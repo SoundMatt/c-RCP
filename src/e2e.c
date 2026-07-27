@@ -194,6 +194,7 @@ typedef struct {
     volatile int       seq;
 } e2e_controller_t;
 
+//cfusa:req REQ-E2E-010
 static rcp_zone_t e2e_ctrl_zone(rcp_controller_t *self)
 {
     return rcp_controller_zone(((e2e_controller_t *)self)->inner);
@@ -216,12 +217,14 @@ static int e2e_ctrl_send(rcp_controller_t *self, const rcp_context_t *ctx,
     return result;
 }
 
+//cfusa:req REQ-E2E-011
 static int e2e_ctrl_subscribe(rcp_controller_t *self, const rcp_context_t *ctx, rcp_status_channel_t **out)
 {
     e2e_controller_t *ec = (e2e_controller_t *)self;
     return rcp_controller_subscribe(ec->inner, ctx, out);
 }
 
+//cfusa:req REQ-E2E-012
 static int e2e_ctrl_close(rcp_controller_t *self)
 {
     e2e_controller_t *ec = (e2e_controller_t *)self;

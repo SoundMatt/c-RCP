@@ -6,6 +6,7 @@
 //cfusa:test REQ-RL-006
 //cfusa:test REQ-RL-007
 //cfusa:test REQ-RL-008
+//cfusa:test REQ-RL-009
 #include "unity.h"
 
 #include <rcp/mock.h>
@@ -171,6 +172,21 @@ static void test_close_stops_sends(void)
     rcp_controller_release(inner);
 }
 
+static void test_subscribe_delegates_to_inner(void)
+{
+    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *rl = rcp_ratelimit_controller_new(inner, rcp_ratelimit_default_config());
+    rcp_context_t ctx = rcp_context_background();
+    rcp_status_channel_t *ch = NULL;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(rl, &ctx, &ch));
+    TEST_ASSERT_NOT_NULL(ch);
+
+    rcp_status_channel_release(ch);
+    rcp_controller_release(rl);
+    rcp_controller_release(inner);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -182,6 +198,7 @@ int main(void)
     RUN_TEST(test_critical_does_not_bypass_bucket_when_not_exempt);
     RUN_TEST(test_send_returns_zone_mismatch_on_wrong_zone);
     RUN_TEST(test_close_stops_sends);
+    RUN_TEST(test_subscribe_delegates_to_inner);
 
     return UNITY_END();
 }

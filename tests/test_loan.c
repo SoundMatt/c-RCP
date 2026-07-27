@@ -4,6 +4,8 @@
 //cfusa:test REQ-LOAN-004
 //cfusa:test REQ-LOAN-005
 //cfusa:test REQ-LOAN-006
+//cfusa:test REQ-LOAN-007
+//cfusa:test REQ-LOAN-008
 #include "unity.h"
 
 #include <rcp/loan.h>
@@ -130,6 +132,41 @@ static void test_zone_returns_inner_zone(void)
     rcp_controller_release(inner);
 }
 
+static void test_send_delegates_to_inner(void)
+{
+    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *lc = rcp_loan_controller_new(inner);
+    rcp_context_t ctx = rcp_context_background();
+    rcp_command_t cmd = {0};
+    rcp_response_t resp = {0};
+
+    cmd.zone = RCP_ZONE_FRONT_LEFT;
+    cmd.id   = 7;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(lc, &ctx, &cmd, &resp));
+    TEST_ASSERT_EQUAL_UINT32(7, resp.command_id);
+    TEST_ASSERT_EQUAL(RCP_RESPONSE_OK, resp.status);
+
+    rcp_response_free(&resp);
+    rcp_controller_release(lc);
+    rcp_controller_release(inner);
+}
+
+static void test_subscribe_delegates_to_inner(void)
+{
+    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *lc = rcp_loan_controller_new(inner);
+    rcp_context_t ctx = rcp_context_background();
+    rcp_status_channel_t *ch = NULL;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(lc, &ctx, &ch));
+    TEST_ASSERT_NOT_NULL(ch);
+
+    rcp_status_channel_release(ch);
+    rcp_controller_release(lc);
+    rcp_controller_release(inner);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -140,6 +177,8 @@ int main(void)
     RUN_TEST(test_send_loaned_delivers_command_and_returns_ok);
     RUN_TEST(test_loan_release_returns_buffer_to_pool);
     RUN_TEST(test_zone_returns_inner_zone);
+    RUN_TEST(test_send_delegates_to_inner);
+    RUN_TEST(test_subscribe_delegates_to_inner);
 
     return UNITY_END();
 }

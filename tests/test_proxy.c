@@ -4,6 +4,7 @@
 //cfusa:test REQ-PROXY-004
 //cfusa:test REQ-PROXY-005
 //cfusa:test REQ-PROXY-006
+//cfusa:test REQ-PROXY-007
 #include "unity.h"
 
 #include <rcp/mock.h>
@@ -160,6 +161,21 @@ static void test_duplicate_route_returns_already_exists(void)
     rcp_controller_release(b);
 }
 
+static void test_subscribe_delegates_to_upstream(void)
+{
+    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *pc = rcp_proxy_controller_new(inner, rcp_proxy_default_config());
+    rcp_context_t ctx = rcp_context_background();
+    rcp_status_channel_t *ch = NULL;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(pc, &ctx, &ch));
+    TEST_ASSERT_NOT_NULL(ch);
+
+    rcp_status_channel_release(ch);
+    rcp_controller_release(pc);
+    rcp_controller_release(inner);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -172,6 +188,7 @@ int main(void)
     RUN_TEST(test_deregister_closes_the_upstream_controller);
     RUN_TEST(test_registry_close_is_idempotent);
     RUN_TEST(test_duplicate_route_returns_already_exists);
+    RUN_TEST(test_subscribe_delegates_to_upstream);
 
     return UNITY_END();
 }

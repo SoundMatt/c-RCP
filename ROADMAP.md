@@ -1446,3 +1446,39 @@ with lcov 2.x) to every `lcov --capture`/`--remove` invocation in both
   verification against the real CI environment's actual tool version
   to catch — the same lesson as milestone 49's stale-c-FuSa-binary
   correction, applied again.
+
+---
+### 52. Coverage maximization, batch 2: decorator vtable methods (v0.52.0)
+---
+
+Second coverage batch: 16 of the 67 zero-hit functions were `zone()`/
+`subscribe()`/`close()`/`send()` vtable methods on 8 decorator
+controllers that simply delegate to an inner controller —
+`e2e_ctrl_zone/subscribe/close`, `fi_ctrl_subscribe/close`,
+`loan_ctrl_send/subscribe`, `observe_ctrl_zone/subscribe/close`,
+`proxy_ctrl_subscribe`, `rl_ctrl_subscribe`,
+`record_ctrl_zone/subscribe/close`, `redundancy_ctrl_subscribe`.
+- **Mirrored the established `test_authz.c` pattern exactly**
+  (`test_zone_delegates_to_inner`/`test_subscribe_delegates_to_inner`/
+  `test_close_delegates_to_inner`) rather than inventing a new style —
+  each new test asserts the delegated call reaches the *actual* inner
+  controller (e.g. `close()`'s test sends through the inner directly
+  afterward and expects `RCP_ERR_CLOSED`, proving the wrapper's close()
+  really propagated rather than just returning `RCP_OK` locally).
+  `faultinject`'s close test additionally confirms the wrapper itself
+  starts rejecting `send()` after close, since `fi_ctrl_close()` (unlike
+  the other seven) also flips an internal `closed` flag.
+- **16 new requirements** added across 8 modules (`REQ-E2E-010..012`,
+  `REQ-FI-009..010`, `REQ-LOAN-007..008`, `REQ-OBS-009..011`,
+  `REQ-PROXY-007`, `REQ-RL-009`, `REQ-REC-009..011`, `REQ-RED-009`) —
+  several modules (`faultinject`, `loan`, `ratelimit`, `redundancy`)
+  already had `zone()` or `close()` tested from earlier milestones, so
+  only the genuinely-missing methods got a new requirement rather than
+  padding with redundant ones.
+- **Verified real, not just added**: pulled the post-change lcov record
+  for all 16 target functions and confirmed each now shows a non-zero
+  hit count; local function coverage rose from 88.1% to 91.5%.
+- Remaining batch: registry lifecycle (federation/shmem/tls/udp — the
+  largest, ~44 functions across 4 files, including `udp.c`'s 60.7%
+  line-coverage worst-in-codebase) and internal helpers (~7 functions),
+  tracked as follow-up.

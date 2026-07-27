@@ -81,6 +81,7 @@ static rcp_zone_t loan_ctrl_zone(rcp_controller_t *self)
     return rcp_controller_zone(((loan_controller_t *)self)->inner);
 }
 
+//cfusa:req REQ-LOAN-007
 static int loan_ctrl_send(rcp_controller_t *self, const rcp_context_t *ctx,
                            const rcp_command_t *cmd, rcp_response_t *out)
 {
@@ -88,6 +89,7 @@ static int loan_ctrl_send(rcp_controller_t *self, const rcp_context_t *ctx,
     return rcp_controller_send(lc->inner, ctx, cmd, out);
 }
 
+//cfusa:req REQ-LOAN-008
 static int loan_ctrl_subscribe(rcp_controller_t *self, const rcp_context_t *ctx, rcp_status_channel_t **out)
 {
     loan_controller_t *lc = (loan_controller_t *)self;

@@ -128,6 +128,7 @@ typedef struct {
     rcp_metrics_sink_t  sink;
 } observe_controller_t;
 
+//cfusa:req REQ-OBS-009
 static rcp_zone_t observe_ctrl_zone(rcp_controller_t *self)
 {
     return rcp_controller_zone(((observe_controller_t *)self)->inner);
@@ -165,12 +166,14 @@ static int observe_ctrl_send(rcp_controller_t *self, const rcp_context_t *ctx,
     return ec;
 }
 
+//cfusa:req REQ-OBS-010
 static int observe_ctrl_subscribe(rcp_controller_t *self, const rcp_context_t *ctx, rcp_status_channel_t **out)
 {
     observe_controller_t *oc = (observe_controller_t *)self;
     return rcp_controller_subscribe(oc->inner, ctx, out);
 }
 
+//cfusa:req REQ-OBS-011
 static int observe_ctrl_close(rcp_controller_t *self)
 {
     observe_controller_t *oc = (observe_controller_t *)self;
