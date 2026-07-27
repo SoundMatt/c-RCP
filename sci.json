@@ -1,5 +1,5 @@
 Software Configuration Index
-Project: c-RCP v0.53.0   Generated: 2026-07-27T23:10:59Z
+Project: c-RCP v0.54.0   Generated: 2026-07-27T23:30:58Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
@@ -21,7 +21,7 @@ FILE                                                          SHA-256
 ./include/rcp/adapt.h                                         6623ba9c2942ffa9491e2531294eefa6e6d61b5ddfba17390cb42343ca5e1a45
 ./include/rcp/udp.h                                           05bf00b6fb1f1ee26bba018cc9cb414a138fbd29196348678a88ef140c164e41
 ./include/rcp/record.h                                        25c294d4914c5e8559db85d5a8669bd2b166ff59216fd75484158752420353d6
-./include/rcp/version.h                                       85fec38ada438efe94f0c42a3f0f7c32b4083ac854b1290de876f79fa7a0f3ce
+./include/rcp/version.h                                       d376831134e550afde32c7b7a1c9a99916b2ff96b3c5b1162e2ee5ec50828e06
 ./include/rcp/cli.h                                           d479738a54a077a4a0019dec3ec62a39b73857fadbe1ae2745d2f7609506b7d9
 ./include/rcp/firmware.h                                      05e7c8629d16284d9c39d092090ab95872d5f8c9128918e7d31d51ffac52404c
 ./include/rcp/sim.h                                           b3b995de5409a38b31e8e876a456d4469c4071eca1df0b8b4ef007bdb71285e8
@@ -46,7 +46,7 @@ FILE                                                          SHA-256
 ./include/rcp/faultinject.h                                   8421676b84e438e792beb8d18232566554e0233cb96adb31f66b0f3643babcf8
 ./include/relay/relay.h                                       d02b4c29e9ce91284f58b1acbd8fd5afc30d01970bc3eeb5da4bf5d779fe0d5a
 ./src/doipbr.c                                                7d2a8d175a7a767bcbd4325ace4fc2d0dbdd8cba49428baedb765158a3b59131
-./src/proxy.c                                                 f5c1704d4cfcf64c188a57fe312a4b1980276778f0ee62e8ba66a101b8bfe546
+./src/proxy.c                                                 85c848d24ba230a68c87731d39cc0a7570ee8b1baa0700d95fd53878120b068a
 ./src/watchdog.c                                              42f0801f38f3023ddfbe59ddbbbcc1686956d70cd644e912822744742cc4e74c
 ./src/config.c                                                e3c8cd112bedf87bf3e3a5f4df0e9c169ee71620451fd0b5fed334690b1e5ac3
 ./src/record.c                                                804fe2a14e2799129dccafb7112bada6ce53ba2e40b00573d5cb498a32ebe7f5
@@ -54,16 +54,16 @@ FILE                                                          SHA-256
 ./src/federation.c                                            552b11f0ec3dc3d781b7c9e0623c1409c3b523fbbf952db8d233743f1b4a4ce0
 ./src/restbridge.c                                            bce3df12c33733784b3089b16ad8c0012f1074407c47a4207eca62e4b46529c0
 ./src/platform.h                                              38d92316e7ae88bb84c169fca79d87bef6ac6ef49b7b4679d37013b41972c800
-./src/prioqueue.c                                             98a51769444b799ed685bad7f52f566990bc21b8379803e48a8a15f9916ad8a4
+./src/prioqueue.c                                             b94f8f761f36cc77bea143df08ad1c2ce0893f7ea5f2453b2d53d920b6b8d341
 ./src/e2e.c                                                   c138a419113fe5b522e7331705cc69d8ea0a3a97e2ec20955b07e53e2f72a08c
 ./src/firmware.c                                              60c0ddbbc09d8b0e414beef42079893f08609761419c282e1b5427e5bddeeeac
 ./src/mock.c                                                  223bc296c2754623525788f7370394098f35c175007c294def0080e29ee8a4ce
 ./src/adapt.c                                                 d7d7df3f537837eea68e31c229ee573121055b54e2399d850cbdeaad44ed89d1
 ./src/admin.c                                                 17a89f685e1aabc19d5303b274f2cb065a32924132ae8cc9faaba6efeaa0dffb
 ./src/cli.c                                                   00617c2cbdb867dec817d9333c6f1a8efab0206c2c1764cfe9fe3d8005f3e78a
-./src/observe.c                                               ca61d86e533656c26567581781e9745e1e839a95ccc10baaaecb81a3a4d5a5cd
+./src/observe.c                                               3b09c139c9f5618a5539b23045dc1e3a6a6c9be68a2a553d6e4d6e8f2b8827ab
 ./src/faultinject.c                                           659817cca14ec780c92733d3f5b2c483ddad18d87d3f5d8cc8516565546842ce
-./src/relay.c                                                 c0ed1c207200eb6b9c1d4a3fc303ef093cd9d382643851b4e4add3692671c863
+./src/relay.c                                                 a2af150901262ab1d44f74cbdd79ae31aa70809ce3556bbbde74099cf3cd79f5
 ./src/linbr.c                                                 890fbd6fbde916bd30fe0a308123feb655bcb465f66768550e9a489f5fbb17a4
 ./src/redundancy.c                                            eee9bfc65fc7075c81fba4bcdd13f854be6797fdc809a8f2cb36d7423cde4c22
 ./src/platform.c                                              72fe578947526dc43baafc3034b0937481013a0f2bda0ea1a5e909103250ee59
@@ -73,13 +73,13 @@ FILE                                                          SHA-256
 ./src/zonegroup.c                                             232953a4e8555c5849f6cb391e40431ce5720636a5b184922ba7f538bb2d90fa
 ./src/loan.c                                                  8b0bc0d526d9c29dee6df08b2f7140c9e0f211108ab85001e708187ede25915f
 ./src/ratelimit.c                                             5d24a5cc30eba9eb8feda7b774a616bdbf41634c54e5f9c57e6251a6de996c88
-./src/powerstate.c                                            aabe93f4e78fea22709ea185730b8301355471c7057966e96ac7a4302a9e0167
+./src/powerstate.c                                            d5ea70e40230a71ae4455db8395a861042a3e6de55a976f38f00e09805df65ef
 ./src/ddsbr.c                                                 a35dab57988d5bbde8ace370cbd0b4693ddf19012eabc6d94b8decaf9a90ba80
 ./src/tsn.c                                                   4c0b57c5510fe5a2687652b62d66c8e7f9cad8f0216692c6b104d4c387a82814
-./src/sim.c                                                   afe2c0797c76c029b0fbd8f7116348bba54c8120d7111014fedf25585746a252
+./src/sim.c                                                   d0aa028516c388e7568348ce377c50ce26936bc9f806930108a0cbda6942ca25
 ./src/udp.c                                                   a2a0bddacb72ff3456b93219de59b4aca40f4cc7f5ea9afb6c1903ccee312c15
 ./src/deadline.c                                              a2d4761a3819f40e3bf3c65c372515b655ddf03e435418644cd30e7855738ffe
-./src/mdns.c                                                  73cd651fa106178b8a259ea78a40ead7b068d62263b521aa546b461806477b0a
+./src/mdns.c                                                  30c7b817330d96a10f0f21832e8c50b54db437c58e8bad93ae926d23c8de42b2
 ./src/mqttbr.c                                                17a4f9febb4851ebea0b9eabb09e051f9adbac1747ae6c64f18927bef79eab9b
 ./src/canbr.c                                                 bc5834b4adaff1549bbf01f1c3d967c932c5bbe980346bb036ef4e50b7dc83ee
 ./src/rcp.c                                                   352f8f2c98a9e15381076fcbf99b0a9fe156fde76a2b66e4c31eabedf9069930
@@ -88,8 +88,8 @@ FILE                                                          SHA-256
 ./src/tls.c                                                   c0c611c03fa4080883f32b85a2d2bf635cc1c8e68f5fd2b347139a4e64215fe1
 ./src/wire.c                                                  8191e7c0c7da4a61694e18fc0c6e22b4e374a099ec7041c60a6ce72c46c64fec
 ./src/someipbr.c                                              a004339867ab69c2f50f5f8c49c16cfd6eb77173104f4a4dbdd1faa8cb87b2b7
-./tests/test_adapt.c                                          f5a39e1262269049b95e8ee3d579b2ac5cfe9f04d3d168bfb42eab31aa87dbd8
-./tests/test_powerstate.c                                     1934e334694f0755a9283347d4aacf4ce61f1410d44dc1ee4c11a6d5333968a3
+./tests/test_adapt.c                                          385131fcd18b43505472b2d1b1f0b56d26bd019fd996f7f54a2407380a5d4b13
+./tests/test_powerstate.c                                     2a3cb88e440e3b42942f37aee8e1876419b1e1f9d4a58f07fab92ec810306789
 ./tests/test_ratelimit.c                                      54191cd3a0236b49f6fff2aee838278032ca533969b07ef1708d9ee9fa4539f8
 ./tests/test_udp.c                                            66c9475bedb4a2295f7e72ec0a0c1c62bc17f6be51495e1414557d37fdb66c78
 ./tests/test_deadline.c                                       f883ee3cfebda363a41b62b87a60f3c36e172adc4befbb36a9082bf3ea4f3e1f
@@ -100,7 +100,7 @@ FILE                                                          SHA-256
 ./tests/bench_util.h                                          f81551a420952d65e3d76b9c03bdd6be6938f080de843d9e16f51272d41584c4
 ./tests/test_canbr.c                                          02a76c12fd85be4993a9663f19e470ab43ef9c33c3278e93cf3a34226d7719b7
 ./tests/test_tls.c                                            be0c06df07d3a9b271c3fee32efe047ca971eb6932ba3b412f7e979cc6a403cb
-./tests/test_mdns.c                                           c2c9835ccf054a266d74575f7882526a1234b4dbe16c5712f39b5e670a392f48
+./tests/test_mdns.c                                           f327de9c8d6f9feb4a73970e30995cf2389937e5811765ecdba0e118fa919e6b
 ./tests/test_authz.c                                          bb61930274b50d6745a5637cb5125d2ee2c204ede7fa2c15e5a790df37c9867c
 ./tests/test_dyndata.c                                        759fab493ad4ebd4563b68d39b7d8c2164c7612accf7aca72e45c38523c3941a
 ./tests/bench_mock.c                                          20dcd4efe8c8b255626d65aee2675271324b820c2490c629f4b9edbb2ba96b6d
@@ -121,15 +121,15 @@ FILE                                                          SHA-256
 ./tests/test_udsbr.c                                          565f0abf974e93a1ec7dc011e9309fa56e27cae2b04741f9662005421b5805c1
 ./tests/test_someipbr.c                                       680c48dffe4758b6c7a458eaa347a5c25eaf5fd0348c392979dc486170407b60
 ./tests/test_zonegroup.c                                      fd5598473448618020ed0b7ffd06a49a1cc87691cacf964821e6daffded2c75d
-./tests/test_proxy.c                                          e09bddde288406b3abb335c9877887c70c6d4e88d406cdd5f3e052b9303fedd1
-./tests/test_observe.c                                        f0c324724181a5c9eb028d31ca40cc015f007f434e68eb086d9979fcece900c2
+./tests/test_proxy.c                                          587e10c9f8a79a2a0a85bfbd2254bf38a29b1479404155207fe5735e66714bd1
+./tests/test_observe.c                                        a2692e7909ae36a324deb0b3fb564fbe8a8359208ab2f79ee14f8e3a448007fc
 ./tests/test_redundancy.c                                     b6729e9b231951547f28afc810c9b2b342c7773bf61915ad977b61848f1a0443
 ./tests/test_mock.c                                           5c824eb897d51b4474dc7354f10b856c32d23d8a38d918219c57ab565155d5f2
-./tests/test_prioqueue.c                                      a1a9fcd44328450d944981fa3bec4de3f75e697153fe3f1cd8b61da33eca14ce
+./tests/test_prioqueue.c                                      8f174955f384b3ef88964ea3708a7c2b4c1fb2b2484a436c00eee27dd7f76211
 ./tests/test_e2e.c                                            5bf665f7e216db67a11de8f6bc02c2bf02b66c0dfbbebe91c83f7512649e0c47
 ./tests/test_watchdog.c                                       fb2b1c030c2e192f32fbe6794feaec82e9814bb5b8b849c1ff0515f4acf61bea
 ./tests/test_cli.c                                            722333860aed7bbd83a6bc0dc19efed239410e94217b0c872210b6b5fa98954f
-./tests/test_sim.c                                            7d9a2294654455f417d48868d7062ec7847c6d1ad27f7b138f34c454c19a42a6
+./tests/test_sim.c                                            e3addfdf6af83a8ef4112d5d3f6b9d6cde0f8fe26ff2e80c62dafd5e31a7bdaa
 ./cli/main.c                                                  541875eda25d51c675d488ca4ddc24226dbccd51e91b77390569c451c36710e1
 
 Total files: 128

@@ -1,8 +1,8 @@
 {
   "tool": "cfusa fmea",
   "project": "c-RCP",
-  "version": "0.53.0",
-  "generated": "2026-07-27T23:10:59Z",
+  "version": "0.54.0",
+  "generated": "2026-07-27T23:30:57Z",
   "standard": "IEC 60812 / ISO 26262-5",
   "entries": [
     {
@@ -65,7 +65,7 @@
       "id": "FM-005",
       "function": "free",
       "file": "proxy.c",
-      "line": 236,
+      "line": 237,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -79,7 +79,7 @@
       "id": "FM-006",
       "function": "rcp_proxy_registry_new",
       "file": "proxy.c",
-      "line": 249,
+      "line": 250,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -93,7 +93,7 @@
       "id": "FM-007",
       "function": "rcp_proxy_registry_add_route",
       "file": "proxy.c",
-      "line": 259,
+      "line": 260,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -107,7 +107,7 @@
       "id": "FM-008",
       "function": "rcp_controller_release",
       "file": "proxy.c",
-      "line": 266,
+      "line": 267,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -625,7 +625,7 @@
       "id": "FM-045",
       "function": "rcp_prioqueue_controller_new",
       "file": "prioqueue.c",
-      "line": 284,
+      "line": 286,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -1213,7 +1213,7 @@
       "id": "FM-087",
       "function": "rcp_span_duration_ms",
       "file": "observe.c",
-      "line": 9,
+      "line": 10,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -1227,7 +1227,7 @@
       "id": "FM-088",
       "function": "rcp_noop_metrics_sink",
       "file": "observe.c",
-      "line": 29,
+      "line": 31,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -1241,7 +1241,7 @@
       "id": "FM-089",
       "function": "rcp_in_memory_sink_new",
       "file": "observe.c",
-      "line": 46,
+      "line": 48,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -1255,7 +1255,7 @@
       "id": "FM-090",
       "function": "rcp_in_memory_sink_as_sink",
       "file": "observe.c",
-      "line": 88,
+      "line": 91,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -1269,7 +1269,7 @@
       "id": "FM-091",
       "function": "rcp_in_memory_sink_span_count",
       "file": "observe.c",
-      "line": 96,
+      "line": 99,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -1283,7 +1283,7 @@
       "id": "FM-092",
       "function": "rcp_in_memory_sink_spans",
       "file": "observe.c",
-      "line": 105,
+      "line": 108,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -1297,7 +1297,7 @@
       "id": "FM-093",
       "function": "rcp_in_memory_sink_destroy",
       "file": "observe.c",
-      "line": 115,
+      "line": 118,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -1311,7 +1311,7 @@
       "id": "FM-094",
       "function": "rcp_observe_controller_new",
       "file": "observe.c",
-      "line": 200,
+      "line": 203,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -1591,7 +1591,7 @@
       "id": "FM-114",
       "function": "relay_message_channel_is_closed",
       "file": "relay.c",
-      "line": 313,
+      "line": 314,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -1605,7 +1605,7 @@
       "id": "FM-115",
       "function": "rcp_relay_caller_retain",
       "file": "relay.c",
-      "line": 324,
+      "line": 326,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -1619,7 +1619,7 @@
       "id": "FM-116",
       "function": "rcp_relay_caller_release",
       "file": "relay.c",
-      "line": 330,
+      "line": 332,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -2655,7 +2655,7 @@
       "id": "FM-190",
       "function": "rcp_powerstate_manager_sleep",
       "file": "powerstate.c",
-      "line": 101,
+      "line": 102,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -2669,7 +2669,7 @@
       "id": "FM-191",
       "function": "rcp_powerstate_manager_wake",
       "file": "powerstate.c",
-      "line": 132,
+      "line": 133,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -2683,7 +2683,7 @@
       "id": "FM-192",
       "function": "rcp_powerstate_manager_state",
       "file": "powerstate.c",
-      "line": 253,
+      "line": 254,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -2697,7 +2697,7 @@
       "id": "FM-193",
       "function": "rcp_powerstate_manager_subscribe",
       "file": "powerstate.c",
-      "line": 266,
+      "line": 267,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -2711,7 +2711,7 @@
       "id": "FM-194",
       "function": "rcp_powerstate_manager_close",
       "file": "powerstate.c",
-      "line": 276,
+      "line": 277,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -2725,7 +2725,7 @@
       "id": "FM-195",
       "function": "rcp_powerstate_manager_destroy",
       "file": "powerstate.c",
-      "line": 288,
+      "line": 289,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -2823,7 +2823,7 @@
       "id": "FM-202",
       "function": "rcp_status_channel_release",
       "file": "sim.c",
-      "line": 168,
+      "line": 169,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -2837,7 +2837,7 @@
       "id": "FM-203",
       "function": "rcp_status_channel_release",
       "file": "sim.c",
-      "line": 173,
+      "line": 174,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -2851,7 +2851,7 @@
       "id": "FM-204",
       "function": "rcp_sim_controller_publish",
       "file": "sim.c",
-      "line": 218,
+      "line": 219,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -2865,7 +2865,7 @@
       "id": "FM-205",
       "function": "free",
       "file": "sim.c",
-      "line": 351,
+      "line": 352,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -2879,7 +2879,7 @@
       "id": "FM-206",
       "function": "rcp_sim_controller_new",
       "file": "sim.c",
-      "line": 365,
+      "line": 366,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -2893,7 +2893,7 @@
       "id": "FM-207",
       "function": "rcp_sim_controller_fault",
       "file": "sim.c",
-      "line": 393,
+      "line": 394,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -2907,7 +2907,7 @@
       "id": "FM-208",
       "function": "rcp_sim_controller_recover",
       "file": "sim.c",
-      "line": 402,
+      "line": 403,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -2921,7 +2921,7 @@
       "id": "FM-209",
       "function": "rcp_sim_controller_watchdog_missed",
       "file": "sim.c",
-      "line": 410,
+      "line": 412,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -3565,7 +3565,7 @@
       "id": "FM-255",
       "function": "rcp_mdns_announcer_destroy",
       "file": "mdns.c",
-      "line": 15,
+      "line": 16,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -3579,7 +3579,7 @@
       "id": "FM-256",
       "function": "rcp_mdns_make_instance_name",
       "file": "mdns.c",
-      "line": 22,
+      "line": 23,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -3593,7 +3593,7 @@
       "id": "FM-257",
       "function": "rcp_mdns_static_discoverer_new",
       "file": "mdns.c",
-      "line": 120,
+      "line": 121,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -4363,7 +4363,7 @@
       "id": "FM-312",
       "function": "setUp",
       "file": "test_adapt.c",
-      "line": 31,
+      "line": 33,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -4377,7 +4377,7 @@
       "id": "FM-313",
       "function": "tearDown",
       "file": "test_adapt.c",
-      "line": 32,
+      "line": 34,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -4391,7 +4391,7 @@
       "id": "FM-314",
       "function": "relay_message_free",
       "file": "test_adapt.c",
-      "line": 68,
+      "line": 70,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -4405,7 +4405,7 @@
       "id": "FM-315",
       "function": "TEST_ASSERT_FALSE",
       "file": "test_adapt.c",
-      "line": 117,
+      "line": 119,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -4419,7 +4419,7 @@
       "id": "FM-316",
       "function": "TEST_ASSERT_EQUAL_STRING",
       "file": "test_adapt.c",
-      "line": 199,
+      "line": 212,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -4433,7 +4433,7 @@
       "id": "FM-317",
       "function": "main",
       "file": "test_adapt.c",
-      "line": 355,
+      "line": 386,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -4447,7 +4447,7 @@
       "id": "FM-318",
       "function": "setUp",
       "file": "test_powerstate.c",
-      "line": 50,
+      "line": 51,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -4461,7 +4461,7 @@
       "id": "FM-319",
       "function": "tearDown",
       "file": "test_powerstate.c",
-      "line": 51,
+      "line": 52,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -4475,7 +4475,7 @@
       "id": "FM-320",
       "function": "TEST_ASSERT_NOT_EQUAL",
       "file": "test_powerstate.c",
-      "line": 240,
+      "line": 285,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -4489,7 +4489,7 @@
       "id": "FM-321",
       "function": "TEST_ASSERT_NOT_EQUAL",
       "file": "test_powerstate.c",
-      "line": 316,
+      "line": 361,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -4503,7 +4503,7 @@
       "id": "FM-322",
       "function": "test_sleep_ms",
       "file": "test_powerstate.c",
-      "line": 327,
+      "line": 372,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -4517,7 +4517,7 @@
       "id": "FM-323",
       "function": "test_sleep_ms",
       "file": "test_powerstate.c",
-      "line": 329,
+      "line": 374,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -4531,7 +4531,7 @@
       "id": "FM-324",
       "function": "main",
       "file": "test_powerstate.c",
-      "line": 355,
+      "line": 400,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -4979,7 +4979,7 @@
       "id": "FM-356",
       "function": "setUp",
       "file": "test_mdns.c",
-      "line": 18,
+      "line": 19,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -4993,7 +4993,7 @@
       "id": "FM-357",
       "function": "tearDown",
       "file": "test_mdns.c",
-      "line": 19,
+      "line": 20,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -5007,7 +5007,7 @@
       "id": "FM-358",
       "function": "TEST_ASSERT_EQUAL_INT",
       "file": "test_mdns.c",
-      "line": 177,
+      "line": 182,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -5019,9 +5019,9 @@
     },
     {
       "id": "FM-359",
-      "function": "main",
+      "function": "rcp_mdns_announcer_destroy",
       "file": "test_mdns.c",
-      "line": 264,
+      "line": 279,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -5033,6 +5033,20 @@
     },
     {
       "id": "FM-360",
+      "function": "main",
+      "file": "test_mdns.c",
+      "line": 282,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-361",
       "function": "setUp",
       "file": "test_authz.c",
       "line": 39,
@@ -5046,7 +5060,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-361",
+      "id": "FM-362",
       "function": "tearDown",
       "file": "test_authz.c",
       "line": 40,
@@ -5060,7 +5074,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-362",
+      "id": "FM-363",
       "function": "main",
       "file": "test_authz.c",
       "line": 296,
@@ -5074,7 +5088,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-363",
+      "id": "FM-364",
       "function": "setUp",
       "file": "test_dyndata.c",
       "line": 39,
@@ -5088,7 +5102,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-364",
+      "id": "FM-365",
       "function": "tearDown",
       "file": "test_dyndata.c",
       "line": 40,
@@ -5102,7 +5116,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-365",
+      "id": "FM-366",
       "function": "TEST_ASSERT_EQUAL_UINT",
       "file": "test_dyndata.c",
       "line": 91,
@@ -5116,7 +5130,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-366",
+      "id": "FM-367",
       "function": "main",
       "file": "test_dyndata.c",
       "line": 199,
@@ -5130,7 +5144,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-367",
+      "id": "FM-368",
       "function": "setUp",
       "file": "bench_mock.c",
       "line": 51,
@@ -5144,7 +5158,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-368",
+      "id": "FM-369",
       "function": "tearDown",
       "file": "bench_mock.c",
       "line": 52,
@@ -5158,7 +5172,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-369",
+      "id": "FM-370",
       "function": "printf",
       "file": "bench_mock.c",
       "line": 58,
@@ -5172,7 +5186,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-370",
+      "id": "FM-371",
       "function": "main",
       "file": "bench_mock.c",
       "line": 221,
@@ -5186,7 +5200,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-371",
+      "id": "FM-372",
       "function": "setUp",
       "file": "test_config.c",
       "line": 15,
@@ -5200,7 +5214,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-372",
+      "id": "FM-373",
       "function": "tearDown",
       "file": "test_config.c",
       "line": 16,
@@ -5214,7 +5228,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-373",
+      "id": "FM-374",
       "function": "rcp_proxy_registry_new",
       "file": "test_config.c",
       "line": 58,
@@ -5228,7 +5242,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-374",
+      "id": "FM-375",
       "function": "main",
       "file": "test_config.c",
       "line": 100,
@@ -5242,7 +5256,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-375",
+      "id": "FM-376",
       "function": "setUp",
       "file": "test_faultinject.c",
       "line": 18,
@@ -5256,24 +5270,10 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-376",
+      "id": "FM-377",
       "function": "tearDown",
       "file": "test_faultinject.c",
       "line": 19,
-      "failure_mode": "",
-      "effect": "",
-      "cause": "",
-      "severity": "Low",
-      "occurrence": 1,
-      "detection": 1,
-      "rpn": 3,
-      "cyber_failure_mode": ""
-    },
-    {
-      "id": "FM-377",
-      "function": "TEST_ASSERT_NOT_EQUAL",
-      "file": "test_faultinject.c",
-      "line": 135,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -5287,7 +5287,7 @@
       "id": "FM-378",
       "function": "TEST_ASSERT_NOT_EQUAL",
       "file": "test_faultinject.c",
-      "line": 136,
+      "line": 135,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -5299,6 +5299,20 @@
     },
     {
       "id": "FM-379",
+      "function": "TEST_ASSERT_NOT_EQUAL",
+      "file": "test_faultinject.c",
+      "line": 136,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-380",
       "function": "TEST_ASSERT_EQUAL",
       "file": "test_faultinject.c",
       "line": 137,
@@ -5312,7 +5326,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-380",
+      "id": "FM-381",
       "function": "main",
       "file": "test_faultinject.c",
       "line": 237,
@@ -5326,7 +5340,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-381",
+      "id": "FM-382",
       "function": "setUp",
       "file": "test_wire.c",
       "line": 23,
@@ -5340,7 +5354,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-382",
+      "id": "FM-383",
       "function": "tearDown",
       "file": "test_wire.c",
       "line": 24,
@@ -5354,7 +5368,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-383",
+      "id": "FM-384",
       "function": "main",
       "file": "test_wire.c",
       "line": 321,
@@ -5368,7 +5382,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-384",
+      "id": "FM-385",
       "function": "setUp",
       "file": "test_ddsbr.c",
       "line": 18,
@@ -5382,7 +5396,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-385",
+      "id": "FM-386",
       "function": "tearDown",
       "file": "test_ddsbr.c",
       "line": 19,
@@ -5396,7 +5410,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-386",
+      "id": "FM-387",
       "function": "main",
       "file": "test_ddsbr.c",
       "line": 64,
@@ -5410,7 +5424,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-387",
+      "id": "FM-388",
       "function": "setUp",
       "file": "test_record.c",
       "line": 44,
@@ -5424,7 +5438,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-388",
+      "id": "FM-389",
       "function": "tearDown",
       "file": "test_record.c",
       "line": 45,
@@ -5438,24 +5452,10 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-389",
+      "id": "FM-390",
       "function": "rcp_controller_close",
       "file": "test_record.c",
       "line": 174,
-      "failure_mode": "",
-      "effect": "",
-      "cause": "",
-      "severity": "Low",
-      "occurrence": 1,
-      "detection": 1,
-      "rpn": 3,
-      "cyber_failure_mode": ""
-    },
-    {
-      "id": "FM-390",
-      "function": "TEST_ASSERT_EQUAL",
-      "file": "test_record.c",
-      "line": 179,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -5469,7 +5469,7 @@
       "id": "FM-391",
       "function": "TEST_ASSERT_EQUAL",
       "file": "test_record.c",
-      "line": 182,
+      "line": 179,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -5481,6 +5481,20 @@
     },
     {
       "id": "FM-392",
+      "function": "TEST_ASSERT_EQUAL",
+      "file": "test_record.c",
+      "line": 182,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-393",
       "function": "main",
       "file": "test_record.c",
       "line": 319,
@@ -5494,7 +5508,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-393",
+      "id": "FM-394",
       "function": "setUp",
       "file": "command_latency_test.c",
       "line": 31,
@@ -5508,7 +5522,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-394",
+      "id": "FM-395",
       "function": "tearDown",
       "file": "command_latency_test.c",
       "line": 32,
@@ -5522,7 +5536,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-395",
+      "id": "FM-396",
       "function": "fprintf",
       "file": "command_latency_test.c",
       "line": 83,
@@ -5536,7 +5550,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-396",
+      "id": "FM-397",
       "function": "TEST_ASSERT_TRUE",
       "file": "command_latency_test.c",
       "line": 100,
@@ -5550,7 +5564,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-397",
+      "id": "FM-398",
       "function": "TEST_ASSERT_TRUE",
       "file": "command_latency_test.c",
       "line": 101,
@@ -5564,7 +5578,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-398",
+      "id": "FM-399",
       "function": "main",
       "file": "command_latency_test.c",
       "line": 104,
@@ -5578,7 +5592,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-399",
+      "id": "FM-400",
       "function": "setUp",
       "file": "test_federation.c",
       "line": 20,
@@ -5592,7 +5606,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-400",
+      "id": "FM-401",
       "function": "tearDown",
       "file": "test_federation.c",
       "line": 21,
@@ -5606,7 +5620,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-401",
+      "id": "FM-402",
       "function": "TEST_ASSERT_TRUE",
       "file": "test_federation.c",
       "line": 40,
@@ -5620,7 +5634,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-402",
+      "id": "FM-403",
       "function": "main",
       "file": "test_federation.c",
       "line": 197,
@@ -5634,7 +5648,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-403",
+      "id": "FM-404",
       "function": "setUp",
       "file": "test_tsn.c",
       "line": 13,
@@ -5648,7 +5662,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-404",
+      "id": "FM-405",
       "function": "tearDown",
       "file": "test_tsn.c",
       "line": 14,
@@ -5662,7 +5676,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-405",
+      "id": "FM-406",
       "function": "TEST_ASSERT_EQUAL",
       "file": "test_tsn.c",
       "line": 76,
@@ -5676,7 +5690,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-406",
+      "id": "FM-407",
       "function": "main",
       "file": "test_tsn.c",
       "line": 100,
@@ -5690,24 +5704,10 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-407",
+      "id": "FM-408",
       "function": "setUp",
       "file": "test_restbridge.c",
       "line": 18,
-      "failure_mode": "",
-      "effect": "",
-      "cause": "",
-      "severity": "Low",
-      "occurrence": 1,
-      "detection": 1,
-      "rpn": 3,
-      "cyber_failure_mode": ""
-    },
-    {
-      "id": "FM-408",
-      "function": "tearDown",
-      "file": "test_restbridge.c",
-      "line": 19,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -5719,6 +5719,20 @@
     },
     {
       "id": "FM-409",
+      "function": "tearDown",
+      "file": "test_restbridge.c",
+      "line": 19,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-410",
       "function": "main",
       "file": "test_restbridge.c",
       "line": 64,
@@ -5732,7 +5746,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-410",
+      "id": "FM-411",
       "function": "setUp",
       "file": "test_mqttbr.c",
       "line": 18,
@@ -5746,7 +5760,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-411",
+      "id": "FM-412",
       "function": "tearDown",
       "file": "test_mqttbr.c",
       "line": 19,
@@ -5760,7 +5774,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-412",
+      "id": "FM-413",
       "function": "main",
       "file": "test_mqttbr.c",
       "line": 64,
@@ -5774,7 +5788,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-413",
+      "id": "FM-414",
       "function": "setUp",
       "file": "test_rcp.c",
       "line": 49,
@@ -5788,7 +5802,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-414",
+      "id": "FM-415",
       "function": "tearDown",
       "file": "test_rcp.c",
       "line": 50,
@@ -5802,7 +5816,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-415",
+      "id": "FM-416",
       "function": "main",
       "file": "test_rcp.c",
       "line": 355,
@@ -5816,7 +5830,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-416",
+      "id": "FM-417",
       "function": "setUp",
       "file": "test_loan.c",
       "line": 17,
@@ -5830,7 +5844,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-417",
+      "id": "FM-418",
       "function": "tearDown",
       "file": "test_loan.c",
       "line": 18,
@@ -5844,7 +5858,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-418",
+      "id": "FM-419",
       "function": "rcp_loan_return",
       "file": "test_loan.c",
       "line": 90,
@@ -5858,7 +5872,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-419",
+      "id": "FM-420",
       "function": "rcp_loan_release",
       "file": "test_loan.c",
       "line": 111,
@@ -5872,7 +5886,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-420",
+      "id": "FM-421",
       "function": "main",
       "file": "test_loan.c",
       "line": 170,
@@ -5886,7 +5900,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-421",
+      "id": "FM-422",
       "function": "setUp",
       "file": "test_admin.c",
       "line": 47,
@@ -5900,7 +5914,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-422",
+      "id": "FM-423",
       "function": "tearDown",
       "file": "test_admin.c",
       "line": 48,
@@ -5914,7 +5928,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-423",
+      "id": "FM-424",
       "function": "TEST_ASSERT_EQUAL_UINT",
       "file": "test_admin.c",
       "line": 59,
@@ -5928,7 +5942,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-424",
+      "id": "FM-425",
       "function": "main",
       "file": "test_admin.c",
       "line": 262,
@@ -5942,24 +5956,10 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-425",
+      "id": "FM-426",
       "function": "setUp",
       "file": "test_linbr.c",
       "line": 18,
-      "failure_mode": "",
-      "effect": "",
-      "cause": "",
-      "severity": "Low",
-      "occurrence": 1,
-      "detection": 1,
-      "rpn": 3,
-      "cyber_failure_mode": ""
-    },
-    {
-      "id": "FM-426",
-      "function": "tearDown",
-      "file": "test_linbr.c",
-      "line": 19,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -5971,6 +5971,20 @@
     },
     {
       "id": "FM-427",
+      "function": "tearDown",
+      "file": "test_linbr.c",
+      "line": 19,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-428",
       "function": "main",
       "file": "test_linbr.c",
       "line": 64,
@@ -5984,24 +5998,10 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-428",
+      "id": "FM-429",
       "function": "setUp",
       "file": "test_udsbr.c",
       "line": 18,
-      "failure_mode": "",
-      "effect": "",
-      "cause": "",
-      "severity": "Low",
-      "occurrence": 1,
-      "detection": 1,
-      "rpn": 3,
-      "cyber_failure_mode": ""
-    },
-    {
-      "id": "FM-429",
-      "function": "tearDown",
-      "file": "test_udsbr.c",
-      "line": 19,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -6013,6 +6013,20 @@
     },
     {
       "id": "FM-430",
+      "function": "tearDown",
+      "file": "test_udsbr.c",
+      "line": 19,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-431",
       "function": "main",
       "file": "test_udsbr.c",
       "line": 64,
@@ -6026,7 +6040,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-431",
+      "id": "FM-432",
       "function": "setUp",
       "file": "test_someipbr.c",
       "line": 18,
@@ -6040,7 +6054,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-432",
+      "id": "FM-433",
       "function": "tearDown",
       "file": "test_someipbr.c",
       "line": 19,
@@ -6054,7 +6068,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-433",
+      "id": "FM-434",
       "function": "main",
       "file": "test_someipbr.c",
       "line": 64,
@@ -6068,7 +6082,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-434",
+      "id": "FM-435",
       "function": "setUp",
       "file": "test_zonegroup.c",
       "line": 13,
@@ -6082,7 +6096,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-435",
+      "id": "FM-436",
       "function": "tearDown",
       "file": "test_zonegroup.c",
       "line": 14,
@@ -6096,7 +6110,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-436",
+      "id": "FM-437",
       "function": "rcp_zone_group_add",
       "file": "test_zonegroup.c",
       "line": 142,
@@ -6110,7 +6124,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-437",
+      "id": "FM-438",
       "function": "TEST_ASSERT_EQUAL_UINT",
       "file": "test_zonegroup.c",
       "line": 144,
@@ -6124,7 +6138,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-438",
+      "id": "FM-439",
       "function": "rcp_context_with_deadline_ms",
       "file": "test_zonegroup.c",
       "line": 155,
@@ -6138,7 +6152,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-439",
+      "id": "FM-440",
       "function": "main",
       "file": "test_zonegroup.c",
       "line": 174,
@@ -6152,22 +6166,8 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-440",
-      "function": "setUp",
-      "file": "test_proxy.c",
-      "line": 14,
-      "failure_mode": "",
-      "effect": "",
-      "cause": "",
-      "severity": "Low",
-      "occurrence": 1,
-      "detection": 1,
-      "rpn": 3,
-      "cyber_failure_mode": ""
-    },
-    {
       "id": "FM-441",
-      "function": "tearDown",
+      "function": "setUp",
       "file": "test_proxy.c",
       "line": 15,
       "failure_mode": "",
@@ -6181,9 +6181,9 @@
     },
     {
       "id": "FM-442",
-      "function": "rcp_proxy_controller_new",
+      "function": "tearDown",
       "file": "test_proxy.c",
-      "line": 27,
+      "line": 16,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -6195,9 +6195,9 @@
     },
     {
       "id": "FM-443",
-      "function": "TEST_ASSERT_EQUAL",
+      "function": "rcp_proxy_controller_new",
       "file": "test_proxy.c",
-      "line": 143,
+      "line": 28,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -6209,9 +6209,9 @@
     },
     {
       "id": "FM-444",
-      "function": "main",
+      "function": "TEST_ASSERT_EQUAL",
       "file": "test_proxy.c",
-      "line": 179,
+      "line": 144,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -6223,9 +6223,9 @@
     },
     {
       "id": "FM-445",
-      "function": "setUp",
-      "file": "test_observe.c",
-      "line": 44,
+      "function": "main",
+      "file": "test_proxy.c",
+      "line": 202,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -6237,9 +6237,9 @@
     },
     {
       "id": "FM-446",
-      "function": "tearDown",
+      "function": "setUp",
       "file": "test_observe.c",
-      "line": 45,
+      "line": 46,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -6251,9 +6251,9 @@
     },
     {
       "id": "FM-447",
-      "function": "rcp_controller_close",
+      "function": "tearDown",
       "file": "test_observe.c",
-      "line": 237,
+      "line": 47,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -6265,9 +6265,9 @@
     },
     {
       "id": "FM-448",
-      "function": "TEST_ASSERT_EQUAL",
+      "function": "rcp_controller_close",
       "file": "test_observe.c",
-      "line": 246,
+      "line": 269,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -6279,9 +6279,9 @@
     },
     {
       "id": "FM-449",
-      "function": "TEST_ASSERT_TRUE",
+      "function": "TEST_ASSERT_EQUAL",
       "file": "test_observe.c",
-      "line": 248,
+      "line": 278,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -6293,9 +6293,9 @@
     },
     {
       "id": "FM-450",
-      "function": "main",
+      "function": "TEST_ASSERT_TRUE",
       "file": "test_observe.c",
-      "line": 348,
+      "line": 280,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -6307,6 +6307,20 @@
     },
     {
       "id": "FM-451",
+      "function": "main",
+      "file": "test_observe.c",
+      "line": 380,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-452",
       "function": "setUp",
       "file": "test_redundancy.c",
       "line": 18,
@@ -6320,7 +6334,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-452",
+      "id": "FM-453",
       "function": "tearDown",
       "file": "test_redundancy.c",
       "line": 19,
@@ -6334,7 +6348,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-453",
+      "id": "FM-454",
       "function": "TEST_ASSERT_EQUAL",
       "file": "test_redundancy.c",
       "line": 153,
@@ -6348,7 +6362,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-454",
+      "id": "FM-455",
       "function": "TEST_ASSERT_FALSE",
       "file": "test_redundancy.c",
       "line": 154,
@@ -6362,7 +6376,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-455",
+      "id": "FM-456",
       "function": "TEST_ASSERT_EQUAL",
       "file": "test_redundancy.c",
       "line": 197,
@@ -6376,7 +6390,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-456",
+      "id": "FM-457",
       "function": "TEST_ASSERT_TRUE",
       "file": "test_redundancy.c",
       "line": 198,
@@ -6390,7 +6404,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-457",
+      "id": "FM-458",
       "function": "main",
       "file": "test_redundancy.c",
       "line": 242,
@@ -6404,7 +6418,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-458",
+      "id": "FM-459",
       "function": "setUp",
       "file": "test_mock.c",
       "line": 92,
@@ -6418,7 +6432,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-459",
+      "id": "FM-460",
       "function": "tearDown",
       "file": "test_mock.c",
       "line": 93,
@@ -6432,7 +6446,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-460",
+      "id": "FM-461",
       "function": "rcp_mock_controller_publish",
       "file": "test_mock.c",
       "line": 514,
@@ -6446,7 +6460,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-461",
+      "id": "FM-462",
       "function": "main",
       "file": "test_mock.c",
       "line": 812,
@@ -6460,24 +6474,10 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-462",
+      "id": "FM-463",
       "function": "setUp",
       "file": "test_prioqueue.c",
-      "line": 39,
-      "failure_mode": "",
-      "effect": "",
-      "cause": "",
-      "severity": "Low",
-      "occurrence": 1,
-      "detection": 1,
-      "rpn": 3,
-      "cyber_failure_mode": ""
-    },
-    {
-      "id": "FM-463",
-      "function": "tearDown",
-      "file": "test_prioqueue.c",
-      "line": 40,
+      "line": 54,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -6489,9 +6489,9 @@
     },
     {
       "id": "FM-464",
-      "function": "main",
+      "function": "tearDown",
       "file": "test_prioqueue.c",
-      "line": 202,
+      "line": 55,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -6503,6 +6503,34 @@
     },
     {
       "id": "FM-465",
+      "function": "test_sleep_ms",
+      "file": "test_prioqueue.c",
+      "line": 194,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-466",
+      "function": "main",
+      "file": "test_prioqueue.c",
+      "line": 283,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-467",
       "function": "setUp",
       "file": "test_e2e.c",
       "line": 21,
@@ -6516,7 +6544,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-466",
+      "id": "FM-468",
       "function": "tearDown",
       "file": "test_e2e.c",
       "line": 22,
@@ -6530,7 +6558,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-467",
+      "id": "FM-469",
       "function": "TEST_ASSERT_EQUAL_UINT32",
       "file": "test_e2e.c",
       "line": 164,
@@ -6544,7 +6572,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-468",
+      "id": "FM-470",
       "function": "main",
       "file": "test_e2e.c",
       "line": 235,
@@ -6558,7 +6586,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-469",
+      "id": "FM-471",
       "function": "setUp",
       "file": "test_watchdog.c",
       "line": 19,
@@ -6572,7 +6600,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-470",
+      "id": "FM-472",
       "function": "tearDown",
       "file": "test_watchdog.c",
       "line": 20,
@@ -6586,7 +6614,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-471",
+      "id": "FM-473",
       "function": "rcp_controller_close",
       "file": "test_watchdog.c",
       "line": 103,
@@ -6600,7 +6628,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-472",
+      "id": "FM-474",
       "function": "rcp_controller_close",
       "file": "test_watchdog.c",
       "line": 125,
@@ -6614,7 +6642,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-473",
+      "id": "FM-475",
       "function": "rcp_watchdog_keeper_close",
       "file": "test_watchdog.c",
       "line": 184,
@@ -6628,7 +6656,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-474",
+      "id": "FM-476",
       "function": "main",
       "file": "test_watchdog.c",
       "line": 208,
@@ -6642,7 +6670,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-475",
+      "id": "FM-477",
       "function": "setUp",
       "file": "test_cli.c",
       "line": 26,
@@ -6656,7 +6684,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-476",
+      "id": "FM-478",
       "function": "tearDown",
       "file": "test_cli.c",
       "line": 27,
@@ -6670,7 +6698,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-477",
+      "id": "FM-479",
       "function": "main",
       "file": "test_cli.c",
       "line": 179,
@@ -6684,38 +6712,10 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-478",
+      "id": "FM-480",
       "function": "setUp",
       "file": "test_sim.c",
-      "line": 15,
-      "failure_mode": "",
-      "effect": "",
-      "cause": "",
-      "severity": "Low",
-      "occurrence": 1,
-      "detection": 1,
-      "rpn": 3,
-      "cyber_failure_mode": ""
-    },
-    {
-      "id": "FM-479",
-      "function": "tearDown",
-      "file": "test_sim.c",
-      "line": 16,
-      "failure_mode": "",
-      "effect": "",
-      "cause": "",
-      "severity": "Low",
-      "occurrence": 1,
-      "detection": 1,
-      "rpn": 3,
-      "cyber_failure_mode": ""
-    },
-    {
-      "id": "FM-480",
-      "function": "TEST_ASSERT_EQUAL",
-      "file": "test_sim.c",
-      "line": 205,
+      "line": 17,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -6727,9 +6727,9 @@
     },
     {
       "id": "FM-481",
-      "function": "main",
+      "function": "tearDown",
       "file": "test_sim.c",
-      "line": 210,
+      "line": 18,
       "failure_mode": "",
       "effect": "",
       "cause": "",
@@ -6741,6 +6741,62 @@
     },
     {
       "id": "FM-482",
+      "function": "TEST_ASSERT_TRUE",
+      "file": "test_sim.c",
+      "line": 243,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-483",
+      "function": "TEST_ASSERT_FALSE",
+      "file": "test_sim.c",
+      "line": 250,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-484",
+      "function": "TEST_ASSERT_EQUAL",
+      "file": "test_sim.c",
+      "line": 284,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-485",
+      "function": "main",
+      "file": "test_sim.c",
+      "line": 289,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-486",
       "function": "main",
       "file": "main.c",
       "line": 11,
