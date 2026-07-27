@@ -1,5 +1,5 @@
 Software Configuration Index
-Project: c-RCP v0.48.0   Generated: 2026-07-27T21:54:31Z
+Project: c-RCP v0.49.0   Generated: 2026-07-27T22:15:31Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
@@ -21,7 +21,7 @@ FILE                                                          SHA-256
 ./include/rcp/adapt.h                                         6623ba9c2942ffa9491e2531294eefa6e6d61b5ddfba17390cb42343ca5e1a45
 ./include/rcp/udp.h                                           05bf00b6fb1f1ee26bba018cc9cb414a138fbd29196348678a88ef140c164e41
 ./include/rcp/record.h                                        25c294d4914c5e8559db85d5a8669bd2b166ff59216fd75484158752420353d6
-./include/rcp/version.h                                       addcc16604d8ca7fcc084f757917168a22a857eb272a33c3a6e9c8b945287a60
+./include/rcp/version.h                                       97ff9b3127c127e3ce4c5e40cb085e88812d8783d3ac39019cf66473e5ce4d46
 ./include/rcp/cli.h                                           d479738a54a077a4a0019dec3ec62a39b73857fadbe1ae2745d2f7609506b7d9
 ./include/rcp/firmware.h                                      05e7c8629d16284d9c39d092090ab95872d5f8c9128918e7d31d51ffac52404c
 ./include/rcp/sim.h                                           b3b995de5409a38b31e8e876a456d4469c4071eca1df0b8b4ef007bdb71285e8
