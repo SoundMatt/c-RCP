@@ -4,9 +4,9 @@
   "tool": "c-FuSa",
   "toolVersion": "0.5.40",
   "language": "c",
-  "generatedAt": "2026-07-27T14:06:51Z",
+  "generatedAt": "2026-07-27T14:15:52Z",
   "project": "c-RCP",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "standard": "ISO 21434:2021 Clause 9",
   "assets": [
     {"id":"ASSET-001","description":"[describe asset]","property":"CIA"}

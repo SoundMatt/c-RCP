@@ -1,8 +1,8 @@
 {
   "tool": "cfusa fmea",
   "project": "c-RCP",
-  "version": "0.2.0",
-  "generated": "2026-07-27T14:06:51Z",
+  "version": "0.3.0",
+  "generated": "2026-07-27T14:15:52Z",
   "standard": "IEC 60812 / ISO 26262-5",
   "entries": [
     {
@@ -792,6 +792,146 @@
     {
       "id": "FM-057",
       "function": "setUp",
+      "file": "bench_mock.c",
+      "line": 51,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-058",
+      "function": "tearDown",
+      "file": "bench_mock.c",
+      "line": 52,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-059",
+      "function": "printf",
+      "file": "bench_mock.c",
+      "line": 58,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-060",
+      "function": "main",
+      "file": "bench_mock.c",
+      "line": 221,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-061",
+      "function": "setUp",
+      "file": "command_latency_test.c",
+      "line": 31,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-062",
+      "function": "tearDown",
+      "file": "command_latency_test.c",
+      "line": 32,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-063",
+      "function": "fprintf",
+      "file": "command_latency_test.c",
+      "line": 83,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-064",
+      "function": "TEST_ASSERT_TRUE",
+      "file": "command_latency_test.c",
+      "line": 100,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-065",
+      "function": "TEST_ASSERT_TRUE",
+      "file": "command_latency_test.c",
+      "line": 101,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-066",
+      "function": "main",
+      "file": "command_latency_test.c",
+      "line": 104,
+      "failure_mode": "",
+      "effect": "",
+      "cause": "",
+      "severity": "Low",
+      "occurrence": 1,
+      "detection": 1,
+      "rpn": 3,
+      "cyber_failure_mode": ""
+    },
+    {
+      "id": "FM-067",
+      "function": "setUp",
       "file": "test_rcp.c",
       "line": 46,
       "failure_mode": "",
@@ -804,7 +944,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-058",
+      "id": "FM-068",
       "function": "tearDown",
       "file": "test_rcp.c",
       "line": 47,
@@ -818,7 +958,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-059",
+      "id": "FM-069",
       "function": "main",
       "file": "test_rcp.c",
       "line": 272,
@@ -832,7 +972,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-060",
+      "id": "FM-070",
       "function": "setUp",
       "file": "test_mock.c",
       "line": 92,
@@ -846,7 +986,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-061",
+      "id": "FM-071",
       "function": "tearDown",
       "file": "test_mock.c",
       "line": 93,
@@ -860,7 +1000,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-062",
+      "id": "FM-072",
       "function": "rcp_mock_controller_publish",
       "file": "test_mock.c",
       "line": 514,
@@ -874,7 +1014,7 @@
       "cyber_failure_mode": ""
     },
     {
-      "id": "FM-063",
+      "id": "FM-073",
       "function": "main",
       "file": "test_mock.c",
       "line": 812,

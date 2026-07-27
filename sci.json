@@ -1,5 +1,5 @@
 Software Configuration Index
-Project: c-RCP v0.2.0   Generated: 2026-07-27T14:06:51Z
+Project: c-RCP v0.3.0   Generated: 2026-07-27T14:15:52Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
@@ -12,7 +12,10 @@ FILE                                                          SHA-256
 ./src/mock.c                                                  c76a158b6a693c438d363a544eb35189871a01ddb5fc6b2a4ba7727ea08bce4a
 ./src/platform.c                                              53f2230aa826cd3c8955144cfdb4fc4b95502fa2fe73fef42c06a71898bbaa26
 ./src/rcp.c                                                   9a1ec4068d08238470be5af96a2d006a45dee2b1a087229859c9a60acc662261
+./tests/bench_util.h                                          f81551a420952d65e3d76b9c03bdd6be6938f080de843d9e16f51272d41584c4
+./tests/bench_mock.c                                          20dcd4efe8c8b255626d65aee2675271324b820c2490c629f4b9edbb2ba96b6d
+./tests/command_latency_test.c                                3ed7c7694e59e0ca0839d13f081c7232198314a9adeeadaa72aba43366fbad8d
 ./tests/test_rcp.c                                            a101960f867f8d69d3faa38d5c6ff73dab2c4d315e6fde141e64a03e2a6de78f
 ./tests/test_mock.c                                           5c824eb897d51b4474dc7354f10b856c32d23d8a38d918219c57ab565155d5f2
 
-Total files: 11
+Total files: 14
