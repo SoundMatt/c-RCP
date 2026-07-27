@@ -1,6 +1,6 @@
-# Safety Case — c-RCP v0.27.0
+# Safety Case — c-RCP v0.28.0
 
-**Standard:** iso26262  |  **Generated:** 2026-07-27T18:49:06Z
+**Standard:** iso26262  |  **Generated:** 2026-07-27T18:57:08Z
 
 ---
 
