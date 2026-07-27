@@ -1,6 +1,6 @@
 # Threat Analysis and Risk Assessment (TARA)
-## ISO 21434 Clause 9 — c-RCP v0.40.0
-Generated: 2026-07-27T20:17:20Z
+## ISO 21434 Clause 9 — c-RCP v0.41.0
+Generated: 2026-07-27T20:25:02Z
 
 ---
 
