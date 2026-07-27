@@ -1,14 +1,14 @@
 {
-  "schemaVersion": "1.10.12",
+  "schemaVersion": "1.11.0",
   "kind": "provenance",
   "tool": "c-FuSa",
-  "toolVersion": "0.5.42",
+  "toolVersion": "0.5.43",
   "language": "c",
-  "generatedAt": "2026-07-27T18:12:50Z",
+  "generatedAt": "2026-07-27T18:20:24Z",
   "format": "x-FuSa provenance v1",
-  "module": "c-RCP@0.23.0",
+  "module": "c-RCP@0.24.0",
   "builder": "local",
-  "vcsRevision": "a9dc521a2cc67901993bc8248d7a732eb93dca93",
+  "vcsRevision": "53b16653463c4ec367dd4a8068708930f5316c45",
   "vcsBranch": "main",
   "vcsModified": false
 }
