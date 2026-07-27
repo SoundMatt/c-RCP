@@ -582,9 +582,40 @@ byte, matching cpp-RCP's own wire encoding exactly.
 ### Phase 7 — Topology & Scalability
 ---
 
-### 21. Zone Groups (v0.21.0)
+### 21. Zone Groups (v0.21.0) ✅
 
-`include/rcp/zonegroup.h`: atomic multi-zone command broadcast.
+`include/rcp/zonegroup.h` + `src/zonegroup.c`: ports cpp-RCP's
+`zonegroup.hpp` — `rcp_zonegroup_send()` dispatches one command to every
+zone in a `rcp_zone_group_t` concurrently (one background thread per zone)
+via any `rcp_registry_t`, collecting per-zone results into a
+`rcp_group_response_t`.
+- `rcp_zone_group_t` uses a **fixed-capacity array** (`RCP_ZONE_GROUP_MAX =
+  8`, generous headroom over the protocol's 5 real zones) rather than
+  cpp-RCP's unbounded `std::vector<Zone>` — this is what makes plain struct
+  assignment (`b = a;`) a full, independent copy with zero extra code, since
+  there's no heap buffer for two structs to alias or for `add()` to
+  reallocate out from under a caller still holding the original. An
+  unbounded vector would need an explicit deep-copy function to satisfy the
+  same "copyable value type" guarantee cpp-RCP's test suite checks for.
+- **Scope note**: cpp-RCP's own header comment claims "Priority::Critical
+  commands ignore any ErrBusy backpressure," but `GroupRegistry::send_group()`
+  contains no such priority-based bypass logic at all — every command is
+  sent identically regardless of priority. This port mirrors what's
+  actually shipped, the same judgment call made for firmware's SHA-256
+  claim, TSN's VLAN tagging, and loan's per-transport note.
+- **Requirements catalog gap filled**: like authz and firmware, no
+  `REQ-ZG-*` entries existed; added `REQ-ZG-001` through `-006`.
+- `tests/test_zonegroup.c` ports all 6 of cpp-RCP's `test_zonegroup.cpp`
+  cases, substituting `rcp_mock_registry_new()` (with individual zones
+  deregistered as needed) for cpp-RCP's `proxy::ProxyRegistry`, since Zone
+  Proxy isn't ported until the next milestone (v0.22.0) and this project's
+  process implements milestones strictly in roadmap order. Confirmed via
+  20 repeated local runs (debug + 20x ASan/UBSan) with no flakes. Hit and
+  fixed the known CFUSA-CY004 false-positive pattern once more — this time
+  triggered not by the destination pointer but by `group->len` (a
+  legitimate count argument) appearing after `calloc(` on the same line;
+  extracted to a local `n` throughout the function, which also simplified
+  the rest of the loop bodies.
 
 ### 22. Zone Proxy (v0.22.0)
 
