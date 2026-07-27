@@ -617,9 +617,29 @@ via any `rcp_registry_t`, collecting per-zone results into a
   extracted to a local `n` throughout the function, which also simplified
   the rest of the loop bodies.
 
-### 22. Zone Proxy (v0.22.0)
+### 22. Zone Proxy (v0.22.0) ✅
 
-`include/rcp/proxy.h`: transparent proxy for cascaded zonal topologies.
+`include/rcp/proxy.h` + `src/proxy.c`: ports cpp-RCP's `proxy.hpp` — two
+parts. (1) `rcp_proxy_controller_new()`, a generic decorator (same
+vtable-wrapping pattern used since v0.9.0) that enforces a latency budget
+at a proxy hop: derives a `now + latency_budget_ms` deadline and forwards
+with whichever is tighter, that or the caller's own `ctx` deadline. (2)
+`rcp_proxy_registry_new()`, a standalone `rcp_registry_t` implementation
+(zone → controller route table) closely mirroring `mock.c`'s own registry
+structure and locking discipline (growable entries array, single mutex,
+steal-the-array-then-unlock pattern in `close()`), just starting empty
+rather than pre-populated with the 5 standard zones.
+`rcp_proxy_registry_add_route()` wraps an upstream controller in a proxy
+controller and registers it via the generic `rcp_registry_register()`
+vtable call — no special-casing needed since registration doesn't care
+what kind of controller it's holding.
+- `tests/test_proxy.c` ports all 8 of cpp-RCP's `test_proxy.cpp` cases
+  (budget-respected send, zero-budget timeout, zone passthrough,
+  registry lookup+send, unknown-zone lookup, deregister closes upstream,
+  idempotent close, duplicate-route rejection).
+- **Requirements catalog gap filled**: added `REQ-PROXY-001` through `-006`
+  (none existed previously, following the same pattern as authz, firmware,
+  and zone groups).
 
 ### 23. Redundancy (v0.23.0)
 

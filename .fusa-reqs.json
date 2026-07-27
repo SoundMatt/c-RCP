@@ -737,6 +737,54 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-PROXY-001",
+      "title": "ProxyController enforces the latency budget",
+      "text": "send() shall derive a deadline of now + latency_budget and use it (or the caller's own deadline, if tighter) when forwarding to the upstream controller.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PROXY-002",
+      "title": "ProxyRegistry lookup returns a working controller",
+      "text": "A controller returned by rcp_registry_lookup() on a proxy registry shall forward send() calls to the upstream controller for that route.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PROXY-003",
+      "title": "deregister() closes the upstream controller",
+      "text": "deregister() shall close the upstream controller for that zone and remove its route.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PROXY-004",
+      "title": "lookup of unknown zone returns RCP_ERR_NOT_FOUND",
+      "text": "rcp_registry_lookup() for a zone with no registered route shall return RCP_ERR_NOT_FOUND.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PROXY-005",
+      "title": "ProxyRegistry close() is idempotent",
+      "text": "Calling close() on an already-closed proxy registry shall return RCP_OK without error.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PROXY-006",
+      "title": "ProxyController zone matches upstream",
+      "text": "zone() shall return the upstream controller's zone.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-LOAN-001",
       "title": "loan() returns zeroed buffer",
       "text": "rcp_loan_controller_t::loan(n) shall return a zeroed byte vector of exactly n bytes.",
