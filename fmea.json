@@ -1,8 +1,8 @@
 {
   "tool": "cfusa fmea",
   "project": "c-RCP",
-  "version": "0.3.0",
-  "generated": "2026-07-27T14:15:52Z",
+  "version": "0.4.0",
+  "generated": "2026-07-27T14:46:41Z",
   "standard": "IEC 60812 / ISO 26262-5",
   "entries": [
     {
