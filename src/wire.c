@@ -90,6 +90,7 @@ rcp_bytes_t rcp_wire_encode_command(const rcp_command_t *cmd)
 //cfusa:req REQ-UDP-004
 //cfusa:req REQ-UDP-005
 //cfusa:req REQ-UDP-006
+//cfusa:req REQ-UDP-013
 rcp_wire_errc_t rcp_wire_decode_command(const uint8_t *b, size_t len, rcp_command_t *out)
 {
     uint32_t body_len;
@@ -97,7 +98,8 @@ rcp_wire_errc_t rcp_wire_decode_command(const uint8_t *b, size_t len, rcp_comman
     if (ec != RCP_WIRE_OK) return ec;
 
     body_len = get_u32(&b[12]);
-    if (len < RCP_WIRE_HEADER_LEN + body_len) return RCP_WIRE_ERR_SHORT_FRAME;
+    if (body_len > RCP_WIRE_MAX_PAYLOAD) return RCP_WIRE_ERR_SHORT_FRAME;
+    if (len < RCP_WIRE_HEADER_LEN + (size_t)body_len) return RCP_WIRE_ERR_SHORT_FRAME;
 
     out->zone     = (rcp_zone_t)b[4];
     out->type     = (rcp_command_type_t)get_u16(&b[5]);
@@ -115,6 +117,7 @@ rcp_bytes_t rcp_wire_encode_response(const rcp_response_t *resp)
 }
 
 //cfusa:req REQ-UDP-007
+//cfusa:req REQ-UDP-013
 rcp_wire_errc_t rcp_wire_decode_response(const uint8_t *b, size_t len, rcp_response_t *out)
 {
     uint32_t body_len;
@@ -122,7 +125,8 @@ rcp_wire_errc_t rcp_wire_decode_response(const uint8_t *b, size_t len, rcp_respo
     if (ec != RCP_WIRE_OK) return ec;
 
     body_len = get_u32(&b[12]);
-    if (len < RCP_WIRE_HEADER_LEN + body_len) return RCP_WIRE_ERR_SHORT_FRAME;
+    if (body_len > RCP_WIRE_MAX_PAYLOAD) return RCP_WIRE_ERR_SHORT_FRAME;
+    if (len < RCP_WIRE_HEADER_LEN + (size_t)body_len) return RCP_WIRE_ERR_SHORT_FRAME;
 
     out->zone       = (rcp_zone_t)b[4];
     out->status     = (rcp_response_status_t)b[7];
@@ -139,6 +143,7 @@ rcp_bytes_t rcp_wire_encode_status(const rcp_status_t *st)
 }
 
 //cfusa:req REQ-UDP-008
+//cfusa:req REQ-UDP-013
 rcp_wire_errc_t rcp_wire_decode_status(const uint8_t *b, size_t len, rcp_status_t *out)
 {
     uint32_t body_len;
@@ -146,7 +151,8 @@ rcp_wire_errc_t rcp_wire_decode_status(const uint8_t *b, size_t len, rcp_status_
     if (ec != RCP_WIRE_OK) return ec;
 
     body_len = get_u32(&b[12]);
-    if (len < RCP_WIRE_HEADER_LEN + body_len) return RCP_WIRE_ERR_SHORT_FRAME;
+    if (body_len > RCP_WIRE_MAX_PAYLOAD) return RCP_WIRE_ERR_SHORT_FRAME;
+    if (len < RCP_WIRE_HEADER_LEN + (size_t)body_len) return RCP_WIRE_ERR_SHORT_FRAME;
 
     out->zone    = (rcp_zone_t)b[4];
     out->healthy = (b[7] == 1u);

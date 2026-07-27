@@ -1144,3 +1144,55 @@ own measured numbers rather than copying cpp-RCP's:
   new executable code.
 
 This completes all 43 milestones of the original roadmap.
+
+---
+### Post-roadmap: RELAY conformance & security audit findings
+---
+
+A RELAY-ecosystem conformance audit (2026-07-27) filed five issues
+against this repository (`SoundMatt/c-RCP#8`–`#12`). Each is being
+addressed as its own versioned release, in dependency order, following
+the same PR/CI-green/tag discipline as every milestone above.
+
+### 44. Wire decoder integer-overflow fix (v0.44.0) ✅ — closes #9
+
+`src/wire.c`'s `rcp_wire_decode_command()`/`_response()`/`_status()`
+validated an attacker-controlled `uint32_t body_len` against the actual
+buffer length as `if (len < RCP_WIRE_HEADER_LEN + body_len)`. On any
+32-bit-`size_t` target (the bare-metal/RTOS profile this library is
+built for, per `PORTABILITY.md`), that addition can wrap around for
+`body_len` values near `UINT32_MAX`, defeating the short-frame guard
+entirely and reaching `rcp_bytes_dup()` with an attacker-controlled
+length far exceeding the real buffer — a heap over-read on untrusted
+UDP input. `RCP_WIRE_MAX_PAYLOAD` (`include/rcp/wire.h`) already existed
+as a ceiling constant but was never used as a bound check.
+- **Fix**: all three decoders now reject `body_len > RCP_WIRE_MAX_PAYLOAD`
+  *before* computing the addition, closing the overflow independent of
+  `size_t` width.
+- **Regression test verified genuine, not just added**: `tests/test_wire.c`
+  gained 4 new cases. Confirmed by temporarily reverting the fix locally
+  that `test_decode_command_rejects_body_len_just_over_max_even_with_real_buffer`
+  (which allocates a real, fully-sized buffer so the *old* length check
+  alone would have let the frame through) fails without the new ceiling
+  check and passes with it — the other 3 new cases (header-only buffers)
+  pass either way on this 64-bit CI host, since the pre-fix check already
+  happened to reject a claimed-length-vastly-exceeding-actual-buffer case
+  for unrelated reasons on 64-bit `size_t`; only the real-buffer case
+  proves the fix's actual guarantee.
+- **Requirements catalog**: added `REQ-UDP-013`.
+
+### 45. `rcp_zone_string()` PascalCase + `rcp_zone_from_string()` (v0.45.0) — closes #11
+
+_(pending)_
+
+### 46. `Adapt()`/`ToMessage()`/`FromMessage()`/`SpecVersion` (v0.46.0) — closes #10
+
+_(pending)_
+
+### 47. CLI binary — `version`/`capabilities`/`status` (v0.47.0) — closes #8
+
+_(pending)_
+
+### 48. `relay conform` CI gate (v0.48.0) — closes #12
+
+_(pending)_

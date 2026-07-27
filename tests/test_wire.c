@@ -10,11 +10,13 @@
 //cfusa:test REQ-UDP-010
 //cfusa:test REQ-UDP-011
 //cfusa:test REQ-UDP-012
+//cfusa:test REQ-UDP-013
 #include "unity.h"
 
 #include <rcp/rcp.h>
 #include <rcp/wire.h>
 
+#include <stdlib.h>
 #include <string.h>
 
 void setUp(void) {}
@@ -204,6 +206,85 @@ static void test_decode_command_rejects_wrong_version(void)
     rcp_bytes_free(&frame);
 }
 
+/* ── Overflow guard (body_len near UINT32_MAX) ─────────────────────────────── */
+
+/* Hand-crafts a header-only "frame" with an attacker-controlled body_len at
+ * offset 12, simulating a malicious UDP datagram whose declared payload
+ * length vastly exceeds both RCP_WIRE_MAX_PAYLOAD and the actual bytes
+ * received. On a 32-bit size_t target, RCP_WIRE_HEADER_LEN + body_len can
+ * wrap around to a small value, defeating a naive `len < header+body_len`
+ * check; the fix rejects any body_len > RCP_WIRE_MAX_PAYLOAD outright,
+ * before that addition ever happens, so this must fail regardless of the
+ * host's size_t width. */
+static void make_oversized_header(uint8_t *b, uint8_t msg_type, uint32_t body_len)
+{
+    memset(b, 0, RCP_WIRE_HEADER_LEN);
+    b[0] = RCP_WIRE_MAGIC_0;
+    b[1] = RCP_WIRE_MAGIC_1;
+    b[2] = RCP_WIRE_PROTO_VERSION;
+    b[3] = msg_type;
+    b[12] = (uint8_t)(body_len >> 24);
+    b[13] = (uint8_t)((body_len >> 16) & 0xFFu);
+    b[14] = (uint8_t)((body_len >> 8) & 0xFFu);
+    b[15] = (uint8_t)(body_len & 0xFFu);
+}
+
+static void test_decode_command_rejects_oversized_body_len(void)
+{
+    uint8_t b[RCP_WIRE_HEADER_LEN];
+    rcp_command_t out = {0};
+
+    make_oversized_header(b, RCP_WIRE_TYPE_COMMAND, 0xFFFFFFF0u);
+
+    TEST_ASSERT_EQUAL(RCP_WIRE_ERR_SHORT_FRAME,
+                       rcp_wire_decode_command(b, RCP_WIRE_HEADER_LEN, &out));
+}
+
+static void test_decode_response_rejects_oversized_body_len(void)
+{
+    uint8_t b[RCP_WIRE_HEADER_LEN];
+    rcp_response_t out = {0};
+
+    make_oversized_header(b, RCP_WIRE_TYPE_RESPONSE, 0xFFFFFFF0u);
+
+    TEST_ASSERT_EQUAL(RCP_WIRE_ERR_SHORT_FRAME,
+                       rcp_wire_decode_response(b, RCP_WIRE_HEADER_LEN, &out));
+}
+
+static void test_decode_status_rejects_oversized_body_len(void)
+{
+    uint8_t b[RCP_WIRE_HEADER_LEN];
+    rcp_status_t out = {0};
+
+    make_oversized_header(b, RCP_WIRE_TYPE_STATUS, 0xFFFFFFF0u);
+
+    TEST_ASSERT_EQUAL(RCP_WIRE_ERR_SHORT_FRAME,
+                       rcp_wire_decode_status(b, RCP_WIRE_HEADER_LEN, &out));
+}
+
+/* Unlike the tests above (which pass a header-only buffer far shorter than
+ * the claimed body_len, so even the pre-fix `len < header+body_len` check
+ * would have caught it on a 64-bit host), this test provides a REAL,
+ * fully-backed buffer exactly as long as `header + body_len` demands --
+ * i.e. long enough that the old length check alone would have let it
+ * through. Only the new `body_len > RCP_WIRE_MAX_PAYLOAD` ceiling check
+ * (independent of the addition, and thus independent of size_t width)
+ * rejects it, which is the actual guarantee this fix adds. */
+static void test_decode_command_rejects_body_len_just_over_max_even_with_real_buffer(void)
+{
+    uint32_t body_len = (uint32_t)RCP_WIRE_MAX_PAYLOAD + 1u;
+    size_t total = RCP_WIRE_HEADER_LEN + (size_t)body_len;
+    uint8_t *b = (uint8_t *)malloc(total);
+    rcp_command_t out = {0};
+
+    TEST_ASSERT_NOT_NULL(b);
+    make_oversized_header(b, RCP_WIRE_TYPE_COMMAND, body_len);
+
+    TEST_ASSERT_EQUAL(RCP_WIRE_ERR_SHORT_FRAME, rcp_wire_decode_command(b, total, &out));
+
+    free(b);
+}
+
 /* ── Control frame ─────────────────────────────────────────────────────────── */
 
 static void test_encode_control_produces_header_only_frame(void)
@@ -235,6 +316,11 @@ int main(void)
     RUN_TEST(test_frame_begins_with_magic_and_version);
     RUN_TEST(test_decode_command_rejects_wrong_magic);
     RUN_TEST(test_decode_command_rejects_wrong_version);
+
+    RUN_TEST(test_decode_command_rejects_oversized_body_len);
+    RUN_TEST(test_decode_response_rejects_oversized_body_len);
+    RUN_TEST(test_decode_status_rejects_oversized_body_len);
+    RUN_TEST(test_decode_command_rejects_body_len_just_over_max_even_with_real_buffer);
 
     RUN_TEST(test_encode_control_produces_header_only_frame);
 
