@@ -30,6 +30,7 @@ const char *rcp_strerror(rcp_errc_t e)
     case RCP_ERR_TIMEOUT:        return "rcp: command timeout";
     case RCP_ERR_BUSY:           return "rcp: zone controller busy";
     case RCP_ERR_ZONE_MISMATCH:  return "rcp: zone mismatch";
+    case RCP_ERR_NOT_SUPPORTED:  return "rcp: not supported (transport backend not compiled in)";
     default:                     return "rcp: unknown error";
     }
 }

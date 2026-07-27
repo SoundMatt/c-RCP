@@ -117,6 +117,11 @@ typedef enum {
     RCP_ERR_TIMEOUT         = 4,
     RCP_ERR_BUSY            = 5,
     RCP_ERR_ZONE_MISMATCH   = 6,
+    /* A transport compiled without its optional backend (e.g. tls.h without
+     * an OpenSSL build) returns this rather than silently falling back to
+     * an insecure/unimplemented path. Mirrors cpp-RCP's use of the generic
+     * std::errc::function_not_supported for the same stub contract. */
+    RCP_ERR_NOT_SUPPORTED   = 7,
 } rcp_errc_t;
 
 /* Human-readable message for an rcp_errc_t value. Never returns NULL. */
