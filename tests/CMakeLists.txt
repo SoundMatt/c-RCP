@@ -127,3 +127,8 @@ target_link_libraries(test_zonegroup PRIVATE rcp::rcp unity)
 target_compile_options(test_zonegroup PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_zonegroup COMMAND test_zonegroup)
 set_tests_properties(rcp_zonegroup PROPERTIES TIMEOUT 30)
+
+add_executable(test_proxy test_proxy.c)
+target_link_libraries(test_proxy PRIVATE rcp::rcp unity)
+target_compile_options(test_proxy PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_proxy COMMAND test_proxy)
