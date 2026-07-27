@@ -997,9 +997,19 @@ hardware API backend linked); `zone()` returns the configured zone;
 - **Requirements catalog gap filled**: added `REQ-LIN-001` through `-004`
   (none existed previously).
 
-### 38. UDS Bridge (v0.38.0)
+### 38. UDS Bridge (v0.38.0) ✅
 
-`include/rcp/udsbr.h` — bridge to ISO 14229 UDS service calls (stub).
+`include/rcp/udsbr.h` + `src/udsbr.c`: ports cpp-RCP's `udsbr.hpp` — the
+same compile-time stub pattern as the other protocol bridges, configured
+by `routine_id` (default `0x0100`), `p2_timeout_ms` (default P2 server
+timeout, default 50), and `p2ext_timeout_ms` (extended P2* timeout,
+default 5000), matching ISO 14229's own RoutineControl (SID 0x31) timing
+parameters. `send()`/`subscribe()` always return `RCP_ERR_NOT_SUPPORTED`
+(no UDS stack integration linked); `zone()` returns the configured zone;
+`close()` always succeeds.
+- `tests/test_udsbr.c` ports all 4 of cpp-RCP's `test_udsbr.cpp` cases.
+- **Requirements catalog gap filled**: added `REQ-UDS-001` through `-004`
+  (none existed previously).
 
 ### 39. DoIP Bridge (v0.39.0)
 
