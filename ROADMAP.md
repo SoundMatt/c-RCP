@@ -175,10 +175,34 @@ integration test where practical.
 ### Phase 3 — Transport Stack
 ---
 
-### 5. UDP Transport (v0.5.0)
+### 5. UDP Transport (v0.5.0) ✅
 
-`include/rcp/udp.h`: length-framed binary command/response protocol over UDP;
-static unicast zone discovery with optional multicast announcement.
+- `include/rcp/wire.h` + `src/wire.c`: length-framed binary command/response/
+  status codec shared by UDP and (later) TLS — ported 1:1 from cpp-RCP's
+  `wire.hpp`, with the same ownership caveat made explicit: unlike
+  `rcp_command_t.payload`'s usual borrowed-by-default convention, a
+  wire-decoded command/response/status owns its payload.
+- `include/rcp/udp.h` + `src/udp.c`: `rcp_udp_zone_server_t` (binds, serves
+  Commands, publishes Status to subscribers), a `rcp_controller_t`
+  implementation that dials a zone server, and a `rcp_registry_t` backed by
+  UDP controllers with a `dial()` convenience — ported from cpp-RCP's
+  `udp::ZoneServer`/`udp::Controller`/`udp::Registry`. POSIX only for now
+  (Linux/macOS via BSD sockets); Windows gets the same
+  `RCP_ERR_CLOSED`-everywhere stub cpp-RCP uses until a native
+  implementation lands.
+- `tests/test_wire.c` ports cpp-RCP's `test_wire.cpp` (12 requirements,
+  frame round-trip + corruption rejection). `tests/test_udp.c` is a new
+  loopback integration smoke test (send round-trip, zone-mismatch
+  rejection, publish/subscribe) — cpp-RCP has no equivalent `test_udp.cpp`,
+  but go-RCP's own UDP milestone calls for "integration tests with loopback
+  interface," so this is a deliberate, quality-motivated addition rather
+  than a straight port.
+- `src/platform.{h,c}` gained a joinable thread primitive
+  (`rcp_thread_start`/`rcp_thread_join`) and a timed condvar wait
+  (`rcp_cond_timedwait_until`), needed so the UDP controller can honor
+  `rcp_context_t` deadlines on `send()` and cleanly join its socket I/O
+  threads on `close()` (the existing detached-thread helper from v0.1.0
+  isn't joinable by design).
 
 ### 6. mDNS Discovery (v0.6.0)
 
