@@ -430,9 +430,21 @@ follows the same generic-decorator vtable pattern used since v0.9.0.
   passthrough, close-rejects-further-sends). Confirmed via 20 repeated
   local runs (debug + 20x ASan/UBSan) with no flakes.
 
-### 16. Rate Limiting (v0.16.0)
+### 16. Rate Limiting (v0.16.0) ✅
 
-`include/rcp/ratelimit.h`: per-zone token-bucket admission control.
+`include/rcp/ratelimit.h` + `src/ratelimit.c`: ports cpp-RCP's
+`ratelimit.hpp` — a token-bucket admission-control decorator (same
+generic-wrapper vtable pattern used since v0.9.0). `rcp_ratelimit_config_t`
+carries `rate` (tokens/second refill), `burst` (max accumulation), and
+`exempt_critical` (bypass the bucket for `RCP_PRIORITY_CRITICAL`, default
+true, so watchdog kicks and emergency actuation are never throttled).
+Tokens refill lazily on each `send()` based on elapsed wall time (via
+`rcp_monotonic_ms()`), matching cpp-RCP's own `steady_clock`-based lazy
+refill rather than a background ticking thread — no dispatch thread needed
+for this milestone.
+- `tests/test_ratelimit.c` ports all 7 of cpp-RCP's `test_ratelimit.cpp`
+  cases (basic send, zone passthrough, bucket exhaustion, critical
+  exemption on/off, zone-mismatch passthrough, close-rejects-further-sends).
 
 ---
 ### Phase 5 — Verification

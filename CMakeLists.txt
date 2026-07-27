@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(c-rcp
-    VERSION 0.15.0
+    VERSION 0.16.0
     DESCRIPTION "Remote Control Protocol for automotive zonal architecture (C)"
     HOMEPAGE_URL "https://github.com/SoundMatt/c-RCP"
     LANGUAGES C
@@ -55,6 +55,7 @@ add_library(rcp STATIC
     src/powerstate.c
     src/e2e.c
     src/prioqueue.c
+    src/ratelimit.c
 )
 add_library(rcp::rcp ALIAS rcp)
 

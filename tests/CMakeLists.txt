@@ -94,3 +94,8 @@ target_link_libraries(test_prioqueue PRIVATE rcp::rcp unity)
 target_compile_options(test_prioqueue PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_prioqueue COMMAND test_prioqueue)
 set_tests_properties(rcp_prioqueue PROPERTIES TIMEOUT 30)
+
+add_executable(test_ratelimit test_ratelimit.c)
+target_link_libraries(test_ratelimit PRIVATE rcp::rcp unity)
+target_compile_options(test_ratelimit PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_ratelimit COMMAND test_ratelimit)
