@@ -189,3 +189,8 @@ add_executable(test_someipbr test_someipbr.c)
 target_link_libraries(test_someipbr PRIVATE rcp::rcp unity)
 target_compile_options(test_someipbr PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_someipbr COMMAND test_someipbr)
+
+add_executable(test_canbr test_canbr.c)
+target_link_libraries(test_canbr PRIVATE rcp::rcp unity)
+target_compile_options(test_canbr PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_canbr COMMAND test_canbr)
