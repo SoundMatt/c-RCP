@@ -977,6 +977,70 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-ADMIN-001",
+      "title": "zones() returns a snapshot of registered controllers",
+      "text": "zones() shall return one entry (marked registered) for every controller currently registered on the wrapped registry.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADMIN-002",
+      "title": "subscribe() registers a callback invoked by emit()",
+      "text": "A callback registered via subscribe() shall be invoked for every subsequent emit() call.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADMIN-003",
+      "title": "emit() delivers to all subscribers",
+      "text": "emit() shall invoke every registered subscriber callback, in registration order.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADMIN-004",
+      "title": "record_counter() accumulates every delta exactly once",
+      "text": "record_counter() shall add delta to the named counter's running total exactly once per call, even under concurrent invocation from multiple threads.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADMIN-005",
+      "title": "AdminServer tolerates concurrent mutation without data races",
+      "text": "record_counter() and emit() shall be safe to call concurrently from multiple threads without data races or lost updates.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADMIN-006",
+      "title": "metrics_text() renders Prometheus-format counter lines",
+      "text": "metrics_text() shall render a '# TYPE <name> counter' line followed by '<name>{<labels>} <value>' for every recorded counter.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADMIN-007",
+      "title": "Distinct name+labels combinations are tracked separately",
+      "text": "record_counter() calls with the same name but different labels shall accumulate into distinct counters.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADMIN-008",
+      "title": "emit() delivers the correct event type and zone",
+      "text": "A subscriber callback shall observe the same event type and zone that were passed to emit().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-LOAN-001",
       "title": "loan() returns zeroed buffer",
       "text": "rcp_loan_controller_t::loan(n) shall return a zeroed byte vector of exactly n bytes.",
