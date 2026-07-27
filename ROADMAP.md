@@ -889,9 +889,20 @@ envelope (4-byte big-endian schema ID + raw data blob) with
 ### Phase 9 — Remote Access
 ---
 
-### 31. gRPC Bridge (v0.31.0)
+### 31. gRPC Bridge (v0.31.0) ✅
 
-`include/rcp/grpcbridge.h`: gRPC transport interface stub for cloud-connected zone controllers.
+`include/rcp/grpcbridge.h` + `src/grpcbridge.c`: ports cpp-RCP's
+`grpcbridge.hpp` — a compile-time interface stub matching the same pattern
+already established for `tls.h` at v0.7.0. No generated gRPC stub (from an
+`rcp.proto`) is linked, so `send()`/`subscribe()` always return
+`RCP_ERR_NOT_SUPPORTED`; `zone()` returns the configured zone regardless,
+and `close()` always succeeds. Considerably simpler than the TLS stub
+(no `ZoneServer`/registry-dial surface), matching cpp-RCP's own
+`grpcbridge.hpp`, which likewise only stubs a bare `Controller`.
+`tests/test_grpcbridge.c` ports all 4 of cpp-RCP's `test_grpcbridge.cpp`
+cases.
+- **Requirements catalog gap filled**: added `REQ-GRPC-001` through `-004`
+  (none existed previously).
 
 ### 32. REST Bridge (v0.32.0)
 
