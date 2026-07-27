@@ -2527,6 +2527,110 @@
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-RELAY-001",
+      "title": "rcp_wallclock_ms() returns wall-clock epoch milliseconds",
+      "text": "rcp_wallclock_ms() shall return the number of milliseconds elapsed since the Unix epoch, per the host's wall-clock (calendar) time source.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-RELAY-002",
+      "title": "relay_protocol_string() returns a unique name per protocol",
+      "text": "relay_protocol_string() shall return a unique, non-empty string for each defined relay_protocol_t constant, matching the RELAY spec's protocol identifier names (e.g. \"RCP\").",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-RELAY-003",
+      "title": "relay_message_t lifecycle: init, free, set_id are safe and non-leaking",
+      "text": "relay_message_init() shall zero a relay_message_t to a safely-freeable state; relay_message_free() shall release all owned fields (id, payload, meta) and be safe to call repeatedly; relay_message_set_id() shall deep-copy the given id, replacing (and freeing) any prior value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RELAY-004",
+      "title": "relay_message_t meta map: set upserts, get looks up, both deep-copy",
+      "text": "relay_message_set_meta() shall deep-copy key and value, replacing any existing entry with the same key rather than appending a duplicate; relay_message_get_meta() shall return the value for a given key, or NULL if absent.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RELAY-005",
+      "title": "rcp_status_to_message() maps Status fields per §15.7.5",
+      "text": "rcp_status_to_message() shall set protocol to RCP, id to the zone's PascalCase name, payload to a copy of the status payload, seq to the status sequence number, timestamp_ms to the current wall-clock time, and meta[\"rcp.healthy\"] to \"true\" or \"false\".",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RELAY-006",
+      "title": "rcp_response_to_message() maps Response fields per §15.7.5",
+      "text": "rcp_response_to_message() shall set protocol to RCP, id to the zone's PascalCase name, payload to a copy of the response payload, and meta[\"rcp.status\"] to the decimal string of the response status.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RELAY-007",
+      "title": "rcp_message_to_command() maps Message fields per §15.7.5",
+      "text": "rcp_message_to_command() shall set zone from the message id (via rcp_zone_from_string), priority from meta[\"rcp.priority\"] (\"high\"/\"critical\"/else Normal), type from meta[\"rcp.cmd_type\"] (\"set\"/\"get\"/\"reset\"/\"watchdog\"/\"sleep\"/\"wake\"/else Noop), and payload borrowed from the message payload.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RELAY-008",
+      "title": "Adapter send() maps and dispatches, discarding the response",
+      "text": "The relay Caller adapter's send() shall convert the given message to a Command, dispatch it via the wrapped controller's send(), and return the resulting error code while discarding the Response payload.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RELAY-009",
+      "title": "Adapter call() maps request, dispatches, and maps the reply back",
+      "text": "The relay Caller adapter's call() shall convert the given request message to a Command, dispatch it via the wrapped controller's send(), and on success convert the resulting Response to a Message.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RELAY-010",
+      "title": "Adapter subscribe() forwards Status as Message via a per-subscription thread",
+      "text": "The relay Caller adapter's subscribe() shall subscribe to the wrapped controller's Status channel and spawn one thread per subscription that converts each Status to a Message and pushes it to the returned channel, closing the returned channel when the underlying Status channel closes.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RELAY-011",
+      "title": "Adapter subscribe() applies the requested back-pressure policy",
+      "text": "The subscription thread shall apply DropNewest (discard the incoming message if the channel is full), DropOldest (evict the oldest queued message to make room), or Block (retry until space is available or the channel closes) per the caller's SubscriberOptions.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RELAY-012",
+      "title": "rcp_adapt() wraps a controller without blocking or connecting",
+      "text": "rcp_adapt() shall retain the given controller and return a relay Caller wrapping it immediately, without blocking or establishing any connection.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RELAY-013",
+      "title": "RCP_SPEC_VERSION aliases RELAY_SPEC_VERSION",
+      "text": "RCP_SPEC_VERSION shall be defined and shall equal RELAY_SPEC_VERSION, per the RELAY spec's required package-level SpecVersion export (§17 requirement 12, §19.4).",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
     }
   ]
 }

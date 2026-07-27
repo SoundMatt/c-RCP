@@ -1215,9 +1215,61 @@ and `Status.ToMessage()`.
   all 5 zones, a round-trip through both new functions, legacy
   kebab-case acceptance, and unknown/NULL rejection.
 
-### 46. `Adapt()`/`ToMessage()`/`FromMessage()`/`SpecVersion` (v0.46.0) — closes #10
+### 46. `Adapt()`/`ToMessage()`/`FromMessage()`/`SpecVersion` (v0.46.0) ✅ — closes #10
 
-_(pending)_
+The largest of the five conformance-audit fixes. c-RCP had none of
+RELAY's mandatory §17 requirements 6 (`Adapt()`), 9 (`ToMessage()`/
+`FromMessage()`), or 12 (`SpecVersion`) — `include/relay/relay.h` only
+bundled the error sentinels and `Context`, explicitly noting "not a
+full RELAY binding." This milestone fleshes it out and ports cpp-RCP's
+`adapt.hpp` pattern to C99.
+- **`include/relay/relay.h` grows substantially**: `RELAY_SPEC_VERSION`
+  (`"1.11"` — deliberately the *current* spec version, not cpp-RCP's own
+  stale `"1.10"`, since conforming to the version that motivated this
+  whole remediation effort would be self-defeating), `relay_protocol_t`
+  + `relay_protocol_string()`, `relay_message_t` (the universal envelope
+  — id/payload/meta all owned, with `relay_message_init/free/set_id/
+  set_meta/get_meta`), `relay_backpressure_t` +
+  `relay_subscriber_options_t`, `relay_message_channel_t` (a concrete
+  bounded queue mirroring `rcp_status_channel_t`'s exact
+  mutex/condvar/circular-buffer pattern, since C has no templates for a
+  generic `Channel<T>`), and `rcp_relay_caller_t` (a vtable-based
+  Node+Caller — C has no interface inheritance, so one vtable covers
+  both roles).
+  - Uses its own `relay_bytes_t` rather than `rcp.h`'s `rcp_bytes_t`:
+    `relay.h` must stay protocol-agnostic (the envelope is shared by
+    every adapter — CAN, DDS, LIN, MQTT, RCP, SOMEIP), and `rcp_bytes_t`
+    is only defined later in `rcp.h`, which itself includes this header
+    first — a real ordering constraint caught while writing the code,
+    not a stylistic choice.
+- **`include/rcp/adapt.h` + `src/adapt.c`**: `rcp_status_to_message()`/
+  `rcp_response_to_message()`/`rcp_message_to_command()` implement the
+  exact §15.7.5 field mapping cpp-RCP's `adapt.hpp` already
+  established; `rcp_adapt()` wraps an `rcp_controller_t` (retaining it)
+  as a vtable-based caller. `subscribe()` spawns one detached thread per
+  subscription (§10.5) that drains the wrapped controller's
+  `rcp_status_channel_t` and pushes mapped messages to the returned
+  `relay_message_channel_t`, applying the requested back-pressure
+  policy (DropNewest/DropOldest/Block), and exits — closing the output
+  channel — when the underlying status channel closes.
+- **`RCP_SPEC_VERSION`** (`rcp.h`) is a distinct macro aliasing
+  `RELAY_SPEC_VERSION`, mirroring go-RCP's two-symbol pattern
+  (`rcp.SpecVersion` aliasing `relay.SpecVersion`) rather than cpp-RCP's
+  single-symbol approach, so callers get an RCP-specific answer without
+  reaching into `relay.h` directly.
+- **`src/clock.c`** gains `rcp_wallclock_ms()` (wall-clock epoch
+  milliseconds) — needed for `Message.timestamp` and not previously
+  exposed; `clock.h` only had `rcp_monotonic_ms()`.
+- **Golden-vector conformance test**: `tests/test_adapt.c` pins
+  `rcp_status_to_message()` against the same
+  `RELAY spec/vectors/rcp-status.json` (v0.3) golden vector cpp-RCP's
+  own `test_relay.cpp` pins against — confirmed by reading that
+  reference file directly rather than assuming the mapping. 20 test
+  cases total, matching (and in the channel/lifecycle cases, slightly
+  exceeding) cpp-RCP's own `test_relay.cpp` rigor — including running
+  the multi-threaded subscribe test 10 times under ASan/UBSan to catch
+  any intermittent race, with zero failures.
+- **Requirements catalog**: added `REQ-RELAY-001` through `-013`.
 
 ### 47. CLI binary — `version`/`capabilities`/`status` (v0.47.0) — closes #8
 

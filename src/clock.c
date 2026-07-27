@@ -26,6 +26,21 @@ uint64_t rcp_monotonic_ms(void)
     return (uint64_t)((counter.QuadPart * 1000) / freq.QuadPart);
 }
 
+//cfusa:req REQ-RELAY-001
+uint64_t rcp_wallclock_ms(void)
+{
+    FILETIME ft;
+    ULARGE_INTEGER ull;
+    /* FILETIME is 100ns ticks since 1601-01-01; 116444736000000000 is the
+     * number of such ticks between 1601-01-01 and the Unix epoch. */
+    const uint64_t EPOCH_DIFF_100NS = 116444736000000000ULL;
+
+    GetSystemTimeAsFileTime(&ft);
+    ull.LowPart  = ft.dwLowDateTime;
+    ull.HighPart = ft.dwHighDateTime;
+    return (uint64_t)((ull.QuadPart - EPOCH_DIFF_100NS) / 10000ULL);
+}
+
 #else
 
 #include <time.h>
@@ -36,6 +51,14 @@ uint64_t rcp_monotonic_ms(void)
 {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (uint64_t)ts.tv_sec * 1000u + (uint64_t)(ts.tv_nsec / 1000000);
+}
+
+//cfusa:req REQ-RELAY-001
+uint64_t rcp_wallclock_ms(void)
+{
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
     return (uint64_t)ts.tv_sec * 1000u + (uint64_t)(ts.tv_nsec / 1000000);
 }
 
