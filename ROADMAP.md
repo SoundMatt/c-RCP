@@ -355,10 +355,30 @@ growable-array pattern as `watchdog.c`.
   "repeated dead events suppressed") rather than merely `> 0`. Confirmed via
   20 repeated local runs (debug + 15x ASan/UBSan) with no flakes.
 
-### 13. Power State (v0.13.0)
+### 13. Power State (v0.13.0) ✅
 
-`include/rcp/powerstate.h`: Sleep/Wake command handling; zone power state
-machine with bus-off recovery.
+`include/rcp/powerstate.h` + `src/powerstate.c`: ports cpp-RCP's
+`powerstate.hpp` Manager — sends `RCP_CMD_SLEEP`/`RCP_CMD_WAKE` to zone
+controllers and tracks the resulting power state
+(Active/Sleeping/BusOff). `rcp_powerstate_manager_sleep()`/`_wake()` return
+`RCP_ERR_BUSY` if the zone isn't in the expected state to begin with
+(mirroring cpp-RCP's own busy-error precondition checks), and
+`RCP_ERR_NOT_FOUND` for an unregistered zone. On send failure a zone
+transitions to BusOff; a single background recovery thread retries
+`RCP_CMD_WAKE` for every BusOff zone at `recovery_interval_ms` until it
+succeeds, using the same ~5ms-polling-increment `close()` responsiveness
+pattern as v0.11.0's watchdog Keeper.
+`rcp_powerstate_manager_subscribe()` supports multiple callbacks via the
+same growable-array pattern as `watchdog.c`/`deadline.c`.
+- `tests/test_powerstate.c` ports all 6 of cpp-RCP's `test_powerstate.cpp`
+  cases (sleep transitions, wake transitions, BusOff on failure, background
+  recovery, `state()` thread-safety under concurrent readers, close stops
+  the recovery loop), including custom `AlwaysFail`/`FailThenOk` test
+  controllers (ported from cpp-RCP's own custom `rcp::Controller`
+  subclasses of the same name) implemented as small `rcp_controller_t`
+  vtable structs, matching the existing custom-vtable test-double pattern
+  already used in `test_mdns.c`. Confirmed via 20 repeated local runs
+  (debug + 15x ASan/UBSan) with no flakes.
 
 ### 14. E2E Protection (v0.14.0)
 
