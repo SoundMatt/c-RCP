@@ -107,6 +107,13 @@
 extern "C" {
 #endif
 
+/* RELAY spec version this package targets (§17 requirement 12, §19.4).
+ * A distinct rcp-namespaced symbol re-exporting relay.h's own constant,
+ * mirroring go-RCP's two-symbol pattern (rcp.SpecVersion aliasing
+ * relay.SpecVersion) rather than requiring callers to reach into relay.h
+ * directly for an RCP-specific answer. */
+#define RCP_SPEC_VERSION RELAY_SPEC_VERSION
+
 /* Opaque forward declaration: the full definition (and the loaning
  * extension's public API) lives in loan.h, which includes this header —
  * only a pointer to it is needed here, in the optional loan/send_loaned
