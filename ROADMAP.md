@@ -329,10 +329,31 @@ suite only ever registers one).
   milestones; proactively re-grepped the whole codebase afterward and found
   no other occurrences.
 
-### 12. Deadline Monitoring (v0.12.0)
+### 12. Deadline Monitoring (v0.12.0) ✅
 
-`include/rcp/deadline.h`: zone-to-HPC liveness — alert when Status stops
-arriving within a configured deadline.
+`include/rcp/deadline.h` + `src/deadline.c`: ports cpp-RCP's `deadline.hpp`
+Monitor — subscribes to every registered zone controller's Status stream on
+construction and resets a per-zone deadline timer on every incoming Status.
+If no Status arrives within `deadline_ms`, the zone transitions to dead and
+a `rcp_liveness_event_t` is emitted (once — not re-emitted on subsequent
+missed cycles while still dead); the next Status received afterward emits
+alive immediately. `rcp_deadline_monitor_new()` starts one background watch
+thread per controller (unlike v0.11.0's watchdog Keeper, which kicks zones
+sequentially on a single thread — each watch thread here blocks on its own
+subscription's channel,
+so there's no shared-timeout-budget reason to serialize them, and cpp-RCP's
+own per-controller-thread design has no destructor lifetime hazard here
+since each thread only touches its own captured state, not a `this` that
+could be freed mid-kick).
+`rcp_deadline_monitor_subscribe()` supports multiple callbacks via the same
+growable-array pattern as `watchdog.c`.
+- `tests/test_deadline.c` ports all 5 of cpp-RCP's `test_deadline.cpp` cases
+  (construct, dead-event-not-repeated, alive-on-first-status,
+  alive()-false-before-first-status, close-stops-threads) plus an explicit
+  assertion cpp-RCP's own test never made: that the dead event fires
+  *exactly once* across multiple missed deadline cycles (REQ-DL-003,
+  "repeated dead events suppressed") rather than merely `> 0`. Confirmed via
+  20 repeated local runs (debug + 15x ASan/UBSan) with no flakes.
 
 ### 13. Power State (v0.13.0)
 
