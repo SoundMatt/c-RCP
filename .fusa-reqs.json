@@ -2385,6 +2385,14 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-UDP-013",
+      "title": "Frame decoders reject an oversized body_len before any length arithmetic",
+      "text": "rcp_wire_decode_command()/_response()/_status() shall reject any body_len exceeding RCP_WIRE_MAX_PAYLOAD before computing RCP_WIRE_HEADER_LEN + body_len, so that no size_t-width-dependent integer overflow can bypass the short-frame length check on attacker-controlled input.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-WDG-001",
       "title": "Keeper kicks all zones periodically",
       "text": "rcp_watchdog_keeper_t shall send a CmdWatchdog command to every registered zone controller at the configured interval.",
