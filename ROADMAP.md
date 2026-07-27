@@ -757,9 +757,43 @@ SSE-style event push channel, and `rcp_admin_server_record_counter()`/
 - **Requirements catalog gap filled**: added `REQ-ADMIN-001` through `-008`
   (none existed previously).
 
-### 27. Record & Replay (v0.27.0)
+### 27. Record & Replay (v0.27.0) ✅
 
-`include/rcp/record.h`: record command/response/status streams to disk; replay for regression.
+`include/rcp/record.h` + `src/record.c`: ports cpp-RCP's `record.hpp` —
+`rcp_record_controller_new()` wraps any controller (same generic-decorator
+vtable pattern used since v0.9.0) and appends a timestamped entry to a
+`rcp_record_t` for every Command/Response pair; `rcp_playback_run_all()`
+replays a Record against a target controller using the recorded
+inter-entry timing (scaled by `speed_factor`).
+- **Deviation note**: entry timestamps use `rcp_monotonic_ms()` rather than
+  cpp-RCP's wall-clock `std::chrono::system_clock` — a genuine improvement
+  here, not just reduced precision: a monotonic clock can never run
+  backward (unlike wall-clock time under NTP adjustment), so it is
+  strictly better suited to this module's own "timestamps never decrease"
+  guarantee. The on-disk binary log format is this port's own (millisecond
+  timestamps, native byte order) rather than a byte-for-byte match of
+  cpp-RCP's log format, since the format is a local debug/tooling artifact
+  read back only by this same library, not a cross-language wire format.
+- **Bug found and fixed, not reproduced**: cpp-RCP's `Playback::run_all()`
+  iterates `Record::entries()` (a direct, unsynchronized reference into the
+  `Record`'s internal `std::vector`) with no lock, while `Record::append()`
+  holds a mutex to push into that same vector — a genuine, if narrow, data
+  race between concurrent recording and playback (a vector reallocation
+  mid-iteration could invalidate what playback is reading). This port's
+  `rcp_playback_run_all()` takes a locked snapshot of the record's entries
+  before starting playback, closing that window entirely.
+- Hit and fixed a real (non-false-positive) `CFUSA-A007` finding (CERT-C
+  ERR33-C, unchecked `fwrite()`/`fclose()` return values) in
+  `rcp_record_write_binary()` — every write is now checked, and the first
+  failure aborts the write and returns an error rather than silently
+  producing a truncated log file.
+- `tests/test_record.c` ports all 7 of cpp-RCP's `test_record.cpp` cases
+  (captures entries, sequential entries, `write_binary` creates a file,
+  monotonically non-decreasing timestamps, forwards the inner result
+  unchanged, concurrent appends, playback against a target). Confirmed via
+  20 repeated local runs (debug + 20x ASan/UBSan) with no flakes.
+- **Requirements catalog gap filled**: added `REQ-REC-001` through `-008`
+  (none existed previously).
 
 ### 28. Config (v0.28.0)
 

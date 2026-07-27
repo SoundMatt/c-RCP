@@ -1041,6 +1041,70 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-REC-001",
+      "title": "Recording controller captures entries",
+      "text": "Every send() through a recording controller shall append exactly one entry to its Record, capturing the command's type and the send's result.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-REC-002",
+      "title": "Multiple sends produce sequential entries",
+      "text": "N successive send() calls through a recording controller shall append N entries to its Record, in order.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-REC-003",
+      "title": "write_binary creates a non-empty file",
+      "text": "rcp_record_write_binary() shall write a non-empty file for a Record containing at least one entry.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-REC-004",
+      "title": "Playback replays entries against a target controller",
+      "text": "rcp_playback_run_all() shall send() every recorded entry's command to the target controller.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-REC-005",
+      "title": "speed_factor of 0 disables inter-entry delays",
+      "text": "A rcp_playback_config_t with speed_factor == 0.0 shall replay every entry back-to-back without pausing for the recorded inter-entry timing.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-REC-006",
+      "title": "Entry timestamps are monotonically non-decreasing",
+      "text": "Consecutive entries appended to the same Record shall have timestamp_ms values that never decrease.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-REC-007",
+      "title": "Forwards inner send result unchanged",
+      "text": "A recording controller's send() shall return the inner controller's result verbatim, and capture that same result in the appended entry.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-REC-008",
+      "title": "Record tolerates concurrent appends",
+      "text": "rcp_record's append path shall be safe to call concurrently from multiple threads without data races or lost entries.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-LOAN-001",
       "title": "loan() returns zeroed buffer",
       "text": "rcp_loan_controller_t::loan(n) shall return a zeroed byte vector of exactly n bytes.",
