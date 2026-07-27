@@ -42,13 +42,30 @@ const char *rcp_strerror(rcp_errc_t e)
 const char *rcp_zone_string(rcp_zone_t z)
 {
     switch (z) {
-    case RCP_ZONE_FRONT_LEFT:  return "front-left";
-    case RCP_ZONE_FRONT_RIGHT: return "front-right";
-    case RCP_ZONE_REAR_LEFT:   return "rear-left";
-    case RCP_ZONE_REAR_RIGHT:  return "rear-right";
-    case RCP_ZONE_CENTRAL:     return "central";
-    default:                   return "unknown";
+    case RCP_ZONE_FRONT_LEFT:  return "FrontLeft";
+    case RCP_ZONE_FRONT_RIGHT: return "FrontRight";
+    case RCP_ZONE_REAR_LEFT:   return "RearLeft";
+    case RCP_ZONE_REAR_RIGHT:  return "RearRight";
+    case RCP_ZONE_CENTRAL:     return "Central";
+    default:                   return "Unknown";
     }
+}
+
+/* Accepts both the canonical PascalCase form rcp_zone_string() emits and the
+ * legacy kebab-case form this function returned before RELAY spec
+ * conformance (see rcp_zone_string()'s history), so callers holding
+ * previously-persisted or previously-logged zone names still resolve. */
+//cfusa:req REQ-ZONE-009
+rcp_zone_t rcp_zone_from_string(const char *s)
+{
+    if (!s) return RCP_ZONE_UNKNOWN;
+
+    if (strcmp(s, "FrontLeft") == 0 || strcmp(s, "front-left") == 0)   return RCP_ZONE_FRONT_LEFT;
+    if (strcmp(s, "FrontRight") == 0 || strcmp(s, "front-right") == 0) return RCP_ZONE_FRONT_RIGHT;
+    if (strcmp(s, "RearLeft") == 0 || strcmp(s, "rear-left") == 0)     return RCP_ZONE_REAR_LEFT;
+    if (strcmp(s, "RearRight") == 0 || strcmp(s, "rear-right") == 0)   return RCP_ZONE_REAR_RIGHT;
+    if (strcmp(s, "Central") == 0 || strcmp(s, "central") == 0)        return RCP_ZONE_CENTRAL;
+    return RCP_ZONE_UNKNOWN;
 }
 
 //cfusa:req REQ-STATUS-001

@@ -2458,8 +2458,8 @@
     },
     {
       "id": "REQ-ZONE-001",
-      "title": "rcp_zone_string() returns unique human-readable name",
-      "text": "rcp_zone_string() shall return a unique, non-empty, human-readable string for each defined rcp_zone_t constant. Two distinct rcp_zone_t constants shall never return the same string.",
+      "title": "rcp_zone_string() returns unique PascalCase name",
+      "text": "rcp_zone_string() shall return a unique, non-empty, PascalCase string (e.g. \"FrontLeft\") for each defined rcp_zone_t constant, per RELAY spec routing conventions. Two distinct rcp_zone_t constants shall never return the same string.",
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A"
@@ -2519,6 +2519,14 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ZONE-009",
+      "title": "rcp_zone_from_string() reverses rcp_zone_string(), accepts legacy form",
+      "text": "rcp_zone_from_string() shall return the rcp_zone_t constant matching a zone name previously returned by rcp_zone_string() (PascalCase), shall also accept the legacy kebab-case form for backward compatibility, and shall return RCP_ZONE_UNKNOWN for NULL or an unrecognized string.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
     }
   ]
 }
