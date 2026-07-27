@@ -667,9 +667,32 @@ the active controller manually — calling it twice returns to primary.
 - **Requirements catalog gap filled**: added `REQ-RED-001` through `-008`
   (none existed previously, following the established pattern).
 
-### 24. Multi-HPC Federation (v0.24.0)
+### 24. Multi-HPC Federation (v0.24.0) ✅
 
-`include/rcp/federation.h`: multiple active HPCs coordinating disjoint zone ownership.
+`include/rcp/federation.h` + `src/federation.c`: ports cpp-RCP's
+`federation.hpp` — `rcp_federation_registry_new(local_id)` is a standalone
+`rcp_registry_t` implementation whose `lookup()` prefers a locally
+registered controller, and falls through to a time-bounded remote-HPC
+lease (`rcp_federation_registry_add_lease()`) when no local registration
+exists. An expired lease (`rcp_monotonic_ms() >= expires_at_ms`) causes
+`lookup()` to return `RCP_ERR_NOT_FOUND` until refreshed.
+- **Deviation note**: cpp-RCP's `add_lease(Zone, Lease)` takes a raw
+  `Lease` struct whose `remote_ctrl` field is a `std::shared_ptr` the
+  caller must populate correctly, sharing ownership implicitly via the
+  struct copy. This port instead exposes
+  `rcp_federation_registry_add_lease()` taking the remote controller
+  directly and retaining it internally — there's no public `Lease` type
+  with an ownership-ambiguous pointer field for a caller to get wrong.
+- `register_ctrl()`/`deregister()`/`controllers()` only ever touch the
+  local-controller table, never leases — matching cpp-RCP's own map
+  separation (`local_` vs `leases_`) exactly: leases are visible only
+  through `lookup()`'s fallback path.
+- `tests/test_federation.c` ports all 8 of cpp-RCP's `test_federation.cpp`
+  cases (local-preferred-over-lease, remote-lease-when-no-local,
+  expired-lease, revoke-lease, local_id preserved, duplicate-zone
+  rejection, close closes both tables, closed-registry lookup).
+- **Requirements catalog gap filled**: added `REQ-FED-001` through `-008`
+  (none existed previously).
 
 ---
 ### Phase 8 — Tooling

@@ -849,6 +849,70 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-FED-001",
+      "title": "Local controller preferred over lease",
+      "text": "lookup() shall return the locally registered controller for a zone even when a remote lease also exists for it.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FED-002",
+      "title": "Expired lease returns RCP_ERR_NOT_FOUND",
+      "text": "lookup() shall return RCP_ERR_NOT_FOUND for a zone whose only lease has passed its expires_at_ms deadline.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FED-003",
+      "title": "revoke_lease() removes an active lease",
+      "text": "revoke_lease() shall remove the lease for a zone, after which lookup() for that zone returns RCP_ERR_NOT_FOUND (absent a local registration).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FED-004",
+      "title": "Remote lease used when no local controller registered",
+      "text": "lookup() shall return the leased remote controller for a zone that has no local registration.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FED-005",
+      "title": "local_id is preserved",
+      "text": "rcp_federation_registry_local_id() shall return the local_id passed to rcp_federation_registry_new().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FED-006",
+      "title": "close() closes local and remote controllers",
+      "text": "close() shall close every locally registered controller and every leased remote controller.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FED-007",
+      "title": "Closed registry returns RCP_ERR_CLOSED on lookup",
+      "text": "lookup() on a closed federated registry shall return RCP_ERR_CLOSED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FED-008",
+      "title": "register_ctrl rejects duplicate zone",
+      "text": "register_ctrl() shall return RCP_ERR_ALREADY_EXISTS when a local controller is already registered for that zone.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-LOAN-001",
       "title": "loan() returns zeroed buffer",
       "text": "rcp_loan_controller_t::loan(n) shall return a zeroed byte vector of exactly n bytes.",

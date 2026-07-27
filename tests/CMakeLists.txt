@@ -137,3 +137,8 @@ add_executable(test_redundancy test_redundancy.c)
 target_link_libraries(test_redundancy PRIVATE rcp::rcp unity)
 target_compile_options(test_redundancy PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_redundancy COMMAND test_redundancy)
+
+add_executable(test_federation test_federation.c)
+target_link_libraries(test_federation PRIVATE rcp::rcp unity)
+target_compile_options(test_federation PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_federation COMMAND test_federation)
