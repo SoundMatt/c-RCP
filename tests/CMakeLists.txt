@@ -199,3 +199,8 @@ add_executable(test_ddsbr test_ddsbr.c)
 target_link_libraries(test_ddsbr PRIVATE rcp::rcp unity)
 target_compile_options(test_ddsbr PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_ddsbr COMMAND test_ddsbr)
+
+add_executable(test_mqttbr test_mqttbr.c)
+target_link_libraries(test_mqttbr PRIVATE rcp::rcp unity)
+target_compile_options(test_mqttbr PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_mqttbr COMMAND test_mqttbr)

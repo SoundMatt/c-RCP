@@ -1361,6 +1361,38 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-MQTT-001",
+      "title": "send() returns RCP_ERR_NOT_SUPPORTED when stub",
+      "text": "Until a concrete MQTT backend is linked, send() shall return RCP_ERR_NOT_SUPPORTED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MQTT-002",
+      "title": "zone() returns configured zone",
+      "text": "zone() shall return the zone passed to rcp_mqtt_controller_new(), regardless of backend availability.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MQTT-003",
+      "title": "subscribe() returns RCP_ERR_NOT_SUPPORTED when stub",
+      "text": "Until a concrete MQTT backend is linked, subscribe() shall return RCP_ERR_NOT_SUPPORTED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MQTT-004",
+      "title": "close() returns no error",
+      "text": "close() shall return RCP_OK even when no backend is linked.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-LOAN-001",
       "title": "loan() returns zeroed buffer",
       "text": "rcp_loan_controller_t::loan(n) shall return a zeroed byte vector of exactly n bytes.",
