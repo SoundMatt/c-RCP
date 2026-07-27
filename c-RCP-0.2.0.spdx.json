@@ -1,0 +1,97 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "c-RCP",
+  "documentNamespace": "https://github.com/SoundMatt/c-FuSa/sbom/c-RCP-0.2.0",
+  "creationInfo": {
+    "created": "2026-07-27T14:06:51Z",
+    "creators": ["Tool: cfusa"]
+  },
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package",
+      "name": "c-RCP",
+      "versionInfo": "0.2.0",
+      "downloadLocation": "https://github.com/SoundMatt/c-FuSa",
+      "licenseConcluded": "MPL-2.0",
+      "licenseDeclared": "MPL-2.0",
+      "copyrightText": "NOASSERTION"
+    }
+  ],
+  "files": [
+    {
+      "SPDXID": "SPDXRef-File-1",
+      "fileName": "./mock.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "ec2b0a87c520c79bccbf806daa948d11928e75391a6c99cda0d87769ae41e2cd"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-2",
+      "fileName": "./rcp.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "4239fd17a375982ea13ce557523a8326bd528a3c41973aa0ca1e501c2b0f0819"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-3",
+      "fileName": "./clock.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "f907473a6a7de9be91e981bf19c4d417c2685870677b60aff6f21cc733040c92"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-4",
+      "fileName": "./relay.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "052b46bf9dc74a06bde10ee6f5a94074f998ba0991837516d812978f973d3e87"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-5",
+      "fileName": "./clock.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "c5c62e612e9da074abbf21db9e31d7f74e10622d554db8e9dfc413b8f44a1597"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-6",
+      "fileName": "./platform.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "eff1fd91ae131fbb02255200bb0703db6f3b815df265155a45c96340742798d2"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-7",
+      "fileName": "./mock.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "c76a158b6a693c438d363a544eb35189871a01ddb5fc6b2a4ba7727ea08bce4a"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-8",
+      "fileName": "./platform.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "53f2230aa826cd3c8955144cfdb4fc4b95502fa2fe73fef42c06a71898bbaa26"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-9",
+      "fileName": "./rcp.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "9a1ec4068d08238470be5af96a2d006a45dee2b1a087229859c9a60acc662261"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-10",
+      "fileName": "./test_rcp.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "a101960f867f8d69d3faa38d5c6ff73dab2c4d315e6fde141e64a03e2a6de78f"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-11",
+      "fileName": "./test_mock.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "5c824eb897d51b4474dc7354f10b856c32d23d8a38d918219c57ab565155d5f2"}]
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package"
+    }
+  ]
+}
