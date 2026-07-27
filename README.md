@@ -100,6 +100,6 @@ Errors are returned as `rcp_errc_t` values (a plain `int` return code; `RCP_OK` 
 
 c-RCP targets deployment in automotive safety-critical environments.
 
-- Safety standard: ISO 26262 ASIL-B / IEC 61508 SIL-2
+- Safety standard: ISO 26262 ASIL-B baseline / IEC 61508 SIL-2 (see `HARA.md` — several hazards currently compute to ASIL-C/D, open and tracked)
 - Security standard: IEC 62443 SL-2
 - c-FuSa static analysis (MISRA-C:2012 / CERT-C) runs in CI on every PR
