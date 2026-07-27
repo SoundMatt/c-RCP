@@ -698,9 +698,32 @@ exists. An expired lease (`rcp_monotonic_ms() >= expires_at_ms`) causes
 ### Phase 8 — Tooling
 ---
 
-### 25. Observability (v0.25.0)
+### 25. Observability (v0.25.0) ✅
 
-`include/rcp/observe.h`: OpenTelemetry traces and Prometheus-compatible metrics.
+`include/rcp/observe.h` + `src/observe.c`: ports cpp-RCP's `observe.hpp` —
+`rcp_observe_controller_new()` wraps any controller (same generic-decorator
+vtable pattern used since v0.9.0) and records a latency span plus
+`rcp.commands.total`/`rcp.commands.errors` counters around every `send()`,
+exported via a caller-supplied `rcp_metrics_sink_t`.
+- Since C has no virtual dispatch, `MetricsSink` becomes a `(vtable, ctx)`
+  pair (`rcp_metrics_sink_t` + `rcp_metrics_sink_vtable_t`) rather than an
+  abstract base class — the same borrowed-callback convention already used
+  by `rcp_sim_handler_fn`/`rcp_watchdog_health_fn`. `rcp_noop_metrics_sink()`
+  and `rcp_in_memory_sink_*()` (a real, thread-safe, growable span
+  collector for test/debug use) port cpp-RCP's `NoopSink`/`InMemorySink`
+  directly; cpp-RCP's own `CountingSink` is private to its test file, so it
+  stays a private test double here too (`tests/test_observe.c`).
+- **Deviation note**: span timestamps use `rcp_monotonic_ms()` (millisecond
+  resolution) rather than cpp-RCP's `std::chrono::steady_clock`
+  (sub-microsecond resolution) — this project has no higher-resolution
+  clock primitive anywhere else, and every other module's timing already
+  operates at millisecond granularity, so a new one just for this module
+  would be inconsistent scope creep.
+- `tests/test_observe.c` ports all 7 of cpp-RCP's `test_observe.cpp` cases.
+  Confirmed via 20 repeated local runs (debug + 20x ASan/UBSan) with no
+  flakes.
+- **Requirements catalog gap filled**: added `REQ-OBS-001` through `-008`
+  (none existed previously).
 
 ### 26. Admin API (v0.26.0)
 

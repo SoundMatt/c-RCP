@@ -913,6 +913,70 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-OBS-001",
+      "title": "Span recorded on successful send",
+      "text": "send() shall record exactly one span per call, carrying the command's zone and command type.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-OBS-002",
+      "title": "Multiple sends accumulate spans",
+      "text": "InMemorySink shall accumulate one span per send() call across repeated calls, in order.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-OBS-003",
+      "title": "Span duration is non-negative",
+      "text": "A recorded span's end timestamp shall never precede its start timestamp.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-OBS-004",
+      "title": "Span captures the send's error code",
+      "text": "A recorded span's result field shall equal the error code returned by the wrapped send() call.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-OBS-005",
+      "title": "Noop sink does not crash",
+      "text": "The default no-op metrics sink shall accept every record_span/record_gauge/record_counter call without side effects or crashing.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-OBS-006",
+      "title": "InMemorySink is thread-safe under concurrent spans",
+      "text": "InMemorySink shall record every span from concurrent send() calls across multiple threads without data races or lost updates.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-OBS-007",
+      "title": "commands.total counter increments per send",
+      "text": "Every send() call, successful or not, shall increment the rcp.commands.total counter by 1 for that command's zone.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-OBS-008",
+      "title": "commands.errors counter increments on failure",
+      "text": "A send() call that returns a non-RCP_OK error shall additionally increment the rcp.commands.errors counter by 1 for that command's zone.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-LOAN-001",
       "title": "loan() returns zeroed buffer",
       "text": "rcp_loan_controller_t::loan(n) shall return a zeroed byte vector of exactly n bytes.",
