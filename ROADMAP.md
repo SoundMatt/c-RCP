@@ -1350,3 +1350,32 @@ not just the dedicated conformance job's single Ubuntu runner.
   (mirror cpp-RCP) was deliberately overridden by a more specific,
   better-reasoned choice, spelled out explicitly rather than silently
   diverging.
+
+---
+### 49. CI hardening: remove vestigial CFUSA-L004 escape hatch (v0.49.0)
+---
+
+A deep compliance audit (2026-07-27) verifying that CI's `cfusa-*` gates
+are real (not decorative) surfaced a correction to this project's own
+prior understanding: `cfusa-check`/`cfusa-lint` had carried
+`continue-on-error: true` since v0.1.0, shielding against a confirmed
+c-FuSa tool bug (`CFUSA-L004`, a naive recursion-check false positive,
+tracked as `SoundMatt/c-FuSa#59`). Auditing against the *actual* CI-built
+c-FuSa binary (not a stale local rebuild — an easy trap, since a local
+binary built earlier in this project's history no longer matches what
+`git clone --depth=1` fetches fresh on every CI run) showed the bug was
+fixed upstream in c-FuSa v0.5.39, and the real, current CI has been
+reporting 0 `CFUSA-L004` findings — and 0 errors overall — on every run
+since, without anyone noticing the escape hatch was no longer needed.
+- Removed `continue-on-error: true` from both `cfusa-check` and
+  `cfusa-lint` in `.github/workflows/ci.yml`, restoring them as genuine
+  hard gates.
+- Cleared the now-stale `DISP-0001` entry from `.fusa-dispositions.json`
+  (an "accept" disposition for a finding that no longer occurs is
+  inaccurate bookkeeping, not a harmless leftover).
+- **Verified against a freshly-rebuilt local c-FuSa binary** (v0.5.44,
+  matching CI) before shipping: `check`/`lint`/`analyze`/`cyber`/
+  `trace`/`qualify`/`vuln` all genuinely exit 0, not just "look green"
+  from a stale cache.
+- No new `.c`/`.h`/test files — workflow and disposition-bookkeeping
+  changes only.
