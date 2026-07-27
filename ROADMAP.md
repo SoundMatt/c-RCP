@@ -1319,6 +1319,34 @@ expose `version`/`capabilities`/`status` as a runnable CLI, gated behind
   it, not by disabling or loosening the gate.
 - **Requirements catalog**: added `REQ-CLI-001` through `-006`.
 
-### 48. `relay conform` CI gate (v0.48.0) — closes #12
+### 48. `relay conform` CI gate (v0.48.0) ✅ — closes #12
 
-_(pending)_
+The final finding of the five-issue RELAY-ecosystem audit, and a
+direct consequence of milestone 47 landing: `.github/workflows/ci.yml`
+gains a new `relay-conform` job — checkout `SoundMatt/RELAY`, build its
+`cmd/relay` conformance tool from source, build `c-rcp` with
+`-DRELAY_BUILD_CLI=ON`, and run `relay conform --strict` against it —
+mirroring cpp-RCP's own `ci.yml` job template exactly (`cpp-rcp`
+renamed to `c-rcp`, no other structural changes). The main
+`build-and-test` matrix's `Configure` step also gains
+`-DRELAY_BUILD_CLI=ON`, so the CLI compiles and its unit tests
+(`tests/test_cli.c`) run across all 4 platforms in the existing matrix,
+not just the dedicated conformance job's single Ubuntu runner.
+- **Verified locally before ever touching CI**: built `relay` from
+  `SoundMatt/RELAY` source and ran `relay conform --strict` against a
+  local `-DRELAY_BUILD_CLI=ON` build — PASS on all three documents —
+  the same verification already done once at milestone 47, repeated
+  here against the final CI-wired configuration to catch any
+  regression before pushing.
+- No new `.c`/`.h`/test files: this is CI/workflow wiring only, per the
+  issue's own scope note ("filing separately only in case the CLI gets
+  added without someone remembering to also add the CI gate").
+- **This completes the five-issue RELAY-ecosystem conformance audit**
+  (`SoundMatt/c-RCP#8`–`#12`) filed 2026-07-27, each shipped as its own
+  versioned release (v0.44.0–v0.48.0) in dependency order, verified
+  against the real spec/tooling (not assumed), and each documented
+  transparently — including the two places (the zone-string fix, the
+  CLI `language` field) where this project's own established precedent
+  (mirror cpp-RCP) was deliberately overridden by a more specific,
+  better-reasoned choice, spelled out explicitly rather than silently
+  diverging.
