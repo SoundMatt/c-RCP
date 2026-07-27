@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(c-rcp
-    VERSION 0.28.0
+    VERSION 0.29.0
     DESCRIPTION "Remote Control Protocol for automotive zonal architecture (C)"
     HOMEPAGE_URL "https://github.com/SoundMatt/c-RCP"
     LANGUAGES C

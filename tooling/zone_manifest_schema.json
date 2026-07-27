@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://rcp.example.com/schemas/zone-manifest/v1",
+  "title": "c-RCP Zone Manifest",
+  "description": "Schema for the zone registry manifest loaded by rcp_config_load() (rcp/config.h)",
+  "type": "object",
+  "required": ["zones"],
+  "properties": {
+    "version": {
+      "type": "string",
+      "description": "Manifest schema version (semver)",
+      "default": "1.0.0"
+    },
+    "zones": {
+      "type": "array",
+      "description": "List of zone definitions",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/ZoneEntry"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "ZoneEntry": {
+      "type": "object",
+      "required": ["zone"],
+      "properties": {
+        "zone": {
+          "type": "string",
+          "enum": ["FrontLeft", "FrontRight", "RearLeft", "RearRight", "Central"],
+          "description": "Zone identifier matching rcp_zone_t"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["Low", "Normal", "High", "Critical"],
+          "default": "Normal",
+          "description": "Default command priority for this zone (currently informational only -- rcp_config_load() does not yet act on this field, matching cpp-RCP's own config.hpp)"
+        },
+        "transport": {
+          "type": "string",
+          "enum": ["mock", "udp", "shmem", "tls", "tsn"],
+          "default": "mock",
+          "description": "Transport adapter to instantiate for this zone (currently informational only -- rcp_config_load() always registers a mock controller regardless of this field, matching cpp-RCP's own load(), which likewise ignores it entirely). Limited to the transports shipped as of this milestone (v0.29.0); does not include protocol bridges landing in later milestones."
+        },
+        "address": {
+          "type": "string",
+          "description": "Transport-specific address (IP:port, socket path, etc.)"
+        },
+        "extra": {
+          "type": "object",
+          "description": "Transport-specific extra configuration",
+          "additionalProperties": true
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

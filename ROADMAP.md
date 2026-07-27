@@ -825,9 +825,40 @@ formatting, understanding only this module's own manifest schema).
 - **Requirements catalog gap filled**: added `REQ-CFG-001` through `-006`
   (none existed previously).
 
-### 29. Code Generation (v0.29.0)
+### 29. Code Generation (v0.29.0) ✅
 
-Zone manifest schema and generator stub emitting `fusa:req`-annotated C stubs.
+`tooling/zone_manifest_schema.json`: a JSON Schema document for the zone
+manifest format `rcp/config.h` (v0.28.0) already loads.
+- **Scope note — the largest gap yet between roadmap prose and shipped
+  code**: this project's own `ROADMAP.md` entry (written from cpp-RCP's
+  roadmap prose before this milestone was reached) promised "a generator
+  stub emitting `fusa:req`-annotated C stubs." cpp-RCP's own `ROADMAP.md`
+  goes further still, describing an `rcptool gen <manifest.yaml>` CLI that
+  "generates typed C++ controller stubs with `// fusa:req` annotations
+  pre-populated," complete with matching test skeletons and requirements
+  entries. **None of that exists anywhere in cpp-RCP's actual repository**
+  — no `rcptool`, no generator source, no generated-stub examples, not
+  even a stub interface header. Searching the entire tree turns up exactly
+  one artifact for this whole milestone: `tooling/zone_manifest_schema.json`,
+  a JSON Schema describing the manifest format that `config.hpp`'s
+  hand-rolled parser already validates informally through its own parsing
+  logic. This port ships the direct equivalent — nothing more, since
+  nothing more was ever built. (cpp-RCP's own `.fusa-reqs.json` has no
+  `REQ-CODEGEN-*` entries either, confirming this was never treated as
+  testable, shippable code even upstream.)
+- The `transport` enum is scoped to what this project has actually shipped
+  as of v0.29.0 (`mock`, `udp`, `shmem`, `tls`, `tsn`) rather than
+  cpp-RCP's own schema file, which lists every protocol bridge across its
+  *entire* finished history (gRPC, REST, SOME/IP, CAN, DDS, MQTT, LIN, UDS,
+  DoIP) — those don't exist in cpp-RCP's own repository until milestones
+  31–38, well after this one, so listing them here would describe
+  capabilities this project hasn't built yet. Both `priority` and
+  `transport` are documented as currently informational-only, since
+  `rcp_config_load()` (like cpp-RCP's own `load()`) ignores both fields
+  and always registers a plain mock controller regardless of what the
+  manifest requests.
+- No new `.c`/`.h`/test files, and no new `REQ-*` catalog entries (there is
+  no executable requirement to trace for a schema document).
 
 ### 30. Dynamic Data (v0.30.0)
 
