@@ -2631,6 +2631,54 @@
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-CLI-001",
+      "title": "version command emits a schema-conformant document",
+      "text": "rcp_cli_run() shall, given the 'version' command, print a document (JSON or text per --format) containing the tool name, RCP_VERSION, RELAY_SPEC_VERSION, and language/runtime fields, conforming to RELAY spec/schemas/cli-version.json.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-CLI-002",
+      "title": "capabilities command emits a schema-conformant document",
+      "text": "rcp_cli_run() shall, given the 'capabilities' command, always print a JSON document listing the tool's implemented commands (including at least version/capabilities/status), transports, interfaces, and adapt status, conforming to RELAY spec/schemas/cli-capabilities.json.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-CLI-003",
+      "title": "status command emits a schema-conformant document",
+      "text": "rcp_cli_run() shall, given the 'status' command, print a document (JSON or text per --format) containing tool/version/healthy/connected/endpoint/details fields, conforming to RELAY spec/schemas/cli-status.json, and shall return exit code 0 when healthy.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-CLI-004",
+      "title": "Unknown command or missing argument returns exit code 2",
+      "text": "rcp_cli_run() shall return RCP_CLI_INVALID_ARGS (2) for an empty argument list, an unrecognized command, or an unrecognized/incomplete --format value, per RELAY spec §11.3 exit code conventions.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-CLI-005",
+      "title": "--format text|json selects the document encoding",
+      "text": "rcp_cli_run() shall default to text output when --format is absent, honor --format json / --format text when present, and reject any other --format value.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-CLI-006",
+      "title": "CLI entry point forwards process arguments to rcp_cli_run()",
+      "text": "The c-rcp executable's main() shall forward argv[1..argc) and stdout/stderr to rcp_cli_run() unmodified and return its exit code, per the RELAY spec's CLI contract (§11.3).",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
     }
   ]
 }
