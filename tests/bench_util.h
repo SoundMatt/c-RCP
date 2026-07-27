@@ -5,6 +5,13 @@
 #ifndef RCP_TEST_BENCH_UTIL_H
 #define RCP_TEST_BENCH_UTIL_H
 
+/* Must precede any system header on POSIX (see clock.c/platform.c for the
+ * same fix and rationale): exposes clock_gettime()/CLOCK_MONOTONIC on
+ * glibc under strict -std=c99. */
+#if !defined(_WIN32)
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include <stdint.h>
 
 #if defined(_WIN32)
@@ -25,7 +32,6 @@ static inline uint64_t bench_now_ns(void)
 }
 
 #else
-#define _POSIX_C_SOURCE 200809L
 #include <time.h>
 
 static inline uint64_t bench_now_ns(void)

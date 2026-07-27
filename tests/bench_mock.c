@@ -7,8 +7,12 @@
  *
  * Run with: ctest -R rcp_bench --output-on-failure -V
  */
-#include "unity.h"
+/* Must be included before any other header (including unity.h, which pulls
+ * in <stdio.h> etc.): bench_util.h's _POSIX_C_SOURCE define needs to land
+ * before glibc's feature-test macros lock in on first system-header use. */
 #include "bench_util.h"
+
+#include "unity.h"
 
 #include <rcp/mock.h>
 #include <rcp/rcp.h>
