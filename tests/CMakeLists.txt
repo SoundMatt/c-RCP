@@ -214,3 +214,8 @@ add_executable(test_udsbr test_udsbr.c)
 target_link_libraries(test_udsbr PRIVATE rcp::rcp unity)
 target_compile_options(test_udsbr PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_udsbr COMMAND test_udsbr)
+
+add_executable(test_doipbr test_doipbr.c)
+target_link_libraries(test_doipbr PRIVATE rcp::rcp unity)
+target_compile_options(test_doipbr PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_doipbr COMMAND test_doipbr)

@@ -1011,9 +1011,26 @@ parameters. `send()`/`subscribe()` always return `RCP_ERR_NOT_SUPPORTED`
 - **Requirements catalog gap filled**: added `REQ-UDS-001` through `-004`
   (none existed previously).
 
-### 39. DoIP Bridge (v0.39.0)
+### 39. DoIP Bridge (v0.39.0) ✅
 
-`include/rcp/doipbr.h` — ISO 13400 Diagnostics over IP transport (stub).
+`include/rcp/doipbr.h` + `src/doipbr.c`: ports cpp-RCP's `doipbr.hpp` —
+the last of the protocol-bridge stubs, configured by `server_ip` (no
+default — `NULL` until the caller sets it, matching cpp-RCP's own
+must-be-set-by-caller `std::string`), `server_port` (default `13400`),
+`logical_addr` (default `0x0001`), and `tcp_timeout_ms` (default 2000).
+`send()`/`subscribe()` always return `RCP_ERR_NOT_SUPPORTED` (no DoIP
+stack integration linked); `zone()` returns the configured zone;
+`close()` always succeeds.
+- `tests/test_doipbr.c` ports all 4 of cpp-RCP's `test_doipbr.cpp` cases.
+- **Requirements catalog gap filled**: added `REQ-DOIP-001` through `-004`
+  (none existed previously).
+- **Phase note**: this completes Phase 10 (Automotive Protocol Bridges,
+  milestones 33–39). All seven bridges (SOME/IP, CAN, DDS, MQTT, LIN,
+  UDS, DoIP) ship the identical compile-time-stub pattern established at
+  v0.31.0 (gRPC) — none of cpp-RCP's own bridge modules link a real
+  backend, so none of the C ports do either; each is a faithful,
+  requirement-traced placeholder ready for a concrete backend to be
+  wired in later.
 
 ---
 ### Phase 11 — Platform
