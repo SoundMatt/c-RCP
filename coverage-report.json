@@ -4,6 +4,6 @@ Coverage report  source: coverage.info
 
   Line      coverage:  84.85%  (3897 / 4593)  FAIL
   Function  coverage:  89.56%  (489 / 546)
-  Branch    coverage: 100.00%  (0 / 0)  PASS
+  Branch    coverage:  62.78%  (1103 / 1757)  FAIL
 
   Overall: FAIL
