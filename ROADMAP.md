@@ -478,10 +478,28 @@ ratelimit).
   Confirmed via 20 repeated local runs (debug + 20x ASan/UBSan) with no
   flakes.
 
-### 18. Fault Injection (v0.18.0)
+### 18. Fault Injection (v0.18.0) ✅
 
-`include/rcp/faultinject.h`: structured fault injection harness validating the
-v0.11.0–v0.16.0 safety mechanisms.
+`include/rcp/faultinject.h` + `src/faultinject.c`: ports cpp-RCP's
+`faultinject.hpp` — a generic decorator (same vtable-wrapping pattern used
+since v0.9.0) that intercepts `send()` according to an ordered list of
+rules (`RCP_FI_DROP`/`_SLOW`/`_ERROR`/`_TIMEOUT`), each either firing
+forever (`count = -1`) or auto-expiring after N firings.
+- **Bug found and fixed, not reproduced**: cpp-RCP's own `pick_rule()`
+  returns a raw `Rule*` into its internal `std::vector`, but calls
+  `rules_.erase(it)` on that same element first whenever a count-based rule
+  has just expired — the returned pointer (and the caller's subsequent
+  `rule->type`/`rule->latency` reads in `send()`) is a genuine
+  use-after-free in cpp-RCP's shipped code. This port's `fi_pick()` copies
+  the rule's value out *before* deciding whether to remove it from the
+  array, so the caller only ever reads its own local copy — the array
+  mutation and the read are fully decoupled. (Scoped to this port's own
+  `ROADMAP.md`/commit history per this project's process; no upstream
+  cpp-RCP issue was filed, as that repository is out of scope for this
+  session's instructions.)
+- `tests/test_faultinject.c` ports all 8 of cpp-RCP's `test_faultinject.cpp`
+  cases (passthrough, Drop, Error, Slow, count-based expiry, clear_rules,
+  Timeout, zone passthrough).
 
 ---
 ### Phase 6 — Security

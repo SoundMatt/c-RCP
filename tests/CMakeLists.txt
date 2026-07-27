@@ -105,3 +105,8 @@ target_link_libraries(test_sim PRIVATE rcp::rcp unity)
 target_compile_options(test_sim PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_sim COMMAND test_sim)
 set_tests_properties(rcp_sim PROPERTIES TIMEOUT 30)
+
+add_executable(test_faultinject test_faultinject.c)
+target_link_libraries(test_faultinject PRIVATE rcp::rcp unity)
+target_compile_options(test_faultinject PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_faultinject COMMAND test_faultinject)
