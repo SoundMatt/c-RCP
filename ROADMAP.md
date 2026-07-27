@@ -985,9 +985,17 @@ zone; `close()` always succeeds.
 - **Requirements catalog gap filled**: added `REQ-MQTT-001` through `-004`
   (none existed previously).
 
-### 37. LIN Bridge (v0.37.0)
+### 37. LIN Bridge (v0.37.0) ✅
 
-`include/rcp/linbr.h` — bridge to LIN frames (stub).
+`include/rcp/linbr.h` + `src/linbr.c`: ports cpp-RCP's `linbr.hpp` — the
+simplest protocol-bridge config yet, just `frame_id` (`uint8_t`, default
+`0x10`) and `timeout_ms`. `send()`/`subscribe()` always return
+`RCP_ERR_NOT_SUPPORTED` (no SocketCAN LIN driver or dedicated LIN
+hardware API backend linked); `zone()` returns the configured zone;
+`close()` always succeeds.
+- `tests/test_linbr.c` ports all 4 of cpp-RCP's `test_linbr.cpp` cases.
+- **Requirements catalog gap filled**: added `REQ-LIN-001` through `-004`
+  (none existed previously).
 
 ### 38. UDS Bridge (v0.38.0)
 
