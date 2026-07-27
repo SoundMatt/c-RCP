@@ -4,9 +4,12 @@
 # (e.g. TEST_ASSERT_TRUE(RCP_PRIORITY_HIGH > RCP_PRIORITY_NORMAL) over two
 # enum literals) are exactly what unit tests are for — MSVC's C4127 flags
 # that pattern unconditionally, so it's noise here rather than signal.
+# C4310 ("cast truncates constant value") is the same category of noise:
+# TEST_ASSERT_EQUAL_HEX8(0xAA, ...) intentionally narrows an int literal
+# >0x7F to uint8_t inside Unity's own macro expansion.
 set(RCP_TEST_WARNING_FLAGS ${RCP_WARNING_FLAGS})
 if(MSVC)
-    list(APPEND RCP_TEST_WARNING_FLAGS /wd4127)
+    list(APPEND RCP_TEST_WARNING_FLAGS /wd4127 /wd4310)
 endif()
 
 add_executable(test_rcp test_rcp.c)
