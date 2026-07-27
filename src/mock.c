@@ -286,6 +286,8 @@ static const rcp_controller_vtable_t mock_controller_vtable = {
     mock_controller_subscribe,
     mock_controller_close,
     mock_controller_destroy,
+    NULL, /* loan: not supported */
+    NULL, /* send_loaned: not supported */
 };
 
 rcp_controller_t *rcp_mock_controller_new(rcp_zone_t zone, rcp_mock_handler_fn handler, void *user_data)

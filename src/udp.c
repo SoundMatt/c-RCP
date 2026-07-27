@@ -746,6 +746,8 @@ static const rcp_controller_vtable_t udp_controller_vtable = {
     udp_controller_subscribe,
     udp_controller_close,
     udp_controller_destroy,
+    NULL, /* loan: not supported */
+    NULL, /* send_loaned: not supported */
 };
 
 rcp_controller_t *rcp_udp_controller_new(rcp_zone_t zone, const char *server_host, uint16_t server_port)
@@ -1015,7 +1017,7 @@ static int stub_close(rcp_controller_t *self) { (void)self; return RCP_OK; }
 static void stub_destroy(rcp_controller_t *self) { free(self); }
 
 static const rcp_controller_vtable_t udp_stub_vtable = {
-    stub_zone, stub_send, stub_subscribe, stub_close, stub_destroy,
+    stub_zone, stub_send, stub_subscribe, stub_close, stub_destroy, NULL, NULL,
 };
 
 rcp_controller_t *rcp_udp_controller_new(rcp_zone_t zone, const char *server_host, uint16_t server_port)

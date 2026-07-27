@@ -327,6 +327,8 @@ static const rcp_controller_vtable_t shmem_controller_vtable = {
     shmem_ctrl_subscribe,
     shmem_ctrl_close,
     shmem_ctrl_destroy,
+    NULL, /* loan: not supported */
+    NULL, /* send_loaned: not supported */
 };
 
 rcp_controller_t *rcp_shmem_controller_new(rcp_shmem_zone_server_t *server)

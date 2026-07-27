@@ -55,3 +55,8 @@ add_executable(test_shmem test_shmem.c)
 target_link_libraries(test_shmem PRIVATE rcp::rcp unity)
 target_compile_options(test_shmem PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_shmem COMMAND test_shmem)
+
+add_executable(test_loan test_loan.c)
+target_link_libraries(test_loan PRIVATE rcp::rcp unity)
+target_compile_options(test_loan PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_loan COMMAND test_loan)

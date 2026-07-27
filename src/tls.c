@@ -61,6 +61,8 @@ static const rcp_controller_vtable_t tls_controller_vtable = {
     tls_subscribe,
     tls_close,
     tls_destroy,
+    NULL, /* loan: not supported */
+    NULL, /* send_loaned: not supported */
 };
 
 rcp_controller_t *rcp_tls_controller_new(rcp_zone_t zone, const char *server_host,

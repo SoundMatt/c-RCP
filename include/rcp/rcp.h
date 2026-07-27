@@ -107,6 +107,12 @@
 extern "C" {
 #endif
 
+/* Opaque forward declaration: the full definition (and the loaning
+ * extension's public API) lives in loan.h, which includes this header —
+ * only a pointer to it is needed here, in the optional loan/send_loaned
+ * vtable slots below. */
+typedef struct rcp_loan rcp_loan_t;
+
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 
 typedef enum {
@@ -306,6 +312,15 @@ typedef struct {
     /* Frees the concrete implementation once its refcount reaches 0. Never
      * called directly; invoked by rcp_controller_release(). */
     void (*destroy)(rcp_controller_t *self);
+
+    /* Optional — NULL for controllers that don't support loaning (most
+     * don't). Mirrors cpp-RCP's LoaningController, a Controller subtype
+     * with two extra methods; C has no subtyping, so capability is
+     * signalled by a nullable vtable slot instead of a downcast. See
+     * loan.h for the wrapper that implements these. */
+    int (*loan)(rcp_controller_t *self, int size, rcp_loan_t **out);
+    int (*send_loaned)(rcp_controller_t *self, const rcp_context_t *ctx,
+                        rcp_command_t *cmd, rcp_response_t *out);
 } rcp_controller_vtable_t;
 
 /* Base "class": concrete implementations embed this as their first member
@@ -339,6 +354,21 @@ static inline int rcp_controller_subscribe(rcp_controller_t *c, const rcp_contex
 static inline int rcp_controller_close(rcp_controller_t *c)
 {
     return c->vt->close(c);
+}
+
+/* Both return RCP_ERR_NOT_SUPPORTED if c's vtable doesn't implement the
+ * loaning extension (vt->loan / vt->send_loaned is NULL) — see loan.h. */
+static inline int rcp_controller_loan(rcp_controller_t *c, int size, rcp_loan_t **out)
+{
+    if (!c->vt->loan) return RCP_ERR_NOT_SUPPORTED;
+    return c->vt->loan(c, size, out);
+}
+
+static inline int rcp_controller_send_loaned(rcp_controller_t *c, const rcp_context_t *ctx,
+                                              rcp_command_t *cmd, rcp_response_t *out)
+{
+    if (!c->vt->send_loaned) return RCP_ERR_NOT_SUPPORTED;
+    return c->vt->send_loaned(c, ctx, cmd, out);
 }
 
 /* ── Registry — vtable-based interface ────────────────────────────────────── */
