@@ -1,6 +1,6 @@
 # Software Accomplishment Summary (SAS)
 
-**Project:** c-RCP v0.24.0  |  **DAL:** DAL-B  |  **Generated:** 2026-07-27T18:20:24Z  |  **Standard:** DO-178C §11.20
+**Project:** c-RCP v0.25.0  |  **DAL:** DAL-B  |  **Generated:** 2026-07-27T18:29:43Z  |  **Standard:** DO-178C §11.20
 
 | ID | Description | Evidence Type | Status |
 |---|---|---|---|
