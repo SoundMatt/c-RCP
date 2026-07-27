@@ -1113,6 +1113,34 @@ C symbol names in place of cpp-RCP's C++ class names.
   milestone documents and gap-analyzes existing security controls
   rather than adding new ones.
 
-### 43. Certification (v0.43.0)
+### 43. Certification (v0.43.0) ✅
 
-ASIL-D gap analysis, structural coverage report, audit pack.
+`AUDIT_PACK.md`: the final certification-evidence document, mirroring
+cpp-RCP's own `AUDIT_PACK.md` structure and ASIL-D derogation rationale
+(the underlying architecture — single-channel zonal network with E2E
+protection — is identical between both projects), but reporting c-RCP's
+own measured numbers rather than copying cpp-RCP's:
+- **314 requirements across 44 groups** (vs. cpp-RCP's 198 across 24 —
+  this project's catalog grew substantially larger across the 8
+  protocol-bridge milestones and platform/verification docs cpp-RCP's
+  own catalog doesn't separately enumerate).
+- **Real, measured coverage** from this project's own
+  `coverage-report.json`: 83.33% line (3489/4187), 86.92% function,
+  meeting the ≥80% DAL-B line-coverage threshold. Branch/MC/DC coverage
+  is flagged as an **honest open item** rather than invented — this
+  project's `lcov --capture` step in `release.yml` doesn't currently
+  pass a branch-coverage flag, so `cfusa coverage` reports `0/0` for
+  branch data; closing that gap is documented as follow-up work rather
+  than papered over with a fabricated percentage (unlike cpp-RCP's own
+  `AUDIT_PACK.md`, whose per-module coverage table has no corresponding
+  machine-generated source `cfusa coverage` produces, and so isn't
+  reproduced here).
+- A full CI-gate summary table (17 gates spanning static analysis
+  through the audit pack itself) and the change-impact procedure,
+  ported near-verbatim since both projects run the identical `cfusa`/
+  `cpfusa` gate set.
+- **No new `.c`/`.h`/test files or `REQ-*` catalog entries**: like
+  milestones 40 and 42, this is a certification-evidence document, not
+  new executable code.
+
+This completes all 43 milestones of the original roadmap.
