@@ -1,0 +1,5 @@
+{
+  "dispositions": [
+    {"id":"DISP-0001","rule":"CFUSA-L004","action":"accept","rationale":"Confirmed tool false-positive in the line-based recursion heuristic (l004_file() in c-FuSa's cmd_lint.c matches any occurrence of an unrelated function's name substring while brace-depth tracking is desynced across lines) -- rcp_monotonic_ms() is called twice in this function's body but never calls itself. Filed as SoundMatt/c-FuSa#59 with root cause and suggested fix.","reviewer":"SoundMatt","ref":"https://github.com/SoundMatt/c-FuSa/issues/59","createdAt":"2026-07-27T13:28:43Z"}
+  ]
+}
