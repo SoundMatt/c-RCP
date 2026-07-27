@@ -73,6 +73,7 @@ static int fed_registry_register(rcp_registry_t *self, rcp_controller_t *ctrl)
     return RCP_OK;
 }
 
+//cfusa:req REQ-FED-010
 static int fed_registry_deregister(rcp_registry_t *self, rcp_zone_t zone)
 {
     fed_registry_t   *fr = (fed_registry_t *)self;
@@ -136,6 +137,7 @@ static int fed_registry_lookup(rcp_registry_t *self, rcp_zone_t zone, rcp_contro
     return RCP_ERR_NOT_FOUND;
 }
 
+//cfusa:req REQ-FED-009
 static size_t fed_registry_controllers(rcp_registry_t *self, rcp_controller_t **out, size_t cap)
 {
     fed_registry_t *fr = (fed_registry_t *)self;

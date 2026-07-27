@@ -6,8 +6,14 @@
 //cfusa:test REQ-SHMEM-006
 //cfusa:test REQ-SHMEM-007
 //cfusa:test REQ-SHMEM-008
+//cfusa:test REQ-SHMEM-009
+//cfusa:test REQ-SHMEM-010
+//cfusa:test REQ-SHMEM-011
+//cfusa:test REQ-SHMEM-012
+//cfusa:test REQ-SHMEM-013
 #include "unity.h"
 
+#include <rcp/clock.h>
 #include <rcp/rcp.h>
 #include <rcp/shmem.h>
 
@@ -203,6 +209,80 @@ static void test_registry_close_releases_all_controllers(void)
     rcp_shmem_zone_server_release(server);
 }
 
+static void test_zone_server_close_marks_unhealthy(void)
+{
+    rcp_shmem_zone_server_t *server = rcp_shmem_zone_server_new(RCP_ZONE_FRONT_LEFT);
+
+    TEST_ASSERT_TRUE(rcp_shmem_zone_server_ok(server));
+    rcp_shmem_zone_server_close(server);
+    TEST_ASSERT_FALSE(rcp_shmem_zone_server_ok(server));
+
+    rcp_shmem_zone_server_release(server);
+}
+
+static void test_subscription_watcher_removes_sub_on_controller_close(void)
+{
+    rcp_shmem_zone_server_t *server = rcp_shmem_zone_server_new(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *ctrl = rcp_shmem_controller_new(server);
+    rcp_context_t ctx = rcp_context_background();
+    rcp_status_channel_t *ch = NULL;
+    uint64_t deadline;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
+    TEST_ASSERT_NOT_NULL(ch);
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_close(ctrl));
+
+    /* The watcher thread polls every ~1ms and, on seeing the controller
+     * closed, removes this channel from the server and closes it -- wait
+     * for that to happen rather than asserting immediately. */
+    deadline = rcp_monotonic_ms() + 500;
+    while (!rcp_status_channel_is_closed(ch) && rcp_monotonic_ms() < deadline) {
+        /* busy-wait */
+    }
+    TEST_ASSERT_TRUE(rcp_status_channel_is_closed(ch));
+
+    rcp_status_channel_release(ch);
+    rcp_controller_release(ctrl);
+    rcp_shmem_zone_server_release(server);
+}
+
+static void test_registry_controllers_lists_registered_servers(void)
+{
+    rcp_registry_t *reg = rcp_shmem_registry_new();
+    rcp_shmem_zone_server_t *a = rcp_shmem_zone_server_new(RCP_ZONE_FRONT_LEFT);
+    rcp_shmem_zone_server_t *b = rcp_shmem_zone_server_new(RCP_ZONE_REAR_RIGHT);
+    rcp_controller_t *out[4] = {0};
+    size_t n;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_shmem_registry_add_server(reg, a));
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_shmem_registry_add_server(reg, b));
+
+    n = rcp_registry_controllers(reg, out, 4);
+    TEST_ASSERT_EQUAL_UINT(2, n);
+
+    rcp_controller_release(out[0]);
+    rcp_controller_release(out[1]);
+    rcp_registry_destroy(reg);
+    rcp_shmem_zone_server_release(a);
+    rcp_shmem_zone_server_release(b);
+}
+
+static void test_registry_deregister_removes_and_closes_controller(void)
+{
+    rcp_registry_t *reg = rcp_shmem_registry_new();
+    rcp_shmem_zone_server_t *server = rcp_shmem_zone_server_new(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *out[1] = {0};
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_shmem_registry_add_server(reg, server));
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_registry_deregister(reg, RCP_ZONE_FRONT_LEFT));
+    TEST_ASSERT_EQUAL(RCP_ERR_NOT_FOUND, rcp_registry_deregister(reg, RCP_ZONE_FRONT_LEFT));
+    TEST_ASSERT_EQUAL_UINT(0, rcp_registry_controllers(reg, out, 1));
+
+    rcp_registry_destroy(reg);
+    rcp_shmem_zone_server_release(server);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -215,6 +295,10 @@ int main(void)
     RUN_TEST(test_controller_copies_payload);
     RUN_TEST(test_registry_lookup_finds_registered_server);
     RUN_TEST(test_registry_close_releases_all_controllers);
+    RUN_TEST(test_zone_server_close_marks_unhealthy);
+    RUN_TEST(test_subscription_watcher_removes_sub_on_controller_close);
+    RUN_TEST(test_registry_controllers_lists_registered_servers);
+    RUN_TEST(test_registry_deregister_removes_and_closes_controller);
 
     return UNITY_END();
 }

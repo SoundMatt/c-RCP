@@ -23,6 +23,7 @@ typedef struct {
     rcp_zone_t        zone;
 } tls_controller_t;
 
+//cfusa:req REQ-TLS-011
 static rcp_zone_t tls_zone(rcp_controller_t *self)
 {
     return ((tls_controller_t *)self)->zone;
@@ -83,6 +84,7 @@ struct rcp_tls_zone_server {
     int unused;
 };
 
+//cfusa:req REQ-TLS-012
 rcp_tls_zone_server_t *rcp_tls_zone_server_new(rcp_zone_t zone, const char *addr,
                                                 uint16_t port, rcp_tls_config_t config)
 {
@@ -90,32 +92,38 @@ rcp_tls_zone_server_t *rcp_tls_zone_server_new(rcp_zone_t zone, const char *addr
     return (rcp_tls_zone_server_t *)calloc(1, sizeof(rcp_tls_zone_server_t));
 }
 
+//cfusa:req REQ-TLS-012
 bool rcp_tls_zone_server_ok(const rcp_tls_zone_server_t *srv)
 {
     (void)srv;
     return false;
 }
 
+//cfusa:req REQ-TLS-012
 void rcp_tls_zone_server_set_handler(rcp_tls_zone_server_t *srv, rcp_tls_handler_fn handler, void *user_data)
 {
     (void)srv; (void)handler; (void)user_data;
 }
 
+//cfusa:req REQ-TLS-012
 void rcp_tls_zone_server_set_healthy(rcp_tls_zone_server_t *srv, bool healthy)
 {
     (void)srv; (void)healthy;
 }
 
+//cfusa:req REQ-TLS-012
 void rcp_tls_zone_server_publish(rcp_tls_zone_server_t *srv, const uint8_t *payload, size_t len)
 {
     (void)srv; (void)payload; (void)len;
 }
 
+//cfusa:req REQ-TLS-012
 void rcp_tls_zone_server_close(rcp_tls_zone_server_t *srv)
 {
     (void)srv;
 }
 
+//cfusa:req REQ-TLS-012
 void rcp_tls_zone_server_destroy(rcp_tls_zone_server_t *srv)
 {
     free(srv);
@@ -146,6 +154,7 @@ static int tls_reg_lookup(rcp_registry_t *self, rcp_zone_t zone, rcp_controller_
     return RCP_ERR_NOT_SUPPORTED;
 }
 
+//cfusa:req REQ-TLS-013
 static size_t tls_reg_controllers(rcp_registry_t *self, rcp_controller_t **out, size_t cap)
 {
     (void)self; (void)out; (void)cap;

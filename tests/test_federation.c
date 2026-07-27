@@ -6,6 +6,8 @@
 //cfusa:test REQ-FED-006
 //cfusa:test REQ-FED-007
 //cfusa:test REQ-FED-008
+//cfusa:test REQ-FED-009
+//cfusa:test REQ-FED-010
 #include "unity.h"
 
 #include <rcp/clock.h>
@@ -156,6 +158,42 @@ static void test_closed_registry_returns_closed_on_lookup(void)
     rcp_registry_destroy(reg);
 }
 
+static void test_controllers_lists_registered_local_controllers(void)
+{
+    rcp_registry_t *reg = rcp_federation_registry_new("hpc-a");
+    rcp_controller_t *a = make_mock(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *b = make_mock(RCP_ZONE_REAR_RIGHT);
+    rcp_controller_t *out[4] = {0};
+    size_t n;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_registry_register(reg, a));
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_registry_register(reg, b));
+
+    n = rcp_registry_controllers(reg, out, 4);
+    TEST_ASSERT_EQUAL_UINT(2, n);
+
+    rcp_controller_release(out[0]);
+    rcp_controller_release(out[1]);
+    rcp_registry_destroy(reg);
+    rcp_controller_release(a);
+    rcp_controller_release(b);
+}
+
+static void test_deregister_removes_and_closes_local_controller(void)
+{
+    rcp_registry_t *reg = rcp_federation_registry_new("hpc-a");
+    rcp_controller_t *ctrl = make_mock(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *out[1] = {0};
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_registry_register(reg, ctrl));
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_registry_deregister(reg, RCP_ZONE_FRONT_LEFT));
+    TEST_ASSERT_EQUAL(RCP_ERR_NOT_FOUND, rcp_registry_deregister(reg, RCP_ZONE_FRONT_LEFT));
+    TEST_ASSERT_EQUAL_UINT(0, rcp_registry_controllers(reg, out, 1));
+
+    rcp_registry_destroy(reg);
+    rcp_controller_release(ctrl);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -168,6 +206,8 @@ int main(void)
     RUN_TEST(test_register_ctrl_rejects_duplicate_zone);
     RUN_TEST(test_close_closes_local_and_remote_controllers);
     RUN_TEST(test_closed_registry_returns_closed_on_lookup);
+    RUN_TEST(test_controllers_lists_registered_local_controllers);
+    RUN_TEST(test_deregister_removes_and_closes_local_controller);
 
     return UNITY_END();
 }

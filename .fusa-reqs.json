@@ -993,6 +993,22 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-FED-009",
+      "title": "controllers() lists registered local controllers",
+      "text": "The federation registry's controllers() shall return a retained reference to each locally-registered controller, up to the caller's capacity, and return the true count.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FED-010",
+      "title": "deregister() removes and closes the local controller",
+      "text": "The federation registry's deregister() shall remove and close the local controller for the given zone, or return RCP_ERR_NOT_FOUND if none is registered there.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-OBS-001",
       "title": "Span recorded on successful send",
       "text": "send() shall record exactly one span per call, carrying the command's zone and command type.",
@@ -2169,6 +2185,46 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-SHMEM-009",
+      "title": "zone_server close() marks unhealthy and closes all subscriber channels",
+      "text": "rcp_shmem_zone_server_close() shall mark the server closed (rcp_shmem_zone_server_ok() subsequently returns false) and close every currently-registered subscriber status channel.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SHMEM-010",
+      "title": "zone_server ok() reflects closed state",
+      "text": "rcp_shmem_zone_server_ok() shall return true before close() and false after close().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SHMEM-011",
+      "title": "subscription watcher removes its channel from the server on controller close",
+      "text": "When a shmem controller is closed while a subscription is active, the subscription's background watcher shall call rcp_shmem_zone_server_remove_sub() and close the subscriber's status channel.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SHMEM-012",
+      "title": "registry controllers() lists registered servers",
+      "text": "The shmem registry's controllers() shall return a retained reference to each registered server's controller, up to the caller's capacity, and return the true count.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SHMEM-013",
+      "title": "registry deregister() removes and closes the registered controller",
+      "text": "The shmem registry's deregister() shall remove and close the controller for the given zone, or return RCP_ERR_NOT_FOUND if none is registered there.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-SIM-001",
       "title": "send() returns OK by default",
       "text": "rcp_sim_controller_t::send() shall return RCP_RESPONSE_OK unless a fault has been injected.",
@@ -2401,6 +2457,30 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-TLS-011",
+      "title": "controller zone() returns the configured zone",
+      "text": "The TLS controller's zone() shall return the zone passed to rcp_tls_controller_new(), matching every other transport's zone() contract.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TLS-012",
+      "title": "zone_server stub surface is inert and non-crashing",
+      "text": "rcp_tls_zone_server_new()/ok()/set_handler()/set_healthy()/publish()/close()/destroy() shall not crash when called (no OpenSSL backend is linked); ok() shall always return false, matching the documented stub contract.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TLS-013",
+      "title": "registry controllers() returns zero (no backend linked)",
+      "text": "The TLS registry's controllers() shall always return 0, consistent with lookup()/register()/deregister() all returning RCP_ERR_NOT_SUPPORTED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-TSN-001",
       "title": "SO_PRIORITY set per command priority",
       "text": "rcp_tsn_controller_t::send() shall set the SO_PRIORITY socket option proportional to the command's rcp_priority_t before sending.",
@@ -2559,6 +2639,46 @@
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-UDP-015",
+      "title": "controller zone() returns the configured zone",
+      "text": "The UDP controller's zone() shall return the zone passed to rcp_udp_controller_new().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UDP-016",
+      "title": "zone_server addr_string() returns the bound address",
+      "text": "rcp_udp_zone_server_addr_string() shall format the server's actual bound local address as \"ip:port\" once the socket is open, or return 0 if the server is not open.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UDP-017",
+      "title": "zone_server set_healthy() affects subsequently published status",
+      "text": "rcp_udp_zone_server_set_healthy() shall change the healthy flag embedded in every Status published afterward via rcp_udp_zone_server_publish().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UDP-018",
+      "title": "closing a subscription removes it from both controller and server subscriber lists",
+      "text": "When a subscriber's status channel is closed without closing the whole controller, the controller's background watcher shall remove the channel from its own subscriber list and send an Unsubscribe control frame so the zone server removes the matching address from its own subscriber list.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UDP-019",
+      "title": "registry dial() connects and registers a real UDP controller",
+      "text": "rcp_udp_registry_dial() shall construct a UDP controller for the given zone/host/port, verify it is usable, and register it into the given registry, returning RCP_ERR_NOT_FOUND if the controller cannot be constructed or is not usable.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     },
     {
       "id": "REQ-WDG-001",

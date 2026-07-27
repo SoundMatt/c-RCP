@@ -1482,3 +1482,56 @@ controllers that simply delegate to an inner controller —
   largest, ~44 functions across 4 files, including `udp.c`'s 60.7%
   line-coverage worst-in-codebase) and internal helpers (~7 functions),
   tracked as follow-up.
+
+---
+### 53. Coverage maximization, batch 3: registry lifecycle (v0.53.0)
+---
+
+The largest coverage batch: 30 zero-hit functions across the 4
+transport/registry modules — `federation.c` (2), `shmem.c` (5),
+`tls.c` (9), and `udp.c` (14, the file with the worst line coverage in
+the codebase at 60.7%).
+- **`federation.c`**: `controllers()`/`deregister()` — straightforward,
+  mirrors the `test_authz.c`/batch-2 delegation-test style.
+- **`shmem.c`**: `zone_server_close()`/`_ok()` (health-flag lifecycle),
+  the subscription watcher's `remove_sub()` path (triggered by closing
+  the controller while a subscription is active — waited for the
+  background thread to actually complete the teardown rather than
+  asserting immediately), and registry `controllers()`/`deregister()`.
+- **`tls.c`**: confirmed via direct source read that this entire module
+  is a compile-time stub (every `zone_server_*` function ignores its
+  parameters and returns a fixed value, `registry.controllers()` always
+  returns 0) — wrote one consolidated "stub surface is inert" test
+  rather than 7 near-identical trivial tests, plus a real
+  `controller.zone()` test and a `registry.controllers()` test.
+- **`udp.c`** (the real socket-based transport, hence the largest and
+  most involved of the four): `controller.zone()`, `addr_string()`
+  (parses the real bound socket address), `set_healthy()` (verified it
+  actually changes a subsequently-published Status, not just that it
+  doesn't crash), and — the trickiest one — `same_addr()`/
+  `subs_remove()`/`zserv_subs_remove()`, which only run when a
+  subscription's status channel is closed *without* closing the whole
+  controller (closing the controller takes a different code path that
+  skips them entirely, confirmed by reading `udp_watcher_thread_fn`
+  before writing the test). Also added registry lifecycle tests
+  (`register`/`lookup`/`controllers`/`deregister`/`close`, all already
+  covered by shared `REQ-REG-*` requirements from the mock registry's
+  own tests — reused those IDs rather than inventing UDP-specific
+  duplicates) and `rcp_udp_registry_new()`/`rcp_udp_registry_dial()`.
+- **Noted, not fixed**: `tests/test_udp.c` uses an existing (pre-dating
+  this batch) local convention of `//cfusa:req` tags directly above
+  each test function rather than the `//cfusa:test` block-at-top style
+  every other test file in this project uses. Matched that file's own
+  established convention for the new tests rather than "fixing" an
+  unrelated, out-of-scope inconsistency mid-batch.
+- **21 new requirements** across the 4 modules (`REQ-FED-009..010`,
+  `REQ-SHMEM-009..013`, `REQ-TLS-011..013`, `REQ-UDP-015..019`).
+- **Verified real and non-flaky**: pulled the post-change lcov record
+  for all 30 target functions — all show non-zero hits, none missing.
+  Local function coverage rose from 91.5% to 96.4% (line: 85.5% →
+  90.4%). The UDP socket/thread-teardown tests were additionally run 8
+  times standalone (plain and under ASan/UBSan) with zero failures,
+  given the inherent timing sensitivity of real-socket async teardown.
+- Remaining batch: internal helpers (~7 functions: `prioqueue.c`'s heap
+  operations, `sim.c`, `powerstate.c`, `mdns.c`, `relay.c`, `observe.c`'s
+  gauge-recording functions), tracked as follow-up.
