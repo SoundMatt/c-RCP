@@ -214,9 +214,18 @@ concrete Announcer ships here — same as cpp-RCP, a full mDNS responder
 with the interface. `tests/test_mdns.c` ports cpp-RCP's `test_mdns.cpp`
 (8 requirements), including a local test-double Announcer implementation.
 
-### 7. TLS Transport (v0.7.0)
+### 7. TLS Transport (v0.7.0) ✅
 
-`include/rcp/tls.h`: mutual TLS channel for zone-controller communication.
+`include/rcp/tls.h` + `src/tls.c`: mutual TLS channel interface — ported
+from cpp-RCP's `tls.hpp`, which is itself a compile-time stub absent an
+OpenSSL backend (`RCP_TLS_OPENSSL`, never defined in this codebase either).
+Every transport call returns the new `RCP_ERR_NOT_SUPPORTED` sentinel
+(added to `rcp_errc_t`) rather than silently falling back to plaintext —
+the safety property cpp-RCP's own stub is built to guarantee. `Config`
+(cert/key/ca file paths, `verify_peer`) is fully real and carried through
+even though no backend consumes it yet. `tests/test_tls.c` ports cpp-RCP's
+`test_tls.cpp` (10 requirements): config defaults, secure-by-default
+refusal to send/subscribe/dial, and clean close/error propagation.
 
 ### 8. Shared Memory Transport (v0.8.0)
 

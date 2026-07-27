@@ -45,3 +45,8 @@ add_executable(test_mdns test_mdns.c)
 target_link_libraries(test_mdns PRIVATE rcp::rcp unity)
 target_compile_options(test_mdns PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_mdns COMMAND test_mdns)
+
+add_executable(test_tls test_tls.c)
+target_link_libraries(test_tls PRIVATE rcp::rcp unity)
+target_compile_options(test_tls PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_tls COMMAND test_tls)
