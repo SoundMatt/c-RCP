@@ -291,10 +291,43 @@ inner controller actually receives, proving pass-through.
 ### Phase 4 — Safety Mechanisms
 ---
 
-### 11. Watchdog & Heartbeat (v0.11.0)
+### 11. Watchdog & Heartbeat (v0.11.0) ✅
 
-`include/rcp/watchdog.h`: periodic watchdog-kick scheduling; zone health state
-machine (Healthy → Degraded → Faulted).
+`include/rcp/watchdog.h` + `src/watchdog.c`: ports cpp-RCP's `watchdog.hpp`
+Keeper — periodically sends `RCP_CMD_WATCHDOG` to every registered zone
+controller and drives each zone through a health state machine (Healthy →
+Degraded → Faulted, recovering directly to Healthy on the next successful
+kick). `rcp_watchdog_keeper_new()` takes an array of controllers (retains
+each); `rcp_watchdog_keeper_health()` reads a zone's current state;
+`rcp_watchdog_keeper_subscribe()` registers a callback fired on every
+transition (a small growable array, supporting multiple subscribers like
+cpp-RCP's own `std::vector<HealthCallback>`, even though the ported test
+suite only ever registers one).
+- **Deviation note**: cpp-RCP's Keeper dispatches each zone's kick on its own
+  detached thread every cycle, and its destructor only joins the *run*
+  thread — a kick still in flight when the Keeper is destroyed captures a
+  dangling `this` with no synchronization stopping it. This port kicks
+  zones sequentially within the single run thread instead (each kick is
+  already bounded by its own `rcp_context_t` timeout), which fully removes
+  that lifetime hazard; the cost is zones are kicked one at a time per
+  cycle rather than in parallel, acceptable given the small fixed zone count
+  and short per-kick timeouts this protocol targets. `rcp_watchdog_keeper_close()`
+  sets the closed flag and joins the run thread, checking the flag in ~5ms
+  polling increments during the inter-cycle sleep so `close()` returns
+  promptly rather than blocking for a full `interval_ms`.
+- `tests/test_watchdog.c` ports all 8 of cpp-RCP's `test_watchdog.cpp` cases
+  (construct/kick-all, starts-Healthy, Degraded-after-`degrade_after`,
+  Faulted-after-`fault_after`, recovery-to-Healthy, callback-fires-on-transition,
+  kick-timeout, close-stops-thread), using the same poll-with-deadline
+  pattern (rather than a single fixed sleep) already established in
+  `test_udp.c` and `test_mock.c` to avoid CI flakiness under scheduling
+  jitter — confirmed via 15 repeated local runs (debug + ASan/UBSan) with no
+  flakes.
+- Hit and fixed the known CFUSA-CY004 false-positive pattern once more
+  (`calloc(n, sizeof(*k->states))` — `->` appearing after `calloc(` on the
+  same line inside `sizeof`), same extract-to-local-variable fix as prior
+  milestones; proactively re-grepped the whole codebase afterward and found
+  no other occurrences.
 
 ### 12. Deadline Monitoring (v0.12.0)
 
