@@ -2,25 +2,23 @@
 
 ## Scope
 
-c-RCP is the pure-C99 implementation of the Remote Control Protocol for automotive zonal architecture targeting ISO 26262 ASIL-B / IEC 61508 SIL-2.
+c-RCP is the pure-C99 implementation of the Remote Control Protocol for automotive zonal architecture, baselined at ISO 26262 ASIL-B / IEC 61508 SIL-2.
 
 ## Safety standard
 
 | Standard | Target level |
 |---|---|
-| ISO 26262 | ASIL-B |
+| ISO 26262 | ASIL-B baseline; **HARA.md identifies four hazards computed at ASIL-C/D** (H-001, H-003, H-006, H-008, H-009) — open, tracked for milestones 41/43, not yet closed |
 | IEC 61508 | SIL-2 |
 | IEC 62443 | SL-2 |
 
 ## Safety goals
 
-| ID | Description | ASIL |
-|---|---|---|
-| SG-002 | Misrouted commands rejected | ASIL-B |
-
-Additional safety goals (SG-001, SG-003, SG-004, SG-007, ...) are introduced as
-the mechanisms that satisfy them land — see `ROADMAP.md`. The full set mirrors
-cpp-RCP's HARA and is finalized at the v0.4.0 HARA-expansion milestone.
+See `HARA.md` for the full SG-001..SG-010 table with ASIL ratings computed
+via `cfusa hara asil` (ISO 26262-3:2018 Table 4). Only SG-002 (ASIL-B) is
+addressed by code shipped so far (`rcp_controller_send()`'s zone-mismatch
+check); the rest are introduced as the mechanisms that satisfy them land —
+see `ROADMAP.md`.
 
 ## Safety mechanisms
 

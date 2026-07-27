@@ -157,13 +157,19 @@ integration test where practical.
   with P99 / Max latency gates enforced (relaxed on shared CI runners),
   writes `COMMAND_LATENCY.md` as FuSa audit evidence
 
-### 4. HARA Expansion (v0.4.0)
+### 4. HARA Expansion (v0.4.0) ✅
 
 - `.fusa-hara.json` expanded to H-001..H-010 and SG-001..SG-010, same
   hazard set as cpp-RCP's HARA (delivery loss, misrouting, watchdog failure,
   replay, priority inversion, rate-limiter/watchdog interaction, unauthorized
   injection, power-state failure, fault-injection persistence)
-- `HARA.md` documents ASIL decomposition rationale
+- `HARA.md` documents the hazard table, safety goals, and residual risks
+- **Finding**: recomputing ASIL via `cfusa hara asil` (ISO 26262-3:2018
+  Table 4) against cpp-RCP's own S/E/C classifications yields a higher ASIL
+  than cpp-RCP's HARA.md records for 6 of 10 hazards (ASIL-C/D vs. its
+  ASIL-A/B) — see HARA.md's "ASIL Determination Note". This project treats
+  c-FuSa's computed value as authoritative and tracks closing the gap
+  (decomposition argument or revised classification) at milestones 41/43.
 
 ---
 ### Phase 3 — Transport Stack
