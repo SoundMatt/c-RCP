@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+//cfusa:req REQ-UDP-014
 const char *rcp_wire_strerror(rcp_wire_errc_t e)
 {
     switch (e) {

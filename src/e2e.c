@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+//cfusa:req REQ-E2E-009
 const char *rcp_e2e_strerror(rcp_e2e_errc_t e)
 {
     switch (e) {

@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 
+//cfusa:req REQ-PWR-009
 const char *rcp_power_state_string(rcp_power_state_t p)
 {
     switch (p) {

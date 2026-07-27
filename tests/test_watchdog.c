@@ -6,12 +6,15 @@
 //cfusa:test REQ-WDG-006
 //cfusa:test REQ-WDG-007
 //cfusa:test REQ-WDG-008
+//cfusa:test REQ-WDG-009
 #include "unity.h"
 
 #include <rcp/clock.h>
 #include <rcp/mock.h>
 #include <rcp/rcp.h>
 #include <rcp/watchdog.h>
+
+#include <string.h>
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -184,6 +187,24 @@ static void test_close_stops_background_kicks(void)
     rcp_controller_release(ctrl);
 }
 
+static void test_health_state_string_unique_nonempty(void)
+{
+    const rcp_health_state_t states[] = {
+        RCP_HEALTH_HEALTHY, RCP_HEALTH_DEGRADED, RCP_HEALTH_FAULTED,
+    };
+    const size_t n = sizeof(states) / sizeof(states[0]);
+    size_t i, j;
+
+    for (i = 0; i < n; i++) {
+        const char *s = rcp_health_state_string(states[i]);
+        TEST_ASSERT_NOT_NULL(s);
+        TEST_ASSERT_TRUE(strlen(s) > 0);
+        for (j = 0; j < i; j++) {
+            TEST_ASSERT_NOT_EQUAL(0, strcmp(s, rcp_health_state_string(states[j])) != 0 ? 1 : 0);
+        }
+    }
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -194,6 +215,7 @@ int main(void)
     RUN_TEST(test_faulted_after_fault_after_misses);
     RUN_TEST(test_recovery_to_healthy_after_degraded);
     RUN_TEST(test_close_stops_background_kicks);
+    RUN_TEST(test_health_state_string_unique_nonempty);
 
     return UNITY_END();
 }

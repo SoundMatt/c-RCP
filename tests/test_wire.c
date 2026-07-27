@@ -11,6 +11,7 @@
 //cfusa:test REQ-UDP-011
 //cfusa:test REQ-UDP-012
 //cfusa:test REQ-UDP-013
+//cfusa:test REQ-UDP-014
 #include "unity.h"
 
 #include <rcp/rcp.h>
@@ -298,6 +299,25 @@ static void test_encode_control_produces_header_only_frame(void)
     rcp_bytes_free(&frame);
 }
 
+static void test_wire_strerror_unique_nonempty(void)
+{
+    const rcp_wire_errc_t codes[] = {
+        RCP_WIRE_OK, RCP_WIRE_ERR_SHORT_FRAME,
+        RCP_WIRE_ERR_BAD_MAGIC, RCP_WIRE_ERR_BAD_VERSION,
+    };
+    const size_t n = sizeof(codes) / sizeof(codes[0]);
+    size_t i, j;
+
+    for (i = 0; i < n; i++) {
+        const char *s = rcp_wire_strerror(codes[i]);
+        TEST_ASSERT_NOT_NULL(s);
+        TEST_ASSERT_TRUE(strlen(s) > 0);
+        for (j = 0; j < i; j++) {
+            TEST_ASSERT_NOT_EQUAL(0, strcmp(s, rcp_wire_strerror(codes[j])) != 0 ? 1 : 0);
+        }
+    }
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -323,6 +343,7 @@ int main(void)
     RUN_TEST(test_decode_command_rejects_body_len_just_over_max_even_with_real_buffer);
 
     RUN_TEST(test_encode_control_produces_header_only_frame);
+    RUN_TEST(test_wire_strerror_unique_nonempty);
 
     return UNITY_END();
 }

@@ -409,6 +409,14 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-E2E-009",
+      "title": "rcp_e2e_strerror() returns unique human-readable message",
+      "text": "rcp_e2e_strerror() shall return a unique, non-empty message for each defined rcp_e2e_errc_t constant, including RCP_E2E_OK.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
       "id": "REQ-ERR-001",
       "title": "RCP_ERR_CLOSED is non-zero",
       "text": "The sentinel error RCP_ERR_CLOSED shall be non-zero so callers can distinguish it from RCP_OK (success).",
@@ -495,6 +503,14 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ERR-012",
+      "title": "rcp_strerror() returns unique human-readable message",
+      "text": "rcp_strerror() shall return a unique, non-empty message for each defined rcp_errc_t constant, including RCP_OK.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
     },
     {
       "id": "REQ-FI-001",
@@ -687,6 +703,14 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FW-009",
+      "title": "rcp_fw_strerror() returns unique human-readable message",
+      "text": "rcp_fw_strerror() shall return a unique, non-empty message for each defined rcp_fw_errc_t constant (100-103).",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
     },
     {
       "id": "REQ-ZG-001",
@@ -1698,7 +1722,7 @@
     },
     {
       "id": "REQ-PWR-002",
-      "title": "sleep() transitions Active\u2192Sleeping",
+      "title": "sleep() transitions Active→Sleeping",
       "text": "A successful sleep() call shall transition the zone from Active to Sleeping.",
       "standard": "iso26262",
       "level": "ASIL-B",
@@ -1714,7 +1738,7 @@
     },
     {
       "id": "REQ-PWR-004",
-      "title": "wake() transitions Sleeping\u2192Active",
+      "title": "wake() transitions Sleeping→Active",
       "text": "A successful wake() call shall transition the zone from Sleeping or BusOff to Active.",
       "standard": "iso26262",
       "level": "ASIL-B",
@@ -1751,6 +1775,14 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWR-009",
+      "title": "rcp_power_state_string() returns unique human-readable name",
+      "text": "rcp_power_state_string() shall return a unique, non-empty name for each defined rcp_power_state_t constant.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
     },
     {
       "id": "REQ-REG-001",
@@ -2323,7 +2355,7 @@
     {
       "id": "REQ-UDP-005",
       "title": "rcp_command_type_t field for commands",
-      "text": "Bytes 5\u20136 of Command frames shall encode the rcp_command_type_t as a big-endian uint16.",
+      "text": "Bytes 5–6 of Command frames shall encode the rcp_command_type_t as a big-endian uint16.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -2339,7 +2371,7 @@
     {
       "id": "REQ-UDP-007",
       "title": "Command/response ID field",
-      "text": "Bytes 8\u201311 shall encode the Command or Response ID as a big-endian uint32.",
+      "text": "Bytes 8–11 shall encode the Command or Response ID as a big-endian uint32.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -2347,7 +2379,7 @@
     {
       "id": "REQ-UDP-008",
       "title": "Payload length field",
-      "text": "Bytes 12\u201315 shall encode the payload byte count as a big-endian uint32.",
+      "text": "Bytes 12–15 shall encode the payload byte count as a big-endian uint32.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -2371,7 +2403,7 @@
     {
       "id": "REQ-UDP-011",
       "title": "Frame validation rejects bad magic",
-      "text": "The decoder shall return an error if frame bytes 0\u20131 are not 0x52, 0x43.",
+      "text": "The decoder shall return an error if frame bytes 0–1 are not 0x52, 0x43.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -2391,6 +2423,14 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UDP-014",
+      "title": "rcp_wire_strerror() returns unique human-readable message",
+      "text": "rcp_wire_strerror() shall return a unique, non-empty message for each defined rcp_wire_errc_t constant, including RCP_WIRE_OK.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
     },
     {
       "id": "REQ-WDG-001",
@@ -2455,6 +2495,14 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WDG-009",
+      "title": "rcp_health_state_string() returns unique human-readable name",
+      "text": "rcp_health_state_string() shall return a unique, non-empty name for each defined rcp_health_state_t constant.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
     },
     {
       "id": "REQ-ZONE-001",
@@ -2628,6 +2676,14 @@
       "id": "REQ-RELAY-013",
       "title": "RCP_SPEC_VERSION aliases RELAY_SPEC_VERSION",
       "text": "RCP_SPEC_VERSION shall be defined and shall equal RELAY_SPEC_VERSION, per the RELAY spec's required package-level SpecVersion export (§17 requirement 12, §19.4).",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-RELAY-014",
+      "title": "relay_strerror() returns unique human-readable message",
+      "text": "relay_strerror() shall return a unique, non-empty message for each defined relay_errc_t constant.",
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A"

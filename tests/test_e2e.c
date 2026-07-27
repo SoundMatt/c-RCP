@@ -6,6 +6,7 @@
 //cfusa:test REQ-E2E-006
 //cfusa:test REQ-E2E-007
 //cfusa:test REQ-E2E-008
+//cfusa:test REQ-E2E-009
 #include "unity.h"
 
 #include <rcp/e2e.h>
@@ -164,6 +165,25 @@ static void test_controller_wraps_payload_with_incrementing_seq(void)
     rcp_controller_release(inner);
 }
 
+static void test_e2e_strerror_unique_nonempty(void)
+{
+    const rcp_e2e_errc_t codes[] = {
+        RCP_E2E_OK, RCP_E2E_ERR_CRC_MISMATCH,
+        RCP_E2E_ERR_SHORT_FRAME, RCP_E2E_ERR_REPLAY,
+    };
+    const size_t n = sizeof(codes) / sizeof(codes[0]);
+    size_t i, j;
+
+    for (i = 0; i < n; i++) {
+        const char *s = rcp_e2e_strerror(codes[i]);
+        TEST_ASSERT_NOT_NULL(s);
+        TEST_ASSERT_TRUE(strlen(s) > 0);
+        for (j = 0; j < i; j++) {
+            TEST_ASSERT_NOT_EQUAL(0, strcmp(s, rcp_e2e_strerror(codes[j])) != 0 ? 1 : 0);
+        }
+    }
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -177,6 +197,7 @@ int main(void)
     RUN_TEST(test_replay_guard_rejects_old_seq_outside_window);
     RUN_TEST(test_replay_guard_accepts_seq_zero_exactly_once);
     RUN_TEST(test_controller_wraps_payload_with_incrementing_seq);
+    RUN_TEST(test_e2e_strerror_unique_nonempty);
 
     return UNITY_END();
 }

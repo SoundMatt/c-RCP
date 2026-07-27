@@ -1379,3 +1379,49 @@ since, without anyone noticing the escape hatch was no longer needed.
   from a stale cache.
 - No new `.c`/`.h`/test files — workflow and disposition-bookkeeping
   changes only.
+
+---
+### 50. Coverage maximization, batch 1: branch instrumentation + strerror() functions (v0.50.0)
+---
+
+A follow-up audit ("are all requirements and tests maximised with
+regard to coverage?") pulled the real `coverage.info` artifact from the
+last CI run rather than approximating locally, and found: 83.5% line /
+87.7% function coverage, and **67 functions across 23 of 45 source
+files never called by any test** — including, surprisingly,
+`rcp_strerror()` and `relay_strerror()` (confirmed via grep: zero
+references anywhere outside their own definitions, despite being basic
+public API). This is the first of several batches closing that gap.
+
+- **Branch-coverage instrumentation enabled**: `lcov --capture`/
+  `--remove` in both `ci.yml` and `release.yml` gain
+  `--rc branch_coverage=1`. Previously reported a vacuous `0/0`
+  ("PASS" by default) in `cfusa coverage`; verified locally (via a
+  local coverage build with a matching `gcov` tool) that the flag
+  produces real, non-trivial branch data (52.8% on an unfiltered local
+  run) rather than assuming the flag name was correct.
+- **7 new tests for the "surprisingly untested" string-lookup
+  functions**: `rcp_strerror()`/`relay_strerror()` (`test_rcp.c`),
+  `rcp_e2e_strerror()` (`test_e2e.c`), `rcp_fw_strerror()`
+  (`test_firmware.c`), `rcp_wire_strerror()` (`test_wire.c`),
+  `rcp_health_state_string()` (`test_watchdog.c`),
+  `rcp_power_state_string()` (`test_powerstate.c`) — each asserting a
+  unique, non-empty string per enum value, matching the established
+  pattern already used for `rcp_zone_string()`/
+  `rcp_response_status_string()`.
+- **Requirements catalog gap**: none of these 7 functions had a
+  `.fusa-reqs.json` entry at all (part of why they went untested —
+  there was no requirement for a test to trace to). Added
+  `REQ-ERR-012`, `REQ-RELAY-014`, `REQ-E2E-009`, `REQ-FW-009`,
+  `REQ-UDP-014`, `REQ-WDG-009`, `REQ-PWR-009`.
+- **Verified the coverage improvement is real**, not just "tests
+  added": pulled the raw `.info` record for each of the 7 target
+  functions post-change and confirmed each now shows a non-zero hit
+  count (6–45 hits depending on how many test cases exercise it),
+  after first catching and fixing a mismatched lcov record-format
+  assumption in the verification script itself (lcov 2.x's `FNA:`
+  format vs. the older `FNDA:` this session's earlier ad hoc parsing
+  script assumed).
+- Remaining batches (vtable methods, registry lifecycle, internal
+  helpers — 60 more zero-hit functions across ~17 files) tracked as
+  follow-up work, not silently declared done.
