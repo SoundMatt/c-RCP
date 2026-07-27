@@ -403,9 +403,32 @@ refcounting throughout the codebase.
   per send) — cpp-RCP's `e2e.hpp` ships a `Controller` class with zero test
   coverage in `test_e2e.cpp`.
 
-### 15. Priority Queuing (v0.15.0)
+### 15. Priority Queuing (v0.15.0) ✅
 
-`include/rcp/prioqueue.h`: per-zone priority queue honouring Critical/High/Normal.
+`include/rcp/prioqueue.h` + `src/prioqueue.c`: ports cpp-RCP's
+`prioqueue.hpp` — serialises concurrent senders through a single background
+dispatch thread and a binary max-heap ordered by (priority desc, seq asc),
+so `RCP_PRIORITY_CRITICAL` always pre-empts queued `HIGH`/`NORMAL` commands
+and equal-priority commands stay FIFO. `rcp_prioqueue_controller_new()`
+follows the same generic-decorator vtable pattern used since v0.9.0.
+- Since C has no `std::promise`/`std::future`, each queued entry uses a
+  **rendezvous refcount** (starts at 2: one share for queue membership, one
+  for the sending thread) — exactly the pattern already established for
+  `udp.c`'s pending-request tracking: whichever side finishes last (the
+  dispatch thread completing the entry, or the sender giving up on a
+  context timeout) brings the refcount to 0 and frees it, guaranteeing
+  correct cleanup regardless of race timing.
+- **Deviation note**: cpp-RCP's `close()` flips its closed flag and returns
+  immediately without waiting for the dispatch thread to drain (only its
+  destructor joins). This port's `close()` joins the dispatch thread before
+  returning, matching the stronger close()-blocks-until-drained guarantee
+  already established by every other background-thread module in this port
+  (watchdog, deadline, powerstate).
+- `tests/test_prioqueue.c` ports all 7 of cpp-RCP's `test_prioqueue.cpp`
+  cases (basic send, zone passthrough, concurrent-priority no-crash,
+  already-expired-context timeout, zone-mismatch passthrough, subscribe
+  passthrough, close-rejects-further-sends). Confirmed via 20 repeated
+  local runs (debug + 20x ASan/UBSan) with no flakes.
 
 ### 16. Rate Limiting (v0.16.0)
 
