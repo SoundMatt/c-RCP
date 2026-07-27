@@ -1,3 +1,10 @@
+/* SO_PRIORITY is a glibc extension, not exposed by <sys/socket.h> under
+ * strict -std=c99 unless _DEFAULT_SOURCE is defined first — must be the
+ * literal first thing in the translation unit, before any include (even
+ * "rcp/tsn.h", which pulls in <stdint.h> and could lock in feature-test
+ * macros via glibc's <features.h> before we get a chance to set this). */
+#define _DEFAULT_SOURCE
+
 #include "rcp/tsn.h"
 
 #include <stdlib.h>
