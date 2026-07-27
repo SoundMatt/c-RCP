@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.10.12",
+  "kind": "provenance",
+  "tool": "c-FuSa",
+  "toolVersion": "0.5.40",
+  "language": "c",
+  "generatedAt": "2026-07-27T13:51:26Z",
+  "format": "x-FuSa provenance v1",
+  "module": "c-RCP@0.1.0",
+  "builder": "local",
+  "vcsRevision": "7f30f965a73ac7184c28e5c70006ef942526e34b",
+  "vcsBranch": "main",
+  "vcsModified": false
+}

@@ -1,0 +1,30 @@
+IEC 61508 Parts 1-3 Gap Report — c-RCP (target SIL-2)
+=====================================================
+
+Clause   Objective                                     cfusa Rule      Reqmt      Status
+-------- --------------------------------------------- --------------- ---------- ------
+7.2.2    Structured programming                        CFUSA-L001      Mandatory  COVERED
+7.2.2    No dynamic objects / memory                   CFUSA-L003      Recommended COVERED
+7.2.2    No recursion                                  CFUSA-L004      Recommended COVERED
+7.2.2    No goto                                       CFUSA-L002      Mandatory  COVERED
+7.2.2    No setjmp/longjmp                             CFUSA-L006      Mandatory  COVERED
+7.2.2    Limited use of interrupts                     -               Recommended GAP (R)
+7.3.2    Defensive programming                         CFUSA-A002      Mandatory  COVERED
+7.3.2    Fault detection/recovery routines             -               Mandatory  GAP (M)
+7.3.2    Safety bag techniques                         -               Recommended GAP (R)
+7.4.2    Static analysis                               CFUSA-A003      Mandatory  COVERED
+7.4.2    Dynamic analysis and testing                  -               Mandatory  GAP (M)
+7.4.2    Data recording and analysis                   -               Mandatory  GAP (M)
+7.5.1    Software module testing                       CFUSA-A007      Mandatory  COVERED
+7.5.2    Statement coverage                            CFUSA-COV       Mandatory  COVERED
+7.5.2    Branch coverage                               CFUSA-COV       Mandatory  COVERED
+7.6      Software integration testing                  -               Mandatory  GAP (M)
+7.7      Programmable electronics                      -               Mandatory  GAP (M)
+7.8      Software safety validation                    CFUSA-QUALIFY   Mandatory  COVERED
+7.9      Software modification                         -               Mandatory  GAP (M)
+7.10     Software verification                         CFUSA-TRACE     Mandatory  COVERED
+1.3      Hazard and risk analysis present              HARA001         Mandatory  COVERED
+4.2      FMEA failure mode evidence                    fmea.json       Mandatory  COVERED
+5.4      SCI evidence present                          CFUSA-SCI       Mandatory  COVERED
+
+Summary: 15 covered, 6 mandatory gap(s), 2 recommended gap(s), 4 not applicable for SIL-2
