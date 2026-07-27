@@ -450,9 +450,33 @@ for this milestone.
 ### Phase 5 — Verification
 ---
 
-### 17. Zone Simulator (v0.17.0)
+### 17. Zone Simulator (v0.17.0) ✅
 
-`include/rcp/sim.h`: timing-realistic zone controller simulator for SiL/HIL testing.
+`include/rcp/sim.h` + `src/sim.c`: ports cpp-RCP's `sim.hpp` — a full
+`rcp_controller_t` implementation (not a decorator, like `mock.h`) purpose-built
+for SiL/HIL testing, adding configurable latency (constant or jitter via a
+seeded `xorshift32` PRNG — C99 has no `<random>`, and MSVC lacks POSIX's
+`rand_r()`, so a small self-contained generator avoids both), fault
+injection (`rcp_sim_controller_fault()`/`_recover()`), periodic Status
+publishing, and watchdog-miss detection to validate the safety mechanisms
+from v0.11.0–v0.16.0 (watchdog, deadline, powerstate, e2e, prioqueue,
+ratelimit).
+- **Deviation note**: cpp-RCP's watchdog-miss detector runs a background
+  thread that periodically refreshes a cached `wd_miss_` atomic bool. This
+  port instead computes the miss state **on demand** in
+  `rcp_sim_controller_watchdog_missed()` directly from the last-kick
+  timestamp — always accurate, with no polling-interval staleness window.
+  The background watchdog thread is still spawned (an otherwise-inert
+  responsive sleep loop) so `close()` still has a second thread to join,
+  preserving the "status and watchdog background threads" plural wording of
+  REQ-SIM-008.
+- The per-subscription watcher-thread pattern (auto-expire the returned
+  channel on context timeout or controller close) and the publish/close
+  subs-array-stealing technique are both reused verbatim from `mock.c`'s
+  established design, applied to `sim.c`'s own struct.
+- `tests/test_sim.c` ports all 8 of cpp-RCP's `test_sim.cpp` cases.
+  Confirmed via 20 repeated local runs (debug + 20x ASan/UBSan) with no
+  flakes.
 
 ### 18. Fault Injection (v0.18.0)
 
