@@ -63,7 +63,7 @@ static int fi_ctrl_send(rcp_controller_t *self, const rcp_context_t *ctx,
 {
     faultinject_controller_t *fi = (faultinject_controller_t *)self;
     bool closed_now;
-    rcp_fi_rule_t rule;
+    rcp_fi_rule_t rule = {0};
     bool have_rule;
 
     rcp_mutex_lock(&fi->mu);
