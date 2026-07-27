@@ -1,5 +1,5 @@
 Software Configuration Index
-Project: c-RCP v0.45.0   Generated: 2026-07-27T21:23:17Z
+Project: c-RCP v0.46.0   Generated: 2026-07-27T21:38:57Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
@@ -18,6 +18,7 @@ FILE                                                          SHA-256
 ./include/rcp/redundancy.h                                    b85949273fd6ef714b5d12b7200b4ec6a76090d8221fa55506a2f8f57240dc25
 ./include/rcp/mqttbr.h                                        2dec415b7742732dcd64ed0136a2c057c5e0cb2fe3239a5d10fa55ceb28b954b
 ./include/rcp/config.h                                        a11add969d5b0e883eab513a322e3bf06523b80cf39c0f0a9f8b574f387b0f62
+./include/rcp/adapt.h                                         6623ba9c2942ffa9491e2531294eefa6e6d61b5ddfba17390cb42343ca5e1a45
 ./include/rcp/udp.h                                           05bf00b6fb1f1ee26bba018cc9cb414a138fbd29196348678a88ef140c164e41
 ./include/rcp/record.h                                        25c294d4914c5e8559db85d5a8669bd2b166ff59216fd75484158752420353d6
 ./include/rcp/firmware.h                                      05e7c8629d16284d9c39d092090ab95872d5f8c9128918e7d31d51ffac52404c
@@ -27,7 +28,7 @@ FILE                                                          SHA-256
 ./include/rcp/dyndata.h                                       8f85c752c3c62c88afaf44eb8a77cc91d57cd75217da728d625f133e9fa1274c
 ./include/rcp/admin.h                                         63c73a53b2a908b0035b887170dcfa413b075978efc06b971adc2e83abfbfb3d
 ./include/rcp/zonegroup.h                                     ab368bbaa9121c146aab79dd5f46a4b64eb35c25a0c02cb72bbefa92db63b35e
-./include/rcp/rcp.h                                           130b93056878421ec05fecb0ff9919839d84732977846d82821127538c84490c
+./include/rcp/rcp.h                                           451d956a6b35ab4e67ecf30b70bced33a89f36b9e84b610437e7e25d604863f4
 ./include/rcp/loan.h                                          a56772232a8bf7afa67126871dad3be8235980cb371efe78b8157ac7c6f2e0de
 ./include/rcp/someipbr.h                                      16cadac07f5794c22eec996edc46ba3c6b2ccde65b7f8a82e6272d7a2b4b2fe7
 ./include/rcp/powerstate.h                                    b47e56115128ffc9b70d7f71a1608a636f44f7b67379c7781138397983606316
@@ -37,17 +38,17 @@ FILE                                                          SHA-256
 ./include/rcp/federation.h                                    ad2ff15541b34c4d887b28060114530f5bd907256595ba81199e236ce28e6c62
 ./include/rcp/e2e.h                                           47733572304a88052703550e7967376c83a53926815a061da6ee26ea1bff2567
 ./include/rcp/ratelimit.h                                     5e786f7f08c360a0495fdc1545cdb3dd5d2466e7e9735dad686830392c1e8a9a
-./include/rcp/clock.h                                         f907473a6a7de9be91e981bf19c4d417c2685870677b60aff6f21cc733040c92
+./include/rcp/clock.h                                         5bbbaacde70354f906afb8819beaa45501a95ab204158e40d9144a2926e229db
 ./include/rcp/ddsbr.h                                         8877d2b11283ac5506af4604e7dcf987f16d829e2b9f9543d7a959aec536e9ae
 ./include/rcp/udsbr.h                                         98347f233dfaad75e931afc4b192780896f60ce1c465b8bea7757c4551318521
 ./include/rcp/faultinject.h                                   8421676b84e438e792beb8d18232566554e0233cb96adb31f66b0f3643babcf8
-./include/relay/relay.h                                       052b46bf9dc74a06bde10ee6f5a94074f998ba0991837516d812978f973d3e87
+./include/relay/relay.h                                       d02b4c29e9ce91284f58b1acbd8fd5afc30d01970bc3eeb5da4bf5d779fe0d5a
 ./src/doipbr.c                                                7d2a8d175a7a767bcbd4325ace4fc2d0dbdd8cba49428baedb765158a3b59131
 ./src/proxy.c                                                 27951cccd5ed3a265e78129ba28835cd93866871089cafd68634cc5477cfc70f
 ./src/watchdog.c                                              2ec6104709026dc6fb1b5bc7b804d4ea5fa295a2b99781945fa00bbb438e7c3c
 ./src/config.c                                                e3c8cd112bedf87bf3e3a5f4df0e9c169ee71620451fd0b5fed334690b1e5ac3
 ./src/record.c                                                1e7587656b81ebceb7f8b38f0805f7b863ada9ba90650a0c56e01b48aef3e77f
-./src/clock.c                                                 c5c62e612e9da074abbf21db9e31d7f74e10622d554db8e9dfc413b8f44a1597
+./src/clock.c                                                 707d61141ea28cf93a970e308be11353ec9e85d953e61dbc0e0b7c6157c177e2
 ./src/federation.c                                            6a6030f974962115ea71a90fd60d6fcb53d4562764966e3dee94dda483f91cdc
 ./src/restbridge.c                                            bce3df12c33733784b3089b16ad8c0012f1074407c47a4207eca62e4b46529c0
 ./src/platform.h                                              38d92316e7ae88bb84c169fca79d87bef6ac6ef49b7b4679d37013b41972c800
@@ -55,9 +56,11 @@ FILE                                                          SHA-256
 ./src/e2e.c                                                   3d93b9c2dda37a3f41d591c8094386c2f8390d11b6dc9b263b1803f8c420d61e
 ./src/firmware.c                                              2c2a1e8cec85f05ed20a5d121ba5fb64cd9b53d5381165b0439055b6753ecce8
 ./src/mock.c                                                  223bc296c2754623525788f7370394098f35c175007c294def0080e29ee8a4ce
+./src/adapt.c                                                 d7d7df3f537837eea68e31c229ee573121055b54e2399d850cbdeaad44ed89d1
 ./src/admin.c                                                 17a89f685e1aabc19d5303b274f2cb065a32924132ae8cc9faaba6efeaa0dffb
 ./src/observe.c                                               036f77b2a4c579039c524d25a3b5cbd25d35860a91bf91357cf9f6d4996281c8
 ./src/faultinject.c                                           2077b3232c37eb2c15778277b22875516ea5aad60a5159b8ba15c21673b97f56
+./src/relay.c                                                 c0ed1c207200eb6b9c1d4a3fc303ef093cd9d382643851b4e4add3692671c863
 ./src/linbr.c                                                 890fbd6fbde916bd30fe0a308123feb655bcb465f66768550e9a489f5fbb17a4
 ./src/redundancy.c                                            3973ccd159b905b1f51497c1009c9944b911d7ef5afdbd44490e203749204d74
 ./src/platform.c                                              72fe578947526dc43baafc3034b0937481013a0f2bda0ea1a5e909103250ee59
@@ -82,6 +85,7 @@ FILE                                                          SHA-256
 ./src/tls.c                                                   05c4b6c91eb1d4b1301657d2f0e0cfd0572abb8cc2fa2770d1ce58abc97e07a5
 ./src/wire.c                                                  6aff92a9f0df31edca42d194a3118ae421ff36b7b322c93398a7257d350b771a
 ./src/someipbr.c                                              a004339867ab69c2f50f5f8c49c16cfd6eb77173104f4a4dbdd1faa8cb87b2b7
+./tests/test_adapt.c                                          f5a39e1262269049b95e8ee3d579b2ac5cfe9f04d3d168bfb42eab31aa87dbd8
 ./tests/test_powerstate.c                                     d0cbc4ef785190539989bd7aa28b92475ff8a30d699bc8ca2043ccaf5014df19
 ./tests/test_ratelimit.c                                      cd92d8f34724c69b8f35fe22196789034ae44e534aadff1eb5fba762e6f3d01d
 ./tests/test_udp.c                                            d3b2402129b6e416f9cf3f63fc240771362054589f3762bb0192060135acf546
@@ -123,4 +127,4 @@ FILE                                                          SHA-256
 ./tests/test_watchdog.c                                       bf9469c57098bb4aaebebacd933c2435e896300af79d9fe73095123825525231
 ./tests/test_sim.c                                            7d9a2294654455f417d48868d7062ec7847c6d1ad27f7b138f34c454c19a42a6
 
-Total files: 119
+Total files: 123
