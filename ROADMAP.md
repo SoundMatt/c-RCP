@@ -266,9 +266,26 @@ reference. `tests/test_shmem.c` ports cpp-RCP's `test_shmem.cpp`
   "multicast announcement," which cpp-RCP's `udp.hpp` doesn't implement
   either).
 
-### 10. TSN Transport (v0.10.0)
+### 10. TSN Transport (v0.10.0) ✅
 
-`include/rcp/tsn.h`: IEEE 802.1Qbv-aware UDP transport for hard real-time delivery.
+`include/rcp/tsn.h` + `src/tsn.c`: IEEE 802.1Qbv-aware transport adapter,
+ported from cpp-RCP's `tsn.hpp`. `rcp_tsn_controller_new()` wraps any
+`rcp_controller_t` (the same generic-decorator vtable pattern used by
+[[loan.h]]'s LoaningController) and applies `SO_PRIORITY` to a caller-supplied
+socket fd before each `send()`, mapping `rcp_priority_t` to an IEEE 802.1p PCP
+value (`RCP_PRIORITY_NORMAL`→2, `HIGH`→5, `CRITICAL`→7 by default, via
+`rcp_tsn_pcp_map_t`/`rcp_tsn_default_pcp_map()`). The `setsockopt()` call is
+gated to `__linux__` (matching cpp-RCP's own `#if defined(__linux__)` guard);
+on other platforms, or when `socket_fd < 0`, the PCP mapping is still
+computed but the syscall is skipped — `send()` always delegates to the inner
+controller regardless. `rcp_tsn_config_t` additionally carries `vlan_id` and
+`cycle_ns` fields (802.1Qbv gate cycle) mirroring cpp-RCP's struct, though —
+same as cpp-RCP itself — actual VLAN tagging and gate-schedule programming
+are out of scope for this milestone (would require a TSN-capable NIC driver
+integration); the fields are carried through for forward compatibility only.
+`tests/test_tsn.c` ports all 6 of cpp-RCP's `test_tsn.cpp` cases 1:1, using
+`rcp_mock_controller_new()`'s handler callback to capture the priority the
+inner controller actually receives, proving pass-through.
 
 ---
 ### Phase 4 — Safety Mechanisms

@@ -60,3 +60,8 @@ add_executable(test_loan test_loan.c)
 target_link_libraries(test_loan PRIVATE rcp::rcp unity)
 target_compile_options(test_loan PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_loan COMMAND test_loan)
+
+add_executable(test_tsn test_tsn.c)
+target_link_libraries(test_tsn PRIVATE rcp::rcp unity)
+target_compile_options(test_tsn PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_tsn COMMAND test_tsn)
