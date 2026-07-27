@@ -202,12 +202,13 @@ jobs:
 
   # ── c-FuSa: built-in safety check (lint + analyze + cyber) ───────────────────
   #
-  # NOT gated on exit code: c-FuSa's CFUSA-L004 (recursion) rule has a
-  # confirmed false-positive bug (fires on non-recursive functions, including
-  # empty ones) — see https://github.com/SoundMatt/c-FuSa/issues/59 and the
-  # disposition recorded in .fusa-dispositions.json (DISP-0001). The report
-  # is still generated so real regressions remain visible; re-enable hard
-  # gating here once the upstream fix lands.
+  # Hard-gated on exit code. Previously carried continue-on-error: true here
+  # because c-FuSa's CFUSA-L004 (recursion) rule had a confirmed false-positive
+  # bug (fired on non-recursive functions, including empty ones) — see
+  # https://github.com/SoundMatt/c-FuSa/issues/59. That was fixed upstream in
+  # c-FuSa v0.5.39 (verified 2026-07-27: a fresh clone+build now reports 0
+  # CFUSA-L004 findings), so the escape hatch is removed and the corresponding
+  # disposition (DISP-0001) has been cleared from .fusa-dispositions.json.
   cfusa-check:
     name: cfusa check
     runs-on: ubuntu-22.04
@@ -223,10 +224,9 @@ jobs:
       - run: chmod +x /tmp/cfusa/build/cfusa
 
       - name: Safety check
-        continue-on-error: true
         run: /tmp/cfusa/build/cfusa check
 
-  # ── c-FuSa: MISRA-C/CERT-C lint (same CFUSA-L004 caveat as check above) ──────
+  # ── c-FuSa: MISRA-C/CERT-C lint (same fix history as check above) ────────────
   cfusa-lint:
     name: cfusa lint (MISRA-C/CERT-C)
     runs-on: ubuntu-22.04
@@ -242,7 +242,6 @@ jobs:
       - run: chmod +x /tmp/cfusa/build/cfusa
 
       - name: MISRA-C/CERT-C lint
-        continue-on-error: true
         run: /tmp/cfusa/build/cfusa lint
 
   # ── c-FuSa: static analysis (overflow, unchecked returns, ...) ───────────────
