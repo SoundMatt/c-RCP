@@ -959,9 +959,18 @@ zone; `close()` always succeeds.
 - **Requirements catalog gap filled**: added `REQ-CAN-001` through `-004`
   (none existed previously).
 
-### 35. DDS Bridge (v0.35.0)
+### 35. DDS Bridge (v0.35.0) ✅
 
-`include/rcp/ddsbr.h` — bridge Status updates to DDS topics (stub).
+`include/rcp/ddsbr.h` + `src/ddsbr.c`: ports cpp-RCP's `ddsbr.hpp` — the
+same compile-time stub pattern as the other protocol bridges, configured
+by `topic_prefix` (DDS topic names: `{prefix}/command`,
+`{prefix}/response`, default `"rcp"`), `domain_id`, and `timeout_ms`.
+`send()`/`subscribe()` always return `RCP_ERR_NOT_SUPPORTED` (no OMG DDS
+implementation such as FastDDS or Cyclone DDS linked); `zone()` returns
+the configured zone; `close()` always succeeds.
+- `tests/test_ddsbr.c` ports all 4 of cpp-RCP's `test_ddsbr.cpp` cases.
+- **Requirements catalog gap filled**: added `REQ-DDS-001` through `-004`
+  (none existed previously).
 
 ### 36. MQTT Bridge (v0.36.0)
 

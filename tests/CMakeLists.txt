@@ -194,3 +194,8 @@ add_executable(test_canbr test_canbr.c)
 target_link_libraries(test_canbr PRIVATE rcp::rcp unity)
 target_compile_options(test_canbr PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_canbr COMMAND test_canbr)
+
+add_executable(test_ddsbr test_ddsbr.c)
+target_link_libraries(test_ddsbr PRIVATE rcp::rcp unity)
+target_compile_options(test_ddsbr PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_ddsbr COMMAND test_ddsbr)
