@@ -119,7 +119,7 @@ static void test_udp_publish_subscribe_over_loopback(void)
     rcp_controller_t *ctrl;
     rcp_context_t ctx;
     rcp_status_channel_t *ch = NULL;
-    rcp_status_t st;
+    rcp_status_t st = {0};
     uint8_t payload[] = {0x01};
     uint16_t port;
 
