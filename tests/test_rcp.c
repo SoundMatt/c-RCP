@@ -33,6 +33,8 @@
 //cfusa:test REQ-ERR-009
 //cfusa:test REQ-ERR-010
 //cfusa:test REQ-ERR-011
+//cfusa:test REQ-ERR-012
+//cfusa:test REQ-RELAY-014
 //cfusa:test REQ-CMDSTRUCT-001
 //cfusa:test REQ-CMDSTRUCT-002
 //cfusa:test REQ-RESP-003
@@ -262,6 +264,45 @@ static void test_zone_mismatch_distinct_from_others(void)
     TEST_ASSERT_NOT_EQUAL(RCP_ERR_ZONE_MISMATCH, RCP_ERR_BUSY);
 }
 
+static void test_rcp_strerror_unique_nonempty(void)
+{
+    const rcp_errc_t codes[] = {
+        RCP_OK, RCP_ERR_CLOSED, RCP_ERR_NOT_FOUND, RCP_ERR_ALREADY_EXISTS,
+        RCP_ERR_TIMEOUT, RCP_ERR_BUSY, RCP_ERR_ZONE_MISMATCH,
+        RCP_ERR_NOT_SUPPORTED, RCP_ERR_FORBIDDEN,
+    };
+    const size_t n = sizeof(codes) / sizeof(codes[0]);
+    size_t i, j;
+
+    for (i = 0; i < n; i++) {
+        const char *s = rcp_strerror(codes[i]);
+        TEST_ASSERT_NOT_NULL(s);
+        TEST_ASSERT_TRUE(strlen(s) > 0);
+        for (j = 0; j < i; j++) {
+            TEST_ASSERT_NOT_EQUAL(0, strcmp(s, rcp_strerror(codes[j])) != 0 ? 1 : 0);
+        }
+    }
+}
+
+static void test_relay_strerror_unique_nonempty(void)
+{
+    const relay_errc_t codes[] = {
+        RELAY_ERRC_CLOSED, RELAY_ERRC_NOT_CONNECTED,
+        RELAY_ERRC_TIMEOUT, RELAY_ERRC_PAYLOAD_TOO_LARGE,
+    };
+    const size_t n = sizeof(codes) / sizeof(codes[0]);
+    size_t i, j;
+
+    for (i = 0; i < n; i++) {
+        const char *s = relay_strerror(codes[i]);
+        TEST_ASSERT_NOT_NULL(s);
+        TEST_ASSERT_TRUE(strlen(s) > 0);
+        for (j = 0; j < i; j++) {
+            TEST_ASSERT_NOT_EQUAL(0, strcmp(s, relay_strerror(codes[j])) != 0 ? 1 : 0);
+        }
+    }
+}
+
 /* ── Struct zero values ────────────────────────────────────────────────────── */
 
 static void test_zero_command_is_safe(void)
@@ -335,6 +376,8 @@ int main(void)
     RUN_TEST(test_sentinel_errors_nonzero);
     RUN_TEST(test_sentinel_errors_distinct);
     RUN_TEST(test_zone_mismatch_distinct_from_others);
+    RUN_TEST(test_rcp_strerror_unique_nonempty);
+    RUN_TEST(test_relay_strerror_unique_nonempty);
 
     RUN_TEST(test_zero_command_is_safe);
     RUN_TEST(test_zero_response_has_ok_status);

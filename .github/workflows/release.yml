@@ -50,9 +50,11 @@ jobs:
           lcov --capture \
             --directory build-cov \
             --gcov-tool gcov-12 \
+            --rc branch_coverage=1 \
             --output-file coverage.info
           lcov --remove coverage.info \
             '*/tests/*' '*/unity/*' '*/_deps/*' \
+            --rc branch_coverage=1 \
             --output-file coverage.info
 
       - name: Regenerate dFMEA (with cybersecurity analysis)

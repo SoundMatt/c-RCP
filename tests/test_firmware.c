@@ -6,6 +6,7 @@
 //cfusa:test REQ-FW-006
 //cfusa:test REQ-FW-007
 //cfusa:test REQ-FW-008
+//cfusa:test REQ-FW-009
 #include "unity.h"
 
 #include <rcp/firmware.h>
@@ -167,6 +168,25 @@ static void test_rollback_resets_to_idle(void)
     rcp_controller_release(ctrl);
 }
 
+static void test_fw_strerror_unique_nonempty(void)
+{
+    const rcp_fw_errc_t codes[] = {
+        RCP_FW_ERR_BAD_STATE, RCP_FW_ERR_VERIFY_FAILED,
+        RCP_FW_ERR_TRANSFER_ERROR, RCP_FW_ERR_ROLLBACK_FAILED,
+    };
+    const size_t n = sizeof(codes) / sizeof(codes[0]);
+    size_t i, j;
+
+    for (i = 0; i < n; i++) {
+        const char *s = rcp_fw_strerror(codes[i]);
+        TEST_ASSERT_NOT_NULL(s);
+        TEST_ASSERT_TRUE(strlen(s) > 0);
+        for (j = 0; j < i; j++) {
+            TEST_ASSERT_NOT_EQUAL(0, strcmp(s, rcp_fw_strerror(codes[j])) != 0 ? 1 : 0);
+        }
+    }
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -178,6 +198,7 @@ int main(void)
     RUN_TEST(test_full_happy_path);
     RUN_TEST(test_transfer_chunks_image_with_per_chunk_progress);
     RUN_TEST(test_rollback_resets_to_idle);
+    RUN_TEST(test_fw_strerror_unique_nonempty);
 
     return UNITY_END();
 }

@@ -4,6 +4,7 @@
 
 #include <stdlib.h>
 
+//cfusa:req REQ-WDG-009
 const char *rcp_health_state_string(rcp_health_state_t h)
 {
     switch (h) {

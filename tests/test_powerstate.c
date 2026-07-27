@@ -6,12 +6,15 @@
 //cfusa:test REQ-PWR-006
 //cfusa:test REQ-PWR-007
 //cfusa:test REQ-PWR-008
+//cfusa:test REQ-PWR-009
 #include "unity.h"
 
 #include <rcp/clock.h>
 #include <rcp/mock.h>
 #include <rcp/powerstate.h>
 #include <rcp/rcp.h>
+
+#include <string.h>
 
 #include <stdlib.h>
 
@@ -331,6 +334,24 @@ static void test_close_stops_the_recovery_loop(void)
     rcp_controller_release(ctrl);
 }
 
+static void test_power_state_string_unique_nonempty(void)
+{
+    const rcp_power_state_t states[] = {
+        RCP_POWER_ACTIVE, RCP_POWER_SLEEPING, RCP_POWER_BUS_OFF,
+    };
+    const size_t n = sizeof(states) / sizeof(states[0]);
+    size_t i, j;
+
+    for (i = 0; i < n; i++) {
+        const char *s = rcp_power_state_string(states[i]);
+        TEST_ASSERT_NOT_NULL(s);
+        TEST_ASSERT_TRUE(strlen(s) > 0);
+        for (j = 0; j < i; j++) {
+            TEST_ASSERT_NOT_EQUAL(0, strcmp(s, rcp_power_state_string(states[j])) != 0 ? 1 : 0);
+        }
+    }
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -341,6 +362,7 @@ int main(void)
     RUN_TEST(test_recover_loop_retries_bus_off_zones);
     RUN_TEST(test_state_is_thread_safe);
     RUN_TEST(test_close_stops_the_recovery_loop);
+    RUN_TEST(test_power_state_string_unique_nonempty);
 
     return UNITY_END();
 }

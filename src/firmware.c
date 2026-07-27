@@ -15,6 +15,7 @@ rcp_fw_config_t rcp_fw_default_config(void)
     return c;
 }
 
+//cfusa:req REQ-FW-009
 const char *rcp_fw_strerror(rcp_fw_errc_t e)
 {
     switch (e) {

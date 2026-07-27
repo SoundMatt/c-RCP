@@ -7,6 +7,7 @@
 
 /* ── relay error strings ───────────────────────────────────────────────────── */
 
+//cfusa:req REQ-RELAY-014
 const char *relay_strerror(relay_errc_t e)
 {
     switch (e) {
@@ -20,6 +21,7 @@ const char *relay_strerror(relay_errc_t e)
 
 /* ── rcp error strings ─────────────────────────────────────────────────────── */
 
+//cfusa:req REQ-ERR-012
 const char *rcp_strerror(rcp_errc_t e)
 {
     switch (e) {
