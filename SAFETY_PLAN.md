@@ -33,9 +33,16 @@ cpp-RCP's HARA and is finalized at the v0.4.0 HARA-expansion milestone.
 
 ## Verification approach
 
-- All requirements in `.fusa-reqs.json` are annotated with `// fusa:req` and `// fusa:test` markers
-- c-FuSa `check` enforces zero violations on every PR
-- Traceability verified: every requirement must be traced to an implementation and a test
+- Implemented requirements in `.fusa-reqs.json` are annotated with
+  `//cfusa:req` and `//cfusa:test` markers in source and tests
+- c-FuSa `check`/`lint`/`analyze`/`cyber` run on every PR (`check`/`lint` are
+  currently non-blocking pending [c-FuSa#59](https://github.com/SoundMatt/c-FuSa/issues/59))
+- Function-annotation density (every `.c` file traces to at least one
+  requirement) is a hard 100% CI gate from v0.1.0
+- Requirement traceability is **not** yet a hard 100% gate: as of v0.2.0,
+  `.fusa-reqs.json` forward-declares the full 198-requirement SEOOC catalog
+  for modules not yet implemented (REQ-UDP, REQ-E2E, REQ-WDG, ... — see
+  `ROADMAP.md` milestone 2). The gate returns once every module ships.
 - Tests run on Ubuntu (gcc, clang), macOS (clang), and Windows (MSVC) in CI
 
 ## Artifact locations
