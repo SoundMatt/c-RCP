@@ -1,8 +1,9 @@
 Software Configuration Index
-Project: c-RCP v0.9.0   Generated: 2026-07-27T16:03:10Z
+Project: c-RCP v0.10.0   Generated: 2026-07-27T16:11:53Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
+./include/rcp/tsn.h                                           d5515debe324b5ab2dcd474e1138b7556fb4e6df9285d6dae265d275a586d860
 ./include/rcp/mdns.h                                          81b034f2a6b2ae79de47579fc370af0d5ed37c95ef3b7a0ddac70fbdbd42ba1b
 ./include/rcp/tls.h                                           f62738ef10a3da2eebafe8cda2b8b8248b882a9f3a09b9b5fe29fb9542b85c65
 ./include/rcp/mock.h                                          ec2b0a87c520c79bccbf806daa948d11928e75391a6c99cda0d87769ae41e2cd
@@ -19,6 +20,7 @@ FILE                                                          SHA-256
 ./src/platform.c                                              72fe578947526dc43baafc3034b0937481013a0f2bda0ea1a5e909103250ee59
 ./src/shmem.c                                                 fbef85e85cfc24289c5751b1e504aaf97bcfd7f7a8a3187875942e269eae6e13
 ./src/loan.c                                                  ab090020e40ee73015e52dd387451256258433c2b6fa3242d7005cb96ca3de12
+./src/tsn.c                                                   4c0b57c5510fe5a2687652b62d66c8e7f9cad8f0216692c6b104d4c387a82814
 ./src/udp.c                                                   e1ddc3e8c8f3830b4f6430ba25406272570d4b3f63a58d701dc928068e1604aa
 ./src/mdns.c                                                  73cd651fa106178b8a259ea78a40ead7b068d62263b521aa546b461806477b0a
 ./src/rcp.c                                                   30506de3513246c80e89e349092cbd5c23d3f9717558e997099c6010f6bd77b0
@@ -32,8 +34,9 @@ FILE                                                          SHA-256
 ./tests/bench_mock.c                                          20dcd4efe8c8b255626d65aee2675271324b820c2490c629f4b9edbb2ba96b6d
 ./tests/test_wire.c                                           fd757c402ed9ca0e245e2f00bc187492f6d58be0742c2729aa47f437ff52908e
 ./tests/command_latency_test.c                                3ed7c7694e59e0ca0839d13f081c7232198314a9adeeadaa72aba43366fbad8d
+./tests/test_tsn.c                                            a5d77443f566a6dcb61a246fefa34c29fb6a15e92aa54925920794cbd4aa0551
 ./tests/test_rcp.c                                            a101960f867f8d69d3faa38d5c6ff73dab2c4d315e6fde141e64a03e2a6de78f
 ./tests/test_loan.c                                           12396b4cd1c56ddc45ff61cef8eeb180a2cb28cef4a7ce8026cc1ed1c110baa0
 ./tests/test_mock.c                                           5c824eb897d51b4474dc7354f10b856c32d23d8a38d918219c57ab565155d5f2
 
-Total files: 32
+Total files: 35
