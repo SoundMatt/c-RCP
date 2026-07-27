@@ -160,3 +160,8 @@ target_link_libraries(test_record PRIVATE rcp::rcp unity)
 target_compile_options(test_record PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_record COMMAND test_record)
 set_tests_properties(rcp_record PROPERTIES TIMEOUT 30)
+
+add_executable(test_config test_config.c)
+target_link_libraries(test_config PRIVATE rcp::rcp unity)
+target_compile_options(test_config PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_config COMMAND test_config)

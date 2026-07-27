@@ -795,9 +795,35 @@ inter-entry timing (scaled by `speed_factor`).
 - **Requirements catalog gap filled**: added `REQ-REC-001` through `-008`
   (none existed previously).
 
-### 28. Config (v0.28.0)
+### 28. Config (v0.28.0) ✅
 
-`include/rcp/config.h`: YAML/JSON zone registry configuration with hot-reload.
+`include/rcp/config.h` + `src/config.c`: ports cpp-RCP's `config.hpp` — a
+hand-rolled, minimal JSON manifest parser (not a general-purpose JSON
+library, matching cpp-RCP's own documented scope) that populates a
+`rcp_registry_t` with mock controllers per zone entry.
+`rcp_config_parse_json()` and `rcp_config_load()` port the same
+substring-scanning algorithm as cpp-RCP's `parse_json()`/`load()`
+(unbounded quote-search per field, tolerant of surrounding whitespace/
+formatting, understanding only this module's own manifest schema).
+- **Deviation note**: cpp-RCP signals malformed input by throwing
+  `config::ParseError` (a `std::runtime_error` subclass). C has no
+  exceptions, so `rcp_config_parse_json()`/`_load()` return
+  `RCP_CFG_ERR_PARSE` (offset to 100+, matching firmware.h's convention)
+  and write a description into a caller-supplied buffer instead.
+- **Scope note**: this project's own `ROADMAP.md` entry for this milestone
+  (written up-front from cpp-RCP's roadmap prose, before this port existed)
+  said "YAML/JSON... with hot-reload" — but cpp-RCP's own shipped
+  `config.hpp` implements neither: YAML support is explicitly documented
+  as requiring an external, unshipped YAML→JSON shim, and there is no
+  reload/watch mechanism anywhere in the module (`load()` is a one-shot
+  parse-then-register call). This port mirrors what's actually shipped,
+  the same judgment call made for every other roadmap-over-promises note
+  in this project.
+- `tests/test_config.c` ports all 5 of cpp-RCP's `test_config.cpp` cases,
+  substituting `rcp_proxy_registry_new()` (which starts empty) for
+  cpp-RCP's `proxy::ProxyRegistry` in the same role.
+- **Requirements catalog gap filled**: added `REQ-CFG-001` through `-006`
+  (none existed previously).
 
 ### 29. Code Generation (v0.29.0)
 

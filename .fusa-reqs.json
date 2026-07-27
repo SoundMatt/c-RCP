@@ -1105,6 +1105,54 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-CFG-001",
+      "title": "parse_json parses multiple zone entries",
+      "text": "rcp_config_parse_json() shall parse a manifest containing multiple zone entries, extracting each entry's zone and priority fields.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CFG-002",
+      "title": "parse_json extracts the optional priority field",
+      "text": "When a zone entry includes a priority field, rcp_config_parse_json() shall copy its string value into the corresponding manifest entry.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CFG-003",
+      "title": "parse_json rejects unknown zone names",
+      "text": "rcp_config_parse_json() shall return RCP_CFG_ERR_PARSE for a zone entry naming a zone not in the fixed 5-zone map.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CFG-004",
+      "title": "load() registers one controller per manifest zone entry",
+      "text": "rcp_config_load() shall register one mock controller for every zone entry in the parsed manifest.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CFG-005",
+      "title": "load() returns RCP_ERR_ALREADY_EXISTS on duplicate zone entries",
+      "text": "rcp_config_load() shall return RCP_ERR_ALREADY_EXISTS if the manifest names the same zone more than once.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CFG-006",
+      "title": "Parse errors carry a descriptive message",
+      "text": "On RCP_CFG_ERR_PARSE, rcp_config_parse_json() shall write a human-readable description identifying the invalid input into the caller-supplied error buffer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-LOAN-001",
       "title": "loan() returns zeroed buffer",
       "text": "rcp_loan_controller_t::loan(n) shall return a zeroed byte vector of exactly n bytes.",
