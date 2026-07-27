@@ -725,9 +725,37 @@ exported via a caller-supplied `rcp_metrics_sink_t`.
 - **Requirements catalog gap filled**: added `REQ-OBS-001` through `-008`
   (none existed previously).
 
-### 26. Admin API (v0.26.0)
+### 26. Admin API (v0.26.0) ✅
 
-`include/rcp/admin.h`: HTTP admin interface for runtime registry inspection.
+`include/rcp/admin.h` + `src/admin.c`: ports cpp-RCP's `admin.hpp` — an
+in-process (not HTTP-bound, matching cpp-RCP's own scope: "an actual HTTP
+binding is out of scope") admin interface: `rcp_admin_server_zones()` lists
+registered controllers, `rcp_admin_server_subscribe()`/`_emit()` provide an
+SSE-style event push channel, and `rcp_admin_server_record_counter()`/
+`_metrics_text()` render Prometheus text-format counters.
+- **Bugs found and fixed during the port, not carried into the C
+  translation**: my own first draft of `zones()` and `emit()` each used a
+  small hardcoded internal buffer (16 controllers / 64 subscribers) to
+  stage results before copying to the caller — silently dropping anything
+  beyond that count regardless of the caller's own `cap` argument or
+  subscriber count. Both were caught before shipping and rewritten to size
+  the internal buffer to the real count first (two-call `size-then-fill`
+  pattern for `zones()`, matching how many other registry-style APIs in
+  this codebase already work; a lock-protected heap-allocated snapshot for
+  `emit()`).
+- **Deviation note**: cpp-RCP's `emit()` holds its mutex for the duration
+  of every subscriber callback invocation; this port invokes callbacks
+  outside the lock instead, matching the established convention from
+  `watchdog.c`/`deadline.c`/`powerstate.c` — a subscriber that calls back
+  into the same server cannot deadlock. Event timestamps use
+  `rcp_monotonic_ms()` rather than cpp-RCP's wall-clock
+  `std::chrono::system_clock`, since this project has no wall-clock
+  primitive anywhere else.
+- `tests/test_admin.c` ports all 6 of cpp-RCP's `test_admin.cpp` cases.
+  Confirmed via 20 repeated local runs (debug + 20x ASan/UBSan) with no
+  flakes.
+- **Requirements catalog gap filled**: added `REQ-ADMIN-001` through `-008`
+  (none existed previously).
 
 ### 27. Record & Replay (v0.27.0)
 
