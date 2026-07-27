@@ -1,5 +1,5 @@
 Software Configuration Index
-Project: c-RCP v0.44.0   Generated: 2026-07-27T21:14:44Z
+Project: c-RCP v0.45.0   Generated: 2026-07-27T21:23:17Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
@@ -27,7 +27,7 @@ FILE                                                          SHA-256
 ./include/rcp/dyndata.h                                       8f85c752c3c62c88afaf44eb8a77cc91d57cd75217da728d625f133e9fa1274c
 ./include/rcp/admin.h                                         63c73a53b2a908b0035b887170dcfa413b075978efc06b971adc2e83abfbfb3d
 ./include/rcp/zonegroup.h                                     ab368bbaa9121c146aab79dd5f46a4b64eb35c25a0c02cb72bbefa92db63b35e
-./include/rcp/rcp.h                                           98d3e5b1536fa838dbc2dd20d67194ac3c5fd8f52d67447400b547fdd99c5e6e
+./include/rcp/rcp.h                                           130b93056878421ec05fecb0ff9919839d84732977846d82821127538c84490c
 ./include/rcp/loan.h                                          a56772232a8bf7afa67126871dad3be8235980cb371efe78b8157ac7c6f2e0de
 ./include/rcp/someipbr.h                                      16cadac07f5794c22eec996edc46ba3c6b2ccde65b7f8a82e6272d7a2b4b2fe7
 ./include/rcp/powerstate.h                                    b47e56115128ffc9b70d7f71a1608a636f44f7b67379c7781138397983606316
@@ -76,7 +76,7 @@ FILE                                                          SHA-256
 ./src/mdns.c                                                  73cd651fa106178b8a259ea78a40ead7b068d62263b521aa546b461806477b0a
 ./src/mqttbr.c                                                17a4f9febb4851ebea0b9eabb09e051f9adbac1747ae6c64f18927bef79eab9b
 ./src/canbr.c                                                 bc5834b4adaff1549bbf01f1c3d967c932c5bbe980346bb036ef4e50b7dc83ee
-./src/rcp.c                                                   01d00008dfd5e40d2bc34b5c93719b23b92a06a2372676aaf0710bd7658dc487
+./src/rcp.c                                                   2f6da9a8316760d11714e31b3a76b278c7400e4545b46d0ef1f671ab56eb03d3
 ./src/dyndata.c                                               7a148c6e3fd9c14f3aa19cbf28c49b5569c4c68ed24210b60a6b2ef717d1991f
 ./src/authz.c                                                 098802fab58dd018906263415dcf85ce7d341ae4191f54ccaa3842604bc3285a
 ./src/tls.c                                                   05c4b6c91eb1d4b1301657d2f0e0cfd0572abb8cc2fa2770d1ce58abc97e07a5
@@ -107,7 +107,7 @@ FILE                                                          SHA-256
 ./tests/test_tsn.c                                            a5d77443f566a6dcb61a246fefa34c29fb6a15e92aa54925920794cbd4aa0551
 ./tests/test_restbridge.c                                     1dfc12b005af67c9ef1499f4cdfed298a38fe4a466780b8d49b737ed6a9878b0
 ./tests/test_mqttbr.c                                         ee606cbb1f5467fe976840814a465ddade8697a6b15d19e5c57ac456d29f7f12
-./tests/test_rcp.c                                            a101960f867f8d69d3faa38d5c6ff73dab2c4d315e6fde141e64a03e2a6de78f
+./tests/test_rcp.c                                            41c6bc0c668171429d70690f12b2cc3026edc14be7ffe6acadd220387e27d605
 ./tests/test_loan.c                                           12396b4cd1c56ddc45ff61cef8eeb180a2cb28cef4a7ce8026cc1ed1c110baa0
 ./tests/test_admin.c                                          0e5a54f92393221ded6bf6f0c53a2ad34d3ef3e6d06c7aa61a0b6aa592dd1839
 ./tests/test_linbr.c                                          ca0122fc83aae5f5c6576edff51c45b66c303c5d2100d54cd6edc6babc5c6d7e
