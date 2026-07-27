@@ -1064,9 +1064,28 @@ than silently declared "done."
 ### Phase 12 — Certification & Formal Methods
 ---
 
-### 41. Formal Verification (v0.41.0)
+### 41. Formal Verification (v0.41.0) ✅
 
-TLA+ specs for the zone health state machine, watchdog protocol, and anti-replay guard.
+`tla/HealthStateMachine.tla`, `tla/WatchdogProtocol.tla`,
+`tla/AntiReplayGuard.tla`, `FORMAL_VERIFICATION.md`: ports cpp-RCP's
+three TLA+ specs verbatim (byte-identical — confirmed via `diff`). These
+specs describe state transitions and safety properties (SP1: no direct
+`Healthy`→`Faulted` transition; SP2: no double-acceptance of a replayed
+sequence number) at a level with no C++ or C syntax anywhere in the
+model, and c-RCP's `watchdog.c`/`e2e.c` implement the identical state
+machine and sliding-window algorithm as cpp-RCP's `watchdog.hpp`/
+`e2e.hpp` — same states, same transition guards, same 32-slot window —
+so the specs apply unmodified. Only `FORMAL_VERIFICATION.md`'s "Mapping
+to Implementation" table changes, pointing at this project's actual C
+symbol names (`zone_state_t.health`/`.misses` in `src/watchdog.c`,
+`rcp_e2e_replay_guard_t.bitmap[]`/`.high_water` in `src/e2e.c`) instead
+of cpp-RCP's C++ ones, plus a note that `HealthStateMachine.tla`'s
+single-`MaxMiss` model is a slight abstraction of c-RCP's actual
+two-threshold `degrade_after`/`fault_after` design — a strict
+refinement that preserves the same `NoDirectFault` safety property.
+- **No new `REQ-*` catalog entries**: the specs verify safety properties
+  of watchdog/E2E behavior already covered by `REQ-WDG-*`/`REQ-E2E-*`
+  from earlier milestones, not new requirements.
 
 ### 42. ISO 21434 / Cybersecurity (v0.42.0)
 
