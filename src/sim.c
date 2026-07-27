@@ -70,6 +70,7 @@ static bool sc_subs_append(rcp_sim_controller_t *sc, rcp_status_channel_t *ch)
     return true;
 }
 
+//cfusa:req REQ-SIM-009
 static void sc_subs_remove(rcp_sim_controller_t *sc, rcp_status_channel_t *ch)
 {
     size_t i;
@@ -407,6 +408,7 @@ void rcp_sim_controller_recover(rcp_controller_t *ctrl)
     rcp_mutex_unlock(&sc->mu);
 }
 
+//cfusa:req REQ-SIM-010
 bool rcp_sim_controller_watchdog_missed(rcp_controller_t *ctrl)
 {
     rcp_sim_controller_t *sc = (rcp_sim_controller_t *)ctrl;

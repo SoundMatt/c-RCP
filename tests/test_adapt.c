@@ -18,6 +18,8 @@
 //cfusa:test REQ-RELAY-011
 //cfusa:test REQ-RELAY-012
 //cfusa:test REQ-RELAY-013
+//cfusa:test REQ-RELAY-015
+//cfusa:test REQ-RELAY-016
 #include "unity.h"
 
 #include <rcp/adapt.h>
@@ -138,6 +140,17 @@ static void test_channel_recv_returns_false_after_close_with_empty_queue(void)
 
     relay_message_channel_close(ch);
     TEST_ASSERT_FALSE(relay_message_channel_recv(ch, &out));
+
+    relay_message_channel_release(ch);
+}
+
+static void test_channel_is_closed_reflects_close_state(void)
+{
+    relay_message_channel_t *ch = relay_message_channel_new(8);
+
+    TEST_ASSERT_FALSE(relay_message_channel_is_closed(ch));
+    relay_message_channel_close(ch);
+    TEST_ASSERT_TRUE(relay_message_channel_is_closed(ch));
 
     relay_message_channel_release(ch);
 }
@@ -352,6 +365,24 @@ static void test_adapt_close_is_idempotent(void)
     rcp_relay_caller_release(caller);
 }
 
+static void test_caller_retain_returns_same_pointer_and_keeps_it_alive(void)
+{
+    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
+    rcp_relay_caller_t *caller = rcp_adapt(ctrl);
+    rcp_relay_caller_t *retained = rcp_relay_caller_retain(caller);
+
+    TEST_ASSERT_TRUE(retained == caller);
+
+    /* One release just drops the retain()'d share; the caller must still
+     * be usable afterwards. */
+    rcp_relay_caller_release(retained);
+    TEST_ASSERT_EQUAL(RELAY_PROTOCOL_RCP, rcp_relay_caller_protocol(caller));
+
+    TEST_ASSERT_NULL(rcp_relay_caller_retain(NULL));
+
+    rcp_relay_caller_release(caller);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -367,6 +398,7 @@ int main(void)
     RUN_TEST(test_channel_push_returns_false_when_full);
     RUN_TEST(test_channel_push_returns_false_after_close);
     RUN_TEST(test_channel_recv_returns_false_after_close_with_empty_queue);
+    RUN_TEST(test_channel_is_closed_reflects_close_state);
 
     RUN_TEST(test_subscriber_options_defaults);
 
@@ -381,6 +413,7 @@ int main(void)
     RUN_TEST(test_adapt_send_succeeds);
     RUN_TEST(test_adapt_subscribe_returns_valid_channel);
     RUN_TEST(test_adapt_close_is_idempotent);
+    RUN_TEST(test_caller_retain_returns_same_pointer_and_keeps_it_alive);
 
     return UNITY_END();
 }

@@ -1535,3 +1535,88 @@ the codebase at 60.7%).
 - Remaining batch: internal helpers (~7 functions: `prioqueue.c`'s heap
   operations, `sim.c`, `powerstate.c`, `mdns.c`, `relay.c`, `observe.c`'s
   gauge-recording functions), tracked as follow-up.
+
+### 54. Coverage maximization, batch 4: internal helpers (v0.54.0)
+---
+
+The final batch of the coverage-maximization effort. The original
+estimate of "~7 functions" undercounted: re-deriving the exact list from
+the audit gave **14 zero-hit functions across 7 files**, all closed
+here.
+- **`prioqueue.c`**: `higher()`, `heap_swap()`, `heap_sift_down()` — the
+  binary max-heap's internal comparison/reorder helpers, previously
+  never exercised because the existing concurrency test's fast mock
+  handler let the dispatch thread drain each entry before the next was
+  even enqueued, so the heap never held more than one element at a time
+  (confirmed by tracing `heap_pop()`: `heap_sift_down()` is only called
+  when `heap_len > 0` *after* the decrement, i.e. only when 2+ entries
+  were pending). Fixed with a deterministic (not racy) construction:
+  one thread sends a first command into a handler that blocks on its
+  first invocation, then — while that thread is still stuck inside the
+  handler — three more commands are sent sequentially from the test's
+  own thread using an already-expired context deadline. `pq_ctrl_send()`
+  pushes onto the heap unconditionally before ever consulting the
+  context, so each of those three calls deterministically enqueues (in
+  a known order) before returning `RCP_ERR_TIMEOUT` almost immediately;
+  the entries themselves stay queued for the dispatch thread to process
+  later. Hand-simulating the resulting heap confirmed a real swap
+  occurs during insertion (the third, `CRITICAL`-priority push bubbles
+  past the first two via `heap_sift_up()`), so `heap_swap()` is
+  guaranteed hit — not just probabilistically likely.
+- **`sim.c`**: `sc_subs_remove()` (only reached when a status channel is
+  closed directly rather than closing the whole controller — the same
+  distinction discovered for UDP in batch 3, confirmed again here by
+  reading `sim_watcher_thread_fn` before writing the test) and
+  `rcp_sim_controller_watchdog_missed()` (tested across all three of its
+  states: never kicked → `true`, freshly kicked → `false`, kicked but
+  past the timeout → `true`, plus `watchdog_timeout_ms == 0` → always
+  `false`).
+- **`powerstate.c`**: `callbacks_append()` and
+  `rcp_powerstate_manager_subscribe()` — the latter already carried a
+  requirement tag from the original milestone but had never actually
+  been called by a test. Added a test subscribing two callbacks (forcing
+  `callbacks_append()`'s backing array to grow past one entry) and
+  asserting both are invoked with the correct zone/state on a real
+  sleep transition.
+- **`mdns.c`**: `rcp_mdns_announcer_destroy()` — added a `destroyed`
+  flag to the test file's existing `test_announcer_t` double (mdns.h
+  ships no concrete Announcer implementation, matching cpp-RCP) and
+  confirmed both dispatch-through-vtable and the NULL no-op case.
+- **`relay.c`**: `rcp_relay_caller_retain()` and
+  `relay_message_channel_is_closed()` — both live in `test_adapt.c`
+  (there's no separate `test_relay.c`; RELAY-layer functions are tested
+  there since `relay.c`/`adapt.c` implement the same conformance layer).
+- **`observe.c`**: `rcp_span_duration_ms()` (a pure function, tested
+  directly against a stack `rcp_span_t`) and `noop_record_gauge()`/
+  `in_memory_record_gauge()` — neither is ever called internally
+  (`observe_ctrl_send()` only calls `record_span()`/`record_counter()`
+  on its sink; `record_gauge()` exists on the vtable for API
+  completeness but has no internal call site), so both were called
+  directly through the sink vtable.
+- **`proxy.c`**: `proxy_registry_controllers()` — mirrors the
+  `federation.c`/`shmem.c` registry-`controllers()` test pattern from
+  batch 3.
+- **9 new requirements** (`REQ-PQ-009`, `REQ-OBS-012..013`,
+  `REQ-PWR-010`, `REQ-MDNS-009`, `REQ-RELAY-015..016`, `REQ-SIM-009..010`,
+  `REQ-PROXY-008`).
+- **Caught before shipping**: the first pass at the `prioqueue.c` test
+  used `RCP_PRIORITY_LOW`, a priority level that doesn't exist in this
+  project (only `NORMAL`/`HIGH`/`CRITICAL`) — a build failure, not a
+  runtime bug, fixed before the first green build. Separately, the two
+  new `test_adapt.c` tests were initially missing their `RUN_TEST(...)`
+  registrations — caught because the local coverage build showed 0 hits
+  for `rcp_relay_caller_retain()`/`relay_message_channel_is_closed()`
+  despite the test functions compiling cleanly, a reminder that a test
+  which compiles but is never registered produces exactly the same
+  "function never called" signature as a genuinely missing test.
+- **Verified real and non-flaky**: local function coverage rose from
+  96.1% to **98.9%** (line: 89.7% → 92.5%); all 14 target functions
+  confirmed via the actual lcov record showing non-zero hits, not just
+  the aggregate percentage. The two timing-sensitive tests
+  (`test_heap_reorders_multiple_pending_entries`,
+  `test_closing_channel_directly_removes_watcher_subscription`) were run
+  8× standalone plain and 8× under ASan/UBSan, zero failures.
+- This completes the coverage-maximization effort begun by the user's
+  "close the gaps now" request: all 67 originally-identified zero-hit
+  functions now have tests, and branch-coverage instrumentation
+  (milestones 50–51) is live in CI.

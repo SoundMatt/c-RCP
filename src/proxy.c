@@ -183,6 +183,7 @@ static int proxy_registry_lookup(rcp_registry_t *self, rcp_zone_t zone, rcp_cont
     return RCP_ERR_NOT_FOUND;
 }
 
+//cfusa:req REQ-PROXY-008
 static size_t proxy_registry_controllers(rcp_registry_t *self, rcp_controller_t **out, size_t cap)
 {
     proxy_registry_t *pr = (proxy_registry_t *)self;

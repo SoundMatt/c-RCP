@@ -2983,6 +2983,86 @@
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-PQ-009",
+      "title": "Heap swap/sift-down reorder pending entries by priority",
+      "text": "When more than one command is pending in the priority queue, popping the next entry for dispatch shall re-heapify the remaining entries so the highest-priority (then oldest) entry is dispatched next.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-OBS-012",
+      "title": "Gauge sink implementations accept a metric without side effects beyond recording",
+      "text": "Both the noop and in-memory metrics sink implementations shall accept a record_gauge() call for any rcp_metric_t without crashing.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM"
+    },
+    {
+      "id": "REQ-PWR-010",
+      "title": "Power-state manager grows its callback list on demand",
+      "text": "rcp_powerstate_manager_subscribe() shall append the caller's callback to the manager's internal list, growing its backing storage as needed, and return false only on allocation failure.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDNS-009",
+      "title": "Announcer destroy dispatches through its vtable",
+      "text": "rcp_mdns_announcer_destroy() shall invoke the announcer's vtable destroy() function and shall be a no-op when passed NULL.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM"
+    },
+    {
+      "id": "REQ-RELAY-015",
+      "title": "Relay caller retain increments refcount and returns the same pointer",
+      "text": "rcp_relay_caller_retain() shall increment the caller's refcount and return the same pointer passed in, and shall be a no-op returning NULL when passed NULL.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM"
+    },
+    {
+      "id": "REQ-RELAY-016",
+      "title": "Message channel reports its closed state",
+      "text": "relay_message_channel_is_closed() shall report whether the channel has been closed, reflecting the state set by its close operation.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM"
+    },
+    {
+      "id": "REQ-SIM-009",
+      "title": "Sim controller removes a subscriber from its internal list on teardown",
+      "text": "When a sim controller's status-channel watcher tears down while the controller is still open, it shall remove the channel from the controller's internal subscriber list before releasing its reference.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SIM-010",
+      "title": "Sim controller reports watchdog-missed based on last kick time",
+      "text": "rcp_sim_controller_watchdog_missed() shall return true if the watchdog has never been kicked or the elapsed time since the last kick meets or exceeds the configured timeout, and false otherwise; it shall always return false when watchdog_timeout_ms is 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PROXY-008",
+      "title": "Proxy registry lists registered upstream controllers",
+      "text": "rcp_registry_controllers() on a proxy registry shall return the number of registered upstream controllers and populate the output array (up to cap) with retained references to them.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-OBS-013",
+      "title": "Span duration is computed as end minus start",
+      "text": "rcp_span_duration_ms() shall return the difference between a span's end_ms and start_ms timestamps.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM"
     }
   ]
 }

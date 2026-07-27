@@ -52,6 +52,7 @@ static zone_entry_t *find_entry(rcp_powerstate_manager_t *m, rcp_zone_t z)
     return NULL;
 }
 
+//cfusa:req REQ-PWR-010
 static bool callbacks_append(rcp_powerstate_manager_t *m, rcp_powerstate_power_fn cb, void *user_data)
 {
     if (m->n_callbacks == m->callbacks_cap) {
