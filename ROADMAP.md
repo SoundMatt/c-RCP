@@ -241,10 +241,30 @@ controller (and each subscription's watcher thread) retains its own
 reference. `tests/test_shmem.c` ports cpp-RCP's `test_shmem.cpp`
 (8 requirements).
 
-### 9. Loaned Samples (v0.9.0)
+### 9. Loaned Samples (v0.9.0) ✅
 
-Loaning controller extension (`rcp_loan_t`, `loan()`/`send_loaned()`) bringing
-zero-copy to all transports that support it.
+- `rcp_loan_t` and two new *optional* `rcp_controller_vtable_t` slots
+  (`loan`/`send_loaned`, NULL for controllers that don't support loaning —
+  C's stand-in for cpp-RCP's `LoaningController` subtype, since C has no
+  subtyping) added to `rcp.h`. `rcp_controller_loan()`/
+  `rcp_controller_send_loaned()` return `RCP_ERR_NOT_SUPPORTED` if the
+  concrete controller doesn't implement them.
+- `include/rcp/loan.h` + `src/loan.c`: a generic wrapper
+  (`rcp_loan_controller_new()`) extending any inner controller with a real
+  pool (free-list, not just accumulation) of reusable buffers — see the
+  header comment for the one deliberate deviation from cpp-RCP's own
+  `loan.hpp`, whose pool is write-only (`loan()` never actually reads it
+  back, so returned buffers just accumulate for the controller's lifetime).
+  `tests/test_loan.c` ports cpp-RCP's `test_loan.cpp` (6 requirements).
+- **Scope note**: cpp-RCP's own roadmap prose for this milestone describes
+  per-transport zero-copy implementations (shmem/mock/UDP-specific
+  pool-backed variants) and a benchmark gate enforcing zero allocations on
+  the loaned path — none of that exists in cpp-RCP's actual shipped code
+  (only the one generic wrapper `loan.hpp` + `test_loan.cpp` cover), so
+  this port mirrors what was actually built, not the more ambitious
+  narrative (same judgment call already made for UDP's roadmap-mentioned
+  "multicast announcement," which cpp-RCP's `udp.hpp` doesn't implement
+  either).
 
 ### 10. TSN Transport (v0.10.0)
 
