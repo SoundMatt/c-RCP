@@ -27,6 +27,19 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
+### RELAY-conformant CLI
+
+c-RCP ships as a library by default. Pass `-DRELAY_BUILD_CLI=ON` to also
+build the `c-rcp` binary, which implements the RELAY spec's mandatory
+`version`/`capabilities`/`status` commands (spec §11, §17):
+
+```bash
+cmake -B build -DRELAY_BUILD_CLI=ON
+cmake --build build --target c-rcp
+./build/c-rcp version
+./build/c-rcp capabilities
+```
+
 ## Quick start
 
 ```c

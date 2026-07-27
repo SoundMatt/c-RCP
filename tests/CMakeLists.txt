@@ -225,3 +225,8 @@ target_link_libraries(test_adapt PRIVATE rcp::rcp unity)
 target_compile_options(test_adapt PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_adapt COMMAND test_adapt)
 set_tests_properties(rcp_adapt PROPERTIES TIMEOUT 30)
+
+add_executable(test_cli test_cli.c)
+target_link_libraries(test_cli PRIVATE rcp::rcp unity)
+target_compile_options(test_cli PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_cli COMMAND test_cli)

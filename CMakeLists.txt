@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(c-rcp
-    VERSION 0.46.0
+    VERSION 0.47.0
     DESCRIPTION "Remote Control Protocol for automotive zonal architecture (C)"
     HOMEPAGE_URL "https://github.com/SoundMatt/c-RCP"
     LANGUAGES C
@@ -80,6 +80,7 @@ add_library(rcp STATIC
     src/doipbr.c
     src/relay.c
     src/adapt.c
+    src/cli.c
 )
 add_library(rcp::rcp ALIAS rcp)
 
@@ -89,6 +90,22 @@ target_include_directories(rcp PUBLIC
 )
 target_link_libraries(rcp PUBLIC Threads::Threads)
 target_compile_options(rcp PRIVATE ${RCP_WARNING_FLAGS})
+
+# ── RELAY-conformant CLI (spec §11, §13.2) ───────────────────────────────────
+#
+# rcp_cli_run()'s logic (src/cli.c) is always compiled into the rcp library
+# above, so it's unit-testable without this option. This option gates only
+# the standalone c-rcp BINARY target, per spec §17.7: "A library that does
+# not ship a standalone binary by default MUST still expose them through a
+# CLI target built with -DRELAY_BUILD_CLI=ON (or the language's equivalent
+# build option)."
+option(RELAY_BUILD_CLI "Build the c-rcp RELAY-conformant CLI (spec §11)" OFF)
+if(RELAY_BUILD_CLI)
+    add_executable(c-rcp cli/main.c)
+    target_link_libraries(c-rcp PRIVATE rcp::rcp)
+    target_compile_options(c-rcp PRIVATE ${RCP_WARNING_FLAGS})
+    set_target_properties(c-rcp PROPERTIES OUTPUT_NAME c-rcp)
+endif()
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 option(RCP_BUILD_TESTS "Build tests" ON)
