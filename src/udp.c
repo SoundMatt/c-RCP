@@ -39,6 +39,7 @@ struct rcp_udp_zone_server {
     bool                serve_thread_started;
 };
 
+//cfusa:req REQ-UDP-018
 static bool same_addr(const struct sockaddr_in *a, const struct sockaddr_in *b)
 {
     return a->sin_addr.s_addr == b->sin_addr.s_addr && a->sin_port == b->sin_port;
@@ -62,6 +63,7 @@ static bool zserv_subs_append(rcp_udp_zone_server_t *srv, const struct sockaddr_
     return true;
 }
 
+//cfusa:req REQ-UDP-018
 static void zserv_subs_remove(rcp_udp_zone_server_t *srv, const struct sockaddr_in *addr)
 {
     size_t i;
@@ -174,6 +176,7 @@ bool rcp_udp_zone_server_ok(const rcp_udp_zone_server_t *srv)
     return srv->fd >= 0;
 }
 
+//cfusa:req REQ-UDP-016
 size_t rcp_udp_zone_server_addr_string(const rcp_udp_zone_server_t *srv, char *buf, size_t buf_len)
 {
     struct sockaddr_in sa;
@@ -206,6 +209,7 @@ void rcp_udp_zone_server_set_handler(rcp_udp_zone_server_t *srv, rcp_udp_handler
     rcp_mutex_unlock(&srv->mu);
 }
 
+//cfusa:req REQ-UDP-017
 void rcp_udp_zone_server_set_healthy(rcp_udp_zone_server_t *srv, bool healthy)
 {
     rcp_mutex_lock(&srv->mu);
@@ -387,6 +391,7 @@ static bool subs_append(rcp_udp_controller_t *uc, rcp_status_channel_t *ch)
     return true;
 }
 
+//cfusa:req REQ-UDP-018
 static void subs_remove(rcp_udp_controller_t *uc, rcp_status_channel_t *ch)
 {
     size_t i;
@@ -399,6 +404,7 @@ static void subs_remove(rcp_udp_controller_t *uc, rcp_status_channel_t *ch)
     }
 }
 
+//cfusa:req REQ-UDP-015
 static rcp_zone_t udp_controller_zone(rcp_controller_t *self)
 {
     return ((rcp_udp_controller_t *)self)->zone;
@@ -970,6 +976,7 @@ rcp_registry_t *rcp_udp_registry_new(void)
     return &ur->base;
 }
 
+//cfusa:req REQ-UDP-019
 int rcp_udp_registry_dial(rcp_registry_t *reg, rcp_zone_t zone, const char *server_host, uint16_t server_port)
 {
     rcp_controller_t *ctrl = rcp_udp_controller_new(zone, server_host, server_port);

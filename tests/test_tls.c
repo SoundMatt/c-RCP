@@ -10,6 +10,9 @@
 //cfusa:test REQ-TLS-002
 //cfusa:test REQ-TLS-003
 //cfusa:test REQ-TLS-004
+//cfusa:test REQ-TLS-011
+//cfusa:test REQ-TLS-012
+//cfusa:test REQ-TLS-013
 //cfusa:test REQ-TLS-005
 //cfusa:test REQ-TLS-006
 //cfusa:test REQ-TLS-007
@@ -123,6 +126,50 @@ static void test_transport_errors_propagate(void)
     rcp_registry_destroy(reg);
 }
 
+static void test_controller_zone_returns_configured_zone(void)
+{
+    rcp_tls_config_t c = mtls_config();
+    rcp_controller_t *ctrl = rcp_tls_controller_new(RCP_ZONE_REAR_RIGHT, "127.0.0.1", 8443, c);
+
+    TEST_ASSERT_EQUAL(RCP_ZONE_REAR_RIGHT, rcp_controller_zone(ctrl));
+
+    rcp_controller_release(ctrl);
+}
+
+static void handler_stub(const rcp_command_t *cmd, rcp_response_t *out, void *user_data)
+{
+    (void)cmd; (void)out; (void)user_data;
+}
+
+static void test_zone_server_stub_surface_is_inert(void)
+{
+    rcp_tls_config_t c = mtls_config();
+    rcp_tls_zone_server_t *srv = rcp_tls_zone_server_new(RCP_ZONE_FRONT_LEFT, "127.0.0.1", 8443, c);
+    uint8_t payload[] = {0x01};
+
+    TEST_ASSERT_NOT_NULL(srv);
+    TEST_ASSERT_FALSE(rcp_tls_zone_server_ok(srv));
+
+    /* None of these may crash absent an OpenSSL backend. */
+    rcp_tls_zone_server_set_handler(srv, handler_stub, NULL);
+    rcp_tls_zone_server_set_healthy(srv, true);
+    rcp_tls_zone_server_publish(srv, payload, sizeof(payload));
+    rcp_tls_zone_server_close(srv);
+    TEST_ASSERT_FALSE(rcp_tls_zone_server_ok(srv));
+
+    rcp_tls_zone_server_destroy(srv);
+}
+
+static void test_registry_controllers_returns_zero(void)
+{
+    rcp_registry_t *reg = rcp_tls_registry_new();
+    rcp_controller_t *out[1] = {0};
+
+    TEST_ASSERT_EQUAL_UINT(0, rcp_registry_controllers(reg, out, 1));
+
+    rcp_registry_destroy(reg);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -135,6 +182,9 @@ int main(void)
     RUN_TEST(test_no_insecure_fallback_without_backend);
     RUN_TEST(test_close_terminates_session_cleanly);
     RUN_TEST(test_transport_errors_propagate);
+    RUN_TEST(test_controller_zone_returns_configured_zone);
+    RUN_TEST(test_zone_server_stub_surface_is_inert);
+    RUN_TEST(test_registry_controllers_returns_zero);
 
     return UNITY_END();
 }

@@ -145,6 +145,7 @@ void rcp_shmem_zone_server_add_sub(rcp_shmem_zone_server_t *srv, rcp_status_chan
     rcp_mutex_unlock(&srv->mu);
 }
 
+//cfusa:req REQ-SHMEM-011
 void rcp_shmem_zone_server_remove_sub(rcp_shmem_zone_server_t *srv, rcp_status_channel_t *ch)
 {
     size_t i;
@@ -159,6 +160,7 @@ void rcp_shmem_zone_server_remove_sub(rcp_shmem_zone_server_t *srv, rcp_status_c
     rcp_mutex_unlock(&srv->mu);
 }
 
+//cfusa:req REQ-SHMEM-009
 void rcp_shmem_zone_server_close(rcp_shmem_zone_server_t *srv)
 {
     rcp_status_channel_t **local = NULL;
@@ -180,6 +182,7 @@ void rcp_shmem_zone_server_close(rcp_shmem_zone_server_t *srv)
     free(local);
 }
 
+//cfusa:req REQ-SHMEM-010
 bool rcp_shmem_zone_server_ok(const rcp_shmem_zone_server_t *srv)
 {
     /* const-correctness note: reading a mutex-protected bool without the
@@ -394,6 +397,7 @@ static int shmem_reg_register(rcp_registry_t *self, rcp_controller_t *ctrl)
     return RCP_OK;
 }
 
+//cfusa:req REQ-SHMEM-013
 static int shmem_reg_deregister(rcp_registry_t *self, rcp_zone_t zone)
 {
     shmem_registry_t *r = (shmem_registry_t *)self;
@@ -439,6 +443,7 @@ static int shmem_reg_lookup(rcp_registry_t *self, rcp_zone_t zone, rcp_controlle
     return RCP_ERR_NOT_FOUND;
 }
 
+//cfusa:req REQ-SHMEM-012
 static size_t shmem_reg_controllers(rcp_registry_t *self, rcp_controller_t **out, size_t cap)
 {
     shmem_registry_t *r = (shmem_registry_t *)self;
