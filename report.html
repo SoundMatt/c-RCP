@@ -1,5 +1,5 @@
 <!DOCTYPE html><html><head><meta charset="utf-8"><title>cfusa report — c-RCP</title><style>body{font-family:sans-serif;max-width:900px;margin:2em auto}table{border-collapse:collapse;width:100%}th,td{border:1px solid #ccc;padding:6px 10px;text-align:left}th{background:#f0f0f0}.ERROR{color:#c00}.WARNING{color:#960}.INFO{color:#066}.score{font-size:2em;font-weight:bold}</style></head><body>
-<h1>cfusa — Safety Report</h1><p><b>Project:</b> c-RCP &nbsp; <b>Version:</b> 0.46.0 &nbsp;<b>Generated:</b> 2026-07-27T21:38:57Z</p><p><b>Standard:</b> iso26262</p><p class="score">Score: 0.0 / 100</p><p>Errors: 0 &nbsp; Warnings: 731 &nbsp; Info: 382</p>
+<h1>cfusa — Safety Report</h1><p><b>Project:</b> c-RCP &nbsp; <b>Version:</b> 0.47.0 &nbsp;<b>Generated:</b> 2026-07-27T21:49:26Z</p><p><b>Standard:</b> iso26262</p><p class="score">Score: 0.0 / 100</p><p>Errors: 0 &nbsp; Warnings: 733 &nbsp; Info: 388</p>
 <table><tr><th>Severity</th><th>Rule</th><th>Category</th><th>File</th><th>Line</th><th>Message</th></tr>
 <tr><td class="WARNING">WARNING</td><td>CFUSA-L001</td><td>lint</td><td>src/watchdog.c</td><td>79</td><td>function 'kick' is 52 lines (max 50); MISRA-C recommends short functions</td></tr>
 <tr><td class="WARNING">WARNING</td><td>CFUSA-L001</td><td>lint</td><td>src/config.c</td><td>80</td><td>function 'rcp_config_parse_json' is 76 lines (max 50); MISRA-C recommends short functions</td></tr>
@@ -492,6 +492,7 @@
 <tr><td class="WARNING">WARNING</td><td>CFUSA-L003</td><td>lint</td><td>tests/test_sim.c</td><td>188</td><td>dynamic memory allocation ('free') — MISRA-C 2012 Rule 21.3: heap usage prohibited in safety-critical code</td></tr>
 <tr><td class="INFO">INFO</td><td>CFUSA-L007</td><td>lint</td><td>src/clock.c</td><td>17</td><td>mutable static variable — consider 'const' or restrict scope (MISRA-C 2012 Rule 8.9)</td></tr>
 <tr><td class="INFO">INFO</td><td>CFUSA-L007</td><td>lint</td><td>src/clock.c</td><td>18</td><td>mutable static variable — consider 'const' or restrict scope (MISRA-C 2012 Rule 8.9)</td></tr>
+<tr><td class="INFO">INFO</td><td>CFUSA-L007</td><td>lint</td><td>src/cli.c</td><td>13</td><td>mutable static variable — consider 'const' or restrict scope (MISRA-C 2012 Rule 8.9)</td></tr>
 <tr><td class="INFO">INFO</td><td>CFUSA-L007</td><td>lint</td><td>tests/test_deadline.c</td><td>50</td><td>mutable static variable — consider 'const' or restrict scope (MISRA-C 2012 Rule 8.9)</td></tr>
 <tr><td class="INFO">INFO</td><td>CFUSA-L007</td><td>lint</td><td>tests/test_deadline.c</td><td>84</td><td>mutable static variable — consider 'const' or restrict scope (MISRA-C 2012 Rule 8.9)</td></tr>
 <tr><td class="INFO">INFO</td><td>CFUSA-L007</td><td>lint</td><td>tests/test_shmem.c</td><td>133</td><td>mutable static variable — consider 'const' or restrict scope (MISRA-C 2012 Rule 8.9)</td></tr>
@@ -678,6 +679,11 @@
 <tr><td class="INFO">INFO</td><td>CFUSA-A006</td><td>safety</td><td>src/udp.c</td><td>61</td><td>pointer arithmetic detected — verify bounds (MISRA-C:2012 R18.4)</td></tr>
 <tr><td class="INFO">INFO</td><td>CFUSA-A006</td><td>safety</td><td>tests/test_firmware.c</td><td>80</td><td>pointer arithmetic detected — verify bounds (MISRA-C:2012 R18.4)</td></tr>
 <tr><td class="INFO">INFO</td><td>CFUSA-A006</td><td>safety</td><td>tests/test_proxy.c</td><td>26</td><td>pointer arithmetic detected — verify bounds (MISRA-C:2012 R18.4)</td></tr>
+<tr><td class="INFO">INFO</td><td>CFUSA-A006</td><td>safety</td><td>tests/test_cli.c</td><td>72</td><td>pointer arithmetic detected — verify bounds (MISRA-C:2012 R18.4)</td></tr>
+<tr><td class="INFO">INFO</td><td>CFUSA-A006</td><td>safety</td><td>tests/test_cli.c</td><td>116</td><td>pointer arithmetic detected — verify bounds (MISRA-C:2012 R18.4)</td></tr>
+<tr><td class="INFO">INFO</td><td>CFUSA-A006</td><td>safety</td><td>tests/test_cli.c</td><td>156</td><td>pointer arithmetic detected — verify bounds (MISRA-C:2012 R18.4)</td></tr>
+<tr><td class="INFO">INFO</td><td>CFUSA-A006</td><td>safety</td><td>tests/test_cli.c</td><td>164</td><td>pointer arithmetic detected — verify bounds (MISRA-C:2012 R18.4)</td></tr>
+<tr><td class="INFO">INFO</td><td>CFUSA-A006</td><td>safety</td><td>tests/test_cli.c</td><td>172</td><td>pointer arithmetic detected — verify bounds (MISRA-C:2012 R18.4)</td></tr>
 <tr><td class="WARNING">WARNING</td><td>CFUSA-A007</td><td>safety</td><td>src/proxy.c</td><td>235</td><td>return value of 'close' may be unchecked — system call failures must be handled (CERT-C ERR33-C)</td></tr>
 <tr><td class="WARNING">WARNING</td><td>CFUSA-A007</td><td>safety</td><td>src/federation.c</td><td>201</td><td>return value of 'close' may be unchecked — system call failures must be handled (CERT-C ERR33-C)</td></tr>
 <tr><td class="WARNING">WARNING</td><td>CFUSA-A007</td><td>safety</td><td>src/mock.c</td><td>279</td><td>return value of 'close' may be unchecked — system call failures must be handled (CERT-C ERR33-C)</td></tr>
@@ -692,6 +698,8 @@
 <tr><td class="WARNING">WARNING</td><td>CFUSA-A007</td><td>safety</td><td>src/udp.c</td><td>777</td><td>return value of 'close' may be unchecked — system call failures must be handled (CERT-C ERR33-C)</td></tr>
 <tr><td class="WARNING">WARNING</td><td>CFUSA-A007</td><td>safety</td><td>tests/test_record.c</td><td>121</td><td>return value of 'fclose' may be unchecked — system call failures must be handled (CERT-C ERR33-C)</td></tr>
 <tr><td class="WARNING">WARNING</td><td>CFUSA-A007</td><td>safety</td><td>tests/command_latency_test.c</td><td>90</td><td>return value of 'fclose' may be unchecked — system call failures must be handled (CERT-C ERR33-C)</td></tr>
+<tr><td class="WARNING">WARNING</td><td>CFUSA-A007</td><td>safety</td><td>tests/test_cli.c</td><td>47</td><td>return value of 'fclose' may be unchecked — system call failures must be handled (CERT-C ERR33-C)</td></tr>
+<tr><td class="WARNING">WARNING</td><td>CFUSA-A007</td><td>safety</td><td>tests/test_cli.c</td><td>52</td><td>return value of 'fclose' may be unchecked — system call failures must be handled (CERT-C ERR33-C)</td></tr>
 <tr><td class="WARNING">WARNING</td><td>CFUSA-CY001</td><td>security</td><td>src/config.c</td><td>70</td><td>CWE-120: buffer copy 'memcpy' — ensure destination buffer is large enough; prefer explicit size-bounded variants</td></tr>
 <tr><td class="WARNING">WARNING</td><td>CFUSA-CY001</td><td>security</td><td>src/federation.c</td><td>37</td><td>CWE-120: buffer copy 'strncpy' — ensure destination buffer is large enough; prefer explicit size-bounded variants</td></tr>
 <tr><td class="WARNING">WARNING</td><td>CFUSA-CY001</td><td>security</td><td>src/e2e.c</td><td>84</td><td>CWE-120: buffer copy 'memcpy' — ensure destination buffer is large enough; prefer explicit size-bounded variants</td></tr>
