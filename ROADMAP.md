@@ -227,9 +227,19 @@ even though no backend consumes it yet. `tests/test_tls.c` ports cpp-RCP's
 `test_tls.cpp` (10 requirements): config defaults, secure-by-default
 refusal to send/subscribe/dial, and clean close/error propagation.
 
-### 8. Shared Memory Transport (v0.8.0)
+### 8. Shared Memory Transport (v0.8.0) ✅
 
-`include/rcp/shmem.h`: zero-copy intra-host command delivery via POSIX shared memory.
+`include/rcp/shmem.h` + `src/shmem.c`: zero-copy intra-host command delivery
+via direct in-process calls between a refcounted `rcp_shmem_zone_server_t`
+and one or more paired `rcp_controller_t` instances — ported from cpp-RCP's
+`shmem.hpp`, which is itself an in-process (not true OS `shm_open`/`mmap`)
+implementation; that path remains future work in cpp-RCP too. Unlike
+`udp.c`'s ZoneServer/Controller (which are 1:1, spawned by dialing), shmem's
+`rcp_shmem_zone_server_t` is independently refcounted since it's shared
+directly by reference rather than addressed over a socket — the paired
+controller (and each subscription's watcher thread) retains its own
+reference. `tests/test_shmem.c` ports cpp-RCP's `test_shmem.cpp`
+(8 requirements).
 
 ### 9. Loaned Samples (v0.9.0)
 
