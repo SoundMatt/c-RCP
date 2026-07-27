@@ -904,9 +904,29 @@ cases.
 - **Requirements catalog gap filled**: added `REQ-GRPC-001` through `-004`
   (none existed previously).
 
-### 32. REST Bridge (v0.32.0)
+### 32. REST Bridge (v0.32.0) ✅
 
-`include/rcp/restbridge.h`: HTTP/SSE bridge interface stub.
+`include/rcp/restbridge.h` + `src/restbridge.c`: ports cpp-RCP's
+`restbridge.hpp` — structurally identical to the already-shipped
+`grpcbridge.h`/`grpcbridge.c` (v0.31.0): a compile-time interface stub with
+no HTTP client backend linked, so `send()`/`subscribe()` always return
+`RCP_ERR_NOT_SUPPORTED`, `zone()` returns the configured zone regardless,
+and `close()` always succeeds. `rcp_rest_config_t` renames cpp-RCP's
+`base_url`/`request_timeout` fields verbatim (`request_timeout_ms` as a
+`uint64_t` millisecond count, matching the `rpc_timeout_ms` convention
+already used for `rcp_grpc_config_t`).
+- **Scope note**: despite the file-header comment in cpp-RCP's own
+  `restbridge.hpp` mentioning "REST/HTTP protocol bridge" and this
+  project's earlier roadmap prose describing "HTTP/SSE bridge interface
+  stub," cpp-RCP's actual shipped `RestController` has no SSE
+  (server-sent-events) surface at all — `subscribe()` is just as
+  unconditionally stubbed as `send()`. This port mirrors what's actually
+  there, not the aspirational comment, consistent with the same judgment
+  call made for milestones 26–29.
+- `tests/test_restbridge.c` ports all 4 of cpp-RCP's `test_restbridge.cpp`
+  cases, mirroring `test_grpcbridge.c` exactly.
+- **Requirements catalog gap filled**: added `REQ-REST-001` through `-004`
+  (none existed previously).
 
 ---
 ### Phase 10 — Automotive Protocol Bridges
