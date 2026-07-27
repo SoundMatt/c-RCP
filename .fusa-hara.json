@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.10.4",
+  "kind": "hara",
+  "tool": "c-FuSa",
+  "toolVersion": "0.5.36",
+  "language": "c",
+  "generatedAt": "2026-07-27T13:03:27Z",
+  "project": "c-RCP",
+  "version": "0.1.0",
+  "standard": "ISO 26262-3:2018",
+  "hazards": [
+    {
+      "id": "H-002",
+      "item": "rcp_controller_t (mock backend)",
+      "hazardous_event": "Spurious command sent to the wrong zone controller",
+      "severity": 2,
+      "exposure": 3,
+      "controllability": 2,
+      "asil": "ASIL-B",
+      "safe_state": "rcp_controller_send() rejects the command with RCP_ERR_ZONE_MISMATCH before invoking any handler",
+      "safety_goal": "SG-002: Commands shall only be processed by the zone they are addressed to; misrouted commands shall be rejected.",
+      "ftti_ms": 0
+    }
+  ],
+  "note": "Foundation-scope seed (v0.1.0). Full comprehensive HARA (H-001..H-010) lands with the safety-mechanism milestones per ROADMAP.md, matching cpp-RCP's v0.4.0 HARA expansion."
+}

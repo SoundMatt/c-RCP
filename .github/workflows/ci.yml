@@ -1,0 +1,417 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Build and test (cross-platform matrix) ───────────────────────────────────
+  build-and-test:
+    name: ${{ matrix.os }} / ${{ matrix.compiler }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            compiler: clang-14
+            cc: clang-14
+          - os: ubuntu-22.04
+            compiler: gcc-12
+            cc: gcc-12
+          - os: macos-14
+            compiler: clang
+            cc: clang
+          - os: windows-2022
+            compiler: msvc
+            cc: cl
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools (Ubuntu)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake ninja-build
+
+      - name: Set up MSVC environment (Windows)
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Configure
+        shell: bash
+        env:
+          CC: ${{ matrix.cc }}
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_EXPORT_COMPILE_COMMANDS=ON \
+            -G Ninja
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Test
+        run: ctest --test-dir build --output-on-failure -j1
+
+      - name: Upload compile_commands.json (Linux clang-14 only)
+        if: matrix.os == 'ubuntu-22.04' && matrix.compiler == 'clang-14'
+        uses: actions/upload-artifact@v4
+        with:
+          name: compile-commands
+          path: build/compile_commands.json
+
+  # ── Required safety artifacts present ────────────────────────────────────────
+  required-artifacts:
+    name: Required safety artifacts present
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify required safety artifacts are present
+        run: |
+          missing=0
+          for f in \
+            .fusa.json \
+            .fusa-reqs.json \
+            .fusa-hara.json \
+            .fusa-problems.json \
+            .fusa-iec62443.json \
+            SECURITY.md \
+            INCIDENT-RESPONSE.md \
+            SAFETY_PLAN.md \
+            .github/CODEOWNERS; do
+            if [ ! -f "$f" ]; then
+              echo "::error::Required safety artifact missing: $f"
+              missing=$((missing + 1))
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+
+  # ── LCOV coverage ─────────────────────────────────────────────────────────────
+  coverage:
+    name: Coverage (LCOV)
+    runs-on: ubuntu-22.04
+    needs: build-and-test
+    outputs:
+      coverage-info: coverage.info
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake ninja-build lcov
+
+      - name: Configure (coverage build)
+        env:
+          CC: gcc-12
+        run: |
+          cmake -B build-cov \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="--coverage -O0" \
+            -DCMAKE_EXE_LINKER_FLAGS="--coverage" \
+            -G Ninja
+
+      - name: Build
+        run: cmake --build build-cov --parallel
+
+      - name: Test
+        run: ctest --test-dir build-cov --output-on-failure -j1
+
+      - name: Collect LCOV data
+        run: |
+          lcov --capture \
+            --directory build-cov \
+            --gcov-tool gcov-12 \
+            --output-file coverage.info
+          lcov --remove coverage.info \
+            '*/tests/*' '*/unity/*' '*/_deps/*' '*/cmake-build*/*' \
+            --output-file coverage.info
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-info
+          path: coverage.info
+
+  # ── Build c-FuSa binary (shared by all cfusa-* jobs) ─────────────────────────
+  cfusa-build:
+    name: Build c-FuSa
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Install tools
+        run: sudo apt-get update -qq && sudo apt-get install -y cmake ninja-build
+
+      - name: Build c-FuSa from source
+        run: |
+          git clone --depth=1 https://github.com/SoundMatt/c-FuSa /tmp/cfusa
+          cmake -B /tmp/cfusa/build -S /tmp/cfusa \
+            -DCMAKE_BUILD_TYPE=Release -G Ninja
+          cmake --build /tmp/cfusa/build --parallel
+
+      - name: Upload cfusa binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: cfusa-binary
+          path: /tmp/cfusa/build/cfusa
+
+  # ── c-FuSa: built-in safety check (lint + analyze + cyber) ───────────────────
+  #
+  # NOT gated on exit code: c-FuSa's CFUSA-L004 (recursion) rule has a
+  # confirmed false-positive bug (fires on non-recursive functions, including
+  # empty ones) — see https://github.com/SoundMatt/c-FuSa/issues/59 and the
+  # disposition recorded in .fusa-dispositions.json (DISP-0001). The report
+  # is still generated so real regressions remain visible; re-enable hard
+  # gating here once the upstream fix lands.
+  cfusa-check:
+    name: cfusa check
+    runs-on: ubuntu-22.04
+    needs: [build-and-test, cfusa-build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cfusa-binary
+          path: /tmp/cfusa/build
+
+      - run: chmod +x /tmp/cfusa/build/cfusa
+
+      - name: Safety check
+        continue-on-error: true
+        run: /tmp/cfusa/build/cfusa check
+
+  # ── c-FuSa: MISRA-C/CERT-C lint (same CFUSA-L004 caveat as check above) ──────
+  cfusa-lint:
+    name: cfusa lint (MISRA-C/CERT-C)
+    runs-on: ubuntu-22.04
+    needs: [build-and-test, cfusa-build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cfusa-binary
+          path: /tmp/cfusa/build
+
+      - run: chmod +x /tmp/cfusa/build/cfusa
+
+      - name: MISRA-C/CERT-C lint
+        continue-on-error: true
+        run: /tmp/cfusa/build/cfusa lint
+
+  # ── c-FuSa: static analysis (overflow, unchecked returns, ...) ───────────────
+  cfusa-analyze:
+    name: cfusa analyze
+    runs-on: ubuntu-22.04
+    needs: [build-and-test, cfusa-build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cfusa-binary
+          path: /tmp/cfusa/build
+
+      - run: chmod +x /tmp/cfusa/build/cfusa
+
+      - name: Static analysis
+        run: /tmp/cfusa/build/cfusa analyze
+
+  # ── c-FuSa: CWE-mapped cybersecurity rules (ISO 21434) ───────────────────────
+  cfusa-cyber:
+    name: cfusa cyber
+    runs-on: ubuntu-22.04
+    needs: [build-and-test, cfusa-build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cfusa-binary
+          path: /tmp/cfusa/build
+
+      - run: chmod +x /tmp/cfusa/build/cfusa
+
+      - name: Cybersecurity rules (ISO 21434)
+        run: /tmp/cfusa/build/cfusa cyber
+
+  # ── c-FuSa: requirements traceability (100% coverage gate) ───────────────────
+  cfusa-trace:
+    name: cfusa trace (100% coverage)
+    runs-on: ubuntu-22.04
+    needs: [build-and-test, cfusa-build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cfusa-binary
+          path: /tmp/cfusa/build
+
+      - run: chmod +x /tmp/cfusa/build/cfusa
+
+      - name: Traceability check (all requirements traced)
+        run: /tmp/cfusa/build/cfusa trace
+
+      - name: Traceability gaps report
+        run: /tmp/cfusa/build/cfusa trace --gaps || true
+
+      # Every requirement MUST be traced to an implementation AND covered by
+      # function-level annotation density (100%) — see ROADMAP.md's process note.
+      - name: Enforce 100% requirement + annotation coverage
+        run: /tmp/cfusa/build/cfusa trace --req-coverage 100
+
+  # ── c-FuSa: ctest integration → test-evidence.md ─────────────────────────────
+  cfusa-verify:
+    name: cfusa verify (test evidence)
+    runs-on: ubuntu-22.04
+    needs: [build-and-test, cfusa-build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: sudo apt-get update -qq && sudo apt-get install -y cmake ninja-build
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cfusa-binary
+          path: /tmp/cfusa/build
+
+      - run: chmod +x /tmp/cfusa/build/cfusa
+
+      - name: Configure
+        env:
+          CC: gcc-12
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -G Ninja
+
+      - name: Build
+        run: cmake --build build --parallel
+
+      - name: Run tests
+        run: ctest --test-dir build --output-on-failure -j1
+
+      - name: Generate test evidence bundle
+        run: /tmp/cfusa/build/cfusa verify
+
+      - name: Upload test evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-evidence
+          path: test-evidence.md
+
+  # ── c-FuSa: tool qualification suite ──────────────────────────────────────────
+  cfusa-qualify:
+    name: cfusa qualify
+    runs-on: ubuntu-22.04
+    needs: cfusa-build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cfusa-binary
+          path: /tmp/cfusa/build
+
+      - run: chmod +x /tmp/cfusa/build/cfusa
+
+      - name: Tool qualification
+        run: /tmp/cfusa/build/cfusa qualify
+
+  # ── c-FuSa: known-vulnerable function pattern scan ───────────────────────────
+  cfusa-vuln:
+    name: cfusa vuln
+    runs-on: ubuntu-22.04
+    needs: cfusa-build
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cfusa-binary
+          path: /tmp/cfusa/build
+
+      - run: chmod +x /tmp/cfusa/build/cfusa
+
+      - name: Vulnerability pattern scan
+        run: /tmp/cfusa/build/cfusa vuln
+
+  # ── c-FuSa: change impact analysis on PRs ────────────────────────────────────
+  cfusa-impact:
+    name: cfusa impact (change analysis)
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'pull_request'
+    needs: [cfusa-build, cfusa-trace]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cfusa-binary
+          path: /tmp/cfusa/build
+
+      - run: chmod +x /tmp/cfusa/build/cfusa
+
+      - name: Change impact analysis
+        run: /tmp/cfusa/build/cfusa impact || true
+
+  # ── c-FuSa: full compliance report (aggregated) ──────────────────────────────
+  cfusa-report:
+    name: cfusa report (compliance)
+    runs-on: ubuntu-22.04
+    needs:
+      - build-and-test
+      - coverage
+      - cfusa-analyze
+      - cfusa-cyber
+      - cfusa-trace
+      - cfusa-verify
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cfusa-binary
+          path: /tmp/cfusa/build
+
+      - run: chmod +x /tmp/cfusa/build/cfusa
+
+      - name: Download coverage info
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-info
+          path: .
+
+      - name: Structural coverage report (DO-178C)
+        run: /tmp/cfusa/build/cfusa coverage --lcov coverage.info --dal DAL-B --output coverage-report.json || true
+
+      - name: Full compliance report (JSON)
+        run: /tmp/cfusa/build/cfusa report --format json --output report.json || true
+
+      - name: Full compliance report (SARIF)
+        run: /tmp/cfusa/build/cfusa report --format sarif --output results.sarif || true
+
+      - name: Safety metrics snapshot
+        run: /tmp/cfusa/build/cfusa metrics record || true
+
+      - name: Upload compliance report
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-report
+          path: |
+            report.json
+            results.sarif
+            coverage-report.json
