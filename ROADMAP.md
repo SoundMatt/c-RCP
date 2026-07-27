@@ -1425,3 +1425,24 @@ public API). This is the first of several batches closing that gap.
 - Remaining batches (vtable methods, registry lifecycle, internal
   helpers — 60 more zero-hit functions across ~17 files) tracked as
   follow-up work, not silently declared done.
+
+---
+### 51. Fix: branch coverage still not captured on real CI (v0.51.0)
+---
+
+Checking the *actual* v0.50.0 release run's logs (not assuming the
+previous milestone's fix worked) found `branches...: no data found` —
+the `--rc branch_coverage=1` flag added in milestone 50 had no effect
+in real CI. Root cause: Ubuntu 22.04's `apt-get install lcov` provides
+**lcov 1.15**, which predates the `branch_coverage` rc-key rename;
+confirmed directly from lcov v1.15's own `lcovrc.5` man-page source
+(`lcov_branch_coverage`, not `branch_coverage`) rather than guessing.
+Fixed by passing both `--rc lcov_branch_coverage=1` (the name lcov 1.15
+actually recognizes) and `--rc branch_coverage=1` (forward-compatible
+with lcov 2.x) to every `lcov --capture`/`--remove` invocation in both
+`ci.yml` and `release.yml`.
+- This is the second time in this coverage-maximization effort that a
+  fix looked right locally (my local lcov is 2.4) but needed
+  verification against the real CI environment's actual tool version
+  to catch — the same lesson as milestone 49's stale-c-FuSa-binary
+  correction, applied again.
