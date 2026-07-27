@@ -91,6 +91,12 @@ jobs:
             --dal b \
             --output do178-gap-report.json || true
 
+      - name: Regenerate IEC 62443 gap report (SL-2)
+        run: |
+          /tmp/cfusa/build/cfusa iec62443 \
+            --sl SL-2 \
+            --output iec62443-gap-report.json || true
+
       - name: Regenerate structural coverage report (DO-178C)
         run: |
           /tmp/cfusa/build/cfusa coverage \
@@ -134,6 +140,7 @@ jobs:
             iso26262-gap-report.json \
             iec61508-gap-report.json \
             do178-gap-report.json \
+            iec62443-gap-report.json \
             coverage-report.json \
             sas.md \
             sci.json \
@@ -165,6 +172,7 @@ jobs:
             iso26262-gap-report.json
             iec61508-gap-report.json
             do178-gap-report.json
+            iec62443-gap-report.json
             coverage-report.json
             audit-pack.zip
             fusa-badge.svg
