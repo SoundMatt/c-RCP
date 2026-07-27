@@ -93,12 +93,14 @@ static int fi_ctrl_send(rcp_controller_t *self, const rcp_context_t *ctx,
     }
 }
 
+//cfusa:req REQ-FI-009
 static int fi_ctrl_subscribe(rcp_controller_t *self, const rcp_context_t *ctx, rcp_status_channel_t **out)
 {
     faultinject_controller_t *fi = (faultinject_controller_t *)self;
     return rcp_controller_subscribe(fi->inner, ctx, out);
 }
 
+//cfusa:req REQ-FI-010
 static int fi_ctrl_close(rcp_controller_t *self)
 {
     faultinject_controller_t *fi = (faultinject_controller_t *)self;

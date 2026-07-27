@@ -417,6 +417,30 @@
       "asil": "ASIL-A"
     },
     {
+      "id": "REQ-E2E-010",
+      "title": "zone() delegates to inner",
+      "text": "The E2E controller's zone() shall return the wrapped inner controller's zone.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-E2E-011",
+      "title": "subscribe() delegates to inner",
+      "text": "The E2E controller's subscribe() shall forward to the wrapped inner controller's subscribe().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-E2E-012",
+      "title": "close() delegates to inner",
+      "text": "The E2E controller's close() shall forward to the wrapped inner controller's close().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-ERR-001",
       "title": "RCP_ERR_CLOSED is non-zero",
       "text": "The sentinel error RCP_ERR_CLOSED shall be non-zero so callers can distinguish it from RCP_OK (success).",
@@ -572,6 +596,22 @@
       "id": "REQ-FI-008",
       "title": "zone() delegates to inner",
       "text": "zone() shall return the inner controller's zone.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FI-009",
+      "title": "subscribe() delegates to inner",
+      "text": "The fault-injection controller's subscribe() shall forward to the wrapped inner controller's subscribe().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FI-010",
+      "title": "close() delegates to inner and rejects further sends",
+      "text": "The fault-injection controller's close() shall forward to the wrapped inner controller's close() and mark the controller closed so subsequent send() calls return RCP_ERR_CLOSED.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -809,6 +849,14 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-PROXY-007",
+      "title": "subscribe() delegates to upstream",
+      "text": "The proxy controller's subscribe() shall forward to the wrapped upstream controller's subscribe().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-RED-001",
       "title": "Primary succeeds, standby unused",
       "text": "While the primary controller answers send() successfully, the standby shall never be contacted.",
@@ -868,6 +916,14 @@
       "id": "REQ-RED-008",
       "title": "zone() returns zone of the active controller",
       "text": "zone() shall return the zone of whichever controller (primary or standby) is currently active.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RED-009",
+      "title": "subscribe() delegates to the currently active controller",
+      "text": "The redundancy controller's subscribe() shall forward to whichever of primary/standby is currently active.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -1001,6 +1057,30 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-OBS-009",
+      "title": "zone() delegates to inner",
+      "text": "The observe controller's zone() shall return the wrapped inner controller's zone.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-OBS-010",
+      "title": "subscribe() delegates to inner",
+      "text": "The observe controller's subscribe() shall forward to the wrapped inner controller's subscribe().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-OBS-011",
+      "title": "close() delegates to inner",
+      "text": "The observe controller's close() shall forward to the wrapped inner controller's close().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-ADMIN-001",
       "title": "zones() returns a snapshot of registered controllers",
       "text": "zones() shall return one entry (marked registered) for every controller currently registered on the wrapped registry.",
@@ -1124,6 +1204,30 @@
       "id": "REQ-REC-008",
       "title": "Record tolerates concurrent appends",
       "text": "rcp_record's append path shall be safe to call concurrently from multiple threads without data races or lost entries.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-REC-009",
+      "title": "zone() delegates to inner",
+      "text": "The record controller's zone() shall return the wrapped inner controller's zone.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-REC-010",
+      "title": "subscribe() delegates to inner",
+      "text": "The record controller's subscribe() shall forward to the wrapped inner controller's subscribe().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-REC-011",
+      "title": "close() delegates to inner",
+      "text": "The record controller's close() shall forward to the wrapped inner controller's close().",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -1561,6 +1665,22 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-LOAN-007",
+      "title": "send() delegates to inner",
+      "text": "The loan controller's send() shall forward to the wrapped inner controller's send().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LOAN-008",
+      "title": "subscribe() delegates to inner",
+      "text": "The loan controller's subscribe() shall forward to the wrapped inner controller's subscribe().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-MDNS-001",
       "title": "Discoverer interface for zone discovery",
       "text": "rcp_mdns_discoverer_t shall define the abstract interface for mDNS-based zone controller discovery.",
@@ -1972,6 +2092,14 @@
       "id": "REQ-RL-008",
       "title": "send() after close returns RCP_ERR_CLOSED",
       "text": "Any send() call after close() shall return RCP_ERR_CLOSED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RL-009",
+      "title": "subscribe() delegates to inner",
+      "text": "The rate-limit controller's subscribe() shall forward to the wrapped inner controller's subscribe().",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"

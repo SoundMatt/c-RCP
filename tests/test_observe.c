@@ -6,6 +6,9 @@
 //cfusa:test REQ-OBS-006
 //cfusa:test REQ-OBS-007
 //cfusa:test REQ-OBS-008
+//cfusa:test REQ-OBS-009
+//cfusa:test REQ-OBS-010
+//cfusa:test REQ-OBS-011
 #include "unity.h"
 
 #include <rcp/mock.h>
@@ -299,6 +302,49 @@ static void test_in_memory_sink_thread_safe_under_concurrent_spans(void)
     rcp_in_memory_sink_destroy(sink);
 }
 
+static void test_zone_delegates_to_inner(void)
+{
+    rcp_controller_t *inner = make_mock(RCP_ZONE_REAR_LEFT);
+    rcp_controller_t *ctrl = rcp_observe_controller_new(inner, rcp_noop_metrics_sink());
+
+    TEST_ASSERT_EQUAL(RCP_ZONE_REAR_LEFT, rcp_controller_zone(ctrl));
+
+    rcp_controller_release(ctrl);
+    rcp_controller_release(inner);
+}
+
+static void test_subscribe_delegates_to_inner(void)
+{
+    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *ctrl = rcp_observe_controller_new(inner, rcp_noop_metrics_sink());
+    rcp_context_t ctx = rcp_context_background();
+    rcp_status_channel_t *ch = NULL;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
+    TEST_ASSERT_NOT_NULL(ch);
+
+    rcp_status_channel_release(ch);
+    rcp_controller_release(ctrl);
+    rcp_controller_release(inner);
+}
+
+static void test_close_delegates_to_inner(void)
+{
+    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *ctrl = rcp_observe_controller_new(inner, rcp_noop_metrics_sink());
+    rcp_context_t ctx = rcp_context_background();
+    rcp_command_t cmd = {0};
+    rcp_response_t resp = {0};
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_close(ctrl));
+
+    cmd.zone = RCP_ZONE_FRONT_LEFT;
+    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_controller_send(inner, &ctx, &cmd, &resp));
+
+    rcp_controller_release(ctrl);
+    rcp_controller_release(inner);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -310,6 +356,9 @@ int main(void)
     RUN_TEST(test_commands_total_counter_increments_per_send);
     RUN_TEST(test_span_captures_error_and_error_counter_increments);
     RUN_TEST(test_in_memory_sink_thread_safe_under_concurrent_spans);
+    RUN_TEST(test_zone_delegates_to_inner);
+    RUN_TEST(test_subscribe_delegates_to_inner);
+    RUN_TEST(test_close_delegates_to_inner);
 
     return UNITY_END();
 }

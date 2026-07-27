@@ -7,6 +7,9 @@
 //cfusa:test REQ-E2E-007
 //cfusa:test REQ-E2E-008
 //cfusa:test REQ-E2E-009
+//cfusa:test REQ-E2E-010
+//cfusa:test REQ-E2E-011
+//cfusa:test REQ-E2E-012
 #include "unity.h"
 
 #include <rcp/e2e.h>
@@ -165,6 +168,51 @@ static void test_controller_wraps_payload_with_incrementing_seq(void)
     rcp_controller_release(inner);
 }
 
+static void test_e2e_ctrl_zone_delegates_to_inner(void)
+{
+    rcp_controller_t *inner = rcp_mock_controller_new(RCP_ZONE_REAR_LEFT, NULL, NULL);
+    rcp_controller_t *ctrl = rcp_e2e_controller_new(inner);
+
+    TEST_ASSERT_EQUAL(RCP_ZONE_REAR_LEFT, rcp_controller_zone(ctrl));
+
+    rcp_controller_release(ctrl);
+    rcp_controller_release(inner);
+}
+
+static void test_e2e_ctrl_subscribe_delegates_to_inner(void)
+{
+    rcp_controller_t *inner = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
+    rcp_controller_t *ctrl = rcp_e2e_controller_new(inner);
+    rcp_context_t ctx = rcp_context_background();
+    rcp_status_channel_t *ch = NULL;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
+    TEST_ASSERT_NOT_NULL(ch);
+
+    rcp_status_channel_release(ch);
+    rcp_controller_release(ctrl);
+    rcp_controller_release(inner);
+}
+
+static void test_e2e_ctrl_close_delegates_to_inner(void)
+{
+    rcp_controller_t *inner = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
+    rcp_controller_t *ctrl = rcp_e2e_controller_new(inner);
+    rcp_context_t ctx = rcp_context_background();
+    rcp_command_t cmd = {0};
+    rcp_response_t resp = {0};
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_close(ctrl));
+
+    /* Confirm close() really reached the inner controller, not just the
+     * wrapper -- sending through the inner directly must now fail. */
+    cmd.zone = RCP_ZONE_FRONT_LEFT;
+    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_controller_send(inner, &ctx, &cmd, &resp));
+
+    rcp_controller_release(ctrl);
+    rcp_controller_release(inner);
+}
+
 static void test_e2e_strerror_unique_nonempty(void)
 {
     const rcp_e2e_errc_t codes[] = {
@@ -197,6 +245,9 @@ int main(void)
     RUN_TEST(test_replay_guard_rejects_old_seq_outside_window);
     RUN_TEST(test_replay_guard_accepts_seq_zero_exactly_once);
     RUN_TEST(test_controller_wraps_payload_with_incrementing_seq);
+    RUN_TEST(test_e2e_ctrl_zone_delegates_to_inner);
+    RUN_TEST(test_e2e_ctrl_subscribe_delegates_to_inner);
+    RUN_TEST(test_e2e_ctrl_close_delegates_to_inner);
     RUN_TEST(test_e2e_strerror_unique_nonempty);
 
     return UNITY_END();

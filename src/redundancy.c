@@ -81,6 +81,7 @@ static int redundancy_ctrl_send(rcp_controller_t *self, const rcp_context_t *ctx
     return ec;
 }
 
+//cfusa:req REQ-RED-009
 static int redundancy_ctrl_subscribe(rcp_controller_t *self, const rcp_context_t *ctx, rcp_status_channel_t **out)
 {
     redundancy_controller_t *rc = (redundancy_controller_t *)self;

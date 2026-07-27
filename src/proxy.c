@@ -43,6 +43,7 @@ static int proxy_ctrl_send(rcp_controller_t *self, const rcp_context_t *ctx,
     return rcp_controller_send(pc->upstream, &proxy_ctx, cmd, out);
 }
 
+//cfusa:req REQ-PROXY-007
 static int proxy_ctrl_subscribe(rcp_controller_t *self, const rcp_context_t *ctx, rcp_status_channel_t **out)
 {
     proxy_controller_t *pc = (proxy_controller_t *)self;

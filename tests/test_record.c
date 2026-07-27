@@ -6,6 +6,9 @@
 //cfusa:test REQ-REC-006
 //cfusa:test REQ-REC-007
 //cfusa:test REQ-REC-008
+//cfusa:test REQ-REC-009
+//cfusa:test REQ-REC-010
+//cfusa:test REQ-REC-011
 #include "unity.h"
 
 #include <rcp/mock.h>
@@ -264,6 +267,55 @@ static void test_playback_replays_entries_against_target(void)
     rcp_record_destroy(rec);
 }
 
+static void test_zone_delegates_to_inner(void)
+{
+    rcp_record_t *rec = rcp_record_new();
+    rcp_controller_t *inner = make_mock(RCP_ZONE_REAR_LEFT);
+    rcp_controller_t *ctrl = rcp_record_controller_new(inner, rec);
+
+    TEST_ASSERT_EQUAL(RCP_ZONE_REAR_LEFT, rcp_controller_zone(ctrl));
+
+    rcp_controller_release(ctrl);
+    rcp_controller_release(inner);
+    rcp_record_destroy(rec);
+}
+
+static void test_subscribe_delegates_to_inner(void)
+{
+    rcp_record_t *rec = rcp_record_new();
+    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *ctrl = rcp_record_controller_new(inner, rec);
+    rcp_context_t ctx = rcp_context_background();
+    rcp_status_channel_t *ch = NULL;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
+    TEST_ASSERT_NOT_NULL(ch);
+
+    rcp_status_channel_release(ch);
+    rcp_controller_release(ctrl);
+    rcp_controller_release(inner);
+    rcp_record_destroy(rec);
+}
+
+static void test_close_delegates_to_inner(void)
+{
+    rcp_record_t *rec = rcp_record_new();
+    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *ctrl = rcp_record_controller_new(inner, rec);
+    rcp_context_t ctx = rcp_context_background();
+    rcp_command_t cmd = {0};
+    rcp_response_t resp = {0};
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_close(ctrl));
+
+    cmd.zone = RCP_ZONE_FRONT_LEFT;
+    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_controller_send(inner, &ctx, &cmd, &resp));
+
+    rcp_controller_release(ctrl);
+    rcp_controller_release(inner);
+    rcp_record_destroy(rec);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -275,6 +327,9 @@ int main(void)
     RUN_TEST(test_forwards_inner_send_result_unchanged);
     RUN_TEST(test_record_tolerates_concurrent_appends);
     RUN_TEST(test_playback_replays_entries_against_target);
+    RUN_TEST(test_zone_delegates_to_inner);
+    RUN_TEST(test_subscribe_delegates_to_inner);
+    RUN_TEST(test_close_delegates_to_inner);
 
     return UNITY_END();
 }

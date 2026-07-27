@@ -6,6 +6,8 @@
 //cfusa:test REQ-FI-006
 //cfusa:test REQ-FI-007
 //cfusa:test REQ-FI-008
+//cfusa:test REQ-FI-009
+//cfusa:test REQ-FI-010
 #include "unity.h"
 
 #include <rcp/clock.h>
@@ -198,6 +200,40 @@ static void test_zone_returns_inner_zone(void)
     rcp_controller_release(inner);
 }
 
+static void test_subscribe_delegates_to_inner(void)
+{
+    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *fi = rcp_faultinject_controller_new(inner);
+    rcp_context_t ctx = rcp_context_background();
+    rcp_status_channel_t *ch = NULL;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(fi, &ctx, &ch));
+    TEST_ASSERT_NOT_NULL(ch);
+
+    rcp_status_channel_release(ch);
+    rcp_controller_release(fi);
+    rcp_controller_release(inner);
+}
+
+static void test_close_delegates_to_inner_and_rejects_further_sends(void)
+{
+    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *fi = rcp_faultinject_controller_new(inner);
+    rcp_context_t ctx = rcp_context_background();
+    rcp_command_t cmd = {0};
+    rcp_response_t resp = {0};
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_close(fi));
+
+    cmd.zone = RCP_ZONE_FRONT_LEFT;
+    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_controller_send(fi, &ctx, &cmd, &resp));
+    /* Confirm close() really reached the inner controller too. */
+    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_controller_send(inner, &ctx, &cmd, &resp));
+
+    rcp_controller_release(fi);
+    rcp_controller_release(inner);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -210,6 +246,8 @@ int main(void)
     RUN_TEST(test_clear_rules_removes_all_active_rules);
     RUN_TEST(test_timeout_rule_returns_err_timeout);
     RUN_TEST(test_zone_returns_inner_zone);
+    RUN_TEST(test_subscribe_delegates_to_inner);
+    RUN_TEST(test_close_delegates_to_inner_and_rejects_further_sends);
 
     return UNITY_END();
 }

@@ -6,6 +6,7 @@
 //cfusa:test REQ-RED-006
 //cfusa:test REQ-RED-007
 //cfusa:test REQ-RED-008
+//cfusa:test REQ-RED-009
 #include "unity.h"
 
 #include <rcp/mock.h>
@@ -221,6 +222,23 @@ static void test_close_closes_both_controllers(void)
     rcp_controller_release(standby);
 }
 
+static void test_subscribe_delegates_to_active_controller(void)
+{
+    rcp_controller_t *primary = make_mock(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *standby = make_mock(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *ctrl = rcp_redundancy_controller_new(primary, standby, rcp_redundancy_default_config());
+    rcp_context_t ctx = rcp_context_background();
+    rcp_status_channel_t *ch = NULL;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
+    TEST_ASSERT_NOT_NULL(ch);
+
+    rcp_status_channel_release(ch);
+    rcp_controller_release(ctrl);
+    rcp_controller_release(primary);
+    rcp_controller_release(standby);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -233,6 +251,7 @@ int main(void)
     RUN_TEST(test_auto_promotes_standby_on_timeout);
     RUN_TEST(test_auto_promote_false_disables_automatic_failover);
     RUN_TEST(test_close_closes_both_controllers);
+    RUN_TEST(test_subscribe_delegates_to_active_controller);
 
     return UNITY_END();
 }

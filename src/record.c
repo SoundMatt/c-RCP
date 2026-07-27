@@ -161,6 +161,7 @@ typedef struct {
     rcp_record_t      *rec;   /* borrowed; must outlive this controller, see record.h */
 } record_controller_t;
 
+//cfusa:req REQ-REC-009
 static rcp_zone_t record_ctrl_zone(rcp_controller_t *self)
 {
     return rcp_controller_zone(((record_controller_t *)self)->inner);
@@ -177,12 +178,14 @@ static int record_ctrl_send(rcp_controller_t *self, const rcp_context_t *ctx,
     return ec;
 }
 
+//cfusa:req REQ-REC-010
 static int record_ctrl_subscribe(rcp_controller_t *self, const rcp_context_t *ctx, rcp_status_channel_t **out)
 {
     record_controller_t *rc = (record_controller_t *)self;
     return rcp_controller_subscribe(rc->inner, ctx, out);
 }
 
+//cfusa:req REQ-REC-011
 static int record_ctrl_close(rcp_controller_t *self)
 {
     record_controller_t *rc = (record_controller_t *)self;
