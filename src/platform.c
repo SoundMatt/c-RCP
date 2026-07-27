@@ -1,3 +1,8 @@
+/* Must precede any system header: exposes nanosleep() and the pthread
+ * declarations used below on glibc under strict -std=c99 (see clock.c for
+ * the same fix and rationale). */
+#define _POSIX_C_SOURCE 200809L
+
 #include "platform.h"
 
 #include <stdlib.h>

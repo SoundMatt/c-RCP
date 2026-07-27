@@ -13,16 +13,20 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+# Warning flags are applied per-target (not via global add_compile_options)
+# so they never leak into vendored dependencies fetched via FetchContent
+# (e.g. Unity) — CMake's directory-scoped COMPILE_OPTIONS would otherwise
+# apply to every target configured afterward, including third-party sources
+# we have no business holding to our own standard.
 if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-    add_compile_options(
+    set(RCP_WARNING_FLAGS
         -Wall -Wextra -Wpedantic
         -Wshadow -Wcast-align -Wunused
         -Wstrict-prototypes -Wmissing-prototypes
         -Wno-unused-parameter
     )
-endif()
-if(MSVC)
-    add_compile_options(
+elseif(MSVC)
+    set(RCP_WARNING_FLAGS
         /W4 /WX
         /wd4100   # unreferenced formal parameter
         /wd4996
@@ -47,6 +51,7 @@ target_include_directories(rcp PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(rcp PUBLIC Threads::Threads)
+target_compile_options(rcp PRIVATE ${RCP_WARNING_FLAGS})
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 option(RCP_BUILD_TESTS "Build tests" ON)

@@ -1,3 +1,9 @@
+/* Must precede any system header: exposes clock_gettime()/CLOCK_MONOTONIC
+ * on glibc under strict -std=c99 (glibc gates POSIX.1-2008 declarations
+ * behind this feature-test macro; BSD/Apple libc does not, which is why
+ * this was only caught on the Linux CI legs). */
+#define _POSIX_C_SOURCE 200809L
+
 #include "rcp/clock.h"
 
 #if defined(_WIN32)
