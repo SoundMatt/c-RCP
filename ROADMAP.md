@@ -932,9 +932,19 @@ already used for `rcp_grpc_config_t`).
 ### Phase 10 — Automotive Protocol Bridges
 ---
 
-### 33. SOME/IP Bridge (v0.33.0)
+### 33. SOME/IP Bridge (v0.33.0) ✅
 
-`include/rcp/someipbr.h` — bridge to SOME/IP service methods (stub, via c-SOMEIP if available).
+`include/rcp/someipbr.h` + `src/someipbr.c`: ports cpp-RCP's `someipbr.hpp`
+— the same compile-time stub pattern as `restbridge`/`grpcbridge`, this
+time addressed by `service_id`/`instance_id`/`method_id` (`uint16_t`, per
+SOME/IP's own wire addressing scheme) plus a `timeout_ms` rather than a
+URL/hostname. `send()`/`subscribe()` always return
+`RCP_ERR_NOT_SUPPORTED` (no vsomeip or equivalent backend linked);
+`zone()` returns the configured zone; `close()` always succeeds.
+- `tests/test_someipbr.c` ports all 4 of cpp-RCP's `test_someipbr.cpp`
+  cases, mirroring `test_restbridge.c`/`test_grpcbridge.c`.
+- **Requirements catalog gap filled**: added `REQ-SOMEIP-001` through
+  `-004` (none existed previously).
 
 ### 34. CAN Bridge (v0.34.0)
 
