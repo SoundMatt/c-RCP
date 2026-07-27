@@ -70,7 +70,10 @@ static void test_thread_join(test_thread_t t)
     WaitForSingleObject(t, INFINITE);
     CloseHandle(t);
 }
-static int test_atomic_add(volatile LONG *v, LONG n) { return (int)InterlockedExchangeAdd(v, n) + (int)n; }
+static int test_atomic_add(volatile int *v, int n)
+{
+    return (int)InterlockedExchangeAdd((volatile LONG *)v, (LONG)n) + n;
+}
 #else
 #include <pthread.h>
 typedef pthread_t test_thread_t;
