@@ -128,6 +128,9 @@ typedef enum {
      * an insecure/unimplemented path. Mirrors cpp-RCP's use of the generic
      * std::errc::function_not_supported for the same stub contract. */
     RCP_ERR_NOT_SUPPORTED   = 7,
+    /* Returned by the authz decorator (authz.h) when the caller's identity
+     * is not permitted to send the given command type to the given zone. */
+    RCP_ERR_FORBIDDEN       = 8,
 } rcp_errc_t;
 
 /* Human-readable message for an rcp_errc_t value. Never returns NULL. */
