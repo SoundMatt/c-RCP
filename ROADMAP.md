@@ -972,9 +972,18 @@ the configured zone; `close()` always succeeds.
 - **Requirements catalog gap filled**: added `REQ-DDS-001` through `-004`
   (none existed previously).
 
-### 36. MQTT Bridge (v0.36.0)
+### 36. MQTT Bridge (v0.36.0) ✅
 
-`include/rcp/mqttbr.h` — bridge Status to MQTT topics (stub).
+`include/rcp/mqttbr.h` + `src/mqttbr.c`: ports cpp-RCP's `mqttbr.hpp` —
+the same compile-time stub pattern as the other protocol bridges,
+configured by `broker_url` (default `"tcp://localhost:1883"`),
+`topic_prefix` (default `"rcp"`), `qos`, and `timeout_ms`. `send()`/
+`subscribe()` always return `RCP_ERR_NOT_SUPPORTED` (no MQTT client
+library such as Eclipse Paho linked); `zone()` returns the configured
+zone; `close()` always succeeds.
+- `tests/test_mqttbr.c` ports all 4 of cpp-RCP's `test_mqttbr.cpp` cases.
+- **Requirements catalog gap filled**: added `REQ-MQTT-001` through `-004`
+  (none existed previously).
 
 ### 37. LIN Bridge (v0.37.0)
 
