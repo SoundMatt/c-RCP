@@ -147,12 +147,15 @@ integration test where practical.
 ### Phase 2 — Safety Groundwork
 ---
 
-### 3. Hardening (v0.3.0)
+### 3. Hardening (v0.3.0) ✅
 
 - Benchmarks (`tests/bench_mock.c`): send round-trip, send with payload,
-  concurrent send (8 threads), publish fan-out, registry lookup
+  concurrent send (8 threads), publish fan-out, registry lookup — Unity has
+  no BENCHMARK macro, so each case times N iterations and prints mean
+  latency (`ctest -R rcp_bench -V`)
 - Safety timing evidence (`tests/command_latency_test.c`): sustained workload
-  with P99 / Max latency gates enforced, written as FuSa audit evidence
+  with P99 / Max latency gates enforced (relaxed on shared CI runners),
+  writes `COMMAND_LATENCY.md` as FuSa audit evidence
 
 ### 4. HARA Expansion (v0.4.0)
 
