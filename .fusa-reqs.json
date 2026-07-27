@@ -689,6 +689,54 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-ZG-001",
+      "title": "ZoneGroup::all() contains exactly 5 zones",
+      "text": "rcp_zone_group_all() shall return a group containing front-left, front-right, rear-left, rear-right, and central, and no others.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ZG-002",
+      "title": "send_group() dispatches concurrently to every zone in the group",
+      "text": "rcp_zonegroup_send() shall dispatch the command to every zone in the group concurrently, not sequentially.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ZG-003",
+      "title": "send_group() collects a per-zone result for every zone",
+      "text": "The returned rcp_group_response_t shall contain exactly one result (response and error) for every zone in the group.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ZG-004",
+      "title": "errors() lists every failing zone",
+      "text": "rcp_group_response_errors() shall list every zone whose result carries a non-RCP_OK error, and no others.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ZG-005",
+      "title": "ZoneGroup is a copyable value type",
+      "text": "Assigning one rcp_zone_group_t to another shall produce an independent copy; mutating the copy via rcp_zone_group_add() shall not affect the original.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ZG-006",
+      "title": "send_group() propagates the caller's context deadline",
+      "text": "The rcp_context_t passed to rcp_zonegroup_send() shall be propagated unchanged to every per-zone send.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-LOAN-001",
       "title": "loan() returns zeroed buffer",
       "text": "rcp_loan_controller_t::loan(n) shall return a zeroed byte vector of exactly n bytes.",
