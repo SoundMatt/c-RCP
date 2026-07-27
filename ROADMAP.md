@@ -946,9 +946,18 @@ URL/hostname. `send()`/`subscribe()` always return
 - **Requirements catalog gap filled**: added `REQ-SOMEIP-001` through
   `-004` (none existed previously).
 
-### 34. CAN Bridge (v0.34.0)
+### 34. CAN Bridge (v0.34.0) ✅
 
-`include/rcp/canbr.h` — bridge to CAN frames (stub).
+`include/rcp/canbr.h` + `src/canbr.c`: ports cpp-RCP's `canbr.hpp` — the
+same compile-time stub pattern as the other protocol bridges, configured
+by `can_id_base` (base arbitration ID), `fd_mode` (CAN-FD frames), and
+`timeout_ms` rather than a URL/hostname/service triad. `send()`/
+`subscribe()` always return `RCP_ERR_NOT_SUPPORTED` (no SocketCAN or
+hardware CAN driver backend linked); `zone()` returns the configured
+zone; `close()` always succeeds.
+- `tests/test_canbr.c` ports all 4 of cpp-RCP's `test_canbr.cpp` cases.
+- **Requirements catalog gap filled**: added `REQ-CAN-001` through `-004`
+  (none existed previously).
 
 ### 35. DDS Bridge (v0.35.0)
 
