@@ -2,11 +2,11 @@
   "schemaVersion": "1.10.12",
   "kind": "tara",
   "tool": "c-FuSa",
-  "toolVersion": "0.5.40",
+  "toolVersion": "0.5.41",
   "language": "c",
-  "generatedAt": "2026-07-27T15:19:06Z",
+  "generatedAt": "2026-07-27T15:41:45Z",
   "project": "c-RCP",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "standard": "ISO 21434:2021 Clause 9",
   "assets": [
     {"id":"ASSET-001","description":"[describe asset]","property":"CIA"}

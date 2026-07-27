@@ -1,12 +1,13 @@
 Software Configuration Index
-Project: c-RCP v0.6.0   Generated: 2026-07-27T15:19:06Z
+Project: c-RCP v0.7.0   Generated: 2026-07-27T15:41:45Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
 ./include/rcp/mdns.h                                          81b034f2a6b2ae79de47579fc370af0d5ed37c95ef3b7a0ddac70fbdbd42ba1b
+./include/rcp/tls.h                                           f62738ef10a3da2eebafe8cda2b8b8248b882a9f3a09b9b5fe29fb9542b85c65
 ./include/rcp/mock.h                                          ec2b0a87c520c79bccbf806daa948d11928e75391a6c99cda0d87769ae41e2cd
 ./include/rcp/udp.h                                           05bf00b6fb1f1ee26bba018cc9cb414a138fbd29196348678a88ef140c164e41
-./include/rcp/rcp.h                                           4239fd17a375982ea13ce557523a8326bd528a3c41973aa0ca1e501c2b0f0819
+./include/rcp/rcp.h                                           a82ad095bea0575995941fe80d54928e1f11cf6c279b3630f4e22664ea3ec421
 ./include/rcp/wire.h                                          b679f5f8cc803600cbb4dafa17844d3de73154fd3023da4819887e1504ce87fc
 ./include/rcp/clock.h                                         f907473a6a7de9be91e981bf19c4d417c2685870677b60aff6f21cc733040c92
 ./include/relay/relay.h                                       052b46bf9dc74a06bde10ee6f5a94074f998ba0991837516d812978f973d3e87
@@ -16,10 +17,12 @@ FILE                                                          SHA-256
 ./src/platform.c                                              72fe578947526dc43baafc3034b0937481013a0f2bda0ea1a5e909103250ee59
 ./src/udp.c                                                   3d770260eab1d5801d9750483e58da249f2b7539a18afebe637f1fb1888be1f8
 ./src/mdns.c                                                  73cd651fa106178b8a259ea78a40ead7b068d62263b521aa546b461806477b0a
-./src/rcp.c                                                   9a1ec4068d08238470be5af96a2d006a45dee2b1a087229859c9a60acc662261
+./src/rcp.c                                                   30506de3513246c80e89e349092cbd5c23d3f9717558e997099c6010f6bd77b0
+./src/tls.c                                                   3b02bc99aede19354af8756f9fd910094e67cdde532fede082892f100e4aaca3
 ./src/wire.c                                                  8305a30b79cfcffe392dc3119e85a3d5f6af92046a2d36f042df0c4b365c6694
 ./tests/test_udp.c                                            d3b2402129b6e416f9cf3f63fc240771362054589f3762bb0192060135acf546
 ./tests/bench_util.h                                          f81551a420952d65e3d76b9c03bdd6be6938f080de843d9e16f51272d41584c4
+./tests/test_tls.c                                            be4641eec135f56b3b1556f06d7678a01e7b76d81820e70fa27a58e67f00754d
 ./tests/test_mdns.c                                           c2c9835ccf054a266d74575f7882526a1234b4dbe16c5712f39b5e670a392f48
 ./tests/bench_mock.c                                          20dcd4efe8c8b255626d65aee2675271324b820c2490c629f4b9edbb2ba96b6d
 ./tests/test_wire.c                                           fd757c402ed9ca0e245e2f00bc187492f6d58be0742c2729aa47f437ff52908e
@@ -27,4 +30,4 @@ FILE                                                          SHA-256
 ./tests/test_rcp.c                                            a101960f867f8d69d3faa38d5c6ff73dab2c4d315e6fde141e64a03e2a6de78f
 ./tests/test_mock.c                                           5c824eb897d51b4474dc7354f10b856c32d23d8a38d918219c57ab565155d5f2
 
-Total files: 23
+Total files: 26
