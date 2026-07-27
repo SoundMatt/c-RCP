@@ -1087,9 +1087,31 @@ refinement that preserves the same `NoDirectFault` safety property.
   of watchdog/E2E behavior already covered by `REQ-WDG-*`/`REQ-E2E-*`
   from earlier milestones, not new requirements.
 
-### 42. ISO 21434 / Cybersecurity (v0.42.0)
+### 42. ISO 21434 / Cybersecurity (v0.42.0) ✅
 
-TARA, CYBERSECURITY.md, IEC 62443 SL-2 gap analysis closing `.fusa-iec62443.json` items.
+`CYBERSECURITY.md`: documents the five-layer defense already implemented
+across earlier milestones — TLS (v0.7.0), authorization (v0.19.0), E2E
+anti-replay (v0.13.0, formally verified at v0.41.0), rate limiting
+(v0.22.0), and firmware integrity (v0.20.0) — plus the threat-to-
+countermeasure mapping and IEC 62443 SL-2 FR1–FR7 status table. Ports
+cpp-RCP's `CYBERSECURITY.md` structure, updated to reference c-RCP's own
+C symbol names in place of cpp-RCP's C++ class names.
+- **`.github/workflows/release.yml` gains a new step**: `cfusa iec62443
+  --sl SL-2 --output iec62443-gap-report.json`, wired in identically to
+  the existing `iso26262`/`iec61508`/`do178` gap-report steps (same
+  `|| true` non-blocking pattern — the workflow's job is to generate the
+  artifact, not gate on it). This closes the actual gap in this
+  project's own tooling: `.fusa-iec62443.json` (target `SL-2`) had
+  existed since the v0.1.0 scaffold, but nothing ever invoked `cfusa
+  iec62443` against it until now, so no gap report had ever been
+  produced for c-RCP specifically.
+- TARA already exists as an auto-generated artifact (`tara.md`/
+  `tara.json`, regenerated every tagged release by `cfusa tara` since
+  the initial scaffold) — `CYBERSECURITY.md` references it rather than
+  duplicating it.
+- **No new `.c`/`.h`/test files or `REQ-*` catalog entries**: this
+  milestone documents and gap-analyzes existing security controls
+  rather than adding new ones.
 
 ### 43. Certification (v0.43.0)
 
