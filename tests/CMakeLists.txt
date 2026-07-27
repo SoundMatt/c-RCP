@@ -174,3 +174,8 @@ target_link_libraries(test_dyndata PRIVATE rcp::rcp unity)
 target_compile_options(test_dyndata PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_dyndata COMMAND test_dyndata)
 set_tests_properties(rcp_dyndata PROPERTIES TIMEOUT 30)
+
+add_executable(test_grpcbridge test_grpcbridge.c)
+target_link_libraries(test_grpcbridge PRIVATE rcp::rcp unity)
+target_compile_options(test_grpcbridge PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_grpcbridge COMMAND test_grpcbridge)
