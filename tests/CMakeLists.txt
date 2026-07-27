@@ -132,3 +132,8 @@ add_executable(test_proxy test_proxy.c)
 target_link_libraries(test_proxy PRIVATE rcp::rcp unity)
 target_compile_options(test_proxy PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_proxy COMMAND test_proxy)
+
+add_executable(test_redundancy test_redundancy.c)
+target_link_libraries(test_redundancy PRIVATE rcp::rcp unity)
+target_compile_options(test_redundancy PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_redundancy COMMAND test_redundancy)

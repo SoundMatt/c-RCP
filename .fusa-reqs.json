@@ -785,6 +785,70 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-RED-001",
+      "title": "Primary succeeds, standby unused",
+      "text": "While the primary controller answers send() successfully, the standby shall never be contacted.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RED-002",
+      "title": "Auto-promotes standby on RCP_ERR_CLOSED",
+      "text": "When auto_promote is enabled and the active controller's send() returns RCP_ERR_CLOSED, the redundant controller shall promote the standby and retry.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RED-003",
+      "title": "Auto-promotes standby on RCP_ERR_TIMEOUT",
+      "text": "When auto_promote is enabled and the active controller's send() returns RCP_ERR_TIMEOUT, the redundant controller shall promote the standby and retry.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RED-004",
+      "title": "Manual promote() switches the active controller",
+      "text": "promote() shall switch the active controller from primary to standby, or from standby to primary.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RED-005",
+      "title": "Double promote() returns to primary",
+      "text": "Calling promote() twice in succession shall return the active controller to the primary.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RED-006",
+      "title": "close() closes both controllers",
+      "text": "close() shall close both the primary and the standby controller.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RED-007",
+      "title": "auto_promote=false disables automatic failover",
+      "text": "When auto_promote is false, send() shall surface the active controller's error unchanged rather than promoting the standby.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RED-008",
+      "title": "zone() returns zone of the active controller",
+      "text": "zone() shall return the zone of whichever controller (primary or standby) is currently active.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-LOAN-001",
       "title": "loan() returns zeroed buffer",
       "text": "rcp_loan_controller_t::loan(n) shall return a zeroed byte vector of exactly n bytes.",
