@@ -641,9 +641,31 @@ what kind of controller it's holding.
   (none existed previously, following the same pattern as authz, firmware,
   and zone groups).
 
-### 23. Redundancy (v0.23.0)
+### 23. Redundancy (v0.23.0) ✅
 
-`include/rcp/redundancy.h`: hot-standby registry with automatic promotion on failover.
+`include/rcp/redundancy.h` + `src/redundancy.c`: ports cpp-RCP's
+`redundancy.hpp` — `rcp_redundancy_controller_new()` holds a primary and a
+standby controller for the same zone (same generic-decorator vtable
+pattern used since v0.9.0). All sends go to whichever is currently active
+(primary by default); on `RCP_ERR_CLOSED` or `RCP_ERR_TIMEOUT` (when
+`auto_promote` is enabled) the controller promotes the standby and retries
+up to `max_retries` times. `rcp_redundancy_controller_promote()` toggles
+the active controller manually — calling it twice returns to primary.
+- **Scope note**: cpp-RCP's own header comment claims "`RedundantRegistry`
+  wraps two `rcp::Registry` instances (primary/standby)" and that
+  "heartbeat health monitoring (via `watchdog::Keeper`) drives promotion,"
+  but no `RedundantRegistry` class — nor any watchdog integration — exists
+  anywhere in the shipped `redundancy.hpp`; only `RedundantController` is
+  implemented. This port mirrors what's actually shipped, the same
+  judgment call made for firmware's SHA-256 claim, zone groups' Critical
+  bypass claim, TSN's VLAN tagging, and loan's per-transport note.
+- `tests/test_redundancy.c` ports all 8 of cpp-RCP's `test_redundancy.cpp`
+  cases, including a custom `FailController` test double (ported from
+  cpp-RCP's own custom `rcp::Controller` subclass of the same name,
+  matching the established custom-vtable test-double pattern already used
+  in `test_mdns.c`/`test_powerstate.c`).
+- **Requirements catalog gap filled**: added `REQ-RED-001` through `-008`
+  (none existed previously, following the established pattern).
 
 ### 24. Multi-HPC Federation (v0.24.0)
 
