@@ -1036,10 +1036,29 @@ stack integration linked); `zone()` returns the configured zone;
 ### Phase 11 — Platform
 ---
 
-### 40. RTOS / Bare-Metal (v0.40.0)
+### 40. RTOS / Bare-Metal (v0.40.0) ✅
 
-See adaptation note above — RTOS portability audit + integration notes rather
-than a new C API (the core is already C).
+`PORTABILITY.md`: the portability audit flagged in this project's
+original scope-adaptation plan. cpp-RCP's own v0.40.0 shipped a new
+`capi.h`/`capi_impl.hpp` pure-C API layer so RTOS targets that can't
+link a C++17 runtime could still call in; c-RCP's public API already
+*is* that layer, so a second C API on top would be pure duplication.
+Instead, the audit identifies: (1) the wire/protocol/codec logic
+(`rcp.c`, `wire.c`, `e2e.c`, `faultinject.c`, `dyndata.c`) as already
+100% RTOS-portable with zero OS dependency; (2) every other module as
+depending on exactly one seam — `src/platform.h`/`platform.c`'s
+mutex/cond/thread/clock primitives — meaning a Zephyr or FreeRTOS
+backend is an additive third `#if defined(...)` branch in one file, not
+a redesign; (3) two concrete gaps a real RTOS port would still need to
+close (static/pool allocation in place of `malloc`/`calloc` at ~117 call
+sites; collapsing the one-thread-per-decorator pattern used by
+`watchdog.c`/`deadline.c`/`powerstate.c`/`sim.c`/`prioqueue.c`/
+`zonegroup.c` into fewer cooperative tasks for fixed-task-count
+hardware) — both explicitly deferred as separate future work rather
+than silently declared "done."
+- **No new `.c`/`.h`/test files, and no new `REQ-*` catalog entries**:
+  consistent with the Code Generation milestone (v0.29.0), an audit
+  document is not executable code and has no requirement to trace.
 
 ---
 ### Phase 12 — Certification & Formal Methods
