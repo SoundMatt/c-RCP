@@ -625,6 +625,70 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-FW-001",
+      "title": "Session starts in Idle state",
+      "text": "A newly constructed rcp_firmware_session_t shall be in RCP_FW_STATE_IDLE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FW-002",
+      "title": "initiate() transitions Idle to Initiated",
+      "text": "A successful initiate() call shall transition the session from RCP_FW_STATE_IDLE to RCP_FW_STATE_INITIATED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FW-003",
+      "title": "initiate() from non-Idle state fails",
+      "text": "initiate() called from any state other than RCP_FW_STATE_IDLE shall return RCP_FW_ERR_BAD_STATE without sending a command.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FW-004",
+      "title": "transfer() requires Initiated state",
+      "text": "transfer() called from any state other than RCP_FW_STATE_INITIATED shall return RCP_FW_ERR_BAD_STATE without sending a command.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FW-005",
+      "title": "verify()/activate() advance the state machine",
+      "text": "A successful verify() shall transition to RCP_FW_STATE_VERIFYING and a successful activate() shall transition to RCP_FW_STATE_ACTIVATED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FW-006",
+      "title": "transfer() splits the image into chunk_size segments",
+      "text": "transfer() shall split the image into ceil(len / chunk_size) chunks, each at most chunk_size bytes.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FW-007",
+      "title": "rollback() resets session to Idle",
+      "text": "A successful rollback() shall transition the session back to RCP_FW_STATE_IDLE regardless of its prior state.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FW-008",
+      "title": "transfer() invokes the progress callback once per chunk",
+      "text": "If a progress callback is supplied, transfer() shall invoke it exactly once per chunk sent, with cumulative bytes_sent and the current chunk_index/total_chunks.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-LOAN-001",
       "title": "loan() returns zeroed buffer",
       "text": "rcp_loan_controller_t::loan(n) shall return a zeroed byte vector of exactly n bytes.",
