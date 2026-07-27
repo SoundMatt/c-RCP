@@ -147,8 +147,15 @@ typedef enum {
     RCP_ZONE_CENTRAL     = 5,
 } rcp_zone_t;
 
-/* Unique, non-empty, human-readable name for a zone. Never returns NULL. */
+/* Unique, non-empty, PascalCase name for a zone (e.g. "FrontLeft"), per
+ * RELAY spec routing conventions. Never returns NULL. */
 const char *rcp_zone_string(rcp_zone_t z);
+
+/* Reverse of rcp_zone_string(): parses a zone name back into its rcp_zone_t
+ * constant. Accepts both the canonical PascalCase form and the legacy
+ * kebab-case form for backward compatibility. Returns RCP_ZONE_UNKNOWN for
+ * NULL or an unrecognized string. */
+rcp_zone_t rcp_zone_from_string(const char *s);
 
 /* ── Priority ──────────────────────────────────────────────────────────────── */
 

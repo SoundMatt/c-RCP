@@ -6,6 +6,7 @@
 //cfusa:test REQ-ZONE-006
 //cfusa:test REQ-ZONE-007
 //cfusa:test REQ-ZONE-008
+//cfusa:test REQ-ZONE-009
 //cfusa:test REQ-PRI-001
 //cfusa:test REQ-PRI-002
 //cfusa:test REQ-PRI-003
@@ -77,6 +78,47 @@ static void test_zone_string_unique_nonempty(void)
             TEST_ASSERT_NOT_EQUAL(0, strcmp(s, rcp_zone_string(zones[j])) != 0 ? 1 : 0);
         }
     }
+}
+
+static void test_zone_string_is_pascal_case(void)
+{
+    TEST_ASSERT_EQUAL_STRING("FrontLeft",  rcp_zone_string(RCP_ZONE_FRONT_LEFT));
+    TEST_ASSERT_EQUAL_STRING("FrontRight", rcp_zone_string(RCP_ZONE_FRONT_RIGHT));
+    TEST_ASSERT_EQUAL_STRING("RearLeft",   rcp_zone_string(RCP_ZONE_REAR_LEFT));
+    TEST_ASSERT_EQUAL_STRING("RearRight",  rcp_zone_string(RCP_ZONE_REAR_RIGHT));
+    TEST_ASSERT_EQUAL_STRING("Central",    rcp_zone_string(RCP_ZONE_CENTRAL));
+    TEST_ASSERT_EQUAL_STRING("Unknown",    rcp_zone_string(RCP_ZONE_UNKNOWN));
+}
+
+static void test_zone_from_string_roundtrips_with_zone_string(void)
+{
+    const rcp_zone_t zones[] = {
+        RCP_ZONE_FRONT_LEFT, RCP_ZONE_FRONT_RIGHT,
+        RCP_ZONE_REAR_LEFT,  RCP_ZONE_REAR_RIGHT,
+        RCP_ZONE_CENTRAL,
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof(zones) / sizeof(zones[0]); i++) {
+        const char *s = rcp_zone_string(zones[i]);
+        TEST_ASSERT_EQUAL(zones[i], rcp_zone_from_string(s));
+    }
+}
+
+static void test_zone_from_string_accepts_legacy_kebab_case(void)
+{
+    TEST_ASSERT_EQUAL(RCP_ZONE_FRONT_LEFT,  rcp_zone_from_string("front-left"));
+    TEST_ASSERT_EQUAL(RCP_ZONE_FRONT_RIGHT, rcp_zone_from_string("front-right"));
+    TEST_ASSERT_EQUAL(RCP_ZONE_REAR_LEFT,   rcp_zone_from_string("rear-left"));
+    TEST_ASSERT_EQUAL(RCP_ZONE_REAR_RIGHT,  rcp_zone_from_string("rear-right"));
+    TEST_ASSERT_EQUAL(RCP_ZONE_CENTRAL,     rcp_zone_from_string("central"));
+}
+
+static void test_zone_from_string_rejects_unknown_and_null(void)
+{
+    TEST_ASSERT_EQUAL(RCP_ZONE_UNKNOWN, rcp_zone_from_string("NotAZone"));
+    TEST_ASSERT_EQUAL(RCP_ZONE_UNKNOWN, rcp_zone_from_string(""));
+    TEST_ASSERT_EQUAL(RCP_ZONE_UNKNOWN, rcp_zone_from_string(NULL));
 }
 
 static void test_zone_values(void)
@@ -274,6 +316,10 @@ int main(void)
     UNITY_BEGIN();
 
     RUN_TEST(test_zone_string_unique_nonempty);
+    RUN_TEST(test_zone_string_is_pascal_case);
+    RUN_TEST(test_zone_from_string_roundtrips_with_zone_string);
+    RUN_TEST(test_zone_from_string_accepts_legacy_kebab_case);
+    RUN_TEST(test_zone_from_string_rejects_unknown_and_null);
     RUN_TEST(test_zone_values);
     RUN_TEST(test_zone_values_distinct);
 

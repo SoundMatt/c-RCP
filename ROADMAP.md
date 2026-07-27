@@ -1181,9 +1181,39 @@ as a ceiling constant but was never used as a bound check.
   proves the fix's actual guarantee.
 - **Requirements catalog**: added `REQ-UDP-013`.
 
-### 45. `rcp_zone_string()` PascalCase + `rcp_zone_from_string()` (v0.45.0) — closes #11
+### 45. `rcp_zone_string()` PascalCase + `rcp_zone_from_string()` (v0.45.0) ✅ — closes #11
 
-_(pending)_
+`src/rcp.c`'s `rcp_zone_string()` returned lowercase kebab-case
+(`"front-left"` etc.), but RELAY spec §10.4/§15.7.5 mandate PascalCase
+(`"FrontLeft"`) as the canonical zone-name string form used in routing
+and `Status.ToMessage()`.
+- **Deviation from cpp-RCP's own precedent, deliberately**: cpp-RCP
+  fixed the identical upstream defect (also present in go-RCP, tracked
+  there as issue #51) differently — it left its own `to_string(Zone)`
+  untouched in kebab-case and added a *separate*, RELAY-only pair
+  (`zone_to_relay_id`/`zone_from_relay_id`) inside `adapt.hpp`. This
+  fix instead follows go-RCP's own resolution and this issue's own
+  literal suggested-fix text: `rcp_zone_string()` itself now returns
+  PascalCase directly, with a new `rcp_zone_from_string()` accepting
+  both the new PascalCase form and the legacy kebab-case form (for
+  backward compatibility with anything that persisted or logged the
+  old strings) — mirroring go-RCP's dual-accept `ZoneFromString`
+  exactly. This also means milestone 46's `adapt.c` can call
+  `rcp_zone_string()`/`rcp_zone_from_string()` directly rather than
+  needing a second, RELAY-only pair of functions.
+- Two real call sites (`src/mdns.c`'s instance-name builder,
+  `tests/test_mdns.c`'s expectation) both call `rcp_zone_string()`
+  dynamically rather than hardcoding the old casing, so both adapted
+  with no further changes needed — confirmed by re-reading both files
+  before touching anything.
+- **Requirements catalog**: added `REQ-ZONE-009` (`REQ-ZONE-002` was
+  already taken by an unrelated pre-existing requirement — caught via
+  a duplicate-ID check on `.fusa-reqs.json` before shipping, not after).
+  Updated `REQ-ZONE-001`'s text to describe PascalCase instead of
+  generic "human-readable."
+- 4 new test cases in `tests/test_rcp.c`: exact PascalCase strings for
+  all 5 zones, a round-trip through both new functions, legacy
+  kebab-case acceptance, and unknown/NULL rejection.
 
 ### 46. `Adapt()`/`ToMessage()`/`FromMessage()`/`SpecVersion` (v0.46.0) — closes #10
 
