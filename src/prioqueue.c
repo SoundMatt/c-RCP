@@ -50,6 +50,7 @@ static bool higher(const pq_entry_t *a, const pq_entry_t *b)
     return a->seq < b->seq;
 }
 
+//cfusa:req REQ-PQ-009
 static void heap_swap(prioqueue_controller_t *pc, size_t i, size_t j)
 {
     pq_entry_t *tmp = pc->heap[i];
@@ -67,6 +68,7 @@ static void heap_sift_up(prioqueue_controller_t *pc, size_t i)
     }
 }
 
+//cfusa:req REQ-PQ-009
 static void heap_sift_down(prioqueue_controller_t *pc, size_t i)
 {
     for (;;) {

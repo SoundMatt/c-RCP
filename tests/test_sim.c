@@ -6,6 +6,8 @@
 //cfusa:test REQ-SIM-006
 //cfusa:test REQ-SIM-007
 //cfusa:test REQ-SIM-008
+//cfusa:test REQ-SIM-009
+//cfusa:test REQ-SIM-010
 #include "unity.h"
 
 #include <rcp/clock.h>
@@ -191,6 +193,83 @@ static void test_publishes_status_on_interval(void)
     rcp_controller_release(ctrl);
 }
 
+static void test_closing_channel_directly_removes_watcher_subscription(void)
+{
+    rcp_sim_config_t cfg = rcp_sim_default_config(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *ctrl;
+    rcp_context_t ctx = rcp_context_background();
+    rcp_status_channel_t *ch = NULL;
+    uint64_t start;
+
+    cfg.status_interval_ms  = 0;
+    cfg.watchdog_timeout_ms = 0;
+    ctrl = rcp_sim_controller_new(cfg, NULL, NULL);
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
+    TEST_ASSERT_NOT_NULL(ch);
+
+    /* Closing the channel directly (not the controller) is the path that
+     * makes the watcher thread take the sc_subs_remove() branch, unlike
+     * rcp_controller_close() which skips it (mirrors the equivalent UDP
+     * teardown distinction in test_udp.c). */
+    rcp_status_channel_close(ch);
+
+    start = rcp_monotonic_ms();
+    while (rcp_monotonic_ms() - start < 200) { /* busy-wait for the watcher to notice */ }
+
+    /* publish() must not crash walking a subscriber list the watcher has
+     * already removed itself from. */
+    rcp_sim_controller_publish(ctrl, NULL, 0);
+
+    rcp_status_channel_release(ch);
+    rcp_controller_release(ctrl);
+}
+
+/* ── Watchdog ─────────────────────────────────────────────────────────────── */
+
+static void test_watchdog_missed_reports_kick_state(void)
+{
+    rcp_sim_config_t cfg = rcp_sim_default_config(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *ctrl;
+    rcp_context_t ctx = rcp_context_background();
+    rcp_command_t cmd = {0};
+    rcp_response_t resp = {0};
+    uint64_t start;
+
+    cfg.status_interval_ms  = 0;
+    cfg.watchdog_timeout_ms = 30;
+    ctrl = rcp_sim_controller_new(cfg, NULL, NULL);
+
+    TEST_ASSERT_TRUE(rcp_sim_controller_watchdog_missed(ctrl)); /* never kicked */
+
+    cmd.zone = RCP_ZONE_FRONT_LEFT;
+    cmd.type = RCP_CMD_WATCHDOG;
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(ctrl, &ctx, &cmd, &resp));
+    rcp_response_free(&resp);
+
+    TEST_ASSERT_FALSE(rcp_sim_controller_watchdog_missed(ctrl)); /* just kicked */
+
+    start = rcp_monotonic_ms();
+    while (rcp_monotonic_ms() - start < 50) { /* busy-wait past the 30ms timeout */ }
+    TEST_ASSERT_TRUE(rcp_sim_controller_watchdog_missed(ctrl));
+
+    rcp_controller_release(ctrl);
+}
+
+static void test_watchdog_missed_always_false_when_disabled(void)
+{
+    rcp_sim_config_t cfg = rcp_sim_default_config(RCP_ZONE_FRONT_LEFT);
+    rcp_controller_t *ctrl;
+
+    cfg.status_interval_ms  = 0;
+    cfg.watchdog_timeout_ms = 0;
+    ctrl = rcp_sim_controller_new(cfg, NULL, NULL);
+
+    TEST_ASSERT_FALSE(rcp_sim_controller_watchdog_missed(ctrl));
+
+    rcp_controller_release(ctrl);
+}
+
 /* ── Close ────────────────────────────────────────────────────────────────── */
 
 static void test_close_stops_background_threads(void)
@@ -218,6 +297,9 @@ int main(void)
     RUN_TEST(test_fault_causes_send_to_fail);
     RUN_TEST(test_recover_restores_normal_operation);
     RUN_TEST(test_publishes_status_on_interval);
+    RUN_TEST(test_closing_channel_directly_removes_watcher_subscription);
+    RUN_TEST(test_watchdog_missed_reports_kick_state);
+    RUN_TEST(test_watchdog_missed_always_false_when_disabled);
     RUN_TEST(test_close_stops_background_threads);
 
     return UNITY_END();

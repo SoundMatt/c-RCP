@@ -9,6 +9,8 @@
 //cfusa:test REQ-OBS-009
 //cfusa:test REQ-OBS-010
 //cfusa:test REQ-OBS-011
+//cfusa:test REQ-OBS-012
+//cfusa:test REQ-OBS-013
 #include "unity.h"
 
 #include <rcp/mock.h>
@@ -173,6 +175,36 @@ static void test_span_duration_is_non_negative(void)
 
     rcp_controller_release(ctrl);
     rcp_controller_release(inner);
+    rcp_in_memory_sink_destroy(sink);
+}
+
+static void test_span_duration_ms_is_end_minus_start(void)
+{
+    rcp_span_t span;
+
+    memset(&span, 0, sizeof(span));
+    span.start_ms = 100;
+    span.end_ms   = 150;
+    TEST_ASSERT_EQUAL_UINT64(50, rcp_span_duration_ms(&span));
+
+    span.start_ms = span.end_ms = 42;
+    TEST_ASSERT_EQUAL_UINT64(0, rcp_span_duration_ms(&span));
+}
+
+static void test_record_gauge_accepts_metric_without_crashing(void)
+{
+    rcp_in_memory_sink_t *sink = rcp_in_memory_sink_new();
+    rcp_metrics_sink_t noop = rcp_noop_metrics_sink();
+    rcp_metrics_sink_t in_mem = rcp_in_memory_sink_as_sink(sink);
+    rcp_metric_t m;
+
+    m.name  = "rcp.queue_depth";
+    m.value = 3.0;
+    m.zone  = RCP_ZONE_FRONT_LEFT;
+
+    noop.vt->record_gauge(&m, noop.ctx);
+    in_mem.vt->record_gauge(&m, in_mem.ctx);
+
     rcp_in_memory_sink_destroy(sink);
 }
 
@@ -352,6 +384,8 @@ int main(void)
     RUN_TEST(test_span_recorded_on_successful_send);
     RUN_TEST(test_multiple_sends_accumulate_spans);
     RUN_TEST(test_span_duration_is_non_negative);
+    RUN_TEST(test_span_duration_ms_is_end_minus_start);
+    RUN_TEST(test_record_gauge_accepts_metric_without_crashing);
     RUN_TEST(test_noop_sink_does_not_crash);
     RUN_TEST(test_commands_total_counter_increments_per_send);
     RUN_TEST(test_span_captures_error_and_error_counter_increments);

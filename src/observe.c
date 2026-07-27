@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 
+//cfusa:req REQ-OBS-013
 uint64_t rcp_span_duration_ms(const rcp_span_t *span)
 {
     return span->end_ms - span->start_ms;
@@ -14,6 +15,7 @@ uint64_t rcp_span_duration_ms(const rcp_span_t *span)
 /* ── Noop sink ─────────────────────────────────────────────────────────────── */
 
 static void noop_record_span(const rcp_span_t *span, void *ctx) { (void)span; (void)ctx; }
+//cfusa:req REQ-OBS-012
 static void noop_record_gauge(const rcp_metric_t *metric, void *ctx) { (void)metric; (void)ctx; }
 static void noop_record_counter(const char *name, rcp_zone_t zone, double delta, void *ctx)
 {
@@ -73,6 +75,7 @@ static void in_memory_record_span(const rcp_span_t *span, void *ctx)
     rcp_mutex_unlock(&s->mu);
 }
 
+//cfusa:req REQ-OBS-012
 static void in_memory_record_gauge(const rcp_metric_t *metric, void *ctx) { (void)metric; (void)ctx; }
 static void in_memory_record_counter(const char *name, rcp_zone_t zone, double delta, void *ctx)
 {

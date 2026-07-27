@@ -310,6 +310,7 @@ void relay_message_channel_close(relay_message_channel_t *ch)
     rcp_mutex_unlock(&ch->mu);
 }
 
+//cfusa:req REQ-RELAY-016
 bool relay_message_channel_is_closed(relay_message_channel_t *ch)
 {
     bool c;
@@ -321,6 +322,7 @@ bool relay_message_channel_is_closed(relay_message_channel_t *ch)
 
 /* ── Caller — generic retain/release ──────────────────────────────────────── */
 
+//cfusa:req REQ-RELAY-015
 rcp_relay_caller_t *rcp_relay_caller_retain(rcp_relay_caller_t *c)
 {
     if (c) rcp_atomic_inc(&c->refcount);

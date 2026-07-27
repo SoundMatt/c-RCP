@@ -12,6 +12,7 @@ void rcp_mdns_discoverer_destroy(rcp_mdns_discoverer_t *d)
     d->vt->destroy(d);
 }
 
+//cfusa:req REQ-MDNS-009
 void rcp_mdns_announcer_destroy(rcp_mdns_announcer_t *a)
 {
     if (!a) return;

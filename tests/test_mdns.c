@@ -6,6 +6,7 @@
 //cfusa:test REQ-MDNS-006
 //cfusa:test REQ-MDNS-007
 //cfusa:test REQ-MDNS-008
+//cfusa:test REQ-MDNS-009
 #include "unity.h"
 
 #include <rcp/mdns.h>
@@ -45,6 +46,7 @@ typedef struct {
     rcp_mdns_announcer_t base;
     announced_entry_t     entries[8];
     size_t                len;
+    bool                  destroyed;
 } test_announcer_t;
 
 static int test_announcer_announce(rcp_mdns_announcer_t *self, const rcp_mdns_zone_info_t *info)
@@ -82,7 +84,10 @@ static void test_announcer_withdraw(rcp_mdns_announcer_t *self, rcp_zone_t zone)
     }
 }
 
-static void test_announcer_destroy(rcp_mdns_announcer_t *self) { (void)self; }
+static void test_announcer_destroy(rcp_mdns_announcer_t *self)
+{
+    ((test_announcer_t *)self)->destroyed = true;
+}
 
 static const rcp_mdns_announcer_vtable_t test_announcer_vtable = {
     test_announcer_announce,
@@ -261,6 +266,19 @@ static void test_withdraw_removes_record(void)
     TEST_ASSERT_FALSE(announcer_has(&ann, RCP_ZONE_REAR_RIGHT, NULL));
 }
 
+static void test_announcer_destroy_dispatches_through_vtable(void)
+{
+    test_announcer_t ann;
+
+    memset(&ann, 0, sizeof(ann));
+    ann.base.vt = &test_announcer_vtable;
+
+    rcp_mdns_announcer_destroy(&ann.base);
+    TEST_ASSERT_TRUE(ann.destroyed);
+
+    rcp_mdns_announcer_destroy(NULL); /* must be a no-op, not crash */
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -272,6 +290,7 @@ int main(void)
     RUN_TEST(test_make_instance_name_follows_convention);
     RUN_TEST(test_announcer_registers_zone_record);
     RUN_TEST(test_withdraw_removes_record);
+    RUN_TEST(test_announcer_destroy_dispatches_through_vtable);
 
     return UNITY_END();
 }

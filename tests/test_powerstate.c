@@ -7,6 +7,7 @@
 //cfusa:test REQ-PWR-007
 //cfusa:test REQ-PWR-008
 //cfusa:test REQ-PWR-009
+//cfusa:test REQ-PWR-010
 #include "unity.h"
 
 #include <rcp/clock.h>
@@ -193,6 +194,50 @@ static void test_wake_sends_cmd_wake_and_transitions_sleeping_to_active(void)
     rcp_controller_release(ctrl);
 }
 
+/* ── Subscribe ────────────────────────────────────────────────────────────── */
+
+typedef struct {
+    rcp_power_event_t events[4];
+    size_t             len;
+} captured_events_t;
+
+static void capture_event_cb(const rcp_power_event_t *ev, void *user_data)
+{
+    captured_events_t *ce = (captured_events_t *)user_data;
+    ce->events[ce->len++] = *ev;
+}
+
+static void test_subscribe_delivers_transition_events_to_multiple_callbacks(void)
+{
+    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
+    rcp_controller_t *ctrls[] = {ctrl};
+    rcp_powerstate_manager_t *mgr = rcp_powerstate_manager_new(rcp_powerstate_default_config(), ctrls, 1);
+    rcp_context_t ctx = rcp_context_background();
+    captured_events_t first;
+    captured_events_t second;
+
+    memset(&first, 0, sizeof(first));
+    memset(&second, 0, sizeof(second));
+
+    /* Two subscriptions force callbacks_append() to grow its backing array
+     * beyond a single entry, and both must be invoked on the same
+     * transition. */
+    TEST_ASSERT_TRUE(rcp_powerstate_manager_subscribe(mgr, capture_event_cb, &first));
+    TEST_ASSERT_TRUE(rcp_powerstate_manager_subscribe(mgr, capture_event_cb, &second));
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_powerstate_manager_sleep(mgr, &ctx, RCP_ZONE_FRONT_LEFT));
+
+    TEST_ASSERT_EQUAL_UINT(1, first.len);
+    TEST_ASSERT_EQUAL(RCP_ZONE_FRONT_LEFT, first.events[0].zone);
+    TEST_ASSERT_EQUAL(RCP_POWER_SLEEPING, first.events[0].state);
+    TEST_ASSERT_EQUAL_UINT(1, second.len);
+    TEST_ASSERT_EQUAL(RCP_ZONE_FRONT_LEFT, second.events[0].zone);
+    TEST_ASSERT_EQUAL(RCP_POWER_SLEEPING, second.events[0].state);
+
+    rcp_powerstate_manager_destroy(mgr);
+    rcp_controller_release(ctrl);
+}
+
 /* ── BusOff ───────────────────────────────────────────────────────────────── */
 
 static void test_command_failure_yields_bus_off(void)
@@ -358,6 +403,7 @@ int main(void)
 
     RUN_TEST(test_sleep_sends_cmd_sleep_and_transitions_active_to_sleeping);
     RUN_TEST(test_wake_sends_cmd_wake_and_transitions_sleeping_to_active);
+    RUN_TEST(test_subscribe_delivers_transition_events_to_multiple_callbacks);
     RUN_TEST(test_command_failure_yields_bus_off);
     RUN_TEST(test_recover_loop_retries_bus_off_zones);
     RUN_TEST(test_state_is_thread_safe);
