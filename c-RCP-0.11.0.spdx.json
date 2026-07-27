@@ -1,0 +1,259 @@
+{
+  "spdxVersion": "SPDX-2.3",
+  "dataLicense": "CC0-1.0",
+  "SPDXID": "SPDXRef-DOCUMENT",
+  "name": "c-RCP",
+  "documentNamespace": "https://github.com/SoundMatt/c-FuSa/sbom/c-RCP-0.11.0",
+  "creationInfo": {
+    "created": "2026-07-27T16:28:19Z",
+    "creators": ["Tool: cfusa"]
+  },
+  "packages": [
+    {
+      "SPDXID": "SPDXRef-Package",
+      "name": "c-RCP",
+      "versionInfo": "0.11.0",
+      "downloadLocation": "https://github.com/SoundMatt/c-FuSa",
+      "licenseConcluded": "MPL-2.0",
+      "licenseDeclared": "MPL-2.0",
+      "copyrightText": "NOASSERTION"
+    }
+  ],
+  "files": [
+    {
+      "SPDXID": "SPDXRef-File-1",
+      "fileName": "./tsn.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "d5515debe324b5ab2dcd474e1138b7556fb4e6df9285d6dae265d275a586d860"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-2",
+      "fileName": "./mdns.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "81b034f2a6b2ae79de47579fc370af0d5ed37c95ef3b7a0ddac70fbdbd42ba1b"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-3",
+      "fileName": "./tls.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "f62738ef10a3da2eebafe8cda2b8b8248b882a9f3a09b9b5fe29fb9542b85c65"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-4",
+      "fileName": "./mock.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "ec2b0a87c520c79bccbf806daa948d11928e75391a6c99cda0d87769ae41e2cd"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-5",
+      "fileName": "./watchdog.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "b496dbf5a1a95df4ca019c02291c0219451e9961b31a97550f2d01581c74a006"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-6",
+      "fileName": "./udp.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "05bf00b6fb1f1ee26bba018cc9cb414a138fbd29196348678a88ef140c164e41"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-7",
+      "fileName": "./rcp.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "5b448e707c9058afd8218058fe5bac6b6168a47d0c0f5d902fe6b8e35aa9e179"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-8",
+      "fileName": "./loan.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "a56772232a8bf7afa67126871dad3be8235980cb371efe78b8157ac7c6f2e0de"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-9",
+      "fileName": "./wire.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "b679f5f8cc803600cbb4dafa17844d3de73154fd3023da4819887e1504ce87fc"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-10",
+      "fileName": "./shmem.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "ad58c2a937df0f4b7f4cbe245e21ac592570feebb56e8dfe61605375502b234b"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-11",
+      "fileName": "./clock.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "f907473a6a7de9be91e981bf19c4d417c2685870677b60aff6f21cc733040c92"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-12",
+      "fileName": "./relay.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "052b46bf9dc74a06bde10ee6f5a94074f998ba0991837516d812978f973d3e87"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-13",
+      "fileName": "./watchdog.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "2ec6104709026dc6fb1b5bc7b804d4ea5fa295a2b99781945fa00bbb438e7c3c"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-14",
+      "fileName": "./clock.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "c5c62e612e9da074abbf21db9e31d7f74e10622d554db8e9dfc413b8f44a1597"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-15",
+      "fileName": "./platform.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "38d92316e7ae88bb84c169fca79d87bef6ac6ef49b7b4679d37013b41972c800"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-16",
+      "fileName": "./mock.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "223bc296c2754623525788f7370394098f35c175007c294def0080e29ee8a4ce"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-17",
+      "fileName": "./platform.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "72fe578947526dc43baafc3034b0937481013a0f2bda0ea1a5e909103250ee59"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-18",
+      "fileName": "./shmem.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "fbef85e85cfc24289c5751b1e504aaf97bcfd7f7a8a3187875942e269eae6e13"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-19",
+      "fileName": "./loan.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "ab090020e40ee73015e52dd387451256258433c2b6fa3242d7005cb96ca3de12"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-20",
+      "fileName": "./tsn.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "4c0b57c5510fe5a2687652b62d66c8e7f9cad8f0216692c6b104d4c387a82814"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-21",
+      "fileName": "./udp.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "e1ddc3e8c8f3830b4f6430ba25406272570d4b3f63a58d701dc928068e1604aa"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-22",
+      "fileName": "./mdns.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "73cd651fa106178b8a259ea78a40ead7b068d62263b521aa546b461806477b0a"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-23",
+      "fileName": "./rcp.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "30506de3513246c80e89e349092cbd5c23d3f9717558e997099c6010f6bd77b0"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-24",
+      "fileName": "./tls.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "05c4b6c91eb1d4b1301657d2f0e0cfd0572abb8cc2fa2770d1ce58abc97e07a5"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-25",
+      "fileName": "./wire.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "8305a30b79cfcffe392dc3119e85a3d5f6af92046a2d36f042df0c4b365c6694"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-26",
+      "fileName": "./test_udp.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "d3b2402129b6e416f9cf3f63fc240771362054589f3762bb0192060135acf546"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-27",
+      "fileName": "./test_shmem.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "580485b440402d09a9a9d57e2d2c545b2baa0d2dd0342f2745081e9c0cd10541"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-28",
+      "fileName": "./bench_util.h",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "f81551a420952d65e3d76b9c03bdd6be6938f080de843d9e16f51272d41584c4"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-29",
+      "fileName": "./test_tls.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "be4641eec135f56b3b1556f06d7678a01e7b76d81820e70fa27a58e67f00754d"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-30",
+      "fileName": "./test_mdns.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "c2c9835ccf054a266d74575f7882526a1234b4dbe16c5712f39b5e670a392f48"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-31",
+      "fileName": "./bench_mock.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "20dcd4efe8c8b255626d65aee2675271324b820c2490c629f4b9edbb2ba96b6d"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-32",
+      "fileName": "./test_wire.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "fd757c402ed9ca0e245e2f00bc187492f6d58be0742c2729aa47f437ff52908e"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-33",
+      "fileName": "./command_latency_test.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "3ed7c7694e59e0ca0839d13f081c7232198314a9adeeadaa72aba43366fbad8d"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-34",
+      "fileName": "./test_tsn.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "a5d77443f566a6dcb61a246fefa34c29fb6a15e92aa54925920794cbd4aa0551"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-35",
+      "fileName": "./test_rcp.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "a101960f867f8d69d3faa38d5c6ff73dab2c4d315e6fde141e64a03e2a6de78f"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-36",
+      "fileName": "./test_loan.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "12396b4cd1c56ddc45ff61cef8eeb180a2cb28cef4a7ce8026cc1ed1c110baa0"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-37",
+      "fileName": "./test_mock.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "5c824eb897d51b4474dc7354f10b856c32d23d8a38d918219c57ab565155d5f2"}]
+    },
+    {
+      "SPDXID": "SPDXRef-File-38",
+      "fileName": "./test_watchdog.c",
+      "fileTypes": ["SOURCE"],
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "bf9469c57098bb4aaebebacd933c2435e896300af79d9fe73095123825525231"}]
+    }
+  ],
+  "relationships": [
+    {
+      "spdxElementId": "SPDXRef-DOCUMENT",
+      "relationshipType": "DESCRIBES",
+      "relatedSpdxElement": "SPDXRef-Package"
+    }
+  ]
+}
