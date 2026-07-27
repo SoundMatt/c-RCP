@@ -40,3 +40,8 @@ target_link_libraries(test_udp PRIVATE rcp::rcp unity)
 target_compile_options(test_udp PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_udp COMMAND test_udp)
 set_tests_properties(rcp_udp PROPERTIES TIMEOUT 30)
+
+add_executable(test_mdns test_mdns.c)
+target_link_libraries(test_mdns PRIVATE rcp::rcp unity)
+target_compile_options(test_mdns PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_mdns COMMAND test_mdns)

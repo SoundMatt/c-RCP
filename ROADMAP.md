@@ -204,9 +204,15 @@ integration test where practical.
   threads on `close()` (the existing detached-thread helper from v0.1.0
   isn't joinable by design).
 
-### 6. mDNS Discovery (v0.6.0)
+### 6. mDNS Discovery (v0.6.0) ✅
 
-`include/rcp/mdns.h`: zero-configuration zone controller discovery via mDNS/DNS-SD.
+`include/rcp/mdns.h` + `src/mdns.c`: abstract `rcp_mdns_discoverer_t` /
+`rcp_mdns_announcer_t` interfaces (ported from cpp-RCP's `mdns.hpp`) plus a
+concrete `rcp_mdns_static_discoverer_t` for testing/static config. No
+concrete Announcer ships here — same as cpp-RCP, a full mDNS responder
+(Avahi/dns_sd) needs platform APIs outside this library's scope; wrap one
+with the interface. `tests/test_mdns.c` ports cpp-RCP's `test_mdns.cpp`
+(8 requirements), including a local test-double Announcer implementation.
 
 ### 7. TLS Transport (v0.7.0)
 
