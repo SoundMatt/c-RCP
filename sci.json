@@ -1,5 +1,5 @@
 Software Configuration Index
-Project: c-RCP v0.8.0   Generated: 2026-07-27T15:48:48Z
+Project: c-RCP v0.9.0   Generated: 2026-07-27T16:03:10Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
@@ -7,20 +7,22 @@ FILE                                                          SHA-256
 ./include/rcp/tls.h                                           f62738ef10a3da2eebafe8cda2b8b8248b882a9f3a09b9b5fe29fb9542b85c65
 ./include/rcp/mock.h                                          ec2b0a87c520c79bccbf806daa948d11928e75391a6c99cda0d87769ae41e2cd
 ./include/rcp/udp.h                                           05bf00b6fb1f1ee26bba018cc9cb414a138fbd29196348678a88ef140c164e41
-./include/rcp/rcp.h                                           a82ad095bea0575995941fe80d54928e1f11cf6c279b3630f4e22664ea3ec421
+./include/rcp/rcp.h                                           5b448e707c9058afd8218058fe5bac6b6168a47d0c0f5d902fe6b8e35aa9e179
+./include/rcp/loan.h                                          a56772232a8bf7afa67126871dad3be8235980cb371efe78b8157ac7c6f2e0de
 ./include/rcp/wire.h                                          b679f5f8cc803600cbb4dafa17844d3de73154fd3023da4819887e1504ce87fc
 ./include/rcp/shmem.h                                         ad58c2a937df0f4b7f4cbe245e21ac592570feebb56e8dfe61605375502b234b
 ./include/rcp/clock.h                                         f907473a6a7de9be91e981bf19c4d417c2685870677b60aff6f21cc733040c92
 ./include/relay/relay.h                                       052b46bf9dc74a06bde10ee6f5a94074f998ba0991837516d812978f973d3e87
 ./src/clock.c                                                 c5c62e612e9da074abbf21db9e31d7f74e10622d554db8e9dfc413b8f44a1597
 ./src/platform.h                                              38d92316e7ae88bb84c169fca79d87bef6ac6ef49b7b4679d37013b41972c800
-./src/mock.c                                                  c76a158b6a693c438d363a544eb35189871a01ddb5fc6b2a4ba7727ea08bce4a
+./src/mock.c                                                  223bc296c2754623525788f7370394098f35c175007c294def0080e29ee8a4ce
 ./src/platform.c                                              72fe578947526dc43baafc3034b0937481013a0f2bda0ea1a5e909103250ee59
-./src/shmem.c                                                 c9956968fc9f5bf1ab8ff46d170d19449ff8b9d12ea1b4e539ce88c22164051e
-./src/udp.c                                                   3d770260eab1d5801d9750483e58da249f2b7539a18afebe637f1fb1888be1f8
+./src/shmem.c                                                 fbef85e85cfc24289c5751b1e504aaf97bcfd7f7a8a3187875942e269eae6e13
+./src/loan.c                                                  ab090020e40ee73015e52dd387451256258433c2b6fa3242d7005cb96ca3de12
+./src/udp.c                                                   e1ddc3e8c8f3830b4f6430ba25406272570d4b3f63a58d701dc928068e1604aa
 ./src/mdns.c                                                  73cd651fa106178b8a259ea78a40ead7b068d62263b521aa546b461806477b0a
 ./src/rcp.c                                                   30506de3513246c80e89e349092cbd5c23d3f9717558e997099c6010f6bd77b0
-./src/tls.c                                                   3b02bc99aede19354af8756f9fd910094e67cdde532fede082892f100e4aaca3
+./src/tls.c                                                   05c4b6c91eb1d4b1301657d2f0e0cfd0572abb8cc2fa2770d1ce58abc97e07a5
 ./src/wire.c                                                  8305a30b79cfcffe392dc3119e85a3d5f6af92046a2d36f042df0c4b365c6694
 ./tests/test_udp.c                                            d3b2402129b6e416f9cf3f63fc240771362054589f3762bb0192060135acf546
 ./tests/test_shmem.c                                          580485b440402d09a9a9d57e2d2c545b2baa0d2dd0342f2745081e9c0cd10541
@@ -31,6 +33,7 @@ FILE                                                          SHA-256
 ./tests/test_wire.c                                           fd757c402ed9ca0e245e2f00bc187492f6d58be0742c2729aa47f437ff52908e
 ./tests/command_latency_test.c                                3ed7c7694e59e0ca0839d13f081c7232198314a9adeeadaa72aba43366fbad8d
 ./tests/test_rcp.c                                            a101960f867f8d69d3faa38d5c6ff73dab2c4d315e6fde141e64a03e2a6de78f
+./tests/test_loan.c                                           12396b4cd1c56ddc45ff61cef8eeb180a2cb28cef4a7ce8026cc1ed1c110baa0
 ./tests/test_mock.c                                           5c824eb897d51b4474dc7354f10b856c32d23d8a38d918219c57ab565155d5f2
 
-Total files: 29
+Total files: 32
