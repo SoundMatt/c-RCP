@@ -1153,6 +1153,54 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-DYN-001",
+      "title": "Schema registry add and lookup",
+      "text": "rcp_schema_registry_add() followed by rcp_schema_registry_lookup() for the same schema id shall return the entry's name and fields as added.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DYN-002",
+      "title": "Unknown schema lookup returns false",
+      "text": "rcp_schema_registry_lookup() for a schema id that was never added shall return false without modifying *out.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DYN-003",
+      "title": "encode() prepends schema_id big-endian",
+      "text": "rcp_dynamic_payload_encode() shall prepend the 4-byte schema_id in big-endian (most-significant byte first) order to the payload data.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DYN-004",
+      "title": "encode/decode round-trip preserves schema_id and data",
+      "text": "Decoding a buffer produced by encode() shall reconstruct the original schema_id and data unchanged.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DYN-005",
+      "title": "decode() of a too-short buffer returns a zeroed payload",
+      "text": "rcp_dynamic_payload_decode() given fewer than 4 bytes shall return schema_id = 0 and empty data rather than reading out of bounds or erroring.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DYN-006",
+      "title": "SchemaRegistry is thread-safe",
+      "text": "rcp_schema_registry_add()/_lookup() shall be safe to call concurrently from multiple threads without data races or lost entries.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-LOAN-001",
       "title": "loan() returns zeroed buffer",
       "text": "rcp_loan_controller_t::loan(n) shall return a zeroed byte vector of exactly n bytes.",

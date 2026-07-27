@@ -860,9 +860,30 @@ manifest format `rcp/config.h` (v0.28.0) already loads.
 - No new `.c`/`.h`/test files, and no new `REQ-*` catalog entries (there is
   no executable requirement to trace for a schema document).
 
-### 30. Dynamic Data (v0.30.0)
+### 30. Dynamic Data (v0.30.0) ✅
 
-`include/rcp/dyndata.h`: runtime schema registry and typed payload codec.
+`include/rcp/dyndata.h` + `src/dyndata.c`: ports cpp-RCP's `dyndata.hpp` —
+`rcp_schema_registry_t` maps a `rcp_schema_id_t` to a human-readable name
+and optional field descriptors; `rcp_dynamic_payload_t` is a self-describing
+envelope (4-byte big-endian schema ID + raw data blob) with
+`rcp_dynamic_payload_encode()`/`_decode()`.
+- Both `rcp_schema_registry_add()` and `_lookup()` deep-copy the
+  variable-length `fields` array (via `malloc`+`memcpy`, freed with
+  `rcp_schema_entry_free()`), matching cpp-RCP's own by-value
+  `std::vector<FieldDescriptor>` copy semantics — the registry never
+  aliases a caller's array, and a looked-up entry is fully independent of
+  the registry's internal storage.
+- `rcp_dynamic_payload_decode()` on a buffer shorter than 4 bytes returns a
+  zeroed payload (`schema_id = 0`, empty data) rather than erroring —
+  deliberately mirroring cpp-RCP's own `decode()`, whose test suite
+  explicitly verifies this lenient behavior (not a bug to "fix").
+- `tests/test_dyndata.c` ports all 7 of cpp-RCP's `test_dyndata.cpp` cases.
+  Confirmed via 20 repeated local runs (debug + 20x ASan/UBSan) with no
+  flakes. Hit and fixed the known CFUSA-CY004 false-positive pattern once
+  more (`malloc(4 + dp->data.len)`); re-grepped the whole codebase
+  afterward, no other occurrences.
+- **Requirements catalog gap filled**: added `REQ-DYN-001` through `-006`
+  (none existed previously).
 
 ---
 ### Phase 9 — Remote Access
