@@ -1,5 +1,5 @@
 Software Configuration Index
-Project: c-RCP v0.43.0   Generated: 2026-07-27T20:35:37Z
+Project: c-RCP v0.44.0   Generated: 2026-07-27T21:14:44Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
@@ -80,7 +80,7 @@ FILE                                                          SHA-256
 ./src/dyndata.c                                               7a148c6e3fd9c14f3aa19cbf28c49b5569c4c68ed24210b60a6b2ef717d1991f
 ./src/authz.c                                                 098802fab58dd018906263415dcf85ce7d341ae4191f54ccaa3842604bc3285a
 ./src/tls.c                                                   05c4b6c91eb1d4b1301657d2f0e0cfd0572abb8cc2fa2770d1ce58abc97e07a5
-./src/wire.c                                                  8305a30b79cfcffe392dc3119e85a3d5f6af92046a2d36f042df0c4b365c6694
+./src/wire.c                                                  6aff92a9f0df31edca42d194a3118ae421ff36b7b322c93398a7257d350b771a
 ./src/someipbr.c                                              a004339867ab69c2f50f5f8c49c16cfd6eb77173104f4a4dbdd1faa8cb87b2b7
 ./tests/test_powerstate.c                                     d0cbc4ef785190539989bd7aa28b92475ff8a30d699bc8ca2043ccaf5014df19
 ./tests/test_ratelimit.c                                      cd92d8f34724c69b8f35fe22196789034ae44e534aadff1eb5fba762e6f3d01d
@@ -99,7 +99,7 @@ FILE                                                          SHA-256
 ./tests/bench_mock.c                                          20dcd4efe8c8b255626d65aee2675271324b820c2490c629f4b9edbb2ba96b6d
 ./tests/test_config.c                                         5ebc67a603d029dce5ee46e14e2a0319c3da1977f9814ed7ebe52a6964aeec9e
 ./tests/test_faultinject.c                                    939de2f8f34a54ea7c1355418632a5fd230891f221e9943e5d780aee8c3a15a2
-./tests/test_wire.c                                           fd757c402ed9ca0e245e2f00bc187492f6d58be0742c2729aa47f437ff52908e
+./tests/test_wire.c                                           e84a6d06f21b55e38311b03198924ae4ee753d157fb672259b0c8ad8bd40b3eb
 ./tests/test_ddsbr.c                                          89eb84d70ada98f8a1e2d44845f3e6c402b7d692a98c07cf0ac81b65082b6879
 ./tests/test_record.c                                         c9ce69bd82177505f3e16f2f4fa8cecfa8de2f0af7069270e024a5870664a568
 ./tests/command_latency_test.c                                3ed7c7694e59e0ca0839d13f081c7232198314a9adeeadaa72aba43366fbad8d
