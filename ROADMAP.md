@@ -380,9 +380,28 @@ same growable-array pattern as `watchdog.c`/`deadline.c`.
   already used in `test_mdns.c`. Confirmed via 20 repeated local runs
   (debug + 15x ASan/UBSan) with no flakes.
 
-### 14. E2E Protection (v0.14.0)
+### 14. E2E Protection (v0.14.0) ✅
 
-`include/rcp/e2e.h`: sequence counter, CRC-16, replay guard on command frames.
+`include/rcp/e2e.h` + `src/e2e.c`: ports cpp-RCP's `e2e.hpp` — three layers
+of ISO 26262 Part 7 E2E defence: (1) a per-controller monotonically
+incrementing `uint32` sequence counter, (2) a CRC-16/CCITT-FALSE checksum
+computed over seq + payload, (3) `rcp_e2e_replay_guard_t`, a 32-slot bitmap
+sliding-window replay detector. `rcp_e2e_wrap()`/`rcp_e2e_unwrap()` use
+`rcp_bytes_t` for owned buffers (matching this project's existing
+byte-buffer convention rather than raw pointer+length out-params).
+`rcp_e2e_controller_new()` wraps any controller (the same generic-decorator
+vtable pattern used since v0.9.0's loaning controller) and applies wrap()
+to every command payload on send(), using `rcp_atomic_inc()` for the
+sequence counter instead of C11 `<stdatomic.h>` (unavailable under this
+project's C99 standard) — the same atomic-builtins wrapper already used for
+refcounting throughout the codebase.
+- `tests/test_e2e.c` ports all 8 of cpp-RCP's `test_e2e.cpp` cases (wrap/unwrap
+  round-trip, header layout, short-frame rejection, CRC-mismatch rejection,
+  and four ReplayGuard cases) plus one cpp-RCP's own test suite never
+  covered: an explicit test of the `Controller` wrapper itself (verifying
+  the wrapped payload unwraps correctly and the sequence counter increments
+  per send) — cpp-RCP's `e2e.hpp` ships a `Controller` class with zero test
+  coverage in `test_e2e.cpp`.
 
 ### 15. Priority Queuing (v0.15.0)
 

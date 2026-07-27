@@ -83,3 +83,8 @@ target_link_libraries(test_powerstate PRIVATE rcp::rcp unity)
 target_compile_options(test_powerstate PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_powerstate COMMAND test_powerstate)
 set_tests_properties(rcp_powerstate PROPERTIES TIMEOUT 30)
+
+add_executable(test_e2e test_e2e.c)
+target_link_libraries(test_e2e PRIVATE rcp::rcp unity)
+target_compile_options(test_e2e PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_e2e COMMAND test_e2e)
