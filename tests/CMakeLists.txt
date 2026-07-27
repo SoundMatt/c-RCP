@@ -184,3 +184,8 @@ add_executable(test_restbridge test_restbridge.c)
 target_link_libraries(test_restbridge PRIVATE rcp::rcp unity)
 target_compile_options(test_restbridge PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_restbridge COMMAND test_restbridge)
+
+add_executable(test_someipbr test_someipbr.c)
+target_link_libraries(test_someipbr PRIVATE rcp::rcp unity)
+target_compile_options(test_someipbr PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_someipbr COMMAND test_someipbr)
