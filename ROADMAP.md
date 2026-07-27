@@ -505,9 +505,42 @@ forever (`count = -1`) or auto-expiring after N firings.
 ### Phase 6 — Security
 ---
 
-### 19. Authorization (v0.19.0)
+### 19. Authorization (v0.19.0) ✅
 
-`include/rcp/authz.h`: command-level access control; ISO 21434 SL-2 policy enforcement.
+`include/rcp/authz.h` + `src/authz.c`: ports cpp-RCP's `authz.hpp` — a
+generic decorator (same vtable-wrapping pattern used since v0.9.0) that
+checks each `send()` against a shared, refcounted `rcp_authz_policy_t`
+before forwarding, denying with the new `RCP_ERR_FORBIDDEN` error code
+(added to the shared `rcp_errc_t` enum in `rcp.h`, alongside every other
+generic controller error).
+- `rcp_authz_policy_allow()` represents each entry's permitted
+  zones/command-types as small `uint32_t` bitmasks (bit index = enum value)
+  rather than cpp-RCP's `std::unordered_set`, avoiding per-entry heap
+  allocation entirely — a mask of `0` naturally means "all", identical to
+  cpp-RCP's "empty set = all" semantics, with no extra wildcard flag
+  needed. Identity strings are fixed `RCP_AUTHZ_IDENTITY_MAX`-byte buffers
+  (128 bytes) rather than arbitrary-length `std::string`, matching the
+  fixed-buffer convention already established for short labels elsewhere
+  in this port (e.g. `mdns.c`'s host/instance-name fields).
+- `rcp_authz_policy_t` is refcounted (`_retain()`/`_release()`), matching
+  cpp-RCP's `std::shared_ptr<AccessPolicy>` sharing guarantee across
+  multiple `AuthController`s — a deliberate fidelity choice, since a plain
+  non-owning pointer would diverge from cpp-RCP's actual lifetime contract.
+- **Requirements catalog gap filled**: unlike every other milestone so far,
+  `.fusa-reqs.json` had no forward-declared `REQ-AUTH-*` entries at all.
+  Added `REQ-AUTH-001` through `-008` this milestone, matching the existing
+  entries' schema (recorded under the same `iso26262`/ASIL-B fields as the
+  rest of the safety catalog, even though authz's primary standard context
+  is ISO 21434/IEC 62443 per cpp-RCP's own header comment — no separate
+  cybersecurity-standard schema exists yet in this file).
+- `tests/test_authz.c` ports all 10 of cpp-RCP's `test_authz.cpp` cases.
+  Hit a new c-FuSa false-positive pattern: `CFUSA-CY009` (weak-crypto
+  substring match on `des_`) flagged the ordinary English test-function
+  name `test_identity_fn_overrides_set_identity`, whose middle
+  ("overri**des_s**et") coincidentally contains that substring. Renamed to
+  `test_identity_fn_takes_priority_over_fixed_identity`; proactively
+  grepped the whole codebase for `des_` afterward, found no other
+  occurrences.
 
 ### 20. Firmware Update / OTA (v0.20.0)
 

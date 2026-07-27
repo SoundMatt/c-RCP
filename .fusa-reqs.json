@@ -561,6 +561,70 @@
       "asil": "ASIL-B"
     },
     {
+      "id": "REQ-AUTH-001",
+      "title": "Permitted identity/zone/type combination succeeds",
+      "text": "send() shall delegate to the inner controller when the caller's identity is permitted the command's zone and type by the access policy.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AUTH-002",
+      "title": "Denied identity returns RCP_ERR_FORBIDDEN",
+      "text": "send() shall return RCP_ERR_FORBIDDEN without calling the inner controller when the access policy denies the caller's identity.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AUTH-003",
+      "title": "Empty zone/type set means all allowed",
+      "text": "A policy entry with an empty zone set or an empty command-type set shall permit all zones or all command types respectively for that identity.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AUTH-004",
+      "title": "AccessPolicy permits concurrently without data races",
+      "text": "rcp_authz_policy_permit() shall be safe to call concurrently with rcp_authz_policy_allow() from multiple threads.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AUTH-005",
+      "title": "zone() delegates to inner",
+      "text": "zone() shall return the inner controller's zone.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AUTH-006",
+      "title": "subscribe() delegates to inner",
+      "text": "subscribe() shall delegate to the inner controller unchanged; access policy is only enforced on send().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AUTH-007",
+      "title": "close() delegates to inner",
+      "text": "close() shall delegate to the inner controller.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AUTH-008",
+      "title": "RCP_ERR_FORBIDDEN is a distinct error code",
+      "text": "RCP_ERR_FORBIDDEN shall be a distinct rcp_errc_t value from every other defined error code.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
       "id": "REQ-LOAN-001",
       "title": "loan() returns zeroed buffer",
       "text": "rcp_loan_controller_t::loan(n) shall return a zeroed byte vector of exactly n bytes.",
