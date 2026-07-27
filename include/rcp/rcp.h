@@ -168,6 +168,7 @@ typedef enum {
     RCP_CMD_WATCHDOG = 4,
     RCP_CMD_SLEEP    = 5,
     RCP_CMD_WAKE     = 6,
+    RCP_CMD_UPDATE   = 7,
 } rcp_command_type_t;
 
 /* ── ResponseStatus ────────────────────────────────────────────────────────── */

@@ -542,9 +542,41 @@ generic controller error).
   grepped the whole codebase for `des_` afterward, found no other
   occurrences.
 
-### 20. Firmware Update / OTA (v0.20.0)
+### 20. Firmware Update / OTA (v0.20.0) ✅
 
-`include/rcp/firmware.h`: chunked firmware delivery with SHA-256 integrity check and rollback.
+`include/rcp/firmware.h` + `src/firmware.c`: ports cpp-RCP's `firmware.hpp`
+— a multi-command OTA exchange state machine (Idle → Initiated →
+Transferring → Verifying → Activated, with Rollback available from any
+state), all steps sent as `RCP_CMD_UPDATE` (added to `rcp_command_type_t`
+this milestone) with a 1-byte subcommand selector as the first payload
+byte, matching cpp-RCP's own wire encoding exactly.
+- **Scope note**: cpp-RCP's own header comment claims "SHA-256 integrity is
+  computed over the full image before the Verify step," but no such
+  computation exists anywhere in its shipped `FirmwareSession` — `verify()`
+  just sends the bare subcommand byte with no hash. This port mirrors what
+  cpp-RCP actually ships (no local hashing), not its more ambitious header
+  narrative — the same judgment call made for UDP's multicast note, loan's
+  per-transport note, and TSN's VLAN/gate-schedule note.
+- Firmware-specific errors (`RCP_FW_ERR_BAD_STATE`/`_VERIFY_FAILED`/
+  `_TRANSFER_ERROR`/`_ROLLBACK_FAILED`) are offset to 100+ so they never
+  collide with the generic `rcp_errc_t` values (0-8) that session functions
+  may also return directly when `rcp_controller_send()` itself fails —
+  standing in for cpp-RCP's separate `std::error_code` category, which C
+  has no equivalent of.
+- **Requirements catalog gap filled**: like authz in v0.19.0,
+  `.fusa-reqs.json` had no forward-declared `REQ-FW-*` entries; added
+  `REQ-FW-001` through `-008` this milestone.
+- Faithfully preserves two API quirks from cpp-RCP rather than "fixing"
+  them into something more consistent: `transfer()` and `verify()` both
+  accept a `ctx` parameter that is never actually used in the body (each
+  builds its own timeout context from `cfg` instead), while `initiate()`,
+  `activate()`, and `rollback()` do use the passed `ctx` directly — an
+  inconsistency in cpp-RCP's own API, carried over unembellished and noted
+  here rather than silently "fixed" beyond what was asked.
+- `tests/test_firmware.c` ports all 7 of cpp-RCP's `test_firmware.cpp`
+  cases (starts Idle, initiate transitions, double-initiate fails,
+  transfer requires Initiated, full happy path, chunking with per-chunk
+  progress, rollback resets to Idle).
 
 ---
 ### Phase 7 — Topology & Scalability

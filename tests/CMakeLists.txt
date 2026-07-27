@@ -116,3 +116,8 @@ target_link_libraries(test_authz PRIVATE rcp::rcp unity)
 target_compile_options(test_authz PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_authz COMMAND test_authz)
 set_tests_properties(rcp_authz PROPERTIES TIMEOUT 30)
+
+add_executable(test_firmware test_firmware.c)
+target_link_libraries(test_firmware PRIVATE rcp::rcp unity)
+target_compile_options(test_firmware PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_firmware COMMAND test_firmware)
