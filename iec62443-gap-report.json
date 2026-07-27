@@ -1,0 +1,30 @@
+IEC 62443 Gap Report — c-RCP (target SL-2, profile 4-2)
+==================================================
+
+CR       FR     Requirement                                   cfusa Rule      Reqmt      Status
+-------- ------ --------------------------------------------- --------------- ---------- ------
+CR 1.1   FR1    Human user identification and authentication  -               Mandatory  GAP (M)
+CR 1.2   FR1    Software process identification and authentication -               Mandatory  GAP (M)
+CR 1.5   FR1    Authenticator management                      -               Mandatory  GAP (M)
+CR 1.7   FR1    Strength of password-based authentication     CFUSA-CY008     Mandatory  COVERED
+CR 1.11  FR1    Unsuccessful login attempts                   -               Mandatory  GAP (M)
+CR 2.1   FR2    Authorization enforcement                     -               Mandatory  GAP (M)
+CR 2.8   FR2    Auditable events                              -               Mandatory  GAP (M)
+CR 2.11  FR2    Timestamps                                    -               Mandatory  GAP (M)
+CR 3.1   FR3    Communication integrity                       CFUSA-CY004     Mandatory  COVERED
+CR 3.2   FR3    Malicious code protection                     CFUSA-CY001     Mandatory  COVERED
+CR 3.3   FR3    Security functionality verification           CFUSA-QUALIFY   Mandatory  COVERED
+CR 3.4   FR3    Software and information integrity            CFUSA-SIGN      Mandatory  COVERED
+CR 3.5   FR3    Input validation                              CFUSA-A002      Mandatory  COVERED
+CR 3.7   FR3    Error handling                                CFUSA-A002      Mandatory  COVERED
+CR 3.8   FR3    Session integrity                             -               Mandatory  GAP (M)
+CR 4.1   FR4    Information confidentiality                   CFUSA-CY004     Mandatory  COVERED
+CR 4.3   FR4    Use of cryptography                           CFUSA-CY008     Mandatory  COVERED
+CR 5.1   FR5    Network segmentation                          -               Mandatory  GAP (M)
+CR 6.1   FR6    Audit log accessibility                       -               Mandatory  GAP (M)
+CR 6.2   FR6    Continuous monitoring                         -               Mandatory  GAP (M)
+CR 7.1   FR7    Denial of service protection                  -               Mandatory  GAP (M)
+CR 7.2   FR7    Resource management                           CFUSA-L003      Mandatory  COVERED
+CR 7.3   FR7    Control system backup                         -               Mandatory  GAP (M)
+
+Summary: 10 covered, 13 mandatory gap(s), 0 recommended gap(s), 4 not applicable for SL-2
