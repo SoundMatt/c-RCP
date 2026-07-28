@@ -1,28 +1,85 @@
 {
   "schemaVersion": "1.11.0",
   "kind": "tara",
-  "tool": "c-FuSa",
-  "toolVersion": "0.5.45",
+  "tool": "hand-authored (see note)",
+  "toolVersion": "n/a",
   "language": "c",
   "generatedAt": "2026-07-28T01:05:37Z",
   "project": "c-RCP",
-  "version": "0.55.0",
+  "version": "0.57.0",
   "standard": "ISO 21434:2021 Clause 9",
+  "note": "Hand-authored, not `cfusa tara`-generated. cfusa tara only emits a placeholder skeleton (no input-file mechanism to seed real content) -- see ROADMAP.md milestone 57 and CYBERSECURITY.md section 3 for why this file is maintained by hand rather than regenerated on every release, matching the precedent already set by HARA.md/.fusa-hara.json in this same repo. Update by hand when threats, mitigations, or their implementation status change.",
   "assets": [
-    {"id":"ASSET-001","description":"[describe asset]","property":"CIA"}
+    {"id": "ASSET-001", "description": "RCP command/control channel between HPC callers and zone controllers (rcp_controller_send/loan)", "property": "Integrity, Availability"},
+    {"id": "ASSET-002", "description": "RCP status/telemetry stream from zone controllers to subscribers (rcp_controller_subscribe)", "property": "Integrity"},
+    {"id": "ASSET-003", "description": "Zone controller registry and registration identity (rcp_registry_register/dial)", "property": "Integrity"},
+    {"id": "ASSET-004", "description": "OTA firmware image and update/rollback session state (rcp_firmware_session_t)", "property": "Integrity"}
   ],
   "threats": [
     {
       "id": "TS-001",
       "asset": "ASSET-001",
-      "threat": "[describe threat]",
-      "attack_vector": "[local/remote/physical]",
-      "impact": "[none/low/med/high/severe]",
-      "feasibility": "[1-4]",
-      "risk_level": "[LOW/MEDIUM/HIGH/CRITICAL]",
-      "treatment": "[avoid/reduce/share/accept]",
-      "cybersecurity_goal": "[goal]",
-      "requirement_ref": "[SRS-xxx]"
+      "threat": "An attacker with access to the command bus injects forged commands impersonating a legitimate HPC caller (command injection / spoofed HPC).",
+      "attack_vector": "remote (requires network/bus access to the HPC-zone command path)",
+      "impact": "high",
+      "feasibility": "3",
+      "risk_level": "HIGH",
+      "treatment": "reduce",
+      "cybersecurity_goal": "No command shall be forwarded to a zone controller unless the caller's asserted identity is permitted for that zone/command-type by the loaded policy.",
+      "requirement_ref": "REQ-AUTH-001, REQ-AUTH-002",
+      "notes": "rcp_authz_controller_new() (Layer 2, REAL and working) rejects any identity/zone/command-type combination not in the policy table with RCP_ERR_FORBIDDEN. Its identity input is resolved by a caller-supplied rcp_authz_identity_fn -- this project's own default posture (mock/sim/udp transports; tls.c is an unimplemented compile-time interface stub, confirmed by direct source read) does not itself supply a cryptographically-verified identity source. Per CYBERSECURITY.md Layer 1, integrators are expected to plug in a real TLS backend and feed its verified certificate CN as the identity; until that's done, authz.c's policy check is only as trustworthy as whatever identity_fn the integrator supplies. Risk rating reflects this library's own shipped, backend-less posture."
+    },
+    {
+      "id": "TS-002",
+      "asset": "ASSET-002",
+      "threat": "An attacker captures a previously-valid command or status message and replays it to cause unintended repeated actuation or a stale status report.",
+      "attack_vector": "remote",
+      "impact": "high",
+      "feasibility": "2",
+      "risk_level": "MEDIUM",
+      "treatment": "reduce",
+      "cybersecurity_goal": "No command or status message carrying a previously-seen or excessively-stale sequence number shall be accepted.",
+      "requirement_ref": "REQ-E2E-007, REQ-E2E-008",
+      "notes": "rcp_e2e_replay_guard_t's 32-entry sliding-window bitmap (REAL, working, exercised by test_e2e.c) rejects duplicate sequence numbers and any sequence number more than 32 behind the high-water mark. This risk rating is based on that guard's tested runtime behavior, NOT on a formal-proof claim -- FORMAL_VERIFICATION.md's claim that tla/AntiReplayGuard.tla model-checks cleanly is separately disputed and under remediation (issue #57); this TARA entry does not rely on it."
+    },
+    {
+      "id": "TS-003",
+      "asset": "ASSET-003",
+      "threat": "An attacker registers a rogue controller for a zone it does not legitimately own, hijacking command routing and status reporting for that zone.",
+      "attack_vector": "remote (or physical, if the attacker has direct zone-bus access)",
+      "impact": "severe",
+      "feasibility": "3",
+      "risk_level": "HIGH",
+      "treatment": "reduce",
+      "cybersecurity_goal": "Only a controller presenting a valid, CA-verified certificate matching its claimed zone shall be permitted to register or dial into the registry.",
+      "requirement_ref": "REQ-TLS-001, REQ-TLS-002",
+      "notes": "Full mitigation requires mutual TLS with certificate-based zone binding. tls.h defines this integration surface (rcp_tls_registry_new/dial, config verify_peer default true) but tls.c is a confirmed compile-time stub absent an OpenSSL/wolfSSL/mbedTLS backend -- every transport call returns RCP_ERR_NOT_SUPPORTED rather than an insecure fallback (secure-by-refusal, not secure-by-encryption). Registries lacking mTLS (mock/sim/udp/shmem) have no cryptographic registration control at all; this is the highest residual risk in this TARA and requires an integrator-supplied TLS backend to close, consistent with CYBERSECURITY.md's own SEOOC framing of Layer 1."
+    },
+    {
+      "id": "TS-004",
+      "asset": "ASSET-004",
+      "threat": "An attacker tampers with or substitutes a firmware image delivered via OTA update, or forces an unauthorized rollback to a vulnerable prior version.",
+      "attack_vector": "remote (network-delivered OTA)",
+      "impact": "severe",
+      "feasibility": "3",
+      "risk_level": "HIGH",
+      "treatment": "reduce (partial)",
+      "cybersecurity_goal": "Only a firmware image matching an expected, cryptographically-verified content hash shall be activated.",
+      "requirement_ref": "REQ-FW-005",
+      "notes": "CURRENTLY UNMET, tracked as a real gap in issue #69 (filed 2026-07-28): rcp_firmware_session_verify() is a protocol-flow state-machine gate (Initiated -> Verified, bounded by verify_timeout_ms) with NO cryptographic image-hash or signature check -- confirmed by direct source read of src/firmware.c. rcp_firmware_session_rollback() is a plain command like any other, inheriting only whatever Layer 1-2 authorization wraps the underlying controller, not a specially-authenticated operation of its own. CYBERSECURITY.md previously claimed a SHA-256 check existed here; that claim has been corrected (see CYBERSECURITY.md Layer 5, 2026-07-28) to avoid this same TARA/CYBERSECURITY.md inconsistency this document exists to prevent."
+    },
+    {
+      "id": "TS-005",
+      "asset": "ASSET-001",
+      "threat": "An attacker floods a zone controller with commands to exhaust its processing capacity, starving legitimate commands (denial of service).",
+      "attack_vector": "remote",
+      "impact": "moderate",
+      "feasibility": "2",
+      "risk_level": "LOW",
+      "treatment": "reduce",
+      "cybersecurity_goal": "A flood of non-critical commands shall not exhaust a zone controller's processing capacity; RCP_PRIORITY_CRITICAL commands shall remain unaffected.",
+      "requirement_ref": "REQ-RL-001, REQ-RL-004",
+      "notes": "rcp_ratelimit_controller_new()'s token-bucket limiter (REAL, working, exercised by test_ratelimit.c) rejects excess non-critical commands with RCP_ERR_BUSY once the bucket is exhausted, refilling based on elapsed time. exempt_critical (default per rcp_ratelimit_config_t) specifically preserves safety-relevant command availability under flood conditions, which is why impact/feasibility/risk are rated lower here than the other four threats."
     }
   ]
 }
