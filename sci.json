@@ -1,10 +1,11 @@
 Software Configuration Index
-Project: c-RCP v0.59.0   Generated: 2026-07-28T14:42:35Z
+Project: c-RCP v0.60.0   Generated: 2026-07-28T15:05:34Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
 ./include/rcp/tsn.h                                           d5515debe324b5ab2dcd474e1138b7556fb4e6df9285d6dae265d275a586d860
 ./include/rcp/deadline.h                                      ddfdc5d517d2282018b18bdb7924974ca7297df28da45cf01772609841427d7c
+./include/rcp/acf.h                                           e5fc86d6522308a4061853a8c6b7bfcca5a03b4c0b753e6c5300955c65afaa7c
 ./include/rcp/mdns.h                                          81b034f2a6b2ae79de47579fc370af0d5ed37c95ef3b7a0ddac70fbdbd42ba1b
 ./include/rcp/restbridge.h                                    ea39a06c13d0ad464f4f34df65e63d10a3aec5ccf3473890c3255d4ef686a8fe
 ./include/rcp/authz.h                                         961554a4dadf81d267da7dfecbd3881f93b1056b9815a225b28496e879676276
@@ -20,7 +21,7 @@ FILE                                                          SHA-256
 ./include/rcp/config.h                                        a11add969d5b0e883eab513a322e3bf06523b80cf39c0f0a9f8b574f387b0f62
 ./include/rcp/adapt.h                                         a3a7e233c9a8773973ce2ea6b251fcd40f3403fc395f03ac77e97f689e8720b5
 ./include/rcp/udp.h                                           05bf00b6fb1f1ee26bba018cc9cb414a138fbd29196348678a88ef140c164e41
-./include/rcp/version.h                                       db51aa81703dedb217f51baed183b05a76a4ad86c7917b448afae0eeca41101d
+./include/rcp/version.h                                       fca9aa347777f39d231b872174f93c3645d08b13e5d2dd7e7ae1c3059065be7b
 ./include/rcp/recorder.h                                      db4b9c80c24ccb3e68daa06378ed700c53c70cc97131305133d2ccf5b9a03732
 ./include/rcp/cli.h                                           d479738a54a077a4a0019dec3ec62a39b73857fadbe1ae2745d2f7609506b7d9
 ./include/rcp/avtp.h                                          416f4beb4eb8c68d1dac4842372d0747da15c45677c67ae1de11c8849657b055
@@ -82,6 +83,7 @@ FILE                                                          SHA-256
 ./src/deadline.c                                              a2d4761a3819f40e3bf3c65c372515b655ddf03e435418644cd30e7855738ffe
 ./src/mdns.c                                                  30c7b817330d96a10f0f21832e8c50b54db437c58e8bad93ae926d23c8de42b2
 ./src/mqttbr.c                                                17a4f9febb4851ebea0b9eabb09e051f9adbac1747ae6c64f18927bef79eab9b
+./src/acf.c                                                   2b5ba4fa4aa087639aad8016cdd55cbb99c1514c91f74ca2b8ed569045d87b61
 ./src/canbr.c                                                 bc5834b4adaff1549bbf01f1c3d967c932c5bbe980346bb036ef4e50b7dc83ee
 ./src/rcp.c                                                   352f8f2c98a9e15381076fcbf99b0a9fe156fde76a2b66e4c31eabedf9069930
 ./src/dyndata.c                                               7a148c6e3fd9c14f3aa19cbf28c49b5569c4c68ed24210b60a6b2ef717d1991f
@@ -117,6 +119,7 @@ FILE                                                          SHA-256
 ./tests/test_restbridge.c                                     1dfc12b005af67c9ef1499f4cdfed298a38fe4a466780b8d49b737ed6a9878b0
 ./tests/test_mqttbr.c                                         ee606cbb1f5467fe976840814a465ddade8697a6b15d19e5c57ac456d29f7f12
 ./tests/test_rcp.c                                            06ca82e83d0296c37c293f022d128258ea5c2e20ddb1ed0c368d54bbf208abf0
+./tests/test_acf.c                                            cf4d2b885f4de910b12be1b27e2716f0853d7f8ef7205b945522ab6821b43b84
 ./tests/test_loan.c                                           dba12813e84800def6bd168bc017162cad520a675e83b72d71f398f1461a8458
 ./tests/test_avtp.c                                           f4add302a4841c9900f5e32a8820de8dbc1947090cc4dc7d68266e9666b2dfcd
 ./tests/test_admin.c                                          0e5a54f92393221ded6bf6f0c53a2ad34d3ef3e6d06c7aa61a0b6aa592dd1839
@@ -135,4 +138,4 @@ FILE                                                          SHA-256
 ./tests/test_sim.c                                            e3addfdf6af83a8ef4112d5d3f6b9d6cde0f8fe26ff2e80c62dafd5e31a7bdaa
 ./cli/main.c                                                  541875eda25d51c675d488ca4ddc24226dbccd51e91b77390569c451c36710e1
 
-Total files: 131
+Total files: 134
