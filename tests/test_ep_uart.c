@@ -30,6 +30,7 @@
 
 #include <rcp/acf.h>
 #include <rcp/ep_uart.h>
+#include <rcp/fragment.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
 #include <rcp/lifecycle.h>
@@ -537,6 +538,110 @@ static void test_read_response_decode_rejects_wrong_bus_and_short_frame(void)
                                           &timed, &ts, &txn));
 }
 
+/* ── Fragmented read response (Phase 20, fragment.h) ───────────────────────── */
+
+static void test_fragment_count_one_when_unfragmented(void)
+{
+    TEST_ASSERT_EQUAL_UINT(1, rcp_ep_uart_read_response_fragment_count(10, 100));
+    TEST_ASSERT_EQUAL_UINT(1, rcp_ep_uart_read_response_fragment_count(0, 0));
+}
+
+static void test_fragment_unfragmented_matches_single_frame_path(void)
+{
+    uint8_t     rx[3] = {0x11, 0x22, 0x33};
+    rcp_bytes_t plain;
+    rcp_bytes_t fragmented[1];
+    size_t      count;
+
+    plain = rcp_ep_uart_encode_read_response(6, rx, sizeof(rx), 12, false, 0);
+    TEST_ASSERT_NOT_NULL(plain.data);
+
+    count = rcp_ep_uart_encode_read_response_fragmented(6, rx, sizeof(rx), 12, false, 0, 255,
+                                                          fragmented);
+    TEST_ASSERT_EQUAL_UINT(1, count);
+    TEST_ASSERT_EQUAL_UINT(plain.len, fragmented[0].len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(plain.data, fragmented[0].data, plain.len);
+
+    rcp_bytes_free(&plain);
+    rcp_bytes_free(&fragmented[0]);
+}
+
+/* Closes the deferred single-AVTPDU-worst-case test noted at milestone 66
+ * (v0.66.0): exercises fragment.h's ms/segment_num mechanism against this
+ * endpoint's own wire codec end-to-end, using a deliberately small
+ * max_fragment_payload -- see the file header for why this endpoint's own
+ * one-octet read_size means genuine UART traffic never actually needs
+ * more than one fragment in practice; this test proves the mechanism
+ * composes correctly regardless. */
+static void test_fragment_deliberately_small_cap_round_trip(void)
+{
+    uint8_t                     rx[20];
+    size_t                      i;
+    size_t                      max_fragment_payload = 6;
+    size_t                      count;
+    rcp_bytes_t                 frames[4];
+    rcp_fragment_reassembler_t  reasm;
+
+    for (i = 0; i < sizeof(rx); i++) rx[i] = (uint8_t)(100 + i);
+
+    count = rcp_ep_uart_read_response_fragment_count(sizeof(rx), max_fragment_payload);
+    TEST_ASSERT_EQUAL_UINT(4, count); /* ceil(20/6) */
+    TEST_ASSERT_TRUE(count <= (sizeof(frames) / sizeof(frames[0])));
+
+    count = rcp_ep_uart_encode_read_response_fragmented(3, rx, sizeof(rx), 66, true,
+                                                          0x0102030405060708ull,
+                                                          max_fragment_payload, frames);
+    TEST_ASSERT_EQUAL_UINT(4, count);
+
+    rcp_fragment_reassembler_init(&reasm, sizeof(rx));
+    for (i = 0; i < count; i++) {
+        bool                         ms;
+        uint8_t                      segnum;
+        const uint8_t                *payload;
+        size_t                        payload_len;
+        bool                          timed;
+        uint64_t                      ts;
+        uint8_t                       txn;
+        rcp_fragment_reasm_result_t   rc;
+
+        TEST_ASSERT_EQUAL(RCP_EP_UART_OK,
+            rcp_ep_uart_decode_read_response_fragment(frames[i].data, frames[i].len, 3, &ms,
+                                                        &segnum, &payload, &payload_len,
+                                                        &timed, &ts, &txn));
+        TEST_ASSERT_EQUAL_UINT8(66, txn);
+        TEST_ASSERT_TRUE(timed);
+        TEST_ASSERT_EQUAL_UINT64(0x0102030405060708ull, ts);
+
+        rc = rcp_fragment_reassembler_feed(&reasm, ms, segnum, payload, payload_len);
+        if (i + 1 < count) {
+            TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_CONTINUE, rc);
+        } else {
+            TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_COMPLETE, rc);
+        }
+    }
+
+    {
+        const uint8_t *reassembled;
+        size_t         reassembled_len;
+
+        rcp_fragment_reassembler_get(&reasm, &reassembled, &reassembled_len);
+        TEST_ASSERT_EQUAL_UINT(sizeof(rx), reassembled_len);
+        TEST_ASSERT_EQUAL_UINT8_ARRAY(rx, reassembled, sizeof(rx));
+    }
+
+    rcp_fragment_reassembler_destroy(&reasm);
+    for (i = 0; i < count; i++) rcp_bytes_free(&frames[i]);
+}
+
+static void test_fragment_encode_disabled_when_zero_cap_and_oversized(void)
+{
+    uint8_t     rx[4] = {1, 2, 3, 4};
+    rcp_bytes_t frames[4];
+    size_t      count = rcp_ep_uart_encode_read_response_fragmented(3, rx, sizeof(rx), 1, false,
+                                                                       0, 0, frames);
+    TEST_ASSERT_EQUAL_UINT(0, count);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -575,6 +680,11 @@ int main(void)
     RUN_TEST(test_read_response_round_trip_full_length);
     RUN_TEST(test_read_response_round_trip_short_read_single_avtpdu);
     RUN_TEST(test_read_response_decode_rejects_wrong_bus_and_short_frame);
+
+    RUN_TEST(test_fragment_count_one_when_unfragmented);
+    RUN_TEST(test_fragment_unfragmented_matches_single_frame_path);
+    RUN_TEST(test_fragment_deliberately_small_cap_round_trip);
+    RUN_TEST(test_fragment_encode_disabled_when_zero_cap_and_oversized);
 
     return UNITY_END();
 }

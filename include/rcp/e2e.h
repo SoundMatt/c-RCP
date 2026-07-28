@@ -110,21 +110,23 @@
  * -- and the caller must skip executing the request the frame carried,
  * per this milestone's roadmap scope.
  *
- * ── Fragmentation/CRC interaction: modeled now, activated at Phase 20 ──────
+ * ── Fragmentation/CRC interaction: modeled here, driven by fragment.h ──────
  *
- * acf.h's read_size_or_segment_num field already exists but is round-
- * tripped only (fragmentation itself is Phase 20's job, and does not yet
- * have a dedicated module of its own -- see the registry note in
- * ROADMAP.md/issue #87 once Phase 20 lands one, it is named `fragment`
- * per RELAY spec v1.14 §13.7.2). This milestone's roadmap scope calls for
- * the fragmentation/CRC interaction rule to be modeled now regardless:
- * only the last fragment of a multi-segment message carries a CRC
- * (computed across the fully reassembled payload), and the length-
- * accounting pre-adjustment applies only to that final segment.
- * rcp_e2e_fragment_carries_crc() is the pure, directly-testable expression
- * of that rule, ready for Phase 20 to call once real segment_num-driven
- * reassembly exists; it has no fragmentation state of its own to model in
- * the meantime.
+ * acf.h's read_size_or_segment_num field, and the ms bit alongside it, are
+ * interpreted as a fragmentation signal by fragment.h (Phase 20,
+ * ROADMAP.md milestone 76 -- named `fragment` per RELAY spec v1.14
+ * §13.7.2, per the registry note ROADMAP.md/issue #87 left for that
+ * milestone). This module's own fragmentation/CRC interaction rule
+ * predates that module and is unchanged by it: only the last fragment of
+ * a multi-segment message carries a CRC (computed across the fully
+ * reassembled payload), and the length-accounting pre-adjustment applies
+ * only to that final segment. rcp_e2e_fragment_carries_crc() is the pure,
+ * directly-testable expression of that rule; fragment.h's own file header
+ * documents it as the caller-facing entry point a fragmentation-aware
+ * encode/decode path (e.g. ep_can.h's fragmented response codec) drives
+ * against its own final-segment determination -- this module still has no
+ * fragmentation state of its own to model, by design (see the file header
+ * above for why: reused, not duplicated).
  *
  * ── Safety-request execution gating ─────────────────────────────────────────
  *

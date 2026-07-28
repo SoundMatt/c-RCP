@@ -91,7 +91,7 @@
  * matching acf.c's own decode convention, for the same reason ep_spi.h's/
  * ep_i2c.h's own raw payloads are borrowed rather than copied.
  *
- * ── RX: read_size/uart_timeout race, single-AVTPDU scope this milestone ────
+ * ── RX: read_size/uart_timeout race, and Phase 20 fragmentation ─────────────
  *
  * A read (RX) request carries no payload of its own -- see
  * rcp_ep_uart_decode_read_request()'s RCP_EP_UART_ERR_UNKNOWN_CMD case
@@ -101,18 +101,23 @@
  * bytes. The real RC Server races that read_size against the endpoint's
  * uart_timeout_ms functional-config field (whichever completes the read
  * first), which can yield a response shorter than the requested
- * read_size -- a *short read*. This milestone's scope deliberately covers
- * only the single-AVTPDU case: a short read's response payload, however
- * many bytes shorter than read_size it is, still fits in one ACF message
- * and is decoded exactly like a full-length response, with no
- * segment_num-based reassembly of any kind. True multi-AVTPDU
- * fragmentation of an over-long read (the `ms`/segment_num-driven
- * mechanism acf.h's own header comment already reserves the wire slot
- * for) is explicitly deferred to Phase 20, ROADMAP.md milestone 76 -- not
- * pulled forward here. rcp_ep_uart_decode_read_response() therefore has no
- * notion of "more segments follow"; a caller wanting to detect a short
- * read compares its returned payload length against the read_size it
- * requested.
+ * read_size -- a *short read*. rcp_ep_uart_encode_read_request()'s
+ * read_size parameter is itself one octet wide, so this endpoint's own
+ * largest possible read response (255 bytes) always fits comfortably
+ * within a single AVTPDU regardless -- unlike ep_can.h's CAN XL captured
+ * frames (up to 2054 bytes), this endpoint's own traffic never actually
+ * needs fragment.h's ms/segment_num mechanism (Phase 20, ROADMAP.md
+ * milestone 76) in real-world use. rcp_ep_uart_encode_read_response_fragmented()/
+ * rcp_ep_uart_decode_read_response_fragment() below are nonetheless
+ * provided -- retrofitted uniformly across every Phase 20 target endpoint,
+ * per that milestone's own roadmap scope -- and are exercised end-to-end
+ * in this module's own test suite against a deliberately small
+ * max_fragment_payload, closing the deferred single-AVTPDU-worst-case
+ * test milestone 66 left open, even though this endpoint's own read_size
+ * width means the mechanism is never actually reachable from genuine
+ * UART traffic. rcp_ep_uart_decode_read_response() (the plain,
+ * unfragmented codec) is unchanged and remains the ordinary path for
+ * every real read response.
  *
  * ── The payload-bearing-read-request rejection: a deliberate asymmetry ─────
  *
@@ -160,6 +165,7 @@
 
 #include "rcp/acf.h"
 #include "rcp/avtp.h"
+#include "rcp/fragment.h"
 #include "rcp/rcp.h"
 #include "rcp/regmap.h"
 #include "rcp/lifecycle.h"
@@ -385,9 +391,11 @@ rcp_bytes_t rcp_ep_uart_encode_read_response(rcp_byte_bus_id_t byte_bus_id,
  * RCP_EP_UART_OK, *out_transaction_num is populated; *out_rx_data /
  * *out_rx_len are set to a *borrowed* view into b (not copied) of the
  * received payload -- possibly shorter than the originating request's
- * read_size, i.e. a short read (see the file header; this milestone's
- * single-AVTPDU scope means no segment_num-based reassembly is performed
- * or expected here); *out_timed and *out_timestamp report whether the
+ * read_size, i.e. a short read (see the file header); this endpoint's own
+ * read_size width means a response never actually needs the
+ * segment_num-based reassembly rcp_ep_uart_decode_read_response_fragment()
+ * below provides for API-consistency with every other Phase 20 target
+ * endpoint; *out_timed and *out_timestamp report whether the
  * message was ACF_GBB with a valid (rcp_acf_gbb_is_timed()) timestamp,
  * and that timestamp's value (0 when !*out_timed). */
 rcp_ep_uart_errc_t rcp_ep_uart_decode_read_response(const uint8_t *b, size_t len,
@@ -396,6 +404,65 @@ rcp_ep_uart_errc_t rcp_ep_uart_decode_read_response(const uint8_t *b, size_t len
                                                      size_t *out_rx_len, bool *out_timed,
                                                      uint64_t *out_timestamp,
                                                      uint8_t *out_transaction_num);
+
+/* ── Fragmented read response (Phase 20, fragment.h) ───────────────────────── */
+
+/* The number of ACF frames rcp_ep_uart_encode_read_response_fragmented()
+ * would produce for rx_len octets of read-response payload split into
+ * fragments of at most max_fragment_payload octets each -- see
+ * fragment.h's rcp_fragment_plan_count(). Provided for API consistency
+ * across every Phase 20 target endpoint (see the file header); this
+ * endpoint's own one-octet read_size means a real response is always
+ * well under any plausible max_fragment_payload, so this virtually always
+ * returns 1 in practice. */
+size_t rcp_ep_uart_read_response_fragment_count(size_t rx_len, size_t max_fragment_payload);
+
+/* Encodes a UART read (RX) response as one or more ACF frames, fragmenting
+ * via fragment.h's ms/segment_num mechanism whenever rx_len exceeds
+ * max_fragment_payload octets -- into
+ * out_frames[0..rcp_ep_uart_read_response_fragment_count(rx_len,
+ * max_fragment_payload)) (caller-allocated, sized by calling that
+ * function first). Every fragment shares byte_bus_id/op(READ)/
+ * transaction_num/timed/timestamp with rcp_ep_uart_encode_read_response();
+ * only the ms flag, read_size_or_segment_num (meaningful only on an
+ * ms=true fragment), and each fragment's own payload slice differ. When
+ * rx_len already fits in one fragment, this produces exactly one frame
+ * identical to what rcp_ep_uart_encode_read_response() itself would have.
+ * Returns the number of frames written on success, or 0 (out_frames left
+ * untouched) under the same conditions rcp_ep_uart_read_response_fragment_count()
+ * returns 0 for, or on allocation failure partway through (any
+ * already-written out_frames entries are freed before returning). Caller
+ * frees each successfully returned out_frames[i] with rcp_bytes_free(). */
+size_t rcp_ep_uart_encode_read_response_fragmented(rcp_byte_bus_id_t byte_bus_id,
+                                                    const uint8_t *rx_data, size_t rx_len,
+                                                    uint8_t transaction_num, bool timed,
+                                                    uint64_t timestamp,
+                                                    size_t max_fragment_payload,
+                                                    rcp_bytes_t *out_frames);
+
+/* Decodes one fragment of a (possibly multi-fragment) UART read response
+ * from b[0..len) -- the same peek-message-type/byte_bus_id validation
+ * rcp_ep_uart_decode_read_response() applies, but surfaces the fragment's
+ * own ms bit and read_size_or_segment_num (as *out_segment_num,
+ * meaningful only when *out_ms) alongside the raw payload slice
+ * (*out_payload / *out_payload_len, borrowed into b), for a caller to
+ * feed straight into a rcp_fragment_reassembler_t (fragment.h). Once
+ * reassembly reports RCP_FRAGMENT_REASM_COMPLETE,
+ * rcp_fragment_reassembler_get()'s output *is* the fully reassembled
+ * rx_data directly -- unlike ep_can.h's fragmented response, this
+ * endpoint's payload has no further internal structure of its own to
+ * parse. Fails with the same RCP_EP_UART_ERR_SHORT_FRAME/
+ * _ERR_BAD_MSG_TYPE/_ERR_WRONG_BUS conditions
+ * rcp_ep_uart_decode_read_response() does. */
+rcp_ep_uart_errc_t rcp_ep_uart_decode_read_response_fragment(const uint8_t *b, size_t len,
+                                                              rcp_byte_bus_id_t expected_bus_id,
+                                                              bool *out_ms,
+                                                              uint8_t *out_segment_num,
+                                                              const uint8_t **out_payload,
+                                                              size_t *out_payload_len,
+                                                              bool *out_timed,
+                                                              uint64_t *out_timestamp,
+                                                              uint8_t *out_transaction_num);
 
 #ifdef __cplusplus
 }

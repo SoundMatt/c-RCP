@@ -115,6 +115,7 @@
 
 #include "rcp/acf.h"
 #include "rcp/avtp.h"
+#include "rcp/fragment.h"
 #include "rcp/rcp.h"
 #include "rcp/regmap.h"
 #include "rcp/lifecycle.h"
@@ -252,6 +253,81 @@ typedef struct {
  * echo the same byte_bus_id and a read-classified op. */
 rcp_discovery_errc_t rcp_discovery_decode_response(const uint8_t *b, size_t len,
                                                     rcp_discovery_result_t *out_result);
+
+/* ── Fragmented response (Phase 20, fragment.h) ────────────────────────────── */
+
+/* read_size is one octet wide, so a discovery response's payload (always
+ * exactly read_size octets, per RCP_DISCOVERY_GENERAL_SLICE_LEN's own
+ * comment) is always well under any plausible max_fragment_payload --
+ * this endpoint's traffic, like ep_uart.h's read responses, never
+ * actually needs fragment.h's ms/segment_num mechanism (Phase 20,
+ * ROADMAP.md milestone 76) in real-world use. The functions below are
+ * nonetheless provided for API consistency across every Phase 20 target
+ * endpoint and are exercised end-to-end in this module's own test suite
+ * against a deliberately small max_fragment_payload, closing the deferred
+ * single-AVTPDU-worst-case test milestone 63 left open. See
+ * rcp_ep_uart_read_response_fragment_count()'s own comment for the same
+ * reasoning applied there. */
+size_t rcp_discovery_response_fragment_count(uint8_t read_size, size_t max_fragment_payload);
+
+/* Encodes the discovery response as one or more full NTSCF-framed
+ * ACF_ABB messages, fragmenting via fragment.h's ms/segment_num mechanism
+ * whenever read_size exceeds max_fragment_payload octets -- into
+ * out_frames[0..rcp_discovery_response_fragment_count(read_size,
+ * max_fragment_payload)) (caller-allocated, sized by calling that
+ * function first). Same conventions as rcp_discovery_encode_response()
+ * otherwise (every fragment echoes transaction_num and is addressed via
+ * server_stream_id); only the ms flag, read_size_or_segment_num
+ * (meaningful only on an ms=true fragment; the final fragment carries
+ * read_size itself, exactly as rcp_discovery_encode_response() always
+ * does), and each fragment's own payload slice differ. When read_size
+ * already fits in one fragment, this produces exactly one frame identical
+ * to what rcp_discovery_encode_response() itself would have. Returns the
+ * number of frames written on success, or 0 (out_frames left untouched)
+ * under the same conditions rcp_discovery_response_fragment_count()
+ * returns 0 for, or on allocation failure partway through (any
+ * already-written out_frames entries are freed before returning). Caller
+ * frees each successfully returned out_frames[i] with rcp_bytes_free(). */
+size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
+                                                 uint8_t read_size, uint8_t transaction_num,
+                                                 rcp_stream_id_t server_stream_id,
+                                                 size_t max_fragment_payload,
+                                                 rcp_bytes_t *out_frames);
+
+/* Decodes one fragment of a (possibly multi-fragment) discovery response
+ * frame -- the same AVTP/ACF-level validation rcp_discovery_decode_response()
+ * applies (see that function's own failure-mode list), but surfaces the
+ * fragment's own ms bit and read_size_or_segment_num (as
+ * *out_segment_num, meaningful only when *out_ms) alongside the raw ACF
+ * payload slice (*out_payload / *out_payload_len, borrowed into b), for a
+ * caller to feed straight into a rcp_fragment_reassembler_t (fragment.h).
+ * *out_server_stream_id is populated the same way
+ * rcp_discovery_decode_response()'s own result.server_stream_id is. */
+rcp_discovery_errc_t rcp_discovery_decode_response_fragment(const uint8_t *b, size_t len,
+                                                             rcp_stream_id_t *out_server_stream_id,
+                                                             bool *out_ms,
+                                                             uint8_t *out_segment_num,
+                                                             const uint8_t **out_payload,
+                                                             size_t *out_payload_len);
+
+/* Once fragment.h reports RCP_FRAGMENT_REASM_COMPLETE, applies this
+ * module's own general-register-slice parsing (see
+ * RCP_DISCOVERY_GENERAL_SLICE_LEN's own comment) to
+ * rcp_fragment_reassembler_get()'s output -- the second half of what
+ * rcp_discovery_decode_response() does in one step for a single,
+ * unfragmented frame. server_stream_id is whatever
+ * rcp_discovery_decode_response_fragment() reported for (any of) that
+ * sequence's own fragments (round-tripped identically on every fragment
+ * of one logical response, the same NTSCF sender-assigns-stream_id
+ * convention every fragment shares). Returns RCP_DISCOVERY_ERR_SHORT_FRAME
+ * if reassembled_len is shorter than RCP_DISCOVERY_GENERAL_SLICE_LEN,
+ * same as rcp_discovery_decode_response() does for an unfragmented
+ * response. On RCP_DISCOVERY_OK, *out_result is populated with valid =
+ * true. */
+rcp_discovery_errc_t rcp_discovery_decode_reassembled_response(const uint8_t *reassembled,
+                                                                size_t reassembled_len,
+                                                                rcp_stream_id_t server_stream_id,
+                                                                rcp_discovery_result_t *out_result);
 
 /* ── Discovery-stream claiming ──────────────────────────────────────────────── */
 

@@ -107,7 +107,12 @@
  * rx_safestate_sequencer/rx_safe_sequencer_state that milestone 62's own
  * placeholder comment had not yet named -- see
  * rcp_regmap_request_stream_cfg_t's own field comments below and
- * e2e.h's file header for the behavior each one now drives.
+ * e2e.h's file header for the behavior each one now drives. Phase 20
+ * (fragment.h/fragment.c, milestone 76) has since added
+ * rx_stream_max_request_size to the same struct, the "request-stream
+ * config table reserved since Phase 14" that milestone's own roadmap
+ * entry refers to -- see that field's own comment and fragment.h's file
+ * header for the fragmentation mechanism it configures.
  *
  * ── Known spec ambiguity: EP-ID/byte_bus_id ordering is not enforced ───────
  *
@@ -400,6 +405,37 @@ typedef struct {
     uint8_t  rx_safe_sequencer_state;   /* the sequencer state value, at
                                             rx_safestate_sequencer, that means
                                             "endpoint is in its safe state" */
+
+    /* ── Fragmentation (fragment.h) ─────────────────────────────────── */
+    size_t   rx_stream_max_request_size; /* the largest single-AVTPDU ACF
+                                             payload (header-and-payload,
+                                             excluding any e2e.h CRC
+                                             trailer) this stream will
+                                             assemble or accept in one
+                                             fragment, in either direction,
+                                             before fragment.h's ms/
+                                             segment_num mechanism must
+                                             split a larger message across
+                                             multiple frames -- a caller
+                                             passes this value as
+                                             fragment.h's own
+                                             max_fragment_payload (encode
+                                             side) or max_total_len
+                                             (rcp_fragment_reassembler_init(),
+                                             decode side; that bounds the
+                                             *reassembled* total, not each
+                                             individual fragment, but this
+                                             is this codebase's one
+                                             configured ceiling for the
+                                             stream either way). 0 means
+                                             fragmentation is unsupported
+                                             for this stream: a message
+                                             that would not fit in a single
+                                             AVTPDU is rejected/capped by
+                                             the endpoint's own
+                                             single-AVTPDU-only behavior,
+                                             unchanged from every milestone
+                                             before Phase 20. */
 } rcp_regmap_request_stream_cfg_t;
 
 /* Zero-initializes cfg (configured = false, everything else 0). */

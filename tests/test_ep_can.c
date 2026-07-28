@@ -23,7 +23,9 @@
 #include "unity.h"
 
 #include <rcp/acf.h>
+#include <rcp/avtp.h>
 #include <rcp/ep_can.h>
+#include <rcp/fragment.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
 #include <rcp/lifecycle.h>
@@ -697,6 +699,200 @@ static void test_frame_response_encode_rejects_bad_frame_format(void)
     TEST_ASSERT_NULL(frame.data);
 }
 
+/* ── Fragmented response (Phase 20, fragment.h) ────────────────────────────── */
+
+static void test_fragment_count_one_when_fits_in_one_fragment(void)
+{
+    /* A 3-byte classical response's combined (4-byte prefix + 3-byte
+     * data) payload is 7 octets; with a generous 100-octet cap this needs
+     * exactly one (unfragmented) frame -- count is 1, not 0 (0 means
+     * "not representable", not "no fragmentation needed"). */
+    size_t count = rcp_ep_can_frame_response_fragment_count(
+        RCP_EP_CAN_FRAME_CBFF, 0x10, NULL, 3, 100);
+    TEST_ASSERT_EQUAL_UINT(1, count);
+}
+
+static void test_fragment_count_zero_for_bad_preconditions(void)
+{
+    /* Invalid frame_format -> encode_preconditions_ok() fails -> 0. */
+    size_t count = rcp_ep_can_frame_response_fragment_count(
+        (rcp_ep_can_frame_format_t)7, 0x10, NULL, 3, 100);
+    TEST_ASSERT_EQUAL_UINT(0, count);
+}
+
+/* Closes the single-AVTPDU-worst-case test deferred at milestone 72
+ * (v0.72.0): a full RCP_EP_CAN_XL_MAX_DATA_LEN (2048)-byte CAN XL captured
+ * frame, whose combined prefix-then-data ACF payload (2058 octets, see
+ * ep_can.h's file header) does not fit within a single
+ * RCP_AVTP_NTSCF_MAX_PAYLOAD (2047)-byte NTSCF AVTPDU -- exactly the
+ * scenario ROADMAP.md's Phase 20 go-decision names as the concrete driver
+ * for this milestone. Encodes it fragmented at a max_fragment_payload
+ * comfortably under that NTSCF ceiling, then reassembles it back via
+ * fragment.h and this module's own reassembled-response decode helper. */
+static void test_fragment_worst_case_can_xl_response_round_trip(void)
+{
+    uint8_t                     rx[RCP_EP_CAN_XL_MAX_DATA_LEN];
+    rcp_ep_can_xl_header_t      xl_hdr_in = {0};
+    rcp_ep_can_xl_header_t      xl_hdr_out;
+    size_t                      i;
+    size_t                      max_fragment_payload = 1024;
+    size_t                      count;
+    rcp_bytes_t                 frames[4];
+    rcp_fragment_reassembler_t  reasm;
+    size_t                      combined_len = 4u + 6u + RCP_EP_CAN_XL_MAX_DATA_LEN;
+
+    for (i = 0; i < sizeof(rx); i++) rx[i] = (uint8_t)(i * 3 + 7);
+    xl_hdr_in.sdt  = 0x5;
+    xl_hdr_in.vcid = 0x9;
+    xl_hdr_in.af   = 0xDEADBEEFu;
+
+    count = rcp_ep_can_frame_response_fragment_count(
+        RCP_EP_CAN_FRAME_XL_NEW_PL, 0x123, &xl_hdr_in, sizeof(rx), max_fragment_payload);
+    TEST_ASSERT_EQUAL_UINT(3, count); /* 2058 / 1024 -> ceil = 3 */
+    TEST_ASSERT_TRUE(count <= (sizeof(frames) / sizeof(frames[0])));
+
+    count = rcp_ep_can_encode_frame_response_fragmented(
+        7, RCP_EP_CAN_FRAME_XL_NEW_PL, 0x123, &xl_hdr_in, rx, sizeof(rx), 55, false, 0,
+        max_fragment_payload, frames);
+    TEST_ASSERT_EQUAL_UINT(3, count);
+
+    /* Every individual fragment must fit comfortably under NTSCF's own
+     * single-AVTPDU payload ceiling -- the whole point of fragmenting. */
+    for (i = 0; i < count; i++) {
+        TEST_ASSERT_NOT_NULL(frames[i].data);
+        TEST_ASSERT_TRUE(frames[i].len < RCP_AVTP_NTSCF_MAX_PAYLOAD);
+    }
+
+    rcp_fragment_reassembler_init(&reasm, combined_len);
+    for (i = 0; i < count; i++) {
+        rcp_ep_can_frame_format_t   fmt;
+        bool                         ms;
+        uint8_t                      segnum;
+        const uint8_t                *payload;
+        size_t                        payload_len;
+        bool                          timed;
+        uint64_t                      ts;
+        uint8_t                       txn;
+        rcp_fragment_reasm_result_t   rc;
+
+        TEST_ASSERT_EQUAL(RCP_EP_CAN_OK,
+            rcp_ep_can_decode_frame_response_fragment(frames[i].data, frames[i].len, 7, &fmt,
+                                                        &ms, &segnum, &payload, &payload_len,
+                                                        &timed, &ts, &txn));
+        TEST_ASSERT_EQUAL(RCP_EP_CAN_FRAME_XL_NEW_PL, fmt);
+        TEST_ASSERT_EQUAL_UINT8(55, txn);
+        TEST_ASSERT_FALSE(timed);
+
+        rc = rcp_fragment_reassembler_feed(&reasm, ms, segnum, payload, payload_len);
+        if (i + 1 < count) {
+            TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_CONTINUE, rc);
+        } else {
+            TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_COMPLETE, rc);
+        }
+    }
+
+    {
+        const uint8_t *reassembled;
+        size_t         reassembled_len;
+
+        rcp_fragment_reassembler_get(&reasm, &reassembled, &reassembled_len);
+        TEST_ASSERT_EQUAL_UINT(combined_len, reassembled_len);
+
+        {
+            uint32_t       out_id = 0;
+            const uint8_t *out_rx = NULL;
+            size_t         out_rx_len = 0;
+
+            TEST_ASSERT_EQUAL(RCP_EP_CAN_OK,
+                rcp_ep_can_decode_reassembled_frame_response(
+                    reassembled, reassembled_len, RCP_EP_CAN_FRAME_XL_NEW_PL, &out_id,
+                    &xl_hdr_out, &out_rx, &out_rx_len));
+
+            TEST_ASSERT_EQUAL_UINT32(0x123, out_id);
+            TEST_ASSERT_EQUAL_UINT8(0x5, xl_hdr_out.sdt);
+            TEST_ASSERT_EQUAL_UINT8(0x9, xl_hdr_out.vcid);
+            TEST_ASSERT_EQUAL_UINT32(0xDEADBEEFu, xl_hdr_out.af);
+            TEST_ASSERT_EQUAL_UINT(sizeof(rx), out_rx_len);
+            TEST_ASSERT_EQUAL_UINT8_ARRAY(rx, out_rx, sizeof(rx));
+        }
+    }
+
+    rcp_fragment_reassembler_destroy(&reasm);
+    for (i = 0; i < count; i++) rcp_bytes_free(&frames[i]);
+}
+
+static void test_fragment_response_unfragmented_matches_single_frame_path(void)
+{
+    /* When the combined payload already fits in one fragment, the
+     * fragmented encoder must produce exactly what the plain,
+     * unfragmented encoder would have -- fragmentation is a strict
+     * superset of the single-frame wire format, not a parallel one. */
+    uint8_t      rx[3] = {0xAA, 0xBB, 0xCC};
+    rcp_bytes_t  plain;
+    rcp_bytes_t  fragmented[1];
+    size_t       count;
+
+    plain = rcp_ep_can_encode_frame_response(4, RCP_EP_CAN_FRAME_CBFF, 0x42, NULL, rx,
+                                              sizeof(rx), 9, false, 0);
+    TEST_ASSERT_NOT_NULL(plain.data);
+
+    count = rcp_ep_can_encode_frame_response_fragmented(
+        4, RCP_EP_CAN_FRAME_CBFF, 0x42, NULL, rx, sizeof(rx), 9, false, 0, 1024, fragmented);
+    TEST_ASSERT_EQUAL_UINT(1, count);
+
+    TEST_ASSERT_EQUAL_UINT(plain.len, fragmented[0].len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(plain.data, fragmented[0].data, plain.len);
+
+    rcp_bytes_free(&plain);
+    rcp_bytes_free(&fragmented[0]);
+}
+
+static void test_fragment_encode_rejects_bad_preconditions(void)
+{
+    rcp_bytes_t frames[4];
+    size_t      count = rcp_ep_can_encode_frame_response_fragmented(
+        4, (rcp_ep_can_frame_format_t)7, 0x42, NULL, NULL, 0, 9, false, 0, 1024, frames);
+    TEST_ASSERT_EQUAL_UINT(0, count);
+}
+
+static void test_fragment_decode_fragment_rejects_wrong_bus(void)
+{
+    uint8_t     rx[3] = {1, 2, 3};
+    rcp_bytes_t frames[1];
+    size_t      count = rcp_ep_can_encode_frame_response_fragmented(
+        4, RCP_EP_CAN_FRAME_CBFF, 0x42, NULL, rx, sizeof(rx), 9, false, 0, 1024, frames);
+    rcp_ep_can_frame_format_t fmt;
+    bool                       ms;
+    uint8_t                    segnum;
+    const uint8_t              *payload;
+    size_t                      payload_len;
+    bool                        timed;
+    uint64_t                    ts;
+    uint8_t                     txn;
+
+    TEST_ASSERT_EQUAL_UINT(1, count);
+    TEST_ASSERT_EQUAL(RCP_EP_CAN_ERR_WRONG_BUS,
+        rcp_ep_can_decode_frame_response_fragment(frames[0].data, frames[0].len, 99, &fmt, &ms,
+                                                    &segnum, &payload, &payload_len, &timed, &ts,
+                                                    &txn));
+
+    rcp_bytes_free(&frames[0]);
+}
+
+static void test_reassembled_decode_rejects_short_frame(void)
+{
+    uint8_t                 too_short[3] = {0};
+    uint32_t                 id = 0;
+    rcp_ep_can_xl_header_t   xl_hdr;
+    const uint8_t             *out_rx = NULL;
+    size_t                     out_rx_len = 0;
+
+    TEST_ASSERT_EQUAL(RCP_EP_CAN_ERR_SHORT_FRAME,
+        rcp_ep_can_decode_reassembled_frame_response(too_short, sizeof(too_short),
+                                                       RCP_EP_CAN_FRAME_CBFF, &id, &xl_hdr,
+                                                       &out_rx, &out_rx_len));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -750,6 +946,14 @@ int main(void)
     RUN_TEST(test_frame_response_decode_rejects_wrong_bus);
     RUN_TEST(test_frame_response_decode_rejects_short_frame);
     RUN_TEST(test_frame_response_encode_rejects_bad_frame_format);
+
+    RUN_TEST(test_fragment_count_one_when_fits_in_one_fragment);
+    RUN_TEST(test_fragment_count_zero_for_bad_preconditions);
+    RUN_TEST(test_fragment_worst_case_can_xl_response_round_trip);
+    RUN_TEST(test_fragment_response_unfragmented_matches_single_frame_path);
+    RUN_TEST(test_fragment_encode_rejects_bad_preconditions);
+    RUN_TEST(test_fragment_decode_fragment_rejects_wrong_bus);
+    RUN_TEST(test_reassembled_decode_rejects_short_frame);
 
     return UNITY_END();
 }
