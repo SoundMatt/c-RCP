@@ -6527,6 +6527,182 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-001",
+      "title": "rcp_ep_can_frame_format_valid() accepts exactly the six defined evt[2:0] values",
+      "text": "rcp_ep_can_frame_format_valid() shall return true for v in 0..5 and false for any value above 5.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-002",
+      "title": "rcp_ep_can_frame_format_is_xl() identifies the two CAN XL variants",
+      "text": "rcp_ep_can_frame_format_is_xl() shall return true for RCP_EP_CAN_FRAME_XL_CLASSICAL_PL and RCP_EP_CAN_FRAME_XL_NEW_PL, and false for every other value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-003",
+      "title": "rcp_ep_can_frame_format_id_width() reports the correct arbitration-id width per format",
+      "text": "rcp_ep_can_frame_format_id_width() shall return RCP_EP_CAN_ID_WIDTH_EXTENDED_29 for RCP_EP_CAN_FRAME_CEFF and RCP_EP_CAN_FRAME_FEFF, and RCP_EP_CAN_ID_WIDTH_BASE_11 for every other value including an invalid format.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-004",
+      "title": "rcp_ep_can_arbitration_id_valid() bounds an identifier against its format's id width",
+      "text": "rcp_ep_can_arbitration_id_valid() shall return true iff format is rcp_ep_can_frame_format_valid() and id does not exceed 0x7FF (BASE_11 formats) or 0x1FFFFFFF (EXTENDED_29 formats), and false for an invalid format regardless of id.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-005",
+      "title": "rcp_ep_can_frame_format_max_data_len() reports each frame kind's own data ceiling",
+      "text": "rcp_ep_can_frame_format_max_data_len() shall return 8 for CBFF/CEFF, 64 for FBFF/FEFF, RCP_EP_CAN_XL_MAX_DATA_LEN (2048) for both CAN XL variants, and 0 for an invalid format.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-006",
+      "title": "rcp_ep_can_xl_filter_index_valid() accepts exactly the defined filter-table indices",
+      "text": "rcp_ep_can_xl_filter_index_valid() shall return true for index in 0..RCP_EP_CAN_XL_MAX_FILTERS-1 and false for index >= RCP_EP_CAN_XL_MAX_FILTERS.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-007",
+      "title": "rcp_ep_can_functional_cfg_init() zero-initializes every functional-config field",
+      "text": "rcp_ep_can_functional_cfg_init() shall zero cfg->common's flags, every bit-timing register set, delay_comp_enable/_offset, exec_delay_clk_divider, and every xl_filters[] entry.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-008",
+      "title": "rcp_ep_can_functional_cfg_writable() reuses server.h's field-writability authorization",
+      "text": "rcp_ep_can_functional_cfg_writable() shall return exactly rcp_server_field_writable(state, RCP_SERVER_FIELD_FUNCTIONAL_W, writer).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-009",
+      "title": "rcp_ep_can_set_arbitration_timing() is gated by functional-config authorization",
+      "text": "rcp_ep_can_set_arbitration_timing() shall apply timing to cfg->arbitration_timing and return true iff rcp_ep_can_functional_cfg_writable() authorizes the write for state/writer, leaving cfg unchanged and returning false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-010",
+      "title": "rcp_ep_can_set_fd_data_timing() is gated by functional-config authorization",
+      "text": "rcp_ep_can_set_fd_data_timing() shall apply timing to cfg->fd_data_timing and return true iff rcp_ep_can_functional_cfg_writable() authorizes the write for state/writer, leaving cfg unchanged and returning false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-011",
+      "title": "rcp_ep_can_set_xl_data_timing() is gated by functional-config authorization",
+      "text": "rcp_ep_can_set_xl_data_timing() shall apply timing to cfg->xl_data_timing and return true iff rcp_ep_can_functional_cfg_writable() authorizes the write for state/writer, leaving cfg unchanged and returning false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-012",
+      "title": "rcp_ep_can_set_delay_compensation() is gated by functional-config authorization",
+      "text": "rcp_ep_can_set_delay_compensation() shall apply enable/offset to cfg->delay_comp_enable/cfg->delay_comp_offset and return true iff rcp_ep_can_functional_cfg_writable() authorizes the write for state/writer, leaving cfg unchanged and returning false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-013",
+      "title": "rcp_ep_can_set_exec_delay_clk_divider() is gated by functional-config authorization",
+      "text": "rcp_ep_can_set_exec_delay_clk_divider() shall apply divider to cfg->exec_delay_clk_divider and return true iff rcp_ep_can_functional_cfg_writable() authorizes the write for state/writer, leaving cfg unchanged and returning false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-014",
+      "title": "rcp_ep_can_set_xl_filter() validates the filter index and functional-config authorization",
+      "text": "rcp_ep_can_set_xl_filter() shall apply filter to cfg->xl_filters[index] and return true iff index is rcp_ep_can_xl_filter_index_valid() and rcp_ep_can_functional_cfg_writable() authorizes the write for state/writer, leaving cfg unchanged and returning false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-015",
+      "title": "rcp_ep_can_strerror() returns a non-null, distinct message for every error code",
+      "text": "rcp_ep_can_strerror() shall return a non-null, non-empty string for every rcp_ep_can_errc_t value, distinct across all defined values, and a non-null string for an undefined value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-016",
+      "title": "rcp_ep_can_encode_frame_request() enforces frame-format, id, length, and xl_header preconditions",
+      "text": "rcp_ep_can_encode_frame_request() shall return a zeroed rcp_bytes_t if frame_format is not rcp_ep_can_frame_format_valid(), arbitration_id is not rcp_ep_can_arbitration_id_valid() for frame_format, tx_len exceeds rcp_ep_can_frame_format_max_data_len(frame_format), or xl_header's presence does not match rcp_ep_can_frame_format_is_xl(frame_format); otherwise it shall encode an ACF_ABB request carrying frame_format in evt[2:0] and this module's own arbitration-id/xl-header/data prefix layout.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-017",
+      "title": "rcp_ep_can_decode_frame_request() rejects a malformed, misaddressed, or malformed-selector frame",
+      "text": "rcp_ep_can_decode_frame_request() shall return RCP_EP_CAN_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header, its declared payload length, or this module's own frame_format-dependent prefix length; RCP_EP_CAN_ERR_BAD_MSG_TYPE if b is not an ACF_ABB message; RCP_EP_CAN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id; RCP_EP_CAN_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE; and RCP_EP_CAN_ERR_BAD_FRAME_FORMAT when evt[2:0] is not rcp_ep_can_frame_format_valid().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-018",
+      "title": "rcp_ep_can_decode_frame_request() round-trips a well-formed frame's fields",
+      "text": "rcp_ep_can_decode_frame_request() shall, given a frame produced by rcp_ep_can_encode_frame_request(), return RCP_EP_CAN_OK and recover frame_format, arbitration_id, xl_header (iff frame_format is a CAN XL variant), the tx data bytes, and transaction_num unchanged.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-019",
+      "title": "rcp_ep_can_encode_frame_response() enforces the same preconditions as the request encoder and supports timed/untimed encoding",
+      "text": "rcp_ep_can_encode_frame_response() shall apply the same frame-format/id/length/xl_header preconditions as rcp_ep_can_encode_frame_request() (substituting rx_data/rx_len), encoding as ACF_ABB when timed is false and as ACF_GBB with message_timestamp set to timestamp when timed is true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-020",
+      "title": "rcp_ep_can_decode_frame_response() rejects a malformed, misaddressed, or malformed-selector frame across both ACF_ABB and ACF_GBB",
+      "text": "rcp_ep_can_decode_frame_response() shall return RCP_EP_CAN_ERR_SHORT_FRAME for a frame too short for the applicable fixed header, its declared payload length, or this module's own frame_format-dependent prefix length; RCP_EP_CAN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id; and RCP_EP_CAN_ERR_BAD_FRAME_FORMAT when evt[2:0] is not rcp_ep_can_frame_format_valid(), regardless of whether the message is ACF_ABB or ACF_GBB.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-021",
+      "title": "rcp_ep_can_decode_frame_response() reports timed/untimed status and timestamp correctly",
+      "text": "rcp_ep_can_decode_frame_response() shall, given a frame produced by rcp_ep_can_encode_frame_response() with timed false, report out_timed false and out_timestamp 0; given one produced with timed true, report out_timed true and out_timestamp equal to the original timestamp.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-022",
+      "title": "rcp_ep_can_decode_frame_response() round-trips a well-formed frame's fields",
+      "text": "rcp_ep_can_decode_frame_response() shall, given a frame produced by rcp_ep_can_encode_frame_response(), return RCP_EP_CAN_OK and recover frame_format, arbitration_id, xl_header (iff frame_format is a CAN XL variant), the rx data bytes, and transaction_num unchanged.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     }
   ]
 }

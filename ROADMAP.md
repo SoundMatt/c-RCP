@@ -3169,7 +3169,7 @@ round trips) passes, alongside the full existing `ctest` suite (61/61).
 `cfusa trace --req-coverage 100` (both metrics) stay green, and
 `relay conform --strict` passes against the rebuilt CLI.
 
-### 72. CAN controller endpoint, incl. CAN XL (v0.72.0)
+### 72. CAN controller endpoint, incl. CAN XL (v0.72.0) ✅
 
 - `include/rcp/ep_can.h` + `src/ep_can.c`: FrameFormat-selected Classical
   (CBFF/CEFF), FD (FBFF/FEFF), and XL (classical/new physical layer)
@@ -3190,6 +3190,69 @@ round trips) passes, alongside the full existing `ctest` suite (61/61).
   distinct things sharing one underlying bus technology — cross-referenced
   in each module's header comment to prevent the three-way duplication
   flagged in the Satellite Disposition table.
+
+**Done (v0.72.0)**: `include/rcp/ep_can.h` + `src/ep_can.c` land as new,
+additive protocol-core surface, following the same layering discipline
+every endpoint type since milestone 64 established (nothing in `rcp.h`,
+`wire.c`, `avtp.h`/`avtp.c`, `acf.h`/`acf.c`, `server.h`/`server.c`,
+`regmap.h`/`regmap.c`, `discovery.h`/`discovery.c`, or any prior `ep_*`
+module is touched). `rcp_ep_can_frame_format_t` selects among the six
+FrameFormat variants the bullet above names (CBFF/CEFF, FBFF/FEFF,
+XL_CLASSICAL_PL/XL_NEW_PL) via `evt[2:0]`, the same selector-via-evt
+convention `ep_spi.h`'s channel selector already established, rejecting
+the two undefined 3-bit codes with the new `RCP_EP_CAN_ERR_BAD_FRAME_FORMAT`
+on decode (mirroring `ep_spi.h`'s own `BAD_CHANNEL`). Only data frames are
+modeled — there is no remote-frame encode/decode path anywhere in this
+module. `rcp_ep_can_xl_header_t` (sdt/vcid/af) carries CAN XL's extra
+header content as this module's own 6-byte wire prefix (RRS is
+deliberately not a separately-encoded field — its value is implied by
+the frame-format selection itself; see `ep_can.h`'s own file header for
+why). That file header also spells out, with actual numbers, why CAN
+XL's worst-case frame is "the concrete driver for Phase 20's
+fragmentation go-decision" the bullet above names: this module's own
+worst-case encoded length (`RCP_EP_CAN_XL_MAX_ENCODED_LEN`, 2058 bytes)
+exceeds `RCP_AVTP_NTSCF_MAX_PAYLOAD` (2047, `avtp.h`) — and NTSCF is the
+only AVTPDU format an RC Server itself ever sends — so a worst-case CAN
+XL response is explicitly single-AVTPDU/TSCF-only scope until Phase 20
+lands, the same deliberate scope narrowing `ep_uart.h`'s own RX short-read
+handling already carries forward from milestone 66.
+Per extraction §5.11, `rcp_ep_can_functional_cfg_t` composes three
+independent `rcp_ep_can_bit_timing_t` register sets (arbitration/FD-data/
+XL-data), a delay-compensation control, a CAN-XL acceptance/ID filter
+table (`rcp_ep_can_xl_filter_t`, `RCP_EP_CAN_XL_MAX_FILTERS` deep — this
+module's own chosen depth, not a spec-derived number), and
+`exec_delay_clk_divider`, this endpoint's own base-clock/divider register
+scoped only to execution-delay timing, explicitly distinct from the three
+bit-timing register sets. Every setter is gated by
+`rcp_ep_can_functional_cfg_writable()`, a thin wrapper over `server.h`'s
+`rcp_server_field_writable()`, reusing rather than duplicating that
+authorization logic, matching every prior endpoint type's own setters.
+Per extraction §7, this module defines **no** trigger-signal enumeration
+at all — a documented reflection of a gap in the specification itself,
+not an oversight, spelled out in `ep_can.h`'s file header and contrasted
+explicitly against `ep_lin.h`'s TX_DONE trigger and `ep_gpio.h`'s per-pin
+trigger table.
+`ep_can.h`'s file header also carries forward the Phase 13 terminology
+note: this native CAN endpoint, CAN(FD/XL)-as-RCP's-own-transport
+(`avtp.h`, milestone 59 — cited there, not re-implemented here), and the
+untouched `canbr.c` bridge stub to an *external* CAN segment (disposition
+ADAPT/narrowed-role, Satellite Rework v0.81.0) are drawn out as three
+distinct things sharing one bus technology, closing the loop the
+Satellite Disposition table calls for without editing `avtp.h`/`canbr.h`
+themselves (out of this milestone's layering-discipline scope).
+**Requirement-id naming note**: the pre-replacement `canbr.c` stub already
+owns the `REQ-CAN-*` id prefix in `.fusa-reqs.json`, so this module's own
+22 new requirements are tagged `REQ-CANEP-001`..`022` ("CAN endpoint")
+instead — the same collision-avoidance naming seam `ep_lin.h` established
+for `REQ-LINEP-*` at v0.71.0.
+`tests/test_ep_can.c` (41 cases covering frame-format/id-width/data-length
+helpers, functional-config authorization across all three bit-timing sets
+plus delay-compensation/exec-delay-divider/XL-filter setters, and
+command-request/response round trips for both Classical and CAN XL
+frames) passes, alongside the full existing `ctest` suite (62/62,
+ASan/UBSan-clean). `cfusa check`/`lint`/`analyze`/`cyber`/`vuln`/`qualify`
+(0 errors) and `cfusa trace --req-coverage 100` (both metrics) stay
+green, and `relay conform --strict` passes against the rebuilt CLI.
 
 ### 73. ISELED endpoint (v0.73.0)
 
