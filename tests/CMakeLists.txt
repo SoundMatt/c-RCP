@@ -128,6 +128,11 @@ target_link_libraries(test_scheduler PRIVATE rcp::rcp unity)
 target_compile_options(test_scheduler PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_scheduler COMMAND test_scheduler)
 
+add_executable(test_safept test_safept.c)
+target_link_libraries(test_safept PRIVATE rcp::rcp unity)
+target_compile_options(test_safept PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_safept COMMAND test_safept)
+
 add_executable(test_udp test_udp.c)
 target_link_libraries(test_udp PRIVATE rcp::rcp unity)
 target_compile_options(test_udp PRIVATE ${RCP_TEST_WARNING_FLAGS})

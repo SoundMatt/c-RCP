@@ -6135,6 +6135,222 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-001",
+      "title": "rcp_safept_strerror() never returns NULL and gives every error code a distinct message",
+      "text": "rcp_safept_strerror() shall return a non-NULL string for every rcp_safept_errc_t value, including unrecognized ones, with each defined error code mapped to a distinct message.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-002",
+      "title": "rcp_safept_crc32() implements the fixed CRC32 parameter set (poly 0xF4ACFB13, init/xorout 0xFFFFFFFF, refin/refout true)",
+      "text": "rcp_safept_crc32() shall compute a 32-bit CRC using polynomial 0xF4ACFB13, initial value 0xFFFFFFFF, final XOR 0xFFFFFFFF, with both input and output reflection enabled, verified against the published CRC-32/AUTOSAR check value 0x1697D06A over the ASCII bytes \"123456789\".",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-003",
+      "title": "rcp_safept_compute_crc() covers stream_id, avtp_timestamp, and the ACF header-and-payload region, in that order",
+      "text": "rcp_safept_compute_crc() shall return the same value as calling rcp_safept_crc32() over the concatenation of stream_id (8 bytes, big-endian), avtp_timestamp (8 bytes, big-endian), and acf_frame[0..acf_frame_len).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-004",
+      "title": "rcp_safept_length_with_crc() applies the length-accounting pre-adjustment",
+      "text": "rcp_safept_length_with_crc() shall return payload_len + RCP_SAFEPT_CRC_LEN, saturating at SIZE_MAX rather than wrapping when payload_len is within RCP_SAFEPT_CRC_LEN of SIZE_MAX.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-005",
+      "title": "rcp_safept_wrap() appends a big-endian CRC32 trailer computed via rcp_safept_compute_crc()",
+      "text": "rcp_safept_wrap() shall return an owned rcp_bytes_t equal to acf_frame[0..acf_frame_len) followed by RCP_SAFEPT_CRC_LEN big-endian bytes holding rcp_safept_compute_crc(stream_id, avtp_timestamp, acf_frame, acf_frame_len).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-006",
+      "title": "rcp_safept_wrap() fails safe on invalid input or allocation failure",
+      "text": "rcp_safept_wrap() shall return a zeroed rcp_bytes_t (data=NULL, len=0) when acf_frame is NULL while acf_frame_len != 0, or when the internal allocation fails.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-007",
+      "title": "rcp_safept_unwrap() rejects a frame shorter than the CRC32 trailer",
+      "text": "rcp_safept_unwrap() shall return RCP_SAFEPT_ERR_SHORT_FRAME whenever frame_len < RCP_SAFEPT_CRC_LEN.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-008",
+      "title": "rcp_safept_unwrap() reports CRC_ERROR on a mismatched trailer",
+      "text": "rcp_safept_unwrap() shall return RCP_SAFEPT_ERR_CRC_MISMATCH whenever the trailing RCP_SAFEPT_CRC_LEN bytes of frame do not equal rcp_safept_compute_crc(stream_id, avtp_timestamp, frame, frame_len - RCP_SAFEPT_CRC_LEN); a caller receiving this code shall skip executing the request the frame carries.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-009",
+      "title": "rcp_safept_unwrap() round-trips a frame produced by rcp_safept_wrap()",
+      "text": "For a frame produced by rcp_safept_wrap(stream_id, avtp_timestamp, acf_frame, acf_frame_len), rcp_safept_unwrap() called with the same stream_id and avtp_timestamp shall return RCP_SAFEPT_OK with *out_acf_frame/*out_acf_frame_len describing exactly acf_frame[0..acf_frame_len).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-010",
+      "title": "rcp_safept_fragment_carries_crc() implements the fragmentation/CRC interaction rule",
+      "text": "rcp_safept_fragment_carries_crc() shall return is_last_fragment unmodified, modeling that only a multi-segment message's final fragment carries a CRC.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-011",
+      "title": "rcp_safept_is_safety_request() tests request_type's MSB",
+      "text": "rcp_safept_is_safety_request() shall return true iff (request_type & 0x80) != 0, covering RCP_REQUEST_TYPE_COMPOUND_SAFETY (0x8F), RCP_REQUEST_TYPE_COMPOUND_WAIT_SAFETY (0x8B), and RCP_REQUEST_TYPE_TRIGGERED_SAFETY (0x8E).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-012",
+      "title": "rcp_safept_request_may_execute() gates safety-tagged requests on the endpoint's safe-state flag",
+      "text": "rcp_safept_request_may_execute() shall return endpoint_in_safe_state whenever rcp_safept_is_safety_request(request_type) is true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-013",
+      "title": "rcp_safept_request_may_execute() always permits a non-safety-tagged request_type",
+      "text": "rcp_safept_request_may_execute() shall return true whenever rcp_safept_is_safety_request(request_type) is false, regardless of endpoint_in_safe_state.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-014",
+      "title": "rcp_safept_watchdog_purge_should_keep() implements the watchdog-purge-vs-safety-survive rule",
+      "text": "rcp_safept_watchdog_purge_should_keep() shall return rcp_safept_is_safety_request(request_type).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-015",
+      "title": "rcp_safept_watchdog_purge_classify() applies the purge rule across a caller-supplied array",
+      "text": "rcp_safept_watchdog_purge_classify() shall write rcp_safept_watchdog_purge_should_keep(request_types[i]) into out_keep[i] for every i in [0, count).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-016",
+      "title": "rcp_safept_measure_valid() recognizes exactly the two defined rcp_safept_measure_t values",
+      "text": "rcp_safept_measure_valid() shall return true iff rx_safety_measure equals RCP_SAFEPT_MEASURE_FORCE_HIGH_IMPEDANCE or RCP_SAFEPT_MEASURE_SEQUENCER, and false for any other byte value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-017",
+      "title": "rcp_safept_endpoint_in_safe_state() always reports true for the force-high-impedance measure",
+      "text": "rcp_safept_endpoint_in_safe_state() shall return true whenever rx_safety_measure == RCP_SAFEPT_MEASURE_FORCE_HIGH_IMPEDANCE, regardless of table, safestate_sequencer, or safe_sequencer_state.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-018",
+      "title": "rcp_safept_endpoint_in_safe_state() polls the configured sequencer for the sequencer-based measure",
+      "text": "For rx_safety_measure == RCP_SAFEPT_MEASURE_SEQUENCER and a valid safestate_sequencer index into a non-NULL table, rcp_safept_endpoint_in_safe_state() shall return true iff rcp_sequencer_get_state(table, safestate_sequencer, ...) reports a state equal to safe_sequencer_state.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-019",
+      "title": "rcp_safept_endpoint_in_safe_state() fails closed on an unrecognized measure or an invalid sequencer index",
+      "text": "rcp_safept_endpoint_in_safe_state() shall return false when rx_safety_measure is not a value recognized by rcp_safept_measure_valid(), when table is NULL for RCP_SAFEPT_MEASURE_SEQUENCER, or when safestate_sequencer does not address a valid entry in table.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-020",
+      "title": "rcp_safept_crc_error_action() maps rx_enforce_e2e to the correct CRC-error action",
+      "text": "rcp_safept_crc_error_action() shall return RCP_SAFEPT_CRC_ACTION_LATCH_STREAM_FAULT iff rx_enforce_e2e is true, and RCP_SAFEPT_CRC_ACTION_DROP_REQUEST otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-021",
+      "title": "rcp_safept_stream_fault_on_crc_error() always signals skip-this-request and latches under rx_enforce_e2e",
+      "text": "rcp_safept_stream_fault_on_crc_error() shall always return true, and shall additionally set f->faulted to true whenever rcp_safept_crc_error_action(rx_enforce_e2e) == RCP_SAFEPT_CRC_ACTION_LATCH_STREAM_FAULT.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-022",
+      "title": "rcp_safept_stream_fault_on_crc_error() leaves f unchanged for the drop-request action",
+      "text": "rcp_safept_stream_fault_on_crc_error() shall leave f->faulted unmodified whenever rcp_safept_crc_error_action(rx_enforce_e2e) == RCP_SAFEPT_CRC_ACTION_DROP_REQUEST.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-023",
+      "title": "rcp_safept_stream_fault_reset() clears a latched fault",
+      "text": "rcp_safept_stream_fault_reset() shall set f->faulted to false, and rcp_safept_stream_fault_is_faulted() shall report false immediately afterward.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-024",
+      "title": "rcp_safept_wd_evaluate() never reports an overflow while the per-stream watchdog is disabled",
+      "text": "rcp_safept_wd_evaluate() shall set overflowed to false whenever rx_wd_enable is false, regardless of elapsed_since_last_kick_ms or rx_wd_timeout_ms.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-025",
+      "title": "rcp_safept_wd_evaluate() reports an overflow once the elapsed time reaches the configured timeout",
+      "text": "rcp_safept_wd_evaluate() shall set overflowed to true iff rx_wd_enable is true and elapsed_since_last_kick_ms >= rx_wd_timeout_ms.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-026",
+      "title": "rcp_safept_wd_evaluate() gates enter_safe_state on rx_wd_safestate_enable",
+      "text": "rcp_safept_wd_evaluate() shall set enter_safe_state to (overflowed && rx_wd_safestate_enable).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SAFEPT-027",
+      "title": "rcp_safept_wd_evaluate() gates notify on rx_wd_info_enable independently of enter_safe_state",
+      "text": "rcp_safept_wd_evaluate() shall set notify to (overflowed && rx_wd_info_enable), independent of the value computed for enter_safe_state.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     }
   ]
 }

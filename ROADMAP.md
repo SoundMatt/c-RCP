@@ -2991,7 +2991,7 @@ safety-critical gap area" (extraction §6 item 4) — this is the direct,
 explicit replacement for `e2e.c`'s ad-hoc CRC-16 mechanism named in this
 program's own charter.
 
-### 70. Safe points: CRC32 + safety-request variants (v0.70.0)
+### 70. Safe points: CRC32 + safety-request variants (v0.70.0) ✅
 
 - `include/rcp/safept.h` + `src/safept.c`: the exact CRC32 parameter set
   — polynomial `0xF4ACFB13`, width 32, init `0xFFFFFFFF`, final XOR
@@ -3019,6 +3019,82 @@ program's own charter.
   20**: only the last fragment of a multi-segment message carries a CRC
   (computed across the combined payload); the length-accounting
   adjustment applies only to that final segment.
+
+**Done (v0.70.0)**: `include/rcp/safept.h` + `src/safept.c` land as new,
+additive protocol-core surface, following every request-kind module's own
+"own small pure helpers, don't reach into sibling modules" layering
+discipline (the only dependency taken on is `sequencer.h`, milestone 68's
+already-established shared primitive — the same one `compound.h`/
+`triggered.h` both depend on directly). Nothing in `rcp.h`, `wire.c`,
+`avtp.h`/`avtp.c`, `acf.h`/`acf.c`, `server.h`/`server.c`, or any `ep_*`
+endpoint module is touched.
+`rcp_safept_crc32()` implements the exact parameter set the roadmap calls
+for via a reflected bit-at-a-time update (mirroring `e2e.c`'s own
+`crc16_update()` structural precedent, not its CRC-16 table), verified
+against the published CRC-32/AUTOSAR check value `0x1697D06A` over
+`"123456789"` — an independent reference vector this parameter set
+happens to coincide with. `rcp_safept_compute_crc()` is the coverage-span
+wrapper (`stream_id` + `avtp_timestamp` + ACF header-and-payload, in
+that order, with no intermediate allocation), `rcp_safept_length_with_crc()`
+is the +1-quadlet/+4-octet length-accounting pre-adjustment, and
+`rcp_safept_wrap()`/`rcp_safept_unwrap()` are the actual trailer
+append/validate pair (`RCP_SAFEPT_ERR_CRC_MISMATCH` is this module's own
+spelling of `CRC_ERROR`, with `*out_acf_frame` borrowed rather than
+copied, matching `acf.c`'s own decode convention).
+**Deviation from the bullet's "replacing `e2e.c`'s CRC-16/CCITT-FALSE
+entirely, not alongside it" framing**: per this milestone's own explicit
+scope (and mirroring milestone 69's identical `scheduler.c`/`prioqueue.c`
+precedent), `safept.c` lands as `e2e.c`'s replacement in the sense that
+matters now — new code adopts `safept.h`, not `e2e.h` — but `e2e.c`
+itself stays REPLACE-dispositioned and physically in the tree, untouched,
+pending its own scheduled removal at v0.79.0's satellite rework; this
+milestone does not delete or modify `e2e.h`/`e2e.c`.
+Safety-request MSB-tagged variants (`0x8F`/`0x8B`/`0x8E`) already existed
+as round-tripped `compound.h`/`triggered.h` opcode constants since
+milestones 68/69, both of which explicitly deferred gating their
+execution to this milestone; `rcp_safept_is_safety_request()` (this
+module's own MSB test) and `rcp_safept_request_may_execute()` are that
+gate. The watchdog-purge-vs-safety-survive rule is
+`rcp_safept_watchdog_purge_should_keep()`/`rcp_safept_watchdog_purge_classify()`
+(operating on caller-owned `request_type` arrays, the same pattern
+`scheduler.c`'s own `rcp_sched_compare()` established, rather than
+reaching into `server.h`'s still request-kind-unaware
+`rcp_server_endpoint_t` queue) plus `rcp_safept_wd_evaluate()`, which
+ties `regmap.h`'s whole `rx_wd_*` family together into one pure
+overflow/enter-safe-state/notify evaluation.
+`regmap.h`'s `rcp_regmap_request_stream_cfg_t` is extended (not replaced)
+with the fuller field set this milestone's own scope note flagged as
+missing — `rx_wd_enable`, `rx_wd_safestate_enable`, `rx_wd_info_enable`,
+`rx_safestate_sequencer`, `rx_safe_sequencer_state` — alongside the four
+fields milestone 62 had already reserved (`rx_wd_timeout_ms`,
+`rx_wd_action`, `rx_enforce_e2e`, `rx_safety_measure`), all now wired to
+real behavior via `safept.h`'s own functions rather than the struct
+itself growing behavior of its own.
+`rcp_safept_endpoint_in_safe_state()` reads `rx_safety_measure` against a
+live `sequencer.h` table (always true for
+`RCP_SAFEPT_MEASURE_FORCE_HIGH_IMPEDANCE`; polls
+`rx_safestate_sequencer`/`rx_safe_sequencer_state` for
+`RCP_SAFEPT_MEASURE_SEQUENCER`) and fails *closed* — false, not true — on
+an unrecognized measure byte or an invalid sequencer index, an explicit
+engineering choice by this implementation documented in `safept.h`'s own
+file header, not a value taken from the specification.
+`rcp_safept_crc_error_action()` plus the caller-owned
+`rcp_safept_stream_fault_t` latch (mirroring `e2e.h`'s own
+`rcp_e2e_replay_guard_t` precedent for a small stateful helper type) wire
+`rx_enforce_e2e`'s single-request-drop-vs-whole-stream-latch-to-fault
+rule. `rcp_safept_fragment_carries_crc()` is the fragmentation/CRC
+interaction rule modeled now (literally `is_last_fragment`, ready for
+Phase 20 to call once real `segment_num`-driven reassembly exists) but
+not otherwise activated.
+`tests/test_safept.c` (35 cases, including a known-answer CRC32 vector
+and an explicit end-to-end "watchdog overflow drives the full purge/
+survive/safe-state-gate flow" scenario, verified ASan/UBSan-clean) and
+`tests/test_regmap.c`'s existing zero-init test extended for the new
+fields, plus 27 new requirements (`REQ-SAFEPT-001`..`027`) added to
+`.fusa-reqs.json`; `cfusa trace --req-coverage 100` (both metrics) and
+`cfusa check`/`lint`/`analyze`/`cyber`/`vuln`/`qualify` (0 errors) stay
+green, and the full `ctest` suite and `relay conform --strict` both stay
+green.
 
 ---
 ### Phase 19 — Remaining Endpoint Types
