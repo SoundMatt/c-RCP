@@ -3231,6 +3231,126 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ACF-001",
+      "title": "rcp_acf_strerror() returns a unique human-readable message",
+      "text": "rcp_acf_strerror() shall return a unique, non-empty message for each defined rcp_acf_errc_t constant, including RCP_ACF_OK.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-ACF-002",
+      "title": "Response classification selects among Acknowledge/Write/Read/Error",
+      "text": "rcp_acf_classify_response() shall return RCP_ACF_RESP_ERROR whenever hdr->err is set regardless of hdr->op, and otherwise shall return RCP_ACF_RESP_WRITE for RCP_ACF_OP_WRITE, RCP_ACF_RESP_READ for RCP_ACF_OP_READ, and RCP_ACF_RESP_ACKNOWLEDGE for RCP_ACF_OP_NONE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ACF-003",
+      "title": "Acknowledge-with-event identification",
+      "text": "rcp_acf_hdr_ack_has_event() shall return true if and only if hdr classifies as RCP_ACF_RESP_ACKNOWLEDGE (per rcp_acf_classify_response()) and hdr->evt is nonzero.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ACF-004",
+      "title": "Encoders write the correct acf_msg_type regardless of the caller-supplied header",
+      "text": "rcp_acf_encode_abb() shall write RCP_ACF_MSG_TYPE_ABB and rcp_acf_encode_gbb() shall write RCP_ACF_MSG_TYPE_GBB at offset 0 of the encoded message, independent of any acf_msg_type value the caller's header struct happens to carry.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ACF-005",
+      "title": "Decoders reject a frame shorter than the fixed header",
+      "text": "rcp_acf_decode_abb() shall return RCP_ACF_ERR_SHORT_FRAME if given fewer than RCP_ACF_ABB_HEADER_LEN bytes, and rcp_acf_decode_gbb() shall return RCP_ACF_ERR_SHORT_FRAME if given fewer than RCP_ACF_GBB_HEADER_LEN bytes.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ACF-006",
+      "title": "acf_msg_length is recomputed from the actual payload length on encode",
+      "text": "rcp_acf_encode_abb() and rcp_acf_encode_gbb() shall derive the encoded acf_msg_length field from payload_len, ignoring any acf_msg_length value present in the caller-supplied header.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ACF-007",
+      "title": "ACF_ABB decode rejects a mismatched acf_msg_type",
+      "text": "rcp_acf_decode_abb() shall return RCP_ACF_ERR_BAD_MSG_TYPE if byte 0 of the input is not RCP_ACF_MSG_TYPE_ABB, including when it is RCP_ACF_MSG_TYPE_GBB.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ACF-008",
+      "title": "ACF_GBB decode rejects a mismatched acf_msg_type",
+      "text": "rcp_acf_decode_gbb() shall return RCP_ACF_ERR_BAD_MSG_TYPE if byte 0 of the input is not RCP_ACF_MSG_TYPE_GBB, including when it is RCP_ACF_MSG_TYPE_ABB.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ACF-009",
+      "title": "Decoders reject a declared payload length exceeding the supplied buffer",
+      "text": "rcp_acf_decode_abb() and rcp_acf_decode_gbb() shall return RCP_ACF_ERR_SHORT_FRAME whenever the header's declared acf_msg_length describes a payload extending past the end of the supplied buffer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ACF-010",
+      "title": "byte_message_info header round-trip",
+      "text": "rcp_acf_decode_abb() applied to the output of rcp_acf_encode_abb(), and rcp_acf_decode_gbb() applied to the output of rcp_acf_encode_gbb(), shall each recover the original byte_bus_id, evt, op, transaction_num, and payload bytes unchanged, and rcp_acf_decode_gbb() shall additionally recover the original message_timestamp unchanged whenever mtv indicates a valid timestamp.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ACF-011",
+      "title": "ACF_GBB encode zeroes the timestamp region for an untimed message",
+      "text": "rcp_acf_encode_gbb() shall write an all-zero message_timestamp region whenever hdr->info.mtv equals RCP_ACF_MTV_UNTIMED, regardless of the value held in hdr->message_timestamp.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ACF-012",
+      "title": "Timestamp-validity folding rule",
+      "text": "rcp_acf_gbb_is_timed() shall return true only when info.mtv equals RCP_ACF_MTV_VALID; it shall return false for both RCP_ACF_MTV_UNTIMED and RCP_ACF_MTV_UNCERTAIN, folding the uncertain ('tu') state into the same not-confidently-timed treatment as untimed.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ACF-013",
+      "title": "rcp_acf_peek_msg_type() reads the acf_msg_type byte without a full header decode",
+      "text": "rcp_acf_peek_msg_type() shall report the ACF message's acf_msg_type byte (offset 0) from a buffer as short as 1 byte, and shall return RCP_ACF_ERR_SHORT_FRAME for a zero-length buffer.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-ACF-014",
+      "title": "Encoded ACF_ABB/ACF_GBB message length matches header length plus payload",
+      "text": "rcp_acf_encode_abb() shall produce a frame of exactly RCP_ACF_ABB_HEADER_LEN + payload_len bytes, and rcp_acf_encode_gbb() shall produce a frame of exactly RCP_ACF_GBB_HEADER_LEN + payload_len bytes, with RCP_ACF_GBB_HEADER_LEN equal to RCP_ACF_ABB_HEADER_LEN plus the 8-byte message_timestamp field.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ACF-015",
+      "title": "byte_message_info round-trips its remaining flag and count fields unchanged",
+      "text": "rcp_acf_decode_abb() and rcp_acf_decode_gbb() shall recover the original pad, hs, cs, rsp, err, ms, and read_size_or_segment_num field values unchanged from what rcp_acf_encode_abb()/rcp_acf_encode_gbb() encoded.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     }
   ]
 }

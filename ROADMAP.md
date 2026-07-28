@@ -2130,7 +2130,7 @@ cutover milestone.
   `cfusa trace --req-coverage 100` and the full `ctest` suite both stay
   green.
 
-### 60. ACF message format + byte_message_info header (v0.60.0)
+### 60. ACF message format + byte_message_info header (v0.60.0) ✅
 
 - `include/rcp/acf.h` + `src/acf.c`: ACF_ABB (`acf_msg_type = 0x0E`, no
   timestamp field at all) and ACF_GBB (`0x0D`, 64-bit `message_timestamp`)
@@ -2152,6 +2152,51 @@ cutover milestone.
   later phases (17, 20) rather than smuggled in here.
 - `tests/test_acf.c`: header round-trip, ABB/GBB length differences,
   all four response-type identification rules, timestamp-folding cases.
+
+**Done (v0.60.0)**: `include/rcp/acf.h` + `src/acf.c` land as new,
+additive protocol-core surface layered on top of milestone 59's AVTPDU
+framing — an ACF message is exactly what an NTSCF/TSCF frame's payload
+carries. Nothing in `rcp.h`, `wire.c`, `avtp.h`/`avtp.c`, or any
+satellite package is touched.
+- `byte_message_info`'s on-wire byte layout (which byte/bit each field
+  occupies) is this implementation's own original engineering design —
+  the confidential OPEN Alliance TC18 spec text is never reproduced here,
+  only the field names, their high-level semantics, and the two
+  `acf_msg_type` values are taken by reference. `pad`/`hs`/`cs`/`rsp`/`ms`
+  round-trip unmodified (their real behavior belongs to conditional
+  requests/sequencers and compound bundles, both out of this milestone's
+  scope), mirroring the treatment `avtp.c`'s TSCF codec already gives its
+  own `mr` field.
+- `mtv` is modeled as a 3-state field (`RCP_ACF_MTV_UNTIMED` /
+  `_VALID` / `_UNCERTAIN`) rather than two separate bits, specifically so
+  the "untimed" and "uncertain (`tu`)" states naturally fold into the same
+  `rcp_acf_gbb_is_timed() == false` treatment through one comparison
+  rather than two ORed conditions. `rcp_acf_encode_gbb()` additionally
+  forces the wire's `message_timestamp` region to all-zero whenever
+  `mtv == RCP_ACF_MTV_UNTIMED`, regardless of what the caller's struct
+  holds — the on-wire half of the "zeroed region" rule.
+- `rcp_acf_classify_response()`: `err` takes priority (any `err`-set
+  message is `RCP_ACF_RESP_ERROR` regardless of `op`), otherwise `op`
+  selects `RCP_ACF_RESP_WRITE` / `RCP_ACF_RESP_READ` /
+  `RCP_ACF_RESP_ACKNOWLEDGE`. `rcp_acf_hdr_ack_has_event()` further
+  distinguishes a plain Acknowledge from one tagged with an asynchronous
+  event via a nonzero `evt` nibble.
+- `read_size`/`segment_num` deliberately share one on-wire byte
+  (`read_size_or_segment_num`): which interpretation applies is a
+  function of `op`, and fragmentation's own use of a segment counter is
+  left unimplemented rather than smuggled into this milestone, per its
+  own explicit scope limit above.
+- `tests/test_acf.c` (29 cases): `byte_message_info` header round-trip
+  for both ABB and GBB (including every flag/count field, not just the
+  ones with behavior), the exact 8-byte length difference between the
+  two variants, all four response-type identification rules (including
+  the ack-has-event sub-rule), and the timestamp-folding cases —
+  `mtv=UNTIMED` forcing a zeroed wire region, and `mtv=UNCERTAIN`
+  (`tu`) folding to "not timed" while still preserving its wire value.
+- 15 new requirements (`REQ-ACF-001`..`015`) added to `.fusa-reqs.json`;
+  `cfusa trace --req-coverage 100` (both metrics), `cfusa check`/`lint`/
+  `analyze`/`cyber` (0 errors), the full `ctest` suite (43/43), and
+  `relay conform --strict` all stay green.
 
 ---
 ### Phase 14 — RC Server Lifecycle & Register Map
