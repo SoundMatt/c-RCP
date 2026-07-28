@@ -5,6 +5,7 @@
 
 #include "relay/relay.h"
 #include "rcp/rcp.h"
+#include "rcp/regmap.h"
 #include "rcp/version.h"
 
 /* runtime_string returns the compiler id + major version (§12.1 "runtime"). */
@@ -61,10 +62,75 @@ static void version_text(char *buf, size_t buf_len)
  * rcp_adapt() (v0.46.0) is a real, working Adapt() implementation.
  * "protocol"/"protocol_int" mirror version_json()'s values -- §12.2's
  * worked example includes them for single-protocol tools like this one.
+ *
+ * "features" (ROADMAP.md milestone 77, "Foundational test/config
+ * satellites"): before this milestone this listed a legacy-satellite-
+ * flavored ["loaning"] entry. It now instead names, one per group this
+ * build actually implements, regmap.h's own svr_implemented_options
+ * feature-bundle groups (RCP_REGMAP_OPT_* -- "three all-or-nothing feature
+ * groups", src/regmap.c since v0.62.0): time_sync (TSCF framing plus its
+ * presentation-timestamp companion), enhanced_cancel (a cancellation
+ * request plus its acknowledgement, request_cancel.h), compound_bundles
+ * (a bundle header plus per-segment addressing, request_compound.h). This
+ * is a static, build-time answer -- this generic CLI tool never connects
+ * to a live RC Server (see status_json()'s own "connected":false), so
+ * there is no live svr_implemented_options value to report instead of the
+ * library's own implemented feature set. RCP_CLI_ALL_IMPLEMENTED_OPTIONS
+ * sets every bit in all three groups together, so it is always
+ * rcp_regmap_options_group_consistent() by construction.
  */
+#define RCP_CLI_ALL_IMPLEMENTED_OPTIONS                                        \
+    (RCP_REGMAP_OPT_TIME_SYNC_TSCF | RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION |    \
+     RCP_REGMAP_OPT_ENH_CANCEL_REQUEST | RCP_REGMAP_OPT_ENH_CANCEL_ACK |        \
+     RCP_REGMAP_OPT_COMPOUND_HEADER | RCP_REGMAP_OPT_COMPOUND_SEGMENT)
+
+/* Renders options' implemented feature-bundle groups as a JSON array of
+ * strings into buf (e.g. "[\"time_sync\",\"enhanced_cancel\"]"). A group is
+ * listed iff every bit belonging to it is set in options; per
+ * rcp_regmap_options_group_consistent()'s own all-or-nothing invariant, a
+ * caller-supplied options value would never set only some of a group's
+ * bits, but this function checks the full group mask regardless, rather
+ * than trusting that invariant silently. */
+static void features_json(uint32_t options, char *buf, size_t buf_len)
+{
+    typedef struct {
+        const char *name;
+        uint32_t    group;
+    } feature_group_t;
+    static const feature_group_t GROUPS[] = {
+        {"time_sync",        RCP_REGMAP_OPT_TIME_SYNC_TSCF | RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION},
+        {"enhanced_cancel",  RCP_REGMAP_OPT_ENH_CANCEL_REQUEST | RCP_REGMAP_OPT_ENH_CANCEL_ACK},
+        {"compound_bundles", RCP_REGMAP_OPT_COMPOUND_HEADER | RCP_REGMAP_OPT_COMPOUND_SEGMENT},
+    };
+    size_t i;
+    size_t off = 0;
+    bool   first = true;
+    int    n;
+
+    if (buf_len == 0) return;
+
+    n = snprintf(buf + off, buf_len - off, "[");
+    if (n < 0 || (size_t)n >= buf_len - off) return;
+    off += (size_t)n;
+
+    for (i = 0; i < sizeof(GROUPS) / sizeof(GROUPS[0]); i++) {
+        if ((options & GROUPS[i].group) != GROUPS[i].group) continue;
+        n = snprintf(buf + off, buf_len - off, "%s\"%s\"", first ? "" : ",", GROUPS[i].name);
+        if (n < 0 || (size_t)n >= buf_len - off) return; /* truncated: leave buf as-is (invalid JSON,
+                                                              but never an out-of-bounds write) */
+        off += (size_t)n;
+        first = false;
+    }
+    snprintf(buf + off, buf_len - off, "]");
+}
+
 //cfusa:req REQ-CLI-002
 static void capabilities_json(char *buf, size_t buf_len)
 {
+    char features[128];
+
+    features_json((uint32_t)RCP_CLI_ALL_IMPLEMENTED_OPTIONS, features, sizeof(features));
+
     snprintf(buf, buf_len,
         "{"
         "\"kind\":\"capabilities\","
@@ -75,12 +141,12 @@ static void capabilities_json(char *buf, size_t buf_len)
         "\"spec_version\":\"%s\","
         "\"commands\":[\"version\",\"capabilities\",\"status\"],"
         "\"transports\":[\"mock\",\"udp\",\"shmem\",\"tls\",\"tsn\"],"
-        "\"features\":[\"loaning\"],"
+        "\"features\":%s,"
         "\"interfaces\":[\"Node\",\"Caller\"],"
         "\"optional_interfaces\":[],"
         "\"adapt\":true"
         "}",
-        (int)RELAY_PROTOCOL_RCP, RCP_VERSION, RELAY_SPEC_VERSION);
+        (int)RELAY_PROTOCOL_RCP, RCP_VERSION, RELAY_SPEC_VERSION, features);
 }
 
 /* ── §12.3 status document ────────────────────────────────────────────────── */

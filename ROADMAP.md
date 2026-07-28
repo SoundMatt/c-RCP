@@ -3643,7 +3643,7 @@ against. Grouped into batches the same way the legacy program's own
 same reason: each batch is independently shippable and CI-green on its
 own, rather than one enormous PR.
 
-### 77. Foundational test/config satellites (v0.77.0)
+### 77. Foundational test/config satellites (v0.77.0) ✅
 
 - **REPLACE** `mock.c`: in-process RC-Server/endpoint test double
   replacing the old zone-controller mock, built against the Phase 14
@@ -3654,6 +3654,78 @@ own, rather than one enormous PR.
 - **ADAPT** `cli.c`: `capabilities`'s payload content moves from the old
   `RCP_CMD_*` enum to the new `svr_implemented_options` feature-bundle
   flags; `version`/`status` structurally unaffected.
+
+**Legacy-double relocation note**: `mock.c`'s replacement drops the
+`rcp_controller_t`/`rcp_registry_t` vtable pair entirely, but 18 not-yet-
+migrated legacy satellites' own unit tests (`authz`, `ratelimit`, `loan`,
+`observe`, `faultinject`, `admin`, `recorder`, `deadline`, `watchdog`,
+`powerstate`, `tsn`, `proxy`, `redundancy`, `federation`, `zonegroup`,
+`prioqueue`, `firmware`, `adapt`, plus `bench_mock`/`command_latency_test`)
+still build fixtures against exactly that legacy double — those satellites
+are Satellite Rework's own later batches (v0.79.0-v0.84.0), out of this
+milestone's scope. Rather than block this REPLACE on migrating 18 unrelated
+modules early, the old `include/rcp/mock.h`/`src/mock.c` content moved
+verbatim (same struct layout, same function/type names, same
+`REQ-CTRL-*`/`REQ-REG-*`/`REQ-RESP-*`/`REQ-STAT-*`/`REQ-ERR-011` coverage)
+to `tests/legacy_mock.h`/`tests/legacy_mock.c` — a test-only translation
+unit, no longer shipped as part of the public `rcp` library, linked
+directly into each of those 18 test binaries (`tests/CMakeLists.txt`).
+`tests/test_mock.c` was renamed to `tests/test_legacy_mock.c` unchanged
+(new `rcp_legacy_mock` ctest entry) and a from-scratch `tests/test_mock.c`
+now tests the new module instead. This keeps the full test suite green on
+its own, per this Phase's own "each batch is independently shippable"
+framing, without pre-empting v0.79.0-v0.84.0's own migration work.
+
+**Done (v0.77.0)**: `include/rcp/mock.h` + `src/mock.c` land as a
+TC18-shaped `rcp_mock_server_t`: an `rcp_lifecycle_state_t`, an
+`rcp_regmap_general_t` (mutable, directly exposed via
+`rcp_mock_server_regmap()`), and a fixed `RCP_MOCK_MAX_ENDPOINTS`-slot
+table pairing `server.h`'s own `rcp_server_endpoint_t` ep_enable/queue with
+a caller-supplied `rcp_mock_endpoint_handler_fn` — this module owns no
+per-endpoint wire semantics itself, never calling into any `ep_*.c`
+directly, matching `lifecycle.h`/`regmap.h`'s own "operate on caller-owned
+data" layering. `rcp_mock_server_dispatch()` runs one already-framed
+request through `lifecycle.h`'s `rcp_lifecycle_should_accept()` first (a
+rejected frame never reaches an endpoint, mirroring a real server), then
+the addressed endpoint's `rcp_server_endpoint_submit()` decides whether its
+handler runs immediately or the request queues; `rcp_mock_server_drain_endpoint()`
+is the queue's other half. New `REQ-MOCK-001`..`018` (18 requirements,
+verified against `.fusa-reqs.json` before picking the prefix — no
+pre-existing `REQ-MOCK-*` group).
+
+`include/rcp/config.h` + `src/config.c` land as a from-scratch manifest
+loader: an optional `server` object (`vendor_id`/`device_id`/`magic`/
+`svr_implemented_options`, the last a named-group array mapped onto
+`regmap.h`'s `RCP_REGMAP_OPT_*` bits) plus `hw_pin_map`/`endpoints`/
+`streams` entry lists, parsed by the same hand-rolled, non-nesting-aware
+JSON scanner style the old `config.c` used (documented as such, including
+the scanner's own known looseness). `rcp_config_apply_to_mock()` sets the
+new `mock.c` double's regmap fields and registers one endpoint per manifest
+entry; `hw_pin_map`/`streams` are parsed data only (regmap.h's own
+`hw_pin_map`/`request_stream_cfg` fields are location/capacity descriptors,
+not per-entry backing storage yet, so there is nothing to apply them into).
+`REQ-CFG-001`..`006` were rewritten in place (new schema, same six-entry
+budget) and `REQ-CFG-007`..`010` added for `parse_json`'s own
+whole-document behavior and the two `apply_to_mock`/`load` entry points.
+
+`src/cli.c`'s `capabilities_json()` now derives its `"features"` array from
+`RCP_REGMAP_OPT_*` group membership (`time_sync`/`enhanced_cancel`/
+`compound_bundles`) instead of the old, legacy-satellite-flavored
+`["loaning"]`; `version_json()`/`status_json()` untouched, per scope.
+`tests/test_mock.c` (24 cases) and `tests/test_config.c` (14 cases) are
+both from-scratch rewrites; the full `ctest` suite (68/68, including the
+new `rcp_legacy_mock` target) passes, verified locally under both a plain
+Debug build and a manual `-fsanitize=address,undefined` build (sequential
+`ctest -j1`; ASan+UBSan-clean — a `-j8` parallel run produced spurious
+"Subprocess aborted" failures that did not reproduce sequentially or when
+each binary was run standalone, an environment artifact of this sandbox,
+not a defect). `cfusa lint`/`analyze`/`cyber`/`vuln`/`qualify`, `cfusa
+trace --req-coverage 100`, and `relay conform --strict` were not re-run
+locally (no local `cfusa`/`relay` toolchain in this environment, the same
+note every prior milestone has made) — `REQ-MOCK-*`/`REQ-CFG-*`
+`//cfusa:req`/`//cfusa:test` tag sets were cross-checked 1:1 by hand before
+pushing. `cfusa check`'s own pre-existing HARA002/HARA003 findings are
+unchanged and not introduced or touched here.
 
 ### 78. Transport satellites (v0.78.0)
 

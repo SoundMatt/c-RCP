@@ -1,858 +1,425 @@
-//cfusa:test REQ-CTRL-001
-//cfusa:test REQ-CTRL-002
-//cfusa:test REQ-CTRL-003
-//cfusa:test REQ-CTRL-004
-//cfusa:test REQ-CTRL-005
-//cfusa:test REQ-CTRL-006
-//cfusa:test REQ-CTRL-007
-//cfusa:test REQ-CTRL-008
-//cfusa:test REQ-CTRL-009
-//cfusa:test REQ-CTRL-010
-//cfusa:test REQ-CTRL-011
-//cfusa:test REQ-CTRL-012
-//cfusa:test REQ-CTRL-013
-//cfusa:test REQ-CTRL-014
-//cfusa:test REQ-CTRL-015
-//cfusa:test REQ-CTRL-016
-//cfusa:test REQ-CTRL-017
-//cfusa:test REQ-CTRL-018
-//cfusa:test REQ-CTRL-019
-//cfusa:test REQ-CTRL-020
-//cfusa:test REQ-CTRL-021
-//cfusa:test REQ-CTRL-022
-//cfusa:test REQ-CTRL-023
-//cfusa:test REQ-CTRL-024
-//cfusa:test REQ-CTRL-025
-//cfusa:test REQ-CTRL-026
-//cfusa:test REQ-CTRL-027
-//cfusa:test REQ-REG-001
-//cfusa:test REQ-REG-002
-//cfusa:test REQ-REG-003
-//cfusa:test REQ-REG-004
-//cfusa:test REQ-REG-005
-//cfusa:test REQ-REG-006
-//cfusa:test REQ-REG-007
-//cfusa:test REQ-REG-008
-//cfusa:test REQ-REG-009
-//cfusa:test REQ-REG-010
-//cfusa:test REQ-REG-011
-//cfusa:test REQ-REG-012
-//cfusa:test REQ-REG-013
-//cfusa:test REQ-RESP-001
-//cfusa:test REQ-RESP-002
-//cfusa:test REQ-STAT-001
-//cfusa:test REQ-STAT-002
-//cfusa:test REQ-STAT-003
-//cfusa:test REQ-STAT-004
-//cfusa:test REQ-ERR-011
+//cfusa:test REQ-MOCK-001
+//cfusa:test REQ-MOCK-002
+//cfusa:test REQ-MOCK-003
+//cfusa:test REQ-MOCK-004
+//cfusa:test REQ-MOCK-005
+//cfusa:test REQ-MOCK-006
+//cfusa:test REQ-MOCK-007
+//cfusa:test REQ-MOCK-008
+//cfusa:test REQ-MOCK-009
+//cfusa:test REQ-MOCK-010
+//cfusa:test REQ-MOCK-011
+//cfusa:test REQ-MOCK-012
+//cfusa:test REQ-MOCK-013
+//cfusa:test REQ-MOCK-014
+//cfusa:test REQ-MOCK-015
+//cfusa:test REQ-MOCK-016
+//cfusa:test REQ-MOCK-017
+//cfusa:test REQ-MOCK-018
+/* Tests the TC18-shaped RC-Server/endpoint test double (ROADMAP.md
+ * milestone 77). The pre-TC18 zone-controller mock this file used to test
+ * moved to tests/legacy_mock.h/.c; tests/test_legacy_mock.c (a renamed
+ * copy of this file's own old content) now tests that instead. */
 #include "unity.h"
 
+#include <rcp/acf.h>
+#include <rcp/avtp.h>
+#include <rcp/lifecycle.h>
 #include <rcp/mock.h>
 #include <rcp/rcp.h>
+#include <rcp/regmap.h>
 
 #include <string.h>
-
-/* Minimal cross-platform thread spawn for the two concurrency tests below
- * (REQ-CTRL-018/019). Test-only: the library itself never exposes threading
- * primitives in its public API, so this is self-contained rather than
- * reaching into the library's internal platform shim. */
-#if defined(_WIN32)
-#include <windows.h>
-typedef HANDLE test_thread_t;
-#define TEST_THREAD_CALL WINAPI
-typedef DWORD test_thread_ret_t;
-static test_thread_t test_thread_spawn(test_thread_ret_t(TEST_THREAD_CALL *fn)(LPVOID), void *arg)
-{
-    return CreateThread(NULL, 0, fn, arg, 0, NULL);
-}
-static void test_thread_join(test_thread_t t)
-{
-    WaitForSingleObject(t, INFINITE);
-    CloseHandle(t);
-}
-static int test_atomic_add(volatile int *v, int n)
-{
-    return (int)InterlockedExchangeAdd((volatile LONG *)v, (LONG)n) + n;
-}
-#else
-#include <pthread.h>
-typedef pthread_t test_thread_t;
-#define TEST_THREAD_CALL
-typedef void *test_thread_ret_t;
-static test_thread_t test_thread_spawn(test_thread_ret_t(TEST_THREAD_CALL *fn)(void *), void *arg)
-{
-    pthread_t t;
-    pthread_create(&t, NULL, fn, arg);
-    return t;
-}
-static void test_thread_join(test_thread_t t) { pthread_join(t, NULL); }
-static int test_atomic_add(volatile int *v, int n) { return __atomic_add_fetch(v, n, __ATOMIC_ACQ_REL); }
-#endif
 
 void setUp(void) {}
 void tearDown(void) {}
 
-/* ── Registry pre-population ──────────────────────────────────────────────── */
+/* An empty plausibility snapshot: vacuously satisfies both lifecycle.h
+ * transition guards (no endpoint/request-stream claims to be inconsistent
+ * about), enough to drive a fresh rcp_mock_server_t from
+ * HW_UNCONFIGURED to HW_CONFIGURED in these tests without needing a full
+ * regmap-backed fixture. */
+static const rcp_lifecycle_plausibility_snapshot_t EMPTY_SNAP = {NULL, 0, NULL, 0};
 
-static void test_new_registry_prepopulates_zones(void)
+static void to_hw_configured(rcp_mock_server_t *srv)
 {
-    rcp_registry_t *reg = rcp_mock_registry_new();
-    const rcp_zone_t zones[] = {
-        RCP_ZONE_FRONT_LEFT, RCP_ZONE_FRONT_RIGHT,
-        RCP_ZONE_REAR_LEFT,  RCP_ZONE_REAR_RIGHT,
-        RCP_ZONE_CENTRAL,
-    };
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+        rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP));
+}
+
+/* ── Server lifecycle ──────────────────────────────────────────────────────── */
+
+static void test_new_server_starts_hw_unconfigured(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, rcp_mock_server_state(srv));
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_transition_passthrough_valid(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    to_hw_configured(srv);
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_CONFIGURED, rcp_mock_server_state(srv));
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_transition_passthrough_rejects_invalid(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_INVALID_TRANSITION,
+        rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, rcp_mock_server_state(srv));
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_destroy_null_is_safe(void)
+{
+    rcp_mock_server_destroy(NULL);
+    TEST_PASS();
+}
+
+/* ── Register map access ───────────────────────────────────────────────────── */
+
+static void test_new_server_regmap_starts_empty(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    const rcp_regmap_general_t *map = rcp_mock_server_regmap(srv);
+
+    TEST_ASSERT_EQUAL_UINT16(0, map->svr_ep_count);
+    TEST_ASSERT_EQUAL_UINT16(RCP_REGMAP_NO_ROOT_CLIENT, map->svr_root_client_index);
+
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_regmap_is_mutable(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_regmap_general_t *map = rcp_mock_server_regmap(srv);
+
+    map->vendor_id = 0x1234;
+    TEST_ASSERT_EQUAL_UINT16(0x1234, rcp_mock_server_regmap(srv)->vendor_id);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── Endpoint registration ─────────────────────────────────────────────────── */
+
+static void test_add_endpoint_increments_svr_ep_count(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1, 5, true, NULL, NULL));
+    TEST_ASSERT_EQUAL_UINT16(1, rcp_mock_server_regmap(srv)->svr_ep_count);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 2, 6, false, NULL, NULL));
+    TEST_ASSERT_EQUAL_UINT16(2, rcp_mock_server_regmap(srv)->svr_ep_count);
+
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_add_endpoint_duplicate_bus_id_rejected(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1, 5, true, NULL, NULL));
+    TEST_ASSERT_EQUAL(RCP_MOCK_ERR_DUPLICATE_BUS_ID,
+        rcp_mock_server_add_endpoint(srv, 1, 9, true, NULL, NULL));
+    TEST_ASSERT_EQUAL_UINT16(1, rcp_mock_server_regmap(srv)->svr_ep_count);
+
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_add_endpoint_capacity_exhausted(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
     size_t i;
 
-    for (i = 0; i < sizeof(zones) / sizeof(zones[0]); i++) {
-        rcp_controller_t *ctrl = NULL;
-        TEST_ASSERT_EQUAL(RCP_OK, rcp_registry_lookup(reg, zones[i], &ctrl));
-        TEST_ASSERT_EQUAL(zones[i], rcp_controller_zone(ctrl));
-        rcp_controller_release(ctrl);
+    for (i = 0; i < RCP_MOCK_MAX_ENDPOINTS; i++) {
+        TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+            rcp_mock_server_add_endpoint(srv, (rcp_byte_bus_id_t)i, 1, true, NULL, NULL));
     }
-    rcp_registry_close(reg);
-    rcp_registry_destroy(reg);
+    TEST_ASSERT_EQUAL(RCP_MOCK_ERR_CAPACITY,
+        rcp_mock_server_add_endpoint(srv, (rcp_byte_bus_id_t)RCP_MOCK_MAX_ENDPOINTS, 1, true, NULL, NULL));
+
+    rcp_mock_server_destroy(srv);
 }
 
-static void test_register_duplicate_zone_already_exists(void)
+static void test_remove_endpoint_decrements_svr_ep_count(void)
 {
-    rcp_registry_t *reg = rcp_mock_registry_new();
-    rcp_controller_t *dup = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
+    rcp_mock_server_t *srv = rcp_mock_server_new();
 
-    TEST_ASSERT_EQUAL(RCP_ERR_ALREADY_EXISTS, rcp_registry_register(reg, dup));
+    rcp_mock_server_add_endpoint(srv, 1, 5, true, NULL, NULL);
+    rcp_mock_server_add_endpoint(srv, 2, 6, true, NULL, NULL);
 
-    rcp_controller_release(dup);
-    rcp_registry_close(reg);
-    rcp_registry_destroy(reg);
+    TEST_ASSERT_TRUE(rcp_mock_server_remove_endpoint(srv, 1));
+    TEST_ASSERT_EQUAL_UINT16(1, rcp_mock_server_regmap(srv)->svr_ep_count);
+
+    rcp_mock_server_destroy(srv);
 }
 
-static void test_deregister_removes_and_closes(void)
+static void test_remove_endpoint_unknown_bus_returns_false(void)
 {
-    rcp_registry_t *reg = rcp_mock_registry_new();
-    rcp_controller_t *ctrl = NULL;
-
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_registry_deregister(reg, RCP_ZONE_FRONT_LEFT));
-    TEST_ASSERT_EQUAL(RCP_ERR_NOT_FOUND, rcp_registry_lookup(reg, RCP_ZONE_FRONT_LEFT, &ctrl));
-
-    rcp_registry_close(reg);
-    rcp_registry_destroy(reg);
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    TEST_ASSERT_FALSE(rcp_mock_server_remove_endpoint(srv, 42));
+    rcp_mock_server_destroy(srv);
 }
 
-static void test_lookup_absent_zone_not_found(void)
+static void test_readd_after_remove_succeeds(void)
 {
-    rcp_registry_t *reg = rcp_mock_registry_new();
-    rcp_controller_t *ctrl = NULL;
+    rcp_mock_server_t *srv = rcp_mock_server_new();
 
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_registry_deregister(reg, RCP_ZONE_FRONT_LEFT));
-    TEST_ASSERT_EQUAL(RCP_ERR_NOT_FOUND, rcp_registry_lookup(reg, RCP_ZONE_FRONT_LEFT, &ctrl));
+    rcp_mock_server_add_endpoint(srv, 1, 5, true, NULL, NULL);
+    rcp_mock_server_remove_endpoint(srv, 1);
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1, 7, true, NULL, NULL));
 
-    rcp_registry_close(reg);
-    rcp_registry_destroy(reg);
+    rcp_mock_server_destroy(srv);
 }
 
-static void test_registry_close_idempotent(void)
+static void test_set_endpoint_enable_unknown_bus_returns_false(void)
 {
-    rcp_registry_t *reg = rcp_mock_registry_new();
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_registry_close(reg));
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_registry_close(reg));
-    rcp_registry_destroy(reg);
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    TEST_ASSERT_FALSE(rcp_mock_server_set_endpoint_enable(srv, 42, true));
+    rcp_mock_server_destroy(srv);
 }
 
-static void test_registry_controllers_returns_all(void)
+static void test_queue_len_unknown_bus_is_zero(void)
 {
-    rcp_registry_t *reg = rcp_mock_registry_new();
-    rcp_controller_t *ctrls[8] = {0};
-    size_t n = rcp_registry_controllers(reg, ctrls, 8);
-    size_t i;
-
-    TEST_ASSERT_EQUAL_UINT(5, n);
-    for (i = 0; i < n; i++) rcp_controller_release(ctrls[i]);
-
-    rcp_registry_close(reg);
-    rcp_registry_destroy(reg);
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    TEST_ASSERT_EQUAL_UINT(0, rcp_mock_server_endpoint_queue_len(srv, 42));
+    rcp_mock_server_destroy(srv);
 }
 
-static void test_register_after_close_is_closed(void)
+/* ── Dispatch ───────────────────────────────────────────────────────────────── */
+
+static bool    g_handler_called;
+static uint8_t g_seen_request[16];
+static size_t  g_seen_request_len;
+static void   *g_seen_user_data;
+
+static void echo_handler(const uint8_t *request, size_t request_len, rcp_bytes_t *out_response,
+                          void *user_data)
 {
-    rcp_registry_t *reg = rcp_mock_registry_new();
-    rcp_controller_t *extra;
-
-    rcp_registry_close(reg);
-    extra = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_registry_register(reg, extra));
-
-    rcp_controller_release(extra);
-    rcp_registry_destroy(reg);
+    g_handler_called    = true;
+    g_seen_request_len  = request_len;
+    g_seen_user_data    = user_data;
+    if (request_len > 0 && request_len <= sizeof(g_seen_request)) {
+        memcpy(g_seen_request, request, request_len);
+    }
+    *out_response = rcp_bytes_dup(request, request_len);
 }
 
-static void test_deregister_never_registered_not_found(void)
+static void reset_handler_capture(void)
 {
-    rcp_registry_t *reg = rcp_mock_registry_new();
-
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_registry_deregister(reg, RCP_ZONE_FRONT_LEFT));
-    TEST_ASSERT_EQUAL(RCP_ERR_NOT_FOUND, rcp_registry_deregister(reg, RCP_ZONE_FRONT_LEFT));
-
-    rcp_registry_close(reg);
-    rcp_registry_destroy(reg);
+    g_handler_called   = false;
+    g_seen_request_len = 0;
+    g_seen_user_data   = NULL;
+    memset(g_seen_request, 0, sizeof(g_seen_request));
 }
 
-static void test_registered_controller_immediately_lookupable(void)
+static void test_dispatch_dropped_by_lifecycle(void)
 {
-    rcp_registry_t *reg = rcp_mock_registry_new();
-    rcp_controller_t *nc = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_controller_t *got = NULL;
+    rcp_mock_server_t *srv = rcp_mock_server_new(); /* still HW_UNCONFIGURED */
+    rcp_bytes_t resp = {0};
+    const uint8_t req[] = {0xAA};
 
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_registry_deregister(reg, RCP_ZONE_FRONT_LEFT));
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_registry_register(reg, nc));
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_registry_lookup(reg, RCP_ZONE_FRONT_LEFT, &got));
-    TEST_ASSERT_EQUAL_PTR(nc, got);
+    /* A TSCF-headed frame is dropped outright while HW_UNCONFIGURED,
+     * regardless of endpoint registration. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_DROPPED,
+        rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  req, sizeof(req), &resp));
+    TEST_ASSERT_NULL(resp.data);
 
-    rcp_controller_release(got);
-    rcp_controller_release(nc);
-    rcp_registry_close(reg);
-    rcp_registry_destroy(reg);
+    rcp_mock_server_destroy(srv);
 }
 
-static void test_registry_close_closes_all_controllers(void)
+static void test_dispatch_unknown_bus_after_lifecycle_accepts(void)
 {
-    rcp_registry_t *reg = rcp_mock_registry_new();
-    rcp_controller_t *ctrl = NULL;
-    rcp_response_t out = {0};
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t resp = {0};
+    const uint8_t req[] = {0xAA};
 
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_registry_lookup(reg, RCP_ZONE_FRONT_LEFT, &ctrl));
-    rcp_registry_close(reg);
+    to_hw_configured(srv); /* any byte_bus_id passes lifecycle admission now */
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_controller_send(ctrl, &ctx, &cmd, &out));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS,
+        rcp_mock_server_dispatch(srv, 7, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  req, sizeof(req), &resp));
+    TEST_ASSERT_NULL(resp.data);
 
-    rcp_controller_release(ctrl);
-    rcp_registry_destroy(reg);
+    rcp_mock_server_destroy(srv);
 }
 
-static void test_lookup_on_closed_registry_is_closed(void)
+static void test_dispatch_ok_runs_handler_immediately(void)
 {
-    rcp_registry_t *reg = rcp_mock_registry_new();
-    rcp_controller_t *ctrl = NULL;
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t resp = {0};
+    const uint8_t req[] = {1, 2, 3};
+    int user_data_marker = 7;
 
-    rcp_registry_close(reg);
-    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_registry_lookup(reg, RCP_ZONE_FRONT_LEFT, &ctrl));
+    to_hw_configured(srv);
+    reset_handler_capture();
+    rcp_mock_server_add_endpoint(srv, 3, 1, true /* ep_enable */, echo_handler, &user_data_marker);
 
-    rcp_registry_destroy(reg);
-}
-
-static void test_deregister_already_deregistered_not_found(void)
-{
-    rcp_registry_t *reg = rcp_mock_registry_new();
-
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_registry_deregister(reg, RCP_ZONE_FRONT_LEFT));
-    TEST_ASSERT_EQUAL(RCP_ERR_NOT_FOUND, rcp_registry_deregister(reg, RCP_ZONE_FRONT_LEFT));
-
-    rcp_registry_close(reg);
-    rcp_registry_destroy(reg);
-}
-
-/* ── Controller::send ──────────────────────────────────────────────────────── */
-
-static void test_send_no_handler_returns_ok(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t out = {0};
-
-    cmd.id = 1;
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(ctrl, &ctx, &cmd, &out));
-    TEST_ASSERT_EQUAL(RCP_RESPONSE_OK, out.status);
-
-    rcp_response_free(&out);
-    rcp_controller_release(ctrl);
-}
-
-static bool g_handler_called;
-
-static void handler_error_verbatim(const rcp_command_t *cmd, rcp_response_t *out, void *user_data)
-{
-    (void)user_data;
-    g_handler_called = true;
-    out->command_id = cmd->id;
-    out->zone       = cmd->zone;
-    out->status     = RCP_RESPONSE_ERROR;
-}
-
-static void test_send_dispatches_to_handler_verbatim(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, handler_error_verbatim, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t out = {0};
-
-    g_handler_called = false;
-    cmd.id = 42;
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(ctrl, &ctx, &cmd, &out));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch(srv, 3, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  req, sizeof(req), &resp));
     TEST_ASSERT_TRUE(g_handler_called);
-    TEST_ASSERT_EQUAL(RCP_RESPONSE_ERROR, out.status);
-    TEST_ASSERT_EQUAL_UINT32(42, out.command_id);
+    TEST_ASSERT_EQUAL_UINT(sizeof(req), g_seen_request_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(req, g_seen_request, sizeof(req));
+    TEST_ASSERT_EQUAL_PTR(&user_data_marker, g_seen_user_data);
+    TEST_ASSERT_EQUAL_UINT(sizeof(req), resp.len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(req, resp.data, sizeof(req));
 
-    rcp_response_free(&out);
-    rcp_controller_release(ctrl);
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
 }
 
-static void test_send_after_close_is_closed(void)
+static void test_dispatch_no_handler_leaves_response_zeroed(void)
 {
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t out = {0};
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t resp = {0};
+    const uint8_t req[] = {0x01};
 
-    rcp_controller_close(ctrl);
-    cmd.id = 1;
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_controller_send(ctrl, &ctx, &cmd, &out));
+    to_hw_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 4, 1, true, NULL, NULL);
 
-    rcp_controller_release(ctrl);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch(srv, 4, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  req, sizeof(req), &resp));
+    TEST_ASSERT_NULL(resp.data);
+    TEST_ASSERT_EQUAL_UINT(0, resp.len);
+
+    rcp_mock_server_destroy(srv);
 }
 
-static bool g_must_not_be_called;
-
-static void handler_marks_called(const rcp_command_t *cmd, rcp_response_t *out, void *user_data)
+static void test_dispatch_queued_when_endpoint_disabled(void)
 {
-    (void)cmd; (void)out; (void)user_data;
-    g_must_not_be_called = true;
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t resp = {0};
+    const uint8_t req[] = {0x01};
+
+    to_hw_configured(srv);
+    reset_handler_capture();
+    rcp_mock_server_add_endpoint(srv, 5, 1, false /* ep_enable */, echo_handler, NULL);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_QUEUED,
+        rcp_mock_server_dispatch(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  req, sizeof(req), &resp));
+    TEST_ASSERT_FALSE(g_handler_called);
+    TEST_ASSERT_NULL(resp.data);
+    TEST_ASSERT_EQUAL_UINT(1, rcp_mock_server_endpoint_queue_len(srv, 5));
+
+    rcp_mock_server_destroy(srv);
 }
 
-static void test_send_done_context_returns_timeout(void)
+static void test_drain_endpoint_runs_queued_request(void)
 {
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, handler_marks_called, NULL);
-    rcp_context_t past = rcp_context_with_deadline_ms(rcp_monotonic_ms() - 1000);
-    rcp_command_t cmd = {0};
-    rcp_response_t out = {0};
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t resp = {0};
+    const uint8_t req[] = {9, 8, 7};
 
-    g_must_not_be_called = false;
-    cmd.id = 1;
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
+    to_hw_configured(srv);
+    reset_handler_capture();
+    rcp_mock_server_add_endpoint(srv, 6, 1, false, echo_handler, NULL);
+    rcp_mock_server_dispatch(srv, 6, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                              req, sizeof(req), &resp);
+    TEST_ASSERT_FALSE(g_handler_called);
 
-    TEST_ASSERT_EQUAL(RCP_ERR_TIMEOUT, rcp_controller_send(ctrl, &past, &cmd, &out));
-    TEST_ASSERT_FALSE(g_must_not_be_called);
+    rcp_mock_server_set_endpoint_enable(srv, 6, true);
+    TEST_ASSERT_TRUE(rcp_mock_server_drain_endpoint(srv, 6, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    TEST_ASSERT_EQUAL_UINT(sizeof(req), g_seen_request_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(req, g_seen_request, sizeof(req));
+    TEST_ASSERT_EQUAL_UINT(0, rcp_mock_server_endpoint_queue_len(srv, 6));
 
-    rcp_controller_release(ctrl);
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
 }
 
-static void test_controller_close_idempotent(void)
+static void test_drain_endpoint_empty_queue_returns_false(void)
 {
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_close(ctrl));
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_close(ctrl));
-    rcp_controller_release(ctrl);
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t resp = {0};
+
+    rcp_mock_server_add_endpoint(srv, 8, 1, true, NULL, NULL);
+    TEST_ASSERT_FALSE(rcp_mock_server_drain_endpoint(srv, 8, &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    rcp_mock_server_destroy(srv);
 }
 
-static void test_subscribe_channel_closes_on_controller_close(void)
+static void test_drain_endpoint_unknown_bus_returns_false(void)
 {
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_status_channel_t *ch = NULL;
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t resp = {0};
 
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
-    rcp_controller_close(ctrl);
+    TEST_ASSERT_FALSE(rcp_mock_server_drain_endpoint(srv, 99, &resp));
+    TEST_ASSERT_NULL(resp.data);
 
-    /* The watcher thread and close() both close the channel synchronously
-     * from close()'s perspective (close() closes subs directly before
-     * returning), so no extra wait is required here. */
-    TEST_ASSERT_TRUE(rcp_status_channel_is_closed(ch));
-
-    rcp_status_channel_release(ch);
-    rcp_controller_release(ctrl);
+    rcp_mock_server_destroy(srv);
 }
 
-static void test_subscribe_after_close_is_closed(void)
+static void test_discovery_bus_accepted_while_hw_unconfigured(void)
 {
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_status_channel_t *ch = NULL;
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t resp = {0};
+    const uint8_t req[] = {0x00};
 
-    rcp_controller_close(ctrl);
-    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_controller_subscribe(ctrl, &ctx, &ch));
+    reset_handler_capture();
+    rcp_mock_server_add_endpoint(srv, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, 1, true, echo_handler, NULL);
 
-    rcp_controller_release(ctrl);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch(srv, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_SUBTYPE_NTSCF,
+                                  RCP_ACF_MSG_TYPE_ABB, true, req, sizeof(req), &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
 }
 
-static void test_controller_zone_returns_declared_zone(void)
+/* ── Error strings ─────────────────────────────────────────────────────────── */
+
+static void test_strerror_never_null(void)
 {
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_REAR_RIGHT, NULL, NULL);
-    TEST_ASSERT_EQUAL(RCP_ZONE_REAR_RIGHT, rcp_controller_zone(ctrl));
-    rcp_controller_release(ctrl);
-}
-
-static void test_status_seq_strictly_increasing(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_CENTRAL, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_status_channel_t *ch = NULL;
-    uint32_t last = 0;
-    int i;
-
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
-    rcp_mock_controller_publish(ctrl, NULL, 0);
-    rcp_mock_controller_publish(ctrl, NULL, 0);
-    rcp_mock_controller_publish(ctrl, NULL, 0);
-
-    for (i = 0; i < 3; i++) {
-        rcp_status_t st;
-        TEST_ASSERT_TRUE(rcp_status_channel_recv(ch, &st));
-        TEST_ASSERT_TRUE(st.seq > last);
-        last = st.seq;
-        rcp_status_free(&st);
-    }
-
-    rcp_status_channel_release(ch);
-    rcp_controller_close(ctrl);
-    rcp_controller_release(ctrl);
-}
-
-static void test_subscribe_channel_closes_on_context_expiry(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_with_timeout_ms(20);
-    rcp_status_channel_t *ch = NULL;
-    uint64_t start;
-
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
-
-    /* Poll instead of a fixed sleep: wait up to 500ms for the watcher
-     * thread to notice the expired context and close the channel. */
-    start = rcp_monotonic_ms();
-    while (!rcp_status_channel_is_closed(ch) && rcp_monotonic_ms() - start < 500) {
-        /* busy-wait */
-    }
-    TEST_ASSERT_TRUE(rcp_status_channel_is_closed(ch));
-
-    rcp_status_channel_release(ch);
-    rcp_controller_close(ctrl);
-    rcp_controller_release(ctrl);
-}
-
-static void test_multiple_subscribers_each_receive_published_status(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_status_channel_t *channels[3] = {0};
-    const uint8_t payload[] = {0x01};
-    size_t i;
-
-    for (i = 0; i < 3; i++) {
-        TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &channels[i]));
-    }
-    rcp_mock_controller_publish(ctrl, payload, sizeof(payload));
-
-    for (i = 0; i < 3; i++) {
-        rcp_status_t st;
-        TEST_ASSERT_TRUE(rcp_status_channel_recv(channels[i], &st));
-        TEST_ASSERT_EQUAL(RCP_ZONE_FRONT_LEFT, st.zone);
-        TEST_ASSERT_EQUAL_UINT(1, st.payload.len);
-        TEST_ASSERT_EQUAL_UINT8(0x01, st.payload.data[0]);
-        rcp_status_free(&st);
-        rcp_status_channel_release(channels[i]);
-    }
-
-    rcp_controller_close(ctrl);
-    rcp_controller_release(ctrl);
-}
-
-static void test_send_noop_returns_ok(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t out = {0};
-
-    cmd.id = 1; cmd.zone = RCP_ZONE_FRONT_LEFT; cmd.type = RCP_CMD_NOOP;
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(ctrl, &ctx, &cmd, &out));
-    TEST_ASSERT_EQUAL(RCP_RESPONSE_OK, out.status);
-
-    rcp_response_free(&out);
-    rcp_controller_release(ctrl);
-}
-
-static void test_send_watchdog_returns_ok(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t out = {0};
-
-    cmd.id = 1; cmd.zone = RCP_ZONE_FRONT_LEFT; cmd.type = RCP_CMD_WATCHDOG;
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(ctrl, &ctx, &cmd, &out));
-    TEST_ASSERT_EQUAL(RCP_RESPONSE_OK, out.status);
-
-    rcp_response_free(&out);
-    rcp_controller_release(ctrl);
-}
-
-static void test_send_reset_returns_ok(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t out = {0};
-
-    cmd.id = 1; cmd.zone = RCP_ZONE_FRONT_LEFT; cmd.type = RCP_CMD_RESET;
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(ctrl, &ctx, &cmd, &out));
-    TEST_ASSERT_EQUAL(RCP_RESPONSE_OK, out.status);
-
-    rcp_response_free(&out);
-    rcp_controller_release(ctrl);
-}
-
-static void test_publish_on_closed_does_not_crash(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_controller_close(ctrl);
-    rcp_mock_controller_publish(ctrl, NULL, 0); /* must not crash */
-    rcp_controller_release(ctrl);
-    TEST_PASS();
-}
-
-#define CONCURRENCY_THREADS 8
-#define CONCURRENCY_ITERS   100
-
-typedef struct {
-    rcp_controller_t *ctrl;
-    int               thread_index;
-    volatile int     *ok_counter;
-} send_worker_args_t;
-
-static test_thread_ret_t TEST_THREAD_CALL send_worker(
-#if defined(_WIN32)
-    LPVOID arg
-#else
-    void *arg
-#endif
-)
-{
-    send_worker_args_t *a = (send_worker_args_t *)arg;
-    rcp_context_t ctx = rcp_context_background();
-    int i;
-
-    for (i = 0; i < CONCURRENCY_ITERS; i++) {
-        rcp_response_t out = {0};
-        rcp_command_t cmd = {0};
-        cmd.id = (uint32_t)(a->thread_index * CONCURRENCY_ITERS + i);
-        cmd.zone = RCP_ZONE_FRONT_LEFT;
-        cmd.type = RCP_CMD_GET;
-        if (rcp_controller_send(a->ctrl, &ctx, &cmd, &out) == RCP_OK) {
-            test_atomic_add(a->ok_counter, 1);
-        }
-        rcp_response_free(&out);
-    }
-#if defined(_WIN32)
-    return 0;
-#else
-    return NULL;
-#endif
-}
-
-static void test_concurrent_send_data_race_free(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    test_thread_t threads[CONCURRENCY_THREADS];
-    send_worker_args_t args[CONCURRENCY_THREADS];
-    volatile int ok_counter = 0;
-    int i;
-
-    for (i = 0; i < CONCURRENCY_THREADS; i++) {
-        args[i].ctrl = ctrl;
-        args[i].thread_index = i;
-        args[i].ok_counter = &ok_counter;
-        threads[i] = test_thread_spawn(send_worker, &args[i]);
-    }
-    for (i = 0; i < CONCURRENCY_THREADS; i++) test_thread_join(threads[i]);
-
-    TEST_ASSERT_EQUAL_INT(CONCURRENCY_THREADS * CONCURRENCY_ITERS, ok_counter);
-
-    rcp_controller_close(ctrl);
-    rcp_controller_release(ctrl);
-}
-
-typedef struct {
-    rcp_controller_t   *ctrl;
-    volatile int        stop;
-} publish_worker_args_t;
-
-static test_thread_ret_t TEST_THREAD_CALL publish_worker(
-#if defined(_WIN32)
-    LPVOID arg
-#else
-    void *arg
-#endif
-)
-{
-    publish_worker_args_t *a = (publish_worker_args_t *)arg;
-    const uint8_t payload[] = {0xAB};
-    while (!a->stop) {
-        rcp_mock_controller_publish(a->ctrl, payload, sizeof(payload));
-    }
-#if defined(_WIN32)
-    return 0;
-#else
-    return NULL;
-#endif
-}
-
-static void test_concurrent_publish_and_subscribe_data_race_free(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_status_channel_t *ch = NULL;
-    publish_worker_args_t args;
-    test_thread_t t;
-    uint64_t start;
-
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
-
-    args.ctrl = ctrl;
-    args.stop = 0;
-    t = test_thread_spawn(publish_worker, &args);
-
-    start = rcp_monotonic_ms();
-    while (rcp_monotonic_ms() - start < 20) {
-        rcp_status_t st;
-        if (rcp_status_channel_try_recv(ch, &st)) rcp_status_free(&st);
-    }
-    args.stop = 1;
-    test_thread_join(t);
-
-    rcp_status_channel_release(ch);
-    rcp_controller_close(ctrl);
-    rcp_controller_release(ctrl);
-    TEST_PASS();
-}
-
-static void test_status_zone_correct(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_REAR_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_status_channel_t *ch = NULL;
-    rcp_status_t st;
-
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
-    rcp_mock_controller_publish(ctrl, NULL, 0);
-    TEST_ASSERT_TRUE(rcp_status_channel_recv(ch, &st));
-    TEST_ASSERT_EQUAL(RCP_ZONE_REAR_LEFT, st.zone);
-
-    rcp_status_free(&st);
-    rcp_status_channel_release(ch);
-    rcp_controller_close(ctrl);
-    rcp_controller_release(ctrl);
-}
-
-static void test_status_payload_matches_published(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_status_channel_t *ch = NULL;
-    const uint8_t payload[] = {0xDE, 0xAD, 0xBE, 0xEF};
-    rcp_status_t st;
-
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
-    rcp_mock_controller_publish(ctrl, payload, sizeof(payload));
-    TEST_ASSERT_TRUE(rcp_status_channel_recv(ch, &st));
-    TEST_ASSERT_EQUAL_UINT(sizeof(payload), st.payload.len);
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(payload, st.payload.data, sizeof(payload));
-
-    rcp_status_free(&st);
-    rcp_status_channel_release(ch);
-    rcp_controller_close(ctrl);
-    rcp_controller_release(ctrl);
-}
-
-static void test_status_healthy_true_while_open(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_status_channel_t *ch = NULL;
-    rcp_status_t st;
-
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
-    rcp_mock_controller_publish(ctrl, NULL, 0);
-    TEST_ASSERT_TRUE(rcp_status_channel_recv(ch, &st));
-    TEST_ASSERT_TRUE(st.healthy);
-
-    rcp_status_free(&st);
-    rcp_status_channel_release(ch);
-    rcp_controller_close(ctrl);
-    rcp_controller_release(ctrl);
-}
-
-static void test_send_empty_payload_does_not_crash(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t out = {0};
-
-    cmd.id = 1; cmd.zone = RCP_ZONE_FRONT_LEFT;
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(ctrl, &ctx, &cmd, &out));
-
-    rcp_response_free(&out);
-    rcp_controller_release(ctrl);
-}
-
-static void test_send_zone_mismatch(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t out = {0};
-
-    cmd.id = 1; cmd.zone = RCP_ZONE_FRONT_RIGHT;
-    TEST_ASSERT_EQUAL(RCP_ERR_ZONE_MISMATCH, rcp_controller_send(ctrl, &ctx, &cmd, &out));
-
-    rcp_controller_release(ctrl);
-}
-
-static uint8_t g_seen_payload[3];
-static size_t  g_seen_payload_len;
-
-static void handler_capture_payload(const rcp_command_t *cmd, rcp_response_t *out, void *user_data)
-{
-    (void)user_data;
-    g_seen_payload_len = cmd->payload.len;
-    if (cmd->payload.len > 0) memcpy(g_seen_payload, cmd->payload.data, cmd->payload.len);
-    out->command_id = cmd->id;
-    out->zone       = cmd->zone;
-    out->status     = RCP_RESPONSE_OK;
-}
-
-static void test_payload_copied_before_handler(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, handler_capture_payload, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    uint8_t payload[] = {1, 2, 3};
-    rcp_command_t cmd = {0};
-    rcp_response_t out = {0};
-
-    g_seen_payload_len = 0;
-    cmd.id = 1;
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    cmd.payload.data = payload;
-    cmd.payload.len  = sizeof(payload);
-
-    rcp_controller_send(ctrl, &ctx, &cmd, &out);
-    payload[0] = 0xFF; /* mutate after send returns */
-
-    TEST_ASSERT_EQUAL_UINT(3, g_seen_payload_len);
-    TEST_ASSERT_EQUAL_UINT8(1, g_seen_payload[0]);
-    TEST_ASSERT_EQUAL_UINT8(2, g_seen_payload[1]);
-    TEST_ASSERT_EQUAL_UINT8(3, g_seen_payload[2]);
-
-    rcp_response_free(&out);
-    rcp_controller_release(ctrl);
-}
-
-static void test_publish_copies_payload_before_delivery(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_status_channel_t *ch = NULL;
-    uint8_t payload[] = {0xAA, 0xBB};
-    rcp_status_t st;
-
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
-    rcp_mock_controller_publish(ctrl, payload, sizeof(payload));
-    payload[0] = 0x00;
-
-    TEST_ASSERT_TRUE(rcp_status_channel_recv(ch, &st));
-    TEST_ASSERT_EQUAL_UINT8(0xAA, st.payload.data[0]);
-    TEST_ASSERT_EQUAL_UINT8(0xBB, st.payload.data[1]);
-
-    rcp_status_free(&st);
-    rcp_status_channel_release(ch);
-    rcp_controller_close(ctrl);
-    rcp_controller_release(ctrl);
-}
-
-/* ── Response fields ───────────────────────────────────────────────────────── */
-
-static void test_response_command_id_echoes(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t out = {0};
-
-    cmd.id = 0xDEADBEEF;
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(ctrl, &ctx, &cmd, &out));
-    TEST_ASSERT_EQUAL_UINT32(0xDEADBEEF, out.command_id);
-
-    rcp_response_free(&out);
-    rcp_controller_release(ctrl);
-}
-
-static void test_response_zone_identifies_processor(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_REAR_RIGHT, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t out = {0};
-
-    cmd.id = 1;
-    cmd.zone = RCP_ZONE_REAR_RIGHT;
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(ctrl, &ctx, &cmd, &out));
-    TEST_ASSERT_EQUAL(RCP_ZONE_REAR_RIGHT, out.zone);
-
-    rcp_response_free(&out);
-    rcp_controller_release(ctrl);
+    TEST_ASSERT_NOT_NULL(rcp_mock_strerror(RCP_MOCK_OK));
+    TEST_ASSERT_NOT_NULL(rcp_mock_strerror(RCP_MOCK_ERR_DUPLICATE_BUS_ID));
+    TEST_ASSERT_NOT_NULL(rcp_mock_strerror(RCP_MOCK_ERR_CAPACITY));
+    TEST_ASSERT_NOT_NULL(rcp_mock_strerror(RCP_MOCK_ERR_NOT_FOUND));
+    TEST_ASSERT_NOT_NULL(rcp_mock_strerror((rcp_mock_errc_t)999));
 }
 
 int main(void)
 {
     UNITY_BEGIN();
 
-    RUN_TEST(test_new_registry_prepopulates_zones);
-    RUN_TEST(test_register_duplicate_zone_already_exists);
-    RUN_TEST(test_deregister_removes_and_closes);
-    RUN_TEST(test_lookup_absent_zone_not_found);
-    RUN_TEST(test_registry_close_idempotent);
-    RUN_TEST(test_registry_controllers_returns_all);
-    RUN_TEST(test_register_after_close_is_closed);
-    RUN_TEST(test_deregister_never_registered_not_found);
-    RUN_TEST(test_registered_controller_immediately_lookupable);
-    RUN_TEST(test_registry_close_closes_all_controllers);
-    RUN_TEST(test_lookup_on_closed_registry_is_closed);
-    RUN_TEST(test_deregister_already_deregistered_not_found);
+    RUN_TEST(test_new_server_starts_hw_unconfigured);
+    RUN_TEST(test_transition_passthrough_valid);
+    RUN_TEST(test_transition_passthrough_rejects_invalid);
+    RUN_TEST(test_destroy_null_is_safe);
 
-    RUN_TEST(test_send_no_handler_returns_ok);
-    RUN_TEST(test_send_dispatches_to_handler_verbatim);
-    RUN_TEST(test_send_after_close_is_closed);
-    RUN_TEST(test_send_done_context_returns_timeout);
-    RUN_TEST(test_controller_close_idempotent);
-    RUN_TEST(test_subscribe_channel_closes_on_controller_close);
-    RUN_TEST(test_subscribe_after_close_is_closed);
-    RUN_TEST(test_controller_zone_returns_declared_zone);
-    RUN_TEST(test_status_seq_strictly_increasing);
-    RUN_TEST(test_subscribe_channel_closes_on_context_expiry);
-    RUN_TEST(test_multiple_subscribers_each_receive_published_status);
-    RUN_TEST(test_send_noop_returns_ok);
-    RUN_TEST(test_send_watchdog_returns_ok);
-    RUN_TEST(test_send_reset_returns_ok);
-    RUN_TEST(test_publish_on_closed_does_not_crash);
-    RUN_TEST(test_concurrent_send_data_race_free);
-    RUN_TEST(test_concurrent_publish_and_subscribe_data_race_free);
-    RUN_TEST(test_status_zone_correct);
-    RUN_TEST(test_status_payload_matches_published);
-    RUN_TEST(test_status_healthy_true_while_open);
-    RUN_TEST(test_send_empty_payload_does_not_crash);
-    RUN_TEST(test_send_zone_mismatch);
-    RUN_TEST(test_payload_copied_before_handler);
-    RUN_TEST(test_publish_copies_payload_before_delivery);
+    RUN_TEST(test_new_server_regmap_starts_empty);
+    RUN_TEST(test_regmap_is_mutable);
 
-    RUN_TEST(test_response_command_id_echoes);
-    RUN_TEST(test_response_zone_identifies_processor);
+    RUN_TEST(test_add_endpoint_increments_svr_ep_count);
+    RUN_TEST(test_add_endpoint_duplicate_bus_id_rejected);
+    RUN_TEST(test_add_endpoint_capacity_exhausted);
+    RUN_TEST(test_remove_endpoint_decrements_svr_ep_count);
+    RUN_TEST(test_remove_endpoint_unknown_bus_returns_false);
+    RUN_TEST(test_readd_after_remove_succeeds);
+    RUN_TEST(test_set_endpoint_enable_unknown_bus_returns_false);
+    RUN_TEST(test_queue_len_unknown_bus_is_zero);
+
+    RUN_TEST(test_dispatch_dropped_by_lifecycle);
+    RUN_TEST(test_dispatch_unknown_bus_after_lifecycle_accepts);
+    RUN_TEST(test_dispatch_ok_runs_handler_immediately);
+    RUN_TEST(test_dispatch_no_handler_leaves_response_zeroed);
+    RUN_TEST(test_dispatch_queued_when_endpoint_disabled);
+    RUN_TEST(test_drain_endpoint_runs_queued_request);
+    RUN_TEST(test_drain_endpoint_empty_queue_returns_false);
+    RUN_TEST(test_drain_endpoint_unknown_bus_returns_false);
+    RUN_TEST(test_discovery_bus_accepted_while_hw_unconfigured);
+
+    RUN_TEST(test_strerror_never_null);
 
     return UNITY_END();
 }

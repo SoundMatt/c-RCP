@@ -12,7 +12,7 @@
 
 #include <rcp/clock.h>
 #include <rcp/faultinject.h>
-#include <rcp/mock.h>
+#include "legacy_mock.h"
 #include <rcp/rcp.h>
 
 void setUp(void) {}

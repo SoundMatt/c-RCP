@@ -91,8 +91,16 @@
  *
  * Controller and Registry are vtable-based interfaces (C has no virtual
  * classes): a concrete implementation embeds rcp_controller_t/rcp_registry_t
- * as the first member of its own struct and fills in the vtable. See mock.h
- * for the reference (in-process, zero-I/O) implementation.
+ * as the first member of its own struct and fills in the vtable. This is
+ * this repo's own pre-TC18 legacy model, superseded going forward by the
+ * TC18 register-map/lifecycle/endpoint core (regmap.h, lifecycle.h,
+ * ep_*.h) -- see ROADMAP.md's Satellite Package Disposition table and
+ * Phase 21 for the migration this legacy vtable pair is being worked out
+ * of. As of milestone 77, the reference (in-process, zero-I/O)
+ * implementation of *this* legacy interface pair is
+ * tests/legacy_mock.h -- test-only, kept for the not-yet-migrated legacy
+ * satellites that still implement/decorate it. mock.h itself now doubles
+ * the TC18 core instead (see its own file header).
  */
 #ifndef RCP_RCP_H
 #define RCP_RCP_H

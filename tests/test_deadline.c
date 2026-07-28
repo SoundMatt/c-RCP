@@ -10,7 +10,7 @@
 
 #include <rcp/clock.h>
 #include <rcp/deadline.h>
-#include <rcp/mock.h>
+#include "legacy_mock.h"
 #include <rcp/rcp.h>
 
 void setUp(void) {}

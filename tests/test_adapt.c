@@ -25,7 +25,7 @@
 
 #include <rcp/adapt.h>
 #include <rcp/clock.h>
-#include <rcp/mock.h>
+#include "legacy_mock.h"
 #include <rcp/rcp.h>
 #include <relay/relay.h>
 

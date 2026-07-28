@@ -9,7 +9,7 @@
 //cfusa:test REQ-RL-009
 #include "unity.h"
 
-#include <rcp/mock.h>
+#include "legacy_mock.h"
 #include <rcp/ratelimit.h>
 #include <rcp/rcp.h>
 

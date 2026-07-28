@@ -11,7 +11,7 @@
 #include "unity.h"
 
 #include <rcp/clock.h>
-#include <rcp/mock.h>
+#include "legacy_mock.h"
 #include <rcp/powerstate.h>
 #include <rcp/rcp.h>
 

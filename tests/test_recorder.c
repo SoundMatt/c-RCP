@@ -11,7 +11,7 @@
 //cfusa:test REQ-REC-011
 #include "unity.h"
 
-#include <rcp/mock.h>
+#include "legacy_mock.h"
 #include <rcp/rcp.h>
 #include <rcp/recorder.h>
 

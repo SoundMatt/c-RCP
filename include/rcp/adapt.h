@@ -5,8 +5,11 @@
  * so application code can use the protocol-agnostic relay interface and
  * swap the underlying protocol with a single constructor change.
  *
- * Usage:
- *   rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT);
+ * Usage (rcp_mock_controller_new() here is tests/legacy_mock.h's own
+ * legacy zone-controller double -- see that header's file comment; adapt.c
+ * itself, like the rcp_controller_t interface it wraps, is scheduled for
+ * its own TC18 rework at ROADMAP.md milestone 84):
+ *   rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
  *   rcp_relay_caller_t *caller = rcp_adapt(ctrl);   // retains ctrl
  *   relay_context_t ctx = relay_context_background();
  *   relay_message_t req = {0}, resp = {0};

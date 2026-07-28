@@ -1154,48 +1154,48 @@
     },
     {
       "id": "REQ-CFG-001",
-      "title": "parse_json parses multiple zone entries",
-      "text": "rcp_config_parse_json() shall parse a manifest containing multiple zone entries, extracting each entry's zone and priority fields.",
+      "title": "hw_pin_map entries require a numeric hw_ep_nr",
+      "text": "rcp_config_parse_json() shall reject a hw_pin_map entry missing a numeric hw_ep_nr field with RCP_CFG_ERR_PARSE.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-CFG-002",
-      "title": "parse_json extracts the optional priority field",
-      "text": "When a zone entry includes a priority field, rcp_config_parse_json() shall copy its string value into the corresponding manifest entry.",
+      "title": "hw_pin_map entries require a numeric hw_ep_pin_nr",
+      "text": "rcp_config_parse_json() shall reject a hw_pin_map entry missing a numeric hw_ep_pin_nr field with RCP_CFG_ERR_PARSE.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-CFG-003",
-      "title": "parse_json rejects unknown zone names",
-      "text": "rcp_config_parse_json() shall return RCP_CFG_ERR_PARSE for a zone entry naming a zone not in the fixed 5-zone map.",
+      "title": "hw_pin_map entries parse the optional pin_property name array",
+      "text": "rcp_config_parse_json() shall OR together the RCP_REGMAP_PIN_PROP_* bit named by each recognized string in a hw_pin_map entry's optional pin_property array into that entry's pin_property field, leaving it 0 when the array is absent.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-CFG-004",
-      "title": "load() registers one controller per manifest zone entry",
-      "text": "rcp_config_load() shall register one mock controller for every zone entry in the parsed manifest.",
+      "title": "endpoint entries require numeric byte_bus_id and ep_type",
+      "text": "rcp_config_parse_json() shall reject an endpoints entry missing a numeric byte_bus_id or ep_type field with RCP_CFG_ERR_PARSE.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-CFG-005",
-      "title": "load() returns RCP_ERR_ALREADY_EXISTS on duplicate zone entries",
-      "text": "rcp_config_load() shall return RCP_ERR_ALREADY_EXISTS if the manifest names the same zone more than once.",
+      "title": "endpoint entries parse the optional ep_enable flag",
+      "text": "rcp_config_parse_json() shall set an endpoints entry's ep_enable field from its optional ep_enable boolean, defaulting to false when absent.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-CFG-006",
-      "title": "Parse errors carry a descriptive message",
-      "text": "On RCP_CFG_ERR_PARSE, rcp_config_parse_json() shall write a human-readable description identifying the invalid input into the caller-supplied error buffer.",
+      "title": "stream entries require rx_stream_id; configured defaults to true",
+      "text": "rcp_config_parse_json() shall reject a streams entry missing a numeric rx_stream_id field with RCP_CFG_ERR_PARSE, and shall set its configured field from the optional configured boolean, defaulting to true for an entry that is otherwise present.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -7420,6 +7420,182 @@
       "id": "REQ-DISC-028",
       "title": "rcp_discovery_decode_reassembled_response() parses a fully reassembled general-register-slice payload into a discovery result",
       "text": "rcp_discovery_decode_reassembled_response() shall, given a reassembled buffer of at least RCP_DISCOVERY_GENERAL_SLICE_LEN octets, populate out_result identically to how rcp_discovery_decode_response() would have for the same original, unfragmented response payload, and shall return RCP_DISCOVERY_ERR_SHORT_FRAME for a shorter buffer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-001",
+      "title": "rcp_mock_strerror() never returns NULL",
+      "text": "rcp_mock_strerror() shall return a non-NULL, human-readable string for every rcp_mock_errc_t value, including one outside the defined enum.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-002",
+      "title": "rcp_mock_server_new() starts HW_UNCONFIGURED with an initialized, empty register map",
+      "text": "rcp_mock_server_new() shall return a server whose rcp_mock_server_state() is RCP_LIFECYCLE_HW_UNCONFIGURED and whose rcp_mock_server_regmap() has been initialized via rcp_regmap_general_init() (svr_ep_count 0, svr_root_client_index RCP_REGMAP_NO_ROOT_CLIENT), with no endpoints registered.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-003",
+      "title": "rcp_mock_server_destroy() frees every endpoint's queued requests and is NULL-safe",
+      "text": "rcp_mock_server_destroy() shall free every registered endpoint's queued (undelivered) requests and srv itself, and shall be a no-op when srv is NULL.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-004",
+      "title": "rcp_mock_server_state() reports the server's current lifecycle state",
+      "text": "rcp_mock_server_state() shall return srv's own current rcp_lifecycle_state_t, reflecting the most recent successful rcp_mock_server_transition().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-005",
+      "title": "rcp_mock_server_transition() is a thin passthrough to rcp_lifecycle_transition()",
+      "text": "rcp_mock_server_transition() shall apply lifecycle.h's own rcp_lifecycle_transition() rules to srv's own state, leaving srv's state unchanged and returning the same error code rcp_lifecycle_transition() would for a rejected transition.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-006",
+      "title": "rcp_mock_server_regmap() exposes srv's own register map for direct mutation",
+      "text": "rcp_mock_server_regmap() shall return a non-NULL pointer to srv's own rcp_regmap_general_t, valid for srv's lifetime, through which a caller may freely read and write every field.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-007",
+      "title": "rcp_mock_server_add_endpoint() registers a new endpoint slot and updates svr_ep_count",
+      "text": "rcp_mock_server_add_endpoint() shall, on success, add a slot addressed at byte_bus_id with generic config ep_type/ep_used=true and a queue starting at the given ep_enable, and shall update rcp_mock_server_regmap()'s own svr_ep_count to the new total registered-endpoint count.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-008",
+      "title": "rcp_mock_server_add_endpoint() rejects a duplicate byte_bus_id or a full endpoint table",
+      "text": "rcp_mock_server_add_endpoint() shall return RCP_MOCK_ERR_DUPLICATE_BUS_ID, without adding a slot, when byte_bus_id is already registered, and RCP_MOCK_ERR_CAPACITY when srv already holds RCP_MOCK_MAX_ENDPOINTS endpoints.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-009",
+      "title": "rcp_mock_server_remove_endpoint() removes a registered slot and updates svr_ep_count, or reports not-found",
+      "text": "rcp_mock_server_remove_endpoint() shall, for a registered byte_bus_id, free its queued requests, remove its slot, decrement svr_ep_count, and return true; for an unregistered byte_bus_id it shall leave srv unchanged and return false.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-010",
+      "title": "rcp_mock_server_set_endpoint_enable() sets a registered endpoint's ep_enable, or reports not-found",
+      "text": "rcp_mock_server_set_endpoint_enable() shall set the ep_enable flag of the endpoint at a registered byte_bus_id and return true, or return false without effect for an unregistered byte_bus_id.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-011",
+      "title": "rcp_mock_server_endpoint_queue_len() returns a registered endpoint's queue length, or 0",
+      "text": "rcp_mock_server_endpoint_queue_len() shall return the number of requests currently queued on the endpoint at a registered byte_bus_id, or 0 for an unregistered byte_bus_id.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-012",
+      "title": "rcp_mock_server_dispatch() consults rcp_lifecycle_should_accept() before anything else",
+      "text": "rcp_mock_server_dispatch() shall call lifecycle.h's rcp_lifecycle_should_accept() with srv's own state and the given time_sync_supported/avtp_subtype/acf_msg_type/byte_bus_id, and shall return RCP_MOCK_DISPATCH_DROPPED with *out_response left zeroed whenever it returns false, without consulting any endpoint slot.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-013",
+      "title": "rcp_mock_server_dispatch() reports an unregistered byte_bus_id once admission succeeds",
+      "text": "rcp_mock_server_dispatch() shall return RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS, with *out_response left zeroed, when rcp_lifecycle_should_accept() accepts the frame but byte_bus_id names no registered endpoint.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-014",
+      "title": "rcp_mock_server_dispatch() runs the endpoint's handler immediately when its queue is enabled",
+      "text": "rcp_mock_server_dispatch() shall, for a registered and ep_enable=true endpoint, invoke its registered rcp_mock_endpoint_handler_fn synchronously with the given request/request_len and that endpoint's own user_data, populate *out_response from it, and return RCP_MOCK_DISPATCH_OK.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-015",
+      "title": "rcp_mock_server_dispatch() queues the request without running the handler when the endpoint is disabled",
+      "text": "rcp_mock_server_dispatch() shall, for a registered and ep_enable=false endpoint, append the request to that endpoint's queue without invoking its handler, leave *out_response zeroed, and return RCP_MOCK_DISPATCH_QUEUED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-016",
+      "title": "rcp_mock_server_drain_endpoint() runs the oldest queued request's handler once re-enabled",
+      "text": "rcp_mock_server_drain_endpoint() shall, for a registered endpoint with ep_enable=true and a non-empty queue, dequeue its oldest request, invoke its registered handler with that request, populate *out_response from it, and return true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-017",
+      "title": "rcp_mock_server_drain_endpoint() reports nothing to drain without invoking the handler",
+      "text": "rcp_mock_server_drain_endpoint() shall return false, with *out_response left zeroed and without invoking any handler, when the addressed endpoint's queue is empty or its ep_enable is false.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MOCK-018",
+      "title": "rcp_mock_server_drain_endpoint() reports an unregistered byte_bus_id",
+      "text": "rcp_mock_server_drain_endpoint() shall return false, with *out_response left zeroed, when byte_bus_id names no registered endpoint.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CFG-007",
+      "title": "parse_json parses the optional server object plus zero or more entry-list sections",
+      "text": "rcp_config_parse_json() shall populate out->server from an optional top-level server object's vendor_id/device_id/magic/svr_implemented_options fields, and shall parse an arbitrary number of hw_pin_map/endpoints/streams entries (each recognized by its own required key) from anywhere in the document, succeeding (RCP_OK) for an empty object.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CFG-008",
+      "title": "apply_to_mock sets the mock server's regmap general fields from the manifest",
+      "text": "rcp_config_apply_to_mock() shall set srv's own rcp_mock_server_regmap() vendor_id/device_id fields, OR its svr_implemented_options field, from m->server, leaving magic unchanged when m->server.magic is 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CFG-009",
+      "title": "apply_to_mock registers one mock endpoint per manifest endpoint entry",
+      "text": "rcp_config_apply_to_mock() shall call rcp_mock_server_add_endpoint() once per m->endpoints entry (byte_bus_id/ep_type/ep_enable, handler NULL) and shall return the first non-RCP_MOCK_OK result encountered without registering any later entry.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CFG-010",
+      "title": "load() parses then applies a manifest document in one call",
+      "text": "rcp_config_load() shall parse json with rcp_config_parse_json() and, on success, apply the result to srv with rcp_config_apply_to_mock(), returning RCP_CFG_ERR_PARSE (with err_msg filled) for a parse failure or the apply step's own rcp_mock_errc_t (cast to int) otherwise.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"

@@ -13,7 +13,7 @@
 //cfusa:test REQ-OBS-013
 #include "unity.h"
 
-#include <rcp/mock.h>
+#include "legacy_mock.h"
 #include <rcp/observe.h>
 #include <rcp/rcp.h>
 
