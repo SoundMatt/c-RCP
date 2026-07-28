@@ -2,8 +2,8 @@ Coverage report  source: coverage.info
 
   Design Assurance Level: DAL-B
 
-  Line      coverage:  93.77%  (5220 / 5567)  FAIL
-  Function  coverage: 100.00%  (675 / 675)
-  Branch    coverage:  73.48%  (1657 / 2255)  FAIL
+  Line      coverage:  93.99%  (5457 / 5806)  FAIL
+  Function  coverage: 100.00%  (702 / 702)
+  Branch    coverage:  74.07%  (1757 / 2372)  FAIL
 
   Overall: FAIL
