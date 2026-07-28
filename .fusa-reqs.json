@@ -3351,6 +3351,198 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-001",
+      "title": "Lifecycle states have their defined on-wire byte values",
+      "text": "RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, and RCP_SERVER_LIFECYCLE_RCP_CONFIGURED shall have the numeric values 0x00, 0x55, and 0xAA respectively.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-002",
+      "title": "HW_CFG_INCONSISTENT triggers on a missing HW pin mapping",
+      "text": "rcp_server_check_hw_cfg() shall return RCP_SERVER_ERR_HW_CFG_INCONSISTENT whenever any endpoint with ep_used set has hw_pin_mapped unset, regardless of the state of any other endpoint.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-003",
+      "title": "HW_CFG_INCONSISTENT triggers on a missing configured request stream",
+      "text": "rcp_server_check_hw_cfg() shall return RCP_SERVER_ERR_HW_CFG_INCONSISTENT whenever any endpoint with ep_used set has has_request_stream unset.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-004",
+      "title": "HW_CFG_INCONSISTENT does not trigger when every used endpoint is plausibly configured",
+      "text": "rcp_server_check_hw_cfg() shall return RCP_SERVER_OK when every endpoint with ep_used set has both hw_pin_mapped and has_request_stream set, ignoring endpoints with ep_used unset, and shall treat a NULL snapshot as inconsistent rather than vacuously plausible.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-005",
+      "title": "RCP_CFG_INCONSISTENT triggers on a missing stream/byte_bus_id association",
+      "text": "rcp_server_check_rcp_cfg() shall return RCP_SERVER_ERR_RCP_CFG_INCONSISTENT whenever any endpoint with ep_used set has has_stream_assoc unset.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-006",
+      "title": "RCP_CFG_INCONSISTENT triggers on a request stream missing its response stream",
+      "text": "rcp_server_check_rcp_cfg() shall return RCP_SERVER_ERR_RCP_CFG_INCONSISTENT whenever any request stream with configured set has has_response_stream unset.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-007",
+      "title": "RCP_CFG_INCONSISTENT does not trigger when every used endpoint and configured request stream is plausibly associated",
+      "text": "rcp_server_check_rcp_cfg() shall return RCP_SERVER_OK when every endpoint with ep_used set has has_stream_assoc set and every request stream with configured set has has_response_stream set, and shall treat a NULL snapshot as inconsistent rather than vacuously plausible.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-008",
+      "title": "HW_UNCONFIGURED to HW_CONFIGURED is gated by the HW_CFG_INCONSISTENT check",
+      "text": "rcp_server_lifecycle_transition() shall move *state from RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED to RCP_SERVER_LIFECYCLE_HW_CONFIGURED only when rcp_server_check_hw_cfg() returns RCP_SERVER_OK for the supplied snapshot, and shall otherwise leave *state unchanged and return the check's RCP_SERVER_ERR_HW_CFG_INCONSISTENT result.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-009",
+      "title": "HW_CONFIGURED to RCP_CONFIGURED is gated by the RCP_CFG_INCONSISTENT check",
+      "text": "rcp_server_lifecycle_transition() shall move *state from RCP_SERVER_LIFECYCLE_HW_CONFIGURED to RCP_SERVER_LIFECYCLE_RCP_CONFIGURED only when rcp_server_check_rcp_cfg() returns RCP_SERVER_OK for the supplied snapshot, and shall otherwise leave *state unchanged and return the check's RCP_SERVER_ERR_RCP_CFG_INCONSISTENT result.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-010",
+      "title": "HW_CONFIGURED to HW_UNCONFIGURED demotion is unconditional",
+      "text": "rcp_server_lifecycle_transition() shall move *state from RCP_SERVER_LIFECYCLE_HW_CONFIGURED to RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED and return RCP_SERVER_OK regardless of the supplied snapshot, including a NULL snapshot.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-011",
+      "title": "RCP_CONFIGURED to HW_UNCONFIGURED full-reset demotion is unconditional",
+      "text": "rcp_server_lifecycle_transition() shall move *state from RCP_SERVER_LIFECYCLE_RCP_CONFIGURED to RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED and return RCP_SERVER_OK regardless of the supplied snapshot, including a NULL snapshot.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-012",
+      "title": "Unmodeled lifecycle transitions are rejected",
+      "text": "rcp_server_lifecycle_transition() shall return RCP_SERVER_ERR_INVALID_TRANSITION and leave *state unchanged for any requested transition other than HW_UNCONFIGURED->HW_CONFIGURED, HW_CONFIGURED->RCP_CONFIGURED, HW_CONFIGURED->HW_UNCONFIGURED, RCP_CONFIGURED->HW_UNCONFIGURED, or a same-state transition -- including HW_UNCONFIGURED->RCP_CONFIGURED and RCP_CONFIGURED->HW_CONFIGURED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-013",
+      "title": "A same-state lifecycle transition is a no-op success",
+      "text": "rcp_server_lifecycle_transition() shall return RCP_SERVER_OK and leave *state unchanged whenever target equals the current *state, for all three lifecycle states, regardless of the supplied snapshot.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-014",
+      "title": "HW_UNCONFIGURED accepts an ACF_ABB request at the discovery byte_bus_id under NTSCF",
+      "text": "rcp_server_lifecycle_should_accept() shall return true for RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED when avtp_subtype is RCP_AVTP_SUBTYPE_NTSCF, acf_msg_type is RCP_ACF_MSG_TYPE_ABB, and byte_bus_id equals RCP_SERVER_DISCOVERY_BYTE_BUS_ID.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-015",
+      "title": "HW_UNCONFIGURED silently drops everything but the discovery ACF_ABB request",
+      "text": "rcp_server_lifecycle_should_accept() shall return false for RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED whenever avtp_subtype is not RCP_AVTP_SUBTYPE_NTSCF, acf_msg_type is not RCP_ACF_MSG_TYPE_ABB, or byte_bus_id does not equal RCP_SERVER_DISCOVERY_BYTE_BUS_ID.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-016",
+      "title": "HW_UNCONFIGURED drops any TSCF-headed frame regardless of time-sync support",
+      "text": "rcp_server_lifecycle_should_accept() shall return false for RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED whenever avtp_subtype is RCP_AVTP_SUBTYPE_TSCF, regardless of the value of time_sync_supported.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-017",
+      "title": "HW_CONFIGURED and RCP_CONFIGURED apply the ordinary TSCF/time-sync drop rule",
+      "text": "rcp_server_lifecycle_should_accept() shall return false for RCP_SERVER_LIFECYCLE_HW_CONFIGURED and RCP_SERVER_LIFECYCLE_RCP_CONFIGURED whenever rcp_avtp_should_drop_tscf() would return true for the given time_sync_supported and avtp_subtype, and shall otherwise return true for those two states.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-018",
+      "title": "HW_GENERIC fields become read-only once HW_CONFIGURED",
+      "text": "rcp_server_field_writable() shall return true for RCP_SERVER_FIELD_HW_GENERIC only when state is RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, for every writer context, and shall return false for that field kind in both RCP_SERVER_LIFECYCLE_HW_CONFIGURED and RCP_SERVER_LIFECYCLE_RCP_CONFIGURED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-019",
+      "title": "FUNCTIONAL_W fields require an authorized writer once RCP_CONFIGURED",
+      "text": "rcp_server_field_writable() shall return true for RCP_SERVER_FIELD_FUNCTIONAL_W in RCP_SERVER_LIFECYCLE_HW_CONFIGURED for every writer context, shall return false in RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED for every writer context, and shall return true in RCP_SERVER_LIFECYCLE_RCP_CONFIGURED if and only if writer.via_root_client_ep0 or writer.via_owning_stream is true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-020",
+      "title": "FUNCTIONAL_W_STAR fields are permanently locked once RCP_CONFIGURED",
+      "text": "rcp_server_field_writable() shall return false for RCP_SERVER_FIELD_FUNCTIONAL_W_STAR in RCP_SERVER_LIFECYCLE_RCP_CONFIGURED for every writer context, including one with both via_root_client_ep0 and via_owning_stream set, while returning true for that field kind in RCP_SERVER_LIFECYCLE_HW_CONFIGURED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-021",
+      "title": "A disabled endpoint queues submitted requests instead of executing them",
+      "text": "rcp_server_endpoint_submit() shall return false and append a copy of the submitted request to ep's queue (incrementing the value rcp_server_endpoint_queue_len() reports) whenever ep->ep_enable is false at the time of the call.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-022",
+      "title": "An enabled endpoint reports immediate execution without touching its queue",
+      "text": "rcp_server_endpoint_submit() shall return true and leave rcp_server_endpoint_queue_len() unchanged whenever ep->ep_enable is true at the time of the call.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-023",
+      "title": "Re-enabling an endpoint drains its queued requests in FIFO order",
+      "text": "rcp_server_endpoint_drain_one() shall return false and leave the queue untouched while ep->ep_enable is false, and after rcp_server_endpoint_set_enable() sets ep->ep_enable to true, repeated calls to rcp_server_endpoint_drain_one() shall dequeue every previously-queued request in the same order it was submitted, returning false once the queue is empty.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SRV-024",
+      "title": "rcp_server_strerror() returns a unique human-readable message",
+      "text": "rcp_server_strerror() shall return a distinct, non-empty, non-NULL string for each of RCP_SERVER_OK, RCP_SERVER_ERR_HW_CFG_INCONSISTENT, RCP_SERVER_ERR_RCP_CFG_INCONSISTENT, and RCP_SERVER_ERR_INVALID_TRANSITION.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
     }
   ]
 }

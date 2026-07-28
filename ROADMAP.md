@@ -2207,7 +2207,7 @@ lifecycle as "probably the single biggest structural gap" relative to the
 old informal protocol — expect this to touch register-access code paths
 pervasively for the rest of the program.
 
-### 61. Lifecycle state machine (v0.61.0)
+### 61. Lifecycle state machine (v0.61.0) ✅
 
 - `include/rcp/server.h` + `src/server.c`: `rcp_server_lifecycle_t` with
   the three states `HW_UNCONFIGURED` (`0x00`), `HW_CONFIGURED` (`0x55`),
@@ -2229,6 +2229,69 @@ pervasively for the rest of the program.
   collapsed into one writability bit.
 - Per-endpoint `ep_enable`: disabled endpoints still queue requests
   without executing them (pre-load-then-drain-on-enable semantics).
+
+**Done (v0.61.0)**: `include/rcp/server.h` + `src/server.c` land as new,
+additive protocol-core surface layered on top of milestone 59's AVTPDU
+framing and milestone 60's ACF message format. Nothing in `rcp.h`,
+`wire.c`, `avtp.h`/`avtp.c`, `acf.h`/`acf.c`, or any satellite package is
+touched.
+- `rcp_server_lifecycle_t` (`HW_UNCONFIGURED`/`HW_CONFIGURED`/
+  `RCP_CONFIGURED` = `0x00`/`0x55`/`0xAA`) plus `rcp_server_errc_t`
+  (`RCP_SERVER_ERR_HW_CFG_INCONSISTENT`/`_RCP_CFG_INCONSISTENT`/
+  `_INVALID_TRANSITION`). The two plausibility checks
+  (`rcp_server_check_hw_cfg()`/`_check_rcp_cfg()`) run over a minimal,
+  self-contained `rcp_server_plausibility_snapshot_t` stand-in
+  (per-endpoint `ep_used`/`hw_pin_mapped`/`has_request_stream`/
+  `has_stream_assoc`, per-request-stream `configured`/
+  `has_response_stream`) — deliberately not milestone 62's full register
+  tables, per this milestone's own scope limit above. A `NULL` snapshot is
+  treated as inconsistent (fail-safe), never as vacuously plausible.
+- `rcp_server_lifecycle_transition()`: gates `HW_UNCONFIGURED` →
+  `HW_CONFIGURED` and `HW_CONFIGURED` → `RCP_CONFIGURED` behind the two
+  plausibility checks, leaving state unchanged and returning the specific
+  `*_INCONSISTENT` code on failure; treats `HW_CONFIGURED` →
+  `HW_UNCONFIGURED` and `RCP_CONFIGURED` → `HW_UNCONFIGURED` (the
+  discovery-stream/root-client reset path) as unconditional; treats a
+  same-state target as a no-op success; rejects every other transition
+  (e.g. skipping straight to `RCP_CONFIGURED`, or downgrading from
+  `RCP_CONFIGURED` to `HW_CONFIGURED` directly) with
+  `RCP_SERVER_ERR_INVALID_TRANSITION`.
+- `rcp_server_lifecycle_should_accept()`: the per-state request-filtering
+  rule as its own directly-tested function, mirroring `avtp.c`'s
+  `rcp_avtp_should_drop_tscf()` convention and reusing that function for
+  the ordinary TSCF/time-sync rule. While `HW_UNCONFIGURED`, a TSCF-headed
+  frame is dropped outright regardless of time-sync support (presentation
+  time presupposes a configured request stream that cannot exist yet), and
+  only an NTSCF-headed ACF_ABB request at `RCP_SERVER_DISCOVERY_BYTE_BUS_ID`
+  is accepted — everything else is silently dropped. While `HW_CONFIGURED`/
+  `RCP_CONFIGURED`, frame-level acceptance beyond the time-sync rule is
+  unrestricted at this milestone.
+- `rcp_server_field_writable()`: register-locking-by-state over
+  `rcp_server_field_kind_t` — `HW_GENERIC` (writable only in
+  `HW_UNCONFIGURED`), `FUNCTIONAL_W` (writable by any writer while
+  `HW_CONFIGURED`, restricted to `rcp_server_writer_ctx_t`'s
+  `via_root_client_ep0`/`via_owning_stream` once `RCP_CONFIGURED`), and
+  `FUNCTIONAL_W_STAR` (same through `HW_CONFIGURED`, but permanently
+  locked for every writer once `RCP_CONFIGURED`) — three distinct enum
+  values, not one writability bit, per the roadmap's explicit requirement.
+- `rcp_server_endpoint_t` + `rcp_server_endpoint_submit()`/
+  `_set_enable()`/`_drain_one()`/`_queue_len()`: pre-load-then-drain-on-
+  enable semantics for per-endpoint `ep_enable` — a disabled endpoint
+  queues (rather than executes) a submitted request; `drain_one()` refuses
+  while still disabled and otherwise dequeues in FIFO order once
+  re-enabled.
+- `tests/test_server.c` (36 cases): lifecycle wire values; both
+  plausibility checks in triggering and non-triggering form (including the
+  `NULL`-snapshot fail-safe); every modeled and rejected lifecycle
+  transition; per-state request filtering (discovery accept, silent drop,
+  TSCF-outright-drop while `HW_UNCONFIGURED`; the ordinary time-sync rule
+  once configured); register-locking for `HW_GENERIC`/`FUNCTIONAL_W`/
+  `FUNCTIONAL_W_STAR`; and `ep_enable`'s queue-then-drain-on-enable
+  behavior, including FIFO ordering and destroying a non-empty queue.
+- 24 new requirements (`REQ-SRV-001`..`024`) added to `.fusa-reqs.json`;
+  `cfusa trace --req-coverage 100` (both metrics), `cfusa check`/`lint`/
+  `analyze`/`cyber` (0 errors), the full `ctest` suite (44/44, including
+  under ASan/UBSan), and `relay conform --strict` all stay green.
 
 ### 62. Register-map model (v0.62.0)
 
