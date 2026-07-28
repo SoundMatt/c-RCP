@@ -1783,3 +1783,59 @@ them as a complete TARA covering 5 named threats.
   docs/JSON/CI) against a freshly rebuilt `cfusa` binary. Confirmed
   `tara.json` is valid JSON and `release.yml`'s YAML parses cleanly
   after the edits.
+
+### 58. RELAY-conformance audit remediation, batch 5: real TLC verification (v0.58.0)
+---
+
+Closes issue #57 (P2), the last of the 7-issue second conformance
+audit. `FORMAL_VERIFICATION.md` claimed the 3 TLA+ specs in `tla/`
+model-check cleanly, but the audit found: no `.cfg` existed for any
+spec, no CI job ever ran TLC, `AntiReplayGuard.tla` didn't even parse
+for model-checking, and its `NoDoubleAccept` safety property was stated
+backwards. **Actually did the formal verification, rather than just
+downgrading the doc's claim** — downloaded `tla2tools.jar` (TLC2 2.19,
+already present locally from the audit's own investigation) and ran it
+for real, iterating until all three specs genuinely pass.
+- **`AntiReplayGuard.tla`** (the spec with real bugs): `\E n \in Nat`
+  is a non-enumerable quantifier bound — confirmed directly ("TLC
+  encountered a non-enumerable quantifier bound Nat"). Bounded it to a
+  new `MaxSeq` CONSTANT. `NoDoubleAccept` was
+  `\A n \in accepted : n \notin accepted'` — backwards, since `accepted`
+  only ever grows (`Check`'s `accepted' = accepted \cup {n}`); fails on
+  the very first accept. Corrected to
+  `\A n \in accepted : n \in accepted'` (monotonicity — combined with
+  `Check(n)`'s own `n \notin accepted` precondition, this is what "no
+  double acceptance" actually means for this model). First attempt at
+  an *additional* invariant (`WindowInvariant`, asserting every accepted
+  `n` stays within the current window forever) was itself wrong and
+  caught by TLC — old accepted entries are *supposed* to age out of the
+  window without being forgotten (that's how duplicate detection keeps
+  working), so the invariant was dropped rather than kept and
+  mis-explained.
+- **`HealthStateMachine.tla`**: `miss_count` grew without bound (`Miss`
+  incremented it forever, even after reaching `Faulted`), making the
+  state space genuinely infinite — TLC would never terminate. Capped it
+  at `MaxMiss` in the model itself, confirmed to be a model-checking-only
+  bound with no behavioral difference (no C or TLA+ logic reads
+  `miss_count` past the point it first reaches the fault threshold).
+- **`WatchdogProtocol.tla`**: `clock` is a genuinely free-running counter
+  with no fixed point (`Tick` always fires `clock' = clock + 1`) —
+  bounded via a `ClockBound` state CONSTRAINT in the `.cfg`, the standard
+  TLA+ idiom for this exact situation (doesn't touch the spec itself).
+- **All three now genuinely pass**: re-ran each one after every fix,
+  confirmed the real `Model checking completed. No error has been
+  found.` output each time — not inferred from the corrected formulas,
+  actually executed via `tla2tools.jar`.
+- **Wired into CI**: new `formal-verification` job in `ci.yml`
+  downloads `tla2tools.jar` from the official TLA+ releases and
+  model-checks all three specs on every push/PR against `main`,
+  failing the job on any violation.
+- Updated `FORMAL_VERIFICATION.md` with a "Corrections" section
+  documenting exactly what was wrong and what changed, and restored
+  `CYBERSECURITY.md`'s "formally verified" claim for the E2E anti-replay
+  guard (softened to "disputed" during issue #56's remediation, now
+  genuinely true again) — including the TARA's own TS-002 entry, which
+  had explicitly avoided relying on the disputed claim.
+- This closes the last of the 7 issues from the second RELAY-conformance
+  audit (#55–#61), plus the two issues (#69, TARA's OTA-tampering entry)
+  discovered and fixed along the way. All are now closed.

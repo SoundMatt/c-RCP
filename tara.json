@@ -6,7 +6,7 @@
   "language": "c",
   "generatedAt": "2026-07-28T01:05:37Z",
   "project": "c-RCP",
-  "version": "0.57.0",
+  "version": "0.58.0",
   "standard": "ISO 21434:2021 Clause 9",
   "note": "Hand-authored, not `cfusa tara`-generated. cfusa tara only emits a placeholder skeleton (no input-file mechanism to seed real content) -- see ROADMAP.md milestone 57 and CYBERSECURITY.md section 3 for why this file is maintained by hand rather than regenerated on every release, matching the precedent already set by HARA.md/.fusa-hara.json in this same repo. Update by hand when threats, mitigations, or their implementation status change.",
   "assets": [
@@ -40,7 +40,7 @@
       "treatment": "reduce",
       "cybersecurity_goal": "No command or status message carrying a previously-seen or excessively-stale sequence number shall be accepted.",
       "requirement_ref": "REQ-E2E-007, REQ-E2E-008",
-      "notes": "rcp_e2e_replay_guard_t's 32-entry sliding-window bitmap (REAL, working, exercised by test_e2e.c) rejects duplicate sequence numbers and any sequence number more than 32 behind the high-water mark. This risk rating is based on that guard's tested runtime behavior, NOT on a formal-proof claim -- FORMAL_VERIFICATION.md's claim that tla/AntiReplayGuard.tla model-checks cleanly is separately disputed and under remediation (issue #57); this TARA entry does not rely on it."
+      "notes": "rcp_e2e_replay_guard_t's 32-entry sliding-window bitmap (REAL, working, exercised by test_e2e.c) rejects duplicate sequence numbers and any sequence number more than 32 behind the high-water mark. This risk rating is grounded in both the guard's tested runtime behavior and a real TLC model-check of tla/AntiReplayGuard.tla (issue #57, fixed 2026-07-28 -- the spec previously didn't even parse for model-checking and its safety property was stated backwards; both are corrected, re-verified via an actual TLC run, and wired into CI)."
     },
     {
       "id": "TS-003",

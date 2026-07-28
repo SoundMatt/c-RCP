@@ -38,7 +38,13 @@ Kick(z) ==
 Miss(z) ==
     LET mc == miss_count[z]
     IN
-    /\ miss_count' = [miss_count EXCEPT ![z] = mc + 1]
+    \* Cap mc at MaxMiss: only the first MaxMiss misses affect the state
+    \* transition below, and capping keeps miss_count's range finite for
+    \* TLC (the real rcp_watchdog_keeper_t's misses counter is an
+    \* uncapped int -- this cap is a model-checking-only bound, not a
+    \* behavioral difference; confirmed no C code anywhere reads misses
+    \* past the point it first reaches fault_after/degrade_after).
+    /\ miss_count' = [miss_count EXCEPT ![z] = IF mc < MaxMiss THEN mc + 1 ELSE mc]
     /\ IF state[z] = Healthy
        THEN state' = [state EXCEPT ![z] = Degraded]
        ELSE IF state[z] = Degraded /\ mc + 1 >= MaxMiss
