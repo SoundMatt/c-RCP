@@ -1,5 +1,5 @@
 Software Configuration Index
-Project: c-RCP v0.55.0   Generated: 2026-07-28T01:05:37Z
+Project: c-RCP v0.56.0   Generated: 2026-07-28T01:20:01Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
@@ -18,9 +18,9 @@ FILE                                                          SHA-256
 ./include/rcp/redundancy.h                                    b85949273fd6ef714b5d12b7200b4ec6a76090d8221fa55506a2f8f57240dc25
 ./include/rcp/mqttbr.h                                        2dec415b7742732dcd64ed0136a2c057c5e0cb2fe3239a5d10fa55ceb28b954b
 ./include/rcp/config.h                                        a11add969d5b0e883eab513a322e3bf06523b80cf39c0f0a9f8b574f387b0f62
-./include/rcp/adapt.h                                         6623ba9c2942ffa9491e2531294eefa6e6d61b5ddfba17390cb42343ca5e1a45
+./include/rcp/adapt.h                                         a3a7e233c9a8773973ce2ea6b251fcd40f3403fc395f03ac77e97f689e8720b5
 ./include/rcp/udp.h                                           05bf00b6fb1f1ee26bba018cc9cb414a138fbd29196348678a88ef140c164e41
-./include/rcp/version.h                                       c6440ce1c39f2004298458bb68b66ea72d8cde7ab5bcfdf611ffccd7c946cbdd
+./include/rcp/version.h                                       053c18dbc428308bbb740b80323ff7f5fcc04d1e96b5f41f84aedb404f483462
 ./include/rcp/recorder.h                                      db4b9c80c24ccb3e68daa06378ed700c53c70cc97131305133d2ccf5b9a03732
 ./include/rcp/cli.h                                           d479738a54a077a4a0019dec3ec62a39b73857fadbe1ae2745d2f7609506b7d9
 ./include/rcp/firmware.h                                      05e7c8629d16284d9c39d092090ab95872d5f8c9128918e7d31d51ffac52404c
@@ -57,7 +57,7 @@ FILE                                                          SHA-256
 ./src/e2e.c                                                   c138a419113fe5b522e7331705cc69d8ea0a3a97e2ec20955b07e53e2f72a08c
 ./src/firmware.c                                              60c0ddbbc09d8b0e414beef42079893f08609761419c282e1b5427e5bddeeeac
 ./src/mock.c                                                  223bc296c2754623525788f7370394098f35c175007c294def0080e29ee8a4ce
-./src/adapt.c                                                 d7d7df3f537837eea68e31c229ee573121055b54e2399d850cbdeaad44ed89d1
+./src/adapt.c                                                 78bf204c40bfdbfc343122cc4041a4005260d7d3e23ace149e45b1100f289feb
 ./src/admin.c                                                 17a89f685e1aabc19d5303b274f2cb065a32924132ae8cc9faaba6efeaa0dffb
 ./src/cli.c                                                   3ae5682df54f11a7ae5b34d04ec3e4566d223a0e959cf2d113948f4f1cbb957f
 ./src/observe.c                                               3b09c139c9f5618a5539b23045dc1e3a6a6c9be68a2a553d6e4d6e8f2b8827ab
@@ -88,7 +88,7 @@ FILE                                                          SHA-256
 ./src/wire.c                                                  8191e7c0c7da4a61694e18fc0c6e22b4e374a099ec7041c60a6ce72c46c64fec
 ./src/someipbr.c                                              a004339867ab69c2f50f5f8c49c16cfd6eb77173104f4a4dbdd1faa8cb87b2b7
 ./src/recorder.c                                              314abce9dbec09a16c6e01d09c3e3cf4c43afedabf720727317a9e2b5f3e8d92
-./tests/test_adapt.c                                          f3b09e749c7f35e24ec00316f214e869c1141be534e70a5024b051307f383853
+./tests/test_adapt.c                                          b0aa4726fc4b3f14e5370e1f703d43166045316fd35edb88ad78c02710b21f56
 ./tests/test_powerstate.c                                     2a3cb88e440e3b42942f37aee8e1876419b1e1f9d4a58f07fab92ec810306789
 ./tests/test_ratelimit.c                                      54191cd3a0236b49f6fff2aee838278032ca533969b07ef1708d9ee9fa4539f8
 ./tests/test_udp.c                                            66c9475bedb4a2295f7e72ec0a0c1c62bc17f6be51495e1414557d37fdb66c78
