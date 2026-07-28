@@ -3063,6 +3063,14 @@
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM"
+    },
+    {
+      "id": "REQ-RELAY-017",
+      "title": "Native errors report equivalence to RELAY common-error sentinels",
+      "text": "rcp_errc_to_relay_errc() shall report true and the corresponding relay_errc_t for RCP_ERR_CLOSED and RCP_ERR_TIMEOUT, and false for RCP_OK and any rcp_errc_t value with no RELAY common-error equivalent.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM"
     }
   ]
 }

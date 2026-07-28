@@ -20,6 +20,7 @@
 //cfusa:test REQ-RELAY-013
 //cfusa:test REQ-RELAY-015
 //cfusa:test REQ-RELAY-016
+//cfusa:test REQ-RELAY-017
 #include "unity.h"
 
 #include <rcp/adapt.h>
@@ -383,6 +384,62 @@ static void test_caller_retain_returns_same_pointer_and_keeps_it_alive(void)
     rcp_relay_caller_release(caller);
 }
 
+/* ── §5.2 error wrapping ───────────────────────────────────────────────────── */
+
+static void test_send_closed_error_is_relay_equivalent(void)
+{
+    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
+    rcp_relay_caller_t *caller = rcp_adapt(ctrl);
+    relay_context_t ctx = relay_context_with_timeout_ms(1000);
+    relay_message_t msg;
+    relay_errc_t relay_ec;
+    int ec;
+
+    rcp_controller_close(ctrl);
+
+    relay_message_init(&msg);
+    relay_message_set_id(&msg, "FrontLeft");
+
+    ec = rcp_relay_caller_send(caller, &ctx, &msg);
+    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, ec);
+    TEST_ASSERT_TRUE(rcp_errc_to_relay_errc(ec, &relay_ec));
+    TEST_ASSERT_EQUAL(RELAY_ERRC_CLOSED, relay_ec);
+
+    relay_message_free(&msg);
+    rcp_relay_caller_release(caller);
+}
+
+static void test_call_timeout_error_is_relay_equivalent(void)
+{
+    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
+    rcp_relay_caller_t *caller = rcp_adapt(ctrl);
+    relay_context_t ctx = relay_context_with_deadline_ms(1); /* already expired */
+    relay_message_t req, resp = {0};
+    relay_errc_t relay_ec;
+    int ec;
+
+    relay_message_init(&req);
+    relay_message_set_id(&req, "FrontLeft");
+
+    ec = rcp_relay_caller_call(caller, &ctx, &req, &resp);
+    TEST_ASSERT_EQUAL(RCP_ERR_TIMEOUT, ec);
+    TEST_ASSERT_TRUE(rcp_errc_to_relay_errc(ec, &relay_ec));
+    TEST_ASSERT_EQUAL(RELAY_ERRC_TIMEOUT, relay_ec);
+
+    relay_message_free(&req);
+    rcp_relay_caller_release(caller);
+}
+
+static void test_ok_and_rcp_specific_errors_have_no_relay_equivalent(void)
+{
+    relay_errc_t relay_ec;
+
+    TEST_ASSERT_FALSE(rcp_errc_to_relay_errc(RCP_OK, &relay_ec));
+    TEST_ASSERT_FALSE(rcp_errc_to_relay_errc(RCP_ERR_ZONE_MISMATCH, &relay_ec));
+    TEST_ASSERT_FALSE(rcp_errc_to_relay_errc(RCP_ERR_NOT_FOUND, &relay_ec));
+    TEST_ASSERT_FALSE(rcp_errc_to_relay_errc(RCP_ERR_FORBIDDEN, &relay_ec));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -414,6 +471,10 @@ int main(void)
     RUN_TEST(test_adapt_subscribe_returns_valid_channel);
     RUN_TEST(test_adapt_close_is_idempotent);
     RUN_TEST(test_caller_retain_returns_same_pointer_and_keeps_it_alive);
+
+    RUN_TEST(test_send_closed_error_is_relay_equivalent);
+    RUN_TEST(test_call_timeout_error_is_relay_equivalent);
+    RUN_TEST(test_ok_and_rcp_specific_errors_have_no_relay_equivalent);
 
     return UNITY_END();
 }

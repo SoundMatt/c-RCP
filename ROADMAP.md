@@ -1668,3 +1668,62 @@ follow-up milestones.
   `ctest` (41/41), fresh local `cfusa check --strict` (0 errors) and
   `cfusa trace --req-coverage 100` (exit 0, both metrics 100%) against a
   freshly rebuilt `cfusa` binary.
+
+### 56. RELAY-conformance audit remediation, batch 3: Adapt() error wrapping (v0.56.0)
+---
+
+Closes issue #55 (P1): `adapter_send()`/`adapter_call()`/
+`adapter_subscribe()`/`adapter_close()` returned native `rcp_errc_t`
+values directly, with no way for a caller written against the generic
+`relay::Caller`-equivalent contract to test `ec == RELAY_ERRC_CLOSED` in
+a protocol-agnostic way, unmet against spec §5.2 / §17 requirement 3.
+- **A genuine numeric hazard found while implementing the issue's own
+  suggested fix, not just style disagreement**: the issue suggests an
+  `rcp_errc_to_relay_errc()` translation "applied at the
+  adapter_send/_call/_subscribe/_close boundary." Read literally (having
+  those four functions *return* the translated `relay_errc_t` value in
+  place of the native one), this collides catastrophically:
+  `RELAY_ERRC_CLOSED` is numerically `0` — the exact same value
+  `rcp_relay_caller_send()` (and every other `rcp_errc_t`-returning
+  function in this codebase) already use for **success**
+  (`RCP_OK == 0`, documented in `relay.h`'s own vtable comment as
+  "RELAY_OK-equivalent 0 return"). Substituting the raw sentinel value
+  into the return path would make a real "closed" *failure*
+  indistinguishable from success for any caller checking
+  `ec != RCP_OK` — turning an error into an apparent success, not a
+  cosmetic gap. Other language bindings avoid this because
+  `std::error_condition`/`errors.Is` are structured types where "no
+  error" is distinct from "error code 0 in category X"; plain C has no
+  such category machinery.
+- **Fix**: implemented `rcp_errc_to_relay_errc(int rcp_ec, relay_errc_t
+  *out)` as a **query function**, not a value substitution —
+  `adapter_send()`/`_call()`/`_subscribe()`/`_close()` continue
+  returning their real `rcp_errc_t` values unchanged (so `RCP_OK`
+  safely stays `0`), and a caller wanting protocol-agnostic sentinel
+  testing calls this function on the (non-`RCP_OK`) result instead of
+  comparing the raw return value directly. This satisfies the substance
+  of §5.2 (protocol-specific errors are recognizably equivalent to the
+  four common sentinels) through a mechanism that's actually safe under
+  this project's plain-int error-code convention, and is documented as a
+  deliberate adaptation in both `adapt.h` and this entry rather than a
+  silent deviation from the issue's literal suggested code.
+- Maps `RCP_ERR_CLOSED` → `RELAY_ERRC_CLOSED` and `RCP_ERR_TIMEOUT` →
+  `RELAY_ERRC_TIMEOUT` — the only two RCP-specific codes with a genuine
+  RELAY common-sentinel equivalent. `RCP_OK` and every other RCP-specific
+  code (`NOT_FOUND`, `ALREADY_EXISTS`, `BUSY`, `ZONE_MISMATCH`,
+  `NOT_SUPPORTED`, `FORBIDDEN`) report no equivalence — they're
+  legitimate protocol-specific conditions, not one of RELAY's four.
+  RELAY's other two sentinels (`NOT_CONNECTED`, `PAYLOAD_TOO_LARGE`)
+  have no corresponding RCP condition to map from.
+- New `REQ-RELAY-017`, tested end-to-end: closing the wrapped controller
+  then calling `rcp_relay_caller_send()` really does produce
+  `RCP_ERR_CLOSED`, which really does translate to
+  `RELAY_ERRC_CLOSED`; an already-expired context on
+  `rcp_relay_caller_call()` produces `RCP_ERR_TIMEOUT` →
+  `RELAY_ERRC_TIMEOUT`; and `RCP_OK`/`RCP_ERR_ZONE_MISMATCH`/
+  `RCP_ERR_NOT_FOUND`/`RCP_ERR_FORBIDDEN` all correctly report no
+  equivalence.
+- **Verified**: full rebuild + `ctest` (41/41), ASan/UBSan rebuild +
+  `ctest` (41/41), fresh local `cfusa check --strict` (0 errors) and
+  `cfusa trace --req-coverage 100` (100%, both metrics) against a
+  freshly rebuilt `cfusa` binary.
