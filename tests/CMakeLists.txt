@@ -103,6 +103,31 @@ target_link_libraries(test_compound PRIVATE rcp::rcp unity)
 target_compile_options(test_compound PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_compound COMMAND test_compound)
 
+add_executable(test_triggered test_triggered.c)
+target_link_libraries(test_triggered PRIVATE rcp::rcp unity)
+target_compile_options(test_triggered PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_triggered COMMAND test_triggered)
+
+add_executable(test_chained test_chained.c)
+target_link_libraries(test_chained PRIVATE rcp::rcp unity)
+target_compile_options(test_chained PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_chained COMMAND test_chained)
+
+add_executable(test_timed test_timed.c)
+target_link_libraries(test_timed PRIVATE rcp::rcp unity)
+target_compile_options(test_timed PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_timed COMMAND test_timed)
+
+add_executable(test_cancel test_cancel.c)
+target_link_libraries(test_cancel PRIVATE rcp::rcp unity)
+target_compile_options(test_cancel PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_cancel COMMAND test_cancel)
+
+add_executable(test_scheduler test_scheduler.c)
+target_link_libraries(test_scheduler PRIVATE rcp::rcp unity)
+target_compile_options(test_scheduler PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_scheduler COMMAND test_scheduler)
+
 add_executable(test_udp test_udp.c)
 target_link_libraries(test_udp PRIVATE rcp::rcp unity)
 target_compile_options(test_udp PRIVATE ${RCP_TEST_WARNING_FLAGS})

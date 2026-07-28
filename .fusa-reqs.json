@@ -1858,7 +1858,7 @@
     },
     {
       "id": "REQ-PWR-002",
-      "title": "sleep() transitions Active→Sleeping",
+      "title": "sleep() transitions Active\u2192Sleeping",
       "text": "A successful sleep() call shall transition the zone from Active to Sleeping.",
       "standard": "iso26262",
       "level": "ASIL-B",
@@ -1874,7 +1874,7 @@
     },
     {
       "id": "REQ-PWR-004",
-      "title": "wake() transitions Sleeping→Active",
+      "title": "wake() transitions Sleeping\u2192Active",
       "text": "A successful wake() call shall transition the zone from Sleeping or BusOff to Active.",
       "standard": "iso26262",
       "level": "ASIL-B",
@@ -2563,7 +2563,7 @@
     {
       "id": "REQ-UDP-005",
       "title": "rcp_command_type_t field for commands",
-      "text": "Bytes 5–6 of Command frames shall encode the rcp_command_type_t as a big-endian uint16.",
+      "text": "Bytes 5\u20136 of Command frames shall encode the rcp_command_type_t as a big-endian uint16.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -2579,7 +2579,7 @@
     {
       "id": "REQ-UDP-007",
       "title": "Command/response ID field",
-      "text": "Bytes 8–11 shall encode the Command or Response ID as a big-endian uint32.",
+      "text": "Bytes 8\u201311 shall encode the Command or Response ID as a big-endian uint32.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -2587,7 +2587,7 @@
     {
       "id": "REQ-UDP-008",
       "title": "Payload length field",
-      "text": "Bytes 12–15 shall encode the payload byte count as a big-endian uint32.",
+      "text": "Bytes 12\u201315 shall encode the payload byte count as a big-endian uint32.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -2611,7 +2611,7 @@
     {
       "id": "REQ-UDP-011",
       "title": "Frame validation rejects bad magic",
-      "text": "The decoder shall return an error if frame bytes 0–1 are not 0x52, 0x43.",
+      "text": "The decoder shall return an error if frame bytes 0\u20131 are not 0x52, 0x43.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -2858,7 +2858,7 @@
     },
     {
       "id": "REQ-RELAY-005",
-      "title": "rcp_status_to_message() maps Status fields per §15.7.5",
+      "title": "rcp_status_to_message() maps Status fields per \u00a715.7.5",
       "text": "rcp_status_to_message() shall set protocol to RCP, id to the zone's PascalCase name, payload to a copy of the status payload, seq to the status sequence number, timestamp_ms to the current wall-clock time, and meta[\"rcp.healthy\"] to \"true\" or \"false\".",
       "standard": "iso26262",
       "level": "ASIL-B",
@@ -2866,7 +2866,7 @@
     },
     {
       "id": "REQ-RELAY-006",
-      "title": "rcp_response_to_message() maps Response fields per §15.7.5",
+      "title": "rcp_response_to_message() maps Response fields per \u00a715.7.5",
       "text": "rcp_response_to_message() shall set protocol to RCP, id to the zone's PascalCase name, payload to a copy of the response payload, and meta[\"rcp.status\"] to the decimal string of the response status.",
       "standard": "iso26262",
       "level": "ASIL-B",
@@ -2874,7 +2874,7 @@
     },
     {
       "id": "REQ-RELAY-007",
-      "title": "rcp_message_to_command() maps Message fields per §15.7.5",
+      "title": "rcp_message_to_command() maps Message fields per \u00a715.7.5",
       "text": "rcp_message_to_command() shall set zone from the message id (via rcp_zone_from_string), priority from meta[\"rcp.priority\"] (\"high\"/\"critical\"/else Normal), type from meta[\"rcp.cmd_type\"] (\"set\"/\"get\"/\"reset\"/\"watchdog\"/\"sleep\"/\"wake\"/else Noop), and payload borrowed from the message payload.",
       "standard": "iso26262",
       "level": "ASIL-B",
@@ -2923,7 +2923,7 @@
     {
       "id": "REQ-RELAY-013",
       "title": "RCP_SPEC_VERSION aliases RELAY_SPEC_VERSION",
-      "text": "RCP_SPEC_VERSION shall be defined and shall equal RELAY_SPEC_VERSION, per the RELAY spec's required package-level SpecVersion export (§17 requirement 12, §19.4).",
+      "text": "RCP_SPEC_VERSION shall be defined and shall equal RELAY_SPEC_VERSION, per the RELAY spec's required package-level SpecVersion export (\u00a717 requirement 12, \u00a719.4).",
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A"
@@ -2963,7 +2963,7 @@
     {
       "id": "REQ-CLI-004",
       "title": "Unknown command or missing argument returns exit code 2",
-      "text": "rcp_cli_run() shall return RCP_CLI_INVALID_ARGS (2) for an empty argument list, an unrecognized command, or an unrecognized/incomplete --format value, per RELAY spec §11.3 exit code conventions.",
+      "text": "rcp_cli_run() shall return RCP_CLI_INVALID_ARGS (2) for an empty argument list, an unrecognized command, or an unrecognized/incomplete --format value, per RELAY spec \u00a711.3 exit code conventions.",
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A"
@@ -2979,7 +2979,7 @@
     {
       "id": "REQ-CLI-006",
       "title": "CLI entry point forwards process arguments to rcp_cli_run()",
-      "text": "The c-rcp executable's main() shall forward argv[1..argc) and stdout/stderr to rcp_cli_run() unmodified and return its exit code, per the RELAY spec's CLI contract (§11.3).",
+      "text": "The c-rcp executable's main() shall forward argv[1..argc) and stdout/stderr to rcp_cli_run() unmodified and return its exit code, per the RELAY spec's CLI contract (\u00a711.3).",
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A"
@@ -5724,6 +5724,414 @@
       "id": "REQ-CMP-024",
       "title": "rcp_compound_wait_tick() never advances a sequencer that has already left start_state, even on a condition match",
       "text": "rcp_compound_wait_tick() shall return false and leave table unchanged when condition_met is true but the target sequencer's current state does not equal step->start_state.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TRIG-001",
+      "title": "rcp_request_type_is_triggered() recognizes RCP_REQUEST_TYPE_TRIGGERED and its safety variant",
+      "text": "rcp_request_type_is_triggered() shall return true iff request_type == RCP_REQUEST_TYPE_TRIGGERED or request_type == RCP_REQUEST_TYPE_TRIGGERED_SAFETY.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TRIG-002",
+      "title": "rcp_triggered_strerror() never returns NULL and gives every error code a distinct message",
+      "text": "rcp_triggered_strerror() shall return a non-NULL string for every rcp_triggered_errc_t value, including unrecognized ones, with each defined error code mapped to a distinct message.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TRIG-003",
+      "title": "rcp_triggered_encode_request() rejects a request_type it does not recognize",
+      "text": "rcp_triggered_encode_request() shall return a zeroed rcp_bytes_t (data == NULL) when request_type is neither RCP_REQUEST_TYPE_TRIGGERED nor RCP_REQUEST_TYPE_TRIGGERED_SAFETY.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TRIG-004",
+      "title": "rcp_triggered_encode_request() packs step into the repurposed message_timestamp region",
+      "text": "For a recognized request_type, rcp_triggered_encode_request() shall produce an ACF_GBB frame with mtv forced to RCP_ACF_MTV_UNTIMED, the opcode byte set to request_type, and step's sequencer_index/start_state/next_state/trigger_exec_delay_ms/repeat_count packed into the remaining 7 sub-field bytes.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TRIG-005",
+      "title": "rcp_triggered_decode_request() maps ACF decode failures to their rcp_triggered_errc_t equivalents",
+      "text": "rcp_triggered_decode_request() shall return RCP_TRIGGERED_ERR_SHORT_FRAME or RCP_TRIGGERED_ERR_BAD_MSG_TYPE when rcp_acf_decode_gbb() reports the corresponding failure.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TRIG-006",
+      "title": "rcp_triggered_decode_request() rejects a non-repurposed message_timestamp",
+      "text": "rcp_triggered_decode_request() shall return RCP_TRIGGERED_ERR_NOT_REPURPOSED when the decoded mtv is not RCP_ACF_MTV_UNTIMED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TRIG-007",
+      "title": "rcp_triggered_decode_request() rejects an opcode byte that is not a triggered request_type",
+      "text": "rcp_triggered_decode_request() shall return RCP_TRIGGERED_ERR_UNKNOWN_TYPE when the decoded opcode byte does not satisfy rcp_request_type_is_triggered(), and shall otherwise populate *out_request_type, *out_byte_bus_id, *out_step, *out_transaction_num, and a borrowed *out_payload/*out_payload_len view into the input buffer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TRIG-008",
+      "title": "rcp_triggered_runtime_enter_started() resets the trigger-occurrence counter",
+      "text": "rcp_triggered_runtime_enter_started() shall set occurrence_count to 0 and started to true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TRIG-009",
+      "title": "rcp_triggered_runtime_record_occurrence() only increments the counter once started",
+      "text": "rcp_triggered_runtime_record_occurrence() shall increment occurrence_count and return true iff started is true, and shall leave occurrence_count unchanged and return false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TRIG-010",
+      "title": "rcp_triggered_advance_guard() reports whether the target sequencer is still in start_state",
+      "text": "rcp_triggered_advance_guard() shall return true iff step->sequencer_index is a valid index into table and that sequencer's current state equals step->start_state, and shall return false for an invalid sequencer_index.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TRIG-011",
+      "title": "rcp_triggered_exec_delay_elapsed() compares elapsed_ms against trigger_exec_delay_ms",
+      "text": "rcp_triggered_exec_delay_elapsed() shall return true iff elapsed_ms >= step->trigger_exec_delay_ms.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TRIG-012",
+      "title": "rcp_triggered_tick() only fires when started, at least one occurrence is recorded, the delay has elapsed, and the endpoint is idle",
+      "text": "rcp_triggered_tick() shall return false and leave table and rt unchanged unless rt->started is true, rt->occurrence_count > 0, rcp_triggered_exec_delay_elapsed() holds, and endpoint_idle is true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TRIG-013",
+      "title": "rcp_triggered_tick() advances the sequencer and resets the runtime on a successful fire",
+      "text": "When rcp_triggered_tick()'s firing conditions all hold and rcp_triggered_advance_guard() holds, it shall set table's target sequencer to step->next_state, reset rt->occurrence_count to 0 and rt->started to false, and return true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CHAIN-001",
+      "title": "rcp_chained_strerror() never returns NULL and gives every error code a distinct message",
+      "text": "rcp_chained_strerror() shall return a non-NULL string for every rcp_chained_errc_t value, including unrecognized ones, with each defined error code mapped to a distinct message.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CHAIN-002",
+      "title": "rcp_chained_encode_member() rejects chain_length below RCP_CHAINED_MIN_MEMBERS",
+      "text": "rcp_chained_encode_member() shall return a zeroed rcp_bytes_t (data == NULL) when chain_length < RCP_CHAINED_MIN_MEMBERS.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CHAIN-003",
+      "title": "rcp_chained_encode_member() rejects chain_position >= chain_length",
+      "text": "rcp_chained_encode_member() shall return a zeroed rcp_bytes_t (data == NULL) when chain_position >= chain_length.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CHAIN-004",
+      "title": "rcp_chained_encode_member() packs chain_length/chain_position and cs into the encoded frame",
+      "text": "For valid inputs, rcp_chained_encode_member() shall produce an ACF_GBB frame with mtv forced to RCP_ACF_MTV_UNTIMED, the opcode byte set to RCP_REQUEST_TYPE_CHAINED, cs encoded into byte_message_info's cs field, and chain_length/chain_position packed into the repurposed message_timestamp region's sub-field bytes.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CHAIN-005",
+      "title": "rcp_chained_decode_member() maps ACF decode failures to their rcp_chained_errc_t equivalents",
+      "text": "rcp_chained_decode_member() shall return RCP_CHAINED_ERR_SHORT_FRAME or RCP_CHAINED_ERR_BAD_MSG_TYPE when rcp_acf_decode_gbb() reports the corresponding failure.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CHAIN-006",
+      "title": "rcp_chained_decode_member() rejects a non-repurposed message_timestamp",
+      "text": "rcp_chained_decode_member() shall return RCP_CHAINED_ERR_NOT_REPURPOSED when the decoded mtv is not RCP_ACF_MTV_UNTIMED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CHAIN-007",
+      "title": "rcp_chained_decode_member() rejects an opcode byte that is not RCP_REQUEST_TYPE_CHAINED",
+      "text": "rcp_chained_decode_member() shall return RCP_CHAINED_ERR_UNKNOWN_TYPE when the decoded opcode byte is not RCP_REQUEST_TYPE_CHAINED, and shall otherwise populate *out_byte_bus_id, *out_chain_length, *out_chain_position, *out_cs, *out_transaction_num, and a borrowed *out_payload/*out_payload_len view into the input buffer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CHAIN-008",
+      "title": "rcp_chained_advance() reports RCP_CHAINED_MEMBER_CHAIN_ABORTED once *chain_aborted is set, without consulting member_errored/cs",
+      "text": "rcp_chained_advance() shall return RCP_CHAINED_MEMBER_CHAIN_ABORTED and leave *chain_aborted unchanged whenever *chain_aborted is already true on entry.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CHAIN-009",
+      "title": "rcp_chained_advance() reports RCP_CHAINED_MEMBER_OK for a non-errored member",
+      "text": "rcp_chained_advance() shall return RCP_CHAINED_MEMBER_OK and leave *chain_aborted false whenever *chain_aborted is false on entry and member_errored is false.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CHAIN-010",
+      "title": "rcp_chained_advance() sets *chain_aborted only when an errored member selected RCP_CHAINED_CS_ABORT_ON_ERROR",
+      "text": "rcp_chained_advance() shall return RCP_CHAINED_MEMBER_CHAIN_ERROR whenever *chain_aborted is false on entry and member_errored is true, and shall set *chain_aborted to true iff cs == RCP_CHAINED_CS_ABORT_ON_ERROR (leaving it false when cs == RCP_CHAINED_CS_CONTINUE_ON_ERROR).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TIMED-001",
+      "title": "rcp_timed_strerror() never returns NULL and gives every error code a distinct message",
+      "text": "rcp_timed_strerror() shall return a non-NULL string for every rcp_timed_errc_t value, including unrecognized ones, with each defined error code mapped to a distinct message.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TIMED-002",
+      "title": "rcp_timed_feature_enabled() requires both time-sync option bits set",
+      "text": "rcp_timed_feature_enabled() shall return true iff both RCP_REGMAP_OPT_TIME_SYNC_TSCF and RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION are set in options.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TIMED-003",
+      "title": "rcp_timed_encode_request() packs presentation_time into the repurposed message_timestamp region",
+      "text": "rcp_timed_encode_request() shall produce an ACF_GBB frame with mtv forced to RCP_ACF_MTV_UNTIMED, the opcode byte set to RCP_REQUEST_TYPE_TIMED, and presentation_time packed into the repurposed message_timestamp region's first 4 sub-field bytes, or return a zeroed rcp_bytes_t (data == NULL) when payload_len exceeds RCP_ACF_MAX_PAYLOAD.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TIMED-004",
+      "title": "rcp_timed_decode_request() maps ACF decode failures and rejects a non-repurposed message_timestamp",
+      "text": "rcp_timed_decode_request() shall return RCP_TIMED_ERR_SHORT_FRAME or RCP_TIMED_ERR_BAD_MSG_TYPE when rcp_acf_decode_gbb() reports the corresponding failure, and RCP_TIMED_ERR_NOT_REPURPOSED when the decoded mtv is not RCP_ACF_MTV_UNTIMED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TIMED-005",
+      "title": "rcp_timed_decode_request() rejects an opcode byte that is not RCP_REQUEST_TYPE_TIMED",
+      "text": "rcp_timed_decode_request() shall return RCP_TIMED_ERR_UNKNOWN_TYPE when the decoded opcode byte is not RCP_REQUEST_TYPE_TIMED, and shall otherwise populate *out_byte_bus_id, *out_presentation_time, *out_transaction_num, and a borrowed *out_payload/*out_payload_len view into the input buffer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TIMED-006",
+      "title": "rcp_timed_too_far() is wraparound-safe and never reports a past presentation_time as too far",
+      "text": "rcp_timed_too_far() shall return false whenever presentation_time is at or before now (by wraparound-safe signed subtraction), and shall return true iff presentation_time is strictly after now by more than max_horizon.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TIMED-007",
+      "title": "rcp_timed_admit() reports RCP_TIMED_REJECT_GPTP_FAIL whenever gptp_locked is false",
+      "text": "rcp_timed_admit() shall return RCP_TIMED_REJECT_GPTP_FAIL whenever gptp_locked is false, regardless of presentation_time, now, or max_horizon.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TIMED-008",
+      "title": "rcp_timed_admit() reports RCP_TIMED_REJECT_PRESENTATION_TIME_TOO_FAR or RCP_TIMED_ACCEPT when gPTP is locked",
+      "text": "rcp_timed_admit() shall return RCP_TIMED_REJECT_PRESENTATION_TIME_TOO_FAR when gptp_locked is true and rcp_timed_too_far(presentation_time, now, max_horizon) holds, and RCP_TIMED_ACCEPT otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANCEL-001",
+      "title": "rcp_cancel_strerror() never returns NULL and gives every error code a distinct message",
+      "text": "rcp_cancel_strerror() shall return a non-NULL string for every rcp_cancel_errc_t value, including unrecognized ones, with each defined error code mapped to a distinct message.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANCEL-002",
+      "title": "rcp_cancel_encode_clear_all() encodes a zero-payload clear-all request",
+      "text": "rcp_cancel_encode_clear_all() shall produce an ACF_GBB frame with mtv forced to RCP_ACF_MTV_UNTIMED, the opcode byte set to RCP_REQUEST_TYPE_CLEAR_ALL, and the remaining repurposed sub-field bytes zeroed.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANCEL-003",
+      "title": "rcp_cancel_decode_clear_all() maps ACF decode failures and rejects a non-repurposed message_timestamp",
+      "text": "rcp_cancel_decode_clear_all() shall return RCP_CANCEL_ERR_SHORT_FRAME or RCP_CANCEL_ERR_BAD_MSG_TYPE when rcp_acf_decode_gbb() reports the corresponding failure, and RCP_CANCEL_ERR_NOT_REPURPOSED when the decoded mtv is not RCP_ACF_MTV_UNTIMED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANCEL-004",
+      "title": "rcp_cancel_decode_clear_all() rejects an opcode byte that is not RCP_REQUEST_TYPE_CLEAR_ALL",
+      "text": "rcp_cancel_decode_clear_all() shall return RCP_CANCEL_ERR_UNKNOWN_TYPE when the decoded opcode byte is not RCP_REQUEST_TYPE_CLEAR_ALL, and shall otherwise populate *out_byte_bus_id and *out_transaction_num.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANCEL-005",
+      "title": "rcp_cancel_encode_clear_single() packs clear_transaction_num into the repurposed message_timestamp region",
+      "text": "rcp_cancel_encode_clear_single() shall produce an ACF_GBB frame with mtv forced to RCP_ACF_MTV_UNTIMED, the opcode byte set to RCP_REQUEST_TYPE_CLEAR_SINGLE, clear_transaction_num packed into the first repurposed sub-field byte, and the remaining sub-field bytes zeroed.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANCEL-006",
+      "title": "rcp_cancel_decode_clear_single() maps ACF decode failures and rejects a non-repurposed message_timestamp",
+      "text": "rcp_cancel_decode_clear_single() shall return RCP_CANCEL_ERR_SHORT_FRAME or RCP_CANCEL_ERR_BAD_MSG_TYPE when rcp_acf_decode_gbb() reports the corresponding failure, and RCP_CANCEL_ERR_NOT_REPURPOSED when the decoded mtv is not RCP_ACF_MTV_UNTIMED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANCEL-007",
+      "title": "rcp_cancel_decode_clear_single() rejects an opcode byte that is not RCP_REQUEST_TYPE_CLEAR_SINGLE",
+      "text": "rcp_cancel_decode_clear_single() shall return RCP_CANCEL_ERR_UNKNOWN_TYPE when the decoded opcode byte is not RCP_REQUEST_TYPE_CLEAR_SINGLE, and shall otherwise populate *out_byte_bus_id, *out_clear_transaction_num, and *out_transaction_num.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANCEL-008",
+      "title": "rcp_cancel_is_cancellable() is true only for RCP_CANCEL_LIFECYCLE_QUEUED",
+      "text": "rcp_cancel_is_cancellable() shall return true iff state == RCP_CANCEL_LIFECYCLE_QUEUED, and false for RCP_CANCEL_LIFECYCLE_EXECUTING or RCP_CANCEL_LIFECYCLE_DONE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANCEL-009",
+      "title": "rcp_cancel_attempt() reports RCP_CANCEL_RESULT_NOT_FOUND when the target was not found",
+      "text": "rcp_cancel_attempt() shall return RCP_CANCEL_RESULT_NOT_FOUND whenever found is false, regardless of state.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANCEL-010",
+      "title": "rcp_cancel_attempt() reports RCP_CANCEL_RESULT_NOT_CANCELLABLE for a found request outside the cancellable window",
+      "text": "rcp_cancel_attempt() shall return RCP_CANCEL_RESULT_NOT_CANCELLABLE whenever found is true and !rcp_cancel_is_cancellable(state).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANCEL-011",
+      "title": "rcp_cancel_attempt() reports RCP_CANCEL_RESULT_CANCELED for a found, cancellable request",
+      "text": "rcp_cancel_attempt() shall return RCP_CANCEL_RESULT_CANCELED whenever found is true and rcp_cancel_is_cancellable(state).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANCEL-012",
+      "title": "rcp_cancel_chain_should_cascade() cascades to a chain member's own position and every position after it",
+      "text": "rcp_cancel_chain_should_cascade() shall return true iff member_position >= canceled_position.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SCHED-001",
+      "title": "rcp_sched_classify() classifies every repurposed opcode this project's request-kind modules define",
+      "text": "rcp_sched_classify() shall return RCP_SCHED_KIND_STANDARD whenever is_repurposed is false, and shall otherwise classify request_type into RCP_SCHED_KIND_CANCELLATION (clear-all/clear-non-safestate/clear-single), RCP_SCHED_KIND_TRIGGERED, RCP_SCHED_KIND_TIMED, RCP_SCHED_KIND_COMPOUND, RCP_SCHED_KIND_COMPOUND_WAIT, RCP_SCHED_KIND_CHAINED, or RCP_SCHED_KIND_STANDARD for any opcode not recognized by those modules.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SCHED-002",
+      "title": "rcp_sched_kind_rank() encodes the cancellation > triggered > timed > compound > compound-wait > chained > standard ordering",
+      "text": "rcp_sched_kind_rank() shall return a strictly higher value for RCP_SCHED_KIND_CANCELLATION than RCP_SCHED_KIND_TRIGGERED, for RCP_SCHED_KIND_TRIGGERED than RCP_SCHED_KIND_TIMED, for RCP_SCHED_KIND_TIMED than RCP_SCHED_KIND_COMPOUND, for RCP_SCHED_KIND_COMPOUND than RCP_SCHED_KIND_COMPOUND_WAIT, for RCP_SCHED_KIND_COMPOUND_WAIT than RCP_SCHED_KIND_CHAINED, and for RCP_SCHED_KIND_CHAINED than RCP_SCHED_KIND_STANDARD.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SCHED-003",
+      "title": "rcp_sched_compare() orders by rank first and FIFO sequence second",
+      "text": "rcp_sched_compare() shall return a negative value when a's rank exceeds b's rank (regardless of sequence), a positive value when b's rank exceeds a's, and among equal ranks shall return negative iff a->sequence < b->sequence, positive iff a->sequence > b->sequence, and zero only when both kind and sequence are equal.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SCHED-004",
+      "title": "rcp_sched_split_frame_members() reports every member's byte offset in an ACF payload stream",
+      "text": "For a well-formed ACF payload stream (every member's declared acf_msg_type/acf_msg_length correctly delimiting a header-plus-payload region that fits within the stream), rcp_sched_split_frame_members() shall return the number of members found and write each member's starting byte offset, in order, into out_offsets (up to out_cap entries).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SCHED-005",
+      "title": "rcp_sched_split_frame_members() returns 0 on a malformed stream",
+      "text": "rcp_sched_split_frame_members() shall return 0 when the first byte is neither RCP_ACF_MSG_TYPE_ABB nor RCP_ACF_MSG_TYPE_GBB, or when any member's own declared header-plus-payload length would run past len, without writing a partial member to out_offsets.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SCHED-006",
+      "title": "rcp_sched_split_frame_members() returns 0 for an empty stream",
+      "text": "rcp_sched_split_frame_members() shall return 0 when len == 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SCHED-007",
+      "title": "rcp_sched_frame_timing_consistent() is trivially true for NTSCF frames and empty member lists",
+      "text": "rcp_sched_frame_timing_consistent() shall return true whenever is_tscf is false, and shall return true whenever count == 0, regardless of member_is_timed's contents.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SCHED-008",
+      "title": "rcp_sched_frame_timing_consistent() rejects a TSCF frame mixing timed and untimed members",
+      "text": "For is_tscf == true and count > 0, rcp_sched_frame_timing_consistent() shall return true iff every entry in member_is_timed[0..count) equals member_is_timed[0], and false otherwise.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
