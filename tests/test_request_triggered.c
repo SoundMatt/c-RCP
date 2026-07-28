@@ -15,8 +15,8 @@
 
 #include <rcp/acf.h>
 #include <rcp/avtp.h>
-#include <rcp/sequencer.h>
-#include <rcp/triggered.h>
+#include <rcp/request_sequencer.h>
+#include <rcp/request_triggered.h>
 
 #include <string.h>
 

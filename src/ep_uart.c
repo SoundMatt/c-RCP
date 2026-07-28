@@ -48,16 +48,16 @@ void rcp_ep_uart_functional_cfg_init(rcp_ep_uart_functional_cfg_t *cfg)
 //cfusa:req REQ-UART-005
 //cfusa:req REQ-UART-006
 //cfusa:req REQ-UART-007
-bool rcp_ep_uart_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                         rcp_server_writer_ctx_t writer)
+bool rcp_ep_uart_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                         rcp_lifecycle_writer_ctx_t writer)
 {
-    return rcp_server_field_writable(state, RCP_SERVER_FIELD_FUNCTIONAL_W, writer);
+    return rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, writer);
 }
 
 //cfusa:req REQ-UART-008
 //cfusa:req REQ-UART-009
 bool rcp_ep_uart_set_baud_rate(rcp_ep_uart_functional_cfg_t *cfg, uint32_t baud_rate,
-                                rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer)
+                                rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_uart_functional_cfg_writable(state, writer)) return false;
 
@@ -70,7 +70,7 @@ bool rcp_ep_uart_set_baud_rate(rcp_ep_uart_functional_cfg_t *cfg, uint32_t baud_
 //cfusa:req REQ-UART-012
 bool rcp_ep_uart_set_frame_format(rcp_ep_uart_functional_cfg_t *cfg, uint8_t nr_bits,
                                    rcp_ep_uart_parity_t parity, rcp_ep_uart_stop_bits_t stop_bits,
-                                   rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer)
+                                   rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_uart_nr_bits_valid(nr_bits)) return false;
     if (!rcp_ep_uart_functional_cfg_writable(state, writer)) return false;
@@ -84,7 +84,7 @@ bool rcp_ep_uart_set_frame_format(rcp_ep_uart_functional_cfg_t *cfg, uint8_t nr_
 //cfusa:req REQ-UART-013
 //cfusa:req REQ-UART-014
 bool rcp_ep_uart_set_rx_buffer_size(rcp_ep_uart_functional_cfg_t *cfg, uint16_t rx_buffer_size,
-                                     rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer)
+                                     rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_uart_functional_cfg_writable(state, writer)) return false;
 
@@ -95,7 +95,7 @@ bool rcp_ep_uart_set_rx_buffer_size(rcp_ep_uart_functional_cfg_t *cfg, uint16_t 
 //cfusa:req REQ-UART-015
 //cfusa:req REQ-UART-016
 bool rcp_ep_uart_set_timeout(rcp_ep_uart_functional_cfg_t *cfg, uint32_t timeout_ms,
-                              rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer)
+                              rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_uart_functional_cfg_writable(state, writer)) return false;
 

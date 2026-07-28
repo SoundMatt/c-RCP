@@ -89,7 +89,7 @@ static rcp_discovery_errc_t decode_common(const uint8_t *b, size_t len,
     if (acf_rc == RCP_ACF_ERR_SHORT_FRAME) return RCP_DISCOVERY_ERR_SHORT_FRAME;
     if (acf_rc != RCP_ACF_OK) return RCP_DISCOVERY_ERR_BAD_MSG_TYPE;
 
-    if (out_hdr->byte_bus_id != RCP_SERVER_DISCOVERY_BYTE_BUS_ID) return RCP_DISCOVERY_ERR_WRONG_BUS;
+    if (out_hdr->byte_bus_id != RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID) return RCP_DISCOVERY_ERR_WRONG_BUS;
     if (out_hdr->op != RCP_ACF_OP_READ) return RCP_DISCOVERY_ERR_WRONG_OP;
 
     *out_stream_id = ntscf_hdr.stream_id;
@@ -108,7 +108,7 @@ rcp_bytes_t rcp_discovery_encode_request(rcp_stream_id_t requester_stream_id,
     rcp_bytes_t                 acf_frame;
     rcp_bytes_t                 frame = {0};
 
-    hdr.byte_bus_id               = RCP_SERVER_DISCOVERY_BYTE_BUS_ID;
+    hdr.byte_bus_id               = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
     hdr.op                        = RCP_ACF_OP_READ;
     hdr.read_size_or_segment_num  = read_size;
     hdr.transaction_num           = transaction_num;
@@ -187,7 +187,7 @@ rcp_bytes_t rcp_discovery_encode_response(const rcp_regmap_general_t *map,
                    : RCP_DISCOVERY_GENERAL_SLICE_LEN;
     memcpy(payload, slice, copy_len);
 
-    hdr.byte_bus_id              = RCP_SERVER_DISCOVERY_BYTE_BUS_ID;
+    hdr.byte_bus_id              = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
     hdr.op                       = RCP_ACF_OP_READ;
     hdr.read_size_or_segment_num = read_size;
     hdr.transaction_num          = transaction_num;

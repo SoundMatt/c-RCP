@@ -12,7 +12,7 @@
 
 #include <rcp/acf.h>
 #include <rcp/avtp.h>
-#include <rcp/chained.h>
+#include <rcp/request_chained.h>
 
 #include <string.h>
 

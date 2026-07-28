@@ -11,7 +11,7 @@
 #include <rcp/acf.h>
 #include <rcp/avtp.h>
 #include <rcp/regmap.h>
-#include <rcp/timed.h>
+#include <rcp/request_timed.h>
 
 #include <string.h>
 

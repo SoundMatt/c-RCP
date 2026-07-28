@@ -35,7 +35,7 @@
 #include <rcp/ep_pwm.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
-#include <rcp/server.h>
+#include <rcp/lifecycle.h>
 
 #include <string.h>
 
@@ -207,37 +207,37 @@ static void test_functional_cfg_init_zeroes(void)
 
 static void test_functional_cfg_writable_false_hw_unconfigured(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
-    TEST_ASSERT_FALSE(rcp_ep_adc_functional_cfg_writable(RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, writer));
+    TEST_ASSERT_FALSE(rcp_ep_adc_functional_cfg_writable(RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
 }
 
 static void test_functional_cfg_writable_true_hw_configured_any_writer(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
-    TEST_ASSERT_TRUE(rcp_ep_adc_functional_cfg_writable(RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+    TEST_ASSERT_TRUE(rcp_ep_adc_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, writer));
 }
 
 static void test_functional_cfg_writable_rcp_configured_requires_authorization(void)
 {
-    rcp_server_writer_ctx_t unauth = {0};
-    rcp_server_writer_ctx_t auth   = {0};
+    rcp_lifecycle_writer_ctx_t unauth = {0};
+    rcp_lifecycle_writer_ctx_t auth   = {0};
 
     auth.via_root_client_ep0 = true;
 
-    TEST_ASSERT_FALSE(rcp_ep_adc_functional_cfg_writable(RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, unauth));
-    TEST_ASSERT_TRUE(rcp_ep_adc_functional_cfg_writable(RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, auth));
+    TEST_ASSERT_FALSE(rcp_ep_adc_functional_cfg_writable(RCP_LIFECYCLE_RCP_CONFIGURED, unauth));
+    TEST_ASSERT_TRUE(rcp_ep_adc_functional_cfg_writable(RCP_LIFECYCLE_RCP_CONFIGURED, auth));
 }
 
 static void test_set_samples_per_avg_interval_rejects_unauthorized(void)
 {
     rcp_ep_adc_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
 
     rcp_ep_adc_functional_cfg_init(&cfg);
 
-    TEST_ASSERT_FALSE(rcp_ep_adc_set_samples_per_avg_interval(&cfg, 16, RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED,
+    TEST_ASSERT_FALSE(rcp_ep_adc_set_samples_per_avg_interval(&cfg, 16, RCP_LIFECYCLE_HW_UNCONFIGURED,
                                                                writer));
     TEST_ASSERT_EQUAL_UINT16(0, cfg.adc_samples_per_avg_interval);
 }
@@ -245,11 +245,11 @@ static void test_set_samples_per_avg_interval_rejects_unauthorized(void)
 static void test_set_samples_per_avg_interval_applies_when_authorized(void)
 {
     rcp_ep_adc_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
 
     rcp_ep_adc_functional_cfg_init(&cfg);
 
-    TEST_ASSERT_TRUE(rcp_ep_adc_set_samples_per_avg_interval(&cfg, 16, RCP_SERVER_LIFECYCLE_HW_CONFIGURED,
+    TEST_ASSERT_TRUE(rcp_ep_adc_set_samples_per_avg_interval(&cfg, 16, RCP_LIFECYCLE_HW_CONFIGURED,
                                                               writer));
     TEST_ASSERT_EQUAL_UINT16(16, cfg.adc_samples_per_avg_interval);
 }
@@ -257,11 +257,11 @@ static void test_set_samples_per_avg_interval_applies_when_authorized(void)
 static void test_set_avg_intervals_per_request_rejects_unauthorized(void)
 {
     rcp_ep_adc_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
 
     rcp_ep_adc_functional_cfg_init(&cfg);
 
-    TEST_ASSERT_FALSE(rcp_ep_adc_set_avg_intervals_per_request(&cfg, 4, RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED,
+    TEST_ASSERT_FALSE(rcp_ep_adc_set_avg_intervals_per_request(&cfg, 4, RCP_LIFECYCLE_HW_UNCONFIGURED,
                                                                 writer));
     TEST_ASSERT_EQUAL_UINT16(0, cfg.adc_avg_intervals_per_request);
 }
@@ -269,11 +269,11 @@ static void test_set_avg_intervals_per_request_rejects_unauthorized(void)
 static void test_set_avg_intervals_per_request_applies_when_authorized(void)
 {
     rcp_ep_adc_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
 
     rcp_ep_adc_functional_cfg_init(&cfg);
 
-    TEST_ASSERT_TRUE(rcp_ep_adc_set_avg_intervals_per_request(&cfg, 4, RCP_SERVER_LIFECYCLE_HW_CONFIGURED,
+    TEST_ASSERT_TRUE(rcp_ep_adc_set_avg_intervals_per_request(&cfg, 4, RCP_LIFECYCLE_HW_CONFIGURED,
                                                                writer));
     TEST_ASSERT_EQUAL_UINT16(4, cfg.adc_avg_intervals_per_request);
 }
@@ -281,26 +281,26 @@ static void test_set_avg_intervals_per_request_applies_when_authorized(void)
 static void test_set_combine_mode_rejects_invalid_mode_or_unauthorized(void)
 {
     rcp_ep_adc_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
 
     rcp_ep_adc_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_adc_set_combine_mode(&cfg, (rcp_ep_adc_combine_mode_t)9,
-                                                   RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+                                                   RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_FALSE(rcp_ep_adc_set_combine_mode(&cfg, RCP_EP_ADC_COMBINE_MAX,
-                                                   RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, writer));
+                                                   RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_ADC_COMBINE_AVERAGE, cfg.adc_combine_avg_values);
 }
 
 static void test_set_combine_mode_applies_when_valid_and_authorized(void)
 {
     rcp_ep_adc_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
 
     rcp_ep_adc_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_adc_set_combine_mode(&cfg, RCP_EP_ADC_COMBINE_MAX,
-                                                  RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+                                                  RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_ADC_COMBINE_MAX, cfg.adc_combine_avg_values);
 }
 

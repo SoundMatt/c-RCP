@@ -28,7 +28,7 @@
 #include <rcp/ep_iseled.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
-#include <rcp/server.h>
+#include <rcp/lifecycle.h>
 
 #include <string.h>
 
@@ -255,133 +255,133 @@ static void test_functional_cfg_init_zeroes(void)
 
 static void test_functional_cfg_writable_false_hw_unconfigured(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
     writer.via_root_client_ep0 = true;
     writer.via_owning_stream   = true;
 
     TEST_ASSERT_FALSE(rcp_ep_iseled_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, writer));
+        RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
 }
 
 static void test_functional_cfg_writable_true_hw_configured_any_writer(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
     TEST_ASSERT_TRUE(rcp_ep_iseled_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        RCP_LIFECYCLE_HW_CONFIGURED, writer));
 }
 
 static void test_functional_cfg_writable_rcp_configured_requires_authorization(void)
 {
-    rcp_server_writer_ctx_t none = {0};
-    rcp_server_writer_ctx_t via_ep0 = {0};
-    rcp_server_writer_ctx_t via_stream = {0};
+    rcp_lifecycle_writer_ctx_t none = {0};
+    rcp_lifecycle_writer_ctx_t via_ep0 = {0};
+    rcp_lifecycle_writer_ctx_t via_stream = {0};
 
     via_ep0.via_root_client_ep0 = true;
     via_stream.via_owning_stream = true;
 
     TEST_ASSERT_FALSE(rcp_ep_iseled_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, none));
+        RCP_LIFECYCLE_RCP_CONFIGURED, none));
     TEST_ASSERT_TRUE(rcp_ep_iseled_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, via_ep0));
+        RCP_LIFECYCLE_RCP_CONFIGURED, via_ep0));
     TEST_ASSERT_TRUE(rcp_ep_iseled_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, via_stream));
+        RCP_LIFECYCLE_RCP_CONFIGURED, via_stream));
 }
 
 static void test_set_bit_clk_divider_rejects_unauthorized(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t        none = {0};
+    rcp_lifecycle_writer_ctx_t        none = {0};
 
     rcp_ep_iseled_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_iseled_set_bit_clk_divider(
-        &cfg, 42, RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, none));
+        &cfg, 42, RCP_LIFECYCLE_RCP_CONFIGURED, none));
     TEST_ASSERT_EQUAL_UINT32(0, cfg.iseled_bit_clk_divider);
 }
 
 static void test_set_bit_clk_divider_applies_when_authorized(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t        writer = {0};
+    rcp_lifecycle_writer_ctx_t        writer = {0};
 
     rcp_ep_iseled_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_iseled_set_bit_clk_divider(
-        &cfg, 42, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, 42, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT32(42, cfg.iseled_bit_clk_divider);
 }
 
 static void test_set_use_rcv_clk_rejects_unauthorized(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t        none = {0};
+    rcp_lifecycle_writer_ctx_t        none = {0};
 
     rcp_ep_iseled_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_iseled_set_use_rcv_clk(
-        &cfg, true, RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, none));
+        &cfg, true, RCP_LIFECYCLE_RCP_CONFIGURED, none));
     TEST_ASSERT_FALSE(cfg.iseled_use_rcv_clk);
 }
 
 static void test_set_use_rcv_clk_applies_when_authorized(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t        writer = {0};
+    rcp_lifecycle_writer_ctx_t        writer = {0};
 
     rcp_ep_iseled_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_iseled_set_use_rcv_clk(
-        &cfg, true, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, true, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_TRUE(cfg.iseled_use_rcv_clk);
 }
 
 static void test_set_crc_enable_rejects_unauthorized(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t        none = {0};
+    rcp_lifecycle_writer_ctx_t        none = {0};
 
     rcp_ep_iseled_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_iseled_set_crc_enable(
-        &cfg, true, RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, none));
+        &cfg, true, RCP_LIFECYCLE_RCP_CONFIGURED, none));
     TEST_ASSERT_FALSE(cfg.iseled_crc_enable);
 }
 
 static void test_set_crc_enable_applies_when_authorized(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t        writer = {0};
+    rcp_lifecycle_writer_ctx_t        writer = {0};
 
     rcp_ep_iseled_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_iseled_set_crc_enable(
-        &cfg, true, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, true, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_TRUE(cfg.iseled_crc_enable);
 }
 
 static void test_set_trigger_rejects_unauthorized(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t        none = {0};
+    rcp_lifecycle_writer_ctx_t        none = {0};
 
     rcp_ep_iseled_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_iseled_set_trigger(
-        &cfg, RCP_EP_ISELED_TRIGGER_TX_COMPLETE, RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, none));
+        &cfg, RCP_EP_ISELED_TRIGGER_TX_COMPLETE, RCP_LIFECYCLE_RCP_CONFIGURED, none));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_ISELED_TRIGGER_NONE, cfg.trigger);
 }
 
 static void test_set_trigger_applies_when_authorized(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t        writer = {0};
+    rcp_lifecycle_writer_ctx_t        writer = {0};
 
     rcp_ep_iseled_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_iseled_set_trigger(
-        &cfg, RCP_EP_ISELED_TRIGGER_TX_COMPLETE, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, RCP_EP_ISELED_TRIGGER_TX_COMPLETE, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_ISELED_TRIGGER_TX_COMPLETE, cfg.trigger);
 }
 

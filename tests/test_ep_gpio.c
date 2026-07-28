@@ -36,7 +36,7 @@
 #include <rcp/ep_gpio.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
-#include <rcp/server.h>
+#include <rcp/lifecycle.h>
 
 #include <string.h>
 
@@ -211,68 +211,68 @@ static void test_functional_cfg_init_zeroes(void)
 
 static void test_functional_cfg_writable_false_hw_unconfigured(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
     writer.via_root_client_ep0 = true;
     writer.via_owning_stream   = true;
 
     TEST_ASSERT_FALSE(rcp_ep_gpio_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, writer));
+        RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
 }
 
 static void test_functional_cfg_writable_true_hw_configured_any_writer(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
     TEST_ASSERT_TRUE(rcp_ep_gpio_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        RCP_LIFECYCLE_HW_CONFIGURED, writer));
 }
 
 static void test_functional_cfg_writable_rcp_configured_requires_authorization(void)
 {
-    rcp_server_writer_ctx_t none = {0};
-    rcp_server_writer_ctx_t via_ep0 = {0};
-    rcp_server_writer_ctx_t via_stream = {0};
+    rcp_lifecycle_writer_ctx_t none = {0};
+    rcp_lifecycle_writer_ctx_t via_ep0 = {0};
+    rcp_lifecycle_writer_ctx_t via_stream = {0};
 
     via_ep0.via_root_client_ep0 = true;
     via_stream.via_owning_stream = true;
 
     TEST_ASSERT_FALSE(rcp_ep_gpio_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, none));
+        RCP_LIFECYCLE_RCP_CONFIGURED, none));
     TEST_ASSERT_TRUE(rcp_ep_gpio_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, via_ep0));
+        RCP_LIFECYCLE_RCP_CONFIGURED, via_ep0));
     TEST_ASSERT_TRUE(rcp_ep_gpio_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, via_stream));
+        RCP_LIFECYCLE_RCP_CONFIGURED, via_stream));
 }
 
 static void test_set_pin_property_rejects_invalid_pin_or_unauthorized(void)
 {
     rcp_ep_gpio_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t      authorized = {0};
-    rcp_server_writer_ctx_t      none = {0};
+    rcp_lifecycle_writer_ctx_t      authorized = {0};
+    rcp_lifecycle_writer_ctx_t      none = {0};
 
     authorized.via_root_client_ep0 = true;
     rcp_ep_gpio_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_gpio_set_pin_property(
-        &cfg, 32, RCP_REGMAP_PIN_PROP_OUTPUT, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, authorized));
+        &cfg, 32, RCP_REGMAP_PIN_PROP_OUTPUT, RCP_LIFECYCLE_HW_CONFIGURED, authorized));
     TEST_ASSERT_EQUAL_UINT8(0, cfg.pins[0].pin_property);
 
     TEST_ASSERT_FALSE(rcp_ep_gpio_set_pin_property(
-        &cfg, 0, RCP_REGMAP_PIN_PROP_OUTPUT, RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, none));
+        &cfg, 0, RCP_REGMAP_PIN_PROP_OUTPUT, RCP_LIFECYCLE_RCP_CONFIGURED, none));
     TEST_ASSERT_EQUAL_UINT8(0, cfg.pins[0].pin_property);
 }
 
 static void test_set_pin_property_applies_when_authorized(void)
 {
     rcp_ep_gpio_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t      writer = {0};
+    rcp_lifecycle_writer_ctx_t      writer = {0};
 
     rcp_ep_gpio_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_gpio_set_pin_property(
         &cfg, 5, RCP_REGMAP_PIN_PROP_OUTPUT | RCP_REGMAP_PIN_PROP_PULL_UP,
-        RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8(RCP_REGMAP_PIN_PROP_OUTPUT | RCP_REGMAP_PIN_PROP_PULL_UP,
                              cfg.pins[5].pin_property);
 }
@@ -280,26 +280,26 @@ static void test_set_pin_property_applies_when_authorized(void)
 static void test_set_pin_trigger_rejects_invalid_pin_or_unauthorized(void)
 {
     rcp_ep_gpio_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t      none = {0};
+    rcp_lifecycle_writer_ctx_t      none = {0};
 
     rcp_ep_gpio_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_gpio_set_pin_trigger(
-        &cfg, 32, RCP_EP_GPIO_TRIGGER_RISING, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, none));
+        &cfg, 32, RCP_EP_GPIO_TRIGGER_RISING, RCP_LIFECYCLE_HW_CONFIGURED, none));
     TEST_ASSERT_FALSE(rcp_ep_gpio_set_pin_trigger(
-        &cfg, 0, RCP_EP_GPIO_TRIGGER_RISING, RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, none));
+        &cfg, 0, RCP_EP_GPIO_TRIGGER_RISING, RCP_LIFECYCLE_HW_UNCONFIGURED, none));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_GPIO_TRIGGER_NONE, cfg.pins[0].trigger);
 }
 
 static void test_set_pin_trigger_applies_when_authorized(void)
 {
     rcp_ep_gpio_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t      writer = {0};
+    rcp_lifecycle_writer_ctx_t      writer = {0};
 
     rcp_ep_gpio_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_gpio_set_pin_trigger(
-        &cfg, 9, RCP_EP_GPIO_TRIGGER_FALLING, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, 9, RCP_EP_GPIO_TRIGGER_FALLING, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_GPIO_TRIGGER_FALLING, cfg.pins[9].trigger);
 }
 

@@ -102,17 +102,17 @@ void rcp_ep_can_functional_cfg_init(rcp_ep_can_functional_cfg_t *cfg)
 }
 
 //cfusa:req REQ-CANEP-008
-bool rcp_ep_can_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                         rcp_server_writer_ctx_t writer)
+bool rcp_ep_can_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                         rcp_lifecycle_writer_ctx_t writer)
 {
-    return rcp_server_field_writable(state, RCP_SERVER_FIELD_FUNCTIONAL_W, writer);
+    return rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, writer);
 }
 
 //cfusa:req REQ-CANEP-009
 bool rcp_ep_can_set_arbitration_timing(rcp_ep_can_functional_cfg_t *cfg,
                                         rcp_ep_can_bit_timing_t timing,
-                                        rcp_server_lifecycle_t state,
-                                        rcp_server_writer_ctx_t writer)
+                                        rcp_lifecycle_state_t state,
+                                        rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_can_functional_cfg_writable(state, writer)) return false;
 
@@ -123,8 +123,8 @@ bool rcp_ep_can_set_arbitration_timing(rcp_ep_can_functional_cfg_t *cfg,
 //cfusa:req REQ-CANEP-010
 bool rcp_ep_can_set_fd_data_timing(rcp_ep_can_functional_cfg_t *cfg,
                                     rcp_ep_can_bit_timing_t timing,
-                                    rcp_server_lifecycle_t state,
-                                    rcp_server_writer_ctx_t writer)
+                                    rcp_lifecycle_state_t state,
+                                    rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_can_functional_cfg_writable(state, writer)) return false;
 
@@ -135,8 +135,8 @@ bool rcp_ep_can_set_fd_data_timing(rcp_ep_can_functional_cfg_t *cfg,
 //cfusa:req REQ-CANEP-011
 bool rcp_ep_can_set_xl_data_timing(rcp_ep_can_functional_cfg_t *cfg,
                                     rcp_ep_can_bit_timing_t timing,
-                                    rcp_server_lifecycle_t state,
-                                    rcp_server_writer_ctx_t writer)
+                                    rcp_lifecycle_state_t state,
+                                    rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_can_functional_cfg_writable(state, writer)) return false;
 
@@ -146,8 +146,8 @@ bool rcp_ep_can_set_xl_data_timing(rcp_ep_can_functional_cfg_t *cfg,
 
 //cfusa:req REQ-CANEP-012
 bool rcp_ep_can_set_delay_compensation(rcp_ep_can_functional_cfg_t *cfg, bool enable,
-                                        uint8_t offset, rcp_server_lifecycle_t state,
-                                        rcp_server_writer_ctx_t writer)
+                                        uint8_t offset, rcp_lifecycle_state_t state,
+                                        rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_can_functional_cfg_writable(state, writer)) return false;
 
@@ -158,8 +158,8 @@ bool rcp_ep_can_set_delay_compensation(rcp_ep_can_functional_cfg_t *cfg, bool en
 
 //cfusa:req REQ-CANEP-013
 bool rcp_ep_can_set_exec_delay_clk_divider(rcp_ep_can_functional_cfg_t *cfg, uint32_t divider,
-                                            rcp_server_lifecycle_t state,
-                                            rcp_server_writer_ctx_t writer)
+                                            rcp_lifecycle_state_t state,
+                                            rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_can_functional_cfg_writable(state, writer)) return false;
 
@@ -169,8 +169,8 @@ bool rcp_ep_can_set_exec_delay_clk_divider(rcp_ep_can_functional_cfg_t *cfg, uin
 
 //cfusa:req REQ-CANEP-014
 bool rcp_ep_can_set_xl_filter(rcp_ep_can_functional_cfg_t *cfg, uint8_t index,
-                               rcp_ep_can_xl_filter_t filter, rcp_server_lifecycle_t state,
-                               rcp_server_writer_ctx_t writer)
+                               rcp_ep_can_xl_filter_t filter, rcp_lifecycle_state_t state,
+                               rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_can_xl_filter_index_valid(index)) return false;
     if (!rcp_ep_can_functional_cfg_writable(state, writer)) return false;

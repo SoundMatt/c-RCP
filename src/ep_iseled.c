@@ -135,16 +135,16 @@ void rcp_ep_iseled_functional_cfg_init(rcp_ep_iseled_functional_cfg_t *cfg)
 }
 
 //cfusa:req REQ-ISELED-010
-bool rcp_ep_iseled_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                            rcp_server_writer_ctx_t writer)
+bool rcp_ep_iseled_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                            rcp_lifecycle_writer_ctx_t writer)
 {
-    return rcp_server_field_writable(state, RCP_SERVER_FIELD_FUNCTIONAL_W, writer);
+    return rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, writer);
 }
 
 //cfusa:req REQ-ISELED-011
 bool rcp_ep_iseled_set_bit_clk_divider(rcp_ep_iseled_functional_cfg_t *cfg, uint32_t divider,
-                                        rcp_server_lifecycle_t state,
-                                        rcp_server_writer_ctx_t writer)
+                                        rcp_lifecycle_state_t state,
+                                        rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_iseled_functional_cfg_writable(state, writer)) return false;
 
@@ -154,7 +154,7 @@ bool rcp_ep_iseled_set_bit_clk_divider(rcp_ep_iseled_functional_cfg_t *cfg, uint
 
 //cfusa:req REQ-ISELED-012
 bool rcp_ep_iseled_set_use_rcv_clk(rcp_ep_iseled_functional_cfg_t *cfg, bool use_rcv_clk,
-                                    rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer)
+                                    rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_iseled_functional_cfg_writable(state, writer)) return false;
 
@@ -164,7 +164,7 @@ bool rcp_ep_iseled_set_use_rcv_clk(rcp_ep_iseled_functional_cfg_t *cfg, bool use
 
 //cfusa:req REQ-ISELED-013
 bool rcp_ep_iseled_set_crc_enable(rcp_ep_iseled_functional_cfg_t *cfg, bool enable,
-                                   rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer)
+                                   rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_iseled_functional_cfg_writable(state, writer)) return false;
 
@@ -174,8 +174,8 @@ bool rcp_ep_iseled_set_crc_enable(rcp_ep_iseled_functional_cfg_t *cfg, bool enab
 
 //cfusa:req REQ-ISELED-014
 bool rcp_ep_iseled_set_trigger(rcp_ep_iseled_functional_cfg_t *cfg,
-                                rcp_ep_iseled_trigger_t trigger, rcp_server_lifecycle_t state,
-                                rcp_server_writer_ctx_t writer)
+                                rcp_ep_iseled_trigger_t trigger, rcp_lifecycle_state_t state,
+                                rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_iseled_functional_cfg_writable(state, writer)) return false;
 

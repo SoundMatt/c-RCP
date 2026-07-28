@@ -132,17 +132,17 @@ void rcp_ep_pwm_out_functional_cfg_init(rcp_ep_pwm_out_functional_cfg_t *cfg)
 //cfusa:req REQ-PWM-017
 //cfusa:req REQ-PWM-018
 //cfusa:req REQ-PWM-019
-bool rcp_ep_pwm_out_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                            rcp_server_writer_ctx_t writer)
+bool rcp_ep_pwm_out_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                            rcp_lifecycle_writer_ctx_t writer)
 {
-    return rcp_server_field_writable(state, RCP_SERVER_FIELD_FUNCTIONAL_W, writer);
+    return rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, writer);
 }
 
 //cfusa:req REQ-PWM-020
 //cfusa:req REQ-PWM-021
 bool rcp_ep_pwm_out_set_trigger(rcp_ep_pwm_out_functional_cfg_t *cfg,
                                  rcp_ep_pwm_out_trigger_t trigger,
-                                 rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer)
+                                 rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_pwm_out_functional_cfg_writable(state, writer)) return false;
 
@@ -153,7 +153,7 @@ bool rcp_ep_pwm_out_set_trigger(rcp_ep_pwm_out_functional_cfg_t *cfg,
 //cfusa:req REQ-PWM-022
 //cfusa:req REQ-PWM-023
 bool rcp_ep_pwm_out_set_enabled(rcp_ep_pwm_out_functional_cfg_t *cfg, bool enabled,
-                                 rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer)
+                                 rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_pwm_out_functional_cfg_writable(state, writer)) return false;
 
@@ -380,17 +380,17 @@ void rcp_ep_pwm_in_functional_cfg_init(rcp_ep_pwm_in_functional_cfg_t *cfg)
 //cfusa:req REQ-PWM-036
 //cfusa:req REQ-PWM-037
 //cfusa:req REQ-PWM-038
-bool rcp_ep_pwm_in_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                           rcp_server_writer_ctx_t writer)
+bool rcp_ep_pwm_in_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                           rcp_lifecycle_writer_ctx_t writer)
 {
-    return rcp_server_field_writable(state, RCP_SERVER_FIELD_FUNCTIONAL_W, writer);
+    return rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, writer);
 }
 
 //cfusa:req REQ-PWM-039
 //cfusa:req REQ-PWM-040
 bool rcp_ep_pwm_in_set_trigger(rcp_ep_pwm_in_functional_cfg_t *cfg,
-                                rcp_ep_pwm_in_trigger_t trigger, rcp_server_lifecycle_t state,
-                                rcp_server_writer_ctx_t writer)
+                                rcp_ep_pwm_in_trigger_t trigger, rcp_lifecycle_state_t state,
+                                rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_pwm_in_functional_cfg_writable(state, writer)) return false;
 

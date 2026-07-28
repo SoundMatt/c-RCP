@@ -155,7 +155,7 @@
  * adc_samples_per_avg_interval, adc_avg_intervals_per_request, and
  * adc_combine_avg_values. rcp_ep_adc_functional_cfg_writable() is,
  * likewise, a thin, named wrapper over server.h's
- * rcp_server_field_writable() (RCP_SERVER_FIELD_FUNCTIONAL_W), and every
+ * rcp_lifecycle_field_writable() (RCP_LIFECYCLE_FIELD_FUNCTIONAL_W), and every
  * rcp_ep_adc_set_*() mutator consults it before ever touching cfg --
  * reusing, never duplicating, server.h's/regmap.h's existing authorization
  * logic, per the roadmap's explicit instruction (the same rule every
@@ -169,7 +169,7 @@
 #include "rcp/ep_pwm.h"
 #include "rcp/rcp.h"
 #include "rcp/regmap.h"
-#include "rcp/server.h"
+#include "rcp/lifecycle.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -261,11 +261,11 @@ typedef struct {
 void rcp_ep_adc_functional_cfg_init(rcp_ep_adc_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
- * writer -- a thin, named wrapper over rcp_server_field_writable()
- * (server.h) with kind RCP_SERVER_FIELD_FUNCTIONAL_W; see the file header.
+ * writer -- a thin, named wrapper over rcp_lifecycle_field_writable()
+ * (server.h) with kind RCP_LIFECYCLE_FIELD_FUNCTIONAL_W; see the file header.
  * Reuses, and never duplicates, that function's authorization logic. */
-bool rcp_ep_adc_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                        rcp_server_writer_ctx_t writer);
+bool rcp_ep_adc_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                        rcp_lifecycle_writer_ctx_t writer);
 
 /* Sets cfg->adc_samples_per_avg_interval to samples_per_interval iff
  * rcp_ep_adc_functional_cfg_writable() authorizes the write for
@@ -273,15 +273,15 @@ bool rcp_ep_adc_functional_cfg_writable(rcp_server_lifecycle_t state,
  * entirely unchanged when it returns false. */
 bool rcp_ep_adc_set_samples_per_avg_interval(rcp_ep_adc_functional_cfg_t *cfg,
                                               uint16_t samples_per_interval,
-                                              rcp_server_lifecycle_t state,
-                                              rcp_server_writer_ctx_t writer);
+                                              rcp_lifecycle_state_t state,
+                                              rcp_lifecycle_writer_ctx_t writer);
 
 /* Same authorization rule as rcp_ep_adc_set_samples_per_avg_interval(),
  * for cfg->adc_avg_intervals_per_request. */
 bool rcp_ep_adc_set_avg_intervals_per_request(rcp_ep_adc_functional_cfg_t *cfg,
                                                uint16_t intervals_per_request,
-                                               rcp_server_lifecycle_t state,
-                                               rcp_server_writer_ctx_t writer);
+                                               rcp_lifecycle_state_t state,
+                                               rcp_lifecycle_writer_ctx_t writer);
 
 /* Sets cfg->adc_combine_avg_values to combine_mode iff combine_mode is
  * rcp_ep_adc_combine_mode_valid() and rcp_ep_adc_functional_cfg_writable()
@@ -289,7 +289,7 @@ bool rcp_ep_adc_set_avg_intervals_per_request(rcp_ep_adc_functional_cfg_t *cfg,
  * applied. cfg is left entirely unchanged when it returns false. */
 bool rcp_ep_adc_set_combine_mode(rcp_ep_adc_functional_cfg_t *cfg,
                                   rcp_ep_adc_combine_mode_t combine_mode,
-                                  rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer);
+                                  rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer);
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 

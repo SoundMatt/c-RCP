@@ -23,7 +23,7 @@
 #include <rcp/ep_mdio.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
-#include <rcp/server.h>
+#include <rcp/lifecycle.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -210,38 +210,38 @@ static void test_functional_cfg_init_zeroes(void)
 
 static void test_functional_cfg_writable_false_hw_unconfigured(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
     writer.via_root_client_ep0 = true;
     writer.via_owning_stream   = true;
 
     TEST_ASSERT_FALSE(
-        rcp_ep_mdio_functional_cfg_writable(RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, writer));
+        rcp_ep_mdio_functional_cfg_writable(RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
 }
 
 static void test_functional_cfg_writable_true_hw_configured_any_writer(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
     TEST_ASSERT_TRUE(
-        rcp_ep_mdio_functional_cfg_writable(RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        rcp_ep_mdio_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, writer));
 }
 
 static void test_functional_cfg_writable_rcp_configured_requires_authorization(void)
 {
-    rcp_server_writer_ctx_t none       = {0};
-    rcp_server_writer_ctx_t via_ep0    = {0};
-    rcp_server_writer_ctx_t via_stream = {0};
+    rcp_lifecycle_writer_ctx_t none       = {0};
+    rcp_lifecycle_writer_ctx_t via_ep0    = {0};
+    rcp_lifecycle_writer_ctx_t via_stream = {0};
 
     via_ep0.via_root_client_ep0  = true;
     via_stream.via_owning_stream = true;
 
     TEST_ASSERT_FALSE(
-        rcp_ep_mdio_functional_cfg_writable(RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, none));
+        rcp_ep_mdio_functional_cfg_writable(RCP_LIFECYCLE_RCP_CONFIGURED, none));
     TEST_ASSERT_TRUE(
-        rcp_ep_mdio_functional_cfg_writable(RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, via_ep0));
+        rcp_ep_mdio_functional_cfg_writable(RCP_LIFECYCLE_RCP_CONFIGURED, via_ep0));
     TEST_ASSERT_TRUE(
-        rcp_ep_mdio_functional_cfg_writable(RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, via_stream));
+        rcp_ep_mdio_functional_cfg_writable(RCP_LIFECYCLE_RCP_CONFIGURED, via_stream));
 }
 
 /* ── strerror ───────────────────────────────────────────────────────────────── */

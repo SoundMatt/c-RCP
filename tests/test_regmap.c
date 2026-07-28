@@ -25,7 +25,7 @@
 #include <rcp/avtp.h>
 #include <rcp/regmap.h>
 #include <rcp/rcp.h>
-#include <rcp/server.h>
+#include <rcp/lifecycle.h>
 
 #include <string.h>
 
@@ -48,7 +48,7 @@ static void test_is_ep0_false_for_other_indices(void)
 
 static void test_ep0_index_matches_discovery_byte_bus_id(void)
 {
-    TEST_ASSERT_EQUAL_UINT16((uint16_t)RCP_SERVER_DISCOVERY_BYTE_BUS_ID,
+    TEST_ASSERT_EQUAL_UINT16((uint16_t)RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID,
                               RCP_REGMAP_EP0_INDEX);
 }
 
@@ -144,7 +144,7 @@ static void test_options_consistent_when_multiple_groups_fully_set(void)
 static void test_writer_ctx_grants_root_client_via_ep0(void)
 {
     rcp_regmap_general_t map;
-    rcp_server_writer_ctx_t ctx;
+    rcp_lifecycle_writer_ctx_t ctx;
 
     rcp_regmap_general_init(&map);
     map.svr_root_client_index = 7;
@@ -157,7 +157,7 @@ static void test_writer_ctx_grants_root_client_via_ep0(void)
 static void test_writer_ctx_denies_root_client_when_wrong_stream_or_not_ep0(void)
 {
     rcp_regmap_general_t map;
-    rcp_server_writer_ctx_t ctx;
+    rcp_lifecycle_writer_ctx_t ctx;
 
     rcp_regmap_general_init(&map);
     map.svr_root_client_index = 7;
@@ -172,7 +172,7 @@ static void test_writer_ctx_denies_root_client_when_wrong_stream_or_not_ep0(void
 static void test_writer_ctx_denies_root_client_when_none_granted(void)
 {
     rcp_regmap_general_t map;
-    rcp_server_writer_ctx_t ctx;
+    rcp_lifecycle_writer_ctx_t ctx;
 
     rcp_regmap_general_init(&map); /* svr_root_client_index == RCP_REGMAP_NO_ROOT_CLIENT */
 
@@ -184,7 +184,7 @@ static void test_writer_ctx_grants_owning_stream(void)
 {
     rcp_regmap_general_t map;
     rcp_regmap_ep_client_t owner;
-    rcp_server_writer_ctx_t ctx;
+    rcp_lifecycle_writer_ctx_t ctx;
 
     rcp_regmap_general_init(&map);
     owner.has_owning_stream   = true;
@@ -199,7 +199,7 @@ static void test_writer_ctx_denies_owning_stream_when_no_owner_or_null(void)
 {
     rcp_regmap_general_t map;
     rcp_regmap_ep_client_t owner;
-    rcp_server_writer_ctx_t ctx;
+    rcp_lifecycle_writer_ctx_t ctx;
 
     rcp_regmap_general_init(&map);
 

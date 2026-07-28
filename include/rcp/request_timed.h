@@ -7,7 +7,7 @@
 //cfusa:req REQ-TIMED-007
 //cfusa:req REQ-TIMED-008
 /*
- * timed.h -- Timed conditional requests for the TC18 Remote Control
+ * request_timed.h -- Timed conditional requests for the TC18 Remote Control
  * Protocol wire layer (ROADMAP.md Phase 17, "Conditional Requests &
  * Sequencers", milestone 69).
  *
@@ -32,13 +32,13 @@
  * moment" presentation time for every ACF message inside that AVTPDU
  * (avtp.h's own file header). A Timed request (request_type
  * RCP_REQUEST_TYPE_TIMED, 0x0A, no safety-tagged variant exists) instead
- * carries its own presentation_time sub-field directly, via compound.h's
+ * carries its own presentation_time sub-field directly, via request_compound.h's
  * shared message_timestamp-repurposing convention (see that header's file
  * comment) -- letting a client express the identical "don't execute
  * before this instant" semantics inside a plain NTSCF frame, without
- * needing a TSCF header at all. Like triggered.h and chained.h, this
+ * needing a TSCF header at all. Like request_triggered.h and request_chained.h, this
  * module reuses that shared wire convention without including or calling
- * into compound.h itself.
+ * into request_compound.h itself.
  *
  * This module's own 7-byte sub-field layout: presentation_time (4 bytes,
  * the same uint32_t width and "gPTP-domain instant" semantics as
@@ -68,8 +68,8 @@
  * meaningless without the same underlying time-sync capability TSCF
  * itself depends on.
  */
-#ifndef RCP_TIMED_H
-#define RCP_TIMED_H
+#ifndef RCP_REQUEST_TIMED_H
+#define RCP_REQUEST_TIMED_H
 
 #include "rcp/acf.h"
 #include "rcp/avtp.h"
@@ -115,7 +115,7 @@ bool rcp_timed_feature_enabled(uint32_t options);
  * region's first 4 sub-field bytes (the remaining 3 reserved and zeroed)
  * with the leading opcode byte set to RCP_REQUEST_TYPE_TIMED and mtv
  * forced to RCP_ACF_MTV_UNTIMED -- same conventions as
- * rcp_compound_encode_request() (compound.h). payload/payload_len is this
+ * rcp_compound_encode_request() (request_compound.h). payload/payload_len is this
  * request's own opaque, endpoint-specific data; payload may be NULL iff
  * payload_len == 0. Returns a zeroed rcp_bytes_t (data=NULL) if
  * payload_len exceeds RCP_ACF_MAX_PAYLOAD or on allocation failure.
@@ -125,7 +125,7 @@ rcp_bytes_t rcp_timed_encode_request(rcp_byte_bus_id_t byte_bus_id, uint32_t pre
                                       size_t payload_len);
 
 /* Decodes and validates a timed request from b[0..len). Same failure-mode
- * conventions as rcp_compound_decode_request() (compound.h), with
+ * conventions as rcp_compound_decode_request() (request_compound.h), with
  * RCP_TIMED_ERR_UNKNOWN_TYPE returned whenever the decoded opcode byte is
  * not RCP_REQUEST_TYPE_TIMED. On RCP_TIMED_OK, *out_byte_bus_id,
  * *out_presentation_time, and *out_transaction_num are populated, and
@@ -164,4 +164,4 @@ rcp_timed_admission_t rcp_timed_admit(bool gptp_locked, uint32_t presentation_ti
 }
 #endif
 
-#endif /* RCP_TIMED_H */
+#endif /* RCP_REQUEST_TIMED_H */

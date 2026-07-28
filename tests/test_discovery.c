@@ -29,7 +29,7 @@
 #include <rcp/discovery.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
-#include <rcp/server.h>
+#include <rcp/lifecycle.h>
 
 #include <string.h>
 
@@ -85,7 +85,7 @@ static void test_request_addressed_to_discovery_bus(void)
     const uint8_t *payload;
     size_t payload_len;
 
-    hdr.byte_bus_id = RCP_SERVER_DISCOVERY_BYTE_BUS_ID;
+    hdr.byte_bus_id = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
     hdr.op = RCP_ACF_OP_READ;
     hdr.read_size_or_segment_num = 12;
     acf_frame = rcp_acf_encode_abb(&hdr, NULL, 0);
@@ -96,7 +96,7 @@ static void test_request_addressed_to_discovery_bus(void)
 
     TEST_ASSERT_EQUAL(RCP_AVTP_OK,
                        rcp_avtp_decode_ntscf(frame.data, frame.len, &decoded_ntscf, &payload, &payload_len));
-    TEST_ASSERT_EQUAL_HEX8(RCP_SERVER_DISCOVERY_BYTE_BUS_ID, payload[3]);
+    TEST_ASSERT_EQUAL_HEX8(RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, payload[3]);
 
     rcp_bytes_free(&frame);
 }
@@ -109,7 +109,7 @@ static void test_request_dropped_when_tscf_headed(void)
     rcp_bytes_t frame;
     rcp_discovery_request_t req;
 
-    acf_hdr.byte_bus_id = RCP_SERVER_DISCOVERY_BYTE_BUS_ID;
+    acf_hdr.byte_bus_id = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
     acf_hdr.op = RCP_ACF_OP_READ;
     acf_frame = rcp_acf_encode_abb(&acf_hdr, NULL, 0);
 
@@ -132,7 +132,7 @@ static void test_request_rejects_non_abb_msg_type(void)
     rcp_bytes_t frame;
     rcp_discovery_request_t req;
 
-    gbb_hdr.info.byte_bus_id = RCP_SERVER_DISCOVERY_BYTE_BUS_ID;
+    gbb_hdr.info.byte_bus_id = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
     gbb_hdr.info.op = RCP_ACF_OP_READ;
     acf_frame = rcp_acf_encode_gbb(&gbb_hdr, NULL, 0);
 
@@ -180,7 +180,7 @@ static void test_request_rejects_wrong_op(void)
     rcp_bytes_t acf_frame;
     rcp_avtp_ntscf_header_t ntscf_hdr = {0};
 
-    hdr.byte_bus_id = RCP_SERVER_DISCOVERY_BYTE_BUS_ID;
+    hdr.byte_bus_id = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
     hdr.op = RCP_ACF_OP_WRITE; /* discovery is always a read */
     acf_frame = rcp_acf_encode_abb(&hdr, NULL, 0);
 

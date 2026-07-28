@@ -9,12 +9,12 @@
 #include "unity.h"
 
 #include <rcp/acf.h>
-#include <rcp/cancel.h>
-#include <rcp/chained.h>
-#include <rcp/compound.h>
+#include <rcp/request_cancel.h>
+#include <rcp/request_chained.h>
+#include <rcp/request_compound.h>
 #include <rcp/scheduler.h>
-#include <rcp/timed.h>
-#include <rcp/triggered.h>
+#include <rcp/request_timed.h>
+#include <rcp/request_triggered.h>
 
 #include <string.h>
 

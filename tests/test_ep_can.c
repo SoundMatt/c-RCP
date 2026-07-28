@@ -26,7 +26,7 @@
 #include <rcp/ep_can.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
-#include <rcp/server.h>
+#include <rcp/lifecycle.h>
 
 #include <string.h>
 
@@ -161,41 +161,41 @@ static void test_functional_cfg_init_zeroes(void)
 
 static void test_functional_cfg_writable_false_hw_unconfigured(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
     writer.via_root_client_ep0 = true;
     writer.via_owning_stream   = true;
 
     TEST_ASSERT_FALSE(rcp_ep_can_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, writer));
+        RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
 }
 
 static void test_functional_cfg_writable_true_hw_configured_any_writer(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
     TEST_ASSERT_TRUE(rcp_ep_can_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        RCP_LIFECYCLE_HW_CONFIGURED, writer));
 }
 
 static void test_set_arbitration_timing_rejects_unauthorized(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     none = {0};
+    rcp_lifecycle_writer_ctx_t     none = {0};
     rcp_ep_can_bit_timing_t     timing = {0};
 
     rcp_ep_can_functional_cfg_init(&cfg);
     timing.prescaler = 5;
 
     TEST_ASSERT_FALSE(rcp_ep_can_set_arbitration_timing(
-        &cfg, timing, RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, none));
+        &cfg, timing, RCP_LIFECYCLE_RCP_CONFIGURED, none));
     TEST_ASSERT_EQUAL_UINT32(0, cfg.arbitration_timing.prescaler);
 }
 
 static void test_set_arbitration_timing_applies_when_authorized(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
     rcp_ep_can_bit_timing_t     timing = {0};
 
     rcp_ep_can_functional_cfg_init(&cfg);
@@ -206,7 +206,7 @@ static void test_set_arbitration_timing_applies_when_authorized(void)
     timing.sync_jump_width  = 1;
 
     TEST_ASSERT_TRUE(rcp_ep_can_set_arbitration_timing(
-        &cfg, timing, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, timing, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT32(5, cfg.arbitration_timing.prescaler);
     TEST_ASSERT_EQUAL_UINT16(3, cfg.arbitration_timing.prop_seg);
 }
@@ -214,14 +214,14 @@ static void test_set_arbitration_timing_applies_when_authorized(void)
 static void test_set_fd_data_timing_applies_when_authorized(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
     rcp_ep_can_bit_timing_t     timing = {0};
 
     rcp_ep_can_functional_cfg_init(&cfg);
     timing.prescaler = 9;
 
     TEST_ASSERT_TRUE(rcp_ep_can_set_fd_data_timing(
-        &cfg, timing, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, timing, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT32(9, cfg.fd_data_timing.prescaler);
     TEST_ASSERT_EQUAL_UINT32(0, cfg.arbitration_timing.prescaler);
 }
@@ -229,26 +229,26 @@ static void test_set_fd_data_timing_applies_when_authorized(void)
 static void test_set_xl_data_timing_applies_when_authorized(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
     rcp_ep_can_bit_timing_t     timing = {0};
 
     rcp_ep_can_functional_cfg_init(&cfg);
     timing.prescaler = 13;
 
     TEST_ASSERT_TRUE(rcp_ep_can_set_xl_data_timing(
-        &cfg, timing, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, timing, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT32(13, cfg.xl_data_timing.prescaler);
 }
 
 static void test_set_delay_compensation_applies_when_authorized(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
 
     rcp_ep_can_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_can_set_delay_compensation(
-        &cfg, true, 7, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, true, 7, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_TRUE(cfg.delay_comp_enable);
     TEST_ASSERT_EQUAL_UINT8(7, cfg.delay_comp_offset);
 }
@@ -256,12 +256,12 @@ static void test_set_delay_compensation_applies_when_authorized(void)
 static void test_set_delay_compensation_rejects_unauthorized(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     none = {0};
+    rcp_lifecycle_writer_ctx_t     none = {0};
 
     rcp_ep_can_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_can_set_delay_compensation(
-        &cfg, true, 7, RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, none));
+        &cfg, true, 7, RCP_LIFECYCLE_RCP_CONFIGURED, none));
     TEST_ASSERT_FALSE(cfg.delay_comp_enable);
     TEST_ASSERT_EQUAL_UINT8(0, cfg.delay_comp_offset);
 }
@@ -269,31 +269,31 @@ static void test_set_delay_compensation_rejects_unauthorized(void)
 static void test_set_exec_delay_clk_divider_applies_when_authorized(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
 
     rcp_ep_can_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_can_set_exec_delay_clk_divider(
-        &cfg, 42, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, 42, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT32(42, cfg.exec_delay_clk_divider);
 }
 
 static void test_set_exec_delay_clk_divider_rejects_unauthorized(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     none = {0};
+    rcp_lifecycle_writer_ctx_t     none = {0};
 
     rcp_ep_can_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_can_set_exec_delay_clk_divider(
-        &cfg, 42, RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, none));
+        &cfg, 42, RCP_LIFECYCLE_RCP_CONFIGURED, none));
     TEST_ASSERT_EQUAL_UINT32(0, cfg.exec_delay_clk_divider);
 }
 
 static void test_set_xl_filter_applies_when_authorized(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
     rcp_ep_can_xl_filter_t      filter = {0};
 
     rcp_ep_can_functional_cfg_init(&cfg);
@@ -302,7 +302,7 @@ static void test_set_xl_filter_applies_when_authorized(void)
     filter.enable = true;
 
     TEST_ASSERT_TRUE(rcp_ep_can_set_xl_filter(
-        &cfg, 2, filter, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, 2, filter, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT32(0x123, cfg.xl_filters[2].id);
     TEST_ASSERT_TRUE(cfg.xl_filters[2].enable);
     TEST_ASSERT_FALSE(cfg.xl_filters[0].enable);
@@ -311,14 +311,14 @@ static void test_set_xl_filter_applies_when_authorized(void)
 static void test_set_xl_filter_rejects_bad_index(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
     rcp_ep_can_xl_filter_t      filter = {0};
 
     rcp_ep_can_functional_cfg_init(&cfg);
     filter.enable = true;
 
     TEST_ASSERT_FALSE(rcp_ep_can_set_xl_filter(
-        &cfg, RCP_EP_CAN_XL_MAX_FILTERS, filter, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, RCP_EP_CAN_XL_MAX_FILTERS, filter, RCP_LIFECYCLE_HW_CONFIGURED, writer));
 }
 
 /* ── strerror ───────────────────────────────────────────────────────────────── */

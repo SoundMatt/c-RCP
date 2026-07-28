@@ -36,7 +36,7 @@
 #include <rcp/ep_spi.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
-#include <rcp/server.h>
+#include <rcp/lifecycle.h>
 
 #include <string.h>
 
@@ -141,159 +141,159 @@ static void test_functional_cfg_init_zeroes(void)
 
 static void test_functional_cfg_writable_false_hw_unconfigured(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
     writer.via_root_client_ep0 = true;
     writer.via_owning_stream   = true;
 
     TEST_ASSERT_FALSE(rcp_ep_spi_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, writer));
+        RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
 }
 
 static void test_functional_cfg_writable_true_hw_configured_any_writer(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
     TEST_ASSERT_TRUE(rcp_ep_spi_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        RCP_LIFECYCLE_HW_CONFIGURED, writer));
 }
 
 static void test_functional_cfg_writable_rcp_configured_requires_authorization(void)
 {
-    rcp_server_writer_ctx_t none = {0};
-    rcp_server_writer_ctx_t via_ep0 = {0};
-    rcp_server_writer_ctx_t via_stream = {0};
+    rcp_lifecycle_writer_ctx_t none = {0};
+    rcp_lifecycle_writer_ctx_t via_ep0 = {0};
+    rcp_lifecycle_writer_ctx_t via_stream = {0};
 
     via_ep0.via_root_client_ep0 = true;
     via_stream.via_owning_stream = true;
 
     TEST_ASSERT_FALSE(rcp_ep_spi_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, none));
+        RCP_LIFECYCLE_RCP_CONFIGURED, none));
     TEST_ASSERT_TRUE(rcp_ep_spi_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, via_ep0));
+        RCP_LIFECYCLE_RCP_CONFIGURED, via_ep0));
     TEST_ASSERT_TRUE(rcp_ep_spi_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, via_stream));
+        RCP_LIFECYCLE_RCP_CONFIGURED, via_stream));
 }
 
 static void test_set_channel_mode_rejects_invalid_channel_or_unauthorized(void)
 {
     rcp_ep_spi_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     authorized = {0};
-    rcp_server_writer_ctx_t     none = {0};
+    rcp_lifecycle_writer_ctx_t     authorized = {0};
+    rcp_lifecycle_writer_ctx_t     none = {0};
 
     authorized.via_root_client_ep0 = true;
     rcp_ep_spi_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_spi_set_channel_mode(
-        &cfg, 6, RCP_EP_SPI_MODE_3, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, authorized));
+        &cfg, 6, RCP_EP_SPI_MODE_3, RCP_LIFECYCLE_HW_CONFIGURED, authorized));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_SPI_MODE_0, cfg.channels[0].mode);
 
     TEST_ASSERT_FALSE(rcp_ep_spi_set_channel_mode(
-        &cfg, 0, RCP_EP_SPI_MODE_3, RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, none));
+        &cfg, 0, RCP_EP_SPI_MODE_3, RCP_LIFECYCLE_RCP_CONFIGURED, none));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_SPI_MODE_0, cfg.channels[0].mode);
 }
 
 static void test_set_channel_mode_applies_when_authorized(void)
 {
     rcp_ep_spi_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
 
     rcp_ep_spi_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_spi_set_channel_mode(
-        &cfg, 3, RCP_EP_SPI_MODE_2, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, 3, RCP_EP_SPI_MODE_2, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_SPI_MODE_2, cfg.channels[3].mode);
 }
 
 static void test_set_channel_bit_order_rejects_invalid_channel_or_unauthorized(void)
 {
     rcp_ep_spi_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     none = {0};
+    rcp_lifecycle_writer_ctx_t     none = {0};
 
     rcp_ep_spi_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_spi_set_channel_bit_order(
-        &cfg, 6, RCP_EP_SPI_BIT_ORDER_LSB_FIRST, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, none));
+        &cfg, 6, RCP_EP_SPI_BIT_ORDER_LSB_FIRST, RCP_LIFECYCLE_HW_CONFIGURED, none));
     TEST_ASSERT_FALSE(rcp_ep_spi_set_channel_bit_order(
-        &cfg, 0, RCP_EP_SPI_BIT_ORDER_LSB_FIRST, RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, none));
+        &cfg, 0, RCP_EP_SPI_BIT_ORDER_LSB_FIRST, RCP_LIFECYCLE_HW_UNCONFIGURED, none));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_SPI_BIT_ORDER_MSB_FIRST, cfg.channels[0].bit_order);
 }
 
 static void test_set_channel_bit_order_applies_when_authorized(void)
 {
     rcp_ep_spi_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
 
     rcp_ep_spi_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_spi_set_channel_bit_order(
-        &cfg, 1, RCP_EP_SPI_BIT_ORDER_LSB_FIRST, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, 1, RCP_EP_SPI_BIT_ORDER_LSB_FIRST, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_SPI_BIT_ORDER_LSB_FIRST, cfg.channels[1].bit_order);
 }
 
 static void test_set_channel_cs_polarity_rejects_invalid_channel_or_unauthorized(void)
 {
     rcp_ep_spi_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     none = {0};
+    rcp_lifecycle_writer_ctx_t     none = {0};
 
     rcp_ep_spi_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_spi_set_channel_cs_polarity(
-        &cfg, 6, RCP_EP_SPI_CS_ACTIVE_HIGH, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, none));
+        &cfg, 6, RCP_EP_SPI_CS_ACTIVE_HIGH, RCP_LIFECYCLE_HW_CONFIGURED, none));
     TEST_ASSERT_FALSE(rcp_ep_spi_set_channel_cs_polarity(
-        &cfg, 0, RCP_EP_SPI_CS_ACTIVE_HIGH, RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, none));
+        &cfg, 0, RCP_EP_SPI_CS_ACTIVE_HIGH, RCP_LIFECYCLE_HW_UNCONFIGURED, none));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_SPI_CS_ACTIVE_LOW, cfg.channels[0].cs_polarity);
 }
 
 static void test_set_channel_cs_polarity_applies_when_authorized(void)
 {
     rcp_ep_spi_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
 
     rcp_ep_spi_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_spi_set_channel_cs_polarity(
-        &cfg, 2, RCP_EP_SPI_CS_ACTIVE_HIGH, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, 2, RCP_EP_SPI_CS_ACTIVE_HIGH, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_SPI_CS_ACTIVE_HIGH, cfg.channels[2].cs_polarity);
 }
 
 static void test_set_channel_clock_divider_rejects_invalid_channel_or_unauthorized(void)
 {
     rcp_ep_spi_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     none = {0};
+    rcp_lifecycle_writer_ctx_t     none = {0};
 
     rcp_ep_spi_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_spi_set_channel_clock_divider(
-        &cfg, 6, 128, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, none));
+        &cfg, 6, 128, RCP_LIFECYCLE_HW_CONFIGURED, none));
     TEST_ASSERT_FALSE(rcp_ep_spi_set_channel_clock_divider(
-        &cfg, 0, 128, RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, none));
+        &cfg, 0, 128, RCP_LIFECYCLE_HW_UNCONFIGURED, none));
     TEST_ASSERT_EQUAL_UINT32(0, cfg.channels[0].clock_divider);
 }
 
 static void test_set_channel_clock_divider_applies_when_authorized(void)
 {
     rcp_ep_spi_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
 
     rcp_ep_spi_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_spi_set_channel_clock_divider(
-        &cfg, 4, 256, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, 4, 256, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT32(256, cfg.channels[4].clock_divider);
 }
 
 static void test_set_channel_timing_rejects_invalid_channel_or_unauthorized(void)
 {
     rcp_ep_spi_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     none = {0};
+    rcp_lifecycle_writer_ctx_t     none = {0};
 
     rcp_ep_spi_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_spi_set_channel_timing(
-        &cfg, 6, 100, 200, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, none));
+        &cfg, 6, 100, 200, RCP_LIFECYCLE_HW_CONFIGURED, none));
     TEST_ASSERT_FALSE(rcp_ep_spi_set_channel_timing(
-        &cfg, 0, 100, 200, RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, none));
+        &cfg, 0, 100, 200, RCP_LIFECYCLE_HW_UNCONFIGURED, none));
     TEST_ASSERT_EQUAL_UINT32(0, cfg.channels[0].inter_byte_delay_ns);
     TEST_ASSERT_EQUAL_UINT32(0, cfg.channels[0].inter_transfer_delay_ns);
 }
@@ -301,12 +301,12 @@ static void test_set_channel_timing_rejects_invalid_channel_or_unauthorized(void
 static void test_set_channel_timing_applies_when_authorized(void)
 {
     rcp_ep_spi_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
 
     rcp_ep_spi_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_spi_set_channel_timing(
-        &cfg, 5, 50, 500, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, 5, 50, 500, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT32(50, cfg.channels[5].inter_byte_delay_ns);
     TEST_ASSERT_EQUAL_UINT32(500, cfg.channels[5].inter_transfer_delay_ns);
 }
@@ -314,26 +314,26 @@ static void test_set_channel_timing_applies_when_authorized(void)
 static void test_set_channel_trigger_rejects_invalid_channel_or_unauthorized(void)
 {
     rcp_ep_spi_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     none = {0};
+    rcp_lifecycle_writer_ctx_t     none = {0};
 
     rcp_ep_spi_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_spi_set_channel_trigger(
-        &cfg, 6, RCP_EP_SPI_TRIGGER_TRANSFER_DONE, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, none));
+        &cfg, 6, RCP_EP_SPI_TRIGGER_TRANSFER_DONE, RCP_LIFECYCLE_HW_CONFIGURED, none));
     TEST_ASSERT_FALSE(rcp_ep_spi_set_channel_trigger(
-        &cfg, 0, RCP_EP_SPI_TRIGGER_TRANSFER_DONE, RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, none));
+        &cfg, 0, RCP_EP_SPI_TRIGGER_TRANSFER_DONE, RCP_LIFECYCLE_HW_UNCONFIGURED, none));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_SPI_TRIGGER_NONE, cfg.channels[0].trigger);
 }
 
 static void test_set_channel_trigger_applies_when_authorized(void)
 {
     rcp_ep_spi_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t     writer = {0};
+    rcp_lifecycle_writer_ctx_t     writer = {0};
 
     rcp_ep_spi_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_spi_set_channel_trigger(
-        &cfg, 0, RCP_EP_SPI_TRIGGER_CS_ASSERT, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, 0, RCP_EP_SPI_TRIGGER_CS_ASSERT, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_SPI_TRIGGER_CS_ASSERT, cfg.channels[0].trigger);
 }
 

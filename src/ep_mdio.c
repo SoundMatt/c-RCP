@@ -113,10 +113,10 @@ void rcp_ep_mdio_functional_cfg_init(rcp_ep_mdio_functional_cfg_t *cfg)
 }
 
 //cfusa:req REQ-MDIO-010
-bool rcp_ep_mdio_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                          rcp_server_writer_ctx_t writer)
+bool rcp_ep_mdio_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                          rcp_lifecycle_writer_ctx_t writer)
 {
-    return rcp_server_field_writable(state, RCP_SERVER_FIELD_FUNCTIONAL_W, writer);
+    return rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, writer);
 }
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */

@@ -112,7 +112,7 @@
  * module's documented convention, same as ep_gpio.h/ep_spi.h) and adds
  * this endpoint's one runtime-adjustable field: i2c_mode.
  * rcp_ep_i2c_functional_cfg_writable() is, likewise, a thin, named wrapper
- * over server.h's rcp_server_field_writable() (RCP_SERVER_FIELD_FUNCTIONAL_W),
+ * over server.h's rcp_lifecycle_field_writable() (RCP_LIFECYCLE_FIELD_FUNCTIONAL_W),
  * and rcp_ep_i2c_set_mode() consults it before ever touching cfg -- reusing,
  * never duplicating, server.h's/regmap.h's existing authorization logic,
  * per the roadmap's explicit instruction (the same rule ep_gpio.h's/
@@ -125,7 +125,7 @@
 #include "rcp/avtp.h"
 #include "rcp/rcp.h"
 #include "rcp/regmap.h"
-#include "rcp/server.h"
+#include "rcp/lifecycle.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -166,18 +166,18 @@ typedef struct {
 void rcp_ep_i2c_functional_cfg_init(rcp_ep_i2c_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
- * writer -- a thin, named wrapper over rcp_server_field_writable()
- * (server.h) with kind RCP_SERVER_FIELD_FUNCTIONAL_W; see the file header.
+ * writer -- a thin, named wrapper over rcp_lifecycle_field_writable()
+ * (server.h) with kind RCP_LIFECYCLE_FIELD_FUNCTIONAL_W; see the file header.
  * Reuses, and never duplicates, that function's authorization logic. */
-bool rcp_ep_i2c_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                        rcp_server_writer_ctx_t writer);
+bool rcp_ep_i2c_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                        rcp_lifecycle_writer_ctx_t writer);
 
 /* Sets cfg->i2c_mode to mode iff rcp_ep_i2c_functional_cfg_writable()
  * authorizes the write for state/writer and mode is rcp_ep_i2c_mode_valid();
  * returns whether the write was applied. cfg is left entirely unchanged
  * when it returns false. */
 bool rcp_ep_i2c_set_mode(rcp_ep_i2c_functional_cfg_t *cfg, rcp_ep_i2c_mode_t mode,
-                          rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer);
+                          rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer);
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 

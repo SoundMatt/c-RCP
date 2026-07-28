@@ -11,7 +11,7 @@
 //cfusa:req REQ-CANCEL-011
 //cfusa:req REQ-CANCEL-012
 /*
- * cancel.h -- The cancellation taxonomy for the TC18 Remote Control
+ * request_cancel.h -- The cancellation taxonomy for the TC18 Remote Control
  * Protocol wire layer (ROADMAP.md Phase 17, "Conditional Requests &
  * Sequencers", milestone 69).
  *
@@ -35,7 +35,7 @@
  *                                13's baseline, but not previously given
  *                                its own encode/decode surface anywhere in
  *                                this codebase.
- *   0x06  clear-non-safestate   compound.c/compound.h (already shipped at
+ *   0x06  clear-non-safestate   request_compound.c/compound.h (already shipped at
  *                                v0.68.0, milestone 68) -- see
  *                                rcp_compound_encode_clear_non_safestate()/
  *                                _decode_clear_non_safestate(). Not
@@ -44,14 +44,14 @@
  *                                clear_transaction_num field identifying
  *                                which queued request to cancel.
  *
- * All three share compound.h's message_timestamp-repurposing wire
+ * All three share request_compound.h's message_timestamp-repurposing wire
  * convention (see that header's file comment); this module reuses it
- * without including or calling into compound.h itself, matching
- * triggered.h/chained.h/timed.h's own precedent. clear-all and
+ * without including or calling into request_compound.h itself, matching
+ * request_triggered.h/chained.h/timed.h's own precedent. clear-all and
  * clear-single both carry no payload of their own beyond their opcode
  * byte and (for clear-single) the one clear_transaction_num sub-field --
  * the remaining sub-field bytes are always encoded/decoded as zero,
- * mirroring compound.h's own clear-non-safestate encoding.
+ * mirroring request_compound.h's own clear-non-safestate encoding.
  *
  * ── General cancellation semantics ───────────────────────────────────────────
  *
@@ -73,14 +73,14 @@
  *
  * rcp_cancel_chain_should_cascade() is this module's own expression of
  * the roadmap's chained-successor cascade rule: canceling one member of a
- * chained request (chained.h) also cancels every member at or after that
+ * chained request (request_chained.h) also cancels every member at or after that
  * member's own chain_position within the same chain -- this function is
  * the pure per-member predicate a caller applies across a chain's
  * members, mirroring the same "pure decision function, caller drives the
- * loop" shape chained.h's own rcp_chained_advance() already established.
+ * loop" shape request_chained.h's own rcp_chained_advance() already established.
  */
-#ifndef RCP_CANCEL_H
-#define RCP_CANCEL_H
+#ifndef RCP_REQUEST_CANCEL_H
+#define RCP_REQUEST_CANCEL_H
 
 #include "rcp/acf.h"
 #include "rcp/avtp.h"
@@ -121,14 +121,14 @@ const char *rcp_cancel_strerror(rcp_cancel_errc_t e);
  * byte set to RCP_REQUEST_TYPE_CLEAR_ALL and its remaining 7 sub-field
  * bytes zeroed (this request type carries none of its own) and mtv
  * forced to RCP_ACF_MTV_UNTIMED, same convention as
- * rcp_compound_encode_clear_non_safestate() (compound.h). Returns a
+ * rcp_compound_encode_clear_non_safestate() (request_compound.h). Returns a
  * zeroed rcp_bytes_t (data=NULL) only on allocation failure. Caller frees
  * the result with rcp_bytes_free(). */
 rcp_bytes_t rcp_cancel_encode_clear_all(rcp_byte_bus_id_t byte_bus_id, uint8_t transaction_num);
 
 /* Decodes and validates a clear-all request from b[0..len). Same
  * failure-mode conventions as rcp_compound_decode_clear_non_safestate()
- * (compound.h), with RCP_CANCEL_ERR_UNKNOWN_TYPE returned whenever the
+ * (request_compound.h), with RCP_CANCEL_ERR_UNKNOWN_TYPE returned whenever the
  * decoded opcode byte is not RCP_REQUEST_TYPE_CLEAR_ALL. On
  * RCP_CANCEL_OK, *out_byte_bus_id and *out_transaction_num are
  * populated. */
@@ -192,10 +192,10 @@ rcp_cancel_result_t rcp_cancel_attempt(bool found, rcp_cancel_lifecycle_t state)
 /* True iff a chain member at member_position must also be canceled as
  * part of cascading a cancellation targeted at canceled_position within
  * the same chain -- i.e. member_position is at or after
- * canceled_position. Both positions use chained.h's own 0-based
+ * canceled_position. Both positions use request_chained.h's own 0-based
  * chain_position numbering. A member strictly before canceled_position
  * has already executed by the time a chain member is canceled (chained
- * execution is sequential, per chained.h's own file header) and is
+ * execution is sequential, per request_chained.h's own file header) and is
  * therefore never cascaded to. */
 bool rcp_cancel_chain_should_cascade(uint8_t member_position, uint8_t canceled_position);
 
@@ -203,4 +203,4 @@ bool rcp_cancel_chain_should_cascade(uint8_t member_position, uint8_t canceled_p
 }
 #endif
 
-#endif /* RCP_CANCEL_H */
+#endif /* RCP_REQUEST_CANCEL_H */

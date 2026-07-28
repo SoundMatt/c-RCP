@@ -148,8 +148,8 @@
  * ep_rx_buffer_size (the RX FIFO's size in octets), and uart_timeout_ms
  * (the read-completion race's timeout half -- see above).
  * rcp_ep_uart_functional_cfg_writable() is, likewise, a thin, named
- * wrapper over server.h's rcp_server_field_writable()
- * (RCP_SERVER_FIELD_FUNCTIONAL_W), and every rcp_ep_uart_set_*() mutator
+ * wrapper over server.h's rcp_lifecycle_field_writable()
+ * (RCP_LIFECYCLE_FIELD_FUNCTIONAL_W), and every rcp_ep_uart_set_*() mutator
  * consults it before ever touching cfg -- reusing, never duplicating,
  * server.h's/regmap.h's existing authorization logic, per the roadmap's
  * explicit instruction (the same rule every prior endpoint type's own
@@ -162,7 +162,7 @@
 #include "rcp/avtp.h"
 #include "rcp/rcp.h"
 #include "rcp/regmap.h"
-#include "rcp/server.h"
+#include "rcp/lifecycle.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -235,17 +235,17 @@ typedef struct {
 void rcp_ep_uart_functional_cfg_init(rcp_ep_uart_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
- * writer -- a thin, named wrapper over rcp_server_field_writable()
- * (server.h) with kind RCP_SERVER_FIELD_FUNCTIONAL_W; see the file header.
+ * writer -- a thin, named wrapper over rcp_lifecycle_field_writable()
+ * (server.h) with kind RCP_LIFECYCLE_FIELD_FUNCTIONAL_W; see the file header.
  * Reuses, and never duplicates, that function's authorization logic. */
-bool rcp_ep_uart_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                         rcp_server_writer_ctx_t writer);
+bool rcp_ep_uart_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                         rcp_lifecycle_writer_ctx_t writer);
 
 /* Sets cfg->baud_rate to baud_rate iff rcp_ep_uart_functional_cfg_writable()
  * authorizes the write for state/writer; returns whether the write was
  * applied. cfg is left entirely unchanged when it returns false. */
 bool rcp_ep_uart_set_baud_rate(rcp_ep_uart_functional_cfg_t *cfg, uint32_t baud_rate,
-                                rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer);
+                                rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer);
 
 /* Sets cfg->uart_nr_bits/parity/stop_bits together (one setter for all
  * three, since they are always reconfigured as a pack on the wire) iff
@@ -255,18 +255,18 @@ bool rcp_ep_uart_set_baud_rate(rcp_ep_uart_functional_cfg_t *cfg, uint32_t baud_
  * entirely unchanged when it returns false. */
 bool rcp_ep_uart_set_frame_format(rcp_ep_uart_functional_cfg_t *cfg, uint8_t nr_bits,
                                    rcp_ep_uart_parity_t parity, rcp_ep_uart_stop_bits_t stop_bits,
-                                   rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer);
+                                   rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer);
 
 /* Same authorization rule as rcp_ep_uart_set_baud_rate(), for
  * cfg->ep_rx_buffer_size. */
 bool rcp_ep_uart_set_rx_buffer_size(rcp_ep_uart_functional_cfg_t *cfg, uint16_t rx_buffer_size,
-                                     rcp_server_lifecycle_t state,
-                                     rcp_server_writer_ctx_t writer);
+                                     rcp_lifecycle_state_t state,
+                                     rcp_lifecycle_writer_ctx_t writer);
 
 /* Same authorization rule as rcp_ep_uart_set_baud_rate(), for
  * cfg->uart_timeout_ms. */
 bool rcp_ep_uart_set_timeout(rcp_ep_uart_functional_cfg_t *cfg, uint32_t timeout_ms,
-                              rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer);
+                              rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer);
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 

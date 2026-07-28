@@ -23,7 +23,7 @@
 //cfusa:req REQ-CMP-023
 //cfusa:req REQ-CMP-024
 /*
- * compound.h -- Compound / compound-wait conditional requests and the
+ * request_compound.h -- Compound / compound-wait conditional requests and the
  * clear-non-safestate cancellation request type for the TC18 Remote
  * Control Protocol wire layer (ROADMAP.md Phase 17, "Conditional Requests &
  * Sequencers", milestone 68).
@@ -32,7 +32,7 @@
  * framing (avtp.h/avtp.c, milestone 59), the ACF message format (acf.h/
  * acf.c, milestone 60), the RC Server lifecycle state machine (server.h/
  * server.c, milestone 61), and this same milestone's own sequencer-state
- * primitive (sequencer.h/sequencer.c). Nothing in rcp.h, wire.c, avtp.h/
+ * primitive (request_sequencer.h/sequencer.c). Nothing in rcp.h, wire.c, avtp.h/
  * avtp.c, acf.h/acf.c, server.h/server.c, regmap.h/regmap.c, or any ep_*
  * endpoint module is touched here -- the same layering discipline every
  * module since milestone 64 has followed.
@@ -69,9 +69,9 @@
  *
  * request_type values this module recognizes (every other request_type
  * byte this shared convention carries is a peer module's own, landed
- * alongside this one at milestone 69: chained 0x01 -- chained.h, clear-all
- * 0x05 and clear-single 0x07 -- cancel.h, timed 0x0A -- timed.h, and
- * triggered 0x0E/0x8E -- triggered.h):
+ * alongside this one at milestone 69: chained 0x01 -- request_chained.h, clear-all
+ * 0x05 and clear-single 0x07 -- request_cancel.h, timed 0x0A -- request_timed.h, and
+ * triggered 0x0E/0x8E -- request_triggered.h):
  *
  *   0x06       clear-non-safestate (this module's own cancellation
  *              request; no safety-tagged counterpart of its own)
@@ -81,7 +81,7 @@
  * The safety-tagged (MSB-set) variants are round-tripped by this
  * milestone's encode/decode functions exactly like any other request_type
  * value -- gating their execution on the endpoint's configured safe state
- * is Phase 18's job (safept.h, milestone 70), not this one's, mirroring
+ * is Phase 18's job (e2e.h, milestone 70), not this one's, mirroring
  * acf.h's own precedent of round-tripping a field before its full behavior
  * is implemented elsewhere.
  *
@@ -91,7 +91,7 @@
  * rcp_compound_step_t -- this module's own design choice, following
  * ep_pwm.h's exact precedent of PWM_OUT/PWM_IN sharing one payload shape
  * (rcp_ep_pwm_value_t) for two closely related request kinds.
- * sequencer_index selects which of a table's sequencers (sequencer.h) this
+ * sequencer_index selects which of a table's sequencers (request_sequencer.h) this
  * step targets; start_state/next_state are the state-number sub-fields the
  * roadmap's scope calls for; exec_delay_ms is this step's cmp_exec_delay
  * (compound) or cmpw_exec_delay (compound-wait) timer, in milliseconds
@@ -129,13 +129,13 @@
  * project's established convention (ep_adc.h's averaging functions, etc.)
  * for every protocol-core module built so far.
  */
-#ifndef RCP_COMPOUND_H
-#define RCP_COMPOUND_H
+#ifndef RCP_REQUEST_COMPOUND_H
+#define RCP_REQUEST_COMPOUND_H
 
 #include "rcp/acf.h"
 #include "rcp/avtp.h"
 #include "rcp/rcp.h"
-#include "rcp/sequencer.h"
+#include "rcp/request_sequencer.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -318,4 +318,4 @@ bool rcp_compound_wait_tick(rcp_sequencer_table_t *table, const rcp_compound_ste
 }
 #endif
 
-#endif /* RCP_COMPOUND_H */
+#endif /* RCP_REQUEST_COMPOUND_H */

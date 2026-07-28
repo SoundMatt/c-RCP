@@ -58,7 +58,7 @@
 #include <rcp/ep_pwm.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
-#include <rcp/server.h>
+#include <rcp/lifecycle.h>
 
 #include <string.h>
 
@@ -233,75 +233,75 @@ static void test_out_functional_cfg_init_zeroes(void)
 
 static void test_out_functional_cfg_writable_false_hw_unconfigured(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
     writer.via_root_client_ep0 = true;
     writer.via_owning_stream   = true;
 
-    TEST_ASSERT_FALSE(rcp_ep_pwm_out_functional_cfg_writable(RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, writer));
+    TEST_ASSERT_FALSE(rcp_ep_pwm_out_functional_cfg_writable(RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
 }
 
 static void test_out_functional_cfg_writable_true_hw_configured_any_writer(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
-    TEST_ASSERT_TRUE(rcp_ep_pwm_out_functional_cfg_writable(RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+    TEST_ASSERT_TRUE(rcp_ep_pwm_out_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, writer));
 }
 
 static void test_out_functional_cfg_writable_rcp_configured_requires_authorization(void)
 {
-    rcp_server_writer_ctx_t unauth = {0};
-    rcp_server_writer_ctx_t auth   = {0};
+    rcp_lifecycle_writer_ctx_t unauth = {0};
+    rcp_lifecycle_writer_ctx_t auth   = {0};
 
     auth.via_root_client_ep0 = true;
 
-    TEST_ASSERT_FALSE(rcp_ep_pwm_out_functional_cfg_writable(RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, unauth));
-    TEST_ASSERT_TRUE(rcp_ep_pwm_out_functional_cfg_writable(RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, auth));
+    TEST_ASSERT_FALSE(rcp_ep_pwm_out_functional_cfg_writable(RCP_LIFECYCLE_RCP_CONFIGURED, unauth));
+    TEST_ASSERT_TRUE(rcp_ep_pwm_out_functional_cfg_writable(RCP_LIFECYCLE_RCP_CONFIGURED, auth));
 }
 
 static void test_out_set_trigger_rejects_unauthorized(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t         writer = {0};
+    rcp_lifecycle_writer_ctx_t         writer = {0};
 
     rcp_ep_pwm_out_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_pwm_out_set_trigger(&cfg, RCP_EP_PWM_OUT_TRIGGER_DONE,
-                                                  RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, writer));
+                                                  RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_PWM_OUT_TRIGGER_NONE, cfg.trigger);
 }
 
 static void test_out_set_trigger_applies_when_authorized(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t         writer = {0};
+    rcp_lifecycle_writer_ctx_t         writer = {0};
 
     rcp_ep_pwm_out_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_pwm_out_set_trigger(&cfg, RCP_EP_PWM_OUT_TRIGGER_DONE,
-                                                 RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+                                                 RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_PWM_OUT_TRIGGER_DONE, cfg.trigger);
 }
 
 static void test_out_set_enabled_rejects_unauthorized(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t         writer = {0};
+    rcp_lifecycle_writer_ctx_t         writer = {0};
 
     rcp_ep_pwm_out_functional_cfg_init(&cfg);
 
-    TEST_ASSERT_FALSE(rcp_ep_pwm_out_set_enabled(&cfg, true, RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, writer));
+    TEST_ASSERT_FALSE(rcp_ep_pwm_out_set_enabled(&cfg, true, RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
     TEST_ASSERT_FALSE(cfg.enabled);
 }
 
 static void test_out_set_enabled_applies_when_authorized(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t         writer = {0};
+    rcp_lifecycle_writer_ctx_t         writer = {0};
 
     rcp_ep_pwm_out_functional_cfg_init(&cfg);
 
-    TEST_ASSERT_TRUE(rcp_ep_pwm_out_set_enabled(&cfg, true, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+    TEST_ASSERT_TRUE(rcp_ep_pwm_out_set_enabled(&cfg, true, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_TRUE(cfg.enabled);
 }
 
@@ -529,50 +529,50 @@ static void test_in_functional_cfg_init_zeroes(void)
 
 static void test_in_functional_cfg_writable_false_hw_unconfigured(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
-    TEST_ASSERT_FALSE(rcp_ep_pwm_in_functional_cfg_writable(RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, writer));
+    TEST_ASSERT_FALSE(rcp_ep_pwm_in_functional_cfg_writable(RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
 }
 
 static void test_in_functional_cfg_writable_true_hw_configured_any_writer(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
-    TEST_ASSERT_TRUE(rcp_ep_pwm_in_functional_cfg_writable(RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+    TEST_ASSERT_TRUE(rcp_ep_pwm_in_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, writer));
 }
 
 static void test_in_functional_cfg_writable_rcp_configured_requires_authorization(void)
 {
-    rcp_server_writer_ctx_t unauth = {0};
-    rcp_server_writer_ctx_t auth   = {0};
+    rcp_lifecycle_writer_ctx_t unauth = {0};
+    rcp_lifecycle_writer_ctx_t auth   = {0};
 
     auth.via_owning_stream = true;
 
-    TEST_ASSERT_FALSE(rcp_ep_pwm_in_functional_cfg_writable(RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, unauth));
-    TEST_ASSERT_TRUE(rcp_ep_pwm_in_functional_cfg_writable(RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, auth));
+    TEST_ASSERT_FALSE(rcp_ep_pwm_in_functional_cfg_writable(RCP_LIFECYCLE_RCP_CONFIGURED, unauth));
+    TEST_ASSERT_TRUE(rcp_ep_pwm_in_functional_cfg_writable(RCP_LIFECYCLE_RCP_CONFIGURED, auth));
 }
 
 static void test_in_set_trigger_rejects_unauthorized(void)
 {
     rcp_ep_pwm_in_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t        writer = {0};
+    rcp_lifecycle_writer_ctx_t        writer = {0};
 
     rcp_ep_pwm_in_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_pwm_in_set_trigger(&cfg, RCP_EP_PWM_IN_TRIGGER_RISING,
-                                                 RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, writer));
+                                                 RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_PWM_IN_TRIGGER_NONE, cfg.trigger);
 }
 
 static void test_in_set_trigger_applies_when_authorized(void)
 {
     rcp_ep_pwm_in_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t        writer = {0};
+    rcp_lifecycle_writer_ctx_t        writer = {0};
 
     rcp_ep_pwm_in_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_pwm_in_set_trigger(&cfg, RCP_EP_PWM_IN_TRIGGER_FALLING,
-                                                RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+                                                RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_PWM_IN_TRIGGER_FALLING, cfg.trigger);
 }
 

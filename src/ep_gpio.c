@@ -135,17 +135,17 @@ void rcp_ep_gpio_functional_cfg_init(rcp_ep_gpio_functional_cfg_t *cfg)
 //cfusa:req REQ-GPIO-019
 //cfusa:req REQ-GPIO-020
 //cfusa:req REQ-GPIO-021
-bool rcp_ep_gpio_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                         rcp_server_writer_ctx_t writer)
+bool rcp_ep_gpio_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                         rcp_lifecycle_writer_ctx_t writer)
 {
-    return rcp_server_field_writable(state, RCP_SERVER_FIELD_FUNCTIONAL_W, writer);
+    return rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, writer);
 }
 
 //cfusa:req REQ-GPIO-022
 //cfusa:req REQ-GPIO-023
 bool rcp_ep_gpio_set_pin_property(rcp_ep_gpio_functional_cfg_t *cfg, uint8_t pin_index,
-                                   uint8_t pin_property, rcp_server_lifecycle_t state,
-                                   rcp_server_writer_ctx_t writer)
+                                   uint8_t pin_property, rcp_lifecycle_state_t state,
+                                   rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_gpio_pin_index_valid(pin_index)) return false;
     if (!rcp_ep_gpio_functional_cfg_writable(state, writer)) return false;
@@ -157,8 +157,8 @@ bool rcp_ep_gpio_set_pin_property(rcp_ep_gpio_functional_cfg_t *cfg, uint8_t pin
 //cfusa:req REQ-GPIO-024
 //cfusa:req REQ-GPIO-025
 bool rcp_ep_gpio_set_pin_trigger(rcp_ep_gpio_functional_cfg_t *cfg, uint8_t pin_index,
-                                  rcp_ep_gpio_trigger_t trigger, rcp_server_lifecycle_t state,
-                                  rcp_server_writer_ctx_t writer)
+                                  rcp_ep_gpio_trigger_t trigger, rcp_lifecycle_state_t state,
+                                  rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_gpio_pin_index_valid(pin_index)) return false;
     if (!rcp_ep_gpio_functional_cfg_writable(state, writer)) return false;

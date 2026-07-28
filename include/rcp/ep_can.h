@@ -27,11 +27,12 @@
  *
  * This is new, additive protocol-core surface layered on top of the AVTPDU
  * framing (avtp.h/avtp.c, milestone 59), the ACF message format (acf.h/
- * acf.c, milestone 60), the RC Server lifecycle state machine (server.h/
- * server.c, milestone 61), the register-map model (regmap.h/regmap.c,
+ * acf.c, milestone 60), the RC Server lifecycle state machine (lifecycle.h/
+ * lifecycle.c, milestone 61), the register-map model (regmap.h/regmap.c,
  * milestone 62), and discovery (discovery.h/discovery.c, milestone 63).
- * Nothing in rcp.h, wire.c, avtp.h/avtp.c, acf.h/acf.c, server.h/server.c,
- * regmap.h/regmap.c, discovery.h/discovery.c, or any prior endpoint file
+ * Nothing in rcp.h, wire.c, avtp.h/avtp.c, acf.h/acf.c, lifecycle.h/
+ * lifecycle.c, server.h/server.c, regmap.h/regmap.c, discovery.h/
+ * discovery.c, or any prior endpoint file
  * (ep_gpio.h/.c, ep_spi.h/.c, ep_i2c.h/.c, ep_uart.h/.c, ep_pwm.h/.c,
  * ep_adc.h/.c, ep_lin.h/.c) is touched here -- the same layering discipline
  * every endpoint type since milestone 64 has established, followed
@@ -259,10 +260,10 @@
  * regmap.h's rcp_regmap_ep_functional_cfg_t as cfg's own first member
  * follows that module's documented convention (every endpoint type's own
  * precedent); rcp_ep_can_functional_cfg_writable() is, likewise, a thin,
- * named wrapper over server.h's rcp_server_field_writable()
- * (RCP_SERVER_FIELD_FUNCTIONAL_W), and every rcp_ep_can_set_*() mutator
+ * named wrapper over lifecycle.h's rcp_lifecycle_field_writable()
+ * (RCP_LIFECYCLE_FIELD_FUNCTIONAL_W), and every rcp_ep_can_set_*() mutator
  * consults it before ever touching cfg -- reusing, never duplicating,
- * server.h's/regmap.h's existing authorization logic, per the roadmap's
+ * lifecycle.h's/regmap.h's existing authorization logic, per the roadmap's
  * explicit instruction (the same rule every prior endpoint type's own
  * setters already follow).
  */
@@ -273,7 +274,7 @@
 #include "rcp/avtp.h"
 #include "rcp/rcp.h"
 #include "rcp/regmap.h"
-#include "rcp/server.h"
+#include "rcp/lifecycle.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -403,11 +404,11 @@ typedef struct {
 void rcp_ep_can_functional_cfg_init(rcp_ep_can_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
- * writer -- a thin, named wrapper over rcp_server_field_writable()
- * (server.h) with kind RCP_SERVER_FIELD_FUNCTIONAL_W; see the file header.
+ * writer -- a thin, named wrapper over rcp_lifecycle_field_writable()
+ * (lifecycle.h) with kind RCP_LIFECYCLE_FIELD_FUNCTIONAL_W; see the file header.
  * Reuses, and never duplicates, that function's authorization logic. */
-bool rcp_ep_can_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                         rcp_server_writer_ctx_t writer);
+bool rcp_ep_can_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                         rcp_lifecycle_writer_ctx_t writer);
 
 /* Sets cfg->arbitration_timing to timing iff
  * rcp_ep_can_functional_cfg_writable() authorizes the write for
@@ -415,36 +416,36 @@ bool rcp_ep_can_functional_cfg_writable(rcp_server_lifecycle_t state,
  * entirely unchanged when it returns false. */
 bool rcp_ep_can_set_arbitration_timing(rcp_ep_can_functional_cfg_t *cfg,
                                         rcp_ep_can_bit_timing_t timing,
-                                        rcp_server_lifecycle_t state,
-                                        rcp_server_writer_ctx_t writer);
+                                        rcp_lifecycle_state_t state,
+                                        rcp_lifecycle_writer_ctx_t writer);
 
 /* Same authorization rule as rcp_ep_can_set_arbitration_timing(), for
  * cfg->fd_data_timing. */
 bool rcp_ep_can_set_fd_data_timing(rcp_ep_can_functional_cfg_t *cfg,
                                     rcp_ep_can_bit_timing_t timing,
-                                    rcp_server_lifecycle_t state,
-                                    rcp_server_writer_ctx_t writer);
+                                    rcp_lifecycle_state_t state,
+                                    rcp_lifecycle_writer_ctx_t writer);
 
 /* Same authorization rule, for cfg->xl_data_timing. */
 bool rcp_ep_can_set_xl_data_timing(rcp_ep_can_functional_cfg_t *cfg,
                                     rcp_ep_can_bit_timing_t timing,
-                                    rcp_server_lifecycle_t state,
-                                    rcp_server_writer_ctx_t writer);
+                                    rcp_lifecycle_state_t state,
+                                    rcp_lifecycle_writer_ctx_t writer);
 
 /* Same authorization rule, for cfg->delay_comp_enable and
  * cfg->delay_comp_offset together (one setter for both, since they are
  * always reconfigured as a pair on the wire, mirroring ep_spi.h's own
  * paired-timing-fields setter convention). */
 bool rcp_ep_can_set_delay_compensation(rcp_ep_can_functional_cfg_t *cfg, bool enable,
-                                        uint8_t offset, rcp_server_lifecycle_t state,
-                                        rcp_server_writer_ctx_t writer);
+                                        uint8_t offset, rcp_lifecycle_state_t state,
+                                        rcp_lifecycle_writer_ctx_t writer);
 
 /* Same authorization rule, for cfg->exec_delay_clk_divider -- see the file
  * header for why this is a distinct register from the three bit-timing
  * sets above. */
 bool rcp_ep_can_set_exec_delay_clk_divider(rcp_ep_can_functional_cfg_t *cfg, uint32_t divider,
-                                            rcp_server_lifecycle_t state,
-                                            rcp_server_writer_ctx_t writer);
+                                            rcp_lifecycle_state_t state,
+                                            rcp_lifecycle_writer_ctx_t writer);
 
 /* Sets cfg->xl_filters[index] to filter iff index is
  * rcp_ep_can_xl_filter_index_valid() and
@@ -452,8 +453,8 @@ bool rcp_ep_can_set_exec_delay_clk_divider(rcp_ep_can_functional_cfg_t *cfg, uin
  * state/writer; returns whether the write was applied. cfg is left
  * entirely unchanged when it returns false. */
 bool rcp_ep_can_set_xl_filter(rcp_ep_can_functional_cfg_t *cfg, uint8_t index,
-                               rcp_ep_can_xl_filter_t filter, rcp_server_lifecycle_t state,
-                               rcp_server_writer_ctx_t writer);
+                               rcp_ep_can_xl_filter_t filter, rcp_lifecycle_state_t state,
+                               rcp_lifecycle_writer_ctx_t writer);
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 

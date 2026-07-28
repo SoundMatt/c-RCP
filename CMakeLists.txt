@@ -46,6 +46,7 @@ add_library(rcp STATIC
     src/wire.c
     src/avtp.c
     src/acf.c
+    src/lifecycle.c
     src/server.c
     src/regmap.c
     src/discovery.c
@@ -59,14 +60,13 @@ add_library(rcp STATIC
     src/ep_can.c
     src/ep_iseled.c
     src/ep_mdio.c
-    src/sequencer.c
-    src/compound.c
-    src/triggered.c
-    src/chained.c
-    src/timed.c
-    src/cancel.c
+    src/request_sequencer.c
+    src/request_compound.c
+    src/request_triggered.c
+    src/request_chained.c
+    src/request_timed.c
+    src/request_cancel.c
     src/scheduler.c
-    src/safept.c
     src/udp.c
     src/mdns.c
     src/tls.c
