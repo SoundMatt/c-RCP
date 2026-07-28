@@ -1,5 +1,5 @@
 Software Configuration Index
-Project: c-RCP v0.63.0   Generated: 2026-07-28T16:15:34Z
+Project: c-RCP v0.64.0   Generated: 2026-07-28T16:35:09Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
@@ -22,7 +22,8 @@ FILE                                                          SHA-256
 ./include/rcp/config.h                                        a11add969d5b0e883eab513a322e3bf06523b80cf39c0f0a9f8b574f387b0f62
 ./include/rcp/adapt.h                                         a3a7e233c9a8773973ce2ea6b251fcd40f3403fc395f03ac77e97f689e8720b5
 ./include/rcp/udp.h                                           05bf00b6fb1f1ee26bba018cc9cb414a138fbd29196348678a88ef140c164e41
-./include/rcp/version.h                                       16aabd5234c908253082d053788001a384dabffb9df79bc313721fecb1524f4d
+./include/rcp/ep_gpio.h                                       341deb8ca07ce5efe97732e32964e5a62214b064ceb699fc1110ad82534cfd37
+./include/rcp/version.h                                       455354be1d35494e5dee7fb550c0224d7bc3b0c584750d4680996e584fe685c7
 ./include/rcp/recorder.h                                      db4b9c80c24ccb3e68daa06378ed700c53c70cc97131305133d2ccf5b9a03732
 ./include/rcp/cli.h                                           d479738a54a077a4a0019dec3ec62a39b73857fadbe1ae2745d2f7609506b7d9
 ./include/rcp/avtp.h                                          416f4beb4eb8c68d1dac4842372d0747da15c45677c67ae1de11c8849657b055
@@ -95,6 +96,7 @@ FILE                                                          SHA-256
 ./src/authz.c                                                 098802fab58dd018906263415dcf85ce7d341ae4191f54ccaa3842604bc3285a
 ./src/tls.c                                                   c0c611c03fa4080883f32b85a2d2bf635cc1c8e68f5fd2b347139a4e64215fe1
 ./src/regmap.c                                                ffc328be2cda810d26bb67db1e3f3ae103ca9aa07dabbedfc111a5964ceeb5f6
+./src/ep_gpio.c                                               26b79f6289b2b349984afa7161ef9b0210f33452c03135819933e462b8f2b90f
 ./src/wire.c                                                  8191e7c0c7da4a61694e18fc0c6e22b4e374a099ec7041c60a6ce72c46c64fec
 ./src/someipbr.c                                              a004339867ab69c2f50f5f8c49c16cfd6eb77173104f4a4dbdd1faa8cb87b2b7
 ./src/recorder.c                                              314abce9dbec09a16c6e01d09c3e3cf4c43afedabf720727317a9e2b5f3e8d92
@@ -138,6 +140,7 @@ FILE                                                          SHA-256
 ./tests/test_proxy.c                                          587e10c9f8a79a2a0a85bfbd2254bf38a29b1479404155207fe5735e66714bd1
 ./tests/test_observe.c                                        a2692e7909ae36a324deb0b3fb564fbe8a8359208ab2f79ee14f8e3a448007fc
 ./tests/test_redundancy.c                                     b6729e9b231951547f28afc810c9b2b342c7773bf61915ad977b61848f1a0443
+./tests/test_ep_gpio.c                                        65fa904a7dce9a0162a1c7573b4d96104d809a6f7c02d9daafe0852d47a7019d
 ./tests/test_mock.c                                           5c824eb897d51b4474dc7354f10b856c32d23d8a38d918219c57ab565155d5f2
 ./tests/test_prioqueue.c                                      8f174955f384b3ef88964ea3708a7c2b4c1fb2b2484a436c00eee27dd7f76211
 ./tests/test_e2e.c                                            5bf665f7e216db67a11de8f6bc02c2bf02b66c0dfbbebe91c83f7512649e0c47
@@ -147,4 +150,4 @@ FILE                                                          SHA-256
 ./tests/test_server.c                                         402e517e2096234262ffe44d36e36d3373f241e4644bee127ecc5b20caf0697c
 ./cli/main.c                                                  541875eda25d51c675d488ca4ddc24226dbccd51e91b77390569c451c36710e1
 
-Total files: 143
+Total files: 146
