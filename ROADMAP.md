@@ -3108,7 +3108,7 @@ place (LIN, Classical CAN). **DAC remains explicitly out of scope** per
 the Phase 16 note — reserved `ep_type` code, no functional-config chapter,
 revisit only on a future spec revision.
 
-### 71. LIN commander endpoint (v0.71.0)
+### 71. LIN commander endpoint (v0.71.0) ✅
 
 - `include/rcp/ep_lin.h` + `src/ep_lin.c`: LIN bus commander (master)
   only, payload driven directly onto the bus, response generated when a
@@ -3123,6 +3123,51 @@ revisit only on a future spec revision.
   in this repo's history assumed otherwise, that assumption does not
   carry forward; documented explicitly in `ep_lin.h`'s header comment so
   it isn't rediscovered the hard way later.
+
+**Done (v0.71.0)**: `include/rcp/ep_lin.h` + `src/ep_lin.c` land as new,
+additive protocol-core surface, following the same layering discipline
+every endpoint type since milestone 64 established (nothing in `rcp.h`,
+`wire.c`, `avtp.h`/`avtp.c`, `acf.h`/`acf.c`, `server.h`/`server.c`,
+`regmap.h`/`regmap.c`, `discovery.h`/`discovery.c`, or any prior `ep_*`
+module is touched). Modeled most closely on `ep_i2c.h`/`ep_uart.h`'s own
+raw-byte-stream, controller-only shape (`ep_i2c.h`'s own file header had
+already flagged this milestone as the next validation of that same
+design), since LIN here is likewise commander-only with no protocol-level
+framing help.
+The scope validation the bullet above calls for is spelled out in
+`ep_lin.h`'s own file header: no checksum-mode selection, no PID/
+identifier generation, no schedule-table mechanism at this layer, and an
+explicit note that the pre-replacement `linbr.c` LIN bridge stub's
+frame-ID-shaped model (`rcp_lin_config_t.frame_id`) does not carry
+forward to this endpoint type — `linbr.c` itself is untouched, its own
+disposition (ADAPT, narrowed role) remaining Phase 21's job.
+`rcp_ep_lin_compare_mode_t` (`rcp_ep_lin_compare_mode_valid()`/
+`rcp_ep_lin_compare_fires()`) is this module's own original design for the
+`evt[2:0]` comparison rule the bullet names but does not itself enumerate:
+EXACT/PREFIX/ANY/NEVER plus four documented-no-op reserved values,
+modeled on `ep_gpio.h`'s existing evt[2:0]-as-eight-value-selector
+precedent (there, write semantics) and failing safe (never fires) for
+NEVER and every reserved value, mirroring `ep_gpio.h`'s own RESERVED6
+treatment. `rcp_ep_lin_trigger_t`/`rcp_ep_lin_trigger_fires()` is the
+transmission-done trigger, narrowed from `ep_spi.h`'s three-trigger table
+to the one event a commander-only LIN push actually produces.
+`rcp_ep_lin_functional_cfg_t` composes `regmap.h`'s shared functional-cfg
+prefix and adds `lin_clk_divider` (the bit-time clock divider) and
+`trigger`, with `rcp_ep_lin_functional_cfg_writable()`/
+`rcp_ep_lin_set_clk_divider()`/`rcp_ep_lin_set_trigger()` reusing
+`server.h`'s `rcp_server_field_writable()` exactly as every prior
+endpoint type's own setters do.
+**Requirement-id naming note**: the pre-replacement `linbr.c` stub already
+owns the `REQ-LIN-*` id prefix in `.fusa-reqs.json`, so this module's own
+27 new requirements are tagged `REQ-LINEP-001`..`022` ("LIN endpoint")
+instead — a collision-avoidance naming seam documented in `ep_lin.h`'s own
+file header, not a numbering gap.
+`tests/test_ep_lin.c` (22 cases covering the comparison-mode rules, the
+trigger, functional-config authorization, and command-request/response
+round trips) passes, alongside the full existing `ctest` suite (61/61).
+`cfusa check`/`lint`/`analyze`/`cyber`/`vuln`/`qualify` (0 errors) and
+`cfusa trace --req-coverage 100` (both metrics) stay green, and
+`relay conform --strict` passes against the rebuilt CLI.
 
 ### 72. CAN controller endpoint, incl. CAN XL (v0.72.0)
 

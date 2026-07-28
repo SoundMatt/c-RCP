@@ -6351,6 +6351,182 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-001",
+      "title": "rcp_ep_lin_compare_mode_valid() accepts exactly the eight evt[2:0] values",
+      "text": "rcp_ep_lin_compare_mode_valid() shall return true for v in 0..7 and false for any value above 7.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-002",
+      "title": "rcp_ep_lin_compare_fires() implements RCP_EP_LIN_COMPARE_EXACT",
+      "text": "rcp_ep_lin_compare_fires() shall return true for mode RCP_EP_LIN_COMPARE_EXACT iff rx_len equals request_len and rx_data[0..rx_len) equals request_data[0..request_len) byte for byte, and false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-003",
+      "title": "rcp_ep_lin_compare_fires() implements RCP_EP_LIN_COMPARE_PREFIX",
+      "text": "rcp_ep_lin_compare_fires() shall return true for mode RCP_EP_LIN_COMPARE_PREFIX iff rx_len is at least request_len and the leading request_len bytes of rx_data equal request_data byte for byte, and false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-004",
+      "title": "rcp_ep_lin_compare_fires() implements RCP_EP_LIN_COMPARE_ANY",
+      "text": "rcp_ep_lin_compare_fires() shall return true for mode RCP_EP_LIN_COMPARE_ANY regardless of request_data/request_len/rx_data/rx_len.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-005",
+      "title": "rcp_ep_lin_compare_fires() fails safe for RCP_EP_LIN_COMPARE_NEVER and every reserved mode",
+      "text": "rcp_ep_lin_compare_fires() shall return false for mode RCP_EP_LIN_COMPARE_NEVER and for every RCP_EP_LIN_COMPARE_RESERVED4..RESERVED7 value, regardless of whether rx_data would otherwise satisfy an exact or prefix comparison against request_data.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-006",
+      "title": "rcp_ep_lin_trigger_fires() evaluates the transmission-done trigger",
+      "text": "rcp_ep_lin_trigger_fires() shall return false for trigger RCP_EP_LIN_TRIGGER_NONE regardless of tx_done_event, and shall return tx_done_event unchanged for trigger RCP_EP_LIN_TRIGGER_TX_DONE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-007",
+      "title": "rcp_ep_lin_functional_cfg_init() zero-initializes cfg",
+      "text": "rcp_ep_lin_functional_cfg_init() shall set every rcp_regmap_ep_functional_cfg_t flag in cfg->common to false, cfg->lin_clk_divider to 0, and cfg->trigger to RCP_EP_LIN_TRIGGER_NONE (0), regardless of cfg's prior contents.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-008",
+      "title": "rcp_ep_lin_functional_cfg_writable() denies every writer while HW_UNCONFIGURED",
+      "text": "rcp_ep_lin_functional_cfg_writable() shall return false for lifecycle state RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED regardless of writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-009",
+      "title": "rcp_ep_lin_functional_cfg_writable() allows every writer while HW_CONFIGURED",
+      "text": "rcp_ep_lin_functional_cfg_writable() shall return true for lifecycle state RCP_SERVER_LIFECYCLE_HW_CONFIGURED regardless of writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-010",
+      "title": "rcp_ep_lin_functional_cfg_writable() requires authorization while RCP_CONFIGURED",
+      "text": "rcp_ep_lin_functional_cfg_writable() shall return false for lifecycle state RCP_SERVER_LIFECYCLE_RCP_CONFIGURED when writer has neither via_root_client_ep0 nor via_owning_stream set, and true when either is set.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-011",
+      "title": "rcp_ep_lin_set_clk_divider() rejects an unauthorized write",
+      "text": "rcp_ep_lin_set_clk_divider() shall leave cfg->lin_clk_divider unchanged and return false when rcp_ep_lin_functional_cfg_writable() denies the write for the given state/writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-012",
+      "title": "rcp_ep_lin_set_clk_divider() applies an authorized write",
+      "text": "rcp_ep_lin_set_clk_divider() shall set cfg->lin_clk_divider to lin_clk_divider and return true when rcp_ep_lin_functional_cfg_writable() authorizes the write for the given state/writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-013",
+      "title": "rcp_ep_lin_set_trigger() rejects an unauthorized write",
+      "text": "rcp_ep_lin_set_trigger() shall leave cfg->trigger unchanged and return false when rcp_ep_lin_functional_cfg_writable() denies the write for the given state/writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-014",
+      "title": "rcp_ep_lin_set_trigger() applies an authorized write",
+      "text": "rcp_ep_lin_set_trigger() shall set cfg->trigger to trigger and return true when rcp_ep_lin_functional_cfg_writable() authorizes the write for the given state/writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-015",
+      "title": "rcp_ep_lin_strerror() returns a distinct, non-NULL message per error code",
+      "text": "rcp_ep_lin_strerror() shall return a non-NULL, non-empty, and distinct string for each of RCP_EP_LIN_OK, RCP_EP_LIN_ERR_SHORT_FRAME, RCP_EP_LIN_ERR_BAD_MSG_TYPE, RCP_EP_LIN_ERR_WRONG_BUS, and RCP_EP_LIN_ERR_WRONG_OP, and a non-NULL string for any other value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-016",
+      "title": "rcp_ep_lin_encode_command_request() carries the raw payload and evt[2:0] compare_mode unmodified",
+      "text": "rcp_ep_lin_encode_command_request() shall encode an ACF_ABB message addressed to byte_bus_id with op RCP_ACF_OP_WRITE, evt[2:0] set to compare_mode, transaction_num set to transaction_num, and payload equal to tx_data[0..tx_len) byte for byte.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-017",
+      "title": "rcp_ep_lin_decode_command_request() round-trips a valid command request",
+      "text": "rcp_ep_lin_decode_command_request() shall, given a frame produced by rcp_ep_lin_encode_command_request() for byte_bus_id == expected_bus_id, return RCP_EP_LIN_OK and recover the raw tx payload, compare_mode, and transaction_num unchanged.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-018",
+      "title": "rcp_ep_lin_decode_command_request() rejects a malformed or misaddressed frame",
+      "text": "rcp_ep_lin_decode_command_request() shall return RCP_EP_LIN_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length, RCP_EP_LIN_ERR_BAD_MSG_TYPE when the frame is not an ACF_ABB message, RCP_EP_LIN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, and RCP_EP_LIN_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-019",
+      "title": "rcp_ep_lin_encode_response() selects ACF_ABB or ACF_GBB by the timed flag",
+      "text": "rcp_ep_lin_encode_response() shall encode an ACF_ABB message when timed is false, and an ACF_GBB message with message_timestamp set to timestamp and mtv RCP_ACF_MTV_VALID when timed is true, in both cases with op RCP_ACF_OP_READ, byte_bus_id set to byte_bus_id, transaction_num set to transaction_num, and payload equal to rx_data[0..rx_len) byte for byte.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-020",
+      "title": "rcp_ep_lin_decode_response() round-trips an untimed (ACF_ABB) response",
+      "text": "rcp_ep_lin_decode_response() shall, given a frame produced by rcp_ep_lin_encode_response() with timed false, return RCP_EP_LIN_OK, recover the rx payload and transaction_num unchanged, report out_timed false, and report out_timestamp 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-021",
+      "title": "rcp_ep_lin_decode_response() round-trips a timed (ACF_GBB) response",
+      "text": "rcp_ep_lin_decode_response() shall, given a frame produced by rcp_ep_lin_encode_response() with timed true, return RCP_EP_LIN_OK, recover the rx payload and transaction_num unchanged, report out_timed true, and report out_timestamp equal to the original timestamp.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-LINEP-022",
+      "title": "rcp_ep_lin_decode_response() rejects a malformed or misaddressed frame",
+      "text": "rcp_ep_lin_decode_response() shall return RCP_EP_LIN_ERR_SHORT_FRAME for a frame too short for its applicable ACF fixed header and RCP_EP_LIN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     }
   ]
 }
