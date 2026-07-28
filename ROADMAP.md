@@ -1727,3 +1727,59 @@ a protocol-agnostic way, unmet against spec §5.2 / §17 requirement 3.
   `ctest` (41/41), fresh local `cfusa check --strict` (0 errors) and
   `cfusa trace --req-coverage 100` (100%, both metrics) against a
   freshly rebuilt `cfusa` binary.
+
+### 57. RELAY-conformance audit remediation, batch 4: real TARA content (v0.57.0)
+---
+
+Closes issue #56 (P1): `tara.md`/`tara.json` had been pure `cfusa tara`
+placeholder skeletons (`"[describe asset]"`, `"[describe threat]"`, etc.)
+since v0.1.0 across 56 releases, despite `CYBERSECURITY.md` §3 citing
+them as a complete TARA covering 5 named threats.
+- **`cfusa tara` confirmed to have no input-file mechanism**: read
+  `cmd_tara.c` directly — it's a one-shot skeleton generator with no way
+  to seed real asset/threat content that survives regeneration, unlike
+  `cfusa hara show`, which renders from a hand-authored
+  `.fusa-hara.json` that release.yml never touches. Since
+  `release.yml` ran `cfusa tara` fresh on every tag and committed the
+  result back to `main`, hand-populating the file without also removing
+  that step would have had the very next release silently clobber it
+  back to boilerplate.
+- **A second false claim found and fixed while writing the TARA
+  honestly**: `CYBERSECURITY.md`'s Layer 5 section claimed "SHA-256 hash
+  of the transferred image is verified... before activation." Direct
+  read of `src/firmware.c` found no hash/digest/checksum logic anywhere
+  — `rcp_firmware_session_verify()` is purely a state-machine transition
+  gated by a timeout, with no cryptographic check at all. Writing an
+  honest TARA entry for the OTA-tampering threat was impossible without
+  either repeating this false claim or contradicting it, so — with the
+  user's explicit approval to expand scope for this — corrected
+  `CYBERSECURITY.md`'s Layer 5 section and its threat/countermeasure
+  table row to accurately describe `verify()` as a protocol-flow gate,
+  not a cryptographic one, and filed the real gap as issue #69 (real
+  image-hash verification is not yet implemented).
+- Also softened `CYBERSECURITY.md`'s "formally verified" claim for the
+  E2E anti-replay guard (Layer 3 text and its threat-table row) to
+  reference issue #57 rather than assert a clean TLA+ proof that is
+  itself under separate dispute — the TARA's own TS-002 entry is
+  explicit that its MEDIUM risk rating rests on `test_e2e.c`'s tested
+  runtime behavior, not on the disputed formal-verification claim.
+- **The TARA itself** (`tara.json`/`tara.md`): 4 assets, 5 threats
+  (matching `CYBERSECURITY.md`'s existing table), each with a real
+  attack-vector/impact/feasibility/risk rating grounded in the actual
+  code — not the aspirational architecture. The two HIGH-risk entries
+  tied to identity (TS-001 command injection, TS-003 rogue controller
+  registration) explicitly document that `tls.c` is a confirmed
+  compile-time stub with no working backend in this library's own
+  shipped posture, so real mitigation depends on an integrator supplying
+  TLS — consistent with `CYBERSECURITY.md`'s own SEOOC framing of
+  Layer 1, not a new finding invented for this TARA.
+- **Stopped the clobbering**: removed the `cfusa tara` regeneration step
+  and `tara.json`/`tara.md` from `release.yml`'s git-add list entirely.
+  These files are now hand-maintained, exactly like
+  `HARA.md`/`.fusa-hara.json` already were.
+- **Verified**: full rebuild + `ctest` (41/41), fresh local
+  `cfusa check --strict` (0 errors) and `cfusa trace --req-coverage 100`
+  (100%, both metrics — this milestone changed no source/tests, only
+  docs/JSON/CI) against a freshly rebuilt `cfusa` binary. Confirmed
+  `tara.json` is valid JSON and `release.yml`'s YAML parses cleanly
+  after the edits.

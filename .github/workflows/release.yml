@@ -65,8 +65,12 @@ jobs:
       - name: Regenerate safety case (GSN)
         run: /tmp/cfusa/build/cfusa safety-case --gsn --standard iso26262
 
-      - name: Regenerate TARA (ISO 21434 Ch. 9)
-        run: /tmp/cfusa/build/cfusa tara
+      # tara.json/tara.md are hand-authored, not regenerated here: `cfusa
+      # tara` only emits a placeholder skeleton with no input-file mechanism
+      # to seed real threat content, so running it on every release would
+      # silently clobber the real TARA back to boilerplate (see issue #56,
+      # fixed by no longer running this step; ROADMAP.md milestone 57).
+      # Update tara.json/tara.md by hand when the threat model changes.
 
       - name: Regenerate SBOM, provenance, and artifact manifest
         run: /tmp/cfusa/build/cfusa release
@@ -139,7 +143,6 @@ jobs:
           git add \
             fmea.csv fmea.json \
             safety-case.md \
-            tara.json tara.md \
             sbom.json provenance.json artifact-manifest.json *.spdx.json \
             iso26262-gap-report.json \
             iec61508-gap-report.json \
