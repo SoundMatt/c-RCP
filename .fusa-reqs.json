@@ -3543,6 +3543,182 @@
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-RMAP-001",
+      "title": "rcp_regmap_is_ep0() identifies EP0 by index",
+      "text": "rcp_regmap_is_ep0() shall return true if and only if ep_index equals RCP_REGMAP_EP0_INDEX.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RMAP-002",
+      "title": "EP0 shares its index with the discovery byte_bus_id",
+      "text": "RCP_REGMAP_EP0_INDEX shall equal RCP_SERVER_DISCOVERY_BYTE_BUS_ID, since EP0 and the discovery channel are reached through the same address.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-RMAP-003",
+      "title": "rcp_regmap_general_init() zero-initializes with no root client granted",
+      "text": "rcp_regmap_general_init() shall set every field of its argument to zero except svr_root_client_index, which it shall set to RCP_REGMAP_NO_ROOT_CLIENT.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RMAP-004",
+      "title": "svr_implemented_options bit assignments are pairwise distinct",
+      "text": "The six RCP_REGMAP_OPT_* bitmask constants (time-sync, enhanced-cancel, and compound-bundles groups) shall each occupy a distinct bit position.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-RMAP-005",
+      "title": "rcp_regmap_options_group_consistent() accepts an all-clear options value",
+      "text": "rcp_regmap_options_group_consistent() shall return true when options is 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RMAP-006",
+      "title": "rcp_regmap_options_group_consistent() accepts a fully-set feature group",
+      "text": "rcp_regmap_options_group_consistent() shall return true when options has every bit of one or more of the time-sync, enhanced-cancel, or compound-bundles groups set together.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RMAP-007",
+      "title": "rcp_regmap_options_group_consistent() rejects a partially-set feature group",
+      "text": "rcp_regmap_options_group_consistent() shall return false when options has exactly one bit of any of the three feature groups set without that group's other bit.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RMAP-008",
+      "title": "rcp_regmap_options_group_consistent() accepts multiple independently-complete groups",
+      "text": "rcp_regmap_options_group_consistent() shall return true when options has two or more of the three feature groups fully set at once.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RMAP-009",
+      "title": "rcp_regmap_writer_ctx() grants via_root_client_ep0 for the root client through EP0",
+      "text": "rcp_regmap_writer_ctx() shall set via_root_client_ep0 true when via_ep0 is true, svr_root_client_index is not RCP_REGMAP_NO_ROOT_CLIENT, and requesting_stream_index equals svr_root_client_index.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RMAP-010",
+      "title": "rcp_regmap_writer_ctx() withholds via_root_client_ep0 while no root client is granted",
+      "text": "rcp_regmap_writer_ctx() shall set via_root_client_ep0 false whenever svr_root_client_index equals RCP_REGMAP_NO_ROOT_CLIENT, regardless of via_ep0 or requesting_stream_index.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RMAP-011",
+      "title": "rcp_regmap_writer_ctx() grants via_owning_stream to an endpoint's owning stream",
+      "text": "rcp_regmap_writer_ctx() shall set via_owning_stream true when ep_client is non-NULL, ep_client->has_owning_stream is true, and requesting_stream_index equals ep_client->owning_stream_index.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RMAP-012",
+      "title": "rcp_regmap_writer_ctx() withholds via_owning_stream with no owning stream on record",
+      "text": "rcp_regmap_writer_ctx() shall set via_owning_stream false when ep_client is NULL or ep_client->has_owning_stream is false.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RMAP-013",
+      "title": "HW pin-property bit assignments are pairwise distinct",
+      "text": "The six RCP_REGMAP_PIN_PROP_* bitmask constants shall each occupy a distinct bit position.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-RMAP-014",
+      "title": "rcp_regmap_named_signal_string() never returns NULL",
+      "text": "rcp_regmap_named_signal_string() shall return a non-NULL string for every value from 0 through RCP_REGMAP_SIGNAL_COUNT-1, and shall return \"unknown\" for a value outside that range.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-RMAP-015",
+      "title": "rcp_regmap_named_signal_string() returns a unique name per signal",
+      "text": "rcp_regmap_named_signal_string() shall return a distinct string for each distinct value from 0 through RCP_REGMAP_SIGNAL_COUNT-1.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-RMAP-016",
+      "title": "rcp_regmap_ep_generic_cfg_init() zero-initializes generic endpoint config",
+      "text": "rcp_regmap_ep_generic_cfg_init() shall set ep_used to false and every other field of its argument to 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RMAP-017",
+      "title": "rcp_regmap_ep_functional_cfg_init() zero-initializes functional endpoint config",
+      "text": "rcp_regmap_ep_functional_cfg_init() shall set every flag of its argument to false.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RMAP-018",
+      "title": "rcp_regmap_request_stream_cfg_init() zero-initializes request-stream config",
+      "text": "rcp_regmap_request_stream_cfg_init() shall set configured to false and every other field of its argument to 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RMAP-019",
+      "title": "rcp_regmap_response_queue_cfg_init() zero-initializes response-queue config",
+      "text": "rcp_regmap_response_queue_cfg_init() shall set every field of its argument to 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-RMAP-020",
+      "title": "rcp_regmap_ep_id_map_is_ascending() recognizes a strictly ascending table",
+      "text": "rcp_regmap_ep_id_map_is_ascending() shall return true when every consecutive pair of entries has a strictly increasing byte_bus_id.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-RMAP-021",
+      "title": "rcp_regmap_ep_id_map_is_ascending() recognizes a non-ascending table",
+      "text": "rcp_regmap_ep_id_map_is_ascending() shall return false when any consecutive pair of entries has an equal or decreasing byte_bus_id.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-RMAP-022",
+      "title": "rcp_regmap_ep_id_map_is_ascending() is vacuously true for 0 or 1 entries",
+      "text": "rcp_regmap_ep_id_map_is_ascending() shall return true when count is 0 or 1.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
     }
   ]
 }

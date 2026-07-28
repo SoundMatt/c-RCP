@@ -2293,7 +2293,7 @@ touched.
   `analyze`/`cyber` (0 errors), the full `ctest` suite (44/44, including
   under ASan/UBSan), and `relay conform --strict` all stay green.
 
-### 62. Register-map model (v0.62.0)
+### 62. Register-map model (v0.62.0) ✅
 
 - The general (vendor-agnostic, EP0-reachable) register map: magic
   number, `svr_version`, vendor/device ID, `svr_ep_count`,
@@ -2329,6 +2329,66 @@ touched.
   spec itself (extraction §3.9, §7) — documented as a client
   responsibility with no corrective mechanism, not treated as a bug in
   this implementation.
+
+**Done (v0.62.0)**: `include/rcp/regmap.h` + `src/regmap.c` land as new,
+additive protocol-core surface layered on top of milestone 59's AVTPDU
+framing, milestone 60's ACF message format, and milestone 61's lifecycle
+state machine. Nothing in `rcp.h`, `wire.c`, `avtp.h`/`avtp.c`,
+`acf.h`/`acf.c`, `server.h`/`server.c`, or any satellite package is
+touched.
+- `rcp_regmap_general_t`: magic/`svr_version`/vendor/device ID/
+  `svr_ep_count`/stream/sequencer/memory capacity fields plus
+  `svr_root_client_index` and an `rcp_regmap_table_ref_t`
+  (offset/capacity) pair for each of the six sub-tables below;
+  `rcp_regmap_general_init()` zero-initializes it with
+  `svr_root_client_index` defaulted to the new `RCP_REGMAP_NO_ROOT_CLIENT`
+  sentinel. `svr_implemented_options`'s three feature groups (time-sync/
+  enhanced-cancel/compound-bundles) are this implementation's own bit
+  assignment; `rcp_regmap_options_group_consistent()` is the all-or-
+  nothing-per-group check the roadmap called for.
+- The generic-vs-functional split landed as two distinct structs exactly
+  as scoped: `rcp_regmap_ep_generic_cfg_t` (server-owned: `ep_type`,
+  `ep_used`, `ep_delay_time`, `ep_req_storage_size`) and
+  `rcp_regmap_ep_functional_cfg_t` (the common prefix: `ep_enable`,
+  `ep_clear_req_storage`, `ep_req_crc_enable`, `ep_response_ts_enable`,
+  `ep_suppress_response`), each with its own zero-initializer.
+- `RCP_REGMAP_EP0_INDEX` (0) is deliberately the same numeric value as
+  `RCP_SERVER_DISCOVERY_BYTE_BUS_ID` from milestone 61.
+  `rcp_regmap_ep_client_t` models the per-endpoint owning-stream
+  restriction, and `rcp_regmap_writer_ctx()` derives server.h's
+  `rcp_server_writer_ctx_t` from `svr_root_client_index` and an
+  endpoint's `rcp_regmap_ep_client_t` — reusing
+  `rcp_server_field_writable()`'s existing authorization logic rather
+  than duplicating it.
+- `rcp_regmap_hw_pin_map_entry_t` (`hw_ep_nr`/`hw_ep_pin_nr`/
+  `pin_property`, this module's own bit layout) plus
+  `rcp_regmap_named_signal_t`, the 43-entry named-signal index (GPIO0-31,
+  SPI_CLK/PICO/POCI/CS0-5, I2C_SCL/SDA) and its
+  `rcp_regmap_named_signal_string()`.
+- `rcp_regmap_request_stream_cfg_t` (`rx_stream_id`, `rx_wd_timeout_ms`,
+  `rx_wd_action`, `rx_enforce_e2e`, `rx_safety_measure`) and
+  `rcp_regmap_response_queue_cfg_t` (`max_avtpdu_size`,
+  `flush_on_count`, `flush_time_us`) — the E2E/watchdog-relevant fields
+  exist but no code reads them yet, per this milestone's explicit scope.
+- `rcp_regmap_ep_id_map_entry_t` plus
+  `rcp_regmap_ep_id_map_is_ascending()`, documented in both the file
+  header and the function's own comment as a read-only diagnostic only —
+  it is not called from, and must not be mistaken for, server-side
+  enforcement, since the specification itself defines none.
+- No encode/decode pair is added in this milestone (unlike avtp.h/acf.h):
+  register *contents* are modeled now so every later endpoint type
+  composes them the same way, but wiring them to an actual
+  `byte_message_info` read/write exchange remains later phases' job.
+- `tests/test_regmap.c` (25 cases): EP0 index identity, `general_init()`
+  defaults, all three option-group consistency rules, all four
+  `writer_ctx()` grant/deny combinations, pin-property and
+  `svr_implemented_options` bit distinctness, named-signal-string
+  non-NULL/uniqueness, every config struct's zero-initializer, and the
+  ascending-table diagnostic's true/false/vacuous cases.
+- 22 new requirements (`REQ-RMAP-001`..`022`) added to `.fusa-reqs.json`;
+  `cfusa trace --req-coverage 100` (both metrics), `cfusa check`/`lint`/
+  `analyze`/`cyber`/`vuln`/`qualify` (0 errors), and the full `ctest`
+  suite (45/45, including under ASan/UBSan) all stay green.
 
 ---
 ### Phase 15 — Discovery
