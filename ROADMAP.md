@@ -2498,7 +2498,7 @@ signal, but with no functional-config chapter anywhere in v0.5.1_RC
 (extraction §1.2, §7); treated as reserved-but-undefined and revisited only
 if a future spec revision actually defines it.
 
-### 64. GPIO endpoint (v0.64.0)
+### 64. GPIO endpoint (v0.64.0) ✅
 
 - `include/rcp/ep_gpio.h` + `src/ep_gpio.c`: up to 32 pins, 4-byte
   bitmask request/response payload, all 8 `evt[2:0]` write-semantics
@@ -2508,6 +2508,63 @@ if a future spec revision actually defines it.
 - Per-pin trigger signals (any-change/rising/falling) and functional
   config (direction, electrical properties mirroring the HW pin-mapping
   table's pull-up/down/drive-strength fields for runtime adjustment).
+
+**Done (v0.64.0)**: `include/rcp/ep_gpio.h` + `src/ep_gpio.c` land as new,
+additive protocol-core surface layered on top of the AVTPDU framing
+(milestone 59), ACF message format (milestone 60), RC Server lifecycle
+state machine (milestone 61), register-map model (milestone 62), and
+discovery (milestone 63). Nothing in `rcp.h`, `wire.c`, `avtp.h`/`avtp.c`,
+`acf.h`/`acf.c`, `server.h`/`server.c`, `regmap.h`/`regmap.c`,
+`discovery.h`/`discovery.c`, or any satellite package is touched.
+- Unlike discovery, a GPIO request/response is ordinary endpoint traffic
+  with no NTSCF-only rule of its own, so this module operates at the ACF
+  level only (`acf.h`'s `rcp_acf_encode_abb()`/`_encode_gbb()` and their
+  decode counterparts) -- a caller wraps/unwraps NTSCF or TSCF framing
+  separately via `avtp.h`, exactly as `acf.c` itself does not wrap AVTP.
+  `rcp_ep_gpio_encode_read_request()`/`_decode_read_request()` and
+  `_encode_write_request()`/`_decode_write_request()` round-trip the
+  4-byte big-endian bitmask payload against a caller-supplied
+  `byte_bus_id`; `rcp_ep_gpio_encode_response()`/`_decode_response()`
+  choose ACF_ABB (untimed) or ACF_GBB (timed, carrying
+  `message_timestamp`) per a caller-supplied `timed` flag standing in for
+  the endpoint's `ep_response_ts_enable` functional-config bit.
+- `rcp_ep_gpio_apply_write()`: the six ordinary evt[2:0] data-write
+  semantics (replace/OR/AND/XOR/add/subtract) against the endpoint's
+  32-bit bitmask register, with add/subtract saturating at
+  `0x00000000`/`0xFFFFFFFF` rather than wrapping -- this module's own
+  extension, to GPIO's register width, of the write-semantics saturation
+  rule described generically (at a narrower word width) for other
+  endpoint types' fields. evt[2:0]=6 is not otherwise assigned meaning by
+  this milestone's scope and is implemented as a documented no-op pending
+  spec clarification, flagged rather than guessed at (mirroring this
+  project's existing convention for a genuine spec ambiguity, e.g.
+  `regmap.h`'s EP-ID/`byte_bus_id` ordering note).
+- `rcp_ep_gpio_apply_reconfig()`: the reconfiguration escape hatch
+  (evt[2:0]=7) -- this module's own original design for what it
+  accomplishes, reinterpreting the 32-bit write payload as a per-pin
+  selector and toggling each selected pin's direction
+  (`RCP_REGMAP_PIN_PROP_OUTPUT`/`_INPUT`, `regmap.h`) while leaving every
+  other `pin_property` bit, and every unselected pin, untouched.
+- `rcp_ep_gpio_trigger_fires()`: the three per-pin trigger modes
+  (any-change/rising/falling) plus `NONE`, evaluated as a pure function of
+  one level transition.
+- `rcp_ep_gpio_functional_cfg_t` composes `regmap.h`'s
+  `rcp_regmap_ep_functional_cfg_t` as its own first member (per that
+  module's documented convention) and adds one `pin_property`
+  (`RCP_REGMAP_PIN_PROP_*`, mirroring the HW pin-mapping table's own
+  direction/pull-up/pull-down/drive-strength fields, independently
+  runtime-adjustable here) plus trigger mode per pin.
+  `rcp_ep_gpio_functional_cfg_writable()` is a thin, named wrapper over
+  `rcp_server_field_writable()` (`RCP_SERVER_FIELD_FUNCTIONAL_W`) --
+  reused, not duplicated, from `server.h`; `rcp_ep_gpio_set_pin_property()`/
+  `_set_pin_trigger()` consult it (and pin-index validity) before ever
+  mutating the config, the first actual caller of
+  `rcp_server_field_writable()` in this codebase.
+- `tests/test_ep_gpio.c` (40 cases) and 32 new requirements
+  (`REQ-GPIO-001`..`032`) added to `.fusa-reqs.json`; `cfusa trace
+  --req-coverage 100` (both metrics), `cfusa check`/`lint`/`analyze`/
+  `cyber`/`vuln`/`qualify` (0 errors), and the full `ctest` suite all stay
+  green.
 
 ### 65. SPI endpoint (v0.65.0)
 

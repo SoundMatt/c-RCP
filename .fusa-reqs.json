@@ -3911,6 +3911,262 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-001",
+      "title": "rcp_ep_gpio_strerror() never returns NULL and is unique per code",
+      "text": "rcp_ep_gpio_strerror() shall return a non-NULL, non-empty, distinct message for each rcp_ep_gpio_errc_t value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-002",
+      "title": "rcp_ep_gpio_pin_index_valid() bounds pin indices to 0..31",
+      "text": "rcp_ep_gpio_pin_index_valid() shall return true if and only if pin_index is strictly less than RCP_EP_GPIO_MAX_PINS (32).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-003",
+      "title": "rcp_ep_gpio_pin_mask() derives a single-bit mask, or 0 for an invalid index",
+      "text": "rcp_ep_gpio_pin_mask() shall return (1u << pin_index) for a valid pin_index, and 0 for a pin_index that is not rcp_ep_gpio_pin_index_valid().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-004",
+      "title": "rcp_ep_gpio_pin_get() reads one bit of a bitmask",
+      "text": "rcp_ep_gpio_pin_get() shall return true if and only if bitmask's bit at pin_index is set, and shall return false (not an error) for an invalid pin_index.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-005",
+      "title": "rcp_ep_gpio_write_semantics_valid() accepts exactly 0..7",
+      "text": "rcp_ep_gpio_write_semantics_valid() shall return true for every value v with v <= 7, and false for every v > 7.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-006",
+      "title": "rcp_ep_gpio_apply_write() implements RCP_EP_GPIO_WRITE_REPLACE",
+      "text": "rcp_ep_gpio_apply_write() with evt = RCP_EP_GPIO_WRITE_REPLACE shall return request, discarding current.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-007",
+      "title": "rcp_ep_gpio_apply_write() implements RCP_EP_GPIO_WRITE_OR",
+      "text": "rcp_ep_gpio_apply_write() with evt = RCP_EP_GPIO_WRITE_OR shall return current bitwise-ORed with request.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-008",
+      "title": "rcp_ep_gpio_apply_write() implements RCP_EP_GPIO_WRITE_AND",
+      "text": "rcp_ep_gpio_apply_write() with evt = RCP_EP_GPIO_WRITE_AND shall return current bitwise-ANDed with request.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-009",
+      "title": "rcp_ep_gpio_apply_write() implements RCP_EP_GPIO_WRITE_XOR",
+      "text": "rcp_ep_gpio_apply_write() with evt = RCP_EP_GPIO_WRITE_XOR shall return current bitwise-XORed with request.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-010",
+      "title": "rcp_ep_gpio_apply_write() implements saturating RCP_EP_GPIO_WRITE_ADD",
+      "text": "rcp_ep_gpio_apply_write() with evt = RCP_EP_GPIO_WRITE_ADD shall return current + request when that sum does not exceed 0xFFFFFFFF, and shall return 0xFFFFFFFF (saturating, not wrapping) when it would.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-011",
+      "title": "rcp_ep_gpio_apply_write() implements saturating RCP_EP_GPIO_WRITE_SUB",
+      "text": "rcp_ep_gpio_apply_write() with evt = RCP_EP_GPIO_WRITE_SUB shall return current - request when request <= current, and shall return 0 (saturating, not wrapping) when request > current.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-012",
+      "title": "rcp_ep_gpio_apply_write() treats RCP_EP_GPIO_WRITE_RESERVED6 as a no-op",
+      "text": "rcp_ep_gpio_apply_write() with evt = RCP_EP_GPIO_WRITE_RESERVED6 shall return current unchanged, regardless of request.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-013",
+      "title": "rcp_ep_gpio_apply_reconfig() toggles only the flagged pins' direction",
+      "text": "rcp_ep_gpio_apply_reconfig() shall, for every pin index whose bit is set in reconfig_mask, toggle that pin's pin_property between RCP_REGMAP_PIN_PROP_OUTPUT and RCP_REGMAP_PIN_PROP_INPUT while leaving its other pin_property bits unchanged, and shall leave every pin whose bit is clear in reconfig_mask entirely untouched.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-014",
+      "title": "rcp_ep_gpio_trigger_fires() never fires for RCP_EP_GPIO_TRIGGER_NONE",
+      "text": "rcp_ep_gpio_trigger_fires() with trigger = RCP_EP_GPIO_TRIGGER_NONE shall return false for every combination of prev_level and new_level.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-015",
+      "title": "rcp_ep_gpio_trigger_fires() implements RCP_EP_GPIO_TRIGGER_ANY_CHANGE",
+      "text": "rcp_ep_gpio_trigger_fires() with trigger = RCP_EP_GPIO_TRIGGER_ANY_CHANGE shall return true if and only if prev_level != new_level.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-016",
+      "title": "rcp_ep_gpio_trigger_fires() implements RCP_EP_GPIO_TRIGGER_RISING",
+      "text": "rcp_ep_gpio_trigger_fires() with trigger = RCP_EP_GPIO_TRIGGER_RISING shall return true if and only if prev_level is false and new_level is true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-017",
+      "title": "rcp_ep_gpio_trigger_fires() implements RCP_EP_GPIO_TRIGGER_FALLING",
+      "text": "rcp_ep_gpio_trigger_fires() with trigger = RCP_EP_GPIO_TRIGGER_FALLING shall return true if and only if prev_level is true and new_level is false.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-018",
+      "title": "rcp_ep_gpio_functional_cfg_init() zero-initializes cfg",
+      "text": "rcp_ep_gpio_functional_cfg_init() shall set cfg's common functional-config flags all false and every pins[i].pin_property to 0 and pins[i].trigger to RCP_EP_GPIO_TRIGGER_NONE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-019",
+      "title": "rcp_ep_gpio_functional_cfg_writable() is unwritable while HW_UNCONFIGURED",
+      "text": "rcp_ep_gpio_functional_cfg_writable() shall return false while state is RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, for every writer context.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-020",
+      "title": "rcp_ep_gpio_functional_cfg_writable() is writable by any writer while HW_CONFIGURED",
+      "text": "rcp_ep_gpio_functional_cfg_writable() shall return true while state is RCP_SERVER_LIFECYCLE_HW_CONFIGURED, for every writer context.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-021",
+      "title": "rcp_ep_gpio_functional_cfg_writable() requires authorization once RCP_CONFIGURED",
+      "text": "rcp_ep_gpio_functional_cfg_writable() shall, while state is RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, return true if and only if writer.via_root_client_ep0 or writer.via_owning_stream is true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-022",
+      "title": "rcp_ep_gpio_set_pin_property() rejects an invalid pin index or an unauthorized write without mutating cfg",
+      "text": "rcp_ep_gpio_set_pin_property() shall return false and leave cfg unchanged when pin_index is not rcp_ep_gpio_pin_index_valid(), or when rcp_ep_gpio_functional_cfg_writable() denies the write for state/writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-023",
+      "title": "rcp_ep_gpio_set_pin_property() applies the write when authorized",
+      "text": "rcp_ep_gpio_set_pin_property() shall set cfg->pins[pin_index].pin_property to pin_property and return true when pin_index is valid and the write is authorized.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-024",
+      "title": "rcp_ep_gpio_set_pin_trigger() rejects an invalid pin index or an unauthorized write without mutating cfg",
+      "text": "rcp_ep_gpio_set_pin_trigger() shall return false and leave cfg unchanged when pin_index is not rcp_ep_gpio_pin_index_valid(), or when rcp_ep_gpio_functional_cfg_writable() denies the write for state/writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-025",
+      "title": "rcp_ep_gpio_set_pin_trigger() applies the write when authorized",
+      "text": "rcp_ep_gpio_set_pin_trigger() shall set cfg->pins[pin_index].trigger to trigger and return true when pin_index is valid and the write is authorized.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-026",
+      "title": "GPIO read request encode/decode round-trips",
+      "text": "rcp_ep_gpio_decode_read_request() shall, given a frame produced by rcp_ep_gpio_encode_read_request() with the same byte_bus_id, return RCP_EP_GPIO_OK and recover the original transaction_num.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-027",
+      "title": "rcp_ep_gpio_decode_read_request() rejects a malformed or misaddressed frame",
+      "text": "rcp_ep_gpio_decode_read_request() shall return RCP_EP_GPIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB fixed header or its declared payload length, RCP_EP_GPIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_GPIO_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, and RCP_EP_GPIO_ERR_WRONG_OP when op is not RCP_ACF_OP_READ.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-028",
+      "title": "GPIO write request encode/decode round-trips, including evt[2:0]",
+      "text": "rcp_ep_gpio_decode_write_request() shall, given a frame produced by rcp_ep_gpio_encode_write_request() with the same byte_bus_id, return RCP_EP_GPIO_OK and recover the original bitmask, evt[2:0] masked to its low three bits, and transaction_num.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-029",
+      "title": "rcp_ep_gpio_decode_write_request() rejects a malformed or misaddressed frame",
+      "text": "rcp_ep_gpio_decode_write_request() shall return RCP_EP_GPIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB fixed header or its declared payload length, RCP_EP_GPIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_GPIO_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, RCP_EP_GPIO_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE, and RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN when the payload is not exactly RCP_EP_GPIO_PAYLOAD_LEN octets.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-030",
+      "title": "GPIO response encode/decode round-trips when untimed",
+      "text": "rcp_ep_gpio_decode_response() shall, given a frame produced by rcp_ep_gpio_encode_response() with timed = false and the same byte_bus_id, return RCP_EP_GPIO_OK, recover the original bitmask and transaction_num, and report *out_timed = false with *out_timestamp = 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-031",
+      "title": "GPIO response encode/decode round-trips when timed",
+      "text": "rcp_ep_gpio_decode_response() shall, given a frame produced by rcp_ep_gpio_encode_response() with timed = true, the same byte_bus_id, and a timestamp, return RCP_EP_GPIO_OK, recover the original bitmask and transaction_num, and report *out_timed = true with *out_timestamp equal to the original timestamp.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-GPIO-032",
+      "title": "rcp_ep_gpio_decode_response() rejects a malformed or misaddressed frame",
+      "text": "rcp_ep_gpio_decode_response() shall return RCP_EP_GPIO_ERR_SHORT_FRAME for a frame too short for its applicable ACF fixed header, RCP_EP_GPIO_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, and RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN when the payload is not exactly RCP_EP_GPIO_PAYLOAD_LEN octets.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     }
   ]
 }

@@ -63,6 +63,11 @@ target_link_libraries(test_discovery PRIVATE rcp::rcp unity)
 target_compile_options(test_discovery PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_discovery COMMAND test_discovery)
 
+add_executable(test_ep_gpio test_ep_gpio.c)
+target_link_libraries(test_ep_gpio PRIVATE rcp::rcp unity)
+target_compile_options(test_ep_gpio PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_ep_gpio COMMAND test_ep_gpio)
+
 add_executable(test_udp test_udp.c)
 target_link_libraries(test_udp PRIVATE rcp::rcp unity)
 target_compile_options(test_udp PRIVATE ${RCP_TEST_WARNING_FLAGS})
