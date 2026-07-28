@@ -24,17 +24,17 @@ void rcp_ep_i2c_functional_cfg_init(rcp_ep_i2c_functional_cfg_t *cfg)
 //cfusa:req REQ-I2C-003
 //cfusa:req REQ-I2C-004
 //cfusa:req REQ-I2C-005
-bool rcp_ep_i2c_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                        rcp_server_writer_ctx_t writer)
+bool rcp_ep_i2c_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                        rcp_lifecycle_writer_ctx_t writer)
 {
-    return rcp_server_field_writable(state, RCP_SERVER_FIELD_FUNCTIONAL_W, writer);
+    return rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, writer);
 }
 
 //cfusa:req REQ-I2C-006
 //cfusa:req REQ-I2C-007
 //cfusa:req REQ-I2C-008
 bool rcp_ep_i2c_set_mode(rcp_ep_i2c_functional_cfg_t *cfg, rcp_ep_i2c_mode_t mode,
-                          rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer)
+                          rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_i2c_mode_valid((uint8_t)mode)) return false;
     if (!rcp_ep_i2c_functional_cfg_writable(state, writer)) return false;

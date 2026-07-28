@@ -1,9 +1,9 @@
-#include "rcp/chained.h"
+#include "rcp/request_chained.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-/* ── Byte-order helpers (this TU's own copy -- see compound.c's identical
+/* ── Byte-order helpers (this TU's own copy -- see request_compound.c's identical
  * comment for the house convention this follows) ─────────────────────────── */
 
 static void put_u16(uint8_t *p, uint16_t v)

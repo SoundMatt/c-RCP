@@ -13,8 +13,8 @@
  * milestone 69).
  *
  * This is new, additive protocol-core surface. It composes this
- * milestone's own sibling request-kind modules (compound.h from milestone
- * 68, and triggered.h/chained.h/timed.h/cancel.h from this same
+ * milestone's own sibling request-kind modules (request_compound.h from milestone
+ * 68, and request_triggered.h/chained.h/timed.h/cancel.h from this same
  * milestone) purely to classify an already-decoded request_type byte --
  * it does not touch rcp.h, wire.c, avtp.h/avtp.c, server.h/server.c,
  * regmap.h/regmap.c, or any ep_* endpoint module, and it reads (not
@@ -68,7 +68,7 @@
  * expression of this same scope's one-presentation-time-per-TSCF-frame
  * rule: a TSCF-headed AVTPDU's single avtp_timestamp applies uniformly to
  * every member packed inside it, so a frame mixing a Timed (0x0A,
- * timed.h) request with any non-Timed member is never well-formed --
+ * request_timed.h) request with any non-Timed member is never well-formed --
  * either every member in a TSCF frame is itself Timed, or none are.
  * NTSCF frames carry no shared presentation time at all and are exempt
  * from this rule entirely.
@@ -77,12 +77,12 @@
 #define RCP_SCHEDULER_H
 
 #include "rcp/acf.h"
-#include "rcp/cancel.h"
-#include "rcp/chained.h"
-#include "rcp/compound.h"
+#include "rcp/request_cancel.h"
+#include "rcp/request_chained.h"
+#include "rcp/request_compound.h"
 #include "rcp/rcp.h"
-#include "rcp/timed.h"
-#include "rcp/triggered.h"
+#include "rcp/request_timed.h"
+#include "rcp/request_triggered.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -107,7 +107,7 @@ typedef enum {
                                           clear-single, all three */
 } rcp_sched_kind_t;
 
-/* Classifies an already-decoded repurposed-opcode byte (see compound.h's
+/* Classifies an already-decoded repurposed-opcode byte (see request_compound.h's
  * file header for the shared message_timestamp-repurposing convention
  * every non-Standard request type in this milestone and milestone 68
  * uses) into its rcp_sched_kind_t. is_repurposed must be true iff the

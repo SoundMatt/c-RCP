@@ -75,17 +75,17 @@ void rcp_ep_spi_functional_cfg_init(rcp_ep_spi_functional_cfg_t *cfg)
 //cfusa:req REQ-SPI-011
 //cfusa:req REQ-SPI-012
 //cfusa:req REQ-SPI-013
-bool rcp_ep_spi_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                        rcp_server_writer_ctx_t writer)
+bool rcp_ep_spi_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                        rcp_lifecycle_writer_ctx_t writer)
 {
-    return rcp_server_field_writable(state, RCP_SERVER_FIELD_FUNCTIONAL_W, writer);
+    return rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, writer);
 }
 
 //cfusa:req REQ-SPI-014
 //cfusa:req REQ-SPI-015
 bool rcp_ep_spi_set_channel_mode(rcp_ep_spi_functional_cfg_t *cfg, uint8_t channel,
-                                  rcp_ep_spi_mode_t mode, rcp_server_lifecycle_t state,
-                                  rcp_server_writer_ctx_t writer)
+                                  rcp_ep_spi_mode_t mode, rcp_lifecycle_state_t state,
+                                  rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_spi_channel_valid(channel)) return false;
     if (!rcp_ep_spi_functional_cfg_writable(state, writer)) return false;
@@ -98,8 +98,8 @@ bool rcp_ep_spi_set_channel_mode(rcp_ep_spi_functional_cfg_t *cfg, uint8_t chann
 //cfusa:req REQ-SPI-017
 bool rcp_ep_spi_set_channel_bit_order(rcp_ep_spi_functional_cfg_t *cfg, uint8_t channel,
                                        rcp_ep_spi_bit_order_t bit_order,
-                                       rcp_server_lifecycle_t state,
-                                       rcp_server_writer_ctx_t writer)
+                                       rcp_lifecycle_state_t state,
+                                       rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_spi_channel_valid(channel)) return false;
     if (!rcp_ep_spi_functional_cfg_writable(state, writer)) return false;
@@ -112,8 +112,8 @@ bool rcp_ep_spi_set_channel_bit_order(rcp_ep_spi_functional_cfg_t *cfg, uint8_t 
 //cfusa:req REQ-SPI-019
 bool rcp_ep_spi_set_channel_cs_polarity(rcp_ep_spi_functional_cfg_t *cfg, uint8_t channel,
                                          rcp_ep_spi_cs_polarity_t cs_polarity,
-                                         rcp_server_lifecycle_t state,
-                                         rcp_server_writer_ctx_t writer)
+                                         rcp_lifecycle_state_t state,
+                                         rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_spi_channel_valid(channel)) return false;
     if (!rcp_ep_spi_functional_cfg_writable(state, writer)) return false;
@@ -125,8 +125,8 @@ bool rcp_ep_spi_set_channel_cs_polarity(rcp_ep_spi_functional_cfg_t *cfg, uint8_
 //cfusa:req REQ-SPI-020
 //cfusa:req REQ-SPI-021
 bool rcp_ep_spi_set_channel_clock_divider(rcp_ep_spi_functional_cfg_t *cfg, uint8_t channel,
-                                           uint32_t clock_divider, rcp_server_lifecycle_t state,
-                                           rcp_server_writer_ctx_t writer)
+                                           uint32_t clock_divider, rcp_lifecycle_state_t state,
+                                           rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_spi_channel_valid(channel)) return false;
     if (!rcp_ep_spi_functional_cfg_writable(state, writer)) return false;
@@ -140,8 +140,8 @@ bool rcp_ep_spi_set_channel_clock_divider(rcp_ep_spi_functional_cfg_t *cfg, uint
 bool rcp_ep_spi_set_channel_timing(rcp_ep_spi_functional_cfg_t *cfg, uint8_t channel,
                                     uint32_t inter_byte_delay_ns,
                                     uint32_t inter_transfer_delay_ns,
-                                    rcp_server_lifecycle_t state,
-                                    rcp_server_writer_ctx_t writer)
+                                    rcp_lifecycle_state_t state,
+                                    rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_spi_channel_valid(channel)) return false;
     if (!rcp_ep_spi_functional_cfg_writable(state, writer)) return false;
@@ -154,8 +154,8 @@ bool rcp_ep_spi_set_channel_timing(rcp_ep_spi_functional_cfg_t *cfg, uint8_t cha
 //cfusa:req REQ-SPI-024
 //cfusa:req REQ-SPI-025
 bool rcp_ep_spi_set_channel_trigger(rcp_ep_spi_functional_cfg_t *cfg, uint8_t channel,
-                                     rcp_ep_spi_trigger_t trigger, rcp_server_lifecycle_t state,
-                                     rcp_server_writer_ctx_t writer)
+                                     rcp_ep_spi_trigger_t trigger, rcp_lifecycle_state_t state,
+                                     rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_spi_channel_valid(channel)) return false;
     if (!rcp_ep_spi_functional_cfg_writable(state, writer)) return false;

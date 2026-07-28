@@ -12,21 +12,21 @@
 //cfusa:req REQ-TRIG-012
 //cfusa:req REQ-TRIG-013
 /*
- * triggered.h -- Triggered conditional requests for the TC18 Remote Control
+ * request_triggered.h -- Triggered conditional requests for the TC18 Remote Control
  * Protocol wire layer (ROADMAP.md Phase 17, "Conditional Requests &
  * Sequencers", milestone 69).
  *
  * This is new, additive protocol-core surface layered on top of the AVTPDU
  * framing (avtp.h/avtp.c, milestone 59), the ACF message format (acf.h/
  * acf.c, milestone 60), and this project's own sequencer-state primitive
- * (sequencer.h/sequencer.c, milestone 68). Nothing in rcp.h, wire.c, avtp.h/
+ * (request_sequencer.h/sequencer.c, milestone 68). Nothing in rcp.h, wire.c, avtp.h/
  * avtp.c, acf.h/acf.c, server.h/server.c, regmap.h/regmap.c, or any ep_*
  * endpoint module is touched here -- the same layering discipline every
  * module since milestone 64 has followed. This module is a peer of
- * compound.h (milestone 68), not a dependent of it: it follows the exact
+ * request_compound.h (milestone 68), not a dependent of it: it follows the exact
  * same architectural template (the message_timestamp-repurposing trick,
- * the advance-only-if-still-in-start_state guard against sequencer.h) but
- * does not include or call into compound.h itself, matching this project's
+ * the advance-only-if-still-in-start_state guard against request_sequencer.h) but
+ * does not include or call into request_compound.h itself, matching this project's
  * own precedent of every request-kind module owning its own small pure
  * helpers rather than sharing them through a cross-module dependency.
  *
@@ -39,22 +39,22 @@
  *
  * ── request_type and the shared repurposing trick ───────────────────────────
  *
- * Triggered requests reuse compound.h's own message_timestamp-repurposing
- * convention (see compound.h's file header for the full rationale): an
+ * Triggered requests reuse request_compound.h's own message_timestamp-repurposing
+ * convention (see request_compound.h's file header for the full rationale): an
  * ACF_GBB message whose mtv is RCP_ACF_MTV_UNTIMED has its 8-byte
  * message_timestamp region reinterpreted as a 1-byte request_type opcode
  * followed by 7 kind-specific sub-field bytes. request_type
  * RCP_REQUEST_TYPE_TRIGGERED (0x0E) and its safety-tagged counterpart
  * RCP_REQUEST_TYPE_TRIGGERED_SAFETY (0x8E) are this module's two opcode
- * values within that shared convention -- compound.h's own docstring
+ * values within that shared convention -- request_compound.h's own docstring
  * reserved both ahead of time. Safety-tagged gating (only executing once
  * the endpoint is in its configured safe state) is Phase 18's job
- * (safept.h, milestone 70), not this one's, mirroring compound.h's own
+ * (e2e.h, milestone 70), not this one's, mirroring request_compound.h's own
  * precedent for its own safety-tagged variants.
  *
  * ── rcp_triggered_step_t: this module's own 7-byte sub-field layout ────────
  *
- * Unlike compound.h's rcp_compound_step_t (16-bit sequencer_index, 8-bit
+ * Unlike request_compound.h's rcp_compound_step_t (16-bit sequencer_index, 8-bit
  * repeat_count -- exactly 7 bytes with those widths), this module's own
  * repeat_count is 16 bits wide per this milestone's roadmap scope, which
  * does not fit alongside a 16-bit sequencer_index in the same 7-byte
@@ -63,7 +63,7 @@
  * sequencer_index (1 byte) | start_state (1) | next_state (1) |
  * trigger_exec_delay_ms (2) | repeat_count (2) == 7 bytes. repeat_count is
  * round-tripped by the encode/decode functions below, exactly like
- * compound.h's own repeat_count (see that header's file comment) -- this
+ * request_compound.h's own repeat_count (see that header's file comment) -- this
  * milestone's scope extends only to RCP_TRIGGERED_REPEAT_INFINITE's wire
  * round-trip, not to any re-arming/repetition scheduling behavior.
  *
@@ -82,16 +82,16 @@
  *
  * Neither this module nor rcp_triggered_tick() owns a timer, thread, or
  * polling loop of its own -- every tick is caller-driven, matching every
- * protocol-core module built so far (see compound.h's own file header for
+ * protocol-core module built so far (see request_compound.h's own file header for
  * the same convention).
  */
-#ifndef RCP_TRIGGERED_H
-#define RCP_TRIGGERED_H
+#ifndef RCP_REQUEST_TRIGGERED_H
+#define RCP_REQUEST_TRIGGERED_H
 
 #include "rcp/acf.h"
 #include "rcp/avtp.h"
 #include "rcp/rcp.h"
-#include "rcp/sequencer.h"
+#include "rcp/request_sequencer.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -127,7 +127,7 @@ const char *rcp_triggered_strerror(rcp_triggered_errc_t e);
 /* ── rcp_triggered_step_t: wire sub-fields ────────────────────────────────── */
 
 /* Sentinel repeat_count value meaning "repeat indefinitely" -- this
- * module's own 16-bit analogue of compound.h's 8-bit
+ * module's own 16-bit analogue of request_compound.h's 8-bit
  * RCP_COMPOUND_REPEAT_INFINITE, per this milestone's own roadmap scope.
  * Round-tripped only; see the file header. */
 #define RCP_TRIGGERED_REPEAT_INFINITE ((uint16_t)0xFFFFu)
@@ -143,7 +143,7 @@ typedef struct {
     uint16_t trigger_exec_delay_ms; /* this step's own trigger_exec_delay
                                         timer, in milliseconds (this
                                         module's own unit choice, matching
-                                        compound.h's exec_delay_ms
+                                        request_compound.h's exec_delay_ms
                                         precedent) */
     uint16_t repeat_count;        /* round-tripped only; see the file header */
 } rcp_triggered_step_t;
@@ -154,7 +154,7 @@ typedef struct {
  * packing step into the repurposed message_timestamp region's 7 sub-field
  * bytes with the leading opcode byte set to request_type and mtv forced
  * to RCP_ACF_MTV_UNTIMED -- same conventions as
- * rcp_compound_encode_request() (compound.h). request_type must be
+ * rcp_compound_encode_request() (request_compound.h). request_type must be
  * RCP_REQUEST_TYPE_TRIGGERED or RCP_REQUEST_TYPE_TRIGGERED_SAFETY.
  * payload/payload_len is this request's own opaque, endpoint-specific
  * data; payload may be NULL iff payload_len == 0. Returns a zeroed
@@ -167,7 +167,7 @@ rcp_bytes_t rcp_triggered_encode_request(uint8_t request_type, rcp_byte_bus_id_t
 
 /* Decodes and validates an ACF-level triggered request from b[0..len).
  * Same failure-mode conventions as rcp_compound_decode_request()
- * (compound.h), with RCP_TRIGGERED_ERR_UNKNOWN_TYPE returned whenever the
+ * (request_compound.h), with RCP_TRIGGERED_ERR_UNKNOWN_TYPE returned whenever the
  * decoded opcode byte is not rcp_request_type_is_triggered(). On
  * RCP_TRIGGERED_OK, *out_request_type, *out_byte_bus_id, *out_step, and
  * *out_transaction_num are populated, and *out_payload / *out_payload_len
@@ -202,7 +202,7 @@ bool rcp_triggered_runtime_record_occurrence(rcp_triggered_runtime_t *rt);
 
 /* True iff table's sequencer step->sequencer_index is currently sitting
  * in step->start_state -- this module's own copy of the advance-only-if-
- * still-in-start_state guard (compound.h's rcp_compound_advance_guard()
+ * still-in-start_state guard (request_compound.h's rcp_compound_advance_guard()
  * expresses the identical rule for compound/compound-wait; this module
  * intentionally does not share that function across the module boundary,
  * see the file header). False if step->sequencer_index is not
@@ -211,7 +211,7 @@ bool rcp_triggered_advance_guard(const rcp_sequencer_table_t *table,
                                   const rcp_triggered_step_t *step);
 
 /* True iff elapsed_ms >= step->trigger_exec_delay_ms. Pure; see
- * compound.h's rcp_compound_exec_delay_elapsed() for the identical shape
+ * request_compound.h's rcp_compound_exec_delay_elapsed() for the identical shape
  * applied to this module's own delay field. */
 bool rcp_triggered_exec_delay_elapsed(const rcp_triggered_step_t *step, uint32_t elapsed_ms);
 
@@ -233,4 +233,4 @@ bool rcp_triggered_tick(rcp_sequencer_table_t *table, const rcp_triggered_step_t
 }
 #endif
 
-#endif /* RCP_TRIGGERED_H */
+#endif /* RCP_REQUEST_TRIGGERED_H */

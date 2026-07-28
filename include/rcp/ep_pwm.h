@@ -181,8 +181,8 @@
  * member (per that module's documented convention, same as every prior
  * endpoint type). rcp_ep_pwm_out_functional_cfg_writable()/
  * rcp_ep_pwm_in_functional_cfg_writable() are, likewise, thin, named
- * wrappers over server.h's rcp_server_field_writable()
- * (RCP_SERVER_FIELD_FUNCTIONAL_W), and every setter below consults the
+ * wrappers over server.h's rcp_lifecycle_field_writable()
+ * (RCP_LIFECYCLE_FIELD_FUNCTIONAL_W), and every setter below consults the
  * applicable one before ever touching cfg -- reusing, never duplicating,
  * server.h's/regmap.h's existing authorization logic, per the roadmap's
  * explicit instruction (the same rule every prior endpoint type's own
@@ -195,7 +195,7 @@
 #include "rcp/avtp.h"
 #include "rcp/rcp.h"
 #include "rcp/regmap.h"
-#include "rcp/server.h"
+#include "rcp/lifecycle.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -310,23 +310,23 @@ typedef struct {
 void rcp_ep_pwm_out_functional_cfg_init(rcp_ep_pwm_out_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
- * writer -- a thin, named wrapper over rcp_server_field_writable()
- * (server.h) with kind RCP_SERVER_FIELD_FUNCTIONAL_W; see the file header.
+ * writer -- a thin, named wrapper over rcp_lifecycle_field_writable()
+ * (server.h) with kind RCP_LIFECYCLE_FIELD_FUNCTIONAL_W; see the file header.
  * Reuses, and never duplicates, that function's authorization logic. */
-bool rcp_ep_pwm_out_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                            rcp_server_writer_ctx_t writer);
+bool rcp_ep_pwm_out_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                            rcp_lifecycle_writer_ctx_t writer);
 
 /* Sets cfg->trigger to trigger iff rcp_ep_pwm_out_functional_cfg_writable()
  * authorizes the write for state/writer; returns whether the write was
  * applied. cfg is left entirely unchanged when it returns false. */
 bool rcp_ep_pwm_out_set_trigger(rcp_ep_pwm_out_functional_cfg_t *cfg,
                                  rcp_ep_pwm_out_trigger_t trigger,
-                                 rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer);
+                                 rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer);
 
 /* Same authorization rule as rcp_ep_pwm_out_set_trigger(), for
  * cfg->enabled. */
 bool rcp_ep_pwm_out_set_enabled(rcp_ep_pwm_out_functional_cfg_t *cfg, bool enabled,
-                                 rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer);
+                                 rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer);
 
 /* ── PWM_OUT: error codes ──────────────────────────────────────────────────── */
 
@@ -448,15 +448,15 @@ void rcp_ep_pwm_in_functional_cfg_init(rcp_ep_pwm_in_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
  * writer -- same convention as rcp_ep_pwm_out_functional_cfg_writable(). */
-bool rcp_ep_pwm_in_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                           rcp_server_writer_ctx_t writer);
+bool rcp_ep_pwm_in_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                           rcp_lifecycle_writer_ctx_t writer);
 
 /* Sets cfg->trigger to trigger iff rcp_ep_pwm_in_functional_cfg_writable()
  * authorizes the write for state/writer; returns whether the write was
  * applied. cfg is left entirely unchanged when it returns false. */
 bool rcp_ep_pwm_in_set_trigger(rcp_ep_pwm_in_functional_cfg_t *cfg,
-                                rcp_ep_pwm_in_trigger_t trigger, rcp_server_lifecycle_t state,
-                                rcp_server_writer_ctx_t writer);
+                                rcp_ep_pwm_in_trigger_t trigger, rcp_lifecycle_state_t state,
+                                rcp_lifecycle_writer_ctx_t writer);
 
 /* ── PWM_IN: error codes ───────────────────────────────────────────────────── */
 

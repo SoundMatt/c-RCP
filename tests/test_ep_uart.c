@@ -32,7 +32,7 @@
 #include <rcp/ep_uart.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
-#include <rcp/server.h>
+#include <rcp/lifecycle.h>
 
 #include <string.h>
 
@@ -115,74 +115,74 @@ static void test_functional_cfg_init_zeroes_except_nr_bits(void)
 
 static void test_functional_cfg_writable_false_hw_unconfigured(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
     writer.via_root_client_ep0 = true;
     writer.via_owning_stream   = true;
 
     TEST_ASSERT_FALSE(rcp_ep_uart_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, writer));
+        RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
 }
 
 static void test_functional_cfg_writable_true_hw_configured_any_writer(void)
 {
-    rcp_server_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t writer = {0};
 
     TEST_ASSERT_TRUE(rcp_ep_uart_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        RCP_LIFECYCLE_HW_CONFIGURED, writer));
 }
 
 static void test_functional_cfg_writable_rcp_configured_requires_authorization(void)
 {
-    rcp_server_writer_ctx_t none = {0};
-    rcp_server_writer_ctx_t via_ep0 = {0};
-    rcp_server_writer_ctx_t via_stream = {0};
+    rcp_lifecycle_writer_ctx_t none = {0};
+    rcp_lifecycle_writer_ctx_t via_ep0 = {0};
+    rcp_lifecycle_writer_ctx_t via_stream = {0};
 
     via_ep0.via_root_client_ep0 = true;
     via_stream.via_owning_stream = true;
 
     TEST_ASSERT_FALSE(rcp_ep_uart_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, none));
+        RCP_LIFECYCLE_RCP_CONFIGURED, none));
     TEST_ASSERT_TRUE(rcp_ep_uart_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, via_ep0));
+        RCP_LIFECYCLE_RCP_CONFIGURED, via_ep0));
     TEST_ASSERT_TRUE(rcp_ep_uart_functional_cfg_writable(
-        RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, via_stream));
+        RCP_LIFECYCLE_RCP_CONFIGURED, via_stream));
 }
 
 static void test_set_baud_rate_rejects_unauthorized(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t      none = {0};
+    rcp_lifecycle_writer_ctx_t      none = {0};
 
     rcp_ep_uart_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_uart_set_baud_rate(
-        &cfg, 115200, RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, none));
+        &cfg, 115200, RCP_LIFECYCLE_HW_UNCONFIGURED, none));
     TEST_ASSERT_EQUAL_UINT32(0, cfg.baud_rate);
 }
 
 static void test_set_baud_rate_applies_when_authorized(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t      writer = {0};
+    rcp_lifecycle_writer_ctx_t      writer = {0};
 
     rcp_ep_uart_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_uart_set_baud_rate(
-        &cfg, 115200, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, 115200, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT32(115200, cfg.baud_rate);
 }
 
 static void test_set_frame_format_rejects_invalid_nr_bits(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t      writer = {0};
+    rcp_lifecycle_writer_ctx_t      writer = {0};
 
     rcp_ep_uart_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_uart_set_frame_format(
         &cfg, 0, RCP_EP_UART_PARITY_EVEN, RCP_EP_UART_STOP_BITS_TWO,
-        RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8(RCP_EP_UART_NR_BITS_MAX, cfg.uart_nr_bits);
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_PARITY_NONE, cfg.parity);
 }
@@ -190,26 +190,26 @@ static void test_set_frame_format_rejects_invalid_nr_bits(void)
 static void test_set_frame_format_rejects_unauthorized(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t      none = {0};
+    rcp_lifecycle_writer_ctx_t      none = {0};
 
     rcp_ep_uart_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_uart_set_frame_format(
         &cfg, 7, RCP_EP_UART_PARITY_ODD, RCP_EP_UART_STOP_BITS_ONE,
-        RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, none));
+        RCP_LIFECYCLE_HW_UNCONFIGURED, none));
     TEST_ASSERT_EQUAL_UINT8(RCP_EP_UART_NR_BITS_MAX, cfg.uart_nr_bits);
 }
 
 static void test_set_frame_format_applies_when_valid_and_authorized(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t      writer = {0};
+    rcp_lifecycle_writer_ctx_t      writer = {0};
 
     rcp_ep_uart_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_uart_set_frame_format(
         &cfg, 7, RCP_EP_UART_PARITY_EVEN, RCP_EP_UART_STOP_BITS_TWO,
-        RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8(7, cfg.uart_nr_bits);
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_PARITY_EVEN, cfg.parity);
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_STOP_BITS_TWO, cfg.stop_bits);
@@ -218,48 +218,48 @@ static void test_set_frame_format_applies_when_valid_and_authorized(void)
 static void test_set_rx_buffer_size_rejects_unauthorized(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t      none = {0};
+    rcp_lifecycle_writer_ctx_t      none = {0};
 
     rcp_ep_uart_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_uart_set_rx_buffer_size(
-        &cfg, 256, RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, none));
+        &cfg, 256, RCP_LIFECYCLE_HW_UNCONFIGURED, none));
     TEST_ASSERT_EQUAL_UINT16(0, cfg.ep_rx_buffer_size);
 }
 
 static void test_set_rx_buffer_size_applies_when_authorized(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t      writer = {0};
+    rcp_lifecycle_writer_ctx_t      writer = {0};
 
     rcp_ep_uart_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_uart_set_rx_buffer_size(
-        &cfg, 256, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, 256, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT16(256, cfg.ep_rx_buffer_size);
 }
 
 static void test_set_timeout_rejects_unauthorized(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t      none = {0};
+    rcp_lifecycle_writer_ctx_t      none = {0};
 
     rcp_ep_uart_functional_cfg_init(&cfg);
 
     TEST_ASSERT_FALSE(rcp_ep_uart_set_timeout(
-        &cfg, 50, RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, none));
+        &cfg, 50, RCP_LIFECYCLE_HW_UNCONFIGURED, none));
     TEST_ASSERT_EQUAL_UINT32(0, cfg.uart_timeout_ms);
 }
 
 static void test_set_timeout_applies_when_authorized(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
-    rcp_server_writer_ctx_t      writer = {0};
+    rcp_lifecycle_writer_ctx_t      writer = {0};
 
     rcp_ep_uart_functional_cfg_init(&cfg);
 
     TEST_ASSERT_TRUE(rcp_ep_uart_set_timeout(
-        &cfg, 50, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, writer));
+        &cfg, 50, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT32(50, cfg.uart_timeout_ms);
 }
 

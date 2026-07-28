@@ -139,18 +139,18 @@ void rcp_ep_adc_functional_cfg_init(rcp_ep_adc_functional_cfg_t *cfg)
 //cfusa:req REQ-ADC-015
 //cfusa:req REQ-ADC-016
 //cfusa:req REQ-ADC-017
-bool rcp_ep_adc_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                        rcp_server_writer_ctx_t writer)
+bool rcp_ep_adc_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                        rcp_lifecycle_writer_ctx_t writer)
 {
-    return rcp_server_field_writable(state, RCP_SERVER_FIELD_FUNCTIONAL_W, writer);
+    return rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, writer);
 }
 
 //cfusa:req REQ-ADC-018
 //cfusa:req REQ-ADC-019
 bool rcp_ep_adc_set_samples_per_avg_interval(rcp_ep_adc_functional_cfg_t *cfg,
                                               uint16_t samples_per_interval,
-                                              rcp_server_lifecycle_t state,
-                                              rcp_server_writer_ctx_t writer)
+                                              rcp_lifecycle_state_t state,
+                                              rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_adc_functional_cfg_writable(state, writer)) return false;
 
@@ -162,8 +162,8 @@ bool rcp_ep_adc_set_samples_per_avg_interval(rcp_ep_adc_functional_cfg_t *cfg,
 //cfusa:req REQ-ADC-021
 bool rcp_ep_adc_set_avg_intervals_per_request(rcp_ep_adc_functional_cfg_t *cfg,
                                                uint16_t intervals_per_request,
-                                               rcp_server_lifecycle_t state,
-                                               rcp_server_writer_ctx_t writer)
+                                               rcp_lifecycle_state_t state,
+                                               rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_adc_functional_cfg_writable(state, writer)) return false;
 
@@ -175,7 +175,7 @@ bool rcp_ep_adc_set_avg_intervals_per_request(rcp_ep_adc_functional_cfg_t *cfg,
 //cfusa:req REQ-ADC-023
 bool rcp_ep_adc_set_combine_mode(rcp_ep_adc_functional_cfg_t *cfg,
                                   rcp_ep_adc_combine_mode_t combine_mode,
-                                  rcp_server_lifecycle_t state, rcp_server_writer_ctx_t writer)
+                                  rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer)
 {
     if (!rcp_ep_adc_combine_mode_valid((uint8_t)combine_mode)) return false;
     if (!rcp_ep_adc_functional_cfg_writable(state, writer)) return false;

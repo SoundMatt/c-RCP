@@ -124,13 +124,13 @@
  * the HW pin-mapping table's own direction/pull-up/pull-down/drive-strength
  * fields, but here independently runtime-adjustable per pin) and a trigger
  * mode. rcp_ep_gpio_functional_cfg_writable() is a thin, named wrapper over
- * server.h's rcp_server_field_writable() (RCP_SERVER_FIELD_FUNCTIONAL_W --
+ * server.h's rcp_lifecycle_field_writable() (RCP_LIFECYCLE_FIELD_FUNCTIONAL_W --
  * this configuration is functionally, not permanently, re-lockable once
  * RCP_CONFIGURED, per server.h's own distinction between _W and _W_STAR);
  * rcp_ep_gpio_set_pin_property()/_set_pin_trigger() are this module's own
  * mutators consulting that authorization before ever touching cfg, reusing
  * -- never duplicating -- server.h's/regmap.h's existing authorization
- * logic (rcp_server_field_writable()/rcp_regmap_writer_ctx()), per the
+ * logic (rcp_lifecycle_field_writable()/rcp_regmap_writer_ctx()), per the
  * roadmap's explicit instruction.
  */
 #ifndef RCP_EP_GPIO_H
@@ -140,7 +140,7 @@
 #include "rcp/avtp.h"
 #include "rcp/rcp.h"
 #include "rcp/regmap.h"
-#include "rcp/server.h"
+#include "rcp/lifecycle.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -241,25 +241,25 @@ typedef struct {
 void rcp_ep_gpio_functional_cfg_init(rcp_ep_gpio_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
- * writer -- a thin, named wrapper over rcp_server_field_writable()
- * (server.h) with kind RCP_SERVER_FIELD_FUNCTIONAL_W; see the file header.
+ * writer -- a thin, named wrapper over rcp_lifecycle_field_writable()
+ * (server.h) with kind RCP_LIFECYCLE_FIELD_FUNCTIONAL_W; see the file header.
  * Reuses, and never duplicates, that function's authorization logic. */
-bool rcp_ep_gpio_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                         rcp_server_writer_ctx_t writer);
+bool rcp_ep_gpio_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                         rcp_lifecycle_writer_ctx_t writer);
 
 /* Sets cfg->pins[pin_index].pin_property to pin_property iff pin_index is
  * rcp_ep_gpio_pin_index_valid() and rcp_ep_gpio_functional_cfg_writable()
  * authorizes the write for state/writer; returns whether the write was
  * applied. cfg is left entirely unchanged when it returns false. */
 bool rcp_ep_gpio_set_pin_property(rcp_ep_gpio_functional_cfg_t *cfg, uint8_t pin_index,
-                                   uint8_t pin_property, rcp_server_lifecycle_t state,
-                                   rcp_server_writer_ctx_t writer);
+                                   uint8_t pin_property, rcp_lifecycle_state_t state,
+                                   rcp_lifecycle_writer_ctx_t writer);
 
 /* Same authorization/validity rule as rcp_ep_gpio_set_pin_property(), for
  * cfg->pins[pin_index].trigger. */
 bool rcp_ep_gpio_set_pin_trigger(rcp_ep_gpio_functional_cfg_t *cfg, uint8_t pin_index,
-                                  rcp_ep_gpio_trigger_t trigger, rcp_server_lifecycle_t state,
-                                  rcp_server_writer_ctx_t writer);
+                                  rcp_ep_gpio_trigger_t trigger, rcp_lifecycle_state_t state,
+                                  rcp_lifecycle_writer_ctx_t writer);
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 

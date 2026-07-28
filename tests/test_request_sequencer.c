@@ -11,7 +11,7 @@
 //cfusa:test REQ-SEQ-011
 #include "unity.h"
 
-#include <rcp/sequencer.h>
+#include <rcp/request_sequencer.h>
 
 void setUp(void) {}
 void tearDown(void) {}

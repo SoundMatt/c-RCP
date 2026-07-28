@@ -10,7 +10,7 @@
 //cfusa:req REQ-SEQ-010
 //cfusa:req REQ-SEQ-011
 /*
- * sequencer.h -- Persistent sequencer-state registers for the TC18 Remote
+ * request_sequencer.h -- Persistent sequencer-state registers for the TC18 Remote
  * Control Protocol wire layer (ROADMAP.md Phase 17, "Conditional Requests &
  * Sequencers", milestone 68).
  *
@@ -32,11 +32,11 @@
  * ── What a sequencer is, in this codebase's own terms ───────────────────────
  *
  * A sequencer is nothing more than one persistent 8-bit state register.
- * compound.h's compound/compound-wait requests (this same milestone) are
+ * request_compound.h's compound/compound-wait requests (this same milestone) are
  * the only things that ever read or advance one -- this header models the
  * register itself as a first-class, independently testable primitive, per
  * the roadmap's explicit instruction, rather than folding it into
- * compound.c as a private implementation detail.
+ * request_compound.c as a private implementation detail.
  *
  * regmap.h's rcp_regmap_general_t.svr_max_sequencers (a register field
  * reserved, but inert, since milestone 62) is this module's own
@@ -61,8 +61,8 @@
  * every accessor below fails safe (returns false) rather than fabricating
  * a register that does not exist.
  */
-#ifndef RCP_SEQUENCER_H
-#define RCP_SEQUENCER_H
+#ifndef RCP_REQUEST_SEQUENCER_H
+#define RCP_REQUEST_SEQUENCER_H
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -123,7 +123,7 @@ bool rcp_sequencer_get_state(const rcp_sequencer_table_t *table, uint16_t idx,
 
 /* Overwrites table's sequencer idx's state with state. Returns whether
  * idx was valid (table left entirely unchanged when it returns false).
- * This is the one primitive compound.h's guarded advance step (see
+ * This is the one primitive request_compound.h's guarded advance step (see
  * rcp_compound_tick()/rcp_compound_wait_tick()) as well as any future
  * direct register-map write to sequencer_state ultimately calls -- this
  * module assigns idx no special meaning of its own beyond addressing one
@@ -134,4 +134,4 @@ bool rcp_sequencer_set_state(rcp_sequencer_table_t *table, uint16_t idx, uint8_t
 }
 #endif
 
-#endif /* RCP_SEQUENCER_H */
+#endif /* RCP_REQUEST_SEQUENCER_H */

@@ -49,12 +49,12 @@ void rcp_regmap_general_init(rcp_regmap_general_t *map)
 //cfusa:req REQ-RMAP-010
 //cfusa:req REQ-RMAP-011
 //cfusa:req REQ-RMAP-012
-rcp_server_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map,
+rcp_lifecycle_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map,
                                                const rcp_regmap_ep_client_t *ep_client,
                                                uint16_t requesting_stream_index,
                                                bool via_ep0)
 {
-    rcp_server_writer_ctx_t ctx;
+    rcp_lifecycle_writer_ctx_t ctx;
 
     ctx.via_root_client_ep0 = via_ep0 &&
                               map->svr_root_client_index != RCP_REGMAP_NO_ROOT_CLIENT &&

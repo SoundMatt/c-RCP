@@ -9,7 +9,7 @@
 //cfusa:req REQ-CHAIN-009
 //cfusa:req REQ-CHAIN-010
 /*
- * chained.h -- Chained conditional requests for the TC18 Remote Control
+ * request_chained.h -- Chained conditional requests for the TC18 Remote Control
  * Protocol wire layer (ROADMAP.md Phase 17, "Conditional Requests &
  * Sequencers", milestone 69).
  *
@@ -33,10 +33,10 @@
  * packed as separate ACF messages within one AVTPDU. Each member of a
  * chain is its own ACF_GBB message carrying request_type
  * RCP_REQUEST_TYPE_CHAINED (0x01, no safety-tagged variant exists) via
- * compound.h's shared message_timestamp-repurposing convention (see that
+ * request_compound.h's shared message_timestamp-repurposing convention (see that
  * header's file comment for the full rationale) -- this module reuses
- * that same wire convention but, like triggered.h, does not include or
- * call into compound.h itself. This module's own 7-byte sub-field layout
+ * that same wire convention but, like request_triggered.h, does not include or
+ * call into request_compound.h itself. This module's own 7-byte sub-field layout
  * for a chain member is chain_length (this chain's total member count,
  * >= 2) and chain_position (this member's own 0-based position within the
  * chain, < chain_length), with the remaining 5 bytes reserved and always
@@ -48,7 +48,7 @@
  * inert, as of milestone 60 ("belong[s] to functionality this milestone
  * deliberately does not implement"). This module is the first to give
  * that already-published, unmodified field real behavior, exactly the
- * kind of "round-trip now, activate later" precedent compound.h's own
+ * kind of "round-trip now, activate later" precedent request_compound.h's own
  * safety-tagged (MSB) request_type variants already established. A chain
  * member's own cs value (RCP_CHAINED_CS_CONTINUE_ON_ERROR /
  * RCP_CHAINED_CS_ABORT_ON_ERROR) selects, for the chain members still to
@@ -72,8 +72,8 @@
  * rcp_chained_advance() to learn what the *next* member's status should
  * be.
  */
-#ifndef RCP_CHAINED_H
-#define RCP_CHAINED_H
+#ifndef RCP_REQUEST_CHAINED_H
+#define RCP_REQUEST_CHAINED_H
 
 #include "rcp/acf.h"
 #include "rcp/avtp.h"
@@ -123,7 +123,7 @@ const char *rcp_chained_strerror(rcp_chained_errc_t e);
  * byte set to RCP_REQUEST_TYPE_CHAINED, cs set to one of
  * RCP_CHAINED_CS_CONTINUE_ON_ERROR/_ABORT_ON_ERROR, and mtv forced to
  * RCP_ACF_MTV_UNTIMED -- same conventions as
- * rcp_compound_encode_request() (compound.h). payload/payload_len is this
+ * rcp_compound_encode_request() (request_compound.h). payload/payload_len is this
  * member's own opaque, endpoint-specific request data; payload may be
  * NULL iff payload_len == 0. Returns a zeroed rcp_bytes_t (data=NULL) if
  * chain_length < RCP_CHAINED_MIN_MEMBERS, chain_position >= chain_length,
@@ -134,7 +134,7 @@ rcp_bytes_t rcp_chained_encode_member(rcp_byte_bus_id_t byte_bus_id, uint8_t cha
                                        const uint8_t *payload, size_t payload_len);
 
 /* Decodes and validates a chained-request member from b[0..len). Same
- * failure-mode conventions as rcp_compound_decode_request() (compound.h),
+ * failure-mode conventions as rcp_compound_decode_request() (request_compound.h),
  * with RCP_CHAINED_ERR_UNKNOWN_TYPE returned whenever the decoded opcode
  * byte is not RCP_REQUEST_TYPE_CHAINED. On RCP_CHAINED_OK,
  * *out_byte_bus_id, *out_chain_length, *out_chain_position, *out_cs, and
@@ -188,4 +188,4 @@ rcp_chained_member_outcome_t rcp_chained_advance(bool *chain_aborted, bool membe
 }
 #endif
 
-#endif /* RCP_CHAINED_H */
+#endif /* RCP_REQUEST_CHAINED_H */

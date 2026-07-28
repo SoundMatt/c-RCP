@@ -109,7 +109,7 @@
  * regmap.h's rcp_regmap_ep_functional_cfg_t as its own first member follows
  * that module's documented convention (and ep_gpio.h's precedent);
  * rcp_ep_spi_functional_cfg_writable() is, likewise, a thin, named wrapper
- * over server.h's rcp_server_field_writable() (RCP_SERVER_FIELD_FUNCTIONAL_W),
+ * over server.h's rcp_lifecycle_field_writable() (RCP_LIFECYCLE_FIELD_FUNCTIONAL_W),
  * and every rcp_ep_spi_set_channel_*() mutator consults it (and channel
  * validity) before ever touching cfg -- reusing, never duplicating,
  * server.h's/regmap.h's existing authorization logic, per the roadmap's
@@ -146,7 +146,7 @@
 #include "rcp/avtp.h"
 #include "rcp/rcp.h"
 #include "rcp/regmap.h"
-#include "rcp/server.h"
+#include "rcp/lifecycle.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -255,37 +255,37 @@ typedef struct {
 void rcp_ep_spi_functional_cfg_init(rcp_ep_spi_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
- * writer -- a thin, named wrapper over rcp_server_field_writable()
- * (server.h) with kind RCP_SERVER_FIELD_FUNCTIONAL_W; see the file header.
+ * writer -- a thin, named wrapper over rcp_lifecycle_field_writable()
+ * (server.h) with kind RCP_LIFECYCLE_FIELD_FUNCTIONAL_W; see the file header.
  * Reuses, and never duplicates, that function's authorization logic. */
-bool rcp_ep_spi_functional_cfg_writable(rcp_server_lifecycle_t state,
-                                        rcp_server_writer_ctx_t writer);
+bool rcp_ep_spi_functional_cfg_writable(rcp_lifecycle_state_t state,
+                                        rcp_lifecycle_writer_ctx_t writer);
 
 /* Sets cfg->channels[channel].mode to mode iff channel is
  * rcp_ep_spi_channel_valid() and rcp_ep_spi_functional_cfg_writable()
  * authorizes the write for state/writer; returns whether the write was
  * applied. cfg is left entirely unchanged when it returns false. */
 bool rcp_ep_spi_set_channel_mode(rcp_ep_spi_functional_cfg_t *cfg, uint8_t channel,
-                                  rcp_ep_spi_mode_t mode, rcp_server_lifecycle_t state,
-                                  rcp_server_writer_ctx_t writer);
+                                  rcp_ep_spi_mode_t mode, rcp_lifecycle_state_t state,
+                                  rcp_lifecycle_writer_ctx_t writer);
 
 /* Same authorization/validity rule as rcp_ep_spi_set_channel_mode(), for
  * cfg->channels[channel].bit_order. */
 bool rcp_ep_spi_set_channel_bit_order(rcp_ep_spi_functional_cfg_t *cfg, uint8_t channel,
                                        rcp_ep_spi_bit_order_t bit_order,
-                                       rcp_server_lifecycle_t state,
-                                       rcp_server_writer_ctx_t writer);
+                                       rcp_lifecycle_state_t state,
+                                       rcp_lifecycle_writer_ctx_t writer);
 
 /* Same authorization/validity rule, for cfg->channels[channel].cs_polarity. */
 bool rcp_ep_spi_set_channel_cs_polarity(rcp_ep_spi_functional_cfg_t *cfg, uint8_t channel,
                                          rcp_ep_spi_cs_polarity_t cs_polarity,
-                                         rcp_server_lifecycle_t state,
-                                         rcp_server_writer_ctx_t writer);
+                                         rcp_lifecycle_state_t state,
+                                         rcp_lifecycle_writer_ctx_t writer);
 
 /* Same authorization/validity rule, for cfg->channels[channel].clock_divider. */
 bool rcp_ep_spi_set_channel_clock_divider(rcp_ep_spi_functional_cfg_t *cfg, uint8_t channel,
-                                           uint32_t clock_divider, rcp_server_lifecycle_t state,
-                                           rcp_server_writer_ctx_t writer);
+                                           uint32_t clock_divider, rcp_lifecycle_state_t state,
+                                           rcp_lifecycle_writer_ctx_t writer);
 
 /* Same authorization/validity rule, for cfg->channels[channel]'s
  * inter_byte_delay_ns and inter_transfer_delay_ns together (one setter for
@@ -294,13 +294,13 @@ bool rcp_ep_spi_set_channel_clock_divider(rcp_ep_spi_functional_cfg_t *cfg, uint
 bool rcp_ep_spi_set_channel_timing(rcp_ep_spi_functional_cfg_t *cfg, uint8_t channel,
                                     uint32_t inter_byte_delay_ns,
                                     uint32_t inter_transfer_delay_ns,
-                                    rcp_server_lifecycle_t state,
-                                    rcp_server_writer_ctx_t writer);
+                                    rcp_lifecycle_state_t state,
+                                    rcp_lifecycle_writer_ctx_t writer);
 
 /* Same authorization/validity rule, for cfg->channels[channel].trigger. */
 bool rcp_ep_spi_set_channel_trigger(rcp_ep_spi_functional_cfg_t *cfg, uint8_t channel,
-                                     rcp_ep_spi_trigger_t trigger, rcp_server_lifecycle_t state,
-                                     rcp_server_writer_ctx_t writer);
+                                     rcp_ep_spi_trigger_t trigger, rcp_lifecycle_state_t state,
+                                     rcp_lifecycle_writer_ctx_t writer);
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 

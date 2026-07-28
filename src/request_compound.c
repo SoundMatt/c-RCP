@@ -1,4 +1,4 @@
-#include "rcp/compound.h"
+#include "rcp/request_compound.h"
 
 #include <stdlib.h>
 #include <string.h>

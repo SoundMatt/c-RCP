@@ -44,10 +44,10 @@
  * ── The discovery request/response exchange ────────────────────────────────
  *
  * Discovery is a single ACF_ABB (milestone 60) read request addressed to
- * RCP_SERVER_DISCOVERY_BYTE_BUS_ID (server.h, milestone 61) -- the same
+ * RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID (server.h, milestone 61) -- the same
  * numeric address as RCP_REGMAP_EP0_INDEX (regmap.h, milestone 62) -- and
  * is the one request an RC Server answers regardless of its current
- * rcp_server_lifecycle_t. rcp_discovery_encode_request()/_decode_request()
+ * rcp_lifecycle_state_t. rcp_discovery_encode_request()/_decode_request()
  * build and parse that request; rcp_discovery_encode_response()/
  * _decode_response() build and parse the reply, a register-map slice
  * starting at address 0 of the requested read_size, populated from
@@ -66,7 +66,7 @@
  * (rcp_discovery_should_drop(), mirroring avtp.c's own
  * rcp_avtp_should_drop_tscf() convention) layered on top of -- not a
  * replacement for -- avtp.h's general time-sync-gated TSCF drop rule and
- * server.h's per-state rcp_server_lifecycle_should_accept() filtering.
+ * server.h's per-state rcp_lifecycle_should_accept() filtering.
  *
  * ── Discovery-stream claiming ───────────────────────────────────────────────
  *
@@ -87,7 +87,7 @@
  * configuration *write*'s authorization consults the claim. This module
  * deliberately does not itself decide whether a given register field is
  * writable in the server's current lifecycle state -- that remains
- * rcp_server_field_writable()'s and rcp_regmap_writer_ctx()'s job; a
+ * rcp_lifecycle_field_writable()'s and rcp_regmap_writer_ctx()'s job; a
  * caller combines rcp_discovery_claim_is_claimant()'s answer with those as
  * one more input to an overall write-authorization decision, the same way
  * rcp_regmap_writer_ctx() already combines root-client and owning-stream
@@ -117,7 +117,7 @@
 #include "rcp/avtp.h"
 #include "rcp/rcp.h"
 #include "rcp/regmap.h"
-#include "rcp/server.h"
+#include "rcp/lifecycle.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -135,7 +135,7 @@ typedef enum {
     RCP_DISCOVERY_ERR_NOT_NTSCF   = 2, /* TSCF-headed (or unrecognized-subtype)
                                           frame; the NTSCF-only rule dropped it */
     RCP_DISCOVERY_ERR_BAD_MSG_TYPE = 3, /* not an ACF_ABB message */
-    RCP_DISCOVERY_ERR_WRONG_BUS    = 4, /* byte_bus_id != RCP_SERVER_DISCOVERY_BYTE_BUS_ID */
+    RCP_DISCOVERY_ERR_WRONG_BUS    = 4, /* byte_bus_id != RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID */
     RCP_DISCOVERY_ERR_WRONG_OP     = 5, /* acf op is not a read */
 } rcp_discovery_errc_t;
 
@@ -162,7 +162,7 @@ typedef struct {
 } rcp_discovery_request_t;
 
 /* Encodes a full NTSCF-framed ACF_ABB discovery read request: byte_bus_id
- * RCP_SERVER_DISCOVERY_BYTE_BUS_ID, op READ, an empty payload,
+ * RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, op READ, an empty payload,
  * read_size_or_segment_num set to read_size. requester_stream_id becomes
  * the NTSCF header's own stream_id (the requesting client's identity, per
  * NTSCF's sender-assigns-stream_id convention -- see avtp.h). Returns a
@@ -183,7 +183,7 @@ rcp_bytes_t rcp_discovery_encode_request(rcp_stream_id_t requester_stream_id,
  *   - RCP_DISCOVERY_ERR_BAD_MSG_TYPE: the NTSCF payload is not an ACF_ABB
  *     message.
  *   - RCP_DISCOVERY_ERR_WRONG_BUS: the ACF header's byte_bus_id is not
- *     RCP_SERVER_DISCOVERY_BYTE_BUS_ID.
+ *     RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID.
  *   - RCP_DISCOVERY_ERR_WRONG_OP: the ACF header's op is not
  *     RCP_ACF_OP_READ.
  */
@@ -280,7 +280,7 @@ bool rcp_discovery_claim_is_open(const rcp_discovery_claim_t *claim, uint64_t no
 /* Call when a discovery request arrives while the server's lifecycle
  * state is HW_UNCONFIGURED or HW_CONFIGURED (the caller is responsible
  * for that state check -- this function does not consult
- * rcp_server_lifecycle_t itself, matching this codebase's convention of
+ * rcp_lifecycle_state_t itself, matching this codebase's convention of
  * taking already-classified inputs). If the claim is open, grants it to
  * requester and starts a fresh Discovery_TimeOut window. If the claim is
  * already held by a not-yet-lapsed different claimant, this is a no-op:
@@ -294,7 +294,7 @@ void rcp_discovery_claim_note_request(rcp_discovery_claim_t *claim,
 
 /* True iff claim is currently held by writer specifically (not lapsed) as
  * of now_ms. A pure query: does not mutate claim. One input a caller
- * combines with rcp_server_field_writable()/rcp_regmap_writer_ctx() to
+ * combines with rcp_lifecycle_field_writable()/rcp_regmap_writer_ctx() to
  * decide whether a configuration write is authorized -- see the file
  * header. */
 bool rcp_discovery_claim_is_claimant(const rcp_discovery_claim_t *claim,

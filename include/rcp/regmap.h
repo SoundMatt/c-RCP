@@ -66,13 +66,13 @@
  *
  * EP0 is the pseudo-endpoint exposing this whole register surface; it is
  * always endpoint index RCP_REGMAP_EP0_INDEX (0) -- deliberately the same
- * numeric value as RCP_SERVER_DISCOVERY_BYTE_BUS_ID in server.h, since
+ * numeric value as RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID in server.h, since
  * discovery (milestone 63) and the general register map are both reached
  * through the same address. svr_root_client_index names the one stream
  * with full-server write access; every other stream is restricted to the
  * endpoint(s) it owns via rcp_regmap_ep_client_t. rcp_regmap_writer_ctx()
- * derives server.h's rcp_server_writer_ctx_t from this register data,
- * without duplicating rcp_server_field_writable()'s already-built
+ * derives server.h's rcp_lifecycle_writer_ctx_t from this register data,
+ * without duplicating rcp_lifecycle_field_writable()'s already-built
  * authorization logic.
  *
  * ── The generic-vs-functional config split ─────────────────────────────────
@@ -101,13 +101,13 @@
  * (62) the E2E/watchdog-relevant fields (rx_wd_timeout_ms, rx_wd_action,
  * rx_enforce_e2e, rx_safety_measure) existed but were deliberately inert,
  * so Phase 18 would never need a second register-layout pass. Phase 18
- * (safept.h/safept.c, milestone 70) has since both wired those four
+ * (e2e.h/e2e.c, milestone 70) has since both wired those four
  * fields to real behavior and rounded out the rest of the rx_wd_* family
  * (rx_wd_enable, rx_wd_safestate_enable, rx_wd_info_enable) plus
  * rx_safestate_sequencer/rx_safe_sequencer_state that milestone 62's own
  * placeholder comment had not yet named -- see
  * rcp_regmap_request_stream_cfg_t's own field comments below and
- * safept.h's file header for the behavior each one now drives.
+ * e2e.h's file header for the behavior each one now drives.
  *
  * ── Known spec ambiguity: EP-ID/byte_bus_id ordering is not enforced ───────
  *
@@ -130,7 +130,7 @@
 #include "rcp/acf.h"
 #include "rcp/avtp.h"
 #include "rcp/rcp.h"
-#include "rcp/server.h"
+#include "rcp/lifecycle.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -143,7 +143,7 @@ extern "C" {
 /* ── EP0 ────────────────────────────────────────────────────────────────────── */
 
 /* The pseudo-endpoint index exposing the whole register-map surface.
- * Deliberately the same numeric value as RCP_SERVER_DISCOVERY_BYTE_BUS_ID
+ * Deliberately the same numeric value as RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID
  * (server.h) -- see the file header above. */
 #define RCP_REGMAP_EP0_INDEX ((uint16_t)0u)
 
@@ -222,7 +222,7 @@ void rcp_regmap_general_init(rcp_regmap_general_t *map);
 
 /* One endpoint's write-restriction: the single stream (if any) authorized
  * to write that endpoint's functional config directly through its own
- * registered request stream, per server.h's rcp_server_writer_ctx_t
+ * registered request stream, per server.h's rcp_lifecycle_writer_ctx_t
  * via_owning_stream member. has_owning_stream distinguishes "no owning
  * stream configured" from stream index 0, which is itself a valid index. */
 typedef struct {
@@ -230,7 +230,7 @@ typedef struct {
     uint16_t owning_stream_index;
 } rcp_regmap_ep_client_t;
 
-/* Derives an rcp_server_writer_ctx_t (server.h) from this register map's
+/* Derives an rcp_lifecycle_writer_ctx_t (server.h) from this register map's
  * root-client/owning-stream data for a request arriving on
  * requesting_stream_index. via_ep0 must be true iff the request actually
  * arrived through EP0 (RCP_REGMAP_EP0_INDEX); this function does not
@@ -238,7 +238,7 @@ typedef struct {
  * convention of taking already-classified inputs rather than re-parsing
  * a frame. ep_client may be NULL, meaning "this endpoint has no owning
  * stream on record" (via_owning_stream is then always false). */
-rcp_server_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map,
+rcp_lifecycle_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map,
                                                const rcp_regmap_ep_client_t *ep_client,
                                                uint16_t requesting_stream_index,
                                                bool via_ep0);
@@ -355,16 +355,16 @@ const char *rcp_regmap_named_signal_string(rcp_regmap_named_signal_t sig);
 /* ── Request-stream and response/ack queue config ──────────────────────────── */
 
 /* E2E/watchdog fields are wired to real behavior as of Phase 18
- * (safept.h/safept.c, milestone 70): rx_enforce_e2e, rx_wd_enable,
+ * (e2e.h/e2e.c, milestone 70): rx_enforce_e2e, rx_wd_enable,
  * rx_wd_timeout_ms, rx_wd_safestate_enable, rx_wd_info_enable,
  * rx_safety_measure, rx_safestate_sequencer, and rx_safe_sequencer_state
- * are all consumed by safept.h's own pure functions (which take each
+ * are all consumed by e2e.h's own pure functions (which take each
  * field as a plain argument rather than this struct itself, matching
  * every request-kind module's "operate on caller-owned data" convention
  * -- see scheduler.h's rcp_sched_compare() for the established
  * precedent). rx_wd_action, present since milestone 62, stays
  * caller-defined/round-tripped: this milestone's roadmap scope names no
- * concrete action enumeration for it, so no safept.h function
+ * concrete action enumeration for it, so no e2e.h function
  * interprets its value. */
 typedef struct {
     bool     configured;
@@ -372,16 +372,16 @@ typedef struct {
                                     listens on; same addressing model as
                                     avtp.h */
 
-    /* ── E2E (safept.h CRC32 safe points) ──────────────────────────────── */
+    /* ── E2E (e2e.h CRC32 safe points) ──────────────────────────────── */
     bool     rx_enforce_e2e;    /* false: a CRC_ERROR drops only the
                                     single offending request
-                                    (RCP_SAFEPT_CRC_ACTION_DROP_REQUEST).
+                                    (RCP_E2E_CRC_ACTION_DROP_REQUEST).
                                     true: the first CRC_ERROR latches the
                                     whole stream to a faulted state
-                                    (RCP_SAFEPT_CRC_ACTION_LATCH_STREAM_FAULT)
-                                    -- see rcp_safept_crc_error_action(). */
+                                    (RCP_E2E_CRC_ACTION_LATCH_STREAM_FAULT)
+                                    -- see rcp_e2e_crc_error_action(). */
 
-    /* ── Per-stream watchdog (safept.h) ────────────────────────────────── */
+    /* ── Per-stream watchdog (e2e.h) ────────────────────────────────── */
     bool     rx_wd_enable;            /* watchdog active on this stream at all */
     uint32_t rx_wd_timeout_ms;        /* elapsed-since-last-kick overflow threshold */
     uint8_t  rx_wd_action;            /* caller-defined; round-tripped only */
@@ -391,11 +391,11 @@ typedef struct {
                                           status/event, independent of
                                           rx_wd_safestate_enable */
 
-    /* ── Configured safe state (safept.h) ──────────────────────────────── */
-    uint8_t  rx_safety_measure;         /* RCP_SAFEPT_MEASURE_FORCE_HIGH_IMPEDANCE (0)
-                                            or RCP_SAFEPT_MEASURE_SEQUENCER (1) */
-    uint16_t rx_safestate_sequencer;    /* sequencer.h table index the
-                                            RCP_SAFEPT_MEASURE_SEQUENCER measure
+    /* ── Configured safe state (e2e.h) ──────────────────────────────── */
+    uint8_t  rx_safety_measure;         /* RCP_E2E_MEASURE_FORCE_HIGH_IMPEDANCE (0)
+                                            or RCP_E2E_MEASURE_SEQUENCER (1) */
+    uint16_t rx_safestate_sequencer;    /* request_sequencer.h table index the
+                                            RCP_E2E_MEASURE_SEQUENCER measure
                                             polls; meaningless otherwise */
     uint8_t  rx_safe_sequencer_state;   /* the sequencer state value, at
                                             rx_safestate_sequencer, that means

@@ -345,102 +345,6 @@
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-E2E-001",
-      "title": "E2E header prepended to payload",
-      "text": "The rcp_e2e_wrap() function shall prepend a 6-byte header (4-byte seq + 2-byte CRC-16) to the payload.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-E2E-002",
-      "title": "Sequence counter increments per send",
-      "text": "Each call to e2e::rcp_controller_send()() shall increment the sequence counter atomically.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-E2E-003",
-      "title": "CRC-16/CCITT-FALSE algorithm",
-      "text": "The CRC shall be computed using the CRC-16/CCITT-FALSE polynomial (0x1021, init 0xFFFF).",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-E2E-004",
-      "title": "CRC covers seq and payload",
-      "text": "The CRC-16 shall cover both the 4-byte sequence number and the entire payload.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-E2E-005",
-      "title": "Unwrap validates CRC",
-      "text": "rcp_e2e_unwrap() shall return E2EErrc::crc_mismatch if the CRC in the frame does not match the computed CRC.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-E2E-006",
-      "title": "Unwrap rejects short frames",
-      "text": "rcp_e2e_unwrap() shall return E2EErrc::short_frame if the frame is shorter than HeaderLen bytes.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-E2E-007",
-      "title": "ReplayGuard rejects duplicate seq",
-      "text": "ReplayGuard::check() shall return E2EErrc::replay for any sequence number that was already accepted within the window.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-E2E-008",
-      "title": "ReplayGuard rejects old seq outside window",
-      "text": "ReplayGuard::check() shall return E2EErrc::replay for sequence numbers more than ReplayWindowSize behind the current high-water mark.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-E2E-009",
-      "title": "rcp_e2e_strerror() returns unique human-readable message",
-      "text": "rcp_e2e_strerror() shall return a unique, non-empty message for each defined rcp_e2e_errc_t constant, including RCP_E2E_OK.",
-      "standard": "iso26262",
-      "level": "ASIL-A",
-      "asil": "ASIL-A"
-    },
-    {
-      "id": "REQ-E2E-010",
-      "title": "zone() delegates to inner",
-      "text": "The E2E controller's zone() shall return the wrapped inner controller's zone.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-E2E-011",
-      "title": "subscribe() delegates to inner",
-      "text": "The E2E controller's subscribe() shall forward to the wrapped inner controller's subscribe().",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-E2E-012",
-      "title": "close() delegates to inner",
-      "text": "The E2E controller's close() shall forward to the wrapped inner controller's close().",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
       "id": "REQ-ERR-001",
       "title": "RCP_ERR_CLOSED is non-zero",
       "text": "The sentinel error RCP_ERR_CLOSED shall be non-zero so callers can distinguish it from RCP_OK (success).",
@@ -3353,167 +3257,167 @@
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-001",
+      "id": "REQ-LIFECYCLE-001",
       "title": "Lifecycle states have their defined on-wire byte values",
-      "text": "RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, RCP_SERVER_LIFECYCLE_HW_CONFIGURED, and RCP_SERVER_LIFECYCLE_RCP_CONFIGURED shall have the numeric values 0x00, 0x55, and 0xAA respectively.",
+      "text": "RCP_LIFECYCLE_HW_UNCONFIGURED, RCP_LIFECYCLE_HW_CONFIGURED, and RCP_LIFECYCLE_RCP_CONFIGURED shall have the numeric values 0x00, 0x55, and 0xAA respectively.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-002",
+      "id": "REQ-LIFECYCLE-002",
       "title": "HW_CFG_INCONSISTENT triggers on a missing HW pin mapping",
-      "text": "rcp_server_check_hw_cfg() shall return RCP_SERVER_ERR_HW_CFG_INCONSISTENT whenever any endpoint with ep_used set has hw_pin_mapped unset, regardless of the state of any other endpoint.",
+      "text": "rcp_lifecycle_check_hw_cfg() shall return RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT whenever any endpoint with ep_used set has hw_pin_mapped unset, regardless of the state of any other endpoint.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-003",
+      "id": "REQ-LIFECYCLE-003",
       "title": "HW_CFG_INCONSISTENT triggers on a missing configured request stream",
-      "text": "rcp_server_check_hw_cfg() shall return RCP_SERVER_ERR_HW_CFG_INCONSISTENT whenever any endpoint with ep_used set has has_request_stream unset.",
+      "text": "rcp_lifecycle_check_hw_cfg() shall return RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT whenever any endpoint with ep_used set has has_request_stream unset.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-004",
+      "id": "REQ-LIFECYCLE-004",
       "title": "HW_CFG_INCONSISTENT does not trigger when every used endpoint is plausibly configured",
-      "text": "rcp_server_check_hw_cfg() shall return RCP_SERVER_OK when every endpoint with ep_used set has both hw_pin_mapped and has_request_stream set, ignoring endpoints with ep_used unset, and shall treat a NULL snapshot as inconsistent rather than vacuously plausible.",
+      "text": "rcp_lifecycle_check_hw_cfg() shall return RCP_LIFECYCLE_OK when every endpoint with ep_used set has both hw_pin_mapped and has_request_stream set, ignoring endpoints with ep_used unset, and shall treat a NULL snapshot as inconsistent rather than vacuously plausible.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-005",
+      "id": "REQ-LIFECYCLE-005",
       "title": "RCP_CFG_INCONSISTENT triggers on a missing stream/byte_bus_id association",
-      "text": "rcp_server_check_rcp_cfg() shall return RCP_SERVER_ERR_RCP_CFG_INCONSISTENT whenever any endpoint with ep_used set has has_stream_assoc unset.",
+      "text": "rcp_lifecycle_check_rcp_cfg() shall return RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT whenever any endpoint with ep_used set has has_stream_assoc unset.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-006",
+      "id": "REQ-LIFECYCLE-006",
       "title": "RCP_CFG_INCONSISTENT triggers on a request stream missing its response stream",
-      "text": "rcp_server_check_rcp_cfg() shall return RCP_SERVER_ERR_RCP_CFG_INCONSISTENT whenever any request stream with configured set has has_response_stream unset.",
+      "text": "rcp_lifecycle_check_rcp_cfg() shall return RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT whenever any request stream with configured set has has_response_stream unset.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-007",
+      "id": "REQ-LIFECYCLE-007",
       "title": "RCP_CFG_INCONSISTENT does not trigger when every used endpoint and configured request stream is plausibly associated",
-      "text": "rcp_server_check_rcp_cfg() shall return RCP_SERVER_OK when every endpoint with ep_used set has has_stream_assoc set and every request stream with configured set has has_response_stream set, and shall treat a NULL snapshot as inconsistent rather than vacuously plausible.",
+      "text": "rcp_lifecycle_check_rcp_cfg() shall return RCP_LIFECYCLE_OK when every endpoint with ep_used set has has_stream_assoc set and every request stream with configured set has has_response_stream set, and shall treat a NULL snapshot as inconsistent rather than vacuously plausible.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-008",
+      "id": "REQ-LIFECYCLE-008",
       "title": "HW_UNCONFIGURED to HW_CONFIGURED is gated by the HW_CFG_INCONSISTENT check",
-      "text": "rcp_server_lifecycle_transition() shall move *state from RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED to RCP_SERVER_LIFECYCLE_HW_CONFIGURED only when rcp_server_check_hw_cfg() returns RCP_SERVER_OK for the supplied snapshot, and shall otherwise leave *state unchanged and return the check's RCP_SERVER_ERR_HW_CFG_INCONSISTENT result.",
+      "text": "rcp_lifecycle_transition() shall move *state from RCP_LIFECYCLE_HW_UNCONFIGURED to RCP_LIFECYCLE_HW_CONFIGURED only when rcp_lifecycle_check_hw_cfg() returns RCP_LIFECYCLE_OK for the supplied snapshot, and shall otherwise leave *state unchanged and return the check's RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT result.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-009",
+      "id": "REQ-LIFECYCLE-009",
       "title": "HW_CONFIGURED to RCP_CONFIGURED is gated by the RCP_CFG_INCONSISTENT check",
-      "text": "rcp_server_lifecycle_transition() shall move *state from RCP_SERVER_LIFECYCLE_HW_CONFIGURED to RCP_SERVER_LIFECYCLE_RCP_CONFIGURED only when rcp_server_check_rcp_cfg() returns RCP_SERVER_OK for the supplied snapshot, and shall otherwise leave *state unchanged and return the check's RCP_SERVER_ERR_RCP_CFG_INCONSISTENT result.",
+      "text": "rcp_lifecycle_transition() shall move *state from RCP_LIFECYCLE_HW_CONFIGURED to RCP_LIFECYCLE_RCP_CONFIGURED only when rcp_lifecycle_check_rcp_cfg() returns RCP_LIFECYCLE_OK for the supplied snapshot, and shall otherwise leave *state unchanged and return the check's RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT result.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-010",
+      "id": "REQ-LIFECYCLE-010",
       "title": "HW_CONFIGURED to HW_UNCONFIGURED demotion is unconditional",
-      "text": "rcp_server_lifecycle_transition() shall move *state from RCP_SERVER_LIFECYCLE_HW_CONFIGURED to RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED and return RCP_SERVER_OK regardless of the supplied snapshot, including a NULL snapshot.",
+      "text": "rcp_lifecycle_transition() shall move *state from RCP_LIFECYCLE_HW_CONFIGURED to RCP_LIFECYCLE_HW_UNCONFIGURED and return RCP_LIFECYCLE_OK regardless of the supplied snapshot, including a NULL snapshot.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-011",
+      "id": "REQ-LIFECYCLE-011",
       "title": "RCP_CONFIGURED to HW_UNCONFIGURED full-reset demotion is unconditional",
-      "text": "rcp_server_lifecycle_transition() shall move *state from RCP_SERVER_LIFECYCLE_RCP_CONFIGURED to RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED and return RCP_SERVER_OK regardless of the supplied snapshot, including a NULL snapshot.",
+      "text": "rcp_lifecycle_transition() shall move *state from RCP_LIFECYCLE_RCP_CONFIGURED to RCP_LIFECYCLE_HW_UNCONFIGURED and return RCP_LIFECYCLE_OK regardless of the supplied snapshot, including a NULL snapshot.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-012",
+      "id": "REQ-LIFECYCLE-012",
       "title": "Unmodeled lifecycle transitions are rejected",
-      "text": "rcp_server_lifecycle_transition() shall return RCP_SERVER_ERR_INVALID_TRANSITION and leave *state unchanged for any requested transition other than HW_UNCONFIGURED->HW_CONFIGURED, HW_CONFIGURED->RCP_CONFIGURED, HW_CONFIGURED->HW_UNCONFIGURED, RCP_CONFIGURED->HW_UNCONFIGURED, or a same-state transition -- including HW_UNCONFIGURED->RCP_CONFIGURED and RCP_CONFIGURED->HW_CONFIGURED.",
+      "text": "rcp_lifecycle_transition() shall return RCP_LIFECYCLE_ERR_INVALID_TRANSITION and leave *state unchanged for any requested transition other than HW_UNCONFIGURED->HW_CONFIGURED, HW_CONFIGURED->RCP_CONFIGURED, HW_CONFIGURED->HW_UNCONFIGURED, RCP_CONFIGURED->HW_UNCONFIGURED, or a same-state transition -- including HW_UNCONFIGURED->RCP_CONFIGURED and RCP_CONFIGURED->HW_CONFIGURED.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-013",
+      "id": "REQ-LIFECYCLE-013",
       "title": "A same-state lifecycle transition is a no-op success",
-      "text": "rcp_server_lifecycle_transition() shall return RCP_SERVER_OK and leave *state unchanged whenever target equals the current *state, for all three lifecycle states, regardless of the supplied snapshot.",
+      "text": "rcp_lifecycle_transition() shall return RCP_LIFECYCLE_OK and leave *state unchanged whenever target equals the current *state, for all three lifecycle states, regardless of the supplied snapshot.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-014",
+      "id": "REQ-LIFECYCLE-014",
       "title": "HW_UNCONFIGURED accepts an ACF_ABB request at the discovery byte_bus_id under NTSCF",
-      "text": "rcp_server_lifecycle_should_accept() shall return true for RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED when avtp_subtype is RCP_AVTP_SUBTYPE_NTSCF, acf_msg_type is RCP_ACF_MSG_TYPE_ABB, and byte_bus_id equals RCP_SERVER_DISCOVERY_BYTE_BUS_ID.",
+      "text": "rcp_lifecycle_should_accept() shall return true for RCP_LIFECYCLE_HW_UNCONFIGURED when avtp_subtype is RCP_AVTP_SUBTYPE_NTSCF, acf_msg_type is RCP_ACF_MSG_TYPE_ABB, and byte_bus_id equals RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-015",
+      "id": "REQ-LIFECYCLE-015",
       "title": "HW_UNCONFIGURED silently drops everything but the discovery ACF_ABB request",
-      "text": "rcp_server_lifecycle_should_accept() shall return false for RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED whenever avtp_subtype is not RCP_AVTP_SUBTYPE_NTSCF, acf_msg_type is not RCP_ACF_MSG_TYPE_ABB, or byte_bus_id does not equal RCP_SERVER_DISCOVERY_BYTE_BUS_ID.",
+      "text": "rcp_lifecycle_should_accept() shall return false for RCP_LIFECYCLE_HW_UNCONFIGURED whenever avtp_subtype is not RCP_AVTP_SUBTYPE_NTSCF, acf_msg_type is not RCP_ACF_MSG_TYPE_ABB, or byte_bus_id does not equal RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-016",
+      "id": "REQ-LIFECYCLE-016",
       "title": "HW_UNCONFIGURED drops any TSCF-headed frame regardless of time-sync support",
-      "text": "rcp_server_lifecycle_should_accept() shall return false for RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED whenever avtp_subtype is RCP_AVTP_SUBTYPE_TSCF, regardless of the value of time_sync_supported.",
+      "text": "rcp_lifecycle_should_accept() shall return false for RCP_LIFECYCLE_HW_UNCONFIGURED whenever avtp_subtype is RCP_AVTP_SUBTYPE_TSCF, regardless of the value of time_sync_supported.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-017",
+      "id": "REQ-LIFECYCLE-017",
       "title": "HW_CONFIGURED and RCP_CONFIGURED apply the ordinary TSCF/time-sync drop rule",
-      "text": "rcp_server_lifecycle_should_accept() shall return false for RCP_SERVER_LIFECYCLE_HW_CONFIGURED and RCP_SERVER_LIFECYCLE_RCP_CONFIGURED whenever rcp_avtp_should_drop_tscf() would return true for the given time_sync_supported and avtp_subtype, and shall otherwise return true for those two states.",
+      "text": "rcp_lifecycle_should_accept() shall return false for RCP_LIFECYCLE_HW_CONFIGURED and RCP_LIFECYCLE_RCP_CONFIGURED whenever rcp_avtp_should_drop_tscf() would return true for the given time_sync_supported and avtp_subtype, and shall otherwise return true for those two states.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-018",
+      "id": "REQ-LIFECYCLE-018",
       "title": "HW_GENERIC fields become read-only once HW_CONFIGURED",
-      "text": "rcp_server_field_writable() shall return true for RCP_SERVER_FIELD_HW_GENERIC only when state is RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, for every writer context, and shall return false for that field kind in both RCP_SERVER_LIFECYCLE_HW_CONFIGURED and RCP_SERVER_LIFECYCLE_RCP_CONFIGURED.",
+      "text": "rcp_lifecycle_field_writable() shall return true for RCP_LIFECYCLE_FIELD_HW_GENERIC only when state is RCP_LIFECYCLE_HW_UNCONFIGURED, for every writer context, and shall return false for that field kind in both RCP_LIFECYCLE_HW_CONFIGURED and RCP_LIFECYCLE_RCP_CONFIGURED.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-019",
+      "id": "REQ-LIFECYCLE-019",
       "title": "FUNCTIONAL_W fields require an authorized writer once RCP_CONFIGURED",
-      "text": "rcp_server_field_writable() shall return true for RCP_SERVER_FIELD_FUNCTIONAL_W in RCP_SERVER_LIFECYCLE_HW_CONFIGURED for every writer context, shall return false in RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED for every writer context, and shall return true in RCP_SERVER_LIFECYCLE_RCP_CONFIGURED if and only if writer.via_root_client_ep0 or writer.via_owning_stream is true.",
+      "text": "rcp_lifecycle_field_writable() shall return true for RCP_LIFECYCLE_FIELD_FUNCTIONAL_W in RCP_LIFECYCLE_HW_CONFIGURED for every writer context, shall return false in RCP_LIFECYCLE_HW_UNCONFIGURED for every writer context, and shall return true in RCP_LIFECYCLE_RCP_CONFIGURED if and only if writer.via_root_client_ep0 or writer.via_owning_stream is true.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-020",
+      "id": "REQ-LIFECYCLE-020",
       "title": "FUNCTIONAL_W_STAR fields are permanently locked once RCP_CONFIGURED",
-      "text": "rcp_server_field_writable() shall return false for RCP_SERVER_FIELD_FUNCTIONAL_W_STAR in RCP_SERVER_LIFECYCLE_RCP_CONFIGURED for every writer context, including one with both via_root_client_ep0 and via_owning_stream set, while returning true for that field kind in RCP_SERVER_LIFECYCLE_HW_CONFIGURED.",
+      "text": "rcp_lifecycle_field_writable() shall return false for RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR in RCP_LIFECYCLE_RCP_CONFIGURED for every writer context, including one with both via_root_client_ep0 and via_owning_stream set, while returning true for that field kind in RCP_LIFECYCLE_HW_CONFIGURED.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-021",
+      "id": "REQ-SRV-001",
       "title": "A disabled endpoint queues submitted requests instead of executing them",
       "text": "rcp_server_endpoint_submit() shall return false and append a copy of the submitted request to ep's queue (incrementing the value rcp_server_endpoint_queue_len() reports) whenever ep->ep_enable is false at the time of the call.",
       "standard": "iso26262",
@@ -3521,7 +3425,7 @@
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-022",
+      "id": "REQ-SRV-002",
       "title": "An enabled endpoint reports immediate execution without touching its queue",
       "text": "rcp_server_endpoint_submit() shall return true and leave rcp_server_endpoint_queue_len() unchanged whenever ep->ep_enable is true at the time of the call.",
       "standard": "iso26262",
@@ -3529,7 +3433,7 @@
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-023",
+      "id": "REQ-SRV-003",
       "title": "Re-enabling an endpoint drains its queued requests in FIFO order",
       "text": "rcp_server_endpoint_drain_one() shall return false and leave the queue untouched while ep->ep_enable is false, and after rcp_server_endpoint_set_enable() sets ep->ep_enable to true, repeated calls to rcp_server_endpoint_drain_one() shall dequeue every previously-queued request in the same order it was submitted, returning false once the queue is empty.",
       "standard": "iso26262",
@@ -3537,9 +3441,9 @@
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SRV-024",
-      "title": "rcp_server_strerror() returns a unique human-readable message",
-      "text": "rcp_server_strerror() shall return a distinct, non-empty, non-NULL string for each of RCP_SERVER_OK, RCP_SERVER_ERR_HW_CFG_INCONSISTENT, RCP_SERVER_ERR_RCP_CFG_INCONSISTENT, and RCP_SERVER_ERR_INVALID_TRANSITION.",
+      "id": "REQ-LIFECYCLE-021",
+      "title": "rcp_lifecycle_strerror() returns a unique human-readable message",
+      "text": "rcp_lifecycle_strerror() shall return a distinct, non-empty, non-NULL string for each of RCP_LIFECYCLE_OK, RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT, RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT, and RCP_LIFECYCLE_ERR_INVALID_TRANSITION.",
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A"
@@ -6137,217 +6041,217 @@
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-001",
-      "title": "rcp_safept_strerror() never returns NULL and gives every error code a distinct message",
-      "text": "rcp_safept_strerror() shall return a non-NULL string for every rcp_safept_errc_t value, including unrecognized ones, with each defined error code mapped to a distinct message.",
+      "id": "REQ-E2E-001",
+      "title": "rcp_e2e_strerror() never returns NULL and gives every error code a distinct message",
+      "text": "rcp_e2e_strerror() shall return a non-NULL string for every rcp_e2e_errc_t value, including unrecognized ones, with each defined error code mapped to a distinct message.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-002",
-      "title": "rcp_safept_crc32() implements the fixed CRC32 parameter set (poly 0xF4ACFB13, init/xorout 0xFFFFFFFF, refin/refout true)",
-      "text": "rcp_safept_crc32() shall compute a 32-bit CRC using polynomial 0xF4ACFB13, initial value 0xFFFFFFFF, final XOR 0xFFFFFFFF, with both input and output reflection enabled, verified against the published CRC-32/AUTOSAR check value 0x1697D06A over the ASCII bytes \"123456789\".",
+      "id": "REQ-E2E-002",
+      "title": "rcp_e2e_crc32() implements the fixed CRC32 parameter set (poly 0xF4ACFB13, init/xorout 0xFFFFFFFF, refin/refout true)",
+      "text": "rcp_e2e_crc32() shall compute a 32-bit CRC using polynomial 0xF4ACFB13, initial value 0xFFFFFFFF, final XOR 0xFFFFFFFF, with both input and output reflection enabled, verified against the published CRC-32/AUTOSAR check value 0x1697D06A over the ASCII bytes \"123456789\".",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-003",
-      "title": "rcp_safept_compute_crc() covers stream_id, avtp_timestamp, and the ACF header-and-payload region, in that order",
-      "text": "rcp_safept_compute_crc() shall return the same value as calling rcp_safept_crc32() over the concatenation of stream_id (8 bytes, big-endian), avtp_timestamp (8 bytes, big-endian), and acf_frame[0..acf_frame_len).",
+      "id": "REQ-E2E-003",
+      "title": "rcp_e2e_compute_crc() covers stream_id, avtp_timestamp, and the ACF header-and-payload region, in that order",
+      "text": "rcp_e2e_compute_crc() shall return the same value as calling rcp_e2e_crc32() over the concatenation of stream_id (8 bytes, big-endian), avtp_timestamp (8 bytes, big-endian), and acf_frame[0..acf_frame_len).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-004",
-      "title": "rcp_safept_length_with_crc() applies the length-accounting pre-adjustment",
-      "text": "rcp_safept_length_with_crc() shall return payload_len + RCP_SAFEPT_CRC_LEN, saturating at SIZE_MAX rather than wrapping when payload_len is within RCP_SAFEPT_CRC_LEN of SIZE_MAX.",
+      "id": "REQ-E2E-004",
+      "title": "rcp_e2e_length_with_crc() applies the length-accounting pre-adjustment",
+      "text": "rcp_e2e_length_with_crc() shall return payload_len + RCP_E2E_CRC_LEN, saturating at SIZE_MAX rather than wrapping when payload_len is within RCP_E2E_CRC_LEN of SIZE_MAX.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-005",
-      "title": "rcp_safept_wrap() appends a big-endian CRC32 trailer computed via rcp_safept_compute_crc()",
-      "text": "rcp_safept_wrap() shall return an owned rcp_bytes_t equal to acf_frame[0..acf_frame_len) followed by RCP_SAFEPT_CRC_LEN big-endian bytes holding rcp_safept_compute_crc(stream_id, avtp_timestamp, acf_frame, acf_frame_len).",
+      "id": "REQ-E2E-005",
+      "title": "rcp_e2e_wrap() appends a big-endian CRC32 trailer computed via rcp_e2e_compute_crc()",
+      "text": "rcp_e2e_wrap() shall return an owned rcp_bytes_t equal to acf_frame[0..acf_frame_len) followed by RCP_E2E_CRC_LEN big-endian bytes holding rcp_e2e_compute_crc(stream_id, avtp_timestamp, acf_frame, acf_frame_len).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-006",
-      "title": "rcp_safept_wrap() fails safe on invalid input or allocation failure",
-      "text": "rcp_safept_wrap() shall return a zeroed rcp_bytes_t (data=NULL, len=0) when acf_frame is NULL while acf_frame_len != 0, or when the internal allocation fails.",
+      "id": "REQ-E2E-006",
+      "title": "rcp_e2e_wrap() fails safe on invalid input or allocation failure",
+      "text": "rcp_e2e_wrap() shall return a zeroed rcp_bytes_t (data=NULL, len=0) when acf_frame is NULL while acf_frame_len != 0, or when the internal allocation fails.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-007",
-      "title": "rcp_safept_unwrap() rejects a frame shorter than the CRC32 trailer",
-      "text": "rcp_safept_unwrap() shall return RCP_SAFEPT_ERR_SHORT_FRAME whenever frame_len < RCP_SAFEPT_CRC_LEN.",
+      "id": "REQ-E2E-007",
+      "title": "rcp_e2e_unwrap() rejects a frame shorter than the CRC32 trailer",
+      "text": "rcp_e2e_unwrap() shall return RCP_E2E_ERR_SHORT_FRAME whenever frame_len < RCP_E2E_CRC_LEN.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-008",
-      "title": "rcp_safept_unwrap() reports CRC_ERROR on a mismatched trailer",
-      "text": "rcp_safept_unwrap() shall return RCP_SAFEPT_ERR_CRC_MISMATCH whenever the trailing RCP_SAFEPT_CRC_LEN bytes of frame do not equal rcp_safept_compute_crc(stream_id, avtp_timestamp, frame, frame_len - RCP_SAFEPT_CRC_LEN); a caller receiving this code shall skip executing the request the frame carries.",
+      "id": "REQ-E2E-008",
+      "title": "rcp_e2e_unwrap() reports CRC_ERROR on a mismatched trailer",
+      "text": "rcp_e2e_unwrap() shall return RCP_E2E_ERR_CRC_MISMATCH whenever the trailing RCP_E2E_CRC_LEN bytes of frame do not equal rcp_e2e_compute_crc(stream_id, avtp_timestamp, frame, frame_len - RCP_E2E_CRC_LEN); a caller receiving this code shall skip executing the request the frame carries.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-009",
-      "title": "rcp_safept_unwrap() round-trips a frame produced by rcp_safept_wrap()",
-      "text": "For a frame produced by rcp_safept_wrap(stream_id, avtp_timestamp, acf_frame, acf_frame_len), rcp_safept_unwrap() called with the same stream_id and avtp_timestamp shall return RCP_SAFEPT_OK with *out_acf_frame/*out_acf_frame_len describing exactly acf_frame[0..acf_frame_len).",
+      "id": "REQ-E2E-009",
+      "title": "rcp_e2e_unwrap() round-trips a frame produced by rcp_e2e_wrap()",
+      "text": "For a frame produced by rcp_e2e_wrap(stream_id, avtp_timestamp, acf_frame, acf_frame_len), rcp_e2e_unwrap() called with the same stream_id and avtp_timestamp shall return RCP_E2E_OK with *out_acf_frame/*out_acf_frame_len describing exactly acf_frame[0..acf_frame_len).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-010",
-      "title": "rcp_safept_fragment_carries_crc() implements the fragmentation/CRC interaction rule",
-      "text": "rcp_safept_fragment_carries_crc() shall return is_last_fragment unmodified, modeling that only a multi-segment message's final fragment carries a CRC.",
+      "id": "REQ-E2E-010",
+      "title": "rcp_e2e_fragment_carries_crc() implements the fragmentation/CRC interaction rule",
+      "text": "rcp_e2e_fragment_carries_crc() shall return is_last_fragment unmodified, modeling that only a multi-segment message's final fragment carries a CRC.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-011",
-      "title": "rcp_safept_is_safety_request() tests request_type's MSB",
-      "text": "rcp_safept_is_safety_request() shall return true iff (request_type & 0x80) != 0, covering RCP_REQUEST_TYPE_COMPOUND_SAFETY (0x8F), RCP_REQUEST_TYPE_COMPOUND_WAIT_SAFETY (0x8B), and RCP_REQUEST_TYPE_TRIGGERED_SAFETY (0x8E).",
+      "id": "REQ-E2E-011",
+      "title": "rcp_e2e_is_safety_request() tests request_type's MSB",
+      "text": "rcp_e2e_is_safety_request() shall return true iff (request_type & 0x80) != 0, covering RCP_REQUEST_TYPE_COMPOUND_SAFETY (0x8F), RCP_REQUEST_TYPE_COMPOUND_WAIT_SAFETY (0x8B), and RCP_REQUEST_TYPE_TRIGGERED_SAFETY (0x8E).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-012",
-      "title": "rcp_safept_request_may_execute() gates safety-tagged requests on the endpoint's safe-state flag",
-      "text": "rcp_safept_request_may_execute() shall return endpoint_in_safe_state whenever rcp_safept_is_safety_request(request_type) is true.",
+      "id": "REQ-E2E-012",
+      "title": "rcp_e2e_request_may_execute() gates safety-tagged requests on the endpoint's safe-state flag",
+      "text": "rcp_e2e_request_may_execute() shall return endpoint_in_safe_state whenever rcp_e2e_is_safety_request(request_type) is true.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-013",
-      "title": "rcp_safept_request_may_execute() always permits a non-safety-tagged request_type",
-      "text": "rcp_safept_request_may_execute() shall return true whenever rcp_safept_is_safety_request(request_type) is false, regardless of endpoint_in_safe_state.",
+      "id": "REQ-E2E-013",
+      "title": "rcp_e2e_request_may_execute() always permits a non-safety-tagged request_type",
+      "text": "rcp_e2e_request_may_execute() shall return true whenever rcp_e2e_is_safety_request(request_type) is false, regardless of endpoint_in_safe_state.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-014",
-      "title": "rcp_safept_watchdog_purge_should_keep() implements the watchdog-purge-vs-safety-survive rule",
-      "text": "rcp_safept_watchdog_purge_should_keep() shall return rcp_safept_is_safety_request(request_type).",
+      "id": "REQ-E2E-014",
+      "title": "rcp_e2e_watchdog_purge_should_keep() implements the watchdog-purge-vs-safety-survive rule",
+      "text": "rcp_e2e_watchdog_purge_should_keep() shall return rcp_e2e_is_safety_request(request_type).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-015",
-      "title": "rcp_safept_watchdog_purge_classify() applies the purge rule across a caller-supplied array",
-      "text": "rcp_safept_watchdog_purge_classify() shall write rcp_safept_watchdog_purge_should_keep(request_types[i]) into out_keep[i] for every i in [0, count).",
+      "id": "REQ-E2E-015",
+      "title": "rcp_e2e_watchdog_purge_classify() applies the purge rule across a caller-supplied array",
+      "text": "rcp_e2e_watchdog_purge_classify() shall write rcp_e2e_watchdog_purge_should_keep(request_types[i]) into out_keep[i] for every i in [0, count).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-016",
-      "title": "rcp_safept_measure_valid() recognizes exactly the two defined rcp_safept_measure_t values",
-      "text": "rcp_safept_measure_valid() shall return true iff rx_safety_measure equals RCP_SAFEPT_MEASURE_FORCE_HIGH_IMPEDANCE or RCP_SAFEPT_MEASURE_SEQUENCER, and false for any other byte value.",
+      "id": "REQ-E2E-016",
+      "title": "rcp_e2e_measure_valid() recognizes exactly the two defined rcp_e2e_measure_t values",
+      "text": "rcp_e2e_measure_valid() shall return true iff rx_safety_measure equals RCP_E2E_MEASURE_FORCE_HIGH_IMPEDANCE or RCP_E2E_MEASURE_SEQUENCER, and false for any other byte value.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-017",
-      "title": "rcp_safept_endpoint_in_safe_state() always reports true for the force-high-impedance measure",
-      "text": "rcp_safept_endpoint_in_safe_state() shall return true whenever rx_safety_measure == RCP_SAFEPT_MEASURE_FORCE_HIGH_IMPEDANCE, regardless of table, safestate_sequencer, or safe_sequencer_state.",
+      "id": "REQ-E2E-017",
+      "title": "rcp_e2e_endpoint_in_safe_state() always reports true for the force-high-impedance measure",
+      "text": "rcp_e2e_endpoint_in_safe_state() shall return true whenever rx_safety_measure == RCP_E2E_MEASURE_FORCE_HIGH_IMPEDANCE, regardless of table, safestate_sequencer, or safe_sequencer_state.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-018",
-      "title": "rcp_safept_endpoint_in_safe_state() polls the configured sequencer for the sequencer-based measure",
-      "text": "For rx_safety_measure == RCP_SAFEPT_MEASURE_SEQUENCER and a valid safestate_sequencer index into a non-NULL table, rcp_safept_endpoint_in_safe_state() shall return true iff rcp_sequencer_get_state(table, safestate_sequencer, ...) reports a state equal to safe_sequencer_state.",
+      "id": "REQ-E2E-018",
+      "title": "rcp_e2e_endpoint_in_safe_state() polls the configured sequencer for the sequencer-based measure",
+      "text": "For rx_safety_measure == RCP_E2E_MEASURE_SEQUENCER and a valid safestate_sequencer index into a non-NULL table, rcp_e2e_endpoint_in_safe_state() shall return true iff rcp_sequencer_get_state(table, safestate_sequencer, ...) reports a state equal to safe_sequencer_state.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-019",
-      "title": "rcp_safept_endpoint_in_safe_state() fails closed on an unrecognized measure or an invalid sequencer index",
-      "text": "rcp_safept_endpoint_in_safe_state() shall return false when rx_safety_measure is not a value recognized by rcp_safept_measure_valid(), when table is NULL for RCP_SAFEPT_MEASURE_SEQUENCER, or when safestate_sequencer does not address a valid entry in table.",
+      "id": "REQ-E2E-019",
+      "title": "rcp_e2e_endpoint_in_safe_state() fails closed on an unrecognized measure or an invalid sequencer index",
+      "text": "rcp_e2e_endpoint_in_safe_state() shall return false when rx_safety_measure is not a value recognized by rcp_e2e_measure_valid(), when table is NULL for RCP_E2E_MEASURE_SEQUENCER, or when safestate_sequencer does not address a valid entry in table.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-020",
-      "title": "rcp_safept_crc_error_action() maps rx_enforce_e2e to the correct CRC-error action",
-      "text": "rcp_safept_crc_error_action() shall return RCP_SAFEPT_CRC_ACTION_LATCH_STREAM_FAULT iff rx_enforce_e2e is true, and RCP_SAFEPT_CRC_ACTION_DROP_REQUEST otherwise.",
+      "id": "REQ-E2E-020",
+      "title": "rcp_e2e_crc_error_action() maps rx_enforce_e2e to the correct CRC-error action",
+      "text": "rcp_e2e_crc_error_action() shall return RCP_E2E_CRC_ACTION_LATCH_STREAM_FAULT iff rx_enforce_e2e is true, and RCP_E2E_CRC_ACTION_DROP_REQUEST otherwise.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-021",
-      "title": "rcp_safept_stream_fault_on_crc_error() always signals skip-this-request and latches under rx_enforce_e2e",
-      "text": "rcp_safept_stream_fault_on_crc_error() shall always return true, and shall additionally set f->faulted to true whenever rcp_safept_crc_error_action(rx_enforce_e2e) == RCP_SAFEPT_CRC_ACTION_LATCH_STREAM_FAULT.",
+      "id": "REQ-E2E-021",
+      "title": "rcp_e2e_stream_fault_on_crc_error() always signals skip-this-request and latches under rx_enforce_e2e",
+      "text": "rcp_e2e_stream_fault_on_crc_error() shall always return true, and shall additionally set f->faulted to true whenever rcp_e2e_crc_error_action(rx_enforce_e2e) == RCP_E2E_CRC_ACTION_LATCH_STREAM_FAULT.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-022",
-      "title": "rcp_safept_stream_fault_on_crc_error() leaves f unchanged for the drop-request action",
-      "text": "rcp_safept_stream_fault_on_crc_error() shall leave f->faulted unmodified whenever rcp_safept_crc_error_action(rx_enforce_e2e) == RCP_SAFEPT_CRC_ACTION_DROP_REQUEST.",
+      "id": "REQ-E2E-022",
+      "title": "rcp_e2e_stream_fault_on_crc_error() leaves f unchanged for the drop-request action",
+      "text": "rcp_e2e_stream_fault_on_crc_error() shall leave f->faulted unmodified whenever rcp_e2e_crc_error_action(rx_enforce_e2e) == RCP_E2E_CRC_ACTION_DROP_REQUEST.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-023",
-      "title": "rcp_safept_stream_fault_reset() clears a latched fault",
-      "text": "rcp_safept_stream_fault_reset() shall set f->faulted to false, and rcp_safept_stream_fault_is_faulted() shall report false immediately afterward.",
+      "id": "REQ-E2E-023",
+      "title": "rcp_e2e_stream_fault_reset() clears a latched fault",
+      "text": "rcp_e2e_stream_fault_reset() shall set f->faulted to false, and rcp_e2e_stream_fault_is_faulted() shall report false immediately afterward.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-024",
-      "title": "rcp_safept_wd_evaluate() never reports an overflow while the per-stream watchdog is disabled",
-      "text": "rcp_safept_wd_evaluate() shall set overflowed to false whenever rx_wd_enable is false, regardless of elapsed_since_last_kick_ms or rx_wd_timeout_ms.",
+      "id": "REQ-E2E-024",
+      "title": "rcp_e2e_wd_evaluate() never reports an overflow while the per-stream watchdog is disabled",
+      "text": "rcp_e2e_wd_evaluate() shall set overflowed to false whenever rx_wd_enable is false, regardless of elapsed_since_last_kick_ms or rx_wd_timeout_ms.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-025",
-      "title": "rcp_safept_wd_evaluate() reports an overflow once the elapsed time reaches the configured timeout",
-      "text": "rcp_safept_wd_evaluate() shall set overflowed to true iff rx_wd_enable is true and elapsed_since_last_kick_ms >= rx_wd_timeout_ms.",
+      "id": "REQ-E2E-025",
+      "title": "rcp_e2e_wd_evaluate() reports an overflow once the elapsed time reaches the configured timeout",
+      "text": "rcp_e2e_wd_evaluate() shall set overflowed to true iff rx_wd_enable is true and elapsed_since_last_kick_ms >= rx_wd_timeout_ms.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-026",
-      "title": "rcp_safept_wd_evaluate() gates enter_safe_state on rx_wd_safestate_enable",
-      "text": "rcp_safept_wd_evaluate() shall set enter_safe_state to (overflowed && rx_wd_safestate_enable).",
+      "id": "REQ-E2E-026",
+      "title": "rcp_e2e_wd_evaluate() gates enter_safe_state on rx_wd_safestate_enable",
+      "text": "rcp_e2e_wd_evaluate() shall set enter_safe_state to (overflowed && rx_wd_safestate_enable).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-SAFEPT-027",
-      "title": "rcp_safept_wd_evaluate() gates notify on rx_wd_info_enable independently of enter_safe_state",
-      "text": "rcp_safept_wd_evaluate() shall set notify to (overflowed && rx_wd_info_enable), independent of the value computed for enter_safe_state.",
+      "id": "REQ-E2E-027",
+      "title": "rcp_e2e_wd_evaluate() gates notify on rx_wd_info_enable independently of enter_safe_state",
+      "text": "rcp_e2e_wd_evaluate() shall set notify to (overflowed && rx_wd_info_enable), independent of the value computed for enter_safe_state.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
