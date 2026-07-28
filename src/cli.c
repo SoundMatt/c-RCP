@@ -25,14 +25,12 @@ static const char *runtime_string(void)
 
 /* ── §12.1 version document ────────────────────────────────────────────────── *
  *
- * "language" is "cpp", not "c": the RELAY spec/schemas/cli-version.json
- * enum only accepts "go"|"cpp"|"rust" (confirmed by reading the schema
- * directly, and confirmed schema violations are hard FAILs in `relay
- * conform --strict`, not warnings) -- there is no accommodation for a
- * pure-C implementation. "cpp" is the closest truthful-enough value that
- * keeps the schema (and thus conformance) passing; using the literally
- * correct "c" would make this CLI fail its own new CI gate (issue #12).
- * This is a real upstream spec gap, not an oversight here.
+ * "language" was "cpp" through RELAY spec 1.11: spec/schemas/cli-version.json's
+ * enum only accepted "go"|"cpp"|"rust", with no accommodation for a pure-C
+ * implementation, and a literal "c" would have hard-FAILed `relay conform
+ * --strict` (confirmed by reading the schema directly). RELAY v1.12 added
+ * "c" to that enum (github.com/SoundMatt/RELAY PR #61) -- this now reports
+ * the accurate value.
  */
 //cfusa:req REQ-CLI-001
 static void version_json(char *buf, size_t buf_len)
@@ -44,7 +42,7 @@ static void version_json(char *buf, size_t buf_len)
         "\"protocol_int\":%d,"
         "\"version\":\"%s\","
         "\"spec_version\":\"%s\","
-        "\"language\":\"cpp\","
+        "\"language\":\"c\","
         "\"runtime\":\"%s\""
         "}",
         (int)RELAY_PROTOCOL_RCP, RCP_VERSION, RELAY_SPEC_VERSION, runtime_string());
@@ -52,7 +50,7 @@ static void version_json(char *buf, size_t buf_len)
 
 static void version_text(char *buf, size_t buf_len)
 {
-    snprintf(buf, buf_len, "c-rcp %s (RCP, RELAY spec %s, cpp, %s)",
+    snprintf(buf, buf_len, "c-rcp %s (RCP, RELAY spec %s, c, %s)",
         RCP_VERSION, RELAY_SPEC_VERSION, runtime_string());
 }
 
@@ -61,6 +59,8 @@ static void version_text(char *buf, size_t buf_len)
  * "commands" honestly omits "send": this port implements only the three
  * mandatory commands (see cli.h's scope note). "adapt":true is accurate --
  * rcp_adapt() (v0.46.0) is a real, working Adapt() implementation.
+ * "protocol"/"protocol_int" mirror version_json()'s values -- §12.2's
+ * worked example includes them for single-protocol tools like this one.
  */
 //cfusa:req REQ-CLI-002
 static void capabilities_json(char *buf, size_t buf_len)
@@ -69,6 +69,8 @@ static void capabilities_json(char *buf, size_t buf_len)
         "{"
         "\"kind\":\"capabilities\","
         "\"tool\":\"c-rcp\","
+        "\"protocol\":\"RCP\","
+        "\"protocol_int\":%d,"
         "\"version\":\"%s\","
         "\"spec_version\":\"%s\","
         "\"commands\":[\"version\",\"capabilities\",\"status\"],"
@@ -78,7 +80,7 @@ static void capabilities_json(char *buf, size_t buf_len)
         "\"optional_interfaces\":[],"
         "\"adapt\":true"
         "}",
-        RCP_VERSION, RELAY_SPEC_VERSION);
+        (int)RELAY_PROTOCOL_RCP, RCP_VERSION, RELAY_SPEC_VERSION);
 }
 
 /* ── §12.3 status document ────────────────────────────────────────────────── */

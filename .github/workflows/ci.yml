@@ -305,25 +305,20 @@ jobs:
       - name: Traceability gaps report
         run: /tmp/cfusa/build/cfusa trace --gaps || true
 
-      # Function-level annotation density (metric 2) is a hard 100% gate from
-      # v0.1.0 onward: every .c file must trace to at least one requirement.
+      # Both metrics are hard-gated at 100% via cfusa's own exit code:
+      # `--req-coverage N` fails (exit 1) if EITHER metric 1 (requirement
+      # traceability) or metric 2 (function annotation density) is below N%
+      # -- no shell parsing needed, the tool's own gate covers both.
       #
-      # Requirement traceability (metric 1) is NOT hard-gated at 100% yet:
-      # starting at v0.2.0, .fusa-reqs.json forward-declares the full SEOOC
-      # catalog for modules not yet implemented (same spec-first pattern
-      # go-RCP and cpp-RCP both used in their own "Requirements" milestones —
-      # see cpp-RCP's git history, where 100% requirement coverage wasn't
-      # enforced as a hard CI gate until v1.0.1, well after v0.2.0). This job
-      # reports the real percentage every run; it becomes a hard 100% gate
-      # again once every module in ROADMAP.md is implemented.
-      - name: Requirement + annotation coverage report
-        run: /tmp/cfusa/build/cfusa trace --req-coverage 100 || true
-
-      - name: Enforce 100% function-annotation density
-        run: |
-          pct=$(/tmp/cfusa/build/cfusa trace --req-coverage 100 2>&1 | grep "Metric 2" | grep -oE '[0-9]+%' | head -1 | tr -d '%')
-          echo "Function annotation density: ${pct}%"
-          [ "$pct" -eq 100 ]
+      # Metric 2 has been a hard 100% gate since v0.1.0. Metric 1 was
+      # intentionally left soft-gated (via `|| true`) from v0.2.0 through
+      # v0.53.0 while .fusa-reqs.json forward-declared the SEOOC catalog for
+      # modules not yet implemented (same spec-first pattern go-RCP/cpp-RCP
+      # both used). All 43 roadmap modules are now implemented and metric 1
+      # has been genuinely at 100% for several releases, so this is now a
+      # real hard gate, not just a report (fixed for issue #58).
+      - name: Requirement + annotation coverage report (100% hard gate, both metrics)
+        run: /tmp/cfusa/build/cfusa trace --req-coverage 100
 
   # ── c-FuSa: ctest integration → test-evidence.md ─────────────────────────────
   cfusa-verify:

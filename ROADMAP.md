@@ -1620,3 +1620,51 @@ here.
   "close the gaps now" request: all 67 originally-identified zero-hit
   functions now have tests, and branch-coverage instrumentation
   (milestones 50–51) is live in CI.
+
+### 55. RELAY-conformance audit remediation, batch 2: mechanical fixes (v0.55.0)
+---
+
+A second, deeper conformance audit (distinct from the earlier 5-issue
+batch fixed at milestones 44–48) filed 7 new issues (#55–#61). This
+milestone closes the 4 mechanical/CI ones; #55 (Adapt() error-wrapping),
+#56 (TARA content), and #57 (TLA+ specs) are larger and tracked as
+follow-up milestones.
+- **#59 — language field**: RELAY v1.12 (github.com/SoundMatt/RELAY PR
+  #61) added `"c"` to `cli-version.json`'s `language` enum, resolving
+  the upstream gap that forced this project to report `"cpp"` since
+  milestone 47. Switched to the accurate `"c"` in both `version_json()`
+  and `version_text()`, and bumped `RELAY_SPEC_VERSION` from `"1.11"` to
+  `"1.12"` — confirmed via `git diff v1.11.1..v1.12.0 --stat` upstream
+  that the language-enum addition is v1.12's only functional change, so
+  no other conformance behavior shifts.
+- **#61 — capabilities protocol fields**: `capabilities_json()` was
+  missing `"protocol"`/`"protocol_int"`, which `version_json()` already
+  carried and which §12.2's worked example includes for single-protocol
+  tools. Added both, matching `version_json()`'s values.
+- **#60 — module naming**: renamed `src/record.c`/`include/rcp/record.h`/
+  `tests/test_record.c` to `recorder.c`/`recorder.h`/`test_recorder.c`
+  per spec §13.7.2's module-name registry (`recorder` for capture/replay
+  concerns). Renamed the public API prefix too (`rcp_record_t` →
+  `rcp_recorder_t`, etc.) rather than just the filenames — a
+  filename-only rename would leave the public symbol surface still
+  saying "record", which doesn't meaningfully satisfy a module-naming
+  requirement. Left `rcp_playback_*` as-is (already descriptively named
+  for the replay half) and the internal `record_append()` helper renamed
+  to `recorder_append()` for consistency. Confirmed via grep this module
+  is self-contained (no external callers) before renaming.
+- **#58 — CI hard-gate**: discovered by reading `cfusa`'s own
+  `cmd_trace.c` that `--req-coverage N` already hard-gates *both* metric
+  1 (requirement traceability) and metric 2 (function annotation
+  density) via its own exit code — the existing CI's two-step dance
+  (`--req-coverage 100 || true` followed by a separate shell script
+  `grep`-parsing "Metric 2" out of the text output to hard-check it
+  manually) was solving a problem the tool already solves natively, more
+  simply, and for both metrics at once. Replaced both steps with the one
+  bare invocation (no `|| true`, no parsing). Metric 1 has been
+  genuinely at 100% (383/383) for several releases now that all 43
+  roadmap modules are implemented, so this hard-gates real, already-true
+  state rather than something aspirational.
+- **Verified**: full rebuild + `ctest` (41/41), ASan/UBSan rebuild +
+  `ctest` (41/41), fresh local `cfusa check --strict` (0 errors) and
+  `cfusa trace --req-coverage 100` (exit 0, both metrics 100%) against a
+  freshly rebuilt `cfusa` binary.

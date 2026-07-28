@@ -1,4 +1,4 @@
-#include "rcp/record.h"
+#include "rcp/recorder.h"
 
 #include "platform.h"
 
@@ -8,22 +8,22 @@
 #include <stdlib.h>
 #include <string.h>
 
-struct rcp_record {
+struct rcp_recorder {
     rcp_mutex_t          mu; /* protects entries[] */
-    rcp_record_entry_t *entries;
+    rcp_recorder_entry_t *entries;
     size_t                len;
     size_t                cap;
 };
 
-rcp_record_t *rcp_record_new(void)
+rcp_recorder_t *rcp_recorder_new(void)
 {
-    rcp_record_t *r = (rcp_record_t *)calloc(1, sizeof(*r));
+    rcp_recorder_t *r = (rcp_recorder_t *)calloc(1, sizeof(*r));
     if (!r) return NULL;
     rcp_mutex_init(&r->mu);
     return r;
 }
 
-void rcp_record_destroy(rcp_record_t *r)
+void rcp_recorder_destroy(rcp_recorder_t *r)
 {
     size_t i;
 
@@ -37,7 +37,7 @@ void rcp_record_destroy(rcp_record_t *r)
     free(r);
 }
 
-size_t rcp_record_size(rcp_record_t *r)
+size_t rcp_recorder_size(rcp_recorder_t *r)
 {
     size_t n;
     rcp_mutex_lock(&r->mu);
@@ -46,7 +46,7 @@ size_t rcp_record_size(rcp_record_t *r)
     return n;
 }
 
-size_t rcp_record_entries(rcp_record_t *r, rcp_record_entry_t *out, size_t cap)
+size_t rcp_recorder_entries(rcp_recorder_t *r, rcp_recorder_entry_t *out, size_t cap)
 {
     size_t i, n;
 
@@ -61,10 +61,10 @@ size_t rcp_record_entries(rcp_record_t *r, rcp_record_entry_t *out, size_t cap)
 //cfusa:req REQ-REC-002
 //cfusa:req REQ-REC-006
 //cfusa:req REQ-REC-008
-static bool record_append(rcp_record_t *r, uint64_t ts_ms, const rcp_command_t *cmd,
+static bool recorder_append(rcp_recorder_t *r, uint64_t ts_ms, const rcp_command_t *cmd,
                            const rcp_response_t *resp, int error)
 {
-    rcp_record_entry_t e;
+    rcp_recorder_entry_t e;
     bool ok = true;
 
     e.timestamp_ms = ts_ms;
@@ -77,7 +77,7 @@ static bool record_append(rcp_record_t *r, uint64_t ts_ms, const rcp_command_t *
     rcp_mutex_lock(&r->mu);
     if (r->len == r->cap) {
         size_t new_cap = (r->cap == 0) ? 16 : r->cap * 2;
-        rcp_record_entry_t *grown = (rcp_record_entry_t *)realloc(r->entries, new_cap * sizeof(*grown));
+        rcp_recorder_entry_t *grown = (rcp_recorder_entry_t *)realloc(r->entries, new_cap * sizeof(*grown));
         if (!grown) {
             ok = false;
         } else {
@@ -113,7 +113,7 @@ static bool write_bytes(FILE *f, const void *data, size_t len)
 }
 
 //cfusa:req REQ-REC-003
-int rcp_record_write_binary(rcp_record_t *r, const char *path)
+int rcp_recorder_write_binary(rcp_recorder_t *r, const char *path)
 {
     FILE *f;
     size_t i;
@@ -128,7 +128,7 @@ int rcp_record_write_binary(rcp_record_t *r, const char *path)
     }
 
     for (i = 0; i < r->len && ok; i++) {
-        const rcp_record_entry_t *e = &r->entries[i];
+        const rcp_recorder_entry_t *e = &r->entries[i];
         uint64_t ts     = e->timestamp_ms;
         uint16_t type   = (uint16_t)e->cmd.type;
         uint8_t  zone   = (uint8_t)e->cmd.zone;
@@ -158,7 +158,7 @@ int rcp_record_write_binary(rcp_record_t *r, const char *path)
 typedef struct {
     rcp_controller_t  base;
     rcp_controller_t *inner; /* retained */
-    rcp_record_t      *rec;   /* borrowed; must outlive this controller, see record.h */
+    rcp_recorder_t      *rec;   /* borrowed; must outlive this controller, see recorder.h */
 } record_controller_t;
 
 //cfusa:req REQ-REC-009
@@ -174,7 +174,7 @@ static int record_ctrl_send(rcp_controller_t *self, const rcp_context_t *ctx,
     record_controller_t *rc = (record_controller_t *)self;
     int ec = rcp_controller_send(rc->inner, ctx, cmd, out);
 
-    record_append(rc->rec, rcp_monotonic_ms(), cmd, out, ec);
+    recorder_append(rc->rec, rcp_monotonic_ms(), cmd, out, ec);
     return ec;
 }
 
@@ -209,7 +209,7 @@ static const rcp_controller_vtable_t record_controller_vtable = {
     NULL, /* send_loaned: not supported */
 };
 
-rcp_controller_t *rcp_record_controller_new(rcp_controller_t *inner, rcp_record_t *rec)
+rcp_controller_t *rcp_recorder_controller_new(rcp_controller_t *inner, rcp_recorder_t *rec)
 {
     record_controller_t *rc = (record_controller_t *)calloc(1, sizeof(*rc));
     if (!rc) return NULL;
@@ -231,19 +231,19 @@ rcp_playback_config_t rcp_playback_default_config(void)
 
 //cfusa:req REQ-REC-004
 //cfusa:req REQ-REC-005
-int rcp_playback_run_all(rcp_controller_t *target, rcp_record_t *rec, const rcp_context_t *ctx,
+int rcp_playback_run_all(rcp_controller_t *target, rcp_recorder_t *rec, const rcp_context_t *ctx,
                           rcp_playback_config_t cfg)
 {
-    size_t n = rcp_record_size(rec);
-    rcp_record_entry_t *snapshot;
+    size_t n = rcp_recorder_size(rec);
+    rcp_recorder_entry_t *snapshot;
     size_t i;
     uint64_t prev_ts;
 
     if (n == 0) return RCP_OK;
 
-    snapshot = (rcp_record_entry_t *)malloc(n * sizeof(*snapshot));
+    snapshot = (rcp_recorder_entry_t *)malloc(n * sizeof(*snapshot));
     if (!snapshot) return RCP_ERR_BUSY;
-    n = rcp_record_entries(rec, snapshot, n);
+    n = rcp_recorder_entries(rec, snapshot, n);
 
     prev_ts = n > 0 ? snapshot[0].timestamp_ms : 0;
     for (i = 0; i < n; i++) {

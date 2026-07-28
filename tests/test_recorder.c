@@ -13,7 +13,7 @@
 
 #include <rcp/mock.h>
 #include <rcp/rcp.h>
-#include <rcp/record.h>
+#include <rcp/recorder.h>
 
 #include <stdio.h>
 
@@ -51,34 +51,34 @@ static rcp_controller_t *make_mock(rcp_zone_t z)
 
 static void test_recording_controller_captures_entries(void)
 {
-    rcp_record_t *rec = rcp_record_new();
+    rcp_recorder_t *rec = rcp_recorder_new();
     rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl = rcp_record_controller_new(inner, rec);
+    rcp_controller_t *ctrl = rcp_recorder_controller_new(inner, rec);
     rcp_context_t ctx = rcp_context_background();
     rcp_command_t cmd = {0};
     rcp_response_t resp = {0};
-    rcp_record_entry_t entries[1];
+    rcp_recorder_entry_t entries[1];
 
     cmd.zone = RCP_ZONE_FRONT_LEFT;
     cmd.type = RCP_CMD_GET;
     TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(ctrl, &ctx, &cmd, &resp));
 
-    TEST_ASSERT_EQUAL_UINT(1, rcp_record_size(rec));
-    TEST_ASSERT_EQUAL_UINT(1, rcp_record_entries(rec, entries, 1));
+    TEST_ASSERT_EQUAL_UINT(1, rcp_recorder_size(rec));
+    TEST_ASSERT_EQUAL_UINT(1, rcp_recorder_entries(rec, entries, 1));
     TEST_ASSERT_EQUAL(RCP_CMD_GET, entries[0].cmd.type);
     TEST_ASSERT_EQUAL(RCP_OK, entries[0].error);
 
     rcp_response_free(&resp);
     rcp_controller_release(ctrl);
     rcp_controller_release(inner);
-    rcp_record_destroy(rec);
+    rcp_recorder_destroy(rec);
 }
 
 static void test_multiple_sends_produce_sequential_entries(void)
 {
-    rcp_record_t *rec = rcp_record_new();
+    rcp_recorder_t *rec = rcp_recorder_new();
     rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl = rcp_record_controller_new(inner, rec);
+    rcp_controller_t *ctrl = rcp_recorder_controller_new(inner, rec);
     rcp_context_t ctx = rcp_context_background();
     int i;
 
@@ -91,18 +91,18 @@ static void test_multiple_sends_produce_sequential_entries(void)
         rcp_response_free(&resp);
     }
 
-    TEST_ASSERT_EQUAL_UINT(3, rcp_record_size(rec));
+    TEST_ASSERT_EQUAL_UINT(3, rcp_recorder_size(rec));
 
     rcp_controller_release(ctrl);
     rcp_controller_release(inner);
-    rcp_record_destroy(rec);
+    rcp_recorder_destroy(rec);
 }
 
 static void test_write_binary_creates_file(void)
 {
-    rcp_record_t *rec = rcp_record_new();
+    rcp_recorder_t *rec = rcp_recorder_new();
     rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl = rcp_record_controller_new(inner, rec);
+    rcp_controller_t *ctrl = rcp_recorder_controller_new(inner, rec);
     rcp_context_t ctx = rcp_context_background();
     rcp_command_t cmd = {0};
     rcp_response_t resp = {0};
@@ -115,7 +115,7 @@ static void test_write_binary_creates_file(void)
     (void)rcp_controller_send(ctrl, &ctx, &cmd, &resp);
     rcp_response_free(&resp);
 
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_record_write_binary(rec, path));
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_recorder_write_binary(rec, path));
 
     f = fopen(path, "rb");
     TEST_ASSERT_NOT_NULL(f);
@@ -127,16 +127,16 @@ static void test_write_binary_creates_file(void)
 
     rcp_controller_release(ctrl);
     rcp_controller_release(inner);
-    rcp_record_destroy(rec);
+    rcp_recorder_destroy(rec);
 }
 
 static void test_entry_timestamps_are_monotonically_non_decreasing(void)
 {
-    rcp_record_t *rec = rcp_record_new();
+    rcp_recorder_t *rec = rcp_recorder_new();
     rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl = rcp_record_controller_new(inner, rec);
+    rcp_controller_t *ctrl = rcp_recorder_controller_new(inner, rec);
     rcp_context_t ctx = rcp_context_background();
-    rcp_record_entry_t entries[20];
+    rcp_recorder_entry_t entries[20];
     size_t n;
     size_t i;
     int j;
@@ -150,7 +150,7 @@ static void test_entry_timestamps_are_monotonically_non_decreasing(void)
         rcp_response_free(&resp);
     }
 
-    n = rcp_record_entries(rec, entries, 20);
+    n = rcp_recorder_entries(rec, entries, 20);
     TEST_ASSERT_EQUAL_UINT(20, n);
     for (i = 1; i < n; i++) {
         TEST_ASSERT_TRUE(entries[i].timestamp_ms >= entries[i - 1].timestamp_ms);
@@ -158,32 +158,32 @@ static void test_entry_timestamps_are_monotonically_non_decreasing(void)
 
     rcp_controller_release(ctrl);
     rcp_controller_release(inner);
-    rcp_record_destroy(rec);
+    rcp_recorder_destroy(rec);
 }
 
 static void test_forwards_inner_send_result_unchanged(void)
 {
-    rcp_record_t *rec = rcp_record_new();
+    rcp_recorder_t *rec = rcp_recorder_new();
     rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
     rcp_context_t ctx = rcp_context_background();
     rcp_command_t cmd = {0};
     rcp_response_t resp = {0};
     rcp_controller_t *ctrl;
-    rcp_record_entry_t entries[1];
+    rcp_recorder_entry_t entries[1];
 
     rcp_controller_close(inner); /* closed inner returns RCP_ERR_CLOSED */
-    ctrl = rcp_record_controller_new(inner, rec);
+    ctrl = rcp_recorder_controller_new(inner, rec);
 
     cmd.zone = RCP_ZONE_FRONT_LEFT;
     cmd.type = RCP_CMD_GET;
     TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_controller_send(ctrl, &ctx, &cmd, &resp)); /* result passed through verbatim */
-    TEST_ASSERT_EQUAL_UINT(1, rcp_record_size(rec));
-    rcp_record_entries(rec, entries, 1);
+    TEST_ASSERT_EQUAL_UINT(1, rcp_recorder_size(rec));
+    rcp_recorder_entries(rec, entries, 1);
     TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, entries[0].error); /* and captured in the log */
 
     rcp_controller_release(ctrl);
     rcp_controller_release(inner);
-    rcp_record_destroy(rec);
+    rcp_recorder_destroy(rec);
 }
 
 /* ── Concurrency ──────────────────────────────────────────────────────────── */
@@ -220,30 +220,30 @@ static void *send_worker(void *arg)
 
 static void test_record_tolerates_concurrent_appends(void)
 {
-    rcp_record_t *rec = rcp_record_new();
+    rcp_recorder_t *rec = rcp_recorder_new();
     rcp_controller_t *inner = make_mock(RCP_ZONE_CENTRAL);
     test_thread_t threads[KTHREADS];
     int i;
 
-    g_ctrl = rcp_record_controller_new(inner, rec);
+    g_ctrl = rcp_recorder_controller_new(inner, rec);
 
     for (i = 0; i < KTHREADS; i++) threads[i] = test_thread_spawn(send_worker, NULL);
     for (i = 0; i < KTHREADS; i++) test_thread_join(threads[i]);
 
-    TEST_ASSERT_EQUAL_UINT(KTHREADS * KPER_THREAD, rcp_record_size(rec));
+    TEST_ASSERT_EQUAL_UINT(KTHREADS * KPER_THREAD, rcp_recorder_size(rec));
 
     rcp_controller_release(g_ctrl);
     rcp_controller_release(inner);
-    rcp_record_destroy(rec);
+    rcp_recorder_destroy(rec);
 }
 
 /* ── Playback ─────────────────────────────────────────────────────────────── */
 
 static void test_playback_replays_entries_against_target(void)
 {
-    rcp_record_t *rec = rcp_record_new();
+    rcp_recorder_t *rec = rcp_recorder_new();
     rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl = rcp_record_controller_new(inner, rec);
+    rcp_controller_t *ctrl = rcp_recorder_controller_new(inner, rec);
     rcp_context_t ctx = rcp_context_background();
     rcp_command_t cmd = {0};
     rcp_response_t resp = {0};
@@ -255,7 +255,7 @@ static void test_playback_replays_entries_against_target(void)
     (void)rcp_controller_send(ctrl, &ctx, &cmd, &resp);
     rcp_response_free(&resp);
 
-    TEST_ASSERT_EQUAL_UINT(1, rcp_record_size(rec));
+    TEST_ASSERT_EQUAL_UINT(1, rcp_recorder_size(rec));
 
     target = make_mock(RCP_ZONE_FRONT_LEFT);
     cfg.speed_factor = 0.0; /* no delays */
@@ -264,27 +264,27 @@ static void test_playback_replays_entries_against_target(void)
     rcp_controller_release(target);
     rcp_controller_release(ctrl);
     rcp_controller_release(inner);
-    rcp_record_destroy(rec);
+    rcp_recorder_destroy(rec);
 }
 
 static void test_zone_delegates_to_inner(void)
 {
-    rcp_record_t *rec = rcp_record_new();
+    rcp_recorder_t *rec = rcp_recorder_new();
     rcp_controller_t *inner = make_mock(RCP_ZONE_REAR_LEFT);
-    rcp_controller_t *ctrl = rcp_record_controller_new(inner, rec);
+    rcp_controller_t *ctrl = rcp_recorder_controller_new(inner, rec);
 
     TEST_ASSERT_EQUAL(RCP_ZONE_REAR_LEFT, rcp_controller_zone(ctrl));
 
     rcp_controller_release(ctrl);
     rcp_controller_release(inner);
-    rcp_record_destroy(rec);
+    rcp_recorder_destroy(rec);
 }
 
 static void test_subscribe_delegates_to_inner(void)
 {
-    rcp_record_t *rec = rcp_record_new();
+    rcp_recorder_t *rec = rcp_recorder_new();
     rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl = rcp_record_controller_new(inner, rec);
+    rcp_controller_t *ctrl = rcp_recorder_controller_new(inner, rec);
     rcp_context_t ctx = rcp_context_background();
     rcp_status_channel_t *ch = NULL;
 
@@ -294,14 +294,14 @@ static void test_subscribe_delegates_to_inner(void)
     rcp_status_channel_release(ch);
     rcp_controller_release(ctrl);
     rcp_controller_release(inner);
-    rcp_record_destroy(rec);
+    rcp_recorder_destroy(rec);
 }
 
 static void test_close_delegates_to_inner(void)
 {
-    rcp_record_t *rec = rcp_record_new();
+    rcp_recorder_t *rec = rcp_recorder_new();
     rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl = rcp_record_controller_new(inner, rec);
+    rcp_controller_t *ctrl = rcp_recorder_controller_new(inner, rec);
     rcp_context_t ctx = rcp_context_background();
     rcp_command_t cmd = {0};
     rcp_response_t resp = {0};
@@ -313,7 +313,7 @@ static void test_close_delegates_to_inner(void)
 
     rcp_controller_release(ctrl);
     rcp_controller_release(inner);
-    rcp_record_destroy(rec);
+    rcp_recorder_destroy(rec);
 }
 
 int main(void)
