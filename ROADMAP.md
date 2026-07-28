@@ -3254,7 +3254,7 @@ ASan/UBSan-clean). `cfusa check`/`lint`/`analyze`/`cyber`/`vuln`/`qualify`
 (0 errors) and `cfusa trace --req-coverage 100` (both metrics) stay
 green, and `relay conform --strict` passes against the rebuilt CLI.
 
-### 73. ISELED endpoint (v0.73.0)
+### 73. ISELED endpoint (v0.73.0) ✅
 
 - `include/rcp/ep_iseled.h` + `src/ep_iseled.c`: native 4-bit/5-bit ISELED
   framing over ISP_P/ISP_N, client payload taken as raw plain instruction/
@@ -3262,6 +3262,68 @@ green, and `relay conform --strict` passes against the rebuilt CLI.
   native ISELED CRC (separate from and additional to Phase 18's RCP-level
   CRC32); recovered-clock mode (`iseled_use_rcv_clk`) needing no ISP_N pin
   wired at all; single transmission-complete trigger.
+
+**Requirement-id naming note**: unlike `ep_lin.h`'s `REQ-LINEP-*` and
+`ep_can.h`'s `REQ-CANEP-*` (both collision-avoidance suffixes against a
+pre-replacement bridge/stub module that already owned the unsuffixed
+prefix), this codebase has never carried a pre-replacement ISELED
+bridge/stub of any kind — verified directly against `.fusa-reqs.json`
+before picking a prefix, so this module's own 24 new requirements are
+tagged plain `REQ-ISELED-001`..`024`, no suffix needed.
+
+**Done (v0.73.0)**: `include/rcp/ep_iseled.h` + `src/ep_iseled.c` land as
+new, additive protocol-core surface, following the same layering
+discipline every endpoint type since milestone 64 established (nothing in
+`rcp.h`, `wire.c`, `avtp.h`/`avtp.c`, `acf.h`/`acf.c`, `server.h`/
+`server.c`, `regmap.h`/`regmap.c`, `discovery.h`/`discovery.c`, or any
+prior `ep_*` module is touched). The ACF-level command request/response
+codec (`rcp_ep_iseled_encode_command_request()`/`_decode_command_request()`
+and their response counterparts) carries the caller's plain instruction/
+address/data content verbatim, unmodified — mirroring `ep_lin.h`'s own
+raw-byte-stream convention — deliberately kept separate from this
+endpoint's own native bit-framing engine
+(`rcp_ep_iseled_symbol_encode()`/`_symbol_decode()`,
+`rcp_ep_iseled_encode_bitframe()`/`_decode_bitframe()`), which is this
+module's own original design: each 4-bit nibble frames onto ISP_P/ISP_N as
+a 5-bit even-parity symbol, giving every symbol a built-in single-bit
+integrity check and guaranteeing the transition density recovered-clock
+mode needs (`0x0` and `0xF` nibbles are given different parity bits, so
+they never repeat the same symbol back to back). `rcp_ep_iseled_crc8()`
+implements a second, independent, optional integrity layer (a standard
+CRC-8, poly 0x07/init 0x00 — a publicly documented algorithm, not
+spec-derived, chosen the same way `e2e.c`'s own CRC-16/CCITT-FALSE already
+is) gated by `iseled_crc_enable` and framed as a trailing content octet
+*inside* the bit-framed symbol stream — explicitly independent of, and
+stackable with, Phase 18's own RCP-level `e2e.c` wrap/unwrap, which
+operates one layer further out and has no knowledge of ISELED at all; the
+two integrity layers are never conflated. `iseled_use_rcv_clk` selects
+recovered-clock mode, with `rcp_ep_iseled_requires_isp_n()` as a small,
+pure, directly-testable statement that the ISP_N pin need not be
+wired/mapped at all in that mode. `rcp_ep_iseled_trigger_t` names exactly
+one real trigger (`TX_COMPLETE`) plus `NONE` — a single fixed trigger,
+distinct from `ep_gpio.h`'s per-pin table and from `ep_can.h`'s documented
+absence of any trigger table. `rcp_ep_iseled_functional_cfg_t` composes
+`regmap.h`'s shared functional-cfg prefix and adds
+`iseled_bit_clk_divider`, `iseled_use_rcv_clk`, `iseled_crc_enable`, and
+`trigger`, with every setter gated by
+`rcp_ep_iseled_functional_cfg_writable()`, a thin wrapper over
+`server.h`'s `rcp_server_field_writable()`, reusing rather than
+duplicating that authorization logic, matching every prior endpoint
+type's own setters.
+`tests/test_ep_iseled.c` (39 cases covering the bit-framing symbol
+codec's round trips and corruption handling, the CRC-8 layer, the
+recovered-clock helper, the transmission-complete trigger,
+functional-config authorization, and command-request/response round
+trips) passes, alongside the full existing `ctest` suite (63/63,
+ASan/UBSan-clean). `cfusa lint`/`analyze`/`cyber`/`vuln`/`qualify` (0
+errors) and `cfusa trace --req-coverage 100` (both metrics) stay green,
+and `relay conform --strict` passes against the rebuilt CLI. `cfusa
+check`'s own HARA002/HARA003 findings (10 hazards in `.fusa-hara.json`
+each missing a risk rating and a `safetyGoals` reference) are a
+pre-existing gap unrelated to this milestone — confirmed present, and
+already failing that same CI job, on `main` at this milestone's own base
+commit (`c27ab16`, before this branch's own changes) — not introduced or
+touched here.
 
 ### 74. MDIO endpoint (v0.74.0)
 

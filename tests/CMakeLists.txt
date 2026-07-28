@@ -103,6 +103,11 @@ target_link_libraries(test_ep_can PRIVATE rcp::rcp unity)
 target_compile_options(test_ep_can PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_ep_can COMMAND test_ep_can)
 
+add_executable(test_ep_iseled test_ep_iseled.c)
+target_link_libraries(test_ep_iseled PRIVATE rcp::rcp unity)
+target_compile_options(test_ep_iseled PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_ep_iseled COMMAND test_ep_iseled)
+
 add_executable(test_sequencer test_sequencer.c)
 target_link_libraries(test_sequencer PRIVATE rcp::rcp unity)
 target_compile_options(test_sequencer PRIVATE ${RCP_TEST_WARNING_FLAGS})
