@@ -23,13 +23,13 @@ extern "C" {
 
 /* ── Spec version (§19.4) ──────────────────────────────────────────────────── *
  *
- * Deliberately targets the current RELAY spec (v1.11, which removed the
- * CLI conformance waiver -- see c-RCP issue #8), not cpp-RCP's own
- * kRelaySpecVersion ("1.10", one minor behind) -- conforming to the
- * version that motivated this whole remediation effort would be
- * self-defeating otherwise.
+ * Deliberately targets the current RELAY spec (v1.12, which added "c" to
+ * the cli-version.json language enum -- see c-RCP issue #59), not
+ * cpp-RCP's own kRelaySpecVersion ("1.10", two minors behind) --
+ * conforming to the version that motivated this whole remediation effort
+ * would be self-defeating otherwise.
  */
-#define RELAY_SPEC_VERSION "1.11"
+#define RELAY_SPEC_VERSION "1.12"
 
 /* ── Error conditions — mandatory sentinels (§5.1) ────────────────────────── */
 

@@ -38,7 +38,7 @@ void tearDown(void) {}
 static void test_rcp_spec_version_equals_relay_spec_version(void)
 {
     TEST_ASSERT_EQUAL_STRING(RELAY_SPEC_VERSION, RCP_SPEC_VERSION);
-    TEST_ASSERT_EQUAL_STRING("1.11", RCP_SPEC_VERSION);
+    TEST_ASSERT_EQUAL_STRING("1.12", RCP_SPEC_VERSION);
 }
 
 /* ── §3: Protocol enum ─────────────────────────────────────────────────────── */

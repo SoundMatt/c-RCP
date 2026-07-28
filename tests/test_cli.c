@@ -78,7 +78,7 @@ static void test_version_json_has_required_fields(void)
     TEST_ASSERT_NOT_NULL(strstr(out, "\"protocol_int\":5"));
     TEST_ASSERT_NOT_NULL(strstr(out, "\"version\":\"" RCP_VERSION "\""));
     TEST_ASSERT_NOT_NULL(strstr(out, "\"spec_version\":\"" RELAY_SPEC_VERSION "\""));
-    TEST_ASSERT_NOT_NULL(strstr(out, "\"language\":\"cpp\""));
+    TEST_ASSERT_NOT_NULL(strstr(out, "\"language\":\"c\""));
     TEST_ASSERT_NOT_NULL(strstr(out, "\"runtime\":"));
 }
 
@@ -91,6 +91,8 @@ static void test_capabilities_is_always_json_and_lists_mandatory_commands(void)
 
     TEST_ASSERT_EQUAL(RCP_CLI_OK, run_capture(1, argv, out, sizeof(out), err, sizeof(err)));
     TEST_ASSERT_NOT_NULL(strstr(out, "\"kind\":\"capabilities\""));
+    TEST_ASSERT_NOT_NULL(strstr(out, "\"protocol\":\"RCP\""));
+    TEST_ASSERT_NOT_NULL(strstr(out, "\"protocol_int\":5"));
     TEST_ASSERT_NOT_NULL(strstr(out, "\"version\""));
     TEST_ASSERT_NOT_NULL(strstr(out, "\"capabilities\""));
     TEST_ASSERT_NOT_NULL(strstr(out, "\"status\""));
