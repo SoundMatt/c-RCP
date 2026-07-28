@@ -4,7 +4,7 @@
   "tool": "c-FuSa",
   "toolVersion": "0.5.46",
   "language": "c",
-  "generatedAt": "2026-07-28T23:19:41Z",
+  "generatedAt": "2026-07-28T23:55:54Z",
   "project": "c-RCP",
   "version": "0.70.0",
   "standard": "IEC 60812:2018 / ISO 26262-5",
@@ -300,12 +300,28 @@
     },
     {
       "id": "FM-019",
-      "item": "rcp_manifest_free",
+      "item": "rcp_config_manifest_free",
       "file": "config.c",
-      "line": 23,
-      "failureMode": "rcp_manifest_free (general function) does not perform its intended action",
-      "effect": "Failure of rcp_manifest_free could propagate undetected to callers in config.c",
-      "cause": "Logic error or untested edge case in rcp_manifest_free",
+      "line": 159,
+      "failureMode": "rcp_config_manifest_free (monitoring/control function) does not perform its intended action",
+      "effect": "Failure of rcp_config_manifest_free could propagate undetected to callers in config.c",
+      "cause": "Configuration or state inconsistency affecting rcp_config_manifest_free",
+      "severity": 5,
+      "occurrence": 3,
+      "detection": 4,
+      "actionPriority": "medium",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-020",
+      "item": "DEFINE_APPEND",
+      "file": "config.c",
+      "line": 186,
+      "failureMode": "DEFINE_APPEND (general function) does not perform its intended action",
+      "effect": "Failure of DEFINE_APPEND could propagate undetected to callers in config.c",
+      "cause": "Logic error or untested edge case in DEFINE_APPEND",
       "severity": 3,
       "occurrence": 2,
       "detection": 3,
@@ -315,10 +331,42 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-020",
+      "id": "FM-021",
+      "item": "DEFINE_APPEND",
+      "file": "config.c",
+      "line": 187,
+      "failureMode": "DEFINE_APPEND (general function) does not perform its intended action",
+      "effect": "Failure of DEFINE_APPEND could propagate undetected to callers in config.c",
+      "cause": "Logic error or untested edge case in DEFINE_APPEND",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-022",
+      "item": "DEFINE_APPEND",
+      "file": "config.c",
+      "line": 188,
+      "failureMode": "DEFINE_APPEND (general function) does not perform its intended action",
+      "effect": "Failure of DEFINE_APPEND could propagate undetected to callers in config.c",
+      "cause": "Logic error or untested edge case in DEFINE_APPEND",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-023",
       "item": "rcp_config_parse_json",
       "file": "config.c",
-      "line": 79,
+      "line": 314,
       "failureMode": "rcp_config_parse_json (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_config_parse_json could propagate undetected to callers in config.c",
       "cause": "Configuration or state inconsistency affecting rcp_config_parse_json",
@@ -331,13 +379,13 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-021",
-      "item": "extract_str",
+      "id": "FM-024",
+      "item": "find_in_range",
       "file": "config.c",
-      "line": 145,
-      "failureMode": "extract_str (general function) does not perform its intended action",
-      "effect": "Failure of extract_str could propagate undetected to callers in config.c",
-      "cause": "Logic error or untested edge case in extract_str",
+      "line": 349,
+      "failureMode": "find_in_range (general function) does not perform its intended action",
+      "effect": "Failure of find_in_range could propagate undetected to callers in config.c",
+      "cause": "Logic error or untested edge case in find_in_range",
       "severity": 3,
       "occurrence": 2,
       "detection": 3,
@@ -347,10 +395,26 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-022",
+      "id": "FM-025",
+      "item": "rcp_config_apply_to_mock",
+      "file": "config.c",
+      "line": 386,
+      "failureMode": "rcp_config_apply_to_mock (monitoring/control function) does not perform its intended action",
+      "effect": "Failure of rcp_config_apply_to_mock could propagate undetected to callers in config.c",
+      "cause": "Configuration or state inconsistency affecting rcp_config_apply_to_mock",
+      "severity": 5,
+      "occurrence": 3,
+      "detection": 4,
+      "actionPriority": "medium",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-026",
       "item": "rcp_config_load",
       "file": "config.c",
-      "line": 160,
+      "line": 406,
       "failureMode": "rcp_config_load (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_config_load could propagate undetected to callers in config.c",
       "cause": "Configuration or state inconsistency affecting rcp_config_load",
@@ -363,23 +427,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-023",
-      "item": "rcp_controller_release",
-      "file": "config.c",
-      "line": 177,
-      "failureMode": "rcp_controller_release (general function) does not perform its intended action",
-      "effect": "Failure of rcp_controller_release could propagate undetected to callers in config.c",
-      "cause": "Logic error or untested edge case in rcp_controller_release",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-024",
+      "id": "FM-027",
       "item": "rcp_ep_i2c_mode_valid",
       "file": "ep_i2c.c",
       "line": 8,
@@ -395,7 +443,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-025",
+      "id": "FM-028",
       "item": "rcp_ep_i2c_functional_cfg_init",
       "file": "ep_i2c.c",
       "line": 16,
@@ -411,7 +459,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-026",
+      "id": "FM-029",
       "item": "rcp_ep_i2c_strerror",
       "file": "ep_i2c.c",
       "line": 49,
@@ -427,7 +475,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-027",
+      "id": "FM-030",
       "item": "rcp_ep_can_frame_format_valid",
       "file": "ep_can.c",
       "line": 26,
@@ -443,7 +491,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-028",
+      "id": "FM-031",
       "item": "rcp_ep_can_frame_format_is_xl",
       "file": "ep_can.c",
       "line": 32,
@@ -459,7 +507,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-029",
+      "id": "FM-032",
       "item": "rcp_ep_can_frame_format_id_width",
       "file": "ep_can.c",
       "line": 46,
@@ -475,7 +523,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-030",
+      "id": "FM-033",
       "item": "rcp_ep_can_arbitration_id_valid",
       "file": "ep_can.c",
       "line": 60,
@@ -491,7 +539,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-031",
+      "id": "FM-034",
       "item": "rcp_ep_can_frame_format_max_data_len",
       "file": "ep_can.c",
       "line": 71,
@@ -507,7 +555,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-032",
+      "id": "FM-035",
       "item": "rcp_ep_can_xl_filter_index_valid",
       "file": "ep_can.c",
       "line": 87,
@@ -523,7 +571,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-033",
+      "id": "FM-036",
       "item": "rcp_ep_can_functional_cfg_init",
       "file": "ep_can.c",
       "line": 95,
@@ -539,7 +587,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-034",
+      "id": "FM-037",
       "item": "rcp_ep_can_strerror",
       "file": "ep_can.c",
       "line": 185,
@@ -555,7 +603,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-035",
+      "id": "FM-038",
       "item": "rcp_request_type_is_triggered",
       "file": "request_triggered.c",
       "line": 30,
@@ -571,7 +619,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-036",
+      "id": "FM-039",
       "item": "rcp_triggered_strerror",
       "file": "request_triggered.c",
       "line": 39,
@@ -587,7 +635,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-037",
+      "id": "FM-040",
       "item": "rcp_triggered_runtime_enter_started",
       "file": "request_triggered.c",
       "line": 145,
@@ -603,7 +651,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-038",
+      "id": "FM-041",
       "item": "rcp_triggered_runtime_record_occurrence",
       "file": "request_triggered.c",
       "line": 152,
@@ -619,7 +667,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-039",
+      "id": "FM-042",
       "item": "rcp_triggered_exec_delay_elapsed",
       "file": "request_triggered.c",
       "line": 170,
@@ -635,7 +683,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-040",
+      "id": "FM-043",
       "item": "rcp_monotonic_ms",
       "file": "clock.c",
       "line": 15,
@@ -651,7 +699,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-041",
+      "id": "FM-044",
       "item": "rcp_wallclock_ms",
       "file": "clock.c",
       "line": 30,
@@ -667,7 +715,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-042",
+      "id": "FM-045",
       "item": "rcp_monotonic_ms",
       "file": "clock.c",
       "line": 50,
@@ -683,7 +731,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-043",
+      "id": "FM-046",
       "item": "rcp_wallclock_ms",
       "file": "clock.c",
       "line": 58,
@@ -699,7 +747,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-044",
+      "id": "FM-047",
       "item": "free",
       "file": "federation.c",
       "line": 203,
@@ -715,7 +763,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-045",
+      "id": "FM-048",
       "item": "rcp_federation_registry_new",
       "file": "federation.c",
       "line": 217,
@@ -731,7 +779,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-046",
+      "id": "FM-049",
       "item": "rcp_federation_registry_local_id",
       "file": "federation.c",
       "line": 228,
@@ -747,7 +795,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-047",
+      "id": "FM-050",
       "item": "rcp_federation_registry_revoke_lease",
       "file": "federation.c",
       "line": 276,
@@ -763,7 +811,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-048",
+      "id": "FM-051",
       "item": "rcp_cancel_strerror",
       "file": "request_cancel.c",
       "line": 30,
@@ -779,7 +827,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-049",
+      "id": "FM-052",
       "item": "rcp_cancel_encode_clear_all",
       "file": "request_cancel.c",
       "line": 45,
@@ -795,7 +843,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-050",
+      "id": "FM-053",
       "item": "mtv=RCP_ACF_MTV_UNTIMED",
       "file": "request_cancel.c",
       "line": 58,
@@ -811,7 +859,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-051",
+      "id": "FM-054",
       "item": "mtv=RCP_ACF_MTV_UNTIMED",
       "file": "request_cancel.c",
       "line": 115,
@@ -827,7 +875,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-052",
+      "id": "FM-055",
       "item": "rcp_cancel_is_cancellable",
       "file": "request_cancel.c",
       "line": 160,
@@ -843,7 +891,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-053",
+      "id": "FM-056",
       "item": "rcp_cancel_attempt",
       "file": "request_cancel.c",
       "line": 168,
@@ -859,7 +907,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-054",
+      "id": "FM-057",
       "item": "rcp_cancel_chain_should_cascade",
       "file": "request_cancel.c",
       "line": 176,
@@ -875,7 +923,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-055",
+      "id": "FM-058",
       "item": "rcp_rest_default_config",
       "file": "restbridge.c",
       "line": 5,
@@ -891,7 +939,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-056",
+      "id": "FM-059",
       "item": "rcp_rest_controller_new",
       "file": "restbridge.c",
       "line": 64,
@@ -907,7 +955,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-057",
+      "id": "FM-060",
       "item": "rcp_lifecycle_strerror",
       "file": "lifecycle.c",
       "line": 4,
@@ -923,7 +971,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-058",
+      "id": "FM-061",
       "item": "rcp_lifecycle_check_hw_cfg",
       "file": "lifecycle.c",
       "line": 20,
@@ -939,7 +987,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-059",
+      "id": "FM-062",
       "item": "rcp_lifecycle_check_rcp_cfg",
       "file": "lifecycle.c",
       "line": 42,
@@ -955,7 +1003,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-060",
+      "id": "FM-063",
       "item": "rcp_chained_strerror",
       "file": "request_chained.c",
       "line": 30,
@@ -971,7 +1019,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-061",
+      "id": "FM-064",
       "item": "rcp_prioqueue_controller_new",
       "file": "prioqueue.c",
       "line": 286,
@@ -987,7 +1035,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-062",
+      "id": "FM-065",
       "item": "rcp_timed_strerror",
       "file": "request_timed.c",
       "line": 30,
@@ -1003,7 +1051,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-063",
+      "id": "FM-066",
       "item": "rcp_timed_feature_enabled",
       "file": "request_timed.c",
       "line": 45,
@@ -1019,7 +1067,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-064",
+      "id": "FM-067",
       "item": "mtv=RCP_ACF_MTV_UNTIMED",
       "file": "request_timed.c",
       "line": 72,
@@ -1035,7 +1083,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-065",
+      "id": "FM-068",
       "item": "rcp_timed_too_far",
       "file": "request_timed.c",
       "line": 118,
@@ -1051,7 +1099,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-066",
+      "id": "FM-069",
       "item": "rcp_e2e_strerror",
       "file": "e2e.c",
       "line": 7,
@@ -1067,7 +1115,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-067",
+      "id": "FM-070",
       "item": "rcp_e2e_crc32",
       "file": "e2e.c",
       "line": 37,
@@ -1083,7 +1131,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-068",
+      "id": "FM-071",
       "item": "rcp_e2e_length_with_crc",
       "file": "e2e.c",
       "line": 88,
@@ -1099,7 +1147,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-069",
+      "id": "FM-072",
       "item": "rcp_e2e_fragment_carries_crc",
       "file": "e2e.c",
       "line": 147,
@@ -1115,7 +1163,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-070",
+      "id": "FM-073",
       "item": "rcp_e2e_is_safety_request",
       "file": "e2e.c",
       "line": 155,
@@ -1131,7 +1179,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-071",
+      "id": "FM-074",
       "item": "rcp_e2e_request_may_execute",
       "file": "e2e.c",
       "line": 162,
@@ -1147,7 +1195,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-072",
+      "id": "FM-075",
       "item": "rcp_e2e_watchdog_purge_should_keep",
       "file": "e2e.c",
       "line": 171,
@@ -1163,7 +1211,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-073",
+      "id": "FM-076",
       "item": "rcp_e2e_measure_valid",
       "file": "e2e.c",
       "line": 189,
@@ -1179,7 +1227,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-074",
+      "id": "FM-077",
       "item": "rcp_e2e_crc_error_action",
       "file": "e2e.c",
       "line": 236,
@@ -1195,7 +1243,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-075",
+      "id": "FM-078",
       "item": "rcp_e2e_stream_fault_init",
       "file": "e2e.c",
       "line": 242,
@@ -1211,7 +1259,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-076",
+      "id": "FM-079",
       "item": "rcp_e2e_stream_fault_on_crc_error",
       "file": "e2e.c",
       "line": 249,
@@ -1227,7 +1275,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-077",
+      "id": "FM-080",
       "item": "rcp_e2e_stream_fault_is_faulted",
       "file": "e2e.c",
       "line": 257,
@@ -1243,7 +1291,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-078",
+      "id": "FM-081",
       "item": "rcp_e2e_stream_fault_reset",
       "file": "e2e.c",
       "line": 263,
@@ -1259,7 +1307,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-079",
+      "id": "FM-082",
       "item": "rcp_fw_default_config",
       "file": "firmware.c",
       "line": 8,
@@ -1275,7 +1323,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-080",
+      "id": "FM-083",
       "item": "rcp_fw_strerror",
       "file": "firmware.c",
       "line": 19,
@@ -1291,7 +1339,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-081",
+      "id": "FM-084",
       "item": "rcp_firmware_session_new",
       "file": "firmware.c",
       "line": 37,
@@ -1307,7 +1355,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-082",
+      "id": "FM-085",
       "item": "rcp_firmware_session_state",
       "file": "firmware.c",
       "line": 49,
@@ -1323,7 +1371,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-083",
+      "id": "FM-086",
       "item": "rcp_firmware_session_initiate",
       "file": "firmware.c",
       "line": 60,
@@ -1339,7 +1387,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-084",
+      "id": "FM-087",
       "item": "rcp_firmware_session_verify",
       "file": "firmware.c",
       "line": 191,
@@ -1355,7 +1403,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-085",
+      "id": "FM-088",
       "item": "rcp_firmware_session_activate",
       "file": "firmware.c",
       "line": 236,
@@ -1371,7 +1419,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-086",
+      "id": "FM-089",
       "item": "rcp_firmware_session_rollback",
       "file": "firmware.c",
       "line": 281,
@@ -1387,7 +1435,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-087",
+      "id": "FM-090",
       "item": "rcp_firmware_session_destroy",
       "file": "firmware.c",
       "line": 307,
@@ -1403,77 +1451,29 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-088",
-      "item": "rcp_status_channel_release",
-      "file": "mock.c",
-      "line": 136,
-      "failureMode": "rcp_status_channel_release (general function) does not perform its intended action",
-      "effect": "Failure of rcp_status_channel_release could propagate undetected to callers in mock.c",
-      "cause": "Logic error or untested edge case in rcp_status_channel_release",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-089",
-      "item": "rcp_status_channel_release",
-      "file": "mock.c",
-      "line": 141,
-      "failureMode": "rcp_status_channel_release (general function) does not perform its intended action",
-      "effect": "Failure of rcp_status_channel_release could propagate undetected to callers in mock.c",
-      "cause": "Logic error or untested edge case in rcp_status_channel_release",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-090",
-      "item": "rcp_mock_controller_publish",
-      "file": "mock.c",
-      "line": 207,
-      "failureMode": "rcp_mock_controller_publish (general function) does not perform its intended action",
-      "effect": "Failure of rcp_mock_controller_publish could propagate undetected to callers in mock.c",
-      "cause": "Logic error or untested edge case in rcp_mock_controller_publish",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
       "id": "FM-091",
-      "item": "rcp_bytes_dup",
+      "item": "rcp_mock_strerror",
       "file": "mock.c",
-      "line": 220,
-      "failureMode": "rcp_bytes_dup (general function) does not perform its intended action",
-      "effect": "Failure of rcp_bytes_dup could propagate undetected to callers in mock.c",
-      "cause": "Logic error or untested edge case in rcp_bytes_dup",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
+      "line": 27,
+      "failureMode": "rcp_mock_strerror (safety-critical function) does not perform its intended action",
+      "effect": "Failure of rcp_mock_strerror could propagate undetected to callers in mock.c",
+      "cause": "Unhandled fault or invalid input condition within rcp_mock_strerror",
+      "severity": 9,
+      "occurrence": 4,
+      "detection": 6,
+      "actionPriority": "high",
       "mitigations": [],
       "requirementIds": [],
       "cyberFailureMode": ""
     },
     {
       "id": "FM-092",
-      "item": "free",
+      "item": "rcp_mock_server_new",
       "file": "mock.c",
-      "line": 279,
-      "failureMode": "free (general function) does not perform its intended action",
-      "effect": "Failure of free could propagate undetected to callers in mock.c",
-      "cause": "Logic error or untested edge case in free",
+      "line": 39,
+      "failureMode": "rcp_mock_server_new (general function) does not perform its intended action",
+      "effect": "Failure of rcp_mock_server_new could propagate undetected to callers in mock.c",
+      "cause": "Logic error or untested edge case in rcp_mock_server_new",
       "severity": 3,
       "occurrence": 2,
       "detection": 3,
@@ -1484,12 +1484,12 @@
     },
     {
       "id": "FM-093",
-      "item": "rcp_mock_controller_new",
+      "item": "rcp_mock_server_destroy",
       "file": "mock.c",
-      "line": 293,
-      "failureMode": "rcp_mock_controller_new (general function) does not perform its intended action",
-      "effect": "Failure of rcp_mock_controller_new could propagate undetected to callers in mock.c",
-      "cause": "Logic error or untested edge case in rcp_mock_controller_new",
+      "line": 50,
+      "failureMode": "rcp_mock_server_destroy (general function) does not perform its intended action",
+      "effect": "Failure of rcp_mock_server_destroy could propagate undetected to callers in mock.c",
+      "cause": "Logic error or untested edge case in rcp_mock_server_destroy",
       "severity": 3,
       "occurrence": 2,
       "detection": 3,
@@ -1500,12 +1500,12 @@
     },
     {
       "id": "FM-094",
-      "item": "free",
+      "item": "rcp_mock_server_state",
       "file": "mock.c",
-      "line": 464,
-      "failureMode": "free (general function) does not perform its intended action",
-      "effect": "Failure of free could propagate undetected to callers in mock.c",
-      "cause": "Logic error or untested edge case in free",
+      "line": 64,
+      "failureMode": "rcp_mock_server_state (general function) does not perform its intended action",
+      "effect": "Failure of rcp_mock_server_state could propagate undetected to callers in mock.c",
+      "cause": "Logic error or untested edge case in rcp_mock_server_state",
       "severity": 3,
       "occurrence": 2,
       "detection": 3,
@@ -1516,12 +1516,12 @@
     },
     {
       "id": "FM-095",
-      "item": "rcp_mock_registry_new",
+      "item": "rcp_mock_server_regmap",
       "file": "mock.c",
-      "line": 478,
-      "failureMode": "rcp_mock_registry_new (general function) does not perform its intended action",
-      "effect": "Failure of rcp_mock_registry_new could propagate undetected to callers in mock.c",
-      "cause": "Logic error or untested edge case in rcp_mock_registry_new",
+      "line": 78,
+      "failureMode": "rcp_mock_server_regmap (general function) does not perform its intended action",
+      "effect": "Failure of rcp_mock_server_regmap could propagate undetected to callers in mock.c",
+      "cause": "Logic error or untested edge case in rcp_mock_server_regmap",
       "severity": 3,
       "occurrence": 2,
       "detection": 3,
@@ -1532,6 +1532,38 @@
     },
     {
       "id": "FM-096",
+      "item": "rcp_mock_server_remove_endpoint",
+      "file": "mock.c",
+      "line": 148,
+      "failureMode": "rcp_mock_server_remove_endpoint (general function) does not perform its intended action",
+      "effect": "Failure of rcp_mock_server_remove_endpoint could propagate undetected to callers in mock.c",
+      "cause": "Logic error or untested edge case in rcp_mock_server_remove_endpoint",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-097",
+      "item": "rcp_mock_server_endpoint_queue_len",
+      "file": "mock.c",
+      "line": 173,
+      "failureMode": "rcp_mock_server_endpoint_queue_len (general function) does not perform its intended action",
+      "effect": "Failure of rcp_mock_server_endpoint_queue_len could propagate undetected to callers in mock.c",
+      "cause": "Logic error or untested edge case in rcp_mock_server_endpoint_queue_len",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-098",
       "item": "rcp_status_to_message",
       "file": "adapt.c",
       "line": 36,
@@ -1547,7 +1579,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-097",
+      "id": "FM-099",
       "item": "rcp_response_to_message",
       "file": "adapt.c",
       "line": 51,
@@ -1563,7 +1595,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-098",
+      "id": "FM-100",
       "item": "rcp_message_to_command",
       "file": "adapt.c",
       "line": 67,
@@ -1579,7 +1611,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-099",
+      "id": "FM-101",
       "item": "rcp_errc_to_relay_errc",
       "file": "adapt.c",
       "line": 83,
@@ -1595,7 +1627,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-100",
+      "id": "FM-102",
       "item": "!relay_message_channel_is_closed",
       "file": "adapt.c",
       "line": 172,
@@ -1611,7 +1643,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-101",
+      "id": "FM-103",
       "item": "subscribe",
       "file": "adapt.c",
       "line": 220,
@@ -1627,7 +1659,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-102",
+      "id": "FM-104",
       "item": "rcp_adapt",
       "file": "adapt.c",
       "line": 262,
@@ -1643,7 +1675,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-103",
+      "id": "FM-105",
       "item": "rcp_admin_server_new",
       "file": "admin.c",
       "line": 31,
@@ -1659,7 +1691,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-104",
+      "id": "FM-106",
       "item": "rcp_admin_server_destroy",
       "file": "admin.c",
       "line": 40,
@@ -1675,7 +1707,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-105",
+      "id": "FM-107",
       "item": "rcp_admin_server_zones",
       "file": "admin.c",
       "line": 50,
@@ -1691,7 +1723,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-106",
+      "id": "FM-108",
       "item": "rcp_admin_server_subscribe",
       "file": "admin.c",
       "line": 75,
@@ -1707,7 +1739,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-107",
+      "id": "FM-109",
       "item": "rcp_admin_server_emit",
       "file": "admin.c",
       "line": 101,
@@ -1723,7 +1755,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-108",
+      "id": "FM-110",
       "item": "rcp_admin_server_record_counter",
       "file": "admin.c",
       "line": 127,
@@ -1739,7 +1771,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-109",
+      "id": "FM-111",
       "item": "rcp_admin_server_metrics_text",
       "file": "admin.c",
       "line": 165,
@@ -1755,7 +1787,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-110",
+      "id": "FM-112",
       "item": "snprintf",
       "file": "admin.c",
       "line": 179,
@@ -1771,7 +1803,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-111",
+      "id": "FM-113",
       "item": "snprintf",
       "file": "admin.c",
       "line": 183,
@@ -1787,10 +1819,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-112",
+      "id": "FM-114",
       "item": "snprintf",
       "file": "cli.c",
-      "line": 53,
+      "line": 54,
       "failureMode": "snprintf (general function) does not perform its intended action",
       "effect": "Failure of snprintf could propagate undetected to callers in cli.c",
       "cause": "Logic error or untested edge case in snprintf",
@@ -1803,10 +1835,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-113",
+      "id": "FM-115",
       "item": "rcp_cli_run",
       "file": "cli.c",
-      "line": 145,
+      "line": 211,
       "failureMode": "rcp_cli_run (general function) does not perform its intended action",
       "effect": "Failure of rcp_cli_run could propagate undetected to callers in cli.c",
       "cause": "Logic error or untested edge case in rcp_cli_run",
@@ -1819,10 +1851,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-114",
+      "id": "FM-116",
       "item": "strcmp",
       "file": "cli.c",
-      "line": 189,
+      "line": 255,
       "failureMode": "strcmp (general function) does not perform its intended action",
       "effect": "Failure of strcmp could propagate undetected to callers in cli.c",
       "cause": "Logic error or untested edge case in strcmp",
@@ -1835,7 +1867,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-115",
+      "id": "FM-117",
       "item": "rcp_span_duration_ms",
       "file": "observe.c",
       "line": 10,
@@ -1851,7 +1883,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-116",
+      "id": "FM-118",
       "item": "rcp_noop_metrics_sink",
       "file": "observe.c",
       "line": 31,
@@ -1867,7 +1899,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-117",
+      "id": "FM-119",
       "item": "rcp_in_memory_sink_new",
       "file": "observe.c",
       "line": 48,
@@ -1883,7 +1915,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-118",
+      "id": "FM-120",
       "item": "rcp_in_memory_sink_as_sink",
       "file": "observe.c",
       "line": 91,
@@ -1899,7 +1931,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-119",
+      "id": "FM-121",
       "item": "rcp_in_memory_sink_span_count",
       "file": "observe.c",
       "line": 99,
@@ -1915,7 +1947,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-120",
+      "id": "FM-122",
       "item": "rcp_in_memory_sink_spans",
       "file": "observe.c",
       "line": 108,
@@ -1931,7 +1963,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-121",
+      "id": "FM-123",
       "item": "rcp_in_memory_sink_destroy",
       "file": "observe.c",
       "line": 118,
@@ -1947,7 +1979,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-122",
+      "id": "FM-124",
       "item": "rcp_observe_controller_new",
       "file": "observe.c",
       "line": 203,
@@ -1963,7 +1995,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-123",
+      "id": "FM-125",
       "item": "rcp_ep_iseled_symbol_encode",
       "file": "ep_iseled.c",
       "line": 21,
@@ -1979,7 +2011,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-124",
+      "id": "FM-126",
       "item": "rcp_ep_iseled_symbol_decode",
       "file": "ep_iseled.c",
       "line": 30,
@@ -1995,7 +2027,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-125",
+      "id": "FM-127",
       "item": "rcp_ep_iseled_bitframe_encoded_len",
       "file": "ep_iseled.c",
       "line": 44,
@@ -2011,7 +2043,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-126",
+      "id": "FM-128",
       "item": "rcp_ep_iseled_encode_bitframe",
       "file": "ep_iseled.c",
       "line": 53,
@@ -2027,7 +2059,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-127",
+      "id": "FM-129",
       "item": "rcp_ep_iseled_crc8",
       "file": "ep_iseled.c",
       "line": 96,
@@ -2043,7 +2075,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-128",
+      "id": "FM-130",
       "item": "rcp_ep_iseled_requires_isp_n",
       "file": "ep_iseled.c",
       "line": 108,
@@ -2059,7 +2091,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-129",
+      "id": "FM-131",
       "item": "rcp_ep_iseled_trigger_fires",
       "file": "ep_iseled.c",
       "line": 116,
@@ -2075,7 +2107,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-130",
+      "id": "FM-132",
       "item": "rcp_ep_iseled_functional_cfg_init",
       "file": "ep_iseled.c",
       "line": 128,
@@ -2091,7 +2123,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-131",
+      "id": "FM-133",
       "item": "rcp_ep_iseled_strerror",
       "file": "ep_iseled.c",
       "line": 189,
@@ -2107,7 +2139,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-132",
+      "id": "FM-134",
       "item": "!rcp_ep_iseled_symbol_decode",
       "file": "ep_iseled.c",
       "line": 236,
@@ -2123,7 +2155,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-133",
+      "id": "FM-135",
       "item": "rcp_faultinject_controller_new",
       "file": "faultinject.c",
       "line": 132,
@@ -2139,7 +2171,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-134",
+      "id": "FM-136",
       "item": "rcp_faultinject_add_rule",
       "file": "faultinject.c",
       "line": 144,
@@ -2155,7 +2187,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-135",
+      "id": "FM-137",
       "item": "rcp_faultinject_clear_rules",
       "file": "faultinject.c",
       "line": 165,
@@ -2171,7 +2203,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-136",
+      "id": "FM-138",
       "item": "rcp_ep_wakeup_functional_cfg_init",
       "file": "ep_wakeup.c",
       "line": 13,
@@ -2187,7 +2219,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-137",
+      "id": "FM-139",
       "item": "rcp_ep_wakeup_source_asserted",
       "file": "ep_wakeup.c",
       "line": 27,
@@ -2203,7 +2235,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-138",
+      "id": "FM-140",
       "item": "rcp_ep_wakeup_wup_status_init",
       "file": "ep_wakeup.c",
       "line": 53,
@@ -2219,7 +2251,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-139",
+      "id": "FM-141",
       "item": "rcp_ep_wakeup_wup_status_latch",
       "file": "ep_wakeup.c",
       "line": 59,
@@ -2235,7 +2267,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-140",
+      "id": "FM-142",
       "item": "rcp_ep_wakeup_wup_status_clear",
       "file": "ep_wakeup.c",
       "line": 65,
@@ -2251,7 +2283,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-141",
+      "id": "FM-143",
       "item": "rcp_ep_wakeup_wup_status_is_clear",
       "file": "ep_wakeup.c",
       "line": 71,
@@ -2267,7 +2299,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-142",
+      "id": "FM-144",
       "item": "rcp_ep_wakeup_strerror",
       "file": "ep_wakeup.c",
       "line": 79,
@@ -2283,7 +2315,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-143",
+      "id": "FM-145",
       "item": "rcp_pwrmode_string",
       "file": "power.c",
       "line": 6,
@@ -2299,7 +2331,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-144",
+      "id": "FM-146",
       "item": "rcp_pwrmode_strerror",
       "file": "power.c",
       "line": 20,
@@ -2315,7 +2347,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-145",
+      "id": "FM-147",
       "item": "rcp_pwrmode_cold_start_lifecycle_target",
       "file": "power.c",
       "line": 32,
@@ -2331,7 +2363,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-146",
+      "id": "FM-148",
       "item": "rcp_pwrmode_hotstart_required",
       "file": "power.c",
       "line": 73,
@@ -2347,7 +2379,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-147",
+      "id": "FM-149",
       "item": "rcp_pwrmode_handshake_init",
       "file": "power.c",
       "line": 79,
@@ -2363,7 +2395,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-148",
+      "id": "FM-150",
       "item": "rcp_pwrmode_handshake_iface_reenabled",
       "file": "power.c",
       "line": 87,
@@ -2379,7 +2411,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-149",
+      "id": "FM-151",
       "item": "rcp_pwrmode_handshake_wakeup_attempt",
       "file": "power.c",
       "line": 96,
@@ -2395,7 +2427,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-150",
+      "id": "FM-152",
       "item": "rcp_pwrmode_handshake_resume_queues",
       "file": "power.c",
       "line": 116,
@@ -2411,7 +2443,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-151",
+      "id": "FM-153",
       "item": "rcp_pwrmode_handshake_is_complete",
       "file": "power.c",
       "line": 125,
@@ -2427,7 +2459,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-152",
+      "id": "FM-154",
       "item": "rcp_pwrmode_handshake_has_failed",
       "file": "power.c",
       "line": 131,
@@ -2443,7 +2475,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-153",
+      "id": "FM-155",
       "item": "rcp_pwrmode_check_entry",
       "file": "power.c",
       "line": 161,
@@ -2459,7 +2491,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-154",
+      "id": "FM-156",
       "item": "rcp_server_endpoint_init",
       "file": "server.c",
       "line": 11,
@@ -2475,7 +2507,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-155",
+      "id": "FM-157",
       "item": "rcp_server_endpoint_destroy",
       "file": "server.c",
       "line": 22,
@@ -2491,7 +2523,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-156",
+      "id": "FM-158",
       "item": "rcp_server_endpoint_set_enable",
       "file": "server.c",
       "line": 59,
@@ -2507,7 +2539,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-157",
+      "id": "FM-159",
       "item": "rcp_server_endpoint_drain_one",
       "file": "server.c",
       "line": 65,
@@ -2523,7 +2555,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-158",
+      "id": "FM-160",
       "item": "rcp_server_endpoint_queue_len",
       "file": "server.c",
       "line": 81,
@@ -2539,7 +2571,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-159",
+      "id": "FM-161",
       "item": "relay_protocol_string",
       "file": "relay.c",
       "line": 9,
@@ -2555,7 +2587,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-160",
+      "id": "FM-162",
       "item": "relay_bytes_dup",
       "file": "relay.c",
       "line": 24,
@@ -2571,7 +2603,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-161",
+      "id": "FM-163",
       "item": "relay_bytes_free",
       "file": "relay.c",
       "line": 39,
@@ -2587,7 +2619,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-162",
+      "id": "FM-164",
       "item": "relay_message_init",
       "file": "relay.c",
       "line": 50,
@@ -2603,7 +2635,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-163",
+      "id": "FM-165",
       "item": "relay_message_free",
       "file": "relay.c",
       "line": 63,
@@ -2619,7 +2651,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-164",
+      "id": "FM-166",
       "item": "relay_message_set_id",
       "file": "relay.c",
       "line": 81,
@@ -2635,7 +2667,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-165",
+      "id": "FM-167",
       "item": "relay_message_set_meta",
       "file": "relay.c",
       "line": 98,
@@ -2651,7 +2683,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-166",
+      "id": "FM-168",
       "item": "relay_message_get_meta",
       "file": "relay.c",
       "line": 143,
@@ -2667,7 +2699,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-167",
+      "id": "FM-169",
       "item": "relay_subscriber_options_default",
       "file": "relay.c",
       "line": 154,
@@ -2683,7 +2715,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-168",
+      "id": "FM-170",
       "item": "relay_message_channel_new",
       "file": "relay.c",
       "line": 180,
@@ -2699,7 +2731,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-169",
+      "id": "FM-171",
       "item": "relay_message_channel_retain",
       "file": "relay.c",
       "line": 205,
@@ -2715,7 +2747,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-170",
+      "id": "FM-172",
       "item": "relay_message_channel_release",
       "file": "relay.c",
       "line": 211,
@@ -2731,7 +2763,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-171",
+      "id": "FM-173",
       "item": "relay_message_channel_push",
       "file": "relay.c",
       "line": 250,
@@ -2747,7 +2779,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-172",
+      "id": "FM-174",
       "item": "relay_message_channel_recv",
       "file": "relay.c",
       "line": 274,
@@ -2763,7 +2795,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-173",
+      "id": "FM-175",
       "item": "relay_message_channel_try_recv",
       "file": "relay.c",
       "line": 291,
@@ -2779,7 +2811,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-174",
+      "id": "FM-176",
       "item": "relay_message_channel_close",
       "file": "relay.c",
       "line": 305,
@@ -2795,7 +2827,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-175",
+      "id": "FM-177",
       "item": "relay_message_channel_is_closed",
       "file": "relay.c",
       "line": 314,
@@ -2811,7 +2843,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-176",
+      "id": "FM-178",
       "item": "rcp_relay_caller_retain",
       "file": "relay.c",
       "line": 326,
@@ -2827,7 +2859,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-177",
+      "id": "FM-179",
       "item": "rcp_relay_caller_release",
       "file": "relay.c",
       "line": 332,
@@ -2843,7 +2875,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-178",
+      "id": "FM-180",
       "item": "rcp_ep_pwm_out_write_semantics_valid",
       "file": "ep_pwm.c",
       "line": 71,
@@ -2859,7 +2891,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-179",
+      "id": "FM-181",
       "item": "rcp_ep_pwm_out_apply_reconfig",
       "file": "ep_pwm.c",
       "line": 97,
@@ -2875,7 +2907,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-180",
+      "id": "FM-182",
       "item": "rcp_ep_pwm_out_trigger_fires",
       "file": "ep_pwm.c",
       "line": 110,
@@ -2891,7 +2923,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-181",
+      "id": "FM-183",
       "item": "rcp_ep_pwm_out_functional_cfg_init",
       "file": "ep_pwm.c",
       "line": 124,
@@ -2907,7 +2939,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-182",
+      "id": "FM-184",
       "item": "rcp_ep_pwm_out_strerror",
       "file": "ep_pwm.c",
       "line": 167,
@@ -2923,7 +2955,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-183",
+      "id": "FM-185",
       "item": "rcp_ep_pwm_in_trigger_fires",
       "file": "ep_pwm.c",
       "line": 359,
@@ -2939,7 +2971,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-184",
+      "id": "FM-186",
       "item": "rcp_ep_pwm_in_functional_cfg_init",
       "file": "ep_pwm.c",
       "line": 372,
@@ -2955,7 +2987,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-185",
+      "id": "FM-187",
       "item": "rcp_ep_pwm_in_strerror",
       "file": "ep_pwm.c",
       "line": 404,
@@ -2971,7 +3003,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-186",
+      "id": "FM-188",
       "item": "rcp_ep_pwm_in_compound_wait_mode_valid",
       "file": "ep_pwm.c",
       "line": 548,
@@ -2987,7 +3019,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-187",
+      "id": "FM-189",
       "item": "rcp_discovery_strerror",
       "file": "discovery.c",
       "line": 7,
@@ -3003,7 +3035,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-188",
+      "id": "FM-190",
       "item": "rcp_discovery_should_drop",
       "file": "discovery.c",
       "line": 51,
@@ -3019,7 +3051,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-189",
+      "id": "FM-191",
       "item": "rcp_discovery_response_fragment_count",
       "file": "discovery.c",
       "line": 236,
@@ -3035,7 +3067,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-190",
+      "id": "FM-192",
       "item": "rcp_discovery_claim_init",
       "file": "discovery.c",
       "line": 360,
@@ -3051,7 +3083,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-191",
+      "id": "FM-193",
       "item": "rcp_discovery_claim_is_open",
       "file": "discovery.c",
       "line": 367,
@@ -3067,7 +3099,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-192",
+      "id": "FM-194",
       "item": "rcp_discovery_claim_release",
       "file": "discovery.c",
       "line": 407,
@@ -3083,7 +3115,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-193",
+      "id": "FM-195",
       "item": "rcp_discovery_cache_init",
       "file": "discovery.c",
       "line": 415,
@@ -3099,7 +3131,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-194",
+      "id": "FM-196",
       "item": "rcp_discovery_cache_destroy",
       "file": "discovery.c",
       "line": 423,
@@ -3115,7 +3147,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-195",
+      "id": "FM-197",
       "item": "rcp_discovery_cache_len",
       "file": "discovery.c",
       "line": 474,
@@ -3131,7 +3163,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-196",
+      "id": "FM-198",
       "item": "rcp_lin_default_config",
       "file": "linbr.c",
       "line": 5,
@@ -3147,7 +3179,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-197",
+      "id": "FM-199",
       "item": "rcp_lin_controller_new",
       "file": "linbr.c",
       "line": 63,
@@ -3163,7 +3195,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-198",
+      "id": "FM-200",
       "item": "rcp_redundancy_default_config",
       "file": "redundancy.c",
       "line": 7,
@@ -3179,7 +3211,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-199",
+      "id": "FM-201",
       "item": "rcp_redundancy_controller_promote",
       "file": "redundancy.c",
       "line": 42,
@@ -3195,7 +3227,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-200",
+      "id": "FM-202",
       "item": "rcp_redundancy_controller_is_primary_active",
       "file": "redundancy.c",
       "line": 50,
@@ -3211,7 +3243,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-201",
+      "id": "FM-203",
       "item": "rcp_mutex_init",
       "file": "platform.c",
       "line": 16,
@@ -3227,7 +3259,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-202",
+      "id": "FM-204",
       "item": "rcp_mutex_lock",
       "file": "platform.c",
       "line": 17,
@@ -3243,7 +3275,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-203",
+      "id": "FM-205",
       "item": "rcp_mutex_unlock",
       "file": "platform.c",
       "line": 18,
@@ -3259,7 +3291,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-204",
+      "id": "FM-206",
       "item": "rcp_mutex_destroy",
       "file": "platform.c",
       "line": 19,
@@ -3275,7 +3307,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-205",
+      "id": "FM-207",
       "item": "rcp_cond_init",
       "file": "platform.c",
       "line": 21,
@@ -3291,7 +3323,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-206",
+      "id": "FM-208",
       "item": "rcp_cond_wait",
       "file": "platform.c",
       "line": 22,
@@ -3307,7 +3339,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-207",
+      "id": "FM-209",
       "item": "rcp_cond_timedwait_until",
       "file": "platform.c",
       "line": 24,
@@ -3323,7 +3355,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-208",
+      "id": "FM-210",
       "item": "rcp_cond_signal",
       "file": "platform.c",
       "line": 31,
@@ -3339,7 +3371,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-209",
+      "id": "FM-211",
       "item": "rcp_cond_broadcast",
       "file": "platform.c",
       "line": 32,
@@ -3355,7 +3387,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-210",
+      "id": "FM-212",
       "item": "rcp_cond_destroy",
       "file": "platform.c",
       "line": 33,
@@ -3371,7 +3403,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-211",
+      "id": "FM-213",
       "item": "rcp_thread_start_detached",
       "file": "platform.c",
       "line": 52,
@@ -3387,7 +3419,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-212",
+      "id": "FM-214",
       "item": "CloseHandle",
       "file": "platform.c",
       "line": 64,
@@ -3403,7 +3435,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-213",
+      "id": "FM-215",
       "item": "rcp_thread_start",
       "file": "platform.c",
       "line": 68,
@@ -3419,7 +3451,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-214",
+      "id": "FM-216",
       "item": "rcp_thread_join",
       "file": "platform.c",
       "line": 84,
@@ -3435,7 +3467,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-215",
+      "id": "FM-217",
       "item": "rcp_atomic_inc",
       "file": "platform.c",
       "line": 90,
@@ -3451,7 +3483,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-216",
+      "id": "FM-218",
       "item": "rcp_atomic_dec",
       "file": "platform.c",
       "line": 95,
@@ -3467,7 +3499,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-217",
+      "id": "FM-219",
       "item": "rcp_sleep_ms",
       "file": "platform.c",
       "line": 100,
@@ -3483,7 +3515,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-218",
+      "id": "FM-220",
       "item": "rcp_mutex_init",
       "file": "platform.c",
       "line": 111,
@@ -3499,7 +3531,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-219",
+      "id": "FM-221",
       "item": "rcp_mutex_lock",
       "file": "platform.c",
       "line": 112,
@@ -3515,7 +3547,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-220",
+      "id": "FM-222",
       "item": "rcp_mutex_unlock",
       "file": "platform.c",
       "line": 113,
@@ -3531,7 +3563,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-221",
+      "id": "FM-223",
       "item": "rcp_mutex_destroy",
       "file": "platform.c",
       "line": 114,
@@ -3547,7 +3579,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-222",
+      "id": "FM-224",
       "item": "rcp_cond_init",
       "file": "platform.c",
       "line": 116,
@@ -3563,7 +3595,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-223",
+      "id": "FM-225",
       "item": "rcp_cond_wait",
       "file": "platform.c",
       "line": 117,
@@ -3579,7 +3611,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-224",
+      "id": "FM-226",
       "item": "rcp_cond_timedwait_until",
       "file": "platform.c",
       "line": 119,
@@ -3595,7 +3627,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-225",
+      "id": "FM-227",
       "item": "rcp_cond_signal",
       "file": "platform.c",
       "line": 143,
@@ -3611,7 +3643,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-226",
+      "id": "FM-228",
       "item": "rcp_cond_broadcast",
       "file": "platform.c",
       "line": 144,
@@ -3627,7 +3659,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-227",
+      "id": "FM-229",
       "item": "rcp_cond_destroy",
       "file": "platform.c",
       "line": 145,
@@ -3643,7 +3675,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-228",
+      "id": "FM-230",
       "item": "rcp_thread_start_detached",
       "file": "platform.c",
       "line": 164,
@@ -3659,7 +3691,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-229",
+      "id": "FM-231",
       "item": "rcp_thread_start",
       "file": "platform.c",
       "line": 181,
@@ -3675,7 +3707,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-230",
+      "id": "FM-232",
       "item": "rcp_thread_join",
       "file": "platform.c",
       "line": 196,
@@ -3691,7 +3723,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-231",
+      "id": "FM-233",
       "item": "rcp_atomic_inc",
       "file": "platform.c",
       "line": 201,
@@ -3707,7 +3739,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-232",
+      "id": "FM-234",
       "item": "rcp_atomic_dec",
       "file": "platform.c",
       "line": 206,
@@ -3723,7 +3755,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-233",
+      "id": "FM-235",
       "item": "rcp_sleep_ms",
       "file": "platform.c",
       "line": 211,
@@ -3739,7 +3771,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-234",
+      "id": "FM-236",
       "item": "rcp_grpc_default_config",
       "file": "grpcbridge.c",
       "line": 5,
@@ -3755,7 +3787,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-235",
+      "id": "FM-237",
       "item": "rcp_grpc_controller_new",
       "file": "grpcbridge.c",
       "line": 64,
@@ -3771,7 +3803,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-236",
+      "id": "FM-238",
       "item": "rcp_uds_default_config",
       "file": "udsbr.c",
       "line": 5,
@@ -3787,7 +3819,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-237",
+      "id": "FM-239",
       "item": "rcp_uds_controller_new",
       "file": "udsbr.c",
       "line": 64,
@@ -3803,7 +3835,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-238",
+      "id": "FM-240",
       "item": "rcp_shmem_zone_server_new",
       "file": "shmem.c",
       "line": 24,
@@ -3819,7 +3851,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-239",
+      "id": "FM-241",
       "item": "rcp_shmem_zone_server_retain",
       "file": "shmem.c",
       "line": 35,
@@ -3835,7 +3867,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-240",
+      "id": "FM-242",
       "item": "rcp_shmem_zone_server_release",
       "file": "shmem.c",
       "line": 41,
@@ -3851,7 +3883,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-241",
+      "id": "FM-243",
       "item": "rcp_shmem_zone_server_zone",
       "file": "shmem.c",
       "line": 50,
@@ -3867,7 +3899,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-242",
+      "id": "FM-244",
       "item": "rcp_shmem_zone_server_set_handler",
       "file": "shmem.c",
       "line": 55,
@@ -3883,7 +3915,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-243",
+      "id": "FM-245",
       "item": "rcp_shmem_zone_server_set_healthy",
       "file": "shmem.c",
       "line": 63,
@@ -3899,7 +3931,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-244",
+      "id": "FM-246",
       "item": "rcp_shmem_zone_server_publish",
       "file": "shmem.c",
       "line": 71,
@@ -3915,7 +3947,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-245",
+      "id": "FM-247",
       "item": "rcp_shmem_zone_server_dispatch_one",
       "file": "shmem.c",
       "line": 107,
@@ -3931,7 +3963,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-246",
+      "id": "FM-248",
       "item": "rcp_shmem_zone_server_add_sub",
       "file": "shmem.c",
       "line": 141,
@@ -3947,7 +3979,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-247",
+      "id": "FM-249",
       "item": "rcp_shmem_zone_server_remove_sub",
       "file": "shmem.c",
       "line": 149,
@@ -3963,7 +3995,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-248",
+      "id": "FM-250",
       "item": "rcp_shmem_zone_server_close",
       "file": "shmem.c",
       "line": 164,
@@ -3979,7 +4011,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-249",
+      "id": "FM-251",
       "item": "rcp_shmem_zone_server_ok",
       "file": "shmem.c",
       "line": 186,
@@ -3995,7 +4027,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-250",
+      "id": "FM-252",
       "item": "rcp_shmem_controller_new",
       "file": "shmem.c",
       "line": 337,
@@ -4011,7 +4043,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-251",
+      "id": "FM-253",
       "item": "rcp_shmem_registry_new",
       "file": "shmem.c",
       "line": 510,
@@ -4027,7 +4059,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-252",
+      "id": "FM-254",
       "item": "rcp_shmem_registry_add_server",
       "file": "shmem.c",
       "line": 519,
@@ -4043,7 +4075,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-253",
+      "id": "FM-255",
       "item": "rcp_controller_release",
       "file": "shmem.c",
       "line": 525,
@@ -4059,7 +4091,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-254",
+      "id": "FM-256",
       "item": "rcp_zone_group_empty",
       "file": "zonegroup.c",
       "line": 8,
@@ -4075,7 +4107,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-255",
+      "id": "FM-257",
       "item": "rcp_zone_group_all",
       "file": "zonegroup.c",
       "line": 16,
@@ -4091,7 +4123,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-256",
+      "id": "FM-258",
       "item": "rcp_zone_group_rear",
       "file": "zonegroup.c",
       "line": 28,
@@ -4107,7 +4139,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-257",
+      "id": "FM-259",
       "item": "rcp_zone_group_front",
       "file": "zonegroup.c",
       "line": 37,
@@ -4123,7 +4155,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-258",
+      "id": "FM-260",
       "item": "rcp_zone_group_add",
       "file": "zonegroup.c",
       "line": 47,
@@ -4139,7 +4171,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-259",
+      "id": "FM-261",
       "item": "rcp_group_response_ok",
       "file": "zonegroup.c",
       "line": 56,
@@ -4155,7 +4187,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-260",
+      "id": "FM-262",
       "item": "rcp_group_response_errors",
       "file": "zonegroup.c",
       "line": 67,
@@ -4171,7 +4203,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-261",
+      "id": "FM-263",
       "item": "rcp_group_response_free",
       "file": "zonegroup.c",
       "line": 81,
@@ -4187,7 +4219,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-262",
+      "id": "FM-264",
       "item": "rcp_loan_return",
       "file": "loan.c",
       "line": 8,
@@ -4203,7 +4235,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-263",
+      "id": "FM-265",
       "item": "rcp_loan_release",
       "file": "loan.c",
       "line": 17,
@@ -4219,7 +4251,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-264",
+      "id": "FM-266",
       "item": "rcp_loan_controller_new",
       "file": "loan.c",
       "line": 210,
@@ -4235,7 +4267,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-265",
+      "id": "FM-267",
       "item": "rcp_ratelimit_default_config",
       "file": "ratelimit.c",
       "line": 9,
@@ -4251,7 +4283,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-266",
+      "id": "FM-268",
       "item": "rcp_ratelimit_controller_new",
       "file": "ratelimit.c",
       "line": 115,
@@ -4267,7 +4299,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-267",
+      "id": "FM-269",
       "item": "rcp_power_state_string",
       "file": "powerstate.c",
       "line": 8,
@@ -4283,7 +4315,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-268",
+      "id": "FM-270",
       "item": "rcp_powerstate_default_config",
       "file": "powerstate.c",
       "line": 18,
@@ -4299,7 +4331,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-269",
+      "id": "FM-271",
       "item": "rcp_powerstate_manager_sleep",
       "file": "powerstate.c",
       "line": 102,
@@ -4315,7 +4347,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-270",
+      "id": "FM-272",
       "item": "rcp_powerstate_manager_wake",
       "file": "powerstate.c",
       "line": 133,
@@ -4331,7 +4363,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-271",
+      "id": "FM-273",
       "item": "rcp_powerstate_manager_state",
       "file": "powerstate.c",
       "line": 254,
@@ -4347,7 +4379,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-272",
+      "id": "FM-274",
       "item": "rcp_powerstate_manager_subscribe",
       "file": "powerstate.c",
       "line": 267,
@@ -4363,7 +4395,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-273",
+      "id": "FM-275",
       "item": "rcp_powerstate_manager_close",
       "file": "powerstate.c",
       "line": 277,
@@ -4379,7 +4411,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-274",
+      "id": "FM-276",
       "item": "rcp_powerstate_manager_destroy",
       "file": "powerstate.c",
       "line": 289,
@@ -4395,7 +4427,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-275",
+      "id": "FM-277",
       "item": "rcp_dds_default_config",
       "file": "ddsbr.c",
       "line": 5,
@@ -4411,7 +4443,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-276",
+      "id": "FM-278",
       "item": "rcp_dds_controller_new",
       "file": "ddsbr.c",
       "line": 64,
@@ -4427,7 +4459,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-277",
+      "id": "FM-279",
       "item": "rcp_ep_uart_nr_bits_valid",
       "file": "ep_uart.c",
       "line": 9,
@@ -4443,7 +4475,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-278",
+      "id": "FM-280",
       "item": "rcp_ep_uart_bit_pad_mask",
       "file": "ep_uart.c",
       "line": 15,
@@ -4459,7 +4491,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-279",
+      "id": "FM-281",
       "item": "rcp_ep_uart_apply_bit_padding",
       "file": "ep_uart.c",
       "line": 25,
@@ -4475,7 +4507,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-280",
+      "id": "FM-282",
       "item": "rcp_ep_uart_functional_cfg_init",
       "file": "ep_uart.c",
       "line": 38,
@@ -4491,7 +4523,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-281",
+      "id": "FM-283",
       "item": "rcp_ep_uart_strerror",
       "file": "ep_uart.c",
       "line": 110,
@@ -4507,7 +4539,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-282",
+      "id": "FM-284",
       "item": "rcp_ep_uart_read_response_fragment_count",
       "file": "ep_uart.c",
       "line": 384,
@@ -4523,7 +4555,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-283",
+      "id": "FM-285",
       "item": "rcp_tsn_default_pcp_map",
       "file": "tsn.c",
       "line": 18,
@@ -4539,7 +4571,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-284",
+      "id": "FM-286",
       "item": "rcp_tsn_pcp_for",
       "file": "tsn.c",
       "line": 30,
@@ -4555,7 +4587,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-285",
+      "id": "FM-287",
       "item": "rcp_tsn_default_config",
       "file": "tsn.c",
       "line": 40,
@@ -4571,7 +4603,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-286",
+      "id": "FM-288",
       "item": "rcp_avtp_strerror",
       "file": "avtp.c",
       "line": 9,
@@ -4587,7 +4619,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-287",
+      "id": "FM-289",
       "item": "rcp_stream_id_make",
       "file": "avtp.c",
       "line": 64,
@@ -4603,7 +4635,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-288",
+      "id": "FM-290",
       "item": "rcp_stream_id_to_u64",
       "file": "avtp.c",
       "line": 73,
@@ -4619,7 +4651,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-289",
+      "id": "FM-291",
       "item": "rcp_stream_id_from_u64",
       "file": "avtp.c",
       "line": 82,
@@ -4635,7 +4667,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-290",
+      "id": "FM-292",
       "item": "rcp_stream_id_equal",
       "file": "avtp.c",
       "line": 98,
@@ -4651,7 +4683,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-291",
+      "id": "FM-293",
       "item": "rcp_avtp_addr_equal",
       "file": "avtp.c",
       "line": 104,
@@ -4667,7 +4699,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-292",
+      "id": "FM-294",
       "item": "rcp_avtp_peek_subtype",
       "file": "avtp.c",
       "line": 241,
@@ -4683,7 +4715,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-293",
+      "id": "FM-295",
       "item": "rcp_avtp_should_drop_tscf",
       "file": "avtp.c",
       "line": 249,
@@ -4699,7 +4731,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-294",
+      "id": "FM-296",
       "item": "rcp_avtp_transport_retain",
       "file": "avtp.c",
       "line": 258,
@@ -4715,7 +4747,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-295",
+      "id": "FM-297",
       "item": "rcp_avtp_transport_release",
       "file": "avtp.c",
       "line": 265,
@@ -4731,7 +4763,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-296",
+      "id": "FM-298",
       "item": "rcp_sim_default_config",
       "file": "sim.c",
       "line": 10,
@@ -4747,7 +4779,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-297",
+      "id": "FM-299",
       "item": "rcp_status_channel_release",
       "file": "sim.c",
       "line": 169,
@@ -4763,7 +4795,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-298",
+      "id": "FM-300",
       "item": "rcp_status_channel_release",
       "file": "sim.c",
       "line": 174,
@@ -4779,7 +4811,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-299",
+      "id": "FM-301",
       "item": "rcp_sim_controller_publish",
       "file": "sim.c",
       "line": 219,
@@ -4795,7 +4827,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-300",
+      "id": "FM-302",
       "item": "free",
       "file": "sim.c",
       "line": 352,
@@ -4811,7 +4843,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-301",
+      "id": "FM-303",
       "item": "rcp_sim_controller_new",
       "file": "sim.c",
       "line": 366,
@@ -4827,7 +4859,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-302",
+      "id": "FM-304",
       "item": "rcp_sim_controller_fault",
       "file": "sim.c",
       "line": 394,
@@ -4843,7 +4875,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-303",
+      "id": "FM-305",
       "item": "rcp_sim_controller_recover",
       "file": "sim.c",
       "line": 403,
@@ -4859,7 +4891,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-304",
+      "id": "FM-306",
       "item": "rcp_sim_controller_watchdog_missed",
       "file": "sim.c",
       "line": 412,
@@ -4875,7 +4907,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-305",
+      "id": "FM-307",
       "item": "rcp_udp_zone_server_new",
       "file": "udp.c",
       "line": 138,
@@ -4891,7 +4923,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-306",
+      "id": "FM-308",
       "item": "rcp_udp_zone_server_ok",
       "file": "udp.c",
       "line": 174,
@@ -4907,7 +4939,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-307",
+      "id": "FM-309",
       "item": "rcp_udp_zone_server_addr_string",
       "file": "udp.c",
       "line": 180,
@@ -4923,7 +4955,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-308",
+      "id": "FM-310",
       "item": "rcp_udp_zone_server_port",
       "file": "udp.c",
       "line": 196,
@@ -4939,7 +4971,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-309",
+      "id": "FM-311",
       "item": "rcp_udp_zone_server_set_handler",
       "file": "udp.c",
       "line": 204,
@@ -4955,7 +4987,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-310",
+      "id": "FM-312",
       "item": "rcp_udp_zone_server_set_healthy",
       "file": "udp.c",
       "line": 213,
@@ -4971,7 +5003,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-311",
+      "id": "FM-313",
       "item": "rcp_udp_zone_server_publish",
       "file": "udp.c",
       "line": 226,
@@ -4987,7 +5019,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-312",
+      "id": "FM-314",
       "item": "rcp_udp_zone_server_close",
       "file": "udp.c",
       "line": 263,
@@ -5003,7 +5035,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-313",
+      "id": "FM-315",
       "item": "rcp_udp_zone_server_destroy",
       "file": "udp.c",
       "line": 285,
@@ -5019,7 +5051,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-314",
+      "id": "FM-316",
       "item": "send",
       "file": "udp.c",
       "line": 307,
@@ -5035,7 +5067,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-315",
+      "id": "FM-317",
       "item": "pending_release",
       "file": "udp.c",
       "line": 476,
@@ -5051,7 +5083,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-316",
+      "id": "FM-318",
       "item": "pending_release",
       "file": "udp.c",
       "line": 477,
@@ -5067,7 +5099,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-317",
+      "id": "FM-319",
       "item": "pending_release",
       "file": "udp.c",
       "line": 491,
@@ -5083,7 +5115,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-318",
+      "id": "FM-320",
       "item": "pending_release",
       "file": "udp.c",
       "line": 492,
@@ -5099,7 +5131,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-319",
+      "id": "FM-321",
       "item": "pending_release",
       "file": "udp.c",
       "line": 519,
@@ -5115,7 +5147,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-320",
+      "id": "FM-322",
       "item": "rcp_status_channel_release",
       "file": "udp.c",
       "line": 553,
@@ -5131,7 +5163,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-321",
+      "id": "FM-323",
       "item": "rcp_status_channel_release",
       "file": "udp.c",
       "line": 561,
@@ -5147,7 +5179,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-322",
+      "id": "FM-324",
       "item": "pending_release",
       "file": "udp.c",
       "line": 642,
@@ -5163,7 +5195,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-323",
+      "id": "FM-325",
       "item": "rcp_response_free",
       "file": "udp.c",
       "line": 644,
@@ -5179,7 +5211,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-324",
+      "id": "FM-326",
       "item": "pending_release",
       "file": "udp.c",
       "line": 726,
@@ -5195,7 +5227,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-325",
+      "id": "FM-327",
       "item": "free",
       "file": "udp.c",
       "line": 744,
@@ -5211,7 +5243,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-326",
+      "id": "FM-328",
       "item": "rcp_udp_controller_new",
       "file": "udp.c",
       "line": 759,
@@ -5227,7 +5259,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-327",
+      "id": "FM-329",
       "item": "rcp_udp_controller_ok",
       "file": "udp.c",
       "line": 794,
@@ -5243,7 +5275,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-328",
+      "id": "FM-330",
       "item": "rcp_udp_registry_new",
       "file": "udp.c",
       "line": 970,
@@ -5259,7 +5291,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-329",
+      "id": "FM-331",
       "item": "rcp_udp_registry_dial",
       "file": "udp.c",
       "line": 980,
@@ -5275,7 +5307,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-330",
+      "id": "FM-332",
       "item": "rcp_controller_release",
       "file": "udp.c",
       "line": 991,
@@ -5291,7 +5323,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-331",
+      "id": "FM-333",
       "item": "rcp_udp_zone_server_new",
       "file": "udp.c",
       "line": 999,
@@ -5307,7 +5339,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-332",
+      "id": "FM-334",
       "item": "rcp_udp_zone_server_ok",
       "file": "udp.c",
       "line": 1004,
@@ -5323,7 +5355,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-333",
+      "id": "FM-335",
       "item": "rcp_udp_zone_server_addr_string",
       "file": "udp.c",
       "line": 1005,
@@ -5339,7 +5371,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-334",
+      "id": "FM-336",
       "item": "rcp_udp_zone_server_port",
       "file": "udp.c",
       "line": 1007,
@@ -5355,7 +5387,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-335",
+      "id": "FM-337",
       "item": "rcp_udp_zone_server_set_handler",
       "file": "udp.c",
       "line": 1008,
@@ -5371,7 +5403,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-336",
+      "id": "FM-338",
       "item": "rcp_udp_zone_server_set_healthy",
       "file": "udp.c",
       "line": 1010,
@@ -5387,7 +5419,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-337",
+      "id": "FM-339",
       "item": "rcp_udp_zone_server_publish",
       "file": "udp.c",
       "line": 1011,
@@ -5403,7 +5435,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-338",
+      "id": "FM-340",
       "item": "rcp_udp_zone_server_close",
       "file": "udp.c",
       "line": 1013,
@@ -5419,7 +5451,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-339",
+      "id": "FM-341",
       "item": "rcp_udp_zone_server_destroy",
       "file": "udp.c",
       "line": 1014,
@@ -5435,7 +5467,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-340",
+      "id": "FM-342",
       "item": "rcp_udp_controller_new",
       "file": "udp.c",
       "line": 1030,
@@ -5451,7 +5483,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-341",
+      "id": "FM-343",
       "item": "rcp_udp_controller_ok",
       "file": "udp.c",
       "line": 1042,
@@ -5467,7 +5499,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-342",
+      "id": "FM-344",
       "item": "rcp_udp_registry_new",
       "file": "udp.c",
       "line": 1062,
@@ -5483,7 +5515,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-343",
+      "id": "FM-345",
       "item": "rcp_udp_registry_dial",
       "file": "udp.c",
       "line": 1070,
@@ -5499,7 +5531,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-344",
+      "id": "FM-346",
       "item": "rcp_fragment_strerror",
       "file": "fragment.c",
       "line": 7,
@@ -5515,7 +5547,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-345",
+      "id": "FM-347",
       "item": "rcp_fragment_plan_count",
       "file": "fragment.c",
       "line": 22,
@@ -5531,7 +5563,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-346",
+      "id": "FM-348",
       "item": "rcp_fragment_reasm_result_string",
       "file": "fragment.c",
       "line": 83,
@@ -5547,7 +5579,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-347",
+      "id": "FM-349",
       "item": "rcp_fragment_reassembler_init",
       "file": "fragment.c",
       "line": 96,
@@ -5563,7 +5595,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-348",
+      "id": "FM-350",
       "item": "rcp_fragment_reassembler_reset",
       "file": "fragment.c",
       "line": 107,
@@ -5579,7 +5611,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-349",
+      "id": "FM-351",
       "item": "rcp_fragment_reassembler_destroy",
       "file": "fragment.c",
       "line": 116,
@@ -5595,7 +5627,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-350",
+      "id": "FM-352",
       "item": "rcp_fragment_reassembler_is_collecting",
       "file": "fragment.c",
       "line": 191,
@@ -5611,7 +5643,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-351",
+      "id": "FM-353",
       "item": "rcp_deadline_default_config",
       "file": "deadline.c",
       "line": 9,
@@ -5627,7 +5659,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-352",
+      "id": "FM-354",
       "item": "rcp_deadline_monitor_alive",
       "file": "deadline.c",
       "line": 201,
@@ -5643,7 +5675,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-353",
+      "id": "FM-355",
       "item": "rcp_deadline_monitor_subscribe",
       "file": "deadline.c",
       "line": 213,
@@ -5659,7 +5691,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-354",
+      "id": "FM-356",
       "item": "rcp_deadline_monitor_close",
       "file": "deadline.c",
       "line": 224,
@@ -5675,7 +5707,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-355",
+      "id": "FM-357",
       "item": "rcp_deadline_monitor_destroy",
       "file": "deadline.c",
       "line": 240,
@@ -5691,7 +5723,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-356",
+      "id": "FM-358",
       "item": "rcp_mdns_discoverer_destroy",
       "file": "mdns.c",
       "line": 9,
@@ -5707,7 +5739,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-357",
+      "id": "FM-359",
       "item": "rcp_mdns_announcer_destroy",
       "file": "mdns.c",
       "line": 16,
@@ -5723,7 +5755,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-358",
+      "id": "FM-360",
       "item": "rcp_mdns_make_instance_name",
       "file": "mdns.c",
       "line": 23,
@@ -5739,7 +5771,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-359",
+      "id": "FM-361",
       "item": "rcp_mdns_static_discoverer_new",
       "file": "mdns.c",
       "line": 121,
@@ -5755,7 +5787,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-360",
+      "id": "FM-362",
       "item": "rcp_ep_lin_compare_mode_valid",
       "file": "ep_lin.c",
       "line": 8,
@@ -5771,7 +5803,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-361",
+      "id": "FM-363",
       "item": "rcp_ep_lin_trigger_fires",
       "file": "ep_lin.c",
       "line": 45,
@@ -5787,7 +5819,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-362",
+      "id": "FM-364",
       "item": "rcp_ep_lin_functional_cfg_init",
       "file": "ep_lin.c",
       "line": 57,
@@ -5803,7 +5835,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-363",
+      "id": "FM-365",
       "item": "rcp_ep_lin_strerror",
       "file": "ep_lin.c",
       "line": 99,
@@ -5819,7 +5851,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-364",
+      "id": "FM-366",
       "item": "rcp_mqtt_default_config",
       "file": "mqttbr.c",
       "line": 5,
@@ -5835,7 +5867,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-365",
+      "id": "FM-367",
       "item": "rcp_mqtt_controller_new",
       "file": "mqttbr.c",
       "line": 65,
@@ -5851,7 +5883,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-366",
+      "id": "FM-368",
       "item": "rcp_acf_strerror",
       "file": "acf.c",
       "line": 7,
@@ -5867,7 +5899,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-367",
+      "id": "FM-369",
       "item": "rcp_acf_classify_response",
       "file": "acf.c",
       "line": 90,
@@ -5883,7 +5915,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-368",
+      "id": "FM-370",
       "item": "rcp_acf_hdr_ack_has_event",
       "file": "acf.c",
       "line": 102,
@@ -5899,7 +5931,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-369",
+      "id": "FM-371",
       "item": "rcp_acf_gbb_is_timed",
       "file": "acf.c",
       "line": 247,
@@ -5915,7 +5947,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-370",
+      "id": "FM-372",
       "item": "rcp_acf_peek_msg_type",
       "file": "acf.c",
       "line": 255,
@@ -5931,7 +5963,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-371",
+      "id": "FM-373",
       "item": "rcp_can_default_config",
       "file": "canbr.c",
       "line": 5,
@@ -5947,7 +5979,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-372",
+      "id": "FM-374",
       "item": "rcp_can_controller_new",
       "file": "canbr.c",
       "line": 64,
@@ -5963,7 +5995,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-373",
+      "id": "FM-375",
       "item": "relay_strerror",
       "file": "rcp.c",
       "line": 11,
@@ -5979,7 +6011,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-374",
+      "id": "FM-376",
       "item": "rcp_strerror",
       "file": "rcp.c",
       "line": 25,
@@ -5995,7 +6027,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-375",
+      "id": "FM-377",
       "item": "rcp_zone_string",
       "file": "rcp.c",
       "line": 44,
@@ -6011,7 +6043,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-376",
+      "id": "FM-378",
       "item": "rcp_zone_from_string",
       "file": "rcp.c",
       "line": 61,
@@ -6027,7 +6059,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-377",
+      "id": "FM-379",
       "item": "rcp_response_status_string",
       "file": "rcp.c",
       "line": 74,
@@ -6043,7 +6075,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-378",
+      "id": "FM-380",
       "item": "rcp_bytes_dup",
       "file": "rcp.c",
       "line": 90,
@@ -6059,7 +6091,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-379",
+      "id": "FM-381",
       "item": "rcp_bytes_free",
       "file": "rcp.c",
       "line": 105,
@@ -6075,7 +6107,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-380",
+      "id": "FM-382",
       "item": "rcp_response_free",
       "file": "rcp.c",
       "line": 113,
@@ -6091,7 +6123,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-381",
+      "id": "FM-383",
       "item": "rcp_status_free",
       "file": "rcp.c",
       "line": 119,
@@ -6107,7 +6139,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-382",
+      "id": "FM-384",
       "item": "rcp_status_channel_new",
       "file": "rcp.c",
       "line": 138,
@@ -6123,7 +6155,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-383",
+      "id": "FM-385",
       "item": "rcp_status_channel_retain",
       "file": "rcp.c",
       "line": 163,
@@ -6139,7 +6171,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-384",
+      "id": "FM-386",
       "item": "rcp_status_channel_release",
       "file": "rcp.c",
       "line": 169,
@@ -6155,7 +6187,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-385",
+      "id": "FM-387",
       "item": "rcp_status_channel_push",
       "file": "rcp.c",
       "line": 187,
@@ -6171,7 +6203,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-386",
+      "id": "FM-388",
       "item": "rcp_status_channel_recv",
       "file": "rcp.c",
       "line": 213,
@@ -6187,7 +6219,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-387",
+      "id": "FM-389",
       "item": "rcp_status_channel_try_recv",
       "file": "rcp.c",
       "line": 230,
@@ -6203,7 +6235,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-388",
+      "id": "FM-390",
       "item": "rcp_status_channel_close",
       "file": "rcp.c",
       "line": 246,
@@ -6219,7 +6251,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-389",
+      "id": "FM-391",
       "item": "rcp_status_channel_is_closed",
       "file": "rcp.c",
       "line": 254,
@@ -6235,7 +6267,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-390",
+      "id": "FM-392",
       "item": "rcp_controller_retain",
       "file": "rcp.c",
       "line": 266,
@@ -6251,7 +6283,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-391",
+      "id": "FM-393",
       "item": "rcp_controller_release",
       "file": "rcp.c",
       "line": 272,
@@ -6267,7 +6299,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-392",
+      "id": "FM-394",
       "item": "rcp_registry_destroy",
       "file": "rcp.c",
       "line": 282,
@@ -6283,7 +6315,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-393",
+      "id": "FM-395",
       "item": "rcp_schema_entry_free",
       "file": "dyndata.c",
       "line": 8,
@@ -6299,7 +6331,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-394",
+      "id": "FM-396",
       "item": "rcp_schema_registry_new",
       "file": "dyndata.c",
       "line": 23,
@@ -6315,7 +6347,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-395",
+      "id": "FM-397",
       "item": "rcp_schema_registry_destroy",
       "file": "dyndata.c",
       "line": 31,
@@ -6331,7 +6363,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-396",
+      "id": "FM-398",
       "item": "rcp_schema_registry_lookup",
       "file": "dyndata.c",
       "line": 105,
@@ -6347,7 +6379,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-397",
+      "id": "FM-399",
       "item": "rcp_schema_registry_size",
       "file": "dyndata.c",
       "line": 125,
@@ -6363,7 +6395,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-398",
+      "id": "FM-400",
       "item": "rcp_dynamic_payload_encode",
       "file": "dyndata.c",
       "line": 136,
@@ -6379,7 +6411,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-399",
+      "id": "FM-401",
       "item": "rcp_dynamic_payload_decode",
       "file": "dyndata.c",
       "line": 159,
@@ -6395,7 +6427,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-400",
+      "id": "FM-402",
       "item": "rcp_sched_classify",
       "file": "scheduler.c",
       "line": 6,
@@ -6411,7 +6443,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-401",
+      "id": "FM-403",
       "item": "rcp_sched_kind_rank",
       "file": "scheduler.c",
       "line": 29,
@@ -6427,7 +6459,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-402",
+      "id": "FM-404",
       "item": "rcp_sched_compare",
       "file": "scheduler.c",
       "line": 46,
@@ -6443,7 +6475,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-403",
+      "id": "FM-405",
       "item": "rcp_sched_frame_timing_consistent",
       "file": "scheduler.c",
       "line": 98,
@@ -6459,7 +6491,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-404",
+      "id": "FM-406",
       "item": "rcp_ep_spi_channel_valid",
       "file": "ep_spi.c",
       "line": 8,
@@ -6475,7 +6507,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-405",
+      "id": "FM-407",
       "item": "rcp_ep_spi_mode_valid",
       "file": "ep_spi.c",
       "line": 16,
@@ -6491,7 +6523,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-406",
+      "id": "FM-408",
       "item": "rcp_ep_spi_mode_cpol",
       "file": "ep_spi.c",
       "line": 22,
@@ -6507,7 +6539,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-407",
+      "id": "FM-409",
       "item": "rcp_ep_spi_mode_cpha",
       "file": "ep_spi.c",
       "line": 34,
@@ -6523,7 +6555,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-408",
+      "id": "FM-410",
       "item": "rcp_ep_spi_trigger_fires",
       "file": "ep_spi.c",
       "line": 51,
@@ -6539,7 +6571,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-409",
+      "id": "FM-411",
       "item": "rcp_ep_spi_functional_cfg_init",
       "file": "ep_spi.c",
       "line": 65,
@@ -6555,7 +6587,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-410",
+      "id": "FM-412",
       "item": "rcp_ep_spi_strerror",
       "file": "ep_spi.c",
       "line": 170,
@@ -6571,7 +6603,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-411",
+      "id": "FM-413",
       "item": "rcp_authz_policy_new",
       "file": "authz.c",
       "line": 30,
@@ -6587,7 +6619,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-412",
+      "id": "FM-414",
       "item": "rcp_authz_policy_retain",
       "file": "authz.c",
       "line": 39,
@@ -6603,7 +6635,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-413",
+      "id": "FM-415",
       "item": "rcp_authz_policy_release",
       "file": "authz.c",
       "line": 45,
@@ -6619,7 +6651,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-414",
+      "id": "FM-416",
       "item": "rcp_authz_controller_set_identity",
       "file": "authz.c",
       "line": 201,
@@ -6635,7 +6667,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-415",
+      "id": "FM-417",
       "item": "rcp_tls_config_default",
       "file": "tls.c",
       "line": 9,
@@ -6651,7 +6683,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-416",
+      "id": "FM-418",
       "item": "rcp_tls_zone_server_ok",
       "file": "tls.c",
       "line": 96,
@@ -6667,7 +6699,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-417",
+      "id": "FM-419",
       "item": "rcp_tls_zone_server_set_handler",
       "file": "tls.c",
       "line": 103,
@@ -6683,7 +6715,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-418",
+      "id": "FM-420",
       "item": "rcp_tls_zone_server_set_healthy",
       "file": "tls.c",
       "line": 109,
@@ -6699,7 +6731,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-419",
+      "id": "FM-421",
       "item": "rcp_tls_zone_server_publish",
       "file": "tls.c",
       "line": 115,
@@ -6715,7 +6747,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-420",
+      "id": "FM-422",
       "item": "rcp_tls_zone_server_close",
       "file": "tls.c",
       "line": 121,
@@ -6731,7 +6763,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-421",
+      "id": "FM-423",
       "item": "rcp_tls_zone_server_destroy",
       "file": "tls.c",
       "line": 127,
@@ -6747,7 +6779,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-422",
+      "id": "FM-424",
       "item": "rcp_tls_registry_new",
       "file": "tls.c",
       "line": 184,
@@ -6763,7 +6795,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-423",
+      "id": "FM-425",
       "item": "rcp_regmap_is_ep0",
       "file": "regmap.c",
       "line": 8,
@@ -6779,7 +6811,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-424",
+      "id": "FM-426",
       "item": "rcp_regmap_options_group_consistent",
       "file": "regmap.c",
       "line": 19,
@@ -6795,7 +6827,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-425",
+      "id": "FM-427",
       "item": "rcp_regmap_general_init",
       "file": "regmap.c",
       "line": 40,
@@ -6811,7 +6843,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-426",
+      "id": "FM-428",
       "item": "rcp_regmap_ep_generic_cfg_init",
       "file": "regmap.c",
       "line": 73,
@@ -6827,7 +6859,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-427",
+      "id": "FM-429",
       "item": "rcp_regmap_ep_functional_cfg_init",
       "file": "regmap.c",
       "line": 79,
@@ -6843,7 +6875,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-428",
+      "id": "FM-430",
       "item": "rcp_regmap_named_signal_string",
       "file": "regmap.c",
       "line": 88,
@@ -6859,7 +6891,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-429",
+      "id": "FM-431",
       "item": "rcp_regmap_request_stream_cfg_init",
       "file": "regmap.c",
       "line": 141,
@@ -6875,7 +6907,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-430",
+      "id": "FM-432",
       "item": "rcp_regmap_response_queue_cfg_init",
       "file": "regmap.c",
       "line": 147,
@@ -6891,7 +6923,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-431",
+      "id": "FM-433",
       "item": "rcp_ep_gpio_pin_index_valid",
       "file": "ep_gpio.c",
       "line": 25,
@@ -6907,7 +6939,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-432",
+      "id": "FM-434",
       "item": "rcp_ep_gpio_pin_mask",
       "file": "ep_gpio.c",
       "line": 31,
@@ -6923,7 +6955,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-433",
+      "id": "FM-435",
       "item": "rcp_ep_gpio_pin_get",
       "file": "ep_gpio.c",
       "line": 38,
@@ -6939,7 +6971,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-434",
+      "id": "FM-436",
       "item": "rcp_ep_gpio_write_semantics_valid",
       "file": "ep_gpio.c",
       "line": 46,
@@ -6955,7 +6987,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-435",
+      "id": "FM-437",
       "item": "rcp_ep_gpio_apply_reconfig",
       "file": "ep_gpio.c",
       "line": 90,
@@ -6971,7 +7003,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-436",
+      "id": "FM-438",
       "item": "rcp_ep_gpio_trigger_fires",
       "file": "ep_gpio.c",
       "line": 113,
@@ -6987,7 +7019,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-437",
+      "id": "FM-439",
       "item": "rcp_ep_gpio_functional_cfg_init",
       "file": "ep_gpio.c",
       "line": 127,
@@ -7003,7 +7035,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-438",
+      "id": "FM-440",
       "item": "rcp_ep_gpio_strerror",
       "file": "ep_gpio.c",
       "line": 173,
@@ -7019,7 +7051,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-439",
+      "id": "FM-441",
       "item": "rcp_ep_gpio_encode_read_request",
       "file": "ep_gpio.c",
       "line": 189,
@@ -7035,7 +7067,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-440",
+      "id": "FM-442",
       "item": "rcp_request_type_is_safety",
       "file": "request_compound.c",
       "line": 31,
@@ -7051,7 +7083,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-441",
+      "id": "FM-443",
       "item": "rcp_request_type_is_compound",
       "file": "request_compound.c",
       "line": 37,
@@ -7067,7 +7099,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-442",
+      "id": "FM-444",
       "item": "rcp_request_type_is_compound_wait",
       "file": "request_compound.c",
       "line": 44,
@@ -7083,7 +7115,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-443",
+      "id": "FM-445",
       "item": "rcp_compound_strerror",
       "file": "request_compound.c",
       "line": 53,
@@ -7099,7 +7131,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-444",
+      "id": "FM-446",
       "item": "!rcp_request_type_is_compound_wait",
       "file": "request_compound.c",
       "line": 123,
@@ -7115,7 +7147,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-445",
+      "id": "FM-447",
       "item": "mtv=RCP_ACF_MTV_UNTIMED",
       "file": "request_compound.c",
       "line": 207,
@@ -7131,7 +7163,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-446",
+      "id": "FM-448",
       "item": "rcp_compound_exec_delay_elapsed",
       "file": "request_compound.c",
       "line": 259,
@@ -7147,7 +7179,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-447",
+      "id": "FM-449",
       "item": "rcp_wire_strerror",
       "file": "wire.c",
       "line": 7,
@@ -7163,7 +7195,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-448",
+      "id": "FM-450",
       "item": "rcp_wire_validate_header",
       "file": "wire.c",
       "line": 48,
@@ -7179,7 +7211,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-449",
+      "id": "FM-451",
       "item": "rcp_wire_encode_command",
       "file": "wire.c",
       "line": 84,
@@ -7195,7 +7227,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-450",
+      "id": "FM-452",
       "item": "rcp_wire_decode_command",
       "file": "wire.c",
       "line": 95,
@@ -7211,7 +7243,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-451",
+      "id": "FM-453",
       "item": "rcp_wire_encode_response",
       "file": "wire.c",
       "line": 114,
@@ -7227,7 +7259,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-452",
+      "id": "FM-454",
       "item": "rcp_wire_decode_response",
       "file": "wire.c",
       "line": 122,
@@ -7243,7 +7275,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-453",
+      "id": "FM-455",
       "item": "rcp_wire_encode_status",
       "file": "wire.c",
       "line": 140,
@@ -7259,7 +7291,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-454",
+      "id": "FM-456",
       "item": "rcp_wire_decode_status",
       "file": "wire.c",
       "line": 148,
@@ -7275,7 +7307,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-455",
+      "id": "FM-457",
       "item": "rcp_wire_encode_control",
       "file": "wire.c",
       "line": 166,
@@ -7291,7 +7323,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-456",
+      "id": "FM-458",
       "item": "rcp_someip_default_config",
       "file": "someipbr.c",
       "line": 5,
@@ -7307,7 +7339,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-457",
+      "id": "FM-459",
       "item": "rcp_someip_controller_new",
       "file": "someipbr.c",
       "line": 65,
@@ -7323,7 +7355,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-458",
+      "id": "FM-460",
       "item": "rcp_ep_mdio_addr_valid",
       "file": "ep_mdio.c",
       "line": 29,
@@ -7339,7 +7371,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-459",
+      "id": "FM-461",
       "item": "rcp_ep_mdio_burst_next_regad",
       "file": "ep_mdio.c",
       "line": 42,
@@ -7355,7 +7387,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-460",
+      "id": "FM-462",
       "item": "rcp_ep_mdio_word_encode",
       "file": "ep_mdio.c",
       "line": 55,
@@ -7371,7 +7403,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-461",
+      "id": "FM-463",
       "item": "rcp_ep_mdio_word_decode",
       "file": "ep_mdio.c",
       "line": 61,
@@ -7387,7 +7419,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-462",
+      "id": "FM-464",
       "item": "rcp_ep_mdio_pack_len",
       "file": "ep_mdio.c",
       "line": 67,
@@ -7403,7 +7435,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-463",
+      "id": "FM-465",
       "item": "rcp_ep_mdio_pack_words",
       "file": "ep_mdio.c",
       "line": 73,
@@ -7419,7 +7451,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-464",
+      "id": "FM-466",
       "item": "rcp_ep_mdio_word_count_of",
       "file": "ep_mdio.c",
       "line": 92,
@@ -7435,7 +7467,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-465",
+      "id": "FM-467",
       "item": "rcp_ep_mdio_unpack_word_at",
       "file": "ep_mdio.c",
       "line": 101,
@@ -7451,7 +7483,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-466",
+      "id": "FM-468",
       "item": "rcp_ep_mdio_functional_cfg_init",
       "file": "ep_mdio.c",
       "line": 109,
@@ -7467,7 +7499,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-467",
+      "id": "FM-469",
       "item": "rcp_ep_mdio_strerror",
       "file": "ep_mdio.c",
       "line": 125,
@@ -7483,7 +7515,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-468",
+      "id": "FM-470",
       "item": "rcp_recorder_new",
       "file": "recorder.c",
       "line": 18,
@@ -7499,7 +7531,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-469",
+      "id": "FM-471",
       "item": "rcp_recorder_destroy",
       "file": "recorder.c",
       "line": 26,
@@ -7515,7 +7547,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-470",
+      "id": "FM-472",
       "item": "rcp_recorder_size",
       "file": "recorder.c",
       "line": 40,
@@ -7531,7 +7563,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-471",
+      "id": "FM-473",
       "item": "rcp_recorder_entries",
       "file": "recorder.c",
       "line": 49,
@@ -7547,7 +7579,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-472",
+      "id": "FM-474",
       "item": "rcp_recorder_write_binary",
       "file": "recorder.c",
       "line": 116,
@@ -7563,7 +7595,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-473",
+      "id": "FM-475",
       "item": "write_field",
       "file": "recorder.c",
       "line": 140,
@@ -7579,7 +7611,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-474",
+      "id": "FM-476",
       "item": "write_field",
       "file": "recorder.c",
       "line": 141,
@@ -7595,7 +7627,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-475",
+      "id": "FM-477",
       "item": "write_field",
       "file": "recorder.c",
       "line": 142,
@@ -7611,7 +7643,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-476",
+      "id": "FM-478",
       "item": "write_field",
       "file": "recorder.c",
       "line": 143,
@@ -7627,7 +7659,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-477",
+      "id": "FM-479",
       "item": "write_field",
       "file": "recorder.c",
       "line": 144,
@@ -7643,7 +7675,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-478",
+      "id": "FM-480",
       "item": "write_bytes",
       "file": "recorder.c",
       "line": 145,
@@ -7659,7 +7691,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-479",
+      "id": "FM-481",
       "item": "write_field",
       "file": "recorder.c",
       "line": 146,
@@ -7675,7 +7707,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-480",
+      "id": "FM-482",
       "item": "write_field",
       "file": "recorder.c",
       "line": 147,
@@ -7691,7 +7723,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-481",
+      "id": "FM-483",
       "item": "rcp_recorder_controller_new",
       "file": "recorder.c",
       "line": 212,
@@ -7707,7 +7739,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-482",
+      "id": "FM-484",
       "item": "rcp_playback_default_config",
       "file": "recorder.c",
       "line": 225,
@@ -7723,7 +7755,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-483",
+      "id": "FM-485",
       "item": "rcp_sequencer_table_new",
       "file": "request_sequencer.c",
       "line": 9,
@@ -7739,7 +7771,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-484",
+      "id": "FM-486",
       "item": "rcp_sequencer_table_unsupported",
       "file": "request_sequencer.c",
       "line": 27,
@@ -7755,7 +7787,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-485",
+      "id": "FM-487",
       "item": "rcp_sequencer_table_reset",
       "file": "request_sequencer.c",
       "line": 33,
@@ -7771,7 +7803,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-486",
+      "id": "FM-488",
       "item": "rcp_sequencer_table_free",
       "file": "request_sequencer.c",
       "line": 40,
@@ -7787,7 +7819,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-487",
+      "id": "FM-489",
       "item": "rcp_sequencer_index_valid",
       "file": "request_sequencer.c",
       "line": 48,
@@ -7803,7 +7835,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-488",
+      "id": "FM-490",
       "item": "rcp_sequencer_set_state",
       "file": "request_sequencer.c",
       "line": 65,
@@ -7819,7 +7851,135 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-489",
+      "id": "FM-491",
+      "item": "rcp_status_channel_release",
+      "file": "legacy_mock.c",
+      "line": 142,
+      "failureMode": "rcp_status_channel_release (general function) does not perform its intended action",
+      "effect": "Failure of rcp_status_channel_release could propagate undetected to callers in legacy_mock.c",
+      "cause": "Logic error or untested edge case in rcp_status_channel_release",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-492",
+      "item": "rcp_status_channel_release",
+      "file": "legacy_mock.c",
+      "line": 147,
+      "failureMode": "rcp_status_channel_release (general function) does not perform its intended action",
+      "effect": "Failure of rcp_status_channel_release could propagate undetected to callers in legacy_mock.c",
+      "cause": "Logic error or untested edge case in rcp_status_channel_release",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-493",
+      "item": "rcp_mock_controller_publish",
+      "file": "legacy_mock.c",
+      "line": 213,
+      "failureMode": "rcp_mock_controller_publish (general function) does not perform its intended action",
+      "effect": "Failure of rcp_mock_controller_publish could propagate undetected to callers in legacy_mock.c",
+      "cause": "Logic error or untested edge case in rcp_mock_controller_publish",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-494",
+      "item": "rcp_bytes_dup",
+      "file": "legacy_mock.c",
+      "line": 226,
+      "failureMode": "rcp_bytes_dup (general function) does not perform its intended action",
+      "effect": "Failure of rcp_bytes_dup could propagate undetected to callers in legacy_mock.c",
+      "cause": "Logic error or untested edge case in rcp_bytes_dup",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-495",
+      "item": "free",
+      "file": "legacy_mock.c",
+      "line": 285,
+      "failureMode": "free (general function) does not perform its intended action",
+      "effect": "Failure of free could propagate undetected to callers in legacy_mock.c",
+      "cause": "Logic error or untested edge case in free",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-496",
+      "item": "rcp_mock_controller_new",
+      "file": "legacy_mock.c",
+      "line": 299,
+      "failureMode": "rcp_mock_controller_new (general function) does not perform its intended action",
+      "effect": "Failure of rcp_mock_controller_new could propagate undetected to callers in legacy_mock.c",
+      "cause": "Logic error or untested edge case in rcp_mock_controller_new",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-497",
+      "item": "free",
+      "file": "legacy_mock.c",
+      "line": 470,
+      "failureMode": "free (general function) does not perform its intended action",
+      "effect": "Failure of free could propagate undetected to callers in legacy_mock.c",
+      "cause": "Logic error or untested edge case in free",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-498",
+      "item": "rcp_mock_registry_new",
+      "file": "legacy_mock.c",
+      "line": 484,
+      "failureMode": "rcp_mock_registry_new (general function) does not perform its intended action",
+      "effect": "Failure of rcp_mock_registry_new could propagate undetected to callers in legacy_mock.c",
+      "cause": "Logic error or untested edge case in rcp_mock_registry_new",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-499",
       "item": "setUp",
       "file": "bench_mock.c",
       "line": 51,
@@ -7835,7 +7995,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-490",
+      "id": "FM-500",
       "item": "tearDown",
       "file": "bench_mock.c",
       "line": 52,
@@ -7851,7 +8011,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-491",
+      "id": "FM-501",
       "item": "printf",
       "file": "bench_mock.c",
       "line": 58,
@@ -7867,7 +8027,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-492",
+      "id": "FM-502",
       "item": "main",
       "file": "bench_mock.c",
       "line": 221,
@@ -7883,7 +8043,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-493",
+      "id": "FM-503",
       "item": "main",
       "file": "main.c",
       "line": 11,
@@ -7900,7 +8060,7 @@
     }
   ],
   "summary": {
-    "total": 493, "highPriority": 68,
-    "componentsAnalyzed": 493, "componentsInProject": 493, "coveragePct": 100
+    "total": 503, "highPriority": 69,
+    "componentsAnalyzed": 503, "componentsInProject": 503, "coveragePct": 100
   }
 }
