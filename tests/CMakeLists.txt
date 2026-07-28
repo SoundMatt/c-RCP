@@ -118,6 +118,16 @@ target_link_libraries(test_ep_mdio PRIVATE rcp::rcp unity)
 target_compile_options(test_ep_mdio PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_ep_mdio COMMAND test_ep_mdio)
 
+add_executable(test_power test_power.c)
+target_link_libraries(test_power PRIVATE rcp::rcp unity)
+target_compile_options(test_power PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_power COMMAND test_power)
+
+add_executable(test_ep_wakeup test_ep_wakeup.c)
+target_link_libraries(test_ep_wakeup PRIVATE rcp::rcp unity)
+target_compile_options(test_ep_wakeup PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_ep_wakeup COMMAND test_ep_wakeup)
+
 add_executable(test_request_sequencer test_request_sequencer.c)
 target_link_libraries(test_request_sequencer PRIVATE rcp::rcp unity)
 target_compile_options(test_request_sequencer PRIVATE ${RCP_TEST_WARNING_FLAGS})

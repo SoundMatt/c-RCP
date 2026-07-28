@@ -3409,7 +3409,7 @@ failing that same CI job, on `main` at this milestone's own base commit
 `main` since v0.72.0's own merge for this same reason) — not introduced or
 touched here.
 
-### 75. Wakeup control endpoint + power modes (v0.75.0)
+### 75. Wakeup control endpoint + power modes (v0.75.0) ✅
 
 - `include/rcp/ep_wakeup.h` + `src/ep_wakeup.c`: the dedicated
   power-management endpoint (`ep_type=0x01`) — wake-source pin
@@ -3430,6 +3430,96 @@ touched here.
   Disposition — the client-side convenience wrapper moves to Satellite
   Rework v0.79.0, built on top of this milestone's actual protocol
   mechanism).
+
+**Requirement-id naming note**: verified directly against `.fusa-reqs.json`
+before picking prefixes for *both* new modules. A pre-existing
+`REQ-PWR-001`..`010` group already exists (`src/powerstate.c`, the legacy
+v0.13.0 client-side Active/Sleeping/BusOff satellite manager — untouched by
+this milestone; its own REPLACE work is Satellite Rework v0.79.0), so
+`power.h`/`power.c` deliberately use the distinct prefix `REQ-PWRMODE-*`
+(13 requirements) rather than colliding with or renumbering that
+pre-existing group. `ep_wakeup.h`/`ep_wakeup.c` carry no pre-existing
+`REQ-WAKEUP-*` group of any kind, so they use that prefix plain, 16
+requirements, no collision-avoidance suffix needed — the same check every
+prior endpoint milestone has made.
+
+**Done (v0.75.0)**: `include/rcp/power.h` + `src/power.c` land as new,
+additive protocol-core surface, cross-referencing `lifecycle.h` (not
+`server.h`) for lifecycle-state concerns, per the module boundary the
+#87/#88 naming split established. `rcp_pwrmode_t` names the four modes
+under its own `rcp_pwrmode_`/`RCP_PWRMODE_` prefix, deliberately distinct
+from `powerstate.h`'s own `rcp_power_state_t`/`RCP_POWER_*` names to avoid
+any symbol collision and to keep this module visibly separate from the
+legacy client-side model it supersedes at the wire level.
+`rcp_pwrmode_transition()` implements the general Normal/StandBy/Sleep/
+Unpowered transition table (Normal↔StandBy hot; Normal/StandBy→Sleep,
+any→Unpowered, and Unpowered→Normal cold; anything else, including
+Sleep→Normal, rejected — the latter routed instead through its own
+function). `rcp_pwrmode_wake_from_sleep()` classifies waking from Sleep:
+always hot for a network-level wake path (`RCP_PWRMODE_WAKE_VIA_NETWORK`,
+the roadmap's TC14/TC10 signal), and for a pin-level wake
+(`RCP_PWRMODE_WAKE_VIA_PIN`) hot only once the caller has driven
+`rcp_pwrmode_handshake_t` through all four handshake steps
+(`_iface_reenabled()` → repeated `_wakeup_attempt()` until echoed or its
+own repeat-limit is hit → `_resume_queues()`), cold otherwise — this
+module's own explicit, directly-testable state machine for the roadmap's
+four-step sequence, rather than documented prose. `rcp_pwrmode_check_entry()`
+is the shared StandBy/Sleep entry-refusal gate, taking plain bools
+(`wup_status_clear`, `endpoint_idle`, `response_queue_empty`) rather than
+reaching into any endpoint module directly, keeping this module
+endpoint-agnostic; a `NULL` gate is treated as refused, the same
+fail-safe convention `lifecycle.h`'s own NULL-snapshot handling already
+established.
+
+`include/rcp/ep_wakeup.h` + `src/ep_wakeup.c` land alongside it as this
+endpoint type's own wire encoding (`ep_type=0x01`). SleepCMD gets its own
+dedicated, non-taxonomy wire encoding — an ACF_ABB message whose payload
+is the fixed `RCP_EP_WAKEUP_SLEEPCMD_OPCODE` (`0xA5`) marker byte followed
+by the requested `rcp_pwrmode_t` target (`RCP_PWRMODE_STANDBY` or
+`RCP_PWRMODE_SLEEP` only; anything else rejected with
+`RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE`), entirely outside the message_timestamp-
+repurposing convention `request_compound.h`/`request_triggered.h`/
+`request_chained.h`/`request_timed.h`/`request_cancel.h` share — with a
+response carrying `power.h`'s own `rcp_pwrmode_entry_result_t` outcome.
+`rcp_ep_wakeup_encode_wakeup_message()` is this endpoint's own dedicated
+emission path (its own fixed `RCP_EP_WAKEUP_WAKEUP_OPCODE` marker,
+distinct from SleepCMD's own byte) replacing the generic trigger-signal
+mechanism every other endpoint type uses — there is no
+`rcp_ep_wakeup_trigger_t` anywhere in this file.
+`rcp_ep_wakeup_is_wakeup_echo()` is the small predicate feeding
+`power.h`'s handshake step (b) its own `echoed` argument.
+`rcp_ep_wakeup_functional_cfg_t` composes `regmap.h`'s shared prefix and
+adds its own `sources[RCP_EP_WAKEUP_MAX_SOURCES]` (8) wake-source table
+(`enabled` + `active_high` polarity per slot), with
+`rcp_ep_wakeup_source_asserted()`/`_any_source_asserted()` as small, pure,
+directly-testable statements of which sources currently indicate a wake
+condition given caller-sampled raw pin levels; `rcp_ep_wakeup_wup_status_t`
+is this module's own minimal `wup_status` latch
+(`_latch()`/`_clear()`/`_is_clear()`), which a caller wires into `power.h`'s
+`rcp_pwrmode_entry_gate_t` — the two modules are deliberately not
+compile-coupled the other way (`power.h` does not include `ep_wakeup.h`).
+
+`tests/test_power.c` (32 cases covering the general transition table, the
+hot/cold wake-from-Sleep classification for both wake paths, the
+handshake state machine including out-of-order-call rejection and
+repeat-limit exhaustion, and the entry-refusal gate) and
+`tests/test_ep_wakeup.c` (28 cases covering wake-source polarity/
+monitoring, the wup_status latch, SleepCMD request/response round trips
+and their short-frame/wrong-bus/wrong-message-type/bad-opcode/bad-target-
+mode rejection, the WakeUp message round trip, and echo recognition) both
+pass, alongside the full existing `ctest` suite (66/66, ASan/UBSan-clean,
+verified locally). `cfusa lint`/`analyze`/`cyber`/`vuln`/`qualify`,
+`cfusa trace --req-coverage 100`, and `relay conform --strict` were not
+re-run locally in this pass (no local `cfusa`/`relay` toolchain available
+in this environment) — left for this PR's own CI run to confirm, as
+every prior milestone's own CI run already does independently of this
+note. `cfusa check`'s own HARA002/HARA003 findings (10 hazards in
+`.fusa-hara.json` each missing a risk rating and a `safetyGoals`
+reference) are the same pre-existing gap ep_mdio.h's own v0.74.0 entry
+above already documents — confirmed still present in `.fusa-hara.json` at
+this milestone's own base commit (`b85c351`, before this branch's own
+changes; CI has been red on `main` since v0.72.0's own merge for this
+same reason) — not introduced or touched here.
 
 ---
 ### Phase 20 — Fragmentation
