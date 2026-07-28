@@ -67,10 +67,11 @@
  * mtv, so this module decodes through it unmodified and reinterprets the
  * result itself.
  *
- * request_type values this module recognizes (any other request_type byte
- * is out of this milestone's scope -- see ROADMAP.md milestone 69 for
- * chained 0x01, clear-all 0x05, clear-single 0x07, timed 0x0A, and
- * triggered 0x0E/0x8E):
+ * request_type values this module recognizes (every other request_type
+ * byte this shared convention carries is a peer module's own, landed
+ * alongside this one at milestone 69: chained 0x01 -- chained.h, clear-all
+ * 0x05 and clear-single 0x07 -- cancel.h, timed 0x0A -- timed.h, and
+ * triggered 0x0E/0x8E -- triggered.h):
  *
  *   0x06       clear-non-safestate (this module's own cancellation
  *              request; no safety-tagged counterpart of its own)

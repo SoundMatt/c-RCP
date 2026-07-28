@@ -2896,7 +2896,7 @@ requirements (`REQ-SEQ-001`..`011`, `REQ-CMP-001`..`024`) added to
 `cfusa check`/`lint`/`analyze`/`cyber`/`vuln`/`qualify` (0 errors) stay
 green, and the full `ctest` suite stays green.
 
-### 69. Triggered/chained/timed requests + cancellation taxonomy (v0.69.0)
+### 69. Triggered/chained/timed requests + cancellation taxonomy (v0.69.0) ✅
 
 - Triggered (`0x0E`/`0x8E`): trigger-occurrence counter reset on
   entering "started," counting independent of the endpoint's idle/busy
@@ -2925,6 +2925,62 @@ green, and the full `ctest` suite stays green.
 - Multi-request-per-frame handling: independent per-ACF-message
   evaluation, one presentation time applying uniformly to every entry in
   a TSCF-headed frame (no mixed timed/untimed within one AVTPDU).
+
+**Done (v0.69.0)**: five new peer modules land alongside compound.h/
+compound.c (milestone 68), each following that module's exact
+architectural template rather than depending on it directly — every
+module (`triggered.h`/`triggered.c`, `chained.h`/`chained.c`, `timed.h`/
+`timed.c`, `cancel.h`/`cancel.c`) that reuses the message_timestamp-
+repurposing convention owns its own small pure helpers instead of
+including compound.h, matching this project's established "one concept,
+one module" layering discipline; nothing in `rcp.h`, `wire.c`, `avtp.h`/
+`avtp.c`, `acf.h`/`acf.c`, `server.h`/`server.c`, `regmap.h`/`regmap.c`,
+or any `ep_*` module is touched by any of them.
+`triggered.h`/`triggered.c` implement the trigger-occurrence counter
+(`rcp_triggered_runtime_t`, reset by `rcp_triggered_runtime_enter_started()`
+and free-running via `rcp_triggered_runtime_record_occurrence()`
+independent of endpoint idle/busy state) and `rcp_triggered_tick()`'s own
+idle-gated fire transition, plus the wire-level `trigger_exec_delay_ms`
+timer and the 16-bit `RCP_TRIGGERED_REPEAT_INFINITE` (`0xFFFF`) sentinel
+(round-tripped only, mirroring compound's own `repeat_count` precedent).
+`chained.h`/`chained.c` give acf.h's previously inert, round-tripped `cs`
+field its first real behavior — `rcp_chained_advance()` is the pure,
+per-member sequencing step implementing abort-on-error vs.
+continue-regardless and reporting `RCP_CHAINED_MEMBER_CHAIN_ERROR`/
+`_CHAIN_ABORTED` (this module's own spelling of `CHAIN_ERROR`/
+`CHAIN_ABORTED`) per member. `timed.h`/`timed.c` implement
+presentation-time admission via `rcp_timed_admit()`
+(`RCP_TIMED_REJECT_GPTP_FAIL` takes priority over
+`RCP_TIMED_REJECT_PRESENTATION_TIME_TOO_FAR`, wraparound-safe, a past
+presentation_time is never "too far"), gated on
+`rcp_timed_feature_enabled()` reading regmap.h's already-published
+time-sync option bits. `cancel.h`/`cancel.c` complete the cancellation
+taxonomy alongside milestone 68's clear-non-safestate: clear-all (`0x05`)
+and clear-single (`0x07`, `REQUEST_NOT_FOUND` on a miss via
+`rcp_cancel_attempt()`), plus the shared queued-vs-executing
+cancellability window (`rcp_cancel_is_cancellable()`) and the
+chained-successor cascade rule (`rcp_cancel_chain_should_cascade()`).
+`scheduler.h`/`scheduler.c` are new protocol-core surface (not an
+adaptation of `prioqueue.c`, which stays in the tree DEPRECATE-dispositioned
+per the Satellite Disposition table until its own scheduled removal
+milestone): `rcp_sched_classify()`/`rcp_sched_kind_rank()`/
+`rcp_sched_compare()` implement the
+cancellation > triggered > timed > compound > compound-wait > chained >
+standard priority ordering with FIFO tie-breaking as a genuine total
+order, and `rcp_sched_split_frame_members()`/
+`rcp_sched_frame_timing_consistent()` implement multi-request-per-frame
+handling (independent per-member evaluation, reading only acf.h's
+already-published header layout; one presentation time applies uniformly
+across every member of a TSCF-headed frame, mixed timed/untimed rejected).
+`tests/test_triggered.c` (17 cases), `tests/test_chained.c` (11 cases),
+`tests/test_timed.c` (12 cases), `tests/test_cancel.c` (12 cases), and
+`tests/test_scheduler.c` (18 cases) — all five ASan/UBSan-clean — and 51
+new requirements (`REQ-TRIG-001`..`013`, `REQ-CHAIN-001`..`010`,
+`REQ-TIMED-001`..`008`, `REQ-CANCEL-001`..`012`, `REQ-SCHED-001`..`008`)
+added to `.fusa-reqs.json`; `cfusa trace --req-coverage 100` (both
+metrics) and `cfusa check`/`lint`/`analyze`/`cyber`/`vuln`/`qualify` (0
+errors) stay green, and the full `ctest` suite and `relay conform
+--strict` both stay green.
 
 ---
 ### Phase 18 — E2E Protection (Safe Points)
