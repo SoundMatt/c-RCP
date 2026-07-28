@@ -38,6 +38,11 @@ target_link_libraries(test_wire PRIVATE rcp::rcp unity)
 target_compile_options(test_wire PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_wire COMMAND test_wire)
 
+add_executable(test_avtp test_avtp.c)
+target_link_libraries(test_avtp PRIVATE rcp::rcp unity)
+target_compile_options(test_avtp PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_avtp COMMAND test_avtp)
+
 add_executable(test_udp test_udp.c)
 target_link_libraries(test_udp PRIVATE rcp::rcp unity)
 target_compile_options(test_udp PRIVATE ${RCP_TEST_WARNING_FLAGS})

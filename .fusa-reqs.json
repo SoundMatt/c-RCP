@@ -3071,6 +3071,166 @@
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM"
+    },
+    {
+      "id": "REQ-AVTP-001",
+      "title": "NTSCF AVTP subtype value",
+      "text": "The AVTPDU subtype byte (offset 0) of every NTSCF header shall equal RCP_AVTP_SUBTYPE_NTSCF (0x82), the IEEE 1722 base-standard subtype for the Non-Time-Synchronous Control Format.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-002",
+      "title": "TSCF AVTP subtype value",
+      "text": "The AVTPDU subtype byte (offset 0) of every TSCF header shall equal RCP_AVTP_SUBTYPE_TSCF (0x05), the IEEE 1722 base-standard subtype for the Time-Synchronous Control Format.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-003",
+      "title": "NTSCF header round-trip",
+      "text": "rcp_avtp_decode_ntscf() applied to the output of rcp_avtp_encode_ntscf() shall recover the original sv, version, sequence_num, stream_id, and payload bytes unchanged.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-004",
+      "title": "TSCF header round-trip",
+      "text": "rcp_avtp_decode_tscf() applied to the output of rcp_avtp_encode_tscf() shall recover the original sv, version, mr, tv, tu, sequence_num, stream_id, avtp_timestamp, and payload bytes unchanged.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-005",
+      "title": "NTSCF decode rejects a frame shorter than the fixed header",
+      "text": "rcp_avtp_decode_ntscf() shall return RCP_AVTP_ERR_SHORT_FRAME if given fewer than RCP_AVTP_NTSCF_HEADER_LEN bytes.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-006",
+      "title": "TSCF decode rejects a frame shorter than the fixed header",
+      "text": "rcp_avtp_decode_tscf() shall return RCP_AVTP_ERR_SHORT_FRAME if given fewer than RCP_AVTP_TSCF_HEADER_LEN bytes.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-007",
+      "title": "NTSCF decode rejects a mismatched subtype",
+      "text": "rcp_avtp_decode_ntscf() shall return RCP_AVTP_ERR_BAD_SUBTYPE if byte 0 of the input is not RCP_AVTP_SUBTYPE_NTSCF, including when it is RCP_AVTP_SUBTYPE_TSCF.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-008",
+      "title": "TSCF decode rejects a mismatched subtype",
+      "text": "rcp_avtp_decode_tscf() shall return RCP_AVTP_ERR_BAD_SUBTYPE if byte 0 of the input is not RCP_AVTP_SUBTYPE_TSCF, including when it is RCP_AVTP_SUBTYPE_NTSCF.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-009",
+      "title": "Decoders reject a declared payload length exceeding the supplied buffer",
+      "text": "rcp_avtp_decode_ntscf() and rcp_avtp_decode_tscf() shall return RCP_AVTP_ERR_SHORT_FRAME whenever the header's declared data-length field describes a payload extending past the end of the supplied buffer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-010",
+      "title": "stream_id packs to and unpacks from its 64-bit on-wire form",
+      "text": "rcp_stream_id_from_u64(rcp_stream_id_to_u64(id)) shall recover a stream_id equal (per rcp_stream_id_equal()) to the original id for any MAC and unique_id, and rcp_stream_id_make() shall construct a stream_id from a given MAC and unique_id unchanged.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-011",
+      "title": "stream_id equality compares both MAC and unique_id",
+      "text": "rcp_stream_id_equal() shall return false if either the MAC or the unique_id differs between its two arguments, and true only if both match.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-012",
+      "title": "AVTP address equality requires a matching byte_bus_id, not just stream_id",
+      "text": "rcp_avtp_addr_equal() shall return false for two addresses that share a stream_id but differ in byte_bus_id, and true only when both the stream_id and byte_bus_id match.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-013",
+      "title": "rcp_avtp_peek_subtype() reads the subtype byte without a full header",
+      "text": "rcp_avtp_peek_subtype() shall report the AVTPDU's subtype byte (offset 0) from a buffer as short as 1 byte, and shall return RCP_AVTP_ERR_SHORT_FRAME for a zero-length buffer.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-AVTP-014",
+      "title": "TSCF-without-time-sync is unconditionally dropped",
+      "text": "rcp_avtp_should_drop_tscf() shall return true if and only if subtype equals RCP_AVTP_SUBTYPE_TSCF and server_time_sync_supported is false; it shall return false for RCP_AVTP_SUBTYPE_NTSCF regardless of server_time_sync_supported, and false for RCP_AVTP_SUBTYPE_TSCF when server_time_sync_supported is true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-015",
+      "title": "rcp_avtp_strerror() returns a unique human-readable message",
+      "text": "rcp_avtp_strerror() shall return a unique, non-empty message for each defined rcp_avtp_errc_t constant, including RCP_AVTP_OK.",
+      "standard": "iso26262",
+      "level": "ASIL-A",
+      "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-AVTP-016",
+      "title": "AVTP transport refcounting releases exactly at zero",
+      "text": "rcp_avtp_transport_retain() shall increment a transport's refcount and return the same pointer; rcp_avtp_transport_release() shall invoke the transport's destroy() callback only once its refcount reaches zero, and never before.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-017",
+      "title": "Loopback transport delivers frames in FIFO order",
+      "text": "A frame enqueued via the loopback transport's send() shall be returned by a subsequent recv() unchanged and in the same relative order as other queued frames.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-018",
+      "title": "Loopback transport recv() honors a context deadline",
+      "text": "The loopback transport's recv() shall return RCP_ERR_TIMEOUT if no frame becomes available before the given rcp_context_t's deadline elapses.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-019",
+      "title": "Loopback transport rejects operations after close()",
+      "text": "After the loopback transport's close() has been called, send() shall return RCP_ERR_CLOSED, and recv() shall return RCP_ERR_CLOSED once any already-queued frames are exhausted.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-AVTP-020",
+      "title": "Loopback transport enforces its configured queue capacity",
+      "text": "The loopback transport's send() shall return RCP_ERR_BUSY once the number of undelivered queued frames reaches the capacity given to rcp_avtp_loopback_transport_new().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     }
   ]
 }
