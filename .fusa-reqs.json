@@ -6703,6 +6703,198 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-001",
+      "title": "rcp_ep_iseled_symbol_encode() frames a nibble as a 5-bit even-parity symbol",
+      "text": "rcp_ep_iseled_symbol_encode() shall return a value in 0..31 whose bit 4 equals the even parity of bits [3:0], with bits [3:0] equal to the input nibble masked to its own low 4 bits.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-002",
+      "title": "rcp_ep_iseled_symbol_decode() validates a symbol's parity bit",
+      "text": "rcp_ep_iseled_symbol_decode() shall return true and set *out_nibble to bits [3:0] of the symbol iff bit 4 equals the even parity of bits [3:0], and shall return false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-003",
+      "title": "rcp_ep_iseled_bitframe_encoded_len() reports two symbols per content octet",
+      "text": "rcp_ep_iseled_bitframe_encoded_len(data_len, append_crc) shall return 2 * (data_len + (append_crc ? 1 : 0)).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-004",
+      "title": "rcp_ep_iseled_encode_bitframe() produces only valid, round-trippable symbols",
+      "text": "rcp_ep_iseled_encode_bitframe() shall produce exactly rcp_ep_iseled_bitframe_encoded_len(data_len, append_crc) octets, each holding a value in 0..31 that rcp_ep_iseled_symbol_decode() accepts.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-005",
+      "title": "rcp_ep_iseled_encode_bitframe() appends the CRC-8 trailer when append_crc is true",
+      "text": "rcp_ep_iseled_encode_bitframe() shall, when append_crc is true, frame rcp_ep_iseled_crc8(data, data_len) as one extra trailing content octet after the data octets and before symbol expansion.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-006",
+      "title": "rcp_ep_iseled_crc8() is a deterministic, input-sensitive CRC-8",
+      "text": "rcp_ep_iseled_crc8() shall return the same value for the same input, shall return 0x00 for a zero-length input, and shall return a different value for two inputs that differ in content.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-007",
+      "title": "rcp_ep_iseled_requires_isp_n() reflects recovered-clock mode",
+      "text": "rcp_ep_iseled_requires_isp_n() shall return false iff use_rcv_clk is true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-008",
+      "title": "rcp_ep_iseled_trigger_fires() evaluates the single transmission-complete trigger",
+      "text": "rcp_ep_iseled_trigger_fires() shall return false for RCP_EP_ISELED_TRIGGER_NONE regardless of tx_complete_event, and for RCP_EP_ISELED_TRIGGER_TX_COMPLETE shall return the value of tx_complete_event.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-009",
+      "title": "rcp_ep_iseled_functional_cfg_init() zero-initializes the functional config",
+      "text": "rcp_ep_iseled_functional_cfg_init() shall set every rcp_regmap_ep_functional_cfg_t flag false, iseled_bit_clk_divider to 0, iseled_use_rcv_clk and iseled_crc_enable to false, and trigger to RCP_EP_ISELED_TRIGGER_NONE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-010",
+      "title": "rcp_ep_iseled_functional_cfg_writable() wraps server.h's field-writability authorization",
+      "text": "rcp_ep_iseled_functional_cfg_writable() shall return the result of rcp_server_field_writable() called with kind RCP_SERVER_FIELD_FUNCTIONAL_W.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-011",
+      "title": "rcp_ep_iseled_set_bit_clk_divider() is gated by functional-config writability",
+      "text": "rcp_ep_iseled_set_bit_clk_divider() shall apply the write and return true iff rcp_ep_iseled_functional_cfg_writable() authorizes it for the given state/writer, and shall leave cfg unchanged and return false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-012",
+      "title": "rcp_ep_iseled_set_use_rcv_clk() is gated by functional-config writability",
+      "text": "rcp_ep_iseled_set_use_rcv_clk() shall apply the write and return true iff rcp_ep_iseled_functional_cfg_writable() authorizes it for the given state/writer, and shall leave cfg unchanged and return false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-013",
+      "title": "rcp_ep_iseled_set_crc_enable() is gated by functional-config writability",
+      "text": "rcp_ep_iseled_set_crc_enable() shall apply the write and return true iff rcp_ep_iseled_functional_cfg_writable() authorizes it for the given state/writer, and shall leave cfg unchanged and return false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-014",
+      "title": "rcp_ep_iseled_set_trigger() is gated by functional-config writability",
+      "text": "rcp_ep_iseled_set_trigger() shall apply the write and return true iff rcp_ep_iseled_functional_cfg_writable() authorizes it for the given state/writer, and shall leave cfg unchanged and return false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-015",
+      "title": "rcp_ep_iseled_strerror() never returns NULL and is distinct per code",
+      "text": "rcp_ep_iseled_strerror() shall return a non-NULL, non-empty string for every rcp_ep_iseled_errc_t value (including an unknown value), with a distinct string for each defined value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-016",
+      "title": "rcp_ep_iseled_decode_bitframe() rejects an odd symbol count",
+      "text": "rcp_ep_iseled_decode_bitframe() shall return RCP_EP_ISELED_ERR_ODD_SYMBOL_COUNT iff symbol_count is odd.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-017",
+      "title": "rcp_ep_iseled_decode_bitframe() rejects an invalid symbol",
+      "text": "rcp_ep_iseled_decode_bitframe() shall return RCP_EP_ISELED_ERR_BAD_SYMBOL iff any symbol in symbols[0..symbol_count) fails rcp_ep_iseled_symbol_decode().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-018",
+      "title": "rcp_ep_iseled_decode_bitframe() rejects too few symbols when a CRC trailer is expected",
+      "text": "rcp_ep_iseled_decode_bitframe() shall return RCP_EP_ISELED_ERR_SHORT_FRAME iff expect_crc is true and symbol_count yields fewer than one reconstructed content octet.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-019",
+      "title": "rcp_ep_iseled_decode_bitframe() rejects a native ISELED CRC-8 mismatch",
+      "text": "rcp_ep_iseled_decode_bitframe() shall return RCP_EP_ISELED_ERR_CRC_MISMATCH iff expect_crc is true and the trailing reconstructed octet does not equal rcp_ep_iseled_crc8() of the preceding reconstructed octets.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-020",
+      "title": "rcp_ep_iseled_decode_bitframe() round-trips rcp_ep_iseled_encode_bitframe()'s output",
+      "text": "rcp_ep_iseled_decode_bitframe() shall, for symbols produced by rcp_ep_iseled_encode_bitframe(data, data_len, append_crc) with matching expect_crc, return RCP_EP_ISELED_OK and populate *out_data with exactly data[0..data_len).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-021",
+      "title": "rcp_ep_iseled_encode_command_request() carries the caller's plain payload verbatim as ACF_OP_WRITE",
+      "text": "rcp_ep_iseled_encode_command_request() shall encode an ACF_ABB frame addressed to byte_bus_id with op RCP_ACF_OP_WRITE and payload exactly tx_data[0..tx_len), unmodified.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-022",
+      "title": "rcp_ep_iseled_decode_command_request() validates and decodes an ACF-level command request",
+      "text": "rcp_ep_iseled_decode_command_request() shall return RCP_EP_ISELED_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header or its declared payload, RCP_EP_ISELED_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_ISELED_ERR_WRONG_BUS for a mismatched byte_bus_id, RCP_EP_ISELED_ERR_WRONG_OP for an op other than RCP_ACF_OP_WRITE, and otherwise RCP_EP_ISELED_OK with the plain payload and transaction number populated.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-023",
+      "title": "rcp_ep_iseled_encode_response() encodes timed and untimed responses",
+      "text": "rcp_ep_iseled_encode_response() shall encode an ACF_GBB frame with message_timestamp set to timestamp and mtv RCP_ACF_MTV_VALID when timed is true, and an ACF_ABB frame otherwise, in both cases with payload exactly rx_data[0..rx_len) and op RCP_ACF_OP_READ.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-024",
+      "title": "rcp_ep_iseled_decode_response() validates and decodes either ACF_ABB or ACF_GBB responses",
+      "text": "rcp_ep_iseled_decode_response() shall accept either an ACF_ABB or ACF_GBB frame, return RCP_EP_ISELED_ERR_SHORT_FRAME for a frame too short for the applicable header or declared payload, RCP_EP_ISELED_ERR_WRONG_BUS for a mismatched byte_bus_id, and otherwise RCP_EP_ISELED_OK with the plain payload, transaction number, and timed/timestamp populated.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     }
   ]
 }
