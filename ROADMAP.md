@@ -2719,7 +2719,7 @@ touched.
   (0 errors), and the full `ctest` suite (ASan/UBSan-clean) all stay
   green.
 
-### 67. ADC + PWM_OUT + PWM_IN endpoints (v0.67.0)
+### 67. ADC + PWM_OUT + PWM_IN endpoints (v0.67.0) ✅
 
 - `include/rcp/ep_adc.h`/`ep_pwm.h` + `.c`: ADC's three-layer averaging
   model (`adc_samples_per_avg_interval` → `adc_avg_intervals_per_request`
@@ -2737,6 +2737,90 @@ touched.
   §4.6) implemented and unit-tested now, ahead of Phase 17's general
   compound-wait request-type landing, matching the SPI-truncation
   precedent set at v0.65.0.
+
+**Done (v0.67.0)**: `include/rcp/ep_pwm.h` + `src/ep_pwm.c` (PWM_OUT +
+PWM_IN + the PWM_IN compound-wait comparison helper) and
+`include/rcp/ep_adc.h` + `src/ep_adc.c` land as new, additive
+protocol-core surface, following `ep_gpio.h`/`ep_spi.h`/`ep_i2c.h`/
+`ep_uart.h`'s (milestones 64–66) established layering discipline exactly:
+ACF level only, with nothing in `rcp.h`, `wire.c`, `avtp.h`/`avtp.c`,
+`acf.h`/`acf.c`, `server.h`/`server.c`, `regmap.h`/`regmap.c`,
+`discovery.h`/`discovery.c`, or any prior `ep_*` module touched.
+`ep_adc.c`'s only new-module dependency is on `ep_pwm.h`, landing in this
+same milestone alongside it, solely to reuse its `RCP_EP_PWM_IN_NO_SIGNAL`
+sentinel rather than declare a second, inconsistent one.
+- PWM_OUT and PWM_IN share one on-wire payload shape,
+  `rcp_ep_pwm_value_t` (a big-endian `{period, active_duration}` 16-bit
+  pair, `RCP_EP_PWM_PAYLOAD_LEN` = 4 octets) and address exactly one
+  channel per `byte_bus_id` — no `evt`-selected channel, unlike
+  `ep_spi.h`. `rcp_ep_pwm_out_apply_write()` reuses `ep_gpio.h`'s exact
+  eight `evt[2:0]` write-semantics values as PWM_OUT's own
+  `rcp_ep_pwm_out_write_semantics_t`, applying each of the six ordinary
+  data-write operations independently to the period and active-duration
+  fields (each its own 16-bit register, add/subtract saturating at
+  0x0000/0xFFFF per field rather than wrapping or carrying between
+  fields) — this module's own extension of GPIO's single-32-bit-register
+  rule to a pair of independent 16-bit registers sharing one wire
+  payload. `rcp_ep_pwm_out_apply_reconfig()` is this endpoint type's own
+  single-flag analogue of GPIO's per-pin reconfiguration escape hatch
+  (`evt[2:0]=7`): bit 0 of the reinterpreted write payload toggles a
+  single `enabled` functional-config flag, adapted from GPIO's 32-pin
+  bitmask selector down to PWM_OUT's own single output channel.
+- `rcp_ep_pwm_out_trigger_fires()`/`rcp_ep_pwm_in_trigger_fires()`:
+  cycle-start/mid-pulse/done for PWM_OUT and rising/falling for PWM_IN,
+  the same pure trigger-evaluation pattern `ep_spi.h`/`ep_gpio.h` already
+  established. PWM_IN has no write request of its own — only a read
+  request (mirroring `ep_gpio.h`'s payload-free read request) answered
+  by a response whose fields may legitimately equal
+  `RCP_EP_PWM_IN_NO_SIGNAL` (`0xFFFF`, this module's own sentinel
+  choice) when no valid edge-to-edge measurement completed in time.
+- `rcp_ep_adc_average_interval()` (layer 1) computes one averaging
+  interval's mean from caller-supplied raw samples, excluding any
+  individual `RCP_EP_PWM_IN_NO_SIGNAL` sample from the mean and reporting
+  `NO_SIGNAL` itself only when every sample in that interval timed out,
+  with the interval's timestamp always its first sample's timestamp.
+  `rcp_ep_adc_combine_avg_values()` (layers 2/3) combines
+  `adc_avg_intervals_per_request` such per-interval results per
+  `rcp_ep_adc_combine_mode_t` (average/min/max/latest — this module's own
+  enumeration of plausible combine semantics, `LATEST` deliberately
+  reporting its most recent interval's value verbatim, `NO_SIGNAL` or
+  not). `rcp_ep_adc_capture_moment_timestamp()` is the single,
+  directly-testable expression of the first-sample-of-first-
+  combined-value rule: always `avg_values[0].timestamp`, independent of
+  which combine mode selected the reported value itself. Neither
+  function nor any other part of this milestone owns a timer, thread, or
+  autonomous sampling loop — every raw sample is caller-supplied,
+  matching the specification's request-driven sampling model referenced
+  by name only.
+- `rcp_ep_pwm_in_compound_wait_compare()`: the PWM_IN numeric ≥/≤
+  comparison-mode helper this milestone's scope calls for, implemented
+  and unit-tested now even though generic compound-wait request-type
+  plumbing itself lands at Phase 17 milestone 69 — following the exact
+  "isolated precedent" `ep_spi.h`'s
+  `rcp_ep_spi_compound_wait_status_equal()` (milestone 65) set, per the
+  roadmap's explicit instruction. Compares `captured.period` (`evt[2:0]`
+  = 100/101) or `captured.active_duration` (`evt[2:0]` = 110/111, this
+  module's own reading of "duty-cycle sub-field" as the raw
+  active-duration tick count already reported, requiring no additional
+  percentage computation) against a caller-supplied threshold, returning
+  false — never a match — whenever the compared sub-field itself equals
+  `RCP_EP_PWM_IN_NO_SIGNAL`.
+- Every functional-config mutator on all three endpoint surfaces
+  (`rcp_ep_pwm_out_set_trigger()`/`_set_enabled()`;
+  `rcp_ep_pwm_in_set_trigger()`; `rcp_ep_adc_set_samples_per_avg_interval()`/
+  `_set_avg_intervals_per_request()`/`_set_combine_mode()`) is gated by a
+  thin, named wrapper over `rcp_server_field_writable()`
+  (`RCP_SERVER_FIELD_FUNCTIONAL_W`) — reused, not duplicated, from
+  `server.h` — matching every prior endpoint type's own idiom exactly.
+- `tests/test_ep_pwm.c` (57 cases) and `tests/test_ep_adc.c` (34 cases,
+  ASan/UBSan-clean), and 84 new requirements (`REQ-PWM-001`..`054`,
+  `REQ-ADC-001`..`030`) added to `.fusa-reqs.json`; `cfusa trace
+  --req-coverage 100` (both metrics), `cfusa check`/`lint`/`analyze`/
+  `cyber`/`vuln`/`qualify` (0 errors), and the full `ctest` suite all
+  stay green.
+
+This closes out Phase 16 (Basic Endpoints) — every milestone from 64
+through 67 is now landed.
 
 ---
 ### Phase 17 — Conditional Requests & Sequencers

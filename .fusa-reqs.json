@@ -4775,6 +4775,678 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-001",
+      "title": "rcp_ep_pwm_out_write_semantics_valid() accepts exactly 0..7",
+      "text": "rcp_ep_pwm_out_write_semantics_valid() shall return true for every value v with v <= 7, and false for every v > 7.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-002",
+      "title": "rcp_ep_pwm_out_apply_write() implements RCP_EP_PWM_OUT_WRITE_REPLACE per field",
+      "text": "rcp_ep_pwm_out_apply_write() shall, for evt == RCP_EP_PWM_OUT_WRITE_REPLACE, set result.period = request.period and result.active_duration = request.active_duration.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-003",
+      "title": "rcp_ep_pwm_out_apply_write() implements RCP_EP_PWM_OUT_WRITE_OR per field",
+      "text": "rcp_ep_pwm_out_apply_write() shall, for evt == RCP_EP_PWM_OUT_WRITE_OR, bitwise-OR request into current independently for the period and active_duration fields.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-004",
+      "title": "rcp_ep_pwm_out_apply_write() implements RCP_EP_PWM_OUT_WRITE_AND per field",
+      "text": "rcp_ep_pwm_out_apply_write() shall, for evt == RCP_EP_PWM_OUT_WRITE_AND, bitwise-AND request into current independently for the period and active_duration fields.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-005",
+      "title": "rcp_ep_pwm_out_apply_write() implements RCP_EP_PWM_OUT_WRITE_XOR per field",
+      "text": "rcp_ep_pwm_out_apply_write() shall, for evt == RCP_EP_PWM_OUT_WRITE_XOR, bitwise-XOR request into current independently for the period and active_duration fields.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-006",
+      "title": "rcp_ep_pwm_out_apply_write() implements RCP_EP_PWM_OUT_WRITE_ADD with per-field 16-bit saturation",
+      "text": "rcp_ep_pwm_out_apply_write() shall, for evt == RCP_EP_PWM_OUT_WRITE_ADD, add request to current independently for the period and active_duration fields, each saturating at 0xFFFF rather than wrapping or carrying into the other field.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-007",
+      "title": "rcp_ep_pwm_out_apply_write() implements RCP_EP_PWM_OUT_WRITE_SUB with per-field 16-bit saturation",
+      "text": "rcp_ep_pwm_out_apply_write() shall, for evt == RCP_EP_PWM_OUT_WRITE_SUB, subtract request from current independently for the period and active_duration fields, each saturating at 0x0000 rather than wrapping.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-008",
+      "title": "rcp_ep_pwm_out_apply_write() treats RCP_EP_PWM_OUT_WRITE_RESERVED6 as a no-op",
+      "text": "rcp_ep_pwm_out_apply_write() shall return current unchanged for evt == RCP_EP_PWM_OUT_WRITE_RESERVED6.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-009",
+      "title": "rcp_ep_pwm_out_apply_write() fails safe for a misrouted RCP_EP_PWM_OUT_WRITE_RECONFIG",
+      "text": "rcp_ep_pwm_out_apply_write() shall return current unchanged for evt == RCP_EP_PWM_OUT_WRITE_RECONFIG, since callers must route that value to rcp_ep_pwm_out_apply_reconfig() instead.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-010",
+      "title": "rcp_ep_pwm_out_apply_reconfig() toggles *enabled when bit 0 of reconfig_word is set",
+      "text": "rcp_ep_pwm_out_apply_reconfig() shall toggle *enabled iff bit 0 of reconfig_word is set, regardless of the state of any other bit.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-011",
+      "title": "rcp_ep_pwm_out_apply_reconfig() leaves *enabled unchanged when bit 0 of reconfig_word is clear",
+      "text": "rcp_ep_pwm_out_apply_reconfig() shall leave *enabled unchanged when bit 0 of reconfig_word is clear, regardless of the state of any other bit.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-012",
+      "title": "rcp_ep_pwm_out_trigger_fires() never fires for RCP_EP_PWM_OUT_TRIGGER_NONE",
+      "text": "rcp_ep_pwm_out_trigger_fires() shall return false for trigger == RCP_EP_PWM_OUT_TRIGGER_NONE regardless of event.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-013",
+      "title": "rcp_ep_pwm_out_trigger_fires() implements RCP_EP_PWM_OUT_TRIGGER_CYCLE_START",
+      "text": "rcp_ep_pwm_out_trigger_fires() shall return true for trigger == RCP_EP_PWM_OUT_TRIGGER_CYCLE_START iff event == RCP_EP_PWM_OUT_EVENT_CYCLE_START.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-014",
+      "title": "rcp_ep_pwm_out_trigger_fires() implements RCP_EP_PWM_OUT_TRIGGER_MID_PULSE",
+      "text": "rcp_ep_pwm_out_trigger_fires() shall return true for trigger == RCP_EP_PWM_OUT_TRIGGER_MID_PULSE iff event == RCP_EP_PWM_OUT_EVENT_MID_PULSE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-015",
+      "title": "rcp_ep_pwm_out_trigger_fires() implements RCP_EP_PWM_OUT_TRIGGER_DONE",
+      "text": "rcp_ep_pwm_out_trigger_fires() shall return true for trigger == RCP_EP_PWM_OUT_TRIGGER_DONE iff event == RCP_EP_PWM_OUT_EVENT_DONE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-016",
+      "title": "rcp_ep_pwm_out_functional_cfg_init() zero-initializes cfg",
+      "text": "rcp_ep_pwm_out_functional_cfg_init() shall set every common flag false, trigger = RCP_EP_PWM_OUT_TRIGGER_NONE, and enabled = false, regardless of cfg's prior contents.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-017",
+      "title": "rcp_ep_pwm_out_functional_cfg_writable() is unwritable while HW_UNCONFIGURED",
+      "text": "rcp_ep_pwm_out_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED regardless of writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-018",
+      "title": "rcp_ep_pwm_out_functional_cfg_writable() is writable by any writer while HW_CONFIGURED",
+      "text": "rcp_ep_pwm_out_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED regardless of writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-019",
+      "title": "rcp_ep_pwm_out_functional_cfg_writable() requires authorization once RCP_CONFIGURED",
+      "text": "rcp_ep_pwm_out_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_RCP_CONFIGURED when writer indicates neither via_root_client_ep0 nor via_owning_stream, and true when either is set.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-020",
+      "title": "rcp_ep_pwm_out_set_trigger() rejects an unauthorized write without mutating cfg",
+      "text": "rcp_ep_pwm_out_set_trigger() shall return false and leave cfg unchanged when the write is not authorized by rcp_ep_pwm_out_functional_cfg_writable().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-021",
+      "title": "rcp_ep_pwm_out_set_trigger() applies the write when authorized",
+      "text": "rcp_ep_pwm_out_set_trigger() shall return true and set cfg->trigger to the requested trigger when the write is authorized.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-022",
+      "title": "rcp_ep_pwm_out_set_enabled() rejects an unauthorized write without mutating cfg",
+      "text": "rcp_ep_pwm_out_set_enabled() shall return false and leave cfg unchanged when the write is not authorized by rcp_ep_pwm_out_functional_cfg_writable().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-023",
+      "title": "rcp_ep_pwm_out_set_enabled() applies the write when authorized",
+      "text": "rcp_ep_pwm_out_set_enabled() shall return true and set cfg->enabled to the requested value when the write is authorized.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-024",
+      "title": "rcp_ep_pwm_out_strerror() never returns NULL and is unique per code",
+      "text": "rcp_ep_pwm_out_strerror() shall return a non-NULL, non-empty, distinct message for each rcp_ep_pwm_out_errc_t value, including an out-of-range value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-025",
+      "title": "PWM_OUT read request encode/decode round-trips",
+      "text": "rcp_ep_pwm_out_decode_read_request() shall, given a frame produced by rcp_ep_pwm_out_encode_read_request() with the same byte_bus_id, return RCP_EP_PWM_OUT_OK and recover the original transaction_num.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-026",
+      "title": "rcp_ep_pwm_out_decode_read_request() rejects a malformed, misaddressed, or wrong-op frame",
+      "text": "rcp_ep_pwm_out_decode_read_request() shall return RCP_EP_PWM_OUT_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB fixed header, RCP_EP_PWM_OUT_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_PWM_OUT_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, and RCP_EP_PWM_OUT_ERR_WRONG_OP when op is not RCP_ACF_OP_READ.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-027",
+      "title": "PWM_OUT write request encode/decode round-trips, including evt[2:0] write semantics",
+      "text": "rcp_ep_pwm_out_decode_write_request() shall, given a frame produced by rcp_ep_pwm_out_encode_write_request() with the same byte_bus_id, return RCP_EP_PWM_OUT_OK and recover the original value, evt[2:0], and transaction_num.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-028",
+      "title": "rcp_ep_pwm_out_decode_write_request() rejects a malformed, wrong-op, or bad-payload-length frame",
+      "text": "rcp_ep_pwm_out_decode_write_request() shall return RCP_EP_PWM_OUT_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE, and RCP_EP_PWM_OUT_ERR_BAD_PAYLOAD_LEN when the payload is not exactly RCP_EP_PWM_PAYLOAD_LEN octets.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-029",
+      "title": "PWM_OUT response encode/decode round-trips when untimed",
+      "text": "rcp_ep_pwm_out_decode_response() shall, given a frame produced by rcp_ep_pwm_out_encode_response() with timed = false and the same byte_bus_id, return RCP_EP_PWM_OUT_OK, recover the original value and transaction_num, and report *out_timed = false with *out_timestamp = 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-030",
+      "title": "PWM_OUT response encode/decode round-trips when timed",
+      "text": "rcp_ep_pwm_out_decode_response() shall, given a frame produced by rcp_ep_pwm_out_encode_response() with timed = true, the same byte_bus_id, and a timestamp, return RCP_EP_PWM_OUT_OK, recover the original value and transaction_num, and report *out_timed = true with *out_timestamp equal to the original timestamp.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-031",
+      "title": "rcp_ep_pwm_out_decode_response() rejects a malformed or misaddressed frame",
+      "text": "rcp_ep_pwm_out_decode_response() shall return RCP_EP_PWM_OUT_ERR_SHORT_FRAME for a frame too short for its applicable ACF fixed header and RCP_EP_PWM_OUT_ERR_WRONG_BUS when byte_bus_id != expected_bus_id.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-032",
+      "title": "rcp_ep_pwm_in_trigger_fires() never fires for RCP_EP_PWM_IN_TRIGGER_NONE",
+      "text": "rcp_ep_pwm_in_trigger_fires() shall return false for trigger == RCP_EP_PWM_IN_TRIGGER_NONE regardless of the level transition.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-033",
+      "title": "rcp_ep_pwm_in_trigger_fires() implements RCP_EP_PWM_IN_TRIGGER_RISING",
+      "text": "rcp_ep_pwm_in_trigger_fires() shall return true for trigger == RCP_EP_PWM_IN_TRIGGER_RISING iff prev_level is false and new_level is true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-034",
+      "title": "rcp_ep_pwm_in_trigger_fires() implements RCP_EP_PWM_IN_TRIGGER_FALLING",
+      "text": "rcp_ep_pwm_in_trigger_fires() shall return true for trigger == RCP_EP_PWM_IN_TRIGGER_FALLING iff prev_level is true and new_level is false.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-035",
+      "title": "rcp_ep_pwm_in_functional_cfg_init() zero-initializes cfg",
+      "text": "rcp_ep_pwm_in_functional_cfg_init() shall set every common flag false and trigger = RCP_EP_PWM_IN_TRIGGER_NONE, regardless of cfg's prior contents.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-036",
+      "title": "rcp_ep_pwm_in_functional_cfg_writable() is unwritable while HW_UNCONFIGURED",
+      "text": "rcp_ep_pwm_in_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED regardless of writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-037",
+      "title": "rcp_ep_pwm_in_functional_cfg_writable() is writable by any writer while HW_CONFIGURED",
+      "text": "rcp_ep_pwm_in_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED regardless of writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-038",
+      "title": "rcp_ep_pwm_in_functional_cfg_writable() requires authorization once RCP_CONFIGURED",
+      "text": "rcp_ep_pwm_in_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_RCP_CONFIGURED when writer indicates neither via_root_client_ep0 nor via_owning_stream, and true when either is set.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-039",
+      "title": "rcp_ep_pwm_in_set_trigger() rejects an unauthorized write without mutating cfg",
+      "text": "rcp_ep_pwm_in_set_trigger() shall return false and leave cfg unchanged when the write is not authorized by rcp_ep_pwm_in_functional_cfg_writable().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-040",
+      "title": "rcp_ep_pwm_in_set_trigger() applies the write when authorized",
+      "text": "rcp_ep_pwm_in_set_trigger() shall return true and set cfg->trigger to the requested trigger when the write is authorized.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-041",
+      "title": "rcp_ep_pwm_in_strerror() never returns NULL and is unique per code",
+      "text": "rcp_ep_pwm_in_strerror() shall return a non-NULL, non-empty, distinct message for each rcp_ep_pwm_in_errc_t value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-042",
+      "title": "PWM_IN read request encode/decode round-trips",
+      "text": "rcp_ep_pwm_in_decode_read_request() shall, given a frame produced by rcp_ep_pwm_in_encode_read_request() with the same byte_bus_id, return RCP_EP_PWM_IN_OK and recover the original transaction_num.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-043",
+      "title": "rcp_ep_pwm_in_decode_read_request() rejects a malformed or misaddressed frame",
+      "text": "rcp_ep_pwm_in_decode_read_request() shall return RCP_EP_PWM_IN_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB fixed header and RCP_EP_PWM_IN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-044",
+      "title": "PWM_IN response encode/decode round-trips when untimed",
+      "text": "rcp_ep_pwm_in_decode_response() shall, given a frame produced by rcp_ep_pwm_in_encode_response() with timed = false and the same byte_bus_id, return RCP_EP_PWM_IN_OK, recover the original value and transaction_num, and report *out_timed = false with *out_timestamp = 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-045",
+      "title": "PWM_IN response encode/decode round-trips when timed",
+      "text": "rcp_ep_pwm_in_decode_response() shall, given a frame produced by rcp_ep_pwm_in_encode_response() with timed = true, the same byte_bus_id, and a timestamp, return RCP_EP_PWM_IN_OK, recover the original value and transaction_num, and report *out_timed = true with *out_timestamp equal to the original timestamp.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-046",
+      "title": "rcp_ep_pwm_in_decode_response() rejects a misaddressed frame",
+      "text": "rcp_ep_pwm_in_decode_response() shall return RCP_EP_PWM_IN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-047",
+      "title": "PWM_IN response encode/decode round-trips RCP_EP_PWM_IN_NO_SIGNAL verbatim",
+      "text": "rcp_ep_pwm_in_decode_response() shall, given a frame produced by rcp_ep_pwm_in_encode_response() with either or both of value's fields equal to RCP_EP_PWM_IN_NO_SIGNAL, recover that sentinel unchanged, treating it as an ordinary uint16_t value with no special decode-time handling.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-048",
+      "title": "rcp_ep_pwm_in_compound_wait_mode_valid() accepts exactly 4..7",
+      "text": "rcp_ep_pwm_in_compound_wait_mode_valid() shall return true for every value v with 4 <= v <= 7, and false for every other value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-049",
+      "title": "rcp_ep_pwm_in_compound_wait_compare() implements RCP_EP_PWM_IN_CMP_PERIOD_GE",
+      "text": "rcp_ep_pwm_in_compound_wait_compare() shall, for mode == RCP_EP_PWM_IN_CMP_PERIOD_GE, return true iff captured.period is not RCP_EP_PWM_IN_NO_SIGNAL and captured.period >= threshold.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-050",
+      "title": "rcp_ep_pwm_in_compound_wait_compare() implements RCP_EP_PWM_IN_CMP_PERIOD_LE",
+      "text": "rcp_ep_pwm_in_compound_wait_compare() shall, for mode == RCP_EP_PWM_IN_CMP_PERIOD_LE, return true iff captured.period is not RCP_EP_PWM_IN_NO_SIGNAL and captured.period <= threshold.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-051",
+      "title": "rcp_ep_pwm_in_compound_wait_compare() implements RCP_EP_PWM_IN_CMP_DUTY_GE",
+      "text": "rcp_ep_pwm_in_compound_wait_compare() shall, for mode == RCP_EP_PWM_IN_CMP_DUTY_GE, return true iff captured.active_duration is not RCP_EP_PWM_IN_NO_SIGNAL and captured.active_duration >= threshold.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-052",
+      "title": "rcp_ep_pwm_in_compound_wait_compare() implements RCP_EP_PWM_IN_CMP_DUTY_LE",
+      "text": "rcp_ep_pwm_in_compound_wait_compare() shall, for mode == RCP_EP_PWM_IN_CMP_DUTY_LE, return true iff captured.active_duration is not RCP_EP_PWM_IN_NO_SIGNAL and captured.active_duration <= threshold.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-053",
+      "title": "rcp_ep_pwm_in_compound_wait_compare() returns false for an invalid mode",
+      "text": "rcp_ep_pwm_in_compound_wait_compare() shall return false, never treating it as a match, for any mode value outside RCP_EP_PWM_IN_CMP_PERIOD_GE..RCP_EP_PWM_IN_CMP_DUTY_LE (4..7).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWM-054",
+      "title": "rcp_ep_pwm_in_compound_wait_compare() never matches a RCP_EP_PWM_IN_NO_SIGNAL sub-field",
+      "text": "rcp_ep_pwm_in_compound_wait_compare() shall return false for every defined mode whenever the sub-field that mode compares (captured.period for PERIOD_GE/PERIOD_LE, captured.active_duration for DUTY_GE/DUTY_LE) equals RCP_EP_PWM_IN_NO_SIGNAL, regardless of threshold.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-001",
+      "title": "rcp_ep_adc_combine_mode_valid() accepts exactly the four defined combine modes",
+      "text": "rcp_ep_adc_combine_mode_valid() shall return true for v in 0..3 (RCP_EP_ADC_COMBINE_AVERAGE..RCP_EP_ADC_COMBINE_LATEST) and false for any other value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-002",
+      "title": "rcp_ep_adc_average_interval() computes the arithmetic mean of its raw samples",
+      "text": "rcp_ep_adc_average_interval() shall, given sample_count samples none of which equal RCP_EP_PWM_IN_NO_SIGNAL, return a value equal to their arithmetic mean, rounded down.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-003",
+      "title": "rcp_ep_adc_average_interval() returns RCP_EP_PWM_IN_NO_SIGNAL with a zero timestamp when sample_count is 0",
+      "text": "rcp_ep_adc_average_interval() shall return value == RCP_EP_PWM_IN_NO_SIGNAL and timestamp == 0 when sample_count == 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-004",
+      "title": "rcp_ep_adc_average_interval() excludes RCP_EP_PWM_IN_NO_SIGNAL samples from its mean, and reports NO_SIGNAL only if every sample timed out",
+      "text": "rcp_ep_adc_average_interval() shall exclude every sample whose value equals RCP_EP_PWM_IN_NO_SIGNAL from its arithmetic mean, and shall return value == RCP_EP_PWM_IN_NO_SIGNAL only when every sample in the interval equals RCP_EP_PWM_IN_NO_SIGNAL.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-005",
+      "title": "rcp_ep_adc_average_interval() reports the interval's first sample's timestamp",
+      "text": "rcp_ep_adc_average_interval() shall set the returned timestamp to samples[0].timestamp for any sample_count > 0, regardless of how many samples are averaged or excluded.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-006",
+      "title": "rcp_ep_adc_combine_avg_values() implements RCP_EP_ADC_COMBINE_AVERAGE",
+      "text": "rcp_ep_adc_combine_avg_values() shall, for combine_mode == RCP_EP_ADC_COMBINE_AVERAGE, return the arithmetic mean (rounded down) of every avg_values[i].value not equal to RCP_EP_PWM_IN_NO_SIGNAL.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-007",
+      "title": "rcp_ep_adc_combine_avg_values() implements RCP_EP_ADC_COMBINE_MIN",
+      "text": "rcp_ep_adc_combine_avg_values() shall, for combine_mode == RCP_EP_ADC_COMBINE_MIN, return the smallest avg_values[i].value not equal to RCP_EP_PWM_IN_NO_SIGNAL.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-008",
+      "title": "rcp_ep_adc_combine_avg_values() implements RCP_EP_ADC_COMBINE_MAX",
+      "text": "rcp_ep_adc_combine_avg_values() shall, for combine_mode == RCP_EP_ADC_COMBINE_MAX, return the largest avg_values[i].value not equal to RCP_EP_PWM_IN_NO_SIGNAL.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-009",
+      "title": "rcp_ep_adc_combine_avg_values() implements RCP_EP_ADC_COMBINE_LATEST, including verbatim NO_SIGNAL reporting",
+      "text": "rcp_ep_adc_combine_avg_values() shall, for combine_mode == RCP_EP_ADC_COMBINE_LATEST, return avg_values[avg_count - 1].value unchanged, even when that value equals RCP_EP_PWM_IN_NO_SIGNAL.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-010",
+      "title": "rcp_ep_adc_combine_avg_values() returns RCP_EP_PWM_IN_NO_SIGNAL when avg_count is 0",
+      "text": "rcp_ep_adc_combine_avg_values() shall return RCP_EP_PWM_IN_NO_SIGNAL when avg_count == 0, for every combine_mode.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-011",
+      "title": "rcp_ep_adc_combine_avg_values() returns RCP_EP_PWM_IN_NO_SIGNAL when every avg_value is itself NO_SIGNAL, for AVERAGE/MIN/MAX",
+      "text": "rcp_ep_adc_combine_avg_values() shall return RCP_EP_PWM_IN_NO_SIGNAL when every avg_values[i].value equals RCP_EP_PWM_IN_NO_SIGNAL, for combine_mode in RCP_EP_ADC_COMBINE_AVERAGE, RCP_EP_ADC_COMBINE_MIN, and RCP_EP_ADC_COMBINE_MAX.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-012",
+      "title": "rcp_ep_adc_capture_moment_timestamp() returns the first avg_value's timestamp",
+      "text": "rcp_ep_adc_capture_moment_timestamp() shall return avg_values[0].timestamp for any avg_count > 0, independent of combine_mode.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-013",
+      "title": "rcp_ep_adc_capture_moment_timestamp() returns 0 when avg_count is 0",
+      "text": "rcp_ep_adc_capture_moment_timestamp() shall return 0 when avg_count == 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-014",
+      "title": "rcp_ep_adc_functional_cfg_init() zero-initializes cfg",
+      "text": "rcp_ep_adc_functional_cfg_init() shall set every common flag false, adc_samples_per_avg_interval = 0, adc_avg_intervals_per_request = 0, and adc_combine_avg_values = RCP_EP_ADC_COMBINE_AVERAGE (0), regardless of cfg's prior contents.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-015",
+      "title": "rcp_ep_adc_functional_cfg_writable() is unwritable while HW_UNCONFIGURED",
+      "text": "rcp_ep_adc_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED regardless of writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-016",
+      "title": "rcp_ep_adc_functional_cfg_writable() is writable by any writer while HW_CONFIGURED",
+      "text": "rcp_ep_adc_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED regardless of writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-017",
+      "title": "rcp_ep_adc_functional_cfg_writable() requires authorization once RCP_CONFIGURED",
+      "text": "rcp_ep_adc_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_RCP_CONFIGURED when writer indicates neither via_root_client_ep0 nor via_owning_stream, and true when either is set.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-018",
+      "title": "rcp_ep_adc_set_samples_per_avg_interval() rejects an unauthorized write without mutating cfg",
+      "text": "rcp_ep_adc_set_samples_per_avg_interval() shall return false and leave cfg unchanged when the write is not authorized by rcp_ep_adc_functional_cfg_writable().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-019",
+      "title": "rcp_ep_adc_set_samples_per_avg_interval() applies the write when authorized",
+      "text": "rcp_ep_adc_set_samples_per_avg_interval() shall return true and set cfg->adc_samples_per_avg_interval to the requested value when the write is authorized.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-020",
+      "title": "rcp_ep_adc_set_avg_intervals_per_request() rejects an unauthorized write without mutating cfg",
+      "text": "rcp_ep_adc_set_avg_intervals_per_request() shall return false and leave cfg unchanged when the write is not authorized by rcp_ep_adc_functional_cfg_writable().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-021",
+      "title": "rcp_ep_adc_set_avg_intervals_per_request() applies the write when authorized",
+      "text": "rcp_ep_adc_set_avg_intervals_per_request() shall return true and set cfg->adc_avg_intervals_per_request to the requested value when the write is authorized.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-022",
+      "title": "rcp_ep_adc_set_combine_mode() rejects an invalid mode or an unauthorized write without mutating cfg",
+      "text": "rcp_ep_adc_set_combine_mode() shall return false and leave cfg unchanged when combine_mode is not rcp_ep_adc_combine_mode_valid() or the write is not authorized by rcp_ep_adc_functional_cfg_writable().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-023",
+      "title": "rcp_ep_adc_set_combine_mode() applies the write when valid and authorized",
+      "text": "rcp_ep_adc_set_combine_mode() shall return true and set cfg->adc_combine_avg_values to the requested combine_mode when combine_mode is valid and the write is authorized.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-024",
+      "title": "rcp_ep_adc_strerror() never returns NULL and is unique per code",
+      "text": "rcp_ep_adc_strerror() shall return a non-NULL, non-empty, distinct message for each rcp_ep_adc_errc_t value, including an out-of-range value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-025",
+      "title": "ADC read request encode/decode round-trips",
+      "text": "rcp_ep_adc_decode_read_request() shall, given a frame produced by rcp_ep_adc_encode_read_request() with the same byte_bus_id, return RCP_EP_ADC_OK and recover the original transaction_num.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-026",
+      "title": "rcp_ep_adc_decode_read_request() rejects a malformed, misaddressed, or wrong-op frame",
+      "text": "rcp_ep_adc_decode_read_request() shall return RCP_EP_ADC_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB fixed header, RCP_EP_ADC_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, and RCP_EP_ADC_ERR_WRONG_OP when op is not RCP_ACF_OP_READ.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-027",
+      "title": "ADC response encode/decode round-trips when untimed",
+      "text": "rcp_ep_adc_decode_response() shall, given a frame produced by rcp_ep_adc_encode_response() with timed = false and the same byte_bus_id, return RCP_EP_ADC_OK, recover the original value and transaction_num, and report *out_timed = false with *out_timestamp = 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-028",
+      "title": "ADC response encode/decode round-trips when timed",
+      "text": "rcp_ep_adc_decode_response() shall, given a frame produced by rcp_ep_adc_encode_response() with timed = true, the same byte_bus_id, and a timestamp, return RCP_EP_ADC_OK, recover the original value and transaction_num, and report *out_timed = true with *out_timestamp equal to the original timestamp.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-029",
+      "title": "rcp_ep_adc_decode_response() rejects a bad-payload-length frame",
+      "text": "rcp_ep_adc_decode_response() shall return RCP_EP_ADC_ERR_BAD_PAYLOAD_LEN when the decoded payload is not exactly RCP_EP_ADC_PAYLOAD_LEN octets.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ADC-030",
+      "title": "ADC response encode/decode round-trips RCP_EP_PWM_IN_NO_SIGNAL verbatim",
+      "text": "rcp_ep_adc_decode_response() shall, given a frame produced by rcp_ep_adc_encode_response() with value == RCP_EP_PWM_IN_NO_SIGNAL, recover that sentinel unchanged.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     }
   ]
 }
