@@ -8,7 +8,7 @@
 //cfusa:test REQ-PROXY-008
 #include "unity.h"
 
-#include <rcp/mock.h>
+#include "legacy_mock.h"
 #include <rcp/proxy.h>
 #include <rcp/rcp.h>
 

@@ -9,7 +9,7 @@
 #include "unity.h"
 
 #include <rcp/admin.h>
-#include <rcp/mock.h>
+#include "legacy_mock.h"
 #include <rcp/rcp.h>
 
 #include <stdio.h>

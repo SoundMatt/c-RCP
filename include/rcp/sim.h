@@ -39,8 +39,10 @@ typedef struct {
 rcp_sim_config_t rcp_sim_default_config(rcp_zone_t z);
 
 /* User-supplied function producing a Response for a Command, same
- * convention as rcp_mock_handler_fn (see mock.h). If NULL, the controller
- * returns RCP_RESPONSE_OK with an empty payload. */
+ * convention as tests/legacy_mock.h's own rcp_mock_handler_fn (the legacy
+ * zone-controller reference double this milestone-77 mock.h rework moved
+ * out of the public library -- see mock.h's own file header). If NULL, the
+ * controller returns RCP_RESPONSE_OK with an empty payload. */
 typedef void (*rcp_sim_handler_fn)(const rcp_command_t *cmd, rcp_response_t *out, void *user_data);
 
 /* Creates a simulated zone controller. Returned with refcount 1 (release

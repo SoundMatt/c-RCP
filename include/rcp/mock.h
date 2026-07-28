@@ -1,91 +1,245 @@
-//cfusa:req REQ-CTRL-001
-//cfusa:req REQ-CTRL-002
-//cfusa:req REQ-CTRL-003
-//cfusa:req REQ-CTRL-004
-//cfusa:req REQ-CTRL-005
-//cfusa:req REQ-CTRL-006
-//cfusa:req REQ-CTRL-007
-//cfusa:req REQ-CTRL-008
-//cfusa:req REQ-CTRL-009
-//cfusa:req REQ-CTRL-010
-//cfusa:req REQ-CTRL-011
-//cfusa:req REQ-CTRL-012
-//cfusa:req REQ-CTRL-013
-//cfusa:req REQ-CTRL-014
-//cfusa:req REQ-CTRL-015
-//cfusa:req REQ-CTRL-016
-//cfusa:req REQ-CTRL-017
-//cfusa:req REQ-CTRL-018
-//cfusa:req REQ-CTRL-019
-//cfusa:req REQ-CTRL-020
-//cfusa:req REQ-CTRL-021
-//cfusa:req REQ-CTRL-022
-//cfusa:req REQ-CTRL-023
-//cfusa:req REQ-CTRL-024
-//cfusa:req REQ-CTRL-025
-//cfusa:req REQ-CTRL-026
-//cfusa:req REQ-CTRL-027
-//cfusa:req REQ-REG-001
-//cfusa:req REQ-REG-002
-//cfusa:req REQ-REG-003
-//cfusa:req REQ-REG-004
-//cfusa:req REQ-REG-005
-//cfusa:req REQ-REG-006
-//cfusa:req REQ-REG-007
-//cfusa:req REQ-REG-008
-//cfusa:req REQ-REG-009
-//cfusa:req REQ-REG-010
-//cfusa:req REQ-REG-011
-//cfusa:req REQ-REG-012
-//cfusa:req REQ-REG-013
-//cfusa:req REQ-RESP-001
-//cfusa:req REQ-RESP-002
-//cfusa:req REQ-STAT-001
-//cfusa:req REQ-STAT-002
-//cfusa:req REQ-STAT-003
-//cfusa:req REQ-STAT-004
-//cfusa:req REQ-ERR-011
+//cfusa:req REQ-MOCK-001
+//cfusa:req REQ-MOCK-002
+//cfusa:req REQ-MOCK-003
+//cfusa:req REQ-MOCK-004
+//cfusa:req REQ-MOCK-005
+//cfusa:req REQ-MOCK-006
+//cfusa:req REQ-MOCK-007
+//cfusa:req REQ-MOCK-008
+//cfusa:req REQ-MOCK-009
+//cfusa:req REQ-MOCK-010
+//cfusa:req REQ-MOCK-011
+//cfusa:req REQ-MOCK-012
+//cfusa:req REQ-MOCK-013
+//cfusa:req REQ-MOCK-014
+//cfusa:req REQ-MOCK-015
+//cfusa:req REQ-MOCK-016
+//cfusa:req REQ-MOCK-017
+//cfusa:req REQ-MOCK-018
 /*
- * mock.h provides an in-process RCP controller and registry for unit tests.
+ * mock.h -- in-process RC-Server/endpoint test double for the TC18 Remote
+ * Control Protocol wire layer (ROADMAP.md Phase 21, "Satellite Package
+ * Rework", milestone 77, "Foundational test/config satellites").
  *
- * All operations execute synchronously in memory — no I/O, minimal
- * threading (one watcher thread per subscription, to auto-expire the
- * returned channel on context timeout or controller close). Safe for
- * concurrent use.
+ * This replaces the pre-TC18 zone-controller mock (rcp_mock_controller_t /
+ * rcp_mock_registry_t, the rcp_controller_t/rcp_registry_t vtables'
+ * reference implementation) with a double shaped around the actual TC18
+ * core this repo has built since: the RC Server lifecycle state machine
+ * (lifecycle.h, milestone 61), the register-map model (regmap.h, milestone
+ * 62), and the per-endpoint ep_enable request queue (server.h, milestone
+ * 61). There is no Command/Response shape left to double for -- every
+ * Phase 16+ endpoint type (ep_gpio.h and its siblings) and discovery.h
+ * already operate on raw, already-framed AVTPDU/ACF request and response
+ * bytes, so this module's dispatch surface does too.
+ *
+ * The old zone-controller mock is not deleted outright: several
+ * not-yet-migrated legacy satellites (authz.c, ratelimit.c, loan.c,
+ * observe.c, faultinject.c, admin.c, recorder.c, deadline.c, watchdog.c,
+ * powerstate.c, tsn.c, proxy.c, redundancy.c, federation.c, zonegroup.c,
+ * prioqueue.c, firmware.c, adapt.c -- ROADMAP.md Phase 21 milestones
+ * 79-84) still implement/decorate the legacy rcp_controller_t/
+ * rcp_registry_t vtables, and their own unit tests still need a double for
+ * them. That double moved, verbatim (same struct layout, same function
+ * names, same REQ-CTRL-*, REQ-REG-*, REQ-RESP-*, REQ-STAT-*, REQ-ERR-011
+ * requirement coverage), to tests/legacy_mock.h -- a test-only translation
+ * unit no longer shipped as part of the public rcp library, since it
+ * doubles an interface this milestone's own scope does not touch. See
+ * tests/legacy_mock.h's own file header for the full rationale. rcp.h's
+ * "Controller and Registry are vtable-based interfaces... See mock.h for
+ * the reference implementation" comment now points there instead.
+ *
+ * ── What this double actually is ─────────────────────────────────────────────
+ *
+ * rcp_mock_server_t bundles exactly the three TC18-core building blocks a
+ * caller needs to exercise an endpoint module end-to-end without any real
+ * transport: an rcp_lifecycle_state_t, an rcp_regmap_general_t, and a small
+ * fixed-capacity table of endpoint slots, each pairing an
+ * rcp_server_endpoint_t (server.h's ep_enable/queue) with a caller-supplied
+ * rcp_mock_endpoint_handler_fn. This module owns none of the per-endpoint
+ * wire semantics itself (it never calls into ep_gpio.c or any sibling
+ * directly) -- a caller registers one handler per byte_bus_id, and that
+ * handler is free to use whichever ep_*.h/discovery.h encode/decode
+ * functions it is testing. This is the same "own small pure helpers,
+ * operate on caller-owned data" layering discipline lifecycle.h, regmap.h,
+ * and fragment.h already established; the callback shape itself is this
+ * module's own direct descendant of the old rcp_mock_handler_fn.
+ *
+ * rcp_mock_server_dispatch() is the entry point a caller drives with one
+ * already-framed request: it runs lifecycle.h's own
+ * rcp_lifecycle_should_accept() admission check first (a dropped frame
+ * never reaches an endpoint at all, matching a real server), then looks up
+ * the addressed byte_bus_id's slot and submits the frame to its
+ * rcp_server_endpoint_t queue -- exactly the same pre-load-then-drain
+ * behavior a real disabled endpoint exhibits. rcp_mock_server_drain_endpoint()
+ * is the other half: pulling a queued frame back out (once re-enabled) and
+ * running it through the same registered handler.
  */
 #ifndef RCP_MOCK_H
 #define RCP_MOCK_H
 
+#include "rcp/lifecycle.h"
 #include "rcp/rcp.h"
+#include "rcp/regmap.h"
+#include "rcp/server.h"
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* User-supplied function producing a Response for a Command. If NULL is
- * passed to rcp_mock_controller_new(), the controller returns
- * RCP_RESPONSE_OK with an empty payload. user_data is the opaque pointer
- * passed to rcp_mock_controller_new(); *out is zeroed before the handler is
- * invoked. If the handler wants a response payload, it must allocate it
- * (e.g. via rcp_bytes_dup) — ownership transfers to the response. */
-typedef void (*rcp_mock_handler_fn)(const rcp_command_t *cmd, rcp_response_t *out, void *user_data);
+/* ── Endpoint handler ──────────────────────────────────────────────────────── */
 
-/* Creates a mock zone controller. Returned with refcount 1 (release with
- * rcp_controller_release()). handler may be NULL. */
-rcp_controller_t *rcp_mock_controller_new(rcp_zone_t zone, rcp_mock_handler_fn handler, void *user_data);
+/* Handler registered for one endpoint slot (see
+ * rcp_mock_server_add_endpoint() below). request/request_len is one
+ * already-framed request (e.g. built by an ep_*.h _encode_*_request()
+ * function, or discovery.h's rcp_discovery_encode_request() for a
+ * byte_bus_id 0/EP0 handler); the handler decodes it with that same
+ * module's own _decode_*() function and encodes a result into
+ * *out_response with that module's own _encode_response(). *out_response
+ * is zeroed before the handler runs; leaving it zeroed means "no response
+ * frame" (a fire-and-forget request). Ownership of any allocated
+ * *out_response transfers to the dispatcher's own caller
+ * (rcp_mock_server_dispatch()'s or rcp_mock_server_drain_endpoint()'s
+ * out_response parameter); free it with rcp_bytes_free(). user_data is the
+ * opaque pointer passed to rcp_mock_server_add_endpoint(). */
+typedef void (*rcp_mock_endpoint_handler_fn)(const uint8_t *request, size_t request_len,
+                                              rcp_bytes_t *out_response, void *user_data);
 
-/* Pushes a Status update (zone = ctrl's own zone, seq = incrementing,
- * healthy = !closed) to all active subscribers. payload may be NULL iff
- * len==0. Safe to call after close() (a no-op in that case: the subscriber
- * list is already empty). ctrl must have been created by
- * rcp_mock_controller_new(). */
-void rcp_mock_controller_publish(rcp_controller_t *ctrl, const uint8_t *payload, size_t len);
+/* ── Error codes ───────────────────────────────────────────────────────────── */
 
-/* Creates an in-process registry pre-populated with the five standard zones
- * (front-left/front-right/rear-left/rear-right/central), each backed by a
- * default (no-handler) mock controller. Release with rcp_registry_close()
- * then rcp_registry_destroy(). */
-rcp_registry_t *rcp_mock_registry_new(void);
+typedef enum {
+    RCP_MOCK_OK                   = 0,
+    RCP_MOCK_ERR_DUPLICATE_BUS_ID = 1,
+    RCP_MOCK_ERR_CAPACITY         = 2,
+    RCP_MOCK_ERR_NOT_FOUND        = 3,
+} rcp_mock_errc_t;
+
+/* Human-readable message for an rcp_mock_errc_t value. Never returns NULL. */
+const char *rcp_mock_strerror(rcp_mock_errc_t e);
+
+/* The fixed number of endpoint slots an rcp_mock_server_t can hold --
+ * comfortably above svr_ep_count for any test fixture built by this
+ * milestone's own config.c manifest loader or by hand. A fixed table
+ * (rather than a growable one) keeps this test double's own memory
+ * behavior trivial to reason about, matching regmap.h's
+ * rcp_regmap_table_ref_t capacity-bounded-table convention. */
+#define RCP_MOCK_MAX_ENDPOINTS ((size_t)64u)
+
+/* ── The server double ─────────────────────────────────────────────────────── */
+
+typedef struct rcp_mock_server rcp_mock_server_t;
+
+/* Allocates a new server double: lifecycle state RCP_LIFECYCLE_HW_UNCONFIGURED,
+ * an rcp_regmap_general_init()-initialized register map, and no endpoints.
+ * Returns NULL on allocation failure. Release with rcp_mock_server_destroy(). */
+rcp_mock_server_t *rcp_mock_server_new(void);
+
+/* Frees srv and every endpoint's queued (undelivered) requests. Safe to
+ * call with srv == NULL. */
+void rcp_mock_server_destroy(rcp_mock_server_t *srv);
+
+/* The server's current lifecycle state. */
+rcp_lifecycle_state_t rcp_mock_server_state(const rcp_mock_server_t *srv);
+
+/* Thin passthrough to lifecycle.h's rcp_lifecycle_transition(), operating
+ * on srv's own state. See lifecycle.h for the permitted-transition table
+ * and snap's role. */
+rcp_lifecycle_errc_t rcp_mock_server_transition(rcp_mock_server_t *srv,
+                                                 rcp_lifecycle_state_t target,
+                                                 const rcp_lifecycle_plausibility_snapshot_t *snap);
+
+/* Mutable access to srv's own register map: a test or this milestone's own
+ * config.c manifest loader may freely set magic/vendor_id/device_id/
+ * svr_root_client_index/svr_implemented_options and the rest directly.
+ * svr_ep_count is server-owned (see rcp_mock_server_add_endpoint()/
+ * _remove_endpoint()) -- writing it directly here is not itself rejected,
+ * but rcp_mock_server_add_endpoint()/_remove_endpoint() overwrite it with
+ * the true slot count on their own next call. The returned pointer is
+ * valid for srv's own lifetime; never NULL for a non-NULL srv. */
+rcp_regmap_general_t *rcp_mock_server_regmap(rcp_mock_server_t *srv);
+
+/* ── Endpoint registration ─────────────────────────────────────────────────── */
+
+/* Adds one endpoint slot addressed at byte_bus_id, with generic config
+ * ep_type/ep_used=true (regmap.h's rcp_regmap_ep_generic_cfg_t; every other
+ * generic-cfg field left at its rcp_regmap_ep_generic_cfg_init() default)
+ * and an rcp_server_endpoint_t queue starting at ep_enable. handler may be
+ * NULL (dispatched/drained requests then produce no response, as if the
+ * endpoint accepted but never replied). On success, srv's own
+ * svr_ep_count is updated to the new total slot count. Returns
+ * RCP_MOCK_ERR_DUPLICATE_BUS_ID if byte_bus_id is already registered,
+ * RCP_MOCK_ERR_CAPACITY if srv already holds RCP_MOCK_MAX_ENDPOINTS
+ * endpoints. */
+rcp_mock_errc_t rcp_mock_server_add_endpoint(rcp_mock_server_t *srv,
+                                              rcp_byte_bus_id_t byte_bus_id,
+                                              uint8_t ep_type, bool ep_enable,
+                                              rcp_mock_endpoint_handler_fn handler,
+                                              void *user_data);
+
+/* Removes the endpoint slot at byte_bus_id, freeing any requests still
+ * queued on it. Returns true iff a slot was found and removed (and
+ * svr_ep_count decremented); false, leaving srv unchanged, if byte_bus_id
+ * was never registered. */
+bool rcp_mock_server_remove_endpoint(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id);
+
+/* Sets the ep_enable flag of the endpoint at byte_bus_id (server.h's
+ * rcp_server_endpoint_set_enable()). Returns true iff byte_bus_id names a
+ * registered endpoint. */
+bool rcp_mock_server_set_endpoint_enable(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
+                                          bool enable);
+
+/* Number of requests currently queued (awaiting drain) on the endpoint at
+ * byte_bus_id, or 0 if byte_bus_id names no registered endpoint. */
+size_t rcp_mock_server_endpoint_queue_len(const rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id);
+
+/* ── Dispatch ───────────────────────────────────────────────────────────────── */
+
+typedef enum {
+    /* The addressed endpoint's queue was enabled: its handler ran
+     * synchronously and *out_response (possibly still zeroed, meaning "no
+     * response") reflects its result. */
+    RCP_MOCK_DISPATCH_OK              = 0,
+    /* The addressed endpoint's queue was disabled: request queued
+     * (server.h ep_enable semantics), no handler ran, *out_response is left
+     * zeroed. Call rcp_mock_server_drain_endpoint() once the endpoint is
+     * re-enabled to actually run it. */
+    RCP_MOCK_DISPATCH_QUEUED          = 1,
+    /* rcp_lifecycle_should_accept() rejected the frame outright for srv's
+     * current lifecycle state; *out_response is left zeroed. Mirrors a real
+     * server silently dropping the frame -- this is not itself an error. */
+    RCP_MOCK_DISPATCH_DROPPED         = 2,
+    /* byte_bus_id names no registered endpoint. *out_response is left
+     * zeroed. */
+    RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS = 3,
+} rcp_mock_dispatch_result_t;
+
+/* Runs one already-framed request through srv: first
+ * rcp_lifecycle_should_accept(srv's own state, time_sync_supported,
+ * avtp_subtype, acf_msg_type, byte_bus_id) (lifecycle.h); if accepted, the
+ * addressed endpoint's rcp_server_endpoint_submit() decides whether the
+ * request runs now (its own registered handler, synchronously) or is
+ * queued. *out_response is zeroed on entry and left zeroed whenever no
+ * handler actually ran or the handler chose not to produce a response;
+ * caller frees any populated response with rcp_bytes_free(). */
+rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
+                                                     rcp_byte_bus_id_t byte_bus_id,
+                                                     uint8_t avtp_subtype, uint8_t acf_msg_type,
+                                                     bool time_sync_supported,
+                                                     const uint8_t *request, size_t request_len,
+                                                     rcp_bytes_t *out_response);
+
+/* Drains and runs the oldest queued request on the endpoint at byte_bus_id
+ * (server.h's rcp_server_endpoint_drain_one() -- a no-op unless that
+ * endpoint's own ep_enable is currently true and its queue is non-empty).
+ * On a successful drain, *out_response (zeroed on entry) is populated the
+ * same way rcp_mock_server_dispatch() populates it, and true is returned.
+ * Returns false (out_response left zeroed) if byte_bus_id names no
+ * registered endpoint, or its queue has nothing to drain right now. */
+bool rcp_mock_server_drain_endpoint(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
+                                     rcp_bytes_t *out_response);
 
 #ifdef __cplusplus
 }

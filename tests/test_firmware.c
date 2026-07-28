@@ -10,7 +10,7 @@
 #include "unity.h"
 
 #include <rcp/firmware.h>
-#include <rcp/mock.h>
+#include "legacy_mock.h"
 #include <rcp/rcp.h>
 
 #include <string.h>

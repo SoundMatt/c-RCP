@@ -9,7 +9,7 @@
 //cfusa:test REQ-RED-009
 #include "unity.h"
 
-#include <rcp/mock.h>
+#include "legacy_mock.h"
 #include <rcp/rcp.h>
 #include <rcp/redundancy.h>
 

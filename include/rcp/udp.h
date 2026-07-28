@@ -19,8 +19,10 @@ extern "C" {
 /* Handler invoked by an rcp_udp_zone_server_t when it receives a Command.
  * If NULL, the server replies RCP_RESPONSE_OK with an empty payload.
  * *out is zeroed before the handler runs; ownership rules match
- * rcp_mock_handler_fn (see mock.h): if the handler wants a response
- * payload, it must allocate it itself (e.g. via rcp_bytes_dup). */
+ * tests/legacy_mock.h's own rcp_mock_handler_fn (the legacy zone-controller
+ * reference double this milestone-77 mock.h rework moved out of the public
+ * library -- see mock.h's own file header): if the handler wants a
+ * response payload, it must allocate it itself (e.g. via rcp_bytes_dup). */
 typedef void (*rcp_udp_handler_fn)(const rcp_command_t *cmd, rcp_response_t *out, void *user_data);
 
 /* ── ZoneServer: listens on a UDP port, dispatches Commands, publishes Status ── */

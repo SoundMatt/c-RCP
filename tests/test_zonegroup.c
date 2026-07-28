@@ -6,7 +6,7 @@
 //cfusa:test REQ-ZG-006
 #include "unity.h"
 
-#include <rcp/mock.h>
+#include "legacy_mock.h"
 #include <rcp/rcp.h>
 #include <rcp/zonegroup.h>
 
