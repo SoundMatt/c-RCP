@@ -1,5 +1,5 @@
 Software Configuration Index
-Project: c-RCP v0.69.0   Generated: 2026-07-28T18:42:56Z
+Project: c-RCP v0.70.0   Generated: 2026-07-28T19:09:49Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
@@ -11,6 +11,7 @@ FILE                                                          SHA-256
 ./include/rcp/acf.h                                           e5fc86d6522308a4061853a8c6b7bfcca5a03b4c0b753e6c5300955c65afaa7c
 ./include/rcp/mdns.h                                          81b034f2a6b2ae79de47579fc370af0d5ed37c95ef3b7a0ddac70fbdbd42ba1b
 ./include/rcp/restbridge.h                                    ea39a06c13d0ad464f4f34df65e63d10a3aec5ccf3473890c3255d4ef686a8fe
+./include/rcp/safept.h                                        712cb4d52d7749900d48e5f857151021664ce5a1749bf67b12c878ea314cd947
 ./include/rcp/authz.h                                         961554a4dadf81d267da7dfecbd3881f93b1056b9815a225b28496e879676276
 ./include/rcp/proxy.h                                         45fdac4af00813cb301e9df19252ae587f54607cdcec088d43666eac8f3e71a8
 ./include/rcp/tls.h                                           f62738ef10a3da2eebafe8cda2b8b8248b882a9f3a09b9b5fe29fb9542b85c65
@@ -30,7 +31,7 @@ FILE                                                          SHA-256
 ./include/rcp/ep_gpio.h                                       341deb8ca07ce5efe97732e32964e5a62214b064ceb699fc1110ad82534cfd37
 ./include/rcp/timed.h                                         28a7f7399336a11af70bcf7c0fcebc3238de53584cfb308a5627755c173e1a12
 ./include/rcp/ep_adc.h                                        01b2609e35aea005c2ebd289d27abc0d359e4e4a3e8a7e4bc766ed2b95cec87c
-./include/rcp/version.h                                       1d75375661469a0478710c3224545289d2b00a258d2e6a2c88a47193eb8fd356
+./include/rcp/version.h                                       298a8cdaed8c328bbc26257759cc00403962320efae627f10afd3eb166dc435c
 ./include/rcp/recorder.h                                      db4b9c80c24ccb3e68daa06378ed700c53c70cc97131305133d2ccf5b9a03732
 ./include/rcp/cli.h                                           d479738a54a077a4a0019dec3ec62a39b73857fadbe1ae2745d2f7609506b7d9
 ./include/rcp/avtp.h                                          416f4beb4eb8c68d1dac4842372d0747da15c45677c67ae1de11c8849657b055
@@ -38,7 +39,7 @@ FILE                                                          SHA-256
 ./include/rcp/sim.h                                           b3b995de5409a38b31e8e876a456d4469c4071eca1df0b8b4ef007bdb71285e8
 ./include/rcp/doipbr.h                                        0baebfd08eb7dd649c2f3cd60277074f9ff67647016dba1ae8d7a57d2b61be08
 ./include/rcp/linbr.h                                         87c5ebf60896912201de739253cabd3d84e191599e3e69c6589c96ec345c3a2a
-./include/rcp/regmap.h                                        aaf4b19bfec96fdf79c669dbdc7389596e1788d1a2189dd92ec5da586e69ab49
+./include/rcp/regmap.h                                        e8540d1e6ba9e19ad27916469bc8efc9d83b6a1b182e705ece8457f1d1fa99d5
 ./include/rcp/dyndata.h                                       8f85c752c3c62c88afaf44eb8a77cc91d57cd75217da728d625f133e9fa1274c
 ./include/rcp/admin.h                                         63c73a53b2a908b0035b887170dcfa413b075978efc06b971adc2e83abfbfb3d
 ./include/rcp/zonegroup.h                                     ab368bbaa9121c146aab79dd5f46a4b64eb35c25a0c02cb72bbefa92db63b35e
@@ -76,6 +77,7 @@ FILE                                                          SHA-256
 ./src/platform.h                                              38d92316e7ae88bb84c169fca79d87bef6ac6ef49b7b4679d37013b41972c800
 ./src/sequencer.c                                             2d9f41de8ce046dcf92b964474ceb458dbbba7a5f1c8544f9c471a3bbd10056d
 ./src/prioqueue.c                                             b94f8f761f36cc77bea143df08ad1c2ce0893f7ea5f2453b2d53d920b6b8d341
+./src/safept.c                                                d182a01533cebbc95e853ffa809ff1a06fd856856b485d425a333668b7e2dbc5
 ./src/e2e.c                                                   c138a419113fe5b522e7331705cc69d8ea0a3a97e2ec20955b07e53e2f72a08c
 ./src/firmware.c                                              60c0ddbbc09d8b0e414beef42079893f08609761419c282e1b5427e5bddeeeac
 ./src/mock.c                                                  223bc296c2754623525788f7370394098f35c175007c294def0080e29ee8a4ce
@@ -160,7 +162,7 @@ FILE                                                          SHA-256
 ./tests/test_triggered.c                                      da9bf6252a00fae63c52be8f01fec62a1d7cf7af7c643433bb0eb3f4b08e7084
 ./tests/test_cancel.c                                         0d362bed1452cc8d0fed3ef5c52c98e4905cbcb904e2a8e2b33e1877bdb5c709
 ./tests/test_restbridge.c                                     1dfc12b005af67c9ef1499f4cdfed298a38fe4a466780b8d49b737ed6a9878b0
-./tests/test_regmap.c                                         e9fe3affa39cac7c6f31bb9e88796958a576945704b11ffdcaa6c3130d438882
+./tests/test_regmap.c                                         819e667aa4f578c8a8a95f7af760653ef6c9c24e4cebf2f8cdb161d44af608ca
 ./tests/test_mqttbr.c                                         ee606cbb1f5467fe976840814a465ddade8697a6b15d19e5c57ac456d29f7f12
 ./tests/test_rcp.c                                            06ca82e83d0296c37c293f022d128258ea5c2e20ddb1ed0c368d54bbf208abf0
 ./tests/test_acf.c                                            cf4d2b885f4de910b12be1b27e2716f0853d7f8ef7205b945522ab6821b43b84
@@ -181,9 +183,10 @@ FILE                                                          SHA-256
 ./tests/test_e2e.c                                            5bf665f7e216db67a11de8f6bc02c2bf02b66c0dfbbebe91c83f7512649e0c47
 ./tests/test_watchdog.c                                       fb2b1c030c2e192f32fbe6794feaec82e9814bb5b8b849c1ff0515f4acf61bea
 ./tests/test_cli.c                                            35b479ce67c8f43017461bac129c7cd874b240cb0192826a024f47a02659d73a
+./tests/test_safept.c                                         51b94a6b53ee4b9a8ef99c59d3fa84cc1d764a58abbace6187f61e1345bbac6a
 ./tests/test_sim.c                                            e3addfdf6af83a8ef4112d5d3f6b9d6cde0f8fe26ff2e80c62dafd5e31a7bdaa
 ./tests/test_server.c                                         402e517e2096234262ffe44d36e36d3373f241e4644bee127ecc5b20caf0697c
 ./tests/test_ep_adc.c                                         9027eb9d5e8c0e9c4f53be86a3fa12c075f16999fc9ecb259a0a904033017610
 ./cli/main.c                                                  541875eda25d51c675d488ca4ddc24226dbccd51e91b77390569c451c36710e1
 
-Total files: 182
+Total files: 185

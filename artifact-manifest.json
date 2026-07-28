@@ -4,9 +4,9 @@
   "tool": "c-FuSa",
   "toolVersion": "0.5.45",
   "language": "c",
-  "generatedAt": "2026-07-28T18:42:56Z",
+  "generatedAt": "2026-07-28T19:09:48Z",
   "format": "x-FuSa manifest v1",
   "artifacts": [
-    {"path": "sbom.json", "sha256": "a03a99c7009020cd1c7d4c5573fbea149f68bf4cfc3add23562283b9537fdd6d"}
+    {"path": "sbom.json", "sha256": "ca3432dac1da976c1723821cc3f254e0fef2bc0706285e15ff233da7ce0a40cb"}
   ]
 }
