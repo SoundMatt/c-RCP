@@ -2399,7 +2399,7 @@ wound into lifecycle bootstrapping — the second-highest-impact structural
 gap after Phase 14 per the gap analysis's own prioritization (extraction
 §9 item 2).
 
-### 63. Discovery (v0.63.0)
+### 63. Discovery (v0.63.0) ✅
 
 - Broadcastable ACF_ABB read request at `byte_bus_id 0`, register-map
   address 0, answerable in **any** lifecycle state, NTSCF-only (a
@@ -2420,6 +2420,70 @@ gap after Phase 14 per the gap analysis's own prioritization (extraction
 - Client-side discovery result persistence (so re-discovery isn't
   mandatory every power cycle on a known topology) as a thin convenience
   API, not a protocol requirement.
+
+**Done (v0.63.0)**: `include/rcp/discovery.h` + `src/discovery.c` land as
+new, additive protocol-core surface layered on top of the AVTPDU framing
+(milestone 59), ACF message format (milestone 60), RC Server lifecycle
+state machine (milestone 61), and register-map model (milestone 62).
+Nothing in `rcp.h`, `wire.c`, `avtp.h`/`avtp.c`, `acf.h`/`acf.c`,
+`server.h`/`server.c`, `regmap.h`/`regmap.c`, or any satellite package is
+touched.
+- `rcp_discovery_should_drop()`: the NTSCF-only rule as its own directly-
+  testable function, mirroring `avtp.c`'s own
+  `rcp_avtp_should_drop_tscf()` convention — a discovery request/response
+  never rides on a TSCF-headed frame, independent of lifecycle state or
+  time-sync capability. `rcp_discovery_decode_request()`/
+  `_decode_response()` apply it before any ACF-level parsing is attempted.
+- `rcp_discovery_encode_request()`/`_decode_request()`: a full NTSCF-
+  framed ACF_ABB read addressed to `RCP_SERVER_DISCOVERY_BYTE_BUS_ID`,
+  answerable regardless of `rcp_server_lifecycle_t` -- this module
+  deliberately never gates on it, unlike ordinary field writes.
+- `rcp_discovery_encode_response()`/`_decode_response()`: a register-map
+  slice from address 0 whose payload length always equals the requested
+  `read_size` (`RCP_DISCOVERY_GENERAL_SLICE_LEN`, this module's own
+  12-octet layout, holds the populated magic/`svr_version`/vendor/device
+  ID/`svr_ep_count` fields already modeled by `rcp_regmap_general_t`; any
+  requested length beyond that is zero-filled reserved space). Addressing
+  the underlying carrier frame back to the requester's MAC is left to a
+  future real transport, matching `avtp.h`'s transport-independent design
+  -- the requester's `stream_id.mac`, already recovered by
+  `rcp_discovery_decode_request()`, is what such a transport would use.
+- `rcp_discovery_claim_t`: the discovery-stream claim/timeout/re-open
+  state machine as its own small piece of server-side mutable state, with
+  `Discovery_TimeOut` a configurable field (`RCP_DISCOVERY_DEFAULT_TIMEOUT_MS`
+  = 20 ms is only a suggested default, mirroring `regmap.h`'s
+  `rcp_regmap_request_stream_cfg_t.rx_wd_timeout_ms` convention of never
+  hardcoding a timeout inside the module itself).
+  `rcp_discovery_claim_note_request()` grants an open (never-held or
+  lapsed) claim to its requester without preempting an active claimant;
+  `rcp_discovery_claim_note_config_write()` refreshes the claimant's
+  deadline and never resurrects an already-lapsed claim;
+  `rcp_discovery_claim_is_claimant()` is the pure query a caller combines
+  with `rcp_server_field_writable()`/`rcp_regmap_writer_ctx()` -- reusing
+  their existing authorization logic rather than duplicating it, the same
+  pattern `regmap.c` established for milestone 62 -- as one more input to
+  an overall write-authorization decision; `rcp_discovery_claim_release()`
+  is the unconditional reset path for the server's demotion back to
+  `HW_UNCONFIGURED`. Every function taking elapsed time takes an explicit
+  `now_ms` parameter rather than reading a clock itself, keeping the whole
+  state machine deterministic to test.
+- `rcp_discovery_cache_t`: client-side discovery result persistence,
+  keyed by each result's `server_stream_id` (one entry per server,
+  last-discovered-wins), landed exactly as scoped -- a thin convenience
+  API this module never itself consults to decide whether to (re-)issue a
+  discovery request.
+- `tests/test_discovery.c` (31 cases): the NTSCF-only rule across all
+  three subtype cases, request/response encode-decode round trips, every
+  request/response rejection path (wrong subtype, message type,
+  byte_bus_id, op, short/empty frame), the response's read_size-always-
+  matches-payload-length rule with both truncation and zero-fill, the
+  full claim state machine (grant/no-preempt/lapse/reopen/refresh/reject/
+  release), and the discovery cache's put/find/grow/update-in-place
+  behavior.
+- 24 new requirements (`REQ-DISC-001`..`024`) added to `.fusa-reqs.json`;
+  `cfusa trace --req-coverage 100` (both metrics), `cfusa check`/`lint`/
+  `analyze`/`cyber`/`vuln`/`qualify` (0 errors), and the full `ctest`
+  suite all stay green.
 
 ---
 ### Phase 16 — Basic Endpoints
