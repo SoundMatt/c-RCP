@@ -3325,7 +3325,7 @@ already failing that same CI job, on `main` at this milestone's own base
 commit (`c27ab16`, before this branch's own changes) — not introduced or
 touched here.
 
-### 74. MDIO endpoint (v0.74.0)
+### 74. MDIO endpoint (v0.74.0) ✅
 
 - `include/rcp/ep_mdio.h` + `src/ep_mdio.c`: the endpoint entirely absent
   from the spec's own informative "ten interfaces" scope list yet fully
@@ -3334,6 +3334,80 @@ touched here.
   type-specific functional config beyond the universal common block, no
   trigger-signal table. Reusable to expose an on-die integrated PHY's
   management registers when no physical MDIO pins are mapped at all.
+
+**Requirement-id naming note**: verified directly against `.fusa-reqs.json`
+before picking a prefix, the same check every prior endpoint milestone has
+made — this codebase has never carried a pre-replacement MDIO bridge/stub
+module, and none of this repository's satellite packages are named `mdio`,
+so this module's own 19 new requirements are tagged plain
+`REQ-MDIO-001`..`019`, no "-EP" collision-avoidance suffix needed.
+
+**Done (v0.74.0)**: `include/rcp/ep_mdio.h` + `src/ep_mdio.c` land as new,
+additive protocol-core surface, following the same layering discipline
+every endpoint type since milestone 64 established (nothing in `rcp.h`,
+`wire.c`, `avtp.h`/`avtp.c`, `acf.h`/`acf.c`, `server.h`/`server.c`,
+`regmap.h`/`regmap.c`, `discovery.h`/`discovery.c`, or any prior `ep_*`
+module is touched). `rcp_ep_mdio_addr_t` models both Clause-22 ("MMD", a
+5-bit port/PHY address plus a 5-bit register address selecting one 16-bit
+register directly) and Clause-45 ("MMS", the same 5-bit port/PHY address
+joined by a 5-bit MMD device address and a full 16-bit register address),
+with `rcp_ep_mdio_addr_valid()` as a small, pure, directly-testable
+statement of both modes' field-range invariants at once. A request's
+`word_count` selects single-word (1) vs. burst (>1) addressing;
+`rcp_ep_mdio_burst_next_regad()` is this module's own pure,
+directly-testable one-step-advance helper for a caller's own burst loop,
+generalizing the well-known MDIO post-increment idiom to both addressing
+modes uniformly, with wraparound at each mode's own register-address width
+rather than an out-of-range result. `RCP_EP_MDIO_MAX_BURST_WORDS` (512) is
+this module's own chosen cap, keeping every worst-case encoded frame
+comfortably inside `RCP_AVTP_NTSCF_MAX_PAYLOAD` — the same deliberate
+single-AVTPDU-worst-case scope `ep_uart.h`'s/`ep_lin.h`'s/`ep_iseled.h`'s
+own request/response pairs already commit to, needing none of `ep_can.h`'s
+own CAN-XL-specific exception. Following `ep_uart.h`'s own TX-write/RX-read
+two-family precedent (rather than `ep_iseled.h`'s/`ep_can.h`'s single
+request/response pair), this module exposes independent
+read (`rcp_ep_mdio_encode_read_request()`/`_decode_read_request()`,
+`rcp_ep_mdio_encode_read_response()`/`_decode_read_response()`) and write
+(`rcp_ep_mdio_encode_write_request()`/`_decode_write_request()`,
+`rcp_ep_mdio_encode_write_response()`/`_decode_write_response()`) request/
+response families, because this endpoint type has two genuinely distinct
+underlying MDIO operations, unlike a single symmetric command/reply
+exchange. `rcp_ep_mdio_pack_words()`/`_word_count_of()`/`_unpack_word_at()`
+(plus the pure `_word_encode()`/`_word_decode()` primitives) are this
+module's own small, directly-testable big-endian register-word packing
+layer, used by every encoder/decoder above but never touching the content
+of any data word itself. Per the roadmap's own scope,
+`rcp_ep_mdio_functional_cfg_t` composes only `regmap.h`'s shared
+functional-cfg prefix and adds nothing of its own — a documented "nothing
+more to add" finding, not an oversight, so there are no
+`rcp_ep_mdio_set_*()` mutators in this file at all (no endpoint type in
+this codebase exposes a setter for the common block's own fields either);
+`rcp_ep_mdio_functional_cfg_init()` and
+`rcp_ep_mdio_functional_cfg_writable()` are still provided purely for
+consistency with every other endpoint type's own init/writable pair, the
+latter a thin wrapper over `server.h`'s `rcp_server_field_writable()`.
+Mirroring `ep_can.h`'s own documented reflection of the same spec gap
+(extraction §7), this module defines no trigger enumeration and no
+`rcp_ep_mdio_trigger_t`-shaped field anywhere. The file header also
+documents this endpoint type's usefulness with zero physical MDIO/MDC pins
+mapped at all, for exposing an on-die/integrated PHY's own management
+registers entirely internally.
+`tests/test_ep_mdio.c` (56 cases covering address validation for both
+addressing modes, the burst-address-advance helper, the register-word
+packing layer, functional-config authorization, and all four
+read/write request/response round trips including short-frame/wrong-bus/
+wrong-op/bad-address/bad-word-count rejection) passes, alongside the full
+existing `ctest` suite (64/64, ASan/UBSan-clean). `cfusa
+lint`/`analyze`/`cyber`/`vuln`/`qualify` (0 errors) and `cfusa trace
+--req-coverage 100` (both metrics) stay green, and `relay conform --strict`
+passes against the rebuilt CLI. `cfusa check`'s own HARA002/HARA003
+findings (10 hazards in `.fusa-hara.json` each missing a risk rating and a
+`safetyGoals` reference) are the same pre-existing gap ep_iseled.h's own
+v0.73.0 entry above already documents — confirmed still present, and still
+failing that same CI job, on `main` at this milestone's own base commit
+(`61b912a`, before this branch's own changes; CI has in fact been red on
+`main` since v0.72.0's own merge for this same reason) — not introduced or
+touched here.
 
 ### 75. Wakeup control endpoint + power modes (v0.75.0)
 

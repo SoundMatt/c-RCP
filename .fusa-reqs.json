@@ -6895,6 +6895,158 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-001",
+      "title": "rcp_ep_mdio_addr_valid() validates a Clause-22/Clause-45 MDIO address",
+      "text": "rcp_ep_mdio_addr_valid() shall return false for any prtad above RCP_EP_MDIO_PRTAD_MAX, for a RCP_EP_MDIO_CLAUSE_22 address with a nonzero devad or a regad above RCP_EP_MDIO_CLAUSE22_REGAD_MAX, for a RCP_EP_MDIO_CLAUSE_45 address with devad above RCP_EP_MDIO_DEVAD_MAX, and for any other clause value; true otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-002",
+      "title": "rcp_ep_mdio_burst_next_regad() computes the next burst register address",
+      "text": "rcp_ep_mdio_burst_next_regad() shall return regad+1 wrapped modulo 32 for RCP_EP_MDIO_CLAUSE_22, regad+1 wrapped modulo 65536 for RCP_EP_MDIO_CLAUSE_45, and regad unchanged for any other clause value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-003",
+      "title": "rcp_ep_mdio_word_encode() encodes a 16-bit register word as two big-endian octets",
+      "text": "rcp_ep_mdio_word_encode() shall write word's high byte to out[0] and word's low byte to out[1].",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-004",
+      "title": "rcp_ep_mdio_word_decode() decodes two big-endian octets as a 16-bit register word",
+      "text": "rcp_ep_mdio_word_decode() shall return (in[0] << 8) | in[1].",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-005",
+      "title": "rcp_ep_mdio_pack_len() computes the packed byte length of a word count",
+      "text": "rcp_ep_mdio_pack_len() shall return word_count * 2.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-006",
+      "title": "rcp_ep_mdio_pack_words() packs a register-word array into a big-endian byte buffer",
+      "text": "rcp_ep_mdio_pack_words() shall return a zeroed rcp_bytes_t when word_count is 0 or on allocation failure, and otherwise a newly allocated buffer of rcp_ep_mdio_pack_len(word_count) octets holding each word's rcp_ep_mdio_word_encode() result in order.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-007",
+      "title": "rcp_ep_mdio_word_count_of() derives a word count from a packed byte length",
+      "text": "rcp_ep_mdio_word_count_of() shall return false and leave *out_word_count untouched when byte_len is odd, and otherwise return true with *out_word_count set to byte_len / 2.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-008",
+      "title": "rcp_ep_mdio_unpack_word_at() reads one packed register word by index",
+      "text": "rcp_ep_mdio_unpack_word_at() shall return rcp_ep_mdio_word_decode() applied to data[2*word_index .. 2*word_index+2).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-009",
+      "title": "rcp_ep_mdio_functional_cfg_init() zero-initializes an MDIO functional config",
+      "text": "rcp_ep_mdio_functional_cfg_init() shall zero-initialize cfg and initialize cfg->common via rcp_regmap_ep_functional_cfg_init(), leaving every common flag false.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-010",
+      "title": "rcp_ep_mdio_functional_cfg_writable() delegates to the shared field-authorization logic",
+      "text": "rcp_ep_mdio_functional_cfg_writable() shall return rcp_server_field_writable(state, RCP_SERVER_FIELD_FUNCTIONAL_W, writer).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-011",
+      "title": "rcp_ep_mdio_strerror() returns a non-NULL message for every error code",
+      "text": "rcp_ep_mdio_strerror() shall return a non-NULL, non-empty, distinct message for each rcp_ep_mdio_errc_t value, and a non-NULL message for any unrecognized value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-012",
+      "title": "rcp_ep_mdio_encode_read_request() encodes an ACF_ABB MDIO read request",
+      "text": "rcp_ep_mdio_encode_read_request() shall return a zeroed rcp_bytes_t when !rcp_ep_mdio_addr_valid(addr) or word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS, and otherwise encode an ACF_ABB message with op RCP_ACF_OP_READ whose payload is addr's clause/prtad/devad/regad fields followed by word_count, all as specified.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-013",
+      "title": "rcp_ep_mdio_decode_read_request() validates and decodes an ACF-level MDIO read request",
+      "text": "rcp_ep_mdio_decode_read_request() shall return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header, its declared payload, or the 7-byte request prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_MDIO_ERR_WRONG_OP for an op other than RCP_ACF_OP_READ; RCP_EP_MDIO_ERR_BAD_ADDR when the decoded address fails rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT when the decoded word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS; and otherwise RCP_EP_MDIO_OK with the address, word count, and transaction number populated.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-014",
+      "title": "rcp_ep_mdio_encode_read_response() encodes timed and untimed MDIO read responses",
+      "text": "rcp_ep_mdio_encode_read_response() shall return a zeroed rcp_bytes_t when word_count exceeds RCP_EP_MDIO_MAX_BURST_WORDS or on allocation failure, and otherwise encode an ACF_GBB frame with message_timestamp set to timestamp and mtv RCP_ACF_MTV_VALID when timed is true, or an ACF_ABB frame otherwise, in both cases with payload rcp_ep_mdio_pack_words(words, word_count) and op RCP_ACF_OP_READ.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-015",
+      "title": "rcp_ep_mdio_decode_read_response() validates and decodes either ACF_ABB or ACF_GBB MDIO read responses",
+      "text": "rcp_ep_mdio_decode_read_response() shall accept either an ACF_ABB or ACF_GBB frame, return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame too short for the applicable header or declared payload, RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id, RCP_EP_MDIO_ERR_BAD_WORD_COUNT for an odd payload length or more than RCP_EP_MDIO_MAX_BURST_WORDS words, and otherwise RCP_EP_MDIO_OK with the packed word bytes, word count, transaction number, and timed/timestamp populated.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-016",
+      "title": "rcp_ep_mdio_encode_write_request() encodes an ACF_ABB MDIO write request",
+      "text": "rcp_ep_mdio_encode_write_request() shall return a zeroed rcp_bytes_t when !rcp_ep_mdio_addr_valid(addr), word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS, or on allocation failure, and otherwise encode an ACF_ABB message with op RCP_ACF_OP_WRITE whose payload is addr's clause/prtad/devad/regad fields followed by rcp_ep_mdio_pack_words(words, word_count).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-017",
+      "title": "rcp_ep_mdio_decode_write_request() validates and decodes an ACF-level MDIO write request",
+      "text": "rcp_ep_mdio_decode_write_request() shall return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header, its declared payload, or the 5-byte address prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_MDIO_ERR_WRONG_OP for an op other than RCP_ACF_OP_WRITE; RCP_EP_MDIO_ERR_BAD_ADDR when the decoded address fails rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT when the trailing words region's byte length is odd, is 0, or represents more than RCP_EP_MDIO_MAX_BURST_WORDS words; and otherwise RCP_EP_MDIO_OK with the address, packed word bytes, word count, and transaction number populated.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-018",
+      "title": "rcp_ep_mdio_encode_write_response() encodes timed and untimed MDIO write responses",
+      "text": "rcp_ep_mdio_encode_write_response() shall return a zeroed rcp_bytes_t when accepted_word_count exceeds RCP_EP_MDIO_MAX_BURST_WORDS or on allocation failure, and otherwise encode an ACF_GBB frame with message_timestamp set to timestamp and mtv RCP_ACF_MTV_VALID when timed is true, or an ACF_ABB frame otherwise, in both cases with payload rcp_ep_mdio_pack_words(accepted_words, accepted_word_count) and op RCP_ACF_OP_WRITE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-019",
+      "title": "rcp_ep_mdio_decode_write_response() validates and decodes either ACF_ABB or ACF_GBB MDIO write responses",
+      "text": "rcp_ep_mdio_decode_write_response() shall accept either an ACF_ABB or ACF_GBB frame, return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame too short for the applicable header or declared payload, RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id, RCP_EP_MDIO_ERR_BAD_WORD_COUNT for an odd payload length or more than RCP_EP_MDIO_MAX_BURST_WORDS words, and otherwise RCP_EP_MDIO_OK with the accepted packed word bytes, word count, transaction number, and timed/timestamp populated.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     }
   ]
 }
