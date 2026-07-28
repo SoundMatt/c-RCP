@@ -6951,6 +6951,238 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWRMODE-001",
+      "title": "rcp_pwrmode_string() returns a unique human-readable name",
+      "text": "rcp_pwrmode_string() shall return a unique, non-empty name for each defined rcp_pwrmode_t constant, and a non-NULL name for any other value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWRMODE-002",
+      "title": "rcp_pwrmode_strerror() returns a non-NULL message for every error code",
+      "text": "rcp_pwrmode_strerror() shall return a non-NULL, non-empty message for each rcp_pwrmode_errc_t value, and a non-NULL message for any unrecognized value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWRMODE-003",
+      "title": "rcp_pwrmode_cold_start_lifecycle_target() names the cold-start re-init target",
+      "text": "rcp_pwrmode_cold_start_lifecycle_target() shall return RCP_LIFECYCLE_HW_UNCONFIGURED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWRMODE-004",
+      "title": "rcp_pwrmode_transition() implements the general power-mode transition table",
+      "text": "rcp_pwrmode_transition() shall succeed with RCP_PWRMODE_START_HOT for Normal<->StandBy and for a mode transitioning to itself; shall succeed with RCP_PWRMODE_START_COLD for Normal/StandBy->Sleep, any mode->Unpowered, and Unpowered->Normal; and shall fail with RCP_PWRMODE_ERR_INVALID_TRANSITION (leaving *mode unchanged) for Sleep->Normal and for any other transition not named above.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWRMODE-005",
+      "title": "rcp_pwrmode_hotstart_required() identifies the network-wake handshake bypass",
+      "text": "rcp_pwrmode_hotstart_required() shall return false for RCP_PWRMODE_WAKE_VIA_NETWORK and true for RCP_PWRMODE_WAKE_VIA_PIN.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWRMODE-006",
+      "title": "rcp_pwrmode_handshake_init() sets the initial handshake state",
+      "text": "rcp_pwrmode_handshake_init() shall set hs->step to RCP_PWRMODE_HANDSHAKE_NOT_STARTED, hs->wakeup_attempts to 0, and hs->wakeup_repeat_limit to repeat_limit.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWRMODE-007",
+      "title": "rcp_pwrmode_handshake_iface_reenabled() implements handshake step (a)",
+      "text": "rcp_pwrmode_handshake_iface_reenabled() shall, when hs->step == RCP_PWRMODE_HANDSHAKE_NOT_STARTED, advance hs->step to RCP_PWRMODE_HANDSHAKE_IFACE_REENABLED and return true; otherwise it shall leave hs unchanged and return false.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWRMODE-008",
+      "title": "rcp_pwrmode_handshake_wakeup_attempt() implements handshake step (b)",
+      "text": "rcp_pwrmode_handshake_wakeup_attempt() shall, when hs->step != RCP_PWRMODE_HANDSHAKE_IFACE_REENABLED, leave hs unchanged and return false; otherwise it shall increment hs->wakeup_attempts, and if echoed is true advance hs->step to RCP_PWRMODE_HANDSHAKE_ECHOED and return true, else if hs->wakeup_attempts has reached hs->wakeup_repeat_limit advance hs->step to RCP_PWRMODE_HANDSHAKE_FAILED and return false, else leave hs->step unchanged and return true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWRMODE-009",
+      "title": "rcp_pwrmode_handshake_resume_queues() implements handshake step (c)",
+      "text": "rcp_pwrmode_handshake_resume_queues() shall, when hs->step == RCP_PWRMODE_HANDSHAKE_ECHOED, advance hs->step to RCP_PWRMODE_HANDSHAKE_COMPLETE and return true; otherwise it shall leave hs unchanged and return false.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWRMODE-010",
+      "title": "rcp_pwrmode_handshake_is_complete() reports handshake completion",
+      "text": "rcp_pwrmode_handshake_is_complete() shall return true iff hs->step == RCP_PWRMODE_HANDSHAKE_COMPLETE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWRMODE-011",
+      "title": "rcp_pwrmode_handshake_has_failed() reports handshake failure",
+      "text": "rcp_pwrmode_handshake_has_failed() shall return true iff hs->step == RCP_PWRMODE_HANDSHAKE_FAILED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWRMODE-012",
+      "title": "rcp_pwrmode_wake_from_sleep() classifies hot vs. cold wake starts",
+      "text": "rcp_pwrmode_wake_from_sleep() shall fail with RCP_PWRMODE_ERR_INVALID_TRANSITION when *mode != RCP_PWRMODE_SLEEP; otherwise it shall set *mode to RCP_PWRMODE_NORMAL and report *out_start_kind as RCP_PWRMODE_START_HOT when !rcp_pwrmode_hotstart_required(path) or when handshake is non-NULL and rcp_pwrmode_handshake_is_complete(handshake), and as RCP_PWRMODE_START_COLD otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWRMODE-013",
+      "title": "rcp_pwrmode_check_entry() gates StandBy/Sleep entry requests",
+      "text": "rcp_pwrmode_check_entry() shall return RCP_PWRMODE_ENTRY_REFUSED when gate is NULL or any of gate->wup_status_clear, gate->endpoint_idle, gate->response_queue_empty is false, and RCP_PWRMODE_ENTRY_OK otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WAKEUP-001",
+      "title": "rcp_ep_wakeup_functional_cfg_init() zero-initializes a wakeup functional config",
+      "text": "rcp_ep_wakeup_functional_cfg_init() shall zero-initialize cfg (including every sources[] entry) and initialize cfg->common via rcp_regmap_ep_functional_cfg_init().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WAKEUP-002",
+      "title": "rcp_ep_wakeup_functional_cfg_writable() delegates to the shared field-authorization logic",
+      "text": "rcp_ep_wakeup_functional_cfg_writable() shall return rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, writer).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WAKEUP-003",
+      "title": "rcp_ep_wakeup_source_asserted() applies one source's own polarity",
+      "text": "rcp_ep_wakeup_source_asserted() shall return true iff cfg.enabled is true and pin_level equals cfg.active_high.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WAKEUP-004",
+      "title": "rcp_ep_wakeup_any_source_asserted() reports whether any configured source is asserted",
+      "text": "rcp_ep_wakeup_any_source_asserted() shall return false when fcfg is NULL or when pin_levels is NULL with pin_level_count > 0, and otherwise return true iff rcp_ep_wakeup_source_asserted() is true for at least one of the first min(pin_level_count, RCP_EP_WAKEUP_MAX_SOURCES) source/pin_level pairs.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WAKEUP-005",
+      "title": "rcp_ep_wakeup_wup_status_init() clears the wup_status latch",
+      "text": "rcp_ep_wakeup_wup_status_init() shall set s->latched to false.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WAKEUP-006",
+      "title": "rcp_ep_wakeup_wup_status_latch() sets the wup_status latch",
+      "text": "rcp_ep_wakeup_wup_status_latch() shall set s->latched to true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WAKEUP-007",
+      "title": "rcp_ep_wakeup_wup_status_clear() clears the wup_status latch",
+      "text": "rcp_ep_wakeup_wup_status_clear() shall set s->latched to false.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WAKEUP-008",
+      "title": "rcp_ep_wakeup_wup_status_is_clear() reports the wup_status latch's state",
+      "text": "rcp_ep_wakeup_wup_status_is_clear() shall return !s->latched.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WAKEUP-009",
+      "title": "rcp_ep_wakeup_strerror() returns a non-NULL message for every error code",
+      "text": "rcp_ep_wakeup_strerror() shall return a non-NULL, non-empty message for each rcp_ep_wakeup_errc_t value, and a non-NULL message for any unrecognized value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WAKEUP-010",
+      "title": "rcp_ep_wakeup_encode_sleepcmd_request() encodes a fixed-opcode SleepCMD request",
+      "text": "rcp_ep_wakeup_encode_sleepcmd_request() shall return a zeroed rcp_bytes_t when target_mode is neither RCP_PWRMODE_STANDBY nor RCP_PWRMODE_SLEEP, and otherwise encode an ACF_ABB message with op RCP_ACF_OP_NONE whose 2-byte payload is RCP_EP_WAKEUP_SLEEPCMD_OPCODE followed by target_mode's raw value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WAKEUP-011",
+      "title": "rcp_ep_wakeup_decode_sleepcmd_request() validates and decodes a SleepCMD request",
+      "text": "rcp_ep_wakeup_decode_sleepcmd_request() shall return RCP_EP_WAKEUP_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header or its declared 2-byte payload; RCP_EP_WAKEUP_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_WAKEUP_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_WAKEUP_ERR_BAD_OPCODE when the first payload byte is not RCP_EP_WAKEUP_SLEEPCMD_OPCODE; RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE when the second payload byte is neither RCP_PWRMODE_STANDBY nor RCP_PWRMODE_SLEEP; and otherwise RCP_EP_WAKEUP_OK with the target mode and transaction number populated.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WAKEUP-012",
+      "title": "rcp_ep_wakeup_encode_sleepcmd_response() encodes a fixed-opcode SleepCMD response",
+      "text": "rcp_ep_wakeup_encode_sleepcmd_response() shall encode an ACF_ABB message with op RCP_ACF_OP_NONE whose 2-byte payload is RCP_EP_WAKEUP_SLEEPCMD_OPCODE followed by result's raw value, echoing transaction_num.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WAKEUP-013",
+      "title": "rcp_ep_wakeup_decode_sleepcmd_response() validates and decodes a SleepCMD response",
+      "text": "rcp_ep_wakeup_decode_sleepcmd_response() shall apply the same short-frame/wrong-message-type/wrong-bus/bad-opcode failure modes as rcp_ep_wakeup_decode_sleepcmd_request(), and on RCP_EP_WAKEUP_OK shall set *out_result to RCP_PWRMODE_ENTRY_OK only when the second payload byte equals RCP_PWRMODE_ENTRY_OK's own raw value, and to RCP_PWRMODE_ENTRY_REFUSED for every other byte value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WAKEUP-014",
+      "title": "rcp_ep_wakeup_encode_wakeup_message() encodes a fixed-opcode WakeUp message",
+      "text": "rcp_ep_wakeup_encode_wakeup_message() shall encode an ACF_ABB message with op RCP_ACF_OP_NONE whose 1-byte payload is RCP_EP_WAKEUP_WAKEUP_OPCODE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WAKEUP-015",
+      "title": "rcp_ep_wakeup_decode_wakeup_message() validates and decodes a WakeUp message",
+      "text": "rcp_ep_wakeup_decode_wakeup_message() shall return RCP_EP_WAKEUP_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header or its declared 1-byte payload; RCP_EP_WAKEUP_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_WAKEUP_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_WAKEUP_ERR_BAD_OPCODE when the payload byte is not RCP_EP_WAKEUP_WAKEUP_OPCODE; and otherwise RCP_EP_WAKEUP_OK with the transaction number populated.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-WAKEUP-016",
+      "title": "rcp_ep_wakeup_is_wakeup_echo() recognizes a matching WakeUp echo",
+      "text": "rcp_ep_wakeup_is_wakeup_echo() shall return true iff rcp_ep_wakeup_decode_wakeup_message() succeeds on b[0..len) against expected_bus_id and the decoded transaction number equals sent_transaction_num, and false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     }
   ]
 }
