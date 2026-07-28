@@ -2061,7 +2061,7 @@ layer can be built, tested, or even meaningfully designed before this
 lands. Spec basis: OPEN Alliance TC18 RCP v0.5.1_RC, Ch.10–11 (extraction
 §2).
 
-### 59. AVTPDU framing (v0.59.0)
+### 59. AVTPDU framing (v0.59.0) ✅
 
 - New `include/rcp/avtp.h` + `src/avtp.c`: the two IEEE 1722 AVTPDU header
   variants — NTSCF (`ntscf_data_length`, `sequence_num`; the *only* format
@@ -2088,6 +2088,47 @@ lands. Spec basis: OPEN Alliance TC18 RCP v0.5.1_RC, Ch.10–11 (extraction
   System" / "RC Node" / "RC Client" / "RC Server" / "RC Edge Node" /
   "Endpoint (EP)" / "RCP Message" / "RCP Frame" replace "zone
   controller"/"HPC"/"Command"/"Response"/"Status" throughout.
+
+**Done (v0.59.0)**: `include/rcp/avtp.h` + `src/avtp.c` land as new,
+additive protocol-core surface — nothing in `rcp.h`/`wire.c` or any
+satellite package is touched, so the legacy Zone/Command/Response/Status
+stack keeps building unchanged alongside this new wire layer until its own
+cutover milestone.
+- NTSCF (`ntscf_data_length`/`sequence_num`, subtype `0x82`) and TSCF
+  (`stream_data_length`/`avtp_timestamp`, subtype `0x05`) header codecs,
+  both encode/decode round-tripping through a `rcp_bytes_t` frame exactly
+  like `wire.c`'s existing convention, and both drawn from the public IEEE
+  1722-2016 base-standard subtype registry (not the confidential TC18
+  spec text) — decode rejects a wrong subtype, a frame shorter than the
+  fixed header, and a declared payload length extending past the supplied
+  buffer.
+- `rcp_stream_id_t` (48-bit MAC + 16-bit unique suffix, with
+  `rcp_stream_id_to_u64()`/`_from_u64()` matching the header's on-wire
+  packing) and `rcp_byte_bus_id_t`, combined into `rcp_avtp_addr_t`
+  (`stream_id` + `byte_bus_id`) as the new addressing pair every module
+  built against this wire layer will use going forward.
+- `rcp_avtp_transport_t`: a vtable abstraction (`send`/`recv`/`close`/
+  `destroy`, mirroring `rcp_controller_t`'s own convention in `rcp.h`) so
+  adding Ethernet/IEEE1722-over-UDP-IP/CAN(FD/XL) carriers later never
+  requires touching the codec above it. Only one concrete carrier ships
+  in this milestone: `rcp_avtp_loopback_transport_new()`, an in-process,
+  bounded-FIFO reference implementation (mirroring `mock.h`'s role for
+  `rcp_controller_t`) used to exercise the vtable contract — including
+  `rcp_context_t`-deadline timeouts and post-`close()` rejection — without
+  a real socket or CAN interface. Native Ethernet, IEEE1722-over-UDP/IP,
+  and CAN(FD/XL)-as-network carriers remain unimplemented, as flagged as
+  acceptable for this milestone by this Phase's own framing above.
+- `rcp_avtp_should_drop_tscf()`: the TSCF-without-time-sync drop rule as
+  its own directly-tested function, not folded into a receive loop.
+- `tests/test_avtp.c` (28 cases): header round-trips for both variants,
+  `stream_id`/`byte_bus_id` addressing (including that a shared
+  `stream_id` with a different `byte_bus_id` is *not* the same address),
+  the drop rule for all three (subtype × time-sync-support) combinations
+  that matter, and the loopback transport's FIFO order, timeout, capacity,
+  and post-close behavior.
+- 20 new requirements (`REQ-AVTP-001`..`020`) added to `.fusa-reqs.json`;
+  `cfusa trace --req-coverage 100` and the full `ctest` suite both stay
+  green.
 
 ### 60. ACF message format + byte_message_info header (v0.60.0)
 
