@@ -2634,7 +2634,7 @@ package touched.
   `cyber`/`vuln`/`qualify` (0 errors), and the full `ctest` suite
   (ASan/UBSan-clean) all stay green.
 
-### 66. I²C + UART endpoints (v0.66.0)
+### 66. I²C + UART endpoints (v0.66.0) ✅
 
 - `include/rcp/ep_i2c.h`/`ep_uart.h` + `.c`: I²C controller-only, raw byte
   stream including address bytes (no protocol-level address parsing);
@@ -2654,6 +2654,70 @@ package touched.
   §5.7) is the same philosophy this program commits to for LIN (Phase 19)
   — validated against this project's actual endpoint code once, not
   re-litigated per endpoint type.
+
+**Done (v0.66.0)**: `include/rcp/ep_i2c.h` + `src/ep_i2c.c` and
+`include/rcp/ep_uart.h` + `src/ep_uart.c` land as new, additive
+protocol-core surface, following `ep_gpio.h`/`ep_spi.h`'s (milestones 64–65)
+established layering discipline exactly: ACF-level only (`acf.h`'s
+`rcp_acf_encode_abb()`/`_encode_gbb()` and their decode counterparts), with
+nothing in `rcp.h`, `wire.c`, `avtp.h`/`avtp.c`, `acf.h`/`acf.c`,
+`server.h`/`server.c`, `regmap.h`/`regmap.c`, `discovery.h`/`discovery.c`,
+`ep_gpio.h`/`ep_gpio.c`, `ep_spi.h`/`ep_spi.c`, or any satellite package
+touched.
+- I²C addresses exactly one bus per `byte_bus_id` (unlike SPI's up-to-6
+  `evt`-selected channels — `RCP_REGMAP_SIGNAL_I2C_SCL`/`_SDA` is itself
+  only a single pair), so `evt` is always 0 and there is no channel
+  selector or `BAD_CHANNEL` error on this endpoint type.
+  `rcp_ep_i2c_encode_transfer_request()`/`_decode_transfer_request()`
+  round-trip a transfer's raw outgoing bytes — target-device address
+  byte(s) included, unparsed — as an `ACF_OP_WRITE` request, and
+  `rcp_ep_i2c_encode_response()`/`_decode_response()` round-trip the raw
+  captured bytes as an `ACF_OP_READ`-classified response (`ACF_ABB`
+  untimed / `ACF_GBB` timed); decoded payloads are *borrowed* views into
+  the caller's frame buffer, matching `ep_spi.h`'s own convention for the
+  same raw-byte-stream/no-framing-help design — the explicit early
+  validation of that design (ahead of LIN, milestone 71) the roadmap
+  called for above.
+- `rcp_ep_i2c_mode_t` names the four `i2c_mode` bus-speed presets; the
+  file header documents, in this implementation's own words, the
+  deliberate lower-numbered/conservative resolution chosen for the
+  extraction §5.7/§7 high-speed-enum ambiguity, flagged pending spec
+  errata rather than picked arbitrarily.
+- UART models transmit and receive as two independent request/response
+  families (`rcp_ep_uart_encode_write_request()`/`_decode_write_request()`
+  + `_encode_write_response()`/`_decode_write_response()` for TX;
+  `_encode_read_request()`/`_decode_read_request()` +
+  `_encode_read_response()`/`_decode_read_response()` for RX) sharing one
+  `rcp_ep_uart_functional_cfg_t` (baud rate, `uart_nr_bits`/parity/stop
+  bits, `ep_rx_buffer_size`, `uart_timeout_ms`). A read request's
+  `read_size` rides the existing ACF `byte_message_info` header's
+  `read_size_or_segment_num` field rather than a new payload field; a
+  read response may legitimately be shorter than the requested
+  `read_size` (the `uart_timeout_ms` race), decoded exactly like any
+  other payload length — this milestone's single-AVTPDU scope, with the
+  `ms`/`segment_num`-driven multi-AVTPDU case explicitly deferred to
+  Phase 20 (v0.76.0) and not pulled forward.
+  `rcp_ep_uart_decode_read_request()` rejects any payload-bearing read
+  request with the new `RCP_EP_UART_ERR_UNKNOWN_CMD`, documented in both
+  the header and a decode-site comment as a deliberate asymmetry against
+  GPIO's/the future PWM_OUT's request types, which do accept a payload on
+  some of their own requests.
+  `rcp_ep_uart_bit_pad_mask()`/`_apply_bit_padding()` are pure,
+  directly-testable helpers for representing `uart_nr_bits < 8` words as
+  one masked payload byte per word, this module's own wire-layout choice.
+- Every functional-config mutator on both endpoint types
+  (`rcp_ep_i2c_set_mode()`; `rcp_ep_uart_set_baud_rate()`/
+  `_set_frame_format()`/`_set_rx_buffer_size()`/`_set_timeout()`) is
+  gated by a thin, named wrapper over `rcp_server_field_writable()`
+  (`RCP_SERVER_FIELD_FUNCTIONAL_W`) — reused, not duplicated, from
+  `server.h` — matching `ep_spi.c`'s `rcp_ep_spi_functional_cfg_writable()`
+  idiom exactly.
+- `tests/test_ep_i2c.c` (19 cases) and `tests/test_ep_uart.c` (29 cases),
+  and 44 new requirements (`REQ-I2C-001`..`016`, `REQ-UART-001`..`028`)
+  added to `.fusa-reqs.json`; `cfusa trace --req-coverage 100` (both
+  metrics), `cfusa check`/`lint`/`analyze`/`cyber`/`vuln`/`qualify`
+  (0 errors), and the full `ctest` suite (ASan/UBSan-clean) all stay
+  green.
 
 ### 67. ADC + PWM_OUT + PWM_IN endpoints (v0.67.0)
 
