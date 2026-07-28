@@ -1,5 +1,5 @@
 # Threat Analysis and Risk Assessment (TARA)
-## ISO 21434 Clause 9 — c-RCP v0.57.0
+## ISO 21434 Clause 9 — c-RCP v0.58.0
 Generated: 2026-07-28T01:05:37Z
 
 **Hand-authored, not `cfusa tara`-generated.** `cfusa tara` only emits a
@@ -78,7 +78,7 @@ _TS-005 note: naively sending a lot of traffic is trivial (layman/public/easy), 
 ### Notes on residual risk (read before citing this document as evidence of full mitigation)
 
 - **TS-001 / TS-003** (the two HIGH-risk entries tied to identity/authentication): `rcp_authz_controller_new()` (Layer 2) and the TLS integration surface (Layer 1, `tls.h`) are real, but `tls.c` is a **confirmed compile-time stub** absent an OpenSSL/wolfSSL/mbedTLS backend — every transport call returns `RCP_ERR_NOT_SUPPORTED` rather than an insecure fallback (secure-by-refusal, not secure-by-encryption). This library's own default posture (mock/sim/udp/shmem transports) has **no working cryptographic identity source**; closing this residual risk requires an integrator to supply a real TLS backend, consistent with `CYBERSECURITY.md`'s own SEOOC framing of Layer 1.
-- **TS-002**: this risk rating is based on `rcp_e2e_replay_guard_t`'s tested runtime behavior (`test_e2e.c`), not on a formal-proof claim. `FORMAL_VERIFICATION.md`'s claim that `tla/AntiReplayGuard.tla` model-checks cleanly is separately disputed and under remediation (issue #57); this entry does not rely on it.
+- **TS-002**: this risk rating is grounded in both `rcp_e2e_replay_guard_t`'s tested runtime behavior (`test_e2e.c`) and a real TLC model-check of `tla/AntiReplayGuard.tla` (issue #57, fixed 2026-07-28 — the spec previously didn't even parse for model-checking and its safety property was stated backwards; both corrected, re-verified via an actual TLC run, and wired into CI).
 - **TS-004**: `rcp_firmware_session_verify()` is a protocol-flow state-machine gate only — **no cryptographic image-hash or signature verification exists** (confirmed by direct source read of `src/firmware.c`, filed as issue #69). `CYBERSECURITY.md` previously claimed a SHA-256 check existed here; that claim has been corrected (2026-07-28) to avoid the exact TARA/CYBERSECURITY.md inconsistency this document exists to prevent.
 - **TS-005**: the only threat in this TARA with a genuinely complete, working mitigation at the library level with no external backend dependency.
 

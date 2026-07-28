@@ -13,7 +13,12 @@
 
 EXTENDS Naturals, TLC
 
-CONSTANTS Zones, Interval
+CONSTANTS Zones, Interval,
+          MaxClock  \* bounds model-checking exploration only (see ClockBound
+                     \* below) -- clock itself is unbounded in the spec, as
+                     \* it should be; Tick always fires clock' = clock + 1
+                     \* with no natural fixed point, so TLC needs a state
+                     \* constraint to keep the model finite.
 
 VARIABLES zone_state,    \* Zone -> {Healthy, Degraded, Faulted}
           last_kick,      \* Zone -> Nat (simulated clock at last kick)
@@ -51,6 +56,10 @@ Spec == Init /\ [][Next]_<<zone_state, last_kick, clock>>
 SP1_NoDirectFault ==
     [][\A z \in Zones :
         zone_state[z] = Healthy => zone_state'[z] # Faulted]_<<zone_state>>
+
+\* Model-checking-only state constraint (see MaxClock above); referenced
+\* by name from WatchdogProtocol.cfg's CONSTRAINT section.
+ClockBound == clock <= MaxClock
 
 THEOREM Spec => SP1_NoDirectFault
 

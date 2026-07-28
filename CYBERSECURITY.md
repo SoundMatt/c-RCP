@@ -29,12 +29,13 @@ REQ-AUTH-001..REQ-AUTH-008
 
 A 32-entry sliding-window bitmap (`RCP_E2E_REPLAY_WINDOW_SIZE`) detects
 replayed sequence numbers. Sequence numbers more than 32 behind the
-high-water mark are unconditionally rejected. A TLA+ model of this guard
-exists at `tla/AntiReplayGuard.tla` (see `FORMAL_VERIFICATION.md`), but
-its claimed clean model-check is currently disputed and under
-remediation — see issue #57. This mechanism's guarantee is currently
-substantiated by its runtime test suite (`test_e2e.c`), not by formal
-proof.
+high-water mark are unconditionally rejected. Formally verified via TLC
+model checking in `tla/AntiReplayGuard.tla` (see
+`FORMAL_VERIFICATION.md`) — corrected 2026-07-28 (issue #57) after an
+audit found the spec previously didn't even parse for model-checking and
+its safety property was stated backwards; both are fixed, verified via a
+real TLC run (not assumed), and wired into CI
+(`.github/workflows/ci.yml`'s `formal-verification` job).
 
 REQ-E2E-004, REQ-E2E-005, REQ-E2E-006
 
@@ -106,7 +107,7 @@ to an implemented countermeasure from the security layers above:
 | Threat | Countermeasure |
 |---|---|
 | Command injection / spoofed HPC | mTLS (Layer 1) + authz (Layer 2) |
-| Replay attack | E2E anti-replay guard (Layer 3); formal-verification claim in `FORMAL_VERIFICATION.md` currently disputed, see issue #57 |
+| Replay attack | E2E anti-replay guard (Layer 3), formally verified (TLC, wired into CI as of issue #57) |
 | Rogue zone controller registration | mTLS mutual auth (Layer 1) |
 | OTA firmware tampering | Partially mitigated: transfer state-machine gate (Layer 5) + whatever Layer 1–2 auth wraps the session; no cryptographic image-hash check yet (tracked: issue #69) |
 | Command-flood DoS | Token-bucket rate limiter (Layer 4) |

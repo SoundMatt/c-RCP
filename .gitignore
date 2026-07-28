@@ -16,3 +16,6 @@ _deps/
 *.swo
 .DS_Store
 .claude/
+
+# TLC model-checker scratch state (tla2tools.jar working directory)
+tla/states/
