@@ -4,8 +4,8 @@
   "tool": "c-FuSa",
   "toolVersion": "0.5.45",
   "language": "c",
-  "generatedAt": "2026-07-28T16:35:08Z",
+  "generatedAt": "2026-07-28T16:54:36Z",
   "format": "x-FuSa SBOM v1",
-  "module": "c-RCP@0.64.0",
+  "module": "c-RCP@0.65.0",
   "components": []
 }
