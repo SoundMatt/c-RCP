@@ -4167,6 +4167,262 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-001",
+      "title": "rcp_ep_spi_strerror() never returns NULL and is unique per code",
+      "text": "rcp_ep_spi_strerror() shall return a non-NULL, non-empty, distinct message for each rcp_ep_spi_errc_t value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-002",
+      "title": "rcp_ep_spi_channel_valid() bounds channel indices to 0..5",
+      "text": "rcp_ep_spi_channel_valid() shall return true iff channel < RCP_EP_SPI_MAX_CHANNELS (6).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-003",
+      "title": "rcp_ep_spi_mode_valid() accepts exactly 0..3",
+      "text": "rcp_ep_spi_mode_valid() shall return true iff v <= 3.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-004",
+      "title": "rcp_ep_spi_mode_cpol() derives CPOL correctly for all 4 modes",
+      "text": "rcp_ep_spi_mode_cpol() shall return false for RCP_EP_SPI_MODE_0/_1 and true for RCP_EP_SPI_MODE_2/_3.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-005",
+      "title": "rcp_ep_spi_mode_cpha() derives CPHA correctly for all 4 modes",
+      "text": "rcp_ep_spi_mode_cpha() shall return false for RCP_EP_SPI_MODE_0/_2 and true for RCP_EP_SPI_MODE_1/_3.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-006",
+      "title": "rcp_ep_spi_trigger_fires() never fires for RCP_EP_SPI_TRIGGER_NONE",
+      "text": "rcp_ep_spi_trigger_fires() shall return false for trigger == RCP_EP_SPI_TRIGGER_NONE regardless of event.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-007",
+      "title": "rcp_ep_spi_trigger_fires() implements RCP_EP_SPI_TRIGGER_TRANSFER_DONE",
+      "text": "rcp_ep_spi_trigger_fires() shall return true for trigger == RCP_EP_SPI_TRIGGER_TRANSFER_DONE iff event == RCP_EP_SPI_EVENT_TRANSFER_DONE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-008",
+      "title": "rcp_ep_spi_trigger_fires() implements RCP_EP_SPI_TRIGGER_CS_ASSERT",
+      "text": "rcp_ep_spi_trigger_fires() shall return true for trigger == RCP_EP_SPI_TRIGGER_CS_ASSERT iff event == RCP_EP_SPI_EVENT_CS_ASSERT.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-009",
+      "title": "rcp_ep_spi_trigger_fires() implements RCP_EP_SPI_TRIGGER_CS_DEASSERT",
+      "text": "rcp_ep_spi_trigger_fires() shall return true for trigger == RCP_EP_SPI_TRIGGER_CS_DEASSERT iff event == RCP_EP_SPI_EVENT_CS_DEASSERT.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-010",
+      "title": "rcp_ep_spi_functional_cfg_init() zero-initializes cfg",
+      "text": "rcp_ep_spi_functional_cfg_init() shall set every common flag false and, for every channel, mode = RCP_EP_SPI_MODE_0, bit_order = RCP_EP_SPI_BIT_ORDER_MSB_FIRST, cs_polarity = RCP_EP_SPI_CS_ACTIVE_LOW, trigger = RCP_EP_SPI_TRIGGER_NONE, and clock_divider/inter_byte_delay_ns/inter_transfer_delay_ns all 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-011",
+      "title": "rcp_ep_spi_functional_cfg_writable() is unwritable while HW_UNCONFIGURED",
+      "text": "rcp_ep_spi_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED regardless of writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-012",
+      "title": "rcp_ep_spi_functional_cfg_writable() is writable by any writer while HW_CONFIGURED",
+      "text": "rcp_ep_spi_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED regardless of writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-013",
+      "title": "rcp_ep_spi_functional_cfg_writable() requires authorization once RCP_CONFIGURED",
+      "text": "rcp_ep_spi_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_RCP_CONFIGURED when writer indicates neither via_root_client_ep0 nor via_owning_stream, and true when either is set.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-014",
+      "title": "rcp_ep_spi_set_channel_mode() rejects an invalid channel or an unauthorized write without mutating cfg",
+      "text": "rcp_ep_spi_set_channel_mode() shall return false and leave cfg unchanged when channel is not rcp_ep_spi_channel_valid() or the write is not authorized by rcp_ep_spi_functional_cfg_writable().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-015",
+      "title": "rcp_ep_spi_set_channel_mode() applies the write when authorized",
+      "text": "rcp_ep_spi_set_channel_mode() shall return true and set cfg->channels[channel].mode to the requested mode when channel is valid and the write is authorized.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-016",
+      "title": "rcp_ep_spi_set_channel_bit_order() rejects an invalid channel or an unauthorized write without mutating cfg",
+      "text": "rcp_ep_spi_set_channel_bit_order() shall return false and leave cfg unchanged when channel is not rcp_ep_spi_channel_valid() or the write is not authorized by rcp_ep_spi_functional_cfg_writable().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-017",
+      "title": "rcp_ep_spi_set_channel_bit_order() applies the write when authorized",
+      "text": "rcp_ep_spi_set_channel_bit_order() shall return true and set cfg->channels[channel].bit_order to the requested bit_order when channel is valid and the write is authorized.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-018",
+      "title": "rcp_ep_spi_set_channel_cs_polarity() rejects an invalid channel or an unauthorized write without mutating cfg",
+      "text": "rcp_ep_spi_set_channel_cs_polarity() shall return false and leave cfg unchanged when channel is not rcp_ep_spi_channel_valid() or the write is not authorized by rcp_ep_spi_functional_cfg_writable().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-019",
+      "title": "rcp_ep_spi_set_channel_cs_polarity() applies the write when authorized",
+      "text": "rcp_ep_spi_set_channel_cs_polarity() shall return true and set cfg->channels[channel].cs_polarity to the requested cs_polarity when channel is valid and the write is authorized.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-020",
+      "title": "rcp_ep_spi_set_channel_clock_divider() rejects an invalid channel or an unauthorized write without mutating cfg",
+      "text": "rcp_ep_spi_set_channel_clock_divider() shall return false and leave cfg unchanged when channel is not rcp_ep_spi_channel_valid() or the write is not authorized by rcp_ep_spi_functional_cfg_writable().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-021",
+      "title": "rcp_ep_spi_set_channel_clock_divider() applies the write when authorized",
+      "text": "rcp_ep_spi_set_channel_clock_divider() shall return true and set cfg->channels[channel].clock_divider to the requested value when channel is valid and the write is authorized.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-022",
+      "title": "rcp_ep_spi_set_channel_timing() rejects an invalid channel or an unauthorized write without mutating cfg",
+      "text": "rcp_ep_spi_set_channel_timing() shall return false and leave cfg unchanged when channel is not rcp_ep_spi_channel_valid() or the write is not authorized by rcp_ep_spi_functional_cfg_writable().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-023",
+      "title": "rcp_ep_spi_set_channel_timing() applies the write when authorized",
+      "text": "rcp_ep_spi_set_channel_timing() shall return true and set cfg->channels[channel].inter_byte_delay_ns and inter_transfer_delay_ns to the requested values when channel is valid and the write is authorized.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-024",
+      "title": "rcp_ep_spi_set_channel_trigger() rejects an invalid channel or an unauthorized write without mutating cfg",
+      "text": "rcp_ep_spi_set_channel_trigger() shall return false and leave cfg unchanged when channel is not rcp_ep_spi_channel_valid() or the write is not authorized by rcp_ep_spi_functional_cfg_writable().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-025",
+      "title": "rcp_ep_spi_set_channel_trigger() applies the write when authorized",
+      "text": "rcp_ep_spi_set_channel_trigger() shall return true and set cfg->channels[channel].trigger to the requested trigger when channel is valid and the write is authorized.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-026",
+      "title": "SPI transfer request encode/decode round-trips, including channel selection via evt[2:0]",
+      "text": "rcp_ep_spi_decode_transfer_request() shall, given a frame produced by rcp_ep_spi_encode_transfer_request() with the same byte_bus_id, return RCP_EP_SPI_OK and recover the original channel, PICO-out payload bytes, and transaction_num.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-027",
+      "title": "rcp_ep_spi_decode_transfer_request() rejects a malformed, misaddressed, or bad-channel frame",
+      "text": "rcp_ep_spi_decode_transfer_request() shall return RCP_EP_SPI_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB fixed header or its declared payload length, RCP_EP_SPI_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_SPI_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, RCP_EP_SPI_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE, and RCP_EP_SPI_ERR_BAD_CHANNEL when evt[2:0] is not rcp_ep_spi_channel_valid().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-028",
+      "title": "SPI response encode/decode round-trips when untimed",
+      "text": "rcp_ep_spi_decode_response() shall, given a frame produced by rcp_ep_spi_encode_response() with timed = false and the same byte_bus_id, return RCP_EP_SPI_OK, recover the original channel, POCI-in payload bytes, and transaction_num, and report *out_timed = false with *out_timestamp = 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-029",
+      "title": "SPI response encode/decode round-trips when timed",
+      "text": "rcp_ep_spi_decode_response() shall, given a frame produced by rcp_ep_spi_encode_response() with timed = true, the same byte_bus_id, and a timestamp, return RCP_EP_SPI_OK, recover the original channel, POCI-in payload bytes, and transaction_num, and report *out_timed = true with *out_timestamp equal to the original timestamp.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-030",
+      "title": "rcp_ep_spi_decode_response() rejects a malformed, misaddressed, or bad-channel frame",
+      "text": "rcp_ep_spi_decode_response() shall return RCP_EP_SPI_ERR_SHORT_FRAME for a frame too short for its applicable ACF fixed header, RCP_EP_SPI_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, and RCP_EP_SPI_ERR_BAD_CHANNEL when evt[2:0] is not rcp_ep_spi_channel_valid().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-031",
+      "title": "rcp_ep_spi_compound_wait_status_equal() compares only the first RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN bytes",
+      "text": "rcp_ep_spi_compound_wait_status_equal() shall compare only the first RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN (4) bytes of status and target for equality, ignoring any bytes beyond the fourth in either buffer up to RCP_EP_SPI_STATUS_MAX_LEN (20).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SPI-032",
+      "title": "rcp_ep_spi_compound_wait_status_equal() returns false when either buffer is shorter than RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN",
+      "text": "rcp_ep_spi_compound_wait_status_equal() shall return false, never treating a too-short buffer as a match, when status_len or target_len is less than RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN (4).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     }
   ]
 }
