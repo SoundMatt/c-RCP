@@ -1,5 +1,5 @@
 Software Configuration Index
-Project: c-RCP v0.60.0   Generated: 2026-07-28T15:05:34Z
+Project: c-RCP v0.61.0   Generated: 2026-07-28T15:30:43Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
@@ -21,7 +21,7 @@ FILE                                                          SHA-256
 ./include/rcp/config.h                                        a11add969d5b0e883eab513a322e3bf06523b80cf39c0f0a9f8b574f387b0f62
 ./include/rcp/adapt.h                                         a3a7e233c9a8773973ce2ea6b251fcd40f3403fc395f03ac77e97f689e8720b5
 ./include/rcp/udp.h                                           05bf00b6fb1f1ee26bba018cc9cb414a138fbd29196348678a88ef140c164e41
-./include/rcp/version.h                                       fca9aa347777f39d231b872174f93c3645d08b13e5d2dd7e7ae1c3059065be7b
+./include/rcp/version.h                                       6b9ee312138b7c066655c201bfa7a730a1e59102032b8b0a656ad896a93d411e
 ./include/rcp/recorder.h                                      db4b9c80c24ccb3e68daa06378ed700c53c70cc97131305133d2ccf5b9a03732
 ./include/rcp/cli.h                                           d479738a54a077a4a0019dec3ec62a39b73857fadbe1ae2745d2f7609506b7d9
 ./include/rcp/avtp.h                                          416f4beb4eb8c68d1dac4842372d0747da15c45677c67ae1de11c8849657b055
@@ -32,6 +32,7 @@ FILE                                                          SHA-256
 ./include/rcp/dyndata.h                                       8f85c752c3c62c88afaf44eb8a77cc91d57cd75217da728d625f133e9fa1274c
 ./include/rcp/admin.h                                         63c73a53b2a908b0035b887170dcfa413b075978efc06b971adc2e83abfbfb3d
 ./include/rcp/zonegroup.h                                     ab368bbaa9121c146aab79dd5f46a4b64eb35c25a0c02cb72bbefa92db63b35e
+./include/rcp/server.h                                        2081ca67da9f28275246fce7224e4f1967314e750a4cd6fa10c787a7ddd1770b
 ./include/rcp/rcp.h                                           451d956a6b35ab4e67ecf30b70bced33a89f36b9e84b610437e7e25d604863f4
 ./include/rcp/loan.h                                          a56772232a8bf7afa67126871dad3be8235980cb371efe78b8157ac7c6f2e0de
 ./include/rcp/someipbr.h                                      16cadac07f5794c22eec996edc46ba3c6b2ccde65b7f8a82e6272d7a2b4b2fe7
@@ -64,6 +65,7 @@ FILE                                                          SHA-256
 ./src/cli.c                                                   3ae5682df54f11a7ae5b34d04ec3e4566d223a0e959cf2d113948f4f1cbb957f
 ./src/observe.c                                               3b09c139c9f5618a5539b23045dc1e3a6a6c9be68a2a553d6e4d6e8f2b8827ab
 ./src/faultinject.c                                           659817cca14ec780c92733d3f5b2c483ddad18d87d3f5d8cc8516565546842ce
+./src/server.c                                                0ded8006c4ccb11befe49237516991e70d1e2394a9383caaa772a80136d3b041
 ./src/relay.c                                                 a2af150901262ab1d44f74cbdd79ae31aa70809ce3556bbbde74099cf3cd79f5
 ./src/linbr.c                                                 890fbd6fbde916bd30fe0a308123feb655bcb465f66768550e9a489f5fbb17a4
 ./src/redundancy.c                                            eee9bfc65fc7075c81fba4bcdd13f854be6797fdc809a8f2cb36d7423cde4c22
@@ -136,6 +138,7 @@ FILE                                                          SHA-256
 ./tests/test_watchdog.c                                       fb2b1c030c2e192f32fbe6794feaec82e9814bb5b8b849c1ff0515f4acf61bea
 ./tests/test_cli.c                                            35b479ce67c8f43017461bac129c7cd874b240cb0192826a024f47a02659d73a
 ./tests/test_sim.c                                            e3addfdf6af83a8ef4112d5d3f6b9d6cde0f8fe26ff2e80c62dafd5e31a7bdaa
+./tests/test_server.c                                         402e517e2096234262ffe44d36e36d3373f241e4644bee127ecc5b20caf0697c
 ./cli/main.c                                                  541875eda25d51c675d488ca4ddc24226dbccd51e91b77390569c451c36710e1
 
-Total files: 134
+Total files: 137
