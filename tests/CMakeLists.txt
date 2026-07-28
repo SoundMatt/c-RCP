@@ -53,6 +53,11 @@ target_link_libraries(test_server PRIVATE rcp::rcp unity)
 target_compile_options(test_server PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_server COMMAND test_server)
 
+add_executable(test_regmap test_regmap.c)
+target_link_libraries(test_regmap PRIVATE rcp::rcp unity)
+target_compile_options(test_regmap PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_regmap COMMAND test_regmap)
+
 add_executable(test_udp test_udp.c)
 target_link_libraries(test_udp PRIVATE rcp::rcp unity)
 target_compile_options(test_udp PRIVATE ${RCP_TEST_WARNING_FLAGS})
