@@ -1,5 +1,5 @@
 Software Configuration Index
-Project: c-RCP v0.70.0   Generated: 2026-07-28T21:14:45Z
+Project: c-RCP v0.70.0   Generated: 2026-07-28T21:56:46Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
@@ -13,6 +13,7 @@ FILE                                                          SHA-256
 ./include/rcp/restbridge.h                                    sha256:ea39a06c13d0ad464f4f34df65e63d10a3aec5ccf3473890c3255d4ef686a8fe
 ./include/rcp/ep_iseled.h                                     sha256:2f5d0e06bf8cb63d2cdb846e1ff253270d2b87c1f418f2c15a4e095dd2d0cbe5
 ./include/rcp/safept.h                                        sha256:712cb4d52d7749900d48e5f857151021664ce5a1749bf67b12c878ea314cd947
+./include/rcp/ep_mdio.h                                       sha256:0d84c2b3bb03d54351c54f1d59caa2310b701436b951c082b5a2d3024223a52b
 ./include/rcp/authz.h                                         sha256:961554a4dadf81d267da7dfecbd3881f93b1056b9815a225b28496e879676276
 ./include/rcp/proxy.h                                         sha256:45fdac4af00813cb301e9df19252ae587f54607cdcec088d43666eac8f3e71a8
 ./include/rcp/tls.h                                           sha256:f62738ef10a3da2eebafe8cda2b8b8248b882a9f3a09b9b5fe29fb9542b85c65
@@ -131,6 +132,7 @@ FILE                                                          SHA-256
 ./src/ep_gpio.c                                               sha256:26b79f6289b2b349984afa7161ef9b0210f33452c03135819933e462b8f2b90f
 ./src/wire.c                                                  sha256:8191e7c0c7da4a61694e18fc0c6e22b4e374a099ec7041c60a6ce72c46c64fec
 ./src/someipbr.c                                              sha256:a004339867ab69c2f50f5f8c49c16cfd6eb77173104f4a4dbdd1faa8cb87b2b7
+./src/ep_mdio.c                                               sha256:90d13c7fc2726ea4485e5498ba1559c0e76b4e615e6028957c299389398b4560
 ./src/recorder.c                                              sha256:314abce9dbec09a16c6e01d09c3e3cf4c43afedabf720727317a9e2b5f3e8d92
 ./tests/test_ep_i2c.c                                         sha256:69ed337870ee7036a62eeeab6a8f3b27f4cb549379461b5d82fb56fb7804bfbc
 ./tests/test_adapt.c                                          sha256:b0aa4726fc4b3f14e5370e1f703d43166045316fd35edb88ad78c02710b21f56
@@ -188,6 +190,7 @@ FILE                                                          SHA-256
 ./tests/test_redundancy.c                                     sha256:b6729e9b231951547f28afc810c9b2b342c7773bf61915ad977b61848f1a0443
 ./tests/test_ep_gpio.c                                        sha256:65fa904a7dce9a0162a1c7573b4d96104d809a6f7c02d9daafe0852d47a7019d
 ./tests/test_mock.c                                           sha256:5c824eb897d51b4474dc7354f10b856c32d23d8a38d918219c57ab565155d5f2
+./tests/test_ep_mdio.c                                        sha256:a9d8ca579edc9797168db3445fa75ac7eabf871c38d6605e1bf10719476b0c9a
 ./tests/test_prioqueue.c                                      sha256:8f174955f384b3ef88964ea3708a7c2b4c1fb2b2484a436c00eee27dd7f76211
 ./tests/test_e2e.c                                            sha256:5bf665f7e216db67a11de8f6bc02c2bf02b66c0dfbbebe91c83f7512649e0c47
 ./tests/test_watchdog.c                                       sha256:fb2b1c030c2e192f32fbe6794feaec82e9814bb5b8b849c1ff0515f4acf61bea
@@ -198,4 +201,4 @@ FILE                                                          SHA-256
 ./tests/test_ep_adc.c                                         sha256:9027eb9d5e8c0e9c4f53be86a3fa12c075f16999fc9ecb259a0a904033017610
 ./cli/main.c                                                  sha256:541875eda25d51c675d488ca4ddc24226dbccd51e91b77390569c451c36710e1
 
-Total files: 194
+Total files: 197

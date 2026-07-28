@@ -4,7 +4,7 @@
   "tool": "c-FuSa",
   "toolVersion": "0.5.46",
   "language": "c",
-  "generatedAt": "2026-07-28T21:14:45Z",
+  "generatedAt": "2026-07-28T21:56:46Z",
   "project": "c-RCP",
   "version": "0.70.0",
   "standard": "IEC 60812:2018 / ISO 26262-5",
@@ -7084,6 +7084,166 @@
     },
     {
       "id": "FM-443",
+      "item": "rcp_ep_mdio_addr_valid",
+      "file": "ep_mdio.c",
+      "line": 29,
+      "failureMode": "rcp_ep_mdio_addr_valid (general function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_mdio_addr_valid could propagate undetected to callers in ep_mdio.c",
+      "cause": "Logic error or untested edge case in rcp_ep_mdio_addr_valid",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-444",
+      "item": "rcp_ep_mdio_burst_next_regad",
+      "file": "ep_mdio.c",
+      "line": 42,
+      "failureMode": "rcp_ep_mdio_burst_next_regad (general function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_mdio_burst_next_regad could propagate undetected to callers in ep_mdio.c",
+      "cause": "Logic error or untested edge case in rcp_ep_mdio_burst_next_regad",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-445",
+      "item": "rcp_ep_mdio_word_encode",
+      "file": "ep_mdio.c",
+      "line": 55,
+      "failureMode": "rcp_ep_mdio_word_encode (general function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_mdio_word_encode could propagate undetected to callers in ep_mdio.c",
+      "cause": "Logic error or untested edge case in rcp_ep_mdio_word_encode",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-446",
+      "item": "rcp_ep_mdio_word_decode",
+      "file": "ep_mdio.c",
+      "line": 61,
+      "failureMode": "rcp_ep_mdio_word_decode (general function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_mdio_word_decode could propagate undetected to callers in ep_mdio.c",
+      "cause": "Logic error or untested edge case in rcp_ep_mdio_word_decode",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-447",
+      "item": "rcp_ep_mdio_pack_len",
+      "file": "ep_mdio.c",
+      "line": 67,
+      "failureMode": "rcp_ep_mdio_pack_len (general function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_mdio_pack_len could propagate undetected to callers in ep_mdio.c",
+      "cause": "Logic error or untested edge case in rcp_ep_mdio_pack_len",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-448",
+      "item": "rcp_ep_mdio_pack_words",
+      "file": "ep_mdio.c",
+      "line": 73,
+      "failureMode": "rcp_ep_mdio_pack_words (general function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_mdio_pack_words could propagate undetected to callers in ep_mdio.c",
+      "cause": "Logic error or untested edge case in rcp_ep_mdio_pack_words",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-449",
+      "item": "rcp_ep_mdio_word_count_of",
+      "file": "ep_mdio.c",
+      "line": 92,
+      "failureMode": "rcp_ep_mdio_word_count_of (general function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_mdio_word_count_of could propagate undetected to callers in ep_mdio.c",
+      "cause": "Logic error or untested edge case in rcp_ep_mdio_word_count_of",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-450",
+      "item": "rcp_ep_mdio_unpack_word_at",
+      "file": "ep_mdio.c",
+      "line": 101,
+      "failureMode": "rcp_ep_mdio_unpack_word_at (general function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_mdio_unpack_word_at could propagate undetected to callers in ep_mdio.c",
+      "cause": "Logic error or untested edge case in rcp_ep_mdio_unpack_word_at",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-451",
+      "item": "rcp_ep_mdio_functional_cfg_init",
+      "file": "ep_mdio.c",
+      "line": 109,
+      "failureMode": "rcp_ep_mdio_functional_cfg_init (monitoring/control function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_mdio_functional_cfg_init could propagate undetected to callers in ep_mdio.c",
+      "cause": "Configuration or state inconsistency affecting rcp_ep_mdio_functional_cfg_init",
+      "severity": 5,
+      "occurrence": 3,
+      "detection": 4,
+      "actionPriority": "medium",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-452",
+      "item": "rcp_ep_mdio_strerror",
+      "file": "ep_mdio.c",
+      "line": 125,
+      "failureMode": "rcp_ep_mdio_strerror (safety-critical function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_mdio_strerror could propagate undetected to callers in ep_mdio.c",
+      "cause": "Unhandled fault or invalid input condition within rcp_ep_mdio_strerror",
+      "severity": 9,
+      "occurrence": 4,
+      "detection": 6,
+      "actionPriority": "high",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-453",
       "item": "rcp_recorder_new",
       "file": "recorder.c",
       "line": 18,
@@ -7099,7 +7259,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-444",
+      "id": "FM-454",
       "item": "rcp_recorder_destroy",
       "file": "recorder.c",
       "line": 26,
@@ -7115,7 +7275,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-445",
+      "id": "FM-455",
       "item": "rcp_recorder_size",
       "file": "recorder.c",
       "line": 40,
@@ -7131,7 +7291,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-446",
+      "id": "FM-456",
       "item": "rcp_recorder_entries",
       "file": "recorder.c",
       "line": 49,
@@ -7147,7 +7307,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-447",
+      "id": "FM-457",
       "item": "rcp_recorder_write_binary",
       "file": "recorder.c",
       "line": 116,
@@ -7163,7 +7323,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-448",
+      "id": "FM-458",
       "item": "write_field",
       "file": "recorder.c",
       "line": 140,
@@ -7179,7 +7339,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-449",
+      "id": "FM-459",
       "item": "write_field",
       "file": "recorder.c",
       "line": 141,
@@ -7195,7 +7355,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-450",
+      "id": "FM-460",
       "item": "write_field",
       "file": "recorder.c",
       "line": 142,
@@ -7211,7 +7371,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-451",
+      "id": "FM-461",
       "item": "write_field",
       "file": "recorder.c",
       "line": 143,
@@ -7227,7 +7387,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-452",
+      "id": "FM-462",
       "item": "write_field",
       "file": "recorder.c",
       "line": 144,
@@ -7243,7 +7403,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-453",
+      "id": "FM-463",
       "item": "write_bytes",
       "file": "recorder.c",
       "line": 145,
@@ -7259,7 +7419,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-454",
+      "id": "FM-464",
       "item": "write_field",
       "file": "recorder.c",
       "line": 146,
@@ -7275,7 +7435,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-455",
+      "id": "FM-465",
       "item": "write_field",
       "file": "recorder.c",
       "line": 147,
@@ -7291,7 +7451,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-456",
+      "id": "FM-466",
       "item": "rcp_recorder_controller_new",
       "file": "recorder.c",
       "line": 212,
@@ -7307,7 +7467,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-457",
+      "id": "FM-467",
       "item": "rcp_playback_default_config",
       "file": "recorder.c",
       "line": 225,
@@ -7323,7 +7483,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-458",
+      "id": "FM-468",
       "item": "setUp",
       "file": "bench_mock.c",
       "line": 51,
@@ -7339,7 +7499,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-459",
+      "id": "FM-469",
       "item": "tearDown",
       "file": "bench_mock.c",
       "line": 52,
@@ -7355,7 +7515,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-460",
+      "id": "FM-470",
       "item": "printf",
       "file": "bench_mock.c",
       "line": 58,
@@ -7371,7 +7531,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-461",
+      "id": "FM-471",
       "item": "main",
       "file": "bench_mock.c",
       "line": 221,
@@ -7387,7 +7547,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-462",
+      "id": "FM-472",
       "item": "main",
       "file": "main.c",
       "line": 11,
@@ -7404,7 +7564,7 @@
     }
   ],
   "summary": {
-    "total": 462, "highPriority": 65,
-    "componentsAnalyzed": 462, "componentsInProject": 462, "coveragePct": 100
+    "total": 472, "highPriority": 66,
+    "componentsAnalyzed": 472, "componentsInProject": 472, "coveragePct": 100
   }
 }
