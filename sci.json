@@ -1,12 +1,13 @@
 Software Configuration Index
-Project: c-RCP v0.70.0   Generated: 2026-07-28T22:49:12Z
+Project: c-RCP v0.70.0   Generated: 2026-07-28T23:19:41Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
 ./include/rcp/tsn.h                                           sha256:d5515debe324b5ab2dcd474e1138b7556fb4e6df9285d6dae265d275a586d860
-./include/rcp/discovery.h                                     sha256:a7155227cad027a743d6350bd2f698cc86abdc6a4c8e254a68d8c1e2d2043600
+./include/rcp/discovery.h                                     sha256:8bb7aec805e79e78942364959deccb2ae51a51fd37d6188415827187954ea0ca
 ./include/rcp/scheduler.h                                     sha256:abeecfd251cf90bade368ec860614de57c460cc74de9d745e896ae5516df12f9
-./include/rcp/ep_uart.h                                       sha256:e9691c0232334f718fd3d367cdb42b6155ca1666f90aad188fc3a6ec2d3cedb7
+./include/rcp/fragment.h                                      sha256:81015bcec3c59f3b9799788e053069b66b5d58af42dee4b1721c082857f3a356
+./include/rcp/ep_uart.h                                       sha256:8c54643322163b56c25b88dba63a2299f7f1a7b783d6910210d5c70e8c26b508
 ./include/rcp/ep_wakeup.h                                     sha256:d1410400145fe2beb467ea88a66bb995ece506ce15ce2737691e8831b45296b0
 ./include/rcp/deadline.h                                      sha256:ddfdc5d517d2282018b18bdb7924974ca7297df28da45cf01772609841427d7c
 ./include/rcp/request_compound.h                              sha256:09c8c8217047cf55e74204798f4bdb69329b32b7e3bfe854b88c911919524e6f
@@ -34,7 +35,7 @@ FILE                                                          SHA-256
 ./include/rcp/adapt.h                                         sha256:a3a7e233c9a8773973ce2ea6b251fcd40f3403fc395f03ac77e97f689e8720b5
 ./include/rcp/udp.h                                           sha256:05bf00b6fb1f1ee26bba018cc9cb414a138fbd29196348678a88ef140c164e41
 ./include/rcp/ep_lin.h                                        sha256:4c75c9002f2304e1babda285e23adaaf6a64bcc148361ce5b11792e0d4018884
-./include/rcp/ep_can.h                                        sha256:a897292facc896955417074c9d6c31218cab7f3f403366c08981e52baeb20717
+./include/rcp/ep_can.h                                        sha256:2fbbfa4c8849902fae04dce5ef4dfa9059cb0c554748ee438fc1042492259305
 ./include/rcp/ep_gpio.h                                       sha256:f351c8e5f70babbfd79632af59b861a4d64aa24356f59285356a6e3d24d01dda
 ./include/rcp/request_sequencer.h                             sha256:2ad60f0fedd50e8883d76ddefa13e58b50085eb34fad7862f2f80d26adaa4673
 ./include/rcp/ep_adc.h                                        sha256:c2837212eb4c339014c1bbd57297688d62d5ae1cdb41cfc286a558416334b73e
@@ -46,7 +47,7 @@ FILE                                                          SHA-256
 ./include/rcp/sim.h                                           sha256:b3b995de5409a38b31e8e876a456d4469c4071eca1df0b8b4ef007bdb71285e8
 ./include/rcp/doipbr.h                                        sha256:0baebfd08eb7dd649c2f3cd60277074f9ff67647016dba1ae8d7a57d2b61be08
 ./include/rcp/linbr.h                                         sha256:87c5ebf60896912201de739253cabd3d84e191599e3e69c6589c96ec345c3a2a
-./include/rcp/regmap.h                                        sha256:266a530d159a9ac88b503689d2cc2fef2ead9afb98c7e8bc22a9d89bacdfcb3a
+./include/rcp/regmap.h                                        sha256:6e4bd8fc0676073e8dd89b8db5d8d4a51e6b377edfc6dd7d6d0c9bc56bc6ff4a
 ./include/rcp/dyndata.h                                       sha256:8f85c752c3c62c88afaf44eb8a77cc91d57cd75217da728d625f133e9fa1274c
 ./include/rcp/admin.h                                         sha256:63c73a53b2a908b0035b887170dcfa413b075978efc06b971adc2e83abfbfb3d
 ./include/rcp/zonegroup.h                                     sha256:ab368bbaa9121c146aab79dd5f46a4b64eb35c25a0c02cb72bbefa92db63b35e
@@ -61,7 +62,7 @@ FILE                                                          SHA-256
 ./include/rcp/shmem.h                                         sha256:ad58c2a937df0f4b7f4cbe245e21ac592570feebb56e8dfe61605375502b234b
 ./include/rcp/federation.h                                    sha256:ad2ff15541b34c4d887b28060114530f5bd907256595ba81199e236ce28e6c62
 ./include/rcp/ep_spi.h                                        sha256:8f6cd421ada3197d68ef6885c9c7ba11b20e8c2121e9b8e9803ec3abcc30cbcc
-./include/rcp/e2e.h                                           sha256:3f81f6832aeeca32772b930c9144fba7c3897e589ad1c1ed78914d083be982ed
+./include/rcp/e2e.h                                           sha256:91bb3a42270386334ee7ae55a8039717e4161fea33a13edb09c962bafe7ac0f0
 ./include/rcp/ratelimit.h                                     sha256:5e786f7f08c360a0495fdc1545cdb3dd5d2466e7e9735dad686830392c1e8a9a
 ./include/rcp/lifecycle.h                                     sha256:e0458a0575e676b37c078091a4067ec9db0fd21c9abd95c3d2ca39ae7d56f2ba
 ./include/rcp/ep_i2c.h                                        sha256:ccc0faa2e3769fcdc36e62878ca60b115133e9d7be0bc3b89f98fa31679ad81f
@@ -76,7 +77,7 @@ FILE                                                          SHA-256
 ./src/watchdog.c                                              sha256:42f0801f38f3023ddfbe59ddbbbcc1686956d70cd644e912822744742cc4e74c
 ./src/config.c                                                sha256:e3c8cd112bedf87bf3e3a5f4df0e9c169ee71620451fd0b5fed334690b1e5ac3
 ./src/ep_i2c.c                                                sha256:558c68d6f0a5e2c495080fad1388a58135ec9011e09824c8c5531a67d7c617ea
-./src/ep_can.c                                                sha256:aeeea82524f22b73ff5288fb8d606610b26c6b04d518dd139cac8b361f680e43
+./src/ep_can.c                                                sha256:7778f18f74e453bc2570a9eefdf85dae553c3d0b28166b1cd55c89973d0d6634
 ./src/request_triggered.c                                     sha256:2f81e04c4d1d01a9a42f3d6d9f9a9d5042f3d75860c383604c02255b9764279e
 ./src/clock.c                                                 sha256:707d61141ea28cf93a970e308be11353ec9e85d953e61dbc0e0b7c6157c177e2
 ./src/federation.c                                            sha256:552b11f0ec3dc3d781b7c9e0623c1409c3b523fbbf952db8d233743f1b4a4ce0
@@ -101,7 +102,7 @@ FILE                                                          SHA-256
 ./src/server.c                                                sha256:2fda0f710b6f5f1c6ff6b9d4004571dd48173de156b8819c5aecd56d1d6c5250
 ./src/relay.c                                                 sha256:a2af150901262ab1d44f74cbdd79ae31aa70809ce3556bbbde74099cf3cd79f5
 ./src/ep_pwm.c                                                sha256:3429ba0ce0740f894f7e48cde87210d7bd33284566877a53471d4afdbd6452fa
-./src/discovery.c                                             sha256:279c81e80de6b400d167102c08f16dbd51eb385db59c6eb4e56e290944c9f48b
+./src/discovery.c                                             sha256:25c9c4876c2ead2dece22ab3a9bd381ca378c72c03234e37c182ae7f773f052f
 ./src/linbr.c                                                 sha256:890fbd6fbde916bd30fe0a308123feb655bcb465f66768550e9a489f5fbb17a4
 ./src/redundancy.c                                            sha256:eee9bfc65fc7075c81fba4bcdd13f854be6797fdc809a8f2cb36d7423cde4c22
 ./src/platform.c                                              sha256:72fe578947526dc43baafc3034b0937481013a0f2bda0ea1a5e909103250ee59
@@ -113,11 +114,12 @@ FILE                                                          SHA-256
 ./src/ratelimit.c                                             sha256:5d24a5cc30eba9eb8feda7b774a616bdbf41634c54e5f9c57e6251a6de996c88
 ./src/powerstate.c                                            sha256:d5ea70e40230a71ae4455db8395a861042a3e6de55a976f38f00e09805df65ef
 ./src/ddsbr.c                                                 sha256:a35dab57988d5bbde8ace370cbd0b4693ddf19012eabc6d94b8decaf9a90ba80
-./src/ep_uart.c                                               sha256:304bead7932688deda837cc90f8c2020666bc807c14d369d360efa611a62e732
+./src/ep_uart.c                                               sha256:241584f981cadd95686c1ac38a316f990be47a7ed533e051ce2e8429cde18b6a
 ./src/tsn.c                                                   sha256:4c0b57c5510fe5a2687652b62d66c8e7f9cad8f0216692c6b104d4c387a82814
 ./src/avtp.c                                                  sha256:a869c08da7e5552fc7309277c3217f2c4f8ebfb9f071eabcb812f4c89dcca693
 ./src/sim.c                                                   sha256:d0aa028516c388e7568348ce377c50ce26936bc9f806930108a0cbda6942ca25
 ./src/udp.c                                                   sha256:a2a0bddacb72ff3456b93219de59b4aca40f4cc7f5ea9afb6c1903ccee312c15
+./src/fragment.c                                              sha256:e78dbb8776d9446f26c80968b485d48b291aa5794db359b387a960c0ff2bfdcf
 ./src/deadline.c                                              sha256:a2d4761a3819f40e3bf3c65c372515b655ddf03e435418644cd30e7855738ffe
 ./src/mdns.c                                                  sha256:30c7b817330d96a10f0f21832e8c50b54db437c58e8bad93ae926d23c8de42b2
 ./src/ep_lin.c                                                sha256:4eae6323e0f616599ceb96f63edc4d5c61b513ee9ac57f86b121f3cc3c1dab1f
@@ -154,7 +156,7 @@ FILE                                                          SHA-256
 ./tests/test_grpcbridge.c                                     sha256:cfd320f46fb88fbdcd07ee7a4bb071e6322124a8a5ef96f997200fef6cc0942c
 ./tests/bench_util.h                                          sha256:f81551a420952d65e3d76b9c03bdd6be6938f080de843d9e16f51272d41584c4
 ./tests/test_canbr.c                                          sha256:02a76c12fd85be4993a9663f19e470ab43ef9c33c3278e93cf3a34226d7719b7
-./tests/test_ep_uart.c                                        sha256:aea7b7ef4bf7cdca8ec7711ec6290e6e7880dc99cf0f83c420673ba11241454e
+./tests/test_ep_uart.c                                        sha256:5e283e8befc4685693fffcaa9fd1ec4091f800bf7be7aa15950357e8444cd045
 ./tests/test_tls.c                                            sha256:be0c06df07d3a9b271c3fee32efe047ca971eb6932ba3b412f7e979cc6a403cb
 ./tests/test_ep_lin.c                                         sha256:eb1b27e878a62661642a4b216a447220080e8b5c7ef31ce4e57d4e717e31830d
 ./tests/test_mdns.c                                           sha256:f327de9c8d6f9feb4a73970e30995cf2389937e5811765ecdba0e118fa919e6b
@@ -167,7 +169,7 @@ FILE                                                          SHA-256
 ./tests/test_faultinject.c                                    sha256:96e9a1c5e2ae007689e89d427f71bd264ce5c54aa24d7335bf7423764862219f
 ./tests/test_wire.c                                           sha256:60386f18e95618f1e777741607a5f53232a0fb09215816a15399817ca6a57de3
 ./tests/test_ep_spi.c                                         sha256:ff290b7d565e31866afaf379d29b92b4c3fb9da4ae3213067d3c603235f3253d
-./tests/test_discovery.c                                      sha256:0c416b0e660a9eccce4de992b47697a0f3ebc621c0efb8fc13b853e04148b70f
+./tests/test_discovery.c                                      sha256:8226f15ed2e3011d229a0a6a4a3b372f9b3a5357308f6696662d2508f8d055bb
 ./tests/test_scheduler.c                                      sha256:71d57bcf2f01cd0d01a2eb2b5dbf5c66c0c10f3aea79c2ca5cc406a7398c3b71
 ./tests/test_ep_pwm.c                                         sha256:d3c740ba40b526c880c2919647c2ca31125b9ae4498c260e951c4e226adef6ff
 ./tests/test_ddsbr.c                                          sha256:89eb84d70ada98f8a1e2d44845f3e6c402b7d692a98c07cf0ac81b65082b6879
@@ -177,7 +179,7 @@ FILE                                                          SHA-256
 ./tests/test_federation.c                                     sha256:895883c46ddfb3ac25d5f543f1f9e473faf7de0e69c59d2e6522b9c767673508
 ./tests/test_tsn.c                                            sha256:a5d77443f566a6dcb61a246fefa34c29fb6a15e92aa54925920794cbd4aa0551
 ./tests/test_restbridge.c                                     sha256:1dfc12b005af67c9ef1499f4cdfed298a38fe4a466780b8d49b737ed6a9878b0
-./tests/test_regmap.c                                         sha256:022950ecc3f5325459548cfffb0fc31881700f8580107c65bd19633b98757917
+./tests/test_regmap.c                                         sha256:38114bbb5f6c48e770afa6067eceae595e44faf81a21819f8b4904075b4846d9
 ./tests/test_mqttbr.c                                         sha256:ee606cbb1f5467fe976840814a465ddade8697a6b15d19e5c57ac456d29f7f12
 ./tests/test_rcp.c                                            sha256:06ca82e83d0296c37c293f022d128258ea5c2e20ddb1ed0c368d54bbf208abf0
 ./tests/test_acf.c                                            sha256:cf4d2b885f4de910b12be1b27e2716f0853d7f8ef7205b945522ab6821b43b84
@@ -187,7 +189,7 @@ FILE                                                          SHA-256
 ./tests/test_linbr.c                                          sha256:ca0122fc83aae5f5c6576edff51c45b66c303c5d2100d54cd6edc6babc5c6d7e
 ./tests/test_request_triggered.c                              sha256:df8365ad37d1a45636160b2049d4863c6c4c27fd92bd1c8230e1cd74563e55c7
 ./tests/test_udsbr.c                                          sha256:565f0abf974e93a1ec7dc011e9309fa56e27cae2b04741f9662005421b5805c1
-./tests/test_ep_can.c                                         sha256:7c33cbb7d53940ebcb82be6b1b746260dac429cd594eb72b55b5f3b5c22cffdc
+./tests/test_ep_can.c                                         sha256:49a094a33c24b8fe8b91d0c5b46e38228ba4d937652dae5e92ae91beb66397d3
 ./tests/test_someipbr.c                                       sha256:680c48dffe4758b6c7a458eaa347a5c25eaf5fd0348c392979dc486170407b60
 ./tests/test_zonegroup.c                                      sha256:fd5598473448618020ed0b7ffd06a49a1cc87691cacf964821e6daffded2c75d
 ./tests/test_ep_iseled.c                                      sha256:d5e24cf271232d5554376026782a7e5a6cac1280179649c7d9f648c15398329b
@@ -197,6 +199,7 @@ FILE                                                          SHA-256
 ./tests/test_redundancy.c                                     sha256:b6729e9b231951547f28afc810c9b2b342c7773bf61915ad977b61848f1a0443
 ./tests/test_ep_gpio.c                                        sha256:196afb71d6052793ccb86da2e1c9a2008f340abefc1f853af0b9ee50769bc449
 ./tests/test_mock.c                                           sha256:5c824eb897d51b4474dc7354f10b856c32d23d8a38d918219c57ab565155d5f2
+./tests/test_fragment.c                                       sha256:a5e86d9bf5a0c6fcc6de8cee250da1272f695ae2cfb783dbe38bca508eef7448
 ./tests/test_ep_mdio.c                                        sha256:16959058fa01875bc97f6c2df316a04539a2b335ff7e4cd595c9f6dc397cb98b
 ./tests/test_prioqueue.c                                      sha256:8f174955f384b3ef88964ea3708a7c2b4c1fb2b2484a436c00eee27dd7f76211
 ./tests/test_e2e.c                                            sha256:a8693e751c0eac431bc0d4a59786aab86fd2b454e60dc73ec65041ef119495e4
@@ -207,4 +210,4 @@ FILE                                                          SHA-256
 ./tests/test_ep_adc.c                                         sha256:f5201054c42cc1210df48bb814418c3ca84781a308cadefbd25f184b52b4ffe7
 ./cli/main.c                                                  sha256:541875eda25d51c675d488ca4ddc24226dbccd51e91b77390569c451c36710e1
 
-Total files: 203
+Total files: 206
