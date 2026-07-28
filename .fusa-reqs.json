@@ -5447,6 +5447,286 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SEQ-001",
+      "title": "rcp_sequencer_table_new() treats count == 0 as unsupported, not a failure",
+      "text": "rcp_sequencer_table_new() shall, given count == 0, return a table with state == NULL and count == 0, and rcp_sequencer_table_unsupported() shall report true for that table.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SEQ-002",
+      "title": "rcp_sequencer_table_new() reports allocation failure via a zeroed table",
+      "text": "rcp_sequencer_table_new() shall, given a nonzero count for which the underlying allocation fails, return a table with state == NULL and count == 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SEQ-003",
+      "title": "rcp_sequencer_table_new() initializes every register to the power-on default",
+      "text": "rcp_sequencer_table_new() shall, given a nonzero count for which allocation succeeds, return a table with count registers, each initialized to RCP_SEQUENCER_POWER_ON_STATE (1).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SEQ-004",
+      "title": "rcp_sequencer_table_unsupported() is true iff count == 0",
+      "text": "rcp_sequencer_table_unsupported() shall return true iff table->count == 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SEQ-005",
+      "title": "rcp_sequencer_table_reset() restores every register to the power-on default",
+      "text": "rcp_sequencer_table_reset() shall set every sequencer in a nonzero-count table back to RCP_SEQUENCER_POWER_ON_STATE, and shall be a no-op on a count == 0 table.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SEQ-006",
+      "title": "rcp_sequencer_table_free() zeroes the table and is idempotent",
+      "text": "rcp_sequencer_table_free() shall free table->state (if any) and set table->state = NULL and table->count = 0, and shall be safe to call again on an already-zeroed table.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SEQ-007",
+      "title": "rcp_sequencer_index_valid() bounds idx to 0..count-1",
+      "text": "rcp_sequencer_index_valid() shall return true iff idx < table->count.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SEQ-008",
+      "title": "rcp_sequencer_get_state() reads the current state of a valid index",
+      "text": "rcp_sequencer_get_state() shall, given a valid idx, return true and set *out_state to table->state[idx].",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SEQ-009",
+      "title": "rcp_sequencer_get_state() rejects an invalid index without touching *out_state",
+      "text": "rcp_sequencer_get_state() shall, given an idx for which rcp_sequencer_index_valid() is false, return false and leave *out_state unchanged.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SEQ-010",
+      "title": "rcp_sequencer_set_state() overwrites the state of a valid index",
+      "text": "rcp_sequencer_set_state() shall, given a valid idx, set table->state[idx] to state and return true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-SEQ-011",
+      "title": "rcp_sequencer_set_state() rejects an invalid index without changing table",
+      "text": "rcp_sequencer_set_state() shall, given an idx for which rcp_sequencer_index_valid() is false, return false and leave table entirely unchanged.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-001",
+      "title": "rcp_request_type_is_safety() reports the MSB (0x80) of request_type",
+      "text": "rcp_request_type_is_safety() shall return true iff (request_type & 0x80) != 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-002",
+      "title": "rcp_request_type_is_compound() recognizes RCP_REQUEST_TYPE_COMPOUND and its safety variant",
+      "text": "rcp_request_type_is_compound() shall return true iff request_type == RCP_REQUEST_TYPE_COMPOUND or request_type == RCP_REQUEST_TYPE_COMPOUND_SAFETY.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-003",
+      "title": "rcp_request_type_is_compound_wait() recognizes RCP_REQUEST_TYPE_COMPOUND_WAIT and its safety variant",
+      "text": "rcp_request_type_is_compound_wait() shall return true iff request_type == RCP_REQUEST_TYPE_COMPOUND_WAIT or request_type == RCP_REQUEST_TYPE_COMPOUND_WAIT_SAFETY.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-004",
+      "title": "rcp_compound_strerror() never returns NULL and is unique per code",
+      "text": "rcp_compound_strerror() shall return a non-NULL, non-empty, distinct message for each rcp_compound_errc_t value, and a non-NULL message for any other value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-005",
+      "title": "rcp_compound_peek_request_type() rejects a frame shorter than the ACF_GBB header",
+      "text": "rcp_compound_peek_request_type() shall return RCP_COMPOUND_ERR_SHORT_FRAME when len < RCP_ACF_GBB_HEADER_LEN.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-006",
+      "title": "rcp_compound_peek_request_type() rejects a non-ACF_GBB message",
+      "text": "rcp_compound_peek_request_type() shall return RCP_COMPOUND_ERR_BAD_MSG_TYPE when b[0] != RCP_ACF_MSG_TYPE_GBB.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-007",
+      "title": "rcp_compound_peek_request_type() reads the repurposed opcode byte when mtv is untimed",
+      "text": "rcp_compound_peek_request_type() shall, given a well-formed ACF_GBB frame whose decoded mtv nibble equals RCP_ACF_MTV_UNTIMED, return RCP_COMPOUND_OK and set *out_request_type to b[RCP_ACF_ABB_HEADER_LEN]; and shall return RCP_COMPOUND_ERR_NOT_REPURPOSED when that mtv nibble is not RCP_ACF_MTV_UNTIMED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-008",
+      "title": "rcp_compound_encode_request() rejects an unrecognized request_type",
+      "text": "rcp_compound_encode_request() shall return a zeroed rcp_bytes_t (data == NULL) when request_type is neither rcp_request_type_is_compound() nor rcp_request_type_is_compound_wait().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-009",
+      "title": "rcp_compound_encode_request() rejects an oversized payload",
+      "text": "rcp_compound_encode_request() shall return a zeroed rcp_bytes_t (data == NULL) when payload_len exceeds RCP_ACF_MAX_PAYLOAD.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-010",
+      "title": "rcp_compound_encode_request() encodes an ACF_GBB frame with mtv forced untimed and the opcode/step packed into message_timestamp",
+      "text": "rcp_compound_encode_request() shall, given a recognized request_type and payload_len <= RCP_ACF_MAX_PAYLOAD, produce an RCP_ACF_GBB_HEADER_LEN + payload_len byte frame of type RCP_ACF_MSG_TYPE_GBB addressed to byte_bus_id, whose decoded mtv nibble is RCP_ACF_MTV_UNTIMED and whose message_timestamp region's leading byte equals request_type with the remaining 7 bytes packing step's sequencer_index/start_state/next_state/exec_delay_ms/repeat_count fields, followed by payload.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-011",
+      "title": "rcp_compound_decode_request() rejects a frame shorter than declared",
+      "text": "rcp_compound_decode_request() shall return RCP_COMPOUND_ERR_SHORT_FRAME when b is shorter than the ACF_GBB fixed header or its declared payload length.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-012",
+      "title": "rcp_compound_decode_request() rejects a non-ACF_GBB message",
+      "text": "rcp_compound_decode_request() shall return RCP_COMPOUND_ERR_BAD_MSG_TYPE when b[0] != RCP_ACF_MSG_TYPE_GBB.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-013",
+      "title": "rcp_compound_decode_request() rejects a message whose mtv is not untimed",
+      "text": "rcp_compound_decode_request() shall return RCP_COMPOUND_ERR_NOT_REPURPOSED when the decoded byte_message_info.mtv is not RCP_ACF_MTV_UNTIMED.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-014",
+      "title": "rcp_compound_decode_request() rejects a request_type it does not recognize",
+      "text": "rcp_compound_decode_request() shall return RCP_COMPOUND_ERR_UNKNOWN_TYPE when the decoded opcode byte is neither rcp_request_type_is_compound() nor rcp_request_type_is_compound_wait().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-015",
+      "title": "rcp_compound_decode_request() round-trips a frame produced by rcp_compound_encode_request()",
+      "text": "rcp_compound_decode_request() shall, given a frame produced by rcp_compound_encode_request(), return RCP_COMPOUND_OK and recover the original request_type, byte_bus_id, step (sequencer_index/start_state/next_state/exec_delay_ms/repeat_count), transaction_num, and a borrowed view of the original payload.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-016",
+      "title": "rcp_compound_encode_clear_non_safestate() encodes an RCP_ACF_GBB_HEADER_LEN-byte, opcode-0x06, mtv-untimed frame",
+      "text": "rcp_compound_encode_clear_non_safestate() shall produce an RCP_ACF_GBB_HEADER_LEN-byte frame of type RCP_ACF_MSG_TYPE_GBB addressed to byte_bus_id, echoing transaction_num, with mtv RCP_ACF_MTV_UNTIMED and the message_timestamp region's leading byte equal to RCP_REQUEST_TYPE_CLEAR_NON_SAFESTATE and its remaining 7 bytes zero.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-017",
+      "title": "rcp_compound_decode_clear_non_safestate() round-trips a frame produced by its own encoder",
+      "text": "rcp_compound_decode_clear_non_safestate() shall, given a frame produced by rcp_compound_encode_clear_non_safestate(), return RCP_COMPOUND_OK and recover the original byte_bus_id and transaction_num.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-018",
+      "title": "rcp_compound_decode_clear_non_safestate() rejects a request_type other than 0x06",
+      "text": "rcp_compound_decode_clear_non_safestate() shall return RCP_COMPOUND_ERR_UNKNOWN_TYPE when the decoded opcode byte is not RCP_REQUEST_TYPE_CLEAR_NON_SAFESTATE, given the same short-frame/bad-msg-type/not-repurposed failure modes as rcp_compound_decode_request().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-019",
+      "title": "rcp_compound_advance_guard() is true iff the target sequencer is still in start_state",
+      "text": "rcp_compound_advance_guard() shall return true iff step->sequencer_index is rcp_sequencer_index_valid() for table and table's current state at that index equals step->start_state, and shall return false (never a fabricated true) for an invalid sequencer_index.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-020",
+      "title": "rcp_compound_exec_delay_elapsed() compares elapsed_ms against exec_delay_ms",
+      "text": "rcp_compound_exec_delay_elapsed() shall return true iff elapsed_ms >= step->exec_delay_ms.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-021",
+      "title": "rcp_compound_tick() advances the sequencer only once both the delay has elapsed and the guard holds",
+      "text": "rcp_compound_tick() shall set table's sequencer step->sequencer_index to step->next_state and return true iff both rcp_compound_exec_delay_elapsed(step, elapsed_ms) and rcp_compound_advance_guard(table, step) are true; otherwise it shall leave table unchanged and return false.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-022",
+      "title": "rcp_compound_tick() never advances a sequencer that has already left start_state, even after its delay elapses",
+      "text": "rcp_compound_tick() shall return false and leave table unchanged when elapsed_ms >= step->exec_delay_ms but the target sequencer's current state does not equal step->start_state.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-023",
+      "title": "rcp_compound_wait_tick() advances the sequencer only once both condition_met and the guard hold",
+      "text": "rcp_compound_wait_tick() shall set table's sequencer step->sequencer_index to step->next_state and return true iff both condition_met and rcp_compound_advance_guard(table, step) are true; otherwise it shall leave table unchanged and return false, regardless of any elapsed-time value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CMP-024",
+      "title": "rcp_compound_wait_tick() never advances a sequencer that has already left start_state, even on a condition match",
+      "text": "rcp_compound_wait_tick() shall return false and leave table unchanged when condition_met is true but the target sequencer's current state does not equal step->start_state.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     }
   ]
 }

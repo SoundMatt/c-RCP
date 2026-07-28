@@ -2832,7 +2832,7 @@ wholesale-new territory relative to the old informal protocol (extraction
 read/write, this entire subsystem has no precedent in this codebase to
 port from.
 
-### 68. Compound + compound-wait requests + sequencers (v0.68.0)
+### 68. Compound + compound-wait requests + sequencers (v0.68.0) ✅
 
 - `include/rcp/sequencer.h` + `src/sequencer.c`: persistent 8-bit
   sequencer-state registers (power-on default `1`, up to
@@ -2852,6 +2852,49 @@ port from.
   this milestone, not compound-message-parsing alone — a repo claiming
   "compound support" without the other two per the spec's own bundle
   definition would be non-conformant.
+
+**Done (v0.68.0)**: `include/rcp/sequencer.h` + `src/sequencer.c` land as
+a standalone, dynamically-sized (`rcp_sequencer_table_new(count)`, heap-
+allocated like `rcp.h`'s `rcp_bytes_t`, not a compile-time-capped array)
+sequencer-state-register primitive, independently testable ahead of and
+apart from compound.h's own use of it — exactly the "first-class
+supporting primitive, not an implementation detail" split the roadmap
+calls for. `include/rcp/compound.h` + `src/compound.c` land alongside it
+as new, additive protocol-core surface, following `ep_gpio.h`/`ep_spi.h`/
+.../`ep_adc.h`'s (milestones 64–67) established layering discipline:
+nothing in `rcp.h`, `wire.c`, `avtp.h`/`avtp.c`, `acf.h`/`acf.c`,
+`server.h`/`server.c`, `regmap.h`/`regmap.c`, or any `ep_*` module is
+touched. Because `acf.c`'s own `rcp_acf_encode_gbb()` deliberately zeroes
+the `message_timestamp` region whenever `mtv` is untimed (a milestone-60
+rule predating this repurposing, left unchanged here per that same
+layering discipline), `compound.c`'s own request encoders build the
+ACF_GBB frame directly against `acf.h`'s already-published header layout
+instead of calling into `acf.c`; decoding has no such conflict and goes
+through `rcp_acf_decode_gbb()` unmodified.
+`rcp_compound_step_t` is this module's own shared sub-field shape for
+both compound and compound-wait (`sequencer_index`/`start_state`/
+`next_state`/`exec_delay_ms`/`repeat_count`), the same one-payload-shape-
+for-two-related-kinds precedent `ep_pwm.h`'s `rcp_ep_pwm_value_t` already
+set. `rcp_compound_advance_guard()` is the pure, directly-testable
+expression of the advance-only-if-still-in-`start_state` rule;
+`rcp_compound_tick()` composes it with `rcp_compound_exec_delay_elapsed()`
+for compound's own unconditional-after-the-delay timer, while
+`rcp_compound_wait_tick()` composes the same guard with a
+caller-supplied `condition_met` bool instead — this module owns no
+endpoint-specific comparison logic of its own, consuming
+`ep_spi.h`'s `rcp_ep_spi_compound_wait_status_equal()` and `ep_pwm.h`'s
+`rcp_ep_pwm_in_compound_wait_compare()` exactly as the isolated
+precedents milestones 65/67 built them to be. The clear-non-safestate
+cancellation type (`request_type` `0x06`) ships in this same milestone via
+`rcp_compound_encode_clear_non_safestate()`/`_decode_clear_non_safestate()`,
+and `rcp_sequencer_table_new()` supports any count including the
+roadmap's required **at least 4** — completing the all-or-nothing bundle
+per extraction §3.1. `tests/test_sequencer.c` (12 cases) and
+`tests/test_compound.c` (25 cases, ASan/UBSan-clean), and 35 new
+requirements (`REQ-SEQ-001`..`011`, `REQ-CMP-001`..`024`) added to
+`.fusa-reqs.json`; `cfusa trace --req-coverage 100` (both metrics) and
+`cfusa check`/`lint`/`analyze`/`cyber`/`vuln`/`qualify` (0 errors) stay
+green, and the full `ctest` suite stays green.
 
 ### 69. Triggered/chained/timed requests + cancellation taxonomy (v0.69.0)
 
