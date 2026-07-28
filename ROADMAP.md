@@ -3169,7 +3169,7 @@ round trips) passes, alongside the full existing `ctest` suite (61/61).
 `cfusa trace --req-coverage 100` (both metrics) stay green, and
 `relay conform --strict` passes against the rebuilt CLI.
 
-### 72. CAN controller endpoint, incl. CAN XL (v0.72.0)
+### 72. CAN controller endpoint, incl. CAN XL (v0.72.0) ✅
 
 - `include/rcp/ep_can.h` + `src/ep_can.c`: FrameFormat-selected Classical
   (CBFF/CEFF), FD (FBFF/FEFF), and XL (classical/new physical layer)
@@ -3191,7 +3191,70 @@ round trips) passes, alongside the full existing `ctest` suite (61/61).
   in each module's header comment to prevent the three-way duplication
   flagged in the Satellite Disposition table.
 
-### 73. ISELED endpoint (v0.73.0)
+**Done (v0.72.0)**: `include/rcp/ep_can.h` + `src/ep_can.c` land as new,
+additive protocol-core surface, following the same layering discipline
+every endpoint type since milestone 64 established (nothing in `rcp.h`,
+`wire.c`, `avtp.h`/`avtp.c`, `acf.h`/`acf.c`, `server.h`/`server.c`,
+`regmap.h`/`regmap.c`, `discovery.h`/`discovery.c`, or any prior `ep_*`
+module is touched). `rcp_ep_can_frame_format_t` selects among the six
+FrameFormat variants the bullet above names (CBFF/CEFF, FBFF/FEFF,
+XL_CLASSICAL_PL/XL_NEW_PL) via `evt[2:0]`, the same selector-via-evt
+convention `ep_spi.h`'s channel selector already established, rejecting
+the two undefined 3-bit codes with the new `RCP_EP_CAN_ERR_BAD_FRAME_FORMAT`
+on decode (mirroring `ep_spi.h`'s own `BAD_CHANNEL`). Only data frames are
+modeled — there is no remote-frame encode/decode path anywhere in this
+module. `rcp_ep_can_xl_header_t` (sdt/vcid/af) carries CAN XL's extra
+header content as this module's own 6-byte wire prefix (RRS is
+deliberately not a separately-encoded field — its value is implied by
+the frame-format selection itself; see `ep_can.h`'s own file header for
+why). That file header also spells out, with actual numbers, why CAN
+XL's worst-case frame is "the concrete driver for Phase 20's
+fragmentation go-decision" the bullet above names: this module's own
+worst-case encoded length (`RCP_EP_CAN_XL_MAX_ENCODED_LEN`, 2058 bytes)
+exceeds `RCP_AVTP_NTSCF_MAX_PAYLOAD` (2047, `avtp.h`) — and NTSCF is the
+only AVTPDU format an RC Server itself ever sends — so a worst-case CAN
+XL response is explicitly single-AVTPDU/TSCF-only scope until Phase 20
+lands, the same deliberate scope narrowing `ep_uart.h`'s own RX short-read
+handling already carries forward from milestone 66.
+Per extraction §5.11, `rcp_ep_can_functional_cfg_t` composes three
+independent `rcp_ep_can_bit_timing_t` register sets (arbitration/FD-data/
+XL-data), a delay-compensation control, a CAN-XL acceptance/ID filter
+table (`rcp_ep_can_xl_filter_t`, `RCP_EP_CAN_XL_MAX_FILTERS` deep — this
+module's own chosen depth, not a spec-derived number), and
+`exec_delay_clk_divider`, this endpoint's own base-clock/divider register
+scoped only to execution-delay timing, explicitly distinct from the three
+bit-timing register sets. Every setter is gated by
+`rcp_ep_can_functional_cfg_writable()`, a thin wrapper over `server.h`'s
+`rcp_server_field_writable()`, reusing rather than duplicating that
+authorization logic, matching every prior endpoint type's own setters.
+Per extraction §7, this module defines **no** trigger-signal enumeration
+at all — a documented reflection of a gap in the specification itself,
+not an oversight, spelled out in `ep_can.h`'s file header and contrasted
+explicitly against `ep_lin.h`'s TX_DONE trigger and `ep_gpio.h`'s per-pin
+trigger table.
+`ep_can.h`'s file header also carries forward the Phase 13 terminology
+note: this native CAN endpoint, CAN(FD/XL)-as-RCP's-own-transport
+(`avtp.h`, milestone 59 — cited there, not re-implemented here), and the
+untouched `canbr.c` bridge stub to an *external* CAN segment (disposition
+ADAPT/narrowed-role, Satellite Rework v0.81.0) are drawn out as three
+distinct things sharing one bus technology, closing the loop the
+Satellite Disposition table calls for without editing `avtp.h`/`canbr.h`
+themselves (out of this milestone's layering-discipline scope).
+**Requirement-id naming note**: the pre-replacement `canbr.c` stub already
+owns the `REQ-CAN-*` id prefix in `.fusa-reqs.json`, so this module's own
+22 new requirements are tagged `REQ-CANEP-001`..`022` ("CAN endpoint")
+instead — the same collision-avoidance naming seam `ep_lin.h` established
+for `REQ-LINEP-*` at v0.71.0.
+`tests/test_ep_can.c` (41 cases covering frame-format/id-width/data-length
+helpers, functional-config authorization across all three bit-timing sets
+plus delay-compensation/exec-delay-divider/XL-filter setters, and
+command-request/response round trips for both Classical and CAN XL
+frames) passes, alongside the full existing `ctest` suite (62/62,
+ASan/UBSan-clean). `cfusa check`/`lint`/`analyze`/`cyber`/`vuln`/`qualify`
+(0 errors) and `cfusa trace --req-coverage 100` (both metrics) stay
+green, and `relay conform --strict` passes against the rebuilt CLI.
+
+### 73. ISELED endpoint (v0.73.0) ✅
 
 - `include/rcp/ep_iseled.h` + `src/ep_iseled.c`: native 4-bit/5-bit ISELED
   framing over ISP_P/ISP_N, client payload taken as raw plain instruction/
@@ -3200,7 +3263,69 @@ round trips) passes, alongside the full existing `ctest` suite (61/61).
   CRC32); recovered-clock mode (`iseled_use_rcv_clk`) needing no ISP_N pin
   wired at all; single transmission-complete trigger.
 
-### 74. MDIO endpoint (v0.74.0)
+**Requirement-id naming note**: unlike `ep_lin.h`'s `REQ-LINEP-*` and
+`ep_can.h`'s `REQ-CANEP-*` (both collision-avoidance suffixes against a
+pre-replacement bridge/stub module that already owned the unsuffixed
+prefix), this codebase has never carried a pre-replacement ISELED
+bridge/stub of any kind — verified directly against `.fusa-reqs.json`
+before picking a prefix, so this module's own 24 new requirements are
+tagged plain `REQ-ISELED-001`..`024`, no suffix needed.
+
+**Done (v0.73.0)**: `include/rcp/ep_iseled.h` + `src/ep_iseled.c` land as
+new, additive protocol-core surface, following the same layering
+discipline every endpoint type since milestone 64 established (nothing in
+`rcp.h`, `wire.c`, `avtp.h`/`avtp.c`, `acf.h`/`acf.c`, `server.h`/
+`server.c`, `regmap.h`/`regmap.c`, `discovery.h`/`discovery.c`, or any
+prior `ep_*` module is touched). The ACF-level command request/response
+codec (`rcp_ep_iseled_encode_command_request()`/`_decode_command_request()`
+and their response counterparts) carries the caller's plain instruction/
+address/data content verbatim, unmodified — mirroring `ep_lin.h`'s own
+raw-byte-stream convention — deliberately kept separate from this
+endpoint's own native bit-framing engine
+(`rcp_ep_iseled_symbol_encode()`/`_symbol_decode()`,
+`rcp_ep_iseled_encode_bitframe()`/`_decode_bitframe()`), which is this
+module's own original design: each 4-bit nibble frames onto ISP_P/ISP_N as
+a 5-bit even-parity symbol, giving every symbol a built-in single-bit
+integrity check and guaranteeing the transition density recovered-clock
+mode needs (`0x0` and `0xF` nibbles are given different parity bits, so
+they never repeat the same symbol back to back). `rcp_ep_iseled_crc8()`
+implements a second, independent, optional integrity layer (a standard
+CRC-8, poly 0x07/init 0x00 — a publicly documented algorithm, not
+spec-derived, chosen the same way `e2e.c`'s own CRC-16/CCITT-FALSE already
+is) gated by `iseled_crc_enable` and framed as a trailing content octet
+*inside* the bit-framed symbol stream — explicitly independent of, and
+stackable with, Phase 18's own RCP-level `e2e.c` wrap/unwrap, which
+operates one layer further out and has no knowledge of ISELED at all; the
+two integrity layers are never conflated. `iseled_use_rcv_clk` selects
+recovered-clock mode, with `rcp_ep_iseled_requires_isp_n()` as a small,
+pure, directly-testable statement that the ISP_N pin need not be
+wired/mapped at all in that mode. `rcp_ep_iseled_trigger_t` names exactly
+one real trigger (`TX_COMPLETE`) plus `NONE` — a single fixed trigger,
+distinct from `ep_gpio.h`'s per-pin table and from `ep_can.h`'s documented
+absence of any trigger table. `rcp_ep_iseled_functional_cfg_t` composes
+`regmap.h`'s shared functional-cfg prefix and adds
+`iseled_bit_clk_divider`, `iseled_use_rcv_clk`, `iseled_crc_enable`, and
+`trigger`, with every setter gated by
+`rcp_ep_iseled_functional_cfg_writable()`, a thin wrapper over
+`server.h`'s `rcp_server_field_writable()`, reusing rather than
+duplicating that authorization logic, matching every prior endpoint
+type's own setters.
+`tests/test_ep_iseled.c` (39 cases covering the bit-framing symbol
+codec's round trips and corruption handling, the CRC-8 layer, the
+recovered-clock helper, the transmission-complete trigger,
+functional-config authorization, and command-request/response round
+trips) passes, alongside the full existing `ctest` suite (63/63,
+ASan/UBSan-clean). `cfusa lint`/`analyze`/`cyber`/`vuln`/`qualify` (0
+errors) and `cfusa trace --req-coverage 100` (both metrics) stay green,
+and `relay conform --strict` passes against the rebuilt CLI. `cfusa
+check`'s own HARA002/HARA003 findings (10 hazards in `.fusa-hara.json`
+each missing a risk rating and a `safetyGoals` reference) are a
+pre-existing gap unrelated to this milestone — confirmed present, and
+already failing that same CI job, on `main` at this milestone's own base
+commit (`c27ab16`, before this branch's own changes) — not introduced or
+touched here.
+
+### 74. MDIO endpoint (v0.74.0) ✅
 
 - `include/rcp/ep_mdio.h` + `src/ep_mdio.c`: the endpoint entirely absent
   from the spec's own informative "ten interfaces" scope list yet fully
@@ -3209,6 +3334,80 @@ round trips) passes, alongside the full existing `ctest` suite (61/61).
   type-specific functional config beyond the universal common block, no
   trigger-signal table. Reusable to expose an on-die integrated PHY's
   management registers when no physical MDIO pins are mapped at all.
+
+**Requirement-id naming note**: verified directly against `.fusa-reqs.json`
+before picking a prefix, the same check every prior endpoint milestone has
+made — this codebase has never carried a pre-replacement MDIO bridge/stub
+module, and none of this repository's satellite packages are named `mdio`,
+so this module's own 19 new requirements are tagged plain
+`REQ-MDIO-001`..`019`, no "-EP" collision-avoidance suffix needed.
+
+**Done (v0.74.0)**: `include/rcp/ep_mdio.h` + `src/ep_mdio.c` land as new,
+additive protocol-core surface, following the same layering discipline
+every endpoint type since milestone 64 established (nothing in `rcp.h`,
+`wire.c`, `avtp.h`/`avtp.c`, `acf.h`/`acf.c`, `server.h`/`server.c`,
+`regmap.h`/`regmap.c`, `discovery.h`/`discovery.c`, or any prior `ep_*`
+module is touched). `rcp_ep_mdio_addr_t` models both Clause-22 ("MMD", a
+5-bit port/PHY address plus a 5-bit register address selecting one 16-bit
+register directly) and Clause-45 ("MMS", the same 5-bit port/PHY address
+joined by a 5-bit MMD device address and a full 16-bit register address),
+with `rcp_ep_mdio_addr_valid()` as a small, pure, directly-testable
+statement of both modes' field-range invariants at once. A request's
+`word_count` selects single-word (1) vs. burst (>1) addressing;
+`rcp_ep_mdio_burst_next_regad()` is this module's own pure,
+directly-testable one-step-advance helper for a caller's own burst loop,
+generalizing the well-known MDIO post-increment idiom to both addressing
+modes uniformly, with wraparound at each mode's own register-address width
+rather than an out-of-range result. `RCP_EP_MDIO_MAX_BURST_WORDS` (512) is
+this module's own chosen cap, keeping every worst-case encoded frame
+comfortably inside `RCP_AVTP_NTSCF_MAX_PAYLOAD` — the same deliberate
+single-AVTPDU-worst-case scope `ep_uart.h`'s/`ep_lin.h`'s/`ep_iseled.h`'s
+own request/response pairs already commit to, needing none of `ep_can.h`'s
+own CAN-XL-specific exception. Following `ep_uart.h`'s own TX-write/RX-read
+two-family precedent (rather than `ep_iseled.h`'s/`ep_can.h`'s single
+request/response pair), this module exposes independent
+read (`rcp_ep_mdio_encode_read_request()`/`_decode_read_request()`,
+`rcp_ep_mdio_encode_read_response()`/`_decode_read_response()`) and write
+(`rcp_ep_mdio_encode_write_request()`/`_decode_write_request()`,
+`rcp_ep_mdio_encode_write_response()`/`_decode_write_response()`) request/
+response families, because this endpoint type has two genuinely distinct
+underlying MDIO operations, unlike a single symmetric command/reply
+exchange. `rcp_ep_mdio_pack_words()`/`_word_count_of()`/`_unpack_word_at()`
+(plus the pure `_word_encode()`/`_word_decode()` primitives) are this
+module's own small, directly-testable big-endian register-word packing
+layer, used by every encoder/decoder above but never touching the content
+of any data word itself. Per the roadmap's own scope,
+`rcp_ep_mdio_functional_cfg_t` composes only `regmap.h`'s shared
+functional-cfg prefix and adds nothing of its own — a documented "nothing
+more to add" finding, not an oversight, so there are no
+`rcp_ep_mdio_set_*()` mutators in this file at all (no endpoint type in
+this codebase exposes a setter for the common block's own fields either);
+`rcp_ep_mdio_functional_cfg_init()` and
+`rcp_ep_mdio_functional_cfg_writable()` are still provided purely for
+consistency with every other endpoint type's own init/writable pair, the
+latter a thin wrapper over `server.h`'s `rcp_server_field_writable()`.
+Mirroring `ep_can.h`'s own documented reflection of the same spec gap
+(extraction §7), this module defines no trigger enumeration and no
+`rcp_ep_mdio_trigger_t`-shaped field anywhere. The file header also
+documents this endpoint type's usefulness with zero physical MDIO/MDC pins
+mapped at all, for exposing an on-die/integrated PHY's own management
+registers entirely internally.
+`tests/test_ep_mdio.c` (56 cases covering address validation for both
+addressing modes, the burst-address-advance helper, the register-word
+packing layer, functional-config authorization, and all four
+read/write request/response round trips including short-frame/wrong-bus/
+wrong-op/bad-address/bad-word-count rejection) passes, alongside the full
+existing `ctest` suite (64/64, ASan/UBSan-clean). `cfusa
+lint`/`analyze`/`cyber`/`vuln`/`qualify` (0 errors) and `cfusa trace
+--req-coverage 100` (both metrics) stay green, and `relay conform --strict`
+passes against the rebuilt CLI. `cfusa check`'s own HARA002/HARA003
+findings (10 hazards in `.fusa-hara.json` each missing a risk rating and a
+`safetyGoals` reference) are the same pre-existing gap ep_iseled.h's own
+v0.73.0 entry above already documents — confirmed still present, and still
+failing that same CI job, on `main` at this milestone's own base commit
+(`61b912a`, before this branch's own changes; CI has in fact been red on
+`main` since v0.72.0's own merge for this same reason) — not introduced or
+touched here.
 
 ### 75. Wakeup control endpoint + power modes (v0.75.0)
 

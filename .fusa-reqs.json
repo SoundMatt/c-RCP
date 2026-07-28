@@ -6431,6 +6431,526 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-001",
+      "title": "rcp_ep_can_frame_format_valid() accepts exactly the six defined evt[2:0] values",
+      "text": "rcp_ep_can_frame_format_valid() shall return true for v in 0..5 and false for any value above 5.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-002",
+      "title": "rcp_ep_can_frame_format_is_xl() identifies the two CAN XL variants",
+      "text": "rcp_ep_can_frame_format_is_xl() shall return true for RCP_EP_CAN_FRAME_XL_CLASSICAL_PL and RCP_EP_CAN_FRAME_XL_NEW_PL, and false for every other value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-003",
+      "title": "rcp_ep_can_frame_format_id_width() reports the correct arbitration-id width per format",
+      "text": "rcp_ep_can_frame_format_id_width() shall return RCP_EP_CAN_ID_WIDTH_EXTENDED_29 for RCP_EP_CAN_FRAME_CEFF and RCP_EP_CAN_FRAME_FEFF, and RCP_EP_CAN_ID_WIDTH_BASE_11 for every other value including an invalid format.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-004",
+      "title": "rcp_ep_can_arbitration_id_valid() bounds an identifier against its format's id width",
+      "text": "rcp_ep_can_arbitration_id_valid() shall return true iff format is rcp_ep_can_frame_format_valid() and id does not exceed 0x7FF (BASE_11 formats) or 0x1FFFFFFF (EXTENDED_29 formats), and false for an invalid format regardless of id.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-005",
+      "title": "rcp_ep_can_frame_format_max_data_len() reports each frame kind's own data ceiling",
+      "text": "rcp_ep_can_frame_format_max_data_len() shall return 8 for CBFF/CEFF, 64 for FBFF/FEFF, RCP_EP_CAN_XL_MAX_DATA_LEN (2048) for both CAN XL variants, and 0 for an invalid format.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-006",
+      "title": "rcp_ep_can_xl_filter_index_valid() accepts exactly the defined filter-table indices",
+      "text": "rcp_ep_can_xl_filter_index_valid() shall return true for index in 0..RCP_EP_CAN_XL_MAX_FILTERS-1 and false for index >= RCP_EP_CAN_XL_MAX_FILTERS.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-007",
+      "title": "rcp_ep_can_functional_cfg_init() zero-initializes every functional-config field",
+      "text": "rcp_ep_can_functional_cfg_init() shall zero cfg->common's flags, every bit-timing register set, delay_comp_enable/_offset, exec_delay_clk_divider, and every xl_filters[] entry.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-008",
+      "title": "rcp_ep_can_functional_cfg_writable() reuses server.h's field-writability authorization",
+      "text": "rcp_ep_can_functional_cfg_writable() shall return exactly rcp_server_field_writable(state, RCP_SERVER_FIELD_FUNCTIONAL_W, writer).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-009",
+      "title": "rcp_ep_can_set_arbitration_timing() is gated by functional-config authorization",
+      "text": "rcp_ep_can_set_arbitration_timing() shall apply timing to cfg->arbitration_timing and return true iff rcp_ep_can_functional_cfg_writable() authorizes the write for state/writer, leaving cfg unchanged and returning false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-010",
+      "title": "rcp_ep_can_set_fd_data_timing() is gated by functional-config authorization",
+      "text": "rcp_ep_can_set_fd_data_timing() shall apply timing to cfg->fd_data_timing and return true iff rcp_ep_can_functional_cfg_writable() authorizes the write for state/writer, leaving cfg unchanged and returning false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-011",
+      "title": "rcp_ep_can_set_xl_data_timing() is gated by functional-config authorization",
+      "text": "rcp_ep_can_set_xl_data_timing() shall apply timing to cfg->xl_data_timing and return true iff rcp_ep_can_functional_cfg_writable() authorizes the write for state/writer, leaving cfg unchanged and returning false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-012",
+      "title": "rcp_ep_can_set_delay_compensation() is gated by functional-config authorization",
+      "text": "rcp_ep_can_set_delay_compensation() shall apply enable/offset to cfg->delay_comp_enable/cfg->delay_comp_offset and return true iff rcp_ep_can_functional_cfg_writable() authorizes the write for state/writer, leaving cfg unchanged and returning false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-013",
+      "title": "rcp_ep_can_set_exec_delay_clk_divider() is gated by functional-config authorization",
+      "text": "rcp_ep_can_set_exec_delay_clk_divider() shall apply divider to cfg->exec_delay_clk_divider and return true iff rcp_ep_can_functional_cfg_writable() authorizes the write for state/writer, leaving cfg unchanged and returning false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-014",
+      "title": "rcp_ep_can_set_xl_filter() validates the filter index and functional-config authorization",
+      "text": "rcp_ep_can_set_xl_filter() shall apply filter to cfg->xl_filters[index] and return true iff index is rcp_ep_can_xl_filter_index_valid() and rcp_ep_can_functional_cfg_writable() authorizes the write for state/writer, leaving cfg unchanged and returning false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-015",
+      "title": "rcp_ep_can_strerror() returns a non-null, distinct message for every error code",
+      "text": "rcp_ep_can_strerror() shall return a non-null, non-empty string for every rcp_ep_can_errc_t value, distinct across all defined values, and a non-null string for an undefined value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-016",
+      "title": "rcp_ep_can_encode_frame_request() enforces frame-format, id, length, and xl_header preconditions",
+      "text": "rcp_ep_can_encode_frame_request() shall return a zeroed rcp_bytes_t if frame_format is not rcp_ep_can_frame_format_valid(), arbitration_id is not rcp_ep_can_arbitration_id_valid() for frame_format, tx_len exceeds rcp_ep_can_frame_format_max_data_len(frame_format), or xl_header's presence does not match rcp_ep_can_frame_format_is_xl(frame_format); otherwise it shall encode an ACF_ABB request carrying frame_format in evt[2:0] and this module's own arbitration-id/xl-header/data prefix layout.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-017",
+      "title": "rcp_ep_can_decode_frame_request() rejects a malformed, misaddressed, or malformed-selector frame",
+      "text": "rcp_ep_can_decode_frame_request() shall return RCP_EP_CAN_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header, its declared payload length, or this module's own frame_format-dependent prefix length; RCP_EP_CAN_ERR_BAD_MSG_TYPE if b is not an ACF_ABB message; RCP_EP_CAN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id; RCP_EP_CAN_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE; and RCP_EP_CAN_ERR_BAD_FRAME_FORMAT when evt[2:0] is not rcp_ep_can_frame_format_valid().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-018",
+      "title": "rcp_ep_can_decode_frame_request() round-trips a well-formed frame's fields",
+      "text": "rcp_ep_can_decode_frame_request() shall, given a frame produced by rcp_ep_can_encode_frame_request(), return RCP_EP_CAN_OK and recover frame_format, arbitration_id, xl_header (iff frame_format is a CAN XL variant), the tx data bytes, and transaction_num unchanged.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-019",
+      "title": "rcp_ep_can_encode_frame_response() enforces the same preconditions as the request encoder and supports timed/untimed encoding",
+      "text": "rcp_ep_can_encode_frame_response() shall apply the same frame-format/id/length/xl_header preconditions as rcp_ep_can_encode_frame_request() (substituting rx_data/rx_len), encoding as ACF_ABB when timed is false and as ACF_GBB with message_timestamp set to timestamp when timed is true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-020",
+      "title": "rcp_ep_can_decode_frame_response() rejects a malformed, misaddressed, or malformed-selector frame across both ACF_ABB and ACF_GBB",
+      "text": "rcp_ep_can_decode_frame_response() shall return RCP_EP_CAN_ERR_SHORT_FRAME for a frame too short for the applicable fixed header, its declared payload length, or this module's own frame_format-dependent prefix length; RCP_EP_CAN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id; and RCP_EP_CAN_ERR_BAD_FRAME_FORMAT when evt[2:0] is not rcp_ep_can_frame_format_valid(), regardless of whether the message is ACF_ABB or ACF_GBB.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-021",
+      "title": "rcp_ep_can_decode_frame_response() reports timed/untimed status and timestamp correctly",
+      "text": "rcp_ep_can_decode_frame_response() shall, given a frame produced by rcp_ep_can_encode_frame_response() with timed false, report out_timed false and out_timestamp 0; given one produced with timed true, report out_timed true and out_timestamp equal to the original timestamp.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-022",
+      "title": "rcp_ep_can_decode_frame_response() round-trips a well-formed frame's fields",
+      "text": "rcp_ep_can_decode_frame_response() shall, given a frame produced by rcp_ep_can_encode_frame_response(), return RCP_EP_CAN_OK and recover frame_format, arbitration_id, xl_header (iff frame_format is a CAN XL variant), the rx data bytes, and transaction_num unchanged.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-001",
+      "title": "rcp_ep_iseled_symbol_encode() frames a nibble as a 5-bit even-parity symbol",
+      "text": "rcp_ep_iseled_symbol_encode() shall return a value in 0..31 whose bit 4 equals the even parity of bits [3:0], with bits [3:0] equal to the input nibble masked to its own low 4 bits.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-002",
+      "title": "rcp_ep_iseled_symbol_decode() validates a symbol's parity bit",
+      "text": "rcp_ep_iseled_symbol_decode() shall return true and set *out_nibble to bits [3:0] of the symbol iff bit 4 equals the even parity of bits [3:0], and shall return false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-003",
+      "title": "rcp_ep_iseled_bitframe_encoded_len() reports two symbols per content octet",
+      "text": "rcp_ep_iseled_bitframe_encoded_len(data_len, append_crc) shall return 2 * (data_len + (append_crc ? 1 : 0)).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-004",
+      "title": "rcp_ep_iseled_encode_bitframe() produces only valid, round-trippable symbols",
+      "text": "rcp_ep_iseled_encode_bitframe() shall produce exactly rcp_ep_iseled_bitframe_encoded_len(data_len, append_crc) octets, each holding a value in 0..31 that rcp_ep_iseled_symbol_decode() accepts.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-005",
+      "title": "rcp_ep_iseled_encode_bitframe() appends the CRC-8 trailer when append_crc is true",
+      "text": "rcp_ep_iseled_encode_bitframe() shall, when append_crc is true, frame rcp_ep_iseled_crc8(data, data_len) as one extra trailing content octet after the data octets and before symbol expansion.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-006",
+      "title": "rcp_ep_iseled_crc8() is a deterministic, input-sensitive CRC-8",
+      "text": "rcp_ep_iseled_crc8() shall return the same value for the same input, shall return 0x00 for a zero-length input, and shall return a different value for two inputs that differ in content.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-007",
+      "title": "rcp_ep_iseled_requires_isp_n() reflects recovered-clock mode",
+      "text": "rcp_ep_iseled_requires_isp_n() shall return false iff use_rcv_clk is true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-008",
+      "title": "rcp_ep_iseled_trigger_fires() evaluates the single transmission-complete trigger",
+      "text": "rcp_ep_iseled_trigger_fires() shall return false for RCP_EP_ISELED_TRIGGER_NONE regardless of tx_complete_event, and for RCP_EP_ISELED_TRIGGER_TX_COMPLETE shall return the value of tx_complete_event.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-009",
+      "title": "rcp_ep_iseled_functional_cfg_init() zero-initializes the functional config",
+      "text": "rcp_ep_iseled_functional_cfg_init() shall set every rcp_regmap_ep_functional_cfg_t flag false, iseled_bit_clk_divider to 0, iseled_use_rcv_clk and iseled_crc_enable to false, and trigger to RCP_EP_ISELED_TRIGGER_NONE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-010",
+      "title": "rcp_ep_iseled_functional_cfg_writable() wraps server.h's field-writability authorization",
+      "text": "rcp_ep_iseled_functional_cfg_writable() shall return the result of rcp_server_field_writable() called with kind RCP_SERVER_FIELD_FUNCTIONAL_W.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-011",
+      "title": "rcp_ep_iseled_set_bit_clk_divider() is gated by functional-config writability",
+      "text": "rcp_ep_iseled_set_bit_clk_divider() shall apply the write and return true iff rcp_ep_iseled_functional_cfg_writable() authorizes it for the given state/writer, and shall leave cfg unchanged and return false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-012",
+      "title": "rcp_ep_iseled_set_use_rcv_clk() is gated by functional-config writability",
+      "text": "rcp_ep_iseled_set_use_rcv_clk() shall apply the write and return true iff rcp_ep_iseled_functional_cfg_writable() authorizes it for the given state/writer, and shall leave cfg unchanged and return false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-013",
+      "title": "rcp_ep_iseled_set_crc_enable() is gated by functional-config writability",
+      "text": "rcp_ep_iseled_set_crc_enable() shall apply the write and return true iff rcp_ep_iseled_functional_cfg_writable() authorizes it for the given state/writer, and shall leave cfg unchanged and return false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-014",
+      "title": "rcp_ep_iseled_set_trigger() is gated by functional-config writability",
+      "text": "rcp_ep_iseled_set_trigger() shall apply the write and return true iff rcp_ep_iseled_functional_cfg_writable() authorizes it for the given state/writer, and shall leave cfg unchanged and return false otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-015",
+      "title": "rcp_ep_iseled_strerror() never returns NULL and is distinct per code",
+      "text": "rcp_ep_iseled_strerror() shall return a non-NULL, non-empty string for every rcp_ep_iseled_errc_t value (including an unknown value), with a distinct string for each defined value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-016",
+      "title": "rcp_ep_iseled_decode_bitframe() rejects an odd symbol count",
+      "text": "rcp_ep_iseled_decode_bitframe() shall return RCP_EP_ISELED_ERR_ODD_SYMBOL_COUNT iff symbol_count is odd.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-017",
+      "title": "rcp_ep_iseled_decode_bitframe() rejects an invalid symbol",
+      "text": "rcp_ep_iseled_decode_bitframe() shall return RCP_EP_ISELED_ERR_BAD_SYMBOL iff any symbol in symbols[0..symbol_count) fails rcp_ep_iseled_symbol_decode().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-018",
+      "title": "rcp_ep_iseled_decode_bitframe() rejects too few symbols when a CRC trailer is expected",
+      "text": "rcp_ep_iseled_decode_bitframe() shall return RCP_EP_ISELED_ERR_SHORT_FRAME iff expect_crc is true and symbol_count yields fewer than one reconstructed content octet.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-019",
+      "title": "rcp_ep_iseled_decode_bitframe() rejects a native ISELED CRC-8 mismatch",
+      "text": "rcp_ep_iseled_decode_bitframe() shall return RCP_EP_ISELED_ERR_CRC_MISMATCH iff expect_crc is true and the trailing reconstructed octet does not equal rcp_ep_iseled_crc8() of the preceding reconstructed octets.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-020",
+      "title": "rcp_ep_iseled_decode_bitframe() round-trips rcp_ep_iseled_encode_bitframe()'s output",
+      "text": "rcp_ep_iseled_decode_bitframe() shall, for symbols produced by rcp_ep_iseled_encode_bitframe(data, data_len, append_crc) with matching expect_crc, return RCP_EP_ISELED_OK and populate *out_data with exactly data[0..data_len).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-021",
+      "title": "rcp_ep_iseled_encode_command_request() carries the caller's plain payload verbatim as ACF_OP_WRITE",
+      "text": "rcp_ep_iseled_encode_command_request() shall encode an ACF_ABB frame addressed to byte_bus_id with op RCP_ACF_OP_WRITE and payload exactly tx_data[0..tx_len), unmodified.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-022",
+      "title": "rcp_ep_iseled_decode_command_request() validates and decodes an ACF-level command request",
+      "text": "rcp_ep_iseled_decode_command_request() shall return RCP_EP_ISELED_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header or its declared payload, RCP_EP_ISELED_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_ISELED_ERR_WRONG_BUS for a mismatched byte_bus_id, RCP_EP_ISELED_ERR_WRONG_OP for an op other than RCP_ACF_OP_WRITE, and otherwise RCP_EP_ISELED_OK with the plain payload and transaction number populated.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-023",
+      "title": "rcp_ep_iseled_encode_response() encodes timed and untimed responses",
+      "text": "rcp_ep_iseled_encode_response() shall encode an ACF_GBB frame with message_timestamp set to timestamp and mtv RCP_ACF_MTV_VALID when timed is true, and an ACF_ABB frame otherwise, in both cases with payload exactly rx_data[0..rx_len) and op RCP_ACF_OP_READ.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-ISELED-024",
+      "title": "rcp_ep_iseled_decode_response() validates and decodes either ACF_ABB or ACF_GBB responses",
+      "text": "rcp_ep_iseled_decode_response() shall accept either an ACF_ABB or ACF_GBB frame, return RCP_EP_ISELED_ERR_SHORT_FRAME for a frame too short for the applicable header or declared payload, RCP_EP_ISELED_ERR_WRONG_BUS for a mismatched byte_bus_id, and otherwise RCP_EP_ISELED_OK with the plain payload, transaction number, and timed/timestamp populated.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-001",
+      "title": "rcp_ep_mdio_addr_valid() validates a Clause-22/Clause-45 MDIO address",
+      "text": "rcp_ep_mdio_addr_valid() shall return false for any prtad above RCP_EP_MDIO_PRTAD_MAX, for a RCP_EP_MDIO_CLAUSE_22 address with a nonzero devad or a regad above RCP_EP_MDIO_CLAUSE22_REGAD_MAX, for a RCP_EP_MDIO_CLAUSE_45 address with devad above RCP_EP_MDIO_DEVAD_MAX, and for any other clause value; true otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-002",
+      "title": "rcp_ep_mdio_burst_next_regad() computes the next burst register address",
+      "text": "rcp_ep_mdio_burst_next_regad() shall return regad+1 wrapped modulo 32 for RCP_EP_MDIO_CLAUSE_22, regad+1 wrapped modulo 65536 for RCP_EP_MDIO_CLAUSE_45, and regad unchanged for any other clause value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-003",
+      "title": "rcp_ep_mdio_word_encode() encodes a 16-bit register word as two big-endian octets",
+      "text": "rcp_ep_mdio_word_encode() shall write word's high byte to out[0] and word's low byte to out[1].",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-004",
+      "title": "rcp_ep_mdio_word_decode() decodes two big-endian octets as a 16-bit register word",
+      "text": "rcp_ep_mdio_word_decode() shall return (in[0] << 8) | in[1].",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-005",
+      "title": "rcp_ep_mdio_pack_len() computes the packed byte length of a word count",
+      "text": "rcp_ep_mdio_pack_len() shall return word_count * 2.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-006",
+      "title": "rcp_ep_mdio_pack_words() packs a register-word array into a big-endian byte buffer",
+      "text": "rcp_ep_mdio_pack_words() shall return a zeroed rcp_bytes_t when word_count is 0 or on allocation failure, and otherwise a newly allocated buffer of rcp_ep_mdio_pack_len(word_count) octets holding each word's rcp_ep_mdio_word_encode() result in order.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-007",
+      "title": "rcp_ep_mdio_word_count_of() derives a word count from a packed byte length",
+      "text": "rcp_ep_mdio_word_count_of() shall return false and leave *out_word_count untouched when byte_len is odd, and otherwise return true with *out_word_count set to byte_len / 2.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-008",
+      "title": "rcp_ep_mdio_unpack_word_at() reads one packed register word by index",
+      "text": "rcp_ep_mdio_unpack_word_at() shall return rcp_ep_mdio_word_decode() applied to data[2*word_index .. 2*word_index+2).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-009",
+      "title": "rcp_ep_mdio_functional_cfg_init() zero-initializes an MDIO functional config",
+      "text": "rcp_ep_mdio_functional_cfg_init() shall zero-initialize cfg and initialize cfg->common via rcp_regmap_ep_functional_cfg_init(), leaving every common flag false.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-010",
+      "title": "rcp_ep_mdio_functional_cfg_writable() delegates to the shared field-authorization logic",
+      "text": "rcp_ep_mdio_functional_cfg_writable() shall return rcp_server_field_writable(state, RCP_SERVER_FIELD_FUNCTIONAL_W, writer).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-011",
+      "title": "rcp_ep_mdio_strerror() returns a non-NULL message for every error code",
+      "text": "rcp_ep_mdio_strerror() shall return a non-NULL, non-empty, distinct message for each rcp_ep_mdio_errc_t value, and a non-NULL message for any unrecognized value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-012",
+      "title": "rcp_ep_mdio_encode_read_request() encodes an ACF_ABB MDIO read request",
+      "text": "rcp_ep_mdio_encode_read_request() shall return a zeroed rcp_bytes_t when !rcp_ep_mdio_addr_valid(addr) or word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS, and otherwise encode an ACF_ABB message with op RCP_ACF_OP_READ whose payload is addr's clause/prtad/devad/regad fields followed by word_count, all as specified.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-013",
+      "title": "rcp_ep_mdio_decode_read_request() validates and decodes an ACF-level MDIO read request",
+      "text": "rcp_ep_mdio_decode_read_request() shall return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header, its declared payload, or the 7-byte request prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_MDIO_ERR_WRONG_OP for an op other than RCP_ACF_OP_READ; RCP_EP_MDIO_ERR_BAD_ADDR when the decoded address fails rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT when the decoded word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS; and otherwise RCP_EP_MDIO_OK with the address, word count, and transaction number populated.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-014",
+      "title": "rcp_ep_mdio_encode_read_response() encodes timed and untimed MDIO read responses",
+      "text": "rcp_ep_mdio_encode_read_response() shall return a zeroed rcp_bytes_t when word_count exceeds RCP_EP_MDIO_MAX_BURST_WORDS or on allocation failure, and otherwise encode an ACF_GBB frame with message_timestamp set to timestamp and mtv RCP_ACF_MTV_VALID when timed is true, or an ACF_ABB frame otherwise, in both cases with payload rcp_ep_mdio_pack_words(words, word_count) and op RCP_ACF_OP_READ.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-015",
+      "title": "rcp_ep_mdio_decode_read_response() validates and decodes either ACF_ABB or ACF_GBB MDIO read responses",
+      "text": "rcp_ep_mdio_decode_read_response() shall accept either an ACF_ABB or ACF_GBB frame, return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame too short for the applicable header or declared payload, RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id, RCP_EP_MDIO_ERR_BAD_WORD_COUNT for an odd payload length or more than RCP_EP_MDIO_MAX_BURST_WORDS words, and otherwise RCP_EP_MDIO_OK with the packed word bytes, word count, transaction number, and timed/timestamp populated.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-016",
+      "title": "rcp_ep_mdio_encode_write_request() encodes an ACF_ABB MDIO write request",
+      "text": "rcp_ep_mdio_encode_write_request() shall return a zeroed rcp_bytes_t when !rcp_ep_mdio_addr_valid(addr), word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS, or on allocation failure, and otherwise encode an ACF_ABB message with op RCP_ACF_OP_WRITE whose payload is addr's clause/prtad/devad/regad fields followed by rcp_ep_mdio_pack_words(words, word_count).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-017",
+      "title": "rcp_ep_mdio_decode_write_request() validates and decodes an ACF-level MDIO write request",
+      "text": "rcp_ep_mdio_decode_write_request() shall return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header, its declared payload, or the 5-byte address prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_MDIO_ERR_WRONG_OP for an op other than RCP_ACF_OP_WRITE; RCP_EP_MDIO_ERR_BAD_ADDR when the decoded address fails rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT when the trailing words region's byte length is odd, is 0, or represents more than RCP_EP_MDIO_MAX_BURST_WORDS words; and otherwise RCP_EP_MDIO_OK with the address, packed word bytes, word count, and transaction number populated.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-018",
+      "title": "rcp_ep_mdio_encode_write_response() encodes timed and untimed MDIO write responses",
+      "text": "rcp_ep_mdio_encode_write_response() shall return a zeroed rcp_bytes_t when accepted_word_count exceeds RCP_EP_MDIO_MAX_BURST_WORDS or on allocation failure, and otherwise encode an ACF_GBB frame with message_timestamp set to timestamp and mtv RCP_ACF_MTV_VALID when timed is true, or an ACF_ABB frame otherwise, in both cases with payload rcp_ep_mdio_pack_words(accepted_words, accepted_word_count) and op RCP_ACF_OP_WRITE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-MDIO-019",
+      "title": "rcp_ep_mdio_decode_write_response() validates and decodes either ACF_ABB or ACF_GBB MDIO write responses",
+      "text": "rcp_ep_mdio_decode_write_response() shall accept either an ACF_ABB or ACF_GBB frame, return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame too short for the applicable header or declared payload, RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id, RCP_EP_MDIO_ERR_BAD_WORD_COUNT for an odd payload length or more than RCP_EP_MDIO_MAX_BURST_WORDS words, and otherwise RCP_EP_MDIO_OK with the accepted packed word bytes, word count, transaction number, and timed/timestamp populated.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     }
   ]
 }

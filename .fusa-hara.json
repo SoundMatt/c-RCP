@@ -2,7 +2,7 @@
   "schemaVersion": "1.10.4",
   "kind": "hara",
   "tool": "c-FuSa",
-  "toolVersion": "0.5.36",
+  "toolVersion": "0.5.46",
   "language": "c",
   "generatedAt": "2026-07-27T13:03:27Z",
   "project": "c-RCP",
@@ -13,122 +13,252 @@
       "id": "H-001",
       "item": "rcp_watchdog_keeper_t / rcp_deadline_monitor_t (milestones 11-12)",
       "hazardous_event": "Loss of command delivery to safety-critical zone (e.g. braking actuator)",
-      "severity": 3,
-      "exposure": 4,
-      "controllability": 2,
-      "asil": "ASIL-D",
+      "risk": {
+        "severity": "S3",
+        "exposure": "E4",
+        "controllability": "C2",
+        "asil": "ASIL-D"
+      },
       "safe_state": "Watchdog keeper and deadline monitor jointly detect a non-responsive zone and signal a fault; see ASIL Determination Note below regarding decomposition to the currently-targeted ASIL-B mechanisms.",
-      "safety_goal": "SG-001: Commands to safety-critical zones shall be delivered within the watchdog period or a fault shall be signalled.",
+      "safetyGoals": [
+        "SG-001"
+      ],
       "ftti_ms": 100
     },
     {
       "id": "H-002",
       "item": "rcp_controller_t (mock backend)",
       "hazardous_event": "Spurious command sent to the wrong zone controller",
-      "severity": 2,
-      "exposure": 3,
-      "controllability": 2,
-      "asil": "ASIL-B",
+      "risk": {
+        "severity": "S2",
+        "exposure": "E3",
+        "controllability": "C2",
+        "asil": "ASIL-B"
+      },
       "safe_state": "rcp_controller_send() rejects the command with RCP_ERR_ZONE_MISMATCH before invoking any handler",
-      "safety_goal": "SG-002: Commands shall only be processed by the zone they are addressed to; misrouted commands shall be rejected.",
+      "safetyGoals": [
+        "SG-002"
+      ],
       "ftti_ms": 0
     },
     {
       "id": "H-003",
       "item": "rcp_watchdog_keeper_t (milestone 11)",
       "hazardous_event": "Zone controller watchdog not kicked, leading to unintended reset",
-      "severity": 2,
-      "exposure": 4,
-      "controllability": 2,
-      "asil": "ASIL-C",
+      "risk": {
+        "severity": "S2",
+        "exposure": "E4",
+        "controllability": "C2",
+        "asil": "ASIL-C"
+      },
       "safe_state": "Priority-queue and rate-limit Critical-priority bypass guarantee RCP_CMD_WATCHDOG is always deliverable at the configured priority",
-      "safety_goal": "SG-003: The watchdog kick command shall always be deliverable at the configured priority.",
+      "safetyGoals": [
+        "SG-003"
+      ],
       "ftti_ms": 100
     },
     {
       "id": "H-004",
       "item": "rcp_e2e_replay_guard_t (milestone 14)",
       "hazardous_event": "Replay of stale commands from a previous drive cycle",
-      "severity": 2,
-      "exposure": 3,
-      "controllability": 2,
-      "asil": "ASIL-B",
+      "risk": {
+        "severity": "S2",
+        "exposure": "E3",
+        "controllability": "C2",
+        "asil": "ASIL-B"
+      },
       "safe_state": "32-entry sliding-window bitmap detects and rejects replayed or out-of-window sequence numbers",
-      "safety_goal": "SG-004: Replayed or duplicated commands from prior sessions shall be detected and rejected.",
+      "safetyGoals": [
+        "SG-004"
+      ],
       "ftti_ms": 0
     },
     {
       "id": "H-005",
       "item": "rcp_deadline_monitor_t (milestone 12)",
       "hazardous_event": "Zone controller falsely reported as alive when unresponsive",
-      "severity": 2,
-      "exposure": 3,
-      "controllability": 2,
-      "asil": "ASIL-B",
+      "risk": {
+        "severity": "S2",
+        "exposure": "E3",
+        "controllability": "C2",
+        "asil": "ASIL-B"
+      },
       "safe_state": "Deadline monitor transitions a zone to Faulted after missing its configured Status deadline",
-      "safety_goal": "SG-007: A zone controller that stops publishing Status shall be detected as dead within the configured deadline.",
+      "safetyGoals": [
+        "SG-007"
+      ],
       "ftti_ms": 100
     },
     {
       "id": "H-006",
       "item": "rcp_prioqueue_controller_t (milestone 15)",
-      "hazardous_event": "Priority inversion — low-priority burst starves safety-critical watchdog kicks",
-      "severity": 2,
-      "exposure": 4,
-      "controllability": 2,
-      "asil": "ASIL-C",
+      "hazardous_event": "Priority inversion \u2014 low-priority burst starves safety-critical watchdog kicks",
+      "risk": {
+        "severity": "S2",
+        "exposure": "E4",
+        "controllability": "C2",
+        "asil": "ASIL-C"
+      },
       "safe_state": "Priority queue always dispatches RCP_PRIORITY_CRITICAL entries ahead of High/Normal",
-      "safety_goal": "SG-001, SG-005: Commands to safety-critical zones delivered within the watchdog period; Critical commands never delayed by lower-priority ones.",
+      "safetyGoals": [
+        "SG-001",
+        "SG-005"
+      ],
       "ftti_ms": 0
     },
     {
       "id": "H-007",
       "item": "rcp_ratelimit_controller_t (milestone 16)",
       "hazardous_event": "Rate limiter blocks watchdog kick during high command burst",
-      "severity": 2,
-      "exposure": 3,
-      "controllability": 2,
-      "asil": "ASIL-B",
+      "risk": {
+        "severity": "S2",
+        "exposure": "E3",
+        "controllability": "C2",
+        "asil": "ASIL-B"
+      },
       "safe_state": "Rate limiter exempts RCP_PRIORITY_CRITICAL commands from the token bucket",
-      "safety_goal": "SG-003, SG-005: Watchdog kick always deliverable; Critical commands never delayed.",
+      "safetyGoals": [
+        "SG-003",
+        "SG-005"
+      ],
       "ftti_ms": 0
     },
     {
       "id": "H-008",
       "item": "TLS transport / rcp_faultinject_controller_t authorization layer (milestones 7, 19)",
       "hazardous_event": "Unauthorized command injection via unsecured transport",
-      "severity": 3,
-      "exposure": 2,
-      "controllability": 2,
-      "asil": "ASIL-C",
+      "risk": {
+        "severity": "S3",
+        "exposure": "E2",
+        "controllability": "C2",
+        "asil": "ASIL-C"
+      },
       "safe_state": "Mutual TLS authentication required before any command is accepted from a transport peer",
-      "safety_goal": "SG-006: Transport authentication (mTLS or equivalent) shall be enforced on all external zone controller connections.",
+      "safetyGoals": [
+        "SG-006"
+      ],
       "ftti_ms": 0
     },
     {
       "id": "H-009",
       "item": "rcp_powerstate_manager_t (milestone 13)",
-      "hazardous_event": "Power state management failure — zone not properly woken from sleep",
-      "severity": 3,
-      "exposure": 3,
-      "controllability": 2,
-      "asil": "ASIL-D",
+      "hazardous_event": "Power state management failure \u2014 zone not properly woken from sleep",
+      "risk": {
+        "severity": "S3",
+        "exposure": "E3",
+        "controllability": "C2",
+        "asil": "ASIL-D"
+      },
       "safe_state": "Zone only declared operational after a successful RCP_CMD_WAKE response gate",
-      "safety_goal": "SG-001, SG-008: Commands delivered within watchdog period; zone declared operational only after successful Wake response.",
+      "safetyGoals": [
+        "SG-001",
+        "SG-008"
+      ],
       "ftti_ms": 100
     },
     {
       "id": "H-010",
       "item": "rcp_faultinject_controller_t (milestone 18)",
       "hazardous_event": "Fault injection state persists across vehicle power cycles",
-      "severity": 2,
-      "exposure": 2,
-      "controllability": 3,
-      "asil": "ASIL-B",
+      "risk": {
+        "severity": "S2",
+        "exposure": "E2",
+        "controllability": "C3",
+        "asil": "ASIL-B"
+      },
       "safe_state": "Fault injection rules held only in-process memory of the injecting process; never persisted to disk",
-      "safety_goal": "SG-009: Fault injection rules shall not persist beyond the lifetime of the injecting process.",
+      "safetyGoals": [
+        "SG-009"
+      ],
       "ftti_ms": 0
     }
   ],
-  "note": "ASIL values are computed via `cfusa hara asil` (ISO 26262-3:2018 Table 4) from each hazard's S/E/C classification. See HARA.md's 'ASIL Determination Note' for a discovered discrepancy against cpp-RCP's own hand-authored HARA table, which used the same S/E/C classifications but recorded lower ASIL-B/A letters for several hazards, and HARA.md's 'Safety Goals' table for the full SG-001..SG-010 list (kept in Markdown, not duplicated here, since c-FuSa's HARA002/HARA003 rules scan every top-level '\"id\"' occurrence in this file as if it were a hazard entry)."
+  "note": "ASIL values are computed via `cfusa hara asil` (ISO 26262-3:2018 Table 4) from each hazard's S/E/C classification. See HARA.md's 'ASIL Determination Note' for a discovered discrepancy against cpp-RCP's own hand-authored HARA table, which used the same S/E/C classifications but recorded lower ASIL-B/A letters for several hazards, and HARA.md's 'Safety Goals' table for the full SG-001..SG-010 list (kept in Markdown, not duplicated here, since c-FuSa's HARA002/HARA003 rules scan every top-level '\"id\"' occurrence in this file as if it were a hazard entry).",
+  "safetyGoals": [
+    {
+      "id": "SG-001",
+      "description": "Commands to safety-critical zones shall be delivered within the watchdog period or a fault shall be signalled.",
+      "hazards": [
+        "H-001",
+        "H-006",
+        "H-009"
+      ],
+      "asil": "ASIL-D",
+      "safeState": "Watchdog keeper and deadline monitor jointly detect a non-responsive zone and signal a fault."
+    },
+    {
+      "id": "SG-002",
+      "description": "Commands shall only be processed by the zone they are addressed to; misrouted commands shall be rejected.",
+      "hazards": [
+        "H-002"
+      ],
+      "asil": "ASIL-B",
+      "safeState": "rcp_controller_send() rejects the command with RCP_ERR_ZONE_MISMATCH before invoking any handler."
+    },
+    {
+      "id": "SG-003",
+      "description": "The watchdog kick command shall always be deliverable at the configured priority.",
+      "hazards": [
+        "H-003",
+        "H-007"
+      ],
+      "asil": "ASIL-C",
+      "safeState": "Priority-queue and rate-limit Critical-priority bypass guarantee RCP_CMD_WATCHDOG is always deliverable at the configured priority."
+    },
+    {
+      "id": "SG-004",
+      "description": "Replayed or duplicated commands from prior sessions shall be detected and rejected.",
+      "hazards": [
+        "H-004"
+      ],
+      "asil": "ASIL-B",
+      "safeState": "32-entry sliding-window bitmap detects and rejects replayed or out-of-window sequence numbers."
+    },
+    {
+      "id": "SG-005",
+      "description": "Critical-priority commands shall never be delayed by lower-priority commands.",
+      "hazards": [
+        "H-006",
+        "H-007"
+      ],
+      "asil": "ASIL-C",
+      "safeState": "Priority queue always dispatches RCP_PRIORITY_CRITICAL entries ahead of High/Normal, and the rate limiter exempts them from the token bucket."
+    },
+    {
+      "id": "SG-006",
+      "description": "Transport authentication (mTLS or equivalent) shall be enforced on all external zone controller connections.",
+      "hazards": [
+        "H-008"
+      ],
+      "asil": "ASIL-C",
+      "safeState": "Mutual TLS authentication required before any command is accepted from a transport peer."
+    },
+    {
+      "id": "SG-007",
+      "description": "A zone controller that stops publishing Status shall be detected as dead within the configured deadline.",
+      "hazards": [
+        "H-005"
+      ],
+      "asil": "ASIL-B",
+      "safeState": "Deadline monitor transitions a zone to Faulted after missing its configured Status deadline."
+    },
+    {
+      "id": "SG-008",
+      "description": "A zone shall be declared operational only after a successful Wake response gate.",
+      "hazards": [
+        "H-009"
+      ],
+      "asil": "ASIL-D",
+      "safeState": "Zone only declared operational after a successful RCP_CMD_WAKE response gate."
+    },
+    {
+      "id": "SG-009",
+      "description": "Fault injection rules shall not persist beyond the lifetime of the injecting process.",
+      "hazards": [
+        "H-010"
+      ],
+      "asil": "ASIL-B",
+      "safeState": "Fault injection rules held only in-process memory of the injecting process; never persisted to disk."
+    }
+  ]
 }
