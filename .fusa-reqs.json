@@ -7183,6 +7183,246 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-001",
+      "title": "rcp_fragment_strerror() never returns NULL and gives every error code a distinct message",
+      "text": "rcp_fragment_strerror() shall return a non-NULL string for every rcp_fragment_errc_t value, including unrecognized ones, with each defined error code mapped to a distinct message.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-002",
+      "title": "rcp_fragment_plan_count() always plans a payload that already fits in one fragment (including an empty payload) to exactly one segment",
+      "text": "rcp_fragment_plan_count() shall return 1 for payload_len == 0 regardless of max_fragment_payload, and shall return 1 whenever payload_len <= max_fragment_payload.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-003",
+      "title": "rcp_fragment_plan_count() returns 0 when fragmentation is disabled or the split exceeds the representable segment count",
+      "text": "rcp_fragment_plan_count() shall return 0 when max_fragment_payload == 0 and payload_len exceeds it, and shall return 0 when the resulting split would need more than RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS intermediate segments to represent.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-004",
+      "title": "rcp_fragment_plan() plans a single ms=false segment for a payload that fits in one fragment",
+      "text": "rcp_fragment_plan() shall, when rcp_fragment_plan_count() reports 1, write exactly one segment spanning the whole payload with ms == false.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-005",
+      "title": "rcp_fragment_plan() contiguously covers a multi-segment payload with correctly numbered intermediate segments",
+      "text": "rcp_fragment_plan() shall, when rcp_fragment_plan_count() reports more than 1, produce segments whose offset/len ranges contiguously cover the whole payload, with every segment but the last carrying ms == true and a segment_num equal to its zero-based index, and the last segment carrying ms == false.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-006",
+      "title": "rcp_fragment_plan() returns a distinct error code for each of its own precondition failures",
+      "text": "rcp_fragment_plan() shall return RCP_FRAGMENT_ERR_DISABLED or RCP_FRAGMENT_ERR_TOO_MANY_SEGMENTS under the same conditions rcp_fragment_plan_count() returns 0 for, and shall return RCP_FRAGMENT_ERR_BAD_SEGMENT_COUNT when segment_count does not match rcp_fragment_plan_count()'s answer for the same payload_len/max_fragment_payload.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-007",
+      "title": "rcp_fragment_reasm_result_string() never returns NULL and gives every result value a distinct message",
+      "text": "rcp_fragment_reasm_result_string() shall return a non-NULL string for every rcp_fragment_reasm_result_t value, including unrecognized ones, with each defined value mapped to a distinct message.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-008",
+      "title": "rcp_fragment_reassembler_init() initializes a reassembler to the empty, not-collecting state",
+      "text": "rcp_fragment_reassembler_init() shall leave the reassembler not collecting, with an empty reassembled buffer, and with max_total_len set to the caller-supplied value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-009",
+      "title": "rcp_fragment_reassembler_reset() discards in-progress state while preserving max_total_len",
+      "text": "rcp_fragment_reassembler_reset() shall discard any in-progress reassembly and any previously reassembled payload, leaving the reassembler in the same state rcp_fragment_reassembler_init() would with the same max_total_len it already had.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-010",
+      "title": "rcp_fragment_reassembler_destroy() releases the reassembler's internal storage",
+      "text": "rcp_fragment_reassembler_destroy() shall free the reassembler's internal buffer and leave it in a state that does not leak memory when the reassembler is discarded.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-011",
+      "title": "rcp_fragment_reassembler_feed() completes immediately for a never-fragmented (ms=false) first fragment",
+      "text": "rcp_fragment_reassembler_feed() shall, when fed a single ms=false fragment on a freshly-initialized-or-reset reassembler, return RCP_FRAGMENT_REASM_COMPLETE with that fragment's payload as the reassembled result, without entering the collecting state.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-012",
+      "title": "rcp_fragment_reassembler_feed() requires the first ms=true fragment of a sequence to carry segment_num 0",
+      "text": "rcp_fragment_reassembler_feed() shall return RCP_FRAGMENT_REASM_ERR_OUT_OF_ORDER, without appending the fragment, when the first ms=true fragment fed to a freshly-initialized-or-reset reassembler carries a segment_num other than 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-013",
+      "title": "rcp_fragment_reassembler_feed() requires each subsequent ms=true fragment's segment_num to be exactly one more than the previous",
+      "text": "rcp_fragment_reassembler_feed() shall return RCP_FRAGMENT_REASM_ERR_OUT_OF_ORDER, without appending the fragment and without disturbing already-collected state, when an ms=true fragment's segment_num is not exactly one more than the previously accepted fragment's segment_num.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-014",
+      "title": "rcp_fragment_reassembler_feed() completes a sequence on any ms=false fragment regardless of its own segment_num field value",
+      "text": "rcp_fragment_reassembler_feed() shall return RCP_FRAGMENT_REASM_COMPLETE and append the fragment's payload when fed an ms=false fragment while collecting, without validating or consulting that fragment's segment_num argument.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-015",
+      "title": "rcp_fragment_reassembler_feed() rejects a fragment that would exceed max_total_len without mutating state",
+      "text": "rcp_fragment_reassembler_feed() shall return RCP_FRAGMENT_REASM_ERR_TOO_LARGE, leaving the reassembler's already-collected state unchanged, when appending the fed fragment's payload would cause the reassembled total to exceed max_total_len.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-016",
+      "title": "rcp_fragment_reassembler_feed() reports an allocation failure distinctly from every other failure mode",
+      "text": "rcp_fragment_reassembler_feed() shall return RCP_FRAGMENT_REASM_ERR_ALLOC, leaving the reassembler's already-collected state unchanged, when its internal buffer growth fails, and this value shall be distinct from every other rcp_fragment_reasm_result_t value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-017",
+      "title": "rcp_fragment_reassembler_is_collecting() reports whether a fragment sequence is currently in progress",
+      "text": "rcp_fragment_reassembler_is_collecting() shall return true iff the reassembler has accepted at least one ms=true fragment since the last completed reassembly or reset, and false otherwise, without mutating the reassembler.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-FRAG-018",
+      "title": "rcp_fragment_reassembler_get() returns the reassembled payload and its length after a completed reassembly",
+      "text": "rcp_fragment_reassembler_get(), called immediately after rcp_fragment_reassembler_feed() has returned RCP_FRAGMENT_REASM_COMPLETE, shall report a payload pointer and length equal to the concatenation, in segment_num order, of every fragment's payload accepted for that sequence.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-023",
+      "title": "rcp_ep_can_frame_response_fragment_count() reports 0 under the same preconditions the unfragmented response encoder fails for, and delegates the fragment count to fragment.h otherwise",
+      "text": "rcp_ep_can_frame_response_fragment_count() shall return 0 when frame_format/arbitration_id/xl_header/rx_len fail the same preconditions rcp_ep_can_encode_frame_response() validates, and shall otherwise return rcp_fragment_plan_count()'s answer for the combined prefix-then-data payload length and max_fragment_payload.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-024",
+      "title": "rcp_ep_can_encode_frame_response_fragmented() splits a CAN frame response's combined payload into correctly-numbered ACF fragments",
+      "text": "rcp_ep_can_encode_frame_response_fragmented() shall encode rcp_ep_can_frame_response_fragment_count() ACF frames whose ms/read_size_or_segment_num fields follow fragment.h's rcp_fragment_plan() and whose byte_bus_id/evt/op/transaction_num/timed/timestamp match rcp_ep_can_encode_frame_response()'s own single-frame encoding, producing exactly one frame identical to that single-frame encoding when the combined payload already fits in one fragment.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-025",
+      "title": "rcp_ep_can_decode_frame_response_fragment() surfaces a fragment's ms bit, segment_num, and raw ACF payload without stripping this module's own prefix",
+      "text": "rcp_ep_can_decode_frame_response_fragment() shall, on RCP_EP_CAN_OK, populate out_ms and out_segment_num from the decoded ACF header's ms and read_size_or_segment_num fields and out_payload/out_payload_len as a borrowed view of the full, unstripped ACF payload.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-026",
+      "title": "rcp_ep_can_decode_frame_response_fragment() validates byte_bus_id, message type, and frame_format the same way the unfragmented response decoder does",
+      "text": "rcp_ep_can_decode_frame_response_fragment() shall return the same RCP_EP_CAN_ERR_SHORT_FRAME/_ERR_BAD_MSG_TYPE/_ERR_WRONG_BUS/_ERR_BAD_FRAME_FORMAT error codes, under the same conditions, that rcp_ep_can_decode_frame_response() returns them for.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-CANEP-027",
+      "title": "rcp_ep_can_decode_reassembled_frame_response() parses a fully reassembled combined payload into arbitration_id/xl_header/rx_data",
+      "text": "rcp_ep_can_decode_reassembled_frame_response() shall, given frame_format and a reassembled buffer of at least that format's prefix length, populate out_arbitration_id, out_xl_header (only when the format is a CAN XL variant), and out_rx_data/out_rx_len identically to how rcp_ep_can_decode_frame_response() would have for the same original, unfragmented payload.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-029",
+      "title": "rcp_ep_uart_read_response_fragment_count() delegates its answer to fragment.h's rcp_fragment_plan_count()",
+      "text": "rcp_ep_uart_read_response_fragment_count() shall return rcp_fragment_plan_count(rx_len, max_fragment_payload)'s answer for every input.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-030",
+      "title": "rcp_ep_uart_encode_read_response_fragmented() splits a UART read response's payload into correctly-numbered ACF fragments",
+      "text": "rcp_ep_uart_encode_read_response_fragmented() shall encode rcp_ep_uart_read_response_fragment_count() ACF frames whose ms/read_size_or_segment_num fields follow fragment.h's rcp_fragment_plan() and whose byte_bus_id/op/transaction_num/timed/timestamp match rcp_ep_uart_encode_read_response()'s own single-frame encoding, producing exactly one frame identical to that single-frame encoding when rx_len already fits in one fragment.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-031",
+      "title": "rcp_ep_uart_decode_read_response_fragment() surfaces a fragment's ms bit, segment_num, and raw payload, validated the same way the unfragmented response decoder is",
+      "text": "rcp_ep_uart_decode_read_response_fragment() shall, on RCP_EP_UART_OK, populate out_ms and out_segment_num from the decoded ACF header's ms and read_size_or_segment_num fields and out_payload/out_payload_len as a borrowed view of the ACF payload, and shall return the same RCP_EP_UART_ERR_SHORT_FRAME/_ERR_BAD_MSG_TYPE/_ERR_WRONG_BUS error codes, under the same conditions, that rcp_ep_uart_decode_read_response() returns them for.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-025",
+      "title": "rcp_discovery_response_fragment_count() delegates its answer to fragment.h's rcp_fragment_plan_count()",
+      "text": "rcp_discovery_response_fragment_count() shall return rcp_fragment_plan_count((size_t)read_size, max_fragment_payload)'s answer for every input.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-026",
+      "title": "rcp_discovery_encode_response_fragmented() splits the discovery general-register-slice payload into correctly-numbered NTSCF-framed ACF fragments",
+      "text": "rcp_discovery_encode_response_fragmented() shall encode rcp_discovery_response_fragment_count() full NTSCF-framed ACF_ABB frames whose ms/read_size_or_segment_num fields follow fragment.h's rcp_fragment_plan() (the final fragment carrying read_size itself) and whose byte_bus_id/op/transaction_num/server_stream_id match rcp_discovery_encode_response()'s own single-frame encoding, producing exactly one frame identical to that single-frame encoding when read_size already fits in one fragment.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-027",
+      "title": "rcp_discovery_decode_response_fragment() surfaces a fragment's ms bit, segment_num, server_stream_id, and raw payload, validated the same way the unfragmented response decoder is",
+      "text": "rcp_discovery_decode_response_fragment() shall, on RCP_DISCOVERY_OK, populate out_server_stream_id, out_ms, and out_segment_num from the decoded frame, and out_payload/out_payload_len as a borrowed view of the ACF payload, applying the same AVTP/ACF-level validation rcp_discovery_decode_response() applies.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-028",
+      "title": "rcp_discovery_decode_reassembled_response() parses a fully reassembled general-register-slice payload into a discovery result",
+      "text": "rcp_discovery_decode_reassembled_response() shall, given a reassembled buffer of at least RCP_DISCOVERY_GENERAL_SLICE_LEN octets, populate out_result identically to how rcp_discovery_decode_response() would have for the same original, unfragmented response payload, and shall return RCP_DISCOVERY_ERR_SHORT_FRAME for a shorter buffer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     }
   ]
 }

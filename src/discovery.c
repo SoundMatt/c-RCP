@@ -230,6 +230,130 @@ rcp_discovery_errc_t rcp_discovery_decode_response(const uint8_t *b, size_t len,
     return RCP_DISCOVERY_OK;
 }
 
+/* ── Fragmented response (Phase 20, fragment.h) ────────────────────────────── */
+
+//cfusa:req REQ-DISC-025
+size_t rcp_discovery_response_fragment_count(uint8_t read_size, size_t max_fragment_payload)
+{
+    return rcp_fragment_plan_count((size_t)read_size, max_fragment_payload);
+}
+
+//cfusa:req REQ-DISC-026
+size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
+                                                 uint8_t read_size, uint8_t transaction_num,
+                                                 rcp_stream_id_t server_stream_id,
+                                                 size_t max_fragment_payload,
+                                                 rcp_bytes_t *out_frames)
+{
+    uint8_t                  slice[RCP_DISCOVERY_GENERAL_SLICE_LEN];
+    uint8_t                  payload[256];
+    size_t                   copy_len;
+    size_t                   count;
+    rcp_fragment_segment_t  *segs;
+    size_t                   i;
+
+    count = rcp_discovery_response_fragment_count(read_size, max_fragment_payload);
+    if (count == 0) return 0;
+
+    put_u32(&slice[0],  map->magic);
+    put_u16(&slice[4],  map->svr_version);
+    put_u16(&slice[6],  map->vendor_id);
+    put_u16(&slice[8],  map->device_id);
+    put_u16(&slice[10], map->svr_ep_count);
+
+    memset(payload, 0, sizeof(payload));
+    copy_len = ((size_t)read_size < RCP_DISCOVERY_GENERAL_SLICE_LEN)
+                   ? (size_t)read_size
+                   : RCP_DISCOVERY_GENERAL_SLICE_LEN;
+    memcpy(payload, slice, copy_len);
+
+    segs = (rcp_fragment_segment_t *)malloc(count * sizeof(*segs));
+    if (!segs) return 0;
+
+    if (rcp_fragment_plan((size_t)read_size, max_fragment_payload, segs, count) != RCP_FRAGMENT_OK) {
+        free(segs);
+        return 0;
+    }
+
+    for (i = 0; i < count; i++) {
+        rcp_acf_byte_message_info_t hdr       = {0};
+        rcp_avtp_ntscf_header_t     ntscf_hdr = {0};
+        rcp_bytes_t                 acf_frame;
+        rcp_bytes_t                 frame;
+
+        hdr.byte_bus_id              = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
+        hdr.op                       = RCP_ACF_OP_READ;
+        hdr.transaction_num          = transaction_num;
+        hdr.ms                       = segs[i].ms ? 1u : 0u;
+        hdr.read_size_or_segment_num = segs[i].ms ? segs[i].segment_num : read_size;
+
+        acf_frame = rcp_acf_encode_abb(&hdr, &payload[segs[i].offset], segs[i].len);
+        if (!acf_frame.data) {
+            size_t j;
+
+            for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
+            free(segs);
+            return 0;
+        }
+
+        ntscf_hdr.sv        = 1;
+        ntscf_hdr.stream_id = server_stream_id;
+
+        frame = rcp_avtp_encode_ntscf(&ntscf_hdr, acf_frame.data, acf_frame.len);
+        rcp_bytes_free(&acf_frame);
+
+        if (!frame.data) {
+            size_t j;
+
+            for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
+            free(segs);
+            return 0;
+        }
+
+        out_frames[i] = frame;
+    }
+
+    free(segs);
+    return count;
+}
+
+//cfusa:req REQ-DISC-027
+rcp_discovery_errc_t rcp_discovery_decode_response_fragment(const uint8_t *b, size_t len,
+                                                             rcp_stream_id_t *out_server_stream_id,
+                                                             bool *out_ms,
+                                                             uint8_t *out_segment_num,
+                                                             const uint8_t **out_payload,
+                                                             size_t *out_payload_len)
+{
+    rcp_acf_byte_message_info_t hdr;
+    rcp_discovery_errc_t        rc;
+
+    rc = decode_common(b, len, out_server_stream_id, &hdr, out_payload, out_payload_len);
+    if (rc != RCP_DISCOVERY_OK) return rc;
+
+    *out_ms          = (hdr.ms != 0u);
+    *out_segment_num = hdr.read_size_or_segment_num;
+    return RCP_DISCOVERY_OK;
+}
+
+//cfusa:req REQ-DISC-028
+rcp_discovery_errc_t rcp_discovery_decode_reassembled_response(const uint8_t *reassembled,
+                                                                size_t reassembled_len,
+                                                                rcp_stream_id_t server_stream_id,
+                                                                rcp_discovery_result_t *out_result)
+{
+    if (reassembled_len < RCP_DISCOVERY_GENERAL_SLICE_LEN) return RCP_DISCOVERY_ERR_SHORT_FRAME;
+
+    out_result->valid            = true;
+    out_result->server_stream_id = server_stream_id;
+    out_result->magic            = get_u32(&reassembled[0]);
+    out_result->svr_version      = get_u16(&reassembled[4]);
+    out_result->vendor_id        = get_u16(&reassembled[6]);
+    out_result->device_id        = get_u16(&reassembled[8]);
+    out_result->svr_ep_count     = get_u16(&reassembled[10]);
+    return RCP_DISCOVERY_OK;
+}
+
 /* ── Discovery-stream claiming ──────────────────────────────────────────────── */
 
 //cfusa:req REQ-DISC-015

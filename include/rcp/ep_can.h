@@ -192,16 +192,16 @@
  * Server needs to send therefore cannot be carried in a single NTSCF
  * AVTPDU today; it fits in a single TSCF AVTPDU (RCP_AVTP_TSCF_MAX_PAYLOAD,
  * 65535) but TSCF is client-to-server only (avtp.h), so it is not a
- * general answer either. This is exactly the concrete driver ROADMAP.md
- * names for Phase 20's fragmentation go-decision (v0.76.0, the `ms`-bit/
- * segment_num mechanism) -- until that milestone lands, this endpoint's own
- * worst-case CAN XL payload is explicitly single-AVTPDU-request-only scope
- * for a TSCF-carried, or size-limited, exchange; no segment_num-based
- * reassembly of any kind is implemented or expected here, the same
- * deliberate single-AVTPDU-worst-case scope ep_uart.h's own RX read
- * request/response already carries forward from milestone 66, called out
- * explicitly again here because CAN XL is the payload size that actually
- * exercises it.
+ * general answer either. This was exactly the concrete driver ROADMAP.md
+ * named for Phase 20's fragmentation go-decision (v0.76.0, the `ms`-bit/
+ * segment_num mechanism, fragment.h) -- rcp_ep_can_encode_frame_response_fragmented()/
+ * rcp_ep_can_decode_frame_response_fragment() below are that milestone's
+ * retrofit of this endpoint, closing the single-AVTPDU-worst-case gap this
+ * paragraph used to describe as open. rcp_ep_can_encode_frame_response()/
+ * _decode_frame_response() above are unchanged and remain the right choice
+ * whenever the caller already knows (or doesn't need to fragment) a
+ * response fits in one AVTPDU -- fragmentation is opt-in per call, not a
+ * behavior change to the existing single-frame codec.
  *
  * ── Wire layout: this module's own prefix-then-data choice ─────────────────
  *
@@ -272,6 +272,7 @@
 
 #include "rcp/acf.h"
 #include "rcp/avtp.h"
+#include "rcp/fragment.h"
 #include "rcp/rcp.h"
 #include "rcp/regmap.h"
 #include "rcp/lifecycle.h"
@@ -561,6 +562,111 @@ rcp_ep_can_errc_t rcp_ep_can_decode_frame_response(const uint8_t *b, size_t len,
                                                     size_t *out_rx_len, bool *out_timed,
                                                     uint64_t *out_timestamp,
                                                     uint8_t *out_transaction_num);
+
+/* ── Fragmented response (Phase 20, fragment.h) ────────────────────────────── */
+
+/* The number of ACF frames rcp_ep_can_encode_frame_response_fragmented()
+ * would produce for this response's combined prefix-then-data payload
+ * (see the file header's "Wire layout" section) split into fragments of
+ * at most max_fragment_payload octets each -- see fragment.h's
+ * rcp_fragment_plan_count(). Returns 0 under the same conditions
+ * rcp_ep_can_encode_frame_response() already fails encode_preconditions_ok()
+ * for, plus rcp_fragment_plan_count()'s own 0-sentinel conditions
+ * (max_fragment_payload == 0 with a combined payload that doesn't fit in
+ * one fragment; more segments needed than fragment.h's segment_num width
+ * can address). A caller uses this to size out_frames before calling
+ * rcp_ep_can_encode_frame_response_fragmented(). */
+size_t rcp_ep_can_frame_response_fragment_count(rcp_ep_can_frame_format_t frame_format,
+                                                 uint32_t arbitration_id,
+                                                 const rcp_ep_can_xl_header_t *xl_header,
+                                                 size_t rx_len, size_t max_fragment_payload);
+
+/* Encodes a CAN frame response as one or more ACF frames, fragmenting via
+ * fragment.h's ms/segment_num mechanism (ROADMAP.md Phase 20, milestone
+ * 76) whenever the combined prefix-then-data payload exceeds
+ * max_fragment_payload octets -- into
+ * out_frames[0..rcp_ep_can_frame_response_fragment_count(...)) (caller-
+ * allocated, sized by calling that function first). Every fragment
+ * shares byte_bus_id/frame_format(evt)/op(READ)/transaction_num/timed/
+ * timestamp with rcp_ep_can_encode_frame_response(); only the ms flag,
+ * the read_size_or_segment_num field (meaningful only on an ms=true
+ * fragment -- see acf.h/fragment.h), and each fragment's own payload
+ * slice differ. When the combined payload already fits in one fragment,
+ * this produces exactly one frame identical to what
+ * rcp_ep_can_encode_frame_response() itself would have produced --
+ * fragmentation is a strict superset of the unfragmented path, not a
+ * separate wire format. Returns the number of frames written to
+ * out_frames on success (equal to
+ * rcp_ep_can_frame_response_fragment_count()'s answer), or 0
+ * (out_frames left entirely untouched) under the same conditions that
+ * function returns 0 for, or on allocation failure partway through (any
+ * already-written out_frames entries are freed before returning). Caller
+ * frees each successfully returned out_frames[i] with rcp_bytes_free().
+ * This function does not itself apply e2e.h's safe-point CRC -- per
+ * fragment.h's own file header, a caller wanting E2E protection wraps
+ * only the final (ms=false) frame (out_frames[count-1]) with
+ * rcp_e2e_wrap() itself, after this function returns. */
+size_t rcp_ep_can_encode_frame_response_fragmented(rcp_byte_bus_id_t byte_bus_id,
+                                                    rcp_ep_can_frame_format_t frame_format,
+                                                    uint32_t arbitration_id,
+                                                    const rcp_ep_can_xl_header_t *xl_header,
+                                                    const uint8_t *rx_data, size_t rx_len,
+                                                    uint8_t transaction_num, bool timed,
+                                                    uint64_t timestamp,
+                                                    size_t max_fragment_payload,
+                                                    rcp_bytes_t *out_frames);
+
+/* Decodes one fragment of a (possibly multi-fragment) CAN frame response
+ * from b[0..len) -- the same peek-message-type/byte_bus_id/frame_format
+ * validation rcp_ep_can_decode_frame_response() applies, but this
+ * function does *not* strip this module's own prefix-then-data layout
+ * from the payload (a fragment other than the first may not even contain
+ * the whole prefix -- fragmentation operates on the flat combined byte
+ * sequence, agnostic to its own internal structure, per fragment.h's file
+ * header). Instead it surfaces the fragment's own ms bit,
+ * read_size_or_segment_num (as *out_segment_num, meaningful only when
+ * *out_ms), and raw ACF payload slice (*out_payload / *out_payload_len,
+ * borrowed into b, matching every decode function in this module), for a
+ * caller to feed straight into a rcp_fragment_reassembler_t
+ * (fragment.h). Once reassembly reports RCP_FRAGMENT_REASM_COMPLETE, pass
+ * the reassembled buffer to rcp_ep_can_decode_reassembled_frame_response()
+ * to extract arbitration_id/xl_header/rx_data. Fails with the same
+ * RCP_EP_CAN_ERR_SHORT_FRAME/_ERR_BAD_MSG_TYPE/_ERR_WRONG_BUS/
+ * _ERR_BAD_FRAME_FORMAT conditions rcp_ep_can_decode_frame_response()
+ * does; on RCP_EP_CAN_OK, every output parameter is populated. */
+rcp_ep_can_errc_t rcp_ep_can_decode_frame_response_fragment(const uint8_t *b, size_t len,
+                                                             rcp_byte_bus_id_t expected_bus_id,
+                                                             rcp_ep_can_frame_format_t *out_frame_format,
+                                                             bool *out_ms,
+                                                             uint8_t *out_segment_num,
+                                                             const uint8_t **out_payload,
+                                                             size_t *out_payload_len,
+                                                             bool *out_timed,
+                                                             uint64_t *out_timestamp,
+                                                             uint8_t *out_transaction_num);
+
+/* Applies this module's own prefix-then-data parsing (see the file
+ * header's "Wire layout" section) to a fully reassembled combined payload
+ * -- rcp_fragment_reassembler_get()'s output once
+ * rcp_fragment_reassembler_feed() has reported RCP_FRAGMENT_REASM_COMPLETE
+ * -- for frame_format as recorded from (any of) that sequence's own
+ * fragments (rcp_ep_can_decode_frame_response_fragment()'s *out_frame_format,
+ * which is round-tripped identically on every fragment of one logical
+ * response). This is the second half of what
+ * rcp_ep_can_decode_frame_response() does in one step for a single,
+ * unfragmented frame. Returns RCP_EP_CAN_ERR_SHORT_FRAME if reassembled_len
+ * is shorter than frame_format's own prefix length; RCP_EP_CAN_ERR_BAD_FRAME_FORMAT
+ * if frame_format itself is not rcp_ep_can_frame_format_valid(). On
+ * RCP_EP_CAN_OK, *out_arbitration_id / *out_xl_header are populated (the
+ * latter only when rcp_ep_can_frame_format_is_xl(frame_format)) and
+ * *out_rx_data / *out_rx_len are set to a *borrowed* view into reassembled. */
+rcp_ep_can_errc_t rcp_ep_can_decode_reassembled_frame_response(const uint8_t *reassembled,
+                                                                size_t reassembled_len,
+                                                                rcp_ep_can_frame_format_t frame_format,
+                                                                uint32_t *out_arbitration_id,
+                                                                rcp_ep_can_xl_header_t *out_xl_header,
+                                                                const uint8_t **out_rx_data,
+                                                                size_t *out_rx_len);
 
 #ifdef __cplusplus
 }

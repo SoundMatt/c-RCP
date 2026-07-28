@@ -1,5 +1,6 @@
 #include "rcp/ep_uart.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 /* ── Word format: data bits, parity, stop bits ──────────────────────────────── */
@@ -371,6 +372,145 @@ rcp_ep_uart_errc_t rcp_ep_uart_decode_read_response(const uint8_t *b, size_t len
      * file header. */
     *out_rx_data         = payload;
     *out_rx_len          = payload_len;
+    *out_timed           = timed;
+    *out_timestamp       = timestamp;
+    *out_transaction_num = transaction_num;
+    return RCP_EP_UART_OK;
+}
+
+/* ── Fragmented read response (Phase 20, fragment.h) ───────────────────────── */
+
+//cfusa:req REQ-UART-029
+size_t rcp_ep_uart_read_response_fragment_count(size_t rx_len, size_t max_fragment_payload)
+{
+    return rcp_fragment_plan_count(rx_len, max_fragment_payload);
+}
+
+//cfusa:req REQ-UART-030
+size_t rcp_ep_uart_encode_read_response_fragmented(rcp_byte_bus_id_t byte_bus_id,
+                                                    const uint8_t *rx_data, size_t rx_len,
+                                                    uint8_t transaction_num, bool timed,
+                                                    uint64_t timestamp,
+                                                    size_t max_fragment_payload,
+                                                    rcp_bytes_t *out_frames)
+{
+    size_t                  count;
+    rcp_fragment_segment_t *segs;
+    size_t                  i;
+
+    count = rcp_fragment_plan_count(rx_len, max_fragment_payload);
+    if (count == 0) return 0;
+
+    segs = (rcp_fragment_segment_t *)malloc(count * sizeof(*segs));
+    if (!segs) return 0;
+
+    if (rcp_fragment_plan(rx_len, max_fragment_payload, segs, count) != RCP_FRAGMENT_OK) {
+        free(segs);
+        return 0;
+    }
+
+    for (i = 0; i < count; i++) {
+        const uint8_t *slice     = (rx_data != NULL) ? &rx_data[segs[i].offset] : NULL;
+        size_t         slice_len = segs[i].len;
+        rcp_bytes_t    frame;
+
+        if (timed) {
+            rcp_acf_gbb_header_t hdr = {0};
+
+            hdr.info.byte_bus_id              = byte_bus_id;
+            hdr.info.op                       = RCP_ACF_OP_READ;
+            hdr.info.evt                      = 0;
+            hdr.info.mtv                      = RCP_ACF_MTV_VALID;
+            hdr.info.transaction_num          = transaction_num;
+            hdr.info.ms                       = segs[i].ms ? 1u : 0u;
+            hdr.info.read_size_or_segment_num = segs[i].ms ? segs[i].segment_num : 0u;
+            hdr.message_timestamp             = timestamp;
+
+            frame = rcp_acf_encode_gbb(&hdr, slice, slice_len);
+        } else {
+            rcp_acf_byte_message_info_t hdr = {0};
+
+            hdr.byte_bus_id              = byte_bus_id;
+            hdr.op                       = RCP_ACF_OP_READ;
+            hdr.evt                      = 0;
+            hdr.transaction_num          = transaction_num;
+            hdr.ms                       = segs[i].ms ? 1u : 0u;
+            hdr.read_size_or_segment_num = segs[i].ms ? segs[i].segment_num : 0u;
+
+            frame = rcp_acf_encode_abb(&hdr, slice, slice_len);
+        }
+
+        if (!frame.data) {
+            size_t j;
+
+            for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
+            free(segs);
+            return 0;
+        }
+
+        out_frames[i] = frame;
+    }
+
+    free(segs);
+    return count;
+}
+
+//cfusa:req REQ-UART-031
+rcp_ep_uart_errc_t rcp_ep_uart_decode_read_response_fragment(const uint8_t *b, size_t len,
+                                                              rcp_byte_bus_id_t expected_bus_id,
+                                                              bool *out_ms,
+                                                              uint8_t *out_segment_num,
+                                                              const uint8_t **out_payload,
+                                                              size_t *out_payload_len,
+                                                              bool *out_timed,
+                                                              uint64_t *out_timestamp,
+                                                              uint8_t *out_transaction_num)
+{
+    uint8_t                     msg_type;
+    rcp_acf_errc_t               acf_rc;
+    rcp_acf_byte_message_info_t  abb_hdr;
+    rcp_acf_gbb_header_t         gbb_hdr;
+    const uint8_t                *payload;
+    size_t                        payload_len;
+    rcp_byte_bus_id_t             bus_id;
+    uint8_t                       ms;
+    uint8_t                       segment_num;
+    uint8_t                       transaction_num;
+    bool                          timed;
+    uint64_t                      timestamp;
+
+    if (rcp_acf_peek_msg_type(b, len, &msg_type) != RCP_ACF_OK) return RCP_EP_UART_ERR_SHORT_FRAME;
+
+    if (msg_type == RCP_ACF_MSG_TYPE_GBB) {
+        acf_rc = rcp_acf_decode_gbb(b, len, &gbb_hdr, &payload, &payload_len);
+        if (acf_rc == RCP_ACF_ERR_SHORT_FRAME) return RCP_EP_UART_ERR_SHORT_FRAME;
+        if (acf_rc != RCP_ACF_OK) return RCP_EP_UART_ERR_BAD_MSG_TYPE;
+
+        bus_id          = gbb_hdr.info.byte_bus_id;
+        ms              = gbb_hdr.info.ms;
+        segment_num     = gbb_hdr.info.read_size_or_segment_num;
+        transaction_num = gbb_hdr.info.transaction_num;
+        timed           = rcp_acf_gbb_is_timed(&gbb_hdr);
+        timestamp       = timed ? gbb_hdr.message_timestamp : 0u;
+    } else {
+        acf_rc = rcp_acf_decode_abb(b, len, &abb_hdr, &payload, &payload_len);
+        if (acf_rc == RCP_ACF_ERR_SHORT_FRAME) return RCP_EP_UART_ERR_SHORT_FRAME;
+        if (acf_rc != RCP_ACF_OK) return RCP_EP_UART_ERR_BAD_MSG_TYPE;
+
+        bus_id          = abb_hdr.byte_bus_id;
+        ms              = abb_hdr.ms;
+        segment_num     = abb_hdr.read_size_or_segment_num;
+        transaction_num = abb_hdr.transaction_num;
+        timed           = false;
+        timestamp       = 0u;
+    }
+
+    if (bus_id != expected_bus_id) return RCP_EP_UART_ERR_WRONG_BUS;
+
+    *out_ms              = (ms != 0u);
+    *out_segment_num     = segment_num;
+    *out_payload         = payload;
+    *out_payload_len     = payload_len;
     *out_timed           = timed;
     *out_timestamp       = timestamp;
     *out_transaction_num = transaction_num;

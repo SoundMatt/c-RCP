@@ -27,6 +27,7 @@
 #include <rcp/acf.h>
 #include <rcp/avtp.h>
 #include <rcp/discovery.h>
+#include <rcp/fragment.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
 #include <rcp/lifecycle.h>
@@ -319,6 +320,117 @@ static void test_response_zero_fills_beyond_general_slice(void)
     rcp_bytes_free(&frame);
 }
 
+/* ── Fragmented response (Phase 20, fragment.h) ────────────────────────────── */
+
+static void test_fragment_count_one_when_unfragmented(void)
+{
+    TEST_ASSERT_EQUAL_UINT(1, rcp_discovery_response_fragment_count(12, 100));
+    TEST_ASSERT_EQUAL_UINT(1, rcp_discovery_response_fragment_count(0, 0));
+}
+
+static void test_fragment_unfragmented_matches_single_frame_path(void)
+{
+    rcp_regmap_general_t map = sample_map();
+    rcp_stream_id_t server = rcp_stream_id_make(SERVER_MAC, 3);
+    rcp_bytes_t plain = rcp_discovery_encode_response(
+        &map, (uint8_t)RCP_DISCOVERY_GENERAL_SLICE_LEN, 9, server);
+    rcp_bytes_t fragmented[1];
+    size_t count;
+
+    TEST_ASSERT_NOT_NULL(plain.data);
+
+    count = rcp_discovery_encode_response_fragmented(
+        &map, (uint8_t)RCP_DISCOVERY_GENERAL_SLICE_LEN, 9, server, 255, fragmented);
+    TEST_ASSERT_EQUAL_UINT(1, count);
+    TEST_ASSERT_EQUAL_UINT(plain.len, fragmented[0].len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(plain.data, fragmented[0].data, plain.len);
+
+    rcp_bytes_free(&plain);
+    rcp_bytes_free(&fragmented[0]);
+}
+
+/* Closes the deferred single-AVTPDU-worst-case test noted at milestone 63
+ * (v0.63.0): exercises fragment.h's ms/segment_num mechanism against this
+ * module's own NTSCF+ACF wire codec end-to-end, using a deliberately
+ * small max_fragment_payload -- see this endpoint's own header comment
+ * for why read_size's one-octet width means genuine discovery traffic
+ * never actually needs more than one fragment in practice; this test
+ * proves the mechanism composes correctly regardless. */
+static void test_fragment_deliberately_small_cap_round_trip(void)
+{
+    rcp_regmap_general_t       map    = sample_map();
+    rcp_stream_id_t             server = rcp_stream_id_make(SERVER_MAC, 3);
+    uint8_t                     read_size = 20;
+    size_t                      max_fragment_payload = 6;
+    size_t                      count;
+    rcp_bytes_t                 frames[4];
+    rcp_fragment_reassembler_t  reasm;
+    size_t                      i;
+
+    count = rcp_discovery_response_fragment_count(read_size, max_fragment_payload);
+    TEST_ASSERT_EQUAL_UINT(4, count); /* ceil(20/6) */
+    TEST_ASSERT_TRUE(count <= (sizeof(frames) / sizeof(frames[0])));
+
+    count = rcp_discovery_encode_response_fragmented(&map, read_size, 42, server,
+                                                       max_fragment_payload, frames);
+    TEST_ASSERT_EQUAL_UINT(4, count);
+
+    rcp_fragment_reassembler_init(&reasm, read_size);
+    for (i = 0; i < count; i++) {
+        rcp_stream_id_t              from_stream;
+        bool                          ms;
+        uint8_t                      segnum;
+        const uint8_t                *payload;
+        size_t                        payload_len;
+        rcp_fragment_reasm_result_t   rc;
+
+        TEST_ASSERT_EQUAL(RCP_DISCOVERY_OK,
+            rcp_discovery_decode_response_fragment(frames[i].data, frames[i].len, &from_stream,
+                                                     &ms, &segnum, &payload, &payload_len));
+        TEST_ASSERT_TRUE(rcp_stream_id_equal(server, from_stream));
+
+        rc = rcp_fragment_reassembler_feed(&reasm, ms, segnum, payload, payload_len);
+        if (i + 1 < count) {
+            TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_CONTINUE, rc);
+        } else {
+            TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_COMPLETE, rc);
+        }
+    }
+
+    {
+        const uint8_t          *reassembled;
+        size_t                   reassembled_len;
+        rcp_discovery_result_t   result;
+
+        rcp_fragment_reassembler_get(&reasm, &reassembled, &reassembled_len);
+        TEST_ASSERT_EQUAL_UINT(read_size, reassembled_len);
+
+        TEST_ASSERT_EQUAL(RCP_DISCOVERY_OK,
+            rcp_discovery_decode_reassembled_response(reassembled, reassembled_len, server,
+                                                        &result));
+        TEST_ASSERT_TRUE(result.valid);
+        TEST_ASSERT_TRUE(rcp_stream_id_equal(server, result.server_stream_id));
+        TEST_ASSERT_EQUAL_UINT32(map.magic, result.magic);
+        TEST_ASSERT_EQUAL_UINT16(map.svr_version, result.svr_version);
+        TEST_ASSERT_EQUAL_UINT16(map.vendor_id, result.vendor_id);
+        TEST_ASSERT_EQUAL_UINT16(map.device_id, result.device_id);
+        TEST_ASSERT_EQUAL_UINT16(map.svr_ep_count, result.svr_ep_count);
+    }
+
+    rcp_fragment_reassembler_destroy(&reasm);
+    for (i = 0; i < count; i++) rcp_bytes_free(&frames[i]);
+}
+
+static void test_fragment_encode_disabled_when_zero_cap_and_oversized(void)
+{
+    rcp_regmap_general_t map = sample_map();
+    rcp_stream_id_t server = rcp_stream_id_make(SERVER_MAC, 3);
+    rcp_bytes_t frames[4];
+    size_t count = rcp_discovery_encode_response_fragmented(&map, 20, 1, server, 0, frames);
+
+    TEST_ASSERT_EQUAL_UINT(0, count);
+}
+
 /* ── Discovery-stream claiming ──────────────────────────────────────────────── */
 
 static void test_claim_init_is_open_and_unheld(void)
@@ -585,6 +697,11 @@ int main(void)
     RUN_TEST(test_response_payload_len_always_equals_read_size);
     RUN_TEST(test_response_truncated_slice_when_read_size_small);
     RUN_TEST(test_response_zero_fills_beyond_general_slice);
+
+    RUN_TEST(test_fragment_count_one_when_unfragmented);
+    RUN_TEST(test_fragment_unfragmented_matches_single_frame_path);
+    RUN_TEST(test_fragment_deliberately_small_cap_round_trip);
+    RUN_TEST(test_fragment_encode_disabled_when_zero_cap_and_oversized);
 
     RUN_TEST(test_claim_init_is_open_and_unheld);
     RUN_TEST(test_claim_note_request_grants_when_open);

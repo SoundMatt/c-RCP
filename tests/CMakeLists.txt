@@ -48,6 +48,11 @@ target_link_libraries(test_acf PRIVATE rcp::rcp unity)
 target_compile_options(test_acf PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_acf COMMAND test_acf)
 
+add_executable(test_fragment test_fragment.c)
+target_link_libraries(test_fragment PRIVATE rcp::rcp unity)
+target_compile_options(test_fragment PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_fragment COMMAND test_fragment)
+
 add_executable(test_lifecycle test_lifecycle.c)
 target_link_libraries(test_lifecycle PRIVATE rcp::rcp unity)
 target_compile_options(test_lifecycle PRIVATE ${RCP_TEST_WARNING_FLAGS})

@@ -295,7 +295,7 @@ certification evidence against what Phase 13–21 actually built.
 | **Remaining Endpoints** | v0.73.0 | ISELED endpoint | LED/sensor daisy-chain, native encoding |
 | **Remaining Endpoints** | v0.74.0 | MDIO endpoint | Clause-22/45 PHY management access |
 | **Remaining Endpoints** | v0.75.0 | Wakeup control + power modes | Normal/StandBy/Sleep/Unpowered, cold/hot start, WakeUp handshake |
-| **Fragmentation** | v0.76.0 | Fragmentation (GO) | Multi-AVTPDU `ms`/`segment_num` support for CAN XL, UART, large discovery reads |
+| **Fragmentation** | v0.76.0 | Fragmentation | Multi-AVTPDU `ms`/`segment_num` support for CAN XL, UART, large discovery reads |
 | **Satellite Rework** | v0.77.0 | Foundational test/config satellites | REPLACE `mock`, `config`; ADAPT `cli` capabilities payload |
 | **Satellite Rework** | v0.78.0 | Transport satellites | REPLACE `udp`, `shmem`; ADAPT `tsn`; DEPRECATE `tls` |
 | **Satellite Rework** | v0.79.0 | Safety-adjacent satellites | REPLACE `watchdog`, `deadline`, `powerstate` |
@@ -3537,7 +3537,7 @@ mechanism (`ms` bit + `segment_num`) reusable across every endpoint that
 needs it, implementing it once here is cheaper than three separate ad hoc
 size-capping workarounds bolted onto three different endpoint modules.
 
-### 76. Fragmentation support (v0.76.0)
+### 76. Fragmentation support (v0.76.0) ✅
 
 - Multi-AVTPDU reassembly for both ACF_ABB and ACF_GBB: `ms=1`
   intermediate fragments carrying `segment_num` in place of `read_size`,
@@ -3550,6 +3550,87 @@ size-capping workarounds bolted onto three different endpoint modules.
   and discovery (v0.63.0) to actually exercise it end-to-end, closing out
   the three deferred single-AVTPDU-worst-case tests noted at those
   milestones.
+
+**Module-naming note**: per RELAY spec v1.14 §13.7.2's registry (checked
+before picking a name, per the pattern v0.75.0's own "Requirement-id
+naming note" set), multi-frame message fragmentation/reassembly is a
+constrained name — `fragment` — so this milestone lands as new
+`include/rcp/fragment.h` + `src/fragment.c`, not a `frag.h`/folded-into-
+`acf.h` alternative.
+
+**Done (v0.76.0)**: `include/rcp/fragment.h` + `src/fragment.c` land as
+new, additive protocol-core surface layered on top of `acf.h`/`acf.c`
+(milestone 60), interpreting the `ms` bit and dual-purpose
+`read_size_or_segment_num` field that module has round-tripped, unused,
+since its own original milestone. This module owns the mechanism exactly
+once, generically — `rcp_fragment_plan_count()`/`_plan()` (encode side)
+split a payload into a caller-owned array of `rcp_fragment_segment_t`
+(offset/len/ms/segment_num), reducing to a single unfragmented `ms=0`
+segment whenever the payload already fits, so fragmentation is a strict
+superset of every prior milestone's own single-frame wire format, not a
+parallel one; `rcp_fragment_reassembler_t` (decode side) is a small,
+caller-owned accumulator (mirroring `e2e.h`'s own `rcp_e2e_stream_fault_t`
+precedent) enforcing strictly-monotonic, zero-based `segment_num`
+ordering and a caller-supplied `max_total_len` ceiling, failing closed
+(`RCP_FRAGMENT_REASM_ERR_TOO_LARGE`/`_ERR_OUT_OF_ORDER`) rather than
+growing unbounded or accepting a corrupt sequence. Neither half calls into
+`acf.c`, `e2e.h`, or any endpoint module directly — the same "own small
+pure helpers, operate on caller-owned data" layering discipline `e2e.h`
+and `scheduler.h` already established; `e2e.h`'s own
+`rcp_e2e_fragment_carries_crc()` hook (modeled since milestone 70, ready
+for this milestone to call) is unchanged and is what a caller drives
+against `fragment.h`'s own final-segment determination to decide which
+one frame of a sequence gets a safe-point CRC.
+
+`regmap.h`'s `rcp_regmap_request_stream_cfg_t` gains
+`rx_stream_max_request_size` (a `size_t`, zero-initialized by the
+existing `rcp_regmap_request_stream_cfg_init()` — no new requirement-id
+group needed, the same precedent Phase 18's own E2E/watchdog field
+additions to this struct set): 0 means fragmentation is unsupported for
+that stream, matching this milestone's own roadmap wording; a nonzero
+value is the ceiling a caller passes as `fragment.h`'s own
+`max_fragment_payload` (encode) or `max_total_len` (decode).
+
+Per-endpoint retrofit, all three targets named above:
+`rcp_ep_can_encode_frame_response_fragmented()`/
+`_decode_frame_response_fragment()`/`_decode_reassembled_frame_response()`
+(`ep_can.h`/`ep_can.c`) close CAN XL's own deferred worst-case test with a
+*genuine* driver — a full 2048-byte CAN XL captured frame's combined
+prefix-then-data ACF payload (2058 octets) does not fit in a single
+`RCP_AVTP_NTSCF_MAX_PAYLOAD` (2047)-byte NTSCF AVTPDU, exactly the gap
+this phase's own go-decision named; the new test suite round-trips that
+exact worst case through real fragmentation and reassembly. The matching
+`rcp_ep_uart_encode_read_response_fragmented()`/
+`_decode_read_response_fragment()` (`ep_uart.h`/`ep_uart.c`) and
+`rcp_discovery_encode_response_fragmented()`/`_decode_response_fragment()`/
+`_decode_reassembled_response()` (`discovery.h`/`discovery.c`) retrofits
+are documented honestly rather than oversold: both endpoints' own
+`read_size` field is one octet wide (max 255), so neither one's genuine
+wire traffic can ever actually produce a payload needing more than one
+fragment — their own test suites instead exercise the mechanism
+end-to-end against a deliberately small `max_fragment_payload`, which
+still closes out the single-AVTPDU-worst-case tests those two milestones
+(66, 63) left open by proving the retrofit composes correctly against
+each endpoint's own wire codec, not by fabricating a real-world scenario
+that field width does not actually allow.
+
+`tests/test_fragment.c` (27 cases: strerror/result-string coverage,
+`plan_count()`/`plan()` boundary and layout cases including the exact
+256-intermediate-segment ceiling, the full reassembler state machine
+including out-of-order rejection and the `max_total_len` fail-closed
+path, reset/reuse across messages, and one test composing a plan directly
+against `rcp_e2e_fragment_carries_crc()`) and the new fragmentation cases
+added to `tests/test_ep_can.c` (7), `tests/test_ep_uart.c` (4), and
+`tests/test_discovery.c` (4) all pass, alongside the full existing
+`ctest` suite (67/67, ASan/UBSan-clean, verified locally). `cfusa
+lint`/`analyze`/`cyber`/`vuln`/`qualify`, `cfusa trace --req-coverage
+100`, and `relay conform --strict` were not re-run locally in this pass
+(no local `cfusa`/`relay` toolchain available in this environment) — left
+for this PR's own CI run to confirm, the same note every prior milestone
+in this environment has made. `cfusa check`'s own HARA002/HARA003
+findings (the same pre-existing `.fusa-hara.json` gap documented at every
+milestone since v0.72.0's own merge) are unchanged and not introduced or
+touched here.
 
 ---
 ### Phase 21 — Satellite Package Rework

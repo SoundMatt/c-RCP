@@ -319,6 +319,7 @@ static void test_request_stream_cfg_init_zeroes(void)
     TEST_ASSERT_EQUAL_UINT8(0, cfg.rx_safety_measure);
     TEST_ASSERT_EQUAL_UINT16(0, cfg.rx_safestate_sequencer);
     TEST_ASSERT_EQUAL_UINT8(0, cfg.rx_safe_sequencer_state);
+    TEST_ASSERT_EQUAL_UINT(0, cfg.rx_stream_max_request_size);
 }
 
 static void test_response_queue_cfg_init_zeroes(void)
