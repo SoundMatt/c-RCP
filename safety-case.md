@@ -1,68 +1,64 @@
 # Safety Case — c-RCP v0.70.0
 
-**Standard:** iso26262  |  **Generated:** 2026-07-28T19:28:56Z
+**Standard:** iso26262  |  **Generated:** 2026-07-28T20:44:45Z
 
 ---
 
-## G1 — Top-Level Goal
+## G1 — goal
 
-> **c-RCP is acceptably safe for its intended use in its intended environment**
+> c-RCP v0.70.0 has no unmitigated hazard from .fusa-hara.json and no unresolved ERROR finding from `cfusa check` at the iso26262 analysis boundary
 
-### Evidence for G1
+## St1 — strategy
 
-| Evidence Item | Source | Status |
+> Argue over hazard elimination and process confidence separately
+
+## C1 — context
+
+> Scope: c-RCP source under ".", analyzed against iso26262 by c-FuSa v0.5.46
+
+## A1 — assumption
+
+> The underlying hardware/platform on which c-RCP runs meets its own safety requirements independently of this software safety case
+
+## G1.1 — goal
+
+> Every hazard recorded in .fusa-hara.json is eliminated or controlled to its assigned ASIL (ISO 26262-3 Clause 6)
+
+## G1.2 — goal
+
+> The c-RCP development process gives justified confidence: static analysis, FMEA/TARA, and tool qualification evidence are current
+
+## Sn3 — solution
+
+> Design FMEA
+
+Evidence: `fmea.json`
+
+## Sn4 — solution
+
+> Threat analysis and risk assessment
+
+Evidence: `tara.json`
+
+## Sn5 — solution
+
+> Tool qualification record
+
+Evidence: `qualify-report.json`
+
+---
+
+## Argument Structure
+
+| From | To | Relation |
 |---|---|---|
-| Hazard analysis complete | hara.md | [ ] |
-| Safety requirements defined | safety-plan.md | [ ] |
-| MISRA-C lint clean | cfusa lint | [ ] |
-| Static analysis clean | cfusa analyze | [ ] |
-| Cybersecurity analysis complete | cfusa cyber / tara.md | [ ] |
-| Test evidence complete | cfusa verify | [ ] |
-| Coverage targets met | cfusa coverage | [ ] |
-| FMEA complete | fmea.md | [ ] |
-| Tool qualification | cfusa qualify | [ ] |
-| SCI produced | cfusa sci | [ ] |
+| G1 | St1 | supportedBy |
+| G1 | C1 | inContextOf |
+| St1 | A1 | inContextOf |
+| St1 | G1.1 | supportedBy |
+| St1 | G1.2 | supportedBy |
+| G1.2 | Sn3 | supportedBy |
+| G1.2 | Sn4 | supportedBy |
+| G1.2 | Sn5 | supportedBy |
 
----
-
-## G1.1 — Hazard Elimination
-
-> **All identified hazards are either eliminated or controlled to an acceptable level**
-
-- Context: C1 — Operating environment is [describe]
-- Strategy: S1 — Argue over identified hazardous events
-
-### G1.1 Sub-goals
-
-| ID | Sub-goal | Evidence |
-|---|---|---|
-| G1.1.1 | Hazardous event HE-001 risk is [ASIL] or below | hara.md §2 |
-| G1.1.2 | Software contributes no additional hazards | cfusa check (exit 0) |
-
----
-
-## G1.2 — Process Confidence
-
-> **The software development process is sufficient to give confidence in the result**
-
-- S2 — Argue over process compliance
-
-| ID | Sub-goal | Evidence |
-|---|---|---|
-| G1.2.1 | Coding standard followed | cfusa lint (exit 0) |
-| G1.2.2 | Requirements traced to code | cfusa trace |
-| G1.2.3 | Test coverage meets threshold | cfusa coverage |
-| G1.2.4 | All PRs resolved | cfusa pr --status open |
-
----
-
-## Assumptions
-
-- A1: The hardware is assumed safe as per [HW safety case reference]
-- A2: The operating environment is as described in [SRS reference]
-
----
-
-_Safety case owner: [name / role]_  
-_Last reviewed: [date]_  
-_Next review: [date]_
+_Completeness: 3 goal(s), 1 with cited evidence, 1 undeveloped._
