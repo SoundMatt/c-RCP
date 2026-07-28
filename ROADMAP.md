@@ -1,32 +1,195 @@
 # c-RCP Roadmap
 
+## Protocol Replacement Notice — read this first
+
+A gap analysis (2026-07-27/28) confirmed that everything below "Legacy Release
+Plan" and "Legacy Milestones" describes a working but **entirely different
+wire protocol** from the real industry standard this project was always meant
+to track. c-RCP's existing Zone/Command/Response/Status model over a bespoke
+16-byte header shares nothing at the wire level with the OPEN Alliance TC18
+Remote Control Protocol (the actual "RCP" this project is named after).
+
+The user has explicitly authorized a **full replacement**, not an
+incremental gap-patch: c-RCP's core protocol is going to *become* the real
+TC18 protocol. Phases 13–22 below are that replacement program. Everything
+in Phase 1–12 (the "Legacy" sections, milestones 1–58) is **superseded**,
+not extended — it remains in this file as project history (and because
+several of its satellite packages carry forward, per the disposition table
+below), not as a description of where this project is headed.
+
+**This breaks every existing consumer of this library.** `rcp_zone_t`,
+`rcp_command_t`/`rcp_response_t`/`rcp_status_t`, `rcp_controller_t`,
+`rcp_registry_t`, and the wire format in `wire.c` all go away. Every one of
+the ~30 satellite packages built as a generic decorator around
+`rcp_controller_t`'s `send(cmd) -> response` shape (authz, ratelimit, loan,
+observe, faultinject, prioqueue, redundancy, proxy, zonegroup, federation,
+recorder, tsn, e2e, watchdog, deadline, powerstate, sim, ...) loses the
+single generic "Command" abstraction it was built against, because TC18 has
+no such abstraction — it has 13 heterogeneous endpoint types, each with its
+own fixed request/response shape, sitting behind a register-map
+configuration model. This is not a header-compatible refactor.
+
+**No compatibility shim is planned.** Reasoned explicitly, not assumed:
+1. The wire format changes at the byte level (IEEE 1722 AVTPDU/ACF framing
+   vs. this project's custom length-prefixed frames) — no in-process shim
+   makes an old client and a new server (or vice versa) interoperate; that
+   would require a protocol translator no simpler than one of the ADAPT-class
+   bridges below, and speaking two incompatible wire protocols out of one
+   `send()` call is not a "compatibility" story, it's a second protocol
+   stack.
+2. The semantic model changes too — there is no TC18 concept of a
+   zone-addressed, priority-tagged, generically-typed "Command"; addressing
+   is server/endpoint/`(stream_id, byte_bus_id)`, and payload shape is fixed
+   per endpoint type. A shim would have to invent a Zone/Command
+   abstraction TC18 itself doesn't have, which defeats the point of
+   conforming to it.
+3. c-RCP is pre-1.0 (`0.x` throughout its history) — semver already signals
+   "anything may change at any time," and the user's authorization is
+   explicit. Anyone needing the old behavior can pin to the last `v0.58.x`
+   tag; that tag remains a valid, buildable snapshot of the informal
+   protocol indefinitely. That's the soft landing, not a maintained shim.
+4. If cross-version interop is later found to matter operationally
+   (unlikely — this predecessor protocol has never actually implemented the
+   thing it was named after), a standalone bridge package following the
+   same ADAPT pattern as `canbr`/`linbr` is the right shape for it, not a
+   shim baked into the core.
+
+**This project stops mirroring cpp-RCP port-for-port.** Every milestone in
+Phase 1–12 below is phrased as "ports cpp-RCP's `X.hpp`" — that convention
+ends at Phase 13. cpp-RCP (and go-RCP/rust-RCP) are out of scope for this
+effort entirely; nothing here assumes they are, or aren't, making the same
+jump. From Phase 13 onward, requirements are derived directly from the OPEN
+Alliance TC18 Remote Control Protocol Specification v0.5.1_RC, via a
+structured internal gap-analysis extraction prepared for this effort
+(cited below by its own section numbers, e.g. "extraction §3.2", for
+traceability — that extraction document itself is a confidential working
+reference and is never to be committed to this or any repository; only the
+spec's own chapter numbers, defined field names, and numeric constants —
+protocol facts, not the spec's prose — appear in this roadmap and in any
+code/comments that implement it).
+
+---
+
+## Satellite Package Disposition
+
+Every package alongside the core protocol (`include/rcp/*.h` + `src/*.c`,
+excluding the core protocol/codec/RELAY-binding surface itself) gets an
+individual, justified call. Four dispositions, matching CONTRIBUTING's
+process for tracking scope decisions:
+
+- **REPLACE** — becomes a spec-conformant equivalent of a concept the spec
+  itself defines (possibly under a new name/shape); the old implementation
+  is not salvageable as-is.
+- **ADAPT** — sits on top of / integrates with the new core protocol;
+  needs its calls rebound to the new request/response primitive, not a
+  redesign of its own purpose or architecture.
+- **DEPRECATE** — no place in the new model; removed (or archived,
+  unmaintained) rather than carried forward.
+- **KEEP AS-IS** — genuinely orthogonal to the protocol replacement,
+  unaffected.
+
+| Package | Disposition | Reason |
+|---|---|---|
+| `rcp.h`/`rcp.c` | **REPLACE** (core, not satellite) | The Zone/Command/Response/Status/Controller/Registry types *are* the thing being replaced — see Phase 13–14. |
+| `wire.h`/`wire.c` | **REPLACE** (core, not satellite) | Custom length-framed codec replaced wholesale by IEEE 1722 AVTPDU/ACF framing — Phase 13. |
+| `relay/relay.h`, `adapt.h`/`adapt.c` | **REPLACE**, flagged for upstream coordination | RELAY's generic `Message`/`ToMessage()`/`FromMessage()` envelope assumes a single generic command/response shape; TC18's 13 heterogeneous, fixed-shape endpoint types don't map onto that envelope without per-endpoint-type translation rules RELAY itself doesn't yet define. Tracked at Phase 21 (M84) as its own milestone rather than assumed solvable as a drop-in port. |
+| `config.h`/`config.c` | **REPLACE** | Zone-manifest JSON schema has no TC18 counterpart; becomes an RC-Server/endpoint manifest (HW pin map, EP list, stream config) instead. |
+| `cli.h`/`cli.c`, `cli/main.c` | **ADAPT** | The three RELAY-mandated commands (`version`/`capabilities`/`status`) stay; only `capabilities`'s *content* (currently the old `RCP_CMD_*` enum) needs updating to describe the new feature-bundle flags (`svr_implemented_options`). |
+| `clock.h`/`clock.c`, `platform.h`/`platform.c` | **KEEP AS-IS** | OS-abstraction seam (mutex/cond/thread/clock) is orthogonal to wire format; may gain a gPTP time-source query later, but isn't rewritten. |
+| `version.h` | **KEEP AS-IS** | Mechanical version string; bumped per milestone as always. |
+| `mock.h`/`mock.c` | **REPLACE** | The entire vtable it doubles for (`rcp_controller_t`) is gone; becomes an in-process RC-Server/endpoint test double instead. |
+| `sim.h`/`sim.c` | **REPLACE** | Same reasoning as `mock`; the SiL/HIL-simulator *purpose* is preserved (arguably more valuable given TC18's state-machine complexity) but the implementation is a full rewrite against the new endpoint/lifecycle model. |
+| `udp.h`/`udp.c` | **REPLACE** | Becomes the IEEE 1722-over-UDP/IP (spec Annex J) transport carrying AVTPDUs; POSIX socket/thread plumbing may be reused as a starting point, but the frame codec it carries fully changes. |
+| `shmem.h`/`shmem.c` | **REPLACE** | Rebuilt as an in-process AVTPDU-frame loopback transport; likely consolidates with the new `mock` backend rather than staying a fully separate module. |
+| `tls.h`/`tls.c` | **DEPRECATE** | Spec's actual security control is MACsec (802.1AE, link-layer, explicitly declared a product-specific/opaque config block) — a materially different mechanism to an application-level TLS session wrapper. No natural home in the new model; revisit only if the IEEE1722-over-UDP/IP transport variant later wants DTLS. |
+| `watchdog.h`/`watchdog.c` | **REPLACE** | Superseded by the spec's own per-request-stream watchdog (`rx_wd_enable`/`rx_wd_timeout_interval`/`rx_wd_safestate_enable`) plus the safety-request (`0x8x`) mechanism (Phase 18); the "kick + health state machine" idea survives only as a thin client convenience around that register, not as an independent side-channel command. |
+| `deadline.h`/`deadline.c` | **REPLACE** | No generic "Status stream" exists to monitor in TC18; liveness must be re-derived from response/ack-queue heartbeats (`Flush_time`) and/or `rx_wd_info_enable` safe-state notifications. |
+| `powerstate.h`/`powerstate.c` | **REPLACE** | Ad-hoc Active/Sleeping/BusOff model replaced by the spec's Normal/StandBy/Sleep/Unpowered model with cold-start/hot-start distinction and the WakeUp handshake (Phase 19). |
+| `e2e.h`/`e2e.c` | **REPLACE** | Ad-hoc CRC-16 + sequence + replay-guard replaced by the spec's actual CRC32 (poly `0xF4ACFB13`) "safe point" mechanism and safety-request MSB-tagged request variants (Phase 18). |
+| `prioqueue.h`/`prioqueue.c` | **DEPRECATE** | Request execution priority is now a protocol-defined, server-side property of request *kind* (cancellation > triggered > timed > compound > compound-wait > chained > standard), not a client-assigned per-command priority queued before transmission. A client-side priority heap has no defined role to attach to. |
+| `ratelimit.h`/`ratelimit.c` | **ADAPT** | Still a reasonable client-side self-throttling decorator against an endpoint's finite, un-flow-controlled request-queue capacity — needs rebinding to the new send primitive, not a redesign. |
+| `authz.h`/`authz.c` | **ADAPT** | Access-control-before-send is protocol-agnostic; policy keys move from zone/command-type to stream/endpoint/request-type identifiers. |
+| `firmware.h`/`firmware.c` | **DEPRECATE** | No OTA/firmware-update endpoint or message exists anywhere in the spec — it's explicitly an OEM/application-layer concern, out of scope of RCP itself. No protocol hook left to attach it to. |
+| `zonegroup.h`/`zonegroup.c` | **DEPRECATE** | "Zone" as a first-class addressable/groupable unit doesn't exist in TC18; addressing is server/endpoint/`(stream_id, byte_bus_id)`, with no defined multi-target broadcast grouping concept. |
+| `proxy.h`/`proxy.c` | **DEPRECATE** | No zone concept to proxy; the spec explicitly delegates multi-hop/bridging concerns to "the network," not the RC system. |
+| `redundancy.h`/`redundancy.c` | **DEPRECATE** | Built entirely on Controller/Zone; an RC Server is a single node with one lifecycle state — no server-redundancy concept is defined. |
+| `federation.h`/`federation.c` | **DEPRECATE** | The zone/HPC-lease registry model has no TC18 counterpart. |
+| `observe.h`/`observe.c` | **ADAPT** | Latency-span/counter wrapping is protocol-agnostic; rebind around the new send primitive, with metric labels moving from zone/command-type to server/endpoint/request-type. |
+| `admin.h`/`admin.c` | **ADAPT** | In-process zones/metrics/SSE admin surface reworked to list registered RC Servers/endpoints instead of zones; the SSE/metrics plumbing itself is unaffected. |
+| `recorder.h`/`recorder.c` | **ADAPT** | Record/replay of raw ACF messages/AVTPDUs is a strictly more general, still-useful version of the same idea — needs a new on-the-wire capture format, not an architectural redesign. |
+| `dyndata.h`/`dyndata.c` | **DEPRECATE** | Every TC18 endpoint type has one fixed, spec-defined payload shape; a client-negotiated schema registry solves a problem this protocol doesn't have. |
+| `faultinject.h`/`faultinject.c` | **ADAPT** | Fault-injection-at-the-boundary (drop/slow/error/timeout) is protocol-agnostic; rebind to whatever new send primitive exists. |
+| `loan.h`/`loan.c` | **ADAPT** | The pooled zero-copy buffer pattern is still valuable for large endpoint payloads (UART RX FIFO, CAN XL up to 2054B, SPI) — rebind to the new send primitive. |
+| `tsn.h`/`tsn.c` | **ADAPT** | 802.1p PCP tagging over AVB/TSN Ethernet stays relevant, but its priority source must move from the retired `rcp_priority_t` enum to the protocol's own request-kind execution-priority classes (spec Ch.12 §3.14). |
+| `mdns.h`/`mdns.c` | **ADAPT** | Retained as an *optional* convenience discovery layer for the IEEE1722-over-UDP/IP transport specifically — layered beside, never instead of, the spec's own mandatory native broadcast discovery (Phase 15). |
+| `grpcbridge.h`/`.c`, `restbridge.h`/`.c`, `someipbr.h`/`.c`, `ddsbr.h`/`.c`, `mqttbr.h`/`.c`, `udsbr.h`/`.c`, `doipbr.h`/`.c` | **ADAPT** | All seven are compile-time stub decorators with no linked backend today; each just needs its framing calls updated to the new endpoint-request/response shape, not a redesign. |
+| `canbr.h`/`canbr.c` | **ADAPT**, narrowed role | CAN becomes a *native* endpoint type (Phase 19 §5.11) **and** the spec allows CAN(FD/XL) as RCP's own underlying transport network (extraction §2.1) — this bridge's remaining, non-overlapping role is gatewaying to an *external* CAN segment not reachable via either of those two paths. Docs must draw this three-way distinction explicitly so nobody builds the same CAN support three times. |
+| `linbr.h`/`linbr.c` | **ADAPT**, narrowed role | Same reasoning as `canbr`: LIN is now also a native endpoint type (Phase 19 §5.10); this bridge's role narrows to external-LIN-segment gatewaying. |
+| Requirements/safety/security artifacts (`.fusa*.json`, `HARA.md`, `tara.md`/`.json`, `CYBERSECURITY.md`, `AUDIT_PACK.md`, `tla/*.tla`, `FORMAL_VERIFICATION.md`, `*-gap-report.json`, `coverage-report.json`, SBOM/SPDX/provenance files) | **REPLACE**, deliberately last | Every requirement, hazard, TARA entry, and TLA+ model here describes Zone/Command/Watchdog/CRC-16 behavior. All become stale once the protocol changes, but re-deriving certification evidence from code that doesn't exist yet is backwards — tracked as Phase 22, after implementation lands. |
+| `SECURITY.md`, `INCIDENT-RESPONSE.md`, `.github/CODEOWNERS`, `CONTRIBUTING.md` | **KEEP AS-IS** | Process documents, protocol-agnostic. |
+| `CMakeLists.txt`, `cmake/FetchDeps.cmake`, `tests/CMakeLists.txt` | **KEEP AS-IS** | Build tooling; will gain/lose targets as source files come and go, but the build system's own structure is unaffected. |
+| `PORTABILITY.md` | **KEEP AS-IS**, revisit later | RTOS/bare-metal audit conclusions (single `platform.h` seam, no libc assumptions beyond C99) still hold structurally; worth a re-read once the new endpoint code exists, not a rewrite now. |
+| `README.md` | Rewritten alongside Phase 13–14 | Not a "satellite package," but its Zone/Command wire-model description goes stale the moment Phase 13 lands; tracked as part of that work, not called out as its own milestone here. |
+
+---
+
 ## Vision
 
-c-RCP is a pure-C99 Remote Control Protocol for automotive zonal architecture —
-a feature and API mirror of [cpp-RCP](https://github.com/SoundMatt/cpp-RCP),
-built for targets where a C++ toolchain isn't available or isn't wanted
-(AUTOSAR Classic ECUs, bare-metal/RTOS zone controllers, MISRA-C-gated codebases).
+c-RCP is a pure-C99 implementation of the OPEN Alliance TC18 Remote Control
+Protocol (RCP) — the real automotive zonal-architecture standard this
+project is named after, and, as of Phase 13, actually conforms to. It lets
+a central/zonal ECU's application logic drive low-level peripheral
+interfaces (SPI, GPIO, I²C, UART, ADC, PWM, LIN, CAN, ISELED, MDIO, ...)
+physically wired to a separate, simpler ECU — the RC Server — over an
+IEEE 1722-framed Ethernet (or CAN(FD/XL)) link, without that simpler ECU
+needing any OEM-specific application logic of its own.
+
+*(Historical note: through v0.58.0/Phase 1–12, this project instead
+described itself as "a feature and API mirror of cpp-RCP" implementing an
+informal, bespoke Zone/Command/Response/Status protocol. See the Protocol
+Replacement Notice above for why that framing no longer applies and is not
+being extended.)*
 
 The project focuses on:
 
-- Reliable command delivery from a central computer to distributed zone controllers
-- Safety-first design with traceability to ISO 26262 ASIL-B requirements
-- A small, dependency-free C99 core — vtable-based interfaces, swappable transports
+- Byte-for-byte conformance to the OPEN Alliance TC18 RCP wire protocol —
+  correctness against the spec, not against a sibling repo's port
+- Safety-first design, re-traced to ISO 26262 ASIL-B requirements once the
+  new protocol's actual safety mechanisms (E2E CRC32 safe points, watchdog
+  safe-state entry) exist to trace against (Phase 22)
+- A small, dependency-free C99 core — vtable-based interfaces, swappable
+  transports (native Ethernet, IEEE1722-over-UDP/IP, CAN(FD/XL)-as-network)
 - Deterministic latency suitable for hard real-time automotive contexts
-- Observability by default — metrics, heartbeats, and watchdog support built in
+- Observability by default — metrics, heartbeats, and watchdog support
+  built in, re-derived from the protocol's own heartbeat/safe-state
+  mechanisms rather than a bespoke side channel
 
 ---
 
 ## Guiding Principles
 
 1. Pure C99 first — no OS-specific headers in core interfaces
-2. Safety as a first-class concern — requirements in `.fusa-reqs.json`, traced to tests
-3. Simplicity over completeness — clean interfaces, not a protocol kitchen sink
-4. Testability by default — mock backend ships with the library
-5. Zonal architecture native — `rcp_zone_t` is a first-class type, not an afterthought
-6. Transport-agnostic — swap in-process mock for UDP or TLS without API changes
-7. Explicit ownership — every heap allocation has one clearly documented owner;
-   no hidden allocation behind "value semantics" the way C++ containers provide
+2. Safety as a first-class concern — requirements in `.fusa-reqs.json`,
+   traced to tests (re-derived against the new protocol at Phase 22, not
+   assumed to carry over from the superseded catalog)
+3. Simplicity over completeness — clean interfaces, not a protocol kitchen
+   sink
+4. Testability by default — a mock RC-Server/endpoint backend ships with
+   the library
+5. **Spec-conformant, not zonal-architecture-native** — as of Phase 13,
+   `rcp_zone_t` and the "zonal architecture" framing are retired; the RC
+   Server/Endpoint/register-map model *is* the first-class type, because
+   that's what the real TC18 spec defines. (This supersedes the prior
+   "Zonal architecture native" principle from Phase 1–12 — see the
+   Protocol Replacement Notice.)
+6. Transport-agnostic — the spec itself requires this: native Ethernet,
+   IEEE1722-over-UDP/IP, or CAN(FD/XL)-as-network are all valid RCP
+   carriers, swappable without changing endpoint-facing API shape
+7. Explicit ownership — every heap allocation has one clearly documented
+   owner; no hidden allocation behind "value semantics" the way C++
+   containers provide
+8. Requirements derived from the spec, not mirrored from a sibling repo —
+   see the Protocol Replacement Notice's note on cpp-RCP/go-RCP/rust-RCP
 
 ---
 
@@ -41,7 +204,10 @@ cross-session tracker for "what's implemented" and "what's next."
 
 ---
 
-## Release Plan
+## Legacy Release Plan (v0.1.0–v0.58.0, superseded)
+
+Kept as project history — see the Protocol Replacement Notice. Not
+extended; the active plan is "TC18 Replacement Release Plan" below.
 
 | Phase | Version | Theme | Summary |
 |---|---|---|---|
@@ -100,7 +266,53 @@ integration test where practical.
 
 ---
 
-## Milestones
+## TC18 Replacement Release Plan (v0.59.0+, active)
+
+Dependency-ordered per the Protocol Replacement Notice. Versions are
+projected, not committed — actual version numbers are assigned as each
+milestone starts, same as every phase before it. Phases 13–20 sequence the
+core protocol itself (in the order recommended by this effort's own
+gap-analysis extraction, §9); Phase 21 works back through every satellite
+package per its Disposition table entry above; Phase 22 re-derives
+certification evidence against what Phase 13–21 actually built.
+
+| Phase | Version | Theme | Summary |
+|---|---|---|---|
+| **Wire Format Core** | v0.59.0 | AVTPDU framing | NTSCF/TSCF headers, `stream_id`/`byte_bus_id` addressing, transport independence (Ethernet / IEEE1722-over-UDP-IP / CAN(FD/XL)-as-network) |
+| **Wire Format Core** | v0.60.0 | ACF message format | ACF_ABB/ACF_GBB, the shared `byte_message_info` header, the four response types |
+| **RC Server Lifecycle** | v0.61.0 | Lifecycle state machine | HW_UNCONFIGURED / HW_CONFIGURED / RCP_CONFIGURED, plausibility checks, register locking |
+| **RC Server Lifecycle** | v0.62.0 | Register-map model | Generic vs. functional config split, EP0, root-client, general register map |
+| **Discovery** | v0.63.0 | Discovery | Broadcast discovery read, discovery-stream claiming, `Discovery_TimeOut` |
+| **Basic Endpoints** | v0.64.0 | GPIO endpoint | Simplest bitmask read/write endpoint, per-pin triggers |
+| **Basic Endpoints** | v0.65.0 | SPI endpoint | Up to 6 channels, transfer-done/CS-edge triggers |
+| **Basic Endpoints** | v0.66.0 | I²C + UART endpoints | Raw-byte-stream controller-only endpoints |
+| **Basic Endpoints** | v0.67.0 | ADC + PWM_OUT + PWM_IN endpoints | Timing/averaging-flavored endpoints |
+| **Conditional Requests** | v0.68.0 | Compound requests | Compound + compound-wait + sequencers |
+| **Conditional Requests** | v0.69.0 | Triggered/chained/timed + cancellation | Full request-kind taxonomy, clear-all/non-safestate/single |
+| **E2E Protection** | v0.70.0 | Safe points | CRC32 (`0xF4ACFB13`) safe-point mechanism, safety-request MSB variants |
+| **Remaining Endpoints** | v0.71.0 | LIN commander endpoint | Raw-byte pass-through LIN master |
+| **Remaining Endpoints** | v0.72.0 | CAN controller endpoint | Classical/FD/XL, data frames only |
+| **Remaining Endpoints** | v0.73.0 | ISELED endpoint | LED/sensor daisy-chain, native encoding |
+| **Remaining Endpoints** | v0.74.0 | MDIO endpoint | Clause-22/45 PHY management access |
+| **Remaining Endpoints** | v0.75.0 | Wakeup control + power modes | Normal/StandBy/Sleep/Unpowered, cold/hot start, WakeUp handshake |
+| **Fragmentation** | v0.76.0 | Fragmentation (GO) | Multi-AVTPDU `ms`/`segment_num` support for CAN XL, UART, large discovery reads |
+| **Satellite Rework** | v0.77.0 | Foundational test/config satellites | REPLACE `mock`, `config`; ADAPT `cli` capabilities payload |
+| **Satellite Rework** | v0.78.0 | Transport satellites | REPLACE `udp`, `shmem`; ADAPT `tsn`; DEPRECATE `tls` |
+| **Satellite Rework** | v0.79.0 | Safety-adjacent satellites | REPLACE `watchdog`, `deadline`, `powerstate` |
+| **Satellite Rework** | v0.80.0 | Generic decorators, batch 1 | ADAPT `authz`, `ratelimit`, `loan`, `observe`, `faultinject`, `admin`, `recorder` |
+| **Satellite Rework** | v0.81.0 | Protocol bridges | ADAPT all 7 bridge stubs; narrow `canbr`/`linbr`'s role explicitly |
+| **Satellite Rework** | v0.82.0 | Optional discovery convenience | ADAPT `mdns` |
+| **Satellite Rework** | v0.83.0 | Deprecation batch | Remove `prioqueue`, `firmware`, `zonegroup`, `proxy`, `redundancy`, `federation`, `dyndata` |
+| **Satellite Rework** | v0.84.0 | RELAY adapter rework | REPLACE `relay.h`/`adapt.c`, flagged for upstream RELAY-spec coordination |
+| **Re-certification** | v0.85.0 | Safety/security re-certification | Requirements catalog, HARA, TARA, CYBERSECURITY.md, TLA+ specs, AUDIT_PACK.md, README.md rewritten against the new protocol |
+
+---
+
+## Legacy Milestones (v0.1.0–v0.58.0, superseded)
+
+Kept as project history — see the Protocol Replacement Notice. Not
+extended; new milestone detail starts at "TC18 Replacement Milestones"
+after Phase 12 below.
 
 ---
 ### Phase 1 — Foundation
@@ -1839,3 +2051,604 @@ for real, iterating until all three specs genuinely pass.
 - This closes the last of the 7 issues from the second RELAY-conformance
   audit (#55–#61), plus the two issues (#69, TARA's OTA-tampering entry)
   discovered and fixed along the way. All are now closed.
+
+---
+### Phase 13 — Wire Format Core
+---
+
+Dependency root of the entire replacement program: nothing above the wire
+layer can be built, tested, or even meaningfully designed before this
+lands. Spec basis: OPEN Alliance TC18 RCP v0.5.1_RC, Ch.10–11 (extraction
+§2).
+
+### 59. AVTPDU framing (v0.59.0)
+
+- New `include/rcp/avtp.h` + `src/avtp.c`: the two IEEE 1722 AVTPDU header
+  variants — NTSCF (`ntscf_data_length`, `sequence_num`; the *only* format
+  an RC Server ever sends) and TSCF (`stream_data_length`,
+  `avtp_timestamp`; client→server only, presentation-time semantics — the
+  earliest execution time, never a hard deadline).
+- `stream_id` (sender MAC + locally-assigned unique suffix) and
+  `byte_bus_id` (endpoint-within-stream addressing, unique only *within*
+  a given `stream_id`, not globally) as first-class addressing types,
+  replacing `rcp_zone_t` everywhere.
+- **Transport independence, explicit from day one**: an
+  `rcp_avtp_transport_t` vtable abstraction with three concrete carriers
+  targeted across this milestone and the next: native Ethernet
+  (EtherType 1722), IEEE1722-over-UDP/IP (spec Annex J), and
+  CAN(FD/XL)-as-underlying-network (extraction §2.1, §3.13) — the last of
+  which is easy to miss and explicitly flagged in the gap analysis as a
+  case this project's prior Ethernet-only assumption (`udp.c`, `tsn.c`)
+  got wrong for the old protocol *and* would get wrong again here if not
+  called out up front. A TSCF-headed AVTPDU received while the server
+  doesn't support time-sync is dropped outright, no response — implemented
+  and tested as an explicit, unconditional rule (extraction §2.2), not an
+  incidental side effect of a missing feature.
+- Terminology note for the codebase and its docs going forward: "RC
+  System" / "RC Node" / "RC Client" / "RC Server" / "RC Edge Node" /
+  "Endpoint (EP)" / "RCP Message" / "RCP Frame" replace "zone
+  controller"/"HPC"/"Command"/"Response"/"Status" throughout.
+
+### 60. ACF message format + byte_message_info header (v0.60.0)
+
+- `include/rcp/acf.h` + `src/acf.c`: ACF_ABB (`acf_msg_type = 0x0E`, no
+  timestamp field at all) and ACF_GBB (`0x0D`, 64-bit `message_timestamp`)
+  message codecs sharing one `byte_message_info` header layout —
+  `acf_msg_length`/`pad`/`mtv`/`byte_bus_id`/`evt`/`hs`/`cs`/
+  `transaction_num`/`op`/`rsp`/`err`/`ms`/`read_size`-or-`segment_num`
+  (extraction §2.3–2.4). This header is the single most load-bearing
+  structure in the protocol — every endpoint type built in later phases
+  reads/writes it identically.
+- The four response semantics layered on top of the same header
+  (Acknowledge / Write response / Read response / Error response,
+  distinguished by `err`/`op`/`evt[3:0]`, extraction §2.8), plus the
+  timestamp-validity folding rules (`mtv=0`-but-zeroed region ⇒ treat as
+  untimed; the `tu` "uncertain" state folds the same way, extraction
+  §2.6).
+- **Standard request kind only** in this milestone (best-effort,
+  unconditional, mandatory per extraction §3.1) — conditional requests,
+  cancellation, and fragmentation are explicitly deferred to their own
+  later phases (17, 20) rather than smuggled in here.
+- `tests/test_acf.c`: header round-trip, ABB/GBB length differences,
+  all four response-type identification rules, timestamp-folding cases.
+
+---
+### Phase 14 — RC Server Lifecycle & Register Map
+---
+
+Spec basis: Ch.12 (extraction §3). The gap analysis flags the 3-state
+lifecycle as "probably the single biggest structural gap" relative to the
+old informal protocol — expect this to touch register-access code paths
+pervasively for the rest of the program.
+
+### 61. Lifecycle state machine (v0.61.0)
+
+- `include/rcp/server.h` + `src/server.c`: `rcp_server_lifecycle_t` with
+  the three states `HW_UNCONFIGURED` (`0x00`), `HW_CONFIGURED` (`0x55`),
+  `RCP_CONFIGURED` (`0xAA`), and their transition guards — the
+  `HW_CFG_INCONSISTENT` plausibility check (every `ep_used=1` endpoint has
+  a valid HW pin mapping and at least one configured request stream) gating
+  entry to `HW_CONFIGURED`, and the `RCP_CFG_INCONSISTENT` check (every used
+  endpoint has a stream/`byte_bus_id` association, every request stream has
+  an associated response stream) gating entry to `RCP_CONFIGURED`.
+- Per-state request filtering: `HW_UNCONFIGURED` accepts only ACF_ABB at
+  discovery `byte_bus_id` 0 under NTSCF (everything else silently dropped,
+  TSCF dropped outright); demotion back to `HW_UNCONFIGURED` from
+  `HW_CONFIGURED` via the same discovery-stream/root-client path.
+- Register-locking-by-state: HW-pin/generic config read-only once
+  `HW_CONFIGURED`; functional config the only thing left writable in
+  `RCP_CONFIGURED`, and only via the endpoint's own registered stream(s)
+  or the root client through EP0. `W*` (permanently locked once
+  `RCP_CONFIGURED`) vs. plain `W` fields modeled explicitly, not
+  collapsed into one writability bit.
+- Per-endpoint `ep_enable`: disabled endpoints still queue requests
+  without executing them (pre-load-then-drain-on-enable semantics).
+
+### 62. Register-map model (v0.62.0)
+
+- The general (vendor-agnostic, EP0-reachable) register map: magic
+  number, `svr_version`, vendor/device ID, `svr_ep_count`,
+  stream/sequencer/memory capacity fields, `svr_implemented_options`
+  bitmask (time-sync / enhanced-cancel / compound bundles — each an
+  all-or-nothing group per extraction §3.1), and the pointer/capacity
+  pairs to every sub-table (HW pin map, request-stream config,
+  response/ack queue config, EP generic/functional config,
+  EP-ID/`byte_bus_id` map, sequencer state) — extraction §3.6.
+- **The generic-vs-functional config split**, itself flagged as a
+  recent, pervasive TC18 restructuring (extraction §6 item 5): the
+  server-owned generic block (`ep_type`, `ep_used`, `ep_delay_time`,
+  `ep_req_storage_size`, ...) vs. the common functional-config prefix
+  shared by every endpoint type (`ep_enable`, `ep_clear_req_storage`,
+  `ep_req_crc_enable`, `ep_response_ts_enable`, `ep_supress_response`,
+  ...) — modeled as two distinct C structs, not one merged blob, so every
+  endpoint type built in Phase 16/19 composes them the same way.
+- EP0 itself as the pseudo-endpoint exposing this whole surface;
+  `svr_root_client_index` (the one stream with full-server write access)
+  and the per-EP-restricted-client model for every other stream.
+- HW pin-mapping table (`hw_ep_nr`/`hw_ep_pin_nr`/pin-property byte) and
+  the full per-endpoint-type named-signal index table (GPIO 0–31, SPI
+  CLK/PICO/POCI/CS0-5, I²C SCL/SDA, ... extraction §3.7) — written once
+  here, reused unmodified by every endpoint type added later.
+- Request-stream config (`rx_stream_id`, `rx_wd_*`, `rx_enforce_e2e`,
+  `rx_safety_measure`, ...) and response/ack queue config
+  (`Max_AVTPDUsize`, `flush_on_count`, `Flush_time`) tables — fields
+  relevant to E2E/watchdog (Phase 18) are modeled now but not yet wired
+  to behavior, avoiding a second register-layout pass later.
+- **Known spec ambiguity carried forward as an explicit code comment,
+  not silently resolved**: the EP-ID/`byte_bus_id` mapping table's
+  required ascending ordering has no server-side enforcement per the
+  spec itself (extraction §3.9, §7) — documented as a client
+  responsibility with no corrective mechanism, not treated as a bug in
+  this implementation.
+
+---
+### Phase 15 — Discovery
+---
+
+Spec basis: extraction §3.5. Flagged as "newly clarified" and tightly
+wound into lifecycle bootstrapping — the second-highest-impact structural
+gap after Phase 14 per the gap analysis's own prioritization (extraction
+§9 item 2).
+
+### 63. Discovery (v0.63.0)
+
+- Broadcastable ACF_ABB read request at `byte_bus_id 0`, register-map
+  address 0, answerable in **any** lifecycle state, NTSCF-only (a
+  TSCF-headed discovery request is dropped).
+- Discovery-stream claiming: the first discovery request received while
+  in `HW_UNCONFIGURED`/`HW_CONFIGURED` reserves the discovery stream for
+  configuration writes; the reservation lapses after a configurable
+  `Discovery_TimeOut` (~20 ms default) with no follow-up configuration
+  request, re-opening the server to a new claimant. Concurrent read-only
+  discovery from other clients remains possible while a stream holds the
+  claim; only the claimant may configure.
+- Response shape: register-map slice starting at address 0, length =
+  requested `read_size`, addressed back to the requester's MAC,
+  untagged — carrying the magic number, protocol version, vendor/device
+  ID, and endpoint count needed for generic compatible-device recognition
+  (vendor/device-specific detail is explicitly out-of-band, e.g. a
+  datasheet).
+- Client-side discovery result persistence (so re-discovery isn't
+  mandatory every power cycle on a known topology) as a thin convenience
+  API, not a protocol requirement.
+
+---
+### Phase 16 — Basic Endpoints
+---
+
+Spec basis: Ch.13.7 (extraction §5). Ordered simplest-shape-first per this
+effort's own scope: GPIO and SPI (fixed small payloads, no averaging/timing
+state) before I²C/UART (raw byte streams) before ADC/PWM (multi-field,
+stateful averaging/timing). DAC is **explicitly out of scope for this
+program** — enumerated in the spec's `ep_type` table with a `DAC_OUT` pin
+signal, but with no functional-config chapter anywhere in v0.5.1_RC
+(extraction §1.2, §7); treated as reserved-but-undefined and revisited only
+if a future spec revision actually defines it.
+
+### 64. GPIO endpoint (v0.64.0)
+
+- `include/rcp/ep_gpio.h` + `src/ep_gpio.c`: up to 32 pins, 4-byte
+  bitmask request/response payload, all 8 `evt[2:0]` write-semantics
+  (replace/OR/AND/XOR/add/subtract, with add/subtract saturating rather
+  than wrapping at `0x0000`/`0xFFFF`, plus the reconfiguration escape
+  hatch at `evt[2:0]=7`, extraction §4.5 Group C).
+- Per-pin trigger signals (any-change/rising/falling) and functional
+  config (direction, electrical properties mirroring the HW pin-mapping
+  table's pull-up/down/drive-strength fields for runtime adjustment).
+
+### 65. SPI endpoint (v0.65.0)
+
+- `include/rcp/ep_spi.h` + `src/ep_spi.c`: controller-only, up to 6
+  pre-configured channels selected via `evt[2:0]` values 0–5 (extraction
+  §4.5 Group A); transfer payload is raw PICO-out bytes, response is the
+  same-length POCI-in bytes.
+- Per-channel functional config (clock polarity/phase — the 4 standard
+  SPI modes, bit order, clock divider, CS active-polarity, inter-transfer/
+  inter-byte timing) and transfer-done/per-CS-edge triggers.
+- Compound-wait-against-SPI's truncation rule (compares only the first 4
+  of up to 20 status bytes, extraction §4.6) implemented and tested even
+  though compound-wait itself lands in Phase 17 — the truncation behavior
+  is an SPI-endpoint property, tested here in isolation via a raw
+  comparison-mode helper.
+
+### 66. I²C + UART endpoints (v0.66.0)
+
+- `include/rcp/ep_i2c.h`/`ep_uart.h` + `.c`: I²C controller-only, raw byte
+  stream including address bytes (no protocol-level address parsing);
+  `i2c_mode` bus-speed presets, with the spec's own high-speed enum
+  ambiguity (extraction §5.7, §7) implemented per the *lower*-numbered,
+  more-conservative interpretation and flagged in a code comment pending
+  spec errata, not silently guessed at.
+- UART: independent TX/RX queues sharing one functional-config block, RX
+  FIFO sized via `ep_rx_buffer_size`, `read_size`-or-`uart_timeout`
+  completion race (short reads fragment via `ms` — exercised here only as
+  a single-AVTPDU-worst-case test until Phase 20 lands full fragmentation),
+  bit-padding for non-multiple-of-8 `uart_nr_bits`, and the payload-bearing
+  UART read rejection (`UNKNOWN_CMD`) called out as a deliberate asymmetry
+  versus GPIO/PWM_OUT in code comments.
+- **Explicit LIN/CAN-adjacent scope validation, done here early rather
+  than assumed**: I²C's raw-byte-stream, no-framing-help design (extraction
+  §5.7) is the same philosophy this program commits to for LIN (Phase 19)
+  — validated against this project's actual endpoint code once, not
+  re-litigated per endpoint type.
+
+### 67. ADC + PWM_OUT + PWM_IN endpoints (v0.67.0)
+
+- `include/rcp/ep_adc.h`/`ep_pwm.h` + `.c`: ADC's three-layer averaging
+  model (`adc_samples_per_avg_interval` → `adc_avg_intervals_per_request`
+  → `adc_combine_avg_values`), request-driven sampling (no autonomous
+  sampling — cyclic cadence via self-triggering or an external trigger
+  source), `PWM_IN_NO_SIGNAL` on measurement timeout, and the
+  first-sample-of-first-combined-value timestamp-capture-moment rule
+  (extraction §5.9).
+- PWM_OUT (period + active-duration 16-bit pair, same 8 write-semantics
+  as GPIO, cycle-start/mid-pulse/done triggers useful for phase-locked
+  ADC sampling) and PWM_IN (response-only capture of the same pair,
+  rising/falling-edge triggers) — extraction §5.5–5.6.
+- Compound-wait's numeric ≥/≤ comparison modes against PWM_IN's
+  period/duty-cycle sub-fields (`evt[2:0]` = 100/101/110/111, extraction
+  §4.6) implemented and unit-tested now, ahead of Phase 17's general
+  compound-wait request-type landing, matching the SPI-truncation
+  precedent set at v0.65.0.
+
+---
+### Phase 17 — Conditional Requests & Sequencers
+---
+
+Spec basis: extraction §2.7, §3.11, §3.14, §3.16. Flagged as likely
+wholesale-new territory relative to the old informal protocol (extraction
+§6 items 6–7) — if the old protocol only ever did simple immediate
+read/write, this entire subsystem has no precedent in this codebase to
+port from.
+
+### 68. Compound + compound-wait requests + sequencers (v0.68.0)
+
+- `include/rcp/sequencer.h` + `src/sequencer.c`: persistent 8-bit
+  sequencer-state registers (power-on default `1`, up to
+  `svr_sequencers_max` exposed, `0` = compound operations unsupported
+  entirely) — a first-class supporting primitive, not an implementation
+  detail of compound requests.
+- Compound (`request_type` `0x0F`/safety `0x8F`) and compound-wait
+  (`0x0B`/`0x8B`): the `message_timestamp`-field-repurposing trick when
+  `mtv=0` (first byte = `request_type` opcode, remaining 7 bytes = kind-
+  specific sub-fields — state numbers, delays, repetition counts),
+  `cmp_exec_delay`/`cmpw_exec_delay` timers, and the
+  advance-sequencer-only-if-still-in-`cmp_start_state` guard (extraction
+  §3.14).
+- Per extraction §3.1's bundling rule, implemented as one all-or-nothing
+  feature bundle: compound-wait support and **at least 4 sequencers** and
+  the clear-non-safestate (`0x06`) cancellation type all ship together in
+  this milestone, not compound-message-parsing alone — a repo claiming
+  "compound support" without the other two per the spec's own bundle
+  definition would be non-conformant.
+
+### 69. Triggered/chained/timed requests + cancellation taxonomy (v0.69.0)
+
+- Triggered (`0x0E`/`0x8E`): trigger-occurrence counter reset on
+  entering "started," counting independent of the endpoint's idle/busy
+  state (only the final fire transition is idle-gated), `trigger_exec_delay`
+  timer, infinite-repeat sentinel `0xFFFF`.
+- Chained (`0x01`, no safety variant): forces sequential execution of 2+
+  requests packed in one AVTPDU; `cs` bit semantics for chained requests
+  (abort-on-predecessor-error vs. execute-regardless) and the
+  `CHAIN_ABORTED`/`CHAIN_ERROR` error codes.
+- Timed (`0x0A`, no safety variant): presentation-time-based execution as
+  an alternative to a TSCF header — requires the time-sync bundle
+  (`svr_implemented_options`) from Phase 13; `PRESENTATION_TIME_TOO_FAR`/
+  `GPTP_FAIL` rejection paths.
+- Cancellation taxonomy: clear-all (`0x05`, mandatory, already required
+  since Phase 13's baseline) formalized alongside clear-non-safestate
+  (`0x06`, shipped at v0.68.0) and clear-single (`0x07`, `clear_transaction_num`,
+  `REQUEST_NOT_FOUND` on a miss) — general semantics (cancel between
+  queued and executing only, chained-successor cancellation cascades,
+  `REQUEST_CANCELED` per individually-cancelled request).
+- **Execution priority ordering**, implemented as a genuine
+  server-side scheduler property for the first time in this project's
+  history (extraction §3.14): cancellation > triggered > timed > compound
+  > compound-wait > chained > standard, ties FIFO. This is the direct
+  spec-conformant replacement for the old `prioqueue.c`'s client-side
+  priority heap — see Satellite Disposition.
+- Multi-request-per-frame handling: independent per-ACF-message
+  evaluation, one presentation time applying uniformly to every entry in
+  a TSCF-headed frame (no mixed timed/untimed within one AVTPDU).
+
+---
+### Phase 18 — E2E Protection (Safe Points)
+---
+
+Spec basis: extraction §4.7, §3.8. Flagged as "probably the most
+safety-critical gap area" (extraction §6 item 4) — this is the direct,
+explicit replacement for `e2e.c`'s ad-hoc CRC-16 mechanism named in this
+program's own charter.
+
+### 70. Safe points: CRC32 + safety-request variants (v0.70.0)
+
+- `include/rcp/safept.h` + `src/safept.c`: the exact CRC32 parameter set
+  — polynomial `0xF4ACFB13`, width 32, init `0xFFFFFFFF`, final XOR
+  `0xFFFFFFFF`, input/output reflection both true — replacing `e2e.c`'s
+  CRC-16/CCITT-FALSE entirely, not alongside it.
+- Coverage rule: CRC spans `stream_id` + `avtp_timestamp` (all-zero
+  stand-in under NTSCF) + the full ACF header + payload, with the
+  +1-quadlet/+4-octet length-accounting pre-adjustment for the trailing
+  CRC bytes. `CRC_ERROR` on failure, execution skipped.
+- Safety-request MSB-tagged variants (`0x8F`/`0x8B`/`0x8E` — compound/
+  compound-wait/triggered only execute once the endpoint is in its
+  configured safe state) and the **watchdog-purge-vs-safety-survive**
+  rule: on watchdog overflow, normal (`0x0F`/`0x0B`/`0x0E`) requests are
+  purged from the endpoint's queue while the safety variants remain
+  active and become what actually drives the system to/through its safe
+  state — implemented and tested as the primary safety mechanism it is,
+  not an edge case.
+- Per-stream `rx_enforce_e2e` (single-request drop vs. whole-stream
+  latch-to-fault), `rx_wd_*` (enable/timeout/safestate-enable/info-enable),
+  `rx_safety_measure` (0 = force-high-impedance vs. 1 = run a configured
+  sequencer-based safety sequence), `rx_safestate_sequencer`/
+  `rx_safe_sequencer_state` — wired against the register-map fields
+  reserved (but inert) since Phase 14.
+- **Fragmentation/CRC interaction rule modeled now, activated at Phase
+  20**: only the last fragment of a multi-segment message carries a CRC
+  (computed across the combined payload); the length-accounting
+  adjustment applies only to that final segment.
+
+---
+### Phase 19 — Remaining Endpoint Types
+---
+
+Spec basis: extraction §5.10–5.13, §3.3–3.4. Each of LIN/CAN/ISELED/MDIO
+is flagged as likely wholesale-new territory (extraction §6 items 9–11)
+if the old informal protocol predates the newer entries (MDIO, CAN XL,
+ISELED) or never modeled the others as raw-byte-pass-through in the first
+place (LIN, Classical CAN). **DAC remains explicitly out of scope** per
+the Phase 16 note — reserved `ep_type` code, no functional-config chapter,
+revisit only on a future spec revision.
+
+### 71. LIN commander endpoint (v0.71.0)
+
+- `include/rcp/ep_lin.h` + `src/ep_lin.c`: LIN bus commander (master)
+  only, payload driven directly onto the bus, response generated when a
+  received message's data matches the payload under the `evt[2:0]`
+  comparison rule; transmission-done trigger, `lin_clk_divider`-derived
+  bit-time clock.
+- **Explicit scope validation, not assumed**: per extraction §5.10, no
+  classic LIN-frame concept (checksum selection, PID/identifier
+  generation, schedule tables) exists at this protocol layer — it's a
+  "dumb" raw-byte pusher, with all LIN-frame semantics constructed
+  client-side in the request payload. If any pre-replacement LIN handling
+  in this repo's history assumed otherwise, that assumption does not
+  carry forward; documented explicitly in `ep_lin.h`'s header comment so
+  it isn't rediscovered the hard way later.
+
+### 72. CAN controller endpoint, incl. CAN XL (v0.72.0)
+
+- `include/rcp/ep_can.h` + `src/ep_can.c`: FrameFormat-selected Classical
+  (CBFF/CEFF), FD (FBFF/FEFF), and XL (classical/new physical layer)
+  frames, data frames only (no remote-frame support); CAN XL's 6 extra
+  header bytes (RRS/SDT/VCID/AF) ahead of up to 2048 bytes of payload
+  (2054B total) — the concrete driver for Phase 20's fragmentation
+  go-decision.
+- Separate bit-timing register sets for arbitration/FD-data/XL-data
+  phases, delay-compensation-control, CAN-XL acceptance/ID filters, and
+  the endpoint's own base-clock/divider registers scoped *only* to
+  execution-delay timing (not bit-timing itself) — extraction §5.11.
+- **No trigger-signal table populated**, matching the spec's own gap
+  (extraction §7) — documented as an upstream spec gap in `ep_can.h`, not
+  silently invented.
+- **Terminology note carried from Phase 13**: this native CAN endpoint,
+  CAN(FD/XL)-as-RCP's-own-transport (Phase 13), and the `canbr` bridge to
+  an *external* CAN segment (Satellite Rework, v0.81.0) are three
+  distinct things sharing one underlying bus technology — cross-referenced
+  in each module's header comment to prevent the three-way duplication
+  flagged in the Satellite Disposition table.
+
+### 73. ISELED endpoint (v0.73.0)
+
+- `include/rcp/ep_iseled.h` + `src/ep_iseled.c`: native 4-bit/5-bit ISELED
+  framing over ISP_P/ISP_N, client payload taken as raw plain instruction/
+  address/data content and ISELED-encoded by the endpoint; optional
+  native ISELED CRC (separate from and additional to Phase 18's RCP-level
+  CRC32); recovered-clock mode (`iseled_use_rcv_clk`) needing no ISP_N pin
+  wired at all; single transmission-complete trigger.
+
+### 74. MDIO endpoint (v0.74.0)
+
+- `include/rcp/ep_mdio.h` + `src/ep_mdio.c`: the endpoint entirely absent
+  from the spec's own informative "ten interfaces" scope list yet fully
+  specified in its normative register map (extraction §1.2) — Clause-22
+  MMD / Clause-45 MMS single-word and burst addressing modes, no
+  type-specific functional config beyond the universal common block, no
+  trigger-signal table. Reusable to expose an on-die integrated PHY's
+  management registers when no physical MDIO pins are mapped at all.
+
+### 75. Wakeup control endpoint + power modes (v0.75.0)
+
+- `include/rcp/ep_wakeup.h` + `src/ep_wakeup.c`: the dedicated
+  power-management endpoint (`ep_type=0x01`) — wake-source pin
+  configuration/monitoring, the fixed `SleepCMD` (`0xA5`) request kind
+  (distinct from the general request taxonomy), WakeUp-message emission
+  in place of the generic trigger-signal mechanism.
+- `include/rcp/power.h` + `src/power.c`: Normal/StandBy/Sleep/Unpowered
+  modes (extraction §3.3–3.4) — StandBy reachable from Normal only via a
+  hot start (no re-init), Sleep always a cold start (full re-init);
+  hot-start-from-Sleep's four-step handshake (network-interface
+  re-enable → repeating WakeUp message until echoed or repeat-limit hit →
+  other response/ack queues resume → skip the handshake entirely for a
+  network-level TC14/TC10 wake signal instead of the pin-wake path).
+- Entry-refusal gating for both StandBy and Sleep requests (`wup_status`
+  uncleared, a non-idle endpoint, or an unsent response/ack queue message
+  ⇒ `REQUEST_CANCELED`), and the direct, spec-conformant replacement for
+  `powerstate.c`'s ad-hoc Active/Sleeping/BusOff model (see Satellite
+  Disposition — the client-side convenience wrapper moves to Satellite
+  Rework v0.79.0, built on top of this milestone's actual protocol
+  mechanism).
+
+---
+### Phase 20 — Fragmentation
+---
+
+Spec basis: extraction §2.5, §4.7, §7. **Explicit go/no-go call, not left
+open**: **GO.** Three features already committed earlier in this same
+plan — CAN XL's up to 2054-byte frames (v0.72.0), UART's FIFO-vs-timeout
+short reads (v0.66.0), and full-register-map discovery reads on
+larger-endpoint-count servers (v0.63.0) — functionally need multi-AVTPDU
+support; skipping it would mean either capping CAN XL's usable payload far
+below what v0.72.0 itself claims to support, or refusing full-register
+discovery past whatever fits in one frame. Since it's one generic
+mechanism (`ms` bit + `segment_num`) reusable across every endpoint that
+needs it, implementing it once here is cheaper than three separate ad hoc
+size-capping workarounds bolted onto three different endpoint modules.
+
+### 76. Fragmentation support (v0.76.0)
+
+- Multi-AVTPDU reassembly for both ACF_ABB and ACF_GBB: `ms=1`
+  intermediate fragments carrying `segment_num` in place of `read_size`,
+  the final `ms=0` fragment carrying the true `acf_msg_length`/payload-
+  completion semantics and (per Phase 18) the only fragment allowed to
+  carry a safe-point CRC, computed across the full reassembled payload.
+- `rx_stream_max_request_size` (0 = fragmentation unsupported for that
+  stream) wired into the request-stream config table reserved since
+  Phase 14; per-endpoint retrofit of CAN XL (v0.72.0), UART (v0.66.0),
+  and discovery (v0.63.0) to actually exercise it end-to-end, closing out
+  the three deferred single-AVTPDU-worst-case tests noted at those
+  milestones.
+
+---
+### Phase 21 — Satellite Package Rework
+---
+
+Works back through every entry in the Satellite Package Disposition table
+above, now that Phases 13–20 have landed a stable new core API to rebind
+against. Grouped into batches the same way the legacy program's own
+"coverage maximization" milestones (v0.50.0–v0.54.0) were batched, for the
+same reason: each batch is independently shippable and CI-green on its
+own, rather than one enormous PR.
+
+### 77. Foundational test/config satellites (v0.77.0)
+
+- **REPLACE** `mock.c`: in-process RC-Server/endpoint test double
+  replacing the old zone-controller mock, built against the Phase 14
+  register-map model and Phase 16+ endpoint types directly (no
+  Command/Response shape left to double for).
+- **REPLACE** `config.c`: RC-Server/endpoint manifest loader (HW pin map,
+  EP list, stream config) replacing the old zone-manifest JSON schema.
+- **ADAPT** `cli.c`: `capabilities`'s payload content moves from the old
+  `RCP_CMD_*` enum to the new `svr_implemented_options` feature-bundle
+  flags; `version`/`status` structurally unaffected.
+
+### 78. Transport satellites (v0.78.0)
+
+- **REPLACE** `udp.c`: becomes the IEEE1722-over-UDP/IP (Annex J)
+  transport carrying AVTPDUs; POSIX socket/thread plumbing from the old
+  implementation reused as a starting point where it still fits.
+- **REPLACE** `shmem.c`: in-process AVTPDU-frame loopback transport;
+  evaluate consolidating with the new `mock.c` rather than shipping both.
+- **ADAPT** `tsn.c`: 802.1p PCP tagging retained, priority source moved
+  from the retired `rcp_priority_t` enum to the new request-kind
+  execution-priority classes (Phase 17, extraction §3.14).
+- **DEPRECATE** `tls.c`: removed; the spec's real security control is
+  MACsec (802.1AE, link-layer), out of this library's transport
+  abstraction entirely (declared product-specific/opaque in the register
+  map, same as PHY/network-interface config).
+
+### 79. Safety-adjacent satellites (v0.79.0)
+
+- **REPLACE** `watchdog.c`: thin client convenience around the Phase 18
+  per-stream `rx_wd_*` registers and safety-request sequences, not an
+  independent `RCP_CMD_WATCHDOG` side channel.
+- **REPLACE** `deadline.c`: liveness re-derived from response/ack-queue
+  `Flush_time` heartbeats and/or `rx_wd_info_enable` notifications — no
+  generic "Status stream" left to monitor.
+- **REPLACE** `powerstate.c`: client convenience wrapper around the
+  Phase 19 Wakeup endpoint + Normal/StandBy/Sleep/Unpowered model,
+  replacing the ad-hoc Active/Sleeping/BusOff state machine entirely.
+
+### 80. Generic decorators, batch 1 (v0.80.0)
+
+- **ADAPT**, rebound to the new endpoint-request/response primitive in
+  place of `rcp_controller_t`'s `send(cmd)`: `authz.c` (policy keys move
+  to stream/endpoint/request-type), `ratelimit.c` (admission control
+  against an endpoint's finite request-queue capacity), `loan.c`
+  (zero-copy pooled buffers for CAN XL/UART/SPI-sized payloads),
+  `observe.c` (metric labels move to server/endpoint/request-type),
+  `faultinject.c` (drop/slow/error/timeout rules), `admin.c` (lists RC
+  Servers/endpoints instead of zones), `recorder.c` (captures raw
+  ACF messages/AVTPDUs instead of Command/Response pairs, with a new
+  on-the-wire capture format).
+
+### 81. Protocol bridges (v0.81.0)
+
+- **ADAPT** all seven compile-time-stub bridges (`grpcbridge`,
+  `restbridge`, `someipbr`, `ddsbr`, `mqttbr`, `udsbr`, `doipbr`):
+  framing calls updated to the new endpoint-request/response shape; none
+  currently link a real backend, so none require one now either.
+- **ADAPT**, narrowed role: `canbr.c`/`linbr.c` — CAN and LIN are now
+  native endpoint types (Phase 19) and CAN(FD/XL) can be RCP's own
+  transport network (Phase 13); these two bridges keep only the
+  external-foreign-bus-segment gateway role that doesn't overlap either.
+  Documented cross-references added in all three modules' header
+  comments (native endpoint, transport-network option, bridge) so the
+  three-way distinction survives future contributors, per the Satellite
+  Disposition table.
+
+### 82. Optional discovery convenience (v0.82.0)
+
+- **ADAPT** `mdns.c`: retained strictly as an optional convenience
+  discovery layer scoped to the IEEE1722-over-UDP/IP transport variant,
+  layered beside — never instead of — the Phase 15 native broadcast
+  discovery mechanism, which remains the only mandatory discovery path.
+
+### 83. Deprecation batch (v0.83.0)
+
+- **DEPRECATE** (removed from the tree, with rationale preserved in this
+  ROADMAP.md and this milestone's commit message, not silently deleted):
+  `prioqueue.c` (superseded by protocol-defined execution-priority
+  ordering, Phase 17), `firmware.c` (no OTA/firmware endpoint exists
+  anywhere in the spec — an OEM/application-layer concern out of RCP's
+  own scope), `zonegroup.c`/`proxy.c`/`redundancy.c`/`federation.c` (all
+  built entirely on the retired Zone concept, with no TC18 counterpart
+  for multi-target grouping, proxying, server redundancy, or multi-HPC
+  leasing), `dyndata.c` (every endpoint type has one fixed, spec-defined
+  payload shape — no schema-negotiation problem exists to solve).
+
+### 84. RELAY adapter rework (v0.84.0)
+
+- **REPLACE** `relay/relay.h` + `adapt.c`: RELAY's generic
+  `Message`/`ToMessage()`/`FromMessage()` envelope assumes one generic
+  command/response shape; TC18's 13 heterogeneous, fixed-shape endpoint
+  types don't map onto it without per-endpoint-type translation rules
+  RELAY itself doesn't yet define. This milestone proposes an interim
+  per-endpoint-type message mapping scoped to this repo, and opens the
+  upstream conversation with `SoundMatt/RELAY` (a GitHub issue against
+  that repo, not an edit to it — per this project's own cross-repo
+  policy) rather than assuming a resolution unilaterally.
+
+---
+### Phase 22 — Safety/Security Re-certification
+---
+
+Deliberately last, per the Satellite Disposition table's reasoning:
+re-deriving certification evidence from code that doesn't exist yet is
+backwards. Spec basis for the *content* being re-derived: whatever Phases
+13–21 actually built, not the superseded catalog.
+
+### 85. Full re-certification pass (v0.85.0)
+
+- `.fusa-reqs.json`: full requirements catalog re-derived against the new
+  protocol's actual behavior (register-map access control, lifecycle
+  transitions, E2E safe points, endpoint request/response shapes) —
+  starting the traceability count over, the same honest
+  "intentionally-below-100%-until-everything-lands" posture the legacy
+  program used at its own v0.2.0, not a claimed carry-over of the old
+  314-requirement count.
+- `HARA.md`/`.fusa-hara.json`: hazard analysis re-run against the new
+  safety mechanisms (Phase 18's CRC32 safe points and safety-request
+  MSB variants, Phase 19's power-mode model) rather than the retired
+  watchdog/E2E-CRC-16 hazard set.
+- `tara.md`/`.json`, `CYBERSECURITY.md`: threat model re-authored against
+  the new attack surface (MACsec's role now that `tls.c` is deprecated,
+  the new discovery/lifecycle bootstrap sequence as an attack surface).
+- `tla/*.tla`, `FORMAL_VERIFICATION.md`: new TLA+ models for the Phase 14
+  lifecycle state machine and the Phase 18 CRC32 safe-point/safety-request
+  mechanism, replacing the retired Healthy/Degraded/Faulted watchdog and
+  CRC-16 anti-replay models.
+- `AUDIT_PACK.md`, README.md: rewritten to describe the shipped TC18
+  protocol rather than the superseded Zone/Command model.
