@@ -4423,6 +4423,358 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-I2C-001",
+      "title": "rcp_ep_i2c_mode_valid() accepts exactly the four defined presets",
+      "text": "rcp_ep_i2c_mode_valid() shall return true for v in 0..3 (RCP_EP_I2C_MODE_STANDARD..RCP_EP_I2C_MODE_HIGH_SPEED) and false for any other value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-I2C-002",
+      "title": "rcp_ep_i2c_functional_cfg_init() zero-initializes cfg",
+      "text": "rcp_ep_i2c_functional_cfg_init() shall set every rcp_regmap_ep_functional_cfg_t flag in cfg->common to false and cfg->i2c_mode to RCP_EP_I2C_MODE_STANDARD (0), regardless of cfg's prior contents.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-I2C-003",
+      "title": "rcp_ep_i2c_functional_cfg_writable() is false while HW_UNCONFIGURED",
+      "text": "rcp_ep_i2c_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, for any writer, by delegating to rcp_server_field_writable() with kind RCP_SERVER_FIELD_FUNCTIONAL_W.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-I2C-004",
+      "title": "rcp_ep_i2c_functional_cfg_writable() is true while HW_CONFIGURED for any writer",
+      "text": "rcp_ep_i2c_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED regardless of writer's contents.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-I2C-005",
+      "title": "rcp_ep_i2c_functional_cfg_writable() requires authorization once RCP_CONFIGURED",
+      "text": "rcp_ep_i2c_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_RCP_CONFIGURED when writer has neither via_root_client_ep0 nor via_owning_stream set, and true when either is set.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-I2C-006",
+      "title": "rcp_ep_i2c_set_mode() rejects an invalid mode value",
+      "text": "rcp_ep_i2c_set_mode() shall return false and leave cfg unchanged when mode is not rcp_ep_i2c_mode_valid(), regardless of state/writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-I2C-007",
+      "title": "rcp_ep_i2c_set_mode() rejects an unauthorized write",
+      "text": "rcp_ep_i2c_set_mode() shall return false and leave cfg unchanged when rcp_ep_i2c_functional_cfg_writable() does not authorize the write for state/writer, even when mode is valid.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-I2C-008",
+      "title": "rcp_ep_i2c_set_mode() applies a valid, authorized write",
+      "text": "rcp_ep_i2c_set_mode() shall set cfg->i2c_mode to mode and return true when mode is rcp_ep_i2c_mode_valid() and rcp_ep_i2c_functional_cfg_writable() authorizes the write for state/writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-I2C-009",
+      "title": "rcp_ep_i2c_strerror() never returns NULL and returns distinct messages",
+      "text": "rcp_ep_i2c_strerror() shall return a non-NULL, non-empty message for every rcp_ep_i2c_errc_t value (including an out-of-range value), with a distinct message per defined error code.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-I2C-010",
+      "title": "rcp_ep_i2c_encode_transfer_request() encodes an ACF_ABB write with evt = 0",
+      "text": "rcp_ep_i2c_encode_transfer_request() shall produce an ACF_ABB frame with op == RCP_ACF_OP_WRITE, evt == 0, byte_bus_id == byte_bus_id, transaction_num == transaction_num, and payload exactly tx_data[0..tx_len).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-I2C-011",
+      "title": "rcp_ep_i2c_decode_transfer_request() round-trips the raw payload verbatim",
+      "text": "rcp_ep_i2c_decode_transfer_request() shall, given a frame produced by rcp_ep_i2c_encode_transfer_request() and the same byte_bus_id, return RCP_EP_I2C_OK and recover the original tx bytes (address byte(s) included, unparsed) and transaction_num unchanged, byte for byte.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-I2C-012",
+      "title": "rcp_ep_i2c_decode_transfer_request() rejects a malformed, misaddressed, or misdirected frame",
+      "text": "rcp_ep_i2c_decode_transfer_request() shall return RCP_EP_I2C_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length, RCP_EP_I2C_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_I2C_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, and RCP_EP_I2C_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-I2C-013",
+      "title": "rcp_ep_i2c_encode_response() encodes ACF_ABB when untimed and ACF_GBB when timed",
+      "text": "rcp_ep_i2c_encode_response() shall produce an ACF_ABB frame when timed is false and an ACF_GBB frame with mtv == RCP_ACF_MTV_VALID and message_timestamp == timestamp when timed is true, in both cases with op == RCP_ACF_OP_READ, evt == 0, and payload exactly rx_data[0..rx_len).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-I2C-014",
+      "title": "rcp_ep_i2c_decode_response() round-trips an untimed response",
+      "text": "rcp_ep_i2c_decode_response() shall, given a frame produced by rcp_ep_i2c_encode_response() with timed = false and the same byte_bus_id, return RCP_EP_I2C_OK, recover the original rx payload bytes and transaction_num, and report *out_timed = false with *out_timestamp == 0.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-I2C-015",
+      "title": "rcp_ep_i2c_decode_response() round-trips a timed response",
+      "text": "rcp_ep_i2c_decode_response() shall, given a frame produced by rcp_ep_i2c_encode_response() with timed = true, the same byte_bus_id, and a timestamp, return RCP_EP_I2C_OK, recover the original rx payload bytes and transaction_num, and report *out_timed = true with *out_timestamp equal to the original timestamp.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-I2C-016",
+      "title": "rcp_ep_i2c_decode_response() rejects a malformed or misaddressed frame",
+      "text": "rcp_ep_i2c_decode_response() shall return RCP_EP_I2C_ERR_SHORT_FRAME for a frame too short for its applicable ACF fixed header and RCP_EP_I2C_ERR_WRONG_BUS when byte_bus_id != expected_bus_id.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-001",
+      "title": "rcp_ep_uart_nr_bits_valid() accepts exactly 1..8",
+      "text": "rcp_ep_uart_nr_bits_valid() shall return true for nr_bits in RCP_EP_UART_NR_BITS_MIN..RCP_EP_UART_NR_BITS_MAX (1..8) inclusive and false for 0 or any value above 8.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-002",
+      "title": "rcp_ep_uart_bit_pad_mask() computes (1 << nr_bits) - 1, and 0 for an invalid nr_bits",
+      "text": "rcp_ep_uart_bit_pad_mask() shall return (1u << nr_bits) - 1 for every rcp_ep_uart_nr_bits_valid() nr_bits (0xFF for nr_bits == 8, 0x7F for nr_bits == 7, ...) and 0 for any nr_bits outside 1..8.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-003",
+      "title": "rcp_ep_uart_apply_bit_padding() masks every byte in place, and is a no-op for nr_bits == 8",
+      "text": "rcp_ep_uart_apply_bit_padding() shall AND rcp_ep_uart_bit_pad_mask(nr_bits) into every byte of buf[0..len), leaving buf unchanged when nr_bits == 8 and clearing every byte to 0 when nr_bits is outside 1..8.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-004",
+      "title": "rcp_ep_uart_functional_cfg_init() zero-initializes cfg except uart_nr_bits",
+      "text": "rcp_ep_uart_functional_cfg_init() shall set every rcp_regmap_ep_functional_cfg_t flag in cfg->common to false, baud_rate/ep_rx_buffer_size/uart_timeout_ms to 0, parity to RCP_EP_UART_PARITY_NONE, stop_bits to RCP_EP_UART_STOP_BITS_ONE, and cfg->uart_nr_bits to RCP_EP_UART_NR_BITS_MAX (8), regardless of cfg's prior contents.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-005",
+      "title": "rcp_ep_uart_functional_cfg_writable() is false while HW_UNCONFIGURED",
+      "text": "rcp_ep_uart_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, for any writer, by delegating to rcp_server_field_writable() with kind RCP_SERVER_FIELD_FUNCTIONAL_W.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-006",
+      "title": "rcp_ep_uart_functional_cfg_writable() is true while HW_CONFIGURED for any writer",
+      "text": "rcp_ep_uart_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED regardless of writer's contents.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-007",
+      "title": "rcp_ep_uart_functional_cfg_writable() requires authorization once RCP_CONFIGURED",
+      "text": "rcp_ep_uart_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_RCP_CONFIGURED when writer has neither via_root_client_ep0 nor via_owning_stream set, and true when either is set.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-008",
+      "title": "rcp_ep_uart_set_baud_rate() rejects an unauthorized write",
+      "text": "rcp_ep_uart_set_baud_rate() shall return false and leave cfg unchanged when rcp_ep_uart_functional_cfg_writable() does not authorize the write for state/writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-009",
+      "title": "rcp_ep_uart_set_baud_rate() applies an authorized write",
+      "text": "rcp_ep_uart_set_baud_rate() shall set cfg->baud_rate to baud_rate and return true when rcp_ep_uart_functional_cfg_writable() authorizes the write for state/writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-010",
+      "title": "rcp_ep_uart_set_frame_format() rejects an invalid nr_bits",
+      "text": "rcp_ep_uart_set_frame_format() shall return false and leave cfg unchanged when nr_bits is not rcp_ep_uart_nr_bits_valid(), regardless of state/writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-011",
+      "title": "rcp_ep_uart_set_frame_format() rejects an unauthorized write",
+      "text": "rcp_ep_uart_set_frame_format() shall return false and leave cfg unchanged when rcp_ep_uart_functional_cfg_writable() does not authorize the write for state/writer, even when nr_bits is valid.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-012",
+      "title": "rcp_ep_uart_set_frame_format() applies a valid, authorized write to all three fields together",
+      "text": "rcp_ep_uart_set_frame_format() shall set cfg->uart_nr_bits, cfg->parity, and cfg->stop_bits together and return true when nr_bits is rcp_ep_uart_nr_bits_valid() and rcp_ep_uart_functional_cfg_writable() authorizes the write for state/writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-013",
+      "title": "rcp_ep_uart_set_rx_buffer_size() rejects an unauthorized write",
+      "text": "rcp_ep_uart_set_rx_buffer_size() shall return false and leave cfg unchanged when rcp_ep_uart_functional_cfg_writable() does not authorize the write for state/writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-014",
+      "title": "rcp_ep_uart_set_rx_buffer_size() applies an authorized write",
+      "text": "rcp_ep_uart_set_rx_buffer_size() shall set cfg->ep_rx_buffer_size to rx_buffer_size and return true when rcp_ep_uart_functional_cfg_writable() authorizes the write for state/writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-015",
+      "title": "rcp_ep_uart_set_timeout() rejects an unauthorized write",
+      "text": "rcp_ep_uart_set_timeout() shall return false and leave cfg unchanged when rcp_ep_uart_functional_cfg_writable() does not authorize the write for state/writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-016",
+      "title": "rcp_ep_uart_set_timeout() applies an authorized write",
+      "text": "rcp_ep_uart_set_timeout() shall set cfg->uart_timeout_ms to timeout_ms and return true when rcp_ep_uart_functional_cfg_writable() authorizes the write for state/writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-017",
+      "title": "rcp_ep_uart_strerror() never returns NULL and returns distinct messages",
+      "text": "rcp_ep_uart_strerror() shall return a non-NULL, non-empty message for every rcp_ep_uart_errc_t value (including an out-of-range value), with a distinct message per defined error code.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-018",
+      "title": "rcp_ep_uart_encode_write_request() encodes an ACF_ABB write with evt = 0",
+      "text": "rcp_ep_uart_encode_write_request() shall produce an ACF_ABB frame with op == RCP_ACF_OP_WRITE, evt == 0, byte_bus_id == byte_bus_id, transaction_num == transaction_num, and payload exactly tx_data[0..tx_len).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-019",
+      "title": "rcp_ep_uart_decode_write_request() round-trips the raw TX payload",
+      "text": "rcp_ep_uart_decode_write_request() shall, given a frame produced by rcp_ep_uart_encode_write_request() and the same byte_bus_id, return RCP_EP_UART_OK and recover the original tx bytes and transaction_num unchanged, byte for byte.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-020",
+      "title": "rcp_ep_uart_decode_write_request() rejects a malformed, misaddressed, or misdirected frame",
+      "text": "rcp_ep_uart_decode_write_request() shall return RCP_EP_UART_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length, RCP_EP_UART_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_UART_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, and RCP_EP_UART_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-021",
+      "title": "rcp_ep_uart_encode_write_response() encodes ACF_ABB when untimed and ACF_GBB when timed",
+      "text": "rcp_ep_uart_encode_write_response() shall produce an ACF_ABB frame when timed is false and an ACF_GBB frame with mtv == RCP_ACF_MTV_VALID and message_timestamp == timestamp when timed is true, in both cases with op == RCP_ACF_OP_WRITE, evt == 0, and payload exactly accepted_data[0..accepted_len).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-022",
+      "title": "rcp_ep_uart_decode_write_response() round-trips the accepted-bytes payload and timing",
+      "text": "rcp_ep_uart_decode_write_response() shall, given a frame produced by rcp_ep_uart_encode_write_response(), the same byte_bus_id, and either timed value, return RCP_EP_UART_OK, recover the accepted payload bytes and transaction_num, and report *out_timed/*out_timestamp consistently with the original timed/timestamp arguments; it shall return RCP_EP_UART_ERR_SHORT_FRAME for a frame too short for its applicable ACF fixed header and RCP_EP_UART_ERR_WRONG_BUS when byte_bus_id != expected_bus_id.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-023",
+      "title": "rcp_ep_uart_encode_read_request() carries read_size in the ACF header's read_size_or_segment_num field, with no payload",
+      "text": "rcp_ep_uart_encode_read_request() shall produce an ACF_ABB frame with op == RCP_ACF_OP_READ, evt == 0, read_size_or_segment_num == read_size, byte_bus_id == byte_bus_id, transaction_num == transaction_num, and an empty payload.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-024",
+      "title": "rcp_ep_uart_decode_read_request() round-trips read_size and transaction_num",
+      "text": "rcp_ep_uart_decode_read_request() shall, given a frame produced by rcp_ep_uart_encode_read_request() and the same byte_bus_id, return RCP_EP_UART_OK and recover the original read_size and transaction_num unchanged.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-025",
+      "title": "rcp_ep_uart_decode_read_request() rejects a payload-bearing read request with RCP_EP_UART_ERR_UNKNOWN_CMD",
+      "text": "rcp_ep_uart_decode_read_request() shall return RCP_EP_UART_ERR_UNKNOWN_CMD, rather than RCP_EP_UART_OK, when an otherwise well-formed read request carries a non-empty payload -- the deliberate asymmetry against GPIO/PWM_OUT request types documented in ep_uart.h.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-026",
+      "title": "rcp_ep_uart_encode_read_response() encodes ACF_ABB when untimed and ACF_GBB when timed",
+      "text": "rcp_ep_uart_encode_read_response() shall produce an ACF_ABB frame when timed is false and an ACF_GBB frame with mtv == RCP_ACF_MTV_VALID and message_timestamp == timestamp when timed is true, in both cases with op == RCP_ACF_OP_READ, evt == 0, and payload exactly rx_data[0..rx_len).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-027",
+      "title": "rcp_ep_uart_decode_read_response() round-trips a full-length and a short-read (single-AVTPDU) RX payload",
+      "text": "rcp_ep_uart_decode_read_response() shall, given a frame produced by rcp_ep_uart_encode_read_response() with rx_len equal to or less than the originating request's read_size, return RCP_EP_UART_OK and recover the rx payload bytes, transaction_num, and timed/timestamp state unchanged, with no segment_num-based reassembly performed or required for a same-AVTPDU short read.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-UART-028",
+      "title": "rcp_ep_uart_decode_read_response() rejects a malformed or misaddressed frame",
+      "text": "rcp_ep_uart_decode_read_response() shall return RCP_EP_UART_ERR_SHORT_FRAME for a frame too short for its applicable ACF fixed header and RCP_EP_UART_ERR_WRONG_BUS when byte_bus_id != expected_bus_id.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     }
   ]
 }
