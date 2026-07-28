@@ -310,10 +310,15 @@ static void test_request_stream_cfg_init_zeroes(void)
 
     TEST_ASSERT_FALSE(cfg.configured);
     TEST_ASSERT_EQUAL_UINT64(0, cfg.rx_stream_id);
+    TEST_ASSERT_FALSE(cfg.rx_enforce_e2e);
+    TEST_ASSERT_FALSE(cfg.rx_wd_enable);
     TEST_ASSERT_EQUAL_UINT32(0, cfg.rx_wd_timeout_ms);
     TEST_ASSERT_EQUAL_UINT8(0, cfg.rx_wd_action);
-    TEST_ASSERT_FALSE(cfg.rx_enforce_e2e);
+    TEST_ASSERT_FALSE(cfg.rx_wd_safestate_enable);
+    TEST_ASSERT_FALSE(cfg.rx_wd_info_enable);
     TEST_ASSERT_EQUAL_UINT8(0, cfg.rx_safety_measure);
+    TEST_ASSERT_EQUAL_UINT16(0, cfg.rx_safestate_sequencer);
+    TEST_ASSERT_EQUAL_UINT8(0, cfg.rx_safe_sequencer_state);
 }
 
 static void test_response_queue_cfg_init_zeroes(void)

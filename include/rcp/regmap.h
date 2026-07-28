@@ -97,10 +97,17 @@
  * ── Request-stream and response/ack queue config ───────────────────────────
  *
  * rcp_regmap_request_stream_cfg_t and rcp_regmap_response_queue_cfg_t model
- * the fields those two tables need, including the E2E/watchdog-relevant
- * ones (rx_wd_timeout_ms, rx_wd_action, rx_enforce_e2e, rx_safety_measure)
- * required by this milestone's scope to exist now so Phase 18 never needs
- * a second register-layout pass -- none of them are wired to behavior yet.
+ * the fields those two tables need. At this module's original milestone
+ * (62) the E2E/watchdog-relevant fields (rx_wd_timeout_ms, rx_wd_action,
+ * rx_enforce_e2e, rx_safety_measure) existed but were deliberately inert,
+ * so Phase 18 would never need a second register-layout pass. Phase 18
+ * (safept.h/safept.c, milestone 70) has since both wired those four
+ * fields to real behavior and rounded out the rest of the rx_wd_* family
+ * (rx_wd_enable, rx_wd_safestate_enable, rx_wd_info_enable) plus
+ * rx_safestate_sequencer/rx_safe_sequencer_state that milestone 62's own
+ * placeholder comment had not yet named -- see
+ * rcp_regmap_request_stream_cfg_t's own field comments below and
+ * safept.h's file header for the behavior each one now drives.
  *
  * ── Known spec ambiguity: EP-ID/byte_bus_id ordering is not enforced ───────
  *
@@ -347,18 +354,52 @@ const char *rcp_regmap_named_signal_string(rcp_regmap_named_signal_t sig);
 
 /* ── Request-stream and response/ack queue config ──────────────────────────── */
 
-/* Fields relevant to E2E/watchdog (Phase 18) are present but inert: no
- * code in this codebase reads rx_wd_timeout_ms, rx_wd_action,
- * rx_enforce_e2e, or rx_safety_measure to influence behavior yet. */
+/* E2E/watchdog fields are wired to real behavior as of Phase 18
+ * (safept.h/safept.c, milestone 70): rx_enforce_e2e, rx_wd_enable,
+ * rx_wd_timeout_ms, rx_wd_safestate_enable, rx_wd_info_enable,
+ * rx_safety_measure, rx_safestate_sequencer, and rx_safe_sequencer_state
+ * are all consumed by safept.h's own pure functions (which take each
+ * field as a plain argument rather than this struct itself, matching
+ * every request-kind module's "operate on caller-owned data" convention
+ * -- see scheduler.h's rcp_sched_compare() for the established
+ * precedent). rx_wd_action, present since milestone 62, stays
+ * caller-defined/round-tripped: this milestone's roadmap scope names no
+ * concrete action enumeration for it, so no safept.h function
+ * interprets its value. */
 typedef struct {
     bool     configured;
     uint64_t rx_stream_id;      /* IEEE 1722 StreamID this request stream
                                     listens on; same addressing model as
                                     avtp.h */
-    uint32_t rx_wd_timeout_ms;  /* inert until Phase 18 */
-    uint8_t  rx_wd_action;      /* inert until Phase 18 */
-    bool     rx_enforce_e2e;    /* inert until Phase 18 */
-    uint8_t  rx_safety_measure; /* inert until Phase 18 */
+
+    /* ── E2E (safept.h CRC32 safe points) ──────────────────────────────── */
+    bool     rx_enforce_e2e;    /* false: a CRC_ERROR drops only the
+                                    single offending request
+                                    (RCP_SAFEPT_CRC_ACTION_DROP_REQUEST).
+                                    true: the first CRC_ERROR latches the
+                                    whole stream to a faulted state
+                                    (RCP_SAFEPT_CRC_ACTION_LATCH_STREAM_FAULT)
+                                    -- see rcp_safept_crc_error_action(). */
+
+    /* ── Per-stream watchdog (safept.h) ────────────────────────────────── */
+    bool     rx_wd_enable;            /* watchdog active on this stream at all */
+    uint32_t rx_wd_timeout_ms;        /* elapsed-since-last-kick overflow threshold */
+    uint8_t  rx_wd_action;            /* caller-defined; round-tripped only */
+    bool     rx_wd_safestate_enable;  /* overflow drives the endpoint toward
+                                          its configured safe state */
+    bool     rx_wd_info_enable;       /* overflow raises an informational
+                                          status/event, independent of
+                                          rx_wd_safestate_enable */
+
+    /* ── Configured safe state (safept.h) ──────────────────────────────── */
+    uint8_t  rx_safety_measure;         /* RCP_SAFEPT_MEASURE_FORCE_HIGH_IMPEDANCE (0)
+                                            or RCP_SAFEPT_MEASURE_SEQUENCER (1) */
+    uint16_t rx_safestate_sequencer;    /* sequencer.h table index the
+                                            RCP_SAFEPT_MEASURE_SEQUENCER measure
+                                            polls; meaningless otherwise */
+    uint8_t  rx_safe_sequencer_state;   /* the sequencer state value, at
+                                            rx_safestate_sequencer, that means
+                                            "endpoint is in its safe state" */
 } rcp_regmap_request_stream_cfg_t;
 
 /* Zero-initializes cfg (configured = false, everything else 0). */

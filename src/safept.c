@@ -1,0 +1,266 @@
+#include "rcp/safept.h"
+
+#include <stdlib.h>
+#include <string.h>
+
+//cfusa:req REQ-SAFEPT-001
+const char *rcp_safept_strerror(rcp_safept_errc_t e)
+{
+    switch (e) {
+    case RCP_SAFEPT_OK:               return "safept: ok";
+    case RCP_SAFEPT_ERR_SHORT_FRAME:  return "safept: frame too short for a CRC32 trailer";
+    case RCP_SAFEPT_ERR_CRC_MISMATCH: return "safept: CRC_ERROR -- CRC32 mismatch, execution skipped";
+    default:                          return "safept: unknown error";
+    }
+}
+
+/* ── CRC32 (poly 0xF4ACFB13, init/xorout 0xFFFFFFFF, refin/refout true) ────── */
+
+/* Bit-reversed form of 0xF4ACFB13, used directly by the reflected
+ * (LSB-first) update below -- the standard technique for implementing a
+ * refin=true/refout=true CRC without reflecting each input byte and the
+ * running remainder separately. */
+#define RCP_SAFEPT_CRC32_RPOLY 0xC8DF352Fu
+
+static uint32_t crc32_update(uint32_t crc, uint8_t b)
+{
+    int i;
+
+    crc ^= b;
+    for (i = 0; i < 8; i++) {
+        crc = (crc & 1u) ? ((crc >> 1) ^ RCP_SAFEPT_CRC32_RPOLY) : (crc >> 1);
+    }
+    return crc;
+}
+
+//cfusa:req REQ-SAFEPT-002
+uint32_t rcp_safept_crc32(const uint8_t *data, size_t len)
+{
+    uint32_t crc = 0xFFFFFFFFu;
+    size_t i;
+
+    for (i = 0; i < len; i++) crc = crc32_update(crc, data[i]);
+    return crc ^ 0xFFFFFFFFu;
+}
+
+static void put_u64(uint8_t *p, uint64_t v)
+{
+    size_t i;
+    for (i = 0; i < 8; i++) {
+        p[i] = (uint8_t)(v >> (56u - 8u * i));
+    }
+}
+
+static void put_u32(uint8_t *p, uint32_t v)
+{
+    p[0] = (uint8_t)(v >> 24);
+    p[1] = (uint8_t)(v >> 16);
+    p[2] = (uint8_t)(v >> 8);
+    p[3] = (uint8_t)v;
+}
+
+static uint32_t get_u32(const uint8_t *p)
+{
+    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) |
+           ((uint32_t)p[2] << 8)  |  (uint32_t)p[3];
+}
+
+//cfusa:req REQ-SAFEPT-003
+uint32_t rcp_safept_compute_crc(uint64_t stream_id, uint64_t avtp_timestamp,
+                                 const uint8_t *acf_frame, size_t acf_frame_len)
+{
+    uint32_t crc = 0xFFFFFFFFu;
+    uint8_t  sid[8];
+    uint8_t  ts[8];
+    size_t   i;
+
+    put_u64(sid, stream_id);
+    put_u64(ts, avtp_timestamp);
+
+    for (i = 0; i < 8; i++) crc = crc32_update(crc, sid[i]);
+    for (i = 0; i < 8; i++) crc = crc32_update(crc, ts[i]);
+    for (i = 0; i < acf_frame_len; i++) crc = crc32_update(crc, acf_frame[i]);
+
+    return crc ^ 0xFFFFFFFFu;
+}
+
+//cfusa:req REQ-SAFEPT-004
+size_t rcp_safept_length_with_crc(size_t payload_len)
+{
+    if (payload_len > (size_t)-1 - RCP_SAFEPT_CRC_LEN) return (size_t)-1;
+    return payload_len + RCP_SAFEPT_CRC_LEN;
+}
+
+/* ── wrap / unwrap ─────────────────────────────────────────────────────────── */
+
+//cfusa:req REQ-SAFEPT-005
+//cfusa:req REQ-SAFEPT-006
+rcp_bytes_t rcp_safept_wrap(uint64_t stream_id, uint64_t avtp_timestamp,
+                             const uint8_t *acf_frame, size_t acf_frame_len)
+{
+    rcp_bytes_t out = {0};
+    uint8_t    *data;
+    uint32_t    crc;
+
+    if (!acf_frame && acf_frame_len > 0) return out;
+    if (acf_frame_len > (size_t)-1 - RCP_SAFEPT_CRC_LEN) return out;
+
+    data = (uint8_t *)malloc(acf_frame_len + RCP_SAFEPT_CRC_LEN);
+    if (!data) return out;
+
+    if (acf_frame_len > 0) memcpy(data, acf_frame, acf_frame_len);
+    crc = rcp_safept_compute_crc(stream_id, avtp_timestamp, acf_frame, acf_frame_len);
+    put_u32(data + acf_frame_len, crc);
+
+    out.data = data;
+    out.len  = acf_frame_len + RCP_SAFEPT_CRC_LEN;
+    return out;
+}
+
+//cfusa:req REQ-SAFEPT-007
+//cfusa:req REQ-SAFEPT-008
+//cfusa:req REQ-SAFEPT-009
+rcp_safept_errc_t rcp_safept_unwrap(uint64_t stream_id, uint64_t avtp_timestamp,
+                                     const uint8_t *frame, size_t frame_len,
+                                     const uint8_t **out_acf_frame, size_t *out_acf_frame_len)
+{
+    size_t   body_len;
+    uint32_t got;
+    uint32_t want;
+
+    if (frame_len < RCP_SAFEPT_CRC_LEN) return RCP_SAFEPT_ERR_SHORT_FRAME;
+
+    body_len = frame_len - RCP_SAFEPT_CRC_LEN;
+    got      = get_u32(frame + body_len);
+    want     = rcp_safept_compute_crc(stream_id, avtp_timestamp, frame, body_len);
+
+    *out_acf_frame     = frame;
+    *out_acf_frame_len = body_len;
+
+    if (got != want) return RCP_SAFEPT_ERR_CRC_MISMATCH;
+    return RCP_SAFEPT_OK;
+}
+
+/* ── Fragmentation/CRC interaction ─────────────────────────────────────────── */
+
+//cfusa:req REQ-SAFEPT-010
+bool rcp_safept_fragment_carries_crc(bool is_last_fragment)
+{
+    return is_last_fragment;
+}
+
+/* ── Safety-tagged request classification ──────────────────────────────────── */
+
+//cfusa:req REQ-SAFEPT-011
+bool rcp_safept_is_safety_request(uint8_t request_type)
+{
+    return (request_type & 0x80u) != 0u;
+}
+
+//cfusa:req REQ-SAFEPT-012
+//cfusa:req REQ-SAFEPT-013
+bool rcp_safept_request_may_execute(uint8_t request_type, bool endpoint_in_safe_state)
+{
+    if (rcp_safept_is_safety_request(request_type)) return endpoint_in_safe_state;
+    return true;
+}
+
+/* ── The watchdog-purge-vs-safety-survive rule ─────────────────────────────── */
+
+//cfusa:req REQ-SAFEPT-014
+bool rcp_safept_watchdog_purge_should_keep(uint8_t request_type)
+{
+    return rcp_safept_is_safety_request(request_type);
+}
+
+//cfusa:req REQ-SAFEPT-015
+void rcp_safept_watchdog_purge_classify(const uint8_t *request_types, size_t count,
+                                         bool *out_keep)
+{
+    size_t i;
+    for (i = 0; i < count; i++) {
+        out_keep[i] = rcp_safept_watchdog_purge_should_keep(request_types[i]);
+    }
+}
+
+/* ── The configured safe state ─────────────────────────────────────────────── */
+
+//cfusa:req REQ-SAFEPT-016
+bool rcp_safept_measure_valid(uint8_t rx_safety_measure)
+{
+    return rx_safety_measure == (uint8_t)RCP_SAFEPT_MEASURE_FORCE_HIGH_IMPEDANCE ||
+           rx_safety_measure == (uint8_t)RCP_SAFEPT_MEASURE_SEQUENCER;
+}
+
+//cfusa:req REQ-SAFEPT-017
+//cfusa:req REQ-SAFEPT-018
+//cfusa:req REQ-SAFEPT-019
+bool rcp_safept_endpoint_in_safe_state(uint8_t rx_safety_measure,
+                                        const rcp_sequencer_table_t *table,
+                                        uint16_t safestate_sequencer,
+                                        uint8_t safe_sequencer_state)
+{
+    uint8_t current;
+
+    if (rx_safety_measure == (uint8_t)RCP_SAFEPT_MEASURE_FORCE_HIGH_IMPEDANCE) return true;
+    if (rx_safety_measure != (uint8_t)RCP_SAFEPT_MEASURE_SEQUENCER) return false; /* fail closed */
+
+    if (!table) return false; /* fail closed */
+    if (!rcp_sequencer_get_state(table, safestate_sequencer, &current)) return false; /* fail closed */
+
+    return current == safe_sequencer_state;
+}
+
+/* ── Per-stream watchdog ────────────────────────────────────────────────────── */
+
+//cfusa:req REQ-SAFEPT-024
+//cfusa:req REQ-SAFEPT-025
+//cfusa:req REQ-SAFEPT-026
+//cfusa:req REQ-SAFEPT-027
+rcp_safept_wd_result_t rcp_safept_wd_evaluate(bool rx_wd_enable, uint32_t rx_wd_timeout_ms,
+                                               bool rx_wd_safestate_enable,
+                                               bool rx_wd_info_enable,
+                                               uint64_t elapsed_since_last_kick_ms)
+{
+    rcp_safept_wd_result_t r;
+
+    r.overflowed = rx_wd_enable && (elapsed_since_last_kick_ms >= (uint64_t)rx_wd_timeout_ms);
+    r.enter_safe_state = r.overflowed && rx_wd_safestate_enable;
+    r.notify           = r.overflowed && rx_wd_info_enable;
+    return r;
+}
+
+/* ── rx_enforce_e2e: single-request drop vs. whole-stream latch-to-fault ────── */
+
+//cfusa:req REQ-SAFEPT-020
+rcp_safept_crc_action_t rcp_safept_crc_error_action(bool rx_enforce_e2e)
+{
+    return rx_enforce_e2e ? RCP_SAFEPT_CRC_ACTION_LATCH_STREAM_FAULT
+                           : RCP_SAFEPT_CRC_ACTION_DROP_REQUEST;
+}
+
+void rcp_safept_stream_fault_init(rcp_safept_stream_fault_t *f)
+{
+    f->faulted = false;
+}
+
+//cfusa:req REQ-SAFEPT-021
+//cfusa:req REQ-SAFEPT-022
+bool rcp_safept_stream_fault_on_crc_error(rcp_safept_stream_fault_t *f, bool rx_enforce_e2e)
+{
+    if (rcp_safept_crc_error_action(rx_enforce_e2e) == RCP_SAFEPT_CRC_ACTION_LATCH_STREAM_FAULT) {
+        f->faulted = true;
+    }
+    return true; /* a CRC_ERROR always skips this request's execution */
+}
+
+bool rcp_safept_stream_fault_is_faulted(const rcp_safept_stream_fault_t *f)
+{
+    return f->faulted;
+}
+
+//cfusa:req REQ-SAFEPT-023
+void rcp_safept_stream_fault_reset(rcp_safept_stream_fault_t *f)
+{
+    f->faulted = false;
+}
