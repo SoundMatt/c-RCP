@@ -3719,6 +3719,198 @@
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A"
+    },
+    {
+      "id": "REQ-DISC-001",
+      "title": "rcp_discovery_should_drop() flags any non-NTSCF subtype",
+      "text": "rcp_discovery_should_drop() shall return true for any avtp_subtype value other than the NTSCF subtype, including the TSCF subtype, independent of lifecycle state or time-sync capability.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-002",
+      "title": "rcp_discovery_encode_request() builds an NTSCF-framed ACF_ABB read at the discovery bus",
+      "text": "rcp_discovery_encode_request() shall encode a full NTSCF-framed ACF_ABB message addressed to RCP_SERVER_DISCOVERY_BYTE_BUS_ID with op READ, carrying the given read_size and transaction_num and no payload.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-003",
+      "title": "rcp_discovery_decode_request() recovers the requester, read_size, and transaction_num",
+      "text": "rcp_discovery_decode_request() shall, on RCP_DISCOVERY_OK, populate out_req's requester from the frame's NTSCF stream_id and its read_size/transaction_num from the ACF header.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-004",
+      "title": "rcp_discovery_decode_request() drops a TSCF-headed frame",
+      "text": "rcp_discovery_decode_request() shall return RCP_DISCOVERY_ERR_NOT_NTSCF when the frame's AVTP subtype is not NTSCF, before attempting any ACF-level parsing.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-005",
+      "title": "rcp_discovery_decode_request() rejects a non-ACF_ABB message",
+      "text": "rcp_discovery_decode_request() shall return RCP_DISCOVERY_ERR_BAD_MSG_TYPE when the NTSCF payload is not an ACF_ABB message.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-006",
+      "title": "rcp_discovery_decode_request() rejects the wrong byte_bus_id",
+      "text": "rcp_discovery_decode_request() shall return RCP_DISCOVERY_ERR_WRONG_BUS when the ACF header's byte_bus_id is not RCP_SERVER_DISCOVERY_BYTE_BUS_ID.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-007",
+      "title": "rcp_discovery_decode_request() rejects a non-read op",
+      "text": "rcp_discovery_decode_request() shall return RCP_DISCOVERY_ERR_WRONG_OP when the ACF header's op is not RCP_ACF_OP_READ.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-008",
+      "title": "rcp_discovery_decode_request() rejects a short or empty buffer",
+      "text": "rcp_discovery_decode_request() shall return RCP_DISCOVERY_ERR_SHORT_FRAME when the input buffer is empty or shorter than the frame's declared header-plus-payload length.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-009",
+      "title": "rcp_discovery_encode_response() payload length always equals the requested read_size",
+      "text": "rcp_discovery_encode_response() shall encode a response whose ACF payload length equals read_size exactly, regardless of how many octets of the general register slice are actually defined.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-010",
+      "title": "rcp_discovery_encode_response() populates the general slice from rcp_regmap_general_t",
+      "text": "rcp_discovery_encode_response() shall encode the response's leading RCP_DISCOVERY_GENERAL_SLICE_LEN octets, when present, as big-endian magic, svr_version, vendor_id, device_id, and svr_ep_count taken from map.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-011",
+      "title": "rcp_discovery_encode_response() zero-fills beyond the general slice",
+      "text": "rcp_discovery_encode_response() shall zero-fill any response payload octets beyond RCP_DISCOVERY_GENERAL_SLICE_LEN when read_size exceeds it.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-012",
+      "title": "rcp_discovery_decode_response() recovers a valid discovery result",
+      "text": "rcp_discovery_decode_response() shall, on RCP_DISCOVERY_OK, populate out_result with valid = true, the response frame's own NTSCF stream_id as server_stream_id, and the general slice fields decoded from the payload.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-013",
+      "title": "rcp_discovery_decode_response() rejects a payload shorter than the general slice",
+      "text": "rcp_discovery_decode_response() shall return RCP_DISCOVERY_ERR_SHORT_FRAME when the ACF payload is shorter than RCP_DISCOVERY_GENERAL_SLICE_LEN octets.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-014",
+      "title": "rcp_discovery_decode_response() applies the same AVTP/ACF-level checks as a request",
+      "text": "rcp_discovery_decode_response() shall return RCP_DISCOVERY_ERR_NOT_NTSCF, RCP_DISCOVERY_ERR_BAD_MSG_TYPE, RCP_DISCOVERY_ERR_WRONG_BUS, or RCP_DISCOVERY_ERR_WRONG_OP under the same conditions rcp_discovery_decode_request() does.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-015",
+      "title": "rcp_discovery_claim_init() starts unheld with the given timeout",
+      "text": "rcp_discovery_claim_init() shall initialize claim with held = false and timeout_ms set to the given value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-016",
+      "title": "rcp_discovery_claim_is_open() reports lapsed or never-held claims as open",
+      "text": "rcp_discovery_claim_is_open() shall return true when claim has never been held, or when now_ms is at or past claim's deadline_ms.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-017",
+      "title": "rcp_discovery_claim_note_request() grants an open claim to the requester",
+      "text": "rcp_discovery_claim_note_request() shall, when the claim is open, set held = true, claimant = requester, and deadline_ms = now_ms + timeout_ms.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-018",
+      "title": "rcp_discovery_claim_note_request() does not preempt an active claimant",
+      "text": "rcp_discovery_claim_note_request() shall leave an already-held, not-yet-lapsed claim by a different claimant unchanged.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-019",
+      "title": "rcp_discovery_claim_is_claimant() checks held, deadline, and identity",
+      "text": "rcp_discovery_claim_is_claimant() shall return true if and only if claim is held, now_ms is strictly before claim's deadline_ms, and claimant equals writer.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-020",
+      "title": "rcp_discovery_claim_note_config_write() refreshes the deadline for the claimant",
+      "text": "rcp_discovery_claim_note_config_write() shall, when writer is the current claimant, set deadline_ms = now_ms + timeout_ms and return true.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-021",
+      "title": "rcp_discovery_claim_note_config_write() rejects a non-claimant without mutating state",
+      "text": "rcp_discovery_claim_note_config_write() shall return false and leave claim unchanged when writer is not the current claimant, including when the claim has already lapsed.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-022",
+      "title": "rcp_discovery_claim_release() unconditionally clears the claim",
+      "text": "rcp_discovery_claim_release() shall set held = false regardless of the claim's prior state.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-023",
+      "title": "The discovery result cache stores at most one entry per server_stream_id",
+      "text": "rcp_discovery_cache_put() shall overwrite an existing entry whose server_stream_id matches result's in place, and otherwise append a new entry growing internal storage as needed; rcp_discovery_cache_find() shall return a pointer to the matching entry or NULL if none is on record.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-DISC-024",
+      "title": "rcp_discovery_strerror() never returns NULL and is unique per code",
+      "text": "rcp_discovery_strerror() shall return a non-NULL, non-empty, distinct message for each rcp_discovery_errc_t value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     }
   ]
 }
