@@ -1,9 +1,10 @@
 Software Configuration Index
-Project: c-RCP v0.62.0   Generated: 2026-07-28T15:52:14Z
+Project: c-RCP v0.63.0   Generated: 2026-07-28T16:15:34Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
 ./include/rcp/tsn.h                                           d5515debe324b5ab2dcd474e1138b7556fb4e6df9285d6dae265d275a586d860
+./include/rcp/discovery.h                                     dbbbc6c78409d83da33731c6d94ef08119a3e0587e173bd80224001438fcddb9
 ./include/rcp/deadline.h                                      ddfdc5d517d2282018b18bdb7924974ca7297df28da45cf01772609841427d7c
 ./include/rcp/acf.h                                           e5fc86d6522308a4061853a8c6b7bfcca5a03b4c0b753e6c5300955c65afaa7c
 ./include/rcp/mdns.h                                          81b034f2a6b2ae79de47579fc370af0d5ed37c95ef3b7a0ddac70fbdbd42ba1b
@@ -21,7 +22,7 @@ FILE                                                          SHA-256
 ./include/rcp/config.h                                        a11add969d5b0e883eab513a322e3bf06523b80cf39c0f0a9f8b574f387b0f62
 ./include/rcp/adapt.h                                         a3a7e233c9a8773973ce2ea6b251fcd40f3403fc395f03ac77e97f689e8720b5
 ./include/rcp/udp.h                                           05bf00b6fb1f1ee26bba018cc9cb414a138fbd29196348678a88ef140c164e41
-./include/rcp/version.h                                       9483ca463aaa5e55265cc72202f3da7029c0ae72b290b5e7eb284284f64793fe
+./include/rcp/version.h                                       16aabd5234c908253082d053788001a384dabffb9df79bc313721fecb1524f4d
 ./include/rcp/recorder.h                                      db4b9c80c24ccb3e68daa06378ed700c53c70cc97131305133d2ccf5b9a03732
 ./include/rcp/cli.h                                           d479738a54a077a4a0019dec3ec62a39b73857fadbe1ae2745d2f7609506b7d9
 ./include/rcp/avtp.h                                          416f4beb4eb8c68d1dac4842372d0747da15c45677c67ae1de11c8849657b055
@@ -68,6 +69,7 @@ FILE                                                          SHA-256
 ./src/faultinject.c                                           659817cca14ec780c92733d3f5b2c483ddad18d87d3f5d8cc8516565546842ce
 ./src/server.c                                                0ded8006c4ccb11befe49237516991e70d1e2394a9383caaa772a80136d3b041
 ./src/relay.c                                                 a2af150901262ab1d44f74cbdd79ae31aa70809ce3556bbbde74099cf3cd79f5
+./src/discovery.c                                             365a3e7e1b8be47e9a5176eb3e58970cb03b01c7e78c864a679843384259eb80
 ./src/linbr.c                                                 890fbd6fbde916bd30fe0a308123feb655bcb465f66768550e9a489f5fbb17a4
 ./src/redundancy.c                                            eee9bfc65fc7075c81fba4bcdd13f854be6797fdc809a8f2cb36d7423cde4c22
 ./src/platform.c                                              72fe578947526dc43baafc3034b0937481013a0f2bda0ea1a5e909103250ee59
@@ -116,6 +118,7 @@ FILE                                                          SHA-256
 ./tests/test_config.c                                         5ebc67a603d029dce5ee46e14e2a0319c3da1977f9814ed7ebe52a6964aeec9e
 ./tests/test_faultinject.c                                    96e9a1c5e2ae007689e89d427f71bd264ce5c54aa24d7335bf7423764862219f
 ./tests/test_wire.c                                           60386f18e95618f1e777741607a5f53232a0fb09215816a15399817ca6a57de3
+./tests/test_discovery.c                                      85c44eb12c8f2aad0c4c8d5541f60c6684b06052099d471a35bebbf7dfb70d64
 ./tests/test_ddsbr.c                                          89eb84d70ada98f8a1e2d44845f3e6c402b7d692a98c07cf0ac81b65082b6879
 ./tests/command_latency_test.c                                3ed7c7694e59e0ca0839d13f081c7232198314a9adeeadaa72aba43366fbad8d
 ./tests/test_federation.c                                     895883c46ddfb3ac25d5f543f1f9e473faf7de0e69c59d2e6522b9c767673508
@@ -144,4 +147,4 @@ FILE                                                          SHA-256
 ./tests/test_server.c                                         402e517e2096234262ffe44d36e36d3373f241e4644bee127ecc5b20caf0697c
 ./cli/main.c                                                  541875eda25d51c675d488ca4ddc24226dbccd51e91b77390569c451c36710e1
 
-Total files: 140
+Total files: 143
