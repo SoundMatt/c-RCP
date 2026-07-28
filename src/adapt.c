@@ -77,6 +77,18 @@ rcp_command_t rcp_message_to_command(const relay_message_t *msg)
     return cmd;
 }
 
+/* ── Error wrapping (§5.2) ─────────────────────────────────────────────────── */
+
+//cfusa:req REQ-RELAY-017
+bool rcp_errc_to_relay_errc(int rcp_ec, relay_errc_t *out)
+{
+    switch (rcp_ec) {
+    case RCP_ERR_CLOSED:  *out = RELAY_ERRC_CLOSED;  return true;
+    case RCP_ERR_TIMEOUT: *out = RELAY_ERRC_TIMEOUT; return true;
+    default:              return false;
+    }
+}
+
 /* ── RcpCallerAdapter — implements rcp_relay_caller_t over rcp_controller_t ── */
 
 typedef struct {
