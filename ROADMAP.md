@@ -2566,7 +2566,7 @@ discovery (milestone 63). Nothing in `rcp.h`, `wire.c`, `avtp.h`/`avtp.c`,
   `cyber`/`vuln`/`qualify` (0 errors), and the full `ctest` suite all stay
   green.
 
-### 65. SPI endpoint (v0.65.0)
+### 65. SPI endpoint (v0.65.0) ✅
 
 - `include/rcp/ep_spi.h` + `src/ep_spi.c`: controller-only, up to 6
   pre-configured channels selected via `evt[2:0]` values 0–5 (extraction
@@ -2580,6 +2580,59 @@ discovery (milestone 63). Nothing in `rcp.h`, `wire.c`, `avtp.h`/`avtp.c`,
   though compound-wait itself lands in Phase 17 — the truncation behavior
   is an SPI-endpoint property, tested here in isolation via a raw
   comparison-mode helper.
+
+**Done (v0.65.0)**: `include/rcp/ep_spi.h` + `src/ep_spi.c` land as new,
+additive protocol-core surface, following `ep_gpio.h`/`ep_gpio.c`'s
+(milestone 64) established layering discipline exactly: ACF-level only
+(`acf.h`'s `rcp_acf_encode_abb()`/`_encode_gbb()` and their decode
+counterparts), with nothing in `rcp.h`, `wire.c`, `avtp.h`/`avtp.c`,
+`acf.h`/`acf.c`, `server.h`/`server.c`, `regmap.h`/`regmap.c`,
+`discovery.h`/`discovery.c`, `ep_gpio.h`/`ep_gpio.c`, or any satellite
+package touched.
+- Unlike GPIO's fixed-shape 4-byte bitmask, an SPI transfer's payload is
+  raw and variable-length: `rcp_ep_spi_encode_transfer_request()`/
+  `_decode_transfer_request()` round-trip the PICO-out bytes as an
+  `ACF_OP_WRITE` request, and `rcp_ep_spi_encode_response()`/
+  `_decode_response()` round-trip the same-length POCI-in bytes as an
+  `ACF_OP_READ`-classified response (`ACF_ABB` untimed / `ACF_GBB` timed,
+  mirroring GPIO's own timed/untimed choice) — decoded payloads are
+  *borrowed* views into the caller's frame buffer, matching `acf.c`'s own
+  decode convention, since a variable-length payload has no natural
+  fixed-size out-parameter to copy into. Channel selection also diverges
+  from GPIO: `evt[2:0]` carries the channel number (0–5) directly rather
+  than a write-semantics code, validated on decode via
+  `rcp_ep_spi_channel_valid()` (`RCP_EP_SPI_ERR_BAD_CHANNEL` for 6/7).
+- `rcp_ep_spi_mode_cpol()`/`_mode_cpha()`: pure, directly-testable
+  derivation of the two underlying clock-polarity/-phase bits from each of
+  the four standard `rcp_ep_spi_mode_t` values.
+- `rcp_ep_spi_trigger_fires()`: this endpoint type's own analogue of
+  `rcp_ep_gpio_trigger_fires()`, evaluating one of three SPI-specific
+  events (transfer-done, CS-assert-edge, CS-deassert-edge) against a
+  selected trigger mode.
+- `rcp_ep_spi_functional_cfg_t` composes `regmap.h`'s
+  `rcp_regmap_ep_functional_cfg_t` as its own first member (per that
+  module's documented convention, same as `ep_gpio.h`) and adds, per
+  channel: clock mode, bit order, CS active-polarity, clock divider,
+  inter-byte/inter-transfer timing delays, and trigger mode.
+  `rcp_ep_spi_functional_cfg_writable()` is a thin, named wrapper over
+  `rcp_server_field_writable()` (`RCP_SERVER_FIELD_FUNCTIONAL_W`) --
+  reused, not duplicated, from `server.h`; every
+  `rcp_ep_spi_set_channel_*()` mutator consults it (and channel validity)
+  before ever mutating `cfg`.
+- `rcp_ep_spi_compound_wait_status_equal()`: the SPI-truncation precedent
+  called for by this milestone's scope, implemented and unit-tested now
+  even though generic compound-wait request-type plumbing itself lands at
+  Phase 17 milestone 69 -- compares only the first
+  `RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN` (4) of up to
+  `RCP_EP_SPI_STATUS_MAX_LEN` (20) status bytes, byte for byte, returning
+  false (fail-safe, never an error code) when either buffer is shorter
+  than 4 bytes. Milestone 67's PWM_IN numeric compound-wait comparison
+  modes are explicitly told to follow this precedent.
+- `tests/test_ep_spi.c` (39 cases) and 32 new requirements
+  (`REQ-SPI-001`..`032`) added to `.fusa-reqs.json`; `cfusa trace
+  --req-coverage 100` (both metrics), `cfusa check`/`lint`/`analyze`/
+  `cyber`/`vuln`/`qualify` (0 errors), and the full `ctest` suite
+  (ASan/UBSan-clean) all stay green.
 
 ### 66. I²C + UART endpoints (v0.66.0)
 
