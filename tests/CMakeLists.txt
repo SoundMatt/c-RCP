@@ -83,6 +83,16 @@ target_link_libraries(test_ep_uart PRIVATE rcp::rcp unity)
 target_compile_options(test_ep_uart PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_ep_uart COMMAND test_ep_uart)
 
+add_executable(test_ep_pwm test_ep_pwm.c)
+target_link_libraries(test_ep_pwm PRIVATE rcp::rcp unity)
+target_compile_options(test_ep_pwm PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_ep_pwm COMMAND test_ep_pwm)
+
+add_executable(test_ep_adc test_ep_adc.c)
+target_link_libraries(test_ep_adc PRIVATE rcp::rcp unity)
+target_compile_options(test_ep_adc PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_ep_adc COMMAND test_ep_adc)
+
 add_executable(test_udp test_udp.c)
 target_link_libraries(test_udp PRIVATE rcp::rcp unity)
 target_compile_options(test_udp PRIVATE ${RCP_TEST_WARNING_FLAGS})
