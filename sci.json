@@ -1,5 +1,5 @@
 Software Configuration Index
-Project: c-RCP v0.70.0   Generated: 2026-07-28T19:09:49Z
+Project: c-RCP v0.70.0   Generated: 2026-07-28T19:28:57Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
@@ -28,6 +28,7 @@ FILE                                                          SHA-256
 ./include/rcp/adapt.h                                         a3a7e233c9a8773973ce2ea6b251fcd40f3403fc395f03ac77e97f689e8720b5
 ./include/rcp/udp.h                                           05bf00b6fb1f1ee26bba018cc9cb414a138fbd29196348678a88ef140c164e41
 ./include/rcp/chained.h                                       788e4083ba8c8a718ebc41698f377775806d51b8baa1f59bbfe7a841701da1c2
+./include/rcp/ep_lin.h                                        fa871e9e273321e193f2eeae970f0521f972dc26ad3dfcf1c126a380fc791f45
 ./include/rcp/ep_gpio.h                                       341deb8ca07ce5efe97732e32964e5a62214b064ceb699fc1110ad82534cfd37
 ./include/rcp/timed.h                                         28a7f7399336a11af70bcf7c0fcebc3238de53584cfb308a5627755c173e1a12
 ./include/rcp/ep_adc.h                                        01b2609e35aea005c2ebd289d27abc0d359e4e4a3e8a7e4bc766ed2b95cec87c
@@ -112,6 +113,7 @@ FILE                                                          SHA-256
 ./src/compound.c                                              4768fb878c41525f1e9e3fe177e3bc6c44d578c75aecc3a4bcf14d75ca90af66
 ./src/deadline.c                                              a2d4761a3819f40e3bf3c65c372515b655ddf03e435418644cd30e7855738ffe
 ./src/mdns.c                                                  30c7b817330d96a10f0f21832e8c50b54db437c58e8bad93ae926d23c8de42b2
+./src/ep_lin.c                                                24830144dc162afa4abf5aa7bf51569574892365c7fb0a68321fa08ec321ca2a
 ./src/mqttbr.c                                                17a4f9febb4851ebea0b9eabb09e051f9adbac1747ae6c64f18927bef79eab9b
 ./src/acf.c                                                   2b5ba4fa4aa087639aad8016cdd55cbb99c1514c91f74ca2b8ed569045d87b61
 ./src/canbr.c                                                 bc5834b4adaff1549bbf01f1c3d967c932c5bbe980346bb036ef4e50b7dc83ee
@@ -142,6 +144,7 @@ FILE                                                          SHA-256
 ./tests/test_canbr.c                                          02a76c12fd85be4993a9663f19e470ab43ef9c33c3278e93cf3a34226d7719b7
 ./tests/test_ep_uart.c                                        6990b392b728e9f163d42de36a6abb0ab51cc3898bace029534dfd4cef132b1c
 ./tests/test_tls.c                                            be0c06df07d3a9b271c3fee32efe047ca971eb6932ba3b412f7e979cc6a403cb
+./tests/test_ep_lin.c                                         f01294049b4839316a77f839c0b209723d6a500dc7191fbe65a2e9a1352b93b2
 ./tests/test_mdns.c                                           f327de9c8d6f9feb4a73970e30995cf2389937e5811765ecdba0e118fa919e6b
 ./tests/test_authz.c                                          bb61930274b50d6745a5637cb5125d2ee2c204ede7fa2c15e5a790df37c9867c
 ./tests/test_timed.c                                          5b5f2064ceba0767f1ced82c6abd205649de0a831dbaa8b345afdf8ea71e0e10
@@ -189,4 +192,4 @@ FILE                                                          SHA-256
 ./tests/test_ep_adc.c                                         9027eb9d5e8c0e9c4f53be86a3fa12c075f16999fc9ecb259a0a904033017610
 ./cli/main.c                                                  541875eda25d51c675d488ca4ddc24226dbccd51e91b77390569c451c36710e1
 
-Total files: 185
+Total files: 188
