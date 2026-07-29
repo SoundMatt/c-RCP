@@ -6,75 +6,692 @@
 
 #include "platform.h"
 
-/* ── Meta parsers (§15.7.5) ────────────────────────────────────────────────── */
+#include "rcp/discovery.h"
+#include "rcp/ep_adc.h"
+#include "rcp/ep_can.h"
+#include "rcp/ep_gpio.h"
+#include "rcp/ep_i2c.h"
+#include "rcp/ep_iseled.h"
+#include "rcp/ep_lin.h"
+#include "rcp/ep_mdio.h"
+#include "rcp/ep_pwm.h"
+#include "rcp/ep_spi.h"
+#include "rcp/ep_uart.h"
+#include "rcp/ep_wakeup.h"
+#include "rcp/power.h"
 
-static rcp_priority_t priority_from_meta(const relay_message_t *msg)
+/* ── Op <-> kind / string (see adapt.h's file header table) ─────────────────── */
+
+//cfusa:req REQ-RELAY-007
+rcp_adapt_ep_kind_t rcp_adapt_op_kind(rcp_adapt_op_t op)
 {
-    const char *v = relay_message_get_meta(msg, "rcp.priority");
-    if (!v) return RCP_PRIORITY_NORMAL;
-    if (strcmp(v, "high") == 0)     return RCP_PRIORITY_HIGH;
-    if (strcmp(v, "critical") == 0) return RCP_PRIORITY_CRITICAL;
-    return RCP_PRIORITY_NORMAL;
+    switch (op) {
+    case RCP_ADAPT_OP_GPIO_READ:       return RCP_ADAPT_EP_GPIO;
+    case RCP_ADAPT_OP_GPIO_WRITE:      return RCP_ADAPT_EP_GPIO;
+    case RCP_ADAPT_OP_SPI_TRANSFER:    return RCP_ADAPT_EP_SPI;
+    case RCP_ADAPT_OP_I2C_TRANSFER:    return RCP_ADAPT_EP_I2C;
+    case RCP_ADAPT_OP_UART_WRITE:      return RCP_ADAPT_EP_UART;
+    case RCP_ADAPT_OP_UART_READ:       return RCP_ADAPT_EP_UART;
+    case RCP_ADAPT_OP_ADC_READ:        return RCP_ADAPT_EP_ADC;
+    case RCP_ADAPT_OP_PWM_OUT_READ:    return RCP_ADAPT_EP_PWM_OUT;
+    case RCP_ADAPT_OP_PWM_OUT_WRITE:   return RCP_ADAPT_EP_PWM_OUT;
+    case RCP_ADAPT_OP_PWM_IN_READ:     return RCP_ADAPT_EP_PWM_IN;
+    case RCP_ADAPT_OP_LIN_COMMAND:     return RCP_ADAPT_EP_LIN;
+    case RCP_ADAPT_OP_CAN_FRAME:       return RCP_ADAPT_EP_CAN;
+    case RCP_ADAPT_OP_ISELED_COMMAND:  return RCP_ADAPT_EP_ISELED;
+    case RCP_ADAPT_OP_MDIO_READ:       return RCP_ADAPT_EP_MDIO;
+    case RCP_ADAPT_OP_MDIO_WRITE:      return RCP_ADAPT_EP_MDIO;
+    case RCP_ADAPT_OP_WAKEUP_SLEEPCMD: return RCP_ADAPT_EP_WAKEUP;
+    case RCP_ADAPT_OP_WAKEUP_WAKEUP:   return RCP_ADAPT_EP_WAKEUP;
+    case RCP_ADAPT_OP_DISCOVERY:       return RCP_ADAPT_EP_DISCOVERY;
+    default:                           return RCP_ADAPT_EP_DISCOVERY;
+    }
 }
 
-static rcp_command_type_t cmd_type_from_meta(const relay_message_t *msg)
+typedef struct {
+    rcp_adapt_op_t op;
+    const char    *name;
+} op_name_entry_t;
+
+static const op_name_entry_t OP_NAMES[] = {
+    { RCP_ADAPT_OP_GPIO_READ,       "gpio_read" },
+    { RCP_ADAPT_OP_GPIO_WRITE,      "gpio_write" },
+    { RCP_ADAPT_OP_SPI_TRANSFER,    "spi_transfer" },
+    { RCP_ADAPT_OP_I2C_TRANSFER,    "i2c_transfer" },
+    { RCP_ADAPT_OP_UART_WRITE,      "uart_write" },
+    { RCP_ADAPT_OP_UART_READ,       "uart_read" },
+    { RCP_ADAPT_OP_ADC_READ,        "adc_read" },
+    { RCP_ADAPT_OP_PWM_OUT_READ,    "pwm_out_read" },
+    { RCP_ADAPT_OP_PWM_OUT_WRITE,   "pwm_out_write" },
+    { RCP_ADAPT_OP_PWM_IN_READ,     "pwm_in_read" },
+    { RCP_ADAPT_OP_LIN_COMMAND,     "lin_command" },
+    { RCP_ADAPT_OP_CAN_FRAME,       "can_frame" },
+    { RCP_ADAPT_OP_ISELED_COMMAND,  "iseled_command" },
+    { RCP_ADAPT_OP_MDIO_READ,       "mdio_read" },
+    { RCP_ADAPT_OP_MDIO_WRITE,      "mdio_write" },
+    { RCP_ADAPT_OP_WAKEUP_SLEEPCMD, "wakeup_sleepcmd" },
+    { RCP_ADAPT_OP_WAKEUP_WAKEUP,   "wakeup_wakeup" },
+    { RCP_ADAPT_OP_DISCOVERY,       "discovery" },
+};
+#define OP_NAMES_COUNT (sizeof(OP_NAMES) / sizeof(OP_NAMES[0]))
+
+//cfusa:req REQ-RELAY-007
+const char *rcp_adapt_op_string(rcp_adapt_op_t op)
 {
-    const char *v = relay_message_get_meta(msg, "rcp.cmd_type");
-    if (!v) return RCP_CMD_NOOP;
-    if (strcmp(v, "set") == 0)      return RCP_CMD_SET;
-    if (strcmp(v, "get") == 0)      return RCP_CMD_GET;
-    if (strcmp(v, "reset") == 0)    return RCP_CMD_RESET;
-    if (strcmp(v, "watchdog") == 0) return RCP_CMD_WATCHDOG;
-    if (strcmp(v, "sleep") == 0)    return RCP_CMD_SLEEP;
-    if (strcmp(v, "wake") == 0)     return RCP_CMD_WAKE;
-    return RCP_CMD_NOOP;
+    size_t i;
+    for (i = 0; i < OP_NAMES_COUNT; i++) {
+        if (OP_NAMES[i].op == op) return OP_NAMES[i].name;
+    }
+    return "unknown";
 }
 
-/* ── ToMessage / FromMessage (§15.7.5) ─────────────────────────────────────── */
+//cfusa:req REQ-RELAY-007
+bool rcp_adapt_op_from_string(const char *name, rcp_adapt_op_t *out)
+{
+    size_t i;
+    if (!name) return false;
+    for (i = 0; i < OP_NAMES_COUNT; i++) {
+        if (strcmp(OP_NAMES[i].name, name) == 0) {
+            *out = OP_NAMES[i].op;
+            return true;
+        }
+    }
+    return false;
+}
+
+//cfusa:req REQ-RELAY-011
+const char *rcp_adapt_strerror(rcp_adapt_errc_t e)
+{
+    switch (e) {
+    case RCP_ADAPT_OK:               return "ok";
+    case RCP_ADAPT_ERR_CLOSED:       return "closed";
+    case RCP_ADAPT_ERR_TIMEOUT:      return "timeout";
+    case RCP_ADAPT_ERR_ENCODE:       return "could not encode message as a wire request";
+    case RCP_ADAPT_ERR_DECODE:       return "could not decode wire response as a message";
+    case RCP_ADAPT_ERR_TRANSPORT:    return "underlying transport failure";
+    case RCP_ADAPT_ERR_NOT_SUPPORTED: return "not supported";
+    default:                         return "unknown rcp_adapt_errc_t";
+    }
+}
+
+/* ── Meta helpers (decimal-string convention, see adapt.h's field table) ────── */
+
+static bool meta_get_u32(const relay_message_t *msg, const char *key, uint32_t *out)
+{
+    const char *v = relay_message_get_meta(msg, key);
+    char *end = NULL;
+    unsigned long parsed;
+    if (!v || !*v) return false;
+    parsed = strtoul(v, &end, 10);
+    if (!end || *end != '\0') return false;
+    *out = (uint32_t)parsed;
+    return true;
+}
+
+static uint32_t meta_get_u32_default(const relay_message_t *msg, const char *key, uint32_t def)
+{
+    uint32_t v;
+    return meta_get_u32(msg, key, &v) ? v : def;
+}
+
+static void meta_set_u32(relay_message_t *msg, const char *key, uint32_t v)
+{
+    char buf[16];
+    snprintf(buf, sizeof(buf), "%u", (unsigned)v);
+    relay_message_set_meta(msg, key, buf);
+}
+
+static void meta_set_u64(relay_message_t *msg, const char *key, uint64_t v)
+{
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%llu", (unsigned long long)v);
+    relay_message_set_meta(msg, key, buf);
+}
+
+static void meta_set_bool(relay_message_t *msg, const char *key, bool v)
+{
+    relay_message_set_meta(msg, key, v ? "true" : "false");
+}
+
+/* ── Fixed-width big-endian scalar pack/unpack (GPIO/ADC/PWM_OUT/PWM_IN) ─────── */
+
+static uint16_t be16_decode(const uint8_t *p) { return (uint16_t)(((uint16_t)p[0] << 8) | p[1]); }
+
+static void be16_encode(uint8_t *p, uint16_t v)
+{
+    p[0] = (uint8_t)(v >> 8);
+    p[1] = (uint8_t)v;
+}
+
+static uint32_t be32_decode(const uint8_t *p)
+{
+    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) | ((uint32_t)p[2] << 8) | (uint32_t)p[3];
+}
+
+static void be32_encode(uint8_t *p, uint32_t v)
+{
+    p[0] = (uint8_t)(v >> 24);
+    p[1] = (uint8_t)(v >> 16);
+    p[2] = (uint8_t)(v >> 8);
+    p[3] = (uint8_t)v;
+}
+
+static rcp_ep_pwm_value_t pwm_value_decode(const uint8_t *p)
+{
+    rcp_ep_pwm_value_t v;
+    v.period          = be16_decode(p);
+    v.active_duration = be16_decode(p + 2);
+    return v;
+}
+
+static void pwm_value_encode(uint8_t *p, rcp_ep_pwm_value_t v)
+{
+    be16_encode(p, v.period);
+    be16_encode(p + 2, v.active_duration);
+}
+
+/* ── rcp_message_to_request() ─────────────────────────────────────────────── */
+
+static rcp_bytes_t fail_encode(rcp_adapt_errc_t *out_err)
+{
+    rcp_bytes_t zero = {0};
+    if (out_err) *out_err = RCP_ADAPT_ERR_ENCODE;
+    return zero;
+}
 
 //cfusa:req REQ-RELAY-005
-relay_message_t rcp_status_to_message(const rcp_status_t *s)
+rcp_bytes_t rcp_message_to_request(rcp_adapt_op_t op, rcp_byte_bus_id_t byte_bus_id,
+                                    rcp_stream_id_t requester_stream_id,
+                                    const relay_message_t *msg, uint8_t transaction_num,
+                                    rcp_adapt_errc_t *out_err)
+{
+    rcp_bytes_t result = {0};
+
+    if (out_err) *out_err = RCP_ADAPT_OK;
+
+    switch (op) {
+    case RCP_ADAPT_OP_DISCOVERY: {
+        uint32_t read_size = meta_get_u32_default(msg, "rcp.discovery.read_size",
+                                                    (uint32_t)RCP_DISCOVERY_GENERAL_SLICE_LEN);
+        result = rcp_discovery_encode_request(requester_stream_id, (uint8_t)read_size,
+                                               transaction_num);
+        break;
+    }
+
+    case RCP_ADAPT_OP_GPIO_READ:
+        result = rcp_ep_gpio_encode_read_request(byte_bus_id, transaction_num);
+        break;
+
+    case RCP_ADAPT_OP_GPIO_WRITE: {
+        uint32_t evt;
+        uint32_t bitmask;
+        if (msg->payload.len != RCP_EP_GPIO_PAYLOAD_LEN) return fail_encode(out_err);
+        evt     = meta_get_u32_default(msg, "rcp.gpio.evt", 0);
+        bitmask = be32_decode(msg->payload.data);
+        result  = rcp_ep_gpio_encode_write_request(byte_bus_id, bitmask,
+                                                    (rcp_ep_gpio_write_semantics_t)evt,
+                                                    transaction_num);
+        break;
+    }
+
+    case RCP_ADAPT_OP_SPI_TRANSFER: {
+        uint32_t channel = meta_get_u32_default(msg, "rcp.spi.channel", 0);
+        result = rcp_ep_spi_encode_transfer_request(byte_bus_id, (uint8_t)channel,
+                                                     msg->payload.data, msg->payload.len,
+                                                     transaction_num);
+        break;
+    }
+
+    case RCP_ADAPT_OP_I2C_TRANSFER:
+        result = rcp_ep_i2c_encode_transfer_request(byte_bus_id, msg->payload.data,
+                                                      msg->payload.len, transaction_num);
+        break;
+
+    case RCP_ADAPT_OP_UART_WRITE:
+        result = rcp_ep_uart_encode_write_request(byte_bus_id, msg->payload.data,
+                                                    msg->payload.len, transaction_num);
+        break;
+
+    case RCP_ADAPT_OP_UART_READ: {
+        uint32_t read_size;
+        if (!meta_get_u32(msg, "rcp.uart.read_size", &read_size)) return fail_encode(out_err);
+        result = rcp_ep_uart_encode_read_request(byte_bus_id, (uint8_t)read_size,
+                                                  transaction_num);
+        break;
+    }
+
+    case RCP_ADAPT_OP_ADC_READ:
+        result = rcp_ep_adc_encode_read_request(byte_bus_id, transaction_num);
+        break;
+
+    case RCP_ADAPT_OP_PWM_OUT_READ:
+        result = rcp_ep_pwm_out_encode_read_request(byte_bus_id, transaction_num);
+        break;
+
+    case RCP_ADAPT_OP_PWM_OUT_WRITE: {
+        uint32_t evt;
+        rcp_ep_pwm_value_t value;
+        if (msg->payload.len != RCP_EP_PWM_PAYLOAD_LEN) return fail_encode(out_err);
+        evt   = meta_get_u32_default(msg, "rcp.pwm.evt", 0);
+        value = pwm_value_decode(msg->payload.data);
+        result = rcp_ep_pwm_out_encode_write_request(byte_bus_id, value,
+                                                       (rcp_ep_pwm_out_write_semantics_t)evt,
+                                                       transaction_num);
+        break;
+    }
+
+    case RCP_ADAPT_OP_PWM_IN_READ:
+        result = rcp_ep_pwm_in_encode_read_request(byte_bus_id, transaction_num);
+        break;
+
+    case RCP_ADAPT_OP_LIN_COMMAND: {
+        uint32_t compare_mode = meta_get_u32_default(msg, "rcp.lin.compare_mode", 0);
+        result = rcp_ep_lin_encode_command_request(byte_bus_id, msg->payload.data,
+                                                    msg->payload.len,
+                                                    (rcp_ep_lin_compare_mode_t)compare_mode,
+                                                    transaction_num);
+        break;
+    }
+
+    case RCP_ADAPT_OP_CAN_FRAME: {
+        uint32_t frame_format;
+        uint32_t arbitration_id;
+        if (!meta_get_u32(msg, "rcp.can.frame_format", &frame_format)) return fail_encode(out_err);
+        if (!meta_get_u32(msg, "rcp.can.arbitration_id", &arbitration_id)) return fail_encode(out_err);
+        /* xl_header is always NULL here: ep_can.h's own encoder already
+         * requires a non-NULL xl_header for the two CAN XL formats and
+         * fails (zeroed rcp_bytes_t) when it's missing -- see adapt.h's
+         * file header on why CAN XL is out of this interim mapping's
+         * scope. */
+        result = rcp_ep_can_encode_frame_request(byte_bus_id,
+                                                  (rcp_ep_can_frame_format_t)frame_format,
+                                                  arbitration_id, NULL, msg->payload.data,
+                                                  msg->payload.len, transaction_num);
+        break;
+    }
+
+    case RCP_ADAPT_OP_ISELED_COMMAND:
+        result = rcp_ep_iseled_encode_command_request(byte_bus_id, msg->payload.data,
+                                                       msg->payload.len, transaction_num);
+        break;
+
+    case RCP_ADAPT_OP_MDIO_READ: {
+        uint32_t clause, prtad, devad, regad, word_count;
+        rcp_ep_mdio_addr_t addr;
+        if (!meta_get_u32(msg, "rcp.mdio.clause", &clause))          return fail_encode(out_err);
+        if (!meta_get_u32(msg, "rcp.mdio.prtad", &prtad))            return fail_encode(out_err);
+        if (!meta_get_u32(msg, "rcp.mdio.devad", &devad))            return fail_encode(out_err);
+        if (!meta_get_u32(msg, "rcp.mdio.regad", &regad))            return fail_encode(out_err);
+        if (!meta_get_u32(msg, "rcp.mdio.word_count", &word_count))  return fail_encode(out_err);
+        addr.clause = (rcp_ep_mdio_clause_t)clause;
+        addr.prtad  = (uint8_t)prtad;
+        addr.devad  = (uint8_t)devad;
+        addr.regad  = (uint16_t)regad;
+        result = rcp_ep_mdio_encode_read_request(byte_bus_id, addr, (size_t)word_count,
+                                                  transaction_num);
+        break;
+    }
+
+    case RCP_ADAPT_OP_MDIO_WRITE: {
+        uint32_t clause, prtad, devad, regad;
+        rcp_ep_mdio_addr_t addr;
+        size_t word_count;
+        uint16_t words[RCP_EP_MDIO_MAX_BURST_WORDS];
+        size_t i;
+        if (!meta_get_u32(msg, "rcp.mdio.clause", &clause)) return fail_encode(out_err);
+        if (!meta_get_u32(msg, "rcp.mdio.prtad", &prtad))   return fail_encode(out_err);
+        if (!meta_get_u32(msg, "rcp.mdio.devad", &devad))   return fail_encode(out_err);
+        if (!meta_get_u32(msg, "rcp.mdio.regad", &regad))   return fail_encode(out_err);
+        if (msg->payload.len == 0 || (msg->payload.len % 2) != 0) return fail_encode(out_err);
+        word_count = msg->payload.len / 2;
+        if (word_count > RCP_EP_MDIO_MAX_BURST_WORDS) return fail_encode(out_err);
+        for (i = 0; i < word_count; i++) {
+            words[i] = rcp_ep_mdio_unpack_word_at(msg->payload.data, i);
+        }
+        addr.clause = (rcp_ep_mdio_clause_t)clause;
+        addr.prtad  = (uint8_t)prtad;
+        addr.devad  = (uint8_t)devad;
+        addr.regad  = (uint16_t)regad;
+        result = rcp_ep_mdio_encode_write_request(byte_bus_id, addr, words, word_count,
+                                                   transaction_num);
+        break;
+    }
+
+    case RCP_ADAPT_OP_WAKEUP_SLEEPCMD: {
+        uint32_t target_mode;
+        if (!meta_get_u32(msg, "rcp.wakeup.target_mode", &target_mode)) return fail_encode(out_err);
+        result = rcp_ep_wakeup_encode_sleepcmd_request(byte_bus_id, (rcp_pwrmode_t)target_mode,
+                                                        transaction_num);
+        break;
+    }
+
+    case RCP_ADAPT_OP_WAKEUP_WAKEUP:
+        result = rcp_ep_wakeup_encode_wakeup_message(byte_bus_id, transaction_num);
+        break;
+
+    default:
+        return fail_encode(out_err);
+    }
+
+    if (!result.data) {
+        if (out_err) *out_err = RCP_ADAPT_ERR_ENCODE;
+    }
+    return result;
+}
+
+/* ── rcp_response_to_message() ────────────────────────────────────────────── */
+
+static relay_message_t fail_decode(rcp_adapt_errc_t *out_err)
+{
+    relay_message_t zero;
+    relay_message_init(&zero);
+    if (out_err) *out_err = RCP_ADAPT_ERR_DECODE;
+    return zero;
+}
+
+/* Common tail for every op whose own ep_*.h codec reports timed/timestamp/
+ * transaction_num (every op except the two RCP_ADAPT_OP_WAKEUP_* ops and
+ * RCP_ADAPT_OP_DISCOVERY -- see adapt.h's field table). */
+static relay_message_t finish_timed_response(bool timed, uint64_t timestamp,
+                                              uint8_t transaction_num)
 {
     relay_message_t msg;
-
     relay_message_init(&msg);
     msg.protocol     = RELAY_PROTOCOL_RCP;
     msg.timestamp_ms = rcp_wallclock_ms();
-    msg.seq          = s->seq;
-    relay_message_set_id(&msg, rcp_zone_string(s->zone));
-    msg.payload = relay_bytes_dup(s->payload.data, s->payload.len);
-    relay_message_set_meta(&msg, "rcp.healthy", s->healthy ? "true" : "false");
+    meta_set_bool(&msg, "rcp.timed", timed);
+    if (timed) meta_set_u64(&msg, "rcp.timestamp", timestamp);
+    meta_set_u32(&msg, "rcp.transaction_num", transaction_num);
     return msg;
 }
 
 //cfusa:req REQ-RELAY-006
-relay_message_t rcp_response_to_message(const rcp_response_t *r)
+relay_message_t rcp_response_to_message(rcp_adapt_op_t op, rcp_byte_bus_id_t byte_bus_id,
+                                         const uint8_t *b, size_t len,
+                                         rcp_adapt_errc_t *out_err)
 {
-    relay_message_t msg;
-    char status_buf[16];
+    if (out_err) *out_err = RCP_ADAPT_OK;
 
-    relay_message_init(&msg);
-    msg.protocol     = RELAY_PROTOCOL_RCP;
-    msg.timestamp_ms = rcp_wallclock_ms();
-    relay_message_set_id(&msg, rcp_zone_string(r->zone));
-    msg.payload = relay_bytes_dup(r->payload.data, r->payload.len);
-    snprintf(status_buf, sizeof(status_buf), "%d", (int)r->status);
-    relay_message_set_meta(&msg, "rcp.status", status_buf);
-    return msg;
-}
+    switch (op) {
+    case RCP_ADAPT_OP_DISCOVERY: {
+        rcp_discovery_result_t result;
+        relay_message_t msg;
+        char id_buf[17];
+        if (rcp_discovery_decode_response(b, len, &result) != RCP_DISCOVERY_OK) {
+            return fail_decode(out_err);
+        }
+        relay_message_init(&msg);
+        msg.protocol     = RELAY_PROTOCOL_RCP;
+        msg.timestamp_ms = rcp_wallclock_ms();
+        snprintf(id_buf, sizeof(id_buf), "%016llx",
+                 (unsigned long long)rcp_stream_id_to_u64(result.server_stream_id));
+        relay_message_set_id(&msg, id_buf);
+        meta_set_u32(&msg, "rcp.discovery.magic", result.magic);
+        meta_set_u32(&msg, "rcp.discovery.svr_version", result.svr_version);
+        meta_set_u32(&msg, "rcp.discovery.vendor_id", result.vendor_id);
+        meta_set_u32(&msg, "rcp.discovery.device_id", result.device_id);
+        meta_set_u32(&msg, "rcp.discovery.svr_ep_count", result.svr_ep_count);
+        return msg;
+    }
 
-//cfusa:req REQ-RELAY-007
-rcp_command_t rcp_message_to_command(const relay_message_t *msg)
-{
-    rcp_command_t cmd;
+    case RCP_ADAPT_OP_GPIO_READ:
+    case RCP_ADAPT_OP_GPIO_WRITE: {
+        uint32_t bitmask;
+        bool timed;
+        uint64_t timestamp;
+        uint8_t transaction_num;
+        uint8_t payload[RCP_EP_GPIO_PAYLOAD_LEN];
+        relay_message_t msg;
+        if (rcp_ep_gpio_decode_response(b, len, byte_bus_id, &bitmask, &timed, &timestamp,
+                                         &transaction_num) != RCP_EP_GPIO_OK) {
+            return fail_decode(out_err);
+        }
+        be32_encode(payload, bitmask);
+        msg = finish_timed_response(timed, timestamp, transaction_num);
+        msg.payload = relay_bytes_dup(payload, sizeof(payload));
+        return msg;
+    }
 
-    cmd.id       = 0;
-    cmd.zone     = rcp_zone_from_string(msg->id);
-    cmd.type     = cmd_type_from_meta(msg);
-    cmd.priority = priority_from_meta(msg);
-    cmd.payload.data = msg->payload.data;
-    cmd.payload.len  = msg->payload.len;
-    return cmd;
+    case RCP_ADAPT_OP_SPI_TRANSFER: {
+        uint8_t channel;
+        const uint8_t *rx_data;
+        size_t rx_len;
+        bool timed;
+        uint64_t timestamp;
+        uint8_t transaction_num;
+        relay_message_t msg;
+        if (rcp_ep_spi_decode_response(b, len, byte_bus_id, &channel, &rx_data, &rx_len, &timed,
+                                        &timestamp, &transaction_num) != RCP_EP_SPI_OK) {
+            return fail_decode(out_err);
+        }
+        msg = finish_timed_response(timed, timestamp, transaction_num);
+        msg.payload = relay_bytes_dup(rx_data, rx_len);
+        meta_set_u32(&msg, "rcp.spi.channel", channel);
+        return msg;
+    }
+
+    case RCP_ADAPT_OP_I2C_TRANSFER: {
+        const uint8_t *rx_data;
+        size_t rx_len;
+        bool timed;
+        uint64_t timestamp;
+        uint8_t transaction_num;
+        relay_message_t msg;
+        if (rcp_ep_i2c_decode_response(b, len, byte_bus_id, &rx_data, &rx_len, &timed, &timestamp,
+                                        &transaction_num) != RCP_EP_I2C_OK) {
+            return fail_decode(out_err);
+        }
+        msg = finish_timed_response(timed, timestamp, transaction_num);
+        msg.payload = relay_bytes_dup(rx_data, rx_len);
+        return msg;
+    }
+
+    case RCP_ADAPT_OP_UART_WRITE: {
+        const uint8_t *accepted_data;
+        size_t accepted_len;
+        bool timed;
+        uint64_t timestamp;
+        uint8_t transaction_num;
+        relay_message_t msg;
+        if (rcp_ep_uart_decode_write_response(b, len, byte_bus_id, &accepted_data, &accepted_len,
+                                               &timed, &timestamp, &transaction_num)
+            != RCP_EP_UART_OK) {
+            return fail_decode(out_err);
+        }
+        msg = finish_timed_response(timed, timestamp, transaction_num);
+        msg.payload = relay_bytes_dup(accepted_data, accepted_len);
+        return msg;
+    }
+
+    case RCP_ADAPT_OP_UART_READ: {
+        const uint8_t *rx_data;
+        size_t rx_len;
+        bool timed;
+        uint64_t timestamp;
+        uint8_t transaction_num;
+        relay_message_t msg;
+        if (rcp_ep_uart_decode_read_response(b, len, byte_bus_id, &rx_data, &rx_len, &timed,
+                                              &timestamp, &transaction_num) != RCP_EP_UART_OK) {
+            return fail_decode(out_err);
+        }
+        msg = finish_timed_response(timed, timestamp, transaction_num);
+        msg.payload = relay_bytes_dup(rx_data, rx_len);
+        return msg;
+    }
+
+    case RCP_ADAPT_OP_ADC_READ: {
+        uint16_t value;
+        bool timed;
+        uint64_t timestamp;
+        uint8_t transaction_num;
+        uint8_t payload[RCP_EP_ADC_PAYLOAD_LEN];
+        relay_message_t msg;
+        if (rcp_ep_adc_decode_response(b, len, byte_bus_id, &value, &timed, &timestamp,
+                                        &transaction_num) != RCP_EP_ADC_OK) {
+            return fail_decode(out_err);
+        }
+        be16_encode(payload, value);
+        msg = finish_timed_response(timed, timestamp, transaction_num);
+        msg.payload = relay_bytes_dup(payload, sizeof(payload));
+        return msg;
+    }
+
+    case RCP_ADAPT_OP_PWM_OUT_READ:
+    case RCP_ADAPT_OP_PWM_OUT_WRITE: {
+        rcp_ep_pwm_value_t value;
+        bool timed;
+        uint64_t timestamp;
+        uint8_t transaction_num;
+        uint8_t payload[RCP_EP_PWM_PAYLOAD_LEN];
+        relay_message_t msg;
+        if (rcp_ep_pwm_out_decode_response(b, len, byte_bus_id, &value, &timed, &timestamp,
+                                            &transaction_num) != RCP_EP_PWM_OUT_OK) {
+            return fail_decode(out_err);
+        }
+        pwm_value_encode(payload, value);
+        msg = finish_timed_response(timed, timestamp, transaction_num);
+        msg.payload = relay_bytes_dup(payload, sizeof(payload));
+        return msg;
+    }
+
+    case RCP_ADAPT_OP_PWM_IN_READ: {
+        rcp_ep_pwm_value_t value;
+        bool timed;
+        uint64_t timestamp;
+        uint8_t transaction_num;
+        uint8_t payload[RCP_EP_PWM_PAYLOAD_LEN];
+        relay_message_t msg;
+        if (rcp_ep_pwm_in_decode_response(b, len, byte_bus_id, &value, &timed, &timestamp,
+                                           &transaction_num) != RCP_EP_PWM_IN_OK) {
+            return fail_decode(out_err);
+        }
+        pwm_value_encode(payload, value);
+        msg = finish_timed_response(timed, timestamp, transaction_num);
+        msg.payload = relay_bytes_dup(payload, sizeof(payload));
+        return msg;
+    }
+
+    case RCP_ADAPT_OP_LIN_COMMAND: {
+        const uint8_t *rx_data;
+        size_t rx_len;
+        bool timed;
+        uint64_t timestamp;
+        uint8_t transaction_num;
+        relay_message_t msg;
+        if (rcp_ep_lin_decode_response(b, len, byte_bus_id, &rx_data, &rx_len, &timed, &timestamp,
+                                        &transaction_num) != RCP_EP_LIN_OK) {
+            return fail_decode(out_err);
+        }
+        msg = finish_timed_response(timed, timestamp, transaction_num);
+        msg.payload = relay_bytes_dup(rx_data, rx_len);
+        return msg;
+    }
+
+    case RCP_ADAPT_OP_CAN_FRAME: {
+        rcp_ep_can_frame_format_t frame_format;
+        uint32_t arbitration_id;
+        rcp_ep_can_xl_header_t xl_header;
+        const uint8_t *rx_data;
+        size_t rx_len;
+        bool timed;
+        uint64_t timestamp;
+        uint8_t transaction_num;
+        relay_message_t msg;
+        if (rcp_ep_can_decode_frame_response(b, len, byte_bus_id, &frame_format, &arbitration_id,
+                                              &xl_header, &rx_data, &rx_len, &timed, &timestamp,
+                                              &transaction_num) != RCP_EP_CAN_OK) {
+            return fail_decode(out_err);
+        }
+        msg = finish_timed_response(timed, timestamp, transaction_num);
+        msg.payload = relay_bytes_dup(rx_data, rx_len);
+        meta_set_u32(&msg, "rcp.can.frame_format", (uint32_t)frame_format);
+        meta_set_u32(&msg, "rcp.can.arbitration_id", arbitration_id);
+        return msg;
+    }
+
+    case RCP_ADAPT_OP_ISELED_COMMAND: {
+        const uint8_t *rx_data;
+        size_t rx_len;
+        bool timed;
+        uint64_t timestamp;
+        uint8_t transaction_num;
+        relay_message_t msg;
+        if (rcp_ep_iseled_decode_response(b, len, byte_bus_id, &rx_data, &rx_len, &timed,
+                                           &timestamp, &transaction_num) != RCP_EP_ISELED_OK) {
+            return fail_decode(out_err);
+        }
+        msg = finish_timed_response(timed, timestamp, transaction_num);
+        msg.payload = relay_bytes_dup(rx_data, rx_len);
+        return msg;
+    }
+
+    case RCP_ADAPT_OP_MDIO_READ: {
+        const uint8_t *words_data;
+        size_t word_count;
+        bool timed;
+        uint64_t timestamp;
+        uint8_t transaction_num;
+        relay_message_t msg;
+        if (rcp_ep_mdio_decode_read_response(b, len, byte_bus_id, &words_data, &word_count,
+                                              &timed, &timestamp, &transaction_num)
+            != RCP_EP_MDIO_OK) {
+            return fail_decode(out_err);
+        }
+        msg = finish_timed_response(timed, timestamp, transaction_num);
+        msg.payload = relay_bytes_dup(words_data, word_count * 2u);
+        return msg;
+    }
+
+    case RCP_ADAPT_OP_MDIO_WRITE: {
+        const uint8_t *words_data;
+        size_t word_count;
+        bool timed;
+        uint64_t timestamp;
+        uint8_t transaction_num;
+        relay_message_t msg;
+        if (rcp_ep_mdio_decode_write_response(b, len, byte_bus_id, &words_data, &word_count,
+                                               &timed, &timestamp, &transaction_num)
+            != RCP_EP_MDIO_OK) {
+            return fail_decode(out_err);
+        }
+        msg = finish_timed_response(timed, timestamp, transaction_num);
+        msg.payload = relay_bytes_dup(words_data, word_count * 2u);
+        return msg;
+    }
+
+    case RCP_ADAPT_OP_WAKEUP_SLEEPCMD: {
+        rcp_pwrmode_entry_result_t result;
+        uint8_t transaction_num;
+        relay_message_t msg;
+        if (rcp_ep_wakeup_decode_sleepcmd_response(b, len, byte_bus_id, &result,
+                                                    &transaction_num) != RCP_EP_WAKEUP_OK) {
+            return fail_decode(out_err);
+        }
+        relay_message_init(&msg);
+        msg.protocol     = RELAY_PROTOCOL_RCP;
+        msg.timestamp_ms = rcp_wallclock_ms();
+        meta_set_u32(&msg, "rcp.transaction_num", transaction_num);
+        meta_set_u32(&msg, "rcp.wakeup.result", (uint32_t)result);
+        return msg;
+    }
+
+    case RCP_ADAPT_OP_WAKEUP_WAKEUP: {
+        uint8_t transaction_num;
+        relay_message_t msg;
+        if (rcp_ep_wakeup_decode_wakeup_message(b, len, byte_bus_id, &transaction_num)
+            != RCP_EP_WAKEUP_OK) {
+            return fail_decode(out_err);
+        }
+        relay_message_init(&msg);
+        msg.protocol     = RELAY_PROTOCOL_RCP;
+        msg.timestamp_ms = rcp_wallclock_ms();
+        meta_set_u32(&msg, "rcp.transaction_num", transaction_num);
+        return msg;
+    }
+
+    default:
+        return fail_decode(out_err);
+    }
 }
 
 /* ── Error wrapping (§5.2) ─────────────────────────────────────────────────── */
@@ -89,11 +706,23 @@ bool rcp_errc_to_relay_errc(int rcp_ec, relay_errc_t *out)
     }
 }
 
-/* ── RcpCallerAdapter — implements rcp_relay_caller_t over rcp_controller_t ── */
+/* ── RcpAdapter — implements rcp_relay_caller_t over rcp_avtp_transport_t ───── */
+
+/* The largest AVTPDU this adapter ever needs to receive: every op it
+ * supports rides NTSCF framing only (see adapt.h's file header), so the
+ * ceiling is RCP_AVTP_NTSCF_MAX_PAYLOAD plus headroom for the NTSCF fixed
+ * header itself -- comfortably under a kilobyte in practice, nowhere near
+ * TSCF's much larger 65535-octet ceiling this adapter never needs. */
+#define ADAPT_RECV_BUF_LEN ((size_t)(RCP_AVTP_NTSCF_MAX_PAYLOAD + 64u))
 
 typedef struct {
-    rcp_relay_caller_t base;
-    rcp_controller_t  *ctrl; /* retained */
+    rcp_relay_caller_t    base;
+    rcp_avtp_transport_t *transport; /* retained */
+    rcp_stream_id_t        local_stream_id;
+    rcp_byte_bus_id_t      byte_bus_id;
+    rcp_adapt_ep_kind_t    kind;
+    volatile int            next_transaction;
+    volatile int            next_sequence;
 } rcp_adapter_t;
 
 static relay_protocol_t adapter_protocol(rcp_relay_caller_t *self)
@@ -102,148 +731,139 @@ static relay_protocol_t adapter_protocol(rcp_relay_caller_t *self)
     return RELAY_PROTOCOL_RCP;
 }
 
-/* send maps relay_message_t -> rcp_command_t, discards the response (§10.6). */
+static bool resolve_op(const rcp_adapter_t *a, const relay_message_t *msg, rcp_adapt_op_t *out_op)
+{
+    rcp_adapt_op_t op;
+    if (!rcp_adapt_op_from_string(relay_message_get_meta(msg, "rcp.adapt.op"), &op)) return false;
+    if (rcp_adapt_op_kind(op) != a->kind) return false;
+    *out_op = op;
+    return true;
+}
+
+/* Packs msg into a fully wire-ready frame for op: an ACF request wrapped
+ * in NTSCF for every op except RCP_ADAPT_OP_DISCOVERY, which
+ * rcp_message_to_request() already returns fully NTSCF-framed. */
+static rcp_bytes_t build_frame(rcp_adapter_t *a, rcp_adapt_op_t op, const relay_message_t *msg,
+                                uint8_t transaction_num, rcp_adapt_errc_t *out_err)
+{
+    rcp_bytes_t body = rcp_message_to_request(op, a->byte_bus_id, a->local_stream_id, msg,
+                                               transaction_num, out_err);
+    rcp_avtp_ntscf_header_t hdr;
+    rcp_bytes_t frame;
+
+    if (!body.data) return body;
+    if (op == RCP_ADAPT_OP_DISCOVERY) return body; /* already NTSCF-framed */
+
+    hdr.sv                = 1;
+    hdr.version            = 0;
+    hdr.ntscf_data_length  = 0; /* recomputed by the encoder */
+    hdr.sequence_num       = (uint8_t)rcp_atomic_inc(&a->next_sequence);
+    hdr.stream_id          = a->local_stream_id;
+
+    frame = rcp_avtp_encode_ntscf(&hdr, body.data, body.len);
+    rcp_bytes_free(&body);
+    if (!frame.data && out_err) *out_err = RCP_ADAPT_ERR_ENCODE;
+    return frame;
+}
+
+/* send maps msg to a request and transmits it, discarding any reply (§10.6). */
 //cfusa:req REQ-RELAY-008
 static int adapter_send(rcp_relay_caller_t *self, const relay_context_t *ctx,
                          const relay_message_t *msg)
 {
     rcp_adapter_t *a = (rcp_adapter_t *)self;
-    rcp_command_t cmd = rcp_message_to_command(msg);
-    rcp_response_t resp = {0};
+    rcp_adapt_op_t op;
+    rcp_bytes_t frame;
+    uint8_t transaction_num;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
     int ec;
 
-    if (!a->ctrl) return RCP_ERR_CLOSED;
-    ec = rcp_controller_send(a->ctrl, ctx, &cmd, &resp);
-    rcp_response_free(&resp);
-    return ec;
+    (void)ctx;
+
+    if (!resolve_op(a, msg, &op)) return RCP_ADAPT_ERR_ENCODE;
+
+    transaction_num = (uint8_t)rcp_atomic_inc(&a->next_transaction);
+    frame = build_frame(a, op, msg, transaction_num, &err);
+    if (!frame.data) return err;
+
+    ec = rcp_avtp_transport_send(a->transport, frame.data, frame.len);
+    rcp_bytes_free(&frame);
+    if (ec == RCP_OK) return RCP_ADAPT_OK;
+    if (ec == RCP_ERR_CLOSED) return RCP_ADAPT_ERR_CLOSED;
+    return RCP_ADAPT_ERR_TRANSPORT;
 }
 
-/* call maps relay_message_t -> rcp_command_t -> relay_message_t (§10.2). */
+/* call maps req to a request, transmits it, blocks (subject to ctx) for
+ * exactly one reply frame, and maps that frame back to *out (§10.2). */
 //cfusa:req REQ-RELAY-009
 static int adapter_call(rcp_relay_caller_t *self, const relay_context_t *ctx,
                          const relay_message_t *req, relay_message_t *out)
 {
     rcp_adapter_t *a = (rcp_adapter_t *)self;
-    rcp_command_t cmd = rcp_message_to_command(req);
-    rcp_response_t resp = {0};
+    rcp_adapt_op_t op;
+    rcp_bytes_t frame;
+    uint8_t transaction_num;
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
     int ec;
+    uint8_t recv_buf[ADAPT_RECV_BUF_LEN];
+    size_t recv_len = 0;
+    relay_message_t resp;
 
-    if (!a->ctrl) return RCP_ERR_CLOSED;
-    ec = rcp_controller_send(a->ctrl, ctx, &cmd, &resp);
-    if (ec != RCP_OK) return ec;
-    *out = rcp_response_to_message(&resp);
-    rcp_response_free(&resp);
-    return RCP_OK;
-}
+    if (!resolve_op(a, req, &op)) return RCP_ADAPT_ERR_ENCODE;
 
-typedef struct {
-    rcp_status_channel_t    *status_ch; /* retained; released by the thread */
-    relay_message_channel_t *out;       /* retained; released by the thread */
-    relay_backpressure_t     bp;
-} subscribe_thread_ctx_t;
+    transaction_num = (uint8_t)rcp_atomic_inc(&a->next_transaction);
+    frame = build_frame(a, op, req, transaction_num, &err);
+    if (!frame.data) return err;
 
-/* Runs in its own detached thread per subscription (§10.5): reads Status
- * updates from status_ch and pushes the mapped Message onto out until
- * status_ch closes, then closes out and releases both channel references. */
-static void subscribe_thread_fn(void *arg)
-{
-    subscribe_thread_ctx_t *tctx = (subscribe_thread_ctx_t *)arg;
-    rcp_status_t st;
+    ec = rcp_avtp_transport_send(a->transport, frame.data, frame.len);
+    rcp_bytes_free(&frame);
+    if (ec == RCP_ERR_CLOSED) return RCP_ADAPT_ERR_CLOSED;
+    if (ec != RCP_OK) return RCP_ADAPT_ERR_TRANSPORT;
 
-    while (rcp_status_channel_recv(tctx->status_ch, &st)) {
-        relay_message_t msg = rcp_status_to_message(&st);
-        rcp_status_free(&st);
+    ec = rcp_avtp_transport_recv(a->transport, ctx, recv_buf, sizeof(recv_buf), &recv_len);
+    if (ec == RCP_ERR_TIMEOUT) return RCP_ADAPT_ERR_TIMEOUT;
+    if (ec == RCP_ERR_CLOSED) return RCP_ADAPT_ERR_CLOSED;
+    if (ec != RCP_OK) return RCP_ADAPT_ERR_TRANSPORT;
 
-        switch (tctx->bp) {
-        case RELAY_BACKPRESSURE_DROP_NEWEST:
-            relay_message_channel_push(tctx->out, &msg);
-            break;
-        case RELAY_BACKPRESSURE_DROP_OLDEST:
-            if (!relay_message_channel_push(tctx->out, &msg)) {
-                relay_message_t discard;
-                if (relay_message_channel_try_recv(tctx->out, &discard)) {
-                    relay_message_free(&discard);
-                }
-                relay_message_channel_push(tctx->out, &msg);
-            }
-            break;
-        case RELAY_BACKPRESSURE_BLOCK:
-            while (!relay_message_channel_push(tctx->out, &msg) &&
-                   !relay_message_channel_is_closed(tctx->out)) {
-                rcp_sleep_ms(1);
-            }
-            break;
+    if (op == RCP_ADAPT_OP_DISCOVERY) {
+        resp = rcp_response_to_message(op, a->byte_bus_id, recv_buf, recv_len, &err);
+    } else {
+        rcp_avtp_ntscf_header_t hdr;
+        const uint8_t *acf = NULL;
+        size_t acf_len = 0;
+        if (rcp_avtp_decode_ntscf(recv_buf, recv_len, &hdr, &acf, &acf_len) != RCP_AVTP_OK) {
+            return RCP_ADAPT_ERR_DECODE;
         }
-        /* relay_message_channel_push() deep-copies; our copy is ours either
-         * way, whether it was accepted, dropped, or the channel had closed
-         * out from under us. */
-        relay_message_free(&msg);
+        resp = rcp_response_to_message(op, a->byte_bus_id, acf, acf_len, &err);
     }
+    if (err != RCP_ADAPT_OK) return err;
 
-    relay_message_channel_close(tctx->out);
-    rcp_status_channel_release(tctx->status_ch);
-    relay_message_channel_release(tctx->out);
-    free(tctx);
+    *out = resp;
+    return RCP_ADAPT_OK;
 }
 
-/* subscribe wraps rcp_controller_subscribe, forwarding Status as
- * relay_message_t via a background thread per §10.5. */
 //cfusa:req REQ-RELAY-010
-//cfusa:req REQ-RELAY-011
 static int adapter_subscribe(rcp_relay_caller_t *self, const relay_subscriber_options_t *opts,
                               relay_message_channel_t **out)
 {
-    rcp_adapter_t *a = (rcp_adapter_t *)self;
-    rcp_context_t ctx = rcp_context_background();
-    rcp_status_channel_t *status_ch = NULL;
-    relay_message_channel_t *chan;
-    subscribe_thread_ctx_t *tctx;
-    int ec;
-
-    if (!a->ctrl) return RCP_ERR_CLOSED;
-
-    ec = rcp_controller_subscribe(a->ctrl, &ctx, &status_ch);
-    if (ec != RCP_OK) return ec;
-
-    chan = relay_message_channel_new(opts->channel_depth);
-    if (!chan) {
-        rcp_status_channel_release(status_ch);
-        return RCP_ERR_BUSY;
-    }
-
-    tctx = (subscribe_thread_ctx_t *)malloc(sizeof(*tctx));
-    if (!tctx) {
-        relay_message_channel_release(chan);
-        rcp_status_channel_release(status_ch);
-        return RCP_ERR_BUSY;
-    }
-    tctx->status_ch = status_ch; /* transfers the reference from subscribe() above */
-    tctx->out       = relay_message_channel_retain(chan);
-    tctx->bp        = opts->back_pressure;
-
-    if (rcp_thread_start_detached(subscribe_thread_fn, tctx) != 0) {
-        relay_message_channel_release(tctx->out);
-        rcp_status_channel_release(tctx->status_ch);
-        free(tctx);
-        relay_message_channel_release(chan);
-        return RCP_ERR_BUSY;
-    }
-
-    *out = chan; /* caller's reference */
-    return RCP_OK;
+    /* No native TC18 periodic Status-equivalent stream exists to wrap --
+     * see adapt.h's file header. */
+    (void)self;
+    (void)opts;
+    (void)out;
+    return RCP_ADAPT_ERR_NOT_SUPPORTED;
 }
 
 static int adapter_close(rcp_relay_caller_t *self)
 {
     rcp_adapter_t *a = (rcp_adapter_t *)self;
-    if (!a->ctrl) return RCP_OK;
-    return rcp_controller_close(a->ctrl);
+    return rcp_avtp_transport_close(a->transport);
 }
 
 static void adapter_destroy(rcp_relay_caller_t *self)
 {
     rcp_adapter_t *a = (rcp_adapter_t *)self;
-    rcp_controller_release(a->ctrl);
+    rcp_avtp_transport_release(a->transport);
     free(a);
 }
 
@@ -259,12 +879,18 @@ static const rcp_relay_caller_vtable_t adapter_vtable = {
 /* ── Adapt() (§10.3) ──────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-RELAY-012
-rcp_relay_caller_t *rcp_adapt(rcp_controller_t *ctrl)
+rcp_relay_caller_t *rcp_adapt(rcp_avtp_transport_t *transport, rcp_stream_id_t local_stream_id,
+                               rcp_byte_bus_id_t byte_bus_id, rcp_adapt_ep_kind_t kind)
 {
     rcp_adapter_t *a = (rcp_adapter_t *)calloc(1, sizeof(*a));
     if (!a) return NULL;
-    a->base.vt       = &adapter_vtable;
-    a->base.refcount = 1;
-    a->ctrl          = rcp_controller_retain(ctrl);
+    a->base.vt           = &adapter_vtable;
+    a->base.refcount      = 1;
+    a->transport          = rcp_avtp_transport_retain(transport);
+    a->local_stream_id    = local_stream_id;
+    a->byte_bus_id        = byte_bus_id;
+    a->kind               = kind;
+    a->next_transaction   = 0;
+    a->next_sequence      = 0;
     return &a->base;
 }

@@ -48,31 +48,33 @@
 /*
  * legacy_mock.h -- test-only relocation of the pre-TC18 in-process
  * rcp_controller_t/rcp_registry_t reference implementation (formerly
- * include/rcp/mock.h + src/mock.c), kept for the not-yet-migrated legacy
- * satellites (proxy.c, redundancy.c, federation.c, zonegroup.c,
- * prioqueue.c, firmware.c, adapt.c -- ROADMAP.md Phase 21 milestones
- * 81-84) whose own unit tests still need a double for the legacy vtables
- * those modules decorate/implement. See ROADMAP.md's "Foundational
+ * include/rcp/mock.h + src/mock.c). See ROADMAP.md's "Foundational
  * test/config satellites (v0.77.0)" entry and include/rcp/mock.h's own
  * file header for why this moved: milestone 77 replaced mock.h/mock.c
  * with a TC18-shaped RC-Server/endpoint test double that has no
  * Command/Response shape left to double the legacy vtables with.
  * (tsn.c, deadline.c, watchdog.c, and powerstate.c moved off this double
  * at milestones 78 and 79; authz.c, ratelimit.c, loan.c, observe.c,
- * faultinject.c, admin.c, and recorder.c moved off it at milestone 80 --
- * none of their test binaries link this file any more, see
- * tests/CMakeLists.txt.)
+ * faultinject.c, admin.c, and recorder.c moved off it at milestone 80;
+ * proxy.c, redundancy.c, federation.c, zonegroup.c, prioqueue.c, and
+ * firmware.c were DEPRECATE-removed outright at milestone 83 rather than
+ * migrated; adapt.c REPLACEd its own rcp_controller_t dependency at
+ * milestone 84 -- none of their test binaries link this file any more,
+ * see tests/CMakeLists.txt.)
  *
  * This file is a pure relocation, not a rewrite: same struct layout, same
  * function/type names, same REQ-CTRL-*, REQ-REG-*, REQ-RESP-*, REQ-STAT-*,
  * REQ-ERR-011 requirement coverage (now exercised by
  * tests/test_legacy_mock.c, itself a renamed copy of the old
  * tests/test_mock.c). Deliberately not installed/shipped as part of the
- * public rcp library -- it is compiled directly into each legacy-satellite
- * test binary that still needs it (see tests/CMakeLists.txt). Once
- * milestones 81-84 finish migrating or deprecating every remaining
- * legacy-vtable satellite, this file (and its .c counterpart) can be
- * deleted outright.
+ * public rcp library. With milestone 84 landed, no satellite decorates the
+ * legacy vtables any more -- this file's only remaining consumers are its
+ * own test (tests/test_legacy_mock.c) and the bench_mock/
+ * command_latency_test benchmarking tools (see tests/CMakeLists.txt).
+ * Whether to retire this file (and those two benchmarks) outright, versus
+ * keeping it as a still-useful reference-implementation exercise, is left
+ * as an open follow-up call rather than decided unilaterally here -- it
+ * is not part of milestone 84's own "REPLACE relay.h + adapt.c" scope.
  *
  * All operations execute synchronously in memory — no I/O, minimal
  * threading (one watcher thread per subscription, to auto-expire the

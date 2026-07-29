@@ -23,8 +23,10 @@ target_compile_options(test_mock PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_mock COMMAND test_mock)
 
 # test_legacy_mock exercises the relocated pre-TC18 zone-controller mock
-# double (tests/legacy_mock.h/.c) that several not-yet-migrated legacy
-# satellites' own unit tests still build fixtures against -- see
+# double (tests/legacy_mock.h/.c) -- no satellite decorates the legacy
+# vtables it doubles any more (milestone 84 was the last one to migrate
+# off it), so its own remaining consumers are this test and the
+# bench_mock/command_latency_test benchmarking tools below -- see
 # tests/legacy_mock.h's own file header (ROADMAP.md milestone 77).
 add_executable(test_legacy_mock test_legacy_mock.c legacy_mock.c)
 target_link_libraries(test_legacy_mock PRIVATE rcp::rcp unity)
@@ -241,13 +243,15 @@ add_test(NAME rcp_e2e COMMAND test_e2e)
 # test_recorder no longer link legacy_mock.c either: milestone 80's own
 # ADAPT rebind moves all six off rcp_controller_t/rcp_zone_t entirely
 # (each module's own file header), so none of them need the legacy
-# zone-controller double any more. (The remaining legacy_mock.c-linked
-# suites -- test_legacy_mock, bench_mock, command_latency_test,
-# test_adapt -- are the mock double's own tests and the not-yet-migrated
-# adapt.c, not satellite decorators; the six satellites that still
-# needed legacy_mock.c -- prioqueue/firmware/zonegroup/proxy/redundancy/
-# federation -- were DEPRECATE-removed outright at milestone 83 rather
-# than migrated, per the Satellite Disposition table.)
+# zone-controller double any more. (prioqueue/firmware/zonegroup/proxy/
+# redundancy/federation -- the six satellites that still needed
+# legacy_mock.c -- were DEPRECATE-removed outright at milestone 83 rather
+# than migrated, per the Satellite Disposition table; adapt.c REPLACEd its
+# own rcp_controller_t dependency at milestone 84 and moved off
+# legacy_mock.c too -- see below. The remaining legacy_mock.c-linked
+# suites -- test_legacy_mock, bench_mock, command_latency_test -- are the
+# mock double's own tests and benchmarking tools, not satellite
+# decorators.)
 add_executable(test_ratelimit test_ratelimit.c)
 target_link_libraries(test_ratelimit PRIVATE rcp::rcp unity)
 target_compile_options(test_ratelimit PRIVATE ${RCP_TEST_WARNING_FLAGS})
@@ -338,7 +342,11 @@ target_link_libraries(test_doipbr PRIVATE rcp::rcp unity)
 target_compile_options(test_doipbr PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_doipbr COMMAND test_doipbr)
 
-add_executable(test_adapt test_adapt.c legacy_mock.c)
+# test_adapt no longer links legacy_mock.c: milestone 84's own REPLACE
+# rebinds adapt.c off rcp_controller_t/rcp_zone_t entirely (adapt.h's own
+# file header), onto rcp_avtp_transport_t (avtp.h) and shmem.h's
+# rcp_shmem_avtp_pair_new() test double instead.
+add_executable(test_adapt test_adapt.c)
 target_link_libraries(test_adapt PRIVATE rcp::rcp unity)
 target_compile_options(test_adapt PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_adapt COMMAND test_adapt)
