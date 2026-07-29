@@ -4101,7 +4101,7 @@ those two documents' own prose (and TARA/CYBERSECURITY.md's separately
 already-flagged stale `REQ-E2E-*` references, milestone 70's own gap) is
 Phase 22's job (v0.85.0), not this milestone's.
 
-### 81. Protocol bridges (v0.81.0)
+### 81. Protocol bridges (v0.81.0) ✅
 
 - **ADAPT** all seven compile-time-stub bridges (`grpcbridge`,
   `restbridge`, `someipbr`, `ddsbr`, `mqttbr`, `udsbr`, `doipbr`):
@@ -4115,6 +4115,65 @@ Phase 22's job (v0.85.0), not this milestone's.
   comments (native endpoint, transport-network option, bridge) so the
   three-way distinction survives future contributors, per the Satellite
   Disposition table.
+
+**Done (v0.81.0)**: All nine bridge stubs (the seven general-purpose
+ones plus `canbr.c`/`linbr.c`) were still built against the pre-Phase-13
+`rcp_controller_t`/`rcp_zone_t` vtable shape milestones 77-80 already
+rebound everything else off of -- the only satellites left on it. Every
+module drops its `rcp_<x>_controller_t` wrapper and
+`rcp_<x>_controller_new(rcp_zone_t, cfg)` entry point entirely and
+replaces it with a single plain function, `rcp_<x>_bridge_send(cfg, addr,
+request_type, payload, payload_len, out_response)`, operating on
+`avtp.h`'s `rcp_avtp_addr_t` plus a caller-supplied, deliberately opaque
+`request_type` byte in place of `rcp_zone_t`/`rcp_command_type_t` --
+exactly the pattern milestone 80 established, applied here to modules
+that carry no real backend rather than to modules with actual internal
+state. Every config struct (`rcp_grpc_config_t` and its eight siblings)
+and its `_default_config()` keep their pre-existing fields and default
+values unchanged; only the call shape wrapped around them changes. All
+nine still return `RCP_ERR_NOT_SUPPORTED` unconditionally (no backend
+newly linked in this milestone) and now additionally document, in the
+same breath, that `*out_response` is left untouched on that path.
+
+`canbr.h`/`linbr.h` each gained a new "Narrowed role" section in their
+own file header spelling out the three-way (CAN) / two-way (LIN)
+distinction the Satellite Disposition table calls for: `ep_can.h`/
+`ep_lin.h` (native endpoint, Phase 19), `avtp.h`'s
+`rcp_avtp_transport_t` (CAN(FD/XL)-as-transport, Phase 13, CAN only --
+LIN has no transport role), and this bridge's own remaining
+external-foreign-segment-gateway role. `ep_can.h` (milestone 72) and
+`ep_lin.h` (milestone 71) already carried their own half of this same
+distinction, explicitly deferring the `canbr.h`/`linbr.h`-side write-up
+to "Phase 21... tracked for Satellite Rework v0.81.0" -- this milestone
+closes that loop from the `canbr.h`/`linbr.h` side without re-touching
+`ep_can.h`/`ep_lin.h`/`avtp.h` themselves, per those modules' own stated
+layering discipline ("avtp.h and canbr.h themselves are not touched
+here").
+
+`tests/test_grpcbridge.c` and its eight siblings are from-scratch
+rewrites (2 cases each: `bridge_send()` returns `RCP_ERR_NOT_SUPPORTED`
+and leaves `*out_response` untouched; `_default_config()` returns its
+documented defaults), none of them ever having linked
+`tests/legacy_mock.c` to begin with. `REQ-GRPC-*`/`REQ-REST-*`/
+`REQ-SOMEIP-*`/`REQ-DDS-*`/`REQ-MQTT-*`/`REQ-UDS-*`/`REQ-DOIP-*`/
+`REQ-CAN-*`/`REQ-LIN-*` are rewritten in place in `.fusa-reqs.json`
+(same nine prefixes, reduced from 4 to 2 requirements each -- the
+retired `zone()`/`subscribe()`/`close()` vtable slots no longer exist to
+have their own requirements). `REQ-CANEP-*`/`REQ-LINEP-*` (`ep_can.c`/
+`ep_lin.c`'s own, already-disjoint id bands) are untouched.
+
+Verified locally: full `ctest` suite (67/67, unchanged from v0.80.0)
+under both a plain Debug build and a manual
+`-fsanitize=address,undefined` build (ASan+UBSan-clean across the full
+suite; macOS ASan does not support leak detection, so leak-checking
+itself is not covered by this local run). A local `cfusa` v0.5.46
+toolchain build: `lint`/`check`/`cyber`/`qualify`/`vuln` all exit 0
+against a clean tree; `trace --req-coverage 100` reports 911/911
+requirements traced (100%, both metrics) -- the tool's own advisory
+`UNTRACED` list still names the same four pre-existing gaps milestone 80
+already flagged (`REQ-MDNS-007/008`, `REQ-PQ-005`, `REQ-RELAY-013`),
+unchanged by this milestone. A local build of RELAY's own `relay conform
+--strict` against the `-DRELAY_BUILD_CLI=ON` CLI target reports PASS.
 
 ### 82. Optional discovery convenience (v0.82.0)
 
