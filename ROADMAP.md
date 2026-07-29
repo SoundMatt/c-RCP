@@ -4575,3 +4575,27 @@ were always phrased against the named constant, not a raw evt value.
 
 Verified locally: full `ctest` suite passes (60/60 suites, including the
 new regression tests) under a plain Debug build.
+
+### 87. Pin c-FuSa to v0.5.49 (v0.87.0) ✅
+
+`ci.yml`'s and `release.yml`'s c-FuSa clone step were both still pinned to
+`v0.5.46`, three patch releases behind upstream's actual latest
+(`v0.5.49`) at audit time. CI stayed green against the stale pin the whole
+time, so the gap wasn't visible from build status alone.
+
+Bumped both pins to `v0.5.49`. Verified locally with a real v0.5.49
+`cfusa` build (not assumed compatible): `check`/`lint`/`analyze`/`cyber`/
+`qualify`/`vuln` all still exit 0 (0 errors), and every command
+`release.yml` runs (`fmea --cyber`, `safety-case --gsn`, `release`, `sas`,
+`sci`, `audit-pack`, `badge`, `qualify --format json`) also exits 0.
+`trace --req-coverage 100` still reports 854/854 traced, 512/512 functions
+annotated, unchanged from v0.5.46.
+
+One real behavioral difference surfaced: `cfusa check`'s combined safety
+category gained two new rule families not present in v0.5.46 --
+`COUP002`/`COUP003` (coupling) and `COMP001` (complexity) -- accounting
+for 60 additional findings, all `WARNING` severity. Neither `ci.yml` nor
+`release.yml` invokes any `cfusa` subcommand with `--strict` anywhere, so
+these new warnings do not change any job's exit code; recorded here for
+visibility since a future `--strict` adoption would need to budget for
+them.
