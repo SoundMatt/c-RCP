@@ -4295,7 +4295,7 @@ flagged — no longer exists to be untraced. A local build of RELAY's own
 `relay conform --strict` against the `-DRELAY_BUILD_CLI=ON` CLI target
 reports PASS.
 
-### 84. RELAY adapter rework (v0.84.0)
+### 84. RELAY adapter rework (v0.84.0) ✅
 
 - **REPLACE** `relay/relay.h` + `adapt.c`: RELAY's generic
   `Message`/`ToMessage()`/`FromMessage()` envelope assumes one generic
@@ -4306,6 +4306,111 @@ reports PASS.
   upstream conversation with `SoundMatt/RELAY` (a GitHub issue against
   that repo, not an edit to it — per this project's own cross-repo
   policy) rather than assuming a resolution unilaterally.
+
+**Done (v0.84.0)**:
+
+- **`relay/relay.h`**: confirmed protocol-agnostic and structurally
+  unaffected by the TC18 replacement (§18.2's Message/Context/Channel/
+  Caller surface has no zone/command-shape assumption baked in) — the
+  only change is bumping `RELAY_SPEC_VERSION` from the stale `"1.12"` to
+  the current released `"1.14"` (v1.13 was a deep-audit fix pass; v1.14
+  expanded the §13.7.2 module-name registry this project's own
+  module-naming reconciliation, issue #87, already consulted), an
+  incidental cleanup while this area was already being touched.
+- **`include/rcp/adapt.h` + `src/adapt.c`**: fully REPLACEd, dropping
+  every dependency on the retired `rcp_zone_t`/`rcp_command_t`/
+  `rcp_response_t`/`rcp_status_t`/`rcp_controller_t` types (still defined,
+  untouched, in `rcp.h` for `rcp.c`/`wire.c`/`mock.c`/`sim.c`/
+  `tests/legacy_mock.*`'s own sake — this milestone is the *last*
+  consumer of them anywhere in `src/` to move off). The interim
+  per-endpoint-type mapping this milestone proposes:
+  - `rcp_adapt_op_t`: a flat 18-value operation opcode, one entry per
+    distinct wire request/response shape (finer than "endpoint type" —
+    GPIO's read and write pack/unpack entirely different fields), each
+    tagged with the endpoint-type family (`rcp_adapt_ep_kind_t`, 13
+    values — 12 codec kinds, since PWM splits into PWM_OUT/PWM_IN, plus
+    discovery — reconciling the roadmap's own "13 heterogeneous endpoint
+    types... plus discovery and the register-map/lifecycle surface"
+    phrasing against what actually has an ACF-level encode/decode pair to
+    dispatch to; regmap.h/lifecycle.h confirmed to have none of their
+    own, per regmap.h's own "unlike avtp.h/acf.h" note) it belongs to.
+  - `rcp_message_to_request()`/`rcp_response_to_message()`: the new
+    `FromMessage()`/`ToMessage()`-equivalent pair, each taking the opcode
+    explicitly and dispatching via a per-opcode switch against the
+    matching `ep_*.h`/`discovery.h` encode/decode function, per a
+    documented field table (`relay_message_t.payload` always carries the
+    operation's own natural wire-format bytes — raw tx/rx data or a
+    fixed-width big-endian scalar; every other field is a decimal-string
+    `meta["rcp.<kind>.<field>"]` entry, rekeying the old
+    zone/command-type convention to endpoint-type/field per the
+    milestone-80 precedent). CAN XL's two frame formats are out of this
+    interim mapping's scope (ep_can.h's own encoder already rejects a
+    missing `xl_header`, which this mapping never builds, for exactly
+    those two formats — a naturally-enforced, not silently-mishandled,
+    scope boundary, mirroring `RCP_EP_GPIO_WRITE_RESERVED6`'s own
+    precedent).
+  - `rcp_adapt()`: now wraps `avtp.h`'s pre-existing
+    `rcp_avtp_transport_t` (the "send/recv one already-framed AVTPDU"
+    primitive every endpoint type already assumes underneath its own
+    ACF-level codec) rather than a retired `rcp_controller_t`, binding one
+    `Caller` to exactly one endpoint address and endpoint-type kind —
+    reusing, not reinventing, `shmem.h`'s `rcp_shmem_avtp_pair_new()`
+    (milestone 78) as the in-process test double. `send()`/`call()` fail
+    with a new `RCP_ADAPT_ERR_ENCODE` if a message's
+    `meta["rcp.adapt.op"]` doesn't name an operation belonging to the
+    bound kind.
+  - `subscribe()` always returns a new `RCP_ADAPT_ERR_NOT_SUPPORTED`: TC18
+    defines no generic periodic Status-equivalent stream for any endpoint
+    type to forward, the same conclusion milestone 79's `deadline.c`
+    REPLACE already reached for the same reason.
+  - `rcp_errc_to_relay_errc()` (§5.2 error wrapping) is unchanged.
+- **Upstream coordination**: opened
+  [`SoundMatt/RELAY#66`](https://github.com/SoundMatt/RELAY/issues/66),
+  proposing that RELAY's own spec (§15.7.5 and/or the `Adapt()`
+  requirement) acknowledge the "several heterogeneous, fixed-shape
+  request/response pairs, no shared generic envelope" case and point
+  bindings toward a documented per-operation meta-key convention plus a
+  narrower-than-\"the-whole-protocol\" `Caller` binding — filed as a
+  GitHub issue against that repo, per this project's own "never edit
+  other repos, file issues only" cross-repo policy, not assumed
+  resolvable unilaterally here.
+- **`tests/test_adapt.c`**: rewritten from scratch against real endpoint
+  types, dropping its `tests/legacy_mock.h` dependency (the pattern every
+  other milestone-77–83 satellite test rewrite already used) — direct
+  `rcp_message_to_request()`/`rcp_response_to_message()` field-mapping
+  coverage for a representative op from each shape family (GPIO's
+  fixed-width scalar, SPI's channel-selector-plus-raw-bytes, I²C's
+  plain-raw-bytes, UART's required-read-size, CAN's XL-rejection, MDIO's
+  addressing-plus-packed-words, Wakeup's no-timed-variant, discovery's own
+  NTSCF-framed shape), plus end-to-end `rcp_adapt()` vtable coverage
+  (`send()`/`call()` round-tripped through a real `rcp_shmem_avtp_pair_new()`
+  pair, `subscribe()`'s not-supported result, close idempotency, retain/
+  release, and the §5.2 error-wrapping tests) — `tests/CMakeLists.txt`
+  updated to match (`test_adapt` no longer links `legacy_mock.c`; with
+  this milestone landed, no satellite decorates the legacy
+  `rcp_controller_t`/`rcp_registry_t` vtables any more, so `mock.h`'s and
+  `tests/legacy_mock.h`'s own file-header "not-yet-migrated" lists are
+  updated to reflect that — whether to retire `tests/legacy_mock.h`
+  itself, now that only its own test and the two benchmarking tools still
+  use it, is left an open follow-up call, not decided unilaterally as
+  part of this milestone's own "REPLACE relay.h + adapt.c" scope).
+- **`.fusa-reqs.json`**: `REQ-RELAY-005` through `-012` rewritten in place
+  to describe the new per-operation mapping/`Adapt()`/`send()`/`call()`/
+  `subscribe()` behavior (same 17-entry `REQ-RELAY-*` count as before —
+  no requirement added or orphaned); `REQ-RELAY-017`'s `//cfusa:req` tag
+  restored in the rewritten `adapt.c` (behavior itself unchanged).
+
+Verified locally: full `ctest` suite passes (60/60, unchanged from
+v0.83.0) under both a plain Debug build and a manual
+`-fsanitize=address,undefined` build (ASan+UBSan-clean across the full
+suite). A local `cfusa` v0.5.46 toolchain build: `check`/`cyber`/
+`qualify`/`vuln` all exit 0 against a clean tree; `trace --req-coverage
+100` reports 854/854 requirements traced and 512/512 functions annotated
+(both metrics), with the tool's own advisory `UNTRACED` list back to its
+prior three-entry steady state (`REQ-MDNS-007/008`, `REQ-RELAY-013`) — no
+new gap introduced. A local build of `SoundMatt/RELAY`'s own `relay
+conform --strict` (built from that repo's current `main`, v1.14) against
+a local `-DRELAY_BUILD_CLI=ON` build reports PASS.
 
 ---
 ### Phase 22 — Safety/Security Re-certification

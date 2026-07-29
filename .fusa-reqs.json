@@ -2018,64 +2018,64 @@
     },
     {
       "id": "REQ-RELAY-005",
-      "title": "rcp_status_to_message() maps Status fields per \u00a715.7.5",
-      "text": "rcp_status_to_message() shall set protocol to RCP, id to the zone's PascalCase name, payload to a copy of the status payload, seq to the status sequence number, timestamp_ms to the current wall-clock time, and meta[\"rcp.healthy\"] to \"true\" or \"false\".",
+      "title": "rcp_message_to_request() maps a Message to a protocol-native request per \u00a715.7.5",
+      "text": "rcp_message_to_request() shall pack a relay_message_t's payload and meta fields into a protocol-native request for the given rcp_adapt_op_t, per this module's own per-operation field table, addressed to the given byte_bus_id (or, for RCP_ADAPT_OP_DISCOVERY, framed as a full NTSCF AVTPDU addressed via requester_stream_id) and self-identified by the given transaction_num, reporting RCP_ADAPT_ERR_ENCODE on any packing failure.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-RELAY-006",
-      "title": "rcp_response_to_message() maps Response fields per \u00a715.7.5",
-      "text": "rcp_response_to_message() shall set protocol to RCP, id to the zone's PascalCase name, payload to a copy of the response payload, and meta[\"rcp.status\"] to the decimal string of the response status.",
+      "title": "rcp_response_to_message() maps a protocol-native response to a Message per \u00a715.7.5",
+      "text": "rcp_response_to_message() shall unpack a protocol-native response frame for the given rcp_adapt_op_t into a relay_message_t, per this module's own per-operation field table, validating the frame decodes for the expected byte_bus_id and reporting RCP_ADAPT_ERR_DECODE otherwise.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-RELAY-007",
-      "title": "rcp_message_to_command() maps Message fields per \u00a715.7.5",
-      "text": "rcp_message_to_command() shall set zone from the message id (via rcp_zone_from_string), priority from meta[\"rcp.priority\"] (\"high\"/\"critical\"/else Normal), type from meta[\"rcp.cmd_type\"] (\"set\"/\"get\"/\"reset\"/\"watchdog\"/\"sleep\"/\"wake\"/else Noop), and payload borrowed from the message payload.",
+      "title": "rcp_adapt_op_kind()/_string()/_from_string() classify and round-trip every operation",
+      "text": "rcp_adapt_op_kind() shall report the endpoint-type family (rcp_adapt_ep_kind_t) each rcp_adapt_op_t value belongs to; rcp_adapt_op_string() shall return a unique, non-empty canonical name for each defined rcp_adapt_op_t value; rcp_adapt_op_from_string() shall parse that name back to the same value, and shall report false for any unrecognized or NULL name.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-RELAY-008",
-      "title": "Adapter send() maps and dispatches, discarding the response",
-      "text": "The relay Caller adapter's send() shall convert the given message to a Command, dispatch it via the wrapped controller's send(), and return the resulting error code while discarding the Response payload.",
+      "title": "Adapter send() maps a message to a request for the bound op and transmits it, discarding any reply",
+      "text": "The relay Caller adapter's send() shall resolve the operation named by the given message's meta[\"rcp.adapt.op\"], fail with RCP_ADAPT_ERR_ENCODE if that operation's rcp_adapt_op_kind() does not match the adapter's own bound kind, otherwise pack and transmit the corresponding request via the wrapped rcp_avtp_transport_t without waiting for a reply.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-RELAY-009",
-      "title": "Adapter call() maps request, dispatches, and maps the reply back",
-      "text": "The relay Caller adapter's call() shall convert the given request message to a Command, dispatch it via the wrapped controller's send(), and on success convert the resulting Response to a Message.",
+      "title": "Adapter call() maps a request, transmits it, and maps the one reply frame back",
+      "text": "The relay Caller adapter's call() shall perform the same operation resolution and request packing as send(), transmit the request, block (subject to ctx) for exactly one reply frame from the wrapped transport, and on success map that frame back to *out via rcp_response_to_message().",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-RELAY-010",
-      "title": "Adapter subscribe() forwards Status as Message via a per-subscription thread",
-      "text": "The relay Caller adapter's subscribe() shall subscribe to the wrapped controller's Status channel and spawn one thread per subscription that converts each Status to a Message and pushes it to the returned channel, closing the returned channel when the underlying Status channel closes.",
+      "title": "Adapter subscribe() reports not-supported: no native TC18 periodic status stream exists",
+      "text": "The relay Caller adapter's subscribe() shall always return RCP_ADAPT_ERR_NOT_SUPPORTED, since TC18 defines no generic periodic Status-equivalent stream for any endpoint type to forward.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-RELAY-011",
-      "title": "Adapter subscribe() applies the requested back-pressure policy",
-      "text": "The subscription thread shall apply DropNewest (discard the incoming message if the channel is full), DropOldest (evict the oldest queued message to make room), or Block (retry until space is available or the channel closes) per the caller's SubscriberOptions.",
+      "title": "rcp_adapt_strerror() returns a unique human-readable message",
+      "text": "rcp_adapt_strerror() shall return a unique, non-empty message for each defined rcp_adapt_errc_t constant.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-RELAY-012",
-      "title": "rcp_adapt() wraps a controller without blocking or connecting",
-      "text": "rcp_adapt() shall retain the given controller and return a relay Caller wrapping it immediately, without blocking or establishing any connection.",
+      "title": "rcp_adapt() binds a transport/address/kind without blocking or connecting",
+      "text": "rcp_adapt() shall retain the given rcp_avtp_transport_t and return a relay Caller bound to the given byte_bus_id, local_stream_id, and endpoint-type kind immediately, without blocking or transmitting any traffic itself.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"

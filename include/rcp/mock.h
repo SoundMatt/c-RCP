@@ -32,23 +32,26 @@
  * already operate on raw, already-framed AVTPDU/ACF request and response
  * bytes, so this module's dispatch surface does too.
  *
- * The old zone-controller mock is not deleted outright: several
- * not-yet-migrated legacy satellites (proxy.c, redundancy.c,
- * federation.c, zonegroup.c, prioqueue.c, firmware.c, adapt.c --
- * ROADMAP.md Phase 21 milestones 81-84) still implement/decorate the
- * legacy rcp_controller_t/rcp_registry_t vtables, and their own unit
- * tests still need a double for them. (tsn.c, deadline.c, watchdog.c, and
- * powerstate.c moved off that double at milestones 78 and 79; authz.c,
- * ratelimit.c, loan.c, observe.c, faultinject.c, admin.c, and recorder.c
- * moved off it at milestone 80.) That double moved, verbatim (same struct
- * layout, same function names, same REQ-CTRL-*, REQ-REG-*, REQ-RESP-*,
- * REQ-STAT-*, REQ-ERR-011 requirement coverage), to tests/legacy_mock.h
- * -- a test-only translation unit no longer shipped as part of the
- * public rcp library, since it
- * doubles an interface this milestone's own scope does not touch. See
- * tests/legacy_mock.h's own file header for the full rationale. rcp.h's
- * "Controller and Registry are vtable-based interfaces... See mock.h for
- * the reference implementation" comment now points there instead.
+ * The old zone-controller mock is not deleted outright: tests/legacy_mock.h
+ * (a pure relocation of this file's own pre-TC18 predecessor) still backs
+ * tests/test_legacy_mock.c's own coverage of that double, plus the
+ * bench_mock/command_latency_test benchmarking tools -- none of which
+ * decorate the legacy rcp_controller_t/rcp_registry_t vtables as a
+ * satellite any more. Every satellite that once did has now moved off:
+ * tsn.c, deadline.c, watchdog.c, and powerstate.c at milestones 78-79;
+ * authz.c, ratelimit.c, loan.c, observe.c, faultinject.c, admin.c, and
+ * recorder.c at milestone 80; proxy.c, redundancy.c, federation.c,
+ * zonegroup.c, prioqueue.c, and firmware.c were DEPRECATE-removed outright
+ * at milestone 83 rather than migrated; adapt.c REPLACEd its own
+ * rcp_controller_t dependency at milestone 84 (rcp/adapt.h/adapt.c now
+ * wrap rcp_avtp_transport_t instead). That double moved, verbatim (same
+ * struct layout, same function names, same REQ-CTRL-*, REQ-REG-*,
+ * REQ-RESP-*, REQ-STAT-*, REQ-ERR-011 requirement coverage), to
+ * tests/legacy_mock.h -- a test-only translation unit no longer shipped as
+ * part of the public rcp library. See tests/legacy_mock.h's own file
+ * header for the full rationale. rcp.h's "Controller and Registry are
+ * vtable-based interfaces... See mock.h for the reference implementation"
+ * comment now points there instead.
  *
  * ── What this double actually is ─────────────────────────────────────────────
  *

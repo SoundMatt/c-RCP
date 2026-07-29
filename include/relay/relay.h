@@ -1,4 +1,4 @@
-/* RELAY C bindings — relay_* types (RELAY spec §18.2, v1.11).
+/* RELAY C bindings — relay_* types (RELAY spec §18.2, v1.14).
  *
  * Defines the protocol-agnostic subset of the relay spec c-RCP depends on:
  * the mandatory error-condition sentinels (§5.1), Context (§18.2), the
@@ -7,6 +7,13 @@
  * inheritance -- rcp_relay_caller_t satisfies both roles). This is a pure-C
  * port of the same subset cpp-RCP's include/relay/relay.hpp exposes; it is
  * not a full RELAY binding.
+ *
+ * This header itself is protocol-agnostic and structurally unaffected by
+ * ROADMAP.md's Phase 13-21 TC18 protocol replacement -- the per-endpoint-
+ * type Message-mapping problem that replacement created lives entirely in
+ * rcp/adapt.h/adapt.c (milestone 84), not here. Bumping RELAY_SPEC_VERSION
+ * to the current released RELAY version below is this milestone's own
+ * incidental cleanup while that area was already being touched.
  */
 #ifndef RELAY_RELAY_H
 #define RELAY_RELAY_H
@@ -23,13 +30,15 @@ extern "C" {
 
 /* ── Spec version (§19.4) ──────────────────────────────────────────────────── *
  *
- * Deliberately targets the current RELAY spec (v1.12, which added "c" to
- * the cli-version.json language enum -- see c-RCP issue #59), not
- * cpp-RCP's own kRelaySpecVersion ("1.10", two minors behind) --
- * conforming to the version that motivated this whole remediation effort
- * would be self-defeating otherwise.
+ * Deliberately targets the current released RELAY spec version, not
+ * whatever earlier version motivated a prior remediation effort --
+ * conforming to a stale target would be self-defeating. v1.13 was a
+ * deep-audit fix pass (conformance-gate bugs, tooling fixes, C++/Rust
+ * binding parity); v1.14 expanded the §13.7.2 module-name registry this
+ * project's own module-naming reconciliation (issue #87) already
+ * consulted (see ROADMAP.md's "Module-naming note").
  */
-#define RELAY_SPEC_VERSION "1.12"
+#define RELAY_SPEC_VERSION "1.14"
 
 /* ── Error conditions — mandatory sentinels (§5.1) ────────────────────────── */
 
