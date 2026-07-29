@@ -89,12 +89,13 @@
  * that occupy (extraction §4.5 Group C). Six of the eight are ordinary
  * whole-register arithmetic/logical operations against the endpoint's
  * current 32-bit bitmask (replace/OR/AND/XOR/add/subtract); a seventh
- * (RCP_EP_GPIO_WRITE_RESERVED6, value 6) is not otherwise assigned meaning
- * by this milestone's scope and is treated here as a documented no-op --
- * this module's own placeholder for that evt[2:0] value pending spec
- * clarification, flagged rather than guessed at (this project's existing
- * convention for a genuine spec ambiguity, e.g. regmap.h's EP-ID/byte_bus_id
- * ordering note). The eighth, RCP_EP_GPIO_WRITE_RECONFIG (value 7), is the
+ * (RCP_EP_GPIO_WRITE_RESERVED4, value 4) carries no assigned meaning and is
+ * treated here as a documented no-op, matching this codebase's fail-safe
+ * convention for a wire value with no defined write behavior. This
+ * ordering (4=reserved, 5=add, 6=subtract) was independently cross-checked
+ * against cpp-RCP's own WriteSemantics enum (derived from the same
+ * structured spec extraction this module cites) and corrected accordingly
+ * -- see issue #104. The eighth, RCP_EP_GPIO_WRITE_RECONFIG (value 7), is the
  * "reconfiguration escape hatch": rather than writing the bitmask register,
  * it reinterprets the same 32-bit payload as a per-pin selector and toggles
  * each selected pin's direction (RCP_REGMAP_PIN_PROP_OUTPUT <->
@@ -175,9 +176,9 @@ typedef enum {
     RCP_EP_GPIO_WRITE_OR        = 1,
     RCP_EP_GPIO_WRITE_AND       = 2,
     RCP_EP_GPIO_WRITE_XOR       = 3,
-    RCP_EP_GPIO_WRITE_ADD       = 4,
-    RCP_EP_GPIO_WRITE_SUB       = 5,
-    RCP_EP_GPIO_WRITE_RESERVED6 = 6, /* documented no-op; see the file header */
+    RCP_EP_GPIO_WRITE_RESERVED4 = 4, /* documented no-op; see the file header */
+    RCP_EP_GPIO_WRITE_ADD       = 5,
+    RCP_EP_GPIO_WRITE_SUB       = 6,
     RCP_EP_GPIO_WRITE_RECONFIG  = 7, /* the reconfiguration escape hatch */
 } rcp_ep_gpio_write_semantics_t;
 
@@ -187,11 +188,11 @@ bool rcp_ep_gpio_write_semantics_valid(uint8_t v);
 
 /* Computes the new 32-bit register value from current and a write request
  * of value request under evt's semantics. evt must be one of
- * RCP_EP_GPIO_WRITE_REPLACE .. _SUB or _RESERVED6 -- never
+ * RCP_EP_GPIO_WRITE_REPLACE .. _SUB or _RESERVED4 -- never
  * RCP_EP_GPIO_WRITE_RECONFIG (use rcp_ep_gpio_apply_reconfig() for that
  * one instead; see the file header). RCP_EP_GPIO_WRITE_ADD/_SUB saturate at
  * 0xFFFFFFFF/0x00000000 respectively rather than wrapping.
- * RCP_EP_GPIO_WRITE_RESERVED6 returns current unchanged. */
+ * RCP_EP_GPIO_WRITE_RESERVED4 returns current unchanged. */
 uint32_t rcp_ep_gpio_apply_write(uint32_t current, uint32_t request,
                                   rcp_ep_gpio_write_semantics_t evt);
 

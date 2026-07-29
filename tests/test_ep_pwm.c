@@ -138,15 +138,53 @@ static void test_out_apply_write_sub_saturates(void)
     TEST_ASSERT_EQUAL_UINT16(150, result.active_duration);
 }
 
-static void test_out_apply_write_reserved6_is_noop(void)
+static void test_out_apply_write_reserved4_is_noop(void)
 {
     rcp_ep_pwm_value_t current = {123, 456};
     rcp_ep_pwm_value_t request = {999, 999};
     rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request,
-                                                              RCP_EP_PWM_OUT_WRITE_RESERVED6);
+                                                              RCP_EP_PWM_OUT_WRITE_RESERVED4);
 
     TEST_ASSERT_EQUAL_UINT16(123, result.period);
     TEST_ASSERT_EQUAL_UINT16(456, result.active_duration);
+}
+
+/* Regression test for issue #104: raw wire evt[2:0] values 4/5/6 must map
+ * to Reserved/ADD/SUB respectively (not the previous off-by-one ADD/SUB/
+ * Reserved mapping). Exercises rcp_ep_pwm_out_apply_write() with the raw
+ * wire-value enum casts a decoder would actually produce, not just the
+ * named constants. */
+static void test_out_apply_write_wire_value_4_is_reserved_noop(void)
+{
+    rcp_ep_pwm_value_t current = {123, 456};
+    rcp_ep_pwm_value_t request = {999, 999};
+    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request,
+                                                              (rcp_ep_pwm_out_write_semantics_t)4u);
+
+    TEST_ASSERT_EQUAL_UINT16(123, result.period);
+    TEST_ASSERT_EQUAL_UINT16(456, result.active_duration);
+}
+
+static void test_out_apply_write_wire_value_5_is_add(void)
+{
+    rcp_ep_pwm_value_t current = {10, 200};
+    rcp_ep_pwm_value_t request = {20, 50};
+    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request,
+                                                              (rcp_ep_pwm_out_write_semantics_t)5u);
+
+    TEST_ASSERT_EQUAL_UINT16(30, result.period);
+    TEST_ASSERT_EQUAL_UINT16(250, result.active_duration);
+}
+
+static void test_out_apply_write_wire_value_6_is_sub(void)
+{
+    rcp_ep_pwm_value_t current = {30, 250};
+    rcp_ep_pwm_value_t request = {20, 50};
+    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request,
+                                                              (rcp_ep_pwm_out_write_semantics_t)6u);
+
+    TEST_ASSERT_EQUAL_UINT16(10, result.period);
+    TEST_ASSERT_EQUAL_UINT16(200, result.active_duration);
 }
 
 static void test_out_apply_write_reconfig_misrouted_is_noop(void)
@@ -780,7 +818,10 @@ int main(void)
     RUN_TEST(test_out_apply_write_xor);
     RUN_TEST(test_out_apply_write_add_saturates);
     RUN_TEST(test_out_apply_write_sub_saturates);
-    RUN_TEST(test_out_apply_write_reserved6_is_noop);
+    RUN_TEST(test_out_apply_write_reserved4_is_noop);
+    RUN_TEST(test_out_apply_write_wire_value_4_is_reserved_noop);
+    RUN_TEST(test_out_apply_write_wire_value_5_is_add);
+    RUN_TEST(test_out_apply_write_wire_value_6_is_sub);
     RUN_TEST(test_out_apply_write_reconfig_misrouted_is_noop);
     RUN_TEST(test_out_apply_reconfig_toggles_when_bit0_set);
     RUN_TEST(test_out_apply_reconfig_leaves_unchanged_when_bit0_clear);

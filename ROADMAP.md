@@ -4536,3 +4536,42 @@ clean tree; `trace --req-coverage 100` reports 854/854 requirements
 traced and 512/512 functions annotated (both metrics unchanged from
 v0.84.0). Both new TLA+ specs verified via a real local TLC run
 (`tla2tools.jar`, TLC2 2.19), not assumed correct from inspection.
+
+### Phase 23 — Post-Replacement Conformance Fixes
+---
+
+Targeted fixes found by an external audit against the shipped Phase 13–22
+TC18 replacement, each scoped to its own milestone rather than bundled,
+following this project's existing one-fix-per-milestone precedent (e.g.
+v0.44.0, v0.56.0).
+
+### 86. GPIO/PWM_OUT write-semantics enum off-by-one (v0.86.0) ✅
+
+`rcp_ep_gpio_write_semantics_t` (`ep_gpio.h`) and
+`rcp_ep_pwm_out_write_semantics_t` (`ep_pwm.h`) mapped wire `evt[2:0]`
+values 4/5/6 to ADD/SUB/Reserved — one slot earlier than the correct
+4=Reserved/5=ADD/6=SUB assignment (extraction §4.5 Group C). Both header
+comments already flagged this as an unconfirmed guess pending clarification
+rather than presenting it as settled; a cross-check against cpp-RCP's own
+`WriteSemantics` enum (independently derived from the same structured spec
+extraction, and presented there as an authoritative reading rather than a
+guess) confirmed the correct assignment and this project's own value was
+off by one.
+
+Fixed by renumbering both enums (`RCP_EP_GPIO_WRITE_RESERVED4` /
+`RCP_EP_PWM_OUT_WRITE_RESERVED4` now occupy value 4; `_ADD`/`_SUB` shift to
+5/6) and updating `rcp_ep_gpio_apply_write()`'s and
+`rcp_ep_pwm_out_apply_write()`'s switch statements to match. Both enums
+are named-constant `typedef enum`s consumed only by name throughout this
+codebase (never a raw integer literal), so the fix is a pure
+value-reassignment with no call-site changes required elsewhere. Added
+regression tests exercising the *raw* wire-value casts (not just the named
+constants) for evt = 4/5/6 against both endpoint types, so a future
+accidental reordering of the enum's numeric values (as opposed to its
+names) would still be caught. `.fusa-reqs.json`'s REQ-GPIO-012/REQ-PWM-008
+titles/text updated to reference `_RESERVED4` instead of the old
+`_RESERVED6` name; no requirement behavior changed, since both requirements
+were always phrased against the named constant, not a raw evt value.
+
+Verified locally: full `ctest` suite passes (60/60 suites, including the
+new regression tests) under a plain Debug build.

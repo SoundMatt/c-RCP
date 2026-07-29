@@ -56,7 +56,7 @@
  * codebase has not yet pinned one down for, "ep_type" is always a raw
  * manifest-supplied integer (0-255) here, not a name this parser
  * interprets -- flagged as an honest limitation, the same "flag rather
- * than guess" convention ep_gpio.h's own RCP_EP_GPIO_WRITE_RESERVED6 note
+ * than guess" convention ep_gpio.h's own RCP_EP_GPIO_WRITE_RESERVED4 note
  * follows.
  */
 #ifndef RCP_CONFIG_H

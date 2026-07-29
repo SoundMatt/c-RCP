@@ -131,10 +131,34 @@ static void test_apply_write_sub_saturates_at_lower_boundary(void)
     TEST_ASSERT_EQUAL_UINT32(0u, rcp_ep_gpio_apply_write(0u, 1u, RCP_EP_GPIO_WRITE_SUB));
 }
 
-static void test_apply_write_reserved6_is_noop(void)
+static void test_apply_write_reserved4_is_noop(void)
 {
     TEST_ASSERT_EQUAL_UINT32(0x1234u,
-        rcp_ep_gpio_apply_write(0x1234u, 0xFFFFu, RCP_EP_GPIO_WRITE_RESERVED6));
+        rcp_ep_gpio_apply_write(0x1234u, 0xFFFFu, RCP_EP_GPIO_WRITE_RESERVED4));
+}
+
+/* Regression test for issue #104: raw wire evt[2:0] values 4/5/6 must map
+ * to Reserved/ADD/SUB respectively (not the previous off-by-one ADD/SUB/
+ * Reserved mapping). Exercises rcp_ep_gpio_apply_write() with the raw
+ * wire-value enum casts a decoder would actually produce, not just the
+ * named constants, so a future accidental re-shuffle of the enum values
+ * themselves (not just their names) would still be caught. */
+static void test_apply_write_wire_value_4_is_reserved_noop(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(0x1234u,
+        rcp_ep_gpio_apply_write(0x1234u, 0xFFFFu, (rcp_ep_gpio_write_semantics_t)4u));
+}
+
+static void test_apply_write_wire_value_5_is_add(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(30u,
+        rcp_ep_gpio_apply_write(10u, 20u, (rcp_ep_gpio_write_semantics_t)5u));
+}
+
+static void test_apply_write_wire_value_6_is_sub(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(10u,
+        rcp_ep_gpio_apply_write(30u, 20u, (rcp_ep_gpio_write_semantics_t)6u));
 }
 
 static void test_apply_reconfig_toggles_only_flagged_pins(void)
@@ -559,7 +583,10 @@ int main(void)
     RUN_TEST(test_apply_write_add_saturates_at_upper_boundary);
     RUN_TEST(test_apply_write_sub_ordinary);
     RUN_TEST(test_apply_write_sub_saturates_at_lower_boundary);
-    RUN_TEST(test_apply_write_reserved6_is_noop);
+    RUN_TEST(test_apply_write_reserved4_is_noop);
+    RUN_TEST(test_apply_write_wire_value_4_is_reserved_noop);
+    RUN_TEST(test_apply_write_wire_value_5_is_add);
+    RUN_TEST(test_apply_write_wire_value_6_is_sub);
     RUN_TEST(test_apply_reconfig_toggles_only_flagged_pins);
 
     RUN_TEST(test_trigger_none_never_fires);

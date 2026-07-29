@@ -114,9 +114,11 @@
  * add/subtract saturating at each field's own 0x0000/0xFFFF boundary
  * rather than wrapping (or, worse, carrying between the two fields, which
  * this module deliberately avoids by applying arithmetic per field, never
- * on the two fields' 32-bit concatenation). RCP_EP_PWM_OUT_WRITE_RESERVED6
- * (value 6) is, like GPIO's own RESERVED6, a documented no-op pending
- * further specification, not silently guessed at. The eighth,
+ * on the two fields' 32-bit concatenation). RCP_EP_PWM_OUT_WRITE_RESERVED4
+ * (value 4) is, like GPIO's own RESERVED4, a documented no-op for a wire
+ * value with no assigned write behavior. This ordering (4=reserved,
+ * 5=add, 6=subtract) matches ep_gpio.h's own correction -- see issue #104.
+ * The eighth,
  * RCP_EP_PWM_OUT_WRITE_RECONFIG (value 7), is this endpoint type's own
  * single-flag analogue of ep_gpio.h's per-pin reconfiguration escape
  * hatch: rather than writing the period/active-duration registers, it
@@ -233,9 +235,9 @@ typedef enum {
     RCP_EP_PWM_OUT_WRITE_OR        = 1,
     RCP_EP_PWM_OUT_WRITE_AND       = 2,
     RCP_EP_PWM_OUT_WRITE_XOR       = 3,
-    RCP_EP_PWM_OUT_WRITE_ADD       = 4,
-    RCP_EP_PWM_OUT_WRITE_SUB       = 5,
-    RCP_EP_PWM_OUT_WRITE_RESERVED6 = 6, /* documented no-op; see the file header */
+    RCP_EP_PWM_OUT_WRITE_RESERVED4 = 4, /* documented no-op; see the file header */
+    RCP_EP_PWM_OUT_WRITE_ADD       = 5,
+    RCP_EP_PWM_OUT_WRITE_SUB       = 6,
     RCP_EP_PWM_OUT_WRITE_RECONFIG  = 7, /* the reconfiguration escape hatch */
 } rcp_ep_pwm_out_write_semantics_t;
 
@@ -247,11 +249,11 @@ bool rcp_ep_pwm_out_write_semantics_valid(uint8_t v);
  * request of value request under evt's semantics, applying each of the six
  * ordinary data-write semantics independently to period and to
  * active_duration (each its own 16-bit register -- see the file header).
- * evt must be one of RCP_EP_PWM_OUT_WRITE_REPLACE .. _SUB or _RESERVED6 --
+ * evt must be one of RCP_EP_PWM_OUT_WRITE_REPLACE .. _SUB or _RESERVED4 --
  * never RCP_EP_PWM_OUT_WRITE_RECONFIG (use rcp_ep_pwm_out_apply_reconfig()
  * for that one instead). RCP_EP_PWM_OUT_WRITE_ADD/_SUB saturate each field
  * at 0xFFFF/0x0000 respectively rather than wrapping or carrying into the
- * other field. RCP_EP_PWM_OUT_WRITE_RESERVED6 returns current unchanged;
+ * other field. RCP_EP_PWM_OUT_WRITE_RESERVED4 returns current unchanged;
  * so, fail-safe, does RCP_EP_PWM_OUT_WRITE_RECONFIG itself, for a caller
  * that violates the "never RECONFIG here" contract. */
 rcp_ep_pwm_value_t rcp_ep_pwm_out_apply_write(rcp_ep_pwm_value_t current,

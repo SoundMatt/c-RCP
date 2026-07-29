@@ -54,7 +54,7 @@ static uint16_t apply_write_field(uint16_t current, uint16_t request,
     case RCP_EP_PWM_OUT_WRITE_XOR:     return (uint16_t)(current ^ request);
     case RCP_EP_PWM_OUT_WRITE_ADD:     return saturating_add_u16(current, request);
     case RCP_EP_PWM_OUT_WRITE_SUB:     return saturating_sub_u16(current, request);
-    case RCP_EP_PWM_OUT_WRITE_RESERVED6:
+    case RCP_EP_PWM_OUT_WRITE_RESERVED4:
         return current; /* documented no-op; see the file header */
     case RCP_EP_PWM_OUT_WRITE_RECONFIG:
     default:

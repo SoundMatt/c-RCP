@@ -97,7 +97,7 @@
  * fails with RCP_ADAPT_ERR_ENCODE for them -- a caller needing CAN XL uses
  * ep_can.h directly, exactly as ROADMAP.md's own "documented, not silently
  * mishandled, scope boundary" convention elsewhere in this codebase (e.g.
- * ep_gpio.h's RCP_EP_GPIO_WRITE_RESERVED6) already establishes.
+ * ep_gpio.h's RCP_EP_GPIO_WRITE_RESERVED4) already establishes.
  *
  * ── No subscribe() equivalent ────────────────────────────────────────────────
  *

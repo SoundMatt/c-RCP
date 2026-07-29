@@ -3530,8 +3530,8 @@
     },
     {
       "id": "REQ-GPIO-012",
-      "title": "rcp_ep_gpio_apply_write() treats RCP_EP_GPIO_WRITE_RESERVED6 as a no-op",
-      "text": "rcp_ep_gpio_apply_write() with evt = RCP_EP_GPIO_WRITE_RESERVED6 shall return current unchanged, regardless of request.",
+      "title": "rcp_ep_gpio_apply_write() treats RCP_EP_GPIO_WRITE_RESERVED4 as a no-op",
+      "text": "rcp_ep_gpio_apply_write() with evt = RCP_EP_GPIO_WRITE_RESERVED4 shall return current unchanged, regardless of request.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4466,8 +4466,8 @@
     },
     {
       "id": "REQ-PWM-008",
-      "title": "rcp_ep_pwm_out_apply_write() treats RCP_EP_PWM_OUT_WRITE_RESERVED6 as a no-op",
-      "text": "rcp_ep_pwm_out_apply_write() shall return current unchanged for evt == RCP_EP_PWM_OUT_WRITE_RESERVED6.",
+      "title": "rcp_ep_pwm_out_apply_write() treats RCP_EP_PWM_OUT_WRITE_RESERVED4 as a no-op",
+      "text": "rcp_ep_pwm_out_apply_write() shall return current unchanged for evt == RCP_EP_PWM_OUT_WRITE_RESERVED4.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",

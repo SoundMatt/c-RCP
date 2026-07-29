@@ -74,7 +74,7 @@ uint32_t rcp_ep_gpio_apply_write(uint32_t current, uint32_t request,
     case RCP_EP_GPIO_WRITE_SUB:
         /* Saturate at 0x00000000 rather than wrapping. */
         return (request > current) ? 0u : (current - request);
-    case RCP_EP_GPIO_WRITE_RESERVED6:
+    case RCP_EP_GPIO_WRITE_RESERVED4:
         return current; /* documented no-op; see the file header */
     case RCP_EP_GPIO_WRITE_RECONFIG:
     default:
