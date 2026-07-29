@@ -1,5 +1,5 @@
 Software Configuration Index
-Project: c-RCP v0.70.0   Generated: 2026-07-29T03:44:42Z
+Project: c-RCP v0.70.0   Generated: 2026-07-29T04:21:23Z
 
 FILE                                                          SHA-256
 ------------------------------------------------------------  ----------------------------------------------------------------
@@ -35,7 +35,7 @@ FILE                                                          SHA-256
 ./include/rcp/ep_gpio.h                                       sha256:f351c8e5f70babbfd79632af59b861a4d64aa24356f59285356a6e3d24d01dda
 ./include/rcp/request_sequencer.h                             sha256:2ad60f0fedd50e8883d76ddefa13e58b50085eb34fad7862f2f80d26adaa4673
 ./include/rcp/ep_adc.h                                        sha256:c2837212eb4c339014c1bbd57297688d62d5ae1cdb41cfc286a558416334b73e
-./include/rcp/version.h                                       sha256:41aaa089071ece6f0417fe8dfa7afac0c1c0ddd1ae82d212b12a19c5e1c401ac
+./include/rcp/version.h                                       sha256:ea74e97c7b552e6765139d2841928592afe7b5262018dde451ff658565256921
 ./include/rcp/recorder.h                                      sha256:dcfbb6f7f0441038f8bfda5b08a22d4b821e32e210cd425945d63bbe69303125
 ./include/rcp/cli.h                                           sha256:d479738a54a077a4a0019dec3ec62a39b73857fadbe1ae2745d2f7609506b7d9
 ./include/rcp/avtp.h                                          sha256:416f4beb4eb8c68d1dac4842372d0747da15c45677c67ae1de11c8849657b055
