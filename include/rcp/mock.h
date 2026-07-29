@@ -33,14 +33,14 @@
  * bytes, so this module's dispatch surface does too.
  *
  * The old zone-controller mock is not deleted outright: several
- * not-yet-migrated legacy satellites (authz.c, ratelimit.c, loan.c,
- * observe.c, faultinject.c, admin.c, recorder.c, proxy.c, redundancy.c,
+ * not-yet-migrated legacy satellites (proxy.c, redundancy.c,
  * federation.c, zonegroup.c, prioqueue.c, firmware.c, adapt.c --
- * ROADMAP.md Phase 21 milestones 80-84) still implement/decorate the
+ * ROADMAP.md Phase 21 milestones 81-84) still implement/decorate the
  * legacy rcp_controller_t/rcp_registry_t vtables, and their own unit
  * tests still need a double for them. (tsn.c, deadline.c, watchdog.c, and
- * powerstate.c have each since moved off that double too, at milestones
- * 78 and 79 respectively.) That double moved, verbatim (same struct
+ * powerstate.c moved off that double at milestones 78 and 79; authz.c,
+ * ratelimit.c, loan.c, observe.c, faultinject.c, admin.c, and recorder.c
+ * moved off it at milestone 80.) That double moved, verbatim (same struct
  * layout, same function names, same REQ-CTRL-*, REQ-REG-*, REQ-RESP-*,
  * REQ-STAT-*, REQ-ERR-011 requirement coverage), to tests/legacy_mock.h
  * -- a test-only translation unit no longer shipped as part of the

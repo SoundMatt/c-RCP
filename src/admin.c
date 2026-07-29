@@ -18,8 +18,10 @@ typedef struct {
 } admin_subscriber_t;
 
 struct rcp_admin_server {
-    rcp_registry_t       *reg; /* borrowed, not retained */
-    rcp_mutex_t             mu; /* protects subscribers[], counters[] */
+    rcp_mutex_t             mu; /* protects endpoints[], subscribers[], counters[] */
+    rcp_avtp_addr_t        *endpoints;
+    size_t                  endpoints_len;
+    size_t                  endpoints_cap;
     admin_subscriber_t    *subscribers;
     size_t                  subscribers_len;
     size_t                  subscribers_cap;
@@ -28,11 +30,10 @@ struct rcp_admin_server {
     size_t                  counters_cap;
 };
 
-rcp_admin_server_t *rcp_admin_server_new(rcp_registry_t *reg)
+rcp_admin_server_t *rcp_admin_server_new(void)
 {
     rcp_admin_server_t *srv = (rcp_admin_server_t *)calloc(1, sizeof(*srv));
     if (!srv) return NULL;
-    srv->reg = reg;
     rcp_mutex_init(&srv->mu);
     return srv;
 }
@@ -41,37 +42,81 @@ void rcp_admin_server_destroy(rcp_admin_server_t *srv)
 {
     if (!srv) return;
     rcp_mutex_destroy(&srv->mu);
+    free(srv->endpoints);
     free(srv->subscribers);
     free(srv->counters);
     free(srv);
 }
 
-//cfusa:req REQ-ADMIN-001
-size_t rcp_admin_server_zones(rcp_admin_server_t *srv, rcp_zone_info_t *out, size_t cap)
+static size_t find_endpoint_index(rcp_admin_server_t *srv, rcp_avtp_addr_t addr)
 {
-    size_t              n = rcp_registry_controllers(srv->reg, NULL, 0);
-    rcp_controller_t **ctrls;
-    size_t              i;
-
-    if (n == 0) return 0;
-
-    ctrls = (rcp_controller_t **)malloc(n * sizeof(*ctrls));
-    if (!ctrls) return 0; /* best-effort on OOM; no dedicated sentinel */
-
-    n = rcp_registry_controllers(srv->reg, ctrls, n);
-    for (i = 0; i < n; i++) {
-        if (i < cap) {
-            out[i].zone       = rcp_controller_zone(ctrls[i]);
-            out[i].registered = true;
-            out[i].extra[0]   = '\0';
-        }
-        rcp_controller_release(ctrls[i]);
+    size_t i;
+    for (i = 0; i < srv->endpoints_len; i++) {
+        if (rcp_avtp_addr_equal(srv->endpoints[i], addr)) return i;
     }
-    free(ctrls);
-    return n;
+    return srv->endpoints_len; /* not found */
 }
 
 //cfusa:req REQ-ADMIN-002
+//cfusa:req REQ-ADMIN-008
+bool rcp_admin_server_register_endpoint(rcp_admin_server_t *srv, rcp_avtp_addr_t addr)
+{
+    bool changed = false;
+
+    rcp_mutex_lock(&srv->mu);
+    if (find_endpoint_index(srv, addr) == srv->endpoints_len) {
+        if (srv->endpoints_len == srv->endpoints_cap) {
+            size_t new_cap = (srv->endpoints_cap == 0) ? 8 : srv->endpoints_cap * 2;
+            rcp_avtp_addr_t *grown = (rcp_avtp_addr_t *)realloc(srv->endpoints, new_cap * sizeof(*grown));
+            if (grown) {
+                srv->endpoints     = grown;
+                srv->endpoints_cap = new_cap;
+            }
+        }
+        if (srv->endpoints_len < srv->endpoints_cap) {
+            srv->endpoints[srv->endpoints_len++] = addr;
+            changed = true;
+        }
+    }
+    rcp_mutex_unlock(&srv->mu);
+    return changed;
+}
+
+//cfusa:req REQ-ADMIN-002
+bool rcp_admin_server_deregister_endpoint(rcp_admin_server_t *srv, rcp_avtp_addr_t addr)
+{
+    bool changed = false;
+    size_t idx;
+
+    rcp_mutex_lock(&srv->mu);
+    idx = find_endpoint_index(srv, addr);
+    if (idx < srv->endpoints_len) {
+        srv->endpoints[idx] = srv->endpoints[srv->endpoints_len - 1];
+        srv->endpoints_len--;
+        changed = true;
+    }
+    rcp_mutex_unlock(&srv->mu);
+    return changed;
+}
+
+//cfusa:req REQ-ADMIN-001
+size_t rcp_admin_server_endpoints(rcp_admin_server_t *srv, rcp_endpoint_info_t *out, size_t cap)
+{
+    size_t n;
+    size_t i;
+
+    rcp_mutex_lock(&srv->mu);
+    n = srv->endpoints_len;
+    for (i = 0; i < n && i < cap; i++) {
+        out[i].addr       = srv->endpoints[i];
+        out[i].registered = true;
+        out[i].extra[0]   = '\0';
+    }
+    rcp_mutex_unlock(&srv->mu);
+    return n;
+}
+
+//cfusa:req REQ-ADMIN-003
 bool rcp_admin_server_subscribe(rcp_admin_server_t *srv, rcp_admin_event_fn cb, void *user_data)
 {
     bool ok = true;
@@ -96,8 +141,7 @@ bool rcp_admin_server_subscribe(rcp_admin_server_t *srv, rcp_admin_event_fn cb, 
     return ok;
 }
 
-//cfusa:req REQ-ADMIN-003
-//cfusa:req REQ-ADMIN-008
+//cfusa:req REQ-ADMIN-004
 void rcp_admin_server_emit(rcp_admin_server_t *srv, rcp_admin_event_t ev)
 {
     admin_subscriber_t *local;
@@ -121,7 +165,6 @@ void rcp_admin_server_emit(rcp_admin_server_t *srv, rcp_admin_event_t ev)
     free(local);
 }
 
-//cfusa:req REQ-ADMIN-004
 //cfusa:req REQ-ADMIN-005
 //cfusa:req REQ-ADMIN-007
 bool rcp_admin_server_record_counter(rcp_admin_server_t *srv, const char *name, const char *labels, double delta)

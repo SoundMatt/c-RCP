@@ -3971,7 +3971,7 @@ e2e.h's own milestone-70 REPLACE already flagged) is Phase 22's job
 here since it made a factual claim (`powerstate.c` spawns a background
 thread) this milestone's rewrite made false.
 
-### 80. Generic decorators, batch 1 (v0.80.0)
+### 80. Generic decorators, batch 1 (v0.80.0) ✅
 
 - **ADAPT**, rebound to the new endpoint-request/response primitive in
   place of `rcp_controller_t`'s `send(cmd)`: `authz.c` (policy keys move
@@ -3983,6 +3983,123 @@ thread) this milestone's rewrite made false.
   Servers/endpoints instead of zones), `recorder.c` (captures raw
   ACF messages/AVTPDUs instead of Command/Response pairs, with a new
   on-the-wire capture format).
+
+**Done (v0.80.0)**: Unlike milestone 79's three modules, none of these
+seven had a single generic `rcp_controller_t` choke point left to
+re-anchor to a new equivalent -- Phase 16-19 built 13 heterogeneous,
+independently-typed endpoint modules instead of one. Every module here
+therefore drops its old vtable-wrapper shape entirely and becomes a
+plain, caller-driven library operating on caller-owned/already-classified
+data, the same "sends no wire traffic and owns no transport" pattern
+milestone 79's watchdog.c/deadline.c/powerstate.c established -- a
+caller now calls the appropriate function directly, immediately before
+or after whichever endpoint-specific (`ep_gpio.h`-shaped) encode/apply
+call it's actually making, instead of interposing on a `send()` that no
+longer exists.
+
+`authz.h`/`authz.c`: `rcp_authz_policy_t` keeps its shape (identity ->
+permitted-address/request-type entries) but is rekeyed from
+`rcp_zone_t`/`rcp_command_type_t` to `avtp.h`'s `rcp_avtp_addr_t`
+(stream_id + byte_bus_id) plus a caller-supplied `request_type` byte --
+left deliberately opaque to this module (it may be `acf.h`'s
+`rcp_acf_op_t` for a Standard request or a peer request-kind module's own
+opcode, e.g. `request_compound.h`'s 0x0F/0x8F), matching every
+request-kind module's own "operate on caller-classified data" layering.
+The old `AuthController` wrapper and `identity_fn` indirection are
+dropped outright: `rcp_authz_policy_permit()` is now the whole
+interception point, called directly by the caller.
+
+`ratelimit.h`/`ratelimit.c`: `rcp_ratelimit_limiter_t` now keeps one
+independent token bucket per `rcp_avtp_addr_t`, lazily created on first
+use, rather than one shared bucket for a whole wrapped controller --
+matching the roadmap's own "an endpoint's own finite capacity" framing.
+The old `exempt_critical` flag (`RCP_PRIORITY_CRITICAL`, a retired
+client-assigned tag) is replaced by `exempt_safety`, keyed on `e2e.h`'s
+`rcp_e2e_is_safety_request()` MSB test against the caller-supplied
+`request_type` -- the one client-visible request-kind signal that
+actually survives the protocol replacement.
+
+`loan.h`/`loan.c`: the free-list pool itself is unchanged (still a real
+free-list, not cpp-RCP's write-only one); only the `LoaningController`
+wrapper is gone. `rcp_loan_pool_acquire()`/`rcp_loan_return()`/
+`rcp_loan_release()` replace `rcp_controller_loan()`/
+`rcp_controller_send_loaned()` -- there is no `send_loaned()`
+counterpart any more, since a caller now drives whichever endpoint's own
+request-sending path directly with the loaned buffer.
+
+`observe.h`/`observe.c`: `rcp_span_t`/`rcp_metric_t` move their
+`zone`/`cmd_type` fields to `addr`/`request_type`; counter names move
+from `rcp.commands.*` to `rcp.requests.*`. `rcp_observe_record()`
+replaces the `ObservingController` wrapper: the caller measures its own
+start/end `rcp_monotonic_ms()` timestamps around whichever request it
+just drove and passes them in directly.
+
+`faultinject.h`/`faultinject.c`: the rule list/count-expiry logic is
+byte-for-byte the same engine as before (this module was never
+zone/command-addressed to begin with); only the interception point
+changes. `rcp_fi_action_t` (`PROCEED`/`DROP`/`SLOW`/`ERROR`/`TIMEOUT`)
+replaces the old implicit "return an `rcp_errc_t`/mutate a
+`rcp_response_t`" contract, and `rcp_faultinject_evaluate()` -- a public
+version of the old private `fi_pick()` -- replaces the
+`FaultInjectingController` wrapper.
+
+`admin.h`/`admin.c`: the SSE-style subscribe/emit channel and the
+Prometheus counter/metrics-text renderer are untouched (they never read
+a zone out of `rcp_command_t` to begin with). Only the listing surface
+changes: `rcp_admin_server_new()` no longer wraps an `rcp_registry_t` (no
+TC18 counterpart exists); `rcp_admin_server_register_endpoint()`/
+`_deregister_endpoint()`/`_endpoints()` replace
+`rcp_admin_server_zones()`, with whatever application code discovers RC
+Servers (`discovery.h`, a manifest, etc.) telling this module directly.
+
+`recorder.h`/`recorder.c`: `rcp_recorder_entry_t` now holds a raw
+captured frame (`rcp_bytes_t`) tagged with an `rcp_avtp_addr_t` and an
+`inbound` flag, instead of a `rcp_command_t`/`rcp_response_t` pair -- a
+new on-the-wire capture format, per this milestone's own roadmap scope,
+with its own from-scratch binary layout (timestamp/stream_id/byte_bus_id/
+inbound/frame_len/frame). `rcp_recorder_capture()` replaces the
+`RecordingController` wrapper; `rcp_playback_run_all()` now drives a
+caller-supplied `rcp_playback_deliver_fn` callback instead of a single
+generic target controller, leaving "what replaying a frame means" to the
+caller.
+
+`tests/test_authz.c`, `test_ratelimit.c`, `test_loan.c`, `test_observe.c`,
+`test_faultinject.c`, `test_admin.c`, and `test_recorder.c` are all
+from-scratch rewrites (7, 7, 6, 8, 10, 7, and 11 cases respectively),
+none of them linking `tests/legacy_mock.c` any more (all seven moved off
+`rcp_controller_t`/
+`rcp_zone_t`/`rcp_registry_t` entirely -- `tests/CMakeLists.txt`,
+`tests/legacy_mock.h`, and `include/rcp/mock.h`'s own file-header
+satellite lists updated to match); the full `ctest` suite (67/67,
+unchanged from v0.79.0 -- this milestone neither adds nor removes a test
+binary) passes, verified locally under both a plain Debug build and a
+manual `-fsanitize=address,undefined` build (ASan+UBSan-clean across the
+full suite, run sequentially; macOS ASan does not support leak detection,
+so leak-checking itself is not covered by this local run). Unlike every
+prior milestone's note, a local `cfusa` v0.5.46 toolchain build and a
+local `relay conform --strict` build *were* available this time: `cfusa
+lint`/`check`/`analyze`/`cyber`/`qualify`/`vuln` all exit 0 against a
+clean (no stray `build*/` directories) tree; `cfusa trace
+--req-coverage 100` reports 929/929 requirements traced (100%, both
+metrics) -- the tool's own advisory `UNTRACED` list still names four
+pre-existing gaps this milestone does not touch (`REQ-MDNS-007/008`,
+`REQ-PQ-005`, `REQ-RELAY-013`), unchanged from before this PR; and a
+local build of RELAY's own `relay conform --strict` against the CLI
+target reports PASS. `REQ-AUTH-*`/`REQ-RL-*`/`REQ-LOAN-*`/`REQ-OBS-*`/
+`REQ-FI-*`/`REQ-ADMIN-*`/`REQ-REC-*` are rewritten in place in
+`.fusa-reqs.json` (same seven prefixes, same id-band counts: 8/9/8/13/
+10/8/11).
+
+**Deferred, not forgotten**: `CYBERSECURITY.md` and `HARA.md` both still
+name pre-rebind symbols this milestone renamed or removed
+(`rcp_authz_controller_new()`, `rcp_ratelimit_controller_t` /
+`exempt_critical`, `rcp_faultinject_controller_t`, `rcp_prioqueue_controller_t`
+-- the last belongs to milestone 83's still-pending DEPRECATE, not this
+one). Per the Satellite Disposition table's own "Requirements/safety/
+security artifacts... REPLACE, deliberately last" entry, re-deriving
+those two documents' own prose (and TARA/CYBERSECURITY.md's separately
+already-flagged stale `REQ-E2E-*` references, milestone 70's own gap) is
+Phase 22's job (v0.85.0), not this milestone's.
 
 ### 81. Protocol bridges (v0.81.0)
 

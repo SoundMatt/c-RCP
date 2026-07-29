@@ -9,10 +9,10 @@
 #include <string.h>
 
 struct rcp_recorder {
-    rcp_mutex_t          mu; /* protects entries[] */
-    rcp_recorder_entry_t *entries;
-    size_t                len;
-    size_t                cap;
+    rcp_mutex_t            mu; /* protects entries[] */
+    rcp_recorder_entry_t  *entries;
+    size_t                  len;
+    size_t                  cap;
 };
 
 rcp_recorder_t *rcp_recorder_new(void)
@@ -23,15 +23,13 @@ rcp_recorder_t *rcp_recorder_new(void)
     return r;
 }
 
+//cfusa:req REQ-REC-011
 void rcp_recorder_destroy(rcp_recorder_t *r)
 {
     size_t i;
 
     if (!r) return;
-    for (i = 0; i < r->len; i++) {
-        rcp_bytes_free(&r->entries[i].cmd.payload);
-        rcp_bytes_free(&r->entries[i].resp.payload);
-    }
+    for (i = 0; i < r->len; i++) rcp_bytes_free(&r->entries[i].frame);
     rcp_mutex_destroy(&r->mu);
     free(r->entries);
     free(r);
@@ -46,6 +44,7 @@ size_t rcp_recorder_size(rcp_recorder_t *r)
     return n;
 }
 
+//cfusa:req REQ-REC-009
 size_t rcp_recorder_entries(rcp_recorder_t *r, rcp_recorder_entry_t *out, size_t cap)
 {
     size_t i, n;
@@ -60,19 +59,19 @@ size_t rcp_recorder_entries(rcp_recorder_t *r, rcp_recorder_entry_t *out, size_t
 //cfusa:req REQ-REC-001
 //cfusa:req REQ-REC-002
 //cfusa:req REQ-REC-006
+//cfusa:req REQ-REC-007
 //cfusa:req REQ-REC-008
-static bool recorder_append(rcp_recorder_t *r, uint64_t ts_ms, const rcp_command_t *cmd,
-                           const rcp_response_t *resp, int error)
+bool rcp_recorder_capture(rcp_recorder_t *r, uint64_t timestamp_ms, rcp_avtp_addr_t addr,
+                           bool inbound, const uint8_t *frame, size_t frame_len)
 {
     rcp_recorder_entry_t e;
     bool ok = true;
 
-    e.timestamp_ms = ts_ms;
-    e.cmd          = *cmd;
-    e.cmd.payload  = rcp_bytes_dup(cmd->payload.data, cmd->payload.len);
-    e.resp         = *resp;
-    e.resp.payload = rcp_bytes_dup(resp->payload.data, resp->payload.len);
-    e.error        = error;
+    e.timestamp_ms = timestamp_ms;
+    e.addr         = addr;
+    e.inbound      = inbound;
+    e.frame        = rcp_bytes_dup(frame, frame_len);
+    if (frame_len > 0 && !e.frame.data) return false; /* rcp_bytes_dup() allocation failure */
 
     rcp_mutex_lock(&r->mu);
     if (r->len == r->cap) {
@@ -91,10 +90,7 @@ static bool recorder_append(rcp_recorder_t *r, uint64_t ts_ms, const rcp_command
     }
     rcp_mutex_unlock(&r->mu);
 
-    if (!ok) {
-        rcp_bytes_free(&e.cmd.payload);
-        rcp_bytes_free(&e.resp.payload);
-    }
+    if (!ok) rcp_bytes_free(&e.frame);
     return ok;
 }
 
@@ -113,6 +109,7 @@ static bool write_bytes(FILE *f, const void *data, size_t len)
 }
 
 //cfusa:req REQ-REC-003
+//cfusa:req REQ-REC-010
 int rcp_recorder_write_binary(rcp_recorder_t *r, const char *path)
 {
     FILE *f;
@@ -129,95 +126,23 @@ int rcp_recorder_write_binary(rcp_recorder_t *r, const char *path)
 
     for (i = 0; i < r->len && ok; i++) {
         const rcp_recorder_entry_t *e = &r->entries[i];
-        uint64_t ts     = e->timestamp_ms;
-        uint16_t type   = (uint16_t)e->cmd.type;
-        uint8_t  zone   = (uint8_t)e->cmd.zone;
-        uint8_t  prio   = (uint8_t)e->cmd.priority;
-        uint32_t clen   = (uint32_t)e->cmd.payload.len;
-        uint8_t  status = (uint8_t)e->resp.status;
-        uint32_t rlen   = (uint32_t)e->resp.payload.len;
+        uint64_t ts        = e->timestamp_ms;
+        uint64_t stream_id = rcp_stream_id_to_u64(e->addr.stream_id);
+        uint8_t  byte_bus  = e->addr.byte_bus_id;
+        uint8_t  inbound   = e->inbound ? 1u : 0u;
+        uint32_t flen      = (uint32_t)e->frame.len;
 
         ok = write_field(f, &ts, sizeof(ts))
-          && write_field(f, &type, sizeof(type))
-          && write_field(f, &zone, sizeof(zone))
-          && write_field(f, &prio, sizeof(prio))
-          && write_field(f, &clen, sizeof(clen))
-          && write_bytes(f, e->cmd.payload.data, clen)
-          && write_field(f, &status, sizeof(status))
-          && write_field(f, &rlen, sizeof(rlen))
-          && write_bytes(f, e->resp.payload.data, rlen);
+          && write_field(f, &stream_id, sizeof(stream_id))
+          && write_field(f, &byte_bus, sizeof(byte_bus))
+          && write_field(f, &inbound, sizeof(inbound))
+          && write_field(f, &flen, sizeof(flen))
+          && write_bytes(f, e->frame.data, flen);
     }
 
     if (fclose(f) != 0) ok = false;
     rcp_mutex_unlock(&r->mu);
     return ok ? RCP_OK : RCP_ERR_BUSY;
-}
-
-/* ── RecordingController ───────────────────────────────────────────────────── */
-
-typedef struct {
-    rcp_controller_t  base;
-    rcp_controller_t *inner; /* retained */
-    rcp_recorder_t      *rec;   /* borrowed; must outlive this controller, see recorder.h */
-} record_controller_t;
-
-//cfusa:req REQ-REC-009
-static rcp_zone_t record_ctrl_zone(rcp_controller_t *self)
-{
-    return rcp_controller_zone(((record_controller_t *)self)->inner);
-}
-
-//cfusa:req REQ-REC-007
-static int record_ctrl_send(rcp_controller_t *self, const rcp_context_t *ctx,
-                             const rcp_command_t *cmd, rcp_response_t *out)
-{
-    record_controller_t *rc = (record_controller_t *)self;
-    int ec = rcp_controller_send(rc->inner, ctx, cmd, out);
-
-    recorder_append(rc->rec, rcp_monotonic_ms(), cmd, out, ec);
-    return ec;
-}
-
-//cfusa:req REQ-REC-010
-static int record_ctrl_subscribe(rcp_controller_t *self, const rcp_context_t *ctx, rcp_status_channel_t **out)
-{
-    record_controller_t *rc = (record_controller_t *)self;
-    return rcp_controller_subscribe(rc->inner, ctx, out);
-}
-
-//cfusa:req REQ-REC-011
-static int record_ctrl_close(rcp_controller_t *self)
-{
-    record_controller_t *rc = (record_controller_t *)self;
-    return rcp_controller_close(rc->inner);
-}
-
-static void record_ctrl_destroy(rcp_controller_t *self)
-{
-    record_controller_t *rc = (record_controller_t *)self;
-    rcp_controller_release(rc->inner);
-    free(rc);
-}
-
-static const rcp_controller_vtable_t record_controller_vtable = {
-    record_ctrl_zone,
-    record_ctrl_send,
-    record_ctrl_subscribe,
-    record_ctrl_close,
-    record_ctrl_destroy,
-    NULL, /* loan: not supported */
-    NULL, /* send_loaned: not supported */
-};
-
-rcp_controller_t *rcp_recorder_controller_new(rcp_controller_t *inner, rcp_recorder_t *rec)
-{
-    record_controller_t *rc = (record_controller_t *)calloc(1, sizeof(*rc));
-    if (!rc) return NULL;
-    rc->base.vt       = &record_controller_vtable;
-    rc->base.refcount = 1;
-    rc->inner         = rcp_controller_retain(inner);
-    rc->rec           = rec;
-    return &rc->base;
 }
 
 /* ── Playback ──────────────────────────────────────────────────────────────── */
@@ -231,7 +156,7 @@ rcp_playback_config_t rcp_playback_default_config(void)
 
 //cfusa:req REQ-REC-004
 //cfusa:req REQ-REC-005
-int rcp_playback_run_all(rcp_controller_t *target, rcp_recorder_t *rec, const rcp_context_t *ctx,
+int rcp_playback_run_all(rcp_recorder_t *rec, rcp_playback_deliver_fn deliver, void *user_data,
                           rcp_playback_config_t cfg)
 {
     size_t n = rcp_recorder_size(rec);
@@ -247,8 +172,6 @@ int rcp_playback_run_all(rcp_controller_t *target, rcp_recorder_t *rec, const rc
 
     prev_ts = n > 0 ? snapshot[0].timestamp_ms : 0;
     for (i = 0; i < n; i++) {
-        rcp_response_t out = {0};
-
         if (snapshot[i].timestamp_ms > prev_ts && cfg.speed_factor > 0.0) {
             uint64_t gap_ms = snapshot[i].timestamp_ms - prev_ts;
             uint64_t delay_ms = (uint64_t)((double)gap_ms / cfg.speed_factor);
@@ -256,8 +179,7 @@ int rcp_playback_run_all(rcp_controller_t *target, rcp_recorder_t *rec, const rc
         }
         prev_ts = snapshot[i].timestamp_ms;
 
-        (void)rcp_controller_send(target, ctx, &snapshot[i].cmd, &out);
-        rcp_response_free(&out);
+        deliver(&snapshot[i], user_data);
     }
 
     free(snapshot);

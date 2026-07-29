@@ -5,20 +5,20 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ── AccessPolicy ──────────────────────────────────────────────────────────── */
-
 typedef struct {
-    char     identity[RCP_AUTHZ_IDENTITY_MAX];
-    uint32_t zone_mask;     /* bit (1u << zone) set if allowed; 0 = all zones */
-    uint32_t cmd_type_mask; /* bit (1u << type) set if allowed; 0 = all types */
+    char             identity[RCP_AUTHZ_IDENTITY_MAX];
+    rcp_avtp_addr_t *addrs;         /* NULL/0 = any address */
+    size_t           n_addrs;
+    uint8_t         *request_types; /* NULL/0 = any request type */
+    size_t           n_request_types;
 } policy_entry_t;
 
 struct rcp_authz_policy {
     int              refcount;
-    rcp_mutex_t       mu; /* protects entries[] */
-    policy_entry_t   *entries;
-    size_t            entries_len;
-    size_t            entries_cap;
+    rcp_mutex_t      mu; /* protects entries[] */
+    policy_entry_t  *entries;
+    size_t           entries_len;
+    size_t           entries_cap;
 };
 
 static void copy_identity(char *dst, const char *src)
@@ -42,28 +42,51 @@ rcp_authz_policy_t *rcp_authz_policy_retain(rcp_authz_policy_t *p)
     return p;
 }
 
+static void entry_free(policy_entry_t *e)
+{
+    free(e->addrs);
+    free(e->request_types);
+}
+
 void rcp_authz_policy_release(rcp_authz_policy_t *p)
 {
+    size_t i;
+
     if (!p) return;
     if (rcp_atomic_dec(&p->refcount) > 0) return;
+    for (i = 0; i < p->entries_len; i++) entry_free(&p->entries[i]);
     rcp_mutex_destroy(&p->mu);
     free(p->entries);
     free(p);
 }
 
 //cfusa:req REQ-AUTH-003
+//cfusa:req REQ-AUTH-008
 bool rcp_authz_policy_allow(rcp_authz_policy_t *policy, const char *identity,
-                             const rcp_zone_t *zones, size_t n_zones,
-                             const rcp_command_type_t *cmd_types, size_t n_cmd_types)
+                             const rcp_avtp_addr_t *addrs, size_t n_addrs,
+                             const uint8_t *request_types, size_t n_request_types)
 {
     policy_entry_t entry;
-    size_t i;
     bool ok = true;
 
     memset(&entry, 0, sizeof(entry));
     copy_identity(entry.identity, identity);
-    for (i = 0; i < n_zones; i++) entry.zone_mask |= (1u << (unsigned)zones[i]);
-    for (i = 0; i < n_cmd_types; i++) entry.cmd_type_mask |= (1u << (unsigned)cmd_types[i]);
+
+    if (n_addrs > 0) {
+        entry.addrs = (rcp_avtp_addr_t *)malloc(n_addrs * sizeof(*entry.addrs));
+        if (!entry.addrs) return false;
+        memcpy(entry.addrs, addrs, n_addrs * sizeof(*entry.addrs));
+        entry.n_addrs = n_addrs;
+    }
+    if (n_request_types > 0) {
+        entry.request_types = (uint8_t *)malloc(n_request_types * sizeof(*entry.request_types));
+        if (!entry.request_types) {
+            free(entry.addrs);
+            return false;
+        }
+        memcpy(entry.request_types, request_types, n_request_types * sizeof(*entry.request_types));
+        entry.n_request_types = n_request_types;
+    }
 
     rcp_mutex_lock(&policy->mu);
     if (policy->entries_len == policy->entries_cap) {
@@ -76,16 +99,45 @@ bool rcp_authz_policy_allow(rcp_authz_policy_t *policy, const char *identity,
             policy->entries_cap = new_cap;
         }
     }
-    if (ok) policy->entries[policy->entries_len++] = entry;
+    if (ok) {
+        policy->entries[policy->entries_len++] = entry;
+    }
     rcp_mutex_unlock(&policy->mu);
+
+    if (!ok) entry_free(&entry);
     return ok;
+}
+
+//cfusa:req REQ-AUTH-005
+static bool entry_matches_addr(const policy_entry_t *e, rcp_avtp_addr_t addr)
+{
+    size_t i;
+
+    if (e->n_addrs == 0) return true;
+    for (i = 0; i < e->n_addrs; i++) {
+        if (rcp_avtp_addr_equal(e->addrs[i], addr)) return true;
+    }
+    return false;
+}
+
+//cfusa:req REQ-AUTH-006
+static bool entry_matches_request_type(const policy_entry_t *e, uint8_t request_type)
+{
+    size_t i;
+
+    if (e->n_request_types == 0) return true;
+    for (i = 0; i < e->n_request_types; i++) {
+        if (e->request_types[i] == request_type) return true;
+    }
+    return false;
 }
 
 //cfusa:req REQ-AUTH-001
 //cfusa:req REQ-AUTH-002
 //cfusa:req REQ-AUTH-004
+//cfusa:req REQ-AUTH-007
 bool rcp_authz_policy_permit(rcp_authz_policy_t *policy, const char *identity,
-                              rcp_zone_t zone, rcp_command_type_t type)
+                              rcp_avtp_addr_t addr, uint8_t request_type)
 {
     size_t i;
     bool permitted = false;
@@ -93,115 +145,13 @@ bool rcp_authz_policy_permit(rcp_authz_policy_t *policy, const char *identity,
     rcp_mutex_lock(&policy->mu);
     for (i = 0; i < policy->entries_len; i++) {
         const policy_entry_t *e = &policy->entries[i];
-        bool zone_ok;
-        bool type_ok;
 
         if (strncmp(e->identity, identity, RCP_AUTHZ_IDENTITY_MAX) != 0) continue;
-
-        zone_ok = (e->zone_mask == 0)     || (e->zone_mask & (1u << (unsigned)zone));
-        type_ok = (e->cmd_type_mask == 0) || (e->cmd_type_mask & (1u << (unsigned)type));
-        if (zone_ok && type_ok) {
+        if (entry_matches_addr(e, addr) && entry_matches_request_type(e, request_type)) {
             permitted = true;
             break;
         }
     }
     rcp_mutex_unlock(&policy->mu);
     return permitted;
-}
-
-/* ── AuthController ────────────────────────────────────────────────────────── */
-
-typedef struct {
-    rcp_controller_t       base;
-    rcp_controller_t      *inner;  /* retained */
-    rcp_authz_policy_t     *policy; /* retained */
-    rcp_authz_identity_fn  identity_fn;
-    void                   *identity_fn_user_data;
-    rcp_mutex_t              mu; /* protects fixed_identity */
-    char                     fixed_identity[RCP_AUTHZ_IDENTITY_MAX];
-} authz_controller_t;
-
-static rcp_zone_t authz_ctrl_zone(rcp_controller_t *self)
-{
-    return rcp_controller_zone(((authz_controller_t *)self)->inner);
-}
-
-//cfusa:req REQ-AUTH-001
-//cfusa:req REQ-AUTH-002
-static int authz_ctrl_send(rcp_controller_t *self, const rcp_context_t *ctx,
-                            const rcp_command_t *cmd, rcp_response_t *out)
-{
-    authz_controller_t *ac = (authz_controller_t *)self;
-    const char *id;
-    char id_buf[RCP_AUTHZ_IDENTITY_MAX];
-
-    if (ac->identity_fn) {
-        id = ac->identity_fn(ac->identity_fn_user_data);
-    } else {
-        rcp_mutex_lock(&ac->mu);
-        copy_identity(id_buf, ac->fixed_identity);
-        rcp_mutex_unlock(&ac->mu);
-        id = id_buf;
-    }
-
-    if (!rcp_authz_policy_permit(ac->policy, id, cmd->zone, cmd->type)) {
-        return RCP_ERR_FORBIDDEN;
-    }
-    return rcp_controller_send(ac->inner, ctx, cmd, out);
-}
-
-//cfusa:req REQ-AUTH-006
-static int authz_ctrl_subscribe(rcp_controller_t *self, const rcp_context_t *ctx, rcp_status_channel_t **out)
-{
-    authz_controller_t *ac = (authz_controller_t *)self;
-    return rcp_controller_subscribe(ac->inner, ctx, out);
-}
-
-//cfusa:req REQ-AUTH-007
-static int authz_ctrl_close(rcp_controller_t *self)
-{
-    authz_controller_t *ac = (authz_controller_t *)self;
-    return rcp_controller_close(ac->inner);
-}
-
-static void authz_ctrl_destroy(rcp_controller_t *self)
-{
-    authz_controller_t *ac = (authz_controller_t *)self;
-    rcp_controller_release(ac->inner);
-    rcp_authz_policy_release(ac->policy);
-    rcp_mutex_destroy(&ac->mu);
-    free(ac);
-}
-
-static const rcp_controller_vtable_t authz_controller_vtable = {
-    authz_ctrl_zone,
-    authz_ctrl_send,
-    authz_ctrl_subscribe,
-    authz_ctrl_close,
-    authz_ctrl_destroy,
-    NULL, /* loan: not supported */
-    NULL, /* send_loaned: not supported */
-};
-
-rcp_controller_t *rcp_authz_controller_new(rcp_controller_t *inner, rcp_authz_policy_t *policy,
-                                            rcp_authz_identity_fn identity_fn, void *identity_fn_user_data)
-{
-    authz_controller_t *ac = (authz_controller_t *)calloc(1, sizeof(*ac));
-    if (!ac) return NULL;
-    ac->base.vt                 = &authz_controller_vtable;
-    ac->base.refcount            = 1;
-    ac->inner                    = rcp_controller_retain(inner);
-    ac->policy                   = rcp_authz_policy_retain(policy);
-    ac->identity_fn               = identity_fn;
-    ac->identity_fn_user_data     = identity_fn_user_data;
-    rcp_mutex_init(&ac->mu);
-    return &ac->base;
-}
-
-void rcp_authz_controller_set_identity(rcp_controller_t *ctrl, const char *identity)
-{
-    authz_controller_t *ac = (authz_controller_t *)ctrl;
-    rcp_mutex_lock(&ac->mu);
-    copy_identity(ac->fixed_identity, identity);
-    rcp_mutex_unlock(&ac->mu);
 }

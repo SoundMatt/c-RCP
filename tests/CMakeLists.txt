@@ -193,7 +193,11 @@ target_link_libraries(test_shmem PRIVATE rcp::rcp unity)
 target_compile_options(test_shmem PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_shmem COMMAND test_shmem)
 
-add_executable(test_loan test_loan.c legacy_mock.c)
+# test_loan no longer links legacy_mock.c: its milestone-80 ADAPT rebind
+# drops the controller-wrapper shape entirely (loan.h's own file header),
+# so it needs no legacy zone-controller double any more (contrast the
+# not-yet-migrated satellites below, which still do).
+add_executable(test_loan test_loan.c)
 target_link_libraries(test_loan PRIVATE rcp::rcp unity)
 target_compile_options(test_loan PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_loan COMMAND test_loan)
@@ -239,7 +243,13 @@ target_compile_options(test_prioqueue PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_prioqueue COMMAND test_prioqueue)
 set_tests_properties(rcp_prioqueue PROPERTIES TIMEOUT 30)
 
-add_executable(test_ratelimit test_ratelimit.c legacy_mock.c)
+# test_ratelimit/test_faultinject/test_authz/test_observe/test_admin/
+# test_recorder no longer link legacy_mock.c either: milestone 80's own
+# ADAPT rebind moves all six off rcp_controller_t/rcp_zone_t entirely
+# (each module's own file header), so none of them need the legacy
+# zone-controller double any more (contrast the not-yet-migrated
+# satellites below, which still do).
+add_executable(test_ratelimit test_ratelimit.c)
 target_link_libraries(test_ratelimit PRIVATE rcp::rcp unity)
 target_compile_options(test_ratelimit PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_ratelimit COMMAND test_ratelimit)
@@ -250,12 +260,12 @@ target_compile_options(test_sim PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_sim COMMAND test_sim)
 set_tests_properties(rcp_sim PROPERTIES TIMEOUT 30)
 
-add_executable(test_faultinject test_faultinject.c legacy_mock.c)
+add_executable(test_faultinject test_faultinject.c)
 target_link_libraries(test_faultinject PRIVATE rcp::rcp unity)
 target_compile_options(test_faultinject PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_faultinject COMMAND test_faultinject)
 
-add_executable(test_authz test_authz.c legacy_mock.c)
+add_executable(test_authz test_authz.c)
 target_link_libraries(test_authz PRIVATE rcp::rcp unity)
 target_compile_options(test_authz PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_authz COMMAND test_authz)
@@ -287,19 +297,19 @@ target_link_libraries(test_federation PRIVATE rcp::rcp unity)
 target_compile_options(test_federation PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_federation COMMAND test_federation)
 
-add_executable(test_observe test_observe.c legacy_mock.c)
+add_executable(test_observe test_observe.c)
 target_link_libraries(test_observe PRIVATE rcp::rcp unity)
 target_compile_options(test_observe PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_observe COMMAND test_observe)
 set_tests_properties(rcp_observe PROPERTIES TIMEOUT 30)
 
-add_executable(test_admin test_admin.c legacy_mock.c)
+add_executable(test_admin test_admin.c)
 target_link_libraries(test_admin PRIVATE rcp::rcp unity)
 target_compile_options(test_admin PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_admin COMMAND test_admin)
 set_tests_properties(rcp_admin PROPERTIES TIMEOUT 30)
 
-add_executable(test_recorder test_recorder.c legacy_mock.c)
+add_executable(test_recorder test_recorder.c)
 target_link_libraries(test_recorder PRIVATE rcp::rcp unity)
 target_compile_options(test_recorder PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_recorder COMMAND test_recorder)
