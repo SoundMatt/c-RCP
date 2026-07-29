@@ -4224,7 +4224,7 @@ four pre-existing gaps prior milestones already flagged (`REQ-MDNS-007/008`,
 slot count changed here. A local build of RELAY's own `relay conform
 --strict` against the `-DRELAY_BUILD_CLI=ON` CLI target reports PASS.
 
-### 83. Deprecation batch (v0.83.0)
+### 83. Deprecation batch (v0.83.0) ✅
 
 - **DEPRECATE** (removed from the tree, with rationale preserved in this
   ROADMAP.md and this milestone's commit message, not silently deleted):
@@ -4236,6 +4236,64 @@ slot count changed here. A local build of RELAY's own `relay conform
   for multi-target grouping, proxying, server redundancy, or multi-HPC
   leasing), `dyndata.c` (every endpoint type has one fixed, spec-defined
   payload shape — no schema-negotiation problem exists to solve).
+
+**Done (v0.83.0)**: the seven satellites the Satellite Disposition table
+already called **DEPRECATE** are gone from the tree outright, executing
+those pre-agreed dispositions rather than re-litigating them:
+`prioqueue.h`/`.c`, `firmware.h`/`.c`, `zonegroup.h`/`.c`, `proxy.h`/`.c`,
+`redundancy.h`/`.c`, `federation.h`/`.c`, and `dyndata.h`/`.c`, plus each
+one's `tests/test_*.c`. None of the seven had a live caller anywhere else
+in `src/`/`include/` (verified by grep before deletion), so removal is a
+pure subtraction:
+
+- `prioqueue.c` — TC18 makes execution priority a server-side property of
+  request *kind* (cancellation > triggered > timed > compound >
+  compound-wait > chained > standard, Phase 17), not a value a client
+  attaches before sending. A client-side priority heap has nothing left
+  to order.
+- `firmware.c` — no OTA/firmware-update endpoint or message exists
+  anywhere in the spec; it is explicitly an OEM/application-layer concern
+  the protocol itself has no hook for.
+- `zonegroup.c`, `proxy.c`, `redundancy.c`, `federation.c` — all four are
+  built on the retired Zone concept (grouping, proxying, and the
+  Controller/Zone pair specifically). TC18 addresses
+  server/endpoint/`(stream_id, byte_bus_id)` instead, has no multi-target
+  broadcast-grouping concept, delegates multi-hop/bridging to "the
+  network" rather than the RC system, models an RC Server as a single
+  node with one lifecycle state (no server-redundancy concept), and has
+  no counterpart to the old zone/HPC-lease federation registry.
+- `dyndata.c` — every TC18 endpoint type has one fixed, spec-defined
+  payload shape, so there is no schema-negotiation problem left for a
+  client-side dynamic-data registry to solve.
+
+`CMakeLists.txt`'s source list and `tests/CMakeLists.txt`'s matching
+`add_executable`/`target_link_libraries`/`add_test` blocks drop all seven
+modules; the `tests/CMakeLists.txt` comment above `test_ratelimit`
+explaining which suites still link `legacy_mock.c` is reworded so it no
+longer refers to these six as "not-yet-migrated" (they were never
+migrated — they were removed). `.fusa-reqs.json` drops the now-orphaned
+`REQ-PQ-*` (9), `REQ-FW-*` (9), `REQ-ZG-*` (6), `REQ-PROXY-*` (8),
+`REQ-RED-*` (9), `REQ-FED-*` (10), and `REQ-DYN-*` (6) requirement
+entries — 57 requirements total, taking the catalog from 911 to 854 —
+rather than leaving them to dangle untraced against code that no longer
+exists.
+
+Verified locally: full `ctest` suite passes (60/60, down from 67/67 at
+v0.82.0 — exactly the seven removed suites, nothing else regressed)
+under both a plain Debug build and a manual
+`-fsanitize=address,undefined` build (ASan+UBSan-clean across the full
+suite; macOS ASan has no leak detector, so leak-checking itself is not
+covered by this local run). A local `cfusa` v0.5.46 toolchain build:
+`check`/`cyber`/`qualify`/`vuln` all exit 0 against a clean tree (no
+`build*/` directories present — `cfusa` has no `.gitignore` awareness of
+its own and will otherwise flag the vendored `unity` fetch-content
+sources); `trace --req-coverage 100` reports 854/854 requirements traced
+(100%, both metrics) — the tool's own advisory `UNTRACED` list drops from
+four entries to three (`REQ-MDNS-007/008`, `REQ-RELAY-013`), since
+`REQ-PQ-005` — one of the four pre-existing gaps prior milestones
+flagged — no longer exists to be untraced. A local build of RELAY's own
+`relay conform --strict` against the `-DRELAY_BUILD_CLI=ON` CLI target
+reports PASS.
 
 ### 84. RELAY adapter rework (v0.84.0)
 

@@ -237,18 +237,17 @@ target_link_libraries(test_e2e PRIVATE rcp::rcp unity)
 target_compile_options(test_e2e PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_e2e COMMAND test_e2e)
 
-add_executable(test_prioqueue test_prioqueue.c legacy_mock.c)
-target_link_libraries(test_prioqueue PRIVATE rcp::rcp unity)
-target_compile_options(test_prioqueue PRIVATE ${RCP_TEST_WARNING_FLAGS})
-add_test(NAME rcp_prioqueue COMMAND test_prioqueue)
-set_tests_properties(rcp_prioqueue PROPERTIES TIMEOUT 30)
-
 # test_ratelimit/test_faultinject/test_authz/test_observe/test_admin/
 # test_recorder no longer link legacy_mock.c either: milestone 80's own
 # ADAPT rebind moves all six off rcp_controller_t/rcp_zone_t entirely
 # (each module's own file header), so none of them need the legacy
-# zone-controller double any more (contrast the not-yet-migrated
-# satellites below, which still do).
+# zone-controller double any more. (The remaining legacy_mock.c-linked
+# suites -- test_legacy_mock, bench_mock, command_latency_test,
+# test_adapt -- are the mock double's own tests and the not-yet-migrated
+# adapt.c, not satellite decorators; the six satellites that still
+# needed legacy_mock.c -- prioqueue/firmware/zonegroup/proxy/redundancy/
+# federation -- were DEPRECATE-removed outright at milestone 83 rather
+# than migrated, per the Satellite Disposition table.)
 add_executable(test_ratelimit test_ratelimit.c)
 target_link_libraries(test_ratelimit PRIVATE rcp::rcp unity)
 target_compile_options(test_ratelimit PRIVATE ${RCP_TEST_WARNING_FLAGS})
@@ -270,32 +269,6 @@ target_link_libraries(test_authz PRIVATE rcp::rcp unity)
 target_compile_options(test_authz PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_authz COMMAND test_authz)
 set_tests_properties(rcp_authz PROPERTIES TIMEOUT 30)
-
-add_executable(test_firmware test_firmware.c legacy_mock.c)
-target_link_libraries(test_firmware PRIVATE rcp::rcp unity)
-target_compile_options(test_firmware PRIVATE ${RCP_TEST_WARNING_FLAGS})
-add_test(NAME rcp_firmware COMMAND test_firmware)
-
-add_executable(test_zonegroup test_zonegroup.c legacy_mock.c)
-target_link_libraries(test_zonegroup PRIVATE rcp::rcp unity)
-target_compile_options(test_zonegroup PRIVATE ${RCP_TEST_WARNING_FLAGS})
-add_test(NAME rcp_zonegroup COMMAND test_zonegroup)
-set_tests_properties(rcp_zonegroup PROPERTIES TIMEOUT 30)
-
-add_executable(test_proxy test_proxy.c legacy_mock.c)
-target_link_libraries(test_proxy PRIVATE rcp::rcp unity)
-target_compile_options(test_proxy PRIVATE ${RCP_TEST_WARNING_FLAGS})
-add_test(NAME rcp_proxy COMMAND test_proxy)
-
-add_executable(test_redundancy test_redundancy.c legacy_mock.c)
-target_link_libraries(test_redundancy PRIVATE rcp::rcp unity)
-target_compile_options(test_redundancy PRIVATE ${RCP_TEST_WARNING_FLAGS})
-add_test(NAME rcp_redundancy COMMAND test_redundancy)
-
-add_executable(test_federation test_federation.c legacy_mock.c)
-target_link_libraries(test_federation PRIVATE rcp::rcp unity)
-target_compile_options(test_federation PRIVATE ${RCP_TEST_WARNING_FLAGS})
-add_test(NAME rcp_federation COMMAND test_federation)
 
 add_executable(test_observe test_observe.c)
 target_link_libraries(test_observe PRIVATE rcp::rcp unity)
@@ -319,12 +292,6 @@ add_executable(test_config test_config.c)
 target_link_libraries(test_config PRIVATE rcp::rcp unity)
 target_compile_options(test_config PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_config COMMAND test_config)
-
-add_executable(test_dyndata test_dyndata.c)
-target_link_libraries(test_dyndata PRIVATE rcp::rcp unity)
-target_compile_options(test_dyndata PRIVATE ${RCP_TEST_WARNING_FLAGS})
-add_test(NAME rcp_dyndata COMMAND test_dyndata)
-set_tests_properties(rcp_dyndata PROPERTIES TIMEOUT 30)
 
 add_executable(test_grpcbridge test_grpcbridge.c)
 target_link_libraries(test_grpcbridge PRIVATE rcp::rcp unity)
