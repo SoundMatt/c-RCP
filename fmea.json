@@ -4,7 +4,7 @@
   "tool": "c-FuSa",
   "toolVersion": "0.5.46",
   "language": "c",
-  "generatedAt": "2026-07-29T00:34:31Z",
+  "generatedAt": "2026-07-29T01:23:17Z",
   "project": "c-RCP",
   "version": "0.70.0",
   "standard": "IEC 60812:2018 / ISO 26262-5",
@@ -204,25 +204,9 @@
     },
     {
       "id": "FM-013",
-      "item": "rcp_health_state_string",
-      "file": "watchdog.c",
-      "line": 8,
-      "failureMode": "rcp_health_state_string (general function) does not perform its intended action",
-      "effect": "Failure of rcp_health_state_string could propagate undetected to callers in watchdog.c",
-      "cause": "Logic error or untested edge case in rcp_health_state_string",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-014",
       "item": "rcp_watchdog_default_config",
       "file": "watchdog.c",
-      "line": 18,
+      "line": 10,
       "failureMode": "rcp_watchdog_default_config (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_watchdog_default_config could propagate undetected to callers in watchdog.c",
       "cause": "Unhandled fault or invalid input condition within rcp_watchdog_default_config",
@@ -235,13 +219,29 @@
       "cyberFailureMode": ""
     },
     {
+      "id": "FM-014",
+      "item": "rcp_watchdog_keeper_kick",
+      "file": "watchdog.c",
+      "line": 194,
+      "failureMode": "rcp_watchdog_keeper_kick (safety-critical function) does not perform its intended action",
+      "effect": "Failure of rcp_watchdog_keeper_kick could propagate undetected to callers in watchdog.c",
+      "cause": "Unhandled fault or invalid input condition within rcp_watchdog_keeper_kick",
+      "severity": 9,
+      "occurrence": 4,
+      "detection": 6,
+      "actionPriority": "high",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
       "id": "FM-015",
-      "item": "rcp_watchdog_keeper_health",
+      "item": "rcp_watchdog_keeper_status",
       "file": "watchdog.c",
       "line": 208,
-      "failureMode": "rcp_watchdog_keeper_health (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_watchdog_keeper_health could propagate undetected to callers in watchdog.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_watchdog_keeper_health",
+      "failureMode": "rcp_watchdog_keeper_status (safety-critical function) does not perform its intended action",
+      "effect": "Failure of rcp_watchdog_keeper_status could propagate undetected to callers in watchdog.c",
+      "cause": "Unhandled fault or invalid input condition within rcp_watchdog_keeper_status",
       "severity": 9,
       "occurrence": 4,
       "detection": 6,
@@ -254,7 +254,7 @@
       "id": "FM-016",
       "item": "rcp_watchdog_keeper_subscribe",
       "file": "watchdog.c",
-      "line": 221,
+      "line": 224,
       "failureMode": "rcp_watchdog_keeper_subscribe (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_watchdog_keeper_subscribe could propagate undetected to callers in watchdog.c",
       "cause": "Unhandled fault or invalid input condition within rcp_watchdog_keeper_subscribe",
@@ -270,7 +270,7 @@
       "id": "FM-017",
       "item": "rcp_watchdog_keeper_close",
       "file": "watchdog.c",
-      "line": 231,
+      "line": 234,
       "failureMode": "rcp_watchdog_keeper_close (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_watchdog_keeper_close could propagate undetected to callers in watchdog.c",
       "cause": "Unhandled fault or invalid input condition within rcp_watchdog_keeper_close",
@@ -286,7 +286,7 @@
       "id": "FM-018",
       "item": "rcp_watchdog_keeper_destroy",
       "file": "watchdog.c",
-      "line": 243,
+      "line": 246,
       "failureMode": "rcp_watchdog_keeper_destroy (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_watchdog_keeper_destroy could propagate undetected to callers in watchdog.c",
       "cause": "Unhandled fault or invalid input condition within rcp_watchdog_keeper_destroy",
@@ -4044,28 +4044,12 @@
     },
     {
       "id": "FM-253",
-      "item": "rcp_power_state_string",
+      "item": "rcp_powerstate_strerror",
       "file": "powerstate.c",
       "line": 8,
-      "failureMode": "rcp_power_state_string (general function) does not perform its intended action",
-      "effect": "Failure of rcp_power_state_string could propagate undetected to callers in powerstate.c",
-      "cause": "Logic error or untested edge case in rcp_power_state_string",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-254",
-      "item": "rcp_powerstate_default_config",
-      "file": "powerstate.c",
-      "line": 18,
-      "failureMode": "rcp_powerstate_default_config (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_powerstate_default_config could propagate undetected to callers in powerstate.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_powerstate_default_config",
+      "failureMode": "rcp_powerstate_strerror (safety-critical function) does not perform its intended action",
+      "effect": "Failure of rcp_powerstate_strerror could propagate undetected to callers in powerstate.c",
+      "cause": "Unhandled fault or invalid input condition within rcp_powerstate_strerror",
       "severity": 9,
       "occurrence": 4,
       "detection": 6,
@@ -4075,13 +4059,29 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-255",
-      "item": "rcp_powerstate_manager_sleep",
+      "id": "FM-254",
+      "item": "rcp_powerstate_manager_new",
       "file": "powerstate.c",
-      "line": 102,
-      "failureMode": "rcp_powerstate_manager_sleep (general function) does not perform its intended action",
-      "effect": "Failure of rcp_powerstate_manager_sleep could propagate undetected to callers in powerstate.c",
-      "cause": "Logic error or untested edge case in rcp_powerstate_manager_sleep",
+      "line": 88,
+      "failureMode": "rcp_powerstate_manager_new (general function) does not perform its intended action",
+      "effect": "Failure of rcp_powerstate_manager_new could propagate undetected to callers in powerstate.c",
+      "cause": "Logic error or untested edge case in rcp_powerstate_manager_new",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-255",
+      "item": "rcp_powerstate_manager_mode",
+      "file": "powerstate.c",
+      "line": 116,
+      "failureMode": "rcp_powerstate_manager_mode (general function) does not perform its intended action",
+      "effect": "Failure of rcp_powerstate_manager_mode could propagate undetected to callers in powerstate.c",
+      "cause": "Logic error or untested edge case in rcp_powerstate_manager_mode",
       "severity": 3,
       "occurrence": 2,
       "detection": 3,
@@ -4092,12 +4092,12 @@
     },
     {
       "id": "FM-256",
-      "item": "rcp_powerstate_manager_wake",
+      "item": "rcp_powerstate_manager_handshake_resume_queues",
       "file": "powerstate.c",
-      "line": 133,
-      "failureMode": "rcp_powerstate_manager_wake (general function) does not perform its intended action",
-      "effect": "Failure of rcp_powerstate_manager_wake could propagate undetected to callers in powerstate.c",
-      "cause": "Logic error or untested edge case in rcp_powerstate_manager_wake",
+      "line": 296,
+      "failureMode": "rcp_powerstate_manager_handshake_resume_queues (general function) does not perform its intended action",
+      "effect": "Failure of rcp_powerstate_manager_handshake_resume_queues could propagate undetected to callers in powerstate.c",
+      "cause": "Logic error or untested edge case in rcp_powerstate_manager_handshake_resume_queues",
       "severity": 3,
       "occurrence": 2,
       "detection": 3,
@@ -4108,25 +4108,9 @@
     },
     {
       "id": "FM-257",
-      "item": "rcp_powerstate_manager_state",
-      "file": "powerstate.c",
-      "line": 254,
-      "failureMode": "rcp_powerstate_manager_state (general function) does not perform its intended action",
-      "effect": "Failure of rcp_powerstate_manager_state could propagate undetected to callers in powerstate.c",
-      "cause": "Logic error or untested edge case in rcp_powerstate_manager_state",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-258",
       "item": "rcp_powerstate_manager_subscribe",
       "file": "powerstate.c",
-      "line": 267,
+      "line": 340,
       "failureMode": "rcp_powerstate_manager_subscribe (general function) does not perform its intended action",
       "effect": "Failure of rcp_powerstate_manager_subscribe could propagate undetected to callers in powerstate.c",
       "cause": "Logic error or untested edge case in rcp_powerstate_manager_subscribe",
@@ -4139,26 +4123,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-259",
-      "item": "rcp_powerstate_manager_close",
-      "file": "powerstate.c",
-      "line": 277,
-      "failureMode": "rcp_powerstate_manager_close (general function) does not perform its intended action",
-      "effect": "Failure of rcp_powerstate_manager_close could propagate undetected to callers in powerstate.c",
-      "cause": "Logic error or untested edge case in rcp_powerstate_manager_close",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-260",
+      "id": "FM-258",
       "item": "rcp_powerstate_manager_destroy",
       "file": "powerstate.c",
-      "line": 289,
+      "line": 349,
       "failureMode": "rcp_powerstate_manager_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_powerstate_manager_destroy could propagate undetected to callers in powerstate.c",
       "cause": "Logic error or untested edge case in rcp_powerstate_manager_destroy",
@@ -4171,7 +4139,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-261",
+      "id": "FM-259",
       "item": "rcp_dds_default_config",
       "file": "ddsbr.c",
       "line": 5,
@@ -4187,7 +4155,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-262",
+      "id": "FM-260",
       "item": "rcp_dds_controller_new",
       "file": "ddsbr.c",
       "line": 64,
@@ -4203,7 +4171,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-263",
+      "id": "FM-261",
       "item": "rcp_ep_uart_nr_bits_valid",
       "file": "ep_uart.c",
       "line": 9,
@@ -4219,7 +4187,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-264",
+      "id": "FM-262",
       "item": "rcp_ep_uart_bit_pad_mask",
       "file": "ep_uart.c",
       "line": 15,
@@ -4235,7 +4203,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-265",
+      "id": "FM-263",
       "item": "rcp_ep_uart_apply_bit_padding",
       "file": "ep_uart.c",
       "line": 25,
@@ -4251,7 +4219,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-266",
+      "id": "FM-264",
       "item": "rcp_ep_uart_functional_cfg_init",
       "file": "ep_uart.c",
       "line": 38,
@@ -4267,7 +4235,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-267",
+      "id": "FM-265",
       "item": "rcp_ep_uart_strerror",
       "file": "ep_uart.c",
       "line": 110,
@@ -4283,7 +4251,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-268",
+      "id": "FM-266",
       "item": "rcp_ep_uart_read_response_fragment_count",
       "file": "ep_uart.c",
       "line": 384,
@@ -4299,7 +4267,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-269",
+      "id": "FM-267",
       "item": "rcp_tsn_default_pcp_map",
       "file": "tsn.c",
       "line": 21,
@@ -4315,7 +4283,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-270",
+      "id": "FM-268",
       "item": "rcp_tsn_pcp_for",
       "file": "tsn.c",
       "line": 33,
@@ -4331,7 +4299,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-271",
+      "id": "FM-269",
       "item": "rcp_tsn_default_config",
       "file": "tsn.c",
       "line": 41,
@@ -4347,7 +4315,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-272",
+      "id": "FM-270",
       "item": "rcp_tsn_classify_frame",
       "file": "tsn.c",
       "line": 53,
@@ -4363,7 +4331,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-273",
+      "id": "FM-271",
       "item": "rcp_avtp_strerror",
       "file": "avtp.c",
       "line": 9,
@@ -4379,7 +4347,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-274",
+      "id": "FM-272",
       "item": "rcp_stream_id_make",
       "file": "avtp.c",
       "line": 64,
@@ -4395,7 +4363,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-275",
+      "id": "FM-273",
       "item": "rcp_stream_id_to_u64",
       "file": "avtp.c",
       "line": 73,
@@ -4411,7 +4379,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-276",
+      "id": "FM-274",
       "item": "rcp_stream_id_from_u64",
       "file": "avtp.c",
       "line": 82,
@@ -4427,7 +4395,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-277",
+      "id": "FM-275",
       "item": "rcp_stream_id_equal",
       "file": "avtp.c",
       "line": 98,
@@ -4443,7 +4411,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-278",
+      "id": "FM-276",
       "item": "rcp_avtp_addr_equal",
       "file": "avtp.c",
       "line": 104,
@@ -4459,7 +4427,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-279",
+      "id": "FM-277",
       "item": "rcp_avtp_peek_subtype",
       "file": "avtp.c",
       "line": 241,
@@ -4475,7 +4443,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-280",
+      "id": "FM-278",
       "item": "rcp_avtp_should_drop_tscf",
       "file": "avtp.c",
       "line": 249,
@@ -4491,7 +4459,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-281",
+      "id": "FM-279",
       "item": "rcp_avtp_transport_retain",
       "file": "avtp.c",
       "line": 258,
@@ -4507,7 +4475,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-282",
+      "id": "FM-280",
       "item": "rcp_avtp_transport_release",
       "file": "avtp.c",
       "line": 265,
@@ -4523,7 +4491,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-283",
+      "id": "FM-281",
       "item": "rcp_sim_default_config",
       "file": "sim.c",
       "line": 10,
@@ -4539,7 +4507,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-284",
+      "id": "FM-282",
       "item": "rcp_status_channel_release",
       "file": "sim.c",
       "line": 169,
@@ -4555,7 +4523,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-285",
+      "id": "FM-283",
       "item": "rcp_status_channel_release",
       "file": "sim.c",
       "line": 174,
@@ -4571,7 +4539,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-286",
+      "id": "FM-284",
       "item": "rcp_sim_controller_publish",
       "file": "sim.c",
       "line": 219,
@@ -4587,7 +4555,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-287",
+      "id": "FM-285",
       "item": "free",
       "file": "sim.c",
       "line": 352,
@@ -4603,7 +4571,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-288",
+      "id": "FM-286",
       "item": "rcp_sim_controller_new",
       "file": "sim.c",
       "line": 366,
@@ -4619,7 +4587,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-289",
+      "id": "FM-287",
       "item": "rcp_sim_controller_fault",
       "file": "sim.c",
       "line": 394,
@@ -4635,7 +4603,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-290",
+      "id": "FM-288",
       "item": "rcp_sim_controller_recover",
       "file": "sim.c",
       "line": 403,
@@ -4651,7 +4619,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-291",
+      "id": "FM-289",
       "item": "rcp_sim_controller_watchdog_missed",
       "file": "sim.c",
       "line": 412,
@@ -4667,7 +4635,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-292",
+      "id": "FM-290",
       "item": "rcp_udp_avtp_transport_bind",
       "file": "udp.c",
       "line": 39,
@@ -4683,7 +4651,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-293",
+      "id": "FM-291",
       "item": "rcp_udp_avtp_transport_ok",
       "file": "udp.c",
       "line": 271,
@@ -4699,7 +4667,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-294",
+      "id": "FM-292",
       "item": "rcp_udp_avtp_transport_port",
       "file": "udp.c",
       "line": 277,
@@ -4715,7 +4683,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-295",
+      "id": "FM-293",
       "item": "rcp_udp_avtp_transport_addr_string",
       "file": "udp.c",
       "line": 287,
@@ -4731,7 +4699,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-296",
+      "id": "FM-294",
       "item": "rcp_udp_avtp_transport_ok",
       "file": "udp.c",
       "line": 368,
@@ -4747,7 +4715,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-297",
+      "id": "FM-295",
       "item": "rcp_udp_avtp_transport_port",
       "file": "udp.c",
       "line": 375,
@@ -4763,7 +4731,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-298",
+      "id": "FM-296",
       "item": "rcp_udp_avtp_transport_addr_string",
       "file": "udp.c",
       "line": 382,
@@ -4779,7 +4747,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-299",
+      "id": "FM-297",
       "item": "rcp_fragment_strerror",
       "file": "fragment.c",
       "line": 7,
@@ -4795,7 +4763,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-300",
+      "id": "FM-298",
       "item": "rcp_fragment_plan_count",
       "file": "fragment.c",
       "line": 22,
@@ -4811,7 +4779,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-301",
+      "id": "FM-299",
       "item": "rcp_fragment_reasm_result_string",
       "file": "fragment.c",
       "line": 83,
@@ -4827,7 +4795,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-302",
+      "id": "FM-300",
       "item": "rcp_fragment_reassembler_init",
       "file": "fragment.c",
       "line": 96,
@@ -4843,7 +4811,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-303",
+      "id": "FM-301",
       "item": "rcp_fragment_reassembler_reset",
       "file": "fragment.c",
       "line": 107,
@@ -4859,7 +4827,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-304",
+      "id": "FM-302",
       "item": "rcp_fragment_reassembler_destroy",
       "file": "fragment.c",
       "line": 116,
@@ -4875,7 +4843,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-305",
+      "id": "FM-303",
       "item": "rcp_fragment_reassembler_is_collecting",
       "file": "fragment.c",
       "line": 191,
@@ -4891,7 +4859,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-306",
+      "id": "FM-304",
       "item": "rcp_deadline_default_config",
       "file": "deadline.c",
       "line": 9,
@@ -4907,10 +4875,42 @@
       "cyberFailureMode": ""
     },
     {
+      "id": "FM-305",
+      "item": "rcp_deadline_monitor_heartbeat",
+      "file": "deadline.c",
+      "line": 92,
+      "failureMode": "rcp_deadline_monitor_heartbeat (monitoring/control function) does not perform its intended action",
+      "effect": "Failure of rcp_deadline_monitor_heartbeat could propagate undetected to callers in deadline.c",
+      "cause": "Configuration or state inconsistency affecting rcp_deadline_monitor_heartbeat",
+      "severity": 5,
+      "occurrence": 3,
+      "detection": 4,
+      "actionPriority": "medium",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-306",
+      "item": "rcp_deadline_monitor_notify_overflow",
+      "file": "deadline.c",
+      "line": 111,
+      "failureMode": "rcp_deadline_monitor_notify_overflow (monitoring/control function) does not perform its intended action",
+      "effect": "Failure of rcp_deadline_monitor_notify_overflow could propagate undetected to callers in deadline.c",
+      "cause": "Configuration or state inconsistency affecting rcp_deadline_monitor_notify_overflow",
+      "severity": 5,
+      "occurrence": 3,
+      "detection": 4,
+      "actionPriority": "medium",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
       "id": "FM-307",
       "item": "rcp_deadline_monitor_alive",
       "file": "deadline.c",
-      "line": 201,
+      "line": 217,
       "failureMode": "rcp_deadline_monitor_alive (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_deadline_monitor_alive could propagate undetected to callers in deadline.c",
       "cause": "Configuration or state inconsistency affecting rcp_deadline_monitor_alive",
@@ -4926,7 +4926,7 @@
       "id": "FM-308",
       "item": "rcp_deadline_monitor_subscribe",
       "file": "deadline.c",
-      "line": 213,
+      "line": 229,
       "failureMode": "rcp_deadline_monitor_subscribe (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_deadline_monitor_subscribe could propagate undetected to callers in deadline.c",
       "cause": "Configuration or state inconsistency affecting rcp_deadline_monitor_subscribe",
@@ -4942,7 +4942,7 @@
       "id": "FM-309",
       "item": "rcp_deadline_monitor_close",
       "file": "deadline.c",
-      "line": 224,
+      "line": 240,
       "failureMode": "rcp_deadline_monitor_close (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_deadline_monitor_close could propagate undetected to callers in deadline.c",
       "cause": "Configuration or state inconsistency affecting rcp_deadline_monitor_close",
@@ -4958,7 +4958,7 @@
       "id": "FM-310",
       "item": "rcp_deadline_monitor_destroy",
       "file": "deadline.c",
-      "line": 240,
+      "line": 252,
       "failureMode": "rcp_deadline_monitor_destroy (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_deadline_monitor_destroy could propagate undetected to callers in deadline.c",
       "cause": "Configuration or state inconsistency affecting rcp_deadline_monitor_destroy",
@@ -7180,7 +7180,7 @@
     }
   ],
   "summary": {
-    "total": 448, "highPriority": 68,
+    "total": 448, "highPriority": 69,
     "componentsAnalyzed": 448, "componentsInProject": 448, "coveragePct": 100
   }
 }
