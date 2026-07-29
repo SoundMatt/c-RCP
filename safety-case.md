@@ -1,6 +1,6 @@
 # Safety Case — c-RCP v0.70.0
 
-**Standard:** iso26262  |  **Generated:** 2026-07-29T17:18:17Z
+**Standard:** iso26262  |  **Generated:** 2026-07-29T17:27:28Z
 
 ---
 
@@ -14,7 +14,7 @@
 
 ## C1 — context
 
-> Scope: c-RCP source under ".", analyzed against iso26262 by c-FuSa v0.5.46
+> Scope: c-RCP source under ".", analyzed against iso26262 by c-FuSa v0.5.48
 
 ## A1 — assumption
 

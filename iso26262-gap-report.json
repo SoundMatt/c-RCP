@@ -25,5 +25,5 @@ Clause   Objective                                     cfusa Rule     Status
 7.5      Safety goals                                  HARA003        COVERED
 10.4     Software component interaction (SCI) evidence CFUSA-SCI      COVERED
 
-Summary: 15 covered, 6 gap(s), 6 not applicable for ASIL-B
+Summary: 15 covered, 6 gap(s), 0 recommended gap(s), 6 not applicable for ASIL-B
 Review gaps and add manual evidence or custom cfusa rules.

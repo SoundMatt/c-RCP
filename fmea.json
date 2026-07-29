@@ -1,19 +1,19 @@
 {
-  "schemaVersion": "1.14.0",
+  "schemaVersion": "1.15.2",
   "kind": "fmea-report",
   "tool": "c-FuSa",
-  "toolVersion": "0.5.46",
+  "toolVersion": "0.5.48",
   "language": "c",
-  "generatedAt": "2026-07-29T17:18:17Z",
+  "generatedAt": "2026-07-29T17:27:28Z",
   "project": "c-RCP",
   "version": "0.70.0",
-  "standard": "IEC 60812:2018 / ISO 26262-5",
+  "standard": "iso26262",
   "ratingScale": "cfusa-heuristic-1-10",
   "entries": [
     {
       "id": "FM-001",
       "item": "rcp_doip_default_config",
-      "file": "doipbr.c",
+      "file": "src/doipbr.c",
       "line": 4,
       "failureMode": "rcp_doip_default_config (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_doip_default_config could propagate undetected to callers in doipbr.c",
@@ -29,7 +29,7 @@
     {
       "id": "FM-002",
       "item": "rcp_ep_adc_combine_mode_valid",
-      "file": "ep_adc.c",
+      "file": "src/ep_adc.c",
       "line": 22,
       "failureMode": "rcp_ep_adc_combine_mode_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_adc_combine_mode_valid could propagate undetected to callers in ep_adc.c",
@@ -45,7 +45,7 @@
     {
       "id": "FM-003",
       "item": "rcp_ep_adc_functional_cfg_init",
-      "file": "ep_adc.c",
+      "file": "src/ep_adc.c",
       "line": 130,
       "failureMode": "rcp_ep_adc_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_adc_functional_cfg_init could propagate undetected to callers in ep_adc.c",
@@ -60,24 +60,8 @@
     },
     {
       "id": "FM-004",
-      "item": "rcp_ep_adc_strerror",
-      "file": "ep_adc.c",
-      "line": 190,
-      "failureMode": "rcp_ep_adc_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_ep_adc_strerror could propagate undetected to callers in ep_adc.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_ep_adc_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-005",
       "item": "rcp_ep_adc_encode_read_request",
-      "file": "ep_adc.c",
+      "file": "src/ep_adc.c",
       "line": 206,
       "failureMode": "rcp_ep_adc_encode_read_request (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_adc_encode_read_request could propagate undetected to callers in ep_adc.c",
@@ -91,9 +75,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-006",
+      "id": "FM-005",
       "item": "rcp_watchdog_default_config",
-      "file": "watchdog.c",
+      "file": "src/watchdog.c",
       "line": 10,
       "failureMode": "rcp_watchdog_default_config (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_watchdog_default_config could propagate undetected to callers in watchdog.c",
@@ -107,9 +91,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-007",
+      "id": "FM-006",
       "item": "rcp_watchdog_keeper_kick",
-      "file": "watchdog.c",
+      "file": "src/watchdog.c",
       "line": 194,
       "failureMode": "rcp_watchdog_keeper_kick (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_watchdog_keeper_kick could propagate undetected to callers in watchdog.c",
@@ -123,9 +107,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-008",
+      "id": "FM-007",
       "item": "rcp_watchdog_keeper_status",
-      "file": "watchdog.c",
+      "file": "src/watchdog.c",
       "line": 208,
       "failureMode": "rcp_watchdog_keeper_status (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_watchdog_keeper_status could propagate undetected to callers in watchdog.c",
@@ -139,9 +123,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-009",
+      "id": "FM-008",
       "item": "rcp_watchdog_keeper_subscribe",
-      "file": "watchdog.c",
+      "file": "src/watchdog.c",
       "line": 224,
       "failureMode": "rcp_watchdog_keeper_subscribe (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_watchdog_keeper_subscribe could propagate undetected to callers in watchdog.c",
@@ -155,9 +139,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-010",
+      "id": "FM-009",
       "item": "rcp_watchdog_keeper_close",
-      "file": "watchdog.c",
+      "file": "src/watchdog.c",
       "line": 234,
       "failureMode": "rcp_watchdog_keeper_close (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_watchdog_keeper_close could propagate undetected to callers in watchdog.c",
@@ -171,9 +155,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-011",
+      "id": "FM-010",
       "item": "rcp_watchdog_keeper_destroy",
-      "file": "watchdog.c",
+      "file": "src/watchdog.c",
       "line": 246,
       "failureMode": "rcp_watchdog_keeper_destroy (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_watchdog_keeper_destroy could propagate undetected to callers in watchdog.c",
@@ -187,9 +171,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-012",
+      "id": "FM-011",
       "item": "rcp_config_manifest_free",
-      "file": "config.c",
+      "file": "src/config.c",
       "line": 159,
       "failureMode": "rcp_config_manifest_free (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_config_manifest_free could propagate undetected to callers in config.c",
@@ -203,10 +187,26 @@
       "cyberFailureMode": ""
     },
     {
+      "id": "FM-012",
+      "item": "DEFINE_APPEND",
+      "file": "src/config.c",
+      "line": 186,
+      "failureMode": "DEFINE_APPEND (general function) does not perform its intended action",
+      "effect": "Failure of DEFINE_APPEND could propagate undetected to callers in config.c",
+      "cause": "Logic error or untested edge case in DEFINE_APPEND",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
       "id": "FM-013",
       "item": "DEFINE_APPEND",
-      "file": "config.c",
-      "line": 186,
+      "file": "src/config.c",
+      "line": 187,
       "failureMode": "DEFINE_APPEND (general function) does not perform its intended action",
       "effect": "Failure of DEFINE_APPEND could propagate undetected to callers in config.c",
       "cause": "Logic error or untested edge case in DEFINE_APPEND",
@@ -221,23 +221,7 @@
     {
       "id": "FM-014",
       "item": "DEFINE_APPEND",
-      "file": "config.c",
-      "line": 187,
-      "failureMode": "DEFINE_APPEND (general function) does not perform its intended action",
-      "effect": "Failure of DEFINE_APPEND could propagate undetected to callers in config.c",
-      "cause": "Logic error or untested edge case in DEFINE_APPEND",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-015",
-      "item": "DEFINE_APPEND",
-      "file": "config.c",
+      "file": "src/config.c",
       "line": 188,
       "failureMode": "DEFINE_APPEND (general function) does not perform its intended action",
       "effect": "Failure of DEFINE_APPEND could propagate undetected to callers in config.c",
@@ -251,9 +235,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-016",
+      "id": "FM-015",
       "item": "rcp_config_parse_json",
-      "file": "config.c",
+      "file": "src/config.c",
       "line": 314,
       "failureMode": "rcp_config_parse_json (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_config_parse_json could propagate undetected to callers in config.c",
@@ -267,9 +251,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-017",
+      "id": "FM-016",
       "item": "find_in_range",
-      "file": "config.c",
+      "file": "src/config.c",
       "line": 349,
       "failureMode": "find_in_range (general function) does not perform its intended action",
       "effect": "Failure of find_in_range could propagate undetected to callers in config.c",
@@ -283,9 +267,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-018",
+      "id": "FM-017",
       "item": "rcp_config_apply_to_mock",
-      "file": "config.c",
+      "file": "src/config.c",
       "line": 386,
       "failureMode": "rcp_config_apply_to_mock (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_config_apply_to_mock could propagate undetected to callers in config.c",
@@ -299,9 +283,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-019",
+      "id": "FM-018",
       "item": "rcp_config_load",
-      "file": "config.c",
+      "file": "src/config.c",
       "line": 406,
       "failureMode": "rcp_config_load (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_config_load could propagate undetected to callers in config.c",
@@ -315,9 +299,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-020",
+      "id": "FM-019",
       "item": "rcp_ep_i2c_mode_valid",
-      "file": "ep_i2c.c",
+      "file": "src/ep_i2c.c",
       "line": 8,
       "failureMode": "rcp_ep_i2c_mode_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_i2c_mode_valid could propagate undetected to callers in ep_i2c.c",
@@ -331,9 +315,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-021",
+      "id": "FM-020",
       "item": "rcp_ep_i2c_functional_cfg_init",
-      "file": "ep_i2c.c",
+      "file": "src/ep_i2c.c",
       "line": 16,
       "failureMode": "rcp_ep_i2c_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_i2c_functional_cfg_init could propagate undetected to callers in ep_i2c.c",
@@ -347,25 +331,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-022",
-      "item": "rcp_ep_i2c_strerror",
-      "file": "ep_i2c.c",
-      "line": 49,
-      "failureMode": "rcp_ep_i2c_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_ep_i2c_strerror could propagate undetected to callers in ep_i2c.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_ep_i2c_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-023",
+      "id": "FM-021",
       "item": "rcp_ep_can_frame_format_valid",
-      "file": "ep_can.c",
+      "file": "src/ep_can.c",
       "line": 26,
       "failureMode": "rcp_ep_can_frame_format_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_can_frame_format_valid could propagate undetected to callers in ep_can.c",
@@ -379,9 +347,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-024",
+      "id": "FM-022",
       "item": "rcp_ep_can_frame_format_is_xl",
-      "file": "ep_can.c",
+      "file": "src/ep_can.c",
       "line": 32,
       "failureMode": "rcp_ep_can_frame_format_is_xl (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_can_frame_format_is_xl could propagate undetected to callers in ep_can.c",
@@ -395,9 +363,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-025",
+      "id": "FM-023",
       "item": "rcp_ep_can_frame_format_id_width",
-      "file": "ep_can.c",
+      "file": "src/ep_can.c",
       "line": 46,
       "failureMode": "rcp_ep_can_frame_format_id_width (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_can_frame_format_id_width could propagate undetected to callers in ep_can.c",
@@ -411,9 +379,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-026",
+      "id": "FM-024",
       "item": "rcp_ep_can_arbitration_id_valid",
-      "file": "ep_can.c",
+      "file": "src/ep_can.c",
       "line": 60,
       "failureMode": "rcp_ep_can_arbitration_id_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_can_arbitration_id_valid could propagate undetected to callers in ep_can.c",
@@ -427,9 +395,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-027",
+      "id": "FM-025",
       "item": "rcp_ep_can_frame_format_max_data_len",
-      "file": "ep_can.c",
+      "file": "src/ep_can.c",
       "line": 71,
       "failureMode": "rcp_ep_can_frame_format_max_data_len (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_can_frame_format_max_data_len could propagate undetected to callers in ep_can.c",
@@ -443,9 +411,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-028",
+      "id": "FM-026",
       "item": "rcp_ep_can_xl_filter_index_valid",
-      "file": "ep_can.c",
+      "file": "src/ep_can.c",
       "line": 87,
       "failureMode": "rcp_ep_can_xl_filter_index_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_can_xl_filter_index_valid could propagate undetected to callers in ep_can.c",
@@ -459,9 +427,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-029",
+      "id": "FM-027",
       "item": "rcp_ep_can_functional_cfg_init",
-      "file": "ep_can.c",
+      "file": "src/ep_can.c",
       "line": 95,
       "failureMode": "rcp_ep_can_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_can_functional_cfg_init could propagate undetected to callers in ep_can.c",
@@ -475,25 +443,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-030",
-      "item": "rcp_ep_can_strerror",
-      "file": "ep_can.c",
-      "line": 185,
-      "failureMode": "rcp_ep_can_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_ep_can_strerror could propagate undetected to callers in ep_can.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_ep_can_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-031",
+      "id": "FM-028",
       "item": "rcp_request_type_is_triggered",
-      "file": "request_triggered.c",
+      "file": "src/request_triggered.c",
       "line": 30,
       "failureMode": "rcp_request_type_is_triggered (general function) does not perform its intended action",
       "effect": "Failure of rcp_request_type_is_triggered could propagate undetected to callers in request_triggered.c",
@@ -507,25 +459,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-032",
-      "item": "rcp_triggered_strerror",
-      "file": "request_triggered.c",
-      "line": 39,
-      "failureMode": "rcp_triggered_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_triggered_strerror could propagate undetected to callers in request_triggered.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_triggered_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-033",
+      "id": "FM-029",
       "item": "rcp_triggered_runtime_enter_started",
-      "file": "request_triggered.c",
+      "file": "src/request_triggered.c",
       "line": 145,
       "failureMode": "rcp_triggered_runtime_enter_started (general function) does not perform its intended action",
       "effect": "Failure of rcp_triggered_runtime_enter_started could propagate undetected to callers in request_triggered.c",
@@ -539,9 +475,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-034",
+      "id": "FM-030",
       "item": "rcp_triggered_runtime_record_occurrence",
-      "file": "request_triggered.c",
+      "file": "src/request_triggered.c",
       "line": 152,
       "failureMode": "rcp_triggered_runtime_record_occurrence (general function) does not perform its intended action",
       "effect": "Failure of rcp_triggered_runtime_record_occurrence could propagate undetected to callers in request_triggered.c",
@@ -555,9 +491,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-035",
+      "id": "FM-031",
       "item": "rcp_triggered_exec_delay_elapsed",
-      "file": "request_triggered.c",
+      "file": "src/request_triggered.c",
       "line": 170,
       "failureMode": "rcp_triggered_exec_delay_elapsed (general function) does not perform its intended action",
       "effect": "Failure of rcp_triggered_exec_delay_elapsed could propagate undetected to callers in request_triggered.c",
@@ -571,9 +507,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-036",
+      "id": "FM-032",
       "item": "rcp_monotonic_ms",
-      "file": "clock.c",
+      "file": "src/clock.c",
       "line": 15,
       "failureMode": "rcp_monotonic_ms (general function) does not perform its intended action",
       "effect": "Failure of rcp_monotonic_ms could propagate undetected to callers in clock.c",
@@ -587,9 +523,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-037",
+      "id": "FM-033",
       "item": "rcp_wallclock_ms",
-      "file": "clock.c",
+      "file": "src/clock.c",
       "line": 30,
       "failureMode": "rcp_wallclock_ms (general function) does not perform its intended action",
       "effect": "Failure of rcp_wallclock_ms could propagate undetected to callers in clock.c",
@@ -603,9 +539,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-038",
+      "id": "FM-034",
       "item": "rcp_monotonic_ms",
-      "file": "clock.c",
+      "file": "src/clock.c",
       "line": 50,
       "failureMode": "rcp_monotonic_ms (general function) does not perform its intended action",
       "effect": "Failure of rcp_monotonic_ms could propagate undetected to callers in clock.c",
@@ -619,9 +555,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-039",
+      "id": "FM-035",
       "item": "rcp_wallclock_ms",
-      "file": "clock.c",
+      "file": "src/clock.c",
       "line": 58,
       "failureMode": "rcp_wallclock_ms (general function) does not perform its intended action",
       "effect": "Failure of rcp_wallclock_ms could propagate undetected to callers in clock.c",
@@ -635,25 +571,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-040",
-      "item": "rcp_cancel_strerror",
-      "file": "request_cancel.c",
-      "line": 30,
-      "failureMode": "rcp_cancel_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_cancel_strerror could propagate undetected to callers in request_cancel.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_cancel_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-041",
+      "id": "FM-036",
       "item": "rcp_cancel_encode_clear_all",
-      "file": "request_cancel.c",
+      "file": "src/request_cancel.c",
       "line": 45,
       "failureMode": "rcp_cancel_encode_clear_all (general function) does not perform its intended action",
       "effect": "Failure of rcp_cancel_encode_clear_all could propagate undetected to callers in request_cancel.c",
@@ -667,13 +587,13 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-042",
-      "item": "mtv=RCP_ACF_MTV_UNTIMED",
-      "file": "request_cancel.c",
+      "id": "FM-037",
+      "item": "RCP_ACF_MTV_UNTIMED",
+      "file": "src/request_cancel.c",
       "line": 58,
-      "failureMode": "mtv=RCP_ACF_MTV_UNTIMED (general function) does not perform its intended action",
-      "effect": "Failure of mtv=RCP_ACF_MTV_UNTIMED could propagate undetected to callers in request_cancel.c",
-      "cause": "Logic error or untested edge case in mtv=RCP_ACF_MTV_UNTIMED",
+      "failureMode": "RCP_ACF_MTV_UNTIMED (general function) does not perform its intended action",
+      "effect": "Failure of RCP_ACF_MTV_UNTIMED could propagate undetected to callers in request_cancel.c",
+      "cause": "Logic error or untested edge case in RCP_ACF_MTV_UNTIMED",
       "severity": 3,
       "occurrence": 2,
       "detection": 3,
@@ -683,13 +603,13 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-043",
-      "item": "mtv=RCP_ACF_MTV_UNTIMED",
-      "file": "request_cancel.c",
+      "id": "FM-038",
+      "item": "RCP_ACF_MTV_UNTIMED",
+      "file": "src/request_cancel.c",
       "line": 115,
-      "failureMode": "mtv=RCP_ACF_MTV_UNTIMED (general function) does not perform its intended action",
-      "effect": "Failure of mtv=RCP_ACF_MTV_UNTIMED could propagate undetected to callers in request_cancel.c",
-      "cause": "Logic error or untested edge case in mtv=RCP_ACF_MTV_UNTIMED",
+      "failureMode": "RCP_ACF_MTV_UNTIMED (general function) does not perform its intended action",
+      "effect": "Failure of RCP_ACF_MTV_UNTIMED could propagate undetected to callers in request_cancel.c",
+      "cause": "Logic error or untested edge case in RCP_ACF_MTV_UNTIMED",
       "severity": 3,
       "occurrence": 2,
       "detection": 3,
@@ -699,9 +619,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-044",
+      "id": "FM-039",
       "item": "rcp_cancel_is_cancellable",
-      "file": "request_cancel.c",
+      "file": "src/request_cancel.c",
       "line": 160,
       "failureMode": "rcp_cancel_is_cancellable (general function) does not perform its intended action",
       "effect": "Failure of rcp_cancel_is_cancellable could propagate undetected to callers in request_cancel.c",
@@ -715,9 +635,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-045",
+      "id": "FM-040",
       "item": "rcp_cancel_attempt",
-      "file": "request_cancel.c",
+      "file": "src/request_cancel.c",
       "line": 168,
       "failureMode": "rcp_cancel_attempt (general function) does not perform its intended action",
       "effect": "Failure of rcp_cancel_attempt could propagate undetected to callers in request_cancel.c",
@@ -731,9 +651,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-046",
+      "id": "FM-041",
       "item": "rcp_cancel_chain_should_cascade",
-      "file": "request_cancel.c",
+      "file": "src/request_cancel.c",
       "line": 176,
       "failureMode": "rcp_cancel_chain_should_cascade (general function) does not perform its intended action",
       "effect": "Failure of rcp_cancel_chain_should_cascade could propagate undetected to callers in request_cancel.c",
@@ -747,9 +667,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-047",
+      "id": "FM-042",
       "item": "rcp_rest_default_config",
-      "file": "restbridge.c",
+      "file": "src/restbridge.c",
       "line": 4,
       "failureMode": "rcp_rest_default_config (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_rest_default_config could propagate undetected to callers in restbridge.c",
@@ -763,25 +683,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-048",
-      "item": "rcp_lifecycle_strerror",
-      "file": "lifecycle.c",
-      "line": 4,
-      "failureMode": "rcp_lifecycle_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_lifecycle_strerror could propagate undetected to callers in lifecycle.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_lifecycle_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-049",
+      "id": "FM-043",
       "item": "rcp_lifecycle_check_hw_cfg",
-      "file": "lifecycle.c",
+      "file": "src/lifecycle.c",
       "line": 20,
       "failureMode": "rcp_lifecycle_check_hw_cfg (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_lifecycle_check_hw_cfg could propagate undetected to callers in lifecycle.c",
@@ -795,9 +699,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-050",
+      "id": "FM-044",
       "item": "rcp_lifecycle_check_rcp_cfg",
-      "file": "lifecycle.c",
+      "file": "src/lifecycle.c",
       "line": 42,
       "failureMode": "rcp_lifecycle_check_rcp_cfg (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_lifecycle_check_rcp_cfg could propagate undetected to callers in lifecycle.c",
@@ -811,41 +715,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-051",
-      "item": "rcp_chained_strerror",
-      "file": "request_chained.c",
-      "line": 30,
-      "failureMode": "rcp_chained_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_chained_strerror could propagate undetected to callers in request_chained.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_chained_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-052",
-      "item": "rcp_timed_strerror",
-      "file": "request_timed.c",
-      "line": 30,
-      "failureMode": "rcp_timed_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_timed_strerror could propagate undetected to callers in request_timed.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_timed_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-053",
+      "id": "FM-045",
       "item": "rcp_timed_feature_enabled",
-      "file": "request_timed.c",
+      "file": "src/request_timed.c",
       "line": 45,
       "failureMode": "rcp_timed_feature_enabled (general function) does not perform its intended action",
       "effect": "Failure of rcp_timed_feature_enabled could propagate undetected to callers in request_timed.c",
@@ -859,13 +731,13 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-054",
-      "item": "mtv=RCP_ACF_MTV_UNTIMED",
-      "file": "request_timed.c",
+      "id": "FM-046",
+      "item": "RCP_ACF_MTV_UNTIMED",
+      "file": "src/request_timed.c",
       "line": 72,
-      "failureMode": "mtv=RCP_ACF_MTV_UNTIMED (general function) does not perform its intended action",
-      "effect": "Failure of mtv=RCP_ACF_MTV_UNTIMED could propagate undetected to callers in request_timed.c",
-      "cause": "Logic error or untested edge case in mtv=RCP_ACF_MTV_UNTIMED",
+      "failureMode": "RCP_ACF_MTV_UNTIMED (general function) does not perform its intended action",
+      "effect": "Failure of RCP_ACF_MTV_UNTIMED could propagate undetected to callers in request_timed.c",
+      "cause": "Logic error or untested edge case in RCP_ACF_MTV_UNTIMED",
       "severity": 3,
       "occurrence": 2,
       "detection": 3,
@@ -875,9 +747,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-055",
+      "id": "FM-047",
       "item": "rcp_timed_too_far",
-      "file": "request_timed.c",
+      "file": "src/request_timed.c",
       "line": 118,
       "failureMode": "rcp_timed_too_far (general function) does not perform its intended action",
       "effect": "Failure of rcp_timed_too_far could propagate undetected to callers in request_timed.c",
@@ -891,25 +763,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-056",
-      "item": "rcp_e2e_strerror",
-      "file": "e2e.c",
-      "line": 7,
-      "failureMode": "rcp_e2e_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_e2e_strerror could propagate undetected to callers in e2e.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_e2e_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-057",
+      "id": "FM-048",
       "item": "rcp_e2e_crc32",
-      "file": "e2e.c",
+      "file": "src/e2e.c",
       "line": 37,
       "failureMode": "rcp_e2e_crc32 (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_crc32 could propagate undetected to callers in e2e.c",
@@ -923,9 +779,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-058",
+      "id": "FM-049",
       "item": "rcp_e2e_length_with_crc",
-      "file": "e2e.c",
+      "file": "src/e2e.c",
       "line": 88,
       "failureMode": "rcp_e2e_length_with_crc (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_length_with_crc could propagate undetected to callers in e2e.c",
@@ -939,9 +795,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-059",
+      "id": "FM-050",
       "item": "rcp_e2e_fragment_carries_crc",
-      "file": "e2e.c",
+      "file": "src/e2e.c",
       "line": 147,
       "failureMode": "rcp_e2e_fragment_carries_crc (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_fragment_carries_crc could propagate undetected to callers in e2e.c",
@@ -955,9 +811,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-060",
+      "id": "FM-051",
       "item": "rcp_e2e_is_safety_request",
-      "file": "e2e.c",
+      "file": "src/e2e.c",
       "line": 155,
       "failureMode": "rcp_e2e_is_safety_request (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_is_safety_request could propagate undetected to callers in e2e.c",
@@ -971,9 +827,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-061",
+      "id": "FM-052",
       "item": "rcp_e2e_request_may_execute",
-      "file": "e2e.c",
+      "file": "src/e2e.c",
       "line": 162,
       "failureMode": "rcp_e2e_request_may_execute (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_request_may_execute could propagate undetected to callers in e2e.c",
@@ -987,9 +843,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-062",
+      "id": "FM-053",
       "item": "rcp_e2e_watchdog_purge_should_keep",
-      "file": "e2e.c",
+      "file": "src/e2e.c",
       "line": 171,
       "failureMode": "rcp_e2e_watchdog_purge_should_keep (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_watchdog_purge_should_keep could propagate undetected to callers in e2e.c",
@@ -1003,9 +859,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-063",
+      "id": "FM-054",
       "item": "rcp_e2e_measure_valid",
-      "file": "e2e.c",
+      "file": "src/e2e.c",
       "line": 189,
       "failureMode": "rcp_e2e_measure_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_measure_valid could propagate undetected to callers in e2e.c",
@@ -1019,9 +875,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-064",
+      "id": "FM-055",
       "item": "rcp_e2e_crc_error_action",
-      "file": "e2e.c",
+      "file": "src/e2e.c",
       "line": 236,
       "failureMode": "rcp_e2e_crc_error_action (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_crc_error_action could propagate undetected to callers in e2e.c",
@@ -1035,9 +891,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-065",
+      "id": "FM-056",
       "item": "rcp_e2e_stream_fault_init",
-      "file": "e2e.c",
+      "file": "src/e2e.c",
       "line": 242,
       "failureMode": "rcp_e2e_stream_fault_init (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_fault_init could propagate undetected to callers in e2e.c",
@@ -1051,9 +907,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-066",
+      "id": "FM-057",
       "item": "rcp_e2e_stream_fault_on_crc_error",
-      "file": "e2e.c",
+      "file": "src/e2e.c",
       "line": 249,
       "failureMode": "rcp_e2e_stream_fault_on_crc_error (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_fault_on_crc_error could propagate undetected to callers in e2e.c",
@@ -1067,9 +923,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-067",
+      "id": "FM-058",
       "item": "rcp_e2e_stream_fault_is_faulted",
-      "file": "e2e.c",
+      "file": "src/e2e.c",
       "line": 257,
       "failureMode": "rcp_e2e_stream_fault_is_faulted (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_fault_is_faulted could propagate undetected to callers in e2e.c",
@@ -1083,9 +939,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-068",
+      "id": "FM-059",
       "item": "rcp_e2e_stream_fault_reset",
-      "file": "e2e.c",
+      "file": "src/e2e.c",
       "line": 263,
       "failureMode": "rcp_e2e_stream_fault_reset (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_fault_reset could propagate undetected to callers in e2e.c",
@@ -1099,25 +955,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-069",
-      "item": "rcp_mock_strerror",
-      "file": "mock.c",
-      "line": 27,
-      "failureMode": "rcp_mock_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_mock_strerror could propagate undetected to callers in mock.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_mock_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-070",
+      "id": "FM-060",
       "item": "rcp_mock_server_new",
-      "file": "mock.c",
+      "file": "src/mock.c",
       "line": 39,
       "failureMode": "rcp_mock_server_new (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_new could propagate undetected to callers in mock.c",
@@ -1131,9 +971,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-071",
+      "id": "FM-061",
       "item": "rcp_mock_server_destroy",
-      "file": "mock.c",
+      "file": "src/mock.c",
       "line": 50,
       "failureMode": "rcp_mock_server_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_destroy could propagate undetected to callers in mock.c",
@@ -1147,9 +987,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-072",
+      "id": "FM-062",
       "item": "rcp_mock_server_state",
-      "file": "mock.c",
+      "file": "src/mock.c",
       "line": 64,
       "failureMode": "rcp_mock_server_state (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_state could propagate undetected to callers in mock.c",
@@ -1163,9 +1003,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-073",
+      "id": "FM-063",
       "item": "rcp_mock_server_regmap",
-      "file": "mock.c",
+      "file": "src/mock.c",
       "line": 78,
       "failureMode": "rcp_mock_server_regmap (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_regmap could propagate undetected to callers in mock.c",
@@ -1179,9 +1019,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-074",
+      "id": "FM-064",
       "item": "rcp_mock_server_remove_endpoint",
-      "file": "mock.c",
+      "file": "src/mock.c",
       "line": 148,
       "failureMode": "rcp_mock_server_remove_endpoint (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_remove_endpoint could propagate undetected to callers in mock.c",
@@ -1195,9 +1035,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-075",
+      "id": "FM-065",
       "item": "rcp_mock_server_endpoint_queue_len",
-      "file": "mock.c",
+      "file": "src/mock.c",
       "line": 173,
       "failureMode": "rcp_mock_server_endpoint_queue_len (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_endpoint_queue_len could propagate undetected to callers in mock.c",
@@ -1211,9 +1051,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-076",
+      "id": "FM-066",
       "item": "rcp_adapt_op_kind",
-      "file": "adapt.c",
+      "file": "src/adapt.c",
       "line": 26,
       "failureMode": "rcp_adapt_op_kind (general function) does not perform its intended action",
       "effect": "Failure of rcp_adapt_op_kind could propagate undetected to callers in adapt.c",
@@ -1227,25 +1067,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-077",
-      "item": "rcp_adapt_op_string",
-      "file": "adapt.c",
-      "line": 79,
-      "failureMode": "rcp_adapt_op_string (general function) does not perform its intended action",
-      "effect": "Failure of rcp_adapt_op_string could propagate undetected to callers in adapt.c",
-      "cause": "Logic error or untested edge case in rcp_adapt_op_string",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-078",
+      "id": "FM-067",
       "item": "rcp_adapt_op_from_string",
-      "file": "adapt.c",
+      "file": "src/adapt.c",
       "line": 89,
       "failureMode": "rcp_adapt_op_from_string (general function) does not perform its intended action",
       "effect": "Failure of rcp_adapt_op_from_string could propagate undetected to callers in adapt.c",
@@ -1259,25 +1083,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-079",
-      "item": "rcp_adapt_strerror",
-      "file": "adapt.c",
-      "line": 103,
-      "failureMode": "rcp_adapt_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_adapt_strerror could propagate undetected to callers in adapt.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_adapt_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-080",
+      "id": "FM-068",
       "item": "rcp_discovery_encode_request",
-      "file": "adapt.c",
+      "file": "src/adapt.c",
       "line": 216,
       "failureMode": "rcp_discovery_encode_request (general function) does not perform its intended action",
       "effect": "Failure of rcp_discovery_encode_request could propagate undetected to callers in adapt.c",
@@ -1291,9 +1099,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-081",
+      "id": "FM-069",
       "item": "rcp_ep_spi_encode_transfer_request",
-      "file": "adapt.c",
+      "file": "src/adapt.c",
       "line": 239,
       "failureMode": "rcp_ep_spi_encode_transfer_request (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_spi_encode_transfer_request could propagate undetected to callers in adapt.c",
@@ -1307,9 +1115,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-082",
+      "id": "FM-070",
       "item": "rcp_ep_uart_encode_read_request",
-      "file": "adapt.c",
+      "file": "src/adapt.c",
       "line": 258,
       "failureMode": "rcp_ep_uart_encode_read_request (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_uart_encode_read_request could propagate undetected to callers in adapt.c",
@@ -1323,9 +1131,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-083",
+      "id": "FM-071",
       "item": "rcp_ep_mdio_encode_read_request",
-      "file": "adapt.c",
+      "file": "src/adapt.c",
       "line": 330,
       "failureMode": "rcp_ep_mdio_encode_read_request (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_mdio_encode_read_request could propagate undetected to callers in adapt.c",
@@ -1339,9 +1147,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-084",
+      "id": "FM-072",
       "item": "rcp_ep_wakeup_encode_sleepcmd_request",
-      "file": "adapt.c",
+      "file": "src/adapt.c",
       "line": 363,
       "failureMode": "rcp_ep_wakeup_encode_sleepcmd_request (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_wakeup_encode_sleepcmd_request could propagate undetected to callers in adapt.c",
@@ -1355,25 +1163,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-085",
-      "item": "snprintf",
-      "file": "adapt.c",
-      "line": 426,
-      "failureMode": "snprintf (general function) does not perform its intended action",
-      "effect": "Failure of snprintf could propagate undetected to callers in adapt.c",
-      "cause": "Logic error or untested edge case in snprintf",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-086",
+      "id": "FM-073",
       "item": "rcp_errc_to_relay_errc",
-      "file": "adapt.c",
+      "file": "src/adapt.c",
       "line": 700,
       "failureMode": "rcp_errc_to_relay_errc (general function) does not perform its intended action",
       "effect": "Failure of rcp_errc_to_relay_errc could propagate undetected to callers in adapt.c",
@@ -1387,9 +1179,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-087",
+      "id": "FM-074",
       "item": "rcp_admin_server_new",
-      "file": "admin.c",
+      "file": "src/admin.c",
       "line": 33,
       "failureMode": "rcp_admin_server_new (general function) does not perform its intended action",
       "effect": "Failure of rcp_admin_server_new could propagate undetected to callers in admin.c",
@@ -1403,9 +1195,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-088",
+      "id": "FM-075",
       "item": "rcp_admin_server_destroy",
-      "file": "admin.c",
+      "file": "src/admin.c",
       "line": 41,
       "failureMode": "rcp_admin_server_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_admin_server_destroy could propagate undetected to callers in admin.c",
@@ -1419,9 +1211,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-089",
+      "id": "FM-076",
       "item": "rcp_admin_server_register_endpoint",
-      "file": "admin.c",
+      "file": "src/admin.c",
       "line": 62,
       "failureMode": "rcp_admin_server_register_endpoint (general function) does not perform its intended action",
       "effect": "Failure of rcp_admin_server_register_endpoint could propagate undetected to callers in admin.c",
@@ -1435,9 +1227,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-090",
+      "id": "FM-077",
       "item": "rcp_admin_server_deregister_endpoint",
-      "file": "admin.c",
+      "file": "src/admin.c",
       "line": 86,
       "failureMode": "rcp_admin_server_deregister_endpoint (general function) does not perform its intended action",
       "effect": "Failure of rcp_admin_server_deregister_endpoint could propagate undetected to callers in admin.c",
@@ -1451,9 +1243,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-091",
+      "id": "FM-078",
       "item": "rcp_admin_server_endpoints",
-      "file": "admin.c",
+      "file": "src/admin.c",
       "line": 103,
       "failureMode": "rcp_admin_server_endpoints (general function) does not perform its intended action",
       "effect": "Failure of rcp_admin_server_endpoints could propagate undetected to callers in admin.c",
@@ -1467,9 +1259,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-092",
+      "id": "FM-079",
       "item": "rcp_admin_server_subscribe",
-      "file": "admin.c",
+      "file": "src/admin.c",
       "line": 120,
       "failureMode": "rcp_admin_server_subscribe (general function) does not perform its intended action",
       "effect": "Failure of rcp_admin_server_subscribe could propagate undetected to callers in admin.c",
@@ -1483,9 +1275,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-093",
+      "id": "FM-080",
       "item": "rcp_admin_server_emit",
-      "file": "admin.c",
+      "file": "src/admin.c",
       "line": 145,
       "failureMode": "rcp_admin_server_emit (general function) does not perform its intended action",
       "effect": "Failure of rcp_admin_server_emit could propagate undetected to callers in admin.c",
@@ -1499,9 +1291,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-094",
+      "id": "FM-081",
       "item": "rcp_admin_server_record_counter",
-      "file": "admin.c",
+      "file": "src/admin.c",
       "line": 170,
       "failureMode": "rcp_admin_server_record_counter (general function) does not perform its intended action",
       "effect": "Failure of rcp_admin_server_record_counter could propagate undetected to callers in admin.c",
@@ -1515,9 +1307,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-095",
+      "id": "FM-082",
       "item": "rcp_admin_server_metrics_text",
-      "file": "admin.c",
+      "file": "src/admin.c",
       "line": 208,
       "failureMode": "rcp_admin_server_metrics_text (general function) does not perform its intended action",
       "effect": "Failure of rcp_admin_server_metrics_text could propagate undetected to callers in admin.c",
@@ -1531,57 +1323,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-096",
-      "item": "snprintf",
-      "file": "admin.c",
-      "line": 222,
-      "failureMode": "snprintf (general function) does not perform its intended action",
-      "effect": "Failure of snprintf could propagate undetected to callers in admin.c",
-      "cause": "Logic error or untested edge case in snprintf",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-097",
-      "item": "snprintf",
-      "file": "admin.c",
-      "line": 226,
-      "failureMode": "snprintf (general function) does not perform its intended action",
-      "effect": "Failure of snprintf could propagate undetected to callers in admin.c",
-      "cause": "Logic error or untested edge case in snprintf",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-098",
-      "item": "snprintf",
-      "file": "cli.c",
-      "line": 54,
-      "failureMode": "snprintf (general function) does not perform its intended action",
-      "effect": "Failure of snprintf could propagate undetected to callers in cli.c",
-      "cause": "Logic error or untested edge case in snprintf",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-099",
+      "id": "FM-083",
       "item": "rcp_cli_run",
-      "file": "cli.c",
+      "file": "src/cli.c",
       "line": 211,
       "failureMode": "rcp_cli_run (general function) does not perform its intended action",
       "effect": "Failure of rcp_cli_run could propagate undetected to callers in cli.c",
@@ -1595,25 +1339,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-100",
-      "item": "strcmp",
-      "file": "cli.c",
-      "line": 255,
-      "failureMode": "strcmp (general function) does not perform its intended action",
-      "effect": "Failure of strcmp could propagate undetected to callers in cli.c",
-      "cause": "Logic error or untested edge case in strcmp",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-101",
+      "id": "FM-084",
       "item": "rcp_span_duration_ms",
-      "file": "observe.c",
+      "file": "src/observe.c",
       "line": 8,
       "failureMode": "rcp_span_duration_ms (general function) does not perform its intended action",
       "effect": "Failure of rcp_span_duration_ms could propagate undetected to callers in observe.c",
@@ -1627,9 +1355,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-102",
+      "id": "FM-085",
       "item": "rcp_noop_metrics_sink",
-      "file": "observe.c",
+      "file": "src/observe.c",
       "line": 30,
       "failureMode": "rcp_noop_metrics_sink (general function) does not perform its intended action",
       "effect": "Failure of rcp_noop_metrics_sink could propagate undetected to callers in observe.c",
@@ -1643,9 +1371,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-103",
+      "id": "FM-086",
       "item": "rcp_in_memory_sink_new",
-      "file": "observe.c",
+      "file": "src/observe.c",
       "line": 47,
       "failureMode": "rcp_in_memory_sink_new (general function) does not perform its intended action",
       "effect": "Failure of rcp_in_memory_sink_new could propagate undetected to callers in observe.c",
@@ -1659,9 +1387,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-104",
+      "id": "FM-087",
       "item": "rcp_in_memory_sink_as_sink",
-      "file": "observe.c",
+      "file": "src/observe.c",
       "line": 90,
       "failureMode": "rcp_in_memory_sink_as_sink (general function) does not perform its intended action",
       "effect": "Failure of rcp_in_memory_sink_as_sink could propagate undetected to callers in observe.c",
@@ -1675,9 +1403,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-105",
+      "id": "FM-088",
       "item": "rcp_in_memory_sink_span_count",
-      "file": "observe.c",
+      "file": "src/observe.c",
       "line": 98,
       "failureMode": "rcp_in_memory_sink_span_count (general function) does not perform its intended action",
       "effect": "Failure of rcp_in_memory_sink_span_count could propagate undetected to callers in observe.c",
@@ -1691,9 +1419,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-106",
+      "id": "FM-089",
       "item": "rcp_in_memory_sink_spans",
-      "file": "observe.c",
+      "file": "src/observe.c",
       "line": 107,
       "failureMode": "rcp_in_memory_sink_spans (general function) does not perform its intended action",
       "effect": "Failure of rcp_in_memory_sink_spans could propagate undetected to callers in observe.c",
@@ -1707,9 +1435,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-107",
+      "id": "FM-090",
       "item": "rcp_in_memory_sink_destroy",
-      "file": "observe.c",
+      "file": "src/observe.c",
       "line": 117,
       "failureMode": "rcp_in_memory_sink_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_in_memory_sink_destroy could propagate undetected to callers in observe.c",
@@ -1723,9 +1451,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-108",
+      "id": "FM-091",
       "item": "rcp_ep_iseled_symbol_encode",
-      "file": "ep_iseled.c",
+      "file": "src/ep_iseled.c",
       "line": 21,
       "failureMode": "rcp_ep_iseled_symbol_encode (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_iseled_symbol_encode could propagate undetected to callers in ep_iseled.c",
@@ -1739,9 +1467,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-109",
+      "id": "FM-092",
       "item": "rcp_ep_iseled_symbol_decode",
-      "file": "ep_iseled.c",
+      "file": "src/ep_iseled.c",
       "line": 30,
       "failureMode": "rcp_ep_iseled_symbol_decode (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_iseled_symbol_decode could propagate undetected to callers in ep_iseled.c",
@@ -1755,9 +1483,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-110",
+      "id": "FM-093",
       "item": "rcp_ep_iseled_bitframe_encoded_len",
-      "file": "ep_iseled.c",
+      "file": "src/ep_iseled.c",
       "line": 44,
       "failureMode": "rcp_ep_iseled_bitframe_encoded_len (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_iseled_bitframe_encoded_len could propagate undetected to callers in ep_iseled.c",
@@ -1771,9 +1499,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-111",
+      "id": "FM-094",
       "item": "rcp_ep_iseled_encode_bitframe",
-      "file": "ep_iseled.c",
+      "file": "src/ep_iseled.c",
       "line": 53,
       "failureMode": "rcp_ep_iseled_encode_bitframe (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_iseled_encode_bitframe could propagate undetected to callers in ep_iseled.c",
@@ -1787,9 +1515,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-112",
+      "id": "FM-095",
       "item": "rcp_ep_iseled_crc8",
-      "file": "ep_iseled.c",
+      "file": "src/ep_iseled.c",
       "line": 96,
       "failureMode": "rcp_ep_iseled_crc8 (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_iseled_crc8 could propagate undetected to callers in ep_iseled.c",
@@ -1803,9 +1531,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-113",
+      "id": "FM-096",
       "item": "rcp_ep_iseled_requires_isp_n",
-      "file": "ep_iseled.c",
+      "file": "src/ep_iseled.c",
       "line": 108,
       "failureMode": "rcp_ep_iseled_requires_isp_n (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_iseled_requires_isp_n could propagate undetected to callers in ep_iseled.c",
@@ -1819,9 +1547,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-114",
+      "id": "FM-097",
       "item": "rcp_ep_iseled_trigger_fires",
-      "file": "ep_iseled.c",
+      "file": "src/ep_iseled.c",
       "line": 116,
       "failureMode": "rcp_ep_iseled_trigger_fires (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_iseled_trigger_fires could propagate undetected to callers in ep_iseled.c",
@@ -1835,9 +1563,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-115",
+      "id": "FM-098",
       "item": "rcp_ep_iseled_functional_cfg_init",
-      "file": "ep_iseled.c",
+      "file": "src/ep_iseled.c",
       "line": 128,
       "failureMode": "rcp_ep_iseled_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_iseled_functional_cfg_init could propagate undetected to callers in ep_iseled.c",
@@ -1851,29 +1579,13 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-116",
-      "item": "rcp_ep_iseled_strerror",
-      "file": "ep_iseled.c",
-      "line": 189,
-      "failureMode": "rcp_ep_iseled_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_ep_iseled_strerror could propagate undetected to callers in ep_iseled.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_ep_iseled_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-117",
-      "item": "!rcp_ep_iseled_symbol_decode",
-      "file": "ep_iseled.c",
+      "id": "FM-099",
+      "item": "rcp_ep_iseled_symbol_decode",
+      "file": "src/ep_iseled.c",
       "line": 236,
-      "failureMode": "!rcp_ep_iseled_symbol_decode (general function) does not perform its intended action",
-      "effect": "Failure of !rcp_ep_iseled_symbol_decode could propagate undetected to callers in ep_iseled.c",
-      "cause": "Logic error or untested edge case in !rcp_ep_iseled_symbol_decode",
+      "failureMode": "rcp_ep_iseled_symbol_decode (general function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_iseled_symbol_decode could propagate undetected to callers in ep_iseled.c",
+      "cause": "Logic error or untested edge case in rcp_ep_iseled_symbol_decode",
       "severity": 3,
       "occurrence": 2,
       "detection": 3,
@@ -1883,9 +1595,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-118",
+      "id": "FM-100",
       "item": "rcp_faultinject_new",
-      "file": "faultinject.c",
+      "file": "src/faultinject.c",
       "line": 15,
       "failureMode": "rcp_faultinject_new (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_faultinject_new could propagate undetected to callers in faultinject.c",
@@ -1899,9 +1611,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-119",
+      "id": "FM-101",
       "item": "rcp_faultinject_add_rule",
-      "file": "faultinject.c",
+      "file": "src/faultinject.c",
       "line": 24,
       "failureMode": "rcp_faultinject_add_rule (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_faultinject_add_rule could propagate undetected to callers in faultinject.c",
@@ -1915,9 +1627,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-120",
+      "id": "FM-102",
       "item": "rcp_faultinject_clear_rules",
-      "file": "faultinject.c",
+      "file": "src/faultinject.c",
       "line": 44,
       "failureMode": "rcp_faultinject_clear_rules (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_faultinject_clear_rules could propagate undetected to callers in faultinject.c",
@@ -1931,9 +1643,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-121",
+      "id": "FM-103",
       "item": "rcp_faultinject_evaluate",
-      "file": "faultinject.c",
+      "file": "src/faultinject.c",
       "line": 84,
       "failureMode": "rcp_faultinject_evaluate (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_faultinject_evaluate could propagate undetected to callers in faultinject.c",
@@ -1947,9 +1659,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-122",
+      "id": "FM-104",
       "item": "rcp_faultinject_destroy",
-      "file": "faultinject.c",
+      "file": "src/faultinject.c",
       "line": 100,
       "failureMode": "rcp_faultinject_destroy (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_faultinject_destroy could propagate undetected to callers in faultinject.c",
@@ -1963,9 +1675,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-123",
+      "id": "FM-105",
       "item": "rcp_ep_wakeup_functional_cfg_init",
-      "file": "ep_wakeup.c",
+      "file": "src/ep_wakeup.c",
       "line": 13,
       "failureMode": "rcp_ep_wakeup_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_wakeup_functional_cfg_init could propagate undetected to callers in ep_wakeup.c",
@@ -1979,9 +1691,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-124",
+      "id": "FM-106",
       "item": "rcp_ep_wakeup_source_asserted",
-      "file": "ep_wakeup.c",
+      "file": "src/ep_wakeup.c",
       "line": 27,
       "failureMode": "rcp_ep_wakeup_source_asserted (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_wakeup_source_asserted could propagate undetected to callers in ep_wakeup.c",
@@ -1995,9 +1707,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-125",
+      "id": "FM-107",
       "item": "rcp_ep_wakeup_wup_status_init",
-      "file": "ep_wakeup.c",
+      "file": "src/ep_wakeup.c",
       "line": 53,
       "failureMode": "rcp_ep_wakeup_wup_status_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_wakeup_wup_status_init could propagate undetected to callers in ep_wakeup.c",
@@ -2011,9 +1723,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-126",
+      "id": "FM-108",
       "item": "rcp_ep_wakeup_wup_status_latch",
-      "file": "ep_wakeup.c",
+      "file": "src/ep_wakeup.c",
       "line": 59,
       "failureMode": "rcp_ep_wakeup_wup_status_latch (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_wakeup_wup_status_latch could propagate undetected to callers in ep_wakeup.c",
@@ -2027,9 +1739,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-127",
+      "id": "FM-109",
       "item": "rcp_ep_wakeup_wup_status_clear",
-      "file": "ep_wakeup.c",
+      "file": "src/ep_wakeup.c",
       "line": 65,
       "failureMode": "rcp_ep_wakeup_wup_status_clear (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_wakeup_wup_status_clear could propagate undetected to callers in ep_wakeup.c",
@@ -2043,9 +1755,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-128",
+      "id": "FM-110",
       "item": "rcp_ep_wakeup_wup_status_is_clear",
-      "file": "ep_wakeup.c",
+      "file": "src/ep_wakeup.c",
       "line": 71,
       "failureMode": "rcp_ep_wakeup_wup_status_is_clear (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_wakeup_wup_status_is_clear could propagate undetected to callers in ep_wakeup.c",
@@ -2059,57 +1771,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-129",
-      "item": "rcp_ep_wakeup_strerror",
-      "file": "ep_wakeup.c",
-      "line": 79,
-      "failureMode": "rcp_ep_wakeup_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_ep_wakeup_strerror could propagate undetected to callers in ep_wakeup.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_ep_wakeup_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-130",
-      "item": "rcp_pwrmode_string",
-      "file": "power.c",
-      "line": 6,
-      "failureMode": "rcp_pwrmode_string (general function) does not perform its intended action",
-      "effect": "Failure of rcp_pwrmode_string could propagate undetected to callers in power.c",
-      "cause": "Logic error or untested edge case in rcp_pwrmode_string",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-131",
-      "item": "rcp_pwrmode_strerror",
-      "file": "power.c",
-      "line": 20,
-      "failureMode": "rcp_pwrmode_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_pwrmode_strerror could propagate undetected to callers in power.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_pwrmode_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-132",
+      "id": "FM-111",
       "item": "rcp_pwrmode_cold_start_lifecycle_target",
-      "file": "power.c",
+      "file": "src/power.c",
       "line": 32,
       "failureMode": "rcp_pwrmode_cold_start_lifecycle_target (general function) does not perform its intended action",
       "effect": "Failure of rcp_pwrmode_cold_start_lifecycle_target could propagate undetected to callers in power.c",
@@ -2123,9 +1787,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-133",
+      "id": "FM-112",
       "item": "rcp_pwrmode_hotstart_required",
-      "file": "power.c",
+      "file": "src/power.c",
       "line": 73,
       "failureMode": "rcp_pwrmode_hotstart_required (general function) does not perform its intended action",
       "effect": "Failure of rcp_pwrmode_hotstart_required could propagate undetected to callers in power.c",
@@ -2139,9 +1803,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-134",
+      "id": "FM-113",
       "item": "rcp_pwrmode_handshake_init",
-      "file": "power.c",
+      "file": "src/power.c",
       "line": 79,
       "failureMode": "rcp_pwrmode_handshake_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_pwrmode_handshake_init could propagate undetected to callers in power.c",
@@ -2155,9 +1819,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-135",
+      "id": "FM-114",
       "item": "rcp_pwrmode_handshake_iface_reenabled",
-      "file": "power.c",
+      "file": "src/power.c",
       "line": 87,
       "failureMode": "rcp_pwrmode_handshake_iface_reenabled (general function) does not perform its intended action",
       "effect": "Failure of rcp_pwrmode_handshake_iface_reenabled could propagate undetected to callers in power.c",
@@ -2171,9 +1835,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-136",
+      "id": "FM-115",
       "item": "rcp_pwrmode_handshake_wakeup_attempt",
-      "file": "power.c",
+      "file": "src/power.c",
       "line": 96,
       "failureMode": "rcp_pwrmode_handshake_wakeup_attempt (general function) does not perform its intended action",
       "effect": "Failure of rcp_pwrmode_handshake_wakeup_attempt could propagate undetected to callers in power.c",
@@ -2187,9 +1851,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-137",
+      "id": "FM-116",
       "item": "rcp_pwrmode_handshake_resume_queues",
-      "file": "power.c",
+      "file": "src/power.c",
       "line": 116,
       "failureMode": "rcp_pwrmode_handshake_resume_queues (general function) does not perform its intended action",
       "effect": "Failure of rcp_pwrmode_handshake_resume_queues could propagate undetected to callers in power.c",
@@ -2203,9 +1867,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-138",
+      "id": "FM-117",
       "item": "rcp_pwrmode_handshake_is_complete",
-      "file": "power.c",
+      "file": "src/power.c",
       "line": 125,
       "failureMode": "rcp_pwrmode_handshake_is_complete (general function) does not perform its intended action",
       "effect": "Failure of rcp_pwrmode_handshake_is_complete could propagate undetected to callers in power.c",
@@ -2219,9 +1883,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-139",
+      "id": "FM-118",
       "item": "rcp_pwrmode_handshake_has_failed",
-      "file": "power.c",
+      "file": "src/power.c",
       "line": 131,
       "failureMode": "rcp_pwrmode_handshake_has_failed (general function) does not perform its intended action",
       "effect": "Failure of rcp_pwrmode_handshake_has_failed could propagate undetected to callers in power.c",
@@ -2235,9 +1899,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-140",
+      "id": "FM-119",
       "item": "rcp_pwrmode_check_entry",
-      "file": "power.c",
+      "file": "src/power.c",
       "line": 161,
       "failureMode": "rcp_pwrmode_check_entry (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_pwrmode_check_entry could propagate undetected to callers in power.c",
@@ -2251,9 +1915,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-141",
+      "id": "FM-120",
       "item": "rcp_server_endpoint_init",
-      "file": "server.c",
+      "file": "src/server.c",
       "line": 11,
       "failureMode": "rcp_server_endpoint_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_server_endpoint_init could propagate undetected to callers in server.c",
@@ -2267,9 +1931,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-142",
+      "id": "FM-121",
       "item": "rcp_server_endpoint_destroy",
-      "file": "server.c",
+      "file": "src/server.c",
       "line": 22,
       "failureMode": "rcp_server_endpoint_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_server_endpoint_destroy could propagate undetected to callers in server.c",
@@ -2283,9 +1947,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-143",
+      "id": "FM-122",
       "item": "rcp_server_endpoint_set_enable",
-      "file": "server.c",
+      "file": "src/server.c",
       "line": 59,
       "failureMode": "rcp_server_endpoint_set_enable (general function) does not perform its intended action",
       "effect": "Failure of rcp_server_endpoint_set_enable could propagate undetected to callers in server.c",
@@ -2299,9 +1963,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-144",
+      "id": "FM-123",
       "item": "rcp_server_endpoint_drain_one",
-      "file": "server.c",
+      "file": "src/server.c",
       "line": 65,
       "failureMode": "rcp_server_endpoint_drain_one (general function) does not perform its intended action",
       "effect": "Failure of rcp_server_endpoint_drain_one could propagate undetected to callers in server.c",
@@ -2315,9 +1979,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-145",
+      "id": "FM-124",
       "item": "rcp_server_endpoint_queue_len",
-      "file": "server.c",
+      "file": "src/server.c",
       "line": 81,
       "failureMode": "rcp_server_endpoint_queue_len (general function) does not perform its intended action",
       "effect": "Failure of rcp_server_endpoint_queue_len could propagate undetected to callers in server.c",
@@ -2331,25 +1995,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-146",
-      "item": "relay_protocol_string",
-      "file": "relay.c",
-      "line": 9,
-      "failureMode": "relay_protocol_string (general function) does not perform its intended action",
-      "effect": "Failure of relay_protocol_string could propagate undetected to callers in relay.c",
-      "cause": "Logic error or untested edge case in relay_protocol_string",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-147",
+      "id": "FM-125",
       "item": "relay_bytes_dup",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 24,
       "failureMode": "relay_bytes_dup (general function) does not perform its intended action",
       "effect": "Failure of relay_bytes_dup could propagate undetected to callers in relay.c",
@@ -2363,9 +2011,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-148",
+      "id": "FM-126",
       "item": "relay_bytes_free",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 39,
       "failureMode": "relay_bytes_free (general function) does not perform its intended action",
       "effect": "Failure of relay_bytes_free could propagate undetected to callers in relay.c",
@@ -2379,9 +2027,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-149",
+      "id": "FM-127",
       "item": "relay_message_init",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 50,
       "failureMode": "relay_message_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of relay_message_init could propagate undetected to callers in relay.c",
@@ -2395,9 +2043,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-150",
+      "id": "FM-128",
       "item": "relay_message_free",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 63,
       "failureMode": "relay_message_free (general function) does not perform its intended action",
       "effect": "Failure of relay_message_free could propagate undetected to callers in relay.c",
@@ -2411,9 +2059,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-151",
+      "id": "FM-129",
       "item": "relay_message_set_id",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 81,
       "failureMode": "relay_message_set_id (general function) does not perform its intended action",
       "effect": "Failure of relay_message_set_id could propagate undetected to callers in relay.c",
@@ -2427,9 +2075,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-152",
+      "id": "FM-130",
       "item": "relay_message_set_meta",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 98,
       "failureMode": "relay_message_set_meta (general function) does not perform its intended action",
       "effect": "Failure of relay_message_set_meta could propagate undetected to callers in relay.c",
@@ -2443,25 +2091,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-153",
-      "item": "relay_message_get_meta",
-      "file": "relay.c",
-      "line": 143,
-      "failureMode": "relay_message_get_meta (general function) does not perform its intended action",
-      "effect": "Failure of relay_message_get_meta could propagate undetected to callers in relay.c",
-      "cause": "Logic error or untested edge case in relay_message_get_meta",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-154",
+      "id": "FM-131",
       "item": "relay_subscriber_options_default",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 154,
       "failureMode": "relay_subscriber_options_default (safety-critical function) does not perform its intended action",
       "effect": "Failure of relay_subscriber_options_default could propagate undetected to callers in relay.c",
@@ -2475,9 +2107,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-155",
+      "id": "FM-132",
       "item": "relay_message_channel_new",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 180,
       "failureMode": "relay_message_channel_new (general function) does not perform its intended action",
       "effect": "Failure of relay_message_channel_new could propagate undetected to callers in relay.c",
@@ -2491,9 +2123,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-156",
+      "id": "FM-133",
       "item": "relay_message_channel_retain",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 205,
       "failureMode": "relay_message_channel_retain (general function) does not perform its intended action",
       "effect": "Failure of relay_message_channel_retain could propagate undetected to callers in relay.c",
@@ -2507,9 +2139,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-157",
+      "id": "FM-134",
       "item": "relay_message_channel_release",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 211,
       "failureMode": "relay_message_channel_release (general function) does not perform its intended action",
       "effect": "Failure of relay_message_channel_release could propagate undetected to callers in relay.c",
@@ -2523,9 +2155,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-158",
+      "id": "FM-135",
       "item": "relay_message_channel_push",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 250,
       "failureMode": "relay_message_channel_push (general function) does not perform its intended action",
       "effect": "Failure of relay_message_channel_push could propagate undetected to callers in relay.c",
@@ -2539,9 +2171,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-159",
+      "id": "FM-136",
       "item": "relay_message_channel_recv",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 274,
       "failureMode": "relay_message_channel_recv (general function) does not perform its intended action",
       "effect": "Failure of relay_message_channel_recv could propagate undetected to callers in relay.c",
@@ -2555,9 +2187,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-160",
+      "id": "FM-137",
       "item": "relay_message_channel_try_recv",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 291,
       "failureMode": "relay_message_channel_try_recv (general function) does not perform its intended action",
       "effect": "Failure of relay_message_channel_try_recv could propagate undetected to callers in relay.c",
@@ -2571,9 +2203,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-161",
+      "id": "FM-138",
       "item": "relay_message_channel_close",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 305,
       "failureMode": "relay_message_channel_close (general function) does not perform its intended action",
       "effect": "Failure of relay_message_channel_close could propagate undetected to callers in relay.c",
@@ -2587,9 +2219,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-162",
+      "id": "FM-139",
       "item": "relay_message_channel_is_closed",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 314,
       "failureMode": "relay_message_channel_is_closed (general function) does not perform its intended action",
       "effect": "Failure of relay_message_channel_is_closed could propagate undetected to callers in relay.c",
@@ -2603,9 +2235,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-163",
+      "id": "FM-140",
       "item": "rcp_relay_caller_retain",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 326,
       "failureMode": "rcp_relay_caller_retain (general function) does not perform its intended action",
       "effect": "Failure of rcp_relay_caller_retain could propagate undetected to callers in relay.c",
@@ -2619,9 +2251,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-164",
+      "id": "FM-141",
       "item": "rcp_relay_caller_release",
-      "file": "relay.c",
+      "file": "src/relay.c",
       "line": 332,
       "failureMode": "rcp_relay_caller_release (general function) does not perform its intended action",
       "effect": "Failure of rcp_relay_caller_release could propagate undetected to callers in relay.c",
@@ -2635,9 +2267,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-165",
+      "id": "FM-142",
       "item": "rcp_ep_pwm_out_write_semantics_valid",
-      "file": "ep_pwm.c",
+      "file": "src/ep_pwm.c",
       "line": 71,
       "failureMode": "rcp_ep_pwm_out_write_semantics_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_pwm_out_write_semantics_valid could propagate undetected to callers in ep_pwm.c",
@@ -2651,9 +2283,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-166",
+      "id": "FM-143",
       "item": "rcp_ep_pwm_out_apply_reconfig",
-      "file": "ep_pwm.c",
+      "file": "src/ep_pwm.c",
       "line": 97,
       "failureMode": "rcp_ep_pwm_out_apply_reconfig (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_pwm_out_apply_reconfig could propagate undetected to callers in ep_pwm.c",
@@ -2667,9 +2299,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-167",
+      "id": "FM-144",
       "item": "rcp_ep_pwm_out_trigger_fires",
-      "file": "ep_pwm.c",
+      "file": "src/ep_pwm.c",
       "line": 110,
       "failureMode": "rcp_ep_pwm_out_trigger_fires (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_pwm_out_trigger_fires could propagate undetected to callers in ep_pwm.c",
@@ -2683,9 +2315,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-168",
+      "id": "FM-145",
       "item": "rcp_ep_pwm_out_functional_cfg_init",
-      "file": "ep_pwm.c",
+      "file": "src/ep_pwm.c",
       "line": 124,
       "failureMode": "rcp_ep_pwm_out_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_pwm_out_functional_cfg_init could propagate undetected to callers in ep_pwm.c",
@@ -2699,25 +2331,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-169",
-      "item": "rcp_ep_pwm_out_strerror",
-      "file": "ep_pwm.c",
-      "line": 167,
-      "failureMode": "rcp_ep_pwm_out_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_ep_pwm_out_strerror could propagate undetected to callers in ep_pwm.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_ep_pwm_out_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-170",
+      "id": "FM-146",
       "item": "rcp_ep_pwm_in_trigger_fires",
-      "file": "ep_pwm.c",
+      "file": "src/ep_pwm.c",
       "line": 359,
       "failureMode": "rcp_ep_pwm_in_trigger_fires (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_pwm_in_trigger_fires could propagate undetected to callers in ep_pwm.c",
@@ -2731,9 +2347,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-171",
+      "id": "FM-147",
       "item": "rcp_ep_pwm_in_functional_cfg_init",
-      "file": "ep_pwm.c",
+      "file": "src/ep_pwm.c",
       "line": 372,
       "failureMode": "rcp_ep_pwm_in_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_pwm_in_functional_cfg_init could propagate undetected to callers in ep_pwm.c",
@@ -2747,25 +2363,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-172",
-      "item": "rcp_ep_pwm_in_strerror",
-      "file": "ep_pwm.c",
-      "line": 404,
-      "failureMode": "rcp_ep_pwm_in_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_ep_pwm_in_strerror could propagate undetected to callers in ep_pwm.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_ep_pwm_in_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-173",
+      "id": "FM-148",
       "item": "rcp_ep_pwm_in_compound_wait_mode_valid",
-      "file": "ep_pwm.c",
+      "file": "src/ep_pwm.c",
       "line": 548,
       "failureMode": "rcp_ep_pwm_in_compound_wait_mode_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_pwm_in_compound_wait_mode_valid could propagate undetected to callers in ep_pwm.c",
@@ -2779,25 +2379,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-174",
-      "item": "rcp_discovery_strerror",
-      "file": "discovery.c",
-      "line": 7,
-      "failureMode": "rcp_discovery_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_discovery_strerror could propagate undetected to callers in discovery.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_discovery_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-175",
+      "id": "FM-149",
       "item": "rcp_discovery_should_drop",
-      "file": "discovery.c",
+      "file": "src/discovery.c",
       "line": 51,
       "failureMode": "rcp_discovery_should_drop (general function) does not perform its intended action",
       "effect": "Failure of rcp_discovery_should_drop could propagate undetected to callers in discovery.c",
@@ -2811,9 +2395,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-176",
+      "id": "FM-150",
       "item": "rcp_discovery_response_fragment_count",
-      "file": "discovery.c",
+      "file": "src/discovery.c",
       "line": 236,
       "failureMode": "rcp_discovery_response_fragment_count (general function) does not perform its intended action",
       "effect": "Failure of rcp_discovery_response_fragment_count could propagate undetected to callers in discovery.c",
@@ -2827,9 +2411,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-177",
+      "id": "FM-151",
       "item": "rcp_discovery_claim_init",
-      "file": "discovery.c",
+      "file": "src/discovery.c",
       "line": 360,
       "failureMode": "rcp_discovery_claim_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_discovery_claim_init could propagate undetected to callers in discovery.c",
@@ -2843,9 +2427,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-178",
+      "id": "FM-152",
       "item": "rcp_discovery_claim_is_open",
-      "file": "discovery.c",
+      "file": "src/discovery.c",
       "line": 367,
       "failureMode": "rcp_discovery_claim_is_open (general function) does not perform its intended action",
       "effect": "Failure of rcp_discovery_claim_is_open could propagate undetected to callers in discovery.c",
@@ -2859,9 +2443,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-179",
+      "id": "FM-153",
       "item": "rcp_discovery_claim_release",
-      "file": "discovery.c",
+      "file": "src/discovery.c",
       "line": 407,
       "failureMode": "rcp_discovery_claim_release (general function) does not perform its intended action",
       "effect": "Failure of rcp_discovery_claim_release could propagate undetected to callers in discovery.c",
@@ -2875,9 +2459,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-180",
+      "id": "FM-154",
       "item": "rcp_discovery_cache_init",
-      "file": "discovery.c",
+      "file": "src/discovery.c",
       "line": 415,
       "failureMode": "rcp_discovery_cache_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_discovery_cache_init could propagate undetected to callers in discovery.c",
@@ -2891,9 +2475,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-181",
+      "id": "FM-155",
       "item": "rcp_discovery_cache_destroy",
-      "file": "discovery.c",
+      "file": "src/discovery.c",
       "line": 423,
       "failureMode": "rcp_discovery_cache_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_discovery_cache_destroy could propagate undetected to callers in discovery.c",
@@ -2907,9 +2491,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-182",
+      "id": "FM-156",
       "item": "rcp_discovery_cache_len",
-      "file": "discovery.c",
+      "file": "src/discovery.c",
       "line": 474,
       "failureMode": "rcp_discovery_cache_len (general function) does not perform its intended action",
       "effect": "Failure of rcp_discovery_cache_len could propagate undetected to callers in discovery.c",
@@ -2923,9 +2507,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-183",
+      "id": "FM-157",
       "item": "rcp_lin_default_config",
-      "file": "linbr.c",
+      "file": "src/linbr.c",
       "line": 4,
       "failureMode": "rcp_lin_default_config (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_lin_default_config could propagate undetected to callers in linbr.c",
@@ -2939,9 +2523,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-184",
+      "id": "FM-158",
       "item": "rcp_mutex_init",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 16,
       "failureMode": "rcp_mutex_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_mutex_init could propagate undetected to callers in platform.c",
@@ -2955,9 +2539,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-185",
+      "id": "FM-159",
       "item": "rcp_mutex_lock",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 17,
       "failureMode": "rcp_mutex_lock (general function) does not perform its intended action",
       "effect": "Failure of rcp_mutex_lock could propagate undetected to callers in platform.c",
@@ -2971,9 +2555,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-186",
+      "id": "FM-160",
       "item": "rcp_mutex_unlock",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 18,
       "failureMode": "rcp_mutex_unlock (general function) does not perform its intended action",
       "effect": "Failure of rcp_mutex_unlock could propagate undetected to callers in platform.c",
@@ -2987,9 +2571,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-187",
+      "id": "FM-161",
       "item": "rcp_mutex_destroy",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 19,
       "failureMode": "rcp_mutex_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_mutex_destroy could propagate undetected to callers in platform.c",
@@ -3003,9 +2587,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-188",
+      "id": "FM-162",
       "item": "rcp_cond_init",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 21,
       "failureMode": "rcp_cond_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_cond_init could propagate undetected to callers in platform.c",
@@ -3019,9 +2603,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-189",
+      "id": "FM-163",
       "item": "rcp_cond_wait",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 22,
       "failureMode": "rcp_cond_wait (general function) does not perform its intended action",
       "effect": "Failure of rcp_cond_wait could propagate undetected to callers in platform.c",
@@ -3035,9 +2619,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-190",
+      "id": "FM-164",
       "item": "rcp_cond_timedwait_until",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 24,
       "failureMode": "rcp_cond_timedwait_until (general function) does not perform its intended action",
       "effect": "Failure of rcp_cond_timedwait_until could propagate undetected to callers in platform.c",
@@ -3051,9 +2635,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-191",
+      "id": "FM-165",
       "item": "rcp_cond_signal",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 31,
       "failureMode": "rcp_cond_signal (general function) does not perform its intended action",
       "effect": "Failure of rcp_cond_signal could propagate undetected to callers in platform.c",
@@ -3067,9 +2651,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-192",
+      "id": "FM-166",
       "item": "rcp_cond_broadcast",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 32,
       "failureMode": "rcp_cond_broadcast (general function) does not perform its intended action",
       "effect": "Failure of rcp_cond_broadcast could propagate undetected to callers in platform.c",
@@ -3083,9 +2667,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-193",
+      "id": "FM-167",
       "item": "rcp_cond_destroy",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 33,
       "failureMode": "rcp_cond_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_cond_destroy could propagate undetected to callers in platform.c",
@@ -3099,9 +2683,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-194",
+      "id": "FM-168",
       "item": "rcp_thread_start_detached",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 52,
       "failureMode": "rcp_thread_start_detached (general function) does not perform its intended action",
       "effect": "Failure of rcp_thread_start_detached could propagate undetected to callers in platform.c",
@@ -3115,9 +2699,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-195",
+      "id": "FM-169",
       "item": "CloseHandle",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 64,
       "failureMode": "CloseHandle (general function) does not perform its intended action",
       "effect": "Failure of CloseHandle could propagate undetected to callers in platform.c",
@@ -3131,9 +2715,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-196",
+      "id": "FM-170",
       "item": "rcp_thread_start",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 68,
       "failureMode": "rcp_thread_start (general function) does not perform its intended action",
       "effect": "Failure of rcp_thread_start could propagate undetected to callers in platform.c",
@@ -3147,9 +2731,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-197",
+      "id": "FM-171",
       "item": "rcp_thread_join",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 84,
       "failureMode": "rcp_thread_join (general function) does not perform its intended action",
       "effect": "Failure of rcp_thread_join could propagate undetected to callers in platform.c",
@@ -3163,9 +2747,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-198",
+      "id": "FM-172",
       "item": "rcp_atomic_inc",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 90,
       "failureMode": "rcp_atomic_inc (general function) does not perform its intended action",
       "effect": "Failure of rcp_atomic_inc could propagate undetected to callers in platform.c",
@@ -3179,9 +2763,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-199",
+      "id": "FM-173",
       "item": "rcp_atomic_dec",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 95,
       "failureMode": "rcp_atomic_dec (general function) does not perform its intended action",
       "effect": "Failure of rcp_atomic_dec could propagate undetected to callers in platform.c",
@@ -3195,9 +2779,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-200",
+      "id": "FM-174",
       "item": "rcp_sleep_ms",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 100,
       "failureMode": "rcp_sleep_ms (general function) does not perform its intended action",
       "effect": "Failure of rcp_sleep_ms could propagate undetected to callers in platform.c",
@@ -3211,9 +2795,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-201",
+      "id": "FM-175",
       "item": "rcp_mutex_init",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 111,
       "failureMode": "rcp_mutex_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_mutex_init could propagate undetected to callers in platform.c",
@@ -3227,9 +2811,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-202",
+      "id": "FM-176",
       "item": "rcp_mutex_lock",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 112,
       "failureMode": "rcp_mutex_lock (general function) does not perform its intended action",
       "effect": "Failure of rcp_mutex_lock could propagate undetected to callers in platform.c",
@@ -3243,9 +2827,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-203",
+      "id": "FM-177",
       "item": "rcp_mutex_unlock",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 113,
       "failureMode": "rcp_mutex_unlock (general function) does not perform its intended action",
       "effect": "Failure of rcp_mutex_unlock could propagate undetected to callers in platform.c",
@@ -3259,9 +2843,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-204",
+      "id": "FM-178",
       "item": "rcp_mutex_destroy",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 114,
       "failureMode": "rcp_mutex_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_mutex_destroy could propagate undetected to callers in platform.c",
@@ -3275,9 +2859,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-205",
+      "id": "FM-179",
       "item": "rcp_cond_init",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 116,
       "failureMode": "rcp_cond_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_cond_init could propagate undetected to callers in platform.c",
@@ -3291,9 +2875,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-206",
+      "id": "FM-180",
       "item": "rcp_cond_wait",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 117,
       "failureMode": "rcp_cond_wait (general function) does not perform its intended action",
       "effect": "Failure of rcp_cond_wait could propagate undetected to callers in platform.c",
@@ -3307,9 +2891,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-207",
+      "id": "FM-181",
       "item": "rcp_cond_timedwait_until",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 119,
       "failureMode": "rcp_cond_timedwait_until (general function) does not perform its intended action",
       "effect": "Failure of rcp_cond_timedwait_until could propagate undetected to callers in platform.c",
@@ -3323,9 +2907,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-208",
+      "id": "FM-182",
       "item": "rcp_cond_signal",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 143,
       "failureMode": "rcp_cond_signal (general function) does not perform its intended action",
       "effect": "Failure of rcp_cond_signal could propagate undetected to callers in platform.c",
@@ -3339,9 +2923,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-209",
+      "id": "FM-183",
       "item": "rcp_cond_broadcast",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 144,
       "failureMode": "rcp_cond_broadcast (general function) does not perform its intended action",
       "effect": "Failure of rcp_cond_broadcast could propagate undetected to callers in platform.c",
@@ -3355,9 +2939,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-210",
+      "id": "FM-184",
       "item": "rcp_cond_destroy",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 145,
       "failureMode": "rcp_cond_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_cond_destroy could propagate undetected to callers in platform.c",
@@ -3371,9 +2955,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-211",
+      "id": "FM-185",
       "item": "rcp_thread_start_detached",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 164,
       "failureMode": "rcp_thread_start_detached (general function) does not perform its intended action",
       "effect": "Failure of rcp_thread_start_detached could propagate undetected to callers in platform.c",
@@ -3387,9 +2971,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-212",
+      "id": "FM-186",
       "item": "rcp_thread_start",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 181,
       "failureMode": "rcp_thread_start (general function) does not perform its intended action",
       "effect": "Failure of rcp_thread_start could propagate undetected to callers in platform.c",
@@ -3403,9 +2987,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-213",
+      "id": "FM-187",
       "item": "rcp_thread_join",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 196,
       "failureMode": "rcp_thread_join (general function) does not perform its intended action",
       "effect": "Failure of rcp_thread_join could propagate undetected to callers in platform.c",
@@ -3419,9 +3003,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-214",
+      "id": "FM-188",
       "item": "rcp_atomic_inc",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 201,
       "failureMode": "rcp_atomic_inc (general function) does not perform its intended action",
       "effect": "Failure of rcp_atomic_inc could propagate undetected to callers in platform.c",
@@ -3435,9 +3019,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-215",
+      "id": "FM-189",
       "item": "rcp_atomic_dec",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 206,
       "failureMode": "rcp_atomic_dec (general function) does not perform its intended action",
       "effect": "Failure of rcp_atomic_dec could propagate undetected to callers in platform.c",
@@ -3451,9 +3035,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-216",
+      "id": "FM-190",
       "item": "rcp_sleep_ms",
-      "file": "platform.c",
+      "file": "src/platform.c",
       "line": 211,
       "failureMode": "rcp_sleep_ms (general function) does not perform its intended action",
       "effect": "Failure of rcp_sleep_ms could propagate undetected to callers in platform.c",
@@ -3467,9 +3051,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-217",
+      "id": "FM-191",
       "item": "rcp_grpc_default_config",
-      "file": "grpcbridge.c",
+      "file": "src/grpcbridge.c",
       "line": 4,
       "failureMode": "rcp_grpc_default_config (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_grpc_default_config could propagate undetected to callers in grpcbridge.c",
@@ -3483,9 +3067,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-218",
+      "id": "FM-192",
       "item": "rcp_uds_default_config",
-      "file": "udsbr.c",
+      "file": "src/udsbr.c",
       "line": 4,
       "failureMode": "rcp_uds_default_config (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_uds_default_config could propagate undetected to callers in udsbr.c",
@@ -3499,9 +3083,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-219",
+      "id": "FM-193",
       "item": "rcp_loan_return",
-      "file": "loan.c",
+      "file": "src/loan.c",
       "line": 10,
       "failureMode": "rcp_loan_return (general function) does not perform its intended action",
       "effect": "Failure of rcp_loan_return could propagate undetected to callers in loan.c",
@@ -3515,9 +3099,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-220",
+      "id": "FM-194",
       "item": "rcp_loan_release",
-      "file": "loan.c",
+      "file": "src/loan.c",
       "line": 20,
       "failureMode": "rcp_loan_release (general function) does not perform its intended action",
       "effect": "Failure of rcp_loan_release could propagate undetected to callers in loan.c",
@@ -3531,9 +3115,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-221",
+      "id": "FM-195",
       "item": "rcp_loan_pool_new",
-      "file": "loan.c",
+      "file": "src/loan.c",
       "line": 47,
       "failureMode": "rcp_loan_pool_new (general function) does not perform its intended action",
       "effect": "Failure of rcp_loan_pool_new could propagate undetected to callers in loan.c",
@@ -3547,9 +3131,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-222",
+      "id": "FM-196",
       "item": "rcp_loan_pool_acquire",
-      "file": "loan.c",
+      "file": "src/loan.c",
       "line": 91,
       "failureMode": "rcp_loan_pool_acquire (general function) does not perform its intended action",
       "effect": "Failure of rcp_loan_pool_acquire could propagate undetected to callers in loan.c",
@@ -3563,9 +3147,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-223",
+      "id": "FM-197",
       "item": "rcp_loan_pool_destroy",
-      "file": "loan.c",
+      "file": "src/loan.c",
       "line": 140,
       "failureMode": "rcp_loan_pool_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_loan_pool_destroy could propagate undetected to callers in loan.c",
@@ -3579,9 +3163,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-224",
+      "id": "FM-198",
       "item": "rcp_ratelimit_default_config",
-      "file": "ratelimit.c",
+      "file": "src/ratelimit.c",
       "line": 9,
       "failureMode": "rcp_ratelimit_default_config (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_ratelimit_default_config could propagate undetected to callers in ratelimit.c",
@@ -3595,9 +3179,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-225",
+      "id": "FM-199",
       "item": "rcp_ratelimit_limiter_new",
-      "file": "ratelimit.c",
+      "file": "src/ratelimit.c",
       "line": 32,
       "failureMode": "rcp_ratelimit_limiter_new (general function) does not perform its intended action",
       "effect": "Failure of rcp_ratelimit_limiter_new could propagate undetected to callers in ratelimit.c",
@@ -3611,9 +3195,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-226",
+      "id": "FM-200",
       "item": "rcp_ratelimit_limiter_allow",
-      "file": "ratelimit.c",
+      "file": "src/ratelimit.c",
       "line": 83,
       "failureMode": "rcp_ratelimit_limiter_allow (general function) does not perform its intended action",
       "effect": "Failure of rcp_ratelimit_limiter_allow could propagate undetected to callers in ratelimit.c",
@@ -3627,9 +3211,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-227",
+      "id": "FM-201",
       "item": "rcp_ratelimit_limiter_destroy",
-      "file": "ratelimit.c",
+      "file": "src/ratelimit.c",
       "line": 100,
       "failureMode": "rcp_ratelimit_limiter_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_ratelimit_limiter_destroy could propagate undetected to callers in ratelimit.c",
@@ -3643,25 +3227,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-228",
-      "item": "rcp_powerstate_strerror",
-      "file": "powerstate.c",
-      "line": 8,
-      "failureMode": "rcp_powerstate_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_powerstate_strerror could propagate undetected to callers in powerstate.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_powerstate_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-229",
+      "id": "FM-202",
       "item": "rcp_powerstate_manager_new",
-      "file": "powerstate.c",
+      "file": "src/powerstate.c",
       "line": 88,
       "failureMode": "rcp_powerstate_manager_new (general function) does not perform its intended action",
       "effect": "Failure of rcp_powerstate_manager_new could propagate undetected to callers in powerstate.c",
@@ -3675,9 +3243,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-230",
+      "id": "FM-203",
       "item": "rcp_powerstate_manager_mode",
-      "file": "powerstate.c",
+      "file": "src/powerstate.c",
       "line": 116,
       "failureMode": "rcp_powerstate_manager_mode (general function) does not perform its intended action",
       "effect": "Failure of rcp_powerstate_manager_mode could propagate undetected to callers in powerstate.c",
@@ -3691,9 +3259,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-231",
+      "id": "FM-204",
       "item": "rcp_powerstate_manager_handshake_resume_queues",
-      "file": "powerstate.c",
+      "file": "src/powerstate.c",
       "line": 296,
       "failureMode": "rcp_powerstate_manager_handshake_resume_queues (general function) does not perform its intended action",
       "effect": "Failure of rcp_powerstate_manager_handshake_resume_queues could propagate undetected to callers in powerstate.c",
@@ -3707,9 +3275,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-232",
+      "id": "FM-205",
       "item": "rcp_powerstate_manager_subscribe",
-      "file": "powerstate.c",
+      "file": "src/powerstate.c",
       "line": 340,
       "failureMode": "rcp_powerstate_manager_subscribe (general function) does not perform its intended action",
       "effect": "Failure of rcp_powerstate_manager_subscribe could propagate undetected to callers in powerstate.c",
@@ -3723,9 +3291,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-233",
+      "id": "FM-206",
       "item": "rcp_powerstate_manager_destroy",
-      "file": "powerstate.c",
+      "file": "src/powerstate.c",
       "line": 349,
       "failureMode": "rcp_powerstate_manager_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_powerstate_manager_destroy could propagate undetected to callers in powerstate.c",
@@ -3739,9 +3307,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-234",
+      "id": "FM-207",
       "item": "rcp_dds_default_config",
-      "file": "ddsbr.c",
+      "file": "src/ddsbr.c",
       "line": 4,
       "failureMode": "rcp_dds_default_config (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_dds_default_config could propagate undetected to callers in ddsbr.c",
@@ -3755,9 +3323,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-235",
+      "id": "FM-208",
       "item": "rcp_ep_uart_nr_bits_valid",
-      "file": "ep_uart.c",
+      "file": "src/ep_uart.c",
       "line": 9,
       "failureMode": "rcp_ep_uart_nr_bits_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_uart_nr_bits_valid could propagate undetected to callers in ep_uart.c",
@@ -3771,9 +3339,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-236",
+      "id": "FM-209",
       "item": "rcp_ep_uart_bit_pad_mask",
-      "file": "ep_uart.c",
+      "file": "src/ep_uart.c",
       "line": 15,
       "failureMode": "rcp_ep_uart_bit_pad_mask (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_uart_bit_pad_mask could propagate undetected to callers in ep_uart.c",
@@ -3787,9 +3355,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-237",
+      "id": "FM-210",
       "item": "rcp_ep_uart_apply_bit_padding",
-      "file": "ep_uart.c",
+      "file": "src/ep_uart.c",
       "line": 25,
       "failureMode": "rcp_ep_uart_apply_bit_padding (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_uart_apply_bit_padding could propagate undetected to callers in ep_uart.c",
@@ -3803,9 +3371,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-238",
+      "id": "FM-211",
       "item": "rcp_ep_uart_functional_cfg_init",
-      "file": "ep_uart.c",
+      "file": "src/ep_uart.c",
       "line": 38,
       "failureMode": "rcp_ep_uart_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_uart_functional_cfg_init could propagate undetected to callers in ep_uart.c",
@@ -3819,25 +3387,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-239",
-      "item": "rcp_ep_uart_strerror",
-      "file": "ep_uart.c",
-      "line": 110,
-      "failureMode": "rcp_ep_uart_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_ep_uart_strerror could propagate undetected to callers in ep_uart.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_ep_uart_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-240",
+      "id": "FM-212",
       "item": "rcp_ep_uart_read_response_fragment_count",
-      "file": "ep_uart.c",
+      "file": "src/ep_uart.c",
       "line": 384,
       "failureMode": "rcp_ep_uart_read_response_fragment_count (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_uart_read_response_fragment_count could propagate undetected to callers in ep_uart.c",
@@ -3851,9 +3403,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-241",
+      "id": "FM-213",
       "item": "rcp_tsn_default_pcp_map",
-      "file": "tsn.c",
+      "file": "src/tsn.c",
       "line": 21,
       "failureMode": "rcp_tsn_default_pcp_map (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_tsn_default_pcp_map could propagate undetected to callers in tsn.c",
@@ -3867,9 +3419,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-242",
+      "id": "FM-214",
       "item": "rcp_tsn_pcp_for",
-      "file": "tsn.c",
+      "file": "src/tsn.c",
       "line": 33,
       "failureMode": "rcp_tsn_pcp_for (general function) does not perform its intended action",
       "effect": "Failure of rcp_tsn_pcp_for could propagate undetected to callers in tsn.c",
@@ -3883,9 +3435,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-243",
+      "id": "FM-215",
       "item": "rcp_tsn_default_config",
-      "file": "tsn.c",
+      "file": "src/tsn.c",
       "line": 41,
       "failureMode": "rcp_tsn_default_config (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_tsn_default_config could propagate undetected to callers in tsn.c",
@@ -3899,9 +3451,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-244",
+      "id": "FM-216",
       "item": "rcp_tsn_classify_frame",
-      "file": "tsn.c",
+      "file": "src/tsn.c",
       "line": 53,
       "failureMode": "rcp_tsn_classify_frame (general function) does not perform its intended action",
       "effect": "Failure of rcp_tsn_classify_frame could propagate undetected to callers in tsn.c",
@@ -3915,25 +3467,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-245",
-      "item": "rcp_avtp_strerror",
-      "file": "avtp.c",
-      "line": 9,
-      "failureMode": "rcp_avtp_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_avtp_strerror could propagate undetected to callers in avtp.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_avtp_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-246",
+      "id": "FM-217",
       "item": "rcp_stream_id_make",
-      "file": "avtp.c",
+      "file": "src/avtp.c",
       "line": 64,
       "failureMode": "rcp_stream_id_make (general function) does not perform its intended action",
       "effect": "Failure of rcp_stream_id_make could propagate undetected to callers in avtp.c",
@@ -3947,9 +3483,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-247",
+      "id": "FM-218",
       "item": "rcp_stream_id_to_u64",
-      "file": "avtp.c",
+      "file": "src/avtp.c",
       "line": 73,
       "failureMode": "rcp_stream_id_to_u64 (general function) does not perform its intended action",
       "effect": "Failure of rcp_stream_id_to_u64 could propagate undetected to callers in avtp.c",
@@ -3963,9 +3499,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-248",
+      "id": "FM-219",
       "item": "rcp_stream_id_from_u64",
-      "file": "avtp.c",
+      "file": "src/avtp.c",
       "line": 82,
       "failureMode": "rcp_stream_id_from_u64 (general function) does not perform its intended action",
       "effect": "Failure of rcp_stream_id_from_u64 could propagate undetected to callers in avtp.c",
@@ -3979,9 +3515,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-249",
+      "id": "FM-220",
       "item": "rcp_stream_id_equal",
-      "file": "avtp.c",
+      "file": "src/avtp.c",
       "line": 98,
       "failureMode": "rcp_stream_id_equal (general function) does not perform its intended action",
       "effect": "Failure of rcp_stream_id_equal could propagate undetected to callers in avtp.c",
@@ -3995,9 +3531,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-250",
+      "id": "FM-221",
       "item": "rcp_avtp_addr_equal",
-      "file": "avtp.c",
+      "file": "src/avtp.c",
       "line": 104,
       "failureMode": "rcp_avtp_addr_equal (general function) does not perform its intended action",
       "effect": "Failure of rcp_avtp_addr_equal could propagate undetected to callers in avtp.c",
@@ -4011,9 +3547,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-251",
+      "id": "FM-222",
       "item": "rcp_avtp_peek_subtype",
-      "file": "avtp.c",
+      "file": "src/avtp.c",
       "line": 241,
       "failureMode": "rcp_avtp_peek_subtype (general function) does not perform its intended action",
       "effect": "Failure of rcp_avtp_peek_subtype could propagate undetected to callers in avtp.c",
@@ -4027,9 +3563,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-252",
+      "id": "FM-223",
       "item": "rcp_avtp_should_drop_tscf",
-      "file": "avtp.c",
+      "file": "src/avtp.c",
       "line": 249,
       "failureMode": "rcp_avtp_should_drop_tscf (general function) does not perform its intended action",
       "effect": "Failure of rcp_avtp_should_drop_tscf could propagate undetected to callers in avtp.c",
@@ -4043,9 +3579,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-253",
+      "id": "FM-224",
       "item": "rcp_avtp_transport_retain",
-      "file": "avtp.c",
+      "file": "src/avtp.c",
       "line": 258,
       "failureMode": "rcp_avtp_transport_retain (general function) does not perform its intended action",
       "effect": "Failure of rcp_avtp_transport_retain could propagate undetected to callers in avtp.c",
@@ -4059,9 +3595,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-254",
+      "id": "FM-225",
       "item": "rcp_avtp_transport_release",
-      "file": "avtp.c",
+      "file": "src/avtp.c",
       "line": 265,
       "failureMode": "rcp_avtp_transport_release (general function) does not perform its intended action",
       "effect": "Failure of rcp_avtp_transport_release could propagate undetected to callers in avtp.c",
@@ -4075,9 +3611,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-255",
+      "id": "FM-226",
       "item": "rcp_sim_default_config",
-      "file": "sim.c",
+      "file": "src/sim.c",
       "line": 10,
       "failureMode": "rcp_sim_default_config (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_sim_default_config could propagate undetected to callers in sim.c",
@@ -4091,9 +3627,25 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-256",
+      "id": "FM-227",
+      "item": "RCP_OK",
+      "file": "src/sim.c",
+      "line": 36,
+      "failureMode": "RCP_OK (general function) does not perform its intended action",
+      "effect": "Failure of RCP_OK could propagate undetected to callers in sim.c",
+      "cause": "Logic error or untested edge case in RCP_OK",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-228",
       "item": "rcp_status_channel_release",
-      "file": "sim.c",
+      "file": "src/sim.c",
       "line": 169,
       "failureMode": "rcp_status_channel_release (general function) does not perform its intended action",
       "effect": "Failure of rcp_status_channel_release could propagate undetected to callers in sim.c",
@@ -4107,9 +3659,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-257",
+      "id": "FM-229",
       "item": "rcp_status_channel_release",
-      "file": "sim.c",
+      "file": "src/sim.c",
       "line": 174,
       "failureMode": "rcp_status_channel_release (general function) does not perform its intended action",
       "effect": "Failure of rcp_status_channel_release could propagate undetected to callers in sim.c",
@@ -4123,9 +3675,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-258",
+      "id": "FM-230",
       "item": "rcp_sim_controller_publish",
-      "file": "sim.c",
+      "file": "src/sim.c",
       "line": 219,
       "failureMode": "rcp_sim_controller_publish (general function) does not perform its intended action",
       "effect": "Failure of rcp_sim_controller_publish could propagate undetected to callers in sim.c",
@@ -4139,25 +3691,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-259",
-      "item": "free",
-      "file": "sim.c",
-      "line": 352,
-      "failureMode": "free (general function) does not perform its intended action",
-      "effect": "Failure of free could propagate undetected to callers in sim.c",
-      "cause": "Logic error or untested edge case in free",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-260",
+      "id": "FM-231",
       "item": "rcp_sim_controller_new",
-      "file": "sim.c",
+      "file": "src/sim.c",
       "line": 366,
       "failureMode": "rcp_sim_controller_new (general function) does not perform its intended action",
       "effect": "Failure of rcp_sim_controller_new could propagate undetected to callers in sim.c",
@@ -4171,9 +3707,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-261",
+      "id": "FM-232",
       "item": "rcp_sim_controller_fault",
-      "file": "sim.c",
+      "file": "src/sim.c",
       "line": 394,
       "failureMode": "rcp_sim_controller_fault (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_sim_controller_fault could propagate undetected to callers in sim.c",
@@ -4187,9 +3723,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-262",
+      "id": "FM-233",
       "item": "rcp_sim_controller_recover",
-      "file": "sim.c",
+      "file": "src/sim.c",
       "line": 403,
       "failureMode": "rcp_sim_controller_recover (general function) does not perform its intended action",
       "effect": "Failure of rcp_sim_controller_recover could propagate undetected to callers in sim.c",
@@ -4203,9 +3739,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-263",
+      "id": "FM-234",
       "item": "rcp_sim_controller_watchdog_missed",
-      "file": "sim.c",
+      "file": "src/sim.c",
       "line": 412,
       "failureMode": "rcp_sim_controller_watchdog_missed (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_sim_controller_watchdog_missed could propagate undetected to callers in sim.c",
@@ -4219,9 +3755,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-264",
+      "id": "FM-235",
       "item": "rcp_udp_avtp_transport_bind",
-      "file": "udp.c",
+      "file": "src/udp.c",
       "line": 39,
       "failureMode": "rcp_udp_avtp_transport_bind (general function) does not perform its intended action",
       "effect": "Failure of rcp_udp_avtp_transport_bind could propagate undetected to callers in udp.c",
@@ -4235,9 +3771,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-265",
+      "id": "FM-236",
       "item": "rcp_udp_avtp_transport_ok",
-      "file": "udp.c",
+      "file": "src/udp.c",
       "line": 271,
       "failureMode": "rcp_udp_avtp_transport_ok (general function) does not perform its intended action",
       "effect": "Failure of rcp_udp_avtp_transport_ok could propagate undetected to callers in udp.c",
@@ -4251,9 +3787,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-266",
+      "id": "FM-237",
       "item": "rcp_udp_avtp_transport_port",
-      "file": "udp.c",
+      "file": "src/udp.c",
       "line": 277,
       "failureMode": "rcp_udp_avtp_transport_port (general function) does not perform its intended action",
       "effect": "Failure of rcp_udp_avtp_transport_port could propagate undetected to callers in udp.c",
@@ -4267,9 +3803,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-267",
+      "id": "FM-238",
       "item": "rcp_udp_avtp_transport_addr_string",
-      "file": "udp.c",
+      "file": "src/udp.c",
       "line": 287,
       "failureMode": "rcp_udp_avtp_transport_addr_string (general function) does not perform its intended action",
       "effect": "Failure of rcp_udp_avtp_transport_addr_string could propagate undetected to callers in udp.c",
@@ -4283,9 +3819,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-268",
+      "id": "FM-239",
       "item": "rcp_udp_avtp_transport_ok",
-      "file": "udp.c",
+      "file": "src/udp.c",
       "line": 368,
       "failureMode": "rcp_udp_avtp_transport_ok (general function) does not perform its intended action",
       "effect": "Failure of rcp_udp_avtp_transport_ok could propagate undetected to callers in udp.c",
@@ -4299,9 +3835,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-269",
+      "id": "FM-240",
       "item": "rcp_udp_avtp_transport_port",
-      "file": "udp.c",
+      "file": "src/udp.c",
       "line": 375,
       "failureMode": "rcp_udp_avtp_transport_port (general function) does not perform its intended action",
       "effect": "Failure of rcp_udp_avtp_transport_port could propagate undetected to callers in udp.c",
@@ -4315,9 +3851,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-270",
+      "id": "FM-241",
       "item": "rcp_udp_avtp_transport_addr_string",
-      "file": "udp.c",
+      "file": "src/udp.c",
       "line": 382,
       "failureMode": "rcp_udp_avtp_transport_addr_string (general function) does not perform its intended action",
       "effect": "Failure of rcp_udp_avtp_transport_addr_string could propagate undetected to callers in udp.c",
@@ -4331,25 +3867,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-271",
-      "item": "rcp_fragment_strerror",
-      "file": "fragment.c",
-      "line": 7,
-      "failureMode": "rcp_fragment_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_fragment_strerror could propagate undetected to callers in fragment.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_fragment_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-272",
+      "id": "FM-242",
       "item": "rcp_fragment_plan_count",
-      "file": "fragment.c",
+      "file": "src/fragment.c",
       "line": 22,
       "failureMode": "rcp_fragment_plan_count (general function) does not perform its intended action",
       "effect": "Failure of rcp_fragment_plan_count could propagate undetected to callers in fragment.c",
@@ -4363,25 +3883,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-273",
-      "item": "rcp_fragment_reasm_result_string",
-      "file": "fragment.c",
-      "line": 83,
-      "failureMode": "rcp_fragment_reasm_result_string (general function) does not perform its intended action",
-      "effect": "Failure of rcp_fragment_reasm_result_string could propagate undetected to callers in fragment.c",
-      "cause": "Logic error or untested edge case in rcp_fragment_reasm_result_string",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-274",
+      "id": "FM-243",
       "item": "rcp_fragment_reassembler_init",
-      "file": "fragment.c",
+      "file": "src/fragment.c",
       "line": 96,
       "failureMode": "rcp_fragment_reassembler_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_fragment_reassembler_init could propagate undetected to callers in fragment.c",
@@ -4395,9 +3899,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-275",
+      "id": "FM-244",
       "item": "rcp_fragment_reassembler_reset",
-      "file": "fragment.c",
+      "file": "src/fragment.c",
       "line": 107,
       "failureMode": "rcp_fragment_reassembler_reset (general function) does not perform its intended action",
       "effect": "Failure of rcp_fragment_reassembler_reset could propagate undetected to callers in fragment.c",
@@ -4411,9 +3915,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-276",
+      "id": "FM-245",
       "item": "rcp_fragment_reassembler_destroy",
-      "file": "fragment.c",
+      "file": "src/fragment.c",
       "line": 116,
       "failureMode": "rcp_fragment_reassembler_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_fragment_reassembler_destroy could propagate undetected to callers in fragment.c",
@@ -4427,9 +3931,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-277",
+      "id": "FM-246",
       "item": "rcp_fragment_reassembler_is_collecting",
-      "file": "fragment.c",
+      "file": "src/fragment.c",
       "line": 191,
       "failureMode": "rcp_fragment_reassembler_is_collecting (general function) does not perform its intended action",
       "effect": "Failure of rcp_fragment_reassembler_is_collecting could propagate undetected to callers in fragment.c",
@@ -4443,9 +3947,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-278",
+      "id": "FM-247",
       "item": "rcp_deadline_default_config",
-      "file": "deadline.c",
+      "file": "src/deadline.c",
       "line": 9,
       "failureMode": "rcp_deadline_default_config (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_deadline_default_config could propagate undetected to callers in deadline.c",
@@ -4459,9 +3963,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-279",
+      "id": "FM-248",
       "item": "rcp_deadline_monitor_heartbeat",
-      "file": "deadline.c",
+      "file": "src/deadline.c",
       "line": 92,
       "failureMode": "rcp_deadline_monitor_heartbeat (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_deadline_monitor_heartbeat could propagate undetected to callers in deadline.c",
@@ -4475,9 +3979,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-280",
+      "id": "FM-249",
       "item": "rcp_deadline_monitor_notify_overflow",
-      "file": "deadline.c",
+      "file": "src/deadline.c",
       "line": 111,
       "failureMode": "rcp_deadline_monitor_notify_overflow (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_deadline_monitor_notify_overflow could propagate undetected to callers in deadline.c",
@@ -4491,9 +3995,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-281",
+      "id": "FM-250",
       "item": "rcp_deadline_monitor_alive",
-      "file": "deadline.c",
+      "file": "src/deadline.c",
       "line": 217,
       "failureMode": "rcp_deadline_monitor_alive (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_deadline_monitor_alive could propagate undetected to callers in deadline.c",
@@ -4507,9 +4011,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-282",
+      "id": "FM-251",
       "item": "rcp_deadline_monitor_subscribe",
-      "file": "deadline.c",
+      "file": "src/deadline.c",
       "line": 229,
       "failureMode": "rcp_deadline_monitor_subscribe (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_deadline_monitor_subscribe could propagate undetected to callers in deadline.c",
@@ -4523,9 +4027,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-283",
+      "id": "FM-252",
       "item": "rcp_deadline_monitor_close",
-      "file": "deadline.c",
+      "file": "src/deadline.c",
       "line": 240,
       "failureMode": "rcp_deadline_monitor_close (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_deadline_monitor_close could propagate undetected to callers in deadline.c",
@@ -4539,9 +4043,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-284",
+      "id": "FM-253",
       "item": "rcp_deadline_monitor_destroy",
-      "file": "deadline.c",
+      "file": "src/deadline.c",
       "line": 252,
       "failureMode": "rcp_deadline_monitor_destroy (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_deadline_monitor_destroy could propagate undetected to callers in deadline.c",
@@ -4555,9 +4059,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-285",
+      "id": "FM-254",
       "item": "rcp_mdns_discoverer_destroy",
-      "file": "mdns.c",
+      "file": "src/mdns.c",
       "line": 10,
       "failureMode": "rcp_mdns_discoverer_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_mdns_discoverer_destroy could propagate undetected to callers in mdns.c",
@@ -4571,9 +4075,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-286",
+      "id": "FM-255",
       "item": "rcp_mdns_announcer_destroy",
-      "file": "mdns.c",
+      "file": "src/mdns.c",
       "line": 17,
       "failureMode": "rcp_mdns_announcer_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_mdns_announcer_destroy could propagate undetected to callers in mdns.c",
@@ -4587,9 +4091,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-287",
+      "id": "FM-256",
       "item": "rcp_mdns_make_instance_name",
-      "file": "mdns.c",
+      "file": "src/mdns.c",
       "line": 24,
       "failureMode": "rcp_mdns_make_instance_name (general function) does not perform its intended action",
       "effect": "Failure of rcp_mdns_make_instance_name could propagate undetected to callers in mdns.c",
@@ -4603,9 +4107,25 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-288",
+      "id": "FM-257",
+      "item": "stopped",
+      "file": "src/mdns.c",
+      "line": 45,
+      "failureMode": "stopped (general function) does not perform its intended action",
+      "effect": "Failure of stopped could propagate undetected to callers in mdns.c",
+      "cause": "Logic error or untested edge case in stopped",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-258",
       "item": "rcp_mdns_static_discoverer_new",
-      "file": "mdns.c",
+      "file": "src/mdns.c",
       "line": 123,
       "failureMode": "rcp_mdns_static_discoverer_new (general function) does not perform its intended action",
       "effect": "Failure of rcp_mdns_static_discoverer_new could propagate undetected to callers in mdns.c",
@@ -4619,9 +4139,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-289",
+      "id": "FM-259",
       "item": "rcp_ep_lin_compare_mode_valid",
-      "file": "ep_lin.c",
+      "file": "src/ep_lin.c",
       "line": 8,
       "failureMode": "rcp_ep_lin_compare_mode_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_lin_compare_mode_valid could propagate undetected to callers in ep_lin.c",
@@ -4635,9 +4155,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-290",
+      "id": "FM-260",
       "item": "rcp_ep_lin_trigger_fires",
-      "file": "ep_lin.c",
+      "file": "src/ep_lin.c",
       "line": 45,
       "failureMode": "rcp_ep_lin_trigger_fires (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_lin_trigger_fires could propagate undetected to callers in ep_lin.c",
@@ -4651,9 +4171,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-291",
+      "id": "FM-261",
       "item": "rcp_ep_lin_functional_cfg_init",
-      "file": "ep_lin.c",
+      "file": "src/ep_lin.c",
       "line": 57,
       "failureMode": "rcp_ep_lin_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_lin_functional_cfg_init could propagate undetected to callers in ep_lin.c",
@@ -4667,25 +4187,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-292",
-      "item": "rcp_ep_lin_strerror",
-      "file": "ep_lin.c",
-      "line": 99,
-      "failureMode": "rcp_ep_lin_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_ep_lin_strerror could propagate undetected to callers in ep_lin.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_ep_lin_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-293",
+      "id": "FM-262",
       "item": "rcp_mqtt_default_config",
-      "file": "mqttbr.c",
+      "file": "src/mqttbr.c",
       "line": 4,
       "failureMode": "rcp_mqtt_default_config (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_mqtt_default_config could propagate undetected to callers in mqttbr.c",
@@ -4699,25 +4203,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-294",
-      "item": "rcp_acf_strerror",
-      "file": "acf.c",
-      "line": 7,
-      "failureMode": "rcp_acf_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_acf_strerror could propagate undetected to callers in acf.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_acf_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-295",
+      "id": "FM-263",
       "item": "rcp_acf_classify_response",
-      "file": "acf.c",
+      "file": "src/acf.c",
       "line": 90,
       "failureMode": "rcp_acf_classify_response (general function) does not perform its intended action",
       "effect": "Failure of rcp_acf_classify_response could propagate undetected to callers in acf.c",
@@ -4731,9 +4219,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-296",
+      "id": "FM-264",
       "item": "rcp_acf_hdr_ack_has_event",
-      "file": "acf.c",
+      "file": "src/acf.c",
       "line": 102,
       "failureMode": "rcp_acf_hdr_ack_has_event (general function) does not perform its intended action",
       "effect": "Failure of rcp_acf_hdr_ack_has_event could propagate undetected to callers in acf.c",
@@ -4747,9 +4235,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-297",
+      "id": "FM-265",
       "item": "rcp_acf_gbb_is_timed",
-      "file": "acf.c",
+      "file": "src/acf.c",
       "line": 247,
       "failureMode": "rcp_acf_gbb_is_timed (general function) does not perform its intended action",
       "effect": "Failure of rcp_acf_gbb_is_timed could propagate undetected to callers in acf.c",
@@ -4763,9 +4251,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-298",
+      "id": "FM-266",
       "item": "rcp_acf_peek_msg_type",
-      "file": "acf.c",
+      "file": "src/acf.c",
       "line": 255,
       "failureMode": "rcp_acf_peek_msg_type (general function) does not perform its intended action",
       "effect": "Failure of rcp_acf_peek_msg_type could propagate undetected to callers in acf.c",
@@ -4779,9 +4267,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-299",
+      "id": "FM-267",
       "item": "rcp_can_default_config",
-      "file": "canbr.c",
+      "file": "src/canbr.c",
       "line": 4,
       "failureMode": "rcp_can_default_config (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_can_default_config could propagate undetected to callers in canbr.c",
@@ -4795,57 +4283,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-300",
-      "item": "relay_strerror",
-      "file": "rcp.c",
-      "line": 11,
-      "failureMode": "relay_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of relay_strerror could propagate undetected to callers in rcp.c",
-      "cause": "Unhandled fault or invalid input condition within relay_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-301",
-      "item": "rcp_strerror",
-      "file": "rcp.c",
-      "line": 25,
-      "failureMode": "rcp_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_strerror could propagate undetected to callers in rcp.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-302",
-      "item": "rcp_zone_string",
-      "file": "rcp.c",
-      "line": 44,
-      "failureMode": "rcp_zone_string (general function) does not perform its intended action",
-      "effect": "Failure of rcp_zone_string could propagate undetected to callers in rcp.c",
-      "cause": "Logic error or untested edge case in rcp_zone_string",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-303",
+      "id": "FM-268",
       "item": "rcp_zone_from_string",
-      "file": "rcp.c",
+      "file": "src/rcp.c",
       "line": 61,
       "failureMode": "rcp_zone_from_string (general function) does not perform its intended action",
       "effect": "Failure of rcp_zone_from_string could propagate undetected to callers in rcp.c",
@@ -4859,25 +4299,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-304",
-      "item": "rcp_response_status_string",
-      "file": "rcp.c",
-      "line": 74,
-      "failureMode": "rcp_response_status_string (general function) does not perform its intended action",
-      "effect": "Failure of rcp_response_status_string could propagate undetected to callers in rcp.c",
-      "cause": "Logic error or untested edge case in rcp_response_status_string",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-305",
+      "id": "FM-269",
       "item": "rcp_bytes_dup",
-      "file": "rcp.c",
+      "file": "src/rcp.c",
       "line": 90,
       "failureMode": "rcp_bytes_dup (general function) does not perform its intended action",
       "effect": "Failure of rcp_bytes_dup could propagate undetected to callers in rcp.c",
@@ -4891,9 +4315,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-306",
+      "id": "FM-270",
       "item": "rcp_bytes_free",
-      "file": "rcp.c",
+      "file": "src/rcp.c",
       "line": 105,
       "failureMode": "rcp_bytes_free (general function) does not perform its intended action",
       "effect": "Failure of rcp_bytes_free could propagate undetected to callers in rcp.c",
@@ -4907,9 +4331,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-307",
+      "id": "FM-271",
       "item": "rcp_response_free",
-      "file": "rcp.c",
+      "file": "src/rcp.c",
       "line": 113,
       "failureMode": "rcp_response_free (general function) does not perform its intended action",
       "effect": "Failure of rcp_response_free could propagate undetected to callers in rcp.c",
@@ -4923,9 +4347,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-308",
+      "id": "FM-272",
       "item": "rcp_status_free",
-      "file": "rcp.c",
+      "file": "src/rcp.c",
       "line": 119,
       "failureMode": "rcp_status_free (general function) does not perform its intended action",
       "effect": "Failure of rcp_status_free could propagate undetected to callers in rcp.c",
@@ -4939,9 +4363,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-309",
+      "id": "FM-273",
       "item": "rcp_status_channel_new",
-      "file": "rcp.c",
+      "file": "src/rcp.c",
       "line": 138,
       "failureMode": "rcp_status_channel_new (general function) does not perform its intended action",
       "effect": "Failure of rcp_status_channel_new could propagate undetected to callers in rcp.c",
@@ -4955,9 +4379,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-310",
+      "id": "FM-274",
       "item": "rcp_status_channel_retain",
-      "file": "rcp.c",
+      "file": "src/rcp.c",
       "line": 163,
       "failureMode": "rcp_status_channel_retain (general function) does not perform its intended action",
       "effect": "Failure of rcp_status_channel_retain could propagate undetected to callers in rcp.c",
@@ -4971,9 +4395,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-311",
+      "id": "FM-275",
       "item": "rcp_status_channel_release",
-      "file": "rcp.c",
+      "file": "src/rcp.c",
       "line": 169,
       "failureMode": "rcp_status_channel_release (general function) does not perform its intended action",
       "effect": "Failure of rcp_status_channel_release could propagate undetected to callers in rcp.c",
@@ -4987,9 +4411,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-312",
+      "id": "FM-276",
       "item": "rcp_status_channel_push",
-      "file": "rcp.c",
+      "file": "src/rcp.c",
       "line": 187,
       "failureMode": "rcp_status_channel_push (general function) does not perform its intended action",
       "effect": "Failure of rcp_status_channel_push could propagate undetected to callers in rcp.c",
@@ -5003,9 +4427,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-313",
+      "id": "FM-277",
       "item": "rcp_status_channel_recv",
-      "file": "rcp.c",
+      "file": "src/rcp.c",
       "line": 213,
       "failureMode": "rcp_status_channel_recv (general function) does not perform its intended action",
       "effect": "Failure of rcp_status_channel_recv could propagate undetected to callers in rcp.c",
@@ -5019,9 +4443,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-314",
+      "id": "FM-278",
       "item": "rcp_status_channel_try_recv",
-      "file": "rcp.c",
+      "file": "src/rcp.c",
       "line": 230,
       "failureMode": "rcp_status_channel_try_recv (general function) does not perform its intended action",
       "effect": "Failure of rcp_status_channel_try_recv could propagate undetected to callers in rcp.c",
@@ -5035,9 +4459,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-315",
+      "id": "FM-279",
       "item": "rcp_status_channel_close",
-      "file": "rcp.c",
+      "file": "src/rcp.c",
       "line": 246,
       "failureMode": "rcp_status_channel_close (general function) does not perform its intended action",
       "effect": "Failure of rcp_status_channel_close could propagate undetected to callers in rcp.c",
@@ -5051,9 +4475,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-316",
+      "id": "FM-280",
       "item": "rcp_status_channel_is_closed",
-      "file": "rcp.c",
+      "file": "src/rcp.c",
       "line": 254,
       "failureMode": "rcp_status_channel_is_closed (general function) does not perform its intended action",
       "effect": "Failure of rcp_status_channel_is_closed could propagate undetected to callers in rcp.c",
@@ -5067,9 +4491,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-317",
+      "id": "FM-281",
       "item": "rcp_controller_retain",
-      "file": "rcp.c",
+      "file": "src/rcp.c",
       "line": 266,
       "failureMode": "rcp_controller_retain (general function) does not perform its intended action",
       "effect": "Failure of rcp_controller_retain could propagate undetected to callers in rcp.c",
@@ -5083,9 +4507,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-318",
+      "id": "FM-282",
       "item": "rcp_controller_release",
-      "file": "rcp.c",
+      "file": "src/rcp.c",
       "line": 272,
       "failureMode": "rcp_controller_release (general function) does not perform its intended action",
       "effect": "Failure of rcp_controller_release could propagate undetected to callers in rcp.c",
@@ -5099,9 +4523,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-319",
+      "id": "FM-283",
       "item": "rcp_registry_destroy",
-      "file": "rcp.c",
+      "file": "src/rcp.c",
       "line": 282,
       "failureMode": "rcp_registry_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_registry_destroy could propagate undetected to callers in rcp.c",
@@ -5115,9 +4539,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-320",
+      "id": "FM-284",
       "item": "rcp_sched_classify",
-      "file": "scheduler.c",
+      "file": "src/scheduler.c",
       "line": 6,
       "failureMode": "rcp_sched_classify (general function) does not perform its intended action",
       "effect": "Failure of rcp_sched_classify could propagate undetected to callers in scheduler.c",
@@ -5131,9 +4555,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-321",
+      "id": "FM-285",
       "item": "rcp_sched_kind_rank",
-      "file": "scheduler.c",
+      "file": "src/scheduler.c",
       "line": 29,
       "failureMode": "rcp_sched_kind_rank (general function) does not perform its intended action",
       "effect": "Failure of rcp_sched_kind_rank could propagate undetected to callers in scheduler.c",
@@ -5147,9 +4571,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-322",
+      "id": "FM-286",
       "item": "rcp_sched_compare",
-      "file": "scheduler.c",
+      "file": "src/scheduler.c",
       "line": 46,
       "failureMode": "rcp_sched_compare (general function) does not perform its intended action",
       "effect": "Failure of rcp_sched_compare could propagate undetected to callers in scheduler.c",
@@ -5163,9 +4587,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-323",
+      "id": "FM-287",
       "item": "rcp_sched_frame_timing_consistent",
-      "file": "scheduler.c",
+      "file": "src/scheduler.c",
       "line": 98,
       "failureMode": "rcp_sched_frame_timing_consistent (general function) does not perform its intended action",
       "effect": "Failure of rcp_sched_frame_timing_consistent could propagate undetected to callers in scheduler.c",
@@ -5179,9 +4603,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-324",
+      "id": "FM-288",
       "item": "rcp_ep_spi_channel_valid",
-      "file": "ep_spi.c",
+      "file": "src/ep_spi.c",
       "line": 8,
       "failureMode": "rcp_ep_spi_channel_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_spi_channel_valid could propagate undetected to callers in ep_spi.c",
@@ -5195,9 +4619,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-325",
+      "id": "FM-289",
       "item": "rcp_ep_spi_mode_valid",
-      "file": "ep_spi.c",
+      "file": "src/ep_spi.c",
       "line": 16,
       "failureMode": "rcp_ep_spi_mode_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_spi_mode_valid could propagate undetected to callers in ep_spi.c",
@@ -5211,9 +4635,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-326",
+      "id": "FM-290",
       "item": "rcp_ep_spi_mode_cpol",
-      "file": "ep_spi.c",
+      "file": "src/ep_spi.c",
       "line": 22,
       "failureMode": "rcp_ep_spi_mode_cpol (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_spi_mode_cpol could propagate undetected to callers in ep_spi.c",
@@ -5227,9 +4651,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-327",
+      "id": "FM-291",
       "item": "rcp_ep_spi_mode_cpha",
-      "file": "ep_spi.c",
+      "file": "src/ep_spi.c",
       "line": 34,
       "failureMode": "rcp_ep_spi_mode_cpha (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_spi_mode_cpha could propagate undetected to callers in ep_spi.c",
@@ -5243,9 +4667,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-328",
+      "id": "FM-292",
       "item": "rcp_ep_spi_trigger_fires",
-      "file": "ep_spi.c",
+      "file": "src/ep_spi.c",
       "line": 51,
       "failureMode": "rcp_ep_spi_trigger_fires (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_spi_trigger_fires could propagate undetected to callers in ep_spi.c",
@@ -5259,9 +4683,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-329",
+      "id": "FM-293",
       "item": "rcp_ep_spi_functional_cfg_init",
-      "file": "ep_spi.c",
+      "file": "src/ep_spi.c",
       "line": 65,
       "failureMode": "rcp_ep_spi_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_spi_functional_cfg_init could propagate undetected to callers in ep_spi.c",
@@ -5275,25 +4699,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-330",
-      "item": "rcp_ep_spi_strerror",
-      "file": "ep_spi.c",
-      "line": 170,
-      "failureMode": "rcp_ep_spi_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_ep_spi_strerror could propagate undetected to callers in ep_spi.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_ep_spi_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-331",
+      "id": "FM-294",
       "item": "rcp_authz_policy_new",
-      "file": "authz.c",
+      "file": "src/authz.c",
       "line": 30,
       "failureMode": "rcp_authz_policy_new (general function) does not perform its intended action",
       "effect": "Failure of rcp_authz_policy_new could propagate undetected to callers in authz.c",
@@ -5307,9 +4715,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-332",
+      "id": "FM-295",
       "item": "rcp_authz_policy_retain",
-      "file": "authz.c",
+      "file": "src/authz.c",
       "line": 39,
       "failureMode": "rcp_authz_policy_retain (general function) does not perform its intended action",
       "effect": "Failure of rcp_authz_policy_retain could propagate undetected to callers in authz.c",
@@ -5323,9 +4731,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-333",
+      "id": "FM-296",
       "item": "rcp_authz_policy_release",
-      "file": "authz.c",
+      "file": "src/authz.c",
       "line": 51,
       "failureMode": "rcp_authz_policy_release (general function) does not perform its intended action",
       "effect": "Failure of rcp_authz_policy_release could propagate undetected to callers in authz.c",
@@ -5339,9 +4747,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-334",
+      "id": "FM-297",
       "item": "rcp_regmap_is_ep0",
-      "file": "regmap.c",
+      "file": "src/regmap.c",
       "line": 8,
       "failureMode": "rcp_regmap_is_ep0 (general function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_is_ep0 could propagate undetected to callers in regmap.c",
@@ -5355,9 +4763,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-335",
+      "id": "FM-298",
       "item": "rcp_regmap_options_group_consistent",
-      "file": "regmap.c",
+      "file": "src/regmap.c",
       "line": 19,
       "failureMode": "rcp_regmap_options_group_consistent (general function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_options_group_consistent could propagate undetected to callers in regmap.c",
@@ -5371,9 +4779,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-336",
+      "id": "FM-299",
       "item": "rcp_regmap_general_init",
-      "file": "regmap.c",
+      "file": "src/regmap.c",
       "line": 40,
       "failureMode": "rcp_regmap_general_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_general_init could propagate undetected to callers in regmap.c",
@@ -5387,9 +4795,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-337",
+      "id": "FM-300",
       "item": "rcp_regmap_ep_generic_cfg_init",
-      "file": "regmap.c",
+      "file": "src/regmap.c",
       "line": 73,
       "failureMode": "rcp_regmap_ep_generic_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_ep_generic_cfg_init could propagate undetected to callers in regmap.c",
@@ -5403,9 +4811,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-338",
+      "id": "FM-301",
       "item": "rcp_regmap_ep_functional_cfg_init",
-      "file": "regmap.c",
+      "file": "src/regmap.c",
       "line": 79,
       "failureMode": "rcp_regmap_ep_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_ep_functional_cfg_init could propagate undetected to callers in regmap.c",
@@ -5419,25 +4827,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-339",
-      "item": "rcp_regmap_named_signal_string",
-      "file": "regmap.c",
-      "line": 88,
-      "failureMode": "rcp_regmap_named_signal_string (general function) does not perform its intended action",
-      "effect": "Failure of rcp_regmap_named_signal_string could propagate undetected to callers in regmap.c",
-      "cause": "Logic error or untested edge case in rcp_regmap_named_signal_string",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-340",
+      "id": "FM-302",
       "item": "rcp_regmap_request_stream_cfg_init",
-      "file": "regmap.c",
+      "file": "src/regmap.c",
       "line": 141,
       "failureMode": "rcp_regmap_request_stream_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_request_stream_cfg_init could propagate undetected to callers in regmap.c",
@@ -5451,9 +4843,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-341",
+      "id": "FM-303",
       "item": "rcp_regmap_response_queue_cfg_init",
-      "file": "regmap.c",
+      "file": "src/regmap.c",
       "line": 147,
       "failureMode": "rcp_regmap_response_queue_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_response_queue_cfg_init could propagate undetected to callers in regmap.c",
@@ -5467,9 +4859,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-342",
+      "id": "FM-304",
       "item": "rcp_ep_gpio_pin_index_valid",
-      "file": "ep_gpio.c",
+      "file": "src/ep_gpio.c",
       "line": 25,
       "failureMode": "rcp_ep_gpio_pin_index_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_gpio_pin_index_valid could propagate undetected to callers in ep_gpio.c",
@@ -5483,9 +4875,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-343",
+      "id": "FM-305",
       "item": "rcp_ep_gpio_pin_mask",
-      "file": "ep_gpio.c",
+      "file": "src/ep_gpio.c",
       "line": 31,
       "failureMode": "rcp_ep_gpio_pin_mask (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_gpio_pin_mask could propagate undetected to callers in ep_gpio.c",
@@ -5499,9 +4891,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-344",
+      "id": "FM-306",
       "item": "rcp_ep_gpio_pin_get",
-      "file": "ep_gpio.c",
+      "file": "src/ep_gpio.c",
       "line": 38,
       "failureMode": "rcp_ep_gpio_pin_get (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_gpio_pin_get could propagate undetected to callers in ep_gpio.c",
@@ -5515,9 +4907,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-345",
+      "id": "FM-307",
       "item": "rcp_ep_gpio_write_semantics_valid",
-      "file": "ep_gpio.c",
+      "file": "src/ep_gpio.c",
       "line": 46,
       "failureMode": "rcp_ep_gpio_write_semantics_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_gpio_write_semantics_valid could propagate undetected to callers in ep_gpio.c",
@@ -5531,9 +4923,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-346",
+      "id": "FM-308",
       "item": "rcp_ep_gpio_apply_reconfig",
-      "file": "ep_gpio.c",
+      "file": "src/ep_gpio.c",
       "line": 90,
       "failureMode": "rcp_ep_gpio_apply_reconfig (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_gpio_apply_reconfig could propagate undetected to callers in ep_gpio.c",
@@ -5547,9 +4939,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-347",
+      "id": "FM-309",
       "item": "rcp_ep_gpio_trigger_fires",
-      "file": "ep_gpio.c",
+      "file": "src/ep_gpio.c",
       "line": 113,
       "failureMode": "rcp_ep_gpio_trigger_fires (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_gpio_trigger_fires could propagate undetected to callers in ep_gpio.c",
@@ -5563,9 +4955,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-348",
+      "id": "FM-310",
       "item": "rcp_ep_gpio_functional_cfg_init",
-      "file": "ep_gpio.c",
+      "file": "src/ep_gpio.c",
       "line": 127,
       "failureMode": "rcp_ep_gpio_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_gpio_functional_cfg_init could propagate undetected to callers in ep_gpio.c",
@@ -5579,25 +4971,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-349",
-      "item": "rcp_ep_gpio_strerror",
-      "file": "ep_gpio.c",
-      "line": 173,
-      "failureMode": "rcp_ep_gpio_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_ep_gpio_strerror could propagate undetected to callers in ep_gpio.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_ep_gpio_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-350",
+      "id": "FM-311",
       "item": "rcp_ep_gpio_encode_read_request",
-      "file": "ep_gpio.c",
+      "file": "src/ep_gpio.c",
       "line": 189,
       "failureMode": "rcp_ep_gpio_encode_read_request (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_gpio_encode_read_request could propagate undetected to callers in ep_gpio.c",
@@ -5611,9 +4987,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-351",
+      "id": "FM-312",
       "item": "rcp_request_type_is_safety",
-      "file": "request_compound.c",
+      "file": "src/request_compound.c",
       "line": 31,
       "failureMode": "rcp_request_type_is_safety (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_request_type_is_safety could propagate undetected to callers in request_compound.c",
@@ -5627,9 +5003,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-352",
+      "id": "FM-313",
       "item": "rcp_request_type_is_compound",
-      "file": "request_compound.c",
+      "file": "src/request_compound.c",
       "line": 37,
       "failureMode": "rcp_request_type_is_compound (general function) does not perform its intended action",
       "effect": "Failure of rcp_request_type_is_compound could propagate undetected to callers in request_compound.c",
@@ -5643,9 +5019,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-353",
+      "id": "FM-314",
       "item": "rcp_request_type_is_compound_wait",
-      "file": "request_compound.c",
+      "file": "src/request_compound.c",
       "line": 44,
       "failureMode": "rcp_request_type_is_compound_wait (general function) does not perform its intended action",
       "effect": "Failure of rcp_request_type_is_compound_wait could propagate undetected to callers in request_compound.c",
@@ -5659,29 +5035,13 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-354",
-      "item": "rcp_compound_strerror",
-      "file": "request_compound.c",
-      "line": 53,
-      "failureMode": "rcp_compound_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_compound_strerror could propagate undetected to callers in request_compound.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_compound_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-355",
-      "item": "!rcp_request_type_is_compound_wait",
-      "file": "request_compound.c",
+      "id": "FM-315",
+      "item": "rcp_request_type_is_compound_wait",
+      "file": "src/request_compound.c",
       "line": 123,
-      "failureMode": "!rcp_request_type_is_compound_wait (general function) does not perform its intended action",
-      "effect": "Failure of !rcp_request_type_is_compound_wait could propagate undetected to callers in request_compound.c",
-      "cause": "Logic error or untested edge case in !rcp_request_type_is_compound_wait",
+      "failureMode": "rcp_request_type_is_compound_wait (general function) does not perform its intended action",
+      "effect": "Failure of rcp_request_type_is_compound_wait could propagate undetected to callers in request_compound.c",
+      "cause": "Logic error or untested edge case in rcp_request_type_is_compound_wait",
       "severity": 3,
       "occurrence": 2,
       "detection": 3,
@@ -5691,13 +5051,13 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-356",
-      "item": "mtv=RCP_ACF_MTV_UNTIMED",
-      "file": "request_compound.c",
+      "id": "FM-316",
+      "item": "RCP_ACF_MTV_UNTIMED",
+      "file": "src/request_compound.c",
       "line": 207,
-      "failureMode": "mtv=RCP_ACF_MTV_UNTIMED (general function) does not perform its intended action",
-      "effect": "Failure of mtv=RCP_ACF_MTV_UNTIMED could propagate undetected to callers in request_compound.c",
-      "cause": "Logic error or untested edge case in mtv=RCP_ACF_MTV_UNTIMED",
+      "failureMode": "RCP_ACF_MTV_UNTIMED (general function) does not perform its intended action",
+      "effect": "Failure of RCP_ACF_MTV_UNTIMED could propagate undetected to callers in request_compound.c",
+      "cause": "Logic error or untested edge case in RCP_ACF_MTV_UNTIMED",
       "severity": 3,
       "occurrence": 2,
       "detection": 3,
@@ -5707,9 +5067,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-357",
+      "id": "FM-317",
       "item": "rcp_compound_exec_delay_elapsed",
-      "file": "request_compound.c",
+      "file": "src/request_compound.c",
       "line": 259,
       "failureMode": "rcp_compound_exec_delay_elapsed (general function) does not perform its intended action",
       "effect": "Failure of rcp_compound_exec_delay_elapsed could propagate undetected to callers in request_compound.c",
@@ -5723,25 +5083,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-358",
-      "item": "rcp_wire_strerror",
-      "file": "wire.c",
-      "line": 7,
-      "failureMode": "rcp_wire_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_wire_strerror could propagate undetected to callers in wire.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_wire_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-359",
+      "id": "FM-318",
       "item": "rcp_wire_validate_header",
-      "file": "wire.c",
+      "file": "src/wire.c",
       "line": 48,
       "failureMode": "rcp_wire_validate_header (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_wire_validate_header could propagate undetected to callers in wire.c",
@@ -5755,9 +5099,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-360",
+      "id": "FM-319",
       "item": "rcp_wire_encode_command",
-      "file": "wire.c",
+      "file": "src/wire.c",
       "line": 84,
       "failureMode": "rcp_wire_encode_command (general function) does not perform its intended action",
       "effect": "Failure of rcp_wire_encode_command could propagate undetected to callers in wire.c",
@@ -5771,9 +5115,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-361",
+      "id": "FM-320",
       "item": "rcp_wire_decode_command",
-      "file": "wire.c",
+      "file": "src/wire.c",
       "line": 95,
       "failureMode": "rcp_wire_decode_command (general function) does not perform its intended action",
       "effect": "Failure of rcp_wire_decode_command could propagate undetected to callers in wire.c",
@@ -5787,9 +5131,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-362",
+      "id": "FM-321",
       "item": "rcp_wire_encode_response",
-      "file": "wire.c",
+      "file": "src/wire.c",
       "line": 114,
       "failureMode": "rcp_wire_encode_response (general function) does not perform its intended action",
       "effect": "Failure of rcp_wire_encode_response could propagate undetected to callers in wire.c",
@@ -5803,9 +5147,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-363",
+      "id": "FM-322",
       "item": "rcp_wire_decode_response",
-      "file": "wire.c",
+      "file": "src/wire.c",
       "line": 122,
       "failureMode": "rcp_wire_decode_response (general function) does not perform its intended action",
       "effect": "Failure of rcp_wire_decode_response could propagate undetected to callers in wire.c",
@@ -5819,9 +5163,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-364",
+      "id": "FM-323",
       "item": "rcp_wire_encode_status",
-      "file": "wire.c",
+      "file": "src/wire.c",
       "line": 140,
       "failureMode": "rcp_wire_encode_status (general function) does not perform its intended action",
       "effect": "Failure of rcp_wire_encode_status could propagate undetected to callers in wire.c",
@@ -5835,9 +5179,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-365",
+      "id": "FM-324",
       "item": "rcp_wire_decode_status",
-      "file": "wire.c",
+      "file": "src/wire.c",
       "line": 148,
       "failureMode": "rcp_wire_decode_status (general function) does not perform its intended action",
       "effect": "Failure of rcp_wire_decode_status could propagate undetected to callers in wire.c",
@@ -5851,9 +5195,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-366",
+      "id": "FM-325",
       "item": "rcp_wire_encode_control",
-      "file": "wire.c",
+      "file": "src/wire.c",
       "line": 166,
       "failureMode": "rcp_wire_encode_control (general function) does not perform its intended action",
       "effect": "Failure of rcp_wire_encode_control could propagate undetected to callers in wire.c",
@@ -5867,9 +5211,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-367",
+      "id": "FM-326",
       "item": "rcp_someip_default_config",
-      "file": "someipbr.c",
+      "file": "src/someipbr.c",
       "line": 4,
       "failureMode": "rcp_someip_default_config (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_someip_default_config could propagate undetected to callers in someipbr.c",
@@ -5883,9 +5227,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-368",
+      "id": "FM-327",
       "item": "rcp_ep_mdio_addr_valid",
-      "file": "ep_mdio.c",
+      "file": "src/ep_mdio.c",
       "line": 29,
       "failureMode": "rcp_ep_mdio_addr_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_mdio_addr_valid could propagate undetected to callers in ep_mdio.c",
@@ -5899,9 +5243,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-369",
+      "id": "FM-328",
       "item": "rcp_ep_mdio_burst_next_regad",
-      "file": "ep_mdio.c",
+      "file": "src/ep_mdio.c",
       "line": 42,
       "failureMode": "rcp_ep_mdio_burst_next_regad (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_mdio_burst_next_regad could propagate undetected to callers in ep_mdio.c",
@@ -5915,9 +5259,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-370",
+      "id": "FM-329",
       "item": "rcp_ep_mdio_word_encode",
-      "file": "ep_mdio.c",
+      "file": "src/ep_mdio.c",
       "line": 55,
       "failureMode": "rcp_ep_mdio_word_encode (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_mdio_word_encode could propagate undetected to callers in ep_mdio.c",
@@ -5931,9 +5275,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-371",
+      "id": "FM-330",
       "item": "rcp_ep_mdio_word_decode",
-      "file": "ep_mdio.c",
+      "file": "src/ep_mdio.c",
       "line": 61,
       "failureMode": "rcp_ep_mdio_word_decode (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_mdio_word_decode could propagate undetected to callers in ep_mdio.c",
@@ -5947,9 +5291,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-372",
+      "id": "FM-331",
       "item": "rcp_ep_mdio_pack_len",
-      "file": "ep_mdio.c",
+      "file": "src/ep_mdio.c",
       "line": 67,
       "failureMode": "rcp_ep_mdio_pack_len (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_mdio_pack_len could propagate undetected to callers in ep_mdio.c",
@@ -5963,9 +5307,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-373",
+      "id": "FM-332",
       "item": "rcp_ep_mdio_pack_words",
-      "file": "ep_mdio.c",
+      "file": "src/ep_mdio.c",
       "line": 73,
       "failureMode": "rcp_ep_mdio_pack_words (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_mdio_pack_words could propagate undetected to callers in ep_mdio.c",
@@ -5979,9 +5323,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-374",
+      "id": "FM-333",
       "item": "rcp_ep_mdio_word_count_of",
-      "file": "ep_mdio.c",
+      "file": "src/ep_mdio.c",
       "line": 92,
       "failureMode": "rcp_ep_mdio_word_count_of (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_mdio_word_count_of could propagate undetected to callers in ep_mdio.c",
@@ -5995,9 +5339,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-375",
+      "id": "FM-334",
       "item": "rcp_ep_mdio_unpack_word_at",
-      "file": "ep_mdio.c",
+      "file": "src/ep_mdio.c",
       "line": 101,
       "failureMode": "rcp_ep_mdio_unpack_word_at (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_mdio_unpack_word_at could propagate undetected to callers in ep_mdio.c",
@@ -6011,9 +5355,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-376",
+      "id": "FM-335",
       "item": "rcp_ep_mdio_functional_cfg_init",
-      "file": "ep_mdio.c",
+      "file": "src/ep_mdio.c",
       "line": 109,
       "failureMode": "rcp_ep_mdio_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_mdio_functional_cfg_init could propagate undetected to callers in ep_mdio.c",
@@ -6027,25 +5371,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-377",
-      "item": "rcp_ep_mdio_strerror",
-      "file": "ep_mdio.c",
-      "line": 125,
-      "failureMode": "rcp_ep_mdio_strerror (safety-critical function) does not perform its intended action",
-      "effect": "Failure of rcp_ep_mdio_strerror could propagate undetected to callers in ep_mdio.c",
-      "cause": "Unhandled fault or invalid input condition within rcp_ep_mdio_strerror",
-      "severity": 9,
-      "occurrence": 4,
-      "detection": 6,
-      "actionPriority": "high",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-378",
+      "id": "FM-336",
       "item": "rcp_recorder_new",
-      "file": "recorder.c",
+      "file": "src/recorder.c",
       "line": 18,
       "failureMode": "rcp_recorder_new (general function) does not perform its intended action",
       "effect": "Failure of rcp_recorder_new could propagate undetected to callers in recorder.c",
@@ -6059,9 +5387,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-379",
+      "id": "FM-337",
       "item": "rcp_recorder_destroy",
-      "file": "recorder.c",
+      "file": "src/recorder.c",
       "line": 27,
       "failureMode": "rcp_recorder_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_recorder_destroy could propagate undetected to callers in recorder.c",
@@ -6075,9 +5403,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-380",
+      "id": "FM-338",
       "item": "rcp_recorder_size",
-      "file": "recorder.c",
+      "file": "src/recorder.c",
       "line": 38,
       "failureMode": "rcp_recorder_size (general function) does not perform its intended action",
       "effect": "Failure of rcp_recorder_size could propagate undetected to callers in recorder.c",
@@ -6091,9 +5419,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-381",
+      "id": "FM-339",
       "item": "rcp_recorder_entries",
-      "file": "recorder.c",
+      "file": "src/recorder.c",
       "line": 48,
       "failureMode": "rcp_recorder_entries (general function) does not perform its intended action",
       "effect": "Failure of rcp_recorder_entries could propagate undetected to callers in recorder.c",
@@ -6107,9 +5435,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-382",
+      "id": "FM-340",
       "item": "rcp_recorder_write_binary",
-      "file": "recorder.c",
+      "file": "src/recorder.c",
       "line": 113,
       "failureMode": "rcp_recorder_write_binary (general function) does not perform its intended action",
       "effect": "Failure of rcp_recorder_write_binary could propagate undetected to callers in recorder.c",
@@ -6123,9 +5451,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-383",
+      "id": "FM-341",
       "item": "write_field",
-      "file": "recorder.c",
+      "file": "src/recorder.c",
       "line": 135,
       "failureMode": "write_field (general function) does not perform its intended action",
       "effect": "Failure of write_field could propagate undetected to callers in recorder.c",
@@ -6139,9 +5467,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-384",
+      "id": "FM-342",
       "item": "write_field",
-      "file": "recorder.c",
+      "file": "src/recorder.c",
       "line": 136,
       "failureMode": "write_field (general function) does not perform its intended action",
       "effect": "Failure of write_field could propagate undetected to callers in recorder.c",
@@ -6155,9 +5483,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-385",
+      "id": "FM-343",
       "item": "write_field",
-      "file": "recorder.c",
+      "file": "src/recorder.c",
       "line": 137,
       "failureMode": "write_field (general function) does not perform its intended action",
       "effect": "Failure of write_field could propagate undetected to callers in recorder.c",
@@ -6171,9 +5499,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-386",
+      "id": "FM-344",
       "item": "write_field",
-      "file": "recorder.c",
+      "file": "src/recorder.c",
       "line": 138,
       "failureMode": "write_field (general function) does not perform its intended action",
       "effect": "Failure of write_field could propagate undetected to callers in recorder.c",
@@ -6187,9 +5515,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-387",
+      "id": "FM-345",
       "item": "write_field",
-      "file": "recorder.c",
+      "file": "src/recorder.c",
       "line": 139,
       "failureMode": "write_field (general function) does not perform its intended action",
       "effect": "Failure of write_field could propagate undetected to callers in recorder.c",
@@ -6203,9 +5531,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-388",
+      "id": "FM-346",
       "item": "rcp_playback_default_config",
-      "file": "recorder.c",
+      "file": "src/recorder.c",
       "line": 150,
       "failureMode": "rcp_playback_default_config (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_playback_default_config could propagate undetected to callers in recorder.c",
@@ -6219,9 +5547,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-389",
+      "id": "FM-347",
       "item": "rcp_sequencer_table_new",
-      "file": "request_sequencer.c",
+      "file": "src/request_sequencer.c",
       "line": 9,
       "failureMode": "rcp_sequencer_table_new (general function) does not perform its intended action",
       "effect": "Failure of rcp_sequencer_table_new could propagate undetected to callers in request_sequencer.c",
@@ -6235,9 +5563,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-390",
+      "id": "FM-348",
       "item": "rcp_sequencer_table_unsupported",
-      "file": "request_sequencer.c",
+      "file": "src/request_sequencer.c",
       "line": 27,
       "failureMode": "rcp_sequencer_table_unsupported (general function) does not perform its intended action",
       "effect": "Failure of rcp_sequencer_table_unsupported could propagate undetected to callers in request_sequencer.c",
@@ -6251,9 +5579,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-391",
+      "id": "FM-349",
       "item": "rcp_sequencer_table_reset",
-      "file": "request_sequencer.c",
+      "file": "src/request_sequencer.c",
       "line": 33,
       "failureMode": "rcp_sequencer_table_reset (general function) does not perform its intended action",
       "effect": "Failure of rcp_sequencer_table_reset could propagate undetected to callers in request_sequencer.c",
@@ -6267,9 +5595,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-392",
+      "id": "FM-350",
       "item": "rcp_sequencer_table_free",
-      "file": "request_sequencer.c",
+      "file": "src/request_sequencer.c",
       "line": 40,
       "failureMode": "rcp_sequencer_table_free (general function) does not perform its intended action",
       "effect": "Failure of rcp_sequencer_table_free could propagate undetected to callers in request_sequencer.c",
@@ -6283,9 +5611,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-393",
+      "id": "FM-351",
       "item": "rcp_sequencer_index_valid",
-      "file": "request_sequencer.c",
+      "file": "src/request_sequencer.c",
       "line": 48,
       "failureMode": "rcp_sequencer_index_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_sequencer_index_valid could propagate undetected to callers in request_sequencer.c",
@@ -6299,9 +5627,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-394",
+      "id": "FM-352",
       "item": "rcp_sequencer_set_state",
-      "file": "request_sequencer.c",
+      "file": "src/request_sequencer.c",
       "line": 65,
       "failureMode": "rcp_sequencer_set_state (general function) does not perform its intended action",
       "effect": "Failure of rcp_sequencer_set_state could propagate undetected to callers in request_sequencer.c",
@@ -6315,9 +5643,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-395",
+      "id": "FM-353",
       "item": "rcp_status_channel_release",
-      "file": "legacy_mock.c",
+      "file": "tests/legacy_mock.c",
       "line": 142,
       "failureMode": "rcp_status_channel_release (general function) does not perform its intended action",
       "effect": "Failure of rcp_status_channel_release could propagate undetected to callers in legacy_mock.c",
@@ -6331,9 +5659,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-396",
+      "id": "FM-354",
       "item": "rcp_status_channel_release",
-      "file": "legacy_mock.c",
+      "file": "tests/legacy_mock.c",
       "line": 147,
       "failureMode": "rcp_status_channel_release (general function) does not perform its intended action",
       "effect": "Failure of rcp_status_channel_release could propagate undetected to callers in legacy_mock.c",
@@ -6347,9 +5675,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-397",
+      "id": "FM-355",
       "item": "rcp_mock_controller_publish",
-      "file": "legacy_mock.c",
+      "file": "tests/legacy_mock.c",
       "line": 213,
       "failureMode": "rcp_mock_controller_publish (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_controller_publish could propagate undetected to callers in legacy_mock.c",
@@ -6363,9 +5691,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-398",
+      "id": "FM-356",
       "item": "rcp_bytes_dup",
-      "file": "legacy_mock.c",
+      "file": "tests/legacy_mock.c",
       "line": 226,
       "failureMode": "rcp_bytes_dup (general function) does not perform its intended action",
       "effect": "Failure of rcp_bytes_dup could propagate undetected to callers in legacy_mock.c",
@@ -6379,25 +5707,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-399",
-      "item": "free",
-      "file": "legacy_mock.c",
-      "line": 285,
-      "failureMode": "free (general function) does not perform its intended action",
-      "effect": "Failure of free could propagate undetected to callers in legacy_mock.c",
-      "cause": "Logic error or untested edge case in free",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-400",
+      "id": "FM-357",
       "item": "rcp_mock_controller_new",
-      "file": "legacy_mock.c",
+      "file": "tests/legacy_mock.c",
       "line": 299,
       "failureMode": "rcp_mock_controller_new (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_controller_new could propagate undetected to callers in legacy_mock.c",
@@ -6411,25 +5723,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-401",
-      "item": "free",
-      "file": "legacy_mock.c",
-      "line": 470,
-      "failureMode": "free (general function) does not perform its intended action",
-      "effect": "Failure of free could propagate undetected to callers in legacy_mock.c",
-      "cause": "Logic error or untested edge case in free",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-402",
+      "id": "FM-358",
       "item": "rcp_mock_registry_new",
-      "file": "legacy_mock.c",
+      "file": "tests/legacy_mock.c",
       "line": 484,
       "failureMode": "rcp_mock_registry_new (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_registry_new could propagate undetected to callers in legacy_mock.c",
@@ -6443,9 +5739,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-403",
+      "id": "FM-359",
       "item": "setUp",
-      "file": "bench_mock.c",
+      "file": "tests/bench_mock.c",
       "line": 51,
       "failureMode": "setUp (general function) does not perform its intended action",
       "effect": "Failure of setUp could propagate undetected to callers in bench_mock.c",
@@ -6459,9 +5755,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-404",
+      "id": "FM-360",
       "item": "tearDown",
-      "file": "bench_mock.c",
+      "file": "tests/bench_mock.c",
       "line": 52,
       "failureMode": "tearDown (general function) does not perform its intended action",
       "effect": "Failure of tearDown could propagate undetected to callers in bench_mock.c",
@@ -6475,25 +5771,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-405",
-      "item": "printf",
-      "file": "bench_mock.c",
-      "line": 58,
-      "failureMode": "printf (general function) does not perform its intended action",
-      "effect": "Failure of printf could propagate undetected to callers in bench_mock.c",
-      "cause": "Logic error or untested edge case in printf",
-      "severity": 3,
-      "occurrence": 2,
-      "detection": 3,
-      "actionPriority": "low",
-      "mitigations": [],
-      "requirementIds": [],
-      "cyberFailureMode": ""
-    },
-    {
-      "id": "FM-406",
+      "id": "FM-361",
       "item": "main",
-      "file": "bench_mock.c",
+      "file": "tests/bench_mock.c",
       "line": 221,
       "failureMode": "main (general function) does not perform its intended action",
       "effect": "Failure of main could propagate undetected to callers in bench_mock.c",
@@ -6507,9 +5787,9 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-407",
+      "id": "FM-362",
       "item": "main",
-      "file": "main.c",
+      "file": "cli/main.c",
       "line": 11,
       "failureMode": "main (general function) does not perform its intended action",
       "effect": "Failure of main could propagate undetected to callers in main.c",
@@ -6524,7 +5804,7 @@
     }
   ],
   "summary": {
-    "total": 407, "highPriority": 67,
-    "componentsAnalyzed": 407, "componentsInProject": 407, "coveragePct": 100
+    "total": 362, "highPriority": 37,
+    "componentsAnalyzed": 362, "componentsInProject": 362, "coveragePct": 100
   }
 }

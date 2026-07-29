@@ -1,12 +1,12 @@
 {
-  "schemaVersion": "1.14.0",
+  "schemaVersion": "1.15.2",
   "kind": "artifact-manifest",
   "tool": "c-FuSa",
-  "toolVersion": "0.5.46",
+  "toolVersion": "0.5.48",
   "language": "c",
-  "generatedAt": "2026-07-29T17:18:17Z",
+  "generatedAt": "2026-07-29T17:27:28Z",
   "format": "x-FuSa manifest v1",
   "artifacts": [
-    {"path": "sbom.json", "sha256": "f471b21a6fad5c0b584d6ae0592117642d506ea19f4797c30e15e30d2d452721"}
+    {"path": "sbom.json", "sha256": "579a15e9f062c316228e7210dd5679a77bf4b5ec68d4aa092d1daae6853b8e48"}
   ]
 }
