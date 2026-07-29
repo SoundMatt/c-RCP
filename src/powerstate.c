@@ -4,55 +4,49 @@
 
 #include <stdlib.h>
 
-//cfusa:req REQ-PWR-009
-const char *rcp_power_state_string(rcp_power_state_t p)
+//cfusa:req REQ-PWR-010
+const char *rcp_powerstate_strerror(rcp_powerstate_errc_t e)
 {
-    switch (p) {
-    case RCP_POWER_ACTIVE:   return "active";
-    case RCP_POWER_SLEEPING: return "sleeping";
-    case RCP_POWER_BUS_OFF:  return "bus-off";
-    default:                 return "unknown";
+    switch (e) {
+    case RCP_POWERSTATE_OK:                   return "ok";
+    case RCP_POWERSTATE_ERR_UNKNOWN_ENDPOINT:  return "unknown endpoint";
+    case RCP_POWERSTATE_ERR_DECODE:            return "decode failed";
+    case RCP_POWERSTATE_ERR_UNEXPECTED_TXN:    return "unexpected transaction number";
+    case RCP_POWERSTATE_ERR_ENTRY_REFUSED:     return "entry refused";
+    case RCP_POWERSTATE_ERR_TRANSITION:        return "invalid transition";
+    default:                                   return "unknown";
     }
 }
 
-rcp_powerstate_config_t rcp_powerstate_default_config(void)
-{
-    rcp_powerstate_config_t c;
-    c.recovery_interval_ms = 100;
-    c.recovery_timeout_ms  = 50;
-    return c;
-}
-
 typedef struct {
-    rcp_controller_t  *ctrl; /* retained */
-    rcp_zone_t          zone;
-    rcp_power_state_t   state;
-} zone_entry_t;
+    rcp_avtp_addr_t         addr;
+    rcp_pwrmode_t           mode;
+    rcp_pwrmode_handshake_t handshake;
+
+    bool          request_pending;
+    rcp_pwrmode_t pending_target;
+    uint8_t       pending_txn;
+} endpoint_entry_t;
 
 struct rcp_powerstate_manager {
-    rcp_powerstate_config_t  cfg;
-    rcp_mutex_t               mu; /* protects entries[].state, callbacks[], closed */
-    zone_entry_t             *entries;
+    rcp_mutex_t               mu; /* protects entries[], callbacks[] */
+    endpoint_entry_t         *entries;
     size_t                    n_entries;
     rcp_powerstate_power_fn  *callbacks;
     void                    **callback_ctx;
     size_t                    n_callbacks;
     size_t                    callbacks_cap;
-    bool                      closed;
-    rcp_thread_t              recover_thread;
-    bool                      have_recover_thread;
 };
 
-static zone_entry_t *find_entry(rcp_powerstate_manager_t *m, rcp_zone_t z)
+static endpoint_entry_t *find_entry(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr)
 {
     size_t i;
     for (i = 0; i < m->n_entries; i++) {
-        if (m->entries[i].zone == z) return &m->entries[i];
+        if (rcp_avtp_addr_equal(m->entries[i].addr, addr)) return &m->entries[i];
     }
     return NULL;
 }
 
-//cfusa:req REQ-PWR-010
 static bool callbacks_append(rcp_powerstate_manager_t *m, rcp_powerstate_power_fn cb, void *user_data)
 {
     if (m->n_callbacks == m->callbacks_cap) {
@@ -72,164 +66,35 @@ static bool callbacks_append(rcp_powerstate_manager_t *m, rcp_powerstate_power_f
     return true;
 }
 
-static void transition(rcp_powerstate_manager_t *m, zone_entry_t *e, rcp_power_state_t next, int err)
+static void emit(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr, rcp_pwrmode_t mode, rcp_powerstate_errc_t err)
 {
     rcp_power_event_t ev;
     size_t i;
-    bool changed;
 
-    rcp_mutex_lock(&m->mu);
-    changed = (e->state != next);
-    if (changed) e->state = next;
-    rcp_mutex_unlock(&m->mu);
+    ev.addr = addr;
+    ev.mode = mode;
+    ev.err  = err;
 
-    if (!changed) return;
-
-    ev.zone  = e->zone;
-    ev.state = next;
-    ev.err   = err;
-
-    /* Invoked outside the lock, matching watchdog.c/deadline.c: subscribe()
-     * is documented as not thread-safe with close(), so this read is safe
-     * without holding mu. */
+    /* Invoked outside any lock the caller might be holding when it calls
+     * into this module: subscribe() is documented as not thread-safe with
+     * destroy(), matching watchdog.c/deadline.c's own precedent, so
+     * n_callbacks/callbacks are safe to read here without mu (only ever
+     * appended to before m is handed to other threads). */
     for (i = 0; i < m->n_callbacks; i++) {
         m->callbacks[i](&ev, m->callback_ctx[i]);
     }
 }
 
-//cfusa:req REQ-PWR-001
-//cfusa:req REQ-PWR-002
-int rcp_powerstate_manager_sleep(rcp_powerstate_manager_t *m, const rcp_context_t *ctx, rcp_zone_t zone)
-{
-    zone_entry_t *e;
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
-    int ec;
-
-    rcp_mutex_lock(&m->mu);
-    e = find_entry(m, zone);
-    if (!e) {
-        rcp_mutex_unlock(&m->mu);
-        return RCP_ERR_NOT_FOUND;
-    }
-    if (e->state != RCP_POWER_ACTIVE) {
-        rcp_mutex_unlock(&m->mu);
-        return RCP_ERR_BUSY;
-    }
-    rcp_mutex_unlock(&m->mu);
-
-    cmd.zone     = zone;
-    cmd.type     = RCP_CMD_SLEEP;
-    cmd.priority = RCP_PRIORITY_HIGH;
-    ec = rcp_controller_send(e->ctrl, ctx, &cmd, &resp);
-    rcp_response_free(&resp);
-
-    transition(m, e, ec == RCP_OK ? RCP_POWER_SLEEPING : RCP_POWER_BUS_OFF, ec);
-    return ec;
-}
-
-//cfusa:req REQ-PWR-003
-//cfusa:req REQ-PWR-004
-int rcp_powerstate_manager_wake(rcp_powerstate_manager_t *m, const rcp_context_t *ctx, rcp_zone_t zone)
-{
-    zone_entry_t *e;
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
-    int ec;
-
-    rcp_mutex_lock(&m->mu);
-    e = find_entry(m, zone);
-    if (!e) {
-        rcp_mutex_unlock(&m->mu);
-        return RCP_ERR_NOT_FOUND;
-    }
-    if (e->state == RCP_POWER_ACTIVE) {
-        rcp_mutex_unlock(&m->mu);
-        return RCP_ERR_BUSY;
-    }
-    rcp_mutex_unlock(&m->mu);
-
-    cmd.zone     = zone;
-    cmd.type     = RCP_CMD_WAKE;
-    cmd.priority = RCP_PRIORITY_HIGH;
-    ec = rcp_controller_send(e->ctrl, ctx, &cmd, &resp);
-    rcp_response_free(&resp);
-
-    transition(m, e, ec == RCP_OK ? RCP_POWER_ACTIVE : RCP_POWER_BUS_OFF, ec);
-    return ec;
-}
-
-//cfusa:req REQ-PWR-005
-//cfusa:req REQ-PWR-006
-static void attempt_recovery(rcp_powerstate_manager_t *m)
-{
-    size_t i;
-
-    for (i = 0; i < m->n_entries; i++) {
-        zone_entry_t *e = &m->entries[i];
-        rcp_command_t cmd = {0};
-        rcp_response_t resp = {0};
-        rcp_context_t ctx;
-        int ec;
-        bool is_bus_off;
-
-        rcp_mutex_lock(&m->mu);
-        is_bus_off = (e->state == RCP_POWER_BUS_OFF);
-        rcp_mutex_unlock(&m->mu);
-        if (!is_bus_off) continue;
-
-        cmd.zone     = e->zone;
-        cmd.type     = RCP_CMD_WAKE;
-        cmd.priority = RCP_PRIORITY_HIGH;
-        ctx = rcp_context_with_timeout_ms(m->cfg.recovery_timeout_ms);
-        ec = rcp_controller_send(e->ctrl, &ctx, &cmd, &resp);
-        rcp_response_free(&resp);
-
-        if (ec == RCP_OK) transition(m, e, RCP_POWER_ACTIVE, RCP_OK);
-    }
-}
-
-static void recover_thread_fn(void *arg)
-{
-    rcp_powerstate_manager_t *m = (rcp_powerstate_manager_t *)arg;
-
-    for (;;) {
-        bool closed_now;
-        uint64_t waited_ms;
-
-        rcp_mutex_lock(&m->mu);
-        closed_now = m->closed;
-        rcp_mutex_unlock(&m->mu);
-        if (closed_now) break;
-
-        attempt_recovery(m);
-
-        waited_ms = 0;
-        while (waited_ms < m->cfg.recovery_interval_ms) {
-            unsigned chunk = (m->cfg.recovery_interval_ms - waited_ms) < 5
-                                 ? (unsigned)(m->cfg.recovery_interval_ms - waited_ms) : 5;
-            rcp_mutex_lock(&m->mu);
-            closed_now = m->closed;
-            rcp_mutex_unlock(&m->mu);
-            if (closed_now) break;
-            rcp_sleep_ms(chunk == 0 ? 1 : chunk);
-            waited_ms += (chunk == 0 ? 1 : chunk);
-        }
-    }
-}
-
-rcp_powerstate_manager_t *rcp_powerstate_manager_new(rcp_powerstate_config_t cfg,
-                                                      rcp_controller_t *const *ctrls, size_t n_ctrls)
+rcp_powerstate_manager_t *rcp_powerstate_manager_new(const rcp_avtp_addr_t *endpoints, size_t n_endpoints)
 {
     rcp_powerstate_manager_t *m = (rcp_powerstate_manager_t *)calloc(1, sizeof(*m));
     size_t i;
 
     if (!m) return NULL;
-    m->cfg = cfg;
     rcp_mutex_init(&m->mu);
 
-    if (n_ctrls > 0) {
-        zone_entry_t *entries = (zone_entry_t *)calloc(n_ctrls, sizeof(*entries));
+    if (n_endpoints > 0) {
+        endpoint_entry_t *entries = (endpoint_entry_t *)calloc(n_endpoints, sizeof(*entries));
         m->entries = entries;
         if (!m->entries) {
             rcp_mutex_destroy(&m->mu);
@@ -237,33 +102,241 @@ rcp_powerstate_manager_t *rcp_powerstate_manager_new(rcp_powerstate_config_t cfg
             return NULL;
         }
     }
-    for (i = 0; i < n_ctrls; i++) {
-        m->entries[i].ctrl  = rcp_controller_retain(ctrls[i]);
-        m->entries[i].zone  = rcp_controller_zone(ctrls[i]);
-        m->entries[i].state = RCP_POWER_ACTIVE;
+    for (i = 0; i < n_endpoints; i++) {
+        m->entries[i].addr            = endpoints[i];
+        m->entries[i].mode            = RCP_PWRMODE_NORMAL;
+        m->entries[i].request_pending = false;
+        rcp_pwrmode_handshake_init(&m->entries[i].handshake, 0);
     }
-    m->n_entries = n_ctrls;
-
-    if (rcp_thread_start(&m->recover_thread, recover_thread_fn, m) == 0) {
-        m->have_recover_thread = true;
-    }
+    m->n_entries = n_endpoints;
 
     return m;
 }
 
-rcp_power_state_t rcp_powerstate_manager_state(rcp_powerstate_manager_t *m, rcp_zone_t zone)
+rcp_pwrmode_t rcp_powerstate_manager_mode(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr)
 {
-    zone_entry_t *e;
-    rcp_power_state_t s;
+    endpoint_entry_t *e;
+    rcp_pwrmode_t mode;
 
     rcp_mutex_lock(&m->mu);
-    e = find_entry(m, zone);
-    s = e ? e->state : RCP_POWER_BUS_OFF;
+    e = find_entry(m, addr);
+    mode = e ? e->mode : RCP_PWRMODE_NORMAL;
     rcp_mutex_unlock(&m->mu);
-    return s;
+    return mode;
+}
+
+//cfusa:req REQ-PWR-001
+rcp_bytes_t rcp_powerstate_manager_encode_entry_request(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
+                                                          rcp_pwrmode_t target_mode, uint8_t transaction_num)
+{
+    endpoint_entry_t *e;
+    rcp_bytes_t frame;
+
+    rcp_mutex_lock(&m->mu);
+    e = find_entry(m, addr);
+    rcp_mutex_unlock(&m->mu);
+    if (!e) {
+        rcp_bytes_t zero = {0};
+        return zero;
+    }
+
+    frame = rcp_ep_wakeup_encode_sleepcmd_request(addr.byte_bus_id, target_mode, transaction_num);
+    if (frame.data) {
+        rcp_mutex_lock(&m->mu);
+        e->request_pending = true;
+        e->pending_target  = target_mode;
+        e->pending_txn     = transaction_num;
+        rcp_mutex_unlock(&m->mu);
+    }
+    return frame;
+}
+
+//cfusa:req REQ-PWR-002
+//cfusa:req REQ-PWR-003
+//cfusa:req REQ-PWR-004
+rcp_powerstate_errc_t rcp_powerstate_manager_apply_entry_response(rcp_powerstate_manager_t *m,
+                                                                    rcp_avtp_addr_t addr,
+                                                                    const uint8_t *b, size_t len)
+{
+    endpoint_entry_t *e;
+    rcp_pwrmode_entry_result_t result;
+    uint8_t txn;
+    rcp_ep_wakeup_errc_t dec;
+    rcp_pwrmode_t target;
+    rcp_pwrmode_errc_t tec;
+    rcp_pwrmode_t mode_after;
+
+    rcp_mutex_lock(&m->mu);
+    e = find_entry(m, addr);
+    rcp_mutex_unlock(&m->mu);
+    if (!e) return RCP_POWERSTATE_ERR_UNKNOWN_ENDPOINT;
+
+    dec = rcp_ep_wakeup_decode_sleepcmd_response(b, len, addr.byte_bus_id, &result, &txn);
+    if (dec != RCP_EP_WAKEUP_OK) return RCP_POWERSTATE_ERR_DECODE;
+
+    rcp_mutex_lock(&m->mu);
+    if (!e->request_pending || e->pending_txn != txn) {
+        rcp_mutex_unlock(&m->mu);
+        return RCP_POWERSTATE_ERR_UNEXPECTED_TXN;
+    }
+    target = e->pending_target;
+    rcp_mutex_unlock(&m->mu);
+
+    if (result == RCP_PWRMODE_ENTRY_REFUSED) {
+        rcp_mutex_lock(&m->mu);
+        e->request_pending = false;
+        mode_after = e->mode; /* unchanged on refusal -- see the header's
+                                  "unchanged from before the event iff
+                                  err != RCP_POWERSTATE_OK" contract */
+        rcp_mutex_unlock(&m->mu);
+        emit(m, addr, mode_after, RCP_POWERSTATE_ERR_ENTRY_REFUSED);
+        return RCP_POWERSTATE_ERR_ENTRY_REFUSED;
+    }
+
+    rcp_mutex_lock(&m->mu);
+    tec = rcp_pwrmode_transition(&e->mode, target, NULL);
+    e->request_pending = false;
+    mode_after = e->mode;
+    rcp_mutex_unlock(&m->mu);
+
+    if (tec != RCP_PWRMODE_OK) {
+        emit(m, addr, mode_after, RCP_POWERSTATE_ERR_TRANSITION);
+        return RCP_POWERSTATE_ERR_TRANSITION;
+    }
+
+    emit(m, addr, mode_after, RCP_POWERSTATE_OK);
+    return RCP_POWERSTATE_OK;
+}
+
+//cfusa:req REQ-PWR-005
+rcp_powerstate_errc_t rcp_powerstate_manager_wake_via_network(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
+                                                                rcp_pwrmode_start_kind_t *out_start_kind)
+{
+    endpoint_entry_t *e;
+    rcp_pwrmode_errc_t ec;
+    rcp_pwrmode_t mode_after;
+
+    rcp_mutex_lock(&m->mu);
+    e = find_entry(m, addr);
+    if (!e) {
+        rcp_mutex_unlock(&m->mu);
+        return RCP_POWERSTATE_ERR_UNKNOWN_ENDPOINT;
+    }
+    ec = rcp_pwrmode_wake_from_sleep(&e->mode, RCP_PWRMODE_WAKE_VIA_NETWORK, NULL, out_start_kind);
+    mode_after = e->mode;
+    rcp_mutex_unlock(&m->mu);
+
+    if (ec != RCP_PWRMODE_OK) {
+        emit(m, addr, mode_after, RCP_POWERSTATE_ERR_TRANSITION);
+        return RCP_POWERSTATE_ERR_TRANSITION;
+    }
+
+    emit(m, addr, mode_after, RCP_POWERSTATE_OK);
+    return RCP_POWERSTATE_OK;
+}
+
+//cfusa:req REQ-PWR-006
+bool rcp_powerstate_manager_handshake_begin(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
+                                             uint32_t wakeup_repeat_limit)
+{
+    endpoint_entry_t *e;
+    bool ok;
+
+    rcp_mutex_lock(&m->mu);
+    e = find_entry(m, addr);
+    if (!e) {
+        rcp_mutex_unlock(&m->mu);
+        return false;
+    }
+    rcp_pwrmode_handshake_init(&e->handshake, wakeup_repeat_limit);
+    ok = rcp_pwrmode_handshake_iface_reenabled(&e->handshake);
+    rcp_mutex_unlock(&m->mu);
+    return ok;
+}
+
+rcp_bytes_t rcp_powerstate_manager_encode_wakeup_probe(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
+                                                         uint8_t transaction_num)
+{
+    endpoint_entry_t *e;
+
+    rcp_mutex_lock(&m->mu);
+    e = find_entry(m, addr);
+    rcp_mutex_unlock(&m->mu);
+    if (!e) {
+        rcp_bytes_t zero = {0};
+        return zero;
+    }
+
+    return rcp_ep_wakeup_encode_wakeup_message(addr.byte_bus_id, transaction_num);
 }
 
 //cfusa:req REQ-PWR-007
+bool rcp_powerstate_manager_apply_wakeup_echo(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
+                                               const uint8_t *b, size_t len, uint8_t sent_transaction_num)
+{
+    endpoint_entry_t *e;
+    bool echoed;
+    bool ok;
+
+    /* rcp_ep_wakeup_is_wakeup_echo() is a pure function over b/len -- safe
+     * to call before taking mu. */
+    echoed = rcp_ep_wakeup_is_wakeup_echo(b, len, addr.byte_bus_id, sent_transaction_num);
+
+    rcp_mutex_lock(&m->mu);
+    e = find_entry(m, addr);
+    if (!e) {
+        rcp_mutex_unlock(&m->mu);
+        return false;
+    }
+    ok = rcp_pwrmode_handshake_wakeup_attempt(&e->handshake, echoed);
+    rcp_mutex_unlock(&m->mu);
+    return ok;
+}
+
+bool rcp_powerstate_manager_handshake_resume_queues(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr)
+{
+    endpoint_entry_t *e;
+    bool ok;
+
+    rcp_mutex_lock(&m->mu);
+    e = find_entry(m, addr);
+    if (!e) {
+        rcp_mutex_unlock(&m->mu);
+        return false;
+    }
+    ok = rcp_pwrmode_handshake_resume_queues(&e->handshake);
+    rcp_mutex_unlock(&m->mu);
+    return ok;
+}
+
+//cfusa:req REQ-PWR-008
+rcp_powerstate_errc_t rcp_powerstate_manager_wake_via_pin(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
+                                                            rcp_pwrmode_start_kind_t *out_start_kind)
+{
+    endpoint_entry_t *e;
+    rcp_pwrmode_errc_t ec;
+    rcp_pwrmode_t mode_after;
+
+    rcp_mutex_lock(&m->mu);
+    e = find_entry(m, addr);
+    if (!e) {
+        rcp_mutex_unlock(&m->mu);
+        return RCP_POWERSTATE_ERR_UNKNOWN_ENDPOINT;
+    }
+    ec = rcp_pwrmode_wake_from_sleep(&e->mode, RCP_PWRMODE_WAKE_VIA_PIN, &e->handshake, out_start_kind);
+    mode_after = e->mode;
+    rcp_mutex_unlock(&m->mu);
+
+    if (ec != RCP_PWRMODE_OK) {
+        emit(m, addr, mode_after, RCP_POWERSTATE_ERR_TRANSITION);
+        return RCP_POWERSTATE_ERR_TRANSITION;
+    }
+
+    emit(m, addr, mode_after, RCP_POWERSTATE_OK);
+    return RCP_POWERSTATE_OK;
+}
+
+//cfusa:req REQ-PWR-009
 bool rcp_powerstate_manager_subscribe(rcp_powerstate_manager_t *m, rcp_powerstate_power_fn cb, void *user_data)
 {
     bool ok;
@@ -273,29 +346,10 @@ bool rcp_powerstate_manager_subscribe(rcp_powerstate_manager_t *m, rcp_powerstat
     return ok;
 }
 
-//cfusa:req REQ-PWR-008
-void rcp_powerstate_manager_close(rcp_powerstate_manager_t *m)
-{
-    rcp_mutex_lock(&m->mu);
-    m->closed = true;
-    rcp_mutex_unlock(&m->mu);
-
-    if (m->have_recover_thread) {
-        rcp_thread_join(m->recover_thread);
-        m->have_recover_thread = false;
-    }
-}
-
 void rcp_powerstate_manager_destroy(rcp_powerstate_manager_t *m)
 {
-    size_t i;
-
     if (!m) return;
-    rcp_powerstate_manager_close(m);
 
-    for (i = 0; i < m->n_entries; i++) {
-        rcp_controller_release(m->entries[i].ctrl);
-    }
     free(m->entries);
     free(m->callbacks);
     free(m->callback_ctx);

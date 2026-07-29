@@ -10,11 +10,7 @@
 #include "unity.h"
 
 #include <rcp/clock.h>
-#include "legacy_mock.h"
-#include <rcp/rcp.h>
 #include <rcp/watchdog.h>
-
-#include <string.h>
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -27,195 +23,245 @@ static void test_sleep_ms(unsigned ms)
     }
 }
 
+static rcp_watchdog_stream_cfg_t make_cfg(uint64_t stream_id, bool enable, uint32_t timeout_ms,
+                                           bool safestate, bool info)
+{
+    rcp_watchdog_stream_cfg_t c;
+    c.stream_id             = stream_id;
+    c.rx_wd_enable           = enable;
+    c.rx_wd_timeout_ms       = timeout_ms;
+    c.rx_wd_safestate_enable = safestate;
+    c.rx_wd_info_enable      = info;
+    return c;
+}
+
 /* ── Keeper creation ──────────────────────────────────────────────────────── */
 
-static void test_keeper_constructs_and_kicks_all_zones(void)
+static void test_keeper_constructs_with_zero_streams(void)
 {
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_controller_t *ctrls[] = {ctrl};
     rcp_watchdog_config_t cfg = rcp_watchdog_default_config();
-    rcp_watchdog_keeper_t *keeper;
+    rcp_watchdog_keeper_t *k  = rcp_watchdog_keeper_new(cfg, NULL, 0);
 
-    cfg.interval_ms   = 200;
-    cfg.timeout_ms    = 50;
-    cfg.degrade_after = 3;
-    cfg.fault_after   = 5;
-
-    keeper = rcp_watchdog_keeper_new(cfg, ctrls, 1);
-    TEST_ASSERT_NOT_NULL(keeper);
-
-    rcp_watchdog_keeper_destroy(keeper);
-    rcp_controller_release(ctrl);
+    TEST_ASSERT_NOT_NULL(k);
+    rcp_watchdog_keeper_destroy(k);
 }
 
-/* ── Initial state ─────────────────────────────────────────────────────────── */
-
-static void test_zone_starts_healthy(void)
+//cfusa:test REQ-WDG-009
+static void test_initial_status_established_synchronously(void)
 {
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_controller_t *ctrls[] = {ctrl};
+    rcp_watchdog_stream_cfg_t streams[] = {make_cfg(1, true, 5000, true, true)};
     rcp_watchdog_config_t cfg = rcp_watchdog_default_config();
-    rcp_watchdog_keeper_t *keeper;
+    rcp_watchdog_keeper_t *k;
+    rcp_e2e_wd_result_t status;
 
-    cfg.interval_ms = 500; /* long so no kicks fire before the assertion */
+    cfg.poll_interval_ms = 1000; /* long enough that the background thread
+                                     hasn't run its first cycle yet */
+    k = rcp_watchdog_keeper_new(cfg, streams, 1);
 
-    keeper = rcp_watchdog_keeper_new(cfg, ctrls, 1);
-    TEST_ASSERT_EQUAL(RCP_HEALTH_HEALTHY, rcp_watchdog_keeper_health(keeper, RCP_ZONE_FRONT_LEFT));
+    status = rcp_watchdog_keeper_status(k, 1);
+    TEST_ASSERT_FALSE(status.overflowed);
 
-    rcp_watchdog_keeper_destroy(keeper);
-    rcp_controller_release(ctrl);
+    rcp_watchdog_keeper_destroy(k);
 }
 
-/* ── Health state transitions ─────────────────────────────────────────────── */
+/* ── kick() ────────────────────────────────────────────────────────────────── */
 
-/* Plain (non-atomic) int: only ever written by the keeper's background
- * thread and read by the test after rcp_watchdog_keeper_destroy() has
- * joined that thread, which establishes happens-before without needing
- * <stdatomic.h> (C11, unavailable under this project's C99 standard). */
-static int g_last_state;
-
-static void capture_last_state(const rcp_health_event_t *ev, void *user_data)
+//cfusa:test REQ-WDG-003
+static void test_kick_unknown_stream_returns_false(void)
 {
-    (void)user_data;
-    g_last_state = (int)ev->state;
+    rcp_watchdog_config_t cfg = rcp_watchdog_default_config();
+    rcp_watchdog_keeper_t *k  = rcp_watchdog_keeper_new(cfg, NULL, 0);
+
+    TEST_ASSERT_FALSE(rcp_watchdog_keeper_kick(k, 42));
+
+    rcp_watchdog_keeper_destroy(k);
 }
 
-static bool poll_for_state(rcp_watchdog_keeper_t *keeper, rcp_zone_t z, rcp_health_state_t want)
+//cfusa:test REQ-WDG-005
+static void test_status_unknown_stream_all_false(void)
 {
-    /* Background kick cadence isn't deterministic under CI scheduling, so
-     * poll up to a generous deadline rather than a single fixed sleep. */
+    rcp_watchdog_config_t cfg = rcp_watchdog_default_config();
+    rcp_watchdog_keeper_t *k  = rcp_watchdog_keeper_new(cfg, NULL, 0);
+    rcp_e2e_wd_result_t status = rcp_watchdog_keeper_status(k, 42);
+
+    TEST_ASSERT_FALSE(status.overflowed);
+    TEST_ASSERT_FALSE(status.enter_safe_state);
+    TEST_ASSERT_FALSE(status.notify);
+
+    rcp_watchdog_keeper_destroy(k);
+}
+
+/* ── Overflow behavior ────────────────────────────────────────────────────── */
+
+static bool poll_for_overflow(rcp_watchdog_keeper_t *k, uint64_t stream_id, bool want)
+{
     int elapsed_ms = 0;
     while (elapsed_ms < 5000) {
-        if (rcp_watchdog_keeper_health(keeper, z) == want) return true;
+        if (rcp_watchdog_keeper_status(k, stream_id).overflowed == want) return true;
         test_sleep_ms(10);
         elapsed_ms += 10;
     }
     return false;
 }
 
-static void test_degraded_after_degrade_after_misses(void)
+//cfusa:test REQ-WDG-001
+//cfusa:test REQ-WDG-002
+static void test_overflow_after_timeout_without_kick(void)
 {
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_controller_t *ctrls[] = {ctrl};
+    rcp_watchdog_stream_cfg_t streams[] = {make_cfg(7, true, 20, true, true)};
     rcp_watchdog_config_t cfg = rcp_watchdog_default_config();
-    rcp_watchdog_keeper_t *keeper;
+    rcp_watchdog_keeper_t *k;
 
-    rcp_controller_close(ctrl); /* every kick now fails with RCP_ERR_CLOSED */
+    cfg.poll_interval_ms = 5;
+    k = rcp_watchdog_keeper_new(cfg, streams, 1);
 
-    cfg.interval_ms   = 20;
-    cfg.timeout_ms    = 5;
-    cfg.degrade_after = 2;
-    cfg.fault_after   = 100; /* effectively unreachable within this test's deadline */
+    TEST_ASSERT_TRUE(poll_for_overflow(k, 7, true));
 
-    keeper = rcp_watchdog_keeper_new(cfg, ctrls, 1);
-
-    TEST_ASSERT_TRUE(poll_for_state(keeper, RCP_ZONE_FRONT_LEFT, RCP_HEALTH_DEGRADED));
-
-    rcp_watchdog_keeper_destroy(keeper);
-    rcp_controller_release(ctrl);
+    rcp_watchdog_keeper_destroy(k);
 }
 
-static void test_faulted_after_fault_after_misses(void)
+//cfusa:test REQ-WDG-008
+static void test_disabled_watchdog_never_overflows(void)
 {
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_controller_t *ctrls[] = {ctrl};
+    rcp_watchdog_stream_cfg_t streams[] = {make_cfg(9, false, 10, true, true)};
     rcp_watchdog_config_t cfg = rcp_watchdog_default_config();
-    rcp_watchdog_keeper_t *keeper;
+    rcp_watchdog_keeper_t *k;
 
-    rcp_controller_close(ctrl); /* every kick now fails with RCP_ERR_CLOSED */
+    cfg.poll_interval_ms = 5;
+    k = rcp_watchdog_keeper_new(cfg, streams, 1);
 
-    cfg.interval_ms   = 20;
-    cfg.timeout_ms    = 5;
-    cfg.degrade_after = 2;
-    cfg.fault_after   = 3;
-
-    g_last_state = (int)RCP_HEALTH_HEALTHY;
-    keeper = rcp_watchdog_keeper_new(cfg, ctrls, 1);
-    rcp_watchdog_keeper_subscribe(keeper, capture_last_state, NULL);
-
-    TEST_ASSERT_TRUE(poll_for_state(keeper, RCP_ZONE_FRONT_LEFT, RCP_HEALTH_FAULTED));
-
-    /* rcp_watchdog_keeper_destroy() joins the background thread before
-     * returning, which is what makes reading the plain (non-atomic)
-     * g_last_state below safe — see its declaration comment. */
-    rcp_watchdog_keeper_destroy(keeper);
-    TEST_ASSERT_EQUAL(RCP_HEALTH_FAULTED, g_last_state);
-
-    rcp_controller_release(ctrl);
-}
-
-/* ── Health recovery ───────────────────────────────────────────────────────── */
-
-static void test_recovery_to_healthy_after_degraded(void)
-{
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_controller_t *ctrls[] = {ctrl};
-    rcp_watchdog_config_t cfg = rcp_watchdog_default_config();
-    rcp_watchdog_keeper_t *keeper;
-
-    cfg.interval_ms   = 20;
-    cfg.timeout_ms    = 5;
-    cfg.degrade_after = 2;
-    cfg.fault_after   = 100;
-
-    keeper = rcp_watchdog_keeper_new(cfg, ctrls, 1);
-
-    /* Should never leave Healthy: the mock controller is open and answers
-     * every kick successfully. */
     test_sleep_ms(150);
-    TEST_ASSERT_EQUAL(RCP_HEALTH_HEALTHY, rcp_watchdog_keeper_health(keeper, RCP_ZONE_FRONT_LEFT));
+    TEST_ASSERT_FALSE(rcp_watchdog_keeper_status(k, 9).overflowed);
 
-    rcp_watchdog_keeper_destroy(keeper);
-    rcp_controller_release(ctrl);
+    rcp_watchdog_keeper_destroy(k);
+}
+
+static void test_kick_resets_timer_prevents_overflow(void)
+{
+    rcp_watchdog_stream_cfg_t streams[] = {make_cfg(3, true, 40, true, true)};
+    rcp_watchdog_config_t cfg = rcp_watchdog_default_config();
+    rcp_watchdog_keeper_t *k;
+    int i;
+
+    cfg.poll_interval_ms = 5;
+    k = rcp_watchdog_keeper_new(cfg, streams, 1);
+
+    for (i = 0; i < 10; i++) {
+        test_sleep_ms(10);
+        TEST_ASSERT_TRUE(rcp_watchdog_keeper_kick(k, 3));
+        TEST_ASSERT_FALSE(rcp_watchdog_keeper_status(k, 3).overflowed);
+    }
+
+    rcp_watchdog_keeper_destroy(k);
+}
+
+/* ── notify/enter_safe_state independence ─────────────────────────────────── */
+
+static void test_notify_only_when_safestate_disabled(void)
+{
+    rcp_watchdog_stream_cfg_t streams[] = {make_cfg(11, true, 20, false, true)};
+    rcp_watchdog_config_t cfg = rcp_watchdog_default_config();
+    rcp_watchdog_keeper_t *k;
+    rcp_e2e_wd_result_t status;
+
+    cfg.poll_interval_ms = 5;
+    k = rcp_watchdog_keeper_new(cfg, streams, 1);
+
+    TEST_ASSERT_TRUE(poll_for_overflow(k, 11, true));
+    status = rcp_watchdog_keeper_status(k, 11);
+    TEST_ASSERT_TRUE(status.notify);
+    TEST_ASSERT_FALSE(status.enter_safe_state);
+
+    rcp_watchdog_keeper_destroy(k);
+}
+
+static void test_safestate_only_when_info_disabled(void)
+{
+    rcp_watchdog_stream_cfg_t streams[] = {make_cfg(12, true, 20, true, false)};
+    rcp_watchdog_config_t cfg = rcp_watchdog_default_config();
+    rcp_watchdog_keeper_t *k;
+    rcp_e2e_wd_result_t status;
+
+    cfg.poll_interval_ms = 5;
+    k = rcp_watchdog_keeper_new(cfg, streams, 1);
+
+    TEST_ASSERT_TRUE(poll_for_overflow(k, 12, true));
+    status = rcp_watchdog_keeper_status(k, 12);
+    TEST_ASSERT_TRUE(status.enter_safe_state);
+    TEST_ASSERT_FALSE(status.notify);
+
+    rcp_watchdog_keeper_destroy(k);
+}
+
+/* ── Subscription ─────────────────────────────────────────────────────────── */
+
+/* Only ever written by the keeper's background thread; read by the test
+ * after rcp_watchdog_keeper_destroy() has joined that thread, which
+ * establishes happens-before without needing <stdatomic.h> (C11,
+ * unavailable under this project's C99 standard). */
+static int g_event_count;
+static bool g_last_overflowed;
+
+static void count_events(const rcp_watchdog_event_t *ev, void *user_data)
+{
+    (void)user_data;
+    g_event_count++;
+    g_last_overflowed = ev->result.overflowed;
+}
+
+//cfusa:test REQ-WDG-006
+static void test_subscribe_fires_on_overflow(void)
+{
+    rcp_watchdog_stream_cfg_t streams[] = {make_cfg(15, true, 20, true, true)};
+    rcp_watchdog_config_t cfg = rcp_watchdog_default_config();
+    rcp_watchdog_keeper_t *k;
+
+    cfg.poll_interval_ms = 5;
+    g_event_count = 0;
+    g_last_overflowed = false;
+
+    k = rcp_watchdog_keeper_new(cfg, streams, 1);
+    TEST_ASSERT_TRUE(rcp_watchdog_keeper_subscribe(k, count_events, NULL));
+
+    TEST_ASSERT_TRUE(poll_for_overflow(k, 15, true));
+
+    rcp_watchdog_keeper_destroy(k);
+    TEST_ASSERT_TRUE(g_event_count > 0);
+    TEST_ASSERT_TRUE(g_last_overflowed);
 }
 
 /* ── Close ─────────────────────────────────────────────────────────────────── */
 
-static void test_close_stops_background_kicks(void)
+//cfusa:test REQ-WDG-007
+static void test_close_stops_background_thread(void)
 {
-    rcp_controller_t *ctrl = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, NULL, NULL);
-    rcp_controller_t *ctrls[] = {ctrl};
     rcp_watchdog_config_t cfg = rcp_watchdog_default_config();
-    rcp_watchdog_keeper_t *keeper;
+    rcp_watchdog_keeper_t *k;
 
-    cfg.interval_ms = 50;
-    keeper = rcp_watchdog_keeper_new(cfg, ctrls, 1);
+    cfg.poll_interval_ms = 50;
+    k = rcp_watchdog_keeper_new(cfg, NULL, 0);
 
-    rcp_watchdog_keeper_close(keeper); /* must return promptly, not hang */
+    rcp_watchdog_keeper_close(k); /* must return promptly, not hang */
+    rcp_watchdog_keeper_close(k); /* idempotent */
 
-    rcp_watchdog_keeper_destroy(keeper);
-    rcp_controller_release(ctrl);
-}
-
-static void test_health_state_string_unique_nonempty(void)
-{
-    const rcp_health_state_t states[] = {
-        RCP_HEALTH_HEALTHY, RCP_HEALTH_DEGRADED, RCP_HEALTH_FAULTED,
-    };
-    const size_t n = sizeof(states) / sizeof(states[0]);
-    size_t i, j;
-
-    for (i = 0; i < n; i++) {
-        const char *s = rcp_health_state_string(states[i]);
-        TEST_ASSERT_NOT_NULL(s);
-        TEST_ASSERT_TRUE(strlen(s) > 0);
-        for (j = 0; j < i; j++) {
-            TEST_ASSERT_NOT_EQUAL(0, strcmp(s, rcp_health_state_string(states[j])) != 0 ? 1 : 0);
-        }
-    }
+    rcp_watchdog_keeper_destroy(k);
 }
 
 int main(void)
 {
     UNITY_BEGIN();
 
-    RUN_TEST(test_keeper_constructs_and_kicks_all_zones);
-    RUN_TEST(test_zone_starts_healthy);
-    RUN_TEST(test_degraded_after_degrade_after_misses);
-    RUN_TEST(test_faulted_after_fault_after_misses);
-    RUN_TEST(test_recovery_to_healthy_after_degraded);
-    RUN_TEST(test_close_stops_background_kicks);
-    RUN_TEST(test_health_state_string_unique_nonempty);
+    RUN_TEST(test_keeper_constructs_with_zero_streams);
+    RUN_TEST(test_initial_status_established_synchronously);
+    RUN_TEST(test_kick_unknown_stream_returns_false);
+    RUN_TEST(test_status_unknown_stream_all_false);
+    RUN_TEST(test_overflow_after_timeout_without_kick);
+    RUN_TEST(test_disabled_watchdog_never_overflows);
+    RUN_TEST(test_kick_resets_timer_prevents_overflow);
+    RUN_TEST(test_notify_only_when_safestate_disabled);
+    RUN_TEST(test_safestate_only_when_info_disabled);
+    RUN_TEST(test_subscribe_fires_on_overflow);
+    RUN_TEST(test_close_stops_background_thread);
 
     return UNITY_END();
 }

@@ -282,8 +282,8 @@
     },
     {
       "id": "REQ-DL-001",
-      "title": "Monitor subscribes to all zones",
-      "text": "rcp_deadline_monitor_t shall subscribe to each registered zone controller's Status stream on construction.",
+      "title": "heartbeat() resets a stream's deadline timer",
+      "text": "rcp_deadline_monitor_heartbeat() shall reset the named stream's last-signal time to the current time, and shall return false without changing any state if the stream was not registered.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -291,7 +291,7 @@
     {
       "id": "REQ-DL-002",
       "title": "Dead event on initial deadline",
-      "text": "The monitor shall emit LivenessEvent{alive=false} for any zone that does not publish a Status within the configured deadline, including the very first deadline period.",
+      "text": "The monitor shall emit LivenessEvent{alive=false} for any stream that receives no heartbeat within its configured deadline, including the very first deadline period.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -299,47 +299,47 @@
     {
       "id": "REQ-DL-003",
       "title": "Repeated dead events suppressed",
-      "text": "The monitor shall not re-emit LivenessEvent{alive=false} for a zone that is already known to be dead.",
+      "text": "The monitor shall not re-emit LivenessEvent{alive=false} for a stream that is already known to be dead.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-DL-004",
-      "title": "Alive event on first status",
-      "text": "The monitor shall emit LivenessEvent{alive=true} when the first Status arrives for a previously-dead zone.",
+      "title": "Alive event on first heartbeat",
+      "text": "The monitor shall emit LivenessEvent{alive=true} when the first heartbeat arrives for a previously-dead stream.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-DL-005",
-      "title": "Deadline timer resets on status",
-      "text": "Receipt of a Status shall reset the per-zone deadline timer.",
+      "title": "alive() reflects the most recently emitted liveness state",
+      "text": "Monitor::alive(stream_id) shall return the alive value of the most recent LivenessEvent emitted for stream_id, and false for any stream not yet reported on.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-DL-006",
-      "title": "alive() returns false before first status",
-      "text": "Monitor::alive(z) shall return false for any zone that has not yet published a Status.",
+      "title": "notify_overflow() immediately declares a stream dead",
+      "text": "rcp_deadline_monitor_notify_overflow() shall emit LivenessEvent{alive=false} for the named stream immediately, without waiting for its deadline timer to elapse, and shall return false without changing any state if the stream was not registered.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-DL-007",
-      "title": "Close terminates watch threads",
-      "text": "Monitor::close() shall signal all watch threads to stop.",
+      "title": "Close terminates the background thread",
+      "text": "Monitor::close() shall signal the background deadline-check thread to stop and shall be idempotent.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-DL-008",
-      "title": "Destructor joins threads",
-      "text": "The Monitor destructor shall join all watch threads before returning.",
+      "title": "Destructor joins the background thread",
+      "text": "The Monitor destructor shall join the background deadline-check thread before returning.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -1754,72 +1754,80 @@
     },
     {
       "id": "REQ-PWR-001",
-      "title": "sleep() sends CmdSleep",
-      "text": "rcp_powerstate_manager_t::sleep() shall send RCP_CMD_SLEEP to the target zone.",
+      "title": "encode_entry_request() records a pending request",
+      "text": "rcp_powerstate_manager_encode_entry_request() shall encode a SleepCMD request via ep_wakeup.h and, on success, remember its target_mode and transaction_num for the addressed endpoint; it shall return a zeroed rcp_bytes_t for an unregistered endpoint or an invalid target_mode, recording no pending state.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-PWR-002",
-      "title": "sleep() transitions Active\u2192Sleeping",
-      "text": "A successful sleep() call shall transition the zone from Active to Sleeping.",
+      "title": "apply_entry_response() applies StandBy/Sleep on ENTRY_OK",
+      "text": "rcp_powerstate_manager_apply_entry_response() shall, on a decoded RCP_PWRMODE_ENTRY_OK matching the endpoint's pending transaction_num, apply the pending target_mode via rcp_pwrmode_transition() and clear the pending request.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-PWR-003",
-      "title": "wake() sends CmdWake",
-      "text": "rcp_powerstate_manager_t::wake() shall send RCP_CMD_WAKE to the target zone.",
+      "title": "apply_entry_response() leaves mode unchanged on ENTRY_REFUSED",
+      "text": "rcp_powerstate_manager_apply_entry_response() shall not change the endpoint's mirrored mode when the decoded result is RCP_PWRMODE_ENTRY_REFUSED, returning RCP_POWERSTATE_ERR_ENTRY_REFUSED.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-PWR-004",
-      "title": "wake() transitions Sleeping\u2192Active",
-      "text": "A successful wake() call shall transition the zone from Sleeping or BusOff to Active.",
+      "title": "apply_entry_response() rejects a mismatched transaction number",
+      "text": "rcp_powerstate_manager_apply_entry_response() shall return RCP_POWERSTATE_ERR_UNEXPECTED_TXN without changing any state when there is no pending request for the endpoint or the decoded transaction_num does not match it.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-PWR-005",
-      "title": "Command failure yields BusOff",
-      "text": "A send error during sleep() or wake() shall transition the zone to BusOff.",
+      "title": "wake_via_network() is always a hot start",
+      "text": "rcp_powerstate_manager_wake_via_network() shall move a Sleep-ing endpoint to RCP_PWRMODE_NORMAL with RCP_PWRMODE_START_HOT, and shall return RCP_POWERSTATE_ERR_TRANSITION without changing mode if the endpoint is not currently in RCP_PWRMODE_SLEEP.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-PWR-006",
-      "title": "recover_loop retries BusOff zones",
-      "text": "The background recovery loop shall periodically attempt wake() for every zone in the BusOff state.",
+      "title": "handshake_begin() starts step (a)",
+      "text": "rcp_powerstate_manager_handshake_begin() shall (re)initialize the endpoint's handshake with the given repeat limit and attempt rcp_pwrmode_handshake_iface_reenabled() on it, returning false for an unregistered endpoint.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-PWR-007",
-      "title": "state() is thread-safe",
-      "text": "rcp_powerstate_manager_t::state(z) shall be safe to call concurrently with sleep(), wake(), or the recovery loop.",
+      "title": "apply_wakeup_echo() drives step (b)",
+      "text": "rcp_powerstate_manager_apply_wakeup_echo() shall decode the given bytes as a WakeUp echo and feed the result into the endpoint's own rcp_pwrmode_handshake_wakeup_attempt(), returning false for an unregistered endpoint.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-PWR-008",
-      "title": "Close stops recovery loop",
-      "text": "Manager::close() shall stop the background recovery thread without hanging.",
+      "title": "wake_via_pin() honors the handshake's hot/cold classification",
+      "text": "rcp_powerstate_manager_wake_via_pin() shall move a Sleep-ing endpoint to RCP_PWRMODE_NORMAL, reporting RCP_PWRMODE_START_HOT only when the endpoint's handshake has reached RCP_PWRMODE_HANDSHAKE_COMPLETE and RCP_PWRMODE_START_COLD otherwise, and shall return RCP_POWERSTATE_ERR_TRANSITION without changing mode if the endpoint is not currently in RCP_PWRMODE_SLEEP.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-PWR-009",
-      "title": "rcp_power_state_string() returns unique human-readable name",
-      "text": "rcp_power_state_string() shall return a unique, non-empty name for each defined rcp_power_state_t constant.",
+      "title": "Callback fires on every attempted transition",
+      "text": "The power event callback shall be invoked, across all registered endpoints, on every attempted mode transition -- successful or not.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-PWR-010",
+      "title": "rcp_powerstate_strerror() returns unique human-readable name",
+      "text": "rcp_powerstate_strerror() shall return a unique, non-empty name for each defined rcp_powerstate_errc_t constant, and a non-NULL name for any other value.",
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A"
@@ -2418,75 +2426,75 @@
     },
     {
       "id": "REQ-WDG-001",
-      "title": "Keeper kicks all zones periodically",
-      "text": "rcp_watchdog_keeper_t shall send a CmdWatchdog command to every registered zone controller at the configured interval.",
+      "title": "Keeper re-evaluates every registered stream periodically",
+      "text": "rcp_watchdog_keeper_t shall re-run rcp_e2e_wd_evaluate() for every registered stream at the configured poll interval.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-WDG-002",
-      "title": "rcp_zone_t starts Healthy",
-      "text": "A zone controller shall be in the Healthy state immediately after Keeper construction.",
+      "title": "Elapsed time measured from the last kick",
+      "text": "The elapsed_since_last_kick_ms argument passed to rcp_e2e_wd_evaluate() shall be the time since the stream's most recent kick (or since Keeper construction if never kicked).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-WDG-003",
-      "title": "Degraded after degrade_after misses",
-      "text": "A zone controller shall transition to Degraded after degrade_after consecutive kick failures.",
+      "title": "kick() resets a stream's elapsed-since-last-kick clock",
+      "text": "rcp_watchdog_keeper_kick() shall reset the named stream's last-kick time to the current time, and shall return false without changing any state if the stream was not registered.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-WDG-004",
-      "title": "Faulted after fault_after misses",
-      "text": "A zone controller shall transition to Faulted after fault_after consecutive kick failures.",
+      "title": "status() returns the most recently computed result",
+      "text": "rcp_watchdog_keeper_status() shall return the rcp_e2e_wd_result_t most recently computed for the named stream.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-WDG-005",
-      "title": "Recovery to Healthy on success",
-      "text": "A zone controller shall transition back to Healthy on the next successful kick after any degraded or faulted state.",
+      "title": "status() returns an all-false result for an unregistered stream",
+      "text": "rcp_watchdog_keeper_status() shall return an rcp_e2e_wd_result_t with every field false for a stream_id not registered with the Keeper.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-WDG-006",
-      "title": "Callback fires on transition",
-      "text": "The health callback shall be invoked with the new HealthState whenever a zone's health state changes.",
+      "title": "Callback fires on every result change",
+      "text": "The event callback shall be invoked with the new rcp_e2e_wd_result_t whenever a stream's computed watchdog result changes.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-WDG-007",
-      "title": "Kick timeout respected",
-      "text": "Each kick shall use a rcp_context_t with the configured timeout; a timeout response shall count as a miss.",
+      "title": "Close stops the background thread",
+      "text": "Keeper::close() shall cause the background re-evaluation thread to terminate without hanging, and shall be idempotent.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-WDG-008",
-      "title": "Close stops background thread",
-      "text": "Keeper::close() shall cause the background kick thread to terminate without hanging.",
+      "title": "A disabled watchdog never overflows",
+      "text": "A stream registered with rx_wd_enable == false shall never report overflowed == true, regardless of elapsed time since its last kick.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-WDG-009",
-      "title": "rcp_health_state_string() returns unique human-readable name",
-      "text": "rcp_health_state_string() shall return a unique, non-empty name for each defined rcp_health_state_t constant.",
+      "title": "Construction establishes each stream's initial verdict synchronously",
+      "text": "rcp_watchdog_keeper_new() shall compute each registered stream's initial rcp_e2e_wd_result_t before returning, so rcp_watchdog_keeper_status() never observes a stale placeholder for an already-registered stream.",
       "standard": "iso26262",
-      "level": "ASIL-A",
-      "asil": "ASIL-A"
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
     },
     {
       "id": "REQ-ZONE-001",
@@ -2735,14 +2743,6 @@
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM"
-    },
-    {
-      "id": "REQ-PWR-010",
-      "title": "Power-state manager grows its callback list on demand",
-      "text": "rcp_powerstate_manager_subscribe() shall append the caller's callback to the manager's internal list, growing its backing storage as needed, and return false only on allocation failure.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
     },
     {
       "id": "REQ-MDNS-009",
