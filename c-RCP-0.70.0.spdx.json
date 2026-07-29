@@ -5,7 +5,7 @@
   "name": "c-RCP",
   "documentNamespace": "https://github.com/SoundMatt/c-FuSa/sbom/c-RCP-0.70.0",
   "creationInfo": {
-    "created": "2026-07-29T01:23:17Z",
+    "created": "2026-07-29T01:59:57Z",
     "creators": ["Tool: cfusa"]
   },
   "packages": [
@@ -120,7 +120,7 @@
       "SPDXID": "SPDXRef-File-17",
       "fileName": "./authz.h",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "8f22f07874f9385f36330321bee9a98c60a888d5f713857d1706067c4a734e91"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "edc6f491bf40b3a21871178fbd5dfcc52b727e2b6e0f31bfcd184fa143910935"}]
     },
     {
       "SPDXID": "SPDXRef-File-18",
@@ -144,13 +144,13 @@
       "SPDXID": "SPDXRef-File-21",
       "fileName": "./observe.h",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "c8437c251c043263a4f64f250e3aaac8aa7764971ecf28d30f5fc380171d3682"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "715b31d685374ede594340f2e840d34a84e256b5bb576fdfc41d16bbf268a549"}]
     },
     {
       "SPDXID": "SPDXRef-File-22",
       "fileName": "./mock.h",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "d109f67b3cd05b727f46f1f6d6112d18bb990adcb5374f1c07d7903dfdd62a5a"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "edafae2ec8911f4d56d5233b1186b9acb452c1a495728da3ab54fbd744dddf91"}]
     },
     {
       "SPDXID": "SPDXRef-File-23",
@@ -234,13 +234,13 @@
       "SPDXID": "SPDXRef-File-36",
       "fileName": "./version.h",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "a247ebb24b1919666047cf64405c027f986d02101aa795e807f447fd5ee73c13"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "632503f4d00467765c545d4e57d9c623a81b8dd4cdb1c62f8ee66c180a0ca8bb"}]
     },
     {
       "SPDXID": "SPDXRef-File-37",
       "fileName": "./recorder.h",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "db4b9c80c24ccb3e68daa06378ed700c53c70cc97131305133d2ccf5b9a03732"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "dcfbb6f7f0441038f8bfda5b08a22d4b821e32e210cd425945d63bbe69303125"}]
     },
     {
       "SPDXID": "SPDXRef-File-38",
@@ -294,7 +294,7 @@
       "SPDXID": "SPDXRef-File-46",
       "fileName": "./admin.h",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "63c73a53b2a908b0035b887170dcfa413b075978efc06b971adc2e83abfbfb3d"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "d5dbd3091227ccdf945e498a270131da8ca87fd4701dbd761f9734f30ac1a472"}]
     },
     {
       "SPDXID": "SPDXRef-File-47",
@@ -318,7 +318,7 @@
       "SPDXID": "SPDXRef-File-50",
       "fileName": "./loan.h",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "a56772232a8bf7afa67126871dad3be8235980cb371efe78b8157ac7c6f2e0de"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "3892f450574d2420fbe118d6fc3babf0c2d6d8c390cbba945f5cc7926c50d3f7"}]
     },
     {
       "SPDXID": "SPDXRef-File-51",
@@ -378,7 +378,7 @@
       "SPDXID": "SPDXRef-File-60",
       "fileName": "./ratelimit.h",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "5e786f7f08c360a0495fdc1545cdb3dd5d2466e7e9735dad686830392c1e8a9a"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "436be3ca3620e63c667622624e9655f9c9bb9be64a9e1e5d9b6e1ec1622cac5e"}]
     },
     {
       "SPDXID": "SPDXRef-File-61",
@@ -414,7 +414,7 @@
       "SPDXID": "SPDXRef-File-66",
       "fileName": "./faultinject.h",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "8421676b84e438e792beb8d18232566554e0233cb96adb31f66b0f3643babcf8"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "76b38797c870567658965d9f6079fa206989b4b310f88d19673e5d0ade2adc6d"}]
     },
     {
       "SPDXID": "SPDXRef-File-67",
@@ -552,7 +552,7 @@
       "SPDXID": "SPDXRef-File-89",
       "fileName": "./admin.c",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "17a89f685e1aabc19d5303b274f2cb065a32924132ae8cc9faaba6efeaa0dffb"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "a424c9619060893e9410799d65b45b8d1b8296b879c73093c3e095287345ff51"}]
     },
     {
       "SPDXID": "SPDXRef-File-90",
@@ -564,7 +564,7 @@
       "SPDXID": "SPDXRef-File-91",
       "fileName": "./observe.c",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "3b09c139c9f5618a5539b23045dc1e3a6a6c9be68a2a553d6e4d6e8f2b8827ab"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "69603bd160de2095c473e758263dd6a1aa8fa0e349978e90a2fc253cb9ffb674"}]
     },
     {
       "SPDXID": "SPDXRef-File-92",
@@ -576,7 +576,7 @@
       "SPDXID": "SPDXRef-File-93",
       "fileName": "./faultinject.c",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "659817cca14ec780c92733d3f5b2c483ddad18d87d3f5d8cc8516565546842ce"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "349f44eeeb18ebd9be451c6745e2501963a9b64d74d71b6a35ce693641b5bc26"}]
     },
     {
       "SPDXID": "SPDXRef-File-94",
@@ -660,13 +660,13 @@
       "SPDXID": "SPDXRef-File-107",
       "fileName": "./loan.c",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "8b0bc0d526d9c29dee6df08b2f7140c9e0f211108ab85001e708187ede25915f"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "e454eaaaa238662625193e3b8f8a24a994897dd9082dd8b74c0dbe5aa98aa8ee"}]
     },
     {
       "SPDXID": "SPDXRef-File-108",
       "fileName": "./ratelimit.c",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "5d24a5cc30eba9eb8feda7b774a616bdbf41634c54e5f9c57e6251a6de996c88"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "d6da0e04af2541bc23f21bc3d08cfb2eb71e8fe43a70ddb663fc75455b187f3b"}]
     },
     {
       "SPDXID": "SPDXRef-File-109",
@@ -780,7 +780,7 @@
       "SPDXID": "SPDXRef-File-127",
       "fileName": "./authz.c",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "098802fab58dd018906263415dcf85ce7d341ae4191f54ccaa3842604bc3285a"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "45b82a154dda8a47d68431c46126fa18b47fbd081cee2cb63c2da4a526018c2e"}]
     },
     {
       "SPDXID": "SPDXRef-File-128",
@@ -822,7 +822,7 @@
       "SPDXID": "SPDXRef-File-134",
       "fileName": "./recorder.c",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "314abce9dbec09a16c6e01d09c3e3cf4c43afedabf720727317a9e2b5f3e8d92"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "e218e4f69185d32f39052476f69c82227c985ff118cc929b12fa81ab8d1ddb2b"}]
     },
     {
       "SPDXID": "SPDXRef-File-135",
@@ -870,7 +870,7 @@
       "SPDXID": "SPDXRef-File-142",
       "fileName": "./test_ratelimit.c",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "b9edf33464e049f41291738af5266b6c3cfcc84c729aa5dce422aeab612ee85a"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "48cc8f9a6025d0f547850cac1d0cc864a21ec0c26a863ba7c46020c845b79d45"}]
     },
     {
       "SPDXID": "SPDXRef-File-143",
@@ -912,13 +912,13 @@
       "SPDXID": "SPDXRef-File-149",
       "fileName": "./legacy_mock.h",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "e9be58853c9d21610fe51a07609eb76aab30fc17afcd5281f9fb36758d00d347"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "7f79d8ccf70987e6338003b38c3cd1ba2f8e223bd409dc5fc4e71f27b048092f"}]
     },
     {
       "SPDXID": "SPDXRef-File-150",
       "fileName": "./test_recorder.c",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "773d2ee4bf8b5c153547a46ef6c63e68545d105988f18f5ae1bf38bfc8c9f53e"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "9946a776e3c3a535ff34ed710b954e81eac548a8cc7713898bf2e12e2ea69785"}]
     },
     {
       "SPDXID": "SPDXRef-File-151",
@@ -966,7 +966,7 @@
       "SPDXID": "SPDXRef-File-158",
       "fileName": "./test_authz.c",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "1049bc1827594faa45e514b46f38610e3b3a37067f97448b8ee4671dc3a562ab"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "8841ef150e2b98f7d1c55bbaf80175f9a79c15c3eb01dcb668ea654eb68c39ae"}]
     },
     {
       "SPDXID": "SPDXRef-File-159",
@@ -1002,7 +1002,7 @@
       "SPDXID": "SPDXRef-File-164",
       "fileName": "./test_faultinject.c",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "c4034e83f61aa622376d677648339a84a3f4b5d3046b67ed0f1f42c87de656dd"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "1bfc81ae990750854e73492867dc65909f89ec7eb835b6a573139bde00cfd2bf"}]
     },
     {
       "SPDXID": "SPDXRef-File-165",
@@ -1104,7 +1104,7 @@
       "SPDXID": "SPDXRef-File-181",
       "fileName": "./test_loan.c",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "d43beac0e2617d9e7638fc2d358291775374903b424e8a4b8ae2ccd8d7c007a5"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "406d951a239e5c9e80667f22b5eb26774bfda28641cf488d72f4a7988495d09b"}]
     },
     {
       "SPDXID": "SPDXRef-File-182",
@@ -1116,7 +1116,7 @@
       "SPDXID": "SPDXRef-File-183",
       "fileName": "./test_admin.c",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "c9620c8ce7c45e8b2bf0ea141aec83a5cc88a7bc4d56c3d25fa08bac4194171d"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "379b8e95ad5915cf134644bff0dbdabf5cacded9744b6d9456fa74b9f8eacd7a"}]
     },
     {
       "SPDXID": "SPDXRef-File-184",
@@ -1170,7 +1170,7 @@
       "SPDXID": "SPDXRef-File-192",
       "fileName": "./test_observe.c",
       "fileTypes": ["SOURCE"],
-      "checksums": [{"algorithm": "SHA256", "checksumValue": "19359d785852bf7f6d541fa4524e08c35deda3babe708274b1bc6b5484d78a8d"}]
+      "checksums": [{"algorithm": "SHA256", "checksumValue": "841af0b3fe76b34669230493d428bef01d4dc93c9932220760308ee6ba187294"}]
     },
     {
       "SPDXID": "SPDXRef-File-193",
