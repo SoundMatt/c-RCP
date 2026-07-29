@@ -3727,7 +3727,7 @@ note every prior milestone has made) — `REQ-MOCK-*`/`REQ-CFG-*`
 pushing. `cfusa check`'s own pre-existing HARA002/HARA003 findings are
 unchanged and not introduced or touched here.
 
-### 78. Transport satellites (v0.78.0)
+### 78. Transport satellites (v0.78.0) ✅
 
 - **REPLACE** `udp.c`: becomes the IEEE1722-over-UDP/IP (Annex J)
   transport carrying AVTPDUs; POSIX socket/thread plumbing from the old
@@ -3741,6 +3741,95 @@ unchanged and not introduced or touched here.
   MACsec (802.1AE, link-layer), out of this library's transport
   abstraction entirely (declared product-specific/opaque in the register
   map, same as PHY/network-interface config).
+
+**Done (v0.78.0)**: `include/rcp/udp.h` + `src/udp.c` are a from-scratch
+`rcp_avtp_transport_t` (avtp.h, milestone 59) implementation --
+`rcp_udp_avtp_transport_dial()` connects a UDP socket to a fixed peer;
+`rcp_udp_avtp_transport_bind()` binds a local association and learns its
+peer address from the first datagram it receives (a deliberate,
+documented single-peer-per-socket simplification, not per-stream_id
+multi-peer routing -- see the header's own file comment). The old
+`rcp_udp_controller_t`/`rcp_udp_zone_server_t` pair's pending-request
+rendezvous-by-id, Subscribe/Unsubscribe control frames, and Zone-addressed
+Command/Response/Status codec are gone outright: none of that has a role
+left once the transport's own job shrinks to "move an already-framed
+AVTPDU," per the REPLACE disposition's own reasoning. What *is* reused
+from the predecessor module, per this milestone's own text: the POSIX
+socket create/bind/connect/getsockname helpers. `recv()` polls the
+socket in short slices rather than blocking directly on it, so `close()`
+-- called from a different thread than whichever one is inside `recv()`
+-- reliably unblocks that call on every targeted platform without relying
+on non-portable shutdown-interrupts-a-blocking-recv semantics; `close()`
+itself only raises a flag, deferring the real `close(fd)` to `destroy()`,
+so a racing `close()` can never invalidate the fd out from under a
+`select()`/`recvfrom()` call already in flight. Windows keeps the
+predecessor module's own documented stub (`ok()` always false,
+`send()`/`recv()` always `RCP_ERR_CLOSED`) rather than gaining a new
+winsock implementation. New `REQ-UDP-001`..`014` (rewritten in place,
+same prefix/count band as the predecessor's own 19, reduced because the
+correlation/subscription machinery those old requirements described no
+longer exists in this module).
+
+`include/rcp/shmem.h` + `src/shmem.c` land as
+`rcp_shmem_avtp_pair_new()`: two cross-wired `rcp_avtp_transport_t`
+sides sharing one pair of bounded FIFOs, so whatever one side sends the
+other side's `recv()` receives, entirely in-process. This is
+deliberately not a thin rename of `avtp.c`'s own
+`rcp_avtp_loopback_transport_new()` (a single self-echoing instance,
+which cannot play two distinct in-process parties at once) and
+deliberately not folded into `mock.c` either (which doubles a server's
+*dispatch* logic against already-decoded parameters and never moves raw
+bytes) -- `shmem.h`'s own file header documents this three-way
+distinction (echo one node's own traffic / connect two distinct
+in-process nodes / double a server's dispatch behavior) in response to
+this milestone's own "evaluate consolidating" instruction, per the same
+practice `canbr.h`/`linbr.h` used for their own three-way native-endpoint/
+transport-network/bridge distinction. New `REQ-SHMEM-001`..`009`
+(rewritten in place).
+
+`include/rcp/tsn.h` + `src/tsn.c` keep the SO_PRIORITY/802.1p PCP-tagging
+mechanism unchanged and wrap an `rcp_avtp_transport_t` instead of the
+retired `rcp_controller_t`. `rcp_tsn_classify_frame()` peeks the outgoing
+AVTPDU's subtype and, for a repurposed ACF_GBB message, its
+`request_type` opcode (reusing `acf.h`/`request_compound.h`'s own already-
+published decode helpers, adding no new wire-parsing logic of its own) to
+derive an `rcp_sched_kind_t` (scheduler.h, milestone 69), which
+`rcp_tsn_pcp_for()` maps to a PCP value via a map indexed directly by
+`rcp_sched_kind_t` (default: `pcp[kind] = rcp_sched_kind_rank(kind)`).
+`recv()`/`close()` are pure passthroughs, matching the predecessor
+module's own scope (PCP tagging is egress-only). New `REQ-TSN-001`..`007`
+(rewritten in place).
+
+`include/rcp/tls.h`, `src/tls.c`, and `tests/test_tls.c` are removed
+outright, and `REQ-TLS-001`..`013` removed from `.fusa-reqs.json` with
+them -- the spec's actual security control is MACsec (802.1AE,
+link-layer), which the Satellite Disposition table above describes as
+declared product-specific/opaque register-map configuration, not
+something this library's transport abstraction should keep wrapping.
+`authz.h`'s and `rcp.h`'s own doc comments, and `PORTABILITY.md`'s module
+list, had their `tls.h`/`tls.c` references updated to stop pointing at a
+now-deleted file; `CYBERSECURITY.md`/`tara.md`'s own TLS-layer framing is
+left untouched, per the Satellite Disposition table's own "Requirements/
+safety/security artifacts... REPLACE, deliberately last" entry -- re-
+deriving that certification evidence is Phase 22's job (v0.85.0), not
+this milestone's.
+
+`tests/test_udp.c` (10 cases, including a real cross-thread
+close()-unblocks-a-blocked-recv() test), `tests/test_shmem.c` (11 cases),
+and `tests/test_tsn.c` (10 cases) are all from-scratch rewrites; the full
+`ctest` suite (67/67, one fewer than v0.77.0's 68 now that
+`rcp_tls` is gone) passes, verified locally under both a plain Debug
+build and a manual `-fsanitize=address,undefined` build (ASan+UBSan-clean
+across the full suite, run sequentially). `cfusa lint`/`analyze`/`cyber`/
+`vuln`/`qualify`, `cfusa trace --req-coverage 100`, and `relay conform
+--strict` were not re-run locally (no local `cfusa`/`relay` toolchain in
+this environment, the same note every prior milestone has made) --
+`REQ-UDP-*`/`REQ-SHMEM-*`/`REQ-TSN-*` `//cfusa:req`/`//cfusa:test` tag
+sets were cross-checked 1:1 by hand before pushing, and `REQ-TLS-*`
+confirmed to have zero remaining `//cfusa:req`/`//cfusa:test` references
+anywhere in the tree before removing it from `.fusa-reqs.json`. `cfusa
+check`'s own pre-existing HARA002/HARA003 findings are unchanged and not
+introduced or touched here.
 
 ### 79. Safety-adjacent satellites (v0.79.0)
 

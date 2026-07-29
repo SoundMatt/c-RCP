@@ -8,8 +8,10 @@
  *
  * The caller identity is a short string label (certificate CN or
  * pre-shared key label). Full certificate-chain validation is the
- * responsibility of the TLS layer (rcp/tls.h); authz only checks the
- * presented identity against the policy table.
+ * responsibility of whatever link-layer security control is in effect
+ * (MACsec / 802.1AE, per ROADMAP.md's Satellite Disposition table --
+ * rcp/tls.h was removed at v0.78.0, see that table's own reasoning);
+ * authz only checks the presented identity against the policy table.
  */
 #ifndef RCP_AUTHZ_H
 #define RCP_AUTHZ_H

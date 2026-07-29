@@ -5,523 +5,236 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* ── ZoneServer ────────────────────────────────────────────────────────────── */
-
-struct rcp_shmem_zone_server {
-    rcp_zone_t            zone;
-    rcp_mutex_t           mu; /* protects handler/user_data/healthy/closed/seq/subs */
-    rcp_shmem_handler_fn  handler;
-    void                 *user_data;
-    bool                  closed;
-    bool                  healthy;
-    uint32_t              seq;
-    rcp_status_channel_t **subs;
-    size_t                 subs_len;
-    size_t                 subs_cap;
-    int                    refcount;
-};
-
-rcp_shmem_zone_server_t *rcp_shmem_zone_server_new(rcp_zone_t zone)
-{
-    rcp_shmem_zone_server_t *srv = (rcp_shmem_zone_server_t *)calloc(1, sizeof(*srv));
-    if (!srv) return NULL;
-    srv->zone     = zone;
-    srv->healthy  = true;
-    srv->refcount = 1;
-    rcp_mutex_init(&srv->mu);
-    return srv;
-}
-
-rcp_shmem_zone_server_t *rcp_shmem_zone_server_retain(rcp_shmem_zone_server_t *srv)
-{
-    if (srv) rcp_atomic_inc(&srv->refcount);
-    return srv;
-}
-
-void rcp_shmem_zone_server_release(rcp_shmem_zone_server_t *srv)
-{
-    if (!srv) return;
-    if (rcp_atomic_dec(&srv->refcount) != 0) return;
-    rcp_mutex_destroy(&srv->mu);
-    free(srv->subs);
-    free(srv);
-}
-
-rcp_zone_t rcp_shmem_zone_server_zone(const rcp_shmem_zone_server_t *srv)
-{
-    return srv->zone;
-}
-
-void rcp_shmem_zone_server_set_handler(rcp_shmem_zone_server_t *srv, rcp_shmem_handler_fn handler, void *user_data)
-{
-    rcp_mutex_lock(&srv->mu);
-    srv->handler   = handler;
-    srv->user_data = user_data;
-    rcp_mutex_unlock(&srv->mu);
-}
-
-void rcp_shmem_zone_server_set_healthy(rcp_shmem_zone_server_t *srv, bool healthy)
-{
-    rcp_mutex_lock(&srv->mu);
-    srv->healthy = healthy;
-    rcp_mutex_unlock(&srv->mu);
-}
-
-//cfusa:req REQ-SHMEM-005
-void rcp_shmem_zone_server_publish(rcp_shmem_zone_server_t *srv, const uint8_t *payload, size_t len)
-{
-    rcp_status_t st;
-    rcp_status_channel_t **snapshot = NULL;
-    size_t snapshot_len = 0;
-    size_t i;
-
-    memset(&st, 0, sizeof(st));
-
-    rcp_mutex_lock(&srv->mu);
-    srv->seq++;
-    st.zone         = srv->zone;
-    st.seq          = srv->seq;
-    st.healthy      = srv->healthy;
-    st.payload.data = (uint8_t *)(uintptr_t)payload; /* read-only: push() below copies it */
-    st.payload.len  = len;
-
-    if (srv->subs_len > 0) {
-        size_t n = srv->subs_len;
-        snapshot = (rcp_status_channel_t **)malloc(n * sizeof(*snapshot));
-        if (snapshot) {
-            for (i = 0; i < n; i++) snapshot[i] = rcp_status_channel_retain(srv->subs[i]);
-            snapshot_len = n;
-        }
-    }
-    rcp_mutex_unlock(&srv->mu);
-
-    for (i = 0; i < snapshot_len; i++) {
-        rcp_status_channel_push(snapshot[i], &st);
-        rcp_status_channel_release(snapshot[i]);
-    }
-    free(snapshot);
-}
-
-//cfusa:req REQ-SHMEM-001
-//cfusa:req REQ-SHMEM-002
-bool rcp_shmem_zone_server_dispatch_one(rcp_shmem_zone_server_t *srv, const rcp_command_t *cmd, rcp_response_t *out)
-{
-    bool closed_now;
-
-    rcp_mutex_lock(&srv->mu);
-    closed_now = srv->closed;
-    if (!closed_now) {
-        memset(out, 0, sizeof(*out));
-        if (srv->handler) {
-            srv->handler(cmd, out, srv->user_data);
-        } else {
-            out->command_id = cmd->id;
-            out->zone       = srv->zone;
-            out->status     = RCP_RESPONSE_OK;
-        }
-    }
-    rcp_mutex_unlock(&srv->mu);
-    return !closed_now;
-}
-
-static bool zserv_subs_append(rcp_shmem_zone_server_t *srv, rcp_status_channel_t *ch)
-{
-    if (srv->subs_len == srv->subs_cap) {
-        size_t new_cap = (srv->subs_cap == 0) ? 4 : srv->subs_cap * 2;
-        rcp_status_channel_t **grown =
-            (rcp_status_channel_t **)realloc(srv->subs, new_cap * sizeof(*grown));
-        if (!grown) return false;
-        srv->subs     = grown;
-        srv->subs_cap = new_cap;
-    }
-    srv->subs[srv->subs_len++] = ch;
-    return true;
-}
-
-void rcp_shmem_zone_server_add_sub(rcp_shmem_zone_server_t *srv, rcp_status_channel_t *ch)
-{
-    rcp_mutex_lock(&srv->mu);
-    (void)zserv_subs_append(srv, ch);
-    rcp_mutex_unlock(&srv->mu);
-}
-
-//cfusa:req REQ-SHMEM-011
-void rcp_shmem_zone_server_remove_sub(rcp_shmem_zone_server_t *srv, rcp_status_channel_t *ch)
-{
-    size_t i;
-    rcp_mutex_lock(&srv->mu);
-    for (i = 0; i < srv->subs_len; i++) {
-        if (srv->subs[i] == ch) {
-            srv->subs[i] = srv->subs[srv->subs_len - 1];
-            srv->subs_len--;
-            break;
-        }
-    }
-    rcp_mutex_unlock(&srv->mu);
-}
-
-//cfusa:req REQ-SHMEM-009
-void rcp_shmem_zone_server_close(rcp_shmem_zone_server_t *srv)
-{
-    rcp_status_channel_t **local = NULL;
-    size_t local_len = 0;
-    size_t i;
-
-    rcp_mutex_lock(&srv->mu);
-    srv->closed = true;
-    local        = srv->subs;
-    local_len    = srv->subs_len;
-    srv->subs     = NULL;
-    srv->subs_len = 0;
-    srv->subs_cap = 0;
-    rcp_mutex_unlock(&srv->mu);
-
-    for (i = 0; i < local_len; i++) {
-        rcp_status_channel_close(local[i]);
-    }
-    free(local);
-}
-
-//cfusa:req REQ-SHMEM-010
-bool rcp_shmem_zone_server_ok(const rcp_shmem_zone_server_t *srv)
-{
-    /* const-correctness note: reading a mutex-protected bool without the
-     * lock here would be a data race in the general case, but this mirrors
-     * cpp-RCP's own `!closed_.load()` snapshot read — a point-in-time
-     * liveness check, not a synchronization primitive. */
-    return !srv->closed;
-}
-
-/* ── Controller ────────────────────────────────────────────────────────────── */
+/* ── Shared pair state ─────────────────────────────────────────────────────── */
 
 typedef struct {
-    rcp_controller_t          base;
-    rcp_shmem_zone_server_t  *server; /* retained */
-    rcp_mutex_t               mu;     /* protects closed */
-    bool                      closed;
-} shmem_controller_t;
+    rcp_mutex_t mu;
+    rcp_cond_t  cv;
+    int         refcount; /* 2 initially: one per side; freed at 0 */
 
-static rcp_zone_t shmem_ctrl_zone(rcp_controller_t *self)
+    bool a_closed;
+    bool b_closed;
+
+    /* a_to_b: frames A has sent, awaiting B's recv(). b_to_a: the reverse
+     * direction. Each is its own bounded circular buffer of owned
+     * rcp_bytes_t copies, mirroring avtp.c's own loopback transport's
+     * internal ring-buffer shape (this module's own copy -- see other
+     * modules' "this TU's own copy" convention for small shared-shape
+     * helpers not worth a cross-module utility). */
+    rcp_bytes_t *a_to_b_items;
+    size_t       a_to_b_head, a_to_b_count, a_to_b_cap;
+    rcp_bytes_t *b_to_a_items;
+    size_t       b_to_a_head, b_to_a_count, b_to_a_cap;
+} rcp_shmem_pair_core_t;
+
+typedef struct {
+    rcp_avtp_transport_t   base; /* first member: rcp_avtp_transport_t* <-> this cast */
+    rcp_shmem_pair_core_t *core;
+    bool                    is_a;
+} rcp_shmem_side_t;
+
+static void ring_push(rcp_bytes_t *items, size_t cap, size_t *head, size_t *count, rcp_bytes_t item)
 {
-    shmem_controller_t *c = (shmem_controller_t *)self;
-    return rcp_shmem_zone_server_zone(c->server);
+    size_t tail = (*head + *count) % cap;
+    items[tail] = item;
+    (*count)++;
 }
 
+/* ── Transport vtable ──────────────────────────────────────────────────────── */
+
+//cfusa:req REQ-SHMEM-002
+//cfusa:req REQ-SHMEM-003
+//cfusa:req REQ-SHMEM-005
+//cfusa:req REQ-SHMEM-007
+static int shmem_side_send(rcp_avtp_transport_t *self, const uint8_t *frame, size_t frame_len)
+{
+    rcp_shmem_side_t      *s = (rcp_shmem_side_t *)self;
+    rcp_shmem_pair_core_t *c = s->core;
+    bool        *own_closed = s->is_a ? &c->a_closed : &c->b_closed;
+    rcp_bytes_t *items      = s->is_a ? c->a_to_b_items : c->b_to_a_items;
+    size_t       cap        = s->is_a ? c->a_to_b_cap : c->b_to_a_cap;
+    size_t      *head       = s->is_a ? &c->a_to_b_head : &c->b_to_a_head;
+    size_t      *count      = s->is_a ? &c->a_to_b_count : &c->b_to_a_count;
+
+    rcp_mutex_lock(&c->mu);
+    if (*own_closed) {
+        rcp_mutex_unlock(&c->mu);
+        return RCP_ERR_CLOSED;
+    }
+    if (*count >= cap) {
+        rcp_mutex_unlock(&c->mu);
+        return RCP_ERR_BUSY;
+    }
+    ring_push(items, cap, head, count, rcp_bytes_dup(frame, frame_len));
+    rcp_cond_broadcast(&c->cv);
+    rcp_mutex_unlock(&c->mu);
+    return RCP_OK;
+}
+
+//cfusa:req REQ-SHMEM-002
 //cfusa:req REQ-SHMEM-003
 //cfusa:req REQ-SHMEM-004
-//cfusa:req REQ-SHMEM-006
-static int shmem_ctrl_send(rcp_controller_t *self, const rcp_context_t *ctx,
-                            const rcp_command_t *cmd, rcp_response_t *out)
-{
-    shmem_controller_t *c = (shmem_controller_t *)self;
-    rcp_command_t safe;
-    bool closed_now;
-
-    rcp_mutex_lock(&c->mu);
-    closed_now = c->closed;
-    rcp_mutex_unlock(&c->mu);
-    if (closed_now) return RCP_ERR_CLOSED;
-
-    if (rcp_context_done(ctx)) return RCP_ERR_TIMEOUT;
-    if (cmd->zone != rcp_shmem_zone_server_zone(c->server)) return RCP_ERR_ZONE_MISMATCH;
-
-    /* Copy payload before dispatch (REQ-SHMEM-006: no aliasing) — the
-     * handler must not observe caller-side mutation after this call. */
-    safe = *cmd;
-    safe.payload = rcp_bytes_dup(cmd->payload.data, cmd->payload.len);
-
-    if (!rcp_shmem_zone_server_dispatch_one(c->server, &safe, out)) {
-        rcp_bytes_free(&safe.payload);
-        return RCP_ERR_CLOSED;
-    }
-    rcp_bytes_free(&safe.payload);
-    return RCP_OK;
-}
-
-typedef struct {
-    rcp_controller_t         *ctrl_base; /* retained, cast back to shmem_controller_t */
-    rcp_shmem_zone_server_t  *server;     /* retained */
-    rcp_status_channel_t     *ch;         /* retained */
-    rcp_context_t             ctx;
-} shmem_watcher_args_t;
-
-static void shmem_watcher_thread_fn(void *arg)
-{
-    shmem_watcher_args_t *w = (shmem_watcher_args_t *)arg;
-    shmem_controller_t *c = (shmem_controller_t *)w->ctrl_base;
-
-    for (;;) {
-        bool closed_now;
-        rcp_mutex_lock(&c->mu);
-        closed_now = c->closed;
-        rcp_mutex_unlock(&c->mu);
-
-        if (closed_now) break;
-        if (rcp_status_channel_is_closed(w->ch)) break;
-        if (rcp_context_done(&w->ctx)) break;
-
-        rcp_sleep_ms(1);
-    }
-
-    rcp_shmem_zone_server_remove_sub(w->server, w->ch);
-    rcp_status_channel_close(w->ch);
-
-    rcp_status_channel_release(w->ch);
-    rcp_shmem_zone_server_release(w->server);
-    rcp_controller_release(w->ctrl_base);
-    free(w);
-}
-
 //cfusa:req REQ-SHMEM-005
-static int shmem_ctrl_subscribe(rcp_controller_t *self, const rcp_context_t *ctx, rcp_status_channel_t **out)
+//cfusa:req REQ-SHMEM-006
+//cfusa:req REQ-SHMEM-007
+static int shmem_side_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
+                            uint8_t *buf, size_t buf_cap, size_t *out_len)
 {
-    shmem_controller_t *c = (shmem_controller_t *)self;
-    rcp_status_channel_t *ch;
-    shmem_watcher_args_t *w;
-    bool closed_now;
+    rcp_shmem_side_t      *s = (rcp_shmem_side_t *)self;
+    rcp_shmem_pair_core_t *c = s->core;
+    /* A's recv() drains what B sent (b_to_a); B's recv() drains what A
+     * sent (a_to_b) -- the mirror image of shmem_side_send() above. */
+    bool        *own_closed  = s->is_a ? &c->a_closed : &c->b_closed;
+    bool        *peer_closed = s->is_a ? &c->b_closed : &c->a_closed;
+    rcp_bytes_t *items       = s->is_a ? c->b_to_a_items : c->a_to_b_items;
+    size_t       cap         = s->is_a ? c->b_to_a_cap : c->a_to_b_cap;
+    size_t      *head        = s->is_a ? &c->b_to_a_head : &c->a_to_b_head;
+    size_t      *count       = s->is_a ? &c->b_to_a_count : &c->a_to_b_count;
+    rcp_bytes_t  item;
+    int          rc = RCP_OK;
 
     rcp_mutex_lock(&c->mu);
-    closed_now = c->closed;
-    rcp_mutex_unlock(&c->mu);
-    if (closed_now) return RCP_ERR_CLOSED;
-
-    ch = rcp_status_channel_new(16);
-    if (!ch) return RCP_ERR_BUSY;
-
-    rcp_shmem_zone_server_add_sub(c->server, ch);
-    *out = rcp_status_channel_retain(ch);
-
-    w = (shmem_watcher_args_t *)malloc(sizeof(*w));
-    if (w) {
-        w->ctrl_base = rcp_controller_retain(self);
-        w->server    = rcp_shmem_zone_server_retain(c->server);
-        w->ch        = rcp_status_channel_retain(ch);
-        w->ctx       = *ctx;
-        if (rcp_thread_start_detached(shmem_watcher_thread_fn, w) != 0) {
-            rcp_controller_release(w->ctrl_base);
-            rcp_shmem_zone_server_release(w->server);
-            rcp_status_channel_release(w->ch);
-            free(w);
+    while (*count == 0 && !*own_closed && !*peer_closed && !rcp_context_done(ctx)) {
+        if (ctx->has_deadline) {
+            (void)rcp_cond_timedwait_until(&c->cv, &c->mu, ctx->deadline_ms);
+        } else {
+            rcp_cond_wait(&c->cv, &c->mu);
         }
     }
-    return RCP_OK;
-}
 
-static int shmem_ctrl_close(rcp_controller_t *self)
-{
-    shmem_controller_t *c = (shmem_controller_t *)self;
-    rcp_mutex_lock(&c->mu);
-    c->closed = true;
+    if (*count == 0) {
+        rc = (*own_closed || *peer_closed) ? RCP_ERR_CLOSED : RCP_ERR_TIMEOUT;
+        rcp_mutex_unlock(&c->mu);
+        return rc;
+    }
+
+    item = items[*head];
+    if (item.len > buf_cap) {
+        /* Left queued, matching avtp.c's own loopback_recv() -- rejecting
+         * into too-small a buffer must not silently drop it. */
+        rcp_mutex_unlock(&c->mu);
+        return RCP_ERR_BUSY;
+    }
+
+    if (item.len > 0) memcpy(buf, item.data, item.len);
+    *out_len = item.len;
+    rcp_bytes_free(&items[*head]);
+    *head = (*head + 1) % cap;
+    (*count)--;
+
     rcp_mutex_unlock(&c->mu);
     return RCP_OK;
 }
 
-static void shmem_ctrl_destroy(rcp_controller_t *self)
+//cfusa:req REQ-SHMEM-004
+//cfusa:req REQ-SHMEM-005
+static int shmem_side_close(rcp_avtp_transport_t *self)
 {
-    shmem_controller_t *c = (shmem_controller_t *)self;
-    rcp_mutex_destroy(&c->mu);
-    rcp_shmem_zone_server_release(c->server);
-    free(c);
+    rcp_shmem_side_t      *s = (rcp_shmem_side_t *)self;
+    rcp_shmem_pair_core_t *c = s->core;
+    bool                   *own_closed = s->is_a ? &c->a_closed : &c->b_closed;
+
+    rcp_mutex_lock(&c->mu);
+    *own_closed = true;
+    rcp_cond_broadcast(&c->cv);
+    rcp_mutex_unlock(&c->mu);
+    return RCP_OK;
 }
-
-static const rcp_controller_vtable_t shmem_controller_vtable = {
-    shmem_ctrl_zone,
-    shmem_ctrl_send,
-    shmem_ctrl_subscribe,
-    shmem_ctrl_close,
-    shmem_ctrl_destroy,
-    NULL, /* loan: not supported */
-    NULL, /* send_loaned: not supported */
-};
-
-rcp_controller_t *rcp_shmem_controller_new(rcp_shmem_zone_server_t *server)
-{
-    shmem_controller_t *c = (shmem_controller_t *)calloc(1, sizeof(*c));
-    if (!c) return NULL;
-    c->base.vt       = &shmem_controller_vtable;
-    c->base.refcount = 1;
-    c->server        = rcp_shmem_zone_server_retain(server);
-    rcp_mutex_init(&c->mu);
-    return &c->base;
-}
-
-/* ── Registry ──────────────────────────────────────────────────────────────── */
-
-typedef struct {
-    rcp_zone_t         zone;
-    rcp_controller_t  *ctrl;
-} shmem_registry_entry_t;
-
-typedef struct {
-    rcp_registry_t           base;
-    rcp_mutex_t              mu;
-    bool                     closed;
-    shmem_registry_entry_t  *entries;
-    size_t                   len;
-    size_t                   cap;
-} shmem_registry_t;
 
 //cfusa:req REQ-SHMEM-007
-static int shmem_reg_register(rcp_registry_t *self, rcp_controller_t *ctrl)
+//cfusa:req REQ-SHMEM-009
+static void shmem_side_destroy(rcp_avtp_transport_t *self)
 {
-    shmem_registry_t *r = (shmem_registry_t *)self;
-    rcp_zone_t zone = rcp_controller_zone(ctrl);
-    size_t i;
+    rcp_shmem_side_t      *s = (rcp_shmem_side_t *)self;
+    rcp_shmem_pair_core_t *c = s->core;
+    bool                    free_core;
 
-    rcp_mutex_lock(&r->mu);
-    if (r->closed) {
-        rcp_mutex_unlock(&r->mu);
-        return RCP_ERR_CLOSED;
-    }
-    for (i = 0; i < r->len; i++) {
-        if (r->entries[i].zone == zone) {
-            rcp_mutex_unlock(&r->mu);
-            return RCP_ERR_ALREADY_EXISTS;
+    rcp_mutex_lock(&c->mu);
+    c->refcount--;
+    free_core = (c->refcount == 0);
+    rcp_mutex_unlock(&c->mu);
+
+    if (free_core) {
+        size_t i;
+        for (i = 0; i < c->a_to_b_count; i++) {
+            rcp_bytes_free(&c->a_to_b_items[(c->a_to_b_head + i) % c->a_to_b_cap]);
         }
-    }
-    if (r->len == r->cap) {
-        size_t new_cap = (r->cap == 0) ? 8 : r->cap * 2;
-        shmem_registry_entry_t *grown =
-            (shmem_registry_entry_t *)realloc(r->entries, new_cap * sizeof(*grown));
-        if (!grown) {
-            rcp_mutex_unlock(&r->mu);
-            return RCP_ERR_BUSY;
+        for (i = 0; i < c->b_to_a_count; i++) {
+            rcp_bytes_free(&c->b_to_a_items[(c->b_to_a_head + i) % c->b_to_a_cap]);
         }
-        r->entries = grown;
-        r->cap     = new_cap;
+        rcp_mutex_destroy(&c->mu);
+        rcp_cond_destroy(&c->cv);
+        free(c->a_to_b_items);
+        free(c->b_to_a_items);
+        free(c);
     }
-    r->entries[r->len].zone = zone;
-    r->entries[r->len].ctrl = rcp_controller_retain(ctrl);
-    r->len++;
-    rcp_mutex_unlock(&r->mu);
-    return RCP_OK;
+    free(s);
 }
 
-//cfusa:req REQ-SHMEM-013
-static int shmem_reg_deregister(rcp_registry_t *self, rcp_zone_t zone)
-{
-    shmem_registry_t *r = (shmem_registry_t *)self;
-    rcp_controller_t *found = NULL;
-    size_t i;
-
-    rcp_mutex_lock(&r->mu);
-    for (i = 0; i < r->len; i++) {
-        if (r->entries[i].zone == zone) {
-            found = r->entries[i].ctrl;
-            r->entries[i] = r->entries[r->len - 1];
-            r->len--;
-            break;
-        }
-    }
-    rcp_mutex_unlock(&r->mu);
-
-    if (!found) return RCP_ERR_NOT_FOUND;
-
-    rcp_controller_close(found);
-    rcp_controller_release(found);
-    return RCP_OK;
-}
-
-static int shmem_reg_lookup(rcp_registry_t *self, rcp_zone_t zone, rcp_controller_t **out)
-{
-    shmem_registry_t *r = (shmem_registry_t *)self;
-    size_t i;
-
-    rcp_mutex_lock(&r->mu);
-    if (r->closed) {
-        rcp_mutex_unlock(&r->mu);
-        return RCP_ERR_CLOSED;
-    }
-    for (i = 0; i < r->len; i++) {
-        if (r->entries[i].zone == zone) {
-            *out = rcp_controller_retain(r->entries[i].ctrl);
-            rcp_mutex_unlock(&r->mu);
-            return RCP_OK;
-        }
-    }
-    rcp_mutex_unlock(&r->mu);
-    return RCP_ERR_NOT_FOUND;
-}
-
-//cfusa:req REQ-SHMEM-012
-static size_t shmem_reg_controllers(rcp_registry_t *self, rcp_controller_t **out, size_t cap)
-{
-    shmem_registry_t *r = (shmem_registry_t *)self;
-    size_t i, n;
-
-    rcp_mutex_lock(&r->mu);
-    n = r->len;
-    for (i = 0; i < n && i < cap; i++) {
-        out[i] = rcp_controller_retain(r->entries[i].ctrl);
-    }
-    rcp_mutex_unlock(&r->mu);
-    return n;
-}
-
-//cfusa:req REQ-SHMEM-008
-static int shmem_reg_close(rcp_registry_t *self)
-{
-    shmem_registry_t *r = (shmem_registry_t *)self;
-    bool was_open;
-    shmem_registry_entry_t *local = NULL;
-    size_t local_len = 0;
-    size_t i;
-
-    rcp_mutex_lock(&r->mu);
-    was_open = !r->closed;
-    if (was_open) {
-        r->closed  = true;
-        local      = r->entries;
-        local_len  = r->len;
-        r->entries = NULL;
-        r->len     = 0;
-        r->cap     = 0;
-    }
-    rcp_mutex_unlock(&r->mu);
-
-    if (!was_open) return RCP_OK;
-
-    for (i = 0; i < local_len; i++) {
-        rcp_controller_close(local[i].ctrl);
-        rcp_controller_release(local[i].ctrl);
-    }
-    free(local);
-    return RCP_OK;
-}
-
-static void shmem_reg_destroy(rcp_registry_t *self)
-{
-    shmem_registry_t *r = (shmem_registry_t *)self;
-    (void)shmem_reg_close(self);
-    rcp_mutex_destroy(&r->mu);
-    free(r->entries);
-    free(r);
-}
-
-static const rcp_registry_vtable_t shmem_registry_vtable = {
-    shmem_reg_register,
-    shmem_reg_deregister,
-    shmem_reg_lookup,
-    shmem_reg_controllers,
-    shmem_reg_close,
-    shmem_reg_destroy,
+static const rcp_avtp_transport_vtable_t shmem_side_vtable = {
+    shmem_side_send,
+    shmem_side_recv,
+    shmem_side_close,
+    shmem_side_destroy,
 };
 
-rcp_registry_t *rcp_shmem_registry_new(void)
-{
-    shmem_registry_t *r = (shmem_registry_t *)calloc(1, sizeof(*r));
-    if (!r) return NULL;
-    r->base.vt = &shmem_registry_vtable;
-    rcp_mutex_init(&r->mu);
-    return &r->base;
-}
+/* ── Construction ──────────────────────────────────────────────────────────── */
 
-int rcp_shmem_registry_add_server(rcp_registry_t *reg, rcp_shmem_zone_server_t *server)
+//cfusa:req REQ-SHMEM-001
+//cfusa:req REQ-SHMEM-008
+rcp_shmem_errc_t rcp_shmem_avtp_pair_new(bool time_sync_supported, size_t queue_capacity,
+                                          rcp_avtp_transport_t **out_a,
+                                          rcp_avtp_transport_t **out_b)
 {
-    rcp_controller_t *ctrl = rcp_shmem_controller_new(server);
-    int rc;
-    if (!ctrl) return RCP_ERR_BUSY;
-    rc = rcp_registry_register(reg, ctrl);
-    rcp_controller_release(ctrl); /* register() took its own reference */
-    return rc;
+    rcp_shmem_pair_core_t *c;
+    rcp_shmem_side_t      *a;
+    rcp_shmem_side_t      *b;
+
+    if (queue_capacity == 0) queue_capacity = 1;
+
+    c = (rcp_shmem_pair_core_t *)calloc(1, sizeof(*c));
+    if (!c) return RCP_SHMEM_ERR_ALLOC;
+
+    c->a_to_b_items = (rcp_bytes_t *)calloc(queue_capacity, sizeof(*c->a_to_b_items));
+    c->b_to_a_items = (rcp_bytes_t *)calloc(queue_capacity, sizeof(*c->b_to_a_items));
+    if (!c->a_to_b_items || !c->b_to_a_items) {
+        free(c->a_to_b_items);
+        free(c->b_to_a_items);
+        free(c);
+        return RCP_SHMEM_ERR_ALLOC;
+    }
+    c->a_to_b_cap = queue_capacity;
+    c->b_to_a_cap = queue_capacity;
+    c->refcount   = 2;
+    rcp_mutex_init(&c->mu);
+    rcp_cond_init(&c->cv);
+
+    a = (rcp_shmem_side_t *)calloc(1, sizeof(*a));
+    b = (rcp_shmem_side_t *)calloc(1, sizeof(*b));
+    if (!a || !b) {
+        free(a);
+        free(b);
+        free(c->a_to_b_items);
+        free(c->b_to_a_items);
+        rcp_mutex_destroy(&c->mu);
+        rcp_cond_destroy(&c->cv);
+        free(c);
+        return RCP_SHMEM_ERR_ALLOC;
+    }
+
+    a->base.vt                  = &shmem_side_vtable;
+    a->base.refcount             = 1;
+    a->base.time_sync_supported = time_sync_supported;
+    a->core                     = c;
+    a->is_a                     = true;
+
+    b->base.vt                  = &shmem_side_vtable;
+    b->base.refcount             = 1;
+    b->base.time_sync_supported = time_sync_supported;
+    b->core                     = c;
+    b->is_a                     = false;
+
+    *out_a = &a->base;
+    *out_b = &b->base;
+    return RCP_SHMEM_OK;
 }

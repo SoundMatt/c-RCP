@@ -1,83 +1,134 @@
+//cfusa:req REQ-UDP-001
+//cfusa:req REQ-UDP-002
+//cfusa:req REQ-UDP-003
+//cfusa:req REQ-UDP-004
+//cfusa:req REQ-UDP-005
+//cfusa:req REQ-UDP-006
+//cfusa:req REQ-UDP-007
+//cfusa:req REQ-UDP-008
+//cfusa:req REQ-UDP-009
+//cfusa:req REQ-UDP-010
+//cfusa:req REQ-UDP-011
+//cfusa:req REQ-UDP-012
+//cfusa:req REQ-UDP-013
+//cfusa:req REQ-UDP-014
 /*
- * Pure-C UDP transport for the RCP protocol.
+ * udp.h -- IEEE1722-over-UDP/IP (spec Annex J) transport for the TC18
+ * Remote Control Protocol wire layer (ROADMAP.md Phase 21, "Satellite
+ * Package Rework", milestone 78, "Transport satellites").
  *
- * On POSIX (Linux, macOS): full implementation using BSD sockets.
- * On Windows: stub that returns RCP_ERR_CLOSED from every operation (no
- * BSD-sockets implementation there yet — see ROADMAP.md).
+ * REPLACEs the pre-TC18 length-framed Command/Response UDP transport
+ * (rcp_udp_zone_server_t / rcp_udp_controller_t, wire.h's own frame
+ * format) with an rcp_avtp_transport_t (avtp.h, milestone 59)
+ * implementation: this module's only remaining job is moving
+ * already-framed AVTPDUs (as produced by avtp.c's own
+ * rcp_avtp_encode_ntscf()/_tscf()) across a UDP/IP association, exactly
+ * per the "transport independence" contract avtp.h's own file header
+ * describes. Every request/response correlation, addressing, and
+ * dispatch concern the old rcp_udp_controller_t/rcp_udp_zone_server_t
+ * pair used to own (pending-request rendezvous by id, Subscribe/
+ * Unsubscribe control frames, Zone-addressed responses) belongs one
+ * layer up from here now -- to whichever future module drives an
+ * rcp_avtp_transport_t against lifecycle.h/regmap.h/server.h (see
+ * ROADMAP.md's own Phase 21 sequencing) -- so none of that machinery
+ * survives the REPLACE. What *is* reused, per ROADMAP.md's own
+ * milestone-78 text ("POSIX socket/thread plumbing reused as a starting
+ * point where it still fits"): the POSIX socket create/bind/connect/
+ * getsockname helpers the predecessor module already had, and the
+ * cross-platform mutex seam from platform.h.
  *
- * Frame format is defined in rcp/wire.h.
+ * Two construction modes, matching a client dialing a known RC Server
+ * and an RC Server binding a local association:
+ *
+ *   - rcp_udp_avtp_transport_dial(): connects a UDP socket to a fixed
+ *     peer (host:port). send()/recv() go through that connected socket,
+ *     so the kernel itself discards any datagram not actually from that
+ *     peer -- the usual "connected UDP" hardening.
+ *   - rcp_udp_avtp_transport_bind(): binds a UDP socket to a local
+ *     addr:port (addr NULL/"" -> INADDR_ANY; port 0 -> an OS-assigned
+ *     ephemeral port, see rcp_udp_avtp_transport_port()). This transport
+ *     starts with no known peer; its first successfully received
+ *     datagram records the sender's address as the peer send()
+ *     subsequently targets (see rcp_udp_avtp_transport_bind()'s own
+ *     send() behavior below). This is a deliberate, documented
+ *     simplification for a first cut at a UDP AVTP transport -- one
+ *     learned peer per bound socket, not per-stream_id multi-peer
+ *     routing; multiplexing many RC Clients behind a single bound RC
+ *     Server association is tracked as future work, not assumed solved
+ *     here.
+ *
+ * recv() polls the underlying socket in short slices rather than
+ * blocking directly on it, so that close() -- called from a different
+ * thread than whichever one is inside recv() -- reliably unblocks that
+ * call within one poll slice on every platform this project targets,
+ * instead of relying on shutdown()-interrupts-a-blocking-recv semantics,
+ * which are not portable (POSIX leaves that implementation-defined for
+ * datagram sockets, and Windows' own semantics differ again). close()
+ * itself never touches the underlying socket -- it only raises a flag
+ * send()/recv() both check first -- so a close() racing a recv() already
+ * inside select()/recvfrom() on the same fd can never invalidate that
+ * fd out from under it; the fd is only actually closed once this
+ * transport's own destroy() runs (i.e. once nothing holds a reference to
+ * it any more, per avtp.h's own refcounting contract), the same
+ * "flag-then-real-teardown" split avtp.c's own loopback transport uses
+ * for its own close()/destroy() pair.
+ *
+ * On Windows: stub, matching the predecessor module's own documented
+ * scope gap -- every operation fails (ok() false, send()/recv() return
+ * RCP_ERR_CLOSED) rather than attempting a real winsock implementation.
+ * See ROADMAP.md.
  */
 #ifndef RCP_UDP_H
 #define RCP_UDP_H
 
+#include "rcp/avtp.h"
 #include "rcp/rcp.h"
+
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* Handler invoked by an rcp_udp_zone_server_t when it receives a Command.
- * If NULL, the server replies RCP_RESPONSE_OK with an empty payload.
- * *out is zeroed before the handler runs; ownership rules match
- * tests/legacy_mock.h's own rcp_mock_handler_fn (the legacy zone-controller
- * reference double this milestone-77 mock.h rework moved out of the public
- * library -- see mock.h's own file header): if the handler wants a
- * response payload, it must allocate it itself (e.g. via rcp_bytes_dup). */
-typedef void (*rcp_udp_handler_fn)(const rcp_command_t *cmd, rcp_response_t *out, void *user_data);
+/* Connects a UDP socket to host:port and returns an rcp_avtp_transport_t
+ * wrapping it, with refcount 1 (release with rcp_avtp_transport_release()).
+ * Never returns NULL except on allocation failure -- check
+ * rcp_udp_avtp_transport_ok() to distinguish a successful connect from a
+ * socket/connect failure (mirrors the predecessor module's own
+ * rcp_udp_controller_ok() convention). time_sync_supported is recorded on
+ * the returned transport's own base.time_sync_supported field (avtp.h). */
+rcp_avtp_transport_t *rcp_udp_avtp_transport_dial(const char *host, uint16_t port,
+                                                   bool time_sync_supported);
 
-/* ── ZoneServer: listens on a UDP port, dispatches Commands, publishes Status ── */
+/* Binds a UDP socket to addr:port and returns an rcp_avtp_transport_t
+ * wrapping it, same refcount/ownership/ok() conventions as
+ * rcp_udp_avtp_transport_dial(). Its send() targets whichever peer
+ * address its own recv() most recently learned (see the file header);
+ * before any datagram has ever been received, send() returns
+ * RCP_ERR_BUSY rather than silently discarding the frame or guessing a
+ * destination. */
+rcp_avtp_transport_t *rcp_udp_avtp_transport_bind(const char *addr, uint16_t port,
+                                                   bool time_sync_supported);
 
-typedef struct rcp_udp_zone_server rcp_udp_zone_server_t;
+/* True iff t is a transport returned by this module's own dial()/bind()
+ * and its underlying socket was created (and, for dial(), connected; for
+ * bind(), bound) successfully. Behavior is undefined if t was not
+ * returned by this module's own dial()/bind(). */
+bool rcp_udp_avtp_transport_ok(rcp_avtp_transport_t *t);
 
-/* Binds to addr:port (addr NULL or "" binds INADDR_ANY; port 0 lets the OS
- * assign an ephemeral port — see rcp_udp_zone_server_port()). Returns NULL
- * only on allocation failure; check rcp_udp_zone_server_ok() to distinguish
- * a successful bind from a socket/bind failure (mirrors cpp-RCP's ok()). */
-rcp_udp_zone_server_t *rcp_udp_zone_server_new(rcp_zone_t zone, const char *addr, uint16_t port);
+/* The local port t's socket is actually bound to (useful after passing
+ * port 0 to rcp_udp_avtp_transport_bind()/_dial() to let the OS assign
+ * one). Returns 0 if t is not ok(). Behavior is undefined if t was not
+ * returned by this module's own dial()/bind(). */
+uint16_t rcp_udp_avtp_transport_port(rcp_avtp_transport_t *t);
 
-bool rcp_udp_zone_server_ok(const rcp_udp_zone_server_t *srv);
-
-/* Writes "host:port\0" into buf (up to buf_len bytes) and returns the
- * string length excluding the NUL; returns 0 (buf untouched) on failure. */
-size_t rcp_udp_zone_server_addr_string(const rcp_udp_zone_server_t *srv, char *buf, size_t buf_len);
-
-uint16_t rcp_udp_zone_server_port(const rcp_udp_zone_server_t *srv);
-
-void rcp_udp_zone_server_set_handler(rcp_udp_zone_server_t *srv, rcp_udp_handler_fn handler, void *user_data);
-void rcp_udp_zone_server_set_healthy(rcp_udp_zone_server_t *srv, bool healthy);
-
-/* Publishes a Status update to every subscriber that has sent a Subscribe
- * control frame. payload may be NULL iff len==0. */
-void rcp_udp_zone_server_publish(rcp_udp_zone_server_t *srv, const uint8_t *payload, size_t len);
-
-/* Stops the server's receive loop and closes the socket. Safe to call more
- * than once; blocks until the internal serve thread has fully exited. */
-void rcp_udp_zone_server_close(rcp_udp_zone_server_t *srv);
-
-/* Frees the server. Call after rcp_udp_zone_server_close() (close() is
- * idempotent and safe to call again here if not already closed). */
-void rcp_udp_zone_server_destroy(rcp_udp_zone_server_t *srv);
-
-/* ── Controller: dials a ZoneServer, implements rcp_controller_t ─────────────── */
-
-/* Connects to server_host:server_port for zone. Returned with refcount 1
- * (release with rcp_controller_release()) even on connect failure — check
- * rcp_udp_controller_ok() first; a not-ok controller's send()/subscribe()
- * always return RCP_ERR_CLOSED. */
-rcp_controller_t *rcp_udp_controller_new(rcp_zone_t zone, const char *server_host, uint16_t server_port);
-
-bool rcp_udp_controller_ok(rcp_controller_t *ctrl);
-
-/* ── Registry: rcp_registry_t backed by UDP controllers ──────────────────────── */
-
-rcp_registry_t *rcp_udp_registry_new(void);
-
-/* Dials server_host:server_port for zone and registers the resulting
- * controller (taking a reference; the registry owns the dialed controller
- * going forward). Returns RCP_ERR_NOT_FOUND if the dial itself fails
- * (mirrors cpp-RCP's udp::Registry::dial), or the usual register_ctrl()
- * outcomes (RCP_ERR_ALREADY_EXISTS / RCP_ERR_CLOSED / RCP_OK) otherwise. */
-int rcp_udp_registry_dial(rcp_registry_t *reg, rcp_zone_t zone, const char *server_host, uint16_t server_port);
+/* Writes "host:port\0" into buf (up to buf_len bytes) for t's own bound
+ * local address and returns the string length excluding the NUL; returns
+ * 0 (buf untouched) if t is not ok() or buf_len == 0. Behavior is
+ * undefined if t was not returned by this module's own dial()/bind(). */
+size_t rcp_udp_avtp_transport_addr_string(rcp_avtp_transport_t *t, char *buf, size_t buf_len);
 
 #ifdef __cplusplus
 }
