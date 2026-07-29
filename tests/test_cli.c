@@ -7,12 +7,22 @@
  * .github/workflows/ci.yml's relay-conform job) against the actual c-rcp
  * binary -- these tests instead pin the specific field values rcp_cli_run()
  * must emit, which is finer-grained than schema validity alone.
+ *
+ * REQ-CLI-006 (main()'s own argv[1..argc)/stdout/stderr forwarding to
+ * rcp_cli_run(), cli/main.c) has no dedicated test in this file, since
+ * main() is a two-line, subprocess-only entry point unity's in-process
+ * harness cannot invoke directly. It is tagged here rather than left
+ * untagged because it is genuinely exercised end-to-end by the same
+ * relay-conform CI job referenced above, which builds and runs the real
+ * c-rcp binary (i.e. main() itself, not just rcp_cli_run()) against
+ * `relay conform --strict`.
  */
 //cfusa:test REQ-CLI-001
 //cfusa:test REQ-CLI-002
 //cfusa:test REQ-CLI-003
 //cfusa:test REQ-CLI-004
 //cfusa:test REQ-CLI-005
+//cfusa:test REQ-CLI-006
 #include "unity.h"
 
 #include <rcp/cli.h>

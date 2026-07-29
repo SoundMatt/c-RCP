@@ -20,6 +20,11 @@
 //cfusa:test REQ-CANEP-020
 //cfusa:test REQ-CANEP-021
 //cfusa:test REQ-CANEP-022
+//cfusa:test REQ-CANEP-023
+//cfusa:test REQ-CANEP-024
+//cfusa:test REQ-CANEP-025
+//cfusa:test REQ-CANEP-026
+//cfusa:test REQ-CANEP-027
 #include "unity.h"
 
 #include <rcp/acf.h>

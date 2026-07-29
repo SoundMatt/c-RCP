@@ -26,6 +26,9 @@
 //cfusa:test REQ-UART-026
 //cfusa:test REQ-UART-027
 //cfusa:test REQ-UART-028
+//cfusa:test REQ-UART-029
+//cfusa:test REQ-UART-030
+//cfusa:test REQ-UART-031
 #include "unity.h"
 
 #include <rcp/acf.h>
