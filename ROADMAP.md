@@ -4691,3 +4691,38 @@ spec_version`) had `"1.14"` hardcoded as an expected value; updated to
 `"2.0"`. `cfusa` v0.5.49 `check`/`lint`/`analyze`/`cyber`/`qualify`/
 `vuln` all exit 0; `trace --req-coverage 100` and `trace --sec-tested
 100` both still report 854/854 (100%), unchanged.
+
+### 90. Add CHANGELOG.md (v0.90.0) ✅
+
+No `CHANGELOG.md` existed anywhere in the tree despite (at the start of
+this milestone) 89 tagged releases, even though `ROADMAP.md` documents
+real deprecate-and-remove-in-the-same-release cycles with no intervening
+MINOR release (`v0.78.0` removing `tls.c`, `v0.83.0`'s seven-module
+deprecation batch). RELAY spec §19.2 requires `CHANGELOG.md` to record
+the deprecation, replacement, and planned/actual removal version for
+exactly this kind of event, and no such machine-discoverable or
+conventionally-located record existed -- only prose buried in
+`ROADMAP.md`.
+
+Added `CHANGELOG.md` at the repo root: one entry per tagged release
+(generated from `ROADMAP.md`'s own per-milestone headers and this
+repository's tag history, newest first, each linking back to `ROADMAP.md`
+for full detail rather than duplicating it), plus a dedicated
+"Deprecation & Removal Log" table up top recording both real
+deprecate-and-remove events found (`tls` at v0.78.0; `prioqueue`/
+`firmware`/`zonegroup`/`proxy`/`redundancy`/`federation`/`dyndata` at
+v0.83.0) against §19.2's required fields (deprecation version,
+replacement, removal version).
+
+Also: added a `CHANGELOG.md` line to `CONTRIBUTING.md`'s PR checklist
+(required whenever a change deprecates/replaces/removes something;
+otherwise a one-line entry alongside the `ROADMAP.md` update suffices),
+and a short "Changelog" section to `README.md` pointing at it -- per the
+issue's own suggestion to treat `CHANGELOG.md` as an ongoing release-gate
+requirement going forward, not a one-time retroactive document.
+
+Verified locally: full `ctest` suite (60/60) unaffected (docs-only
+change, no source touched). `cfusa` v0.5.49
+`check`/`lint`/`analyze`/`cyber`/`qualify`/`vuln`/`trace --req-coverage
+100`/`trace --sec-tested 100` all unchanged from the prior milestone
+(this change touches no tagged/tested code).
