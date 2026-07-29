@@ -3933,6 +3933,31 @@ same note every prior milestone has made) — `REQ-WDG-*`/`REQ-DL-*`/
 by hand before pushing. `cfusa check`'s own pre-existing HARA002/HARA003
 findings are unchanged and not introduced or touched here.
 
+**PR #97 follow-up (landing fix)**: CI's `cfusa check`/`cfusa lint`
+jobs came back red on the branch above with a single `CFUSA-L004`
+(MISRA-C 2012 Rule 17.2, no-recursion) error against `src/watchdog.c`'s
+static `evaluate()`, even though that function is not recursive — its
+only call at the flagged line is to e2e.h's unrelated
+`rcp_e2e_wd_evaluate()` (milestone 70). This is a new instance of the
+same lint-rule bug class as `SoundMatt/c-FuSa#59` (the false-positive
+that motivated retiring the CI escape hatch at milestone 49): the
+checker appears to key recursion detection off of a name-suffix match
+rather than an actual call graph, and a local function named `evaluate`
+calling anything ending in `..._evaluate` collides with it. Fixed
+locally, in this repo only, by renaming the static function (and its
+sole call site in `evaluate_all()`) to `evaluate_stream` — a pure
+rename with no behavior change, so no `REQ-WDG-*` tag or test needed
+updating. Verified with a real local `cmake`/`ctest` build (67/67
+passing), a from-source local build of `cfusa` v0.5.46 (`cfusa lint`
+and `cfusa check` both exit 0 with zero `CFUSA-L004` findings post-
+rename; `cfusa trace` reports 929/929 requirements traced), and a local
+build of RELAY's own `relay conform --strict` against the CLI target
+(PASS). A narrowly-scoped issue describing this new false-positive
+pattern was filed against `SoundMatt/c-FuSa` (issue only, that repo's
+own source is untouched, per this ecosystem's cross-repo policy) so the
+upstream recursion check can move to real call-graph resolution instead
+of name matching; no broad CI waiver was reinstated for it.
+
 **Deferred, not forgotten**: `FORMAL_VERIFICATION.md`'s `HealthStateMachine.tla`/
 `WatchdogProtocol.tla` mapping-to-C-implementation table and
 `PORTABILITY.md`'s thread-per-decorator inventory both still describe

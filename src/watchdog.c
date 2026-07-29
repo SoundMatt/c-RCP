@@ -68,10 +68,14 @@ static bool wd_result_equal(rcp_e2e_wd_result_t a, rcp_e2e_wd_result_t b)
            && a.notify == b.notify;
 }
 
+/* Named evaluate_stream (not evaluate) so it doesn't share a suffix with
+ * rcp_e2e_wd_evaluate() below -- cfusa lint's CFUSA-L004 recursion check
+ * matched on that name overlap and flagged this as self-recursive even
+ * though the two are unrelated functions with no call cycle between them. */
 //cfusa:req REQ-WDG-001
 //cfusa:req REQ-WDG-002
 //cfusa:req REQ-WDG-008
-static void evaluate(rcp_watchdog_keeper_t *k, stream_state_t *st, uint64_t now_ms)
+static void evaluate_stream(rcp_watchdog_keeper_t *k, stream_state_t *st, uint64_t now_ms)
 {
     uint64_t elapsed;
     rcp_e2e_wd_result_t result;
@@ -110,7 +114,7 @@ static void evaluate_all(rcp_watchdog_keeper_t *k)
     uint64_t now_ms = rcp_monotonic_ms();
     size_t i;
     for (i = 0; i < k->n_states; i++) {
-        evaluate(k, &k->states[i], now_ms);
+        evaluate_stream(k, &k->states[i], now_ms);
     }
 }
 
