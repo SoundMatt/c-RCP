@@ -4175,12 +4175,54 @@ already flagged (`REQ-MDNS-007/008`, `REQ-PQ-005`, `REQ-RELAY-013`),
 unchanged by this milestone. A local build of RELAY's own `relay conform
 --strict` against the `-DRELAY_BUILD_CLI=ON` CLI target reports PASS.
 
-### 82. Optional discovery convenience (v0.82.0)
+### 82. Optional discovery convenience (v0.82.0) ✅
 
 - **ADAPT** `mdns.c`: retained strictly as an optional convenience
   discovery layer scoped to the IEEE1722-over-UDP/IP transport variant,
   layered beside — never instead of — the Phase 15 native broadcast
   discovery mechanism, which remains the only mandatory discovery path.
+
+**Done (v0.82.0)**: `mdns.h`/`mdns.c` rebound off the retired `rcp_zone_t`/
+`rcp_zone_string()` onto `avtp.h`'s `rcp_stream_id_t` -- the same server
+identity `discovery.h`'s `rcp_discovery_result_t.server_stream_id` already
+uses (milestone 63) -- so an mDNS-advertised record and a
+natively-discovered one describe the same kind of thing. `rcp_mdns_zone_info_t`
+becomes `rcp_mdns_server_info_t` (`server_stream_id`/`host`/`port`/
+`instance_name`); the discoverer/announcer vtables and the `StaticDiscoverer`
+test double are otherwise structurally unchanged, only rekeyed.
+`rcp_mdns_make_instance_name()` drops the zone-per-service `"<zone>.<host>.
+_rcp._udp.local"` scheme (no zone concept survives to name a record after)
+in favor of `"<server_stream_id as 16 hex digits>.<host>._rcp-tc18._udp.local"`
+-- a service type distinct from any legacy naming, scoped to this module's
+own IEEE1722-over-UDP/IP convenience role rather than a value the
+specification itself defines.
+
+`mdns.h`'s file header gained an explicit "Optional, and never a substitute
+for discovery.h" section, the same cross-reference discipline milestone 81
+used for `canbr.h`/`linbr.h`'s three-way CAN/LIN distinction: this module
+is scoped strictly to the IEEE1722-over-UDP/IP transport variant, sits
+beside `discovery.h`'s mandatory native broadcast discovery (Phase 15,
+milestone 63) rather than replacing it, and neither module depends on the
+other.
+
+`tests/test_mdns.c` is a from-scratch rewrite of the same eight cases
+(StaticDiscoverer emits/stops/carries-fields, instance-name generation,
+Announcer register/withdraw/destroy) against `rcp_stream_id_t`-keyed
+records instead of zones. `REQ-MDNS-001..009` are rewritten in place in
+`.fusa-reqs.json` (same prefix and count -- no vtable slots were added or
+removed, only rekeyed, unlike the bridges' milestone-81 shrink).
+
+Verified locally: full `ctest` suite (67/67, unchanged from v0.81.0) under
+both a plain Debug build and a manual `-fsanitize=address,undefined` build
+(ASan+UBSan-clean; macOS ASan has no leak detector, so leak-checking is not
+covered by this local run). A local `cfusa` v0.5.46 toolchain build:
+`lint`/`check`/`cyber`/`qualify`/`vuln` all exit 0 against a clean tree;
+`trace --req-coverage 100` reports 911/911 requirements traced (100%, both
+metrics) -- the tool's own advisory `UNTRACED` list still names the same
+four pre-existing gaps prior milestones already flagged (`REQ-MDNS-007/008`,
+`REQ-PQ-005`, `REQ-RELAY-013`), unchanged by this milestone since no vtable
+slot count changed here. A local build of RELAY's own `relay conform
+--strict` against the `-DRELAY_BUILD_CLI=ON` CLI target reports PASS.
 
 ### 83. Deprecation batch (v0.83.0)
 

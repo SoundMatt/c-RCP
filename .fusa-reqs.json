@@ -1458,16 +1458,16 @@
     },
     {
       "id": "REQ-MDNS-001",
-      "title": "Discoverer interface for zone discovery",
-      "text": "rcp_mdns_discoverer_t shall define the abstract interface for mDNS-based zone controller discovery.",
+      "title": "Discoverer interface for server discovery",
+      "text": "rcp_mdns_discoverer_t shall define the abstract interface for mDNS-based RC Server discovery.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-MDNS-002",
-      "title": "start() fires Added event for each discovered zone",
-      "text": "Discoverer::start() shall invoke the callback with EventType::Added for each discovered ZoneInfo.",
+      "title": "start() fires Added event for each discovered record",
+      "text": "Discoverer::start() shall invoke the callback with EventType::Added for each discovered ServerInfo.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -1482,32 +1482,32 @@
     },
     {
       "id": "REQ-MDNS-004",
-      "title": "StaticDiscoverer emits configured zones",
-      "text": "StaticDiscoverer::start() shall emit all configured ZoneInfo entries synchronously before returning.",
+      "title": "StaticDiscoverer emits configured records",
+      "text": "StaticDiscoverer::start() shall emit all configured ServerInfo entries synchronously before returning.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-MDNS-005",
-      "title": "ZoneInfo carries host, port, and zone",
-      "text": "ZoneInfo shall carry the rcp_zone_t, host string, port number, and service instance name.",
+      "title": "ServerInfo carries stream_id, host, and port",
+      "text": "ServerInfo shall carry the rcp_stream_id_t identifying the RC Server, host string, port number, and service instance name.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-MDNS-006",
-      "title": "instance_name follows _rcp._udp.local convention",
-      "text": "make_instance_name() shall produce names of the form '<zone>.<host>._rcp._udp.local'.",
+      "title": "instance_name follows _rcp-tc18._udp.local convention",
+      "text": "make_instance_name() shall produce names of the form '<server_stream_id as 16 hex digits>.<host>._rcp-tc18._udp.local'.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-MDNS-007",
-      "title": "Announcer interface for zone registration",
-      "text": "rcp_mdns_Announcer shall define the abstract interface for announcing zone controllers via the local mDNS responder.",
+      "title": "Announcer interface for server registration",
+      "text": "rcp_mdns_Announcer shall define the abstract interface for announcing an RC Server via the local mDNS responder.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -1515,7 +1515,7 @@
     {
       "id": "REQ-MDNS-008",
       "title": "withdraw() removes mDNS record",
-      "text": "Announcer::withdraw(z) shall remove the mDNS record for the given zone.",
+      "text": "Announcer::withdraw(server_stream_id) shall remove the mDNS record for the given RC Server stream_id.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
