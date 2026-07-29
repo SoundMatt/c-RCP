@@ -405,10 +405,14 @@ static relay_message_t finish_timed_response(bool timed, uint64_t timestamp,
     return msg;
 }
 
-//cfusa:req REQ-RELAY-006
-relay_message_t rcp_response_to_message(rcp_adapt_op_t op, rcp_byte_bus_id_t byte_bus_id,
-                                         const uint8_t *b, size_t len,
-                                         rcp_adapt_errc_t *out_err)
+/* The actual per-op decode/mapping switch, unchanged from before RELAY
+ * spec v2.0 landed -- rcp_response_to_message() below wraps this to add
+ * the one new field v2.0's §15.7.5 base mapping requires that this
+ * function's own per-op branches don't already set (see that wrapper's
+ * own comment for why it's a wrapper and not folded in per-branch). */
+static relay_message_t response_to_message_impl(rcp_adapt_op_t op, rcp_byte_bus_id_t byte_bus_id,
+                                                  const uint8_t *b, size_t len,
+                                                  rcp_adapt_errc_t *out_err)
 {
     if (out_err) *out_err = RCP_ADAPT_OK;
 
@@ -692,6 +696,39 @@ relay_message_t rcp_response_to_message(rcp_adapt_op_t op, rcp_byte_bus_id_t byt
     default:
         return fail_decode(out_err);
     }
+}
+
+/* RELAY spec v2.0 §15.7.5 defines RCP's own canonical ToMessage() mapping:
+ * a response Message's `ID` is the responding endpoint's ByteBusID as a
+ * decimal string. This module's own per-op mapping (this file's header
+ * comment explains why it is a richer superset of that base shape, not a
+ * literal implementation of it) never set relay_message_t::id for any op
+ * except RCP_ADAPT_OP_DISCOVERY, whose id instead names the responding
+ * server's stream_id (discovery has no single meaningful ByteBusID of its
+ * own to report -- it's always issued against the fixed discovery bus,
+ * per lifecycle.h's RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID -- and per
+ * §15.7.5's own closing paragraph, extending `ID`'s encoding for a
+ * multi-stream-capable adapter is an explicitly sanctioned deviation from
+ * the single-field base shape, provided it's documented, which this is).
+ * Every other op has exactly one well-defined ByteBusID -- the byte_bus_id
+ * parameter already threaded through every branch above -- so setting it
+ * uniformly here, once, is both correct and simpler than repeating a
+ * relay_message_set_id() call in all 17 non-discovery branches. */
+//cfusa:req REQ-RELAY-006
+relay_message_t rcp_response_to_message(rcp_adapt_op_t op, rcp_byte_bus_id_t byte_bus_id,
+                                         const uint8_t *b, size_t len,
+                                         rcp_adapt_errc_t *out_err)
+{
+    rcp_adapt_errc_t err = RCP_ADAPT_OK;
+    relay_message_t  msg = response_to_message_impl(op, byte_bus_id, b, len, &err);
+
+    if (out_err) *out_err = err;
+    if (err == RCP_ADAPT_OK && op != RCP_ADAPT_OP_DISCOVERY) {
+        char id_buf[4]; /* byte_bus_id is 0-255 -- "255" + NUL */
+        snprintf(id_buf, sizeof(id_buf), "%u", (unsigned)byte_bus_id);
+        relay_message_set_id(&msg, id_buf);
+    }
+    return msg;
 }
 
 /* ── Error wrapping (§5.2) ─────────────────────────────────────────────────── */

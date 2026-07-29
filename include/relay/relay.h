@@ -1,4 +1,4 @@
-/* RELAY C bindings — relay_* types (RELAY spec §18.2, v1.14).
+/* RELAY C bindings — relay_* types (RELAY spec §18.2, v2.0).
  *
  * Defines the protocol-agnostic subset of the relay spec c-RCP depends on:
  * the mandatory error-condition sentinels (§5.1), Context (§18.2), the
@@ -9,11 +9,15 @@
  * not a full RELAY binding.
  *
  * This header itself is protocol-agnostic and structurally unaffected by
- * ROADMAP.md's Phase 13-21 TC18 protocol replacement -- the per-endpoint-
- * type Message-mapping problem that replacement created lives entirely in
- * rcp/adapt.h/adapt.c (milestone 84), not here. Bumping RELAY_SPEC_VERSION
- * to the current released RELAY version below is this milestone's own
- * incidental cleanup while that area was already being touched.
+ * either ROADMAP.md's Phase 13-21 TC18 protocol replacement or RELAY spec
+ * v2.0's own §15.5/§15.7.5 rework (replacing the RCP canonical types this
+ * project's own pre-TC18 protocol generation had been keyed to) -- the
+ * per-endpoint-type Message-mapping problem those create lives entirely in
+ * rcp/adapt.h/adapt.c (milestone 84, and its own file header's discussion of
+ * SoundMatt/RELAY issue #66 for the still-open upstream question), not
+ * here. Bumping RELAY_SPEC_VERSION to the current released RELAY version
+ * below is this milestone's own incidental cleanup while that area was
+ * already being touched.
  */
 #ifndef RELAY_RELAY_H
 #define RELAY_RELAY_H
@@ -36,9 +40,12 @@ extern "C" {
  * deep-audit fix pass (conformance-gate bugs, tooling fixes, C++/Rust
  * binding parity); v1.14 expanded the §13.7.2 module-name registry this
  * project's own module-naming reconciliation (issue #87) already
- * consulted (see ROADMAP.md's "Module-naming note").
+ * consulted (see ROADMAP.md's "Module-naming note"). v2.0 (a MAJOR bump,
+ * per §19.3's stability guarantee) replaced §15.5's RCP canonical types
+ * and §15.7.5's ToMessage()/FromMessage() mapping outright -- see
+ * rcp/adapt.h's file header and issue #107 for how that lands here.
  */
-#define RELAY_SPEC_VERSION "1.14"
+#define RELAY_SPEC_VERSION "2.0"
 
 /* ── Error conditions — mandatory sentinels (§5.1) ────────────────────────── */
 

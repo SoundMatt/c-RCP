@@ -57,7 +57,7 @@ static rcp_stream_id_t make_stream(uint16_t unique_id)
 static void test_rcp_spec_version_equals_relay_spec_version(void)
 {
     TEST_ASSERT_EQUAL_STRING(RELAY_SPEC_VERSION, RCP_SPEC_VERSION);
-    TEST_ASSERT_EQUAL_STRING("1.14", RCP_SPEC_VERSION);
+    TEST_ASSERT_EQUAL_STRING("2.0", RCP_SPEC_VERSION);
 }
 
 /* ── §3: Protocol enum ─────────────────────────────────────────────────────── */
@@ -289,6 +289,9 @@ static void test_gpio_response_maps_bitmask_into_payload(void)
     msg = rcp_response_to_message(RCP_ADAPT_OP_GPIO_READ, 7, frame.data, frame.len, &err);
     TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
     TEST_ASSERT_EQUAL(RELAY_PROTOCOL_RCP, msg.protocol);
+    /* RELAY spec v2.0 §15.7.5: a response Message's ID is the responding
+     * endpoint's ByteBusID as a decimal string -- see issue #107. */
+    TEST_ASSERT_EQUAL_STRING("7", msg.id);
     TEST_ASSERT_EQUAL_UINT(RCP_EP_GPIO_PAYLOAD_LEN, msg.payload.len);
     TEST_ASSERT_EQUAL_UINT8(0xAA, msg.payload.data[0]);
     TEST_ASSERT_EQUAL_UINT8(0xDD, msg.payload.data[3]);

@@ -4637,3 +4637,57 @@ change, no source touched). `cfusa` v0.5.49 `trace --sec-tested 100`
 reports 854/854 (100%, exit 0); `trace --req-coverage 100` still reports
 854/854 traced, 512/512 functions annotated, unchanged. `check`/`lint`/
 `analyze`/`cyber`/`qualify`/`vuln` all still exit 0.
+
+### 89. RELAY_SPEC_VERSION tracks spec v2.0 (v0.89.0) ✅
+
+`include/relay/relay.h` still declared `RELAY_SPEC_VERSION "1.14"`, stale
+against the RELAY spec's current MAJOR (v2.0, a breaking change replacing
+§15.5's RCP canonical types and §15.7.5's `ToMessage()`/`FromMessage()`
+mapping outright, released after this project's own v0.84.0 "RELAY
+adapter rework" milestone had already landed a pre-v2.0 interim design).
+
+Reviewed v2.0's actual RCP-specific content against `rcp/adapt.c`'s
+existing per-op mapping (milestone 84): `relay/relay.h`'s own
+`relay_message_t` envelope was already structurally compatible (a generic
+`id`/`payload`/`meta` shape, not the retired Zone/Command types v2.0
+describes leaving behind). `rcp/adapt.c`'s mapping, however, is a richer,
+endpoint-specific superset of v2.0's new base mapping, not a literal
+implementation of it -- it never set `relay_message_t::id` at all (except
+for `RCP_ADAPT_OP_DISCOVERY`, which sets it to a stream_id for its own
+reasons), where v2.0 §15.7.5 requires a response `Message`'s `id` to be
+the responding endpoint's `ByteBusID` as a decimal string.
+
+Bumped `RELAY_SPEC_VERSION` to `"2.0"`. Fixed the concrete gap this
+milestone's scope covers: `rcp_response_to_message()` now sets `msg.id`
+to the decimal `byte_bus_id` string for every op except `DISCOVERY`
+(whose own stream_id-based `id` is the multi-stream extension §15.7.5's
+own closing paragraph explicitly sanctions, since discovery has no
+single meaningful `ByteBusID` of its own to report). Implemented as a
+thin wrapper (`rcp_response_to_message()`) around the existing per-op
+switch (renamed to the static `response_to_message_impl()`), so the id
+is set in exactly one place rather than duplicated across 17 branches.
+
+`Meta["rcp.op"]`/`Meta["rcp.error"]` (the other two fields v2.0's base
+mapping defines) are **not** added by this milestone -- `rcp.op` would
+require threading a generic read/write classification through the
+request-encode path's 18 branches (today selected via the richer
+`rcp_adapt_op_t` opcode, not a generic verb), and `rcp.error` would
+require every one of the 13 endpoint types' response decoders to
+recognize and surface an ACF-level `err=1` response frame, which several
+don't currently attempt to decode at all (they're built against a
+successful-response frame shape only). Both are real, correctly-scoped
+gaps, not overlooked -- tracked via a comment update to the still-open
+upstream `SoundMatt/RELAY#66` (this project's own prior request for
+RELAY spec guidance on exactly this "heterogeneous fixed-shape
+sub-protocol" problem, filed against milestone 84), rather than either
+silently left undocumented or claimed as done. A future milestone should
+pick this up explicitly rather than assume it's covered here.
+
+Verified locally: full `ctest` suite (60/60, plus a new assertion on the
+GPIO-response test confirming `msg.id == "7"`, and the existing
+discovery-response test confirming its own stream_id-based `id` is
+unaffected). One pre-existing test (`test_rcp_spec_version_equals_relay_
+spec_version`) had `"1.14"` hardcoded as an expected value; updated to
+`"2.0"`. `cfusa` v0.5.49 `check`/`lint`/`analyze`/`cyber`/`qualify`/
+`vuln` all exit 0; `trace --req-coverage 100` and `trace --sec-tested
+100` both still report 854/854 (100%), unchanged.
