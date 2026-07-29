@@ -343,6 +343,17 @@ jobs:
       - name: Requirement + annotation coverage report (100% hard gate, both metrics)
         run: /tmp/cfusa/build/cfusa trace --req-coverage 100
 
+      # RELAY §20.1.2 also requires the "tested" metric (every requirement
+      # has a //cfusa:test or //cfusa:sec-test trace, not just a //cfusa:req
+      # impl tag) at 100%, which --req-coverage above does NOT gate --
+      # cfusa's own trace command treats --req-coverage and --sec-tested as
+      # two independent gates, not one combined check. Added (issue #106)
+      # after an audit found 13 requirements with an impl tag but no
+      # test/sec-test tag anywhere in the tree, undetected because this
+      # step didn't exist yet.
+      - name: Test-trace coverage report (100% hard gate, "tested" metric)
+        run: /tmp/cfusa/build/cfusa trace --sec-tested 100
+
   # ── c-FuSa: ctest integration → test-evidence.md ─────────────────────────────
   cfusa-verify:
     name: cfusa verify (test evidence)

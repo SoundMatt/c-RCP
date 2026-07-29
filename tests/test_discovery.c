@@ -22,6 +22,10 @@
 //cfusa:test REQ-DISC-022
 //cfusa:test REQ-DISC-023
 //cfusa:test REQ-DISC-024
+//cfusa:test REQ-DISC-025
+//cfusa:test REQ-DISC-026
+//cfusa:test REQ-DISC-027
+//cfusa:test REQ-DISC-028
 #include "unity.h"
 
 #include <rcp/acf.h>

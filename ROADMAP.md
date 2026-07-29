@@ -4599,3 +4599,41 @@ for 60 additional findings, all `WARNING` severity. Neither `ci.yml` nor
 these new warnings do not change any job's exit code; recorded here for
 visibility since a future `--strict` adoption would need to budget for
 them.
+
+### 88. cfusa-trace CI job now gates on --sec-tested too (v0.88.0) ✅
+
+The `cfusa-trace` job only ran `cfusa trace --req-coverage 100`, which
+gates metric 1 (requirement traceability, i.e. every requirement has a
+`//cfusa:req` impl tag somewhere) and metric 2 (function annotation
+density). `cfusa trace` also supports a third, independent gate,
+`--sec-tested N`, covering a different metric entirely: whether every
+requirement additionally has a `//cfusa:test` or `//cfusa:sec-test` trace
+tag pointing at the code that actually exercises it. `--req-coverage` and
+`--sec-tested` are separate gates in `cfusa`'s own implementation (an
+invocation picks one or the other, not both), and this job only ever
+invoked the first. RELAY spec §20.1.2 requires both metrics at 100% for
+continuous conformance.
+
+An audit found 13 requirements (`REQ-CANEP-023..027`, `REQ-CLI-006`,
+`REQ-DISC-025..028`, `REQ-UART-029..031`) carrying an impl tag but no
+test/sec-test tag anywhere in the tree -- each is genuinely exercised by
+an existing test (confirmed by reading each test file, not assumed), just
+never tagged. Added `//cfusa:test` tags for all 13 at each file's existing
+top-of-file tag block, matching this codebase's established per-file
+tagging convention. `REQ-CLI-006` (covering `cli/main.c`'s `main()`) has
+no dedicated unity test -- `main()` is a two-line, subprocess-only entry
+point unity's in-process harness cannot invoke directly -- so it's tagged
+in `tests/test_cli.c` with an explanatory comment pointing at the
+`relay-conform` CI job, which builds and runs the actual `c-rcp` binary
+(exercising `main()` itself, not just `rcp_cli_run()`) against
+`relay conform --strict`.
+
+Added a new `cfusa trace --sec-tested 100` step to the `cfusa-trace` job,
+alongside (not replacing) the existing `--req-coverage 100` step, so both
+metrics are now independently hard-gated.
+
+Verified locally: full `ctest` suite (60/60) unaffected (tag-only/CI-only
+change, no source touched). `cfusa` v0.5.49 `trace --sec-tested 100`
+reports 854/854 (100%, exit 0); `trace --req-coverage 100` still reports
+854/854 traced, 512/512 functions annotated, unchanged. `check`/`lint`/
+`analyze`/`cyber`/`qualify`/`vuln` all still exit 0.
