@@ -2,6 +2,7 @@
 
 #include "platform.h"
 
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -20,11 +21,12 @@ void rcp_mdns_announcer_destroy(rcp_mdns_announcer_t *a)
 }
 
 //cfusa:req REQ-MDNS-006
-size_t rcp_mdns_make_instance_name(rcp_zone_t zone, const char *hostname, char *buf, size_t buf_len)
+size_t rcp_mdns_make_instance_name(rcp_stream_id_t server_stream_id, const char *hostname, char *buf, size_t buf_len)
 {
     int n;
     if (buf_len == 0) return 0;
-    n = snprintf(buf, buf_len, "%s.%s._rcp._udp.local", rcp_zone_string(zone), hostname ? hostname : "");
+    n = snprintf(buf, buf_len, "%016" PRIx64 ".%s._rcp-tc18._udp.local",
+                 rcp_stream_id_to_u64(server_stream_id), hostname ? hostname : "");
     if (n < 0) return 0;
     return ((size_t)n < buf_len) ? (size_t)n : buf_len - 1;
 }
@@ -32,18 +34,18 @@ size_t rcp_mdns_make_instance_name(rcp_zone_t zone, const char *hostname, char *
 /* ── StaticDiscoverer ──────────────────────────────────────────────────────── */
 
 typedef struct {
-    rcp_zone_t  zone;
-    char       *host;          /* owned copy */
-    uint16_t    port;
-    char       *instance_name; /* owned copy */
-} static_zone_entry_t;
+    rcp_stream_id_t server_stream_id;
+    char           *host;          /* owned copy */
+    uint16_t        port;
+    char           *instance_name; /* owned copy */
+} static_record_entry_t;
 
 typedef struct {
-    rcp_mdns_discoverer_t  base;
-    rcp_mutex_t            mu; /* protects stopped (start()/stop() may race) */
-    bool                   stopped;
-    static_zone_entry_t   *zones;
-    size_t                 count;
+    rcp_mdns_discoverer_t   base;
+    rcp_mutex_t             mu; /* protects stopped (start()/stop() may race) */
+    bool                    stopped;
+    static_record_entry_t  *records;
+    size_t                  count;
 } static_discoverer_t;
 
 static char *dup_cstr(const char *s)
@@ -81,11 +83,11 @@ static int static_disc_start(rcp_mdns_discoverer_t *self, rcp_mdns_discovery_cal
         rcp_mutex_unlock(&d->mu);
         if (stopped_now) break;
 
-        ev.event             = RCP_MDNS_EVENT_ADDED;
-        ev.info.zone          = d->zones[i].zone;
-        ev.info.host          = d->zones[i].host;
-        ev.info.port          = d->zones[i].port;
-        ev.info.instance_name = d->zones[i].instance_name;
+        ev.event                     = RCP_MDNS_EVENT_ADDED;
+        ev.info.server_stream_id     = d->records[i].server_stream_id;
+        ev.info.host                 = d->records[i].host;
+        ev.info.port                 = d->records[i].port;
+        ev.info.instance_name        = d->records[i].instance_name;
         cb(&ev, user_data);
     }
     return RCP_OK;
@@ -104,10 +106,10 @@ static void static_disc_destroy(rcp_mdns_discoverer_t *self)
     static_discoverer_t *d = (static_discoverer_t *)self;
     size_t i;
     for (i = 0; i < d->count; i++) {
-        free(d->zones[i].host);
-        free(d->zones[i].instance_name);
+        free(d->records[i].host);
+        free(d->records[i].instance_name);
     }
-    free(d->zones);
+    free(d->records);
     rcp_mutex_destroy(&d->mu);
     free(d);
 }
@@ -118,7 +120,7 @@ static const rcp_mdns_discoverer_vtable_t static_disc_vtable = {
     static_disc_destroy,
 };
 
-rcp_mdns_discoverer_t *rcp_mdns_static_discoverer_new(const rcp_mdns_zone_info_t *zones, size_t count)
+rcp_mdns_discoverer_t *rcp_mdns_static_discoverer_new(const rcp_mdns_server_info_t *records, size_t count)
 {
     static_discoverer_t *d = (static_discoverer_t *)calloc(1, sizeof(*d));
     size_t i;
@@ -128,21 +130,21 @@ rcp_mdns_discoverer_t *rcp_mdns_static_discoverer_new(const rcp_mdns_zone_info_t
     rcp_mutex_init(&d->mu);
 
     if (count > 0) {
-        static_zone_entry_t *entries =
-            (static_zone_entry_t *)calloc(count, sizeof(*entries));
+        static_record_entry_t *entries =
+            (static_record_entry_t *)calloc(count, sizeof(*entries));
         if (!entries) {
             rcp_mutex_destroy(&d->mu);
             free(d);
             return NULL;
         }
-        d->zones = entries;
+        d->records = entries;
     }
     d->count = count;
     for (i = 0; i < count; i++) {
-        d->zones[i].zone          = zones[i].zone;
-        d->zones[i].host          = dup_cstr(zones[i].host);
-        d->zones[i].port          = zones[i].port;
-        d->zones[i].instance_name = dup_cstr(zones[i].instance_name);
+        d->records[i].server_stream_id = records[i].server_stream_id;
+        d->records[i].host             = dup_cstr(records[i].host);
+        d->records[i].port             = records[i].port;
+        d->records[i].instance_name    = dup_cstr(records[i].instance_name);
     }
     return &d->base;
 }
