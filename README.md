@@ -161,3 +161,9 @@ New integrations should use the headers listed above instead. Anyone
 needing the full pre-replacement protocol as it stood before Phase 13
 can pin to the `v0.58.x` tag series, which remains a valid, buildable
 snapshot indefinitely.
+
+## Changelog
+
+See [`CHANGELOG.md`](CHANGELOG.md) for the per-release summary,
+including a dedicated deprecation/replacement/removal log. `ROADMAP.md`
+remains the source of full per-milestone detail.

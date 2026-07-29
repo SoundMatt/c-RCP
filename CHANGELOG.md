@@ -1,0 +1,390 @@
+# Changelog
+
+All notable changes to c-RCP are recorded here, one entry per tagged
+release, newest first. Generated retroactively (issue #108) from
+`ROADMAP.md`'s existing per-milestone detail and this repository's own
+tag history; maintained going forward as a release-gate requirement
+alongside `ROADMAP.md`, per RELAY spec §19.2.
+
+## Deprecation & Removal Log
+
+Per RELAY spec §19.2, this table records every module deprecation:
+the version it was deprecated in, its replacement (if any), and the
+version it was actually removed in. Both entries below deprecated and
+removed a module in the *same* release, with no intervening MINOR
+deprecation window -- see each module's own release entry below for
+the rationale.
+
+| Module | Deprecated in | Replacement | Removed in |
+|---|---|---|---|
+| `tls.h`/`tls.c` | v0.78.0 | MACsec (802.1AE, link-layer; out of this library's scope) | v0.78.0 |
+| `prioqueue.h`/`prioqueue.c` | v0.83.0 | Protocol-defined request-kind execution priority (server-side) | v0.83.0 |
+| `firmware.h`/`firmware.c` | v0.83.0 | None (OTA is explicitly an OEM/application-layer concern, out of RCP's scope) | v0.83.0 |
+| `zonegroup.h`/`zonegroup.c` | v0.83.0 | None (no multi-target broadcast grouping concept in TC18) | v0.83.0 |
+| `proxy.h`/`proxy.c` | v0.83.0 | None (multi-hop/bridging is a network concern, not RCP's) | v0.83.0 |
+| `redundancy.h`/`redundancy.c` | v0.83.0 | None (no server-redundancy concept in TC18) | v0.83.0 |
+| `federation.h`/`federation.c` | v0.83.0 | None (no TC18 counterpart to the zone/HPC-lease registry model) | v0.83.0 |
+| `dyndata.h`/`dyndata.c` | v0.83.0 | None (every TC18 endpoint has one fixed, spec-defined payload shape) | v0.83.0 |
+
+## Releases
+
+### v0.90.0 -- 2026-07-29
+
+Add CHANGELOG.md. (Milestone 90; see `ROADMAP.md` for full detail.)
+
+### v0.89.0 -- 2026-07-29
+
+RELAY_SPEC_VERSION tracks spec v2.0. (Milestone 89; see `ROADMAP.md` for full detail.)
+
+### v0.88.0 -- 2026-07-29
+
+cfusa-trace CI job now gates on --sec-tested too. (Milestone 88; see `ROADMAP.md` for full detail.)
+
+### v0.87.0 -- 2026-07-29
+
+Pin c-FuSa to v0.5.49. (Milestone 87; see `ROADMAP.md` for full detail.)
+
+### v0.86.0 -- 2026-07-29
+
+GPIO/PWM_OUT write-semantics enum off-by-one. (Milestone 86; see `ROADMAP.md` for full detail.)
+
+### v0.85.0 -- 2026-07-28
+
+Full re-certification pass. (Milestone 85; see `ROADMAP.md` for full detail.)
+
+### v0.84.0 -- 2026-07-28
+
+RELAY adapter rework. (Milestone 84; see `ROADMAP.md` for full detail.)
+
+### v0.83.0 -- 2026-07-28
+
+Deprecation batch. (Milestone 83; see `ROADMAP.md` for full detail.)
+
+### v0.82.0 -- 2026-07-28
+
+Optional discovery convenience. (Milestone 82; see `ROADMAP.md` for full detail.)
+
+### v0.81.0 -- 2026-07-28
+
+Protocol bridges. (Milestone 81; see `ROADMAP.md` for full detail.)
+
+### v0.80.0 -- 2026-07-28
+
+Generic decorators, batch 1. (Milestone 80; see `ROADMAP.md` for full detail.)
+
+### v0.79.0 -- 2026-07-28
+
+Safety-adjacent satellites. (Milestone 79; see `ROADMAP.md` for full detail.)
+
+### v0.78.0 -- 2026-07-28
+
+Transport satellites. (Milestone 78; see `ROADMAP.md` for full detail.)
+
+### v0.77.0 -- 2026-07-28
+
+Foundational test/config satellites. (Milestone 77; see `ROADMAP.md` for full detail.)
+
+### v0.76.0 -- 2026-07-28
+
+Fragmentation support. (Milestone 76; see `ROADMAP.md` for full detail.)
+
+### v0.75.0 -- 2026-07-28
+
+Wakeup control endpoint + power modes. (Milestone 75; see `ROADMAP.md` for full detail.)
+
+### v0.74.0 -- 2026-07-28
+
+MDIO endpoint. (Milestone 74; see `ROADMAP.md` for full detail.)
+
+### v0.73.0 -- 2026-07-28
+
+ISELED endpoint. (Milestone 73; see `ROADMAP.md` for full detail.)
+
+### v0.72.0 -- 2026-07-28
+
+CAN controller endpoint, incl. CAN XL. (Milestone 72; see `ROADMAP.md` for full detail.)
+
+### v0.71.0 -- 2026-07-28
+
+LIN commander endpoint. (Milestone 71; see `ROADMAP.md` for full detail.)
+
+### v0.70.0 -- 2026-07-28
+
+Safe points: CRC32 + safety-request variants. (Milestone 70; see `ROADMAP.md` for full detail.)
+
+### v0.69.0 -- 2026-07-28
+
+Triggered/chained/timed requests + cancellation taxonomy. (Milestone 69; see `ROADMAP.md` for full detail.)
+
+### v0.68.0 -- 2026-07-28
+
+Compound + compound-wait requests + sequencers. (Milestone 68; see `ROADMAP.md` for full detail.)
+
+### v0.67.0 -- 2026-07-28
+
+ADC + PWM_OUT + PWM_IN endpoints. (Milestone 67; see `ROADMAP.md` for full detail.)
+
+### v0.66.0 -- 2026-07-28
+
+I²C + UART endpoints. (Milestone 66; see `ROADMAP.md` for full detail.)
+
+### v0.65.0 -- 2026-07-28
+
+SPI endpoint. (Milestone 65; see `ROADMAP.md` for full detail.)
+
+### v0.64.0 -- 2026-07-28
+
+GPIO endpoint. (Milestone 64; see `ROADMAP.md` for full detail.)
+
+### v0.63.0 -- 2026-07-28
+
+Discovery. (Milestone 63; see `ROADMAP.md` for full detail.)
+
+### v0.62.0 -- 2026-07-28
+
+Register-map model. (Milestone 62; see `ROADMAP.md` for full detail.)
+
+### v0.61.0 -- 2026-07-28
+
+Lifecycle state machine. (Milestone 61; see `ROADMAP.md` for full detail.)
+
+### v0.60.0 -- 2026-07-28
+
+ACF message format + byte_message_info header. (Milestone 60; see `ROADMAP.md` for full detail.)
+
+### v0.59.0 -- 2026-07-28
+
+AVTPDU framing. (Milestone 59; see `ROADMAP.md` for full detail.)
+
+### v0.58.0 -- 2026-07-27
+
+RELAY-conformance audit remediation, batch 5: real TLC verification. (Milestone 58; see `ROADMAP.md` for full detail.)
+
+### v0.57.0 -- 2026-07-27
+
+RELAY-conformance audit remediation, batch 4: real TARA content. (Milestone 57; see `ROADMAP.md` for full detail.)
+
+### v0.56.0 -- 2026-07-27
+
+RELAY-conformance audit remediation, batch 3: Adapt() error wrapping. (Milestone 56; see `ROADMAP.md` for full detail.)
+
+### v0.55.0 -- 2026-07-27
+
+RELAY-conformance audit remediation, batch 2: mechanical fixes. (Milestone 55; see `ROADMAP.md` for full detail.)
+
+### v0.54.0 -- 2026-07-27
+
+Coverage maximization, batch 4: internal helpers. (Milestone 54; see `ROADMAP.md` for full detail.)
+
+### v0.53.0 -- 2026-07-27
+
+Coverage maximization, batch 3: registry lifecycle. (Milestone 53; see `ROADMAP.md` for full detail.)
+
+### v0.52.0 -- 2026-07-27
+
+Coverage maximization, batch 2: decorator vtable methods. (Milestone 52; see `ROADMAP.md` for full detail.)
+
+### v0.51.0 -- 2026-07-27
+
+Fix: branch coverage still not captured on real CI. (Milestone 51; see `ROADMAP.md` for full detail.)
+
+### v0.50.0 -- 2026-07-27
+
+Coverage maximization, batch 1: branch instrumentation + strerror() functions. (Milestone 50; see `ROADMAP.md` for full detail.)
+
+### v0.49.0 -- 2026-07-27
+
+CI hardening: remove vestigial CFUSA-L004 escape hatch. (Milestone 49; see `ROADMAP.md` for full detail.)
+
+### v0.48.0 -- 2026-07-27
+
+`relay conform` CI gate -- closes #12. (Milestone 48; see `ROADMAP.md` for full detail.)
+
+### v0.47.0 -- 2026-07-27
+
+CLI binary — `version`/`capabilities`/`status` -- closes #8. (Milestone 47; see `ROADMAP.md` for full detail.)
+
+### v0.46.0 -- 2026-07-27
+
+`Adapt()`/`ToMessage()`/`FromMessage()`/`SpecVersion` -- closes #10. (Milestone 46; see `ROADMAP.md` for full detail.)
+
+### v0.45.0 -- 2026-07-27
+
+`rcp_zone_string()` PascalCase + `rcp_zone_from_string()` -- closes #11. (Milestone 45; see `ROADMAP.md` for full detail.)
+
+### v0.44.0 -- 2026-07-27
+
+Wire decoder integer-overflow fix -- closes #9. (Milestone 44; see `ROADMAP.md` for full detail.)
+
+### v0.43.0 -- 2026-07-27
+
+Certification. (Milestone 43; see `ROADMAP.md` for full detail.)
+
+### v0.42.0 -- 2026-07-27
+
+ISO 21434 / Cybersecurity. (Milestone 42; see `ROADMAP.md` for full detail.)
+
+### v0.41.0 -- 2026-07-27
+
+Formal Verification. (Milestone 41; see `ROADMAP.md` for full detail.)
+
+### v0.40.0 -- 2026-07-27
+
+RTOS / Bare-Metal. (Milestone 40; see `ROADMAP.md` for full detail.)
+
+### v0.39.0 -- 2026-07-27
+
+DoIP Bridge. (Milestone 39; see `ROADMAP.md` for full detail.)
+
+### v0.38.0 -- 2026-07-27
+
+UDS Bridge. (Milestone 38; see `ROADMAP.md` for full detail.)
+
+### v0.37.0 -- 2026-07-27
+
+LIN Bridge. (Milestone 37; see `ROADMAP.md` for full detail.)
+
+### v0.36.0 -- 2026-07-27
+
+MQTT Bridge. (Milestone 36; see `ROADMAP.md` for full detail.)
+
+### v0.35.0 -- 2026-07-27
+
+DDS Bridge. (Milestone 35; see `ROADMAP.md` for full detail.)
+
+### v0.34.0 -- 2026-07-27
+
+CAN Bridge. (Milestone 34; see `ROADMAP.md` for full detail.)
+
+### v0.33.0 -- 2026-07-27
+
+SOME/IP Bridge. (Milestone 33; see `ROADMAP.md` for full detail.)
+
+### v0.32.0 -- 2026-07-27
+
+REST Bridge. (Milestone 32; see `ROADMAP.md` for full detail.)
+
+### v0.31.0 -- 2026-07-27
+
+gRPC Bridge. (Milestone 31; see `ROADMAP.md` for full detail.)
+
+### v0.30.0 -- 2026-07-27
+
+Dynamic Data. (Milestone 30; see `ROADMAP.md` for full detail.)
+
+### v0.29.0 -- 2026-07-27
+
+Code Generation. (Milestone 29; see `ROADMAP.md` for full detail.)
+
+### v0.28.0 -- 2026-07-27
+
+Config. (Milestone 28; see `ROADMAP.md` for full detail.)
+
+### v0.27.0 -- 2026-07-27
+
+Record & Replay. (Milestone 27; see `ROADMAP.md` for full detail.)
+
+### v0.26.0 -- 2026-07-27
+
+Admin API. (Milestone 26; see `ROADMAP.md` for full detail.)
+
+### v0.25.0 -- 2026-07-27
+
+Observability. (Milestone 25; see `ROADMAP.md` for full detail.)
+
+### v0.24.0 -- 2026-07-27
+
+Multi-HPC Federation. (Milestone 24; see `ROADMAP.md` for full detail.)
+
+### v0.23.0 -- 2026-07-27
+
+Redundancy. (Milestone 23; see `ROADMAP.md` for full detail.)
+
+### v0.22.0 -- 2026-07-27
+
+Zone Proxy. (Milestone 22; see `ROADMAP.md` for full detail.)
+
+### v0.21.0 -- 2026-07-27
+
+Zone Groups. (Milestone 21; see `ROADMAP.md` for full detail.)
+
+### v0.20.0 -- 2026-07-27
+
+Firmware Update / OTA. (Milestone 20; see `ROADMAP.md` for full detail.)
+
+### v0.19.0 -- 2026-07-27
+
+Authorization. (Milestone 19; see `ROADMAP.md` for full detail.)
+
+### v0.18.0 -- 2026-07-27
+
+Fault Injection. (Milestone 18; see `ROADMAP.md` for full detail.)
+
+### v0.17.0 -- 2026-07-27
+
+Zone Simulator. (Milestone 17; see `ROADMAP.md` for full detail.)
+
+### v0.16.0 -- 2026-07-27
+
+Rate Limiting. (Milestone 16; see `ROADMAP.md` for full detail.)
+
+### v0.15.0 -- 2026-07-27
+
+Priority Queuing. (Milestone 15; see `ROADMAP.md` for full detail.)
+
+### v0.14.0 -- 2026-07-27
+
+E2E Protection. (Milestone 14; see `ROADMAP.md` for full detail.)
+
+### v0.13.0 -- 2026-07-27
+
+Power State. (Milestone 13; see `ROADMAP.md` for full detail.)
+
+### v0.12.0 -- 2026-07-27
+
+Deadline Monitoring. (Milestone 12; see `ROADMAP.md` for full detail.)
+
+### v0.11.0 -- 2026-07-27
+
+Watchdog & Heartbeat. (Milestone 11; see `ROADMAP.md` for full detail.)
+
+### v0.10.0 -- 2026-07-27
+
+TSN Transport. (Milestone 10; see `ROADMAP.md` for full detail.)
+
+### v0.9.0 -- 2026-07-27
+
+Loaned Samples. (Milestone 9; see `ROADMAP.md` for full detail.)
+
+### v0.8.0 -- 2026-07-27
+
+Shared Memory Transport. (Milestone 8; see `ROADMAP.md` for full detail.)
+
+### v0.7.0 -- 2026-07-27
+
+TLS Transport. (Milestone 7; see `ROADMAP.md` for full detail.)
+
+### v0.6.0 -- 2026-07-27
+
+mDNS Discovery. (Milestone 6; see `ROADMAP.md` for full detail.)
+
+### v0.5.0 -- 2026-07-27
+
+UDP Transport. (Milestone 5; see `ROADMAP.md` for full detail.)
+
+### v0.4.0 -- 2026-07-27
+
+HARA Expansion. (Milestone 4; see `ROADMAP.md` for full detail.)
+
+### v0.3.0 -- 2026-07-27
+
+Hardening. (Milestone 3; see `ROADMAP.md` for full detail.)
+
+### v0.2.0 -- 2026-07-27
+
+Requirements. (Milestone 2; see `ROADMAP.md` for full detail.)
+
+### v0.1.0 -- 2026-07-27
+
+Foundation. (Milestone 1; see `ROADMAP.md` for full detail.)
+

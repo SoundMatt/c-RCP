@@ -25,6 +25,9 @@ Pass `-s` to `git commit` to add this automatically.
 - [ ] Tests added or updated
 - [ ] `.fusa-reqs.json` updated with any new requirements
 - [ ] `ROADMAP.md` updated
+- [ ] `CHANGELOG.md` updated (required for any deprecation, replacement, or
+      removal, per RELAY spec §19.2; otherwise a one-line entry alongside
+      the `ROADMAP.md` update is enough)
 - [ ] Lint passes (`cfusa lint`, `cfusa check`)
 - [ ] All tests pass (`ctest`)
 - [ ] DCO sign-off present on every commit
