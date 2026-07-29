@@ -4421,7 +4421,7 @@ re-deriving certification evidence from code that doesn't exist yet is
 backwards. Spec basis for the *content* being re-derived: whatever Phases
 13–21 actually built, not the superseded catalog.
 
-### 85. Full re-certification pass (v0.85.0)
+### 85. Full re-certification pass (v0.85.0) ✅
 
 - `.fusa-reqs.json`: full requirements catalog re-derived against the new
   protocol's actual behavior (register-map access control, lifecycle
@@ -4443,3 +4443,96 @@ backwards. Spec basis for the *content* being re-derived: whatever Phases
   CRC-16 anti-replay models.
 - `AUDIT_PACK.md`, README.md: rewritten to describe the shipped TC18
   protocol rather than the superseded Zone/Command model.
+
+**Done (v0.85.0)**:
+
+- **`.fusa-reqs.json`**: not a blind carry-over. Every one of the 854
+  existing entries was individually re-audited against the source file
+  its own `//cfusa:req` tag actually appears in (a per-prefix grep
+  across `src/`/`include/rcp/`, not an assumption), and classified with
+  a new `"scope"` field. 779 entries (`REQ-E2E`, `REQ-LIFECYCLE`,
+  `REQ-RMAP`, `REQ-FRAG`, `REQ-DISC`, `REQ-PWRMODE`, `REQ-PWR`, every
+  `REQ-<endpoint-type>` family, `REQ-WDG`, `REQ-DL`, `REQ-CFG`,
+  `REQ-AUTH`, `REQ-RL`, and every other already-TC18-native
+  requirement) are `scope: "tc18"` — this project's actual ISO 26262
+  safety-case basis, confirmed to already describe Phase 13–21's real
+  implemented behavior rather than needing rewriting from scratch (most
+  of this catalog was kept incrementally accurate by each landing
+  milestone, not left to rot). The remaining 75 entries
+  (`REQ-ZONE`, `REQ-CMD`, `REQ-CMDSTRUCT`, `REQ-PRI`, `REQ-STATUS`,
+  `REQ-CTRL`, `REQ-REG`, `REQ-RESP`, `REQ-STAT`, and `REQ-ERR-011`) are
+  confirmed exclusively tied to the retired `rcp.h`/`rcp.c` and
+  `tests/legacy_mock.*` surface (v0.84.0's own milestone already
+  established that surface as the last consumer of those retired types
+  anywhere in `src/`) — reclassified `scope: "legacy-compat"`, `level`/
+  `asil` demoted to `QM`, and their `text` prefixed with an explicit
+  out-of-safety-case note, rather than deleted (deleting them out from
+  under a surviving `//cfusa:req` tag in code this milestone is not
+  authorized to touch would only trade one inaccuracy for a dangling-
+  reference one). `cfusa trace --req-coverage 100` still reports 854/854
+  (100%, both metrics) — the tool's own advisory `UNTRACED` list
+  unchanged (`REQ-MDNS-007/008`, `REQ-RELAY-013`).
+- **`HARA.md`/`.fusa-hara.json`**: full replacement, not an edit. 11 new
+  hazards (H-001..H-011) and safety goals (SG-001..SG-011), re-derived
+  against `regmap.h`'s writer-authorization model, `lifecycle.h`'s state
+  machine, `e2e.h`'s CRC32 safe-point/safety-request gate and per-stream
+  watchdog, `power.h`'s WakeUp handshake, and `discovery.h`'s bootstrap
+  claim — not the retired Zone/watchdog/CRC-16 set. ASIL letters
+  computed via `cfusa hara asil` (four hazards resolve to ASIL-C/D,
+  documented in the ASIL Determination Note). Two hazards (H-004
+  replay, H-007 link-layer authentication) are recorded honestly as
+  **open, unmitigated** rather than folded into the same "derogation"
+  framing as an implemented-but-lower-rigor control — there is no
+  mechanism in this library to fall short of for either.
+- **`tara.md`/`.json`, `CYBERSECURITY.md`**: full replacement. Threat
+  model re-derived against the actual TC18 attack surface: request
+  injection/spoofing (`authz.c`), replay (now genuinely unmitigated —
+  `include/rcp/e2e.h`'s own file header already flagged this gap before
+  this milestone closed the documentation debt around it), rogue
+  discovery/bootstrap claims (`discovery.c`'s first-claimant-wins
+  model), link-layer eavesdrop/tamper (MACsec absent from this
+  library's own scope), and request-flood DoS (`ratelimit.c`, still
+  exempting safety-tagged requests by default). `CYBERSECURITY.md`
+  restructured from a 5-layer TLS/anti-replay/rate-limit/firmware model
+  to a 6-layer MACsec(deployment)/authz/E2E/discovery-claim/regmap-
+  write-auth/rate-limit model, since firmware.c's removal (v0.83.0)
+  left no OTA-transfer layer to describe.
+- **`tla/*.tla`, `FORMAL_VERIFICATION.md`**: `WatchdogProtocol.tla`,
+  `HealthStateMachine.tla`, and `AntiReplayGuard.tla` deleted outright
+  (all three modeled a Healthy/Degraded/Faulted per-zone watchdog or a
+  CRC-16 sequence-number replay window, neither of which this codebase
+  implements any more), replaced with two original models:
+  `LifecycleStateMachine.tla` (`NoSkipConfiguration`,
+  `FieldLockMonotonicWhileConfigured`) and `E2ESafePoint.tla`
+  (`SafetyRequestsSurvivePurge`, `NoUnsafeSafetyExecution`). Both run
+  clean through TLC 2.19 locally (`Model checking completed. No error
+  has been found.`) before this PR was opened; CI's
+  `formal-verification` job updated to model-check the new filenames.
+- **`AUDIT_PACK.md`, `README.md`**: full rewrite. `README.md` drops the
+  "zonal control"/cpp-RCP-and-go-RCP-port-mirror opening in favor of the
+  shipped TC18 header/lifecycle/quick-start surface (the quick-start
+  example was compiled and run locally against a real build, not just
+  written); the retired Zone/Command surface is documented under its
+  own "Legacy API" section rather than presented as the library's
+  primary interface. `AUDIT_PACK.md` similarly rewritten (v2.0.0),
+  dropping the ASIL-D gap table's cpp-RCP-mirrored derogation framing
+  in favor of this project's own current posture, and correcting a
+  stale "branch coverage not instrumented" open item that a later,
+  unrelated workflow change had already fixed without this document
+  being updated to say so.
+- **`SAFETY_PLAN.md`**: also updated (not itself listed in this
+  milestone's own bullet scope above, but squarely the same "safety/
+  security artifacts" bucket, and left blatantly self-contradictory —
+  stale hazard IDs, a stale SG-001..SG-010 count, an already-fixed
+  "check/lint non-blocking" claim — if skipped while every document it
+  cross-references was rewritten around it).
+
+Verified locally: full `ctest` suite passes under a plain Debug build
+(existing suite unchanged — this milestone touches no `src/`/`tests/`
+code, only requirements/safety/security artifacts, per its own REPLACE
+scope from the Satellite Disposition table). A local `cfusa` v0.5.46
+toolchain build: `check`/`cyber`/`qualify`/`vuln` all exit 0 against a
+clean tree; `trace --req-coverage 100` reports 854/854 requirements
+traced and 512/512 functions annotated (both metrics unchanged from
+v0.84.0). Both new TLA+ specs verified via a real local TLC run
+(`tla2tools.jar`, TLC2 2.19), not assumed correct from inspection.

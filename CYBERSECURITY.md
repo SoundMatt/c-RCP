@@ -1,71 +1,104 @@
-# Cybersecurity Architecture — c-RCP (Milestone 42)
+# Cybersecurity Architecture — c-RCP (Milestone 85)
 ## IEC 62443 SL-2 / ISO 21434
 
-**Document version**: 1.0.0
+**Document version**: 2.0.0
+
+This document fully replaces its pre-TC18 (v1.0.0) content, which
+described a TLS/anti-replay/firmware-transfer layered defense that no
+longer matches this codebase — `tls.c` was deprecated at v0.78.0
+(MACsec, not TLS, is the spec's own link-layer security control),
+`firmware.c` was removed outright at v0.83.0 (no TC18 endpoint or
+message exists for OTA firmware transfer), and the retired CRC-16
+anti-replay guard has no TC18 replacement (see §1.3 below). See
+`ROADMAP.md` milestone 85 (Phase 22 re-certification pass).
 
 ---
 
 ## 1. Security Layers
 
-### Layer 1 — Transport Security (TLS 1.3)
+### 1.1 Layer 1 — Link-Layer Authentication (MACsec)
 
-`include/rcp/tls.h` provides the integration surface for mTLS. The actual
-TLS implementation (OpenSSL / wolfSSL / mbedTLS) is plugged in at the
-application layer.
+The TC18 spec's own security control is MACsec (IEEE 802.1AE),
+explicitly a product-specific/opaque configuration block operating below
+this library's own transport code. **Not implemented within this
+library** — `include/rcp/tls.h`/`tls.c`, the pre-TC18 application-level
+mTLS integration surface, was deprecated at v0.78.0 rather than adapted,
+since MACsec is a materially different mechanism (link-layer, not an
+application-level session wrapper) with no natural home in the TC18
+model. This library's own shipped transports (`udp.c`, `avtp.c`,
+`shmem.c`) carry AVTPDUs with no authentication or encryption of their
+own; an integrator deploying this library must supply MACsec at the link
+layer. See `tara.md` TS-004 for the residual-risk analysis.
 
-- Mutual certificate authentication (both HPC and zone controller present certs)
-- Certificate CN is extracted and passed to `rcp_authz_controller_new()`
-- Cipher suites: TLS_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384 (mandatory)
+### 1.2 Layer 2 — Request Authorization (`rcp_authz_policy_permit()`)
 
-### Layer 2 — Command Authorization (`rcp_authz_controller_new()`)
-
-Each `send()` is checked against an `rcp_authz_policy_t` table (bitmask-based
-zone/command-type entries). The policy is loaded from a signed manifest at
-boot. `RCP_ERR_FORBIDDEN` is returned without forwarding the command.
+Each request is checked against an `rcp_authz_policy_t` table
+(identity/address/request-type entries, keyed on `(stream_id,
+byte_bus_id)` rather than the retired zone/command-type pair). A denied
+combination is rejected before the request is forwarded to its
+endpoint-specific encode/send call. The caller identity is still a
+short string label (certificate CN or pre-shared key label); full
+certificate-chain validation remains the responsibility of whichever
+Layer 1 control is in effect.
 
 REQ-AUTH-001..REQ-AUTH-008
 
-### Layer 3 — E2E Anti-Replay (`rcp_e2e_replay_guard_t`)
+### 1.3 Layer 3 — E2E Safe Points and Safety-Request Execution Gating (`e2e.c`)
 
-A 32-entry sliding-window bitmap (`RCP_E2E_REPLAY_WINDOW_SIZE`) detects
-replayed sequence numbers. Sequence numbers more than 32 behind the
-high-water mark are unconditionally rejected. Formally verified via TLC
-model checking in `tla/AntiReplayGuard.tla` (see
-`FORMAL_VERIFICATION.md`) — corrected 2026-07-28 (issue #57) after an
-audit found the spec previously didn't even parse for model-checking and
-its safety property was stated backwards; both are fixed, verified via a
-real TLC run (not assumed), and wired into CI
-(`.github/workflows/ci.yml`'s `formal-verification` job).
+CRC32 (poly `0xF4ACFB13`) frame integrity, safety-tagged (MSB-set)
+request execution gating on the endpoint's configured safe state, and a
+per-stream watchdog whose overflow purge always keeps safety-tagged
+requests queued rather than discarding them. Formally verified via TLC
+model checking in `tla/E2ESafePoint.tla` (see `FORMAL_VERIFICATION.md`).
 
-REQ-E2E-004, REQ-E2E-005, REQ-E2E-006
+**This layer does not include replay/staleness detection.** The
+pre-TC18 architecture's "Layer 3 — E2E Anti-Replay" (a 32-entry
+sliding-window bitmap over CRC-16-protected sequence numbers) has no
+TC18 counterpart in this codebase — confirmed by direct read of
+`include/rcp/e2e.h`'s own file header, which records this as a
+deliberate scope boundary of milestone 70, not an oversight. See
+`tara.md` TS-002 for the residual-risk analysis; no requirement in
+`.fusa-reqs.json` claims replay mitigation.
 
-### Layer 4 — Rate Limiting (`rcp_ratelimit_controller_new()`)
+REQ-E2E-011, REQ-E2E-012, REQ-E2E-014, REQ-E2E-015, REQ-E2E-020..REQ-E2E-027
 
-Token-bucket rate limiter prevents DoS via command flooding.
-`RCP_PRIORITY_CRITICAL` commands are exempt by default
-(`rcp_ratelimit_config_t.exempt_critical`) to preserve safety function
-availability.
+### 1.4 Layer 4 — Discovery/Bootstrap Claim (`discovery.c`)
+
+A first-claimant-wins model with a configurable timeout:
+`rcp_discovery_claim_note_request()` grants an open (unheld or lapsed)
+claim to the first requester and never preempts an already-active
+claimant; `rcp_discovery_claim_note_config_write()` rejects a
+configuration write from a non-claimant without mutating state. This
+prevents a *second* attacker from displacing an already-bonded
+legitimate claimant during a server's `HW_UNCONFIGURED` bootstrap
+window, but does not itself cryptographically authenticate the *first*
+claimant to arrive — that gap is closed only by Layer 1 (MACsec), not
+by this layer alone. See `tara.md` TS-003.
+
+REQ-DISC-015..REQ-DISC-022
+
+### 1.5 Layer 5 — Register-Map Write Authorization (`regmap.c`)
+
+`rcp_regmap_writer_ctx()` grants write authority only to the EP0
+root-client (once a root client is established) or to a request
+stream's own owning stream. `HW_GENERIC` fields become read-only once
+`HW_CONFIGURED`, and `FUNCTIONAL_W_STAR` fields are permanently locked
+for the remainder of the configured session once `RCP_CONFIGURED` — the
+latter formally verified via `tla/LifecycleStateMachine.tla`'s
+`FieldLockMonotonicWhileConfigured` property.
+
+REQ-RMAP-009..REQ-RMAP-012, REQ-LIFECYCLE-018..REQ-LIFECYCLE-020
+
+### 1.6 Layer 6 — Rate Limiting (`ratelimit.c`)
+
+Per-`(stream_id, byte_bus_id)` token-bucket admission control prevents
+DoS via request flooding. Safety-tagged (MSB-set) requests are exempt
+by default — re-anchored on `rcp_e2e_is_safety_request()` now that the
+retired `RCP_PRIORITY_CRITICAL` client-assigned tag has no TC18
+counterpart (request execution priority is now a protocol-defined,
+server-side property of request kind).
 
 REQ-RL-003, REQ-RL-004
-
-### Layer 5 — Firmware Transfer State Machine (`rcp_firmware_session_t`)
-
-`rcp_firmware_session_verify()` is a protocol-flow gate: it advances the
-session from `Initiated` to `Verified` (bounded by
-`cfg.verify_timeout_ms`) before `activate()` is permitted, preventing an
-incomplete or out-of-order transfer from being activated. **Correction
-(2026-07-28, issue #69):** this document previously claimed a SHA-256
-image-hash check is performed here — confirmed by direct source read
-that no cryptographic hash/digest verification exists anywhere in
-`src/firmware.c`. `rcp_firmware_session_rollback()` is likewise a plain
-command like any other on the wrapped controller, not a specially
-authenticated operation in its own right — it inherits whatever
-authorization/transport security (Layers 1–2) the deployment layers
-around the underlying controller, the same as every other command.
-Real cryptographic image-integrity verification is tracked as a gap in
-issue #69, not yet implemented.
-
-REQ-FW-005..REQ-FW-007
 
 ---
 
@@ -73,54 +106,54 @@ REQ-FW-005..REQ-FW-007
 
 | Requirement | Status | Notes |
 |------------|--------|-------|
-| FR1 Identification & Authentication | Implemented | mTLS + authz |
-| FR2 Use Control | Implemented | `rcp_authz_policy_t` per zone/command-type |
-| FR3 System Integrity | Implemented | E2E CRC-16 + anti-replay |
-| FR4 Data Confidentiality | Partial | TLS stub; HSM key storage external |
-| FR5 Restricted Data Flow | Implemented | Zone isolation in routing |
-| FR6 Timely Response | Implemented | Deadline monitor + watchdog |
-| FR7 Resource Availability | Implemented | Token-bucket rate limiter |
+| FR1 Identification & Authentication | Partial | Layer 2 policy check implemented; Layer 1 (MACsec) is a deployment-level dependency, not implemented in this library |
+| FR2 Use Control | Implemented | `rcp_authz_policy_t` per identity/address/request-type; `rcp_regmap_writer_ctx()` per register field |
+| FR3 System Integrity | Partial | E2E CRC32 safe points implemented; no replay/staleness detection (§1.3) |
+| FR4 Data Confidentiality | Not implemented in-library | MACsec is the spec's own control; out of this library's scope (§1.1) |
+| FR5 Restricted Data Flow | Implemented | `(stream_id, byte_bus_id)` addressing scopes every request to its endpoint |
+| FR6 Timely Response | Implemented | Per-stream watchdog (`rcp_e2e_wd_evaluate()`) + WakeUp handshake completion gate |
+| FR7 Resource Availability | Implemented | Per-endpoint token-bucket rate limiter |
 
 Machine-readable gap report: `iec62443-gap-report.json`, regenerated on
 every tagged release by `cfusa iec62443 --sl SL-2` (see `release.yml`).
-Gaps recorded as `GAP (M)` are mandatory CRs with no automated cfusa rule
-mapped to them yet (e.g. session integrity, audit log accessibility,
-network segmentation) — these require deployment-level controls
-(network architecture, logging infrastructure) outside what a
-single-process C library can enforce on its own, matching cpp-RCP's own
-disposition of the same gaps.
+Gaps recorded as `GAP (M)` are mandatory CRs with no automated cfusa
+rule mapped to them yet (e.g. session integrity, audit log
+accessibility, network segmentation) — these require deployment-level
+controls (network architecture, logging infrastructure, MACsec key
+management) outside what a single-process C library can enforce on its
+own.
 
 ---
 
 ## 3. Threat Analysis and Risk Assessment
 
-See `tara.md` / `tara.json` (hand-authored; **no longer** auto-generated
-by `cfusa tara` as of 2026-07-28 — see issue #56 and `ROADMAP.md`
-milestone 57. `cfusa tara` only emits a placeholder skeleton with no way
-to seed real content, so regenerating it on every release silently
-clobbered the real TARA back to boilerplate) for the structured TARA
-covering command injection, replay attacks, rogue zone controller
-registration, OTA firmware tampering, and denial-of-service via command
-flooding. Each finding maps
-to an implemented countermeasure from the security layers above:
+See `tara.md` / `tara.json` (hand-authored; **not** auto-generated by
+`cfusa tara` — see issue #56 and `ROADMAP.md` milestone 57. `cfusa tara`
+only emits a placeholder skeleton with no way to seed real content, so
+regenerating it on every release would silently clobber the real TARA
+back to boilerplate) for the structured TARA covering request
+injection/spoofing, replay attacks, rogue bootstrap claims, link-layer
+eavesdrop/tamper, and denial-of-service via request flooding. Each
+finding maps to an implemented (or, where noted, deployment-level)
+countermeasure from the security layers above:
 
 | Threat | Countermeasure |
 |---|---|
-| Command injection / spoofed HPC | mTLS (Layer 1) + authz (Layer 2) |
-| Replay attack | E2E anti-replay guard (Layer 3), formally verified (TLC, wired into CI as of issue #57) |
-| Rogue zone controller registration | mTLS mutual auth (Layer 1) |
-| OTA firmware tampering | Partially mitigated: transfer state-machine gate (Layer 5) + whatever Layer 1–2 auth wraps the session; no cryptographic image-hash check yet (tracked: issue #69) |
-| Command-flood DoS | Token-bucket rate limiter (Layer 4) |
+| Request injection / spoofing | Layer 2 (`rcp_authz_policy_permit()`); full identity assurance depends on Layer 1 (MACsec), not implemented in-library |
+| Replay attack | **None implemented.** See §1.3 and `tara.md` TS-002. |
+| Rogue bootstrap claim | Layer 4 (`discovery.c` first-claimant-wins) + Layer 5 (`regmap.c` writer authorization); full identity assurance depends on Layer 1 |
+| Link-layer eavesdrop/tamper | **None implemented in-library.** MACsec is a deployment-level dependency (§1.1). |
+| Request-flood DoS | Layer 6 (token-bucket rate limiter with safety-tagged exemption) |
 
 ---
 
-## 4. Relationship to cpp-RCP
+## 4. Relationship to Earlier Milestones
 
-This document ports cpp-RCP's `CYBERSECURITY.md` structure and threat
-coverage, updated to reference c-RCP's own C module/function names in
-place of cpp-RCP's C++ class names. The security architecture itself is
-unchanged: c-RCP implements the identical layered defense (mTLS →
-authorization → anti-replay → rate limiting → firmware integrity) with
-the identical countermeasure-to-threat mapping, since both projects
-target the same IEC 62443 SL-2 profile against the same RELAY protocol
-surface.
+This document's v1.0.0 (Milestone 42) ported cpp-RCP's own
+`CYBERSECURITY.md` structure and threat coverage, describing the
+pre-TC18 Zone/Command wire model's TLS/anti-replay/rate-limiting/
+firmware-transfer defense-in-depth. As of Phase 13 (`ROADMAP.md`'s
+Protocol Replacement Notice), c-RCP stopped mirroring cpp-RCP
+port-for-port; this v2.0.0 revision is derived directly from the actual
+TC18 attack surface Phases 13–21 implemented, not ported from any
+sibling project.

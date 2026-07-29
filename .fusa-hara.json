@@ -4,22 +4,22 @@
   "tool": "c-FuSa",
   "toolVersion": "0.5.46",
   "language": "c",
-  "generatedAt": "2026-07-27T13:03:27Z",
+  "generatedAt": "2026-07-28T21:00:00Z",
   "project": "c-RCP",
-  "version": "0.4.0",
+  "version": "0.85.0",
   "standard": "ISO 26262-3:2018",
   "hazards": [
     {
       "id": "H-001",
-      "item": "rcp_watchdog_keeper_t / rcp_deadline_monitor_t (milestones 11-12)",
-      "hazardous_event": "Loss of command delivery to safety-critical zone (e.g. braking actuator)",
+      "item": "rcp_e2e_wd_evaluate() / rcp_watchdog_keeper_t (Phase 18 milestone 70, Phase 21 milestone 79)",
+      "hazardous_event": "Loss of safety-tagged request delivery/execution to a safety-critical endpoint (e.g. an actuator fail-safe command)",
       "risk": {
         "severity": "S3",
         "exposure": "E4",
         "controllability": "C2",
         "asil": "ASIL-D"
       },
-      "safe_state": "Watchdog keeper and deadline monitor jointly detect a non-responsive zone and signal a fault; see ASIL Determination Note below regarding decomposition to the currently-targeted ASIL-B mechanisms.",
+      "safe_state": "rcp_e2e_wd_evaluate() reports overflow once elapsed time reaches rx_wd_timeout_ms and, when rx_wd_safestate_enable is set, drives the stream toward its configured safe state; rcp_watchdog_keeper_t re-evaluates this periodically and fires a callback on every verdict change.",
       "safetyGoals": [
         "SG-001"
       ],
@@ -27,15 +27,15 @@
     },
     {
       "id": "H-002",
-      "item": "rcp_controller_t (mock backend)",
-      "hazardous_event": "Spurious command sent to the wrong zone controller",
+      "item": "avtp.h (stream_id, byte_bus_id) addressing + regmap.h endpoint identification (Phase 13-14)",
+      "hazardous_event": "A request is executed against the wrong endpoint due to a stream_id/byte_bus_id addressing error",
       "risk": {
         "severity": "S2",
         "exposure": "E3",
         "controllability": "C2",
         "asil": "ASIL-B"
       },
-      "safe_state": "rcp_controller_send() rejects the command with RCP_ERR_ZONE_MISMATCH before invoking any handler",
+      "safe_state": "Requests are addressed by the (stream_id, byte_bus_id) pair; a request naming an unregistered byte_bus_id is rejected once lifecycle admission succeeds, never silently routed to a different endpoint.",
       "safetyGoals": [
         "SG-002"
       ],
@@ -43,15 +43,15 @@
     },
     {
       "id": "H-003",
-      "item": "rcp_watchdog_keeper_t (milestone 11)",
-      "hazardous_event": "Zone controller watchdog not kicked, leading to unintended reset",
+      "item": "rcp_e2e_wd_evaluate() rx_wd_safestate_enable gating (Phase 18 milestone 70)",
+      "hazardous_event": "A request stream's watchdog overflows but the endpoint is not driven toward its configured safe state",
       "risk": {
         "severity": "S2",
         "exposure": "E4",
         "controllability": "C2",
         "asil": "ASIL-C"
       },
-      "safe_state": "Priority-queue and rate-limit Critical-priority bypass guarantee RCP_CMD_WATCHDOG is always deliverable at the configured priority",
+      "safe_state": "rx_wd_safestate_enable independently gates whether an overflow drives enter_safe_state; rcp_e2e_watchdog_purge_should_keep()/_classify() ensure a safety-tagged request pending at overflow time is never discarded by the resulting purge (formally verified: tla/E2ESafePoint.tla SafetyRequestsSurvivePurge).",
       "safetyGoals": [
         "SG-003"
       ],
@@ -59,15 +59,15 @@
     },
     {
       "id": "H-004",
-      "item": "rcp_e2e_replay_guard_t (milestone 14)",
-      "hazardous_event": "Replay of stale commands from a previous drive cycle",
+      "item": "include/rcp/e2e.h (Phase 18 milestone 70) -- no sequence-counter/replay-window mechanism implemented",
+      "hazardous_event": "A stale or duplicated request is captured and re-executed",
       "risk": {
         "severity": "S2",
         "exposure": "E3",
         "controllability": "C2",
         "asil": "ASIL-B"
       },
-      "safe_state": "32-entry sliding-window bitmap detects and rejects replayed or out-of-window sequence numbers",
+      "safe_state": "No mitigation is currently implemented in this library -- the TC18 CRC32 safe-point mechanism that replaced the retired CRC-16/sequence-counter/replay-window guard does not reimplement replay detection (see include/rcp/e2e.h's own file header and tara.md TS-002). Tracked as an open residual risk, not a closed hazard.",
       "safetyGoals": [
         "SG-004"
       ],
@@ -75,190 +75,217 @@
     },
     {
       "id": "H-005",
-      "item": "rcp_deadline_monitor_t (milestone 12)",
-      "hazardous_event": "Zone controller falsely reported as alive when unresponsive",
-      "risk": {
-        "severity": "S2",
-        "exposure": "E3",
-        "controllability": "C2",
-        "asil": "ASIL-B"
-      },
-      "safe_state": "Deadline monitor transitions a zone to Faulted after missing its configured Status deadline",
-      "safetyGoals": [
-        "SG-007"
-      ],
-      "ftti_ms": 100
-    },
-    {
-      "id": "H-006",
-      "item": "rcp_prioqueue_controller_t (milestone 15)",
-      "hazardous_event": "Priority inversion \u2014 low-priority burst starves safety-critical watchdog kicks",
-      "risk": {
-        "severity": "S2",
-        "exposure": "E4",
-        "controllability": "C2",
-        "asil": "ASIL-C"
-      },
-      "safe_state": "Priority queue always dispatches RCP_PRIORITY_CRITICAL entries ahead of High/Normal",
-      "safetyGoals": [
-        "SG-001",
-        "SG-005"
-      ],
-      "ftti_ms": 0
-    },
-    {
-      "id": "H-007",
-      "item": "rcp_ratelimit_controller_t (milestone 16)",
-      "hazardous_event": "Rate limiter blocks watchdog kick during high command burst",
-      "risk": {
-        "severity": "S2",
-        "exposure": "E3",
-        "controllability": "C2",
-        "asil": "ASIL-B"
-      },
-      "safe_state": "Rate limiter exempts RCP_PRIORITY_CRITICAL commands from the token bucket",
-      "safetyGoals": [
-        "SG-003",
-        "SG-005"
-      ],
-      "ftti_ms": 0
-    },
-    {
-      "id": "H-008",
-      "item": "TLS transport / rcp_faultinject_controller_t authorization layer (milestones 7, 19)",
-      "hazardous_event": "Unauthorized command injection via unsecured transport",
-      "risk": {
-        "severity": "S3",
-        "exposure": "E2",
-        "controllability": "C2",
-        "asil": "ASIL-C"
-      },
-      "safe_state": "Mutual TLS authentication required before any command is accepted from a transport peer",
-      "safetyGoals": [
-        "SG-006"
-      ],
-      "ftti_ms": 0
-    },
-    {
-      "id": "H-009",
-      "item": "rcp_powerstate_manager_t (milestone 13)",
-      "hazardous_event": "Power state management failure \u2014 zone not properly woken from sleep",
+      "item": "rcp_e2e_endpoint_in_safe_state() / rcp_e2e_request_may_execute() (Phase 18 milestone 70)",
+      "hazardous_event": "A safety-tagged request executes before its endpoint has actually reached the configured safe state",
       "risk": {
         "severity": "S3",
         "exposure": "E3",
         "controllability": "C2",
         "asil": "ASIL-D"
       },
-      "safe_state": "Zone only declared operational after a successful RCP_CMD_WAKE response gate",
+      "safe_state": "rcp_e2e_endpoint_in_safe_state() fails closed (returns false) for an unrecognized rx_safety_measure or an invalid safestate_sequencer index, and rcp_e2e_request_may_execute() denies execution of a safety-tagged request whenever it returns false (formally verified: tla/E2ESafePoint.tla NoUnsafeSafetyExecution).",
       "safetyGoals": [
-        "SG-001",
+        "SG-005"
+      ],
+      "ftti_ms": 0
+    },
+    {
+      "id": "H-006",
+      "item": "rcp_regmap_writer_ctx() (Phase 14 milestone 62)",
+      "hazardous_event": "A register-map field write succeeds without the caller holding the required writer authorization",
+      "risk": {
+        "severity": "S2",
+        "exposure": "E3",
+        "controllability": "C2",
+        "asil": "ASIL-B"
+      },
+      "safe_state": "rcp_regmap_writer_ctx() grants via_root_client_ep0/via_owning_stream only to the authorized writer context; HW_GENERIC fields become read-only once HW_CONFIGURED and FUNCTIONAL_W_STAR fields are permanently locked for the remainder of the configured session once RCP_CONFIGURED (formally verified: tla/LifecycleStateMachine.tla FieldLockMonotonicWhileConfigured).",
+      "safetyGoals": [
+        "SG-006"
+      ],
+      "ftti_ms": 0
+    },
+    {
+      "id": "H-007",
+      "item": "native Ethernet / IEEE1722-over-UDP/IP transport (udp.c, avtp.c) -- MACsec is link-layer, outside this library",
+      "hazardous_event": "An unauthenticated request is accepted and acted on over the native transport in the absence of link-layer authentication",
+      "risk": {
+        "severity": "S3",
+        "exposure": "E2",
+        "controllability": "C2",
+        "asil": "ASIL-C"
+      },
+      "safe_state": "Not mitigated within this library. MACsec (802.1AE) is a link-layer, product-specific/opaque control the spec delegates outside RCP itself; this library's own default posture (mock/sim/udp/shmem transports) has no cryptographic identity source, matching the tls.c-deprecation rationale (see CYBERSECURITY.md Layer 1 and tara.md TS-001/TS-003).",
+      "safetyGoals": [
+        "SG-007"
+      ],
+      "ftti_ms": 0
+    },
+    {
+      "id": "H-008",
+      "item": "rcp_pwrmode_* WakeUp handshake state machine (Phase 19 milestones 73-75)",
+      "hazardous_event": "The RC Server fails to complete its WakeUp handshake after a Sleep/StandBy transition, leaving safety-relevant actuators unresponsive",
+      "risk": {
+        "severity": "S3",
+        "exposure": "E3",
+        "controllability": "C2",
+        "asil": "ASIL-D"
+      },
+      "safe_state": "rcp_pwrmode_handshake_is_complete() must report true before normal operation resumes; a failed handshake is reported via rcp_pwrmode_handshake_has_failed() rather than silently assumed complete, and rcp_pwrmode_wake_from_sleep() correctly classifies hot vs. cold wake starts so a cold start re-runs full re-initialization.",
+      "safetyGoals": [
         "SG-008"
       ],
-      "ftti_ms": 100
+      "ftti_ms": 200
+    },
+    {
+      "id": "H-009",
+      "item": "rcp_e2e_crc_error_action() / rcp_e2e_stream_fault_t (Phase 18 milestone 70)",
+      "hazardous_event": "A CRC32-corrupted request frame is executed instead of rejected",
+      "risk": {
+        "severity": "S2",
+        "exposure": "E3",
+        "controllability": "C2",
+        "asil": "ASIL-B"
+      },
+      "safe_state": "rcp_e2e_unwrap() reports CRC_ERROR on a mismatched trailer; rcp_e2e_crc_error_action() maps the endpoint's rx_enforce_e2e configuration to either drop-this-request or latch-the-whole-stream-faulted, and rcp_e2e_stream_fault_t implements the latter statefully until explicitly reset.",
+      "safetyGoals": [
+        "SG-009"
+      ],
+      "ftti_ms": 0
     },
     {
       "id": "H-010",
-      "item": "rcp_faultinject_controller_t (milestone 18)",
-      "hazardous_event": "Fault injection state persists across vehicle power cycles",
+      "item": "faultinject.c (Phase 21 milestone 80, ADAPT)",
+      "hazardous_event": "Fault-injection rules persist across process or vehicle power cycles, masking or fabricating faults outside the test session that created them",
       "risk": {
         "severity": "S2",
         "exposure": "E2",
         "controllability": "C3",
         "asil": "ASIL-B"
       },
-      "safe_state": "Fault injection rules held only in-process memory of the injecting process; never persisted to disk",
+      "safe_state": "Fault-injection rules live only in caller-owned, in-process state with no persistence mechanism of its own.",
       "safetyGoals": [
-        "SG-009"
+        "SG-010"
+      ],
+      "ftti_ms": 0
+    },
+    {
+      "id": "H-011",
+      "item": "rcp_lifecycle_transition() (Phase 14 milestone 61)",
+      "hazardous_event": "The RC Server reaches RCP_CONFIGURED without having passed through a validated HW_CONFIGURED state (a configuration-validation bypass)",
+      "risk": {
+        "severity": "S2",
+        "exposure": "E2",
+        "controllability": "C2",
+        "asil": "ASIL-A"
+      },
+      "safe_state": "rcp_lifecycle_transition() rejects any transition outside its modeled table; RCP_CONFIGURED is reachable only from HW_CONFIGURED, itself gated by the HW_CFG_INCONSISTENT check (formally verified: tla/LifecycleStateMachine.tla NoSkipConfiguration).",
+      "safetyGoals": [
+        "SG-011"
       ],
       "ftti_ms": 0
     }
   ],
-  "note": "ASIL values are computed via `cfusa hara asil` (ISO 26262-3:2018 Table 4) from each hazard's S/E/C classification. See HARA.md's 'ASIL Determination Note' for a discovered discrepancy against cpp-RCP's own hand-authored HARA table, which used the same S/E/C classifications but recorded lower ASIL-B/A letters for several hazards, and HARA.md's 'Safety Goals' table for the full SG-001..SG-010 list (kept in Markdown, not duplicated here, since c-FuSa's HARA002/HARA003 rules scan every top-level '\"id\"' occurrence in this file as if it were a hazard entry).",
   "safetyGoals": [
     {
       "id": "SG-001",
-      "description": "Commands to safety-critical zones shall be delivered within the watchdog period or a fault shall be signalled.",
+      "description": "Safety-tagged requests to a safety-critical endpoint shall execute, or the endpoint shall be driven to a defined safe state, within the configured per-stream watchdog timeout.",
       "hazards": [
-        "H-001",
-        "H-006",
-        "H-009"
+        "H-001"
       ],
       "asil": "ASIL-D",
-      "safeState": "Watchdog keeper and deadline monitor jointly detect a non-responsive zone and signal a fault."
+      "safeState": "rcp_e2e_wd_evaluate() reports overflow once elapsed time reaches rx_wd_timeout_ms and, when rx_wd_safestate_enable is set, drives the stream toward its configured safe state; rcp_watchdog_keeper_t re-evaluates this periodically and fires a callback on every verdict change."
     },
     {
       "id": "SG-002",
-      "description": "Commands shall only be processed by the zone they are addressed to; misrouted commands shall be rejected.",
+      "description": "Requests shall only be executed against the endpoint identified by their (stream_id, byte_bus_id) address; a request naming an unregistered address shall be rejected.",
       "hazards": [
         "H-002"
       ],
       "asil": "ASIL-B",
-      "safeState": "rcp_controller_send() rejects the command with RCP_ERR_ZONE_MISMATCH before invoking any handler."
+      "safeState": "Requests are addressed by the (stream_id, byte_bus_id) pair; a request naming an unregistered byte_bus_id is rejected once lifecycle admission succeeds, never silently routed to a different endpoint."
     },
     {
       "id": "SG-003",
-      "description": "The watchdog kick command shall always be deliverable at the configured priority.",
+      "description": "A per-stream watchdog overflow with rx_wd_safestate_enable set shall drive the endpoint toward its configured safe state and shall never discard a pending safety-tagged request in doing so.",
       "hazards": [
-        "H-003",
-        "H-007"
+        "H-003"
       ],
       "asil": "ASIL-C",
-      "safeState": "Priority-queue and rate-limit Critical-priority bypass guarantee RCP_CMD_WATCHDOG is always deliverable at the configured priority."
+      "safeState": "rx_wd_safestate_enable independently gates whether an overflow drives enter_safe_state; rcp_e2e_watchdog_purge_should_keep()/_classify() ensure a safety-tagged request pending at overflow time is never discarded by the resulting purge (formally verified: tla/E2ESafePoint.tla SafetyRequestsSurvivePurge)."
     },
     {
       "id": "SG-004",
-      "description": "Replayed or duplicated commands from prior sessions shall be detected and rejected.",
+      "description": "Replayed or duplicated requests should be detected and rejected. [Open -- no implemented mitigation; see H-004.]",
       "hazards": [
         "H-004"
       ],
       "asil": "ASIL-B",
-      "safeState": "32-entry sliding-window bitmap detects and rejects replayed or out-of-window sequence numbers."
+      "safeState": "No mitigation is currently implemented in this library -- the TC18 CRC32 safe-point mechanism that replaced the retired CRC-16/sequence-counter/replay-window guard does not reimplement replay detection (see include/rcp/e2e.h's own file header and tara.md TS-002). Tracked as an open residual risk, not a closed hazard."
     },
     {
       "id": "SG-005",
-      "description": "Critical-priority commands shall never be delayed by lower-priority commands.",
-      "hazards": [
-        "H-006",
-        "H-007"
-      ],
-      "asil": "ASIL-C",
-      "safeState": "Priority queue always dispatches RCP_PRIORITY_CRITICAL entries ahead of High/Normal, and the rate limiter exempts them from the token bucket."
-    },
-    {
-      "id": "SG-006",
-      "description": "Transport authentication (mTLS or equivalent) shall be enforced on all external zone controller connections.",
-      "hazards": [
-        "H-008"
-      ],
-      "asil": "ASIL-C",
-      "safeState": "Mutual TLS authentication required before any command is accepted from a transport peer."
-    },
-    {
-      "id": "SG-007",
-      "description": "A zone controller that stops publishing Status shall be detected as dead within the configured deadline.",
+      "description": "A safety-tagged request shall execute only once its endpoint reports it has reached the configured safe state.",
       "hazards": [
         "H-005"
       ],
+      "asil": "ASIL-D",
+      "safeState": "rcp_e2e_endpoint_in_safe_state() fails closed (returns false) for an unrecognized rx_safety_measure or an invalid safestate_sequencer index, and rcp_e2e_request_may_execute() denies execution of a safety-tagged request whenever it returns false (formally verified: tla/E2ESafePoint.tla NoUnsafeSafetyExecution)."
+    },
+    {
+      "id": "SG-006",
+      "description": "Register-map field writes shall be permitted only for the authorized writer context, and a FUNCTIONAL_W_STAR-class field, once locked while RCP_CONFIGURED, shall never accept a write until a full reset.",
+      "hazards": [
+        "H-006"
+      ],
       "asil": "ASIL-B",
-      "safeState": "Deadline monitor transitions a zone to Faulted after missing its configured Status deadline."
+      "safeState": "rcp_regmap_writer_ctx() grants via_root_client_ep0/via_owning_stream only to the authorized writer context; HW_GENERIC fields become read-only once HW_CONFIGURED and FUNCTIONAL_W_STAR fields are permanently locked for the remainder of the configured session once RCP_CONFIGURED (formally verified: tla/LifecycleStateMachine.tla FieldLockMonotonicWhileConfigured)."
+    },
+    {
+      "id": "SG-007",
+      "description": "Link-layer authentication (MACsec) shall be enforced by the deployment on any transport carrying safety-relevant requests. [Deployment-level control; not implemented within this library -- see H-007.]",
+      "hazards": [
+        "H-007"
+      ],
+      "asil": "ASIL-C",
+      "safeState": "Not mitigated within this library. MACsec (802.1AE) is a link-layer, product-specific/opaque control the spec delegates outside RCP itself; this library's own default posture (mock/sim/udp/shmem transports) has no cryptographic identity source, matching the tls.c-deprecation rationale (see CYBERSECURITY.md Layer 1 and tara.md TS-001/TS-003)."
     },
     {
       "id": "SG-008",
-      "description": "A zone shall be declared operational only after a successful Wake response gate.",
+      "description": "The RC Server shall only resume normal operation after a successfully completed WakeUp handshake step sequence.",
       "hazards": [
-        "H-009"
+        "H-008"
       ],
       "asil": "ASIL-D",
-      "safeState": "Zone only declared operational after a successful RCP_CMD_WAKE response gate."
+      "safeState": "rcp_pwrmode_handshake_is_complete() must report true before normal operation resumes; a failed handshake is reported via rcp_pwrmode_handshake_has_failed() rather than silently assumed complete, and rcp_pwrmode_wake_from_sleep() correctly classifies hot vs. cold wake starts so a cold start re-runs full re-initialization."
     },
     {
       "id": "SG-009",
-      "description": "Fault injection rules shall not persist beyond the lifetime of the injecting process.",
+      "description": "A CRC32-mismatched request frame shall never have its request executed.",
+      "hazards": [
+        "H-009"
+      ],
+      "asil": "ASIL-B",
+      "safeState": "rcp_e2e_unwrap() reports CRC_ERROR on a mismatched trailer; rcp_e2e_crc_error_action() maps the endpoint's rx_enforce_e2e configuration to either drop-this-request or latch-the-whole-stream-faulted, and rcp_e2e_stream_fault_t implements the latter statefully until explicitly reset."
+    },
+    {
+      "id": "SG-010",
+      "description": "Fault-injection rules shall not persist beyond the lifetime of the injecting process.",
       "hazards": [
         "H-010"
       ],
       "asil": "ASIL-B",
-      "safeState": "Fault injection rules held only in-process memory of the injecting process; never persisted to disk."
+      "safeState": "Fault-injection rules live only in caller-owned, in-process state with no persistence mechanism of its own."
+    },
+    {
+      "id": "SG-011",
+      "description": "The RC Server's lifecycle state shall never advance to RCP_CONFIGURED without first passing through a validated HW_CONFIGURED state.",
+      "hazards": [
+        "H-011"
+      ],
+      "asil": "ASIL-A",
+      "safeState": "rcp_lifecycle_transition() rejects any transition outside its modeled table; RCP_CONFIGURED is reachable only from HW_CONFIGURED, itself gated by the HW_CFG_INCONSISTENT check (formally verified: tla/LifecycleStateMachine.tla NoSkipConfiguration)."
     }
-  ]
+  ],
+  "note": "ASIL values are computed via `cfusa hara asil` (ISO 26262-3:2018 Table 4). This HARA replaces the pre-TC18 Zone/Command-era hazard set in full (ROADMAP.md milestone 85, Phase 22 re-certification pass) -- it is derived from the actual implemented TC18 behavior (Phase 13-21), not carried over from the retired watchdog/CRC-16 model. See HARA.md's 'Safety Goals' table for the full SG-001..SG-011 list (kept in Markdown, not duplicated here, since c-FuSa's HARA002/HARA003 rules scan every top-level '\"id\"' occurrence in this file as if it were a hazard entry)."
 }

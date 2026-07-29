@@ -1,85 +1,101 @@
 {
-  "schemaVersion": "1.11.0",
-  "kind": "tara",
-  "tool": "hand-authored (see note)",
-  "toolVersion": "n/a",
-  "language": "c",
-  "generatedAt": "2026-07-28T01:05:37Z",
-  "project": "c-RCP",
-  "version": "0.58.0",
-  "standard": "ISO 21434:2021 Clause 9",
-  "note": "Hand-authored, not `cfusa tara`-generated. cfusa tara only emits a placeholder skeleton (no input-file mechanism to seed real content) -- see ROADMAP.md milestone 57 and CYBERSECURITY.md section 3 for why this file is maintained by hand rather than regenerated on every release, matching the precedent already set by HARA.md/.fusa-hara.json in this same repo. Update by hand when threats, mitigations, or their implementation status change.",
-  "assets": [
-    {"id": "ASSET-001", "description": "RCP command/control channel between HPC callers and zone controllers (rcp_controller_send/loan)", "property": "Integrity, Availability"},
-    {"id": "ASSET-002", "description": "RCP status/telemetry stream from zone controllers to subscribers (rcp_controller_subscribe)", "property": "Integrity"},
-    {"id": "ASSET-003", "description": "Zone controller registry and registration identity (rcp_registry_register/dial)", "property": "Integrity"},
-    {"id": "ASSET-004", "description": "OTA firmware image and update/rollback session state (rcp_firmware_session_t)", "property": "Integrity"}
-  ],
-  "threats": [
-    {
-      "id": "TS-001",
-      "asset": "ASSET-001",
-      "threat": "An attacker with access to the command bus injects forged commands impersonating a legitimate HPC caller (command injection / spoofed HPC).",
-      "attack_vector": "remote (requires network/bus access to the HPC-zone command path)",
-      "impact": "high",
-      "feasibility": "3",
-      "risk_level": "HIGH",
-      "treatment": "reduce",
-      "cybersecurity_goal": "No command shall be forwarded to a zone controller unless the caller's asserted identity is permitted for that zone/command-type by the loaded policy.",
-      "requirement_ref": "REQ-AUTH-001, REQ-AUTH-002",
-      "notes": "rcp_authz_controller_new() (Layer 2, REAL and working) rejects any identity/zone/command-type combination not in the policy table with RCP_ERR_FORBIDDEN. Its identity input is resolved by a caller-supplied rcp_authz_identity_fn -- this project's own default posture (mock/sim/udp transports; tls.c is an unimplemented compile-time interface stub, confirmed by direct source read) does not itself supply a cryptographically-verified identity source. Per CYBERSECURITY.md Layer 1, integrators are expected to plug in a real TLS backend and feed its verified certificate CN as the identity; until that's done, authz.c's policy check is only as trustworthy as whatever identity_fn the integrator supplies. Risk rating reflects this library's own shipped, backend-less posture."
-    },
-    {
-      "id": "TS-002",
-      "asset": "ASSET-002",
-      "threat": "An attacker captures a previously-valid command or status message and replays it to cause unintended repeated actuation or a stale status report.",
-      "attack_vector": "remote",
-      "impact": "high",
-      "feasibility": "2",
-      "risk_level": "MEDIUM",
-      "treatment": "reduce",
-      "cybersecurity_goal": "No command or status message carrying a previously-seen or excessively-stale sequence number shall be accepted.",
-      "requirement_ref": "REQ-E2E-007, REQ-E2E-008",
-      "notes": "rcp_e2e_replay_guard_t's 32-entry sliding-window bitmap (REAL, working, exercised by test_e2e.c) rejects duplicate sequence numbers and any sequence number more than 32 behind the high-water mark. This risk rating is grounded in both the guard's tested runtime behavior and a real TLC model-check of tla/AntiReplayGuard.tla (issue #57, fixed 2026-07-28 -- the spec previously didn't even parse for model-checking and its safety property was stated backwards; both are corrected, re-verified via an actual TLC run, and wired into CI)."
-    },
-    {
-      "id": "TS-003",
-      "asset": "ASSET-003",
-      "threat": "An attacker registers a rogue controller for a zone it does not legitimately own, hijacking command routing and status reporting for that zone.",
-      "attack_vector": "remote (or physical, if the attacker has direct zone-bus access)",
-      "impact": "severe",
-      "feasibility": "3",
-      "risk_level": "HIGH",
-      "treatment": "reduce",
-      "cybersecurity_goal": "Only a controller presenting a valid, CA-verified certificate matching its claimed zone shall be permitted to register or dial into the registry.",
-      "requirement_ref": "REQ-TLS-001, REQ-TLS-002",
-      "notes": "Full mitigation requires mutual TLS with certificate-based zone binding. tls.h defines this integration surface (rcp_tls_registry_new/dial, config verify_peer default true) but tls.c is a confirmed compile-time stub absent an OpenSSL/wolfSSL/mbedTLS backend -- every transport call returns RCP_ERR_NOT_SUPPORTED rather than an insecure fallback (secure-by-refusal, not secure-by-encryption). Registries lacking mTLS (mock/sim/udp/shmem) have no cryptographic registration control at all; this is the highest residual risk in this TARA and requires an integrator-supplied TLS backend to close, consistent with CYBERSECURITY.md's own SEOOC framing of Layer 1."
-    },
-    {
-      "id": "TS-004",
-      "asset": "ASSET-004",
-      "threat": "An attacker tampers with or substitutes a firmware image delivered via OTA update, or forces an unauthorized rollback to a vulnerable prior version.",
-      "attack_vector": "remote (network-delivered OTA)",
-      "impact": "severe",
-      "feasibility": "3",
-      "risk_level": "HIGH",
-      "treatment": "reduce (partial)",
-      "cybersecurity_goal": "Only a firmware image matching an expected, cryptographically-verified content hash shall be activated.",
-      "requirement_ref": "REQ-FW-005",
-      "notes": "CURRENTLY UNMET, tracked as a real gap in issue #69 (filed 2026-07-28): rcp_firmware_session_verify() is a protocol-flow state-machine gate (Initiated -> Verified, bounded by verify_timeout_ms) with NO cryptographic image-hash or signature check -- confirmed by direct source read of src/firmware.c. rcp_firmware_session_rollback() is a plain command like any other, inheriting only whatever Layer 1-2 authorization wraps the underlying controller, not a specially-authenticated operation of its own. CYBERSECURITY.md previously claimed a SHA-256 check existed here; that claim has been corrected (see CYBERSECURITY.md Layer 5, 2026-07-28) to avoid this same TARA/CYBERSECURITY.md inconsistency this document exists to prevent."
-    },
-    {
-      "id": "TS-005",
-      "asset": "ASSET-001",
-      "threat": "An attacker floods a zone controller with commands to exhaust its processing capacity, starving legitimate commands (denial of service).",
-      "attack_vector": "remote",
-      "impact": "moderate",
-      "feasibility": "2",
-      "risk_level": "LOW",
-      "treatment": "reduce",
-      "cybersecurity_goal": "A flood of non-critical commands shall not exhaust a zone controller's processing capacity; RCP_PRIORITY_CRITICAL commands shall remain unaffected.",
-      "requirement_ref": "REQ-RL-001, REQ-RL-004",
-      "notes": "rcp_ratelimit_controller_new()'s token-bucket limiter (REAL, working, exercised by test_ratelimit.c) rejects excess non-critical commands with RCP_ERR_BUSY once the bucket is exhausted, refilling based on elapsed time. exempt_critical (default per rcp_ratelimit_config_t) specifically preserves safety-relevant command availability under flood conditions, which is why impact/feasibility/risk are rated lower here than the other four threats."
-    }
-  ]
+    "schemaVersion": "1.11.0",
+    "kind": "tara",
+    "tool": "hand-authored (see note)",
+    "toolVersion": "n/a",
+    "language": "c",
+    "generatedAt": "2026-07-28T21:00:00Z",
+    "project": "c-RCP",
+    "version": "0.85.0",
+    "standard": "ISO 21434:2021 Clause 9",
+    "note": "Hand-authored, not `cfusa tara`-generated -- cfusa tara only emits a placeholder skeleton with no input-file mechanism to seed real content (see ROADMAP.md milestone 57 and CYBERSECURITY.md section 3). This TARA fully replaces the pre-TC18 threat model (command/status channel, zone registry, OTA firmware transfer -- firmware.h/firmware.c were DEPRECATE-removed at milestone 83 and have no TC18 counterpart) as of ROADMAP.md milestone 85 (Phase 22 re-certification pass), re-derived against the actual TC18 attack surface: request/response streams, the discovery/lifecycle bootstrap sequence, and MACsec's role now that tls.c is deprecated. Update by hand when threats, mitigations, or their implementation status change -- do not run `cfusa tara` over this file.",
+    "assets": [
+        {
+            "id": "ASSET-001",
+            "description": "TC18 request/response traffic on a request stream (register-map writes, per-endpoint-type requests) addressed by (stream_id, byte_bus_id)",
+            "property": "Integrity, Availability"
+        },
+        {
+            "id": "ASSET-002",
+            "description": "Response/ack queue and status/telemetry data returned to the caller over a stream's response queue",
+            "property": "Integrity"
+        },
+        {
+            "id": "ASSET-003",
+            "description": "Discovery/lifecycle bootstrap sequence -- EP0 root-client grant, discovery claim, and the HW/RCP configuration manifest applied while HW_UNCONFIGURED",
+            "property": "Integrity, Availability"
+        },
+        {
+            "id": "ASSET-004",
+            "description": "Link-layer transport carrying AVTPDUs (native Ethernet, IEEE1722-over-UDP/IP, or CAN(FD/XL)-as-network)",
+            "property": "Confidentiality, Integrity"
+        }
+    ],
+    "threats": [
+        {
+            "id": "TS-001",
+            "asset": "ASSET-001",
+            "threat": "An attacker with transport access injects forged ACF requests impersonating a legitimate caller identity (request injection / spoofing).",
+            "attack_vector": "remote",
+            "impact": "high",
+            "feasibility": "3",
+            "risk_level": "HIGH",
+            "treatment": "reduce",
+            "cybersecurity_goal": "No request shall be forwarded to an endpoint unless the caller's asserted identity is permitted for that endpoint/request-type by the loaded policy.",
+            "requirement_ref": "REQ-AUTH-001, REQ-AUTH-002",
+            "notes": "rcp_authz_policy_permit() (REAL, working, exercised by test_authz.c) rejects any identity/address/request-type combination not in the policy table. Its identity input is still a caller-supplied short string label (certificate CN or pre-shared key label per authz.h's own file header); full certificate-chain validation remains the responsibility of whichever link-layer security control (MACsec) is in effect. This library's own default posture (mock/sim/udp/shmem transports) supplies no cryptographic identity source of its own -- see TS-004."
+        },
+        {
+            "id": "TS-002",
+            "asset": "ASSET-001",
+            "threat": "An attacker captures a previously-valid request and replays it to cause unintended repeated actuation or a stale response.",
+            "attack_vector": "remote",
+            "impact": "high",
+            "feasibility": "3",
+            "risk_level": "HIGH",
+            "treatment": "reduce",
+            "cybersecurity_goal": "No request carrying a previously-seen sequence number shall be accepted.",
+            "requirement_ref": "None -- see H-004/SG-004 in HARA.md",
+            "notes": "OPEN, UNMITIGATED. The TC18 CRC32 safe-point mechanism (e2e.c) that replaced the retired CRC-16 sequence-counter/replay-window guard does not reimplement replay detection -- confirmed by direct read of include/rcp/e2e.h's own file header, which records this gap explicitly and names it as a known, deliberate scope boundary of milestone 70, not an oversight discovered here. This risk rating reflects that the previous mitigation was retired without a replacement, not merely an unproven one: feasibility is rated easier than the pre-TC18 TS-002 entry (which had a real, tested, TLC-verified anti-replay guard to defeat) because there is now nothing in this library standing between a captured frame and its re-execution."
+        },
+        {
+            "id": "TS-003",
+            "asset": "ASSET-003",
+            "threat": "An attacker claims the EP0 root-client grant during discovery/bootstrap, or writes HW/RCP configuration it does not legitimately own, hijacking the server's configuration before a legitimate caller establishes its claim.",
+            "attack_vector": "remote or physical",
+            "impact": "severe",
+            "feasibility": "3",
+            "risk_level": "HIGH",
+            "treatment": "reduce",
+            "cybersecurity_goal": "Only a caller holding a valid, unexpired discovery claim (or, post-bootstrap, an authorized EP0 root-client/owning-stream writer context) shall be permitted to write HW/RCP configuration.",
+            "requirement_ref": "REQ-DISC-017, REQ-DISC-018, REQ-DISC-019, REQ-DISC-021, REQ-RMAP-009, REQ-RMAP-010, REQ-RMAP-011, REQ-RMAP-012",
+            "notes": "rcp_discovery_claim_note_request() grants an open (unheld or lapsed) claim to the first requester and does not preempt an already-active claimant (REAL, working, exercised by test_discovery.c); rcp_discovery_claim_note_config_write() rejects a config write from a non-claimant without mutating state. This is a first-claimant-wins model with a configurable timeout, not an identity-verified one -- it prevents a second attacker from displacing an already-bonded legitimate claimant, but does not itself cryptographically authenticate the first claimant to arrive during a server's HW_UNCONFIGURED bootstrap window. Closing that residual gap requires the same link-layer authentication (MACsec) TS-004 already tracks as absent from this library's own posture."
+        },
+        {
+            "id": "TS-004",
+            "asset": "ASSET-004",
+            "threat": "An attacker with link-layer access eavesdrops on or tampers with AVTPDU traffic in the absence of MACsec, since this library implements no link-layer authentication or encryption of its own.",
+            "attack_vector": "physical (link-layer access to the native Ethernet/AVB segment or the IEEE1722-over-UDP/IP path)",
+            "impact": "severe",
+            "feasibility": "3",
+            "risk_level": "HIGH",
+            "treatment": "reduce",
+            "cybersecurity_goal": "Link-layer authentication (MACsec, 802.1AE) shall be enforced by the deployment on any transport carrying safety-relevant requests.",
+            "requirement_ref": "None -- deployment-level control; see CYBERSECURITY.md Layer 1",
+            "notes": "OPEN, by design out of this library's own scope: the TC18 spec's own security control is MACsec, an explicitly product-specific/opaque link-layer configuration block (ROADMAP.md's tls.h/tls.c DEPRECATE disposition), not something a portable C99 protocol library implements itself. This library's own transports (udp.c, avtp.c, shmem.c) carry AVTPDUs with no authentication or encryption layer of their own; every prior TLS-based mitigation this project's pre-TC18 TARA cited (tls.c) is gone, and no replacement is implemented here -- integrators are expected to supply MACsec at the link layer, matching the same secure-by-refusal (not secure-by-a-fallback) posture the retired tls.c stub already established."
+        },
+        {
+            "id": "TS-005",
+            "asset": "ASSET-001",
+            "threat": "An attacker floods an endpoint with non-safety-tagged requests to exhaust its finite request-queue capacity and starve legitimate traffic.",
+            "attack_vector": "remote",
+            "impact": "moderate",
+            "feasibility": "2",
+            "risk_level": "LOW",
+            "treatment": "reduce",
+            "cybersecurity_goal": "A flood of non-safety-tagged requests shall not exhaust an endpoint's processing capacity; safety-tagged requests shall remain exempt by default.",
+            "requirement_ref": "REQ-RL-003, REQ-RL-004",
+            "notes": "rcp_ratelimit_limiter_allow()'s per-(stream_id, byte_bus_id) token bucket (REAL, working, exercised by test_ratelimit.c) exempts safety-tagged (MSB-set) requests by default, re-anchored on e2e.h's rcp_e2e_is_safety_request() now that the retired RCP_PRIORITY_CRITICAL client-assigned tag has no TC18 counterpart. The only threat in this TARA with a complete, working, library-level mitigation with no external backend dependency."
+        }
+    ]
 }

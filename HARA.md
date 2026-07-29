@@ -1,9 +1,28 @@
 # Hazard Analysis and Risk Assessment (HARA)
 
 **Standard:** ISO 26262:2018 Part 3
-**System:** c-RCP — Remote Control Protocol for automotive zonal architecture
+**System:** c-RCP — OPEN Alliance TC18 Remote Control Protocol implementation
 **Target ASIL:** ASIL-B baseline, with ASIL-C/D hazards identified below (see ASIL Determination Note)
 **Source:** `.fusa-hara.json` (machine-readable authoritative source)
+
+---
+
+## Re-derivation note (Phase 22, milestone 85)
+
+This HARA fully replaces the pre-TC18 hazard set (Zone/Command model,
+watchdog Healthy/Degraded/Faulted health state machine, CRC-16
+sequence-counter anti-replay guard). It is re-derived directly against
+the safety mechanisms Phases 13–21 actually implemented — the
+register-map access-control model (`regmap.h`), the RC Server lifecycle
+state machine (`lifecycle.h`), the CRC32 safe-point / safety-tagged
+request execution gate and per-stream watchdog (`e2e.h`), and the
+Normal/StandBy/Sleep/Unpowered power-mode model with its WakeUp
+handshake (`power.h`) — not carried over from the retired catalog. Two
+of the eleven hazards below (H-004, H-007) record genuinely open,
+currently-unmitigated gaps rather than implemented controls; they are
+recorded honestly as open items, matching this project's practice
+throughout the roadmap of not asserting an unverified mitigation (see
+also `tara.md`'s TS-002/TS-001/TS-003 notes on residual risk).
 
 ---
 
@@ -11,12 +30,14 @@
 
 | ID | Description |
 |----|-------------|
-| OS-001 | Normal vehicle operation — all zone controllers reachable |
-| OS-002 | Partial network fault — one or more zone controllers unreachable |
-| OS-003 | Safety-critical manoeuvre — emergency braking or collision avoidance active |
-| OS-004 | HPC software fault — runaway process, crash, or OOM condition |
-| OS-005 | Elevated network latency — congestion, EMI, or hardware degradation |
-| OS-006 | Adversarial access — attacker present on the zone Ethernet bus |
+| OS-001 | Normal operation — RC Server `RCP_CONFIGURED`, all admitted request streams active |
+| OS-002 | HW/RCP configuration fault — HW pin map or endpoint/stream manifest inconsistent; server cannot reach or remain in `RCP_CONFIGURED` |
+| OS-003 | Safety-critical maneuver — a safety-tagged (MSB-set) request in flight against a safety-relevant actuator endpoint |
+| OS-004 | HPC/application software fault — runaway process, crash, or malformed manifest driving the RC Server |
+| OS-005 | Elevated network latency/jitter — congestion, EMI, or degraded Ethernet/CAN(FD/XL) link affecting AVTPDU delivery timing |
+| OS-006 | Adversarial access — attacker present on the native Ethernet/AVB segment or the IEEE1722-over-UDP/IP path |
+| OS-007 | Power transition — cold-start/hot-start WakeUp handshake in progress after a StandBy/Sleep period |
+| OS-008 | Discovery/bootstrap — server in `HW_UNCONFIGURED`, admitting only the discovery request at the reserved discovery `byte_bus_id` |
 
 ---
 
@@ -24,56 +45,48 @@
 
 | ID | Hazard | Severity | Exposure | Controllability | ASIL | Safety Goals |
 |----|--------|----------|----------|-----------------|------|--------------|
-| H-001 | Loss of command delivery to safety-critical zone (e.g. braking actuator) | S3 | E4 | C2 | **ASIL-D** | SG-001 |
-| H-002 | Spurious command sent to wrong zone controller | S2 | E3 | C2 | ASIL-B | SG-002 |
-| H-003 | Zone controller watchdog not kicked, leading to unintended reset | S2 | E4 | C2 | **ASIL-C** | SG-003 |
-| H-004 | Replay of stale commands from a previous drive cycle | S2 | E3 | C2 | ASIL-B | SG-004 |
-| H-005 | Zone controller falsely reported as alive when unresponsive | S2 | E3 | C2 | ASIL-B | SG-007 |
-| H-006 | Priority inversion — low-priority burst starves safety-critical watchdog kick | S2 | E4 | C2 | **ASIL-C** | SG-001, SG-005 |
-| H-007 | Rate limiter blocks watchdog kick during high command burst | S2 | E3 | C2 | ASIL-B | SG-003, SG-005 |
-| H-008 | Unauthorized command injection via unsecured transport | S3 | E2 | C2 | **ASIL-C** | SG-006 |
-| H-009 | Power state management failure — zone not properly woken from sleep | S3 | E3 | C2 | **ASIL-D** | SG-001, SG-008 |
-| H-010 | Fault injection state persists across vehicle power cycles | S2 | E2 | C3 | ASIL-B | SG-009 |
+| H-001 | Loss of safety-tagged request delivery/execution to a safety-critical endpoint | S3 | E4 | C2 | **ASIL-D** | SG-001 |
+| H-002 | Request executed against the wrong endpoint due to a `(stream_id, byte_bus_id)` addressing error | S2 | E3 | C2 | ASIL-B | SG-002 |
+| H-003 | Per-stream watchdog overflows but the endpoint is not driven toward its configured safe state | S2 | E4 | C2 | **ASIL-C** | SG-003 |
+| H-004 | Stale or duplicated request captured and re-executed | S2 | E3 | C2 | ASIL-B | SG-004 |
+| H-005 | A safety-tagged request executes before its endpoint has actually reached the configured safe state | S3 | E3 | C2 | **ASIL-D** | SG-005 |
+| H-006 | A register-map field write succeeds without the caller holding the required writer authorization | S2 | E3 | C2 | ASIL-B | SG-006 |
+| H-007 | An unauthenticated request is accepted over the native transport in the absence of link-layer authentication | S3 | E2 | C2 | **ASIL-C** | SG-007 |
+| H-008 | RC Server fails to complete its WakeUp handshake, leaving safety-relevant actuators unresponsive | S3 | E3 | C2 | **ASIL-D** | SG-008 |
+| H-009 | A CRC32-corrupted request frame is executed instead of rejected | S2 | E3 | C2 | ASIL-B | SG-009 |
+| H-010 | Fault-injection rules persist across process/vehicle power cycles | S2 | E2 | C3 | ASIL-B | SG-010 |
+| H-011 | RC Server reaches `RCP_CONFIGURED` without first passing through a validated `HW_CONFIGURED` state | S2 | E2 | C2 | ASIL-A | SG-011 |
 
 ---
 
 ## ASIL Determination Note
 
-The S/E/C classifications above are carried over unchanged from cpp-RCP's own
-HARA (same hazards, same operational-situation reasoning). **The ASIL
-letters are not** — they are recomputed here via `cfusa hara asil`, which
-implements ISO 26262-3:2018 Table 4 (with the C0 extension, in parity with
-go-FuSa's table). Six of the ten hazards resolve to a higher ASIL under this
-table than cpp-RCP's own HARA.md records for the identical S/E/C inputs:
+ASIL letters are computed via `cfusa hara asil` (ISO 26262-3:2018
+Table 4). Four hazards resolve to ASIL-C or ASIL-D: H-001 and H-005
+(safety-tagged request delivery/execution, S3/E4 and S3/E3
+respectively), H-003 (watchdog-driven safe-state entry, S2/E4), H-007
+(unauthenticated request over the native transport, S3/E2), and H-008
+(WakeUp handshake failure, S3/E3). This mirrors the same structural
+finding the pre-TC18 HARA recorded (several hazards computing above an
+ASIL-B-scoped implementation) — the mechanisms delivering H-001, H-003,
+H-005, H-008's mitigations (`e2e.c`'s watchdog/safe-state gate,
+`power.c`'s handshake state machine) are implemented and tested at their
+own correctness level, but a full ASIL decomposition argument (ISO
+26262-9 §5) or ASIL-C/D-specific process rigor (e.g. two-channel
+redundancy for H-001/H-008) has not been separately pursued. H-007 is a
+genuinely open, unmitigated item within this library (see below), not a
+process-rigor gap on top of an implemented control — it computes
+ASIL-C but has **no ASIL-B-or-higher control implemented at all** in
+this repository, since MACsec is out of this library's scope entirely.
 
-| Hazard | S/E/C | cpp-RCP's ASIL | c-FuSa `hara asil` |
-|---|---|---|---|
-| H-001 | S3/E4/C2 | ASIL-B | **ASIL-D** |
-| H-003 | S2/E4/C2 | ASIL-B | **ASIL-C** |
-| H-006 | S2/E4/C2 | ASIL-B | **ASIL-C** |
-| H-008 | S3/E2/C2 | ASIL-B | **ASIL-C** |
-| H-009 | S3/E3/C2 | ASIL-B | **ASIL-D** |
-| H-010 | S2/E2/C3 | ASIL-A | ASIL-B |
-
-This project adopts c-FuSa's computed values as authoritative: it is the
-project's designated compliance tool and directly implements the cited
-standard table (rather than a value hand-recorded in a markdown file).
-Whether the discrepancy is a defect in cpp-RCP's own HARA.md, a difference
-between cpp-FuSa's and c-FuSa's table implementations, or an intentional
-(but undocumented) decomposition already assumed by cpp-RCP is not yet
-determined — it hasn't been investigated on the cpp-RCP/cpp-FuSa side.
-
-**Consequence:** the mechanisms landing in milestones 7, 11, 13, 15, and 19
-(TLS, watchdog, power state, priority queue, authorization) are currently
-scoped and implemented to an ASIL-B rigor level, matching cpp-RCP's
-mirrored design. Four hazards (H-001, H-003, H-006, H-008, H-009) now show
-a computed target of ASIL-C or ASIL-D. Closing that gap — via a real ASIL
-decomposition argument (independent ASIL-B/A elements combining to satisfy
-a higher target, per ISO 26262-9) or by revising the S/E/C classification
-with updated engineering rationale — is deferred to milestone 41 (Formal
-Verification) and milestone 43 (Certification, which already scopes an
-"ASIL-D gap analysis"). Until then, treat the ASIL-D/C figures above as the
-honest current state, not yet a closed item.
+**H-004 and H-007 are open, not process gaps on an implemented
+mechanism.** Unlike the pre-TC18 HARA's own six discrepancy entries
+(which concerned an ASIL computed *higher than* an already-implemented,
+already-tested mechanism's design rigor), H-004 (replay) and H-007
+(link-layer authentication) have **no implemented control in this
+library at all** to fall short of. Both are honestly recorded as open
+in `.fusa-hara.json`'s `safe_state` field and in `tara.md`'s residual-risk
+notes, not asserted as closed.
 
 ---
 
@@ -81,16 +94,17 @@ honest current state, not yet a closed item.
 
 | ID | Safety Goal | ASIL | Addressed By |
 |----|-------------|------|--------------|
-| SG-001 | Commands to safety-critical zones shall be delivered within the watchdog period or a fault shall be signalled. | ASIL-D | `rcp_watchdog_keeper_t`, `rcp_deadline_monitor_t` |
-| SG-002 | Commands shall only be processed by the zone they are addressed to; misrouted commands shall be rejected. | ASIL-B | `rcp_controller_send()` `RCP_ERR_ZONE_MISMATCH` check |
-| SG-003 | The watchdog kick command shall always be deliverable at the configured priority. | ASIL-C | `rcp_ratelimit_controller_t` Critical exemption, `rcp_prioqueue_controller_t` Critical bypass |
-| SG-004 | Replayed or duplicated commands from prior sessions shall be detected and rejected. | ASIL-B | `rcp_e2e_replay_guard_t` bitmap sliding window |
-| SG-005 | Critical-priority commands shall never be delayed by Normal- or High-priority commands queued earlier. | ASIL-C | `rcp_prioqueue_controller_t` priority ordering |
-| SG-006 | Transport authentication (mTLS or equivalent) shall be enforced on all external zone controller connections. | ASIL-C | TLS transport, mTLS config |
-| SG-007 | A zone controller that stops publishing Status shall be detected as dead within the configured deadline. | ASIL-B | `rcp_deadline_monitor_t` |
-| SG-008 | A zone controller shall only be declared operational after a successful Wake command response. | ASIL-D | `rcp_powerstate_manager_t` Active transition gate |
-| SG-009 | Fault injection rules shall not persist beyond the lifetime of the injecting process. | ASIL-B | `rcp_faultinject_controller_t` in-process state only |
-| SG-010 | Zone controller health state transitions shall be deterministically derivable from observable `send()` outcomes alone. | ASIL-B | `rcp_watchdog_keeper_t` deterministic state machine |
+| SG-001 | Safety-tagged requests to a safety-critical endpoint shall execute, or the endpoint shall be driven to a defined safe state, within the configured per-stream watchdog timeout. | ASIL-D | `rcp_e2e_wd_evaluate()`, `rcp_watchdog_keeper_t` |
+| SG-002 | Requests shall only be executed against the endpoint identified by their `(stream_id, byte_bus_id)` address; a request naming an unregistered address shall be rejected. | ASIL-B | `avtp.h` addressing, `rcp_mock_server_dispatch()` unregistered-`byte_bus_id` handling |
+| SG-003 | A per-stream watchdog overflow with `rx_wd_safestate_enable` set shall drive the endpoint toward its configured safe state and shall never discard a pending safety-tagged request in doing so. | ASIL-C | `rcp_e2e_wd_evaluate()`, `rcp_e2e_watchdog_purge_should_keep()`/`_classify()`; formally verified (`tla/E2ESafePoint.tla` `SafetyRequestsSurvivePurge`) |
+| SG-004 | Replayed or duplicated requests should be detected and rejected. | ASIL-B | **Open — no implemented mitigation.** See ASIL Determination Note and `tara.md` TS-002. |
+| SG-005 | A safety-tagged request shall execute only once its endpoint reports it has reached the configured safe state. | ASIL-D | `rcp_e2e_request_may_execute()`, `rcp_e2e_endpoint_in_safe_state()`; formally verified (`tla/E2ESafePoint.tla` `NoUnsafeSafetyExecution`) |
+| SG-006 | Register-map field writes shall be permitted only for the authorized writer context, and a `FUNCTIONAL_W_STAR`-class field, once locked while `RCP_CONFIGURED`, shall never accept a write until a full reset. | ASIL-B | `rcp_regmap_writer_ctx()`; formally verified (`tla/LifecycleStateMachine.tla` `FieldLockMonotonicWhileConfigured`) |
+| SG-007 | Link-layer authentication (MACsec) shall be enforced by the deployment on any transport carrying safety-relevant requests. | ASIL-C | **Deployment-level control; not implemented within this library.** See ASIL Determination Note and `tara.md` TS-001/TS-003. |
+| SG-008 | The RC Server shall only resume normal operation after a successfully completed WakeUp handshake step sequence. | ASIL-D | `rcp_pwrmode_handshake_is_complete()`, `rcp_pwrmode_handshake_has_failed()`, `rcp_pwrmode_wake_from_sleep()` |
+| SG-009 | A CRC32-mismatched request frame shall never have its request executed. | ASIL-B | `rcp_e2e_unwrap()`, `rcp_e2e_crc_error_action()`, `rcp_e2e_stream_fault_t` |
+| SG-010 | Fault-injection rules shall not persist beyond the lifetime of the injecting process. | ASIL-B | `rcp_faultinject_*` in-process-only state |
+| SG-011 | The RC Server's lifecycle state shall never advance to `RCP_CONFIGURED` without first passing through a validated `HW_CONFIGURED` state. | ASIL-A | `rcp_lifecycle_transition()`; formally verified (`tla/LifecycleStateMachine.tla` `NoSkipConfiguration`) |
 
 ---
 
@@ -98,7 +112,8 @@ honest current state, not yet a closed item.
 
 | Risk | Likelihood | Mitigation | Status |
 |------|-----------|------------|--------|
-| ReplayGuard window exhausted by rapid legitimate traffic | Low | 32-entry window handles 32 in-flight commands per zone; watchdog period is at least 10 ms | Accepted |
-| TLS stub returns "not supported" on non-Linux CI | Low | CI explicitly tests the shmem/mock transport; TLS tested on Linux only | Accepted |
-| mDNS static discovery not sufficient for dynamic topology | Medium | Full mDNS backend deferred to milestone 6; static config covers initial SiL testing | Accepted |
-| Six hazards computed at ASIL-C/D vs. an ASIL-B-scoped implementation | **Open** | See ASIL Determination Note above; tracked for milestone 41/43 | **Open — not yet closed** |
+| No replay/staleness detection for captured-and-resent requests (H-004) | Medium | None implemented in this library; the retired CRC-16 sequence-counter/replay-window mechanism was not carried forward, and the TC18 CRC32 safe-point mechanism that replaced it does not reimplement replay detection (`include/rcp/e2e.h`'s own file header records this gap explicitly) | **Open — tracked, not mitigated** |
+| No link-layer authentication for the native transport in this library's default posture (H-007) | Medium | MACsec (802.1AE) is a link-layer, product-specific/opaque control the spec delegates outside RCP itself; an integrator must supply it | **Open — deployment responsibility, not closed by this library** |
+| `rcp_e2e_endpoint_in_safe_state()` misconfiguration (invalid `safestate_sequencer` index, unrecognized `rx_safety_measure`) | Low | Fails closed (returns false) by explicit design choice, not a spec-mandated value | Accepted |
+| Discovery/bootstrap (`OS-008`) accepts any claimant at the reserved discovery `byte_bus_id` while `HW_UNCONFIGURED` | Low | No identity check exists at this stage in the spec's own bootstrap sequence; matches the same residual posture as H-007 above | Accepted, tracked alongside H-007 |
+| Four hazards (H-001, H-003, H-005, H-008) compute to ASIL-C/D against an ASIL-B-scoped implementation rigor | Open | See ASIL Determination Note above | **Open — not yet closed** |

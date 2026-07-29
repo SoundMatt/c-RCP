@@ -121,17 +121,13 @@ jobs:
       - name: Download TLC (tla2tools.jar)
         run: curl -sSL -o "$RUNNER_TEMP/tla2tools.jar" https://github.com/tlaplus/tlaplus/releases/latest/download/tla2tools.jar
 
-      - name: Model-check AntiReplayGuard.tla
+      - name: Model-check LifecycleStateMachine.tla
         working-directory: tla
-        run: java -jar "$RUNNER_TEMP/tla2tools.jar" -workers 4 AntiReplayGuard.tla
+        run: java -jar "$RUNNER_TEMP/tla2tools.jar" -workers 4 LifecycleStateMachine.tla
 
-      - name: Model-check HealthStateMachine.tla
+      - name: Model-check E2ESafePoint.tla
         working-directory: tla
-        run: java -jar "$RUNNER_TEMP/tla2tools.jar" -workers 4 HealthStateMachine.tla
-
-      - name: Model-check WatchdogProtocol.tla
-        working-directory: tla
-        run: java -jar "$RUNNER_TEMP/tla2tools.jar" -workers 4 WatchdogProtocol.tla
+        run: java -jar "$RUNNER_TEMP/tla2tools.jar" -workers 4 E2ESafePoint.tla
 
   # ── Required safety artifacts present ────────────────────────────────────────
   required-artifacts:
