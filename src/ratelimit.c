@@ -9,119 +9,98 @@
 rcp_ratelimit_config_t rcp_ratelimit_default_config(void)
 {
     rcp_ratelimit_config_t c;
-    c.rate            = 100.0;
-    c.burst           = 20;
-    c.exempt_critical = true;
+    c.rate          = 100.0;
+    c.burst         = 20;
+    c.exempt_safety = true;
     return c;
 }
 
 typedef struct {
-    rcp_controller_t        base;
-    rcp_controller_t       *inner; /* retained */
-    rcp_ratelimit_config_t   cfg;
-    rcp_mutex_t               mu; /* protects tokens, last_ms, closed */
-    double                    tokens;
-    uint64_t                  last_ms;
-    bool                      closed;
-} ratelimit_controller_t;
+    rcp_avtp_addr_t addr;
+    double           tokens;
+    uint64_t         last_ms;
+} bucket_t;
 
-static rcp_zone_t rl_ctrl_zone(rcp_controller_t *self)
+struct rcp_ratelimit_limiter {
+    rcp_ratelimit_config_t cfg;
+    rcp_mutex_t              mu; /* protects buckets[] */
+    bucket_t                *buckets;
+    size_t                    n_buckets;
+    size_t                    cap_buckets;
+};
+
+rcp_ratelimit_limiter_t *rcp_ratelimit_limiter_new(rcp_ratelimit_config_t cfg)
 {
-    return rcp_controller_zone(((ratelimit_controller_t *)self)->inner);
+    rcp_ratelimit_limiter_t *rl = (rcp_ratelimit_limiter_t *)calloc(1, sizeof(*rl));
+    if (!rl) return NULL;
+    rl->cfg = cfg;
+    rcp_mutex_init(&rl->mu);
+    return rl;
+}
+
+static bucket_t *find_or_create_bucket(rcp_ratelimit_limiter_t *rl, rcp_avtp_addr_t addr, uint64_t now_ms)
+{
+    size_t i;
+
+    for (i = 0; i < rl->n_buckets; i++) {
+        if (rcp_avtp_addr_equal(rl->buckets[i].addr, addr)) return &rl->buckets[i];
+    }
+
+    if (rl->n_buckets == rl->cap_buckets) {
+        size_t new_cap = (rl->cap_buckets == 0) ? 4 : rl->cap_buckets * 2;
+        bucket_t *grown = (bucket_t *)realloc(rl->buckets, new_cap * sizeof(*grown));
+        if (!grown) return NULL;
+        rl->buckets     = grown;
+        rl->cap_buckets = new_cap;
+    }
+
+    rl->buckets[rl->n_buckets].addr    = addr;
+    rl->buckets[rl->n_buckets].tokens  = (double)rl->cfg.burst;
+    rl->buckets[rl->n_buckets].last_ms = now_ms;
+    return &rl->buckets[rl->n_buckets++];
 }
 
 //cfusa:req REQ-RL-001
 //cfusa:req REQ-RL-002
-static bool take_token(ratelimit_controller_t *rl)
+//cfusa:req REQ-RL-006
+static bool take_token(rcp_ratelimit_limiter_t *rl, bucket_t *b, uint64_t now_ms)
 {
-    uint64_t now;
-    double secs;
-    bool ok;
+    double secs = (double)(now_ms - b->last_ms) / 1000.0;
+    b->last_ms = now_ms;
+    b->tokens += secs * rl->cfg.rate;
+    if (b->tokens > (double)rl->cfg.burst) b->tokens = (double)rl->cfg.burst;
 
-    rcp_mutex_lock(&rl->mu);
-    now      = rcp_monotonic_ms();
-    secs     = (double)(now - rl->last_ms) / 1000.0;
-    rl->last_ms = now;
-    rl->tokens += secs * rl->cfg.rate;
-    if (rl->tokens > (double)rl->cfg.burst) rl->tokens = (double)rl->cfg.burst;
-
-    if (rl->tokens < 1.0) {
-        ok = false;
-    } else {
-        rl->tokens -= 1.0;
-        ok = true;
-    }
-    rcp_mutex_unlock(&rl->mu);
-    return ok;
+    if (b->tokens < 1.0) return false;
+    b->tokens -= 1.0;
+    return true;
 }
 
 //cfusa:req REQ-RL-003
 //cfusa:req REQ-RL-004
 //cfusa:req REQ-RL-005
+//cfusa:req REQ-RL-007
 //cfusa:req REQ-RL-008
-static int rl_ctrl_send(rcp_controller_t *self, const rcp_context_t *ctx,
-                         const rcp_command_t *cmd, rcp_response_t *out)
+bool rcp_ratelimit_limiter_allow(rcp_ratelimit_limiter_t *rl, rcp_avtp_addr_t addr, uint8_t request_type)
 {
-    ratelimit_controller_t *rl = (ratelimit_controller_t *)self;
-    bool closed_now;
-    bool exempt;
+    uint64_t now_ms = rcp_monotonic_ms();
+    bucket_t *b;
+    bool ok;
+
+    if (rl->cfg.exempt_safety && rcp_e2e_is_safety_request(request_type)) return true;
 
     rcp_mutex_lock(&rl->mu);
-    closed_now = rl->closed;
+    b = find_or_create_bucket(rl, addr, now_ms);
+    ok = b ? take_token(rl, b, now_ms) : false;
     rcp_mutex_unlock(&rl->mu);
-    if (closed_now) return RCP_ERR_CLOSED;
 
-    exempt = rl->cfg.exempt_critical && (cmd->priority == RCP_PRIORITY_CRITICAL);
-    if (!exempt && !take_token(rl)) return RCP_ERR_BUSY;
-
-    return rcp_controller_send(rl->inner, ctx, cmd, out);
+    return ok;
 }
 
 //cfusa:req REQ-RL-009
-static int rl_ctrl_subscribe(rcp_controller_t *self, const rcp_context_t *ctx, rcp_status_channel_t **out)
+void rcp_ratelimit_limiter_destroy(rcp_ratelimit_limiter_t *rl)
 {
-    ratelimit_controller_t *rl = (ratelimit_controller_t *)self;
-    return rcp_controller_subscribe(rl->inner, ctx, out);
-}
-
-//cfusa:req REQ-RL-007
-static int rl_ctrl_close(rcp_controller_t *self)
-{
-    ratelimit_controller_t *rl = (ratelimit_controller_t *)self;
-    rcp_mutex_lock(&rl->mu);
-    rl->closed = true;
-    rcp_mutex_unlock(&rl->mu);
-    return rcp_controller_close(rl->inner);
-}
-
-static void rl_ctrl_destroy(rcp_controller_t *self)
-{
-    ratelimit_controller_t *rl = (ratelimit_controller_t *)self;
-    rcp_controller_release(rl->inner);
+    if (!rl) return;
     rcp_mutex_destroy(&rl->mu);
+    free(rl->buckets);
     free(rl);
-}
-
-static const rcp_controller_vtable_t ratelimit_controller_vtable = {
-    rl_ctrl_zone,
-    rl_ctrl_send,
-    rl_ctrl_subscribe,
-    rl_ctrl_close,
-    rl_ctrl_destroy,
-    NULL, /* loan: not supported */
-    NULL, /* send_loaned: not supported */
-};
-
-rcp_controller_t *rcp_ratelimit_controller_new(rcp_controller_t *inner, rcp_ratelimit_config_t cfg)
-{
-    ratelimit_controller_t *rl = (ratelimit_controller_t *)calloc(1, sizeof(*rl));
-    if (!rl) return NULL;
-    rl->base.vt       = &ratelimit_controller_vtable;
-    rl->base.refcount = 1;
-    rl->inner         = rcp_controller_retain(inner);
-    rl->cfg           = cfg;
-    rl->tokens        = (double)cfg.burst;
-    rl->last_ms       = rcp_monotonic_ms();
-    rcp_mutex_init(&rl->mu);
-    return &rl->base;
 }

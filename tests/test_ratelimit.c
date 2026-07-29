@@ -9,196 +9,179 @@
 //cfusa:test REQ-RL-009
 #include "unity.h"
 
-#include "legacy_mock.h"
+#include <rcp/clock.h>
 #include <rcp/ratelimit.h>
-#include <rcp/rcp.h>
 
 void setUp(void) {}
 void tearDown(void) {}
 
-static rcp_controller_t *make_mock(rcp_zone_t z)
+static void test_sleep_ms(unsigned ms)
 {
-    return rcp_mock_controller_new(z, NULL, NULL);
+    uint64_t start = rcp_monotonic_ms();
+    while (rcp_monotonic_ms() - start < ms) {
+        /* busy-wait */
+    }
 }
 
-/* ── Basic send ───────────────────────────────────────────────────────────── */
-
-static void test_send_forwards_command_when_bucket_has_tokens(void)
+static rcp_avtp_addr_t make_addr(uint16_t unique_id, uint8_t byte_bus_id)
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
+    uint8_t mac[6] = {0xAA, 0xBB, 0xCC, 0xDD, 0xEE, 0xFF};
+    rcp_avtp_addr_t a;
+    a.stream_id   = rcp_stream_id_make(mac, unique_id);
+    a.byte_bus_id = byte_bus_id;
+    return a;
+}
+
+/* ── Basic admission ──────────────────────────────────────────────────────── */
+
+//cfusa:test REQ-RL-001
+//cfusa:test REQ-RL-007
+static void test_first_use_seeds_a_full_bucket(void)
+{
     rcp_ratelimit_config_t cfg = rcp_ratelimit_default_config();
-    rcp_controller_t *rl;
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
+    rcp_ratelimit_limiter_t *rl;
 
     cfg.rate  = 1000;
     cfg.burst = 10;
-    rl = rcp_ratelimit_controller_new(inner, cfg);
+    rl = rcp_ratelimit_limiter_new(cfg);
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(rl, &ctx, &cmd, &resp));
-    TEST_ASSERT_EQUAL(RCP_RESPONSE_OK, resp.status);
+    TEST_ASSERT_TRUE(rcp_ratelimit_limiter_allow(rl, make_addr(1, 0), 0x00));
 
-    rcp_response_free(&resp);
-    rcp_controller_release(rl);
-    rcp_controller_release(inner);
-}
-
-static void test_zone_returns_inner_zone(void)
-{
-    rcp_controller_t *inner = make_mock(RCP_ZONE_CENTRAL);
-    rcp_controller_t *rl = rcp_ratelimit_controller_new(inner, rcp_ratelimit_default_config());
-
-    TEST_ASSERT_EQUAL(RCP_ZONE_CENTRAL, rcp_controller_zone(rl));
-
-    rcp_controller_release(rl);
-    rcp_controller_release(inner);
+    rcp_ratelimit_limiter_destroy(rl);
 }
 
 /* ── Token exhaustion ─────────────────────────────────────────────────────── */
 
-static void test_send_returns_busy_when_bucket_exhausted(void)
+//cfusa:test REQ-RL-003
+//cfusa:test REQ-RL-008
+static void test_allow_returns_false_when_bucket_exhausted(void)
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
     rcp_ratelimit_config_t cfg = rcp_ratelimit_default_config();
-    rcp_controller_t *rl;
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
+    rcp_ratelimit_limiter_t *rl;
+    rcp_avtp_addr_t addr = make_addr(2, 0);
 
-    cfg.rate            = 0.001; /* nearly zero refill */
-    cfg.burst           = 2;
-    cfg.exempt_critical = false;
-    rl = rcp_ratelimit_controller_new(inner, cfg);
+    cfg.rate          = 0.001; /* nearly zero refill */
+    cfg.burst         = 2;
+    cfg.exempt_safety = false;
+    rl = rcp_ratelimit_limiter_new(cfg);
 
-    cmd.zone     = RCP_ZONE_FRONT_LEFT;
-    cmd.priority = RCP_PRIORITY_NORMAL;
+    TEST_ASSERT_TRUE(rcp_ratelimit_limiter_allow(rl, addr, 0x00));
+    TEST_ASSERT_TRUE(rcp_ratelimit_limiter_allow(rl, addr, 0x00));
+    TEST_ASSERT_FALSE(rcp_ratelimit_limiter_allow(rl, addr, 0x00));
 
-    /* Drain the 2 burst tokens. */
-    (void)rcp_controller_send(rl, &ctx, &cmd, &resp); rcp_response_free(&resp);
-    (void)rcp_controller_send(rl, &ctx, &cmd, &resp); rcp_response_free(&resp);
-
-    TEST_ASSERT_EQUAL(RCP_ERR_BUSY, rcp_controller_send(rl, &ctx, &cmd, &resp));
-
-    rcp_controller_release(rl);
-    rcp_controller_release(inner);
+    rcp_ratelimit_limiter_destroy(rl);
 }
 
-/* ── Critical exemption ───────────────────────────────────────────────────── */
-
-static void test_critical_bypasses_bucket_when_exempt(void)
+//cfusa:test REQ-RL-002
+static void test_tokens_refill_over_time(void)
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
     rcp_ratelimit_config_t cfg = rcp_ratelimit_default_config();
-    rcp_controller_t *rl;
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
+    rcp_ratelimit_limiter_t *rl;
+    rcp_avtp_addr_t addr = make_addr(3, 0);
 
-    cfg.rate            = 0.001;
-    cfg.burst           = 1;
-    cfg.exempt_critical = true;
-    rl = rcp_ratelimit_controller_new(inner, cfg);
+    cfg.rate          = 100.0; /* one token every 10ms */
+    cfg.burst         = 1;
+    cfg.exempt_safety = false;
+    rl = rcp_ratelimit_limiter_new(cfg);
 
-    cmd.zone     = RCP_ZONE_FRONT_LEFT;
-    cmd.priority = RCP_PRIORITY_NORMAL;
-    (void)rcp_controller_send(rl, &ctx, &cmd, &resp); rcp_response_free(&resp); /* exhaust the 1 token */
+    TEST_ASSERT_TRUE(rcp_ratelimit_limiter_allow(rl, addr, 0x00));
+    TEST_ASSERT_FALSE(rcp_ratelimit_limiter_allow(rl, addr, 0x00));
 
-    cmd.priority = RCP_PRIORITY_CRITICAL;
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(rl, &ctx, &cmd, &resp));
+    test_sleep_ms(50);
+    TEST_ASSERT_TRUE(rcp_ratelimit_limiter_allow(rl, addr, 0x00));
 
-    rcp_response_free(&resp);
-    rcp_controller_release(rl);
-    rcp_controller_release(inner);
+    rcp_ratelimit_limiter_destroy(rl);
 }
 
-static void test_critical_does_not_bypass_bucket_when_not_exempt(void)
+/* ── Safety exemption ─────────────────────────────────────────────────────── */
+
+//cfusa:test REQ-RL-004
+static void test_safety_tagged_bypasses_bucket_when_exempt(void)
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
     rcp_ratelimit_config_t cfg = rcp_ratelimit_default_config();
-    rcp_controller_t *rl;
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
+    rcp_ratelimit_limiter_t *rl;
+    rcp_avtp_addr_t addr = make_addr(4, 0);
 
-    cfg.rate            = 0.001;
-    cfg.burst           = 1;
-    cfg.exempt_critical = false;
-    rl = rcp_ratelimit_controller_new(inner, cfg);
+    cfg.rate          = 0.001;
+    cfg.burst         = 1;
+    cfg.exempt_safety = true;
+    rl = rcp_ratelimit_limiter_new(cfg);
 
-    cmd.zone     = RCP_ZONE_FRONT_LEFT;
-    cmd.priority = RCP_PRIORITY_NORMAL;
-    (void)rcp_controller_send(rl, &ctx, &cmd, &resp); rcp_response_free(&resp);
+    TEST_ASSERT_TRUE(rcp_ratelimit_limiter_allow(rl, addr, 0x00)); /* exhaust the 1 token */
 
-    cmd.priority = RCP_PRIORITY_CRITICAL;
-    TEST_ASSERT_EQUAL(RCP_ERR_BUSY, rcp_controller_send(rl, &ctx, &cmd, &resp));
+    TEST_ASSERT_TRUE(rcp_ratelimit_limiter_allow(rl, addr, 0x8F)); /* safety-tagged compound */
 
-    rcp_controller_release(rl);
-    rcp_controller_release(inner);
+    rcp_ratelimit_limiter_destroy(rl);
 }
 
-/* ── Zone mismatch / closed ───────────────────────────────────────────────── */
-
-static void test_send_returns_zone_mismatch_on_wrong_zone(void)
+//cfusa:test REQ-RL-005
+static void test_safety_tagged_does_not_bypass_when_not_exempt(void)
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *rl = rcp_ratelimit_controller_new(inner, rcp_ratelimit_default_config());
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
+    rcp_ratelimit_config_t cfg = rcp_ratelimit_default_config();
+    rcp_ratelimit_limiter_t *rl;
+    rcp_avtp_addr_t addr = make_addr(5, 0);
 
-    cmd.zone = RCP_ZONE_REAR_LEFT;
-    TEST_ASSERT_EQUAL(RCP_ERR_ZONE_MISMATCH, rcp_controller_send(rl, &ctx, &cmd, &resp));
+    cfg.rate          = 0.001;
+    cfg.burst         = 1;
+    cfg.exempt_safety = false;
+    rl = rcp_ratelimit_limiter_new(cfg);
 
-    rcp_controller_release(rl);
-    rcp_controller_release(inner);
+    TEST_ASSERT_TRUE(rcp_ratelimit_limiter_allow(rl, addr, 0x00));
+
+    TEST_ASSERT_FALSE(rcp_ratelimit_limiter_allow(rl, addr, 0x8F));
+
+    rcp_ratelimit_limiter_destroy(rl);
 }
 
-static void test_close_stops_sends(void)
+/* ── Per-endpoint independence ────────────────────────────────────────────── */
+
+//cfusa:test REQ-RL-006
+static void test_each_address_has_an_independent_bucket(void)
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *rl = rcp_ratelimit_controller_new(inner, rcp_ratelimit_default_config());
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
+    rcp_ratelimit_config_t cfg = rcp_ratelimit_default_config();
+    rcp_ratelimit_limiter_t *rl;
+    rcp_avtp_addr_t a = make_addr(6, 0);
+    rcp_avtp_addr_t b = make_addr(6, 1); /* same stream, different byte_bus_id */
 
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_close(rl));
+    cfg.rate          = 0.001;
+    cfg.burst         = 1;
+    cfg.exempt_safety = false;
+    rl = rcp_ratelimit_limiter_new(cfg);
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_controller_send(rl, &ctx, &cmd, &resp));
+    TEST_ASSERT_TRUE(rcp_ratelimit_limiter_allow(rl, a, 0x00));  /* exhausts a's bucket only */
+    TEST_ASSERT_FALSE(rcp_ratelimit_limiter_allow(rl, a, 0x00));
+    TEST_ASSERT_TRUE(rcp_ratelimit_limiter_allow(rl, b, 0x00));  /* b's own bucket is still full */
 
-    rcp_controller_release(rl);
-    rcp_controller_release(inner);
+    rcp_ratelimit_limiter_destroy(rl);
 }
 
-static void test_subscribe_delegates_to_inner(void)
+/* ── destroy() ─────────────────────────────────────────────────────────────── */
+
+//cfusa:test REQ-RL-009
+static void test_destroy_frees_every_bucket(void)
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *rl = rcp_ratelimit_controller_new(inner, rcp_ratelimit_default_config());
-    rcp_context_t ctx = rcp_context_background();
-    rcp_status_channel_t *ch = NULL;
+    rcp_ratelimit_config_t cfg = rcp_ratelimit_default_config();
+    rcp_ratelimit_limiter_t *rl = rcp_ratelimit_limiter_new(cfg);
+    int i;
 
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(rl, &ctx, &ch));
-    TEST_ASSERT_NOT_NULL(ch);
+    for (i = 0; i < 32; i++) {
+        (void)rcp_ratelimit_limiter_allow(rl, make_addr((uint16_t)i, 0), 0x00);
+    }
 
-    rcp_status_channel_release(ch);
-    rcp_controller_release(rl);
-    rcp_controller_release(inner);
+    rcp_ratelimit_limiter_destroy(rl); /* must not leak or crash (ASan-checked in CI) */
 }
 
 int main(void)
 {
     UNITY_BEGIN();
 
-    RUN_TEST(test_send_forwards_command_when_bucket_has_tokens);
-    RUN_TEST(test_zone_returns_inner_zone);
-    RUN_TEST(test_send_returns_busy_when_bucket_exhausted);
-    RUN_TEST(test_critical_bypasses_bucket_when_exempt);
-    RUN_TEST(test_critical_does_not_bypass_bucket_when_not_exempt);
-    RUN_TEST(test_send_returns_zone_mismatch_on_wrong_zone);
-    RUN_TEST(test_close_stops_sends);
-    RUN_TEST(test_subscribe_delegates_to_inner);
+    RUN_TEST(test_first_use_seeds_a_full_bucket);
+    RUN_TEST(test_allow_returns_false_when_bucket_exhausted);
+    RUN_TEST(test_tokens_refill_over_time);
+    RUN_TEST(test_safety_tagged_bypasses_bucket_when_exempt);
+    RUN_TEST(test_safety_tagged_does_not_bypass_when_not_exempt);
+    RUN_TEST(test_each_address_has_an_independent_bucket);
+    RUN_TEST(test_destroy_frees_every_bucket);
 
     return UNITY_END();
 }

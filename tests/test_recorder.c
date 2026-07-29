@@ -11,11 +11,11 @@
 //cfusa:test REQ-REC-011
 #include "unity.h"
 
-#include "legacy_mock.h"
-#include <rcp/rcp.h>
+#include <rcp/clock.h>
 #include <rcp/recorder.h>
 
 #include <stdio.h>
+#include <string.h>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -44,78 +44,119 @@ static void test_thread_join(test_thread_t t) { pthread_join(t, NULL); }
 void setUp(void) {}
 void tearDown(void) {}
 
-static rcp_controller_t *make_mock(rcp_zone_t z)
+static rcp_avtp_addr_t make_addr(uint16_t unique_id, uint8_t byte_bus_id)
 {
-    return rcp_mock_controller_new(z, NULL, NULL);
+    uint8_t mac[6] = {0x66, 0x77, 0x88, 0x99, 0xAA, 0xBB};
+    rcp_avtp_addr_t a;
+    a.stream_id   = rcp_stream_id_make(mac, unique_id);
+    a.byte_bus_id = byte_bus_id;
+    return a;
 }
 
-static void test_recording_controller_captures_entries(void)
+/* ── capture() ─────────────────────────────────────────────────────────────── */
+
+//cfusa:test REQ-REC-001
+static void test_capture_appends_an_entry(void)
 {
-    rcp_recorder_t *rec = rcp_recorder_new();
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl = rcp_recorder_controller_new(inner, rec);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
-    rcp_recorder_entry_t entries[1];
+    rcp_recorder_t *r = rcp_recorder_new();
+    uint8_t frame[] = {0x0E, 0x00, 0x00, 0x03, 0xAA, 0xBB, 0xCC};
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    cmd.type = RCP_CMD_GET;
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(ctrl, &ctx, &cmd, &resp));
+    TEST_ASSERT_TRUE(rcp_recorder_capture(r, 100, make_addr(1, 0), true, frame, sizeof(frame)));
+    TEST_ASSERT_EQUAL_UINT(1, rcp_recorder_size(r));
 
-    TEST_ASSERT_EQUAL_UINT(1, rcp_recorder_size(rec));
-    TEST_ASSERT_EQUAL_UINT(1, rcp_recorder_entries(rec, entries, 1));
-    TEST_ASSERT_EQUAL(RCP_CMD_GET, entries[0].cmd.type);
-    TEST_ASSERT_EQUAL(RCP_OK, entries[0].error);
-
-    rcp_response_free(&resp);
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
-    rcp_recorder_destroy(rec);
+    rcp_recorder_destroy(r);
 }
 
-static void test_multiple_sends_produce_sequential_entries(void)
+//cfusa:test REQ-REC-002
+static void test_multiple_captures_produce_sequential_entries(void)
 {
-    rcp_recorder_t *rec = rcp_recorder_new();
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl = rcp_recorder_controller_new(inner, rec);
-    rcp_context_t ctx = rcp_context_background();
+    rcp_recorder_t *r = rcp_recorder_new();
+    uint8_t frame[] = {0x01};
+    rcp_recorder_entry_t out[3];
+
+    TEST_ASSERT_TRUE(rcp_recorder_capture(r, 10, make_addr(1, 0), true, frame, 1));
+    TEST_ASSERT_TRUE(rcp_recorder_capture(r, 20, make_addr(2, 0), false, frame, 1));
+    TEST_ASSERT_TRUE(rcp_recorder_capture(r, 30, make_addr(3, 0), true, frame, 1));
+
+    TEST_ASSERT_EQUAL_UINT(3, rcp_recorder_entries(r, out, 3));
+    TEST_ASSERT_EQUAL_UINT64(10, out[0].timestamp_ms);
+    TEST_ASSERT_EQUAL_UINT64(20, out[1].timestamp_ms);
+    TEST_ASSERT_EQUAL_UINT64(30, out[2].timestamp_ms);
+
+    rcp_recorder_destroy(r);
+}
+
+//cfusa:test REQ-REC-006
+static void test_capture_copies_frame_bytes_by_value(void)
+{
+    rcp_recorder_t *r = rcp_recorder_new();
+    uint8_t frame[4];
+    rcp_recorder_entry_t out;
+
+    memcpy(frame, "\x01\x02\x03\x04", 4);
+    TEST_ASSERT_TRUE(rcp_recorder_capture(r, 1, make_addr(1, 0), true, frame, 4));
+
+    /* Mutating the caller's own buffer after capture() must not affect
+     * the stored entry -- it copied the bytes, not a reference. */
+    memset(frame, 0xFF, sizeof(frame));
+
+    rcp_recorder_entries(r, &out, 1);
+    TEST_ASSERT_EQUAL_UINT8(0x01, out.frame.data[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x04, out.frame.data[3]);
+
+    rcp_recorder_destroy(r);
+}
+
+//cfusa:test REQ-REC-007
+static void test_capture_records_addr_and_inbound(void)
+{
+    rcp_recorder_t *r = rcp_recorder_new();
+    uint8_t frame[] = {0x00};
+    rcp_avtp_addr_t addr = make_addr(7, 4);
+    rcp_recorder_entry_t out;
+
+    TEST_ASSERT_TRUE(rcp_recorder_capture(r, 1, addr, false, frame, 1));
+
+    rcp_recorder_entries(r, &out, 1);
+    TEST_ASSERT_TRUE(rcp_avtp_addr_equal(addr, out.addr));
+    TEST_ASSERT_FALSE(out.inbound);
+
+    rcp_recorder_destroy(r);
+}
+
+/* ── entries() cap handling ───────────────────────────────────────────────── */
+
+//cfusa:test REQ-REC-009
+static void test_entries_honors_cap_but_reports_true_total(void)
+{
+    rcp_recorder_t *r = rcp_recorder_new();
+    uint8_t frame[] = {0x00};
+    rcp_recorder_entry_t out[1];
     int i;
 
-    for (i = 0; i < 3; i++) {
-        rcp_command_t cmd = {0};
-        rcp_response_t resp = {0};
-        cmd.zone = RCP_ZONE_FRONT_LEFT;
-        cmd.type = RCP_CMD_SET;
-        (void)rcp_controller_send(ctrl, &ctx, &cmd, &resp);
-        rcp_response_free(&resp);
+    for (i = 0; i < 5; i++) {
+        TEST_ASSERT_TRUE(rcp_recorder_capture(r, (uint64_t)i, make_addr((uint16_t)i, 0), true, frame, 1));
     }
 
-    TEST_ASSERT_EQUAL_UINT(3, rcp_recorder_size(rec));
+    TEST_ASSERT_EQUAL_UINT(5, rcp_recorder_entries(r, out, 1));
+    TEST_ASSERT_EQUAL_UINT(5, rcp_recorder_size(r));
 
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
-    rcp_recorder_destroy(rec);
+    rcp_recorder_destroy(r);
 }
 
-static void test_write_binary_creates_file(void)
+/* ── write_binary() ───────────────────────────────────────────────────────── */
+
+//cfusa:test REQ-REC-003
+static void test_write_binary_creates_a_non_empty_file(void)
 {
-    rcp_recorder_t *rec = rcp_recorder_new();
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl = rcp_recorder_controller_new(inner, rec);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
-    const char *path = "rcp_test_record.bin";
+    rcp_recorder_t *r = rcp_recorder_new();
+    uint8_t frame[] = {0xDE, 0xAD, 0xBE, 0xEF};
+    const char *path = "test_recorder_output.bin";
     FILE *f;
     long size;
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    cmd.type = RCP_CMD_GET;
-    (void)rcp_controller_send(ctrl, &ctx, &cmd, &resp);
-    rcp_response_free(&resp);
-
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_recorder_write_binary(rec, path));
+    TEST_ASSERT_TRUE(rcp_recorder_capture(r, 1, make_addr(1, 0), true, frame, sizeof(frame)));
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_recorder_write_binary(r, path));
 
     f = fopen(path, "rb");
     TEST_ASSERT_NOT_NULL(f);
@@ -123,93 +164,98 @@ static void test_write_binary_creates_file(void)
     size = ftell(f);
     fclose(f);
     remove(path);
+
     TEST_ASSERT_TRUE(size > 0);
 
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
-    rcp_recorder_destroy(rec);
+    rcp_recorder_destroy(r);
 }
 
-static void test_entry_timestamps_are_monotonically_non_decreasing(void)
+//cfusa:test REQ-REC-010
+static void test_write_binary_returns_busy_when_path_unopenable(void)
 {
-    rcp_recorder_t *rec = rcp_recorder_new();
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl = rcp_recorder_controller_new(inner, rec);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_recorder_entry_t entries[20];
-    size_t n;
-    size_t i;
-    int j;
+    rcp_recorder_t *r = rcp_recorder_new();
 
-    for (j = 0; j < 20; j++) {
-        rcp_command_t cmd = {0};
-        rcp_response_t resp = {0};
-        cmd.zone = RCP_ZONE_FRONT_LEFT;
-        cmd.type = RCP_CMD_SET;
-        (void)rcp_controller_send(ctrl, &ctx, &cmd, &resp);
-        rcp_response_free(&resp);
-    }
+    /* A path inside a nonexistent directory can never be opened for
+     * writing on any supported platform. */
+    TEST_ASSERT_EQUAL(RCP_ERR_BUSY,
+                       rcp_recorder_write_binary(r, "no_such_directory/out.bin"));
 
-    n = rcp_recorder_entries(rec, entries, 20);
-    TEST_ASSERT_EQUAL_UINT(20, n);
-    for (i = 1; i < n; i++) {
-        TEST_ASSERT_TRUE(entries[i].timestamp_ms >= entries[i - 1].timestamp_ms);
-    }
-
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
-    rcp_recorder_destroy(rec);
+    rcp_recorder_destroy(r);
 }
 
-static void test_forwards_inner_send_result_unchanged(void)
+/* ── Playback ─────────────────────────────────────────────────────────────── */
+
+typedef struct {
+    int      count;
+    uint64_t last_ts;
+} playback_ctx_t;
+
+static void playback_deliver(const rcp_recorder_entry_t *entry, void *user_data)
 {
-    rcp_recorder_t *rec = rcp_recorder_new();
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
-    rcp_controller_t *ctrl;
-    rcp_recorder_entry_t entries[1];
+    playback_ctx_t *ctx = (playback_ctx_t *)user_data;
+    ctx->count++;
+    ctx->last_ts = entry->timestamp_ms;
+}
 
-    rcp_controller_close(inner); /* closed inner returns RCP_ERR_CLOSED */
-    ctrl = rcp_recorder_controller_new(inner, rec);
+//cfusa:test REQ-REC-004
+static void test_playback_delivers_every_entry_in_order(void)
+{
+    rcp_recorder_t *r = rcp_recorder_new();
+    uint8_t frame[] = {0x00};
+    playback_ctx_t ctx = {0, 0};
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    cmd.type = RCP_CMD_GET;
-    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_controller_send(ctrl, &ctx, &cmd, &resp)); /* result passed through verbatim */
-    TEST_ASSERT_EQUAL_UINT(1, rcp_recorder_size(rec));
-    rcp_recorder_entries(rec, entries, 1);
-    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, entries[0].error); /* and captured in the log */
+    TEST_ASSERT_TRUE(rcp_recorder_capture(r, 0, make_addr(1, 0), true, frame, 1));
+    TEST_ASSERT_TRUE(rcp_recorder_capture(r, 0, make_addr(2, 0), true, frame, 1));
+    TEST_ASSERT_TRUE(rcp_recorder_capture(r, 0, make_addr(3, 0), true, frame, 1));
 
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
-    rcp_recorder_destroy(rec);
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_playback_run_all(r, playback_deliver, &ctx, rcp_playback_default_config()));
+    TEST_ASSERT_EQUAL(3, ctx.count);
+
+    rcp_recorder_destroy(r);
+}
+
+//cfusa:test REQ-REC-005
+static void test_speed_factor_zero_disables_delays(void)
+{
+    rcp_recorder_t *r = rcp_recorder_new();
+    uint8_t frame[] = {0x00};
+    rcp_playback_config_t cfg;
+    playback_ctx_t ctx = {0, 0};
+    uint64_t start, elapsed;
+
+    TEST_ASSERT_TRUE(rcp_recorder_capture(r, 0, make_addr(1, 0), true, frame, 1));
+    TEST_ASSERT_TRUE(rcp_recorder_capture(r, 5000, make_addr(2, 0), true, frame, 1));
+
+    cfg.speed_factor = 0.0;
+    start = rcp_monotonic_ms();
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_playback_run_all(r, playback_deliver, &ctx, cfg));
+    elapsed = rcp_monotonic_ms() - start;
+
+    TEST_ASSERT_EQUAL(2, ctx.count);
+    TEST_ASSERT_TRUE(elapsed < 1000); /* would be ~5s at speed_factor 1.0 */
+
+    rcp_recorder_destroy(r);
 }
 
 /* ── Concurrency ──────────────────────────────────────────────────────────── */
 
-#define KTHREADS 8
-#define KPER_THREAD 500
-
-static rcp_controller_t *g_ctrl;
+typedef struct {
+    rcp_recorder_t *r;
+    int               idx;
+} worker_args_t;
 
 #if defined(_WIN32)
-static DWORD WINAPI send_worker(void *arg)
+static DWORD WINAPI capture_worker(void *arg)
 #else
-static void *send_worker(void *arg)
+static void *capture_worker(void *arg)
 #endif
 {
-    rcp_context_t ctx = rcp_context_background();
+    worker_args_t *a = (worker_args_t *)arg;
+    uint8_t frame[] = {0x00};
     int i;
-    (void)arg;
 
-    for (i = 0; i < KPER_THREAD; i++) {
-        rcp_command_t cmd = {0};
-        rcp_response_t resp = {0};
-        cmd.zone = RCP_ZONE_CENTRAL;
-        cmd.type = RCP_CMD_GET;
-        (void)rcp_controller_send(g_ctrl, &ctx, &cmd, &resp);
-        rcp_response_free(&resp);
+    for (i = 0; i < 500; i++) {
+        (void)rcp_recorder_capture(a->r, (uint64_t)i, make_addr((uint16_t)(a->idx * 1000 + i), 0), true, frame, 1);
     }
 #if defined(_WIN32)
     return 0;
@@ -218,118 +264,58 @@ static void *send_worker(void *arg)
 #endif
 }
 
-static void test_record_tolerates_concurrent_appends(void)
+//cfusa:test REQ-REC-008
+static void test_record_tolerates_concurrent_captures(void)
 {
-    rcp_recorder_t *rec = rcp_recorder_new();
-    rcp_controller_t *inner = make_mock(RCP_ZONE_CENTRAL);
-    test_thread_t threads[KTHREADS];
+    rcp_recorder_t *r = rcp_recorder_new();
+    worker_args_t args[4];
+    test_thread_t threads[4];
     int i;
 
-    g_ctrl = rcp_recorder_controller_new(inner, rec);
+    for (i = 0; i < 4; i++) {
+        args[i].r   = r;
+        args[i].idx = i;
+        threads[i] = test_thread_spawn(capture_worker, &args[i]);
+    }
+    for (i = 0; i < 4; i++) test_thread_join(threads[i]);
 
-    for (i = 0; i < KTHREADS; i++) threads[i] = test_thread_spawn(send_worker, NULL);
-    for (i = 0; i < KTHREADS; i++) test_thread_join(threads[i]);
+    TEST_ASSERT_EQUAL_UINT(4 * 500, rcp_recorder_size(r));
 
-    TEST_ASSERT_EQUAL_UINT(KTHREADS * KPER_THREAD, rcp_recorder_size(rec));
-
-    rcp_controller_release(g_ctrl);
-    rcp_controller_release(inner);
-    rcp_recorder_destroy(rec);
+    rcp_recorder_destroy(r);
 }
 
-/* ── Playback ─────────────────────────────────────────────────────────────── */
+/* ── destroy() ─────────────────────────────────────────────────────────────── */
 
-static void test_playback_replays_entries_against_target(void)
+//cfusa:test REQ-REC-011
+static void test_destroy_frees_every_captured_entry(void)
 {
-    rcp_recorder_t *rec = rcp_recorder_new();
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl = rcp_recorder_controller_new(inner, rec);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
-    rcp_controller_t *target;
-    rcp_playback_config_t cfg = rcp_playback_default_config();
+    rcp_recorder_t *r = rcp_recorder_new();
+    uint8_t frame[64];
+    int i;
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    cmd.type = RCP_CMD_GET;
-    (void)rcp_controller_send(ctrl, &ctx, &cmd, &resp);
-    rcp_response_free(&resp);
+    memset(frame, 0xAB, sizeof(frame));
+    for (i = 0; i < 16; i++) {
+        TEST_ASSERT_TRUE(rcp_recorder_capture(r, (uint64_t)i, make_addr((uint16_t)i, 0), true, frame, sizeof(frame)));
+    }
 
-    TEST_ASSERT_EQUAL_UINT(1, rcp_recorder_size(rec));
-
-    target = make_mock(RCP_ZONE_FRONT_LEFT);
-    cfg.speed_factor = 0.0; /* no delays */
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_playback_run_all(target, rec, &ctx, cfg));
-
-    rcp_controller_release(target);
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
-    rcp_recorder_destroy(rec);
-}
-
-static void test_zone_delegates_to_inner(void)
-{
-    rcp_recorder_t *rec = rcp_recorder_new();
-    rcp_controller_t *inner = make_mock(RCP_ZONE_REAR_LEFT);
-    rcp_controller_t *ctrl = rcp_recorder_controller_new(inner, rec);
-
-    TEST_ASSERT_EQUAL(RCP_ZONE_REAR_LEFT, rcp_controller_zone(ctrl));
-
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
-    rcp_recorder_destroy(rec);
-}
-
-static void test_subscribe_delegates_to_inner(void)
-{
-    rcp_recorder_t *rec = rcp_recorder_new();
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl = rcp_recorder_controller_new(inner, rec);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_status_channel_t *ch = NULL;
-
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
-    TEST_ASSERT_NOT_NULL(ch);
-
-    rcp_status_channel_release(ch);
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
-    rcp_recorder_destroy(rec);
-}
-
-static void test_close_delegates_to_inner(void)
-{
-    rcp_recorder_t *rec = rcp_recorder_new();
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl = rcp_recorder_controller_new(inner, rec);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
-
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_close(ctrl));
-
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_controller_send(inner, &ctx, &cmd, &resp));
-
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
-    rcp_recorder_destroy(rec);
+    rcp_recorder_destroy(r); /* must not leak (ASan-checked in CI) */
 }
 
 int main(void)
 {
     UNITY_BEGIN();
 
-    RUN_TEST(test_recording_controller_captures_entries);
-    RUN_TEST(test_multiple_sends_produce_sequential_entries);
-    RUN_TEST(test_write_binary_creates_file);
-    RUN_TEST(test_entry_timestamps_are_monotonically_non_decreasing);
-    RUN_TEST(test_forwards_inner_send_result_unchanged);
-    RUN_TEST(test_record_tolerates_concurrent_appends);
-    RUN_TEST(test_playback_replays_entries_against_target);
-    RUN_TEST(test_zone_delegates_to_inner);
-    RUN_TEST(test_subscribe_delegates_to_inner);
-    RUN_TEST(test_close_delegates_to_inner);
+    RUN_TEST(test_capture_appends_an_entry);
+    RUN_TEST(test_multiple_captures_produce_sequential_entries);
+    RUN_TEST(test_capture_copies_frame_bytes_by_value);
+    RUN_TEST(test_capture_records_addr_and_inbound);
+    RUN_TEST(test_entries_honors_cap_but_reports_true_total);
+    RUN_TEST(test_write_binary_creates_a_non_empty_file);
+    RUN_TEST(test_write_binary_returns_busy_when_path_unopenable);
+    RUN_TEST(test_playback_delivers_every_entry_in_order);
+    RUN_TEST(test_speed_factor_zero_disables_delays);
+    RUN_TEST(test_record_tolerates_concurrent_captures);
+    RUN_TEST(test_destroy_frees_every_captured_entry);
 
     return UNITY_END();
 }

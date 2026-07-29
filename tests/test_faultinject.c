@@ -10,244 +10,223 @@
 //cfusa:test REQ-FI-010
 #include "unity.h"
 
-#include <rcp/clock.h>
 #include <rcp/faultinject.h>
-#include "legacy_mock.h"
-#include <rcp/rcp.h>
+
+#if defined(_WIN32)
+#include <windows.h>
+typedef HANDLE test_thread_t;
+static test_thread_t test_thread_spawn(DWORD(WINAPI *fn)(void *), void *arg)
+{
+    return CreateThread(NULL, 0, fn, arg, 0, NULL);
+}
+static void test_thread_join(test_thread_t t)
+{
+    WaitForSingleObject(t, INFINITE);
+    CloseHandle(t);
+}
+#else
+#include <pthread.h>
+typedef pthread_t test_thread_t;
+static test_thread_t test_thread_spawn(void *(*fn)(void *), void *arg)
+{
+    pthread_t t;
+    pthread_create(&t, NULL, fn, arg);
+    return t;
+}
+static void test_thread_join(test_thread_t t) { pthread_join(t, NULL); }
+#endif
 
 void setUp(void) {}
 void tearDown(void) {}
 
-static rcp_controller_t *make_mock(rcp_zone_t z)
-{
-    return rcp_mock_controller_new(z, NULL, NULL);
-}
-
 /* ── No rules ─────────────────────────────────────────────────────────────── */
 
-static void test_send_passes_through_when_no_rules_active(void)
+//cfusa:test REQ-FI-001
+static void test_evaluate_returns_proceed_when_no_rules(void)
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *fi = rcp_faultinject_controller_new(inner);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
+    rcp_faultinject_t *fi = rcp_faultinject_new();
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(fi, &ctx, &cmd, &resp));
-    TEST_ASSERT_EQUAL(RCP_RESPONSE_OK, resp.status);
+    TEST_ASSERT_EQUAL(RCP_FI_PROCEED, rcp_faultinject_evaluate(fi, NULL));
 
-    rcp_response_free(&resp);
-    rcp_controller_release(fi);
-    rcp_controller_release(inner);
+    rcp_faultinject_destroy(fi);
 }
 
-/* ── Drop ─────────────────────────────────────────────────────────────────── */
+/* ── Individual rule types ────────────────────────────────────────────────── */
 
-static void test_drop_rule_causes_send_to_return_error(void)
+//cfusa:test REQ-FI-002
+static void test_drop_rule(void)
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *fi = rcp_faultinject_controller_new(inner);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
-    rcp_fi_rule_t rule = {0};
+    rcp_faultinject_t *fi = rcp_faultinject_new();
+    rcp_fi_rule_t rule = {RCP_FI_DROP, 0, -1};
 
-    rule.type  = RCP_FI_DROP;
-    rule.count = -1;
     TEST_ASSERT_TRUE(rcp_faultinject_add_rule(fi, rule));
+    TEST_ASSERT_EQUAL(RCP_FI_DROP, rcp_faultinject_evaluate(fi, NULL));
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    TEST_ASSERT_NOT_EQUAL(RCP_OK, rcp_controller_send(fi, &ctx, &cmd, &resp));
-
-    rcp_controller_release(fi);
-    rcp_controller_release(inner);
+    rcp_faultinject_destroy(fi);
 }
 
-/* ── Error ────────────────────────────────────────────────────────────────── */
-
-static void test_error_rule_returns_response_error(void)
+//cfusa:test REQ-FI-003
+static void test_error_rule(void)
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *fi = rcp_faultinject_controller_new(inner);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
-    rcp_fi_rule_t rule = {0};
+    rcp_faultinject_t *fi = rcp_faultinject_new();
+    rcp_fi_rule_t rule = {RCP_FI_ERROR, 0, -1};
 
-    rule.type  = RCP_FI_ERROR;
-    rule.count = -1;
     TEST_ASSERT_TRUE(rcp_faultinject_add_rule(fi, rule));
+    TEST_ASSERT_EQUAL(RCP_FI_ERROR, rcp_faultinject_evaluate(fi, NULL));
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    (void)rcp_controller_send(fi, &ctx, &cmd, &resp);
-    TEST_ASSERT_EQUAL(RCP_RESPONSE_ERROR, resp.status);
-
-    rcp_controller_release(fi);
-    rcp_controller_release(inner);
+    rcp_faultinject_destroy(fi);
 }
 
-/* ── Slow ─────────────────────────────────────────────────────────────────── */
-
-static void test_slow_rule_adds_latency(void)
+//cfusa:test REQ-FI-004
+static void test_slow_rule_reports_configured_latency(void)
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *fi = rcp_faultinject_controller_new(inner);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
-    rcp_fi_rule_t rule = {0};
-    uint64_t start;
-    uint64_t elapsed;
+    rcp_faultinject_t *fi = rcp_faultinject_new();
+    rcp_fi_rule_t rule = {RCP_FI_SLOW, 250, -1};
+    uint64_t latency_ms = 0;
 
-    rule.type       = RCP_FI_SLOW;
-    rule.latency_ms = 20;
-    rule.count      = 1;
     TEST_ASSERT_TRUE(rcp_faultinject_add_rule(fi, rule));
+    TEST_ASSERT_EQUAL(RCP_FI_SLOW, rcp_faultinject_evaluate(fi, &latency_ms));
+    TEST_ASSERT_EQUAL_UINT64(250, latency_ms);
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    start = rcp_monotonic_ms();
-    (void)rcp_controller_send(fi, &ctx, &cmd, &resp);
-    elapsed = rcp_monotonic_ms() - start;
-    TEST_ASSERT_TRUE(elapsed >= 20);
+    rcp_faultinject_destroy(fi);
+}
 
-    rcp_response_free(&resp);
-    rcp_controller_release(fi);
-    rcp_controller_release(inner);
+//cfusa:test REQ-FI-007
+static void test_timeout_rule(void)
+{
+    rcp_faultinject_t *fi = rcp_faultinject_new();
+    rcp_fi_rule_t rule = {RCP_FI_TIMEOUT, 0, -1};
+
+    TEST_ASSERT_TRUE(rcp_faultinject_add_rule(fi, rule));
+    TEST_ASSERT_EQUAL(RCP_FI_TIMEOUT, rcp_faultinject_evaluate(fi, NULL));
+
+    rcp_faultinject_destroy(fi);
 }
 
 /* ── Count-based expiry ───────────────────────────────────────────────────── */
 
-static void test_rule_expires_after_count_sends(void)
+//cfusa:test REQ-FI-005
+static void test_count_based_rule_expires_after_n_firings(void)
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *fi = rcp_faultinject_controller_new(inner);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
-    rcp_fi_rule_t rule = {0};
+    rcp_faultinject_t *fi = rcp_faultinject_new();
+    rcp_fi_rule_t rule = {RCP_FI_DROP, 0, 2};
 
-    rule.type  = RCP_FI_DROP;
-    rule.count = 2; /* fires twice then expires */
     TEST_ASSERT_TRUE(rcp_faultinject_add_rule(fi, rule));
+    TEST_ASSERT_EQUAL(RCP_FI_DROP, rcp_faultinject_evaluate(fi, NULL));
+    TEST_ASSERT_EQUAL(RCP_FI_DROP, rcp_faultinject_evaluate(fi, NULL));
+    TEST_ASSERT_EQUAL(RCP_FI_PROCEED, rcp_faultinject_evaluate(fi, NULL));
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    TEST_ASSERT_NOT_EQUAL(RCP_OK, rcp_controller_send(fi, &ctx, &cmd, &resp)); /* drop 1 */
-    TEST_ASSERT_NOT_EQUAL(RCP_OK, rcp_controller_send(fi, &ctx, &cmd, &resp)); /* drop 2 */
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(fi, &ctx, &cmd, &resp));     /* passes */
-
-    rcp_response_free(&resp);
-    rcp_controller_release(fi);
-    rcp_controller_release(inner);
+    rcp_faultinject_destroy(fi);
 }
 
-/* ── clear_rules ──────────────────────────────────────────────────────────── */
+/* ── clear_rules() ────────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-FI-006
 static void test_clear_rules_removes_all_active_rules(void)
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *fi = rcp_faultinject_controller_new(inner);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
-    rcp_fi_rule_t rule = {0};
+    rcp_faultinject_t *fi = rcp_faultinject_new();
+    rcp_fi_rule_t rule = {RCP_FI_DROP, 0, -1};
 
-    rule.type  = RCP_FI_DROP;
-    rule.count = -1;
     TEST_ASSERT_TRUE(rcp_faultinject_add_rule(fi, rule));
     rcp_faultinject_clear_rules(fi);
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(fi, &ctx, &cmd, &resp));
+    TEST_ASSERT_EQUAL(RCP_FI_PROCEED, rcp_faultinject_evaluate(fi, NULL));
 
-    rcp_response_free(&resp);
-    rcp_controller_release(fi);
-    rcp_controller_release(inner);
+    rcp_faultinject_destroy(fi);
 }
 
-/* ── Timeout ──────────────────────────────────────────────────────────────── */
+/* ── FIFO order ───────────────────────────────────────────────────────────── */
 
-static void test_timeout_rule_returns_err_timeout(void)
+//cfusa:test REQ-FI-008
+static void test_rules_evaluated_in_fifo_order(void)
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *fi = rcp_faultinject_controller_new(inner);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
-    rcp_fi_rule_t rule = {0};
+    rcp_faultinject_t *fi = rcp_faultinject_new();
+    rcp_fi_rule_t drop_once  = {RCP_FI_DROP, 0, 1};
+    rcp_fi_rule_t error_rest = {RCP_FI_ERROR, 0, -1};
 
-    rule.type  = RCP_FI_TIMEOUT;
-    rule.count = -1;
-    TEST_ASSERT_TRUE(rcp_faultinject_add_rule(fi, rule));
+    TEST_ASSERT_TRUE(rcp_faultinject_add_rule(fi, drop_once));
+    TEST_ASSERT_TRUE(rcp_faultinject_add_rule(fi, error_rest));
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    TEST_ASSERT_EQUAL(RCP_ERR_TIMEOUT, rcp_controller_send(fi, &ctx, &cmd, &resp));
+    TEST_ASSERT_EQUAL(RCP_FI_DROP, rcp_faultinject_evaluate(fi, NULL));  /* the first rule fires first */
+    TEST_ASSERT_EQUAL(RCP_FI_ERROR, rcp_faultinject_evaluate(fi, NULL)); /* then the second, once the first expires */
 
-    rcp_controller_release(fi);
-    rcp_controller_release(inner);
+    rcp_faultinject_destroy(fi);
 }
 
-/* ── Zone passthrough ─────────────────────────────────────────────────────── */
+/* ── Concurrency ──────────────────────────────────────────────────────────── */
 
-static void test_zone_returns_inner_zone(void)
+typedef struct {
+    rcp_faultinject_t *fi;
+} worker_args_t;
+
+#if defined(_WIN32)
+static DWORD WINAPI evaluate_worker(void *arg)
+#else
+static void *evaluate_worker(void *arg)
+#endif
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_CENTRAL);
-    rcp_controller_t *fi = rcp_faultinject_controller_new(inner);
+    worker_args_t *a = (worker_args_t *)arg;
+    int i;
 
-    TEST_ASSERT_EQUAL(RCP_ZONE_CENTRAL, rcp_controller_zone(fi));
-
-    rcp_controller_release(fi);
-    rcp_controller_release(inner);
+    for (i = 0; i < 2000; i++) {
+        (void)rcp_faultinject_evaluate(a->fi, NULL);
+        if ((i & 0x3f) == 0) {
+            rcp_fi_rule_t rule = {RCP_FI_ERROR, 0, 1};
+            (void)rcp_faultinject_add_rule(a->fi, rule);
+        }
+    }
+#if defined(_WIN32)
+    return 0;
+#else
+    return NULL;
+#endif
 }
 
-static void test_subscribe_delegates_to_inner(void)
+//cfusa:test REQ-FI-009
+static void test_add_rule_is_safe_concurrently_with_evaluate(void)
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *fi = rcp_faultinject_controller_new(inner);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_status_channel_t *ch = NULL;
+    rcp_faultinject_t *fi = rcp_faultinject_new();
+    worker_args_t args;
+    test_thread_t threads[4];
+    int i;
 
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(fi, &ctx, &ch));
-    TEST_ASSERT_NOT_NULL(ch);
+    args.fi = fi;
+    for (i = 0; i < 4; i++) threads[i] = test_thread_spawn(evaluate_worker, &args);
+    for (i = 0; i < 4; i++) test_thread_join(threads[i]);
 
-    rcp_status_channel_release(ch);
-    rcp_controller_release(fi);
-    rcp_controller_release(inner);
+    rcp_faultinject_destroy(fi); /* must not crash (ASan/TSan-checked in CI) */
 }
 
-static void test_close_delegates_to_inner_and_rejects_further_sends(void)
+/* ── destroy() ─────────────────────────────────────────────────────────────── */
+
+//cfusa:test REQ-FI-010
+static void test_destroy_frees_every_rule(void)
 {
-    rcp_controller_t *inner = make_mock(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *fi = rcp_faultinject_controller_new(inner);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
+    rcp_faultinject_t *fi = rcp_faultinject_new();
+    int i;
 
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_close(fi));
+    for (i = 0; i < 16; i++) {
+        rcp_fi_rule_t rule = {RCP_FI_DROP, 0, 1};
+        (void)rcp_faultinject_add_rule(fi, rule);
+    }
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_controller_send(fi, &ctx, &cmd, &resp));
-    /* Confirm close() really reached the inner controller too. */
-    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_controller_send(inner, &ctx, &cmd, &resp));
-
-    rcp_controller_release(fi);
-    rcp_controller_release(inner);
+    rcp_faultinject_destroy(fi); /* must not leak (ASan-checked in CI) */
 }
 
 int main(void)
 {
     UNITY_BEGIN();
 
-    RUN_TEST(test_send_passes_through_when_no_rules_active);
-    RUN_TEST(test_drop_rule_causes_send_to_return_error);
-    RUN_TEST(test_error_rule_returns_response_error);
-    RUN_TEST(test_slow_rule_adds_latency);
-    RUN_TEST(test_rule_expires_after_count_sends);
+    RUN_TEST(test_evaluate_returns_proceed_when_no_rules);
+    RUN_TEST(test_drop_rule);
+    RUN_TEST(test_error_rule);
+    RUN_TEST(test_slow_rule_reports_configured_latency);
+    RUN_TEST(test_timeout_rule);
+    RUN_TEST(test_count_based_rule_expires_after_n_firings);
     RUN_TEST(test_clear_rules_removes_all_active_rules);
-    RUN_TEST(test_timeout_rule_returns_err_timeout);
-    RUN_TEST(test_zone_returns_inner_zone);
-    RUN_TEST(test_subscribe_delegates_to_inner);
-    RUN_TEST(test_close_delegates_to_inner_and_rejects_further_sends);
+    RUN_TEST(test_rules_evaluated_in_fifo_order);
+    RUN_TEST(test_add_rule_is_safe_concurrently_with_evaluate);
+    RUN_TEST(test_destroy_frees_every_rule);
 
     return UNITY_END();
 }

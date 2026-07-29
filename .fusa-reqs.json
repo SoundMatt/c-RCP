@@ -443,31 +443,31 @@
     {
       "id": "REQ-FI-001",
       "title": "No fault when no rules",
-      "text": "When no rules are active, send() shall delegate to the inner controller unchanged.",
+      "text": "rcp_faultinject_evaluate() shall return RCP_FI_PROCEED when fi currently has no active rules.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-FI-002",
-      "title": "Drop rule returns error without calling inner",
-      "text": "A Drop rule shall cause send() to return an error without calling the inner controller.",
+      "title": "Drop rule returns RCP_FI_DROP",
+      "text": "rcp_faultinject_evaluate() shall return RCP_FI_DROP when the oldest active rule is type RCP_FI_DROP.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-FI-003",
-      "title": "Error rule returns RCP_RESPONSE_ERROR",
-      "text": "An Error rule shall return {} (no error code) with the Response status set to RCP_RESPONSE_ERROR.",
+      "title": "Error rule returns RCP_FI_ERROR",
+      "text": "rcp_faultinject_evaluate() shall return RCP_FI_ERROR when the oldest active rule is type RCP_FI_ERROR.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-FI-004",
-      "title": "Slow rule adds configured latency",
-      "text": "A Slow rule shall sleep for Rule::latency before delegating to the inner controller.",
+      "title": "Slow rule reports the configured latency",
+      "text": "rcp_faultinject_evaluate() shall return RCP_FI_SLOW and write the rule's latency_ms into *out_latency_ms when the oldest active rule is type RCP_FI_SLOW.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -475,7 +475,7 @@
     {
       "id": "REQ-FI-005",
       "title": "Count-based rule expires after N firings",
-      "text": "A rule with count > 0 shall auto-expire after count applications and be removed from the active list.",
+      "text": "A rule added with count == N > 0 shall fire on exactly its next N rcp_faultinject_evaluate() calls and then be removed, so the (N+1)th call evaluates the next rule (or RCP_FI_PROCEED).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -483,63 +483,63 @@
     {
       "id": "REQ-FI-006",
       "title": "clear_rules() removes all active rules",
-      "text": "clear_rules() shall remove all rules, returning the controller to pass-through mode.",
+      "text": "rcp_faultinject_clear_rules() shall remove every rule from fi's list, so the next rcp_faultinject_evaluate() call returns RCP_FI_PROCEED.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-FI-007",
-      "title": "Timeout rule returns RCP_ERR_TIMEOUT",
-      "text": "A Timeout rule shall return RCP_ERR_TIMEOUT without calling the inner controller.",
+      "title": "Timeout rule returns RCP_FI_TIMEOUT",
+      "text": "rcp_faultinject_evaluate() shall return RCP_FI_TIMEOUT when the oldest active rule is type RCP_FI_TIMEOUT.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-FI-008",
-      "title": "zone() delegates to inner",
-      "text": "zone() shall return the inner controller's zone.",
+      "title": "Rules are evaluated in FIFO order",
+      "text": "rcp_faultinject_evaluate() shall pick the oldest still-active rule in fi's list (the first one added that has not yet expired), not an arbitrary or most-recent one.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-FI-009",
-      "title": "subscribe() delegates to inner",
-      "text": "The fault-injection controller's subscribe() shall forward to the wrapped inner controller's subscribe().",
+      "title": "add_rule() is safe concurrently with evaluate()",
+      "text": "rcp_faultinject_add_rule() shall be safe to call concurrently with rcp_faultinject_evaluate()/rcp_faultinject_clear_rules() from other threads.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-FI-010",
-      "title": "close() delegates to inner and rejects further sends",
-      "text": "The fault-injection controller's close() shall forward to the wrapped inner controller's close() and mark the controller closed so subsequent send() calls return RCP_ERR_CLOSED.",
+      "title": "destroy() frees every tracked rule",
+      "text": "rcp_faultinject_destroy() shall free fi's rule storage, then fi itself, without leaking.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-AUTH-001",
-      "title": "Permitted identity/zone/type combination succeeds",
-      "text": "send() shall delegate to the inner controller when the caller's identity is permitted the command's zone and type by the access policy.",
+      "title": "Permitted identity/addr/request-type combination succeeds",
+      "text": "rcp_authz_policy_permit() shall return true for an identity, address, and request_type matching an entry added via rcp_authz_policy_allow().",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-AUTH-002",
-      "title": "Denied identity returns RCP_ERR_FORBIDDEN",
-      "text": "send() shall return RCP_ERR_FORBIDDEN without calling the inner controller when the access policy denies the caller's identity.",
+      "title": "Denied identity is not permitted",
+      "text": "rcp_authz_policy_permit() shall return false for an identity with no matching policy entry (default-deny).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-AUTH-003",
-      "title": "Empty zone/type set means all allowed",
-      "text": "A policy entry with an empty zone set or an empty command-type set shall permit all zones or all command types respectively for that identity.",
+      "title": "Empty addrs/request_types set means all allowed",
+      "text": "rcp_authz_policy_allow() with n_addrs == 0 and/or n_request_types == 0 shall be treated as a wildcard over that dimension.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -547,39 +547,39 @@
     {
       "id": "REQ-AUTH-004",
       "title": "AccessPolicy permits concurrently without data races",
-      "text": "rcp_authz_policy_permit() shall be safe to call concurrently with rcp_authz_policy_allow() from multiple threads.",
+      "text": "rcp_authz_policy_permit() shall be safe to call concurrently with other rcp_authz_policy_permit()/rcp_authz_policy_allow() calls.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-AUTH-005",
-      "title": "zone() delegates to inner",
-      "text": "zone() shall return the inner controller's zone.",
+      "title": "A listed address must match both stream_id and byte_bus_id",
+      "text": "rcp_authz_policy_permit() shall return false when addr differs from every address in a matching entry's addrs list, even if only one of stream_id/byte_bus_id differs.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-AUTH-006",
-      "title": "subscribe() delegates to inner",
-      "text": "subscribe() shall delegate to the inner controller unchanged; access policy is only enforced on send().",
+      "title": "A listed request_type must match exactly",
+      "text": "rcp_authz_policy_permit() shall return false when request_type is not present in a matching entry's request_types list (and that list is non-empty).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-AUTH-007",
-      "title": "close() delegates to inner",
-      "text": "close() shall delegate to the inner controller.",
+      "title": "An identity with no matching entry is permitted nothing",
+      "text": "rcp_authz_policy_permit() shall return false for any (addr, request_type) when identity does not match any rcp_authz_policy_allow() entry's identity.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-AUTH-008",
-      "title": "RCP_ERR_FORBIDDEN is a distinct error code",
-      "text": "RCP_ERR_FORBIDDEN shall be a distinct rcp_errc_t value from every other defined error code.",
+      "title": "allow() copies its addrs/request_types arrays by value",
+      "text": "rcp_authz_policy_allow() shall copy the addrs and request_types arrays passed to it; mutating the caller's arrays after the call shall not affect the stored policy entry.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -914,16 +914,16 @@
     },
     {
       "id": "REQ-OBS-001",
-      "title": "Span recorded on successful send",
-      "text": "send() shall record exactly one span per call, carrying the command's zone and command type.",
+      "title": "record() produces a span with every field populated",
+      "text": "rcp_observe_record() shall build an rcp_span_t with the given name, addr, request_type, start_ms, end_ms, and result, and pass it to sink.record_span().",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-OBS-002",
-      "title": "Multiple sends accumulate spans",
-      "text": "InMemorySink shall accumulate one span per send() call across repeated calls, in order.",
+      "title": "Multiple record() calls accumulate spans in order",
+      "text": "Repeated rcp_observe_record() calls against an InMemorySink shall accumulate spans in call order, retrievable via rcp_in_memory_sink_spans().",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -931,15 +931,15 @@
     {
       "id": "REQ-OBS-003",
       "title": "Span duration is non-negative",
-      "text": "A recorded span's end timestamp shall never precede its start timestamp.",
+      "text": "rcp_span_duration_ms() shall never return a value that would be negative if interpreted as signed, since end_ms >= start_ms for every span this module produces.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-OBS-004",
-      "title": "Span captures the send's error code",
-      "text": "A recorded span's result field shall equal the error code returned by the wrapped send() call.",
+      "title": "Span captures the caller-supplied result code",
+      "text": "The result field of the rcp_span_t built by rcp_observe_record() shall equal the result argument passed to it.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -947,95 +947,95 @@
     {
       "id": "REQ-OBS-005",
       "title": "Noop sink does not crash",
-      "text": "The default no-op metrics sink shall accept every record_span/record_gauge/record_counter call without side effects or crashing.",
+      "text": "Every callback in rcp_noop_metrics_sink()'s vtable shall be safe to call with any valid arguments and shall have no observable side effect.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-OBS-006",
-      "title": "InMemorySink is thread-safe under concurrent spans",
-      "text": "InMemorySink shall record every span from concurrent send() calls across multiple threads without data races or lost updates.",
+      "title": "InMemorySink is thread-safe under concurrent recording",
+      "text": "rcp_in_memory_sink_t's record_span callback shall be safe to call concurrently from multiple threads without losing or corrupting entries.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-OBS-007",
-      "title": "commands.total counter increments per send",
-      "text": "Every send() call, successful or not, shall increment the rcp.commands.total counter by 1 for that command's zone.",
+      "title": "rcp.requests.total counter fires once per record() call",
+      "text": "rcp_observe_record() shall call sink.record_counter(\"rcp.requests.total\", ...) exactly once per invocation, regardless of result.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-OBS-008",
-      "title": "commands.errors counter increments on failure",
-      "text": "A send() call that returns a non-RCP_OK error shall additionally increment the rcp.commands.errors counter by 1 for that command's zone.",
+      "title": "rcp.requests.errors counter fires only when result != RCP_OK",
+      "text": "rcp_observe_record() shall call sink.record_counter(\"rcp.requests.errors\", ...) iff result != RCP_OK.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-OBS-009",
-      "title": "zone() delegates to inner",
-      "text": "The observe controller's zone() shall return the wrapped inner controller's zone.",
+      "title": "Span captures the addr it was recorded with",
+      "text": "The addr field of the rcp_span_t built by rcp_observe_record() shall equal the addr argument passed to it.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-OBS-010",
-      "title": "subscribe() delegates to inner",
-      "text": "The observe controller's subscribe() shall forward to the wrapped inner controller's subscribe().",
+      "title": "Span captures the request_type it was recorded with",
+      "text": "The request_type field of the rcp_span_t built by rcp_observe_record() shall equal the request_type argument passed to it.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-OBS-011",
-      "title": "close() delegates to inner",
-      "text": "The observe controller's close() shall forward to the wrapped inner controller's close().",
+      "title": "Span captures the name it was recorded with",
+      "text": "The name field of the rcp_span_t built by rcp_observe_record() shall equal the name argument passed to it.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-ADMIN-001",
-      "title": "zones() returns a snapshot of registered controllers",
-      "text": "zones() shall return one entry (marked registered) for every controller currently registered on the wrapped registry.",
+      "title": "endpoints() returns a snapshot of registered endpoints",
+      "text": "rcp_admin_server_endpoints() shall fill out[] with every endpoint currently registered via rcp_admin_server_register_endpoint(), each marked registered = true.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-ADMIN-002",
-      "title": "subscribe() registers a callback invoked by emit()",
-      "text": "A callback registered via subscribe() shall be invoked for every subsequent emit() call.",
+      "title": "register/deregister report whether membership actually changed",
+      "text": "rcp_admin_server_register_endpoint()/rcp_admin_server_deregister_endpoint() shall return true iff the call actually changed srv's registered-endpoint set, false for a redundant call.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-ADMIN-003",
-      "title": "emit() delivers to all subscribers",
-      "text": "emit() shall invoke every registered subscriber callback, in registration order.",
+      "title": "subscribe() registers a callback invoked by emit()",
+      "text": "rcp_admin_server_subscribe() shall register cb such that a subsequent rcp_admin_server_emit() call invokes it.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-ADMIN-004",
-      "title": "record_counter() accumulates every delta exactly once",
-      "text": "record_counter() shall add delta to the named counter's running total exactly once per call, even under concurrent invocation from multiple threads.",
+      "title": "emit() delivers to all subscribers with the correct event",
+      "text": "rcp_admin_server_emit(srv, ev) shall invoke every subscriber registered via rcp_admin_server_subscribe(), in registration order, each with a copy of ev unchanged (type, addr, ts_ms).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-ADMIN-005",
-      "title": "AdminServer tolerates concurrent mutation without data races",
-      "text": "record_counter() and emit() shall be safe to call concurrently from multiple threads without data races or lost updates.",
+      "title": "record_counter() accumulates every delta exactly once",
+      "text": "Repeated rcp_admin_server_record_counter() calls for the same (name, labels) pair shall sum their delta arguments into a single running total.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -1043,7 +1043,7 @@
     {
       "id": "REQ-ADMIN-006",
       "title": "metrics_text() renders Prometheus-format counter lines",
-      "text": "metrics_text() shall render a '# TYPE <name> counter' line followed by '<name>{<labels>} <value>' for every recorded counter.",
+      "text": "rcp_admin_server_metrics_text() shall render each tracked counter as a \"# TYPE <name> counter\" line followed by a \"<name>{<labels>} <value>\" (or \"<name> <value>\" when labels is empty) line.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -1051,47 +1051,47 @@
     {
       "id": "REQ-ADMIN-007",
       "title": "Distinct name+labels combinations are tracked separately",
-      "text": "record_counter() calls with the same name but different labels shall accumulate into distinct counters.",
+      "text": "rcp_admin_server_record_counter() calls with the same name but different labels (or vice versa) shall be tracked as independent running totals.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-ADMIN-008",
-      "title": "emit() delivers the correct event type and zone",
-      "text": "A subscriber callback shall observe the same event type and zone that were passed to emit().",
+      "title": "AdminServer tolerates concurrent mutation without data races",
+      "text": "rcp_admin_server_register_endpoint()/_deregister_endpoint()/record_counter() shall be safe to call concurrently from multiple threads.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-REC-001",
-      "title": "Recording controller captures entries",
-      "text": "Every send() through a recording controller shall append exactly one entry to its Record, capturing the command's type and the send's result.",
+      "title": "capture() appends an entry",
+      "text": "rcp_recorder_capture() shall append one rcp_recorder_entry_t to r, increasing rcp_recorder_size(r) by 1, on success.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-REC-002",
-      "title": "Multiple sends produce sequential entries",
-      "text": "N successive send() calls through a recording controller shall append N entries to its Record, in order.",
+      "title": "Multiple captures produce sequential entries in order",
+      "text": "Successive rcp_recorder_capture() calls shall produce entries retrievable via rcp_recorder_entries() in the same order they were captured.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-REC-003",
-      "title": "write_binary creates a non-empty file",
-      "text": "rcp_record_write_binary() shall write a non-empty file for a Record containing at least one entry.",
+      "title": "write_binary() creates a non-empty file",
+      "text": "rcp_recorder_write_binary() shall, on RCP_OK, have written a file at path whose size is greater than zero for a non-empty recorder.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-REC-004",
-      "title": "Playback replays entries against a target controller",
-      "text": "rcp_playback_run_all() shall send() every recorded entry's command to the target controller.",
+      "title": "Playback invokes deliver() for every entry, in order",
+      "text": "rcp_playback_run_all() shall call deliver exactly once per entry in rec, in the same order the entries were captured.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -1099,55 +1099,55 @@
     {
       "id": "REQ-REC-005",
       "title": "speed_factor of 0 disables inter-entry delays",
-      "text": "A rcp_playback_config_t with speed_factor == 0.0 shall replay every entry back-to-back without pausing for the recorded inter-entry timing.",
+      "text": "rcp_playback_run_all() shall not sleep between deliveries when cfg.speed_factor <= 0.0, regardless of the entries' recorded timestamp gaps.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-REC-006",
-      "title": "Entry timestamps are monotonically non-decreasing",
-      "text": "Consecutive entries appended to the same Record shall have timestamp_ms values that never decrease.",
+      "title": "capture() copies the frame bytes by value",
+      "text": "rcp_recorder_capture() shall copy frame[0..frame_len) into storage it owns; mutating the caller's buffer after the call shall not affect the stored entry.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-REC-007",
-      "title": "Forwards inner send result unchanged",
-      "text": "A recording controller's send() shall return the inner controller's result verbatim, and capture that same result in the appended entry.",
+      "title": "capture() records addr and inbound correctly",
+      "text": "The addr and inbound fields of the entry appended by rcp_recorder_capture() shall equal the addr and inbound arguments passed to it.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-REC-008",
-      "title": "Record tolerates concurrent appends",
-      "text": "rcp_record's append path shall be safe to call concurrently from multiple threads without data races or lost entries.",
+      "title": "Record tolerates concurrent captures",
+      "text": "rcp_recorder_capture() shall be safe to call concurrently from multiple threads without losing or corrupting entries.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-REC-009",
-      "title": "zone() delegates to inner",
-      "text": "The record controller's zone() shall return the wrapped inner controller's zone.",
+      "title": "entries() honors the cap parameter while reporting the true total",
+      "text": "rcp_recorder_entries(r, out, cap) shall write at most cap entries into out but shall always return r's true total entry count.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-REC-010",
-      "title": "subscribe() delegates to inner",
-      "text": "The record controller's subscribe() shall forward to the wrapped inner controller's subscribe().",
+      "title": "write_binary() returns RCP_ERR_BUSY when the path cannot be opened",
+      "text": "rcp_recorder_write_binary() shall return RCP_ERR_BUSY, without crashing, when path cannot be opened for writing.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-REC-011",
-      "title": "close() delegates to inner",
-      "text": "The record controller's close() shall forward to the wrapped inner controller's close().",
+      "title": "destroy() frees every captured entry",
+      "text": "rcp_recorder_destroy() shall free every entry's frame buffer and the entries array itself, then r, without leaking.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -1538,64 +1538,64 @@
     },
     {
       "id": "REQ-LOAN-001",
-      "title": "loan() returns zeroed buffer",
-      "text": "rcp_loan_controller_t::loan(n) shall return a zeroed byte vector of exactly n bytes.",
+      "title": "acquire() returns a zeroed buffer of the requested size",
+      "text": "rcp_loan_pool_acquire(pool, size) shall return a loan whose payload.len == size and whose payload.data bytes are all zero.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-LOAN-002",
-      "title": "loan() returns RCP_ERR_CLOSED when closed",
-      "text": "loan() shall return RCP_ERR_CLOSED if the controller has been closed.",
+      "title": "acquire() reuses a same-or-larger pooled buffer before allocating fresh",
+      "text": "rcp_loan_pool_acquire() shall pop and reuse a free-list entry whose capacity is >= the requested size, when one is available, before calling calloc().",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-LOAN-003",
-      "title": "loan() returns error for negative size",
-      "text": "loan() shall return an error if size < 0.",
+      "title": "acquire() with size 0 returns a valid, empty loan",
+      "text": "rcp_loan_pool_acquire(pool, 0) shall return a non-NULL loan with payload.len == 0.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-LOAN-004",
-      "title": "send_loaned() delegates to inner",
-      "text": "send_loaned() shall delegate command delivery to the inner controller.",
+      "title": "rcp_loan_return() releases the buffer without freeing the loan",
+      "text": "rcp_loan_return() shall return the loan's buffer to its pool's free list and clear release_fn, without freeing the rcp_loan_t itself.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-LOAN-005",
-      "title": "Loan RAII releases buffer to pool",
-      "text": "When a Loan is destroyed without being sent, its destructor shall return the buffer to the pool.",
+      "title": "rcp_loan_release() returns the buffer and frees the loan",
+      "text": "rcp_loan_release() shall call rcp_loan_return() and then free the rcp_loan_t.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-LOAN-006",
-      "title": "zone() delegates to inner",
-      "text": "zone() shall return the inner controller's zone.",
+      "title": "rcp_loan_return() is idempotent",
+      "text": "Calling rcp_loan_return() more than once on the same loan shall be safe and shall not double-free the underlying buffer.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-LOAN-007",
-      "title": "send() delegates to inner",
-      "text": "The loan controller's send() shall forward to the wrapped inner controller's send().",
+      "title": "A returned buffer is available to a later acquire() of the same or smaller size",
+      "text": "A buffer released via rcp_loan_return()/rcp_loan_release() shall be eligible for reuse by a subsequent rcp_loan_pool_acquire() call requesting a size <= its capacity.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-LOAN-008",
-      "title": "subscribe() delegates to inner",
-      "text": "The loan controller's subscribe() shall forward to the wrapped inner controller's subscribe().",
+      "title": "pool_destroy() frees every pooled buffer",
+      "text": "rcp_loan_pool_destroy() shall free every buffer currently in pool's free list, then pool itself, without leaking.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -1962,8 +1962,8 @@
     },
     {
       "id": "REQ-RL-001",
-      "title": "Token bucket with configurable rate and burst",
-      "text": "rcp_ratelimit_controller_t shall implement a token bucket with configurable rate (tokens/s) and burst capacity.",
+      "title": "Token bucket with configurable rate and burst, per endpoint",
+      "text": "rcp_ratelimit_limiter_t shall maintain an independent token bucket per registered (stream_id, byte_bus_id) endpoint address, refilling at cfg.rate tokens/second up to cfg.burst.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -1971,63 +1971,63 @@
     {
       "id": "REQ-RL-002",
       "title": "Tokens refilled based on elapsed time",
-      "text": "The token bucket shall refill tokens proportionally to elapsed wall-clock time since the last take().",
+      "text": "rcp_ratelimit_limiter_allow() shall refill an endpoint's bucket by (elapsed_seconds * cfg.rate) tokens, capped at cfg.burst, before evaluating admission.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-RL-003",
-      "title": "RCP_ERR_BUSY when bucket exhausted",
-      "text": "send() shall return RCP_ERR_BUSY immediately, without calling inner send(), when fewer than 1 token remains.",
+      "title": "allow() returns false when the bucket is exhausted",
+      "text": "rcp_ratelimit_limiter_allow() shall return false, consuming no token, when an endpoint's bucket holds fewer than 1.0 tokens and the request is not safety-exempt.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-RL-004",
-      "title": "Critical commands exempt when configured",
-      "text": "When Config::exempt_critical is true, RCP_PRIORITY_CRITICAL commands shall bypass the token bucket.",
+      "title": "Safety-tagged requests exempt when configured",
+      "text": "rcp_ratelimit_limiter_allow() shall return true without consuming a token when request_type is safety-tagged (rcp_e2e_is_safety_request()) and cfg.exempt_safety is true.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-RL-005",
-      "title": "Non-critical commands not exempt",
-      "text": "RCP_PRIORITY_NORMAL and RCP_PRIORITY_HIGH commands shall always be subject to the token bucket.",
+      "title": "Safety-tagged requests are not exempt when not configured",
+      "text": "rcp_ratelimit_limiter_allow() shall apply normal bucket admission to a safety-tagged request_type when cfg.exempt_safety is false.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-RL-006",
-      "title": "rcp_zone_t mismatch rejected",
-      "text": "send() shall return RCP_ERR_ZONE_MISMATCH if cmd.zone differs from the inner controller's zone.",
+      "title": "Each endpoint address has an independent bucket",
+      "text": "Exhausting one (stream_id, byte_bus_id) address's bucket shall not affect the admission outcome for a different address, even one sharing the same stream_id.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-RL-007",
-      "title": "Close stops sends",
-      "text": "close() shall cause subsequent send() calls to return RCP_ERR_CLOSED.",
+      "title": "First use of an address lazily seeds a full bucket",
+      "text": "rcp_ratelimit_limiter_allow() shall, on the first call naming a given addr, create that endpoint's bucket seeded with cfg.burst tokens before evaluating admission.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-RL-008",
-      "title": "send() after close returns RCP_ERR_CLOSED",
-      "text": "Any send() call after close() shall return RCP_ERR_CLOSED.",
+      "title": "allow() consumes exactly one token per admitted, non-exempt call",
+      "text": "A successful, non-safety-exempt rcp_ratelimit_limiter_allow() call shall decrement the endpoint's bucket by exactly 1.0 tokens.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-RL-009",
-      "title": "subscribe() delegates to inner",
-      "text": "The rate-limit controller's subscribe() shall forward to the wrapped inner controller's subscribe().",
+      "title": "destroy() frees every tracked bucket",
+      "text": "rcp_ratelimit_limiter_destroy() shall free every per-endpoint bucket rl tracks, then rl itself, without leaking.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -2738,8 +2738,8 @@
     },
     {
       "id": "REQ-OBS-012",
-      "title": "Gauge sink implementations accept a metric without side effects beyond recording",
-      "text": "Both the noop and in-memory metrics sink implementations shall accept a record_gauge() call for any rcp_metric_t without crashing.",
+      "title": "Gauge/counter sink implementations accept a metric without side effects beyond recording",
+      "text": "A conforming rcp_metrics_sink_vtable_t::record_gauge/record_counter implementation shall have no observable side effect beyond whatever bookkeeping it documents (e.g. InMemorySink's are no-ops).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM"
@@ -2795,7 +2795,7 @@
     {
       "id": "REQ-OBS-013",
       "title": "Span duration is computed as end minus start",
-      "text": "rcp_span_duration_ms() shall return the difference between a span's end_ms and start_ms timestamps.",
+      "text": "rcp_span_duration_ms() shall return span->end_ms - span->start_ms.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM"

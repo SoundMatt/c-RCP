@@ -9,8 +9,6 @@
 #include "unity.h"
 
 #include <rcp/authz.h>
-#include "legacy_mock.h"
-#include <rcp/rcp.h>
 
 #if defined(_WIN32)
 #include <windows.h>
@@ -39,208 +37,119 @@ static void test_thread_join(test_thread_t t) { pthread_join(t, NULL); }
 void setUp(void) {}
 void tearDown(void) {}
 
-static rcp_controller_t *make_ctrl(rcp_zone_t z)
+static rcp_avtp_addr_t make_addr(uint16_t unique_id, uint8_t byte_bus_id)
 {
-    return rcp_mock_controller_new(z, NULL, NULL);
+    uint8_t mac[6] = {0x00, 0x11, 0x22, 0x33, 0x44, 0x55};
+    rcp_avtp_addr_t a;
+    a.stream_id   = rcp_stream_id_make(mac, unique_id);
+    a.byte_bus_id = byte_bus_id;
+    return a;
 }
 
 /* ── Basic permit/deny ────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-AUTH-001
 static void test_permitted_identity_succeeds(void)
 {
     rcp_authz_policy_t *policy = rcp_authz_policy_new();
-    rcp_zone_t zones[] = {RCP_ZONE_FRONT_LEFT};
-    rcp_command_type_t types[] = {RCP_CMD_SET};
-    rcp_controller_t *inner = make_ctrl(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl;
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
+    rcp_avtp_addr_t addrs[] = {make_addr(1, 3)};
+    uint8_t types[] = {0x00};
 
-    TEST_ASSERT_TRUE(rcp_authz_policy_allow(policy, "alice", zones, 1, types, 1));
-    ctrl = rcp_authz_controller_new(inner, policy, NULL, NULL);
-    rcp_authz_controller_set_identity(ctrl, "alice");
+    TEST_ASSERT_TRUE(rcp_authz_policy_allow(policy, "alice", addrs, 1, types, 1));
+    TEST_ASSERT_TRUE(rcp_authz_policy_permit(policy, "alice", make_addr(1, 3), 0x00));
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    cmd.type = RCP_CMD_SET;
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(ctrl, &ctx, &cmd, &resp));
-
-    rcp_response_free(&resp);
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
     rcp_authz_policy_release(policy);
 }
 
-static void test_denied_identity_returns_forbidden(void)
+//cfusa:test REQ-AUTH-002
+//cfusa:test REQ-AUTH-007
+static void test_denied_identity_is_not_permitted(void)
 {
     rcp_authz_policy_t *policy = rcp_authz_policy_new();
-    rcp_zone_t zones[] = {RCP_ZONE_FRONT_LEFT};
-    rcp_command_type_t types[] = {RCP_CMD_SET};
-    rcp_controller_t *inner = make_ctrl(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl;
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
+    rcp_avtp_addr_t addrs[] = {make_addr(1, 3)};
 
-    TEST_ASSERT_TRUE(rcp_authz_policy_allow(policy, "alice", zones, 1, types, 1));
-    ctrl = rcp_authz_controller_new(inner, policy, NULL, NULL);
-    rcp_authz_controller_set_identity(ctrl, "eve");
+    TEST_ASSERT_TRUE(rcp_authz_policy_allow(policy, "alice", addrs, 1, NULL, 0));
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    cmd.type = RCP_CMD_SET;
-    TEST_ASSERT_EQUAL(RCP_ERR_FORBIDDEN, rcp_controller_send(ctrl, &ctx, &cmd, &resp));
+    /* "eve" never appears in any policy entry: default-deny. */
+    TEST_ASSERT_FALSE(rcp_authz_policy_permit(policy, "eve", make_addr(1, 3), 0x00));
 
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
     rcp_authz_policy_release(policy);
 }
 
 /* ── Wildcards ────────────────────────────────────────────────────────────── */
 
-static void test_empty_zones_types_means_all_allowed(void)
+//cfusa:test REQ-AUTH-003
+static void test_empty_addrs_and_types_means_all_allowed(void)
 {
     rcp_authz_policy_t *policy = rcp_authz_policy_new();
-    rcp_controller_t *inner = make_ctrl(RCP_ZONE_CENTRAL);
-    rcp_controller_t *ctrl;
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
 
     TEST_ASSERT_TRUE(rcp_authz_policy_allow(policy, "admin", NULL, 0, NULL, 0));
-    ctrl = rcp_authz_controller_new(inner, policy, NULL, NULL);
-    rcp_authz_controller_set_identity(ctrl, "admin");
 
-    cmd.zone = RCP_ZONE_CENTRAL;
-    cmd.type = RCP_CMD_RESET;
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(ctrl, &ctx, &cmd, &resp));
+    TEST_ASSERT_TRUE(rcp_authz_policy_permit(policy, "admin", make_addr(99, 7), 0x0F));
+    TEST_ASSERT_TRUE(rcp_authz_policy_permit(policy, "admin", make_addr(1, 0), 0x00));
 
-    rcp_response_free(&resp);
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
     rcp_authz_policy_release(policy);
 }
 
-static void test_wrong_zone_is_forbidden(void)
+//cfusa:test REQ-AUTH-005
+static void test_wrong_address_is_forbidden(void)
 {
     rcp_authz_policy_t *policy = rcp_authz_policy_new();
-    rcp_zone_t zones[] = {RCP_ZONE_FRONT_LEFT};
-    rcp_controller_t *inner = make_ctrl(RCP_ZONE_REAR_RIGHT);
-    rcp_controller_t *ctrl;
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
+    rcp_avtp_addr_t addrs[] = {make_addr(1, 3)};
 
-    TEST_ASSERT_TRUE(rcp_authz_policy_allow(policy, "alice", zones, 1, NULL, 0));
-    ctrl = rcp_authz_controller_new(inner, policy, NULL, NULL);
-    rcp_authz_controller_set_identity(ctrl, "alice");
+    TEST_ASSERT_TRUE(rcp_authz_policy_allow(policy, "alice", addrs, 1, NULL, 0));
 
-    cmd.zone = RCP_ZONE_REAR_RIGHT;
-    cmd.type = RCP_CMD_SET;
-    TEST_ASSERT_EQUAL(RCP_ERR_FORBIDDEN, rcp_controller_send(ctrl, &ctx, &cmd, &resp));
+    /* Same stream_id, different byte_bus_id -- not a match. */
+    TEST_ASSERT_FALSE(rcp_authz_policy_permit(policy, "alice", make_addr(1, 4), 0x00));
+    /* Different stream_id, same byte_bus_id -- not a match either. */
+    TEST_ASSERT_FALSE(rcp_authz_policy_permit(policy, "alice", make_addr(2, 3), 0x00));
 
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
     rcp_authz_policy_release(policy);
 }
 
-/* ── identity_fn override ─────────────────────────────────────────────────── */
-
-static const char *dynamic_identity_fn(void *user_data)
-{
-    (void)user_data;
-    return "dynamic";
-}
-
-static void test_identity_fn_takes_priority_over_fixed_identity(void)
+//cfusa:test REQ-AUTH-006
+static void test_wrong_request_type_is_forbidden(void)
 {
     rcp_authz_policy_t *policy = rcp_authz_policy_new();
-    rcp_controller_t *inner = make_ctrl(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl;
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
+    uint8_t types[] = {0x0F}; /* compound, per request_compound.h */
 
-    TEST_ASSERT_TRUE(rcp_authz_policy_allow(policy, "dynamic", NULL, 0, NULL, 0));
-    ctrl = rcp_authz_controller_new(inner, policy, dynamic_identity_fn, NULL);
-    rcp_authz_controller_set_identity(ctrl, "wrong");
+    TEST_ASSERT_TRUE(rcp_authz_policy_allow(policy, "alice", NULL, 0, types, 1));
 
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    cmd.type = RCP_CMD_GET;
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(ctrl, &ctx, &cmd, &resp));
+    TEST_ASSERT_TRUE(rcp_authz_policy_permit(policy, "alice", make_addr(1, 3), 0x0F));
+    TEST_ASSERT_FALSE(rcp_authz_policy_permit(policy, "alice", make_addr(1, 3), 0x00));
 
-    rcp_response_free(&resp);
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
     rcp_authz_policy_release(policy);
 }
 
-/* ── Passthrough ──────────────────────────────────────────────────────────── */
+/* ── allow() copies its arrays by value ──────────────────────────────────── */
 
-static void test_zone_delegates_to_inner(void)
+//cfusa:test REQ-AUTH-008
+static void test_allow_copies_addrs_and_types_by_value(void)
 {
     rcp_authz_policy_t *policy = rcp_authz_policy_new();
-    rcp_controller_t *inner = make_ctrl(RCP_ZONE_REAR_LEFT);
-    rcp_controller_t *ctrl = rcp_authz_controller_new(inner, policy, NULL, NULL);
+    rcp_avtp_addr_t addrs[1];
+    uint8_t types[1];
 
-    TEST_ASSERT_EQUAL(RCP_ZONE_REAR_LEFT, rcp_controller_zone(ctrl));
+    addrs[0] = make_addr(5, 1);
+    types[0] = 0x01;
+    TEST_ASSERT_TRUE(rcp_authz_policy_allow(policy, "alice", addrs, 1, types, 1));
 
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
+    /* Mutating the caller's own arrays after allow() must not affect the
+     * policy's stored entry -- it copied them by value, not by reference. */
+    addrs[0] = make_addr(6, 2);
+    types[0] = 0x02;
+
+    TEST_ASSERT_TRUE(rcp_authz_policy_permit(policy, "alice", make_addr(5, 1), 0x01));
+    TEST_ASSERT_FALSE(rcp_authz_policy_permit(policy, "alice", make_addr(6, 2), 0x02));
+
     rcp_authz_policy_release(policy);
-}
-
-static void test_subscribe_delegates_to_inner(void)
-{
-    rcp_authz_policy_t *policy = rcp_authz_policy_new();
-    rcp_controller_t *inner = make_ctrl(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl = rcp_authz_controller_new(inner, policy, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_status_channel_t *ch = NULL;
-
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
-    TEST_ASSERT_NOT_NULL(ch);
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_close(ctrl));
-
-    rcp_status_channel_release(ch);
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
-    rcp_authz_policy_release(policy);
-}
-
-static void test_close_delegates_to_inner(void)
-{
-    rcp_authz_policy_t *policy = rcp_authz_policy_new();
-    rcp_controller_t *inner = make_ctrl(RCP_ZONE_FRONT_LEFT);
-    rcp_controller_t *ctrl = rcp_authz_controller_new(inner, policy, NULL, NULL);
-    rcp_context_t ctx = rcp_context_background();
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
-
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_close(ctrl));
-
-    /* After the inner controller is closed, sends through it report RCP_ERR_CLOSED. */
-    cmd.zone = RCP_ZONE_FRONT_LEFT;
-    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_controller_send(inner, &ctx, &cmd, &resp));
-
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
-    rcp_authz_policy_release(policy);
-}
-
-/* ── Distinct error code ──────────────────────────────────────────────────── */
-
-static void test_forbidden_is_a_distinct_error_code(void)
-{
-    TEST_ASSERT_NOT_EQUAL(RCP_OK, RCP_ERR_FORBIDDEN);
-    TEST_ASSERT_NOT_EQUAL(RCP_ERR_CLOSED, RCP_ERR_FORBIDDEN);
-    TEST_ASSERT_NOT_EQUAL(RCP_ERR_BUSY, RCP_ERR_FORBIDDEN);
 }
 
 /* ── Concurrency ──────────────────────────────────────────────────────────── */
 
 typedef struct {
     rcp_authz_policy_t *policy;
-    int                   permits; /* only written by this thread, read after join */
+    int                  permits; /* only written by this thread, read after join */
 } permit_worker_args_t;
 
 #if defined(_WIN32)
@@ -250,15 +159,15 @@ static void *permit_worker(void *arg)
 #endif
 {
     permit_worker_args_t *a = (permit_worker_args_t *)arg;
-    rcp_zone_t central[] = {RCP_ZONE_CENTRAL};
+    rcp_avtp_addr_t tmp[] = {make_addr(42, 9)};
     int i;
 
     for (i = 0; i < 5000; i++) {
-        if (rcp_authz_policy_permit(a->policy, "alice", RCP_ZONE_FRONT_LEFT, RCP_CMD_SET)) {
+        if (rcp_authz_policy_permit(a->policy, "alice", make_addr(1, 3), 0x00)) {
             a->permits++;
         }
         if ((i & 0x3ff) == 0) {
-            (void)rcp_authz_policy_allow(a->policy, "tmp", central, 1, NULL, 0);
+            (void)rcp_authz_policy_allow(a->policy, "tmp", tmp, 1, NULL, 0);
         }
     }
 #if defined(_WIN32)
@@ -268,17 +177,17 @@ static void *permit_worker(void *arg)
 #endif
 }
 
+//cfusa:test REQ-AUTH-004
 static void test_policy_permits_concurrently_without_data_races(void)
 {
     rcp_authz_policy_t *policy = rcp_authz_policy_new();
-    rcp_zone_t zones[] = {RCP_ZONE_FRONT_LEFT};
-    rcp_command_type_t types[] = {RCP_CMD_SET};
+    rcp_avtp_addr_t addrs[] = {make_addr(1, 3)};
     permit_worker_args_t args[8];
     test_thread_t threads[8];
     int total = 0;
     int i;
 
-    TEST_ASSERT_TRUE(rcp_authz_policy_allow(policy, "alice", zones, 1, types, 1));
+    TEST_ASSERT_TRUE(rcp_authz_policy_allow(policy, "alice", addrs, 1, NULL, 0));
 
     for (i = 0; i < 8; i++) {
         args[i].policy  = policy;
@@ -298,14 +207,11 @@ int main(void)
     UNITY_BEGIN();
 
     RUN_TEST(test_permitted_identity_succeeds);
-    RUN_TEST(test_denied_identity_returns_forbidden);
-    RUN_TEST(test_empty_zones_types_means_all_allowed);
-    RUN_TEST(test_wrong_zone_is_forbidden);
-    RUN_TEST(test_identity_fn_takes_priority_over_fixed_identity);
-    RUN_TEST(test_zone_delegates_to_inner);
-    RUN_TEST(test_subscribe_delegates_to_inner);
-    RUN_TEST(test_close_delegates_to_inner);
-    RUN_TEST(test_forbidden_is_a_distinct_error_code);
+    RUN_TEST(test_denied_identity_is_not_permitted);
+    RUN_TEST(test_empty_addrs_and_types_means_all_allowed);
+    RUN_TEST(test_wrong_address_is_forbidden);
+    RUN_TEST(test_wrong_request_type_is_forbidden);
+    RUN_TEST(test_allow_copies_addrs_and_types_by_value);
     RUN_TEST(test_policy_permits_concurrently_without_data_races);
 
     return UNITY_END();

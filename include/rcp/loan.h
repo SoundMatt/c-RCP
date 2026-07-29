@@ -1,55 +1,69 @@
 /*
- * LoaningController extension — wraps any rcp_controller_t with zero-copy*
- * payload loaning via a pool of pre-allocated buffers.
+ * loan.h -- Zero-copy* pooled payload buffers for the TC18 Remote Control
+ * Protocol wire layer (ROADMAP.md Phase 21, "Satellite Package Rework",
+ * milestone 80, "Generic decorators, batch 1").
  *
- * rcp_controller_loan() (declared in rcp.h; a no-op returning
- * RCP_ERR_NOT_SUPPORTED unless the controller was created by
- * rcp_loan_controller_new()) obtains a zeroed buffer from the pool.
- * rcp_controller_send_loaned() forwards to the inner controller's send()
- * — like cpp-RCP's own send_loaned(), it does not itself do anything
- * special with the loan; ownership/zero-copy discipline for the payload is
- * on the caller.
+ * ADAPT-class rebind, not a from-scratch REPLACE: a free-list pool of
+ * pre-allocated payload buffers is, if anything, *more* valuable under
+ * TC18 than it was before -- several endpoint types now have large,
+ * fixed-shape payloads worth avoiding a fresh heap allocation for on every
+ * request (CAN XL up to RCP_EP_CAN_XL_MAX_ENCODED_LEN octets, ep_can.h;
+ * UART RX FIFO drains, ep_uart.h; SPI transfers, ep_spi.h). What changes
+ * is only the wrapping shape: the old rcp_loan_controller_new() decorated
+ * a whole rcp_controller_t with loan()/send_loaned() vtable slots that no
+ * longer exist (ROADMAP.md's Protocol Replacement Notice retires
+ * rcp_controller_t's vtable along with rcp_zone_t/rcp_command_t). There is
+ * no longer a single generic send() choke point to attach a loan/
+ * send_loaned pair to, so this module drops the controller wrapper
+ * entirely and becomes a standalone pool type: rcp_loan_pool_acquire()
+ * replaces rcp_controller_loan(), and there is no send_loaned()
+ * counterpart at all any more -- a caller obtains a buffer, fills it with
+ * whichever ep_*.h encoder produces, and drives that endpoint's own
+ * request-sending path directly, exactly as milestone 79's watchdog.c/
+ * deadline.c/powerstate.c already do for their own caller-driven APIs.
  *
- * *"Zero-copy" describes the buffer hand-off from loan() through to
- * whatever the caller does with it before calling send_loaned() — this
- * module itself does not copy the loaned bytes. Ported from cpp-RCP's
- * loan.hpp, with one deliberate improvement: cpp-RCP's own pool is
- * write-only (returned buffers accumulate in a vector that loan() never
- * reads back from, so it never actually reuses anything — an unbounded
- * accumulation for a long-lived controller). This port's pool is a real
- * free-list: loan() pops a same-or-larger buffer if one is available
- * before allocating fresh.
+ * *"Zero-copy" describes the buffer hand-off from acquire() through to
+ * whatever the caller does with it before releasing it -- this module
+ * itself does not copy the loaned bytes. The pool is a real free-list
+ * (matching this module's own prior improvement over cpp-RCP's loan.hpp,
+ * whose write-only pool never actually reused anything): acquire() pops a
+ * same-or-larger buffer if one is available before allocating fresh.
+ *
+ * All type, field, and constant names in this header are this
+ * implementation's own original engineering design unless a comment says
+ * otherwise. This module implements original behavior *described by* the
+ * confidential OPEN Alliance TC18 Remote Control Protocol Specification
+ * v0.5.1_RC (referenced here by name only, per this project's standing
+ * policy) -- no spec prose, bit layout, or numeric constant is reproduced.
  */
 #ifndef RCP_LOAN_H
 #define RCP_LOAN_H
 
 #include "rcp/rcp.h"
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* A payload buffer borrowed from a loaning controller's pool (see
- * rcp_loan_controller_new()). The caller must eventually call
- * rcp_loan_release() exactly once — whether or not the buffer was also
- * passed to rcp_controller_send_loaned() first (send_loaned() does not
- * consume the rcp_loan_t itself, mirroring cpp-RCP's LoaningController,
- * whose send_loaned() takes a plain Command, not the Loan). Call
- * rcp_loan_return() to release the buffer back to the pool early without
- * sending; rcp_loan_release() is safe to call afterward too (a no-op).
+/* A payload buffer borrowed from a loan pool (see
+ * rcp_loan_pool_acquire()). The caller must eventually call
+ * rcp_loan_release() exactly once. Call rcp_loan_return() to release the
+ * buffer back to the pool early without freeing the rcp_loan_t itself;
+ * rcp_loan_release() is safe to call afterward too (a no-op on the
+ * buffer, still frees the rcp_loan_t).
  *
- * Lifetime note (same assumption cpp-RCP's own Loan makes via its raw
- * `this`-capturing release lambda): a loan must not outlive the loaning
- * controller that issued it. */
+ * Lifetime note: a loan must not outlive the pool that issued it. */
 struct rcp_loan {
     rcp_bytes_t payload;
     void (*release_fn)(void *release_ctx);
     void *release_ctx;
 };
 
-/* Releases the loan's buffer back to its pool without sending. Safe to
- * call more than once (a no-op after the first call). Does not free the
- * rcp_loan_t itself — see rcp_loan_release(). */
+/* Releases the loan's buffer back to its pool without freeing the
+ * rcp_loan_t. Safe to call more than once (a no-op after the first
+ * call). */
 void rcp_loan_return(rcp_loan_t *loan);
 
 /* RAII-destructor equivalent: returns the buffer to the pool (same effect
@@ -57,13 +71,23 @@ void rcp_loan_return(rcp_loan_t *loan);
  * Call exactly once. */
 void rcp_loan_release(rcp_loan_t *loan);
 
-/* Extends inner with loan()/send_loaned() (via rcp_controller_loan() /
- * rcp_controller_send_loaned() in rcp.h) using a pool of pre-allocated
- * buffers. Takes its own reference to inner (retains it) — release your
- * own reference to inner separately if you still need it. Returned with
- * refcount 1; release with rcp_controller_release(), which also releases
- * this wrapper's reference to inner. */
-rcp_controller_t *rcp_loan_controller_new(rcp_controller_t *inner);
+typedef struct rcp_loan_pool rcp_loan_pool_t;
+
+/* Creates an empty pool. Returns NULL on allocation failure. */
+rcp_loan_pool_t *rcp_loan_pool_new(void);
+
+/* Obtains a zeroed buffer of at least `size` octets from pool: reuses a
+ * pooled buffer whose own capacity is >= size if one is available,
+ * otherwise allocates fresh. Returns NULL on allocation failure. Release
+ * the result with rcp_loan_return()/rcp_loan_release() exactly once. */
+rcp_loan_t *rcp_loan_pool_acquire(rcp_loan_pool_t *pool, size_t size);
+
+/* Frees every buffer currently held in pool's free list (whether never
+ * loaned or returned via rcp_loan_return()/rcp_loan_release()), then
+ * pool itself. Any rcp_loan_t not yet returned at the time of this call
+ * must not be used afterward (see the lifetime note above). Call exactly
+ * once. */
+void rcp_loan_pool_destroy(rcp_loan_pool_t *pool);
 
 #ifdef __cplusplus
 }
