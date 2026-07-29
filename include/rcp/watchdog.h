@@ -1,25 +1,56 @@
 /*
- * Watchdog keeper for ASIL-B zone controller liveness (SG-001, SG-003, SG-007).
+ * Per-stream watchdog kicker for the TC18 Remote Control Protocol
+ * (SG-001, SG-003, SG-007) -- ROADMAP.md Phase 21, "Satellite Package
+ * Rework", milestone 79.
  *
- * A Keeper periodically sends RCP_CMD_WATCHDOG to each registered zone
- * controller. Consecutive failures transition a zone through the health
- * state machine: Healthy -> Degraded -> Faulted; a subsequent success
- * transitions it directly back to Healthy.
+ * This is this module's own full REPLACE of its pre-TC18 content: the old
+ * rcp_watchdog_keeper_t sent a dedicated RCP_CMD_WATCHDOG command to each
+ * registered zone controller and drove its own Healthy/Degraded/Faulted
+ * health state machine from consecutive send failures. Neither
+ * RCP_CMD_WATCHDOG nor rcp_zone_t/rcp_controller_t survive in the TC18
+ * model this codebase now targets (ROADMAP.md's Protocol Replacement
+ * Notice) -- there is no dedicated watchdog side channel at all. Instead,
+ * regmap.h's per-request-stream rx_wd_enable/rx_wd_timeout_ms/
+ * rx_wd_safestate_enable/rx_wd_info_enable register family (Phase 18) is
+ * the watchdog, and e2e.h's rcp_e2e_wd_evaluate() is the single pure
+ * function that already ties that family together into an overflow
+ * verdict given an elapsed-since-last-kick duration.
  *
- * Deviation from cpp-RCP's watchdog.hpp: cpp-RCP dispatches each zone's kick
- * on its own detached thread every interval, and its destructor only joins
- * the run thread — spawned kick threads are never waited on, so a kick still
- * in flight when the Keeper is destroyed captures a dangling `this`. This
- * port kicks zones sequentially within the single run thread instead (each
- * kick is already bounded by its own rcp_context_t timeout), which fully
- * avoids that lifetime hazard at the cost of only kicking zones one at a
- * time per cycle rather than in parallel — acceptable given the small,
- * fixed zone count and short per-kick timeouts this protocol targets.
+ * rcp_watchdog_keeper_t's job shrinks accordingly: it is a thin client
+ * convenience that (a) remembers, per registered stream, when it was last
+ * kicked and that stream's own rx_wd_* configuration, and (b) periodically
+ * re-runs rcp_e2e_wd_evaluate() against the elapsed time since that kick,
+ * firing an event whenever the result changes. "Kicking" a stream here
+ * means recording that a safety-request sequence for that stream just
+ * completed (per this milestone's own roadmap scope: "not an independent
+ * RCP_CMD_WATCHDOG side channel") -- a caller drives
+ * rcp_watchdog_keeper_kick() itself, typically right after a safety-tagged
+ * request/response round trip for that stream succeeds; this module sends
+ * no wire traffic of its own and owns no transport, mirroring e2e.h's own
+ * "operate on caller-owned data" layering (see e2e.h's file header, which
+ * explicitly names this module -- under its pre-replacement shape -- as a
+ * distinct concept from rcp_e2e_wd_evaluate() itself: a client-side
+ * liveness *kicker*, not the pure per-request-stream evaluator).
+ *
+ * This module's own Healthy/Degraded/Faulted enum is dropped along with
+ * RCP_CMD_WATCHDOG: e2e.h's rcp_e2e_wd_result_t (overflowed/
+ * enter_safe_state/notify) is already the TC18-shaped verdict a stream's
+ * rx_wd_* configuration produces, and inventing a parallel severity
+ * ladder on top of it here would only duplicate what rx_wd_safestate_enable
+ * and rx_wd_info_enable already independently express. This module
+ * therefore reports that verdict directly, not a re-derived label.
+ *
+ * All type, field, and constant names in this header are this
+ * implementation's own original engineering design unless a comment says
+ * otherwise. This module implements original behavior *described by* the
+ * confidential OPEN Alliance TC18 Remote Control Protocol Specification
+ * v0.5.1_RC (referenced here by name only, per this project's standing
+ * policy) -- no spec prose, bit layout, or numeric constant is reproduced.
  */
 #ifndef RCP_WATCHDOG_H
 #define RCP_WATCHDOG_H
 
-#include "rcp/rcp.h"
+#include "rcp/e2e.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -29,60 +60,71 @@
 extern "C" {
 #endif
 
-typedef enum {
-    RCP_HEALTH_HEALTHY  = 0,
-    RCP_HEALTH_DEGRADED = 1,
-    RCP_HEALTH_FAULTED  = 2,
-} rcp_health_state_t;
+/* One registered request stream's rx_wd_* configuration (regmap.h,
+ * ~line 390), copied in at rcp_watchdog_keeper_new() time -- this module
+ * does not read a live rcp_regmap_request_stream_cfg_t itself, matching
+ * every request-kind module's "operate on caller-owned data" convention
+ * (see e2e.h's own file header). */
+typedef struct {
+    uint64_t stream_id; /* IEEE 1722 StreamID this request stream listens
+                            on; same addressing model as avtp.h */
+    bool     rx_wd_enable;
+    uint32_t rx_wd_timeout_ms;
+    bool     rx_wd_safestate_enable;
+    bool     rx_wd_info_enable;
+} rcp_watchdog_stream_cfg_t;
 
-/* Never returns NULL. */
-const char *rcp_health_state_string(rcp_health_state_t h);
+/* Fired every time a stream's rcp_e2e_wd_result_t changes (including its
+ * very first evaluation at construction time). */
+typedef struct {
+    uint64_t             stream_id;
+    rcp_e2e_wd_result_t  result;
+} rcp_watchdog_event_t;
 
 typedef struct {
-    rcp_zone_t         zone;
-    rcp_health_state_t state;
-    int                err; /* the rcp_errc_t from the kick that caused this transition */
-} rcp_health_event_t;
-
-typedef struct {
-    uint64_t interval_ms;   /* time between kick cycles (default: 10) */
-    uint64_t timeout_ms;    /* per-kick deadline (default: 5) */
-    int      degrade_after; /* consecutive misses before Degraded (default: 3) */
-    int      fault_after;   /* consecutive misses before Faulted (default: 5) */
+    uint64_t poll_interval_ms; /* time between re-evaluation cycles (default: 10) */
 } rcp_watchdog_config_t;
 
-/* { interval_ms = 10, timeout_ms = 5, degrade_after = 3, fault_after = 5 }. */
+/* { poll_interval_ms = 10 }. */
 rcp_watchdog_config_t rcp_watchdog_default_config(void);
 
-/* User-supplied callback fired on every health state change. user_data is
- * the opaque pointer passed to rcp_watchdog_keeper_subscribe(). */
-typedef void (*rcp_watchdog_health_fn)(const rcp_health_event_t *ev, void *user_data);
+/* User-supplied callback fired on every rcp_e2e_wd_result_t change, across
+ * all streams. user_data is the opaque pointer passed to
+ * rcp_watchdog_keeper_subscribe(). */
+typedef void (*rcp_watchdog_event_fn)(const rcp_watchdog_event_t *ev, void *user_data);
 
 typedef struct rcp_watchdog_keeper rcp_watchdog_keeper_t;
 
-/* Creates a Keeper over the given controllers (retains each) and starts its
- * background kick thread immediately. ctrls/n_ctrls may describe zero
- * controllers. Returns NULL on allocation failure. */
+/* Creates a Keeper over the given streams (copied by value) and starts its
+ * background re-evaluation thread immediately, treating construction time
+ * as an implicit initial kick for every stream. streams/n_streams may
+ * describe zero streams. Returns NULL on allocation failure. */
 rcp_watchdog_keeper_t *rcp_watchdog_keeper_new(rcp_watchdog_config_t cfg,
-                                                rcp_controller_t *const *ctrls, size_t n_ctrls);
+                                                const rcp_watchdog_stream_cfg_t *streams,
+                                                size_t n_streams);
 
-/* Returns the current health state for zone, or RCP_HEALTH_FAULTED if zone
- * was not registered with k (matching cpp-RCP's own "unknown -> assume the
- * worst" default). */
-rcp_health_state_t rcp_watchdog_keeper_health(rcp_watchdog_keeper_t *k, rcp_zone_t zone);
+/* Records a kick for stream_id -- see the file header's "not an
+ * independent RCP_CMD_WATCHDOG side channel" note -- resetting its
+ * elapsed-since-last-kick clock to zero. Returns false if stream_id was
+ * not registered with k (no state changed). */
+bool rcp_watchdog_keeper_kick(rcp_watchdog_keeper_t *k, uint64_t stream_id);
 
-/* Registers cb to be invoked on every health state transition, across all
- * zones. Not thread-safe with close()/destroy(); register before handing k
- * to other threads. Returns false on allocation failure (cb not added). */
-bool rcp_watchdog_keeper_subscribe(rcp_watchdog_keeper_t *k, rcp_watchdog_health_fn cb, void *user_data);
+/* Returns the most recently computed rcp_e2e_wd_result_t for stream_id, or
+ * an all-false result (matching a disabled watchdog's own verdict) if
+ * stream_id was not registered with k. */
+rcp_e2e_wd_result_t rcp_watchdog_keeper_status(rcp_watchdog_keeper_t *k, uint64_t stream_id);
 
-/* Stops the background kick thread. Idempotent; safe to call before
- * rcp_watchdog_keeper_destroy(). Blocks until the current kick cycle (if
- * any) finishes. */
+/* Registers cb to be invoked on every result change, across all streams.
+ * Not thread-safe with close()/destroy(); register before handing k to
+ * other threads. Returns false on allocation failure (cb not added). */
+bool rcp_watchdog_keeper_subscribe(rcp_watchdog_keeper_t *k, rcp_watchdog_event_fn cb, void *user_data);
+
+/* Stops the background re-evaluation thread. Idempotent; safe to call
+ * before rcp_watchdog_keeper_destroy(). Blocks until the current
+ * evaluation cycle (if any) finishes. */
 void rcp_watchdog_keeper_close(rcp_watchdog_keeper_t *k);
 
-/* Closes k (if not already) and frees it, releasing its references to every
- * registered controller. Call exactly once. */
+/* Closes k (if not already) and frees it. Call exactly once. */
 void rcp_watchdog_keeper_destroy(rcp_watchdog_keeper_t *k);
 
 #ifdef __cplusplus

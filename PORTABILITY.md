@@ -35,6 +35,10 @@ Every other module — `mock.c`, `udp.c`, `shmem.c`, `watchdog.c`,
 ever calls `rcp_mutex_*`, `rcp_cond_*`, `rcp_thread_start[_detached]`,
 `rcp_sleep_ms`, and `rcp_monotonic_ms` from `platform.h`; none of them
 call `pthread_*`, `CreateThread`, or any other OS primitive directly.
+(`powerstate.c`'s own milestone-79 REPLACE dropped its background thread
+entirely along with the BusOff-recovery loop it existed to drive — see
+below — so it now only calls `rcp_mutex_*`, not the thread/sleep/clock
+primitives.)
 `platform.c` today implements that seam twice: once over POSIX
 `pthread_mutex_t`/`pthread_cond_t`/`pthread_t`, once over Win32
 `CRITICAL_SECTION`/`CONDITION_VARIABLE`/`HANDLE`. Porting to a given RTOS
@@ -64,9 +68,10 @@ targets — the seam is already narrow enough.
    array. This is a larger, separate effort than the audit itself and is
    not attempted here.
 2. **Background-thread-per-decorator pattern.** `watchdog.c`,
-   `deadline.c`, `powerstate.c`, `sim.c`, `prioqueue.c`, and
-   `zonegroup.c` each spawn one or more long-lived threads via
-   `rcp_thread_start[_detached]`. RTOS targets with a fixed, small task
+   `deadline.c`, `sim.c`, `prioqueue.c`, and `zonegroup.c` each spawn one
+   or more long-lived threads via `rcp_thread_start[_detached]`
+   (`powerstate.c` no longer does, as of its own milestone-79 REPLACE —
+   see above). RTOS targets with a fixed, small task
    count (common on microcontroller-class hardware) would want these
    collapsed into a smaller number of cooperative tasks or a single
    dispatcher loop rather than one OS thread per decorator instance —

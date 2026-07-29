@@ -3831,7 +3831,7 @@ anywhere in the tree before removing it from `.fusa-reqs.json`. `cfusa
 check`'s own pre-existing HARA002/HARA003 findings are unchanged and not
 introduced or touched here.
 
-### 79. Safety-adjacent satellites (v0.79.0)
+### 79. Safety-adjacent satellites (v0.79.0) ✅
 
 - **REPLACE** `watchdog.c`: thin client convenience around the Phase 18
   per-stream `rx_wd_*` registers and safety-request sequences, not an
@@ -3842,6 +3842,109 @@ introduced or touched here.
 - **REPLACE** `powerstate.c`: client convenience wrapper around the
   Phase 19 Wakeup endpoint + Normal/StandBy/Sleep/Unpowered model,
   replacing the ad-hoc Active/Sleeping/BusOff state machine entirely.
+
+**Done (v0.79.0)**: `include/rcp/watchdog.h` + `src/watchdog.c` land as
+`rcp_watchdog_keeper_t`, rebuilt around e2e.h's pure `rcp_e2e_wd_evaluate()`
+(milestone 70) instead of the retired `RCP_CMD_WATCHDOG` command: a Keeper
+now tracks, per registered *request stream* (not zone), a copy of that
+stream's `rx_wd_enable`/`rx_wd_timeout_ms`/`rx_wd_safestate_enable`/
+`rx_wd_info_enable` configuration (regmap.h) plus a last-kick timestamp,
+and a background thread periodically re-runs `rcp_e2e_wd_evaluate()`
+against the elapsed time since that kick, firing a subscribed callback
+whenever the resulting `rcp_e2e_wd_result_t` (`overflowed`/
+`enter_safe_state`/`notify`) changes. `rcp_watchdog_keeper_kick()` is the
+new module's own spelling of "a safety-request sequence for this stream
+just completed" — this module sends no wire traffic and owns no
+transport of its own, matching e2e.h's own "operate on caller-owned
+data" layering. The old `rcp_health_state_t` Healthy/Degraded/Faulted
+enum is dropped outright (not re-derived): `rcp_e2e_wd_result_t`'s own
+three independent booleans are already the TC18-shaped verdict, and
+layering a parallel severity ladder on top would only duplicate what
+`rx_wd_safestate_enable`/`rx_wd_info_enable` already express. `REQ-WDG-*`
+rewritten in place (same 9-id band, same prefix — no collision, this
+module owns that prefix already).
+
+`include/rcp/deadline.h` + `src/deadline.c` land as
+`rcp_deadline_monitor_t`, re-keyed on *request stream* and driven by two
+caller-pushed signals instead of a subscribed Status stream (which no
+longer exists in the TC18 model): `rcp_deadline_monitor_heartbeat()` — a
+caller calls this on every observed response/ack-queue flush
+(`rcp_regmap_response_queue_cfg_t::flush_time_us`, regmap.h) — resets a
+stream's deadline timer and reports it alive again if it was dead;
+`rcp_deadline_monitor_notify_overflow()` — a caller calls this on an
+observed `rx_wd_info_enable` watchdog-overflow notification (e2e.h's
+`rcp_e2e_wd_result_t.notify`, e.g. relayed from this same milestone's own
+`rcp_watchdog_keeper_t`) — declares the stream dead immediately, without
+waiting out its deadline window. A background thread still evaluates
+each stream's own deadline timer against the current time and declares
+it dead once too much time has passed without a heartbeat, preserving
+the module's original "silence means dead" contract with a pushed signal
+in place of a subscribed one. `REQ-DL-*` rewritten in place (same 8-id
+band).
+
+`include/rcp/powerstate.h` + `src/powerstate.c` land as
+`rcp_powerstate_manager_t`, a client-side convenience wrapper over
+milestone 75's own already-shipped protocol-core mechanism (power.h's
+`rcp_pwrmode_t`/`rcp_pwrmode_transition()`/`rcp_pwrmode_wake_from_sleep()`/
+`rcp_pwrmode_handshake_t` and ep_wakeup.h's SleepCMD/WakeUp wire codec),
+replacing the ad-hoc Active/Sleeping/BusOff enum and
+`RCP_CMD_SLEEP`/`RCP_CMD_WAKE` calls entirely — there is no BusOff-
+equivalent fault state left to recover from in the TC18 model, so this
+module needs no background retry thread at all (dropped outright, along
+with `close()` — every action here is now caller-driven). Per
+`rcp_avtp_addr_t`-addressed endpoint (replacing `rcp_zone_t`), the
+Manager tracks a mirrored `rcp_pwrmode_t` and (for the pin-wake hot-start
+path) an `rcp_pwrmode_handshake_t`, and supplies paired encode/apply
+functions a caller drives around its own choice of transport — this
+module sends no bytes and owns no transport itself, matching
+udp.c/shmem.c/tsn.c's own "the transport is a distinct concern"
+precedent from v0.78.0:
+`rcp_powerstate_manager_encode_entry_request()`/`_apply_entry_response()`
+drive a client-initiated StandBy/Sleep request against ep_wakeup.h's
+SleepCMD codec, applying `rcp_pwrmode_transition()` once a matching
+response arrives (transaction-number-correlated, rejecting a
+stale/mismatched response rather than acting on it);
+`rcp_powerstate_manager_wake_via_network()` drives the always-hot
+network-level wake path directly; `_handshake_begin()`/
+`_encode_wakeup_probe()`/`_apply_wakeup_echo()`/
+`_handshake_resume_queues()`/`_wake_via_pin()` are thin, endpoint-scoped
+pass-throughs over power.h's own handshake step functions and
+ep_wakeup.h's WakeUp codec. Per power.h's own file header note, the
+pre-existing `REQ-PWR-001`..`010` group belongs to this module and is
+rewritten in place (same prefix, same 10-id band, verified against
+`REQ-PWRMODE-*`/`REQ-WAKEUP-*` for zero collision before reusing it) —
+no renumbering needed, since those two prefixes were already chosen
+distinctly at milestone 75 for exactly this reason.
+
+`tests/test_watchdog.c` (11 cases), `tests/test_deadline.c` (9 cases),
+and `tests/test_powerstate.c` (22 cases) are all from-scratch rewrites,
+none of them linking `tests/legacy_mock.c` any more (all three moved off
+`rcp_controller_t`/`rcp_zone_t` entirely — `tests/CMakeLists.txt`,
+`tests/legacy_mock.h`, and `include/rcp/mock.h`'s own file-header
+satellite lists updated to match); the full `ctest` suite (67/67,
+unchanged from v0.78.0 — this milestone neither adds nor removes a test
+binary) passes, verified locally under both a plain Debug build and a
+manual `-fsanitize=address,undefined` build (ASan+UBSan-clean, run
+sequentially). `cfusa lint`/`analyze`/`cyber`/`vuln`/`qualify`, `cfusa
+trace --req-coverage 100`, and `relay conform --strict` were not re-run
+locally (no local `cfusa`/`relay` toolchain in this environment, the
+same note every prior milestone has made) — `REQ-WDG-*`/`REQ-DL-*`/
+`REQ-PWR-*` `//cfusa:req`/`//cfusa:test` tag sets were cross-checked 1:1
+by hand before pushing. `cfusa check`'s own pre-existing HARA002/HARA003
+findings are unchanged and not introduced or touched here.
+
+**Deferred, not forgotten**: `FORMAL_VERIFICATION.md`'s `HealthStateMachine.tla`/
+`WatchdogProtocol.tla` mapping-to-C-implementation table and
+`PORTABILITY.md`'s thread-per-decorator inventory both still describe
+(or, for `PORTABILITY.md`, have been updated to reflect) the shapes this
+milestone's rewrite touches; per the Satellite Disposition table's own
+"Requirements/safety/security artifacts... REPLACE, deliberately last"
+entry, re-deriving `FORMAL_VERIFICATION.md`'s own TLA+-to-C mapping table
+(and TARA/CYBERSECURITY.md's still-stale `REQ-E2E-*` references, a gap
+e2e.h's own milestone-70 REPLACE already flagged) is Phase 22's job
+(v0.85.0), not this milestone's — `PORTABILITY.md` itself *was* updated
+here since it made a factual claim (`powerstate.c` spawns a background
+thread) this milestone's rewrite made false.
 
 ### 80. Generic decorators, batch 1 (v0.80.0)
 

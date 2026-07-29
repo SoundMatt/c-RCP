@@ -203,19 +203,26 @@ target_link_libraries(test_tsn PRIVATE rcp::rcp unity)
 target_compile_options(test_tsn PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_tsn COMMAND test_tsn)
 
-add_executable(test_watchdog test_watchdog.c legacy_mock.c)
+
+# test_watchdog/test_deadline/test_powerstate no longer link legacy_mock.c:
+# their milestone-79 REPLACE rebinds all three off rcp_controller_t/
+# rcp_zone_t entirely (watchdog.h/deadline.h/powerstate.h's own file
+# headers), so none of them need the legacy zone-controller double any
+# more (contrast the 14 not-yet-migrated satellites below, which still
+# do).
+add_executable(test_watchdog test_watchdog.c)
 target_link_libraries(test_watchdog PRIVATE rcp::rcp unity)
 target_compile_options(test_watchdog PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_watchdog COMMAND test_watchdog)
 set_tests_properties(rcp_watchdog PROPERTIES TIMEOUT 30)
 
-add_executable(test_deadline test_deadline.c legacy_mock.c)
+add_executable(test_deadline test_deadline.c)
 target_link_libraries(test_deadline PRIVATE rcp::rcp unity)
 target_compile_options(test_deadline PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_deadline COMMAND test_deadline)
 set_tests_properties(rcp_deadline PROPERTIES TIMEOUT 30)
 
-add_executable(test_powerstate test_powerstate.c legacy_mock.c)
+add_executable(test_powerstate test_powerstate.c)
 target_link_libraries(test_powerstate PRIVATE rcp::rcp unity)
 target_compile_options(test_powerstate PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_powerstate COMMAND test_powerstate)
