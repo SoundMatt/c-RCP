@@ -2026,104 +2026,72 @@
     },
     {
       "id": "REQ-SHMEM-001",
-      "title": "In-process zero-copy delivery",
-      "text": "rcp_shmem_controller_t::send() shall deliver commands to the ZoneServer without serialising to a byte buffer.",
+      "title": "pair_new() creates two cross-wired AVTPDU transports",
+      "text": "rcp_shmem_avtp_pair_new() shall return two rcp_avtp_transport_t sides, each starting at refcount 1 and sharing the caller-supplied time_sync_supported value and a single pair of bounded FIFOs.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-SHMEM-002",
-      "title": "Custom handler invoked",
-      "text": "If set_handler() has been called, the handler shall be invoked for each command; otherwise a default OK response is returned.",
+      "title": "A's send() is delivered to B's recv() in FIFO order",
+      "text": "Frames sent via one side of a pair shall be delivered to the other side's recv() calls in the order they were sent.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-SHMEM-003",
-      "title": "RCP_ERR_ZONE_MISMATCH on wrong zone",
-      "text": "send() shall return RCP_ERR_ZONE_MISMATCH if cmd.zone differs from the server's zone.",
+      "title": "B's send() is delivered to A's recv()",
+      "text": "The pair's two directions shall be independent: a frame sent by one side shall never be observed by that same side's own recv().",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-SHMEM-004",
-      "title": "RCP_ERR_CLOSED after close()",
-      "text": "send() shall return RCP_ERR_CLOSED after the Controller or ZoneServer has been closed.",
+      "title": "recv() returns RCP_ERR_TIMEOUT when nothing is queued",
+      "text": "recv() shall return RCP_ERR_TIMEOUT once the calling context's deadline elapses while its own inbound queue remains empty.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-SHMEM-005",
-      "title": "publish() delivers to all subscribers",
-      "text": "ZoneServer::publish() shall push the Status to every active StatusChannel.",
+      "title": "send()/recv() on a closed side return RCP_ERR_CLOSED",
+      "text": "Once close() has been called on a side, that side's own send() shall return RCP_ERR_CLOSED immediately, and its recv() shall return RCP_ERR_CLOSED once its already-queued items (if any) have been drained.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-SHMEM-006",
-      "title": "Payload copied before handler",
-      "text": "The controller shall copy the Command payload before passing it to the ZoneServer handler.",
+      "title": "send() rejects once its own outgoing queue is full",
+      "text": "send() shall return RCP_ERR_BUSY without enqueuing when its own outgoing queue already holds queue_capacity items.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-SHMEM-007",
-      "title": "Registry lookup finds registered server",
-      "text": "shmem::rcp_registry_lookup()() shall return the controller for a zone registered via add_server().",
+      "title": "recv() into a too-small buffer leaves the item queued",
+      "text": "recv() shall return RCP_ERR_BUSY, without removing the item from its queue, when the next queued item's length exceeds the caller-supplied buffer capacity.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-SHMEM-008",
-      "title": "rcp_registry_close()() releases all controllers",
-      "text": "rcp_registry_close()() shall close all registered controllers and cause subsequent lookup() to return RCP_ERR_CLOSED.",
+      "title": "releasing one side leaves the other usable",
+      "text": "Releasing one side's last reference shall not itself close or invalidate the other side's own send()/recv(), which remain usable until that other side is itself closed.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-SHMEM-009",
-      "title": "zone_server close() marks unhealthy and closes all subscriber channels",
-      "text": "rcp_shmem_zone_server_close() shall mark the server closed (rcp_shmem_zone_server_ok() subsequently returns false) and close every currently-registered subscriber status channel.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-SHMEM-010",
-      "title": "zone_server ok() reflects closed state",
-      "text": "rcp_shmem_zone_server_ok() shall return true before close() and false after close().",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-SHMEM-011",
-      "title": "subscription watcher removes its channel from the server on controller close",
-      "text": "When a shmem controller is closed while a subscription is active, the subscription's background watcher shall call rcp_shmem_zone_server_remove_sub() and close the subscriber's status channel.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-SHMEM-012",
-      "title": "registry controllers() lists registered servers",
-      "text": "The shmem registry's controllers() shall return a retained reference to each registered server's controller, up to the caller's capacity, and return the true count.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-SHMEM-013",
-      "title": "registry deregister() removes and closes the registered controller",
-      "text": "The shmem registry's deregister() shall remove and close the controller for the given zone, or return RCP_ERR_NOT_FOUND if none is registered there.",
+      "title": "the shared pair state is freed only once both sides are released",
+      "text": "The internal state shared by a pair shall be freed exactly once, only after both sides' own refcounts have independently reached zero, regardless of release order.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
@@ -2281,308 +2249,172 @@
       "asil": "ASIL-B"
     },
     {
-      "id": "REQ-TLS-001",
-      "title": "Mutual TLS authentication",
-      "text": "TLS transport shall require both client and server to present valid X.509 certificates.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-TLS-002",
-      "title": "Certificate verification by CA",
-      "text": "Certificates shall be verified against the configured CA bundle; self-signed certs shall be rejected unless the CA is the cert itself.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-TLS-003",
-      "title": "Config::verify_peer=true by default",
-      "text": "Certificate verification shall be enabled by default.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-TLS-004",
-      "title": "PEM file support",
-      "text": "cert_file, key_file, and ca_file shall accept paths to PEM-formatted files.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-TLS-005",
-      "title": "Command frames encrypted",
-      "text": "All Command and Response frames shall be encrypted in transit.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-TLS-006",
-      "title": "Status frames encrypted",
-      "text": "All Status subscription frames shall be encrypted in transit.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-TLS-007",
-      "title": "TLS 1.2+ enforced",
-      "text": "Connections with TLS protocol version below 1.2 shall be rejected.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-TLS-008",
-      "title": "Weak cipher suites disabled",
-      "text": "NULL, RC4, EXPORT, and DES cipher suites shall be disabled.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-TLS-009",
-      "title": "close() terminates TLS session",
-      "text": "close() shall perform a clean TLS shutdown before closing the underlying socket.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-TLS-010",
-      "title": "Error propagation",
-      "text": "Any TLS handshake or I/O error shall be returned as a rcp_errc_t to the caller.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-TLS-011",
-      "title": "controller zone() returns the configured zone",
-      "text": "The TLS controller's zone() shall return the zone passed to rcp_tls_controller_new(), matching every other transport's zone() contract.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-TLS-012",
-      "title": "zone_server stub surface is inert and non-crashing",
-      "text": "rcp_tls_zone_server_new()/ok()/set_handler()/set_healthy()/publish()/close()/destroy() shall not crash when called (no OpenSSL backend is linked); ok() shall always return false, matching the documented stub contract.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-TLS-013",
-      "title": "registry controllers() returns zero (no backend linked)",
-      "text": "The TLS registry's controllers() shall always return 0, consistent with lookup()/register()/deregister() all returning RCP_ERR_NOT_SUPPORTED.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
       "id": "REQ-TSN-001",
-      "title": "SO_PRIORITY set per command priority",
-      "text": "rcp_tsn_controller_t::send() shall set the SO_PRIORITY socket option proportional to the command's rcp_priority_t before sending.",
+      "title": "default PCP map mirrors rcp_sched_kind_rank()",
+      "text": "rcp_tsn_default_pcp_map() shall assign each rcp_sched_kind_t the PCP value rcp_sched_kind_rank() returns for that kind.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-TSN-002",
-      "title": "PCPMap maps Normal/High/Critical to PCP values",
-      "text": "The PCPMap struct shall provide separate PCP values for RCP_PRIORITY_NORMAL, RCP_PRIORITY_HIGH, and RCP_PRIORITY_CRITICAL.",
+      "title": "pcp_for() fails safe on an out-of-range kind",
+      "text": "rcp_tsn_pcp_for() shall return the map's own RCP_SCHED_KIND_STANDARD entry for any kind value outside rcp_sched_kind_t's defined range, never a fabricated higher class.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-TSN-003",
-      "title": "Critical mapped to highest PCP",
-      "text": "RCP_PRIORITY_CRITICAL shall be mapped to PCP 7 by default.",
+      "title": "classify_frame() classifies Standard and repurposed ACF_GBB frames, failing safe on malformed input",
+      "text": "rcp_tsn_classify_frame() shall classify an ACF_ABB (or non-repurposed ACF_GBB) frame as RCP_SCHED_KIND_STANDARD, a repurposed ACF_GBB frame by its request_type opcode via rcp_sched_classify(), and any short, bad-subtype, or bad-message-type frame as RCP_SCHED_KIND_STANDARD.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-TSN-004",
-      "title": "High mapped to mid-range PCP",
-      "text": "RCP_PRIORITY_HIGH shall be mapped to PCP 5 by default.",
+      "title": "send() tags socket_fd's SO_PRIORITY from the classified frame's kind, then delegates",
+      "text": "send() shall, when socket_fd is not -1, set SO_PRIORITY to the PCP value the configured map assigns to the outgoing frame's classified rcp_sched_kind_t, and shall in every case delegate the send to the inner transport.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-TSN-005",
-      "title": "Normal mapped to low PCP",
-      "text": "RCP_PRIORITY_NORMAL shall be mapped to PCP 2 by default.",
+      "title": "recv() delegates to the inner transport unmodified",
+      "text": "recv() shall forward its call, and return the inner transport's own result, unmodified.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-TSN-006",
-      "title": "subscribe() delegates to inner",
-      "text": "subscribe() shall delegate directly to the inner controller without modifying socket priority.",
+      "title": "close() delegates to the inner transport",
+      "text": "close() shall forward its call, and return the inner transport's own result, unmodified.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B"
+    },
+    {
+      "id": "REQ-TSN-007",
+      "title": "the constructor retains inner and mirrors its time_sync_supported",
+      "text": "rcp_tsn_avtp_transport_new() shall retain a reference to inner and set the returned transport's own base.time_sync_supported to inner's.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-UDP-001",
-      "title": "Header magic bytes 'RC'",
-      "text": "All wire frames shall begin with the two-byte sequence 0x52 ('R'), 0x43 ('C').",
+      "title": "dial() connects a UDP socket to a fixed peer",
+      "text": "rcp_udp_avtp_transport_dial() shall create a UDP socket and connect() it to the given host:port, returning an rcp_avtp_transport_t wrapping it.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-UDP-002",
-      "title": "Protocol version field",
-      "text": "All wire frames shall carry the protocol version (currently 0x01) in byte 2.",
+      "title": "bind() binds a UDP socket to a local address",
+      "text": "rcp_udp_avtp_transport_bind() shall create a UDP socket and bind() it to the given addr:port, binding INADDR_ANY when addr is NULL or empty.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-UDP-003",
-      "title": "Message type field",
-      "text": "Byte 3 of every wire frame shall encode the message type: Command, Response, Status, Subscribe, or Unsubscribe.",
+      "title": "ok() distinguishes success from a socket/connect/bind failure",
+      "text": "rcp_udp_avtp_transport_ok() shall return true only for a transport whose underlying socket was created and (for dial()) connected, or (for bind()) bound, successfully.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-UDP-004",
-      "title": "rcp_zone_t field",
-      "text": "Bytes 4 of every wire frame shall encode the target rcp_zone_t as a uint8.",
+      "title": "port()/addr_string() report the transport's own bound local address",
+      "text": "rcp_udp_avtp_transport_port() and rcp_udp_avtp_transport_addr_string() shall report the local port/address the transport's own socket is actually bound to, including an OS-assigned ephemeral port after port 0 was requested.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-UDP-005",
-      "title": "rcp_command_type_t field for commands",
-      "text": "Bytes 5\u20136 of Command frames shall encode the rcp_command_type_t as a big-endian uint16.",
+      "title": "dialed-mode send()/recv() round trip over loopback",
+      "text": "A frame sent by a dialed transport shall be received, unmodified, by a bound transport's recv() listening on that same peer address.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-UDP-006",
-      "title": "Priority/Status field",
-      "text": "Byte 7 shall encode Priority for Command frames, rcp_response_status_t for Response frames, and Healthy flag for Status frames.",
+      "title": "bound-mode recv() learns the peer from the received datagram",
+      "text": "A bound transport's recv() shall record the sending address of each received datagram as the peer its own subsequent send() calls target.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-UDP-007",
-      "title": "Command/response ID field",
-      "text": "Bytes 8\u201311 shall encode the Command or Response ID as a big-endian uint32.",
+      "title": "bound-mode send() before a peer is learned returns RCP_ERR_BUSY",
+      "text": "A bound transport's send() shall return RCP_ERR_BUSY, without sending, until its own recv() has learned a peer address.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-UDP-008",
-      "title": "Payload length field",
-      "text": "Bytes 12\u201315 shall encode the payload byte count as a big-endian uint32.",
+      "title": "bound-mode send() after learning a peer delivers to it",
+      "text": "Once a bound transport's recv() has learned a peer address, its own subsequent send() calls shall deliver to that address.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-UDP-009",
-      "title": "Payload follows header",
-      "text": "The variable-length payload shall immediately follow the 16-byte header.",
+      "title": "recv() returns RCP_ERR_TIMEOUT once the context deadline elapses",
+      "text": "recv() shall return RCP_ERR_TIMEOUT once the calling context's deadline elapses with no datagram received.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-UDP-010",
-      "title": "Big-endian multi-byte fields",
-      "text": "All multi-byte fields in wire frames shall be encoded in big-endian (network) byte order.",
+      "title": "recv() into a too-small buffer returns RCP_ERR_BUSY",
+      "text": "recv() shall return RCP_ERR_BUSY, without writing into the caller's buffer, when a received datagram's length exceeds the supplied buffer capacity; the oversized datagram itself is not retrievable afterward, matching UDP's own no-guaranteed-delivery contract.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-UDP-011",
-      "title": "Frame validation rejects bad magic",
-      "text": "The decoder shall return an error if frame bytes 0\u20131 are not 0x52, 0x43.",
+      "title": "send()/recv() return RCP_ERR_CLOSED once close() has been called",
+      "text": "Once close() has been called on a transport, its own send() and recv() shall both return RCP_ERR_CLOSED.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-UDP-012",
-      "title": "Frame validation rejects bad version",
-      "text": "The decoder shall return an error if the version byte does not equal the supported protocol version.",
+      "title": "close() unblocks a concurrent in-progress recv()",
+      "text": "Calling close() on a transport while a different thread is blocked inside that same transport's recv() shall cause that recv() call to return RCP_ERR_CLOSED without the underlying socket being invalidated out from under it.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-UDP-013",
-      "title": "Frame decoders reject an oversized body_len before any length arithmetic",
-      "text": "rcp_wire_decode_command()/_response()/_status() shall reject any body_len exceeding RCP_WIRE_MAX_PAYLOAD before computing RCP_WIRE_HEADER_LEN + body_len, so that no size_t-width-dependent integer overflow can bypass the short-frame length check on attacker-controlled input.",
+      "title": "time_sync_supported is recorded on the returned transport",
+      "text": "The time_sync_supported value passed to rcp_udp_avtp_transport_dial()/_bind() shall be recorded on the returned transport's own base.time_sync_supported field.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B"
     },
     {
       "id": "REQ-UDP-014",
-      "title": "rcp_wire_strerror() returns unique human-readable message",
-      "text": "rcp_wire_strerror() shall return a unique, non-empty message for each defined rcp_wire_errc_t constant, including RCP_WIRE_OK.",
+      "title": "Windows stub: ok() false and every operation fails without crashing",
+      "text": "On a platform with no winsock implementation, dial()/bind() shall return a non-NULL transport whose ok() reports false and whose send()/recv() return RCP_ERR_CLOSED without crashing.",
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A"
-    },
-    {
-      "id": "REQ-UDP-015",
-      "title": "controller zone() returns the configured zone",
-      "text": "The UDP controller's zone() shall return the zone passed to rcp_udp_controller_new().",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-UDP-016",
-      "title": "zone_server addr_string() returns the bound address",
-      "text": "rcp_udp_zone_server_addr_string() shall format the server's actual bound local address as \"ip:port\" once the socket is open, or return 0 if the server is not open.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-UDP-017",
-      "title": "zone_server set_healthy() affects subsequently published status",
-      "text": "rcp_udp_zone_server_set_healthy() shall change the healthy flag embedded in every Status published afterward via rcp_udp_zone_server_publish().",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-UDP-018",
-      "title": "closing a subscription removes it from both controller and server subscriber lists",
-      "text": "When a subscriber's status channel is closed without closing the whole controller, the controller's background watcher shall remove the channel from its own subscriber list and send an Unsubscribe control frame so the zone server removes the matching address from its own subscriber list.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
-    },
-    {
-      "id": "REQ-UDP-019",
-      "title": "registry dial() connects and registers a real UDP controller",
-      "text": "rcp_udp_registry_dial() shall construct a UDP controller for the given zone/host/port, verify it is usable, and register it into the given registry, returning RCP_ERR_NOT_FOUND if the controller cannot be constructed or is not usable.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B"
     },
     {
       "id": "REQ-WDG-001",

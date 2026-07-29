@@ -4,109 +4,180 @@
 //cfusa:test REQ-TSN-004
 //cfusa:test REQ-TSN-005
 //cfusa:test REQ-TSN-006
+//cfusa:test REQ-TSN-007
 #include "unity.h"
 
-#include "legacy_mock.h"
+#include <rcp/acf.h>
+#include <rcp/avtp.h>
 #include <rcp/rcp.h>
+#include <rcp/request_cancel.h>
+#include <rcp/scheduler.h>
 #include <rcp/tsn.h>
 
 void setUp(void) {}
 void tearDown(void) {}
 
-static void test_pcp_map_maps_normal_high_critical(void)
+static const uint8_t kMac[6] = {0x02, 0x11, 0x22, 0x33, 0x44, 0x55};
+
+static rcp_bytes_t make_ntscf_frame(rcp_bytes_t acf_msg)
+{
+    rcp_avtp_ntscf_header_t hdr = {0};
+    rcp_bytes_t              frame;
+
+    hdr.sv          = 1;
+    hdr.stream_id    = rcp_stream_id_make(kMac, 1);
+    frame            = rcp_avtp_encode_ntscf(&hdr, acf_msg.data, acf_msg.len);
+    rcp_bytes_free(&acf_msg);
+    return frame;
+}
+
+static rcp_bytes_t make_standard_frame(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    hdr.byte_bus_id = 3;
+    hdr.op          = RCP_ACF_OP_WRITE;
+    return make_ntscf_frame(rcp_acf_encode_abb(&hdr, NULL, 0));
+}
+
+static rcp_bytes_t make_cancellation_frame(void)
+{
+    return make_ntscf_frame(rcp_cancel_encode_clear_all(3, 1));
+}
+
+/* ── PCP map ────────────────────────────────────────────────────────────────── */
+
+static void test_default_pcp_map_mirrors_sched_kind_rank(void)
+{
+    rcp_tsn_pcp_map_t m = rcp_tsn_default_pcp_map();
+    rcp_sched_kind_t   k;
+
+    for (k = RCP_SCHED_KIND_STANDARD; k <= RCP_SCHED_KIND_CANCELLATION; k++) {
+        TEST_ASSERT_EQUAL_UINT8(rcp_sched_kind_rank(k), rcp_tsn_pcp_for(&m, k));
+    }
+}
+
+static void test_cancellation_maps_to_highest_default_pcp(void)
 {
     rcp_tsn_pcp_map_t m = rcp_tsn_default_pcp_map();
 
-    TEST_ASSERT_EQUAL_UINT8(m.normal,   rcp_tsn_pcp_for(&m, RCP_PRIORITY_NORMAL));
-    TEST_ASSERT_EQUAL_UINT8(m.high,     rcp_tsn_pcp_for(&m, RCP_PRIORITY_HIGH));
-    TEST_ASSERT_EQUAL_UINT8(m.critical, rcp_tsn_pcp_for(&m, RCP_PRIORITY_CRITICAL));
+    TEST_ASSERT_EQUAL_UINT8(6, rcp_tsn_pcp_for(&m, RCP_SCHED_KIND_CANCELLATION));
+    TEST_ASSERT_TRUE(rcp_tsn_pcp_for(&m, RCP_SCHED_KIND_CANCELLATION) >
+                      rcp_tsn_pcp_for(&m, RCP_SCHED_KIND_STANDARD));
 }
 
-static void test_critical_maps_to_highest_pcp(void)
+static void test_pcp_for_fails_safe_on_out_of_range_kind(void)
 {
     rcp_tsn_pcp_map_t m = rcp_tsn_default_pcp_map();
 
-    TEST_ASSERT_EQUAL_UINT8(7, rcp_tsn_pcp_for(&m, RCP_PRIORITY_CRITICAL));
-    TEST_ASSERT_TRUE(rcp_tsn_pcp_for(&m, RCP_PRIORITY_CRITICAL) > rcp_tsn_pcp_for(&m, RCP_PRIORITY_HIGH));
+    TEST_ASSERT_EQUAL_UINT8(rcp_tsn_pcp_for(&m, RCP_SCHED_KIND_STANDARD),
+                             rcp_tsn_pcp_for(&m, (rcp_sched_kind_t)99));
 }
 
-static void test_high_maps_to_mid_range_pcp(void)
-{
-    rcp_tsn_pcp_map_t m = rcp_tsn_default_pcp_map();
-    uint8_t high = rcp_tsn_pcp_for(&m, RCP_PRIORITY_HIGH);
+/* ── Frame classification ──────────────────────────────────────────────────── */
 
-    TEST_ASSERT_EQUAL_UINT8(5, high);
-    TEST_ASSERT_TRUE(high > rcp_tsn_pcp_for(&m, RCP_PRIORITY_NORMAL));
-    TEST_ASSERT_TRUE(high < rcp_tsn_pcp_for(&m, RCP_PRIORITY_CRITICAL));
+static void test_classify_standard_frame(void)
+{
+    rcp_bytes_t frame = make_standard_frame();
+    TEST_ASSERT_EQUAL(RCP_SCHED_KIND_STANDARD, rcp_tsn_classify_frame(frame.data, frame.len));
+    rcp_bytes_free(&frame);
 }
 
-static void test_normal_maps_to_low_pcp(void)
+static void test_classify_cancellation_frame(void)
 {
-    rcp_tsn_pcp_map_t m = rcp_tsn_default_pcp_map();
-
-    TEST_ASSERT_EQUAL_UINT8(2, rcp_tsn_pcp_for(&m, RCP_PRIORITY_NORMAL));
-    TEST_ASSERT_TRUE(rcp_tsn_pcp_for(&m, RCP_PRIORITY_NORMAL) < rcp_tsn_pcp_for(&m, RCP_PRIORITY_HIGH));
+    rcp_bytes_t frame = make_cancellation_frame();
+    TEST_ASSERT_EQUAL(RCP_SCHED_KIND_CANCELLATION, rcp_tsn_classify_frame(frame.data, frame.len));
+    rcp_bytes_free(&frame);
 }
 
-static void capture_priority_handler(const rcp_command_t *cmd, rcp_response_t *out, void *user_data)
+static void test_classify_malformed_frame_fails_safe_to_standard(void)
 {
-    rcp_priority_t *seen = (rcp_priority_t *)user_data;
-    *seen = cmd->priority;
-    out->command_id = cmd->id;
-    out->zone       = RCP_ZONE_FRONT_LEFT;
-    out->status     = RCP_RESPONSE_OK;
+    TEST_ASSERT_EQUAL(RCP_SCHED_KIND_STANDARD, rcp_tsn_classify_frame(NULL, 0));
+
+    {
+        uint8_t junk[] = {0xFF, 0xFF, 0xFF, 0xFF};
+        TEST_ASSERT_EQUAL(RCP_SCHED_KIND_STANDARD, rcp_tsn_classify_frame(junk, sizeof(junk)));
+    }
 }
 
-static void test_send_applies_priority_class_then_delegates_to_inner(void)
+/* ── Transport wrapper ─────────────────────────────────────────────────────── */
+
+static void test_send_applies_pcp_then_delegates_to_inner(void)
 {
-    rcp_priority_t seen = RCP_PRIORITY_NORMAL;
-    rcp_controller_t *inner = rcp_mock_controller_new(RCP_ZONE_FRONT_LEFT, capture_priority_handler, &seen);
+    rcp_avtp_transport_t *inner = rcp_avtp_loopback_transport_new(true, 4);
     /* fd = -1 -> SO_PRIORITY is skipped, send still delegates. */
-    rcp_controller_t *ctrl = rcp_tsn_controller_new(inner, -1, rcp_tsn_default_config());
-    rcp_command_t cmd = {0};
-    rcp_response_t resp = {0};
-    rcp_context_t ctx = rcp_context_background();
+    rcp_avtp_transport_t *tsn = rcp_tsn_avtp_transport_new(inner, -1, rcp_tsn_default_config());
+    rcp_bytes_t             frame = make_cancellation_frame();
+    rcp_context_t            ctx = rcp_context_background();
+    uint8_t                  buf[128];
+    size_t                    out_len = 0;
 
-    cmd.zone     = RCP_ZONE_FRONT_LEFT;
-    cmd.type     = RCP_CMD_SET;
-    cmd.priority = RCP_PRIORITY_CRITICAL;
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_send(tsn, frame.data, frame.len));
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_recv(inner, &ctx, buf, sizeof(buf), &out_len));
+    TEST_ASSERT_EQUAL_UINT(frame.len, out_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(frame.data, buf, frame.len);
 
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_send(ctrl, &ctx, &cmd, &resp));
-    TEST_ASSERT_EQUAL(RCP_RESPONSE_OK, resp.status);
-    TEST_ASSERT_EQUAL(RCP_PRIORITY_CRITICAL, seen); /* forwarded unchanged to the inner controller */
-
-    rcp_response_free(&resp);
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
+    rcp_bytes_free(&frame);
+    rcp_avtp_transport_release(tsn);
+    rcp_avtp_transport_release(inner);
 }
 
-static void test_subscribe_delegates_to_inner(void)
+static void test_recv_delegates_to_inner(void)
 {
-    rcp_controller_t *inner = rcp_mock_controller_new(RCP_ZONE_CENTRAL, NULL, NULL);
-    rcp_controller_t *ctrl  = rcp_tsn_controller_new(inner, -1, rcp_tsn_default_config());
-    rcp_status_channel_t *ch = NULL;
-    rcp_context_t ctx = rcp_context_background();
+    rcp_avtp_transport_t *inner = rcp_avtp_loopback_transport_new(true, 4);
+    rcp_avtp_transport_t *tsn = rcp_tsn_avtp_transport_new(inner, -1, rcp_tsn_default_config());
+    rcp_context_t            ctx = rcp_context_background();
+    uint8_t                  frame[] = {0x01, 0x02, 0x03};
+    uint8_t                  buf[16];
+    size_t                    out_len = 0;
 
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_subscribe(ctrl, &ctx, &ch));
-    TEST_ASSERT_NOT_NULL(ch);
-    TEST_ASSERT_EQUAL(RCP_ZONE_CENTRAL, rcp_controller_zone(ctrl));
-    TEST_ASSERT_EQUAL(RCP_OK, rcp_controller_close(ctrl));
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_send(inner, frame, sizeof(frame)));
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_recv(tsn, &ctx, buf, sizeof(buf), &out_len));
+    TEST_ASSERT_EQUAL_UINT(sizeof(frame), out_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(frame, buf, sizeof(frame));
 
-    rcp_status_channel_release(ch);
-    rcp_controller_release(ctrl);
-    rcp_controller_release(inner);
+    rcp_avtp_transport_release(tsn);
+    rcp_avtp_transport_release(inner);
+}
+
+static void test_close_delegates_to_inner(void)
+{
+    rcp_avtp_transport_t *inner = rcp_avtp_loopback_transport_new(true, 4);
+    rcp_avtp_transport_t *tsn = rcp_tsn_avtp_transport_new(inner, -1, rcp_tsn_default_config());
+    rcp_bytes_t              frame = make_standard_frame();
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_close(tsn));
+    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_avtp_transport_send(inner, frame.data, frame.len));
+
+    rcp_bytes_free(&frame);
+    rcp_avtp_transport_release(tsn);
+    rcp_avtp_transport_release(inner);
+}
+
+static void test_constructor_mirrors_inner_time_sync_supported(void)
+{
+    rcp_avtp_transport_t *inner = rcp_avtp_loopback_transport_new(false, 1);
+    rcp_avtp_transport_t *tsn = rcp_tsn_avtp_transport_new(inner, -1, rcp_tsn_default_config());
+
+    TEST_ASSERT_FALSE(tsn->time_sync_supported);
+
+    rcp_avtp_transport_release(tsn);
+    rcp_avtp_transport_release(inner);
 }
 
 int main(void)
 {
     UNITY_BEGIN();
 
-    RUN_TEST(test_pcp_map_maps_normal_high_critical);
-    RUN_TEST(test_critical_maps_to_highest_pcp);
-    RUN_TEST(test_high_maps_to_mid_range_pcp);
-    RUN_TEST(test_normal_maps_to_low_pcp);
-    RUN_TEST(test_send_applies_priority_class_then_delegates_to_inner);
-    RUN_TEST(test_subscribe_delegates_to_inner);
+    RUN_TEST(test_default_pcp_map_mirrors_sched_kind_rank);
+    RUN_TEST(test_cancellation_maps_to_highest_default_pcp);
+    RUN_TEST(test_pcp_for_fails_safe_on_out_of_range_kind);
+    RUN_TEST(test_classify_standard_frame);
+    RUN_TEST(test_classify_cancellation_frame);
+    RUN_TEST(test_classify_malformed_frame_fails_safe_to_standard);
+    RUN_TEST(test_send_applies_pcp_then_delegates_to_inner);
+    RUN_TEST(test_recv_delegates_to_inner);
+    RUN_TEST(test_close_delegates_to_inner);
+    RUN_TEST(test_constructor_mirrors_inner_time_sync_supported);
 
     return UNITY_END();
 }

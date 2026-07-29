@@ -30,7 +30,7 @@ would need a target-specific backend.
 ## What depends on a POSIX/Win32-specific backend
 
 All of it funnels through one seam: `src/platform.h` / `src/platform.c`.
-Every other module — `mock.c`, `udp.c`, `shmem.c`, `tls.c`, `watchdog.c`,
+Every other module — `mock.c`, `udp.c`, `shmem.c`, `watchdog.c`,
 `deadline.c`, `powerstate.c`, `prioqueue.c`, `sim.c`, `zonegroup.c` — only
 ever calls `rcp_mutex_*`, `rcp_cond_*`, `rcp_thread_start[_detached]`,
 `rcp_sleep_ms`, and `rcp_monotonic_ms` from `platform.h`; none of them
