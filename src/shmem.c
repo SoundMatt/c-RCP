@@ -189,20 +189,29 @@ rcp_shmem_errc_t rcp_shmem_avtp_pair_new(bool time_sync_supported, size_t queue_
     rcp_shmem_pair_core_t *c;
     rcp_shmem_side_t      *a;
     rcp_shmem_side_t      *b;
+    rcp_bytes_t            *a_to_b_items;
+    rcp_bytes_t            *b_to_a_items;
 
     if (queue_capacity == 0) queue_capacity = 1;
 
     c = (rcp_shmem_pair_core_t *)calloc(1, sizeof(*c));
     if (!c) return RCP_SHMEM_ERR_ALLOC;
 
-    c->a_to_b_items = (rcp_bytes_t *)calloc(queue_capacity, sizeof(*c->a_to_b_items));
-    c->b_to_a_items = (rcp_bytes_t *)calloc(queue_capacity, sizeof(*c->b_to_a_items));
-    if (!c->a_to_b_items || !c->b_to_a_items) {
-        free(c->a_to_b_items);
-        free(c->b_to_a_items);
+    /* Checked locally before ever being stored through c, rather than
+     * assigning calloc()'s result straight into c->a_to_b_items/
+     * c->b_to_a_items and checking afterward -- matches this codebase's
+     * own "check an allocation before dereferencing/storing it" house
+     * convention (see e.g. avtp.c's loopback constructor). */
+    a_to_b_items = (rcp_bytes_t *)calloc(queue_capacity, sizeof(*a_to_b_items));
+    b_to_a_items = (rcp_bytes_t *)calloc(queue_capacity, sizeof(*b_to_a_items));
+    if (!a_to_b_items || !b_to_a_items) {
+        free(a_to_b_items);
+        free(b_to_a_items);
         free(c);
         return RCP_SHMEM_ERR_ALLOC;
     }
+    c->a_to_b_items = a_to_b_items;
+    c->b_to_a_items = b_to_a_items;
     c->a_to_b_cap = queue_capacity;
     c->b_to_a_cap = queue_capacity;
     c->refcount   = 2;

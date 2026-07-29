@@ -214,7 +214,7 @@ static void test_releasing_one_side_leaves_other_usable_until_closed(void)
 }
 
 //cfusa:test REQ-SHMEM-009
-static void test_pair_state_freed_only_after_both_sides_released(void)
+static void test_pair_state_freed_after_releasing_both_sides(void)
 {
     /* No public way to observe the shared core's own lifetime directly;
      * this pins the externally-visible contract instead: releasing both
@@ -259,7 +259,7 @@ int main(void)
     RUN_TEST(test_send_rejects_when_own_queue_full);
     RUN_TEST(test_recv_into_too_small_buffer_leaves_item_queued);
     RUN_TEST(test_releasing_one_side_leaves_other_usable_until_closed);
-    RUN_TEST(test_pair_state_freed_only_after_both_sides_released);
+    RUN_TEST(test_pair_state_freed_after_releasing_both_sides);
     RUN_TEST(test_pair_shares_time_sync_supported);
 
     return UNITY_END();
