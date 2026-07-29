@@ -92,7 +92,7 @@ static void emit(rcp_deadline_monitor_t *m, stream_watch_t *st, bool alive)
 bool rcp_deadline_monitor_heartbeat(rcp_deadline_monitor_t *m, uint64_t stream_id)
 {
     stream_watch_t *st;
-    bool was_alive;
+    bool was_alive = false;
 
     rcp_mutex_lock(&m->mu);
     st = find_state(m, stream_id);
