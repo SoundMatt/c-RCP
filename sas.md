@@ -1,6 +1,6 @@
 # Software Accomplishment Summary (SAS)
 
-**Project:** c-RCP v0.70.0  |  **DAL:** DAL-B  |  **Generated:** 2026-07-29T17:38:09Z  |  **Standard:** DO-178C §11.20
+**Project:** c-RCP v0.70.0  |  **DAL:** DAL-B  |  **Generated:** 2026-07-29T17:42:29Z  |  **Standard:** DO-178C §11.20
 
 | ID | Description | Evidence | Present |
 |---|---|---|---|
@@ -13,7 +13,7 @@
 | SAS-07 | SW quality assurance process summary | (none) | no |
 | SAS-08 | Compliance statement for each SW life cycle data item | (none) | no |
 | SAS-09 | Problem reports status | (none) | no |
-| SAS-10 | Changes and their classification | CHANGELOG.md | no |
+| SAS-10 | Changes and their classification | CHANGELOG.md | yes |
 | SAS-11 | Deviations from plans/standards | (none) | no |
 | SAS-12 | Unresolved anomalies with justification | (none) | no |
 | SAS-13 | SW verification results | cfusa-self-check.json | no |
@@ -26,5 +26,5 @@
 | SAS-20 | SW configuration index | sci.json | yes |
 
 ---
-_7/20 present_  
+_8/20 present_  
 _Prepared by: SoundMatt_
