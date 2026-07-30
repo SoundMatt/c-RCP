@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /* RELAY-conformant CLI unit tests (RELAY spec §11, §12).
  *
  * Exercises rcp_cli_run() directly (no subprocess) by redirecting its

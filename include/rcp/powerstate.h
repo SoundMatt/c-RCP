@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * Client-side power-mode convenience wrapper for the TC18 Remote Control
  * Protocol (SG-003, ISO 26262 ASIL-B) -- ROADMAP.md Phase 21, "Satellite

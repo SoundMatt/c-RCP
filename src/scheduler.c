@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/scheduler.h"
 
 /* ── Request kind classification ─────────────────────────────────────────── */

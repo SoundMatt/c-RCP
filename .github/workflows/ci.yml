@@ -198,6 +198,23 @@ jobs:
           done
           [ "$missing" -eq 0 ] || exit 1
 
+  # ── SPDX license headers (c-RCP-15) ───────────────────────────────────────────
+  spdx-headers:
+    name: SPDX-License-Identifier headers present
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify every first-party .h/.c file has an SPDX header
+        run: |
+          missing=0
+          for f in $(find include/rcp include/relay src cli tests -type f \( -name '*.h' -o -name '*.c' \)); do
+            if ! head -1 "$f" | grep -q '^/\* SPDX-License-Identifier: MPL-2\.0 \*/$'; then
+              echo "::error file=$f::Missing or malformed SPDX-License-Identifier header (must be line 1)"
+              missing=$((missing + 1))
+            fi
+          done
+          [ "$missing" -eq 0 ] || exit 1
+
   # ── LCOV coverage ─────────────────────────────────────────────────────────────
   coverage:
     name: Coverage (LCOV)

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/server.h"
 
 #include <stdlib.h>

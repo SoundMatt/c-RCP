@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:test REQ-I2C-001
 //cfusa:test REQ-I2C-002
 //cfusa:test REQ-I2C-003

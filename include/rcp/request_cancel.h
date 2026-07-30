@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:req REQ-CANCEL-001
 //cfusa:req REQ-CANCEL-002
 //cfusa:req REQ-CANCEL-003

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /* RELAY conformance tests (RELAY spec §18.2, §5.1, §10.3, §15.7.5, §19.4).
  *
  * Verifies that c-RCP satisfies the mandatory RELAY-conformance

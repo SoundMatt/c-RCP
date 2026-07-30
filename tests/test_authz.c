@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:test REQ-AUTH-001
 //cfusa:test REQ-AUTH-002
 //cfusa:test REQ-AUTH-003

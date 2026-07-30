@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /* SO_PRIORITY is a glibc extension, not exposed by <sys/socket.h> under
  * strict -std=c99 unless _DEFAULT_SOURCE is defined first — must be the
  * literal first thing in the translation unit, before any include (even

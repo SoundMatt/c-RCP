@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /* Test-only nanosecond-resolution timer, shared by bench_mock.c and
  * command_latency_test.c. The library's own rcp_monotonic_ms() is
  * millisecond-resolution (adequate for context deadlines); these two tests

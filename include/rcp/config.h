@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * config.h -- RC-Server/endpoint manifest loader for the TC18 Remote
  * Control Protocol wire layer (ROADMAP.md Phase 21, "Satellite Package

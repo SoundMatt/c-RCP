@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/faultinject.h"
 
 #include "platform.h"

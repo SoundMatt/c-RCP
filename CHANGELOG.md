@@ -31,6 +31,19 @@ the rationale.
 
 ## Releases
 
+### v0.96.0 -- 2026-07-30
+
+Add `/* SPDX-License-Identifier: MPL-2.0 */` as the first line of every
+first-party `.h`/`.c` file (`include/rcp`, `include/relay`, `src`,
+`cli`, `tests` -- 178 files), closing a gap the 2026-07-30 ecosystem
+audit found: this repo ships per-version SPDX SBOMs making per-file
+license claims with no source-level tag to cross-check them against.
+Added a new `spdx-headers` CI job enforcing the header on every such
+file going forward, per the audit's "enforce via CI lint"
+recommendation (no such rule existed in the c-FuSa toolkit itself, so
+this is a small dedicated grep-based check). (Milestone 96; see
+`ROADMAP.md` for full detail.)
+
 ### v0.95.0 -- 2026-07-30
 
 CI hardening: two masked/missing gates found by the 2026-07-30

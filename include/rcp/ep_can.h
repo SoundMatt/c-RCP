@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:req REQ-CANEP-001
 //cfusa:req REQ-CANEP-002
 //cfusa:req REQ-CANEP-003

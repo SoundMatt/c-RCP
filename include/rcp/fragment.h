@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:req REQ-FRAG-001
 //cfusa:req REQ-FRAG-002
 //cfusa:req REQ-FRAG-003

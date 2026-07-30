@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/deadline.h"
 
 #include "platform.h"

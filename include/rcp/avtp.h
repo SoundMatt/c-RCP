@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:req REQ-AVTP-001
 //cfusa:req REQ-AVTP-002
 //cfusa:req REQ-AVTP-003

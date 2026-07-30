@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:req REQ-ISELED-001
 //cfusa:req REQ-ISELED-002
 //cfusa:req REQ-ISELED-003

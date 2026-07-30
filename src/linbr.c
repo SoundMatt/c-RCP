@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/linbr.h"
 
 //cfusa:req REQ-LIN-002

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/restbridge.h"
 
 //cfusa:req REQ-REST-002

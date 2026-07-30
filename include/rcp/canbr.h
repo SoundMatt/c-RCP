@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * canbr.h -- CAN / CAN-FD protocol bridge interface stub (SG-006) for the
  * TC18 Remote Control Protocol wire layer (ROADMAP.md Phase 21,

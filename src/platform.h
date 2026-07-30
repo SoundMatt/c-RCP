@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /* Internal, not installed: portable mutex/condvar/thread/atomic primitives.
  * rcp.h's public API is a plain C99 vtable interface; this header exists so
  * concrete implementations (mock.c today; UDP/TLS/shmem etc. in later

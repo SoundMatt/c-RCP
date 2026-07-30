@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * doipbr.h -- DoIP (Diagnostics over IP / ISO 13400) protocol bridge
  * interface stub (SG-006) for the TC18 Remote Control Protocol wire layer

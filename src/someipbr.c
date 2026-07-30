@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/someipbr.h"
 
 //cfusa:req REQ-SOMEIP-002

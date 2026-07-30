@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/request_chained.h"
 
 #include <stdlib.h>

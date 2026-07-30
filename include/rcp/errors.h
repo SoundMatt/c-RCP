@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * errors.h -- the TC18 Remote Control Protocol wire error-code table
  * (ROADMAP.md Phase 23, closing the numeric-error-code gap the 2026-07-30

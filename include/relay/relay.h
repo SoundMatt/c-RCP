@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /* RELAY C bindings — relay_* types (RELAY spec §18.2, v2.0).
  *
  * Defines the protocol-agnostic subset of the relay spec c-RCP depends on:

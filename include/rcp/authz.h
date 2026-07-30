@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * authz.h -- Request-level access control (ISO 21434 / IEC 62443 SL-2) for
  * the TC18 Remote Control Protocol wire layer (ROADMAP.md Phase 21,

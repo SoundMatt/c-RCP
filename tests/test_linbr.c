@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /* linbr protocol-bridge stub conformance tests.
  *
  * rcp_lin_bridge_send() is a compile-time interface stub: until a

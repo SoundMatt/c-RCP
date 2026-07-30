@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/ddsbr.h"
 
 //cfusa:req REQ-DDS-002

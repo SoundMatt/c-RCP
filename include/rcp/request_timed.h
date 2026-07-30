@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:req REQ-TIMED-001
 //cfusa:req REQ-TIMED-002
 //cfusa:req REQ-TIMED-003

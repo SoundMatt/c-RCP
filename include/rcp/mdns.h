@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * mdns.h -- optional mDNS/DNS-SD (RFC 6762 + RFC 6763) discovery
  * convenience for the TC18 Remote Control Protocol wire layer

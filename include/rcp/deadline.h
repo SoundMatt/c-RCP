@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * Per-stream liveness deadline monitor for the TC18 Remote Control
  * Protocol (SG-001, SG-004) -- ROADMAP.md Phase 21, "Satellite Package

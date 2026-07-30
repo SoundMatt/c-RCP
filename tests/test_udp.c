@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /* Loopback integration tests for the UDP AVTPDU transport. Skips
  * (TEST_IGNORE) rather than failing on platforms where
  * rcp_udp_avtp_transport_ok() reports the transport isn't available

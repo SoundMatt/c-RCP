@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/errors.h"
 
 //cfusa:req REQ-WIREERR-002

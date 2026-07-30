@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:req REQ-SHMEM-001
 //cfusa:req REQ-SHMEM-002
 //cfusa:req REQ-SHMEM-003

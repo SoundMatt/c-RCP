@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * loan.h -- Zero-copy* pooled payload buffers for the TC18 Remote Control
  * Protocol wire layer (ROADMAP.md Phase 21, "Satellite Package Rework",

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:req REQ-MDIO-001
 //cfusa:req REQ-MDIO-002
 //cfusa:req REQ-MDIO-003
