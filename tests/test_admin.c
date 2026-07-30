@@ -176,6 +176,44 @@ static void test_metrics_text_renders_prometheus_format(void)
     rcp_admin_server_destroy(srv);
 }
 
+//cfusa:test REQ-ADMIN-006
+static void test_metrics_text_with_long_name_and_labels_does_not_read_out_of_bounds(void)
+{
+    /* A 63-char name (embedded twice) plus a 127-char labels string plus a
+       large-magnitude value formats to well over the 256-byte stack line
+       buffer inside rcp_admin_server_metrics_text; this must be handled
+       without reading past that buffer (run under ASan to catch a
+       regression — this is what NEW-C-01 found missing). */
+    rcp_admin_server_t *srv = rcp_admin_server_new();
+    char long_name[64];
+    char long_labels[128];
+    char buf[8192];
+    size_t needed;
+
+    memset(long_name, 'a', sizeof(long_name) - 1);
+    long_name[sizeof(long_name) - 1] = '\0';
+    memset(long_labels, 'b', sizeof(long_labels) - 1);
+    long_labels[sizeof(long_labels) - 1] = '\0';
+
+    /* Unformatted, this line would be ~297 bytes -- more than the 256-byte
+       stack buffer inside rcp_admin_server_metrics_text -- so each line is
+       expected to be safely truncated, not fully preserved. The property
+       under test is memory safety (no OOB read, verified by the ASan/UBSan
+       CI job) and internally-consistent length accounting, not verbatim
+       content preservation. */
+    TEST_ASSERT_TRUE(rcp_admin_server_record_counter(srv, long_name, long_labels, 1e300));
+
+    needed = rcp_admin_server_metrics_text(srv, NULL, 0);
+    TEST_ASSERT_TRUE(needed > 0);
+
+    rcp_admin_server_metrics_text(srv, buf, sizeof(buf));
+    TEST_ASSERT_EQUAL_UINT(needed, (unsigned)strlen(buf));
+    TEST_ASSERT_NOT_NULL(strstr(buf, "# TYPE "));
+    TEST_ASSERT_NOT_NULL(strstr(buf, long_name));
+
+    rcp_admin_server_destroy(srv);
+}
+
 /* ── Concurrency ──────────────────────────────────────────────────────────── */
 
 typedef struct {
@@ -233,6 +271,7 @@ int main(void)
     RUN_TEST(test_record_counter_accumulates_each_delta_exactly_once);
     RUN_TEST(test_distinct_name_labels_tracked_separately);
     RUN_TEST(test_metrics_text_renders_prometheus_format);
+    RUN_TEST(test_metrics_text_with_long_name_and_labels_does_not_read_out_of_bounds);
     RUN_TEST(test_admin_server_tolerates_concurrent_mutation);
 
     return UNITY_END();

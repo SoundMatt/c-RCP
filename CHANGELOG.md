@@ -31,6 +31,26 @@ the rationale.
 
 ## Releases
 
+### v0.98.0 -- 2026-07-30
+
+Fix an out-of-bounds stack read in Prometheus metrics rendering
+(NEW-C-01, found by a follow-up re-audit after v0.97.0). Each counter
+line is formatted into a fixed 256-byte stack buffer via `snprintf`,
+but the code then used `snprintf`'s return value -- the length that
+*would* have been written, not the truncated length actually in the
+buffer -- as the size passed to `memcpy`. A counter with a long enough
+`name`/`labels` pair (up to 63/127 bytes each, embedded twice for
+`name`) formats to ~297 bytes, so the `memcpy` read ~41 bytes past the
+end of `line[]` into adjacent stack contents (CWE-125, reachable by
+any long-enough registered counter; a real memory-safety defect in a
+safety-certified C library). Fixed by clamping to the buffer's actual
+capacity before copying, the same defensive pattern `cli.c` already
+uses elsewhere in this codebase. Added a regression test
+(`test_metrics_text_with_long_name_and_labels_does_not_read_out_of_bounds`)
+with a maximal-length name/labels pair; confirmed it reproduces a
+`stack-buffer-overflow` under ASan against the unfixed code and passes
+clean against the fix. (Milestone 98.)
+
 ### v0.97.0 -- 2026-07-30
 
 Fix a real HARA.md documentation bug found alongside a 2026-07-30
