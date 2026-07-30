@@ -531,6 +531,11 @@ static void test_adapt_returns_non_null(void)
     TEST_ASSERT_NOT_NULL(caller);
 
     rcp_relay_caller_release(caller);
+    /* rcp_adapt() retains its own reference to t (adapt.c's
+     * rcp_relay_caller_release() only drops that one); the reference
+     * this test obtained from rcp_avtp_loopback_transport_new() is
+     * still this test's own to release. */
+    rcp_avtp_transport_release(t);
 }
 
 static void test_adapt_protocol_returns_rcp(void)
@@ -541,6 +546,7 @@ static void test_adapt_protocol_returns_rcp(void)
     TEST_ASSERT_EQUAL(RELAY_PROTOCOL_RCP, rcp_relay_caller_protocol(caller));
 
     rcp_relay_caller_release(caller);
+    rcp_avtp_transport_release(t);
 }
 
 static void test_adapt_rejects_op_outside_bound_kind(void)
@@ -557,6 +563,7 @@ static void test_adapt_rejects_op_outside_bound_kind(void)
 
     relay_message_free(&msg);
     rcp_relay_caller_release(caller);
+    rcp_avtp_transport_release(t);
 }
 
 static void test_adapt_send_transmits_a_valid_gpio_write_request(void)
@@ -598,6 +605,10 @@ static void test_adapt_send_transmits_a_valid_gpio_write_request(void)
 
     relay_message_free(&msg);
     rcp_relay_caller_release(caller);
+    /* caller only holds its own retained reference to client_t (see
+     * test_adapt_returns_non_null()'s comment); this test's own
+     * reference from rcp_shmem_avtp_pair_new() is separate. */
+    rcp_avtp_transport_release(client_t);
     rcp_avtp_transport_release(server_t);
 }
 
@@ -643,6 +654,7 @@ static void test_adapt_call_gpio_read_returns_mapped_response(void)
     relay_message_free(&req);
     relay_message_free(&resp);
     rcp_relay_caller_release(caller);
+    rcp_avtp_transport_release(client_t);
     rcp_avtp_transport_release(server_t);
 }
 
@@ -658,6 +670,7 @@ static void test_adapt_subscribe_is_not_supported(void)
     TEST_ASSERT_NULL(ch);
 
     rcp_relay_caller_release(caller);
+    rcp_avtp_transport_release(t);
 }
 
 static void test_adapt_close_is_idempotent(void)
@@ -669,6 +682,7 @@ static void test_adapt_close_is_idempotent(void)
     TEST_ASSERT_EQUAL(RCP_OK, rcp_relay_caller_close(caller));
 
     rcp_relay_caller_release(caller);
+    rcp_avtp_transport_release(t);
 }
 
 static void test_caller_retain_returns_same_pointer_and_keeps_it_alive(void)
@@ -687,6 +701,7 @@ static void test_caller_retain_returns_same_pointer_and_keeps_it_alive(void)
     TEST_ASSERT_NULL(rcp_relay_caller_retain(NULL));
 
     rcp_relay_caller_release(caller);
+    rcp_avtp_transport_release(t);
 }
 
 /* ── §5.2 error wrapping ───────────────────────────────────────────────────── */
@@ -712,6 +727,7 @@ static void test_send_closed_error_is_relay_equivalent(void)
 
     relay_message_free(&msg);
     rcp_relay_caller_release(caller);
+    rcp_avtp_transport_release(t);
 }
 
 static void test_call_timeout_error_is_relay_equivalent(void)
@@ -737,6 +753,7 @@ static void test_call_timeout_error_is_relay_equivalent(void)
 
     relay_message_free(&req);
     rcp_relay_caller_release(caller);
+    rcp_avtp_transport_release(client_t);
     rcp_avtp_transport_release(server_t);
 }
 

@@ -31,6 +31,23 @@ the rationale.
 
 ## Releases
 
+### v0.95.0 -- 2026-07-30
+
+CI hardening: two masked/missing gates found by the 2026-07-30
+ecosystem audit are now real. Added a `sanitizers (ASan/UBSan)` job
+(c-RCP-N2-04): builds and runs the full test suite with
+`-fsanitize=address,undefined`, hard-gated (no `|| true`) -- this
+codebase parses untrusted network frames with unchecked pointer
+arithmetic throughout, which static lint alone cannot prove free of
+out-of-bounds reads or integer-overflow UB. Split the DO-178C
+structural-coverage step (c-RCP-N2-05) into two: the original DAL-B
+report generation stays best-effort (DAL-B's 100%/100% target isn't
+met yet -- tracked separately, c-RCP-11), but a new "Coverage
+regression gate" step now hard-fails if line coverage drops below 88%
+(comfortably under the ~94% currently measured, leaving toolchain
+variance margin) -- previously nothing enforced any coverage floor at
+all. (Milestone 95; see `ROADMAP.md` for full detail.)
+
 ### v0.94.0 -- 2026-07-30
 
 Fix three CLI `capabilities` self-report accuracy issues found by the
