@@ -94,11 +94,11 @@ static void test_message_set_id_replaces_prior_value(void)
     relay_message_t m;
     relay_message_init(&m);
 
-    TEST_ASSERT_TRUE(relay_message_set_id(&m, "FrontLeft"));
-    TEST_ASSERT_EQUAL_STRING("FrontLeft", m.id);
+    TEST_ASSERT_TRUE(relay_message_set_id(&m, "ep-gpio-0"));
+    TEST_ASSERT_EQUAL_STRING("ep-gpio-0", m.id);
 
-    TEST_ASSERT_TRUE(relay_message_set_id(&m, "RearRight"));
-    TEST_ASSERT_EQUAL_STRING("RearRight", m.id);
+    TEST_ASSERT_TRUE(relay_message_set_id(&m, "ep-pwm-1"));
+    TEST_ASSERT_EQUAL_STRING("ep-pwm-1", m.id);
 
     relay_message_free(&m);
 }

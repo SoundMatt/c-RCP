@@ -4726,3 +4726,94 @@ change, no source touched). `cfusa` v0.5.49
 `check`/`lint`/`analyze`/`cyber`/`qualify`/`vuln`/`trace --req-coverage
 100`/`trace --sec-tested 100` all unchanged from the prior milestone
 (this change touches no tagged/tested code).
+
+### 91. Remove retired pre-TC18 placeholder protocol residue (v0.91.0) ✅
+
+A cross-repo ecosystem audit (2026-07-30) found that, despite the TC18
+AVTP/ACF/register-map/lifecycle/endpoint core having been this project's
+real, primary protocol implementation since Phase 13, the *retired*
+pre-TC18 placeholder protocol was still compiled into the shipped `rcp`
+static library: `src/wire.c`/`include/rcp/wire.h` (a bespoke
+length-framed codec keyed to an `'RC'` magic, carrying `Zone`/
+`CommandType` fields), `src/sim.c`/`include/rcp/sim.h` (a "zone
+controller simulator" built on that same retired model), and
+`rcp.h`/`rcp.c`'s own `rcp_zone_t`/`rcp_command_t`/`rcp_response_t`/
+`rcp_status_t`/`rcp_controller_t`/`rcp_registry_t` vtable-based object
+model. Six test/benchmark targets existed solely to certify this
+residue (`test_rcp`, `test_wire`, `test_sim`, `test_legacy_mock`,
+`bench_mock`, `command_latency_test`, backed by `tests/legacy_mock.*`),
+and `.fusa-reqs.json` carried ~90 dead `REQ-ZONE`/`REQ-PRI`/`REQ-CMD`/
+`REQ-STATUS`/`REQ-CMDSTRUCT`/`REQ-RESP`/`REQ-STAT`/`REQ-CTRL`/`REQ-REG`/
+`REQ-SIM`/`REQ-ERR-*` requirement entries tracing it. An orphaned
+`tooling/zone_manifest_schema.json` for the retired zone registry (no
+build target, test, or source consumed it) rounded out the residue.
+
+Per RELAY spec §15.5 ("RCP now means the real ... TC18 ... not the
+earlier RELAY-internal placeholder protocol ... There is no
+compatibility shim"), removed outright: `src/wire.c`, `include/rcp/
+wire.h`, `src/sim.c`, `include/rcp/sim.h`, `tests/legacy_mock.{h,c}`,
+`tests/test_rcp.c`, `tests/test_wire.c`, `tests/test_sim.c`,
+`tests/test_legacy_mock.c`, `tests/bench_mock.c`,
+`tests/command_latency_test.c`, `tooling/zone_manifest_schema.json`,
+and every CMakeLists.txt reference to them. Verified beforehand (grep
+across every `.c`/`.h` file) that no satellite decorator
+(authz/loan/ratelimit/watchdog/deadline/powerstate/e2e/faultinject/
+observe/recorder/adapt) or any other surviving module had a real
+(non-comment) dependency on the removed types -- they had all already
+migrated to TC18 addressing (`rcp_avtp_addr_t`) at milestones 78-84, and
+their remaining hits were historical migration-note comments only,
+left untouched.
+
+`rcp.h`/`rcp.c` were a **partial** removal, not a deletion: the
+protocol-agnostic primitives every TC18 module actually shares --
+`rcp_bytes_t` (+`rcp_bytes_dup`/`rcp_bytes_free`), the base `rcp_errc_t`
+sentinels (minus the now-meaningless `RCP_ERR_ZONE_MISMATCH`),
+`rcp_context_t` (+its inline helpers), and `RCP_SPEC_VERSION` -- were
+kept in place rather than relocated to a new header, since every module
+in the tree already includes `"rcp/rcp.h"` and a rename would have
+touched dozens of unrelated files for no behavioral benefit.
+`rcp_bytes_dup()`/`rcp_bytes_free()` had been tagged with
+`REQ-CTRL-026`/`REQ-CTRL-027`/`REQ-STAT-004` -- retired-model-specific
+requirements describing `rcp_controller_send()`/`rcp_status_t` payload
+copying -- so those three were purged along with the rest of `REQ-CTRL`/
+`REQ-STAT` and replaced with two new, honestly-scoped `REQ-CORE-*`
+requirements describing the primitive itself, with a new
+`tests/test_core.c` covering them plus the surviving `REQ-ERR-*`
+sentinel/`rcp_strerror()`/`relay_strerror()` properties that `test_rcp.c`
+used to test (that file's own coverage of the *removed* zone/command
+surface was not ported forward).
+
+Also found and fixed in the same pass: `src/platform.c` (mutex/condvar/
+thread primitives) and `src/clock.c` (`rcp_monotonic_ms()`) -- both
+generic, codebase-wide infrastructure with no dependency on the retired
+model -- had been tagged with `REQ-CTRL-004`/`007`/`011`/`018`/`019`
+(coincidental reuse of Controller-concurrency requirement IDs, the same
+loose-tagging pattern already seen with `wire.c`'s reuse of `REQ-UDP-*`,
+except those *did* remain valid post-removal since `udp.c` still
+implements them -- these did not, since their only other consumer,
+`tests/legacy_mock.c`, was also removed). Retagged as three new,
+dedicated `REQ-PLATFORM-*` requirements with direct unit coverage in a
+new `tests/test_platform.c` (previously only exercised indirectly
+through the retired mock's own test suite).
+
+`README.md`'s "Legacy API" section (which pointed at the now-removed
+surface) was rewritten as "Removed legacy API", and the one arbitrary
+zone-name string literal in `tests/test_adapt.c` (`"FrontLeft"`/
+`"RearRight"`, used only as generic `relay_message_t.id` test values
+with no zone-lookup semantics) was renamed to `"ep-gpio-0"`/`"ep-pwm-1"`
+to stop implying a connection to the removed model.
+
+Verified locally: full `ctest` suite (56/56 -- 60 minus the six removed
+placeholder-certifying targets, plus the two new `test_core`/
+`test_platform` targets), clean build with zero compiler warnings
+(`-Wall -Wextra -Wpedantic -Wshadow -Wcast-align -Wunused
+-Wstrict-prototypes -Wmissing-prototypes`), `cfusa` v0.5.49
+`check`/`lint`/`analyze`/`cyber`/`qualify`/`vuln` all exit 0 (warning/
+info counts strictly lower than before, as expected from removing
+code), `trace --req-coverage 100` and `trace --sec-tested 100` both
+100% (771/771, down from 854/854 -- 88 requirements purged outright,
+of which 5 had been retired-model-tagged despite covering otherwise-
+generic, still-kept code, so they were re-created as 5 new,
+honestly-scoped requirements: `REQ-CORE-001`/`002` and
+`REQ-PLATFORM-001`/`002`/`003`), and RELAY's own `relay conform
+--strict` still PASS against the built `c-rcp` CLI.

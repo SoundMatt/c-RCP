@@ -11,8 +11,7 @@
 
 #if defined(_WIN32)
 
-//cfusa:req REQ-CTRL-018
-//cfusa:req REQ-CTRL-019
+//cfusa:req REQ-PLATFORM-001
 void rcp_mutex_init(rcp_mutex_t *m)    { InitializeCriticalSection(m); }
 void rcp_mutex_lock(rcp_mutex_t *m)    { EnterCriticalSection(m); }
 void rcp_mutex_unlock(rcp_mutex_t *m)  { LeaveCriticalSection(m); }
@@ -47,8 +46,7 @@ static DWORD WINAPI thread_trampoline(LPVOID param)
     return 0;
 }
 
-//cfusa:req REQ-CTRL-007
-//cfusa:req REQ-CTRL-011
+//cfusa:req REQ-PLATFORM-002
 int rcp_thread_start_detached(void (*fn)(void *arg), void *arg)
 {
     thread_thunk_t *t = (thread_thunk_t *)malloc(sizeof(thread_thunk_t));
@@ -106,8 +104,7 @@ void rcp_sleep_ms(unsigned ms)
 
 #include <time.h>
 
-//cfusa:req REQ-CTRL-018
-//cfusa:req REQ-CTRL-019
+//cfusa:req REQ-PLATFORM-001
 void rcp_mutex_init(rcp_mutex_t *m)    { pthread_mutex_init(m, NULL); }
 void rcp_mutex_lock(rcp_mutex_t *m)    { pthread_mutex_lock(m); }
 void rcp_mutex_unlock(rcp_mutex_t *m)  { pthread_mutex_unlock(m); }
@@ -159,8 +156,7 @@ static void *thread_trampoline(void *param)
     return NULL;
 }
 
-//cfusa:req REQ-CTRL-007
-//cfusa:req REQ-CTRL-011
+//cfusa:req REQ-PLATFORM-002
 int rcp_thread_start_detached(void (*fn)(void *arg), void *arg)
 {
     pthread_t tid;

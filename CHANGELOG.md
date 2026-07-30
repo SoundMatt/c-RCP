@@ -25,8 +25,35 @@ the rationale.
 | `redundancy.h`/`redundancy.c` | v0.83.0 | None (no server-redundancy concept in TC18) | v0.83.0 |
 | `federation.h`/`federation.c` | v0.83.0 | None (no TC18 counterpart to the zone/HPC-lease registry model) | v0.83.0 |
 | `dyndata.h`/`dyndata.c` | v0.83.0 | None (every TC18 endpoint has one fixed, spec-defined payload shape) | v0.83.0 |
+| `wire.h`/`wire.c` (the `'RC'`-magic placeholder codec) | v0.91.0 | The real TC18 AVTP/ACF layer (`avtp.h`/`avtp.c`, `acf.h`/`acf.c`), present and primary since Phase 13 | v0.91.0 |
+| `sim.h`/`sim.c` (zone-controller simulator) | v0.91.0 | None in this repo; SiL/HIL simulation against the TC18 RC Server/Endpoint model can be built on `mock.h`/`mock.c` instead | v0.91.0 |
+| `rcp.h`/`rcp.c`'s pre-TC18 object model (`rcp_zone_t`, `rcp_command_t`, `rcp_response_t`, `rcp_status_t`, `rcp_controller_t`, `rcp_registry_t`) | v0.91.0 | The TC18 register-map/lifecycle/endpoint core (`regmap.h`, `lifecycle.h`, `ep_*.h`) | v0.91.0 |
 
 ## Releases
+
+### v0.91.0 -- 2026-07-30
+
+BREAKING: remove the retired pre-TC18 placeholder protocol residue --
+`wire.h`/`wire.c` (the `'RC'`-magic codec), `sim.h`/`sim.c` (the
+zone-controller simulator), the `rcp_zone_t`/`rcp_command_t`/
+`rcp_response_t`/`rcp_status_t`/`rcp_controller_t`/`rcp_registry_t`
+object model in `rcp.h`/`rcp.c`, the `tests/legacy_mock.*` double and its
+six placeholder-certifying test/benchmark targets, ~90 dead
+`REQ-ZONE`/`REQ-PRI`/`REQ-CMD`/`REQ-STATUS`/`REQ-CMDSTRUCT`/`REQ-RESP`/
+`REQ-STAT`/`REQ-CTRL`/`REQ-REG`/`REQ-SIM`/`REQ-ERR-*` requirement
+entries, and the orphaned `tooling/zone_manifest_schema.json`. Per RELAY
+spec §15.5 this ships with no compatibility shim. `rcp.h`/`rcp.c` retain
+only the protocol-agnostic primitives every TC18 module actually shares
+(`rcp_bytes_t`, the base `rcp_errc_t` sentinels, `rcp_context_t`,
+`RCP_SPEC_VERSION`) -- reworked as new `REQ-CORE-*` requirements, since
+their old `REQ-CTRL-026`/`REQ-CTRL-027`/`REQ-STAT-004` tags described
+retired-model-specific copy semantics. Also fixes two generic-primitive
+requirement families (mutex/condvar/thread in `platform.c`, the
+monotonic clock in `clock.c`) that had been coincidentally tagged with
+soon-to-be-deleted `REQ-CTRL-*` IDs despite implementing unrelated,
+codebase-wide infrastructure -- retagged as new `REQ-PLATFORM-*`
+requirements with dedicated test coverage (`tests/test_platform.c`).
+(Milestone 91; see `ROADMAP.md` for full detail.)
 
 ### v0.90.0 -- 2026-07-29
 

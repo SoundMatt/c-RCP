@@ -10,8 +10,7 @@
 
 #include <windows.h>
 
-//cfusa:req REQ-CTRL-004
-//cfusa:req REQ-CTRL-011
+//cfusa:req REQ-PLATFORM-003
 uint64_t rcp_monotonic_ms(void)
 {
     static LARGE_INTEGER freq;
@@ -45,8 +44,7 @@ uint64_t rcp_wallclock_ms(void)
 
 #include <time.h>
 
-//cfusa:req REQ-CTRL-004
-//cfusa:req REQ-CTRL-011
+//cfusa:req REQ-PLATFORM-003
 uint64_t rcp_monotonic_ms(void)
 {
     struct timespec ts;
