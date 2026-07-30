@@ -70,6 +70,49 @@ jobs:
           name: compile-commands
           path: build/compile_commands.json
 
+  # ── Dynamic memory-safety sanitizers (ASan/UBSan) ────────────────────────────
+  #
+  # A hard gate, not a report: this codebase parses untrusted, attacker-
+  # controlled network frames (acf.c, wire-format decoders, discovery.c,
+  # scheduler.c all index into declared-length fields from received bytes)
+  # using unchecked pointer arithmetic throughout, as C99 requires -- static
+  # lint (cfusa-lint/-analyze) cannot itself prove the absence of an
+  # out-of-bounds read or integer-overflow-driven UB on a malformed input;
+  # only exercising the actual decode paths under a runtime sanitizer can.
+  # Runs the full test suite (which already exercises malformed/boundary
+  # inputs in each module's own decoder tests) built with
+  # -fsanitize=address,undefined; any sanitizer trap fails the job (issue
+  # c-RCP-N2-04 / #131).
+  sanitize:
+    name: sanitizers (ASan/UBSan)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake ninja-build clang-14
+
+      - name: Configure (ASan+UBSan)
+        env:
+          CC: clang-14
+        run: |
+          cmake -B build-san \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1" \
+            -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined" \
+            -G Ninja
+
+      - name: Build
+        run: cmake --build build-san --parallel
+
+      - name: Test (ASan+UBSan, halt on first trapped error)
+        env:
+          ASAN_OPTIONS: halt_on_error=1:abort_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build-san --output-on-failure -j1
+
   # ── RELAY conformance gate (spec §12, §17, §20.1) ────────────────────────────
   relay-conform:
     name: relay conform (RELAY §12 conformance)
@@ -479,8 +522,27 @@ jobs:
           name: coverage-info
           path: .
 
-      - name: Structural coverage report (DO-178C)
+      # Best-effort by design, not masking a real gate: DAL-B requires 100%
+      # line + 100% branch coverage, and this project is not there yet
+      # (currently ~94% line / ~78% branch -- see coverage-report.json,
+      # which is committed and does self-report FAIL against DAL-B
+      # deliberately, as an honest, visible artifact of that gap). This
+      # step exists to keep producing that report for the record, not to
+      # gate the build on a target not yet met. The "Coverage regression
+      # gate" step right below it is the actual hard gate (issue
+      # c-RCP-N2-05 / #132): it enforces a real, currently-met floor so a
+      # PR can't silently regress coverage while DAL-B itself remains a
+      # tracked, not-yet-closed goal (c-RCP-11 / #123).
+      - name: Structural coverage report (DO-178C, informational)
         run: /tmp/cfusa/build/cfusa coverage --lcov coverage.info --dal DAL-B --output coverage-report.json || true
+
+      # The real gate: hard-fails if line coverage drops below a floor
+      # comfortably under the currently-measured ~94% (leaving margin for
+      # cross-toolchain lcov/gcov variance), so this at least prevents
+      # regression while the project works toward full DAL-B. Not itself
+      # a DAL-B compliance claim -- see the step above.
+      - name: Coverage regression gate (line floor, not DAL-B)
+        run: /tmp/cfusa/build/cfusa coverage --lcov coverage.info --threshold 88
 
       - name: Full compliance report (JSON)
         run: /tmp/cfusa/build/cfusa report --format json --output report.json || true

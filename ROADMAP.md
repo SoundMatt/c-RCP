@@ -5010,3 +5010,53 @@ its self-report accuracy and internal structure), and RELAY's own
 passing: README.md's Headers table still listed the removed `<rcp/
 sim.h>` from the v0.91.0 retired-protocol removal -- replaced with
 `<rcp/errors.h>` (added v0.93.0), which the table had not yet listed.
+
+### 95. CI hardening: ASan/UBSan job, real coverage regression gate (v0.95.0) ✅
+
+A cross-repo ecosystem audit (2026-07-30) found two CI gaps in
+`.github/workflows/ci.yml`:
+
+c-RCP-N2-04 (#131): the pipeline built only Release and coverage Debug
+configurations and ran MISRA/CERT static lint plus static analysis,
+but no job ever compiled or ran the test suite under a dynamic memory-
+safety sanitizer. For a C library performing untrusted network-frame
+parsing (`acf.c`, wire-format decoders, `discovery.c`, `scheduler.c`
+all index into attacker-controlled buffers via declared-length fields)
+this is a real verification gap: static analysis cannot itself prove
+the absence of an out-of-bounds read or integer-overflow-driven UB on
+a malformed/boundary input. Added a `sanitizers (ASan/UBSan)` job:
+builds with `-fsanitize=address,undefined -fno-sanitize-recover=all`
+on `clang-14`/Ubuntu and runs the full `ctest` suite (`ASAN_OPTIONS=
+halt_on_error=1:abort_on_error=1`, `UBSAN_OPTIONS=halt_on_error=1`) --
+a hard gate, no `|| true`. Verified locally first (macOS/AppleClang,
+same flags): 57/57 tests pass clean under both sanitizers, so this
+gate is expected to land green, not just theoretically correct.
+
+c-RCP-N2-05 (#132): the "Structural coverage report (DO-178C)" step
+and the full-compliance-report steps all appended `|| true`, so a
+DAL-B structural-coverage shortfall (this project measures ~94% line /
+~78% branch against DAL-B's 100%/100% requirement) never failed the
+build, while `coverage-report.json` itself ships as a self-declared
+FAIL artifact nothing consumed (c-RCP-11, #123 -- still open; closing
+that gap fully means raising branch coverage to 100%, out of this
+milestone's scope). Rather than simply removing `|| true` from the
+DAL-B step (which would turn every future CI run red until DAL-B
+itself is met -- not actionable in this milestone), split it in two:
+the DAL-B report generation step stays best-effort and explicitly
+documented as such (still produces the honest FAIL-against-DAL-B
+artifact for the record), and a new "Coverage regression gate" step
+runs `cfusa coverage --lcov coverage.info --threshold 88` (no `--dal`,
+so it checks line coverage only) as a genuine hard gate -- 88% chosen
+with several points of margin under the ~94% currently measured
+(verified locally: 93.72% line via a local lcov/llvm-cov-gcov capture)
+to absorb cross-toolchain (gcc-12 in CI vs. this verification's
+llvm-cov) variance without flaking. This is a real, previously-entirely-
+absent regression-prevention floor, not a DAL-B compliance claim --
+DAL-B itself remains open, tracked via c-RCP-11/#123, not closed here.
+
+Verified locally: full `ctest` suite unaffected (57/57, this milestone
+touches only `.github/workflows/ci.yml` and version files), `cfusa`
+`check`/`lint`/`analyze`/`cyber` all exit 0, YAML syntax validated
+(`python3 -c "import yaml; yaml.safe_load(...)"`), and the new
+sanitizer build + coverage-threshold command both verified to pass
+locally before being wired into CI as hard gates.
