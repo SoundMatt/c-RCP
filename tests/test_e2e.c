@@ -25,6 +25,7 @@
 //cfusa:test REQ-E2E-025
 //cfusa:test REQ-E2E-026
 //cfusa:test REQ-E2E-027
+//cfusa:test REQ-WIREERR-003
 #include "unity.h"
 
 #include <rcp/e2e.h>
@@ -51,6 +52,20 @@ static void test_strerror_never_null_and_distinct(void)
 
     TEST_ASSERT_TRUE(strcmp(a, b) != 0);
     TEST_ASSERT_TRUE(strcmp(b, c) != 0);
+}
+
+/* ── wire error code mapping (c-RCP-04) ───────────────────────────────────── */
+
+static void test_wire_error_crc_mismatch_maps_to_poci_failure(void)
+{
+    TEST_ASSERT_EQUAL_INT(RCP_ERROR_POCI_FAILURE,
+                           rcp_e2e_wire_error(RCP_E2E_ERR_CRC_MISMATCH));
+}
+
+static void test_wire_error_ok_and_short_frame_map_to_none(void)
+{
+    TEST_ASSERT_EQUAL_INT(RCP_ERROR_NONE, rcp_e2e_wire_error(RCP_E2E_OK));
+    TEST_ASSERT_EQUAL_INT(RCP_ERROR_NONE, rcp_e2e_wire_error(RCP_E2E_ERR_SHORT_FRAME));
 }
 
 /* ── CRC32 known-answer test ───────────────────────────────────────────────── */
@@ -561,6 +576,9 @@ int main(void)
     UNITY_BEGIN();
 
     RUN_TEST(test_strerror_never_null_and_distinct);
+
+    RUN_TEST(test_wire_error_crc_mismatch_maps_to_poci_failure);
+    RUN_TEST(test_wire_error_ok_and_short_frame_map_to_none);
 
     RUN_TEST(test_crc32_known_answer_vector);
     RUN_TEST(test_crc32_empty_input);
