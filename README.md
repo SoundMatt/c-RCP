@@ -16,9 +16,10 @@ standard, and Phases 13–22 replaced it outright — see `ROADMAP.md`'s
 Protocol Replacement Notice. This project no longer mirrors cpp-RCP/
 go-RCP/rust-RCP port-for-port; requirements are derived directly from
 the OPEN Alliance TC18 Remote Control Protocol Specification v0.5.1_RC.
-The pre-replacement Zone/Command surface still exists in
-`include/rcp/rcp.h`/`src/rcp.c`, retained only for existing pre-v0.59
-consumers — see "Legacy API" below.)*
+The pre-replacement Zone/Command surface that used to live in
+`include/rcp/rcp.h`/`src/rcp.c` (retained for a time for pre-v0.59
+consumers) has since been removed outright with no compatibility shim,
+per RELAY spec §15.5 — see "Removed legacy API" below.)*
 
 [![CI](https://github.com/SoundMatt/c-RCP/actions/workflows/ci.yml/badge.svg)](https://github.com/SoundMatt/c-RCP/actions/workflows/ci.yml)
 [![DCO](https://github.com/SoundMatt/c-RCP/actions/workflows/dco.yml/badge.svg)](https://github.com/SoundMatt/c-RCP/actions/workflows/dco.yml)
@@ -149,18 +150,24 @@ c-RCP targets deployment in automotive safety-critical environments.
   `FORMAL_VERIFICATION.md`)
 - c-FuSa static analysis (MISRA-C:2012 / CERT-C) runs in CI on every PR
 
-## Legacy API
+## Removed legacy API
 
-`include/rcp/rcp.h` and `src/rcp.c` still define the pre-TC18
+`include/rcp/rcp.h` and `src/rcp.c` used to also define the pre-TC18
 `rcp_zone_t`/`rcp_command_t`/`rcp_response_t`/`rcp_status_t`/
-`rcp_controller_t`/`rcp_registry_t` surface, retained only for existing
-pre-v0.59 consumers — no new code in this repository depends on it as of
-v0.84.0. It is not part of this library's TC18 conformance claim or its
-ISO 26262/ISO 21434 safety and security case (see `HARA.md`/`tara.md`).
-New integrations should use the headers listed above instead. Anyone
-needing the full pre-replacement protocol as it stood before Phase 13
-can pin to the `v0.58.x` tag series, which remains a valid, buildable
-snapshot indefinitely.
+`rcp_controller_t`/`rcp_registry_t` surface (plus the `'RC'`-magic
+`wire.h`/`wire.c` codec and the `sim.h`/`sim.c` zone-controller
+simulator built on top of it), retained for a time for existing
+pre-v0.59 consumers. It was never part of this library's TC18
+conformance claim or its ISO 26262/ISO 21434 safety and security case
+(see `HARA.md`/`tara.md`), and as of this removal no code in this
+repository depended on it any more. Per RELAY spec §15.5 the removal
+ships with no compatibility shim; `rcp.h`/`rcp.c` now define only the
+protocol-agnostic primitives (`rcp_bytes_t`, the base `rcp_errc_t`
+sentinels, `rcp_context_t`) that the TC18 modules above actually share.
+Anyone needing the full pre-replacement protocol as it stood before
+Phase 13, or the placeholder wire codec/simulator as they stood before
+this removal, can pin to the `v0.90.x` tag series or earlier, which
+remains a valid, buildable snapshot indefinitely.
 
 ## Changelog
 
