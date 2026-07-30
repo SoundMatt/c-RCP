@@ -86,24 +86,33 @@
  * The CRC spans, in order: the 8-byte StreamID this request stream is
  * addressed by (avtp.h's own addressing model; pass 0 for the all-zero
  * stand-in an NTSCF-framed message uses in place of a real StreamID),
- * the 8-byte avtp_timestamp (again 0 under NTSCF framing, which carries
- * no timestamp of its own), and finally the complete ACF header-and-
- * payload region exactly as acf.c's rcp_acf_encode_abb()/_encode_gbb()
- * would produce it. rcp_e2e_wrap() appends a RCP_E2E_CRC_LEN-byte
- * (4-octet / one-quadlet) big-endian trailer of that CRC value; because
- * that trailer becomes part of what the ACF header's own acf_msg_length
- * field (acf.h) must declare, acf_msg_length has to be computed against
- * the *safety-protected* payload length, not the original one --
- * rcp_e2e_length_with_crc() is the pure arithmetic expression of that
- * pre-adjustment. This module does not call into acf.c itself (matching
- * every request-kind module's own "own small pure helpers, don't reach
- * into sibling modules" layering discipline): a caller assembles the
- * safety-protected payload (original payload + placeholder CRC bytes),
- * passes its length via rcp_e2e_length_with_crc() to whichever of
- * acf.c's encoders it is using, and separately calls rcp_e2e_wrap() to
- * produce the actual trailer bytes, or drives both ends through
- * rcp_e2e_wrap()/rcp_e2e_unwrap() directly against an
- * already-assembled ACF header-and-payload region.
+ * the 4-byte avtp_timestamp (IEEE 1722's own field width; again all-zero
+ * under NTSCF framing, which carries no timestamp of its own), and
+ * finally the complete ACF header-and-payload region exactly as acf.c's
+ * rcp_acf_encode_abb()/_encode_gbb() would produce it, *after* the
+ * length adaptation below has already been applied to it.
+ *
+ * Before that CRC is computed, the ACF header's own acf_msg_length field
+ * (acf.h, offset 1-2, big-endian) has to be adapted by plus one quadlet
+ * (RCP_E2E_CRC_LEN, 4 octets) to account for the trailer about to be
+ * appended -- a receiver needs acf_msg_length to describe the message's
+ * true on-wire length, trailer included, to know where it ends.
+ * rcp_e2e_wrap() owns this adaptation itself (patching the copy it
+ * returns, not the caller's original acf_frame) rather than requiring
+ * the caller to pre-assemble an already-extended payload: it is the
+ * "composed encode entry point" that adapts the ACF length and inserts
+ * the CRC together, called against an already fully-encoded ACF
+ * header-and-payload region exactly as acf.c's own encoders produced
+ * it, with their original (un-adapted) acf_msg_length still in place.
+ * rcp_e2e_unwrap() reverses both steps: it verifies the CRC (computed,
+ * like the sender did, over the *adapted* frame) and returns a copy of
+ * the header-and-payload region with acf_msg_length adapted back down
+ * by one quadlet, ready to hand to acf.c's rcp_acf_decode_abb()/_gbb()
+ * unmodified. rcp_e2e_length_with_crc() remains available as the pure
+ * arithmetic expression of the same +1-quadlet adjustment, for a caller
+ * that instead wants to pre-size its own payload buffer before calling
+ * into acf.c directly (e.g. to reserve the trailer's space up front
+ * rather than have rcp_e2e_wrap() reallocate a copy).
  *
  * On a CRC mismatch, rcp_e2e_unwrap() returns
  * RCP_E2E_ERR_CRC_MISMATCH -- this module's own spelling of CRC_ERROR
@@ -261,12 +270,13 @@ const char *rcp_e2e_strerror(rcp_e2e_errc_t e);
 uint32_t rcp_e2e_crc32(const uint8_t *data, size_t len);
 
 /* The coverage-span-specific wrapper: CRC32 over stream_id (8 bytes,
- * big-endian) + avtp_timestamp (8 bytes, big-endian) +
+ * big-endian) + avtp_timestamp (4 bytes, big-endian -- IEEE 1722's own
+ * field width; pass 0 for the NTSCF all-zero stand-in) +
  * acf_frame[0..acf_frame_len). acf_frame may be NULL iff acf_frame_len ==
  * 0. Equivalent to concatenating those three regions and calling
  * rcp_e2e_crc32() once, without the allocation such a concatenation
  * would need. */
-uint32_t rcp_e2e_compute_crc(uint64_t stream_id, uint64_t avtp_timestamp,
+uint32_t rcp_e2e_compute_crc(uint64_t stream_id, uint32_t avtp_timestamp,
                               const uint8_t *acf_frame, size_t acf_frame_len);
 
 /* The length-accounting pre-adjustment: payload_len + RCP_E2E_CRC_LEN.
@@ -276,31 +286,44 @@ size_t rcp_e2e_length_with_crc(size_t payload_len);
 
 /* ── wrap / unwrap ─────────────────────────────────────────────────────────── */
 
-/* Appends a RCP_E2E_CRC_LEN-byte big-endian trailer to acf_frame (an
+/* The composed encode entry point: adapts a copy of acf_frame (an
  * already fully-encoded ACF_ABB/ACF_GBB header-and-payload region, as
- * produced by acf.c), computed via rcp_e2e_compute_crc() over
- * stream_id + avtp_timestamp + acf_frame. acf_frame may be NULL iff
- * acf_frame_len == 0. Returns a freshly heap-allocated, owned rcp_bytes_t
- * (data=NULL, len=0 on allocation failure); caller frees the result with
+ * produced by acf.c, still carrying its own original un-adapted
+ * acf_msg_length) by incrementing its acf_msg_length field (acf.h,
+ * offset 1-2, big-endian) by one quadlet (RCP_E2E_CRC_LEN), computes the
+ * CRC via rcp_e2e_compute_crc() over stream_id + avtp_timestamp + that
+ * adapted copy, and appends the RCP_E2E_CRC_LEN-byte big-endian trailer.
+ * acf_frame may be NULL iff acf_frame_len == 0. acf_frame_len must be at
+ * least 3 octets (enough to contain the acf_msg_length field at offset
+ * 1-2) for the adaptation to have anywhere to write; shorter non-NULL
+ * frames fail safe (data=NULL, len=0), as does an acf_msg_length value
+ * already within RCP_E2E_CRC_LEN of overflowing its 16-bit field. Caller
+ * owns acf_frame throughout -- it is read, never modified. Returns a
+ * freshly heap-allocated, owned rcp_bytes_t (data=NULL, len=0 on
+ * allocation failure or any of the above); caller frees the result with
  * rcp_bytes_free(). */
-rcp_bytes_t rcp_e2e_wrap(uint64_t stream_id, uint64_t avtp_timestamp,
+rcp_bytes_t rcp_e2e_wrap(uint64_t stream_id, uint32_t avtp_timestamp,
                           const uint8_t *acf_frame, size_t acf_frame_len);
 
-/* Validates and strips the trailing CRC32 from frame (header-and-payload
- * plus trailer, as produced by rcp_e2e_wrap()). On RCP_E2E_OK,
- * *out_acf_frame / *out_acf_frame_len point into frame (borrowed, not
- * copied -- matching acf.c's own decode_* convention) covering just the
- * header-and-payload region, ready to hand to acf.c's
- * rcp_acf_decode_abb()/_decode_gbb(). Returns RCP_E2E_ERR_SHORT_FRAME
- * if frame_len < RCP_E2E_CRC_LEN (*out_acf_frame / *out_acf_frame_len
- * left untouched). Returns RCP_E2E_ERR_CRC_MISMATCH (CRC_ERROR) if the
- * trailing CRC does not match -- the caller must skip executing the
- * request this frame carries; *out_acf_frame / *out_acf_frame_len are still
- * populated in this case, for diagnostic use, but must not be treated as
- * a validated payload. */
-rcp_e2e_errc_t rcp_e2e_unwrap(uint64_t stream_id, uint64_t avtp_timestamp,
+/* The composed decode entry point, reversing rcp_e2e_wrap(): validates
+ * the trailing CRC32 of frame (header-and-payload plus trailer, as
+ * produced by rcp_e2e_wrap(), acf_msg_length still reflecting the
+ * sender's +1-quadlet adaptation) via rcp_e2e_compute_crc() over
+ * stream_id + avtp_timestamp + frame-minus-trailer, then -- regardless
+ * of match -- writes *out_acf_frame a freshly heap-allocated copy of the
+ * header-and-payload region (frame minus the trailing RCP_E2E_CRC_LEN
+ * bytes) with acf_msg_length adapted back down by one quadlet, ready to
+ * hand to acf.c's rcp_acf_decode_abb()/_decode_gbb() unmodified. Caller
+ * frees *out_acf_frame with rcp_bytes_free() once RCP_E2E_OK or
+ * RCP_E2E_ERR_CRC_MISMATCH is returned. Returns RCP_E2E_ERR_SHORT_FRAME
+ * if frame_len < RCP_E2E_CRC_LEN (*out_acf_frame left zeroed, nothing to
+ * free). Returns RCP_E2E_ERR_CRC_MISMATCH (CRC_ERROR) if the trailing
+ * CRC does not match -- the caller must skip executing the request this
+ * frame carries; *out_acf_frame is still populated in this case, for
+ * diagnostic use, but must not be treated as a validated payload. */
+rcp_e2e_errc_t rcp_e2e_unwrap(uint64_t stream_id, uint32_t avtp_timestamp,
                                const uint8_t *frame, size_t frame_len,
-                               const uint8_t **out_acf_frame, size_t *out_acf_frame_len);
+                               rcp_bytes_t *out_acf_frame);
 
 /* ── Fragmentation/CRC interaction (modeled now, activated at Phase 20) ────── */
 

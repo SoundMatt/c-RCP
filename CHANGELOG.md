@@ -31,6 +31,34 @@ the rationale.
 
 ## Releases
 
+### v0.92.0 -- 2026-07-30
+
+BREAKING: fix two E2E CRC32 wire-conformance defects found by the
+2026-07-30 ecosystem audit. `rcp_e2e_compute_crc()` (and the
+`rcp_e2e_wrap()`/`rcp_e2e_unwrap()` pair built on it) folded
+`avtp_timestamp` into the CRC as 8 octets; it is a 4-octet field on the
+wire (matching `avtp.h`'s own `uint32_t` modeling of it), so every
+E2E-protected frame carried 4 extra always-zero octets no conformant
+peer would include -- no safe-command-mode CRC produced by this
+implementation could validate against one, or vice versa. Changed the
+`avtp_timestamp` parameter on all three functions from `uint64_t` to
+`uint32_t`.
+
+Separately, `rcp_e2e_wrap()` never performed the mandated "adapt
+acf_msg_length by plus one quadlet before computing the CRC" step:
+it appended the trailer to an already-encoded ACF frame without
+touching the acf_msg_length field baked into that frame's header, so
+the declared message length under-counted the trailer by 4 octets --
+wrong for any peer relying on acf_msg_length to find message
+boundaries in a concatenated ACF stream. `rcp_e2e_wrap()` now adapts a
+copy of the given frame's acf_msg_length (offset 1-2 per acf.h's
+documented layout) by +1 quadlet before computing the CRC and
+appending the trailer; `rcp_e2e_unwrap()` reverses both steps and
+returns an owned copy (previously a borrowed pointer into the input)
+ready to hand to acf.c's decoders unmodified.
+
+(Milestone 92; see `ROADMAP.md` for full detail.)
+
 ### v0.91.0 -- 2026-07-30
 
 BREAKING: remove the retired pre-TC18 placeholder protocol residue --

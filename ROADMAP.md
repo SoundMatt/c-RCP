@@ -4817,3 +4817,81 @@ generic, still-kept code, so they were re-created as 5 new,
 honestly-scoped requirements: `REQ-CORE-001`/`002` and
 `REQ-PLATFORM-001`/`002`/`003`), and RELAY's own `relay conform
 --strict` still PASS against the built `c-rcp` CLI.
+
+### 92. Fix E2E CRC32 timestamp width and acf_msg_length adaptation (v0.92.0) ✅
+
+A cross-repo ecosystem audit (2026-07-30) found two E2E CRC32
+wire-conformance defects in `src/e2e.c`, both critical/high severity
+since the CRC guards safety-tagged request execution:
+
+`rcp_e2e_compute_crc()` fed `avtp_timestamp` into the running CRC as 8
+octets (`put_u64`), but the IEEE 1722 `avtp_timestamp` field this
+module's own file header describes covering is 32-bit/4-octet --
+matching how `avtp.h` itself already models the field (`uint32_t` in
+`rcp_avtp_tscf_header_t`). The mismatch meant every E2E-protected frame
+folded 4 extra always-zero octets into the checksum beyond what a
+conformant peer computes, breaking interop regardless of any other
+fix. Changed `avtp_timestamp` from `uint64_t` to `uint32_t` on
+`rcp_e2e_compute_crc()`/`rcp_e2e_wrap()`/`rcp_e2e_unwrap()`, and the
+internal CRC loop from an 8-byte `put_u64` fold to a 4-byte `put_u32`
+one.
+
+Separately, `rcp_e2e_wrap()` appended its CRC trailer to an
+already-fully-encoded ACF frame without ever adapting that frame's own
+`acf_msg_length` field (acf.h offset 1-2, big-endian) to account for
+the trailer -- the length adaptation this module's own file header had
+always documented as the caller's responsibility ("a caller assembles
+the safety-protected payload... passes its length via
+rcp_e2e_length_with_crc()...") was simply never implemented by
+anything: no caller in the tree drives that documented alternate flow,
+so the composed `rcp_e2e_wrap()`/`rcp_e2e_unwrap()` path -- the one
+the file header also describes as valid -- was the only one actually
+reachable, and it skipped the adaptation entirely. Fixed by having
+`rcp_e2e_wrap()` itself own the adaptation: it now works on a private
+copy of the caller's frame, increments that copy's acf_msg_length by
+one quadlet (`RCP_E2E_CRC_LEN`, matching acf.c's own `payload_len`-only
+convention for that field) via a new file-private
+`adapt_acf_msg_length()` helper, computes the CRC over the *adapted*
+copy, and appends the trailer -- fail-safe (returns a zeroed
+`rcp_bytes_t`) if the given frame is under 3 octets (nowhere for the
+field to live) or already too close to the field's 16-bit ceiling.
+`rcp_e2e_unwrap()` mirrors this: it verifies the CRC against the
+frame as received (already carrying the sender's adaptation), then
+returns a freshly heap-allocated copy of the header-and-payload region
+with acf_msg_length adapted back down by one quadlet, ready for acf.c's
+`rcp_acf_decode_abb()`/`_decode_gbb()` unmodified.
+
+This is a breaking API change to `rcp_e2e_unwrap()`: it previously
+wrote borrowed pointers into the caller's own `frame` buffer
+(`out_acf_frame`/`out_acf_frame_len`); it now takes one `rcp_bytes_t
+*out_acf_frame` and writes an owned, heap-allocated copy the caller
+must free with `rcp_bytes_free()` -- required because the returned
+region's acf_msg_length differs from the corresponding bytes in the
+input (adapted back down by 4), so it can no longer alias the input
+buffer. No caller in this tree used the old borrowed-pointer API
+(verified by grep -- only `tests/test_e2e.c` and `e2e.c` itself
+referenced it), so no other module needed updating.
+
+`e2e.h`'s file header (the "Coverage span and the length-accounting
+pre-adjustment" section) is rewritten to describe the actual, now
+correct, behavior instead of a design that was documented but never
+implemented.
+
+Added: `test_compute_crc_timestamp_is_4_octets_not_8` (pins the CRC
+input width, not just its value, so a regression back to 8 octets
+would fail even if it happened to match on all-zero test timestamps),
+`test_wrap_too_short_for_length_field_fails_safe`,
+`test_wrap_adapts_acf_msg_length_by_one_quadlet` (asserts the encoded
+acf_msg_length actually changes by exactly `RCP_E2E_CRC_LEN`, and that
+the caller's original frame is left untouched). Every existing
+wrap/unwrap/compute_crc test was updated for the new signatures and to
+use frames with a real (if synthetic) acf_msg_length field, since the
+adaptation now needs one.
+
+Verified locally: full `ctest` suite (56/56), zero compiler warnings,
+`cfusa` v0.5.49 `check`/`lint`/`analyze`/`cyber` all exit 0, `trace
+--req-coverage 100` and `trace --sec-tested 100` both still 100%
+(771/771, unchanged -- no requirement family added or removed, only
+`REQ-E2E-003/005/006/007/008/009`'s existing implementations changed
+behavior), and RELAY's own `relay conform --strict` still PASS against
+the built `c-rcp` CLI.
