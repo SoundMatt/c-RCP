@@ -1,65 +1,72 @@
-DO-178C Annex A Gap Report
-Project: c-RCP v0.70.0   DAL: B   Generated: 2026-07-29T17:42:29Z
-Applicable objectives: 57 / 58
-
-ID       PROCESS            OBJECTIVE                                          STATUS
--------- ------------------ -------------------------------------------------- -------
-A1-1     Planning           Software development and verification plan defined [ ] PENDING
-A1-2     Planning           Software development standards defined             [ ] PENDING
-A1-3     Planning           Software verification plan defines means of compliance [ ] PENDING
-A1-4     Planning           Plans reviewed for completeness and accuracy       [ ] PENDING
-A1-5     Planning           SW life cycle environment defined in plans         [ ] PENDING
-A2-1     Development        High-level requirements are developed              [ ] PENDING
-A2-2     Development        HLR are accurate, consistent, and verifiable       [x] COVERED
-A2-3     Development        HLR traceable to system requirements               [ ] PENDING
-A2-4     Development        Low-level requirements are developed               [ ] PENDING
-A2-5     Development        LLR are accurate, consistent, and verifiable       [ ] PENDING
-A2-6     Development        LLR traceable to HLR                               [ ] PENDING
-A2-7     Development        SW architecture is developed                       [ ] PENDING
-A2-8     Development        Architecture is consistent with HLR                [ ] PENDING
-A2-9     Development        Source code implements LLR and architecture        [ ] PENDING
-A2-10    Development        Source code is accurate and consistent             [ ] PENDING
-A2-11    Development        Source code traceable to LLR                       [ ] PENDING
-A2-12    Development        Source code is verifiable                          [ ] PENDING
-A2-13    Development        Executable object code is produced                 [ ] PENDING
-A3-1     Verification       HLR verified — correct (test or review)          [ ] PENDING
-A3-2     Verification       HLR verified — consistent                        [ ] PENDING
-A3-3     Verification       HLR verified — compatible with target computer   [ ] PENDING
-A3-4     Verification       HLR verified — verifiable                        [ ] PENDING
-A3-5     Verification       HLR verified — conforms to standards             [ ] PENDING
-A3-6     Verification       HLR verified — traceable to system requirements  [ ] PENDING
-A3-7     Verification       LLR verified — correct                           [ ] PENDING
-A3-8     Verification       LLR verified — consistent                        [ ] PENDING
-A3-9     Verification       LLR verified — compatible with target            [ ] PENDING
-A3-10    Verification       LLR verified — verifiable                        [ ] PENDING
-A3-11    Verification       LLR verified — conforms to standards             [ ] PENDING
-A3-12    Verification       LLR verified — traceable to HLR                  [ ] PENDING
-A3-13    Verification       SW architecture verified — correct               [ ] PENDING
-A3-14    Verification       SW architecture verified — consistent with HLR   [ ] PENDING
-A3-15    Verification       SW architecture verified — compatible with target [ ] PENDING
-A3-16    Verification       SW architecture verified — verifiable            [ ] PENDING
-A3-17    Verification       SW architecture verified — conforms to standards [ ] PENDING
-A3-18    Verification       Source code verified — complies with standards   [ ] PENDING
-A3-19    Verification       Source code verified — traceable to LLR          [ ] PENDING
-A3-20    Verification       Source code verified — accurate and consistent   [ ] PENDING
-A3-21    Verification       Output of integration verified                     [ ] PENDING
-A4-1     Testing            Test procedures are correct                        [ ] PENDING
-A4-2     Testing            Test results are correct and discrepancies explained [ ] PENDING
-A4-3     Testing            Test coverage of HLR is achieved                   [ ] PENDING
-A4-4     Testing            Test coverage of LLR is achieved                   [ ] PENDING
-A4-5     Testing            Test coverage of SW structure (statement) — DAL C+ [ ] PENDING
-A4-6     Testing            Test coverage of SW structure (decision) — DAL B+ [ ] PENDING
-A5-1     CM                 Configuration items identified                     [ ] PENDING
-A5-2     CM                 Baselines established and documented               [ ] PENDING
-A5-3     CM                 Problem reporting and change control established   [ ] PENDING
-A5-4     CM                 CC process ensures problem reports reviewed and tracked [ ] PENDING
-A6-1     QA                 SW plans and standards reviewed for compliance     [ ] PENDING
-A6-2     QA                 SW life cycle process conforms to plans            [ ] PENDING
-A6-3     QA                 Transition criteria defined and complied with      [ ] PENDING
-A6-4     QA                 SW CCB reviews and approves changes                [ ] PENDING
-A6-5     QA                 Deviations recorded and approved                   [ ] PENDING
-A7-1     Certification      Compliance with certification basis shown          [ ] PENDING
-A7-2     Certification      PSAC submitted and agreed                          [ ] PENDING
-A7-3     Certification      SAS submitted and complete                         [ ] PENDING
-
-Update status column as evidence is produced.
+{
+  "schemaVersion": "1.15.2",
+  "kind": "gap-report",
+  "tool": "c-FuSa",
+  "toolVersion": "0.5.48",
+  "language": "c",
+  "generatedAt": "2026-07-30T15:55:58Z",
+  "projectRoot": ".",
+  "standard": "do178c",
+  "project": "c-RCP",
+  "dal": "B", "applicable": 57, "total": 58,
+  "objectives": [
+    {"id":"A1-1","process":"Planning","title":"Software development and verification plan defined","findings":[],"status":"gap"},
+    {"id":"A1-2","process":"Planning","title":"Software development standards defined","findings":[],"status":"gap"},
+    {"id":"A1-3","process":"Planning","title":"Software verification plan defines means of compliance","findings":[],"status":"gap"},
+    {"id":"A1-4","process":"Planning","title":"Plans reviewed for completeness and accuracy","findings":[],"status":"gap"},
+    {"id":"A1-5","process":"Planning","title":"SW life cycle environment defined in plans","findings":[],"status":"gap"},
+    {"id":"A2-1","process":"Development","title":"High-level requirements are developed","findings":[],"status":"gap"},
+    {"id":"A2-2","process":"Development","title":"HLR are accurate, consistent, and verifiable","findings":[],"status":"satisfied"},
+    {"id":"A2-3","process":"Development","title":"HLR traceable to system requirements","findings":[],"status":"gap"},
+    {"id":"A2-4","process":"Development","title":"Low-level requirements are developed","findings":[],"status":"gap"},
+    {"id":"A2-5","process":"Development","title":"LLR are accurate, consistent, and verifiable","findings":[],"status":"gap"},
+    {"id":"A2-6","process":"Development","title":"LLR traceable to HLR","findings":[],"status":"gap"},
+    {"id":"A2-7","process":"Development","title":"SW architecture is developed","findings":[],"status":"gap"},
+    {"id":"A2-8","process":"Development","title":"Architecture is consistent with HLR","findings":[],"status":"gap"},
+    {"id":"A2-9","process":"Development","title":"Source code implements LLR and architecture","findings":[],"status":"gap"},
+    {"id":"A2-10","process":"Development","title":"Source code is accurate and consistent","findings":[],"status":"gap"},
+    {"id":"A2-11","process":"Development","title":"Source code traceable to LLR","findings":[],"status":"gap"},
+    {"id":"A2-12","process":"Development","title":"Source code is verifiable","findings":[],"status":"gap"},
+    {"id":"A2-13","process":"Development","title":"Executable object code is produced","findings":[],"status":"gap"},
+    {"id":"A3-1","process":"Verification","title":"HLR verified — correct (test or review)","findings":[],"status":"gap"},
+    {"id":"A3-2","process":"Verification","title":"HLR verified — consistent","findings":[],"status":"gap"},
+    {"id":"A3-3","process":"Verification","title":"HLR verified — compatible with target computer","findings":[],"status":"gap"},
+    {"id":"A3-4","process":"Verification","title":"HLR verified — verifiable","findings":[],"status":"gap"},
+    {"id":"A3-5","process":"Verification","title":"HLR verified — conforms to standards","findings":[],"status":"gap"},
+    {"id":"A3-6","process":"Verification","title":"HLR verified — traceable to system requirements","findings":[],"status":"gap"},
+    {"id":"A3-7","process":"Verification","title":"LLR verified — correct","findings":[],"status":"gap"},
+    {"id":"A3-8","process":"Verification","title":"LLR verified — consistent","findings":[],"status":"gap"},
+    {"id":"A3-9","process":"Verification","title":"LLR verified — compatible with target","findings":[],"status":"gap"},
+    {"id":"A3-10","process":"Verification","title":"LLR verified — verifiable","findings":[],"status":"gap"},
+    {"id":"A3-11","process":"Verification","title":"LLR verified — conforms to standards","findings":[],"status":"gap"},
+    {"id":"A3-12","process":"Verification","title":"LLR verified — traceable to HLR","findings":[],"status":"gap"},
+    {"id":"A3-13","process":"Verification","title":"SW architecture verified — correct","findings":[],"status":"gap"},
+    {"id":"A3-14","process":"Verification","title":"SW architecture verified — consistent with HLR","findings":[],"status":"gap"},
+    {"id":"A3-15","process":"Verification","title":"SW architecture verified — compatible with target","findings":[],"status":"gap"},
+    {"id":"A3-16","process":"Verification","title":"SW architecture verified — verifiable","findings":[],"status":"gap"},
+    {"id":"A3-17","process":"Verification","title":"SW architecture verified — conforms to standards","findings":[],"status":"gap"},
+    {"id":"A3-18","process":"Verification","title":"Source code verified — complies with standards","findings":[],"status":"gap"},
+    {"id":"A3-19","process":"Verification","title":"Source code verified — traceable to LLR","findings":[],"status":"gap"},
+    {"id":"A3-20","process":"Verification","title":"Source code verified — accurate and consistent","findings":[],"status":"gap"},
+    {"id":"A3-21","process":"Verification","title":"Output of integration verified","findings":[],"status":"gap"},
+    {"id":"A4-1","process":"Testing","title":"Test procedures are correct","findings":[],"status":"gap"},
+    {"id":"A4-2","process":"Testing","title":"Test results are correct and discrepancies explained","findings":[],"status":"gap"},
+    {"id":"A4-3","process":"Testing","title":"Test coverage of HLR is achieved","findings":[],"status":"gap"},
+    {"id":"A4-4","process":"Testing","title":"Test coverage of LLR is achieved","findings":[],"status":"gap"},
+    {"id":"A4-5","process":"Testing","title":"Test coverage of SW structure (statement) — DAL C+","findings":[],"status":"gap"},
+    {"id":"A4-6","process":"Testing","title":"Test coverage of SW structure (decision) — DAL B+","findings":[],"status":"gap"},
+    {"id":"A5-1","process":"CM","title":"Configuration items identified","findings":[],"status":"gap"},
+    {"id":"A5-2","process":"CM","title":"Baselines established and documented","findings":[],"status":"gap"},
+    {"id":"A5-3","process":"CM","title":"Problem reporting and change control established","findings":[],"status":"gap"},
+    {"id":"A5-4","process":"CM","title":"CC process ensures problem reports reviewed and tracked","findings":[],"status":"gap"},
+    {"id":"A6-1","process":"QA","title":"SW plans and standards reviewed for compliance","findings":[],"status":"gap"},
+    {"id":"A6-2","process":"QA","title":"SW life cycle process conforms to plans","findings":[],"status":"gap"},
+    {"id":"A6-3","process":"QA","title":"Transition criteria defined and complied with","findings":[],"status":"gap"},
+    {"id":"A6-4","process":"QA","title":"SW CCB reviews and approves changes","findings":[],"status":"gap"},
+    {"id":"A6-5","process":"QA","title":"Deviations recorded and approved","findings":[],"status":"gap"},
+    {"id":"A7-1","process":"Certification","title":"Compliance with certification basis shown","findings":[],"status":"gap"},
+    {"id":"A7-2","process":"Certification","title":"PSAC submitted and agreed","findings":[],"status":"gap"},
+    {"id":"A7-3","process":"Certification","title":"SAS submitted and complete","findings":[],"status":"gap"}
+  ],
+  "summary": {"total": 57, "satisfied": 1, "partial": 0, "gaps": 56}
+}
