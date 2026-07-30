@@ -65,23 +65,59 @@ static uint32_t get_u32(const uint8_t *p)
            ((uint32_t)p[2] << 8)  |  (uint32_t)p[3];
 }
 
+static uint16_t get_u16(const uint8_t *p)
+{
+    return (uint16_t)(((uint16_t)p[0] << 8) | (uint16_t)p[1]);
+}
+
+static void put_u16(uint8_t *p, uint16_t v)
+{
+    p[0] = (uint8_t)(v >> 8);
+    p[1] = (uint8_t)v;
+}
+
 //cfusa:req REQ-E2E-003
-uint32_t rcp_e2e_compute_crc(uint64_t stream_id, uint64_t avtp_timestamp,
+uint32_t rcp_e2e_compute_crc(uint64_t stream_id, uint32_t avtp_timestamp,
                                  const uint8_t *acf_frame, size_t acf_frame_len)
 {
     uint32_t crc = 0xFFFFFFFFu;
     uint8_t  sid[8];
-    uint8_t  ts[8];
+    uint8_t  ts[4];
     size_t   i;
 
     put_u64(sid, stream_id);
-    put_u64(ts, avtp_timestamp);
+    put_u32(ts, avtp_timestamp);
 
     for (i = 0; i < 8; i++) crc = crc32_update(crc, sid[i]);
-    for (i = 0; i < 8; i++) crc = crc32_update(crc, ts[i]);
+    for (i = 0; i < 4; i++) crc = crc32_update(crc, ts[i]);
     for (i = 0; i < acf_frame_len; i++) crc = crc32_update(crc, acf_frame[i]);
 
     return crc ^ 0xFFFFFFFFu;
+}
+
+/* Adapts the acf_msg_length field (acf.h's byte_message_info layout,
+ * offset 1-2, big-endian uint16) of frame[0..frame_len) by
+ * delta_quadlets quadlets (RCP_E2E_CRC_LEN octets each), in place.
+ * Returns false, leaving frame unmodified, if frame_len < 3 (too short
+ * to contain the field) or if the adaptation would under/overflow the
+ * 16-bit field; true on success. Private to this module -- e2e.c reads
+ * this one field by documented offset rather than including acf.h,
+ * matching this module's "no dependency on acf.c" layering discipline
+ * (see the file header). */
+static bool adapt_acf_msg_length(uint8_t *frame, size_t frame_len, int delta_quadlets)
+{
+    long delta_octets = (long)delta_quadlets * (long)RCP_E2E_CRC_LEN;
+    long adapted;
+    uint16_t len_field;
+
+    if (frame_len < 3u) return false;
+
+    len_field = get_u16(&frame[1]);
+    adapted   = (long)len_field + delta_octets;
+    if (adapted < 0 || adapted > 0xFFFF) return false;
+
+    put_u16(&frame[1], (uint16_t)adapted);
+    return true;
 }
 
 //cfusa:req REQ-E2E-004
@@ -95,7 +131,7 @@ size_t rcp_e2e_length_with_crc(size_t payload_len)
 
 //cfusa:req REQ-E2E-005
 //cfusa:req REQ-E2E-006
-rcp_bytes_t rcp_e2e_wrap(uint64_t stream_id, uint64_t avtp_timestamp,
+rcp_bytes_t rcp_e2e_wrap(uint64_t stream_id, uint32_t avtp_timestamp,
                              const uint8_t *acf_frame, size_t acf_frame_len)
 {
     rcp_bytes_t out = {0};
@@ -109,7 +145,17 @@ rcp_bytes_t rcp_e2e_wrap(uint64_t stream_id, uint64_t avtp_timestamp,
     if (!data) return out;
 
     if (acf_frame_len > 0) memcpy(data, acf_frame, acf_frame_len);
-    crc = rcp_e2e_compute_crc(stream_id, avtp_timestamp, acf_frame, acf_frame_len);
+
+    /* Adapt the copy's acf_msg_length by +1 quadlet before computing the
+     * CRC, per the coverage-span-and-length-accounting rule in the file
+     * header -- the trailer about to be appended must already be
+     * reflected in the length a conformant peer will read. */
+    if (!adapt_acf_msg_length(data, acf_frame_len, 1)) {
+        free(data);
+        return out;
+    }
+
+    crc = rcp_e2e_compute_crc(stream_id, avtp_timestamp, data, acf_frame_len);
     put_u32(data + acf_frame_len, crc);
 
     out.data = data;
@@ -120,13 +166,17 @@ rcp_bytes_t rcp_e2e_wrap(uint64_t stream_id, uint64_t avtp_timestamp,
 //cfusa:req REQ-E2E-007
 //cfusa:req REQ-E2E-008
 //cfusa:req REQ-E2E-009
-rcp_e2e_errc_t rcp_e2e_unwrap(uint64_t stream_id, uint64_t avtp_timestamp,
+rcp_e2e_errc_t rcp_e2e_unwrap(uint64_t stream_id, uint32_t avtp_timestamp,
                                      const uint8_t *frame, size_t frame_len,
-                                     const uint8_t **out_acf_frame, size_t *out_acf_frame_len)
+                                     rcp_bytes_t *out_acf_frame)
 {
-    size_t   body_len;
-    uint32_t got;
-    uint32_t want;
+    size_t      body_len;
+    uint32_t    got;
+    uint32_t    want;
+    rcp_bytes_t body_copy;
+
+    out_acf_frame->data = NULL;
+    out_acf_frame->len  = 0;
 
     if (frame_len < RCP_E2E_CRC_LEN) return RCP_E2E_ERR_SHORT_FRAME;
 
@@ -134,8 +184,18 @@ rcp_e2e_errc_t rcp_e2e_unwrap(uint64_t stream_id, uint64_t avtp_timestamp,
     got      = get_u32(frame + body_len);
     want     = rcp_e2e_compute_crc(stream_id, avtp_timestamp, frame, body_len);
 
-    *out_acf_frame     = frame;
-    *out_acf_frame_len = body_len;
+    body_copy = rcp_bytes_dup(frame, body_len);
+    if (!body_copy.data && body_len > 0) return got == want ? RCP_E2E_OK : RCP_E2E_ERR_CRC_MISMATCH;
+
+    /* Restore the un-adapted acf_msg_length so the returned copy is
+     * ready for acf.c's decoders exactly as their own encoders produced
+     * it (mirrors rcp_e2e_wrap()'s +1 quadlet in reverse). Left
+     * unadapted (harmless) if body_len < 3: too short to contain the
+     * field, which acf.c's own decoders will reject as RCP_ACF_ERR_
+     * SHORT_FRAME regardless. */
+    (void)adapt_acf_msg_length(body_copy.data, body_copy.len, -1);
+
+    *out_acf_frame = body_copy;
 
     if (got != want) return RCP_E2E_ERR_CRC_MISMATCH;
     return RCP_E2E_OK;
