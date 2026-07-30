@@ -4,9 +4,9 @@
   "tool": "c-FuSa",
   "toolVersion": "0.5.48",
   "language": "c",
-  "generatedAt": "2026-07-30T16:06:55Z",
+  "generatedAt": "2026-07-30T16:14:42Z",
   "project": "c-RCP",
-  "version": "0.92.0",
+  "version": "0.93.0",
   "standard": "iso26262",
   "ratingScale": "cfusa-heuristic-1-10",
   "entries": [
@@ -27,9 +27,24 @@
     },
     {
       "id": "FM-002",
+      "item": "rcp_e2e_wire_error",
+      "file": "src/e2e.c",
+      "line": 24,
+      "failureMode": "rcp_e2e_wire_error (safety-critical function) does not perform its intended action",
+      "effect": "Failure of rcp_e2e_wire_error could propagate undetected to callers in e2e.c",
+      "cause": "Unhandled fault or invalid input condition within rcp_e2e_wire_error",
+      "severity": 9,
+      "occurrence": 4,
+      "detection": 6,
+      "actionPriority": "high",
+      "mitigations": [],
+      "requirementIds": []
+    },
+    {
+      "id": "FM-003",
       "item": "rcp_e2e_crc32",
       "file": "src/e2e.c",
-      "line": 37,
+      "line": 60,
       "failureMode": "rcp_e2e_crc32 (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_crc32 could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_crc32",
@@ -41,10 +56,10 @@
       "requirementIds": []
     },
     {
-      "id": "FM-003",
+      "id": "FM-004",
       "item": "rcp_e2e_length_with_crc",
       "file": "src/e2e.c",
-      "line": 124,
+      "line": 147,
       "failureMode": "rcp_e2e_length_with_crc (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_length_with_crc could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_length_with_crc",
@@ -56,10 +71,10 @@
       "requirementIds": []
     },
     {
-      "id": "FM-004",
+      "id": "FM-005",
       "item": "rcp_e2e_fragment_carries_crc",
       "file": "src/e2e.c",
-      "line": 207,
+      "line": 230,
       "failureMode": "rcp_e2e_fragment_carries_crc (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_fragment_carries_crc could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_fragment_carries_crc",
@@ -71,10 +86,10 @@
       "requirementIds": []
     },
     {
-      "id": "FM-005",
+      "id": "FM-006",
       "item": "rcp_e2e_is_safety_request",
       "file": "src/e2e.c",
-      "line": 215,
+      "line": 238,
       "failureMode": "rcp_e2e_is_safety_request (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_is_safety_request could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_is_safety_request",
@@ -86,10 +101,10 @@
       "requirementIds": []
     },
     {
-      "id": "FM-006",
+      "id": "FM-007",
       "item": "rcp_e2e_request_may_execute",
       "file": "src/e2e.c",
-      "line": 222,
+      "line": 245,
       "failureMode": "rcp_e2e_request_may_execute (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_request_may_execute could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_request_may_execute",
@@ -101,10 +116,10 @@
       "requirementIds": []
     },
     {
-      "id": "FM-007",
+      "id": "FM-008",
       "item": "rcp_e2e_watchdog_purge_should_keep",
       "file": "src/e2e.c",
-      "line": 231,
+      "line": 254,
       "failureMode": "rcp_e2e_watchdog_purge_should_keep (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_watchdog_purge_should_keep could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_watchdog_purge_should_keep",
@@ -116,10 +131,10 @@
       "requirementIds": []
     },
     {
-      "id": "FM-008",
+      "id": "FM-009",
       "item": "rcp_e2e_measure_valid",
       "file": "src/e2e.c",
-      "line": 249,
+      "line": 272,
       "failureMode": "rcp_e2e_measure_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_measure_valid could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_measure_valid",
@@ -131,10 +146,10 @@
       "requirementIds": []
     },
     {
-      "id": "FM-009",
+      "id": "FM-010",
       "item": "rcp_e2e_crc_error_action",
       "file": "src/e2e.c",
-      "line": 296,
+      "line": 319,
       "failureMode": "rcp_e2e_crc_error_action (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_crc_error_action could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_crc_error_action",
@@ -146,10 +161,10 @@
       "requirementIds": []
     },
     {
-      "id": "FM-010",
+      "id": "FM-011",
       "item": "rcp_e2e_stream_fault_init",
       "file": "src/e2e.c",
-      "line": 302,
+      "line": 325,
       "failureMode": "rcp_e2e_stream_fault_init (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_fault_init could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_stream_fault_init",
@@ -161,10 +176,10 @@
       "requirementIds": []
     },
     {
-      "id": "FM-011",
+      "id": "FM-012",
       "item": "rcp_e2e_stream_fault_on_crc_error",
       "file": "src/e2e.c",
-      "line": 309,
+      "line": 332,
       "failureMode": "rcp_e2e_stream_fault_on_crc_error (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_fault_on_crc_error could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_stream_fault_on_crc_error",
@@ -176,10 +191,10 @@
       "requirementIds": []
     },
     {
-      "id": "FM-012",
+      "id": "FM-013",
       "item": "rcp_e2e_stream_fault_is_faulted",
       "file": "src/e2e.c",
-      "line": 317,
+      "line": 340,
       "failureMode": "rcp_e2e_stream_fault_is_faulted (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_fault_is_faulted could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_stream_fault_is_faulted",
@@ -191,10 +206,10 @@
       "requirementIds": []
     },
     {
-      "id": "FM-013",
+      "id": "FM-014",
       "item": "rcp_e2e_stream_fault_reset",
       "file": "src/e2e.c",
-      "line": 323,
+      "line": 346,
       "failureMode": "rcp_e2e_stream_fault_reset (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_fault_reset could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_stream_fault_reset",
@@ -206,7 +221,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-014",
+      "id": "FM-015",
       "item": "rcp_doip_default_config",
       "file": "src/doipbr.c",
       "line": 4,
@@ -221,7 +236,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-015",
+      "id": "FM-016",
       "item": "rcp_fragment_plan_count",
       "file": "src/fragment.c",
       "line": 22,
@@ -236,7 +251,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-016",
+      "id": "FM-017",
       "item": "rcp_fragment_reassembler_init",
       "file": "src/fragment.c",
       "line": 96,
@@ -251,7 +266,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-017",
+      "id": "FM-018",
       "item": "rcp_fragment_reassembler_reset",
       "file": "src/fragment.c",
       "line": 107,
@@ -266,7 +281,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-018",
+      "id": "FM-019",
       "item": "rcp_fragment_reassembler_destroy",
       "file": "src/fragment.c",
       "line": 116,
@@ -281,7 +296,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-019",
+      "id": "FM-020",
       "item": "rcp_fragment_reassembler_is_collecting",
       "file": "src/fragment.c",
       "line": 191,
@@ -296,7 +311,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-020",
+      "id": "FM-021",
       "item": "rcp_adapt_op_kind",
       "file": "src/adapt.c",
       "line": 26,
@@ -311,7 +326,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-021",
+      "id": "FM-022",
       "item": "rcp_adapt_op_from_string",
       "file": "src/adapt.c",
       "line": 89,
@@ -326,7 +341,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-022",
+      "id": "FM-023",
       "item": "rcp_discovery_encode_request",
       "file": "src/adapt.c",
       "line": 216,
@@ -341,7 +356,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-023",
+      "id": "FM-024",
       "item": "rcp_ep_spi_encode_transfer_request",
       "file": "src/adapt.c",
       "line": 239,
@@ -356,7 +371,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-024",
+      "id": "FM-025",
       "item": "rcp_ep_uart_encode_read_request",
       "file": "src/adapt.c",
       "line": 258,
@@ -371,7 +386,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-025",
+      "id": "FM-026",
       "item": "rcp_ep_mdio_encode_read_request",
       "file": "src/adapt.c",
       "line": 330,
@@ -386,7 +401,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-026",
+      "id": "FM-027",
       "item": "rcp_ep_wakeup_encode_sleepcmd_request",
       "file": "src/adapt.c",
       "line": 363,
@@ -401,7 +416,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-027",
+      "id": "FM-028",
       "item": "rcp_errc_to_relay_errc",
       "file": "src/adapt.c",
       "line": 737,
@@ -416,7 +431,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-028",
+      "id": "FM-029",
       "item": "rcp_stream_id_make",
       "file": "src/avtp.c",
       "line": 64,
@@ -431,7 +446,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-029",
+      "id": "FM-030",
       "item": "rcp_stream_id_to_u64",
       "file": "src/avtp.c",
       "line": 73,
@@ -446,7 +461,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-030",
+      "id": "FM-031",
       "item": "rcp_stream_id_from_u64",
       "file": "src/avtp.c",
       "line": 82,
@@ -461,7 +476,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-031",
+      "id": "FM-032",
       "item": "rcp_stream_id_equal",
       "file": "src/avtp.c",
       "line": 98,
@@ -476,7 +491,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-032",
+      "id": "FM-033",
       "item": "rcp_avtp_addr_equal",
       "file": "src/avtp.c",
       "line": 104,
@@ -491,7 +506,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-033",
+      "id": "FM-034",
       "item": "rcp_avtp_peek_subtype",
       "file": "src/avtp.c",
       "line": 241,
@@ -506,7 +521,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-034",
+      "id": "FM-035",
       "item": "rcp_avtp_should_drop_tscf",
       "file": "src/avtp.c",
       "line": 249,
@@ -521,7 +536,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-035",
+      "id": "FM-036",
       "item": "rcp_avtp_transport_retain",
       "file": "src/avtp.c",
       "line": 258,
@@ -536,7 +551,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-036",
+      "id": "FM-037",
       "item": "rcp_avtp_transport_release",
       "file": "src/avtp.c",
       "line": 265,
@@ -551,7 +566,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-037",
+      "id": "FM-038",
       "item": "rcp_recorder_new",
       "file": "src/recorder.c",
       "line": 18,
@@ -566,7 +581,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-038",
+      "id": "FM-039",
       "item": "rcp_recorder_destroy",
       "file": "src/recorder.c",
       "line": 27,
@@ -581,7 +596,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-039",
+      "id": "FM-040",
       "item": "rcp_recorder_size",
       "file": "src/recorder.c",
       "line": 38,
@@ -596,7 +611,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-040",
+      "id": "FM-041",
       "item": "rcp_recorder_entries",
       "file": "src/recorder.c",
       "line": 48,
@@ -611,7 +626,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-041",
+      "id": "FM-042",
       "item": "rcp_recorder_write_binary",
       "file": "src/recorder.c",
       "line": 113,
@@ -626,7 +641,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-042",
+      "id": "FM-043",
       "item": "write_field",
       "file": "src/recorder.c",
       "line": 135,
@@ -641,7 +656,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-043",
+      "id": "FM-044",
       "item": "write_field",
       "file": "src/recorder.c",
       "line": 136,
@@ -656,7 +671,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-044",
+      "id": "FM-045",
       "item": "write_field",
       "file": "src/recorder.c",
       "line": 137,
@@ -671,7 +686,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-045",
+      "id": "FM-046",
       "item": "write_field",
       "file": "src/recorder.c",
       "line": 138,
@@ -686,7 +701,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-046",
+      "id": "FM-047",
       "item": "write_field",
       "file": "src/recorder.c",
       "line": 139,
@@ -701,7 +716,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-047",
+      "id": "FM-048",
       "item": "rcp_playback_default_config",
       "file": "src/recorder.c",
       "line": 150,
@@ -716,7 +731,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-048",
+      "id": "FM-049",
       "item": "rcp_cli_run",
       "file": "src/cli.c",
       "line": 211,
@@ -731,7 +746,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-049",
+      "id": "FM-050",
       "item": "rcp_grpc_default_config",
       "file": "src/grpcbridge.c",
       "line": 4,
@@ -746,7 +761,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-050",
+      "id": "FM-051",
       "item": "rcp_ep_uart_nr_bits_valid",
       "file": "src/ep_uart.c",
       "line": 9,
@@ -761,7 +776,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-051",
+      "id": "FM-052",
       "item": "rcp_ep_uart_bit_pad_mask",
       "file": "src/ep_uart.c",
       "line": 15,
@@ -776,7 +791,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-052",
+      "id": "FM-053",
       "item": "rcp_ep_uart_apply_bit_padding",
       "file": "src/ep_uart.c",
       "line": 25,
@@ -791,7 +806,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-053",
+      "id": "FM-054",
       "item": "rcp_ep_uart_functional_cfg_init",
       "file": "src/ep_uart.c",
       "line": 38,
@@ -806,7 +821,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-054",
+      "id": "FM-055",
       "item": "rcp_ep_uart_read_response_fragment_count",
       "file": "src/ep_uart.c",
       "line": 384,
@@ -821,7 +836,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-055",
+      "id": "FM-056",
       "item": "rcp_mqtt_default_config",
       "file": "src/mqttbr.c",
       "line": 4,
@@ -836,7 +851,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-056",
+      "id": "FM-057",
       "item": "rcp_ep_lin_compare_mode_valid",
       "file": "src/ep_lin.c",
       "line": 8,
@@ -851,7 +866,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-057",
+      "id": "FM-058",
       "item": "rcp_ep_lin_trigger_fires",
       "file": "src/ep_lin.c",
       "line": 45,
@@ -866,7 +881,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-058",
+      "id": "FM-059",
       "item": "rcp_ep_lin_functional_cfg_init",
       "file": "src/ep_lin.c",
       "line": 57,
@@ -881,7 +896,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-059",
+      "id": "FM-060",
       "item": "rcp_ep_adc_combine_mode_valid",
       "file": "src/ep_adc.c",
       "line": 22,
@@ -896,7 +911,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-060",
+      "id": "FM-061",
       "item": "rcp_ep_adc_functional_cfg_init",
       "file": "src/ep_adc.c",
       "line": 130,
@@ -911,7 +926,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-061",
+      "id": "FM-062",
       "item": "rcp_ep_adc_encode_read_request",
       "file": "src/ep_adc.c",
       "line": 206,
@@ -926,7 +941,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-062",
+      "id": "FM-063",
       "item": "rcp_timed_feature_enabled",
       "file": "src/request_timed.c",
       "line": 45,
@@ -941,7 +956,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-063",
+      "id": "FM-064",
       "item": "RCP_ACF_MTV_UNTIMED",
       "file": "src/request_timed.c",
       "line": 72,
@@ -956,7 +971,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-064",
+      "id": "FM-065",
       "item": "rcp_timed_too_far",
       "file": "src/request_timed.c",
       "line": 118,
@@ -971,7 +986,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-065",
+      "id": "FM-066",
       "item": "rcp_deadline_default_config",
       "file": "src/deadline.c",
       "line": 9,
@@ -986,7 +1001,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-066",
+      "id": "FM-067",
       "item": "rcp_deadline_monitor_heartbeat",
       "file": "src/deadline.c",
       "line": 92,
@@ -1001,7 +1016,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-067",
+      "id": "FM-068",
       "item": "rcp_deadline_monitor_notify_overflow",
       "file": "src/deadline.c",
       "line": 111,
@@ -1016,7 +1031,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-068",
+      "id": "FM-069",
       "item": "rcp_deadline_monitor_alive",
       "file": "src/deadline.c",
       "line": 217,
@@ -1031,7 +1046,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-069",
+      "id": "FM-070",
       "item": "rcp_deadline_monitor_subscribe",
       "file": "src/deadline.c",
       "line": 229,
@@ -1046,7 +1061,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-070",
+      "id": "FM-071",
       "item": "rcp_deadline_monitor_close",
       "file": "src/deadline.c",
       "line": 240,
@@ -1061,7 +1076,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-071",
+      "id": "FM-072",
       "item": "rcp_deadline_monitor_destroy",
       "file": "src/deadline.c",
       "line": 252,
@@ -1076,7 +1091,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-072",
+      "id": "FM-073",
       "item": "rcp_span_duration_ms",
       "file": "src/observe.c",
       "line": 8,
@@ -1091,7 +1106,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-073",
+      "id": "FM-074",
       "item": "rcp_noop_metrics_sink",
       "file": "src/observe.c",
       "line": 30,
@@ -1106,7 +1121,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-074",
+      "id": "FM-075",
       "item": "rcp_in_memory_sink_new",
       "file": "src/observe.c",
       "line": 47,
@@ -1121,7 +1136,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-075",
+      "id": "FM-076",
       "item": "rcp_in_memory_sink_as_sink",
       "file": "src/observe.c",
       "line": 90,
@@ -1136,7 +1151,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-076",
+      "id": "FM-077",
       "item": "rcp_in_memory_sink_span_count",
       "file": "src/observe.c",
       "line": 98,
@@ -1151,7 +1166,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-077",
+      "id": "FM-078",
       "item": "rcp_in_memory_sink_spans",
       "file": "src/observe.c",
       "line": 107,
@@ -1166,7 +1181,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-078",
+      "id": "FM-079",
       "item": "rcp_in_memory_sink_destroy",
       "file": "src/observe.c",
       "line": 117,
@@ -1181,7 +1196,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-079",
+      "id": "FM-080",
       "item": "rcp_ratelimit_default_config",
       "file": "src/ratelimit.c",
       "line": 9,
@@ -1196,7 +1211,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-080",
+      "id": "FM-081",
       "item": "rcp_ratelimit_limiter_new",
       "file": "src/ratelimit.c",
       "line": 32,
@@ -1211,7 +1226,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-081",
+      "id": "FM-082",
       "item": "rcp_ratelimit_limiter_allow",
       "file": "src/ratelimit.c",
       "line": 83,
@@ -1226,7 +1241,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-082",
+      "id": "FM-083",
       "item": "rcp_ratelimit_limiter_destroy",
       "file": "src/ratelimit.c",
       "line": 100,
@@ -1241,7 +1256,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-083",
+      "id": "FM-084",
       "item": "rcp_uds_default_config",
       "file": "src/udsbr.c",
       "line": 4,
@@ -1256,7 +1271,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-084",
+      "id": "FM-085",
       "item": "rcp_ep_can_frame_format_valid",
       "file": "src/ep_can.c",
       "line": 26,
@@ -1271,7 +1286,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-085",
+      "id": "FM-086",
       "item": "rcp_ep_can_frame_format_is_xl",
       "file": "src/ep_can.c",
       "line": 32,
@@ -1286,7 +1301,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-086",
+      "id": "FM-087",
       "item": "rcp_ep_can_frame_format_id_width",
       "file": "src/ep_can.c",
       "line": 46,
@@ -1301,7 +1316,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-087",
+      "id": "FM-088",
       "item": "rcp_ep_can_arbitration_id_valid",
       "file": "src/ep_can.c",
       "line": 60,
@@ -1316,7 +1331,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-088",
+      "id": "FM-089",
       "item": "rcp_ep_can_frame_format_max_data_len",
       "file": "src/ep_can.c",
       "line": 71,
@@ -1331,7 +1346,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-089",
+      "id": "FM-090",
       "item": "rcp_ep_can_xl_filter_index_valid",
       "file": "src/ep_can.c",
       "line": 87,
@@ -1346,7 +1361,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-090",
+      "id": "FM-091",
       "item": "rcp_ep_can_functional_cfg_init",
       "file": "src/ep_can.c",
       "line": 95,
@@ -1361,7 +1376,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-091",
+      "id": "FM-092",
       "item": "rcp_ep_wakeup_functional_cfg_init",
       "file": "src/ep_wakeup.c",
       "line": 13,
@@ -1376,7 +1391,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-092",
+      "id": "FM-093",
       "item": "rcp_ep_wakeup_source_asserted",
       "file": "src/ep_wakeup.c",
       "line": 27,
@@ -1391,7 +1406,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-093",
+      "id": "FM-094",
       "item": "rcp_ep_wakeup_wup_status_init",
       "file": "src/ep_wakeup.c",
       "line": 53,
@@ -1406,7 +1421,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-094",
+      "id": "FM-095",
       "item": "rcp_ep_wakeup_wup_status_latch",
       "file": "src/ep_wakeup.c",
       "line": 59,
@@ -1421,7 +1436,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-095",
+      "id": "FM-096",
       "item": "rcp_ep_wakeup_wup_status_clear",
       "file": "src/ep_wakeup.c",
       "line": 65,
@@ -1436,7 +1451,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-096",
+      "id": "FM-097",
       "item": "rcp_ep_wakeup_wup_status_is_clear",
       "file": "src/ep_wakeup.c",
       "line": 71,
@@ -1451,7 +1466,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-097",
+      "id": "FM-098",
       "item": "rcp_request_type_is_triggered",
       "file": "src/request_triggered.c",
       "line": 30,
@@ -1466,7 +1481,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-098",
+      "id": "FM-099",
       "item": "rcp_triggered_runtime_enter_started",
       "file": "src/request_triggered.c",
       "line": 145,
@@ -1481,7 +1496,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-099",
+      "id": "FM-100",
       "item": "rcp_triggered_runtime_record_occurrence",
       "file": "src/request_triggered.c",
       "line": 152,
@@ -1496,7 +1511,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-100",
+      "id": "FM-101",
       "item": "rcp_triggered_exec_delay_elapsed",
       "file": "src/request_triggered.c",
       "line": 170,
@@ -1511,7 +1526,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-101",
+      "id": "FM-102",
       "item": "rcp_powerstate_manager_new",
       "file": "src/powerstate.c",
       "line": 88,
@@ -1526,7 +1541,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-102",
+      "id": "FM-103",
       "item": "rcp_powerstate_manager_mode",
       "file": "src/powerstate.c",
       "line": 116,
@@ -1541,7 +1556,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-103",
+      "id": "FM-104",
       "item": "rcp_powerstate_manager_handshake_resume_queues",
       "file": "src/powerstate.c",
       "line": 296,
@@ -1556,7 +1571,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-104",
+      "id": "FM-105",
       "item": "rcp_powerstate_manager_subscribe",
       "file": "src/powerstate.c",
       "line": 340,
@@ -1571,7 +1586,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-105",
+      "id": "FM-106",
       "item": "rcp_powerstate_manager_destroy",
       "file": "src/powerstate.c",
       "line": 349,
@@ -1586,7 +1601,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-106",
+      "id": "FM-107",
       "item": "rcp_admin_server_new",
       "file": "src/admin.c",
       "line": 33,
@@ -1601,7 +1616,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-107",
+      "id": "FM-108",
       "item": "rcp_admin_server_destroy",
       "file": "src/admin.c",
       "line": 41,
@@ -1616,7 +1631,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-108",
+      "id": "FM-109",
       "item": "rcp_admin_server_register_endpoint",
       "file": "src/admin.c",
       "line": 62,
@@ -1631,7 +1646,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-109",
+      "id": "FM-110",
       "item": "rcp_admin_server_deregister_endpoint",
       "file": "src/admin.c",
       "line": 86,
@@ -1646,7 +1661,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-110",
+      "id": "FM-111",
       "item": "rcp_admin_server_endpoints",
       "file": "src/admin.c",
       "line": 103,
@@ -1661,7 +1676,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-111",
+      "id": "FM-112",
       "item": "rcp_admin_server_subscribe",
       "file": "src/admin.c",
       "line": 120,
@@ -1676,7 +1691,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-112",
+      "id": "FM-113",
       "item": "rcp_admin_server_emit",
       "file": "src/admin.c",
       "line": 145,
@@ -1691,7 +1706,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-113",
+      "id": "FM-114",
       "item": "rcp_admin_server_record_counter",
       "file": "src/admin.c",
       "line": 170,
@@ -1706,7 +1721,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-114",
+      "id": "FM-115",
       "item": "rcp_admin_server_metrics_text",
       "file": "src/admin.c",
       "line": 208,
@@ -1721,7 +1736,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-115",
+      "id": "FM-116",
       "item": "rcp_sequencer_table_new",
       "file": "src/request_sequencer.c",
       "line": 9,
@@ -1736,7 +1751,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-116",
+      "id": "FM-117",
       "item": "rcp_sequencer_table_unsupported",
       "file": "src/request_sequencer.c",
       "line": 27,
@@ -1751,7 +1766,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-117",
+      "id": "FM-118",
       "item": "rcp_sequencer_table_reset",
       "file": "src/request_sequencer.c",
       "line": 33,
@@ -1766,7 +1781,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-118",
+      "id": "FM-119",
       "item": "rcp_sequencer_table_free",
       "file": "src/request_sequencer.c",
       "line": 40,
@@ -1781,7 +1796,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-119",
+      "id": "FM-120",
       "item": "rcp_sequencer_index_valid",
       "file": "src/request_sequencer.c",
       "line": 48,
@@ -1796,7 +1811,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-120",
+      "id": "FM-121",
       "item": "rcp_sequencer_set_state",
       "file": "src/request_sequencer.c",
       "line": 65,
@@ -1811,7 +1826,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-121",
+      "id": "FM-122",
       "item": "rcp_udp_avtp_transport_bind",
       "file": "src/udp.c",
       "line": 39,
@@ -1826,7 +1841,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-122",
+      "id": "FM-123",
       "item": "rcp_udp_avtp_transport_ok",
       "file": "src/udp.c",
       "line": 271,
@@ -1841,7 +1856,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-123",
+      "id": "FM-124",
       "item": "rcp_udp_avtp_transport_port",
       "file": "src/udp.c",
       "line": 277,
@@ -1856,7 +1871,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-124",
+      "id": "FM-125",
       "item": "rcp_udp_avtp_transport_addr_string",
       "file": "src/udp.c",
       "line": 287,
@@ -1871,7 +1886,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-125",
+      "id": "FM-126",
       "item": "rcp_udp_avtp_transport_ok",
       "file": "src/udp.c",
       "line": 368,
@@ -1886,7 +1901,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-126",
+      "id": "FM-127",
       "item": "rcp_udp_avtp_transport_port",
       "file": "src/udp.c",
       "line": 375,
@@ -1901,7 +1916,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-127",
+      "id": "FM-128",
       "item": "rcp_udp_avtp_transport_addr_string",
       "file": "src/udp.c",
       "line": 382,
@@ -1916,7 +1931,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-128",
+      "id": "FM-129",
       "item": "rcp_ep_pwm_out_write_semantics_valid",
       "file": "src/ep_pwm.c",
       "line": 71,
@@ -1931,7 +1946,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-129",
+      "id": "FM-130",
       "item": "rcp_ep_pwm_out_apply_reconfig",
       "file": "src/ep_pwm.c",
       "line": 97,
@@ -1946,7 +1961,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-130",
+      "id": "FM-131",
       "item": "rcp_ep_pwm_out_trigger_fires",
       "file": "src/ep_pwm.c",
       "line": 110,
@@ -1961,7 +1976,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-131",
+      "id": "FM-132",
       "item": "rcp_ep_pwm_out_functional_cfg_init",
       "file": "src/ep_pwm.c",
       "line": 124,
@@ -1976,7 +1991,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-132",
+      "id": "FM-133",
       "item": "rcp_ep_pwm_in_trigger_fires",
       "file": "src/ep_pwm.c",
       "line": 359,
@@ -1991,7 +2006,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-133",
+      "id": "FM-134",
       "item": "rcp_ep_pwm_in_functional_cfg_init",
       "file": "src/ep_pwm.c",
       "line": 372,
@@ -2006,7 +2021,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-134",
+      "id": "FM-135",
       "item": "rcp_ep_pwm_in_compound_wait_mode_valid",
       "file": "src/ep_pwm.c",
       "line": 548,
@@ -2021,7 +2036,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-135",
+      "id": "FM-136",
       "item": "rcp_mutex_init",
       "file": "src/platform.c",
       "line": 15,
@@ -2036,7 +2051,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-136",
+      "id": "FM-137",
       "item": "rcp_mutex_lock",
       "file": "src/platform.c",
       "line": 16,
@@ -2051,7 +2066,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-137",
+      "id": "FM-138",
       "item": "rcp_mutex_unlock",
       "file": "src/platform.c",
       "line": 17,
@@ -2066,7 +2081,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-138",
+      "id": "FM-139",
       "item": "rcp_mutex_destroy",
       "file": "src/platform.c",
       "line": 18,
@@ -2081,7 +2096,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-139",
+      "id": "FM-140",
       "item": "rcp_cond_init",
       "file": "src/platform.c",
       "line": 20,
@@ -2096,7 +2111,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-140",
+      "id": "FM-141",
       "item": "rcp_cond_wait",
       "file": "src/platform.c",
       "line": 21,
@@ -2111,7 +2126,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-141",
+      "id": "FM-142",
       "item": "rcp_cond_timedwait_until",
       "file": "src/platform.c",
       "line": 23,
@@ -2126,7 +2141,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-142",
+      "id": "FM-143",
       "item": "rcp_cond_signal",
       "file": "src/platform.c",
       "line": 30,
@@ -2141,7 +2156,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-143",
+      "id": "FM-144",
       "item": "rcp_cond_broadcast",
       "file": "src/platform.c",
       "line": 31,
@@ -2156,7 +2171,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-144",
+      "id": "FM-145",
       "item": "rcp_cond_destroy",
       "file": "src/platform.c",
       "line": 32,
@@ -2171,7 +2186,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-145",
+      "id": "FM-146",
       "item": "rcp_thread_start_detached",
       "file": "src/platform.c",
       "line": 50,
@@ -2186,7 +2201,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-146",
+      "id": "FM-147",
       "item": "CloseHandle",
       "file": "src/platform.c",
       "line": 62,
@@ -2201,7 +2216,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-147",
+      "id": "FM-148",
       "item": "rcp_thread_start",
       "file": "src/platform.c",
       "line": 66,
@@ -2216,7 +2231,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-148",
+      "id": "FM-149",
       "item": "rcp_thread_join",
       "file": "src/platform.c",
       "line": 82,
@@ -2231,7 +2246,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-149",
+      "id": "FM-150",
       "item": "rcp_atomic_inc",
       "file": "src/platform.c",
       "line": 88,
@@ -2246,7 +2261,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-150",
+      "id": "FM-151",
       "item": "rcp_atomic_dec",
       "file": "src/platform.c",
       "line": 93,
@@ -2261,7 +2276,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-151",
+      "id": "FM-152",
       "item": "rcp_sleep_ms",
       "file": "src/platform.c",
       "line": 98,
@@ -2276,7 +2291,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-152",
+      "id": "FM-153",
       "item": "rcp_mutex_init",
       "file": "src/platform.c",
       "line": 108,
@@ -2291,7 +2306,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-153",
+      "id": "FM-154",
       "item": "rcp_mutex_lock",
       "file": "src/platform.c",
       "line": 109,
@@ -2306,7 +2321,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-154",
+      "id": "FM-155",
       "item": "rcp_mutex_unlock",
       "file": "src/platform.c",
       "line": 110,
@@ -2321,7 +2336,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-155",
+      "id": "FM-156",
       "item": "rcp_mutex_destroy",
       "file": "src/platform.c",
       "line": 111,
@@ -2336,7 +2351,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-156",
+      "id": "FM-157",
       "item": "rcp_cond_init",
       "file": "src/platform.c",
       "line": 113,
@@ -2351,7 +2366,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-157",
+      "id": "FM-158",
       "item": "rcp_cond_wait",
       "file": "src/platform.c",
       "line": 114,
@@ -2366,7 +2381,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-158",
+      "id": "FM-159",
       "item": "rcp_cond_timedwait_until",
       "file": "src/platform.c",
       "line": 116,
@@ -2381,7 +2396,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-159",
+      "id": "FM-160",
       "item": "rcp_cond_signal",
       "file": "src/platform.c",
       "line": 140,
@@ -2396,7 +2411,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-160",
+      "id": "FM-161",
       "item": "rcp_cond_broadcast",
       "file": "src/platform.c",
       "line": 141,
@@ -2411,7 +2426,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-161",
+      "id": "FM-162",
       "item": "rcp_cond_destroy",
       "file": "src/platform.c",
       "line": 142,
@@ -2426,7 +2441,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-162",
+      "id": "FM-163",
       "item": "rcp_thread_start_detached",
       "file": "src/platform.c",
       "line": 160,
@@ -2441,7 +2456,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-163",
+      "id": "FM-164",
       "item": "rcp_thread_start",
       "file": "src/platform.c",
       "line": 177,
@@ -2456,7 +2471,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-164",
+      "id": "FM-165",
       "item": "rcp_thread_join",
       "file": "src/platform.c",
       "line": 192,
@@ -2471,7 +2486,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-165",
+      "id": "FM-166",
       "item": "rcp_atomic_inc",
       "file": "src/platform.c",
       "line": 197,
@@ -2486,7 +2501,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-166",
+      "id": "FM-167",
       "item": "rcp_atomic_dec",
       "file": "src/platform.c",
       "line": 202,
@@ -2501,7 +2516,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-167",
+      "id": "FM-168",
       "item": "rcp_sleep_ms",
       "file": "src/platform.c",
       "line": 207,
@@ -2516,7 +2531,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-168",
+      "id": "FM-169",
       "item": "rcp_monotonic_ms",
       "file": "src/clock.c",
       "line": 14,
@@ -2531,7 +2546,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-169",
+      "id": "FM-170",
       "item": "rcp_wallclock_ms",
       "file": "src/clock.c",
       "line": 29,
@@ -2546,7 +2561,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-170",
+      "id": "FM-171",
       "item": "rcp_monotonic_ms",
       "file": "src/clock.c",
       "line": 48,
@@ -2561,7 +2576,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-171",
+      "id": "FM-172",
       "item": "rcp_wallclock_ms",
       "file": "src/clock.c",
       "line": 56,
@@ -2576,7 +2591,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-172",
+      "id": "FM-173",
       "item": "rcp_server_endpoint_init",
       "file": "src/server.c",
       "line": 11,
@@ -2591,7 +2606,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-173",
+      "id": "FM-174",
       "item": "rcp_server_endpoint_destroy",
       "file": "src/server.c",
       "line": 22,
@@ -2606,7 +2621,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-174",
+      "id": "FM-175",
       "item": "rcp_server_endpoint_set_enable",
       "file": "src/server.c",
       "line": 59,
@@ -2621,7 +2636,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-175",
+      "id": "FM-176",
       "item": "rcp_server_endpoint_drain_one",
       "file": "src/server.c",
       "line": 65,
@@ -2636,7 +2651,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-176",
+      "id": "FM-177",
       "item": "rcp_server_endpoint_queue_len",
       "file": "src/server.c",
       "line": 81,
@@ -2651,7 +2666,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-177",
+      "id": "FM-178",
       "item": "rcp_discovery_should_drop",
       "file": "src/discovery.c",
       "line": 51,
@@ -2666,7 +2681,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-178",
+      "id": "FM-179",
       "item": "rcp_discovery_response_fragment_count",
       "file": "src/discovery.c",
       "line": 236,
@@ -2681,7 +2696,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-179",
+      "id": "FM-180",
       "item": "rcp_discovery_claim_init",
       "file": "src/discovery.c",
       "line": 360,
@@ -2696,7 +2711,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-180",
+      "id": "FM-181",
       "item": "rcp_discovery_claim_is_open",
       "file": "src/discovery.c",
       "line": 367,
@@ -2711,7 +2726,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-181",
+      "id": "FM-182",
       "item": "rcp_discovery_claim_release",
       "file": "src/discovery.c",
       "line": 407,
@@ -2726,7 +2741,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-182",
+      "id": "FM-183",
       "item": "rcp_discovery_cache_init",
       "file": "src/discovery.c",
       "line": 415,
@@ -2741,7 +2756,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-183",
+      "id": "FM-184",
       "item": "rcp_discovery_cache_destroy",
       "file": "src/discovery.c",
       "line": 423,
@@ -2756,7 +2771,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-184",
+      "id": "FM-185",
       "item": "rcp_discovery_cache_len",
       "file": "src/discovery.c",
       "line": 474,
@@ -2771,7 +2786,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-185",
+      "id": "FM-186",
       "item": "rcp_regmap_is_ep0",
       "file": "src/regmap.c",
       "line": 8,
@@ -2786,7 +2801,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-186",
+      "id": "FM-187",
       "item": "rcp_regmap_options_group_consistent",
       "file": "src/regmap.c",
       "line": 19,
@@ -2801,7 +2816,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-187",
+      "id": "FM-188",
       "item": "rcp_regmap_general_init",
       "file": "src/regmap.c",
       "line": 40,
@@ -2816,7 +2831,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-188",
+      "id": "FM-189",
       "item": "rcp_regmap_ep_generic_cfg_init",
       "file": "src/regmap.c",
       "line": 73,
@@ -2831,7 +2846,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-189",
+      "id": "FM-190",
       "item": "rcp_regmap_ep_functional_cfg_init",
       "file": "src/regmap.c",
       "line": 79,
@@ -2846,7 +2861,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-190",
+      "id": "FM-191",
       "item": "rcp_regmap_request_stream_cfg_init",
       "file": "src/regmap.c",
       "line": 141,
@@ -2861,7 +2876,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-191",
+      "id": "FM-192",
       "item": "rcp_regmap_response_queue_cfg_init",
       "file": "src/regmap.c",
       "line": 147,
@@ -2876,7 +2891,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-192",
+      "id": "FM-193",
       "item": "rcp_someip_default_config",
       "file": "src/someipbr.c",
       "line": 4,
@@ -2891,7 +2906,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-193",
+      "id": "FM-194",
       "item": "rcp_pwrmode_cold_start_lifecycle_target",
       "file": "src/power.c",
       "line": 32,
@@ -2906,7 +2921,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-194",
+      "id": "FM-195",
       "item": "rcp_pwrmode_hotstart_required",
       "file": "src/power.c",
       "line": 73,
@@ -2921,7 +2936,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-195",
+      "id": "FM-196",
       "item": "rcp_pwrmode_handshake_init",
       "file": "src/power.c",
       "line": 79,
@@ -2936,7 +2951,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-196",
+      "id": "FM-197",
       "item": "rcp_pwrmode_handshake_iface_reenabled",
       "file": "src/power.c",
       "line": 87,
@@ -2951,7 +2966,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-197",
+      "id": "FM-198",
       "item": "rcp_pwrmode_handshake_wakeup_attempt",
       "file": "src/power.c",
       "line": 96,
@@ -2966,7 +2981,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-198",
+      "id": "FM-199",
       "item": "rcp_pwrmode_handshake_resume_queues",
       "file": "src/power.c",
       "line": 116,
@@ -2981,7 +2996,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-199",
+      "id": "FM-200",
       "item": "rcp_pwrmode_handshake_is_complete",
       "file": "src/power.c",
       "line": 125,
@@ -2996,7 +3011,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-200",
+      "id": "FM-201",
       "item": "rcp_pwrmode_handshake_has_failed",
       "file": "src/power.c",
       "line": 131,
@@ -3011,7 +3026,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-201",
+      "id": "FM-202",
       "item": "rcp_pwrmode_check_entry",
       "file": "src/power.c",
       "line": 161,
@@ -3026,7 +3041,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-202",
+      "id": "FM-203",
       "item": "rcp_watchdog_default_config",
       "file": "src/watchdog.c",
       "line": 10,
@@ -3041,7 +3056,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-203",
+      "id": "FM-204",
       "item": "rcp_watchdog_keeper_kick",
       "file": "src/watchdog.c",
       "line": 194,
@@ -3056,7 +3071,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-204",
+      "id": "FM-205",
       "item": "rcp_watchdog_keeper_status",
       "file": "src/watchdog.c",
       "line": 208,
@@ -3071,7 +3086,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-205",
+      "id": "FM-206",
       "item": "rcp_watchdog_keeper_subscribe",
       "file": "src/watchdog.c",
       "line": 224,
@@ -3086,7 +3101,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-206",
+      "id": "FM-207",
       "item": "rcp_watchdog_keeper_close",
       "file": "src/watchdog.c",
       "line": 234,
@@ -3101,7 +3116,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-207",
+      "id": "FM-208",
       "item": "rcp_watchdog_keeper_destroy",
       "file": "src/watchdog.c",
       "line": 246,
@@ -3116,7 +3131,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-208",
+      "id": "FM-209",
       "item": "rcp_dds_default_config",
       "file": "src/ddsbr.c",
       "line": 4,
@@ -3131,7 +3146,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-209",
+      "id": "FM-210",
       "item": "rcp_can_default_config",
       "file": "src/canbr.c",
       "line": 4,
@@ -3146,7 +3161,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-210",
+      "id": "FM-211",
       "item": "rcp_ep_spi_channel_valid",
       "file": "src/ep_spi.c",
       "line": 8,
@@ -3161,7 +3176,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-211",
+      "id": "FM-212",
       "item": "rcp_ep_spi_mode_valid",
       "file": "src/ep_spi.c",
       "line": 16,
@@ -3176,7 +3191,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-212",
+      "id": "FM-213",
       "item": "rcp_ep_spi_mode_cpol",
       "file": "src/ep_spi.c",
       "line": 22,
@@ -3191,7 +3206,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-213",
+      "id": "FM-214",
       "item": "rcp_ep_spi_mode_cpha",
       "file": "src/ep_spi.c",
       "line": 34,
@@ -3206,7 +3221,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-214",
+      "id": "FM-215",
       "item": "rcp_ep_spi_trigger_fires",
       "file": "src/ep_spi.c",
       "line": 51,
@@ -3221,7 +3236,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-215",
+      "id": "FM-216",
       "item": "rcp_ep_spi_functional_cfg_init",
       "file": "src/ep_spi.c",
       "line": 65,
@@ -3236,7 +3251,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-216",
+      "id": "FM-217",
       "item": "rcp_authz_policy_new",
       "file": "src/authz.c",
       "line": 30,
@@ -3251,7 +3266,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-217",
+      "id": "FM-218",
       "item": "rcp_authz_policy_retain",
       "file": "src/authz.c",
       "line": 39,
@@ -3266,7 +3281,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-218",
+      "id": "FM-219",
       "item": "rcp_authz_policy_release",
       "file": "src/authz.c",
       "line": 51,
@@ -3281,7 +3296,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-219",
+      "id": "FM-220",
       "item": "rcp_cancel_encode_clear_all",
       "file": "src/request_cancel.c",
       "line": 45,
@@ -3296,7 +3311,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-220",
+      "id": "FM-221",
       "item": "RCP_ACF_MTV_UNTIMED",
       "file": "src/request_cancel.c",
       "line": 58,
@@ -3311,7 +3326,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-221",
+      "id": "FM-222",
       "item": "RCP_ACF_MTV_UNTIMED",
       "file": "src/request_cancel.c",
       "line": 115,
@@ -3326,7 +3341,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-222",
+      "id": "FM-223",
       "item": "rcp_cancel_is_cancellable",
       "file": "src/request_cancel.c",
       "line": 160,
@@ -3341,7 +3356,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-223",
+      "id": "FM-224",
       "item": "rcp_cancel_attempt",
       "file": "src/request_cancel.c",
       "line": 168,
@@ -3356,7 +3371,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-224",
+      "id": "FM-225",
       "item": "rcp_cancel_chain_should_cascade",
       "file": "src/request_cancel.c",
       "line": 176,
@@ -3371,7 +3386,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-225",
+      "id": "FM-226",
       "item": "rcp_request_type_is_safety",
       "file": "src/request_compound.c",
       "line": 31,
@@ -3386,7 +3401,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-226",
+      "id": "FM-227",
       "item": "rcp_request_type_is_compound",
       "file": "src/request_compound.c",
       "line": 37,
@@ -3401,7 +3416,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-227",
+      "id": "FM-228",
       "item": "rcp_request_type_is_compound_wait",
       "file": "src/request_compound.c",
       "line": 44,
@@ -3416,7 +3431,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-228",
+      "id": "FM-229",
       "item": "rcp_request_type_is_compound_wait",
       "file": "src/request_compound.c",
       "line": 123,
@@ -3431,7 +3446,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-229",
+      "id": "FM-230",
       "item": "RCP_ACF_MTV_UNTIMED",
       "file": "src/request_compound.c",
       "line": 207,
@@ -3446,7 +3461,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-230",
+      "id": "FM-231",
       "item": "rcp_compound_exec_delay_elapsed",
       "file": "src/request_compound.c",
       "line": 259,
@@ -3461,7 +3476,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-231",
+      "id": "FM-232",
       "item": "rcp_ep_iseled_symbol_encode",
       "file": "src/ep_iseled.c",
       "line": 21,
@@ -3476,7 +3491,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-232",
+      "id": "FM-233",
       "item": "rcp_ep_iseled_symbol_decode",
       "file": "src/ep_iseled.c",
       "line": 30,
@@ -3491,7 +3506,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-233",
+      "id": "FM-234",
       "item": "rcp_ep_iseled_bitframe_encoded_len",
       "file": "src/ep_iseled.c",
       "line": 44,
@@ -3506,7 +3521,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-234",
+      "id": "FM-235",
       "item": "rcp_ep_iseled_encode_bitframe",
       "file": "src/ep_iseled.c",
       "line": 53,
@@ -3521,7 +3536,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-235",
+      "id": "FM-236",
       "item": "rcp_ep_iseled_crc8",
       "file": "src/ep_iseled.c",
       "line": 96,
@@ -3536,7 +3551,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-236",
+      "id": "FM-237",
       "item": "rcp_ep_iseled_requires_isp_n",
       "file": "src/ep_iseled.c",
       "line": 108,
@@ -3551,7 +3566,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-237",
+      "id": "FM-238",
       "item": "rcp_ep_iseled_trigger_fires",
       "file": "src/ep_iseled.c",
       "line": 116,
@@ -3566,7 +3581,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-238",
+      "id": "FM-239",
       "item": "rcp_ep_iseled_functional_cfg_init",
       "file": "src/ep_iseled.c",
       "line": 128,
@@ -3581,7 +3596,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-239",
+      "id": "FM-240",
       "item": "rcp_ep_iseled_symbol_decode",
       "file": "src/ep_iseled.c",
       "line": 236,
@@ -3596,7 +3611,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-240",
+      "id": "FM-241",
       "item": "rcp_config_manifest_free",
       "file": "src/config.c",
       "line": 159,
@@ -3611,7 +3626,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-241",
+      "id": "FM-242",
       "item": "DEFINE_APPEND",
       "file": "src/config.c",
       "line": 186,
@@ -3626,7 +3641,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-242",
+      "id": "FM-243",
       "item": "DEFINE_APPEND",
       "file": "src/config.c",
       "line": 187,
@@ -3641,7 +3656,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-243",
+      "id": "FM-244",
       "item": "DEFINE_APPEND",
       "file": "src/config.c",
       "line": 188,
@@ -3656,7 +3671,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-244",
+      "id": "FM-245",
       "item": "rcp_config_parse_json",
       "file": "src/config.c",
       "line": 314,
@@ -3671,7 +3686,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-245",
+      "id": "FM-246",
       "item": "find_in_range",
       "file": "src/config.c",
       "line": 349,
@@ -3686,7 +3701,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-246",
+      "id": "FM-247",
       "item": "rcp_config_apply_to_mock",
       "file": "src/config.c",
       "line": 386,
@@ -3701,7 +3716,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-247",
+      "id": "FM-248",
       "item": "rcp_config_load",
       "file": "src/config.c",
       "line": 406,
@@ -3716,7 +3731,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-248",
+      "id": "FM-249",
       "item": "rcp_mdns_discoverer_destroy",
       "file": "src/mdns.c",
       "line": 10,
@@ -3731,7 +3746,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-249",
+      "id": "FM-250",
       "item": "rcp_mdns_announcer_destroy",
       "file": "src/mdns.c",
       "line": 17,
@@ -3746,7 +3761,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-250",
+      "id": "FM-251",
       "item": "rcp_mdns_make_instance_name",
       "file": "src/mdns.c",
       "line": 24,
@@ -3761,7 +3776,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-251",
+      "id": "FM-252",
       "item": "stopped",
       "file": "src/mdns.c",
       "line": 45,
@@ -3776,7 +3791,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-252",
+      "id": "FM-253",
       "item": "rcp_mdns_static_discoverer_new",
       "file": "src/mdns.c",
       "line": 123,
@@ -3791,7 +3806,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-253",
+      "id": "FM-254",
       "item": "rcp_rest_default_config",
       "file": "src/restbridge.c",
       "line": 4,
@@ -3806,7 +3821,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-254",
+      "id": "FM-255",
       "item": "rcp_bytes_dup",
       "file": "src/rcp.c",
       "line": 41,
@@ -3821,7 +3836,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-255",
+      "id": "FM-256",
       "item": "rcp_bytes_free",
       "file": "src/rcp.c",
       "line": 57,
@@ -3836,7 +3851,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-256",
+      "id": "FM-257",
       "item": "rcp_tsn_default_pcp_map",
       "file": "src/tsn.c",
       "line": 21,
@@ -3851,7 +3866,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-257",
+      "id": "FM-258",
       "item": "rcp_tsn_pcp_for",
       "file": "src/tsn.c",
       "line": 33,
@@ -3866,7 +3881,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-258",
+      "id": "FM-259",
       "item": "rcp_tsn_default_config",
       "file": "src/tsn.c",
       "line": 41,
@@ -3881,7 +3896,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-259",
+      "id": "FM-260",
       "item": "rcp_tsn_classify_frame",
       "file": "src/tsn.c",
       "line": 53,
@@ -3896,7 +3911,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-260",
+      "id": "FM-261",
       "item": "rcp_lin_default_config",
       "file": "src/linbr.c",
       "line": 4,
@@ -3911,7 +3926,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-261",
+      "id": "FM-262",
       "item": "rcp_acf_classify_response",
       "file": "src/acf.c",
       "line": 90,
@@ -3926,7 +3941,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-262",
+      "id": "FM-263",
       "item": "rcp_acf_hdr_ack_has_event",
       "file": "src/acf.c",
       "line": 102,
@@ -3941,7 +3956,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-263",
+      "id": "FM-264",
       "item": "rcp_acf_gbb_is_timed",
       "file": "src/acf.c",
       "line": 247,
@@ -3956,7 +3971,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-264",
+      "id": "FM-265",
       "item": "rcp_acf_peek_msg_type",
       "file": "src/acf.c",
       "line": 255,
@@ -3971,7 +3986,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-265",
+      "id": "FM-266",
       "item": "rcp_ep_mdio_addr_valid",
       "file": "src/ep_mdio.c",
       "line": 29,
@@ -3986,7 +4001,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-266",
+      "id": "FM-267",
       "item": "rcp_ep_mdio_burst_next_regad",
       "file": "src/ep_mdio.c",
       "line": 42,
@@ -4001,7 +4016,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-267",
+      "id": "FM-268",
       "item": "rcp_ep_mdio_word_encode",
       "file": "src/ep_mdio.c",
       "line": 55,
@@ -4016,7 +4031,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-268",
+      "id": "FM-269",
       "item": "rcp_ep_mdio_word_decode",
       "file": "src/ep_mdio.c",
       "line": 61,
@@ -4031,7 +4046,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-269",
+      "id": "FM-270",
       "item": "rcp_ep_mdio_pack_len",
       "file": "src/ep_mdio.c",
       "line": 67,
@@ -4046,7 +4061,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-270",
+      "id": "FM-271",
       "item": "rcp_ep_mdio_pack_words",
       "file": "src/ep_mdio.c",
       "line": 73,
@@ -4061,7 +4076,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-271",
+      "id": "FM-272",
       "item": "rcp_ep_mdio_word_count_of",
       "file": "src/ep_mdio.c",
       "line": 92,
@@ -4076,7 +4091,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-272",
+      "id": "FM-273",
       "item": "rcp_ep_mdio_unpack_word_at",
       "file": "src/ep_mdio.c",
       "line": 101,
@@ -4091,7 +4106,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-273",
+      "id": "FM-274",
       "item": "rcp_ep_mdio_functional_cfg_init",
       "file": "src/ep_mdio.c",
       "line": 109,
@@ -4106,7 +4121,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-274",
+      "id": "FM-275",
       "item": "rcp_ep_i2c_mode_valid",
       "file": "src/ep_i2c.c",
       "line": 8,
@@ -4121,7 +4136,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-275",
+      "id": "FM-276",
       "item": "rcp_ep_i2c_functional_cfg_init",
       "file": "src/ep_i2c.c",
       "line": 16,
@@ -4136,7 +4151,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-276",
+      "id": "FM-277",
       "item": "rcp_sched_classify",
       "file": "src/scheduler.c",
       "line": 6,
@@ -4151,7 +4166,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-277",
+      "id": "FM-278",
       "item": "rcp_sched_kind_rank",
       "file": "src/scheduler.c",
       "line": 29,
@@ -4166,7 +4181,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-278",
+      "id": "FM-279",
       "item": "rcp_sched_compare",
       "file": "src/scheduler.c",
       "line": 46,
@@ -4181,7 +4196,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-279",
+      "id": "FM-280",
       "item": "rcp_sched_frame_timing_consistent",
       "file": "src/scheduler.c",
       "line": 98,
@@ -4196,7 +4211,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-280",
+      "id": "FM-281",
       "item": "rcp_loan_return",
       "file": "src/loan.c",
       "line": 10,
@@ -4211,7 +4226,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-281",
+      "id": "FM-282",
       "item": "rcp_loan_release",
       "file": "src/loan.c",
       "line": 20,
@@ -4226,7 +4241,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-282",
+      "id": "FM-283",
       "item": "rcp_loan_pool_new",
       "file": "src/loan.c",
       "line": 47,
@@ -4241,7 +4256,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-283",
+      "id": "FM-284",
       "item": "rcp_loan_pool_acquire",
       "file": "src/loan.c",
       "line": 91,
@@ -4256,7 +4271,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-284",
+      "id": "FM-285",
       "item": "rcp_loan_pool_destroy",
       "file": "src/loan.c",
       "line": 140,
@@ -4271,7 +4286,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-285",
+      "id": "FM-286",
       "item": "rcp_mock_server_new",
       "file": "src/mock.c",
       "line": 39,
@@ -4286,7 +4301,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-286",
+      "id": "FM-287",
       "item": "rcp_mock_server_destroy",
       "file": "src/mock.c",
       "line": 50,
@@ -4301,7 +4316,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-287",
+      "id": "FM-288",
       "item": "rcp_mock_server_state",
       "file": "src/mock.c",
       "line": 64,
@@ -4316,7 +4331,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-288",
+      "id": "FM-289",
       "item": "rcp_mock_server_regmap",
       "file": "src/mock.c",
       "line": 78,
@@ -4331,7 +4346,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-289",
+      "id": "FM-290",
       "item": "rcp_mock_server_remove_endpoint",
       "file": "src/mock.c",
       "line": 148,
@@ -4346,7 +4361,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-290",
+      "id": "FM-291",
       "item": "rcp_mock_server_endpoint_queue_len",
       "file": "src/mock.c",
       "line": 173,
@@ -4361,7 +4376,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-291",
+      "id": "FM-292",
       "item": "rcp_lifecycle_check_hw_cfg",
       "file": "src/lifecycle.c",
       "line": 20,
@@ -4376,7 +4391,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-292",
+      "id": "FM-293",
       "item": "rcp_lifecycle_check_rcp_cfg",
       "file": "src/lifecycle.c",
       "line": 42,
@@ -4391,7 +4406,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-293",
+      "id": "FM-294",
       "item": "rcp_ep_gpio_pin_index_valid",
       "file": "src/ep_gpio.c",
       "line": 25,
@@ -4406,7 +4421,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-294",
+      "id": "FM-295",
       "item": "rcp_ep_gpio_pin_mask",
       "file": "src/ep_gpio.c",
       "line": 31,
@@ -4421,7 +4436,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-295",
+      "id": "FM-296",
       "item": "rcp_ep_gpio_pin_get",
       "file": "src/ep_gpio.c",
       "line": 38,
@@ -4436,7 +4451,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-296",
+      "id": "FM-297",
       "item": "rcp_ep_gpio_write_semantics_valid",
       "file": "src/ep_gpio.c",
       "line": 46,
@@ -4451,7 +4466,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-297",
+      "id": "FM-298",
       "item": "rcp_ep_gpio_apply_reconfig",
       "file": "src/ep_gpio.c",
       "line": 90,
@@ -4466,7 +4481,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-298",
+      "id": "FM-299",
       "item": "rcp_ep_gpio_trigger_fires",
       "file": "src/ep_gpio.c",
       "line": 113,
@@ -4481,7 +4496,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-299",
+      "id": "FM-300",
       "item": "rcp_ep_gpio_functional_cfg_init",
       "file": "src/ep_gpio.c",
       "line": 127,
@@ -4496,7 +4511,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-300",
+      "id": "FM-301",
       "item": "rcp_ep_gpio_encode_read_request",
       "file": "src/ep_gpio.c",
       "line": 189,
@@ -4511,7 +4526,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-301",
+      "id": "FM-302",
       "item": "rcp_faultinject_new",
       "file": "src/faultinject.c",
       "line": 15,
@@ -4526,7 +4541,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-302",
+      "id": "FM-303",
       "item": "rcp_faultinject_add_rule",
       "file": "src/faultinject.c",
       "line": 24,
@@ -4541,7 +4556,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-303",
+      "id": "FM-304",
       "item": "rcp_faultinject_clear_rules",
       "file": "src/faultinject.c",
       "line": 44,
@@ -4556,7 +4571,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-304",
+      "id": "FM-305",
       "item": "rcp_faultinject_evaluate",
       "file": "src/faultinject.c",
       "line": 84,
@@ -4571,7 +4586,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-305",
+      "id": "FM-306",
       "item": "rcp_faultinject_destroy",
       "file": "src/faultinject.c",
       "line": 100,
@@ -4586,7 +4601,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-306",
+      "id": "FM-307",
       "item": "relay_bytes_dup",
       "file": "src/relay.c",
       "line": 24,
@@ -4601,7 +4616,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-307",
+      "id": "FM-308",
       "item": "relay_bytes_free",
       "file": "src/relay.c",
       "line": 39,
@@ -4616,7 +4631,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-308",
+      "id": "FM-309",
       "item": "relay_message_init",
       "file": "src/relay.c",
       "line": 50,
@@ -4631,7 +4646,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-309",
+      "id": "FM-310",
       "item": "relay_message_free",
       "file": "src/relay.c",
       "line": 63,
@@ -4646,7 +4661,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-310",
+      "id": "FM-311",
       "item": "relay_message_set_id",
       "file": "src/relay.c",
       "line": 81,
@@ -4661,7 +4676,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-311",
+      "id": "FM-312",
       "item": "relay_message_set_meta",
       "file": "src/relay.c",
       "line": 98,
@@ -4676,7 +4691,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-312",
+      "id": "FM-313",
       "item": "relay_subscriber_options_default",
       "file": "src/relay.c",
       "line": 154,
@@ -4691,7 +4706,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-313",
+      "id": "FM-314",
       "item": "relay_message_channel_new",
       "file": "src/relay.c",
       "line": 180,
@@ -4706,7 +4721,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-314",
+      "id": "FM-315",
       "item": "relay_message_channel_retain",
       "file": "src/relay.c",
       "line": 205,
@@ -4721,7 +4736,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-315",
+      "id": "FM-316",
       "item": "relay_message_channel_release",
       "file": "src/relay.c",
       "line": 211,
@@ -4736,7 +4751,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-316",
+      "id": "FM-317",
       "item": "relay_message_channel_push",
       "file": "src/relay.c",
       "line": 250,
@@ -4751,7 +4766,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-317",
+      "id": "FM-318",
       "item": "relay_message_channel_recv",
       "file": "src/relay.c",
       "line": 274,
@@ -4766,7 +4781,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-318",
+      "id": "FM-319",
       "item": "relay_message_channel_try_recv",
       "file": "src/relay.c",
       "line": 291,
@@ -4781,7 +4796,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-319",
+      "id": "FM-320",
       "item": "relay_message_channel_close",
       "file": "src/relay.c",
       "line": 305,
@@ -4796,7 +4811,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-320",
+      "id": "FM-321",
       "item": "relay_message_channel_is_closed",
       "file": "src/relay.c",
       "line": 314,
@@ -4811,7 +4826,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-321",
+      "id": "FM-322",
       "item": "rcp_relay_caller_retain",
       "file": "src/relay.c",
       "line": 326,
@@ -4826,7 +4841,7 @@
       "requirementIds": []
     },
     {
-      "id": "FM-322",
+      "id": "FM-323",
       "item": "rcp_relay_caller_release",
       "file": "src/relay.c",
       "line": 332,
@@ -4842,7 +4857,7 @@
     }
   ],
   "summary": {
-    "total": 322, "highPriority": 34,
-    "componentsAnalyzed": 322, "componentsInProject": 322, "coveragePct": 100
+    "total": 323, "highPriority": 35,
+    "componentsAnalyzed": 323, "componentsInProject": 323, "coveragePct": 100
   }
 }
