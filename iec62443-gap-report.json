@@ -1,43 +1,30 @@
-{
-  "schemaVersion": "1.15.2",
-  "kind": "gap-report",
-  "tool": "c-FuSa",
-  "toolVersion": "0.5.48",
-  "language": "c",
-  "generatedAt": "2026-07-30T16:48:42Z",
-  "projectRoot": ".",
-  "standard": "iec62443-4-2",
-  "project": "c-RCP",
-  "sl": "SL-2",
-  "hasProjectConfig": true,
-  "covered": 10,
-  "mandatoryGaps": 13,
-  "recommendedGaps": 0,
-  "na": 4,
-  "objectives": [
-    {"id": "CR 1.1", "fr": "FR1", "title": "Human user identification and authentication", "findings": [], "level": "mandatory", "status": "gap"},
-    {"id": "CR 1.2", "fr": "FR1", "title": "Software process identification and authentication", "findings": [], "level": "mandatory", "status": "gap"},
-    {"id": "CR 1.5", "fr": "FR1", "title": "Authenticator management", "findings": [], "level": "mandatory", "status": "gap"},
-    {"id": "CR 1.7", "fr": "FR1", "title": "Strength of password-based authentication", "findings": ["CFUSA-CY008"], "level": "mandatory", "status": "satisfied"},
-    {"id": "CR 1.11", "fr": "FR1", "title": "Unsuccessful login attempts", "findings": [], "level": "mandatory", "status": "gap"},
-    {"id": "CR 2.1", "fr": "FR2", "title": "Authorization enforcement", "findings": [], "level": "mandatory", "status": "gap"},
-    {"id": "CR 2.8", "fr": "FR2", "title": "Auditable events", "findings": [], "level": "mandatory", "status": "gap"},
-    {"id": "CR 2.11", "fr": "FR2", "title": "Timestamps", "findings": [], "level": "mandatory", "status": "gap"},
-    {"id": "CR 3.1", "fr": "FR3", "title": "Communication integrity", "findings": ["CFUSA-CY004"], "level": "mandatory", "status": "satisfied"},
-    {"id": "CR 3.2", "fr": "FR3", "title": "Malicious code protection", "findings": ["CFUSA-CY001"], "level": "mandatory", "status": "satisfied"},
-    {"id": "CR 3.3", "fr": "FR3", "title": "Security functionality verification", "findings": ["CFUSA-QUALIFY"], "level": "mandatory", "status": "satisfied"},
-    {"id": "CR 3.4", "fr": "FR3", "title": "Software and information integrity", "findings": ["CFUSA-SIGN"], "level": "mandatory", "status": "satisfied"},
-    {"id": "CR 3.5", "fr": "FR3", "title": "Input validation", "findings": ["CFUSA-A002"], "level": "mandatory", "status": "satisfied"},
-    {"id": "CR 3.7", "fr": "FR3", "title": "Error handling", "findings": ["CFUSA-A002"], "level": "mandatory", "status": "satisfied"},
-    {"id": "CR 3.8", "fr": "FR3", "title": "Session integrity", "findings": [], "level": "mandatory", "status": "gap"},
-    {"id": "CR 4.1", "fr": "FR4", "title": "Information confidentiality", "findings": ["CFUSA-CY004"], "level": "mandatory", "status": "satisfied"},
-    {"id": "CR 4.3", "fr": "FR4", "title": "Use of cryptography", "findings": ["CFUSA-CY008"], "level": "mandatory", "status": "satisfied"},
-    {"id": "CR 5.1", "fr": "FR5", "title": "Network segmentation", "findings": [], "level": "mandatory", "status": "gap"},
-    {"id": "CR 6.1", "fr": "FR6", "title": "Audit log accessibility", "findings": [], "level": "mandatory", "status": "gap"},
-    {"id": "CR 6.2", "fr": "FR6", "title": "Continuous monitoring", "findings": [], "level": "mandatory", "status": "gap"},
-    {"id": "CR 7.1", "fr": "FR7", "title": "Denial of service protection", "findings": [], "level": "mandatory", "status": "gap"},
-    {"id": "CR 7.2", "fr": "FR7", "title": "Resource management", "findings": ["CFUSA-L003"], "level": "mandatory", "status": "satisfied"},
-    {"id": "CR 7.3", "fr": "FR7", "title": "Control system backup", "findings": [], "level": "mandatory", "status": "gap"}
-  ],
-  "summary": {"total": 23, "satisfied": 10, "partial": 0, "gaps": 13}
-}
+IEC 62443 Gap Report — c-RCP (target SL-2, profile 4-2)
+==================================================
+
+CR       FR     Requirement                                   cfusa Rule      Reqmt      Status
+-------- ------ --------------------------------------------- --------------- ---------- ------
+CR 1.1   FR1    Human user identification and authentication  -               Mandatory  GAP (M)
+CR 1.2   FR1    Software process identification and authentication -               Mandatory  GAP (M)
+CR 1.5   FR1    Authenticator management                      -               Mandatory  GAP (M)
+CR 1.7   FR1    Strength of password-based authentication     CFUSA-CY008     Mandatory  COVERED
+CR 1.11  FR1    Unsuccessful login attempts                   -               Mandatory  GAP (M)
+CR 2.1   FR2    Authorization enforcement                     -               Mandatory  GAP (M)
+CR 2.8   FR2    Auditable events                              -               Mandatory  GAP (M)
+CR 2.11  FR2    Timestamps                                    -               Mandatory  GAP (M)
+CR 3.1   FR3    Communication integrity                       CFUSA-CY004     Mandatory  COVERED
+CR 3.2   FR3    Malicious code protection                     CFUSA-CY001     Mandatory  COVERED
+CR 3.3   FR3    Security functionality verification           CFUSA-QUALIFY   Mandatory  COVERED
+CR 3.4   FR3    Software and information integrity            CFUSA-SIGN      Mandatory  COVERED
+CR 3.5   FR3    Input validation                              CFUSA-A002      Mandatory  COVERED
+CR 3.7   FR3    Error handling                                CFUSA-A002      Mandatory  COVERED
+CR 3.8   FR3    Session integrity                             -               Mandatory  GAP (M)
+CR 4.1   FR4    Information confidentiality                   CFUSA-CY004     Mandatory  COVERED
+CR 4.3   FR4    Use of cryptography                           CFUSA-CY008     Mandatory  COVERED
+CR 5.1   FR5    Network segmentation                          -               Mandatory  GAP (M)
+CR 6.1   FR6    Audit log accessibility                       -               Mandatory  GAP (M)
+CR 6.2   FR6    Continuous monitoring                         -               Mandatory  GAP (M)
+CR 7.1   FR7    Denial of service protection                  -               Mandatory  GAP (M)
+CR 7.2   FR7    Resource management                           CFUSA-L003      Mandatory  COVERED
+CR 7.3   FR7    Control system backup                         -               Mandatory  GAP (M)
+
+Summary: 10 covered, 13 mandatory gap(s), 0 recommended gap(s), 4 not applicable for SL-2

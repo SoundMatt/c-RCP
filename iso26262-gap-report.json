@@ -1,40 +1,29 @@
-{
-  "schemaVersion": "1.15.2",
-  "kind": "gap-report",
-  "tool": "c-FuSa",
-  "toolVersion": "0.5.48",
-  "language": "c",
-  "generatedAt": "2026-07-30T16:48:42Z",
-  "projectRoot": ".",
-  "standard": "iso26262",
-  "project": "c-RCP",
-  "asil": "ASIL-B",
-  "covered": 15,
-  "gaps": 6,
-  "recommendedGaps": 0,
-  "na": 6,
-  "objectives": [
-    {"id": "6.5", "title": "General software requirements specification", "findings": [], "status": "gap"},
-    {"id": "6.6", "title": "Software architectural design", "findings": [], "status": "gap"},
-    {"id": "6.7", "title": "Software unit design", "findings": ["CFUSA-L001"], "status": "satisfied"},
-    {"id": "6.8", "title": "Software unit implementation and verification", "findings": ["CFUSA-L002"], "status": "satisfied"},
-    {"id": "6.9", "title": "Software integration and testing", "findings": ["CFUSA-A007"], "status": "satisfied"},
-    {"id": "6.10", "title": "Software qualification testing", "findings": [], "status": "gap"},
-    {"id": "6.11", "title": "Software safety requirements verification", "findings": ["CFUSA-A002"], "status": "satisfied"},
-    {"id": "6.12", "title": "Software configuration management", "findings": ["CFUSA-SCI"], "status": "satisfied"},
-    {"id": "6.4.3", "title": "No use of setjmp/longjmp", "findings": ["CFUSA-L006"], "status": "satisfied"},
-    {"id": "6.4.4", "title": "No goto statement", "findings": ["CFUSA-L002"], "status": "satisfied"},
-    {"id": "6.4.6", "title": "No unstructured code", "findings": ["CFUSA-L001"], "status": "satisfied"},
-    {"id": "6.4.7", "title": "No dead code", "findings": [], "status": "gap"},
-    {"id": "6.4.8", "title": "No code complexity exceeds limit", "findings": ["COMP001"], "status": "satisfied"},
-    {"id": "6.4.9", "title": "No use of non-standardised language ext.", "findings": [], "status": "gap"},
-    {"id": "6.4.10", "title": "No implicit type conversions", "findings": ["CFUSA-A003"], "status": "satisfied"},
-    {"id": "6.4.12", "title": "No use of global variables", "findings": ["CFUSA-L007"], "status": "satisfied"},
-    {"id": "6.4.14", "title": "No obsolete/deprecated functions", "findings": ["CFUSA-A001"], "status": "satisfied"},
-    {"id": "7.3", "title": "Hazard analysis and risk assessment (HARA)", "findings": ["HARA001"], "status": "satisfied"},
-    {"id": "7.4", "title": "Functional safety concept", "findings": [], "status": "gap"},
-    {"id": "7.5", "title": "Safety goals", "findings": ["HARA003"], "status": "satisfied"},
-    {"id": "10.4", "title": "Software component interaction (SCI) evidence", "findings": ["CFUSA-SCI"], "status": "satisfied"}
-  ],
-  "summary": {"total": 21, "satisfied": 15, "partial": 0, "gaps": 6}
-}
+ISO 26262 Parts 6-11 Gap Report — c-RCP (target ASIL-B)
+=======================================================
+
+Clause   Objective                                     cfusa Rule     Status
+-------- --------------------------------------------- -------------- ------
+6.5      General software requirements specification   -              GAP
+6.6      Software architectural design                 -              GAP
+6.7      Software unit design                          CFUSA-L001     COVERED
+6.8      Software unit implementation and verification CFUSA-L002     COVERED
+6.9      Software integration and testing              CFUSA-A007     COVERED
+6.10     Software qualification testing                -              GAP
+6.11     Software safety requirements verification     CFUSA-A002     COVERED
+6.12     Software configuration management             CFUSA-SCI      COVERED
+6.4.3    No use of setjmp/longjmp                      CFUSA-L006     COVERED
+6.4.4    No goto statement                             CFUSA-L002     COVERED
+6.4.6    No unstructured code                          CFUSA-L001     COVERED
+6.4.7    No dead code                                  -              GAP
+6.4.8    No code complexity exceeds limit              COMP001        COVERED
+6.4.9    No use of non-standardised language ext.      -              GAP
+6.4.10   No implicit type conversions                  CFUSA-A003     COVERED
+6.4.12   No use of global variables                    CFUSA-L007     COVERED
+6.4.14   No obsolete/deprecated functions              CFUSA-A001     COVERED
+7.3      Hazard analysis and risk assessment (HARA)    HARA001        COVERED
+7.4      Functional safety concept                     -              GAP
+7.5      Safety goals                                  HARA003        COVERED
+10.4     Software component interaction (SCI) evidence CFUSA-SCI      COVERED
+
+Summary: 15 covered, 6 gap(s), 0 recommended gap(s), 6 not applicable for ASIL-B
+Review gaps and add manual evidence or custom cfusa rules.
