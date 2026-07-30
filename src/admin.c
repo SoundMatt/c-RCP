@@ -228,18 +228,22 @@ size_t rcp_admin_server_metrics_text(rcp_admin_server_t *srv, char *out, size_t 
                          srv->counters[i].name, srv->counters[i].name, srv->counters[i].value);
         }
         if (n < 0) continue;
+        /* snprintf returns the length that WOULD have been written; clamp
+           to what's actually present in line[] before copying out of it,
+           or a long name/labels pair reads past the stack buffer. */
+        size_t written = ((size_t)n >= sizeof(line)) ? sizeof(line) - 1 : (size_t)n;
 
-        if (scratch_len + (size_t)n + 1 > scratch_cap) {
+        if (scratch_len + written + 1 > scratch_cap) {
             size_t new_cap = scratch_cap == 0 ? 256 : scratch_cap * 2;
             char *grown;
-            while (new_cap < scratch_len + (size_t)n + 1) new_cap *= 2;
+            while (new_cap < scratch_len + written + 1) new_cap *= 2;
             grown = (char *)realloc(scratch, new_cap);
             if (!grown) continue;
             scratch     = grown;
             scratch_cap = new_cap;
         }
-        memcpy(scratch + scratch_len, line, (size_t)n);
-        scratch_len += (size_t)n;
+        memcpy(scratch + scratch_len, line, written);
+        scratch_len += written;
         scratch[scratch_len] = '\0';
     }
     rcp_mutex_unlock(&srv->mu);
