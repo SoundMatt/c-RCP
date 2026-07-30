@@ -39,7 +39,7 @@ per RELAY spec §15.5 — see "Removed legacy API" below.)*
 | `<rcp/ep_gpio.h>`, `<rcp/ep_spi.h>`, `<rcp/ep_i2c.h>`, `<rcp/ep_uart.h>`, `<rcp/ep_adc.h>`, `<rcp/ep_pwm.h>`, `<rcp/ep_can.h>`, `<rcp/ep_lin.h>`, `<rcp/ep_mdio.h>`, `<rcp/ep_iseled.h>`, `<rcp/ep_wakeup.h>` | Per-endpoint-type request/response codecs |
 | `<rcp/request_cancel.h>`, `<rcp/request_chained.h>`, `<rcp/request_compound.h>`, `<rcp/request_sequencer.h>`, `<rcp/request_timed.h>`, `<rcp/request_triggered.h>` | The request-kind taxonomy (execution priority: cancellation > triggered > timed > compound > compound-wait > chained > standard) |
 | `<rcp/mock.h>` | In-process RC-Server/endpoint test double — zero I/O, default for unit tests |
-| `<rcp/sim.h>` | SiL/HIL simulator backend |
+| `<rcp/errors.h>` | Numbered TC18 wire error codes (`rcp_wire_error_t`) |
 | `<relay/relay.h>` | Shared `rcp_context_t` (deadline) and error-condition types |
 
 ## Build
@@ -64,6 +64,24 @@ cmake --build build --target c-rcp
 ./build/c-rcp version
 ./build/c-rcp capabilities
 ```
+
+## CLI capabilities self-report
+
+`c-rcp capabilities`'s `features` array (`time_sync`, `enhanced_cancel`,
+`compound_bundles`) reports **API-surface presence, not full TC18 wire
+conformance**. Each has real, working code behind it, but none is fully
+spec-conformant yet as of this writing: `time_sync`'s presentation-time
+sub-field (`request_timed.c`) is narrower than the spec's own field;
+`enhanced_cancel`'s encoders (`request_cancel.c`) hard-code the shared
+ACF header's `evt` sub-field to 0, so half the mechanism can't be
+expressed on the wire; `compound_bundles`' repetition count
+(`request_compound.c`) is round-tripped only, with no repetition state
+machine actually driving repeated execution. The RELAY capabilities
+JSON schema's `features` array is a flat list of strings with no room
+for a per-entry conformance caveat, so this note — and `src/cli.c`'s own
+comment above `capabilities_json()` — is where that caveat actually
+lives. Treat a `features` entry as "this build compiles the named
+group's request/response codec", not as a spec-conformance claim.
 
 ## Quick start
 

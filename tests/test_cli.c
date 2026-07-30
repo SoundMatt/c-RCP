@@ -121,6 +121,33 @@ static void test_capabilities_honestly_omits_send(void)
     TEST_ASSERT_NULL(strstr(out, "\"send\""));
 }
 
+static void test_capabilities_transports_honestly_omits_tls(void)
+{
+    /* c-RCP-05: tls.h/tls.c were removed outright at v0.78.0 (no
+     * compat shim) -- advertising "tls" as a transport would claim a
+     * backend that doesn't exist in this tree at all. */
+    char *argv[] = {"capabilities"};
+    char out[512], err[512];
+
+    TEST_ASSERT_EQUAL(RCP_CLI_OK, run_capture(1, argv, out, sizeof(out), err, sizeof(err)));
+    TEST_ASSERT_NULL(strstr(out, "\"tls\""));
+}
+
+static void test_capabilities_transports_lists_real_backends(void)
+{
+    char *argv[] = {"capabilities"};
+    char out[512], err[512];
+    const char *transports;
+
+    TEST_ASSERT_EQUAL(RCP_CLI_OK, run_capture(1, argv, out, sizeof(out), err, sizeof(err)));
+    transports = strstr(out, "\"transports\":[");
+    TEST_ASSERT_NOT_NULL(transports);
+    TEST_ASSERT_NOT_NULL(strstr(transports, "\"mock\""));
+    TEST_ASSERT_NOT_NULL(strstr(transports, "\"udp\""));
+    TEST_ASSERT_NOT_NULL(strstr(transports, "\"shmem\""));
+    TEST_ASSERT_NOT_NULL(strstr(transports, "\"tsn\""));
+}
+
 /* ── status ────────────────────────────────────────────────────────────────── */
 
 static void test_status_json_has_required_fields(void)
@@ -197,6 +224,8 @@ int main(void)
 
     RUN_TEST(test_capabilities_is_always_json_and_lists_mandatory_commands);
     RUN_TEST(test_capabilities_honestly_omits_send);
+    RUN_TEST(test_capabilities_transports_honestly_omits_tls);
+    RUN_TEST(test_capabilities_transports_lists_real_backends);
 
     RUN_TEST(test_status_json_has_required_fields);
     RUN_TEST(test_status_text_form);

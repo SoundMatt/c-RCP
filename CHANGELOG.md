@@ -31,6 +31,30 @@ the rationale.
 
 ## Releases
 
+### v0.94.0 -- 2026-07-30
+
+Fix three CLI `capabilities` self-report accuracy issues found by the
+2026-07-30 ecosystem audit. Dropped `tls` from `transports`: `tls.h`/
+`tls.c` were removed outright at v0.78.0 (see this file's Deprecation &
+Removal Log), so the self-report was advertising a transport backend
+that no longer exists in the tree at all. `RCP_CLI_ALL_IMPLEMENTED_
+OPTIONS` (a single hardcoded "every bit in all three groups" constant,
+despite its own comment claiming it named "one per group this build
+actually implements") is now `RCP_CLI_IMPLEMENTED_OPTIONS`, computed
+from three independently-named per-group predicates. Independently
+verified against the actual code that none of the three feature groups
+(`time_sync`, `enhanced_cancel`, `compound_bundles`) is fully
+TC18-wire-conformant yet, despite each having real, working API surface
+compiled in (`request_timed.c`'s `presentation_time` is a plain
+`uint32_t`; `request_cancel.c`'s encoders hard-code the ACF header's
+`evt` sub-field to 0; `request_compound.c`'s `repeat_count` is an
+8-bit, round-tripped-only sub-field with no repetition state machine)
+-- documented this "API surface, not wire conformance" caveat directly
+in `cli.c` and `README.md`, since the RELAY capabilities JSON schema's
+`features` array (`additionalProperties: false`, flat `string[]`) has
+no way to carry a per-entry caveat on the wire itself. (Milestone 94;
+see `ROADMAP.md` for full detail.)
+
 ### v0.93.0 -- 2026-07-30
 
 Add the numbered TC18 wire error-code table (`rcp/errors.h`,
