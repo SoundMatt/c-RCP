@@ -4,9 +4,9 @@
   "tool": "c-FuSa",
   "toolVersion": "0.5.48",
   "language": "c",
-  "generatedAt": "2026-07-30T16:43:21Z",
+  "generatedAt": "2026-07-30T16:48:36Z",
   "project": "c-RCP",
-  "version": "0.96.0",
+  "version": "0.97.0",
   "standard": "iso26262",
   "ratingScale": "cfusa-heuristic-1-10",
   "entries": [
