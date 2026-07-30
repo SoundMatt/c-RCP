@@ -64,25 +64,59 @@ static void version_text(char *buf, size_t buf_len)
  * worked example includes them for single-protocol tools like this one.
  *
  * "features" (ROADMAP.md milestone 77, "Foundational test/config
- * satellites"): before this milestone this listed a legacy-satellite-
- * flavored ["loaning"] entry. It now instead names, one per group this
- * build actually implements, regmap.h's own svr_implemented_options
- * feature-bundle groups (RCP_REGMAP_OPT_* -- "three all-or-nothing feature
- * groups", src/regmap.c since v0.62.0): time_sync (TSCF framing plus its
- * presentation-timestamp companion), enhanced_cancel (a cancellation
- * request plus its acknowledgement, request_cancel.h), compound_bundles
- * (a bundle header plus per-segment addressing, request_compound.h). This
- * is a static, build-time answer -- this generic CLI tool never connects
- * to a live RC Server (see status_json()'s own "connected":false), so
- * there is no live svr_implemented_options value to report instead of the
- * library's own implemented feature set. RCP_CLI_ALL_IMPLEMENTED_OPTIONS
- * sets every bit in all three groups together, so it is always
- * rcp_regmap_options_group_consistent() by construction.
+ * satellites"; caveat added milestone 94, c-RCP-06/c-RCP-07): names, one
+ * per group this build compiles the *API surface* for, regmap.h's own
+ * svr_implemented_options feature-bundle groups (RCP_REGMAP_OPT_* --
+ * "three all-or-nothing feature groups", src/regmap.c since v0.62.0):
+ * time_sync (TSCF framing plus its presentation-timestamp companion),
+ * enhanced_cancel (a cancellation request plus its acknowledgement,
+ * request_cancel.h), compound_bundles (a bundle header plus per-segment
+ * addressing, request_compound.h). This is a static, build-time answer --
+ * this generic CLI tool never connects to a live RC Server (see
+ * status_json()'s own "connected":false), so there is no live
+ * svr_implemented_options value to report instead of the library's own
+ * compiled-in feature set.
+ *
+ * IMPORTANT -- "features" reports API-surface presence, not full TC18
+ * wire conformance. A 2026-07-30 ecosystem audit (c-RCP-06) found, and
+ * this milestone independently confirmed against the actual code, that
+ * none of the three groups is fully wire-conformant yet despite each
+ * having real, working code behind it:
+ *   - time_sync: request_timed.c's presentation_time sub-field is a
+ *     plain uint32_t, narrower than the spec's own wider field.
+ *   - enhanced_cancel: request_cancel.c's encoders hard-code the shared
+ *     ACF header's evt sub-field to 0 (see e.g.
+ *     rcp_cancel_encode_clear_all()'s `b[5] = 0x00u`), so the
+ *     acknowledge-on-filing half of the mechanism cannot be expressed on
+ *     the wire.
+ *   - compound_bundles: request_compound.c's repeat_count is an 8-bit,
+ *     round-tripped-only sub-field (see request_compound.h's own file
+ *     header) -- there is no repetition state machine actually driving
+ *     repeated execution.
+ * The RELAY capabilities schema's "features" array is a flat list of
+ * strings with no room for a per-entry conformance caveat
+ * (spec/schemas/cli-capabilities.json sets additionalProperties:false on
+ * the whole document, and "features" itself is just string[]), so this
+ * caveat cannot be expressed in the JSON output itself -- it is recorded
+ * here, and in README.md, for anyone auditing this self-report against
+ * the actual code. RCP_CLI_IMPLEMENTED_OPTIONS below is derived from
+ * three independently-named per-group predicates rather than one
+ * monolithic "all" constant (c-RCP-07) precisely so that fixing any one
+ * group's conformance gap has a single, obvious place to flip its
+ * predicate to reflect that -- not because any predicate's value differs
+ * from the others today.
  */
-#define RCP_CLI_ALL_IMPLEMENTED_OPTIONS                                        \
-    (RCP_REGMAP_OPT_TIME_SYNC_TSCF | RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION |    \
-     RCP_REGMAP_OPT_ENH_CANCEL_REQUEST | RCP_REGMAP_OPT_ENH_CANCEL_ACK |        \
-     RCP_REGMAP_OPT_COMPOUND_HEADER | RCP_REGMAP_OPT_COMPOUND_SEGMENT)
+#define RCP_CLI_HAS_TIME_SYNC_API        1
+#define RCP_CLI_HAS_ENHANCED_CANCEL_API  1
+#define RCP_CLI_HAS_COMPOUND_BUNDLES_API 1
+
+#define RCP_CLI_IMPLEMENTED_OPTIONS                                                          \
+    ((RCP_CLI_HAS_TIME_SYNC_API                                                              \
+          ? (RCP_REGMAP_OPT_TIME_SYNC_TSCF | RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION) : 0u) |   \
+     (RCP_CLI_HAS_ENHANCED_CANCEL_API                                                        \
+          ? (RCP_REGMAP_OPT_ENH_CANCEL_REQUEST | RCP_REGMAP_OPT_ENH_CANCEL_ACK) : 0u) |       \
+     (RCP_CLI_HAS_COMPOUND_BUNDLES_API                                                       \
+          ? (RCP_REGMAP_OPT_COMPOUND_HEADER | RCP_REGMAP_OPT_COMPOUND_SEGMENT) : 0u))
 
 /* Renders options' implemented feature-bundle groups as a JSON array of
  * strings into buf (e.g. "[\"time_sync\",\"enhanced_cancel\"]"). A group is
@@ -129,8 +163,16 @@ static void capabilities_json(char *buf, size_t buf_len)
 {
     char features[128];
 
-    features_json((uint32_t)RCP_CLI_ALL_IMPLEMENTED_OPTIONS, features, sizeof(features));
+    features_json((uint32_t)RCP_CLI_IMPLEMENTED_OPTIONS, features, sizeof(features));
 
+    /* "transports" (c-RCP-05): "tls" dropped -- tls.h/tls.c were
+     * DEPRECATE-removed outright at v0.78.0 (CHANGELOG.md's Deprecation &
+     * Removal Log), so it advertised a backend that doesn't exist in this
+     * tree at all, let alone a working one. "mock"/"udp"/"shmem"/"tsn"
+     * all have real, non-stub implementations (src/mock.c, src/udp.c,
+     * src/shmem.c, src/tsn.c) and stay listed; udp.c's Windows path being
+     * stub-only is a real, separate, platform-specific gap (not "this
+     * transport doesn't exist" like tls was), tracked independently. */
     snprintf(buf, buf_len,
         "{"
         "\"kind\":\"capabilities\","
@@ -140,7 +182,7 @@ static void capabilities_json(char *buf, size_t buf_len)
         "\"version\":\"%s\","
         "\"spec_version\":\"%s\","
         "\"commands\":[\"version\",\"capabilities\",\"status\"],"
-        "\"transports\":[\"mock\",\"udp\",\"shmem\",\"tls\",\"tsn\"],"
+        "\"transports\":[\"mock\",\"udp\",\"shmem\",\"tsn\"],"
         "\"features\":%s,"
         "\"interfaces\":[\"Node\",\"Caller\"],"
         "\"optional_interfaces\":[],"

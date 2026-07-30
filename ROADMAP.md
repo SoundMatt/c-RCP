@@ -4944,3 +4944,69 @@ contains "des_" -- renamed the function rather than filing an upstream
 c-FuSa issue for a one-line, purely-cosmetic identifier), `trace
 --req-coverage 100` and `trace --sec-tested 100` both 100% (774/774),
 and RELAY's own `relay conform --strict` still PASS.
+
+### 94. CLI capabilities self-report honesty (v0.94.0) ✅
+
+A cross-repo ecosystem audit (2026-07-30) found three related accuracy
+problems in `c-rcp capabilities`'s self-report:
+
+`"transports"` listed `"tls"` (c-RCP-05) despite `tls.h`/`tls.c` having
+been DEPRECATE-removed outright at v0.78.0 (see this file's own
+Deprecation & Removal Log in CHANGELOG.md) -- the self-report was
+advertising a backend that no longer exists in the source tree at all,
+not merely a non-functional stub. Dropped it. `"mock"`/`"udp"`/
+`"shmem"`/`"tsn"` were independently verified (grep for `NOT_SUPPORTED`
+across each backend's `src/*.c`) to all have real, non-stub
+implementations and stay listed; `udp.c`'s Windows-path-is-stub-only
+gap is real but platform-specific, not "doesn't exist", and is a
+separate, smaller, already-tracked issue, not folded into this fix.
+
+`RCP_CLI_ALL_IMPLEMENTED_OPTIONS` (c-RCP-07) was a single hardcoded
+constant unconditionally OR-ing every bit in all three
+`svr_implemented_options` feature groups together, despite its own
+comment claiming the value named "one per group this build actually
+implements" -- there was no per-feature predicate behind it at all.
+Renamed to `RCP_CLI_IMPLEMENTED_OPTIONS` and rebuilt from three
+independently-named per-group predicates
+(`RCP_CLI_HAS_TIME_SYNC_API`/`_ENHANCED_CANCEL_API`/
+`_COMPOUND_BUNDLES_API`). All three still evaluate to 1 today (no
+build-time feature-flag/`#ifdef` mechanism exists yet to ever flip one
+to 0), so the reported bitmask is unchanged -- the fix is structural
+(a future conformance fix has exactly one named predicate to flip),
+not a behavior change.
+
+The audit also flagged (c-RCP-06) that `"features"` reports these
+three groups without any wire-conformance evidence behind them, citing
+prior findings against each. This milestone independently re-verified
+all three directly against the current code rather than assuming the
+prior findings still held: `request_timed.c`'s `presentation_time` is
+indeed a plain `uint32_t` (encode/decode both operate on it as such);
+`request_cancel.c`'s encoders (e.g. `rcp_cancel_encode_clear_all()`)
+do hard-code the shared ACF header's byte 5 (`op`/`evt`/`ms`) to
+`0x00`, zeroing `evt` unconditionally; `request_compound.c`'s
+`repeat_count` is confirmed `uint8_t`, and its own header comment
+already documents it as "round-tripped only" with no repetition state
+machine. All three are real, confirmed gaps -- not fixed here (each is
+a substantially larger wire-conformance fix, out of this milestone's
+scope), but the capabilities self-report now says so explicitly:
+`src/cli.c`'s `capabilities_json()` doc comment and a new README.md
+"CLI capabilities self-report" section both state plainly that
+`features` means "API surface present", not "TC18-conformant". The
+RELAY capabilities JSON schema itself (`additionalProperties: false`,
+`features` a flat `string[]`) has no field to carry this caveat on the
+wire, so it lives in source/docs instead, per the audit's own
+recommended fallback when qualifying the wire-visible bits themselves
+isn't in scope.
+
+Verified locally: full `ctest` suite (57/57, plus two new `test_cli.c`
+cases asserting `tls` is absent and the four real transports are
+present), zero compiler warnings, `cfusa`
+`check`/`lint`/`analyze`/`cyber` all exit 0, `trace --req-coverage 100`
+and `trace --sec-tested 100` both still 100% (774/774, unchanged --
+this milestone changed no requirement's implementation surface, only
+its self-report accuracy and internal structure), and RELAY's own
+`relay conform --strict` still PASS against the built `c-rcp` CLI
+(confirming the schema still validates without `"tls"`). Also fixed in
+passing: README.md's Headers table still listed the removed `<rcp/
+sim.h>` from the v0.91.0 retired-protocol removal -- replaced with
+`<rcp/errors.h>` (added v0.93.0), which the table had not yet listed.
