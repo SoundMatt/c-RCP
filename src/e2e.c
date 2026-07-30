@@ -9,8 +9,31 @@ const char *rcp_e2e_strerror(rcp_e2e_errc_t e)
     switch (e) {
     case RCP_E2E_OK:               return "e2e: ok";
     case RCP_E2E_ERR_SHORT_FRAME:  return "e2e: frame too short for a CRC32 trailer";
-    case RCP_E2E_ERR_CRC_MISMATCH: return "e2e: CRC_ERROR -- CRC32 mismatch, execution skipped";
+    /* Not "CRC_ERROR": the spec's own prose names a CRC mismatch
+     * CRC_ERROR, but its authoritative numbered error-code table has no
+     * such entry -- the code it actually assigns a CRC mismatch is
+     * POCI_FAILURE (12), see rcp_e2e_wire_error(). Naming this string
+     * after the table's real code, not the prose alias, avoids baking a
+     * name with no wire representation into this implementation. */
+    case RCP_E2E_ERR_CRC_MISMATCH: return "e2e: POCI failure -- CRC32 mismatch, execution skipped";
     default:                          return "e2e: unknown error";
+    }
+}
+
+//cfusa:req REQ-WIREERR-003
+rcp_wire_error_t rcp_e2e_wire_error(rcp_e2e_errc_t e)
+{
+    switch (e) {
+    /* The governing spec's numbered error-code table assigns a CRC
+     * mismatch the code POCI_FAILURE (12) -- see errors.h's file header
+     * for why this doesn't literally match the "CRC_ERROR" name used in
+     * the spec's own prose elsewhere. */
+    case RCP_E2E_ERR_CRC_MISMATCH: return RCP_ERROR_POCI_FAILURE;
+    /* RCP_E2E_OK and RCP_E2E_ERR_SHORT_FRAME are both local framing
+     * outcomes with no numbered wire-error-code counterpart: OK means
+     * nothing went wrong, and a too-short frame never reaches the point
+     * of being a transmittable Response at all. */
+    default: return RCP_ERROR_NONE;
     }
 }
 

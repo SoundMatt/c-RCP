@@ -239,6 +239,7 @@
 #ifndef RCP_E2E_H
 #define RCP_E2E_H
 
+#include "rcp/errors.h"
 #include "rcp/rcp.h"
 #include "rcp/request_sequencer.h"
 
@@ -256,12 +257,22 @@ extern "C" {
 typedef enum {
     RCP_E2E_OK               = 0,
     RCP_E2E_ERR_SHORT_FRAME  = 1,
-    RCP_E2E_ERR_CRC_MISMATCH = 2, /* CRC_ERROR: caller must skip
-                                         executing this request */
+    RCP_E2E_ERR_CRC_MISMATCH = 2, /* caller must skip executing this
+                                         request; see rcp_e2e_wire_error() */
 } rcp_e2e_errc_t;
 
 /* Never returns NULL. */
 const char *rcp_e2e_strerror(rcp_e2e_errc_t e);
+
+/* Maps e to its numbered wire error code (errors.h), for a caller
+ * populating a Response frame's err field. Returns RCP_ERROR_POCI_FAILURE
+ * for RCP_E2E_ERR_CRC_MISMATCH (the governing spec's own numbered
+ * error-code table's assigned code for a CRC mismatch -- see errors.h's
+ * file header for why this isn't literally named "CRC_ERROR"), and
+ * RCP_ERROR_NONE for every other value (RCP_E2E_OK and
+ * RCP_E2E_ERR_SHORT_FRAME are both local outcomes with no wire-error-code
+ * counterpart). */
+rcp_wire_error_t rcp_e2e_wire_error(rcp_e2e_errc_t e);
 
 /* ── CRC32 ──────────────────────────────────────────────────────────────────── */
 

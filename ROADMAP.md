@@ -4895,3 +4895,52 @@ Verified locally: full `ctest` suite (56/56), zero compiler warnings,
 `REQ-E2E-003/005/006/007/008/009`'s existing implementations changed
 behavior), and RELAY's own `relay conform --strict` still PASS against
 the built `c-rcp` CLI.
+
+### 93. Add TC18 wire error-code table, fix CRC_ERROR naming (v0.93.0) ✅
+
+A cross-repo ecosystem audit (2026-07-30) found this project shipped no
+representation at all of the governing TC18 spec's own numbered wire
+error-code table (c-RCP-03): every error type in the tree was a local
+`rcp_errc_t` or module-local `rcp_<mod>_errc_t` enum with no wire
+representation, and no code anywhere modeled the seventeen numbered
+codes an RC Server actually places in a Response frame's err field to
+tell an RC Client what went wrong. The audit also corrected an earlier
+issue's speculation that the numeric values "may not be explicitly
+given" -- they are, and several names that earlier issue assumed
+(`HW_CFG_INCONSISTENT`, `EPs_NOT_IDLE`, `LOCKED_CONFIG_ACCESS`, etc.)
+are not the spec table's real names.
+
+Added `include/rcp/errors.h`/`src/errors.c`: `rcp_wire_error_t` assigns
+the seventeen numbered codes 1-17 exactly as the spec's own table does,
+plus a value-0 `RCP_ERROR_NONE` sentinel (this implementation's own
+addition, not part of the spec's table) for "no applicable wire code".
+`rcp_wire_error_string()` gives each a unique, non-empty description.
+This header intentionally does not attempt to wire every internal
+error enum in the codebase onto one of these seventeen codes -- most
+internal errors (allocation failure, buffer-too-small) never reach the
+wire at all, so most of the mapping work is either not applicable or a
+larger module-by-module audit than this milestone's scope.
+
+Separately (c-RCP-04): `src/e2e.c`'s `rcp_e2e_strerror()` hardcoded the
+string "CRC_ERROR" for a CRC mismatch -- the spec's own prose name for
+this condition, but not an entry in the spec's authoritative numbered
+table, which instead assigns a CRC mismatch the code POCI_FAILURE
+(12). Once `rcp_wire_error_t` existed to actually emit real wire
+codes, hardcoding a name with no corresponding number would have meant
+that whenever this project starts emitting real error-code values,
+the CRC-mismatch path would have nothing to emit. Fixed the
+`rcp_e2e_strerror()` text and added `rcp_e2e_wire_error()`, mapping
+`RCP_E2E_ERR_CRC_MISMATCH` to `RCP_ERROR_POCI_FAILURE` and every other
+`rcp_e2e_errc_t` value (both local framing outcomes with no wire
+representation) to `RCP_ERROR_NONE`.
+
+Verified locally: full `ctest` suite (57/57, plus the two new targets
+`test_errors`/the two new `test_e2e` cases), zero compiler warnings,
+`cfusa` v0.5.49 `check`/`lint`/`analyze`/`cyber` all exit 0 (one
+`cfusa cyber` false-positive found and fixed along the way: `CFUSA-
+CY009`'s naive substring match for weak-crypto function names fired on
+a test function named `..._codes_have_..._values`, since "codes_have"
+contains "des_" -- renamed the function rather than filing an upstream
+c-FuSa issue for a one-line, purely-cosmetic identifier), `trace
+--req-coverage 100` and `trace --sec-tested 100` both 100% (774/774),
+and RELAY's own `relay conform --strict` still PASS.

@@ -6938,6 +6938,33 @@
       "level": "QM",
       "asil": "QM",
       "scope": "tc18"
+    },
+    {
+      "id": "REQ-WIREERR-001",
+      "title": "rcp_wire_error_t assigns the governing spec's own numbered wire error codes",
+      "text": "rcp_wire_error_t shall assign each of the seventeen numbered error codes 1-17 the exact numeric value the governing TC18 Remote Control Protocol Specification's own error-code table assigns it, plus a value-0 RCP_ERROR_NONE sentinel (this implementation's own addition, not part of the spec's table) for \"no applicable wire code\".",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-WIREERR-002",
+      "title": "rcp_wire_error_string() returns a unique, non-empty message per code",
+      "text": "rcp_wire_error_string() shall return a unique, non-empty, human-readable description for every defined rcp_wire_error_t constant, and a non-NULL, non-empty generic message for any other value.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-WIREERR-003",
+      "title": "rcp_e2e_wire_error() maps a CRC mismatch to POCI_FAILURE",
+      "text": "rcp_e2e_wire_error() shall return RCP_ERROR_POCI_FAILURE for RCP_E2E_ERR_CRC_MISMATCH -- the code the governing spec's own numbered error-code table assigns a CRC mismatch -- and RCP_ERROR_NONE for every other rcp_e2e_errc_t value, since neither RCP_E2E_OK nor RCP_E2E_ERR_SHORT_FRAME has a wire-error-code counterpart.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
     }
   ],
   "catalogNote": "Phase 22 re-certification pass (ROADMAP.md milestone 85, v0.85.0): every requirement below was individually reviewed against the source file its //cfusa:req tag actually appears in (a per-prefix audit, not a blind carry-over) and classified via the \"scope\" field. scope=\"tc18\" entries (779 of 854) describe the actual implemented TC18 behavior -- register-map access control, lifecycle transitions, E2E CRC32 safe points, per-endpoint-type request/response shapes, discovery, power-mode transitions, and every ADAPT-class satellite -- and are this project's own ISO 26262 ASIL-B safety-case basis going forward. scope=\"legacy-compat\" entries (75 of 854) describe the retired pre-TC18 Zone/Command surface (rcp.h/rcp.c and tests/legacy_mock.* only); they are demoted to level/asil \"QM\" and their text is prefixed accordingly, but kept -- not deleted or renumbered -- because that legacy surface is out of scope for this milestone to touch (ROADMAP.md's v0.84.0 milestone already confirmed it is the last consumer of those retired types anywhere in src/) and still carries //cfusa:req tags naming these ids; deleting the catalog entries out from under a surviving tag would only trade one inaccuracy (an unqualified legacy requirement) for another (a dangling reference cfusa trace would then report). Only the tc18 subset is this project's claimed certification basis, and it is complete against Phases 13-21 as actually shipped -- not a forward-declared placeholder the way the legacy program's own catalog was at its v0.2.0, since unlike v0.2.0 this catalog was not written before the code it describes."

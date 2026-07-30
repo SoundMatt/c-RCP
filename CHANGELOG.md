@@ -31,6 +31,21 @@ the rationale.
 
 ## Releases
 
+### v0.93.0 -- 2026-07-30
+
+Add the numbered TC18 wire error-code table (`rcp/errors.h`,
+`rcp_wire_error_t`), which this project previously shipped no
+representation of at all -- only local `rcp_errc_t`/module-local
+`rcp_<mod>_errc_t` enums, none of which model the numbered codes an RC
+Server places in a Response frame's err field. Also fixes `src/e2e.c`'s
+`rcp_e2e_strerror()`, which hardcoded the spec's own prose alias
+"CRC_ERROR" for a CRC mismatch -- a name with no entry in the spec's
+authoritative numbered table, which instead assigns a CRC mismatch the
+code POCI_FAILURE (12). Added `rcp_e2e_wire_error()`, mapping
+`RCP_E2E_ERR_CRC_MISMATCH` to `RCP_ERROR_POCI_FAILURE` (and everything
+else to a new `RCP_ERROR_NONE` sentinel for "no applicable wire code").
+(Milestone 93; see `ROADMAP.md` for full detail.)
+
 ### v0.92.0 -- 2026-07-30
 
 BREAKING: fix two E2E CRC32 wire-conformance defects found by the
