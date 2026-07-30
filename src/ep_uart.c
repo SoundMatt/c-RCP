@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/ep_uart.h"
 
 #include <stdlib.h>

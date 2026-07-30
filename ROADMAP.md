@@ -5078,3 +5078,31 @@ macOS's `leaks --atExit` against the plain, non-sanitized build, since
 LeakSanitizer itself isn't available locally: 0 leaks before merge).
 This was a test-only resource leak, not a product-code defect -- no
 `src/*.c` file was touched by this fix.
+
+### 96. Add SPDX-License-Identifier source headers (v0.96.0) ✅
+
+A 2026-07-30 ecosystem audit found (c-RCP-15) zero
+`SPDX-License-Identifier` hits across every `.h`/`.c` file in the
+tree, despite the repo shipping a per-version `c-RCP-<version>.spdx.json`
+SBOM (release.yml/`cfusa release`) making per-file license claims --
+MPL-2.0 Exhibit A recommends a per-file notice, and without one the
+SBOM's claims have no source-level tag to cross-check against.
+
+Added `/* SPDX-License-Identifier: MPL-2.0 */` as line 1 of every
+first-party file across `include/rcp/`, `include/relay/`, `src/`,
+`cli/`, and `tests/` (178 files total) -- ahead of any existing
+`//cfusa:req`/`//cfusa:test` tag block or file-header comment, which
+cfusa's own tooling tolerates without issue (verified: `trace
+--req-coverage 100`/`--sec-tested 100` both still 100%, 774/774,
+unchanged after the header insertion). Added a new `spdx-headers` CI
+job (a small dedicated grep-based check, since no existing c-FuSa lint
+rule covers this) enforcing the header's presence on every matching
+file going forward, per the audit's own "enforce via CI lint"
+recommendation.
+
+Verified locally: full `ctest` suite (57/57, this milestone touches no
+executable code), zero compiler warnings, `cfusa`
+`check`/`lint`/`analyze`/`cyber` all exit 0, `trace --req-coverage 100`
+and `trace --sec-tested 100` both 100% (774/774, unchanged), and the
+new `spdx-headers` check's own logic verified locally against the full
+tree (0 missing).

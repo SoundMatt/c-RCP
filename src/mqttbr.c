@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/mqttbr.h"
 
 //cfusa:req REQ-MQTT-002

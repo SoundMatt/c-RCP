@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * restbridge.h -- REST protocol bridge interface stub (SG-006) for the TC18
  * Remote Control Protocol wire layer (ROADMAP.md Phase 21, "Satellite

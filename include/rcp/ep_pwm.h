@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:req REQ-PWM-001
 //cfusa:req REQ-PWM-002
 //cfusa:req REQ-PWM-003

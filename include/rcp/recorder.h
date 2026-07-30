@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * recorder.h -- Binary record and replay of raw wire traffic for the TC18
  * Remote Control Protocol wire layer (ROADMAP.md Phase 21, "Satellite

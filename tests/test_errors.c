@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:test REQ-WIREERR-001
 //cfusa:test REQ-WIREERR-002
 #include "unity.h"

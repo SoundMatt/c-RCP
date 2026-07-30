@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/grpcbridge.h"
 
 //cfusa:req REQ-GRPC-002

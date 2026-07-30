@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * RELAY application interface adapter for c-RCP (RELAY spec §10.3, §18.2,
  * §15.7.5) -- REPLACE, ROADMAP.md Phase 21, "Satellite Package Rework",

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * linbr.h -- LIN (Local Interconnect Network) bus bridge interface stub
  * (SG-006) for the TC18 Remote Control Protocol wire layer (ROADMAP.md

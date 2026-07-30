@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * someipbr.h -- SOME/IP protocol bridge interface stub (SG-006) for the TC18
  * Remote Control Protocol wire layer (ROADMAP.md Phase 21, "Satellite

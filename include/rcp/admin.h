@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * admin.h -- In-process Admin API (endpoint listing, SSE-style events,
  * Prometheus metrics) for the TC18 Remote Control Protocol wire layer

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * observe.h -- OpenTelemetry-style observability (spans and counters) for
  * the TC18 Remote Control Protocol wire layer (ROADMAP.md Phase 21,

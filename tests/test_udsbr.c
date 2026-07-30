@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /* udsbr protocol-bridge stub conformance tests.
  *
  * rcp_uds_bridge_send() is a compile-time interface stub: until a concrete

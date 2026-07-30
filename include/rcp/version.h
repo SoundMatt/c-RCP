@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /* c-RCP binary version -- single source of truth for the CLI and
  * capabilities document. Kept in sync with CMakeLists.txt's project()
  * VERSION and .fusa.json's "version" at every release, the same manual
@@ -5,6 +6,6 @@
 #ifndef RCP_VERSION_H
 #define RCP_VERSION_H
 
-#define RCP_VERSION "0.95.0"
+#define RCP_VERSION "0.96.0"
 
 #endif /* RCP_VERSION_H */

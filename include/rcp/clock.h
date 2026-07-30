@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 #ifndef RCP_CLOCK_H
 #define RCP_CLOCK_H
 

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * udsbr.h -- UDS (Unified Diagnostic Services / ISO 14229) protocol bridge
  * interface stub (SG-006) for the TC18 Remote Control Protocol wire layer

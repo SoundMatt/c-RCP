@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:req REQ-TRIG-001
 //cfusa:req REQ-TRIG-002
 //cfusa:req REQ-TRIG-003

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * rcp.h -- shared, protocol-agnostic primitives used across the whole
  * codebase: the base error sentinel enum, a borrowed/owned byte-buffer

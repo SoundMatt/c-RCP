@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /* c-rcp -- RELAY-conformant CLI entry point (RELAY spec §11, §13.2).
  *
  * Thin wrapper around rcp_cli_run(); all logic lives in <rcp/cli.h> so it

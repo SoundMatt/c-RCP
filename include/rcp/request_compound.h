@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:req REQ-CMP-001
 //cfusa:req REQ-CMP-002
 //cfusa:req REQ-CMP-003

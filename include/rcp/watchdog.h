@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * Per-stream watchdog kicker for the TC18 Remote Control Protocol
  * (SG-001, SG-003, SG-007) -- ROADMAP.md Phase 21, "Satellite Package

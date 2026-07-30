@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /* Must precede any system header: exposes clock_gettime()/CLOCK_MONOTONIC
  * on glibc under strict -std=c99 (glibc gates POSIX.1-2008 declarations
  * behind this feature-test macro; BSD/Apple libc does not, which is why

@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/canbr.h"
 
 //cfusa:req REQ-CAN-002

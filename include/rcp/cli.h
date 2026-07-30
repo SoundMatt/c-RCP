@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * RELAY-conformant CLI for c-RCP (RELAY spec §11 CLI contract, §12
  * capability docs).

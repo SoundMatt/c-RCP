@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * faultinject.h -- Structured fault injection for validating safety
  * mechanisms, for the TC18 Remote Control Protocol wire layer

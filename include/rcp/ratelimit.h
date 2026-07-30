@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: MPL-2.0 */
 /*
  * ratelimit.h -- Per-endpoint token-bucket admission control for the TC18
  * Remote Control Protocol wire layer (ROADMAP.md Phase 21, "Satellite
