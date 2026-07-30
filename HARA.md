@@ -62,7 +62,7 @@ also `tara.md`'s TS-002/TS-001/TS-003 notes on residual risk).
 ## ASIL Determination Note
 
 ASIL letters are computed via `cfusa hara asil` (ISO 26262-3:2018
-Table 4). Four hazards resolve to ASIL-C or ASIL-D: H-001 and H-005
+Table 4). Five hazards resolve to ASIL-C or ASIL-D: H-001 and H-005
 (safety-tagged request delivery/execution, S3/E4 and S3/E3
 respectively), H-003 (watchdog-driven safe-state entry, S2/E4), H-007
 (unauthenticated request over the native transport, S3/E2), and H-008
@@ -116,4 +116,4 @@ notes, not asserted as closed.
 | No link-layer authentication for the native transport in this library's default posture (H-007) | Medium | MACsec (802.1AE) is a link-layer, product-specific/opaque control the spec delegates outside RCP itself; an integrator must supply it | **Open — deployment responsibility, not closed by this library** |
 | `rcp_e2e_endpoint_in_safe_state()` misconfiguration (invalid `safestate_sequencer` index, unrecognized `rx_safety_measure`) | Low | Fails closed (returns false) by explicit design choice, not a spec-mandated value | Accepted |
 | Discovery/bootstrap (`OS-008`) accepts any claimant at the reserved discovery `byte_bus_id` while `HW_UNCONFIGURED` | Low | No identity check exists at this stage in the spec's own bootstrap sequence; matches the same residual posture as H-007 above | Accepted, tracked alongside H-007 |
-| Four hazards (H-001, H-003, H-005, H-008) compute to ASIL-C/D against an ASIL-B-scoped implementation rigor | Open | See ASIL Determination Note above | **Open — not yet closed** |
+| Five hazards (H-001, H-003, H-005, H-007, H-008) compute to ASIL-C/D against an ASIL-B-scoped implementation rigor | Open | See ASIL Determination Note above | **Open — not yet closed** |

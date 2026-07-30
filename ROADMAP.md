@@ -5106,3 +5106,59 @@ executable code), zero compiler warnings, `cfusa`
 and `trace --sec-tested 100` both 100% (774/774, unchanged), and the
 new `spdx-headers` check's own logic verified locally against the full
 tree (0 missing).
+
+### 97. Re-verify HARA ASIL audit finding; fix real hazard-count miscount (v0.97.0) ✅
+
+A 2026-07-30 ecosystem audit (c-RCP-13) claimed HARA.md's ASIL column
+was systematically over-rated: applying a "S+E+C, sum >=7 is A, >=8 is
+B, >=9 is C, >=10 is D" heuristic to the recorded Severity/Exposure/
+Controllability classes, it computed every hazard one-to-two bands
+below what HARA.md/`.fusa-hara.json` actually record (e.g. H-001
+S3+E4+C2 "=9 -> ASIL-C" vs. the recorded ASIL-D; H-005 S3+E3+C2 "=8 ->
+ASIL-B" vs. the recorded ASIL-D).
+
+Before changing any hazard's ASIL letter, re-derived all 11 directly
+against the actual ISO 26262-3:2018 Table 4 -- via `cfusa hara asil
+--severity N --exposure N --controllability N`, this project's own
+referenced authoritative source (HARA.md's ASIL Determination Note:
+"ASIL letters are computed via `cfusa hara asil`"), which implements
+the real table (a genuine 3×4×4 lookup, `src/asil.c` in c-FuSa, not a
+linear sum) rather than the audit's simplified arithmetic proxy. Ran
+all 11 hazards' recorded S/E/C triples through it: **every one of the
+11 currently-recorded ASIL letters is already correct** against the
+real Table 4. The audit's finding does not hold -- its own summation
+heuristic simply does not match ISO 26262-3:2018 Table 4's actual,
+non-linear shape (e.g. S3/C2 rows escalate to ASIL-C/D far faster than
+a linear S+E+C sum would predict, since Table 4 weights severity and
+controllability non-additively). **No hazard's ASIL rating was
+changed** as a result of this milestone.
+
+Re-verifying line-by-line surfaced a real, different bug the audit's
+own restated evidence had actually been pointing at without diagnosing
+correctly: the ASIL Determination Note's own prose said "**Four**
+hazards resolve to ASIL-C or ASIL-D" but then named **five** (H-001,
+H-005, H-003, H-007, H-008) -- and H-007 does independently compute
+ASIL-C per the same tool (S3/E2/C2), confirmed by the document's own
+later prose describing H-007 as "it computes ASIL-C but has no
+ASIL-B-or-higher control implemented at all". The Residual Risks
+table's own summary row repeated the identical four-hazard undercount
+("Four hazards (H-001, H-003, H-005, H-008)..."), independently
+omitting H-007 from its own list too. Fixed both occurrences to say
+"Five" and include H-007. `.fusa-hara.json` needed no change -- its
+per-hazard `risk.severity`/`risk.exposure`/`risk.controllability`/
+`risk.asil` fields already matched HARA.md's table exactly for all 11
+hazards, confirmed before making any edit.
+
+This milestone is intentionally honest about a prior audit claim not
+holding up under direct re-verification against this project's own
+authoritative tool, per the fix-pass's own ground rule not to
+overstate what changed -- see the closing comment on GitHub issue
+c-RCP-13/#125 for the same explanation, posted alongside this
+milestone's PR.
+
+Verified locally: `cfusa hara asil` re-run for all 11 hazards'
+recorded S/E/C triples (documented inline above), full `ctest` suite
+unaffected (57/57, this milestone touches only `HARA.md`), `cfusa`
+`check`/`lint`/`analyze`/`cyber` all exit 0 (this milestone touches no
+tagged/tested code, so `trace --req-coverage 100`/`--sec-tested 100`
+are unaffected).

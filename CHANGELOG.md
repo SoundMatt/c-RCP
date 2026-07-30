@@ -31,6 +31,25 @@ the rationale.
 
 ## Releases
 
+### v0.97.0 -- 2026-07-30
+
+Fix a real HARA.md documentation bug found alongside a 2026-07-30
+ecosystem audit finding that did not hold up on re-verification. The
+audit claimed all 11 HARA.md hazards were mis-rated one-to-two ASIL
+bands high vs. a simplified S+E+C summation. Re-derived every hazard
+against the project's own `cfusa hara asil` tool (the actual ISO
+26262-3:2018 Table 4 lookup, not a linear sum) and found all 11
+current ASIL letters already correct -- the audit's summation
+heuristic does not match the real, non-linear Table 4. No hazard's
+ASIL rating changed. What *was* wrong, found during the same
+re-verification: the ASIL Determination Note said "Four hazards
+resolve to ASIL-C or ASIL-D" while actually naming five (H-001, H-003,
+H-005, H-007, H-008 -- H-007 does compute ASIL-C, confirmed by the same
+tool), and the Residual Risks table's summary row independently
+repeated the same four-hazard undercount, both missing H-007. Fixed
+both to say "Five" and list all five hazards. (Milestone 97; see
+`ROADMAP.md` for full detail.)
+
 ### v0.96.0 -- 2026-07-30
 
 Add `/* SPDX-License-Identifier: MPL-2.0 */` as the first line of every
