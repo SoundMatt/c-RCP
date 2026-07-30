@@ -5054,9 +5054,27 @@ llvm-cov) variance without flaking. This is a real, previously-entirely-
 absent regression-prevention floor, not a DAL-B compliance claim --
 DAL-B itself remains open, tracked via c-RCP-11/#123, not closed here.
 
-Verified locally: full `ctest` suite unaffected (57/57, this milestone
-touches only `.github/workflows/ci.yml` and version files), `cfusa`
+Verified locally: full `ctest` suite unaffected (57/57), `cfusa`
 `check`/`lint`/`analyze`/`cyber` all exit 0, YAML syntax validated
 (`python3 -c "import yaml; yaml.safe_load(...)"`), and the new
 sanitizer build + coverage-threshold command both verified to pass
 locally before being wired into CI as hard gates.
+
+Follow-up, found by the new `sanitizers` job on its first real CI run
+(macOS's AddressSanitizer doesn't implement LeakSanitizer, so this
+escaped local verification entirely): `tests/test_adapt.c` leaked 2456
+bytes across 28 allocations in `rcp_adapt()`-wrapped
+`rcp_avtp_loopback_transport_new()`/`rcp_shmem_avtp_pair_new()`
+transports. Root cause: `rcp_adapt()` takes its own retained reference
+to the transport it wraps (`adapt.c`: `rcp_avtp_transport_retain()` on
+construction, `_release()` on `rcp_relay_caller_release()`) rather than
+sole ownership -- the original creator's own reference (refcount 1 on
+return, per `avtp.h`'s documented contract) is a separate obligation
+the caller must still release. Ten test functions created a transport,
+released only the `rcp_relay_caller_t` wrapping it, and never released
+their own original transport reference. Fixed by adding the missing
+`rcp_avtp_transport_release()` call to each of the ten (verified with
+macOS's `leaks --atExit` against the plain, non-sanitized build, since
+LeakSanitizer itself isn't available locally: 0 leaks before merge).
+This was a test-only resource leak, not a product-code defect -- no
+`src/*.c` file was touched by this fix.
