@@ -2,9 +2,9 @@
   "schemaVersion": "1.15.2",
   "kind": "check-report",
   "tool": "c-FuSa",
-  "toolVersion": "0.97.0",
+  "toolVersion": "0.99.0",
   "language": "c",
-  "generatedAt": "2026-07-30T17:17:24Z",
+  "generatedAt": "2026-07-31T00:35:57Z",
   "projectRoot": "/home/runner/work/c-RCP/c-RCP",
   "project": "c-RCP",
   "standard": "iso26262",
@@ -1353,6 +1353,5 @@
     {"ruleId": "CFUSA-CY006", "category": "security", "severity": "INFO", "location": {"file": "tests/test_ep_adc.c", "line": 423}, "message": "CWE-416: free() call — ensure pointer is set to NULL immediately after and not referenced again (use-after-free prevention)", "fingerprint": "sha256:20400ee4ff6bb470fa6d063ecc843c44977f5de5562af925d223839b1330bebf", "remediation": "CWE-416", "standard": "cert-c", "clause": "MEM30-C"},
     {"ruleId": "CFUSA-CY006", "category": "security", "severity": "INFO", "location": {"file": "tests/test_ep_adc.c", "line": 444}, "message": "CWE-416: free() call — ensure pointer is set to NULL immediately after and not referenced again (use-after-free prevention)", "fingerprint": "sha256:20400ee4ff6bb470fa6d063ecc843c44977f5de5562af925d223839b1330bebf", "remediation": "CWE-416", "standard": "cert-c", "clause": "MEM30-C"},
     {"ruleId": "CFUSA-CY006", "category": "security", "severity": "INFO", "location": {"file": "tests/test_ep_adc.c", "line": 462}, "message": "CWE-416: free() call — ensure pointer is set to NULL immediately after and not referenced again (use-after-free prevention)", "fingerprint": "sha256:20400ee4ff6bb470fa6d063ecc843c44977f5de5562af925d223839b1330bebf", "remediation": "CWE-416", "standard": "cert-c", "clause": "MEM30-C"}
-  ],
-  "errors": []
+  ]
 }
