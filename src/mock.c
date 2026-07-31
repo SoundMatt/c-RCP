@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/mock.h"
 
+#include "rcp/acf.h"
+#include "rcp/scheduler.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -238,4 +241,110 @@ bool rcp_mock_server_drain_endpoint(rcp_mock_server_t *srv, rcp_byte_bus_id_t by
     run_handler(slot, frame.data, frame.len, out_response);
     rcp_bytes_free(&frame);
     return true;
+}
+
+/* Decodes just member[0..member_len)'s shared byte_message_info header
+ * far enough to learn its byte_bus_id, without caring whether it is
+ * ACF_ABB or ACF_GBB. Returns true and sets *out_byte_bus_id on success;
+ * false (leaving *out_byte_bus_id untouched) if member does not decode as
+ * either variant -- see rcp_mock_server_dispatch_frame()'s own doc
+ * comment for how that outcome is surfaced. */
+static bool peek_member_byte_bus_id(const uint8_t *member, size_t member_len, uint8_t *out_msg_type,
+                                     rcp_byte_bus_id_t *out_byte_bus_id)
+{
+    if (rcp_acf_peek_msg_type(member, member_len, out_msg_type) != RCP_ACF_OK) return false;
+
+    if (*out_msg_type == RCP_ACF_MSG_TYPE_ABB) {
+        rcp_acf_byte_message_info_t hdr;
+        const uint8_t              *payload;
+        size_t                       payload_len;
+
+        if (rcp_acf_decode_abb(member, member_len, &hdr, &payload, &payload_len) != RCP_ACF_OK) {
+            return false;
+        }
+        *out_byte_bus_id = hdr.byte_bus_id;
+        return true;
+    }
+
+    if (*out_msg_type == RCP_ACF_MSG_TYPE_GBB) {
+        rcp_acf_gbb_header_t  hdr;
+        const uint8_t        *payload;
+        size_t                 payload_len;
+
+        if (rcp_acf_decode_gbb(member, member_len, &hdr, &payload, &payload_len) != RCP_ACF_OK) {
+            return false;
+        }
+        *out_byte_bus_id = hdr.info.byte_bus_id;
+        return true;
+    }
+
+    return false;
+}
+
+//cfusa:req REQ-MOCK-019
+//cfusa:req REQ-MOCK-020
+size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subtype,
+                                       bool time_sync_supported, const uint8_t *frame,
+                                       size_t frame_len,
+                                       rcp_mock_frame_member_result_t *out_results,
+                                       size_t out_cap)
+{
+    size_t offsets[RCP_MOCK_MAX_FRAME_MEMBERS];
+    size_t real_count;
+    size_t stored_count; /* how many of offsets[] rcp_sched_split_frame_members()
+                             actually wrote -- may be < real_count */
+    size_t process_count;
+    size_t i;
+    size_t dispatched = 0;
+
+    real_count = rcp_sched_split_frame_members(frame, frame_len, offsets, RCP_MOCK_MAX_FRAME_MEMBERS);
+    if (real_count == 0) return 0;
+
+    stored_count = (real_count < RCP_MOCK_MAX_FRAME_MEMBERS) ? real_count : RCP_MOCK_MAX_FRAME_MEMBERS;
+    process_count = (stored_count < out_cap) ? stored_count : out_cap;
+
+    for (i = 0; i < process_count; i++) {
+        size_t                           member_off;
+        size_t                           member_end;
+        size_t                           member_len;
+        const uint8_t                   *member;
+        uint8_t                          msg_type    = 0;
+        rcp_byte_bus_id_t                byte_bus_id = 0;
+        rcp_mock_frame_member_result_t  *out         = &out_results[dispatched];
+
+        member_off = offsets[i];
+        if (i + 1 < stored_count) {
+            member_end = offsets[i + 1];
+        } else if (i + 1 == real_count) {
+            /* i is genuinely the last member in the whole frame. */
+            member_end = frame_len;
+        } else {
+            /* real_count exceeds RCP_MOCK_MAX_FRAME_MEMBERS and i is the
+             * last offset rcp_sched_split_frame_members() had room to
+             * store: there is no reliable way to know where this member
+             * ends without its successor's own offset, so stop here
+             * rather than guess (and possibly swallow the remainder of
+             * the frame into one oversized "member"). */
+            break;
+        }
+
+        member_len = member_end - member_off;
+        member     = &frame[member_off];
+
+        if (!peek_member_byte_bus_id(member, member_len, &msg_type, &byte_bus_id)) {
+            out->result      = RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS;
+            out->byte_bus_id = 0;
+            memset(&out->response, 0, sizeof(out->response));
+            dispatched++;
+            continue;
+        }
+
+        out->byte_bus_id = byte_bus_id;
+        out->result      = rcp_mock_server_dispatch(srv, byte_bus_id, avtp_subtype, msg_type,
+                                                      time_sync_supported, member, member_len,
+                                                      &out->response);
+        dispatched++;
+    }
+
+    return dispatched;
 }

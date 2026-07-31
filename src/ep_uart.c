@@ -288,7 +288,14 @@ rcp_ep_uart_errc_t rcp_ep_uart_decode_read_request(const uint8_t *b, size_t len,
      * the file header. */
     if (payload_len != 0) return RCP_EP_UART_ERR_UNKNOWN_CMD;
 
-    *out_read_size       = hdr.read_size_or_segment_num;
+    /* out_read_size is this endpoint's own pre-existing octet-wide type
+     * (unchanged by the acf.c header rework); hdr.read_size_or_segment_num
+     * is now the wire header's real 12-bit uint16_t field, so the
+     * narrowing needs an explicit cast for MSVC's /W4 -- same reasoning as
+     * discovery.c's identical cast. A UART read request larger than 255
+     * bytes truncates here, same as it silently did before this pass; not
+     * a new limitation introduced by it. */
+    *out_read_size       = (uint8_t)hdr.read_size_or_segment_num;
     *out_transaction_num = hdr.transaction_num;
     return RCP_EP_UART_OK;
 }
@@ -475,6 +482,12 @@ rcp_ep_uart_errc_t rcp_ep_uart_decode_read_response_fragment(const uint8_t *b, s
     size_t                        payload_len;
     rcp_byte_bus_id_t             bus_id;
     uint8_t                       ms;
+    /* This local is this endpoint's own pre-existing octet-wide type
+     * (unchanged by the acf.c header rework); the wire field it's read
+     * from below is now the header's real 12-bit uint16_t field, so both
+     * assignments need an explicit narrowing cast for MSVC's /W4 -- same
+     * reasoning and same pre-existing (not newly introduced) truncation
+     * behavior as ep_uart.c's out_read_size cast above. */
     uint8_t                       segment_num;
     uint8_t                       transaction_num;
     bool                          timed;
@@ -489,7 +502,7 @@ rcp_ep_uart_errc_t rcp_ep_uart_decode_read_response_fragment(const uint8_t *b, s
 
         bus_id          = gbb_hdr.info.byte_bus_id;
         ms              = gbb_hdr.info.ms;
-        segment_num     = gbb_hdr.info.read_size_or_segment_num;
+        segment_num     = (uint8_t)gbb_hdr.info.read_size_or_segment_num;
         transaction_num = gbb_hdr.info.transaction_num;
         timed           = rcp_acf_gbb_is_timed(&gbb_hdr);
         timestamp       = timed ? gbb_hdr.message_timestamp : 0u;
@@ -500,7 +513,7 @@ rcp_ep_uart_errc_t rcp_ep_uart_decode_read_response_fragment(const uint8_t *b, s
 
         bus_id          = abb_hdr.byte_bus_id;
         ms              = abb_hdr.ms;
-        segment_num     = abb_hdr.read_size_or_segment_num;
+        segment_num     = (uint8_t)abb_hdr.read_size_or_segment_num;
         transaction_num = abb_hdr.transaction_num;
         timed           = false;
         timestamp       = 0u;

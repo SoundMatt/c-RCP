@@ -186,23 +186,36 @@
  * out explicitly here so the two numbers are never mistaken for a
  * discrepancy.
  *
- * Both figures comfortably fit within RCP_ACF_MAX_PAYLOAD (65535, acf.h).
- * Neither fits within RCP_AVTP_NTSCF_MAX_PAYLOAD (2047, avtp.h) -- and
+ * Neither figure fits within RCP_ACF_ABB_MAX_PAYLOAD (2036, acf.h) as of
+ * this project's TC18 conformance fix (see CHANGELOG.md): acf_msg_length
+ * is now the real 9-bit quadlet count Table 4 specifies, not the
+ * 16-bit octet count an earlier, non-conformant revision of acf.c used
+ * (which is where this paragraph's old "65535" figure came from -- a
+ * bound no real TC18 peer would have honored either). Neither figure
+ * fits within RCP_AVTP_NTSCF_MAX_PAYLOAD (2047, avtp.h) either -- and
  * NTSCF is the *only* AVTPDU format an RC Server itself ever sends
  * (avtp.h's own file header). A worst-case CAN XL frame response an RC
- * Server needs to send therefore cannot be carried in a single NTSCF
- * AVTPDU today; it fits in a single TSCF AVTPDU (RCP_AVTP_TSCF_MAX_PAYLOAD,
- * 65535) but TSCF is client-to-server only (avtp.h), so it is not a
- * general answer either. This was exactly the concrete driver ROADMAP.md
- * named for Phase 20's fragmentation go-decision (v0.76.0, the `ms`-bit/
+ * Server needs to send therefore cannot be carried in a single ACF
+ * message *or* a single NTSCF AVTPDU today; it fits within a single TSCF
+ * AVTPDU's own RCP_AVTP_TSCF_MAX_PAYLOAD (65535) byte budget, but not
+ * within one ACF message's own 2036-byte ceiling, and TSCF is
+ * client-to-server only (avtp.h) regardless, so it is not a general
+ * answer either. This was exactly the concrete driver ROADMAP.md named
+ * for Phase 20's fragmentation go-decision (v0.76.0, the `ms`-bit/
  * segment_num mechanism, fragment.h) -- rcp_ep_can_encode_frame_response_fragmented()/
  * rcp_ep_can_decode_frame_response_fragment() below are that milestone's
  * retrofit of this endpoint, closing the single-AVTPDU-worst-case gap this
- * paragraph used to describe as open. rcp_ep_can_encode_frame_response()/
- * _decode_frame_response() above are unchanged and remain the right choice
- * whenever the caller already knows (or doesn't need to fragment) a
- * response fits in one AVTPDU -- fragmentation is opt-in per call, not a
- * behavior change to the existing single-frame codec.
+ * paragraph used to describe as open, and (after the conformance fix
+ * above) the *only* way to send a worst-case CAN XL frame at all.
+ * rcp_ep_can_encode_frame_response()/_decode_frame_response() above are
+ * unchanged and remain the right choice whenever the caller already
+ * knows (or doesn't need to fragment) a response fits in one ACF message
+ * -- fragmentation is opt-in per call, not a behavior change to the
+ * existing single-frame codec. There is, as of this fix, no equivalent
+ * fragmented *request* path (rcp_ep_can_encode_frame_request() has no
+ * `_fragmented` counterpart): a worst-case CAN XL new-payload *write*
+ * request cannot be sent in one ACF message and has no multi-message
+ * alternative yet -- tracked as a follow-up, not this fix's scope.
  *
  * ── Wire layout: this module's own prefix-then-data choice ─────────────────
  *

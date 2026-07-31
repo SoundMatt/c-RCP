@@ -8,12 +8,6 @@
  * wire.c's house convention of not sharing a byte-order util across
  * modules) ──────────────────────────────────────────────────────────────── */
 
-static void put_u16(uint8_t *p, uint16_t v)
-{
-    p[0] = (uint8_t)(v >> 8);
-    p[1] = (uint8_t)(v & 0xFFu);
-}
-
 static void put_u64(uint8_t *p, uint64_t v)
 {
     p[0] = (uint8_t)((v >> 56) & 0xFFu);
@@ -71,14 +65,15 @@ const char *rcp_compound_strerror(rcp_compound_errc_t e)
 rcp_compound_errc_t rcp_compound_peek_request_type(const uint8_t *b, size_t len,
                                                     uint8_t *out_request_type)
 {
-    uint8_t flags1;
+    uint8_t msg_type;
     uint8_t mtv;
 
     if (len < RCP_ACF_GBB_HEADER_LEN) return RCP_COMPOUND_ERR_SHORT_FRAME;
-    if (b[0] != RCP_ACF_MSG_TYPE_GBB) return RCP_COMPOUND_ERR_BAD_MSG_TYPE;
 
-    flags1 = b[4];
-    mtv    = (uint8_t)((flags1 >> 4) & 0x3u);
+    msg_type = (uint8_t)(b[0] >> 1); /* acf_msg_type: octet 0 bits 7:1 */
+    if (msg_type != RCP_ACF_MSG_TYPE_GBB) return RCP_COMPOUND_ERR_BAD_MSG_TYPE;
+
+    mtv = (uint8_t)((b[2] >> 5) & 0x1u); /* mtv: octet 2 bit 5 */
     if (mtv != (uint8_t)RCP_ACF_MTV_UNTIMED) return RCP_COMPOUND_ERR_NOT_REPURPOSED;
 
     *out_request_type = b[RCP_ACF_ABB_HEADER_LEN];
@@ -106,6 +101,54 @@ static void unpack_ts(uint64_t ts, rcp_compound_step_t *out_step)
     out_step->repeat_count    = (uint8_t)(ts & 0xFFu);
 }
 
+/* ── Shared raw-header ACF_GBB builder (mtv=0, repurposed timestamp) ─────── */
+
+/* Builds a complete ACF_GBB frame with mtv=RCP_ACF_MTV_UNTIMED(0) and the
+ * message_timestamp region set to the caller-supplied ts (this module's
+ * whole reason for going around rcp_acf_encode_gbb() -- see the file
+ * header), using acf.h's shared rcp_acf_pack_header()/rcp_acf_pad_len()
+ * so the bit layout and quadlet/pad accounting stay in lockstep with
+ * every other module that builds an ACF header. op=RCP_ACF_OP_NONE,
+ * evt=0, ms=0, hs=0, rsp=0, err=0 -- this request kind carries no
+ * read/write data operation of its own. Returns a zeroed rcp_bytes_t
+ * (data=NULL) if payload_len exceeds RCP_ACF_GBB_MAX_PAYLOAD or on
+ * allocation failure. */
+static rcp_bytes_t encode_gbb_repurposed(rcp_byte_bus_id_t byte_bus_id, uint8_t cs,
+                                          uint8_t transaction_num, uint64_t ts,
+                                          const uint8_t *payload, size_t payload_len)
+{
+    rcp_bytes_t                  frame = {0};
+    rcp_acf_byte_message_info_t  info  = {0};
+    size_t                       unpadded, total;
+    uint16_t                     quadlets;
+    uint8_t                      pad;
+    uint8_t                     *b;
+
+    if (payload_len > RCP_ACF_GBB_MAX_PAYLOAD) return frame;
+
+    unpadded = RCP_ACF_GBB_HEADER_LEN + payload_len;
+    pad      = rcp_acf_pad_len(unpadded);
+    total    = unpadded + pad;
+    quadlets = (uint16_t)(total / 4u);
+
+    b = (uint8_t *)malloc(total);
+    if (!b) return frame;
+
+    info.byte_bus_id     = byte_bus_id;
+    info.cs               = cs;
+    info.transaction_num  = transaction_num;
+    info.pad               = pad;
+    rcp_acf_pack_header(b, RCP_ACF_MSG_TYPE_GBB, quadlets, &info);
+    put_u64(&b[RCP_ACF_ABB_HEADER_LEN], ts);
+
+    if (payload_len > 0) memcpy(&b[RCP_ACF_GBB_HEADER_LEN], payload, payload_len);
+    if (pad > 0) memset(&b[RCP_ACF_GBB_HEADER_LEN + payload_len], 0, pad);
+
+    frame.data = b;
+    frame.len  = total;
+    return frame;
+}
+
 /* ── Compound / compound-wait request encode/decode ──────────────────────────── */
 
 //cfusa:req REQ-CMP-008
@@ -116,41 +159,14 @@ rcp_bytes_t rcp_compound_encode_request(uint8_t request_type, rcp_byte_bus_id_t 
                                          const uint8_t *payload, size_t payload_len)
 {
     rcp_bytes_t frame = {0};
-    size_t n;
-    uint8_t *b;
-    uint64_t ts;
 
     if (!rcp_request_type_is_compound(request_type) &&
         !rcp_request_type_is_compound_wait(request_type)) {
         return frame;
     }
-    if (payload_len > RCP_ACF_MAX_PAYLOAD) return frame;
 
-    n = RCP_ACF_GBB_HEADER_LEN + payload_len;
-    b = (uint8_t *)malloc(n);
-    if (!b) return frame;
-
-    b[0] = RCP_ACF_MSG_TYPE_GBB;
-    put_u16(&b[1], (uint16_t)payload_len);
-    b[3] = byte_bus_id;
-    /* pad=0, mtv=RCP_ACF_MTV_UNTIMED(0), hs=cs=rsp=err=0 -- mtv MUST be
-     * encoded as 0 for the repurposing trick to apply, see the file
-     * header. */
-    b[4] = 0x00u;
-    /* op=RCP_ACF_OP_NONE(0), evt=0, ms=0 -- this request type carries no
-     * read/write data operation of its own. */
-    b[5] = 0x00u;
-    b[6] = transaction_num;
-    b[7] = 0x00u; /* read_size_or_segment_num unused by this request kind */
-
-    ts = pack_ts(request_type, step);
-    put_u64(&b[RCP_ACF_ABB_HEADER_LEN], ts);
-
-    if (payload_len > 0) memcpy(&b[RCP_ACF_GBB_HEADER_LEN], payload, payload_len);
-
-    frame.data = b;
-    frame.len  = n;
-    return frame;
+    return encode_gbb_repurposed(byte_bus_id, 0u, transaction_num, pack_ts(request_type, step),
+                                  payload, payload_len);
 }
 
 //cfusa:req REQ-CMP-011
@@ -194,28 +210,9 @@ rcp_compound_errc_t rcp_compound_decode_request(const uint8_t *b, size_t len,
 rcp_bytes_t rcp_compound_encode_clear_non_safestate(rcp_byte_bus_id_t byte_bus_id,
                                                      uint8_t transaction_num)
 {
-    rcp_bytes_t frame = {0};
-    uint8_t *b;
-    size_t n = RCP_ACF_GBB_HEADER_LEN;
-    uint64_t ts;
+    uint64_t ts = ((uint64_t)RCP_REQUEST_TYPE_CLEAR_NON_SAFESTATE) << 56;
 
-    b = (uint8_t *)malloc(n);
-    if (!b) return frame;
-
-    b[0] = RCP_ACF_MSG_TYPE_GBB;
-    put_u16(&b[1], 0u);
-    b[3] = byte_bus_id;
-    b[4] = 0x00u; /* mtv=RCP_ACF_MTV_UNTIMED(0), see the file header */
-    b[5] = 0x00u;
-    b[6] = transaction_num;
-    b[7] = 0x00u;
-
-    ts = ((uint64_t)RCP_REQUEST_TYPE_CLEAR_NON_SAFESTATE) << 56;
-    put_u64(&b[RCP_ACF_ABB_HEADER_LEN], ts);
-
-    frame.data = b;
-    frame.len  = n;
-    return frame;
+    return encode_gbb_repurposed(byte_bus_id, 0u, transaction_num, ts, NULL, 0);
 }
 
 //cfusa:req REQ-CMP-017

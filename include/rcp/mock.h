@@ -17,6 +17,8 @@
 //cfusa:req REQ-MOCK-016
 //cfusa:req REQ-MOCK-017
 //cfusa:req REQ-MOCK-018
+//cfusa:req REQ-MOCK-019
+//cfusa:req REQ-MOCK-020
 /*
  * mock.h -- in-process RC-Server/endpoint test double for the TC18 Remote
  * Control Protocol wire layer (ROADMAP.md Phase 21, "Satellite Package
@@ -71,6 +73,17 @@
  * behavior a real disabled endpoint exhibits. rcp_mock_server_drain_endpoint()
  * is the other half: pulling a queued frame back out (once re-enabled) and
  * running it through the same registered handler.
+ *
+ * rcp_mock_server_dispatch_frame() is the TC18 §12.9.1.1 multi-request-
+ * per-frame entry point: given a raw, not-yet-split NTSCF/TSCF payload
+ * (potentially several ACF messages concatenated back to back), it uses
+ * scheduler.h's rcp_sched_split_frame_members() to enumerate them, peeks
+ * each member's own byte_bus_id (decoding just its shared byte_message_info
+ * header -- acf.h), and dispatches each one to rcp_mock_server_dispatch()
+ * individually, addressed to its own endpoint, exactly as if a caller had
+ * split and dispatched them by hand. A single-member frame behaves
+ * identically to calling rcp_mock_server_dispatch() once directly -- this
+ * is a strict superset, not a parallel code path.
  */
 #ifndef RCP_MOCK_H
 #define RCP_MOCK_H
@@ -238,6 +251,54 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
  * registered endpoint, or its queue has nothing to drain right now. */
 bool rcp_mock_server_drain_endpoint(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
                                      rcp_bytes_t *out_response);
+
+/* ── Multi-request-per-frame dispatch (TC18 §12.9.1.1) ─────────────────────── */
+
+/* The fixed number of ACF members rcp_mock_server_dispatch_frame() can
+ * enumerate/dispatch from a single frame -- mirrors RCP_MOCK_MAX_ENDPOINTS'
+ * "fixed table, trivial memory behavior" rationale. A real frame's member
+ * count is bounded far below this by AVTPDU payload limits (avtp.h) in
+ * practice. */
+#define RCP_MOCK_MAX_FRAME_MEMBERS ((size_t)32u)
+
+/* One frame member's own dispatch outcome, as populated by
+ * rcp_mock_server_dispatch_frame(). */
+typedef struct {
+    rcp_mock_dispatch_result_t result;
+    /* The member's own decoded byte_bus_id. Meaningless (0) when result
+     * could not be determined at all -- see result's own doc comment for
+     * when that happens. */
+    rcp_byte_bus_id_t          byte_bus_id;
+    /* Same convention as rcp_mock_server_dispatch()'s own out_response:
+     * zeroed unless a handler actually ran and produced one. Caller frees
+     * every populated response with rcp_bytes_free(). */
+    rcp_bytes_t                response;
+} rcp_mock_frame_member_result_t;
+
+/* Splits frame[0..frame_len) into its constituent ACF messages
+ * (scheduler.h's rcp_sched_split_frame_members()) and dispatches each one
+ * individually via rcp_mock_server_dispatch(), addressed to its own
+ * decoded byte_bus_id, sharing avtp_subtype/time_sync_supported across
+ * every member (both are properties of the enclosing NTSCF/TSCF frame,
+ * not of an individual ACF message). Writes up to out_cap results into
+ * out_results, in the same order the members appear in frame, and returns
+ * how many were actually dispatched (and thus how many of out_results are
+ * populated) -- 0 if frame does not parse as a well-formed sequence of ACF
+ * messages at all (rcp_sched_split_frame_members() itself returned 0).
+ * If more members are found than out_cap allows, only the first out_cap
+ * are dispatched (mirroring rcp_sched_split_frame_members()'s own
+ * out_offsets truncation) -- pass an out_results/out_cap pair of at least
+ * RCP_MOCK_MAX_FRAME_MEMBERS to be certain no real frame is truncated. If
+ * a member's own byte_message_info header fails to decode (e.g. its
+ * byte_bus_id exceeds this build's 8-bit rcp_byte_bus_id_t range --
+ * RCP_ACF_ERR_BUS_ID_OVERFLOW, acf.h), that member's result is
+ * RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS with byte_bus_id left at 0 and no
+ * handler run, rather than dispatching against a bogus address. */
+size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subtype,
+                                       bool time_sync_supported, const uint8_t *frame,
+                                       size_t frame_len,
+                                       rcp_mock_frame_member_result_t *out_results,
+                                       size_t out_cap);
 
 #ifdef __cplusplus
 }

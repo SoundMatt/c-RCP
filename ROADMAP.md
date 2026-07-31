@@ -5243,3 +5243,144 @@ known `qualify` tool bug — `qualificationBadge` in
 actual pass count — is still present in v0.5.50 (not fixed upstream);
 not hand-edited, since it's a generated artifact CI regenerates every
 release.
+
+### 100. TC18 `byte_message_info` conformance fix: real bit layout, quadlet `acf_msg_length`, multi-request dispatch (v0.100.0) ✅
+
+A cross-repo external gap audit (2026-07/31 pass, coordinated against
+`go-RCP`/`cpp-RCP`/`rust-RCP` and the real TC18 v0.5.1_RC specification
+text) found `acf.h`/`acf.c`'s `byte_message_info` header was, by its own
+file-header's admission, this implementation's own invented byte
+layout, never reproduced from the specification: `acf_msg_type`
+occupied a full leading octet instead of being packed with a 9-bit
+`acf_msg_length` into the first 16-bit word; `acf_msg_length` was a raw
+16-bit octet count of the payload alone, not the specification's 9-bit
+quadlet count spanning the whole message (header+timestamp+payload+
+pad); `byte_bus_id` was a flat 8-bit field at a fixed offset instead of
+an 11-bit field split across two octets; and the `pad`/`mtv`/`hs`/`cs`/
+`rsp`/`err`/`evt`/`op`/`ms` flag octets were grouped differently from
+the specification's own octet 2/4/6 layout. **No prior tagged release
+of this implementation was wire-compatible with a real TC18 peer, or
+with this project's own `go-RCP`/`cpp-RCP` ports, at the ACF header
+level.**
+
+Rewrote `rcp_acf_byte_message_info_t` and its encode/decode pair from
+the specification's real Figure 7 / Table 4 layout, field by field, bit
+by bit, using `go-RCP`'s already-conformant `acf/message.go` as the
+reference pattern (translated into idiomatic C, not a literal port —
+see `acf.h`'s file header for the exact octet-by-octet layout table).
+New shared `rcp_acf_pack_header()`/`rcp_acf_unpack_header()` helpers
+are now the single source of truth for this bit-packing, used by both
+`acf.c`'s own `encode_abb()`/`encode_gbb()`/`decode_abb()`/`decode_gbb()`
+and by the five request-kind modules (`request_compound.c`,
+`request_cancel.c`, `request_timed.c`, `request_triggered.c`,
+`request_chained.c`) that build a raw ACF_GBB header themselves to
+repurpose `message_timestamp` — previously each of those five
+duplicated the (wrong) bit-packing logic by hand.
+
+`acf_msg_length` is now correctly quadlet-counted: `rcp_acf_encode_abb()`/
+`_encode_gbb()` compute the true unpadded header(+timestamp)+payload
+length, round it up to a quadlet boundary via the new
+`rcp_acf_pad_len()`, and encode both the resulting pad-octet count (into
+the `pad` field, per Table 4 — no longer a caller-supplied,
+round-tripped-only value) and the quadlet count (into `acf_msg_length`)
+themselves; decode reads both back and derives payload length as
+`quadlets*4 - header_len - pad`, rather than trusting a raw octet
+count. `e2e.c`'s `adapt_acf_msg_length()` (the +1-quadlet adjustment
+`rcp_e2e_wrap()`/`_unwrap()` apply around the CRC32 trailer) is updated
+to read/write the field at its new bit position instead of the old
+16-bit offset-1-2 field, preserving `acf_msg_type` untouched in the
+process. `scheduler.c`'s `rcp_sched_split_frame_members()` (the
+multi-request-per-frame primitive) is updated identically.
+
+Hand-verified against the specification's own worked examples before
+trusting any of this: Figure 19 (a single ACF_ABB with a CRC32 safe
+point, header+6-byte payload+2-byte pad+4-byte CRC = 20 octets = 5
+quadlets) and Figure 20 (a single ACF_GBB, header+timestamp+7-byte
+payload+1-byte pad+4-byte CRC = 28 octets = 7 quadlets) both reproduce
+exactly (`acf_msg_length` 0x05 and 0x07 respectively, full byte-for-byte
+match) — pinned as golden-vector tests in `tests/test_acf.c`
+(`test_golden_figure19_abb_prelcrc_quadlets_and_pad`/
+`test_golden_figure20_gbb_prelcrc_quadlets_and_pad`).
+
+Secondary fixes bundled with the same header rework (same root cause,
+same file):
+
+- `mtv` is now a single wire bit (`RCP_ACF_MTV_UNTIMED`/`_VALID`), not a
+  2-bit field with an invented third `RCP_ACF_MTV_UNCERTAIN` state that
+  had no TC18 wire encoding.
+- `read_size_or_segment_num` widened from `uint8_t` to `uint16_t` to
+  actually carry its full 12-bit wire range (0-4095), not just 0-255.
+- `op` (a single wire bit: 0=read, 1=write) can no longer losslessly
+  round-trip this project's own 3-state `rcp_acf_op_t` convenience enum
+  (`NONE`/`WRITE`/`READ`, used by endpoints like `ep_wakeup.c` for
+  command-shaped messages with no register read/write semantics of
+  their own) — `RCP_ACF_OP_NONE` now encodes identically to
+  `RCP_ACF_OP_WRITE` on the wire (there is no third wire state to
+  invent one for) and a decoded header's `op` is therefore always
+  `READ` or `WRITE`, never `NONE`. See `acf.h`'s `rcp_acf_op_t` doc
+  comment.
+- Decoding a byte_bus_id whose wire value exceeds 255 (this project's
+  `rcp_byte_bus_id_t` is 8 bits wide, matching `go-RCP`'s own identical
+  limitation) now fails explicitly with a new `RCP_ACF_ERR_BUS_ID_OVERFLOW`,
+  rather than silently truncating.
+- `RCP_ACF_MAX_PAYLOAD` (previously 65535, from the old 16-bit length
+  field) is now `RCP_ACF_GBB_MAX_PAYLOAD` (2028), with
+  `RCP_ACF_ABB_MAX_PAYLOAD` (2036) added for the wider variant-specific
+  bound. This has a real consequence for `ep_can.h`: a worst-case CAN XL
+  new-payload frame's ACF-level encoding (2058 octets) no longer fits
+  in a single unfragmented ACF message at all. The existing fragmented
+  *response* path (`rcp_ep_can_encode_frame_response_fragmented()`) is
+  unaffected (its `max_fragment_payload` is always well under this
+  bound in practice) and is now the *only* way to carry a worst-case CAN
+  XL frame; there is still no fragmented *request* counterpart
+  (`rcp_ep_can_encode_frame_request()` has none), so a worst-case CAN XL
+  new-payload *write* request cannot be sent at all as of this release —
+  tracked as a follow-up, not this milestone's scope (see `ep_can.h`'s
+  updated file header).
+
+Separately, closed the TC18 §12.9.1.1 "RC Server shall support multiple
+requests in one frame" gap: `scheduler.c`'s `rcp_sched_split_frame_members()`
+existed and was unit-tested in isolation, but the only real dispatch
+entry point (`mock.c`'s `rcp_mock_server_dispatch()`) processed exactly
+one pre-decoded request against exactly one `byte_bus_id`. Added
+`rcp_mock_server_dispatch_frame()`: given a raw, not-yet-split NTSCF/TSCF
+payload, it splits it into its constituent ACF messages, decodes each
+one's own `byte_bus_id`, and dispatches each individually via the
+existing `rcp_mock_server_dispatch()`, writing one
+`rcp_mock_frame_member_result_t` per member. A single-member frame
+behaves identically to calling `rcp_mock_server_dispatch()` once
+directly.
+
+Not fixed this milestone (deferred, tracked as follow-ups): TC18
+§11.3.1/§11.3.4's numbered wire error codes (`errors.h`'s
+`rcp_wire_error_t`, complete since v0.93.0) are still never populated
+onto an actual Error response's `byte_msg_payload` by any endpoint
+module, the mock dispatch path, or `regmap.c` — wiring this in requires
+a per-endpoint design decision (which local failure maps to which of
+the 17 numbered codes) for each of `ep_gpio.c` and its ~9 siblings, a
+materially larger and separately-scoped effort than this header rework,
+matching this project's own established precedent of adding wire-error
+mappings one at a time with their own audit (`rcp_e2e_wire_error()`,
+v0.93.0) rather than in bulk. `coverage-report.json`'s self-reported
+`Overall: FAIL` (below this project's own stated DAL-B thresholds) and
+`qualify-report.json`'s three-way-inconsistent qualification signals
+are both `cfusa`-generated artifacts CI regenerates every release (the
+latter is `cfusa`'s own known `qualificationBadge` bug, noted already in
+milestone 99 above) — the correct fix for both belongs in `c-FuSa`
+upstream, not as a hand-edit here that the next CI run would silently
+discard; not touched, per this project's standing policy against
+editing (or hand-patching the generated output of) a sibling repo's
+tooling. `ci.yml`'s `ilammy/msvc-dev-cmd@v1` mutable-tag pin was SHA-pinned
+as a small, unrelated hardening fix bundled into this same release.
+
+Updated `tests/test_acf.c` (golden vectors plus bit-position pins for
+`rcp_acf_pack_header()`/`_unpack_header()`), `tests/test_e2e.c` (the
+`adapt_acf_msg_length()` field-position tests), `tests/test_mock.c`
+(five new `rcp_mock_server_dispatch_frame()` tests), and
+`tests/test_ep_can.c` (the CAN XL request round-trip test's payload
+size, since its previous 2048-byte worst case no longer fits — see
+above; the existing fragmented-response worst-case test is unaffected).
+Full `ctest` suite 57/57 passed. `.fusa-reqs.json` gained
+`REQ-MOCK-019`/`REQ-MOCK-020` for the new dispatch-frame behavior.
+`README.md`'s wire-interop claim now carries an explicit hedge pending
+the deferred items above and live third-party interop testing.

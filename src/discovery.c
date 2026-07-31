@@ -149,8 +149,15 @@ rcp_discovery_errc_t rcp_discovery_decode_request(const uint8_t *b, size_t len,
     (void)payload;
     (void)payload_len;
 
+    /* hdr.read_size_or_segment_num is the wire header's general 12-bit
+     * field (TC18 Table 4), but discovery's own read_size is documented
+     * (see RCP_DISCOVERY_GENERAL_SLICE_LEN's comment in discovery.h) as
+     * always fitting one octet for this subsystem specifically -- the
+     * explicit cast makes that pre-existing, discovery-specific invariant
+     * visible to the compiler instead of relying on an implicit
+     * narrowing conversion. */
     out_req->requester       = requester;
-    out_req->read_size       = hdr.read_size_or_segment_num;
+    out_req->read_size       = (uint8_t)hdr.read_size_or_segment_num;
     out_req->transaction_num = hdr.transaction_num;
     return RCP_DISCOVERY_OK;
 }
@@ -332,8 +339,10 @@ rcp_discovery_errc_t rcp_discovery_decode_response_fragment(const uint8_t *b, si
     rc = decode_common(b, len, out_server_stream_id, &hdr, out_payload, out_payload_len);
     if (rc != RCP_DISCOVERY_OK) return rc;
 
+    /* Same discovery-specific octet-width invariant as
+     * rcp_discovery_decode_request()'s read_size cast above. */
     *out_ms          = (hdr.ms != 0u);
-    *out_segment_num = hdr.read_size_or_segment_num;
+    *out_segment_num = (uint8_t)hdr.read_size_or_segment_num;
     return RCP_DISCOVERY_OK;
 }
 

@@ -94,10 +94,12 @@
  * length adaptation below has already been applied to it.
  *
  * Before that CRC is computed, the ACF header's own acf_msg_length field
- * (acf.h, offset 1-2, big-endian) has to be adapted by plus one quadlet
- * (RCP_E2E_CRC_LEN, 4 octets) to account for the trailer about to be
- * appended -- a receiver needs acf_msg_length to describe the message's
- * true on-wire length, trailer included, to know where it ends.
+ * (acf.h, a 9-bit quadlet count spanning bit 0 of octet 0 and all of
+ * octet 1) has to be adapted by plus one quadlet (RCP_E2E_CRC_LEN, 4
+ * octets is exactly one quadlet, so this is a plain +1) to account for
+ * the trailer about to be appended -- a receiver needs acf_msg_length to
+ * describe the message's true on-wire length, trailer included, to know
+ * where it ends.
  * rcp_e2e_wrap() owns this adaptation itself (patching the copy it
  * returns, not the caller's original acf_frame) rather than requiring
  * the caller to pre-assemble an already-extended payload: it is the
@@ -301,17 +303,18 @@ size_t rcp_e2e_length_with_crc(size_t payload_len);
 /* The composed encode entry point: adapts a copy of acf_frame (an
  * already fully-encoded ACF_ABB/ACF_GBB header-and-payload region, as
  * produced by acf.c, still carrying its own original un-adapted
- * acf_msg_length) by incrementing its acf_msg_length field (acf.h,
- * offset 1-2, big-endian) by one quadlet (RCP_E2E_CRC_LEN), computes the
- * CRC via rcp_e2e_compute_crc() over stream_id + avtp_timestamp + that
- * adapted copy, and appends the RCP_E2E_CRC_LEN-byte big-endian trailer.
- * acf_frame may be NULL iff acf_frame_len == 0. acf_frame_len must be at
- * least 3 octets (enough to contain the acf_msg_length field at offset
- * 1-2) for the adaptation to have anywhere to write; shorter non-NULL
- * frames fail safe (data=NULL, len=0), as does an acf_msg_length value
- * already within RCP_E2E_CRC_LEN of overflowing its 16-bit field. Caller
- * owns acf_frame throughout -- it is read, never modified. Returns a
- * freshly heap-allocated, owned rcp_bytes_t (data=NULL, len=0 on
+ * acf_msg_length) by incrementing its acf_msg_length field (acf.h, the
+ * 9-bit quadlet count spanning bit 0 of octet 0 and all of octet 1;
+ * octet 0's other 7 bits, acf_msg_type, are preserved unmodified) by one
+ * quadlet, computes the CRC via rcp_e2e_compute_crc() over stream_id +
+ * avtp_timestamp + that adapted copy, and appends the RCP_E2E_CRC_LEN-byte
+ * big-endian trailer. acf_frame may be NULL iff acf_frame_len == 0.
+ * acf_frame_len must be at least 2 octets (enough to contain the
+ * acf_msg_length field) for the adaptation to have anywhere to write;
+ * shorter non-NULL frames fail safe (data=NULL, len=0), as does an
+ * acf_msg_length value already at its 9-bit field's maximum (0x1FF).
+ * Caller owns acf_frame throughout -- it is read, never modified. Returns
+ * a freshly heap-allocated, owned rcp_bytes_t (data=NULL, len=0 on
  * allocation failure or any of the above); caller frees the result with
  * rcp_bytes_free(). */
 rcp_bytes_t rcp_e2e_wrap(uint64_t stream_id, uint32_t avtp_timestamp,

@@ -14,6 +14,7 @@
 //cfusa:req REQ-ACF-013
 //cfusa:req REQ-ACF-014
 //cfusa:req REQ-ACF-015
+//cfusa:req REQ-ACF-016
 /*
  * acf.h -- ACF message format + byte_message_info header for the TC18
  * Remote Control Protocol wire layer (ROADMAP.md Phase 13, "Wire Format
@@ -33,40 +34,81 @@
  *   - ACF_GBB (acf_msg_type = 0x0D): carries a 64-bit message_timestamp
  *     immediately after the shared header.
  *
- * byte_message_info field layout (this module's own byte-level design --
- * exact bit positions are an original engineering choice by this
- * implementation, not reproduced from the confidential OPEN Alliance TC18
- * Remote Control Protocol Specification v0.5.1_RC; only the field names,
- * their high-level semantics, and the two acf_msg_type values above come
- * from that specification by reference):
+ * byte_message_info field layout -- this now reproduces the OPEN Alliance
+ * TC18 Remote Control Protocol Specification v0.5.1_RC's own Figure 7 /
+ * Table 4 bit-for-bit (pixel-verified against the rendered spec page; see
+ * ROADMAP.md/CHANGELOG.md for the v0.100.0 conformance-fix entry this
+ * header layout landed in). Earlier revisions of this file used a
+ * different, self-invented byte layout that was never wire-compatible
+ * with a real TC18 peer or with this project's own go-RCP/cpp-RCP ports;
+ * that layout has been fully replaced, and this is a breaking wire-format
+ * change from every prior tagged release.
  *
- *   Offset  Bytes  Field
- *   0       1      acf_msg_type   (0x0E ABB / 0x0D GBB; implied by which
- *                                   encode/decode function is used, not
- *                                   read from the caller-supplied header)
- *   1-2     2      acf_msg_length (payload length in octets, big-endian;
- *                                   recomputed from payload_len on encode,
- *                                   mirroring avtp.c's *_data_length
- *                                   convention)
- *   3       1      byte_bus_id    (rcp_byte_bus_id_t; same addressing
- *                                   role as in avtp.h)
- *   4       1      pad[7:6] | mtv[5:4] | hs[3] | cs[2] | rsp[1] | err[0]
- *   5       1      op[7:5] | evt[4:1] | ms[0]
- *   6       1      transaction_num
- *   7       1      read_size_or_segment_num
+ *   Octet   Bits    Field
+ *   0       7:1     acf_msg_type
+ *           0       acf_msg_length[8] (MSB)
+ *   1       7:0     acf_msg_length[7:0]
+ *   2       7:6     pad        (count of trailing zero pad octets, 0-3)
+ *           5       mtv        (message_timestamp valid; ACF_ABB has no
+ *                                timestamp field, so always encodes 0)
+ *           4:3     rsv        (always 0b on encode; not interpreted on
+ *                                decode -- see the file header's decode
+ *                                leniency note below)
+ *           2:0     byte_bus_id[10:8]
+ *   3       7:0     byte_bus_id[7:0]
+ *   4       7:4     evt
+ *           3:2     rsv        (always 0b on encode; see above)
+ *           1       hs
+ *           0       cs
+ *   5       7:0     transaction_num
+ *   6       7       op         (0 = read/expects a data response,
+ *                                1 = write/no data response expected --
+ *                                see rcp_acf_op_t's own doc comment for
+ *                                how this project's 3-state application
+ *                                convenience enum maps onto this single
+ *                                wire bit)
+ *           6       rsp
+ *           5       err
+ *           4       ms
+ *           3:0     read_size_or_segment_num[11:8]
+ *   7       7:0     read_size_or_segment_num[7:0]
+ *
+ * acf_msg_length is a QUADLET count (not an octet count) spanning the
+ * entire ACF message this header belongs to: this 8-byte header (plus the
+ * 8-byte message_timestamp for ACF_GBB) + payload + the pad octets pad
+ * counts, rounding the whole thing up to a whole number of quadlets --
+ * confirmed against the specification's own Figure 19 (ACF_ABB) and
+ * Figure 20 (ACF_GBB) worked examples (see acf.c's encode functions and
+ * tests/test_acf.c's golden-vector tests pinning both). It deliberately
+ * does NOT include any trailing CRC32 safe-point e2e.c may append --
+ * e2e.c's rcp_e2e_wrap()/_unwrap() adapt this field by +-1 quadlet
+ * themselves when adding/removing that trailer, since the CRC32 append is
+ * a layer above this one and this module has no knowledge of it.
  *
  * ACF_GBB appends an 8-byte big-endian message_timestamp at offset 8,
  * making RCP_ACF_GBB_HEADER_LEN exactly RCP_ACF_ABB_HEADER_LEN + 8 -- the
  * presence/absence of that field is the only structural difference
  * between the two variants.
  *
+ * rcp_acf_pack_header()/rcp_acf_unpack_header() below expose this header's
+ * bit-packing directly (not just through rcp_acf_encode_abb()/_gbb()) so
+ * that other modules which must build or inspect a raw ACF_GBB header of
+ * their own -- request_compound.c, request_cancel.c, request_timed.c,
+ * request_triggered.c, request_chained.c, all of which repurpose the
+ * message_timestamp region when mtv=0 and therefore cannot go through
+ * rcp_acf_encode_gbb()'s own "zero the timestamp when untimed" rule --
+ * never have to duplicate this bit layout themselves. This is the single
+ * source of truth for byte_message_info's wire representation.
+ *
  * Fields hs, cs, rsp, ms, and pad belong to functionality this milestone
- * deliberately does not implement (conditional requests & sequencers,
- * compound bundles, and quadlet padding respectively) -- they are encoded
- * and decoded unmodified (round-tripped), mirroring the treatment
- * avtp.c's TSCF codec already gives its own mr field. Only mtv, evt, op,
- * and err carry behavior in this milestone (the timestamp-folding rule
- * and the four response-semantics identification rules below).
+ * deliberately does not implement in full (conditional requests &
+ * sequencers and compound bundles respectively) -- they are encoded and
+ * decoded unmodified (round-tripped) except pad, which
+ * rcp_acf_encode_abb()/_gbb() now compute and overwrite themselves (see
+ * rcp_acf_pad_len()) so the encoded length is always a whole number of
+ * quadlets, matching acf_msg_length's own unit. Only mtv, evt, op, and err
+ * carry behavior in this milestone (the timestamp-folding rule and the
+ * four response-semantics identification rules below).
  *
  * Scope: this milestone models the Standard request kind only
  * (best-effort, unconditional, mandatory). Conditional requests,
@@ -101,14 +143,34 @@ extern "C" {
 #define RCP_ACF_ABB_HEADER_LEN ((size_t)8u)
 #define RCP_ACF_GBB_HEADER_LEN ((size_t)16u)
 
-/* Largest payload the encoders below can represent, bounded by the width
- * of acf_msg_length (16 bits). Encoding a larger payload fails. */
-#define RCP_ACF_MAX_PAYLOAD ((size_t)65535u)
+/* acf_msg_length is a 9-bit quadlet count (Table 4) -- the largest ACF
+ * message (header/timestamp + payload + pad) this codec can represent. */
+#define RCP_ACF_MAX_QUADLETS ((uint16_t)0x1FFu)
+
+/* Largest payload rcp_acf_encode_abb()/_gbb() can represent, derived from
+ * RCP_ACF_MAX_QUADLETS*4 minus the fixed header (and, for GBB, timestamp)
+ * length -- both figures already land on a quadlet boundary, so no
+ * additional pad headroom is lost. Encoding a larger payload fails. */
+#define RCP_ACF_ABB_MAX_PAYLOAD ((size_t)(RCP_ACF_MAX_QUADLETS * 4u - RCP_ACF_ABB_HEADER_LEN))
+#define RCP_ACF_GBB_MAX_PAYLOAD ((size_t)(RCP_ACF_MAX_QUADLETS * 4u - RCP_ACF_GBB_HEADER_LEN))
+
+/* Deprecated: kept for source compatibility with existing call sites that
+ * used a single bound for either variant. Equal to the more conservative
+ * (smaller) of the two variant-specific bounds above -- callers that need
+ * the full ABB-specific headroom should use RCP_ACF_ABB_MAX_PAYLOAD
+ * instead. This is dramatically smaller than the pre-conformance-fix
+ * value (65535): that old figure came from an invented 16-bit octet-count
+ * length field this module no longer has -- see the file header. */
+#define RCP_ACF_MAX_PAYLOAD RCP_ACF_GBB_MAX_PAYLOAD
 
 typedef enum {
-    RCP_ACF_OK               = 0,
-    RCP_ACF_ERR_SHORT_FRAME   = 1,
-    RCP_ACF_ERR_BAD_MSG_TYPE  = 2,
+    RCP_ACF_OK                  = 0,
+    RCP_ACF_ERR_SHORT_FRAME     = 1,
+    RCP_ACF_ERR_BAD_MSG_TYPE    = 2,
+    /* Decoded byte_bus_id[10:8] is nonzero: the wire value exceeds what
+     * rcp_byte_bus_id_t (8 bits wide -- see avtp.h) can represent. Mirrors
+     * go-RCP's ErrByteBusIDOverflow for the same underlying limitation. */
+    RCP_ACF_ERR_BUS_ID_OVERFLOW = 3,
 } rcp_acf_errc_t;
 
 /* Human-readable message for an rcp_acf_errc_t value. Never returns NULL. */
@@ -116,19 +178,39 @@ const char *rcp_acf_strerror(rcp_acf_errc_t e);
 
 /* ── mtv: message-timestamp validity (ACF_GBB only) ───────────────────────── */
 
-/* mtv states. UNTIMED and UNCERTAIN both fold into "not confidently timed"
- * for scheduling purposes -- see rcp_acf_gbb_is_timed() below. Only VALID
- * is treated as a trustworthy timestamp. */
+/* mtv is a single wire bit (Table 4): whether the message_timestamp region
+ * (only present for ACF_GBB) holds a genuinely valid timestamp. There is
+ * no third "uncertain" wire state -- an earlier revision of this header
+ * modeled one (RCP_ACF_MTV_UNCERTAIN) in a 2-bit field of its own
+ * invention; that field never had a real TC18 encoding and has been
+ * removed. Callers that need to represent "timestamp present but not
+ * trustworthy" must fold that into RCP_ACF_MTV_UNTIMED, the same
+ * "not confidently timed" treatment rcp_acf_gbb_is_timed() already gives
+ * it. */
 typedef enum {
-    RCP_ACF_MTV_UNTIMED   = 0,
-    RCP_ACF_MTV_VALID     = 1,
-    RCP_ACF_MTV_UNCERTAIN = 2,
+    RCP_ACF_MTV_UNTIMED = 0,
+    RCP_ACF_MTV_VALID   = 1,
 } rcp_acf_mtv_t;
 
 /* ── op: the operation this message's byte_bus_id addresses ───────────────── */
 
+/* op is a SINGLE wire bit (Table 4 octet 6 bit 7): 0 selects the
+ * read/expects-a-data-response sense, 1 selects write/no-data-response.
+ * There is no third wire state. This project's application-facing
+ * rcp_acf_op_t nonetheless keeps a third value, RCP_ACF_OP_NONE, as a
+ * convenience for endpoints that send a command-shaped message carrying
+ * no register read/write semantics of its own (e.g. ep_wakeup.c's SleepCMD
+ * and wakeup messages): rcp_acf_encode_abb()/_gbb() encode
+ * RCP_ACF_OP_NONE identically to RCP_ACF_OP_WRITE on the wire (op=1,
+ * "no data response expected"), since that is the only one of the two
+ * real wire states it can be without inventing a bit TC18 does not have.
+ * Decoding therefore never produces RCP_ACF_OP_NONE -- a decoded header's
+ * op is always RCP_ACF_OP_READ or RCP_ACF_OP_WRITE, reflecting what a
+ * real TC18 peer can actually distinguish on the wire. */
 typedef enum {
-    RCP_ACF_OP_NONE  = 0, /* no read/write data operation (e.g. a plain Acknowledge) */
+    RCP_ACF_OP_NONE  = 0, /* encode-only: no read/write data operation of
+                              its own (e.g. a command message); encodes
+                              identically to RCP_ACF_OP_WRITE on the wire */
     RCP_ACF_OP_WRITE = 1,
     RCP_ACF_OP_READ  = 2,
 } rcp_acf_op_t;
@@ -146,12 +228,17 @@ typedef enum {
 
 typedef struct {
     uint8_t           acf_msg_type;   /* RCP_ACF_MSG_TYPE_ABB/_GBB on decode;
-                                         ignored on encode (implied by which
-                                         encode_* function is called) */
-    uint16_t          acf_msg_length; /* payload length in octets; ignored
-                                         on encode, recomputed from
-                                         payload_len */
-    uint8_t           pad;            /* 0-3; round-tripped unmodified */
+                                         ignored by rcp_acf_encode_abb()/
+                                         _gbb() (implied by which function
+                                         is called) */
+    uint16_t          acf_msg_length; /* quadlet count over the whole ACF
+                                         message (see the file header);
+                                         ignored by rcp_acf_encode_abb()/
+                                         _gbb(), which recompute it */
+    uint8_t           pad;            /* 0-3 trailing pad octets; ignored
+                                         by rcp_acf_encode_abb()/_gbb(),
+                                         which recompute it via
+                                         rcp_acf_pad_len() */
     uint8_t           mtv;            /* rcp_acf_mtv_t; ABB always encodes/
                                          decodes this as RCP_ACF_MTV_UNTIMED,
                                          since ABB has no timestamp field to
@@ -161,15 +248,18 @@ typedef struct {
     uint8_t           hs;             /* 0/1; round-tripped unmodified */
     uint8_t           cs;             /* 0/1; round-tripped unmodified */
     uint8_t           transaction_num;
-    uint8_t           op;             /* rcp_acf_op_t */
+    uint8_t           op;             /* rcp_acf_op_t; see its own doc
+                                         comment for the encode/decode
+                                         asymmetry around RCP_ACF_OP_NONE */
     uint8_t           rsp;            /* 0/1; round-tripped unmodified */
     uint8_t           err;            /* 0/1 */
     uint8_t           ms;             /* 0/1; round-tripped unmodified */
-    uint8_t           read_size_or_segment_num; /* meaning depends on op:
-                                         read_size when op == RCP_ACF_OP_READ,
-                                         otherwise segment_num (unused by
-                                         this milestone's Standard-request-
-                                         only scope, but round-tripped) */
+    uint16_t          read_size_or_segment_num; /* 0-4095 (12 bits); meaning
+                                         depends on op: read_size when
+                                         op == RCP_ACF_OP_READ, otherwise
+                                         segment_num (unused by this
+                                         milestone's Standard-request-only
+                                         scope, but round-tripped) */
 } rcp_acf_byte_message_info_t;
 
 /* Classifies a decoded byte_message_info header into one of the four
@@ -177,7 +267,12 @@ typedef struct {
  * Error response regardless of op), otherwise op selects between Write
  * response, Read response, and -- when op carries no data operation --
  * Acknowledge. Use rcp_acf_hdr_ack_has_event() to further distinguish a
- * plain Acknowledge from one tagged with an asynchronous event via evt. */
+ * plain Acknowledge from one tagged with an asynchronous event via evt.
+ * Note that a decoded hdr's op is never RCP_ACF_OP_NONE (see
+ * rcp_acf_op_t's doc comment) -- this function's ACKNOWLEDGE branch is
+ * reachable from decoded input only via evt-tagged Write responses a
+ * caller reclassifies itself; it remains here for callers that construct
+ * hdr by hand with op left at its zero value. */
 rcp_acf_response_kind_t rcp_acf_classify_response(const rcp_acf_byte_message_info_t *hdr);
 
 /* true iff hdr classifies as RCP_ACF_RESP_ACKNOWLEDGE and evt != 0, i.e.
@@ -185,24 +280,61 @@ rcp_acf_response_kind_t rcp_acf_classify_response(const rcp_acf_byte_message_inf
  * being a plain acknowledgement of a Standard request. */
 bool rcp_acf_hdr_ack_has_event(const rcp_acf_byte_message_info_t *hdr);
 
+/* ── byte_message_info bit packing (single source of truth) ───────────────── */
+
+/* Packs the 8-byte byte_message_info header (Table 4, see the file header)
+ * into out[0..8), given the already-computed acf_msg_type and
+ * acf_msg_length (in quadlets). hdr supplies every other field, including
+ * pad -- callers that need rcp_acf_pad_len()'s automatic pad/quadlet
+ * accounting (i.e. everything except the request_* modules' own repurposed-
+ * timestamp builders) should prefer rcp_acf_encode_abb()/_gbb() instead of
+ * calling this directly. */
+void rcp_acf_pack_header(uint8_t out[8], uint8_t acf_msg_type, uint16_t acf_msg_length,
+                          const rcp_acf_byte_message_info_t *hdr);
+
+/* Unpacks the 8-byte byte_message_info header from in[0..8) into *out_hdr
+ * (every field, including acf_msg_type and acf_msg_length). Reserved bits
+ * (rsv at octet 2 bits 4:3 and octet 4 bits 3:2) are not validated -- a
+ * peer that sets them is tolerated, not rejected, per this module's
+ * decode-leniency convention. Returns RCP_ACF_ERR_BUS_ID_OVERFLOW,
+ * leaving *out_hdr partially populated, if the decoded byte_bus_id[10:8]
+ * bits are nonzero (see rcp_byte_bus_id_t's 8-bit width, avtp.h). */
+rcp_acf_errc_t rcp_acf_unpack_header(const uint8_t in[8], rcp_acf_byte_message_info_t *out_hdr);
+
+/* Returns the number of zero pad octets (0-3) needed to bring unpadded_len
+ * octets of header(+timestamp)+payload up to a whole number of quadlets --
+ * the unit acf_msg_length is expressed in. Exposed so any module building
+ * a raw ACF_GBB header of its own (the request_* modules) can compute the
+ * same pad/quadlet accounting rcp_acf_encode_abb()/_gbb() use internally. */
+uint8_t rcp_acf_pad_len(size_t unpadded_len);
+
 /* ── ACF_ABB ───────────────────────────────────────────────────────────────── */
 
 /* Encodes hdr plus a payload of payload_len octets (payload may be NULL
  * iff payload_len == 0) into a freshly heap-allocated ACF_ABB message.
- * hdr's own acf_msg_type and acf_msg_length are ignored on encode.
- * Returns a zeroed rcp_bytes_t (data=NULL) if payload_len exceeds
- * RCP_ACF_MAX_PAYLOAD or on allocation failure. Caller frees the result
- * with rcp_bytes_free(). */
+ * hdr's own acf_msg_type, acf_msg_length, and pad are ignored on encode --
+ * pad is recomputed via rcp_acf_pad_len() and acf_msg_length from the
+ * resulting total quadlet count, and between payload and the trailing
+ * pad|CRC region a peer expects, zero pad octets are appended so the
+ * encoded length is always a whole number of quadlets. Returns a zeroed
+ * rcp_bytes_t (data=NULL) if payload_len exceeds RCP_ACF_ABB_MAX_PAYLOAD
+ * or on allocation failure. Caller frees the result with
+ * rcp_bytes_free(). */
 rcp_bytes_t rcp_acf_encode_abb(const rcp_acf_byte_message_info_t *hdr,
                                 const uint8_t *payload, size_t payload_len);
 
 /* Decodes an ACF_ABB message from b[0..len). On RCP_ACF_OK, *out_hdr is
  * populated (with mtv forced to RCP_ACF_MTV_UNTIMED, ABB having no
  * timestamp to validate) and *out_payload / *out_payload_len point into
- * b (borrowed, not copied -- matching avtp.c's decode_* convention).
- * Returns RCP_ACF_ERR_SHORT_FRAME if b is shorter than the fixed header
- * or than header-plus-declared-payload length. Returns
- * RCP_ACF_ERR_BAD_MSG_TYPE if byte 0 is not RCP_ACF_MSG_TYPE_ABB. */
+ * b (borrowed, not copied -- matching avtp.c's decode_* convention);
+ * *out_payload_len excludes hdr->pad's trailing pad octets. Returns
+ * RCP_ACF_ERR_SHORT_FRAME if b is shorter than the fixed header, if the
+ * decoded acf_msg_length*4 is shorter than the fixed header, if b is
+ * shorter than that quadlet-derived total length, or if pad exceeds the
+ * payload region it is declared to trail. Returns
+ * RCP_ACF_ERR_BAD_MSG_TYPE if the decoded acf_msg_type is not
+ * RCP_ACF_MSG_TYPE_ABB. Returns RCP_ACF_ERR_BUS_ID_OVERFLOW per
+ * rcp_acf_unpack_header(). */
 rcp_acf_errc_t rcp_acf_decode_abb(const uint8_t *b, size_t len,
                                   rcp_acf_byte_message_info_t *out_hdr,
                                   const uint8_t **out_payload, size_t *out_payload_len);
@@ -217,32 +349,36 @@ typedef struct {
     uint64_t                    message_timestamp;
 } rcp_acf_gbb_header_t;
 
-/* Same conventions as rcp_acf_encode_abb(). If hdr->info.mtv ==
- * RCP_ACF_MTV_UNTIMED, the encoded message_timestamp region is forced to
- * all-zero on the wire regardless of hdr->message_timestamp -- an
- * untimed ACF_GBB message always carries a zeroed timestamp region. */
+/* Same conventions as rcp_acf_encode_abb(), against RCP_ACF_GBB_MAX_PAYLOAD.
+ * If hdr->info.mtv == RCP_ACF_MTV_UNTIMED, the encoded message_timestamp
+ * region is forced to all-zero on the wire regardless of
+ * hdr->message_timestamp -- an untimed ACF_GBB message always carries a
+ * zeroed timestamp region. (Callers that need to repurpose that region
+ * for a nonzero value while mtv=0 -- request_compound.c and its siblings
+ * -- build their own raw header with rcp_acf_pack_header() instead of
+ * calling this function, precisely to avoid this zeroing rule.) */
 rcp_bytes_t rcp_acf_encode_gbb(const rcp_acf_gbb_header_t *hdr,
                                 const uint8_t *payload, size_t payload_len);
 
 /* Same conventions as rcp_acf_decode_abb(). Returns
- * RCP_ACF_ERR_BAD_MSG_TYPE if byte 0 is not RCP_ACF_MSG_TYPE_GBB. */
+ * RCP_ACF_ERR_BAD_MSG_TYPE if the decoded acf_msg_type is not
+ * RCP_ACF_MSG_TYPE_GBB. */
 rcp_acf_errc_t rcp_acf_decode_gbb(const uint8_t *b, size_t len,
                                   rcp_acf_gbb_header_t *out_hdr,
                                   const uint8_t **out_payload, size_t *out_payload_len);
 
 /* The timestamp-validity folding rule: true only when info.mtv ==
- * RCP_ACF_MTV_VALID. Both RCP_ACF_MTV_UNTIMED (mtv=0, zeroed timestamp
- * region) and RCP_ACF_MTV_UNCERTAIN ("tu", a timestamp present but not
- * trustworthy) fold into the same "not confidently timed" treatment --
- * callers must not schedule against message_timestamp in either case. */
+ * RCP_ACF_MTV_VALID. RCP_ACF_MTV_UNTIMED (mtv=0, zeroed timestamp region)
+ * is the only other wire state -- see rcp_acf_mtv_t's doc comment for why
+ * there is no longer a distinct "uncertain" state to also fold in here. */
 bool rcp_acf_gbb_is_timed(const rcp_acf_gbb_header_t *hdr);
 
 /* ── Message-type dispatch ─────────────────────────────────────────────────── */
 
-/* Reads just the acf_msg_type byte (offset 0) from a received ACF
- * message, so a caller can decide which of rcp_acf_decode_abb()/_gbb() to
- * invoke without a full decode attempt first. Returns
- * RCP_ACF_ERR_SHORT_FRAME if len == 0. */
+/* Reads just the acf_msg_type field (the top 7 bits of octet 0) from a
+ * received ACF message, so a caller can decide which of
+ * rcp_acf_decode_abb()/_gbb() to invoke without a full decode attempt
+ * first. Returns RCP_ACF_ERR_SHORT_FRAME if len == 0. */
 rcp_acf_errc_t rcp_acf_peek_msg_type(const uint8_t *b, size_t len, uint8_t *out_msg_type);
 
 #ifdef __cplusplus

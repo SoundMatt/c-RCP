@@ -17,6 +17,8 @@
 //cfusa:test REQ-MOCK-016
 //cfusa:test REQ-MOCK-017
 //cfusa:test REQ-MOCK-018
+//cfusa:test REQ-MOCK-019
+//cfusa:test REQ-MOCK-020
 /* Tests the TC18-shaped RC-Server/endpoint test double (ROADMAP.md
  * milestone 77). The pre-TC18 zone-controller mock this file used to test
  * moved to tests/legacy_mock.h/.c; tests/test_legacy_mock.c (a renamed
@@ -378,6 +380,181 @@ static void test_discovery_bus_accepted_while_hw_unconfigured(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* ── Multi-request-per-frame dispatch (TC18 §12.9.1.1) ──────────────────────── */
+
+static void test_dispatch_frame_dispatches_each_member_to_its_own_endpoint(void)
+{
+    rcp_mock_server_t          *srv = rcp_mock_server_new();
+    rcp_acf_byte_message_info_t hdr1 = {0};
+    rcp_acf_byte_message_info_t hdr2 = {0};
+    uint8_t                     body1[] = {0xAA, 0xBB};
+    uint8_t                     body2[] = {0xCC, 0xDD, 0xEE};
+    rcp_bytes_t                 frame1, frame2;
+    uint8_t                     combined[64];
+    size_t                      combined_len;
+    rcp_mock_frame_member_result_t results[RCP_MOCK_MAX_FRAME_MEMBERS];
+    size_t                      dispatched;
+
+    to_hw_configured(srv);
+    reset_handler_capture();
+    rcp_mock_server_add_endpoint(srv, 10, 1, true, echo_handler, NULL);
+    rcp_mock_server_add_endpoint(srv, 20, 1, true, echo_handler, NULL);
+
+    hdr1.byte_bus_id = 10;
+    hdr2.byte_bus_id = 20;
+    frame1 = rcp_acf_encode_abb(&hdr1, body1, sizeof(body1));
+    frame2 = rcp_acf_encode_abb(&hdr2, body2, sizeof(body2));
+    TEST_ASSERT_NOT_NULL(frame1.data);
+    TEST_ASSERT_NOT_NULL(frame2.data);
+    TEST_ASSERT_TRUE(frame1.len + frame2.len <= sizeof(combined));
+
+    memcpy(combined, frame1.data, frame1.len);
+    memcpy(combined + frame1.len, frame2.data, frame2.len);
+    combined_len = frame1.len + frame2.len;
+
+    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, combined,
+                                                 combined_len, results, RCP_MOCK_MAX_FRAME_MEMBERS);
+
+    TEST_ASSERT_EQUAL_UINT(2, dispatched);
+
+    /* echo_handler echoes back the exact request bytes it was handed --
+     * the whole raw ACF member (header+payload+pad), matching
+     * rcp_mock_server_dispatch()'s own request/request_len convention
+     * (mock.h): "request_len is one already-framed request", not just
+     * its payload. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result);
+    TEST_ASSERT_EQUAL_UINT8(10, results[0].byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT(frame1.len, results[0].response.len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(frame1.data, results[0].response.data, frame1.len);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[1].result);
+    TEST_ASSERT_EQUAL_UINT8(20, results[1].byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT(frame2.len, results[1].response.len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(frame2.data, results[1].response.data, frame2.len);
+
+    rcp_bytes_free(&results[0].response);
+    rcp_bytes_free(&results[1].response);
+    rcp_bytes_free(&frame1);
+    rcp_bytes_free(&frame2);
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_dispatch_frame_single_member_matches_direct_dispatch(void)
+{
+    /* A single-member frame behaves identically to calling
+     * rcp_mock_server_dispatch() once directly -- see mock.h's file
+     * header. */
+    rcp_mock_server_t          *srv = rcp_mock_server_new();
+    rcp_acf_byte_message_info_t hdr = {0};
+    uint8_t                     body[] = {1, 2, 3, 4};
+    rcp_bytes_t                 frame;
+    rcp_mock_frame_member_result_t results[RCP_MOCK_MAX_FRAME_MEMBERS];
+    size_t                      dispatched;
+
+    to_hw_configured(srv);
+    reset_handler_capture();
+    rcp_mock_server_add_endpoint(srv, 11, 1, true, echo_handler, NULL);
+
+    hdr.byte_bus_id = 11;
+    frame = rcp_acf_encode_abb(&hdr, body, sizeof(body));
+
+    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, frame.data,
+                                                 frame.len, results, RCP_MOCK_MAX_FRAME_MEMBERS);
+
+    TEST_ASSERT_EQUAL_UINT(1, dispatched);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result);
+    TEST_ASSERT_EQUAL_UINT8(11, results[0].byte_bus_id);
+    /* echo_handler echoes the whole raw ACF member -- see the identical
+     * note in test_dispatch_frame_dispatches_each_member_to_its_own_endpoint. */
+    TEST_ASSERT_EQUAL_UINT(frame.len, results[0].response.len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(frame.data, results[0].response.data, frame.len);
+
+    rcp_bytes_free(&results[0].response);
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_dispatch_frame_returns_zero_for_unparseable_frame(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    const uint8_t       garbage[3] = {0xFF, 0xFF, 0xFF};
+    rcp_mock_frame_member_result_t results[RCP_MOCK_MAX_FRAME_MEMBERS];
+    size_t              dispatched;
+
+    to_hw_configured(srv);
+
+    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, garbage,
+                                                 sizeof(garbage), results, RCP_MOCK_MAX_FRAME_MEMBERS);
+    TEST_ASSERT_EQUAL_UINT(0, dispatched);
+
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_dispatch_frame_reports_unknown_bus_for_undecodable_member(void)
+{
+    /* A syntactically well-formed member (rcp_sched_split_frame_members()
+     * accepts it) whose byte_bus_id[10:8] bits are nonzero cannot decode
+     * through rcp_acf_decode_abb() (RCP_ACF_ERR_BUS_ID_OVERFLOW, acf.h) --
+     * this must surface as RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS, not a crash
+     * or a bogus dispatch. */
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    uint8_t             raw[RCP_ACF_ABB_HEADER_LEN];
+    rcp_mock_frame_member_result_t results[RCP_MOCK_MAX_FRAME_MEMBERS];
+    size_t              dispatched;
+
+    to_hw_configured(srv);
+
+    memset(raw, 0, sizeof(raw));
+    raw[0] = (uint8_t)(RCP_ACF_MSG_TYPE_ABB << 1) | 0x00u; /* type=ABB, len MSB=0 */
+    raw[1] = (uint8_t)(RCP_ACF_ABB_HEADER_LEN / 4u);        /* len=2 quadlets, no payload */
+    raw[2] = 0x01u; /* busid[10:8] = 001 -> overflow */
+
+    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, raw,
+                                                 sizeof(raw), results, RCP_MOCK_MAX_FRAME_MEMBERS);
+
+    TEST_ASSERT_EQUAL_UINT(1, dispatched);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS, results[0].result);
+    TEST_ASSERT_EQUAL_UINT8(0, results[0].byte_bus_id);
+    TEST_ASSERT_NULL(results[0].response.data);
+
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_dispatch_frame_truncates_at_out_cap(void)
+{
+    rcp_mock_server_t          *srv = rcp_mock_server_new();
+    rcp_acf_byte_message_info_t hdr1 = {0};
+    rcp_acf_byte_message_info_t hdr2 = {0};
+    rcp_bytes_t                 frame1, frame2;
+    uint8_t                     combined[64];
+    size_t                      combined_len;
+    rcp_mock_frame_member_result_t results[1];
+    size_t                      dispatched;
+
+    to_hw_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 30, 1, true, NULL, NULL);
+    rcp_mock_server_add_endpoint(srv, 31, 1, true, NULL, NULL);
+
+    hdr1.byte_bus_id = 30;
+    hdr2.byte_bus_id = 31;
+    frame1 = rcp_acf_encode_abb(&hdr1, NULL, 0);
+    frame2 = rcp_acf_encode_abb(&hdr2, NULL, 0);
+
+    memcpy(combined, frame1.data, frame1.len);
+    memcpy(combined + frame1.len, frame2.data, frame2.len);
+    combined_len = frame1.len + frame2.len;
+
+    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, combined,
+                                                 combined_len, results, 1);
+
+    TEST_ASSERT_EQUAL_UINT(1, dispatched); /* only out_cap's worth, not both */
+    TEST_ASSERT_EQUAL_UINT8(30, results[0].byte_bus_id);
+
+    rcp_bytes_free(&frame1);
+    rcp_bytes_free(&frame2);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── Error strings ─────────────────────────────────────────────────────────── */
 
 static void test_strerror_never_null(void)
@@ -419,6 +596,12 @@ int main(void)
     RUN_TEST(test_drain_endpoint_empty_queue_returns_false);
     RUN_TEST(test_drain_endpoint_unknown_bus_returns_false);
     RUN_TEST(test_discovery_bus_accepted_while_hw_unconfigured);
+
+    RUN_TEST(test_dispatch_frame_dispatches_each_member_to_its_own_endpoint);
+    RUN_TEST(test_dispatch_frame_single_member_matches_direct_dispatch);
+    RUN_TEST(test_dispatch_frame_returns_zero_for_unparseable_frame);
+    RUN_TEST(test_dispatch_frame_reports_unknown_bus_for_undecodable_member);
+    RUN_TEST(test_dispatch_frame_truncates_at_out_cap);
 
     RUN_TEST(test_strerror_never_null);
 

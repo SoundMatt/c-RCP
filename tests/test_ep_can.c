@@ -385,7 +385,24 @@ static void test_frame_request_round_trip_classical(void)
 
 static void test_frame_request_round_trip_xl(void)
 {
-    uint8_t                tx[2048];
+    /* NOT RCP_EP_CAN_XL_MAX_DATA_LEN (2048): since the TC18 conformance
+     * fix (see CHANGELOG.md), acf_msg_length is a real 9-bit quadlet
+     * count (RCP_ACF_ABB_MAX_PAYLOAD, acf.h), and a full 2048-byte CAN XL
+     * new-payload frame -- plus this module's own 4-byte arbitration-id
+     * and 6-byte SDT/VCID/AF prefix -- no longer fits in a single
+     * unfragmented ACF_ABB message. rcp_ep_can_encode_frame_request() has
+     * no fragmented counterpart (only
+     * rcp_ep_can_encode_frame_response_fragmented() exists, for the
+     * response direction -- see
+     * test_fragment_worst_case_can_xl_response_round_trip below for that
+     * path exercised at the real 2048-byte worst case, unaffected by this
+     * bound since its max_fragment_payload of 1024 is well under it);
+     * a fragmented *request* path for the worst-case CAN XL write is
+     * tracked as a follow-up, not implemented by this fix. 246 bytes
+     * (well within RCP_ACF_ABB_MAX_PAYLOAD, and chosen so
+     * 4+6+246=256 lands exactly on a quadlet boundary with no pad) is
+     * enough to exercise this round trip's actual behavior. */
+    uint8_t                tx[246];
     rcp_ep_can_xl_header_t xl_hdr_in = {0};
     rcp_bytes_t            frame;
     rcp_ep_can_frame_format_t format;
