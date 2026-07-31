@@ -53,10 +53,16 @@ void rcp_acf_pack_header(uint8_t out[8], uint8_t acf_msg_type, uint16_t acf_msg_
     out[0] = (uint8_t)((acf_msg_type << 1) | ((acf_msg_length >> 8) & 0x01u));
     out[1] = (uint8_t)(acf_msg_length & 0xFFu);
 
-    /* bits 4:3 (rsv) always 0. */
+    /* bits 4:3 (rsv) always 0. byte_bus_id is widened to uint16_t before
+     * shifting: rcp_byte_bus_id_t is only 8 bits wide today (see avtp.h),
+     * so bits 10:8 are always 0, but shifting the narrower type directly
+     * right by 8 trips MSVC's C4333 ("right shift by too large amount")
+     * under /W4 /WX even though the shifted-in-int-promoted value never
+     * actually loses data -- widen first so the shift amount is provably
+     * within the operand's width on every compiler. */
     out[2] = (uint8_t)(((hdr->pad & 0x3u) << 6) |
                         ((hdr->mtv & 0x1u) << 5) |
-                        ((uint8_t)((hdr->byte_bus_id >> 8) & 0x7u)));
+                        ((uint8_t)(((uint16_t)hdr->byte_bus_id >> 8) & 0x7u)));
     out[3] = (uint8_t)(hdr->byte_bus_id & 0xFFu);
 
     /* bits 3:2 (rsv) always 0. */
