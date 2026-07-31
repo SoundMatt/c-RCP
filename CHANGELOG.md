@@ -31,6 +31,27 @@ the rationale.
 
 ## Releases
 
+### v0.99.0 -- 2026-07-30
+
+Bump `ci.yml`/`release.yml`'s c-FuSa pin from v0.5.49 to v0.5.50.
+v0.5.50's release notes disclosed that c-FuSa's shared ASIL-derivation
+table had over-assigned ASIL in 19 of 36 S/E/C cells for its entire
+history through v0.5.49; a real local v0.5.50 build surfaced 11 new
+`HARA006` errors against this repo's own `.fusa-hara.json` as a direct
+consequence -- all 11 recorded hazard ASIL letters had been computed
+against the buggy table. Independently re-derived all 11 by hand
+against the real ISO 26262-3:2018 Table 4 before accepting the
+correction (matches `cfusa hara asil` v0.5.50 exactly for all 11).
+This supersedes v0.97.0's "Re-verify HARA ASIL audit finding"
+conclusion, which had re-verified the same values against the *old,
+buggy* tool and found them self-consistent -- self-consistency with a
+buggy tool was never the same as correctness. Corrected
+`.fusa-hara.json`, `HARA.md`, `SAFETY_PLAN.md`, `AUDIT_PACK.md`, and
+`tara.md`. Only one hazard (H-001) now exceeds the ASIL-B baseline,
+at ASIL-C (previously recorded ASIL-D); H-003/H-005/H-008 now land
+exactly at baseline; H-011 drops to QM. (Milestone 99; see
+`ROADMAP.md` for full detail.)
+
 ### v0.98.0 -- 2026-07-30
 
 Fix an out-of-bounds stack read in Prometheus metrics rendering

@@ -9,7 +9,7 @@ Control Protocol, baselined at ISO 26262 ASIL-B / IEC 61508 SIL-2.
 
 | Standard | Target level |
 |---|---|
-| ISO 26262 | ASIL-B baseline; **HARA.md identifies four hazards computed at ASIL-C/D** (H-001, H-003, H-005, H-008) — open, tracked per `HARA.md`'s ASIL Determination Note, not yet closed |
+| ISO 26262 | ASIL-B baseline; **HARA.md identifies one hazard computed at ASIL-C** (H-001) — open, tracked per `HARA.md`'s ASIL Determination Note, not yet closed |
 | IEC 61508 | SIL-2 |
 | IEC 62443 | SL-2 |
 
