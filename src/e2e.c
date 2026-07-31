@@ -89,17 +89,6 @@ static uint32_t get_u32(const uint8_t *p)
            ((uint32_t)p[2] << 8)  |  (uint32_t)p[3];
 }
 
-static uint16_t get_u16(const uint8_t *p)
-{
-    return (uint16_t)(((uint16_t)p[0] << 8) | (uint16_t)p[1]);
-}
-
-static void put_u16(uint8_t *p, uint16_t v)
-{
-    p[0] = (uint8_t)(v >> 8);
-    p[1] = (uint8_t)v;
-}
-
 //cfusa:req REQ-E2E-003
 uint32_t rcp_e2e_compute_crc(uint64_t stream_id, uint32_t avtp_timestamp,
                                  const uint8_t *acf_frame, size_t acf_frame_len)
@@ -119,28 +108,33 @@ uint32_t rcp_e2e_compute_crc(uint64_t stream_id, uint32_t avtp_timestamp,
     return crc ^ 0xFFFFFFFFu;
 }
 
-/* Adapts the acf_msg_length field (acf.h's byte_message_info layout,
- * offset 1-2, big-endian uint16) of frame[0..frame_len) by
- * delta_quadlets quadlets (RCP_E2E_CRC_LEN octets each), in place.
- * Returns false, leaving frame unmodified, if frame_len < 3 (too short
- * to contain the field) or if the adaptation would under/overflow the
- * 16-bit field; true on success. Private to this module -- e2e.c reads
- * this one field by documented offset rather than including acf.h,
- * matching this module's "no dependency on acf.c" layering discipline
- * (see the file header). */
+/* Adapts the acf_msg_length field (acf.h's byte_message_info layout: a
+ * 9-bit quadlet count spanning bit 0 of octet 0 and all of octet 1; octet
+ * 0's other 7 bits are acf_msg_type, preserved unmodified) of
+ * frame[0..frame_len) by delta_quadlets quadlets, in place. Returns
+ * false, leaving frame unmodified, if frame_len < 2 (too short to
+ * contain the field) or if the adaptation would under/overflow the 9-bit
+ * field (0x1FF, matching acf.h's RCP_E2E_CRC_LEN of exactly one quadlet
+ * -- this module hardcodes 0x1FF rather than including acf.h's own
+ * RCP_ACF_MAX_QUADLETS, matching this module's "no dependency on acf.c"
+ * layering discipline, see the file header); true on success. Private to
+ * this module -- e2e.c reads this field by documented offset rather than
+ * including acf.h. */
 static bool adapt_acf_msg_length(uint8_t *frame, size_t frame_len, int delta_quadlets)
 {
-    long delta_octets = (long)delta_quadlets * (long)RCP_E2E_CRC_LEN;
-    long adapted;
+    long    adapted;
+    uint8_t type_bits;
     uint16_t len_field;
 
-    if (frame_len < 3u) return false;
+    if (frame_len < 2u) return false;
 
-    len_field = get_u16(&frame[1]);
-    adapted   = (long)len_field + delta_octets;
-    if (adapted < 0 || adapted > 0xFFFF) return false;
+    type_bits = (uint8_t)(frame[0] & 0xFEu); /* top 7 bits: acf_msg_type */
+    len_field = (uint16_t)(((uint16_t)(frame[0] & 0x01u) << 8) | (uint16_t)frame[1]);
+    adapted   = (long)len_field + (long)delta_quadlets;
+    if (adapted < 0 || adapted > 0x1FF) return false;
 
-    put_u16(&frame[1], (uint16_t)adapted);
+    frame[0] = (uint8_t)(type_bits | (uint8_t)((adapted >> 8) & 0x01));
+    frame[1] = (uint8_t)(adapted & 0xFFu);
     return true;
 }
 

@@ -137,8 +137,8 @@ static void test_peek_request_type_not_repurposed_when_mtv_nonzero(void)
     uint8_t buf[RCP_ACF_GBB_HEADER_LEN];
 
     memset(buf, 0, sizeof(buf));
-    buf[0] = RCP_ACF_MSG_TYPE_GBB;
-    buf[4] = (uint8_t)(RCP_ACF_MTV_VALID << 4); /* mtv = VALID(1), not UNTIMED */
+    buf[0] = (uint8_t)(RCP_ACF_MSG_TYPE_GBB << 1); /* acf_msg_type: octet 0 bits 7:1 */
+    buf[2] = (uint8_t)(RCP_ACF_MTV_VALID << 5); /* mtv = VALID(1), not UNTIMED: octet 2 bit 5 */
 
     TEST_ASSERT_EQUAL_INT(RCP_COMPOUND_ERR_NOT_REPURPOSED,
                            rcp_compound_peek_request_type(buf, sizeof(buf), &rt));
@@ -280,11 +280,11 @@ static void test_decode_request_rejects_non_repurposed_timestamp(void)
     frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 0, &step, 0, NULL, 0);
     TEST_ASSERT_NOT_NULL(frame.data);
 
-    /* Flip mtv to VALID(1) directly on the wire, simulating a genuinely
-     * timed ACF_GBB message that happens to carry a request_type-shaped
-     * byte pattern in message_timestamp -- must not be misread as a
-     * compound request. */
-    frame.data[4] = (uint8_t)(RCP_ACF_MTV_VALID << 4);
+    /* Flip mtv to VALID(1) directly on the wire (octet 2 bit 5, Table 4),
+     * simulating a genuinely timed ACF_GBB message that happens to carry
+     * a request_type-shaped byte pattern in message_timestamp -- must not
+     * be misread as a compound request. */
+    frame.data[2] = (uint8_t)(RCP_ACF_MTV_VALID << 5);
 
     TEST_ASSERT_EQUAL_INT(RCP_COMPOUND_ERR_NOT_REPURPOSED,
                            rcp_compound_decode_request(frame.data, frame.len, &out_rt, &out_bus,

@@ -31,6 +31,66 @@ the rationale.
 
 ## Releases
 
+### v0.100.0 -- 2026-07-31
+
+BREAKING: fix `acf.h`/`acf.c`'s `byte_message_info` header wire layout,
+found by a 2026-07/31 cross-repo external gap audit -- through v0.99.0
+it was this implementation's own invented byte layout (self-documented
+as such in `acf.h`'s own file header), never wire-compatible with a
+real TC18 peer or with this project's own `go-RCP`/`cpp-RCP` ports.
+Rewrote the header encode/decode from the specification's real Figure 7
+/ Table 4 layout field by field, bit by bit: `acf_msg_type` (7 bits) and
+`acf_msg_length` (9 bits, now a QUADLET count over the whole message,
+not an octet count of the payload alone) share the first 16-bit word;
+`byte_bus_id` is an 11-bit field split across two octets; `pad`/`mtv`/
+`hs`/`cs`/`rsp`/`err`/`evt`/`op`/`ms` are regrouped into the
+specification's own octet 2/4/6 layout. `mtv` is now a single wire bit
+(dropped the invented `RCP_ACF_MTV_UNCERTAIN` third state);
+`read_size_or_segment_num` widened `uint8_t` -> `uint16_t` for its full
+12-bit range; a decoded byte_bus_id exceeding 255 now fails explicitly
+(`RCP_ACF_ERR_BUS_ID_OVERFLOW`) instead of truncating silently; `op`'s
+encode-only `RCP_ACF_OP_NONE` convenience value now encodes identically
+to `RCP_ACF_OP_WRITE` (there is only one wire bit, not three states).
+`RCP_ACF_MAX_PAYLOAD` drops from 65535 (the old, wrong 16-bit field) to
+`RCP_ACF_GBB_MAX_PAYLOAD` (2028)/`RCP_ACF_ABB_MAX_PAYLOAD` (2036) --
+consequently a worst-case CAN XL new-payload frame no longer fits a
+single unfragmented ACF message; the existing fragmented *response*
+path is unaffected and is now the only way to carry one, but there is
+still no fragmented *request* path (tracked as a follow-up).
+
+New shared `rcp_acf_pack_header()`/`rcp_acf_unpack_header()` are the
+single source of truth for this bit-packing, now used by `acf.c` itself
+and by the five request-kind modules (`request_compound.c`,
+`request_cancel.c`, `request_timed.c`, `request_triggered.c`,
+`request_chained.c`) that build a raw ACF_GBB header by hand to
+repurpose `message_timestamp` -- each previously duplicated the (wrong)
+bit-packing independently. `e2e.c`'s `adapt_acf_msg_length()` and
+`scheduler.c`'s `rcp_sched_split_frame_members()` are updated to the new
+field position.
+
+Hand-verified against the specification's own Figure 19 (ACF_ABB,
+header+6-byte payload+2-byte pad+4-byte CRC32 = 20 octets = 5 quadlets)
+and Figure 20 (ACF_GBB, header+timestamp+7-byte payload+1-byte pad+
+4-byte CRC32 = 28 octets = 7 quadlets) worked examples: both reproduce
+exactly, pinned as golden-vector tests in `tests/test_acf.c`.
+
+Separately, closed the TC18 §12.9.1.1 multi-request-per-frame gap:
+added `rcp_mock_server_dispatch_frame()`, which splits a raw NTSCF/TSCF
+payload into its constituent ACF messages (`scheduler.c`'s previously-
+orphaned `rcp_sched_split_frame_members()`) and dispatches each to its
+own addressed `byte_bus_id` via the existing single-request
+`rcp_mock_server_dispatch()`.
+
+Deferred (see `ROADMAP.md` milestone 100 for the full list): TC18's
+numbered wire error codes (`errors.h`) still are not populated onto any
+endpoint's actual Error response; `coverage-report.json`'s self-reported
+FAIL and `qualify-report.json`'s inconsistent qualification signals are
+both `cfusa`-generated artifacts whose correct fix belongs upstream in
+`c-FuSa`, not as a hand-edit here. `ci.yml`'s `ilammy/msvc-dev-cmd@v1`
+mutable-tag pin was SHA-pinned as a small, unrelated hardening fix
+bundled into this release. `README.md`'s wire-interop claim now carries
+an explicit hedge. (Milestone 100; see `ROADMAP.md` for full detail.)
+
 ### v0.99.0 -- 2026-07-30
 
 Bump `ci.yml`/`release.yml`'s c-FuSa pin from v0.5.49 to v0.5.50.

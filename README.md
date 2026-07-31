@@ -21,6 +21,27 @@ The pre-replacement Zone/Command surface that used to live in
 consumers) has since been removed outright with no compatibility shim,
 per RELAY spec §15.5 — see "Removed legacy API" below.)*
 
+*(Wire-interop status: through v0.99.0, `acf.h`/`acf.c`'s
+`byte_message_info` header was this implementation's own invented byte
+layout, not the specification's — self-documented as such in `acf.h`'s
+own file header at the time, but never called out here. v0.100.0
+replaced it with the specification's real Figure 7 / Table 4 bit layout
+and quadlet-counted `acf_msg_length`, verified against the
+specification's own Figure 19/Figure 20 worked examples (see
+`CHANGELOG.md`). This is a **breaking wire-format change** from every
+prior tagged release. As of v0.100.0 the ACF header itself is
+byte-for-byte conformant, but this remains one of four independent RCP
+implementations under active cross-repo reconciliation (`go-RCP`,
+`cpp-RCP`, `rust-RCP`); it has not yet been live-tested against a real
+third-party TC18 peer, and known gaps remain — most notably, no
+endpoint module yet populates the specification's numbered wire error
+codes (`errors.h`) on an actual Error response, and a worst-case CAN XL
+new-payload write *request* (`ep_can.h`) cannot yet be sent at all
+under the corrected 9-bit `acf_msg_length` field, having no fragmented
+request path. Treat "TC18 implementation" below as "TC18 wire-header-
+conformant, gaps tracked in `ROADMAP.md`," not "drop-in interop with an
+arbitrary TC18 peer.")*
+
 [![CI](https://github.com/SoundMatt/c-RCP/actions/workflows/ci.yml/badge.svg)](https://github.com/SoundMatt/c-RCP/actions/workflows/ci.yml)
 [![DCO](https://github.com/SoundMatt/c-RCP/actions/workflows/dco.yml/badge.svg)](https://github.com/SoundMatt/c-RCP/actions/workflows/dco.yml)
 

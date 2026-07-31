@@ -184,12 +184,22 @@ static void test_length_with_crc_saturates(void)
  * excluded) so the adaptation assertions below have a real value to
  * check against.
  */
+/* This module (e2e.c) is deliberately agnostic to acf.h's actual header
+ * semantics -- it only reads/writes the acf_msg_length field by
+ * documented bit position (octet 0 bit 0 | octet 1, a 9-bit quadlet
+ * count -- see e2e.c's adapt_acf_msg_length()) and never validates it
+ * against a real ACF frame's true length. This helper's bytes therefore
+ * don't need to describe a *valid* ACF message, only consistent,
+ * recognizable ones: out[0]'s top 7 bits are a placeholder acf_msg_type
+ * (0x0E, RCP_ACF_MSG_TYPE_ABB -- this module doesn't care), out[0] bit 0
+ * | out[1] is a placeholder acf_msg_length this test suite's own
+ * adaptation tests read back by the same bit position. */
 static void make_test_acf_frame(uint8_t *out, size_t out_len)
 {
     size_t i;
     TEST_ASSERT_TRUE(out_len >= 3);
-    out[0] = 0x0Eu; /* RCP_ACF_MSG_TYPE_ABB, this module doesn't care */
-    out[1] = 0x00u;
+    out[0] = 0x1Cu; /* (0x0E << 1) | 0: acf_msg_type=ABB, length MSB=0 */
+    out[1] = 0x00u; /* placeholder acf_msg_length, low 8 bits */
     out[2] = (uint8_t)(out_len - 8u); /* pretend header is 8 bytes; payload = rest */
     for (i = 3; i < out_len; i++) out[i] = (uint8_t)(i & 0xFFu);
 }
@@ -217,11 +227,13 @@ static void test_wrap_null_frame_nonzero_len_fails_safe(void)
 
 static void test_wrap_too_short_for_length_field_fails_safe(void)
 {
-    /* c-RCP-02: the adaptation needs at least 3 octets (offset 1-2) to
-     * write into. A 0/1/2-byte "frame" has nowhere for acf_msg_length
-     * to live, so wrap must fail safe rather than silently skip the
-     * adaptation and produce a non-conformant frame. */
-    uint8_t tiny[2] = {0xAA, 0xBB};
+    /* c-RCP-02: the adaptation needs at least 2 octets (acf_msg_length
+     * spans bit 0 of octet 0 and all of octet 1 -- see
+     * adapt_acf_msg_length()) to write into. A 0/1-byte "frame" has
+     * nowhere for acf_msg_length to live, so wrap must fail safe rather
+     * than silently skip the adaptation and produce a non-conformant
+     * frame. */
+    uint8_t tiny[1] = {0xAA};
     rcp_bytes_t out = rcp_e2e_wrap(1, 1, tiny, sizeof(tiny));
     TEST_ASSERT_NULL(out.data);
     TEST_ASSERT_EQUAL_UINT(0, out.len);
@@ -234,23 +246,33 @@ static void test_wrap_too_short_for_length_field_fails_safe(void)
 static void test_wrap_adapts_acf_msg_length_by_one_quadlet(void)
 {
     uint8_t acf_frame[14];
+    uint8_t original_type_bits;
     uint16_t original_len;
+    uint8_t adapted_type_bits;
     uint16_t adapted_len;
     rcp_bytes_t wrapped;
 
     make_test_acf_frame(acf_frame, sizeof(acf_frame));
-    original_len = (uint16_t)(((uint16_t)acf_frame[1] << 8) | acf_frame[2]);
+    original_type_bits = (uint8_t)(acf_frame[0] & 0xFEu);
+    original_len = (uint16_t)(((uint16_t)(acf_frame[0] & 0x01u) << 8) | (uint16_t)acf_frame[1]);
 
     wrapped = rcp_e2e_wrap(1, 1, acf_frame, sizeof(acf_frame));
     TEST_ASSERT_NOT_NULL(wrapped.data);
 
-    adapted_len = (uint16_t)(((uint16_t)wrapped.data[1] << 8) | wrapped.data[2]);
-    TEST_ASSERT_EQUAL_UINT16(original_len + RCP_E2E_CRC_LEN, adapted_len);
+    adapted_type_bits = (uint8_t)(wrapped.data[0] & 0xFEu);
+    adapted_len = (uint16_t)(((uint16_t)(wrapped.data[0] & 0x01u) << 8) | (uint16_t)wrapped.data[1]);
+
+    /* +1 quadlet (RCP_E2E_CRC_LEN is exactly one quadlet, 4 octets) --
+     * NOT +RCP_E2E_CRC_LEN, since the field is already in quadlets, not
+     * octets (c-RCP-02). acf_msg_type (the other 7 bits of octet 0) must
+     * be untouched. */
+    TEST_ASSERT_EQUAL_UINT16(original_len + 1u, adapted_len);
+    TEST_ASSERT_EQUAL_HEX8(original_type_bits, adapted_type_bits);
 
     /* The caller's original frame must be untouched -- wrap() adapts a
      * copy, never the input. */
-    TEST_ASSERT_EQUAL_UINT16(original_len,
-                              (uint16_t)(((uint16_t)acf_frame[1] << 8) | acf_frame[2]));
+    TEST_ASSERT_EQUAL_UINT16(
+        original_len, (uint16_t)(((uint16_t)(acf_frame[0] & 0x01u) << 8) | (uint16_t)acf_frame[1]));
 
     rcp_bytes_free(&wrapped);
 }

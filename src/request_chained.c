@@ -7,12 +7,6 @@
 /* ── Byte-order helpers (this TU's own copy -- see request_compound.c's identical
  * comment for the house convention this follows) ─────────────────────────── */
 
-static void put_u16(uint8_t *p, uint16_t v)
-{
-    p[0] = (uint8_t)(v >> 8);
-    p[1] = (uint8_t)(v & 0xFFu);
-}
-
 static void put_u64(uint8_t *p, uint64_t v)
 {
     p[0] = (uint8_t)((v >> 56) & 0xFFu);
@@ -51,28 +45,36 @@ rcp_bytes_t rcp_chained_encode_member(rcp_byte_bus_id_t byte_bus_id, uint8_t cha
                                        uint8_t chain_position, uint8_t cs, uint8_t transaction_num,
                                        const uint8_t *payload, size_t payload_len)
 {
-    rcp_bytes_t frame = {0};
-    size_t n;
-    uint8_t *b;
-    uint64_t ts;
+    rcp_bytes_t                  frame = {0};
+    rcp_acf_byte_message_info_t  info  = {0};
+    size_t                       unpadded, total;
+    uint16_t                     quadlets;
+    uint8_t                      pad;
+    uint8_t                     *b;
+    uint64_t                     ts;
 
     if (chain_length < RCP_CHAINED_MIN_MEMBERS) return frame;
     if (chain_position >= chain_length) return frame;
-    if (payload_len > RCP_ACF_MAX_PAYLOAD) return frame;
+    if (payload_len > RCP_ACF_GBB_MAX_PAYLOAD) return frame;
 
-    n = RCP_ACF_GBB_HEADER_LEN + payload_len;
-    b = (uint8_t *)malloc(n);
+    unpadded = RCP_ACF_GBB_HEADER_LEN + payload_len;
+    pad      = rcp_acf_pad_len(unpadded);
+    total    = unpadded + pad;
+    quadlets = (uint16_t)(total / 4u);
+
+    b = (uint8_t *)malloc(total);
     if (!b) return frame;
 
-    b[0] = RCP_ACF_MSG_TYPE_GBB;
-    put_u16(&b[1], (uint16_t)payload_len);
-    b[3] = byte_bus_id;
-    /* pad=0, mtv=RCP_ACF_MTV_UNTIMED(0), hs=0, cs=this member's own
-     * abort/continue selection, rsp=err=0 -- see the file header for cs. */
-    b[4] = (uint8_t)((cs & 0x1u) << 2);
-    b[5] = 0x00u;
-    b[6] = transaction_num;
-    b[7] = 0x00u;
+    /* pad computed above, mtv=RCP_ACF_MTV_UNTIMED(0), hs=0, cs=this
+     * member's own abort/continue selection, rsp=err=0 -- see the file
+     * header for cs. mtv=0 repurposes message_timestamp, so this module
+     * builds the header directly (rcp_acf_pack_header()) rather than
+     * calling rcp_acf_encode_gbb(), which would zero it. */
+    info.byte_bus_id     = byte_bus_id;
+    info.cs               = (uint8_t)(cs & 0x1u);
+    info.transaction_num  = transaction_num;
+    info.pad               = pad;
+    rcp_acf_pack_header(b, RCP_ACF_MSG_TYPE_GBB, quadlets, &info);
 
     ts = (((uint64_t)RCP_REQUEST_TYPE_CHAINED) << 56) |
          (((uint64_t)chain_length) << 48) |
@@ -80,9 +82,10 @@ rcp_bytes_t rcp_chained_encode_member(rcp_byte_bus_id_t byte_bus_id, uint8_t cha
     put_u64(&b[RCP_ACF_ABB_HEADER_LEN], ts);
 
     if (payload_len > 0) memcpy(&b[RCP_ACF_GBB_HEADER_LEN], payload, payload_len);
+    if (pad > 0) memset(&b[RCP_ACF_GBB_HEADER_LEN + payload_len], 0, pad);
 
     frame.data = b;
-    frame.len  = n;
+    frame.len  = total;
     return frame;
 }
 

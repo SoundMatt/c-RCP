@@ -67,13 +67,20 @@ size_t rcp_sched_split_frame_members(const uint8_t *b, size_t len, size_t *out_o
     size_t found  = 0;
 
     while (offset < len) {
-        size_t header_len;
-        size_t msg_len;
-        uint16_t declared_payload;
+        size_t   header_len;
+        size_t   msg_len;
+        uint8_t  msg_type;
+        uint16_t quadlets;
 
-        if (b[offset] == RCP_ACF_MSG_TYPE_ABB) {
+        /* acf_msg_type occupies bits 7:1 of octet 0 (acf.h Table 4) --
+         * not the full octet -- so at least 2 octets (type+length) must
+         * be present before either can be read. */
+        if (len - offset < 2u) return 0; /* malformed: header truncated */
+
+        msg_type = (uint8_t)(b[offset] >> 1);
+        if (msg_type == RCP_ACF_MSG_TYPE_ABB) {
             header_len = RCP_ACF_ABB_HEADER_LEN;
-        } else if (b[offset] == RCP_ACF_MSG_TYPE_GBB) {
+        } else if (msg_type == RCP_ACF_MSG_TYPE_GBB) {
             header_len = RCP_ACF_GBB_HEADER_LEN;
         } else {
             return 0; /* malformed: not a recognized acf_msg_type */
@@ -81,9 +88,13 @@ size_t rcp_sched_split_frame_members(const uint8_t *b, size_t len, size_t *out_o
 
         if (len - offset < header_len) return 0; /* malformed: header truncated */
 
-        declared_payload = (uint16_t)(((uint16_t)b[offset + 1] << 8) | (uint16_t)b[offset + 2]);
-        msg_len          = header_len + (size_t)declared_payload;
+        /* acf_msg_length (bit 0 of octet 0 | octet 1) is a QUADLET count
+         * over this member's entire ACF message (header included), not a
+         * payload octet count -- see acf.h's file header. */
+        quadlets = (uint16_t)(((uint16_t)(b[offset] & 0x01u) << 8) | (uint16_t)b[offset + 1]);
+        msg_len  = (size_t)quadlets * 4u;
 
+        if (msg_len < header_len) return 0; /* malformed: declared length shorter than header */
         if (len - offset < msg_len) return 0; /* malformed: payload truncated */
 
         if (found < out_cap) out_offsets[found] = offset;

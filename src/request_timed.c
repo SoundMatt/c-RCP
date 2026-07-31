@@ -7,12 +7,6 @@
 /* ── Byte-order helpers (this TU's own copy -- see request_compound.c's identical
  * comment for the house convention this follows) ─────────────────────────── */
 
-static void put_u16(uint8_t *p, uint16_t v)
-{
-    p[0] = (uint8_t)(v >> 8);
-    p[1] = (uint8_t)(v & 0xFFu);
-}
-
 static void put_u64(uint8_t *p, uint64_t v)
 {
     p[0] = (uint8_t)((v >> 56) & 0xFFu);
@@ -56,33 +50,42 @@ rcp_bytes_t rcp_timed_encode_request(rcp_byte_bus_id_t byte_bus_id, uint32_t pre
                                       uint8_t transaction_num, const uint8_t *payload,
                                       size_t payload_len)
 {
-    rcp_bytes_t frame = {0};
-    size_t n;
-    uint8_t *b;
-    uint64_t ts;
+    rcp_bytes_t                  frame = {0};
+    rcp_acf_byte_message_info_t  info  = {0};
+    size_t                       unpadded, total;
+    uint16_t                     quadlets;
+    uint8_t                      pad;
+    uint8_t                     *b;
+    uint64_t                     ts;
 
-    if (payload_len > RCP_ACF_MAX_PAYLOAD) return frame;
+    if (payload_len > RCP_ACF_GBB_MAX_PAYLOAD) return frame;
 
-    n = RCP_ACF_GBB_HEADER_LEN + payload_len;
-    b = (uint8_t *)malloc(n);
+    unpadded = RCP_ACF_GBB_HEADER_LEN + payload_len;
+    pad      = rcp_acf_pad_len(unpadded);
+    total    = unpadded + pad;
+    quadlets = (uint16_t)(total / 4u);
+
+    b = (uint8_t *)malloc(total);
     if (!b) return frame;
 
-    b[0] = RCP_ACF_MSG_TYPE_GBB;
-    put_u16(&b[1], (uint16_t)payload_len);
-    b[3] = byte_bus_id;
-    b[4] = 0x00u; /* mtv=RCP_ACF_MTV_UNTIMED(0), see the file header */
-    b[5] = 0x00u;
-    b[6] = transaction_num;
-    b[7] = 0x00u;
+    /* mtv=RCP_ACF_MTV_UNTIMED(0), see the file header: this repurposes
+     * message_timestamp instead of it holding a real timestamp -- so this
+     * module builds the header directly (rcp_acf_pack_header()) rather
+     * than calling rcp_acf_encode_gbb(), which would zero it. */
+    info.byte_bus_id     = byte_bus_id;
+    info.transaction_num  = transaction_num;
+    info.pad               = pad;
+    rcp_acf_pack_header(b, RCP_ACF_MSG_TYPE_GBB, quadlets, &info);
 
     ts = (((uint64_t)RCP_REQUEST_TYPE_TIMED) << 56) |
          (((uint64_t)presentation_time) << 24);
     put_u64(&b[RCP_ACF_ABB_HEADER_LEN], ts);
 
     if (payload_len > 0) memcpy(&b[RCP_ACF_GBB_HEADER_LEN], payload, payload_len);
+    if (pad > 0) memset(&b[RCP_ACF_GBB_HEADER_LEN + payload_len], 0, pad);
 
     frame.data = b;
-    frame.len  = n;
+    frame.len  = total;
     return frame;
 }
 

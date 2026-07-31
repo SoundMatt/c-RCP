@@ -2008,6 +2008,15 @@
       "scope": "tc18"
     },
     {
+      "id": "REQ-ACF-016",
+      "title": "rcp_acf_pack_header()/rcp_acf_unpack_header() implement byte_message_info per TC18 Table 4 bit-for-bit",
+      "text": "rcp_acf_pack_header() and rcp_acf_unpack_header() shall pack/unpack the 8-octet byte_message_info header exactly per the governing specification Figure 7/Table 4 bit layout (acf_msg_type/acf_msg_length sharing octets 0-1, pad/mtv/byte_bus_id[10:8] in octet 2, byte_bus_id[7:0] in octet 3, evt/hs/cs in octet 4, transaction_num in octet 5, op/rsp/err/ms/read_size_or_segment_num[11:8] in octet 6, read_size_or_segment_num[7:0] in octet 7), and rcp_acf_pad_len() shall compute the zero-pad octet count needed to bring a given unpadded length up to a whole number of quadlets.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
       "id": "REQ-LIFECYCLE-001",
       "title": "Lifecycle states have their defined on-wire byte values",
       "text": "RCP_LIFECYCLE_HW_UNCONFIGURED, RCP_LIFECYCLE_HW_CONFIGURED, and RCP_LIFECYCLE_RCP_CONFIGURED shall have the numeric values 0x00, 0x55, and 0xAA respectively.",
@@ -6853,6 +6862,24 @@
       "id": "REQ-MOCK-018",
       "title": "rcp_mock_server_drain_endpoint() reports an unregistered byte_bus_id",
       "text": "rcp_mock_server_drain_endpoint() shall return false, with *out_response left zeroed, when byte_bus_id names no registered endpoint.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-MOCK-019",
+      "title": "rcp_mock_server_dispatch_frame() splits and dispatches every member of a multi-request frame",
+      "text": "rcp_mock_server_dispatch_frame() shall split frame into its constituent ACF messages (scheduler.h rcp_sched_split_frame_members()) and dispatch each one individually via rcp_mock_server_dispatch(), addressed to its own decoded byte_bus_id, writing each member's outcome into out_results in frame order and returning the count dispatched.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-MOCK-020",
+      "title": "rcp_mock_server_dispatch_frame() fails safe on an unparseable frame or an undecodable member",
+      "text": "rcp_mock_server_dispatch_frame() shall return 0 without dispatching anything when frame does not parse as a well-formed sequence of ACF messages, and shall report RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS for any individual member whose byte_message_info header fails to decode, without invoking any handler for that member.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
