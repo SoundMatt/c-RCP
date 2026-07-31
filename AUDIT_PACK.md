@@ -28,14 +28,25 @@ TC18 protocol and its own measured evidence.
 
 ---
 
-## 2. ASIL-D Gap Analysis (ISO 26262 §7)
+## 2. ASIL-C Gap Analysis (ISO 26262 §7)
 
-c-RCP targets **ASIL-B** as its baseline, with four hazards (H-001,
-H-003, H-005, H-008 — see `HARA.md`) computing to ASIL-C/D under ISO
-26262-3:2018 Table 4. The following table records this project's own
-current derogation posture, derived from the TC18 mechanisms Phases
-13–21 actually built, not ported from any sibling project (this
-project stopped mirroring cpp-RCP/go-RCP/rust-RCP at Phase 13):
+c-RCP targets **ASIL-B** as its baseline. Under ISO 26262-3:2018 Table
+4, only **one** hazard — H-001 (see `HARA.md`) — computes above that
+baseline, to ASIL-C; no hazard computes to ASIL-D. (Prior to the
+`cfusa` v0.5.50 CI pin bump, this section was titled "ASIL-D Gap
+Analysis" and listed four hazards — H-001, H-003, H-005, H-008 — as
+computing to ASIL-C/D; that was a direct consequence of a since-fixed
+bug in `c-FuSa`'s shared ASIL derivation table, see `HARA.md`'s ASIL
+Determination Note. H-003, H-005, and H-008 now land exactly at the
+ASIL-B baseline and no longer require any derogation argument.) The
+following table records this project's own current derogation posture
+for H-001, derived from the TC18 mechanisms Phases 13–21 actually
+built, not ported from any sibling project (this project stopped
+mirroring cpp-RCP/go-RCP/rust-RCP at Phase 13); the higher-rigor
+requirement rows below (redundancy, formal deadlock-absence proofs,
+100% MC/DC) are ASIL-D-specific items retained here as this project's
+stated stretch posture, not requirements H-001's actual ASIL-C rating
+obligates:
 
 | ASIL-D Requirement | Derogation Rationale | Current Coverage |
 |--------------------|----------------------|-------------------|

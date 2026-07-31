@@ -48,7 +48,7 @@ Satellite Package Disposition table).
 
 | Threat | Safety Impact | Financial Impact | Operational Impact | Privacy Impact |
 |---|---|---|---|---|
-| TS-001 | high — unauthorized actuation via a forged request (ASIL-B/C scoped per HARA.md H-002/H-006) | not quantified (library-level SEOOC; deployment-specific) | endpoint-dependent, potentially immediate | none (no PII in the RCP data path) |
+| TS-001 | high — unauthorized actuation via a forged request (ASIL-A scoped per HARA.md H-002/H-006) | not quantified (library-level SEOOC; deployment-specific) | endpoint-dependent, potentially immediate | none (no PII in the RCP data path) |
 | TS-002 | high — repeated unintended actuation from a replayed request, with no library-level mitigation (HARA.md H-004) | not quantified | endpoint-dependent | none |
 | TS-003 | severe — full configuration hijack for the affected server during bootstrap (HARA.md H-011) | not quantified | sustained until the next full reset | none |
 | TS-004 | severe — undermines confidentiality and integrity of every request on the affected link (HARA.md H-007) | not quantified | sustained until MACsec is deployed | none |

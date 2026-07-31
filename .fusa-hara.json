@@ -17,7 +17,7 @@
         "severity": "S3",
         "exposure": "E4",
         "controllability": "C2",
-        "asil": "ASIL-D"
+        "asil": "ASIL-C"
       },
       "safe_state": "rcp_e2e_wd_evaluate() reports overflow once elapsed time reaches rx_wd_timeout_ms and, when rx_wd_safestate_enable is set, drives the stream toward its configured safe state; rcp_watchdog_keeper_t re-evaluates this periodically and fires a callback on every verdict change.",
       "safetyGoals": [
@@ -33,7 +33,7 @@
         "severity": "S2",
         "exposure": "E3",
         "controllability": "C2",
-        "asil": "ASIL-B"
+        "asil": "ASIL-A"
       },
       "safe_state": "Requests are addressed by the (stream_id, byte_bus_id) pair; a request naming an unregistered byte_bus_id is rejected once lifecycle admission succeeds, never silently routed to a different endpoint.",
       "safetyGoals": [
@@ -49,7 +49,7 @@
         "severity": "S2",
         "exposure": "E4",
         "controllability": "C2",
-        "asil": "ASIL-C"
+        "asil": "ASIL-B"
       },
       "safe_state": "rx_wd_safestate_enable independently gates whether an overflow drives enter_safe_state; rcp_e2e_watchdog_purge_should_keep()/_classify() ensure a safety-tagged request pending at overflow time is never discarded by the resulting purge (formally verified: tla/E2ESafePoint.tla SafetyRequestsSurvivePurge).",
       "safetyGoals": [
@@ -65,7 +65,7 @@
         "severity": "S2",
         "exposure": "E3",
         "controllability": "C2",
-        "asil": "ASIL-B"
+        "asil": "ASIL-A"
       },
       "safe_state": "No mitigation is currently implemented in this library -- the TC18 CRC32 safe-point mechanism that replaced the retired CRC-16/sequence-counter/replay-window guard does not reimplement replay detection (see include/rcp/e2e.h's own file header and tara.md TS-002). Tracked as an open residual risk, not a closed hazard.",
       "safetyGoals": [
@@ -81,7 +81,7 @@
         "severity": "S3",
         "exposure": "E3",
         "controllability": "C2",
-        "asil": "ASIL-D"
+        "asil": "ASIL-B"
       },
       "safe_state": "rcp_e2e_endpoint_in_safe_state() fails closed (returns false) for an unrecognized rx_safety_measure or an invalid safestate_sequencer index, and rcp_e2e_request_may_execute() denies execution of a safety-tagged request whenever it returns false (formally verified: tla/E2ESafePoint.tla NoUnsafeSafetyExecution).",
       "safetyGoals": [
@@ -97,7 +97,7 @@
         "severity": "S2",
         "exposure": "E3",
         "controllability": "C2",
-        "asil": "ASIL-B"
+        "asil": "ASIL-A"
       },
       "safe_state": "rcp_regmap_writer_ctx() grants via_root_client_ep0/via_owning_stream only to the authorized writer context; HW_GENERIC fields become read-only once HW_CONFIGURED and FUNCTIONAL_W_STAR fields are permanently locked for the remainder of the configured session once RCP_CONFIGURED (formally verified: tla/LifecycleStateMachine.tla FieldLockMonotonicWhileConfigured).",
       "safetyGoals": [
@@ -113,7 +113,7 @@
         "severity": "S3",
         "exposure": "E2",
         "controllability": "C2",
-        "asil": "ASIL-C"
+        "asil": "ASIL-A"
       },
       "safe_state": "Not mitigated within this library. MACsec (802.1AE) is a link-layer, product-specific/opaque control the spec delegates outside RCP itself; this library's own default posture (mock/sim/udp/shmem transports) has no cryptographic identity source, matching the tls.c-deprecation rationale (see CYBERSECURITY.md Layer 1 and tara.md TS-001/TS-003).",
       "safetyGoals": [
@@ -129,7 +129,7 @@
         "severity": "S3",
         "exposure": "E3",
         "controllability": "C2",
-        "asil": "ASIL-D"
+        "asil": "ASIL-B"
       },
       "safe_state": "rcp_pwrmode_handshake_is_complete() must report true before normal operation resumes; a failed handshake is reported via rcp_pwrmode_handshake_has_failed() rather than silently assumed complete, and rcp_pwrmode_wake_from_sleep() correctly classifies hot vs. cold wake starts so a cold start re-runs full re-initialization.",
       "safetyGoals": [
@@ -145,7 +145,7 @@
         "severity": "S2",
         "exposure": "E3",
         "controllability": "C2",
-        "asil": "ASIL-B"
+        "asil": "ASIL-A"
       },
       "safe_state": "rcp_e2e_unwrap() reports CRC_ERROR on a mismatched trailer; rcp_e2e_crc_error_action() maps the endpoint's rx_enforce_e2e configuration to either drop-this-request or latch-the-whole-stream-faulted, and rcp_e2e_stream_fault_t implements the latter statefully until explicitly reset.",
       "safetyGoals": [
@@ -161,7 +161,7 @@
         "severity": "S2",
         "exposure": "E2",
         "controllability": "C3",
-        "asil": "ASIL-B"
+        "asil": "ASIL-A"
       },
       "safe_state": "Fault-injection rules live only in caller-owned, in-process state with no persistence mechanism of its own.",
       "safetyGoals": [
@@ -177,7 +177,7 @@
         "severity": "S2",
         "exposure": "E2",
         "controllability": "C2",
-        "asil": "ASIL-A"
+        "asil": "QM"
       },
       "safe_state": "rcp_lifecycle_transition() rejects any transition outside its modeled table; RCP_CONFIGURED is reachable only from HW_CONFIGURED, itself gated by the HW_CFG_INCONSISTENT check (formally verified: tla/LifecycleStateMachine.tla NoSkipConfiguration).",
       "safetyGoals": [
@@ -193,7 +193,7 @@
       "hazards": [
         "H-001"
       ],
-      "asil": "ASIL-D",
+      "asil": "ASIL-C",
       "safeState": "rcp_e2e_wd_evaluate() reports overflow once elapsed time reaches rx_wd_timeout_ms and, when rx_wd_safestate_enable is set, drives the stream toward its configured safe state; rcp_watchdog_keeper_t re-evaluates this periodically and fires a callback on every verdict change."
     },
     {
@@ -202,7 +202,7 @@
       "hazards": [
         "H-002"
       ],
-      "asil": "ASIL-B",
+      "asil": "ASIL-A",
       "safeState": "Requests are addressed by the (stream_id, byte_bus_id) pair; a request naming an unregistered byte_bus_id is rejected once lifecycle admission succeeds, never silently routed to a different endpoint."
     },
     {
@@ -211,7 +211,7 @@
       "hazards": [
         "H-003"
       ],
-      "asil": "ASIL-C",
+      "asil": "ASIL-B",
       "safeState": "rx_wd_safestate_enable independently gates whether an overflow drives enter_safe_state; rcp_e2e_watchdog_purge_should_keep()/_classify() ensure a safety-tagged request pending at overflow time is never discarded by the resulting purge (formally verified: tla/E2ESafePoint.tla SafetyRequestsSurvivePurge)."
     },
     {
@@ -220,7 +220,7 @@
       "hazards": [
         "H-004"
       ],
-      "asil": "ASIL-B",
+      "asil": "ASIL-A",
       "safeState": "No mitigation is currently implemented in this library -- the TC18 CRC32 safe-point mechanism that replaced the retired CRC-16/sequence-counter/replay-window guard does not reimplement replay detection (see include/rcp/e2e.h's own file header and tara.md TS-002). Tracked as an open residual risk, not a closed hazard."
     },
     {
@@ -229,7 +229,7 @@
       "hazards": [
         "H-005"
       ],
-      "asil": "ASIL-D",
+      "asil": "ASIL-B",
       "safeState": "rcp_e2e_endpoint_in_safe_state() fails closed (returns false) for an unrecognized rx_safety_measure or an invalid safestate_sequencer index, and rcp_e2e_request_may_execute() denies execution of a safety-tagged request whenever it returns false (formally verified: tla/E2ESafePoint.tla NoUnsafeSafetyExecution)."
     },
     {
@@ -238,7 +238,7 @@
       "hazards": [
         "H-006"
       ],
-      "asil": "ASIL-B",
+      "asil": "ASIL-A",
       "safeState": "rcp_regmap_writer_ctx() grants via_root_client_ep0/via_owning_stream only to the authorized writer context; HW_GENERIC fields become read-only once HW_CONFIGURED and FUNCTIONAL_W_STAR fields are permanently locked for the remainder of the configured session once RCP_CONFIGURED (formally verified: tla/LifecycleStateMachine.tla FieldLockMonotonicWhileConfigured)."
     },
     {
@@ -247,7 +247,7 @@
       "hazards": [
         "H-007"
       ],
-      "asil": "ASIL-C",
+      "asil": "ASIL-A",
       "safeState": "Not mitigated within this library. MACsec (802.1AE) is a link-layer, product-specific/opaque control the spec delegates outside RCP itself; this library's own default posture (mock/sim/udp/shmem transports) has no cryptographic identity source, matching the tls.c-deprecation rationale (see CYBERSECURITY.md Layer 1 and tara.md TS-001/TS-003)."
     },
     {
@@ -256,7 +256,7 @@
       "hazards": [
         "H-008"
       ],
-      "asil": "ASIL-D",
+      "asil": "ASIL-B",
       "safeState": "rcp_pwrmode_handshake_is_complete() must report true before normal operation resumes; a failed handshake is reported via rcp_pwrmode_handshake_has_failed() rather than silently assumed complete, and rcp_pwrmode_wake_from_sleep() correctly classifies hot vs. cold wake starts so a cold start re-runs full re-initialization."
     },
     {
@@ -265,7 +265,7 @@
       "hazards": [
         "H-009"
       ],
-      "asil": "ASIL-B",
+      "asil": "ASIL-A",
       "safeState": "rcp_e2e_unwrap() reports CRC_ERROR on a mismatched trailer; rcp_e2e_crc_error_action() maps the endpoint's rx_enforce_e2e configuration to either drop-this-request or latch-the-whole-stream-faulted, and rcp_e2e_stream_fault_t implements the latter statefully until explicitly reset."
     },
     {
@@ -274,7 +274,7 @@
       "hazards": [
         "H-010"
       ],
-      "asil": "ASIL-B",
+      "asil": "ASIL-A",
       "safeState": "Fault-injection rules live only in caller-owned, in-process state with no persistence mechanism of its own."
     },
     {
@@ -283,7 +283,7 @@
       "hazards": [
         "H-011"
       ],
-      "asil": "ASIL-A",
+      "asil": "QM",
       "safeState": "rcp_lifecycle_transition() rejects any transition outside its modeled table; RCP_CONFIGURED is reachable only from HW_CONFIGURED, itself gated by the HW_CFG_INCONSISTENT check (formally verified: tla/LifecycleStateMachine.tla NoSkipConfiguration)."
     }
   ],

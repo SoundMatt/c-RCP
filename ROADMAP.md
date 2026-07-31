@@ -5162,3 +5162,84 @@ unaffected (57/57, this milestone touches only `HARA.md`), `cfusa`
 `check`/`lint`/`analyze`/`cyber` all exit 0 (this milestone touches no
 tagged/tested code, so `trace --req-coverage 100`/`--sec-tested 100`
 are unaffected).
+
+### 99. Bump c-FuSa pin to v0.5.50; fix real HARA ASIL over-classification (v0.99.0) ✅
+
+Routine upstream check: `ci.yml`/`release.yml`'s c-FuSa clone step was
+pinned to `v0.5.49`, one patch release behind upstream's actual latest
+(`v0.5.50`). Bumped both pins.
+
+`v0.5.50`'s own release notes disclosed a real, previously-unknown bug:
+`c-FuSa`'s shared `cfusa_compute_asil()` table (`src/asil.c`) had
+over-assigned ASIL in 19 of its 36 S×E×C cells (every S2 row except E1,
+and every S3 row) for its entire history up to and including `v0.5.49`
+— see <https://github.com/SoundMatt/c-FuSa/releases/tag/v0.5.50>. A
+local build of the new `cfusa` (not assumed compatible) surfaced a real
+new `HARA006` **ERROR** running `cfusa check` against this repo's own
+`.fusa-hara.json`: all 11 recorded hazard ASIL letters disagreed with
+what the corrected table now computes from their recorded
+severity/exposure/controllability, because all 11 had been computed
+against the buggy pre-`v0.5.50` table.
+
+This directly supersedes milestone 97's (v0.97.0) "Re-verify HARA ASIL
+audit finding" conclusion. That milestone re-ran the same 11 recorded
+S/E/C triples through `cfusa hara asil` (then `v0.5.49`) and found them
+self-consistent, correctly rejecting a contemporaneous external audit's
+simplified "S+E+C sum" heuristic as not matching ISO 26262-3:2018 Table
+4's real, non-linear shape — but the *tool* computing that "real" table
+was itself wrong at the time, so self-consistency with a buggy tool
+was never the same thing as correctness. Independently re-derived all
+11 hazards by hand against the actual ISO 26262-3:2018 Table 4 (a
+genuine 3×4×4 lookup, not trusting either `cfusa`'s old or new output
+blindly, per this fix-pass's standing rule to verify tooling against
+the primary standard) before accepting the corrected values: every one
+of the 11 hand-derived results matches `cfusa hara asil` v0.5.50's
+output exactly. (The external audit's own linear-sum arithmetic, as it
+turns out, *is* an exact reproduction of Table 4's real S×E×C shape for
+all 36 cells — `sum <= 6` → QM, `7` → A, `8` → B, `9` → C, `10` → D —
+so its numeric conclusions were right all along; milestone 97 was
+correct only that "heuristic" was the wrong word for it.)
+
+Corrected `.fusa-hara.json`'s `risk.asil` and `safetyGoals[].asil`
+fields for all 11 hazards/safety-goals against `cfusa hara asil`
+v0.5.50 output: H-001 ASIL-D → ASIL-C, H-002 ASIL-B → ASIL-A, H-003
+ASIL-C → ASIL-B, H-004 ASIL-B → ASIL-A, H-005 ASIL-D → ASIL-B, H-006
+ASIL-B → ASIL-A, H-007 ASIL-C → ASIL-A, H-008 ASIL-D → ASIL-B, H-009
+ASIL-B → ASIL-A, H-010 ASIL-B → ASIL-A, H-011 ASIL-A → QM. Updated
+`HARA.md` (hazard table, ASIL Determination Note, Safety Goals table,
+Residual Risks table) to match, rewrote the ASIL Determination Note to
+explain the correction and supersede milestone 97's conclusion rather
+than silently overwrite it, and updated `SAFETY_PLAN.md` and
+`AUDIT_PACK.md` (retitled its §2 from "ASIL-D Gap Analysis" to
+"ASIL-C Gap Analysis" — no hazard reaches ASIL-D any more) and
+`tara.md`'s TS-001 row, all of which cited the old four/five-hazard
+ASIL-C/D count. `.fusa-reqs.json`'s 774 per-requirement ASIL levels
+were deliberately left untouched — they are independently assigned per
+requirement scope, not derived from hazard S/E/C, and are outside
+`HARA006`'s check.
+
+H-001 remains the sole hazard exceeding the ASIL-B baseline (now at
+ASIL-C, not ASIL-D); H-003/H-005/H-008 now land exactly at the ASIL-B
+baseline and no longer need a decomposition argument; H-007 drops to
+ASIL-A but remains a genuinely open, unmitigated item regardless of
+its ASIL letter (MACsec is still out of this library's scope); H-011
+drops out of ASIL scope entirely (QM).
+
+Verified locally: fresh `cfusa` v0.5.50 built from source
+(`cmake -B build -S . -DCMAKE_BUILD_TYPE=Release -G Ninja && cmake
+--build build --parallel`), `cfusa check` on this repo's own tree
+0 errors/exit 0 (previously 11 `HARA006` errors against the
+uncorrected data, confirmed reproduced before fixing).
+`lint`/`analyze`/`cyber`/`qualify`/`vuln` all still exit 0. Every
+command `release.yml` runs (`fmea --cyber`, `safety-case --gsn`,
+`release`, `iso26262`/`iec61508`/`do178`/`iec62443` gap reports,
+`coverage`, `sas`, `sci`, `audit-pack`, `badge`, `report`,
+`qualify --format json`) also exits 0. `trace --req-coverage 100` and
+`trace --sec-tested 100` both still 100% (774/774), unchanged. Full
+`ctest` suite 57/57 passed (this milestone touches no executable
+source, only CI config and safety documentation/data). c-FuSa's own
+known `qualify` tool bug — `qualificationBadge` in
+`qualify-report.json` always reports `"unqualified"` regardless of
+actual pass count — is still present in v0.5.50 (not fixed upstream);
+not hand-edited, since it's a generated artifact CI regenerates every
+release.
