@@ -266,6 +266,7 @@ rcp_bytes_t rcp_ep_adc_encode_response(rcp_byte_bus_id_t byte_bus_id, const uint
 
         hdr.info.byte_bus_id              = byte_bus_id;
         hdr.info.op                       = RCP_ACF_OP_READ;
+        hdr.info.rsp                      = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
         hdr.info.mtv                      = RCP_ACF_MTV_VALID;
         hdr.info.read_size_or_segment_num = (uint16_t)payload_len;
         hdr.info.transaction_num          = transaction_num;
@@ -277,6 +278,7 @@ rcp_bytes_t rcp_ep_adc_encode_response(rcp_byte_bus_id_t byte_bus_id, const uint
 
         hdr.byte_bus_id              = byte_bus_id;
         hdr.op                       = RCP_ACF_OP_READ;
+        hdr.rsp                      = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
         hdr.read_size_or_segment_num = (uint16_t)payload_len;
         hdr.transaction_num          = transaction_num;
 

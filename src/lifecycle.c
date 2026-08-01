@@ -167,9 +167,13 @@ bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
         return true; /* HW_CONFIGURED */
 
     case RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR:
-        if (state == RCP_LIFECYCLE_HW_UNCONFIGURED)  return false;
-        if (state == RCP_LIFECYCLE_RCP_CONFIGURED)   return false; /* permanently locked */
-        return true; /* HW_CONFIGURED */
+        /* TC18 Table 22's own legend: "This configuration table can only be
+         * changed in the life-cycle states HW_UNCONFIGURED and HW_CONFIGURED.
+         * In RCP_CONFIGURED ... this is read-only. (As indicated by W*)" --
+         * writable in both HW_UNCONFIGURED and HW_CONFIGURED, locked only
+         * once RCP_CONFIGURED is reached. */
+        if (state == RCP_LIFECYCLE_RCP_CONFIGURED) return false; /* permanently locked */
+        return true; /* HW_UNCONFIGURED or HW_CONFIGURED */
 
     default:
         return false;

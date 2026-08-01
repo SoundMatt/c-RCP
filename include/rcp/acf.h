@@ -26,6 +26,7 @@
 //cfusa:req REQ-ACF-019
 //cfusa:req REQ-ACF-020
 //cfusa:req REQ-ACF-021
+//cfusa:req REQ-ACF-022
 /*
  * acf.h -- ACF message format + byte_message_info header for the TC18
  * Remote Control Protocol wire layer (ROADMAP.md Phase 13, "Wire Format

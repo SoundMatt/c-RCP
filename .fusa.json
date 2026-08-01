@@ -1,9 +1,20 @@
 {
   "configVersion": "1.0",
-  "project": {"name": "c-RCP", "version": "0.105.0"},
+  "project": {
+    "name": "c-RCP",
+    "version": "0.106.0"
+  },
   "standard": "iso26262",
   "strict": false,
   "max_function_lines": 50,
-  "sourceDirs": ["."],
-  "excludePatterns": ["build/**", "build-*/**", "vendor/**", ".cache/**", ".git/**"]
+  "sourceDirs": [
+    "."
+  ],
+  "excludePatterns": [
+    "build/**",
+    "build-*/**",
+    "vendor/**",
+    ".cache/**",
+    ".git/**"
+  ]
 }
