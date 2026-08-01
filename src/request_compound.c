@@ -82,23 +82,27 @@ rcp_compound_errc_t rcp_compound_peek_request_type(const uint8_t *b, size_t len,
 
 /* ── rcp_compound_step_t <-> the repurposed 8-byte message_timestamp region ─── */
 
+/* Octet offsets within the repurposed 8-byte message_timestamp region --
+ * see request_compound.h's "wire sub-field layout" section:
+ *   0 request_type | 1 start_state | 2 next_state | 3 sequencer_index |
+ *   4..5 exec_delay (BE) | 6..7 repeat_count (BE) */
 static uint64_t pack_ts(uint8_t request_type, const rcp_compound_step_t *step)
 {
     return (((uint64_t)request_type) << 56) |
-           ((((uint64_t)step->sequencer_index) & 0xFFFFu) << 40) |
-           (((uint64_t)step->start_state) << 32) |
-           (((uint64_t)step->next_state) << 24) |
-           ((((uint64_t)step->exec_delay_ms) & 0xFFFFu) << 8) |
+           (((uint64_t)step->start_state) << 48) |
+           (((uint64_t)step->next_state) << 40) |
+           (((uint64_t)step->sequencer_index) << 32) |
+           (((uint64_t)step->exec_delay) << 16) |
            ((uint64_t)step->repeat_count);
 }
 
 static void unpack_ts(uint64_t ts, rcp_compound_step_t *out_step)
 {
-    out_step->sequencer_index = (uint16_t)((ts >> 40) & 0xFFFFu);
-    out_step->start_state     = (uint8_t)((ts >> 32) & 0xFFu);
-    out_step->next_state      = (uint8_t)((ts >> 24) & 0xFFu);
-    out_step->exec_delay_ms   = (uint16_t)((ts >> 8) & 0xFFFFu);
-    out_step->repeat_count    = (uint8_t)(ts & 0xFFu);
+    out_step->start_state     = (uint8_t)((ts >> 48) & 0xFFu);
+    out_step->next_state      = (uint8_t)((ts >> 40) & 0xFFu);
+    out_step->sequencer_index = (uint8_t)((ts >> 32) & 0xFFu);
+    out_step->exec_delay      = (uint16_t)((ts >> 16) & 0xFFFFu);
+    out_step->repeat_count    = (uint16_t)(ts & 0xFFFFu);
 }
 
 /* ── Shared raw-header ACF_GBB builder (mtv=0, repurposed timestamp) ─────── */
@@ -253,20 +257,42 @@ bool rcp_compound_advance_guard(const rcp_sequencer_table_t *table,
     return current == step->start_state;
 }
 
-//cfusa:req REQ-CMP-020
-bool rcp_compound_exec_delay_elapsed(const rcp_compound_step_t *step, uint32_t elapsed_ms)
+//cfusa:req REQ-CMP-025
+bool rcp_compound_start_condition_met(const rcp_sequencer_table_t *table,
+                                       const rcp_compound_step_t *step)
 {
-    return elapsed_ms >= (uint32_t)step->exec_delay_ms;
+    uint8_t current;
+
+    if (!rcp_sequencer_get_state(table, step->sequencer_index, &current)) return false;
+    if (step->start_state == 0u) return true; /* start in any state */
+    return current == step->start_state;
+}
+
+//cfusa:req REQ-CMP-020
+bool rcp_compound_exec_delay_elapsed(const rcp_compound_step_t *step, uint32_t elapsed)
+{
+    return elapsed >= (uint32_t)step->exec_delay;
+}
+
+/* Applies step->next_state to its sequencer, honouring the "remain in the
+ * current state" sentinel: a next_state of zero leaves the sequencer
+ * exactly where it is rather than driving it to state zero. The execution
+ * itself still succeeded, so this reports true either way (provided the
+ * sequencer exists at all). */
+static bool apply_next_state(rcp_sequencer_table_t *table, const rcp_compound_step_t *step)
+{
+    if (step->next_state == 0u) return rcp_sequencer_index_valid(table, step->sequencer_index);
+    return rcp_sequencer_set_state(table, step->sequencer_index, step->next_state);
 }
 
 //cfusa:req REQ-CMP-021
 //cfusa:req REQ-CMP-022
 bool rcp_compound_tick(rcp_sequencer_table_t *table, const rcp_compound_step_t *step,
-                        uint32_t elapsed_ms)
+                        uint32_t elapsed)
 {
-    if (!rcp_compound_exec_delay_elapsed(step, elapsed_ms)) return false;
+    if (!rcp_compound_exec_delay_elapsed(step, elapsed)) return false;
     if (!rcp_compound_advance_guard(table, step)) return false;
-    return rcp_sequencer_set_state(table, step->sequencer_index, step->next_state);
+    return apply_next_state(table, step);
 }
 
 //cfusa:req REQ-CMP-023
@@ -276,5 +302,5 @@ bool rcp_compound_wait_tick(rcp_sequencer_table_t *table, const rcp_compound_ste
 {
     if (!condition_met) return false;
     if (!rcp_compound_advance_guard(table, step)) return false;
-    return rcp_sequencer_set_state(table, step->sequencer_index, step->next_state);
+    return apply_next_state(table, step);
 }

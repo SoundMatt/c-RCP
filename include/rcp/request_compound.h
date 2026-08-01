@@ -23,6 +23,7 @@
 //cfusa:req REQ-CMP-022
 //cfusa:req REQ-CMP-023
 //cfusa:req REQ-CMP-024
+//cfusa:req REQ-CMP-025
 /*
  * request_compound.h -- Compound / compound-wait conditional requests and the
  * clear-non-safestate cancellation request type for the TC18 Remote
@@ -89,20 +90,32 @@
  * ── rcp_compound_step_t: one shared sub-field shape ─────────────────────────
  *
  * Compound and compound-wait requests share one on-wire sub-field shape,
- * rcp_compound_step_t -- this module's own design choice, following
- * ep_pwm.h's exact precedent of PWM_OUT/PWM_IN sharing one payload shape
- * (rcp_ep_pwm_value_t) for two closely related request kinds.
- * sequencer_index selects which of a table's sequencers (request_sequencer.h) this
- * step targets; start_state/next_state are the state-number sub-fields the
- * roadmap's scope calls for; exec_delay_ms is this step's cmp_exec_delay
- * (compound) or cmpw_exec_delay (compound-wait) timer, in milliseconds
- * (this module's own unit choice, the same kind of explicit-unit decision
- * ep_spi.h's inter_byte_delay_ns already sets a precedent for);
- * repeat_count is the repetition-count sub-field, round-tripped by the
- * encode/decode functions below but not itself consumed by any scheduling
- * behavior in this milestone's scope, which extends only to the
- * exec_delay timer and the advance guard -- see
- * rcp_compound_tick()/rcp_compound_wait_tick() below.
+ * rcp_compound_step_t -- the specification defines the two request kinds
+ * with identical sub-field widths and offsets (only the field-name prefix
+ * differs, cmp_ vs cmpw_), so one struct models both.
+ *
+ * ── wire sub-field layout ───────────────────────────────────────────────────
+ *
+ * The eight octets of the repurposed message_timestamp region carry, in
+ * order (offsets relative to the start of that region):
+ *
+ *   offset 0  request_type   (the opcode octet, 0x0F/0x8F or 0x0B/0x8B)
+ *   offset 1  start_state    (cmp_start_state  / cmpw_start_state)
+ *   offset 2  next_state     (cmp_next_state   / cmpw_next_state)
+ *   offset 3  sequencer_index(cmp_sequencer    / cmpw_sequencer)
+ *   offset 4  exec_delay     (cmp_exec_delay   / cmpw_exec_delay), two
+ *             offset 5       octets, big-endian
+ *   offset 6  repeat_count   (cmp_repetitions  / cmpw_repetitions), two
+ *             offset 7       octets, big-endian
+ *
+ * All three single-octet sub-fields are exactly one octet wide -- notably
+ * sequencer_index, which addresses at most 256 sequencers, and which this
+ * module carried as a 16-bit field at the wrong offset before v0.102.0.
+ * exec_delay is counted in multiples of the addressed endpoint's own
+ * configured ep_delay_time, not in milliseconds; repeat_count's
+ * all-ones value (RCP_COMPOUND_REPEAT_INFINITE) is the infinite-repetition
+ * sentinel, and a repeat_count of zero at the end of an execution means the
+ * request is removed from the endpoint's request store.
  *
  * ── The advance-only-if-still-in-start_state guard ──────────────────────────
  *
@@ -199,20 +212,30 @@ rcp_compound_errc_t rcp_compound_peek_request_type(const uint8_t *b, size_t len,
 
 /* ── rcp_compound_step_t: shared compound/compound-wait sub-fields ──────────── */
 
-/* Sentinel repeat_count value meaning "repeat indefinitely" -- this
- * module's own 1-byte-field analogue of Triggered's (milestone 69)
- * 0xFFFF infinite-repeat sentinel, scaled to this module's own 1-byte
- * repeat_count sub-field. Round-tripped only; see the file header. */
-#define RCP_COMPOUND_REPEAT_INFINITE ((uint8_t)0xFFu)
+/* Sentinel repeat_count value meaning "repeat indefinitely": the
+ * all-ones value of the 2-octet repetition sub-field, per the
+ * specification's own definition of that field. A request carrying it is
+ * never decremented at the end of an execution and is never removed from
+ * the endpoint's request store on repetition-exhaustion grounds. */
+#define RCP_COMPOUND_REPEAT_INFINITE ((uint16_t)0xFFFFu)
 
+/* The five sub-field octets of a compound/compound-wait request, in wire
+ * order after the leading opcode octet: start_state, next_state,
+ * sequencer_index (one octet each), then exec_delay and repeat_count (two
+ * big-endian octets each). See the "wire sub-field layout" section of the
+ * file header for the octet offsets these map to. */
 typedef struct {
-    uint16_t sequencer_index; /* which of a table's sequencers this step targets */
     uint8_t  start_state;     /* the sequencer state this step requires (see
                                   rcp_compound_advance_guard()) */
     uint8_t  next_state;      /* the state this step advances the sequencer to */
-    uint16_t exec_delay_ms;   /* cmp_exec_delay / cmpw_exec_delay, in
-                                  milliseconds -- see the file header */
-    uint8_t  repeat_count;    /* round-tripped only; see the file header */
+    uint8_t  sequencer_index; /* which of a table's sequencers this step targets */
+    uint16_t exec_delay;      /* cmp_exec_delay / cmpw_exec_delay, counted in
+                                  multiples of the addressed endpoint's own
+                                  configured ep_delay_time -- NOT milliseconds;
+                                  see the file header */
+    uint16_t repeat_count;    /* remaining repetitions; RCP_COMPOUND_REPEAT_INFINITE
+                                  means never decrement, 0 means "this execution
+                                  is the last" */
 } rcp_compound_step_t;
 
 /* ── Compound / compound-wait request encode/decode ──────────────────────────── */
@@ -287,20 +310,42 @@ rcp_compound_errc_t rcp_compound_decode_clear_non_safestate(const uint8_t *b, si
 bool rcp_compound_advance_guard(const rcp_sequencer_table_t *table,
                                  const rcp_compound_step_t *step);
 
-/* True iff elapsed_ms >= step->exec_delay_ms, i.e. this step's
- * cmp_exec_delay/cmpw_exec_delay timer has elapsed. Pure; owns no timer or
- * clock of its own -- callers track elapsed_ms themselves (e.g. via
- * clock.h's rcp_monotonic_ms()), matching this project's established
- * convention -- see the file header. */
-bool rcp_compound_exec_delay_elapsed(const rcp_compound_step_t *step, uint32_t elapsed_ms);
+/* True iff this step's *start* condition is satisfied, i.e. the request
+ * may begin: a start_state of zero starts the request in whatever state
+ * the sequencer currently holds, and any other start_state requires the
+ * sequencer to actually be sitting in it. Either way the addressed
+ * sequencer must exist (rcp_sequencer_index_valid()) -- a request naming
+ * a sequencer this server does not have is never started, which is this
+ * module's own modelling of a disabled sequencer prohibiting execution.
+ *
+ * This is deliberately *not* the same predicate as
+ * rcp_compound_advance_guard(): the start condition decides whether the
+ * request runs at all, while the advance guard decides whether the
+ * sequencer is moved to next_state afterwards. For a start_state of zero
+ * the two differ -- the request starts in any state, but only advances
+ * the sequencer if it happens to still be in state zero. */
+bool rcp_compound_start_condition_met(const rcp_sequencer_table_t *table,
+                                       const rcp_compound_step_t *step);
+
+/* True iff elapsed >= step->exec_delay, i.e. this step's
+ * cmp_exec_delay/cmpw_exec_delay timer has elapsed. elapsed is counted in
+ * the same unit as step->exec_delay itself -- multiples of the addressed
+ * endpoint's configured ep_delay_time, see the file header. Pure; owns no
+ * timer or clock of its own -- callers track elapsed themselves, matching
+ * this project's established convention. */
+bool rcp_compound_exec_delay_elapsed(const rcp_compound_step_t *step, uint32_t elapsed);
 
 /* Compound's own tick: advances table's sequencer step->sequencer_index to
  * step->next_state, and returns true, iff both
- * rcp_compound_exec_delay_elapsed(step, elapsed_ms) and
+ * rcp_compound_exec_delay_elapsed(step, elapsed) and
  * rcp_compound_advance_guard(table, step) hold; otherwise table is left
- * entirely unchanged and this returns false. */
+ * entirely unchanged and this returns false.
+ *
+ * A next_state of zero is the "remain in the current state" sentinel: the
+ * sequencer is left exactly where it is, and this still returns true --
+ * the request executed, it simply advanced nothing. */
 bool rcp_compound_tick(rcp_sequencer_table_t *table, const rcp_compound_step_t *step,
-                        uint32_t elapsed_ms);
+                        uint32_t elapsed);
 
 /* Compound-wait's own tick: advances table's sequencer
  * step->sequencer_index to step->next_state, and returns true, iff both
@@ -311,7 +356,8 @@ bool rcp_compound_tick(rcp_sequencer_table_t *table, const rcp_compound_step_t *
  * sufficient here -- callers that want to give up on an unmatched wait
  * once its timer elapses do so themselves, using
  * rcp_compound_exec_delay_elapsed() directly; this function only ever
- * advances on a genuine condition match. */
+ * advances on a genuine condition match. A next_state of zero is the same
+ * "remain in the current state" sentinel rcp_compound_tick() honours. */
 bool rcp_compound_wait_tick(rcp_sequencer_table_t *table, const rcp_compound_step_t *step,
                              bool condition_met);
 

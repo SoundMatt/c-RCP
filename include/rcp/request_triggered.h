@@ -53,33 +53,58 @@
  * (e2e.h, milestone 70), not this one's, mirroring request_compound.h's own
  * precedent for its own safety-tagged variants.
  *
- * ── rcp_triggered_step_t: this module's own 7-byte sub-field layout ────────
+ * ── rcp_triggered_step_t: the trigger-selection sub-fields ─────────────────
  *
- * Unlike request_compound.h's rcp_compound_step_t (16-bit sequencer_index, 8-bit
- * repeat_count -- exactly 7 bytes with those widths), this module's own
- * repeat_count is 16 bits wide per this milestone's roadmap scope, which
- * does not fit alongside a 16-bit sequencer_index in the same 7-byte
- * budget. This module's own byte-level design choice (not reproduced from
- * the specification) narrows sequencer_index to 8 bits instead:
- * sequencer_index (1 byte) | start_state (1) | next_state (1) |
- * trigger_exec_delay_ms (2) | repeat_count (2) == 7 bytes. repeat_count is
- * round-tripped by the encode/decode functions below, exactly like
- * request_compound.h's own repeat_count (see that header's file comment) -- this
- * milestone's scope extends only to RCP_TRIGGERED_REPEAT_INFINITE's wire
- * round-trip, not to any re-arming/repetition scheduling behavior.
+ * A triggered request's execution condition is "a named trigger signal,
+ * emitted by a named endpoint, has occurred at least a named number of
+ * times". Those three things are carried on the wire as three separate
+ * one-octet sub-fields, and the eight octets of the repurposed
+ * message_timestamp region carry, in order (offsets relative to the start
+ * of that region):
  *
- * ── The trigger-occurrence counter ──────────────────────────────────────────
+ *   offset 0  request_type      (the opcode octet, 0x0E or 0x8E)
+ *   offset 1  trigger_source_ep (which endpoint emits the trigger)
+ *   offset 2  trigger_signal_nr (which of that endpoint's trigger signals)
+ *   offset 3  trigger_threshold (how many occurrences must precede execution)
+ *   offset 4  exec_delay        (trigger_exec_delay), two octets, big-endian
+ *             offset 5
+ *   offset 6  repeat_count      (trigger_repetitions), two octets, big-endian
+ *             offset 7
+ *
+ * Before v0.102.0 this module carried request_compound.h's own
+ * sequencer_index/start_state/next_state sub-fields here instead, which
+ * meant a triggered request had no way at all to express *which* trigger
+ * it was waiting on -- the entire trigger-selection mechanism was absent.
+ * A triggered request has no sequencer of its own and no start/next state:
+ * it is not a sequencer-driven request kind, and this module consequently
+ * has no dependency on request_sequencer.h at all.
+ *
+ * exec_delay is counted in multiples of the addressed endpoint's own
+ * configured ep_delay_time, not in milliseconds. repeat_count's all-ones
+ * value (RCP_TRIGGERED_REPEAT_INFINITE) is the infinite-repetition
+ * sentinel.
+ *
+ * ── The trigger-occurrence counter and threshold ────────────────────────────
  *
  * A triggered request's own runtime state (rcp_triggered_runtime_t) tracks
- * how many independent trigger occurrences it has observed since entering
- * its "started" state (rcp_triggered_runtime_enter_started(), which resets
- * the counter to 0) via rcp_triggered_runtime_record_occurrence() -- callers
- * invoke that for every trigger occurrence regardless of the target
- * endpoint's own idle/busy status, per this milestone's roadmap scope.
- * Only the *fire* transition itself (rcp_triggered_tick(), which both
- * advances the target sequencer and requires at least one recorded
- * occurrence) is additionally gated on the caller-supplied endpoint_idle
- * flag -- the counter itself free-runs independent of that flag.
+ * how many matching trigger occurrences it has observed since entering its
+ * "started" state (rcp_triggered_runtime_enter_started(), which resets the
+ * counter to 0). rcp_triggered_runtime_record_occurrence() takes the
+ * observed occurrence's own (source_ep, signal_nr) pair and counts it only
+ * if it matches this request's own trigger_source_ep/trigger_signal_nr --
+ * a request waiting on one endpoint's trigger signal is never advanced by
+ * a different endpoint's, nor by a different signal number of the same
+ * endpoint.
+ *
+ * trigger_threshold counts occurrences *before* execution, so a threshold
+ * of zero means the request executes on the first occurrence and a
+ * threshold of N means it executes on occurrence N+1 --
+ * rcp_triggered_threshold_reached() is that comparison in its own pure,
+ * directly-testable form.
+ *
+ * Only the *fire* transition itself (rcp_triggered_tick()) is additionally
+ * gated on the caller-supplied endpoint_idle flag -- the counter itself
+ * free-runs independent of that flag.
  *
  * Neither this module nor rcp_triggered_tick() owns a timer, thread, or
  * polling loop of its own -- every tick is caller-driven, matching every
@@ -92,7 +117,6 @@
 #include "rcp/acf.h"
 #include "rcp/avtp.h"
 #include "rcp/rcp.h"
-#include "rcp/request_sequencer.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -127,26 +151,25 @@ const char *rcp_triggered_strerror(rcp_triggered_errc_t e);
 
 /* ── rcp_triggered_step_t: wire sub-fields ────────────────────────────────── */
 
-/* Sentinel repeat_count value meaning "repeat indefinitely" -- this
- * module's own 16-bit analogue of request_compound.h's 8-bit
- * RCP_COMPOUND_REPEAT_INFINITE, per this milestone's own roadmap scope.
- * Round-tripped only; see the file header. */
+/* Sentinel repeat_count value meaning "repeat indefinitely": the
+ * all-ones value of the 2-octet repetition sub-field. Identical in
+ * meaning to request_compound.h's RCP_COMPOUND_REPEAT_INFINITE. */
 #define RCP_TRIGGERED_REPEAT_INFINITE ((uint16_t)0xFFFFu)
 
 typedef struct {
-    uint8_t  sequencer_index;     /* which of a table's sequencers this
-                                      step targets -- 8 bits wide, see the
-                                      file header */
-    uint8_t  start_state;         /* required current sequencer state,
-                                      see rcp_triggered_advance_guard() */
-    uint8_t  next_state;          /* state this step advances the
-                                      sequencer to on fire */
-    uint16_t trigger_exec_delay_ms; /* this step's own trigger_exec_delay
-                                        timer, in milliseconds (this
-                                        module's own unit choice, matching
-                                        request_compound.h's exec_delay_ms
-                                        precedent) */
-    uint16_t repeat_count;        /* round-tripped only; see the file header */
+    uint8_t  trigger_source_ep;  /* the endpoint whose trigger signal this
+                                     request waits on */
+    uint8_t  trigger_signal_nr;  /* which of that endpoint's trigger
+                                     signals -- endpoint-defined numbering */
+    uint8_t  trigger_threshold;  /* occurrences that must precede execution:
+                                     0 fires on the first occurrence, N on
+                                     the (N+1)th -- see the file header */
+    uint16_t exec_delay;         /* trigger_exec_delay, counted in multiples
+                                     of the addressed endpoint's configured
+                                     ep_delay_time -- NOT milliseconds */
+    uint16_t repeat_count;       /* remaining repetitions;
+                                     RCP_TRIGGERED_REPEAT_INFINITE means
+                                     never decrement */
 } rcp_triggered_step_t;
 
 /* ── Triggered request encode/decode ──────────────────────────────────────── */
@@ -193,42 +216,45 @@ typedef struct {
  * started" transition per the file header. */
 void rcp_triggered_runtime_enter_started(rcp_triggered_runtime_t *rt);
 
-/* Increments rt->occurrence_count by one iff rt->started -- a no-op
- * (returns false) if rt has never entered "started" (or has already
- * fired -- see rcp_triggered_tick()). Returns whether the occurrence was
- * recorded. Independent of any endpoint idle/busy status: callers invoke
- * this for every trigger occurrence regardless of that status, per the
- * file header. */
-bool rcp_triggered_runtime_record_occurrence(rcp_triggered_runtime_t *rt);
+/* Records one observed trigger occurrence, emitted by endpoint source_ep
+ * as its own trigger signal number signal_nr. Increments
+ * rt->occurrence_count by one, and returns true, iff rt->started *and*
+ * the occurrence matches this request's own selection -- that is,
+ * source_ep == step->trigger_source_ep and signal_nr ==
+ * step->trigger_signal_nr. A non-matching occurrence, or one arriving
+ * while rt has not entered "started" (or has already fired -- see
+ * rcp_triggered_tick()), leaves rt entirely unchanged and returns false.
+ * Independent of any endpoint idle/busy status: callers invoke this for
+ * every trigger occurrence regardless of that status, per the file
+ * header. */
+bool rcp_triggered_runtime_record_occurrence(rcp_triggered_runtime_t *rt,
+                                              const rcp_triggered_step_t *step,
+                                              uint8_t source_ep, uint8_t signal_nr);
 
-/* True iff table's sequencer step->sequencer_index is currently sitting
- * in step->start_state -- this module's own copy of the advance-only-if-
- * still-in-start_state guard (request_compound.h's rcp_compound_advance_guard()
- * expresses the identical rule for compound/compound-wait; this module
- * intentionally does not share that function across the module boundary,
- * see the file header). False if step->sequencer_index is not
- * rcp_sequencer_index_valid() for table. */
-bool rcp_triggered_advance_guard(const rcp_sequencer_table_t *table,
-                                  const rcp_triggered_step_t *step);
+/* True iff enough matching occurrences have been recorded for this
+ * request to execute: rt->occurrence_count > step->trigger_threshold. A
+ * threshold of 0 is therefore satisfied by a single occurrence, and a
+ * threshold of N by N+1 occurrences -- see the file header. */
+bool rcp_triggered_threshold_reached(const rcp_triggered_step_t *step,
+                                      const rcp_triggered_runtime_t *rt);
 
-/* True iff elapsed_ms >= step->trigger_exec_delay_ms. Pure; see
+/* True iff elapsed >= step->exec_delay, in that field's own unit
+ * (multiples of the endpoint's configured ep_delay_time). Pure; see
  * request_compound.h's rcp_compound_exec_delay_elapsed() for the identical shape
- * applied to this module's own delay field. */
-bool rcp_triggered_exec_delay_elapsed(const rcp_triggered_step_t *step, uint32_t elapsed_ms);
+ * applied to that module's own delay field. */
+bool rcp_triggered_exec_delay_elapsed(const rcp_triggered_step_t *step, uint32_t elapsed);
 
-/* The fire transition: advances table's sequencer step->sequencer_index
- * to step->next_state, resets rt (occurrence_count = 0, started = false),
- * and returns true, iff *all* of the following hold: rt->started, at
- * least one occurrence has been recorded (rt->occurrence_count > 0),
- * rcp_triggered_exec_delay_elapsed(step, elapsed_ms), endpoint_idle is
- * true, and rcp_triggered_advance_guard(table, step) holds. Otherwise
- * table and rt are both left entirely unchanged and this returns false.
- * endpoint_idle is the one caller-supplied flag this milestone's roadmap
- * scope requires gating the fire transition on -- the occurrence counter
+/* The fire transition: resets rt (occurrence_count = 0, started = false)
+ * and returns true iff *all* of the following hold: rt->started,
+ * rcp_triggered_threshold_reached(step, rt),
+ * rcp_triggered_exec_delay_elapsed(step, elapsed), and endpoint_idle.
+ * Otherwise rt is left entirely unchanged and this returns false.
+ * endpoint_idle gates the fire transition only -- the occurrence counter
  * itself (see rcp_triggered_runtime_record_occurrence()) is deliberately
- * not gated on it. */
-bool rcp_triggered_tick(rcp_sequencer_table_t *table, const rcp_triggered_step_t *step,
-                         rcp_triggered_runtime_t *rt, uint32_t elapsed_ms, bool endpoint_idle);
+ * not gated on it. This function advances no sequencer: a triggered
+ * request has none, see the file header. */
+bool rcp_triggered_tick(const rcp_triggered_step_t *step, rcp_triggered_runtime_t *rt,
+                         uint32_t elapsed, bool endpoint_idle);
 
 #ifdef __cplusplus
 }

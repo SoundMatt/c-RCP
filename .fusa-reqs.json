@@ -1496,7 +1496,7 @@
     },
     {
       "id": "REQ-RELAY-005",
-      "title": "rcp_message_to_request() maps a Message to a protocol-native request per \u00a715.7.5",
+      "title": "rcp_message_to_request() maps a Message to a protocol-native request per §15.7.5",
       "text": "rcp_message_to_request() shall pack a relay_message_t's payload and meta fields into a protocol-native request for the given rcp_adapt_op_t, per this module's own per-operation field table, addressed to the given byte_bus_id (or, for RCP_ADAPT_OP_DISCOVERY, framed as a full NTSCF AVTPDU addressed via requester_stream_id) and self-identified by the given transaction_num, reporting RCP_ADAPT_ERR_ENCODE on any packing failure.",
       "standard": "iso26262",
       "level": "ASIL-B",
@@ -1505,7 +1505,7 @@
     },
     {
       "id": "REQ-RELAY-006",
-      "title": "rcp_response_to_message() maps a protocol-native response to a Message per \u00a715.7.5",
+      "title": "rcp_response_to_message() maps a protocol-native response to a Message per §15.7.5",
       "text": "rcp_response_to_message() shall unpack a protocol-native response frame for the given rcp_adapt_op_t into a relay_message_t, per this module's own per-operation field table, validating the frame decodes for the expected byte_bus_id and reporting RCP_ADAPT_ERR_DECODE otherwise.",
       "standard": "iso26262",
       "level": "ASIL-B",
@@ -1569,7 +1569,7 @@
     {
       "id": "REQ-RELAY-013",
       "title": "RCP_SPEC_VERSION aliases RELAY_SPEC_VERSION",
-      "text": "RCP_SPEC_VERSION shall be defined and shall equal RELAY_SPEC_VERSION, per the RELAY spec's required package-level SpecVersion export (\u00a717 requirement 12, \u00a719.4).",
+      "text": "RCP_SPEC_VERSION shall be defined and shall equal RELAY_SPEC_VERSION, per the RELAY spec's required package-level SpecVersion export (§17 requirement 12, §19.4).",
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A",
@@ -1614,7 +1614,7 @@
     {
       "id": "REQ-CLI-004",
       "title": "Unknown command or missing argument returns exit code 2",
-      "text": "rcp_cli_run() shall return RCP_CLI_INVALID_ARGS (2) for an empty argument list, an unrecognized command, or an unrecognized/incomplete --format value, per RELAY spec \u00a711.3 exit code conventions.",
+      "text": "rcp_cli_run() shall return RCP_CLI_INVALID_ARGS (2) for an empty argument list, an unrecognized command, or an unrecognized/incomplete --format value, per RELAY spec §11.3 exit code conventions.",
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A",
@@ -1632,7 +1632,7 @@
     {
       "id": "REQ-CLI-006",
       "title": "CLI entry point forwards process arguments to rcp_cli_run()",
-      "text": "The c-rcp executable's main() shall forward argv[1..argc) and stdout/stderr to rcp_cli_run() unmodified and return its exit code, per the RELAY spec's CLI contract (\u00a711.3).",
+      "text": "The c-rcp executable's main() shall forward argv[1..argc) and stdout/stderr to rcp_cli_run() unmodified and return its exit code, per the RELAY spec's CLI contract (§11.3).",
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A",
@@ -4556,8 +4556,8 @@
     },
     {
       "id": "REQ-CMP-010",
-      "title": "rcp_compound_encode_request() encodes an ACF_GBB frame with mtv forced untimed and the opcode/step packed into message_timestamp",
-      "text": "rcp_compound_encode_request() shall, given a recognized request_type and payload_len <= RCP_ACF_MAX_PAYLOAD, produce an RCP_ACF_GBB_HEADER_LEN + payload_len byte frame of type RCP_ACF_MSG_TYPE_GBB addressed to byte_bus_id, whose decoded mtv nibble is RCP_ACF_MTV_UNTIMED and whose message_timestamp region's leading byte equals request_type with the remaining 7 bytes packing step's sequencer_index/start_state/next_state/exec_delay_ms/repeat_count fields, followed by payload.",
+      "title": "rcp_compound_encode_request() packs the step at the specification's own sub-field offsets",
+      "text": "rcp_compound_encode_request() shall, given a recognized request_type and payload_len <= RCP_ACF_MAX_PAYLOAD, produce an RCP_ACF_GBB_HEADER_LEN + payload_len byte frame of type RCP_ACF_MSG_TYPE_GBB addressed to byte_bus_id with mtv forced to RCP_ACF_MTV_UNTIMED, and shall write the repurposed message_timestamp region as: request_type at octet offset 0, step->start_state at offset 1, step->next_state at offset 2, step->sequencer_index at offset 3, step->exec_delay as two big-endian octets at offsets 4-5, and step->repeat_count as two big-endian octets at offsets 6-7 (TC18 v0.5.1_RC §11.2.2.1 Figure 8 / Table 6, §11.2.2.2 Figure 9 / Table 7).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4601,8 +4601,8 @@
     },
     {
       "id": "REQ-CMP-015",
-      "title": "rcp_compound_decode_request() round-trips a frame produced by rcp_compound_encode_request()",
-      "text": "rcp_compound_decode_request() shall, given a frame produced by rcp_compound_encode_request(), return RCP_COMPOUND_OK and recover the original request_type, byte_bus_id, step (sequencer_index/start_state/next_state/exec_delay_ms/repeat_count), transaction_num, and a borrowed view of the original payload.",
+      "title": "rcp_compound_decode_request() recovers every sub-field from the specification's own offsets",
+      "text": "rcp_compound_decode_request() shall, given a frame whose repurposed message_timestamp region carries the layout REQ-CMP-010 defines, return RCP_COMPOUND_OK and recover request_type, byte_bus_id, transaction_num, and every rcp_compound_step_t sub-field (start_state, next_state, sequencer_index, exec_delay, repeat_count) from those same offsets and widths, with sequencer_index one octet wide and repeat_count two octets wide.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4638,7 +4638,7 @@
     {
       "id": "REQ-CMP-019",
       "title": "rcp_compound_advance_guard() is true iff the target sequencer is still in start_state",
-      "text": "rcp_compound_advance_guard() shall return true iff step->sequencer_index is rcp_sequencer_index_valid() for table and table's current state at that index equals step->start_state, and shall return false (never a fabricated true) for an invalid sequencer_index.",
+      "text": "rcp_compound_advance_guard() shall return true iff step->sequencer_index is rcp_sequencer_index_valid() for table and table's current state at that index equals step->start_state, and shall return false for an invalid index. It shall not treat a start_state of zero specially -- that sentinel governs whether a request may start (REQ-CMP-025), not whether its sequencer is advanced afterwards.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4646,8 +4646,8 @@
     },
     {
       "id": "REQ-CMP-020",
-      "title": "rcp_compound_exec_delay_elapsed() compares elapsed_ms against exec_delay_ms",
-      "text": "rcp_compound_exec_delay_elapsed() shall return true iff elapsed_ms >= step->exec_delay_ms.",
+      "title": "rcp_compound_exec_delay_elapsed() compares elapsed against exec_delay",
+      "text": "rcp_compound_exec_delay_elapsed() shall return true iff elapsed >= step->exec_delay, both expressed in multiples of the addressed endpoint's configured ep_delay_time (TC18 v0.5.1_RC §11.2.2.1 Table 6), not in milliseconds.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4656,7 +4656,7 @@
     {
       "id": "REQ-CMP-021",
       "title": "rcp_compound_tick() advances the sequencer only once both the delay has elapsed and the guard holds",
-      "text": "rcp_compound_tick() shall set table's sequencer step->sequencer_index to step->next_state and return true iff both rcp_compound_exec_delay_elapsed(step, elapsed_ms) and rcp_compound_advance_guard(table, step) are true; otherwise it shall leave table unchanged and return false.",
+      "text": "rcp_compound_tick() shall set table's sequencer step->sequencer_index to step->next_state and return true iff both rcp_compound_exec_delay_elapsed(step, elapsed) and rcp_compound_advance_guard(table, step) hold; otherwise it shall leave table unchanged and return false. When step->next_state is zero it shall leave the sequencer in its current state and still return true, per the \"sequencer remains in the current state\" sentinel of TC18 v0.5.1_RC §11.2.2.1.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4674,7 +4674,7 @@
     {
       "id": "REQ-CMP-023",
       "title": "rcp_compound_wait_tick() advances the sequencer only once both condition_met and the guard hold",
-      "text": "rcp_compound_wait_tick() shall set table's sequencer step->sequencer_index to step->next_state and return true iff both condition_met and rcp_compound_advance_guard(table, step) are true; otherwise it shall leave table unchanged and return false, regardless of any elapsed-time value.",
+      "text": "rcp_compound_wait_tick() shall set table's sequencer step->sequencer_index to step->next_state and return true iff both condition_met and rcp_compound_advance_guard(table, step) are true; otherwise it shall leave table unchanged and return false. When step->next_state is zero it shall leave the sequencer in its current state and still return true, per the same sentinel REQ-CMP-021 names (TC18 v0.5.1_RC §11.2.2.2).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4718,8 +4718,8 @@
     },
     {
       "id": "REQ-TRIG-004",
-      "title": "rcp_triggered_encode_request() packs step into the repurposed message_timestamp region",
-      "text": "For a recognized request_type, rcp_triggered_encode_request() shall produce an ACF_GBB frame with mtv forced to RCP_ACF_MTV_UNTIMED, the opcode byte set to request_type, and step's sequencer_index/start_state/next_state/trigger_exec_delay_ms/repeat_count packed into the remaining 7 sub-field bytes.",
+      "title": "rcp_triggered_encode_request() packs the trigger-selection sub-fields at the specification's own offsets",
+      "text": "For a recognized request_type, rcp_triggered_encode_request() shall produce an ACF_GBB frame with mtv forced to RCP_ACF_MTV_UNTIMED and shall write the repurposed message_timestamp region as: request_type at octet offset 0, step->trigger_source_ep at offset 1, step->trigger_signal_nr at offset 2, step->trigger_threshold at offset 3, step->exec_delay as two big-endian octets at offsets 4-5, and step->repeat_count as two big-endian octets at offsets 6-7 (TC18 v0.5.1_RC §11.2.2.3 Figure 10 / Table 8).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4745,8 +4745,8 @@
     },
     {
       "id": "REQ-TRIG-007",
-      "title": "rcp_triggered_decode_request() rejects an opcode byte that is not a triggered request_type",
-      "text": "rcp_triggered_decode_request() shall return RCP_TRIGGERED_ERR_UNKNOWN_TYPE when the decoded opcode byte does not satisfy rcp_request_type_is_triggered(), and shall otherwise populate *out_request_type, *out_byte_bus_id, *out_step, *out_transaction_num, and a borrowed *out_payload/*out_payload_len view into the input buffer.",
+      "title": "rcp_triggered_decode_request() rejects a non-triggered opcode and otherwise recovers every sub-field",
+      "text": "rcp_triggered_decode_request() shall return RCP_TRIGGERED_ERR_UNKNOWN_TYPE when the decoded opcode byte does not satisfy rcp_request_type_is_triggered(), and shall otherwise populate *out_request_type, *out_byte_bus_id, *out_transaction_num, a borrowed *out_payload/*out_payload_len view, and every rcp_triggered_step_t sub-field from the offsets and widths REQ-TRIG-004 defines.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4763,8 +4763,8 @@
     },
     {
       "id": "REQ-TRIG-009",
-      "title": "rcp_triggered_runtime_record_occurrence() only increments the counter once started",
-      "text": "rcp_triggered_runtime_record_occurrence() shall increment occurrence_count and return true iff started is true, and shall leave occurrence_count unchanged and return false otherwise.",
+      "title": "rcp_triggered_runtime_record_occurrence() counts only the trigger this request selected",
+      "text": "rcp_triggered_runtime_record_occurrence() shall increment rt->occurrence_count and return true iff rt->started is true and the observed occurrence matches this request's own selection, i.e. source_ep == step->trigger_source_ep and signal_nr == step->trigger_signal_nr. It shall leave rt entirely unchanged and return false for an occurrence from any other endpoint or any other trigger signal number, and for any occurrence while rt->started is false (TC18 v0.5.1_RC §11.2.2.3 Table 8).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4772,8 +4772,8 @@
     },
     {
       "id": "REQ-TRIG-010",
-      "title": "rcp_triggered_advance_guard() reports whether the target sequencer is still in start_state",
-      "text": "rcp_triggered_advance_guard() shall return true iff step->sequencer_index is a valid index into table and that sequencer's current state equals step->start_state, and shall return false for an invalid sequencer_index.",
+      "title": "rcp_triggered_threshold_reached() counts occurrences that must precede execution",
+      "text": "rcp_triggered_threshold_reached() shall return true iff rt->occurrence_count > step->trigger_threshold, so that a trigger_threshold of zero is satisfied by one occurrence and a trigger_threshold of N by N+1 occurrences, per TC18 v0.5.1_RC §11.2.2.3 Table 8 (\"'0' results in execution after one trigger signal while a '3' will cause an execution after four occurrences\").",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4781,8 +4781,8 @@
     },
     {
       "id": "REQ-TRIG-011",
-      "title": "rcp_triggered_exec_delay_elapsed() compares elapsed_ms against trigger_exec_delay_ms",
-      "text": "rcp_triggered_exec_delay_elapsed() shall return true iff elapsed_ms >= step->trigger_exec_delay_ms.",
+      "title": "rcp_triggered_exec_delay_elapsed() compares elapsed against exec_delay",
+      "text": "rcp_triggered_exec_delay_elapsed() shall return true iff elapsed >= step->exec_delay, both expressed in multiples of the addressed endpoint's configured ep_delay_time (TC18 v0.5.1_RC §11.2.2.3 Table 8), not in milliseconds.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4790,8 +4790,8 @@
     },
     {
       "id": "REQ-TRIG-012",
-      "title": "rcp_triggered_tick() only fires when started, at least one occurrence is recorded, the delay has elapsed, and the endpoint is idle",
-      "text": "rcp_triggered_tick() shall return false and leave table and rt unchanged unless rt->started is true, rt->occurrence_count > 0, rcp_triggered_exec_delay_elapsed() holds, and endpoint_idle is true.",
+      "title": "rcp_triggered_tick() only fires when started, the threshold is reached, the delay has elapsed, and the endpoint is idle",
+      "text": "rcp_triggered_tick() shall return false and leave rt unchanged unless rt->started is true, rcp_triggered_threshold_reached(step, rt) holds, rcp_triggered_exec_delay_elapsed(step, elapsed) holds, and endpoint_idle is true.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4799,8 +4799,8 @@
     },
     {
       "id": "REQ-TRIG-013",
-      "title": "rcp_triggered_tick() advances the sequencer and resets the runtime on a successful fire",
-      "text": "When rcp_triggered_tick()'s firing conditions all hold and rcp_triggered_advance_guard() holds, it shall set table's target sequencer to step->next_state, reset rt->occurrence_count to 0 and rt->started to false, and return true.",
+      "title": "rcp_triggered_tick() resets the runtime on a successful fire and advances no sequencer",
+      "text": "When every condition REQ-TRIG-012 names holds, rcp_triggered_tick() shall reset rt->occurrence_count to 0 and rt->started to false and return true. It shall not read or write any sequencer state: a triggered request carries no sequencer, start_state, or next_state sub-field (TC18 v0.5.1_RC §11.2.2.3 Table 8).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4817,8 +4817,8 @@
     },
     {
       "id": "REQ-CHAIN-002",
-      "title": "rcp_chained_encode_member() rejects chain_length below RCP_CHAINED_MIN_MEMBERS",
-      "text": "rcp_chained_encode_member() shall return a zeroed rcp_bytes_t (data == NULL) when chain_length < RCP_CHAINED_MIN_MEMBERS.",
+      "title": "rcp_chained_encode_member() leaves every reserved sub-field octet zero",
+      "text": "rcp_chained_encode_member() shall write octets 1-3 and 6-7 of the repurposed message_timestamp region as all-zero, per TC18 v0.5.1_RC §11.2.2.4 Table 9 (\"All bits shall be written as 0, else the request will be rejected\"). It shall not encode any chain_length or chain_position sub-field: the specification defines neither, and a member's position in a chain is its position among the enclosing AVTPDU's requests.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4826,8 +4826,8 @@
     },
     {
       "id": "REQ-CHAIN-003",
-      "title": "rcp_chained_encode_member() rejects chain_position >= chain_length",
-      "text": "rcp_chained_encode_member() shall return a zeroed rcp_bytes_t (data == NULL) when chain_position >= chain_length.",
+      "title": "rcp_chained_encode_member() rejects an oversized payload",
+      "text": "rcp_chained_encode_member() shall return a zeroed rcp_bytes_t (data == NULL) when payload_len exceeds RCP_ACF_MAX_PAYLOAD or on allocation failure.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4835,8 +4835,8 @@
     },
     {
       "id": "REQ-CHAIN-004",
-      "title": "rcp_chained_encode_member() packs chain_length/chain_position and cs into the encoded frame",
-      "text": "For valid inputs, rcp_chained_encode_member() shall produce an ACF_GBB frame with mtv forced to RCP_ACF_MTV_UNTIMED, the opcode byte set to RCP_REQUEST_TYPE_CHAINED, cs encoded into byte_message_info's cs field, and chain_length/chain_position packed into the repurposed message_timestamp region's sub-field bytes.",
+      "title": "rcp_chained_encode_member() packs chain_exec_delay and cs at the specification's own positions",
+      "text": "For valid inputs, rcp_chained_encode_member() shall produce an ACF_GBB frame with mtv forced to RCP_ACF_MTV_UNTIMED, the opcode byte RCP_REQUEST_TYPE_CHAINED at octet offset 0 of the repurposed message_timestamp region, chain_exec_delay as two big-endian octets at offsets 4-5, and cs encoded into byte_message_info's own cs bit (TC18 v0.5.1_RC §11.2.2.4 Figure 11 / Table 9).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4862,8 +4862,8 @@
     },
     {
       "id": "REQ-CHAIN-007",
-      "title": "rcp_chained_decode_member() rejects an opcode byte that is not RCP_REQUEST_TYPE_CHAINED",
-      "text": "rcp_chained_decode_member() shall return RCP_CHAINED_ERR_UNKNOWN_TYPE when the decoded opcode byte is not RCP_REQUEST_TYPE_CHAINED, and shall otherwise populate *out_byte_bus_id, *out_chain_length, *out_chain_position, *out_cs, *out_transaction_num, and a borrowed *out_payload/*out_payload_len view into the input buffer.",
+      "title": "rcp_chained_decode_member() rejects a non-chained opcode and otherwise recovers chain_exec_delay and cs",
+      "text": "rcp_chained_decode_member() shall return RCP_CHAINED_ERR_UNKNOWN_TYPE when the decoded opcode byte is not RCP_REQUEST_TYPE_CHAINED, and shall otherwise populate *out_byte_bus_id, *out_chain_exec_delay (from offsets 4-5), *out_cs, *out_transaction_num, and a borrowed *out_payload/*out_payload_len view.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4871,8 +4871,8 @@
     },
     {
       "id": "REQ-CHAIN-008",
-      "title": "rcp_chained_advance() reports RCP_CHAINED_MEMBER_CHAIN_ABORTED once *chain_aborted is set, without consulting member_errored/cs",
-      "text": "rcp_chained_advance() shall return RCP_CHAINED_MEMBER_CHAIN_ABORTED and leave *chain_aborted unchanged whenever *chain_aborted is already true on entry.",
+      "title": "rcp_chained_advance() reports CHAIN_ERROR for a chained member with no predecessor",
+      "text": "rcp_chained_advance() shall return RCP_CHAINED_MEMBER_CHAIN_ERROR and set *chain_aborted to true whenever has_predecessor is false, so that a chained request appearing as the enclosing AVTPDU's first request, and every member after it, is ignored -- per TC18 v0.5.1_RC §11.2.2.4 (\"If the first request in an AVTPDU is a chain request, then there is no predecessor to chain to, thus the entire chain will be ignored\").",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4880,8 +4880,8 @@
     },
     {
       "id": "REQ-CHAIN-009",
-      "title": "rcp_chained_advance() reports RCP_CHAINED_MEMBER_OK for a non-errored member",
-      "text": "rcp_chained_advance() shall return RCP_CHAINED_MEMBER_OK and leave *chain_aborted false whenever *chain_aborted is false on entry and member_errored is false.",
+      "title": "rcp_chained_advance() reports CHAIN_ABORTED once the chain has been aborted",
+      "text": "rcp_chained_advance() shall return RCP_CHAINED_MEMBER_CHAIN_ABORTED, without consulting predecessor_errored or cs and leaving *chain_aborted true, whenever has_predecessor is true and *chain_aborted is already true on entry.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4889,8 +4889,8 @@
     },
     {
       "id": "REQ-CHAIN-010",
-      "title": "rcp_chained_advance() sets *chain_aborted only when an errored member selected RCP_CHAINED_CS_ABORT_ON_ERROR",
-      "text": "rcp_chained_advance() shall return RCP_CHAINED_MEMBER_CHAIN_ERROR whenever *chain_aborted is false on entry and member_errored is true, and shall set *chain_aborted to true iff cs == RCP_CHAINED_CS_ABORT_ON_ERROR (leaving it false when cs == RCP_CHAINED_CS_CONTINUE_ON_ERROR).",
+      "title": "rcp_chained_advance() reads cs off the member about to run, about its predecessor's outcome",
+      "text": "When has_predecessor is true and *chain_aborted is false on entry, rcp_chained_advance() shall return RCP_CHAINED_MEMBER_CHAIN_ABORTED and set *chain_aborted to true iff predecessor_errored is true AND cs == RCP_CHAINED_CS_ABORT_ON_ERROR, and shall otherwise return RCP_CHAINED_MEMBER_OK leaving *chain_aborted false -- including when predecessor_errored is true but cs == RCP_CHAINED_CS_CONTINUE_ON_ERROR. cs is the conditional-start selector of the member about to execute, not of the member that errored (TC18 v0.5.1_RC §11.2.2.4 Table 9).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4916,8 +4916,8 @@
     },
     {
       "id": "REQ-TIMED-003",
-      "title": "rcp_timed_encode_request() packs presentation_time into the repurposed message_timestamp region",
-      "text": "rcp_timed_encode_request() shall produce an ACF_GBB frame with mtv forced to RCP_ACF_MTV_UNTIMED, the opcode byte set to RCP_REQUEST_TYPE_TIMED, and presentation_time packed into the repurposed message_timestamp region's first 4 sub-field bytes, or return a zeroed rcp_bytes_t (data == NULL) when payload_len exceeds RCP_ACF_MAX_PAYLOAD.",
+      "title": "rcp_timed_encode_request() packs a 48-bit presentation_time and holds the reserved octet at zero",
+      "text": "rcp_timed_encode_request() shall produce an ACF_GBB frame with mtv forced to RCP_ACF_MTV_UNTIMED, hs and cs clear, the opcode byte RCP_REQUEST_TYPE_TIMED at octet offset 0 of the repurposed message_timestamp region, an all-zero reserved octet at offset 1, and presentation_time as six big-endian octets spanning offsets 2-7 (TC18 v0.5.1_RC §11.2.2.5 Figure 12 / Table 10). It shall return a zeroed rcp_bytes_t (data == NULL), never a truncated frame, when presentation_time exceeds RCP_TIMED_PRESENTATION_TIME_MAX.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4934,8 +4934,8 @@
     },
     {
       "id": "REQ-TIMED-005",
-      "title": "rcp_timed_decode_request() rejects an opcode byte that is not RCP_REQUEST_TYPE_TIMED",
-      "text": "rcp_timed_decode_request() shall return RCP_TIMED_ERR_UNKNOWN_TYPE when the decoded opcode byte is not RCP_REQUEST_TYPE_TIMED, and shall otherwise populate *out_byte_bus_id, *out_presentation_time, *out_transaction_num, and a borrowed *out_payload/*out_payload_len view into the input buffer.",
+      "title": "rcp_timed_decode_request() rejects a non-timed opcode and otherwise recovers the 48-bit presentation_time",
+      "text": "rcp_timed_decode_request() shall return RCP_TIMED_ERR_UNKNOWN_TYPE when the decoded opcode byte is not RCP_REQUEST_TYPE_TIMED, and shall otherwise populate *out_byte_bus_id, *out_transaction_num, a borrowed *out_payload/*out_payload_len view, and *out_presentation_time from the six octets at offsets 2-7 of the repurposed region, in [0, RCP_TIMED_PRESENTATION_TIME_MAX].",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4943,8 +4943,8 @@
     },
     {
       "id": "REQ-TIMED-006",
-      "title": "rcp_timed_too_far() is wraparound-safe and never reports a past presentation_time as too far",
-      "text": "rcp_timed_too_far() shall return false whenever presentation_time is at or before now (by wraparound-safe signed subtraction), and shall return true iff presentation_time is strictly after now by more than max_horizon.",
+      "title": "rcp_timed_too_far() is wraparound-safe in the 48-bit presentation-time domain",
+      "text": "rcp_timed_too_far() shall compute presentation_time - now modulo RCP_TIMED_PRESENTATION_TIME_MODULUS, shall return false whenever that difference exceeds half the modulus (i.e. presentation_time is at or before now), and shall otherwise return true iff the difference exceeds max_horizon.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4953,7 +4953,7 @@
     {
       "id": "REQ-TIMED-007",
       "title": "rcp_timed_admit() reports RCP_TIMED_REJECT_GPTP_FAIL whenever gptp_locked is false",
-      "text": "rcp_timed_admit() shall return RCP_TIMED_REJECT_GPTP_FAIL whenever gptp_locked is false, regardless of presentation_time, now, or max_horizon.",
+      "text": "rcp_timed_admit() shall return RCP_TIMED_REJECT_GPTP_FAIL whenever gptp_locked is false, regardless of presentation_time, now, or max_horizon (all 64-bit, in the 48-bit gPTP domain).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -5006,8 +5006,8 @@
     },
     {
       "id": "REQ-CANCEL-005",
-      "title": "rcp_cancel_encode_clear_single() packs clear_transaction_num into the repurposed message_timestamp region",
-      "text": "rcp_cancel_encode_clear_single() shall produce an ACF_GBB frame with mtv forced to RCP_ACF_MTV_UNTIMED, the opcode byte set to RCP_REQUEST_TYPE_CLEAR_SINGLE, clear_transaction_num packed into the first repurposed sub-field byte, and the remaining sub-field bytes zeroed.",
+      "title": "rcp_cancel_encode_clear_single() packs clear_transaction_num at the specification's own offset",
+      "text": "rcp_cancel_encode_clear_single() shall produce an ACF_GBB frame with mtv forced to RCP_ACF_MTV_UNTIMED, the opcode byte RCP_REQUEST_TYPE_CLEAR_SINGLE at octet offset 0 of the repurposed message_timestamp region, clear_transaction_num at octet offset 3, and octets 1-2 and 4-7 all-zero (TC18 v0.5.1_RC §11.2.3.3 Figure 15 / Table 13).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -5024,8 +5024,8 @@
     },
     {
       "id": "REQ-CANCEL-007",
-      "title": "rcp_cancel_decode_clear_single() rejects an opcode byte that is not RCP_REQUEST_TYPE_CLEAR_SINGLE",
-      "text": "rcp_cancel_decode_clear_single() shall return RCP_CANCEL_ERR_UNKNOWN_TYPE when the decoded opcode byte is not RCP_REQUEST_TYPE_CLEAR_SINGLE, and shall otherwise populate *out_byte_bus_id, *out_clear_transaction_num, and *out_transaction_num.",
+      "title": "rcp_cancel_decode_clear_single() recovers clear_transaction_num from the specification's own offset",
+      "text": "rcp_cancel_decode_clear_single() shall return RCP_CANCEL_ERR_UNKNOWN_TYPE when the decoded opcode byte is not RCP_REQUEST_TYPE_CLEAR_SINGLE, RCP_CANCEL_ERR_RESERVED_NONZERO when any of octets 1-2 or 4-7 of the repurposed region carries a set bit, and shall otherwise populate *out_byte_bus_id, *out_transaction_num, and *out_clear_transaction_num from octet offset 3.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -7123,6 +7123,213 @@
       "id": "REQ-L2-010",
       "title": "Missing CAP_NET_RAW/root leaves the transport cleanly not-ok()",
       "text": "When the calling process lacks CAP_NET_RAW (and is not root), rcp_l2_avtp_transport_new()'s underlying raw-socket open shall fail and the returned transport's ok() shall report false, without crashing or requiring the caller to pre-check its own privilege level.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-CMP-025",
+      "title": "rcp_compound_start_condition_met() implements the \"any state\" start_state sentinel",
+      "text": "rcp_compound_start_condition_met() shall return true iff step->sequencer_index is rcp_sequencer_index_valid() for table and either step->start_state is zero (the request starts in whatever state the sequencer currently holds) or table's current state at that index equals step->start_state, per TC18 v0.5.1_RC §11.2.2.1 (\"If cmp_start_state = 0 then the request shall be started in any state unless the sequencer is disabled\"). It shall return false for an index the table does not hold, including when start_state is zero.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-TIMED-009",
+      "title": "rcp_timed_decode_request() rejects a non-zero reserved octet",
+      "text": "rcp_timed_decode_request() shall return RCP_TIMED_ERR_RESERVED_NONZERO when the reserved octet at offset 1 of the repurposed message_timestamp region carries any set bit, per TC18 v0.5.1_RC §11.2.2.5 Table 10 (\"All bits shall be written as 0, else the request shall be rejected\").",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-TIMED-010",
+      "title": "rcp_timed_decode_request() rejects a timed request with hs or cs set",
+      "text": "rcp_timed_decode_request() shall return RCP_TIMED_ERR_UNSUPPORTED_CMD when the decoded byte_message_info hs or cs bit is set, per TC18 v0.5.1_RC §11.2.2.5 Table 10 (\"hs, cs -- All bits shall be written as 0, else the request shall be rejected with error code = UNSUPPORTED_CMD\").",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-TIMED-011",
+      "title": "rcp_timed_due() reports whether a presentation_time has arrived",
+      "text": "rcp_timed_due() shall return true iff presentation_time is at or before now in the same wrapping 48-bit domain rcp_timed_too_far() uses, i.e. iff the request's execution condition is satisfied.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-CHAIN-011",
+      "title": "rcp_chained_exec_delay_elapsed() compares elapsed against chain_exec_delay",
+      "text": "rcp_chained_exec_delay_elapsed() shall return true iff elapsed >= chain_exec_delay, both expressed in multiples of the addressed endpoint's configured ep_delay_time and measured from the moment the member's predecessor finalized (TC18 v0.5.1_RC §11.2.2.4 Table 9).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-CHAIN-012",
+      "title": "rcp_chained_decode_member() rejects a non-zero reserved sub-field octet",
+      "text": "rcp_chained_decode_member() shall return RCP_CHAINED_ERR_RESERVED_NONZERO when any of octets 1-3 or 6-7 of the repurposed message_timestamp region carries a set bit, per TC18 v0.5.1_RC §11.2.2.4 Table 9.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-SRV-004",
+      "title": "rcp_server_endpoint_admit() routes each request by its own request_type",
+      "text": "rcp_server_endpoint_admit() shall classify each arriving ACF message by peeking its repurposed request_type opcode and passing it to rcp_sched_classify(), and shall route it accordingly: a message that is not a repurposed-timestamp ACF_GBB, or whose opcode this build does not recognize, shall take the rcp_server_endpoint_submit() path unchanged and report RCP_SERVER_ADMIT_EXECUTE_NOW or RCP_SERVER_ADMIT_QUEUED; a cancellation opcode shall report RCP_SERVER_ADMIT_CANCELLATION without being stored; every other conditional kind shall be decoded and stored, reporting RCP_SERVER_ADMIT_PENDING. *out_request_type shall always be written -- the opcode byte for a conditional or cancellation request, 0 otherwise.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-SRV-005",
+      "title": "rcp_server_endpoint_admit() rejects an undecodable or unstorable conditional request",
+      "text": "rcp_server_endpoint_admit() shall return RCP_SERVER_ADMIT_REJECTED, storing nothing and leaving the request store's occupancy unchanged, when a message whose opcode claims a conditional request kind fails that kind's own decode_* validation, or when the store already holds RCP_SERVER_MAX_PENDING requests.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-SRV-006",
+      "title": "rcp_server_endpoint_select_due() evaluates each stored request against its own execution condition",
+      "text": "rcp_server_endpoint_select_due() shall report a stored request as due only when that request kind's own condition holds: a compound or compound-wait request requires rcp_compound_start_condition_met() against ctx->sequencers and rcp_compound_exec_delay_elapsed() since it first held (a compound-wait additionally requiring ctx->wait_condition_met); a triggered request requires rcp_triggered_threshold_reached(), rcp_triggered_exec_delay_elapsed() since the threshold was reached, and ctx->endpoint_idle; a timed request requires ctx->gptp_locked and rcp_timed_due() against ctx->gptp_now; a chained request requires its predecessor to have finalized, rcp_chained_exec_delay_elapsed() since that instant, and ctx->endpoint_idle. It shall report no request as due when none qualifies.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-SRV-007",
+      "title": "rcp_server_endpoint_select_due() holds safety-tagged requests back until the safe state is reached",
+      "text": "rcp_server_endpoint_select_due() shall report a stored request whose request_type is safety-tagged (MSB set, 0x8x) as due only when rcp_e2e_request_may_execute(request_type, ctx->in_safe_state) permits it, i.e. only once ctx->in_safe_state is true, regardless of whether that request's own execution condition is otherwise satisfied. A non-safety-tagged request shall be unaffected by ctx->in_safe_state.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-SRV-008",
+      "title": "rcp_server_endpoint_select_due() returns the highest-priority due request",
+      "text": "When more than one stored request is due at once, rcp_server_endpoint_select_due() shall return the one that rcp_sched_compare() orders first over {kind, arrival sequence}: the higher rcp_sched_kind_rank() first, and among requests of equal rank the earliest admitted.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-SRV-009",
+      "title": "rcp_server_endpoint_complete() applies the executed request's own completion action",
+      "text": "rcp_server_endpoint_complete() shall, for a compound request, apply rcp_compound_tick() and, for a compound-wait request, rcp_compound_wait_tick() against ctx->sequencers, so that the sequencer is advanced only when the advance guard still holds. It shall not advance any sequencer for a triggered, timed, or chained request.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-SRV-010",
+      "title": "rcp_server_endpoint_complete() applies the repetition rule",
+      "text": "After the completion action, rcp_server_endpoint_complete() shall leave a request whose repeat_count is the all-ones infinite sentinel in the store with its repeat_count unchanged, shall remove a request whose repeat_count is zero, and shall otherwise decrement repeat_count by one and leave the request in the store re-armed (its start condition to be satisfied afresh before it may run again). Timed and chained requests carry no repetition sub-field and shall always be removed. It shall return true iff the request remains in the store.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-SRV-011",
+      "title": "rcp_server_endpoint_notify_trigger() routes an occurrence to every matching stored request",
+      "text": "rcp_server_endpoint_notify_trigger() shall offer the observed (source_ep, signal_nr) occurrence to every stored triggered request via rcp_triggered_runtime_record_occurrence(), so that only requests whose own trigger_source_ep/trigger_signal_nr match count it, and shall return how many counted it.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-SRV-012",
+      "title": "rcp_server_endpoint_chain_predecessor_done() starts a chained request's delay at the predecessor's finalization",
+      "text": "rcp_server_endpoint_chain_predecessor_done() shall mark the stored chained request at index as having its predecessor finalized and record now as the instant its chain_exec_delay is measured from, and shall not restart that timer on any later evaluation. It shall return false, changing nothing, when index does not name a stored chained request.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-SRV-013",
+      "title": "The cancellation functions remove exactly the requests their own opcode names",
+      "text": "rcp_server_endpoint_cancel_all() shall remove every stored conditional request and return how many; rcp_server_endpoint_cancel_single() shall report rcp_cancel_attempt()'s outcome and remove the stored request whose transaction_num equals clear_transaction_num only when that outcome is RCP_CANCEL_RESULT_CANCELED; rcp_server_endpoint_cancel_non_safestate() shall remove every stored request that is not safety-tagged, leaving the safety-tagged ones in place, and return how many were removed. Each shall free the byte copy of every request it removes.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-SRV-014",
+      "title": "rcp_server_endpoint_watchdog_purge() keeps only the safety sequence",
+      "text": "rcp_server_endpoint_watchdog_purge() shall remove from the request store exactly those requests rcp_e2e_watchdog_purge_should_keep() does not keep -- i.e. every non-safety-tagged one -- and return how many were removed, so that only the safety sequence survives a watchdog overflow to drive the endpoint into its configured safe state.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-MOCK-021",
+      "title": "rcp_mock_server_dispatch() routes a request through the request_type-aware admission path",
+      "text": "rcp_mock_server_dispatch() shall, after rcp_lifecycle_should_accept() admission and endpoint lookup, route the request through rcp_server_endpoint_admit() and map its outcome onto RCP_MOCK_DISPATCH_OK (running the endpoint's handler synchronously), _QUEUED, _PENDING, _CANCELLED (having applied the named cancellation against that endpoint's request store), or _REJECTED. A standard request shall behave exactly as before: executed immediately when the endpoint is enabled, queued when it is not.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-MOCK-022",
+      "title": "rcp_mock_server_t owns the sequencer-state table compound requests read",
+      "text": "rcp_mock_server_set_sequencer_count() shall replace and free any sequencer table the server already held with a freshly allocated rcp_sequencer_table_new(count), and rcp_mock_server_sequencers() shall return that table. A server whose table is the unsupported ({NULL,0}) one shall never report a compound or compound-wait request as due.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-MOCK-023",
+      "title": "rcp_mock_server_tick() executes at most one due conditional request",
+      "text": "rcp_mock_server_tick() shall select the highest-priority due stored request on the addressed endpoint via rcp_server_endpoint_select_due(), run that request's own stored frame through that endpoint's registered handler, finalize it via rcp_server_endpoint_complete(), and return true. It shall return false, leaving *out_response zeroed and executing nothing, when the byte_bus_id names no endpoint or no stored request is due.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-MOCK-024",
+      "title": "rcp_mock_server_tick() evaluates conditions against the server's own sequencer table",
+      "text": "rcp_mock_server_tick() shall evaluate execution conditions against the server's own sequencer table, ignoring and overwriting any sequencers pointer the caller supplied in ctx, so a caller cannot have a request evaluated against a table the server does not own.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-MOCK-025",
+      "title": "rcp_mock_server_notify_trigger() reaches every endpoint",
+      "text": "rcp_mock_server_notify_trigger() shall offer the observed (source_ep, signal_nr) occurrence to every registered endpoint's request store, since a triggered request stored on one endpoint routinely waits on a different endpoint's trigger signal, and shall return the total number of stored requests that counted it.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-MOCK-026",
+      "title": "rcp_mock_server_dispatch_frame() applies chain sequencing across a frame's members in order",
+      "text": "rcp_mock_server_dispatch_frame() shall, for each chained member it encounters, call rcp_chained_advance() with whether any request precedes it in this frame, whether that predecessor finalized with an error, and that member's own cs bit -- reporting RCP_MOCK_DISPATCH_CHAIN_ERROR for a chained member with no predecessor and RCP_MOCK_DISPATCH_CHAIN_ABORTED for one the chain state excludes, in both cases without dispatching that member to its endpoint. rcp_mock_server_watchdog_purge() shall apply rcp_server_endpoint_watchdog_purge() to the addressed endpoint and return how many requests it purged.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",

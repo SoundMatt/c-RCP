@@ -30,6 +30,10 @@ const char *rcp_timed_strerror(rcp_timed_errc_t e)
     case RCP_TIMED_ERR_BAD_MSG_TYPE:   return "rcp/timed: unexpected ACF message type";
     case RCP_TIMED_ERR_NOT_REPURPOSED: return "rcp/timed: message_timestamp not repurposed";
     case RCP_TIMED_ERR_UNKNOWN_TYPE:   return "rcp/timed: unrecognized request_type";
+    case RCP_TIMED_ERR_RESERVED_NONZERO:
+        return "rcp/timed: reserved sub-field octet is not zero";
+    case RCP_TIMED_ERR_UNSUPPORTED_CMD:
+        return "rcp/timed: hs/cs must be clear on a timed request";
     default:                           return "rcp/timed: unknown error";
     }
 }
@@ -46,7 +50,7 @@ bool rcp_timed_feature_enabled(uint32_t options)
 /* ── Timed request encode/decode ──────────────────────────────────────────── */
 
 //cfusa:req REQ-TIMED-003
-rcp_bytes_t rcp_timed_encode_request(rcp_byte_bus_id_t byte_bus_id, uint32_t presentation_time,
+rcp_bytes_t rcp_timed_encode_request(rcp_byte_bus_id_t byte_bus_id, uint64_t presentation_time,
                                       uint8_t transaction_num, const uint8_t *payload,
                                       size_t payload_len)
 {
@@ -58,6 +62,7 @@ rcp_bytes_t rcp_timed_encode_request(rcp_byte_bus_id_t byte_bus_id, uint32_t pre
     uint8_t                     *b;
     uint64_t                     ts;
 
+    if (presentation_time > RCP_TIMED_PRESENTATION_TIME_MAX) return frame;
     if (payload_len > RCP_ACF_GBB_MAX_PAYLOAD) return frame;
 
     unpadded = RCP_ACF_GBB_HEADER_LEN + payload_len;
@@ -77,8 +82,11 @@ rcp_bytes_t rcp_timed_encode_request(rcp_byte_bus_id_t byte_bus_id, uint32_t pre
     info.pad               = pad;
     rcp_acf_pack_header(b, RCP_ACF_MSG_TYPE_GBB, quadlets, &info);
 
+    /* Octet 0 opcode, octet 1 reserved (left zero by the shift), octets
+     * 2..7 the 48-bit big-endian presentation_time -- see
+     * request_timed.h's "wire sub-field layout" section. */
     ts = (((uint64_t)RCP_REQUEST_TYPE_TIMED) << 56) |
-         (((uint64_t)presentation_time) << 24);
+         (presentation_time & RCP_TIMED_PRESENTATION_TIME_MAX);
     put_u64(&b[RCP_ACF_ABB_HEADER_LEN], ts);
 
     if (payload_len > 0) memcpy(&b[RCP_ACF_GBB_HEADER_LEN], payload, payload_len);
@@ -91,15 +99,18 @@ rcp_bytes_t rcp_timed_encode_request(rcp_byte_bus_id_t byte_bus_id, uint32_t pre
 
 //cfusa:req REQ-TIMED-004
 //cfusa:req REQ-TIMED-005
+//cfusa:req REQ-TIMED-009
+//cfusa:req REQ-TIMED-010
 rcp_timed_errc_t rcp_timed_decode_request(const uint8_t *b, size_t len,
                                            rcp_byte_bus_id_t *out_byte_bus_id,
-                                           uint32_t *out_presentation_time,
+                                           uint64_t *out_presentation_time,
                                            const uint8_t **out_payload, size_t *out_payload_len,
                                            uint8_t *out_transaction_num)
 {
     rcp_acf_gbb_header_t hdr;
     rcp_acf_errc_t ae;
     uint8_t rt;
+    uint8_t reserved;
 
     ae = rcp_acf_decode_gbb(b, len, &hdr, out_payload, out_payload_len);
     if (ae == RCP_ACF_ERR_SHORT_FRAME) return RCP_TIMED_ERR_SHORT_FRAME;
@@ -110,7 +121,14 @@ rcp_timed_errc_t rcp_timed_decode_request(const uint8_t *b, size_t len,
     rt = (uint8_t)((hdr.message_timestamp >> 56) & 0xFFu);
     if (rt != RCP_REQUEST_TYPE_TIMED) return RCP_TIMED_ERR_UNKNOWN_TYPE;
 
-    *out_presentation_time = (uint32_t)((hdr.message_timestamp >> 24) & 0xFFFFFFFFu);
+    /* The reserved octet at offset 1 must be all-zero, and hs/cs must
+     * both be clear -- a request violating either is rejected rather than
+     * executed against a sub-field this build cannot interpret. */
+    reserved = (uint8_t)((hdr.message_timestamp >> 48) & 0xFFu);
+    if (reserved != 0u) return RCP_TIMED_ERR_RESERVED_NONZERO;
+    if (hdr.info.hs != 0u || hdr.info.cs != 0u) return RCP_TIMED_ERR_UNSUPPORTED_CMD;
+
+    *out_presentation_time = hdr.message_timestamp & RCP_TIMED_PRESENTATION_TIME_MAX;
     *out_byte_bus_id         = hdr.info.byte_bus_id;
     *out_transaction_num     = hdr.info.transaction_num;
     return RCP_TIMED_OK;
@@ -118,19 +136,40 @@ rcp_timed_errc_t rcp_timed_decode_request(const uint8_t *b, size_t len,
 
 /* ── Admission ─────────────────────────────────────────────────────────────── */
 
-//cfusa:req REQ-TIMED-006
-bool rcp_timed_too_far(uint32_t presentation_time, uint32_t now, uint32_t max_horizon)
+/* presentation_time - now, reduced into the field's own 48-bit wrapping
+ * domain. A result above half the modulus is read as "presentation_time
+ * is in the past", the usual unambiguous split for a wrapping domain. */
+static uint64_t forward_delta(uint64_t presentation_time, uint64_t now)
 {
-    int32_t delta = (int32_t)(presentation_time - now);
+    return (presentation_time - now) & RCP_TIMED_PRESENTATION_TIME_MAX;
+}
 
-    if (delta < 0) return false; /* already due or in the past: never "too far" */
-    return (uint32_t)delta > max_horizon;
+static bool in_the_past(uint64_t delta)
+{
+    return delta > (RCP_TIMED_PRESENTATION_TIME_MODULUS / 2u);
+}
+
+//cfusa:req REQ-TIMED-006
+bool rcp_timed_too_far(uint64_t presentation_time, uint64_t now, uint64_t max_horizon)
+{
+    uint64_t delta = forward_delta(presentation_time, now);
+
+    if (in_the_past(delta)) return false; /* already due or past: never "too far" */
+    return delta > max_horizon;
+}
+
+//cfusa:req REQ-TIMED-011
+bool rcp_timed_due(uint64_t presentation_time, uint64_t now)
+{
+    uint64_t delta = forward_delta(presentation_time, now);
+
+    return delta == 0u || in_the_past(delta);
 }
 
 //cfusa:req REQ-TIMED-007
 //cfusa:req REQ-TIMED-008
-rcp_timed_admission_t rcp_timed_admit(bool gptp_locked, uint32_t presentation_time, uint32_t now,
-                                       uint32_t max_horizon)
+rcp_timed_admission_t rcp_timed_admit(bool gptp_locked, uint64_t presentation_time, uint64_t now,
+                                       uint64_t max_horizon)
 {
     if (!gptp_locked) return RCP_TIMED_REJECT_GPTP_FAIL;
     if (rcp_timed_too_far(presentation_time, now, max_horizon)) {

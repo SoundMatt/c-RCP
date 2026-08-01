@@ -31,6 +31,7 @@ static void test_strerror_never_null_and_distinct(void)
     const char *c = rcp_cancel_strerror(RCP_CANCEL_ERR_BAD_MSG_TYPE);
     const char *d = rcp_cancel_strerror(RCP_CANCEL_ERR_NOT_REPURPOSED);
     const char *e = rcp_cancel_strerror(RCP_CANCEL_ERR_UNKNOWN_TYPE);
+    const char *rsv = rcp_cancel_strerror(RCP_CANCEL_ERR_RESERVED_NONZERO);
     const char *unk = rcp_cancel_strerror((rcp_cancel_errc_t)999);
 
     TEST_ASSERT_NOT_NULL(a);
@@ -44,6 +45,8 @@ static void test_strerror_never_null_and_distinct(void)
     TEST_ASSERT_TRUE(strcmp(b, c) != 0);
     TEST_ASSERT_TRUE(strcmp(c, d) != 0);
     TEST_ASSERT_TRUE(strcmp(d, e) != 0);
+    TEST_ASSERT_NOT_NULL(rsv);
+    TEST_ASSERT_TRUE(strcmp(e, rsv) != 0);
 }
 
 /* ── clear-all (0x05) ─────────────────────────────────────────────────────── */
@@ -182,6 +185,95 @@ static void test_chain_cascade(void)
     TEST_ASSERT_TRUE(rcp_cancel_chain_should_cascade(3, 1));
 }
 
+
+/* ── Literal wire layout ──────────────────────────────────────────────────────
+ *
+ * Written from the TC18 v0.5.1_RC single-request-cancellation figure and
+ * field table (§11.2.3.3, Figure 15 / Table 13), NOT copied back out of
+ * this encoder. The figure lays the repurposed message_timestamp region
+ * out as:
+ *
+ *   offset 0     request_type          (one octet, 0x07)
+ *   offsets 1..2 reserved              (all bits zero)
+ *   offset 3     clear_transaction_num (one octet)
+ *   offsets 4..7 reserved              (all bits zero)
+ *
+ * Before v0.102.0 clear_transaction_num was packed at offset 1, two
+ * octets early and on top of a mandatorily-zero reserved octet. A
+ * round-trip through this module's own encode/decode pair could not
+ * detect that, because both halves agreed on the same wrong offset --
+ * which is exactly why this test asserts absolute octet positions instead. */
+
+#define TS_OFF RCP_ACF_ABB_HEADER_LEN
+
+static void test_clear_single_wire_sub_field_offsets(void)
+{
+    rcp_bytes_t frame = rcp_cancel_encode_clear_single(4, 0xA7u, 11);
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_TRUE(frame.len >= TS_OFF + 8u);
+
+    TEST_ASSERT_EQUAL_HEX8(0x07, frame.data[TS_OFF + 0]); /* request_type */
+    TEST_ASSERT_EQUAL_HEX8(0x00, frame.data[TS_OFF + 1]); /* reserved */
+    TEST_ASSERT_EQUAL_HEX8(0x00, frame.data[TS_OFF + 2]); /* reserved */
+    TEST_ASSERT_EQUAL_HEX8(0xA7, frame.data[TS_OFF + 3]); /* clear_transaction_num */
+    TEST_ASSERT_EQUAL_HEX8(0x00, frame.data[TS_OFF + 4]); /* reserved */
+    TEST_ASSERT_EQUAL_HEX8(0x00, frame.data[TS_OFF + 5]); /* reserved */
+    TEST_ASSERT_EQUAL_HEX8(0x00, frame.data[TS_OFF + 6]); /* reserved */
+    TEST_ASSERT_EQUAL_HEX8(0x00, frame.data[TS_OFF + 7]); /* reserved */
+
+    rcp_bytes_free(&frame);
+}
+
+/* Decoding a hand-built spec-shaped octet sequence, so decode is pinned to
+ * the specification independently of encode. */
+static void test_clear_single_decode_reads_hand_built_spec_layout(void)
+{
+    rcp_bytes_t frame;
+    rcp_byte_bus_id_t bbid = 0;
+    uint8_t clear_txn = 0;
+    uint8_t txn = 0;
+    size_t i;
+
+    frame = rcp_cancel_encode_clear_single(1, 0, 2);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    for (i = 0; i < 8; i++) frame.data[TS_OFF + i] = 0x00u;
+    frame.data[TS_OFF + 0] = 0x07u;
+    frame.data[TS_OFF + 3] = 0x5Au;
+
+    TEST_ASSERT_EQUAL_INT(RCP_CANCEL_OK,
+                           rcp_cancel_decode_clear_single(frame.data, frame.len, &bbid, &clear_txn,
+                                                           &txn));
+    TEST_ASSERT_EQUAL_UINT8(0x5Au, clear_txn);
+
+    rcp_bytes_free(&frame);
+}
+
+/* Table 13: reserved "All bits shall be written as 0, else the request
+ * shall be rejected". */
+static void test_clear_single_decode_rejects_nonzero_reserved(void)
+{
+    size_t offsets[6] = {1, 2, 4, 5, 6, 7};
+    size_t i;
+
+    for (i = 0; i < 6; i++) {
+        rcp_bytes_t frame;
+        rcp_byte_bus_id_t bbid = 0;
+        uint8_t clear_txn = 0;
+        uint8_t txn = 0;
+
+        frame = rcp_cancel_encode_clear_single(0, 9, 0);
+        TEST_ASSERT_NOT_NULL(frame.data);
+        frame.data[TS_OFF + offsets[i]] = 0x01u;
+
+        TEST_ASSERT_EQUAL_INT(RCP_CANCEL_ERR_RESERVED_NONZERO,
+                               rcp_cancel_decode_clear_single(frame.data, frame.len, &bbid,
+                                                               &clear_txn, &txn));
+        rcp_bytes_free(&frame);
+    }
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -195,6 +287,9 @@ int main(void)
     RUN_TEST(test_clear_single_round_trip);
     RUN_TEST(test_clear_single_decode_rejects_clear_all);
     RUN_TEST(test_clear_single_decode_rejects_bad_msg_type);
+    RUN_TEST(test_clear_single_wire_sub_field_offsets);
+    RUN_TEST(test_clear_single_decode_reads_hand_built_spec_layout);
+    RUN_TEST(test_clear_single_decode_rejects_nonzero_reserved);
 
     RUN_TEST(test_is_cancellable_only_when_queued);
     RUN_TEST(test_attempt_not_found);

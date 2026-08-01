@@ -30,6 +30,8 @@ const char *rcp_cancel_strerror(rcp_cancel_errc_t e)
     case RCP_CANCEL_ERR_BAD_MSG_TYPE:   return "rcp/cancel: unexpected ACF message type";
     case RCP_CANCEL_ERR_NOT_REPURPOSED: return "rcp/cancel: message_timestamp not repurposed";
     case RCP_CANCEL_ERR_UNKNOWN_TYPE:   return "rcp/cancel: unrecognized request_type";
+    case RCP_CANCEL_ERR_RESERVED_NONZERO:
+        return "rcp/cancel: reserved sub-field octet is not zero";
     default:                            return "rcp/cancel: unknown error";
     }
 }
@@ -105,8 +107,11 @@ rcp_bytes_t rcp_cancel_encode_clear_single(rcp_byte_bus_id_t byte_bus_id,
                                             uint8_t clear_transaction_num,
                                             uint8_t transaction_num)
 {
+    /* Octet 0 opcode, octets 1..2 reserved-zero, octet 3
+     * clear_transaction_num, octets 4..7 reserved-zero -- see
+     * request_cancel.h's "wire sub-field layout" section. */
     uint64_t ts = (((uint64_t)RCP_REQUEST_TYPE_CLEAR_SINGLE) << 56) |
-                  (((uint64_t)clear_transaction_num) << 48);
+                  (((uint64_t)clear_transaction_num) << 32);
 
     return encode_gbb_repurposed(byte_bus_id, transaction_num, ts);
 }
@@ -133,7 +138,13 @@ rcp_cancel_errc_t rcp_cancel_decode_clear_single(const uint8_t *b, size_t len,
     rt = (uint8_t)((hdr.message_timestamp >> 56) & 0xFFu);
     if (rt != RCP_REQUEST_TYPE_CLEAR_SINGLE) return RCP_CANCEL_ERR_UNKNOWN_TYPE;
 
-    *out_clear_transaction_num = (uint8_t)((hdr.message_timestamp >> 48) & 0xFFu);
+    /* Reserved octets 1..2 (mask 0x00FFFF0000000000) and 4..7 (mask
+     * 0x00000000FFFFFFFF) must all be zero. */
+    if ((hdr.message_timestamp & 0x00FFFF00FFFFFFFFull) != 0ull) {
+        return RCP_CANCEL_ERR_RESERVED_NONZERO;
+    }
+
+    *out_clear_transaction_num = (uint8_t)((hdr.message_timestamp >> 32) & 0xFFu);
     *out_byte_bus_id            = hdr.info.byte_bus_id;
     *out_transaction_num        = hdr.info.transaction_num;
     return RCP_CANCEL_OK;

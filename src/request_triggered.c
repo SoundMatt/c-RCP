@@ -45,23 +45,27 @@ const char *rcp_triggered_strerror(rcp_triggered_errc_t e)
 
 /* ── rcp_triggered_step_t <-> the repurposed 8-byte message_timestamp region ── */
 
+/* Octet offsets within the repurposed 8-byte message_timestamp region --
+ * see request_triggered.h's "trigger-selection sub-fields" section:
+ *   0 request_type | 1 trigger_source_ep | 2 trigger_signal_nr |
+ *   3 trigger_threshold | 4..5 exec_delay (BE) | 6..7 repeat_count (BE) */
 static uint64_t pack_ts(uint8_t request_type, const rcp_triggered_step_t *step)
 {
     return (((uint64_t)request_type) << 56) |
-           (((uint64_t)step->sequencer_index) << 48) |
-           (((uint64_t)step->start_state) << 40) |
-           (((uint64_t)step->next_state) << 32) |
-           ((((uint64_t)step->trigger_exec_delay_ms) & 0xFFFFu) << 16) |
+           (((uint64_t)step->trigger_source_ep) << 48) |
+           (((uint64_t)step->trigger_signal_nr) << 40) |
+           (((uint64_t)step->trigger_threshold) << 32) |
+           (((uint64_t)step->exec_delay) << 16) |
            ((uint64_t)step->repeat_count);
 }
 
 static void unpack_ts(uint64_t ts, rcp_triggered_step_t *out_step)
 {
-    out_step->sequencer_index      = (uint8_t)((ts >> 48) & 0xFFu);
-    out_step->start_state          = (uint8_t)((ts >> 40) & 0xFFu);
-    out_step->next_state           = (uint8_t)((ts >> 32) & 0xFFu);
-    out_step->trigger_exec_delay_ms = (uint16_t)((ts >> 16) & 0xFFFFu);
-    out_step->repeat_count         = (uint16_t)(ts & 0xFFFFu);
+    out_step->trigger_source_ep = (uint8_t)((ts >> 48) & 0xFFu);
+    out_step->trigger_signal_nr = (uint8_t)((ts >> 40) & 0xFFu);
+    out_step->trigger_threshold = (uint8_t)((ts >> 32) & 0xFFu);
+    out_step->exec_delay        = (uint16_t)((ts >> 16) & 0xFFFFu);
+    out_step->repeat_count      = (uint16_t)(ts & 0xFFFFu);
 }
 
 /* ── Triggered request encode/decode ──────────────────────────────────────── */
@@ -152,41 +156,40 @@ void rcp_triggered_runtime_enter_started(rcp_triggered_runtime_t *rt)
 }
 
 //cfusa:req REQ-TRIG-009
-bool rcp_triggered_runtime_record_occurrence(rcp_triggered_runtime_t *rt)
+bool rcp_triggered_runtime_record_occurrence(rcp_triggered_runtime_t *rt,
+                                              const rcp_triggered_step_t *step,
+                                              uint8_t source_ep, uint8_t signal_nr)
 {
     if (!rt->started) return false;
+    if (source_ep != step->trigger_source_ep) return false;
+    if (signal_nr != step->trigger_signal_nr) return false;
+
     rt->occurrence_count++;
     return true;
 }
 
 //cfusa:req REQ-TRIG-010
-bool rcp_triggered_advance_guard(const rcp_sequencer_table_t *table,
-                                  const rcp_triggered_step_t *step)
+bool rcp_triggered_threshold_reached(const rcp_triggered_step_t *step,
+                                      const rcp_triggered_runtime_t *rt)
 {
-    uint8_t current;
-
-    if (!rcp_sequencer_get_state(table, step->sequencer_index, &current)) return false;
-    return current == step->start_state;
+    return rt->occurrence_count > (uint32_t)step->trigger_threshold;
 }
 
 //cfusa:req REQ-TRIG-011
-bool rcp_triggered_exec_delay_elapsed(const rcp_triggered_step_t *step, uint32_t elapsed_ms)
+bool rcp_triggered_exec_delay_elapsed(const rcp_triggered_step_t *step, uint32_t elapsed)
 {
-    return elapsed_ms >= (uint32_t)step->trigger_exec_delay_ms;
+    return elapsed >= (uint32_t)step->exec_delay;
 }
 
 //cfusa:req REQ-TRIG-012
 //cfusa:req REQ-TRIG-013
-bool rcp_triggered_tick(rcp_sequencer_table_t *table, const rcp_triggered_step_t *step,
-                         rcp_triggered_runtime_t *rt, uint32_t elapsed_ms, bool endpoint_idle)
+bool rcp_triggered_tick(const rcp_triggered_step_t *step, rcp_triggered_runtime_t *rt,
+                         uint32_t elapsed, bool endpoint_idle)
 {
     if (!rt->started) return false;
-    if (rt->occurrence_count == 0u) return false;
-    if (!rcp_triggered_exec_delay_elapsed(step, elapsed_ms)) return false;
+    if (!rcp_triggered_threshold_reached(step, rt)) return false;
+    if (!rcp_triggered_exec_delay_elapsed(step, elapsed)) return false;
     if (!endpoint_idle) return false;
-    if (!rcp_triggered_advance_guard(table, step)) return false;
-
-    if (!rcp_sequencer_set_state(table, step->sequencer_index, step->next_state)) return false;
 
     rt->occurrence_count = 0;
     rt->started           = false;

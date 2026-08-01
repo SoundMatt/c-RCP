@@ -110,7 +110,28 @@ typedef enum {
     RCP_CANCEL_ERR_UNKNOWN_TYPE   = 4, /* opcode byte matches neither
                                            request type the function
                                            called recognizes */
+    RCP_CANCEL_ERR_RESERVED_NONZERO = 5, /* a reserved sub-field octet
+                                             carries a set bit */
 } rcp_cancel_errc_t;
+
+/* ── wire sub-field layout ───────────────────────────────────────────────────
+ *
+ * Clear-all (0x05) and clear-non-safestate (0x06) carry no sub-field of
+ * their own: every octet of the repurposed message_timestamp region after
+ * the opcode is reserved and transmitted as zero.
+ *
+ * Clear-single (0x07) carries exactly one:
+ *
+ *   offset 0     request_type          (the opcode octet, 0x07)
+ *   offsets 1..2 reserved              (all bits zero)
+ *   offset 3     clear_transaction_num (the transaction_num to cancel)
+ *   offsets 4..7 reserved              (all bits zero)
+ *
+ * Before v0.102.0 clear_transaction_num was packed at offset 1 instead,
+ * which both placed it two octets early and overwrote an octet the
+ * specification mandates be transmitted as zero. A round-trip through
+ * this module's own encode/decode pair could not detect that, since both
+ * halves shared the same wrong offset. */
 
 /* Human-readable message for an rcp_cancel_errc_t value. Never returns NULL. */
 const char *rcp_cancel_strerror(rcp_cancel_errc_t e);

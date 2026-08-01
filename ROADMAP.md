@@ -5495,3 +5495,116 @@ the non-Linux stub, and the missing-privilege path) added to
 `.fusa-reqs.json`, each with a 1:1 `//cfusa:req`/`//cfusa:test` tag pair
 hand-verified before pushing (no local `cfusa` toolchain in this
 environment, the same note every prior milestone has made).
+
+### 102. Conditional-request conformance: real wire sub-fields, and actually wiring them into dispatch (v0.102.0) ✅
+
+**The gap this closes is two independent bugs stacked on top of each
+other**, both across the whole conditional-request feature area (TC18
+§11.2.2/§11.2.3: compound, compound-wait, triggered, chained, timed,
+cancellation).
+
+**Layer 1 -- the wire sub-field encodings were not conformant.** Every
+one of these request kinds carries its own sub-fields in the eight
+octets of an ACF_GBB's repurposed `message_timestamp` region, and every
+one of them had those octets in the wrong place, the wrong width, or
+missing entirely. Each was re-derived here from the specification's own
+figures and field tables (Figure 8/Table 6, Figure 9/Table 7, Figure
+10/Table 8, Figure 11/Table 9, Figure 12/Table 10, Figure 15/Table 13),
+read from the PDF rather than from any prior summary:
+
+- **Compound / compound-wait (0x0F/0x8F, 0x0B/0x8B)**: the correct layout
+  is `start_state`(1) `next_state`(1) `sequencer`(1) `exec_delay`(2)
+  `repetitions`(2) at offsets 1..7. This module packed `sequencer_index`
+  as 16 bits at offset 1, shifting `start_state`/`next_state` two octets
+  late, and squeezed `repetitions` into a single octet with a
+  correspondingly wrong `0xFF` infinite sentinel instead of the
+  specified two-octet `0xFFFF`.
+- **Triggered (0x0E/0x8E)**: the correct layout is `trigger_source_ep`(1)
+  `trigger_signal_nr`(1) `trigger_threshold`(1) `exec_delay`(2)
+  `repetitions`(2). This module carried compound's
+  `sequencer_index`/`start_state`/`next_state` here instead -- meaning
+  the entire trigger-*selection* mechanism was absent: a triggered
+  request had no way to say which trigger it was waiting on, and
+  `rcp_triggered_tick()` gated on a sequencer state a triggered request
+  does not have. This was the largest single change.
+- **Timed (0x0A)**: the correct layout is a mandatorily-zero reserved
+  octet at offset 1 and a 48-bit big-endian `presentation_time` spanning
+  offsets 2..7. This module packed a 32-bit value starting at offset 1,
+  overwriting the reserved octet and truncating the field's rollover
+  period from ~3.25 days to ~4.3 seconds of nanoseconds.
+- **Chained (0x01)**: the correct layout is `chain_exec_delay`(2) at
+  offsets 4..5 with offsets 1..3 and 6..7 reserved-zero. This module
+  invented `chain_length` and `chain_position` sub-fields at offsets 1
+  and 2, overwriting reserved octets, and omitted `chain_exec_delay`
+  entirely. Neither invented field is needed: a chain is defined
+  positionally by consecutive members of one AVTPDU.
+- **Clear-single (0x07)**: `clear_transaction_num` belongs at offset 3,
+  not offset 1.
+
+Two behavioral rules in the same area were also wrong rather than merely
+missing: the chained `cs` bit is a *conditional start* selector, read on
+the member about to run about its predecessor's outcome, but
+`rcp_chained_advance()` read it off the member that errored -- inverting
+who controls the abort. And compound's two sequencer sentinels
+(`start_state == 0` meaning "start in any state", `next_state == 0`
+meaning "remain in the current state") were unimplemented, so a
+`start_state` of 0 never started and a `next_state` of 0 drove the
+sequencer to state 0.
+
+**Layer 2 -- none of it was reachable.** `rcp_compound_tick()`,
+`rcp_compound_wait_tick()`, `rcp_triggered_tick()`,
+`rcp_chained_advance()`, `rcp_timed_admit()` and `rcp_cancel_attempt()`
+had, outside their own modules and unit tests, zero callers.
+`src/mock.c`'s dispatcher never looked at `request_type` at all and
+treated every ACF message identically; `rcp_sched_compare()`'s priority
+ordering and `rcp_e2e_request_may_execute()`'s safety gate were both
+individually correct, individually tested, and never invoked. Real
+dispatch was unconditional FIFO, and only standard requests worked
+end to end.
+
+`server.h`/`server.c` therefore gains a per-endpoint **request store**
+alongside the existing `ep_enable` pre-load queue, and with it the three
+functions that join everything up: `rcp_server_endpoint_admit()`
+(classify by `request_type` via `rcp_sched_classify()`, then route --
+standard requests keep the original submit-or-queue path byte for byte,
+conditional ones are decoded and stored, cancellations are reported for
+the caller to apply), `rcp_server_endpoint_select_due()` (evaluate each
+stored request through its own kind's predicate, gate safety-tagged ones
+on `rcp_e2e_request_may_execute()`, and return the single highest-priority
+due request per `rcp_sched_compare()`), and
+`rcp_server_endpoint_complete()` (apply the completion action, then the
+repetition rule). `mock.c` drives them: `rcp_mock_server_tick()`,
+`rcp_mock_server_notify_trigger()`, `rcp_mock_server_set_sequencer_count()`,
+`rcp_mock_server_watchdog_purge()`, chain sequencing across a frame's
+members in `rcp_mock_server_dispatch_frame()`, and cancellation applied
+against the store.
+
+**Still open, deliberately out of scope**: `src/mock.c`'s dispatcher
+still has no `ep_type` switch and never calls into any `ep_*.h` module's
+own decode function for *standard* requests either -- it invokes only
+the caller-supplied handler. This milestone makes conditional requests
+reach dispatch correctly; making the reference server decode
+endpoint-specific payloads itself is a separate, larger piece of work.
+
+**Testing.** New `tests/test_conditional_dispatch.c` (22 cases) is the
+first test in this repo to exercise these request kinds through the real
+`rcp_mock_server_dispatch()`/`_tick()` path rather than each module's own
+encode/decode in isolation -- it asserts on what the endpoint handler
+actually saw and when, so a request kind that is stored but never
+executes, executes with its condition unmet, or executes in the wrong
+order fails the test. It caught one real bug during development (chained
+arming restarted `chain_exec_delay` from the current tick instead of from
+the predecessor's finalization). Each affected module also gains literal
+octet-offset assertions written from the specification's figures rather
+than copied back out of the encoder -- the pre-existing round-trip tests
+all passed against the *wrong* layouts, since encode and decode agreed
+with each other. Full `ctest` 59/59 passing.
+
+`.fusa-reqs.json` gains `REQ-CMP-025`, `REQ-TIMED-009`..`011`,
+`REQ-CHAIN-011`..`012`, `REQ-SRV-004`..`014` and `REQ-MOCK-021`..`026`,
+and rewrites every requirement that described an old wire layout
+(`REQ-CMP-010`/`015`/`019`..`023`, `REQ-TRIG-004`/`007`/`009`..`013`,
+`REQ-TIMED-003`/`005`/`006`, `REQ-CHAIN-002`..`004`/`007`..`010`,
+`REQ-CANCEL-005`/`007`) with the specification's own offsets and widths
+cited. `include/rcp/version.h` had also drifted from `CMakeLists.txt`
+(`0.100.0` vs `0.101.0`); both, and `.fusa.json`, are now `0.102.0`.

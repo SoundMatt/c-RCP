@@ -7,6 +7,9 @@
 //cfusa:req REQ-TIMED-006
 //cfusa:req REQ-TIMED-007
 //cfusa:req REQ-TIMED-008
+//cfusa:req REQ-TIMED-009
+//cfusa:req REQ-TIMED-010
+//cfusa:req REQ-TIMED-011
 /*
  * request_timed.h -- Timed conditional requests for the TC18 Remote Control
  * Protocol wire layer (ROADMAP.md Phase 17, "Conditional Requests &
@@ -41,11 +44,27 @@
  * module reuses that shared wire convention without including or calling
  * into request_compound.h itself.
  *
- * This module's own 7-byte sub-field layout: presentation_time (4 bytes,
- * the same uint32_t width and "gPTP-domain instant" semantics as
- * avtp.h's own avtp_timestamp field -- this module's own deliberate
- * choice to keep the two directly comparable) followed by 3 reserved
- * bytes, always encoded/decoded as zero.
+ * ── wire sub-field layout ───────────────────────────────────────────────────
+ *
+ * The eight octets of the repurposed message_timestamp region carry, in
+ * order (offsets relative to the start of that region):
+ *
+ *   offset 0     request_type      (the opcode octet, 0x0A)
+ *   offset 1     reserved          (one octet, all bits zero)
+ *   offsets 2..7 presentation_time (six octets, big-endian)
+ *
+ * presentation_time is a 48-bit quantity: a gPTP-domain instant expressed
+ * in nanoseconds, reduced modulo 2^48 (so it rolls over every few days).
+ * Before v0.102.0 this module packed only a 32-bit value, starting one
+ * octet too early -- which both overwrote the mandatory reserved octet and
+ * truncated the field's rollover period. RCP_TIMED_PRESENTATION_TIME_MAX
+ * below is that field's own maximum encodable value.
+ *
+ * The reserved octet at offset 1 is not merely conventionally zero: a
+ * received Timed request carrying a non-zero value there is rejected
+ * outright (RCP_TIMED_ERR_RESERVED_NONZERO), as are the hs and cs header
+ * bits, which a Timed request must likewise leave clear
+ * (RCP_TIMED_ERR_UNSUPPORTED_CMD).
  *
  * ── Admission: PRESENTATION_TIME_TOO_FAR and GPTP_FAIL ──────────────────────
  *
@@ -92,12 +111,25 @@ extern "C" {
 /* ── Errors ─────────────────────────────────────────────────────────────────── */
 
 typedef enum {
-    RCP_TIMED_OK                 = 0,
-    RCP_TIMED_ERR_SHORT_FRAME    = 1,
-    RCP_TIMED_ERR_BAD_MSG_TYPE   = 2,
-    RCP_TIMED_ERR_NOT_REPURPOSED = 3, /* decoded mtv != RCP_ACF_MTV_UNTIMED */
-    RCP_TIMED_ERR_UNKNOWN_TYPE   = 4, /* opcode byte is not RCP_REQUEST_TYPE_TIMED */
+    RCP_TIMED_OK                    = 0,
+    RCP_TIMED_ERR_SHORT_FRAME       = 1,
+    RCP_TIMED_ERR_BAD_MSG_TYPE      = 2,
+    RCP_TIMED_ERR_NOT_REPURPOSED    = 3, /* decoded mtv != RCP_ACF_MTV_UNTIMED */
+    RCP_TIMED_ERR_UNKNOWN_TYPE      = 4, /* opcode byte is not RCP_REQUEST_TYPE_TIMED */
+    RCP_TIMED_ERR_RESERVED_NONZERO  = 5, /* the reserved octet at offset 1 of the
+                                             repurposed region is not all-zero */
+    RCP_TIMED_ERR_UNSUPPORTED_CMD   = 6, /* hs and/or cs set: a Timed request must
+                                             leave both clear */
 } rcp_timed_errc_t;
+
+/* The largest encodable presentation_time: the all-ones value of the
+ * 48-bit sub-field. rcp_timed_encode_request() rejects anything above
+ * this rather than silently truncating it. */
+#define RCP_TIMED_PRESENTATION_TIME_MAX ((uint64_t)0x0000FFFFFFFFFFFFull)
+
+/* One past RCP_TIMED_PRESENTATION_TIME_MAX: the modulus presentation_time
+ * arithmetic (rcp_timed_too_far()) wraps around. */
+#define RCP_TIMED_PRESENTATION_TIME_MODULUS ((uint64_t)0x0001000000000000ull)
 
 /* Human-readable message for an rcp_timed_errc_t value. Never returns NULL. */
 const char *rcp_timed_strerror(rcp_timed_errc_t e);
@@ -113,27 +145,33 @@ bool rcp_timed_feature_enabled(uint32_t options);
 
 /* Encodes an ACF_GBB-framed timed request addressed to byte_bus_id,
  * packing presentation_time into the repurposed message_timestamp
- * region's first 4 sub-field bytes (the remaining 3 reserved and zeroed)
- * with the leading opcode byte set to RCP_REQUEST_TYPE_TIMED and mtv
- * forced to RCP_ACF_MTV_UNTIMED -- same conventions as
- * rcp_compound_encode_request() (request_compound.h). payload/payload_len is this
- * request's own opaque, endpoint-specific data; payload may be NULL iff
- * payload_len == 0. Returns a zeroed rcp_bytes_t (data=NULL) if
- * payload_len exceeds RCP_ACF_MAX_PAYLOAD or on allocation failure.
- * Caller frees the result with rcp_bytes_free(). */
-rcp_bytes_t rcp_timed_encode_request(rcp_byte_bus_id_t byte_bus_id, uint32_t presentation_time,
+ * region's trailing six octets, leaving the reserved octet at offset 1
+ * all-zero, with the leading opcode byte set to RCP_REQUEST_TYPE_TIMED,
+ * hs/cs left clear, and mtv forced to RCP_ACF_MTV_UNTIMED -- same
+ * conventions as rcp_compound_encode_request() (request_compound.h).
+ * payload/payload_len is this request's own opaque, endpoint-specific
+ * data; payload may be NULL iff payload_len == 0. Returns a zeroed
+ * rcp_bytes_t (data=NULL) if presentation_time exceeds
+ * RCP_TIMED_PRESENTATION_TIME_MAX (never silently truncated), payload_len
+ * exceeds RCP_ACF_MAX_PAYLOAD, or on allocation failure. Caller frees the
+ * result with rcp_bytes_free(). */
+rcp_bytes_t rcp_timed_encode_request(rcp_byte_bus_id_t byte_bus_id, uint64_t presentation_time,
                                       uint8_t transaction_num, const uint8_t *payload,
                                       size_t payload_len);
 
 /* Decodes and validates a timed request from b[0..len). Same failure-mode
  * conventions as rcp_compound_decode_request() (request_compound.h), with
  * RCP_TIMED_ERR_UNKNOWN_TYPE returned whenever the decoded opcode byte is
- * not RCP_REQUEST_TYPE_TIMED. On RCP_TIMED_OK, *out_byte_bus_id,
- * *out_presentation_time, and *out_transaction_num are populated, and
- * *out_payload / *out_payload_len are set to a *borrowed* view into b. */
+ * not RCP_REQUEST_TYPE_TIMED, RCP_TIMED_ERR_RESERVED_NONZERO when the
+ * reserved octet at offset 1 of the repurposed region carries any set bit,
+ * and RCP_TIMED_ERR_UNSUPPORTED_CMD when the decoded hs or cs header bit
+ * is set. On RCP_TIMED_OK, *out_byte_bus_id, *out_presentation_time (in
+ * [0, RCP_TIMED_PRESENTATION_TIME_MAX]), and *out_transaction_num are
+ * populated, and *out_payload / *out_payload_len are set to a *borrowed*
+ * view into b. */
 rcp_timed_errc_t rcp_timed_decode_request(const uint8_t *b, size_t len,
                                            rcp_byte_bus_id_t *out_byte_bus_id,
-                                           uint32_t *out_presentation_time,
+                                           uint64_t *out_presentation_time,
                                            const uint8_t **out_payload, size_t *out_payload_len,
                                            uint8_t *out_transaction_num);
 
@@ -146,11 +184,14 @@ typedef enum {
 } rcp_timed_admission_t;
 
 /* True iff presentation_time sits strictly in the future of now (by
- * gPTP-domain wraparound-safe subtraction) by more than max_horizon --
- * i.e. RCP_TIMED_REJECT_PRESENTATION_TIME_TOO_FAR's own pure trigger
- * condition. A presentation_time at or before now is never "too far".
+ * wraparound-safe subtraction modulo RCP_TIMED_PRESENTATION_TIME_MODULUS,
+ * the 48-bit rollover period of the field itself) by more than
+ * max_horizon -- i.e. RCP_TIMED_REJECT_PRESENTATION_TIME_TOO_FAR's own
+ * pure trigger condition. A presentation_time at or before now is never
+ * "too far"; a difference of more than half the modulus is read as "in
+ * the past", the usual unambiguous split for a wrapping time domain.
  * Does not consider gPTP lock state -- see rcp_timed_admit(). */
-bool rcp_timed_too_far(uint32_t presentation_time, uint32_t now, uint32_t max_horizon);
+bool rcp_timed_too_far(uint64_t presentation_time, uint64_t now, uint64_t max_horizon);
 
 /* The combined admission decision: RCP_TIMED_REJECT_GPTP_FAIL if
  * !gptp_locked (presentation_time cannot be trusted at all without a
@@ -158,8 +199,13 @@ bool rcp_timed_too_far(uint32_t presentation_time, uint32_t now, uint32_t max_ho
  * check), else RCP_TIMED_REJECT_PRESENTATION_TIME_TOO_FAR if
  * rcp_timed_too_far(presentation_time, now, max_horizon), else
  * RCP_TIMED_ACCEPT. */
-rcp_timed_admission_t rcp_timed_admit(bool gptp_locked, uint32_t presentation_time, uint32_t now,
-                                       uint32_t max_horizon);
+rcp_timed_admission_t rcp_timed_admit(bool gptp_locked, uint64_t presentation_time, uint64_t now,
+                                       uint64_t max_horizon);
+
+/* True iff presentation_time is at or before now, in the same wrapping
+ * 48-bit domain rcp_timed_too_far() uses -- i.e. this request's execution
+ * condition is satisfied and it may now run. */
+bool rcp_timed_due(uint64_t presentation_time, uint64_t now);
 
 #ifdef __cplusplus
 }
