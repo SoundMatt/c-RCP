@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/ep_pwm.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 /* ── Byte-order helpers (this TU's own copy, matching acf.c's/ep_gpio.c's
@@ -33,16 +34,28 @@ static rcp_ep_pwm_value_t get_pwm_value(const uint8_t *p)
 }
 
 /* Saturating 16-bit add/subtract shared by every RCP_EP_PWM_OUT_WRITE_ADD/
- * _SUB field application below -- see the file header. */
+ * _SUB field application below -- see the file header. Both saturate
+ * rather than wrap, per the specification's own no-overflow/no-wrap-around
+ * rule for these two operations (extraction §4.5 Group C). */
 static uint16_t saturating_add_u16(uint16_t current, uint16_t request)
 {
     uint32_t sum = (uint32_t)current + (uint32_t)request;
     return (sum > 0xFFFFu) ? (uint16_t)0xFFFFu : (uint16_t)sum;
 }
 
+/* The subtraction's operand order is normatively "request minus current"
+ * -- the requested payload value is the minuend and the current interface
+ * status the subtrahend, not the other way round (extraction §4.5 Group C,
+ * the evt[2:0]=110b row). The row's parenthetical remark about decreasing
+ * a PWM duty cycle is an illustrative note attached to that row, not a
+ * second, contradictory definition of the operand order; the operation
+ * itself is stated in the row's own normative sentence. Saturates at
+ * 0x0000 on the low side (issue: this was inverted before -- it computed
+ * current minus request, which produces a different value for every
+ * request where the two operands differ). */
 static uint16_t saturating_sub_u16(uint16_t current, uint16_t request)
 {
-    return (request > current) ? (uint16_t)0u : (uint16_t)(current - request);
+    return (current > request) ? (uint16_t)0u : (uint16_t)(request - current);
 }
 
 static uint16_t apply_write_field(uint16_t current, uint16_t request,
@@ -93,13 +106,172 @@ rcp_ep_pwm_value_t rcp_ep_pwm_out_apply_write(rcp_ep_pwm_value_t current,
     return result;
 }
 
+/* ── PWM_OUT: the EP_func register block (evt[2:0] == 111b) ────────────────── */
+
+/* The EP-common enable&clr (0x0002) and options (0x0003) octets, packed
+ * from / unpacked into the flags regmap.h's shared functional-config
+ * prefix already models. Only the bits regmap.h models are represented:
+ * the specification's own common-entries table defines further option
+ * bits (separate ack/response CRC enables, an error-stream selector, an
+ * ack timestamp enable, an error-message suppressor) that
+ * rcp_regmap_ep_functional_cfg_t does not yet carry, so those bit
+ * positions read back as 0 and a write to them is accepted and dropped.
+ * That is a pre-existing regmap.h modeling gap, called out here so the
+ * register-block round trip below is honest about what it preserves. */
+#define PWM_OUT_ENABLE_CLR_BIT_ENABLE   ((uint8_t)(1u << 0))
+#define PWM_OUT_ENABLE_CLR_BIT_CLEAR    ((uint8_t)(1u << 4))
+#define PWM_OUT_OPTIONS_BIT_REQ_CRC     ((uint8_t)(1u << 0))
+#define PWM_OUT_OPTIONS_BIT_RESP_TS     ((uint8_t)(1u << 3))
+#define PWM_OUT_OPTIONS_BIT_SUPPRESS    ((uint8_t)(1u << 7))
+
+//cfusa:req REQ-PWM-010
+void rcp_ep_pwm_out_render_registers(const rcp_ep_pwm_out_functional_cfg_t *cfg,
+                                      uint8_t out[RCP_EP_PWM_OUT_EP_FUNC_LEN])
+{
+    uint8_t enable_clr = 0u;
+    uint8_t options    = 0u;
+
+    if (cfg->common.ep_enable) enable_clr |= PWM_OUT_ENABLE_CLR_BIT_ENABLE;
+    if (cfg->common.ep_clear_req_storage) enable_clr |= PWM_OUT_ENABLE_CLR_BIT_CLEAR;
+    if (cfg->common.ep_req_crc_enable) options |= PWM_OUT_OPTIONS_BIT_REQ_CRC;
+    if (cfg->common.ep_response_ts_enable) options |= PWM_OUT_OPTIONS_BIT_RESP_TS;
+    if (cfg->common.ep_suppress_response) options |= PWM_OUT_OPTIONS_BIT_SUPPRESS;
+
+    out[RCP_EP_PWM_OUT_REG_EP_LEN]        = (uint8_t)RCP_EP_PWM_OUT_EP_FUNC_LEN;
+    out[RCP_EP_PWM_OUT_REG_RESERVED_01]   = 0u;
+    out[RCP_EP_PWM_OUT_REG_EP_ENABLE_CLR] = enable_clr;
+    out[RCP_EP_PWM_OUT_REG_EP_OPTIONS]    = options;
+    put_u16(&out[RCP_EP_PWM_OUT_REG_BASE_CLK], cfg->base_clk);
+    put_u16(&out[RCP_EP_PWM_OUT_REG_EP_STATUS], cfg->ep_status);
+    out[RCP_EP_PWM_OUT_REG_CLK_DIVIDER]  = cfg->clk_divider;
+    out[RCP_EP_PWM_OUT_REG_SIGNAL_FLAGS] = cfg->signal_flags;
+    put_u16(&out[RCP_EP_PWM_OUT_REG_DUTY_CYCLE_MIN], cfg->duty_cycle_min);
+    put_u16(&out[RCP_EP_PWM_OUT_REG_DUTY_CYCLE_MAX], cfg->duty_cycle_max);
+    out[RCP_EP_PWM_OUT_REG_SKEW] = cfg->skew;
+}
+
+/* The inverse of render: adopts every R/W register from an already
+ * patched block image. The read-only offsets (EP_LEN, the reserved octet,
+ * base_clk) are deliberately not read back -- apply_reconfig() re-renders
+ * them from cfg before patching, so a write covering them is a no-op. */
+static void parse_registers(rcp_ep_pwm_out_functional_cfg_t *cfg,
+                             const uint8_t in[RCP_EP_PWM_OUT_EP_FUNC_LEN])
+{
+    uint8_t enable_clr = in[RCP_EP_PWM_OUT_REG_EP_ENABLE_CLR];
+    uint8_t options    = in[RCP_EP_PWM_OUT_REG_EP_OPTIONS];
+
+    cfg->common.ep_enable            = (enable_clr & PWM_OUT_ENABLE_CLR_BIT_ENABLE) != 0u;
+    cfg->common.ep_clear_req_storage = (enable_clr & PWM_OUT_ENABLE_CLR_BIT_CLEAR) != 0u;
+    cfg->common.ep_req_crc_enable    = (options & PWM_OUT_OPTIONS_BIT_REQ_CRC) != 0u;
+    cfg->common.ep_response_ts_enable = (options & PWM_OUT_OPTIONS_BIT_RESP_TS) != 0u;
+    cfg->common.ep_suppress_response  = (options & PWM_OUT_OPTIONS_BIT_SUPPRESS) != 0u;
+
+    cfg->ep_status      = get_u16(&in[RCP_EP_PWM_OUT_REG_EP_STATUS]);
+    cfg->clk_divider    = in[RCP_EP_PWM_OUT_REG_CLK_DIVIDER];
+    cfg->signal_flags   = in[RCP_EP_PWM_OUT_REG_SIGNAL_FLAGS];
+    cfg->duty_cycle_min = get_u16(&in[RCP_EP_PWM_OUT_REG_DUTY_CYCLE_MIN]);
+    cfg->duty_cycle_max = get_u16(&in[RCP_EP_PWM_OUT_REG_DUTY_CYCLE_MAX]);
+    cfg->skew           = in[RCP_EP_PWM_OUT_REG_SKEW];
+}
+
+/* True iff the octet at relative offset addr belongs to a read-only
+ * register of the block -- EP_LEN, the reserved octet, and both octets of
+ * base_clk. */
+static bool reg_offset_read_only(uint16_t addr)
+{
+    return addr == RCP_EP_PWM_OUT_REG_EP_LEN ||
+           addr == RCP_EP_PWM_OUT_REG_RESERVED_01 ||
+           addr == RCP_EP_PWM_OUT_REG_BASE_CLK ||
+           addr == (uint16_t)(RCP_EP_PWM_OUT_REG_BASE_CLK + 1u);
+}
+
+//cfusa:req REQ-PWM-011
+const char *rcp_ep_pwm_out_reconfig_strerror(rcp_ep_pwm_out_reconfig_errc_t e)
+{
+    switch (e) {
+    case RCP_EP_PWM_OUT_RECONFIG_OK:
+        return "rcp/ep_pwm: PWM_OUT configuration write applied";
+    case RCP_EP_PWM_OUT_RECONFIG_ERR_SHORT:
+        return "rcp/ep_pwm: PWM_OUT configuration write has no address and data";
+    case RCP_EP_PWM_OUT_RECONFIG_ERR_OUT_OF_RANGE:
+        return "rcp/ep_pwm: PWM_OUT configuration write extends past the EP_func block";
+    default:
+        return "rcp/ep_pwm: PWM_OUT unknown configuration-write error";
+    }
+}
+
 //cfusa:req REQ-PWM-010
 //cfusa:req REQ-PWM-011
-void rcp_ep_pwm_out_apply_reconfig(bool *enabled, uint32_t reconfig_word)
+rcp_ep_pwm_out_reconfig_errc_t
+rcp_ep_pwm_out_apply_reconfig(rcp_ep_pwm_out_functional_cfg_t *cfg,
+                               const uint8_t *payload, size_t payload_len)
 {
-    if ((reconfig_word & 0x1u) != 0) {
-        *enabled = !*enabled;
+    uint8_t  block[RCP_EP_PWM_OUT_EP_FUNC_LEN];
+    uint16_t start_address;
+    size_t   data_len;
+    size_t   i;
+
+    if (payload_len <= RCP_EP_PWM_OUT_RECONFIG_ADDR_LEN) {
+        return RCP_EP_PWM_OUT_RECONFIG_ERR_SHORT;
     }
+
+    start_address = get_u16(payload);
+    data_len      = payload_len - RCP_EP_PWM_OUT_RECONFIG_ADDR_LEN;
+
+    /* "Any payload whose length plus the start address exceeds EP_LEN is
+     * to be ignored" -- the whole write, not just its overhanging tail
+     * (extraction §3.7.1). */
+    if ((size_t)start_address + data_len > (size_t)RCP_EP_PWM_OUT_EP_FUNC_LEN) {
+        return RCP_EP_PWM_OUT_RECONFIG_ERR_OUT_OF_RANGE;
+    }
+
+    /* Patch the block's current image at octet granularity, then adopt
+     * it wholesale -- so a write covering only part of a multi-octet
+     * register updates exactly the octets it addresses and leaves that
+     * register's other octets alone. */
+    rcp_ep_pwm_out_render_registers(cfg, block);
+    for (i = 0; i < data_len; i++) {
+        uint16_t addr = (uint16_t)(start_address + i);
+
+        if (reg_offset_read_only(addr)) continue; /* write ignored */
+        block[addr] = payload[RCP_EP_PWM_OUT_RECONFIG_ADDR_LEN + i];
+    }
+    parse_registers(cfg, block);
+
+    return RCP_EP_PWM_OUT_RECONFIG_OK;
+}
+
+//cfusa:req REQ-PWM-010
+rcp_bytes_t rcp_ep_pwm_out_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                    uint16_t start_address,
+                                                    const uint8_t *data, size_t data_len,
+                                                    uint8_t transaction_num)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 empty = {0};
+    uint8_t                    *payload;
+    size_t                      payload_len;
+    rcp_bytes_t                 frame;
+
+    if (data_len == 0 || data == NULL) return empty;
+
+    payload_len = RCP_EP_PWM_OUT_RECONFIG_ADDR_LEN + data_len;
+    if (payload_len > RCP_ACF_MAX_PAYLOAD) return empty;
+
+    payload = (uint8_t *)malloc(payload_len);
+    if (!payload) return empty;
+
+    put_u16(payload, start_address);
+    memcpy(payload + RCP_EP_PWM_OUT_RECONFIG_ADDR_LEN, data, data_len);
+
+    hdr.byte_bus_id     = byte_bus_id;
+    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.evt             = (uint8_t)RCP_EP_PWM_OUT_WRITE_RECONFIG;
+    hdr.transaction_num = transaction_num;
+
+    frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
+    free(payload);
+    return frame;
 }
 
 /* ── PWM_OUT: triggers ──────────────────────────────────────────────────────── */
@@ -126,8 +298,10 @@ void rcp_ep_pwm_out_functional_cfg_init(rcp_ep_pwm_out_functional_cfg_t *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
     rcp_regmap_ep_functional_cfg_init(&cfg->common);
-    /* cfg->trigger is already RCP_EP_PWM_OUT_TRIGGER_NONE (0) and
-     * cfg->enabled already false via the memset above. */
+    /* cfg->trigger is already RCP_EP_PWM_OUT_TRIGGER_NONE (0), every
+     * EP_func register is already 0, and common.ep_enable (this
+     * endpoint's own enable bit) is already false, via the memset and
+     * rcp_regmap_ep_functional_cfg_init() above. */
 }
 
 //cfusa:req REQ-PWM-017
@@ -158,7 +332,7 @@ bool rcp_ep_pwm_out_set_enabled(rcp_ep_pwm_out_functional_cfg_t *cfg, bool enabl
 {
     if (!rcp_ep_pwm_out_functional_cfg_writable(state, writer)) return false;
 
-    cfg->enabled = enabled;
+    cfg->common.ep_enable = enabled;
     return true;
 }
 

@@ -73,8 +73,15 @@ uint32_t rcp_ep_gpio_apply_write(uint32_t current, uint32_t request,
             return (sum > 0xFFFFFFFFu) ? 0xFFFFFFFFu : (uint32_t)sum;
         }
     case RCP_EP_GPIO_WRITE_SUB:
-        /* Saturate at 0x00000000 rather than wrapping. */
-        return (request > current) ? 0u : (current - request);
+        /* The subtraction's operand order is normatively "request minus
+         * current": the requested payload value is the minuend and the
+         * current interface status the subtrahend (extraction §4.5 Group
+         * C, the evt[2:0]=110b row -- one row covering GPIO and PWM_OUT
+         * jointly, so the identical rule ep_pwm.c applies). The row's
+         * parenthetical remark about decreasing a PWM duty cycle is an
+         * illustrative note, not a second definition of the operand
+         * order. Saturates at 0x00000000 rather than wrapping. */
+        return (current > request) ? 0u : (request - current);
     case RCP_EP_GPIO_WRITE_RESERVED4:
         return current; /* documented no-op; see the file header */
     case RCP_EP_GPIO_WRITE_RECONFIG:

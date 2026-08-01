@@ -154,6 +154,13 @@ static void meta_set_bool(relay_message_t *msg, const char *key, bool v)
     relay_message_set_meta(msg, key, v ? "true" : "false");
 }
 
+/* The largest ADC response this bridge decodes into a relay message. An
+ * ADC response carries N 2-octet measurement values (ep_adc.h); this bound
+ * caps the on-stack landing buffers here without constraining ep_adc.c's
+ * own RCP_EP_ADC_MAX_VALUES ceiling. A response carrying more values than
+ * this is rejected as undecodable rather than truncated. */
+#define RCP_ADAPT_ADC_MAX_VALUES ((size_t)64u)
+
 /* ── Fixed-width big-endian scalar pack/unpack (GPIO/ADC/PWM_OUT/PWM_IN) ─────── */
 
 static uint16_t be16_decode(const uint8_t *p) { return (uint16_t)(((uint16_t)p[0] << 8) | p[1]); }
@@ -261,9 +268,17 @@ rcp_bytes_t rcp_message_to_request(rcp_adapt_op_t op, rcp_byte_bus_id_t byte_bus
         break;
     }
 
-    case RCP_ADAPT_OP_ADC_READ:
-        result = rcp_ep_adc_encode_read_request(byte_bus_id, transaction_num);
+    case RCP_ADAPT_OP_ADC_READ: {
+        /* read_size selects how many 2-octet measurement values the
+         * response is to carry (ep_adc.h); default to a single value's
+         * worth so an unannotated request still asks for something
+         * well-formed. */
+        uint32_t read_size = meta_get_u32_default(msg, "rcp.adc.read_size",
+                                                    (uint32_t)RCP_EP_ADC_VALUE_LEN);
+        result = rcp_ep_adc_encode_read_request(byte_bus_id, (uint16_t)read_size,
+                                                 transaction_num);
         break;
+    }
 
     case RCP_ADAPT_OP_PWM_OUT_READ:
         result = rcp_ep_pwm_out_encode_read_request(byte_bus_id, transaction_num);
@@ -525,19 +540,27 @@ static relay_message_t response_to_message_impl(rcp_adapt_op_t op, rcp_byte_bus_
     }
 
     case RCP_ADAPT_OP_ADC_READ: {
-        uint16_t value;
+        uint16_t values[RCP_ADAPT_ADC_MAX_VALUES];
+        size_t value_count;
+        size_t i;
         bool timed;
         uint64_t timestamp;
         uint8_t transaction_num;
-        uint8_t payload[RCP_EP_ADC_PAYLOAD_LEN];
+        uint8_t payload[RCP_ADAPT_ADC_MAX_VALUES * 2u];
         relay_message_t msg;
-        if (rcp_ep_adc_decode_response(b, len, byte_bus_id, &value, &timed, &timestamp,
+        if (rcp_ep_adc_decode_response(b, len, byte_bus_id, values, RCP_ADAPT_ADC_MAX_VALUES,
+                                        &value_count, &timed, &timestamp,
                                         &transaction_num) != RCP_EP_ADC_OK) {
             return fail_decode(out_err);
         }
-        be16_encode(payload, value);
+        /* An ADC response carries N measurement values (ep_adc.h); the
+         * bridged payload is all of them, big-endian, in order. */
+        for (i = 0; i < value_count; i++) {
+            be16_encode(&payload[i * 2u], values[i]);
+        }
         msg = finish_timed_response(timed, timestamp, transaction_num);
-        msg.payload = relay_bytes_dup(payload, sizeof(payload));
+        msg.payload = relay_bytes_dup(payload, value_count * 2u);
+        meta_set_u32(&msg, "rcp.adc.value_count", (uint32_t)value_count);
         return msg;
     }
 

@@ -119,8 +119,17 @@ rcp_bytes_t rcp_ep_lin_encode_command_request(rcp_byte_bus_id_t byte_bus_id,
 {
     rcp_acf_byte_message_info_t hdr = {0};
 
+    /* A LIN command request is a read-direction request: it expects the
+     * endpoint to reply with the bytes received on the bus. The wire op
+     * bit's read sense is 0 (acf.h's RCP_ACF_OP_READ), and the LIN
+     * endpoint's own reply rule is stated in terms of that same read
+     * sense -- a reply is sent only for the read direction (extraction
+     * §5.10.1, and the general request-handling rule in §3.9.1).
+     * Encoding this as a write (op=1) told a conforming peer "no data
+     * response expected", i.e. the exact opposite of what the request
+     * means. */
     hdr.byte_bus_id     = byte_bus_id;
-    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.op              = RCP_ACF_OP_READ;
     hdr.evt             = (uint8_t)compare_mode;
     hdr.transaction_num = transaction_num;
 
@@ -146,7 +155,8 @@ rcp_ep_lin_errc_t rcp_ep_lin_decode_command_request(const uint8_t *b, size_t len
     if (acf_rc != RCP_ACF_OK) return RCP_EP_LIN_ERR_BAD_MSG_TYPE;
 
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_LIN_ERR_WRONG_BUS;
-    if (hdr.op != RCP_ACF_OP_WRITE) return RCP_EP_LIN_ERR_WRONG_OP;
+    /* Read direction -- see rcp_ep_lin_encode_command_request() above. */
+    if (hdr.op != RCP_ACF_OP_READ) return RCP_EP_LIN_ERR_WRONG_OP;
 
     /* payload is round-tripped verbatim, byte for byte, with no
      * protocol-level LIN-frame parsing of any kind -- see the file

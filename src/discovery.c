@@ -181,10 +181,11 @@ rcp_bytes_t rcp_discovery_encode_response(const rcp_regmap_general_t *map,
     rcp_bytes_t                  frame = {0};
 
     put_u32(&slice[0],  map->magic);
-    put_u16(&slice[4],  map->svr_version);
-    put_u16(&slice[6],  map->vendor_id);
-    put_u16(&slice[8],  map->device_id);
-    put_u16(&slice[10], map->svr_ep_count);
+    put_u32(&slice[4],  map->svr_version); /* 32 bit, not 16 -- see
+                                              RCP_DISCOVERY_GENERAL_SLICE_LEN */
+    put_u16(&slice[8],  map->vendor_id);
+    put_u16(&slice[10], map->device_id);
+    put_u16(&slice[12], map->svr_ep_count);
 
     /* A response's payload always spans exactly read_size octets -- see
      * RCP_DISCOVERY_GENERAL_SLICE_LEN's own comment in discovery.h. Any
@@ -231,10 +232,10 @@ rcp_discovery_errc_t rcp_discovery_decode_response(const uint8_t *b, size_t len,
     out_result->valid           = true;
     out_result->server_stream_id = server_stream_id;
     out_result->magic           = get_u32(&payload[0]);
-    out_result->svr_version     = get_u16(&payload[4]);
-    out_result->vendor_id       = get_u16(&payload[6]);
-    out_result->device_id       = get_u16(&payload[8]);
-    out_result->svr_ep_count    = get_u16(&payload[10]);
+    out_result->svr_version     = get_u32(&payload[4]);
+    out_result->vendor_id       = get_u16(&payload[8]);
+    out_result->device_id       = get_u16(&payload[10]);
+    out_result->svr_ep_count    = get_u16(&payload[12]);
     return RCP_DISCOVERY_OK;
 }
 
@@ -264,10 +265,11 @@ size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
     if (count == 0) return 0;
 
     put_u32(&slice[0],  map->magic);
-    put_u16(&slice[4],  map->svr_version);
-    put_u16(&slice[6],  map->vendor_id);
-    put_u16(&slice[8],  map->device_id);
-    put_u16(&slice[10], map->svr_ep_count);
+    put_u32(&slice[4],  map->svr_version); /* 32 bit, not 16 -- see
+                                              RCP_DISCOVERY_GENERAL_SLICE_LEN */
+    put_u16(&slice[8],  map->vendor_id);
+    put_u16(&slice[10], map->device_id);
+    put_u16(&slice[12], map->svr_ep_count);
 
     memset(payload, 0, sizeof(payload));
     copy_len = ((size_t)read_size < RCP_DISCOVERY_GENERAL_SLICE_LEN)
@@ -357,10 +359,10 @@ rcp_discovery_errc_t rcp_discovery_decode_reassembled_response(const uint8_t *re
     out_result->valid            = true;
     out_result->server_stream_id = server_stream_id;
     out_result->magic            = get_u32(&reassembled[0]);
-    out_result->svr_version      = get_u16(&reassembled[4]);
-    out_result->vendor_id        = get_u16(&reassembled[6]);
-    out_result->device_id        = get_u16(&reassembled[8]);
-    out_result->svr_ep_count     = get_u16(&reassembled[10]);
+    out_result->svr_version      = get_u32(&reassembled[4]);
+    out_result->vendor_id        = get_u16(&reassembled[8]);
+    out_result->device_id        = get_u16(&reassembled[10]);
+    out_result->svr_ep_count     = get_u16(&reassembled[12]);
     return RCP_DISCOVERY_OK;
 }
 

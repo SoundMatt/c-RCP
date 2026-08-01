@@ -103,9 +103,12 @@
  * A command request's payload is the *raw* sequence of bytes this endpoint
  * drives directly onto the bus for that transaction -- see the scope
  * validation above; this module never inspects, strips, or reformats any
- * byte of it. Encoded as ACF_OP_WRITE, mirroring every prior raw-byte-
- * stream endpoint's (ep_i2c.h/ep_uart.h) own request-carries-op-WRITE
- * convention. Decoded payloads are *borrowed* pointers into the
+ * byte of it. Encoded as ACF_OP_READ -- the read direction is the one
+ * that expects a data response, and this endpoint's own reply rule is
+ * stated in terms of exactly that direction (extraction §5.10.1): a
+ * command request pushes bytes onto the bus *and* asks for what came
+ * back, so it is a read-direction request, not a write one. Decoded
+ * payloads are *borrowed* pointers into the
  * caller-supplied frame buffer, matching acf.c's own decode_abb()/
  * decode_gbb() convention, for the same reason ep_i2c.h's/ep_uart.h's own
  * raw payloads are borrowed rather than copied: a variable-length payload
@@ -303,7 +306,7 @@ rcp_bytes_t rcp_ep_lin_encode_command_request(rcp_byte_bus_id_t byte_bus_id,
  * fixed header or its declared payload length; RCP_EP_LIN_ERR_BAD_MSG_TYPE
  * if b is not an ACF_ABB message; RCP_EP_LIN_ERR_WRONG_BUS if its
  * byte_bus_id != expected_bus_id; RCP_EP_LIN_ERR_WRONG_OP if its op is not
- * RCP_ACF_OP_WRITE. On RCP_EP_LIN_OK, *out_compare_mode (evt[2:0] of the
+ * RCP_ACF_OP_READ. On RCP_EP_LIN_OK, *out_compare_mode (evt[2:0] of the
  * header's evt field; see rcp_ep_lin_compare_mode_valid()) and
  * *out_transaction_num are populated, and *out_tx_data / *out_tx_len are
  * set to a *borrowed* view into b (not copied -- see the file header) of

@@ -110,6 +110,14 @@
  * saturation behavior described generically (at a narrower word width) by
  * the specification for other endpoint types' fields.
  *
+ * Subtract's operand order is the requested payload value minus the
+ * current register value ("request minus current"), not the reverse: the
+ * single evt[2:0]=110b row that defines the operation covers GPIO and
+ * PWM_OUT jointly and states that order normatively (extraction §4.5
+ * Group C). The row's parenthetical remark about decreasing a PWM duty
+ * cycle is an illustrative note, not a competing definition. Add is
+ * commutative and so is unaffected by this distinction.
+ *
  * ── Per-pin trigger signals ──────────────────────────────────────────────────
  *
  * rcp_ep_gpio_trigger_t names the three asynchronous-event trigger modes a
@@ -192,7 +200,8 @@ bool rcp_ep_gpio_write_semantics_valid(uint8_t v);
  * RCP_EP_GPIO_WRITE_REPLACE .. _SUB or _RESERVED4 -- never
  * RCP_EP_GPIO_WRITE_RECONFIG (use rcp_ep_gpio_apply_reconfig() for that
  * one instead; see the file header). RCP_EP_GPIO_WRITE_ADD/_SUB saturate at
- * 0xFFFFFFFF/0x00000000 respectively rather than wrapping.
+ * 0xFFFFFFFF/0x00000000 respectively rather than wrapping;
+ * RCP_EP_GPIO_WRITE_SUB computes request - current (see the file header).
  * RCP_EP_GPIO_WRITE_RESERVED4 returns current unchanged. */
 uint32_t rcp_ep_gpio_apply_write(uint32_t current, uint32_t request,
                                   rcp_ep_gpio_write_semantics_t evt);

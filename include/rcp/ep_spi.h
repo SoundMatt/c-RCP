@@ -81,10 +81,12 @@
  * matching response's payload is the same-length POCI-in
  * (peripheral-to-controller) bytes captured during that same transfer --
  * this module's own original modeling of a full-duplex SPI exchange as one
- * ACF request/response pair. Encoded as ACF_OP_WRITE (request, carrying the
- * PICO-out bytes) and ACF_OP_READ (response, carrying the POCI-in bytes),
- * mirroring ep_gpio.h's own request-carries-op-WRITE /
- * response-classifies-as-a-read convention. A response is encoded as
+ * ACF request/response pair. Both halves are encoded as ACF_OP_READ: a
+ * transfer request carries the PICO-out bytes *and* asks for the POCI-in
+ * bytes back, which is the read direction (the specification's own worked
+ * SPI example -- write N bytes, get a response with M -- carries op=0 with
+ * a non-zero read_size; extraction §5.3.3), and the response carries the
+ * POCI-in bytes. A response is encoded as
  * ACF_ABB when untimed, or ACF_GBB (carrying a message_timestamp) when the
  * endpoint's ep_response_ts_enable functional-config flag (regmap.h's
  * rcp_regmap_ep_functional_cfg_t, composed into rcp_ep_spi_functional_cfg_t
@@ -335,7 +337,7 @@ rcp_bytes_t rcp_ep_spi_encode_transfer_request(rcp_byte_bus_id_t byte_bus_id, ui
  * fixed header or its declared payload length; RCP_EP_SPI_ERR_BAD_MSG_TYPE
  * if b is not an ACF_ABB message; RCP_EP_SPI_ERR_WRONG_BUS if its
  * byte_bus_id != expected_bus_id; RCP_EP_SPI_ERR_WRONG_OP if its op is not
- * RCP_ACF_OP_WRITE; RCP_EP_SPI_ERR_BAD_CHANNEL if evt[2:0] is not
+ * RCP_ACF_OP_READ; RCP_EP_SPI_ERR_BAD_CHANNEL if evt[2:0] is not
  * rcp_ep_spi_channel_valid(). On RCP_EP_SPI_OK, *out_channel,
  * *out_transaction_num are populated, and *out_tx_data / *out_tx_len are
  * set to a *borrowed* view into b (not copied -- see the file header) of

@@ -63,7 +63,7 @@ static void test_general_init_zeroes_with_no_root_client(void)
     rcp_regmap_general_init(&map);
 
     TEST_ASSERT_EQUAL_UINT32(0, map.magic);
-    TEST_ASSERT_EQUAL_UINT16(0, map.svr_version);
+    TEST_ASSERT_EQUAL_UINT32(0, map.svr_version); /* 32 bit wide -- TC18 Table 18 */
     TEST_ASSERT_EQUAL_UINT16(0, map.vendor_id);
     TEST_ASSERT_EQUAL_UINT16(0, map.device_id);
     TEST_ASSERT_EQUAL_UINT16(0, map.svr_ep_count);

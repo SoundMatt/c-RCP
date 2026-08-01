@@ -195,18 +195,21 @@ rcp_discovery_errc_t rcp_discovery_decode_request(const uint8_t *b, size_t len,
 /* ── Discovery response ─────────────────────────────────────────────────────── */
 
 /* The number of leading octets of the general register slice this
- * milestone actually populates: magic (4) + svr_version (2) + vendor_id
+ * milestone actually populates: magic (4) + svr_version (4) + vendor_id
  * (2) + device_id (2) + svr_ep_count (2), each big-endian, in that order
- * -- this module's own on-wire layout for the slice, not a spec-defined
- * one (the specification itself is not reproduced here; only the
- * high-level field set rcp_regmap_general_t already models is drawn from
- * it by reference). A response's payload length always equals the
- * request's read_size exactly (per the roadmap's own wording): the
- * leading min(read_size, RCP_DISCOVERY_GENERAL_SLICE_LEN) octets carry
- * this slice, and any remaining octets (a read_size greater than this
- * constant) are zero-filled reserved space for fields a future milestone
- * may define. */
-#define RCP_DISCOVERY_GENERAL_SLICE_LEN ((size_t)12u)
+ * -- the field widths and their order are the specification's own for the
+ * leading, device-recognition part of the RC Server general register map
+ * (extraction §3.5); only the field set rcp_regmap_general_t already
+ * models is drawn from it, by reference. svr_version is FOUR octets wide,
+ * not two: a two-octet svr_version shifts vendor_id, device_id and
+ * svr_ep_count each two octets earlier than a conforming peer reads them,
+ * so every one of those three fields is misparsed. A response's payload
+ * length always equals the request's read_size exactly (per the roadmap's
+ * own wording): the leading min(read_size,
+ * RCP_DISCOVERY_GENERAL_SLICE_LEN) octets carry this slice, and any
+ * remaining octets (a read_size greater than this constant) are
+ * zero-filled reserved space for fields a future milestone may define. */
+#define RCP_DISCOVERY_GENERAL_SLICE_LEN ((size_t)14u)
 
 /* Encodes the discovery response: a full NTSCF-framed ACF_ABB message
  * whose payload is exactly read_size octets long (see
@@ -237,7 +240,8 @@ typedef struct {
     bool             valid;
     rcp_stream_id_t  server_stream_id;
     uint32_t         magic;
-    uint16_t         svr_version;
+    uint32_t         svr_version; /* 32 bit on the wire -- see
+                                      RCP_DISCOVERY_GENERAL_SLICE_LEN */
     uint16_t         vendor_id;
     uint16_t         device_id;
     uint16_t         svr_ep_count;
