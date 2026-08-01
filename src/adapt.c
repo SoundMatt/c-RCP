@@ -250,10 +250,20 @@ rcp_bytes_t rcp_message_to_request(rcp_adapt_op_t op, rcp_byte_bus_id_t byte_bus
         break;
     }
 
-    case RCP_ADAPT_OP_I2C_TRANSFER:
-        result = rcp_ep_i2c_encode_transfer_request(byte_bus_id, msg->payload.data,
-                                                      msg->payload.len, transaction_num);
+    case RCP_ADAPT_OP_I2C_TRANSFER: {
+        /* An I2C transfer is half duplex: the payload's own address octet
+         * carries the I2C-bus-level R/W bit, and the ACF op sense says
+         * whether a payload-bearing response is expected (ep_i2c.h). A
+         * caller asking for octets back selects the read direction by
+         * setting rcp.i2c.read_size; the default (absent or 0) is the
+         * write direction. */
+        uint32_t read_size = meta_get_u32_default(msg, "rcp.i2c.read_size", 0);
+        if (read_size > RCP_EP_I2C_MAX_READ_SIZE) return fail_encode(out_err);
+        result = rcp_ep_i2c_encode_transfer_request(
+            byte_bus_id, read_size != 0 ? RCP_EP_I2C_DIR_READ : RCP_EP_I2C_DIR_WRITE,
+            msg->payload.data, msg->payload.len, (uint16_t)read_size, transaction_num);
         break;
+    }
 
     case RCP_ADAPT_OP_UART_WRITE:
         result = rcp_ep_uart_encode_write_request(byte_bus_id, msg->payload.data,
@@ -491,18 +501,24 @@ static relay_message_t response_to_message_impl(rcp_adapt_op_t op, rcp_byte_bus_
     }
 
     case RCP_ADAPT_OP_I2C_TRANSFER: {
+        rcp_ep_i2c_dir_t direction;
         const uint8_t *rx_data;
         size_t rx_len;
         bool timed;
         uint64_t timestamp;
         uint8_t transaction_num;
         relay_message_t msg;
-        if (rcp_ep_i2c_decode_response(b, len, byte_bus_id, &rx_data, &rx_len, &timed, &timestamp,
-                                        &transaction_num) != RCP_EP_I2C_OK) {
+        if (rcp_ep_i2c_decode_response(b, len, byte_bus_id, &direction, &rx_data, &rx_len, &timed,
+                                        &timestamp, &transaction_num) != RCP_EP_I2C_OK) {
             return fail_decode(out_err);
         }
         msg = finish_timed_response(timed, timestamp, transaction_num);
         msg.payload = relay_bytes_dup(rx_data, rx_len);
+        /* A read response carries the octets read back; a write response
+         * carries none (ep_i2c.h). Report which this was in the same key
+         * the request used to ask for it. */
+        meta_set_u32(&msg, "rcp.i2c.read_size",
+                     direction == RCP_EP_I2C_DIR_READ ? (uint32_t)rx_len : 0u);
         return msg;
     }
 

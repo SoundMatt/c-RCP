@@ -5731,4 +5731,44 @@ behaviours as correct: `REQ-GPIO-011`,
 has the same request-carries-`op=WRITE` shape LIN and SPI had and may
 carry the same inversion. It was not in this pass's independently
 verified set and is left for its own change rather than fixed by
-pattern-matching.
+pattern-matching. *(Closed by milestone 104 — the independent check found
+a genuinely different defect, so pattern-matching would have produced the
+wrong fix.)*
+
+### 104. I2C transfer direction: `op` is a parameter, not a constant (v0.104.0) ✅
+
+Resolves milestone 103's open I2C question by checking the specification
+directly rather than by analogy. **`ep_i2c.c` does not have LIN's and
+SPI's inverted-`op` defect.** It has a different one.
+
+§12.9.1 defines `op=0` as the read/payload-response direction and `op=1`
+as the write/no-payload one, and §11.3.2/§11.3.3 mirror that split on the
+response side. But §13.7.7.3 says only that the I2C payload "is the I2C
+payload including the address" and that "the endpoint is just
+transparent", and Figure 29 — rendered from the PDF at 600 dpi, since the
+text extraction cannot show an empty table cell — **leaves the `op` cell
+blank**, while spelling the *I2C-bus-level* R/W bit out inside the
+payload (`1 1 1 1 0 A10 A9 RW`). The direction bit that matters to the
+bus is a payload bit; `op` is the separate RCP-level question of what
+comes back. LIN and SPI are unconditionally response-bearing and their
+sections pin `op=0` for them explicitly (§13.7.10.1, Figure 23), so a
+constant is right for those two. I2C is half duplex and either-directional,
+so no constant is right for it — and §13.7.4's "A read request with a
+`byte_msg_payload` as well as a write request …" confirms a
+payload-bearing read request is an ordinary shape, which is exactly what
+an I2C read is.
+
+The module hard-coded the write sense and rejected the read sense as
+malformed, so an I2C read could be neither sent nor received; a read
+request could not carry a `read_size` at all; and every response was
+encoded `op=0`, so a write confirmation classified as a read response.
+`rcp_ep_i2c_dir_t` now makes the direction an explicit parameter of the
+request and response codecs, `read_size` rides read requests and is
+rejected on write requests (that slot is a `segment_num` there), and the
+request decoder reports the direction instead of rejecting half of them.
+`adapt.c` gains `rcp.i2c.read_size`, matching UART's and ADC's existing
+mappings.
+
+`.fusa-reqs.json` rewrites `REQ-I2C-010`..`015` and adds `REQ-I2C-017`
+(`rcp_ep_i2c_dir_valid()`) and `REQ-I2C-018` (encode-time validation).
+Full `ctest` 59/59 passing.
