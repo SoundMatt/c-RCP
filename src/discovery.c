@@ -198,6 +198,7 @@ rcp_bytes_t rcp_discovery_encode_response(const rcp_regmap_general_t *map,
 
     hdr.byte_bus_id              = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
     hdr.op                       = RCP_ACF_OP_READ;
+    hdr.rsp                      = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
     hdr.read_size_or_segment_num = read_size;
     hdr.transaction_num          = transaction_num;
 
@@ -293,6 +294,7 @@ size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
 
         hdr.byte_bus_id              = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
         hdr.op                       = RCP_ACF_OP_READ;
+        hdr.rsp                      = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
         hdr.transaction_num          = transaction_num;
         hdr.ms                       = segs[i].ms ? 1u : 0u;
         hdr.read_size_or_segment_num = segs[i].ms ? segs[i].segment_num : read_size;

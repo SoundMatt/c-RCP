@@ -810,23 +810,24 @@ static void test_watchdog_timeout_width_and_unit_deviate(void)
     TEST_ASSERT_TRUE(r.overflowed);
 }
 
-/* TC18 §12.7.7: every R/W* field of Table 22 is writable in BOTH
- * HW_unconfigured and HW_configured and read-only in RCP_configured.
- * c-RCP matches only the last of those three: FUNCTIONAL_W_STAR is
- * refused in HW_UNCONFIGURED (deviation) and permanently locked in
- * RCP_CONFIGURED (conforming). No caller anywhere classifies the
- * request-stream table as FUNCTIONAL_W_STAR, so even the conforming half
- * is never actually applied to Table 22. */
-static void test_table22_w_star_window_is_short_by_one_state(void)
+/* TC18 §12.7.7 Table 22's own legend (TC18.txt:2929-2931): "This
+ * configuration table can only be changed in the life-cycle states
+ * HW_UNCONFIGURED and HW_CONFIGURED. In RCP_CONFIGURED ... this is
+ * read-only. (As indicated by W*)" -- every R/W* field is writable in
+ * BOTH HW_UNCONFIGURED and HW_CONFIGURED and read-only only once
+ * RCP_CONFIGURED is reached. Fixed: rcp_lifecycle_field_writable() now
+ * matches this for all three states. (No caller yet classifies the
+ * request-stream table as FUNCTIONAL_W_STAR, so this primitive being
+ * correct doesn't by itself mean Table 22 is wired up end to end --
+ * that's a separate, still-open gap.) */
+static void test_table22_w_star_writable_in_both_pre_rcp_configured_states(void)
 {
-    /* TC18 says writable here; c-RCP refuses. */
-    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_UNCONFIGURED,
-                                                   RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
-                                                   ROOT_WRITER));
-    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_UNCONFIGURED,
-                                                   RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
-                                                   PLAIN_WRITER));
-    /* Conforming for the other two states. */
+    TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_UNCONFIGURED,
+                                                  RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
+                                                  ROOT_WRITER));
+    TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_UNCONFIGURED,
+                                                  RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
+                                                  PLAIN_WRITER));
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
                                                   RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
                                                   PLAIN_WRITER));
@@ -1185,7 +1186,7 @@ int main(void)
     RUN_TEST(test_named_signal_index_is_global_and_covers_three_types);
     RUN_TEST(test_request_stream_cfg_lacks_channel_and_stream_indices);
     RUN_TEST(test_watchdog_timeout_width_and_unit_deviate);
-    RUN_TEST(test_table22_w_star_window_is_short_by_one_state);
+    RUN_TEST(test_table22_w_star_writable_in_both_pre_rcp_configured_states);
     RUN_TEST(test_ep_id_row_lacks_request_stream_index_and_sentinel);
     RUN_TEST(test_ep_id_ordering_ignores_request_stream_index);
     RUN_TEST(test_no_diagnostic_for_multi_client_or_heterogeneous_type);

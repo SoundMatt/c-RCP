@@ -292,6 +292,7 @@ rcp_bytes_t rcp_ep_gpio_encode_response(rcp_byte_bus_id_t byte_bus_id, uint32_t 
 
         hdr.info.byte_bus_id     = byte_bus_id;
         hdr.info.op              = RCP_ACF_OP_READ;
+        hdr.info.rsp             = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
         hdr.info.mtv             = RCP_ACF_MTV_VALID;
         hdr.info.transaction_num = transaction_num;
         hdr.message_timestamp    = timestamp;
@@ -302,6 +303,7 @@ rcp_bytes_t rcp_ep_gpio_encode_response(rcp_byte_bus_id_t byte_bus_id, uint32_t 
 
         hdr.byte_bus_id     = byte_bus_id;
         hdr.op              = RCP_ACF_OP_READ;
+        hdr.rsp             = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
         hdr.transaction_num = transaction_num;
 
         return rcp_acf_encode_abb(&hdr, payload, sizeof(payload));

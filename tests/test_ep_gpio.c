@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MPL-2.0 */
+//cfusa:test REQ-ACF-022
 //cfusa:test REQ-GPIO-001
 //cfusa:test REQ-GPIO-002
 //cfusa:test REQ-GPIO-003
@@ -547,6 +548,26 @@ static void test_response_round_trip_timed(void)
     rcp_bytes_free(&frame);
 }
 
+/* REQ-ACF-022, TC18.txt L1885: "rsp 1b -- identifies this ABB or GBB
+ * message as response". Decoded directly via rcp_acf_decode_abb() (not
+ * rcp_ep_gpio_decode_response(), which doesn't expose the raw header bit)
+ * so this checks the actual wire byte, not a value round-tripped through
+ * the same encoder/decoder pair that produced it. */
+static void test_response_sets_rsp_bit(void)
+{
+    rcp_bytes_t                 frame = rcp_ep_gpio_encode_response(2, 0x0000FF00u, 11, false, 0);
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload     = NULL;
+    size_t                       payload_len = 0;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_ACF_OK,
+        rcp_acf_decode_abb(frame.data, frame.len, &hdr, &payload, &payload_len));
+    TEST_ASSERT_EQUAL_UINT8(1u, hdr.rsp);
+
+    rcp_bytes_free(&frame);
+}
+
 static void test_response_decode_rejects_wrong_bus(void)
 {
     rcp_bytes_t frame = rcp_ep_gpio_encode_response(2, 0, 0, false, 0);
@@ -643,6 +664,7 @@ int main(void)
     RUN_TEST(test_write_request_rejects_wrong_bus_op_and_bad_payload_len);
 
     RUN_TEST(test_response_round_trip_untimed);
+    RUN_TEST(test_response_sets_rsp_bit);
     RUN_TEST(test_response_round_trip_timed);
     RUN_TEST(test_response_decode_rejects_wrong_bus);
     RUN_TEST(test_response_decode_rejects_bad_payload_len);

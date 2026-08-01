@@ -175,6 +175,7 @@ rcp_bytes_t rcp_ep_uart_encode_write_response(rcp_byte_bus_id_t byte_bus_id,
 
         hdr.info.byte_bus_id     = byte_bus_id;
         hdr.info.op              = RCP_ACF_OP_WRITE;
+        hdr.info.rsp             = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
         hdr.info.evt             = 0;
         hdr.info.mtv             = RCP_ACF_MTV_VALID;
         hdr.info.transaction_num = transaction_num;
@@ -186,6 +187,7 @@ rcp_bytes_t rcp_ep_uart_encode_write_response(rcp_byte_bus_id_t byte_bus_id,
 
         hdr.byte_bus_id     = byte_bus_id;
         hdr.op              = RCP_ACF_OP_WRITE;
+        hdr.rsp             = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
         hdr.evt             = 0;
         hdr.transaction_num = transaction_num;
 
@@ -311,6 +313,7 @@ rcp_bytes_t rcp_ep_uart_encode_read_response(rcp_byte_bus_id_t byte_bus_id,
 
         hdr.info.byte_bus_id     = byte_bus_id;
         hdr.info.op              = RCP_ACF_OP_READ;
+        hdr.info.rsp             = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
         hdr.info.evt             = 0;
         hdr.info.mtv             = RCP_ACF_MTV_VALID;
         hdr.info.transaction_num = transaction_num;
@@ -322,6 +325,7 @@ rcp_bytes_t rcp_ep_uart_encode_read_response(rcp_byte_bus_id_t byte_bus_id,
 
         hdr.byte_bus_id     = byte_bus_id;
         hdr.op              = RCP_ACF_OP_READ;
+        hdr.rsp             = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
         hdr.evt             = 0;
         hdr.transaction_num = transaction_num;
 
@@ -427,6 +431,7 @@ size_t rcp_ep_uart_encode_read_response_fragmented(rcp_byte_bus_id_t byte_bus_id
 
             hdr.info.byte_bus_id              = byte_bus_id;
             hdr.info.op                       = RCP_ACF_OP_READ;
+            hdr.info.rsp                      = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
             hdr.info.evt                      = 0;
             hdr.info.mtv                      = RCP_ACF_MTV_VALID;
             hdr.info.transaction_num          = transaction_num;
@@ -440,6 +445,7 @@ size_t rcp_ep_uart_encode_read_response_fragmented(rcp_byte_bus_id_t byte_bus_id
 
             hdr.byte_bus_id              = byte_bus_id;
             hdr.op                       = RCP_ACF_OP_READ;
+            hdr.rsp                      = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
             hdr.evt                      = 0;
             hdr.transaction_num          = transaction_num;
             hdr.ms                       = segs[i].ms ? 1u : 0u;

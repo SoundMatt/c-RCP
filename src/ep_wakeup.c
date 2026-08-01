@@ -155,6 +155,7 @@ rcp_bytes_t rcp_ep_wakeup_encode_sleepcmd_response(rcp_byte_bus_id_t byte_bus_id
 
     hdr.byte_bus_id     = byte_bus_id;
     hdr.op              = RCP_ACF_OP_NONE;
+    hdr.rsp             = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
     hdr.transaction_num = transaction_num;
 
     return rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
