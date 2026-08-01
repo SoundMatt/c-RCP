@@ -52,7 +52,6 @@
 #include <rcp/scheduler.h>
 #include <rcp/server.h>
 
-#include <stdlib.h>
 #include <string.h>
 
 void setUp(void) {}
@@ -690,23 +689,20 @@ static void test_watchdog_purge_keeps_only_the_safety_sequence(void)
 
 /* ── Chained requests, across one frame's members ─────────────────────────── */
 
-/* Concatenates two already-encoded ACF messages into one frame payload,
- * as a single NTSCF/TSCF frame would carry them. */
-static rcp_bytes_t concat2(const rcp_bytes_t *a, const rcp_bytes_t *b)
+/* Room for the small two-member frames these tests build. */
+#define FRAME_BUF_CAP ((size_t)256u)
+
+/* Concatenates two already-encoded ACF messages into out[0..cap), as a
+ * single NTSCF/TSCF frame carries them back to back, and returns the
+ * combined length. Deliberately writes into caller-owned storage rather
+ * than allocating: these frames are a few dozen octets. */
+static size_t concat2(uint8_t *out, size_t cap, const rcp_bytes_t *a, const rcp_bytes_t *b)
 {
-    rcp_bytes_t out = {0};
-    uint8_t    *buf = (uint8_t *)malloc(a->len + b->len);
+    TEST_ASSERT_TRUE(a->len + b->len <= cap);
 
-    if (!buf) {
-        TEST_FAIL_MESSAGE("out of memory concatenating frame members");
-        return out;
-    }
-
-    memcpy(buf, a->data, a->len);
-    memcpy(buf + a->len, b->data, b->len);
-    out.data = buf;
-    out.len  = a->len + b->len;
-    return out;
+    memcpy(out, a->data, a->len);
+    memcpy(out + a->len, b->data, b->len);
+    return a->len + b->len;
 }
 
 /* §11.2.2.4: "If the first request in an AVTPDU is a chain request, then
@@ -720,11 +716,12 @@ static void test_chained_first_in_frame_is_chain_error(void)
                                                     NULL, 0);
     rcp_bytes_t second = rcp_chained_encode_member(1, 0, RCP_CHAINED_CS_CONTINUE_ON_ERROR, 122,
                                                     NULL, 0);
-    rcp_bytes_t frame  = concat2(&first, &second);
+    uint8_t frame[FRAME_BUF_CAP];
+    size_t frame_len = concat2(frame, sizeof(frame), &first, &second);
     rcp_mock_frame_member_result_t results[4];
     size_t n;
 
-    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, frame.data, frame.len,
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, frame, frame_len,
                                         results, 4);
     TEST_ASSERT_EQUAL_size_t(2, n);
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CHAIN_ERROR, results[0].result);
@@ -734,7 +731,6 @@ static void test_chained_first_in_frame_is_chain_error(void)
 
     rcp_bytes_free(&first);
     rcp_bytes_free(&second);
-    rcp_bytes_free(&frame);
     rcp_mock_server_destroy(srv);
 }
 
@@ -747,7 +743,8 @@ static void test_chained_member_after_predecessor_executes(void)
     rcp_acf_byte_message_info_t info = {0};
     rcp_bytes_t lead;
     rcp_bytes_t member;
-    rcp_bytes_t frame;
+    uint8_t frame[FRAME_BUF_CAP];
+    size_t frame_len;
     rcp_mock_frame_member_result_t results[4];
     rcp_server_tick_ctx_t ctx;
     size_t n;
@@ -760,9 +757,9 @@ static void test_chained_member_after_predecessor_executes(void)
     member = rcp_chained_encode_member(1, 10 /* chain_exec_delay */,
                                         RCP_CHAINED_CS_CONTINUE_ON_ERROR, 132, NULL, 0);
     TEST_ASSERT_NOT_NULL(member.data);
-    frame = concat2(&lead, &member);
+    frame_len = concat2(frame, sizeof(frame), &lead, &member);
 
-    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, frame.data, frame.len,
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, frame, frame_len,
                                         results, 4);
     TEST_ASSERT_EQUAL_size_t(2, n);
     /* The lead request is standard: it ran immediately. */
@@ -782,7 +779,6 @@ static void test_chained_member_after_predecessor_executes(void)
 
     rcp_bytes_free(&lead);
     rcp_bytes_free(&member);
-    rcp_bytes_free(&frame);
     rcp_mock_server_destroy(srv);
 }
 
