@@ -31,6 +31,86 @@ the rationale.
 
 ## Releases
 
+### v0.104.0 -- 2026-07-31
+
+**BREAKING (wire format, and API).** Resolves the I2C transfer-direction
+question v0.103.0 left open — but *not* in the direction that entry
+guessed at. `ep_i2c.c` does **not** have LIN's and SPI's inverted-`op`
+defect. It has a different one: `op` was a *constant* where it should be
+a *parameter*.
+
+**What the specification actually says.** §12.9.1 defines the two `op`
+senses ("A response with pay load data read from the EP is given, if
+requested by `op=0` (read request)"; "A response with `err=0` and no
+payload is given after successful execution of a request with `op=1`
+(write request)"), and §11.3.2/§11.3.3 mirror that split on the response
+side — a write response "does not have a `byte_msg_payload`", a read
+response does. §13.7.7.3 says only that the I2C payload "is the I2C
+payload including the address" and that "the endpoint is just
+transparent", and its **Figure 29 leaves the `op` cell blank** while
+spelling the *I2C-bus-level* direction bit out inside the payload
+instead: the first payload octet reads `1 1 1 1 0 A10 A9 RW`, the
+10-bit-address prefix with its R/W bit. So the specification deliberately
+does not pin `op` for this endpoint type — the R/W bit is a *payload* bit
+the transparent endpoint clocks onto the bus, and `op` is the separate
+RCP-level question of what response comes back.
+
+That is why this is not LIN's or SPI's defect. Those two endpoints are
+unconditionally response-bearing (a LIN command always asks for what came
+back; an SPI transfer is full duplex and always returns POCI octets) and
+their own sections pin `op=0` explicitly — §13.7.10.1's "a reply is sent
+if `op = 0`", Figure 23's literal `op=0 ... read_size = 0x0A`. A constant
+`op` is correct for them, and v0.103.0 corrected which constant. An I2C
+transfer is **half duplex and genuinely either-directional**, so *no*
+constant is correct for it. §13.7.4's GPIO wording confirms the general
+model has all three shapes — "A read request without a `byte_msg_payload`
+(pure read)", "A read request with a `byte_msg_payload` as well as a
+write request …" — and a payload-bearing read request is exactly what an
+I2C read is: address out, data back.
+
+**The defect.** The module hard-coded the *write* sense on every request
+and rejected the read sense outright as `RCP_EP_I2C_ERR_WRONG_OP`, so an
+I2C read transaction — the very direction the payload's own R/W bit exists
+to express — could be neither encoded nor accepted. Nor could a read
+request carry a `read_size`: the header slot that says how many octets to
+clock back was left 0, the same "asking a conforming endpoint for
+nothing" shape v0.103.0 fixed in ADC. Meanwhile the module *did* offer a
+data-bearing response encoder — which, per §12.9.1, only an `op=0` request
+can lawfully elicit, and which it hard-coded to `op=0` even for the
+response to a write, so a write confirmation classified as a read
+response on the wire.
+
+**The fix.** `rcp_ep_i2c_dir_t` makes the RCP-level direction an explicit
+parameter of both codecs. A read request encodes `op=0` and carries
+`read_size`; a write request encodes `op=1` and leaves that slot 0
+(there it is a `segment_num`, not a `read_size`, so a `read_size` on a
+write is now rejected at encode rather than silently mis-encoded). The
+request decoder accepts both senses and reports which, instead of
+rejecting half of them. `rcp_ep_i2c_encode_response()` takes the same
+direction and encodes the matching response class, with a write
+response's payload required to be empty. `RCP_EP_I2C_ERR_WRONG_OP` is
+retained for source compatibility but is no longer produced: there is no
+longer a "wrong" `op` on an I2C transfer.
+
+`adapt.c`'s `RCP_ADAPT_OP_I2C_TRANSFER` mapping gains `rcp.i2c.read_size`
+(absent or 0 = the write direction) on the request side and reports it
+back on the response side, matching how `rcp.uart.read_size` and
+`rcp.adc.read_size` already work.
+
+**Verification method.** Read against the specification PDF directly, not
+by analogy with the LIN/SPI pass: §12.9.1, §11.3.2/§11.3.3, §13.5's
+Table 30, §13.7.4's request-shape wording, the byte-message-info field
+tables' "if `op = 0` this is `read_size`, else `segment_num`", and
+Figure 29 rendered from the PDF at 600 dpi to confirm the `op` cell is
+genuinely empty rather than merely lost in text extraction. Full `ctest`
+59/59 passing. The new tests quote each sentence they rest on and assert
+the literal wire bit rather than re-encoded output.
+
+`.fusa-reqs.json` rewrites `REQ-I2C-010` through `REQ-I2C-015`, which
+described the constant-`op` behaviour as correct, and adds `REQ-I2C-017`
+(`rcp_ep_i2c_dir_valid()`) and `REQ-I2C-018` (encode-time direction and
+`read_size` validation).
+
 ### v0.103.0 -- 2026-07-31
 
 **BREAKING (wire format, and API).** Six independently-confirmed
@@ -124,7 +204,9 @@ behaviours as correct: `REQ-GPIO-011`, `REQ-PWM-007`/`010`/`011`/`016`/`023`,
 **Known, deliberately out of scope**: `ep_i2c.c`'s transfer request has
 the same request-carries-`op=WRITE` shape LIN and SPI had, and may have
 the same inversion; it was not part of this pass's verified set and is
-left for its own change.
+left for its own change. *(Resolved in v0.104.0 — verified against the
+specification directly and found to be a **different** defect, not the
+same inversion. Declining to pattern-match it here was the right call.)*
 
 ### v0.102.0 -- 2026-07-31
 

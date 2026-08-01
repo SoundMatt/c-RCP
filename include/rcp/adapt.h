@@ -76,7 +76,7 @@
  * | GPIO_READ               | GPIO      | (none)                                 | (none beyond payload)          |
  * | GPIO_WRITE               | GPIO      | meta rcp.gpio.evt (0-7, default 0)     | (none beyond payload)          |
  * | SPI_TRANSFER             | SPI       | meta rcp.spi.channel (0-7, default 0)  | meta rcp.spi.channel           |
- * | I2C_TRANSFER             | I2C       | (none)                                 | (none)                          |
+ * | I2C_TRANSFER             | I2C       | meta rcp.i2c.read_size (default 0 = the write direction; non-zero selects the read direction and asks for that many octets back) | meta rcp.i2c.read_size (0 on a write response) |
  * | UART_WRITE                | UART      | (none)                                 | (none)                          |
  * | UART_READ                | UART      | meta rcp.uart.read_size (required)     | (none)                          |
  * | ADC_READ                  | ADC       | meta rcp.adc.read_size (default RCP_EP_ADC_VALUE_LEN, i.e. one value) | meta rcp.adc.value_count (how many 2-octet values the payload holds) |
