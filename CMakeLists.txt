@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(c-rcp
-    VERSION 0.100.0
+    VERSION 0.101.0
     DESCRIPTION "OPEN Alliance TC18 Remote Control Protocol (C)"
     HOMEPAGE_URL "https://github.com/SoundMatt/c-RCP"
     LANGUAGES C
@@ -71,6 +71,7 @@ add_library(rcp STATIC
     src/request_cancel.c
     src/scheduler.c
     src/udp.c
+    src/l2.c
     src/mdns.c
     src/shmem.c
     src/loan.c

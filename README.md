@@ -109,7 +109,8 @@ group's request/response codec", not as a spec-conformance claim.
 The example below drives the in-process mock RC Server
 (`<rcp/mock.h>`) through its lifecycle, registers one endpoint, and
 dispatches an already-framed request — the same shape a real transport
-(`<rcp/udp.h>`, native Ethernet) hands to a real RC Server.
+(`<rcp/udp.h>` for IEEE1722-over-UDP/IP, `<rcp/l2.h>` for native
+Ethernet) hands to a real RC Server.
 
 ```c
 #include <rcp/lifecycle.h>

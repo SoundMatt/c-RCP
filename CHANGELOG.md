@@ -31,6 +31,48 @@ the rationale.
 
 ## Releases
 
+### v0.101.0 -- 2026-07-31
+
+Adds the native-Ethernet (L2) `rcp_avtp_transport_t` carrier
+(`rcp/l2.h`/`l2.c`) milestone 59 (v0.59.0) originally named as one of
+three concrete transports this vtable was purpose-built to admit, and
+that milestone 78 (v0.78.0) silently dropped without implementing.
+Linux-only (`AF_PACKET`/`SOCK_RAW`, needs `CAP_NET_RAW`/root): frames are
+destination MAC (6) + source MAC (6, read from the given interface via
+`SIOCGIFHWADDR`, never caller-supplied) + EtherType `0x22F0` (2,
+big-endian) + the AVTPDU directly. Every non-Linux build gets the same
+fail-cleanly stub `udp.c`'s own Windows stub already established.
+
+Also fixes a real Annex J conformance gap in the existing UDP transport,
+present since v0.78.0: UDP/IP framing (Annex J) prepends a 4-octet,
+big-endian encapsulation sequence number ahead of every AVTPDU on the
+wire, which `udp.c` never implemented, and had no standard default
+control-plane port (17221) either. Cross-checked against two independent
+public secondary sources (a Wireshark issue tracker discussion and the
+COVESA Open1722 reference implementation) rather than the paywalled IEEE
+1722-2016 standard text itself, which this project has no access to --
+both `udp.h`'s own file header and this entry say so explicitly. New
+`rcp_udp_annexj_wrap()`/`_unwrap()` (pure, socket-free) are the codec,
+applied transparently inside `rcp_udp_avtp_transport_dial()`/`_bind()`'s
+existing `send()`/`recv()`; new `RCP_UDP_ANNEX_J_CONTROL_PORT` (17221)
+and `_dial_default_port()`/`_bind_default_port()` convenience wrappers
+fill it in, without changing port `0`'s existing, different, already-
+tested meaning for `bind()` ("OS-assigned ephemeral port").
+
+New `tests/test_l2.c` (frame codec, unprivileged, every platform) and 7
+new `tests/test_udp.c` cases (encapsulation codec, monotonic send-
+sequence observability, default-port wrappers) -- the existing UDP
+round-trip tests needed no changes, since the new framing is applied/
+stripped transparently. New, deliberately-not-`ctest`-wired
+`tests/l2_veth_roundtrip.c` moves real AVTPDUs across two real
+`rcp_l2_avtp_transport_t` instances over a real `veth` pair, verifying
+byte-for-byte equality in both directions and a real
+close()-unblocks-a-concurrent-recv() round trip; a new Linux-only,
+elevated-privilege `ci.yml` job (`l2-transport-veth`) builds and runs it.
+New `REQ-UDP-015`..`019` and `REQ-L2-001`..`010` added to
+`.fusa-reqs.json`. Full local `ctest` suite 58/58 passing, clean under
+`-fsanitize=address,undefined`.
+
 ### v0.100.0 -- 2026-07-31
 
 BREAKING: fix `acf.h`/`acf.c`'s `byte_message_info` header wire layout,

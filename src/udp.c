@@ -20,13 +20,76 @@
 #include <unistd.h>
 #endif
 
+/* ── Annex J encapsulation sequence number codec (pure, socket-free) ──────
+ *
+ * Deliberately outside the RCP_UDP_POSIX split below: this is plain byte
+ * manipulation with no I/O and no platform dependency, so it builds and is
+ * unit-testable on every platform this project targets, including the
+ * Windows stub build (which has no real socket implementation but can
+ * still exercise this codec directly). See udp.h's own file header for
+ * this field's exact layout and its public-secondary-source provenance
+ * caveat. Byte-order helper is this TU's own copy, matching acf.c's/
+ * avtp.c's house convention of not sharing a byte-order util across
+ * modules. */
+static void put_u32(uint8_t *p, uint32_t v)
+{
+    p[0] = (uint8_t)((v >> 24) & 0xFFu);
+    p[1] = (uint8_t)((v >> 16) & 0xFFu);
+    p[2] = (uint8_t)((v >> 8) & 0xFFu);
+    p[3] = (uint8_t)(v & 0xFFu);
+}
+
+static uint32_t get_u32(const uint8_t *p)
+{
+    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) |
+           ((uint32_t)p[2] << 8) | (uint32_t)p[3];
+}
+
+//cfusa:req REQ-UDP-015
+rcp_bytes_t rcp_udp_annexj_wrap(uint32_t seq, const uint8_t *avtpdu, size_t avtpdu_len)
+{
+    rcp_bytes_t out;
+    uint8_t    *buf;
+
+    out.data = NULL;
+    out.len  = 0;
+
+    buf = (uint8_t *)malloc(RCP_UDP_ANNEX_J_SEQ_LEN + avtpdu_len);
+    if (!buf) return out;
+
+    put_u32(buf, seq);
+    if (avtpdu_len > 0) memcpy(buf + RCP_UDP_ANNEX_J_SEQ_LEN, avtpdu, avtpdu_len);
+
+    out.data = buf;
+    out.len  = RCP_UDP_ANNEX_J_SEQ_LEN + avtpdu_len;
+    return out;
+}
+
+//cfusa:req REQ-UDP-016
+bool rcp_udp_annexj_unwrap(const uint8_t *datagram, size_t datagram_len,
+                            uint32_t *out_seq, const uint8_t **out_avtpdu,
+                            size_t *out_avtpdu_len)
+{
+    if (datagram_len < RCP_UDP_ANNEX_J_SEQ_LEN) return false;
+
+    *out_seq        = get_u32(datagram);
+    *out_avtpdu     = datagram + RCP_UDP_ANNEX_J_SEQ_LEN;
+    *out_avtpdu_len = datagram_len - RCP_UDP_ANNEX_J_SEQ_LEN;
+    return true;
+}
+
 #if defined(RCP_UDP_POSIX)
 
 /* Largest single AVTPDU this transport will ever move: a TSCF header
  * (the larger of the two variants avtp.h defines) plus its own maximum
  * payload. Any real datagram larger than this is not a frame this wire
- * layer could have produced. */
-#define RCP_UDP_AVTP_MAX_FRAME (RCP_AVTP_TSCF_HEADER_LEN + RCP_AVTP_TSCF_MAX_PAYLOAD)
+ * layer could have produced. The Annex J encapsulation sequence number
+ * (udp.h's own file header) adds RCP_UDP_ANNEX_J_SEQ_LEN more octets
+ * ahead of the AVTPDU on the wire -- the raw datagram buffer must be
+ * sized for that too, even though callers of this transport's own
+ * send()/recv() never see it (it is stripped/prepended transparently). */
+#define RCP_UDP_AVTP_MAX_FRAME \
+    (RCP_UDP_ANNEX_J_SEQ_LEN + RCP_AVTP_TSCF_HEADER_LEN + RCP_AVTP_TSCF_MAX_PAYLOAD)
 
 /* recv()'s polling granularity -- see the file header's discussion of why
  * recv() polls rather than blocking directly on the socket. */
@@ -39,10 +102,19 @@ typedef struct rcp_udp_avtp_transport {
     bool ok;
     bool bound_mode; /* true: rcp_udp_avtp_transport_bind(); false: _dial() */
 
-    rcp_mutex_t        mu; /* protects closed/peer/has_peer */
+    rcp_mutex_t        mu; /* protects closed/peer/has_peer/send_seq/recv_seq */
     bool                closed;
     struct sockaddr_in  peer;
     bool                has_peer;
+
+    /* Annex J encapsulation sequence number state (udp.h's own file
+     * header): send_seq is this transport's own per-connection
+     * monotonically-incrementing counter (wraps on overflow, uint32_t
+     * arithmetic is well-defined modulo 2^32 in C99); recv_seq/
+     * has_recv_seq back rcp_udp_avtp_transport_last_recv_seq(). */
+    uint32_t            send_seq;
+    uint32_t            recv_seq;
+    bool                has_recv_seq;
 } rcp_udp_avtp_transport_t;
 
 //cfusa:req REQ-UDP-004
@@ -50,11 +122,14 @@ typedef struct rcp_udp_avtp_transport {
 //cfusa:req REQ-UDP-007
 //cfusa:req REQ-UDP-008
 //cfusa:req REQ-UDP-011
+//cfusa:req REQ-UDP-017
 static int udp_avtp_send(rcp_avtp_transport_t *self, const uint8_t *frame, size_t frame_len)
 {
     rcp_udp_avtp_transport_t *u = (rcp_udp_avtp_transport_t *)self;
     struct sockaddr_in dest;
     bool have_dest = false;
+    uint32_t seq;
+    rcp_bytes_t wrapped;
     ssize_t n;
 
     rcp_mutex_lock(&u->mu);
@@ -66,14 +141,26 @@ static int udp_avtp_send(rcp_avtp_transport_t *self, const uint8_t *frame, size_
         dest      = u->peer;
         have_dest = true;
     }
+    /* Annex J encapsulation sequence number: this connection's own
+     * monotonically-incrementing counter (udp.h's own file header) --
+     * assigned and advanced under the same lock that already serializes
+     * this transport's other mutable state. */
+    seq = u->send_seq++;
     rcp_mutex_unlock(&u->mu);
 
+    if (u->bound_mode && !have_dest) return RCP_ERR_BUSY; /* no peer learned yet -- see file header */
+
+    wrapped = rcp_udp_annexj_wrap(seq, frame, frame_len);
+    if (!wrapped.data) return RCP_ERR_CLOSED; /* allocation failure -- RCP_UDP_ANNEX_J_SEQ_LEN
+                                                * alone (4) means wrap() only ever returns a
+                                                * NULL buffer here on malloc() failure */
+
     if (u->bound_mode) {
-        if (!have_dest) return RCP_ERR_BUSY; /* no peer learned yet -- see file header */
-        n = sendto(u->fd, frame, frame_len, 0, (struct sockaddr *)&dest, sizeof(dest));
+        n = sendto(u->fd, wrapped.data, wrapped.len, 0, (struct sockaddr *)&dest, sizeof(dest));
     } else {
-        n = send(u->fd, frame, frame_len, 0);
+        n = send(u->fd, wrapped.data, wrapped.len, 0);
     }
+    rcp_bytes_free(&wrapped);
     if (n < 0) return RCP_ERR_CLOSED;
     return RCP_OK;
 }
@@ -83,6 +170,7 @@ static int udp_avtp_send(rcp_avtp_transport_t *self, const uint8_t *frame, size_
 //cfusa:req REQ-UDP-010
 //cfusa:req REQ-UDP-011
 //cfusa:req REQ-UDP-012
+//cfusa:req REQ-UDP-018
 static int udp_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
                           uint8_t *buf, size_t buf_cap, size_t *out_len)
 {
@@ -131,16 +219,33 @@ static int udp_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
             socklen_t          flen = sizeof(from);
             ssize_t            n    = recvfrom(u->fd, tmp, RCP_UDP_AVTP_MAX_FRAME, 0,
                                                 (struct sockaddr *)&from, &flen);
+            uint32_t            seq;
+            const uint8_t      *payload;
+            size_t               payload_len;
+
             if (n < 0) continue; /* transient recv error: keep polling */
 
-            if (u->bound_mode) {
-                rcp_mutex_lock(&u->mu);
-                u->peer     = from;
-                u->has_peer = true;
-                rcp_mutex_unlock(&u->mu);
+            if (!rcp_udp_annexj_unwrap(tmp, (size_t)n, &seq, &payload, &payload_len)) {
+                /* Datagram shorter than the Annex J encapsulation sequence
+                 * number itself: not a frame this wire layer could have
+                 * produced. Dropped and re-polled, same "no delivery
+                 * guarantee to fight" reasoning as the oversized-datagram
+                 * case below -- there is nothing left in the kernel's
+                 * socket buffer to retry against once recvfrom() already
+                 * consumed it. */
+                continue;
             }
 
-            if ((size_t)n > buf_cap) {
+            rcp_mutex_lock(&u->mu);
+            if (u->bound_mode) {
+                u->peer     = from;
+                u->has_peer = true;
+            }
+            u->recv_seq     = seq;
+            u->has_recv_seq = true;
+            rcp_mutex_unlock(&u->mu);
+
+            if (payload_len > buf_cap) {
                 /* Oversized datagram: dropped, not left retrievable -- unlike
                  * avtp.c's own in-process loopback transport, a real UDP
                  * datagram is already gone from the kernel's socket buffer
@@ -150,8 +255,8 @@ static int udp_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
                 free(tmp);
                 return RCP_ERR_BUSY;
             }
-            if (n > 0) memcpy(buf, tmp, (size_t)n);
-            *out_len = (size_t)n;
+            if (payload_len > 0) memcpy(buf, payload, payload_len);
+            *out_len = payload_len;
             free(tmp);
             return RCP_OK;
         }
@@ -268,6 +373,20 @@ rcp_avtp_transport_t *rcp_udp_avtp_transport_bind(const char *addr, uint16_t por
     return &u->base;
 }
 
+//cfusa:req REQ-UDP-019
+rcp_avtp_transport_t *rcp_udp_avtp_transport_dial_default_port(const char *host,
+                                                                 bool time_sync_supported)
+{
+    return rcp_udp_avtp_transport_dial(host, RCP_UDP_ANNEX_J_CONTROL_PORT, time_sync_supported);
+}
+
+//cfusa:req REQ-UDP-019
+rcp_avtp_transport_t *rcp_udp_avtp_transport_bind_default_port(const char *addr,
+                                                                 bool time_sync_supported)
+{
+    return rcp_udp_avtp_transport_bind(addr, RCP_UDP_ANNEX_J_CONTROL_PORT, time_sync_supported);
+}
+
 //cfusa:req REQ-UDP-003
 bool rcp_udp_avtp_transport_ok(rcp_avtp_transport_t *t)
 {
@@ -300,6 +419,18 @@ size_t rcp_udp_avtp_transport_addr_string(rcp_avtp_transport_t *t, char *buf, si
     n = snprintf(buf, buf_len, "%s:%u", ipbuf, (unsigned)ntohs(sa.sin_port));
     if (n < 0) return 0;
     return ((size_t)n < buf_len) ? (size_t)n : buf_len - 1;
+}
+
+//cfusa:req REQ-UDP-018
+uint32_t rcp_udp_avtp_transport_last_recv_seq(rcp_avtp_transport_t *t)
+{
+    rcp_udp_avtp_transport_t *u = (rcp_udp_avtp_transport_t *)t;
+    uint32_t                   seq;
+
+    rcp_mutex_lock(&u->mu);
+    seq = u->has_recv_seq ? u->recv_seq : 0u;
+    rcp_mutex_unlock(&u->mu);
+    return seq;
 }
 
 #else /* !RCP_UDP_POSIX -- Windows: no winsock implementation yet, see ROADMAP.md */
@@ -365,6 +496,20 @@ rcp_avtp_transport_t *rcp_udp_avtp_transport_bind(const char *addr, uint16_t por
     return stub_new(time_sync_supported);
 }
 
+//cfusa:req REQ-UDP-019
+rcp_avtp_transport_t *rcp_udp_avtp_transport_dial_default_port(const char *host,
+                                                                 bool time_sync_supported)
+{
+    return rcp_udp_avtp_transport_dial(host, RCP_UDP_ANNEX_J_CONTROL_PORT, time_sync_supported);
+}
+
+//cfusa:req REQ-UDP-019
+rcp_avtp_transport_t *rcp_udp_avtp_transport_bind_default_port(const char *addr,
+                                                                 bool time_sync_supported)
+{
+    return rcp_udp_avtp_transport_bind(addr, RCP_UDP_ANNEX_J_CONTROL_PORT, time_sync_supported);
+}
+
 //cfusa:req REQ-UDP-014
 bool rcp_udp_avtp_transport_ok(rcp_avtp_transport_t *t)
 {
@@ -383,6 +528,13 @@ uint16_t rcp_udp_avtp_transport_port(rcp_avtp_transport_t *t)
 size_t rcp_udp_avtp_transport_addr_string(rcp_avtp_transport_t *t, char *buf, size_t buf_len)
 {
     (void)t; (void)buf; (void)buf_len;
+    return 0;
+}
+
+//cfusa:req REQ-UDP-014
+uint32_t rcp_udp_avtp_transport_last_recv_seq(rcp_avtp_transport_t *t)
+{
+    (void)t;
     return 0;
 }
 
