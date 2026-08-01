@@ -1,4 +1,5 @@
 /* SPDX-License-Identifier: MPL-2.0 */
+//cfusa:test REQ-ACF-022
 //cfusa:test REQ-GPIO-001
 //cfusa:test REQ-GPIO-002
 //cfusa:test REQ-GPIO-003
