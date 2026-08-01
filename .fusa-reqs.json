@@ -1884,11 +1884,12 @@
     {
       "id": "REQ-ACF-002",
       "title": "Response classification selects among Acknowledge/Write/Read/Error",
-      "text": "rcp_acf_classify_response() shall return RCP_ACF_RESP_ERROR whenever hdr->err is set regardless of hdr->op, and otherwise shall return RCP_ACF_RESP_WRITE for RCP_ACF_OP_WRITE, RCP_ACF_RESP_READ for RCP_ACF_OP_READ, and RCP_ACF_RESP_ACKNOWLEDGE for RCP_ACF_OP_NONE.",
+      "text": "rcp_acf_classify_response() shall return RCP_ACF_RESP_ACKNOWLEDGE whenever hdr->evt equals RCP_ACF_EVT_ACKNOWLEDGE (0xF), regardless of hdr->op or hdr->err, per TC18 Table 15/§11.3.1 -- a rejected Acknowledge (err=1) is still an Acknowledge, not an Error Response. Otherwise it shall return RCP_ACF_RESP_ERROR whenever hdr->err is set regardless of hdr->op, and otherwise shall return RCP_ACF_RESP_WRITE for RCP_ACF_OP_WRITE, RCP_ACF_RESP_READ for RCP_ACF_OP_READ, and RCP_ACF_RESP_ACKNOWLEDGE for RCP_ACF_OP_NONE (an encode-only value never produced by decode).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.3 Table 15 + §11.3.1-§11.3.4, TC18.txt L1876-1926"
     },
     {
       "id": "REQ-ACF-003",
