@@ -4350,12 +4350,13 @@
     },
     {
       "id": "REQ-ADC-026",
-      "title": "rcp_ep_adc_decode_read_request() rejects a malformed, misaddressed, or wrong-op frame",
-      "text": "rcp_ep_adc_decode_read_request() shall return RCP_EP_ADC_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB fixed header, RCP_EP_ADC_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, and RCP_EP_ADC_ERR_WRONG_OP when op is not RCP_ACF_OP_READ.",
+      "title": "rcp_ep_adc_decode_read_request() rejects a malformed, misaddressed, wrong-op, or wrong-evt frame",
+      "text": "rcp_ep_adc_decode_read_request() shall return RCP_EP_ADC_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB fixed header, RCP_EP_ADC_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, RCP_EP_ADC_ERR_WRONG_OP when op is not RCP_ACF_OP_READ, and RCP_EP_ADC_ERR_BAD_EVT when evt[2:0] is not 0b000 -- TC18 §13.5 Table 30's only legal value for a plain request in ADC's endpoint-type row (ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO); every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-ADC-027",
@@ -7442,6 +7443,17 @@
       "scope": "tc18",
       "status": "implemented",
       "tc18": "\u00a711.3, TC18.txt L1885"
+    },
+    {
+      "id": "REQ-ACF-023",
+      "title": "rcp_acf_evt_row2_is_plain() implements Table 30's shared ADC/PWM_IN/I2C/LIN/CAN/UART/ISELED/MDIO rule",
+      "text": "rcp_acf_evt_row2_is_plain(evt) shall return true iff (evt & 0x7) == 0, per TC18 \u00a713.5 Table 30's rule for the {ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO} endpoint-type row: evt[2:0] = 000b is the only value a plain (non-configuration) request in this row may carry; every other value is either reserved (001b-110b, reject with UNSUPPORTED_CMD) or selects a configuration-write-shaped request instead (111b, \u00a712.7.1).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.5 Table 30, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-CFG-011",

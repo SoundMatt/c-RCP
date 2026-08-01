@@ -375,7 +375,7 @@ static void test_strerror_never_null_and_distinct(void)
         RCP_EP_ADC_OK,               RCP_EP_ADC_ERR_SHORT_FRAME,
         RCP_EP_ADC_ERR_BAD_MSG_TYPE, RCP_EP_ADC_ERR_WRONG_BUS,
         RCP_EP_ADC_ERR_WRONG_OP,     RCP_EP_ADC_ERR_BAD_PAYLOAD_LEN,
-        RCP_EP_ADC_ERR_TOO_MANY_VALUES,
+        RCP_EP_ADC_ERR_TOO_MANY_VALUES, RCP_EP_ADC_ERR_BAD_EVT,
     };
     size_t i;
     size_t j;
@@ -443,6 +443,28 @@ static void test_read_request_rejects_wrong_op(void)
 
     rc = rcp_ep_adc_decode_read_request(frame.data, frame.len, 6, &out_read_size, &out_tn);
     TEST_ASSERT_EQUAL(RCP_EP_ADC_ERR_WRONG_OP, rc);
+
+    rcp_bytes_free(&frame);
+}
+
+/* TC18 §13.5 Table 30: evt[2:0] = 000b is the only legal value for a
+ * plain ADC read request; every other value (here, 0b101, a reserved
+ * value in ADC's endpoint-type row) shall be rejected. */
+static void test_read_request_rejects_nonzero_evt(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    uint16_t                    out_read_size;
+    uint8_t                     out_tn;
+    rcp_ep_adc_errc_t           rc;
+
+    hdr.byte_bus_id = 6;
+    hdr.op          = RCP_ACF_OP_READ;
+    hdr.evt         = 0x5;
+    frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+
+    rc = rcp_ep_adc_decode_read_request(frame.data, frame.len, 6, &out_read_size, &out_tn);
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_ERR_BAD_EVT, rc);
 
     rcp_bytes_free(&frame);
 }
@@ -718,6 +740,7 @@ int main(void)
     RUN_TEST(test_read_request_round_trip);
     RUN_TEST(test_read_request_rejects_wrong_bus);
     RUN_TEST(test_read_request_rejects_wrong_op);
+    RUN_TEST(test_read_request_rejects_nonzero_evt);
     RUN_TEST(test_read_request_rejects_short_frame);
 
     RUN_TEST(test_response_carries_eight_measurement_values);

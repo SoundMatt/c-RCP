@@ -300,6 +300,24 @@ rcp_acf_response_kind_t rcp_acf_classify_response(const rcp_acf_byte_message_inf
  * being a plain acknowledgement of a Standard request. */
 bool rcp_acf_hdr_ack_has_event(const rcp_acf_byte_message_info_t *hdr);
 
+/* TC18 §13.5 Table 30's shared rule for the {ADC, PWM_IN, I2C, LIN, CAN,
+ * UART, ISELED, MDIO} endpoint-type row: evt[2:0] = 000b is the only
+ * value a plain (non-configuration) request in this row may carry --
+ * every other value is either reserved (001b-110b, request shall be
+ * rejected with error code UNSUPPORTED_CMD) or selects an entirely
+ * different, configuration-write-shaped request (111b, TC18 §12.7.1
+ * Figure 18) that a plain read/write decoder should never accept. This
+ * row's endpoint types must call this on a decoded request header's evt
+ * before treating it as a plain request; a decoder that skips this check
+ * silently accepts wire values TC18 requires it to refuse.
+ *
+ * Returns true iff (evt & 0x7) == 0. Not meaningful for SPI (its own
+ * dedicated Table 30 row, a real 6-value channel selector) or GPIO/
+ * PWM_OUT (their own dedicated Table 30 row, the 8-value write-semantics
+ * selector) -- see rcp_ep_gpio_write_semantics_valid()/
+ * rcp_ep_spi_channel_valid() for those rows' own rules instead. */
+bool rcp_acf_evt_row2_is_plain(uint8_t evt);
+
 /* ── byte_message_info bit packing (single source of truth) ───────────────── */
 
 /* Packs the 8-byte byte_message_info header (Table 4, see the file header)

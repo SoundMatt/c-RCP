@@ -184,6 +184,7 @@ const char *rcp_ep_adc_strerror(rcp_ep_adc_errc_t e)
     case RCP_EP_ADC_ERR_WRONG_OP:        return "rcp/ep_adc: wrong ACF op";
     case RCP_EP_ADC_ERR_BAD_PAYLOAD_LEN: return "rcp/ep_adc: unexpected payload length";
     case RCP_EP_ADC_ERR_TOO_MANY_VALUES: return "rcp/ep_adc: more measurement values than the caller can hold";
+    case RCP_EP_ADC_ERR_BAD_EVT:         return "rcp/ep_adc: evt[2:0] is not 0b000";
     default:                             return "rcp/ep_adc: unknown error";
     }
 }
@@ -225,6 +226,7 @@ rcp_ep_adc_errc_t rcp_ep_adc_decode_read_request(const uint8_t *b, size_t len,
 
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_ADC_ERR_WRONG_BUS;
     if (hdr.op != RCP_ACF_OP_READ) return RCP_EP_ADC_ERR_WRONG_OP;
+    if (!rcp_acf_evt_row2_is_plain(hdr.evt)) return RCP_EP_ADC_ERR_BAD_EVT;
 
     (void)payload;
     (void)payload_len; /* a read request carries no payload -- see ep_adc.h */

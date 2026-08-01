@@ -144,6 +144,12 @@ bool rcp_acf_hdr_ack_has_event(const rcp_acf_byte_message_info_t *hdr)
     return rcp_acf_classify_response(hdr) == RCP_ACF_RESP_ACKNOWLEDGE && hdr->evt != 0;
 }
 
+//cfusa:req REQ-ACF-023
+bool rcp_acf_evt_row2_is_plain(uint8_t evt)
+{
+    return (evt & 0x7u) == 0u;
+}
+
 /* ── ACF_ABB ───────────────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-ACF-004
