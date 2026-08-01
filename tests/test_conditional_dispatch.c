@@ -697,7 +697,11 @@ static rcp_bytes_t concat2(const rcp_bytes_t *a, const rcp_bytes_t *b)
     rcp_bytes_t out = {0};
     uint8_t    *buf = (uint8_t *)malloc(a->len + b->len);
 
-    TEST_ASSERT_NOT_NULL(buf);
+    if (!buf) {
+        TEST_FAIL_MESSAGE("out of memory concatenating frame members");
+        return out;
+    }
+
     memcpy(buf, a->data, a->len);
     memcpy(buf + a->len, b->data, b->len);
     out.data = buf;

@@ -218,88 +218,116 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
     return RCP_SERVER_ADMIT_PENDING;
 }
 
-/* Arms slot's exec_delay timer at ctx->now if its own start condition has
- * just begun to hold. Returns whether slot is armed afterwards. */
-static bool arm_if_startable(rcp_server_pending_t *slot, const rcp_server_tick_ctx_t *ctx)
+/* Whether slot's own start condition -- the thing that sets its
+ * exec_delay timer running -- holds right now. */
+static bool start_condition_holds(const rcp_server_pending_t *slot,
+                                   const rcp_server_tick_ctx_t *ctx)
 {
-    if (slot->armed) return true;
-
     switch (slot->kind) {
     case RCP_SCHED_KIND_COMPOUND:
     case RCP_SCHED_KIND_COMPOUND_WAIT:
         /* The sequencer has to actually reach start_state (or start_state
          * has to be the any-state value) before the delay starts running. */
-        if (!ctx->sequencers) return false;
-        if (!rcp_compound_start_condition_met(ctx->sequencers, &slot->compound)) return false;
-        break;
+        return ctx->sequencers != NULL &&
+               rcp_compound_start_condition_met(ctx->sequencers, &slot->compound);
 
     case RCP_SCHED_KIND_TRIGGERED:
         /* trigger_exec_delay runs from the moment the threshold is met. */
-        if (!rcp_triggered_threshold_reached(&slot->triggered, &slot->triggered_runtime)) {
-            return false;
-        }
-        break;
+        return rcp_triggered_threshold_reached(&slot->triggered, &slot->triggered_runtime);
 
     case RCP_SCHED_KIND_TIMED:
         /* A timed request's condition is the presentation_time itself; it
          * has no separate arming step. */
-        break;
+        return true;
 
     case RCP_SCHED_KIND_CHAINED:
-        /* chain_exec_delay runs from the moment the predecessor finalized,
-         * not from this tick -- rcp_server_endpoint_chain_predecessor_done()
-         * has already recorded that instant in armed_at, so this branch
-         * must leave it alone rather than restart the timer here. */
-        if (!slot->predecessor_done) return false;
-        slot->armed = true;
-        return true;
+        /* Recorded by rcp_server_endpoint_chain_predecessor_done(). */
+        return slot->predecessor_done;
 
     default:
         return false;
     }
+}
 
-    slot->armed    = true;
-    slot->armed_at = ctx->now;
+/* Arms slot's exec_delay timer at ctx->now if its own start condition has
+ * just begun to hold. Returns whether slot is armed afterwards. */
+static bool arm_if_startable(rcp_server_pending_t *slot, const rcp_server_tick_ctx_t *ctx)
+{
+    if (slot->armed) return true;
+    if (!start_condition_holds(slot, ctx)) return false;
+
+    slot->armed = true;
+    /* A chained request's chain_exec_delay is measured from its
+     * predecessor's finalization, which
+     * rcp_server_endpoint_chain_predecessor_done() already recorded in
+     * armed_at -- restarting the timer here would discard it. Every other
+     * kind starts its delay at this instant. */
+    if (slot->kind != RCP_SCHED_KIND_CHAINED) slot->armed_at = ctx->now;
     return true;
 }
 
-/* Whether slot's execution condition is fully satisfied right now. */
-static bool is_due(rcp_server_pending_t *slot, const rcp_server_tick_ctx_t *ctx)
+/* The non-timer half of slot's condition: what must hold, besides its
+ * exec_delay having elapsed, before it may execute. */
+static bool auxiliary_condition_met(const rcp_server_pending_t *slot,
+                                     const rcp_server_tick_ctx_t *ctx)
 {
-    uint32_t elapsed;
+    switch (slot->kind) {
+    case RCP_SCHED_KIND_COMPOUND_WAIT:
+        /* The caller's own already-evaluated comparison result. */
+        return ctx->wait_condition_met;
 
-    /* Safety-tagged requests stay in the store until the endpoint has
-     * actually reached its configured safe state -- e2e.h's own gate. */
-    if (!rcp_e2e_request_may_execute(slot->request_type, ctx->in_safe_state)) return false;
+    case RCP_SCHED_KIND_TRIGGERED:
+    case RCP_SCHED_KIND_CHAINED:
+        return ctx->endpoint_idle;
 
-    if (!arm_if_startable(slot, ctx)) return false;
-    elapsed = ctx->now - slot->armed_at;
+    case RCP_SCHED_KIND_TIMED:
+        /* Without a locked time base a presentation_time cannot be
+         * evaluated at all. */
+        return ctx->gptp_locked;
 
+    default:
+        return true;
+    }
+}
+
+/* Whether slot's own delay/deadline has expired, given how long it has
+ * been armed. */
+static bool delay_expired(const rcp_server_pending_t *slot, const rcp_server_tick_ctx_t *ctx,
+                           uint32_t elapsed)
+{
     switch (slot->kind) {
     case RCP_SCHED_KIND_COMPOUND:
-        return rcp_compound_exec_delay_elapsed(&slot->compound, elapsed);
-
     case RCP_SCHED_KIND_COMPOUND_WAIT:
-        /* A compound-wait request needs its caller-evaluated comparison to
-         * hold as well as its delay to elapse. */
-        if (!ctx->wait_condition_met) return false;
         return rcp_compound_exec_delay_elapsed(&slot->compound, elapsed);
 
     case RCP_SCHED_KIND_TRIGGERED:
-        if (!ctx->endpoint_idle) return false;
         return rcp_triggered_exec_delay_elapsed(&slot->triggered, elapsed);
 
     case RCP_SCHED_KIND_TIMED:
-        if (!ctx->gptp_locked) return false;
         return rcp_timed_due(slot->presentation_time, ctx->gptp_now);
 
     case RCP_SCHED_KIND_CHAINED:
-        if (!ctx->endpoint_idle) return false;
         return rcp_chained_exec_delay_elapsed(slot->chain_exec_delay, elapsed);
 
     default:
         return false;
     }
+}
+
+/* Whether slot's execution condition is fully satisfied right now. */
+static bool is_due(rcp_server_pending_t *slot, const rcp_server_tick_ctx_t *ctx)
+{
+    /* Safety-tagged requests stay in the store until the endpoint has
+     * actually reached its configured safe state -- e2e.h's own gate. */
+    if (!rcp_e2e_request_may_execute(slot->request_type, ctx->in_safe_state)) return false;
+
+    /* Arming is evaluated before the auxiliary gate on purpose: a
+     * triggered request's exec_delay runs from the moment its threshold
+     * was met, not from whenever the endpoint next happens to be idle. */
+    if (!arm_if_startable(slot, ctx)) return false;
+    if (!auxiliary_condition_met(slot, ctx)) return false;
+
+    return delay_expired(slot, ctx, ctx->now - slot->armed_at);
 }
 
 //cfusa:req REQ-SRV-006
