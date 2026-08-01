@@ -4498,7 +4498,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.2 (request_type MSB selects the safety variant), TC18.txt L1189-1191"
     },
     {
       "id": "REQ-CMP-002",
@@ -4507,7 +4508,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.2 Table 5 (request_type 0x0F/0x8F = Compound), TC18.txt L1194"
     },
     {
       "id": "REQ-CMP-003",
@@ -4516,7 +4518,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.2 Table 5 (request_type 0x0B/0x8B = Compound wait), TC18.txt L1195"
     },
     {
       "id": "REQ-CMP-004",
@@ -4579,7 +4582,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.2.2 Figure 9 (compound-wait GBB sub-field offsets), TC18.txt L1316-1328"
     },
     {
       "id": "REQ-CMP-011",
@@ -4624,7 +4628,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.2.2 Figure 9 (compound-wait GBB sub-field offsets), TC18.txt L1316-1328"
     },
     {
       "id": "REQ-CMP-016",
@@ -4633,7 +4638,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.3.2 Table 12 (clear-non-safestate, request_type 0x06), TC18.txt L1759-1775"
     },
     {
       "id": "REQ-CMP-017",
@@ -4642,7 +4648,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.3.2 Figure 14 (clear-non-safestate GBB layout), TC18.txt L1737-1750"
     },
     {
       "id": "REQ-CMP-018",
@@ -4651,7 +4658,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.3.2 Table 12 (clear-non-safestate, request_type 0x06), TC18.txt L1759-1775"
     },
     {
       "id": "REQ-CMP-019",
@@ -4714,7 +4722,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.2 Table 5 (request_type 0x0E/0x8E = Triggered), TC18.txt L1196"
     },
     {
       "id": "REQ-TRIG-002",
@@ -4741,7 +4750,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.2.3 Table 8 (trigger_source_ep/trigger_signal sub-field offsets), TC18.txt L1447-1461"
     },
     {
       "id": "REQ-TRIG-005",
@@ -4795,7 +4805,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.2.3 Table 8 (trigger_threshold), TC18.txt L1456-1458"
     },
     {
       "id": "REQ-TRIG-011",
@@ -4804,7 +4815,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.2.3 Table 8 (trigger_exec_delay), TC18.txt L1459-1461"
     },
     {
       "id": "REQ-TRIG-012",
@@ -4840,7 +4852,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.2.4 Table 9 (chained request reserved fields), TC18.txt L1548-1552"
     },
     {
       "id": "REQ-CHAIN-003",
@@ -4858,7 +4871,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.2.4 Table 9 (chain_exec_delay, cs semantics), TC18.txt L1548-1560"
     },
     {
       "id": "REQ-CHAIN-005",
@@ -4912,7 +4926,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.2.4 Table 9 (cs conditional-start semantics), TC18.txt L1555-1560"
     },
     {
       "id": "REQ-TIMED-001",
@@ -4939,7 +4954,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.2.5 Figure 12 (48-bit presentation_time offset), TC18.txt L1593-1604"
     },
     {
       "id": "REQ-TIMED-004",
@@ -5002,7 +5018,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.3.1 Figure 13 + Table 11 (clear-all, request_type 0x05), TC18.txt L1682-1710"
     },
     {
       "id": "REQ-CANCEL-003",
@@ -5020,7 +5037,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.3.1 Table 11 (clear-all, request_type 0x05), TC18.txt L1704-1710"
     },
     {
       "id": "REQ-CANCEL-005",
@@ -5029,7 +5047,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.3.3 Figure 15 (clear-single, clear_transaction_num offset), TC18.txt L1797-1810"
     },
     {
       "id": "REQ-CANCEL-006",
@@ -5047,7 +5066,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.3.3 Table 13 (clear-single, clear_transaction_num), TC18.txt L1819-1821"
     },
     {
       "id": "REQ-CANCEL-008",
@@ -6991,7 +7011,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a712.9.6 Table 27, TC18.txt L3414-3446"
     },
     {
       "id": "REQ-WIREERR-002",
@@ -7162,7 +7183,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.2.5 Table 10 (reserved bits must be 0), TC18.txt L1613-1616"
     },
     {
       "id": "REQ-TIMED-010",
@@ -7171,7 +7193,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "\u00a711.2.2.5 Table 10 (hs and cs shall both be 0b), TC18.txt L1618-1619,1628-1629"
     },
     {
       "id": "REQ-TIMED-011",
