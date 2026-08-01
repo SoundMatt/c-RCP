@@ -238,8 +238,17 @@ static void test_gpio_request_payload_is_four_octets(void)
                                                        &tn));
     /* The wire code TC18 13.7.4.1 names for this case is a different,
      * unreachable value. */
-    TEST_ASSERT_EQUAL_INT(15, (int)RCP_ERROR_INVALID_PARAMETER);
-    TEST_ASSERT_NOT_EQUAL((int)RCP_ERROR_INVALID_PARAMETER, (int)RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN);
+    {
+        /* Held in ints, not compared as their own enum types: MSVC's C5287
+         * rejects a direct comparison of two different enumerations, and
+         * the point here is precisely that these are two unrelated
+         * numbering schemes. */
+        const int wire_code  = (int)RCP_ERROR_INVALID_PARAMETER;
+        const int local_code = (int)RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN;
+
+        TEST_ASSERT_EQUAL_INT(15, wire_code);
+        TEST_ASSERT_NOT_EQUAL_INT(wire_code, local_code);
+    }
     rcp_bytes_free(&frame);
 }
 
@@ -712,8 +721,17 @@ static void test_wakeup_refusal_is_positive_response_not_error(void)
     TEST_ASSERT_EQUAL_UINT8(0x33u, tn);
     /* The numbered wire code TC18 12.5 calls for is never carried anywhere
      * in this exchange. */
-    TEST_ASSERT_EQUAL_INT(5, (int)RCP_ERROR_REQUEST_CANCELED);
-    TEST_ASSERT_NOT_EQUAL((int)RCP_ERROR_REQUEST_CANCELED, (int)RCP_PWRMODE_ENTRY_REFUSED);
+    {
+        /* Held in ints, not compared as their own enum types: MSVC's C5287
+         * rejects a direct comparison of two different enumerations, and
+         * the point here is precisely that these are two unrelated
+         * numbering schemes. */
+        const int wire_code  = (int)RCP_ERROR_REQUEST_CANCELED;
+        const int local_code = (int)RCP_PWRMODE_ENTRY_REFUSED;
+
+        TEST_ASSERT_EQUAL_INT(5, wire_code);
+        TEST_ASSERT_NOT_EQUAL_INT(wire_code, local_code);
+    }
     rcp_bytes_free(&frame);
 }
 
