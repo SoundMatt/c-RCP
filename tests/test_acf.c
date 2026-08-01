@@ -651,6 +651,44 @@ static void test_classify_response_acknowledge(void)
     TEST_ASSERT_EQUAL(RCP_ACF_RESP_ACKNOWLEDGE, rcp_acf_classify_response(&hdr));
 }
 
+/* TC18 §11.3.1: evt[3:0] = 0xF identifies an Acknowledge regardless of op,
+ * which for real decoded input is always RCP_ACF_OP_WRITE or
+ * RCP_ACF_OP_READ (RCP_ACF_OP_NONE is encode-only -- see rcp_acf_op_t's
+ * doc comment). Without checking evt first, a real Acknowledge response
+ * with op = RCP_ACF_OP_WRITE was silently misclassified as
+ * RCP_ACF_RESP_WRITE. */
+static void test_classify_response_acknowledge_from_decoded_write_op(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+
+    hdr.evt = RCP_ACF_EVT_ACKNOWLEDGE;
+    hdr.op  = RCP_ACF_OP_WRITE;
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ACKNOWLEDGE, rcp_acf_classify_response(&hdr));
+}
+
+static void test_classify_response_acknowledge_from_decoded_read_op(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+
+    hdr.evt = RCP_ACF_EVT_ACKNOWLEDGE;
+    hdr.op  = RCP_ACF_OP_READ;
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ACKNOWLEDGE, rcp_acf_classify_response(&hdr));
+}
+
+/* TC18 §11.3.1: a rejected Acknowledge (evt[3:0] = 0xF, err = 1) is still
+ * an Acknowledge, not an Error Response (§11.3.4's Error Response is the
+ * distinct evt[3:0] < 0x9, err = 1 case) -- err must not take priority
+ * over evt here. */
+static void test_classify_response_acknowledge_rejected_is_not_error(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+
+    hdr.evt = RCP_ACF_EVT_ACKNOWLEDGE;
+    hdr.op  = RCP_ACF_OP_WRITE;
+    hdr.err = 1;
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ACKNOWLEDGE, rcp_acf_classify_response(&hdr));
+}
+
 static void test_ack_has_event_true_when_evt_nonzero(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -765,6 +803,9 @@ int main(void)
     RUN_TEST(test_classify_response_write);
     RUN_TEST(test_classify_response_read);
     RUN_TEST(test_classify_response_acknowledge);
+    RUN_TEST(test_classify_response_acknowledge_from_decoded_write_op);
+    RUN_TEST(test_classify_response_acknowledge_from_decoded_read_op);
+    RUN_TEST(test_classify_response_acknowledge_rejected_is_not_error);
     RUN_TEST(test_ack_has_event_true_when_evt_nonzero);
     RUN_TEST(test_ack_has_event_false_when_evt_zero);
     RUN_TEST(test_ack_has_event_false_when_not_an_acknowledge);

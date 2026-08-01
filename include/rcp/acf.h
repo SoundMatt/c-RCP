@@ -236,6 +236,11 @@ typedef enum {
     RCP_ACF_RESP_ERROR       = 3,
 } rcp_acf_response_kind_t;
 
+/* TC18 Table 15's evt[3:0] = 0xF value, the wire marker for an Acknowledge
+ * response -- see rcp_acf_classify_response()'s doc comment for why this
+ * must be checked before op/err. */
+#define RCP_ACF_EVT_ACKNOWLEDGE ((uint8_t)0x0Fu)
+
 /* ── byte_message_info: the shared header ─────────────────────────────────── */
 
 typedef struct {
@@ -275,16 +280,19 @@ typedef struct {
 } rcp_acf_byte_message_info_t;
 
 /* Classifies a decoded byte_message_info header into one of the four
- * response semantics: err takes priority (any message with err set is an
- * Error response regardless of op), otherwise op selects between Write
- * response, Read response, and -- when op carries no data operation --
- * Acknowledge. Use rcp_acf_hdr_ack_has_event() to further distinguish a
- * plain Acknowledge from one tagged with an asynchronous event via evt.
- * Note that a decoded hdr's op is never RCP_ACF_OP_NONE (see
- * rcp_acf_op_t's doc comment) -- this function's ACKNOWLEDGE branch is
- * reachable from decoded input only via evt-tagged Write responses a
- * caller reclassifies itself; it remains here for callers that construct
- * hdr by hand with op left at its zero value. */
+ * response semantics per TC18 Table 15/§11.3.1-§11.3.4: evt[3:0] ==
+ * RCP_ACF_EVT_ACKNOWLEDGE (0xF) takes priority over everything else --
+ * an Acknowledge stays an Acknowledge whether err is 0 (request filed) or
+ * 1 (request rejected); the spec's Error Response kind (§11.3.4) is a
+ * distinct, evt[3:0] < 0x9 case, not what a rejected Acknowledge becomes.
+ * Below that, err takes priority (any remaining message with err set is
+ * an Error response regardless of op), otherwise op selects between Write
+ * response and Read response. Use rcp_acf_hdr_ack_has_event() to further
+ * distinguish a plain Acknowledge from one tagged with an asynchronous
+ * event via evt. The op-based ACKNOWLEDGE fallback below (hdr->op ==
+ * RCP_ACF_OP_NONE) is unreachable from decoded input (see rcp_acf_op_t's
+ * doc comment) -- it remains only for callers that construct hdr by hand
+ * with op left at its zero value and no evt set either. */
 rcp_acf_response_kind_t rcp_acf_classify_response(const rcp_acf_byte_message_info_t *hdr);
 
 /* true iff hdr classifies as RCP_ACF_RESP_ACKNOWLEDGE and evt != 0, i.e.

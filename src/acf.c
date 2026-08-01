@@ -122,6 +122,13 @@ uint8_t rcp_acf_pad_len(size_t unpadded_len)
 //cfusa:req REQ-ACF-002
 rcp_acf_response_kind_t rcp_acf_classify_response(const rcp_acf_byte_message_info_t *hdr)
 {
+    /* TC18 §11.3.1: evt[3:0] = 0xF identifies an Acknowledge regardless of
+     * op or err -- must be checked first, or a real decoded Acknowledge
+     * (op is always WRITE or READ once decoded; see rcp_acf_op_t's doc
+     * comment) falls through and is misclassified as a Write/Read/Error
+     * response instead. */
+    if (hdr->evt == RCP_ACF_EVT_ACKNOWLEDGE) return RCP_ACF_RESP_ACKNOWLEDGE;
+
     if (hdr->err) return RCP_ACF_RESP_ERROR;
 
     switch (hdr->op) {
