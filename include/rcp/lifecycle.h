@@ -20,6 +20,28 @@
 //cfusa:req REQ-LIFECYCLE-019
 //cfusa:req REQ-LIFECYCLE-020
 //cfusa:req REQ-LIFECYCLE-021
+
+/* TC18 requirements-corpus completeness pass (v0.105.0): the ids below
+ * are catalogued in .fusa-reqs.json with a "tc18" citation and a
+ * "status" of "implemented", "partial" or "not-implemented". The
+ * not-implemented and partial ones describe normative TC18 behaviour
+ * this module does NOT provide; their tests pin the deviation. */
+//cfusa:req REQ-LIFECYCLE-022
+//cfusa:req REQ-LIFECYCLE-023
+//cfusa:req REQ-LIFECYCLE-024
+//cfusa:req REQ-LIFECYCLE-025
+//cfusa:req REQ-LIFECYCLE-026
+//cfusa:req REQ-LIFECYCLE-027
+//cfusa:req REQ-LIFECYCLE-028
+//cfusa:req REQ-LIFECYCLE-029
+//cfusa:req REQ-LIFECYCLE-030
+//cfusa:req REQ-LIFECYCLE-031
+//cfusa:req REQ-LIFECYCLE-032
+//cfusa:req REQ-LIFECYCLE-033
+//cfusa:req REQ-LIFECYCLE-034
+//cfusa:req REQ-LIFECYCLE-035
+//cfusa:req REQ-LIFECYCLE-036
+//cfusa:req REQ-LIFECYCLE-037
 /*
  * lifecycle.h -- RC Server lifecycle state machine for the TC18 Remote
  * Control Protocol wire layer (ROADMAP.md Phase 14, "RC Server Lifecycle &

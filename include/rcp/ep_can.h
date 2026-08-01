@@ -21,6 +21,17 @@
 //cfusa:req REQ-CANEP-020
 //cfusa:req REQ-CANEP-021
 //cfusa:req REQ-CANEP-022
+
+/* TC18 requirements-corpus completeness pass (v0.105.0): the ids below
+ * are catalogued in .fusa-reqs.json with a "tc18" citation and a
+ * "status" of "implemented", "partial" or "not-implemented". The
+ * not-implemented and partial ones describe normative TC18 behaviour
+ * this module does NOT provide; their tests pin the deviation. */
+//cfusa:req REQ-CANEP-028
+//cfusa:req REQ-CANEP-029
+//cfusa:req REQ-CANEP-030
+//cfusa:req REQ-CANEP-031
+//cfusa:req REQ-CANEP-032
 /*
  * ep_can.h -- CAN controller endpoint (Classical/FD/XL) for the TC18 Remote
  * Control Protocol wire layer (ROADMAP.md Phase 19, "Remaining Endpoint

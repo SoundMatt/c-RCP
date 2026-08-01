@@ -31,6 +31,76 @@ the rationale.
 
 ## Releases
 
+### v0.105.0 -- 2026-08-01
+
+**Requirements-corpus completeness pass. No behavior change** -- not one
+line of `src/` changes here. What changes is what `.fusa-reqs.json`
+*claims*: it stops being a map of this implementation and starts being a
+map of TC18's normative surface, with the parts this implementation does
+not cover marked as such instead of simply absent.
+
+**The problem.** A spec-coverage-gap audit read TC18 §10 through
+§13.7.13 clause by clause and checked each MUST/shall sentence, each
+normative table row and each figure-defined layout against all 817
+existing catalog entries. Roughly a hundred and thirty mandatory clauses
+had *no* corresponding entry at all -- not a wrong requirement, a missing
+one. A catalog that only describes what a codebase does cannot show what
+it does not do, and a reader had no way to tell "c-RCP implements TC18
+§12.5" from "nobody has looked at §12.5". The concentrations were §12.5
+(Goto Sleep / Goto Standby), §12.7.5-12.7.9 (the RC Server register map,
+request-stream config, EP_ID map, response-stream config), §13.6 (E2E
+safe points), and the per-endpoint functional-configuration and
+trigger-signal tables of §13.7.
+
+**What was added.** 158 entries, 817 -> 975, each carrying two new
+fields:
+
+* `"tc18"` -- the exact section, table or figure it was read from, plus
+  the line of the specification text it was extracted from.
+* `"status"` -- `"implemented"` (9), `"partial"` (62) or
+  `"not-implemented"` (87).
+
+`"implemented"` entries keep `scope: "tc18"` and ASIL-B: they describe
+behavior this library provides and were simply never written down.
+`"partial"` and `"not-implemented"` entries get a new `scope:
+"tc18-gap"`, level/asil `QM`, and text that opens with `NOT
+IMPLEMENTED:` and says plainly what the specification requires, what
+c-RCP does instead, and what the consequence is. They are deliberately
+**not** part of the ASIL-B safety-case basis -- claiming ASIL-B integrity
+for absent behavior would be the same dishonesty in the other direction.
+
+Every one of the 158 is traced by a `//cfusa:req` tag in its module's
+public header and by a `//cfusa:test` tag in one of five new test files
+(`tests/test_tc18_gaps_regmap.c`, `_server.c`, `_ep.c`, `_ep2.c`,
+`_e2e.c`). The
+tests for a gap entry are **deviation-pinning**, not decorative: they
+assert the behavior the code actually has where it differs from the
+clause, so the deviation is locked in as tested fact and a future fix
+must update the requirement rather than silently drift. For example
+`rcp_ep_i2c_mode_valid(4)` is asserted to be *false* while TC18 Table 46
+defines Ultra-fast mode (5 Mbit/s) at value 4.
+
+**Two corrections to existing entries.** `REQ-E2E-003` claimed the CRC
+covers `avtp_timestamp` as "8 bytes, big-endian"; `src/e2e.c` has always
+serialised a `uint32_t` with `put_u32` and `tests/test_e2e.c` has always
+asserted 4 octets. The AVTPDU field is 32 bits. The requirement text was
+wrong, not the code, and is corrected here.
+
+**Known gaps this pass does *not* close.** §11.2.2.1-§11.2.3.3 (the
+conditional/cancellation request families), §11.3-§11.4 (responses,
+acknowledges, timestamps), §12.8.2 (frame reception), §12.9 (request,
+response and error handling), §13.2/§13.3/§13.5 (the generic endpoint
+register map, request validation, evt-bit usage) and the remainder of
+§13.7.8-§13.7.13 still have roughly a hundred further candidate gaps
+from the same audit that did not fit this pass. They are the next
+increment, not a claim of completeness.
+
+A capacity note for whoever writes that next increment: c-FuSa's
+`cmd_trace.c` has a compile-time `MAX_REQS` of 1024 and silently ignores
+requirements past it. At 975 this catalog is 49 entries from that
+ceiling, so the limit needs raising upstream before the corpus grows
+much further.
+
 ### v0.104.0 -- 2026-07-31
 
 **BREAKING (wire format, and API).** Resolves the I2C transfer-direction

@@ -15,6 +15,18 @@
 //cfusa:req REQ-WAKEUP-014
 //cfusa:req REQ-WAKEUP-015
 //cfusa:req REQ-WAKEUP-016
+
+/* TC18 requirements-corpus completeness pass (v0.105.0): the ids below
+ * are catalogued in .fusa-reqs.json with a "tc18" citation and a
+ * "status" of "implemented", "partial" or "not-implemented". The
+ * not-implemented and partial ones describe normative TC18 behaviour
+ * this module does NOT provide; their tests pin the deviation. */
+//cfusa:req REQ-WAKEUP-017
+//cfusa:req REQ-WAKEUP-018
+//cfusa:req REQ-WAKEUP-019
+//cfusa:req REQ-WAKEUP-020
+//cfusa:req REQ-WAKEUP-021
+//cfusa:req REQ-WAKEUP-022
 /*
  * ep_wakeup.h -- the dedicated power-management endpoint (ep_type=0x01)
  * for the TC18 Remote Control Protocol wire layer (ROADMAP.md Phase 19,

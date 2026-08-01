@@ -21,6 +21,59 @@
 //cfusa:req REQ-RMAP-020
 //cfusa:req REQ-RMAP-021
 //cfusa:req REQ-RMAP-022
+
+/* TC18 requirements-corpus completeness pass (v0.105.0): the ids below
+ * are catalogued in .fusa-reqs.json with a "tc18" citation and a
+ * "status" of "implemented", "partial" or "not-implemented". The
+ * not-implemented and partial ones describe normative TC18 behaviour
+ * this module does NOT provide; their tests pin the deviation. */
+//cfusa:req REQ-RMAP-023
+//cfusa:req REQ-RMAP-024
+//cfusa:req REQ-RMAP-025
+//cfusa:req REQ-RMAP-026
+//cfusa:req REQ-RMAP-027
+//cfusa:req REQ-RMAP-028
+//cfusa:req REQ-RMAP-029
+//cfusa:req REQ-RMAP-030
+//cfusa:req REQ-RMAP-031
+//cfusa:req REQ-RMAP-032
+//cfusa:req REQ-RMAP-033
+//cfusa:req REQ-RMAP-034
+//cfusa:req REQ-RMAP-035
+//cfusa:req REQ-RMAP-036
+//cfusa:req REQ-RMAP-037
+//cfusa:req REQ-RMAP-038
+//cfusa:req REQ-RMAP-039
+//cfusa:req REQ-RMAP-040
+//cfusa:req REQ-RMAP-041
+//cfusa:req REQ-RMAP-042
+//cfusa:req REQ-RMAP-043
+//cfusa:req REQ-RMAP-044
+//cfusa:req REQ-RMAP-045
+//cfusa:req REQ-RMAP-046
+//cfusa:req REQ-RMAP-047
+//cfusa:req REQ-RMAP-048
+//cfusa:req REQ-RMAP-049
+//cfusa:req REQ-RMAP-050
+//cfusa:req REQ-RMAP-051
+//cfusa:req REQ-RMAP-052
+//cfusa:req REQ-RMAP-053
+//cfusa:req REQ-RMAP-054
+//cfusa:req REQ-RMAP-055
+//cfusa:req REQ-RMAP-056
+//cfusa:req REQ-RMAP-057
+//cfusa:req REQ-RMAP-058
+//cfusa:req REQ-RMAP-059
+//cfusa:req REQ-RMAP-060
+//cfusa:req REQ-RMAP-061
+//cfusa:req REQ-RMAP-062
+//cfusa:req REQ-RMAP-063
+//cfusa:req REQ-RMAP-064
+//cfusa:req REQ-RMAP-065
+//cfusa:req REQ-RMAP-066
+//cfusa:req REQ-RMAP-067
+//cfusa:req REQ-RMAP-068
+//cfusa:req REQ-RMAP-069
 /*
  * regmap.h -- Register-map model for the TC18 Remote Control Protocol RC
  * Server (ROADMAP.md Phase 14, "RC Server Lifecycle & Register Map",

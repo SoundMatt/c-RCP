@@ -363,3 +363,37 @@ add_executable(test_cli test_cli.c)
 target_link_libraries(test_cli PRIVATE rcp::rcp unity)
 target_compile_options(test_cli PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_cli COMMAND test_cli)
+
+# ── TC18 requirements-corpus completeness suites (v0.105.0) ──────────────────
+#
+# One suite per area of the spec-coverage-gap sweep that produced the
+# `status`-bearing entries in .fusa-reqs.json. Two kinds of test live here:
+# spec-literal assertions for clauses c-RCP does implement but never
+# catalogued, and deviation-pinning assertions for clauses it does not --
+# the latter assert the behaviour the code actually has, with a comment
+# naming the TC18 clause it fails to meet, so a gap is a tested fact rather
+# than an absence nobody can see.
+add_executable(test_tc18_gaps_regmap test_tc18_gaps_regmap.c)
+target_link_libraries(test_tc18_gaps_regmap PRIVATE rcp::rcp unity)
+target_compile_options(test_tc18_gaps_regmap PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_tc18_gaps_regmap COMMAND test_tc18_gaps_regmap)
+
+add_executable(test_tc18_gaps_server test_tc18_gaps_server.c)
+target_link_libraries(test_tc18_gaps_server PRIVATE rcp::rcp unity)
+target_compile_options(test_tc18_gaps_server PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_tc18_gaps_server COMMAND test_tc18_gaps_server)
+
+add_executable(test_tc18_gaps_ep test_tc18_gaps_ep.c)
+target_link_libraries(test_tc18_gaps_ep PRIVATE rcp::rcp unity)
+target_compile_options(test_tc18_gaps_ep PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_tc18_gaps_ep COMMAND test_tc18_gaps_ep)
+
+add_executable(test_tc18_gaps_ep2 test_tc18_gaps_ep2.c)
+target_link_libraries(test_tc18_gaps_ep2 PRIVATE rcp::rcp unity)
+target_compile_options(test_tc18_gaps_ep2 PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_tc18_gaps_ep2 COMMAND test_tc18_gaps_ep2)
+
+add_executable(test_tc18_gaps_e2e test_tc18_gaps_e2e.c)
+target_link_libraries(test_tc18_gaps_e2e PRIVATE rcp::rcp unity)
+target_compile_options(test_tc18_gaps_e2e PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_tc18_gaps_e2e COMMAND test_tc18_gaps_e2e)

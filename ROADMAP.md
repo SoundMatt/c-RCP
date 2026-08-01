@@ -5772,3 +5772,55 @@ mappings.
 `.fusa-reqs.json` rewrites `REQ-I2C-010`..`015` and adds `REQ-I2C-017`
 (`rcp_ep_i2c_dir_valid()`) and `REQ-I2C-018` (encode-time validation).
 Full `ctest` 59/59 passing.
+
+### 105. TC18 requirements-corpus completeness: catalog the specification's normative surface, gaps included (v0.105.0) ✅
+
+A spec-coverage-gap audit read TC18 §10 through §13.7.13 clause by
+clause and checked every MUST/shall sentence, every normative table row
+and every figure-defined layout against all 817 existing `.fusa-reqs.json`
+entries. Around a hundred and thirty mandatory clauses had **no**
+corresponding entry at all — not a wrong requirement, a missing one. The
+catalog described what this codebase does; it could not describe what the
+specification requires and this codebase does not do, so nothing
+distinguished "c-RCP implements §12.5" from "nobody has read §12.5".
+
+This milestone changes only `.fusa-reqs.json`, the `//cfusa:req` tag
+blocks that trace it, and five new test files. **`src/` is untouched.**
+
+158 entries were added (817 → 975). Each carries a `"tc18"` field citing
+the exact section/table/figure and the line of the specification text it
+was read from, and a `"status"` field: `"implemented"` (9),
+`"partial"` (62) or `"not-implemented"` (87). The 9 implemented ones keep
+`scope: "tc18"` and ASIL-B — behaviour this library provides that was
+simply never written down. The other 149 get a new `scope: "tc18-gap"`,
+level/asil `QM`, and text opening with `NOT IMPLEMENTED:` that states
+what TC18 requires, what c-RCP does instead, and the consequence. A
+tc18-gap entry is deliberately **not** part of the ASIL-B safety-case
+basis: claiming ASIL-B integrity for absent behaviour would be the same
+dishonesty the pass exists to remove, in the other direction.
+
+Every added entry is traced by a `//cfusa:req` tag in its module's public
+header and a `//cfusa:test` tag in one of `tests/test_tc18_gaps_regmap.c`,
+`_server.c`, `_ep.c`, `_ep2.c`, `_e2e.c`. Gap-entry tests are
+**deviation-pinning**: they assert the behaviour the code actually has
+where it departs from the clause (for instance that
+`rcp_ep_i2c_mode_valid(4)` is *false* although TC18 Table 46 defines
+Ultra-fast mode at value 4), so the deviation is a tested fact and a
+future fix must update the requirement rather than drift silently.
+
+Coverage by TC18 area: §12.5 Goto Sleep/Standby (8), §12.7.5 RC Server
+register map (15), §12.7.6 HW pin mapping (6), §12.7.7 request-stream
+config (9), §12.7.8 EP_ID map (7), §12.7.9 response-stream config (7),
+§12.3 lifecycle (16), §12.4 power/start-up (8), §13.6 E2E safe points
+(12), and the per-endpoint functional-configuration and trigger tables of
+§13.7.1–§13.7.13 (48).
+
+One existing entry was corrected rather than added: `REQ-E2E-003` claimed
+the CRC covers `avtp_timestamp` as "8 bytes, big-endian" while
+`src/e2e.c` has always serialised a `uint32_t` and `tests/test_e2e.c` has
+always asserted 4 octets — the AVTPDU field is 32 bits, so the
+requirement text was wrong, not the code.
+
+Not closed here, and explicitly not claimed as complete: §11.2.2–§11.4,
+§12.8.2, §12.9, §13.2/§13.3/§13.5 and part of §13.7.8–§13.7.13 still
+carry roughly a hundred further candidate gaps from the same audit.

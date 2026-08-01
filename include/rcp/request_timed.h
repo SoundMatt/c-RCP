@@ -10,6 +10,14 @@
 //cfusa:req REQ-TIMED-009
 //cfusa:req REQ-TIMED-010
 //cfusa:req REQ-TIMED-011
+
+/* TC18 requirements-corpus completeness pass (v0.105.0): the ids below
+ * are catalogued in .fusa-reqs.json with a "tc18" citation and a
+ * "status" of "implemented", "partial" or "not-implemented". The
+ * not-implemented and partial ones describe normative TC18 behaviour
+ * this module does NOT provide; their tests pin the deviation. */
+//cfusa:req REQ-TIMED-012
+//cfusa:req REQ-TIMED-013
 /*
  * request_timed.h -- Timed conditional requests for the TC18 Remote Control
  * Protocol wire layer (ROADMAP.md Phase 17, "Conditional Requests &

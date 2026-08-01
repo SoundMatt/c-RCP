@@ -21,6 +21,14 @@
 //cfusa:req REQ-LINEP-020
 //cfusa:req REQ-LINEP-021
 //cfusa:req REQ-LINEP-022
+
+/* TC18 requirements-corpus completeness pass (v0.105.0): the ids below
+ * are catalogued in .fusa-reqs.json with a "tc18" citation and a
+ * "status" of "implemented", "partial" or "not-implemented". The
+ * not-implemented and partial ones describe normative TC18 behaviour
+ * this module does NOT provide; their tests pin the deviation. */
+//cfusa:req REQ-LINEP-023
+//cfusa:req REQ-LINEP-024
 /*
  * ep_lin.h -- LIN endpoint for the TC18 Remote Control Protocol wire layer
  * (ROADMAP.md Phase 19, "Remaining Endpoint Types", milestone 71).
