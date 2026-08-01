@@ -375,6 +375,31 @@ static void test_transfer_request_rejects_wrong_bus(void)
     rcp_bytes_free(&frame);
 }
 
+/* TC18 §13.5 Table 30: evt[2:0] = 000b is the only legal value for a
+ * plain I2C transfer request; every other value (here, 0b011, a reserved
+ * value in I2C's endpoint-type row) shall be rejected. */
+static void test_transfer_request_rejects_nonzero_evt(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_i2c_dir_t             dir;
+    const uint8_t               *out_tx;
+    size_t                       out_tx_len;
+    uint16_t                     read_size;
+    uint8_t                      txn;
+
+    hdr.byte_bus_id = 4;
+    hdr.op          = RCP_ACF_OP_WRITE;
+    hdr.evt         = 0x3;
+    frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+
+    TEST_ASSERT_EQUAL(RCP_EP_I2C_ERR_BAD_EVT,
+        rcp_ep_i2c_decode_transfer_request(frame.data, frame.len, 4, &dir, &out_tx, &out_tx_len,
+                                            &read_size, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
 /* The former test_transfer_request_rejects_wrong_op() asserted that a
  * read-direction (op=0) frame is not an I2C transfer request. It is one --
  * see the direction tests above -- so its replacement asserts the
@@ -594,6 +619,7 @@ int main(void)
     RUN_TEST(test_transfer_request_round_trip_read_direction);
     RUN_TEST(test_transfer_request_round_trip_empty_payload);
     RUN_TEST(test_transfer_request_rejects_wrong_bus);
+    RUN_TEST(test_transfer_request_rejects_nonzero_evt);
     RUN_TEST(test_transfer_request_accepts_hand_built_read_direction_frame);
     RUN_TEST(test_transfer_request_rejects_bad_msg_type);
     RUN_TEST(test_transfer_request_rejects_short_frame);

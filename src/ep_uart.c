@@ -117,6 +117,7 @@ const char *rcp_ep_uart_strerror(rcp_ep_uart_errc_t e)
     case RCP_EP_UART_ERR_WRONG_BUS:    return "rcp/ep_uart: wrong byte_bus_id";
     case RCP_EP_UART_ERR_WRONG_OP:     return "rcp/ep_uart: wrong ACF op";
     case RCP_EP_UART_ERR_UNKNOWN_CMD:  return "rcp/ep_uart: unrecognized command (payload-bearing read request)";
+    case RCP_EP_UART_ERR_BAD_EVT:      return "rcp/ep_uart: evt[2:0] is not 0b000";
     default:                           return "rcp/ep_uart: unknown error";
     }
 }
@@ -157,6 +158,7 @@ rcp_ep_uart_errc_t rcp_ep_uart_decode_write_request(const uint8_t *b, size_t len
 
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_UART_ERR_WRONG_BUS;
     if (hdr.op != RCP_ACF_OP_WRITE) return RCP_EP_UART_ERR_WRONG_OP;
+    if (!rcp_acf_evt_row2_is_plain(hdr.evt)) return RCP_EP_UART_ERR_BAD_EVT;
 
     *out_tx_data         = payload;
     *out_tx_len          = payload_len;
@@ -281,6 +283,7 @@ rcp_ep_uart_errc_t rcp_ep_uart_decode_read_request(const uint8_t *b, size_t len,
 
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_UART_ERR_WRONG_BUS;
     if (hdr.op != RCP_ACF_OP_READ) return RCP_EP_UART_ERR_WRONG_OP;
+    if (!rcp_acf_evt_row2_is_plain(hdr.evt)) return RCP_EP_UART_ERR_BAD_EVT;
 
     /* A UART read request has nothing meaningful a payload could carry
      * (read_size already rides the ACF header itself) -- a payload-bearing

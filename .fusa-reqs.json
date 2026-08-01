@@ -3325,11 +3325,12 @@
     {
       "id": "REQ-I2C-012",
       "title": "rcp_ep_i2c_decode_transfer_request() rejects a malformed or misaddressed frame and accepts both directions",
-      "text": "rcp_ep_i2c_decode_transfer_request() shall return RCP_EP_I2C_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length, RCP_EP_I2C_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, and RCP_EP_I2C_ERR_WRONG_BUS when byte_bus_id != expected_bus_id. It shall accept BOTH op senses -- an I2C transfer is half duplex and either-directional, so neither is malformed -- and report which via *out_direction.",
+      "text": "rcp_ep_i2c_decode_transfer_request() shall return RCP_EP_I2C_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length, RCP_EP_I2C_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_I2C_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, and RCP_EP_I2C_ERR_BAD_EVT when evt[2:0] is not 0b000 -- TC18 §13.5 Table 30's only legal value for a plain request in I2C's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer. It shall accept BOTH op senses -- an I2C transfer is half duplex and either-directional, so neither is malformed -- and report which via *out_direction.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-I2C-013",
@@ -3558,12 +3559,13 @@
     },
     {
       "id": "REQ-UART-020",
-      "title": "rcp_ep_uart_decode_write_request() rejects a malformed, misaddressed, or misdirected frame",
-      "text": "rcp_ep_uart_decode_write_request() shall return RCP_EP_UART_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length, RCP_EP_UART_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_UART_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, and RCP_EP_UART_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE.",
+      "title": "rcp_ep_uart_decode_write_request() rejects a malformed, misaddressed, misdirected, or wrong-evt frame",
+      "text": "rcp_ep_uart_decode_write_request() shall return RCP_EP_UART_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length, RCP_EP_UART_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_UART_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, RCP_EP_UART_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE, and RCP_EP_UART_ERR_BAD_EVT when evt[2:0] is not 0b000 -- TC18 §13.5 Table 30's only legal value for a plain request in UART's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-UART-021",
@@ -3604,11 +3606,12 @@
     {
       "id": "REQ-UART-025",
       "title": "rcp_ep_uart_decode_read_request() rejects a payload-bearing read request with RCP_EP_UART_ERR_UNKNOWN_CMD",
-      "text": "rcp_ep_uart_decode_read_request() shall return RCP_EP_UART_ERR_UNKNOWN_CMD, rather than RCP_EP_UART_OK, when an otherwise well-formed read request carries a non-empty payload -- the deliberate asymmetry against GPIO/PWM_OUT request types documented in ep_uart.h.",
+      "text": "rcp_ep_uart_decode_read_request() shall return RCP_EP_UART_ERR_UNKNOWN_CMD, rather than RCP_EP_UART_OK, when an otherwise well-formed read request carries a non-empty payload -- the deliberate asymmetry against GPIO/PWM_OUT request types documented in ep_uart.h. It shall also return RCP_EP_UART_ERR_BAD_EVT when evt[2:0] is not 0b000 -- TC18 §13.5 Table 30's only legal value for a plain request in UART's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-UART-026",
@@ -6019,11 +6022,12 @@
     {
       "id": "REQ-ISELED-022",
       "title": "rcp_ep_iseled_decode_command_request() validates and decodes an ACF-level command request",
-      "text": "rcp_ep_iseled_decode_command_request() shall return RCP_EP_ISELED_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header or its declared payload, RCP_EP_ISELED_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_ISELED_ERR_WRONG_BUS for a mismatched byte_bus_id, RCP_EP_ISELED_ERR_WRONG_OP for an op other than RCP_ACF_OP_WRITE, and otherwise RCP_EP_ISELED_OK with the plain payload and transaction number populated.",
+      "text": "rcp_ep_iseled_decode_command_request() shall return RCP_EP_ISELED_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header or its declared payload, RCP_EP_ISELED_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_ISELED_ERR_WRONG_BUS for a mismatched byte_bus_id, RCP_EP_ISELED_ERR_WRONG_OP for an op other than RCP_ACF_OP_WRITE, RCP_EP_ISELED_ERR_BAD_EVT when evt[2:0] is not 0b000 (TC18 §13.5 Table 30's only legal value for a plain request in ISELED's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer), and otherwise RCP_EP_ISELED_OK with the plain payload and transaction number populated.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-ISELED-023",
@@ -6154,11 +6158,12 @@
     {
       "id": "REQ-MDIO-013",
       "title": "rcp_ep_mdio_decode_read_request() validates and decodes an ACF-level MDIO read request",
-      "text": "rcp_ep_mdio_decode_read_request() shall return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header, its declared payload, or the 7-byte request prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_MDIO_ERR_WRONG_OP for an op other than RCP_ACF_OP_READ; RCP_EP_MDIO_ERR_BAD_ADDR when the decoded address fails rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT when the decoded word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS; and otherwise RCP_EP_MDIO_OK with the address, word count, and transaction number populated.",
+      "text": "rcp_ep_mdio_decode_read_request() shall return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header, its declared payload, or the 7-byte request prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_MDIO_ERR_WRONG_OP for an op other than RCP_ACF_OP_READ; RCP_EP_MDIO_ERR_BAD_EVT when evt[2:0] is not 0b000 (TC18 §13.5 Table 30's only legal value for a plain request in MDIO's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer); RCP_EP_MDIO_ERR_BAD_ADDR when the decoded address fails rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT when the decoded word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS; and otherwise RCP_EP_MDIO_OK with the address, word count, and transaction number populated.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-MDIO-014",
@@ -6190,11 +6195,12 @@
     {
       "id": "REQ-MDIO-017",
       "title": "rcp_ep_mdio_decode_write_request() validates and decodes an ACF-level MDIO write request",
-      "text": "rcp_ep_mdio_decode_write_request() shall return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header, its declared payload, or the 5-byte address prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_MDIO_ERR_WRONG_OP for an op other than RCP_ACF_OP_WRITE; RCP_EP_MDIO_ERR_BAD_ADDR when the decoded address fails rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT when the trailing words region's byte length is odd, is 0, or represents more than RCP_EP_MDIO_MAX_BURST_WORDS words; and otherwise RCP_EP_MDIO_OK with the address, packed word bytes, word count, and transaction number populated.",
+      "text": "rcp_ep_mdio_decode_write_request() shall return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header, its declared payload, or the 5-byte address prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_MDIO_ERR_WRONG_OP for an op other than RCP_ACF_OP_WRITE; RCP_EP_MDIO_ERR_BAD_EVT when evt[2:0] is not 0b000 (TC18 §13.5 Table 30's only legal value for a plain request in MDIO's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer); RCP_EP_MDIO_ERR_BAD_ADDR when the decoded address fails rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT when the trailing words region's byte length is odd, is 0, or represents more than RCP_EP_MDIO_MAX_BURST_WORDS words; and otherwise RCP_EP_MDIO_OK with the address, packed word bytes, word count, and transaction number populated.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-MDIO-018",

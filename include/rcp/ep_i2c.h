@@ -261,6 +261,11 @@ typedef enum {
      * this module: both op senses are valid on an I2C transfer (see the
      * file header), so there is no longer a "wrong" one to reject. */
     RCP_EP_I2C_ERR_WRONG_OP     = 4,
+    /* evt[2:0] is not 0b000, TC18 §13.5 Table 30's only legal value for a
+     * plain (non-configuration) request in I2C's endpoint-type row --
+     * caller shall respond with error code UNSUPPORTED_CMD (see
+     * rcp_acf_evt_row2_is_plain()). */
+    RCP_EP_I2C_ERR_BAD_EVT      = 5,
 } rcp_ep_i2c_errc_t;
 
 /* Human-readable message for an rcp_ep_i2c_errc_t value. Never returns NULL. */
@@ -299,8 +304,10 @@ rcp_bytes_t rcp_ep_i2c_encode_transfer_request(rcp_byte_bus_id_t byte_bus_id,
  * Fails with RCP_EP_I2C_ERR_SHORT_FRAME if b is shorter than the ACF_ABB
  * fixed header or its declared payload length; RCP_EP_I2C_ERR_BAD_MSG_TYPE
  * if b is not an ACF_ABB message; RCP_EP_I2C_ERR_WRONG_BUS if its
- * byte_bus_id != expected_bus_id. Both op senses are accepted -- see the
- * file header -- and reported via *out_direction.
+ * byte_bus_id != expected_bus_id; RCP_EP_I2C_ERR_BAD_EVT if its evt[2:0]
+ * is not 0b000 (rcp_acf_evt_row2_is_plain(), TC18 §13.5 Table 30 -- the
+ * caller shall respond with error code UNSUPPORTED_CMD). Both op senses
+ * are accepted -- see the file header -- and reported via *out_direction.
  *
  * On RCP_EP_I2C_OK, *out_direction, *out_read_size (the requested
  * read_size for RCP_EP_I2C_DIR_READ, 0 for RCP_EP_I2C_DIR_WRITE, whose

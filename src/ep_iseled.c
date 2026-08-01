@@ -200,6 +200,7 @@ const char *rcp_ep_iseled_strerror(rcp_ep_iseled_errc_t e)
     case RCP_EP_ISELED_ERR_ODD_SYMBOL_COUNT:
         return "rcp/ep_iseled: odd symbol count -- every octet frames to two symbols";
     case RCP_EP_ISELED_ERR_ALLOC:           return "rcp/ep_iseled: allocation failure";
+    case RCP_EP_ISELED_ERR_BAD_EVT:         return "rcp/ep_iseled: evt[2:0] is not 0b000";
     default:                                return "rcp/ep_iseled: unknown error";
     }
 }
@@ -296,6 +297,7 @@ rcp_ep_iseled_errc_t rcp_ep_iseled_decode_command_request(const uint8_t *b, size
 
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_ISELED_ERR_WRONG_BUS;
     if (hdr.op != RCP_ACF_OP_WRITE) return RCP_EP_ISELED_ERR_WRONG_OP;
+    if (!rcp_acf_evt_row2_is_plain(hdr.evt)) return RCP_EP_ISELED_ERR_BAD_EVT;
 
     /* payload is round-tripped verbatim, byte for byte -- see the file
      * header; this endpoint's own bit-framing happens only when it
