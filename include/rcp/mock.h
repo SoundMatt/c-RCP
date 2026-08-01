@@ -19,6 +19,12 @@
 //cfusa:req REQ-MOCK-018
 //cfusa:req REQ-MOCK-019
 //cfusa:req REQ-MOCK-020
+//cfusa:req REQ-MOCK-021
+//cfusa:req REQ-MOCK-022
+//cfusa:req REQ-MOCK-023
+//cfusa:req REQ-MOCK-024
+//cfusa:req REQ-MOCK-025
+//cfusa:req REQ-MOCK-026
 /*
  * mock.h -- in-process RC-Server/endpoint test double for the TC18 Remote
  * Control Protocol wire layer (ROADMAP.md Phase 21, "Satellite Package
@@ -91,6 +97,7 @@
 #include "rcp/lifecycle.h"
 #include "rcp/rcp.h"
 #include "rcp/regmap.h"
+#include "rcp/request_sequencer.h"
 #include "rcp/server.h"
 
 #include <stdbool.h>
@@ -225,6 +232,28 @@ typedef enum {
     /* byte_bus_id names no registered endpoint. *out_response is left
      * zeroed. */
     RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS = 3,
+    /* A conditional request (compound / compound-wait / triggered / timed
+     * / chained): decoded and placed in the addressed endpoint's request
+     * store, awaiting its own execution condition. No handler ran and
+     * *out_response is left zeroed -- drive rcp_mock_server_tick() to
+     * execute it once its condition is satisfied. */
+    RCP_MOCK_DISPATCH_PENDING         = 4,
+    /* A cancellation request (clear-all / clear-non-safestate /
+     * clear-single): applied immediately against the addressed endpoint's
+     * request store. *out_response is left zeroed. */
+    RCP_MOCK_DISPATCH_CANCELLED       = 5,
+    /* The message's own opcode byte claims a conditional request kind that
+     * it then fails to decode as, or the addressed endpoint's request store
+     * is full. Nothing was stored or executed. */
+    RCP_MOCK_DISPATCH_REJECTED        = 6,
+    /* Multi-member frames only: this chained member has no predecessor to
+     * chain to (it is the frame's first request), so it and every member
+     * after it is ignored. */
+    RCP_MOCK_DISPATCH_CHAIN_ERROR     = 7,
+    /* Multi-member frames only: this chained member's predecessor errored
+     * and the member selected RCP_CHAINED_CS_ABORT_ON_ERROR, or an earlier
+     * member had already aborted the chain. */
+    RCP_MOCK_DISPATCH_CHAIN_ABORTED   = 8,
 } rcp_mock_dispatch_result_t;
 
 /* Runs one already-framed request through srv: first
@@ -299,6 +328,64 @@ size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subty
                                        size_t frame_len,
                                        rcp_mock_frame_member_result_t *out_results,
                                        size_t out_cap);
+
+/* ── Conditional-request execution (TC18 §11.2.2) ─────────────────────────── */
+
+/* Allocates srv's own sequencer-state table (request_sequencer.h) with
+ * count registers, replacing and freeing any table it already held. A
+ * count of 0 leaves srv with the "compound operations unsupported"
+ * table, in which case no compound or compound-wait request stored on any
+ * of srv's endpoints ever becomes due. Returns false on allocation
+ * failure, leaving srv without a table. */
+bool rcp_mock_server_set_sequencer_count(rcp_mock_server_t *srv, uint16_t count);
+
+/* Mutable access to srv's own sequencer-state table, so a test can drive
+ * a sequencer into the state a stored compound request is waiting for
+ * (rcp_sequencer_set_state()) and read back the state a completed one
+ * advanced it to. Never NULL for a non-NULL srv; the table is the
+ * unsupported ({NULL,0}) one until
+ * rcp_mock_server_set_sequencer_count() is called. */
+rcp_sequencer_table_t *rcp_mock_server_sequencers(rcp_mock_server_t *srv);
+
+/* Runs at most one due conditional request on the endpoint at
+ * byte_bus_id: selects the highest-priority currently-due stored request
+ * (server.h's rcp_server_endpoint_select_due(), i.e. scheduler.h's
+ * rcp_sched_compare() ordering with e2e.h's safety-request gate applied),
+ * runs it through that endpoint's registered handler exactly as
+ * rcp_mock_server_dispatch() would run a standard request, and then
+ * finalizes it (rcp_server_endpoint_complete(), which advances a compound
+ * request's sequencer and applies the repetition rule).
+ *
+ * ctx supplies the tick's own time, gPTP state, endpoint-idle and
+ * safe-state flags, and the caller's already-evaluated compound-wait
+ * comparison result; its sequencers field is ignored and overwritten with
+ * srv's own table. Returns true iff a request was selected and run, in
+ * which case *out_response (zeroed on entry) carries whatever the handler
+ * produced. Returns false, leaving *out_response zeroed, when byte_bus_id
+ * names no endpoint or nothing is due. */
+bool rcp_mock_server_tick(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
+                           const rcp_server_tick_ctx_t *ctx, rcp_bytes_t *out_response);
+
+/* Reports one observed trigger occurrence, emitted by endpoint source_ep
+ * as its trigger signal number signal_nr, to every endpoint registered on
+ * srv -- a triggered request stored on one endpoint routinely waits on a
+ * *different* endpoint's trigger signal, which is exactly what
+ * trigger_source_ep names. Returns how many stored triggered requests, in
+ * total across every endpoint, counted this occurrence. */
+size_t rcp_mock_server_notify_trigger(rcp_mock_server_t *srv, uint8_t source_ep,
+                                       uint8_t signal_nr);
+
+/* Number of conditional requests currently held in the request store of
+ * the endpoint at byte_bus_id, or 0 if byte_bus_id names no registered
+ * endpoint. */
+size_t rcp_mock_server_pending_count(const rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id);
+
+/* Applies a watchdog overflow to the endpoint at byte_bus_id: purges
+ * every non-safety-tagged request from its store (server.h's
+ * rcp_server_endpoint_watchdog_purge(), i.e. e2e.h's own
+ * keep-only-the-safety-sequence rule), leaving the 0x8x ones to drive the
+ * endpoint into its safe state. Returns how many requests were purged. */
+size_t rcp_mock_server_watchdog_purge(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id);
 
 #ifdef __cplusplus
 }

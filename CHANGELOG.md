@@ -31,6 +31,80 @@ the rationale.
 
 ## Releases
 
+### v0.102.0 -- 2026-07-31
+
+**BREAKING (wire format, and API).** Fixes the entire conditional-request
+feature area (TC18 §11.2.2/§11.2.3), which was broken at two independent
+levels: the wire sub-field encodings were non-conformant, *and* none of
+these request kinds were wired into the reference server's dispatch path
+at all.
+
+**Wire sub-field fixes**, each re-derived from the specification's own
+figures and field tables:
+
+| Request kind | Was | Now (TC18 v0.5.1_RC) |
+|---|---|---|
+| Compound / compound-wait `0x0F`/`0x8F`, `0x0B`/`0x8B` | 16-bit `sequencer` at offset 1; `start_state`/`next_state` two octets late; 8-bit repetitions with an `0xFF` infinite sentinel | offsets 1..7 = `start_state`(1) `next_state`(1) `sequencer`(1) `exec_delay`(2) `repetitions`(2), infinite sentinel `0xFFFF` (Fig. 8/Table 6, Fig. 9/Table 7) |
+| Triggered `0x0E`/`0x8E` | compound's `sequencer`/`start_state`/`next_state` — no trigger-selection fields at all | `trigger_source_ep`(1) `trigger_signal_nr`(1) `trigger_threshold`(1) `exec_delay`(2) `repetitions`(2) (Fig. 10/Table 8) |
+| Timed `0x0A` | 32-bit value at offset 1, overwriting the reserved octet | reserved-zero octet at offset 1, 48-bit big-endian `presentation_time` at offsets 2..7 (Fig. 12/Table 10) |
+| Chained `0x01` | invented `chain_length`/`chain_position` over reserved octets; no `chain_exec_delay` | `chain_exec_delay`(2) at offsets 4..5, offsets 1..3 and 6..7 reserved-zero (Fig. 11/Table 9) |
+| Clear-single `0x07` | `clear_transaction_num` at offset 1 | `clear_transaction_num` at offset 3 (Fig. 15/Table 13) |
+
+Reserved octets are now *enforced* on decode, not merely written as zero:
+`RCP_TIMED_ERR_RESERVED_NONZERO`, `RCP_CHAINED_ERR_RESERVED_NONZERO` and
+`RCP_CANCEL_ERR_RESERVED_NONZERO` are new. Timed requests additionally
+reject a set `hs`/`cs` (`RCP_TIMED_ERR_UNSUPPORTED_CMD`).
+
+Two behavioral rules in the same area were wrong rather than absent, and
+are corrected: chained's `cs` bit is a *conditional start* selector read
+on the member about to run about its predecessor's outcome (it was read
+off the member that errored, inverting who controls the abort), and
+compound's `start_state == 0` ("start in any state") and `next_state == 0`
+("remain in the current state") sentinels are now implemented.
+
+**Dispatch integration.** `rcp_compound_tick()`, `rcp_compound_wait_tick()`,
+`rcp_triggered_tick()`, `rcp_chained_advance()`, `rcp_timed_admit()` and
+`rcp_cancel_attempt()` previously had no callers outside their own modules
+and unit tests: `src/mock.c` never inspected `request_type`, and
+`rcp_sched_compare()`'s priority ordering and
+`rcp_e2e_request_may_execute()`'s safety gate were correct but never
+invoked. Dispatch was unconditional FIFO and only standard requests
+worked end to end. `server.h`/`server.c` now own a per-endpoint
+**request store** (`rcp_server_endpoint_admit()`,
+`rcp_server_endpoint_select_due()`, `rcp_server_endpoint_complete()`,
+plus trigger notification, chain linkage, cancellation and watchdog
+purge), and `mock.c` drives it (`rcp_mock_server_tick()`,
+`rcp_mock_server_notify_trigger()`,
+`rcp_mock_server_set_sequencer_count()`,
+`rcp_mock_server_watchdog_purge()`, and chain sequencing across a frame's
+members). Standard-request behavior is unchanged.
+
+**API changes**: `rcp_compound_step_t.sequencer_index` is now `uint8_t`
+and `.repeat_count` `uint16_t`, `.exec_delay_ms` renamed `.exec_delay`
+(its unit is multiples of the endpoint's `ep_delay_time`, never
+milliseconds); `rcp_triggered_step_t` replaces its sequencer fields with
+the trigger-selection ones and `rcp_triggered_tick()` takes no sequencer
+table; `rcp_timed_*` presentation times are `uint64_t`;
+`rcp_chained_encode_member()`/`_decode_member()` take `chain_exec_delay`
+instead of `chain_length`/`chain_position`; `rcp_chained_advance()` gains
+a `has_predecessor` parameter. `RCP_CHAINED_MIN_MEMBERS`,
+`RCP_CHAINED_ERR_TOO_FEW_MEMBERS` and
+`RCP_CHAINED_ERR_POSITION_OUT_OF_RANGE` are removed.
+
+**Still open**: `src/mock.c`'s dispatcher has no `ep_type` switch and
+never calls any `ep_*.h` decode function for *standard* requests either —
+it invokes only the caller-supplied handler. That broader gap is
+untouched here.
+
+New `tests/test_conditional_dispatch.c` (22 cases) exercises these kinds
+end to end through the real dispatch path; each module also gains literal
+octet-offset assertions written from the specification's figures rather
+than copied out of the encoder (the pre-existing round-trip tests all
+passed against the wrong layouts, since encode and decode agreed with
+each other). `ctest` 59/59 passing. `include/rcp/version.h` had drifted
+from `CMakeLists.txt` (`0.100.0` vs `0.101.0`); both, and `.fusa.json`,
+are now `0.102.0`.
+
 ### v0.101.0 -- 2026-07-31
 
 Adds the native-Ethernet (L2) `rcp_avtp_transport_t` carrier

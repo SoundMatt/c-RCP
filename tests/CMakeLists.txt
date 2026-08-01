@@ -167,6 +167,15 @@ target_link_libraries(test_scheduler PRIVATE rcp::rcp unity)
 target_compile_options(test_scheduler PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_scheduler COMMAND test_scheduler)
 
+# End-to-end conditional-request dispatch: exercises the compound /
+# compound-wait / triggered / timed / chained / cancellation request kinds
+# through the real rcp_mock_server_dispatch()/_tick() path rather than
+# through each module's own encode/decode functions in isolation.
+add_executable(test_conditional_dispatch test_conditional_dispatch.c)
+target_link_libraries(test_conditional_dispatch PRIVATE rcp::rcp unity)
+target_compile_options(test_conditional_dispatch PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_conditional_dispatch COMMAND test_conditional_dispatch)
+
 add_executable(test_udp test_udp.c)
 target_link_libraries(test_udp PRIVATE rcp::rcp unity)
 target_compile_options(test_udp PRIVATE ${RCP_TEST_WARNING_FLAGS})

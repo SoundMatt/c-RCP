@@ -9,6 +9,8 @@
 //cfusa:req REQ-CHAIN-008
 //cfusa:req REQ-CHAIN-009
 //cfusa:req REQ-CHAIN-010
+//cfusa:req REQ-CHAIN-011
+//cfusa:req REQ-CHAIN-012
 /*
  * request_chained.h -- Chained conditional requests for the TC18 Remote Control
  * Protocol wire layer (ROADMAP.md Phase 17, "Conditional Requests &
@@ -37,11 +39,34 @@
  * request_compound.h's shared message_timestamp-repurposing convention (see that
  * header's file comment for the full rationale) -- this module reuses
  * that same wire convention but, like request_triggered.h, does not include or
- * call into request_compound.h itself. This module's own 7-byte sub-field layout
- * for a chain member is chain_length (this chain's total member count,
- * >= 2) and chain_position (this member's own 0-based position within the
- * chain, < chain_length), with the remaining 5 bytes reserved and always
- * encoded/decoded as zero.
+ * call into request_compound.h itself.
+ *
+ * ── wire sub-field layout ───────────────────────────────────────────────────
+ *
+ * A chain member carries exactly one sub-field of its own. The eight
+ * octets of the repurposed message_timestamp region hold, in order
+ * (offsets relative to the start of that region):
+ *
+ *   offset 0     request_type     (the opcode octet, 0x01)
+ *   offsets 1..3 reserved         (all bits zero)
+ *   offsets 4..5 chain_exec_delay (two octets, big-endian)
+ *   offsets 6..7 reserved         (all bits zero)
+ *
+ * Before v0.102.0 this module invented chain_length and chain_position
+ * sub-fields at offsets 1 and 2, which both overwrote octets the
+ * specification mandates be transmitted as zero and omitted
+ * chain_exec_delay entirely. Neither invented field is needed: a chain is
+ * defined positionally, by consecutive members of a single AVTPDU, so a
+ * member's position and the chain's length are properties of the enclosing
+ * frame rather than of any member's own sub-fields. A chain starts at the
+ * first non-chained request in the frame and extends across every
+ * immediately following chained member; a chained member appearing as the
+ * frame's very first request has no predecessor to chain to and is
+ * therefore rejected.
+ *
+ * The reserved octets are not merely conventionally zero: a received chain
+ * member carrying any set bit in them is rejected outright
+ * (RCP_CHAINED_ERR_RESERVED_NONZERO).
  *
  * ── The cs bit: abort-on-error vs. continue-regardless ───────────────────────
  *
@@ -50,12 +75,20 @@
  * deliberately does not implement"). This module is the first to give
  * that already-published, unmodified field real behavior, exactly the
  * kind of "round-trip now, activate later" precedent request_compound.h's own
- * safety-tagged (MSB) request_type variants already established. A chain
- * member's own cs value (RCP_CHAINED_CS_CONTINUE_ON_ERROR /
- * RCP_CHAINED_CS_ABORT_ON_ERROR) selects, for the chain members still to
- * come, whether that member's own error aborts the rest of the chain or
- * whether execution proceeds regardless -- rcp_chained_advance() below is
- * the pure, directly-testable expression of that sequencing rule.
+ * safety-tagged (MSB) request_type variants already established.
+ *
+ * cs is a *conditional start* selector, and it is read on the member
+ * about to run, about the member that just ran:
+ * RCP_CHAINED_CS_CONTINUE_ON_ERROR means this member executes even if its
+ * predecessor returned an error, while RCP_CHAINED_CS_ABORT_ON_ERROR
+ * means this member does not execute at all when its predecessor errored
+ * -- and, as a consequence, neither does the remainder of the chain.
+ * Before v0.102.0 this module read cs off the member that *errored*
+ * rather than off its successor, which inverted control of the
+ * abort decision: a failing member could veto its own successors instead
+ * of each successor deciding for itself whether to proceed.
+ * rcp_chained_advance() below is the pure, directly-testable expression of
+ * the corrected rule.
  *
  * ── Outcomes: CHAIN_ERROR and CHAIN_ABORTED ─────────────────────────────────
  *
@@ -100,90 +133,100 @@ extern "C" {
 /* ── Errors ─────────────────────────────────────────────────────────────────── */
 
 typedef enum {
-    RCP_CHAINED_OK                       = 0,
-    RCP_CHAINED_ERR_SHORT_FRAME          = 1,
-    RCP_CHAINED_ERR_BAD_MSG_TYPE         = 2,
-    RCP_CHAINED_ERR_NOT_REPURPOSED       = 3, /* decoded mtv != RCP_ACF_MTV_UNTIMED */
-    RCP_CHAINED_ERR_UNKNOWN_TYPE         = 4, /* opcode byte is not RCP_REQUEST_TYPE_CHAINED */
-    RCP_CHAINED_ERR_TOO_FEW_MEMBERS      = 5, /* chain_length < 2 on encode */
-    RCP_CHAINED_ERR_POSITION_OUT_OF_RANGE = 6, /* chain_position >= chain_length on encode */
+    RCP_CHAINED_OK                   = 0,
+    RCP_CHAINED_ERR_SHORT_FRAME      = 1,
+    RCP_CHAINED_ERR_BAD_MSG_TYPE     = 2,
+    RCP_CHAINED_ERR_NOT_REPURPOSED   = 3, /* decoded mtv != RCP_ACF_MTV_UNTIMED */
+    RCP_CHAINED_ERR_UNKNOWN_TYPE     = 4, /* opcode byte is not RCP_REQUEST_TYPE_CHAINED */
+    RCP_CHAINED_ERR_RESERVED_NONZERO = 5, /* a reserved sub-field octet carries a set bit */
 } rcp_chained_errc_t;
 
 /* Human-readable message for an rcp_chained_errc_t value. Never returns NULL. */
 const char *rcp_chained_strerror(rcp_chained_errc_t e);
 
-/* Smallest legal chain_length -- a "chain" of fewer than 2 members is not
- * sequential execution of anything, per the file header. */
-#define RCP_CHAINED_MIN_MEMBERS ((uint8_t)2u)
-
 /* ── Chain member encode/decode ───────────────────────────────────────────── */
 
 /* Encodes an ACF_GBB-framed chained-request member addressed to
- * byte_bus_id, packing chain_length/chain_position into the repurposed
- * message_timestamp region (see the file header) with the leading opcode
+ * byte_bus_id, packing chain_exec_delay into the repurposed
+ * message_timestamp region's octets 4..5 and leaving every reserved octet
+ * of that region all-zero (see the file header), with the leading opcode
  * byte set to RCP_REQUEST_TYPE_CHAINED, cs set to one of
  * RCP_CHAINED_CS_CONTINUE_ON_ERROR/_ABORT_ON_ERROR, and mtv forced to
  * RCP_ACF_MTV_UNTIMED -- same conventions as
- * rcp_compound_encode_request() (request_compound.h). payload/payload_len is this
- * member's own opaque, endpoint-specific request data; payload may be
- * NULL iff payload_len == 0. Returns a zeroed rcp_bytes_t (data=NULL) if
- * chain_length < RCP_CHAINED_MIN_MEMBERS, chain_position >= chain_length,
- * payload_len exceeds RCP_ACF_MAX_PAYLOAD, or on allocation failure.
- * Caller frees the result with rcp_bytes_free(). */
-rcp_bytes_t rcp_chained_encode_member(rcp_byte_bus_id_t byte_bus_id, uint8_t chain_length,
-                                       uint8_t chain_position, uint8_t cs, uint8_t transaction_num,
+ * rcp_compound_encode_request() (request_compound.h). chain_exec_delay is
+ * counted in multiples of the addressed endpoint's configured
+ * ep_delay_time, measured from the moment the predecessor request
+ * finalized. payload/payload_len is this member's own opaque,
+ * endpoint-specific request data; payload may be NULL iff payload_len ==
+ * 0. Returns a zeroed rcp_bytes_t (data=NULL) if payload_len exceeds
+ * RCP_ACF_MAX_PAYLOAD or on allocation failure. Caller frees the result
+ * with rcp_bytes_free(). */
+rcp_bytes_t rcp_chained_encode_member(rcp_byte_bus_id_t byte_bus_id, uint16_t chain_exec_delay,
+                                       uint8_t cs, uint8_t transaction_num,
                                        const uint8_t *payload, size_t payload_len);
 
 /* Decodes and validates a chained-request member from b[0..len). Same
  * failure-mode conventions as rcp_compound_decode_request() (request_compound.h),
  * with RCP_CHAINED_ERR_UNKNOWN_TYPE returned whenever the decoded opcode
- * byte is not RCP_REQUEST_TYPE_CHAINED. On RCP_CHAINED_OK,
- * *out_byte_bus_id, *out_chain_length, *out_chain_position, *out_cs, and
- * *out_transaction_num are populated, and *out_payload / *out_payload_len
- * are set to a *borrowed* view into b. This function does not itself
- * enforce chain_length >= RCP_CHAINED_MIN_MEMBERS or chain_position <
- * chain_length -- those are encode-time validations only; a decoder
- * receiving an out-of-range value from the wire reports it faithfully so
- * the caller can decide how to treat a nonconformant peer. */
+ * byte is not RCP_REQUEST_TYPE_CHAINED and RCP_CHAINED_ERR_RESERVED_NONZERO
+ * whenever any reserved octet of the repurposed region (offsets 1..3 and
+ * 6..7) carries a set bit. On RCP_CHAINED_OK, *out_byte_bus_id,
+ * *out_chain_exec_delay, *out_cs, and *out_transaction_num are populated,
+ * and *out_payload / *out_payload_len are set to a *borrowed* view into
+ * b. */
 rcp_chained_errc_t rcp_chained_decode_member(const uint8_t *b, size_t len,
                                               rcp_byte_bus_id_t *out_byte_bus_id,
-                                              uint8_t *out_chain_length, uint8_t *out_chain_position,
+                                              uint16_t *out_chain_exec_delay,
                                               uint8_t *out_cs, const uint8_t **out_payload,
                                               size_t *out_payload_len, uint8_t *out_transaction_num);
+
+/* True iff elapsed >= chain_exec_delay, in that field's own unit
+ * (multiples of the endpoint's configured ep_delay_time), where elapsed
+ * is measured from the moment this member's predecessor finalized. */
+bool rcp_chained_exec_delay_elapsed(uint16_t chain_exec_delay, uint32_t elapsed);
 
 /* ── Sequencing: the cs-bit-driven abort/continue rule ────────────────────── */
 
 typedef enum {
-    RCP_CHAINED_MEMBER_OK            = 0, /* executed without error */
-    RCP_CHAINED_MEMBER_CHAIN_ERROR   = 1, /* this member itself errored (CHAIN_ERROR) */
-    RCP_CHAINED_MEMBER_CHAIN_ABORTED = 2, /* skipped: an earlier member's
-                                              error, combined with
+    RCP_CHAINED_MEMBER_OK            = 0, /* this member may execute */
+    RCP_CHAINED_MEMBER_CHAIN_ERROR   = 1, /* this member has no predecessor to
+                                              chain to, so the whole chain is
+                                              ignored (CHAIN_ERROR) */
+    RCP_CHAINED_MEMBER_CHAIN_ABORTED = 2, /* skipped: its predecessor errored
+                                              and this member selected
                                               RCP_CHAINED_CS_ABORT_ON_ERROR,
-                                              aborted the rest of the chain
+                                              or an earlier member already
+                                              aborted the chain
                                               (CHAIN_ABORTED) */
 } rcp_chained_member_outcome_t;
 
-/* Advances one chain's sequencing state by one member, in chain order.
- * *chain_aborted must start false before a chain's first member and is
- * this function's own accumulated "abort the rest" state, carried by the
- * caller from one call to the next across a chain's members.
+/* Decides, *before* executing one chain member, whether it may run.
+ * Called once per chained member in chain order. *chain_aborted must
+ * start false before a chain's first member and is this function's own
+ * accumulated "abort the rest" state, carried by the caller from one call
+ * to the next across a chain's members.
  *
- * If *chain_aborted is already true (an earlier member both errored and
- * selected RCP_CHAINED_CS_ABORT_ON_ERROR), this member must not be
- * executed at all -- the caller passes member_errored/cs as don't-cares
- * and this function returns RCP_CHAINED_MEMBER_CHAIN_ABORTED without
- * consulting them, leaving *chain_aborted unchanged (still true).
+ * has_predecessor is whether any request precedes this member within the
+ * same AVTPDU. A chained member appearing as the frame's very first
+ * request has nothing to chain to: this returns
+ * RCP_CHAINED_MEMBER_CHAIN_ERROR and sets *chain_aborted, so that member
+ * and every member after it is ignored.
  *
- * Otherwise the caller has already executed this member and reports its
- * own member_errored/cs here: if !member_errored, returns
- * RCP_CHAINED_MEMBER_OK and leaves *chain_aborted false. If
- * member_errored, returns RCP_CHAINED_MEMBER_CHAIN_ERROR, and sets
- * *chain_aborted to true iff cs == RCP_CHAINED_CS_ABORT_ON_ERROR (a
- * member with cs == RCP_CHAINED_CS_CONTINUE_ON_ERROR that itself errors
- * leaves *chain_aborted false -- the chain proceeds to its next member
- * regardless). */
-rcp_chained_member_outcome_t rcp_chained_advance(bool *chain_aborted, bool member_errored,
-                                                   uint8_t cs);
+ * If *chain_aborted is already true, this member must not be executed
+ * either -- predecessor_errored/cs are not consulted and
+ * RCP_CHAINED_MEMBER_CHAIN_ABORTED is returned.
+ *
+ * Otherwise predecessor_errored reports whether the immediately preceding
+ * request finalized with an error, and cs is *this* member's own
+ * conditional-start selector (see the file header). A member with cs ==
+ * RCP_CHAINED_CS_ABORT_ON_ERROR whose predecessor errored does not
+ * execute: this returns RCP_CHAINED_MEMBER_CHAIN_ABORTED and sets
+ * *chain_aborted, ending the chain. Every other combination returns
+ * RCP_CHAINED_MEMBER_OK with *chain_aborted left false -- including a
+ * member with cs == RCP_CHAINED_CS_CONTINUE_ON_ERROR whose predecessor
+ * errored, which proceeds regardless. */
+rcp_chained_member_outcome_t rcp_chained_advance(bool *chain_aborted, bool has_predecessor,
+                                                   bool predecessor_errored, uint8_t cs);
 
 #ifdef __cplusplus
 }

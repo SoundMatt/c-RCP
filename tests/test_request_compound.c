@@ -23,6 +23,7 @@
 //cfusa:test REQ-CMP-022
 //cfusa:test REQ-CMP-023
 //cfusa:test REQ-CMP-024
+//cfusa:test REQ-CMP-025
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -98,7 +99,7 @@ static void test_peek_request_type_reads_compound_opcode(void)
     step.sequencer_index = 1;
     step.start_state     = 1;
     step.next_state       = 2;
-    step.exec_delay_ms    = 500;
+    step.exec_delay    = 500;
     step.repeat_count     = 0;
 
     frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 3, &step, 7, NULL, 0);
@@ -161,7 +162,7 @@ static void test_compound_request_round_trip(void)
     step.sequencer_index = 12;
     step.start_state     = 1;
     step.next_state       = 2;
-    step.exec_delay_ms    = 1500;
+    step.exec_delay    = 1500;
     step.repeat_count     = 3;
 
     frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 9, &step, 42,
@@ -176,11 +177,11 @@ static void test_compound_request_round_trip(void)
     TEST_ASSERT_EQUAL_UINT8(RCP_REQUEST_TYPE_COMPOUND, out_rt);
     TEST_ASSERT_EQUAL_UINT8(9, out_bus);
     TEST_ASSERT_EQUAL_UINT8(42, out_tn);
-    TEST_ASSERT_EQUAL_UINT16(12, out_step.sequencer_index);
+    TEST_ASSERT_EQUAL_UINT8(12, out_step.sequencer_index);
     TEST_ASSERT_EQUAL_UINT8(1, out_step.start_state);
     TEST_ASSERT_EQUAL_UINT8(2, out_step.next_state);
-    TEST_ASSERT_EQUAL_UINT16(1500, out_step.exec_delay_ms);
-    TEST_ASSERT_EQUAL_UINT8(3, out_step.repeat_count);
+    TEST_ASSERT_EQUAL_UINT16(1500, out_step.exec_delay);
+    TEST_ASSERT_EQUAL_UINT16(3, out_step.repeat_count);
     TEST_ASSERT_EQUAL_UINT32(sizeof(payload), out_payload_len);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(payload, out_payload, sizeof(payload));
 
@@ -198,10 +199,10 @@ static void test_compound_wait_safety_request_round_trip(void)
     size_t out_payload_len = 0;
     uint8_t out_tn = 0;
 
-    step.sequencer_index = 65535;
+    step.sequencer_index = 255;
     step.start_state     = 200;
     step.next_state       = 201;
-    step.exec_delay_ms    = 65535;
+    step.exec_delay    = 65535;
     step.repeat_count     = RCP_COMPOUND_REPEAT_INFINITE;
 
     frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT_SAFETY, 1, &step, 5, NULL, 0);
@@ -214,11 +215,11 @@ static void test_compound_wait_safety_request_round_trip(void)
 
     TEST_ASSERT_EQUAL_UINT8(RCP_REQUEST_TYPE_COMPOUND_WAIT_SAFETY, out_rt);
     TEST_ASSERT_TRUE(rcp_request_type_is_safety(out_rt));
-    TEST_ASSERT_EQUAL_UINT16(65535, out_step.sequencer_index);
+    TEST_ASSERT_EQUAL_UINT8(255, out_step.sequencer_index);
     TEST_ASSERT_EQUAL_UINT8(200, out_step.start_state);
     TEST_ASSERT_EQUAL_UINT8(201, out_step.next_state);
-    TEST_ASSERT_EQUAL_UINT16(65535, out_step.exec_delay_ms);
-    TEST_ASSERT_EQUAL_UINT8(RCP_COMPOUND_REPEAT_INFINITE, out_step.repeat_count);
+    TEST_ASSERT_EQUAL_UINT16(65535, out_step.exec_delay);
+    TEST_ASSERT_EQUAL_UINT16(RCP_COMPOUND_REPEAT_INFINITE, out_step.repeat_count);
     TEST_ASSERT_EQUAL_UINT32(0, out_payload_len);
 
     rcp_bytes_free(&frame);
@@ -403,7 +404,7 @@ static void test_advance_guard_false_for_invalid_sequencer_index(void)
 static void test_exec_delay_elapsed(void)
 {
     rcp_compound_step_t step = {0};
-    step.exec_delay_ms = 1000;
+    step.exec_delay = 1000;
 
     TEST_ASSERT_FALSE(rcp_compound_exec_delay_elapsed(&step, 999));
     TEST_ASSERT_TRUE(rcp_compound_exec_delay_elapsed(&step, 1000));
@@ -419,7 +420,7 @@ static void test_compound_tick_advances_only_after_delay_and_guard_both_hold(voi
     step.sequencer_index = 1;
     step.start_state     = RCP_SEQUENCER_POWER_ON_STATE;
     step.next_state       = 5;
-    step.exec_delay_ms    = 1000;
+    step.exec_delay    = 1000;
 
     /* Not yet elapsed: no advance. */
     TEST_ASSERT_FALSE(rcp_compound_tick(&table, &step, 500));
@@ -443,7 +444,7 @@ static void test_compound_tick_guard_blocks_advance_even_after_delay_elapses(voi
     step.sequencer_index = 0;
     step.start_state     = RCP_SEQUENCER_POWER_ON_STATE;
     step.next_state       = 5;
-    step.exec_delay_ms    = 100;
+    step.exec_delay    = 100;
 
     /* Some other request already moved this sequencer away from
      * start_state before the timer elapsed. */
@@ -465,9 +466,9 @@ static void test_compound_wait_tick_advances_only_on_condition_met_and_guard(voi
     step.sequencer_index = 2;
     step.start_state     = RCP_SEQUENCER_POWER_ON_STATE;
     step.next_state       = 9;
-    step.exec_delay_ms    = 5000; /* deliberately irrelevant to this tick */
+    step.exec_delay    = 5000; /* deliberately irrelevant to this tick */
 
-    /* No match: never advances, however long exec_delay_ms is. */
+    /* No match: never advances, however long exec_delay is. */
     TEST_ASSERT_FALSE(rcp_compound_wait_tick(&table, &step, false));
     TEST_ASSERT_TRUE(rcp_sequencer_get_state(&table, 2, &got));
     TEST_ASSERT_EQUAL_UINT8(RCP_SEQUENCER_POWER_ON_STATE, got);
@@ -495,6 +496,201 @@ static void test_compound_wait_tick_guard_blocks_advance_even_on_match(void)
     TEST_ASSERT_FALSE(rcp_compound_wait_tick(&table, &step, true));
     TEST_ASSERT_TRUE(rcp_sequencer_get_state(&table, 0, &got));
     TEST_ASSERT_EQUAL_UINT8(3, got);
+
+    rcp_sequencer_table_free(&table);
+}
+
+/* ── Literal wire layout ──────────────────────────────────────────────────────
+ *
+ * These assertions are written from the TC18 v0.5.1_RC specification's own
+ * compound-request figure and field table (§11.2.2.1, Figure 8 / Table 6)
+ * and compound-wait's (§11.2.2.2, Figure 9 / Table 7), NOT copied back out
+ * of this encoder's output. Both figures lay the repurposed
+ * message_timestamp region out as six sub-fields in this order:
+ *
+ *   offset 0     request_type   (one octet)
+ *   offset 1     start_state    (one octet)
+ *   offset 2     next_state     (one octet)
+ *   offset 3     sequencer      (one octet)
+ *   offsets 4..5 exec_delay     (two octets, big-endian)
+ *   offsets 6..7 repetitions    (two octets, big-endian)
+ *
+ * The whole point of asserting literal octets here is that a pure
+ * encode/decode round-trip cannot detect a self-consistently *wrong*
+ * layout: every round-trip test in this file passed against the
+ * pre-v0.102.0 encoder, which packed sequencer as 16 bits at offset 1 and
+ * repetitions as 8 bits at offset 7. */
+
+/* Offset of the repurposed message_timestamp region within an ACF_GBB
+ * message: it directly follows the 8-octet shared byte_message_info
+ * header. */
+#define TS_OFF RCP_ACF_ABB_HEADER_LEN
+
+static void test_compound_wire_sub_field_offsets(void)
+{
+    rcp_compound_step_t step = {0};
+    rcp_bytes_t frame;
+
+    step.start_state     = 0x11;
+    step.next_state       = 0x22;
+    step.sequencer_index  = 0x33;
+    step.exec_delay       = 0x4455;
+    step.repeat_count     = 0x6677;
+
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 7, &step, 1, NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_TRUE(frame.len >= TS_OFF + 8u);
+
+    TEST_ASSERT_EQUAL_HEX8(0x0F, frame.data[TS_OFF + 0]); /* request_type = compound */
+    TEST_ASSERT_EQUAL_HEX8(0x11, frame.data[TS_OFF + 1]); /* cmp_start_state */
+    TEST_ASSERT_EQUAL_HEX8(0x22, frame.data[TS_OFF + 2]); /* cmp_next_state */
+    TEST_ASSERT_EQUAL_HEX8(0x33, frame.data[TS_OFF + 3]); /* cmp_sequencer */
+    TEST_ASSERT_EQUAL_HEX8(0x44, frame.data[TS_OFF + 4]); /* cmp_exec_delay hi */
+    TEST_ASSERT_EQUAL_HEX8(0x55, frame.data[TS_OFF + 5]); /* cmp_exec_delay lo */
+    TEST_ASSERT_EQUAL_HEX8(0x66, frame.data[TS_OFF + 6]); /* cmp_repetitions hi */
+    TEST_ASSERT_EQUAL_HEX8(0x77, frame.data[TS_OFF + 7]); /* cmp_repetitions lo */
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_compound_wait_safety_wire_sub_field_offsets(void)
+{
+    rcp_compound_step_t step = {0};
+    rcp_bytes_t frame;
+
+    step.start_state     = 0xA1;
+    step.next_state       = 0xB2;
+    step.sequencer_index  = 0xC3;
+    step.exec_delay       = 0x0001;
+    step.repeat_count     = 0x0002;
+
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT_SAFETY, 3, &step, 1,
+                                         NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    TEST_ASSERT_EQUAL_HEX8(0x8B, frame.data[TS_OFF + 0]); /* compound wait, safety-tagged */
+    TEST_ASSERT_EQUAL_HEX8(0xA1, frame.data[TS_OFF + 1]);
+    TEST_ASSERT_EQUAL_HEX8(0xB2, frame.data[TS_OFF + 2]);
+    TEST_ASSERT_EQUAL_HEX8(0xC3, frame.data[TS_OFF + 3]);
+    TEST_ASSERT_EQUAL_HEX8(0x00, frame.data[TS_OFF + 4]);
+    TEST_ASSERT_EQUAL_HEX8(0x01, frame.data[TS_OFF + 5]);
+    TEST_ASSERT_EQUAL_HEX8(0x00, frame.data[TS_OFF + 6]);
+    TEST_ASSERT_EQUAL_HEX8(0x02, frame.data[TS_OFF + 7]);
+
+    rcp_bytes_free(&frame);
+}
+
+/* Table 6/Table 7: "If set to 0xFFFF it indicates infinite repetition" --
+ * a two-octet all-ones value, not a one-octet 0xFF. */
+static void test_repeat_infinite_sentinel_is_two_octets_of_ones(void)
+{
+    rcp_compound_step_t step = {0};
+    rcp_bytes_t frame;
+
+    TEST_ASSERT_EQUAL_UINT16(0xFFFFu, RCP_COMPOUND_REPEAT_INFINITE);
+
+    step.repeat_count = RCP_COMPOUND_REPEAT_INFINITE;
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 0, &step, 0, NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    TEST_ASSERT_EQUAL_HEX8(0xFF, frame.data[TS_OFF + 6]);
+    TEST_ASSERT_EQUAL_HEX8(0xFF, frame.data[TS_OFF + 7]);
+    /* 0x00FF -- an 8-bit 0xFF in the low octet only -- must NOT be read as
+     * the infinite sentinel. */
+    TEST_ASSERT_NOT_EQUAL_UINT16(0x00FFu, RCP_COMPOUND_REPEAT_INFINITE);
+
+    rcp_bytes_free(&frame);
+}
+
+/* Decoding a spec-shaped octet sequence built by hand, so decode is
+ * verified against the specification independently of encode. */
+static void test_decode_reads_hand_built_spec_layout(void)
+{
+    rcp_compound_step_t step = {0};
+    rcp_bytes_t frame;
+    rcp_compound_step_t out_step = {0};
+    uint8_t out_rt = 0;
+    rcp_byte_bus_id_t out_bus = 0;
+    const uint8_t *out_payload = NULL;
+    size_t out_payload_len = 0;
+    uint8_t out_tn = 0;
+
+    /* Build a valid ACF_GBB shell via the encoder, then overwrite the
+     * eight sub-field octets by hand with the spec-derived pattern. */
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 5, &step, 9, NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    frame.data[TS_OFF + 0] = 0x0F;
+    frame.data[TS_OFF + 1] = 0x07; /* start_state */
+    frame.data[TS_OFF + 2] = 0x08; /* next_state */
+    frame.data[TS_OFF + 3] = 0x09; /* sequencer */
+    frame.data[TS_OFF + 4] = 0x01; /* exec_delay = 0x0102 */
+    frame.data[TS_OFF + 5] = 0x02;
+    frame.data[TS_OFF + 6] = 0x03; /* repetitions = 0x0304 */
+    frame.data[TS_OFF + 7] = 0x04;
+
+    TEST_ASSERT_EQUAL_INT(RCP_COMPOUND_OK,
+                           rcp_compound_decode_request(frame.data, frame.len, &out_rt, &out_bus,
+                                                        &out_step, &out_payload, &out_payload_len,
+                                                        &out_tn));
+
+    TEST_ASSERT_EQUAL_UINT8(0x07, out_step.start_state);
+    TEST_ASSERT_EQUAL_UINT8(0x08, out_step.next_state);
+    TEST_ASSERT_EQUAL_UINT8(0x09, out_step.sequencer_index);
+    TEST_ASSERT_EQUAL_UINT16(0x0102, out_step.exec_delay);
+    TEST_ASSERT_EQUAL_UINT16(0x0304, out_step.repeat_count);
+
+    rcp_bytes_free(&frame);
+}
+
+/* ── start_state == 0: "execute in any state" (§11.2.2.1) ─────────────────── */
+
+static void test_start_condition_zero_start_state_matches_any_state(void)
+{
+    rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
+    rcp_compound_step_t step = {0};
+
+    step.sequencer_index = 1;
+    step.start_state     = 0; /* any state */
+
+    TEST_ASSERT_TRUE(rcp_compound_start_condition_met(&table, &step));
+
+    TEST_ASSERT_TRUE(rcp_sequencer_set_state(&table, 1, 200));
+    TEST_ASSERT_TRUE(rcp_compound_start_condition_met(&table, &step));
+
+    /* The advance guard is a different question, and still requires the
+     * sequencer to actually be sitting in start_state. */
+    TEST_ASSERT_FALSE(rcp_compound_advance_guard(&table, &step));
+
+    rcp_sequencer_table_free(&table);
+}
+
+static void test_start_condition_nonzero_start_state_requires_exact_match(void)
+{
+    rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
+    rcp_compound_step_t step = {0};
+
+    step.sequencer_index = 0;
+    step.start_state     = 7;
+
+    TEST_ASSERT_FALSE(rcp_compound_start_condition_met(&table, &step));
+    TEST_ASSERT_TRUE(rcp_sequencer_set_state(&table, 0, 7));
+    TEST_ASSERT_TRUE(rcp_compound_start_condition_met(&table, &step));
+
+    rcp_sequencer_table_free(&table);
+}
+
+/* A sequencer this server does not have models a disabled sequencer,
+ * which prohibits execution -- including for start_state == 0. */
+static void test_start_condition_false_for_unknown_sequencer(void)
+{
+    rcp_sequencer_table_t table = rcp_sequencer_table_new(2);
+    rcp_compound_step_t step = {0};
+
+    step.sequencer_index = 200;
+    step.start_state     = 0;
+
+    TEST_ASSERT_FALSE(rcp_compound_start_condition_met(&table, &step));
 
     rcp_sequencer_table_free(&table);
 }
@@ -535,6 +731,15 @@ int main(void)
     RUN_TEST(test_compound_tick_guard_blocks_advance_even_after_delay_elapses);
     RUN_TEST(test_compound_wait_tick_advances_only_on_condition_met_and_guard);
     RUN_TEST(test_compound_wait_tick_guard_blocks_advance_even_on_match);
+
+    RUN_TEST(test_compound_wire_sub_field_offsets);
+    RUN_TEST(test_compound_wait_safety_wire_sub_field_offsets);
+    RUN_TEST(test_repeat_infinite_sentinel_is_two_octets_of_ones);
+    RUN_TEST(test_decode_reads_hand_built_spec_layout);
+
+    RUN_TEST(test_start_condition_zero_start_state_matches_any_state);
+    RUN_TEST(test_start_condition_nonzero_start_state_requires_exact_match);
+    RUN_TEST(test_start_condition_false_for_unknown_sequencer);
 
     return UNITY_END();
 }
