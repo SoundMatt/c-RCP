@@ -82,22 +82,44 @@
  * models only the averaging math and the read request/response wire
  * codec, exactly like every prior endpoint type's own scope boundary.
  *
- * ── The three-layer averaging model ─────────────────────────────────────────
+ * ── The three-layer sampling model, and the multi-value response ───────────
  *
- * A single ADC response value is the result of three configurable
- * averaging stages, applied in this fixed order (extraction §5.9):
+ * An ADC response carries N measurement values, not one. The three
+ * configurable stages that produce them, applied in this fixed order
+ * (extraction §5.9), are:
  *
  *   1. rcp_ep_adc_average_interval(): adc_samples_per_avg_interval raw
  *      samples are averaged (arithmetic mean, ignoring any individual
  *      sample that itself timed out -- see below) into one
  *      rcp_ep_adc_avg_value_t per averaging interval.
  *   2. adc_avg_intervals_per_request such per-interval averages are
- *      collected (by the caller, into the avg_values array
- *      rcp_ep_adc_combine_avg_values() below takes).
- *   3. rcp_ep_adc_combine_avg_values(): those avg_intervals_per_request
- *      averages are combined, per the endpoint's adc_combine_avg_values
- *      functional-config selector (rcp_ep_adc_combine_mode_t), into the
- *      single value a request's response ultimately reports.
+ *      captured per measurement cycle (by the caller, into the avg_values
+ *      array rcp_ep_adc_collect_response_values() below takes).
+ *   3. adc_combine_avg_values -- a COUNT, not a mode selector: the number
+ *      of averaged output values to be placed in one response.
+ *      rcp_ep_adc_collect_response_values() packs that many averaged
+ *      values, in capture order, into the array
+ *      rcp_ep_adc_encode_response() then encodes as the response payload.
+ *
+ * Stage 3 is deliberately *not* a second arithmetic reduction. An earlier
+ * revision of this module modelled adc_combine_avg_values as a four-way
+ * AVERAGE/MIN/MAX/LATEST mode enum collapsing every averaged value into
+ * one 2-octet response payload; that has no basis in the register table,
+ * which defines the field as the number of output values to be combined
+ * into one response, and it made every response exactly one value wide
+ * where a conforming peer expects N. The count relationship the
+ * specification states for the request side is the same one
+ * rcp_ep_adc_response_value_count() expresses: a response carries as many
+ * measurement values as half the request's read_size.
+ *
+ * The three documented cadence cases follow directly from the two counts
+ * and need no code of their own here (this module models the codec and
+ * the arithmetic, never the scheduling): when adc_combine_avg_values
+ * exceeds adc_avg_intervals_per_request, several request executions feed
+ * one response (whose transaction_num is that of the request that
+ * produced the response's first averaged value); when they are equal,
+ * there is one response per execution; when it is smaller, one execution
+ * yields several responses.
  *
  * Each stage is its own small, pure, directly-testable function operating
  * on caller-supplied arrays -- this module never itself owns sample
@@ -115,34 +137,35 @@
  * milestone. rcp_ep_adc_average_interval() excludes every NO_SIGNAL
  * sample from its arithmetic mean, reporting NO_SIGNAL itself (rather than
  * a mean computed from a smaller-than-expected sample set silently) only
- * when *every* sample in that interval timed out; rcp_ep_adc_combine_avg_values()
- * applies the identical exclusion rule one layer up, over per-interval
- * averages, for RCP_EP_ADC_COMBINE_AVERAGE/_MIN/_MAX -- except
- * RCP_EP_ADC_COMBINE_LATEST, which deliberately reports its single most
- * recent interval's value even when that value is itself NO_SIGNAL (a
- * "most recent reading" combine mode legitimately reports "no signal" when
- * the most recent interval genuinely detected nothing -- the same
+ * when *every* sample in that interval timed out. There is no second
+ * exclusion rule one layer up: because stage 3 is a packing count rather
+ * than a reduction, an averaging interval that produced NO_SIGNAL is
+ * reported verbatim as that response value's own contents -- the same
  * fail-safe-over-silent-substitution philosophy this project applies
- * throughout, not a special case invented for its own sake).
+ * throughout. A peer therefore sees exactly which of the N values in a
+ * response had no valid measurement behind it, instead of that fact being
+ * averaged away.
  *
- * ── The first-sample-of-first-combined-value capture-moment rule ───────────
+ * ── The last-sample-of-the-first-response-value capture-moment rule ────────
  *
- * Per rcp_ep_adc_average_interval()'s own contract, an interval's
- * rcp_ep_adc_avg_value_t.timestamp is always that interval's first raw
- * sample's timestamp (samples[0].timestamp), regardless of how many
- * samples within that interval are later averaged together or excluded as
- * NO_SIGNAL. rcp_ep_adc_capture_moment_timestamp() is this module's own
- * single, directly-testable expression of the resulting rule a response's
- * message_timestamp ultimately follows (extraction §5.9): given the same
- * avg_values array rcp_ep_adc_combine_avg_values() combined into a
- * request's reported value, the applicable timestamp is always
- * avg_values[0].timestamp -- i.e. the very first raw sample of the very
- * first averaging interval that fed the request, independent of which
- * combine mode selected the reported *value* itself (even
- * RCP_EP_ADC_COMBINE_LATEST, which reports its *last* interval's value,
- * still reports the *first* interval's capture moment as the applicable
- * timestamp -- value and timestamp are deliberately not required to trace
- * to the same interval). As with every prior endpoint type's own
+ * A timed response's message_timestamp is the moment the LAST sample that
+ * fed the FIRST averaged value carried in that response was captured
+ * (extraction §5.9.2) -- the end of that first averaging window, not its
+ * start. Two functions express that rule between them:
+ *
+ *   - rcp_ep_adc_average_interval() sets an interval's
+ *     rcp_ep_adc_avg_value_t.timestamp to that interval's *last* raw
+ *     sample that actually contributed to the average, i.e. the last one
+ *     not excluded as NO_SIGNAL. (An earlier revision used
+ *     samples[0].timestamp, the interval's *first* sample -- the opposite
+ *     end of the window, and wrong by a full averaging interval for every
+ *     interval longer than one sample.) When every sample in an interval
+ *     timed out, so that none was "used", the last sample's timestamp is
+ *     reported, since that is still the moment the interval closed.
+ *   - rcp_ep_adc_capture_moment_timestamp() then selects the *first*
+ *     averaged value carried in the response: avg_values[0].timestamp.
+ *
+ * As with every prior endpoint type's own
  * timed-response convention, the resulting timestamp value is still only
  * caller-supplied input to rcp_ep_adc_encode_response()'s own timed/
  * untimed choice, never read from a clock by this module itself.
@@ -152,9 +175,9 @@
  * rcp_ep_adc_functional_cfg_t composes regmap.h's
  * rcp_regmap_ep_functional_cfg_t as its own first member (per that
  * module's documented convention, same as every prior endpoint type) and
- * adds this endpoint's three averaging-pipeline parameters:
+ * adds this endpoint's three sampling-pipeline parameters:
  * adc_samples_per_avg_interval, adc_avg_intervals_per_request, and
- * adc_combine_avg_values. rcp_ep_adc_functional_cfg_writable() is,
+ * adc_combine_avg_values (a count of output values per response). rcp_ep_adc_functional_cfg_writable() is,
  * likewise, a thin, named wrapper over server.h's
  * rcp_lifecycle_field_writable() (RCP_LIFECYCLE_FIELD_FUNCTIONAL_W), and every
  * rcp_ep_adc_set_*() mutator consults it before ever touching cfg --
@@ -180,18 +203,24 @@
 extern "C" {
 #endif
 
-/* ── adc_combine_avg_values: the layer-3 combine modes ──────────────────────── */
+/* ── Response geometry: measurement values are 2 octets each ────────────────── */
 
-typedef enum {
-    RCP_EP_ADC_COMBINE_AVERAGE = 0, /* arithmetic mean of every avg_value */
-    RCP_EP_ADC_COMBINE_MIN     = 1, /* smallest avg_value */
-    RCP_EP_ADC_COMBINE_MAX     = 2, /* largest avg_value */
-    RCP_EP_ADC_COMBINE_LATEST  = 3, /* the most recent (last) avg_value --
-                                        see the file header's NO_SIGNAL note */
-} rcp_ep_adc_combine_mode_t;
+/* The octet width of one measurement value in a response payload. A
+ * response's payload is exactly value_count * RCP_EP_ADC_VALUE_LEN octets
+ * long -- N values, never one (see the file header). */
+#define RCP_EP_ADC_VALUE_LEN ((size_t)2u)
 
-/* True iff v is one of the four defined combine modes, i.e. v <= 3. */
-bool rcp_ep_adc_combine_mode_valid(uint8_t v);
+/* The largest number of measurement values one response can carry, i.e.
+ * the largest value_count rcp_ep_adc_encode_response() accepts. Derived
+ * from acf.h's own payload ceiling for the narrower (GBB) message form,
+ * so the same bound holds whether the response is timed or not. */
+#define RCP_EP_ADC_MAX_VALUES ((size_t)(RCP_ACF_MAX_PAYLOAD / RCP_EP_ADC_VALUE_LEN))
+
+/* The number of measurement values a response to a request carrying
+ * read_size is expected to contain: half the read_size, since each value
+ * occupies RCP_EP_ADC_VALUE_LEN octets (extraction §5.9.3). Returns 0 for
+ * an odd read_size, which cannot describe a whole number of values. */
+size_t rcp_ep_adc_response_value_count(uint16_t read_size);
 
 /* ── Layer 1: adc_samples_per_avg_interval ───────────────────────────────────── */
 
@@ -206,8 +235,10 @@ typedef struct {
 /* One averaging interval's result: value is the arithmetic mean (rounded
  * down) of every samples[i].value that is not RCP_EP_PWM_IN_NO_SIGNAL, or
  * RCP_EP_PWM_IN_NO_SIGNAL itself iff every sample in this interval timed
- * out (or sample_count == 0); timestamp is always samples[0].timestamp (0
- * iff sample_count == 0) -- see the file header's capture-moment note. */
+ * out (or sample_count == 0); timestamp is the capture moment of the LAST
+ * sample that contributed to that mean -- or, when none did, of the last
+ * sample in the interval (0 iff sample_count == 0). See the file header's
+ * capture-moment note. */
 typedef struct {
     uint16_t value;
     uint64_t timestamp;
@@ -221,26 +252,26 @@ rcp_ep_adc_avg_value_t rcp_ep_adc_average_interval(const rcp_ep_adc_sample_t *sa
 
 /* ── Layers 2/3: adc_avg_intervals_per_request + adc_combine_avg_values ─────── */
 
-/* Combines avg_count layer-1 results per combine_mode into the single
- * value a request's response ultimately reports -- layers 2/3 of the
- * three-layer averaging model (see the file header). Returns
- * RCP_EP_PWM_IN_NO_SIGNAL iff avg_count == 0, or (for every combine_mode
- * except RCP_EP_ADC_COMBINE_LATEST) iff every avg_values[i].value is
- * itself RCP_EP_PWM_IN_NO_SIGNAL; RCP_EP_ADC_COMBINE_LATEST instead always
- * returns avg_values[avg_count - 1].value verbatim, NO_SIGNAL or not (see
- * the file header). avg_values may be NULL iff avg_count == 0. An invalid
- * combine_mode is treated the same as RCP_EP_ADC_COMBINE_AVERAGE
- * (fail-safe default, mirroring this project's convention of never
- * fabricating behavior for undefined input by instead falling back to the
- * most conservative defined one). */
-uint16_t rcp_ep_adc_combine_avg_values(const rcp_ep_adc_avg_value_t *avg_values, size_t avg_count,
-                                        rcp_ep_adc_combine_mode_t combine_mode);
+/* Packs the first value_count layer-1 results into out_values, in capture
+ * order and verbatim (a NO_SIGNAL interval is carried through as
+ * NO_SIGNAL, never averaged away) -- layers 2/3 of the sampling model,
+ * where adc_combine_avg_values is the output-value COUNT this function's
+ * value_count parameter carries (see the file header). Returns the number
+ * of values actually written, min(avg_count, value_count); out_values
+ * entries beyond that are left untouched, so a caller that asked for more
+ * values than it has averages yet knows exactly how many it still owes.
+ * avg_values may be NULL iff avg_count == 0; out_values may be NULL iff
+ * value_count == 0. */
+size_t rcp_ep_adc_collect_response_values(const rcp_ep_adc_avg_value_t *avg_values,
+                                           size_t avg_count,
+                                           uint16_t *out_values, size_t value_count);
 
-/* The first-sample-of-first-combined-value capture-moment rule (extraction
- * §5.9) -- see the file header. Given the same avg_values array
- * rcp_ep_adc_combine_avg_values() combined, returns avg_values[0].timestamp
- * (0 iff avg_count == 0), independent of combine_mode. avg_values may be
- * NULL iff avg_count == 0. */
+/* The last-sample-of-the-first-response-value capture-moment rule
+ * (extraction §5.9.2) -- see the file header. Given the same avg_values
+ * array rcp_ep_adc_collect_response_values() packed, returns
+ * avg_values[0].timestamp: the moment the last sample feeding the
+ * response's first measurement value was captured (0 iff avg_count == 0).
+ * avg_values may be NULL iff avg_count == 0. */
 uint64_t rcp_ep_adc_capture_moment_timestamp(const rcp_ep_adc_avg_value_t *avg_values,
                                               size_t avg_count);
 
@@ -253,12 +284,16 @@ typedef struct {
                                                header */
     uint16_t                       adc_samples_per_avg_interval;
     uint16_t                       adc_avg_intervals_per_request;
-    uint8_t                        adc_combine_avg_values; /* rcp_ep_adc_combine_mode_t */
+    uint8_t                        adc_combine_avg_values; /* COUNT of output
+                                                               values per
+                                                               response -- not a
+                                                               mode selector; see
+                                                               the file header */
 } rcp_ep_adc_functional_cfg_t;
 
-/* Zero-initializes cfg (common's flags all false,
- * adc_samples_per_avg_interval/adc_avg_intervals_per_request both 0,
- * adc_combine_avg_values RCP_EP_ADC_COMBINE_AVERAGE (0)). */
+/* Zero-initializes cfg (common's flags all false, and
+ * adc_samples_per_avg_interval, adc_avg_intervals_per_request and
+ * adc_combine_avg_values all 0). */
 void rcp_ep_adc_functional_cfg_init(rcp_ep_adc_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
@@ -284,13 +319,15 @@ bool rcp_ep_adc_set_avg_intervals_per_request(rcp_ep_adc_functional_cfg_t *cfg,
                                                rcp_lifecycle_state_t state,
                                                rcp_lifecycle_writer_ctx_t writer);
 
-/* Sets cfg->adc_combine_avg_values to combine_mode iff combine_mode is
- * rcp_ep_adc_combine_mode_valid() and rcp_ep_adc_functional_cfg_writable()
- * authorizes the write for state/writer; returns whether the write was
- * applied. cfg is left entirely unchanged when it returns false. */
-bool rcp_ep_adc_set_combine_mode(rcp_ep_adc_functional_cfg_t *cfg,
-                                  rcp_ep_adc_combine_mode_t combine_mode,
-                                  rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer);
+/* Same authorization rule as rcp_ep_adc_set_samples_per_avg_interval(),
+ * for cfg->adc_combine_avg_values -- the number of averaged output values
+ * to place in one response (see the file header). Every value the field's
+ * one-octet width can hold is a legal count, so there is no separate
+ * validity predicate for it. */
+bool rcp_ep_adc_set_combine_avg_values(rcp_ep_adc_functional_cfg_t *cfg,
+                                        uint8_t combine_avg_values,
+                                        rcp_lifecycle_state_t state,
+                                        rcp_lifecycle_writer_ctx_t writer);
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 
@@ -301,6 +338,9 @@ typedef enum {
     RCP_EP_ADC_ERR_WRONG_BUS       = 3,
     RCP_EP_ADC_ERR_WRONG_OP        = 4,
     RCP_EP_ADC_ERR_BAD_PAYLOAD_LEN = 5,
+    /* The response carries more measurement values than the caller's
+     * out_values array can hold -- see rcp_ep_adc_decode_response(). */
+    RCP_EP_ADC_ERR_TOO_MANY_VALUES = 6,
 } rcp_ep_adc_errc_t;
 
 /* Human-readable message for an rcp_ep_adc_errc_t value. Never returns
@@ -309,54 +349,62 @@ const char *rcp_ep_adc_strerror(rcp_ep_adc_errc_t e);
 
 /* ── Read request ──────────────────────────────────────────────────────────── */
 
-/* The fixed payload length (octets) of an ADC response -- see the file
- * header. A read request itself carries no payload. */
-#define RCP_EP_ADC_PAYLOAD_LEN ((size_t)2u)
-
 /* Encodes an ACF_ABB read request addressed to byte_bus_id, with no
- * payload -- requests one full run of the three-layer averaging pipeline
- * (see the file header). Returns a zeroed rcp_bytes_t (data=NULL) on
- * allocation failure. Caller frees the result with rcp_bytes_free(). */
-rcp_bytes_t rcp_ep_adc_encode_read_request(rcp_byte_bus_id_t byte_bus_id, uint8_t transaction_num);
+ * payload -- a request carries no byte_msg_payload of its own; how many
+ * measurement values it asks for is carried by read_size alone
+ * (extraction §5.9.3), which the endpoint answers with
+ * rcp_ep_adc_response_value_count(read_size) values. Returns a zeroed
+ * rcp_bytes_t (data=NULL) on allocation failure. Caller frees the result
+ * with rcp_bytes_free(). */
+rcp_bytes_t rcp_ep_adc_encode_read_request(rcp_byte_bus_id_t byte_bus_id, uint16_t read_size,
+                                            uint8_t transaction_num);
 
 /* Decodes and validates an ACF-level ADC read request from b[0..len).
  * Fails with RCP_EP_ADC_ERR_SHORT_FRAME if b is shorter than the ACF_ABB
  * fixed header or its declared payload length; RCP_EP_ADC_ERR_BAD_MSG_TYPE
  * if b is not an ACF_ABB message; RCP_EP_ADC_ERR_WRONG_BUS if its
  * byte_bus_id != expected_bus_id; RCP_EP_ADC_ERR_WRONG_OP if its op is not
- * RCP_ACF_OP_READ. On RCP_EP_ADC_OK, *out_transaction_num is populated. */
+ * RCP_ACF_OP_READ. On RCP_EP_ADC_OK, *out_read_size and
+ * *out_transaction_num are populated. */
 rcp_ep_adc_errc_t rcp_ep_adc_decode_read_request(const uint8_t *b, size_t len,
                                                   rcp_byte_bus_id_t expected_bus_id,
+                                                  uint16_t *out_read_size,
                                                   uint8_t *out_transaction_num);
 
 /* ── Response ───────────────────────────────────────────────────────────────── */
 
-/* Encodes an ADC response carrying value (the pipeline's final combined
- * result -- possibly RCP_EP_PWM_IN_NO_SIGNAL, see the file header) as its
- * RCP_EP_ADC_PAYLOAD_LEN big-endian payload, echoing transaction_num.
+/* Encodes an ADC response carrying values[0..value_count) -- the
+ * measurement values rcp_ep_adc_collect_response_values() packed, each
+ * possibly RCP_EP_PWM_IN_NO_SIGNAL (see the file header) -- as a
+ * value_count * RCP_EP_ADC_VALUE_LEN octet big-endian payload, echoing
+ * transaction_num and reporting 2 * value_count as the header's read_size.
  * Encoded as ACF_ABB when timed is false; as ACF_GBB (with
  * message_timestamp set to timestamp -- see
  * rcp_ep_adc_capture_moment_timestamp() -- mtv = RCP_ACF_MTV_VALID) when
- * timed is true. Returns a zeroed rcp_bytes_t (data=NULL) on allocation
- * failure. Caller frees the result with rcp_bytes_free(). */
-rcp_bytes_t rcp_ep_adc_encode_response(rcp_byte_bus_id_t byte_bus_id, uint16_t value,
-                                       uint8_t transaction_num, bool timed, uint64_t timestamp);
+ * timed is true. Returns a zeroed rcp_bytes_t (data=NULL) if value_count
+ * is 0 or exceeds RCP_EP_ADC_MAX_VALUES, or on allocation failure. Caller
+ * frees the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_ep_adc_encode_response(rcp_byte_bus_id_t byte_bus_id, const uint16_t *values,
+                                       size_t value_count, uint8_t transaction_num, bool timed,
+                                       uint64_t timestamp);
 
 /* Decodes an ADC response from either an ACF_ABB or ACF_GBB message (this
  * function peeks the ACF message type itself, unlike the request decoder
  * above, since a response's encoding depends on the responding endpoint's
  * own timed/untimed choice). Fails with RCP_EP_ADC_ERR_SHORT_FRAME (frame
- * too short for the applicable fixed header or a full
- * RCP_EP_ADC_PAYLOAD_LEN payload), RCP_EP_ADC_ERR_WRONG_BUS (byte_bus_id
- * != expected_bus_id), or RCP_EP_ADC_ERR_BAD_PAYLOAD_LEN (payload present
- * but not exactly RCP_EP_ADC_PAYLOAD_LEN octets). On RCP_EP_ADC_OK,
- * *out_value and *out_transaction_num are populated; *out_timed and
- * *out_timestamp report whether the message was ACF_GBB with a valid
- * (rcp_acf_gbb_is_timed()) timestamp, and that timestamp's value (0 when
- * !*out_timed). */
+ * too short for the applicable fixed header or its declared payload),
+ * RCP_EP_ADC_ERR_WRONG_BUS (byte_bus_id != expected_bus_id),
+ * RCP_EP_ADC_ERR_BAD_PAYLOAD_LEN (payload absent, or present but not a
+ * whole number of RCP_EP_ADC_VALUE_LEN-octet values), or
+ * RCP_EP_ADC_ERR_TOO_MANY_VALUES (the payload holds more values than
+ * max_values). On RCP_EP_ADC_OK, out_values[0..*out_value_count) and
+ * *out_transaction_num are populated; *out_timed and *out_timestamp report
+ * whether the message was ACF_GBB with a valid (rcp_acf_gbb_is_timed())
+ * timestamp, and that timestamp's value (0 when !*out_timed). */
 rcp_ep_adc_errc_t rcp_ep_adc_decode_response(const uint8_t *b, size_t len,
                                               rcp_byte_bus_id_t expected_bus_id,
-                                              uint16_t *out_value, bool *out_timed,
+                                              uint16_t *out_values, size_t max_values,
+                                              size_t *out_value_count, bool *out_timed,
                                               uint64_t *out_timestamp,
                                               uint8_t *out_transaction_num);
 

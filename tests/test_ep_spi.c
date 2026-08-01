@@ -362,6 +362,39 @@ static void test_strerror_never_null_and_distinct(void)
 
 /* ── Transfer request round trip ───────────────────────────────────────────── */
 
+/* TC18 v0.5.1_RC §12.9.1 "Handling of requests" states the op field's
+ * two senses:
+ *
+ *   A response with pay load data read from the EP is given, if requested
+ *   by op=0 (read request) after the request has been executed.
+ *   A response with err=0 and no payload is given after successful
+ *   execution of a request with op=1 (write request) ...
+ *
+ * and §13.7.3.3's own worked SPI example, Figure 23 -- captioned "SPI
+ * request (example to write 20 bytes and get a response with 10 on SPI
+ * channel 3)" -- shows that request's byte message info as evt = 0101b,
+ * op=0, read_size = 0x0A. So an SPI transfer request, which sends PICO
+ * bytes and expects POCI bytes back, carries op=0. Verified here against
+ * the literal wire bit rather than against re-encoded output: acf.h maps
+ * RCP_ACF_OP_READ onto wire op=0. This module previously encoded op=1 and
+ * rejected op=0 -- exactly inverted. */
+static void test_transfer_request_uses_read_direction_op(void)
+{
+    uint8_t                     tx[1] = {0x55};
+    rcp_bytes_t                 frame = rcp_ep_spi_encode_transfer_request(4, 3, tx, sizeof(tx), 3);
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t              *payload;
+    size_t                      payload_len;
+
+    TEST_ASSERT_EQUAL_INT(RCP_ACF_OK,
+                          rcp_acf_decode_abb(frame.data, frame.len, &hdr, &payload, &payload_len));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ACF_OP_READ, hdr.op);
+    /* Figure 23's evt field selects the SPI channel: channel 3 there. */
+    TEST_ASSERT_EQUAL_UINT8(3u, (uint8_t)(hdr.evt & 0x7u));
+
+    rcp_bytes_free(&frame);
+}
+
 static void test_transfer_request_round_trip(void)
 {
     uint8_t     tx[3] = {0x01, 0x02, 0x03};
@@ -417,6 +450,9 @@ static void test_transfer_request_rejects_wrong_bus(void)
     rcp_bytes_free(&frame);
 }
 
+/* The mirror of test_transfer_request_uses_read_direction_op(): a frame
+ * carrying the write direction (§12.9.1's op=1, "no payload data
+ * response") is not an SPI transfer request. */
 static void test_transfer_request_rejects_wrong_op(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -427,7 +463,7 @@ static void test_transfer_request_rejects_wrong_op(void)
     uint8_t                      txn;
 
     hdr.byte_bus_id = 4;
-    hdr.op          = RCP_ACF_OP_READ; /* not a transfer request */
+    hdr.op          = RCP_ACF_OP_WRITE; /* not a transfer request */
     frame = rcp_acf_encode_abb(&hdr, NULL, 0);
 
     TEST_ASSERT_EQUAL(RCP_EP_SPI_ERR_WRONG_OP,
@@ -437,6 +473,13 @@ static void test_transfer_request_rejects_wrong_op(void)
     rcp_bytes_free(&frame);
 }
 
+/* TC18 v0.5.1_RC Table 30 (§13.5), the SPI rows: evt[2:0] "000b to 101b"
+ * selects channel 0..5, "110b" is reserved and to be rejected with
+ * UNSUPPORTED_CMD, and "111b" is the configuration escape hatch -- so
+ * neither 6 nor 7 is a channel selector. (op is the read direction here
+ * because that is what a transfer request carries -- see
+ * test_transfer_request_uses_read_direction_op(); the channel check is
+ * what this test is about.) */
 static void test_transfer_request_rejects_bad_channel(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -447,7 +490,7 @@ static void test_transfer_request_rejects_bad_channel(void)
     uint8_t                      txn;
 
     hdr.byte_bus_id = 4;
-    hdr.op          = RCP_ACF_OP_WRITE;
+    hdr.op          = RCP_ACF_OP_READ;
     hdr.evt         = 7; /* not a valid channel selector */
     frame = rcp_acf_encode_abb(&hdr, NULL, 0);
 
@@ -661,6 +704,7 @@ int main(void)
 
     RUN_TEST(test_strerror_never_null_and_distinct);
 
+    RUN_TEST(test_transfer_request_uses_read_direction_op);
     RUN_TEST(test_transfer_request_round_trip);
     RUN_TEST(test_transfer_request_round_trip_empty_payload);
     RUN_TEST(test_transfer_request_rejects_wrong_bus);

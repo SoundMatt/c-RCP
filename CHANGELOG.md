@@ -31,6 +31,101 @@ the rationale.
 
 ## Releases
 
+### v0.103.0 -- 2026-07-31
+
+**BREAKING (wire format, and API).** Six independently-confirmed
+conformance defects across five endpoint modules, each re-verified
+against the specification's own normative text before being changed.
+None of them overlap; they are batched because they are unrelated
+one-module-each fixes.
+
+**1. PWM_OUT/GPIO `evt[2:0] = 110b` computed the subtraction backwards.**
+The single table row that defines this operation covers the GPIO and
+PWM_OUT endpoint group jointly and states it as *payload minus current
+interface status*. Both modules computed *current minus payload*. Since
+subtraction is not commutative every such request produced a different
+value than a conforming peer expects (and, with saturation at 0x0000,
+frequently produced 0 where a real value was due, or vice versa). The
+row's parenthetical remark about decreasing a PWM duty cycle is an
+illustrative note, not a second definition of the operand order -- GPIO
+was corrected on the same normative sentence, not by analogy.
+
+**2. PWM_OUT `evt[2:0] = 111b` was a single enable-toggle bit; it is an
+addressed register write.** The configuration escape hatch is defined as
+a 16-bit big-endian relative start address followed by configuration
+data written into the endpoint's own EP_func block. `ep_pwm.h` now models
+that block -- EP_LEN, reserved, enable&clr, options, base clock, status,
+clock divider, the output signal flags, duty-cycle min/max, skew -- with
+`rcp_ep_pwm_out_apply_reconfig()` doing the real addressed write
+(honouring the "a write extending past EP_LEN is ignored" rule and
+leaving read-only registers alone), plus
+`rcp_ep_pwm_out_render_registers()` and
+`rcp_ep_pwm_out_encode_reconfig_request()`. `rcp_ep_pwm_out_functional_cfg_t`
+loses its duplicate `enabled` bool: the endpoint's enable bit is the
+EP-common one `regmap.h` already models, which is what the block's
+enable&clr register carries.
+
+**3. ADC `adc_combine_avg_values` was modelled as a four-way
+AVERAGE/MIN/MAX/LATEST mode enum; it is an output-value COUNT.** The
+register table defines the field as the number of output values to be
+combined into one response, and a response carries as many measurement
+values as half the request's `read_size`. Every ADC response this library
+produced was exactly one 2-octet value wide, with the other averages
+silently reduced away. The response codec is now genuinely multi-value:
+`rcp_ep_adc_encode_response()`/`_decode_response()` carry N values and
+report `2 * N` as `read_size`, `rcp_ep_adc_collect_response_values()`
+replaces the reduction with a packing step, `rcp_ep_adc_response_value_count()`
+expresses the read_size relationship, and
+`rcp_ep_adc_encode_read_request()` now carries `read_size` at all (it
+previously left it 0, so a conforming endpoint would have answered with
+nothing).
+
+**4. ADC response timestamp came from the wrong end of the averaging
+window.** The rule is the moment the *last* sample feeding the *first*
+averaged value in the response was captured; `rcp_ep_adc_average_interval()`
+reported `samples[0].timestamp`, the interval's *first* sample -- wrong by
+a whole averaging interval for any interval longer than one sample.
+
+**5. Discovery's `svr_version` was 16 bit; the general register map
+defines it as 32 bit.** Every field after it in the slice was therefore
+two octets early on the wire, so a conforming client misparsed
+`vendor_id`, `device_id` *and* `svr_ep_count` from every discovery
+response this library sent. `RCP_DISCOVERY_GENERAL_SLICE_LEN` goes 12 ->
+14, `rcp_regmap_general_t::svr_version` and
+`rcp_discovery_result_t::svr_version` become `uint32_t`, and all four
+encode/decode paths in `discovery.c` are corrected.
+
+**6. LIN and SPI both encoded the `op` direction inverted.** `op=0` is
+the read/reply-expected direction and `op=1` the write/no-data-response
+one; the LIN endpoint's own reply rule is stated in terms of `op = 0`,
+and the specification's worked SPI example ("write 20 bytes and get a
+response with 10") carries `op=0` with a non-zero `read_size`. Both
+modules encoded `op=1` on a request that expects data back, and rejected
+the correct `op=0` as malformed -- so a conforming peer's request was
+refused and this library's own was told no response was wanted. Both
+modules' existing tests asserted the wrong direction as correct; they now
+assert the literal wire bit with the specification text cited.
+
+**Testing.** 59/59 `ctest` targets passing. Every corrected assertion
+carries an explicit section/table/figure citation with the quoted
+normative sentence, so the assertions are anchored to the specification
+rather than re-derived from this library's own encoder. New coverage
+includes the PWM_OUT EP_func register block (per-register offsets,
+partial multi-octet writes, the EP_LEN overrun rule, read-only registers,
+and a full request round trip), the ADC eight-measurement response
+geometry and end-to-end sampling pipeline, and a discovery general-slice
+octet-layout test pinning each field to its cited absolute address.
+
+`.fusa-reqs.json` rewrites every requirement that described one of these
+behaviours as correct: `REQ-GPIO-011`, `REQ-PWM-007`/`010`/`011`/`016`/`023`,
+`REQ-ADC-001`/`005`..`012`/`014`/`022`/`023`/`025`/`027`..`030`,
+`REQ-DISC-010`/`012`, `REQ-LINEP-016`/`018`, and `REQ-SPI-026`/`027`.
+
+**Known, deliberately out of scope**: `ep_i2c.c`'s transfer request has
+the same request-carries-`op=WRITE` shape LIN and SPI had, and may have
+the same inversion; it was not part of this pass's verified set and is
+left for its own change.
+
 ### v0.102.0 -- 2026-07-31
 
 **BREAKING (wire format, and API).** Fixes the entire conditional-request

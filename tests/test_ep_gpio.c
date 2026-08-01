@@ -121,15 +121,38 @@ static void test_apply_write_add_saturates_at_upper_boundary(void)
         rcp_ep_gpio_apply_write(0xFFFFFFFFu, 0xFFFFFFFFu, RCP_EP_GPIO_WRITE_ADD));
 }
 
-static void test_apply_write_sub_ordinary(void)
+/* TC18 v0.5.1_RC Table 30 (§13.5). The evt[2:0]=110b row belongs to the
+ * "GPIO, PWM_OUT" endpoint group -- one row, one rule, covering both --
+ * and states the operation as:
+ *
+ *   "byte_msg_payload" minus "current interface status" is written as is
+ *   to interface
+ *
+ * i.e. request - current. (Its parenthetical "this can be used to
+ * decrease the duty cycle of PWM_out" is an illustrative note; the row
+ * has no GPIO-specific worked example that would suggest a different
+ * operand order for GPIO.) Since subtraction is not commutative the order
+ * is directly observable: apply_write(current=20, request=30) must be 10,
+ * and the reverse operand order would give 10 for (30, 20) instead. */
+static void test_apply_write_sub_is_request_minus_current(void)
 {
-    TEST_ASSERT_EQUAL_UINT32(10u, rcp_ep_gpio_apply_write(30u, 20u, RCP_EP_GPIO_WRITE_SUB));
+    TEST_ASSERT_EQUAL_UINT32(10u, rcp_ep_gpio_apply_write(20u, 30u, RCP_EP_GPIO_WRITE_SUB));
+    TEST_ASSERT_EQUAL_UINT32(0x00FFu,
+        rcp_ep_gpio_apply_write(0x00000001u, 0x00000100u, RCP_EP_GPIO_WRITE_SUB));
 }
 
+/* Same section's closing sentence:
+ *
+ *   While doing additions and subtractions neither overflows nor
+ *   wrap-arounds shall occur. The values are saturated at 0x0000 on the
+ *   low side and 0xFFFF at the high side.
+ *
+ * (applied here at this endpoint's own 32-bit register width). A request
+ * smaller than the current status saturates at zero rather than wrapping. */
 static void test_apply_write_sub_saturates_at_lower_boundary(void)
 {
-    TEST_ASSERT_EQUAL_UINT32(0u, rcp_ep_gpio_apply_write(5u, 20u, RCP_EP_GPIO_WRITE_SUB));
-    TEST_ASSERT_EQUAL_UINT32(0u, rcp_ep_gpio_apply_write(0u, 1u, RCP_EP_GPIO_WRITE_SUB));
+    TEST_ASSERT_EQUAL_UINT32(0u, rcp_ep_gpio_apply_write(20u, 5u, RCP_EP_GPIO_WRITE_SUB));
+    TEST_ASSERT_EQUAL_UINT32(0u, rcp_ep_gpio_apply_write(1u, 0u, RCP_EP_GPIO_WRITE_SUB));
 }
 
 static void test_apply_write_reserved4_is_noop(void)
@@ -156,10 +179,13 @@ static void test_apply_write_wire_value_5_is_add(void)
         rcp_ep_gpio_apply_write(10u, 20u, (rcp_ep_gpio_write_semantics_t)5u));
 }
 
+/* Raw wire evt[2:0] == 6 is TC18 Table 30's subtract row, computing
+ * payload - current (see test_apply_write_sub_is_request_minus_current()
+ * for the cited text): current=20, request=30 yields 10. */
 static void test_apply_write_wire_value_6_is_sub(void)
 {
     TEST_ASSERT_EQUAL_UINT32(10u,
-        rcp_ep_gpio_apply_write(30u, 20u, (rcp_ep_gpio_write_semantics_t)6u));
+        rcp_ep_gpio_apply_write(20u, 30u, (rcp_ep_gpio_write_semantics_t)6u));
 }
 
 static void test_apply_reconfig_toggles_only_flagged_pins(void)
@@ -582,7 +608,7 @@ int main(void)
     RUN_TEST(test_apply_write_xor);
     RUN_TEST(test_apply_write_add_ordinary);
     RUN_TEST(test_apply_write_add_saturates_at_upper_boundary);
-    RUN_TEST(test_apply_write_sub_ordinary);
+    RUN_TEST(test_apply_write_sub_is_request_minus_current);
     RUN_TEST(test_apply_write_sub_saturates_at_lower_boundary);
     RUN_TEST(test_apply_write_reserved4_is_noop);
     RUN_TEST(test_apply_write_wire_value_4_is_reserved_noop);

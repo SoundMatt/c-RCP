@@ -119,16 +119,26 @@
  * (value 4) is, like GPIO's own RESERVED4, a documented no-op for a wire
  * value with no assigned write behavior. This ordering (4=reserved,
  * 5=add, 6=subtract) matches ep_gpio.h's own correction -- see issue #104.
- * The eighth,
- * RCP_EP_PWM_OUT_WRITE_RECONFIG (value 7), is this endpoint type's own
- * single-flag analogue of ep_gpio.h's per-pin reconfiguration escape
- * hatch: rather than writing the period/active-duration registers, it
- * reinterprets the same 4-byte payload as a single enable/disable
- * selector (bit 0 of the payload's 32-bit-wide view; see
- * rcp_ep_pwm_out_apply_reconfig() below) -- adapted, by this module's own
- * original design, from a 32-pin bitmask selector (GPIO has 32
- * independently addressable pins) down to PWM_OUT's own single output
- * channel (this endpoint type addresses none).
+ * Subtract computes request minus current (the payload value is the
+ * minuend, the current register value the subtrahend), the operand order
+ * the single evt[2:0]=110b row covering GPIO and PWM_OUT jointly states
+ * normatively; the row's parenthetical remark about decreasing a duty
+ * cycle is an illustrative note, not a competing definition.
+ *
+ * ── PWM_OUT: evt[2:0] == 111b is an addressed EP_func register write ───────
+ *
+ * The eighth value, RCP_EP_PWM_OUT_WRITE_RECONFIG (value 7), is not a data
+ * write at all: the payload is not presented at the interface but is
+ * instead an *addressed write into this endpoint's own EP_func
+ * configuration block* -- a 16-bit big-endian relative start address
+ * followed by the configuration data octets to write from that address
+ * onward (extraction §3.7.1). The block itself (extraction §5.7.2) holds
+ * the endpoint's real configuration registers: enable&clr, options, base
+ * clock, status, clock divider, the output signal flags, duty-cycle min
+ * and max, and the output skew. See the "PWM_OUT: the EP_func register
+ * block" section below for the offsets, widths, access classes, and
+ * rcp_ep_pwm_out_apply_reconfig()/_render_registers()/
+ * _encode_reconfig_request().
  *
  * ── PWM_OUT triggers: cycle-start / mid-pulse / done ────────────────────────
  *
@@ -261,16 +271,6 @@ rcp_ep_pwm_value_t rcp_ep_pwm_out_apply_write(rcp_ep_pwm_value_t current,
                                                rcp_ep_pwm_value_t request,
                                                rcp_ep_pwm_out_write_semantics_t evt);
 
-/* Applies the reconfiguration escape hatch (evt[2:0] == 7): iff bit 0 of
- * reconfig_word (this module's own reinterpretation of the same 4-byte
- * write payload as a 32-bit selector, big-endian, period-then-
- * active_duration -- i.e. (uint32_t)period << 16 | active_duration) is
- * set, toggles *enabled; bits 1..31 are reserved and ignored. *enabled is
- * left unchanged when bit 0 is clear -- this module's own single-flag
- * analogue of ep_gpio.h's per-pin reconfiguration toggle, adapted to a
- * PWM_OUT endpoint's single output channel (see the file header). */
-void rcp_ep_pwm_out_apply_reconfig(bool *enabled, uint32_t reconfig_word);
-
 /* ── PWM_OUT: triggers ──────────────────────────────────────────────────────── */
 
 typedef enum {
@@ -296,20 +296,35 @@ bool rcp_ep_pwm_out_trigger_fires(rcp_ep_pwm_out_trigger_t trigger, rcp_ep_pwm_o
 
 /* ── PWM_OUT: functional config ─────────────────────────────────────────────── */
 
+/* The PWM_OUT endpoint's functional config: regmap.h's shared prefix
+ * (which carries the two EP-common register octets, enable&clr and
+ * options) plus the PWM_OUT-specific registers of the EP_func block --
+ * see the register-block section below for each field's own relative
+ * offset, width and access class. */
 typedef struct {
     rcp_regmap_ep_functional_cfg_t common; /* regmap.h's shared functional-
                                                config prefix, composed as the
                                                first member -- see the file
-                                               header */
-    uint8_t                        trigger; /* rcp_ep_pwm_out_trigger_t */
-    bool                           enabled; /* toggled by the write-request
-                                                reconfiguration escape hatch,
-                                                or directly by
-                                                rcp_ep_pwm_out_set_enabled() */
+                                               header. Carries the block's
+                                               enable&clr (0x0002) and
+                                               options (0x0003) octets. */
+    uint8_t                        trigger; /* rcp_ep_pwm_out_trigger_t; this
+                                                module's own field, not part
+                                                of the EP_func block */
+    uint16_t                       base_clk;       /* 0x0004, R   */
+    uint16_t                       ep_status;      /* 0x0006, R/W */
+    uint8_t                        clk_divider;    /* 0x0008, R/W */
+    uint8_t                        signal_flags;   /* 0x0009, R/W; see the
+                                                       RCP_EP_PWM_OUT_FLAG_*
+                                                       masks */
+    uint16_t                       duty_cycle_min; /* 0x000A, R/W */
+    uint16_t                       duty_cycle_max; /* 0x000C, R/W */
+    uint8_t                        skew;           /* 0x000E, R/W */
 } rcp_ep_pwm_out_functional_cfg_t;
 
-/* Zero-initializes cfg (common's flags all false, trigger
- * RCP_EP_PWM_OUT_TRIGGER_NONE, enabled false). */
+/* Zero-initializes cfg (common's flags all false -- including
+ * common.ep_enable, this endpoint's own enable bit -- trigger
+ * RCP_EP_PWM_OUT_TRIGGER_NONE, and every EP_func register 0). */
 void rcp_ep_pwm_out_functional_cfg_init(rcp_ep_pwm_out_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
@@ -327,9 +342,132 @@ bool rcp_ep_pwm_out_set_trigger(rcp_ep_pwm_out_functional_cfg_t *cfg,
                                  rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer);
 
 /* Same authorization rule as rcp_ep_pwm_out_set_trigger(), for
- * cfg->enabled. */
+ * cfg->common.ep_enable -- the EP-common enable bit regmap.h already
+ * models, which is what the EP_func block's own enable&clr register
+ * carries (this endpoint type does not have a second, separate enable
+ * flag of its own). */
 bool rcp_ep_pwm_out_set_enabled(rcp_ep_pwm_out_functional_cfg_t *cfg, bool enabled,
                                  rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer);
+
+/* ── PWM_OUT: the EP_func register block (the evt[2:0] == 111b target) ────── */
+
+/* Relative octet offsets of the registers making up a PWM_OUT endpoint's
+ * own EP_func block, at the widths and in the order the specification's
+ * PWM_OUT functional-configuration register table assigns them
+ * (extraction §5.7.2). Every multi-octet register is big-endian, like
+ * every other multi-octet field this codebase encodes. Offsets marked R
+ * are read-only: a configuration write covering them leaves them
+ * unchanged (see rcp_ep_pwm_out_apply_reconfig()). */
+#define RCP_EP_PWM_OUT_REG_EP_LEN         ((uint16_t)0x0000u) /*  8 bit, R   */
+#define RCP_EP_PWM_OUT_REG_RESERVED_01    ((uint16_t)0x0001u) /*  8 bit, R   */
+#define RCP_EP_PWM_OUT_REG_EP_ENABLE_CLR  ((uint16_t)0x0002u) /*  8 bit, R/W */
+#define RCP_EP_PWM_OUT_REG_EP_OPTIONS     ((uint16_t)0x0003u) /*  8 bit, R/W */
+#define RCP_EP_PWM_OUT_REG_BASE_CLK       ((uint16_t)0x0004u) /* 16 bit, R   */
+#define RCP_EP_PWM_OUT_REG_EP_STATUS      ((uint16_t)0x0006u) /* 16 bit, R/W */
+#define RCP_EP_PWM_OUT_REG_CLK_DIVIDER    ((uint16_t)0x0008u) /*  8 bit, R/W */
+#define RCP_EP_PWM_OUT_REG_SIGNAL_FLAGS   ((uint16_t)0x0009u) /*  8 bit, R/W */
+#define RCP_EP_PWM_OUT_REG_DUTY_CYCLE_MIN ((uint16_t)0x000Au) /* 16 bit, R/W */
+#define RCP_EP_PWM_OUT_REG_DUTY_CYCLE_MAX ((uint16_t)0x000Cu) /* 16 bit, R/W */
+#define RCP_EP_PWM_OUT_REG_SKEW           ((uint16_t)0x000Eu) /*  8 bit, R/W */
+
+/* The block's own length in octets -- one past the last assigned offset,
+ * i.e. the value the endpoint reports at RCP_EP_PWM_OUT_REG_EP_LEN and
+ * the bound the "write beyond EP_LEN is ignored" rule (extraction §3.7.1)
+ * is applied against.
+ *
+ * Note a known editorial defect in the source table: its own description
+ * of the EP_LEN register quotes a length shorter than the extent of the
+ * very table it heads (the table assigns registers well past that
+ * quoted value). The table's assigned offsets are the authoritative
+ * statement of the block's shape, so the block length is derived from
+ * them here rather than from the inconsistent quoted constant. */
+#define RCP_EP_PWM_OUT_EP_FUNC_LEN        ((uint16_t)0x000Fu)
+
+/* Bit masks within the RCP_EP_PWM_OUT_REG_SIGNAL_FLAGS octet.
+ *
+ * Second known editorial defect in the same source table: it assigns
+ * *two* different one-bit parameters (the primary output's idle state and
+ * the inverted output's idle state) to the same bit position .1, which
+ * cannot be what is meant -- the two are independent settings and the
+ * table lists them as separate rows. The three flags are therefore packed
+ * here at the only self-consistent positions the table's own ordering
+ * admits: bit 0, bit 1, bit 2 in row order. */
+#define RCP_EP_PWM_OUT_FLAG_INV_POLARITY   ((uint8_t)(1u << 0))
+#define RCP_EP_PWM_OUT_FLAG_IDLE_STATE     ((uint8_t)(1u << 1))
+#define RCP_EP_PWM_OUT_FLAG_IDLE_STATE_INV ((uint8_t)(1u << 2))
+
+/* The fixed width (octets) of the relative-start-address prefix every
+ * configuration request's payload begins with -- the address is a 16-bit
+ * big-endian field, followed by the configuration data octets to write
+ * from that address onward (extraction §3.7.1). */
+#define RCP_EP_PWM_OUT_RECONFIG_ADDR_LEN ((size_t)2u)
+
+typedef enum {
+    RCP_EP_PWM_OUT_RECONFIG_OK              = 0,
+    RCP_EP_PWM_OUT_RECONFIG_ERR_SHORT       = 1, /* payload carries no
+                                                     address prefix, or an
+                                                     address prefix with no
+                                                     data octet after it */
+    RCP_EP_PWM_OUT_RECONFIG_ERR_OUT_OF_RANGE = 2, /* start_address + data
+                                                      length exceeds
+                                                      RCP_EP_PWM_OUT_EP_FUNC_LEN
+                                                      -- the whole write is
+                                                      ignored, per the
+                                                      specification's own
+                                                      rule */
+} rcp_ep_pwm_out_reconfig_errc_t;
+
+/* Human-readable message for an rcp_ep_pwm_out_reconfig_errc_t value.
+ * Never returns NULL. */
+const char *rcp_ep_pwm_out_reconfig_strerror(rcp_ep_pwm_out_reconfig_errc_t e);
+
+/* Serializes cfg's EP_func registers into out[0..RCP_EP_PWM_OUT_EP_FUNC_LEN)
+ * exactly as a configuration *read* of the whole block would report them
+ * -- the inverse of rcp_ep_pwm_out_apply_reconfig()'s own parse step, and
+ * the same rendering that function patches in place. */
+void rcp_ep_pwm_out_render_registers(const rcp_ep_pwm_out_functional_cfg_t *cfg,
+                                      uint8_t out[RCP_EP_PWM_OUT_EP_FUNC_LEN]);
+
+/* Applies the configuration escape hatch (evt[2:0] == 111b): payload is
+ * NOT presented at the interface but interpreted as an addressed write
+ * into this endpoint's own EP_func block -- a 16-bit big-endian relative
+ * start address followed by the configuration data octets to write from
+ * that address onward (extraction §3.7.1). This is a real register write,
+ * reaching every R/W register the block defines (enable/options, status,
+ * clock divider, signal flags, duty-cycle min/max, skew), not a single
+ * enable toggle.
+ *
+ * Returns RCP_EP_PWM_OUT_RECONFIG_ERR_SHORT when payload_len is not at
+ * least RCP_EP_PWM_OUT_RECONFIG_ADDR_LEN + 1, and
+ * RCP_EP_PWM_OUT_RECONFIG_ERR_OUT_OF_RANGE when the addressed span would
+ * extend past RCP_EP_PWM_OUT_EP_FUNC_LEN; in both cases cfg is left
+ * entirely unchanged, per the specification's own "such a payload is to be
+ * ignored" rule. Octets of the addressed span that land on a read-only
+ * register (EP_LEN, the reserved octet, base_clk) are left at their
+ * current values while the rest of the span is still applied -- writes to
+ * a read-only register are ignored, not treated as an error, matching this
+ * codebase's fail-safe convention. Partially-covered multi-octet registers
+ * are handled correctly: the write is applied at octet granularity over
+ * the block's rendered image, so writing only the high octet of, say,
+ * duty_cycle_max changes only that octet's contribution.
+ *
+ * A caller routing a decoded write request here is responsible for having
+ * checked that evt[2:0] really was RCP_EP_PWM_OUT_WRITE_RECONFIG;
+ * rcp_ep_pwm_out_apply_write() deliberately no-ops for that evt value so a
+ * misrouted request cannot silently corrupt the data registers. */
+rcp_ep_pwm_out_reconfig_errc_t
+rcp_ep_pwm_out_apply_reconfig(rcp_ep_pwm_out_functional_cfg_t *cfg,
+                               const uint8_t *payload, size_t payload_len);
+
+/* Encodes an ACF_ABB configuration request (evt[2:0] == 111b) addressed to
+ * byte_bus_id: payload is start_address (16-bit big-endian) followed by
+ * data[0..data_len). Returns a zeroed rcp_bytes_t (data=NULL) if data_len
+ * is 0, if the encoded payload would exceed RCP_ACF_MAX_PAYLOAD, or on
+ * allocation failure. Caller frees the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_ep_pwm_out_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                    uint16_t start_address,
+                                                    const uint8_t *data, size_t data_len,
+                                                    uint8_t transaction_num);
 
 /* ── PWM_OUT: error codes ──────────────────────────────────────────────────── */
 

@@ -190,8 +190,17 @@ rcp_bytes_t rcp_ep_spi_encode_transfer_request(rcp_byte_bus_id_t byte_bus_id, ui
 {
     rcp_acf_byte_message_info_t hdr = {0};
 
+    /* An SPI transfer request is a read-direction request: the payload
+     * goes out on PICO and the endpoint replies with what came back on
+     * POCI. The wire op bit's read sense is 0 (acf.h's RCP_ACF_OP_READ),
+     * and the specification's own worked SPI transfer example -- "write
+     * N bytes and get a response with M" -- carries exactly that
+     * encoding, op=0 with a non-zero read_size (extraction §5.3.3, and
+     * the general request-handling rule in §3.9.1). Encoding this as a
+     * write (op=1) told a conforming peer "no data response expected",
+     * i.e. the exact opposite of what the request means. */
     hdr.byte_bus_id     = byte_bus_id;
-    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.op              = RCP_ACF_OP_READ;
     hdr.evt             = (uint8_t)(channel & 0x7u);
     hdr.transaction_num = transaction_num;
 
@@ -218,7 +227,8 @@ rcp_ep_spi_errc_t rcp_ep_spi_decode_transfer_request(const uint8_t *b, size_t le
     if (acf_rc != RCP_ACF_OK) return RCP_EP_SPI_ERR_BAD_MSG_TYPE;
 
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_SPI_ERR_WRONG_BUS;
-    if (hdr.op != RCP_ACF_OP_WRITE) return RCP_EP_SPI_ERR_WRONG_OP;
+    /* Read direction -- see rcp_ep_spi_encode_transfer_request() above. */
+    if (hdr.op != RCP_ACF_OP_READ) return RCP_EP_SPI_ERR_WRONG_OP;
 
     channel = (uint8_t)(hdr.evt & 0x7u);
     if (!rcp_ep_spi_channel_valid(channel)) return RCP_EP_SPI_ERR_BAD_CHANNEL;

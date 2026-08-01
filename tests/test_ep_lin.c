@@ -243,6 +243,42 @@ static void test_strerror_never_null_and_distinct(void)
 
 /* ── Command request round trip ────────────────────────────────────────────── */
 
+/* TC18 v0.5.1_RC §12.9.1 "Handling of requests" states the op field's
+ * two senses:
+ *
+ *   A response with pay load data read from the EP is given, if requested
+ *   by op=0 (read request) after the request has been executed.
+ *   A response with err=0 and no payload is given after successful
+ *   execution of a request with op=1 (write request) ...
+ *
+ * and §13.7.10.1 "LIN EP basic concept" states the LIN endpoint's own
+ * reply rule in those same terms:
+ *
+ *   With pending read-requests the LIN endpoint checks each received
+ *   message against the byte_msg_payload and if a match under the
+ *   conditions given by evt[2:0] is found a reply is sent if op = 0.
+ *
+ * A LIN command request pushes bytes onto the bus AND expects the
+ * received bytes back, so it is the op=0 (read) direction. Verified here
+ * against the literal wire bit rather than against re-encoded output:
+ * acf.h maps RCP_ACF_OP_READ onto wire op=0. This module previously
+ * encoded op=1 and rejected op=0 -- exactly inverted. */
+static void test_command_request_uses_read_direction_op(void)
+{
+    uint8_t                     tx[1] = {0x55};
+    rcp_bytes_t                 frame = rcp_ep_lin_encode_command_request(6, tx, sizeof(tx),
+                                                                          RCP_EP_LIN_COMPARE_EXACT, 3);
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t              *payload;
+    size_t                      payload_len;
+
+    TEST_ASSERT_EQUAL_INT(RCP_ACF_OK,
+                          rcp_acf_decode_abb(frame.data, frame.len, &hdr, &payload, &payload_len));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ACF_OP_READ, hdr.op);
+
+    rcp_bytes_free(&frame);
+}
+
 static void test_command_request_round_trip_carries_raw_bytes(void)
 {
     /* Bytes model a client-constructed LIN frame (identifier/PID plus data
@@ -304,6 +340,9 @@ static void test_command_request_rejects_wrong_bus(void)
     rcp_bytes_free(&frame);
 }
 
+/* The mirror of test_command_request_uses_read_direction_op(): a frame
+ * carrying the write direction (§12.9.1's op=1, "no payload data
+ * response") is not a LIN command request. */
 static void test_command_request_rejects_wrong_op(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -314,7 +353,7 @@ static void test_command_request_rejects_wrong_op(void)
     uint8_t                      txn;
 
     hdr.byte_bus_id = 4;
-    hdr.op          = RCP_ACF_OP_READ; /* not a command request */
+    hdr.op          = RCP_ACF_OP_WRITE; /* not a command request */
     frame = rcp_acf_encode_abb(&hdr, NULL, 0);
 
     TEST_ASSERT_EQUAL(RCP_EP_LIN_ERR_WRONG_OP,
@@ -461,6 +500,7 @@ int main(void)
 
     RUN_TEST(test_strerror_never_null_and_distinct);
 
+    RUN_TEST(test_command_request_uses_read_direction_op);
     RUN_TEST(test_command_request_round_trip_carries_raw_bytes);
     RUN_TEST(test_command_request_round_trip_empty_payload);
     RUN_TEST(test_command_request_rejects_wrong_bus);

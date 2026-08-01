@@ -199,7 +199,9 @@ bool rcp_regmap_options_group_consistent(uint32_t options);
 typedef struct {
     uint32_t magic;      /* vendor/device-defined; this module carries the
                              field only, see the file header */
-    uint16_t svr_version;
+    uint32_t svr_version; /* 32 bit wide on the wire, not 16 -- see
+                              discovery.h's RCP_DISCOVERY_GENERAL_SLICE_LEN
+                              for the resulting slice layout */
     uint16_t vendor_id;
     uint16_t device_id;
     uint16_t svr_ep_count;

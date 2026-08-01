@@ -225,7 +225,10 @@ static rcp_regmap_general_t sample_map(void)
 
     rcp_regmap_general_init(&map);
     map.magic           = 0xC0FFEE01u;
-    map.svr_version     = 0x0501u;
+    /* A 32-bit value whose upper half is non-zero, so a 16-bit
+     * svr_version field cannot round-trip it -- see
+     * test_response_general_slice_octet_layout(). */
+    map.svr_version     = 0x00010501u;
     map.vendor_id       = 0x1234u;
     map.device_id       = 0x5678u;
     map.svr_ep_count    = 9u;
@@ -245,10 +248,74 @@ static void test_response_round_trip_exact_slice_len(void)
     TEST_ASSERT_TRUE(result.valid);
     TEST_ASSERT_TRUE(rcp_stream_id_equal(server, result.server_stream_id));
     TEST_ASSERT_EQUAL_UINT32(map.magic, result.magic);
-    TEST_ASSERT_EQUAL_UINT16(map.svr_version, result.svr_version);
+    TEST_ASSERT_EQUAL_UINT32(map.svr_version, result.svr_version);
     TEST_ASSERT_EQUAL_UINT16(map.vendor_id, result.vendor_id);
     TEST_ASSERT_EQUAL_UINT16(map.device_id, result.device_id);
     TEST_ASSERT_EQUAL_UINT16(map.svr_ep_count, result.svr_ep_count);
+
+    rcp_bytes_free(&frame);
+}
+
+/* TC18 v0.5.1_RC §12.7.5 "RC Server Register map - General part",
+ * Table 18 "RC Server configuration static part". The absolute addresses
+ * and widths of the leading, device-recognition part of the block are:
+ *
+ *   0x0000  svr_oa_tc18_magic_nr   32 bit  R
+ *   0x0004  svr_version            32 bit  R   OATC18 RC Protocol Version
+ *                                              Supported
+ *   0x0008  svr_vendor_id          16 bit  R
+ *   0x000A  svr_device_id          16 bit  R
+ *   0x000C  svr_ep_count           16 bit  R
+ *   0x000E  svr_req_stream_max      8 bit  R
+ *
+ * svr_version is 32 bit, so vendor_id starts at 0x0008 -- not 0x0006, as
+ * a 16-bit svr_version would put it. This test pins each field to its
+ * cited absolute address in the encoded payload, so the two-octet
+ * regression (which shifted vendor_id, device_id and svr_ep_count each
+ * two octets early, misparsing all three for any conforming peer) cannot
+ * come back unnoticed. */
+static void test_response_general_slice_octet_layout(void)
+{
+    rcp_regmap_general_t map = sample_map();
+    rcp_stream_id_t server = rcp_stream_id_make(SERVER_MAC, 3);
+    rcp_bytes_t frame = rcp_discovery_encode_response(&map,
+                                                       (uint8_t)RCP_DISCOVERY_GENERAL_SLICE_LEN,
+                                                       9, server);
+    rcp_avtp_ntscf_header_t     ntscf_hdr;
+    const uint8_t              *ntscf_payload;
+    size_t                      ntscf_payload_len;
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t              *p;
+    size_t                      payload_len;
+
+    rcp_avtp_decode_ntscf(frame.data, frame.len, &ntscf_hdr, &ntscf_payload, &ntscf_payload_len);
+    rcp_acf_decode_abb(ntscf_payload, ntscf_payload_len, &hdr, &p, &payload_len);
+
+    /* magic (0x0000..0x0003) + svr_version (0x0004..0x0007) +
+     * vendor_id (0x0008..0x0009) + device_id (0x000A..0x000B) +
+     * svr_ep_count (0x000C..0x000D) = 14 octets. */
+    TEST_ASSERT_EQUAL_UINT((size_t)14u, RCP_DISCOVERY_GENERAL_SLICE_LEN);
+    TEST_ASSERT_EQUAL_UINT(RCP_DISCOVERY_GENERAL_SLICE_LEN, payload_len);
+
+    /* 0x0000 svr_oa_tc18_magic_nr, 32 bit big-endian: 0xC0FFEE01 */
+    TEST_ASSERT_EQUAL_UINT8(0xC0u, p[0x00]);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, p[0x01]);
+    TEST_ASSERT_EQUAL_UINT8(0xEEu, p[0x02]);
+    TEST_ASSERT_EQUAL_UINT8(0x01u, p[0x03]);
+    /* 0x0004 svr_version, 32 bit big-endian: 0x00010501 */
+    TEST_ASSERT_EQUAL_UINT8(0x00u, p[0x04]);
+    TEST_ASSERT_EQUAL_UINT8(0x01u, p[0x05]);
+    TEST_ASSERT_EQUAL_UINT8(0x05u, p[0x06]);
+    TEST_ASSERT_EQUAL_UINT8(0x01u, p[0x07]);
+    /* 0x0008 svr_vendor_id, 16 bit big-endian: 0x1234 */
+    TEST_ASSERT_EQUAL_UINT8(0x12u, p[0x08]);
+    TEST_ASSERT_EQUAL_UINT8(0x34u, p[0x09]);
+    /* 0x000A svr_device_id, 16 bit big-endian: 0x5678 */
+    TEST_ASSERT_EQUAL_UINT8(0x56u, p[0x0A]);
+    TEST_ASSERT_EQUAL_UINT8(0x78u, p[0x0B]);
+    /* 0x000C svr_ep_count, 16 bit big-endian: 9 */
+    TEST_ASSERT_EQUAL_UINT8(0x00u, p[0x0C]);
+    TEST_ASSERT_EQUAL_UINT8(0x09u, p[0x0D]);
 
     rcp_bytes_free(&frame);
 }
@@ -416,7 +483,7 @@ static void test_fragment_deliberately_small_cap_round_trip(void)
         TEST_ASSERT_TRUE(result.valid);
         TEST_ASSERT_TRUE(rcp_stream_id_equal(server, result.server_stream_id));
         TEST_ASSERT_EQUAL_UINT32(map.magic, result.magic);
-        TEST_ASSERT_EQUAL_UINT16(map.svr_version, result.svr_version);
+        TEST_ASSERT_EQUAL_UINT32(map.svr_version, result.svr_version);
         TEST_ASSERT_EQUAL_UINT16(map.vendor_id, result.vendor_id);
         TEST_ASSERT_EQUAL_UINT16(map.device_id, result.device_id);
         TEST_ASSERT_EQUAL_UINT16(map.svr_ep_count, result.svr_ep_count);
@@ -699,6 +766,7 @@ int main(void)
     RUN_TEST(test_request_decode_empty_buffer);
 
     RUN_TEST(test_response_round_trip_exact_slice_len);
+    RUN_TEST(test_response_general_slice_octet_layout);
     RUN_TEST(test_response_payload_len_always_equals_read_size);
     RUN_TEST(test_response_truncated_slice_when_read_size_small);
     RUN_TEST(test_response_zero_fills_beyond_general_slice);

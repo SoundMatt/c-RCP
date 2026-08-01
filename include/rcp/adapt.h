@@ -47,9 +47,10 @@
  * exceptions need calling out per row below:
  *   - msg->payload always carries the op's own natural wire-format data
  *     bytes: the raw tx/rx byte stream for the "any-length raw data"
- *     endpoint types (SPI/I2C/UART/LIN/CAN/ISELED/MDIO), or the fixed-width
+ *     endpoint types (SPI/I2C/UART/LIN/CAN/ISELED/MDIO), the N 2-octet
+ *     big-endian measurement values of an ADC response, or the fixed-width
  *     big-endian value for the "one scalar register" types (GPIO's 4-byte
- *     bitmask, ADC's 2-byte value, PWM_OUT/PWM_IN's 4-byte period+
+ *     bitmask, PWM_OUT/PWM_IN's 4-byte period+
  *     active_duration pair) -- i.e. exactly the bytes each ep_*.h module's
  *     own _encode_*()/_decode_*() functions themselves already treat as
  *     "the payload," never re-encoded into meta.
@@ -78,7 +79,7 @@
  * | I2C_TRANSFER             | I2C       | (none)                                 | (none)                          |
  * | UART_WRITE                | UART      | (none)                                 | (none)                          |
  * | UART_READ                | UART      | meta rcp.uart.read_size (required)     | (none)                          |
- * | ADC_READ                  | ADC       | (none)                                 | (none beyond payload)           |
+ * | ADC_READ                  | ADC       | meta rcp.adc.read_size (default RCP_EP_ADC_VALUE_LEN, i.e. one value) | meta rcp.adc.value_count (how many 2-octet values the payload holds) |
  * | PWM_OUT_READ              | PWM_OUT   | (none)                                 | (none beyond payload)           |
  * | PWM_OUT_WRITE             | PWM_OUT   | meta rcp.pwm.evt (0-7, default 0)      | (none beyond payload)           |
  * | PWM_IN_READ               | PWM_IN    | (none)                                 | (none beyond payload)           |
