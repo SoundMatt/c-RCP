@@ -1,4 +1,18 @@
 /* SPDX-License-Identifier: MPL-2.0 */
+/* struct ifreq's real definition (net/if.h, via bits/ifreq.h) is guarded
+ * behind glibc's __USE_MISC, which strict -std=c99 (this project's own
+ * CMAKE_C_STANDARD 99 with CMAKE_C_EXTENSIONS OFF) does not define on its
+ * own -- must be the literal first thing in the translation unit, before
+ * any include, same fix and same rationale as tsn.c's own _DEFAULT_SOURCE
+ * definition (SO_PRIORITY) and clock.c's _POSIX_C_SOURCE one. Confirmed
+ * necessary by CI (gcc-12/clang-14 on ubuntu-22.04 both failed this
+ * module's own SIOCGIFHWADDR/SIOCGIFINDEX ioctl calls with "storage size
+ * of 'ifr' isn't known" / "incomplete type 'struct ifreq'" without it --
+ * this project's macOS development environment did not catch it, since
+ * this whole file's real (non-stub) implementation only compiles on
+ * Linux in the first place). */
+#define _DEFAULT_SOURCE
+
 #include "rcp/l2.h"
 
 #include "platform.h"

@@ -37,13 +37,42 @@
 //cfusa:test REQ-L2-007
 //cfusa:test REQ-L2-008
 #include <rcp/avtp.h>
+#include <rcp/clock.h>
 #include <rcp/l2.h>
 #include <rcp/rcp.h>
 
-#include <pthread.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
+
+/* This whole program is meaningfully Linux-only (rcp_l2_avtp_transport_new()
+ * itself is a stub everywhere else -- see l2.h's own file header), but
+ * tests/CMakeLists.txt builds it on every CI matrix leg regardless (to
+ * catch a compile regression immediately, per its own comment there), so
+ * this thread abstraction still needs to compile cleanly on Windows too.
+ * Mirrors tests/test_udp.c's own identical cross-platform thread wrapper. */
+#if defined(_WIN32)
+#include <windows.h>
+typedef HANDLE veth_thread_t;
+static veth_thread_t veth_thread_spawn(DWORD(WINAPI *fn)(void *), void *arg)
+{
+    return CreateThread(NULL, 0, fn, arg, 0, NULL);
+}
+static void veth_thread_join(veth_thread_t t)
+{
+    WaitForSingleObject(t, INFINITE);
+    CloseHandle(t);
+}
+#else
+#include <pthread.h>
+typedef pthread_t veth_thread_t;
+static veth_thread_t veth_thread_spawn(void *(*fn)(void *), void *arg)
+{
+    pthread_t t;
+    pthread_create(&t, NULL, fn, arg);
+    return t;
+}
+static void veth_thread_join(veth_thread_t t) { pthread_join(t, NULL); }
+#endif
 
 static const uint8_t k_broadcast_mac[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
@@ -113,7 +142,11 @@ typedef struct {
     int                     result;
 } close_unblock_args_t;
 
+#if defined(_WIN32)
+static DWORD WINAPI close_unblock_recv_thread(void *arg)
+#else
 static void *close_unblock_recv_thread(void *arg)
+#endif
 {
     close_unblock_args_t *a       = (close_unblock_args_t *)arg;
     rcp_context_t           ctx     = rcp_context_with_timeout_ms(5000);
@@ -121,7 +154,11 @@ static void *close_unblock_recv_thread(void *arg)
     size_t                     out_len = 0;
 
     a->result = rcp_avtp_transport_recv(a->t, &ctx, buf, sizeof(buf), &out_len);
+#if defined(_WIN32)
+    return 0;
+#else
     return NULL;
+#endif
 }
 
 /* REQ-L2-008: close() called from one thread must unblock a concurrent
@@ -132,23 +169,24 @@ static void *close_unblock_recv_thread(void *arg)
 static int test_close_unblocks_in_progress_recv(rcp_avtp_transport_t *t)
 {
     close_unblock_args_t args;
-    pthread_t              th;
-    int                      rc;
+    veth_thread_t           th;
+    uint64_t                  start;
+    int                        rc;
 
     args.t      = t;
     args.result = RCP_OK;
-    if (pthread_create(&th, NULL, close_unblock_recv_thread, &args) != 0) {
-        fprintf(stderr, "[close-unblocks-recv] pthread_create() failed\n");
-        return 1;
-    }
+    th          = veth_thread_spawn(close_unblock_recv_thread, &args);
 
     /* Give the reader thread a moment to actually enter recv() and start
      * polling before close() runs -- a few poll slices' worth is enough
-     * (mirrors test_udp.c's own identical busy-wait rationale). */
-    usleep(60000);
+     * (mirrors test_udp.c's own identical busy-wait rationale; a busy-wait
+     * on rcp_monotonic_ms() rather than a sleep call keeps this portable
+     * without needing a third, platform-specific sleep primitive). */
+    start = rcp_monotonic_ms();
+    while (rcp_monotonic_ms() - start < 60) { /* busy-wait */ }
 
     rc = rcp_avtp_transport_close(t);
-    pthread_join(th, NULL);
+    veth_thread_join(th);
 
     if (rc != RCP_OK) {
         fprintf(stderr, "[close-unblocks-recv] close() returned rc=%d, want RCP_OK\n", rc);
