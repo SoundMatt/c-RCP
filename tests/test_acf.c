@@ -719,6 +719,38 @@ static void test_ack_has_event_false_when_not_an_acknowledge(void)
     TEST_ASSERT_FALSE(rcp_acf_hdr_ack_has_event(&hdr));
 }
 
+/* ── Table 30 Row 2 evt[2:0] rule ────────────────────────────────────────────── */
+
+//cfusa:test REQ-ACF-023
+static void test_evt_row2_is_plain_true_for_zero(void)
+{
+    TEST_ASSERT_TRUE(rcp_acf_evt_row2_is_plain(0x0));
+}
+
+//cfusa:test REQ-ACF-023
+static void test_evt_row2_is_plain_false_for_reserved_values(void)
+{
+    uint8_t v;
+
+    for (v = 1; v <= 6; v++) {
+        TEST_ASSERT_FALSE(rcp_acf_evt_row2_is_plain(v));
+    }
+}
+
+//cfusa:test REQ-ACF-023
+static void test_evt_row2_is_plain_false_for_config_value(void)
+{
+    TEST_ASSERT_FALSE(rcp_acf_evt_row2_is_plain(0x7));
+}
+
+//cfusa:test REQ-ACF-023
+static void test_evt_row2_is_plain_ignores_evt3(void)
+{
+    /* evt[3] (the ack-request bit) is outside evt[2:0]'s 3-bit scope --
+     * a request with evt[3] set but evt[2:0] = 000b is still plain. */
+    TEST_ASSERT_TRUE(rcp_acf_evt_row2_is_plain(0x8));
+}
+
 /* ── Message-type dispatch ─────────────────────────────────────────────────── */
 
 static void test_peek_msg_type_reads_first_byte(void)
@@ -809,6 +841,10 @@ int main(void)
     RUN_TEST(test_ack_has_event_true_when_evt_nonzero);
     RUN_TEST(test_ack_has_event_false_when_evt_zero);
     RUN_TEST(test_ack_has_event_false_when_not_an_acknowledge);
+    RUN_TEST(test_evt_row2_is_plain_true_for_zero);
+    RUN_TEST(test_evt_row2_is_plain_false_for_reserved_values);
+    RUN_TEST(test_evt_row2_is_plain_false_for_config_value);
+    RUN_TEST(test_evt_row2_is_plain_ignores_evt3);
 
     RUN_TEST(test_peek_msg_type_reads_first_byte);
     RUN_TEST(test_peek_msg_type_rejects_empty_buffer);

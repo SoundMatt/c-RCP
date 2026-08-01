@@ -353,6 +353,11 @@ typedef enum {
     /* The response carries more measurement values than the caller's
      * out_values array can hold -- see rcp_ep_adc_decode_response(). */
     RCP_EP_ADC_ERR_TOO_MANY_VALUES = 6,
+    /* evt[2:0] is not 0b000, TC18 §13.5 Table 30's only legal value for a
+     * plain (non-configuration) request in ADC's endpoint-type row --
+     * caller shall respond with error code UNSUPPORTED_CMD (see
+     * rcp_acf_evt_row2_is_plain()). */
+    RCP_EP_ADC_ERR_BAD_EVT         = 7,
 } rcp_ep_adc_errc_t;
 
 /* Human-readable message for an rcp_ep_adc_errc_t value. Never returns
@@ -376,8 +381,10 @@ rcp_bytes_t rcp_ep_adc_encode_read_request(rcp_byte_bus_id_t byte_bus_id, uint16
  * fixed header or its declared payload length; RCP_EP_ADC_ERR_BAD_MSG_TYPE
  * if b is not an ACF_ABB message; RCP_EP_ADC_ERR_WRONG_BUS if its
  * byte_bus_id != expected_bus_id; RCP_EP_ADC_ERR_WRONG_OP if its op is not
- * RCP_ACF_OP_READ. On RCP_EP_ADC_OK, *out_read_size and
- * *out_transaction_num are populated. */
+ * RCP_ACF_OP_READ; RCP_EP_ADC_ERR_BAD_EVT if its evt[2:0] is not 0b000
+ * (rcp_acf_evt_row2_is_plain(), TC18 §13.5 Table 30 -- the caller shall
+ * respond with error code UNSUPPORTED_CMD). On RCP_EP_ADC_OK,
+ * *out_read_size and *out_transaction_num are populated. */
 rcp_ep_adc_errc_t rcp_ep_adc_decode_read_request(const uint8_t *b, size_t len,
                                                   rcp_byte_bus_id_t expected_bus_id,
                                                   uint16_t *out_read_size,
