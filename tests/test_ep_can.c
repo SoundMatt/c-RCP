@@ -337,6 +337,7 @@ static void test_strerror_never_null_and_distinct(void)
         RCP_EP_CAN_OK,           RCP_EP_CAN_ERR_SHORT_FRAME,
         RCP_EP_CAN_ERR_BAD_MSG_TYPE, RCP_EP_CAN_ERR_WRONG_BUS,
         RCP_EP_CAN_ERR_WRONG_OP, RCP_EP_CAN_ERR_BAD_FRAME_FORMAT,
+        RCP_EP_CAN_ERR_BAD_EVT,  RCP_EP_CAN_ERR_BAD_ARBITRATION_ID,
     };
     size_t i, j;
 
@@ -556,6 +557,37 @@ static void test_frame_request_decode_rejects_short_frame(void)
                                          &out_tx, &out_tx_len, &txn));
 }
 
+/* TC18 §13.7.11.3 Figure 39: FrameFormat is the payload's leading
+ * quadlet's top 3 bits, not evt[2:0] -- a request with evt[2:0] = 7
+ * (reserved in CAN's Table 30 Row-2) is now rejected for its evt value,
+ * before frame_format is even inspected. */
+static void test_frame_request_decode_rejects_bad_evt(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_can_frame_format_t   format;
+    uint32_t                    id;
+    rcp_ep_can_xl_header_t      xl_hdr;
+    const uint8_t               *out_tx;
+    size_t                       out_tx_len;
+    uint8_t                      txn;
+    uint8_t                      payload[4] = {0};
+
+    hdr.byte_bus_id = 4;
+    hdr.op          = RCP_ACF_OP_WRITE;
+    hdr.evt         = 7; /* reserved in CAN's Table 30 Row-2 */
+    frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_CAN_ERR_BAD_EVT,
+        rcp_ep_can_decode_frame_request(frame.data, frame.len, 4, &format, &id, &xl_hdr, &out_tx,
+                                         &out_tx_len, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
+/* Payload's leading quadlet's top 3 bits are 0b111 (7), Table 54's own
+ * second reserved code -- evt[2:0] is a plain 0b000, so this exercises
+ * frame_format validation specifically, not the evt check above. */
 static void test_frame_request_decode_rejects_bad_frame_format(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -566,11 +598,10 @@ static void test_frame_request_decode_rejects_bad_frame_format(void)
     const uint8_t               *out_tx;
     size_t                       out_tx_len;
     uint8_t                      txn;
-    uint8_t                      payload[4] = {0};
+    uint8_t                      payload[4] = {0xE0, 0, 0, 0}; /* top 3 bits = 111b = 7 */
 
     hdr.byte_bus_id = 4;
     hdr.op          = RCP_ACF_OP_WRITE;
-    hdr.evt         = 7; /* reserved -- no defined frame format */
     frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
 
     TEST_ASSERT_EQUAL(RCP_EP_CAN_ERR_BAD_FRAME_FORMAT,
@@ -580,11 +611,11 @@ static void test_frame_request_decode_rejects_bad_frame_format(void)
     rcp_bytes_free(&frame);
 }
 
-static void test_frame_request_decode_rejects_short_xl_prefix(void)
+/* An 11-bit-width format (CBFF) whose leading quadlet carries a
+ * arbitration_id value outside the low 11 bits -- TC18 §13.7.11.3's own
+ * "shall be right aligned" rule, violated here on purpose. */
+static void test_frame_request_decode_rejects_bad_arbitration_id(void)
 {
-    /* frame_format = XL_NEW_PL (evt=5) but payload is only the 4-byte
-     * arbitration-id prefix, short of the 6-byte SDT/VCID/AF prefix an XL
-     * frame requires. */
     rcp_acf_byte_message_info_t hdr = {0};
     rcp_bytes_t                 frame;
     rcp_ep_can_frame_format_t   format;
@@ -593,16 +624,67 @@ static void test_frame_request_decode_rejects_short_xl_prefix(void)
     const uint8_t               *out_tx;
     size_t                       out_tx_len;
     uint8_t                      txn;
-    uint8_t                      payload[4] = {0};
+    /* frame_format = CBFF (000b) in the top 3 bits; bit 3 (the first bit
+     * of the 29-bit id field's own upper, must-be-zero-for-base-11 range)
+     * set to 1 -- id = 0x08000000, far outside CBFF's 0x7FF ceiling. */
+    uint8_t                      payload[4] = {0x08, 0, 0, 0};
 
     hdr.byte_bus_id = 4;
     hdr.op          = RCP_ACF_OP_WRITE;
-    hdr.evt         = (uint8_t)RCP_EP_CAN_FRAME_XL_NEW_PL;
+    frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_CAN_ERR_BAD_ARBITRATION_ID,
+        rcp_ep_can_decode_frame_request(frame.data, frame.len, 4, &format, &id, &xl_hdr, &out_tx,
+                                         &out_tx_len, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
+/* frame_format = XL_NEW_PL (leading quadlet's top 3 bits = 101b = 5) but
+ * payload is only the 4-byte leading quadlet, short of the 6-byte
+ * SDT/VCID/AF prefix an XL frame requires. */
+static void test_frame_request_decode_rejects_short_xl_prefix(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_can_frame_format_t   format;
+    uint32_t                    id;
+    rcp_ep_can_xl_header_t      xl_hdr;
+    const uint8_t               *out_tx;
+    size_t                       out_tx_len;
+    uint8_t                      txn;
+    /* top 3 bits = 101b (XL_NEW_PL = 5), remaining 29 bits (id) = 0. */
+    uint8_t                      payload[4] = {(uint8_t)(RCP_EP_CAN_FRAME_XL_NEW_PL << 5), 0, 0, 0};
+
+    hdr.byte_bus_id = 4;
+    hdr.op          = RCP_ACF_OP_WRITE;
     frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
 
     TEST_ASSERT_EQUAL(RCP_EP_CAN_ERR_SHORT_FRAME,
         rcp_ep_can_decode_frame_request(frame.data, frame.len, 4, &format, &id, &xl_hdr, &out_tx,
                                          &out_tx_len, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
+/* Golden vector, independently hand-computed against TC18 §13.7.11.3
+ * Figure 39 -- not re-derived from rcp_ep_can_encode_frame_request()
+ * itself, which is what this test exists to check. frame_format = CEFF
+ * (1) in the top 3 bits (0b001), arbitration_id = 0x1ABCDEF (extended-29,
+ * fits in the low 29 bits) -- combined leading quadlet =
+ * (1 << 29) | 0x1ABCDEF = 0x21ABCDEF. */
+static void test_frame_request_golden_leading_quadlet_bit_packing(void)
+{
+    rcp_bytes_t frame = rcp_ep_can_encode_frame_request(
+        4, RCP_EP_CAN_FRAME_CEFF, 0x01ABCDEFu, NULL, NULL, 0, 3);
+    const uint8_t *payload = frame.data + RCP_ACF_ABB_HEADER_LEN;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL_UINT(RCP_ACF_ABB_HEADER_LEN + 4, frame.len);
+    TEST_ASSERT_EQUAL_HEX8(0x21u, payload[0]);
+    TEST_ASSERT_EQUAL_HEX8(0xABu, payload[1]);
+    TEST_ASSERT_EQUAL_HEX8(0xCDu, payload[2]);
+    TEST_ASSERT_EQUAL_HEX8(0xEFu, payload[3]);
 
     rcp_bytes_free(&frame);
 }
@@ -788,7 +870,6 @@ static void test_fragment_worst_case_can_xl_response_round_trip(void)
 
     rcp_fragment_reassembler_init(&reasm, combined_len);
     for (i = 0; i < count; i++) {
-        rcp_ep_can_frame_format_t   fmt;
         bool                         ms;
         uint8_t                      segnum;
         const uint8_t                *payload;
@@ -799,10 +880,9 @@ static void test_fragment_worst_case_can_xl_response_round_trip(void)
         rcp_fragment_reasm_result_t   rc;
 
         TEST_ASSERT_EQUAL(RCP_EP_CAN_OK,
-            rcp_ep_can_decode_frame_response_fragment(frames[i].data, frames[i].len, 7, &fmt,
+            rcp_ep_can_decode_frame_response_fragment(frames[i].data, frames[i].len, 7,
                                                         &ms, &segnum, &payload, &payload_len,
                                                         &timed, &ts, &txn));
-        TEST_ASSERT_EQUAL(RCP_EP_CAN_FRAME_XL_NEW_PL, fmt);
         TEST_ASSERT_EQUAL_UINT8(55, txn);
         TEST_ASSERT_FALSE(timed);
 
@@ -822,15 +902,17 @@ static void test_fragment_worst_case_can_xl_response_round_trip(void)
         TEST_ASSERT_EQUAL_UINT(combined_len, reassembled_len);
 
         {
+            rcp_ep_can_frame_format_t out_format;
             uint32_t       out_id = 0;
             const uint8_t *out_rx = NULL;
             size_t         out_rx_len = 0;
 
             TEST_ASSERT_EQUAL(RCP_EP_CAN_OK,
                 rcp_ep_can_decode_reassembled_frame_response(
-                    reassembled, reassembled_len, RCP_EP_CAN_FRAME_XL_NEW_PL, &out_id,
+                    reassembled, reassembled_len, &out_format, &out_id,
                     &xl_hdr_out, &out_rx, &out_rx_len));
 
+            TEST_ASSERT_EQUAL(RCP_EP_CAN_FRAME_XL_NEW_PL, out_format);
             TEST_ASSERT_EQUAL_UINT32(0x123, out_id);
             TEST_ASSERT_EQUAL_UINT8(0x5, xl_hdr_out.sdt);
             TEST_ASSERT_EQUAL_UINT8(0x9, xl_hdr_out.vcid);
@@ -884,7 +966,6 @@ static void test_fragment_decode_fragment_rejects_wrong_bus(void)
     rcp_bytes_t frames[1];
     size_t      count = rcp_ep_can_encode_frame_response_fragmented(
         4, RCP_EP_CAN_FRAME_CBFF, 0x42, NULL, rx, sizeof(rx), 9, false, 0, 1024, frames);
-    rcp_ep_can_frame_format_t fmt;
     bool                       ms;
     uint8_t                    segnum;
     const uint8_t              *payload;
@@ -895,7 +976,7 @@ static void test_fragment_decode_fragment_rejects_wrong_bus(void)
 
     TEST_ASSERT_EQUAL_UINT(1, count);
     TEST_ASSERT_EQUAL(RCP_EP_CAN_ERR_WRONG_BUS,
-        rcp_ep_can_decode_frame_response_fragment(frames[0].data, frames[0].len, 99, &fmt, &ms,
+        rcp_ep_can_decode_frame_response_fragment(frames[0].data, frames[0].len, 99, &ms,
                                                     &segnum, &payload, &payload_len, &timed, &ts,
                                                     &txn));
 
@@ -904,15 +985,16 @@ static void test_fragment_decode_fragment_rejects_wrong_bus(void)
 
 static void test_reassembled_decode_rejects_short_frame(void)
 {
-    uint8_t                 too_short[3] = {0};
-    uint32_t                 id = 0;
-    rcp_ep_can_xl_header_t   xl_hdr;
-    const uint8_t             *out_rx = NULL;
-    size_t                     out_rx_len = 0;
+    uint8_t                    too_short[3] = {0};
+    rcp_ep_can_frame_format_t  format;
+    uint32_t                   id = 0;
+    rcp_ep_can_xl_header_t     xl_hdr;
+    const uint8_t              *out_rx = NULL;
+    size_t                      out_rx_len = 0;
 
     TEST_ASSERT_EQUAL(RCP_EP_CAN_ERR_SHORT_FRAME,
         rcp_ep_can_decode_reassembled_frame_response(too_short, sizeof(too_short),
-                                                       RCP_EP_CAN_FRAME_CBFF, &id, &xl_hdr,
+                                                       &format, &id, &xl_hdr,
                                                        &out_rx, &out_rx_len));
 }
 
@@ -961,7 +1043,10 @@ int main(void)
     RUN_TEST(test_frame_request_decode_rejects_wrong_op);
     RUN_TEST(test_frame_request_decode_rejects_bad_msg_type);
     RUN_TEST(test_frame_request_decode_rejects_short_frame);
+    RUN_TEST(test_frame_request_decode_rejects_bad_evt);
     RUN_TEST(test_frame_request_decode_rejects_bad_frame_format);
+    RUN_TEST(test_frame_request_decode_rejects_bad_arbitration_id);
+    RUN_TEST(test_frame_request_golden_leading_quadlet_bit_packing);
     RUN_TEST(test_frame_request_decode_rejects_short_xl_prefix);
 
     RUN_TEST(test_frame_response_round_trip_untimed);

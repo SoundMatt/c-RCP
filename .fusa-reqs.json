@@ -5634,12 +5634,13 @@
     },
     {
       "id": "REQ-CANEP-001",
-      "title": "rcp_ep_can_frame_format_valid() accepts exactly the six defined evt[2:0] values",
+      "title": "rcp_ep_can_frame_format_valid() accepts exactly the six FrameFormat values Table 54 defines",
       "text": "rcp_ep_can_frame_format_valid() shall return true for v in 0..5 and false for any value above 5.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 Table 54, TC18.txt L5447-5456"
     },
     {
       "id": "REQ-CANEP-002",
@@ -5770,20 +5771,22 @@
     {
       "id": "REQ-CANEP-016",
       "title": "rcp_ep_can_encode_frame_request() enforces frame-format, id, length, and xl_header preconditions",
-      "text": "rcp_ep_can_encode_frame_request() shall return a zeroed rcp_bytes_t if frame_format is not rcp_ep_can_frame_format_valid(), arbitration_id is not rcp_ep_can_arbitration_id_valid() for frame_format, tx_len exceeds rcp_ep_can_frame_format_max_data_len(frame_format), or xl_header's presence does not match rcp_ep_can_frame_format_is_xl(frame_format); otherwise it shall encode an ACF_ABB request carrying frame_format in evt[2:0] and this module's own arbitration-id/xl-header/data prefix layout.",
+      "text": "rcp_ep_can_encode_frame_request() shall return a zeroed rcp_bytes_t if frame_format is not rcp_ep_can_frame_format_valid(), arbitration_id is not rcp_ep_can_arbitration_id_valid() for frame_format, tx_len exceeds rcp_ep_can_frame_format_max_data_len(frame_format), or xl_header's presence does not match rcp_ep_can_frame_format_is_xl(frame_format); otherwise it shall encode an ACF_ABB request with evt left at 0 (TC18 Table 30's plain-request value for CAN's endpoint-type row) and frame_format packed into the payload's leading quadlet's top 3 bits alongside arbitration_id (TC18 §13.7.11.3 Figure 39), followed by this module's own xl-header/data layout. FIXED (v0.109.0): previously packed frame_format into evt[2:0] instead, a wire position TC18 does not assign it (see REQ-CANEP-031's corrected text).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 Figure 39, TC18.txt L5426-5446"
     },
     {
       "id": "REQ-CANEP-017",
-      "title": "rcp_ep_can_decode_frame_request() rejects a malformed, misaddressed, or malformed-selector frame",
-      "text": "rcp_ep_can_decode_frame_request() shall return RCP_EP_CAN_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header, its declared payload length, or this module's own frame_format-dependent prefix length; RCP_EP_CAN_ERR_BAD_MSG_TYPE if b is not an ACF_ABB message; RCP_EP_CAN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id; RCP_EP_CAN_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE; and RCP_EP_CAN_ERR_BAD_FRAME_FORMAT when evt[2:0] is not rcp_ep_can_frame_format_valid().",
+      "title": "rcp_ep_can_decode_frame_request() rejects a malformed, misaddressed, wrong-evt, malformed-selector, or bad-arbitration-id frame",
+      "text": "rcp_ep_can_decode_frame_request() shall return RCP_EP_CAN_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header, its declared payload length, the 4-byte leading quadlet, or the full frame_format-dependent prefix length; RCP_EP_CAN_ERR_BAD_MSG_TYPE if b is not an ACF_ABB message; RCP_EP_CAN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id; RCP_EP_CAN_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE; RCP_EP_CAN_ERR_BAD_EVT when evt[2:0] is not 0b000 (TC18 §13.5 Table 30's only legal value for a plain request in CAN's endpoint-type row); RCP_EP_CAN_ERR_BAD_FRAME_FORMAT when the leading quadlet's top 3 bits are not rcp_ep_can_frame_format_valid(); and RCP_EP_CAN_ERR_BAD_ARBITRATION_ID when the leading quadlet's low 29 bits are not rcp_ep_can_arbitration_id_valid() for that frame_format.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 Figure 39, TC18.txt L5426-5446"
     },
     {
       "id": "REQ-CANEP-018",
@@ -5805,12 +5808,13 @@
     },
     {
       "id": "REQ-CANEP-020",
-      "title": "rcp_ep_can_decode_frame_response() rejects a malformed, misaddressed, or malformed-selector frame across both ACF_ABB and ACF_GBB",
-      "text": "rcp_ep_can_decode_frame_response() shall return RCP_EP_CAN_ERR_SHORT_FRAME for a frame too short for the applicable fixed header, its declared payload length, or this module's own frame_format-dependent prefix length; RCP_EP_CAN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id; and RCP_EP_CAN_ERR_BAD_FRAME_FORMAT when evt[2:0] is not rcp_ep_can_frame_format_valid(), regardless of whether the message is ACF_ABB or ACF_GBB.",
+      "title": "rcp_ep_can_decode_frame_response() rejects a malformed, misaddressed, wrong-evt, malformed-selector, or bad-arbitration-id frame across both ACF_ABB and ACF_GBB",
+      "text": "rcp_ep_can_decode_frame_response() shall return RCP_EP_CAN_ERR_SHORT_FRAME for a frame too short for the applicable fixed header, its declared payload length, the 4-byte leading quadlet, or the full frame_format-dependent prefix length; RCP_EP_CAN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id; RCP_EP_CAN_ERR_BAD_EVT when evt[2:0] is not 0b000 (TC18 §13.5 Table 30's only legal value for a plain response in CAN's endpoint-type row); RCP_EP_CAN_ERR_BAD_FRAME_FORMAT when the leading quadlet's top 3 bits are not rcp_ep_can_frame_format_valid(); and RCP_EP_CAN_ERR_BAD_ARBITRATION_ID when the leading quadlet's low 29 bits are not rcp_ep_can_arbitration_id_valid() for that frame_format -- regardless of whether the message is ACF_ABB or ACF_GBB.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 Figure 39, TC18.txt L5426-5446"
     },
     {
       "id": "REQ-CANEP-021",
@@ -6672,21 +6676,23 @@
     },
     {
       "id": "REQ-CANEP-026",
-      "title": "rcp_ep_can_decode_frame_response_fragment() validates byte_bus_id, message type, and frame_format the same way the unfragmented response decoder does",
-      "text": "rcp_ep_can_decode_frame_response_fragment() shall return the same RCP_EP_CAN_ERR_SHORT_FRAME/_ERR_BAD_MSG_TYPE/_ERR_WRONG_BUS/_ERR_BAD_FRAME_FORMAT error codes, under the same conditions, that rcp_ep_can_decode_frame_response() returns them for.",
+      "title": "rcp_ep_can_decode_frame_response_fragment() validates byte_bus_id, message type, and evt the same way the unfragmented response decoder does",
+      "text": "rcp_ep_can_decode_frame_response_fragment() shall return the same RCP_EP_CAN_ERR_SHORT_FRAME/_ERR_BAD_MSG_TYPE/_ERR_WRONG_BUS/_ERR_BAD_EVT error codes, under the same conditions, that rcp_ep_can_decode_frame_response() returns them for. It does NOT validate or output frame_format: frame_format lives in the combined payload's own leading quadlet (TC18 §13.7.11.3 Figure 39), not per-fragment header state, so it is only recoverable after reassembly -- see REQ-CANEP-027. FIXED (v0.109.0): this function previously validated and output frame_format derived from evt[2:0], the same non-conformant design corrected across this module.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 Figure 39, TC18.txt L5426-5446"
     },
     {
       "id": "REQ-CANEP-027",
-      "title": "rcp_ep_can_decode_reassembled_frame_response() parses a fully reassembled combined payload into arbitration_id/xl_header/rx_data",
-      "text": "rcp_ep_can_decode_reassembled_frame_response() shall, given frame_format and a reassembled buffer of at least that format's prefix length, populate out_arbitration_id, out_xl_header (only when the format is a CAN XL variant), and out_rx_data/out_rx_len identically to how rcp_ep_can_decode_frame_response() would have for the same original, unfragmented payload.",
+      "title": "rcp_ep_can_decode_reassembled_frame_response() parses a fully reassembled combined payload into frame_format/arbitration_id/xl_header/rx_data",
+      "text": "rcp_ep_can_decode_reassembled_frame_response() shall, given a reassembled buffer of at least 4 bytes, read frame_format from its leading quadlet's top 3 bits (TC18 §13.7.11.3 Figure 39), returning RCP_EP_CAN_ERR_SHORT_FRAME if the buffer is shorter than that format's own full prefix length, RCP_EP_CAN_ERR_BAD_FRAME_FORMAT if it is not rcp_ep_can_frame_format_valid(), or RCP_EP_CAN_ERR_BAD_ARBITRATION_ID if the leading quadlet's low 29 bits are not rcp_ep_can_arbitration_id_valid() for that format; otherwise populate out_frame_format, out_arbitration_id, out_xl_header (only when the format is a CAN XL variant), and out_rx_data/out_rx_len identically to how rcp_ep_can_decode_frame_response() would have for the same original, unfragmented payload. FIXED (v0.109.0): frame_format was previously a caller-supplied input (sourced from a per-fragment evt[2:0], REQ-CANEP-026's now-corrected design); it is now derived from the reassembled payload itself, the only place it is actually carried.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 Figure 39, TC18.txt L5426-5446"
     },
     {
       "id": "REQ-UART-029",
@@ -8959,14 +8965,14 @@
     },
     {
       "id": "REQ-CANEP-031",
-      "title": "The FrameFormat selector's numeric code assignment (CBFF 0 through XL new-PL 5, with 6 and 7 reserved)",
-      "text": "rcp_ep_can_frame_format_t shall assign exactly the FrameFormat codes TC18 \u00a713.7.11.3 Table 54 fixes: RCP_EP_CAN_FRAME_CBFF = 0, RCP_EP_CAN_FRAME_CEFF = 1, RCP_EP_CAN_FRAME_FBFF = 2, RCP_EP_CAN_FRAME_FEFF = 3, RCP_EP_CAN_FRAME_XL_CLASSICAL_PL = 4 (XL over the classical physical layer), and RCP_EP_CAN_FRAME_XL_NEW_PL = 5 (XL over the new physical layer); codes 6 and 7 are reserved and rcp_ep_can_frame_format_valid() shall reject them, causing rcp_ep_can_decode_frame_request()/_decode_frame_response() to return RCP_EP_CAN_ERR_BAD_FRAME_FORMAT. The selector shall be carried in the low three bits of the ACF byte_message_info evt field.",
+      "title": "The FrameFormat selector's numeric code assignment (CBFF 0 through XL new-PL 5, with 6 and 7 reserved), carried in the payload's leading quadlet",
+      "text": "rcp_ep_can_frame_format_t shall assign exactly the FrameFormat codes TC18 \u00a713.7.11.3 Table 54 fixes: RCP_EP_CAN_FRAME_CBFF = 0, RCP_EP_CAN_FRAME_CEFF = 1, RCP_EP_CAN_FRAME_FBFF = 2, RCP_EP_CAN_FRAME_FEFF = 3, RCP_EP_CAN_FRAME_XL_CLASSICAL_PL = 4 (XL over the classical physical layer), and RCP_EP_CAN_FRAME_XL_NEW_PL = 5 (XL over the new physical layer); codes 6 and 7 are reserved and rcp_ep_can_frame_format_valid() shall reject them, causing rcp_ep_can_decode_frame_request()/_decode_frame_response()/_decode_reassembled_frame_response() to return RCP_EP_CAN_ERR_BAD_FRAME_FORMAT. The selector shall be carried in the top 3 bits of the payload's leading quadlet (TC18 \u00a713.7.11.3 Figure 39), sharing that quadlet with a 29-bit arbitration_id. CORRECTED (v0.109.0): this requirement previously (and incorrectly) asserted the selector was carried in the ACF byte_message_info evt field's low three bits -- verified against Figure 39 directly, that claim was never true of TC18 and was itself the bug (evt[2:0] instead carries CAN's ordinary TC18 \u00a713.5 Table 30 Row-2 meaning: 000b plain, 111b configuration-write, else UNSUPPORTED_CMD). Found and fixed while investigating this repo's Table 30 centralization.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 Table 54, TC18.txt L5447-5456"
+      "tc18": "\u00a713.7.11.3 Table 54 + Figure 39, TC18.txt L5426-5456"
     },
     {
       "id": "REQ-CANEP-032",
