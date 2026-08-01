@@ -133,23 +133,34 @@
  * out of this milestone's scope; there is no wire representation, encode
  * function, or decode outcome for a remote frame anywhere in this module.
  *
- * ── FrameFormat selection (evt[2:0]) ────────────────────────────────────────
+ * ── FrameFormat selection (payload prefix, NOT evt[2:0]) ────────────────────
  *
- * rcp_ep_can_frame_format_t names the six frame variants this endpoint
- * selects among -- Classical Base/Extended Frame Format (CBFF/CEFF),
- * FD Base/Extended Frame Format (FBFF/FEFF), and CAN XL over either the
- * classical or the new CAN XL physical layer -- selected via the ACF
- * byte_message_info header's evt field's low three bits (acf.h), the same
- * evt[2:0]-as-selector convention ep_spi.h's channel selector already
- * established (there, a channel number; here, a frame-format code).
- * rcp_ep_can_frame_format_valid() accepts only the six defined values (0-5);
- * values 6-7 select no defined format and are rejected on decode with
- * RCP_EP_CAN_ERR_BAD_FRAME_FORMAT, mirroring ep_spi.h's own
- * RCP_EP_SPI_ERR_BAD_CHANNEL treatment of its own out-of-range evt[2:0]
- * values -- the roadmap does not itself enumerate which 3-bit codes name
- * which frame format; the assignment above is this module's own original
- * design filling that gap, the same kind of gap-filling ep_lin.h's own
- * evt[2:0] comparison-mode enumeration already did for LIN.
+ * TC18 §13.7.11.3 Figure 39 packs FrameFormat into the payload itself, as
+ * the top 3 bits of the request/response's leading quadlet, sharing that
+ * quadlet with a 29-bit CAN ID (right-aligned for an 11-bit base id, per
+ * TC18 §13.7.11.3's own note) -- NOT into evt[2:0], which for CAN (a
+ * member of TC18 §13.5 Table 30's {ADC, PWM_IN, I2C, LIN, CAN, UART,
+ * ISELED, MDIO} row) has the same ordinary meaning every other endpoint in
+ * that row gives it: 000b for a plain request/response, 111b for a
+ * configuration write (§12.7.1), every other value rejected with error
+ * code UNSUPPORTED_CMD (see rcp_acf_evt_row2_is_plain(), acf.h). An earlier
+ * revision of this module packed frame_format into evt[2:0] instead --
+ * modeled on ep_spi.h's real, TC18-sanctioned evt[2:0] channel-selector
+ * row -- without checking that CAN belongs to the *other* Table 30 row,
+ * whose evt[2:0] values TC18 reserves. That was wrong: it accepted
+ * evt[2:0] values Table 30 requires this endpoint type to reject, and put
+ * FrameFormat at a wire position no compliant peer reads it from. Fixed
+ * (v0.109.0) by moving frame_format into the payload's leading quadlet, per
+ * Figure 39, and giving evt[2:0] its ordinary Table 30 meaning.
+ *
+ * rcp_ep_can_frame_format_t names the six frame variants TC18's own Table
+ * 54 enumerates -- Classical Base/Extended Frame Format (CBFF/CEFF), FD
+ * Base/Extended Frame Format (FBFF/FEFF), and CAN XL over either the
+ * classical or the new CAN XL physical layer -- with Table 54's own
+ * numeric assignments (0-5); values 6-7 are Table 54's own two reserved
+ * codes and select no defined format.
+ * rcp_ep_can_frame_format_valid() accepts only 0-5; a decoded FrameFormat
+ * of 6 or 7 is rejected with RCP_EP_CAN_ERR_BAD_FRAME_FORMAT.
  *
  * rcp_ep_can_frame_format_id_width() reports whether a format's arbitration
  * identifier is an 11-bit ("base") or 29-bit ("extended") value: CBFF/FBFF
@@ -228,21 +239,21 @@
  * request cannot be sent in one ACF message and has no multi-message
  * alternative yet -- tracked as a follow-up, not this fix's scope.
  *
- * ── Wire layout: this module's own prefix-then-data choice ─────────────────
+ * ── Wire layout: TC18 §13.7.11.3 Figure 39 ──────────────────────────────────
  *
- * A frame request/response's ACF payload is this module's own fixed-prefix-
- * then-raw-data layout (the same kind of "this module's own wire-layout
- * choice" ep_uart.h's own bit-padding scheme already established as this
- * codebase's convention for representing a structured concept the spec
- * names but does not itself lay out bit-for-bit): a big-endian 4-byte
- * arbitration_id, followed -- only when frame_format is one of the two CAN
- * XL variants -- by xl_header's big-endian sdt (1 byte), vcid (1 byte), and
- * af (4 bytes), followed by the raw CAN data bytes exactly as supplied
- * (this module never inspects, generates, or reformats any byte of the
- * data payload itself, the same "dumb pass-through for the data content"
- * philosophy ep_lin.h/ep_i2c.h/ep_uart.h already established for their own
- * raw-byte content -- only the frame's own structural fields, not its
- * data, are modeled here).
+ * A frame request/response's ACF payload is a big-endian 4-byte leading
+ * quadlet packing frame_format (top 3 bits) and arbitration_id (bottom 29
+ * bits, right-aligned for an 11-bit base id -- see rcp_ep_can_frame_format_id_width()),
+ * followed -- only when frame_format is one of the two CAN XL variants --
+ * by xl_header's big-endian sdt (1 byte), vcid (1 byte), and af (4 bytes)
+ * (Figure 39's own "CAN data field includes ... RRS, SDT, VCID, AF" note:
+ * these six bytes are the leading bytes of Figure 39's "CAN data" region,
+ * not a separate field ahead of it), followed by the raw CAN data bytes
+ * exactly as supplied (this module never inspects, generates, or reformats
+ * any byte of the data payload itself, the same "dumb pass-through for the
+ * data content" philosophy ep_lin.h/ep_i2c.h/ep_uart.h already established
+ * for their own raw-byte content -- only the frame's own structural
+ * fields, not its data, are modeled here).
  *
  * ── No trigger-signal table: a documented upstream spec gap ─────────────────
  *
@@ -485,12 +496,25 @@ bool rcp_ep_can_set_xl_filter(rcp_ep_can_functional_cfg_t *cfg, uint8_t index,
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 
 typedef enum {
-    RCP_EP_CAN_OK                   = 0,
-    RCP_EP_CAN_ERR_SHORT_FRAME      = 1,
-    RCP_EP_CAN_ERR_BAD_MSG_TYPE     = 2,
-    RCP_EP_CAN_ERR_WRONG_BUS        = 3,
-    RCP_EP_CAN_ERR_WRONG_OP         = 4,
-    RCP_EP_CAN_ERR_BAD_FRAME_FORMAT = 5,
+    RCP_EP_CAN_OK                    = 0,
+    RCP_EP_CAN_ERR_SHORT_FRAME       = 1,
+    RCP_EP_CAN_ERR_BAD_MSG_TYPE      = 2,
+    RCP_EP_CAN_ERR_WRONG_BUS         = 3,
+    RCP_EP_CAN_ERR_WRONG_OP          = 4,
+    /* The payload's leading quadlet's top 3 bits (FrameFormat, TC18
+     * Table 54) are not one of Table 54's six defined values -- see the
+     * file header's "FrameFormat selection" section. */
+    RCP_EP_CAN_ERR_BAD_FRAME_FORMAT  = 5,
+    /* evt[2:0] is not 0b000, TC18 §13.5 Table 30's only legal value for a
+     * plain (non-configuration) request/response in CAN's endpoint-type
+     * row -- caller shall respond with error code UNSUPPORTED_CMD (see
+     * rcp_acf_evt_row2_is_plain()). */
+    RCP_EP_CAN_ERR_BAD_EVT            = 6,
+    /* The decoded arbitration_id does not fit FrameFormat's own id width
+     * (TC18 §13.7.11.3: an 11-bit base id must be right-aligned, i.e. the
+     * leading quadlet's bits 3-20 must be zero for a base-11 format) -- see
+     * rcp_ep_can_arbitration_id_valid(). */
+    RCP_EP_CAN_ERR_BAD_ARBITRATION_ID = 7,
 } rcp_ep_can_errc_t;
 
 /* Human-readable message for an rcp_ep_can_errc_t value. Never returns NULL. */
@@ -498,15 +522,15 @@ const char *rcp_ep_can_strerror(rcp_ep_can_errc_t e);
 
 /* ── Frame request ─────────────────────────────────────────────────────────── */
 
-/* Encodes an ACF_ABB frame request addressed to byte_bus_id: evt's low
- * three bits carry frame_format (any other bits of the ACF header's evt
- * field are left 0), and the payload is this module's own prefix-then-data
- * layout -- see the file header -- of arbitration_id, xl_header (only when
- * frame_format is a CAN XL variant), and tx_data[0..tx_len) (the raw CAN
- * data bytes; tx_data may be NULL iff tx_len == 0). Returns a zeroed
- * rcp_bytes_t (data=NULL) if: frame_format is not
- * rcp_ep_can_frame_format_valid(); arbitration_id is not
- * rcp_ep_can_arbitration_id_valid() for frame_format; tx_len exceeds
+/* Encodes an ACF_ABB frame request addressed to byte_bus_id: evt is left
+ * entirely 0 (TC18 §13.5 Table 30's ordinary "plain request" value for
+ * CAN's endpoint-type row), and the payload is TC18 §13.7.11.3 Figure 39's
+ * layout -- see the file header -- of frame_format+arbitration_id (the
+ * leading quadlet), xl_header (only when frame_format is a CAN XL
+ * variant), and tx_data[0..tx_len) (the raw CAN data bytes; tx_data may be
+ * NULL iff tx_len == 0). Returns a zeroed rcp_bytes_t (data=NULL) if:
+ * frame_format is not rcp_ep_can_frame_format_valid(); arbitration_id is
+ * not rcp_ep_can_arbitration_id_valid() for frame_format; tx_len exceeds
  * rcp_ep_can_frame_format_max_data_len(frame_format); xl_header is NULL
  * when rcp_ep_can_frame_format_is_xl(frame_format) is true, or non-NULL
  * when it is false; or on allocation failure. Caller frees the result with
@@ -520,18 +544,24 @@ rcp_bytes_t rcp_ep_can_encode_frame_request(rcp_byte_bus_id_t byte_bus_id,
 
 /* Decodes and validates an ACF-level CAN frame request from b[0..len).
  * Fails with RCP_EP_CAN_ERR_SHORT_FRAME if b is shorter than the ACF_ABB
- * fixed header, its declared payload length, or this module's own
- * frame_format-dependent prefix length; RCP_EP_CAN_ERR_BAD_MSG_TYPE if b is
- * not an ACF_ABB message; RCP_EP_CAN_ERR_WRONG_BUS if its byte_bus_id !=
- * expected_bus_id; RCP_EP_CAN_ERR_WRONG_OP if its op is not
- * RCP_ACF_OP_WRITE; RCP_EP_CAN_ERR_BAD_FRAME_FORMAT if evt[2:0] is not
- * rcp_ep_can_frame_format_valid(). On RCP_EP_CAN_OK, *out_frame_format,
- * *out_arbitration_id, and *out_transaction_num are populated;
- * *out_xl_header is populated iff rcp_ep_can_frame_format_is_xl()
- * (*out_frame_format), left entirely untouched otherwise; *out_tx_data /
- * *out_tx_len are set to a *borrowed* view into b (not copied -- matching
- * every prior endpoint type's own raw-data decode convention) of the raw
- * CAN data bytes following this module's own prefix. */
+ * fixed header, its declared payload length, the 4-byte frame_format+
+ * arbitration_id quadlet, or the full frame_format-dependent prefix
+ * length; RCP_EP_CAN_ERR_BAD_MSG_TYPE if b is not an ACF_ABB message;
+ * RCP_EP_CAN_ERR_WRONG_BUS if its byte_bus_id != expected_bus_id;
+ * RCP_EP_CAN_ERR_WRONG_OP if its op is not RCP_ACF_OP_WRITE;
+ * RCP_EP_CAN_ERR_BAD_EVT if its evt[2:0] is not 0b000
+ * (rcp_acf_evt_row2_is_plain(), TC18 §13.5 Table 30 -- the caller shall
+ * respond with error code UNSUPPORTED_CMD); RCP_EP_CAN_ERR_BAD_FRAME_FORMAT
+ * if the decoded frame_format is not rcp_ep_can_frame_format_valid();
+ * RCP_EP_CAN_ERR_BAD_ARBITRATION_ID if the decoded arbitration_id is not
+ * rcp_ep_can_arbitration_id_valid() for that frame_format. On
+ * RCP_EP_CAN_OK, *out_frame_format, *out_arbitration_id, and
+ * *out_transaction_num are populated; *out_xl_header is populated iff
+ * rcp_ep_can_frame_format_is_xl() (*out_frame_format), left entirely
+ * untouched otherwise; *out_tx_data / *out_tx_len are set to a *borrowed*
+ * view into b (not copied -- matching every prior endpoint type's own
+ * raw-data decode convention) of the raw CAN data bytes following this
+ * module's own prefix. */
 rcp_ep_can_errc_t rcp_ep_can_decode_frame_request(const uint8_t *b, size_t len,
                                                    rcp_byte_bus_id_t expected_bus_id,
                                                    rcp_ep_can_frame_format_t *out_frame_format,
@@ -567,10 +597,14 @@ rcp_bytes_t rcp_ep_can_encode_frame_response(rcp_byte_bus_id_t byte_bus_id,
  * decoder above, since a response's encoding depends on the responding
  * endpoint's own timed/untimed choice). Fails with RCP_EP_CAN_ERR_SHORT_FRAME
  * (frame too short for the applicable fixed header, its declared payload
- * length, or this module's own frame_format-dependent prefix length),
- * RCP_EP_CAN_ERR_WRONG_BUS (byte_bus_id != expected_bus_id), or
- * RCP_EP_CAN_ERR_BAD_FRAME_FORMAT (evt[2:0] is not
- * rcp_ep_can_frame_format_valid()). On RCP_EP_CAN_OK, *out_frame_format,
+ * length, the 4-byte frame_format+arbitration_id quadlet, or the full
+ * frame_format-dependent prefix length), RCP_EP_CAN_ERR_WRONG_BUS
+ * (byte_bus_id != expected_bus_id), RCP_EP_CAN_ERR_BAD_EVT (evt[2:0] is
+ * not 0b000, rcp_acf_evt_row2_is_plain()), RCP_EP_CAN_ERR_BAD_FRAME_FORMAT
+ * (the decoded frame_format is not rcp_ep_can_frame_format_valid()), or
+ * RCP_EP_CAN_ERR_BAD_ARBITRATION_ID (the decoded arbitration_id is not
+ * rcp_ep_can_arbitration_id_valid() for that frame_format). On
+ * RCP_EP_CAN_OK, *out_frame_format,
  * *out_arbitration_id, and *out_transaction_num are populated;
  * *out_xl_header is populated iff rcp_ep_can_frame_format_is_xl()
  * (*out_frame_format), left entirely untouched otherwise; *out_rx_data /
@@ -612,8 +646,11 @@ size_t rcp_ep_can_frame_response_fragment_count(rcp_ep_can_frame_format_t frame_
  * max_fragment_payload octets -- into
  * out_frames[0..rcp_ep_can_frame_response_fragment_count(...)) (caller-
  * allocated, sized by calling that function first). Every fragment
- * shares byte_bus_id/frame_format(evt)/op(READ)/transaction_num/timed/
- * timestamp with rcp_ep_can_encode_frame_response(); only the ms flag,
+ * shares byte_bus_id/evt(0)/op(READ)/transaction_num/timed/timestamp with
+ * rcp_ep_can_encode_frame_response() -- frame_format itself lives inside
+ * the combined payload's own leading quadlet (see the file header), not
+ * per-fragment header state, so only the first fragment actually carries
+ * it. Only the ms flag,
  * the read_size_or_segment_num field (meaningful only on an ms=true
  * fragment -- see acf.h/fragment.h), and each fragment's own payload
  * slice differ. When the combined payload already fits in one fragment,
@@ -642,26 +679,31 @@ size_t rcp_ep_can_encode_frame_response_fragmented(rcp_byte_bus_id_t byte_bus_id
                                                     rcp_bytes_t *out_frames);
 
 /* Decodes one fragment of a (possibly multi-fragment) CAN frame response
- * from b[0..len) -- the same peek-message-type/byte_bus_id/frame_format
- * validation rcp_ep_can_decode_frame_response() applies, but this
- * function does *not* strip this module's own prefix-then-data layout
- * from the payload (a fragment other than the first may not even contain
- * the whole prefix -- fragmentation operates on the flat combined byte
- * sequence, agnostic to its own internal structure, per fragment.h's file
- * header). Instead it surfaces the fragment's own ms bit,
+ * from b[0..len) -- the same peek-message-type/byte_bus_id validation
+ * rcp_ep_can_decode_frame_response() applies, but this function does
+ * *not* strip TC18 Figure 39's leading-quadlet-then-data layout from the
+ * payload (a fragment other than the first may not even contain the
+ * whole leading quadlet -- fragmentation operates on the flat combined
+ * byte sequence, agnostic to its own internal structure, per fragment.h's
+ * file header). Since frame_format now lives inside that leading quadlet
+ * rather than in evt (see the file header's "FrameFormat selection"
+ * section), it is not obtainable per-fragment at all -- unlike the prior
+ * evt-carried design, this function does not (and cannot) output it;
+ * rcp_ep_can_decode_reassembled_frame_response() recovers it once,
+ * *after* reassembly, from the reassembled buffer's own leading quadlet.
+ * This function instead surfaces the fragment's own ms bit,
  * read_size_or_segment_num (as *out_segment_num, meaningful only when
  * *out_ms), and raw ACF payload slice (*out_payload / *out_payload_len,
  * borrowed into b, matching every decode function in this module), for a
  * caller to feed straight into a rcp_fragment_reassembler_t
  * (fragment.h). Once reassembly reports RCP_FRAGMENT_REASM_COMPLETE, pass
  * the reassembled buffer to rcp_ep_can_decode_reassembled_frame_response()
- * to extract arbitration_id/xl_header/rx_data. Fails with the same
- * RCP_EP_CAN_ERR_SHORT_FRAME/_ERR_BAD_MSG_TYPE/_ERR_WRONG_BUS/
- * _ERR_BAD_FRAME_FORMAT conditions rcp_ep_can_decode_frame_response()
- * does; on RCP_EP_CAN_OK, every output parameter is populated. */
+ * to extract frame_format/arbitration_id/xl_header/rx_data. Fails with
+ * the same RCP_EP_CAN_ERR_SHORT_FRAME/_ERR_BAD_MSG_TYPE/_ERR_WRONG_BUS/
+ * _ERR_BAD_EVT conditions rcp_ep_can_decode_frame_response() does; on
+ * RCP_EP_CAN_OK, every output parameter is populated. */
 rcp_ep_can_errc_t rcp_ep_can_decode_frame_response_fragment(const uint8_t *b, size_t len,
                                                              rcp_byte_bus_id_t expected_bus_id,
-                                                             rcp_ep_can_frame_format_t *out_frame_format,
                                                              bool *out_ms,
                                                              uint8_t *out_segment_num,
                                                              const uint8_t **out_payload,
@@ -670,24 +712,25 @@ rcp_ep_can_errc_t rcp_ep_can_decode_frame_response_fragment(const uint8_t *b, si
                                                              uint64_t *out_timestamp,
                                                              uint8_t *out_transaction_num);
 
-/* Applies this module's own prefix-then-data parsing (see the file
+/* Applies TC18 Figure 39's leading-quadlet-then-data parsing (see the file
  * header's "Wire layout" section) to a fully reassembled combined payload
  * -- rcp_fragment_reassembler_get()'s output once
- * rcp_fragment_reassembler_feed() has reported RCP_FRAGMENT_REASM_COMPLETE
- * -- for frame_format as recorded from (any of) that sequence's own
- * fragments (rcp_ep_can_decode_frame_response_fragment()'s *out_frame_format,
- * which is round-tripped identically on every fragment of one logical
- * response). This is the second half of what
- * rcp_ep_can_decode_frame_response() does in one step for a single,
- * unfragmented frame. Returns RCP_EP_CAN_ERR_SHORT_FRAME if reassembled_len
- * is shorter than frame_format's own prefix length; RCP_EP_CAN_ERR_BAD_FRAME_FORMAT
- * if frame_format itself is not rcp_ep_can_frame_format_valid(). On
- * RCP_EP_CAN_OK, *out_arbitration_id / *out_xl_header are populated (the
- * latter only when rcp_ep_can_frame_format_is_xl(frame_format)) and
- * *out_rx_data / *out_rx_len are set to a *borrowed* view into reassembled. */
+ * rcp_fragment_reassembler_feed() has reported RCP_FRAGMENT_REASM_COMPLETE.
+ * This is the second half of what rcp_ep_can_decode_frame_response() does
+ * in one step for a single, unfragmented frame. Returns
+ * RCP_EP_CAN_ERR_SHORT_FRAME if reassembled_len is shorter than the
+ * leading quadlet, or shorter than the full frame_format-dependent
+ * prefix length once frame_format is known; RCP_EP_CAN_ERR_BAD_FRAME_FORMAT
+ * if the decoded frame_format is not rcp_ep_can_frame_format_valid();
+ * RCP_EP_CAN_ERR_BAD_ARBITRATION_ID if the decoded arbitration_id is not
+ * rcp_ep_can_arbitration_id_valid() for that frame_format. On
+ * RCP_EP_CAN_OK, *out_frame_format / *out_arbitration_id / *out_xl_header
+ * are populated (the latter only when
+ * rcp_ep_can_frame_format_is_xl(*out_frame_format)) and *out_rx_data /
+ * *out_rx_len are set to a *borrowed* view into reassembled. */
 rcp_ep_can_errc_t rcp_ep_can_decode_reassembled_frame_response(const uint8_t *reassembled,
                                                                 size_t reassembled_len,
-                                                                rcp_ep_can_frame_format_t frame_format,
+                                                                rcp_ep_can_frame_format_t *out_frame_format,
                                                                 uint32_t *out_arbitration_id,
                                                                 rcp_ep_can_xl_header_t *out_xl_header,
                                                                 const uint8_t **out_rx_data,

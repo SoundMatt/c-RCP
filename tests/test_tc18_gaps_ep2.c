@@ -439,7 +439,9 @@ static void test_lin_trigger_ignores_trailing_time_and_block_lacks_registers(voi
 static void test_can_frame_format_values_match_table_54(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
-    const uint8_t               body[4] = {0, 0, 0, 1};
+    /* Leading quadlet's top 3 bits = 110b (6), Table 54's first reserved
+     * code -- the low 29 bits (arbitration_id) are irrelevant here. */
+    const uint8_t                body[4] = {0xC0u, 0, 0, 0};
     rcp_bytes_t                 f;
     rcp_ep_can_frame_format_t   fmt = RCP_EP_CAN_FRAME_CBFF;
     uint32_t                    id  = 0u;
@@ -460,11 +462,14 @@ static void test_can_frame_format_values_match_table_54(void)
     TEST_ASSERT_FALSE(rcp_ep_can_frame_format_valid(6u));
     TEST_ASSERT_FALSE(rcp_ep_can_frame_format_valid(7u));
 
-    /* The selector rides the low three bits of the ACF evt field, and a
-     * reserved code there is rejected by the frame decoder. */
+    /* FIXED (v0.109.0) -- the selector rides the payload's own leading
+     * quadlet (TC18 §13.7.11.3 Figure 39), not evt[2:0] (an earlier
+     * revision's own design choice, not TC18's); evt is left at its
+     * ordinary Table 30 Row-2 "plain request" value (0), and a reserved
+     * FrameFormat code in the payload is rejected by the frame decoder. */
     hdr.byte_bus_id     = 0x31u;
     hdr.op              = RCP_ACF_OP_WRITE;
-    hdr.evt             = 6u;
+    hdr.evt             = 0u;
     hdr.transaction_num = 2u;
     f = rcp_acf_encode_abb(&hdr, body, sizeof(body));
     TEST_ASSERT_NOT_NULL(f.data);

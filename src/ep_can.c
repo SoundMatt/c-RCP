@@ -21,7 +21,7 @@ static uint32_t get_u32(const uint8_t *p)
            (uint32_t)p[3];
 }
 
-/* ── FrameFormat selection (evt[2:0]) ────────────────────────────────────── */
+/* ── FrameFormat selection (payload leading quadlet, TC18 Table 54) ──────── */
 
 //cfusa:req REQ-CANEP-001
 bool rcp_ep_can_frame_format_valid(uint8_t v)
@@ -191,22 +191,29 @@ const char *rcp_ep_can_strerror(rcp_ep_can_errc_t e)
     case RCP_EP_CAN_ERR_BAD_MSG_TYPE:     return "rcp/ep_can: unexpected ACF message type";
     case RCP_EP_CAN_ERR_WRONG_BUS:        return "rcp/ep_can: wrong byte_bus_id";
     case RCP_EP_CAN_ERR_WRONG_OP:         return "rcp/ep_can: wrong ACF op";
-    case RCP_EP_CAN_ERR_BAD_FRAME_FORMAT: return "rcp/ep_can: invalid frame format selector";
+    case RCP_EP_CAN_ERR_BAD_FRAME_FORMAT:  return "rcp/ep_can: invalid frame format";
+    case RCP_EP_CAN_ERR_BAD_EVT:           return "rcp/ep_can: evt[2:0] is not 0b000";
+    case RCP_EP_CAN_ERR_BAD_ARBITRATION_ID: return "rcp/ep_can: arbitration_id out of range for frame format";
     default:                              return "rcp/ep_can: unknown error";
     }
 }
 
-/* ── Wire layout helpers (this module's own prefix-then-data choice) ────── */
+/* ── Wire layout helpers (TC18 §13.7.11.3 Figure 39) ─────────────────────── */
 
 static size_t prefix_len_for(rcp_ep_can_frame_format_t format)
 {
     return rcp_ep_can_frame_format_is_xl(format) ? (size_t)10u : (size_t)4u;
 }
 
+/* Figure 39's leading quadlet: frame_format in the top 3 bits, the
+ * (right-aligned, for an 11-bit base id) arbitration_id in the bottom 29
+ * bits. */
 static void write_prefix(uint8_t *p, rcp_ep_can_frame_format_t format, uint32_t arbitration_id,
                           const rcp_ep_can_xl_header_t *xl_header)
 {
-    put_u32(p, arbitration_id);
+    uint32_t combined = ((uint32_t)format << 29) | (arbitration_id & 0x1FFFFFFFu);
+
+    put_u32(p, combined);
     if (rcp_ep_can_frame_format_is_xl(format)) {
         p[4] = xl_header->sdt;
         p[5] = xl_header->vcid;
@@ -214,10 +221,18 @@ static void write_prefix(uint8_t *p, rcp_ep_can_frame_format_t format, uint32_t 
     }
 }
 
+/* Reads just the leading quadlet's top 3 bits -- the only field a caller
+ * needs before it knows which format (and therefore which full prefix
+ * length) it is looking at. */
+static rcp_ep_can_frame_format_t read_frame_format(const uint8_t *p)
+{
+    return (rcp_ep_can_frame_format_t)((get_u32(p) >> 29) & 0x7u);
+}
+
 static void read_prefix(const uint8_t *p, rcp_ep_can_frame_format_t format,
                          uint32_t *out_arbitration_id, rcp_ep_can_xl_header_t *out_xl_header)
 {
-    *out_arbitration_id = get_u32(p);
+    *out_arbitration_id = get_u32(p) & 0x1FFFFFFFu;
     if (rcp_ep_can_frame_format_is_xl(format)) {
         out_xl_header->sdt  = p[4];
         out_xl_header->vcid = p[5];
@@ -290,7 +305,7 @@ rcp_bytes_t rcp_ep_can_encode_frame_request(rcp_byte_bus_id_t byte_bus_id,
 
     hdr.byte_bus_id     = byte_bus_id;
     hdr.op              = RCP_ACF_OP_WRITE;
-    hdr.evt             = (uint8_t)frame_format;
+    hdr.evt             = 0; /* TC18 Table 30: plain request in CAN's Row-2 -- frame_format now lives in the payload, see the file header */
     hdr.transaction_num = transaction_num;
 
     frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
@@ -322,14 +337,18 @@ rcp_ep_can_errc_t rcp_ep_can_decode_frame_request(const uint8_t *b, size_t len,
 
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_CAN_ERR_WRONG_BUS;
     if (hdr.op != RCP_ACF_OP_WRITE) return RCP_EP_CAN_ERR_WRONG_OP;
+    if (!rcp_acf_evt_row2_is_plain(hdr.evt)) return RCP_EP_CAN_ERR_BAD_EVT;
 
-    if (!rcp_ep_can_frame_format_valid(hdr.evt & 0x07u)) return RCP_EP_CAN_ERR_BAD_FRAME_FORMAT;
-    frame_format = (rcp_ep_can_frame_format_t)(hdr.evt & 0x07u);
+    if (payload_len < 4u) return RCP_EP_CAN_ERR_SHORT_FRAME;
+    frame_format = read_frame_format(payload);
+    if (!rcp_ep_can_frame_format_valid((uint8_t)frame_format)) return RCP_EP_CAN_ERR_BAD_FRAME_FORMAT;
 
     prefix_len = prefix_len_for(frame_format);
     if (payload_len < prefix_len) return RCP_EP_CAN_ERR_SHORT_FRAME;
 
     read_prefix(payload, frame_format, out_arbitration_id, out_xl_header);
+    if (!rcp_ep_can_arbitration_id_valid(frame_format, *out_arbitration_id))
+        return RCP_EP_CAN_ERR_BAD_ARBITRATION_ID;
 
     *out_frame_format    = frame_format;
     *out_tx_data         = &payload[prefix_len];
@@ -365,7 +384,7 @@ rcp_bytes_t rcp_ep_can_encode_frame_response(rcp_byte_bus_id_t byte_bus_id,
         hdr.info.byte_bus_id     = byte_bus_id;
         hdr.info.op              = RCP_ACF_OP_READ;
         hdr.info.rsp             = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
-        hdr.info.evt             = (uint8_t)frame_format;
+        hdr.info.evt             = 0; /* TC18 Table 30: plain response, see the file header */
         hdr.info.mtv             = RCP_ACF_MTV_VALID;
         hdr.info.transaction_num = transaction_num;
         hdr.message_timestamp    = timestamp;
@@ -377,7 +396,7 @@ rcp_bytes_t rcp_ep_can_encode_frame_response(rcp_byte_bus_id_t byte_bus_id,
         hdr.byte_bus_id     = byte_bus_id;
         hdr.op              = RCP_ACF_OP_READ;
         hdr.rsp             = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
-        hdr.evt             = (uint8_t)frame_format;
+        hdr.evt             = 0; /* TC18 Table 30: plain request in CAN's Row-2 -- frame_format now lives in the payload, see the file header */
         hdr.transaction_num = transaction_num;
 
         frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
@@ -439,14 +458,18 @@ rcp_ep_can_errc_t rcp_ep_can_decode_frame_response(const uint8_t *b, size_t len,
     }
 
     if (bus_id != expected_bus_id) return RCP_EP_CAN_ERR_WRONG_BUS;
+    if (!rcp_acf_evt_row2_is_plain(evt)) return RCP_EP_CAN_ERR_BAD_EVT;
 
-    if (!rcp_ep_can_frame_format_valid(evt & 0x07u)) return RCP_EP_CAN_ERR_BAD_FRAME_FORMAT;
-    frame_format = (rcp_ep_can_frame_format_t)(evt & 0x07u);
+    if (payload_len < 4u) return RCP_EP_CAN_ERR_SHORT_FRAME;
+    frame_format = read_frame_format(payload);
+    if (!rcp_ep_can_frame_format_valid((uint8_t)frame_format)) return RCP_EP_CAN_ERR_BAD_FRAME_FORMAT;
 
     prefix_len = prefix_len_for(frame_format);
     if (payload_len < prefix_len) return RCP_EP_CAN_ERR_SHORT_FRAME;
 
     read_prefix(payload, frame_format, out_arbitration_id, out_xl_header);
+    if (!rcp_ep_can_arbitration_id_valid(frame_format, *out_arbitration_id))
+        return RCP_EP_CAN_ERR_BAD_ARBITRATION_ID;
 
     *out_frame_format    = frame_format;
     *out_rx_data         = &payload[prefix_len];
@@ -521,7 +544,7 @@ size_t rcp_ep_can_encode_frame_response_fragmented(rcp_byte_bus_id_t byte_bus_id
             hdr.info.byte_bus_id              = byte_bus_id;
             hdr.info.op                       = RCP_ACF_OP_READ;
             hdr.info.rsp                      = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
-            hdr.info.evt                      = (uint8_t)frame_format;
+            hdr.info.evt                      = 0; /* TC18 Table 30: plain response, see the file header */
             hdr.info.mtv                      = RCP_ACF_MTV_VALID;
             hdr.info.transaction_num          = transaction_num;
             hdr.info.ms                       = segs[i].ms ? 1u : 0u;
@@ -535,7 +558,7 @@ size_t rcp_ep_can_encode_frame_response_fragmented(rcp_byte_bus_id_t byte_bus_id
             hdr.byte_bus_id              = byte_bus_id;
             hdr.op                       = RCP_ACF_OP_READ;
             hdr.rsp                      = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
-            hdr.evt                      = (uint8_t)frame_format;
+            hdr.evt                      = 0; /* TC18 Table 30: plain response, see the file header */
             hdr.transaction_num          = transaction_num;
             hdr.ms                       = segs[i].ms ? 1u : 0u;
             hdr.read_size_or_segment_num = segs[i].ms ? segs[i].segment_num : 0u;
@@ -564,7 +587,6 @@ size_t rcp_ep_can_encode_frame_response_fragmented(rcp_byte_bus_id_t byte_bus_id
 //cfusa:req REQ-CANEP-026
 rcp_ep_can_errc_t rcp_ep_can_decode_frame_response_fragment(const uint8_t *b, size_t len,
                                                              rcp_byte_bus_id_t expected_bus_id,
-                                                             rcp_ep_can_frame_format_t *out_frame_format,
                                                              bool *out_ms,
                                                              uint8_t *out_segment_num,
                                                              const uint8_t **out_payload,
@@ -592,7 +614,6 @@ rcp_ep_can_errc_t rcp_ep_can_decode_frame_response_fragment(const uint8_t *b, si
     uint8_t                       transaction_num;
     bool                          timed;
     uint64_t                      timestamp;
-    rcp_ep_can_frame_format_t     frame_format;
 
     if (rcp_acf_peek_msg_type(b, len, &msg_type) != RCP_ACF_OK) return RCP_EP_CAN_ERR_SHORT_FRAME;
 
@@ -623,11 +644,8 @@ rcp_ep_can_errc_t rcp_ep_can_decode_frame_response_fragment(const uint8_t *b, si
     }
 
     if (bus_id != expected_bus_id) return RCP_EP_CAN_ERR_WRONG_BUS;
+    if (!rcp_acf_evt_row2_is_plain(evt)) return RCP_EP_CAN_ERR_BAD_EVT;
 
-    if (!rcp_ep_can_frame_format_valid(evt & 0x07u)) return RCP_EP_CAN_ERR_BAD_FRAME_FORMAT;
-    frame_format = (rcp_ep_can_frame_format_t)(evt & 0x07u);
-
-    *out_frame_format    = frame_format;
     *out_ms              = (ms != 0u);
     *out_segment_num     = segment_num;
     *out_payload         = payload;
@@ -641,22 +659,28 @@ rcp_ep_can_errc_t rcp_ep_can_decode_frame_response_fragment(const uint8_t *b, si
 //cfusa:req REQ-CANEP-027
 rcp_ep_can_errc_t rcp_ep_can_decode_reassembled_frame_response(const uint8_t *reassembled,
                                                                 size_t reassembled_len,
-                                                                rcp_ep_can_frame_format_t frame_format,
+                                                                rcp_ep_can_frame_format_t *out_frame_format,
                                                                 uint32_t *out_arbitration_id,
                                                                 rcp_ep_can_xl_header_t *out_xl_header,
                                                                 const uint8_t **out_rx_data,
                                                                 size_t *out_rx_len)
 {
-    size_t prefix_len;
+    rcp_ep_can_frame_format_t frame_format;
+    size_t                    prefix_len;
 
+    if (reassembled_len < 4u) return RCP_EP_CAN_ERR_SHORT_FRAME;
+    frame_format = read_frame_format(reassembled);
     if (!rcp_ep_can_frame_format_valid((uint8_t)frame_format)) return RCP_EP_CAN_ERR_BAD_FRAME_FORMAT;
 
     prefix_len = prefix_len_for(frame_format);
     if (reassembled_len < prefix_len) return RCP_EP_CAN_ERR_SHORT_FRAME;
 
     read_prefix(reassembled, frame_format, out_arbitration_id, out_xl_header);
+    if (!rcp_ep_can_arbitration_id_valid(frame_format, *out_arbitration_id))
+        return RCP_EP_CAN_ERR_BAD_ARBITRATION_ID;
 
-    *out_rx_data = &reassembled[prefix_len];
-    *out_rx_len  = reassembled_len - prefix_len;
+    *out_frame_format = frame_format;
+    *out_rx_data       = &reassembled[prefix_len];
+    *out_rx_len        = reassembled_len - prefix_len;
     return RCP_EP_CAN_OK;
 }

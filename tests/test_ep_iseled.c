@@ -489,6 +489,29 @@ static void test_command_request_rejects_wrong_op(void)
     rcp_bytes_free(&frame);
 }
 
+/* TC18 §13.5 Table 30: evt[2:0] = 000b is the only legal value for a
+ * plain ISELED command request; every other value (here, 0b010, a
+ * reserved value in ISELED's endpoint-type row) shall be rejected. */
+static void test_command_request_rejects_nonzero_evt(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    const uint8_t               *out_tx;
+    size_t                       out_tx_len;
+    uint8_t                      txn;
+
+    hdr.byte_bus_id = 4;
+    hdr.op          = RCP_ACF_OP_WRITE;
+    hdr.evt         = 0x2;
+    frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_ERR_BAD_EVT,
+        rcp_ep_iseled_decode_command_request(frame.data, frame.len, 4, &out_tx, &out_tx_len,
+                                              &txn));
+
+    rcp_bytes_free(&frame);
+}
+
 static void test_command_request_rejects_bad_msg_type(void)
 {
     rcp_acf_gbb_header_t gbb_hdr = {0};
@@ -645,6 +668,7 @@ int main(void)
     RUN_TEST(test_command_request_round_trip_empty_payload);
     RUN_TEST(test_command_request_rejects_wrong_bus);
     RUN_TEST(test_command_request_rejects_wrong_op);
+    RUN_TEST(test_command_request_rejects_nonzero_evt);
     RUN_TEST(test_command_request_rejects_bad_msg_type);
     RUN_TEST(test_command_request_rejects_short_frame);
 

@@ -134,6 +134,7 @@ const char *rcp_ep_mdio_strerror(rcp_ep_mdio_errc_t e)
     case RCP_EP_MDIO_ERR_BAD_ADDR:       return "rcp/ep_mdio: invalid MDIO address";
     case RCP_EP_MDIO_ERR_BAD_WORD_COUNT: return "rcp/ep_mdio: invalid register-word count";
     case RCP_EP_MDIO_ERR_ALLOC:          return "rcp/ep_mdio: allocation failure";
+    case RCP_EP_MDIO_ERR_BAD_EVT:        return "rcp/ep_mdio: evt[2:0] is not 0b000";
     default:                             return "rcp/ep_mdio: unknown error";
     }
 }
@@ -204,6 +205,7 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_read_request(const uint8_t *b, size_t len,
 
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_MDIO_ERR_WRONG_BUS;
     if (hdr.op != RCP_ACF_OP_READ) return RCP_EP_MDIO_ERR_WRONG_OP;
+    if (!rcp_acf_evt_row2_is_plain(hdr.evt)) return RCP_EP_MDIO_ERR_BAD_EVT;
     if (payload_len < READ_REQUEST_PAYLOAD_LEN) return RCP_EP_MDIO_ERR_SHORT_FRAME;
 
     addr = get_addr_prefix(payload);
@@ -378,6 +380,7 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_write_request(const uint8_t *b, size_t len
 
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_MDIO_ERR_WRONG_BUS;
     if (hdr.op != RCP_ACF_OP_WRITE) return RCP_EP_MDIO_ERR_WRONG_OP;
+    if (!rcp_acf_evt_row2_is_plain(hdr.evt)) return RCP_EP_MDIO_ERR_BAD_EVT;
     if (payload_len < ADDR_PREFIX_LEN) return RCP_EP_MDIO_ERR_SHORT_FRAME;
 
     addr = get_addr_prefix(payload);
