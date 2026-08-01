@@ -81,6 +81,7 @@ const char *rcp_ep_i2c_strerror(rcp_ep_i2c_errc_t e)
     case RCP_EP_I2C_ERR_BAD_MSG_TYPE: return "rcp/ep_i2c: unexpected ACF message type";
     case RCP_EP_I2C_ERR_WRONG_BUS:    return "rcp/ep_i2c: wrong byte_bus_id";
     case RCP_EP_I2C_ERR_WRONG_OP:     return "rcp/ep_i2c: wrong ACF op";
+    case RCP_EP_I2C_ERR_BAD_EVT:      return "rcp/ep_i2c: evt[2:0] is not 0b000";
     default:                          return "rcp/ep_i2c: unknown error";
     }
 }
@@ -136,6 +137,7 @@ rcp_ep_i2c_errc_t rcp_ep_i2c_decode_transfer_request(const uint8_t *b, size_t le
     if (acf_rc != RCP_ACF_OK) return RCP_EP_I2C_ERR_BAD_MSG_TYPE;
 
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_I2C_ERR_WRONG_BUS;
+    if (!rcp_acf_evt_row2_is_plain(hdr.evt)) return RCP_EP_I2C_ERR_BAD_EVT;
 
     /* Both op senses are valid on an I2C transfer request -- see the file
      * header. The direction is reported, not rejected. */

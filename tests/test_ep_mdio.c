@@ -370,6 +370,28 @@ static void test_read_request_decode_rejects_wrong_op(void)
     rcp_bytes_free(&frame);
 }
 
+/* TC18 §13.5 Table 30: evt[2:0] = 000b is the only legal value for a
+ * plain MDIO read request; every other value (here, 0b100, reserved in
+ * MDIO's endpoint-type row) shall be rejected. */
+static void test_read_request_decode_rejects_nonzero_evt(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_mdio_addr_t          out_addr;
+    size_t                      out_word_count;
+    uint8_t                     txn;
+
+    hdr.byte_bus_id = 2;
+    hdr.op          = RCP_ACF_OP_READ;
+    hdr.evt         = 0x4;
+    frame           = rcp_acf_encode_abb(&hdr, NULL, 0);
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_BAD_EVT, rcp_ep_mdio_decode_read_request(
+        frame.data, frame.len, 2, &out_addr, &out_word_count, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
 static void test_read_request_decode_rejects_bad_msg_type(void)
 {
     rcp_acf_gbb_header_t gbb_hdr = {0};
@@ -674,6 +696,29 @@ static void test_write_request_decode_rejects_wrong_op(void)
     rcp_bytes_free(&frame);
 }
 
+/* TC18 §13.5 Table 30: evt[2:0] = 000b is the only legal value for a
+ * plain MDIO write request; every other value (here, 0b001, reserved in
+ * MDIO's endpoint-type row) shall be rejected. */
+static void test_write_request_decode_rejects_nonzero_evt(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_mdio_addr_t          out_addr;
+    const uint8_t                *out_words_data;
+    size_t                        out_word_count;
+    uint8_t                       txn;
+
+    hdr.byte_bus_id = 2;
+    hdr.op          = RCP_ACF_OP_WRITE;
+    hdr.evt         = 0x1;
+    frame           = rcp_acf_encode_abb(&hdr, NULL, 0);
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_BAD_EVT, rcp_ep_mdio_decode_write_request(
+        frame.data, frame.len, 2, &out_addr, &out_words_data, &out_word_count, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
 static void test_write_request_decode_rejects_short_frame(void)
 {
     rcp_acf_byte_message_info_t hdr          = {0};
@@ -867,6 +912,7 @@ int main(void)
     RUN_TEST(test_read_request_encode_rejects_word_count_above_max);
     RUN_TEST(test_read_request_decode_rejects_wrong_bus);
     RUN_TEST(test_read_request_decode_rejects_wrong_op);
+    RUN_TEST(test_read_request_decode_rejects_nonzero_evt);
     RUN_TEST(test_read_request_decode_rejects_bad_msg_type);
     RUN_TEST(test_read_request_decode_rejects_short_frame);
     RUN_TEST(test_read_request_decode_rejects_bad_addr);
@@ -886,6 +932,7 @@ int main(void)
     RUN_TEST(test_write_request_encode_rejects_word_count_above_max);
     RUN_TEST(test_write_request_decode_rejects_wrong_bus);
     RUN_TEST(test_write_request_decode_rejects_wrong_op);
+    RUN_TEST(test_write_request_decode_rejects_nonzero_evt);
     RUN_TEST(test_write_request_decode_rejects_short_frame);
     RUN_TEST(test_write_request_decode_rejects_bad_addr);
     RUN_TEST(test_write_request_decode_rejects_zero_words);

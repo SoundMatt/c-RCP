@@ -349,6 +349,28 @@ static void test_write_request_rejects_wrong_bus_op_short_frame_bad_type(void)
                                           &txn));
 }
 
+/* TC18 §13.5 Table 30: evt[2:0] = 000b is the only legal value for a
+ * plain UART write request; every other value (here, 0b110, a reserved
+ * value in UART's endpoint-type row) shall be rejected. */
+static void test_write_request_rejects_nonzero_evt(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    const uint8_t               *out_tx;
+    size_t                       out_tx_len;
+    uint8_t                      txn;
+
+    hdr.byte_bus_id = 4;
+    hdr.op          = RCP_ACF_OP_WRITE;
+    hdr.evt         = 0x6;
+    frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+
+    TEST_ASSERT_EQUAL(RCP_EP_UART_ERR_BAD_EVT,
+        rcp_ep_uart_decode_write_request(frame.data, frame.len, 4, &out_tx, &out_tx_len, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
 static void test_write_response_round_trip_untimed_and_timed(void)
 {
     uint8_t     accepted[2] = {0x55, 0x66};
@@ -460,6 +482,27 @@ static void test_read_request_rejects_wrong_bus_op_short_frame(void)
 
     TEST_ASSERT_EQUAL(RCP_EP_UART_ERR_SHORT_FRAME,
         rcp_ep_uart_decode_read_request(too_short, sizeof(too_short), 6, &read_size, &txn));
+}
+
+/* TC18 §13.5 Table 30: evt[2:0] = 000b is the only legal value for a
+ * plain UART read request; every other value (here, 0b101, a reserved
+ * value in UART's endpoint-type row) shall be rejected. */
+static void test_read_request_rejects_nonzero_evt(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    uint8_t                     read_size;
+    uint8_t                     txn;
+
+    hdr.byte_bus_id = 6;
+    hdr.op          = RCP_ACF_OP_READ;
+    hdr.evt         = 0x5;
+    frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+
+    TEST_ASSERT_EQUAL(RCP_EP_UART_ERR_BAD_EVT,
+        rcp_ep_uart_decode_read_request(frame.data, frame.len, 6, &read_size, &txn));
+
+    rcp_bytes_free(&frame);
 }
 
 static void test_read_response_round_trip_full_length(void)
@@ -675,12 +718,14 @@ int main(void)
 
     RUN_TEST(test_write_request_round_trip);
     RUN_TEST(test_write_request_rejects_wrong_bus_op_short_frame_bad_type);
+    RUN_TEST(test_write_request_rejects_nonzero_evt);
     RUN_TEST(test_write_response_round_trip_untimed_and_timed);
     RUN_TEST(test_write_response_decode_rejects_wrong_bus_and_short_frame);
 
     RUN_TEST(test_read_request_round_trip);
     RUN_TEST(test_read_request_rejects_payload_with_unknown_cmd);
     RUN_TEST(test_read_request_rejects_wrong_bus_op_short_frame);
+    RUN_TEST(test_read_request_rejects_nonzero_evt);
     RUN_TEST(test_read_response_round_trip_full_length);
     RUN_TEST(test_read_response_round_trip_short_read_single_avtpdu);
     RUN_TEST(test_read_response_decode_rejects_wrong_bus_and_short_frame);
