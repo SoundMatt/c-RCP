@@ -113,6 +113,46 @@ jobs:
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: ctest --test-dir build-san --output-on-failure -j1
 
+  # ── L2 (native Ethernet) transport: real veth round trip ─────────────────────
+  #
+  # tests/test_l2.c (part of build-and-test above) already covers the frame
+  # codec (rcp_l2_frame_encode()/_decode()) unprivileged, on every platform.
+  # This job is the real thing: two rcp_l2_avtp_transport_t instances bound
+  # to opposite ends of an actual veth pair, moving actual AVTPDUs over
+  # actual AF_PACKET/SOCK_RAW sockets, asserting byte-for-byte equality in
+  # both directions (tests/l2_veth_roundtrip.c). Linux-only (l2.h's own
+  # file header) and needs CAP_NET_RAW/root to open a raw socket at all, so
+  # it runs as its own dedicated, `sudo`-using job rather than folding into
+  # build-and-test's own unprivileged cross-platform matrix.
+  l2-transport-veth:
+    name: L2 transport (veth)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y cmake ninja-build iproute2
+
+      - name: Configure
+        run: |
+          cmake -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -G Ninja
+
+      - name: Build l2_veth_roundtrip
+        run: cmake --build build --target l2_veth_roundtrip --parallel
+
+      - name: Create veth pair
+        run: |
+          sudo ip link add veth0 type veth peer name veth1
+          sudo ip link set veth0 up
+          sudo ip link set veth1 up
+
+      - name: Real L2 round trip over veth0/veth1
+        run: sudo ./build/tests/l2_veth_roundtrip
+
   # ── RELAY conformance gate (spec §12, §17, §20.1) ────────────────────────────
   relay-conform:
     name: relay conform (RELAY §12 conformance)

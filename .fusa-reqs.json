@@ -6992,6 +6992,141 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18"
+    },
+    {
+      "id": "REQ-UDP-015",
+      "title": "rcp_udp_annexj_wrap() prepends a 4-octet big-endian sequence number",
+      "text": "rcp_udp_annexj_wrap() shall heap-allocate a buffer holding a 4-octet big-endian encapsulation sequence number followed by the given AVTPDU bytes, and return a zeroed rcp_bytes_t (data=NULL) on allocation failure.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-UDP-016",
+      "title": "rcp_udp_annexj_unwrap() strips the sequence number and borrows the AVTPDU",
+      "text": "rcp_udp_annexj_unwrap() shall read the leading 4-octet big-endian sequence number from a wrap()-produced buffer and point the caller at the AVTPDU bytes that follow (borrowed, not copied), returning false without touching any output parameter when the supplied buffer is shorter than RCP_UDP_ANNEX_J_SEQ_LEN.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-UDP-017",
+      "title": "send() applies the Annex J encapsulation sequence number automatically",
+      "text": "A UDP AVTP transport's send() shall prepend its own per-connection monotonically-incrementing sequence number (via rcp_udp_annexj_wrap()) to every AVTPDU before it reaches the socket, transparently to the rcp_avtp_transport_t caller.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-UDP-018",
+      "title": "recv() strips the Annex J encapsulation sequence number automatically",
+      "text": "A UDP AVTP transport's recv() shall strip the leading Annex J encapsulation sequence number (via rcp_udp_annexj_unwrap()) before returning a received AVTPDU to the caller, dropping (and continuing to wait for the next datagram on) any received datagram shorter than the sequence number field itself; rcp_udp_avtp_transport_last_recv_seq() shall report the sequence number of the most recently successfully received datagram, or 0 if none has been received yet.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-UDP-019",
+      "title": "dial()/bind()_default_port() target the Annex J control port",
+      "text": "rcp_udp_avtp_transport_dial_default_port() and rcp_udp_avtp_transport_bind_default_port() shall behave exactly as rcp_udp_avtp_transport_dial()/_bind() called with port == RCP_UDP_ANNEX_J_CONTROL_PORT (17221).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-L2-001",
+      "title": "rcp_l2_frame_encode() builds dst+src+EtherType+AVTPDU framing",
+      "text": "rcp_l2_frame_encode() shall heap-allocate a buffer holding the given destination MAC (6 octets), source MAC (6 octets), RCP_L2_ETHERTYPE (2 octets, big-endian), and the given AVTPDU bytes, in that order, and return a zeroed rcp_bytes_t (data=NULL) on allocation failure.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-L2-002",
+      "title": "rcp_l2_frame_decode() validates EtherType and borrows the AVTPDU",
+      "text": "rcp_l2_frame_decode() shall return false, leaving every output parameter untouched, when the supplied frame is shorter than RCP_L2_HEADER_LEN or its EtherType field is not RCP_L2_ETHERTYPE; otherwise it shall populate the destination/source MAC outputs and point the caller at the AVTPDU bytes that follow (borrowed, not copied).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-L2-003",
+      "title": "rcp_l2_avtp_transport_new() never returns NULL except on allocation failure",
+      "text": "rcp_l2_avtp_transport_new() shall return a non-NULL rcp_avtp_transport_t on any failure to open/bind the underlying raw socket or read the interface's own hardware address, with ok() reporting false in that case; it shall return NULL only on this module's own allocation failure.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-L2-004",
+      "title": "ok() distinguishes a successful open from a socket/bind/ioctl failure",
+      "text": "rcp_l2_avtp_transport_ok() shall return true only for a transport whose underlying raw socket was created, bound to its interface, and had that interface's own hardware address successfully read, all successfully.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-L2-005",
+      "title": "local_mac() reports the transport's own interface-derived source MAC",
+      "text": "rcp_l2_avtp_transport_local_mac() shall write the network interface's own hardware address (read once at construction time, never caller-supplied) into the caller's buffer and return true for an ok() transport, or return false without writing anything for a transport that is not ok().",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-L2-006",
+      "title": "send() frames outgoing AVTPDUs with the caller-supplied destination MAC",
+      "text": "An L2 AVTP transport's send() shall wrap each AVTPDU via rcp_l2_frame_encode() using the transport's own caller-supplied destination MAC and interface-derived source MAC before transmitting it on the underlying raw socket, and shall return RCP_ERR_CLOSED once close() has been called.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-L2-007",
+      "title": "recv() decodes AVTP-over-Ethernet frames and ignores its own transmitted copies",
+      "text": "An L2 AVTP transport's recv() shall decode each received frame via rcp_l2_frame_decode(), returning only its AVTPDU bytes to the caller, and shall ignore (continue waiting past) any frame the underlying raw socket reports as this same socket's own locally-transmitted outgoing copy rather than a frame genuinely received from the wire.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-L2-008",
+      "title": "close() unblocks a concurrent in-progress recv() without invalidating the fd",
+      "text": "Calling close() on an L2 transport while a different thread is blocked inside that same transport's recv() shall cause that recv() call to return RCP_ERR_CLOSED within one poll slice, without the underlying raw socket being invalidated out from under it; the fd itself shall only be closed once destroy() runs.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-L2-009",
+      "title": "Non-Linux stub: ok() false and every operation fails without crashing",
+      "text": "On a non-Linux platform, rcp_l2_avtp_transport_new() shall return a non-NULL transport whose ok() reports false and whose send()/recv() return RCP_ERR_CLOSED without crashing, exactly matching udp.c's own Windows stub convention.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
+      "id": "REQ-L2-010",
+      "title": "Missing CAP_NET_RAW/root leaves the transport cleanly not-ok()",
+      "text": "When the calling process lacks CAP_NET_RAW (and is not root), rcp_l2_avtp_transport_new()'s underlying raw-socket open shall fail and the returned transport's ok() shall report false, without crashing or requiring the caller to pre-check its own privilege level.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
     }
   ],
   "catalogNote": "Phase 22 re-certification pass (ROADMAP.md milestone 85, v0.85.0): every requirement below was individually reviewed against the source file its //cfusa:req tag actually appears in (a per-prefix audit, not a blind carry-over) and classified via the \"scope\" field. scope=\"tc18\" entries (779 of 854) describe the actual implemented TC18 behavior -- register-map access control, lifecycle transitions, E2E CRC32 safe points, per-endpoint-type request/response shapes, discovery, power-mode transitions, and every ADAPT-class satellite -- and are this project's own ISO 26262 ASIL-B safety-case basis going forward. scope=\"legacy-compat\" entries (75 of 854) describe the retired pre-TC18 Zone/Command surface (rcp.h/rcp.c and tests/legacy_mock.* only); they are demoted to level/asil \"QM\" and their text is prefixed accordingly, but kept -- not deleted or renumbered -- because that legacy surface is out of scope for this milestone to touch (ROADMAP.md's v0.84.0 milestone already confirmed it is the last consumer of those retired types anywhere in src/) and still carries //cfusa:req tags naming these ids; deleting the catalog entries out from under a surviving tag would only trade one inaccuracy (an unqualified legacy requirement) for another (a dangling reference cfusa trace would then report). Only the tc18 subset is this project's claimed certification basis, and it is complete against Phases 13-21 as actually shipped -- not a forward-declared placeholder the way the legacy program's own catalog was at its v0.2.0, since unlike v0.2.0 this catalog was not written before the code it describes."

@@ -5384,3 +5384,114 @@ Full `ctest` suite 57/57 passed. `.fusa-reqs.json` gained
 `REQ-MOCK-019`/`REQ-MOCK-020` for the new dispatch-frame behavior.
 `README.md`'s wire-interop claim now carries an explicit hedge pending
 the deferred items above and live third-party interop testing.
+
+### 101. Native Ethernet (L2) transport + real Annex J UDP conformance (v0.101.0) ✅
+
+**Deferred, not forgotten**: milestone 59 (v0.59.0) named three concrete
+`rcp_avtp_transport_t` carriers as this vtable's own reason to exist --
+native Ethernet (EtherType `0x22F0`), IEEE1722-over-UDP/IP (Annex J), and
+CAN(FD/XL)-as-network. Milestone 78 (v0.78.0, "Transport satellites")
+delivered a real, from-scratch UDP transport but silently dropped native
+Ethernet from its own scope without ever saying so; nothing in this
+codebase has implemented it since (`find . -iname "*eth*"` outside
+`.git`/build directories confirmed empty before this milestone started).
+This milestone finally delivers it, and separately fixes a real
+conformance gap the existing UDP transport has carried since v0.78.0:
+CAN(FD/XL)-as-network remains the one still-unimplemented carrier from
+milestone 59's original list, still tracked, not this milestone's scope.
+
+**UDP Annex J conformance fix.** Cross-checked against two independent
+public secondary sources (a Wireshark issue tracker discussion of the
+real Annex J framing, and the COVESA Open1722 open-source reference
+implementation's `Avtp_Udp_t` header struct, BSD-3-Clause) -- this
+project has no access to the paywalled IEEE 1722-2016 standard text
+itself, so both `udp.h`'s own file header and this entry say so
+explicitly rather than presenting either source as primary-source-
+verified. Both sources agree that Annex J framing prepends a 4-octet,
+big-endian "encapsulation sequence number" ahead of the AVTPDU on the
+wire, a field with no counterpart in native-Ethernet framing; `udp.c`'s
+existing transport had neither that field nor a standard default
+control-plane port. New, pure, socket-free `rcp_udp_annexj_wrap()`/
+`_unwrap()` are the codec for that field, applied transparently inside
+`rcp_udp_avtp_transport_dial()`/`_bind()`'s own `send()`/`recv()`; each
+transport instance now maintains its own monotonically-incrementing
+`uint32_t` send counter, and the most recently *received* sequence
+number is exposed via the new `rcp_udp_avtp_transport_last_recv_seq()`
+for callers who want it -- without inventing any receiver-side
+gap/reorder-detection semantics for it, since neither secondary source
+documents what those are meant to be. New `RCP_UDP_ANNEX_J_CONTROL_PORT`
+(17221, the "Discrete"/control-plane port both sources agree on --
+`RCP_UDP_ANNEX_J_CONTINUOUS_PORT`, 17220, is documented alongside it for
+completeness but not used by anything in this module) and new
+`rcp_udp_avtp_transport_dial_default_port()`/`_bind_default_port()`
+convenience wrappers that fill it in; the explicit-port `dial()`/`bind()`
+entry points are untouched for back-compat, and port `0` keeps its
+existing, different, already-tested meaning ("OS-assigned ephemeral
+port" for `bind()`) rather than being overloaded to also mean "use the
+default control port" -- a new wrapper function was the safer,
+non-breaking evolution here, in the same spirit as this project's
+existing `_default_config()`-style convenience-wrapper convention
+elsewhere. `RCP_UDP_AVTP_MAX_FRAME`'s receive-buffer sizing grew by
+`RCP_UDP_ANNEX_J_SEQ_LEN` (4) to account for the extra framing; a
+datagram that arrives shorter than that field itself is dropped and
+polling continues, the same "nothing left in the kernel's own receive
+queue to retry against" reasoning `udp.c` already used for an oversized
+datagram.
+
+**New native-Ethernet (L2) transport.** New `include/rcp/l2.h` +
+`src/l2.c`, structurally parallel to `udp.h`/`udp.c`: another
+`rcp_avtp_transport_t` implementation (`l2_avtp_vtable`), with the same
+poll-rather-than-block `recv()` and "flag-then-real-teardown"
+`close()`/`destroy()` split `udp.c` already established. Wire frame:
+destination MAC (6 octets) + source MAC (6 octets) + EtherType `0x22F0`
+(2 octets, big-endian) + the AVTPDU bytes directly -- deliberately no
+Annex J encapsulation sequence number, which the UDP-only framing above
+does not carry over onto this carrier. `rcp_l2_frame_encode()`/`_decode()`
+are the pure, socket-free codec for that frame, unit-tested (`tests/
+test_l2.c`) with no socket, no privilege, and no Linux requirement, same
+as the new UDP codec functions above. The transport itself
+(`rcp_l2_avtp_transport_new()`) is Linux-only (`AF_PACKET`/`SOCK_RAW`,
+needs `CAP_NET_RAW` or root, documented plainly in `l2.h`'s own doc
+comment): it opens a raw socket bound to a caller-named interface (e.g.
+`"eth0"`), reads that interface's own hardware address via the
+`SIOCGIFHWADDR` ioctl to use as the source MAC on every frame it sends
+(never caller-supplied -- spoofing a different device's address by
+accident is not a decision this module makes for a caller), and targets
+a caller-supplied destination MAC (unicast or multicast -- deriving/
+allocating a multicast MAC from a stream_id is the base IEEE 1722
+standard's own algorithm, not implemented here, per this milestone's
+explicit scope). `recv()` filters out `PACKET_OUTGOING` frames (a raw
+socket, by default, loops a copy of its own transmitted frames back into
+its own receive queue) so a transport never mistakes its own just-sent
+frame for a reply from its peer. Every non-Linux build gets the same
+fail-cleanly stub (`l2_stub_vtable`) `udp.c`'s own Windows stub already
+established: `ok()` reports false, `send()`/`recv()` return
+`RCP_ERR_CLOSED`, nothing crashes.
+
+**Testing.** `tests/test_l2.c` (8 cases) covers the frame codec plus
+graceful construction-time failure, unprivileged, on every platform.
+`tests/test_udp.c` gained 7 cases for the encapsulation codec, monotonic
+send-sequence observability via `last_recv_seq()`, and the new default-
+port wrappers -- the existing UDP round-trip tests needed no changes at
+all, since `send()`/`recv()` apply/strip the new framing transparently.
+A new, deliberately-not-`ctest`-wired `tests/l2_veth_roundtrip.c` program
+moves real AVTPDUs across two real `rcp_l2_avtp_transport_t` instances
+bound to opposite ends of a real `veth` pair over real `AF_PACKET`
+sockets, asserting byte-for-byte equality in both directions and
+exercising `close()`-unblocks-a-concurrent-`recv()` for real -- neither
+of which an unprivileged, cross-platform unit test can itself do. New
+`ci.yml` job `l2-transport-veth` (`sudo ip link add veth0 type veth peer
+name veth1`, elevated privileges, Linux-only, matching this project's
+existing per-concern job-splitting style) builds and runs it. Full local
+`ctest` suite 58/58 passing (57 prior + `rcp_l2`), clean under a manual
+`-fsanitize=address,undefined` run of the same suite; the veth job itself
+was not runnable in this development environment (no Linux host with
+`CAP_NET_RAW` available locally) and is instead verified by CI on push.
+
+New `REQ-UDP-015`..`019` (encapsulation codec, `send()`/`recv()`
+integration, default-port wrappers) and `REQ-L2-001`..`010` (frame codec,
+transport construction/`ok()`/`local_mac()`, `send()`/`recv()`/`close()`,
+the non-Linux stub, and the missing-privilege path) added to
+`.fusa-reqs.json`, each with a 1:1 `//cfusa:req`/`//cfusa:test` tag pair
+hand-verified before pushing (no local `cfusa` toolchain in this
+environment, the same note every prior milestone has made).

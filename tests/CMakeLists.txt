@@ -173,6 +173,21 @@ target_compile_options(test_udp PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_udp COMMAND test_udp)
 set_tests_properties(rcp_udp PROPERTIES TIMEOUT 30)
 
+add_executable(test_l2 test_l2.c)
+target_link_libraries(test_l2 PRIVATE rcp::rcp unity)
+target_compile_options(test_l2 PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_l2 COMMAND test_l2)
+
+# l2_veth_roundtrip is a real-socket, real-privilege verification program,
+# deliberately NOT wired into ctest (see its own file header): it needs
+# CAP_NET_RAW/root and a pre-existing veth0/veth1 pair, neither of which
+# every ctest environment has. Built here so it's compiled by every CI
+# matrix leg (catching any compile regression immediately); only actually
+# *run* by ci.yml's own dedicated, privileged "L2 transport (veth)" job.
+add_executable(l2_veth_roundtrip l2_veth_roundtrip.c)
+target_link_libraries(l2_veth_roundtrip PRIVATE rcp::rcp)
+target_compile_options(l2_veth_roundtrip PRIVATE ${RCP_TEST_WARNING_FLAGS})
+
 add_executable(test_mdns test_mdns.c)
 target_link_libraries(test_mdns PRIVATE rcp::rcp unity)
 target_compile_options(test_mdns PRIVATE ${RCP_TEST_WARNING_FLAGS})
