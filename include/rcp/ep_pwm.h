@@ -53,6 +53,16 @@
 //cfusa:req REQ-PWM-052
 //cfusa:req REQ-PWM-053
 //cfusa:req REQ-PWM-054
+
+/* TC18 requirements-corpus completeness pass (v0.105.0): the ids below
+ * are catalogued in .fusa-reqs.json with a "tc18" citation and a
+ * "status" of "implemented", "partial" or "not-implemented". The
+ * not-implemented and partial ones describe normative TC18 behaviour
+ * this module does NOT provide; their tests pin the deviation. */
+//cfusa:req REQ-PWM-055
+//cfusa:req REQ-PWM-056
+//cfusa:req REQ-PWM-057
+//cfusa:req REQ-PWM-058
 /*
  * ep_pwm.h -- PWM_OUT + PWM_IN endpoints for the TC18 Remote Control
  * Protocol wire layer (ROADMAP.md Phase 16, "Basic Endpoints", milestone

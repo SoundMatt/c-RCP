@@ -1,0 +1,795 @@
+/* SPDX-License-Identifier: MPL-2.0 */
+//cfusa:test REQ-ADC-031
+//cfusa:test REQ-ADC-032
+//cfusa:test REQ-ADC-033
+//cfusa:test REQ-ADC-034
+//cfusa:test REQ-ADC-035
+//cfusa:test REQ-ADC-036
+//cfusa:test REQ-CANEP-028
+//cfusa:test REQ-CANEP-029
+//cfusa:test REQ-CANEP-030
+//cfusa:test REQ-CANEP-031
+//cfusa:test REQ-CANEP-032
+//cfusa:test REQ-ISELED-025
+//cfusa:test REQ-ISELED-026
+//cfusa:test REQ-ISELED-027
+//cfusa:test REQ-ISELED-028
+//cfusa:test REQ-LINEP-023
+//cfusa:test REQ-LINEP-024
+//cfusa:test REQ-MDIO-020
+//cfusa:test REQ-MDIO-021
+//cfusa:test REQ-MDIO-022
+//cfusa:test REQ-UART-032
+//cfusa:test REQ-UART-033
+//cfusa:test REQ-UART-034
+//cfusa:test REQ-UART-035
+//cfusa:test REQ-UART-036
+//cfusa:test REQ-UART-037
+
+/*
+ * test_tc18_gaps_ep2.c -- spec-literal conformance-and-deviation suite for
+ * the TC18 clauses catalogued in the v0.105.0 requirements-corpus
+ * completeness pass covering the UART (§13.7.8), ADC (§13.7.9), LIN
+ * (§13.7.10), CAN (§13.7.11), ISELED (§13.7.12) and MDIO (§13.7.13)
+ * endpoint types.
+ *
+ * Two kinds of test live here, and they are deliberately not mixed up:
+ *
+ *   - For a requirement whose catalogued status is "implemented", the test
+ *     asserts the specified behaviour literally, against constants derived
+ *     from the cited clause (e.g. the CAN FrameFormat code assignment of
+ *     Table 54, the ADC half-the-read_size value-count rule) rather than
+ *     round-tripping the implementation against itself.
+ *
+ *   - For a requirement whose status is "partial" or "not-implemented",
+ *     the test PINS THE DEVIATION: it asserts the current, real, observable
+ *     behaviour of this codebase, and the comment above each such assertion
+ *     names the TC18 clause that is NOT met and what a conforming
+ *     implementation would do instead. These tests are expected to be
+ *     CHANGED, not merely extended, if and when the gap is closed.
+ *
+ * A recurring deviation-pinning technique below is the writable-footprint
+ * count: every rcp_ep_*_functional_cfg_init() memsets its whole struct, so
+ * a byte-for-byte snapshot taken after init and compared after driving
+ * every mutator the module offers (with values whose every octet is
+ * non-zero) yields exactly the number of octets any client can ever reach
+ * through this endpoint's functional-configuration surface. That count is
+ * the direct, portable evidence that a register row the cited table fixes
+ * -- an *_ep_len, an *_ep_status, a base clock, a divider -- has no
+ * representation here at all.
+ */
+#include "unity.h"
+
+#include <rcp/acf.h>
+#include <rcp/ep_adc.h>
+#include <rcp/ep_can.h>
+#include <rcp/ep_iseled.h>
+#include <rcp/ep_lin.h>
+#include <rcp/ep_mdio.h>
+#include <rcp/ep_pwm.h>
+#include <rcp/ep_uart.h>
+#include <rcp/lifecycle.h>
+#include <rcp/rcp.h>
+#include <rcp/regmap.h>
+
+#include <stddef.h>
+#include <string.h>
+
+void setUp(void) {}
+void tearDown(void) {}
+
+/* ── Shared helpers ────────────────────────────────────────────────────────── */
+
+/* Number of octets that differ between two same-length raw views of a
+ * functional-config block -- see the file header's writable-footprint note. */
+static size_t changed_octets(const uint8_t *before, const uint8_t *after, size_t n)
+{
+    size_t i;
+    size_t changed = 0u;
+
+    for (i = 0u; i < n; i++) {
+        if (before[i] != after[i]) changed++;
+    }
+    return changed;
+}
+
+/* An authorized functional-config writer in a state that permits the write
+ * (RCP_LIFECYCLE_HW_CONFIGURED accepts any writer -- lifecycle.h). */
+static rcp_lifecycle_writer_ctx_t any_writer(void)
+{
+    rcp_lifecycle_writer_ctx_t w = {0};
+
+    return w;
+}
+
+/* ── UART (§13.7.8) ────────────────────────────────────────────────────────── */
+
+static void test_uart_functional_block_has_no_len_or_status_register(void)
+{
+    rcp_ep_uart_functional_cfg_t cfg;
+    uint8_t                      before[sizeof(rcp_ep_uart_functional_cfg_t)];
+    rcp_lifecycle_writer_ctx_t   w = any_writer();
+
+    TEST_ASSERT_EQUAL_size_t(1u, sizeof(bool)); /* footprint counting precondition */
+    rcp_ep_uart_functional_cfg_init(&cfg);
+    memcpy(before, &cfg, sizeof(before));
+
+    TEST_ASSERT_TRUE(rcp_ep_uart_set_baud_rate(&cfg, 0x11223344u,
+                                               RCP_LIFECYCLE_HW_CONFIGURED, w));
+    TEST_ASSERT_TRUE(rcp_ep_uart_set_frame_format(&cfg, 7u, RCP_EP_UART_PARITY_EVEN,
+                                                  RCP_EP_UART_STOP_BITS_TWO,
+                                                  RCP_LIFECYCLE_HW_CONFIGURED, w));
+    TEST_ASSERT_TRUE(rcp_ep_uart_set_rx_buffer_size(&cfg, 0x99AAu,
+                                                    RCP_LIFECYCLE_HW_CONFIGURED, w));
+    TEST_ASSERT_TRUE(rcp_ep_uart_set_timeout(&cfg, 0x55667788u,
+                                             RCP_LIFECYCLE_HW_CONFIGURED, w));
+
+    /* DEVIATION -- TC18 §13.7.8.2 Table 48 fixes uart_ep_len at relative
+     * address 0x0000 (8 bit, R), a reserved octet at 0x0001 (reads 0x00)
+     * and uart_ep_status at 0x0004 (16 bit, R/W). A conforming endpoint
+     * would serialize this block at those addresses. c-RCP's block is a
+     * plain C struct with no serializer: relative address 0x0000 holds the
+     * shared common flags, and the entire endpoint-specific surface any
+     * client can reach is 13 octets -- baud_rate(4) + uart_nr_bits(1) +
+     * parity(1) + stop_bits(1) + ep_rx_buffer_size(2) + uart_timeout_ms(4)
+     * -- with no length and no status register among them. */
+    TEST_ASSERT_EQUAL_size_t(0u, offsetof(rcp_ep_uart_functional_cfg_t, common));
+    TEST_ASSERT_EQUAL_size_t(13u, changed_octets(before, (const uint8_t *)&cfg,
+                                                 sizeof(before)));
+}
+
+static void test_uart_rx_fifo_size_bounds_nothing_at_all(void)
+{
+    rcp_ep_uart_functional_cfg_t cfg;
+    rcp_lifecycle_writer_ctx_t   w = any_writer();
+    uint8_t                      rx[16];
+    const uint8_t               *out_rx = NULL;
+    size_t                       out_len = 0u;
+    bool                         timed = true;
+    uint64_t                     ts = 1u;
+    uint8_t                      tn = 0u;
+    rcp_bytes_t                  f;
+
+    rcp_ep_uart_functional_cfg_init(&cfg);
+    TEST_ASSERT_TRUE(rcp_ep_uart_set_rx_buffer_size(&cfg, 4u, RCP_LIFECYCLE_HW_CONFIGURED, w));
+    memset(rx, 0xA5, sizeof(rx));
+
+    /* DEVIATION -- TC18 §13.7.8.1 requires a read response to be emitted
+     * when read_size is satisfied, when uart_timeout expires, or when the
+     * fifo-rx-buffer fills (fragmenting in the last case), and requires an
+     * RX FIFO overflow to be flagged in uart_ep_status. c-RCP arbitrates
+     * none of that: a response four times the configured FIFO size encodes
+     * happily, in exactly one unfragmented frame, with no overflow signal
+     * on any surface -- ep_rx_buffer_size is inert. */
+    f = rcp_ep_uart_encode_read_response(0x11u, rx, sizeof(rx), 3u, false, 0u);
+    TEST_ASSERT_NOT_NULL(f.data);
+    TEST_ASSERT_EQUAL_size_t(1u, rcp_ep_uart_read_response_fragment_count(sizeof(rx), 64u));
+    TEST_ASSERT_EQUAL_INT(RCP_EP_UART_OK,
+                          rcp_ep_uart_decode_read_response(f.data, f.len, 0x11u, &out_rx,
+                                                           &out_len, &timed, &ts, &tn));
+    TEST_ASSERT_EQUAL_size_t(sizeof(rx), out_len);
+    TEST_ASSERT_GREATER_THAN_UINT16(cfg.ep_rx_buffer_size, (uint16_t)out_len);
+    rcp_bytes_free(&f);
+}
+
+static void test_uart_compound_wait_has_no_fifo_bounded_predicate(void)
+{
+    rcp_ep_uart_functional_cfg_t cfg;
+    rcp_lifecycle_writer_ctx_t   w = any_writer();
+    const uint8_t                expected[8] = {1, 2, 3, 4, 5, 6, 7, 8};
+    const uint8_t                fifo[8]     = {1, 2, 3, 4, 5, 6, 7, 8};
+
+    rcp_ep_uart_functional_cfg_init(&cfg);
+    TEST_ASSERT_TRUE(rcp_ep_uart_set_rx_buffer_size(&cfg, 4u, RCP_LIFECYCLE_HW_CONFIGURED, w));
+
+    /* DEVIATION -- TC18 §13.7.8.1 requires a compound wait on a UART
+     * endpoint to compare the request's expected data against the
+     * fifo-rx-buffer, with the compared length bounded above by
+     * uart_rx_fifo_size. c-RCP exposes no UART comparison predicate at all
+     * (contrast ep_lin.h's rcp_ep_lin_compare_fires()), so the only
+     * predicate a caller can reach is LIN's, which knows nothing of this
+     * endpoint: it matches an 8-octet expectation against an 8-octet
+     * capture even though the endpoint's own FIFO holds 4, a match a
+     * conforming implementation would have to refuse. */
+    TEST_ASSERT_EQUAL_UINT16(4u, cfg.ep_rx_buffer_size);
+    TEST_ASSERT_TRUE(rcp_ep_lin_compare_fires(RCP_EP_LIN_COMPARE_EXACT, expected,
+                                              sizeof(expected), fifo, sizeof(fifo)));
+}
+
+static void test_uart_read_size_truncates_above_one_octet(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 f;
+    uint8_t                     read_size = 0xFFu;
+    uint8_t                     tn        = 0u;
+
+    hdr.byte_bus_id              = 0x21u;
+    hdr.op                       = RCP_ACF_OP_READ;
+    hdr.transaction_num          = 9u;
+    hdr.read_size_or_segment_num = 1024u; /* well within acf.h's 12-bit field */
+
+    f = rcp_acf_encode_abb(&hdr, NULL, 0u);
+    TEST_ASSERT_NOT_NULL(f.data);
+
+    /* DEVIATION -- TC18 §13.7.8.1 contemplates a read_size larger than the
+     * RX FIFO (driving a fragmented response), and acf.h's
+     * read_size_or_segment_num is the wire's full 12-bit field (0..4095).
+     * c-RCP's UART read codec narrows read_size to one octet, so a
+     * conforming peer's request for 1024 octets is surfaced here as 0 --
+     * silently truncated, not rejected. A conforming implementation would
+     * report 1024. */
+    TEST_ASSERT_EQUAL_INT(RCP_EP_UART_OK,
+                          rcp_ep_uart_decode_read_request(f.data, f.len, 0x21u,
+                                                          &read_size, &tn));
+    TEST_ASSERT_EQUAL_UINT8(0u, read_size);
+    TEST_ASSERT_EQUAL_UINT8(9u, tn);
+    rcp_bytes_free(&f);
+}
+
+static void test_uart_register_units_diverge_from_table_48(void)
+{
+    rcp_ep_uart_functional_cfg_t cfg;
+    rcp_lifecycle_writer_ctx_t   w = any_writer();
+
+    rcp_ep_uart_functional_cfg_init(&cfg);
+
+    /* DEVIATION -- TC18 §13.7.8.2 Table 48 makes uart_baud_rate a 16-bit
+     * R/W register in kbit/s. c-RCP stores a raw uint32_t that holds a
+     * value no 16-bit kbit/s register could represent, so the two disagree
+     * numerically on this register. */
+    TEST_ASSERT_TRUE(rcp_ep_uart_set_baud_rate(&cfg, 115200u, RCP_LIFECYCLE_HW_CONFIGURED, w));
+    TEST_ASSERT_EQUAL_UINT32(115200u, cfg.baud_rate);
+    TEST_ASSERT_GREATER_THAN_UINT32(65535u, cfg.baud_rate);
+
+    /* DEVIATION -- Table 48 counts uart_stop_bits in HALF stop bits, so 1.5
+     * stop bits is the legal value 3. c-RCP's enum has exactly two members,
+     * 0 and 1, meaning one and two whole stop bits; 3 passes the setter
+     * unvalidated and is stored, but names no framing this module defines,
+     * so 1.5-stop-bit framing is inexpressible. */
+    TEST_ASSERT_EQUAL_INT(0, (int)RCP_EP_UART_STOP_BITS_ONE);
+    TEST_ASSERT_EQUAL_INT(1, (int)RCP_EP_UART_STOP_BITS_TWO);
+    TEST_ASSERT_TRUE(rcp_ep_uart_set_frame_format(&cfg, 8u, RCP_EP_UART_PARITY_NONE,
+                                                  (rcp_ep_uart_stop_bits_t)3,
+                                                  RCP_LIFECYCLE_HW_CONFIGURED, w));
+    TEST_ASSERT_EQUAL_UINT8(3u, cfg.stop_bits);
+
+    /* DEVIATION -- Table 48 expresses uart_timeout as an 8-bit count of BIT
+     * TIMES measured from the last received stop bit. c-RCP stores a 32-bit
+     * millisecond value with no measurement origin, unrelated to the baud
+     * rate: changing the baud rate leaves the stored timeout untouched,
+     * where a bit-time register's real duration would move with it. */
+    TEST_ASSERT_TRUE(rcp_ep_uart_set_timeout(&cfg, 250u, RCP_LIFECYCLE_HW_CONFIGURED, w));
+    TEST_ASSERT_TRUE(rcp_ep_uart_set_baud_rate(&cfg, 9600u, RCP_LIFECYCLE_HW_CONFIGURED, w));
+    TEST_ASSERT_EQUAL_UINT32(250u, cfg.uart_timeout_ms);
+}
+
+/* ── ADC (§13.7.9) ─────────────────────────────────────────────────────────── */
+
+static void test_adc_value_width_and_absent_analog_input_signal(void)
+{
+    /* IMPLEMENTED half of the clause -- TC18 §13.7.9.1 limits an ADC
+     * endpoint to 16-bit resolution, and a response carries as many values
+     * as half the request's read_size. */
+    TEST_ASSERT_EQUAL_size_t(2u, RCP_EP_ADC_VALUE_LEN);
+    TEST_ASSERT_EQUAL_size_t(4u, rcp_ep_adc_response_value_count(8u));
+    TEST_ASSERT_EQUAL_size_t(0u, rcp_ep_adc_response_value_count(9u));
+
+    /* DEVIATION -- TC18 §13.7.9.1 also requires that each ADC endpoint
+     * serve exactly one channel and have an analog input pin selected for
+     * it. regmap.h's named-signal index -- the only way any endpoint type
+     * binds a signal to a hardware pin -- ends at the I2C pair: there is no
+     * ADC analog-input signal, so an ADC endpoint cannot be bound to a
+     * physical input at all. A conforming implementation would define one
+     * and require a hw_pin_map entry for it. */
+    TEST_ASSERT_EQUAL_INT((int)RCP_REGMAP_SIGNAL_COUNT, (int)RCP_REGMAP_SIGNAL_I2C_SDA + 1);
+    TEST_ASSERT_EQUAL_STRING("unknown",
+                             rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_COUNT));
+}
+
+static void test_adc_block_has_no_clock_status_or_interval_registers(void)
+{
+    rcp_ep_adc_functional_cfg_t cfg;
+    uint8_t                     before[sizeof(rcp_ep_adc_functional_cfg_t)];
+    rcp_lifecycle_writer_ctx_t  w = any_writer();
+
+    TEST_ASSERT_EQUAL_size_t(1u, sizeof(bool)); /* footprint counting precondition */
+    rcp_ep_adc_functional_cfg_init(&cfg);
+    memcpy(before, &cfg, sizeof(before));
+
+    TEST_ASSERT_TRUE(rcp_ep_adc_set_samples_per_avg_interval(&cfg, 0x1122u,
+                                                             RCP_LIFECYCLE_HW_CONFIGURED, w));
+    TEST_ASSERT_TRUE(rcp_ep_adc_set_avg_intervals_per_request(&cfg, 0x3344u,
+                                                              RCP_LIFECYCLE_HW_CONFIGURED, w));
+    TEST_ASSERT_TRUE(rcp_ep_adc_set_combine_avg_values(&cfg, 0x55u,
+                                                       RCP_LIFECYCLE_HW_CONFIGURED, w));
+
+    /* DEVIATION -- TC18 §13.7.9.2 Table 51 fixes adc_ep_len at 0x0000
+     * (8 bit, R), a reserved octet at 0x0001, adc_base_clk at 0x0004
+     * (16 bit, R), adc_ep_status at 0x0006 (16 bit, R/W),
+     * adc_base_clk_divider at 0x0008 (8 bit, R/W) and adc_sample_interval
+     * at 0x0009 (8 bit, R/W). The whole endpoint-specific surface a client
+     * can reach here is 5 octets -- adc_samples_per_avg_interval(2) +
+     * adc_avg_intervals_per_request(2) + adc_combine_avg_values(1) -- so
+     * none of those six rows exists, and ADC_CLK cannot be derived. */
+    TEST_ASSERT_EQUAL_size_t(0u, offsetof(rcp_ep_adc_functional_cfg_t, common));
+    TEST_ASSERT_EQUAL_size_t(5u, changed_octets(before, (const uint8_t *)&cfg,
+                                                sizeof(before)));
+}
+
+static void test_adc_inter_sample_spacing_is_unconstrained(void)
+{
+    rcp_ep_adc_sample_t    even[3];
+    rcp_ep_adc_sample_t    ragged[3];
+    rcp_ep_adc_avg_value_t a;
+    rcp_ep_adc_avg_value_t b;
+    size_t                 i;
+
+    for (i = 0u; i < 3u; i++) {
+        even[i].value   = 100u;
+        ragged[i].value = 100u;
+    }
+    even[0].timestamp   = 0u;      /* a uniform 1000-tick cadence */
+    even[1].timestamp   = 1000u;
+    even[2].timestamp   = 2000u;
+    ragged[0].timestamp = 0u;      /* wildly non-uniform spacing */
+    ragged[1].timestamp = 5u;
+    ragged[2].timestamp = 2000u;
+
+    a = rcp_ep_adc_average_interval(even, 3u);
+    b = rcp_ep_adc_average_interval(ragged, 3u);
+
+    /* DEVIATION -- TC18 §13.7.9.1 requires successive samples to be exactly
+     * one adc_sample_interval apart, that interval being a multiple of
+     * adc_base_clk scaled by adc_base_clk_divider, whenever more than one
+     * sample is taken. c-RCP models no cadence whatever: the two intervals
+     * above have completely different sample spacing and are nevertheless
+     * indistinguishable at this module's only output, so nothing here can
+     * reject, or even notice, a stream that violates the interval. */
+    TEST_ASSERT_EQUAL_UINT16(100u, a.value);
+    TEST_ASSERT_EQUAL_UINT16(a.value, b.value);
+    TEST_ASSERT_EQUAL_UINT64(2000u, a.timestamp);
+    TEST_ASSERT_EQUAL_UINT64(a.timestamp, b.timestamp);
+}
+
+static void test_adc_has_no_trigger_outputs_and_no_retained_average(void)
+{
+    rcp_ep_adc_sample_t    crossing[2];
+    rcp_ep_adc_sample_t    flat[2];
+    rcp_ep_adc_avg_value_t crossed;
+    rcp_ep_adc_avg_value_t steady;
+    rcp_ep_adc_avg_value_t empty;
+
+    crossing[0].value = 100u; /* below a nominal adc_trigger_min of 150 */
+    crossing[1].value = 200u; /* and back above it -- two threshold crossings */
+    flat[0].value     = 150u; /* never crosses anything */
+    flat[1].value     = 150u;
+    crossing[0].timestamp = 10u;
+    crossing[1].timestamp = 20u;
+    flat[0].timestamp     = 10u;
+    flat[1].timestamp     = 20u;
+
+    crossed = rcp_ep_adc_average_interval(crossing, 2u);
+    steady  = rcp_ep_adc_average_interval(flat, 2u);
+    empty   = rcp_ep_adc_average_interval(NULL, 0u);
+
+    /* DEVIATION -- TC18 §13.7.9.1 Table 50 enumerates five ADC trigger
+     * outputs: falling below / rising above adc_trigger_min (0/1), falling
+     * below / rising above adc_trigger_max (2/3), and measurement-interval
+     * completion (4). c-RCP defines no trigger enum, no threshold registers
+     * and no evaluation predicate, so a sample stream that crosses a
+     * threshold twice is byte-for-byte indistinguishable from one that
+     * never moves. Trigger 4's absence is why the spec's own cyclic-ADC
+     * pattern -- a trigger request fired by the ADC finishing a measurement
+     * -- cannot be built on this implementation. */
+    TEST_ASSERT_EQUAL_UINT16(150u, crossed.value);
+    TEST_ASSERT_EQUAL_UINT16(crossed.value, steady.value);
+    TEST_ASSERT_EQUAL_UINT64(crossed.timestamp, steady.timestamp);
+
+    /* DEVIATION -- §13.7.9.1 also requires sampling only while a request
+     * executes, and requires a compound wait to compare against the LAST
+     * ACQUIRED average without sampling. This pipeline is stateless: with
+     * no samples it reports the no-signal sentinel rather than any retained
+     * previous average, so there is nothing for a compound wait to compare
+     * against and no request-execution state to gate sampling on. */
+    TEST_ASSERT_EQUAL_UINT16(RCP_EP_PWM_IN_NO_SIGNAL, empty.value);
+    TEST_ASSERT_EQUAL_UINT64(0u, rcp_ep_adc_capture_moment_timestamp(NULL, 0u));
+}
+
+/* ── LIN (§13.7.10) ────────────────────────────────────────────────────────── */
+
+static void test_lin_trigger_ignores_trailing_time_and_block_lacks_registers(void)
+{
+    rcp_ep_lin_functional_cfg_t cfg;
+    uint8_t                     before[sizeof(rcp_ep_lin_functional_cfg_t)];
+    rcp_lifecycle_writer_ctx_t  w = any_writer();
+
+    TEST_ASSERT_EQUAL_size_t(1u, sizeof(bool)); /* footprint counting precondition */
+    rcp_ep_lin_functional_cfg_init(&cfg);
+    memcpy(before, &cfg, sizeof(before));
+
+    TEST_ASSERT_TRUE(rcp_ep_lin_set_clk_divider(&cfg, 0x11223344u,
+                                                RCP_LIFECYCLE_HW_CONFIGURED, w));
+    TEST_ASSERT_TRUE(rcp_ep_lin_set_trigger(&cfg, RCP_EP_LIN_TRIGGER_TX_DONE,
+                                            RCP_LIFECYCLE_HW_CONFIGURED, w));
+
+    /* DEVIATION -- TC18 §13.7.10.1 requires the LIN transmission-done
+     * trigger to fire only once BOTH the transmission has been finalized
+     * AND the configured trailing time has expired. c-RCP's predicate takes
+     * the finalized event as its only argument -- there is no trailing-time
+     * parameter to pass and no trailing-time field to configure -- so it
+     * fires the instant transmission completes, and a repeated
+     * self-trigger produces back-to-back frames with no inter-frame gap. */
+    TEST_ASSERT_TRUE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_TX_DONE, true));
+    TEST_ASSERT_FALSE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_TX_DONE, false));
+    TEST_ASSERT_FALSE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_NONE, true));
+
+    /* DEVIATION -- TC18 §13.7.10.2 Table 52 fixes lin_ep_len at 0x0000
+     * (8 bit, R), a reserved octet at 0x0001, lin_base_clk at 0x0004
+     * (16 bit, R) and lin_ep_status at 0x0006 (16 bit, R/W) alongside
+     * lin_clk_divider at 0x0008. Only 5 octets are reachable here --
+     * lin_clk_divider(4) + trigger(1) -- so a client can write the bit-time
+     * divider but can read neither the base clock it divides nor status. */
+    TEST_ASSERT_EQUAL_size_t(0u, offsetof(rcp_ep_lin_functional_cfg_t, common));
+    TEST_ASSERT_EQUAL_size_t(5u, changed_octets(before, (const uint8_t *)&cfg,
+                                                sizeof(before)));
+}
+
+/* ── CAN (§13.7.11) ────────────────────────────────────────────────────────── */
+
+static void test_can_frame_format_values_match_table_54(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    const uint8_t               body[4] = {0, 0, 0, 1};
+    rcp_bytes_t                 f;
+    rcp_ep_can_frame_format_t   fmt = RCP_EP_CAN_FRAME_CBFF;
+    uint32_t                    id  = 0u;
+    rcp_ep_can_xl_header_t      xl  = {0};
+    const uint8_t              *data = NULL;
+    size_t                      data_len = 0u;
+    uint8_t                     tn = 0u;
+
+    /* IMPLEMENTED -- TC18 §13.7.11.3 Table 54 assigns the FrameFormat
+     * selector codes 0..5 in this exact order, leaving 6 and 7 reserved. */
+    TEST_ASSERT_EQUAL_INT(0, (int)RCP_EP_CAN_FRAME_CBFF);
+    TEST_ASSERT_EQUAL_INT(1, (int)RCP_EP_CAN_FRAME_CEFF);
+    TEST_ASSERT_EQUAL_INT(2, (int)RCP_EP_CAN_FRAME_FBFF);
+    TEST_ASSERT_EQUAL_INT(3, (int)RCP_EP_CAN_FRAME_FEFF);
+    TEST_ASSERT_EQUAL_INT(4, (int)RCP_EP_CAN_FRAME_XL_CLASSICAL_PL);
+    TEST_ASSERT_EQUAL_INT(5, (int)RCP_EP_CAN_FRAME_XL_NEW_PL);
+    TEST_ASSERT_TRUE(rcp_ep_can_frame_format_valid(5u));
+    TEST_ASSERT_FALSE(rcp_ep_can_frame_format_valid(6u));
+    TEST_ASSERT_FALSE(rcp_ep_can_frame_format_valid(7u));
+
+    /* The selector rides the low three bits of the ACF evt field, and a
+     * reserved code there is rejected by the frame decoder. */
+    hdr.byte_bus_id     = 0x31u;
+    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.evt             = 6u;
+    hdr.transaction_num = 2u;
+    f = rcp_acf_encode_abb(&hdr, body, sizeof(body));
+    TEST_ASSERT_NOT_NULL(f.data);
+    TEST_ASSERT_EQUAL_INT(RCP_EP_CAN_ERR_BAD_FRAME_FORMAT,
+                          rcp_ep_can_decode_frame_request(f.data, f.len, 0x31u, &fmt, &id,
+                                                          &xl, &data, &data_len, &tn));
+    rcp_bytes_free(&f);
+}
+
+static void test_can_base_identifier_is_right_aligned_and_data_only(void)
+{
+    const uint8_t               payload_in[2] = {0xDEu, 0xADu};
+    rcp_bytes_t                 f;
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t              *payload  = NULL;
+    size_t                      pay_len  = 0u;
+
+    /* IMPLEMENTED -- TC18 §13.7.11.3: an 11-bit CAN identifier is
+     * right-aligned in the CAN ID field. The identifier prefix is a fixed
+     * big-endian 4-octet field, so the widest base-format identifier
+     * (0x7FF) occupies only the low 11 bits and the top 21 bits read
+     * zero. */
+    f = rcp_ep_can_encode_frame_request(0x31u, RCP_EP_CAN_FRAME_CBFF, 0x7FFu, NULL,
+                                        payload_in, sizeof(payload_in), 4u);
+    TEST_ASSERT_NOT_NULL(f.data);
+    TEST_ASSERT_EQUAL_INT(RCP_ACF_OK, rcp_acf_decode_abb(f.data, f.len, &hdr, &payload,
+                                                         &pay_len));
+    TEST_ASSERT_EQUAL_size_t(4u + sizeof(payload_in), pay_len);
+    TEST_ASSERT_EQUAL_HEX8(0x00u, payload[0]);
+    TEST_ASSERT_EQUAL_HEX8(0x00u, payload[1]);
+    TEST_ASSERT_EQUAL_HEX8(0x07u, payload[2]);
+    TEST_ASSERT_EQUAL_HEX8(0xFFu, payload[3]);
+    rcp_bytes_free(&f);
+
+    /* No bit can escape that alignment: a base-format identifier above
+     * 0x7FF is refused outright, and only data frames exist -- there is no
+     * remote-frame flag, encoder or decode outcome anywhere in this
+     * module, so every frame it produces is a data frame. */
+    TEST_ASSERT_FALSE(rcp_ep_can_arbitration_id_valid(RCP_EP_CAN_FRAME_CBFF, 0x800u));
+    TEST_ASSERT_TRUE(rcp_ep_can_arbitration_id_valid(RCP_EP_CAN_FRAME_CEFF, 0x1FFFFFFFu));
+}
+
+static void test_can_block_lacks_registers_and_receive_filter_table(void)
+{
+    rcp_ep_can_functional_cfg_t cfg;
+    rcp_lifecycle_writer_ctx_t  w = any_writer();
+    rcp_ep_can_xl_filter_t      filt;
+
+    rcp_ep_can_functional_cfg_init(&cfg);
+    filt.id     = 0x123u;
+    filt.mask   = 0x7FFu;
+    filt.enable = true;
+    TEST_ASSERT_TRUE(rcp_ep_can_set_xl_filter(&cfg, 0u, filt, RCP_LIFECYCLE_HW_CONFIGURED, w));
+
+    /* DEVIATION -- TC18 §13.7.11.2 Table 53 fixes can_ep_len at 0x0000
+     * (8 bit, R), a reserved octet at 0x0001, can_base_clk at 0x0004
+     * (16 bit, R), can_ep_status at 0x0006 (16 bit, R/W), a 32-bit CAN EP
+     * status at 0x001C and a 32-bit FIFO status at 0x0020. c-RCP's block
+     * begins at relative address 0x0000 with the shared common flags and
+     * models none of those rows, so bus-off, error-passive and
+     * FIFO-overflow conditions are unobservable. */
+    TEST_ASSERT_EQUAL_size_t(0u, offsetof(rcp_ep_can_functional_cfg_t, common));
+
+    /* DEVIATION -- Table 53 defines TWO distinct 4-entry filter tables:
+     * acceptance filters 1..4 at 0x0024..0x0030 (CAN XL) and receive ID
+     * filters 1..4 at 0x0030..0x003C, the latter valid for ALL CAN
+     * variants. c-RCP has exactly one table, scoped to CAN XL, and it is
+     * the final member of the block -- nothing follows it -- so Classical
+     * CAN, CAN FD and CAN FD light traffic cannot be ID-filtered on
+     * reception at all. A conforming implementation would carry a second,
+     * independently writable receive-filter table. */
+    TEST_ASSERT_EQUAL_UINT8(4u, RCP_EP_CAN_XL_MAX_FILTERS);
+    TEST_ASSERT_TRUE(rcp_ep_can_xl_filter_index_valid(3u));
+    TEST_ASSERT_FALSE(rcp_ep_can_xl_filter_index_valid(4u));
+    TEST_ASSERT_EQUAL_UINT32(0x123u, cfg.xl_filters[0].id);
+    TEST_ASSERT_EQUAL_size_t(sizeof(cfg),
+                             offsetof(rcp_ep_can_functional_cfg_t, xl_filters)
+                                 + sizeof(cfg.xl_filters));
+}
+
+static void test_can_new_physical_layer_is_selected_per_frame(void)
+{
+    const uint8_t          data[2] = {0x5Au, 0xA5u};
+    rcp_ep_can_xl_header_t xl;
+    rcp_bytes_t            classical;
+    rcp_bytes_t            new_pl;
+
+    xl.sdt  = 0x11u;
+    xl.vcid = 0x22u;
+    xl.af   = 0x33445566u;
+
+    classical = rcp_ep_can_encode_frame_request(0x31u, RCP_EP_CAN_FRAME_XL_CLASSICAL_PL,
+                                                0x100u, &xl, data, sizeof(data), 7u);
+    new_pl    = rcp_ep_can_encode_frame_request(0x31u, RCP_EP_CAN_FRAME_XL_NEW_PL,
+                                                0x100u, &xl, data, sizeof(data), 7u);
+    TEST_ASSERT_NOT_NULL(classical.data);
+    TEST_ASSERT_NOT_NULL(new_pl.data);
+
+    /* DEVIATION -- TC18 §13.7.11.2 lists "usage of new PL (YES|NO) for CAN
+     * XL" among the CAN endpoint's FUNCTIONAL-CONFIGURATION settings, i.e.
+     * a per-endpoint, runtime-writable, readable-back choice. c-RCP makes
+     * it a per-FRAME choice instead: two otherwise identical requests
+     * differ in exactly one octet, the one carrying the frame-format
+     * selector, and no functional-config flag exists to constrain or read
+     * back which physical layer the endpoint is provisioned for -- so
+     * nothing can reject a frame whose XL variant contradicts the
+     * endpoint's actual physical layer. */
+    TEST_ASSERT_TRUE(rcp_ep_can_frame_format_is_xl(RCP_EP_CAN_FRAME_XL_CLASSICAL_PL));
+    TEST_ASSERT_TRUE(rcp_ep_can_frame_format_is_xl(RCP_EP_CAN_FRAME_XL_NEW_PL));
+    TEST_ASSERT_EQUAL_size_t(classical.len, new_pl.len);
+    TEST_ASSERT_EQUAL_size_t(1u, changed_octets(classical.data, new_pl.data, classical.len));
+
+    rcp_bytes_free(&classical);
+    rcp_bytes_free(&new_pl);
+}
+
+/* ── ISELED (§13.7.12) ─────────────────────────────────────────────────────── */
+
+static void test_iseled_response_has_no_read_size_ceiling(void)
+{
+    uint8_t                     rx[40];
+    rcp_bytes_t                 f;
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t              *payload = NULL;
+    size_t                      pay_len = 0u;
+    const uint8_t              *out_rx  = NULL;
+    size_t                      out_len = 0u;
+    bool                        timed   = true;
+    uint64_t                    ts      = 1u;
+    uint8_t                     tn      = 0u;
+
+    memset(rx, 0x3C, sizeof(rx));
+    f = rcp_ep_iseled_encode_response(0x41u, rx, sizeof(rx), 6u, false, 0u);
+    TEST_ASSERT_NOT_NULL(f.data);
+
+    /* DEVIATION -- TC18 §13.7.12.1 requires responses received from the
+     * ISELED network to be 5/4-bit decoded and aggregated into one OR MORE
+     * ACF messages, bounded by the read_size the originating read request
+     * carried. c-RCP's encoder takes an already-assembled buffer, never
+     * consults a read_size, enforces no ceiling and has no multi-message
+     * emission path: 40 octets go in, one ACF message comes out carrying
+     * all 40, and the encoded header's read_size field stays 0. A
+     * conforming implementation would clamp at read_size and split the
+     * remainder across further ACF messages. */
+    TEST_ASSERT_EQUAL_INT(RCP_ACF_OK,
+                          rcp_acf_decode_abb(f.data, f.len, &hdr, &payload, &pay_len));
+    TEST_ASSERT_EQUAL_size_t(sizeof(rx), pay_len);
+    TEST_ASSERT_EQUAL_UINT16(0u, hdr.read_size_or_segment_num);
+    TEST_ASSERT_EQUAL_INT(RCP_EP_ISELED_OK,
+                          rcp_ep_iseled_decode_response(f.data, f.len, 0x41u, &out_rx,
+                                                        &out_len, &timed, &ts, &tn));
+    TEST_ASSERT_EQUAL_size_t(sizeof(rx), out_len);
+    rcp_bytes_free(&f);
+}
+
+static void test_iseled_block_lacks_collect_resp_nr_leds_and_rcv_timeout(void)
+{
+    rcp_ep_iseled_functional_cfg_t cfg;
+    uint8_t                        before[sizeof(rcp_ep_iseled_functional_cfg_t)];
+    rcp_lifecycle_writer_ctx_t     w = any_writer();
+
+    TEST_ASSERT_EQUAL_size_t(1u, sizeof(bool)); /* footprint counting precondition */
+    rcp_ep_iseled_functional_cfg_init(&cfg);
+    memcpy(before, &cfg, sizeof(before));
+
+    TEST_ASSERT_TRUE(rcp_ep_iseled_set_bit_clk_divider(&cfg, 0x11223344u,
+                                                       RCP_LIFECYCLE_HW_CONFIGURED, w));
+    TEST_ASSERT_TRUE(rcp_ep_iseled_set_use_rcv_clk(&cfg, true, RCP_LIFECYCLE_HW_CONFIGURED, w));
+    TEST_ASSERT_TRUE(rcp_ep_iseled_set_crc_enable(&cfg, true, RCP_LIFECYCLE_HW_CONFIGURED, w));
+    TEST_ASSERT_TRUE(rcp_ep_iseled_set_trigger(&cfg, RCP_EP_ISELED_TRIGGER_TX_COMPLETE,
+                                               RCP_LIFECYCLE_HW_CONFIGURED, w));
+
+    /* DEVIATION -- TC18 §13.7.12.2 Table 55 fixes iseled_collect_resp at
+     * 0x0007 bit 3 (1 bit, R/W -- the multi-response-per-ACF collection
+     * enable), iseled_nr_leds at 0x0008 (16 bit, R/W -- the chain length
+     * bounding how many responses a read expects) and iseled_rcv_timeout at
+     * 0x000A (16 bit, R/W -- the ISELED-clock-tic receive timeout after
+     * which reception ends and the endpoint returns to IDLE). The whole
+     * reachable surface here is 7 octets -- iseled_bit_clk_divider(4) +
+     * iseled_use_rcv_clk(1) + iseled_crc_enable(1) + trigger(1) -- so an
+     * ISELED read has no completion bound in either the count dimension or
+     * the time dimension, and §13.7.12.1's aggregation has no on/off
+     * control. */
+    TEST_ASSERT_EQUAL_size_t(0u, offsetof(rcp_ep_iseled_functional_cfg_t, common));
+    TEST_ASSERT_EQUAL_size_t(7u, changed_octets(before, (const uint8_t *)&cfg,
+                                                sizeof(before)));
+}
+
+static void test_iseled_requires_isp_n_polarity_is_inverted(void)
+{
+    /* DEVIATION (BUG) -- TC18 §13.7.12.2: iseled_use_rcv_clk selects the
+     * clock provided by the first ISELED device instead of the Freq_Sync
+     * pattern, and that device-provided clock arrives on ISP_N; the spec
+     * states it is only when Freq_Sync is used that ISP_N need not be
+     * connected to a physical pin. So ISP_N is required if and only if
+     * iseled_use_rcv_clk is TRUE. c-RCP returns the exact opposite, as
+     * asserted below: pin-mapping validation built on this predicate will
+     * accept a recovered-clock endpoint with no ISP_N pin bound, leaving
+     * the receiver with no clock source. A conforming implementation would
+     * return true for true and false for false. */
+    TEST_ASSERT_FALSE(rcp_ep_iseled_requires_isp_n(true));
+    TEST_ASSERT_TRUE(rcp_ep_iseled_requires_isp_n(false));
+}
+
+/* ── MDIO (§13.7.13) ───────────────────────────────────────────────────────── */
+
+static void test_mdio_block_is_exactly_the_common_prefix(void)
+{
+    rcp_ep_mdio_functional_cfg_t cfg;
+    rcp_lifecycle_writer_ctx_t   w = any_writer();
+
+    rcp_ep_mdio_functional_cfg_init(&cfg);
+
+    /* IMPLEMENTED half -- TC18 §13.7.13.2: "The MDIO EP does not have any
+     * configurable parameters", and this block indeed adds nothing beyond
+     * the shared common prefix.
+     *
+     * DEVIATION -- Table 56 nevertheless fixes three rows this block does
+     * not model: mdio_ep_len at 0x0000 (8 bit, R), a reserved octet at
+     * 0x0001 reading 0x00, and a 16-bit R/W mdio_ep_status. The block is
+     * byte-for-byte the common prefix and nothing else, so it is not
+     * enumerable at the addresses Table 56 fixes and its status register is
+     * unreadable. */
+    TEST_ASSERT_EQUAL_size_t(sizeof(rcp_regmap_ep_functional_cfg_t),
+                             sizeof(rcp_ep_mdio_functional_cfg_t));
+    TEST_ASSERT_EQUAL_size_t(0u, offsetof(rcp_ep_mdio_functional_cfg_t, common));
+    TEST_ASSERT_FALSE(cfg.common.ep_enable);
+    TEST_ASSERT_TRUE(rcp_ep_mdio_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, w));
+}
+
+static void test_mdio_request_prefix_carries_no_two_bit_mode_field(void)
+{
+    rcp_ep_mdio_addr_t          addr;
+    rcp_bytes_t                 f;
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t              *payload = NULL;
+    size_t                      pay_len = 0u;
+
+    addr.clause = RCP_EP_MDIO_CLAUSE_45;
+    addr.prtad  = 0x1Fu;
+    addr.devad  = 0x0Au;
+    addr.regad  = 0xBEEFu;
+
+    f = rcp_ep_mdio_encode_read_request(0x51u, addr, 3u, 8u);
+    TEST_ASSERT_NOT_NULL(f.data);
+    TEST_ASSERT_EQUAL_INT(RCP_ACF_OK,
+                          rcp_acf_decode_abb(f.data, f.len, &hdr, &payload, &pay_len));
+
+    /* DEVIATION -- TC18 §13.7.13.3 Figure 42 lays a request payload out as
+     * reserved bits, a 2-BIT mdio_mode field, then mdio_address and
+     * mdio_payload, where Table 57 gives mdio_mode four meanings (MMD
+     * single-word, MMD multiple-byte, MMS single-word 10b, MMS multiple
+     * (double) word 11b). c-RCP's payload is instead a 7-octet prefix: a
+     * whole-octet clause selector, prtad, devad, big-endian regad, then a
+     * big-endian word_count. There is no mdio_mode field and no
+     * single-access/multiple-access distinction -- burst behaviour rides
+     * word_count instead -- so these requests are not wire-compatible with
+     * a conforming peer. */
+    TEST_ASSERT_EQUAL_size_t(7u, pay_len);
+    TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_EP_MDIO_CLAUSE_45, payload[0]);
+    TEST_ASSERT_EQUAL_HEX8(0x1Fu, payload[1]);
+    TEST_ASSERT_EQUAL_HEX8(0x0Au, payload[2]);
+    TEST_ASSERT_EQUAL_HEX8(0xBEu, payload[3]);
+    TEST_ASSERT_EQUAL_HEX8(0xEFu, payload[4]);
+    TEST_ASSERT_EQUAL_HEX8(0x00u, payload[5]);
+    TEST_ASSERT_EQUAL_HEX8(0x03u, payload[6]);
+    rcp_bytes_free(&f);
+}
+
+static void test_mdio_data_fields_are_unconditionally_sixteen_bit(void)
+{
+    /* One 32-bit MMS0 register value, big-endian, as a conforming peer
+     * would place it in an MMS0 data field. */
+    const uint8_t mms0_word[4] = {0x12u, 0x34u, 0x56u, 0x78u};
+    uint8_t       out[2];
+    size_t        word_count = 0u;
+
+    rcp_ep_mdio_word_encode(0xBEEFu, out);
+    TEST_ASSERT_EQUAL_HEX8(0xBEu, out[0]);
+    TEST_ASSERT_EQUAL_HEX8(0xEFu, out[1]);
+
+    /* DEVIATION -- TC18 §13.7.13.3 Table 57 requires 16-bit data fields for
+     * MMD accesses and for MMS other than 0 and 1, but 32-BIT data fields
+     * for MMS0 and MMS1. c-RCP's word codec is unconditionally 16-bit and
+     * consults no access mode: a single 32-bit MMS0 value is counted as two
+     * words and misparsed as two unrelated 16-bit halves, and the pack
+     * length is word_count * 2 where an MMS0/MMS1 access needs
+     * word_count * 4. */
+    TEST_ASSERT_TRUE(rcp_ep_mdio_word_count_of(sizeof(mms0_word), &word_count));
+    TEST_ASSERT_EQUAL_size_t(2u, word_count);
+    TEST_ASSERT_EQUAL_HEX16(0x1234u, rcp_ep_mdio_unpack_word_at(mms0_word, 0u));
+    TEST_ASSERT_EQUAL_HEX16(0x5678u, rcp_ep_mdio_unpack_word_at(mms0_word, 1u));
+    TEST_ASSERT_EQUAL_size_t(6u, rcp_ep_mdio_pack_len(3u));
+    TEST_ASSERT_NOT_EQUAL_size_t(12u, rcp_ep_mdio_pack_len(3u));
+}
+
+int main(void)
+{
+    UNITY_BEGIN();
+
+    RUN_TEST(test_uart_functional_block_has_no_len_or_status_register);
+    RUN_TEST(test_uart_rx_fifo_size_bounds_nothing_at_all);
+    RUN_TEST(test_uart_compound_wait_has_no_fifo_bounded_predicate);
+    RUN_TEST(test_uart_read_size_truncates_above_one_octet);
+    RUN_TEST(test_uart_register_units_diverge_from_table_48);
+
+    RUN_TEST(test_adc_value_width_and_absent_analog_input_signal);
+    RUN_TEST(test_adc_block_has_no_clock_status_or_interval_registers);
+    RUN_TEST(test_adc_inter_sample_spacing_is_unconstrained);
+    RUN_TEST(test_adc_has_no_trigger_outputs_and_no_retained_average);
+
+    RUN_TEST(test_lin_trigger_ignores_trailing_time_and_block_lacks_registers);
+
+    RUN_TEST(test_can_frame_format_values_match_table_54);
+    RUN_TEST(test_can_base_identifier_is_right_aligned_and_data_only);
+    RUN_TEST(test_can_block_lacks_registers_and_receive_filter_table);
+    RUN_TEST(test_can_new_physical_layer_is_selected_per_frame);
+
+    RUN_TEST(test_iseled_response_has_no_read_size_ceiling);
+    RUN_TEST(test_iseled_block_lacks_collect_resp_nr_leds_and_rcv_timeout);
+    RUN_TEST(test_iseled_requires_isp_n_polarity_is_inverted);
+
+    RUN_TEST(test_mdio_block_is_exactly_the_common_prefix);
+    RUN_TEST(test_mdio_request_prefix_carries_no_two_bit_mode_field);
+    RUN_TEST(test_mdio_data_fields_are_unconditionally_sixteen_bit);
+
+    return UNITY_END();
+}

@@ -18,6 +18,15 @@
 //cfusa:req REQ-MDIO-017
 //cfusa:req REQ-MDIO-018
 //cfusa:req REQ-MDIO-019
+
+/* TC18 requirements-corpus completeness pass (v0.105.0): the ids below
+ * are catalogued in .fusa-reqs.json with a "tc18" citation and a
+ * "status" of "implemented", "partial" or "not-implemented". The
+ * not-implemented and partial ones describe normative TC18 behaviour
+ * this module does NOT provide; their tests pin the deviation. */
+//cfusa:req REQ-MDIO-020
+//cfusa:req REQ-MDIO-021
+//cfusa:req REQ-MDIO-022
 /*
  * ep_mdio.h -- MDIO management endpoint for the TC18 Remote Control
  * Protocol wire layer (ROADMAP.md Phase 19, "Remaining Endpoint Types",

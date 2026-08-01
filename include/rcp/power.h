@@ -12,6 +12,27 @@
 //cfusa:req REQ-PWRMODE-011
 //cfusa:req REQ-PWRMODE-012
 //cfusa:req REQ-PWRMODE-013
+
+/* TC18 requirements-corpus completeness pass (v0.105.0): the ids below
+ * are catalogued in .fusa-reqs.json with a "tc18" citation and a
+ * "status" of "implemented", "partial" or "not-implemented". The
+ * not-implemented and partial ones describe normative TC18 behaviour
+ * this module does NOT provide; their tests pin the deviation. */
+//cfusa:req REQ-PWRMODE-014
+//cfusa:req REQ-PWRMODE-015
+//cfusa:req REQ-PWRMODE-016
+//cfusa:req REQ-PWRMODE-017
+//cfusa:req REQ-PWRMODE-018
+//cfusa:req REQ-PWRMODE-019
+//cfusa:req REQ-PWRMODE-020
+//cfusa:req REQ-PWRMODE-021
+//cfusa:req REQ-PWRMODE-022
+//cfusa:req REQ-PWRMODE-023
+//cfusa:req REQ-PWRMODE-024
+//cfusa:req REQ-PWRMODE-025
+//cfusa:req REQ-PWRMODE-026
+//cfusa:req REQ-PWRMODE-027
+//cfusa:req REQ-PWRMODE-028
 /*
  * power.h -- RC Server power-mode state machine for the TC18 Remote
  * Control Protocol wire layer (ROADMAP.md Phase 19, "Remaining Endpoint

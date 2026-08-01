@@ -26,6 +26,27 @@
 //cfusa:req REQ-E2E-025
 //cfusa:req REQ-E2E-026
 //cfusa:req REQ-E2E-027
+
+/* TC18 requirements-corpus completeness pass (v0.105.0): the ids below
+ * are catalogued in .fusa-reqs.json with a "tc18" citation and a
+ * "status" of "implemented", "partial" or "not-implemented". The
+ * not-implemented and partial ones describe normative TC18 behaviour
+ * this module does NOT provide; their tests pin the deviation. */
+//cfusa:req REQ-E2E-028
+//cfusa:req REQ-E2E-029
+//cfusa:req REQ-E2E-030
+//cfusa:req REQ-E2E-031
+//cfusa:req REQ-E2E-032
+//cfusa:req REQ-E2E-033
+//cfusa:req REQ-E2E-034
+//cfusa:req REQ-E2E-035
+//cfusa:req REQ-E2E-036
+//cfusa:req REQ-E2E-037
+//cfusa:req REQ-E2E-038
+//cfusa:req REQ-E2E-039
+//cfusa:req REQ-E2E-040
+//cfusa:req REQ-E2E-041
+//cfusa:req REQ-E2E-042
 /*
  * e2e.h -- CRC32 safe points and safety-request execution gating for the
  * TC18 Remote Control Protocol wire layer (ROADMAP.md Phase 18, "E2E
