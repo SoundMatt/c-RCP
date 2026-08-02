@@ -32,6 +32,30 @@ the rationale.
 
 ## Releases
 
+### v0.114.0 -- 2026-08-02
+
+**`rcp_acf_hdr_ack_has_event()` described a distinction TC18 does not
+make (BREAKING).** Investigating this function's own TC18 basis (flagged
+earlier and deferred) found it has no grounding in the spec: its doc
+comment claimed to distinguish "a plain Acknowledge from one tagged with
+an asynchronous event via evt," but TC18's own evt[3:0] field table
+(§11.3, TC18.txt L1876-1880) defines exactly one Acknowledge encoding --
+`0xF` -- with no room for a second, event-carrying variant; `0x0` is
+simple/data/error response, `0x1-0x8` is a repetitive-response counter,
+`0x9-0xE` is reserved, and none of those apply once evt[3:0] == 0xF has
+already matched. Since `rcp_acf_classify_response()` only reaches the
+Acknowledge classification via `hdr->evt == 0xF`, `evt != 0` was always
+true for every real decoded Acknowledge -- the function's only way to
+return false was through a hand-constructed header exercising the same
+op==NONE fallback `rcp_acf_classify_response()`'s own doc comment already
+documents as unreachable from real decoded input. All three of its tests
+confirmed this: each one hand-built a header rather than decoding real
+wire bytes. Removed the function, its declaration, `REQ-ACF-003`, and its
+tests; corrected `rcp_acf_classify_response()`'s and the `evt` field's
+doc comments to stop referencing it. No internal caller ever used this
+function (grep-confirmed) -- 1022 requirements, 100% traced+tested, 0
+`cfusa check` errors.
+
 ### v0.113.0 -- 2026-08-02
 
 **Function-level requirement-coverage audit. Additive, no existing

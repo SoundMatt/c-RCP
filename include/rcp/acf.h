@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:req REQ-ACF-001
 //cfusa:req REQ-ACF-002
-//cfusa:req REQ-ACF-003
 //cfusa:req REQ-ACF-004
 //cfusa:req REQ-ACF-005
 //cfusa:req REQ-ACF-006
@@ -261,7 +260,7 @@ typedef struct {
                                          since ABB has no timestamp field to
                                          validate */
     rcp_byte_bus_id_t byte_bus_id;
-    uint8_t           evt;            /* 0-15; see rcp_acf_hdr_ack_has_event() */
+    uint8_t           evt;            /* 0-15; see rcp_acf_classify_response() */
     uint8_t           hs;             /* 0/1; round-tripped unmodified */
     uint8_t           cs;             /* 0/1; round-tripped unmodified */
     uint8_t           transaction_num;
@@ -287,18 +286,16 @@ typedef struct {
  * distinct, evt[3:0] < 0x9 case, not what a rejected Acknowledge becomes.
  * Below that, err takes priority (any remaining message with err set is
  * an Error response regardless of op), otherwise op selects between Write
- * response and Read response. Use rcp_acf_hdr_ack_has_event() to further
- * distinguish a plain Acknowledge from one tagged with an asynchronous
- * event via evt. The op-based ACKNOWLEDGE fallback below (hdr->op ==
+ * response and Read response. There is no further sub-classification of
+ * an Acknowledge by evt value: TC18's own evt[3:0] field table (§11.3)
+ * defines exactly one Acknowledge encoding (0xF) -- 0x0 is
+ * simple/data/error response, 0x1-0x8 is a repetitive-response counter,
+ * and 0x9-0xE is reserved, none of which apply once evt[3:0] == 0xF has
+ * already matched. The op-based ACKNOWLEDGE fallback below (hdr->op ==
  * RCP_ACF_OP_NONE) is unreachable from decoded input (see rcp_acf_op_t's
  * doc comment) -- it remains only for callers that construct hdr by hand
  * with op left at its zero value and no evt set either. */
 rcp_acf_response_kind_t rcp_acf_classify_response(const rcp_acf_byte_message_info_t *hdr);
-
-/* true iff hdr classifies as RCP_ACF_RESP_ACKNOWLEDGE and evt != 0, i.e.
- * this Acknowledge is tagged with an asynchronous event code rather than
- * being a plain acknowledgement of a Standard request. */
-bool rcp_acf_hdr_ack_has_event(const rcp_acf_byte_message_info_t *hdr);
 
 /* TC18 §13.5 Table 30's shared rule for the {ADC, PWM_IN, I2C, LIN, CAN,
  * UART, ISELED, MDIO} endpoint-type row: evt[2:0] = 000b is the only

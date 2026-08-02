@@ -138,12 +138,6 @@ rcp_acf_response_kind_t rcp_acf_classify_response(const rcp_acf_byte_message_inf
     }
 }
 
-//cfusa:req REQ-ACF-003
-bool rcp_acf_hdr_ack_has_event(const rcp_acf_byte_message_info_t *hdr)
-{
-    return rcp_acf_classify_response(hdr) == RCP_ACF_RESP_ACKNOWLEDGE && hdr->evt != 0;
-}
-
 //cfusa:req REQ-ACF-023
 bool rcp_acf_evt_row2_is_plain(uint8_t evt)
 {
