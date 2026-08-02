@@ -1,9 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:req REQ-LINEP-001
-//cfusa:req REQ-LINEP-002
-//cfusa:req REQ-LINEP-003
-//cfusa:req REQ-LINEP-004
-//cfusa:req REQ-LINEP-005
 //cfusa:req REQ-LINEP-006
 //cfusa:req REQ-LINEP-007
 //cfusa:req REQ-LINEP-008
@@ -29,6 +24,9 @@
  * this module does NOT provide; their tests pin the deviation. */
 //cfusa:req REQ-LINEP-023
 //cfusa:req REQ-LINEP-024
+//cfusa:req REQ-LINEP-025
+//cfusa:req REQ-LINEP-026
+//cfusa:req REQ-LINEP-027
 /*
  * ep_lin.h -- LIN endpoint for the TC18 Remote Control Protocol wire layer
  * (ROADMAP.md Phase 19, "Remaining Endpoint Types", milestone 71).
@@ -122,39 +120,40 @@
  * raw payloads are borrowed rather than copied: a variable-length payload
  * has no natural fixed-size out-parameter to copy into.
  *
- * ── evt[2:0]: the response-generation comparison rule ───────────────────────
+ * ── evt[2:0]: LIN sits in Table 30's plain-request row, like every other
+ *    non-SPI/GPIO/PWM_OUT endpoint ─────────────────────────────────────────
  *
- * The roadmap's own scope for this milestone requires that "a response
- * [be] generated when a received message's data matches the payload under
- * the evt[2:0] comparison rule" -- i.e. some received-bus-data comparison
- * mode, selected via the ACF byte_message_info header's evt field (acf.h;
- * a 4-bit field on the wire), governs whether this endpoint emits a
- * response to a command request at all. The roadmap names the mechanism
- * (an evt[2:0]-selected comparison) but does not itself enumerate which
- * comparison modes occupy those three bits -- the eight-value low-three-
- * bit selector below (rcp_ep_lin_compare_mode_t) is this module's own
- * original design filling that gap, modeled directly on ep_gpio.h's
- * existing evt[2:0]-as-eight-value-mode-selector precedent (there,
- * write-semantics; here, a response comparison rule) rather than on any
- * spec-derived enumeration -- there being no such enumeration cited by the
- * roadmap to derive one from.
+ * v0.112.0 REMOVED this module's own invented eight-value
+ * rcp_ep_lin_compare_mode_t: an earlier milestone's own file header
+ * admitted it was "this module's own original design... rather than on
+ * any spec-derived enumeration -- there being no such enumeration cited
+ * by the roadmap to derive one from." There is one: TC18 §13.5 Table 30
+ * places LIN in the same {ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO}
+ * row as every endpoint type acf.h's rcp_acf_evt_row2_is_plain() already
+ * governs -- evt[2:0] = 000b is the only value a plain (non-configuration)
+ * LIN command request may carry; every other value is either reserved
+ * (rejected with UNSUPPORTED_CMD) or the config-write shape (111b,
+ * §12.7.1, out of this module's scope). LIN is not called out as an
+ * exception anywhere in Table 30 (pixel-verified against the rendered
+ * specification page, same pass that found CAN's Figure 39 defect).
  *
- * Four modes are given concrete behavior (rcp_ep_lin_compare_fires()):
- * RCP_EP_LIN_COMPARE_EXACT (received data length and content must equal
- * the outgoing request payload exactly), RCP_EP_LIN_COMPARE_PREFIX
- * (received data must begin with the request payload's bytes, but may be
- * longer), RCP_EP_LIN_COMPARE_ANY (any received bus message after the
- * request is driven satisfies the rule, content ignored -- e.g. a plain
- * transmit-and-capture-whatever-comes-back use), and
- * RCP_EP_LIN_COMPARE_NEVER (this command request never auto-generates a
- * response; a pure fire-and-forget transmit). The remaining four
- * (RCP_EP_LIN_COMPARE_RESERVED4..7) are documented no-ops -- treated
- * identically to _NEVER by rcp_ep_lin_compare_fires() -- this module's own
- * placeholder for evt[2:0] values not otherwise assigned meaning by this
- * milestone's scope, the same fail-safe treatment ep_gpio.h's own
- * RESERVED6 write-semantics value already established as this codebase's
- * convention for an unassigned low-bit-field value (never fabricate a
- * "true"/data-generating outcome for one).
+ * §13.7.10.1's own prose -- "the LIN endpoint checks each received message
+ * against the byte_msg_payload and if a match under the conditions given
+ * by evt[2:0] is found a reply is sent" -- describes the SAME universal
+ * evt[2:0] vocabulary Table 30/§13.5.1 define everywhere else, not a
+ * LIN-private one: since Table 30 constrains a plain LIN request's
+ * evt[2:0] to 000b, the only "condition" that can ever apply to an
+ * ordinary (non-compound-wait) LIN command request is §13.5.1 mode 000b,
+ * exact match -- which is exactly what a LIN commander's own physical
+ * behavior needs (correlating one of possibly several asynchronous bus
+ * replies against the expected payload), unlike ADC/I2C/UART/etc., where
+ * evt[2:0] = 000b carries no comparison meaning at all. This module's
+ * rcp_ep_lin_response_matches() therefore delegates directly to acf.h's
+ * shared rcp_acf_compound_wait_match(evt=0, ...) rather than
+ * reimplementing exact-match comparison logic of its own -- the same
+ * single-source-of-truth reuse this module's compound-wait dispatch
+ * (server.h/request_compound.h) already established for every endpoint
+ * type's own current-status comparison.
  *
  * ── Transmission-done trigger ────────────────────────────────────────────────
  *
@@ -199,39 +198,17 @@
 extern "C" {
 #endif
 
-/* ── evt[2:0]: the response-generation comparison rule ──────────────────────── */
+/* ── evt[2:0]: exact-match, per Table 30's plain-request row ─────────────── */
 
-typedef enum {
-    RCP_EP_LIN_COMPARE_EXACT     = 0, /* received data equals the request
-                                          payload exactly, length and content */
-    RCP_EP_LIN_COMPARE_PREFIX    = 1, /* received data begins with the
-                                          request payload's bytes */
-    RCP_EP_LIN_COMPARE_ANY       = 2, /* any received message matches,
-                                          content ignored */
-    RCP_EP_LIN_COMPARE_NEVER     = 3, /* fire-and-forget: never auto-generates
-                                          a response */
-    RCP_EP_LIN_COMPARE_RESERVED4 = 4, /* documented no-op; see the file header */
-    RCP_EP_LIN_COMPARE_RESERVED5 = 5,
-    RCP_EP_LIN_COMPARE_RESERVED6 = 6,
-    RCP_EP_LIN_COMPARE_RESERVED7 = 7,
-} rcp_ep_lin_compare_mode_t;
-
-/* True iff v (a raw evt[2:0] value as decoded off the wire) is one of the
- * eight defined comparison-mode values, i.e. v <= 7. */
-bool rcp_ep_lin_compare_mode_valid(uint8_t v);
-
-/* True iff a received-bus-data buffer rx_data[0..rx_len) satisfies mode
- * against the outgoing request's own request_data[0..request_len):
- * RCP_EP_LIN_COMPARE_EXACT iff rx_len == request_len and every byte
- * matches; RCP_EP_LIN_COMPARE_PREFIX iff rx_len >= request_len and the
- * leading request_len bytes of rx_data match request_data byte for byte;
- * RCP_EP_LIN_COMPARE_ANY always true (rx_data/rx_len are not inspected);
- * RCP_EP_LIN_COMPARE_NEVER and every RESERVED value always false -- this
- * module's fail-safe treatment of an unassigned evt[2:0] value, see the
- * file header. request_data/rx_data may be NULL iff their respective
- * length is 0. */
-bool rcp_ep_lin_compare_fires(rcp_ep_lin_compare_mode_t mode, const uint8_t *request_data,
-                               size_t request_len, const uint8_t *rx_data, size_t rx_len);
+/* True iff a received-bus-data buffer rx_data[0..rx_len) matches the
+ * outgoing command request's own tx_data[0..tx_len) under TC18 §13.5.1
+ * mode 000b (exact match, length-capped) -- the only comparison a plain
+ * LIN command request's evt[2:0] can ever select (Table 30 constrains it
+ * to 000b). A thin, named wrapper over acf.h's
+ * rcp_acf_compound_wait_match(0, ...); see the file header. tx_data/
+ * rx_data may be NULL iff their respective length is 0. */
+bool rcp_ep_lin_response_matches(const uint8_t *tx_data, size_t tx_len,
+                                  const uint8_t *rx_data, size_t rx_len);
 
 /* ── Transmission-done trigger ─────────────────────────────────────────────── */
 
@@ -287,6 +264,10 @@ typedef enum {
     RCP_EP_LIN_ERR_BAD_MSG_TYPE = 2,
     RCP_EP_LIN_ERR_WRONG_BUS    = 3,
     RCP_EP_LIN_ERR_WRONG_OP     = 4,
+    /* evt[2:0] != 000b on a decoded command request -- Table 30 reserves
+     * every value but 000b (plain) and 111b (config-write, out of this
+     * module's scope) for this endpoint-type row; see the file header. */
+    RCP_EP_LIN_ERR_BAD_EVT      = 5,
 } rcp_ep_lin_errc_t;
 
 /* Human-readable message for an rcp_ep_lin_errc_t value. Never returns NULL. */
@@ -299,14 +280,14 @@ const char *rcp_ep_lin_strerror(rcp_ep_lin_errc_t e);
  * bus for this transaction -- every LIN-frame semantic (identifier/PID,
  * checksum, schedule position) already constructed into these bytes by the
  * caller, and never parsed or validated by this module (see the file
- * header). evt's low three bits carry compare_mode (any other bits of the
- * ACF header's evt field are left 0). tx_data may be NULL iff tx_len == 0.
+ * header). evt is always encoded 0 -- Table 30 constrains a plain LIN
+ * command request's evt[2:0] to 000b (see the file header); there is no
+ * client-selectable comparison mode. tx_data may be NULL iff tx_len == 0.
  * Returns a zeroed rcp_bytes_t (data=NULL) if tx_len exceeds
  * RCP_ACF_MAX_PAYLOAD or on allocation failure. Caller frees the result
  * with rcp_bytes_free(). */
 rcp_bytes_t rcp_ep_lin_encode_command_request(rcp_byte_bus_id_t byte_bus_id,
                                                const uint8_t *tx_data, size_t tx_len,
-                                               rcp_ep_lin_compare_mode_t compare_mode,
                                                uint8_t transaction_num);
 
 /* Decodes and validates an ACF-level LIN command request from b[0..len).
@@ -314,16 +295,15 @@ rcp_bytes_t rcp_ep_lin_encode_command_request(rcp_byte_bus_id_t byte_bus_id,
  * fixed header or its declared payload length; RCP_EP_LIN_ERR_BAD_MSG_TYPE
  * if b is not an ACF_ABB message; RCP_EP_LIN_ERR_WRONG_BUS if its
  * byte_bus_id != expected_bus_id; RCP_EP_LIN_ERR_WRONG_OP if its op is not
- * RCP_ACF_OP_READ. On RCP_EP_LIN_OK, *out_compare_mode (evt[2:0] of the
- * header's evt field; see rcp_ep_lin_compare_mode_valid()) and
- * *out_transaction_num are populated, and *out_tx_data / *out_tx_len are
- * set to a *borrowed* view into b (not copied -- see the file header) of
- * the raw outgoing payload. */
+ * RCP_ACF_OP_READ; RCP_EP_LIN_ERR_BAD_EVT if
+ * rcp_acf_evt_row2_is_plain(hdr.evt) is false (see the file header). On
+ * RCP_EP_LIN_OK, *out_transaction_num is populated, and *out_tx_data /
+ * *out_tx_len are set to a *borrowed* view into b (not copied -- see the
+ * file header) of the raw outgoing payload. */
 rcp_ep_lin_errc_t rcp_ep_lin_decode_command_request(const uint8_t *b, size_t len,
                                                      rcp_byte_bus_id_t expected_bus_id,
                                                      const uint8_t **out_tx_data,
                                                      size_t *out_tx_len,
-                                                     uint8_t *out_compare_mode,
                                                      uint8_t *out_transaction_num);
 
 /* ── Response ───────────────────────────────────────────────────────────────── */

@@ -310,14 +310,10 @@ rcp_bytes_t rcp_message_to_request(rcp_adapt_op_t op, rcp_byte_bus_id_t byte_bus
         result = rcp_ep_pwm_in_encode_read_request(byte_bus_id, transaction_num);
         break;
 
-    case RCP_ADAPT_OP_LIN_COMMAND: {
-        uint32_t compare_mode = meta_get_u32_default(msg, "rcp.lin.compare_mode", 0);
+    case RCP_ADAPT_OP_LIN_COMMAND:
         result = rcp_ep_lin_encode_command_request(byte_bus_id, msg->payload.data,
-                                                    msg->payload.len,
-                                                    (rcp_ep_lin_compare_mode_t)compare_mode,
-                                                    transaction_num);
+                                                    msg->payload.len, transaction_num);
         break;
-    }
 
     case RCP_ADAPT_OP_CAN_FRAME: {
         uint32_t frame_format;

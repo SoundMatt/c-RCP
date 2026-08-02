@@ -1,9 +1,4 @@
 /* SPDX-License-Identifier: MPL-2.0 */
-//cfusa:test REQ-LINEP-001
-//cfusa:test REQ-LINEP-002
-//cfusa:test REQ-LINEP-003
-//cfusa:test REQ-LINEP-004
-//cfusa:test REQ-LINEP-005
 //cfusa:test REQ-LINEP-006
 //cfusa:test REQ-LINEP-007
 //cfusa:test REQ-LINEP-008
@@ -21,6 +16,9 @@
 //cfusa:test REQ-LINEP-020
 //cfusa:test REQ-LINEP-021
 //cfusa:test REQ-LINEP-022
+//cfusa:test REQ-LINEP-025
+//cfusa:test REQ-LINEP-026
+//cfusa:test REQ-LINEP-027
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -34,77 +32,32 @@
 void setUp(void) {}
 void tearDown(void) {}
 
-/* ── compare_mode_valid ────────────────────────────────────────────────────── */
+/* ── evt[2:0]: exact-match response comparison ────────────────────────────── */
 
-static void test_compare_mode_valid_bounds(void)
-{
-    uint8_t v;
-
-    for (v = 0; v <= 7; v++) {
-        TEST_ASSERT_TRUE(rcp_ep_lin_compare_mode_valid(v));
-    }
-    TEST_ASSERT_FALSE(rcp_ep_lin_compare_mode_valid(8));
-    TEST_ASSERT_FALSE(rcp_ep_lin_compare_mode_valid(255));
-}
-
-/* ── compare_fires ──────────────────────────────────────────────────────────── */
-
-static void test_compare_fires_exact(void)
+static void test_response_matches_exact(void)
 {
     uint8_t req[3] = {0x10, 0x20, 0x30};
     uint8_t rx_same[3] = {0x10, 0x20, 0x30};
     uint8_t rx_diff[3] = {0x10, 0x20, 0x31};
-    uint8_t rx_longer[4] = {0x10, 0x20, 0x30, 0x40};
 
-    TEST_ASSERT_TRUE(rcp_ep_lin_compare_fires(RCP_EP_LIN_COMPARE_EXACT, req, sizeof(req), rx_same,
-                                               sizeof(rx_same)));
-    TEST_ASSERT_FALSE(rcp_ep_lin_compare_fires(RCP_EP_LIN_COMPARE_EXACT, req, sizeof(req), rx_diff,
-                                                sizeof(rx_diff)));
-    TEST_ASSERT_FALSE(rcp_ep_lin_compare_fires(RCP_EP_LIN_COMPARE_EXACT, req, sizeof(req),
-                                                rx_longer, sizeof(rx_longer)));
-    TEST_ASSERT_TRUE(rcp_ep_lin_compare_fires(RCP_EP_LIN_COMPARE_EXACT, NULL, 0, NULL, 0));
+    TEST_ASSERT_TRUE(rcp_ep_lin_response_matches(req, sizeof(req), rx_same, sizeof(rx_same)));
+    TEST_ASSERT_FALSE(rcp_ep_lin_response_matches(req, sizeof(req), rx_diff, sizeof(rx_diff)));
+    TEST_ASSERT_TRUE(rcp_ep_lin_response_matches(NULL, 0, NULL, 0));
 }
 
-static void test_compare_fires_prefix(void)
+/* TC18 §13.5.1's own length rule (see acf.h's rcp_acf_compound_wait_match()):
+ * a shorter received message never matches; a longer one is compared only
+ * up to the outgoing request's own length. */
+static void test_response_matches_length_rule(void)
 {
-    uint8_t req[2] = {0xAA, 0xBB};
-    uint8_t rx_exact[2] = {0xAA, 0xBB};
-    uint8_t rx_longer[4] = {0xAA, 0xBB, 0xCC, 0xDD};
-    uint8_t rx_shorter[1] = {0xAA};
-    uint8_t rx_mismatch[2] = {0xAA, 0x00};
-
-    TEST_ASSERT_TRUE(rcp_ep_lin_compare_fires(RCP_EP_LIN_COMPARE_PREFIX, req, sizeof(req),
-                                               rx_exact, sizeof(rx_exact)));
-    TEST_ASSERT_TRUE(rcp_ep_lin_compare_fires(RCP_EP_LIN_COMPARE_PREFIX, req, sizeof(req),
-                                               rx_longer, sizeof(rx_longer)));
-    TEST_ASSERT_FALSE(rcp_ep_lin_compare_fires(RCP_EP_LIN_COMPARE_PREFIX, req, sizeof(req),
-                                                rx_shorter, sizeof(rx_shorter)));
-    TEST_ASSERT_FALSE(rcp_ep_lin_compare_fires(RCP_EP_LIN_COMPARE_PREFIX, req, sizeof(req),
-                                                rx_mismatch, sizeof(rx_mismatch)));
-}
-
-static void test_compare_fires_any(void)
-{
-    uint8_t req[1] = {0x01};
-    uint8_t rx[3] = {0x99, 0x98, 0x97};
-
-    TEST_ASSERT_TRUE(rcp_ep_lin_compare_fires(RCP_EP_LIN_COMPARE_ANY, req, sizeof(req), rx,
-                                               sizeof(rx)));
-    TEST_ASSERT_TRUE(rcp_ep_lin_compare_fires(RCP_EP_LIN_COMPARE_ANY, NULL, 0, NULL, 0));
-}
-
-static void test_compare_fires_never_and_reserved_fail_safe(void)
-{
-    uint8_t req[1] = {0x01};
-    uint8_t rx[1] = {0x01}; /* would satisfy EXACT/PREFIX/ANY, but must not
-                                fire for NEVER or a reserved mode */
+    uint8_t req[3] = {0x10, 0x20, 0x30};
+    uint8_t rx_shorter[2] = {0x10, 0x20};
+    uint8_t rx_longer_matching_prefix[4] = {0x10, 0x20, 0x30, 0x99};
 
     TEST_ASSERT_FALSE(
-        rcp_ep_lin_compare_fires(RCP_EP_LIN_COMPARE_NEVER, req, sizeof(req), rx, sizeof(rx)));
-    TEST_ASSERT_FALSE(rcp_ep_lin_compare_fires(RCP_EP_LIN_COMPARE_RESERVED4, req, sizeof(req), rx,
-                                                sizeof(rx)));
-    TEST_ASSERT_FALSE(rcp_ep_lin_compare_fires(RCP_EP_LIN_COMPARE_RESERVED7, req, sizeof(req), rx,
-                                                sizeof(rx)));
+        rcp_ep_lin_response_matches(req, sizeof(req), rx_shorter, sizeof(rx_shorter)));
+    TEST_ASSERT_TRUE(rcp_ep_lin_response_matches(req, sizeof(req), rx_longer_matching_prefix,
+                                                  sizeof(rx_longer_matching_prefix)));
 }
 
 /* ── Transmission-done trigger ─────────────────────────────────────────────── */
@@ -225,7 +178,7 @@ static void test_strerror_never_null_and_distinct(void)
 {
     rcp_ep_lin_errc_t codes[] = {
         RCP_EP_LIN_OK, RCP_EP_LIN_ERR_SHORT_FRAME, RCP_EP_LIN_ERR_BAD_MSG_TYPE,
-        RCP_EP_LIN_ERR_WRONG_BUS, RCP_EP_LIN_ERR_WRONG_OP,
+        RCP_EP_LIN_ERR_WRONG_BUS, RCP_EP_LIN_ERR_WRONG_OP, RCP_EP_LIN_ERR_BAD_EVT,
     };
     size_t i, j;
 
@@ -266,8 +219,7 @@ static void test_strerror_never_null_and_distinct(void)
 static void test_command_request_uses_read_direction_op(void)
 {
     uint8_t                     tx[1] = {0x55};
-    rcp_bytes_t                 frame = rcp_ep_lin_encode_command_request(6, tx, sizeof(tx),
-                                                                          RCP_EP_LIN_COMPARE_EXACT, 3);
+    rcp_bytes_t                 frame = rcp_ep_lin_encode_command_request(6, tx, sizeof(tx), 3);
     rcp_acf_byte_message_info_t hdr;
     const uint8_t              *payload;
     size_t                      payload_len;
@@ -285,20 +237,16 @@ static void test_command_request_round_trip_carries_raw_bytes(void)
      * plus checksum) -- this module never parses or strips any of it, see
      * the file header. */
     uint8_t     tx[4] = {0x50, 0x10, 0x20, 0x7F};
-    rcp_bytes_t frame = rcp_ep_lin_encode_command_request(6, tx, sizeof(tx),
-                                                            RCP_EP_LIN_COMPARE_PREFIX, 7);
+    rcp_bytes_t frame = rcp_ep_lin_encode_command_request(6, tx, sizeof(tx), 7);
     const uint8_t *out_tx = NULL;
     size_t      out_tx_len = 0;
-    uint8_t     mode = 0xFF;
     uint8_t     txn = 0;
 
     TEST_ASSERT_NOT_NULL(frame.data);
     TEST_ASSERT_EQUAL(RCP_EP_LIN_OK,
-        rcp_ep_lin_decode_command_request(frame.data, frame.len, 6, &out_tx, &out_tx_len, &mode,
-                                           &txn));
+        rcp_ep_lin_decode_command_request(frame.data, frame.len, 6, &out_tx, &out_tx_len, &txn));
     TEST_ASSERT_EQUAL_UINT32(sizeof(tx), out_tx_len);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(tx, out_tx, sizeof(tx));
-    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_LIN_COMPARE_PREFIX, mode);
     TEST_ASSERT_EQUAL_UINT8(7, txn);
 
     rcp_bytes_free(&frame);
@@ -306,19 +254,15 @@ static void test_command_request_round_trip_carries_raw_bytes(void)
 
 static void test_command_request_round_trip_empty_payload(void)
 {
-    rcp_bytes_t frame =
-        rcp_ep_lin_encode_command_request(1, NULL, 0, RCP_EP_LIN_COMPARE_NEVER, 1);
+    rcp_bytes_t frame = rcp_ep_lin_encode_command_request(1, NULL, 0, 1);
     const uint8_t *out_tx = NULL;
     size_t      out_tx_len = 1;
-    uint8_t     mode = 0xFF;
     uint8_t     txn = 0;
 
     TEST_ASSERT_NOT_NULL(frame.data);
     TEST_ASSERT_EQUAL(RCP_EP_LIN_OK,
-        rcp_ep_lin_decode_command_request(frame.data, frame.len, 1, &out_tx, &out_tx_len, &mode,
-                                           &txn));
+        rcp_ep_lin_decode_command_request(frame.data, frame.len, 1, &out_tx, &out_tx_len, &txn));
     TEST_ASSERT_EQUAL_UINT32(0, out_tx_len);
-    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_LIN_COMPARE_NEVER, mode);
 
     rcp_bytes_free(&frame);
 }
@@ -326,16 +270,35 @@ static void test_command_request_round_trip_empty_payload(void)
 static void test_command_request_rejects_wrong_bus(void)
 {
     uint8_t     tx[1] = {0xAB};
-    rcp_bytes_t frame =
-        rcp_ep_lin_encode_command_request(4, tx, sizeof(tx), RCP_EP_LIN_COMPARE_EXACT, 0);
+    rcp_bytes_t frame = rcp_ep_lin_encode_command_request(4, tx, sizeof(tx), 0);
     const uint8_t *out_tx;
     size_t      out_tx_len;
-    uint8_t     mode;
     uint8_t     txn;
 
     TEST_ASSERT_EQUAL(RCP_EP_LIN_ERR_WRONG_BUS,
-        rcp_ep_lin_decode_command_request(frame.data, frame.len, 5, &out_tx, &out_tx_len, &mode,
-                                           &txn));
+        rcp_ep_lin_decode_command_request(frame.data, frame.len, 5, &out_tx, &out_tx_len, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
+/* TC18 §13.5 Table 30: evt[2:0] must be 000b for a plain LIN command
+ * request; every other value (except 111b's out-of-scope config-write
+ * shape) is reserved and shall be rejected with UNSUPPORTED_CMD. */
+static void test_command_request_rejects_bad_evt(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    const uint8_t               *out_tx;
+    size_t                       out_tx_len;
+    uint8_t                      txn;
+
+    hdr.byte_bus_id = 4;
+    hdr.op          = RCP_ACF_OP_READ;
+    hdr.evt         = 0x3u; /* reserved, mid-range */
+    frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+
+    TEST_ASSERT_EQUAL(RCP_EP_LIN_ERR_BAD_EVT,
+        rcp_ep_lin_decode_command_request(frame.data, frame.len, 4, &out_tx, &out_tx_len, &txn));
 
     rcp_bytes_free(&frame);
 }
@@ -349,7 +312,6 @@ static void test_command_request_rejects_wrong_op(void)
     rcp_bytes_t                 frame;
     const uint8_t               *out_tx;
     size_t                       out_tx_len;
-    uint8_t                      mode;
     uint8_t                      txn;
 
     hdr.byte_bus_id = 4;
@@ -357,8 +319,7 @@ static void test_command_request_rejects_wrong_op(void)
     frame = rcp_acf_encode_abb(&hdr, NULL, 0);
 
     TEST_ASSERT_EQUAL(RCP_EP_LIN_ERR_WRONG_OP,
-        rcp_ep_lin_decode_command_request(frame.data, frame.len, 4, &out_tx, &out_tx_len, &mode,
-                                           &txn));
+        rcp_ep_lin_decode_command_request(frame.data, frame.len, 4, &out_tx, &out_tx_len, &txn));
 
     rcp_bytes_free(&frame);
 }
@@ -369,7 +330,6 @@ static void test_command_request_rejects_bad_msg_type(void)
     rcp_bytes_t          frame;
     const uint8_t        *out_tx;
     size_t                out_tx_len;
-    uint8_t               mode;
     uint8_t               txn;
 
     gbb_hdr.info.byte_bus_id = 4;
@@ -377,8 +337,7 @@ static void test_command_request_rejects_bad_msg_type(void)
     frame = rcp_acf_encode_gbb(&gbb_hdr, NULL, 0);
 
     TEST_ASSERT_EQUAL(RCP_EP_LIN_ERR_BAD_MSG_TYPE,
-        rcp_ep_lin_decode_command_request(frame.data, frame.len, 4, &out_tx, &out_tx_len, &mode,
-                                           &txn));
+        rcp_ep_lin_decode_command_request(frame.data, frame.len, 4, &out_tx, &out_tx_len, &txn));
 
     rcp_bytes_free(&frame);
 }
@@ -388,12 +347,11 @@ static void test_command_request_rejects_short_frame(void)
     uint8_t        too_short[3] = {0};
     const uint8_t  *out_tx;
     size_t          out_tx_len;
-    uint8_t         mode;
     uint8_t         txn;
 
     TEST_ASSERT_EQUAL(RCP_EP_LIN_ERR_SHORT_FRAME,
         rcp_ep_lin_decode_command_request(too_short, sizeof(too_short), 4, &out_tx, &out_tx_len,
-                                           &mode, &txn));
+                                           &txn));
 }
 
 /* ── Response round trip ───────────────────────────────────────────────────── */
@@ -479,12 +437,8 @@ int main(void)
 {
     UNITY_BEGIN();
 
-    RUN_TEST(test_compare_mode_valid_bounds);
-
-    RUN_TEST(test_compare_fires_exact);
-    RUN_TEST(test_compare_fires_prefix);
-    RUN_TEST(test_compare_fires_any);
-    RUN_TEST(test_compare_fires_never_and_reserved_fail_safe);
+    RUN_TEST(test_response_matches_exact);
+    RUN_TEST(test_response_matches_length_rule);
 
     RUN_TEST(test_trigger_fires);
 
@@ -504,6 +458,7 @@ int main(void)
     RUN_TEST(test_command_request_round_trip_carries_raw_bytes);
     RUN_TEST(test_command_request_round_trip_empty_payload);
     RUN_TEST(test_command_request_rejects_wrong_bus);
+    RUN_TEST(test_command_request_rejects_bad_evt);
     RUN_TEST(test_command_request_rejects_wrong_op);
     RUN_TEST(test_command_request_rejects_bad_msg_type);
     RUN_TEST(test_command_request_rejects_short_frame);

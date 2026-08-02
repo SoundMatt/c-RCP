@@ -83,7 +83,7 @@
  * | PWM_OUT_READ              | PWM_OUT   | (none)                                 | (none beyond payload)           |
  * | PWM_OUT_WRITE             | PWM_OUT   | meta rcp.pwm.evt (0-7, default 0)      | (none beyond payload)           |
  * | PWM_IN_READ               | PWM_IN    | (none)                                 | (none beyond payload)           |
- * | LIN_COMMAND               | LIN       | meta rcp.lin.compare_mode (default 0)  | (none)                          |
+ * | LIN_COMMAND               | LIN       | (none)                                 | (none)                          |
  * | CAN_FRAME                  | CAN       | meta rcp.can.frame_format (required, out-of-scope for the 2 CAN XL values -- see below), rcp.can.arbitration_id (required) | meta rcp.can.frame_format, rcp.can.arbitration_id |
  * | ISELED_COMMAND             | ISELED    | (none)                                 | (none)                          |
  * | MDIO_READ                  | MDIO      | meta rcp.mdio.clause/prtad/devad/regad, rcp.mdio.word_count (all required) | meta rcp.mdio.clause/prtad/devad/regad |

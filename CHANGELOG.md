@@ -28,8 +28,58 @@ the rationale.
 | `wire.h`/`wire.c` (the `'RC'`-magic placeholder codec) | v0.91.0 | The real TC18 AVTP/ACF layer (`avtp.h`/`avtp.c`, `acf.h`/`acf.c`), present and primary since Phase 13 | v0.91.0 |
 | `sim.h`/`sim.c` (zone-controller simulator) | v0.91.0 | None in this repo; SiL/HIL simulation against the TC18 RC Server/Endpoint model can be built on `mock.h`/`mock.c` instead | v0.91.0 |
 | `rcp.h`/`rcp.c`'s pre-TC18 object model (`rcp_zone_t`, `rcp_command_t`, `rcp_response_t`, `rcp_status_t`, `rcp_controller_t`, `rcp_registry_t`) | v0.91.0 | The TC18 register-map/lifecycle/endpoint core (`regmap.h`, `lifecycle.h`, `ep_*.h`) | v0.91.0 |
+| `ep_lin.h`/`ep_lin.c`'s `rcp_ep_lin_compare_mode_t`/`rcp_ep_lin_compare_fires()` (an invented eight-value evt[2:0] comparison scheme, self-admittedly not spec-derived) | v0.112.0 | `rcp_acf_evt_row2_is_plain()` validation + `rcp_ep_lin_response_matches()` (delegates to acf.h's shared TC18 §13.5.1 exact-match primitive) | v0.112.0 |
 
 ## Releases
+
+### v0.112.0 -- 2026-08-02
+
+**LIN's evt[2:0] comparison scheme was invented, not spec-derived
+(BREAKING).** `ep_lin.h`'s own file header admitted `rcp_ep_lin_compare_mode_t`
+(an eight-value EXACT/PREFIX/ANY/NEVER+4-reserved enum) was "this module's
+own original design... rather than on any spec-derived enumeration --
+there being no such enumeration cited by the roadmap to derive one from."
+There is one. TC18 §13.5 Table 30 places LIN in the exact same
+`{ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO}` plain-request row every
+other endpoint type's decoder already enforces via `rcp_acf_evt_row2_is_plain()`
+(pixel-verified against the rendered specification page, same table this
+session's ADC/I2C/UART/ISELED/MDIO/CAN fixes already established) -- LIN is
+not called out as an exception anywhere in it. §13.7.10.1's own prose ("the
+LIN endpoint checks each received message against the byte_msg_payload and
+if a match under the conditions given by evt[2:0] is found a reply is
+sent") describes the same universal §13.5.1 vocabulary every other
+endpoint's compound-wait comparison uses, not a LIN-private multi-mode
+scheme: since Table 30 constrains a plain LIN request's evt[2:0] to 000b,
+the only comparison that can ever apply is §13.5.1 mode 000b, exact match.
+
+**What changed.** `rcp_ep_lin_compare_mode_t`/`rcp_ep_lin_compare_valid()`/
+`rcp_ep_lin_compare_fires()` removed. `rcp_ep_lin_encode_command_request()`
+no longer takes a `compare_mode` parameter (always encodes `evt = 0`).
+`rcp_ep_lin_decode_command_request()` no longer surfaces a compare mode;
+it instead returns the new `RCP_EP_LIN_ERR_BAD_EVT` when `evt[2:0] != 000b`,
+per Table 30's own UNSUPPORTED_CMD rule. New `rcp_ep_lin_response_matches()`
+delegates directly to acf.h's shared `rcp_acf_compound_wait_match(0, ...)`
+rather than reimplementing exact-match comparison logic of its own --
+the same single-source-of-truth reuse this module's compound-wait
+dispatch (v0.110.0/v0.111.0) already established. `adapt.c`'s
+`RCP_ADAPT_OP_LIN_COMMAND` mapping drops the now-meaningless
+`rcp.lin.compare_mode` metadata key.
+
+**A second finding, resolved as a side effect.** `REQ-UART-035` tracked
+"c-RCP provides no UART compound-wait comparison surface" as
+not-implemented. It already was, as of v0.110.0/v0.111.0: acf.h's shared
+primitive applies to every endpoint type uniformly, UART included, wired
+through `server.c`'s `current_status`. §13.7.8.1's own "compared length
+bounded above by uart_rx_fifo_size" falls directly out of the shared
+§13.5.1 length rule once a real fifo's contents (which can never exceed
+uart_rx_fifo_size) are supplied as `current_status` -- no UART-specific
+logic needed. Marked implemented; its stale deviation-pinning test
+(which referenced the now-removed LIN helper) replaced with a real
+conformance test.
+
+`REQ-LINEP-001` through `005` (the invented enum) removed; `REQ-LINEP-016`
+through `018` corrected; `REQ-LINEP-025` through `027` added for the new
+behavior. 100% traced.
 
 ### v0.111.0 -- 2026-08-01
 

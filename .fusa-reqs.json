@@ -5417,51 +5417,6 @@
       "scope": "tc18"
     },
     {
-      "id": "REQ-LINEP-001",
-      "title": "rcp_ep_lin_compare_mode_valid() accepts exactly the eight evt[2:0] values",
-      "text": "rcp_ep_lin_compare_mode_valid() shall return true for v in 0..7 and false for any value above 7.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B",
-      "scope": "tc18"
-    },
-    {
-      "id": "REQ-LINEP-002",
-      "title": "rcp_ep_lin_compare_fires() implements RCP_EP_LIN_COMPARE_EXACT",
-      "text": "rcp_ep_lin_compare_fires() shall return true for mode RCP_EP_LIN_COMPARE_EXACT iff rx_len equals request_len and rx_data[0..rx_len) equals request_data[0..request_len) byte for byte, and false otherwise.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B",
-      "scope": "tc18"
-    },
-    {
-      "id": "REQ-LINEP-003",
-      "title": "rcp_ep_lin_compare_fires() implements RCP_EP_LIN_COMPARE_PREFIX",
-      "text": "rcp_ep_lin_compare_fires() shall return true for mode RCP_EP_LIN_COMPARE_PREFIX iff rx_len is at least request_len and the leading request_len bytes of rx_data equal request_data byte for byte, and false otherwise.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B",
-      "scope": "tc18"
-    },
-    {
-      "id": "REQ-LINEP-004",
-      "title": "rcp_ep_lin_compare_fires() implements RCP_EP_LIN_COMPARE_ANY",
-      "text": "rcp_ep_lin_compare_fires() shall return true for mode RCP_EP_LIN_COMPARE_ANY regardless of request_data/request_len/rx_data/rx_len.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B",
-      "scope": "tc18"
-    },
-    {
-      "id": "REQ-LINEP-005",
-      "title": "rcp_ep_lin_compare_fires() fails safe for RCP_EP_LIN_COMPARE_NEVER and every reserved mode",
-      "text": "rcp_ep_lin_compare_fires() shall return false for mode RCP_EP_LIN_COMPARE_NEVER and for every RCP_EP_LIN_COMPARE_RESERVED4..RESERVED7 value, regardless of whether rx_data would otherwise satisfy an exact or prefix comparison against request_data.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B",
-      "scope": "tc18"
-    },
-    {
       "id": "REQ-LINEP-006",
       "title": "rcp_ep_lin_trigger_fires() evaluates the transmission-done trigger",
       "text": "rcp_ep_lin_trigger_fires() shall return false for trigger RCP_EP_LIN_TRIGGER_NONE regardless of tx_done_event, and shall return tx_done_event unchanged for trigger RCP_EP_LIN_TRIGGER_TX_DONE.",
@@ -5553,17 +5508,19 @@
     },
     {
       "id": "REQ-LINEP-016",
-      "title": "rcp_ep_lin_encode_command_request() encodes the read direction and carries the raw payload and evt[2:0] compare_mode unmodified",
-      "text": "rcp_ep_lin_encode_command_request() shall encode an ACF_ABB message addressed to byte_bus_id with op RCP_ACF_OP_READ (the reply-expected direction), evt[2:0] set to compare_mode, transaction_num set to transaction_num, and payload equal to tx_data[0..tx_len) byte for byte.",
+      "title": "rcp_ep_lin_encode_command_request() encodes the read direction, evt=0, and carries the raw payload unmodified",
+      "text": "rcp_ep_lin_encode_command_request() shall encode an ACF_ABB message addressed to byte_bus_id with op RCP_ACF_OP_READ (the reply-expected direction), evt = 0 (Table 30 constrains a plain LIN request's evt[2:0] to 000b; there is no client-selectable comparison mode), transaction_num set to transaction_num, and payload equal to tx_data[0..tx_len) byte for byte.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-LINEP-017",
       "title": "rcp_ep_lin_decode_command_request() round-trips a valid command request",
-      "text": "rcp_ep_lin_decode_command_request() shall, given a frame produced by rcp_ep_lin_encode_command_request() for byte_bus_id == expected_bus_id, return RCP_EP_LIN_OK and recover the raw tx payload, compare_mode, and transaction_num unchanged.",
+      "text": "rcp_ep_lin_decode_command_request() shall, given a frame produced by rcp_ep_lin_encode_command_request() for byte_bus_id == expected_bus_id, return RCP_EP_LIN_OK and recover the raw tx payload and transaction_num unchanged.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -5571,8 +5528,8 @@
     },
     {
       "id": "REQ-LINEP-018",
-      "title": "rcp_ep_lin_decode_command_request() rejects a malformed or misaddressed frame",
-      "text": "rcp_ep_lin_decode_command_request() shall return RCP_EP_LIN_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length, RCP_EP_LIN_ERR_BAD_MSG_TYPE when the frame is not an ACF_ABB message, RCP_EP_LIN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, and RCP_EP_LIN_ERR_WRONG_OP when op is not RCP_ACF_OP_READ.",
+      "title": "rcp_ep_lin_decode_command_request() rejects a malformed, misaddressed, or non-plain frame",
+      "text": "rcp_ep_lin_decode_command_request() shall return RCP_EP_LIN_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length, RCP_EP_LIN_ERR_BAD_MSG_TYPE when the frame is not an ACF_ABB message, RCP_EP_LIN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, RCP_EP_LIN_ERR_WRONG_OP when op is not RCP_ACF_OP_READ, and RCP_EP_LIN_ERR_BAD_EVT when evt[2:0] != 000b (REQ-LINEP-027).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -9155,6 +9112,39 @@
       "tc18": "\u00a713.7.10.2 Table 52, TC18.txt L5287-5296"
     },
     {
+      "id": "REQ-LINEP-025",
+      "title": "rcp_ep_lin_response_matches() delegates to acf.h's shared TC18 \u00a713.5.1 exact-match primitive",
+      "text": "rcp_ep_lin_response_matches(tx_data, tx_len, rx_data, rx_len) shall return rcp_acf_compound_wait_match(0, tx_data, tx_len, rx_data, rx_len) -- the exact-match mode (evt[2:0] = 000b) of acf.h's shared TC18 \u00a713.5.1 comparison primitive, including its length-capping rule. This is the only comparison a plain LIN command request's evt[2:0] can select, since Table 30 constrains it to 000b (REQ-LINEP-027).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.10.1, TC18.txt L5278-5280; \u00a713.5.1, TC18.txt L3735-3742"
+    },
+    {
+      "id": "REQ-LINEP-026",
+      "title": "rcp_ep_lin_encode_command_request() no longer accepts a client-selectable comparison mode",
+      "text": "rcp_ep_lin_encode_command_request() shall have no compare_mode parameter of any kind; it always encodes evt = 0. See REQ-LINEP-016.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.5 Table 30, TC18.txt L3666-3710"
+    },
+    {
+      "id": "REQ-LINEP-027",
+      "title": "rcp_ep_lin_decode_command_request() rejects evt[2:0] != 000b with RCP_EP_LIN_ERR_BAD_EVT",
+      "text": "rcp_ep_lin_decode_command_request() shall return RCP_EP_LIN_ERR_BAD_EVT when rcp_acf_evt_row2_is_plain(hdr.evt) is false, per TC18 \u00a713.5 Table 30's rule for the {ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO} endpoint-type row: evt[2:0] = 000b is the only value a plain (non-configuration) LIN command request may carry. LIN is not called out as an exception anywhere in Table 30, and TC18 \u00a713.7.10.1's own reference to \"the conditions given by evt[2:0]\" describes the same universal \u00a713.5.1 vocabulary Table 30 constrains to 000b here, not a LIN-private multi-mode scheme.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.5 Table 30, TC18.txt L3666-3710; \u00a713.7.10.1, TC18.txt L5278-5280"
+    },
+    {
       "id": "REQ-MDIO-020",
       "title": "The MDIO EP has no configurable parameters beyond the common block, but still exposes mdio_ep_len and mdio_ep_status",
       "text": "NOT IMPLEMENTED (partially): c-RCP correctly gives the MDIO endpoint no endpoint-specific configurable parameters, matching TC18 \u00a713.7.13.2's 'The MDIO EP does not have any configurable parameters' \u2014 rcp_ep_mdio_functional_cfg_t holds only regmap.h's common block. However Table 56 still fixes three register rows c-RCP does not model: mdio_ep_len (0x0000, 8 bit, R \u2014 this description's length in octets), the reserved octet at 0x0001 (8 bit, R, reads 0x00), and mdio_ep_status (16 bit, R/W, contents to be defined by the specification). Consequence: the MDIO block is not enumerable at the addresses Table 56 fixes and its status register is unreadable.",
@@ -9223,13 +9213,13 @@
     {
       "id": "REQ-UART-035",
       "title": "UART compound wait request comparison against the RX FIFO, bounded by uart_rx_fifo_size",
-      "text": "NOT IMPLEMENTED: c-RCP provides no UART compound-wait comparison surface (TC18 \u00a713.7.8.1). A compound wait request on a UART endpoint shall respond when the expected data in the request matches the data held in the fifo-rx-buffer, with the compared length bounded above by uart_rx_fifo_size. ep_uart.h has no analogue of ep_lin.h's rcp_ep_lin_compare_fires()/rcp_ep_lin_compare_mode_t, so a compound wait step targeting a UART endpoint has no defined match semantics in this implementation. Consequence: compound requests (TC18 \u00a713.5.1) cannot be evaluated against a UART endpoint.",
+      "text": "FIXED (v0.110.0/v0.111.0): acf.h's rcp_acf_compound_wait_match() now provides a universal TC18 \u00a713.5.1 comparison surface for every endpoint type, UART included, wired into real dispatch via server.c's rcp_server_tick_ctx_t.current_status. \u00a713.7.8.1's own \"compared length bounded above by uart_rx_fifo_size\" follows directly from \u00a713.5.1's shared length rule once the fifo's real contents (which can never exceed uart_rx_fifo_size) are supplied as current_status: an expected byte_msg_payload longer than the fifo could ever hold never matches (status shorter than payload never matches). No UART-specific comparison logic is needed; this is no longer a gap.",
       "standard": "iso26262",
-      "level": "QM",
-      "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
-      "tc18": "\u00a713.7.8.1, TC18.txt L4892-4894"
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.8.1, TC18.txt L4892-4894; \u00a713.5.1, TC18.txt L3735-3763"
     },
     {
       "id": "REQ-UART-036",
