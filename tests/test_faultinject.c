@@ -9,6 +9,8 @@
 //cfusa:test REQ-FI-008
 //cfusa:test REQ-FI-009
 //cfusa:test REQ-FI-010
+//cfusa:test REQ-FI-011
+//cfusa:test REQ-FI-012
 #include "unity.h"
 
 #include <rcp/faultinject.h>
@@ -43,6 +45,7 @@ void tearDown(void) {}
 /* ── No rules ─────────────────────────────────────────────────────────────── */
 
 //cfusa:test REQ-FI-001
+//cfusa:test REQ-FI-011
 static void test_evaluate_returns_proceed_when_no_rules(void)
 {
     rcp_faultinject_t *fi = rcp_faultinject_new();
@@ -123,6 +126,7 @@ static void test_count_based_rule_expires_after_n_firings(void)
 /* ── clear_rules() ────────────────────────────────────────────────────────── */
 
 //cfusa:test REQ-FI-006
+//cfusa:test REQ-FI-012
 static void test_clear_rules_removes_all_active_rules(void)
 {
     rcp_faultinject_t *fi = rcp_faultinject_new();

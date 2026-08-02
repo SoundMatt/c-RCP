@@ -8,6 +8,8 @@
 //cfusa:test REQ-RL-007
 //cfusa:test REQ-RL-008
 //cfusa:test REQ-RL-009
+//cfusa:test REQ-RL-010
+//cfusa:test REQ-RL-011
 #include "unity.h"
 
 #include <rcp/clock.h>
@@ -33,10 +35,25 @@ static rcp_avtp_addr_t make_addr(uint16_t unique_id, uint8_t byte_bus_id)
     return a;
 }
 
+/* ── Default config ───────────────────────────────────────────────────────── */
+
+//cfusa:test REQ-RL-010
+static void test_default_config_values(void)
+{
+    rcp_ratelimit_config_t cfg = rcp_ratelimit_default_config();
+
+    /* This project's Unity build has double-precision asserts disabled
+     * (embedded-target convention); compare directly instead. */
+    TEST_ASSERT_TRUE(cfg.rate == 100.0);
+    TEST_ASSERT_EQUAL_INT(20, cfg.burst);
+    TEST_ASSERT_TRUE(cfg.exempt_safety);
+}
+
 /* ── Basic admission ──────────────────────────────────────────────────────── */
 
 //cfusa:test REQ-RL-001
 //cfusa:test REQ-RL-007
+//cfusa:test REQ-RL-011
 static void test_first_use_seeds_a_full_bucket(void)
 {
     rcp_ratelimit_config_t cfg = rcp_ratelimit_default_config();
@@ -176,6 +193,7 @@ int main(void)
 {
     UNITY_BEGIN();
 
+    RUN_TEST(test_default_config_values);
     RUN_TEST(test_first_use_seeds_a_full_bucket);
     RUN_TEST(test_allow_returns_false_when_bucket_exhausted);
     RUN_TEST(test_tokens_refill_over_time);

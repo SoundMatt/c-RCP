@@ -32,6 +32,7 @@ extern "C" {
  * mirroring go-RCP's two-symbol pattern (rcp.SpecVersion aliasing
  * relay.SpecVersion) rather than requiring callers to reach into relay.h
  * directly for an RCP-specific answer. */
+//cfusa:req REQ-RELAY-013
 #define RCP_SPEC_VERSION RELAY_SPEC_VERSION
 
 /* Opaque forward declaration: the full definition (and the loaning

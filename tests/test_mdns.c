@@ -8,6 +8,8 @@
 //cfusa:test REQ-MDNS-007
 //cfusa:test REQ-MDNS-008
 //cfusa:test REQ-MDNS-009
+//cfusa:test REQ-MDNS-010
+//cfusa:test REQ-MDNS-011
 #include "unity.h"
 
 #include <rcp/avtp.h>
@@ -143,6 +145,13 @@ static void count_cb(const rcp_mdns_discovery_event_t *ev, void *user_data)
     g_count++;
 }
 
+/* rcp_mdns_static_discoverer_new()/_destroy() are exercised (allocation,
+ * the records copied by value, and -- for destroy -- real vtable dispatch
+ * through the static discoverer's own destroy, ASan-checked in CI for
+ * leaks/double-free) by every test below that constructs and tears down a
+ * static discoverer; this is the first and simplest of them. */
+//cfusa:test REQ-MDNS-010
+//cfusa:test REQ-MDNS-011
 static void test_static_discoverer_emits_on_start(void)
 {
     size_t n;
@@ -255,6 +264,7 @@ static void test_make_instance_name_follows_convention(void)
 
 /* ── Announcer tests ──────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-MDNS-007
 static void test_announcer_registers_service_record(void)
 {
     test_announcer_t ann;
@@ -275,6 +285,7 @@ static void test_announcer_registers_service_record(void)
     TEST_ASSERT_EQUAL_UINT16(6000, port);
 }
 
+//cfusa:test REQ-MDNS-008
 static void test_withdraw_removes_record(void)
 {
     test_announcer_t ann;

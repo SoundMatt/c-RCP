@@ -193,7 +193,7 @@ add_test(NAME rcp_l2 COMMAND test_l2)
 # every ctest environment has. Built here so it's compiled by every CI
 # matrix leg (catching any compile regression immediately); only actually
 # *run* by ci.yml's own dedicated, privileged "L2 transport (veth)" job.
-add_executable(l2_veth_roundtrip l2_veth_roundtrip.c)
+add_executable(l2_veth_roundtrip l2_veth_roundtrip_test.c)
 target_link_libraries(l2_veth_roundtrip PRIVATE rcp::rcp)
 target_compile_options(l2_veth_roundtrip PRIVATE ${RCP_TEST_WARNING_FLAGS})
 

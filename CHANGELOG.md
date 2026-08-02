@@ -32,6 +32,70 @@ the rationale.
 
 ## Releases
 
+### v0.113.0 -- 2026-08-02
+
+**Function-level requirement-coverage audit. Additive, no existing
+behavior changed.** A user-requested deep audit asked whether every
+public function has at least one traced requirement -- a bar `cfusa
+check`/`trace` cannot itself verify (there is no rule for "function
+lacks a requirement tag"; `trace`'s 100% gate only confirms every
+*catalogued* requirement has impl+test tags, not that every function has
+a catalogued requirement in the first place).
+
+A hand-written script cross-referencing every function actually
+*declared* in `include/rcp/*.h` against `//cfusa:req`-tagged definitions
+in `src/*.c` found 39 genuine gaps (an earlier, cruder pass over all
+function definitions regardless of visibility produced 223 false
+positives by also flagging internal `static` helpers -- e.g. `acf.c`'s
+own `put_u64`/`get_u64` byte-order helpers -- which correctly never get
+individual requirements; narrowing to the real public-API surface
+brought that down to the true number). All 39 are satellite/
+infrastructure modules (`admin.c`, `authz.c`, `config.c`, `deadline.c`,
+`e2e.c`, `faultinject.c`, `loan.c`, `mdns.c`, `mock.c`, `observe.c`,
+`powerstate.c`, `ratelimit.c`, `recorder.c`, `server.c`, `tsn.c`,
+`watchdog.c`) -- the TC18 protocol core (`acf.c`, every `ep_*.c`,
+`request_*.c`) was already fully covered.
+
+Every one of the 39 was verified to already have real test exercise
+before being tagged (constructors/destructors used pervasively as
+setup/teardown, or genuinely asserted-on return values) -- confirmed via
+a second script cross-referencing function names against every test
+file. Two real, previously-untested behaviors were found along the way
+and given dedicated new tests rather than just a tag on an incidental
+usage: `rcp_authz_policy_retain()`'s refcount contract (mutation-tested
+under ASan -- a broken refcount reproduces as a genuine
+heap-use-after-free, not just a wrong return value) and
+`rcp_in_memory_sink_spans()`'s cap-truncation behavior (also
+mutation-tested -- removing the bound corrupts memory on the very next
+call). `REQ-ADMIN-009/010`, `REQ-AUTH-009-011`, `REQ-CFG-013`,
+`REQ-DL-009-013`, `REQ-E2E-043/044`, `REQ-FI-011/012`, `REQ-LOAN-009`,
+`REQ-MDNS-010/011`, `REQ-MOCK-027`, `REQ-OBS-014-019`, `REQ-PWR-011-015`,
+`REQ-RL-010/011`, `REQ-REC-012-014`, `REQ-SRV-021`, `REQ-TSN-008`,
+`REQ-WDG-011/012` added -- 1023 requirements, 100% traced+tested.
+
+Verifying the above surfaced a second, independent gap: the locally
+cached `cfusa` binary used for the preceding several releases' `check`/
+`trace` runs predated this repo's own pinned c-FuSa `v0.5.50` tag by
+several commits and was silently stale, producing false-clean results.
+A rebuild from the exact CI-pinned tag turned up three genuinely
+untraced requirements the stale binary had missed --
+`REQ-MDNS-007`/`REQ-MDNS-008` (the `rcp_mdns_announcer_t` interface and
+its `withdraw()` wrapper, both header-only with no `.c` implementation
+to carry the tag) and `REQ-RELAY-013` (the `RCP_SPEC_VERSION` alias
+macro) -- each already had real test exercise (`test_mdns.c`'s
+`TestAnnouncer` double, `test_adapt.c`'s spec-version equality check)
+but no `//cfusa:req`/`//cfusa:test` tag pinned to the specific
+construct. Tagged all three in place. Also renamed
+`tests/l2_veth_roundtrip.c` to `tests/l2_veth_roundtrip_test.c` (CMake
+target and CI job untouched) so `cfusa trace --func-coverage`'s
+test-file exemption -- which only recognizes the `test_*`/`*_test.c`
+naming patterns already used by every other test file in this repo --
+correctly excludes its `main()` from the public-function-annotation
+count, the same way every other test harness in this codebase already
+is. `cfusa check` now reports 0 errors and `cfusa trace --req-coverage
+100 --func-coverage 100 --sec-tested 100` passes clean against the
+correct tool version.
+
 ### v0.112.0 -- 2026-08-02
 
 **LIN's evt[2:0] comparison scheme was invented, not spec-derived

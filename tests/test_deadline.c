@@ -7,6 +7,11 @@
 //cfusa:test REQ-DL-006
 //cfusa:test REQ-DL-007
 //cfusa:test REQ-DL-008
+//cfusa:test REQ-DL-009
+//cfusa:test REQ-DL-010
+//cfusa:test REQ-DL-011
+//cfusa:test REQ-DL-012
+//cfusa:test REQ-DL-013
 #include "unity.h"
 
 #include <rcp/clock.h>
@@ -23,8 +28,20 @@ static void test_sleep_ms(unsigned ms)
     }
 }
 
+/* ── Default config ───────────────────────────────────────────────────────── */
+
+//cfusa:test REQ-DL-009
+static void test_default_config_values(void)
+{
+    rcp_deadline_config_t cfg = rcp_deadline_default_config();
+
+    TEST_ASSERT_EQUAL_UINT32(50, cfg.default_deadline_ms);
+    TEST_ASSERT_EQUAL_UINT32(5, cfg.poll_interval_ms);
+}
+
 /* ── Monitor creation ─────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-DL-010
 static void test_monitor_constructs_without_error(void)
 {
     rcp_deadline_stream_cfg_t streams[] = {{1, 100}};
@@ -32,7 +49,17 @@ static void test_monitor_constructs_without_error(void)
     rcp_deadline_monitor_t *mon = rcp_deadline_monitor_new(cfg, streams, 1);
 
     TEST_ASSERT_NOT_NULL(mon);
+    /* Never heartbeated yet, but the stream IS tracked (unlike an unknown
+     * one -- see test_alive_returns_false_before_first_heartbeat). */
+    TEST_ASSERT_FALSE(rcp_deadline_monitor_alive(mon, 1));
+
     rcp_deadline_monitor_destroy(mon);
+}
+
+//cfusa:test REQ-DL-013
+static void test_destroy_tolerates_null(void)
+{
+    rcp_deadline_monitor_destroy(NULL); /* must not crash */
 }
 
 static void test_zero_deadline_ms_uses_config_default(void)
@@ -69,6 +96,7 @@ static void count_dead(const rcp_liveness_event_t *ev, void *user_data)
 
 //cfusa:test REQ-DL-002
 //cfusa:test REQ-DL-003
+//cfusa:test REQ-DL-012
 static void test_dead_event_fires_and_is_not_repeated(void)
 {
     rcp_deadline_stream_cfg_t streams[] = {{1, 30}};
@@ -79,7 +107,7 @@ static void test_dead_event_fires_and_is_not_repeated(void)
 
     g_dead_count = 0;
     mon = rcp_deadline_monitor_new(cfg, streams, 1);
-    rcp_deadline_monitor_subscribe(mon, count_dead, NULL);
+    TEST_ASSERT_TRUE(rcp_deadline_monitor_subscribe(mon, count_dead, NULL));
 
     /* No heartbeat across several deadline cycles: the dead event must
      * fire exactly once (REQ-DL-002), not re-fire on every subsequent
@@ -170,6 +198,7 @@ static void test_notify_overflow_unknown_stream_returns_false(void)
 /* ── alive() query ────────────────────────────────────────────────────────── */
 
 //cfusa:test REQ-DL-005
+//cfusa:test REQ-DL-011
 static void test_alive_returns_false_before_first_heartbeat(void)
 {
     rcp_deadline_stream_cfg_t streams[] = {{1, 5000}};
@@ -202,7 +231,9 @@ int main(void)
 {
     UNITY_BEGIN();
 
+    RUN_TEST(test_default_config_values);
     RUN_TEST(test_monitor_constructs_without_error);
+    RUN_TEST(test_destroy_tolerates_null);
     RUN_TEST(test_zero_deadline_ms_uses_config_default);
     RUN_TEST(test_dead_event_fires_and_is_not_repeated);
     RUN_TEST(test_alive_event_on_first_heartbeat);

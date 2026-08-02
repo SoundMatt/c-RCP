@@ -39,6 +39,7 @@ uint8_t rcp_tsn_pcp_for(const rcp_tsn_pcp_map_t *m, rcp_sched_kind_t kind)
     return m->pcp[kind];
 }
 
+//cfusa:req REQ-TSN-008
 rcp_tsn_config_t rcp_tsn_default_config(void)
 {
     rcp_tsn_config_t c;

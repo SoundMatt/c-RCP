@@ -16,6 +16,7 @@ struct rcp_recorder {
     size_t                  cap;
 };
 
+//cfusa:req REQ-REC-012
 rcp_recorder_t *rcp_recorder_new(void)
 {
     rcp_recorder_t *r = (rcp_recorder_t *)calloc(1, sizeof(*r));
@@ -36,6 +37,7 @@ void rcp_recorder_destroy(rcp_recorder_t *r)
     free(r);
 }
 
+//cfusa:req REQ-REC-013
 size_t rcp_recorder_size(rcp_recorder_t *r)
 {
     size_t n;
@@ -148,6 +150,7 @@ int rcp_recorder_write_binary(rcp_recorder_t *r, const char *path)
 
 /* ── Playback ──────────────────────────────────────────────────────────────── */
 
+//cfusa:req REQ-REC-014
 rcp_playback_config_t rcp_playback_default_config(void)
 {
     rcp_playback_config_t c;

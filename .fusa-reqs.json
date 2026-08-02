@@ -73,6 +73,51 @@
       "scope": "tc18"
     },
     {
+          "id": "REQ-DL-009",
+          "title": "rcp_deadline_default_config() returns the documented defaults",
+          "text": "rcp_deadline_default_config() shall return default_deadline_ms = 50 and poll_interval_ms = 5.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-DL-010",
+          "title": "rcp_deadline_monitor_new() initializes per-stream watch state and starts the poll thread",
+          "text": "rcp_deadline_monitor_new(cfg, streams, n_streams) shall allocate a monitor tracking exactly n_streams streams, each initialized not-alive with its own deadline (streams[i].deadline_ms if nonzero, otherwise cfg.default_deadline_ms) and last_signal_ms set to the current monotonic time, and shall start the background poll thread; it shall return NULL on allocation failure.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-DL-011",
+          "title": "rcp_deadline_monitor_alive() reports a tracked stream's liveness, false if untracked",
+          "text": "rcp_deadline_monitor_alive(m, stream_id) shall return the tracked stream's current alive flag, or false when stream_id is not tracked by m.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-DL-012",
+          "title": "rcp_deadline_monitor_subscribe() registers a liveness callback",
+          "text": "rcp_deadline_monitor_subscribe(m, cb, user_data) shall register cb/user_data to be invoked on future liveness transitions and return whether registration succeeded (false only on allocation failure while growing the callback list).",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-DL-013",
+          "title": "rcp_deadline_monitor_destroy() closes the poll thread and releases every owned resource",
+          "text": "rcp_deadline_monitor_destroy(m) shall be a safe no-op when m is NULL; otherwise it shall close m (joining the background poll thread if one was started) and then free its states, callbacks, and callback_ctx arrays and destroy its mutex before freeing m itself.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
       "id": "REQ-ERR-001",
       "title": "RCP_ERR_CLOSED is non-zero",
       "text": "The sentinel error RCP_ERR_CLOSED shall be non-zero so callers can distinguish it from RCP_OK (success).",
@@ -235,6 +280,24 @@
       "scope": "tc18"
     },
     {
+          "id": "REQ-FI-011",
+          "title": "rcp_faultinject_new() allocates an injector with no rules",
+          "text": "rcp_faultinject_new() shall return a heap-allocated rcp_faultinject_t with no rules registered and its own mutex initialized, or NULL on allocation failure.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-FI-012",
+          "title": "rcp_faultinject_clear_rules() removes every registered rule without freeing the injector",
+          "text": "rcp_faultinject_clear_rules(fi) shall remove every rule previously added via rcp_faultinject_add_rule(), leaving fi itself allocated and usable for further rcp_faultinject_add_rule() calls.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
       "id": "REQ-AUTH-001",
       "title": "Permitted identity/addr/request-type combination succeeds",
       "text": "rcp_authz_policy_permit() shall return true for an identity, address, and request_type matching an entry added via rcp_authz_policy_allow().",
@@ -305,6 +368,33 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18"
+    },
+    {
+          "id": "REQ-AUTH-009",
+          "title": "rcp_authz_policy_new() allocates a policy with refcount 1; retain/release tolerate NULL",
+          "text": "rcp_authz_policy_new() shall return a heap-allocated rcp_authz_policy_t with refcount 1, no entries, and its own mutex initialized, or NULL on allocation failure. rcp_authz_policy_retain(NULL) shall return NULL without dereferencing it; rcp_authz_policy_release(NULL) shall be a safe no-op.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-AUTH-010",
+          "title": "rcp_authz_policy_retain() increments the refcount and returns its argument unchanged",
+          "text": "rcp_authz_policy_retain(p) shall increment p's refcount and return p unchanged, so that `p = rcp_authz_policy_retain(p)` is a valid idiom.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-AUTH-011",
+          "title": "rcp_authz_policy_release() frees only once the refcount reaches zero",
+          "text": "rcp_authz_policy_release(p) shall decrement p's refcount and free p (its mutex, every entry's owned addrs/request_types arrays, and its own entries array) only once the refcount reaches zero; a policy retained more than once shall remain fully usable after any release that leaves its refcount above zero.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
     },
     {
       "id": "REQ-OBS-001",
@@ -478,6 +568,24 @@
       "scope": "tc18"
     },
     {
+          "id": "REQ-ADMIN-009",
+          "title": "rcp_admin_server_new() allocates a zero-initialized server",
+          "text": "rcp_admin_server_new() shall return a heap-allocated rcp_admin_server_t with no endpoints, subscribers, or counters registered, and its own mutex initialized; it shall return NULL on allocation failure.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-ADMIN-010",
+          "title": "rcp_admin_server_destroy() releases every owned resource",
+          "text": "rcp_admin_server_destroy() shall be a safe no-op when srv is NULL; otherwise it shall destroy srv's mutex and free its endpoints, subscribers, and counters arrays before freeing srv itself.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
       "id": "REQ-REC-001",
       "title": "capture() appends an entry",
       "text": "rcp_recorder_capture() shall append one rcp_recorder_entry_t to r, increasing rcp_recorder_size(r) by 1, on success.",
@@ -575,6 +683,33 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18"
+    },
+    {
+          "id": "REQ-REC-012",
+          "title": "rcp_recorder_new() allocates an empty recorder",
+          "text": "rcp_recorder_new() shall return a heap-allocated rcp_recorder_t with no entries recorded and its own mutex initialized, or NULL on allocation failure.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-REC-013",
+          "title": "rcp_recorder_size() reports the number of entries recorded so far",
+          "text": "rcp_recorder_size(r) shall return the number of entries recorded into r since its creation.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-REC-014",
+          "title": "rcp_playback_default_config() returns the documented default",
+          "text": "rcp_playback_default_config() shall return speed_factor = 1.0.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
     },
     {
       "id": "REQ-CFG-001",
@@ -865,6 +1000,15 @@
       "scope": "tc18"
     },
     {
+          "id": "REQ-LOAN-009",
+          "title": "rcp_loan_pool_new() allocates an empty pool",
+          "text": "rcp_loan_pool_new() shall return a heap-allocated rcp_loan_pool_t with no loaned buffers and its own mutex initialized, or NULL on allocation failure.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
       "id": "REQ-MDNS-001",
       "title": "Discoverer interface for server discovery",
       "text": "rcp_mdns_discoverer_t shall define the abstract interface for mDNS-based RC Server discovery.",
@@ -1027,6 +1171,51 @@
       "scope": "tc18"
     },
     {
+          "id": "REQ-PWR-011",
+          "title": "rcp_powerstate_manager_new() initializes every tracked endpoint to NORMAL with no pending request",
+          "text": "rcp_powerstate_manager_new(endpoints, n_endpoints) shall allocate a manager tracking exactly n_endpoints endpoints, each initialized to RCP_PWRMODE_NORMAL with no pending power-mode request and a freshly-initialized wake handshake; it shall return NULL on allocation failure.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-PWR-012",
+          "title": "rcp_powerstate_manager_mode() reports a tracked endpoint's power mode, NORMAL if untracked",
+          "text": "rcp_powerstate_manager_mode(m, addr) shall return the tracked power mode for addr, or RCP_PWRMODE_NORMAL when addr is not tracked by m.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-PWR-013",
+          "title": "rcp_powerstate_manager_encode_wakeup_probe() encodes a wakeup probe for a tracked endpoint only",
+          "text": "rcp_powerstate_manager_encode_wakeup_probe(m, addr, transaction_num) shall encode a wakeup message addressed to addr's byte_bus_id carrying transaction_num when addr is tracked by m, and shall return a zeroed rcp_bytes_t (data == NULL) when it is not.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-PWR-014",
+          "title": "rcp_powerstate_manager_handshake_resume_queues() applies the resume-queues transition, false if untracked",
+          "text": "rcp_powerstate_manager_handshake_resume_queues(m, addr) shall apply the tracked endpoint's wake-handshake resume-queues transition and return its result when addr is tracked by m, and shall return false without applying any transition when it is not.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-PWR-015",
+          "title": "rcp_powerstate_manager_destroy() releases every owned resource",
+          "text": "rcp_powerstate_manager_destroy(m) shall be a safe no-op when m is NULL; otherwise it shall free its entries, callbacks, and callback_ctx arrays and destroy its mutex before freeing m itself.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
       "id": "REQ-RL-001",
       "title": "Token bucket with configurable rate and burst, per endpoint",
       "text": "rcp_ratelimit_limiter_t shall maintain an independent token bucket per registered (stream_id, byte_bus_id) endpoint address, refilling at cfg.rate tokens/second up to cfg.burst.",
@@ -1106,6 +1295,24 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18"
+    },
+    {
+          "id": "REQ-RL-010",
+          "title": "rcp_ratelimit_default_config() returns the documented defaults",
+          "text": "rcp_ratelimit_default_config() shall return rate = 100.0, burst = 20, and exempt_safety = true.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-RL-011",
+          "title": "rcp_ratelimit_limiter_new() allocates a limiter with cfg and no tracked buckets",
+          "text": "rcp_ratelimit_limiter_new(cfg) shall return a heap-allocated rcp_ratelimit_limiter_t configured with cfg and no per-address token buckets yet tracked, or NULL on allocation failure.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
     },
     {
       "id": "REQ-SHMEM-001",
@@ -1250,6 +1457,15 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18"
+    },
+    {
+          "id": "REQ-TSN-008",
+          "title": "rcp_tsn_default_config() returns the documented defaults",
+          "text": "rcp_tsn_default_config() shall return the default PCP map (rcp_tsn_default_pcp_map()), vlan_id = 0, and cycle_ns = 0.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
     },
     {
       "id": "REQ-UDP-001",
@@ -1657,6 +1873,24 @@
       "scope": "tc18"
     },
     {
+          "id": "REQ-MDNS-010",
+          "title": "rcp_mdns_discoverer_destroy() dispatches to the discoverer's own vtable destroy function",
+          "text": "rcp_mdns_discoverer_destroy(d) shall be a safe no-op when d is NULL; otherwise it shall call d's own vtable destroy function, so every concrete discoverer implementation (e.g. the static discoverer) releases exactly the resources it itself owns.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-MDNS-011",
+          "title": "rcp_mdns_static_discoverer_new() builds a discoverer over a fixed, caller-supplied record set",
+          "text": "rcp_mdns_static_discoverer_new(records, count) shall allocate a discoverer that reports exactly the count caller-supplied records (copied by value) as already-discovered, requiring no network activity; it shall return NULL on allocation failure.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
       "id": "REQ-RELAY-015",
       "title": "Relay caller retain increments refcount and returns the same pointer",
       "text": "rcp_relay_caller_retain() shall increment the caller's refcount and return the same pointer passed in, and shall be a no-op returning NULL when passed NULL.",
@@ -1682,6 +1916,60 @@
       "level": "QM",
       "asil": "QM",
       "scope": "tc18"
+    },
+    {
+          "id": "REQ-OBS-014",
+          "title": "rcp_noop_metrics_sink() returns a sink that discards everything recorded to it",
+          "text": "rcp_noop_metrics_sink() shall return a rcp_metrics_sink_t whose span/gauge/counter recording functions all discard their arguments without side effects.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-OBS-015",
+          "title": "rcp_in_memory_sink_new() allocates an empty in-memory span sink",
+          "text": "rcp_in_memory_sink_new() shall return a heap-allocated rcp_in_memory_sink_t with no spans recorded and its own mutex initialized, or NULL on allocation failure.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-OBS-016",
+          "title": "rcp_in_memory_sink_as_sink() adapts an in-memory sink to the generic sink interface",
+          "text": "rcp_in_memory_sink_as_sink(s) shall return a rcp_metrics_sink_t whose vtable records spans into s (and discards gauges/counters) and whose ctx is s.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-OBS-017",
+          "title": "rcp_in_memory_sink_span_count() reports the number of spans recorded so far",
+          "text": "rcp_in_memory_sink_span_count(s) shall return the number of spans recorded into s since its creation.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-OBS-018",
+          "title": "rcp_in_memory_sink_spans() copies up to cap recorded spans and returns the true count",
+          "text": "rcp_in_memory_sink_spans(s, out, cap) shall copy min(recorded_count, cap) recorded spans into out, in recording order, and return the true recorded count (which may exceed cap, signalling truncation to the caller).",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-OBS-019",
+          "title": "rcp_in_memory_sink_destroy() releases every owned resource",
+          "text": "rcp_in_memory_sink_destroy(s) shall be a safe no-op when s is NULL; otherwise it shall destroy s's mutex and free its recorded-spans array before freeing s itself.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
     },
     {
       "id": "REQ-RELAY-017",
@@ -7352,6 +7640,15 @@
       "scope": "tc18"
     },
     {
+          "id": "REQ-MOCK-027",
+          "title": "rcp_mock_server_pending_count() reports an endpoint's conditional-request store occupancy, 0 if unknown",
+          "text": "rcp_mock_server_pending_count(srv, byte_bus_id) shall return the number of conditional requests currently pending in that endpoint's request store, or 0 if byte_bus_id names no registered endpoint.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
       "id": "REQ-ACF-017",
       "title": "acf_msg_type constants carry the specification's own numeric values",
       "text": "RCP_ACF_MSG_TYPE_ABB shall equal 0x0E and RCP_ACF_MSG_TYPE_GBB shall equal 0x0D, the acf_msg_type values TC18 \u00a711.2.1 Table 4 and \u00a711.2.2.1 Table 6 assign to the abbreviated byte bus (ACF_ABB) and generic byte bus (ACF_GBB) message formats respectively.",
@@ -7526,6 +7823,15 @@
       "scope": "tc18-gap",
       "status": "partial",
       "tc18": "\u00a712.7.1, TC18.txt L2481-2484"
+    },
+    {
+          "id": "REQ-CFG-013",
+          "title": "rcp_config_manifest_free() releases every owned array and zeroes the manifest",
+          "text": "rcp_config_manifest_free(m) shall free m's hw_pin_map, endpoints, and streams arrays and then zero *m in place, leaving it safe to reuse or discard.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
     },
     {
       "id": "REQ-DISC-029",
@@ -8694,6 +9000,15 @@
       "tc18": "\u00a713.5.1, TC18.txt L3735-3763"
     },
     {
+          "id": "REQ-SRV-021",
+          "title": "rcp_server_endpoint_pending_count() reports the conditional-request store's current occupancy",
+          "text": "rcp_server_endpoint_pending_count(ep) shall return the number of conditional requests currently held in ep's request store.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
       "id": "REQ-TIMED-012",
       "title": "A request carried under a TSCF header is postponed until the header's presentation time",
       "text": "NOT IMPLEMENTED: c-RCP does not postpone the execution of a request carried under a TSCF header until the header's avtp_timestamp presentation time (TC18 \u00a711.2, \u00a711.2.1). Only the ACF_GBB-embedded presentation_time of \u00a711.2.2.5 is honoured (rcp_timed_due(), rcp_server_endpoint_select_due()); the TSCF header's own avtp_timestamp is used solely as CRC input by rcp_e2e_compute_crc() and never reaches the admission or due-selection path, so standard, conditional and cancel requests arriving under TSCF execute immediately. Consequence: time-scheduled execution via TSCF -- the specification's primary timed-request mechanism -- does not work.",
@@ -8791,6 +9106,24 @@
       "scope": "tc18-gap",
       "status": "partial",
       "tc18": "\u00a712.7.7, TC18.txt L2936-L2938"
+    },
+    {
+          "id": "REQ-WDG-011",
+          "title": "rcp_watchdog_default_config() returns the documented default",
+          "text": "rcp_watchdog_default_config() shall return poll_interval_ms = 10.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-WDG-012",
+          "title": "rcp_watchdog_keeper_destroy() closes the poll thread and releases every owned resource",
+          "text": "rcp_watchdog_keeper_destroy(k) shall be a safe no-op when k is NULL; otherwise it shall close k (joining the background poll thread if one was started) and then free its states, callbacks, and callback_ctx arrays and destroy its mutex before freeing k itself.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
     },
     {
       "id": "REQ-E2E-031",
@@ -8923,6 +9256,24 @@
       "scope": "tc18-gap",
       "status": "partial",
       "tc18": "\u00a713.6 Figures 19 and 20, TC18.txt L3854-3863, L3872-3881"
+    },
+    {
+          "id": "REQ-E2E-043",
+          "title": "rcp_e2e_stream_fault_init() starts a fault tracker in the not-faulted state",
+          "text": "rcp_e2e_stream_fault_init(f) shall set f->faulted to false.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
+    },
+    {
+          "id": "REQ-E2E-044",
+          "title": "rcp_e2e_stream_fault_is_faulted() reports the tracker's current state",
+          "text": "rcp_e2e_stream_fault_is_faulted(f) shall return f->faulted unchanged.",
+          "standard": "iso26262",
+          "level": "ASIL-B",
+          "asil": "ASIL-B",
+          "scope": "tc18"
     },
     {
       "id": "REQ-ADC-031",

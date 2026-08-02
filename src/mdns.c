@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+//cfusa:req REQ-MDNS-010
 void rcp_mdns_discoverer_destroy(rcp_mdns_discoverer_t *d)
 {
     if (!d) return;
@@ -121,6 +122,7 @@ static const rcp_mdns_discoverer_vtable_t static_disc_vtable = {
     static_disc_destroy,
 };
 
+//cfusa:req REQ-MDNS-011
 rcp_mdns_discoverer_t *rcp_mdns_static_discoverer_new(const rcp_mdns_server_info_t *records, size_t count)
 {
     static_discoverer_t *d = (static_discoverer_t *)calloc(1, sizeof(*d));

@@ -28,6 +28,7 @@ static const rcp_metrics_sink_vtable_t noop_sink_vtable = {
     noop_record_counter,
 };
 
+//cfusa:req REQ-OBS-014
 rcp_metrics_sink_t rcp_noop_metrics_sink(void)
 {
     rcp_metrics_sink_t sink;
@@ -45,6 +46,7 @@ struct rcp_in_memory_sink {
     size_t         cap;
 };
 
+//cfusa:req REQ-OBS-015
 rcp_in_memory_sink_t *rcp_in_memory_sink_new(void)
 {
     rcp_in_memory_sink_t *s = (rcp_in_memory_sink_t *)calloc(1, sizeof(*s));
@@ -88,6 +90,7 @@ static const rcp_metrics_sink_vtable_t in_memory_sink_vtable = {
     in_memory_record_counter,
 };
 
+//cfusa:req REQ-OBS-016
 rcp_metrics_sink_t rcp_in_memory_sink_as_sink(rcp_in_memory_sink_t *s)
 {
     rcp_metrics_sink_t sink;
@@ -96,6 +99,7 @@ rcp_metrics_sink_t rcp_in_memory_sink_as_sink(rcp_in_memory_sink_t *s)
     return sink;
 }
 
+//cfusa:req REQ-OBS-017
 size_t rcp_in_memory_sink_span_count(rcp_in_memory_sink_t *s)
 {
     size_t n;
@@ -105,6 +109,7 @@ size_t rcp_in_memory_sink_span_count(rcp_in_memory_sink_t *s)
     return n;
 }
 
+//cfusa:req REQ-OBS-018
 size_t rcp_in_memory_sink_spans(rcp_in_memory_sink_t *s, rcp_span_t *out, size_t cap)
 {
     size_t i, n;
@@ -115,6 +120,7 @@ size_t rcp_in_memory_sink_spans(rcp_in_memory_sink_t *s, rcp_span_t *out, size_t
     return n;
 }
 
+//cfusa:req REQ-OBS-019
 void rcp_in_memory_sink_destroy(rcp_in_memory_sink_t *s)
 {
     if (!s) return;

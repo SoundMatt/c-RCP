@@ -120,7 +120,7 @@ jobs:
   # This job is the real thing: two rcp_l2_avtp_transport_t instances bound
   # to opposite ends of an actual veth pair, moving actual AVTPDUs over
   # actual AF_PACKET/SOCK_RAW sockets, asserting byte-for-byte equality in
-  # both directions (tests/l2_veth_roundtrip.c). Linux-only (l2.h's own
+  # both directions (tests/l2_veth_roundtrip_test.c). Linux-only (l2.h's own
   # file header) and needs CAP_NET_RAW/root to open a raw socket at all, so
   # it runs as its own dedicated, `sudo`-using job rather than folding into
   # build-and-test's own unprivileged cross-platform matrix.

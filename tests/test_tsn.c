@@ -6,6 +6,7 @@
 //cfusa:test REQ-TSN-005
 //cfusa:test REQ-TSN-006
 //cfusa:test REQ-TSN-007
+//cfusa:test REQ-TSN-008
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -43,6 +44,19 @@ static rcp_bytes_t make_standard_frame(void)
 static rcp_bytes_t make_cancellation_frame(void)
 {
     return make_ntscf_frame(rcp_cancel_encode_clear_all(3, 1));
+}
+
+/* ── Default config ───────────────────────────────────────────────────────── */
+
+//cfusa:test REQ-TSN-008
+static void test_default_config_values(void)
+{
+    rcp_tsn_config_t cfg = rcp_tsn_default_config();
+    rcp_tsn_pcp_map_t default_map = rcp_tsn_default_pcp_map();
+
+    TEST_ASSERT_EQUAL_MEMORY(&default_map, &cfg.pcp_map, sizeof(default_map));
+    TEST_ASSERT_EQUAL_INT(0, cfg.vlan_id);
+    TEST_ASSERT_EQUAL_INT(0, cfg.cycle_ns);
 }
 
 /* ── PCP map ────────────────────────────────────────────────────────────────── */
@@ -169,6 +183,7 @@ int main(void)
 {
     UNITY_BEGIN();
 
+    RUN_TEST(test_default_config_values);
     RUN_TEST(test_default_pcp_map_mirrors_sched_kind_rank);
     RUN_TEST(test_cancellation_maps_to_highest_default_pcp);
     RUN_TEST(test_pcp_for_fails_safe_on_out_of_range_kind);

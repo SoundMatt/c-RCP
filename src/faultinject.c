@@ -13,6 +13,7 @@ struct rcp_faultinject {
     size_t          rules_cap;
 };
 
+//cfusa:req REQ-FI-011
 rcp_faultinject_t *rcp_faultinject_new(void)
 {
     rcp_faultinject_t *fi = (rcp_faultinject_t *)calloc(1, sizeof(*fi));
@@ -42,6 +43,7 @@ bool rcp_faultinject_add_rule(rcp_faultinject_t *fi, rcp_fi_rule_t rule)
     return ok;
 }
 
+//cfusa:req REQ-FI-012
 void rcp_faultinject_clear_rules(rcp_faultinject_t *fi)
 {
     rcp_mutex_lock(&fi->mu);

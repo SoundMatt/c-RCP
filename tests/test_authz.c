@@ -62,6 +62,48 @@ static void test_permitted_identity_succeeds(void)
     rcp_authz_policy_release(policy);
 }
 
+/* rcp_authz_policy_retain()'s own contract: it returns its argument
+ * unchanged (so `p = rcp_authz_policy_retain(p)` is a valid idiom), and a
+ * retained policy survives one rcp_authz_policy_release() call -- only the
+ * matching second release actually frees it. There is no public accessor
+ * for the internal refcount, so this is verified behaviorally: the policy
+ * must still answer rcp_authz_policy_permit() correctly after exactly one
+ * release following one retain (two references, one released), and must
+ * not be used after the second (final) release -- this test stops there,
+ * matching every other test in this file's own convention of never
+ * inspecting freed memory. */
+//cfusa:test REQ-AUTH-009
+//cfusa:test REQ-AUTH-010
+//cfusa:test REQ-AUTH-011
+static void test_retain_keeps_policy_alive_across_one_release(void)
+{
+    rcp_authz_policy_t *policy  = rcp_authz_policy_new();
+    rcp_avtp_addr_t     addrs[] = {make_addr(1, 3)};
+    uint8_t             types[] = {0x00};
+    rcp_authz_policy_t *retained;
+
+    TEST_ASSERT_NOT_NULL(policy);
+    TEST_ASSERT_TRUE(rcp_authz_policy_allow(policy, "alice", addrs, 1, types, 1));
+
+    retained = rcp_authz_policy_retain(policy);
+    TEST_ASSERT_EQUAL_PTR(policy, retained); /* returns its argument unchanged */
+
+    /* One of the two references released; the policy must still be alive
+     * and fully functional. */
+    rcp_authz_policy_release(policy);
+    TEST_ASSERT_TRUE(rcp_authz_policy_permit(retained, "alice", make_addr(1, 3), 0x00));
+
+    /* The matching second release actually frees it. */
+    rcp_authz_policy_release(retained);
+}
+
+//cfusa:test REQ-AUTH-009
+static void test_retain_and_release_tolerate_null(void)
+{
+    TEST_ASSERT_NULL(rcp_authz_policy_retain(NULL));
+    rcp_authz_policy_release(NULL); /* must not crash */
+}
+
 //cfusa:test REQ-AUTH-002
 //cfusa:test REQ-AUTH-007
 static void test_denied_identity_is_not_permitted(void)
@@ -208,6 +250,8 @@ int main(void)
     UNITY_BEGIN();
 
     RUN_TEST(test_permitted_identity_succeeds);
+    RUN_TEST(test_retain_keeps_policy_alive_across_one_release);
+    RUN_TEST(test_retain_and_release_tolerate_null);
     RUN_TEST(test_denied_identity_is_not_permitted);
     RUN_TEST(test_empty_addrs_and_types_means_all_allowed);
     RUN_TEST(test_wrong_address_is_forbidden);
