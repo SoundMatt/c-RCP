@@ -3,41 +3,13 @@
 
 #include <string.h>
 
-/* ── evt[2:0]: the response-generation comparison rule ──────────────────────── */
+/* ── evt[2:0]: exact-match, per Table 30's plain-request row ─────────────── */
 
-//cfusa:req REQ-LINEP-001
-bool rcp_ep_lin_compare_mode_valid(uint8_t v)
+//cfusa:req REQ-LINEP-025
+bool rcp_ep_lin_response_matches(const uint8_t *tx_data, size_t tx_len,
+                                  const uint8_t *rx_data, size_t rx_len)
 {
-    return v <= (uint8_t)RCP_EP_LIN_COMPARE_RESERVED7;
-}
-
-//cfusa:req REQ-LINEP-002
-//cfusa:req REQ-LINEP-003
-//cfusa:req REQ-LINEP-004
-//cfusa:req REQ-LINEP-005
-bool rcp_ep_lin_compare_fires(rcp_ep_lin_compare_mode_t mode, const uint8_t *request_data,
-                               size_t request_len, const uint8_t *rx_data, size_t rx_len)
-{
-    switch (mode) {
-    case RCP_EP_LIN_COMPARE_EXACT:
-        if (rx_len != request_len) return false;
-        return request_len == 0 || memcmp(rx_data, request_data, request_len) == 0;
-
-    case RCP_EP_LIN_COMPARE_PREFIX:
-        if (rx_len < request_len) return false;
-        return request_len == 0 || memcmp(rx_data, request_data, request_len) == 0;
-
-    case RCP_EP_LIN_COMPARE_ANY:
-        return true;
-
-    case RCP_EP_LIN_COMPARE_NEVER:
-    case RCP_EP_LIN_COMPARE_RESERVED4:
-    case RCP_EP_LIN_COMPARE_RESERVED5:
-    case RCP_EP_LIN_COMPARE_RESERVED6:
-    case RCP_EP_LIN_COMPARE_RESERVED7:
-    default:
-        return false;
-    }
+    return rcp_acf_compound_wait_match(0x0u, tx_data, tx_len, rx_data, rx_len);
 }
 
 /* ── Transmission-done trigger ─────────────────────────────────────────────── */
@@ -105,16 +77,16 @@ const char *rcp_ep_lin_strerror(rcp_ep_lin_errc_t e)
     case RCP_EP_LIN_ERR_BAD_MSG_TYPE: return "rcp/ep_lin: unexpected ACF message type";
     case RCP_EP_LIN_ERR_WRONG_BUS:    return "rcp/ep_lin: wrong byte_bus_id";
     case RCP_EP_LIN_ERR_WRONG_OP:     return "rcp/ep_lin: wrong ACF op";
+    case RCP_EP_LIN_ERR_BAD_EVT:      return "rcp/ep_lin: evt[2:0] is not plain (000b)";
     default:                          return "rcp/ep_lin: unknown error";
     }
 }
 
 /* ── Command request ───────────────────────────────────────────────────────── */
 
-//cfusa:req REQ-LINEP-016
+//cfusa:req REQ-LINEP-026
 rcp_bytes_t rcp_ep_lin_encode_command_request(rcp_byte_bus_id_t byte_bus_id,
                                                const uint8_t *tx_data, size_t tx_len,
-                                               rcp_ep_lin_compare_mode_t compare_mode,
                                                uint8_t transaction_num)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -127,10 +99,10 @@ rcp_bytes_t rcp_ep_lin_encode_command_request(rcp_byte_bus_id_t byte_bus_id,
      * §5.10.1, and the general request-handling rule in §3.9.1).
      * Encoding this as a write (op=1) told a conforming peer "no data
      * response expected", i.e. the exact opposite of what the request
-     * means. */
+     * means. evt is left 0 -- Table 30 constrains a plain LIN request's
+     * evt[2:0] to 000b; see the file header. */
     hdr.byte_bus_id     = byte_bus_id;
     hdr.op              = RCP_ACF_OP_READ;
-    hdr.evt             = (uint8_t)compare_mode;
     hdr.transaction_num = transaction_num;
 
     return rcp_acf_encode_abb(&hdr, tx_data, tx_len);
@@ -138,11 +110,11 @@ rcp_bytes_t rcp_ep_lin_encode_command_request(rcp_byte_bus_id_t byte_bus_id,
 
 //cfusa:req REQ-LINEP-017
 //cfusa:req REQ-LINEP-018
+//cfusa:req REQ-LINEP-027
 rcp_ep_lin_errc_t rcp_ep_lin_decode_command_request(const uint8_t *b, size_t len,
                                                      rcp_byte_bus_id_t expected_bus_id,
                                                      const uint8_t **out_tx_data,
                                                      size_t *out_tx_len,
-                                                     uint8_t *out_compare_mode,
                                                      uint8_t *out_transaction_num)
 {
     rcp_acf_byte_message_info_t hdr;
@@ -157,13 +129,14 @@ rcp_ep_lin_errc_t rcp_ep_lin_decode_command_request(const uint8_t *b, size_t len
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_LIN_ERR_WRONG_BUS;
     /* Read direction -- see rcp_ep_lin_encode_command_request() above. */
     if (hdr.op != RCP_ACF_OP_READ) return RCP_EP_LIN_ERR_WRONG_OP;
+    /* Table 30's plain-request row rule; see the file header. */
+    if (!rcp_acf_evt_row2_is_plain(hdr.evt)) return RCP_EP_LIN_ERR_BAD_EVT;
 
     /* payload is round-tripped verbatim, byte for byte, with no
      * protocol-level LIN-frame parsing of any kind -- see the file
      * header. */
     *out_tx_data         = payload;
     *out_tx_len          = payload_len;
-    *out_compare_mode    = hdr.evt & 0x07u;
     *out_transaction_num = hdr.transaction_num;
     return RCP_EP_LIN_OK;
 }

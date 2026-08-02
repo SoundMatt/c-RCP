@@ -172,28 +172,42 @@ static void test_uart_rx_fifo_size_bounds_nothing_at_all(void)
     rcp_bytes_free(&f);
 }
 
-static void test_uart_compound_wait_has_no_fifo_bounded_predicate(void)
+/* RESOLVED (v0.110.0/v0.111.0) -- this test previously pinned a real gap:
+ * c-RCP had no UART compound-wait comparison predicate at all (the only
+ * one reachable was ep_lin.h's own, which is itself endpoint-agnostic and
+ * knows nothing of a UART fifo's bound). acf.h's rcp_acf_compound_wait_match()
+ * now provides that comparison surface universally, per TC18 §13.5.1, for
+ * every endpoint type including UART (wired into real dispatch via
+ * server.c's rcp_server_tick_ctx_t.current_status). §13.7.8.1's own
+ * "compared length bounded above by uart_rx_fifo_size" falls directly out
+ * of the shared §13.5.1 length rule once a real fifo's contents (which
+ * physically can never exceed uart_rx_fifo_size) are supplied as
+ * current_status: an expected byte_msg_payload longer than the fifo could
+ * ever hold can never match (status shorter than payload never matches,
+ * TC18's own rule) -- exactly the bound §13.7.8.1 describes, with no
+ * UART-specific logic required. */
+static void test_uart_compound_wait_now_resolved_via_generic_primitive(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
     rcp_lifecycle_writer_ctx_t   w = any_writer();
     const uint8_t                expected[8] = {1, 2, 3, 4, 5, 6, 7, 8};
-    const uint8_t                fifo[8]     = {1, 2, 3, 4, 5, 6, 7, 8};
+    /* The fifo can never hold more than ep_rx_buffer_size(4) bytes at
+     * once -- a real UART fifo, capped by hardware, not by this test. */
+    const uint8_t                fifo_contents[4] = {1, 2, 3, 4};
 
     rcp_ep_uart_functional_cfg_init(&cfg);
     TEST_ASSERT_TRUE(rcp_ep_uart_set_rx_buffer_size(&cfg, 4u, RCP_LIFECYCLE_HW_CONFIGURED, w));
-
-    /* DEVIATION -- TC18 §13.7.8.1 requires a compound wait on a UART
-     * endpoint to compare the request's expected data against the
-     * fifo-rx-buffer, with the compared length bounded above by
-     * uart_rx_fifo_size. c-RCP exposes no UART comparison predicate at all
-     * (contrast ep_lin.h's rcp_ep_lin_compare_fires()), so the only
-     * predicate a caller can reach is LIN's, which knows nothing of this
-     * endpoint: it matches an 8-octet expectation against an 8-octet
-     * capture even though the endpoint's own FIFO holds 4, a match a
-     * conforming implementation would have to refuse. */
     TEST_ASSERT_EQUAL_UINT16(4u, cfg.ep_rx_buffer_size);
-    TEST_ASSERT_TRUE(rcp_ep_lin_compare_fires(RCP_EP_LIN_COMPARE_EXACT, expected,
-                                              sizeof(expected), fifo, sizeof(fifo)));
+
+    /* An 8-byte expectation can never be satisfied by a fifo that only
+     * ever holds 4 -- correctly bounded, not a silent false match. */
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x0u, expected, sizeof(expected),
+                                                   fifo_contents, sizeof(fifo_contents)));
+
+    /* A 4-byte expectation matching the fifo's own current contents
+     * exactly does succeed -- the real, working comparison surface. */
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x0u, fifo_contents, sizeof(fifo_contents),
+                                                  fifo_contents, sizeof(fifo_contents)));
 }
 
 static void test_uart_read_size_truncates_above_one_octet(void)
@@ -772,7 +786,7 @@ int main(void)
 
     RUN_TEST(test_uart_functional_block_has_no_len_or_status_register);
     RUN_TEST(test_uart_rx_fifo_size_bounds_nothing_at_all);
-    RUN_TEST(test_uart_compound_wait_has_no_fifo_bounded_predicate);
+    RUN_TEST(test_uart_compound_wait_now_resolved_via_generic_primitive);
     RUN_TEST(test_uart_read_size_truncates_above_one_octet);
     RUN_TEST(test_uart_register_units_diverge_from_table_48);
 
