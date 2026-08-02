@@ -24,6 +24,8 @@
 //cfusa:req REQ-CMP-023
 //cfusa:req REQ-CMP-024
 //cfusa:req REQ-CMP-025
+//cfusa:req REQ-CMP-026
+//cfusa:req REQ-CMP-027
 /*
  * request_compound.h -- Compound / compound-wait conditional requests and the
  * clear-non-safestate cancellation request type for the TC18 Remote
@@ -251,13 +253,22 @@ typedef struct {
  * RCP_REQUEST_TYPE_COMPOUND_WAIT[_SAFETY] -- use
  * rcp_compound_encode_clear_non_safestate() for the payload-free 0x06
  * cancellation request instead. payload/payload_len is this request's own
- * opaque, endpoint-specific data (e.g. a compound-wait's comparison target
- * bytes); payload may be NULL iff payload_len == 0. Returns a zeroed
+ * opaque, endpoint-specific data -- for a compound-wait request, this is
+ * TC18 §13.5.1's byte_msg_payload, the comparison target
+ * rcp_acf_compound_wait_match() compares against an endpoint's current
+ * status, dispatched by evt (see below); payload may be NULL iff
+ * payload_len == 0. evt is the ACF header's own evt field
+ * (byte_message_info.evt, NOT one of rcp_compound_step_t's repurposed
+ * sub-fields): for a compound-wait request it selects the comparison mode
+ * per §13.5.1 (acf.h's rcp_acf_compound_wait_evt_valid()/_match()); a
+ * plain (non-wait) compound request has no comparison of its own and
+ * should pass 0. Returns a zeroed
  * rcp_bytes_t (data=NULL) if request_type is not recognized, payload_len
  * exceeds RCP_ACF_MAX_PAYLOAD, or on allocation failure. Caller frees the
  * result with rcp_bytes_free(). */
 rcp_bytes_t rcp_compound_encode_request(uint8_t request_type, rcp_byte_bus_id_t byte_bus_id,
-                                         const rcp_compound_step_t *step, uint8_t transaction_num,
+                                         const rcp_compound_step_t *step, uint8_t evt,
+                                         uint8_t transaction_num,
                                          const uint8_t *payload, size_t payload_len);
 
 /* Decodes and validates an ACF-level compound or compound-wait request
@@ -267,7 +278,9 @@ rcp_bytes_t rcp_compound_encode_request(uint8_t request_type, rcp_byte_bus_id_t 
  * RCP_COMPOUND_ERR_NOT_REPURPOSED (decoded mtv != RCP_ACF_MTV_UNTIMED), or
  * RCP_COMPOUND_ERR_UNKNOWN_TYPE (the decoded opcode byte is not
  * rcp_request_type_is_compound()/_is_compound_wait()). On
- * RCP_COMPOUND_OK, *out_request_type, *out_byte_bus_id, *out_step, and
+ * RCP_COMPOUND_OK, *out_request_type, *out_byte_bus_id, *out_step,
+ * *out_evt (the ACF header's own evt field -- see
+ * rcp_compound_encode_request()'s own doc comment), and
  * *out_transaction_num are populated, and *out_payload / *out_payload_len
  * are set to a *borrowed* view into b (not copied -- matching acf.c's own
  * decode_* convention) of this request's opaque payload. */
@@ -275,6 +288,7 @@ rcp_compound_errc_t rcp_compound_decode_request(const uint8_t *b, size_t len,
                                                  uint8_t *out_request_type,
                                                  rcp_byte_bus_id_t *out_byte_bus_id,
                                                  rcp_compound_step_t *out_step,
+                                                 uint8_t *out_evt,
                                                  const uint8_t **out_payload, size_t *out_payload_len,
                                                  uint8_t *out_transaction_num);
 

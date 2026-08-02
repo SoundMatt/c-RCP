@@ -113,11 +113,14 @@ static void unpack_ts(uint64_t ts, rcp_compound_step_t *out_step)
  * header), using acf.h's shared rcp_acf_pack_header()/rcp_acf_pad_len()
  * so the bit layout and quadlet/pad accounting stay in lockstep with
  * every other module that builds an ACF header. op=RCP_ACF_OP_NONE,
- * evt=0, ms=0, hs=0, rsp=0, err=0 -- this request kind carries no
- * read/write data operation of its own. Returns a zeroed rcp_bytes_t
+ * ms=0, hs=0, rsp=0, err=0 -- this request kind carries no read/write data
+ * operation of its own. evt is caller-supplied: a compound-wait request
+ * uses it to select its §13.5.1 comparison mode (see
+ * rcp_compound_encode_request()'s own doc comment); every other caller
+ * passes 0. Returns a zeroed rcp_bytes_t
  * (data=NULL) if payload_len exceeds RCP_ACF_GBB_MAX_PAYLOAD or on
  * allocation failure. */
-static rcp_bytes_t encode_gbb_repurposed(rcp_byte_bus_id_t byte_bus_id, uint8_t cs,
+static rcp_bytes_t encode_gbb_repurposed(rcp_byte_bus_id_t byte_bus_id, uint8_t cs, uint8_t evt,
                                           uint8_t transaction_num, uint64_t ts,
                                           const uint8_t *payload, size_t payload_len)
 {
@@ -140,6 +143,7 @@ static rcp_bytes_t encode_gbb_repurposed(rcp_byte_bus_id_t byte_bus_id, uint8_t 
 
     info.byte_bus_id     = byte_bus_id;
     info.cs               = cs;
+    info.evt               = evt;
     info.transaction_num  = transaction_num;
     info.pad               = pad;
     rcp_acf_pack_header(b, RCP_ACF_MSG_TYPE_GBB, quadlets, &info);
@@ -158,8 +162,10 @@ static rcp_bytes_t encode_gbb_repurposed(rcp_byte_bus_id_t byte_bus_id, uint8_t 
 //cfusa:req REQ-CMP-008
 //cfusa:req REQ-CMP-009
 //cfusa:req REQ-CMP-010
+//cfusa:req REQ-CMP-026
 rcp_bytes_t rcp_compound_encode_request(uint8_t request_type, rcp_byte_bus_id_t byte_bus_id,
-                                         const rcp_compound_step_t *step, uint8_t transaction_num,
+                                         const rcp_compound_step_t *step, uint8_t evt,
+                                         uint8_t transaction_num,
                                          const uint8_t *payload, size_t payload_len)
 {
     rcp_bytes_t frame = {0};
@@ -169,8 +175,8 @@ rcp_bytes_t rcp_compound_encode_request(uint8_t request_type, rcp_byte_bus_id_t 
         return frame;
     }
 
-    return encode_gbb_repurposed(byte_bus_id, 0u, transaction_num, pack_ts(request_type, step),
-                                  payload, payload_len);
+    return encode_gbb_repurposed(byte_bus_id, 0u, evt, transaction_num,
+                                  pack_ts(request_type, step), payload, payload_len);
 }
 
 //cfusa:req REQ-CMP-011
@@ -178,10 +184,12 @@ rcp_bytes_t rcp_compound_encode_request(uint8_t request_type, rcp_byte_bus_id_t 
 //cfusa:req REQ-CMP-013
 //cfusa:req REQ-CMP-014
 //cfusa:req REQ-CMP-015
+//cfusa:req REQ-CMP-027
 rcp_compound_errc_t rcp_compound_decode_request(const uint8_t *b, size_t len,
                                                  uint8_t *out_request_type,
                                                  rcp_byte_bus_id_t *out_byte_bus_id,
                                                  rcp_compound_step_t *out_step,
+                                                 uint8_t *out_evt,
                                                  const uint8_t **out_payload, size_t *out_payload_len,
                                                  uint8_t *out_transaction_num)
 {
@@ -204,6 +212,7 @@ rcp_compound_errc_t rcp_compound_decode_request(const uint8_t *b, size_t len,
 
     *out_request_type    = rt;
     *out_byte_bus_id      = hdr.info.byte_bus_id;
+    *out_evt              = hdr.info.evt;
     *out_transaction_num  = hdr.info.transaction_num;
     return RCP_COMPOUND_OK;
 }
@@ -216,7 +225,7 @@ rcp_bytes_t rcp_compound_encode_clear_non_safestate(rcp_byte_bus_id_t byte_bus_i
 {
     uint64_t ts = ((uint64_t)RCP_REQUEST_TYPE_CLEAR_NON_SAFESTATE) << 56;
 
-    return encode_gbb_repurposed(byte_bus_id, 0u, transaction_num, ts, NULL, 0);
+    return encode_gbb_repurposed(byte_bus_id, 0u, 0u, transaction_num, ts, NULL, 0);
 }
 
 //cfusa:req REQ-CMP-017

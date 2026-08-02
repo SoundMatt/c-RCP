@@ -92,10 +92,12 @@ size_t rcp_server_endpoint_queue_len(const rcp_server_endpoint_t *ep)
 
 /* ── The conditional-request store ────────────────────────────────────────── */
 
-/* Frees slot's owned frame copy and marks it free. */
+/* Frees slot's owned frame (and, for a COMPOUND_WAIT slot, its own
+ * comparison-target) copies and marks it free. */
 static void release_slot(rcp_server_endpoint_t *ep, rcp_server_pending_t *slot)
 {
     rcp_bytes_free(&slot->frame);
+    rcp_bytes_free(&slot->compound_wait_target);
     memset(slot, 0, sizeof(*slot));
     ep->pending_count--;
 }
@@ -119,6 +121,7 @@ static rcp_server_pending_t *claim_slot(rcp_server_endpoint_t *ep)
 
 //cfusa:req REQ-SRV-004
 //cfusa:req REQ-SRV-005
+//cfusa:req REQ-SRV-019
 rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
                                               const uint8_t *frame, size_t frame_len,
                                               uint32_t now, uint8_t *out_request_type,
@@ -130,6 +133,7 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
     const uint8_t        *payload;
     size_t                payload_len;
     uint8_t               decoded_rt;
+    uint8_t               decoded_evt;
     rcp_byte_bus_id_t     bus;
     uint8_t               tn;
 
@@ -164,9 +168,27 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
     case RCP_SCHED_KIND_COMPOUND:
     case RCP_SCHED_KIND_COMPOUND_WAIT:
         if (rcp_compound_decode_request(frame, frame_len, &decoded_rt, &bus, &slot->compound,
-                                         &payload, &payload_len, &tn) != RCP_COMPOUND_OK) {
+                                         &decoded_evt, &payload, &payload_len,
+                                         &tn) != RCP_COMPOUND_OK) {
             release_slot(ep, slot);
             return RCP_SERVER_ADMIT_REJECTED;
+        }
+        /* TC18 §13.5.1: evt[2:0] = 011b is reserved for a compound-wait
+         * request -- "request shall be ignored and an err-response with
+         * error code = UNSUPPORTED_CMD shall be sent". A plain (non-wait)
+         * compound request has no comparison of its own, so evt carries
+         * no meaning to validate here. */
+        if (kind == RCP_SCHED_KIND_COMPOUND_WAIT) {
+            if (!rcp_acf_compound_wait_evt_valid(decoded_evt)) {
+                release_slot(ep, slot);
+                return RCP_SERVER_ADMIT_REJECTED;
+            }
+            slot->compound_wait_evt    = decoded_evt;
+            slot->compound_wait_target = rcp_bytes_dup(payload, payload_len);
+            if (!slot->compound_wait_target.data && payload_len > 0) {
+                release_slot(ep, slot);
+                return RCP_SERVER_ADMIT_REJECTED;
+            }
         }
         slot->transaction_num = tn;
         break;
@@ -273,8 +295,15 @@ static bool auxiliary_condition_met(const rcp_server_pending_t *slot,
 {
     switch (slot->kind) {
     case RCP_SCHED_KIND_COMPOUND_WAIT:
-        /* The caller's own already-evaluated comparison result. */
-        return ctx->wait_condition_met;
+        /* This slot's own evt/byte_msg_payload (admitted and validated in
+         * rcp_server_endpoint_admit(), never reserved by this point)
+         * against the caller-supplied, endpoint-scoped current status --
+         * each pending COMPOUND_WAIT request is compared independently,
+         * even when several are pending on the same endpoint at once. */
+        return rcp_acf_compound_wait_match(slot->compound_wait_evt,
+                                            slot->compound_wait_target.data,
+                                            slot->compound_wait_target.len,
+                                            ctx->current_status, ctx->current_status_len);
 
     case RCP_SCHED_KIND_TRIGGERED:
     case RCP_SCHED_KIND_CHAINED:
@@ -333,6 +362,7 @@ static bool is_due(rcp_server_pending_t *slot, const rcp_server_tick_ctx_t *ctx)
 //cfusa:req REQ-SRV-006
 //cfusa:req REQ-SRV-007
 //cfusa:req REQ-SRV-008
+//cfusa:req REQ-SRV-020
 bool rcp_server_endpoint_select_due(rcp_server_endpoint_t *ep,
                                      const rcp_server_tick_ctx_t *ctx, size_t *out_index)
 {
@@ -364,6 +394,7 @@ bool rcp_server_endpoint_select_due(rcp_server_endpoint_t *ep,
 
 //cfusa:req REQ-SRV-009
 //cfusa:req REQ-SRV-010
+//cfusa:req REQ-SRV-020
 bool rcp_server_endpoint_complete(rcp_server_endpoint_t *ep, size_t index,
                                    const rcp_server_tick_ctx_t *ctx)
 {
@@ -388,7 +419,11 @@ bool rcp_server_endpoint_complete(rcp_server_endpoint_t *ep, size_t index,
     case RCP_SCHED_KIND_COMPOUND_WAIT:
         if (ctx->sequencers) {
             (void)rcp_compound_wait_tick(ctx->sequencers, &slot->compound,
-                                          ctx->wait_condition_met);
+                                          rcp_acf_compound_wait_match(
+                                              slot->compound_wait_evt,
+                                              slot->compound_wait_target.data,
+                                              slot->compound_wait_target.len,
+                                              ctx->current_status, ctx->current_status_len));
         }
         repeat = &slot->compound.repeat_count;
         break;

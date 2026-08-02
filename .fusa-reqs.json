@@ -3206,24 +3206,6 @@
       "scope": "tc18"
     },
     {
-      "id": "REQ-SPI-031",
-      "title": "rcp_ep_spi_compound_wait_status_equal() compares only the first RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN bytes",
-      "text": "rcp_ep_spi_compound_wait_status_equal() shall compare only the first RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN (4) bytes of status and target for equality, ignoring any bytes beyond the fourth in either buffer up to RCP_EP_SPI_STATUS_MAX_LEN (20).",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B",
-      "scope": "tc18"
-    },
-    {
-      "id": "REQ-SPI-032",
-      "title": "rcp_ep_spi_compound_wait_status_equal() returns false when either buffer is shorter than RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN",
-      "text": "rcp_ep_spi_compound_wait_status_equal() shall return false, never treating a too-short buffer as a match, when status_len or target_len is less than RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN (4).",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B",
-      "scope": "tc18"
-    },
-    {
       "id": "REQ-I2C-001",
       "title": "rcp_ep_i2c_mode_valid() accepts exactly the four defined presets",
       "text": "rcp_ep_i2c_mode_valid() shall return true for v in 0..3 (RCP_EP_I2C_MODE_STANDARD..RCP_EP_I2C_MODE_HIGH_SPEED) and false for any other value.",
@@ -7191,6 +7173,28 @@
       "scope": "tc18"
     },
     {
+      "id": "REQ-CMP-026",
+      "title": "rcp_compound_encode_request() packs evt into the shared byte_message_info header, not one of step's repurposed sub-fields",
+      "text": "rcp_compound_encode_request() shall write its evt parameter into the encoded frame's byte_message_info.evt field (Table 4 octet 4 bits 7:4) via acf.h's rcp_acf_pack_header(), independently of every rcp_compound_step_t sub-field packed into the repurposed message_timestamp region. For a compound-wait request this is the TC18 §13.5.1 comparison-mode selector; a plain compound request has no comparison of its own.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§13.5.1, TC18.txt L3735-3736"
+    },
+    {
+      "id": "REQ-CMP-027",
+      "title": "rcp_compound_decode_request() surfaces the decoded byte_message_info.evt field",
+      "text": "rcp_compound_decode_request() shall, on RCP_COMPOUND_OK, populate *out_evt with the decoded byte_message_info.evt field, independently of every recovered rcp_compound_step_t sub-field.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§13.5.1, TC18.txt L3735-3736"
+    },
+    {
       "id": "REQ-TIMED-009",
       "title": "rcp_timed_decode_request() rejects a non-zero reserved octet",
       "text": "rcp_timed_decode_request() shall return RCP_TIMED_ERR_RESERVED_NONZERO when the reserved octet at offset 1 of the repurposed message_timestamp region carries any set bit, per TC18 v0.5.1_RC \u00a711.2.2.5 Table 10 (\"All bits shall be written as 0, else the request shall be rejected\").",
@@ -8709,6 +8713,28 @@
       "scope": "tc18-gap",
       "status": "not-implemented",
       "tc18": "\u00a713.7.1.3 Table 34, TC18.txt L4048-4053"
+    },
+    {
+      "id": "REQ-SRV-019",
+      "title": "rcp_server_endpoint_admit() stores each COMPOUND_WAIT request's own evt and byte_msg_payload, and rejects a reserved evt",
+      "text": "rcp_server_endpoint_admit() shall, for a decoded RCP_SCHED_KIND_COMPOUND_WAIT request, reject it (RCP_SERVER_ADMIT_REJECTED) when rcp_acf_compound_wait_evt_valid() is false for its decoded evt (TC18 \u00a713.5.1: evt[2:0] = 011b is reserved -- \"request shall be ignored and an err-response with error code = UNSUPPORTED_CMD shall be sent\"), and otherwise store that request's own decoded evt and an owned copy of its byte_msg_payload (rcp_server_pending_t's compound_wait_evt/compound_wait_target) independently of every other pending request on the same endpoint.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.5.1, TC18.txt L3735-3736 (evt[2:0] = 011b reserved)"
+    },
+    {
+      "id": "REQ-SRV-020",
+      "title": "Each pending COMPOUND_WAIT request is evaluated against the caller-supplied current status independently of any other pending request",
+      "text": "rcp_server_endpoint_select_due()/rcp_server_endpoint_complete() shall evaluate a pending RCP_SCHED_KIND_COMPOUND_WAIT request's execution condition via rcp_acf_compound_wait_match(), passing that specific request's own stored evt/byte_msg_payload (not any other pending request's) together with ctx->current_status/current_status_len; two requests pending on the same endpoint with different byte_msg_payload targets shall never be conflated by a single shared result.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.5.1, TC18.txt L3735-3763"
     },
     {
       "id": "REQ-TIMED-012",

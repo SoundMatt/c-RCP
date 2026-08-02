@@ -23,6 +23,8 @@
 //cfusa:req REQ-SRV-016
 //cfusa:req REQ-SRV-017
 //cfusa:req REQ-SRV-018
+//cfusa:req REQ-SRV-019
+//cfusa:req REQ-SRV-020
 /*
  * server.h -- Per-endpoint ep_enable pre-load-then-drain request queue for
  * the TC18 Remote Control Protocol wire layer (ROADMAP.md Phase 14, "RC
@@ -134,6 +136,14 @@ typedef struct {
      * determined by kind -- a plain struct rather than a union so a
      * caller can inspect a stored request without first branching. */
     rcp_compound_step_t     compound;          /* COMPOUND / COMPOUND_WAIT */
+    /* COMPOUND_WAIT only: this request's own TC18 §13.5.1 evt[2:0]
+     * comparison mode and byte_msg_payload comparison target -- an owned
+     * copy, since the frame it was decoded from may outlive nothing but
+     * this store entry itself (mirrors frame's own ownership). Each
+     * pending COMPOUND_WAIT request carries its own independent target;
+     * this is NOT shared across an endpoint's other pending requests. */
+    uint8_t                 compound_wait_evt;
+    rcp_bytes_t             compound_wait_target;
     rcp_triggered_step_t    triggered;         /* TRIGGERED */
     rcp_triggered_runtime_t triggered_runtime; /* TRIGGERED occurrence counter */
     uint64_t                presentation_time; /* TIMED */
@@ -277,10 +287,23 @@ typedef struct {
      * every safety-tagged (0x8x) request through e2e.h's
      * rcp_e2e_request_may_execute(). */
     bool                   in_safe_state;
-    /* The caller's own already-evaluated compound-wait comparison result
-     * (see request_compound.h's rcp_compound_wait_tick()) -- this module
-     * owns no endpoint-specific comparison logic. */
-    bool                   wait_condition_met;
+    /* The endpoint's own current status bytes, for evaluating any pending
+     * COMPOUND_WAIT requests' TC18 §13.5.1 comparison via
+     * acf.h's rcp_acf_compound_wait_match() -- this module owns no
+     * endpoint-specific status representation or comparison logic of its
+     * own; the caller supplies the raw status bytes and this module
+     * combines them with each pending request's own stored evt/
+     * byte_msg_payload (rcp_server_pending_t's compound_wait_evt/
+     * compound_wait_target). This is endpoint-scoped, NOT per-request: at
+     * a given tick, an endpoint has exactly one current status, but each
+     * pending COMPOUND_WAIT request is independently compared against it
+     * with its own evt mode and target -- two pending requests with
+     * different byte_msg_payload are never conflated. May be {NULL,0} if
+     * the endpoint has no status representation, in which case (per
+     * rcp_acf_compound_wait_match()'s own length rule) no COMPOUND_WAIT
+     * request whose byte_msg_payload is nonempty ever becomes due. */
+    const uint8_t         *current_status;
+    size_t                 current_status_len;
 } rcp_server_tick_ctx_t;
 
 /* Re-evaluates every stored request's start condition against ctx (arming

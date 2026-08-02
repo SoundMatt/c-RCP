@@ -31,6 +31,51 @@ the rationale.
 
 ## Releases
 
+### v0.111.0 -- 2026-08-01
+
+**Wire the v0.110.0 compound-wait comparison primitive into real dispatch
+(BREAKING).** v0.110.0 added the TC18 §13.5.1 comparison rule but left it
+completely unreachable: `rcp_compound_encode_request()` had no way to set
+`evt` (every compound-wait request silently encoded `evt = 0`, forcing
+exact-match regardless of caller intent) and `rcp_compound_decode_request()`
+discarded the decoded `evt` entirely. This release closes that gap end to
+end.
+
+**API changes (BREAKING):**
+* `rcp_compound_encode_request()` gains an `evt` parameter.
+* `rcp_compound_decode_request()` gains an `out_evt` output parameter.
+* `rcp_server_tick_ctx_t`'s single `wait_condition_met` bool is replaced
+  by `current_status`/`current_status_len`: the endpoint's own current
+  status bytes. This was a real, separate defect, not just a signature
+  change -- a single flat bool cannot distinguish between two
+  simultaneously-pending COMPOUND_WAIT requests on the same endpoint with
+  different `byte_msg_payload` targets; the old design would apply
+  whichever single result the caller computed to *every* pending
+  COMPOUND_WAIT request indiscriminately. `rcp_server_pending_t` now
+  stores each COMPOUND_WAIT request's own `evt` and an owned copy of its
+  `byte_msg_payload`, admitted and validated independently
+  (`rcp_acf_compound_wait_evt_valid()` rejects the reserved `011b` value
+  at admission time, per TC18 §13.5.1's own "ignored, err-response
+  UNSUPPORTED_CMD" rule, rather than storing a request that could simply
+  never match), and evaluated independently against the shared
+  `current_status` at every tick.
+* `rcp_ep_spi_compound_wait_status_equal()` and
+  `RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN` are removed: both modeled the
+  comparison length as an SPI-specific hardcoded 4 bytes, which was never
+  a real rule -- TC18's own length-capping rule (status capped to
+  `byte_msg_payload`'s own length) is universal, and the specification's
+  4-of-20-bytes worked example merely illustrates it using SPI.
+  `RCP_EP_SPI_STATUS_MAX_LEN` (a genuinely SPI-specific status-report
+  width bound, unrelated to compound-wait) is unaffected. `REQ-SPI-031`/
+  `032` removed with it.
+
+`REQ-CMP-026`/`027` (the encode/decode threading), `REQ-SRV-019`/`020`
+(admission storage + independent per-request evaluation) added, 100%
+traced. New test coverage includes two simultaneously-pending
+COMPOUND_WAIT requests with distinct targets executing independently,
+and reserved-`evt` admission rejection -- both mutation-tested against
+the pre-fix behavior.
+
 ### v0.110.0 -- 2026-08-01
 
 **TC18 §13.5.1 compound-wait comparison primitive. Additive, no existing

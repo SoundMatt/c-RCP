@@ -16,6 +16,8 @@
 //cfusa:test REQ-MOCK-024
 //cfusa:test REQ-MOCK-025
 //cfusa:test REQ-MOCK-026
+//cfusa:test REQ-SRV-019
+//cfusa:test REQ-SRV-020
 /*
  * test_conditional_dispatch.c -- end-to-end tests for conditional-request
  * dispatch (TC18 §11.2.2/§11.2.3) through the real server path.
@@ -121,13 +123,14 @@ static rcp_server_tick_ctx_t base_ctx(uint32_t now)
     rcp_server_tick_ctx_t ctx;
 
     memset(&ctx, 0, sizeof(ctx));
-    ctx.now                = now;
-    ctx.gptp_now           = 0;
-    ctx.gptp_locked        = true;
-    ctx.sequencers         = NULL; /* overwritten by rcp_mock_server_tick() */
-    ctx.endpoint_idle      = true;
-    ctx.in_safe_state      = false;
-    ctx.wait_condition_met = false;
+    ctx.now                 = now;
+    ctx.gptp_now            = 0;
+    ctx.gptp_locked         = true;
+    ctx.sequencers          = NULL; /* overwritten by rcp_mock_server_tick() */
+    ctx.endpoint_idle       = true;
+    ctx.in_safe_state       = false;
+    ctx.current_status      = NULL; /* no status -> no COMPOUND_WAIT ever matches */
+    ctx.current_status_len  = 0;
     return ctx;
 }
 
@@ -176,7 +179,10 @@ static rcp_bytes_t make_compound(uint8_t request_type, uint8_t seq, uint8_t star
     step.sequencer_index  = seq;
     step.exec_delay       = delay;
     step.repeat_count     = repeats;
-    return rcp_compound_encode_request(request_type, 1, &step, txn, NULL, 0);
+    /* evt is irrelevant to every caller of this helper (none are
+     * COMPOUND_WAIT); see test_compound_wait_requires_the_wait_condition()
+     * for a COMPOUND_WAIT request built with a real evt/payload. */
+    return rcp_compound_encode_request(request_type, 1, &step, 0u, txn, NULL, 0);
 }
 
 static void test_compound_waits_for_its_sequencer_state(void)
@@ -249,22 +255,117 @@ static void test_compound_wait_requires_the_wait_condition(void)
 {
     handler_log_t log;
     rcp_mock_server_t *srv = fixture(&log);
-    rcp_bytes_t frame = make_compound(RCP_REQUEST_TYPE_COMPOUND_WAIT, 0,
-                                       RCP_SEQUENCER_POWER_ON_STATE, 7, 0, 0, 13);
+    rcp_compound_step_t step = {0};
+    rcp_bytes_t frame;
+    /* TC18 §13.5.1 evt[2:0] = 000b (exact match) against this 2-byte
+     * byte_msg_payload -- the real comparison mode/target this request
+     * carries on the wire, not a caller-injected shortcut. */
+    const uint8_t target[2] = {0x01, 0x02};
+    const uint8_t mismatched_status[2] = {0x01, 0x03};
+    const uint8_t matching_status[2]   = {0x01, 0x02};
     rcp_server_tick_ctx_t ctx = base_ctx(0);
 
+    step.start_state    = RCP_SEQUENCER_POWER_ON_STATE;
+    step.next_state      = 7;
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT, 1, &step, 0x0u, 13,
+                                         target, sizeof(target));
     TEST_ASSERT_NOT_NULL(frame.data);
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &frame));
 
-    /* Sequencer is in start_state, but the wait condition is not met. */
-    ctx.wait_condition_met = false;
+    /* Sequencer is in start_state, but the endpoint's current status
+     * does not match this request's own byte_msg_payload. */
+    ctx.current_status     = mismatched_status;
+    ctx.current_status_len = sizeof(mismatched_status);
     TEST_ASSERT_FALSE(tick(srv, &ctx));
     TEST_ASSERT_EQUAL_size_t(0, log.count);
 
-    ctx.wait_condition_met = true;
+    ctx.current_status     = matching_status;
+    ctx.current_status_len = sizeof(matching_status);
     TEST_ASSERT_TRUE(tick(srv, &ctx));
     TEST_ASSERT_EQUAL_size_t(1, log.count);
     TEST_ASSERT_EQUAL_HEX8(RCP_REQUEST_TYPE_COMPOUND_WAIT, log.opcode[0]);
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* Two pending COMPOUND_WAIT requests on the same endpoint, each with its
+ * own independent byte_msg_payload target, must be evaluated
+ * independently against the shared current status -- a single flat
+ * "the" wait condition cannot represent this. */
+static void test_two_pending_compound_waits_have_independent_targets(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    rcp_compound_step_t step_a = {0};
+    rcp_compound_step_t step_b = {0};
+    rcp_bytes_t frame_a, frame_b;
+    const uint8_t target_a[2] = {0x00, 0x05};
+    const uint8_t target_b[2] = {0x00, 0x09};
+    const uint8_t status_matches_only_a[2] = {0x00, 0x05};
+    const uint8_t status_matches_only_b[2] = {0x00, 0x09};
+    rcp_server_tick_ctx_t ctx = base_ctx(0);
+
+    /* Distinct sequencers, so one executing never disturbs the other's
+     * own start condition. */
+    step_a.sequencer_index = 0;
+    step_a.start_state      = RCP_SEQUENCER_POWER_ON_STATE;
+    step_a.next_state        = 1;
+    step_b.sequencer_index = 1;
+    step_b.start_state      = RCP_SEQUENCER_POWER_ON_STATE;
+    step_b.next_state        = 1;
+
+    frame_a = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT, 1, &step_a, 0x0u, 21,
+                                           target_a, sizeof(target_a));
+    frame_b = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT, 1, &step_b, 0x0u, 22,
+                                           target_b, sizeof(target_b));
+    TEST_ASSERT_NOT_NULL(frame_a.data);
+    TEST_ASSERT_NOT_NULL(frame_b.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &frame_a));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &frame_b));
+    TEST_ASSERT_EQUAL_size_t(2, rcp_mock_server_pending_count(srv, 1));
+
+    /* Status matches only A's target: exactly A runs, never B -- a shared
+     * flat condition_met could not tell these two requests apart. */
+    ctx.current_status     = status_matches_only_a;
+    ctx.current_status_len = sizeof(status_matches_only_a);
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(1, log.count);
+    TEST_ASSERT_EQUAL_HEX8(21, log.transaction_num[0]);
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 1)); /* B still pending */
+
+    /* Now status matches only B's (still-pending) target. */
+    ctx.current_status     = status_matches_only_b;
+    ctx.current_status_len = sizeof(status_matches_only_b);
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(2, log.count);
+    TEST_ASSERT_EQUAL_HEX8(22, log.transaction_num[1]);
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 1));
+
+    rcp_bytes_free(&frame_a);
+    rcp_bytes_free(&frame_b);
+    rcp_mock_server_destroy(srv);
+}
+
+/* TC18 §13.5.1: evt[2:0] = 011b is reserved for a compound-wait request --
+ * "request shall be ignored and an err-response with error code =
+ * UNSUPPORTED_CMD shall be sent". Admission must reject it outright
+ * rather than storing it as a request that can simply never match. */
+static void test_compound_wait_reserved_evt_is_rejected_at_admission(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    rcp_compound_step_t step = {0};
+    rcp_bytes_t frame;
+
+    step.start_state = RCP_SEQUENCER_POWER_ON_STATE;
+    step.next_state    = 1;
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT, 1, &step, 0x3u, 30,
+                                         NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED, submit(srv, &frame));
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 1));
 
     rcp_bytes_free(&frame);
     rcp_mock_server_destroy(srv);
@@ -833,6 +934,8 @@ int main(void)
     RUN_TEST(test_compound_waits_for_its_sequencer_state);
     RUN_TEST(test_compound_exec_delay_holds_execution_back);
     RUN_TEST(test_compound_wait_requires_the_wait_condition);
+    RUN_TEST(test_two_pending_compound_waits_have_independent_targets);
+    RUN_TEST(test_compound_wait_reserved_evt_is_rejected_at_admission);
 
     RUN_TEST(test_triggered_executes_only_on_its_own_trigger);
     RUN_TEST(test_triggered_threshold_delays_execution);

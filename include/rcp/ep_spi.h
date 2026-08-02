@@ -140,18 +140,22 @@
  * is the pure, directly-testable evaluation of one such event against a
  * selected trigger mode.
  *
- * ── The SPI compound-wait truncation rule ───────────────────────────────────
+ * ── Compound-wait against an SPI endpoint ───────────────────────────────────
  *
- * A future compound-wait request (generic compound-wait plumbing itself
- * lands at Phase 17 milestone 69) that targets an SPI endpoint compares
- * only the first RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN (4) of up to
- * RCP_EP_SPI_STATUS_MAX_LEN (20) status bytes (extraction §4.6) -- a
- * property of this endpoint type itself, not of the compound-wait
- * mechanism, and therefore implemented and unit-tested here, now, via
- * rcp_ep_spi_compound_wait_status_equal(): a raw, milestone-69-independent
- * comparison-mode helper that milestone 67's PWM_IN numeric compound-wait
- * comparison modes are explicitly told (by the roadmap) to follow the
- * precedent of.
+ * v0.111.0 removed this file's own rcp_ep_spi_compound_wait_status_equal()
+ * and its RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN constant: both modeled the
+ * comparison-length rule as an SPI-specific, hardcoded 4-byte truncation.
+ * That was wrong -- TC18 §13.5.1's own length rule (status is capped to
+ * byte_msg_payload's own length, whatever that request happens to carry)
+ * is universal across every endpoint type, and the specification's own
+ * worked example ("only the first four out of 20 received bytes will be
+ * checked when byte_msg_payload has only four bytes") illustrates that
+ * general rule using SPI, rather than stating an SPI-specific rule of its
+ * own. RCP_EP_SPI_STATUS_MAX_LEN below is unaffected (it bounds this
+ * endpoint type's own transfer-done status-report width, unrelated to
+ * compound-wait's comparison length); the comparison itself now goes
+ * through acf.h's rcp_acf_compound_wait_evt_valid()/_match() directly,
+ * exactly like every other endpoint type.
  */
 #ifndef RCP_EP_SPI_H
 #define RCP_EP_SPI_H
@@ -393,37 +397,17 @@ rcp_ep_spi_errc_t rcp_ep_spi_decode_response(const uint8_t *b, size_t len,
                                               bool *out_timed, uint64_t *out_timestamp,
                                               uint8_t *out_transaction_num);
 
-/* ── Compound-wait truncation rule (see the file header) ───────────────────── */
+/* ── SPI status-report width ─────────────────────────────────────────────── */
 
 /* The largest status-report width this endpoint type's transfer-done status
  * may carry -- this module's own bound, matching extraction §4.6's "up to
- * 20 status bytes" ceiling for the compound-wait comparison
- * rcp_ep_spi_compound_wait_status_equal() below services. Not itself
- * enforced by any encode/decode function above (no status-report codec is
- * in this milestone's scope); provided so callers building that
- * status-report representation size it consistently with the truncation
- * rule that will apply to it. */
+ * 20 status bytes" ceiling. Not itself enforced by any encode/decode
+ * function above (no status-report codec is in this milestone's scope);
+ * provided so callers building that status-report representation size it
+ * consistently. Unrelated to compound-wait's own comparison length, which
+ * is driven by byte_msg_payload's length (see the file header) via acf.h's
+ * rcp_acf_compound_wait_evt_valid()/_match(). */
 #define RCP_EP_SPI_STATUS_MAX_LEN ((size_t)20u)
-
-/* The number of leading status bytes a compound-wait request compares
- * against an SPI endpoint, regardless of how much of the up-to-
- * RCP_EP_SPI_STATUS_MAX_LEN-byte status report is actually present -- see
- * the file header. */
-#define RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN ((size_t)4u)
-
-/* Raw comparison-mode helper for a future compound-wait request (Phase 17
- * milestone 69): true iff the first RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN
- * (4) bytes of status equal the first RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN
- * bytes of target, byte for byte; any bytes beyond the fourth in either
- * buffer are ignored regardless of how much of the endpoint's up-to-
- * RCP_EP_SPI_STATUS_MAX_LEN-byte status report is actually present.
- * Returns false (never an error code -- this module's fail-safe treatment
- * of a too-short pair, mirroring rcp_ep_gpio_pin_get()'s treatment of an
- * invalid pin index) if either status_len or target_len is less than
- * RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN. status/target may be NULL iff their
- * respective length is 0. */
-bool rcp_ep_spi_compound_wait_status_equal(const uint8_t *status, size_t status_len,
-                                            const uint8_t *target, size_t target_len);
 
 #ifdef __cplusplus
 }

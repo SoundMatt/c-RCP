@@ -333,16 +333,3 @@ rcp_ep_spi_errc_t rcp_ep_spi_decode_response(const uint8_t *b, size_t len,
     *out_transaction_num = transaction_num;
     return RCP_EP_SPI_OK;
 }
-
-/* ── Compound-wait truncation rule ─────────────────────────────────────────── */
-
-//cfusa:req REQ-SPI-031
-//cfusa:req REQ-SPI-032
-bool rcp_ep_spi_compound_wait_status_equal(const uint8_t *status, size_t status_len,
-                                            const uint8_t *target, size_t target_len)
-{
-    if (status_len < RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN) return false;
-    if (target_len < RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN) return false;
-
-    return memcmp(status, target, RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN) == 0;
-}
