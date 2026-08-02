@@ -2303,7 +2303,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3 (\"The three lifecycle states the device may be in are...\"), TC18.txt L2063"
     },
     {
       "id": "REQ-LIFECYCLE-002",
@@ -2330,7 +2331,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.2 (\"An endpoint may be used or not used in a specific instantiation of a RC Server\"), TC18.txt L3502"
     },
     {
       "id": "REQ-LIFECYCLE-005",
@@ -4547,7 +4549,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.9.2 Table 51 (\"an implementation may decide to fix\" adc_samples_per_avg_interval read-only; this implementation instead makes it writable, the more general of the two spec-permitted choices), TC18.txt L5040, L5107"
     },
     {
       "id": "REQ-ADC-019",
@@ -4665,7 +4668,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.2 (\"[an implementation] may support only a lower number of sequencers\"), TC18.txt L3473"
     },
     {
       "id": "REQ-SEQ-002",
@@ -4989,7 +4993,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "\u00a711.2.2 Table 5 (request_type 0x0E/0x8E = Triggered), TC18.txt L1196"
+      "tc18": "\u00a711.2.2 Table 5 (request_type 0x0E/0x8E = Triggered), TC18.txt L1196; \u00a711.2.2.3 (\"Each endpoint may be configured to start a request upon receiving a selected trigger signal\"), TC18.txt L1413"
     },
     {
       "id": "REQ-TRIG-002",
@@ -5266,7 +5270,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.5 (\"The RC Server may reject the request, when the presentation_time is too far in the future\"), TC18.txt L1649"
     },
     {
       "id": "REQ-CANCEL-001",
@@ -5594,7 +5599,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.7.7 (\"a safe state may be enforced. The safe state to enter can be chosen via the Safety_Measure parameter\"), TC18.txt L2935"
     },
     {
       "id": "REQ-E2E-017",
@@ -6276,7 +6282,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.13.1 (\"An RC Server implementation with an integrated PHY may allow access to the integrated PHY via this MDIO EP\"), TC18.txt L5631"
     },
     {
       "id": "REQ-MDIO-002",
@@ -6476,7 +6483,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.4 (\"The RC Server may support different power modes\"), TC18.txt L2268"
     },
     {
       "id": "REQ-PWRMODE-005",
@@ -7144,7 +7152,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.9.1.1 (\"An RCP frame may include multiple ACF-types (requests)\"), TC18.txt L3220"
     },
     {
       "id": "REQ-MOCK-020",

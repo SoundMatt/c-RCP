@@ -6067,3 +6067,48 @@ additive function, not a rewrite of the old one.
 
 `REQ-GPIO-037` added -- 1023 requirements, 100% traced+tested, 0 `cfusa
 check` errors. Purely additive; non-breaking.
+
+### 116. SHOULD/MAY audit: every RFC2119 SHOULD/MAY in TC18, extracted and referenced (v0.116.0)
+
+Milestone 105's "TC18 requirements-corpus completeness pass" catalogued
+the specification's MUST/SHALL surface; a direct question -- was
+SHOULD/MAY also extracted, even where not implemented? -- found that it
+had not been done as its own explicit pass. Closed the gap: grepped the
+full spec text for `\bshould\b` (12 hits) and `\bmay\b` (44 hits),
+excluded 6 legal-boilerplate hits, and individually read and classified
+every one of the remaining 51 lines against this codebase.
+
+Result: 10 SHOULD lines are all non-testable (six intro §2 design-goal
+philosophy statements about the standard itself, three client-config-
+authoring/request-composition advice pieces the RC Server cannot enforce,
+one hardware register-calibration guideline). 41 MAY lines: 12 already
+implemented and verified against actual code (Triggered/Timed requests,
+gPTP sync, all three lifecycle states, power modes, Safety_Measure-driven
+safe state, multi-request-per-frame dispatch, reduced sequencer counts,
+the EP_USED bit, SPI's six channels, ADC's samples-per-interval
+R/W choice, integrated-PHY-via-MDIO); one (Edge Node PTP/MACsec) is an
+L1/L2 topology concern outside this library's RCP-wire scope entirely;
+the remaining 28 are descriptive prose restating an already-implemented
+architectural fact from a different angle, a client/hardware-deployment
+choice outside what a protocol library tests, or a non-closed-list
+permission ("this may be extended").
+
+None of the 51 required a *new* `.fusa-reqs.json` entry -- every
+implemented MAY-described capability already had an existing REQ id --
+but per the direct follow-up instruction to ensure every SHOULD/MAY is
+formally *referenced*, not just verbally accounted for: added a `tc18`
+citation for the specific SHOULD/MAY line to the 10 existing REQ entries
+covering an already-implemented optional capability (`REQ-TRIG-001`,
+`REQ-TIMED-008`, `REQ-LIFECYCLE-001`, `REQ-LIFECYCLE-004`,
+`REQ-PWRMODE-004`, `REQ-E2E-016`, `REQ-MOCK-019`, `REQ-SEQ-001`,
+`REQ-MDIO-001`, `REQ-ADC-018`; `REQ-SPI-033` already had one). The
+remaining 41 non-testable lines (all 10 SHOULD, 31 MAY) are recorded in
+`docs/TC18-NON-NORMATIVE-CLAUSES.md`, each individually cited and
+disposed -- design-goal prose about the standard itself, client/config-
+authoring advice the server cannot enforce, hardware-deployment/physical-
+layer choices outside this library's scope, or non-closed-list
+permissions -- so every SHOULD/MAY occurrence in TC18 is findable from
+this repo by citation, whether or not it maps to a testable requirement.
+
+No code behavior changed; 1023 requirements (10 gained a citation, none
+added or removed), 100% traced+tested, 0 `cfusa check` errors.
