@@ -32,6 +32,23 @@ the rationale.
 
 ## Releases
 
+### v0.116.0 -- 2026-08-02
+
+**Every TC18 SHOULD/MAY clause extracted and formally referenced, per a
+direct follow-up instruction that verbal accounting wasn't enough.**
+Grepped the full spec text for every SHOULD (12) and MAY (44) occurrence,
+excluded 6 legal-boilerplate hits, and individually classified the
+remaining 51. All 10 already-implemented optional capabilities the MAY
+clauses describe got a real `tc18` citation added to their existing
+requirement entry (`REQ-TRIG-001`, `REQ-TIMED-008`, `REQ-LIFECYCLE-001`,
+`REQ-LIFECYCLE-004`, `REQ-PWRMODE-004`, `REQ-E2E-016`, `REQ-MOCK-019`,
+`REQ-SEQ-001`, `REQ-MDIO-001`, `REQ-ADC-018`); the remaining 41
+non-testable lines (design-goal prose, client-config-authoring advice,
+hardware-deployment choices, non-closed-list permissions) are recorded
+with individual citations in the new `docs/TC18-NON-NORMATIVE-CLAUSES.md`.
+No code behavior changed; 1023 requirements, 100% traced+tested, 0
+`cfusa check` errors.
+
 ### v0.115.0 -- 2026-08-02
 
 **GPIO write requests never respected input-pin configuration.**
