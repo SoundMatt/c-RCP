@@ -31,6 +31,37 @@ the rationale.
 
 ## Releases
 
+### v0.110.0 -- 2026-08-01
+
+**TC18 §13.5.1 compound-wait comparison primitive. Additive, no existing
+behavior changed.** A compound-wait request's `evt[2:0]` carries a
+completely different meaning than Table 30's per-endpoint-type rule: it
+selects one of eight ways to compare that request's own `byte_msg_payload`
+against the addressed endpoint's current status, and this rule is
+identical across every endpoint type. Nothing in this codebase implemented
+it -- the two existing partial helpers this module now supersedes
+(`rcp_ep_spi_compound_wait_status_equal()`, `rcp_ep_pwm_in_compound_wait_compare()`)
+were never wired to a decoded request's `evt` at all, and neither
+implements more than a handful of the eight modes.
+
+**What was added.** `rcp_acf_compound_wait_evt_valid()` and
+`rcp_acf_compound_wait_match()` (`acf.h`/`acf.c`), operating on raw
+`payload`/`status` byte buffers per the specification's own wording:
+exact match (000b), AND-with-1s-mask and AND-with-0s-mask (001b/010b),
+reserved (011b, `UNSUPPORTED_CMD`), and four leading-quadlet high/low-word
+`>=`/`<=` comparisons (100b-111b) -- including the length-capping rule the
+specification states using its own SPI example ("only the first four out
+of 20 received bytes will be checked"). Seven new requirements,
+`REQ-ACF-024` through `REQ-ACF-030`, each independently hand-derived and
+mutation-tested against the rendered specification page.
+
+**What this does not yet do.** This primitive is not yet wired into
+`rcp_compound_encode_request()`/`rcp_compound_decode_request()` (which
+still cannot set/surface `evt` at all -- every compound-wait request is
+currently encoded with `evt = 0`) or into `server.c`'s dispatch pipeline.
+That wiring, and the removal of the two superseded endpoint-specific
+helpers, is tracked as immediate follow-up work.
+
 ### v0.105.0 -- 2026-08-01
 
 **Requirements-corpus completeness pass. No behavior change** -- not one
