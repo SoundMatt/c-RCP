@@ -751,6 +751,162 @@ static void test_evt_row2_is_plain_ignores_evt3(void)
     TEST_ASSERT_TRUE(rcp_acf_evt_row2_is_plain(0x8));
 }
 
+/* ── §13.5.1 compound-wait evt[2:0] comparison rule ─────────────────────────── */
+
+//cfusa:test REQ-ACF-024
+static void test_compound_wait_evt_valid_true_for_every_mode_but_reserved(void)
+{
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_evt_valid(0x0));
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_evt_valid(0x1));
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_evt_valid(0x2));
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_evt_valid(0x4));
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_evt_valid(0x5));
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_evt_valid(0x6));
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_evt_valid(0x7));
+}
+
+//cfusa:test REQ-ACF-024
+static void test_compound_wait_evt_valid_false_for_reserved(void)
+{
+    /* evt[2:0] = 011b is reserved regardless of evt's upper bit(s). */
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_evt_valid(0x3));
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_evt_valid(0xB)); /* 1011b */
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_evt_valid(0xFB & 0x0Fu));
+}
+
+//cfusa:test REQ-ACF-025
+static void test_compound_wait_match_false_when_status_shorter_than_payload(void)
+{
+    const uint8_t payload[4] = {0x01, 0x02, 0x03, 0x04};
+    const uint8_t status[3]  = {0x01, 0x02, 0x03};
+
+    /* Exact match on the shared 3-byte prefix would otherwise succeed --
+     * the length rule must short-circuit before any mode-specific
+     * comparison runs. */
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x0, payload, sizeof(payload),
+                                                   status, sizeof(status)));
+}
+
+//cfusa:test REQ-ACF-025
+static void test_compound_wait_match_caps_status_to_payload_length(void)
+{
+    /* The specification's own SPI worked example: only the first four out
+     * of a longer (here 20-byte) status report are compared when
+     * byte_msg_payload has four bytes. */
+    const uint8_t payload[4]  = {0x00, 0x00, 0x00, 0x02};
+    uint8_t       status[20];
+
+    memset(status, 0xAA, sizeof(status)); /* tail bytes: never read */
+    status[0] = 0x00; status[1] = 0x00; status[2] = 0x00; status[3] = 0x02;
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x0, payload, sizeof(payload),
+                                                  status, sizeof(status)));
+
+    /* Changing a byte within the compared prefix must still be seen. */
+    status[3] = 0x03;
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x0, payload, sizeof(payload),
+                                                   status, sizeof(status)));
+}
+
+//cfusa:test REQ-ACF-026
+static void test_compound_wait_match_exact_mode(void)
+{
+    const uint8_t payload[2] = {0x01, 0x02};
+    const uint8_t equal[2]   = {0x01, 0x02};
+    const uint8_t differs[2] = {0x01, 0x03};
+
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x0, payload, 2, equal, 2));
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x0, payload, 2, differs, 2));
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x0, NULL, 0, NULL, 0));
+}
+
+//cfusa:test REQ-ACF-027
+static void test_compound_wait_match_and_ones_mask_mode(void)
+{
+    /* The specification's own example: byte_msg_payload = 0x00000002
+     * checks whether the second IO pin (bit 1) is asserted. */
+    const uint8_t payload[4]     = {0x00, 0x00, 0x00, 0x02};
+    const uint8_t bit_set[4]     = {0x00, 0x00, 0x00, 0x02};
+    const uint8_t bit_clear[4]   = {0x00, 0x00, 0x00, 0x00};
+    const uint8_t other_bits[4]  = {0xFF, 0xFF, 0xFF, 0xFF};
+
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x1, payload, 4, bit_set, 4));
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x1, payload, 4, bit_clear, 4));
+    /* Payload's own 0-bits are don't-care: status's other set bits (which
+     * correspond to payload 0-bits) must not affect the outcome. */
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x1, payload, 4, other_bits, 4));
+}
+
+//cfusa:test REQ-ACF-028
+static void test_compound_wait_match_and_zeros_mask_mode(void)
+{
+    /* The specification's own example: byte_msg_payload = 0x00000002
+     * checks whether the second IO pin (bit 1) is NOT asserted. */
+    const uint8_t payload[4]        = {0x00, 0x00, 0x00, 0x02};
+    const uint8_t bit_clear[4]      = {0x00, 0x00, 0x00, 0x00};
+    const uint8_t bit_set[4]        = {0x00, 0x00, 0x00, 0x02};
+    const uint8_t other_bits_only[4] = {0xFF, 0xFF, 0xFF, 0xFD};
+
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x2, payload, 4, bit_clear, 4));
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x2, payload, 4, bit_set, 4));
+    /* Payload's own 0-bits are don't-care here too. */
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x2, payload, 4, other_bits_only, 4));
+}
+
+//cfusa:test REQ-ACF-029
+static void test_compound_wait_match_leading_quadlet_hi_word_ge_le(void)
+{
+    const uint8_t payload[4] = {0x00, 0x0A, 0x00, 0x00}; /* hi word = 10 */
+    const uint8_t lower[4]   = {0x00, 0x05, 0x00, 0x00}; /* hi word = 5 */
+    const uint8_t higher[4]  = {0x00, 0x0F, 0x00, 0x00}; /* hi word = 15 */
+    const uint8_t equal[4]   = {0x00, 0x0A, 0x00, 0x00};
+
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x4, payload, 4, lower, 4));  /* 10>=5 */
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x4, payload, 4, higher, 4)); /* 10>=15 */
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x4, payload, 4, equal, 4));  /* 10>=10 */
+
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x5, payload, 4, lower, 4)); /* 10<=5 */
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x5, payload, 4, higher, 4)); /* 10<=15 */
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x5, payload, 4, equal, 4));  /* 10<=10 */
+}
+
+//cfusa:test REQ-ACF-030
+static void test_compound_wait_match_leading_quadlet_lo_word_ge_le(void)
+{
+    const uint8_t payload[4] = {0xFF, 0xFF, 0x00, 0x0A}; /* lo word = 10 */
+    const uint8_t lower[4]   = {0xFF, 0xFF, 0x00, 0x05}; /* lo word = 5 */
+    const uint8_t higher[4]  = {0xFF, 0xFF, 0x00, 0x0F}; /* lo word = 15 */
+
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x6, payload, 4, lower, 4));  /* 10>=5 */
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x6, payload, 4, higher, 4)); /* 10>=15 */
+
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x7, payload, 4, lower, 4)); /* 10<=5 */
+    TEST_ASSERT_TRUE(rcp_acf_compound_wait_match(0x7, payload, 4, higher, 4)); /* 10<=15 */
+}
+
+//cfusa:test REQ-ACF-029
+//cfusa:test REQ-ACF-030
+static void test_compound_wait_match_ge_le_rejects_short_payload(void)
+{
+    const uint8_t payload[3] = {0x00, 0x0A, 0x00};
+    const uint8_t status[3]  = {0x00, 0x00, 0x00};
+
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x4, payload, 3, status, 3));
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x5, payload, 3, status, 3));
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x6, payload, 3, status, 3));
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x7, payload, 3, status, 3));
+}
+
+//cfusa:test REQ-ACF-025
+static void test_compound_wait_match_reserved_mode_always_false(void)
+{
+    const uint8_t payload[2] = {0x01, 0x02};
+
+    /* Callers must gate on rcp_acf_compound_wait_evt_valid() first; this
+     * pins the function's own defined (always-false) behavior if they
+     * don't. */
+    TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x3, payload, 2, payload, 2));
+}
+
 /* ── Message-type dispatch ─────────────────────────────────────────────────── */
 
 static void test_peek_msg_type_reads_first_byte(void)
@@ -845,6 +1001,18 @@ int main(void)
     RUN_TEST(test_evt_row2_is_plain_false_for_reserved_values);
     RUN_TEST(test_evt_row2_is_plain_false_for_config_value);
     RUN_TEST(test_evt_row2_is_plain_ignores_evt3);
+
+    RUN_TEST(test_compound_wait_evt_valid_true_for_every_mode_but_reserved);
+    RUN_TEST(test_compound_wait_evt_valid_false_for_reserved);
+    RUN_TEST(test_compound_wait_match_false_when_status_shorter_than_payload);
+    RUN_TEST(test_compound_wait_match_caps_status_to_payload_length);
+    RUN_TEST(test_compound_wait_match_exact_mode);
+    RUN_TEST(test_compound_wait_match_and_ones_mask_mode);
+    RUN_TEST(test_compound_wait_match_and_zeros_mask_mode);
+    RUN_TEST(test_compound_wait_match_leading_quadlet_hi_word_ge_le);
+    RUN_TEST(test_compound_wait_match_leading_quadlet_lo_word_ge_le);
+    RUN_TEST(test_compound_wait_match_ge_le_rejects_short_payload);
+    RUN_TEST(test_compound_wait_match_reserved_mode_always_false);
 
     RUN_TEST(test_peek_msg_type_reads_first_byte);
     RUN_TEST(test_peek_msg_type_rejects_empty_buffer);

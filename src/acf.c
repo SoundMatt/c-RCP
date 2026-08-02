@@ -150,6 +150,83 @@ bool rcp_acf_evt_row2_is_plain(uint8_t evt)
     return (evt & 0x7u) == 0u;
 }
 
+/* ── §13.5.1: compound-wait's own evt[2:0] comparison-mode rule ──────────── */
+
+#define COMPOUND_WAIT_MODE_EXACT     ((uint8_t)0x0u)
+#define COMPOUND_WAIT_MODE_AND_ONES  ((uint8_t)0x1u)
+#define COMPOUND_WAIT_MODE_AND_ZEROS ((uint8_t)0x2u)
+#define COMPOUND_WAIT_MODE_RESERVED  ((uint8_t)0x3u)
+#define COMPOUND_WAIT_MODE_HI_GE     ((uint8_t)0x4u)
+#define COMPOUND_WAIT_MODE_HI_LE     ((uint8_t)0x5u)
+#define COMPOUND_WAIT_MODE_LO_GE     ((uint8_t)0x6u)
+#define COMPOUND_WAIT_MODE_LO_LE     ((uint8_t)0x7u)
+
+//cfusa:req REQ-ACF-024
+bool rcp_acf_compound_wait_evt_valid(uint8_t evt)
+{
+    return (evt & 0x7u) != COMPOUND_WAIT_MODE_RESERVED;
+}
+
+static uint16_t be16(const uint8_t *p)
+{
+    return (uint16_t)(((uint16_t)p[0] << 8) | (uint16_t)p[1]);
+}
+
+//cfusa:req REQ-ACF-025
+//cfusa:req REQ-ACF-026
+//cfusa:req REQ-ACF-027
+//cfusa:req REQ-ACF-028
+//cfusa:req REQ-ACF-029
+//cfusa:req REQ-ACF-030
+bool rcp_acf_compound_wait_match(uint8_t evt, const uint8_t *payload, size_t payload_len,
+                                  const uint8_t *status, size_t status_len)
+{
+    uint8_t mode = (uint8_t)(evt & 0x7u);
+    size_t  i;
+
+    if (status_len < payload_len) return false;
+    /* status is implicitly capped to payload_len from here on: every branch
+     * below only ever indexes status[0..payload_len) (memcmp's own length
+     * argument, or the switch cases' shared `i < payload_len` loop bound),
+     * so status_len itself is never consulted again after this guard. */
+    (void)status_len;
+
+    switch (mode) {
+    case COMPOUND_WAIT_MODE_EXACT:
+        if (payload_len == 0u) return true;
+        return memcmp(payload, status, payload_len) == 0;
+
+    case COMPOUND_WAIT_MODE_AND_ONES:
+        for (i = 0; i < payload_len; i++) {
+            uint8_t v = (uint8_t)((payload[i] & status[i]) | (uint8_t)~payload[i]);
+            if (v != 0xFFu) return false;
+        }
+        return true;
+
+    case COMPOUND_WAIT_MODE_AND_ZEROS:
+        for (i = 0; i < payload_len; i++) {
+            if ((uint8_t)(payload[i] & status[i]) != 0x00u) return false;
+        }
+        return true;
+
+    case COMPOUND_WAIT_MODE_HI_GE:
+    case COMPOUND_WAIT_MODE_HI_LE:
+        if (payload_len < 4u) return false;
+        return (mode == COMPOUND_WAIT_MODE_HI_GE) ? (be16(payload) >= be16(status))
+                                                   : (be16(payload) <= be16(status));
+
+    case COMPOUND_WAIT_MODE_LO_GE:
+    case COMPOUND_WAIT_MODE_LO_LE:
+        if (payload_len < 4u) return false;
+        return (mode == COMPOUND_WAIT_MODE_LO_GE) ? (be16(&payload[2]) >= be16(&status[2]))
+                                                   : (be16(&payload[2]) <= be16(&status[2]));
+
+    case COMPOUND_WAIT_MODE_RESERVED:
+    default:
+        return false;
+    }
+}
+
 /* ── ACF_ABB ───────────────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-ACF-004

@@ -318,6 +318,67 @@ bool rcp_acf_hdr_ack_has_event(const rcp_acf_byte_message_info_t *hdr);
  * rcp_ep_spi_channel_valid() for those rows' own rules instead. */
 bool rcp_acf_evt_row2_is_plain(uint8_t evt);
 
+/* ── TC18 §13.5.1: compound-wait's own, endpoint-type-independent evt[2:0] rule ─ */
+
+/* TC18 §13.5.1 gives evt[2:0] an entirely different meaning for a
+ * compound-wait request than Table 30 gives it for a Standard request:
+ * here it selects one of eight ways to compare that request's own
+ * byte_msg_payload against the addressed endpoint's current status, and
+ * this rule is the SAME across every endpoint type -- unlike Table 30,
+ * there is no per-endpoint-type row. rcp_acf_evt_row2_is_plain() and
+ * rcp_ep_spi_channel_valid()/rcp_ep_gpio_write_semantics_valid() (Table
+ * 30's own per-row rules) do not apply to a compound-wait request's evt;
+ * use these two functions instead.
+ *
+ * true iff (evt & 0x7) != 0x3 -- every value except the reserved 011b,
+ * which callers must reject with error code UNSUPPORTED_CMD rather than
+ * passing to rcp_acf_compound_wait_match() below (that function's return
+ * value for a reserved evt is not a meaningful "never matches" result --
+ * see its own doc comment). */
+bool rcp_acf_compound_wait_evt_valid(uint8_t evt);
+
+/* TC18 §13.5.1: evaluates whether payload[0..payload_len) matches
+ * status[0..status_len) under the comparison mode evt[2:0] selects.
+ * Callers must call rcp_acf_compound_wait_evt_valid(evt) first and reject
+ * a false result (UNSUPPORTED_CMD) rather than calling this function --
+ * its own return value for evt[2:0] == 011b is unconditionally false, not
+ * a meaningful "reserved" signal distinct from a real non-match.
+ *
+ * Length rule (applies before any mode-specific comparison, per the
+ * specification's own wording and its own SPI example -- "only the first
+ * four out of 20 received bytes will be checked when the byte_msg_payload
+ * in the compound wait has only four bytes"): if status_len < payload_len
+ * the condition never matches (false, regardless of mode, and regardless
+ * of the two buffers' actual contents); otherwise status is compared only
+ * against its own first payload_len bytes, and any bytes beyond that are
+ * never read or considered. This rule is NOT specific to any one endpoint
+ * type or to a fixed comparison width -- it is payload_len itself, of
+ * whatever length that request happens to carry.
+ *
+ * Modes (evt[2:0]):
+ *   000b exact match:        payload[0..n) == status[0..n), byte for byte.
+ *   001b AND-with-1s-mask:   for every byte i, (payload[i] & status[i]) |
+ *                            ~payload[i] == 0xFF -- every payload bit that
+ *                            is 1 must also be 1 in status; payload bits
+ *                            that are 0 place no constraint on status.
+ *   010b AND-with-0s-mask:   for every byte i, payload[i] & status[i] ==
+ *                            0x00 -- every payload bit that is 1 must be 0
+ *                            in status.
+ *   100b/101b: the first two bytes of payload's own leading quadlet,
+ *              read big-endian, are >= (100b) or <= (101b) the same two
+ *              bytes of status. Returns false (never reads OOB) if
+ *              payload_len < 4 -- the specification assumes a whole
+ *              leading quadlet exists; this module's own fail-safe
+ *              default for when it does not, matching this project's
+ *              established too-short-buffer convention.
+ *   110b/111b: same as 100b/101b, but the LAST two bytes of the leading
+ *              quadlet (payload[2..4)), and the same payload_len < 4
+ *              fail-safe.
+ *
+ * status/payload may be NULL iff their respective length is 0. */
+bool rcp_acf_compound_wait_match(uint8_t evt, const uint8_t *payload, size_t payload_len,
+                                  const uint8_t *status, size_t status_len);
+
 /* ── byte_message_info bit packing (single source of truth) ───────────────── */
 
 /* Packs the 8-byte byte_message_info header (Table 4, see the file header)

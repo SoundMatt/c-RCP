@@ -7468,6 +7468,83 @@
       "tc18": "\u00a713.5 Table 30, TC18.txt L3666-3710"
     },
     {
+      "id": "REQ-ACF-024",
+      "title": "rcp_acf_compound_wait_evt_valid() rejects exactly the reserved 011b value",
+      "text": "rcp_acf_compound_wait_evt_valid(evt) shall return true iff (evt & 0x7) != 0x3, per TC18 \u00a713.5.1: a compound-wait request's evt[2:0] selects one of eight comparison modes, of which 011b is reserved -- a request carrying it shall be ignored and an err-response with error code UNSUPPORTED_CMD sent. This rule is endpoint-type-independent, unlike Table 30's per-row rule (rcp_acf_evt_row2_is_plain()).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.5.1, TC18.txt L3735-3762 (evt[2:0] = 011b)"
+    },
+    {
+      "id": "REQ-ACF-025",
+      "title": "rcp_acf_compound_wait_match() applies the shared status-length rule before any mode-specific comparison",
+      "text": "rcp_acf_compound_wait_match() shall return false, regardless of comparison mode or buffer contents, when status_len < payload_len (the wait condition never comes true if the interface status has fewer bytes than byte_msg_payload); otherwise it shall compare against only status's own first payload_len bytes, ignoring any bytes beyond that -- e.g. only the first four out of a 20-byte SPI status report are checked when byte_msg_payload has four bytes. rcp_acf_compound_wait_match() shall also return false for evt[2:0] = 0x3 (reserved); callers must reject that value with UNSUPPORTED_CMD via rcp_acf_compound_wait_evt_valid() rather than relying on this fallback.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.5.1, TC18.txt L3735-3741 (length-capping rule and its own SPI example)"
+    },
+    {
+      "id": "REQ-ACF-026",
+      "title": "rcp_acf_compound_wait_match() evt[2:0]=000b: exact match",
+      "text": "rcp_acf_compound_wait_match() shall, for evt[2:0] = 000b, return true iff byte_msg_payload matches the (length-capped) current interface status exactly, byte for byte.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.5.1, TC18.txt L3742 (evt[2:0] = 000b)"
+    },
+    {
+      "id": "REQ-ACF-027",
+      "title": "rcp_acf_compound_wait_match() evt[2:0]=001b: AND-with-1s-mask",
+      "text": "rcp_acf_compound_wait_match() shall, for evt[2:0] = 001b, return true iff every bit position set to 1 in byte_msg_payload is also set to 1 in the (length-capped) current interface status -- equivalently, for every covered byte i, (payload[i] AND status[i]) OR NOT(payload[i]) == 0xFF.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.5.1, TC18.txt L3743-3746 (evt[2:0] = 001b)"
+    },
+    {
+      "id": "REQ-ACF-028",
+      "title": "rcp_acf_compound_wait_match() evt[2:0]=010b: AND-with-0s-mask",
+      "text": "rcp_acf_compound_wait_match() shall, for evt[2:0] = 010b, return true iff every bit position set to 1 in byte_msg_payload is set to 0 in the (length-capped) current interface status -- equivalently, for every covered byte i, payload[i] AND status[i] == 0x00.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.5.1, TC18.txt L3747-3750 (evt[2:0] = 010b)"
+    },
+    {
+      "id": "REQ-ACF-029",
+      "title": "rcp_acf_compound_wait_match() evt[2:0]=100b/101b: leading-quadlet high-word >=/<=",
+      "text": "rcp_acf_compound_wait_match() shall, for evt[2:0] = 100b, return true iff the first two bytes of byte_msg_payload's own leading quadlet, read big-endian, are >= the same two bytes of the current interface status, and for evt[2:0] = 101b the <= counterpart; both shall return false (never read out of bounds) when payload_len < 4.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.5.1, TC18.txt L3753-3758 (evt[2:0] = 100b/101b)"
+    },
+    {
+      "id": "REQ-ACF-030",
+      "title": "rcp_acf_compound_wait_match() evt[2:0]=110b/111b: leading-quadlet low-word >=/<=",
+      "text": "rcp_acf_compound_wait_match() shall, for evt[2:0] = 110b, return true iff the last two bytes of byte_msg_payload's own leading quadlet, read big-endian, are >= the same two bytes of the current interface status, and for evt[2:0] = 111b the <= counterpart; both shall return false (never read out of bounds) when payload_len < 4.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.5.1, TC18.txt L3759-3763 (evt[2:0] = 110b/111b)"
+    },
+    {
       "id": "REQ-CFG-011",
       "title": "The evt[2:0]=111b EP_func configuration request is implemented for PWM_OUT only",
       "text": "NOT IMPLEMENTED (partial): TC18 \u00a712.7.1 Figure 18 defines one generic configuration request \u2014 evt[2:0] = 111b, byte_msg_payload = a relative register start address within the addressed endpoint's EP_func section followed by configuration data \u2014 usable against EVERY endpoint type either through the RC Server (EP0) register map or directly by byte_bus_id. c-RCP implements this shape for exactly one endpoint type: rcp_ep_pwm_out_apply_reconfig() (src/ep_pwm.c:206), which decodes a 16-bit big-endian relative start address plus data octets. Every other endpoint type (GPIO, SPI, I2C, UART, LIN, CAN, ADC, ISELED, MDIO, wakeup) exposes no EP_func addressed-write path, and no server-side dispatcher classifies an incoming evt==7 request as a configuration request and routes it to the addressed endpoint. Consequence: endpoint functional configuration is unreachable over the wire for all but PWM_OUT.",
