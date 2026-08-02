@@ -5987,3 +5987,54 @@ real conformance test.
 
 `REQ-LINEP-001`–`005` (the invented enum) removed; `016`–`018` corrected;
 `025`–`027` added. 984 requirements, 100% traced+tested throughout.
+
+### 113. Close the per-function requirement-coverage gap (v0.113.0) ✅
+
+A direct question -- does every public function carry at least one
+traced requirement? -- exposed a bar `cfusa check`/`trace` cannot itself
+verify: `trace`'s 100% gate only confirms every *catalogued* requirement
+has impl+test tags, not that every function has a catalogued requirement
+in the first place. A public-API cross-reference script (declared in
+`include/rcp/*.h`, tagged in `src/*.c`, excluding internal `static`
+helpers) found 39 genuine gaps, all in satellite/infrastructure modules
+-- the TC18 protocol core was already fully covered. Tagged all 39,
+confirmed each already had real test exercise, and gave two previously-
+untested behaviors found along the way (`rcp_authz_policy_retain()`'s
+refcounting, `rcp_in_memory_sink_spans()`'s cap-truncation) dedicated,
+mutation-tested tests rather than just a tag.
+
+Verifying with the correct CI-pinned `c-FuSa v0.5.50` binary (the cached
+local one was stale, several commits behind the pinned tag) surfaced a
+second, independent gap: 3 more untraced requirements
+(`REQ-MDNS-007`/`008`, `REQ-RELAY-013`) the stale binary's `check`/
+`trace` had silently passed, plus a `--func-coverage` naming-convention
+gap (`tests/l2_veth_roundtrip.c` renamed to
+`tests/l2_veth_roundtrip_test.c`, CMake target/CI job unchanged) so the
+tool's test-file exemption -- which only recognizes the `test_*`/
+`*_test.c` patterns every other test file in this repo already uses --
+correctly excludes its `main()`.
+
+984 → 1023 requirements, 100% traced+tested, 0 `cfusa check` errors.
+
+### 114. Remove `rcp_acf_hdr_ack_has_event()`, not TC18-conformant (v0.114.0, BREAKING) ✅
+
+Investigating this function's own TC18 basis (flagged during milestone
+99's audit, deferred) found it describes a distinction TC18 does not
+make. Its doc comment claimed to distinguish "a plain Acknowledge from
+one tagged with an asynchronous event via `evt`," but TC18's own
+`evt[3:0]` field table (§11.3) defines exactly one Acknowledge encoding
+-- `0xF` -- with `0x0` = simple/data/error response, `0x1`-`0x8` = a
+repetitive-response counter, and `0x9`-`0xE` reserved; none of those
+apply once `evt[3:0] == 0xF` has already matched. Since
+`rcp_acf_classify_response()` only reaches `RCP_ACF_RESP_ACKNOWLEDGE` via
+`evt == 0xF`, `evt != 0` was always true for every real decoded
+Acknowledge -- the function could only return `false` through a
+hand-constructed header exercising the same `op == RCP_ACF_OP_NONE`
+fallback `rcp_acf_classify_response()`'s own doc comment already
+documents as unreachable from real decoded input, which is exactly what
+all three of its tests did.
+
+Removed the function, `REQ-ACF-003`, and its tests; corrected
+`rcp_acf_classify_response()`'s and the `evt` field's doc comments to
+stop pointing at it. No internal caller ever used it. 1023 → 1022
+requirements, 100% traced+tested, 0 `cfusa check` errors.
