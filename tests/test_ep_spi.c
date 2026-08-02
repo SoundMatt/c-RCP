@@ -29,8 +29,6 @@
 //cfusa:test REQ-SPI-028
 //cfusa:test REQ-SPI-029
 //cfusa:test REQ-SPI-030
-//cfusa:test REQ-SPI-031
-//cfusa:test REQ-SPI-032
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -642,32 +640,13 @@ static void test_response_decode_rejects_short_frame(void)
                                     &out_rx_len, &timed, &ts, &txn));
 }
 
-/* ── Compound-wait truncation rule ─────────────────────────────────────────── */
-
-static void test_compound_wait_status_equal_compares_only_first_4_bytes(void)
-{
-    uint8_t status[RCP_EP_SPI_STATUS_MAX_LEN] = {1, 2, 3, 4, 0xAA, 0xBB, 0xCC};
-    uint8_t target[RCP_EP_SPI_STATUS_MAX_LEN] = {1, 2, 3, 4, 0xDE, 0xAD, 0xBE};
-
-    /* Bytes 4.. differ between status and target, but only the first 4 are
-     * compared -- see the file header's compound-wait truncation note. */
-    TEST_ASSERT_TRUE(rcp_ep_spi_compound_wait_status_equal(status, sizeof(status), target,
-                                                            sizeof(target)));
-
-    status[3] = 0xFF; /* now differs within the first 4 bytes */
-    TEST_ASSERT_FALSE(rcp_ep_spi_compound_wait_status_equal(status, sizeof(status), target,
-                                                             sizeof(target)));
-}
-
-static void test_compound_wait_status_equal_false_when_too_short(void)
-{
-    uint8_t buf4[4] = {1, 2, 3, 4};
-    uint8_t buf3[3] = {1, 2, 3};
-
-    TEST_ASSERT_FALSE(rcp_ep_spi_compound_wait_status_equal(buf3, sizeof(buf3), buf4, sizeof(buf4)));
-    TEST_ASSERT_FALSE(rcp_ep_spi_compound_wait_status_equal(buf4, sizeof(buf4), buf3, sizeof(buf3)));
-    TEST_ASSERT_FALSE(rcp_ep_spi_compound_wait_status_equal(NULL, 0, buf4, sizeof(buf4)));
-}
+/* rcp_ep_spi_compound_wait_status_equal() was removed in v0.111.0: it
+ * hardcoded a fixed 4-byte comparison length that isn't an SPI-specific
+ * rule (see ep_spi.h's file header). Compound-wait comparisons against
+ * SPI now go through acf.h's rcp_acf_compound_wait_evt_valid()/_match()
+ * directly, exercised generically (including this endpoint type's own
+ * 4-of-20-byte length-capping example from the specification) in
+ * test_acf.c. */
 
 int main(void)
 {
@@ -718,9 +697,6 @@ int main(void)
     RUN_TEST(test_response_decode_rejects_wrong_bus);
     RUN_TEST(test_response_decode_rejects_bad_channel);
     RUN_TEST(test_response_decode_rejects_short_frame);
-
-    RUN_TEST(test_compound_wait_status_equal_compares_only_first_4_bytes);
-    RUN_TEST(test_compound_wait_status_equal_false_when_too_short);
 
     return UNITY_END();
 }

@@ -24,6 +24,8 @@
 //cfusa:test REQ-CMP-023
 //cfusa:test REQ-CMP-024
 //cfusa:test REQ-CMP-025
+//cfusa:test REQ-CMP-026
+//cfusa:test REQ-CMP-027
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -102,7 +104,7 @@ static void test_peek_request_type_reads_compound_opcode(void)
     step.exec_delay    = 500;
     step.repeat_count     = 0;
 
-    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 3, &step, 7, NULL, 0);
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 3, &step, 0u, 7, NULL, 0);
     TEST_ASSERT_NOT_NULL(frame.data);
 
     TEST_ASSERT_EQUAL_INT(RCP_COMPOUND_OK, rcp_compound_peek_request_type(frame.data, frame.len, &rt));
@@ -158,6 +160,7 @@ static void test_compound_request_round_trip(void)
     const uint8_t *out_payload = NULL;
     size_t out_payload_len = 0;
     uint8_t out_tn = 0;
+    uint8_t out_evt = 0;
 
     step.sequencer_index = 12;
     step.start_state     = 1;
@@ -165,14 +168,14 @@ static void test_compound_request_round_trip(void)
     step.exec_delay    = 1500;
     step.repeat_count     = 3;
 
-    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 9, &step, 42,
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 9, &step, 0u, 42,
                                          payload, sizeof(payload));
     TEST_ASSERT_NOT_NULL(frame.data);
 
     TEST_ASSERT_EQUAL_INT(RCP_COMPOUND_OK,
                            rcp_compound_decode_request(frame.data, frame.len, &out_rt, &out_bus,
-                                                        &out_step, &out_payload, &out_payload_len,
-                                                        &out_tn));
+                                                        &out_step, &out_evt, &out_payload,
+                                                        &out_payload_len, &out_tn));
 
     TEST_ASSERT_EQUAL_UINT8(RCP_REQUEST_TYPE_COMPOUND, out_rt);
     TEST_ASSERT_EQUAL_UINT8(9, out_bus);
@@ -198,6 +201,7 @@ static void test_compound_wait_safety_request_round_trip(void)
     const uint8_t *out_payload = NULL;
     size_t out_payload_len = 0;
     uint8_t out_tn = 0;
+    uint8_t out_evt = 0;
 
     step.sequencer_index = 255;
     step.start_state     = 200;
@@ -205,13 +209,14 @@ static void test_compound_wait_safety_request_round_trip(void)
     step.exec_delay    = 65535;
     step.repeat_count     = RCP_COMPOUND_REPEAT_INFINITE;
 
-    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT_SAFETY, 1, &step, 5, NULL, 0);
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT_SAFETY, 1, &step, 0u, 5,
+                                         NULL, 0);
     TEST_ASSERT_NOT_NULL(frame.data);
 
     TEST_ASSERT_EQUAL_INT(RCP_COMPOUND_OK,
                            rcp_compound_decode_request(frame.data, frame.len, &out_rt, &out_bus,
-                                                        &out_step, &out_payload, &out_payload_len,
-                                                        &out_tn));
+                                                        &out_step, &out_evt, &out_payload,
+                                                        &out_payload_len, &out_tn));
 
     TEST_ASSERT_EQUAL_UINT8(RCP_REQUEST_TYPE_COMPOUND_WAIT_SAFETY, out_rt);
     TEST_ASSERT_TRUE(rcp_request_type_is_safety(out_rt));
@@ -229,7 +234,7 @@ static void test_encode_request_rejects_unrecognized_request_type(void)
 {
     rcp_compound_step_t step = {0};
     rcp_bytes_t frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_CLEAR_NON_SAFESTATE, 0,
-                                                      &step, 0, NULL, 0);
+                                                      &step, 0u, 0, NULL, 0);
 
     TEST_ASSERT_NULL(frame.data);
 }
@@ -242,11 +247,13 @@ static void test_decode_request_rejects_short_frame(void)
     const uint8_t *out_payload = NULL;
     size_t out_payload_len = 0;
     uint8_t out_tn = 0;
+    uint8_t out_evt = 0;
     uint8_t buf[4] = {0};
 
     TEST_ASSERT_EQUAL_INT(RCP_COMPOUND_ERR_SHORT_FRAME,
                            rcp_compound_decode_request(buf, sizeof(buf), &out_rt, &out_bus, &out_step,
-                                                        &out_payload, &out_payload_len, &out_tn));
+                                                        &out_evt, &out_payload, &out_payload_len,
+                                                        &out_tn));
 }
 
 static void test_decode_request_rejects_bad_msg_type(void)
@@ -257,6 +264,7 @@ static void test_decode_request_rejects_bad_msg_type(void)
     const uint8_t *out_payload = NULL;
     size_t out_payload_len = 0;
     uint8_t out_tn = 0;
+    uint8_t out_evt = 0;
     uint8_t buf[RCP_ACF_GBB_HEADER_LEN];
 
     memset(buf, 0, sizeof(buf));
@@ -264,7 +272,8 @@ static void test_decode_request_rejects_bad_msg_type(void)
 
     TEST_ASSERT_EQUAL_INT(RCP_COMPOUND_ERR_BAD_MSG_TYPE,
                            rcp_compound_decode_request(buf, sizeof(buf), &out_rt, &out_bus, &out_step,
-                                                        &out_payload, &out_payload_len, &out_tn));
+                                                        &out_evt, &out_payload, &out_payload_len,
+                                                        &out_tn));
 }
 
 static void test_decode_request_rejects_non_repurposed_timestamp(void)
@@ -277,8 +286,9 @@ static void test_decode_request_rejects_non_repurposed_timestamp(void)
     const uint8_t *out_payload = NULL;
     size_t out_payload_len = 0;
     uint8_t out_tn = 0;
+    uint8_t out_evt = 0;
 
-    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 0, &step, 0, NULL, 0);
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 0, &step, 0u, 0, NULL, 0);
     TEST_ASSERT_NOT_NULL(frame.data);
 
     /* Flip mtv to VALID(1) directly on the wire (octet 2 bit 5, Table 4),
@@ -289,8 +299,8 @@ static void test_decode_request_rejects_non_repurposed_timestamp(void)
 
     TEST_ASSERT_EQUAL_INT(RCP_COMPOUND_ERR_NOT_REPURPOSED,
                            rcp_compound_decode_request(frame.data, frame.len, &out_rt, &out_bus,
-                                                        &out_step, &out_payload, &out_payload_len,
-                                                        &out_tn));
+                                                        &out_step, &out_evt, &out_payload,
+                                                        &out_payload_len, &out_tn));
 
     rcp_bytes_free(&frame);
 }
@@ -304,6 +314,7 @@ static void test_decode_request_rejects_unknown_request_type(void)
     const uint8_t *out_payload = NULL;
     size_t out_payload_len = 0;
     uint8_t out_tn = 0;
+    uint8_t out_evt = 0;
 
     /* clear-non-safestate is a request_type this decoder does not accept
      * (it belongs to rcp_compound_decode_clear_non_safestate() instead). */
@@ -312,8 +323,8 @@ static void test_decode_request_rejects_unknown_request_type(void)
 
     TEST_ASSERT_EQUAL_INT(RCP_COMPOUND_ERR_UNKNOWN_TYPE,
                            rcp_compound_decode_request(frame.data, frame.len, &out_rt, &out_bus,
-                                                        &out_step, &out_payload, &out_payload_len,
-                                                        &out_tn));
+                                                        &out_step, &out_evt, &out_payload,
+                                                        &out_payload_len, &out_tn));
 
     rcp_bytes_free(&frame);
 }
@@ -346,7 +357,7 @@ static void test_clear_non_safestate_decode_rejects_compound_request(void)
     rcp_byte_bus_id_t out_bus = 0;
     uint8_t out_tn = 0;
 
-    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 0, &step, 0, NULL, 0);
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 0, &step, 0u, 0, NULL, 0);
     TEST_ASSERT_NOT_NULL(frame.data);
 
     TEST_ASSERT_EQUAL_INT(RCP_COMPOUND_ERR_UNKNOWN_TYPE,
@@ -537,7 +548,7 @@ static void test_compound_wire_sub_field_offsets(void)
     step.exec_delay       = 0x4455;
     step.repeat_count     = 0x6677;
 
-    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 7, &step, 1, NULL, 0);
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 7, &step, 0u, 1, NULL, 0);
     TEST_ASSERT_NOT_NULL(frame.data);
     TEST_ASSERT_TRUE(frame.len >= TS_OFF + 8u);
 
@@ -564,7 +575,7 @@ static void test_compound_wait_safety_wire_sub_field_offsets(void)
     step.exec_delay       = 0x0001;
     step.repeat_count     = 0x0002;
 
-    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT_SAFETY, 3, &step, 1,
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT_SAFETY, 3, &step, 0u, 1,
                                          NULL, 0);
     TEST_ASSERT_NOT_NULL(frame.data);
 
@@ -580,6 +591,48 @@ static void test_compound_wait_safety_wire_sub_field_offsets(void)
     rcp_bytes_free(&frame);
 }
 
+/* evt is the ACF header's own byte_message_info.evt field (Table 4 octet
+ * 4 bits 7:4), NOT part of the repurposed message_timestamp sub-fields --
+ * a compound-wait's §13.5.1 comparison mode must round-trip through it
+ * independently of every rcp_compound_step_t sub-field. */
+//cfusa:test REQ-CMP-026
+//cfusa:test REQ-CMP-027
+static void test_evt_round_trips_independently_of_step_subfields(void)
+{
+    rcp_compound_step_t step = {0};
+    rcp_compound_step_t out_step = {0};
+    rcp_bytes_t frame;
+    uint8_t out_rt = 0;
+    rcp_byte_bus_id_t out_bus = 0;
+    const uint8_t *out_payload = NULL;
+    size_t out_payload_len = 0;
+    uint8_t out_tn = 0;
+    uint8_t out_evt = 0;
+
+    step.sequencer_index = 3;
+    step.start_state     = 1;
+    step.next_state       = 2;
+
+    /* evt[2:0] = 110b, the last-two-bytes >= comparison mode -- a value
+     * that would be silently lost (encoded as 0) before this fix. */
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT, 4, &step, 0x6u, 8,
+                                         NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    /* evt lives at octet 4 bits 7:4 of the shared byte_message_info header
+     * (Table 4), independent of the repurposed message_timestamp region
+     * this module's own sub-fields live in. */
+    TEST_ASSERT_EQUAL_HEX8(0x60, (uint8_t)(frame.data[4] & 0xF0u));
+
+    TEST_ASSERT_EQUAL_INT(RCP_COMPOUND_OK,
+                           rcp_compound_decode_request(frame.data, frame.len, &out_rt, &out_bus,
+                                                        &out_step, &out_evt, &out_payload,
+                                                        &out_payload_len, &out_tn));
+    TEST_ASSERT_EQUAL_HEX8(0x6u, out_evt);
+    TEST_ASSERT_EQUAL_UINT8(3, out_step.sequencer_index); /* untouched by evt */
+
+    rcp_bytes_free(&frame);
+}
+
 /* Table 6/Table 7: "If set to 0xFFFF it indicates infinite repetition" --
  * a two-octet all-ones value, not a one-octet 0xFF. */
 static void test_repeat_infinite_sentinel_is_two_octets_of_ones(void)
@@ -590,7 +643,7 @@ static void test_repeat_infinite_sentinel_is_two_octets_of_ones(void)
     TEST_ASSERT_EQUAL_UINT16(0xFFFFu, RCP_COMPOUND_REPEAT_INFINITE);
 
     step.repeat_count = RCP_COMPOUND_REPEAT_INFINITE;
-    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 0, &step, 0, NULL, 0);
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 0, &step, 0u, 0, NULL, 0);
     TEST_ASSERT_NOT_NULL(frame.data);
 
     TEST_ASSERT_EQUAL_HEX8(0xFF, frame.data[TS_OFF + 6]);
@@ -614,10 +667,11 @@ static void test_decode_reads_hand_built_spec_layout(void)
     const uint8_t *out_payload = NULL;
     size_t out_payload_len = 0;
     uint8_t out_tn = 0;
+    uint8_t out_evt = 0;
 
     /* Build a valid ACF_GBB shell via the encoder, then overwrite the
      * eight sub-field octets by hand with the spec-derived pattern. */
-    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 5, &step, 9, NULL, 0);
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 5, &step, 0u, 9, NULL, 0);
     TEST_ASSERT_NOT_NULL(frame.data);
 
     frame.data[TS_OFF + 0] = 0x0F;
@@ -631,8 +685,8 @@ static void test_decode_reads_hand_built_spec_layout(void)
 
     TEST_ASSERT_EQUAL_INT(RCP_COMPOUND_OK,
                            rcp_compound_decode_request(frame.data, frame.len, &out_rt, &out_bus,
-                                                        &out_step, &out_payload, &out_payload_len,
-                                                        &out_tn));
+                                                        &out_step, &out_evt, &out_payload,
+                                                        &out_payload_len, &out_tn));
 
     TEST_ASSERT_EQUAL_UINT8(0x07, out_step.start_state);
     TEST_ASSERT_EQUAL_UINT8(0x08, out_step.next_state);
@@ -734,6 +788,7 @@ int main(void)
 
     RUN_TEST(test_compound_wire_sub_field_offsets);
     RUN_TEST(test_compound_wait_safety_wire_sub_field_offsets);
+    RUN_TEST(test_evt_round_trips_independently_of_step_subfields);
     RUN_TEST(test_repeat_infinite_sentinel_is_two_octets_of_ones);
     RUN_TEST(test_decode_reads_hand_built_spec_layout);
 
