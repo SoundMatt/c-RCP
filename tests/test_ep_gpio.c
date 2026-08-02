@@ -32,6 +32,7 @@
 //cfusa:test REQ-GPIO-030
 //cfusa:test REQ-GPIO-031
 //cfusa:test REQ-GPIO-032
+//cfusa:test REQ-GPIO-037
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -204,6 +205,68 @@ static void test_apply_reconfig_toggles_only_flagged_pins(void)
     TEST_ASSERT_EQUAL_UINT8(RCP_REGMAP_PIN_PROP_INPUT | RCP_REGMAP_PIN_PROP_PULL_UP, pins[0]);
     TEST_ASSERT_EQUAL_UINT8(RCP_REGMAP_PIN_PROP_OUTPUT, pins[1]);
     TEST_ASSERT_EQUAL_UINT8(RCP_REGMAP_PIN_PROP_OUTPUT, pins[2]); /* untouched */
+}
+
+/* ── Input-pin write masking (13.7.4.3) ───────────────────────────────────── */
+
+static void make_pins(uint8_t pins[RCP_EP_GPIO_MAX_PINS], uint32_t output_mask)
+{
+    uint8_t i;
+    for (i = 0; i < RCP_EP_GPIO_MAX_PINS; i++) {
+        pins[i] = (uint8_t)((output_mask & rcp_ep_gpio_pin_mask(i)) != 0
+                                 ? RCP_REGMAP_PIN_PROP_OUTPUT
+                                 : RCP_REGMAP_PIN_PROP_INPUT);
+    }
+}
+
+static void test_apply_masked_write_replace_preserves_input_pins(void)
+{
+    uint8_t pins[RCP_EP_GPIO_MAX_PINS];
+    make_pins(pins, 0x0000000Fu); /* pins 0-3 output, rest input */
+
+    uint32_t result = rcp_ep_gpio_apply_masked_write(0xABCD0005u, 0xFFFFFFF0u,
+                                                       RCP_EP_GPIO_WRITE_REPLACE, pins);
+
+    /* Output pins 0-3 take the request's bits (0x0); every input pin keeps
+     * its prior value (0xABCD0000) untouched, including bit 4. */
+    TEST_ASSERT_EQUAL_UINT32(0xABCD0000u, result);
+}
+
+static void test_apply_masked_write_or_and_only_affect_output_pins(void)
+{
+    uint8_t pins[RCP_EP_GPIO_MAX_PINS];
+    make_pins(pins, 0x000000FFu); /* pins 0-7 output, rest input */
+
+    uint32_t result =
+        rcp_ep_gpio_apply_masked_write(0x00000F0Fu, 0xFFFFFFF0u, RCP_EP_GPIO_WRITE_OR, pins);
+    TEST_ASSERT_EQUAL_UINT32(0x00000FFFu, result);
+
+    result = rcp_ep_gpio_apply_masked_write(0x0000FFFFu, 0x00000000u, RCP_EP_GPIO_WRITE_AND, pins);
+    TEST_ASSERT_EQUAL_UINT32(0x0000FF00u, result); /* output byte cleared, input untouched */
+}
+
+static void test_apply_masked_write_add_saturation_still_respects_mask(void)
+{
+    uint8_t pins[RCP_EP_GPIO_MAX_PINS];
+    make_pins(pins, 0x0000FFFFu); /* low 16 bits output, high 16 bits input */
+
+    uint32_t result =
+        rcp_ep_gpio_apply_masked_write(0xBEEF0000u, 0xFFFFFFFFu, RCP_EP_GPIO_WRITE_ADD, pins);
+
+    /* The 32-bit saturating add itself saturates to 0xFFFFFFFF, but masking
+     * still confines the committed change to the output half. */
+    TEST_ASSERT_EQUAL_UINT32(0xBEEFFFFFu, result);
+}
+
+static void test_apply_masked_write_reconfig_is_a_noop(void)
+{
+    uint8_t pins[RCP_EP_GPIO_MAX_PINS];
+    make_pins(pins, 0x00000000u); /* every pin input */
+
+    uint32_t result =
+        rcp_ep_gpio_apply_masked_write(0x12345678u, 0xFFFFFFFFu, RCP_EP_GPIO_WRITE_RECONFIG, pins);
+
+    TEST_ASSERT_EQUAL_UINT32(0x12345678u, result);
 }
 
 /* ── Per-pin trigger signals ────────────────────────────────────────────────── */
@@ -636,6 +699,10 @@ int main(void)
     RUN_TEST(test_apply_write_wire_value_5_is_add);
     RUN_TEST(test_apply_write_wire_value_6_is_sub);
     RUN_TEST(test_apply_reconfig_toggles_only_flagged_pins);
+    RUN_TEST(test_apply_masked_write_replace_preserves_input_pins);
+    RUN_TEST(test_apply_masked_write_or_and_only_affect_output_pins);
+    RUN_TEST(test_apply_masked_write_add_saturation_still_respects_mask);
+    RUN_TEST(test_apply_masked_write_reconfig_is_a_noop);
 
     RUN_TEST(test_trigger_none_never_fires);
     RUN_TEST(test_trigger_any_change);

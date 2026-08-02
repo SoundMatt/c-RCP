@@ -7913,6 +7913,17 @@
       "tc18": "\u00a713.7.4.3, TC18.txt L4488-4494"
     },
     {
+      "id": "REQ-GPIO-037",
+      "title": "A write to a pin configured as input leaves that pin's value unchanged",
+      "text": "rcp_ep_gpio_apply_masked_write() shall, for every evt, commit rcp_ep_gpio_apply_write()'s combined result to a bit position only when pins[i] has RCP_REGMAP_PIN_PROP_OUTPUT set, and shall leave that bit position's value from current unchanged when pins[i] does not, regardless of what request or the combinator's result specify for that position.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.4.3 (\"A write request to an input pin is ignored for this input pin\"), TC18.txt L4481"
+    },
+    {
       "id": "REQ-I2C-019",
       "title": "I2C functional-config registers beyond i2c_mode, and the missing Ultra-fast preset",
       "text": "NOT IMPLEMENTED (partial): c-RCP's rcp_ep_i2c_functional_cfg_t models TC18 Table 46 only as i2c_mode. i2c_clock_divider (0x0006), i2c_trail (0x0008, minimum trail time between two transactions in I2C clock cycles), i2c_base_clk and i2c_ep_status are absent, and rcp_ep_i2c_mode_valid() accepts only presets 0..3 -- Ultra-fast mode (value 4, 5 Mbit/s) is rejected as invalid. Table 46 numbers two distinct rows '3' (High-speed 1.7 and 3.4 Mbit/s), an ambiguity ep_i2c.h resolves conservatively in favour of the lower numbering.",

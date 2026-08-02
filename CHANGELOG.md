@@ -32,6 +32,33 @@ the rationale.
 
 ## Releases
 
+### v0.115.0 -- 2026-08-02
+
+**GPIO write requests never respected input-pin configuration.**
+Investigating cpp-RCP's identical write-semantics bug (issue #105 there)
+for a possible cross-repo instance found the same gap here: TC18
+§13.7.4.3 states "a write request to an input pin is ignored for this
+input pin," but `rcp_ep_gpio_apply_write()` -- the only write-application
+primitive this library exposes -- has no notion of per-pin direction at
+all, and nothing in this codebase wrapped it with masking; the function
+was never wired into any dispatch path here either (its only callers are
+its own unit tests), so this was a silent gap in the public API surface
+itself rather than a wired-in behavioral bug.
+
+Added `rcp_ep_gpio_apply_masked_write()`: computes the same combined
+value `rcp_ep_gpio_apply_write()` would, then commits it only for bit
+positions whose `pins[i]` has `RCP_REGMAP_PIN_PROP_OUTPUT` set, leaving
+every input-configured bit unchanged regardless of what the request or
+combinator result specify for it -- correct for every write semantics,
+including a bare Replace, and a no-op for `RCP_EP_GPIO_WRITE_RECONFIG`
+(which `rcp_ep_gpio_apply_write()` already leaves unchanged). The
+existing `rcp_ep_gpio_apply_write()` is untouched, including its own 12
+tests, which correctly exercise the unmasked combinator in isolation.
+
+`REQ-GPIO-037` added -- 1023 requirements, 100% traced+tested, 0 `cfusa
+check` errors. Purely additive (new function, no existing signature or
+behavior changed) -- non-breaking.
+
 ### v0.114.0 -- 2026-08-02
 
 **`rcp_acf_hdr_ack_has_event()` described a distinction TC18 does not
