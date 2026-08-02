@@ -41,6 +41,11 @@
 //cfusa:req REQ-GPIO-034
 //cfusa:req REQ-GPIO-035
 //cfusa:req REQ-GPIO-036
+
+/* Input-pin write masking (issue #105): a write request to a pin
+ * configured as input is now ignored for that pin (13.7.4.3), via
+ * rcp_ep_gpio_apply_masked_write() -- see its own doc comment below. */
+//cfusa:req REQ-GPIO-037
 /*
  * ep_gpio.h -- GPIO endpoint for the TC18 Remote Control Protocol wire layer
  * (ROADMAP.md Phase 16, "Basic Endpoints", milestone 64).
@@ -224,6 +229,21 @@ uint32_t rcp_ep_gpio_apply_write(uint32_t current, uint32_t request,
  * reconfig_mask is left entirely untouched. pins must point to an array of
  * exactly RCP_EP_GPIO_MAX_PINS entries. */
 void rcp_ep_gpio_apply_reconfig(uint8_t pins[RCP_EP_GPIO_MAX_PINS], uint32_t reconfig_mask);
+
+/* rcp_ep_gpio_apply_write() plus TC18 13.7.4.3's input-pin write rule ("A
+ * write request to an input pin is ignored for this input pin"): computes
+ * the same combined value rcp_ep_gpio_apply_write(current, request, evt)
+ * would, then commits it only for bit positions whose pins[i] has
+ * RCP_REGMAP_PIN_PROP_OUTPUT set, leaving current's bit unchanged wherever
+ * pins[i] does not (issue #105). evt == RCP_EP_GPIO_WRITE_RECONFIG is
+ * accepted -- rcp_ep_gpio_apply_write() already returns current unchanged
+ * for it, so masking is a no-op -- but callers still needing to actually
+ * apply a reconfiguration must call rcp_ep_gpio_apply_reconfig() themselves;
+ * this function never touches pins. pins must point to an array of exactly
+ * RCP_EP_GPIO_MAX_PINS entries. */
+uint32_t rcp_ep_gpio_apply_masked_write(uint32_t current, uint32_t request,
+                                         rcp_ep_gpio_write_semantics_t evt,
+                                         const uint8_t pins[RCP_EP_GPIO_MAX_PINS]);
 
 /* ── Per-pin trigger signals ────────────────────────────────────────────────── */
 

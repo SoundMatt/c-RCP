@@ -112,6 +112,24 @@ void rcp_ep_gpio_apply_reconfig(uint8_t pins[RCP_EP_GPIO_MAX_PINS], uint32_t rec
     }
 }
 
+//cfusa:req REQ-GPIO-037
+uint32_t rcp_ep_gpio_apply_masked_write(uint32_t current, uint32_t request,
+                                         rcp_ep_gpio_write_semantics_t evt,
+                                         const uint8_t pins[RCP_EP_GPIO_MAX_PINS])
+{
+    uint32_t combined    = rcp_ep_gpio_apply_write(current, request, evt);
+    uint32_t output_mask = 0;
+    uint8_t  i;
+
+    for (i = 0; i < RCP_EP_GPIO_MAX_PINS; i++) {
+        if ((pins[i] & RCP_REGMAP_PIN_PROP_OUTPUT) != 0) {
+            output_mask |= rcp_ep_gpio_pin_mask(i);
+        }
+    }
+
+    return (combined & output_mask) | (current & ~output_mask);
+}
+
 /* ── Per-pin trigger signals ────────────────────────────────────────────────── */
 
 //cfusa:req REQ-GPIO-014

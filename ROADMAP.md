@@ -6038,3 +6038,32 @@ Removed the function, `REQ-ACF-003`, and its tests; corrected
 `rcp_acf_classify_response()`'s and the `evt` field's doc comments to
 stop pointing at it. No internal caller ever used it. 1023 → 1022
 requirements, 100% traced+tested, 0 `cfusa check` errors.
+
+### 115. GPIO write requests never respected input-pin configuration (v0.115.0)
+
+Investigating cpp-RCP's identical write-semantics bug (issue #105 there,
+fixed the same day) for a possible cross-repo instance found the same gap
+here: TC18 §13.7.4.3 states "a write request to an input pin is ignored
+for this input pin," but `rcp_ep_gpio_apply_write()` -- the only
+write-application primitive this library exposes for GPIO -- has no
+notion of per-pin direction at all, and this codebase never wrapped it
+with masking anywhere; the function isn't even wired into any dispatch
+path here (its only callers are its own 12 unit tests), so this was a
+silent gap in the public API surface itself, not a wired-in behavioral
+bug reachable through a request/response round trip today.
+
+Added `rcp_ep_gpio_apply_masked_write()`: computes the same combined
+value `rcp_ep_gpio_apply_write()` would, then commits it only for bit
+positions whose `pins[i]` has `RCP_REGMAP_PIN_PROP_OUTPUT` set (the same
+`pins[]`/`RCP_REGMAP_PIN_PROP_*` convention `rcp_ep_gpio_apply_reconfig()`
+already established), leaving every input-configured bit unchanged
+regardless of what the request or combinator result specify for it --
+correct for every write semantics including a bare Replace, and a no-op
+for `RCP_EP_GPIO_WRITE_RECONFIG` (already left unchanged by
+`rcp_ep_gpio_apply_write()` itself). The existing
+`rcp_ep_gpio_apply_write()` is untouched, including its own tests, which
+correctly exercise the unmasked combinator in isolation -- this is a new,
+additive function, not a rewrite of the old one.
+
+`REQ-GPIO-037` added -- 1023 requirements, 100% traced+tested, 0 `cfusa
+check` errors. Purely additive; non-breaking.
