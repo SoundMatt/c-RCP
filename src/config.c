@@ -157,6 +157,7 @@ static void or_named_bits_u32(const char *start, const char *end, uint32_t *out,
 
 /* ── Manifest lifecycle ────────────────────────────────────────────────────── */
 
+//cfusa:req REQ-CFG-013
 void rcp_config_manifest_free(rcp_config_manifest_t *m)
 {
     free(m->hw_pin_map);

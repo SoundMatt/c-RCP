@@ -16,8 +16,10 @@
 //cfusa:test REQ-MOCK-024
 //cfusa:test REQ-MOCK-025
 //cfusa:test REQ-MOCK-026
+//cfusa:test REQ-MOCK-027
 //cfusa:test REQ-SRV-019
 //cfusa:test REQ-SRV-020
+//cfusa:test REQ-SRV-021
 /*
  * test_conditional_dispatch.c -- end-to-end tests for conditional-request
  * dispatch (TC18 §11.2.2/§11.2.3) through the real server path.
@@ -185,6 +187,8 @@ static rcp_bytes_t make_compound(uint8_t request_type, uint8_t seq, uint8_t star
     return rcp_compound_encode_request(request_type, 1, &step, 0u, txn, NULL, 0);
 }
 
+//cfusa:test REQ-MOCK-027
+//cfusa:test REQ-SRV-021
 static void test_compound_waits_for_its_sequencer_state(void)
 {
     handler_log_t log;

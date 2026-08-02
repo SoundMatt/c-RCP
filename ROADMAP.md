@@ -5824,3 +5824,166 @@ requirement text was wrong, not the code.
 Not closed here, and explicitly not claimed as complete: §11.2.2–§11.4,
 §12.8.2, §12.9, §13.2/§13.3/§13.5 and part of §13.7.8–§13.7.13 still
 carry roughly a hundred further candidate gaps from the same audit.
+
+### 106. `rsp` never set on responses; `lifecycle_field_writable` inversion; citation backfill (v0.106.0/v0.106.1) ✅
+
+TC18 §11.3 states plainly that `rsp = 1b` identifies an ACF_ABB/ACF_GBB
+message as a response — every `rcp_ep_*_encode_response()`/
+`rcp_discovery_encode_response*()` function across all 13 endpoint
+modules left `rsp` at its zero-initialised default instead, making every
+response this library ever produced wire-indistinguishable from a
+request by that bit. Fixed everywhere at once (v0.106.0), alongside a
+second, unrelated real bug found in the same pass:
+`rcp_lifecycle_field_writable()`'s `HW_UNCONFIGURED` handling for R/W*
+fields was inverted (rejecting the one state that must accept them).
+`REQ-ACF-022` and the affected lifecycle requirement corrected to match.
+
+v0.106.1 backfilled the `"tc18"` citation-string field onto 23 requirements
+(`REQ-WIREERR-001`, the `REQ-CMP-*`/`REQ-TRIG-*`/`REQ-CHAIN-*`/
+`REQ-TIMED-*`/`REQ-CANCEL-*` families) that v0.105.0's completeness pass
+had left uncited, and separately fixed `rcp_acf_classify_response()`
+(same version number by oversight): it checked `err`/`op` before `evt`,
+so it never recognised `evt == 0xF` (TC18 §11.3.1's Acknowledge marker) —
+every real decoded Acknowledge was misclassified as a Write/Read/Error
+response instead, since a decoded header's `op` is never the encode-only
+`RCP_ACF_OP_NONE` sentinel the old code relied on. Fixed by checking
+`evt` first, per the spec text; mutation-tested.
+
+### 107. TC18 §13.5 Table 30 Row-2 enforcement: ADC pilot (v0.107.0) ✅
+
+Table 30's `{ADC, PWM_IN, I²C, LIN, CAN, UART, ISELED, MDIO}` row allows
+`evt[2:0] = 000b` for a plain request; every other value but the
+config-write shape (`111b`) is reserved (`UNSUPPORTED_CMD`). Nothing in
+this codebase enforced that rule for any of the eight endpoint types —
+each decoder silently accepted any `evt[2:0]` value. Added the shared
+primitive, `rcp_acf_evt_row2_is_plain()` (`acf.h`/`acf.c`, `REQ-ACF-023`),
+and wired it into ADC's decode path as the pilot, with a new
+`RCP_EP_ADC_ERR_BAD_EVT` error code and mutation-tested tests.
+
+### 108. TC18 §13.5 Table 30 Row-2 enforcement: I²C, UART, ISELED, MDIO (v0.108.0) ✅
+
+Extends milestone 107's `rcp_acf_evt_row2_is_plain()` enforcement to the
+four remaining simple Row-2 endpoint types (CAN needed its own,
+larger fix — milestone 109 below). Each gains its own `_ERR_BAD_EVT`
+variant on both its read and write decode paths where applicable, with
+the same mutation-testing discipline.
+
+### 109. CAN `FrameFormat` lives in the payload, not `evt[2:0]` (v0.109.0, BREAKING) ✅
+
+The largest single defect this pass found. `ep_can.h` packed `FrameFormat`
+(CBFF/CEFF/FBFF/FEFF/XL-classical/XL-new) into `evt[2:0]` as an invented
+six-value selector — modelled on SPI's Table 30 row, which really does
+use `evt[2:0]` as a selector, but CAN belongs to the shared Row-2 rule
+instead, where those values must be *rejected*, not interpreted. TC18's
+own Figure 39 ("can request format") places `FrameFormat` in the top 3
+bits of the payload's leading quadlet instead (arbitration_id in the
+low 29 bits) — pixel-verified at 400dpi against the rendered
+specification page, not taken from text extraction alone.
+
+Every CAN frame this module ever produced was wire-incompatible with a
+real TC18 peer. Fixed comprehensively: `write_prefix()`/`read_prefix()`
+now pack/unpack `FrameFormat` from the leading quadlet; every
+`hdr.evt = frame_format` site changed to `hdr.evt = 0`; decode now calls
+`rcp_acf_evt_row2_is_plain()` first, then validates `FrameFormat` from
+the payload; `decode_frame_response_fragment()` lost its
+per-fragment `out_frame_format` parameter (undeterminable once
+`FrameFormat` moved out of `evt` — a fragment's own quadlet isn't
+necessarily the leading one), moved instead to
+`decode_reassembled_frame_response()` as a derived output. New error
+codes `RCP_EP_CAN_ERR_BAD_EVT`/`RCP_EP_CAN_ERR_BAD_ARBITRATION_ID`. The
+fix also uncovered and corrected `REQ-CANEP-031`, which had formally
+catalogued the wrong evt-carries-FrameFormat design as `"implemented"`,
+and a pre-existing test (`test_tc18_gaps_ep2.c`) that had baked the same
+wrong assumption into a golden vector. Golden vectors hand-derived
+independently (`(1<<29)|0x01ABCDEF = 0x21ABCDEF`, not copied from the
+encoder under test); verified clean under ASan/UBSan locally before push.
+
+### 110. TC18 §13.5.1 compound-wait `evt[2:0]` comparison primitive (v0.110.0) ✅
+
+A compound-wait request's `evt[2:0]` carries a completely different
+meaning than Table 30 gives every other request: it selects one of eight
+ways to compare that request's own `byte_msg_payload` against the
+addressed endpoint's current status — identically across every endpoint
+type, unlike Table 30's per-row rules. Nothing in this codebase
+implemented it. Two existing helpers this milestone supersedes,
+`rcp_ep_spi_compound_wait_status_equal()` and
+`rcp_ep_pwm_in_compound_wait_compare()`, were each only partial (a
+handful of the eight modes) and, per milestone 111 below, were never
+reachable from real request decode at all.
+
+Added `rcp_acf_compound_wait_evt_valid()`/`rcp_acf_compound_wait_match()`
+(`acf.h`/`acf.c`): exact match (`000b`), AND-with-1s-mask/AND-with-0s-mask
+(`001b`/`010b`), reserved (`011b`), and four leading-quadlet high/low-word
+`>=`/`<=` comparisons (`100b`–`111b`), including the length-capping rule
+the specification states using its own SPI example ("only the first four
+out of 20 received bytes will be checked when byte_msg_payload has only
+four bytes"). Seven new requirements, `REQ-ACF-024`–`030`, each
+independently hand-derived and pixel-verified against the rendered
+specification page, individually mutation-tested (six targeted
+mutations, one per mode/guard, each caught by exactly one failing test).
+
+### 111. Wire the §13.5.1 primitive into real dispatch (v0.111.0, BREAKING) ✅
+
+Milestone 110 added the comparison rule but left it unreachable:
+`rcp_compound_encode_request()` had no way to set `evt` (every
+compound-wait request silently encoded `evt = 0`, forcing exact-match
+regardless of caller intent) and `rcp_compound_decode_request()`
+discarded the decoded `evt` entirely. Both now thread it through.
+
+Wiring this up surfaced a second, independent defect:
+`rcp_server_tick_ctx_t`'s single `wait_condition_met` bool cannot
+represent more than one pending `COMPOUND_WAIT` request per endpoint —
+two requests pending on the same endpoint with different comparison
+targets would have whichever single caller-computed result applied to
+both indiscriminately. Replaced with `current_status`/`current_status_len`
+(endpoint-scoped, caller-supplied) plus per-slot storage of each
+request's own `evt`/`byte_msg_payload`
+(`rcp_server_pending_t.compound_wait_evt`/`compound_wait_target`),
+evaluated independently at every tick. Reserved `evt = 011b` now
+rejected at admission (`RCP_SERVER_ADMIT_REJECTED`) per TC18's own
+UNSUPPORTED_CMD rule, rather than stored as a request that could never
+match. `rcp_ep_spi_compound_wait_status_equal()`/
+`RCP_EP_SPI_COMPOUND_WAIT_COMPARE_LEN` removed: both hardcoded an
+SPI-specific fixed 4-byte comparison length that was never a real rule —
+the specification's own length-capping rule is universal and driven by
+`byte_msg_payload`'s actual length; its 4-of-20-bytes example merely
+illustrates the general rule using SPI. New tests cover two
+simultaneously-pending `COMPOUND_WAIT` requests with distinct targets
+executing independently, and reserved-`evt` admission rejection, both
+mutation-tested.
+
+### 112. LIN's `evt[2:0]` comparison scheme was invented, not spec-derived (v0.112.0, BREAKING) ✅
+
+`ep_lin.h`'s own file header admitted `rcp_ep_lin_compare_mode_t` (an
+eight-value EXACT/PREFIX/ANY/NEVER+4-reserved enum) was "this module's
+own original design... rather than on any spec-derived enumeration —
+there being no such enumeration cited by the roadmap to derive one
+from." There is one: TC18 §13.5 Table 30 places LIN in the exact same
+`{ADC, PWM_IN, I²C, LIN, CAN, UART, ISELED, MDIO}` plain-request row
+every other endpoint type's decoder already enforces via
+`rcp_acf_evt_row2_is_plain()` — LIN is not called out as an exception
+anywhere in it, pixel-verified. §13.7.10.1's own prose ("the LIN
+endpoint checks each received message against the byte_msg_payload and
+if a match under the conditions given by `evt[2:0]` is found a reply is
+sent") describes the same universal §13.5.1 vocabulary milestone 110
+built, not a LIN-private multi-mode scheme: since Table 30 constrains a
+plain LIN request's `evt[2:0]` to `000b`, the only comparison that can
+ever apply is §13.5.1 mode `000b`, exact match.
+
+Removed the invented enum entirely. `rcp_ep_lin_encode_command_request()`
+always encodes `evt = 0`; `rcp_ep_lin_decode_command_request()` rejects
+`evt[2:0] != 000b` with the new `RCP_EP_LIN_ERR_BAD_EVT`. New
+`rcp_ep_lin_response_matches()` delegates to `acf.h`'s shared
+`rcp_acf_compound_wait_match(0, ...)` rather than reimplementing
+exact-match logic of its own. `adapt.c`'s `RCP_ADAPT_OP_LIN_COMMAND`
+mapping drops the now-meaningless `rcp.lin.compare_mode` metadata key.
+
+Resolved `REQ-UART-035` (tracked `not-implemented`) as a side effect:
+the milestone-110 primitive already covers UART's own compound-wait
+comparison uniformly with every other endpoint type via `server.c`'s
+`current_status` — its stale deviation-pinning test (which had used the
+now-removed LIN helper as a workaround illustration) replaced with a
+real conformance test.
+
+`REQ-LINEP-001`–`005` (the invented enum) removed; `016`–`018` corrected;
+`025`–`027` added. 984 requirements, 100% traced+tested throughout.

@@ -585,6 +585,7 @@ size_t rcp_mock_server_notify_trigger(rcp_mock_server_t *srv, uint8_t source_ep,
     return matched;
 }
 
+//cfusa:req REQ-MOCK-027
 size_t rcp_mock_server_pending_count(const rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id)
 {
     const rcp_mock_endpoint_slot_t *slot = find_slot_const(srv, byte_bus_id);

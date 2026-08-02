@@ -86,6 +86,7 @@ static void emit(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr, rcp_pwrmode_
     }
 }
 
+//cfusa:req REQ-PWR-011
 rcp_powerstate_manager_t *rcp_powerstate_manager_new(const rcp_avtp_addr_t *endpoints, size_t n_endpoints)
 {
     rcp_powerstate_manager_t *m = (rcp_powerstate_manager_t *)calloc(1, sizeof(*m));
@@ -114,6 +115,7 @@ rcp_powerstate_manager_t *rcp_powerstate_manager_new(const rcp_avtp_addr_t *endp
     return m;
 }
 
+//cfusa:req REQ-PWR-012
 rcp_pwrmode_t rcp_powerstate_manager_mode(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr)
 {
     endpoint_entry_t *e;
@@ -255,6 +257,7 @@ bool rcp_powerstate_manager_handshake_begin(rcp_powerstate_manager_t *m, rcp_avt
     return ok;
 }
 
+//cfusa:req REQ-PWR-013
 rcp_bytes_t rcp_powerstate_manager_encode_wakeup_probe(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
                                                          uint8_t transaction_num)
 {
@@ -294,6 +297,7 @@ bool rcp_powerstate_manager_apply_wakeup_echo(rcp_powerstate_manager_t *m, rcp_a
     return ok;
 }
 
+//cfusa:req REQ-PWR-014
 bool rcp_powerstate_manager_handshake_resume_queues(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr)
 {
     endpoint_entry_t *e;
@@ -347,6 +351,7 @@ bool rcp_powerstate_manager_subscribe(rcp_powerstate_manager_t *m, rcp_powerstat
     return ok;
 }
 
+//cfusa:req REQ-PWR-015
 void rcp_powerstate_manager_destroy(rcp_powerstate_manager_t *m)
 {
     if (!m) return;

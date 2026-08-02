@@ -8,6 +8,8 @@
 //cfusa:test REQ-WDG-007
 //cfusa:test REQ-WDG-008
 //cfusa:test REQ-WDG-009
+//cfusa:test REQ-WDG-011
+//cfusa:test REQ-WDG-012
 #include "unity.h"
 
 #include <rcp/clock.h>
@@ -36,8 +38,19 @@ static rcp_watchdog_stream_cfg_t make_cfg(uint64_t stream_id, bool enable, uint3
     return c;
 }
 
+/* ── Default config ───────────────────────────────────────────────────────── */
+
+//cfusa:test REQ-WDG-011
+static void test_default_config_values(void)
+{
+    rcp_watchdog_config_t cfg = rcp_watchdog_default_config();
+
+    TEST_ASSERT_EQUAL_UINT64(10, cfg.poll_interval_ms);
+}
+
 /* ── Keeper creation ──────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-WDG-012
 static void test_keeper_constructs_with_zero_streams(void)
 {
     rcp_watchdog_config_t cfg = rcp_watchdog_default_config();
@@ -45,6 +58,12 @@ static void test_keeper_constructs_with_zero_streams(void)
 
     TEST_ASSERT_NOT_NULL(k);
     rcp_watchdog_keeper_destroy(k);
+}
+
+//cfusa:test REQ-WDG-012
+static void test_keeper_destroy_tolerates_null(void)
+{
+    rcp_watchdog_keeper_destroy(NULL); /* must not crash */
 }
 
 //cfusa:test REQ-WDG-009
@@ -252,7 +271,9 @@ int main(void)
 {
     UNITY_BEGIN();
 
+    RUN_TEST(test_default_config_values);
     RUN_TEST(test_keeper_constructs_with_zero_streams);
+    RUN_TEST(test_keeper_destroy_tolerates_null);
     RUN_TEST(test_initial_status_established_synchronously);
     RUN_TEST(test_kick_unknown_stream_returns_false);
     RUN_TEST(test_status_unknown_stream_all_false);

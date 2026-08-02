@@ -10,6 +10,9 @@
 //cfusa:test REQ-REC-009
 //cfusa:test REQ-REC-010
 //cfusa:test REQ-REC-011
+//cfusa:test REQ-REC-012
+//cfusa:test REQ-REC-013
+//cfusa:test REQ-REC-014
 #include "unity.h"
 
 #include <rcp/clock.h>
@@ -57,6 +60,8 @@ static rcp_avtp_addr_t make_addr(uint16_t unique_id, uint8_t byte_bus_id)
 /* ── capture() ─────────────────────────────────────────────────────────────── */
 
 //cfusa:test REQ-REC-001
+//cfusa:test REQ-REC-012
+//cfusa:test REQ-REC-013
 static void test_capture_appends_an_entry(void)
 {
     rcp_recorder_t *r = rcp_recorder_new();
@@ -198,6 +203,16 @@ static void playback_deliver(const rcp_recorder_entry_t *entry, void *user_data)
     ctx->last_ts = entry->timestamp_ms;
 }
 
+//cfusa:test REQ-REC-014
+static void test_playback_default_config_values(void)
+{
+    rcp_playback_config_t cfg = rcp_playback_default_config();
+
+    /* This project's Unity build has double-precision asserts disabled
+     * (embedded-target convention); compare directly instead. */
+    TEST_ASSERT_TRUE(cfg.speed_factor == 1.0);
+}
+
 //cfusa:test REQ-REC-004
 static void test_playback_delivers_every_entry_in_order(void)
 {
@@ -313,6 +328,7 @@ int main(void)
     RUN_TEST(test_entries_honors_cap_but_reports_true_total);
     RUN_TEST(test_write_binary_creates_a_non_empty_file);
     RUN_TEST(test_write_binary_returns_busy_when_path_unopenable);
+    RUN_TEST(test_playback_default_config_values);
     RUN_TEST(test_playback_delivers_every_entry_in_order);
     RUN_TEST(test_speed_factor_zero_disables_delays);
     RUN_TEST(test_record_tolerates_concurrent_captures);

@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 
+//cfusa:req REQ-RL-010
 rcp_ratelimit_config_t rcp_ratelimit_default_config(void)
 {
     rcp_ratelimit_config_t c;
@@ -30,6 +31,7 @@ struct rcp_ratelimit_limiter {
     size_t                    cap_buckets;
 };
 
+//cfusa:req REQ-RL-011
 rcp_ratelimit_limiter_t *rcp_ratelimit_limiter_new(rcp_ratelimit_config_t cfg)
 {
     rcp_ratelimit_limiter_t *rl = (rcp_ratelimit_limiter_t *)calloc(1, sizeof(*rl));

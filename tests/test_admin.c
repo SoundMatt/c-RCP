@@ -7,6 +7,8 @@
 //cfusa:test REQ-ADMIN-006
 //cfusa:test REQ-ADMIN-007
 //cfusa:test REQ-ADMIN-008
+//cfusa:test REQ-ADMIN-009
+//cfusa:test REQ-ADMIN-010
 #include "unity.h"
 
 #include <rcp/admin.h>
@@ -48,6 +50,26 @@ static rcp_avtp_addr_t make_addr(uint16_t unique_id, uint8_t byte_bus_id)
     a.stream_id   = rcp_stream_id_make(mac, unique_id);
     a.byte_bus_id = byte_bus_id;
     return a;
+}
+
+/* ── Construction / destruction ───────────────────────────────────────────── */
+
+//cfusa:test REQ-ADMIN-009
+static void test_new_returns_a_server_with_no_endpoints_registered(void)
+{
+    rcp_admin_server_t *srv = rcp_admin_server_new();
+    rcp_endpoint_info_t out[4];
+
+    TEST_ASSERT_NOT_NULL(srv);
+    TEST_ASSERT_EQUAL_size_t(0, rcp_admin_server_endpoints(srv, out, 4));
+
+    rcp_admin_server_destroy(srv);
+}
+
+//cfusa:test REQ-ADMIN-010
+static void test_destroy_tolerates_null(void)
+{
+    rcp_admin_server_destroy(NULL); /* must not crash */
 }
 
 /* ── Endpoint registration ────────────────────────────────────────────────── */
@@ -265,6 +287,8 @@ int main(void)
 {
     UNITY_BEGIN();
 
+    RUN_TEST(test_new_returns_a_server_with_no_endpoints_registered);
+    RUN_TEST(test_destroy_tolerates_null);
     RUN_TEST(test_register_and_deregister_report_membership_changes);
     RUN_TEST(test_endpoints_returns_a_snapshot_of_registered_endpoints);
     RUN_TEST(test_subscribe_and_emit_deliver_the_correct_event);

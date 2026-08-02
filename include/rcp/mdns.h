@@ -119,6 +119,7 @@ rcp_mdns_discoverer_t *rcp_mdns_static_discoverer_new(const rcp_mdns_server_info
  * and platform integrations provide their own implementation.
  */
 
+//cfusa:req REQ-MDNS-007
 typedef struct rcp_mdns_announcer rcp_mdns_announcer_t;
 
 typedef struct {
@@ -136,6 +137,7 @@ static inline int rcp_mdns_announcer_announce(rcp_mdns_announcer_t *a, const rcp
     return a->vt->announce(a, info);
 }
 
+//cfusa:req REQ-MDNS-008
 static inline void rcp_mdns_announcer_withdraw(rcp_mdns_announcer_t *a, rcp_stream_id_t server_stream_id)
 {
     a->vt->withdraw(a, server_stream_id);

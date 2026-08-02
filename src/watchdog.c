@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+//cfusa:req REQ-WDG-011
 rcp_watchdog_config_t rcp_watchdog_default_config(void)
 {
     rcp_watchdog_config_t c;
@@ -244,6 +245,7 @@ void rcp_watchdog_keeper_close(rcp_watchdog_keeper_t *k)
     }
 }
 
+//cfusa:req REQ-WDG-012
 void rcp_watchdog_keeper_destroy(rcp_watchdog_keeper_t *k)
 {
     if (!k) return;

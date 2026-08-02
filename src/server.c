@@ -498,6 +498,7 @@ bool rcp_server_endpoint_chain_predecessor_done(rcp_server_endpoint_t *ep, size_
     return true;
 }
 
+//cfusa:req REQ-SRV-021
 size_t rcp_server_endpoint_pending_count(const rcp_server_endpoint_t *ep)
 {
     return ep->pending_count;

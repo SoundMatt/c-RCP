@@ -45,6 +45,7 @@ typedef struct {
     size_t             cap;
 } loan_release_ctx_t;
 
+//cfusa:req REQ-LOAN-009
 rcp_loan_pool_t *rcp_loan_pool_new(void)
 {
     rcp_loan_pool_t *pool = (rcp_loan_pool_t *)calloc(1, sizeof(*pool));

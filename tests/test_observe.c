@@ -12,6 +12,12 @@
 //cfusa:test REQ-OBS-011
 //cfusa:test REQ-OBS-012
 //cfusa:test REQ-OBS-013
+//cfusa:test REQ-OBS-014
+//cfusa:test REQ-OBS-015
+//cfusa:test REQ-OBS-016
+//cfusa:test REQ-OBS-017
+//cfusa:test REQ-OBS-018
+//cfusa:test REQ-OBS-019
 #include "unity.h"
 
 #include <rcp/observe.h>
@@ -60,6 +66,11 @@ static rcp_avtp_addr_t make_addr(uint16_t unique_id, uint8_t byte_bus_id)
 //cfusa:test REQ-OBS-009
 //cfusa:test REQ-OBS-010
 //cfusa:test REQ-OBS-011
+//cfusa:test REQ-OBS-015
+//cfusa:test REQ-OBS-016
+//cfusa:test REQ-OBS-017
+//cfusa:test REQ-OBS-018
+//cfusa:test REQ-OBS-019
 static void test_record_produces_a_span_with_every_field(void)
 {
     rcp_in_memory_sink_t *mem = rcp_in_memory_sink_new();
@@ -125,9 +136,34 @@ static void test_span_captures_the_result_code(void)
     rcp_in_memory_sink_destroy(mem);
 }
 
+/* rcp_in_memory_sink_spans()'s own contract (include/rcp/observe.h): it
+ * copies min(recorded_count, cap) spans but returns the TRUE recorded
+ * count, which may exceed cap -- signalling truncation to the caller.
+ * Nothing above exercises cap < recorded_count; this does. */
+//cfusa:test REQ-OBS-018
+static void test_spans_reports_true_count_when_truncated_by_cap(void)
+{
+    rcp_in_memory_sink_t *mem = rcp_in_memory_sink_new();
+    rcp_metrics_sink_t sink = rcp_in_memory_sink_as_sink(mem);
+    rcp_span_t out[2];
+    size_t reported;
+
+    rcp_observe_record(sink, "a", make_addr(1, 0), 0x00, 0, 5, RCP_OK);
+    rcp_observe_record(sink, "b", make_addr(2, 0), 0x00, 5, 12, RCP_OK);
+    rcp_observe_record(sink, "c", make_addr(3, 0), 0x00, 12, 20, RCP_OK);
+
+    reported = rcp_in_memory_sink_spans(mem, out, 2); /* cap smaller than the 3 recorded */
+    TEST_ASSERT_EQUAL_UINT(3, reported);              /* true count, not the cap */
+    TEST_ASSERT_EQUAL_STRING("a", out[0].name);        /* only the first cap(2) copied */
+    TEST_ASSERT_EQUAL_STRING("b", out[1].name);
+
+    rcp_in_memory_sink_destroy(mem);
+}
+
 /* ── Noop sink ────────────────────────────────────────────────────────────── */
 
 //cfusa:test REQ-OBS-005
+//cfusa:test REQ-OBS-014
 static void test_noop_sink_does_not_crash(void)
 {
     rcp_metrics_sink_t sink = rcp_noop_metrics_sink();
@@ -245,6 +281,7 @@ int main(void)
     RUN_TEST(test_multiple_records_accumulate_spans_in_order);
     RUN_TEST(test_span_duration_is_end_minus_start);
     RUN_TEST(test_span_captures_the_result_code);
+    RUN_TEST(test_spans_reports_true_count_when_truncated_by_cap);
     RUN_TEST(test_noop_sink_does_not_crash);
     RUN_TEST(test_total_counter_fires_every_time_errors_only_on_failure);
     RUN_TEST(test_in_memory_gauge_and_counter_are_no_ops);

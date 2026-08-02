@@ -55,6 +55,7 @@ static rcp_stream_id_t make_stream(uint16_t unique_id)
 
 /* ── §19.4: SpecVersion ────────────────────────────────────────────────────── */
 
+//cfusa:test REQ-RELAY-013
 static void test_rcp_spec_version_equals_relay_spec_version(void)
 {
     TEST_ASSERT_EQUAL_STRING(RELAY_SPEC_VERSION, RCP_SPEC_VERSION);

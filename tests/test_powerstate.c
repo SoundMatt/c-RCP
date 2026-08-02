@@ -9,6 +9,11 @@
 //cfusa:test REQ-PWR-008
 //cfusa:test REQ-PWR-009
 //cfusa:test REQ-PWR-010
+//cfusa:test REQ-PWR-011
+//cfusa:test REQ-PWR-012
+//cfusa:test REQ-PWR-013
+//cfusa:test REQ-PWR-014
+//cfusa:test REQ-PWR-015
 #include "unity.h"
 
 #include <rcp/powerstate.h>
@@ -54,6 +59,8 @@ static void test_strerror_never_null_and_distinct(void)
 
 /* ── Manager creation / mode() ────────────────────────────────────────────── */
 
+//cfusa:test REQ-PWR-011
+//cfusa:test REQ-PWR-015
 static void test_manager_constructs_with_zero_endpoints(void)
 {
     rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(NULL, 0);
@@ -61,6 +68,7 @@ static void test_manager_constructs_with_zero_endpoints(void)
     rcp_powerstate_manager_destroy(m);
 }
 
+//cfusa:test REQ-PWR-012
 static void test_mode_starts_normal(void)
 {
     rcp_avtp_addr_t endpoints[] = {ADDR};
@@ -71,6 +79,7 @@ static void test_mode_starts_normal(void)
     rcp_powerstate_manager_destroy(m);
 }
 
+//cfusa:test REQ-PWR-012
 static void test_mode_unknown_endpoint_is_normal(void)
 {
     rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(NULL, 0);
@@ -266,6 +275,8 @@ static void test_wake_via_network_unknown_endpoint(void)
 //cfusa:test REQ-PWR-006
 //cfusa:test REQ-PWR-007
 //cfusa:test REQ-PWR-008
+//cfusa:test REQ-PWR-013
+//cfusa:test REQ-PWR-014
 static void test_wake_via_pin_hot_when_handshake_complete(void)
 {
     rcp_avtp_addr_t endpoints[] = {ADDR};
@@ -346,6 +357,7 @@ static void test_handshake_begin_unknown_endpoint(void)
     rcp_powerstate_manager_destroy(m);
 }
 
+//cfusa:test REQ-PWR-013
 static void test_encode_wakeup_probe_unknown_endpoint_is_zeroed(void)
 {
     rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(NULL, 0);

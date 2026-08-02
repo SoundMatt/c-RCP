@@ -31,6 +31,7 @@ struct rcp_admin_server {
     size_t                  counters_cap;
 };
 
+//cfusa:req REQ-ADMIN-009
 rcp_admin_server_t *rcp_admin_server_new(void)
 {
     rcp_admin_server_t *srv = (rcp_admin_server_t *)calloc(1, sizeof(*srv));
@@ -39,6 +40,7 @@ rcp_admin_server_t *rcp_admin_server_new(void)
     return srv;
 }
 
+//cfusa:req REQ-ADMIN-010
 void rcp_admin_server_destroy(rcp_admin_server_t *srv)
 {
     if (!srv) return;

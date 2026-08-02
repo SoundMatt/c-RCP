@@ -317,6 +317,7 @@ rcp_e2e_crc_action_t rcp_e2e_crc_error_action(bool rx_enforce_e2e)
                            : RCP_E2E_CRC_ACTION_DROP_REQUEST;
 }
 
+//cfusa:req REQ-E2E-043
 void rcp_e2e_stream_fault_init(rcp_e2e_stream_fault_t *f)
 {
     f->faulted = false;
@@ -332,6 +333,7 @@ bool rcp_e2e_stream_fault_on_crc_error(rcp_e2e_stream_fault_t *f, bool rx_enforc
     return true; /* a CRC_ERROR always skips this request's execution */
 }
 
+//cfusa:req REQ-E2E-044
 bool rcp_e2e_stream_fault_is_faulted(const rcp_e2e_stream_fault_t *f)
 {
     return f->faulted;

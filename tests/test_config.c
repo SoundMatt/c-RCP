@@ -9,6 +9,7 @@
 //cfusa:test REQ-CFG-008
 //cfusa:test REQ-CFG-009
 //cfusa:test REQ-CFG-010
+//cfusa:test REQ-CFG-013
 /* Tests the RC-Server/endpoint manifest loader (ROADMAP.md milestone 77).
  * Replaces the old zone-manifest schema's own test_config.c entirely --
  * see config.h's file header for the new schema. */
@@ -74,6 +75,34 @@ static void test_parse_server_implemented_options(void)
 }
 
 /* ── parse_json: hw_pin_map ────────────────────────────────────────────────── */
+
+/* rcp_config_manifest_free()'s own contract (include/rcp/config.h): frees
+ * every owned array and zeroes *m in place -- verified here with a
+ * non-empty manifest (so there is real heap allocation to free), then a
+ * second free of the now-zeroed struct to confirm it is also safe on an
+ * already-freed/zero-initialized manifest, per the header's own doc
+ * comment. */
+//cfusa:test REQ-CFG-013
+static void test_manifest_free_zeroes_the_struct_and_tolerates_double_free(void)
+{
+    const char *json =
+        "{ \"hw_pin_map\": [ { \"hw_ep_nr\": 0, \"hw_ep_pin_nr\": 3 } ] }";
+    rcp_config_manifest_t m;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_config_parse_json(json, &m, NULL, 0));
+    TEST_ASSERT_EQUAL_UINT(1, m.hw_pin_map_len);
+    TEST_ASSERT_NOT_NULL(m.hw_pin_map);
+
+    rcp_config_manifest_free(&m);
+    TEST_ASSERT_EQUAL_UINT(0, m.hw_pin_map_len);
+    TEST_ASSERT_EQUAL_UINT(0, m.endpoints_len);
+    TEST_ASSERT_EQUAL_UINT(0, m.streams_len);
+    TEST_ASSERT_NULL(m.hw_pin_map);
+    TEST_ASSERT_NULL(m.endpoints);
+    TEST_ASSERT_NULL(m.streams);
+
+    rcp_config_manifest_free(&m); /* double free of the now-zeroed struct: must not crash */
+}
 
 static void test_parse_hw_pin_map_entries(void)
 {
@@ -273,6 +302,7 @@ int main(void)
     RUN_TEST(test_parse_server_fields);
     RUN_TEST(test_parse_server_implemented_options);
 
+    RUN_TEST(test_manifest_free_zeroes_the_struct_and_tolerates_double_free);
     RUN_TEST(test_parse_hw_pin_map_entries);
     RUN_TEST(test_parse_hw_pin_map_missing_hw_ep_pin_nr_fails);
 

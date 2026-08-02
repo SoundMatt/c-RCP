@@ -22,6 +22,8 @@
 //cfusa:test REQ-E2E-021
 //cfusa:test REQ-E2E-022
 //cfusa:test REQ-E2E-023
+//cfusa:test REQ-E2E-043
+//cfusa:test REQ-E2E-044
 //cfusa:test REQ-E2E-024
 //cfusa:test REQ-E2E-025
 //cfusa:test REQ-E2E-026
@@ -478,6 +480,8 @@ static void test_crc_error_action_maps_rx_enforce_e2e(void)
     TEST_ASSERT_EQUAL_INT(RCP_E2E_CRC_ACTION_LATCH_STREAM_FAULT, rcp_e2e_crc_error_action(true));
 }
 
+//cfusa:test REQ-E2E-043
+//cfusa:test REQ-E2E-044
 static void test_stream_fault_drop_request_never_latches(void)
 {
     rcp_e2e_stream_fault_t f;
@@ -490,6 +494,8 @@ static void test_stream_fault_drop_request_never_latches(void)
     TEST_ASSERT_FALSE(rcp_e2e_stream_fault_is_faulted(&f));
 }
 
+//cfusa:test REQ-E2E-043
+//cfusa:test REQ-E2E-044
 static void test_stream_fault_latches_and_stays_latched_until_reset(void)
 {
     rcp_e2e_stream_fault_t f;

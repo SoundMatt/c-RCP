@@ -7,6 +7,7 @@
 
 #include <stdlib.h>
 
+//cfusa:req REQ-DL-009
 rcp_deadline_config_t rcp_deadline_default_config(void)
 {
     rcp_deadline_config_t c;
@@ -176,6 +177,7 @@ static void run_thread_fn(void *arg)
     }
 }
 
+//cfusa:req REQ-DL-010
 rcp_deadline_monitor_t *rcp_deadline_monitor_new(rcp_deadline_config_t cfg,
                                                   const rcp_deadline_stream_cfg_t *streams,
                                                   size_t n_streams)
@@ -215,6 +217,7 @@ rcp_deadline_monitor_t *rcp_deadline_monitor_new(rcp_deadline_config_t cfg,
     return m;
 }
 
+//cfusa:req REQ-DL-011
 bool rcp_deadline_monitor_alive(rcp_deadline_monitor_t *m, uint64_t stream_id)
 {
     stream_watch_t *st;
@@ -227,6 +230,7 @@ bool rcp_deadline_monitor_alive(rcp_deadline_monitor_t *m, uint64_t stream_id)
     return alive;
 }
 
+//cfusa:req REQ-DL-012
 bool rcp_deadline_monitor_subscribe(rcp_deadline_monitor_t *m, rcp_deadline_liveness_fn cb, void *user_data)
 {
     bool ok;
@@ -250,6 +254,7 @@ void rcp_deadline_monitor_close(rcp_deadline_monitor_t *m)
     }
 }
 
+//cfusa:req REQ-DL-013
 void rcp_deadline_monitor_destroy(rcp_deadline_monitor_t *m)
 {
     if (!m) return;

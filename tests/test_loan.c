@@ -7,6 +7,7 @@
 //cfusa:test REQ-LOAN-006
 //cfusa:test REQ-LOAN-007
 //cfusa:test REQ-LOAN-008
+//cfusa:test REQ-LOAN-009
 #include "unity.h"
 
 #include <rcp/loan.h>
@@ -17,6 +18,7 @@ void tearDown(void) {}
 /* ── acquire() ─────────────────────────────────────────────────────────────── */
 
 //cfusa:test REQ-LOAN-001
+//cfusa:test REQ-LOAN-009
 static void test_acquire_returns_zeroed_buffer_of_requested_size(void)
 {
     rcp_loan_pool_t *pool = rcp_loan_pool_new();

@@ -28,6 +28,7 @@ static void copy_identity(char *dst, const char *src)
     dst[RCP_AUTHZ_IDENTITY_MAX - 1] = '\0';
 }
 
+//cfusa:req REQ-AUTH-009
 rcp_authz_policy_t *rcp_authz_policy_new(void)
 {
     rcp_authz_policy_t *p = (rcp_authz_policy_t *)calloc(1, sizeof(*p));
@@ -37,6 +38,7 @@ rcp_authz_policy_t *rcp_authz_policy_new(void)
     return p;
 }
 
+//cfusa:req REQ-AUTH-010
 rcp_authz_policy_t *rcp_authz_policy_retain(rcp_authz_policy_t *p)
 {
     if (p) rcp_atomic_inc(&p->refcount);
@@ -49,6 +51,7 @@ static void entry_free(policy_entry_t *e)
     free(e->request_types);
 }
 
+//cfusa:req REQ-AUTH-011
 void rcp_authz_policy_release(rcp_authz_policy_t *p)
 {
     size_t i;
