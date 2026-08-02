@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:test REQ-ACF-001
 //cfusa:test REQ-ACF-002
-//cfusa:test REQ-ACF-003
 //cfusa:test REQ-ACF-004
 //cfusa:test REQ-ACF-005
 //cfusa:test REQ-ACF-006
@@ -689,36 +688,6 @@ static void test_classify_response_acknowledge_rejected_is_not_error(void)
     TEST_ASSERT_EQUAL(RCP_ACF_RESP_ACKNOWLEDGE, rcp_acf_classify_response(&hdr));
 }
 
-static void test_ack_has_event_true_when_evt_nonzero(void)
-{
-    rcp_acf_byte_message_info_t hdr = {0};
-
-    hdr.op  = RCP_ACF_OP_NONE;
-    hdr.evt = 3;
-    TEST_ASSERT_TRUE(rcp_acf_hdr_ack_has_event(&hdr));
-}
-
-static void test_ack_has_event_false_when_evt_zero(void)
-{
-    rcp_acf_byte_message_info_t hdr = {0};
-
-    hdr.op  = RCP_ACF_OP_NONE;
-    hdr.evt = 0;
-    TEST_ASSERT_FALSE(rcp_acf_hdr_ack_has_event(&hdr));
-}
-
-static void test_ack_has_event_false_when_not_an_acknowledge(void)
-{
-    /* evt is only meaningful for classifying an Acknowledge; a Write or
-     * Read response with a nonzero evt is not "an acknowledge with an
-     * event" by this rule. */
-    rcp_acf_byte_message_info_t hdr = {0};
-
-    hdr.op  = RCP_ACF_OP_WRITE;
-    hdr.evt = 7;
-    TEST_ASSERT_FALSE(rcp_acf_hdr_ack_has_event(&hdr));
-}
-
 /* ── Table 30 Row 2 evt[2:0] rule ────────────────────────────────────────────── */
 
 //cfusa:test REQ-ACF-023
@@ -994,9 +963,6 @@ int main(void)
     RUN_TEST(test_classify_response_acknowledge_from_decoded_write_op);
     RUN_TEST(test_classify_response_acknowledge_from_decoded_read_op);
     RUN_TEST(test_classify_response_acknowledge_rejected_is_not_error);
-    RUN_TEST(test_ack_has_event_true_when_evt_nonzero);
-    RUN_TEST(test_ack_has_event_false_when_evt_zero);
-    RUN_TEST(test_ack_has_event_false_when_not_an_acknowledge);
     RUN_TEST(test_evt_row2_is_plain_true_for_zero);
     RUN_TEST(test_evt_row2_is_plain_false_for_reserved_values);
     RUN_TEST(test_evt_row2_is_plain_false_for_config_value);

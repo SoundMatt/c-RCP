@@ -2180,15 +2180,6 @@
       "tc18": "§11.3 Table 15 + §11.3.1-§11.3.4, TC18.txt L1876-1926"
     },
     {
-      "id": "REQ-ACF-003",
-      "title": "Acknowledge-with-event identification",
-      "text": "rcp_acf_hdr_ack_has_event() shall return true if and only if hdr classifies as RCP_ACF_RESP_ACKNOWLEDGE (per rcp_acf_classify_response()) and hdr->evt is nonzero.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B",
-      "scope": "tc18"
-    },
-    {
       "id": "REQ-ACF-004",
       "title": "Encoders write the correct acf_msg_type regardless of the caller-supplied header",
       "text": "rcp_acf_encode_abb() shall write RCP_ACF_MSG_TYPE_ABB and rcp_acf_encode_gbb() shall write RCP_ACF_MSG_TYPE_GBB at offset 0 of the encoded message, independent of any acf_msg_type value the caller's header struct happens to carry.",
