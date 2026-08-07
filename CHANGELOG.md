@@ -32,6 +32,17 @@ the rationale.
 
 ## Releases
 
+### v0.143.0 -- 2026-08-07
+
+**Citation backfill, batch 23: CANCEL.** Issue #164. Cited 7 of 8
+remaining uncited cancellation-request requirements against TC18
+§11.2.3's three cancellation mechanisms (clear-all, clear-single, plus
+the cancellable-window, outcome, and chain-cascade predicates). A
+second id-mapping error (`REQ-CANCEL-007`, already cited) caught and
+fixed by the pre-flight check before any edit ran. See `ROADMAP.md`
+milestone 143 for full detail. 1028 requirements (unchanged), 100%
+traced+tested, 0 `cfusa check` errors.
+
 ### v0.142.0 -- 2026-08-07
 
 **Citation backfill, batch 22: CHAIN.** Issue #164. Cited 8 of 9

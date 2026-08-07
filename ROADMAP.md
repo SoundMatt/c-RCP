@@ -6989,3 +6989,39 @@ were genuinely uncited before writing anything.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 143. Citation backfill, batch 23: CANCEL (issue #164) (v0.143.0)
+
+Twenty-third batch. `request_cancel.c`/`request_cancel.h`, 8/12
+uncited going in. A second id-mapping error caught and fixed by the
+pre-flight check before any edit ran, same class as batch 22's:
+`REQ-CANCEL-007` was drafted as a target but the live scan showed it
+already cited -- corrected (folded its intended citation text into
+`006`, its sibling in the same source tag group) before running the
+script.
+
+Cited 7 of the 8 uncited `REQ-CANCEL-*` requirements against §11.2.3's
+three cancellation mechanisms: clear-all decode validation
+(`REQ-CANCEL-003`) against §11.2.3.1 Figure 13/Table 11 (request_type
+0x05); clear-single decode validation (`REQ-CANCEL-006`) against
+§11.2.3.3 Figure 15/Table 13 (request_type 0x07,
+clear_transaction_num); the cancellable-window predicate
+(`REQ-CANCEL-008`, `010`) against "A request can be cancelled while it
+is pending and after it has been started until it is under execution.
+Requests under execution will not be aborted."; the NOT_FOUND/CANCELED
+outcome logic (`REQ-CANCEL-009`, `011`) against the same window text
+plus §11.2.3.3's "error response with the error code = REQUEST_NOT_FOUND,
+when the clear_transaction_num was not found" rule; and the
+chain-cascade predicate (`REQ-CANCEL-012`) against §11.2.3's "If a
+request is cancelled to which a request is chained, then the chained
+successors shall be cancelled by the RC Server as well."
+
+Left uncited, deliberately: `REQ-CANCEL-001` (`strerror()`
+uniqueness) -- the same implementation-detail pattern as every prior
+batch.
+
+Used the pre-flight citation-target check -- confirmed all 7 targets
+were genuinely uncited before writing anything.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
