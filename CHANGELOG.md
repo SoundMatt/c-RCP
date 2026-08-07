@@ -32,6 +32,16 @@ the rationale.
 
 ## Releases
 
+### v0.121.0 -- 2026-08-07
+
+**Citation backfill, batch 1: AVTP.** Issue #164. Cited 11 of 20 AVTP
+requirements against TC18 §11.1's NTSCF/TSCF header definitions and
+worked wire-trace examples. The remaining 9 (stream_id/address equality,
+transport plumbing) are genuine implementation-detail requirements with
+no specific TC18 clause, deliberately left uncited. Purely additive; no
+code or test changed. 1028 requirements (unchanged), 100% traced+tested,
+0 `cfusa check` errors.
+
 ### v0.120.0 -- 2026-08-07
 
 **Fifth real error response: `EP_NOT_FOUND` for an unregistered byte_bus_id.**
