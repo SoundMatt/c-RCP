@@ -7803,6 +7803,17 @@
       "tc18": "\u00a713.5.1, TC18.txt L3759-3763 (evt[2:0] = 110b/111b)"
     },
     {
+      "id": "REQ-ACF-031",
+      "title": "rcp_acf_build_error_response() builds a TC18 \u00a712.9.6 error response",
+      "text": "rcp_acf_build_error_response() shall build an ACF_ABB message carrying the given byte_bus_id and transaction_num, err = 1, rsp = 1, evt != RCP_ACF_EVT_ACKNOWLEDGE (so rcp_acf_classify_response() reports RCP_ACF_RESP_ERROR), and a one-octet byte_msg_payload equal to the given rcp_wire_error_t code's numeric value.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a712.9.6 (\"The error response shall contain the byte_bus_id and transaction number of the request. The error response shall contain a byte_msg_payload with an error code.\"), TC18.txt L3406-3411; \u00a711.3.4, TC18.txt L1924-1926"
+    },
+    {
       "id": "REQ-CFG-011",
       "title": "The evt[2:0]=111b EP_func configuration request is implemented for PWM_OUT only",
       "text": "NOT IMPLEMENTED (partial): TC18 \u00a712.7.1 Figure 18 defines one generic configuration request \u2014 evt[2:0] = 111b, byte_msg_payload = a relative register start address within the addressed endpoint's EP_func section followed by configuration data \u2014 usable against EVERY endpoint type either through the RC Server (EP0) register map or directly by byte_bus_id. c-RCP implements this shape for exactly one endpoint type: rcp_ep_pwm_out_apply_reconfig() (src/ep_pwm.c:206), which decodes a 16-bit big-endian relative start address plus data octets. Every other endpoint type (GPIO, SPI, I2C, UART, LIN, CAN, ADC, ISELED, MDIO, wakeup) exposes no EP_func addressed-write path, and no server-side dispatcher classifies an incoming evt==7 request as a configuration request and routes it to the addressed endpoint. Consequence: endpoint functional configuration is unreachable over the wire for all but PWM_OUT.",
@@ -9018,6 +9029,17 @@
           "level": "ASIL-B",
           "asil": "ASIL-B",
           "scope": "tc18"
+    },
+    {
+      "id": "REQ-SRV-022",
+      "title": "rcp_server_endpoint_admit() reports RCP_ERROR_UNSUPPORTED_CMD for a compound-wait request's reserved evt",
+      "text": "rcp_server_endpoint_admit() shall, when rejecting a decoded RCP_SCHED_KIND_COMPOUND_WAIT request because rcp_acf_compound_wait_evt_valid() is false for its decoded evt, write RCP_ERROR_UNSUPPORTED_CMD to *out_error (when non-NULL) so a caller can build and send a real TC18 error response (rcp_acf_build_error_response()) for this case, per TC18 §13.5.1's explicit requirement that such a request's err-response carry error code = UNSUPPORTED_CMD.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§13.5.1 (\"request shall be ignored and an err-response with error code = UNSUPPORTED_CMD shall be sent\"), TC18.txt L3735-3736"
     },
     {
       "id": "REQ-TIMED-012",

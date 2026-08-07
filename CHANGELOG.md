@@ -32,6 +32,26 @@ the rationale.
 
 ## Releases
 
+### v0.117.0 -- 2026-08-07 (BREAKING)
+
+**First real TC18 §12.9.6 error response.** An audit (issue #163) found
+this library never actually constructed a wire-level Error Response
+anywhere, including its own `mock.c` reference integration -- the 17-code
+`rcp_wire_error_t` enum and `rcp_e2e_wire_error()`'s CRC mapping only ever
+produced a *value*, never response bytes. Added `rcp_acf_build_error_response()`
+(new primitive) and wired the one rejection path that already has
+everything TC18 §12.9.6 requires decoded (a compound-wait request's
+reserved `evt[2:0]=011b`, which `server.c`'s own pre-existing comment
+already quoted the spec's requirement for). `rcp_server_endpoint_admit()`
+gains a new `rcp_wire_error_t *out_error` output parameter -- **every
+caller must update its call site** (two in this repo: `mock.c` and the
+test suite). The other seven rejection paths and 15 of 16 still-unmapped
+Table 27 codes remain open, tracked in issue #163. 1025 requirements
+(`REQ-ACF-031`, `REQ-SRV-022` added), 100% traced+tested, 0 `cfusa check`
+errors. Full build + test suite + ASan/UBSan pass; the new behavior is
+mutation-tested (fix temporarily suppressed, confirmed the new test
+fails, restored).
+
 ### v0.116.0 -- 2026-08-02
 
 **Every TC18 SHOULD/MAY clause extracted and formally referenced, per a

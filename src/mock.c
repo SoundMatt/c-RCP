@@ -246,10 +246,25 @@ static void apply_cancellation(rcp_mock_endpoint_slot_t *slot, uint8_t request_t
 }
 
 /* Maps one server.h admission outcome onto this module's own dispatch
- * result, running the endpoint's handler for the execute-now case. */
+ * result, running the endpoint's handler for the execute-now case.
+ *
+ * error is rcp_server_endpoint_admit()'s *out_error: RCP_ERROR_NONE for
+ * every outcome except the rejection paths that determined a specific
+ * TC18 Table 27 code (see that function's own doc comment for which
+ * paths currently do). When non-RCP_ERROR_NONE, out_response is
+ * populated with a real TC18 sec 12.9.6 error response
+ * (rcp_acf_build_error_response()) instead of being left zeroed --
+ * byte_bus_id is this endpoint's own address (already known to the
+ * caller, which routed to this slot by it); transaction_num is read
+ * back out of the request frame's own header via
+ * rcp_acf_unpack_header(), which populates it correctly regardless of
+ * mtv/request-type repurposing (transaction_num is not part of the
+ * repurposed region). */
 static rcp_mock_dispatch_result_t finish_admission(rcp_mock_endpoint_slot_t *slot,
                                                     rcp_server_admit_t admit, uint8_t request_type,
                                                     const uint8_t *request, size_t request_len,
+                                                    rcp_wire_error_t error,
+                                                    rcp_byte_bus_id_t byte_bus_id,
                                                     rcp_bytes_t *out_response)
 {
     switch (admit) {
@@ -265,6 +280,13 @@ static rcp_mock_dispatch_result_t finish_admission(rcp_mock_endpoint_slot_t *slo
         return RCP_MOCK_DISPATCH_CANCELLED;
     case RCP_SERVER_ADMIT_REJECTED:
     default:
+        if (error != RCP_ERROR_NONE) {
+            rcp_acf_byte_message_info_t hdr = {0};
+            if (request_len >= 8 && rcp_acf_unpack_header(request, &hdr) == RCP_ACF_OK) {
+                *out_response =
+                    rcp_acf_build_error_response(byte_bus_id, hdr.transaction_num, error);
+            }
+        }
         return RCP_MOCK_DISPATCH_REJECTED;
     }
 }
@@ -280,6 +302,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
     rcp_mock_endpoint_slot_t *slot;
     rcp_server_admit_t        admit;
     uint8_t                   request_type = 0;
+    rcp_wire_error_t          error        = RCP_ERROR_NONE;
 
     memset(out_response, 0, sizeof(*out_response));
 
@@ -298,8 +321,10 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
      * its own (0): a stored request's exec_delay is measured from the
      * moment its own start condition first holds, which is decided later
      * by rcp_server_endpoint_select_due() against the caller's tick. */
-    admit = rcp_server_endpoint_admit(&slot->queue, request, request_len, 0u, &request_type, NULL);
-    return finish_admission(slot, admit, request_type, request, request_len, out_response);
+    admit = rcp_server_endpoint_admit(&slot->queue, request, request_len, 0u, &request_type, NULL,
+                                       &error);
+    return finish_admission(slot, admit, request_type, request, request_len, error, byte_bus_id,
+                             out_response);
 }
 
 //cfusa:req REQ-MOCK-016

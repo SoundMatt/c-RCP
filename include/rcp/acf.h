@@ -134,6 +134,7 @@
 #define RCP_ACF_H
 
 #include "rcp/avtp.h"
+#include "rcp/errors.h"
 #include "rcp/rcp.h"
 
 #include <stdbool.h>
@@ -416,6 +417,29 @@ uint8_t rcp_acf_pad_len(size_t unpadded_len);
  * rcp_bytes_t (data=NULL) if payload_len exceeds RCP_ACF_ABB_MAX_PAYLOAD
  * or on allocation failure. Caller frees the result with
  * rcp_bytes_free(). */
+/* Builds a TC18 §12.9.6 error response for a request already known to
+ * carry byte_bus_id and transaction_num: "The error response shall
+ * contain the byte_bus_id and transaction number of the request. The
+ * error response shall contain a byte_msg_payload with an error code."
+ * error_code is encoded as the payload's single octet, matching Table
+ * 27's own small (1-17) numeric range. hdr fields not explicitly listed
+ * here are set to produce a header §11.3.4 ("evt[3:0] < 0x9 and err = 1
+ * is an Error Response") classifies correctly when decoded: evt = 0 (any
+ * value other than RCP_ACF_EVT_ACKNOWLEDGE classifies the same way once
+ * err is set -- see rcp_acf_classify_response()'s own doc comment --
+ * 0 is simply the simplest choice), err = 1, rsp = 1, op =
+ * RCP_ACF_OP_NONE (op does not affect classification once err is set).
+ * Encoded as ACF_ABB (no timestamp) -- a caller needing a timestamped
+ * error response builds its own ACF_GBB header with these same field
+ * values via rcp_acf_pack_header()/rcp_acf_encode_gbb(), matching this
+ * codebase's existing ABB/GBB split convention elsewhere. Returns a
+ * zeroed rcp_bytes_t (data=NULL) only on allocation failure -- a single
+ * payload octet is always within RCP_ACF_ABB_MAX_PAYLOAD. Caller frees
+ * the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_acf_build_error_response(rcp_byte_bus_id_t byte_bus_id,
+                                          uint8_t transaction_num,
+                                          rcp_wire_error_t error_code);
+
 rcp_bytes_t rcp_acf_encode_abb(const rcp_acf_byte_message_info_t *hdr,
                                 const uint8_t *payload, size_t payload_len);
 

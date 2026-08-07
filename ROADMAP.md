@@ -6112,3 +6112,54 @@ this repo by citation, whether or not it maps to a testable requirement.
 
 No code behavior changed; 1023 requirements (10 gained a citation, none
 added or removed), 100% traced+tested, 0 `cfusa check` errors.
+
+### 117. First real TC18 §12.9.6 error response: compound-wait's reserved evt (v0.117.0, BREAKING)
+
+Part of a wider audit (github.com/SoundMatt/c-RCP/issues/163) that found
+this library never actually constructed a wire-level Error Response
+anywhere -- not in the core library, not in `mock.c`'s own reference
+integration. `errors.h`'s `rcp_wire_error_t` enum (all 17 TC18 Table 27
+codes) and `rcp_e2e_wire_error()` (the CRC/E2E mapping) only ever produced
+a *value*; nothing consumed that value to build and return real response
+bytes. `server.c`'s own comment at the compound-wait reserved-evt
+rejection site already quoted TC18 §13.5.1's requirement ("an err-response
+with error code = UNSUPPORTED_CMD shall be sent") right next to code that
+never sent one.
+
+Most of `rcp_server_endpoint_admit()`'s eight `RCP_SERVER_ADMIT_REJECTED`
+paths reject *before* the request's own `byte_bus_id`/`transaction_num`
+are decoded -- TC18 §12.9.6 requires an error response to carry both, so
+nothing conformant can be built for those paths without a larger
+restructuring (tracked in issue #163, not attempted here). Exactly one
+rejection path already has everything decoded: a compound-wait request
+whose `evt[2:0]` is the reserved `011b` value. This milestone wires that
+one path, and the general-purpose primitive everything else in #163 will
+reuse:
+
+- `rcp_acf_build_error_response()` (new, `acf.h`/`acf.c`): builds a
+  complete ACF_ABB error response -- given `byte_bus_id`, `transaction_num`,
+  and an `rcp_wire_error_t` code, sets `err=1`, `rsp=1`, `evt=0` (any
+  non-Acknowledge evt classifies the same way once `err` is set), and a
+  one-octet `byte_msg_payload` carrying the code, per TC18 §12.9.6 and
+  §11.3.4.
+- `rcp_server_endpoint_admit()` gains a new `rcp_wire_error_t *out_error`
+  output parameter (BREAKING: every caller must update its call site --
+  two call sites in this repo, `mock.c` and the test suite). Always
+  `RCP_ERROR_NONE` except the one now-determined case, which writes
+  `RCP_ERROR_UNSUPPORTED_CMD`.
+- `mock.c`'s `rcp_mock_server_dispatch()` -- this library's own reference
+  integration -- now actually builds and returns that response
+  (`finish_admission()` calls `rcp_acf_build_error_response()`, reading
+  `transaction_num` back out of the request frame via
+  `rcp_acf_unpack_header()` since `byte_bus_id` is already known from
+  routing) instead of leaving `out_response` zeroed.
+
+The other seven rejection paths, and 15 of the 16 still-unmapped Table 27
+codes, remain open -- tracked in issue #163, not silently left unlabelled.
+
+`.fusa-reqs.json` gains `REQ-ACF-031` (the new primitive) and
+`REQ-SRV-022` (the new output parameter's one real case), both cited and
+tested, including a mutation test (temporarily suppressed the fix,
+confirmed the new end-to-end test fails, restored it). 1025 requirements,
+100% traced+tested, 0 `cfusa check` errors. Full build + test suite +
+ASan/UBSan all pass.

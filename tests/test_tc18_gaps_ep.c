@@ -190,7 +190,7 @@ static void test_acf_request_flags_round_trip_unconstrained(void)
     rcp_server_endpoint_init(&ep, true);
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_EXECUTE_NOW,
                       rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, &request_type,
-                                                NULL));
+                                                NULL, NULL));
     rcp_server_endpoint_destroy(&ep);
     rcp_bytes_free(&frame);
 }
@@ -829,11 +829,11 @@ static void test_e2e_replayed_request_is_admitted_again(void)
     rcp_server_endpoint_init(&ep, true);
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
                       rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, &request_type,
-                                                &index));
+                                                &index, NULL));
     /* Identical AVTPDU content, no sequence advance: filed again anyway. */
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
                       rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, &request_type,
-                                                &index));
+                                                &index, NULL));
     TEST_ASSERT_EQUAL_UINT(2u, rcp_server_endpoint_pending_count(&ep));
 
     rcp_server_endpoint_destroy(&ep);
@@ -894,14 +894,14 @@ static void test_e2e_request_store_overflow_is_silently_rejected(void)
     for (i = 0; i < RCP_SERVER_MAX_PENDING; i++) {
         TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
                           rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, &request_type,
-                                                    NULL));
+                                                    NULL, NULL));
     }
     TEST_ASSERT_EQUAL_UINT(RCP_SERVER_MAX_PENDING, rcp_server_endpoint_pending_count(&ep));
 
     /* Overflow: rejected and dropped, with no configured safety reaction. */
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_REJECTED,
                       rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, &request_type,
-                                                NULL));
+                                                NULL, NULL));
     TEST_ASSERT_EQUAL_UINT(RCP_SERVER_MAX_PENDING, rcp_server_endpoint_pending_count(&ep));
     TEST_ASSERT_EQUAL_UINT(0u, rcp_server_endpoint_queue_len(&ep));
 

@@ -122,10 +122,11 @@ static rcp_server_pending_t *claim_slot(rcp_server_endpoint_t *ep)
 //cfusa:req REQ-SRV-004
 //cfusa:req REQ-SRV-005
 //cfusa:req REQ-SRV-019
+//cfusa:req REQ-SRV-022
 rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
                                               const uint8_t *frame, size_t frame_len,
                                               uint32_t now, uint8_t *out_request_type,
-                                              size_t *out_index)
+                                              size_t *out_index, rcp_wire_error_t *out_error)
 {
     uint8_t               request_type = 0;
     rcp_sched_kind_t      kind;
@@ -138,6 +139,7 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
     uint8_t               tn;
 
     *out_request_type = 0;
+    if (out_error) *out_error = RCP_ERROR_NONE;
 
     /* Not a repurposed-timestamp ACF_GBB at all: a standard request, and
      * the original submit path handles it unchanged. */
@@ -181,6 +183,7 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
         if (kind == RCP_SCHED_KIND_COMPOUND_WAIT) {
             if (!rcp_acf_compound_wait_evt_valid(decoded_evt)) {
                 release_slot(ep, slot);
+                if (out_error) *out_error = RCP_ERROR_UNSUPPORTED_CMD;
                 return RCP_SERVER_ADMIT_REJECTED;
             }
             slot->compound_wait_evt    = decoded_evt;

@@ -876,6 +876,53 @@ static void test_compound_wait_match_reserved_mode_always_false(void)
     TEST_ASSERT_FALSE(rcp_acf_compound_wait_match(0x3, payload, 2, payload, 2));
 }
 
+/* ── Error response (TC18 §12.9.6 / §11.3.4) ─────────────────────────────────── */
+
+//cfusa:test REQ-ACF-031
+static void test_build_error_response_carries_bus_id_txn_and_code(void)
+{
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    rcp_bytes_t                  resp =
+        rcp_acf_build_error_response((rcp_byte_bus_id_t)7, 200, RCP_ERROR_REQUEST_STORAGE_OVERFLOW);
+
+    TEST_ASSERT_NOT_NULL(resp.data);
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(resp.data, resp.len, &hdr, &payload,
+                                                      &payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&hdr));
+    TEST_ASSERT_EQUAL_UINT8(1u, hdr.err);
+    TEST_ASSERT_EQUAL_UINT8(1u, hdr.rsp);
+    TEST_ASSERT_EQUAL_UINT8(7u, hdr.byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT8(200u, hdr.transaction_num);
+    TEST_ASSERT_EQUAL_size_t(1, payload_len);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_REQUEST_STORAGE_OVERFLOW, payload[0]);
+
+    rcp_bytes_free(&resp);
+}
+
+//cfusa:test REQ-ACF-031
+static void test_build_error_response_never_classifies_as_acknowledge(void)
+{
+    /* evt = 0 (not RCP_ACF_EVT_ACKNOWLEDGE = 0xF): even though err = 1
+     * alone already selects RCP_ACF_RESP_ERROR ahead of any op-based
+     * fallback, this pins that an error response can never be
+     * misclassified as the one evt value TC18 reserves for Acknowledge. */
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    rcp_bytes_t                  resp =
+        rcp_acf_build_error_response((rcp_byte_bus_id_t)1, 1, RCP_ERROR_UNSUPPORTED_CMD);
+
+    TEST_ASSERT_NOT_NULL(resp.data);
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(resp.data, resp.len, &hdr, &payload,
+                                                      &payload_len));
+    TEST_ASSERT_NOT_EQUAL(RCP_ACF_EVT_ACKNOWLEDGE, hdr.evt);
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&hdr));
+
+    rcp_bytes_free(&resp);
+}
+
 /* ── Message-type dispatch ─────────────────────────────────────────────────── */
 
 static void test_peek_msg_type_reads_first_byte(void)
@@ -979,6 +1026,9 @@ int main(void)
     RUN_TEST(test_compound_wait_match_leading_quadlet_lo_word_ge_le);
     RUN_TEST(test_compound_wait_match_ge_le_rejects_short_payload);
     RUN_TEST(test_compound_wait_match_reserved_mode_always_false);
+
+    RUN_TEST(test_build_error_response_carries_bus_id_txn_and_code);
+    RUN_TEST(test_build_error_response_never_classifies_as_acknowledge);
 
     RUN_TEST(test_peek_msg_type_reads_first_byte);
     RUN_TEST(test_peek_msg_type_rejects_empty_buffer);
