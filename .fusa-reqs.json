@@ -3316,7 +3316,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (SPI row, \"selects channel 0 … 5\"), TC18.txt L3678; §13.7.3.1 (\"the SPI endpoint may support up to 6 pre-configurable sets of SPI configurations\"), TC18.txt L4192-4193"
     },
     {
       "id": "REQ-SPI-003",
@@ -3325,7 +3326,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.3.2 Table 39 (\"spi_clk_polarity0\"/\"spi_clk_phase0\", each 1-bit R/W), TC18.txt L4260-4265 -- the four (polarity, phase) combinations this implementation groups as \"mode 0..3\""
     },
     {
       "id": "REQ-SPI-004",
@@ -3334,7 +3336,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.3.2 Table 39 (\"spi_clk_polarity0 ... polarity of SCLK signal, 0b: normal, 1b: inverted\"), TC18.txt L4260-4262"
     },
     {
       "id": "REQ-SPI-005",
@@ -3343,7 +3346,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.3.2 Table 39 (\"spi_clk_phase0 ... sample phase of SCLK, 0b: sample on rising edge, 1b: sample on falling edge\"), TC18.txt L4263-4265"
     },
     {
       "id": "REQ-SPI-006",
@@ -3352,7 +3356,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.3.1 Table 38 (\"An SPI endpoint creates the following trigger events\"), TC18.txt L4204-4219"
     },
     {
       "id": "REQ-SPI-007",
@@ -3361,7 +3366,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.3.1 Table 38 (trigger signal 0, \"SPI execution done\"), TC18.txt L4206"
     },
     {
       "id": "REQ-SPI-008",
@@ -3370,7 +3376,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.3.1 Table 38 (trigger signals 2/4/6/8/10/12, \"CSn asserted\"), TC18.txt L4208-4218"
     },
     {
       "id": "REQ-SPI-009",
@@ -3379,7 +3386,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.3.1 Table 38 (trigger signals 3/5/7/9/11/13, \"CSn de-asserted\"), TC18.txt L4208-4218"
     },
     {
       "id": "REQ-SPI-010",
@@ -3397,7 +3405,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178"
     },
     {
       "id": "REQ-SPI-012",
@@ -3406,7 +3415,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178 -- writable once concluded (i.e. HW_CONFIGURED)"
     },
     {
       "id": "REQ-SPI-013",
@@ -3415,7 +3425,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3 (\"...only write access to the EP's functional configurations is allowed via their dedicated stream_id/byte_bus_id combinations or via root client access EP0... Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables.\"), TC18.txt L2203-2206, L2225-2226"
     },
     {
       "id": "REQ-SPI-014",
@@ -3424,7 +3435,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.3.1 (\"the SPI endpoint may support up to 6 pre-configurable sets of SPI configurations\"), TC18.txt L4192-4193; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same authorization basis as REQ-SPI-013"
     },
     {
       "id": "REQ-SPI-015",
@@ -3433,7 +3445,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-SPI-013"
     },
     {
       "id": "REQ-SPI-016",
@@ -3442,7 +3455,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.3.2 Table 39 (per-channel functional configuration, e.g. bit-order-adjacent fields such as spi_clk_polarity0/spi_clk_phase0), TC18.txt L4260-4291; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
     },
     {
       "id": "REQ-SPI-017",
@@ -3451,7 +3465,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-SPI-013"
     },
     {
       "id": "REQ-SPI-018",
@@ -3460,7 +3475,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.3.2 Table 39 (\"spi_cs_polarity0 ... polarity of CS signal, 0b: CS is low active, 1b: CS is high active\"), TC18.txt L4266-4268; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
     },
     {
       "id": "REQ-SPI-019",
@@ -3469,7 +3485,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-SPI-013"
     },
     {
       "id": "REQ-SPI-020",
@@ -3478,7 +3495,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.3.2 Table 39 (\"spi_baud_rate0 ... SPI baud rate in kbit/s\"), TC18.txt L4259; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
     },
     {
       "id": "REQ-SPI-021",
@@ -3487,7 +3505,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-SPI-013"
     },
     {
       "id": "REQ-SPI-022",
@@ -3496,7 +3515,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.3.2 Table 39 (\"spi_cs_clk_leadtime0\"/\"spi_clk_cs_trailtime0\"/\"spi_bits_max0\"/\"spi_pause_min0\" timing fields), TC18.txt L4272-4282; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
     },
     {
       "id": "REQ-SPI-023",
@@ -3505,7 +3525,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-SPI-013"
     },
     {
       "id": "REQ-SPI-024",
@@ -3514,7 +3535,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.3.1 Table 38 (trigger outputs), TC18.txt L4204-4219; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
     },
     {
       "id": "REQ-SPI-025",
@@ -3523,7 +3545,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-SPI-013"
     },
     {
       "id": "REQ-SPI-026",
@@ -3532,7 +3555,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.3.3 (\"...even if the read_size is less than the number of bytes in the byte_msg_payload.\"), Figure 23 worked example (\"write 20 bytes and get a response with 10 on SPI channel 3\", op=0/read direction), TC18.txt L4355-4375; channel selection per §13.5 Table 30 SPI row, TC18.txt L3678-3680"
     },
     {
       "id": "REQ-SPI-027",
@@ -3541,7 +3565,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3693 (general ACF frame-validation basis, SPI row for channel selection)"
     },
     {
       "id": "REQ-SPI-028",
@@ -3550,7 +3575,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.3.3 (\"The SPI EP shall append zeros in case the read_size is larger than the number of bytes in the byte_msg_payload.\"), TC18.txt L4370-4371"
     },
     {
       "id": "REQ-SPI-029",
@@ -3559,7 +3585,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.3.3 (\"The SPI EP shall append zeros in case the read_size is larger than the number of bytes in the byte_msg_payload.\"), TC18.txt L4370-4371"
     },
     {
       "id": "REQ-SPI-030",
@@ -3568,7 +3595,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3693 (general ACF frame-validation basis, SPI row for channel selection)"
     },
     {
       "id": "REQ-I2C-001",
