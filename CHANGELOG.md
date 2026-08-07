@@ -32,6 +32,19 @@ the rationale.
 
 ## Releases
 
+### v0.139.0 -- 2026-08-07
+
+**Citation backfill, batch 19: SRV.** Issue #164. Cited all 15
+remaining uncited requirements for `server.c`'s request-storage/
+admission/priority-scheduling/completion core against TC18 §12.9.1's
+request handling, §12.9.2's seven-tier priority-in-execution ordering,
+and §12.9.3 Table 26's per-request-type execution procedure -- SRV is
+now 100% cited. Also records that PWR (`powerstate.c`) was scoped and
+rejected as a batch candidate: a thin client-side wrapper with no
+distinct TC18 text of its own. See `ROADMAP.md` milestone 139 for full
+detail. 1028 requirements (unchanged), 100% traced+tested, 0
+`cfusa check` errors.
+
 ### v0.138.0 -- 2026-08-07
 
 **Citation backfill, batch 18: WAKEUP.** Issue #164. Cited 13 of 16
