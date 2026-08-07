@@ -6269,3 +6269,25 @@ TC18 clause behind them, not an oversight.
 Purely additive (new `tc18` citation fields only); no code or test
 changed. 1028 requirements (unchanged count), 100% traced+tested, 0
 `cfusa check` errors.
+
+### 122. Citation backfill, batch 2: ACF (issue #164) (v0.122.0)
+
+Second batch. Cited 11 of the 14 remaining uncited ACF requirements
+against TC18 §11.2.1 Figure 7 / Table 4 (the ABB `byte_message_info`
+header definition -- ACF_GBB shares the same first 8 octets, adding only
+the `message_timestamp` region) and the `acf_msg_type` values (0x0E ABB,
+0x0D GBB) that distinguish the two forms.
+
+Left uncited, deliberately, pending closer investigation rather than a
+speculative citation: `REQ-ACF-001` (strerror uniqueness -- genuine
+implementation detail, no TC18 clause), `REQ-ACF-011` (zero the
+`message_timestamp` region when untimed -- no explicit TC18 text found
+mandating this specific encode-time zeroing, though it's a defensible
+safety choice), `REQ-ACF-012` (`RCP_ACF_MTV_UNCERTAIN` as a third `mtv`
+state -- TC18's own `mtv` bit is binary per Figure 7/Table 4; this may be
+conflating the ACF_GBB `mtv` bit with the AVTP TSCF header's separate
+`tu` bit, or modeling something not yet identified -- needs its own
+investigation before citing, not force-fit here).
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.

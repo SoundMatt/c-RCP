@@ -32,6 +32,18 @@ the rationale.
 
 ## Releases
 
+### v0.122.0 -- 2026-08-07
+
+**Citation backfill, batch 2: ACF.** Issue #164. Cited 11 of 14 remaining
+uncited ACF requirements against TC18 §11.2.1 Figure 7/Table 4 (the
+`byte_message_info` header ABB and GBB share). Left 3 uncited pending
+closer investigation rather than a speculative citation, including one
+genuine open question (`REQ-ACF-012`'s `RCP_ACF_MTV_UNCERTAIN` third
+state -- TC18's own `mtv` bit is binary; may be conflating it with the
+AVTP TSCF header's separate `tu` bit). Purely additive; no code or test
+changed. 1028 requirements (unchanged), 100% traced+tested, 0 `cfusa
+check` errors.
+
 ### v0.121.0 -- 2026-08-07
 
 **Citation backfill, batch 1: AVTP.** Issue #164. Cited 11 of 20 AVTP
