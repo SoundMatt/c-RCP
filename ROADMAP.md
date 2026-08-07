@@ -6800,3 +6800,48 @@ were genuinely uncited before writing anything.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 138. Citation backfill, batch 18: WAKEUP (issue #164) (v0.138.0)
+
+Eighteenth batch. §13.7.2 Wakeup control, 16/22 uncited going in.
+Before committing to this category, this batch's own scoping pass
+first checked MDIO (16 uncited) and found its file header
+self-documents essentially its *entire* wire layout as original,
+non-TC18 design (already tracked as `tc18-gap` #021/#022) -- only one
+requirement in it would have been genuinely citable. WAKEUP, by
+contrast, has rich underlying TC18 prose (§13.7.2.1's basic concept,
+Table 36/37's register block, §13.7.2.3's sleep-request handshake +
+Figure 22 + the "SleepCMD is coded as 0xA5" line) despite the module
+already carrying six pre-existing `tc18-gap` entries
+(`REQ-WAKEUP-017`-`022`) documenting real, specific divergences from
+that same prose.
+
+Cited 13 of the 16 uncited `REQ-WAKEUP-*` requirements, several
+deliberately cross-referencing those pre-existing gap entries rather
+than implying full conformance: lifecycle-gated functional-config
+writability (`REQ-WAKEUP-002`) reusing the established §12.3.1.2/.3
+basis; wake-source assertion (`REQ-WAKEUP-003`-`004`) against
+§13.7.2.1's activity-detection prose and Table 36/37, cross-referencing
+`REQ-WAKEUP-021`/`022` for the module's reduced single-sense/
+single-latch modeling versus Table 37's six-value IO_SRC encoding and
+Table 36's per-source bitfield; the wup_status latch primitives
+(`REQ-WAKEUP-005`-`008`) against Table 36's wup_status register text,
+same `REQ-WAKEUP-021` cross-reference; the SleepCMD request/response
+pair (`REQ-WAKEUP-010`-`013`) against Figure 22, the 0xA5 opcode, and
+the sleep-request acknowledge/refusal prose, with the response pair
+cross-referencing `REQ-WAKEUP-019`'s divergence (refusal signalled as
+a positive-form response, not an error response); and the WakeUp
+message pair (`REQ-WAKEUP-014`-`015`) against §13.7.2.1's repetitive-
+message prose, cross-referencing `REQ-WAKEUP-017`'s divergence (no
+wake-up source field carried).
+
+Left uncited, deliberately: `REQ-WAKEUP-001` (zero-init),
+`REQ-WAKEUP-009` (`strerror()`), and `REQ-WAKEUP-016` (the wakeup-echo
+helper -- transaction_num correlation is this module's own
+implementation convenience with no direct TC18 text of its own).
+
+Used the pre-flight citation-target check -- confirmed all 13 targets
+were genuinely uncited before writing anything.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
