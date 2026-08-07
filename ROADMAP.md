@@ -6424,3 +6424,30 @@ force-fit here either.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 127. Citation backfill, batch 7: GPIO (issue #164) (v0.127.0)
+
+Seventh batch. GPIO was 5/37 cited going in -- the second-largest
+uncited category after PWM, and the batch that motivated the previous
+one's discovery: `REQ-GPIO-006` (the WRITE_REPLACE evt[2:0] semantics)
+was seen uncited during batch 6's research and correctly predicted the
+whole write-semantics cluster shares PWM_OUT's §13.5 Table 30 row.
+
+Cited 30 of the 32 uncited `REQ-GPIO-*` requirements. GPIO's evt[2:0]
+write-modifier semantics (`REQ-GPIO-005`-`012`) reuse the exact same
+Table 30 GPIO/PWM_OUT row citations as batch 6's PWM_OUT half.
+Lifecycle-gated functional-config writability (`REQ-GPIO-019`-`025`)
+reuses the same §12.3.1.2/§12.3.1.3 basis already established for
+LIFECYCLE and PWM. Request/response wire format (`REQ-GPIO-026`-`032`)
+cites §13.7.4.1's GPIO-specific 4-byte/INVALID_PARAMETER rule
+(TC18.txt L4391-4392) plus the general Table 30 frame-validation basis.
+Pin/bitmask helpers (`REQ-GPIO-002`-`004`) cite §13.7.4.1's 32-pin/
+bit-position description. Trigger semantics (`REQ-GPIO-014`-`017`) cite
+Table 40.
+
+Left uncited, deliberately: `REQ-GPIO-001` (`strerror()` uniqueness) and
+`REQ-GPIO-018` (functional-config zero-init) -- the same
+implementation-detail pattern as every prior batch.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
