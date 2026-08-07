@@ -6615,3 +6615,36 @@ the same implementation-detail pattern as every prior batch.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 133. Citation backfill, batch 13: CANEP (issue #164) (v0.133.0)
+
+Thirteenth batch. CANEP was 11/32 cited going in -- already
+substantially seeded from earlier work (`REQ-CANEP-001`, `016`, `017`,
+`020`, `026`-`032` all pre-cited to §13.7.11.3 Figure 39/Table 54 and
+§13.7.11.2 Table 53), which made this batch's citation text mostly a
+direct reuse of that already-established basis rather than fresh
+spec forensics.
+
+Cited 19 of the 21 uncited `REQ-CANEP-*` requirements: frame-format/
+arbitration-id/data-length helpers (`REQ-CANEP-002`-`005`) against
+Table 54 and §13.7.11.3's remote-frame/CAN-ID-alignment and CAN
+XL 2054-byte payload text; the four-entry XL acceptance-filter table
+(`REQ-CANEP-006`, `014`) against Table 53's four `acceptance filter`
+rows; per-field functional-config setters (`REQ-CANEP-008`-`013`)
+against their own Table 53 register plus the established
+§12.3.1.2/§12.3.1.3 lifecycle-writability basis; frame request/response
+round-trips (`REQ-CANEP-018`, `019`, `021`, `022`) against the same
+Figure 39 basis already used for the sibling encode/decode
+requirements; and fragmentation (`REQ-CANEP-023`-`025`) against
+§13.7.11.3's "requires segmentation, which is supported by the fields
+'ms' and 'segment_num'" text.
+
+Used the pre-flight citation-target check added after batch 11 --
+confirmed all 19 targets were genuinely uncited before writing anything.
+
+Left uncited, deliberately: `REQ-CANEP-007` (functional-config
+zero-init) and `REQ-CANEP-015` (`strerror()` uniqueness) -- the same
+implementation-detail pattern as every prior batch.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.

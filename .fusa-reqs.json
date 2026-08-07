@@ -6126,7 +6126,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 Table 54, TC18.txt L5447-5456"
     },
     {
       "id": "REQ-CANEP-003",
@@ -6135,7 +6136,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 (\"Sending remote frames is not supported. In case the CAN ID is 11bits, then it shall be right aligned in the CAN ID field.\"), TC18.txt L5471; §13.7.11.3 Table 54, TC18.txt L5447-5456"
     },
     {
       "id": "REQ-CANEP-004",
@@ -6144,7 +6146,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 (\"In case the CAN ID is 11bits, then it shall be right aligned in the CAN ID field.\"), TC18.txt L5471"
     },
     {
       "id": "REQ-CANEP-005",
@@ -6153,7 +6156,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 (\"For CAN XL this can be up to 2054 bytes (2048 + 6, see below)... The 'CAN data' field includes the additional data (RRS, SDT, VCID, AF (in total 6 bytes)- see ISO11898-1) needed for CAN XL frames\"), TC18.txt L5443-5444, L5472-5473"
     },
     {
       "id": "REQ-CANEP-006",
@@ -6162,7 +6166,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.2 Table 53 (four \"acceptance filter\" entries: acceptance filter 1-4, each 32 bit R/W), TC18.txt L5385-5399"
     },
     {
       "id": "REQ-CANEP-007",
@@ -6180,7 +6185,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
     },
     {
       "id": "REQ-CANEP-009",
@@ -6189,7 +6195,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.2 Table 53 (\"CAN bit time register 1 ... Defines bit times for Classical CAN\"), TC18.txt L5379; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
     },
     {
       "id": "REQ-CANEP-010",
@@ -6198,7 +6205,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.2 Table 53 (\"CAN bit time register 2 ... Defines bit times for CAN FD\"), TC18.txt L5380; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
     },
     {
       "id": "REQ-CANEP-011",
@@ -6207,7 +6215,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.2 Table 53 (\"CAN bit time register 3 ... Defines bit times for CAN XL\"), TC18.txt L5381; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
     },
     {
       "id": "REQ-CANEP-012",
@@ -6216,7 +6225,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.2 Table 53 (\"TDCC register ... delay compensation control\"), TC18.txt L5382; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
     },
     {
       "id": "REQ-CANEP-013",
@@ -6225,7 +6235,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.2 Table 53 (\"can_clk_divider ... generate CAN_CLK time reference\"), TC18.txt L5376; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
     },
     {
       "id": "REQ-CANEP-014",
@@ -6234,7 +6245,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.2 Table 53 (four \"acceptance filter\" entries: acceptance filter 1-4), TC18.txt L5385-5399; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
     },
     {
       "id": "REQ-CANEP-015",
@@ -6272,7 +6284,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 Figure 39, TC18.txt L5426-5446"
     },
     {
       "id": "REQ-CANEP-019",
@@ -6281,7 +6294,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 Figure 39, TC18.txt L5426-5446"
     },
     {
       "id": "REQ-CANEP-020",
@@ -6300,7 +6314,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 Figure 39, TC18.txt L5426-5446"
     },
     {
       "id": "REQ-CANEP-022",
@@ -6309,7 +6324,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 Figure 39, TC18.txt L5426-5446"
     },
     {
       "id": "REQ-ISELED-001",
@@ -7143,7 +7159,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 (\"...which requires segmentation, which is supported by the fields 'ms' and 'segment_num'.\"), TC18.txt L5443-5446"
     },
     {
       "id": "REQ-CANEP-024",
@@ -7152,7 +7169,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 (\"...which requires segmentation, which is supported by the fields 'ms' and 'segment_num'.\"), TC18.txt L5443-5446"
     },
     {
       "id": "REQ-CANEP-025",
@@ -7161,7 +7179,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.11.3 (\"...which requires segmentation, which is supported by the fields 'ms' and 'segment_num'.\"), TC18.txt L5443-5446; §13.7.11.3 Figure 39, TC18.txt L5426-5446"
     },
     {
       "id": "REQ-CANEP-026",
