@@ -32,6 +32,21 @@ the rationale.
 
 ## Releases
 
+### v0.126.0 -- 2026-08-07
+
+**Citation backfill, batch 6: PWM.** Issue #164. First per-endpoint-type
+batch (PWM was the single largest remaining uncited category, 54/58).
+Cited 48 of 54 against §13.5 Table 30's GPIO/PWM_OUT evt[2:0]
+write-modifier row, §13.7.5/§13.7.6's trigger tables and request/
+response format, the §12.3.1.2/.3 lifecycle-writability basis already
+established for LIFECYCLE, and §13.5.1's compound-wait comparison
+clauses. Left 6 uncited: 4 implementation-detail (zero-init,
+`strerror()` uniqueness) and 2 (`RCP_EP_PWM_IN_NO_SIGNAL` round-trip/
+compound-wait exclusion) where the 0xFFFF sentinel has no direct TC18
+textual basis -- flagged as a genuine ambiguity, not force-cited.
+Purely additive; no code or test changed. 1028 requirements (unchanged),
+100% traced+tested, 0 `cfusa check` errors.
+
 ### v0.125.0 -- 2026-08-07
 
 **Citation backfill, batch 5: PWRMODE.** Issue #164. Cited 10 of 12

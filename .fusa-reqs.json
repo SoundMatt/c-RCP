@@ -3964,7 +3964,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (\"evt[2:0]\" GPIO/PWM_OUT row, values 000b-111b), TC18.txt L3690-3717"
     },
     {
       "id": "REQ-PWM-002",
@@ -3973,7 +3974,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=000b: \"The byte_msg_payload is presented at the interface\"), TC18.txt L3694"
     },
     {
       "id": "REQ-PWM-003",
@@ -3982,7 +3984,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=001b: \"The 'byte_msg_payload' bitwise OR 'current interface status' is written to the interface\"), TC18.txt L3695-3698"
     },
     {
       "id": "REQ-PWM-004",
@@ -3991,7 +3994,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=010b: \"The 'byte_msg_payload' bitwise AND 'current interface status' is written to the interface\"), TC18.txt L3699-3702"
     },
     {
       "id": "REQ-PWM-005",
@@ -4000,7 +4004,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=011b: \"The 'byte_msg_payload' bitwise XOR 'current interface status' is written to the interface\"), TC18.txt L3703-3706"
     },
     {
       "id": "REQ-PWM-006",
@@ -4009,7 +4014,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=101b: \"The 'byte_msg_payload' plus 'current interface status' is written to the interface\"), TC18.txt L3709-3711; saturation rule, TC18.txt L3719-3720"
     },
     {
       "id": "REQ-PWM-007",
@@ -4018,7 +4024,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=110b: \"'byte_msg_payload' minus 'current interface status' is written as is to interface\"), TC18.txt L3712-3714; saturation rule, TC18.txt L3719-3720"
     },
     {
       "id": "REQ-PWM-008",
@@ -4027,7 +4034,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=100b: \"reserved -request shall be ignored and an err-response with error code = UNSUPPORTED_CMD shall be sent\"), TC18.txt L3707-3708"
     },
     {
       "id": "REQ-PWM-009",
@@ -4036,7 +4044,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=111b: \"The byte_msg_payload is not presented to the interface but used to change the configuration of the endpoint (see 12.7.1).\"), TC18.txt L3715-3717"
     },
     {
       "id": "REQ-PWM-010",
@@ -4045,7 +4054,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.5.2 Table 43 (pwmo functional configuration register block), TC18.txt L4557-4607"
     },
     {
       "id": "REQ-PWM-011",
@@ -4054,7 +4064,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.5.2 Table 43 (pwmo functional configuration register block, pwmo_ep_len fixed at 0x06), TC18.txt L4557-4607"
     },
     {
       "id": "REQ-PWM-012",
@@ -4063,7 +4074,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.5.1 Table 42 (\"A PWM endpoint creates three trigger events\"), TC18.txt L4525-4537"
     },
     {
       "id": "REQ-PWM-013",
@@ -4072,7 +4084,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.5.1 Table 42 (trigger signal 1, \"at the start of the cycle\"), TC18.txt L4534"
     },
     {
       "id": "REQ-PWM-014",
@@ -4081,7 +4094,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.5.1 Table 42 (trigger signal 2, \"in the middle of the active pulse\"), TC18.txt L4535"
     },
     {
       "id": "REQ-PWM-015",
@@ -4090,7 +4104,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.5.1 Table 42 (trigger signal 0, \"PWM request exec done (requested values applied)\"), TC18.txt L4533"
     },
     {
       "id": "REQ-PWM-016",
@@ -4108,7 +4123,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178"
     },
     {
       "id": "REQ-PWM-018",
@@ -4117,7 +4133,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178 -- writable once concluded (i.e. HW_CONFIGURED)"
     },
     {
       "id": "REQ-PWM-019",
@@ -4126,7 +4143,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3 (\"...only write access to the EP's functional configurations is allowed via their dedicated stream_id/byte_bus_id combinations or via root client access EP0... Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables.\"), TC18.txt L2203-2206, L2225-2226"
     },
     {
       "id": "REQ-PWM-020",
@@ -4135,7 +4153,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-PWM-019"
     },
     {
       "id": "REQ-PWM-021",
@@ -4144,7 +4163,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-PWM-019"
     },
     {
       "id": "REQ-PWM-022",
@@ -4153,7 +4173,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-PWM-019"
     },
     {
       "id": "REQ-PWM-023",
@@ -4162,7 +4183,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-PWM-019"
     },
     {
       "id": "REQ-PWM-024",
@@ -4180,7 +4202,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710 (general ACF frame-validation basis for the request/response wire format)"
     },
     {
       "id": "REQ-PWM-026",
@@ -4189,7 +4212,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-PWM-027",
@@ -4198,7 +4222,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.5.3 (\"The PWM_out request and response contain two values in the payload. The active time of the PWM signal as well as the period of the signal in clock ticks of the clock selected for this PWM_out endpoint.\"), TC18.txt L4621-4623; evt[2:0] semantics per §13.5 Table 30, TC18.txt L3690-3717"
     },
     {
       "id": "REQ-PWM-028",
@@ -4207,7 +4232,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.5.3 (\"A request not having exactly four bytes is rejected and an error response with error code = INVALID_PARAMETER will be sent.\"), TC18.txt L4630-4631"
     },
     {
       "id": "REQ-PWM-029",
@@ -4216,7 +4242,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.5.3 (\"The PWM_out request and response contain two values in the payload.\"), TC18.txt L4621-4623"
     },
     {
       "id": "REQ-PWM-030",
@@ -4225,7 +4252,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.5.3 (\"The PWM_out request and response contain two values in the payload.\"), TC18.txt L4621-4623"
     },
     {
       "id": "REQ-PWM-031",
@@ -4234,7 +4262,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710 (general ACF frame-validation basis)"
     },
     {
       "id": "REQ-PWM-032",
@@ -4243,7 +4272,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.6.1 Table 44 (\"The PWM_IN endpoint generates two trigger events\"), TC18.txt L4673-4676"
     },
     {
       "id": "REQ-PWM-033",
@@ -4252,7 +4282,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.6.1 Table 44 (trigger signal 0, \"rising edge of PWM_IN signal\"), TC18.txt L4674"
     },
     {
       "id": "REQ-PWM-034",
@@ -4261,7 +4292,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.6.1 Table 44 (trigger signal 1, \"falling edge of PWM_IN signal\"), TC18.txt L4675"
     },
     {
       "id": "REQ-PWM-035",
@@ -4279,7 +4311,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178"
     },
     {
       "id": "REQ-PWM-037",
@@ -4288,7 +4321,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178 -- writable once concluded (i.e. HW_CONFIGURED)"
     },
     {
       "id": "REQ-PWM-038",
@@ -4297,7 +4331,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2203-2206, L2225-2226 (W* marker convention) -- same basis as REQ-PWM-019"
     },
     {
       "id": "REQ-PWM-039",
@@ -4306,7 +4341,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-PWM-019"
     },
     {
       "id": "REQ-PWM-040",
@@ -4315,7 +4351,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-PWM-019"
     },
     {
       "id": "REQ-PWM-041",
@@ -4333,7 +4370,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.6.3 (\"The PWM_IN request and response contain two 16 bit values in the payload... The interpretation of the evt-bits is described in the section 'The usage of evt bits in requests'.\"), TC18.txt L4757-4758"
     },
     {
       "id": "REQ-PWM-043",
@@ -4342,7 +4380,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710 (general ACF frame-validation basis)"
     },
     {
       "id": "REQ-PWM-044",
@@ -4351,7 +4390,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.6.3 (\"Responses include the measured active time of the PWM signal as well as the period of the signal in clock ticks of the clock selected for this PWM_IN endpoint.\"), TC18.txt L4759-4761"
     },
     {
       "id": "REQ-PWM-045",
@@ -4360,7 +4400,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.6.3 (\"Responses include the measured active time of the PWM signal as well as the period of the signal in clock ticks of the clock selected for this PWM_IN endpoint.\"), TC18.txt L4759-4761"
     },
     {
       "id": "REQ-PWM-046",
@@ -4369,7 +4410,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710 (general ACF frame-validation basis)"
     },
     {
       "id": "REQ-PWM-047",
@@ -4387,7 +4429,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5.1 (\"evt[2:0] = 100b ... wait condition is met when the first two bytes... larger or equal...\" through \"evt[2:0] = 111b\"), TC18.txt L3771-3782"
     },
     {
       "id": "REQ-PWM-049",
@@ -4396,7 +4439,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5.1 (\"evt[2:0] = 100b 0xB - wait condition is met when the first two bytes of the first quadlet of 'byte_msg_payload' is larger or equal to the first two bytes of the first quadlet of the 'current interface status' (example: this can be used to check the period of PWM_in)\"), TC18.txt L3771-3773"
     },
     {
       "id": "REQ-PWM-050",
@@ -4405,7 +4449,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5.1 (\"evt[2:0] = 101b - wait condition is met when the first two bytes of the first quadlet of 'byte_msg_payload' is smaller or to equal the first two bytes of the first quadlet of the 'current interface status' (example: this can be used to check the period of PWM_in)\"), TC18.txt L3774-3776"
     },
     {
       "id": "REQ-PWM-051",
@@ -4414,7 +4459,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5.1 (\"evt[2:0] = 110b - wait condition is met when the last two bytes of the first quadlet of 'byte_msg_payload' is larger or equal to the last two bytes of the first quadlet of the 'current interface status' (example: this can be used to check the duty_cycle of PWM_in)\"), TC18.txt L3777-3779"
     },
     {
       "id": "REQ-PWM-052",
@@ -4423,7 +4469,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5.1 (\"evt[2:0] = 111b - wait condition is met when the last two bytes of the first quadlet of 'byte_msg_payload' is smaller or to equal... (example: this can be used to check the duty_cycle of PWM_in)\"), TC18.txt L3780-3782"
     },
     {
       "id": "REQ-PWM-053",
@@ -4432,7 +4479,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5.1, TC18.txt L3771-3782 -- only evt[2:0]=100b..111b (4..7) are defined compound-wait comparison modes for PWM_in in this table"
     },
     {
       "id": "REQ-PWM-054",

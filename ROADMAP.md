@@ -6386,3 +6386,41 @@ requirements, no TC18 clause.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 126. Citation backfill, batch 6: PWM (issue #164) (v0.126.0)
+
+Sixth batch, and the first not to complete a foundational/protocol-generic
+module -- this is the first per-endpoint-type batch, chosen because PWM
+was Phase 2's single largest remaining uncited category (54 of 58). Full
+recount before this batch: 291/1028 cited overall (not the smaller
+estimate carried in earlier session notes -- corrected here).
+
+Cited 48 of the 54 uncited `REQ-PWM-*` requirements. PWM_OUT's
+evt[2:0] write-modifier semantics (`REQ-PWM-001`-`009`: REPLACE/OR/AND/
+XOR/reserved/ADD/SUB/RECONFIG-misroute) map directly onto §13.5 Table
+30's GPIO/PWM_OUT row (TC18.txt L3690-3719), including the saturation
+clause for ADD/SUB. Trigger semantics for both PWM_OUT (`REQ-PWM-012`-
+`015`, Table 42) and PWM_IN (`REQ-PWM-032`-`034`, Table 44) map to
+§13.7.5.1/§13.7.6.1. Lifecycle-gated writability for both endpoints'
+functional config (`REQ-PWM-017`-`023`, `036`-`040`) reuses the same
+§12.3.1.2/§12.3.1.3 basis already established for `REQ-LIFECYCLE-018`-
+`020`. Request/response wire format (`REQ-PWM-025`-`031`, `042`-`046`)
+cites §13.7.5.3/§13.7.6.3 plus the general §13.5 Table 30 frame-validation
+basis already used for other endpoints' malformed-frame rejection reqs.
+PWM_IN's compound-wait comparison modes (`REQ-PWM-048`-`053`) map to
+§13.5.1's four numeric ≥/≤ evt[2:0] clauses (TC18.txt L3771-3782).
+
+Left uncited, deliberately: `REQ-PWM-016`/`035` (functional-config
+zero-init) and `REQ-PWM-024`/`041` (`strerror()` uniqueness) -- the same
+implementation-detail pattern as prior batches. `REQ-PWM-047`/`054`
+(the `RCP_EP_PWM_IN_NO_SIGNAL` 0xFFFF sentinel's round-trip and
+compound-wait exclusion behavior) are also left uncited: TC18 defines
+`PWM_IN_NO_SIGNAL` only as a Table 27 wire *error code* (value 9), not
+as a payload sentinel value for PWM_IN's period/active_duration fields
+-- the 0xFFFF-as-payload-sentinel convention is this implementation's
+own design choice with no direct TC18 text behind it, the same kind of
+genuine ambiguity already flagged for `REQ-ACF-012` in batch 2. Not
+force-fit here either.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
