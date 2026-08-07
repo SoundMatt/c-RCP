@@ -32,6 +32,17 @@ the rationale.
 
 ## Releases
 
+### v0.144.0 -- 2026-08-07
+
+**Citation backfill, batch 24: SEQ.** Issue #164. Cited all 10
+remaining uncited sequencer-primitive requirements against TC18
+§12.10 (Sequencers) and §12.7.10 (Sequencer state registers, Table
+25's SEQUENCER_config register map) -- SEQ is now 100% cited. This is
+the shared state-table primitive CMP/SRV both consume, previously
+cited only indirectly through those callers. See `ROADMAP.md`
+milestone 144 for full detail. 1028 requirements (unchanged), 100%
+traced+tested, 0 `cfusa check` errors.
+
 ### v0.143.0 -- 2026-08-07
 
 **Citation backfill, batch 23: CANCEL.** Issue #164. Cited 7 of 8

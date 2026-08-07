@@ -4925,7 +4925,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.10 (\"After power-on/reset all sequencers are in state 1.\"), TC18.txt L3468; §12.7.10 (\"Upon power-on reset all sequencer state values are set to '1'.\"), TC18.txt L3068-3069"
     },
     {
       "id": "REQ-SEQ-003",
@@ -4934,7 +4935,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.10 (\"After power-on/reset all sequencers are in state 1.\"), TC18.txt L3468; §12.7.10 (\"Upon power-on reset all sequencer state values are set to '1'.\"), TC18.txt L3068-3069"
     },
     {
       "id": "REQ-SEQ-004",
@@ -4943,7 +4945,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.10 (\"An RC Server implementation may support only a lower number of sequencers.\"), TC18.txt L3473-3474; the implementation of one or more sequencers into an RC Server is optional, TC18.txt L3072-3073"
     },
     {
       "id": "REQ-SEQ-005",
@@ -4952,7 +4955,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.10 (\"After power-on/reset all sequencers are in state 1.\"), TC18.txt L3468; §12.7.10 (\"Upon power-on reset all sequencer state values are set to '1'.\"), TC18.txt L3068-3069"
     },
     {
       "id": "REQ-SEQ-006",
@@ -4961,7 +4965,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.10 (\"Sequencers are simply a state register which stores the current state of the sequencer.\"), TC18.txt L3466; readable/writable via §12.7.10's SEQUENCER_config register map, TC18.txt L3075-3092"
     },
     {
       "id": "REQ-SEQ-007",
@@ -4970,7 +4975,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.10 (\"The number of sequencers and states per sequencer are limited to 256 by this definition.\"), TC18.txt L3472-3473"
     },
     {
       "id": "REQ-SEQ-008",
@@ -4979,7 +4985,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.10 (\"Sequencers are simply a state register which stores the current state of the sequencer.\"), TC18.txt L3466; readable/writable via §12.7.10's SEQUENCER_config register map, TC18.txt L3075-3092"
     },
     {
       "id": "REQ-SEQ-009",
@@ -4988,7 +4995,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.10 (\"The number of sequencers and states per sequencer are limited to 256 by this definition.\"), TC18.txt L3472-3473"
     },
     {
       "id": "REQ-SEQ-010",
@@ -4997,7 +5005,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.10 (\"Sequencers are simply a state register which stores the current state of the sequencer.\"), TC18.txt L3466; readable/writable via §12.7.10's SEQUENCER_config register map, TC18.txt L3075-3092; §12.7.10 Table 25 (\"Seq_state ... if manually set to 0 then disabled\"), TC18.txt L3082, L3090"
     },
     {
       "id": "REQ-SEQ-011",
@@ -5006,7 +5015,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.10 (\"The number of sequencers and states per sequencer are limited to 256 by this definition.\"), TC18.txt L3472-3473"
     },
     {
       "id": "REQ-CMP-001",
