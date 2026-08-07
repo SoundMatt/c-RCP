@@ -5575,7 +5575,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.3.1 Figure 13 / Table 11 (Usage of GBB message to cancel all requests, request_type=0x05), TC18.txt L1681-1719; general ACF_GBB frame-validation basis and §11.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1186-1189"
     },
     {
       "id": "REQ-CANCEL-004",
@@ -5604,7 +5605,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.3.3 Figure 15 / Table 13 (Usage of GBB message to cancel a single, specific request, request_type=0x07, clear_transaction_num), TC18.txt L1794-1835; general ACF_GBB frame-validation basis and §11.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1186-1189"
     },
     {
       "id": "REQ-CANCEL-007",
@@ -5623,7 +5625,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.3 (\"A request can be cancelled while it is pending and after it has been started until it is under execution. Requests under execution will not be aborted.\"), TC18.txt L1673-1675"
     },
     {
       "id": "REQ-CANCEL-009",
@@ -5632,7 +5635,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.3.3 (\"The request initiating the cancellation will create an error response with the error code = REQUEST_NOT_FOUND, when the clear_transaction_num was not found.\"), TC18.txt L1836-1837"
     },
     {
       "id": "REQ-CANCEL-010",
@@ -5641,7 +5645,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.3 (\"A request can be cancelled while it is pending and after it has been started until it is under execution. Requests under execution will not be aborted.\"), TC18.txt L1673-1675"
     },
     {
       "id": "REQ-CANCEL-011",
@@ -5650,7 +5655,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.3 (\"A request can be cancelled while it is pending and after it has been started until it is under execution. Requests under execution will not be aborted.\"), TC18.txt L1673-1675; §11.2.3.3 (\"The request initiating the cancellation will create an error response with the error code = REQUEST_NOT_FOUND, when the clear_transaction_num was not found.\"), TC18.txt L1836-1837"
     },
     {
       "id": "REQ-CANCEL-012",
@@ -5659,7 +5665,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.3 (\"If a request is cancelled to which a request is chained, then the chained successors shall be cancelled by the RC Server as well.\"), TC18.txt L1674-1675"
     },
     {
       "id": "REQ-SCHED-001",
