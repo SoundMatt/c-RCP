@@ -32,6 +32,18 @@ the rationale.
 
 ## Releases
 
+### v0.130.0 -- 2026-08-07
+
+**Citation backfill, batch 10: DISC.** Issue #164. First non-endpoint-
+type batch: DISC is the RC-Server-level discovery protocol (§12.6).
+Cited 27 of 28 remaining uncited DISC requirements against §12.6.1
+Table 16 (discovery request format), §12.6.2 Table 17 (discovery
+response format), and §12.6's own prose for the discovery-stream claim/
+timeout/preemption mechanism, which has no dedicated table. Left 1
+uncited (`strerror()` uniqueness) -- genuine implementation detail.
+Purely additive; no code or test changed. 1028 requirements
+(unchanged), 100% traced+tested, 0 `cfusa check` errors.
+
 ### v0.129.0 -- 2026-08-07
 
 **Citation backfill, batch 9: UART.** Issue #164. Cited 27 of 29

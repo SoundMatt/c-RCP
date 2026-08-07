@@ -6515,3 +6515,30 @@ implementation-detail pattern as every prior batch.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 130. Citation backfill, batch 10: DISC (issue #164) (v0.130.0)
+
+Tenth batch, and the first not to be a per-endpoint-type module --
+DISC is the RC-Server-level discovery protocol (§12.6), read fresh
+rather than assumed to fit the endpoint-type pattern of batches 6-9.
+DISC was 1/29 cited going in.
+
+Cited 27 of the 28 uncited `REQ-DISC-*` requirements against §12.6.1
+Table 16 (discovery request: fixed NTSCF/ACF_ABB/byte_bus_id=0/op=read
+shape) and §12.6.2 Table 17 (discovery response: same shape, payload
+carrying the register map from address 0x00000, length bounded by
+read_size). The discovery-stream claim mechanism
+(`REQ-DISC-015`-`022`: claim/release/timeout/preemption) cites §12.6's
+own prose -- the first discovery request claims the discovery stream,
+a `Discovery_TimeOut` with no configuration traffic releases it, and
+only the claimant's configuration requests are accepted while held --
+since TC18 describes this entirely in running text with no dedicated
+table. The discovery result cache (`REQ-DISC-023`) cites §12.6.2's
+"maintain a table of relevant discovered RC Servers" client-side
+guidance.
+
+Left uncited, deliberately: `REQ-DISC-024` (`strerror()` uniqueness) --
+the same implementation-detail pattern as every prior batch.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
