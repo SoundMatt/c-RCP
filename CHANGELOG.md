@@ -32,6 +32,20 @@ the rationale.
 
 ## Releases
 
+### v0.128.0 -- 2026-08-07
+
+**Citation backfill, batch 8: SPI.** Issue #164. Cited 28 of 30
+remaining uncited SPI requirements against SPI's own distinct §13.5
+Table 30 row (channel-select 000b-101b, reserved 110b, reconfig 111b --
+read fresh, not reused from GPIO/PWM_OUT's row), §13.7.3.1's 6-channel
+description and Table 38 trigger outputs, Table 39's per-channel
+functional-config fields, and §13.7.3.3's read-direction transfer
+semantics with Figure 23's worked example. Lifecycle-gated writability
+reuses the §12.3.1.2/§12.3.1.3 basis from prior batches. Left 2 uncited
+(`strerror()` uniqueness, functional-config zero-init) -- genuine
+implementation detail. Purely additive; no code or test changed. 1028
+requirements (unchanged), 100% traced+tested, 0 `cfusa check` errors.
+
 ### v0.127.0 -- 2026-08-07
 
 **Citation backfill, batch 7: GPIO.** Issue #164. Cited 30 of 32

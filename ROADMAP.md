@@ -6451,3 +6451,34 @@ implementation-detail pattern as every prior batch.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 128. Citation backfill, batch 8: SPI (issue #164) (v0.128.0)
+
+Eighth batch. SPI was 5/35 cited going in. Unlike PWM_OUT and GPIO
+(batches 6-7, which shared one Table 30 row), SPI has **its own
+distinct Table 30 row**: evt[2:0]=000b-101b select one of 6
+pre-configured channel settings and assert that channel's CSn, 110b is
+reserved/UNSUPPORTED_CMD, 111b is the reconfiguration escape hatch --
+a genuinely different semantic from GPIO/PWM_OUT's register-modify
+row, read fresh from TC18.txt L3671-3693 rather than reused.
+
+Cited 28 of the 30 uncited `REQ-SPI-*` requirements: channel-count and
+CPOL/CPHA derivation (`REQ-SPI-002`-`005`) against §13.7.3.1's 6-channel
+description and Table 39's `spi_clk_polarity0`/`spi_clk_phase0` fields
+(the "SPI mode 0..3" grouping is this implementation's own convenience
+layer over TC18's two independent bits, noted as such rather than
+claimed as spec-named); trigger semantics (`REQ-SPI-006`-`009`) against
+Table 38's per-channel CSn assert/de-assert events; lifecycle-gated
+per-channel functional-config writability (`REQ-SPI-011`-`025`) reusing
+the §12.3.1.2/§12.3.1.3 basis from prior batches, each paired with its
+own Table 39 field citation where one exists; and transfer/response
+wire format (`REQ-SPI-026`-`030`) against §13.7.3.3's read-direction
+transfer semantics and Figure 23's worked "write 20 bytes and get 10
+back" example.
+
+Left uncited, deliberately: `REQ-SPI-001` (`strerror()` uniqueness) and
+`REQ-SPI-010` (functional-config zero-init) -- the same
+implementation-detail pattern as every prior batch.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
