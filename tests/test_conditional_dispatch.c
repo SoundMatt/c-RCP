@@ -22,6 +22,7 @@
 //cfusa:test REQ-SRV-021
 //cfusa:test REQ-SRV-022
 //cfusa:test REQ-ACF-031
+//cfusa:test REQ-MOCK-028
 /*
  * test_conditional_dispatch.c -- end-to-end tests for conditional-request
  * dispatch (TC18 §11.2.2/§11.2.3) through the real server path.
@@ -775,6 +776,42 @@ static void test_clear_single_removes_only_its_target(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* TC18 §11.2.3.3: "The request initiating the cancellation will create an
+ * error response with the error code = REQUEST_NOT_FOUND, when the
+ * clear_transaction_num was not found." The response carries the
+ * cancellation request's own byte_bus_id/transaction_num (§12.9.6's
+ * general rule), not the not-found target's. */
+static void test_clear_single_not_found_sends_request_not_found_error(void)
+{
+    handler_log_t                log;
+    rcp_mock_server_t           *srv = fixture(&log);
+    rcp_bytes_t                  clear = rcp_cancel_encode_clear_single(1, 91, 93);
+    rcp_bytes_t                  resp = {0};
+    rcp_acf_byte_message_info_t  hdr;
+    const uint8_t                *payload;
+    size_t                        payload_len;
+
+    /* Nothing pending at all -- transaction_num 91 cannot be found. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CANCELLED,
+                      rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF,
+                                                RCP_ACF_MSG_TYPE_GBB, true, clear.data, clear.len,
+                                                &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(resp.data, resp.len, &hdr, &payload,
+                                                      &payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&hdr));
+    TEST_ASSERT_EQUAL_UINT8(1u, hdr.err);
+    TEST_ASSERT_EQUAL_UINT8(1u, hdr.byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT8(93u, hdr.transaction_num); /* the cancel request's own tn, not 91 */
+    TEST_ASSERT_EQUAL_size_t(1, payload_len);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_REQUEST_NOT_FOUND, payload[0]);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&clear);
+    rcp_mock_server_destroy(srv);
+}
+
 /* clear-non-safestate (0x06) removes the ordinary requests and leaves the
  * safety sequence intact. */
 static void test_clear_non_safestate_keeps_safety_tagged_requests(void)
@@ -1003,6 +1040,7 @@ int main(void)
 
     RUN_TEST(test_clear_all_empties_the_request_store);
     RUN_TEST(test_clear_single_removes_only_its_target);
+    RUN_TEST(test_clear_single_not_found_sends_request_not_found_error);
     RUN_TEST(test_clear_non_safestate_keeps_safety_tagged_requests);
     RUN_TEST(test_watchdog_purge_keeps_only_the_safety_sequence);
 
