@@ -32,6 +32,17 @@ the rationale.
 
 ## Releases
 
+### v0.140.0 -- 2026-08-07
+
+**Citation backfill, batch 20: SCHED.** Issue #164. Cited all 8
+uncited `scheduler.c` requirements -- SCHED is now 100% cited.
+Request-kind priority ranking/comparison against §12.9.2's seven-tier
+priority list (already cited for SRV, whose own due-selection function
+calls this module's `rcp_sched_compare()`); multi-ACF-per-frame
+splitting and TSCF timing consistency against §12.9.1.1. See
+`ROADMAP.md` milestone 140 for full detail. 1028 requirements
+(unchanged), 100% traced+tested, 0 `cfusa check` errors.
+
 ### v0.139.0 -- 2026-08-07
 
 **Citation backfill, batch 19: SRV.** Issue #164. Cited all 15

@@ -6898,3 +6898,29 @@ were genuinely uncited before writing anything.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 140. Citation backfill, batch 20: SCHED (issue #164) (v0.140.0)
+
+Twentieth batch. `scheduler.c`/`scheduler.h`, 8/8 uncited (100%) going
+in -- the first fully-uncited-to-fully-cited batch since ADC-class
+work began, discovered directly from SRV's own research: the
+scheduler module is the same §12.9.1.1/§12.9.2 machinery SRV already
+consumes (`rcp_sched_compare()` is what `rcp_server_endpoint_select_
+due()` calls), just exposed as its own small, independently-testable
+unit.
+
+Cited all 8 of the 8 uncited `REQ-SCHED-*` requirements: request-kind
+classification/ranking/comparison (`REQ-SCHED-001`-`003`) against
+§12.9.2's exact seven-tier priority list already cited for SRV plus
+the same-priority FIFO tiebreak; multi-ACF-per-frame splitting
+(`REQ-SCHED-004`-`006`) against §12.9.1.1's "An RCP frame may include
+multiple ACF-types (requests). An RC Server shall support to handle
+multiple requests in one frame" rule; and TSCF timing consistency
+(`REQ-SCHED-007`-`008`) against §12.9.1.1's "A presentation time from
+a TSCF header will be applied to all ACFtypes within the frame" rule.
+
+Used the pre-flight citation-target check -- confirmed all 8 targets
+were genuinely uncited before writing anything.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
