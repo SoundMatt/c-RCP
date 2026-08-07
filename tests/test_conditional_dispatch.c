@@ -20,6 +20,8 @@
 //cfusa:test REQ-SRV-019
 //cfusa:test REQ-SRV-020
 //cfusa:test REQ-SRV-021
+//cfusa:test REQ-SRV-022
+//cfusa:test REQ-ACF-031
 /*
  * test_conditional_dispatch.c -- end-to-end tests for conditional-request
  * dispatch (TC18 §11.2.2/§11.2.3) through the real server path.
@@ -371,6 +373,48 @@ static void test_compound_wait_reserved_evt_is_rejected_at_admission(void)
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED, submit(srv, &frame));
     TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 1));
 
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* TC18 §12.9.6: "The error response shall contain the byte_bus_id and
+ * transaction number of the request. The error response shall contain a
+ * byte_msg_payload with an error code." Extends the rejection test above
+ * to check the actual wire bytes, not just the dispatch-result enum --
+ * this is the one rejection path github.com/SoundMatt/c-RCP/issues/163
+ * currently wires end to end. */
+static void test_compound_wait_reserved_evt_sends_unsupported_cmd_error_response(void)
+{
+    handler_log_t                log;
+    rcp_mock_server_t           *srv = fixture(&log);
+    rcp_compound_step_t          step = {0};
+    rcp_bytes_t                  frame, resp = {0};
+    rcp_acf_byte_message_info_t  hdr;
+    const uint8_t                *payload;
+    size_t                        payload_len;
+
+    step.start_state = RCP_SEQUENCER_POWER_ON_STATE;
+    step.next_state    = 1;
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT, 1, &step, 0x3u, 30, NULL,
+                                         0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+                      rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF,
+                                                RCP_ACF_MSG_TYPE_GBB, true, frame.data, frame.len,
+                                                &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(resp.data, resp.len, &hdr, &payload,
+                                                      &payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&hdr));
+    TEST_ASSERT_EQUAL_UINT8(1u, hdr.err);
+    TEST_ASSERT_EQUAL_UINT8(1u, hdr.byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT8(30u, hdr.transaction_num);
+    TEST_ASSERT_EQUAL_size_t(1, payload_len);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_UNSUPPORTED_CMD, payload[0]);
+
+    rcp_bytes_free(&resp);
     rcp_bytes_free(&frame);
     rcp_mock_server_destroy(srv);
 }
@@ -940,6 +984,7 @@ int main(void)
     RUN_TEST(test_compound_wait_requires_the_wait_condition);
     RUN_TEST(test_two_pending_compound_waits_have_independent_targets);
     RUN_TEST(test_compound_wait_reserved_evt_is_rejected_at_admission);
+    RUN_TEST(test_compound_wait_reserved_evt_sends_unsupported_cmd_error_response);
 
     RUN_TEST(test_triggered_executes_only_on_its_own_trigger);
     RUN_TEST(test_triggered_threshold_delays_execution);

@@ -200,7 +200,7 @@ static void test_hw_configured_admits_any_stream_and_any_endpoint(void)
      * dropped without response. */
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_EXECUTE_NOW,
                       rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u,
-                                                &request_type, NULL));
+                                                &request_type, NULL, NULL));
     TEST_ASSERT_EQUAL_UINT8(0u, request_type);
 
     rcp_bytes_free(&frame);
@@ -645,7 +645,7 @@ static void test_entry_gate_is_scoped_to_one_endpoint_and_one_queue(void)
      * arriving mid-drain is still admitted and executed normally. */
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_EXECUTE_NOW,
                       rcp_server_endpoint_admit(&wakeup_ep, frame.data, frame.len, 0u,
-                                                &request_type, NULL));
+                                                &request_type, NULL, NULL));
 
     rcp_bytes_free(&frame);
     rcp_server_endpoint_destroy(&wakeup_ep);
@@ -679,7 +679,7 @@ static void test_disabled_endpoint_queues_config_requests_without_ack(void)
      * (transaction 0x42, above) from a dropped one. */
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_QUEUED,
                       rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u,
-                                                &request_type, NULL));
+                                                &request_type, NULL, NULL));
     TEST_ASSERT_EQUAL_UINT8(0u, request_type);
     TEST_ASSERT_EQUAL_UINT(2u, rcp_server_endpoint_queue_len(&ep));
 
@@ -731,7 +731,7 @@ static void test_gptp_lock_transition_issues_no_trigger_signal(void)
     TEST_ASSERT_NOT_NULL(frame.data);
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
                       rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u,
-                                                &request_type, &idx));
+                                                &request_type, &idx, NULL));
 
     memset(&ctx, 0, sizeof(ctx));
     ctx.sequencers    = &seqs;
@@ -819,7 +819,7 @@ static void test_tscf_presentation_time_and_abb_timed_encoder(void)
      * TSCF header's presentation time lies. */
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_EXECUTE_NOW,
                       rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u,
-                                                &request_type, NULL));
+                                                &request_type, NULL, NULL));
     TEST_ASSERT_EQUAL_UINT8(0u, request_type);
 
     /* TC18 §11.2 / §11.2.1 also encode a timed request whose presentation

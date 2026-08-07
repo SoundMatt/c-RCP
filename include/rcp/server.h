@@ -101,6 +101,7 @@
 #define RCP_SERVER_H
 
 #include "rcp/e2e.h"
+#include "rcp/errors.h"
 #include "rcp/rcp.h"
 #include "rcp/request_sequencer.h"
 #include "rcp/scheduler.h"
@@ -256,11 +257,31 @@ typedef enum {
  * *out_request_type is always written: the repurposed opcode byte for a
  * conditional or cancellation request, or 0 for a standard one.
  * *out_index, when non-NULL, receives the store index a
- * RCP_SERVER_ADMIT_PENDING request was placed at. */
+ * RCP_SERVER_ADMIT_PENDING request was placed at.
+ *
+ * *out_error, when non-NULL, is always written on RCP_SERVER_ADMIT_REJECTED
+ * and always RCP_ERROR_NONE otherwise. TC18 §12.9.6 requires an error
+ * response to carry the request's own byte_bus_id and transaction_num --
+ * most of this function's rejection paths reject *before* those fields
+ * (or the request's own opcode-specific fields needed to pick the
+ * precise Table 27 code) are known, so *out_error is RCP_ERROR_NONE for
+ * those (nothing conformant can be built; the caller has nothing to
+ * respond to). Only the one rejection path with everything already
+ * decoded -- a compound-wait request whose evt[2:0] is the reserved
+ * 011b value (TC18 §13.5.1: "request shall be ignored and an
+ * err-response with error code = UNSUPPORTED_CMD shall be sent") --
+ * currently sets a real code (RCP_ERROR_UNSUPPORTED_CMD). A caller that
+ * gets a non-RCP_ERROR_NONE *out_error back should build and send a real
+ * error response, e.g. via rcp_acf_build_error_response(); see
+ * mock.c's rcp_mock_server_dispatch() for a worked example. The other
+ * rejection paths' error-response wiring is tracked separately
+ * (github.com/SoundMatt/c-RCP/issues/163) -- do not assume
+ * RCP_ERROR_NONE means "no error occurred", only "this function did not
+ * determine a specific Table 27 code for it". */
 rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
                                               const uint8_t *frame, size_t frame_len,
                                               uint32_t now, uint8_t *out_request_type,
-                                              size_t *out_index);
+                                              size_t *out_index, rcp_wire_error_t *out_error);
 
 /* ── The execution-condition tick ─────────────────────────────────────────── */
 
