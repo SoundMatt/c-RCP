@@ -2197,7 +2197,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.1 Table 4 (\"acf_msg_type 0x0E (ABB message)\"), TC18.txt L1152-1153; ACF_GBB acf_msg_type=0x0D, e.g. TC18.txt L1447"
     },
     {
       "id": "REQ-ACF-005",
@@ -2206,7 +2207,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.1 Figure 7's fixed byte_message_info header, TC18.txt L1142-1149"
     },
     {
       "id": "REQ-ACF-006",
@@ -2215,7 +2217,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.1 Table 4 (\"acf_msg_length: number of quadlets of data contained in this message\"), TC18.txt L1154"
     },
     {
       "id": "REQ-ACF-007",
@@ -2224,7 +2227,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "ABB acf_msg_type=0x0E vs GBB acf_msg_type=0x0D distinguish the two ACF message forms, TC18.txt L1153,L1447"
     },
     {
       "id": "REQ-ACF-008",
@@ -2233,7 +2237,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "ABB acf_msg_type=0x0E vs GBB acf_msg_type=0x0D distinguish the two ACF message forms, TC18.txt L1153,L1447"
     },
     {
       "id": "REQ-ACF-009",
@@ -2242,7 +2247,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.1 Table 4's acf_msg_length field, TC18.txt L1154"
     },
     {
       "id": "REQ-ACF-010",
@@ -2251,7 +2257,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.1 Figure 7/Table 4's byte_message_info fields, TC18.txt L1142-1170"
     },
     {
       "id": "REQ-ACF-011",
@@ -2278,7 +2285,8 @@
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.1 Figure 7 (acf_msg_type is byte 0 of byte_message_info), TC18.txt L1142-1153"
     },
     {
       "id": "REQ-ACF-014",
@@ -2287,7 +2295,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.1 Figure 7 (ABB byte_message_info, no timestamp), TC18.txt L1142-1149; ACF_GBB's additional 8-byte message_timestamp, e.g. TC18.txt L1447-1451"
     },
     {
       "id": "REQ-ACF-015",
@@ -2296,7 +2305,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.1 Figure 7/Table 4's byte_message_info fields, TC18.txt L1142-1170"
     },
     {
       "id": "REQ-ACF-016",
@@ -2305,7 +2315,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.1 Figure 7 / Table 4 (\"ABB message standard request\" / \"Usage of ABB message for standard requests\"), TC18.txt L1142-1170"
     },
     {
       "id": "REQ-LIFECYCLE-001",
