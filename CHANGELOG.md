@@ -32,6 +32,19 @@ the rationale.
 
 ## Releases
 
+### v0.124.0 -- 2026-08-07
+
+**Citation backfill, batch 4: LIFECYCLE.** Issue #164. Cited 17 of 19
+remaining uncited LIFECYCLE requirements against TC18 §12.3.1's three
+lifecycle-state subsections. Two pre-existing, already-tracked gap
+requirements (`REQ-LIFECYCLE-022` EPs_NOT_IDLE demotion gate,
+`REQ-LIFECYCLE-028` HW_CONFIGURED TSCF-drop divergence) are
+cross-referenced from the new citations rather than duplicated -- both
+findings predate this batch, this batch just connects the dots. Left 2
+uncited (same-state no-op, `strerror()` uniqueness) -- genuine
+implementation detail. Purely additive; no code or test changed. 1028
+requirements (unchanged), 100% traced+tested, 0 `cfusa check` errors.
+
 ### v0.123.0 -- 2026-08-07
 
 **Citation backfill, batch 3: RMAP.** Issue #164. Cited 15 of 22
