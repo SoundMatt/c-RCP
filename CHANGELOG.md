@@ -32,6 +32,15 @@ the rationale.
 
 ## Releases
 
+### v0.142.0 -- 2026-08-07
+
+**Citation backfill, batch 22: CHAIN.** Issue #164. Cited 8 of 9
+remaining uncited chained-request requirements against TC18
+§11.2.2.4's Figure 11 wire format, the no-predecessor CHAIN_ERROR
+rule, the cs-bit-driven CHAIN_ABORTED rule, and the reserved-octet
+rejection rule. See `ROADMAP.md` milestone 142 for full detail. 1028
+requirements (unchanged), 100% traced+tested, 0 `cfusa check` errors.
+
 ### v0.141.0 -- 2026-08-07
 
 **Citation backfill, batch 21: TRIG.** Issue #164. Cited 8 of 9
