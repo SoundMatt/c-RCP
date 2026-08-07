@@ -6845,3 +6845,56 @@ were genuinely uncited before writing anything.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 139. Citation backfill, batch 19: SRV (issue #164) (v0.139.0)
+
+Nineteenth batch. `server.c`/`server.h` -- the RC Server's per-endpoint
+request-storage/admission/priority-scheduling/completion core, 15/22
+uncited going in. Before committing, this batch's scoping pass first
+checked PWR (`powerstate.c`, 15 uncited) and found it a thin
+client-side convenience wrapper over already-cited primitives
+(ep_wakeup.h + power.h) with no TC18 text of its own -- rejected as a
+batch candidate, same reasoning as batch 18's MDIO rejection. SRV, by
+contrast, sits at the heart of TC18's own request-handling model and
+has the richest single-batch TC18 basis of the session: §12.9.1/
+§12.9.1.1's request-handling and multi-request-per-frame admission
+rules, §12.9.2's priority-in-execution ordering (cancellation >
+triggered > timed > compound > compound-wait > chained > standard,
+plus same-priority FIFO tiebreak), and §12.9.3 Table 26's per-
+request-type execution procedure, which maps almost line for line onto
+`rcp_server_endpoint_complete()`'s own per-kind tick/repeat_count
+switch.
+
+Cited all 15 of the 15 uncited `REQ-SRV-*` requirements -- SRV is now
+100% cited. Highlights: the pre-load-then-drain-on-enable queue
+(`REQ-SRV-001`-`003`) against Table 32's `ep_enable` common field;
+multi-request admission/rejection (`REQ-SRV-004`-`005`) against
+§12.9.1.1's per-request accept/reject rule and Table 5's request_type
+identifiers; the full priority-selection function
+(`REQ-SRV-006`-`008`) against §12.9.2's seven-tier ordering, the
+safety-tagged persistence rule (cross-referencing the already-cited
+`REQ-E2E-012`/`013` e2e.h gate this function calls), and the FIFO
+tiebreak; completion (`REQ-SRV-009`-`010`) and trigger-occurrence
+recording (`REQ-SRV-011`) against Table 26's compound/compound-wait/
+triggered rows; chain-predecessor marking (`REQ-SRV-012`) against
+§11.2.2.4's "the second and following requests always wait on the
+predecessor request to finish its execution" rule; cancellation
+(`REQ-SRV-013`) reusing Phase 1's already-established §11.2.3.1/.2
+basis; watchdog purge (`REQ-SRV-014`) against the 0x0F-cleared/
+0x8F-remains-active watch-dog-overflow rule already used for CMP; and
+the pending-count getter (`REQ-SRV-021`) against §12.9.2's own "EP
+request storage" framing.
+
+One citation-text error caught and fixed during scoping (before any
+edit was written): `rcp_e2e_request_may_execute()` was initially
+attributed to `REQ-E2E-014` by proximity guess; a direct grep against
+`src/e2e.c`'s own tags showed it is actually `REQ-E2E-012`/`013` --
+corrected before the citation script ran. Always verify a
+cross-reference's req-id against the real source tag, never infer it
+from nearby line numbers.
+
+Used the pre-flight citation-target check -- confirmed all 15 targets
+were genuinely uncited before writing anything.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
