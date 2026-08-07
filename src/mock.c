@@ -409,15 +409,18 @@ static bool peek_member_byte_bus_id(const uint8_t *member, size_t member_len, ui
 }
 
 /* True iff member[0..member_len) is a chained request; on true,
- * *out_cs receives its own conditional-start selector. */
-static bool is_chained_member(const uint8_t *member, size_t member_len, uint8_t *out_cs)
+ * *out_cs receives its own conditional-start selector and *out_tn its own
+ * transaction_num -- needed by CHAIN_ERROR/CHAIN_ABORTED error-response
+ * construction (TC18 §12.9.6), which this function's own decode call
+ * already has on hand and would otherwise have to be re-derived. */
+static bool is_chained_member(const uint8_t *member, size_t member_len, uint8_t *out_cs,
+                               uint8_t *out_tn)
 {
     uint8_t           request_type = 0;
     rcp_byte_bus_id_t bus;
     uint16_t          exec_delay;
     const uint8_t    *payload;
     size_t            payload_len;
-    uint8_t           tn;
 
     if (rcp_compound_peek_request_type(member, member_len, &request_type) != RCP_COMPOUND_OK) {
         return false;
@@ -425,7 +428,7 @@ static bool is_chained_member(const uint8_t *member, size_t member_len, uint8_t 
     if (request_type != RCP_REQUEST_TYPE_CHAINED) return false;
 
     if (rcp_chained_decode_member(member, member_len, &bus, &exec_delay, out_cs, &payload,
-                                   &payload_len, &tn) != RCP_CHAINED_OK) {
+                                   &payload_len, out_tn) != RCP_CHAINED_OK) {
         /* Claims to be chained but does not decode as one -- not treated
          * as a chain member here; rcp_mock_server_dispatch() will reject
          * it on its own for the same reason. */
@@ -455,6 +458,7 @@ static size_t last_pending_index(const rcp_server_endpoint_t *ep)
 
 //cfusa:req REQ-MOCK-019
 //cfusa:req REQ-MOCK-020
+//cfusa:req REQ-MOCK-029
 size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subtype,
                                        bool time_sync_supported, const uint8_t *frame,
                                        size_t frame_len,
@@ -525,23 +529,29 @@ size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subty
          * not a sub-field of its own. So the chain decision has to be
          * made here, where frame order is known, rather than inside the
          * per-endpoint store. */
-        if (is_chained_member(member, member_len, &cs)) {
-            rcp_chained_member_outcome_t outcome =
-                rcp_chained_advance(&chain_aborted, i > 0, prev_errored, cs);
+        {
+            uint8_t member_tn = 0;
 
-            if (outcome == RCP_CHAINED_MEMBER_CHAIN_ERROR) {
-                out->result = RCP_MOCK_DISPATCH_CHAIN_ERROR;
-                memset(&out->response, 0, sizeof(out->response));
-                prev_errored = true;
-                dispatched++;
-                continue;
-            }
-            if (outcome == RCP_CHAINED_MEMBER_CHAIN_ABORTED) {
-                out->result = RCP_MOCK_DISPATCH_CHAIN_ABORTED;
-                memset(&out->response, 0, sizeof(out->response));
-                prev_errored = true;
-                dispatched++;
-                continue;
+            if (is_chained_member(member, member_len, &cs, &member_tn)) {
+                rcp_chained_member_outcome_t outcome =
+                    rcp_chained_advance(&chain_aborted, i > 0, prev_errored, cs);
+
+                if (outcome == RCP_CHAINED_MEMBER_CHAIN_ERROR) {
+                    out->result   = RCP_MOCK_DISPATCH_CHAIN_ERROR;
+                    out->response = rcp_acf_build_error_response(byte_bus_id, member_tn,
+                                                                  RCP_ERROR_CHAIN_ERROR);
+                    prev_errored  = true;
+                    dispatched++;
+                    continue;
+                }
+                if (outcome == RCP_CHAINED_MEMBER_CHAIN_ABORTED) {
+                    out->result   = RCP_MOCK_DISPATCH_CHAIN_ABORTED;
+                    out->response = rcp_acf_build_error_response(byte_bus_id, member_tn,
+                                                                  RCP_ERROR_CHAIN_ABORTED);
+                    prev_errored  = true;
+                    dispatched++;
+                    continue;
+                }
             }
         }
 

@@ -6189,3 +6189,38 @@ mutation test (temporarily suppressed the fix, confirmed the new
 end-to-end test fails, restored it). 1026 requirements, 100%
 traced+tested, 0 `cfusa check` errors. Full build + test suite +
 ASan/UBSan all pass.
+
+### 119. Third and fourth real error responses: chained CHAIN_ERROR/CHAIN_ABORTED (v0.119.0)
+
+Issue #163 batch D. TC18 §11.2.2.4: a chained request with no predecessor
+(the first member in an AVTPDU is itself a chain request) sends
+`CHAIN_ERROR` "to each request" in the broken chain; `cs=1` after a
+predecessor errored sends `CHAIN_ABORTED`. `rcp_chained_advance()`
+already correctly classified both outcomes -- `mock.c`'s
+`rcp_mock_server_dispatch_frame()` discarded the response
+(`memset(&out->response, 0, ...)`) in both branches.
+
+Unlike batch A/B's clear-single case, this needed no new output
+parameter: `is_chained_member()` already decodes each member's own
+`transaction_num` internally (to validate it decodes as a real chained
+request at all) but didn't expose it -- now does, alongside its existing
+`cs` output. `byte_bus_id` was already available from the frame-splitting
+loop. Each affected member gets its **own** independent response
+(`rcp_mock_frame_member_result_t`'s per-member array already supports
+this -- no multi-response fanout problem here, unlike batch B's still-open
+`REQUEST_CANCELED`), which the new test specifically pins: two members in
+one broken chain get two different responses, each carrying its own
+`transaction_num` and its own error code.
+
+Also fixed in passing: the pre-existing
+`test_chained_first_in_frame_is_chain_error` test never freed
+`results[0].response`/`results[1].response` -- harmless before this
+milestone (both were always `{NULL,0}`), a real leak after it. Caught by
+running the full ASan/UBSan suite as part of this milestone's own
+verification, not by accident.
+
+`.fusa-reqs.json` gains `REQ-MOCK-029`, cited and tested (one entry
+covering both codes -- same wiring pattern, same function, same
+citation-adjacent spec passage), including a mutation test. 1027
+requirements, 100% traced+tested, 0 `cfusa check` errors. Full build +
+test suite + ASan/UBSan all pass.
