@@ -5273,7 +5273,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.3 Figure 10 / Table 8 (GBB message for triggered requests: request_type=0x0E/0x8E, trigger_source_ep, trigger_signal_nr, trigger_threshold, trigger_exec_delay, trigger_repetitions), TC18.txt L1414-1462"
     },
     {
       "id": "REQ-TRIG-004",
@@ -5292,7 +5293,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1186-1189; general ACF_GBB frame-validation basis"
     },
     {
       "id": "REQ-TRIG-006",
@@ -5301,7 +5303,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1186-1189"
     },
     {
       "id": "REQ-TRIG-007",
@@ -5310,7 +5313,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 Table 5 (\"0x0E, 0x8E\" -> \"Triggered\"), TC18.txt L1186-1199"
     },
     {
       "id": "REQ-TRIG-008",
@@ -5319,7 +5323,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.9.3 Table 26 (Triggered request row: \"Upon entering RS state the counted number of received trigger signals is reset to zero and newly arriving trigger signals are counted from zero. The execution delay timer is started.\"), TC18.txt L3292-3296"
     },
     {
       "id": "REQ-TRIG-009",
@@ -5328,7 +5333,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.9.3 Table 26 (Triggered request row: \"Upon entering RS state the counted number of received trigger signals is reset to zero and newly arriving trigger signals are counted from zero. The execution delay timer is started.\"), TC18.txt L3292-3296; §11.2.2.3 Table 8 (\"trigger_source_ep defines the endpoint which issues the trigger... trigger_signal_nr defines the trigger number of the endpoint addressed by trigger_source_ep\"), TC18.txt L1454-1455"
     },
     {
       "id": "REQ-TRIG-010",
@@ -5357,7 +5363,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.9.3 Table 26 (Triggered request row: \"Upon entering RS state the counted number of received trigger signals is reset to zero and newly arriving trigger signals are counted from zero. The execution delay timer is started.\"), TC18.txt L3292-3296; \"When the trigger_exec_delay timer has expired the state advances to RE as soon as the EP is idle and no request with higher priority is pending.\", TC18.txt L3296-3298"
     },
     {
       "id": "REQ-TRIG-013",
@@ -5366,7 +5373,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.9.3 Table 26 (Triggered request row: \"Upon entering RS state the counted number of received trigger signals is reset to zero and newly arriving trigger signals are counted from zero. The execution delay timer is started.\"), TC18.txt L3292-3296; TC18.txt L3296-3298 (trigger_exec_delay expiry + EP-idle gating)"
     },
     {
       "id": "REQ-CHAIN-001",
