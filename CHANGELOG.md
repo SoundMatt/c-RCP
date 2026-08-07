@@ -32,6 +32,20 @@ the rationale.
 
 ## Releases
 
+### v0.118.0 -- 2026-08-07
+
+**Second real error response: clear-single's `REQUEST_NOT_FOUND`.**
+Issue #163 batch A. `rcp_server_endpoint_cancel_single()` already reported
+`RCP_CANCEL_RESULT_NOT_FOUND`; `mock.c` discarded it. Now builds and
+returns a real TC18 §11.2.3.3 error response, carrying the cancellation
+request's own `byte_bus_id`/`transaction_num` (§12.9.6's general rule),
+not the not-found target's. `REQUEST_CANCELED` (every request a
+cancellation *does* remove also gets its own error response, per §11.2.3)
+needs a multi-response fanout the current API can't represent -- scoped
+out, tracked separately. 1026 requirements (`REQ-MOCK-028` added), 100%
+traced+tested, 0 `cfusa check` errors. Mutation-tested; full build + test
+suite + ASan/UBSan pass.
+
 ### v0.117.0 -- 2026-08-07 (BREAKING)
 
 **First real TC18 §12.9.6 error response.** An audit (issue #163) found

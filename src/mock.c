@@ -207,16 +207,36 @@ static void run_handler(rcp_mock_endpoint_slot_t *slot, const uint8_t *request, 
 //cfusa:req REQ-MOCK-013
 //cfusa:req REQ-MOCK-014
 //cfusa:req REQ-MOCK-015
+//cfusa:req REQ-MOCK-028
 /* Applies an already-classified cancellation request against slot's own
  * request store. Which of the three cancellation opcodes it is decides
  * what gets removed; a clear-single additionally needs its target
- * transaction_num decoded out of the message. */
+ * transaction_num decoded out of the message.
+ *
+ * TC18 §11.2.3.3: "The request initiating the cancellation will create an
+ * error response with the error code = REQUEST_NOT_FOUND, when the
+ * clear_transaction_num was not found." That response carries the
+ * cancellation request's own byte_bus_id/transaction_num (TC18 §12.9.6's
+ * general rule), not the not-found target's -- out_response is populated
+ * accordingly when rcp_server_endpoint_cancel_single() reports
+ * RCP_CANCEL_RESULT_NOT_FOUND. byte_bus_id is this endpoint's own
+ * address (see finish_admission()'s own doc comment for why this is
+ * already known to the caller rather than re-decoded).
+ *
+ * Clear-all and clear-non-safestate cancel every request each removes
+ * with its own REQUEST_CANCELED error response (TC18 §11.2.3, one
+ * response per cancelled request, not one for the cancellation itself)
+ * -- a multi-response fanout this function's single out_response cannot
+ * represent; not attempted here, tracked separately
+ * (github.com/SoundMatt/c-RCP/issues/163). */
 static void apply_cancellation(rcp_mock_endpoint_slot_t *slot, uint8_t request_type,
-                                const uint8_t *request, size_t request_len)
+                                const uint8_t *request, size_t request_len,
+                                rcp_byte_bus_id_t byte_bus_id, rcp_bytes_t *out_response)
 {
-    rcp_byte_bus_id_t bus;
-    uint8_t           target_tn;
-    uint8_t           tn;
+    rcp_byte_bus_id_t    bus;
+    uint8_t              target_tn;
+    uint8_t              tn;
+    rcp_cancel_result_t  result;
 
     switch (request_type) {
     case RCP_REQUEST_TYPE_CLEAR_ALL:
@@ -235,8 +255,12 @@ static void apply_cancellation(rcp_mock_endpoint_slot_t *slot, uint8_t request_t
              * selected request to completion synchronously inside
              * rcp_mock_server_tick(), so nothing is ever observably
              * mid-execution here. */
-            (void)rcp_server_endpoint_cancel_single(&slot->queue, target_tn,
-                                                     RCP_CANCEL_LIFECYCLE_QUEUED);
+            result = rcp_server_endpoint_cancel_single(&slot->queue, target_tn,
+                                                        RCP_CANCEL_LIFECYCLE_QUEUED);
+            if (result == RCP_CANCEL_RESULT_NOT_FOUND) {
+                *out_response =
+                    rcp_acf_build_error_response(byte_bus_id, tn, RCP_ERROR_REQUEST_NOT_FOUND);
+            }
         }
         break;
 
@@ -276,7 +300,7 @@ static rcp_mock_dispatch_result_t finish_admission(rcp_mock_endpoint_slot_t *slo
     case RCP_SERVER_ADMIT_PENDING:
         return RCP_MOCK_DISPATCH_PENDING;
     case RCP_SERVER_ADMIT_CANCELLATION:
-        apply_cancellation(slot, request_type, request, request_len);
+        apply_cancellation(slot, request_type, request, request_len, byte_bus_id, out_response);
         return RCP_MOCK_DISPATCH_CANCELLED;
     case RCP_SERVER_ADMIT_REJECTED:
     default:

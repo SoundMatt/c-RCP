@@ -6163,3 +6163,29 @@ tested, including a mutation test (temporarily suppressed the fix,
 confirmed the new end-to-end test fails, restored it). 1025 requirements,
 100% traced+tested, 0 `cfusa check` errors. Full build + test suite +
 ASan/UBSan all pass.
+
+### 118. Second real error response: clear-single's REQUEST_NOT_FOUND (v0.118.0)
+
+Issue #163 batch A. TC18 §11.2.3.3: "The request initiating the
+cancellation will create an error response with the error code =
+REQUEST_NOT_FOUND, when the clear_transaction_num was not found."
+`rcp_server_endpoint_cancel_single()` already reported
+`RCP_CANCEL_RESULT_NOT_FOUND` -- `mock.c`'s `apply_cancellation()`
+discarded it (`(void)rcp_server_endpoint_cancel_single(...)`). Now builds
+and returns a real error response via `rcp_acf_build_error_response()`,
+carrying the *cancellation request's own* `byte_bus_id`/`transaction_num`
+(TC18 §12.9.6's general rule) -- not the not-found target's, which this
+milestone's new test specifically pins (`hdr.transaction_num == 93`, the
+cancel request's own tn, not `91`, the not-found target).
+
+Explicitly scoped narrower than clear-all/clear-non-safestate's own
+`REQUEST_CANCELED` obligation (TC18 §11.2.3: every request a cancellation
+*does* remove gets its own error response) -- that is a multi-response
+fanout the current one-response-per-dispatch-call API shape cannot
+represent, and is tracked separately, not attempted here.
+
+`.fusa-reqs.json` gains `REQ-MOCK-028`, cited and tested, including a
+mutation test (temporarily suppressed the fix, confirmed the new
+end-to-end test fails, restored it). 1026 requirements, 100%
+traced+tested, 0 `cfusa check` errors. Full build + test suite +
+ASan/UBSan all pass.

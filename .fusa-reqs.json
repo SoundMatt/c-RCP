@@ -7649,6 +7649,17 @@
           "scope": "tc18"
     },
     {
+      "id": "REQ-MOCK-028",
+      "title": "rcp_mock_server_dispatch() sends REQUEST_NOT_FOUND when a clear-single target is not found",
+      "text": "rcp_mock_server_dispatch(), when a decoded clear-single cancellation's target clear_transaction_num is not found in the addressed endpoint's request store (rcp_server_endpoint_cancel_single() reports RCP_CANCEL_RESULT_NOT_FOUND), shall populate out_response with a real TC18 error response (rcp_acf_build_error_response()) carrying RCP_ERROR_REQUEST_NOT_FOUND, the addressed byte_bus_id, and the cancellation request's own transaction_num (not the not-found target's).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§11.2.3.3 (\"The request initiating the cancellation will create an error response with the error code = REQUEST_NOT_FOUND, when the clear_transaction_num was not found.\"), TC18.txt L1837-1838"
+    },
+    {
       "id": "REQ-ACF-017",
       "title": "acf_msg_type constants carry the specification's own numeric values",
       "text": "RCP_ACF_MSG_TYPE_ABB shall equal 0x0E and RCP_ACF_MSG_TYPE_GBB shall equal 0x0D, the acf_msg_type values TC18 \u00a711.2.1 Table 4 and \u00a711.2.2.1 Table 6 assign to the abbreviated byte bus (ACF_ABB) and generic byte bus (ACF_GBB) message formats respectively.",
