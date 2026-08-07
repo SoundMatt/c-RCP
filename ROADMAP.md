@@ -6224,3 +6224,29 @@ covering both codes -- same wiring pattern, same function, same
 citation-adjacent spec passage), including a mutation test. 1027
 requirements, 100% traced+tested, 0 `cfusa check` errors. Full build +
 test suite + ASan/UBSan all pass.
+
+### 120. Fifth real error response: EP_NOT_FOUND for an unregistered byte_bus_id (v0.120.0)
+
+Issue #163 batch E, first half. TC18 Table 27's `EP_NOT_FOUND` (8) covers
+two distinct triggers: an addressed endpoint that doesn't exist, and a
+Trigger request whose `trigger_source_ep` names a nonexistent endpoint.
+This milestone wires the first (`rcp_mock_server_dispatch()`'s
+`find_slot()` returning NULL) -- `byte_bus_id` is already a real, decoded
+value (the function's own parameter) even when it names nothing
+registered, and `transaction_num` is read back out of the request's own
+header via `rcp_acf_unpack_header()`, the same technique batch A/B's
+`finish_admission()` already established. `rcp_mock_server_dispatch_frame()`
+gets this for free, since its per-member loop already delegates to
+`rcp_mock_server_dispatch()` with the member's own `&out->response`.
+
+The second trigger (`trigger_source_ep` validation) is NOT covered here
+-- no code path anywhere validates a Triggered request's
+`trigger_source_ep` against the server's registered-endpoint set at all;
+that's real, new feature work (an admission-time or store-time endpoint-
+registry lookup that doesn't exist yet), not a rewiring of an existing
+correct decision like every fix in this milestone's batch so far. Tracked
+separately on issue #163, not attempted here.
+
+`.fusa-reqs.json` gains `REQ-MOCK-030`, cited and tested, including a
+mutation test. 1028 requirements, 100% traced+tested, 0 `cfusa check`
+errors. Full build + test suite + ASan/UBSan all pass.
