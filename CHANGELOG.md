@@ -32,6 +32,15 @@ the rationale.
 
 ## Releases
 
+### v0.141.0 -- 2026-08-07
+
+**Citation backfill, batch 21: TRIG.** Issue #164. Cited 8 of 9
+remaining uncited triggered-request requirements against TC18
+§11.2.2.3's Figure 10/Table 8 wire format and §12.9.3 Table 26's
+Triggered-request execution-procedure row. See `ROADMAP.md` milestone
+141 for full detail. 1028 requirements (unchanged), 100% traced+
+tested, 0 `cfusa check` errors.
+
 ### v0.140.0 -- 2026-08-07
 
 **Citation backfill, batch 20: SCHED.** Issue #164. Cited all 8

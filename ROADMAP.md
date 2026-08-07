@@ -6924,3 +6924,32 @@ were genuinely uncited before writing anything.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 141. Citation backfill, batch 21: TRIG (issue #164) (v0.141.0)
+
+Twenty-first batch, continuing the conditional-request vein SRV's
+research opened. `request_triggered.c`/`request_triggered.h`, 9/13
+uncited going in.
+
+Cited 8 of the 9 uncited `REQ-TRIG-*` requirements: request encode/
+decode validation (`REQ-TRIG-003`, `005`-`007`) against §11.2.2.3
+Figure 10/Table 8's triggered-request wire format (request_type=0x0E/
+0x8E, trigger_source_ep/trigger_signal_nr/trigger_threshold/
+trigger_exec_delay/trigger_repetitions) and the shared §11.2.2
+mtv=0-repurposing intro + Table 5 opcode identifiers; the
+occurrence-counter start/record pair (`REQ-TRIG-008`-`009`) against
+Table 26's Triggered-request row ("Upon entering RS state the counted
+number of received trigger signals is reset to zero and newly
+arriving trigger signals are counted from zero") and Table 8's
+trigger_source_ep/trigger_signal_nr field definitions; and the fire
+tick (`REQ-TRIG-012`-`013`) against the same Table 26 row's
+trigger_exec_delay-expiry-plus-EP-idle gating text.
+
+Left uncited, deliberately: `REQ-TRIG-002` (`strerror()` uniqueness)
+-- the same implementation-detail pattern as every prior batch.
+
+Used the pre-flight citation-target check -- confirmed all 8 targets
+were genuinely uncited before writing anything.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
