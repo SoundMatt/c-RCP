@@ -2773,7 +2773,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.1 Table 16 (\"subtype: NTSCF\"), TC18.txt L2371"
     },
     {
       "id": "REQ-DISC-002",
@@ -2782,7 +2783,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.1 Table 16 (\"Discovery request\": subtype=NTSCF, acf_msg_type=ACF_ABB, Byte_bus_id=00000000000b, op=1b/read, byte_msg_payload=none), TC18.txt L2367-2381"
     },
     {
       "id": "REQ-DISC-003",
@@ -2791,7 +2793,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.1 Table 16 (\"Discovery request\": subtype=NTSCF, acf_msg_type=ACF_ABB, Byte_bus_id=00000000000b, op=1b/read, byte_msg_payload=none), TC18.txt L2367-2381"
     },
     {
       "id": "REQ-DISC-004",
@@ -2800,7 +2803,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.1 (\"AVTPDUs having a TSCF header are dropped without further response, as well as requests in ACF_GBB format.\"), TC18.txt L2367"
     },
     {
       "id": "REQ-DISC-005",
@@ -2809,7 +2813,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.1 (\"...as well as requests in ACF_GBB format.\"), TC18.txt L2367; Table 16 (\"acf_msg_type: ACF_ABB\"), TC18.txt L2377"
     },
     {
       "id": "REQ-DISC-006",
@@ -2818,7 +2823,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.1 Table 16 (\"Byte_bus_id: 00000000000b\"), TC18.txt L2378"
     },
     {
       "id": "REQ-DISC-007",
@@ -2827,7 +2833,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.1 Table 16 (\"op: 1b (read request)\"), TC18.txt L2380"
     },
     {
       "id": "REQ-DISC-008",
@@ -2836,7 +2843,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.1 (\"A discovery request is a read request. The discovery request format equals the format shown in Table 16.\"), TC18.txt L2364-2365"
     },
     {
       "id": "REQ-DISC-009",
@@ -2845,7 +2853,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.2 (\"The RC Server will respond with the part of the RC Server's register map as starting from 0x0000 and its length being determined by the read_size in the discovery request.\"), TC18.txt L2402-2404"
     },
     {
       "id": "REQ-DISC-010",
@@ -2854,7 +2863,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.2 Table 17 (\"Discovery response\": subtype=NTSCF, acf_msg_type=ACF_ABB, Byte_bus_id=00000000000b, op=1b/read, byte_msg_payload=RC Server's register map content starting from address 0x00000), TC18.txt L2402-2427"
     },
     {
       "id": "REQ-DISC-011",
@@ -2863,7 +2873,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.2 (\"...length being determined by the read_size in the discovery request.\"), TC18.txt L2403-2404"
     },
     {
       "id": "REQ-DISC-012",
@@ -2872,7 +2883,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.2 Table 17 (\"Discovery response\": subtype=NTSCF, acf_msg_type=ACF_ABB, Byte_bus_id=00000000000b, op=1b/read, byte_msg_payload=RC Server's register map content starting from address 0x00000), TC18.txt L2402-2427"
     },
     {
       "id": "REQ-DISC-013",
@@ -2881,7 +2893,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.2 Table 17 (\"Discovery response\": subtype=NTSCF, acf_msg_type=ACF_ABB, Byte_bus_id=00000000000b, op=1b/read, byte_msg_payload=RC Server's register map content starting from address 0x00000), TC18.txt L2402-2427"
     },
     {
       "id": "REQ-DISC-014",
@@ -2890,7 +2903,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.1 (\"AVTPDUs having a TSCF header are dropped without further response, as well as requests in ACF_GBB format.\"), TC18.txt L2367 -- the same AVTP/ACF-level checks apply to responses"
     },
     {
       "id": "REQ-DISC-015",
@@ -2899,7 +2913,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6 (\"...If the RC Server does not receive configuration requests on the stream for a certain time (Discovery_TimeOut) it will drop the discovery stream and is open for a new discovery.\"), TC18.txt L2356-2359"
     },
     {
       "id": "REQ-DISC-016",
@@ -2908,7 +2923,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6 (\"...for a certain time (Discovery_TimeOut) it will drop the discovery stream and is open for a new discovery.\"), TC18.txt L2357-2359"
     },
     {
       "id": "REQ-DISC-017",
@@ -2917,7 +2933,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6 (\"The first discovery request the RC server receives in HW_UNCONFIGURED or HW_CONFIGURED state is used to set the discovery stream from which now on configuration requests will be accepted.\"), TC18.txt L2355-2357"
     },
     {
       "id": "REQ-DISC-018",
@@ -2926,7 +2943,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6 (\"...but only the first one will be allowed as configuration stream. If others send configuration requests they will be rejected and get an error response.\"), TC18.txt L2359-2361"
     },
     {
       "id": "REQ-DISC-019",
@@ -2935,7 +2953,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6 (\"...but only the first one will be allowed as configuration stream.\"), TC18.txt L2359-2360"
     },
     {
       "id": "REQ-DISC-020",
@@ -2944,7 +2963,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6 (\"...for a certain time (Discovery_TimeOut) it will drop the discovery stream...\"), TC18.txt L2357-2359 -- receiving configuration requests on the stream is what resets the timeout"
     },
     {
       "id": "REQ-DISC-021",
@@ -2953,7 +2973,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6 (\"...but only the first one will be allowed as configuration stream. If others send configuration requests they will be rejected...\"), TC18.txt L2359-2361"
     },
     {
       "id": "REQ-DISC-022",
@@ -2962,7 +2983,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6 (\"...it will drop the discovery stream and is open for a new discovery.\"), TC18.txt L2358-2359"
     },
     {
       "id": "REQ-DISC-023",
@@ -2971,7 +2993,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.2 (\"For each RC Server the RC Client can read the register map full or partially and maintain a table of relevant discovered RC Servers and their endpoints.\"), TC18.txt L2406-2408"
     },
     {
       "id": "REQ-DISC-024",
@@ -7151,7 +7174,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.2 Table 17 (\"Acf_msg_length: ≤ read_size of discovery request, limited to max size of register map\"), TC18.txt L2422-2423"
     },
     {
       "id": "REQ-DISC-026",
@@ -7160,7 +7184,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.2 Table 17 (\"Acf_msg_length: ≤ read_size of discovery request, limited to max size of register map\"), TC18.txt L2422-2423"
     },
     {
       "id": "REQ-DISC-027",
@@ -7169,7 +7194,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.2 Table 17 (\"Discovery response\": subtype=NTSCF, acf_msg_type=ACF_ABB, Byte_bus_id=00000000000b, op=1b/read, byte_msg_payload=RC Server's register map content starting from address 0x00000), TC18.txt L2402-2427"
     },
     {
       "id": "REQ-DISC-028",
@@ -7178,7 +7204,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.6.2 Table 17 (\"Discovery response\": subtype=NTSCF, acf_msg_type=ACF_ABB, Byte_bus_id=00000000000b, op=1b/read, byte_msg_payload=RC Server's register map content starting from address 0x00000), TC18.txt L2402-2427"
     },
     {
       "id": "REQ-MOCK-001",
