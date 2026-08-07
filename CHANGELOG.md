@@ -32,6 +32,21 @@ the rationale.
 
 ## Releases
 
+### v0.120.0 -- 2026-08-07
+
+**Fifth real error response: `EP_NOT_FOUND` for an unregistered byte_bus_id.**
+Issue #163 batch E (first half). `rcp_mock_server_dispatch()` now sends a
+real error response when `byte_bus_id` names no registered endpoint --
+the value is already known (the function's own parameter), and
+`transaction_num` is read back out of the request's own header.
+`rcp_mock_server_dispatch_frame()` gets this for free via delegation. The
+Table 27 note's second `EP_NOT_FOUND` trigger (a Trigger request's
+`trigger_source_ep` naming a nonexistent endpoint) is real new feature
+work -- no endpoint-registry validation exists for it anywhere -- and is
+tracked separately, not attempted here. 1028 requirements
+(`REQ-MOCK-030` added), 100% traced+tested, 0 `cfusa check` errors.
+Mutation-tested; full build + test suite + ASan/UBSan pass.
+
 ### v0.119.0 -- 2026-08-07
 
 **Third and fourth real error responses: chained `CHAIN_ERROR`/`CHAIN_ABORTED`.**

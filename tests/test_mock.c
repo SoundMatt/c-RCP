@@ -19,6 +19,7 @@
 //cfusa:test REQ-MOCK-018
 //cfusa:test REQ-MOCK-019
 //cfusa:test REQ-MOCK-020
+//cfusa:test REQ-MOCK-030
 /* Tests the TC18-shaped RC-Server/endpoint test double (ROADMAP.md
  * milestone 77). The pre-TC18 zone-controller mock this file used to test
  * moved to tests/legacy_mock.h/.c; tests/test_legacy_mock.c (a renamed
@@ -249,6 +250,44 @@ static void test_dispatch_unknown_bus_after_lifecycle_accepts(void)
                                   req, sizeof(req), &resp));
     TEST_ASSERT_NULL(resp.data);
 
+    rcp_mock_server_destroy(srv);
+}
+
+/* TC18 Table 27: EP_NOT_FOUND (8). Extends the test above with a real,
+ * fully-decodable request (long enough to carry a transaction_num) to
+ * check the actual response, not just that resp stays NULL for a
+ * too-short one. */
+static void test_dispatch_unknown_bus_sends_ep_not_found_error(void)
+{
+    rcp_mock_server_t           *srv = rcp_mock_server_new();
+    rcp_acf_byte_message_info_t  hdr = {0};
+    rcp_bytes_t                  frame, resp = {0};
+    rcp_acf_byte_message_info_t  resp_hdr;
+    const uint8_t                *payload;
+    size_t                        payload_len;
+
+    to_hw_configured(srv); /* any byte_bus_id passes lifecycle admission now */
+
+    hdr.byte_bus_id     = 7;
+    hdr.transaction_num = 55;
+    frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS,
+        rcp_mock_server_dispatch(srv, 7, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  frame.data, frame.len, &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(resp.data, resp.len, &resp_hdr, &payload,
+                                                      &payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&resp_hdr));
+    TEST_ASSERT_EQUAL_UINT8(7u, resp_hdr.byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT8(55u, resp_hdr.transaction_num);
+    TEST_ASSERT_EQUAL_size_t(1, payload_len);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_EP_NOT_FOUND, payload[0]);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&frame);
     rcp_mock_server_destroy(srv);
 }
 
@@ -589,6 +628,7 @@ int main(void)
 
     RUN_TEST(test_dispatch_dropped_by_lifecycle);
     RUN_TEST(test_dispatch_unknown_bus_after_lifecycle_accepts);
+    RUN_TEST(test_dispatch_unknown_bus_sends_ep_not_found_error);
     RUN_TEST(test_dispatch_ok_runs_handler_immediately);
     RUN_TEST(test_dispatch_no_handler_leaves_response_zeroed);
     RUN_TEST(test_dispatch_queued_when_endpoint_disabled);

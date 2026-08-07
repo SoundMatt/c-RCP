@@ -316,6 +316,7 @@ static rcp_mock_dispatch_result_t finish_admission(rcp_mock_endpoint_slot_t *slo
 }
 
 //cfusa:req REQ-MOCK-021
+//cfusa:req REQ-MOCK-030
 rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
                                                      rcp_byte_bus_id_t byte_bus_id,
                                                      uint8_t avtp_subtype, uint8_t acf_msg_type,
@@ -336,7 +337,19 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
     }
 
     slot = find_slot(srv, byte_bus_id);
-    if (!slot) return RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS;
+    if (!slot) {
+        /* byte_bus_id itself is a real, decoded value (this function's own
+         * parameter) even though it names no registered endpoint --
+         * TC18 Table 27's EP_NOT_FOUND (8) is exactly this case. transaction_num
+         * is read back out of the request frame's own header, same technique
+         * finish_admission() already uses. */
+        rcp_acf_byte_message_info_t hdr = {0};
+        if (request_len >= 8 && rcp_acf_unpack_header(request, &hdr) == RCP_ACF_OK) {
+            *out_response =
+                rcp_acf_build_error_response(byte_bus_id, hdr.transaction_num, RCP_ERROR_EP_NOT_FOUND);
+        }
+        return RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS;
+    }
 
     /* The request_type-aware routing decision lives in server.h: a
      * standard request keeps the original submit-or-queue behavior, a
