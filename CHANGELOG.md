@@ -32,6 +32,19 @@ the rationale.
 
 ## Releases
 
+### v0.132.0 -- 2026-08-07
+
+**Citation backfill, batch 12: E2E.** Issue #164. First batch to use
+the pre-flight target-verification check added after batch 11. Cited
+26 of 28 remaining uncited E2E requirements, spanning two distinct
+TC18 regions: the CRC32 mechanism itself (§13.6 Table 31 and the ABB/
+GBB CRC coverage rules) and the safety/watchdog machinery, which lives
+separately in §11.2.2's safety-request MSB convention and §12.7.7
+Table 22's per-stream register block. Left 2 uncited (`strerror()`
+uniqueness, defensive fail-safe on invalid input) -- genuine
+implementation detail. Purely additive; no code or test changed. 1028
+requirements (unchanged), 100% traced+tested, 0 `cfusa check` errors.
+
 ### v0.131.0 -- 2026-08-07
 
 **Citation backfill, batch 11: ADC.** Issue #164. Cited 22 of 28
