@@ -6482,3 +6482,36 @@ implementation-detail pattern as every prior batch.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 129. Citation backfill, batch 9: UART (issue #164) (v0.129.0)
+
+Ninth batch. UART was 8/37 cited going in. Unlike SPI/GPIO/PWM_OUT,
+UART's evt[2:0] carries no per-value meaning of its own in TC18 §13.5
+Table 30 -- it's grouped with ADC/PWM_IN/I2C/LIN/CAN/ISELED/MDIO in the
+row where evt=000b-110b is reserved (ordinary requests simply carry
+evt=0) and only evt=111b (reconfig) is defined, TC18.txt L3684-3693.
+
+Cited 27 of the 29 uncited `REQ-UART-*` requirements against §13.7.8's
+three subsections: bit-padding for non-multiple-of-8 frame widths
+(`REQ-UART-001`-`003`), Table 48's functional-config register fields
+paired with the §12.3.1.2/§12.3.1.3 lifecycle-writability basis already
+established in prior batches (`REQ-UART-005`-`016`), and the general
+Table 30 row plus §13.7.8.1's read-completion/fragmentation rules for
+wire format (`REQ-UART-018`-`031`).
+
+Two citations explicitly cross-reference pre-existing gap requirements
+rather than implying full conformance: `REQ-UART-008`/`009`
+(`set_baud_rate`) and `REQ-UART-015`/`016` (`set_timeout`) note that
+their units diverge from Table 48's own (kbit/s, bit-times) -- already
+tracked at `REQ-UART-037`, predating this batch. `REQ-UART-013`/`014`
+(`set_rx_buffer_size`) cite TC18's prose description of the
+fifo-rx-buffer rather than a Table 48 register, since TC18 never
+assigns `uart_rx_fifo_size` a register address -- consistent with the
+existing gap notes at `REQ-UART-032`/`036`.
+
+Left uncited, deliberately: `REQ-UART-004` (functional-config zero-init)
+and `REQ-UART-017` (`strerror()` uniqueness) -- the same
+implementation-detail pattern as every prior batch.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.

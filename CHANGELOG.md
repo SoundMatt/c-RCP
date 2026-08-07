@@ -32,6 +32,24 @@ the rationale.
 
 ## Releases
 
+### v0.129.0 -- 2026-08-07
+
+**Citation backfill, batch 9: UART.** Issue #164. Cited 27 of 29
+remaining uncited UART requirements. UART's evt[2:0] carries no
+per-value meaning of its own in TC18 §13.5 Table 30 -- grouped with
+ADC/PWM_IN/I2C/LIN/CAN/ISELED/MDIO where only evt=111b (reconfig) is
+defined. Cited bit-padding rules, Table 48's functional-config fields
+paired with the established §12.3.1.2/§12.3.1.3 lifecycle-writability
+basis, and §13.7.8.1's read-completion/fragmentation rules for wire
+format. Two citations (`set_baud_rate`, `set_timeout`) explicitly
+cross-reference the pre-existing unit-divergence gap at
+`REQ-UART-037`; `set_rx_buffer_size` cites TC18's prose fifo
+description rather than a nonexistent Table 48 register, consistent
+with the existing gap notes at `REQ-UART-032`/`036`. Left 2 uncited
+(functional-config zero-init, `strerror()` uniqueness) -- genuine
+implementation detail. Purely additive; no code or test changed. 1028
+requirements (unchanged), 100% traced+tested, 0 `cfusa check` errors.
+
 ### v0.128.0 -- 2026-08-07
 
 **Citation backfill, batch 8: SPI.** Issue #164. Cited 28 of 30
