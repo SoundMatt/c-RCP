@@ -32,6 +32,21 @@ the rationale.
 
 ## Releases
 
+### v0.119.0 -- 2026-08-07
+
+**Third and fourth real error responses: chained `CHAIN_ERROR`/`CHAIN_ABORTED`.**
+Issue #163 batch D. A chained request with no predecessor sends
+`CHAIN_ERROR` (TC18 §11.2.2.4); `cs=1` after a predecessor errored sends
+`CHAIN_ABORTED`. `rcp_chained_advance()` already classified both
+correctly; `mock.c` discarded the response in both branches. Each
+affected frame member gets its own independent response (no
+multi-response fanout problem here, unlike `REQUEST_CANCELED`'s still-open
+case) -- the new test pins two different members getting two different
+responses. Also fixed a pre-existing test's response leak, caught by this
+milestone's own ASan run (harmless before, real after). 1027 requirements
+(`REQ-MOCK-029` added), 100% traced+tested, 0 `cfusa check` errors.
+Mutation-tested; full build + test suite + ASan/UBSan pass.
+
 ### v0.118.0 -- 2026-08-07
 
 **Second real error response: clear-single's `REQUEST_NOT_FOUND`.**
