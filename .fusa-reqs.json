@@ -6528,7 +6528,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.4.1 (\"After a cold start the RC Server will be in its configured lifecycle state.\"), TC18.txt L2289 -- NOTE: TC18 requires restoring the actually-configured state, not always HW_UNCONFIGURED; that divergence is a known, separately-tracked gap, see REQ-PWRMODE-014 (not this requirement, which documents the mechanism c-RCP actually implements)"
     },
     {
       "id": "REQ-PWRMODE-004",
@@ -6547,7 +6548,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.4.1 (\"If the wake-up source was a TC14/TC10 wake-up request on the network this will also wake the RC Server, but it will directly check for the network availability and proceed as before.\"), TC18.txt L2304-2305 -- NOTE: TC18 requires a network wake to skip only the interface-enable step and still run the rest of the handshake, not bypass the whole handshake; that divergence is a known, separately-tracked gap, see REQ-PWRMODE-020"
     },
     {
       "id": "REQ-PWRMODE-006",
@@ -6556,7 +6558,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.4.1 (\"Hot-start-up procedure:\"), TC18.txt L2295 -- the initial (not-yet-started) state of the procedure described in L2296-2303"
     },
     {
       "id": "REQ-PWRMODE-007",
@@ -6565,7 +6568,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.4.1 (\"...it will first enable the network interface, check if the network is available and if not initiate a WakeUp to be sent via the network.\"), TC18.txt L2296-2297"
     },
     {
       "id": "REQ-PWRMODE-008",
@@ -6574,7 +6578,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.4.1 (\"...the RC Server will send via the responder stream which is configured for the original standby request a repetitive response to the sleep request with a WakeUp message and the WakeUp source. The message will be repeated until a valid AVTPDU from the sleep request Client is received.\"), TC18.txt L2298-2301"
     },
     {
       "id": "REQ-PWRMODE-009",
@@ -6583,7 +6588,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.4.1 (\"After reception of valid message from the sleep request Client all used endpoints and response queues will be enabled.\"), TC18.txt L2301-2303"
     },
     {
       "id": "REQ-PWRMODE-010",
@@ -6592,7 +6598,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.4.1 (\"After reception of valid message from the sleep request Client all used endpoints and response queues will be enabled.\"), TC18.txt L2301-2303 -- the completed end-state of the hot-start-up procedure"
     },
     {
       "id": "REQ-PWRMODE-011",
@@ -6601,7 +6608,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.4.1 (\"Repetition time of the message can be configured inside the WakeUp EP.\"), TC18.txt L2300-2301 -- TC18 bounds the repetition by a configurable time rather than a configurable attempt count; c-RCP's wakeup_repeat_limit/has_failed() is this implementation's own finite-attempt realization of that bound, not itself named in the cited text"
     },
     {
       "id": "REQ-PWRMODE-012",
@@ -6610,7 +6618,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.4.1 (\"There are two types of start-up: a cold start (after power-on or wake-up from sleep) and a hot start (=wake-up from StandBy).\"), TC18.txt L2286-2287"
     },
     {
       "id": "REQ-PWRMODE-013",
@@ -6619,7 +6628,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.5 (\"The RC Server will reject requests to enter sleep or standby mode and send an error message with error code = REQUEST_CANCELED, when: The wake-up event register (wup_status) is not cleared / At least one EP is not idle / In at least one responder queue there is a message pending for transmission.\"), TC18.txt L2327-2332"
     },
     {
       "id": "REQ-WAKEUP-001",

@@ -32,6 +32,19 @@ the rationale.
 
 ## Releases
 
+### v0.125.0 -- 2026-08-07
+
+**Citation backfill, batch 5: PWRMODE.** Issue #164. Cited 10 of 12
+remaining uncited PWRMODE requirements against TC18 §12.4.1's
+cold-start/hot-start-up procedure and §12.5's StandBy/Sleep entry
+gating. Two new citations cross-reference pre-existing gap requirements
+(`REQ-PWRMODE-014` cold-start-target divergence, `REQ-PWRMODE-020`
+network-wake-handshake-bypass divergence) rather than citing over them
+-- both findings predate this batch. Left 2 uncited (`string()`/
+`strerror()` uniqueness) -- genuine implementation detail. Purely
+additive; no code or test changed. 1028 requirements (unchanged), 100%
+traced+tested, 0 `cfusa check` errors.
+
 ### v0.124.0 -- 2026-08-07
 
 **Citation backfill, batch 4: LIFECYCLE.** Issue #164. Cited 17 of 19

@@ -6350,3 +6350,39 @@ clause.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 125. Citation backfill, batch 5: PWRMODE (issue #164) (v0.125.0)
+
+Fifth batch. PWRMODE was 16/28 cited going in; cited 10 of the 12
+remaining against TC18 §12.4.1's cold-start/hot-start-up procedure
+(`REQ-PWRMODE-003`, `005`-`010`, `012`) and §12.5's StandBy/Sleep entry
+gating (`REQ-PWRMODE-013`).
+
+Two of the new citations cross-reference pre-existing, already-tracked
+gap requirements rather than citing over a real divergence:
+
+- `REQ-PWRMODE-003` (cold-start target) cross-references
+  `REQ-PWRMODE-014`: TC18 requires restoring the server's actually
+  configured lifecycle state after a cold start, but
+  `rcp_pwrmode_cold_start_lifecycle_target()` always returns
+  `HW_UNCONFIGURED`. Predates this batch.
+- `REQ-PWRMODE-005` (network-wake handshake bypass) cross-references
+  `REQ-PWRMODE-020`: TC18 requires a network-woken server to skip only
+  the interface-enable step and still complete the rest of the
+  handshake, but `rcp_pwrmode_hotstart_required()` skips the entire
+  handshake for a network wake. Predates this batch.
+
+`REQ-PWRMODE-011` (`handshake_has_failed()`) is cited to the general
+"repetition time... can be configured inside the WakeUp EP" text
+(TC18.txt L2300-2301) with an explicit note that TC18 bounds repetition
+by a configurable *time*, not a configurable *attempt count* --
+`wakeup_repeat_limit` is this implementation's own finite-attempt
+realization of that bound, not itself named in the spec text.
+
+Left uncited, deliberately: `REQ-PWRMODE-001`/`002`
+(`rcp_pwrmode_string()`/`strerror()` uniqueness) -- the same
+implementation-detail pattern as prior batches' `*_strerror()`
+requirements, no TC18 clause.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
