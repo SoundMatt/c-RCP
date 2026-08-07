@@ -5702,7 +5702,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.6 Table 31 (\"CRC32 Polynomial\": Polynomial=0xF4ACFB13, Width=32bit, Initial Value=0xFFFFFFFF, Final XOR=0xFFFFFFFF, Input reflection=TRUE, Output reflection=TRUE), TC18.txt L3796-3809"
     },
     {
       "id": "REQ-E2E-003",
@@ -5711,7 +5712,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.6 (\"For the CRC computation of an ABB/GBB message, the stream_id and avtp_timestamp field of the AVTPDU header shall be included in the calculation... For the ACF types themselves the complete header will be used for CRC calculation including the complete payload.\"), TC18.txt L3811-3815"
     },
     {
       "id": "REQ-E2E-004",
@@ -5720,7 +5722,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.6 (\"Before CRC calculation it is essential to adapt the acf_message_length by plus 1 quadlet for the CRC32 addition to the payload and in the AVTPD to increase the ntscf_data_length or in an TSCF header the stream_data_length by 4 octets per ACF type in the ACF payload being E-2-E protected.\"), TC18.txt L3816-3818"
     },
     {
       "id": "REQ-E2E-005",
@@ -5729,7 +5732,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.6 Figure 19/Figure 20 (\"CRC32\" trailer quadlet in the ABB/GBB message layout), TC18.txt L3854-3856, L3875-3877"
     },
     {
       "id": "REQ-E2E-006",
@@ -5747,7 +5751,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.6 (\"for ms=0 we expect a CRC32 checksum in the last quadlet of the ABB/GBB message\"), TC18.txt L3826-3827"
     },
     {
       "id": "REQ-E2E-008",
@@ -5756,7 +5761,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.6 (\"If a request is received in a E-2-E protected stream and the CRC does not match, the request is not executed and an error response is generated with error code: CRC_ERROR\"), TC18.txt L3829-3830"
     },
     {
       "id": "REQ-E2E-009",
@@ -5765,7 +5771,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.6 (\"The CRC calculation for request and response follows the identical scheme.\"), TC18.txt L3828"
     },
     {
       "id": "REQ-E2E-010",
@@ -5774,7 +5781,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.6 (\"for ms=0 we expect a CRC32 checksum in the last quadlet of the ABB/GBB message... for ms=1 we expect no CRC32 checksum in the message, because we would expect a CRC only at the end of the last ABB/GBB fragment message\"), TC18.txt L3826-3828"
     },
     {
       "id": "REQ-E2E-011",
@@ -5783,7 +5791,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 (\"If the MSB of the identifier (0x8x) is set the request is treated as a safety request and will only be executed when the EP needs to go to safe state.\"), TC18.txt L1190-1191"
     },
     {
       "id": "REQ-E2E-012",
@@ -5792,7 +5801,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 (\"...the request is treated as a safety request and will only be executed when the EP needs to go to safe state. In normal operation these requests stay in the queue and are not executed.\"), TC18.txt L1190-1191"
     },
     {
       "id": "REQ-E2E-013",
@@ -5801,7 +5811,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 (\"...the request is treated as a safety request and will only be executed when the EP needs to go to safe state.\"), TC18.txt L1190-1191 -- non-safety requests are the ordinary, always-executable case"
     },
     {
       "id": "REQ-E2E-014",
@@ -5810,7 +5821,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.1 (\"If a watch-dog overflow is configured to trigger a safe state and execute a safety operation, compound requests with 0x0F will be cleared from the queue while the requests with 0x8F remain active after watch-dog overflow as they belong to the safety sequence to be executed based on the watch-dog triggering.\"), TC18.txt L1230-1233"
     },
     {
       "id": "REQ-E2E-015",
@@ -5819,7 +5831,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.1 (\"...compound requests with 0x0F will be cleared from the queue while the requests with 0x8F remain active after watch-dog overflow...\"), TC18.txt L1231-1233"
     },
     {
       "id": "REQ-E2E-016",
@@ -5838,7 +5851,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.7.7 Table 22 (\"rx_safety_measure ... 0b: as safe state set all IO Pins to high impedance\"), TC18.txt L2882-2884"
     },
     {
       "id": "REQ-E2E-018",
@@ -5847,7 +5861,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.7.7 Table 22 (\"rx_safety_measure ... 1b: use sequencer based safety requests\" / \"rx_safestate_seqencer ... Sequencer Nr used for safety requests\" / \"rx_safe_sequencer_state ... Sequencer state to be set to execute safety requests\"), TC18.txt L2885-2887, L2906-2911"
     },
     {
       "id": "REQ-E2E-019",
@@ -5856,7 +5871,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.7.7 Table 22 (\"rx_safety_measure\" is a 1-bit field with only two defined values), TC18.txt L2885-2887"
     },
     {
       "id": "REQ-E2E-020",
@@ -5865,7 +5881,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.7.7 Table 22 (\"rx_enforce_e2e ... 0b: stream is not blocked, when CRC check at EP fails (EP drops the request if CRC check fails) / 1b: stream is blocked until released, when CRC check at EP fails. Safe state will be entered\"), TC18.txt L2861-2867"
     },
     {
       "id": "REQ-E2E-021",
@@ -5874,7 +5891,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.7.7 Table 22 (\"rx_enforce_e2e ... 1b: stream is blocked until released, when CRC check at EP fails. Safe state will be entered\"), TC18.txt L2865-2867"
     },
     {
       "id": "REQ-E2E-022",
@@ -5883,7 +5901,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.7.7 Table 22 (\"rx_enforce_e2e ... 0b: stream is not blocked, when CRC check at EP fails (EP drops the request if CRC check fails)\"), TC18.txt L2861-2864"
     },
     {
       "id": "REQ-E2E-023",
@@ -5892,7 +5911,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.7.7 Table 22 (\"rx_enforce_e2e ... 1b: stream is blocked until released...\"), TC18.txt L2865-2867 -- the counterpart release mechanism this blocked/latched state implies"
     },
     {
       "id": "REQ-E2E-024",
@@ -5901,7 +5921,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.7.7 (\"...enable Watchdog for this Stream\" / \"WatchDog time out for this Stream in clock tics\"), TC18.txt L2855-2856, L2875-2877"
     },
     {
       "id": "REQ-E2E-025",
@@ -5910,7 +5931,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.7.7 (\"...the watchdog is reset with each request received from this RC Client. If the watchdog exceeds its threshold again it can be selected if a safety measure shall be taken and if so which.\"), TC18.txt L2937-2939"
     },
     {
       "id": "REQ-E2E-026",
@@ -5919,7 +5941,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.7.7 Table 22 (\"rx_wd_safestate_enable ... bring all endpoints for this Stream to safe state if WD triggers\"), TC18.txt L2878-2880"
     },
     {
       "id": "REQ-E2E-027",
@@ -5928,7 +5951,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.7.7 Table 22 (\"rx_wd_info_enable ... send repetitive notification when in safe state\"), TC18.txt L2889-2891"
     },
     {
       "id": "REQ-LINEP-006",
@@ -9576,7 +9600,8 @@
           "standard": "iso26262",
           "level": "ASIL-B",
           "asil": "ASIL-B",
-          "scope": "tc18"
+          "scope": "tc18",
+      "tc18": "§12.7.7 Table 22 (\"rx_enforce_e2e ... 0b: stream is not blocked...\"), TC18.txt L2861-2864 -- the initial, not-yet-faulted state this register default implies"
     },
     {
           "id": "REQ-E2E-044",
@@ -9585,7 +9610,8 @@
           "standard": "iso26262",
           "level": "ASIL-B",
           "asil": "ASIL-B",
-          "scope": "tc18"
+          "scope": "tc18",
+      "tc18": "§12.7.7 Table 22 (\"rx_enforce_e2e ... 1b: stream is blocked until released, when CRC check at EP fails.\"), TC18.txt L2865-2867"
     },
     {
       "id": "REQ-ADC-031",

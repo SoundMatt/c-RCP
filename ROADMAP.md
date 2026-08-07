@@ -6588,3 +6588,30 @@ every prior batch.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 132. Citation backfill, batch 12: E2E (issue #164) (v0.132.0)
+
+Twelfth batch, and the first PR to use the pre-flight safety check
+added after batch 11's self-caught citation-script bug -- every target
+requirement was verified to be in the module's true uncited set before
+any edit ran, and the script printed "Pre-flight OK" confirming 26/26
+targets before writing anything. E2E was 16/44 cited going in.
+
+E2E spans two genuinely different TC18 regions: the CRC32 mechanism
+itself (§13.6, `REQ-E2E-002`-`010`) against Table 31's CRC32P4
+parameter set and the ABB/GBB CRC coverage/fragmentation rules, and
+the safety/watchdog machinery (`REQ-E2E-011`-`027`, `043`-`044`) which
+is NOT in §13.6 at all -- it's split between §11.2.2's safety-request
+MSB convention (request_type 0x8x, Table 5) and §12.7.7 Table 22's
+per-stream `rx_enforce_e2e`/`rx_wd_*`/`rx_safety_measure` register
+block. Reading both regions fresh, rather than assuming everything
+E2E-prefixed lives in §13.6, is what made this batch tractable.
+
+Cited 26 of the 28 uncited `REQ-E2E-*` requirements. Left uncited,
+deliberately: `REQ-E2E-001` (`strerror()` uniqueness) and
+`REQ-E2E-006` (`rcp_e2e_wrap()` failing safe on invalid input or
+allocation failure -- defensive-programming detail, no TC18 clause) --
+the same implementation-detail pattern as every prior batch.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
