@@ -32,6 +32,19 @@ the rationale.
 
 ## Releases
 
+### v0.136.0 -- 2026-08-07
+
+**Citation backfill, batch 16: CMP.** Issue #164. Cited 16 of 16
+remaining uncited compound/compound-wait conditional-request
+requirements against TC18 §11.2.2's rich Table 5/6/7 + Figure 8/9
+basis (request_type dispatch, encode-time validation, and the
+sequencer advance-only-if-still-in-start_state behavioral core).
+Unlike ISELED (v0.134.0), this module's own "original design"
+disclaimer covers only its exact byte packing, not the underlying
+behavior -- which traces directly to well-defined TC18 prose. See
+`ROADMAP.md` milestone 136 for full detail. 1028 requirements
+(unchanged), 100% traced+tested, 0 `cfusa check` errors.
+
 ### v0.135.0 -- 2026-08-07
 
 **Citation backfill, batch 15: I2C.** Issue #164. Cited 15 of 17
