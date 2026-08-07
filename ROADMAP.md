@@ -6648,3 +6648,55 @@ implementation-detail pattern as every prior batch.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 134. Citation backfill, batch 14: ISELED (issue #164) (v0.134.0)
+
+Fourteenth batch, first module whose own file header explicitly
+documents that most of its behavior is this implementation's *own*
+original design rather than TC18-specified content: `ep_iseled.h`
+states plainly that the native 4-bit/5-bit bit-framing line code, the
+CRC-8 (poly 0x07) algorithm, and the trigger-enable toggle are "this
+module's own original design... not values taken from either
+[ISELED's own] ecosystem's own specification or the confidential TC18
+extraction" -- TC18 itself only says data is "4/5bit encoded according
+to the ISLED standard" (§13.7.12.1) without giving the bit-level
+scheme. Respecting that distinction meant citing substantially fewer
+of ISELED's 23 uncited requirements than prior per-endpoint-type
+batches, rather than force-fitting a TC18 citation onto genuinely
+invented behavior.
+
+Cited 9 of the 23 uncited `REQ-ISELED-*` requirements: recovered-clock
+pin requirements (`REQ-ISELED-007`) against §13.7.12.2's Freq_Sync/
+ISP_N prose; the transmission-complete trigger (`REQ-ISELED-008`)
+against §13.7.12.1's "creates a single trigger event... when
+transmission... has been completed" line; the R/W* functional-config
+writability gate, clock-divider, and recovered-clock-mode setters
+(`REQ-ISELED-010`-`012`) against Table 55's `iseled_ep_options`/
+`iseled_clk_divider`/`iseled_use_rcv_clk` register rows plus the
+established §12.3.1.3 W*-marker writability basis; the CRC-*enable*
+gate itself (`REQ-ISELED-013`, distinct from the CRC-8 *algorithm* it
+gates) against §13.7.12.1's "optional CRC generation... can be
+enabled" prose; and the command/response wire encode/decode pair
+(`REQ-ISELED-021`, `023`, `024`) against Figure 40/41's iseled request/
+response formats.
+
+Left uncited, deliberately, as genuinely this-module's-own-design with
+no TC18 basis (not a citation-backfill gap): the symbol encode/decode,
+bitframe length/encode/decode, and CRC-8 primitives (`REQ-ISELED-001`-
+`006`), the bitframe decoder's own four error paths
+(`REQ-ISELED-016`-`020`), and the trigger-select setter
+(`REQ-ISELED-014`, no Table 55 or Table 32 register found for it --
+TC18 defines ISELED as having exactly one trigger, not a selectable
+one). Also left uncited per the standing pattern:
+`REQ-ISELED-009` (zero-init) and `REQ-ISELED-015` (`strerror()`
+uniqueness). `REQ-ISELED-022` was already cited; `REQ-ISELED-025`-`028`
+are pre-existing `tc18-gap` entries, already cited.
+
+Filed issue #184 to track two genuine open TC18 ambiguities surfaced
+during this session's citation work (`REQ-ACF-012`'s `MTV_UNCERTAIN`,
+batch 2; and the `RCP_EP_PWM_IN_NO_SIGNAL` payload-sentinel question
+touching PWM_IN/ADC, batches 6/11) so they aren't lost once issue #164
+closes.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
