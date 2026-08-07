@@ -32,6 +32,21 @@ the rationale.
 
 ## Releases
 
+### v0.138.0 -- 2026-08-07
+
+**Citation backfill, batch 18: WAKEUP.** Issue #164. Cited 13 of 16
+remaining uncited Wakeup-control requirements against TC18 §13.7.2's
+basic-concept prose, Table 36/37's register block, and §13.7.2.3's
+sleep-request handshake (Figure 22, SleepCMD=0xA5). Several citations
+cross-reference the module's pre-existing `tc18-gap` entries
+(`REQ-WAKEUP-017`-`022`) rather than implying full conformance where
+the implementation is a documented, reduced model of the spec's fuller
+register/behavior encoding. Also records that MDIO was scoped and
+rejected as a batch candidate this session -- its wire layout is
+almost entirely self-documented as non-TC18 original design. See
+`ROADMAP.md` milestone 138 for full detail. 1028 requirements
+(unchanged), 100% traced+tested, 0 `cfusa check` errors.
+
 ### v0.137.0 -- 2026-08-07
 
 **Citation backfill, batch 17: LINEP.** Issue #164. Cited 12 of 16

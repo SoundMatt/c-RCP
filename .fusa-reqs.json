@@ -6913,7 +6913,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2/.3, TC18.txt L2177-2178, L2225-2226 -- §12.3.1.3 W* marker convention, TC18.txt L2225-2226"
     },
     {
       "id": "REQ-WAKEUP-003",
@@ -6922,7 +6923,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.2.2 Table 37 (wake-up source pin configuration, IO_SRC[15:11]), TC18.txt L4144; reduced to a single active_high/active_low sense rather than Table 37's six-value IO_SRC encoding -- see the pre-existing gap REQ-WAKEUP-022"
     },
     {
       "id": "REQ-WAKEUP-004",
@@ -6931,7 +6933,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.2.1 (\"the endpoint listens to configurable IO signals for activity... When the WakeUp endpoint detects activity during sleep mode it wakes up the RC Server\"), TC18.txt L4087-4090; §13.7.2.2 Table 36 (ep1 - functional configuration), TC18.txt L4102-4118 (wup_nr_io_pins_max, io_scr1/2 entries) -- see the pre-existing gap REQ-WAKEUP-021 for the reduced register model"
     },
     {
       "id": "REQ-WAKEUP-005",
@@ -6940,7 +6943,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.2.2 Table 36 (ep1 - functional configuration), TC18.txt L4102-4118 (wup_status, \"Indication of wake-up source, writing '1' clears the flag. Each bit represents a wake-up source\"), TC18.txt L4107-4109 -- modeled as a single latch rather than a 16-bit per-source bitfield, see the pre-existing gap REQ-WAKEUP-021"
     },
     {
       "id": "REQ-WAKEUP-006",
@@ -6949,7 +6953,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.2.2 Table 36 (ep1 - functional configuration), TC18.txt L4102-4118 (wup_status register), TC18.txt L4107-4109 -- see the pre-existing gap REQ-WAKEUP-021"
     },
     {
       "id": "REQ-WAKEUP-007",
@@ -6958,7 +6963,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.2.2 Table 36 (ep1 - functional configuration), TC18.txt L4102-4118 (wup_status, \"writing '1' clears the flag\"), TC18.txt L4107-4109 -- see the pre-existing gap REQ-WAKEUP-021"
     },
     {
       "id": "REQ-WAKEUP-008",
@@ -6967,7 +6973,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.2.2 Table 36 (ep1 - functional configuration), TC18.txt L4102-4118 (wup_status register), TC18.txt L4107-4109 -- see the pre-existing gap REQ-WAKEUP-021"
     },
     {
       "id": "REQ-WAKEUP-009",
@@ -6985,7 +6992,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.2.3 Figure 22 (Endpoint sleep request), TC18.txt L4160-4166; \"SleepCMD is coded as 0xA5.\", TC18.txt L4168; target_mode restricted to Standby/Sleep per §12.5's Goto Sleep/Standby entry gating (established PWRMODE basis)"
     },
     {
       "id": "REQ-WAKEUP-011",
@@ -6994,7 +7002,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.2.3 Figure 22 (Endpoint sleep request), TC18.txt L4160-4166; \"SleepCMD is coded as 0xA5.\", TC18.txt L4168"
     },
     {
       "id": "REQ-WAKEUP-012",
@@ -7003,7 +7012,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.2.3 (\"send an acknowledge to sleep request\" / \"bring the RC Server implementation to sleep mode\"), TC18.txt L4157-4158; §13.7.2.3 Figure 22 (Endpoint sleep request), TC18.txt L4160-4166; \"SleepCMD is coded as 0xA5.\", TC18.txt L4168 -- refusal signalled as a positive-form response rather than an error response, see the pre-existing gap REQ-WAKEUP-019"
     },
     {
       "id": "REQ-WAKEUP-013",
@@ -7012,7 +7022,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.2.3 (\"send an acknowledge to sleep request\" / \"bring the RC Server implementation to sleep mode\"), TC18.txt L4157-4158 -- see the pre-existing gap REQ-WAKEUP-019 for the response-shape divergence"
     },
     {
       "id": "REQ-WAKEUP-014",
@@ -7021,7 +7032,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.2.1 (\"After establishing a network connection, the WakeUp endpoint sends repetitive messages.\"), TC18.txt L4090-4092 -- carries no wake-up source of its own, see the pre-existing gap REQ-WAKEUP-017"
     },
     {
       "id": "REQ-WAKEUP-015",
@@ -7030,7 +7042,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.2.1, TC18.txt L4090-4092 -- see the pre-existing gap REQ-WAKEUP-017"
     },
     {
       "id": "REQ-WAKEUP-016",
