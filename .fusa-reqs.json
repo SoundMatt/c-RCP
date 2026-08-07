@@ -2998,7 +2998,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.4.1 (\"Each GPIO endpoint can handle up to 32 IOs.\"), TC18.txt L4381"
     },
     {
       "id": "REQ-GPIO-003",
@@ -3007,7 +3008,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.4.1 (\"Each GPIO pin can be assigned to a bit position of the byte_msg_payload... In case the EP supports less than 32 pins, the least-significant bits are used.\"), TC18.txt L4389-4390"
     },
     {
       "id": "REQ-GPIO-004",
@@ -3016,7 +3018,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.4.1 (\"A GPIO endpoint maps bits from a byte_msg_payload to physical pins.\"), TC18.txt L4380"
     },
     {
       "id": "REQ-GPIO-005",
@@ -3025,7 +3028,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (\"evt[2:0]\" GPIO/PWM_OUT row, values 000b-111b), TC18.txt L3690-3717"
     },
     {
       "id": "REQ-GPIO-006",
@@ -3034,7 +3038,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=000b: \"The byte_msg_payload is presented at the interface\"), TC18.txt L3694"
     },
     {
       "id": "REQ-GPIO-007",
@@ -3043,7 +3048,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=001b: \"The 'byte_msg_payload' bitwise OR 'current interface status' is written to the interface (example: with a byte_msg_payload of 0x0000 0002 the second IO pin will be set, while other IO pins remain unchanged)\"), TC18.txt L3695-3698"
     },
     {
       "id": "REQ-GPIO-008",
@@ -3052,7 +3058,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=010b: \"The 'byte_msg_payload' bitwise AND 'current interface status' is written to the interface (example: with a byte_msg_payload of 0xFFFF FFFE the first IO pin will be reset, while other IO pins remain unchanged)\"), TC18.txt L3699-3702"
     },
     {
       "id": "REQ-GPIO-009",
@@ -3061,7 +3068,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=011b: \"The 'byte_msg_payload' bitwise XOR 'current interface status' is written to the interface (example: with a byte_msg_payload of 0x0000 0002 the second IO pin will be toggled, while other IO pins remain unchanged)\"), TC18.txt L3703-3706"
     },
     {
       "id": "REQ-GPIO-010",
@@ -3070,7 +3078,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=101b: \"The 'byte_msg_payload' plus 'current interface status' is written to the interface\"), TC18.txt L3709-3711; saturation rule, TC18.txt L3719-3720"
     },
     {
       "id": "REQ-GPIO-011",
@@ -3079,7 +3088,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=110b: \"'byte_msg_payload' minus 'current interface status' is written as is to interface\"), TC18.txt L3712-3714; saturation rule, TC18.txt L3719-3720"
     },
     {
       "id": "REQ-GPIO-012",
@@ -3088,7 +3098,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=100b: \"reserved -request shall be ignored and an err-response with error code = UNSUPPORTED_CMD shall be sent\"), TC18.txt L3707-3708"
     },
     {
       "id": "REQ-GPIO-013",
@@ -3097,7 +3108,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.4.1 (\"For each pin the direction (input/output) can be configured.\"), TC18.txt L4386; reconfigured via evt[2:0]=111b, \"The byte_msg_payload is not presented to the interface but used to change the configuration of the endpoint (see 12.7.1).\", TC18.txt L3715-3717"
     },
     {
       "id": "REQ-GPIO-014",
@@ -3106,7 +3118,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.4.1 (\"The GPIO endpoint generates triggers for all its mapped IO-pins on the change, falling and rising edge.\"), TC18.txt L4402"
     },
     {
       "id": "REQ-GPIO-015",
@@ -3115,7 +3128,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.4.1 Table 40 (\"IO0 signal change\"), TC18.txt L4414"
     },
     {
       "id": "REQ-GPIO-016",
@@ -3124,7 +3138,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.4.1 Table 40 (\"IO0 rising edge\"), TC18.txt L4415"
     },
     {
       "id": "REQ-GPIO-017",
@@ -3133,7 +3148,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.4.1 Table 40 (\"IO0 falling edge\"), TC18.txt L4416"
     },
     {
       "id": "REQ-GPIO-018",
@@ -3151,7 +3167,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178"
     },
     {
       "id": "REQ-GPIO-020",
@@ -3160,7 +3177,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178 -- writable once concluded (i.e. HW_CONFIGURED)"
     },
     {
       "id": "REQ-GPIO-021",
@@ -3169,7 +3187,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3 (\"...only write access to the EP's functional configurations is allowed via their dedicated stream_id/byte_bus_id combinations or via root client access EP0... Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables.\"), TC18.txt L2203-2206, L2225-2226"
     },
     {
       "id": "REQ-GPIO-022",
@@ -3178,7 +3197,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-GPIO-021"
     },
     {
       "id": "REQ-GPIO-023",
@@ -3187,7 +3207,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-GPIO-021"
     },
     {
       "id": "REQ-GPIO-024",
@@ -3196,7 +3217,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-GPIO-021"
     },
     {
       "id": "REQ-GPIO-025",
@@ -3205,7 +3227,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-GPIO-021"
     },
     {
       "id": "REQ-GPIO-026",
@@ -3214,7 +3237,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.4.1 (\"A request not having exactly four bytes is rejected and an error response with error code = INVALID_PARAMETER will be sent.\"), TC18.txt L4391-4392; general ACF frame basis, §13.5 Table 30, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-GPIO-027",
@@ -3223,7 +3247,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710 (general ACF frame-validation basis)"
     },
     {
       "id": "REQ-GPIO-028",
@@ -3232,7 +3257,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.4.1 (\"A request not having exactly four bytes is rejected and an error response with error code = INVALID_PARAMETER will be sent.\"), TC18.txt L4391-4392; evt[2:0] semantics per §13.5 Table 30, TC18.txt L3690-3717"
     },
     {
       "id": "REQ-GPIO-029",
@@ -3241,7 +3267,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.4.1 (\"A request not having exactly four bytes is rejected and an error response with error code = INVALID_PARAMETER will be sent.\"), TC18.txt L4391-4392"
     },
     {
       "id": "REQ-GPIO-030",
@@ -3250,7 +3277,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.4.1 (\"A request not having exactly four bytes is rejected...\"), TC18.txt L4391-4392; response payload format mirrors the request's byte_msg_payload bitmask, Figure 24, TC18.txt L4397-4399"
     },
     {
       "id": "REQ-GPIO-031",
@@ -3259,7 +3287,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.4.1 (\"A request not having exactly four bytes is rejected...\"), TC18.txt L4391-4392; response payload format mirrors the request's byte_msg_payload bitmask, Figure 24, TC18.txt L4397-4399"
     },
     {
       "id": "REQ-GPIO-032",
@@ -3268,7 +3297,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710 (general ACF frame-validation basis)"
     },
     {
       "id": "REQ-SPI-001",

@@ -32,6 +32,20 @@ the rationale.
 
 ## Releases
 
+### v0.127.0 -- 2026-08-07
+
+**Citation backfill, batch 7: GPIO.** Issue #164. Cited 30 of 32
+remaining uncited GPIO requirements. evt[2:0] write-modifier semantics
+reuse the same §13.5 Table 30 GPIO/PWM_OUT row citations as the
+previous batch's PWM_OUT half; lifecycle-gated writability reuses the
+§12.3.1.2/§12.3.1.3 basis established for LIFECYCLE/PWM; request/
+response wire format cites §13.7.4.1's GPIO-specific 4-byte/
+INVALID_PARAMETER rule plus the general Table 30 frame-validation
+basis; trigger semantics cite Table 40. Left 2 uncited (`strerror()`
+uniqueness, functional-config zero-init) -- genuine implementation
+detail. Purely additive; no code or test changed. 1028 requirements
+(unchanged), 100% traced+tested, 0 `cfusa check` errors.
+
 ### v0.126.0 -- 2026-08-07
 
 **Citation backfill, batch 6: PWM.** Issue #164. First per-endpoint-type
