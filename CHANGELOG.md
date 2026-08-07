@@ -32,6 +32,20 @@ the rationale.
 
 ## Releases
 
+### v0.123.0 -- 2026-08-07
+
+**Citation backfill, batch 3: RMAP.** Issue #164. Cited 15 of 22
+remaining uncited RMAP requirements against four TC18 sources: §12.3.1.1
+(EP0/discovery `byte_bus_id`), §13.3 Table 33 (`svr_root_client_index`),
+§12.9.1.1 (compound-request options-group bundling), §12.3.1.2
+(root-client and owning-stream write-access grants), and §13.2 Table 23
+(EP_ID_config's required ascending ordering). Left 7 uncited (pin-property
+bitmask distinctness, string-helper non-NULL/uniqueness guarantees,
+config-struct zero-init boilerplate) -- genuine implementation-detail
+requirements with no TC18 clause, not an oversight. Purely additive; no
+code or test changed. 1028 requirements (unchanged), 100% traced+tested,
+0 `cfusa check` errors.
+
 ### v0.122.0 -- 2026-08-07
 
 **Citation backfill, batch 2: ACF.** Issue #164. Cited 11 of 14 remaining

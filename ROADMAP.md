@@ -6291,3 +6291,25 @@ investigation before citing, not force-fit here).
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 123. Citation backfill, batch 3: RMAP (issue #164) (v0.123.0)
+
+Third batch. RMAP was 47/69 cited going in; cited 15 of the 22 remaining
+against three distinct TC18 sources: §12.3.1.1 (`REQ-RMAP-001`/`002`,
+EP0 = the discovery `byte_bus_id` 0x00, TC18.txt L2163-2164); §13.3
+Table 33 (`REQ-RMAP-003`, `svr_root_client_index` 0 meaning no root
+client, TC18.txt L3987-3989); §12.9.1.1 (`REQ-RMAP-004`-`008`, the
+compound-request options-group bundling rule, TC18.txt L2033-2036);
+§12.3.1.2 (`REQ-RMAP-009`-`012`, root-client write access via EP0 and
+per-endpoint owning-stream write access, TC18.txt L2182-2184); and §13.2
+Table 23 (`REQ-RMAP-020`-`022`, the EP_ID_config table's required
+ascending `Request_Stream_Index`/`BBID` ordering, TC18.txt L2979).
+
+Left uncited, deliberately: `REQ-RMAP-013` (pin-property bitmask bits
+pairwise distinct) and `REQ-RMAP-014`-`019` (string-helper non-NULL/
+uniqueness guarantees, config-struct zero-init boilerplate) -- all
+genuine implementation-detail requirements with no TC18 clause behind
+them, not an oversight.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
