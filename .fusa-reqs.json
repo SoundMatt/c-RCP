@@ -1987,7 +1987,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.1 Figure 6 (\"NTSCF-Header Version 0\"), TC18.txt L1064-1072; example wire trace confirming subtype=0x82, TC18.txt L3866-3868"
     },
     {
       "id": "REQ-AVTP-002",
@@ -1996,7 +1997,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.1 Figure 5 (\"TSCF-Header Version 0\"), TC18.txt L1055-1062; example wire trace confirming subtype=0x05, TC18.txt L3843-3846"
     },
     {
       "id": "REQ-AVTP-003",
@@ -2005,7 +2007,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.1 Figure 6 (\"NTSCF-Header Version 0\"), TC18.txt L1064-1072"
     },
     {
       "id": "REQ-AVTP-004",
@@ -2014,7 +2017,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.1 Figure 5 (\"TSCF-Header Version 0\"), TC18.txt L1055-1062"
     },
     {
       "id": "REQ-AVTP-005",
@@ -2023,7 +2027,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.1 Figure 6's fixed header length (\"NTSCF-Header Version 0\"), TC18.txt L1064-1072"
     },
     {
       "id": "REQ-AVTP-006",
@@ -2032,7 +2037,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.1 Figure 5's fixed header length (\"TSCF-Header Version 0\"), TC18.txt L1055-1062"
     },
     {
       "id": "REQ-AVTP-007",
@@ -2041,7 +2047,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.1 (NTSCF subtype=0x82 vs TSCF subtype=0x05 distinguish the two header forms), TC18.txt L1052-1065"
     },
     {
       "id": "REQ-AVTP-008",
@@ -2050,7 +2057,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.1 (NTSCF subtype=0x82 vs TSCF subtype=0x05 distinguish the two header forms), TC18.txt L1052-1065"
     },
     {
       "id": "REQ-AVTP-009",
@@ -2059,7 +2067,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.1 Figures 5/6's ntscf_data_length/tscf_data_length header fields, TC18.txt L1055-1072; example wire trace showing ntscf_data_length=0x038, TC18.txt L3868"
     },
     {
       "id": "REQ-AVTP-010",
@@ -2095,7 +2104,8 @@
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.1 (subtype is byte 0 of both NTSCF Figure 6 and TSCF Figure 5), TC18.txt L1052-1072"
     },
     {
       "id": "REQ-AVTP-014",
@@ -2104,7 +2114,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.1 (\"In case time-synchronization is not supported, AVTPDUs having a TSCF header are dropped, and no response send.\"), TC18.txt L1074"
     },
     {
       "id": "REQ-AVTP-015",

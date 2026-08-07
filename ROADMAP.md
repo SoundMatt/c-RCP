@@ -6250,3 +6250,22 @@ separately on issue #163, not attempted here.
 `.fusa-reqs.json` gains `REQ-MOCK-030`, cited and tested, including a
 mutation test. 1028 requirements, 100% traced+tested, 0 `cfusa check`
 errors. Full build + test suite + ASan/UBSan all pass.
+
+### 121. Citation backfill, batch 1: AVTP (issue #164) (v0.121.0)
+
+First batch of the citation-backfill effort (issue #164), started after
+Phase 1's mechanical-wins sweep concluded. AVTP was 0/20 cited despite
+being spot-checked earlier as legitimate, complete content -- purely a
+citation gap. Cited 11 of 20 (`REQ-AVTP-001` through `009`, `013`, `014`)
+against TC18 §11.1's NTSCF/TSCF header definitions (Figures 5/6) and the
+worked wire-trace examples later in the spec that give the concrete
+subtype byte values (0x82/0x05) the normative figures' own images don't
+survive PDF text extraction for. The remaining 9 (`REQ-AVTP-010`-`012`,
+`015`-`020`: stream_id/address equality semantics, transport refcounting,
+loopback transport plumbing) are deliberately left uncited -- genuine
+implementation-detail/test-infrastructure requirements with no specific
+TC18 clause behind them, not an oversight.
+
+Purely additive (new `tc18` citation fields only); no code or test
+changed. 1028 requirements (unchanged count), 100% traced+tested, 0
+`cfusa check` errors.
