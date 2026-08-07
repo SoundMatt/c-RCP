@@ -2543,7 +2543,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.1 (\"all requests need to be directed to EP0 via the discovery byte_bus_id 0x00\"), TC18.txt L2163-2164"
     },
     {
       "id": "REQ-RMAP-002",
@@ -2552,7 +2553,8 @@
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.1 (\"all requests need to be directed to EP0 via the discovery byte_bus_id 0x00\"), TC18.txt L2163-2164"
     },
     {
       "id": "REQ-RMAP-003",
@@ -2561,7 +2563,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.3 Table 33 (\"svr_root_client_index... 0: no stream has 'root' write access\"), TC18.txt L3987-3989"
     },
     {
       "id": "REQ-RMAP-004",
@@ -2570,7 +2573,8 @@
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.9.1.1 (\"Optional support of compound requests comes as bundle of...\"), TC18.txt L2033-2036"
     },
     {
       "id": "REQ-RMAP-005",
@@ -2579,7 +2583,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.9.1.1 (\"Optional support of compound requests comes as bundle of...\"), TC18.txt L2033-2036"
     },
     {
       "id": "REQ-RMAP-006",
@@ -2588,7 +2593,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.9.1.1 (\"Optional support of compound requests comes as bundle of...\"), TC18.txt L2033-2036"
     },
     {
       "id": "REQ-RMAP-007",
@@ -2597,7 +2603,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.9.1.1 (\"Optional support of compound requests comes as bundle of...\" -- a group's members are honestly claimed only together, not individually), TC18.txt L2033-2036"
     },
     {
       "id": "REQ-RMAP-008",
@@ -2606,7 +2613,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.9.1.1 (\"Optional support of compound requests comes as bundle of...\" -- a group's members are honestly claimed only together, not individually), TC18.txt L2033-2036"
     },
     {
       "id": "REQ-RMAP-009",
@@ -2615,7 +2623,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2184"
     },
     {
       "id": "REQ-RMAP-010",
@@ -2624,7 +2633,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2184"
     },
     {
       "id": "REQ-RMAP-011",
@@ -2633,7 +2643,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"...functional configuration of each individual EP shall be accessible for read and write...via requests having the stream_id and byte_bus_id that is assigned to the respective EP by the configuration (see 12.7.8).\"), TC18.txt L2182-2183"
     },
     {
       "id": "REQ-RMAP-012",
@@ -2642,7 +2653,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"...functional configuration of each individual EP shall be accessible for read and write...via requests having the stream_id and byte_bus_id that is assigned to the respective EP by the configuration (see 12.7.8).\"), TC18.txt L2182-2183"
     },
     {
       "id": "REQ-RMAP-013",
@@ -2714,7 +2726,8 @@
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.2 Table 23 (\"The parameters Request_Stream_Index and BBID shall occur in ascending order. This has to be ensured by the instance that is sending the configuration to this table.\"), TC18.txt L2979"
     },
     {
       "id": "REQ-RMAP-021",
@@ -2723,7 +2736,8 @@
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.2 Table 23 (\"The parameters Request_Stream_Index and BBID shall occur in ascending order. This has to be ensured by the instance that is sending the configuration to this table.\"), TC18.txt L2979"
     },
     {
       "id": "REQ-RMAP-022",
@@ -2732,7 +2746,8 @@
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.2 Table 23 (\"The parameters Request_Stream_Index and BBID shall occur in ascending order.\"), TC18.txt L2979"
     },
     {
       "id": "REQ-DISC-001",
