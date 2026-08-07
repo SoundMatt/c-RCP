@@ -3628,7 +3628,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.7.2 Table 46 (i2c functional configuration), TC18.txt L4795-4824 (i2c_mode, 0x0007, values 0-4 with a duplicated \"3:\" high-speed labeling -- see the pre-existing gap REQ-I2C-019); this module's conservative lower-numbered reading caps valid values at 0..3"
     },
     {
       "id": "REQ-I2C-002",
@@ -3646,7 +3647,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178"
     },
     {
       "id": "REQ-I2C-004",
@@ -3655,7 +3657,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2, TC18.txt L2177-2178 -- writable once concluded (i.e. HW_CONFIGURED)"
     },
     {
       "id": "REQ-I2C-005",
@@ -3664,7 +3667,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
     },
     {
       "id": "REQ-I2C-006",
@@ -3673,7 +3677,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.7.2 Table 46 (i2c functional configuration), TC18.txt L4795-4824 (i2c_mode register), writability per §12.3.1.3 W* marker convention, TC18.txt L2225-2226"
     },
     {
       "id": "REQ-I2C-007",
@@ -3682,7 +3687,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.7.2 Table 46 (i2c functional configuration), TC18.txt L4795-4824 (i2c_mode register), writability per §12.3.1.3 W* marker convention, TC18.txt L2225-2226"
     },
     {
       "id": "REQ-I2C-008",
@@ -3691,7 +3697,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.7.2 Table 46 (i2c functional configuration), TC18.txt L4795-4824 (i2c_mode register), writability per §12.3.1.3 W* marker convention, TC18.txt L2225-2226"
     },
     {
       "id": "REQ-I2C-009",
@@ -3709,7 +3716,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.7.3 Figure 29 (i2c request format), TC18.txt L4829-4846; \"no channel selector\" per §13.5 Table 30 (I2C's row-2 group, only evt=111b defined), TC18.txt L3684-3693"
     },
     {
       "id": "REQ-I2C-011",
@@ -3718,7 +3726,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.7.3 Figure 29 (i2c request format), TC18.txt L4829-4846; §13.7.7.1 (\"Requests are accepted in ACF_ABB and ACF_GBB.\"), TC18.txt L4790-4791; evt[2:0] validation per §13.5 Table 30 (I2C's row-2 group, only evt=111b defined), TC18.txt L3684-3693"
     },
     {
       "id": "REQ-I2C-012",
@@ -3737,7 +3746,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.7.3 Figure 29 (i2c request format), TC18.txt L4829-4846; §13.7.7.3 (\"The byte msg payload is the I2C payload including the address. The I2C endpoint does not know whether there is a 7- or 10-bit address, since the endpoint is just transparent.\"), TC18.txt L4830-4831"
     },
     {
       "id": "REQ-I2C-014",
@@ -3746,7 +3756,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.7.3 Figure 29 (i2c request format), TC18.txt L4829-4846; response timed/untimed ACF_GBB/ACF_ABB convention shared with every prior endpoint type"
     },
     {
       "id": "REQ-I2C-015",
@@ -3755,7 +3766,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.7.3 Figure 29 (i2c request format), TC18.txt L4829-4846; response timed/untimed ACF_GBB/ACF_ABB convention shared with every prior endpoint type"
     },
     {
       "id": "REQ-I2C-016",
@@ -3764,7 +3776,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.7.3 Figure 29 (i2c request format), TC18.txt L4829-4846, TC18.txt L4846 -- general ACF frame-validation basis for the response wire format"
     },
     {
       "id": "REQ-I2C-017",
@@ -3773,7 +3786,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.7.1 (\"The Client can request the I²C endpoint to send one or more bytes... Requests are accepted in ACF_ABB and ACF_GBB.\"), TC18.txt L4788-4791 -- I2C's genuinely bidirectional read/write op sense"
     },
     {
       "id": "REQ-I2C-018",
@@ -3782,7 +3796,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.7.3 Figure 29 (i2c request format), TC18.txt L4829-4846; \"no channel selector\" per §13.5 Table 30 (I2C's row-2 group, only evt=111b defined), TC18.txt L3684-3693"
     },
     {
       "id": "REQ-UART-001",

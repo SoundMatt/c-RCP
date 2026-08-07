@@ -6700,3 +6700,35 @@ closes.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 135. Citation backfill, batch 15: I2C (issue #164) (v0.135.0)
+
+Fifteenth batch. §13.7.7 I²C Controller endpoint, 17/20 uncited going
+in (`REQ-I2C-012`, `019` already cited -- `019` is the pre-existing
+`tc18-gap` entry for Table 46's own duplicated "3:" high-speed-mode
+labeling, cross-referenced rather than re-diagnosed).
+
+Cited 15 of the 17 uncited `REQ-I2C-*` requirements: lifecycle-gated
+functional-config writability (`REQ-I2C-003`-`005`) reusing the
+established §12.3.1.2/.3 basis; the `i2c_mode` register validity/setter
+trio (`REQ-I2C-001`, `006`-`008`) against Table 46, with `001`
+explicitly cross-referencing `REQ-I2C-019`'s spec-ambiguity gap rather
+than treating the conservative 0..3 cap as a fresh finding; the
+transfer request/response encode/decode set (`REQ-I2C-010`, `011`,
+`013`-`016`, `018`) against Figure 29's i2c request format plus
+§13.7.7.3's "the I2C endpoint does not know whether there is a 7- or
+10-bit address, since the endpoint is just transparent" passthrough
+text; and the direction-validity primitive (`REQ-I2C-017`) against
+§13.7.7.1's own description of I2C as the one endpoint type genuinely
+accepting both read and write op senses on the same transfer, unlike
+every fixed-op endpoint before it.
+
+Used the pre-flight citation-target check -- confirmed all 15 targets
+were genuinely uncited before writing anything.
+
+Left uncited, deliberately: `REQ-I2C-002` (functional-config
+zero-init) and `REQ-I2C-009` (`strerror()` uniqueness) -- the same
+implementation-detail pattern as every prior batch.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
