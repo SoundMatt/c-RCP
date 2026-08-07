@@ -32,6 +32,23 @@ the rationale.
 
 ## Releases
 
+### v0.134.0 -- 2026-08-07
+
+**Citation backfill, batch 14: ISELED.** Issue #164. Cited 9 of 23
+remaining uncited ISELED-endpoint requirements against TC18 §13.7.12's
+Freq_Sync/ISP_N clock-recovery prose, single-trigger description,
+Table 55 functional-config registers, CRC-enable prose, and Figure
+40/41 request/response formats. Left the bulk of the module (symbol
+encode/decode, bitframe framing, CRC-8 algorithm, decode error paths,
+trigger-select setter) uncited: the module's own file header states
+these are this implementation's original design, not TC18-specified
+content -- TC18 names the ISLED bit-encoding by reference only, without
+giving its bit-level scheme. Filed issue #184 to track two open TC18
+ambiguities (`REQ-ACF-012`, `PWM_IN_NO_SIGNAL` sentinel) surfaced
+earlier in this backfill. See `ROADMAP.md` milestone 134 for full
+detail. 1028 requirements (unchanged), 100% traced+tested, 0
+`cfusa check` errors.
+
 ### v0.133.0 -- 2026-08-07
 
 **Citation backfill, batch 13: CANEP.** Issue #164. Cited 19 of 21

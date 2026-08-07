@@ -6388,7 +6388,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.12.2 (\"For receiving ISELED frames on the ISP_P Pin of the interface either a clock synchronization via the Freq_Sync pattern can be done or data sampling based on the clock provided on the ISP_N pin. If the Freq_Sync pattern is used it is not necessary to connect the ISP_N of the EP to a physical Pin.\"), TC18.txt L5549-5551"
     },
     {
       "id": "REQ-ISELED-008",
@@ -6397,7 +6398,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.12.1 (\"The ISELED endpoint creates a single trigger event, when transmission of a data packet has been completed on the ISELED network.\"), TC18.txt L5497-5498"
     },
     {
       "id": "REQ-ISELED-009",
@@ -6415,7 +6417,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.12.2 Table 55 (iseled_ep_options, 0x0003, R/W*), TC18.txt L5518-5520; W* marker convention per §12.3.1.3, TC18.txt L2225-2226"
     },
     {
       "id": "REQ-ISELED-011",
@@ -6424,7 +6427,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.12.2 Table 55 (iseled_clk_divider, 0x0006, 8 bit, R/W, \"generate ISELED_CLK time reference should be nominal 2MHz\"), TC18.txt L5524-5527; writability per §12.3.1.3, TC18.txt L2225-2226"
     },
     {
       "id": "REQ-ISELED-012",
@@ -6433,7 +6437,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.12.2 Table 55 (iseled_use_rcv_clk, 0x0007.4, R/W, \"Use clock provided by ISELED 1st device instead of FreqSync pattern\"), TC18.txt L5534-5537; writability per §12.3.1.3, TC18.txt L2225-2226"
     },
     {
       "id": "REQ-ISELED-013",
@@ -6442,7 +6447,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.12.1 (\"The optional CRC generation as specified in the ISLED standard can be enabled. If so, the CRC will be generated and attached to the write messages to the ISELED network.\"), TC18.txt L5494-5496; writability per §12.3.1.3, TC18.txt L2225-2226"
     },
     {
       "id": "REQ-ISELED-014",
@@ -6514,7 +6520,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.12.3 Figure 40 (iseled request format -- Instruction/Address/Data payload, ACF_ABB op=write), TC18.txt L5583-5591"
     },
     {
       "id": "REQ-ISELED-022",
@@ -6533,7 +6540,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.12.3 Figure 41 (iseled response format -- Address/Data[11:0]/CRC payload), TC18.txt L5605-5610; response rsp bit per §11.2.1, TC18.txt L1885"
     },
     {
       "id": "REQ-ISELED-024",
@@ -6542,7 +6550,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.12.3 Figure 41 (iseled response format), TC18.txt L5605-5610; timed/untimed ACF_GBB/ACF_ABB response convention shared with every prior endpoint type"
     },
     {
       "id": "REQ-MDIO-001",
