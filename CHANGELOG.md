@@ -32,6 +32,21 @@ the rationale.
 
 ## Releases
 
+### v0.131.0 -- 2026-08-07
+
+**Citation backfill, batch 11: ADC.** Issue #164. Cited 22 of 28
+remaining uncited ADC requirements against TC18 §13.7.9's averaging,
+functional-config (Table 51), trigger (Table 50), and request-handling
+subsections, plus the general Table 30 row. Left 6 uncited: 4 for the
+`RCP_EP_PWM_IN_NO_SIGNAL` sentinel ambiguity already flagged in batch
+6, 1 zero-init, 1 `strerror()` uniqueness. This batch's own citation
+script had a self-caught bug (a target already cited going in shifted
+four subsequent edits by one requirement) -- fixed before commit; all
+5 prior script-based batches were audited against their base-commit
+state and confirmed unaffected. Purely additive; no code or test
+changed. 1028 requirements (unchanged), 100% traced+tested, 0
+`cfusa check` errors.
+
 ### v0.130.0 -- 2026-08-07
 
 **Citation backfill, batch 10: DISC.** Issue #164. First non-endpoint-

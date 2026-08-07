@@ -6542,3 +6542,49 @@ the same implementation-detail pattern as every prior batch.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 131. Citation backfill, batch 11: ADC (issue #164) (v0.131.0)
+
+Eleventh batch. ADC was 8/36 cited going in. Per-endpoint-type module,
+same shape as PWM/GPIO/SPI/UART: §13.7.9's basic-concept, functional-
+config (Table 51), and request-handling subsections, plus Table 50's
+five trigger events and the general Table 30 row (ADC shares UART's
+row: only evt=111b defined).
+
+Cited 22 of the 28 uncited `REQ-ADC-*` requirements: averaging/
+response-packing semantics (`REQ-ADC-001`-`002`, `005`-`008`, `010`-
+`013`) against §13.7.9.1's averaging-interval and COMBINE_NR_VAL text
+plus §13.7.9.3's "half the read size" and response-timestamp rules;
+lifecycle-gated functional-config writability (`REQ-ADC-015`-`023`)
+reusing the established §12.3.1.2/§12.3.1.3 basis, each paired with its
+own Table 51 field citation where one exists; wire format (`REQ-ADC-
+025`, `027`-`029`) against §13.7.9.3 and the general Table 30 row.
+
+This batch's own citation script had a bug caught before merge: it
+included `REQ-ADC-026` as a target even though that requirement was
+already cited from earlier work. Because the script locates each
+edit site by searching for the next *uncited* pattern after a
+requirement's `id`, that already-cited entry caused every subsequent
+edit in the batch to land one requirement too late -- `REQ-ADC-027`
+through `030` each received the citation intended for the previous
+one, and `030` was wrongly cited at all (it should have stayed
+uncited, matching the same `RCP_EP_PWM_IN_NO_SIGNAL` sentinel ambiguity
+already established for `REQ-PWM-047`/`054` in batch 6 -- TC18 defines
+`PWM_IN_NO_SIGNAL` only as a Table 27 wire error code, not a payload
+sentinel). Caught during this batch's own review, before any commit;
+fixed by hand-correcting the four affected entries. All 9 previously
+merged script-based batches (PWM/GPIO/SPI/UART/DISC) were audited
+against their pre-batch `.fusa-reqs.json` state at their base commits
+and confirmed clean -- none had a target already cited going in, so
+none could have hit this failure mode. (RMAP/LIFECYCLE/PWRMODE used
+direct per-entry edits, not this script pattern, and were never at
+risk.)
+
+Left uncited, deliberately: `REQ-ADC-003`/`004`/`009`/`030`
+(`RCP_EP_PWM_IN_NO_SIGNAL` handling -- the sentinel ambiguity above),
+`REQ-ADC-014` (functional-config zero-init), and `REQ-ADC-024`
+(`strerror()` uniqueness) -- the same implementation-detail pattern as
+every prior batch.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
