@@ -5402,7 +5402,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.4 Figure 11 / field table (GBB for chained requests: request_type=0x01, reserved octets, chain_exec_delay, cs), TC18.txt L1503-1560; general ACF_GBB frame-validation basis"
     },
     {
       "id": "REQ-CHAIN-004",
@@ -5421,7 +5422,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1186-1189; general ACF_GBB frame-validation basis"
     },
     {
       "id": "REQ-CHAIN-006",
@@ -5430,7 +5432,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1186-1189"
     },
     {
       "id": "REQ-CHAIN-007",
@@ -5439,7 +5442,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 Table 5 (\"0x01\" -> \"Chained\"), TC18.txt L1186-1199"
     },
     {
       "id": "REQ-CHAIN-008",
@@ -5448,7 +5452,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.4 (\"If the first request in an AVTPDU is a chain request, then there is no predecessor to chain to, thus the entire chain will be ignored. An error response with the error code 'CHAIN_ERROR' to each request will be generated\"), TC18.txt L1518-1521"
     },
     {
       "id": "REQ-CHAIN-009",
@@ -5457,7 +5462,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.4 (\"cs ... 1b: request will not be executed in case the previous request returned an error, as a consequence the remainder of the chain is not executed, and the request send an error response with error code = CHAIN_ABORTED\"), TC18.txt L1555-1560"
     },
     {
       "id": "REQ-CHAIN-010",
@@ -7848,7 +7854,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.4 (\"chain_exec_delay: Execution delay in multiples of ep_delay_time... for the request execution after the previous request has been finalized.\"), TC18.txt L1550-1551"
     },
     {
       "id": "REQ-CHAIN-012",
@@ -7857,7 +7864,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.4 (\"reserved: All bits shall be written as 0, else the request will be rejected\" / \"...shall be rejected\"), TC18.txt L1549, L1552"
     },
     {
       "id": "REQ-SRV-004",

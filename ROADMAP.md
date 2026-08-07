@@ -6953,3 +6953,39 @@ were genuinely uncited before writing anything.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 142. Citation backfill, batch 22: CHAIN (issue #164) (v0.142.0)
+
+Twenty-second batch. `request_chained.c`/`request_chained.h`, 9/12
+uncited going in. One id-mapping error caught and fixed before
+running the citation script this batch: initially drafted a citation
+for `REQ-CHAIN-002`, but the live field-presence scan showed it was
+already cited (`REQ-CHAIN-001`, the `strerror()` requirement, was the
+one actually uncited and correctly left that way) -- corrected the
+target list before writing anything, the pre-flight check's purpose
+working exactly as intended.
+
+Cited 8 of the 9 uncited `REQ-CHAIN-*` requirements: member encode
+(`REQ-CHAIN-003`) and decode validation (`REQ-CHAIN-005`-`007`)
+against §11.2.2.4's Figure 11 chained-request wire format
+(request_type=0x01, reserved octets, chain_exec_delay, cs) and the
+shared §11.2.2 mtv=0-repurposing intro + Table 5's `0x01` opcode; the
+no-predecessor CHAIN_ERROR rule (`REQ-CHAIN-008`) against "If the
+first request in an AVTPDU is a chain request, then there is no
+predecessor to chain to, thus the entire chain will be ignored. An
+error response with the error code 'CHAIN_ERROR'..."; the cs-bit-driven
+CHAIN_ABORTED rule (`REQ-CHAIN-009`) against the cs field's own two-
+value definition; exec-delay elapsing (`REQ-CHAIN-011`) against
+chain_exec_delay's own field description; and the reserved-octet
+rejection rule (`REQ-CHAIN-012`) against "All bits shall be written as
+0, else the request will be rejected" (appearing twice for the two
+reserved octet groups).
+
+Left uncited, deliberately: `REQ-CHAIN-001` (`strerror()` uniqueness)
+-- the same implementation-detail pattern as every prior batch.
+
+Used the pre-flight citation-target check -- confirmed all 8 targets
+were genuinely uncited before writing anything.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
