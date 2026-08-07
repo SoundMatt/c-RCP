@@ -7056,3 +7056,35 @@ were genuinely uncited before writing anything.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 145. Citation backfill, batch 25: TIMED (issue #164) (v0.145.0)
+
+Twenty-fifth batch, closing out the conditional-request family opened
+by CMP (batch 16): CMP, SCHED, TRIG, CHAIN, CANCEL, SEQ, and now TIMED
+are all cited. `request_timed.c`/`request_timed.h`, 7/13 uncited going
+in. §11.2.2.5 ("Timed requests -- presentation-time based execution of
+requests") is a clean, self-contained TC18 section: Figure 12/Table
+10's wire format (request_type=0x0A, presentation_time[47:0]) plus two
+explicit rejection rules -- PRESENTATION_TIME_TOO_FAR (implementation-
+dependent horizon) and GPTP_FAIL (time sync not established).
+
+Cited 6 of the 7 uncited `REQ-TIMED-*` requirements: feature gating
+(`REQ-TIMED-002`) against the two presentation-time delivery options
+(TSCF avtp_timestamp vs. ACF_GBB message_timestamp) plus the
+conformance bullets naming gPTP + timed-request support as linked
+capabilities; decode validation (`REQ-TIMED-004`-`005`) against the
+shared §11.2.2 mtv=0-repurposing intro and Table 5's `0x0A` opcode;
+the too-far-in-the-future rejection (`REQ-TIMED-006`) against the
+PRESENTATION_TIME_TOO_FAR rule; the gPTP-lock admission gate
+(`REQ-TIMED-007`) against the GPTP_FAIL rule; and the due-check
+(`REQ-TIMED-011`) against "the presentation_time is the earliest point
+in time, when the request shall be executed."
+
+Left uncited, deliberately: `REQ-TIMED-001` (`strerror()` uniqueness)
+-- the same implementation-detail pattern as every prior batch.
+
+Used the pre-flight citation-target check -- confirmed all 6 targets
+were genuinely uncited before writing anything.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.

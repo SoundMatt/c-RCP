@@ -5501,7 +5501,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.5 (\"requests can be sent under TSCF header, where an avtp_timestamp is included... A second option is to convey the presentation time in the message_timestamp field of an ACF_GBB.\"), TC18.txt L1589-1592; conformance bullets \"Implementation of gPTP (IEEE802.1as)\" / \"Support of timed request\", TC18.txt L2024-2025"
     },
     {
       "id": "REQ-TIMED-003",
@@ -5520,7 +5521,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1186-1189; general ACF_GBB frame-validation basis"
     },
     {
       "id": "REQ-TIMED-005",
@@ -5529,7 +5531,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 Table 5 (\"0x0A\" -> \"Timed\"), TC18.txt L1186-1199"
     },
     {
       "id": "REQ-TIMED-006",
@@ -5538,7 +5541,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.5 (\"The RC Server may reject the request, when the presentation_time is too far in the future, which is implementation dependent (error code = PRESENTATION_TIME_TOO_FAR).\"), TC18.txt L1649-1650"
     },
     {
       "id": "REQ-TIMED-007",
@@ -5547,7 +5551,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.5 (\"In case the time synchronization hasn't been established, timed requests (either in the format shown here or under TSCF header) shall be rejected and an error response shall be sent (error code = GPTP_FAIL).\"), TC18.txt L1651-1653"
     },
     {
       "id": "REQ-TIMED-008",
@@ -7862,7 +7867,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.5 (\"In any case the presentation_time is the earliest point in time, when the request shall be executed.\"), TC18.txt L1648-1649"
     },
     {
       "id": "REQ-CHAIN-011",
