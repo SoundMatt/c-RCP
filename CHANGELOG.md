@@ -32,6 +32,19 @@ the rationale.
 
 ## Releases
 
+### v0.133.0 -- 2026-08-07
+
+**Citation backfill, batch 13: CANEP.** Issue #164. Cited 19 of 21
+remaining uncited CAN-endpoint requirements against TC18 §13.7.11's
+frame-format (Table 54), functional-config (Table 53), request/
+response (Figure 39), and fragmentation subsections -- largely reusing
+citation text already established by earlier-cited sibling
+requirements in the same module. Used the pre-flight citation-target
+check added after batch 11. Left 2 uncited (functional-config
+zero-init, `strerror()` uniqueness) -- genuine implementation detail.
+Purely additive; no code or test changed. 1028 requirements
+(unchanged), 100% traced+tested, 0 `cfusa check` errors.
+
 ### v0.132.0 -- 2026-08-07
 
 **Citation backfill, batch 12: E2E.** Issue #164. First batch to use
