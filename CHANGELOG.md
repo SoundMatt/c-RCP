@@ -32,6 +32,18 @@ the rationale.
 
 ## Releases
 
+### v0.137.0 -- 2026-08-07
+
+**Citation backfill, batch 17: LINEP.** Issue #164. Cited 12 of 16
+remaining uncited LIN-commander requirements against TC18 §13.7.10's
+basic-concept prose (single transmission-done trigger, the
+checks-each-received-message reply rule), Table 52 functional config
+(`lin_clk_divider`), and Figure 38's request/response format. Left the
+trigger-select setter uncited alongside the standing zero-init/
+`strerror()` pattern -- same no-register-basis situation as
+`REQ-ISELED-014`. See `ROADMAP.md` milestone 137 for full detail. 1028
+requirements (unchanged), 100% traced+tested, 0 `cfusa check` errors.
+
 ### v0.136.0 -- 2026-08-07
 
 **Citation backfill, batch 16: CMP.** Issue #164. Cited 16 of 16
