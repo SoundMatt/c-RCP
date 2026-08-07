@@ -7025,3 +7025,34 @@ were genuinely uncited before writing anything.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 144. Citation backfill, batch 24: SEQ (issue #164) (v0.144.0)
+
+Twenty-fourth batch. `request_sequencer.c`/`request_sequencer.h`,
+10/14 uncited going in -- the shared sequencer-state-table primitive
+CMP and SRV both consume (`rcp_sequencer_get_state()`/`_set_state()`/
+`_index_valid()`), previously cited only indirectly through those
+callers' own citations. TC18 dedicates two sections to sequencers in
+their own right, not just as compound-request sub-fields: §12.10
+(Sequencers, the concept itself) and §12.7.10 (Sequencer state
+registers, Table 25's SEQUENCER_config register map).
+
+Cited all 10 of the 10 uncited `REQ-SEQ-*` requirements -- SEQ is now
+100% cited: table allocation and power-on-state initialization
+(`REQ-SEQ-002`-`003`, `005`) against "After power-on/reset all
+sequencers are in state 1" (§12.10) and "Upon power-on reset all
+sequencer state values are set to '1'" (§12.7.10); the
+implementation-may-support-fewer-sequencers rule
+(`REQ-SEQ-004`) against §12.10's own optionality text; table teardown
+and the state-register read/write pair (`REQ-SEQ-006`, `008`, `010`)
+against §12.10's "Sequencers are simply a state register" framing and
+Table 25's manual-access register description, `010` also citing
+Table 25's "if manually set to 0 then disabled" rule; and the
+256-sequencer/state bound (`REQ-SEQ-007`, `009`, `011`) against §12.10's
+own "limited to 256 by this definition" line.
+
+Used the pre-flight citation-target check -- confirmed all 10 targets
+were genuinely uncited before writing anything.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
