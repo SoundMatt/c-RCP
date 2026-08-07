@@ -32,6 +32,19 @@ the rationale.
 
 ## Releases
 
+### v0.135.0 -- 2026-08-07
+
+**Citation backfill, batch 15: I2C.** Issue #164. Cited 15 of 17
+remaining uncited I2C-endpoint requirements against TC18 §13.7.7's
+basic-concept prose (ACF_ABB/ACF_GBB acceptance, genuinely
+bidirectional read/write op sense), Table 46 functional config
+(`i2c_mode`, cross-referencing the pre-existing `REQ-I2C-019` gap for
+Table 46's own duplicated high-speed-mode labeling rather than
+re-diagnosing it), and Figure 29's i2c request format plus the
+7-/10-bit-address-transparent passthrough text. See `ROADMAP.md`
+milestone 135 for full detail. 1028 requirements (unchanged), 100%
+traced+tested, 0 `cfusa check` errors.
+
 ### v0.134.0 -- 2026-08-07
 
 **Citation backfill, batch 14: ISELED.** Issue #164. Cited 9 of 23
