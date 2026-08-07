@@ -6313,3 +6313,40 @@ them, not an oversight.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 124. Citation backfill, batch 4: LIFECYCLE (issue #164) (v0.124.0)
+
+Fourth batch. LIFECYCLE was 18/37 cited going in; cited 17 of the 19
+remaining against TC18 §12.3.1's three lifecycle-state subsections,
+including the plausibility-check bullet lists (`REQ-LIFECYCLE-002`/
+`003`/`005`-`009`), the demotion-to-HW_UNCONFIGURED write path
+(`REQ-LIFECYCLE-010`/`011`), the exhaustive transition set implied by
+§12.3.1.1's explicit HW_UNCONFIGURED->RCP_CONFIGURED rejection
+(`REQ-LIFECYCLE-012`), the NTSCF/discovery acceptance rules
+(`REQ-LIFECYCLE-014`-`016`), the general TSCF/time-sync drop rule
+already used for `REQ-AVTP-014` (`REQ-LIFECYCLE-017`), and the
+HW_config/EP_generic_config lock plus the W*-marker convention
+(`REQ-LIFECYCLE-018`-`020`).
+
+Two things worth flagging from this batch, not silently:
+
+- `REQ-LIFECYCLE-011`'s citation notes that TC18's Figure 16
+  state-transition chart additionally gates the RCP_CONFIGURED ->
+  HW_UNCONFIGURED demotion on all other EPs being idle (rejecting with
+  `EPs_NOT_IDLE` otherwise, TC18.txt L2129-2131) -- c-RCP does not
+  implement that gate. This is not a new finding: it's already tracked
+  as its own gap requirement, `REQ-LIFECYCLE-022`
+  (`scope: tc18-gap`, `status: not-implemented`), predating this batch.
+  Cross-referenced rather than duplicated.
+- `REQ-LIFECYCLE-017`'s citation likewise cross-references
+  `REQ-LIFECYCLE-028`, the pre-existing gap entry for HW_CONFIGURED's
+  TSCF-drop rule diverging from the code's general time-sync-conditional
+  rule.
+
+Left uncited, deliberately: `REQ-LIFECYCLE-013` (same-state transition
+is a no-op) and `REQ-LIFECYCLE-021` (`rcp_lifecycle_strerror()` message
+uniqueness) -- genuine implementation-detail requirements with no TC18
+clause.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.

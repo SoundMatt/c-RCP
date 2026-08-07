@@ -2335,7 +2335,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.1 (\"All EPs configured to be used (ep_used set to 1) match to pin mapping in the HW_config... If not plausible the request will be rejected and an error response sent with HW_CFG_INCONSITENT.\"), TC18.txt L2171-2174"
     },
     {
       "id": "REQ-LIFECYCLE-003",
@@ -2344,7 +2345,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.1 (\"All EPs configured to be used have a configuration for the request queue... If not plausible the request will be rejected and an error response sent with HW_CFG_INCONSITENT.\"), TC18.txt L2172-2174"
     },
     {
       "id": "REQ-LIFECYCLE-004",
@@ -2363,7 +2365,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"Each EP used has at least one stream_id/byte_bus_id association... If not plausible the request will be rejected and an error response sent with RCP_CFG_INCONSITENT\"), TC18.txt L2192-2196"
     },
     {
       "id": "REQ-LIFECYCLE-006",
@@ -2372,7 +2375,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"Each response stream configured is assigned to at least one request stream... If not plausible the request will be rejected and an error response sent with RCP_CFG_INCONSITENT\"), TC18.txt L2194-2196"
     },
     {
       "id": "REQ-LIFECYCLE-007",
@@ -2381,7 +2385,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"Only if the configuration so far is plausible the state will be advanced. Plausibility check contains a check that: Each EP used has at least one stream_id/byte_bus_id association...\"), TC18.txt L2190-2194"
     },
     {
       "id": "REQ-LIFECYCLE-008",
@@ -2390,7 +2395,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.1 (\"...the life-cycle state can be advanced to HW_CONFIGURED... Only if the configuration so far is plausible the state will be advanced... If not plausible the request will be rejected and an error response sent with HW_CFG_INCONSITENT.\"), TC18.txt L2167-2174"
     },
     {
       "id": "REQ-LIFECYCLE-009",
@@ -2399,7 +2405,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"...the life-cycle state can be advanced to RCP_CONFIGURED... Only if the configuration so far is plausible the state will be advanced... If not plausible the request will be rejected and an error response sent with RCP_CFG_INCONSITENT\"), TC18.txt L2186-2196"
     },
     {
       "id": "REQ-LIFECYCLE-010",
@@ -2408,7 +2415,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"Besides advancing the state it is also possible to go back to state HW_UNCONFIGURED via a write request to the server functional configuration entry svr_lifecycle_state.\" -- no plausibility gate is described for this direction), TC18.txt L2198-2201"
     },
     {
       "id": "REQ-LIFECYCLE-011",
@@ -2417,7 +2425,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"Besides advancing the state it is also possible to go back to state HW_UNCONFIGURED via a write request...\"), TC18.txt L2198-2201 -- NOTE: TC18's Figure 16 state-transition chart additionally gates this specific demotion on all other EPs being idle (\"other EPs are not Idle -> send error response EPs_NOT_IDLE\", TC18.txt L2129-2131); that gate is a known, separately-tracked gap, see REQ-LIFECYCLE-022 (not this requirement, which documents the mechanism c-RCP actually implements)"
     },
     {
       "id": "REQ-LIFECYCLE-012",
@@ -2426,7 +2435,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.1 (\"A request to advance the state directly to RCP_CONFIGURED will be rejected with an error response.\"), TC18.txt L2168; corroborated by Figure 16's state-transition chart naming no other transitions, TC18.txt L2067-2131"
     },
     {
       "id": "REQ-LIFECYCLE-013",
@@ -2444,7 +2454,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.1 (\"In this state only AVTPDUs having a NTSCF header are accepted... Within the stream only requests ACF_ABB are supported for configuration, and all requests need to be directed to EP0 via the discovery byte_bus_id 0x00.\"), TC18.txt L2162-2164"
     },
     {
       "id": "REQ-LIFECYCLE-015",
@@ -2453,7 +2464,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.1 (\"...all others are dropped without further response... All other requests are dropped without further response.\"), TC18.txt L2162-2164"
     },
     {
       "id": "REQ-LIFECYCLE-016",
@@ -2462,7 +2474,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.1 (\"In this state only AVTPDUs having a NTSCF header are accepted and all others are dropped without further response.\" -- TSCF is one of those \"others\"), TC18.txt L2162"
     },
     {
       "id": "REQ-LIFECYCLE-017",
@@ -2471,7 +2484,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.1 (\"In case time-synchronization is not supported, AVTPDUs having a TSCF header are dropped, and no response send.\"), TC18.txt L1074 -- same general rule as REQ-AVTP-014; TC18 §12.3.1.2 separately specifies HW_CONFIGURED drops TSCF unconditionally regardless of time-sync support, a known divergence tracked at REQ-LIFECYCLE-028"
     },
     {
       "id": "REQ-LIFECYCLE-018",
@@ -2480,7 +2494,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.2 (\"In this state access to the HW configuration of the RC Server shall have been concluded and as such all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178"
     },
     {
       "id": "REQ-LIFECYCLE-019",
@@ -2489,7 +2504,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3 (\"...only write access to the EP's functional configurations is allowed via their dedicated stream_id/byte_bus_id combinations or via root client access EP0... Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables.\"), TC18.txt L2203-2206, L2225-2226"
     },
     {
       "id": "REQ-LIFECYCLE-020",
@@ -2498,7 +2514,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3 (\"Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables (W*: write prohibited in depending on lifecycle state.)\"), TC18.txt L2225-2226 -- TC18's W* marker is general; c-RCP's split into FUNCTIONAL_W (conditionally writable via authorization) versus FUNCTIONAL_W_STAR (unconditionally locked) is this implementation's own refinement of which W* fields fall into which case, not itself named in the cited text"
     },
     {
       "id": "REQ-SRV-001",
