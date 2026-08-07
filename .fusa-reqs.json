@@ -5051,7 +5051,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1186-1189; general ACF_GBB frame-validation basis"
     },
     {
       "id": "REQ-CMP-006",
@@ -5060,7 +5061,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1186-1189; general ACF_GBB frame-validation basis"
     },
     {
       "id": "REQ-CMP-007",
@@ -5069,7 +5071,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 Table 5 (\"first byte in message_timestamp field\" -> \"type of condition\": 0x0F/0x8F Compound, 0x0B/0x8B Compound wait), TC18.txt L1186-1199"
     },
     {
       "id": "REQ-CMP-008",
@@ -5078,7 +5081,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.1 Table 6 / Figure 8 (GBB message for compound requests: request_type, cmp_start_state, cmp_next_state, cmp_sequencer, cmp_exec_delay, cmp_repetitions), TC18.txt L1221-1281; §11.2.2.2 Table 7 / Figure 9 (GBB message for compound wait requests: request_type, cmpw_start_state, cmpw_next_state, cmpw_sequencer, cmpw_exec_delay, cmpw_repetitions), TC18.txt L1320-1389"
     },
     {
       "id": "REQ-CMP-009",
@@ -5087,7 +5091,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.1 Table 6 / Figure 8 (GBB message for compound requests: request_type, cmp_start_state, cmp_next_state, cmp_sequencer, cmp_exec_delay, cmp_repetitions), TC18.txt L1221-1281; §11.2.2.2 Table 7 / Figure 9 (GBB message for compound wait requests: request_type, cmpw_start_state, cmpw_next_state, cmpw_sequencer, cmpw_exec_delay, cmpw_repetitions), TC18.txt L1320-1389"
     },
     {
       "id": "REQ-CMP-010",
@@ -5106,7 +5111,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1186-1189; general ACF_GBB frame-validation basis"
     },
     {
       "id": "REQ-CMP-012",
@@ -5115,7 +5121,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1186-1189; general ACF_GBB frame-validation basis"
     },
     {
       "id": "REQ-CMP-013",
@@ -5124,7 +5131,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1186-1189"
     },
     {
       "id": "REQ-CMP-014",
@@ -5133,7 +5141,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2 Table 5 (\"first byte in message_timestamp field\" -> \"type of condition\": 0x0F/0x8F Compound, 0x0B/0x8B Compound wait), TC18.txt L1186-1199"
     },
     {
       "id": "REQ-CMP-015",
@@ -5182,7 +5191,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.1 (\"the state (cmp_next_state) the sequencer shall enter after the compound request has been executed (if the sequencer is still in cmp_start_state)\"), TC18.txt L1207-1211"
     },
     {
       "id": "REQ-CMP-020",
@@ -5191,7 +5201,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.1 Table 6 (\"cmp_exec_delay: delay time between the sequencer reaching the state defined in start_state and the start of the execution of the request... execution shall happen even in case the state changes before the delay expired\"), TC18.txt L1262-1265"
     },
     {
       "id": "REQ-CMP-021",
@@ -5200,7 +5211,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.1 Table 6 / Figure 8 (GBB message for compound requests: request_type, cmp_start_state, cmp_next_state, cmp_sequencer, cmp_exec_delay, cmp_repetitions), TC18.txt L1221-1281; \"If cmp_next_state is = 0 then the sequencer remains in the current state, when the execution is finalized.\", TC18.txt L1209-1211"
     },
     {
       "id": "REQ-CMP-022",
@@ -5209,7 +5221,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.1 Table 6 (\"cmp_exec_delay: delay time between the sequencer reaching the state defined in start_state and the start of the execution of the request... execution shall happen even in case the state changes before the delay expired\"), TC18.txt L1262-1265; §11.2.2.1 (\"the state (cmp_next_state) the sequencer shall enter after the compound request has been executed (if the sequencer is still in cmp_start_state)\"), TC18.txt L1207-1211"
     },
     {
       "id": "REQ-CMP-023",
@@ -5218,7 +5231,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.2 (\"When the check finds that the condition is met the cmpw_exec_delay needs to expire before a response is generated, else the request execution is finalized without further action.\"), TC18.txt L1307-1309; §11.2.2.1 (\"the state (cmp_next_state) the sequencer shall enter after the compound request has been executed (if the sequencer is still in cmp_start_state)\"), TC18.txt L1207-1211"
     },
     {
       "id": "REQ-CMP-024",
@@ -5227,7 +5241,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.2 (\"When the check finds that the condition is met the cmpw_exec_delay needs to expire before a response is generated, else the request execution is finalized without further action.\"), TC18.txt L1307-1309"
     },
     {
       "id": "REQ-TRIG-001",
@@ -7728,7 +7743,8 @@
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§11.2.2.1 (\"If cmp_start_state = 0 then the request shall be started in any state unless the sequencer is disabled which will prohibit the execution of the compound request.\"), TC18.txt L1212-1214; same rule for compound-wait, §11.2.2.2, TC18.txt L1311-1314"
     },
     {
       "id": "REQ-CMP-026",

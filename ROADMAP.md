@@ -6732,3 +6732,39 @@ implementation-detail pattern as every prior batch.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 136. Citation backfill, batch 16: CMP (issue #164) (v0.136.0)
+
+Sixteenth batch. Unlike ISELED (batch 14), this module's file header
+carries the same "own original design" disclaimer for its *exact
+byte-level packing* of the repurposed `message_timestamp` region --
+but the underlying *behavior* that packing carries turned out to have
+rich, well-defined TC18 basis: §11.2.2's conditional-request framework
+(Table 5's request_type identifier table), §11.2.2.1's compound
+request semantics (Table 6/Figure 8), and §11.2.2.2's compound-wait
+semantics (Table 7/Figure 9) spell out `cmp_start_state`/
+`cmp_next_state`/`cmp_exec_delay`/`cmp_repetitions` and their
+`cmpw_*` counterparts in the same detail Table 30 gave PWM/GPIO/SPI's
+evt[2:0] semantics in earlier batches -- this module's own code
+comments already cited "extraction §3.14" for the advance-guard rule,
+and that rule turned out to trace directly to §11.2.2.1's own prose.
+
+Cited 16 of 16 uncited `REQ-CMP-*` requirements (the 17th, `004`
+`strerror()`, stays uncited per the standing pattern; `001`-`003`,
+`010`, `015`-`018`, `026`-`027` were already cited from earlier work):
+the request-type dispatch/peek trio (`REQ-CMP-005`-`007`, `011`-`014`)
+against §11.2.2's conditional-request framing and Table 5's opcode
+table; the encode-time request_type/payload-length validation
+(`REQ-CMP-008`-`009`) against Table 6/Figure 8 and Table 7/Figure 9's
+wire formats; and the sequencer-advance behavioral core
+(`REQ-CMP-019`-`025`: the advance-only-if-still-in-start_state guard,
+the start_state=0 "any state" rule, exec_delay elapsing, and both
+compound's unconditional and compound-wait's condition-gated tick
+functions) against §11.2.2.1/§11.2.2.2's own prose describing exactly
+that state machine.
+
+Used the pre-flight citation-target check -- confirmed all 16 targets
+were genuinely uncited before writing anything.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
