@@ -6768,3 +6768,35 @@ were genuinely uncited before writing anything.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 137. Citation backfill, batch 17: LINEP (issue #164) (v0.137.0)
+
+Seventeenth batch. §13.7.10 LIN commander endpoint, 16/22 uncited
+going in.
+
+Cited 12 of the 16 uncited `REQ-LINEP-*` requirements: the single
+transmission-done trigger (`REQ-LINEP-006`) against §13.7.10.1's "The
+LIN EP issues a trigger when a transmission has been finalized, and
+the configured trailing time has expired" line; lifecycle-gated
+functional-config writability (`REQ-LINEP-008`-`010`) reusing the
+established §12.3.1.2/.3 basis; the `lin_clk_divider` register
+validity/setter (`REQ-LINEP-011`-`012`) against Table 52; and the
+command/response encode/decode set (`REQ-LINEP-017`-`022`) against
+Figure 38's lin request/response format plus §13.7.10.1's own reply
+rule ("the LIN endpoint checks each received message against the
+byte_msg_payload and if a match... is found a reply is sent if op =
+0").
+
+Left uncited, deliberately: `REQ-LINEP-007` (zero-init), `REQ-LINEP-015`
+(`strerror()`), and the trigger-select setter (`REQ-LINEP-013`-`014`)
+-- same no-register-basis situation as `REQ-ISELED-014` in batch 14:
+`ep_lin.h`'s own header self-documents the selectable-trigger toggle
+as "this endpoint's own analogue of ep_spi.h's TRANSFER_DONE trigger,"
+i.e. this implementation's own design, not a Table 52/Table 32 wire
+field.
+
+Used the pre-flight citation-target check -- confirmed all 12 targets
+were genuinely uncited before writing anything.
+
+Purely additive; no code or test changed. 1028 requirements (unchanged
+count), 100% traced+tested, 0 `cfusa check` errors.
