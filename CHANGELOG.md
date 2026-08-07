@@ -32,6 +32,17 @@ the rationale.
 
 ## Releases
 
+### v0.145.0 -- 2026-08-07
+
+**Citation backfill, batch 25: TIMED.** Issue #164. Cited 6 of 7
+remaining uncited timed-request requirements against TC18 §11.2.2.5's
+Figure 12/Table 10 wire format and its PRESENTATION_TIME_TOO_FAR/
+GPTP_FAIL rejection rules. This closes out the full conditional-
+request family opened by CMP (batch 16): CMP, SCHED, TRIG, CHAIN,
+CANCEL, SEQ, and TIMED are all now cited. See `ROADMAP.md` milestone
+145 for full detail. 1028 requirements (unchanged), 100% traced+
+tested, 0 `cfusa check` errors.
+
 ### v0.144.0 -- 2026-08-07
 
 **Citation backfill, batch 24: SEQ.** Issue #164. Cited all 10
