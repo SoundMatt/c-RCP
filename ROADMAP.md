@@ -9834,3 +9834,65 @@ still `partial`, text narrowed).
 `REQ-RMAP-061`'s own partial progress). Group 1: 5/18 items. Next:
 continue Group 1 in table order -- `REQ-RMAP-029` (`svr_configuration_lock`,
 0x0015, entirely missing -- R/W+ writes are never lock-gated).
+
+### 182. Phase 5d batch 12: `REQ-RMAP-029` -- `svr_configuration_lock` field added, enforcement deliberately deferred to `REQ-RMAP-055` (issue #200)
+
+The first Group 1 item that is genuinely new functionality rather than
+a rename/width fix on an existing field, and the first where the
+"right" scope boundary required cross-referencing a DIFFERENT
+requirement in a DIFFERENT group before writing any code: `-029`'s own
+consequence text ("c-RCP will accept an R/W+ write that a conforming
+server would reject") names real ENFORCEMENT as the goal, but `-055`
+(issue #200 Group 3, "the W+ lockable access type for EP_ID_config and
+the Table 24 W+ queue fields") is this codebase's own already-written,
+explicit "shared plumbing, implement once" note for the exact
+lock-check primitive `-029`'s register would drive -- Table 23's
+EP_ID_config rows and Table 24's STREAM_UID/flush_on_count/Flush_time
+registers are ALSO R/W+ and need the identical check. Building a
+`-029`-specific lock-check here, ahead of `-055`'s own scheduled work
+(issue #200's suggested order: Group 1 before Group 3), would mean
+either a redundant, Table-18-only implementation now or a rework once
+`-055` lands the real shared primitive. Scoped this batch to exactly
+what doesn't require that decision yet: the register's own CONTENT.
+
+New `uint8_t svr_configuration_lock` field on `rcp_regmap_general_t`
+(0x0015), zero-initializing to 0x00 for free via the existing `memset`
+-- the correct "unlocked" default per TC18's own semantics, matching
+this codebase's own established "safe fail-open default" convention.
+Deliberately NOT wired into `rcp_lifecycle_field_kind_t` or
+`rcp_lifecycle_field_writable()` here.
+
+The existing deviation pin's own core claim -- `rcp_lifecycle_field_
+writable()`'s `FUNCTIONAL_W_STAR` verdict depends only on state and
+writer authorization, never on a lock byte -- stays entirely TRUE after
+this batch, since enforcement was deliberately not touched; unlike
+every prior Group 1 batch, this test's assertions needed NO rewrite,
+only its comment narrowed to point at `-055` instead of claiming "no
+such field exists" (now false). Added a small, separate positive test
+for the field's own existence/default/round-trip, keeping the two
+concerns (content vs. enforcement) in two distinct tests rather than
+one that would otherwise conflate a real fix with an intentionally
+still-open gap.
+
+`REQ-RMAP-029` moves `not-implemented` -> `partial`, matching this
+phase's established pattern, with its `.fusa-reqs.json` text explicitly
+naming `REQ-RMAP-055` as the dependency for real enforcement rather than
+describing the remaining gap in the abstract.
+
+Mutation-tested: full revert of the header alone with both test files'
+changes kept -- breaks the build (`no member named
+'svr_configuration_lock'`) -- the correct, sufficient rigor for a purely-
+additive field with no computed logic surrounding it (matching batch
+10's own precedent, not batch 9's/11's paired-mutation treatment, since
+this field has no sync/derivation logic of its own to mutate). Restored
+clean, diff-verified byte-identical against pre-mutation backup. Full
+suite (65/65, +1 net-new test) + ASan/UBSan clean. Fresh `cfusa check`
+(0 errors) + all three separate `cfusa trace` invocations (100%/100%,
+0 untested). 1030 requirements (unchanged), 110 `tc18-gap` entries
+remaining (unchanged -- narrowed from `not-implemented` to `partial`).
+
+**Phase 5d progress after batch 12**: 13/47 items addressed (14 counting
+`REQ-RMAP-061`'s own partial progress). Group 1: 6/18 items. Next:
+continue Group 1 in table order -- `REQ-RMAP-030` (`svr_implemented_options`,
+0x0016, invented 32-bit layout, cannot advertise trigger/other groups
+TC18's own bit assignment defines).

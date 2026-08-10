@@ -324,6 +324,42 @@ typedef struct {
                                      only, same REQ-RMAP-024 wire-
                                      reachability boundary as every other
                                      Group 1 item. */
+    uint8_t  svr_configuration_lock; /* REQ-RMAP-029 (TC18 §12.7.5 Table
+                                         18, relative address 0x0015, 8
+                                         bit, R): 0x00 permits write
+                                         access to "R/W+" (explicitly
+                                         lockable) type parameters; any
+                                         other value causes such write
+                                         access to be rejected --
+                                         independently of the lifecycle-
+                                         state-driven gating
+                                         rcp_lifecycle_field_writable()
+                                         already applies to
+                                         RCP_LIFECYCLE_FIELD_HW_GENERIC/
+                                         _FUNCTIONAL_W/_FUNCTIONAL_W_STAR.
+                                         Content modeling only, same
+                                         REQ-RMAP-024 wire-reachability
+                                         boundary as every other Group 1
+                                         item -- deliberately NOT wired
+                                         into rcp_lifecycle_field_kind_t
+                                         or rcp_lifecycle_field_writable()
+                                         here: REQ-RMAP-055 (issue #200
+                                         Group 3) is this codebase's own
+                                         already-identified "shared
+                                         plumbing, implement once" home
+                                         for the W+ lockable-access-type
+                                         primitive this register drives
+                                         -- Table 23's EP_ID_config rows
+                                         and Table 24's STREAM_UID/
+                                         flush_on_count/Flush_time
+                                         registers are ALSO R/W+ and need
+                                         the identical lock check, so
+                                         building it once there (not
+                                         redundantly here, ahead of that
+                                         work) is this codebase's own
+                                         established sequencing choice
+                                         (issue #200's own suggested
+                                         order: Group 1 before Group 3). */
     uint16_t svr_responder_mem_size; /* REQ-RMAP-027 (TC18 §12.7.5 Table
                                          18, relative address 0x0010, 16
                                          bit, R): maximum responder-queue

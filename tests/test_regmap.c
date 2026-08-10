@@ -70,6 +70,7 @@ static void test_general_init_zeroes_with_no_root_client(void)
     TEST_ASSERT_EQUAL_UINT8(0, map.svr_req_stream_max);
     TEST_ASSERT_EQUAL_UINT8(0, map.svr_responder_streams_max);
     TEST_ASSERT_EQUAL_UINT8(0, map.svr_sequencers_max);
+    TEST_ASSERT_EQUAL_UINT8(0, map.svr_configuration_lock);
     TEST_ASSERT_EQUAL_UINT16(0, map.svr_responder_mem_size);
     TEST_ASSERT_EQUAL_UINT16(0, map.svr_req_mem_size);
     TEST_ASSERT_EQUAL_UINT32(0, map.svr_implemented_options);

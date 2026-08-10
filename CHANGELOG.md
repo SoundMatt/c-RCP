@@ -32,6 +32,33 @@ the rationale.
 
 ## Releases
 
+### v0.182.0 -- 2026-08-10
+
+**Phase 5d batch 12: REQ-RMAP-029 -- svr_configuration_lock field
+added, enforcement deliberately deferred to REQ-RMAP-055.** Issue
+#200. First Group 1 item that is genuinely new functionality rather
+than a rename/width fix, and the first requiring a cross-reference to
+a DIFFERENT requirement before writing code: `-029`'s own consequence
+text names real enforcement as the goal, but `-055` (issue #200 Group
+3) is this codebase's own already-written "shared plumbing, implement
+once" note for the exact lock-check primitive this register would
+drive -- Table 23's EP_ID_config and Table 24's queue registers are
+ALSO R/W+ and need the identical check. New `uint8_t
+svr_configuration_lock` field (0x0015), zero-initializing to the
+correct "unlocked" default; deliberately NOT wired into
+`rcp_lifecycle_field_writable()` here. The existing deviation pin's
+own core claim stayed entirely true (enforcement untouched), so its
+assertions needed no rewrite -- only its comment narrowed, plus a new,
+separate positive test for the field's own content. `REQ-RMAP-029`
+moves `not-implemented` -> `partial`, its text explicitly naming
+`REQ-RMAP-055` as the real-enforcement dependency. Mutation-tested:
+full header revert with tests kept breaks the build (sufficient rigor
+for a field with no computed logic of its own, matching batch 10's
+precedent). Full suite (65/65, +1 test) + ASan/UBSan clean. Fresh
+`cfusa check`/`trace` (0 errors, 100%/100%, three separate CI-matching
+invocations). See `ROADMAP.md` milestone 182 for full detail. 1030
+requirements (unchanged), 110 `tc18-gap` entries remaining (unchanged).
+
 ### v0.181.0 -- 2026-08-10
 
 **Phase 5d batch 11: REQ-RMAP-028 -- svr_sequencers_max corrected

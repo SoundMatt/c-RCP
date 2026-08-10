@@ -529,24 +529,46 @@ static void test_sequencers_max_is_now_correctly_sized_and_synced_from_the_table
     rcp_mock_server_destroy(srv);
 }
 
-/* TC18 §12.7.5 Table 18: svr_configuration_lock is an 8-bit R register at
- * 0x0015; 0x00 permits writes to R/W+ parameters, any other value causes
- * them to be rejected. Deviation: no such field exists and
- * rcp_lifecycle_field_writable() takes no lock input, so its verdict for
- * an R/W+ (FUNCTIONAL_W_STAR) field depends only on state and writer
- * authorization, never on a separate latched-lock byte -- asserted here
- * by two differently-authorized writer contexts (root-client-via-EP0 vs.
- * owning-stream) producing the identical TRUE answer in HW_CONFIGURED,
- * where a real lock register would still have to refuse regardless of
- * which authorized path granted access. (As of REQ-LIFECYCLE-030/036,
- * an *unauthorized* writer is now correctly refused here too -- that is
- * the authorization gate working as intended, not a lock register; see
- * PLAIN_WRITER's own FALSE assertion below, kept to document the
- * distinction rather than silently dropped.) */
-static void test_configuration_lock_register_is_absent(void)
+/* REQ-RMAP-029 (TC18 §12.7.5 Table 18): svr_configuration_lock is an
+ * 8-bit R register at 0x0015. rcp_regmap_general_t now carries this
+ * field (content modeling only), zero-initializing to 0x00 ("permits
+ * write access to R/W+ parameters" -- the correct unlocked default).
+ * Proves the field exists, defaults correctly, and round-trips a
+ * nonzero (locked) value in-process. Still open (REQ-RMAP-024, same as
+ * every other Group 1 item): the address falls past the discovery
+ * slice's 0x000D ceiling. */
+static void test_configuration_lock_register_now_exists_and_defaults_unlocked(void)
 {
-    rcp_regmap_general_t map = populated_map();
-    uint8_t              buf[0x17];
+    rcp_regmap_general_t map;
+
+    rcp_regmap_general_init(&map);
+    TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(map.svr_configuration_lock));
+    TEST_ASSERT_EQUAL_HEX8(0x00u, map.svr_configuration_lock); /* unlocked default */
+
+    map.svr_configuration_lock = 0x01u; /* any nonzero value means locked */
+    TEST_ASSERT_EQUAL_HEX8(0x01u, map.svr_configuration_lock);
+}
+
+/* rcp_lifecycle_field_writable() still takes no lock input, so its
+ * verdict for an R/W+ (FUNCTIONAL_W_STAR) field depends only on state
+ * and writer authorization, never on the new svr_configuration_lock
+ * byte -- asserted here by two differently-authorized writer contexts
+ * (root-client-via-EP0 vs. owning-stream) producing the identical TRUE
+ * answer in HW_CONFIGURED, where a real lock register would still have
+ * to refuse regardless of which authorized path granted access. (As of
+ * REQ-LIFECYCLE-030/036, an *unauthorized* writer is now correctly
+ * refused here too -- that is the authorization gate working as
+ * intended, not a lock register; see PLAIN_WRITER's own FALSE assertion
+ * below, kept to document the distinction rather than silently
+ * dropped.) Deliberately still open: REQ-RMAP-055 (issue #200 Group 3)
+ * is this codebase's own already-identified "shared plumbing, implement
+ * once" home for the W+ lockable-access-type primitive this register
+ * drives -- see regmap.h's own svr_configuration_lock field comment for
+ * the full reasoning. Not re-tested for wire-reachability here (already
+ * covered generically by
+ * test_general_map_wire_reach_stops_after_0x000d()). */
+static void test_configuration_lock_not_yet_consulted_by_field_writable(void)
+{
     const rcp_lifecycle_writer_ctx_t owning_stream_writer = {false, true, false, false};
 
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
@@ -558,8 +580,6 @@ static void test_configuration_lock_register_is_absent(void)
     TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
                                                    RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
                                                    PLAIN_WRITER));
-    read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x15, 0x15));
 }
 
 /* TC18 §12.7.5 Table 18: svr_implemented_options is an 8-bit R register
@@ -1493,7 +1513,8 @@ int main(void)
     RUN_TEST(test_req_stream_max_and_responder_streams_max_are_now_correctly_sized);
     RUN_TEST(test_responder_and_req_mem_size_are_now_distinctly_addressed);
     RUN_TEST(test_sequencers_max_is_now_correctly_sized_and_synced_from_the_table);
-    RUN_TEST(test_configuration_lock_register_is_absent);
+    RUN_TEST(test_configuration_lock_register_now_exists_and_defaults_unlocked);
+    RUN_TEST(test_configuration_lock_not_yet_consulted_by_field_writable);
     RUN_TEST(test_implemented_options_layout_is_invented);
     RUN_TEST(test_reserved_registers_are_indistinguishable_from_zero_fill);
     RUN_TEST(test_io_pin_count_absent_and_hw_cfg_ptr_mis_shaped);

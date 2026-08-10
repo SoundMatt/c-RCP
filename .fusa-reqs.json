@@ -8859,12 +8859,12 @@
     {
       "id": "REQ-RMAP-029",
       "title": "svr_configuration_lock (0x0015) is entirely missing, so R/W+ writes are never lock-gated",
-      "text": "NOT IMPLEMENTED: c-RCP has no svr_configuration_lock register. TC18 \u00a712.7.5 Table 18 defines it as an 8-bit read-only register at absolute address 0x0015 whose value 0x00 permits write access to \"R/W+\" type parameters and whose every other value causes such write access to be rejected. rcp_regmap_general_t (include/rcp/regmap.h:199-222) declares no such field, and rcp_lifecycle_field_writable() (src/lifecycle.c) grants or denies RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR writes purely from the lifecycle state and writer context, with no lock input. Consequence: a device that has latched its configuration cannot express that latch to clients, and c-RCP will accept an R/W+ write that a conforming server would reject.",
+      "text": "PARTIAL: TC18 \u00a712.7.5 Table 18 defines svr_configuration_lock as an 8-bit read-only register at absolute address 0x0015 whose value 0x00 permits write access to \"R/W+\" type parameters and whose every other value causes such write access to be rejected. rcp_regmap_general_t now declares this field (content modeling only), zero-initializing to 0x00 (the correct unlocked default). What remains open: rcp_lifecycle_field_writable() (src/lifecycle.c) still grants or denies RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR writes purely from lifecycle state and writer context, with no lock input, so a device that has latched its configuration still cannot have that latch actually enforced -- deliberately deferred to REQ-RMAP-055 (issue #200 Group 3), this codebase's own already-identified \"shared plumbing, implement once\" home for the W+ lockable-access-type primitive Table 23's EP_ID_config rows and Table 24's queue registers also need identically, rather than building a redundant, table-specific check here ahead of that shared work (issue #200's own suggested order: Group 1 before Group 3). Also still open: this address falls past the discovery response's own 0x000D wire-reachability ceiling (REQ-RMAP-024, still open).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.7.5 Table 18, TC18.txt L2551-2553"
     },
     {
