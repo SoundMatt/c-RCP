@@ -366,6 +366,37 @@ rcp_e2e_errc_t rcp_e2e_unwrap(uint64_t stream_id, uint32_t avtp_timestamp,
                                const uint8_t *frame, size_t frame_len,
                                rcp_bytes_t *out_acf_frame);
 
+/* ── Framing-aware wrap/unwrap: the NTSCF all-zero timestamp stand-in ───────── */
+
+/* Framing-safe convenience wrapper over rcp_e2e_wrap(): forces the CRC's
+ * avtp_timestamp contribution to 0 when is_ntscf_framed is true (TC18
+ * §13.6's own all-zero stand-in for a message riding an NTSCF header,
+ * which carries no timestamp field of its own -- ignoring whatever the
+ * caller passed in avtp_timestamp for that case, rather than trusting it
+ * to already be 0), or passes avtp_timestamp through unchanged when
+ * is_ntscf_framed is false (a TSCF-framed message, whose own
+ * avtp_timestamp field is real and must be reflected in the CRC). Prefer
+ * this over calling rcp_e2e_wrap() directly whenever the caller already
+ * knows which framing a message is riding -- e.g. avtp.h's own
+ * RCP_AVTP_SUBTYPE_NTSCF/_TSCF discriminator -- since rcp_e2e_wrap()
+ * itself has no way to catch a caller passing a nonzero avtp_timestamp
+ * for NTSCF-framed traffic; see the file header. Every other parameter
+ * and the return value are exactly rcp_e2e_wrap()'s own. */
+rcp_bytes_t rcp_e2e_wrap_framed(uint64_t stream_id, bool is_ntscf_framed,
+                                 uint32_t avtp_timestamp,
+                                 const uint8_t *acf_frame, size_t acf_frame_len);
+
+/* The decode-side counterpart of rcp_e2e_wrap_framed(): forces
+ * avtp_timestamp to 0 when is_ntscf_framed is true before delegating to
+ * rcp_e2e_unwrap(), so a caller that already knows a message's framing
+ * cannot accidentally verify it against the wrong (nonzero) timestamp
+ * contribution. Every other parameter and the return value are exactly
+ * rcp_e2e_unwrap()'s own. */
+rcp_e2e_errc_t rcp_e2e_unwrap_framed(uint64_t stream_id, bool is_ntscf_framed,
+                                      uint32_t avtp_timestamp,
+                                      const uint8_t *frame, size_t frame_len,
+                                      rcp_bytes_t *out_acf_frame);
+
 /* ── Fragmentation/CRC interaction (modeled now, activated at Phase 20) ────── */
 
 /* True iff a fragment carries a CRC under the fragmentation/CRC

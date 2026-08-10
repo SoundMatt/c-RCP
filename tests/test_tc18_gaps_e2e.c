@@ -208,31 +208,53 @@ static void test_crc_coverage_prefix_is_stream_id_8_then_timestamp_4(void)
 
 /* ── REQ-E2E-035: the NTSCF all-zero timestamp stand-in ────────────────────── */
 
-/* DEVIATION PIN. TC18 sec. 13.6 requires an NTSCF-framed message (an NTSCF
- * header carries no timestamp of its own) to contribute four all-zero
- * octets as its avtp_timestamp. c-RCP takes avtp_timestamp as a bare
- * uint32_t with no NTSCF/TSCF discriminator, so the stand-in is a caller
- * convention only: wrapping an NTSCF-framed message with a real timestamp
- * succeeds silently and yields a trailer a conforming peer rejects. A
- * conforming implementation would force the zero contribution for NTSCF
- * framing rather than trust the caller. */
-static void test_ntscf_zero_timestamp_is_caller_convention_only(void)
+/* TC18 sec. 13.6 requires an NTSCF-framed message (an NTSCF header carries
+ * no timestamp of its own) to contribute four all-zero octets as its
+ * avtp_timestamp. The raw rcp_e2e_wrap()/_unwrap() primitives stay
+ * general-purpose (a bare uint32_t avtp_timestamp, since they serve both
+ * TSCF- and NTSCF-framed callers) and still trust the caller to pass 0 for
+ * NTSCF traffic -- see test_wrap_unwrap_round_trip_ok()-style direct-primitive
+ * tests elsewhere for that documented contract. As of the REQ-E2E-035 fix,
+ * rcp_e2e_wrap_framed()/_unwrap_framed() are the framing-safe alternative:
+ * a caller that already knows a message's framing passes is_ntscf_framed
+ * instead of pre-zeroing avtp_timestamp itself, and the wrapper enforces
+ * the zero contribution regardless of what avtp_timestamp it was given. */
+static void test_ntscf_framed_wrapper_forces_zero_timestamp(void)
 {
     const uint8_t pl[4]   = {0x5A, 0x5B, 0x5C, 0x5D};
     rcp_bytes_t   frame   = make_abb(0, 0, 0, pl, sizeof(pl));
+    /* Raw primitive: still trusts the caller (documented, unchanged). */
     rcp_bytes_t   as_spec = rcp_e2e_wrap(TEST_SID, 0u, frame.data, frame.len);
     rcp_bytes_t   as_told = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    /* Framing-aware wrapper: is_ntscf_framed=true forces the zero
+     * contribution even though a nonzero avtp_timestamp was passed in. */
+    rcp_bytes_t   framed  = rcp_e2e_wrap_framed(TEST_SID, true, TEST_TS,
+                                                 frame.data, frame.len);
     rcp_bytes_t   body    = {0};
 
-    /* Both wraps succeed and are the same size: nothing rejects or
-     * corrects the non-zero timestamp on an NTSCF-framed message. */
+    /* Raw primitive: both wraps succeed and are the same size -- nothing
+     * rejects or corrects the non-zero timestamp on its own. */
     TEST_ASSERT_NOT_NULL(as_spec.data);
     TEST_ASSERT_NOT_NULL(as_told.data);
     TEST_ASSERT_EQUAL_UINT(as_spec.len, as_told.len);
     TEST_ASSERT_TRUE(be32(as_spec.data + frame.len) != be32(as_told.data + frame.len));
 
-    /* The error surfaces only as a mismatch at a peer applying the
-     * all-zero stand-in the clause mandates. */
+    /* Framing-aware wrapper: despite being told TEST_TS, it produces
+     * exactly the same trailer as the correctly-zeroed raw call. */
+    TEST_ASSERT_NOT_NULL(framed.data);
+    TEST_ASSERT_EQUAL_UINT(as_spec.len, framed.len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(as_spec.data, framed.data, as_spec.len);
+
+    /* Symmetric on the decode side: unwrap_framed(..., true, TEST_TS, ...)
+     * verifies against the zeroed contribution and matches the wrapper's
+     * own output, regardless of the nonzero avtp_timestamp passed in. */
+    TEST_ASSERT_EQUAL_INT(RCP_E2E_OK,
+                          rcp_e2e_unwrap_framed(TEST_SID, true, TEST_TS,
+                                                 framed.data, framed.len, &body));
+    rcp_bytes_free(&body);
+
+    /* The raw primitive's own mismatch-surfaces-late behavior is unchanged
+     * (still documented, not a regression this fix touches). */
     TEST_ASSERT_EQUAL_INT(RCP_E2E_ERR_CRC_MISMATCH,
                           rcp_e2e_unwrap(TEST_SID, 0u, as_told.data, as_told.len, &body));
     rcp_bytes_free(&body);
@@ -240,6 +262,7 @@ static void test_ntscf_zero_timestamp_is_caller_convention_only(void)
                           rcp_e2e_unwrap(TEST_SID, 0u, as_spec.data, as_spec.len, &body));
 
     rcp_bytes_free(&body);
+    rcp_bytes_free(&framed);
     rcp_bytes_free(&as_told);
     rcp_bytes_free(&as_spec);
     rcp_bytes_free(&frame);
@@ -594,7 +617,7 @@ int main(void)
     RUN_TEST(test_plain_vs_safe_mode_bit_is_inert);
     RUN_TEST(test_safe_mode_changes_only_trailer_and_length);
     RUN_TEST(test_crc_coverage_prefix_is_stream_id_8_then_timestamp_4);
-    RUN_TEST(test_ntscf_zero_timestamp_is_caller_convention_only);
+    RUN_TEST(test_ntscf_framed_wrapper_forces_zero_timestamp);
     RUN_TEST(test_acf_msg_length_adaptation_and_reversal);
     RUN_TEST(test_each_member_of_a_multi_acf_frame_carries_its_own_crc);
     RUN_TEST(test_avtpdu_data_length_grows_four_octets_per_protected_member);

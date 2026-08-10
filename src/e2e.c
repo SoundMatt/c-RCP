@@ -228,6 +228,27 @@ rcp_e2e_errc_t rcp_e2e_unwrap(uint64_t stream_id, uint32_t avtp_timestamp,
     return RCP_E2E_OK;
 }
 
+/* ── Framing-aware wrap/unwrap: the NTSCF all-zero timestamp stand-in ───────── */
+
+//cfusa:req REQ-E2E-035
+rcp_bytes_t rcp_e2e_wrap_framed(uint64_t stream_id, bool is_ntscf_framed,
+                                 uint32_t avtp_timestamp,
+                                 const uint8_t *acf_frame, size_t acf_frame_len)
+{
+    return rcp_e2e_wrap(stream_id, is_ntscf_framed ? 0u : avtp_timestamp,
+                         acf_frame, acf_frame_len);
+}
+
+//cfusa:req REQ-E2E-035
+rcp_e2e_errc_t rcp_e2e_unwrap_framed(uint64_t stream_id, bool is_ntscf_framed,
+                                      uint32_t avtp_timestamp,
+                                      const uint8_t *frame, size_t frame_len,
+                                      rcp_bytes_t *out_acf_frame)
+{
+    return rcp_e2e_unwrap(stream_id, is_ntscf_framed ? 0u : avtp_timestamp,
+                           frame, frame_len, out_acf_frame);
+}
+
 /* ── Fragmentation/CRC interaction ─────────────────────────────────────────── */
 
 //cfusa:req REQ-E2E-010
