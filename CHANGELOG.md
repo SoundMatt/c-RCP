@@ -44,11 +44,16 @@ standing flag. `rcp_byte_bus_id_t` (`avtp.h`) widened `uint8_t` ->
 `uint16_t`. `rcp_acf_unpack_header()`'s overflow check removed (now
 provably dead code -- the wire extraction is mathematically bounded to
 0x7FF); `RCP_ACF_ERR_BUS_ID_OVERFLOW` retired outright from
-`rcp_acf_errc_t`. Two real consumer-side fixes found and made
+`rcp_acf_errc_t`. Three real consumer-side fixes found and made
 alongside: `adapt.c`'s byte_bus_id-to-string buffer widened
-(`char[4]` -> `char[6]`), and `test_mock.c`'s own decode-failure test
+(`char[4]` -> `char[6]`); `test_mock.c`'s own decode-failure test
 given a new, still-valid stimulus (an over-declared `pad` count)
-since its old one (a high byte_bus_id) no longer fails to decode.
+since its old one (a high byte_bus_id) no longer fails to decode; and
+`recorder.c`'s own binary-export local retyped after CI's `windows-
+2022 / msvc` job caught a narrowing `C4244` the first, type-name-only
+grep sweep had missed (it accesses `.byte_bus_id` without ever
+spelling `rcp_byte_bus_id_t` by name) -- a broader field-access-pattern
+re-sweep confirmed it was the only one.
 Rewrote three width/reject-pinning deviation tests into positive
 round-trip tests; split one combined test that used to also cover
 `REQ-ACF-018`'s own unrelated, still-open deviation. Renamed one new

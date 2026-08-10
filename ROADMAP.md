@@ -10925,6 +10925,28 @@ bug, needs a full "read every consumer" pass first, matching the
 
 ### 197. Phase 5d batch 27: `rcp_byte_bus_id_t` widened to the full 11-bit wire range -- Group 3 fully complete (issue #200)
 
+**Post-push correction, caught by CI before merge:** the initial grep
+sweep searched for the literal type name `rcp_byte_bus_id_t`, which
+missed `src/recorder.c` -- it accesses `.byte_bus_id` on an
+`rcp_avtp_addr_t` without ever spelling the typedef's own name, so it
+never matched. That file narrowed the field into a local `uint8_t`
+before writing it to its own binary export format; clang/gcc's default
+warning set stayed silent (no `-Wconversion`), but MSVC's `/WX` build
+(`windows-2022 / msvc` CI job) correctly failed on the resulting
+`C4244` narrowing warning. Re-swept by FIELD-ACCESS pattern
+(`\.byte_bus_id\b`/`->byte_bus_id\b`) instead of type name across the
+whole tree to find every site the first sweep could have missed the
+same way -- confirmed `recorder.c` was the only real one (a handful of
+test-helper functions take a deliberately narrow `uint8_t` parameter
+and WIDEN it into the struct field, always safe, no warning). Fixed by
+retyping the local to `rcp_byte_bus_id_t` -- safe to do because this
+export format has no in-repo reader, no version/magic field, and no
+test pinning its exact byte layout, so widening it to match the real
+field carries no compatibility break. Lesson for any future
+"widen a type" investigation in this codebase: grep by both the type
+name AND the field-access pattern, not type name alone -- a caller
+that never spells the typedef can still silently narrow through it.
+
 **REQ-RMAP-053 investigation performed first, as flagged.** Grepped
 `rcp_byte_bus_id_t` across the whole codebase: ~55 files (headers,
 `src/*.c`, tests). Read every one. Findings:
@@ -11006,7 +11028,7 @@ flagged it `CFUSA-CY009` ("weak/broken cryptographic function 'des_'")
 -- a substring false positive on "deco**des_**full", not a real
 finding; renamed to `..._reads_full_...` and re-verified 0 errors.
 
-**Mutation-tested with four independent mutations**, the most for any
+**Mutation-tested with three independent mutations**, the most for any
 single batch this phase, matching the size of the real logic surface
 touched: (1) full revert of `avtp.h`'s typedef alone (`uint16_t` ->
 `uint8_t`) with every other change kept -- caught by three independent
@@ -11016,11 +11038,16 @@ x2); (2) isolated reintroduction of decode-side truncation
 caught by the same three tests; (3) isolated removal of the encode
 path's high-bits extraction (forcing octet 2's own bits to always 0)
 -- caught by the same three tests again, from the opposite (encode)
-direction. Restored the correct implementation after each, diff-
-verified byte-identical against pre-mutation backups. Full suite
-(65/65, some renamed/split, net +2 tests) + ASan/UBSan clean on both
-trees. Fresh `cfusa check` (0 errors after the CY009 rename) + all
-three separate `cfusa trace` invocations (100%/100%, 0 untested, only
+direction. `recorder.c`'s own fix (a pure type retype, no computed
+logic) relies on compile-time verification instead, matching the
+established convention for pure structural/width changes elsewhere
+this phase -- MSVC's own C4244 diagnostic already IS the mutation
+signal here, catching the narrowing the moment it existed. Restored
+the correct implementation after each, diff-verified byte-identical
+against pre-mutation backups. Full suite (65/65, some renamed/split,
+net +2 tests) + ASan/UBSan clean on both trees. Fresh `cfusa check`
+(0 errors after the CY009 rename) + all three separate `cfusa trace`
+invocations (100%/100%, 0 untested, only
 pre-existing unrelated `REQ-UART-03x` warnings). `REQ-RMAP-053` and
 its companion `REQ-ACF-020` both move to `implemented`, fully closed.
 1030 requirements (unchanged), 107 `tc18-gap` entries remaining (down
