@@ -11141,10 +11141,117 @@ remaining (down from 107).
 
 **Phase 5d progress after batch 28**: 30/47 items addressed (31
 counting `REQ-RMAP-061`'s own partial progress). Group 2: 2/6 items
-(`-044`, `-045`). Next: `-042`/`-043` (the `pin_property`/`hw_pin_type`
-bit-layout fix, flagged above as needing its own consumer
-investigation given real behavioral callers in `ep_gpio.c`/`config.c`
-and a possibly-duplicate second `pin_property` field on
-`rcp_ep_gpio_functional_cfg_t`), then `-040`/`-041` (the HW_config
-table's own server-side storage and 3-octet-per-pin wire layout, which
-`-044`/`-045`'s own status text both note are still missing).
+(`-044`, `-045`).
+
+### 199. Phase 5d batch 29: `hw_pin_type` now matches TC18 Table 20's own bit layout (issue #200)
+
+**Consumer investigation, continued from batch 28's own flag.** Read
+TC18 §13.7.4 (GPIO endpoint, primary source) directly: Table 41 "GPIO
+EP functional configuration" has NO pin-direction/pull/drive field
+anywhere -- confirming pin electrical properties are entirely
+HW_config's `hw_pin_type` concern, per §12.7.6's own text ("can only be
+changed in the life-cycle state HW_unconfigured. In other states...
+read-only"). `ep_gpio.h`'s own doc comment is self-aware about not
+following this: its per-pin `pin_property` field "mirror[s] the HW
+pin-mapping table's own direction/pull-up/pull-down/drive-strength
+fields, but here independently runtime-adjustable per pin."
+
+**This surfaced a bigger finding, reported separately (not fixed this
+batch):** re-reading TC18 Table 30 (`evt[2:0]` semantics) shows
+`evt[2:0]=111b` for GPIO/PWM_OUT is explicitly and normatively defined
+as "used to change the configuration of the endpoint (see 12.7.1)" --
+§12.7.1/Figure 18 describes a GENERIC, cross-endpoint mechanism: a
+16-bit big-endian relative start address into the endpoint's own
+EP_func block, followed by configuration data to write from that
+address onward. **`ep_pwm.h`'s own `rcp_ep_pwm_out_apply_reconfig()`
+already implements this correctly** (own citation "extraction
+§3.7.1") -- but `ep_gpio.h`'s own `rcp_ep_gpio_apply_reconfig()`
+instead toggles per-pin OUTPUT/INPUT direction, an entirely different,
+apparently non-conformant interpretation of the same wire value.
+`.fusa-reqs.json` already tracks part of this (`REQ-GPIO-013`
+literally codifies the wrong "toggles only the flagged pins' direction"
+behavior as an accepted requirement rather than a deviation pin;
+`REQ-GPIO-035` already tracks GPIO's own missing EP_func register
+block, Table 41, as `not-implemented`). Properly fixing GPIO's own
+`evt[2:0]=111b` handling would mean modeling GPIO's entire EP_func
+register block (base clock, status, clock divider, 32 debounce
+registers) and retiring/rewriting `rcp_ep_gpio_apply_reconfig()`
+entirely to match `ep_pwm.h`'s own established pattern -- a
+substantially larger, separate undertaking than this batch's own
+scope. Posted the full finding to issue #200 and this session's own
+project memory rather than rushing a fix; not resolved here.
+
+**What this batch actually fixes**: confirmed HW_config's own
+`hw_pin_type` (Table 19/20) and GPIO's own separate, runtime-
+adjustable `pin_property` (`ep_gpio.h`) are genuinely two different
+registers, coupled ONLY by sharing one set of bit-position constants
+(`RCP_REGMAP_PIN_PROP_*`) -- not a functional dependency. This
+decouples the fix: `rcp_regmap_hw_pin_map_entry_t`'s own third field
+renamed `pin_property` -> `hw_pin_type` (matching TC18's own register
+name) with a brand-new, dedicated `RCP_REGMAP_HW_PIN_*` constant
+family at Table 20's exact bit positions (Pull bits 1:0, Output stage
+bits 3:2, Drive strength bits 5:4, reserved bit 6, Schmitt-Trigger bit
+7) -- `RCP_REGMAP_PIN_PROP_*` itself, and every one of its consumers
+in `ep_gpio.c`/`ep_gpio.h`, left completely untouched, at their
+original bit positions, unaffected by this change. `config.h`/
+`config.c`'s manifest JSON parser updated to match: the `hw_pin_map`
+entry key renamed `pin_property` -> `hw_pin_type`, and its own string
+vocabulary changed from the old six one-hot names to Table-20-derived
+field values (`pull_down`/`pull_up`, `open_drain`/`open_source`/
+`push_pull`, `low_drive`/`medium_drive`/`high_drive`,
+`schmitt_trigger`) -- reusing the existing `or_named_bits_u8()` OR-
+scanning helper unchanged, since every field's own default is 0 and
+each name's own table entry is now pre-shifted to its field's real
+position.
+
+`REQ-RMAP-043` ("all outputs are always also an input") closes as a
+natural consequence of the correct bit layout: Table 20's own
+output-stage field selects one of four drive modes, with no separate
+exclusive INPUT/OUTPUT flag pair to toggle away from at all -- unlike
+the old `RCP_REGMAP_PIN_PROP_OUTPUT`/`_INPUT` pair, there is
+structurally no "pure output, unreadable" state representable. Its own
+`.fusa-reqs.json` rewrite corrects a genuine conflation in the OLD
+text, which cited `ep_gpio.c`'s own `rcp_ep_gpio_apply_reconfig()` as
+"the" consequence of this deviation -- that function belongs to a
+DIFFERENT register (GPIO's own `pin_property`) with its own DIFFERENT,
+separately-tracked problem (`REQ-GPIO-013`), not this table's
+`hw_pin_type` at all.
+
+Rewrote the `test_pin_type_bit_layout_contradicts_table_20` deviation
+pin into two positive tests (`test_hw_pin_type_matches_table_20`,
+`test_hw_pin_output_stage_has_no_exclusive_input_flag`). Fixed a
+compile-breaking field rename in
+`test_hw_config_row_stride_absent_and_access_class_inverted`
+(`entry.pin_property` -> `entry.hw_pin_type`) while deliberately
+leaving that test's own GPIO-access-class comparison (a separate,
+still-open concern) untouched.
+`test_output_pin_loses_its_input_capability` (GPIO's own
+`rcp_ep_gpio_apply_reconfig()` toggle test) needed no changes at all --
+confirmed it only references `RCP_REGMAP_PIN_PROP_*`, never
+`hw_pin_type`.
+
+Mutation-tested with two mutations (this is a pure structural/content
+change reusing `or_named_bits_u8()` unchanged, matching the rigor
+level used for similar Group 1 structural batches): (1) full revert of
+`regmap.h`/`config.h`/`config.c` with the new tests kept -- fails to
+compile (20 errors, undeclared `RCP_REGMAP_HW_PIN_*` identifiers); (2)
+isolated mutation swapping `pull_down`/`pull_up`'s own table values in
+`config.c` -- caught (`Expected 0x02 Was 0x01`). Restored the correct
+implementation after each, diff-verified byte-identical against
+pre-mutation backups. Full suite (65/65) + ASan/UBSan clean on both
+trees. Fresh `cfusa check` (0 errors) + all three separate `cfusa
+trace` invocations (100%/100%, 0 untested, only pre-existing unrelated
+`REQ-UART-03x` warnings). `REQ-RMAP-042`/`-043` both move to
+`implemented`. 1030 requirements (unchanged), 103 `tc18-gap` entries
+remaining (down from 105).
+
+**Phase 5d progress after batch 29**: 32/47 items addressed (33
+counting `REQ-RMAP-061`'s own partial progress). Group 2: 4/6 items
+(`-042`, `-043`, `-044`, `-045`). Remaining: `-040`/`-041` (the
+HW_config table's own server-side storage and 3-octet-per-pin wire
+layout). After Group 2 closes: Group 5's remainder (`-047`-`051`,
+`-066`-`068`, coordinate with issue #197's own Table 22 work to avoid
+touching the same struct twice in flight). The GPIO `evt[2:0]=111b`/
+`REQ-GPIO-013`/`REQ-GPIO-035` finding from this batch remains posted
+to issue #200 and this session's own project memory, awaiting a
+decision before any further work touches it.

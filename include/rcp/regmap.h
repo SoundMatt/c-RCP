@@ -827,7 +827,14 @@ void rcp_regmap_ep_functional_cfg_init(rcp_regmap_ep_functional_cfg_t *cfg);
 
 /* ── HW pin mapping ─────────────────────────────────────────────────────────── */
 
-/* This module's own pin-property bit layout -- see the file header. */
+/* RCP_REGMAP_PIN_PROP_* below is NOT this struct's own bit layout --
+ * see the RCP_REGMAP_HW_PIN_* family further down for hw_pin_type's
+ * real one (REQ-RMAP-042/-043). RCP_REGMAP_PIN_PROP_* is ep_gpio.h's
+ * own, separate, runtime-adjustable per-pin bitmask (its own doc
+ * comment explains why it exists alongside this table rather than
+ * replacing it) -- kept here unchanged, at its original bit positions,
+ * so ep_gpio.c/config.c's existing consumption of it is entirely
+ * unaffected by this section's own fix. Do not use it for hw_pin_type. */
 #define RCP_REGMAP_PIN_PROP_OUTPUT     ((uint8_t)1u << 0)
 #define RCP_REGMAP_PIN_PROP_INPUT      ((uint8_t)1u << 1)
 #define RCP_REGMAP_PIN_PROP_OPEN_DRAIN ((uint8_t)1u << 2)
@@ -835,10 +842,52 @@ void rcp_regmap_ep_functional_cfg_init(rcp_regmap_ep_functional_cfg_t *cfg);
 #define RCP_REGMAP_PIN_PROP_PULL_DOWN  ((uint8_t)1u << 4)
 #define RCP_REGMAP_PIN_PROP_ACTIVE_LOW ((uint8_t)1u << 5)
 
+/* TC18 §12.7.6 Table 20's own hw_pin_type bit layout (REQ-RMAP-042),
+ * primary-source verified directly against the TC18 v0.5.1_RC PDF:
+ * four packed sub-fields, not the six independent one-hot flags
+ * RCP_REGMAP_PIN_PROP_* above uses for its own, different, register.
+ * Pull (bits 1:0): float(00b)/pull-down(01b)/pull-up(10b) -- 11b is
+ * undefined by the table, left unnamed here rather than guessed.
+ * Output stage (bits 3:2): input(00b)/open-drain(01b)/open-source(10b)/
+ * push-pull(11b) -- deliberately NOT a separate exclusive INPUT/OUTPUT
+ * flag pair the way RCP_REGMAP_PIN_PROP_* models it: TC18's own text
+ * states "All outputs are always also an input" (REQ-RMAP-043), so a
+ * single 2-bit field selecting one of three OUTPUT drive modes (or
+ * plain input) is the only representation an output-is-simultaneously-
+ * readable-as-input pin can even have -- there is no "pure output,
+ * unreadable" state to invent a separate flag for. Drive strength
+ * (bits 5:4): input(00b)/low(01b)/medium(10b)/high(11b). Bit 6 is
+ * reserved, reads 0. Schmitt-Trigger (bit 7): a plain single bit. */
+#define RCP_REGMAP_HW_PIN_PULL_MASK         ((uint8_t)0x3u)
+#define RCP_REGMAP_HW_PIN_PULL_FLOAT        ((uint8_t)0x0u)
+#define RCP_REGMAP_HW_PIN_PULL_DOWN         ((uint8_t)0x1u)
+#define RCP_REGMAP_HW_PIN_PULL_UP           ((uint8_t)0x2u)
+
+#define RCP_REGMAP_HW_PIN_STAGE_MASK        ((uint8_t)0xCu) /* bits 3:2 */
+#define RCP_REGMAP_HW_PIN_STAGE_INPUT       ((uint8_t)0x0u)
+#define RCP_REGMAP_HW_PIN_STAGE_OPEN_DRAIN  ((uint8_t)0x4u)
+#define RCP_REGMAP_HW_PIN_STAGE_OPEN_SOURCE ((uint8_t)0x8u)
+#define RCP_REGMAP_HW_PIN_STAGE_PUSH_PULL   ((uint8_t)0xCu)
+
+#define RCP_REGMAP_HW_PIN_DRIVE_MASK        ((uint8_t)0x30u) /* bits 5:4 */
+#define RCP_REGMAP_HW_PIN_DRIVE_INPUT       ((uint8_t)0x00u)
+#define RCP_REGMAP_HW_PIN_DRIVE_LOW         ((uint8_t)0x10u)
+#define RCP_REGMAP_HW_PIN_DRIVE_MEDIUM      ((uint8_t)0x20u)
+#define RCP_REGMAP_HW_PIN_DRIVE_HIGH        ((uint8_t)0x30u)
+
+/* bit 6 reserved, reads 0 -- no macro; never set it. */
+#define RCP_REGMAP_HW_PIN_SCHMITT_TRIGGER   ((uint8_t)1u << 7)
+
 typedef struct {
     uint8_t hw_ep_nr;
     uint8_t hw_ep_pin_nr;
-    uint8_t pin_property; /* RCP_REGMAP_PIN_PROP_* bitmask */
+    uint8_t hw_pin_type; /* TC18's own register name (Table 19); RCP_
+                             REGMAP_HW_PIN_* bitmask above, REQ-RMAP-042.
+                             Renamed from this field's earlier name,
+                             pin_property, to match the wire register
+                             exactly and stop implying kinship with
+                             ep_gpio.h's differently-shaped, same-named
+                             field. */
 } rcp_regmap_hw_pin_map_entry_t;
 
 /* ── Per-endpoint-type named-signal index ──────────────────────────────────── */
