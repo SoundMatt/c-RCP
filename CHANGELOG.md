@@ -32,6 +32,33 @@ the rationale.
 
 ## Releases
 
+### v0.163.0 -- 2026-08-10
+
+**Phase 5c batch 1: REQ-PWRMODE-019 -- wake-handshake completion
+actually re-enables endpoints.** Issue #199. First batch of the new
+phase (15 requirements, 4 groups) -- started with the highest-severity
+item: a woken server previously reported a completed hot start while
+every endpoint stayed disabled. `rcp_pwrmode_handshake_resume_queues()`
+(`power.h`) deliberately advances only a state enum, by design -- that
+module never touches `server.h` (matching `lifecycle.h`/`discovery.h`'s
+established "pure primitive, caller composes" layering) -- but no
+caller anywhere in this codebase actually performed that composition.
+Fixed: `mock.h` gains `rcp_mock_server_pwrmode_resume(srv, hs)`, which
+calls the handshake primitive first and then re-enables every
+registered endpoint on success. Kept `partial`: response-queue objects
+and heartbeat-stream re-emission have no implementation anywhere in
+this codebase yet (separate, already-tracked gaps). Also surfaced (not
+acted on) a possible TC18 §12.4.1 internal terminology inconsistency
+between "wake from sleep = cold start" and the detailed hot-start
+procedure that follows it -- flagged for future scoping, not this
+batch. Mutation-tested two ways: full revert of the mock layer alone
+breaks the build; a precise single-line mutation isolates the one test
+pinning real endpoint re-enable. Full suite (64/64) + ASan/UBSan clean,
+fresh `cfusa check`/`trace` (0 errors, 100%/100%, all three separate
+CI-matching invocations). See `ROADMAP.md` milestone 163 for full
+detail. 1030 requirements (unchanged), 130 `tc18-gap` entries
+unchanged in count (text re-scoped more precisely, not a full closure).
+
 ### v0.162.0 -- 2026-08-10
 
 **Phase 5b batch 10: REQ-LIFECYCLE-033/029 -- REQUEST_REJECTED for

@@ -30,6 +30,7 @@
 #include <rcp/avtp.h>
 #include <rcp/lifecycle.h>
 #include <rcp/mock.h>
+#include <rcp/power.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
 
@@ -305,6 +306,86 @@ static void test_dispatch_rejected_by_lifecycle_sends_request_rejected_error(voi
 
     rcp_bytes_free(&resp);
     rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── rcp_mock_server_pwrmode_resume() ──────────────────────────────────────── */
+
+/* REQ-PWRMODE-019 (TC18 §12.4.1): "After reception of valid message from
+ * the sleep request Client all used endpoints and response queues will
+ * be enabled." rcp_mock_server_pwrmode_resume() is the composition point
+ * this codebase's own "pure primitive, caller composes" layering
+ * (power.h deliberately never touches server.h) puts that responsibility
+ * on -- every registered endpoint is re-enabled once the handshake's own
+ * resume-queues step succeeds. */
+static void test_pwrmode_resume_reenables_all_endpoints(void)
+{
+    rcp_mock_server_t      *srv = rcp_mock_server_new();
+    rcp_pwrmode_handshake_t hs;
+
+    TEST_ASSERT_NOT_NULL(srv);
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1, 5, false, NULL, NULL));
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 2, 6, false, NULL, NULL));
+    to_rcp_configured(srv); /* any byte_bus_id passes lifecycle admission now --
+                                see to_rcp_configured()'s own comment */
+
+    rcp_pwrmode_handshake_init(&hs, 3u);
+    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_iface_reenabled(&hs));
+    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_wakeup_attempt(&hs, true));
+
+    /* Still disabled -- resume hasn't happened yet: a request pre-loads
+     * instead of running. */
+    {
+        rcp_bytes_t resp = {0};
+        const uint8_t req_before[] = {1, 2, 3};
+        TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_QUEUED,
+            rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, false,
+                                      req_before, sizeof(req_before), &resp));
+        rcp_bytes_free(&resp);
+    }
+
+    TEST_ASSERT_TRUE(rcp_mock_server_pwrmode_resume(srv, &hs));
+    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_is_complete(&hs));
+
+    /* Both endpoints re-enabled -- confirmed on the OTHER endpoint (bus 2,
+     * untouched by the pre-resume dispatch above): a request now
+     * dispatches EXECUTE_NOW instead of queuing (disabled endpoints
+     * pre-load, per rcp_mock_server_dispatch()'s own doc comment). */
+    {
+        rcp_bytes_t resp = {0};
+        const uint8_t req_after[] = {4, 5, 6};
+        TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+            rcp_mock_server_dispatch(srv, 2, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, false,
+                                      req_after, sizeof(req_after), &resp));
+        rcp_bytes_free(&resp);
+    }
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* A handshake that hasn't reached ECHOED yet (resume_queues()'s own
+ * precondition) leaves every endpoint untouched -- rcp_mock_server_
+ * pwrmode_resume() returns false without iterating. */
+static void test_pwrmode_resume_returns_false_before_handshake_echoed(void)
+{
+    rcp_mock_server_t      *srv = rcp_mock_server_new();
+    rcp_pwrmode_handshake_t hs;
+    rcp_bytes_t             resp = {0};
+    const uint8_t           req[] = {1, 2, 3};
+
+    TEST_ASSERT_NOT_NULL(srv);
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1, 5, false, NULL, NULL));
+    to_rcp_configured(srv);
+
+    rcp_pwrmode_handshake_init(&hs, 3u);
+    TEST_ASSERT_FALSE(rcp_mock_server_pwrmode_resume(srv, &hs)); /* NOT_STARTED, not ECHOED */
+
+    /* Endpoint still disabled: the request pre-loads instead of running. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_QUEUED,
+        rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, false,
+                                  req, sizeof(req), &resp));
+
+    rcp_bytes_free(&resp);
     rcp_mock_server_destroy(srv);
 }
 
@@ -702,6 +783,8 @@ int main(void)
 
     RUN_TEST(test_dispatch_dropped_by_lifecycle);
     RUN_TEST(test_dispatch_rejected_by_lifecycle_sends_request_rejected_error);
+    RUN_TEST(test_pwrmode_resume_reenables_all_endpoints);
+    RUN_TEST(test_pwrmode_resume_returns_false_before_handshake_echoed);
     RUN_TEST(test_dispatch_unknown_bus_after_lifecycle_accepts);
     RUN_TEST(test_dispatch_unknown_bus_sends_ep_not_found_error);
     RUN_TEST(test_dispatch_ok_runs_handler_immediately);
