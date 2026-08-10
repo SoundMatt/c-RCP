@@ -192,3 +192,24 @@ bool rcp_regmap_ep_id_map_is_ascending(const rcp_regmap_ep_id_map_entry_t *entri
 
     return true;
 }
+
+//cfusa:req REQ-RMAP-054
+size_t rcp_regmap_ep_id_map_effective_count(const rcp_regmap_ep_id_map_entry_t *entries,
+                                             size_t capacity)
+{
+    size_t i;
+
+    for (i = 0; i < capacity; i++) {
+        if (entries[i].request_stream_index == 0u) return i;
+    }
+
+    return capacity;
+}
+
+//cfusa:req REQ-RMAP-054
+void rcp_regmap_ep_id_map_row_init_default(rcp_regmap_ep_id_map_entry_t *row)
+{
+    row->request_stream_index = 1u;
+    row->ep_id                = RCP_REGMAP_EP0_INDEX;
+    row->byte_bus_id          = 0u;
+}
