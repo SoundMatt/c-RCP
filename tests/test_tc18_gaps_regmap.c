@@ -78,6 +78,7 @@
 #include <rcp/errors.h>
 #include <rcp/lifecycle.h>
 #include <rcp/regmap.h>
+#include <rcp/respqueue.h>
 #include <rcp/discovery.h>
 #include <rcp/config.h>
 #include <rcp/mock.h>
@@ -1041,33 +1042,49 @@ static void test_response_queue_stream_id_is_configurable(void)
     TEST_ASSERT_TRUE(rcp_stream_id_equal(sid, rcp_stream_id_make(SERVER_MAC, 0x1234u)));
 }
 
-/* TC18 §12.7.9 Table 24 also gives each response/acknowledge queue a
- * Max_AVTPDUsize (0x0002, in quadlets), a queue_size (0x0004, 16 bit, in
- * 32-bit words) and real reserved transmit memory behind it. Deviation
- * (REQ-RMAP-059, still open): rcp_regmap_response_queue_cfg_t has
- * max_avtpdu_size (a register) but no queue_size register and, more
- * fundamentally, no actual queue -- no storage a caller pushes framed
- * responses into or drains from -- exists anywhere in this codebase; the
- * only queue in the codebase (server.h's ep_enable pre-load queue) holds
- * inbound requests, not outbound responses. Max_AVTPDUsize is also not
- * in the 14-octet discovery slice, so a peer cannot discover the frame
- * ceiling either (REQ-RMAP-061). */
-static void test_response_queue_has_no_size_register_or_storage(void)
+/* REQ-RMAP-059 (TC18 §12.7.9 Table 24, relative address 0x0004, 16 bit,
+ * R/W*): a response/acknowledge queue's transmit-memory reservation, in
+ * 32-bit words, and the real storage behind it. regmap.h's
+ * rcp_regmap_response_queue_cfg_t now carries the queue_size register
+ * itself; respqueue.h's rcp_respqueue_t is the actual queue this
+ * codebase was missing entirely before this fix -- distinct from
+ * server.h's ep_enable pre-load queue (which holds inbound requests, not
+ * outbound responses). rcp_respqueue_init() takes the configured
+ * capacity already converted from quadlets to octets (queue_size x 4),
+ * matching rcp_acf_reg_write_len()'s own "caller supplies already-
+ * classified units" convention. */
+static void test_response_queue_size_register_and_storage_now_exist(void)
 {
     rcp_regmap_response_queue_cfg_t cfg;
+    rcp_respqueue_t                 q;
+    const uint8_t                   frame[4] = {1, 2, 3, 4};
 
     memset(&cfg, 0xAA, sizeof(cfg));
     rcp_regmap_response_queue_cfg_init(&cfg);
+    TEST_ASSERT_EQUAL_UINT16(0u, cfg.queue_size);
+
+    cfg.queue_size = 2u; /* 2 quadlets = 8 octets */
+    rcp_respqueue_init(&q, (size_t)cfg.queue_size * 4u);
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
+    TEST_ASSERT_EQUAL_UINT(8u, rcp_respqueue_octets(&q));
+    /* A third push would exceed the 8-octet reservation: refused. */
+    TEST_ASSERT_FALSE(rcp_respqueue_push(&q, frame, sizeof(frame)));
+
+    rcp_respqueue_destroy(&q);
+}
+
+/* TC18 §12.7.9 Table 24's Max_AVTPDUsize (0x0002, in quadlets) is not
+ * yet enforced on transmit, wired to fragment.h's existing mechanism, or
+ * exposed in the 14-octet discovery slice -- REQ-RMAP-061/062, still
+ * open; deferred to a later Group 4 batch, since both need the real
+ * queue this batch just added to hang their own behavior on. */
+static void test_max_avtpdu_size_not_yet_enforced_or_discoverable(void)
+{
+    rcp_regmap_response_queue_cfg_t cfg;
+
+    rcp_regmap_response_queue_cfg_init(&cfg);
     TEST_ASSERT_EQUAL_UINT16(0u, cfg.max_avtpdu_size);
-    TEST_ASSERT_EQUAL_UINT16(0u, cfg.flush_on_count);
-    TEST_ASSERT_EQUAL_UINT32(0u, cfg.flush_time_us);
-
-    /* stream_uid(2) + max_avtpdu_size(2) + flush_on_count(2) +
-     * flush_time_us(4), padded to a 4-byte alignment boundary: 12 octets.
-     * There is no room for, and no member corresponding to, queue_size,
-     * nor any storage array/pointer for the queue's own contents. */
-    TEST_ASSERT_EQUAL_UINT((size_t)12u, sizeof(rcp_regmap_response_queue_cfg_t));
-
     TEST_ASSERT_EQUAL_UINT((size_t)14u, RCP_DISCOVERY_GENERAL_SLICE_LEN);
 }
 
@@ -1307,7 +1324,8 @@ int main(void)
     RUN_TEST(test_byte_bus_id_is_eight_bits_wide);
     RUN_TEST(test_no_lockable_w_plus_field_kind);
     RUN_TEST(test_response_queue_stream_id_is_configurable);
-    RUN_TEST(test_response_queue_has_no_size_register_or_storage);
+    RUN_TEST(test_response_queue_size_register_and_storage_now_exist);
+    RUN_TEST(test_max_avtpdu_size_not_yet_enforced_or_discoverable);
     RUN_TEST(test_flush_triggers_and_heartbeat_are_absent);
     RUN_TEST(test_transmit_fragmentation_not_bounded_by_max_avtpdu_size);
     RUN_TEST(test_ep0_functional_block_and_discovery_timeout_absent);

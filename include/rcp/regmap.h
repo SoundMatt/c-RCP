@@ -533,6 +533,13 @@ typedef struct {
                                   rcp_regmap_response_queue_stream_id() below
                                   for combining the two. */
     uint16_t max_avtpdu_size;
+    uint16_t queue_size;      /* REQ-RMAP-059 (TC18 §12.7.9 Table 24, relative
+                                  address 0x0004, 16 bit, R/W*): this queue's
+                                  configured transmit-memory reservation, in
+                                  32-bit words -- respqueue.h's
+                                  rcp_respqueue_t's own capacity_octets is
+                                  this value x 4, the conversion a caller
+                                  performs when calling rcp_respqueue_init(). */
     uint16_t flush_on_count;
     uint32_t flush_time_us;
 } rcp_regmap_response_queue_cfg_t;

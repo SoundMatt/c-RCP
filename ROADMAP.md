@@ -9171,3 +9171,74 @@ OUTBOUND direction) -- start with `-059` (the storage + `queue_size`
 register itself), since `-061`-`-065` (MTU enforcement, fragmentation
 wiring, flush triggers, heartbeat) all need a real queue to hang their
 own behavior on.
+
+### 173. Phase 5d batch 3: REQ-RMAP-059 -- `respqueue.h`/`respqueue.c`, the response/ack transmit queue (issue #200)
+
+Group 4's foundational item: the actual queue Group 4's remaining 5
+items (`-061` through `-065`) all need to hang their own behavior on.
+This codebase had NO transmit queue for responses/acknowledges
+anywhere before this batch -- `server.h`'s own per-endpoint `ep_enable`
+pre-load queue is a structurally different concept (inbound requests
+awaiting execution, not outbound responses awaiting transmission),
+confirmed by re-reading `server.h`'s own file header before assuming
+any reuse was possible.
+
+A new module, `respqueue.h`/`respqueue.c`, provides `rcp_respqueue_t`
+-- a FIFO of framed byte messages, closely mirroring `server.h`'s own
+`init()`/`push`≈`submit()`/`pop`≈`drain_one()` shape and ownership
+conventions (`rcp_bytes_dup()`/`rcp_bytes_free()`, realloc-doubling
+array growth) for consistency with the rest of this codebase, but for
+the OUTBOUND direction and with one behavioral difference TC18 itself
+requires: **capacity is an octet budget, not an entry-count limit**.
+TC18 §12.7.9 Table 24's own wording for `queue_size` is "Queue N
+assigned memory in 32bit words" -- a memory reservation, not a message
+cap -- so `rcp_respqueue_push()` tracks a running octet total and
+refuses (leaving the queue entirely unchanged) a push that would exceed
+the configured `capacity_octets`, with `0` meaning unbounded (the same
+fail-open default `server.h`'s own queue uses absent an explicit cap).
+`regmap.h`'s `rcp_regmap_response_queue_cfg_t` gains the `queue_size`
+register itself (16 bit, quadlets); the octet-conversion (`x 4`) is the
+caller's own job at `rcp_respqueue_init()` call time, matching this
+codebase's "caller supplies already-classified units" convention
+(`rcp_acf_reg_write_len()`'s own precedent, one batch prior).
+
+New test file `test_respqueue.c` (6 tests: FIFO order, empty-pop
+behavior, unbounded-capacity, capacity refusal at the exact octet
+boundary, capacity freed by a pop, and safe destroy-while-nonempty),
+registered in both `CMakeLists.txt` (library sources) and
+`tests/CMakeLists.txt` (new `test_respqueue`/`rcp_respqueue` target --
+this batch's PR needed a CMake reconfigure, not just a rebuild, the
+first time a Phase 5c/5d batch has added a brand-new source file rather
+than editing existing ones). `test_tc18_gaps_regmap.c`'s `-059`
+deviation pin rewritten to a positive conformance test
+(`test_response_queue_size_register_and_storage_now_exist`); its
+`Max_AVTPDUsize`-discoverability half split out into its own,
+still-open pin for `-061`/`-062`, deferred to a later batch since both
+need this queue's own contents to enforce a bound against.
+
+Mutation-tested TWO ways, matching batch 8's own two-mutation
+precedent from Phase 5c (a change that adds both new code AND a new
+behavioral rule needs both signature/existence coverage AND
+logic/behavior coverage): (1) temporarily removing `src/respqueue.c`
+from `CMakeLists.txt`'s source list (the new-module equivalent of a
+full source revert, since the file is untracked until this PR) breaks
+the BUILD with a LINK error (both `test_respqueue.c` and the rewritten
+`test_tc18_gaps_regmap.c` pin reference the new symbols); (2) an
+isolated single-line mutation removing `rcp_respqueue_push()`'s own
+capacity check entirely leaves the build green but fails BOTH the
+dedicated capacity test in `test_respqueue.c` and the positive
+conformance test in `test_tc18_gaps_regmap.c` -- confirming the octet-
+budget rule itself, not just the queue's existence, is pinned in two
+independent places. Both mutations restored clean (diff-verified
+byte-identical against a pre-mutation backup, not just re-passing
+tests). Full suite (65/65, one net-new test binary) + ASan/UBSan clean,
+pre- and post-restore for both mutations. Fresh `cfusa check` (0
+errors) + `cfusa trace --gaps`/`--req-coverage 100`/`--sec-tested 100`
+(three separate CI-matching invocations; 100%/100%, 0 untested). 1030
+requirements (unchanged), 113 `tc18-gap` entries remaining (was 114).
+
+**Phase 5d progress after batch 3**: 3/47 items addressed. **Next**:
+`REQ-RMAP-061`/`-062` (Max_AVTPDUsize transmit enforcement + wiring to
+`fragment.h`'s existing `rcp_fragment_plan()` mechanism, plus discovery
+exposure) -- the queue this batch added now gives them something real
+to bound.
