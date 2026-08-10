@@ -68,6 +68,12 @@ void rcp_server_endpoint_set_enable(rcp_server_endpoint_t *ep, bool enable)
     ep->ep_enable = enable;
 }
 
+//cfusa:req REQ-PWRMODE-028
+void rcp_server_endpoint_set_admission_suspended(rcp_server_endpoint_t *ep, bool suspended)
+{
+    ep->admission_suspended = suspended;
+}
+
 //cfusa:req REQ-SRV-003
 bool rcp_server_endpoint_drain_one(rcp_server_endpoint_t *ep, rcp_bytes_t *out_frame)
 {
@@ -123,6 +129,7 @@ static rcp_server_pending_t *claim_slot(rcp_server_endpoint_t *ep)
 //cfusa:req REQ-SRV-005
 //cfusa:req REQ-SRV-019
 //cfusa:req REQ-SRV-022
+//cfusa:req REQ-PWRMODE-028
 rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
                                               const uint8_t *frame, size_t frame_len,
                                               uint32_t now, uint8_t *out_request_type,
@@ -140,6 +147,11 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
 
     *out_request_type = 0;
     if (out_error) *out_error = RCP_ERROR_NONE;
+
+    /* REQ-PWRMODE-028 (TC18 §13.7.2.3 step 1): checked before frame is
+     * inspected at all -- a request arriving during a sleep-request drain
+     * never reaches submit()/the request store, whatever kind it is. */
+    if (ep->admission_suspended) return RCP_SERVER_ADMIT_SUSPENDED;
 
     /* Not a repurposed-timestamp ACF_GBB at all: a standard request, and
      * the original submit path handles it unchanged. */

@@ -854,9 +854,9 @@ static void test_entry_gate_is_scoped_to_one_endpoint_and_one_queue(void)
     rcp_server_endpoint_destroy(&busy_ep);
 }
 
-/* ── §13.7.2.3 step 1: the missing admission-suspend state ─────────────────── */
+/* ── §13.7.2.3 step 1: admission suspends during the sleep drain ──────────── */
 
-static void test_admission_is_not_suspended_during_the_sleep_drain(void)
+static void test_admission_is_suspended_during_the_sleep_drain(void)
 {
     rcp_server_endpoint_t wakeup_ep;
     rcp_bytes_t           frame = standard_abb((rcp_byte_bus_id_t)5u, 1u);
@@ -865,14 +865,29 @@ static void test_admission_is_not_suspended_during_the_sleep_drain(void)
     TEST_ASSERT_NOT_NULL(frame.data);
     rcp_server_endpoint_init(&wakeup_ep, true);
 
-    /* REQ-PWRMODE-028 (TC18 §13.7.2.3): "on receipt of a sleep request the
-     * server shall stop entering newly arriving requests into endpoint
-     * queues while the drain proceeds" (step 1, ahead of step 3's
-     * rcp_pwrmode_check_entry()/rcp_pwrmode_commit_entry() preconditions,
-     * both now implemented). server.h exposes no admission-suspend state,
-     * so a request arriving mid-drain is still admitted and executed
-     * normally -- deferred to a follow-on batch (server.h admission-path
-     * surgery, out of this batch's power.h/ep_wakeup.h scope). */
+    /* Before any sleep request has arrived, admission behaves exactly as
+     * ever -- an enabled endpoint executes a standard request immediately. */
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_EXECUTE_NOW,
+                      rcp_server_endpoint_admit(&wakeup_ep, frame.data, frame.len, 0u,
+                                                &request_type, NULL, NULL));
+
+    /* REQ-PWRMODE-028 (TC18 §13.7.2.3 step 1): "on receipt of a sleep
+     * request the server shall stop entering newly arriving requests into
+     * endpoint queues while the drain proceeds." A caller processing a
+     * SleepCMD sets admission_suspended before beginning its drain (steps
+     * 2-3, which power.h's rcp_pwrmode_check_entry()/
+     * rcp_pwrmode_commit_entry() already implement) -- a request arriving
+     * mid-drain is refused outright, not queued and not executed. */
+    rcp_server_endpoint_set_admission_suspended(&wakeup_ep, true);
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_SUSPENDED,
+                      rcp_server_endpoint_admit(&wakeup_ep, frame.data, frame.len, 0u,
+                                                &request_type, NULL, NULL));
+    TEST_ASSERT_EQUAL_UINT(0u, rcp_server_endpoint_queue_len(&wakeup_ep));
+
+    /* If the entry is ultimately refused (rcp_pwrmode_check_entry() said
+     * REFUSED, or response_sent never became true), a caller resumes
+     * normal admission by clearing the flag again. */
+    rcp_server_endpoint_set_admission_suspended(&wakeup_ep, false);
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_EXECUTE_NOW,
                       rcp_server_endpoint_admit(&wakeup_ep, frame.data, frame.len, 0u,
                                                 &request_type, NULL, NULL));
@@ -1139,7 +1154,7 @@ int main(void)
     RUN_TEST(test_commit_entry_requires_the_response_to_have_been_sent);
     RUN_TEST(test_network_sleep_refusal_cannot_suppress_the_lps_confirmation);
     RUN_TEST(test_entry_gate_is_scoped_to_one_endpoint_and_one_queue);
-    RUN_TEST(test_admission_is_not_suspended_during_the_sleep_drain);
+    RUN_TEST(test_admission_is_suspended_during_the_sleep_drain);
 
     RUN_TEST(test_disabled_endpoint_queues_config_requests_without_ack);
     RUN_TEST(test_response_queue_flush_period_is_carried_but_inert);

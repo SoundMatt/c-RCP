@@ -176,6 +176,19 @@ typedef struct {
     rcp_server_pending_t pending[RCP_SERVER_MAX_PENDING];
     size_t               pending_count;
     uint64_t             next_sequence;
+
+    /* REQ-PWRMODE-028 (TC18 §13.7.2.3 step 1): true while this endpoint is
+     * refusing NEW admissions outright during a sleep-request drain --
+     * distinct from ep_enable (which still QUEUES a standard request while
+     * false). Default false on init(); see
+     * rcp_server_endpoint_set_admission_suspended() and
+     * rcp_server_endpoint_admit()'s own RCP_SERVER_ADMIT_SUSPENDED case.
+     * rcp_server_endpoint_submit() does NOT consult this flag -- it is the
+     * lower-level queue primitive admit() itself is built on; a caller
+     * wanting TC18 §13.7.2.3 admission-suspend semantics for standard
+     * requests must route them through admit(), not call submit()
+     * directly. */
+    bool admission_suspended;
 } rcp_server_endpoint_t;
 
 /* Initializes ep with an empty queue and the given initial ep_enable value. */
@@ -201,6 +214,19 @@ bool rcp_server_endpoint_submit(rcp_server_endpoint_t *ep,
  * anything queued; call rcp_server_endpoint_drain_one() afterward to pull
  * queued requests back out once re-enabled. */
 void rcp_server_endpoint_set_enable(rcp_server_endpoint_t *ep, bool enable);
+
+/* Sets ep->admission_suspended -- REQ-PWRMODE-028 (TC18 §13.7.2.3 step 1):
+ * "on receipt of a sleep request the server shall stop entering incoming
+ * requests into endpoint queues" while the drain (steps 2-3) proceeds. A
+ * caller processing a SleepCMD sets suspended=true on every endpoint
+ * before beginning its drain, and (only if the entry is ultimately
+ * refused -- see power.h's rcp_pwrmode_check_entry()/
+ * rcp_pwrmode_commit_entry()) suspended=false again to resume normal
+ * admission; a successful entry has no need to unsuspend, since the
+ * server is now asleep. Toggling this does not itself execute, queue, or
+ * discard anything -- it only changes what rcp_server_endpoint_admit()
+ * does with the NEXT arriving request. */
+void rcp_server_endpoint_set_admission_suspended(rcp_server_endpoint_t *ep, bool suspended);
 
 /* If ep->ep_enable is true and ep's queue is non-empty, dequeues the
  * oldest queued request into *out_frame (caller takes ownership; free with
@@ -237,12 +263,23 @@ typedef enum {
      * claims, or ep's request store is full. Nothing was stored and
      * nothing is to be executed. */
     RCP_SERVER_ADMIT_REJECTED     = 4,
+    /* REQ-PWRMODE-028 (TC18 §13.7.2.3 step 1): ep->admission_suspended was
+     * true. Nothing was decoded, stored, executed, or queued -- checked
+     * before every other admission path, so a request arriving during a
+     * sleep-request drain never reaches submit()/the request store at
+     * all, whatever kind it is. */
+    RCP_SERVER_ADMIT_SUSPENDED    = 5,
 } rcp_server_admit_t;
 
-/* Inspects frame[0..frame_len)'s request_type and routes it. A message
- * that is not a repurposed-timestamp ACF_GBB at all -- i.e. any ordinary
- * ACF_ABB or timestamped ACF_GBB message -- is a standard request and
- * takes the original rcp_server_endpoint_submit() path unchanged, so
+/* Inspects frame[0..frame_len)'s request_type and routes it. If
+ * ep->admission_suspended is true, returns RCP_SERVER_ADMIT_SUSPENDED
+ * immediately (REQ-PWRMODE-028) -- see rcp_server_endpoint_set_admission_
+ * suspended()) -- without inspecting frame at all; every rule below this
+ * paragraph applies only once that is false.
+ *
+ * A message that is not a repurposed-timestamp ACF_GBB at all -- i.e. any
+ * ordinary ACF_ABB or timestamped ACF_GBB message -- is a standard request
+ * and takes the original rcp_server_endpoint_submit() path unchanged, so
  * every pre-v0.102.0 caller keeps its exact previous behavior.
  *
  * A conditional request is decoded through its own module's decode_*

@@ -32,6 +32,33 @@ the rationale.
 
 ## Releases
 
+### v0.168.0 -- 2026-08-10
+
+**Phase 5c batch 6: REQ-PWRMODE-028 -- admission-suspend state closes
+Group 2.** Issue #199. The deferred fifth item of Group 2.
+`server.h`'s `rcp_server_endpoint_t` gains an additive
+`admission_suspended` bool field (default `false`, every pre-existing
+caller silently unaffected) and a new setter,
+`rcp_server_endpoint_set_admission_suspended()`.
+`rcp_server_endpoint_admit()` checks it first, before inspecting the
+arriving frame at all, and returns a new outcome,
+`RCP_SERVER_ADMIT_SUSPENDED` -- neither queued nor executed --
+implementing TC18 §13.7.2.3 step 1 ("stop entering incoming requests
+into endpoint queues") ahead of step 3's preconditions
+(`rcp_pwrmode_check_entry()`/`rcp_pwrmode_commit_entry()`, batch 5).
+`rcp_server_endpoint_submit()` deliberately does not consult the new
+flag -- it is the lower-level primitive `admit()` is built on; a caller
+wanting this admission-suspend semantics routes requests through
+`admit()`. New enum value confirmed additive-safe before adding it:
+`mock.c`'s `finish_admission()`, the only place in this codebase that
+switches over `rcp_server_admit_t`, already has a `default:` case that
+absorbs it correctly. Mutation-tested: full revert breaks the BUILD.
+Full suite (64/64) + ASan/UBSan clean, no new warnings anywhere. Fresh
+`cfusa check`/`trace` (0 errors, 100%/100%, three separate CI-matching
+invocations). See `ROADMAP.md` milestone 168 for full detail. 1030
+requirements (unchanged), 121 `tc18-gap` entries remaining (was 122) --
+**Group 2 of Phase 5c (§12.5/§13.7.2.3) is now fully closed.**
+
 ### v0.167.0 -- 2026-08-10
 
 **Phase 5c batch 5: REQ-PWRMODE-023/024/025/026 -- `rcp_pwrmode_commit_entry()`,

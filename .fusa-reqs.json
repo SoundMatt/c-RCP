@@ -8788,12 +8788,11 @@
     {
       "id": "REQ-PWRMODE-028",
       "title": "Sleep-request processing order: stop admitting requests, drain, then acknowledge",
-      "text": "NOT IMPLEMENTED: c-RCP evaluates TC18 13.7.2.3's step-3 preconditions (rcp_pwrmode_check_entry() requires wup_status clear, all endpoints idle and every responder queue empty) but does not implement step 1 -- on receipt of a sleep request the server shall stop entering newly arriving requests into endpoint queues while the drain proceeds. The library exposes no admission-suspend state, so a request arriving mid-drain is admitted normally.",
+      "text": "server.h's rcp_server_endpoint_t gains an admission_suspended flag (default false, additive) and rcp_server_endpoint_set_admission_suspended() setter; rcp_server_endpoint_admit() checks it first, before inspecting the arriving frame at all, and returns the new RCP_SERVER_ADMIT_SUSPENDED outcome -- neither queued nor executed -- implementing TC18 13.7.2.3 step 1 (\"stop entering incoming requests into endpoint queues\") ahead of step 3's preconditions (rcp_pwrmode_check_entry()/rcp_pwrmode_commit_entry(), REQ-PWRMODE-024/026), which a caller already evaluates during the same drain.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
+      "scope": "tc18",
       "tc18": "\u00a713.7.2.3, TC18.txt L4152-4160"
     },
     {
