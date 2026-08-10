@@ -1345,32 +1345,85 @@ static void test_ep_id_ordering_considers_request_stream_index(void)
     TEST_ASSERT_FALSE(rcp_regmap_ep_id_map_is_ascending(rows, 3u));
 }
 
-/* TC18 §12.7.8 recommends, for safety reasons, that an endpoint be mapped
- * to at most one RC Client at a time, and that endpoints sharing a
- * byte_bus_id within one request stream be of the same ep_type.
- * Deviation: c-RCP has no diagnostic for either condition. The only
- * read-only diagnostic it does have reports both of these tables as
- * perfectly fine: one EP_Nr reached from two rows, and two rows of
- * different endpoints sharing a bus, both come back "ascending". */
-static void test_no_diagnostic_for_multi_client_or_heterogeneous_type(void)
+/* REQ-RMAP-057: TC18 §12.7.8 recommends, for safety reasons, that an
+ * endpoint be mapped to at most one RC Client (request stream) at a
+ * time. rcp_regmap_ep_id_map_has_single_client_per_ep() is the
+ * dedicated diagnostic -- rcp_regmap_ep_id_map_is_ascending() itself
+ * still reports a multi-client table as perfectly fine, since ordering
+ * and multi-client-ness are orthogonal concerns (an out-of-order table
+ * can be single-client, and an ascending table can be multi-client). */
+static void test_ep_id_map_flags_multi_client_ep(void)
 {
-    rcp_regmap_ep_id_map_entry_t shared_ep[2];
-    rcp_regmap_ep_id_map_entry_t shared_bus[2];
+    rcp_regmap_ep_id_map_entry_t two_clients[2];
+    rcp_regmap_ep_id_map_entry_t one_client_two_buses[2];
 
-    /* One endpoint reachable from two rows (two clients, no warning).
-     * Both rows on the same request stream -- this test's own concern
-     * is orthogonal to stream index, so a single, consistent value is
-     * used throughout rather than left indeterminate. */
-    shared_ep[0].ep_id = 7u; shared_ep[0].byte_bus_id = 1u; shared_ep[0].request_stream_index = 1u;
-    shared_ep[1].ep_id = 7u; shared_ep[1].byte_bus_id = 2u; shared_ep[1].request_stream_index = 1u;
-    TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_is_ascending(shared_ep, 2u));
+    /* Same ep_id (7), two DIFFERENT request streams -- this is the
+     * actual hazard the recommendation is about: two distinct RC
+     * Clients concurrently able to drive the same endpoint. */
+    two_clients[0].ep_id = 7u; two_clients[0].byte_bus_id = 1u; two_clients[0].request_stream_index = 1u;
+    two_clients[1].ep_id = 7u; two_clients[1].byte_bus_id = 1u; two_clients[1].request_stream_index = 2u;
+    TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_is_ascending(two_clients, 2u));
+    TEST_ASSERT_FALSE(rcp_regmap_ep_id_map_has_single_client_per_ep(two_clients, 2u));
 
-    /* Two different endpoints; nothing here carries an ep_type at all, so
-     * a heterogeneous-type multicast group cannot even be detected. */
-    shared_bus[0].ep_id = 8u; shared_bus[0].byte_bus_id = 3u; shared_bus[0].request_stream_index = 1u;
-    shared_bus[1].ep_id = 9u; shared_bus[1].byte_bus_id = 4u; shared_bus[1].request_stream_index = 1u;
-    TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_is_ascending(shared_bus, 2u));
-    TEST_ASSERT_EQUAL_UINT(sizeof(rcp_regmap_ep_id_map_entry_t), sizeof(shared_bus[0]));
+    /* Same ep_id (7), same request stream, two different byte_bus_ids
+     * -- still only ONE client addressing the endpoint (via two
+     * registers), not the multi-client hazard, so this must NOT be
+     * flagged. */
+    one_client_two_buses[0].ep_id = 7u; one_client_two_buses[0].byte_bus_id = 1u; one_client_two_buses[0].request_stream_index = 1u;
+    one_client_two_buses[1].ep_id = 7u; one_client_two_buses[1].byte_bus_id = 2u; one_client_two_buses[1].request_stream_index = 1u;
+    TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_has_single_client_per_ep(one_client_two_buses, 2u));
+
+    /* Vacuous cases. */
+    TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_has_single_client_per_ep(NULL, 0u));
+}
+
+/* REQ-RMAP-058: TC18 §12.7.8 recommends that endpoints sharing a
+ * byte_bus_id within one request stream share the same ep_type -- a
+ * shared byte_bus_id is a deliberate multicast-within-a-stream
+ * mechanism, and a request broadcast to endpoints of differing
+ * ep_type would be decoded differently by each.
+ * rcp_regmap_ep_id_map_shared_bus_homogeneous() is the dedicated
+ * diagnostic; it takes a caller-supplied, index-parallel ep_types[]
+ * array since the row itself carries no ep_type (TC18's own row
+ * layout doesn't have one). */
+static void test_ep_id_map_flags_heterogeneous_shared_bus(void)
+{
+    rcp_regmap_ep_id_map_entry_t heterogeneous[2];
+    rcp_regmap_ep_id_map_entry_t homogeneous[2];
+    rcp_regmap_ep_id_map_entry_t not_shared[2];
+    uint8_t het_types[2]   = {1u, 2u}; /* different ep_type */
+    uint8_t homo_types[2]  = {1u, 1u}; /* same ep_type */
+
+    /* Two different endpoints sharing one (stream, BBID) -- a
+     * multicast-within-a-stream group -- with DIFFERING ep_type. Note:
+     * a genuinely shared byte_bus_id necessarily has an EQUAL, not
+     * strictly increasing, BBID between these two rows, so this table
+     * correctly fails is_ascending()'s own pre-existing, unrelated
+     * strict-ordering rule (REQ-RMAP-020/021) -- that is -056's own
+     * concern, orthogonal to the ep_type-homogeneity concern tested
+     * here. */
+    heterogeneous[0].ep_id = 8u; heterogeneous[0].byte_bus_id = 3u; heterogeneous[0].request_stream_index = 1u;
+    heterogeneous[1].ep_id = 9u; heterogeneous[1].byte_bus_id = 3u; heterogeneous[1].request_stream_index = 1u;
+    TEST_ASSERT_FALSE(rcp_regmap_ep_id_map_is_ascending(heterogeneous, 2u));
+    TEST_ASSERT_FALSE(rcp_regmap_ep_id_map_shared_bus_homogeneous(heterogeneous, het_types, 2u));
+
+    /* Same shared-bus shape, but matching ep_type -- a legitimate
+     * multicast group, must NOT be flagged. */
+    homogeneous[0].ep_id = 8u; homogeneous[0].byte_bus_id = 3u; homogeneous[0].request_stream_index = 1u;
+    homogeneous[1].ep_id = 9u; homogeneous[1].byte_bus_id = 3u; homogeneous[1].request_stream_index = 1u;
+    TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_shared_bus_homogeneous(homogeneous, homo_types, 2u));
+
+    /* Two different endpoints, two DIFFERENT byte_bus_ids -- not a
+     * shared-bus group at all, so differing ep_type here is
+     * irrelevant and must NOT be flagged. */
+    not_shared[0].ep_id = 8u; not_shared[0].byte_bus_id = 3u; not_shared[0].request_stream_index = 1u;
+    not_shared[1].ep_id = 9u; not_shared[1].byte_bus_id = 4u; not_shared[1].request_stream_index = 1u;
+    TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_shared_bus_homogeneous(not_shared, het_types, 2u));
+
+    TEST_ASSERT_EQUAL_UINT(sizeof(rcp_regmap_ep_id_map_entry_t), sizeof(heterogeneous[0]));
+
+    /* Vacuous case. */
+    TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_shared_bus_homogeneous(NULL, NULL, 0u));
 }
 
 /* TC18 §12.7.8 Table 23 carries BBID in a 16-bit register holding an
@@ -1844,7 +1897,8 @@ int main(void)
     RUN_TEST(test_ep_id_map_effective_count_stops_at_sentinel);
     RUN_TEST(test_ep_id_map_power_on_default_permits_ep0);
     RUN_TEST(test_ep_id_ordering_considers_request_stream_index);
-    RUN_TEST(test_no_diagnostic_for_multi_client_or_heterogeneous_type);
+    RUN_TEST(test_ep_id_map_flags_multi_client_ep);
+    RUN_TEST(test_ep_id_map_flags_heterogeneous_shared_bus);
     RUN_TEST(test_byte_bus_id_is_eight_bits_wide);
     RUN_TEST(test_no_lockable_w_plus_field_kind);
     RUN_TEST(test_response_queue_stream_id_is_configurable);

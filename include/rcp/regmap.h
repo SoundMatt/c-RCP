@@ -1123,6 +1123,44 @@ size_t rcp_regmap_ep_id_map_effective_count(const rcp_regmap_ep_id_map_entry_t *
  * write. row must not be NULL. */
 void rcp_regmap_ep_id_map_row_init_default(rcp_regmap_ep_id_map_entry_t *row);
 
+/* REQ-RMAP-057: TC18 §12.7.8 recommends, for safety reasons, that an
+ * endpoint be mapped to at most one RC Client at a time. In this
+ * table's own terms, one RC Client corresponds to one request stream
+ * (REQ-RMAP-052's own row shape), so the hazard this diagnostic
+ * flags is one ep_id appearing under more than one DISTINCT
+ * request_stream_index -- not merely appearing on more than one row.
+ * An endpoint legitimately reachable from several rows that all share
+ * the same request_stream_index (e.g. via more than one byte_bus_id)
+ * is still only one client addressing it, and is not what this
+ * recommendation is about. Returns true iff no ep_id in
+ * entries[0..count) is associated with two different
+ * request_stream_index values. O(count^2); count is expected to stay
+ * small (one server's own endpoint set). Read-only diagnostic, not
+ * enforcement -- see the file header's "Known spec ambiguity" note.
+ * entries may be NULL iff count == 0. */
+bool rcp_regmap_ep_id_map_has_single_client_per_ep(const rcp_regmap_ep_id_map_entry_t *entries,
+                                                    size_t count);
+
+/* REQ-RMAP-058: TC18 §12.7.8 recommends that endpoints sharing a
+ * byte_bus_id within one request stream share the same ep_type -- a
+ * shared byte_bus_id is a deliberate multicast-within-a-stream
+ * mechanism, and a request broadcast to endpoints of differing
+ * ep_type would be decoded differently by each. The EP_ID_config row
+ * itself carries no ep_type (TC18's own row layout doesn't have one;
+ * ep_type instead lives on rcp_regmap_ep_generic_cfg_t, looked up by
+ * ep_id), so this diagnostic takes a caller-supplied, index-parallel
+ * ep_types[] array (ep_types[i] is entries[i]'s own endpoint's
+ * ep_type) rather than inventing a field this row doesn't have on the
+ * wire. Returns true iff, for every group of rows that share one
+ * (request_stream_index, byte_bus_id) pair, every ep_types[] value in
+ * that group is identical. O(count^2); count is expected to stay
+ * small. Read-only diagnostic, not enforcement. entries/ep_types may
+ * both be NULL iff count == 0; when non-NULL each must have at least
+ * count elements, index-aligned with entries. */
+bool rcp_regmap_ep_id_map_shared_bus_homogeneous(const rcp_regmap_ep_id_map_entry_t *entries,
+                                                  const uint8_t *ep_types,
+                                                  size_t count);
+
 #ifdef __cplusplus
 }
 #endif

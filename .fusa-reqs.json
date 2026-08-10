@@ -9172,23 +9172,23 @@
     {
       "id": "REQ-RMAP-057",
       "title": "single-RC-Client-per-endpoint recommendation is neither enforced nor diagnosed",
-      "text": "NOT IMPLEMENTED: c-RCP provides no check that an endpoint is mapped to at most one RC Client at a time, the arrangement TC18 \u00a712.7.8 recommends for safety reasons. rcp_regmap_ep_client_t.owning_stream_index (include/rcp/regmap.h:236-239) exists solely to authorize functional-config writes (REQ-RMAP-011/012) and does not constrain which request streams may deliver requests to the endpoint, and no diagnostic analogous to rcp_regmap_ep_id_map_is_ascending() reports the multi-client condition. Consequence: two RC Clients can concurrently drive the same actuator endpoint with no warning, which is precisely the hazard the recommendation exists to prevent.",
+      "text": "c-RCP provides no ENFORCEMENT that an endpoint is mapped to at most one RC Client at a time, the arrangement TC18 \u00a712.7.8 recommends for safety reasons -- rcp_regmap_ep_client_t.owning_stream_index (include/rcp/regmap.h) still exists solely to authorize functional-config writes (REQ-RMAP-011/012) and does not constrain which request streams may deliver requests to the endpoint. Fixed: a read-only DIAGNOSTIC, rcp_regmap_ep_id_map_has_single_client_per_ep() (src/regmap.c), now reports the condition -- true iff no ep_id in the table is associated with two different request_stream_index values; an endpoint reachable from several rows that all share one request_stream_index (multiple byte_bus_ids, one client) is correctly NOT flagged, only a genuine multi-stream (multi-client) mapping is. Matches rcp_regmap_ep_id_map_is_ascending()'s own established read-only-diagnostic, not-enforcement shape. Still open: no server-side rejection or correction of a multi-client table exists, matching this table's own standing \"Known spec ambiguity\" note -- TC18 itself defines no corrective action for a server that receives one.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.7.8, TC18.txt L2985"
     },
     {
       "id": "REQ-RMAP-058",
       "title": "endpoints sharing a byte_bus_id within one stream should be of the same ep_type",
-      "text": "NOT IMPLEMENTED: c-RCP does not check that all endpoints mapped to the same byte_bus_id within a single request stream share an ep_type, as TC18 \u00a712.7.8 recommends. A shared byte_bus_id is a deliberate multicast-within-a-stream mechanism, and a request broadcast to endpoints of differing ep_type is decoded differently by each. rcp_regmap_ep_id_map_entry_t (include/rcp/regmap.h:458-461) carries no ep_type and nothing cross-references rcp_regmap_ep_generic_cfg_t.ep_type. Consequence: one write request can be interpreted as, say, a GPIO bitmask by one endpoint and a PWM duty value by another, with no configuration-time diagnostic.",
+      "text": "c-RCP provides no ENFORCEMENT that all endpoints mapped to the same byte_bus_id within a single request stream share an ep_type, as TC18 \u00a712.7.8 recommends. A shared byte_bus_id is a deliberate multicast-within-a-stream mechanism, and a request broadcast to endpoints of differing ep_type is decoded differently by each. Fixed: a read-only DIAGNOSTIC, rcp_regmap_ep_id_map_shared_bus_homogeneous() (src/regmap.c), now reports the condition. rcp_regmap_ep_id_map_entry_t itself still carries no ep_type (TC18's own EP_ID_config row doesn't have one -- ep_type lives on rcp_regmap_ep_generic_cfg_t, looked up by ep_id), so the diagnostic takes a caller-supplied, index-parallel ep_types[] array rather than inventing a field this row doesn't have on the wire; it returns true iff every group of rows sharing one (request_stream_index, byte_bus_id) pair has an identical ep_types[] value throughout. Still open: no server-side rejection or correction of a heterogeneous shared-bus group exists, and nothing in this codebase yet calls this diagnostic with a real, live ep_types[] array sourced from the actual per-endpoint configuration table -- that wiring is real future work, not modeled here.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.7.8, TC18.txt L2988"
     },
     {

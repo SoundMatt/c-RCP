@@ -10840,3 +10840,90 @@ counting `REQ-RMAP-061`'s own partial progress). Group 3: 3/6 items
 `REQ-RMAP-057`/`-058` (new diagnostic functions, no existing consumer
 to break, same tractable shape as this batch) before tackling
 `REQ-RMAP-053`'s still-deferred dedicated investigation.
+
+### 196. Phase 5d batch 26: multi-client and heterogeneous-shared-bus diagnostics for EP_ID_config (issue #200)
+
+Closes out Group 3's remaining small items. TC18 §12.7.8 recommends,
+for safety reasons, that (`REQ-RMAP-057`) an endpoint be mapped to at
+most one RC Client at a time, and (`REQ-RMAP-058`) endpoints sharing a
+byte_bus_id within one request stream share the same `ep_type`.
+Neither had a diagnostic.
+
+`rcp_regmap_ep_id_map_has_single_client_per_ep()`: true iff no `ep_id`
+in the table is associated with two different `request_stream_index`
+values. In this table's own terms one RC Client corresponds to one
+request stream, so the actual hazard is an endpoint reachable from
+*different streams*, not merely reachable from more than one row --
+an endpoint legitimately addressed via several `byte_bus_id`s all on
+the *same* stream is still only one client, and must not be flagged.
+`rcp_regmap_ep_id_map_shared_bus_homogeneous()`: true iff every group
+of rows sharing one `(request_stream_index, byte_bus_id)` pair has an
+identical `ep_type` throughout. The row itself carries no `ep_type` --
+TC18's own row layout doesn't have one, it lives on
+`rcp_regmap_ep_generic_cfg_t` instead -- so this diagnostic takes a
+caller-supplied, index-parallel `ep_types[]` array rather than
+inventing a field the wire format doesn't have. Both O(count²); count
+is expected to stay small (one server's own endpoint set). Both are
+read-only diagnostics, not enforcement, matching
+`rcp_regmap_ep_id_map_is_ascending()`'s own established shape.
+
+Rewrote the shared existing deviation pin
+(`test_no_diagnostic_for_multi_client_or_heterogeneous_type`) into two
+separate positive tests, one per requirement. **Found and fixed a
+pre-existing scenario-accuracy bug in that old test along the way**:
+its own "two clients" scenario put both rows on the *same*
+`request_stream_index`, which -- as this batch's own analysis above
+makes explicit -- does not actually represent two RC Clients at all,
+only one client using two `byte_bus_id`s. The new
+`test_ep_id_map_flags_multi_client_ep` uses two genuinely different
+stream indices for its positive (flagged) case, and keeps a same-
+stream, different-bus case as an explicit true-negative. Its own
+"shared bus" scenario had the same kind of inaccuracy in the other
+direction: it used two *different* `byte_bus_id` values, so it never
+actually depicted a shared bus at all. `test_ep_id_map_flags_
+heterogeneous_shared_bus` fixes this too, and along the way surfaced
+a real interaction worth documenting: a genuinely shared `byte_bus_id`
+necessarily has an *equal*, not strictly increasing, BBID between its
+rows, so such a table correctly fails `is_ascending()`'s own
+pre-existing, unrelated strict-ordering rule (`REQ-RMAP-020`/`021`) --
+that's `-056`'s own separate concern, orthogonal to the ep_type-
+homogeneity concern tested here, not a bug in either function.
+
+Mutation-tested with three mutations, one per new function plus the
+shared full-revert: (1) full revert -- fails to LINK (undefined
+symbols, both new functions referenced by the new tests); (2) isolated
+mutation on `has_single_client_per_ep()` (`!=` flipped to `==` on the
+stream-index comparison) -- caught (`Expected FALSE Was TRUE`); (3)
+isolated mutation on `shared_bus_homogeneous()` (dropped the
+`byte_bus_id` equality check, leaving only stream index + ep_type) --
+caught (`Expected TRUE Was FALSE`, the not-shared-bus true-negative
+case). Restored the correct implementation after each, diff-verified
+byte-identical against a pre-mutation backup. Full suite (65/65, +1
+net test: 2 new replacing 1 removed) + ASan/UBSan clean on both trees.
+Fresh `cfusa check` (0 errors) + all three separate `cfusa trace`
+invocations (100%/100%, 0 untested, only pre-existing unrelated
+`REQ-UART-03x` dangling-reference warnings). `REQ-RMAP-057` and
+`REQ-RMAP-058` both move `not-implemented` -> `partial` (both still
+lack server-side enforcement, and `-058` still has no real caller
+supplying a live `ep_types[]` array from actual endpoint config --
+both honestly still open, matching this table's own standing "Known
+spec ambiguity" note that TC18 defines no corrective action for a
+server that receives a non-conforming table). 1030 requirements
+(unchanged), 109 `tc18-gap` entries remaining (unchanged -- both were
+already counted as remaining gaps at `not-implemented`, still counted
+at `partial`).
+
+**Phase 5d progress after batch 26**: 27/47 items addressed (28
+counting `REQ-RMAP-061`'s own partial progress). **Group 3 (EP_ID_
+config, §12.7.8 Table 23) now 5/6 items addressed** (`-052`, `-054`,
+`-057`, `-058` partial; `-056` implemented) -- only `REQ-RMAP-053`
+remains, and it still needs its own dedicated investigation session
+(`rcp_byte_bus_id_t` widened from 8 to enough bits for the full 11-bit
+BBID address space -- ~40-file footprint, live `src/acf.c` truncation
+bug, needs a full "read every consumer" pass first, matching the
+`REQ-RMAP-030` investigation precedent). After Group 3 closes: Group 2
+(HW_config, §12.7.6, 6 items -- flagged for extra primary-source
+verification on `-043`/`-045`, its own two contradicted-claim items),
+then Group 5's remainder (`-047`-`051`, `-066`-`068`, coordinate with
+issue #197's own Table 22 work to avoid touching the same struct twice
+in flight).
