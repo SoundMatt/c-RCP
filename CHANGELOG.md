@@ -33,6 +33,24 @@ the rationale.
 
 ## Releases
 
+### v0.185.0 -- 2026-08-10
+
+**Phase 5d batch 15: `REQ-RMAP-032` -- `svr_io_pin_count` now
+explicitly modeled.** Issue #200. New `uint16_t svr_io_pin_count`
+field on `rcp_regmap_general_t` (TC18 §12.7.5 Table 18, 0x0018) --
+§12.7.6's authoritative source for the HW_config table's (Table 19)
+declared extent, which itself stays entirely unimplemented (Group 2's
+own separate, still-open scope). Split a stale-prone combined
+deviation pin (`svr_io_pin_count` + the separate `svr_hw_cfg_ptr`
+mis-shaping, `REQ-RMAP-033`) into a new positive test and a narrowed
+remaining one. Mutation-tested: full header revert with tests kept
+breaks the build (sufficient rigor for a field with no computed
+logic). Full suite (65/65, +1 test) + ASan/UBSan clean. Fresh `cfusa
+check`/`trace` (0 errors, 100%/100%, three separate CI-matching
+invocations). See `ROADMAP.md` milestone 185 for full detail. 1030
+requirements (unchanged), 110 `tc18-gap` entries remaining (unchanged
+-- narrowed from `not-implemented` to `partial`).
+
 ### v0.184.0 -- 2026-08-10
 
 **Phase 5d batch 14: `REQ-RMAP-031` -- reserved octet at 0x0017 now

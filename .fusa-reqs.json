@@ -8896,13 +8896,13 @@
     },
     {
       "id": "REQ-RMAP-032",
-      "title": "svr_io_pin_count (0x0018) is missing, so the HW_config table has no declared extent",
-      "text": "NOT IMPLEMENTED: c-RCP has no svr_io_pin_count register. TC18 \u00a712.7.5 Table 18 defines it as a 16-bit read-only register at absolute address 0x0018 giving the number of assignable I/O pins, and \u00a712.7.6 makes it the authoritative source for how many IO-pin entries the HW_config table (Table 19) contains. rcp_regmap_general_t declares no such field. Consequence: neither a client nor c-RCP itself can bound the HW_config table, so a write addressed past the last real IO pin has no defined limit to be checked against.",
+      "title": "svr_io_pin_count (0x0018) is now explicitly modeled, so the HW_config table has a declared extent",
+      "text": "PARTIAL: TC18 \u00a712.7.5 Table 18 defines svr_io_pin_count as a 16-bit read-only register at absolute address 0x0018 giving the number of assignable I/O pins, and \u00a712.7.6 makes it the authoritative source for how many IO-pin entries the HW_config table (Table 19) contains. rcp_regmap_general_t now declares this field. What remains open: nothing in this codebase yet allocates or bounds a real HW_config table against this count -- that is Group 2's own still-open scope (issue #200 items REQ-RMAP-040 through REQ-RMAP-045); this field is content modeling only, same REQ-RMAP-024 wire-reachability boundary as every other Group 1 item, so a client still cannot read this register over the wire.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.7.5 Table 18, TC18.txt L2564-2566"
     },
     {

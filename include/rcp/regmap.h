@@ -422,6 +422,22 @@ typedef struct {
                                 that helper. Content modeling only, same
                                 REQ-RMAP-024 wire-reachability boundary as
                                 every other Group 1 item. */
+    uint16_t svr_io_pin_count; /* REQ-RMAP-032 (TC18 §12.7.5 Table 18,
+                                   relative address 0x0018, 16 bit, R):
+                                   number of assignable I/O pins --
+                                   §12.7.6's own authoritative source for
+                                   how many IO-pin entries the HW_config
+                                   table (Table 19) contains. Nothing in
+                                   this codebase currently allocates or
+                                   bounds a real HW_config table against
+                                   this count (that is Group 2's own
+                                   still-open scope, issue #200 items
+                                   -040 through -045); this field is
+                                   content modeling only, giving a future
+                                   HW_config implementation a place to
+                                   read/write the count from, same
+                                   REQ-RMAP-024 wire-reachability boundary
+                                   as every other Group 1 item. */
     uint16_t svr_root_client_index;   /* RCP_REGMAP_NO_ROOT_CLIENT if unset */
 
     rcp_regmap_table_ref_t hw_pin_map;

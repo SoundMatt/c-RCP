@@ -10095,3 +10095,48 @@ counting `REQ-RMAP-061`'s own partial progress). Group 1: 8/18 items.
 Next: continue Group 1 in table order -- `REQ-RMAP-032`
 (`svr_io_pin_count`, 0x0018, missing -- also the authority §12.7.6's
 HW_config table depends on).
+
+### 185. Phase 5d batch 15: `REQ-RMAP-032` -- `svr_io_pin_count` now explicitly modeled (issue #200)
+
+Straightforward Group 1 content addition, same shape as batch 14. TC18
+§12.7.5 Table 18 defines `svr_io_pin_count` as a 16-bit R register at
+0x0018 giving the number of assignable I/O pins, and §12.7.6 makes it
+the authoritative source for how many IO-pin entries the HW_config
+table (Table 19) contains -- `rcp_regmap_general_t` declared no such
+field at all. New `uint16_t svr_io_pin_count` field, zero-initializing
+for free via the existing `memset`. Deliberately does NOT attempt to
+allocate or bound a real HW_config table against this count -- that is
+Group 2's own still-open scope (issue #200 items `REQ-RMAP-040`
+through `REQ-RMAP-045`, "entire table missing"); this batch stays
+scoped to exactly the register this table's own extent depends on,
+matching the same content-modeling-only boundary as every other Group
+1 item.
+
+**Split another stale-prone combined deviation pin proactively**
+(third occurrence of this discipline in Group 1, after batches 9's
+implicit split and batch 14's explicit one): the existing test bundled
+`svr_io_pin_count` (this batch) with the SEPARATE `svr_hw_cfg_ptr`
+mis-shaping deviation (`REQ-RMAP-033`, still open) in one function.
+Split into `test_io_pin_count_is_now_explicitly_modeled()` (new,
+positive -- proves the field is 2 octets, zero-inits, round-trips a
+test value, and still reads correctly through `read_general()`) and
+`test_hw_cfg_ptr_mis_shaped()` (kept, narrowed to `-033` only).
+
+Mutation-tested: full header-only revert with the split test file kept
+-- breaks the build (`no member named 'svr_io_pin_count'`) --
+sufficient rigor for a field with zero computed logic, matching
+batches 10/12/14's established precedent. Restored clean, diff-
+verified byte-identical against a pre-mutation backup. Full suite
+(65/65, net +1 test) + ASan/UBSan clean. Fresh `cfusa check` (0
+errors) + all three separate `cfusa trace` invocations (100%/100%, 0
+untested). `REQ-RMAP-032` moves `not-implemented` -> `partial` (not
+fully closed -- still blocked on `REQ-RMAP-024`'s wire-reachability
+gap like every other Group 1 item). 1030 requirements (unchanged), 110
+`tc18-gap` entries remaining (unchanged -- narrowed from
+`not-implemented` to `partial`).
+
+**Phase 5d progress after batch 15**: 16/47 items addressed (17
+counting `REQ-RMAP-061`'s own partial progress). Group 1: 9/18 items.
+Next: continue Group 1 in table order -- `REQ-RMAP-033`
+(`svr_hw_cfg_ptr`, 0x001A, partial -- pointer modeled with the wrong
+shape, offset unit and an extra capacity member TC18 does not define).
