@@ -478,6 +478,47 @@ static void test_field_writable_denies_non_unicast_frame_regardless_of_kind_or_a
         RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, w_star_multicast));
 }
 
+/* REQ-LIFECYCLE-024: rcp_lifecycle_field_write_error() maps every denial
+ * rcp_lifecycle_field_writable() reports to RCP_ERROR_UNAUTHORIZED_ACCESS
+ * -- per TC18 §13.7.1.2's own concrete example -- and RCP_ERROR_NONE
+ * when writable, regardless of *why* a denial occurred (state alone, or
+ * writer/frame on top of an otherwise-permitting state). Exercises one
+ * case of each: state-only (HW_GENERIC past HW_UNCONFIGURED, even a
+ * maximally-authorized writer), writer-only (FUNCTIONAL_W in
+ * RCP_CONFIGURED from an unauthorized writer), and non-unicast-only
+ * (REQ-LIFECYCLE-027, an otherwise-authorized writer on a non-unicast
+ * frame) -- all three collapse to the same wire code, matching the
+ * single "write prohibited register" case TC18 itself describes. */
+static void test_field_write_error_maps_every_denial_to_unauthorized_access(void)
+{
+    rcp_lifecycle_writer_ctx_t root           = { true, false, false, false };
+    rcp_lifecycle_writer_ctx_t stranger        = { false, false, false, false };
+    rcp_lifecycle_writer_ctx_t root_multicast  = { true, false, true, false };
+
+    /* Writable: RCP_ERROR_NONE. */
+    TEST_ASSERT_EQUAL(RCP_ERROR_NONE, rcp_lifecycle_field_write_error(
+        RCP_LIFECYCLE_HW_UNCONFIGURED, RCP_LIFECYCLE_FIELD_HW_GENERIC, root));
+
+    /* State-only denial: even root can't write HW_GENERIC once past
+     * HW_UNCONFIGURED. */
+    TEST_ASSERT_EQUAL(RCP_ERROR_UNAUTHORIZED_ACCESS, rcp_lifecycle_field_write_error(
+        RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_HW_GENERIC, root));
+
+    /* Writer-only denial: RCP_CONFIGURED would permit FUNCTIONAL_W for an
+     * authorized writer, but stranger isn't one. */
+    TEST_ASSERT_EQUAL(RCP_ERROR_UNAUTHORIZED_ACCESS, rcp_lifecycle_field_write_error(
+        RCP_LIFECYCLE_RCP_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, stranger));
+
+    /* Non-unicast-only denial: root would otherwise be authorized. */
+    TEST_ASSERT_EQUAL(RCP_ERROR_UNAUTHORIZED_ACCESS, rcp_lifecycle_field_write_error(
+        RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, root_multicast));
+
+    /* RCP_ERROR_LOCKED_MEM_ACCESS is never emitted by this function --
+     * see its own header doc comment for why. */
+    TEST_ASSERT_NOT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, rcp_lifecycle_field_write_error(
+        RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_HW_GENERIC, root));
+}
+
 /* ── strerror ──────────────────────────────────────────────────────────────── */
 
 static void test_lifecycle_strerror_unique_nonempty(void)
@@ -541,6 +582,7 @@ int main(void)
     RUN_TEST(test_functional_w_requires_authorized_writer_once_rcp_configured);
     RUN_TEST(test_functional_w_star_permanently_locked_once_rcp_configured);
     RUN_TEST(test_field_writable_denies_non_unicast_frame_regardless_of_kind_or_authorization);
+    RUN_TEST(test_field_write_error_maps_every_denial_to_unauthorized_access);
 
     RUN_TEST(test_lifecycle_strerror_unique_nonempty);
 

@@ -7674,6 +7674,15 @@
       "scope": "tc18"
     },
     {
+      "id": "REQ-WIREERR-004",
+      "title": "rcp_lifecycle_field_write_error() maps a denied write to UNAUTHORIZED_ACCESS",
+      "text": "rcp_lifecycle_field_write_error() shall return RCP_ERROR_NONE when rcp_lifecycle_field_writable(state, kind, writer) is true, and RCP_ERROR_UNAUTHORIZED_ACCESS otherwise -- the code TC18 §13.7.1.2's own concrete example assigns a write-prohibited-register write, uniformly regardless of whether the denial is state-driven or writer/frame-driven (REQ-LIFECYCLE-024). It shall never return RCP_ERROR_LOCKED_MEM_ACCESS, which corresponds to the separate, unmodeled svr_configuration_lock mechanism (TC18 §12.9).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18"
+    },
+    {
       "id": "REQ-UDP-015",
       "title": "rcp_udp_annexj_wrap() prepends a 4-octet big-endian sequence number",
       "text": "rcp_udp_annexj_wrap() shall heap-allocate a buffer holding a 4-octet big-endian encapsulation sequence number followed by the given AVTPDU bytes, and return a zeroed rcp_bytes_t (data=NULL) on allocation failure.",
@@ -8446,14 +8455,13 @@
     },
     {
       "id": "REQ-LIFECYCLE-024",
-      "title": "A write to a locked configuration register is answered with a locked-config error response",
-      "text": "NOT IMPLEMENTED: c-RCP never turns a denied configuration write into an error response (TC18 \u00a712.3, Figure 16). rcp_lifecycle_field_writable() returns only a bool, and no requirement or code path maps that denial to an error response carrying RCP_ERROR_LOCKED_MEM_ACCESS. A client whose configuration write was silently dropped cannot distinguish a locked register from a lost frame.",
+      "title": "A write-prohibited configuration write is answered with an UNAUTHORIZED_ACCESS error response",
+      "text": "IMPLEMENTED: TC18 \u00a713.7.1.2's one concrete write-outcome example -- verified directly against the primary-source PDF, correcting this entry's own prior text, which cited RCP_ERROR_LOCKED_MEM_ACCESS -- reads: \"Writing data to read only registers has no effect and request is confirmed normally [err=0]. Writing to a write prohibited register (e.g. lock bit for map set) creates a response with err=1 and an error code UNAUTHORIZED_ACCESS.\" New rcp_lifecycle_field_write_error() maps rcp_lifecycle_field_writable()'s bool to RCP_ERROR_NONE (writable) or RCP_ERROR_UNAUTHORIZED_ACCESS (denied, for any reason -- state alone, or writer/frame authorization on top of an otherwise-permitting state) uniformly, since all three rcp_lifecycle_field_kind_t kinds are genuinely writable-in-principle configuration that becomes write-prohibited, not TC18's distinct \"read only by nature\" case. RCP_ERROR_LOCKED_MEM_ACCESS is deliberately not emitted -- it corresponds to the separate, still-unmodeled svr_configuration_lock register (TC18 \u00a712.9, Table 18 offset 0x0015; see REQ-RMAP's own test_configuration_lock_register_is_absent deviation), not this function's scope.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
-      "tc18": "\u00a712.3, TC18.txt L2113 (Figure 16)"
+      "scope": "tc18",
+      "tc18": "\u00a713.7.1.2, TC18.txt L4039-L4041"
     },
     {
       "id": "REQ-LIFECYCLE-025",

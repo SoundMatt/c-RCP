@@ -7941,3 +7941,77 @@ check` (0 errors) + `cfusa trace --req-coverage 100 --sec-tested 100`
 remaining (unchanged count -- `REQ-LIFECYCLE-031` moves
 `not-implemented` -> `partial` within the gap category, not a full
 closure).
+
+### 158. Phase 5b batch 6: REQ-LIFECYCLE-024 write-denial error response, wire-error-code correction (issue #198)
+
+TC18 §12.3 (Figure 16) requires a denied configuration write be
+answered with an error response, not silently dropped.
+`rcp_lifecycle_field_writable()` returns only a `bool`, with no wire
+error code attached to a `false` verdict at all.
+
+**Primary-source verification caught a real error in this catalog
+entry's own prior text before implementing anything, mirroring the
+`REQ-LIFECYCLE-028` heading-typo precedent** (this time the error was in
+this repository's own generated catalog, not the spec PDF itself): the
+pre-existing `REQ-LIFECYCLE-024` text named `RCP_ERROR_LOCKED_MEM_ACCESS`
+as the expected wire code, and an existing `test_tc18_gaps_regmap.c`
+deviation pin repeated the same assumption in its own comment. Checked
+directly against the primary-source PDF (`pdftotext`-extracted, grep'd
+for the concrete text rather than trusting either prior citation) and
+found TC18 §13.7.1.2's own worked example says otherwise: *"Writing
+data to read only registers has no effect and request is confirmed
+normally [err=0]. Writing to a write prohibited register (e.g. lock bit
+for map set) creates a response with err=1 and an error code
+UNAUTHORIZED_ACCESS."* The error-code table itself (§12.9.6) lists both
+`UNAUTHORIZED_ACCESS` and `LOCKED_MEM_ACCESS` by name with no
+description column filled in for either -- this one worked example is
+the *only* concrete guidance TC18 gives for either code anywhere in the
+document.
+
+**Corrected understanding, now the implemented fix**: all three of
+`rcp_lifecycle_field_kind_t`'s kinds (`HW_GENERIC`/`FUNCTIONAL_W`/
+`FUNCTIONAL_W_STAR`) are genuinely writable-in-principle configuration
+that becomes write-prohibited under lifecycle-state or writer-
+authorization conditions -- none is TC18's distinct "read only by
+nature" case (those, e.g. `vendor_id`, sit entirely outside this
+writability model already). So *any* denial from
+`rcp_lifecycle_field_writable()`, for *any* reason (state alone --
+e.g. `HW_GENERIC` past `HW_UNCONFIGURED` -- or writer/frame
+authorization on top of an otherwise-permitting state), is TC18's
+single "write prohibited register" case: `UNAUTHORIZED_ACCESS`,
+uniformly. New `rcp_lifecycle_field_write_error()` (`REQ-WIREERR-004`,
+matching `rcp_e2e_wire_error()`'s established `xxx_wire_error()`
+mapping-function convention) implements exactly that: `RCP_ERROR_NONE`
+when `rcp_lifecycle_field_writable()` is true, `RCP_ERROR_
+UNAUTHORIZED_ACCESS` otherwise -- a single `if`, deliberately not a
+second, separately-maintained copy of `rcp_lifecycle_field_writable()`'s
+own state/kind table (which would risk the two drifting out of sync).
+`RCP_ERROR_LOCKED_MEM_ACCESS` is deliberately never emitted: it
+corresponds to the *separate*, still entirely unmodeled
+`svr_configuration_lock` mechanism (TC18 §12.9's "safety configuration
+data can be locked to be read only via the RC Server's configuration",
+Table 18 offset 0x0015 -- already tracked by
+`test_configuration_lock_register_is_absent`'s own deviation pin, out
+of this batch's scope).
+
+Test changes: new `test_field_write_error_maps_every_denial_to_
+unauthorized_access` (`test_lifecycle.c`) exercises one case each of
+state-only, writer-only, and non-unicast-only denial, all mapping to
+the same code, plus a `RCP_ERROR_LOCKED_MEM_ACCESS` negative assertion.
+`test_tc18_gaps_regmap.c`'s own `test_write_outcome_has_no_wire_
+response_distinction` deviation pin -- which had itself mislabeled
+`HW_GENERIC`-past-`HW_UNCONFIGURED` as TC18's distinct "read only"
+case rather than a state-locked write-prohibited one -- renamed to
+`test_field_write_error_matches_tc18_write_prohibited_example` and
+rewritten to assert the corrected, closed behavior directly.
+
+Mutation-tested two ways: (1) `git stash` on `src/lifecycle.c` alone ->
+build breaks (`Undefined symbols ... _rcp_lifecycle_field_write_error`),
+the new-API signature; (2) a precise single-line mutation (returning
+`RCP_ERROR_LOCKED_MEM_ACCESS` instead of `RCP_ERROR_UNAUTHORIZED_ACCESS`)
+isolates the mapping logic itself -> exactly the 2 new/rewritten pinned
+tests fail (`Expected 3 Was 4`). Both restored clean. Full test suite
+(64/64) + ASan/UBSan build both clean. Fresh `cfusa check` (0 errors) +
+`cfusa trace --req-coverage 100 --sec-tested 100` (100%/100%). 1030
+requirements (was 1029, `REQ-WIREERR-004` added), 136 `tc18-gap`
+entries remaining (was 137, one genuine closure).

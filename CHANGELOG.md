@@ -32,6 +32,29 @@ the rationale.
 
 ## Releases
 
+### v0.158.0 -- 2026-08-10
+
+**Phase 5b batch 6: REQ-LIFECYCLE-024 write-denial error response,
+wire-error-code correction.** Issue #198. New
+`rcp_lifecycle_field_write_error()` (`REQ-WIREERR-004`) maps
+`rcp_lifecycle_field_writable()`'s bool to `RCP_ERROR_NONE` or
+`RCP_ERROR_UNAUTHORIZED_ACCESS`. **Primary-source verification caught a
+real error in this catalog entry's own prior text**: it named
+`RCP_ERROR_LOCKED_MEM_ACCESS` as the expected wire code, but TC18
+§13.7.1.2's own worked example -- the only concrete guidance the spec
+gives for either code -- assigns a write-prohibited-register denial
+`UNAUTHORIZED_ACCESS` uniformly, regardless of whether the denial is
+state-driven or writer-driven. `RCP_ERROR_LOCKED_MEM_ACCESS` corresponds
+to the separate, still-unmodeled `svr_configuration_lock` mechanism and
+is deliberately never emitted by the new function. An existing
+deviation-pin test that repeated the same mistaken assumption rewritten
+to match. Mutation-tested two ways (new-API build break; a precise
+single-line mutation of the mapping itself). Full suite (64/64) +
+ASan/UBSan clean, fresh `cfusa check`/`trace` (0 errors, 100%/100%). See
+`ROADMAP.md` milestone 158 for full detail. 1030 requirements (was
+1029, `REQ-WIREERR-004` added), 136 `tc18-gap` entries remaining (was
+137).
+
 ### v0.157.0 -- 2026-08-10
 
 **Phase 5b batch 5: REQ-LIFECYCLE-031 svr_lifecycle_state write
