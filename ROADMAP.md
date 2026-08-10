@@ -9662,3 +9662,61 @@ from `not-implemented` to `partial`, not removed).
 `REQ-RMAP-061`'s own partial progress). Group 1: 2/18 items. Next:
 continue Group 1 in table order -- `REQ-RMAP-026` (`svr_req_stream_max`
 width/missing `svr_responder_streams_max`).
+
+### 179. Phase 5d batch 9: `REQ-RMAP-026` -- `svr_req_stream_max`/`svr_responder_streams_max` corrected to 8-bit width (issue #200)
+
+First Group 1 batch to RETYPE and RENAME an existing struct field
+rather than only adding new ones -- checked blast radius before
+touching anything: `svr_max_request_streams` had exactly one
+declaration (`regmap.h`) and five usage sites, all in test files (no
+`src/*.c` consumer yet, confirming it's still pure content modeling,
+unwired to anything, consistent with every prior Group 1 item).
+Retyped `uint16_t` -> `uint8_t` (TC18 Table 18's own register width;
+this codebase's established convention -- see `svr_version`'s own "32
+bit wide on the wire, not 16" comment -- is that a field's C type
+itself reflects its wire width, so a value the real register could
+never hold becomes impossible to construct, not just discouraged) and
+renamed `svr_max_request_streams` -> `svr_req_stream_max` to match
+TC18's own register name exactly (this struct's field names already
+partially drift from TC18's own naming in more than one place --
+`svr_max_sequencers` vs. TC18's own `svr_sequencers_max`, next up as
+`REQ-RMAP-028` -- fixing the name alongside the width now, while the
+field is already being touched, is cheaper than a second pass later).
+New `svr_responder_streams_max` (`uint8_t`) fills the previously-
+missing register at 0x000F.
+
+Rewrote the old deviation pin (which specifically demonstrated the
+16-bit field accepting `0x0100`, a value now impossible to construct at
+all) into a positive test proving both fields are 1 octet wide and
+correctly round-trip their maximum representable value (`0xFF`). Left
+the still-open wire-reachability observation (both addresses fall past
+the discovery slice's own `0x000D` ceiling) as a brief note pointing at
+`test_general_map_wire_reach_stops_after_0x000d()`'s own generic
+`span_is_zero(buf, 0x0E, 0x30)` coverage rather than re-testing it
+redundantly. Found and fixed one more usage site the rename touched
+outside the deviation pin itself:
+`test_reserved_registers_are_indistinguishable_from_zero_fill()`
+(`-031`/`-035`'s own reserved-register test) referenced the old field
+name/width to demonstrate a *different* point (a real, non-reserved
+register also reading back as zero) -- updated the assertion, left its
+own actual content/purpose untouched.
+
+`REQ-RMAP-026` stays `partial` (unchanged status, narrowed text) -- the
+now-correct content still isn't wire-reachable, same `REQ-RMAP-024`
+boundary as every other Group 1 item so far.
+
+Mutation-tested two ways: (1) the retype reverted back to `uint16_t`
+(isolated logic mutation, name kept) -- fails the new test's own
+`sizeof()` assertion; (2) full revert of the header alone with both
+test files' changes kept -- breaks the build (`no member named
+'svr_req_stream_max'`/`'svr_responder_streams_max'`). Both restored
+clean, diff-verified byte-identical against pre-mutation backups. Full
+suite (65/65) + ASan/UBSan clean. Fresh `cfusa check` (0 errors) + all
+three separate `cfusa trace` invocations (100%/100%, 0 untested). 1030
+requirements (unchanged), 110 `tc18-gap` entries remaining (unchanged --
+still `partial`, text narrowed).
+
+**Phase 5d progress after batch 9**: 10/47 items addressed (11 counting
+`REQ-RMAP-061`'s own partial progress). Group 1: 3/18 items. Next:
+continue Group 1 in table order -- `REQ-RMAP-027` (the two undifferentiated
+memory-capacity registers, `svr_responder_mem_size`/`svr_req_mem_size`).

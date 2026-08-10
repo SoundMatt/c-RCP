@@ -116,16 +116,17 @@ static rcp_regmap_general_t populated_map(void)
     rcp_regmap_table_ref_t ref;
 
     rcp_regmap_general_init(&map);
-    map.magic                   = 0xC0FFEE01u;
-    map.svr_version             = 0x00010501u;
-    map.vendor_id               = 0x1234u;
-    map.device_id               = 0x5678u;
-    map.svr_ep_count            = 0x0009u;
-    map.svr_max_request_streams = 0x00ABu;
-    map.svr_max_sequencers      = 0x0007u;
-    map.svr_memory_capacity     = 0x11223344u;
-    map.svr_implemented_options = 0x0000003Fu;
-    map.svr_root_client_index   = 0x0002u;
+    map.magic                     = 0xC0FFEE01u;
+    map.svr_version               = 0x00010501u;
+    map.vendor_id                 = 0x1234u;
+    map.device_id                 = 0x5678u;
+    map.svr_ep_count              = 0x0009u;
+    map.svr_req_stream_max        = 0xABu;
+    map.svr_responder_streams_max = 0xCDu;
+    map.svr_max_sequencers        = 0x0007u;
+    map.svr_memory_capacity       = 0x11223344u;
+    map.svr_implemented_options   = 0x0000003Fu;
+    map.svr_root_client_index     = 0x0002u;
 
     ref.offset = 0x00000040u;
     ref.capacity = 0x0008u;
@@ -422,26 +423,36 @@ static void test_general_static_part_has_no_read_only_class(void)
     rcp_mock_server_destroy(srv);
 }
 
-/* TC18 §12.7.5 Table 18: svr_req_stream_max is an 8-bit R register at
- * absolute address 0x000E and svr_responder_streams_max an 8-bit R
- * register at 0x000F. Deviation: c-RCP's counterpart is 16 bit wide (it
- * accepts 0x0100, which the specified register cannot hold), has no
- * address binding, and 0x000E is exactly the first octet past the wire
- * slice; there is no field at all for svr_responder_streams_max. */
-static void test_req_stream_max_width_and_missing_responder_streams_max(void)
+/* REQ-RMAP-026 (TC18 §12.7.5 Table 18): svr_req_stream_max is an 8-bit R
+ * register at absolute address 0x000E and svr_responder_streams_max an
+ * 8-bit R register at 0x000F. rcp_regmap_general_t now carries both at
+ * the correct width -- uint8_t, so a value neither register could hold
+ * on the wire (e.g. 256) can no longer be constructed in the first
+ * place, and svr_responder_streams_max exists at all. Still open (same
+ * REQ-RMAP-024 wire-reachability boundary as every other Group 1 item):
+ * 0x000E and 0x000F both fall past the discovery slice's own 0x000D
+ * ceiling, already covered generically by
+ * test_general_map_wire_reach_stops_after_0x000d()'s span_is_zero(buf,
+ * 0x0E, 0x30) assertion -- not re-tested here. */
+static void test_req_stream_max_and_responder_streams_max_are_now_correctly_sized(void)
 {
     rcp_regmap_general_t map = populated_map();
-    uint8_t              buf[0x10];
 
-    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_max_request_streams));
-    map.svr_max_request_streams = 0x0100u;
-    TEST_ASSERT_EQUAL_UINT16(0x0100u, map.svr_max_request_streams);
+    TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(map.svr_req_stream_max));
+    TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(map.svr_responder_streams_max));
 
-    /* The slice ends at 0x000D, so 0x000E is the first unreachable
-     * address -- svr_req_stream_max's own. */
+    map.svr_req_stream_max = 0xFFu; /* the widest value an 8-bit
+                                        register can hold, accepted */
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, map.svr_req_stream_max);
+
+    map.svr_responder_streams_max = 0xFFu;
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, map.svr_responder_streams_max);
+
+    /* The slice ends at 0x000D, so 0x000E (svr_req_stream_max's own
+     * address) is the first still-unreachable one -- REQ-RMAP-024's own
+     * boundary, generically covered by
+     * test_general_map_wire_reach_stops_after_0x000d() too. */
     TEST_ASSERT_EQUAL_UINT((size_t)0x0Eu, RCP_DISCOVERY_GENERAL_SLICE_LEN);
-    read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x0E, 0x0F));
 }
 
 /* TC18 §12.7.5 Table 18 defines TWO distinct 16-bit capacity registers,
@@ -562,7 +573,7 @@ static void test_reserved_registers_are_indistinguishable_from_zero_fill(void)
     rcp_regmap_general_t map = populated_map();
     uint8_t              buf[0x24];
 
-    TEST_ASSERT_EQUAL_UINT16(0x00ABu, map.svr_max_request_streams);
+    TEST_ASSERT_EQUAL_UINT8(0xABu, map.svr_req_stream_max);
     read_general(&map, (uint8_t)sizeof(buf), buf);
 
     TEST_ASSERT_TRUE(span_is_zero(buf, 0x17, 0x17)); /* TC18 reserved, 8 bit */
@@ -1447,7 +1458,7 @@ int main(void)
     RUN_TEST(test_lifecycle_state_register_field_tracks_the_authoritative_state);
     RUN_TEST(test_general_map_wire_reach_stops_after_0x000d);
     RUN_TEST(test_general_static_part_has_no_read_only_class);
-    RUN_TEST(test_req_stream_max_width_and_missing_responder_streams_max);
+    RUN_TEST(test_req_stream_max_and_responder_streams_max_are_now_correctly_sized);
     RUN_TEST(test_memory_capacity_is_one_undifferentiated_field);
     RUN_TEST(test_sequencers_max_width_and_zero_encoding_unenforced);
     RUN_TEST(test_configuration_lock_register_is_absent);
