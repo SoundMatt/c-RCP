@@ -1058,7 +1058,10 @@ typedef struct {
                                 (request_stream_index=1, ep_id=0,
                                 byte_bus_id=0, permitting EP0 access
                                 before any configuration is written)
-                                is also still open, same requirement.
+                                is provided by
+                                rcp_regmap_ep_id_map_row_init_default()
+                                below (REQ-RMAP-054, closed as of this
+                                field's own second follow-up batch).
                                 Placed as this struct's LAST field
                                 (TC18's own row puts it first, at
                                 offset 0x0000) so every existing
@@ -1092,6 +1095,33 @@ typedef struct {
  * entries may be NULL iff count == 0. */
 bool rcp_regmap_ep_id_map_is_ascending(const rcp_regmap_ep_id_map_entry_t *entries,
                                         size_t count);
+
+/* REQ-RMAP-054: TC18 §12.7.8 (Table 23 / L2976) defines a
+ * request_stream_index of 0 as the table's own end-of-table sentinel,
+ * not a valid stream index -- every real consumer of the table must
+ * stop scanning at the first such row rather than treat it as a live
+ * mapping. Returns the number of leading rows in entries[0..capacity)
+ * that precede the first sentinel row; if no row in that range is a
+ * sentinel, returns capacity unchanged (the whole buffer is real).
+ * Read-only: does not modify entries, and (like
+ * rcp_regmap_ep_id_map_is_ascending() above) is not, and must not be
+ * treated as, server-side enforcement of anything beyond this one
+ * scan -- see the file header's "Known spec ambiguity" note. entries
+ * may be NULL iff capacity == 0. */
+size_t rcp_regmap_ep_id_map_effective_count(const rcp_regmap_ep_id_map_entry_t *entries,
+                                             size_t capacity);
+
+/* REQ-RMAP-054's other half: TC18 §12.7.8 requires the table's power-on
+ * default contents to permit access to EP0 before any configuration is
+ * written. Populates *row with that default: request_stream_index = 1
+ * (the smallest value that is a valid stream index rather than the
+ * end-of-table sentinel -- 0 itself cannot be used here, since that is
+ * exactly the value rcp_regmap_ep_id_map_effective_count() above
+ * treats as "no more real rows"), ep_id = RCP_REGMAP_EP0_INDEX,
+ * byte_bus_id = 0. Callers that own a fixed-capacity table are
+ * expected to place the result at row 0 at startup, before any client
+ * write. row must not be NULL. */
+void rcp_regmap_ep_id_map_row_init_default(rcp_regmap_ep_id_map_entry_t *row);
 
 #ifdef __cplusplus
 }

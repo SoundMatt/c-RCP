@@ -1230,17 +1230,15 @@ static void test_table22_w_star_writable_in_both_pre_rcp_configured_states(void)
  * EP_Nr (0x0001, 8 bit, R/W+), BBID (0x0002, 16 bit, R/W+) -- so the
  * same byte_bus_id may legally reach different endpoints on different
  * request streams. rcp_regmap_ep_id_map_entry_t now declares
- * request_stream_index, closing this field-content gap. Still open:
- * a Request_Stream_Index of 0 is TC18's own end-of-table sentinel
- * (REQ-RMAP-054, not addressed by this batch) -- no consumer in this
- * codebase stops scanning at it yet, so a trailing all-zero row is
- * still read as a real mapping of BBID 0 to EP0 rather than
- * recognized as "table ends here". Also still open:
- * rcp_regmap_ep_id_map_is_ascending() itself is deliberately NOT
- * updated by this batch to consider the new field -- TC18 requires
- * ascending order in the COMPOSITE key (request_stream_index,
- * byte_bus_id), not byte_bus_id alone (REQ-RMAP-056, its own separate
- * still-open scope, pinned by the very next test below). */
+ * request_stream_index, closing this field-content gap. A
+ * Request_Stream_Index of 0 is TC18's own end-of-table sentinel;
+ * rcp_regmap_ep_id_map_effective_count() (REQ-RMAP-054, see the test
+ * below) is the dedicated consumer that stops scanning at it --
+ * rcp_regmap_ep_id_map_is_ascending() itself deliberately does NOT,
+ * since it is a generic ordering diagnostic, not a sentinel-aware
+ * iterator, and a Request_Stream_Index of 0 is still a real (if
+ * unusually low) value for its own composite-key comparison
+ * (REQ-RMAP-056, pinned by the test after next). */
 static void test_ep_id_row_now_has_request_stream_index(void)
 {
     rcp_regmap_ep_id_map_entry_t rows[3];
@@ -1251,19 +1249,72 @@ static void test_ep_id_row_now_has_request_stream_index(void)
 
     rows[0].ep_id = 5u; rows[0].byte_bus_id = 1u; rows[0].request_stream_index = 1u;
     rows[1].ep_id = 6u; rows[1].byte_bus_id = 2u; rows[1].request_stream_index = 1u;
-    /* TC18's end-of-table sentinel row (Request_Stream_Index == 0) --
-     * now representable, though no consumer recognizes it yet
-     * (REQ-RMAP-054, still open). */
+    /* TC18's end-of-table sentinel row (Request_Stream_Index == 0). */
     rows[2].ep_id = 0u; rows[2].byte_bus_id = 0u; rows[2].request_stream_index = 0u;
     TEST_ASSERT_EQUAL_UINT8(0u, rows[2].request_stream_index);
 
     TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_is_ascending(rows, 2u));
-    /* No sentinel RECOGNITION yet (REQ-RMAP-054): the third row still
-     * counts as a real mapping to is_ascending() itself -- and under the
-     * composite-key rule (REQ-RMAP-056) its request_stream_index (0) is
-     * a decrease from row 1's (1), so this is FALSE on that basis alone,
-     * independent of either row's byte_bus_id. */
+    /* is_ascending() is deliberately sentinel-UNAWARE (see this test's
+     * own header comment): the third row still counts as a real
+     * mapping to it, and under the composite-key rule (REQ-RMAP-056)
+     * its request_stream_index (0) is a decrease from row 1's (1), so
+     * this is FALSE on that basis alone, independent of either row's
+     * byte_bus_id. Sentinel recognition belongs to
+     * rcp_regmap_ep_id_map_effective_count() instead -- see the next
+     * test. */
     TEST_ASSERT_FALSE(rcp_regmap_ep_id_map_is_ascending(rows, 3u));
+}
+
+/* REQ-RMAP-054: TC18 §12.7.8 (Table 23 / L2976) defines a
+ * Request_Stream_Index of 0 as the table's own end-of-table sentinel.
+ * rcp_regmap_ep_id_map_effective_count() is the dedicated, sentinel-
+ * aware consumer that stops scanning at the first such row. */
+static void test_ep_id_map_effective_count_stops_at_sentinel(void)
+{
+    rcp_regmap_ep_id_map_entry_t rows[4];
+
+    rows[0].ep_id = 5u; rows[0].byte_bus_id = 1u; rows[0].request_stream_index = 1u;
+    rows[1].ep_id = 6u; rows[1].byte_bus_id = 2u; rows[1].request_stream_index = 1u;
+    /* Sentinel: everything from here on is not a real mapping. */
+    rows[2].ep_id = 0u; rows[2].byte_bus_id = 0u; rows[2].request_stream_index = 0u;
+    rows[3].ep_id = 9u; rows[3].byte_bus_id = 9u; rows[3].request_stream_index = 9u;
+
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, rcp_regmap_ep_id_map_effective_count(rows, 4u));
+
+    /* No sentinel present in the scanned range -- the whole buffer is
+     * real, so the count equals the capacity given. */
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, rcp_regmap_ep_id_map_effective_count(rows, 2u));
+
+    /* Sentinel is the very first row -- an empty table. */
+    TEST_ASSERT_EQUAL_UINT((size_t)0u, rcp_regmap_ep_id_map_effective_count(&rows[2], 2u));
+
+    /* capacity == 0: entries may be NULL, vacuously 0 real rows. */
+    TEST_ASSERT_EQUAL_UINT((size_t)0u, rcp_regmap_ep_id_map_effective_count(NULL, 0u));
+}
+
+/* REQ-RMAP-054's other half: TC18 §12.7.8 requires the table's
+ * power-on default contents to permit access to EP0 before any
+ * configuration is written. rcp_regmap_ep_id_map_row_init_default()
+ * supplies exactly that default row. */
+static void test_ep_id_map_power_on_default_permits_ep0(void)
+{
+    rcp_regmap_ep_id_map_entry_t row;
+
+    /* Poison the row first so the test cannot pass by accident on an
+     * already-zeroed stack. */
+    row.ep_id = 0xFFu; row.byte_bus_id = 0xFFu; row.request_stream_index = 0xFFu;
+
+    rcp_regmap_ep_id_map_row_init_default(&row);
+
+    TEST_ASSERT_EQUAL_UINT16((uint16_t)RCP_REGMAP_EP0_INDEX, row.ep_id);
+    TEST_ASSERT_EQUAL_UINT8(0u, row.byte_bus_id);
+    /* Nonzero -- REQ-RMAP-054 also defines 0 as the end-of-table
+     * sentinel, so the default row itself must not look like one, or
+     * rcp_regmap_ep_id_map_effective_count() would report an empty
+     * table on power-on rather than one row granting EP0 access. */
+    TEST_ASSERT_NOT_EQUAL_UINT8(0u, row.request_stream_index);
+    TEST_ASSERT_EQUAL_UINT((size_t)1u,
+                            rcp_regmap_ep_id_map_effective_count(&row, 1u));
 }
 
 /* TC18 §12.7.8 requires the table to be ascending in the COMPOSITE key
@@ -1790,6 +1841,8 @@ int main(void)
     RUN_TEST(test_watchdog_timeout_width_and_unit_deviate);
     RUN_TEST(test_table22_w_star_writable_in_both_pre_rcp_configured_states);
     RUN_TEST(test_ep_id_row_now_has_request_stream_index);
+    RUN_TEST(test_ep_id_map_effective_count_stops_at_sentinel);
+    RUN_TEST(test_ep_id_map_power_on_default_permits_ep0);
     RUN_TEST(test_ep_id_ordering_considers_request_stream_index);
     RUN_TEST(test_no_diagnostic_for_multi_client_or_heterogeneous_type);
     RUN_TEST(test_byte_bus_id_is_eight_bits_wide);

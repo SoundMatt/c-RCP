@@ -33,6 +33,27 @@ the rationale.
 
 ## Releases
 
+### v0.195.0 -- 2026-08-10
+
+**Phase 5d batch 25: EP_ID_config table's own end-of-table sentinel and
+power-on default row.** Issue #200. `REQ-RMAP-054`: a
+`Request_Stream_Index` of 0 is TC18's own defined end-of-table
+sentinel, and the table's power-on default contents must permit EP0
+access before any client writes configuration -- neither existed.
+New `rcp_regmap_ep_id_map_effective_count()` scans a buffer and stops
+at the first sentinel row; new `rcp_regmap_ep_id_map_row_init_default()`
+supplies the default row. `rcp_regmap_ep_id_map_is_ascending()` stays
+deliberately sentinel-unaware, since it's a generic ordering
+diagnostic, not a table iterator -- sentinel recognition is this
+batch's own separate concern. Mutation-tested with two mutations (full
+revert -- fails to link; isolated off-by-one on the new function's
+return value -- caught by the new test). Full suite (65/65, +2 tests)
++ ASan/UBSan clean on both trees. Fresh `cfusa check`/`trace` (0
+errors, 100%/100%, three separate CI-matching invocations).
+`REQ-RMAP-054` moves `not-implemented` -> `partial` (this table still
+has no wire encode/decode path at all). See `ROADMAP.md` milestone 195
+for full detail.
+
 ### v0.194.0 -- 2026-08-10
 
 **Phase 5d batch 24: EP_ID_config ordering now checks the composite

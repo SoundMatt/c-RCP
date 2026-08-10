@@ -10774,3 +10774,69 @@ bits for the full 11-bit BBID address space) -- still needs its own
 dedicated investigation pass first, given its ~40-file footprint and
 the live truncation bug already found in `src/acf.c`, before any code
 changes.
+
+### 195. Phase 5d batch 25: EP_ID_config table's own end-of-table sentinel and power-on default row (issue #200)
+
+`REQ-RMAP-054` (TC18 §12.7.8, Table 23 / L2976): a
+`Request_Stream_Index` of 0 is the table's own defined end-of-table
+sentinel, not a valid stream index, and the table's power-on default
+contents must permit EP0 access before any client writes
+configuration. Neither half existed: the table was delimited purely
+by a caller-supplied count with no sentinel concept, and there was no
+default-row constructor.
+
+Two new functions, deliberately kept separate from
+`rcp_regmap_ep_id_map_is_ascending()` rather than folded into it:
+`rcp_regmap_ep_id_map_effective_count(entries, capacity)` scans
+`entries[0..capacity)` and returns the count of leading rows before
+the first sentinel row (or `capacity` unchanged if none appears);
+`rcp_regmap_ep_id_map_row_init_default(row)` populates `*row` with
+TC18's own default (`request_stream_index=1`,
+`ep_id=RCP_REGMAP_EP0_INDEX`, `byte_bus_id=0`) -- nonzero
+`request_stream_index` deliberately, so the default row itself never
+looks like the sentinel it coexists with.
+`rcp_regmap_ep_id_map_is_ascending()` stays sentinel-UNAWARE on
+purpose: it is a generic ordering diagnostic over whatever rows it is
+given, not a table iterator, and a `request_stream_index` of 0 is
+still a real (if unusually low) value for its own composite-key
+comparison (`REQ-RMAP-056`) -- sentinel recognition is this batch's
+new function pair's job specifically, kept as a distinct concern.
+
+Updated `REQ-RMAP-052`'s own existing test
+(`test_ep_id_row_now_has_request_stream_index`) to point at the new
+functions instead of describing the sentinel as unrecognized (its
+comment no longer claims `REQ-RMAP-054` is open). Two new tests:
+`test_ep_id_map_effective_count_stops_at_sentinel` (four cases: a mid-
+table sentinel, no sentinel present, an immediate sentinel producing
+an empty table, and the `NULL`/`capacity==0` vacuous case) and
+`test_ep_id_map_power_on_default_permits_ep0` (poisons the row first
+so the test cannot pass on an already-zeroed stack by accident, then
+asserts the populated row is both EP0-addressed and not itself sentinel-
+shaped).
+
+Mutation-tested with two mutations, matching the rigor used for
+`REQ-RMAP-056`'s own real-logic batch: (1) full revert of
+`src/regmap.c` -- fails to LINK (undefined symbol), since the new
+tests reference functions that no longer exist, the strongest possible
+signal; (2) isolated off-by-one on `effective_count()`'s own return
+value (`return i + 1u` instead of `return i`) -- caught by the new
+test (`Expected 2 Was 3`). Restored the correct implementation after
+each, diff-verified byte-identical against a pre-mutation backup. Full
+suite (65/65, +2 tests) + ASan/UBSan clean on both trees. Fresh
+`cfusa check` (0 errors, only pre-existing unrelated `REQ-UART-03x`
+dangling-reference warnings in an untouched file) + all three separate
+`cfusa trace` invocations (100%/100%, 0 untested). `REQ-RMAP-054`
+moves `not-implemented` -> `partial` (not fully closed -- this
+codebase still has no wire encode/decode path for the EP_ID_config
+table at all, so neither new function is reachable from a real
+exchange yet; same honest caveat `REQ-RMAP-052`'s own status carries).
+1030 requirements (unchanged), 109 `tc18-gap` entries remaining
+(unchanged -- `REQ-RMAP-054` was already counted as a remaining gap
+at `not-implemented`, and `partial` is still a remaining gap).
+
+**Phase 5d progress after batch 25**: 26/47 items addressed (27
+counting `REQ-RMAP-061`'s own partial progress). Group 3: 3/6 items
+(`REQ-RMAP-052`, `-054`, `-056`, all partial or better). Next:
+`REQ-RMAP-057`/`-058` (new diagnostic functions, no existing consumer
+to break, same tractable shape as this batch) before tackling
+`REQ-RMAP-053`'s still-deferred dedicated investigation.
