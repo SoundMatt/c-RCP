@@ -185,17 +185,46 @@ rcp_powerstate_errc_t rcp_powerstate_manager_wake_via_network(rcp_powerstate_man
 /* Step (a). (Re)initializes addr's handshake with wakeup_repeat_limit and
  * attempts rcp_pwrmode_handshake_iface_reenabled() on it with the given
  * network_available (REQ-PWRMODE-016 -- see that function's own doc
- * comment in power.h). Returns false if addr was not registered with m,
- * or if network_available is false (retriable: call again once the
- * network is up; this does not consume any of wakeup_repeat_limit). */
+ * comment in power.h). Records resp_stream_id (REQ-PWRMODE-017, TC18
+ * §12.4.1: "the responder stream which is configured for the original
+ * standby request") -- the IEEE 1722 StreamID this server's own register
+ * map pairs with the request stream the original SleepCMD arrived on
+ * (regmap.h's request_stream_cfg/response_queue_cfg pairing; this module
+ * owns no register-map instance itself, so the caller supplies this
+ * already-resolved value, matching network_available's own convention
+ * just above). Every subsequent WakeUp probe and the eventual wake
+ * notification for addr are meant to go out on resp_stream_id, not
+ * necessarily addr.stream_id itself -- see
+ * rcp_powerstate_manager_wake_response_stream_id(). There is no safe
+ * default (silently reusing addr.stream_id would be non-conformant
+ * whenever the two streams differ), hence a required parameter rather
+ * than an additive optional one. Returns false if addr was not
+ * registered with m, or if network_available is false (retriable: call
+ * again once the network is up; this does not consume any of
+ * wakeup_repeat_limit). */
 bool rcp_powerstate_manager_handshake_begin(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
-                                             uint32_t wakeup_repeat_limit, bool network_available);
+                                             uint32_t wakeup_repeat_limit, bool network_available,
+                                             rcp_stream_id_t resp_stream_id);
+
+/* The resp_stream_id rcp_powerstate_manager_handshake_begin() recorded
+ * for addr (REQ-PWRMODE-017) -- this module owns no transport itself
+ * (see the file header), so a caller consults this before physically
+ * transmitting rcp_powerstate_manager_encode_wakeup_probe()'s own
+ * return value or the eventual wake notification, rather than assuming
+ * addr.stream_id. *out_resp_stream_id is left unchanged, and false
+ * returned, if addr was not registered with m or its handshake was
+ * never begun (rcp_pwrmode_handshake_init()'s own zero-initialized
+ * struct has no recorded stream). */
+bool rcp_powerstate_manager_wake_response_stream_id(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
+                                                     rcp_stream_id_t *out_resp_stream_id);
 
 /* Encodes one WakeUp-message probe for addr's step (b) -- a thin wrapper
  * over rcp_ep_wakeup_encode_wakeup_message(). Returns a zeroed rcp_bytes_t
  * (data=NULL) if addr was not registered with m, or on allocation
- * failure. Caller sends the returned bytes, then waits to see it (or
- * something else) echoed back. */
+ * failure. Caller sends the returned bytes -- on
+ * rcp_powerstate_manager_wake_response_stream_id()'s own resp_stream_id,
+ * per REQ-PWRMODE-017, not necessarily addr.stream_id -- then waits to
+ * see it (or something else) echoed back. */
 rcp_bytes_t rcp_powerstate_manager_encode_wakeup_probe(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
                                                          uint8_t transaction_num);
 
@@ -204,7 +233,16 @@ rcp_bytes_t rcp_powerstate_manager_encode_wakeup_probe(rcp_powerstate_manager_t 
  * the result into rcp_pwrmode_handshake_wakeup_attempt() for addr's own
  * handshake. Returns false if addr was not registered with m, or per
  * rcp_pwrmode_handshake_wakeup_attempt()'s own return contract otherwise
- * (see power.h). */
+ * (see power.h). REQ-PWRMODE-018: this function's own scope is
+ * deliberately narrow -- an exact WakeUp-message echo is one way to
+ * satisfy TC18 §12.4.1's actual termination condition ("a valid AVTPDU
+ * from the sleep request Client"), not the only one. A caller that
+ * itself recognizes some OTHER valid, already-demultiplexed-to-addr
+ * frame (e.g. an ordinary operational request, once this module's own
+ * consumer decodes one) as satisfying that condition should call
+ * power.h's rcp_pwrmode_handshake_wakeup_attempt() directly with
+ * echoed=true for that case, bypassing this convenience wrapper --
+ * see that function's own doc comment. */
 bool rcp_powerstate_manager_apply_wakeup_echo(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
                                                const uint8_t *b, size_t len, uint8_t sent_transaction_num);
 

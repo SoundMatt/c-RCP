@@ -35,6 +35,15 @@ static rcp_avtp_addr_t make_addr(uint16_t unique_id, uint8_t byte_bus_id)
 #define ADDR make_addr(1, 5)
 #define OTHER_ADDR make_addr(2, 5)
 
+/* A responder stream distinct from ADDR's own request stream --
+ * REQ-PWRMODE-017's own point is that these need not be the same. */
+static rcp_stream_id_t resp_stream(void)
+{
+    static const uint8_t mac[6] = {0x02, 0x00, 0x00, 0x00, 0x00, 0x99};
+    return rcp_stream_id_make(mac, 42);
+}
+#define RESP_STREAM resp_stream()
+
 /* ── strerror ──────────────────────────────────────────────────────────────── */
 
 //cfusa:test REQ-PWR-010
@@ -284,9 +293,17 @@ static void test_wake_via_pin_hot_when_handshake_complete(void)
     rcp_bytes_t probe, echo;
     rcp_pwrmode_start_kind_t kind;
 
+    rcp_stream_id_t got_stream;
+
     put_to_sleep(m, ADDR, 1);
 
-    TEST_ASSERT_TRUE(rcp_powerstate_manager_handshake_begin(m, ADDR, 3, true));
+    TEST_ASSERT_TRUE(rcp_powerstate_manager_handshake_begin(m, ADDR, 3, true, RESP_STREAM));
+
+    /* REQ-PWRMODE-017: the responder stream recorded at handshake_begin()
+     * round-trips exactly, independent of ADDR's own request stream. */
+    TEST_ASSERT_TRUE(rcp_powerstate_manager_wake_response_stream_id(m, ADDR, &got_stream));
+    TEST_ASSERT_TRUE(rcp_stream_id_equal(RESP_STREAM, got_stream));
+    TEST_ASSERT_FALSE(rcp_stream_id_equal(ADDR.stream_id, got_stream));
 
     probe = rcp_powerstate_manager_encode_wakeup_probe(m, ADDR, 9);
     TEST_ASSERT_NOT_NULL(probe.data);
@@ -338,7 +355,7 @@ static void test_apply_wakeup_echo_wrong_txn_not_echoed(void)
     rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(endpoints, 1);
     rcp_bytes_t echo;
 
-    TEST_ASSERT_TRUE(rcp_powerstate_manager_handshake_begin(m, ADDR, 1, true));
+    TEST_ASSERT_TRUE(rcp_powerstate_manager_handshake_begin(m, ADDR, 1, true, RESP_STREAM));
 
     echo = rcp_ep_wakeup_encode_wakeup_message(ADDR.byte_bus_id, 1);
     /* sent_transaction_num (2) doesn't match the echo's own txn (1): not
@@ -353,7 +370,7 @@ static void test_apply_wakeup_echo_wrong_txn_not_echoed(void)
 static void test_handshake_begin_unknown_endpoint(void)
 {
     rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(NULL, 0);
-    TEST_ASSERT_FALSE(rcp_powerstate_manager_handshake_begin(m, ADDR, 3, true));
+    TEST_ASSERT_FALSE(rcp_powerstate_manager_handshake_begin(m, ADDR, 3, true, RESP_STREAM));
     rcp_powerstate_manager_destroy(m);
 }
 

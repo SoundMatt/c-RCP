@@ -32,6 +32,33 @@ the rationale.
 
 ## Releases
 
+### v0.166.0 -- 2026-08-10
+
+**Phase 5c batch 4: REQ-PWRMODE-017/018 -- responder-stream recording
+and the WakeUp termination condition.** Issue #199. Group 1's last two
+items, scoped together since both trace to the same missing piece.
+`REQ-PWRMODE-017`: TC18 §12.4.1 requires the wake response go out on
+the responder stream *configured for* the original standby request --
+genuinely a different `StreamID` than the request's own, confirmed via
+`regmap.h`'s own request-stream/response-queue pairing model.
+`rcp_powerstate_manager_handshake_begin()` gains a required
+`resp_stream_id` parameter (no safe default exists) and a new
+`rcp_powerstate_manager_wake_response_stream_id()` getter returns it
+for the caller to transmit on. `REQ-PWRMODE-018` closed via
+documentation/citation correction with zero new logic: the underlying
+`rcp_pwrmode_handshake_wakeup_attempt()` primitive was already
+sufficiently generic (a plain caller-supplied bool); only one narrow
+convenience wrapper and its docs needed clarifying that a literal
+WakeUp echo is one way to satisfy the handshake, not the only one.
+Mutation-tested two ways: full revert breaks the build; a precise
+single-line mutation isolates exactly the 2 tests pinning the
+recorded-stream round-trip. Full suite (64/64) + ASan/UBSan clean,
+fresh `cfusa check`/`trace` (0 errors, 100%/100%, all three separate
+CI-matching invocations). See `ROADMAP.md` milestone 166 for full
+detail. 1030 requirements (unchanged), 126 `tc18-gap` entries remaining
+(was 128, two genuine closures) -- Group 1 of Phase 5c is now fully
+closed out.
+
 ### v0.165.0 -- 2026-08-10
 
 **Phase 5c batch 3: REQ-PWRMODE-016 -- hot start now checks network

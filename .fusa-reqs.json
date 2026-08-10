@@ -8674,23 +8674,21 @@
     {
       "id": "REQ-PWRMODE-017",
       "title": "The wake response is sent on the responder stream configured for the original sleep/standby request",
-      "text": "NOT IMPLEMENTED: c-RCP does not record or use the responder stream of the original sleep/standby request when waking (TC18 \u00a712.4.1). The pending-request state kept by rcp_powerstate_manager_encode_entry_request() holds only the target mode and transaction number, and rcp_pwrmode_handshake_wakeup_attempt() has no stream identity, so nothing constrains the repetitive wake response to travel back on the responder stream that carried the sleep request. The client that put the server to sleep may never see the wake response.",
+      "text": "IMPLEMENTED: rcp_powerstate_manager_handshake_begin() (powerstate.c) now takes a required resp_stream_id parameter (this codebase's established \"caller supplies already-classified inputs\" convention -- this module owns no register-map instance and no transport of its own, so it cannot itself resolve which response stream regmap.h's request_stream_cfg/response_queue_cfg pairing designates; the caller, which does have that access, resolves and supplies it). Recorded per-addr alongside the handshake itself; a new rcp_powerstate_manager_wake_response_stream_id() getter returns it so a caller transmits rcp_powerstate_manager_encode_wakeup_probe()'s own output (and the eventual wake notification) on the correct stream rather than assuming addr's own request stream, which TC18 does not guarantee are the same stream.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
+      "scope": "tc18",
       "tc18": "\u00a712.4.1, TC18.txt L2298-L2299"
     },
     {
       "id": "REQ-PWRMODE-018",
       "title": "WakeUp repetition stops on any valid AVTPDU from the sleep-request client",
-      "text": "c-RCP's WakeUp repetition termination condition diverges from TC18 \u00a712.4.1: rcp_pwrmode_handshake_wakeup_attempt() stops only when rcp_ep_wakeup_is_wakeup_echo() matched an exact echo of the WakeUp message it sent, or when hs->wakeup_repeat_limit is exhausted, whereas the specification stops repetition on receipt of ANY valid AVTPDU from the sleep-request client and defines no repeat limit. The requirement shall record that the handshake terminates on any valid AVTPDU from that client, and that the repeat limit is an implementation-added safety bound whose exhaustion degrades to RCP_PWRMODE_START_COLD.",
+      "text": "IMPLEMENTED (documentation/citation correction, no logic change needed): re-verification found rcp_pwrmode_handshake_wakeup_attempt()'s own `echoed` bool was already sufficiently generic -- it is a plain caller-supplied bool, not itself hardwired to rcp_ep_wakeup_is_wakeup_echo(). powerstate.c's rcp_powerstate_manager_apply_wakeup_echo() is the ONE caller that narrows it to a literal WakeUp echo, but that function's own scope was always meant to be a specific convenience wrapper, not the sole way to satisfy step (b) -- a caller recognizing some other valid, already-demultiplexed frame from the sleep-request client may call rcp_pwrmode_handshake_wakeup_attempt() directly with echoed=true for that case instead, matching TC18 \u00a712.4.1's actual \"a valid AVTPDU from the sleep request Client\" termination condition exactly. Both functions' own doc comments now state this explicitly. The repeat-limit framing this entry's own text already asked for was already correct and unchanged: wakeup_repeat_limit/RCP_PWRMODE_HANDSHAKE_FAILED are this implementation's own added safety bound, not spec-derived -- TC18 itself defines no limit.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
+      "scope": "tc18",
       "tc18": "\u00a712.4.1, TC18.txt L2300-L2301"
     },
     {

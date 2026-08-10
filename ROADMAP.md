@@ -8619,3 +8619,83 @@ closed, `-019` partial). **Next**: `REQ-PWRMODE-017`/`REQ-PWRMODE-018`
 -- both entangled around the same missing piece (the responder stream
 of the original sleep/standby request is never recorded), scope
 together as one batch rather than splitting.
+
+### 166. Phase 5c batch 4: REQ-PWRMODE-017/018 -- responder-stream recording and the WakeUp termination condition (issue #199)
+
+Group 1's last two items, deliberately scoped together per batch 3's
+own closing note.
+
+**Architecture untangling, done before writing any code**: `power.h`'s
+`rcp_avtp_addr_t` already carries a `stream_id`, and
+`powerstate.c`'s own file header self-describes as "client-side," which
+at first read seemed to suggest the responder-stream concept might
+already be implicit in `addr` itself. Reading `regmap.h`'s own
+`request_stream_cfg`/`response_queue_cfg` pairing settled it: TC18
+genuinely models the REQUEST stream and its paired RESPONSE stream as
+two DIFFERENT `StreamID`s, configured via the register map -- `addr`'s
+own single `stream_id` cannot represent that pairing, confirming
+`REQ-PWRMODE-017`'s own gap is real, not an artifact of misreading the
+existing code.
+
+**REQ-PWRMODE-017 (closed)**: TC18 §12.4.1: "the RC Server will send
+via the responder stream which is configured for the original standby
+request a repetitive response." `rcp_powerstate_manager_handshake_begin()`
+gains a required `resp_stream_id` parameter (no safe default exists --
+silently reusing `addr.stream_id` would be non-conformant whenever the
+two streams genuinely differ, matching `REQ-PWRMODE-016`'s own
+required-parameter precedent from batch 3). `powerstate.c` owns no
+register-map instance and no transport of its own, so it cannot itself
+resolve the pairing -- the caller, which does have that access,
+supplies the already-resolved value. Recorded per-`addr` alongside the
+handshake; a new `rcp_powerstate_manager_wake_response_stream_id()`
+getter returns it, so a caller transmits
+`rcp_powerstate_manager_encode_wakeup_probe()`'s own output (and the
+eventual wake notification) on the correct stream.
+
+**REQ-PWRMODE-018 (closed, documentation/citation correction, zero new
+logic)**: re-verification found `rcp_pwrmode_handshake_wakeup_attempt()`'s
+own `echoed` bool was already sufficiently generic -- a plain
+caller-supplied bool, never itself hardwired to
+`rcp_ep_wakeup_is_wakeup_echo()`. `rcp_powerstate_manager_apply_wakeup_echo()`
+is the ONE caller that narrows it to a literal echo, but that
+function's own scope was always meant as one specific convenience
+wrapper, not the sole way to satisfy step (b) -- a caller recognizing
+some OTHER valid, already-demultiplexed frame from the sleep-request
+client may call `rcp_pwrmode_handshake_wakeup_attempt()` directly with
+`echoed=true` for that case, matching TC18's actual "a valid AVTPDU
+from the sleep request Client" termination condition exactly. Both
+functions' own doc comments now state this explicitly. This is the
+same class of correction as `REQ-LIFECYCLE-026`/`035`/`037` earlier
+this phase's predecessor issue (#198): a catalog entry's own text named
+a real gap, but at the wrong enforcement point -- the underlying
+primitive was already correct, only one narrow caller and its
+documentation needed fixing.
+
+Test changes: `test_tc18_gaps_server.c`'s own combined `-016`/`-017`
+deviation pin (`test_hotstart_has_no_network_check_and_no_responder_stream`,
+whose own `-016` half had gone stale after batch 3 without being
+caught) renamed `test_hotstart_now_has_network_check_and_records_
+responder_stream` and rewritten end to end, now also demonstrating
+`REQ-PWRMODE-016`'s gate explicitly (a self-inflicted staleness this
+batch also fixed). `test_powerstate.c` gained a `resp_stream()` helper
+distinct from `ADDR`'s own stream and a round-trip assertion in
+`test_wake_via_pin_hot_when_handshake_complete()`; its other two
+`handshake_begin()` call sites updated mechanically.
+
+Mutation-tested two ways: a full revert of the 3 core files breaks the
+BUILD (test files reference the new function/signature, undeclared
+without them); a precise single-line mutation (`e->has_resp_stream_id`
+forced to stay `false`) isolates exactly the 2 tests pinning the
+recorded-stream round-trip. Both restored clean. Full test suite
+(64/64) + ASan/UBSan build both clean. Fresh `cfusa check` (0 errors) +
+`cfusa trace --gaps` / `--req-coverage 100` / `--sec-tested 100` (all
+three separate invocations, matching CI; 100%/100%, 0 untested). 1030
+requirements (unchanged, no new REQ ids), 126 `tc18-gap` entries
+remaining (was 128, two genuine closures).
+
+**Phase 5c progress after batch 4**: 5/15 items addressed (`-016`/`-017`/
+`-018`/`-020` closed, `-019` partial) -- Group 1 (§12.4.1's wake
+handshake) is now fully closed out. **Next**: Group 2 (§12.5 sleep-entry
+races/scope errors: `-023`/`-024`/`-025`/`-026`/`-028`), starting with
+`-024` (the lost-wakeup race), flagged by issue #199 itself as
+higher-severity than its item count suggests.
