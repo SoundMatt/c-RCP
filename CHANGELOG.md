@@ -32,6 +32,32 @@ the rationale.
 
 ## Releases
 
+### v0.173.0 -- 2026-08-10
+
+**Phase 5d batch 3: `respqueue.h`/`respqueue.c` -- the response/ack
+transmit queue.** Issue #200. Group 4's foundational item: this
+codebase had NO transmit queue for responses/acknowledges anywhere
+before this batch (`server.h`'s own queue holds inbound requests, a
+structurally different concept). New module `rcp_respqueue_t` -- a FIFO
+of framed byte messages mirroring `server.h`'s own
+init/push/pop/ownership conventions, with one TC18-mandated
+behavioral difference: capacity is enforced as an OCTET budget (TC18
+§12.7.9 Table 24's `queue_size` is a memory reservation, "assigned
+memory in 32bit words," not a message-count cap), refusing a push that
+would exceed it and leaving the queue unchanged. `regmap.h`'s
+`rcp_regmap_response_queue_cfg_t` gains the `queue_size` register
+itself. New test file `test_respqueue.c` (6 tests), registered in both
+`CMakeLists.txt` and `tests/CMakeLists.txt` -- the first Phase 5c/5d
+batch to add a brand-new source file rather than edit existing ones.
+Mutation-tested two ways: temporarily dropping the new source from the
+build breaks the BUILD with a link error; an isolated capacity-check
+removal leaves the build green but fails both the dedicated capacity
+test and the rewritten conformance test in `test_tc18_gaps_regmap.c`.
+Full suite (65/65) + ASan/UBSan clean. Fresh `cfusa check`/`trace` (0
+errors, 100%/100%, three separate CI-matching invocations). See
+`ROADMAP.md` milestone 173 for full detail. 1030 requirements
+(unchanged), 113 `tc18-gap` entries remaining (was 114).
+
 ### v0.172.0 -- 2026-08-10
 
 **Phase 5d batch 2: REQ-RMAP-060 -- response queue STREAM_UID

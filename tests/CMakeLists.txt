@@ -67,6 +67,11 @@ target_link_libraries(test_regmap PRIVATE rcp::rcp unity)
 target_compile_options(test_regmap PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_regmap COMMAND test_regmap)
 
+add_executable(test_respqueue test_respqueue.c)
+target_link_libraries(test_respqueue PRIVATE rcp::rcp unity)
+target_compile_options(test_respqueue PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_respqueue COMMAND test_respqueue)
+
 add_executable(test_discovery test_discovery.c)
 target_link_libraries(test_discovery PRIVATE rcp::rcp unity)
 target_compile_options(test_discovery PRIVATE ${RCP_TEST_WARNING_FLAGS})
