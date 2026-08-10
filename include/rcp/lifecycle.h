@@ -101,6 +101,7 @@
 
 #include "rcp/acf.h"
 #include "rcp/avtp.h"
+#include "rcp/errors.h"
 #include "rcp/rcp.h"
 
 #include <stdbool.h>
@@ -368,6 +369,37 @@ typedef enum {
 bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
                                    rcp_lifecycle_field_kind_t kind,
                                    rcp_lifecycle_writer_ctx_t writer);
+
+/* REQ-LIFECYCLE-024: TC18 §13.7.1.2 gives the one concrete write-outcome
+ * example this codebase has: "Writing data to read only registers has no
+ * effect and request is confirmed normally [err=0]. Writing to a write
+ * prohibited register (e.g. lock bit for map set) creates a response
+ * with err=1 and an error code UNAUTHORIZED_ACCESS." None of the three
+ * rcp_lifecycle_field_kind_t kinds are "read only by nature" registers
+ * (those -- e.g. vendor_id -- sit entirely outside this writability
+ * model, per rcp_lifecycle_field_writable()'s own scope); all three are
+ * genuinely writable-in-principle configuration that becomes
+ * write-prohibited under certain lifecycle-state/authorization
+ * conditions -- exactly TC18's "write prohibited register" case,
+ * regardless of *why* the write is denied (state alone, or writer
+ * authorization/frame origin on top of a state that would otherwise
+ * permit it). This function therefore maps every denial
+ * rcp_lifecycle_field_writable() reports to RCP_ERROR_UNAUTHORIZED_ACCESS
+ * uniformly, per the spec's own concrete example -- RCP_ERROR_NONE
+ * otherwise.
+ *
+ * RCP_ERROR_LOCKED_MEM_ACCESS is deliberately NOT emitted by this
+ * function: it corresponds to a *different* TC18 mechanism this library
+ * does not model at all -- the separate svr_configuration_lock register
+ * (TC18 §12.9's "safety configuration data can be locked to be read
+ * only via the RC Server's configuration", Table 18 offset 0x0015; see
+ * test_tc18_gaps_regmap.c's own test_configuration_lock_register_is_
+ * absent() deviation pin), not the lifecycle-state/writer-authorization
+ * rules this function's inputs actually describe. Conflating the two
+ * would misreport a code this library cannot yet honestly emit. */
+rcp_wire_error_t rcp_lifecycle_field_write_error(rcp_lifecycle_state_t state,
+                                                  rcp_lifecycle_field_kind_t kind,
+                                                  rcp_lifecycle_writer_ctx_t writer);
 
 #ifdef __cplusplus
 }

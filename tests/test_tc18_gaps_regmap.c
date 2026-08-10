@@ -1117,31 +1117,53 @@ static void test_ep0_functional_block_and_discovery_timeout_absent(void)
     TEST_ASSERT_EQUAL_UINT32(20u, RCP_DISCOVERY_DEFAULT_TIMEOUT_MS);
 }
 
-/* TC18 §13.7.1.2 distinguishes two register-write outcomes: a write at a
- * READ-ONLY register has no effect yet is confirmed with an ordinary
- * err=0 response, while a write at a WRITE-PROHIBITED register produces
- * err=1 with error code UNAUTHORIZED_ACCESS. Deviation: c-RCP reports
- * writability as one plain bool, so the two cases are indistinguishable
- * -- asserted here by a read-only-by-state field and an unauthorized
- * writer producing the identical `false` -- and RCP_ERROR_UNAUTHORIZED_ACCESS
- * exists as a code no writability path ever emits. */
-static void test_write_outcome_has_no_wire_response_distinction(void)
+/* TC18 §13.7.1.2's one concrete write-outcome example: "Writing data to
+ * read only registers has no effect and request is confirmed normally
+ * [err=0]. Writing to a write prohibited register (e.g. lock bit for map
+ * set) creates a response with err=1 and error code UNAUTHORIZED_ACCESS."
+ * Verified directly against the primary-source PDF (not just this
+ * project's own pre-existing extraction) before trusting it -- this is
+ * the ONLY concrete example TC18 gives for either code; the error table
+ * itself (§12.9.6) lists both UNAUTHORIZED_ACCESS and LOCKED_MEM_ACCESS
+ * by name with no description column filled in for either.
+ *
+ * All three of c-RCP's rcp_lifecycle_field_kind_t kinds are genuinely
+ * writable-in-principle configuration that becomes write-prohibited
+ * under lifecycle-state or writer-authorization conditions -- none is a
+ * "read only by nature" register (those, e.g. vendor_id, sit entirely
+ * outside this writability model already, per
+ * test_general_static_part_has_no_read_only_class() above). So a
+ * denial for ANY of the three kinds, for ANY reason (state alone, or
+ * writer/frame authorization on top of an otherwise-permitting state),
+ * is TC18's "write prohibited register" case -- UNAUTHORIZED_ACCESS,
+ * uniformly (REQ-WIREERR-004). Previously (REQ-LIFECYCLE-024, now closed):
+ * rcp_lifecycle_field_writable() reported writability as one plain
+ * bool with no wire-error-code mapping at all, and this test's own
+ * prior form mislabeled HW_GENERIC-past-HW_UNCONFIGURED as TC18's
+ * distinct "read only" case rather than a state-locked write-prohibited
+ * one -- corrected here alongside the fix. */
+static void test_field_write_error_matches_tc18_write_prohibited_example(void)
 {
-    bool read_only_case;
-    bool prohibited_case;
+    /* HW_GENERIC past HW_UNCONFIGURED: state-locked configuration
+     * (§12.3.1.2's own text: "access to the HW_config...are locked"),
+     * not a read-only-by-nature register -- UNAUTHORIZED_ACCESS, even
+     * for the fully-authorized ROOT_WRITER. */
+    TEST_ASSERT_EQUAL(RCP_ERROR_UNAUTHORIZED_ACCESS, rcp_lifecycle_field_write_error(
+        RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_HW_GENERIC, ROOT_WRITER));
 
-    /* HW_GENERIC past HW_UNCONFIGURED: read-only -- TC18 wants err=0. */
-    read_only_case = rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
-                                                  RCP_LIFECYCLE_FIELD_HW_GENERIC, ROOT_WRITER);
     /* FUNCTIONAL_W in RCP_CONFIGURED from an unauthorized writer:
-     * write-prohibited -- TC18 wants err=1/UNAUTHORIZED_ACCESS. */
-    prohibited_case = rcp_lifecycle_field_writable(RCP_LIFECYCLE_RCP_CONFIGURED,
-                                                   RCP_LIFECYCLE_FIELD_FUNCTIONAL_W,
-                                                   PLAIN_WRITER);
+     * write-prohibited for a different reason (writer, not state) --
+     * same wire code, UNAUTHORIZED_ACCESS, matching TC18's single
+     * undifferentiated example. */
+    TEST_ASSERT_EQUAL(RCP_ERROR_UNAUTHORIZED_ACCESS, rcp_lifecycle_field_write_error(
+        RCP_LIFECYCLE_RCP_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, PLAIN_WRITER));
 
-    TEST_ASSERT_FALSE(read_only_case);
-    TEST_ASSERT_FALSE(prohibited_case);
-    TEST_ASSERT_EQUAL_INT((int)read_only_case, (int)prohibited_case);
+    /* An actually-writable case: RCP_ERROR_NONE, not "err=0 via a
+     * distinct read-only path" -- this model has no such distinct path,
+     * consistent with none of its three kinds being read-only-by-nature. */
+    TEST_ASSERT_EQUAL(RCP_ERROR_NONE, rcp_lifecycle_field_write_error(
+        RCP_LIFECYCLE_HW_UNCONFIGURED, RCP_LIFECYCLE_FIELD_HW_GENERIC, ROOT_WRITER));
+
     TEST_ASSERT_EQUAL_INT(3, (int)RCP_ERROR_UNAUTHORIZED_ACCESS);
 }
 
@@ -1221,7 +1243,7 @@ int main(void)
     RUN_TEST(test_flush_triggers_and_heartbeat_are_absent);
     RUN_TEST(test_transmit_fragmentation_not_bounded_by_max_avtpdu_size);
     RUN_TEST(test_ep0_functional_block_and_discovery_timeout_absent);
-    RUN_TEST(test_write_outcome_has_no_wire_response_distinction);
+    RUN_TEST(test_field_write_error_matches_tc18_write_prohibited_example);
     RUN_TEST(test_effective_register_write_length_helper_absent);
 
     return UNITY_END();

@@ -285,3 +285,15 @@ bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
      * doc comment. */
     return writable && !writer.via_non_unicast_frame;
 }
+
+//cfusa:req REQ-WIREERR-004
+rcp_wire_error_t rcp_lifecycle_field_write_error(rcp_lifecycle_state_t state,
+                                                  rcp_lifecycle_field_kind_t kind,
+                                                  rcp_lifecycle_writer_ctx_t writer)
+{
+    /* TC18 §13.7.1.2's one concrete example maps every write-prohibited
+     * denial to UNAUTHORIZED_ACCESS uniformly -- see this function's own
+     * header doc comment for why LOCKED_MEM_ACCESS does not apply here. */
+    if (rcp_lifecycle_field_writable(state, kind, writer)) return RCP_ERROR_NONE;
+    return RCP_ERROR_UNAUTHORIZED_ACCESS;
+}
