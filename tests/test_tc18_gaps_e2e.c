@@ -41,6 +41,7 @@
 #include <rcp/acf.h>
 #include <rcp/avtp.h>
 #include <rcp/e2e.h>
+#include <rcp/mock.h>
 #include <rcp/regmap.h>
 #include <rcp/scheduler.h>
 
@@ -83,50 +84,116 @@ static uint32_t be32(const uint8_t *p)
            ((uint32_t)p[2] << 8) | (uint32_t)p[3];
 }
 
+/* ── mock.c dispatch_e2e()/dispatch_frame_e2e() test fixtures ─────────────── */
+
+static const rcp_lifecycle_plausibility_snapshot_t EMPTY_SNAP = {NULL, 0, NULL, 0};
+
+/* Any byte_bus_id passes rcp_lifecycle_should_accept() once HW_CONFIGURED. */
+static void to_hw_configured(rcp_mock_server_t *srv)
+{
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                      rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP));
+}
+
+static bool g_handler_called;
+
+static void counting_handler(const uint8_t *request, size_t request_len, rcp_bytes_t *out_response,
+                              void *user_data)
+{
+    (void)request;
+    (void)out_response;
+    (void)user_data;
+    g_handler_called = true;
+    TEST_ASSERT_TRUE(request_len > 0);
+}
+
 /* ── REQ-E2E-031: plain vs. safe command mode ──────────────────────────────── */
 
-/* DEVIATION PIN. TC18 sec. 13.6 puts the plain/safe command-mode bit in the
- * server-owned generic endpoint config and makes it gate execution: in
- * safe command mode a request arriving without a valid CRC32 trailer must
- * not be executed. c-RCP's only such flag is ep_req_crc_enable, and it
- * sits in the CLIENT-writable functional block (regmap.h's
- * rcp_regmap_ep_functional_cfg_t, not rcp_regmap_ep_generic_cfg_t, whose
- * initializer below leaves it no field to live in), and no code path
- * consults it. A conforming implementation would reject the unprotected
- * request the last two assertions show sailing through. */
-static void test_plain_vs_safe_mode_bit_is_inert(void)
+/* TC18 sec. 13.6: in safe command mode (ep_req_crc_enable set) a request
+ * arriving without a valid CRC32 trailer must not be executed; plain
+ * command mode never checks. As of the REQ-E2E-031/041 fix,
+ * rcp_mock_server_set_endpoint_req_crc_enable() (mock.c's own in-process
+ * stand-in for the register bit -- see that function's own doc comment
+ * for why it can't just read rcp_regmap_ep_functional_cfg_t directly) and
+ * rcp_mock_server_dispatch_e2e() together implement this: an endpoint left
+ * at its default (plain mode) executes an unprotected request exactly as
+ * rcp_mock_server_dispatch() would; the same endpoint switched to safe
+ * mode does not. */
+static void test_dispatch_e2e_plain_mode_executes_unprotected_request(void)
 {
-    rcp_regmap_ep_functional_cfg_t fcfg;
-    rcp_regmap_ep_generic_cfg_t    gcfg;
-    rcp_acf_byte_message_info_t    hdr;
-    rcp_bytes_t                    body    = {0};
-    const uint8_t                  pl[4]   = {0x01, 0x02, 0x03, 0x04};
-    rcp_bytes_t                    plain   = make_abb(0, 0, 0, pl, sizeof(pl));
-    const uint8_t                 *out_pl  = NULL;
-    size_t                         out_len = 0;
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t        pl[4] = {0x01, 0x02, 0x03, 0x04};
+    rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
 
-    rcp_regmap_ep_generic_cfg_init(&gcfg);
-    rcp_regmap_ep_functional_cfg_init(&fcfg);
-    TEST_ASSERT_FALSE(fcfg.ep_req_crc_enable);
-    TEST_ASSERT_FALSE(gcfg.ep_used);
+    to_hw_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    /* req_crc_enable left at its default (false): plain command mode. */
 
-    fcfg.ep_req_crc_enable = true; /* "this endpoint is in safe command mode" */
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, TEST_TS,
+                                                    plain.data, plain.len, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
 
-    /* Inert: the unprotected request still decodes, and would execute,
-     * exactly as it does in plain command mode. */
-    TEST_ASSERT_NOT_NULL(plain.data);
-    TEST_ASSERT_EQUAL_INT(RCP_ACF_OK,
-                          rcp_acf_decode_abb(plain.data, plain.len, &hdr, &out_pl, &out_len));
-    TEST_ASSERT_EQUAL_UINT(sizeof(pl), out_len);
-
-    /* The only gate that exists is caller-driven: a caller that does
-     * invoke rcp_e2e_unwrap() on the unprotected frame misreads its last
-     * quadlet as a trailer and reports a mismatch. */
-    TEST_ASSERT_EQUAL_INT(RCP_E2E_ERR_CRC_MISMATCH,
-                          rcp_e2e_unwrap(TEST_SID, TEST_TS, plain.data, plain.len, &body));
-
-    rcp_bytes_free(&body);
+    rcp_bytes_free(&resp);
     rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_dispatch_e2e_safe_mode_executes_a_validly_wrapped_request(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t        pl[4] = {0x01, 0x02, 0x03, 0x04};
+    rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t          wrapped =
+        rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_TS, plain.data, plain.len);
+
+    to_hw_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+
+    g_handler_called = false;
+    TEST_ASSERT_NOT_NULL(wrapped.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, TEST_TS,
+                                                    wrapped.data, wrapped.len, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&wrapped);
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+/* The unprotected request from the plain-mode test above, sent to the
+ * SAME endpoint after it is switched into safe mode: rejected, not
+ * executed -- exactly the gate the pre-fix version of this test pinned
+ * as missing. */
+static void test_dispatch_e2e_safe_mode_rejects_an_unprotected_request(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t        pl[4] = {0x01, 0x02, 0x03, 0x04};
+    rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
+
+    to_hw_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, TEST_TS,
+                                                    plain.data, plain.len, &resp));
+    TEST_ASSERT_FALSE(g_handler_called);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
 }
 
 /* ── REQ-E2E-032 / REQ-E2E-040: what safe mode changes, in both directions ─── */
@@ -315,14 +382,15 @@ static void test_acf_msg_length_adaptation_and_reversal(void)
 
 /* ── REQ-E2E-033: per-ACF-message CRC in a multi-ACF AVTPDU ────────────────── */
 
-/* DEVIATION PIN (partial). TC18 sec. 13.6 requires a separate CRC32 per
- * E2E-protected ACF message, verified individually. rcp_e2e_wrap()/
- * _unwrap() are at that granularity, and the first block below asserts
- * that; what is missing is any composition across a multi-member AVTPDU.
- * rcp_sched_split_frame_members() -- the only walker c-RCP has -- reports
- * the same two members whether or not their trailers verify, and neither
- * it nor rcp_mock_server_dispatch_frame() calls any e2e function. A
- * conforming server would verify each protected member as it walked. */
+/* TC18 sec. 13.6 requires a separate CRC32 per E2E-protected ACF message,
+ * verified individually -- never one CRC across the whole AVTPDU payload.
+ * rcp_e2e_wrap()/_unwrap() are already at that granularity (first block
+ * below, unchanged); as of the REQ-E2E-033/041 fix,
+ * rcp_mock_server_dispatch_frame_e2e() composes that across a real
+ * multi-member frame: each member is routed through
+ * rcp_mock_server_dispatch_e2e() independently, so corrupting only the
+ * second member's trailer produces one successful execution and one
+ * RCP_MOCK_DISPATCH_CRC_ERROR, not an all-or-nothing frame-wide verdict. */
 static void test_each_member_of_a_multi_acf_frame_carries_its_own_crc(void)
 {
     const uint8_t a[4] = {0xA1, 0xA2, 0xA3, 0xA4};
@@ -357,7 +425,9 @@ static void test_each_member_of_a_multi_acf_frame_carries_its_own_crc(void)
     rcp_bytes_free(&body);
     TEST_ASSERT_EQUAL_INT(RCP_E2E_ERR_CRC_MISMATCH,
                           rcp_e2e_unwrap(TEST_SID, TEST_TS, joined + 16u, 16u, &body));
-    /* ...yet the frame walker still reports two good members. */
+    /* The frame walker itself, being e2e-blind, still reports two
+     * syntactic members regardless -- that's rcp_sched_split_frame_members()'s
+     * own, unrelated contract (member boundaries, not trailer validity). */
     TEST_ASSERT_EQUAL_UINT(2u, rcp_sched_split_frame_members(joined, sizeof(joined), offs, 4));
 
     rcp_bytes_free(&body);
@@ -365,6 +435,52 @@ static void test_each_member_of_a_multi_acf_frame_carries_its_own_crc(void)
     rcp_bytes_free(&w1);
     rcp_bytes_free(&m2);
     rcp_bytes_free(&m1);
+}
+
+/* The real server-facing composition: both members addressed to the same
+ * safe-mode endpoint (make_abb() always targets byte_bus_id 0x11), one
+ * with a valid trailer and one corrupted, dispatched together as a single
+ * frame via rcp_mock_server_dispatch_frame_e2e(). */
+static void test_dispatch_frame_e2e_verifies_each_member_independently(void)
+{
+    rcp_mock_server_t             *srv = rcp_mock_server_new();
+    const uint8_t                   a[4] = {0xA1, 0xA2, 0xA3, 0xA4};
+    const uint8_t                   b[4] = {0xB1, 0xB2, 0xB3, 0xB4};
+    rcp_bytes_t                     m1   = make_abb(0, 0, 0, a, sizeof(a));
+    rcp_bytes_t                     m2   = make_abb(0, 0, 0, b, sizeof(b));
+    rcp_bytes_t                     w1   = rcp_e2e_wrap(TEST_SID, TEST_TS, m1.data, m1.len);
+    rcp_bytes_t                     w2   = rcp_e2e_wrap(TEST_SID, TEST_TS, m2.data, m2.len);
+    uint8_t                         joined[32];
+    rcp_mock_frame_member_result_t  results[4];
+    size_t                          dispatched;
+
+    TEST_ASSERT_EQUAL_UINT(16u, w1.len);
+    TEST_ASSERT_EQUAL_UINT(16u, w2.len);
+    memcpy(joined, w1.data, w1.len);
+    memcpy(joined + w1.len, w2.data, w2.len);
+    joined[31] ^= 0xFFu; /* corrupt only the second member's trailer */
+
+    to_hw_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+
+    g_handler_called = false;
+    dispatched = rcp_mock_server_dispatch_frame_e2e(srv, RCP_AVTP_SUBTYPE_TSCF, true, TEST_SID,
+                                                     TEST_TS, joined, sizeof(joined), results, 4);
+    TEST_ASSERT_EQUAL_UINT(2u, dispatched);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR, results[1].result);
+    TEST_ASSERT_TRUE(g_handler_called); /* the first, valid member DID execute */
+    /* The second member's error response carries the real Table 27 code. */
+    TEST_ASSERT_NOT_NULL(results[1].response.data);
+
+    rcp_bytes_free(&results[0].response);
+    rcp_bytes_free(&results[1].response);
+    rcp_bytes_free(&w2);
+    rcp_bytes_free(&w1);
+    rcp_bytes_free(&m2);
+    rcp_bytes_free(&m1);
+    rcp_mock_server_destroy(srv);
 }
 
 /* ── REQ-E2E-037: the AVTPDU data-length adjustment ────────────────────────── */
@@ -520,23 +636,24 @@ static void test_ms_bit_to_carries_crc_binding_is_not_enforced(void)
 
 /* ── REQ-E2E-041: CRC_ERROR handling ───────────────────────────────────────── */
 
-/* DEVIATION PIN (partial). TC18 sec. 13.6 requires a CRC mismatch on a
- * protected stream both to skip execution AND to generate an error
- * response carrying the CRC-mismatch code (POCI_FAILURE, 12, per sec.
- * 12.9.6 Table 27). c-RCP does the first two halves -- the mismatch is
- * reported and maps to code 12 -- but has no caller of rcp_e2e_unwrap()
- * and no error-response emitter, so nothing turns a mismatch into a
- * frame. All that comes back is a diagnostic copy of the REQUEST: its
- * err and rsp bits are still clear, i.e. it is not a Response at all. */
+/* TC18 sec. 13.6 requires a CRC mismatch on a protected stream both to
+ * skip execution AND to generate an error response carrying the
+ * CRC-mismatch code (POCI_FAILURE, 12, per sec. 12.9.6 Table 27). The
+ * raw primitives (rcp_e2e_unwrap()/rcp_e2e_wire_error()) already report
+ * the mismatch and map it to code 12 -- first block below, unchanged.
+ * As of the REQ-E2E-041 fix, rcp_mock_server_dispatch_e2e() is the real
+ * caller and error-response emitter that were missing: on a mismatch it
+ * returns RCP_MOCK_DISPATCH_CRC_ERROR without ever calling
+ * rcp_server_endpoint_admit() (not admitted, not just not-executed), and
+ * *out_response is a genuine TC18 sec. 12.9.6 Error Response -- err=1,
+ * rsp=1, payload = RCP_ERROR_POCI_FAILURE -- built via
+ * rcp_acf_build_error_response(), not a diagnostic echo of the request. */
 static void test_crc_mismatch_skips_execution_without_error_response(void)
 {
     const uint8_t               pl[4] = {0x9A, 0x9B, 0x9C, 0x9D};
     rcp_bytes_t                 frame = make_abb(0, 0, 0, pl, sizeof(pl));
     rcp_bytes_t                 w     = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
     rcp_bytes_t                 body  = {0};
-    rcp_acf_byte_message_info_t hdr;
-    const uint8_t              *out_pl  = NULL;
-    size_t                      out_len = 0;
     rcp_e2e_errc_t              rc;
 
     TEST_ASSERT_NOT_NULL(w.data);
@@ -547,16 +664,56 @@ static void test_crc_mismatch_skips_execution_without_error_response(void)
     TEST_ASSERT_EQUAL_INT(12, (int)RCP_ERROR_POCI_FAILURE);
     TEST_ASSERT_EQUAL_INT(RCP_ERROR_POCI_FAILURE, rcp_e2e_wire_error(rc));
 
-    /* No response is generated: what comes back is the request itself. */
-    TEST_ASSERT_EQUAL_INT(RCP_ACF_OK,
-                          rcp_acf_decode_abb(body.data, body.len, &hdr, &out_pl, &out_len));
-    TEST_ASSERT_EQUAL_UINT8(0u, hdr.err);
-    TEST_ASSERT_EQUAL_UINT8(0u, hdr.rsp);
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(frame.data, body.data, frame.len);
-
     rcp_bytes_free(&body);
     rcp_bytes_free(&w);
     rcp_bytes_free(&frame);
+}
+
+/* The real server-facing half: the same corrupted-trailer frame, through
+ * rcp_mock_server_dispatch_e2e() against a registered, safe-mode
+ * endpoint. */
+static void test_dispatch_e2e_crc_mismatch_yields_real_error_response(void)
+{
+    rcp_mock_server_t          *srv  = rcp_mock_server_new();
+    const uint8_t                pl[4] = {0x9A, 0x9B, 0x9C, 0x9D};
+    rcp_bytes_t                  frame = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t                  w     = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_bytes_t                  resp  = {0};
+    rcp_acf_byte_message_info_t  hdr;
+    const uint8_t               *out_pl  = NULL;
+    size_t                       out_len = 0;
+
+    TEST_ASSERT_NOT_NULL(w.data);
+    w.data[w.len - 1u] ^= 0xFFu; /* corrupt the trailer's last octet */
+
+    to_hw_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, TEST_TS,
+                                                    w.data, w.len, &resp));
+    TEST_ASSERT_FALSE(g_handler_called); /* never admitted, let alone executed */
+
+    /* A genuine Error Response, not an echo of the request. */
+    TEST_ASSERT_NOT_NULL(resp.data);
+    TEST_ASSERT_EQUAL_INT(RCP_ACF_OK,
+                          rcp_acf_decode_abb(resp.data, resp.len, &hdr, &out_pl, &out_len));
+    TEST_ASSERT_EQUAL_UINT8(1u, hdr.err);
+    TEST_ASSERT_EQUAL_UINT8(1u, hdr.rsp);
+    TEST_ASSERT_EQUAL_UINT(1u, out_len);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_POCI_FAILURE, out_pl[0]);
+    /* byte_bus_id/transaction_num carried through from the request, per
+     * TC18 sec. 12.9.6. */
+    TEST_ASSERT_EQUAL_UINT8(0x11u, hdr.byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT8(0x22u, hdr.transaction_num); /* make_abb()'s fixed value */
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&w);
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
 }
 
 /* ── REQ-E2E-042: pad coverage and quadlet alignment ───────────────────────── */
@@ -614,16 +771,20 @@ static void test_crc_covers_pad_octets_and_alignment_is_enforced(void)
 int main(void)
 {
     UNITY_BEGIN();
-    RUN_TEST(test_plain_vs_safe_mode_bit_is_inert);
+    RUN_TEST(test_dispatch_e2e_plain_mode_executes_unprotected_request);
+    RUN_TEST(test_dispatch_e2e_safe_mode_executes_a_validly_wrapped_request);
+    RUN_TEST(test_dispatch_e2e_safe_mode_rejects_an_unprotected_request);
     RUN_TEST(test_safe_mode_changes_only_trailer_and_length);
     RUN_TEST(test_crc_coverage_prefix_is_stream_id_8_then_timestamp_4);
     RUN_TEST(test_ntscf_framed_wrapper_forces_zero_timestamp);
     RUN_TEST(test_acf_msg_length_adaptation_and_reversal);
     RUN_TEST(test_each_member_of_a_multi_acf_frame_carries_its_own_crc);
+    RUN_TEST(test_dispatch_frame_e2e_verifies_each_member_independently);
     RUN_TEST(test_avtpdu_data_length_grows_four_octets_per_protected_member);
     RUN_TEST(test_fragmented_crc_covers_only_the_last_fragment);
     RUN_TEST(test_ms_bit_to_carries_crc_binding_is_not_enforced);
     RUN_TEST(test_crc_mismatch_skips_execution_without_error_response);
+    RUN_TEST(test_dispatch_e2e_crc_mismatch_yields_real_error_response);
     RUN_TEST(test_crc_covers_pad_octets_and_alignment_is_enforced);
     return UNITY_END();
 }

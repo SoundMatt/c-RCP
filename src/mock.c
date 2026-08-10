@@ -2,6 +2,8 @@
 #include "rcp/mock.h"
 
 #include "rcp/acf.h"
+#include "rcp/avtp.h"
+#include "rcp/e2e.h"
 #include "rcp/request_cancel.h"
 #include "rcp/request_chained.h"
 #include "rcp/request_compound.h"
@@ -19,6 +21,17 @@ typedef struct {
     rcp_server_endpoint_t        queue;
     rcp_mock_endpoint_handler_fn handler;
     void                        *user_data;
+    /* This test double's own stand-in for TC18 §12.7.1's
+     * ep_req_crc_enable -- see
+     * rcp_mock_server_set_endpoint_req_crc_enable()'s own doc comment
+     * for why this can't just be read out of
+     * rcp_regmap_ep_functional_cfg_t directly. Defaults false (every
+     * slot starts zeroed -- srv itself is calloc()'d in
+     * rcp_mock_server_new(), and rcp_mock_server_add_endpoint() never
+     * sets this field). Consulted only by
+     * rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e(); the plain
+     * dispatch()/dispatch_frame() ignore it. */
+    bool                         req_crc_enable;
 } rcp_mock_endpoint_slot_t;
 
 /* ── The server double ─────────────────────────────────────────────────────── */
@@ -179,6 +192,17 @@ bool rcp_mock_server_set_endpoint_enable(rcp_mock_server_t *srv, rcp_byte_bus_id
     if (!slot) return false;
 
     rcp_server_endpoint_set_enable(&slot->queue, enable);
+    return true;
+}
+
+//cfusa:req REQ-E2E-031
+bool rcp_mock_server_set_endpoint_req_crc_enable(rcp_mock_server_t *srv,
+                                                  rcp_byte_bus_id_t byte_bus_id, bool enable)
+{
+    rcp_mock_endpoint_slot_t *slot = find_slot(srv, byte_bus_id);
+    if (!slot) return false;
+
+    slot->req_crc_enable = enable;
     return true;
 }
 
@@ -362,6 +386,60 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
                                        &error);
     return finish_admission(slot, admit, request_type, request, request_len, error, byte_bus_id,
                              out_response);
+}
+
+//cfusa:req REQ-E2E-031
+//cfusa:req REQ-E2E-041
+rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
+                                                          rcp_byte_bus_id_t byte_bus_id,
+                                                          uint8_t avtp_subtype, uint8_t acf_msg_type,
+                                                          bool time_sync_supported,
+                                                          uint64_t stream_id, uint32_t avtp_timestamp,
+                                                          const uint8_t *request, size_t request_len,
+                                                          rcp_bytes_t *out_response)
+{
+    rcp_mock_endpoint_slot_t *slot;
+    rcp_bytes_t                unwrapped;
+    rcp_e2e_errc_t             unwrap_result;
+    rcp_mock_dispatch_result_t result;
+
+    memset(out_response, 0, sizeof(*out_response));
+
+    /* "plain command mode" (TC18 §13.6): an endpoint with req_crc_enable
+     * not set, or an unknown byte_bus_id, is untouched by this function
+     * -- delegate outright, including its own EP_NOT_FOUND handling. */
+    slot = find_slot(srv, byte_bus_id);
+    if (!slot || !slot->req_crc_enable) {
+        return rcp_mock_server_dispatch(srv, byte_bus_id, avtp_subtype, acf_msg_type,
+                                         time_sync_supported, request, request_len, out_response);
+    }
+
+    unwrap_result = rcp_e2e_unwrap_framed(stream_id, avtp_subtype == RCP_AVTP_SUBTYPE_NTSCF,
+                                           avtp_timestamp, request, request_len, &unwrapped);
+    if (unwrap_result != RCP_E2E_OK) {
+        /* Not executed, not even admitted -- TC18 §13.6. RCP_E2E_ERR_CRC_MISMATCH
+         * still populates unwrapped (for diagnostic use, per rcp_e2e_unwrap()'s
+         * own doc comment) so it must still be freed even though it is not
+         * used as a request; RCP_E2E_ERR_SHORT_FRAME leaves it zeroed. */
+        rcp_wire_error_t werr = rcp_e2e_wire_error(unwrap_result);
+        if (werr != RCP_ERROR_NONE) {
+            rcp_acf_byte_message_info_t hdr = {0};
+            if (request_len >= 8 && rcp_acf_unpack_header(request, &hdr) == RCP_ACF_OK) {
+                *out_response = rcp_acf_build_error_response(byte_bus_id, hdr.transaction_num, werr);
+            }
+        }
+        rcp_bytes_free(&unwrapped);
+        return RCP_MOCK_DISPATCH_CRC_ERROR;
+    }
+
+    /* CRC validated: dispatch the unwrapped header-and-payload region
+     * (acf_msg_length already adapted back down) exactly as
+     * rcp_mock_server_dispatch() would have dispatched request itself. */
+    result = rcp_mock_server_dispatch(srv, byte_bus_id, avtp_subtype, acf_msg_type,
+                                       time_sync_supported, unwrapped.data, unwrapped.len,
+                                       out_response);
+    rcp_bytes_free(&unwrapped);
+    return result;
 }
 
 //cfusa:req REQ-MOCK-016
@@ -583,6 +661,121 @@ size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subty
         /* A chained member accepted into its endpoint's store has its
          * predecessor behind it already, so its chain_exec_delay timer
          * starts now. */
+        if (out->result == RCP_MOCK_DISPATCH_PENDING) {
+            rcp_mock_endpoint_slot_t *slot = find_slot(srv, byte_bus_id);
+            if (slot) {
+                size_t last = last_pending_index(&slot->queue);
+                (void)rcp_server_endpoint_chain_predecessor_done(&slot->queue, last, 0u);
+            }
+        }
+
+        dispatched++;
+    }
+
+    return dispatched;
+}
+
+//cfusa:req REQ-E2E-033
+size_t rcp_mock_server_dispatch_frame_e2e(rcp_mock_server_t *srv, uint8_t avtp_subtype,
+                                           bool time_sync_supported, uint64_t stream_id,
+                                           uint32_t avtp_timestamp, const uint8_t *frame,
+                                           size_t frame_len,
+                                           rcp_mock_frame_member_result_t *out_results,
+                                           size_t out_cap)
+{
+    size_t offsets[RCP_MOCK_MAX_FRAME_MEMBERS];
+    size_t real_count;
+    size_t stored_count;
+    size_t process_count;
+    size_t i;
+    size_t dispatched = 0;
+    bool   chain_aborted = false;
+    bool   prev_errored  = false;
+    uint8_t cs           = 0;
+
+    real_count = rcp_sched_split_frame_members(frame, frame_len, offsets, RCP_MOCK_MAX_FRAME_MEMBERS);
+    if (real_count == 0) return 0;
+
+    stored_count = (real_count < RCP_MOCK_MAX_FRAME_MEMBERS) ? real_count : RCP_MOCK_MAX_FRAME_MEMBERS;
+    process_count = (stored_count < out_cap) ? stored_count : out_cap;
+
+    for (i = 0; i < process_count; i++) {
+        size_t                           member_off;
+        size_t                           member_end;
+        size_t                           member_len;
+        const uint8_t                   *member;
+        uint8_t                          msg_type    = 0;
+        rcp_byte_bus_id_t                byte_bus_id = 0;
+        rcp_mock_frame_member_result_t  *out         = &out_results[dispatched];
+
+        member_off = offsets[i];
+        if (i + 1 < stored_count) {
+            member_end = offsets[i + 1];
+        } else if (i + 1 == real_count) {
+            member_end = frame_len;
+        } else {
+            break;
+        }
+
+        member_len = member_end - member_off;
+        member     = &frame[member_off];
+
+        if (!peek_member_byte_bus_id(member, member_len, &msg_type, &byte_bus_id)) {
+            out->result      = RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS;
+            out->byte_bus_id = 0;
+            memset(&out->response, 0, sizeof(out->response));
+            prev_errored     = true;
+            dispatched++;
+            continue;
+        }
+
+        out->byte_bus_id = byte_bus_id;
+
+        {
+            uint8_t member_tn = 0;
+
+            if (is_chained_member(member, member_len, &cs, &member_tn)) {
+                rcp_chained_member_outcome_t outcome =
+                    rcp_chained_advance(&chain_aborted, i > 0, prev_errored, cs);
+
+                if (outcome == RCP_CHAINED_MEMBER_CHAIN_ERROR) {
+                    out->result   = RCP_MOCK_DISPATCH_CHAIN_ERROR;
+                    out->response = rcp_acf_build_error_response(byte_bus_id, member_tn,
+                                                                  RCP_ERROR_CHAIN_ERROR);
+                    prev_errored  = true;
+                    dispatched++;
+                    continue;
+                }
+                if (outcome == RCP_CHAINED_MEMBER_CHAIN_ABORTED) {
+                    out->result   = RCP_MOCK_DISPATCH_CHAIN_ABORTED;
+                    out->response = rcp_acf_build_error_response(byte_bus_id, member_tn,
+                                                                  RCP_ERROR_CHAIN_ABORTED);
+                    prev_errored  = true;
+                    dispatched++;
+                    continue;
+                }
+            }
+        }
+
+        /* The one real difference from rcp_mock_server_dispatch_frame():
+         * each member is independently unwrapped-and-verified against
+         * its own CRC32 (if the addressed endpoint has req_crc_enable
+         * set) via rcp_mock_server_dispatch_e2e() -- TC18 §13.6's "a
+         * separate CRC32... for each E2E-protected ACF message"
+         * (REQ-E2E-033), never one CRC across the whole frame. */
+        out->result      = rcp_mock_server_dispatch_e2e(srv, byte_bus_id, avtp_subtype, msg_type,
+                                                          time_sync_supported, stream_id,
+                                                          avtp_timestamp, member, member_len,
+                                                          &out->response);
+
+        /* A member whose CRC failed never reached its endpoint's store
+         * either -- same chaining-error treatment as unknown-bus/
+         * rejected/dropped. */
+        prev_errored = (out->result == RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS ||
+                        out->result == RCP_MOCK_DISPATCH_REJECTED ||
+                        out->result == RCP_MOCK_DISPATCH_DROPPED ||
+                        out->result == RCP_MOCK_DISPATCH_CRC_ERROR);
+
         if (out->result == RCP_MOCK_DISPATCH_PENDING) {
             rcp_mock_endpoint_slot_t *slot = find_slot(srv, byte_bus_id);
             if (slot) {

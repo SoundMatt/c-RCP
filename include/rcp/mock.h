@@ -90,6 +90,20 @@
  * split and dispatched them by hand. A single-member frame behaves
  * identically to calling rcp_mock_server_dispatch() once directly -- this
  * is a strict superset, not a parallel code path.
+ *
+ * rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e() (issue #197,
+ * added after this module's original milestone) are the E2E-aware
+ * counterparts of the two entry points above: for an endpoint with
+ * req_crc_enable set (rcp_mock_server_set_endpoint_req_crc_enable()),
+ * a request's e2e.h CRC32 trailer is verified -- and, on mismatch, the
+ * request is never even admitted, only a conformant error response
+ * built -- before anything else happens. This is deliberately not a
+ * change to the plain dispatch()/dispatch_frame() pair, which keep
+ * ignoring e2e.h entirely, exactly as before: nothing about this
+ * milestone's "own small pure helpers, operate on caller-owned data"
+ * layering discipline changes, this is purely additive surface wiring
+ * an already-existing pure primitive (e2e.h's rcp_e2e_unwrap_framed())
+ * into this double's own dispatch path for the first time.
  */
 #ifndef RCP_MOCK_H
 #define RCP_MOCK_H
@@ -209,6 +223,21 @@ bool rcp_mock_server_remove_endpoint(rcp_mock_server_t *srv, rcp_byte_bus_id_t b
 bool rcp_mock_server_set_endpoint_enable(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
                                           bool enable);
 
+/* Sets whether rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e()
+ * require a valid e2e.h CRC32 trailer on requests addressed to the
+ * endpoint at byte_bus_id -- this test double's own in-process stand-in
+ * for TC18 §12.7.1's ep_req_crc_enable (rcp_regmap_ep_functional_cfg_t),
+ * which every concrete endpoint type's own cfg struct composes but which
+ * this module's type-erased rcp_mock_endpoint_slot_t has no way to read
+ * generically (each endpoint type is a different concrete struct). Has
+ * no effect on the plain rcp_mock_server_dispatch()/_dispatch_frame() --
+ * those never consult it, unchanged from every version before this one.
+ * Defaults false ("plain command mode", TC18 §13.6) for every endpoint
+ * added via rcp_mock_server_add_endpoint(). Returns true iff byte_bus_id
+ * names a registered endpoint. */
+bool rcp_mock_server_set_endpoint_req_crc_enable(rcp_mock_server_t *srv,
+                                                  rcp_byte_bus_id_t byte_bus_id, bool enable);
+
 /* Number of requests currently queued (awaiting drain) on the endpoint at
  * byte_bus_id, or 0 if byte_bus_id names no registered endpoint. */
 size_t rcp_mock_server_endpoint_queue_len(const rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id);
@@ -254,6 +283,15 @@ typedef enum {
      * and the member selected RCP_CHAINED_CS_ABORT_ON_ERROR, or an earlier
      * member had already aborted the chain. */
     RCP_MOCK_DISPATCH_CHAIN_ABORTED   = 8,
+    /* rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e() only: the
+     * addressed endpoint has req_crc_enable set (see
+     * rcp_mock_server_set_endpoint_req_crc_enable()) and request's
+     * trailing CRC32 (e2e.h) did not validate -- TC18 §13.6: the request
+     * is NOT executed. *out_response carries a real Table 27
+     * POCI_FAILURE error response when the frame was at least long
+     * enough to read a transaction_num back out of (RCP_ERROR_NONE
+     * otherwise -- nothing conformant to build a response from). */
+    RCP_MOCK_DISPATCH_CRC_ERROR       = 9,
 } rcp_mock_dispatch_result_t;
 
 /* Runs one already-framed request through srv: first
@@ -328,6 +366,74 @@ size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subty
                                        size_t frame_len,
                                        rcp_mock_frame_member_result_t *out_results,
                                        size_t out_cap);
+
+/* ── E2E-aware dispatch (TC18 §13.6, issue #197 REQ-E2E-031/033/041) ───────── */
+
+/* rcp_mock_server_dispatch()'s E2E-aware counterpart: identical in every
+ * respect (same lifecycle/admission/queueing behavior, same
+ * out_response convention) EXCEPT that when the addressed endpoint has
+ * req_crc_enable set (rcp_mock_server_set_endpoint_req_crc_enable()),
+ * request is first run through e2e.h's rcp_e2e_unwrap_framed() --
+ * is_ntscf_framed is derived from avtp_subtype ==
+ * RCP_AVTP_SUBTYPE_NTSCF (avtp.h), not a separate parameter, so this
+ * function's caller cannot pass an inconsistent combination of the two
+ * -- keyed on stream_id/avtp_timestamp, before anything else happens:
+ *
+ *   - RCP_E2E_ERR_CRC_MISMATCH: the request is NOT executed and NOT
+ *     admitted at all (rcp_server_endpoint_admit() is never called) --
+ *     RCP_MOCK_DISPATCH_CRC_ERROR is returned, and *out_response carries
+ *     a real Table 27 POCI_FAILURE (e2e.h's own spelling of CRC_ERROR;
+ *     see errors.h's file header) error response, built the same way
+ *     finish_admission() already builds one from a determined
+ *     rcp_wire_error_t: byte_bus_id is this call's own parameter,
+ *     transaction_num is read back out of request's own header via
+ *     rcp_acf_unpack_header() (unaffected by the CRC failure -- only the
+ *     trailer, not the header, differs from a valid message).
+ *   - RCP_E2E_ERR_SHORT_FRAME: same RCP_MOCK_DISPATCH_CRC_ERROR
+ *     outcome, but *out_response is left zeroed -- request was too
+ *     short to even carry a CRC32 trailer, so rcp_acf_unpack_header()
+ *     is not attempted (nothing conformant to build a response from,
+ *     the same "RCP_ERROR_NONE means no determined code" convention
+ *     finish_admission() and rcp_server_endpoint_admit() both already
+ *     follow).
+ *   - RCP_E2E_OK: dispatch proceeds exactly as
+ *     rcp_mock_server_dispatch() would, but against the *unwrapped*
+ *     header-and-payload region (acf_msg_length already adapted back
+ *     down by e2e.h) rather than the original CRC-trailered request --
+ *     every other admission/execution/queueing rule is untouched.
+ *
+ * When the addressed endpoint's req_crc_enable is NOT set (including
+ * when byte_bus_id names no registered endpoint at all -- the same
+ * RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS path as always), this function
+ * delegates to rcp_mock_server_dispatch() unchanged: "plain command
+ * mode" (TC18 §13.6) never touches e2e.h at all, matching every
+ * pre-existing caller's behavior exactly. */
+rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
+                                                          rcp_byte_bus_id_t byte_bus_id,
+                                                          uint8_t avtp_subtype, uint8_t acf_msg_type,
+                                                          bool time_sync_supported,
+                                                          uint64_t stream_id, uint32_t avtp_timestamp,
+                                                          const uint8_t *request, size_t request_len,
+                                                          rcp_bytes_t *out_response);
+
+/* rcp_mock_server_dispatch_frame()'s E2E-aware counterpart -- same
+ * member-splitting behavior (TC18 §12.9.1.1), but each member is routed
+ * through rcp_mock_server_dispatch_e2e() instead of
+ * rcp_mock_server_dispatch(), so each E2E-protected member of a
+ * multi-ACF-message frame carries and is verified against its own CRC32
+ * individually (TC18 §13.6's "a separate CRC32... for each E2E-protected
+ * ACF message" requirement -- REQ-E2E-033), never one CRC across the
+ * whole frame. stream_id/avtp_timestamp are shared across every member,
+ * the same way avtp_subtype/time_sync_supported already are (both are
+ * properties of the enclosing NTSCF/TSCF frame, not of an individual ACF
+ * message). Every other parameter and the return value are exactly
+ * rcp_mock_server_dispatch_frame()'s own. */
+size_t rcp_mock_server_dispatch_frame_e2e(rcp_mock_server_t *srv, uint8_t avtp_subtype,
+                                           bool time_sync_supported, uint64_t stream_id,
+                                           uint32_t avtp_timestamp, const uint8_t *frame,
+                                           size_t frame_len,
+                                           rcp_mock_frame_member_result_t *out_results,
+                                           size_t out_cap);
 
 /* ── Conditional-request execution (TC18 §11.2.2) ─────────────────────────── */
 

@@ -9610,12 +9610,11 @@
     {
       "id": "REQ-E2E-031",
       "title": "Plain versus safe command mode is selected per endpoint in the generic endpoint config and gates CRC enforcement",
-      "text": "Each endpoint shall be addressable in exactly one of two modes selected by a bit in its server-owned generic endpoint configuration: plain command mode, in which requests carry no CRC32 trailer, and safe command mode, in which every request must carry a valid CRC32 trailer and a request without one, or with a mismatching one, shall not be executed (TC18 \u00a713.6). NOT IMPLEMENTED: c-RCP's ep_req_crc_enable lives in rcp_regmap_ep_functional_cfg_t rather than the generic block, and no code path consults it, so rcp_e2e_unwrap() is only ever invoked by a caller's own choice and a safe endpoint will happily execute an unprotected request.",
+      "text": "Each endpoint shall be addressable in exactly one of two modes selected by a bit in its server-owned generic endpoint configuration: plain command mode, in which requests carry no CRC32 trailer, and safe command mode, in which every request must carry a valid CRC32 trailer and a request without one, or with a mismatching one, shall not be executed (TC18 \u00a713.6). IMPLEMENTED: mock.c's rcp_mock_server_set_endpoint_req_crc_enable() sets this test double's own in-process gate (its type-erased dispatch layer has no way to read rcp_regmap_ep_functional_cfg_t's ep_req_crc_enable field generically across endpoint types, so it keeps its own copy -- the same reasoning every other config field this module models already follows), and rcp_mock_server_dispatch_e2e() consults it: plain mode executes an unprotected request unchanged, safe mode rejects one (RCP_MOCK_DISPATCH_CRC_ERROR, request never even reaches rcp_server_endpoint_admit()).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
+      "scope": "tc18",
       "tc18": "\u00a713.6, TC18.txt L3782-3787"
     },
     {
@@ -9632,12 +9631,11 @@
     {
       "id": "REQ-E2E-033",
       "title": "Each ACF message in a multi-ACF AVTPDU carries and is verified against its own CRC32",
-      "text": "When an AVTPDU carries more than one ACF message, a separate CRC32 shall be computed, appended to and verified for each E2E-protected ACF message individually, never one CRC across the whole AVTPDU payload (TC18 \u00a713.6). PARTIALLY IMPLEMENTED: rcp_e2e_wrap()/rcp_e2e_unwrap() work per ACF message, but no c-RCP code path walks a multi-member frame verifying each member's own trailer \u2014 rcp_mock_server_dispatch_frame() splits members via rcp_sched_split_frame_members() and dispatches them without any CRC check, so a mixed protected/unprotected frame is not handled.",
+      "text": "When an AVTPDU carries more than one ACF message, a separate CRC32 shall be computed, appended to and verified for each E2E-protected ACF message individually, never one CRC across the whole AVTPDU payload (TC18 \u00a713.6). IMPLEMENTED: rcp_e2e_wrap()/rcp_e2e_unwrap() already worked at this granularity; rcp_mock_server_dispatch_frame_e2e() now composes that across a real multi-member frame -- each member, split via rcp_sched_split_frame_members(), is routed through rcp_mock_server_dispatch_e2e() independently, so a corrupted trailer on one member neither blocks nor is masked by another member's valid one.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
+      "scope": "tc18",
       "tc18": "\u00a713.6, TC18.txt L3789-3791"
     },
     {
@@ -9719,12 +9717,11 @@
     {
       "id": "REQ-E2E-041",
       "title": "A CRC mismatch on a protected stream generates an error response as well as skipping execution",
-      "text": "When a request arrives on an E2E-protected stream and its CRC32 does not match, the RC Server shall not execute the request AND shall generate an error response carrying the CRC-mismatch wire error code (RCP_ERROR_POCI_FAILURE, 12 \u2014 the code TC18 \u00a712.9.6 Table 27 assigns a CRC mismatch, spelled CRC_ERROR in \u00a713.6's prose) (TC18 \u00a713.6). PARTIALLY IMPLEMENTED: rcp_e2e_unwrap() reports RCP_E2E_ERR_CRC_MISMATCH and rcp_e2e_wire_error() maps it, but c-RCP contains no caller of rcp_e2e_unwrap() and no error-response emitter, so the response half never happens.",
+      "text": "When a request arrives on an E2E-protected stream and its CRC32 does not match, the RC Server shall not execute the request AND shall generate an error response carrying the CRC-mismatch wire error code (RCP_ERROR_POCI_FAILURE, 12 \u2014 the code TC18 \u00a712.9.6 Table 27 assigns a CRC mismatch, spelled CRC_ERROR in \u00a713.6's prose) (TC18 \u00a713.6). IMPLEMENTED: rcp_e2e_unwrap() already reported RCP_E2E_ERR_CRC_MISMATCH and rcp_e2e_wire_error() already mapped it; rcp_mock_server_dispatch_e2e() is now the caller and error-response emitter that were missing -- on a mismatch it never calls rcp_server_endpoint_admit() at all (not admitted, not merely not-executed) and builds a genuine TC18 \u00a712.9.6 Error Response (err=1, rsp=1, payload=RCP_ERROR_POCI_FAILURE, byte_bus_id/transaction_num carried through from the request) via rcp_acf_build_error_response().",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
+      "scope": "tc18",
       "tc18": "\u00a713.6, TC18.txt L3827-3828"
     },
     {
