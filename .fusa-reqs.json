@@ -9230,12 +9230,11 @@
     {
       "id": "REQ-RMAP-063",
       "title": "flush_on_count triggers transmission of the whole queue packed into Max_AVTPDUsize-bounded AVTPDUs",
-      "text": "NOT IMPLEMENTED: c-RCP does not implement the flush_on_count trigger (TC18 \u00a712.7.9 Table 24, relative address 0x0006, 16 bit, R/W+, default 1 meaning immediate transmission, legal range 1..queue_size in 32-bit-word entries). Once a response queue holds at least flush_on_count quadlets the server shall begin transmitting, packing as many ACF messages as fit within Max_AVTPDUsize into each AVTPDU and emitting as many AVTPDUs as are needed to drain every queued message including the one that crossed the threshold. rcp_regmap_response_queue_cfg_t.flush_on_count (include/rcp/regmap.h:449) is an inert field with no queue behind it and no packer to drive; scheduler.h implements only the inverse split (rcp_sched_split_frame_members(), REQ-SCHED-004). Consequence: response batching does not exist, so neither the latency/throughput trade-off the register configures nor the multi-message AVTPDU packing the protocol relies on is available.",
+      "text": "respqueue.h's rcp_respqueue_should_flush(q, flush_on_count_octets) implements the trigger -- true once the queue's own running octet total reaches or exceeds the (caller-converted) threshold, matching this codebase's 'caller supplies already-classified units' convention. rcp_respqueue_plan_batch(q, max_avtpdu_size_octets) implements the packing: reports how many of the queue's FIFO-ordered entries fit together within one AVTPDU, so a caller drains exactly that many via rcp_respqueue_pop() and repeats until the queue is empty -- 'packed in a fitting number of AVTPDUs.' Both operate on the queue's own state alone; scheduler.h's rcp_sched_split_frame_members() (the inverse, decode-side split, unchanged) needed no changes.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
+      "scope": "tc18",
       "tc18": "\u00a712.7.9, TC18.txt L3014-L3017 (and Table 24 row 0x0006, L3037-L3039)"
     },
     {

@@ -2,6 +2,7 @@
 //cfusa:req REQ-RMAP-059
 //cfusa:req REQ-RMAP-061
 //cfusa:req REQ-RMAP-062
+//cfusa:req REQ-RMAP-063
 /*
  * respqueue.h -- per-response/acknowledge-stream transmit queue for the
  * TC18 Remote Control Protocol wire layer (ROADMAP.md gap-closure Phase
@@ -16,15 +17,15 @@
  * execution, a structurally different concept (see server.h's own file
  * header) -- there was no OUTBOUND queue of framed responses/
  * acknowledges awaiting transmission anywhere. This module is that
- * queue: REQ-RMAP-059's storage-and-capacity scope, plus
- * REQ-RMAP-061's per-message Max_AVTPDUsize ceiling and REQ-RMAP-062's
- * fragmentation-budget helper, added together since both are the same
- * "keep every transmitted AVTPDU within Max_AVTPDUsize" concern, one
- * enforcing it (refuse an over-size push) and the other enabling a
- * caller to avoid the refusal (fragment first). The remaining Group 4
- * items this queue's own contents will eventually need to satisfy --
- * the flush_on_count packing trigger (REQ-RMAP-063), the Flush_time
- * timer and its empty-queue heartbeat (REQ-RMAP-064/065), and
+ * queue: REQ-RMAP-059's storage-and-capacity scope, REQ-RMAP-061's
+ * per-message Max_AVTPDUsize ceiling, REQ-RMAP-062's fragmentation-
+ * budget helper (all three the same "keep every transmitted AVTPDU
+ * within Max_AVTPDUsize" concern), and REQ-RMAP-063's flush_on_count
+ * packing trigger -- the four together being everything this queue's
+ * OWN contents and state can decide, without needing a clock or a
+ * caller to have transmitted anything. The remaining Group 4 items --
+ * the Flush_time timer and its empty-queue heartbeat (REQ-RMAP-064/065,
+ * which need a clock this module deliberately has none of), and
  * REQ-RMAP-061's own MTU-consistency-check and discovery-exposure
  * halves (a config-time check and a discovery.h change, neither a
  * per-message queue concern) -- are deliberately NOT modeled here.
@@ -161,6 +162,48 @@ size_t rcp_respqueue_octets(const rcp_respqueue_t *q);
  * remains at all once the fixed header and worst-case pad are
  * reserved). */
 size_t rcp_respqueue_max_fragment_payload(size_t max_avtpdu_size_octets, size_t header_len);
+
+/* ── flush_on_count packing trigger ────────────────────────────────────────── */
+
+/* REQ-RMAP-063 (TC18 §12.7.9, Table 24 relative address 0x0006, 16 bit,
+ * R/W+, default 1, legal range 1..queue_size in 32-bit-word entries):
+ * "Once a queue is filled with an amount of quadlets that is equal or
+ * larger than given by flush_on_count, the transmission of one or
+ * multiple AVTPDUs shall be initiated." True iff q currently holds at
+ * least flush_on_count_octets octets -- flush_on_count_octets is the
+ * register's own quadlet value already converted to octets by the
+ * caller (flush_on_count x 4), the same "caller supplies already-
+ * classified units" convention as capacity_octets/max_avtpdu_size_octets
+ * above. flush_on_count_octets == 0 always returns true iff q is
+ * non-empty (the register's own documented default, 1 quadlet, is the
+ * smallest possible nonzero threshold -- "immediate transmission" --
+ * and 0 is not itself a legal configured value per Table 24's own
+ * range, so this is this function's fail-safe reading of an
+ * unconfigured/zero threshold, not a real TC18 case). */
+bool rcp_respqueue_should_flush(const rcp_respqueue_t *q, size_t flush_on_count_octets);
+
+/* REQ-RMAP-063: "Hereby only as much as fitting to the MAX_AVTPDUsize
+ * ACF_types will be included in a generated AVTPDU. Basically all
+ * ACF_types including the one which was exceeding the Flush_on_Count
+ * value will be transmitted, packed in a fitting number of AVTPDUs."
+ * Reports how many of q's own FIFO-ordered entries, starting from the
+ * front, fit together within max_avtpdu_size_octets octets total -- the
+ * membership of ONE generated AVTPDU. A caller builds that AVTPDU by
+ * calling rcp_respqueue_pop() exactly that many times (draining exactly
+ * those entries), then calls this function again for the next AVTPDU,
+ * repeating until rcp_respqueue_len() reaches 0 -- "packed in a fitting
+ * number of AVTPDUs" for the whole queue.
+ *
+ * Always plans at least 1 entry when q is non-empty (an entry too large
+ * for max_avtpdu_size_octets on its own could never have been pushed in
+ * the first place -- rcp_respqueue_push()'s own REQ-RMAP-061
+ * enforcement already guarantees every queued entry individually fits,
+ * so this function never needs to represent "0 entries fit"). Returns 0
+ * iff q is empty. max_avtpdu_size_octets == 0 (unbounded -- no
+ * Max_AVTPDUsize configured) plans every remaining entry into one
+ * AVTPDU, matching this module's own fail-open convention for an
+ * unconfigured ceiling. */
+size_t rcp_respqueue_plan_batch(const rcp_respqueue_t *q, size_t max_avtpdu_size_octets);
 
 #ifdef __cplusplus
 }

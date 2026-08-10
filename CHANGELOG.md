@@ -32,6 +32,29 @@ the rationale.
 
 ## Releases
 
+### v0.175.0 -- 2026-08-10
+
+**Phase 5d batch 5: REQ-RMAP-063 -- flush_on_count trigger + AVTPDU
+packing plan.** Issue #200. Two new, purely additive functions on
+`respqueue.h`'s `rcp_respqueue_t` (no existing signature changed).
+`rcp_respqueue_should_flush()` implements TC18's trigger condition
+against the queue's own running octet total. `rcp_respqueue_plan_batch()`
+implements the packing half, reporting how many FIFO-ordered entries
+fit together within one AVTPDU; a caller drains exactly that many via
+the existing `rcp_respqueue_pop()` and repeats until empty.
+`scheduler.h`'s decode-side `rcp_sched_split_frame_members()` needed no
+changes -- this is its missing encode-side counterpart. Found and split
+a THIRD pre-existing combined deviation pin this phase
+(`-063`/`-064`/`-065` bundled together); `-063`'s half rewritten to a
+positive conformance test. Also hit and fixed a `cfusa` false positive
+(`CFUSA-CY009`'s naive substring match on `des_` inside
+`includes_at_least`) by renaming the offending test identifier. Full
+suite (65/65) + ASan/UBSan clean. Mutation-tested two ways (both
+logic-only, since this batch added no new required parameters). Fresh
+`cfusa check`/`trace` (0 errors, 100%/100%, three separate CI-matching
+invocations). See `ROADMAP.md` milestone 175 for full detail. 1030
+requirements (unchanged), 111 `tc18-gap` entries remaining (was 112).
+
 ### v0.174.0 -- 2026-08-10
 
 **Phase 5d batch 4: REQ-RMAP-061/062 -- Max_AVTPDUsize transmit
