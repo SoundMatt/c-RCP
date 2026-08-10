@@ -31,9 +31,17 @@ const char *rcp_pwrmode_strerror(rcp_pwrmode_errc_t e)
 /* ── Hot vs. cold starts ──────────────────────────────────────────────────── */
 
 //cfusa:req REQ-PWRMODE-003
-rcp_lifecycle_state_t rcp_pwrmode_cold_start_lifecycle_target(void)
+//cfusa:req REQ-PWRMODE-014
+rcp_lifecycle_state_t rcp_pwrmode_cold_start_lifecycle_target(rcp_lifecycle_state_t recovered_state)
 {
-    return RCP_LIFECYCLE_HW_UNCONFIGURED;
+    switch (recovered_state) {
+    case RCP_LIFECYCLE_HW_UNCONFIGURED:
+    case RCP_LIFECYCLE_HW_CONFIGURED:
+    case RCP_LIFECYCLE_RCP_CONFIGURED:
+        return recovered_state;
+    default:
+        return RCP_LIFECYCLE_HW_UNCONFIGURED; /* fail-safe: nothing recovered */
+    }
 }
 
 /* ── General mode transitions ─────────────────────────────────────────────── */

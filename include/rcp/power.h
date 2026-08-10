@@ -242,15 +242,33 @@ const char *rcp_pwrmode_strerror(rcp_pwrmode_errc_t e);
 /* ── Hot vs. cold starts ──────────────────────────────────────────────────────── */
 
 typedef enum {
-    RCP_PWRMODE_START_HOT  = 0, /* prior lifecycle.h state preserved */
+    RCP_PWRMODE_START_HOT  = 0, /* prior lifecycle.h state preserved -- REQ-PWRMODE-015:
+                                    a caller must not discard register-map configuration
+                                    or configured wake-up sources on a transition
+                                    classified HOT; only COLD may. */
     RCP_PWRMODE_START_COLD = 1, /* full lifecycle.h re-init required */
 } rcp_pwrmode_start_kind_t;
 
 /* The lifecycle.h state a cold start's own re-init sequence targets before
  * bringing the server back up -- see the file header. This module never
  * calls rcp_lifecycle_transition() itself; it only names the target state
- * for a caller's own re-init sequence to drive toward. */
-rcp_lifecycle_state_t rcp_pwrmode_cold_start_lifecycle_target(void);
+ * for a caller's own re-init sequence to drive toward.
+ *
+ * REQ-PWRMODE-014 (TC18 §12.3, §12.4.1): "After a cold start the RC
+ * Server will be in its configured lifecycle state" -- recovered from
+ * NVM where present, or from device defaults, which may themselves be
+ * an advanced state. This module owns no NVM access and no default-
+ * configuration table of its own (the same "caller supplies already-
+ * classified inputs" convention as network_available and echoed) --
+ * recovered_state is the caller's own already-recovered fact: whatever
+ * lifecycle.h state its own NVM read (or its own device defaults, absent
+ * NVM) produced. Returned unchanged if it is one of lifecycle.h's three
+ * valid rcp_lifecycle_state_t values; RCP_LIFECYCLE_HW_UNCONFIGURED
+ * (this function's own former unconditional return, still this
+ * function's fail-safe default) is returned instead for any other value
+ * -- an unrecognized or corrupt recovered_state is treated as "nothing
+ * recovered," never as an unvalidated advanced state. */
+rcp_lifecycle_state_t rcp_pwrmode_cold_start_lifecycle_target(rcp_lifecycle_state_t recovered_state);
 
 /* ── General mode transitions (everything except waking from Sleep) ─────────── */
 

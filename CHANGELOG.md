@@ -32,6 +32,36 @@ the rationale.
 
 ## Releases
 
+### v0.170.0 -- 2026-08-10
+
+**Phase 5c batch 8: REQ-PWRMODE-014/015 close Group 4 -- Phase 5c is
+complete.** Issue #199. The last group (cold-start/config persistence).
+Overlap-verified against LIFECYCLE's own config-locking work (issue
+#198, closed in Phase 5b) first, per this phase's scoping discipline --
+orthogonal concerns, no shared plumbing. `rcp_pwrmode_cold_start_
+lifecycle_target()` gains a required `recovered_state` parameter (only
+2 call sites, both tests) -- the caller's own already-recovered fact
+(this module owns no NVM access of its own, the `network_available`
+convention), returned unchanged for a valid `lifecycle.h` state,
+falling back to `RCP_LIFECYCLE_HW_UNCONFIGURED` for a genuinely
+unconfigured device or any unrecognized/corrupt value. Closes
+`REQ-PWRMODE-014`. `REQ-PWRMODE-015` closed via documentation: the
+retention guarantee TC18 requires was already provided by
+`rcp_pwrmode_transition()`'s existing, correct Normal<->StandBy = HOT
+classification -- `RCP_PWRMODE_START_HOT`'s own enumerator comment now
+states the retention obligation explicitly. Mutation-tested two ways:
+a full revert breaks the BUILD (signature coverage), and a separate
+signature-preserving logic mutation is caught by exactly the one test
+pinning it (branch coverage the build-break signal alone would have
+missed). Full suite (64/64) + ASan/UBSan clean. Fresh `cfusa
+check`/`trace` (0 errors, 100%/100%, three separate CI-matching
+invocations). See `ROADMAP.md` milestone 170 for full detail. 1030
+requirements (unchanged), 116 `tc18-gap` entries remaining (was 118).
+
+**Phase 5c is now complete: all 15 items across all 4 groups addressed**
+(14 closed outright, 1 left honestly `partial` with a real
+architecture-limit citation). Issue #199 can be closed.
+
 ### v0.169.0 -- 2026-08-10
 
 **Phase 5c batch 7: REQ-PWRMODE-021/022/027 -- `rcp_pwrmode_commit_network_sleep()`

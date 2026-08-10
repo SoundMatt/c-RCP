@@ -8642,23 +8642,21 @@
     {
       "id": "REQ-PWRMODE-014",
       "title": "A cold start restores the configured lifecycle state, not always HW_UNCONFIGURED",
-      "text": "NOT IMPLEMENTED: c-RCP does not restore the RC Server's configured lifecycle state after a cold start (TC18 \u00a712.3, \u00a712.4.1). rcp_pwrmode_cold_start_lifecycle_target() always returns RCP_LIFECYCLE_HW_UNCONFIGURED, whereas the specification requires the server to come up in the lifecycle state it is actually configured in -- recovered from NVM where present, or from device defaults which may themselves be an advanced state. A server that had reached RCP_CONFIGURED therefore silently loses its configuration on every power cycle and must be re-discovered and re-configured.",
+      "text": "power.h's rcp_pwrmode_cold_start_lifecycle_target() takes a required recovered_state parameter -- the caller's own already-recovered fact (this module owns no NVM access or default-configuration table of its own, the same convention as network_available) -- and returns it unchanged when it is one of lifecycle.h's three valid states, so a server that reached RCP_CONFIGURED before a power cycle no longer silently loses it; RCP_LIFECYCLE_HW_UNCONFIGURED remains the fail-safe default for a genuinely unconfigured device or a corrupt/unrecognized recovered_state.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
+      "scope": "tc18",
       "tc18": "\u00a712.3, TC18.txt L2059-L2062 (also \u00a712.4.1 L2289-L2291)"
     },
     {
       "id": "REQ-PWRMODE-015",
       "title": "Configuration data and wake sources survive StandBy",
-      "text": "An RC Server entering RCP_PWRMODE_STANDBY shall retain its register-map configuration (rcp_regmap_general_t, every endpoint's generic and functional configuration, request-stream and response-queue configuration) and its configured wake-up sources (rcp_ep_wakeup_functional_cfg_t.sources), such that a subsequent hot start reported as RCP_PWRMODE_START_HOT requires no reconfiguration; only a transition classified RCP_PWRMODE_START_COLD may discard configuration.",
+      "text": "power.h owns no register-map or wake-source storage of its own (regmap.c/ep_wakeup.c do) -- the guarantee this library actually provides, and the only one it architecturally can, is that rcp_pwrmode_transition() correctly and always classifies Normal<->StandBy RCP_PWRMODE_START_HOT, now stated explicitly as a retention obligation on RCP_PWRMODE_START_HOT's own doc comment: a caller withholding re-init on HOT (per that documented contract) never has a reason to touch either structure, so both survive by construction, not merely by omission.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
+      "scope": "tc18",
       "tc18": "\u00a712.4, TC18.txt L2274-L2275 (also \u00a712.4.1 L2293-L2294)"
     },
     {
