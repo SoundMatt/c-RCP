@@ -10921,9 +10921,143 @@ remains, and it still needs its own dedicated investigation session
 (`rcp_byte_bus_id_t` widened from 8 to enough bits for the full 11-bit
 BBID address space -- ~40-file footprint, live `src/acf.c` truncation
 bug, needs a full "read every consumer" pass first, matching the
-`REQ-RMAP-030` investigation precedent). After Group 3 closes: Group 2
-(HW_config, §12.7.6, 6 items -- flagged for extra primary-source
-verification on `-043`/`-045`, its own two contradicted-claim items),
-then Group 5's remainder (`-047`-`051`, `-066`-`068`, coordinate with
-issue #197's own Table 22 work to avoid touching the same struct twice
-in flight).
+`REQ-RMAP-030` investigation precedent).
+
+### 197. Phase 5d batch 27: `rcp_byte_bus_id_t` widened to the full 11-bit wire range -- Group 3 fully complete (issue #200)
+
+**Post-push correction, caught by CI before merge:** the initial grep
+sweep searched for the literal type name `rcp_byte_bus_id_t`, which
+missed `src/recorder.c` -- it accesses `.byte_bus_id` on an
+`rcp_avtp_addr_t` without ever spelling the typedef's own name, so it
+never matched. That file narrowed the field into a local `uint8_t`
+before writing it to its own binary export format; clang/gcc's default
+warning set stayed silent (no `-Wconversion`), but MSVC's `/WX` build
+(`windows-2022 / msvc` CI job) correctly failed on the resulting
+`C4244` narrowing warning. Re-swept by FIELD-ACCESS pattern
+(`\.byte_bus_id\b`/`->byte_bus_id\b`) instead of type name across the
+whole tree to find every site the first sweep could have missed the
+same way -- confirmed `recorder.c` was the only real one (a handful of
+test-helper functions take a deliberately narrow `uint8_t` parameter
+and WIDEN it into the struct field, always safe, no warning). Fixed by
+retyping the local to `rcp_byte_bus_id_t` -- safe to do because this
+export format has no in-repo reader, no version/magic field, and no
+test pinning its exact byte layout, so widening it to match the real
+field carries no compatibility break. Lesson for any future
+"widen a type" investigation in this codebase: grep by both the type
+name AND the field-access pattern, not type name alone -- a caller
+that never spells the typedef can still silently narrow through it.
+
+**REQ-RMAP-053 investigation performed first, as flagged.** Grepped
+`rcp_byte_bus_id_t` across the whole codebase: ~55 files (headers,
+`src/*.c`, tests). Read every one. Findings:
+
+- Every endpoint type module (`ep_can.c` through `ep_wakeup.c`), the
+  whole conditional-request layer (`request_cancel.c` through
+  `request_triggered.c`), `config.c`, `lifecycle.c`, `mock.c`, and
+  `server.c` are pure pass-through consumers -- parameter, struct
+  field, or equality comparison, never a bit-masking, shifting, or
+  format-string operation sensitive to the type's width. Confirmed by
+  a targeted grep for exactly those patterns (`0x[fF][fF]`,
+  `UINT8_MAX`, shifts, `%02x`, `snprintf`, `sizeof`) across every
+  consumer file: only two real hits, both fixed below.
+- `src/acf.c`'s own encode path (`rcp_acf_pack_header()`) was NOT
+  actually truncating on encode as earlier notes assumed -- its
+  bit-extraction formula was already written generically for the full
+  11 bits; it only ever produced always-zero high bits because the
+  8-bit *type* itself could never hold anything else. The real bug was
+  purely the typedef's own width, not a second bug in the pack logic.
+  The decode path (`rcp_acf_unpack_header()`) was already honestly
+  *rejecting* (not silently corrupting) any wire value with nonzero
+  high bits, returning `RCP_ACF_ERR_BUS_ID_OVERFLOW` -- safe but
+  incomplete, not a live corruption bug.
+- `src/adapt.c`'s `id_buf[4]` (sized "255"+NUL) would have silently
+  mis-formatted any byte_bus_id above 999 once the type widened --
+  `snprintf` itself was never unsafe (always NUL-terminates within the
+  buffer), but the format would have truncated to 3 digits. Widened to
+  `char[6]` ("2047"+NUL) alongside the type change.
+- `tests/test_mock.c`'s `test_dispatch_frame_reports_unknown_bus_for_
+  undecodable_member` used an out-of-range byte_bus_id as its
+  undecodable-member stimulus -- no longer undecodable once fixed.
+  Tried an unrecognized `acf_msg_type` as a replacement stimulus
+  first; rejected once testing showed `rcp_sched_split_frame_members()`
+  itself only recognizes ACF_ABB/ACF_GBB at the framing level, so that
+  stimulus never reaches per-member decode at all (`dispatched` becomes
+  0, not the needed "1 dispatched but undecodable" case). Settled on an
+  over-declared `pad` count instead (`pad=1` with 0 declared body
+  octets) -- still ABB-typed so the splitter accepts it, still fails
+  `rcp_acf_decode_abb()`'s own unrelated `pad > body_len` check.
+- Checked `errors.c`'s TC18 Table 27 wire-error mapping and
+  `.fusa-reqs.json`: nothing references `RCP_ACF_ERR_BUS_ID_OVERFLOW`
+  for anything but this now-impossible condition, and it was
+  `rcp_acf_errc_t`'s last value, so retiring it outright (not leaving
+  it as permanently-dead code, which this project's own `cfusa`
+  tooling and general hygiene both argue against) renumbers nothing.
+- A stale comment on the enum claimed it "mirrors go-RCP's
+  ErrByteBusIDOverflow for the same underlying limitation" -- checked
+  go-RCP directly before assuming parity or filing a cross-repo issue:
+  go-RCP's own error message reads "ByteBusID out of range for the
+  11-bit wire field (0-2047)", meaning go-RCP already correctly holds
+  the full range and only rejects truly out-of-range values. No
+  matching gap exists there; no issue filed (moot anyway once the enum
+  is retired).
+
+**The fix**: `rcp_byte_bus_id_t` (`avtp.h`) widened `uint8_t` ->
+`uint16_t`. `rcp_acf_unpack_header()`'s overflow check removed (its
+own `busid_full` is mathematically bounded to 0x7FF by the 3-bit +
+8-bit wire extraction, a range the widened type always holds -- the
+check is now provably dead code, not merely unlikely). `RCP_ACF_ERR_
+BUS_ID_OVERFLOW` retired from `rcp_acf_errc_t` and `rcp_acf_strerror()`.
+`adapt.c`'s buffer widened. Doc comments across `acf.h`/`mock.h`
+updated to describe the new behavior rather than the old rejection.
+
+**Test changes**: rewrote three width/reject-pinning deviation tests
+into positive round-trip tests
+(`test_unpack_header_reads_full_11_bit_bus_id` in `test_acf.c`,
+`test_byte_bus_id_is_now_eleven_bits_wide` in
+`test_tc18_gaps_regmap.c`, and a newly split-out
+`test_acf_bus_id_is_now_eleven_bits_wide` in `test_tc18_gaps_ep.c` --
+the old combined test there also covered REQ-ACF-018's own unrelated,
+still-open deviation, split apart so each test's scope matches exactly
+one requirement, this project's own established convention). Updated
+`test_mock.c`'s stimulus as described above. Fixed a stale `sizeof(
+rcp_byte_bus_id_t)==1` width assertion inside `REQ-RMAP-052`'s own
+positive test (`test_ep_id_row_now_has_request_stream_index`) to the
+correct new width. Renamed the first new test
+(`test_unpack_header_decodes_full_11_bit_bus_id`) after `cfusa check`
+flagged it `CFUSA-CY009` ("weak/broken cryptographic function 'des_'")
+-- a substring false positive on "deco**des_**full", not a real
+finding; renamed to `..._reads_full_...` and re-verified 0 errors.
+
+**Mutation-tested with three independent mutations**, the most for any
+single batch this phase, matching the size of the real logic surface
+touched: (1) full revert of `avtp.h`'s typedef alone (`uint16_t` ->
+`uint8_t`) with every other change kept -- caught by three independent
+tests across three files (`Expected 2047 Was 255`, `Expected 2 Was 1`
+x2); (2) isolated reintroduction of decode-side truncation
+(`busid_full & 0xFFu` on assignment) with the type still widened --
+caught by the same three tests; (3) isolated removal of the encode
+path's high-bits extraction (forcing octet 2's own bits to always 0)
+-- caught by the same three tests again, from the opposite (encode)
+direction. `recorder.c`'s own fix (a pure type retype, no computed
+logic) relies on compile-time verification instead, matching the
+established convention for pure structural/width changes elsewhere
+this phase -- MSVC's own C4244 diagnostic already IS the mutation
+signal here, catching the narrowing the moment it existed. Restored
+the correct implementation after each, diff-verified byte-identical
+against pre-mutation backups. Full suite (65/65, some renamed/split,
+net +2 tests) + ASan/UBSan clean on both trees. Fresh `cfusa check`
+(0 errors after the CY009 rename) + all three separate `cfusa trace`
+invocations (100%/100%, 0 untested, only
+pre-existing unrelated `REQ-UART-03x` warnings). `REQ-RMAP-053` and
+its companion `REQ-ACF-020` both move to `implemented`, fully closed.
+1030 requirements (unchanged), 107 `tc18-gap` entries remaining (down
+from 109 -- first reduction of 2 in a single batch this phase).
+
+**Phase 5d progress after batch 27**: 28/47 items addressed (29
+counting `REQ-RMAP-061`'s own partial progress). **Group 3 (EP_ID_
+config, §12.7.8 Table 23) is now COMPLETE: 6/6 items.** Next, per
+issue #200's own suggested order: Group 2 (HW_config, §12.7.6, 6
+items -- flagged for extra primary-source verification on `-043`/
+`-045`, its own two contradicted-claim items), then Group 5's
+remainder (`-047`-`051`, `-066`-`068`, coordinate with issue #197's
+own Table 22 work to avoid touching the same struct twice in flight).

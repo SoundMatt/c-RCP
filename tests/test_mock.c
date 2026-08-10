@@ -687,10 +687,21 @@ static void test_dispatch_frame_returns_zero_for_unparseable_frame(void)
 static void test_dispatch_frame_reports_unknown_bus_for_undecodable_member(void)
 {
     /* A syntactically well-formed member (rcp_sched_split_frame_members()
-     * accepts it) whose byte_bus_id[10:8] bits are nonzero cannot decode
-     * through rcp_acf_decode_abb() (RCP_ACF_ERR_BUS_ID_OVERFLOW, acf.h) --
-     * this must surface as RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS, not a crash
-     * or a bogus dispatch. */
+     * accepts it -- msg_type=ABB, declared length self-consistent with
+     * the buffer) whose own pad count exceeds its declared body region
+     * (pad=1 but acf_msg_length leaves 0 body octets) cannot decode
+     * through rcp_acf_decode_abb() (RCP_ACF_ERR_SHORT_FRAME, acf.h) --
+     * this must surface as RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS, not a
+     * crash or a bogus dispatch. (This used to use an out-of-range
+     * byte_bus_id as its undecodable stimulus; REQ-RMAP-053/REQ-ACF-020
+     * widened rcp_byte_bus_id_t to the full 11-bit wire range, so that
+     * stimulus no longer fails to decode -- an over-declared pad count
+     * is a still-valid, unrelated way for a member to be undecodable.
+     * A msg_type the splitter itself doesn't recognize was tried first
+     * and rejected: rcp_sched_split_frame_members() (scheduler.c) only
+     * accepts ACF_ABB/ACF_GBB at the framing level, so that member never
+     * even reaches per-member decode -- dispatched would be 0, not the
+     * 1-dispatched-but-undecodable scenario this test needs.) */
     rcp_mock_server_t *srv = rcp_mock_server_new();
     uint8_t             raw[RCP_ACF_ABB_HEADER_LEN];
     rcp_mock_frame_member_result_t results[RCP_MOCK_MAX_FRAME_MEMBERS];
@@ -700,8 +711,8 @@ static void test_dispatch_frame_reports_unknown_bus_for_undecodable_member(void)
 
     memset(raw, 0, sizeof(raw));
     raw[0] = (uint8_t)(RCP_ACF_MSG_TYPE_ABB << 1) | 0x00u; /* type=ABB, len MSB=0 */
-    raw[1] = (uint8_t)(RCP_ACF_ABB_HEADER_LEN / 4u);        /* len=2 quadlets, no payload */
-    raw[2] = 0x01u; /* busid[10:8] = 001 -> overflow */
+    raw[1] = (uint8_t)(RCP_ACF_ABB_HEADER_LEN / 4u);        /* len=2 quadlets: 0 body octets */
+    raw[2] = 0x40u; /* pad[7:6] = 01 -> pad=1, but body_len computes to 0 */
 
     dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, raw,
                                                  sizeof(raw), results, RCP_MOCK_MAX_FRAME_MEMBERS);

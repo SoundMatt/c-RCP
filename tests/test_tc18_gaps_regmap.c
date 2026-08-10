@@ -1244,7 +1244,9 @@ static void test_ep_id_row_now_has_request_stream_index(void)
     rcp_regmap_ep_id_map_entry_t rows[3];
 
     TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(rows[0].ep_id));
-    TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(rows[0].byte_bus_id));
+    /* byte_bus_id is now 2 bytes (uint16_t, REQ-RMAP-053/REQ-ACF-020 --
+     * was 1 byte/uint8_t when this test was first written). */
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(rows[0].byte_bus_id));
     TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(rows[0].request_stream_index));
 
     rows[0].ep_id = 5u; rows[0].byte_bus_id = 1u; rows[0].request_stream_index = 1u;
@@ -1428,29 +1430,28 @@ static void test_ep_id_map_flags_heterogeneous_shared_bus(void)
 
 /* TC18 §12.7.8 Table 23 carries BBID in a 16-bit register holding an
  * 11-bit byte_bus_id, and the ACF byte_message_info header transports
- * byte_bus_id[10:8] in octet 2. Deviation: rcp_byte_bus_id_t is uint8_t,
- * so 0x100..0x7FF are unrepresentable: the value truncates on assignment
- * and a frame legitimately carrying one is REJECTED on decode rather than
- * parsed. Only 256 of the protocol's 2048 endpoints per stream are
- * reachable. */
-static void test_byte_bus_id_is_eight_bits_wide(void)
+ * byte_bus_id[10:8] in octet 2. Fixed (REQ-RMAP-053/REQ-ACF-020):
+ * rcp_byte_bus_id_t is now uint16_t, so the full 0x000..0x7FF range is
+ * representable, encodable, and decodable -- all 2048 endpoints per
+ * stream the protocol defines are reachable, not just the first 256. */
+static void test_byte_bus_id_is_now_eleven_bits_wide(void)
 {
     rcp_acf_byte_message_info_t hdr;
     uint8_t                     raw[8];
 
-    TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(rcp_byte_bus_id_t));
-    TEST_ASSERT_EQUAL_HEX16(0x00FFu, (uint16_t)(rcp_byte_bus_id_t)0x07FFu);
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(rcp_byte_bus_id_t));
+    TEST_ASSERT_EQUAL_HEX16(0x07FFu, (uint16_t)(rcp_byte_bus_id_t)0x07FFu);
 
     memset(&hdr, 0, sizeof(hdr));
-    hdr.byte_bus_id = 0xFFu;
+    hdr.byte_bus_id = 0x7FFu;
     hdr.op          = (uint8_t)RCP_ACF_OP_WRITE;
     rcp_acf_pack_header(raw, RCP_ACF_MSG_TYPE_ABB, 2u, &hdr);
-    TEST_ASSERT_EQUAL_HEX8(0x00, (uint8_t)(raw[2] & 0x07u)); /* [10:8] always 0 */
+    TEST_ASSERT_EQUAL_HEX8(0x07, (uint8_t)(raw[2] & 0x07u)); /* [10:8] now real */
     TEST_ASSERT_EQUAL_HEX8(0xFF, raw[3]);
 
-    /* Hand-craft byte_bus_id 0x7FF and decode it: refused, not parsed. */
-    raw[2] = (uint8_t)(raw[2] | 0x07u);
-    TEST_ASSERT_EQUAL(RCP_ACF_ERR_BUS_ID_OVERFLOW, rcp_acf_unpack_header(raw, &hdr));
+    /* Round-trips through decode too, rather than being refused. */
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_unpack_header(raw, &hdr));
+    TEST_ASSERT_EQUAL_UINT16(0x7FFu, hdr.byte_bus_id);
 }
 
 /* TC18 §12.7.8/§12.7.9 mark EP_ID_config rows and the Table 24
@@ -1899,7 +1900,7 @@ int main(void)
     RUN_TEST(test_ep_id_ordering_considers_request_stream_index);
     RUN_TEST(test_ep_id_map_flags_multi_client_ep);
     RUN_TEST(test_ep_id_map_flags_heterogeneous_shared_bus);
-    RUN_TEST(test_byte_bus_id_is_eight_bits_wide);
+    RUN_TEST(test_byte_bus_id_is_now_eleven_bits_wide);
     RUN_TEST(test_no_lockable_w_plus_field_kind);
     RUN_TEST(test_response_queue_stream_id_is_configurable);
     RUN_TEST(test_response_queue_size_register_and_storage_now_exist);

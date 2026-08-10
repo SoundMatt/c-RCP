@@ -11,7 +11,6 @@ const char *rcp_acf_strerror(rcp_acf_errc_t e)
     case RCP_ACF_OK:                  return "rcp/acf: success";
     case RCP_ACF_ERR_SHORT_FRAME:     return "rcp/acf: frame too short";
     case RCP_ACF_ERR_BAD_MSG_TYPE:    return "rcp/acf: unexpected ACF message type";
-    case RCP_ACF_ERR_BUS_ID_OVERFLOW: return "rcp/acf: byte_bus_id exceeds this build's 8-bit range";
     default:                          return "rcp/acf: unknown error";
     }
 }
@@ -53,16 +52,14 @@ void rcp_acf_pack_header(uint8_t out[8], uint8_t acf_msg_type, uint16_t acf_msg_
     out[0] = (uint8_t)((acf_msg_type << 1) | ((acf_msg_length >> 8) & 0x01u));
     out[1] = (uint8_t)(acf_msg_length & 0xFFu);
 
-    /* bits 4:3 (rsv) always 0. byte_bus_id is widened to uint16_t before
-     * shifting: rcp_byte_bus_id_t is only 8 bits wide today (see avtp.h),
-     * so bits 10:8 are always 0, but shifting the narrower type directly
-     * right by 8 trips MSVC's C4333 ("right shift by too large amount")
-     * under /W4 /WX even though the shifted-in-int-promoted value never
-     * actually loses data -- widen first so the shift amount is provably
-     * within the operand's width on every compiler. */
+    /* bits 4:3 (rsv) always 0. rcp_byte_bus_id_t (avtp.h) is uint16_t,
+     * wide enough for the full 11-bit wire field (REQ-RMAP-053/
+     * REQ-ACF-020) -- bits 10:8 land in octet 2, bits 7:0 in octet 3,
+     * both real, both possibly nonzero now, not the always-0 case an
+     * earlier (8-bit) version of this type produced. */
     out[2] = (uint8_t)(((hdr->pad & 0x3u) << 6) |
                         ((hdr->mtv & 0x1u) << 5) |
-                        ((uint8_t)(((uint16_t)hdr->byte_bus_id >> 8) & 0x7u)));
+                        ((uint8_t)((hdr->byte_bus_id >> 8) & 0x7u)));
     out[3] = (uint8_t)(hdr->byte_bus_id & 0xFFu);
 
     /* bits 3:2 (rsv) always 0. */
@@ -89,8 +86,13 @@ rcp_acf_errc_t rcp_acf_unpack_header(const uint8_t in[8], rcp_acf_byte_message_i
 
     out_hdr->pad = (uint8_t)((in[2] >> 6) & 0x3u);
     out_hdr->mtv = (uint8_t)((in[2] >> 5) & 0x1u);
+    /* busid_full is mathematically bounded to 0x7FF (in[2]'s own mask
+     * limits the high part to 3 bits, in[3] contributes the low 8), a
+     * range rcp_byte_bus_id_t (uint16_t, avtp.h) always represents --
+     * no overflow check needed here anymore (REQ-RMAP-053/REQ-ACF-020;
+     * this used to reject busid_full > 0xFFu when the type was 8 bits
+     * wide). */
     busid_full   = (uint16_t)(((uint16_t)(in[2] & 0x07u) << 8) | (uint16_t)in[3]);
-    if (busid_full > 0xFFu) return RCP_ACF_ERR_BUS_ID_OVERFLOW;
     out_hdr->byte_bus_id = (rcp_byte_bus_id_t)busid_full;
 
     out_hdr->evt = (uint8_t)((in[4] >> 4) & 0xFu);

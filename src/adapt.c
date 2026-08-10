@@ -760,7 +760,14 @@ relay_message_t rcp_response_to_message(rcp_adapt_op_t op, rcp_byte_bus_id_t byt
 
     if (out_err) *out_err = err;
     if (err == RCP_ADAPT_OK && op != RCP_ADAPT_OP_DISCOVERY) {
-        char id_buf[4]; /* byte_bus_id is 0-255 -- "255" + NUL */
+        /* byte_bus_id is 0-2047 (REQ-RMAP-053/REQ-ACF-020) -- "2047" +
+         * NUL is 5 bytes; this used to be char[4] ("255"+NUL) back when
+         * rcp_byte_bus_id_t was 8 bits wide. snprintf itself was never
+         * unsafe (it always NUL-terminates within the buffer it's
+         * given), but a 4-byte buffer would have silently truncated
+         * any 4-digit id to 3 digits plus NUL -- a real formatting bug
+         * once the type widened, fixed here alongside it. */
+        char id_buf[6];
         snprintf(id_buf, sizeof(id_buf), "%u", (unsigned)byte_bus_id);
         relay_message_set_id(&msg, id_buf);
     }

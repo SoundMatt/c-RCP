@@ -129,10 +129,17 @@ int rcp_recorder_write_binary(rcp_recorder_t *r, const char *path)
 
     for (i = 0; i < r->len && ok; i++) {
         const rcp_recorder_entry_t *e = &r->entries[i];
-        uint64_t ts        = e->timestamp_ms;
-        uint64_t stream_id = rcp_stream_id_to_u64(e->addr.stream_id);
-        uint8_t  byte_bus  = e->addr.byte_bus_id;
-        uint8_t  inbound   = e->inbound ? 1u : 0u;
+        uint64_t          ts        = e->timestamp_ms;
+        uint64_t          stream_id = rcp_stream_id_to_u64(e->addr.stream_id);
+        /* rcp_byte_bus_id_t (avtp.h) is uint16_t as of REQ-RMAP-053/
+         * REQ-ACF-020 -- this local used to be a narrower uint8_t, which
+         * would silently truncate any address above 255 into this
+         * write-only export format (no in-repo reader exists to have
+         * pinned the old 1-byte width; this format carries no version
+         * field either, so there is no compatibility contract being
+         * broken by widening it to match the real field). */
+        rcp_byte_bus_id_t byte_bus  = e->addr.byte_bus_id;
+        uint8_t           inbound   = e->inbound ? 1u : 0u;
         uint32_t flen      = (uint32_t)e->frame.len;
 
         ok = write_field(f, &ts, sizeof(ts))
