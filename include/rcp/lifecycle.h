@@ -292,6 +292,8 @@ typedef struct {
     bool via_non_unicast_frame; /* true iff the request frame's destination
                                     MAC was multicast or broadcast, not
                                     unicast (REQ-LIFECYCLE-027) */
+    bool via_discovery_stream;  /* request arrived via the discovery stream
+                                    (REQ-LIFECYCLE-030/036) */
 } rcp_lifecycle_writer_ctx_t;
 
 /* True iff a field of the given kind is writable while the server is in
@@ -301,17 +303,24 @@ typedef struct {
  *     read-only from the moment the server reaches HW_CONFIGURED, for any
  *     writer.
  *   - RCP_LIFECYCLE_FIELD_FUNCTIONAL_W: not writable in HW_UNCONFIGURED
- *     (functional configuration presupposes a hardware mapping); writable
- *     by any writer while HW_CONFIGURED; once RCP_CONFIGURED, writable
- *     only when writer indicates the endpoint's own stream or the root
- *     client via EP0.
- *   - RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR: same as FUNCTIONAL_W through
- *     HW_CONFIGURED, but permanently locked (unwritable by any writer, not
- *     just an unauthorized one) once RCP_CONFIGURED is reached -- this is
- *     the distinction the roadmap requires be modeled explicitly rather
- *     than collapsed into a single writability bit.
+ *     (functional configuration presupposes a hardware mapping); while
+ *     HW_CONFIGURED, writable only when writer indicates the root client
+ *     via EP0, the endpoint's own owning stream, or the discovery stream
+ *     (TC18 §12.3.1.2/§12.7.3 -- REQ-LIFECYCLE-030/036); once
+ *     RCP_CONFIGURED, writable only when writer indicates the endpoint's
+ *     own stream or the root client via EP0 (the discovery stream no
+ *     longer suffices on its own at this state -- a distinct, still-open
+ *     concern tracked separately, see test_tc18_gaps_server.c's own
+ *     §12.7.4 deviation pin).
+ *   - RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR: writable unconditionally
+ *     while HW_UNCONFIGURED; the same root-client/owning-stream/
+ *     discovery-stream authorization as FUNCTIONAL_W above while
+ *     HW_CONFIGURED; permanently locked (unwritable by any writer, not
+ *     just an unauthorized one) once RCP_CONFIGURED is reached -- this
+ *     last distinction is the one the roadmap requires be modeled
+ *     explicitly rather than collapsed into a single writability bit.
  *
- * Independently of all three cases above: TC18 §12.3.1.1, §12.3.1.2 and
+ * Independently of all cases above: TC18 §12.3.1.1, §12.3.1.2 and
  * §12.3.1.3 each state (once per lifecycle state) that a write request is
  * accepted only when sent in a unicast frame. This is ANDed in uniformly
  * across every kind/state rather than duplicated per-branch above --

@@ -8511,12 +8511,11 @@
     {
       "id": "REQ-LIFECYCLE-030",
       "title": "In HW_CONFIGURED, EP0 write access to another endpoint's configuration requires the root client or the discovery stream",
-      "text": "NOT IMPLEMENTED: c-RCP grants unrestricted functional-configuration write access in HW_CONFIGURED (TC18 \u00a712.3.1.2). rcp_lifecycle_field_writable() returns true for RCP_LIFECYCLE_FIELD_FUNCTIONAL_W in HW_CONFIGURED for every rcp_lifecycle_writer_ctx_t, whereas the specification permits cross-endpoint write access via EP0 only for a configured root client or via the discovery stream. Any client with a configured stream can reconfigure endpoints it does not own while the server is in HW_CONFIGURED.",
+      "text": "IMPLEMENTED: TC18 \u00a712.3.1.2 permits cross-endpoint write access via EP0 in HW_CONFIGURED only for a configured root client or via the discovery stream. rcp_lifecycle_field_writable() now gates RCP_LIFECYCLE_FIELD_FUNCTIONAL_W's HW_CONFIGURED branch on `authorized || writer.via_discovery_stream`, where authorized is the same via_root_client_ep0 || via_owning_stream formula already used for RCP_CONFIGURED, and via_discovery_stream is a new rcp_lifecycle_writer_ctx_t member (REQ-LIFECYCLE-036 closed the same gate for FUNCTIONAL_W_STAR in the same change, since both requirements reduce to the identical HW_CONFIGURED authorization condition).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
+      "scope": "tc18",
       "tc18": "\u00a712.3.1.2, TC18.txt L2184"
     },
     {
@@ -8576,12 +8575,11 @@
     {
       "id": "REQ-LIFECYCLE-036",
       "title": "HW_CONFIGURED configuration access is restricted to the discovery stream or a known stream_id/byte_bus_id pair",
-      "text": "NOT IMPLEMENTED: in RCP_LIFECYCLE_HW_CONFIGURED c-RCP places no restriction whatever on who may perform a configuration access \u2014 rcp_lifecycle_field_writable() returns true for RCP_LIFECYCLE_FIELD_FUNCTIONAL_W and RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR for every rcp_lifecycle_writer_ctx_t, and rcp_lifecycle_should_accept() accepts every byte_bus_id. TC18 \u00a712.7.3 permits configuration access in this state only (a) via a discovery request on the discovery stream, or (b) via a KNOWN stream_id/byte_bus_id combination addressed directly to the endpoint. Consequence: any stream may reconfigure any endpoint while the server is HW_CONFIGURED.",
+      "text": "IMPLEMENTED: TC18 \u00a712.7.3 permits configuration access in HW_CONFIGURED only (a) via a discovery request on the discovery stream, or (b) via a KNOWN stream_id/byte_bus_id combination addressed directly to the endpoint. rcp_lifecycle_field_writable() now gates both RCP_LIFECYCLE_FIELD_FUNCTIONAL_W and RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR's HW_CONFIGURED branches on `authorized || writer.via_discovery_stream` -- via_owning_stream (already-modeled) is (b)'s \"known stream_id/byte_bus_id pair addressed directly to the endpoint\", and the new via_discovery_stream member is (a). rcp_lifecycle_should_accept()'s own byte_bus_id acceptance is unaffected -- this requirement's substance is about write authorization, which is field_writable()'s layer, matching REQ-LIFECYCLE-030's identical HW_CONFIGURED condition (both closed in the same change).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
+      "scope": "tc18",
       "tc18": "\u00a712.7.3 Configuration in HW_CONFIGURED state, TC18.txt L2493-2494"
     },
     {

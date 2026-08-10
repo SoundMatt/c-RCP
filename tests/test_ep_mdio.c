@@ -220,12 +220,25 @@ static void test_functional_cfg_writable_false_hw_unconfigured(void)
         rcp_ep_mdio_functional_cfg_writable(RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
 }
 
-static void test_functional_cfg_writable_true_hw_configured_any_writer(void)
+static void test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream(void)
 {
-    rcp_lifecycle_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t none          = {0};
+    rcp_lifecycle_writer_ctx_t via_ep0       = {0};
+    rcp_lifecycle_writer_ctx_t via_stream    = {0};
+    rcp_lifecycle_writer_ctx_t via_discovery = {0};
 
-    TEST_ASSERT_TRUE(
-        rcp_ep_mdio_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, writer));
+    via_ep0.via_root_client_ep0        = true;
+    via_stream.via_owning_stream       = true;
+    via_discovery.via_discovery_stream = true;
+
+    /* REQ-LIFECYCLE-030/036: HW_CONFIGURED functional-config write access
+     * now requires the root client via EP0, the endpoint's own owning
+     * stream, or the discovery stream -- no longer any writer
+     * unconditionally. */
+    TEST_ASSERT_FALSE(rcp_ep_mdio_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, none));
+    TEST_ASSERT_TRUE(rcp_ep_mdio_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, via_ep0));
+    TEST_ASSERT_TRUE(rcp_ep_mdio_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, via_stream));
+    TEST_ASSERT_TRUE(rcp_ep_mdio_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, via_discovery));
 }
 
 static void test_functional_cfg_writable_rcp_configured_requires_authorization(void)
@@ -900,7 +913,7 @@ int main(void)
 
     RUN_TEST(test_functional_cfg_init_zeroes);
     RUN_TEST(test_functional_cfg_writable_false_hw_unconfigured);
-    RUN_TEST(test_functional_cfg_writable_true_hw_configured_any_writer);
+    RUN_TEST(test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream);
     RUN_TEST(test_functional_cfg_writable_rcp_configured_requires_authorization);
 
     RUN_TEST(test_strerror_never_null_and_distinct);

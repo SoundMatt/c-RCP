@@ -214,7 +214,14 @@ bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
                                    rcp_lifecycle_field_kind_t kind,
                                    rcp_lifecycle_writer_ctx_t writer)
 {
-    bool authorized = writer.via_root_client_ep0 || writer.via_owning_stream;
+    bool authorized              = writer.via_root_client_ep0 || writer.via_owning_stream;
+    /* TC18 §12.3.1.2/§12.7.3 (REQ-LIFECYCLE-030/036): in HW_CONFIGURED,
+     * functional-config write access is authorized for the root client
+     * via EP0, the endpoint's own owning stream, OR the discovery
+     * stream -- one condition wider than RCP_CONFIGURED's own
+     * `authorized` above, which does not (yet) admit the discovery
+     * stream on its own (see this function's own header doc comment). */
+    bool hw_configured_authorized = authorized || writer.via_discovery_stream;
     bool writable;
 
     switch (kind) {
@@ -230,7 +237,7 @@ bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
         } else if (state == RCP_LIFECYCLE_RCP_CONFIGURED) {
             writable = authorized;
         } else {
-            writable = true; /* HW_CONFIGURED */
+            writable = hw_configured_authorized; /* HW_CONFIGURED */
         }
         break;
 
@@ -238,9 +245,16 @@ bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
         /* TC18 Table 22's own legend: "This configuration table can only be
          * changed in the life-cycle states HW_UNCONFIGURED and HW_CONFIGURED.
          * In RCP_CONFIGURED ... this is read-only. (As indicated by W*)" --
-         * writable in both HW_UNCONFIGURED and HW_CONFIGURED, locked only
-         * once RCP_CONFIGURED is reached. */
-        writable = (state != RCP_LIFECYCLE_RCP_CONFIGURED); /* permanently locked once reached */
+         * writable in both HW_UNCONFIGURED and HW_CONFIGURED (the latter
+         * now subject to the same authorization gate FUNCTIONAL_W applies
+         * above), locked only once RCP_CONFIGURED is reached. */
+        if (state == RCP_LIFECYCLE_RCP_CONFIGURED) {
+            writable = false; /* permanently locked once reached */
+        } else if (state == RCP_LIFECYCLE_HW_CONFIGURED) {
+            writable = hw_configured_authorized;
+        } else {
+            writable = true; /* HW_UNCONFIGURED */
+        }
         break;
 
     default:
