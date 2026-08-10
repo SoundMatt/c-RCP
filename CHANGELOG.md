@@ -32,6 +32,27 @@ the rationale.
 
 ## Releases
 
+### v0.154.0 -- 2026-08-10
+
+**Phase 5b batch 2: REQ-LIFECYCLE-032 HW_CONFIGURED admits only EP0.**
+Issue #198. `rcp_lifecycle_should_accept()` now restricts
+`HW_CONFIGURED` to `RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID` (EP0), per TC18
+§12.3.1.2's "requests to EPs other than EP0 that are not config
+requests will be ignored and dropped". c-RCP has no wire-level
+encode/decode pair for a functional-configuration request at all yet
+(confirmed by grepping the whole codebase), so every non-EP0 request
+is, by construction, operational -- making the EP0-only restriction the
+honestly-achievable form of this rule. Attempted once already in this
+same batch and reverted mid-way when it broke ~35 tests across
+`test_mock.c` and `test_conditional_dispatch.c` that implicitly assume
+ordinary dispatch works in `HW_CONFIGURED`; redone as a two-step plan
+(migrate affected fixtures to `RCP_CONFIGURED` first, verified
+independently, then reapply the fix as a clean diff). Mutation-tested,
+full suite (64/64) + ASan/UBSan clean, fresh `cfusa check`/`trace` (0
+errors, 100%/100%). See `ROADMAP.md` milestone 154 for full detail.
+1028 requirements (unchanged count), 140 `tc18-gap` entries remaining
+(was 141).
+
 ### v0.153.0 -- 2026-08-10
 
 **Phase 5b batch 1: REQ-LIFECYCLE-028 HW_CONFIGURED drops TSCF

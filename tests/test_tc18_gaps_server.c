@@ -172,7 +172,34 @@ static void test_locked_config_write_has_no_kind_and_no_error_response(void)
 
 /* ── §12.3.1.2 / §12.7: unknown streams and non-EP0 endpoints ──────────────── */
 
-static void test_hw_configured_admits_any_stream_and_any_endpoint(void)
+/* As of the REQ-LIFECYCLE-032 fix, HW_CONFIGURED admits only EP0
+ * (RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID) -- byte_bus_id 42 is now
+ * correctly rejected there. RCP_CONFIGURED remains unrestricted at the
+ * byte_bus_id level (REQ-LIFECYCLE-025/036 -- unknown stream_id/
+ * byte_bus_id combinations and writer authorization -- remain real,
+ * separate gaps: rcp_lifecycle_should_accept() still receives no
+ * stream_id and consults no association table or writer identity at
+ * all, so an endpoint no configured request stream maps is still
+ * admitted once RCP_CONFIGURED). */
+static void test_hw_configured_admits_only_ep0(void)
+{
+    TEST_ASSERT_FALSE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)42u));
+    TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
+    TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_RCP_CONFIGURED, false,
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)42u));
+}
+
+/* DEVIATION PIN (REQ-LIFECYCLE-025/036, not implemented): the admission
+ * pipeline behind rcp_lifecycle_should_accept() -- specifically
+ * rcp_server_endpoint_admit(), called directly here, bypassing
+ * should_accept() the same way a real caller would only after
+ * should_accept() has already let a frame through -- takes no lifecycle
+ * state, no stream_id, and no writer identity at all, so an operational
+ * request executes immediately regardless of whether the endpoint it
+ * targets has any configured stream association or who sent it. */
+static void test_admit_takes_no_lifecycle_state_or_stream_identity(void)
 {
     rcp_server_endpoint_t ep;
     rcp_bytes_t           frame = standard_abb((rcp_byte_bus_id_t)42u, 1u);
@@ -181,23 +208,6 @@ static void test_hw_configured_admits_any_stream_and_any_endpoint(void)
     TEST_ASSERT_NOT_NULL(frame.data);
     rcp_server_endpoint_init(&ep, true);
 
-    /* TC18 §12.3 (Figure 16) ignores a request arriving on an unknown
-     * stream_id/byte_bus_id combination; §12.3.1.2 additionally drops every
-     * non-configuration request addressed to an endpoint other than EP0
-     * while HW_CONFIGURED; and §12.7 permits a direct-to-endpoint
-     * configuration request only where a valid stream/byte_bus_id
-     * association exists. rcp_lifecycle_should_accept() receives no
-     * stream_id and consults no association table, so byte_bus_id 42 -- an
-     * endpoint no configured request stream maps -- is admitted in both
-     * configured states. */
-    TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)42u));
-    TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_RCP_CONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)42u));
-
-    /* ...and the dispatch path behind it takes no lifecycle state either,
-     * so the operational request executes immediately rather than being
-     * dropped without response. */
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_EXECUTE_NOW,
                       rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u,
                                                 &request_type, NULL, NULL));
@@ -297,21 +307,23 @@ static void test_hw_configured_drops_tscf(void)
 }
 
 /* DEVIATION PIN (REQ-LIFECYCLE-029, not implemented): TC18 §12.3.1.2 also
- * requires dropping ACF_GBB-format requests in HW_CONFIGURED, without
- * response. Deliberately NOT fixed alongside REQ-LIFECYCLE-028 above:
- * every conditional request kind (compound/compound-wait/triggered/
- * chained/timed/cancel) is wire-encoded as ACF_GBB unconditionally (the
- * mtv-repurposing scheme request_compound.h and siblings document), so an
- * unconditional ACF_GBB drop here would make it impossible to ever admit
- * a conditional request while HW_CONFIGURED -- entangled with
- * REQ-LIFECYCLE-032 (HW_CONFIGURED traffic should be restricted to
- * configuration requests only, not yet implemented either) rather than
- * being a narrow, standalone fix. Tracked as its own follow-up batch in
- * issue #198. */
+ * requires dropping ACF_GBB-format requests addressed to EP0 in
+ * HW_CONFIGURED, without response. Deliberately NOT fixed alongside
+ * REQ-LIFECYCLE-028/032 above: every conditional request kind (compound/
+ * compound-wait/triggered/chained/timed/cancel) is wire-encoded as
+ * ACF_GBB unconditionally (the mtv-repurposing scheme
+ * request_compound.h and siblings document). As of the REQ-LIFECYCLE-032
+ * fix, HW_CONFIGURED already drops every non-EP0 byte_bus_id regardless
+ * of acf_msg_type -- byte_bus_id 7 (used by this test's sibling above)
+ * would now be dropped for that reason alone, no longer exercising this
+ * pin at all, so this test targets RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID
+ * (EP0) specifically: the one remaining case the byte_bus_id restriction
+ * does not already cover. Tracked as its own follow-up batch in issue
+ * #198. */
 static void test_hw_configured_admits_gbb_pending_lifecycle_029(void)
 {
     TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, (rcp_byte_bus_id_t)7u));
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
 }
 
 /* ── §12.7.4: discovery-stream write authority after RCP_CONFIGURED ────────── */
@@ -907,7 +919,8 @@ int main(void)
 
     RUN_TEST(test_transition_takes_neither_idle_nor_writer_input);
     RUN_TEST(test_locked_config_write_has_no_kind_and_no_error_response);
-    RUN_TEST(test_hw_configured_admits_any_stream_and_any_endpoint);
+    RUN_TEST(test_hw_configured_admits_only_ep0);
+    RUN_TEST(test_admit_takes_no_lifecycle_state_or_stream_identity);
     RUN_TEST(test_hw_unconfigured_ignores_claimant_and_request_kind);
     RUN_TEST(test_hw_configured_write_access_is_unrestricted);
     RUN_TEST(test_hw_configured_drops_tscf);

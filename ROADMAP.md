@@ -7589,3 +7589,91 @@ behavior) -- restoring the fix passes clean again. Full test suite
 + `cfusa trace --req-coverage 100 --sec-tested 100` (100%/100%). 1028
 requirements (unchanged count), 141 `tc18-gap` entries remaining (was
 142).
+
+### 154. Phase 5b batch 2: REQ-LIFECYCLE-032 HW_CONFIGURED admits only EP0 (issue #198)
+
+TC18 §12.3.1.2 requires "requests to EPs other than EP0 that are not
+config requests" to be ignored and dropped without response while
+HW_CONFIGURED. `rcp_lifecycle_should_accept()` had no such restriction
+at all -- every byte_bus_id was admitted (subject only to the
+REQ-LIFECYCLE-028 TSCF rule), so an operational request could be
+executed or queued against any endpoint before the server had even
+reached RCP_CONFIGURED.
+
+**Architecture finding this batch turns on**: c-RCP has no wire-level
+encode/decode pair for a functional-configuration read/write request
+at all, for any endpoint type. `regmap.h`'s own file header documents
+this as deliberately deferred ("Exact on-wire encodings for the
+structures below are deliberately left unimplemented... wiring them
+to an actual byte_message_info read/write exchange is later phases'
+job"), confirmed by grepping the entire codebase for any regmap
+encode/decode pair and finding none outside `discovery.c`'s own
+read-only discovery-response encoder. Every wire request this library
+can currently decode for a non-EP0 endpoint is therefore, by
+construction, operational -- so the honestly-achievable, currently-
+correct form of TC18's rule is simply: `rcp_lifecycle_should_accept()`
+now additionally requires `byte_bus_id ==
+RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID` (EP0) in `HW_CONFIGURED`, the
+same restriction `HW_UNCONFIGURED`'s branch already applies.
+
+**Attempted once already, in this same batch, and reverted mid-way**:
+the fix alone breaks not just narrow gap-pin tests but `test_mock.c`'s
+own foundational plumbing suite (8 of its core `add_endpoint`/
+`dispatch`/`drain`/`dispatch_frame` tests -- none of them gap-specific)
+plus 25 of 27 tests in `test_conditional_dispatch.c` plus 1 in
+`test_tc18_gaps_e2e.c` -- ~35 existing tests across 3 files, all built
+on the implicit assumption that ordinary per-endpoint dispatch already
+works in `HW_CONFIGURED`. Rather than push that through blind, the fix
+was reverted, the finding posted to issue #198 (comment `5235892998`),
+and this batch redone as the two-step plan the write-up recommended:
+
+  1. Migrate every affected fixture from `HW_CONFIGURED` to
+     `RCP_CONFIGURED` first, verified independently of the fix itself
+     (a `to_rcp_configured()` helper added to `test_mock.c` and
+     `test_tc18_gaps_e2e.c`, mirroring the one already added to
+     `test_tc18_gaps_e2e.c` in batch 1; `test_conditional_dispatch.c`'s
+     single shared `fixture()` helper gets a second
+     `rcp_mock_server_transition()` call). Each of `test_mock.c`'s 13
+     `to_hw_configured()` call sites was individually inspected --
+     9 needed the swap (all dispatch to a non-EP0 byte_bus_id), 4
+     correctly did not (2 test the transition itself and must stay
+     `HW_CONFIGURED`; 2 test frame-parsing/bus-decode failures that
+     never reach `rcp_lifecycle_should_accept()` at all, so lifecycle
+     state is irrelevant to them) -- not a blind find/replace.
+     `EMPTY_SNAP`'s zero endpoint/request-stream counts trivially
+     satisfy both plausibility checks along the way, the same
+     technique batch 1 already established. This step alone (fix not
+     yet reapplied) was verified to leave both files' full suites
+     passing, proving the migration is safe independent of the fix.
+  2. Reapply the `rcp_lifecycle_should_accept()` fix on top -- now a
+     clean, isolated diff.
+
+Also required, once the fix was back: rewriting
+`test_tc18_gaps_server.c`'s `test_hw_configured_admits_any_stream_and_
+any_endpoint` (previously conflating three separate gaps --
+REQ-LIFECYCLE-025/032/036 -- into one test) into two focused tests:
+`test_hw_configured_admits_only_ep0` (the REQ-LIFECYCLE-032 fix itself)
+and `test_admit_takes_no_lifecycle_state_or_stream_identity` (the
+still-open REQ-LIFECYCLE-025/036 deviation pin, one layer down at
+`rcp_server_endpoint_admit()`, unaffected by this fix); and retargeting
+the `REQ-LIFECYCLE-029` deviation pin from byte_bus_id 7 to EP0, since
+byte_bus_id 7 is now excluded by the new restriction before its
+`acf_msg_type` is ever consulted, no longer exercising the ACF_GBB gap
+it was meant to pin.
+
+`.fusa-reqs.json`'s `REQ-LIFECYCLE-032` moves `scope: "tc18-gap"`/
+`status: "not-implemented"` -> `scope: "tc18"` (fully implemented, no
+`status` field). `REQ-LIFECYCLE-029`'s text updated to record its
+narrowed remaining scope (only an EP0-addressed conditional request
+now escapes it, an edge case no test in this codebase currently
+exercises) -- still `not-implemented`, not overclaimed.
+
+Mutation-tested: reverting the fix (`git stash` on `src/lifecycle.c`,
+`include/rcp/lifecycle.h`) fails `test_hw_configured_admits_only_ep0`'s
+own new assertion (`Expected FALSE Was TRUE`), a runtime assertion
+failure rather than a build break (no new function/type was added,
+only a branch's behavior) -- restoring the fix passes clean again.
+Full test suite (64/64) + ASan/UBSan build both clean. Fresh `cfusa
+check` (0 errors) + `cfusa trace --req-coverage 100 --sec-tested 100`
+(100%/100%). 1028 requirements (unchanged count), 140 `tc18-gap`
+entries remaining (was 141).

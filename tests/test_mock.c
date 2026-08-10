@@ -51,6 +51,18 @@ static void to_hw_configured(rcp_mock_server_t *srv)
         rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP));
 }
 
+/* As of the REQ-LIFECYCLE-032 fix, HW_CONFIGURED admits only requests to
+ * EP0 (byte_bus_id 0) -- a fixture dispatching to any other endpoint needs
+ * RCP_CONFIGURED instead. EMPTY_SNAP's zero endpoint/request-stream counts
+ * trivially satisfy both plausibility checks along the way, same as
+ * to_hw_configured() already relies on for its own single transition. */
+static void to_rcp_configured(rcp_mock_server_t *srv)
+{
+    to_hw_configured(srv);
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+        rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP));
+}
+
 /* ── Server lifecycle ──────────────────────────────────────────────────────── */
 
 static void test_new_server_starts_hw_unconfigured(void)
@@ -243,7 +255,9 @@ static void test_dispatch_unknown_bus_after_lifecycle_accepts(void)
     rcp_bytes_t resp = {0};
     const uint8_t req[] = {0xAA};
 
-    to_hw_configured(srv); /* any byte_bus_id passes lifecycle admission now */
+    /* RCP_CONFIGURED: HW_CONFIGURED admits only EP0 as of the
+     * REQ-LIFECYCLE-032 fix -- see to_rcp_configured()'s own comment. */
+    to_rcp_configured(srv); /* any byte_bus_id passes lifecycle admission now */
 
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS,
         rcp_mock_server_dispatch(srv, 7, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
@@ -266,7 +280,8 @@ static void test_dispatch_unknown_bus_sends_ep_not_found_error(void)
     const uint8_t                *payload;
     size_t                        payload_len;
 
-    to_hw_configured(srv); /* any byte_bus_id passes lifecycle admission now */
+    /* RCP_CONFIGURED -- see to_rcp_configured()'s own comment. */
+    to_rcp_configured(srv); /* any byte_bus_id passes lifecycle admission now */
 
     hdr.byte_bus_id     = 7;
     hdr.transaction_num = 55;
@@ -298,7 +313,7 @@ static void test_dispatch_ok_runs_handler_immediately(void)
     const uint8_t req[] = {1, 2, 3};
     int user_data_marker = 7;
 
-    to_hw_configured(srv);
+    to_rcp_configured(srv); /* see to_rcp_configured()'s own comment */
     reset_handler_capture();
     rcp_mock_server_add_endpoint(srv, 3, 1, true /* ep_enable */, echo_handler, &user_data_marker);
 
@@ -322,7 +337,7 @@ static void test_dispatch_no_handler_leaves_response_zeroed(void)
     rcp_bytes_t resp = {0};
     const uint8_t req[] = {0x01};
 
-    to_hw_configured(srv);
+    to_rcp_configured(srv); /* see to_rcp_configured()'s own comment */
     rcp_mock_server_add_endpoint(srv, 4, 1, true, NULL, NULL);
 
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
@@ -340,7 +355,7 @@ static void test_dispatch_queued_when_endpoint_disabled(void)
     rcp_bytes_t resp = {0};
     const uint8_t req[] = {0x01};
 
-    to_hw_configured(srv);
+    to_rcp_configured(srv); /* see to_rcp_configured()'s own comment */
     reset_handler_capture();
     rcp_mock_server_add_endpoint(srv, 5, 1, false /* ep_enable */, echo_handler, NULL);
 
@@ -360,7 +375,7 @@ static void test_drain_endpoint_runs_queued_request(void)
     rcp_bytes_t resp = {0};
     const uint8_t req[] = {9, 8, 7};
 
-    to_hw_configured(srv);
+    to_rcp_configured(srv); /* see to_rcp_configured()'s own comment */
     reset_handler_capture();
     rcp_mock_server_add_endpoint(srv, 6, 1, false, echo_handler, NULL);
     rcp_mock_server_dispatch(srv, 6, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
@@ -434,7 +449,7 @@ static void test_dispatch_frame_dispatches_each_member_to_its_own_endpoint(void)
     rcp_mock_frame_member_result_t results[RCP_MOCK_MAX_FRAME_MEMBERS];
     size_t                      dispatched;
 
-    to_hw_configured(srv);
+    to_rcp_configured(srv); /* see to_rcp_configured()'s own comment */
     reset_handler_capture();
     rcp_mock_server_add_endpoint(srv, 10, 1, true, echo_handler, NULL);
     rcp_mock_server_add_endpoint(srv, 20, 1, true, echo_handler, NULL);
@@ -490,7 +505,7 @@ static void test_dispatch_frame_single_member_matches_direct_dispatch(void)
     rcp_mock_frame_member_result_t results[RCP_MOCK_MAX_FRAME_MEMBERS];
     size_t                      dispatched;
 
-    to_hw_configured(srv);
+    to_rcp_configured(srv); /* see to_rcp_configured()'s own comment */
     reset_handler_capture();
     rcp_mock_server_add_endpoint(srv, 11, 1, true, echo_handler, NULL);
 
@@ -570,7 +585,7 @@ static void test_dispatch_frame_truncates_at_out_cap(void)
     rcp_mock_frame_member_result_t results[1];
     size_t                      dispatched;
 
-    to_hw_configured(srv);
+    to_rcp_configured(srv); /* see to_rcp_configured()'s own comment */
     rcp_mock_server_add_endpoint(srv, 30, 1, true, NULL, NULL);
     rcp_mock_server_add_endpoint(srv, 31, 1, true, NULL, NULL);
 

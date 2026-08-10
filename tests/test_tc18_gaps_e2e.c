@@ -139,7 +139,10 @@ static void test_dispatch_e2e_plain_mode_executes_unprotected_request(void)
     const uint8_t        pl[4] = {0x01, 0x02, 0x03, 0x04};
     rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
 
-    to_hw_configured(srv);
+    /* RCP_CONFIGURED, not HW_CONFIGURED: HW_CONFIGURED admits only EP0 as
+     * of the REQ-LIFECYCLE-032 fix -- see to_rcp_configured()'s own
+     * comment. */
+    to_rcp_configured(srv);
     rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
     /* req_crc_enable left at its default (false): plain command mode. */
 
