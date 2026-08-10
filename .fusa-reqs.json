@@ -8306,23 +8306,23 @@
     {
       "id": "REQ-E2E-028",
       "title": "per-stream sequence-number enforcement (rx_enforce_seq)",
-      "text": "NOT IMPLEMENTED: c-RCP does not implement the rx_enforce_seq gate (TC18 \u00a712.7.7 Table 22, relative address 0x000D bit 1, 1 bit, R/W*), under which a request shall only be filed for execution if the sequence number carried in its AVTPDU has increased relative to the previously accepted request on that stream. Neither rcp_regmap_request_stream_cfg_t nor e2e.h carries the configuration bit or the per-stream sequence-counter state it would gate. Consequence: a replayed or reordered AVTPDU is filed and executed exactly like a fresh one, defeating the specification's own anti-replay/ordering safety measure; include/rcp/e2e.h:229-240 acknowledges this gap and notes that tara.md/CYBERSECURITY.md still cite the removed REQ-E2E-004..012 replay mitigations.",
+      "text": "PARTIAL: TC18 \u00a712.7.7 Table 22, relative address 0x000D bit 1 (rx_enforce_seq, 1 bit, R/W*), requires that a request only be filed for execution if the sequence number carried in its AVTPDU has increased relative to the previously accepted request on that stream. c-RCP now implements the comparison as a pure, directly-testable primitive: rcp_regmap_request_stream_cfg_t carries the rx_enforce_seq config bit, and rcp_e2e_seq_evaluate() (e2e.h/e2e.c), given a caller-owned rcp_e2e_seq_tracker_t, decides accept/reject using RFC 1982 serial-number comparison so the 8-bit AVTPDU sequence_num's wraparound (0xFF -> 0x00) is treated as a valid single increment rather than a rejection. What remains not implemented: rcp_server_endpoint_admit() itself has no sequence_num input at all -- the AVTPDU header is decoded and discarded by whatever caller demultiplexes a frame before handing admit() the ACF payload (e.g. mock.c's rcp_mock_server_dispatch_frame()) -- so no caller in this codebase actually calls rcp_e2e_seq_evaluate() yet. A replayed or reordered AVTPDU is still filed and executed exactly like a fresh one until that integration exists.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.7.7 Table 22, TC18.txt L2868-L2870"
     },
     {
       "id": "REQ-E2E-029",
       "title": "sequence-error safe-state escalation (rx_seq_safestate_enable)",
-      "text": "NOT IMPLEMENTED: c-RCP does not implement rx_seq_safestate_enable (TC18 \u00a712.7.7 Table 22, relative address 0x000D bit 2, 1 bit, R/W*), under which a detected sequence-number discontinuity (a Sequence_Nr that did not advance by a single increment) shall bring all endpoints bound to that request stream into their configured safe state. c-RCP has neither the detection (see the rx_enforce_seq gap) nor the escalation: rcp_e2e_wd_evaluate() computes enter_safe_state from the watchdog only. Consequence: an interrupted or tampered request sequence produces no safe-state transition, so the only safety net configured through Table 22 that does not depend on a watchdog timeout is entirely absent.",
+      "text": "PARTIAL: TC18 \u00a712.7.7 Table 22, relative address 0x000D bit 2 (rx_seq_safestate_enable, 1 bit, R/W*), requires that a detected sequence-number discontinuity (a Sequence_Nr that did not advance by exactly one increment) bring all endpoints bound to that request stream into their configured safe state. c-RCP now implements the detection: rcp_regmap_request_stream_cfg_t carries the rx_seq_safestate_enable config bit, and rcp_e2e_seq_evaluate()'s result.enter_safe_state field is true exactly when a discontinuity is detected and rx_seq_safestate_enable is set -- independent of, and can be true even when, result.accept is also true (an out-of-order-but-forward gap is still filed, per rx_enforce_seq's own rule, while also being flagged as unsafe). What remains not implemented, and architecturally cannot be performed from inside this decision alone: (1) nothing in this codebase calls rcp_e2e_seq_evaluate() yet -- see REQ-E2E-028's own text for why; (2) even once wired, the actual cross-endpoint escalation this field signals -- bringing every OTHER endpoint bound to the same request stream to its safe state -- is the same architecture boundary already documented for rcp_e2e_overflow_should_enter_safe_state() (REQ-E2E-030): this library's rcp_server_endpoint_t is scoped to one endpoint, with no type representing \"all endpoints on a stream\" to reach across into.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.7.7 Table 22, TC18.txt L2871-L2873"
     },
     {

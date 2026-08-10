@@ -346,6 +346,55 @@ bool rcp_e2e_overflow_should_enter_safe_state(bool rx_ovrflw_safestate_enable)
     return rx_ovrflw_safestate_enable;
 }
 
+/* ── Per-stream sequence-number enforcement ────────────────────────────────── */
+
+void rcp_e2e_seq_tracker_init(rcp_e2e_seq_tracker_t *t)
+{
+    t->has_prev = false;
+    t->prev_seq = 0;
+}
+
+//cfusa:req REQ-E2E-028
+//cfusa:req REQ-E2E-029
+rcp_e2e_seq_result_t rcp_e2e_seq_evaluate(rcp_e2e_seq_tracker_t *t, bool rx_enforce_seq,
+                                           bool rx_seq_safestate_enable, uint8_t seq)
+{
+    rcp_e2e_seq_result_t r;
+    uint8_t               fwd_distance; /* (seq - prev_seq) mod 256 */
+
+    if (!t->has_prev) {
+        /* Nothing to compare against yet: the first request on a stream
+         * always accepts and can never itself be a discontinuity. */
+        r.accept          = true;
+        r.discontinuity   = false;
+        r.enter_safe_state = false;
+        t->has_prev = true;
+        t->prev_seq = seq;
+        return r;
+    }
+
+    fwd_distance = (uint8_t)(seq - t->prev_seq);
+
+    /* RFC 1982 serial-number comparison: seq is "ahead" of prev_seq iff
+     * their forward distance lies in the nearer half of the circle,
+     * [1, 127] -- see this function's declaration-site doc comment for
+     * the full wraparound rationale. */
+    r.accept        = !rx_enforce_seq || (fwd_distance >= 1u && fwd_distance <= 127u);
+    r.discontinuity = (fwd_distance != 1u);
+    r.enter_safe_state = r.discontinuity && rx_seq_safestate_enable;
+
+    /* Tracked state advances only on accept: t->prev_seq is specifically
+     * "the previously ACCEPTED request on this stream" (this function's
+     * own contract, matching REQ-E2E-028's text), not merely the last
+     * seq observed. Advancing on a rejected (stale/replayed) seq would
+     * drag the reference point backward and let a replay weaken
+     * detection of the genuine next request; leaving it unmoved means a
+     * rejected seq changes nothing about what the stream still expects
+     * next. */
+    if (r.accept) t->prev_seq = seq;
+    return r;
+}
+
 /* ── rx_enforce_e2e: single-request drop vs. whole-stream latch-to-fault ────── */
 
 //cfusa:req REQ-E2E-020

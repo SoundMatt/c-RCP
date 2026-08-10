@@ -504,6 +504,89 @@ rcp_e2e_wd_result_t rcp_e2e_wd_evaluate(bool rx_wd_enable, uint32_t rx_wd_timeou
  * caller-facing decision such an orchestrator would consult. */
 bool rcp_e2e_overflow_should_enter_safe_state(bool rx_ovrflw_safestate_enable);
 
+/* ── Per-stream sequence-number enforcement ──────────────────────────────── */
+
+/* Caller-owned per-stream tracker: the "previously accepted request on this
+ * stream" state TC18 §12.7.7 Table 22's rx_enforce_seq/rx_seq_safestate_enable
+ * are both defined against. Same "own small stateful helper living alongside
+ * this module's otherwise-pure functions" shape as rcp_e2e_stream_fault_t
+ * above -- one instance per configured request stream, caller-allocated,
+ * this module owns no registry of them. */
+typedef struct {
+    bool    has_prev;  /* false until the first call to
+                           rcp_e2e_seq_evaluate() -- there is no
+                           "previously accepted request" yet, so that first
+                           call always accepts (nothing to compare against)
+                           and never reports a discontinuity. */
+    uint8_t prev_seq;  /* the last sequence_num rcp_e2e_seq_evaluate()
+                           accepted -- see that function's own doc comment
+                           for why this only ever advances on accept. */
+} rcp_e2e_seq_tracker_t;
+
+/* Zero-initializes t (has_prev = false, prev_seq = 0). */
+void rcp_e2e_seq_tracker_init(rcp_e2e_seq_tracker_t *t);
+
+typedef struct {
+    bool accept;           /* the request may be filed for execution */
+    bool discontinuity;    /* seq did not advance by exactly one increment
+                               from the previously tracked value (never true
+                               on the first call -- see has_prev above) */
+    bool enter_safe_state; /* discontinuity && rx_seq_safestate_enable */
+} rcp_e2e_seq_result_t;
+
+//cfusa:req REQ-E2E-028
+//cfusa:req REQ-E2E-029
+/* TC18 §12.7.7 Table 22 defines two independently-configurable reactions
+ * to a request stream's AVTPDU sequence_num, evaluated together here
+ * because both compare the same incoming seq against the same tracked
+ * state, but deliberately NOT collapsed into one bool: they answer
+ * different questions and either can be enabled without the other.
+ *
+ *   - rx_enforce_seq (bit 1): "Requests are only filed for execution if
+ *     sequence number in AVTPDU is increased" -- the coarser, admission-
+ *     gating check. result.accept is true whenever !rx_enforce_seq (the
+ *     gate is off) or seq is strictly ahead of the tracked value (see the
+ *     wraparound note below); false when seq is stale (a replay or
+ *     reorder) and rx_enforce_seq is on.
+ *
+ *   - rx_seq_safestate_enable (bit 2): "bring all endpoints to safety
+ *     state if Sequence_Nr has no single increment" -- a stricter,
+ *     independent check for a *gap* (seq advanced by more than one, e.g.
+ *     a request was lost in transit), which fires even when
+ *     result.accept is true, because an increase-but-not-by-exactly-one
+ *     is still evidence something is wrong even though ordering itself
+ *     was preserved. Same cross-endpoint escalation boundary as
+ *     rcp_e2e_overflow_should_enter_safe_state() -- this function reports
+ *     the decision, not the stream-wide action itself; see that
+ *     function's own doc comment.
+ *
+ * Wraparound: avtp.h's sequence_num is a plain uint8_t (matching IEEE
+ * 1722's own field width) that free-runs and wraps 0xFF -> 0x00 over any
+ * long-lived stream -- TC18's own prose ("a strict monotonous increasing
+ * sequence number of the requests can be enforced") does not spell out
+ * modular comparison, but a literal always-greater-than reading would
+ * make rx_enforce_seq reject every single request once the counter first
+ * wraps, which cannot be the intended behavior of a mechanism meant to
+ * run indefinitely. This function instead uses the standard serial-number
+ * comparison technique (RFC 1982): seq is "ahead" of prev_seq iff their
+ * unsigned difference, taken modulo 256, lies in [1, 127] -- the nearer
+ * half of the circle in the forward direction -- which treats 0x00 as
+ * ahead of 0xFF (a real wrap) while still rejecting a seq that jumped
+ * backward by any amount up to half the space (a replay). "Exactly one
+ * increment" for discontinuity is unambiguous regardless: seq ==
+ * (uint8_t)(prev_seq + 1).
+ *
+ * t's state advances only when result.accept is true: t->prev_seq is
+ * specifically "the previously ACCEPTED request on this stream" (this
+ * function's own contract), not merely the last seq observed. Advancing
+ * on a rejected (stale/replayed) seq would drag the reference point
+ * backward and weaken this same call's detection of the genuine next
+ * request -- a caller-owned-state discipline in the same spirit as
+ * rcp_e2e_stream_fault_t above, but deliberately not "unconditional"
+ * update, unlike that type's own f->faulted latch. */
+rcp_e2e_seq_result_t rcp_e2e_seq_evaluate(rcp_e2e_seq_tracker_t *t, bool rx_enforce_seq,
+                                           bool rx_seq_safestate_enable, uint8_t seq);
+
 /* ── rx_enforce_e2e: single-request drop vs. whole-stream latch-to-fault ───── */
 
 typedef enum {
