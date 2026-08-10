@@ -556,16 +556,18 @@ static void test_data_length_for_protected_members_is_pure_arithmetic(void)
 
 /* ── REQ-E2E-038: the fragmentation coverage rule ──────────────────────────── */
 
-/* DEVIATION PIN (not implemented). TC18 sec. 13.6 requires a fragmented
+/* PARTIAL (was: not implemented). TC18 sec. 13.6 requires a fragmented
  * message's CRC32 to span the FIRST AVTPDU's stream_id/avtp_timestamp and
  * the FIRST fragment's ACF header, followed by the concatenated
- * byte_msg_payload of EVERY segment in order. c-RCP's documented
- * integration (fragment.h) wraps only the final fragment's own encoded
- * bytes, so the trailer covers the LAST fragment's header and payload
- * alone and every earlier segment is entirely unprotected -- as the last
- * two assertions show: mutating segment 0's payload changes the CRC a
- * conforming implementation would have computed, while this one still
- * verifies the message as good. */
+ * byte_msg_payload of EVERY segment in order. As of the REQ-E2E-038 fix,
+ * rcp_e2e_compute_fragmented_crc() computes exactly that -- covering
+ * segment 0 in a way rcp_e2e_wrap()'s existing final-fragment-only
+ * behavior still does not (the last two assertions show the same gap
+ * this test always pinned: mutating segment 0's payload moves the
+ * conforming CRC but leaves rcp_e2e_wrap()-based verification happy,
+ * because c-RCP still has no caller anywhere that wires the new
+ * primitive into an actual fragmented encode/decode path -- see the
+ * function's own doc comment for why). */
 static void test_fragmented_crc_covers_only_the_last_fragment(void)
 {
     const uint8_t p0[4] = {0xF0, 0xF1, 0xF2, 0xF3};
@@ -576,28 +578,30 @@ static void test_fragmented_crc_covers_only_the_last_fragment(void)
     rcp_bytes_t   f2    = make_abb(0, 0, 2, p2, sizeof(p2)); /* ms=0, final     */
     rcp_bytes_t   w2;
     rcp_bytes_t   body  = {0};
-    uint8_t       span[8 + 4 + 4 + 4]; /* first fragment's ACF header + all payloads */
+    uint8_t       payload[4 + 4 + 4]; /* every segment's own payload, concatenated */
     uint32_t      conforming;
 
     TEST_ASSERT_TRUE(rcp_e2e_fragment_carries_crc(true));
     w2 = rcp_e2e_wrap(TEST_SID, TEST_TS, f2.data, f2.len);
     TEST_ASSERT_NOT_NULL(w2.data);
 
-    /* What c-RCP actually computes: the final fragment's bytes alone. */
+    /* What rcp_e2e_wrap()-based dispatch actually computes: the final
+     * fragment's bytes alone. */
     TEST_ASSERT_EQUAL_HEX32(rcp_e2e_compute_crc(TEST_SID, TEST_TS, w2.data, f2.len),
                             be32(w2.data + f2.len));
 
-    memcpy(span, f0.data, 8);
-    memcpy(span + 8, p0, 4);
-    memcpy(span + 12, p1, 4);
-    memcpy(span + 16, p2, 4);
-    conforming = rcp_e2e_compute_crc(TEST_SID, TEST_TS, span, sizeof(span));
+    memcpy(payload, p0, 4);
+    memcpy(payload + 4, p1, 4);
+    memcpy(payload + 8, p2, 4);
+    conforming = rcp_e2e_compute_fragmented_crc(TEST_SID, TEST_TS, f0.data, 8u,
+                                                 payload, sizeof(payload));
     TEST_ASSERT_TRUE(conforming != be32(w2.data + f2.len));
 
     /* Segment 0 is unprotected: its corruption moves the conforming CRC
      * but leaves this implementation's verification happy. */
-    span[8] ^= 0xFFu;
-    TEST_ASSERT_TRUE(rcp_e2e_compute_crc(TEST_SID, TEST_TS, span, sizeof(span)) != conforming);
+    payload[0] ^= 0xFFu;
+    TEST_ASSERT_TRUE(rcp_e2e_compute_fragmented_crc(TEST_SID, TEST_TS, f0.data, 8u,
+                                                     payload, sizeof(payload)) != conforming);
     TEST_ASSERT_EQUAL_INT(RCP_E2E_OK,
                           rcp_e2e_unwrap(TEST_SID, TEST_TS, w2.data, w2.len, &body));
 
@@ -606,6 +610,44 @@ static void test_fragmented_crc_covers_only_the_last_fragment(void)
     rcp_bytes_free(&f2);
     rcp_bytes_free(&f1);
     rcp_bytes_free(&f0);
+}
+
+/* Direct tests of rcp_e2e_compute_fragmented_crc() itself: equivalent to
+ * concatenating header ++ payload and calling rcp_e2e_compute_crc() once
+ * (the technique it uses internally to avoid the allocation), and
+ * sensitive to a change anywhere in either region. */
+static void test_compute_fragmented_crc_matches_manual_concatenation(void)
+{
+    const uint8_t hdr[8]     = {0x0Eu, 0x00, 0x11, 0x22, 0x00, 0x00, 0x00, 0x10};
+    const uint8_t payload[8] = {0xA0, 0xA1, 0xA2, 0xA3, 0xB0, 0xB1, 0xB2, 0xB3};
+    uint8_t       concat[sizeof(hdr) + sizeof(payload)];
+    uint32_t      via_helper;
+    uint32_t      via_manual_concat;
+
+    memcpy(concat, hdr, sizeof(hdr));
+    memcpy(concat + sizeof(hdr), payload, sizeof(payload));
+
+    via_helper = rcp_e2e_compute_fragmented_crc(TEST_SID, TEST_TS, hdr, sizeof(hdr),
+                                                 payload, sizeof(payload));
+    via_manual_concat = rcp_e2e_compute_crc(TEST_SID, TEST_TS, concat, sizeof(concat));
+    TEST_ASSERT_EQUAL_HEX32(via_manual_concat, via_helper);
+
+    /* Sensitive to the header region... */
+    {
+        uint8_t bad_hdr[8];
+        memcpy(bad_hdr, hdr, sizeof(hdr));
+        bad_hdr[0] ^= 0xFFu;
+        TEST_ASSERT_TRUE(rcp_e2e_compute_fragmented_crc(TEST_SID, TEST_TS, bad_hdr, sizeof(bad_hdr),
+                                                         payload, sizeof(payload)) != via_helper);
+    }
+    /* ...and to the payload region, anywhere in it (not just the tail). */
+    {
+        uint8_t bad_payload[8];
+        memcpy(bad_payload, payload, sizeof(payload));
+        bad_payload[0] ^= 0xFFu; /* segment 0's own octet, not segment 1's */
+        TEST_ASSERT_TRUE(rcp_e2e_compute_fragmented_crc(TEST_SID, TEST_TS, hdr, sizeof(hdr),
+                                                         bad_payload, sizeof(bad_payload)) != via_helper);
+    }
 }
 
 /* ── REQ-E2E-039: the ms bit / trailer binding ─────────────────────────────── */
@@ -801,6 +843,7 @@ int main(void)
     RUN_TEST(test_avtpdu_data_length_grows_four_octets_per_protected_member);
     RUN_TEST(test_data_length_for_protected_members_is_pure_arithmetic);
     RUN_TEST(test_fragmented_crc_covers_only_the_last_fragment);
+    RUN_TEST(test_compute_fragmented_crc_matches_manual_concatenation);
     RUN_TEST(test_ms_bit_to_carries_crc_binding_is_not_enforced);
     RUN_TEST(test_crc_mismatch_skips_execution_without_error_response);
     RUN_TEST(test_dispatch_e2e_crc_mismatch_yields_real_error_response);

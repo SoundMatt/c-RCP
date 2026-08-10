@@ -264,6 +264,29 @@ bool rcp_e2e_fragment_carries_crc(bool is_last_fragment)
     return is_last_fragment;
 }
 
+//cfusa:req REQ-E2E-038
+uint32_t rcp_e2e_compute_fragmented_crc(uint64_t stream_id, uint32_t avtp_timestamp,
+                                         const uint8_t *first_fragment_header,
+                                         size_t first_fragment_header_len,
+                                         const uint8_t *reassembled_payload,
+                                         size_t reassembled_payload_len)
+{
+    uint32_t crc = 0xFFFFFFFFu;
+    uint8_t  sid[8];
+    uint8_t  ts[4];
+    size_t   i;
+
+    put_u64(sid, stream_id);
+    put_u32(ts, avtp_timestamp);
+
+    for (i = 0; i < 8; i++) crc = crc32_update(crc, sid[i]);
+    for (i = 0; i < 4; i++) crc = crc32_update(crc, ts[i]);
+    for (i = 0; i < first_fragment_header_len; i++) crc = crc32_update(crc, first_fragment_header[i]);
+    for (i = 0; i < reassembled_payload_len; i++) crc = crc32_update(crc, reassembled_payload[i]);
+
+    return crc ^ 0xFFFFFFFFu;
+}
+
 /* ── Safety-tagged request classification ──────────────────────────────────── */
 
 //cfusa:req REQ-E2E-011

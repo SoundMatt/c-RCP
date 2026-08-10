@@ -425,6 +425,53 @@ rcp_e2e_errc_t rcp_e2e_unwrap_framed(uint64_t stream_id, bool is_ntscf_framed,
  * segment message's final fragment ever does. See the file header. */
 bool rcp_e2e_fragment_carries_crc(bool is_last_fragment);
 
+//cfusa:req REQ-E2E-038
+/* TC18 §13.6's fragmented-message CRC coverage rule, the one case
+ * rcp_e2e_compute_crc() alone cannot express: for a message split across
+ * more than one AVTPDU (fragment.h), the CRC32 spans stream_id +
+ * avtp_timestamp (as always) followed by the FIRST fragment's ACF header
+ * -- not the last fragment's, even though the trailer this CRC produces
+ * is the one appended to (and only to) the last fragment's own message --
+ * followed by the concatenated byte_msg_payload of EVERY segment in
+ * order (fragment.h's rcp_fragment_reassembler_get() already produces
+ * exactly this concatenation on the decode side; an encode-side caller
+ * assembles the same by concatenating each rcp_fragment_plan() segment's
+ * own payload slice in order).
+ *
+ * first_fragment_header is the first fragment's own encoded
+ * byte_message_info bytes (RCP_ACF_ABB_HEADER_LEN or
+ * RCP_ACF_GBB_HEADER_LEN octets, acf.h -- fixed regardless of which
+ * fragment in the sequence it comes from, so this parameter's length is
+ * always one of those two values in practice, though this function
+ * itself does not require it). reassembled_payload is the full
+ * concatenation described above, NOT any single fragment's own payload
+ * slice. Equivalent to concatenating first_fragment_header ++
+ * reassembled_payload and calling rcp_e2e_compute_crc(stream_id,
+ * avtp_timestamp, ..., ...) once, without the allocation such a
+ * concatenation would need -- the same "running CRC over several
+ * caller-owned regions" technique rcp_e2e_compute_crc() itself already
+ * uses for stream_id/avtp_timestamp/acf_frame.
+ *
+ * This function is the CRC arithmetic alone. It does not itself locate
+ * "the first fragment's header" out of a sequence of already-encoded
+ * fragments, does not itself append the resulting CRC to the last
+ * fragment's message, and does not itself adapt the last fragment's
+ * acf_msg_length/AVTPDU data-length fields (rcp_e2e_length_with_crc()
+ * and rcp_e2e_data_length_for_protected_members() remain the pure
+ * expressions of those two adjustments respectively) -- composing all of
+ * that into an actual fragmented-and-protected encode/decode pipeline is
+ * a caller's job, matching every other function in this module's "own
+ * small pure helpers, operate on caller-owned data" layering discipline.
+ * No caller in this codebase does so yet: mock.c has no fragmented-
+ * message dispatch path of any kind (protected or not) to wire this
+ * into, a materially larger, separate architecture item than adding this
+ * one arithmetic primitive. */
+uint32_t rcp_e2e_compute_fragmented_crc(uint64_t stream_id, uint32_t avtp_timestamp,
+                                         const uint8_t *first_fragment_header,
+                                         size_t first_fragment_header_len,
+                                         const uint8_t *reassembled_payload,
+                                         size_t reassembled_payload_len);
+
 /* ── Safety-tagged request classification ────────────────────────────────── */
 
 /* True iff request_type's MSB (0x80) is set. This module's own,

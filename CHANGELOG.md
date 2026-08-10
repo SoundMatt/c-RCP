@@ -32,6 +32,26 @@ the rationale.
 
 ## Releases
 
+### v0.152.0 -- 2026-08-09
+
+**Phase 5a batch 7 (final): REQ-E2E-038 fragmented-message CRC
+coverage primitive.** Issue #197. Adds
+`rcp_e2e_compute_fragmented_crc()`, computing TC18 §13.6's fragmented-
+message CRC span (stream_id + avtp_timestamp + the FIRST fragment's ACF
+header + the concatenated payload of EVERY segment, not just the final
+fragment's own bytes as `rcp_e2e_wrap()`-based dispatch does today) --
+the same running-CRC-over-several-regions technique
+`rcp_e2e_compute_crc()` already uses. Honestly scoped `partial`, not
+`implemented`: nothing in this codebase calls the new primitive yet,
+and `mock.c` has no fragmented-message dispatch path at all (protected
+or not) to wire it into -- a materially larger, separate architecture
+item. Mutation-tested (the test file fails to build without the fix),
+full suite + ASan/UBSan clean, fresh `cfusa check`/`trace` (0 errors,
+100%/100%). See `ROADMAP.md` milestone 152 for full detail, including
+the closing summary for Phase 5a (issue #197) as a whole. 1028
+requirements (unchanged count), 142 `tc18-gap` entries remaining
+(unchanged count -- stays a gap entry, now `partial`).
+
 ### v0.151.0 -- 2026-08-09
 
 **Phase 5a batch 6: REQ-E2E-037 AVTPDU data-length adjustment helper.**
