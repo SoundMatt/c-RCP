@@ -11061,3 +11061,90 @@ items -- flagged for extra primary-source verification on `-043`/
 `-045`, its own two contradicted-claim items), then Group 5's
 remainder (`-047`-`051`, `-066`-`068`, coordinate with issue #197's
 own Table 22 work to avoid touching the same struct twice in flight).
+
+### 198. Phase 5d batch 28: EP_Signal_Nr enumeration now covers all eleven endpoint types with correct per-type numbering (issue #200)
+
+First Group 2 batch. **Primary-source verification performed first, as
+issue #200 itself flags for `REQ-RMAP-043`/`-045`**: extracted TC18
+§12.7.6's own text (`pdftotext -layout` against the PDF, since no
+locally-extracted `TC18.txt` was found this session) and read Table
+19/20/21 directly. Every one of Group 2's six existing citations
+checked out exactly as written -- Table 19's 3-octet-per-pin layout,
+Table 20's four packed sub-fields (Pull-Up/Output-stage/Drive-strength/
+Schmitt-Trigger), the literal sentence "All outputs are always also an
+input" (confirming `REQ-RMAP-043`'s own claim, not contradicting it
+despite that requirement's "contradicted" framing -- the framing means
+c-RCP's own behavior contradicts TC18, not that the requirement's
+citation is wrong), and Table 21's full per-endpoint-type signal
+enumeration. No requirement-text corrections needed; proceeded to
+implement with confidence.
+
+Blast-radius check on `rcp_regmap_named_signal_t`/`RCP_REGMAP_SIGNAL_*`
+found a small, safe footprint (regmap.h/regmap.c + test files + one
+doc-comment-only reference in `ep_i2c.h`) -- unlike `pin_property`/
+`RCP_REGMAP_PIN_PROP_*` (this group's `-042`/`-043`, deliberately NOT
+touched this batch), which has real behavioral consumers
+(`src/ep_gpio.c`'s pin-direction-toggle logic, `src/config.c`'s JSON
+parser) and a second, possibly-overlapping `pin_property` field on
+`rcp_ep_gpio_functional_cfg_t` (`ep_gpio.h`) whose relationship to
+HW_config's own `hw_pin_type` needs its own dedicated investigation
+before any change -- flagged for a future batch, same "smallest safe
+win first" discipline used throughout this phase.
+
+`rcp_regmap_named_signal_t` extended with 18 new values across eight
+endpoint-type groups (UART/LIN/PWM_OUT+PWM_OUTN/PWM_IN/ADC/DAC/CAN/
+ISELED/MDIO), in Table 21's own signal order, closing `REQ-RMAP-044`'s
+coverage gap. New `rcp_regmap_named_signal_ep_signal_nr()` converts
+this enum's own flat ordinal into TC18's per-type-relative wire value
+(SPI_CLK/I2C_SCL/UART_TX/CAN_RXD/etc. all correctly return 0, restarting
+per type) -- range-check implementation keyed off each group's own
+first member rather than an 18-case switch, kept low-complexity by
+construction since the enum's declaration order IS the grouping.
+Documented (and left, since it wasn't independently exercised by this
+compiler's own unsigned enum representation) an explicit negative-input
+guard for portability across compilers that might choose a signed
+underlying type for this enum.
+
+Rewrote two deviation pins into positive tests:
+`test_named_signal_index_is_global_and_covers_three_types` (now
+`test_named_signal_index_covers_every_endpoint_type`,
+`test_tc18_gaps_regmap.c`) and a second usage site found via the
+established "grep the domain term across the whole suite" discipline
+-- `test_adc_value_width_and_absent_analog_input_signal`
+(`test_tc18_gaps_ep2.c`, renamed `..._named_analog_input_signal`),
+narrowed to point its own still-open remainder at `REQ-ADC-032`
+(already tracks the enforcement half of this gap) rather than
+restating it vaguely.
+
+Mutation-tested with two mutations: full revert -- fails to LINK
+(undefined symbols, both the new enum values and the new function);
+isolated mutation on `ep_signal_nr()`'s CAN offset base
+(`RCP_REGMAP_SIGNAL_CAN_RXD` -> `_CAN_TXD`) -- caught
+(`Expected 0 Was 255`). A third mutation (removing the explicit
+negative-input guard) was NOT caught by this compiler's build --
+confirmed this is because the enum's underlying type is unsigned here
+(all declared values non-negative), so `(rcp_regmap_named_signal_t)-1`
+wraps to a large unsigned value that already falls through every range
+check to the same `return 0u` default the guard would have produced;
+the guard is retained anyway as documented portability defense for a
+compiler that picks a signed underlying type, not as an
+independently-mutation-tested behavior under this one. Restored the
+correct implementation after each, diff-verified byte-identical
+against pre-mutation backups. Full suite (65/65) + ASan/UBSan clean on
+both trees. Fresh `cfusa check` (0 errors) + all three separate `cfusa
+trace` invocations (100%/100%, 0 untested, only pre-existing unrelated
+`REQ-UART-03x` warnings). `REQ-RMAP-044` and `REQ-RMAP-045` both move
+to `implemented` (honestly caveated: content/naming fix only, no wire
+encode/decode path for HW_config exists yet to actually exercise
+either). 1030 requirements (unchanged), 105 `tc18-gap` entries
+remaining (down from 107).
+
+**Phase 5d progress after batch 28**: 30/47 items addressed (31
+counting `REQ-RMAP-061`'s own partial progress). Group 2: 2/6 items
+(`-044`, `-045`). Next: `-042`/`-043` (the `pin_property`/`hw_pin_type`
+bit-layout fix, flagged above as needing its own consumer
+investigation given real behavioral callers in `ep_gpio.c`/`config.c`
+and a possibly-duplicate second `pin_property` field on
+`rcp_ep_gpio_functional_cfg_t`), then `-040`/`-041` (the HW_config
+table's own server-side storage and 3-octet-per-pin wire layout, which
+`-044`/`-045`'s own status text both note are still missing).

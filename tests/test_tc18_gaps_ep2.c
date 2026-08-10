@@ -287,7 +287,7 @@ static void test_uart_register_units_diverge_from_table_48(void)
 
 /* ── ADC (§13.7.9) ─────────────────────────────────────────────────────────── */
 
-static void test_adc_value_width_and_absent_analog_input_signal(void)
+static void test_adc_value_width_and_named_analog_input_signal(void)
 {
     /* IMPLEMENTED half of the clause -- TC18 §13.7.9.1 limits an ADC
      * endpoint to 16-bit resolution, and a response carries as many values
@@ -296,16 +296,17 @@ static void test_adc_value_width_and_absent_analog_input_signal(void)
     TEST_ASSERT_EQUAL_size_t(4u, rcp_ep_adc_response_value_count(8u));
     TEST_ASSERT_EQUAL_size_t(0u, rcp_ep_adc_response_value_count(9u));
 
-    /* DEVIATION -- TC18 §13.7.9.1 also requires that each ADC endpoint
-     * serve exactly one channel and have an analog input pin selected for
-     * it. regmap.h's named-signal index -- the only way any endpoint type
-     * binds a signal to a hardware pin -- ends at the I2C pair: there is no
-     * ADC analog-input signal, so an ADC endpoint cannot be bound to a
-     * physical input at all. A conforming implementation would define one
-     * and require a hw_pin_map entry for it. */
-    TEST_ASSERT_EQUAL_INT((int)RCP_REGMAP_SIGNAL_COUNT, (int)RCP_REGMAP_SIGNAL_I2C_SDA + 1);
-    TEST_ASSERT_EQUAL_STRING("unknown",
-                             rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_COUNT));
+    /* TC18 §13.7.9.1 also requires that each ADC endpoint serve exactly
+     * one channel and have an analog input pin selected for it.
+     * regmap.h's named-signal index -- the only way any endpoint type
+     * binds a signal to a hardware pin -- now defines RCP_REGMAP_SIGNAL_
+     * ADC_IN (REQ-RMAP-044), so an ADC endpoint's analog input CAN now
+     * be named and bound via a hw_pin_map entry. Whether a given ADC
+     * endpoint actually HAS one selected/enforced is REQ-ADC-032's own
+     * separate, still-open scope -- this test's own concern is purely
+     * that the signal exists to bind to. */
+    TEST_ASSERT_EQUAL_STRING("ADC_IN", rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_ADC_IN));
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_regmap_named_signal_ep_signal_nr(RCP_REGMAP_SIGNAL_ADC_IN));
 }
 
 static void test_adc_block_has_no_clock_status_or_interval_registers(void)
@@ -798,7 +799,7 @@ int main(void)
     RUN_TEST(test_uart_read_size_truncates_above_one_octet);
     RUN_TEST(test_uart_register_units_diverge_from_table_48);
 
-    RUN_TEST(test_adc_value_width_and_absent_analog_input_signal);
+    RUN_TEST(test_adc_value_width_and_named_analog_input_signal);
     RUN_TEST(test_adc_block_has_no_clock_status_or_interval_registers);
     RUN_TEST(test_adc_inter_sample_spacing_is_unconstrained);
     RUN_TEST(test_adc_has_no_trigger_outputs_and_no_retained_average);

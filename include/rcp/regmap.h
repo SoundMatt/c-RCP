@@ -845,7 +845,17 @@ typedef struct {
 
 /* The full named-signal index shared by every endpoint type, written once
  * here and reused unmodified by every endpoint type added later (see the
- * file header). */
+ * file header). This is one flat enumeration for human-readable naming
+ * (rcp_regmap_named_signal_string()) -- TC18 §12.7.6 Table 21's own
+ * EP_Signal_Nr wire value is NOT this enum's own ordinal; it restarts at
+ * 0 for every endpoint type (REQ-RMAP-045). rcp_regmap_named_signal_
+ * ep_signal_nr() below is the converter between the two: this enum's
+ * flat ordinal (for naming/identity) and TC18's own per-type-relative
+ * wire value (for hw_ep_pin_nr, TC18 §12.7.6 Table 19). Values are
+ * grouped by endpoint type, in the same order and per-type numbering
+ * Table 21 itself uses, so that converter can compute an offset from
+ * each group's own first member rather than needing a second, parallel
+ * lookup table. */
 typedef enum {
     RCP_REGMAP_SIGNAL_GPIO0 = 0,
     RCP_REGMAP_SIGNAL_GPIO1,
@@ -890,6 +900,34 @@ typedef enum {
     RCP_REGMAP_SIGNAL_SPI_CS5,
     RCP_REGMAP_SIGNAL_I2C_SCL,
     RCP_REGMAP_SIGNAL_I2C_SDA,
+    /* REQ-RMAP-044: TC18 §12.7.6 Table 21 enumerates EP_Signal_Nr for
+     * every endpoint type this codebase implements, not just GPIO/SPI/
+     * I2C -- the eight groups below close that coverage gap, each in
+     * Table 21's own signal order. */
+    RCP_REGMAP_SIGNAL_UART_TX,
+    RCP_REGMAP_SIGNAL_UART_RX,
+    RCP_REGMAP_SIGNAL_UART_RTS,
+    RCP_REGMAP_SIGNAL_UART_CTS,
+    RCP_REGMAP_SIGNAL_LIN_TXD,
+    RCP_REGMAP_SIGNAL_LIN_RXD,
+    RCP_REGMAP_SIGNAL_LIN_NSLP,
+    RCP_REGMAP_SIGNAL_PWM_OUT,  /* positive phase -- Table 21's own name */
+    RCP_REGMAP_SIGNAL_PWM_OUTN, /* inverted phase -- Table 21's own name */
+    RCP_REGMAP_SIGNAL_PWM_IN,
+    RCP_REGMAP_SIGNAL_ADC_IN,
+    RCP_REGMAP_SIGNAL_DAC_OUT,
+    RCP_REGMAP_SIGNAL_CAN_RXD,
+    RCP_REGMAP_SIGNAL_CAN_TXD, /* TC18's own counter-intuitive order:
+                                   RXD=0, TXD=1 (Table 21) */
+    RCP_REGMAP_SIGNAL_ISELED_ISP_P,
+    RCP_REGMAP_SIGNAL_ISELED_ISP_N,
+    RCP_REGMAP_SIGNAL_MDIO_MDC,
+    RCP_REGMAP_SIGNAL_MDIO_DATA, /* Table 21 names this signal "MDIO"
+                                     itself, identical to the endpoint
+                                     type name -- disambiguated here to
+                                     _DATA to avoid an enum-identifier
+                                     collision with the type name; not a
+                                     departure from the wire meaning */
     RCP_REGMAP_SIGNAL_COUNT /* not itself a valid signal; the number of
                                 named signals defined above */
 } rcp_regmap_named_signal_t;
@@ -897,6 +935,19 @@ typedef enum {
 /* Human-readable, unique name for sig. Returns "unknown" (never NULL) for
  * a value outside 0..RCP_REGMAP_SIGNAL_COUNT-1. */
 const char *rcp_regmap_named_signal_string(rcp_regmap_named_signal_t sig);
+
+/* REQ-RMAP-045: converts sig's own flat enum ordinal into TC18 §12.7.6
+ * Table 21's per-endpoint-type EP_Signal_Nr wire value -- the value
+ * hw_ep_pin_nr (Table 19) actually carries, which restarts at 0 for
+ * every endpoint type rather than continuing this enum's own flat
+ * numbering. Returns 0 for RCP_REGMAP_SIGNAL_COUNT or any other value
+ * outside 0..RCP_REGMAP_SIGNAL_COUNT-1 (there is no meaningful
+ * EP_Signal_Nr for a signal that doesn't exist; 0 is chosen over an
+ * out-of-band sentinel to keep the return type a plain uint8_t, matching
+ * the wire field's own width -- callers that need to distinguish "not a
+ * real signal" from "really is EP_Signal_Nr 0" should validate sig
+ * against RCP_REGMAP_SIGNAL_COUNT themselves before calling). */
+uint8_t rcp_regmap_named_signal_ep_signal_nr(rcp_regmap_named_signal_t sig);
 
 /* ── Request-stream and response/ack queue config ──────────────────────────── */
 

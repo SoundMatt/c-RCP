@@ -34,6 +34,32 @@ the rationale.
 
 ## Releases
 
+### v0.198.0 -- 2026-08-10
+
+**Phase 5d batch 28: EP_Signal_Nr enumeration now covers all eleven
+endpoint types with correct per-type numbering.** Issue #200. First
+Group 2 (HW_config, §12.7.6) batch. `REQ-RMAP-044`/`-045`.
+Primary-source verification performed first, as issue #200 itself
+flags for this group's contested items -- extracted TC18 §12.7.6's
+own text directly from the PDF and confirmed every existing citation
+accurate; no requirement-text corrections needed. `rcp_regmap_named_
+signal_t` (avtp.h) extended with 18 new values (UART/LIN/PWM_OUT+
+PWM_OUTN/PWM_IN/ADC/DAC/CAN/ISELED/MDIO), matching Table 21's own
+order. New `rcp_regmap_named_signal_ep_signal_nr()` converts this
+enum's flat ordinal into TC18's per-type-relative wire value, restarting
+at 0 for every endpoint type as Table 21 requires. Deliberately did NOT
+touch `pin_property`/`hw_pin_type` (`-042`/`-043`) this batch -- unlike
+this item, that one has real behavioral consumers (`ep_gpio.c`'s
+pin-direction logic, `config.c`'s JSON parser) and a possibly-
+duplicate second field on `rcp_ep_gpio_functional_cfg_t`, flagged for
+its own dedicated investigation. Mutation-tested with two mutations
+(full revert -- fails to link; isolated CAN-offset mutation -- caught).
+Full suite (65/65) + ASan/UBSan clean on both trees. Fresh `cfusa
+check`/`trace` (0 errors, 100%/100%, three separate CI-matching
+invocations). `REQ-RMAP-044`/`-045` both move to `implemented`
+(content/naming fix only -- no wire encode/decode path for HW_config
+exists yet). See `ROADMAP.md` milestone 198 for full detail.
+
 ### v0.197.0 -- 2026-08-10
 
 **Phase 5d batch 27: `rcp_byte_bus_id_t` widened to the full 11-bit
