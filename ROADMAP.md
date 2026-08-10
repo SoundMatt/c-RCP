@@ -7123,3 +7123,40 @@ expected, restored. Full test suite (64/64) + ASan/UBSan build both
 clean. Fresh `cfusa check` (0 errors) + `cfusa trace --req-coverage 100
 --sec-tested 100` (100%/100%). 1028 requirements (unchanged count), 147
 `tc18-gap` entries remaining (was 148).
+
+### 147. Phase 5a batch 2: REQ-E2E-035 NTSCF-framed wrappers (issue #197)
+
+TC18 §13.6 requires an NTSCF-framed message (an NTSCF header carries no
+timestamp field of its own) to contribute four all-zero octets as its
+`avtp_timestamp` in the CRC32. `rcp_e2e_compute_crc()`/`rcp_e2e_wrap()`/
+`rcp_e2e_unwrap()` take `avtp_timestamp` as a plain `uint32_t` with no
+NTSCF/TSCF discriminator, so nothing prevented a caller from feeding an
+NTSCF message a nonzero timestamp and producing a message a conforming
+peer would reject as a CRC mismatch, with no diagnostic pointing at the
+real cause.
+
+Rather than change the raw primitives' signatures (they stay
+general-purpose, serving both TSCF- and NTSCF-framed callers, and every
+existing caller/test already depends on their current shape), added a
+new framing-aware pair: `rcp_e2e_wrap_framed()`/`rcp_e2e_unwrap_framed()`
+take an explicit `is_ntscf_framed` bool and force the zero contribution
+regardless of what `avtp_timestamp` they were given, delegating to the
+existing `rcp_e2e_wrap()`/`_unwrap()` for everything else. This is the
+conformant entry point for a caller that already knows a message's
+framing (e.g. against `avtp.h`'s own `RCP_AVTP_SUBTYPE_NTSCF`/`_TSCF`
+discriminator) -- the raw primitives remain available, and still trust
+the caller, for a lower-level caller that manages framing itself.
+
+`test_tc18_gaps_e2e.c`'s `REQ-E2E-035` test is rewritten to exercise both
+the raw primitives (unchanged contract, still documented) and the new
+wrapper (proving it produces byte-identical output to a correctly-zeroed
+raw call despite being told a nonzero timestamp, and that
+`unwrap_framed()` verifies against it symmetrically).
+
+Mutation-tested: reverting the fix doesn't just fail a test -- the test
+file fails to *build* at all (`call to undeclared function
+'rcp_e2e_wrap_framed'`), an even stronger signal than a runtime
+assertion failure. Full test suite (64/64) + ASan/UBSan build both
+clean. Fresh `cfusa check` (0 errors) + `cfusa trace --req-coverage 100
+--sec-tested 100` (100%/100%). 1028 requirements (unchanged count), 146
+`tc18-gap` entries remaining (was 147).

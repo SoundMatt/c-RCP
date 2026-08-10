@@ -32,6 +32,19 @@ the rationale.
 
 ## Releases
 
+### v0.147.0 -- 2026-08-09
+
+**Phase 5a batch 2: REQ-E2E-035 NTSCF-framed wrappers.** Issue #197.
+Added `rcp_e2e_wrap_framed()`/`rcp_e2e_unwrap_framed()`: framing-aware
+convenience wrappers that force the CRC's `avtp_timestamp` contribution
+to zero for NTSCF-framed traffic (TC18 §13.6), regardless of what
+timestamp the caller passed in. The raw `rcp_e2e_wrap()`/`_unwrap()`
+primitives are unchanged and stay general-purpose. Mutation-tested (the
+test file fails to build without the fix), full test suite + ASan/UBSan
+clean, fresh `cfusa check`/`trace` (0 errors, 100%/100%). See
+`ROADMAP.md` milestone 147 for full detail. 1028 requirements (unchanged
+count), 146 `tc18-gap` entries remaining (was 147).
+
 ### v0.146.0 -- 2026-08-09
 
 **Phase 5a batch 1: REQ-E2E-042 quadlet-alignment enforcement.** Issue

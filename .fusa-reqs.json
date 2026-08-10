@@ -9654,12 +9654,11 @@
     {
       "id": "REQ-E2E-035",
       "title": "An NTSCF-framed message contributes an all-zero avtp_timestamp to the CRC",
-      "text": "When the enclosing AVTPDU carries an NTSCF header (which has no timestamp field of its own), the avtp_timestamp contribution to the CRC32 shall be four all-zero octets (TC18 \u00a713.6). ONLY A CALLER CONVENTION in c-RCP: rcp_e2e_compute_crc()/rcp_e2e_wrap()/rcp_e2e_unwrap() take avtp_timestamp as a plain uint32_t argument with no NTSCF/TSCF discriminator, so nothing prevents a caller from feeding an NTSCF message a non-zero timestamp and producing an interoperability failure that only shows up as a CRC mismatch at the peer.",
+      "text": "When the enclosing AVTPDU carries an NTSCF header (which has no timestamp field of its own), the avtp_timestamp contribution to the CRC32 shall be four all-zero octets (TC18 \u00a713.6). rcp_e2e_wrap_framed()/rcp_e2e_unwrap_framed() enforce this: a caller passes is_ntscf_framed=true and the wrapper forces the zero contribution regardless of what avtp_timestamp it was given. The lower-level rcp_e2e_compute_crc()/rcp_e2e_wrap()/rcp_e2e_unwrap() primitives remain general-purpose (a plain uint32_t avtp_timestamp, since they serve both TSCF- and NTSCF-framed callers) and still trust the caller to pass 0 for NTSCF traffic -- the framing-aware wrappers are the conformant entry point for a caller that already knows a message's framing.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
+      "scope": "tc18",
       "tc18": "\u00a713.6, TC18.txt L3811"
     },
     {
