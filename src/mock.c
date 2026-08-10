@@ -93,13 +93,24 @@ rcp_lifecycle_state_t rcp_mock_server_state(const rcp_mock_server_t *srv)
 }
 
 //cfusa:req REQ-MOCK-005
+//cfusa:req REQ-RMAP-023
 rcp_lifecycle_errc_t rcp_mock_server_transition(rcp_mock_server_t *srv,
                                                  rcp_lifecycle_state_t target,
                                                  const rcp_lifecycle_plausibility_snapshot_t *snap,
                                                  rcp_lifecycle_writer_ctx_t writer,
                                                  bool all_other_eps_idle)
 {
-    return rcp_lifecycle_transition(&srv->state, target, snap, writer, all_other_eps_idle);
+    rcp_lifecycle_errc_t rc =
+        rcp_lifecycle_transition(&srv->state, target, snap, writer, all_other_eps_idle);
+    /* srv->state reflects its own post-call value either way (updated on
+     * success, left unchanged on failure per rcp_lifecycle_transition()'s
+     * own doc comment) -- an unconditional sync here is therefore always
+     * correct, not just an on-success special case. Keeps
+     * regmap.svr_lifecycle_state (REQ-RMAP-023's own content field) from
+     * ever silently drifting out of sync with the authoritative state
+     * this same call just updated. */
+    srv->regmap.svr_lifecycle_state = (uint8_t)srv->state;
+    return rc;
 }
 
 //cfusa:req REQ-PWRMODE-019

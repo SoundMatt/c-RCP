@@ -291,31 +291,61 @@ static void test_discovery_claim_refusal_is_unreportable(void)
 
 /* ── §12.7.5 Table 18: the RC Server general (static) register map ────────── */
 
-/* TC18 §12.3.1.1/§12.3.1.2/§12.4.1 require the lifecycle state to be
- * exposed as the svr_lifecycle_state register-map entry, readable to
- * learn the server's readiness and writable to drive a transition.
- * Deviation: rcp_regmap_general_t has no lifecycle-state field, so none
- * of the three wire state values (0x00 HW_unconfigured, 0x55
- * HW_configured, 0xAA RCP_configured) appears anywhere in the 64 octets a
- * client can read back from a fully populated map. */
-static void test_lifecycle_state_is_not_a_register_map_entry(void)
+/* REQ-RMAP-023 (TC18 §12.3.1.1/§12.3.1.2/§12.4.1): the lifecycle state
+ * must be exposed as the svr_lifecycle_state register-map entry.
+ * rcp_regmap_general_t now carries that field (content modeling only --
+ * this is NOT REQ-RMAP-024's own separate wire-reachability concern,
+ * which stays open; see test_general_map_wire_reach_stops_after_0x000d()
+ * below, unaffected by this field since it isn't wired into the
+ * discovery slice). Proves the field's own default and that
+ * rcp_mock_server_transition() -- the one caller composing
+ * rcp_lifecycle_transition() with a regmap.h general block today --
+ * keeps it in sync with the authoritative rcp_lifecycle_state_t on every
+ * transition, success or failure. */
+static void test_lifecycle_state_register_field_tracks_the_authoritative_state(void)
 {
-    rcp_regmap_general_t map = populated_map();
-    uint8_t              buf[64];
-    size_t               i;
-    bool                 saw_state_value = false;
+    rcp_mock_server_t                          *srv;
+    rcp_lifecycle_endpoint_plausibility_t       eps[1] = {{true, true, true, true}};
+    rcp_lifecycle_request_stream_plausibility_t rs[1]  = {{true, true}};
+    rcp_lifecycle_plausibility_snapshot_t       snap;
+    rcp_lifecycle_writer_ctx_t                  writer = ROOT_WRITER;
+
+    snap.endpoints            = eps;
+    snap.endpoint_count       = 1u;
+    snap.request_streams      = rs;
+    snap.request_stream_count = 1u;
 
     TEST_ASSERT_EQUAL_HEX8(0x00, (uint8_t)RCP_LIFECYCLE_HW_UNCONFIGURED);
     TEST_ASSERT_EQUAL_HEX8(0x55, (uint8_t)RCP_LIFECYCLE_HW_CONFIGURED);
     TEST_ASSERT_EQUAL_HEX8(0xAA, (uint8_t)RCP_LIFECYCLE_RCP_CONFIGURED);
 
-    read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_EQUAL_HEX8(0xC0, buf[0x00]); /* the read really is live */
+    srv = rcp_mock_server_new();
+    TEST_ASSERT_NOT_NULL(srv);
+    /* A freshly-constructed server's regmap field already matches its
+     * lifecycle state's own default -- both are HW_UNCONFIGURED (0) by
+     * construction, not by an extra sync call. */
+    TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_LIFECYCLE_HW_UNCONFIGURED,
+                           rcp_mock_server_regmap(srv)->svr_lifecycle_state);
 
-    for (i = 0; i < sizeof(buf); i++) {
-        if (buf[i] == 0x55u || buf[i] == 0xAAu) saw_state_value = true;
-    }
-    TEST_ASSERT_FALSE(saw_state_value);
+    /* A rejected transition (HW_UNCONFIGURED -> RCP_CONFIGURED skips a
+     * state -- not a modeled edge regardless of writer or idleness)
+     * leaves both fields exactly where they already were -- the sync
+     * call is unconditional but never introduces drift on a failure
+     * path. */
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_INVALID_TRANSITION,
+                      rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &snap, writer, true));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, rcp_mock_server_state(srv));
+    TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_LIFECYCLE_HW_UNCONFIGURED,
+                           rcp_mock_server_regmap(srv)->svr_lifecycle_state);
+
+    /* A successful transition updates both. */
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                      rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &snap, writer, true));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_CONFIGURED, rcp_mock_server_state(srv));
+    TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_LIFECYCLE_HW_CONFIGURED,
+                           rcp_mock_server_regmap(srv)->svr_lifecycle_state);
+
+    rcp_mock_server_destroy(srv);
 }
 
 /* TC18 §12.7 requires EP0 to be a fully addressable register space.
@@ -1407,7 +1437,7 @@ int main(void)
     RUN_TEST(test_generic_config_request_is_pwm_out_only);
     RUN_TEST(test_ep_len_overrun_rule_exists_only_for_pwm_out);
     RUN_TEST(test_discovery_claim_refusal_is_unreportable);
-    RUN_TEST(test_lifecycle_state_is_not_a_register_map_entry);
+    RUN_TEST(test_lifecycle_state_register_field_tracks_the_authoritative_state);
     RUN_TEST(test_general_map_wire_reach_stops_after_0x000d);
     RUN_TEST(test_general_static_part_has_no_read_only_class);
     RUN_TEST(test_req_stream_max_width_and_missing_responder_streams_max);
