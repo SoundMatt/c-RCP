@@ -9720,3 +9720,45 @@ still `partial`, text narrowed).
 `REQ-RMAP-061`'s own partial progress). Group 1: 3/18 items. Next:
 continue Group 1 in table order -- `REQ-RMAP-027` (the two undifferentiated
 memory-capacity registers, `svr_responder_mem_size`/`svr_req_mem_size`).
+
+### 180. Phase 5d batch 10: `REQ-RMAP-027` -- `svr_responder_mem_size`/`svr_req_mem_size` distinctly addressed (issue #200)
+
+Second Group 1 batch replacing an existing struct field, same blast-
+radius-first discipline as batch 9: `svr_memory_capacity` had one
+declaration and five usage sites, all test-only. Replaced the single
+undifferentiated 32-bit `svr_memory_capacity` with two distinct 16-bit
+fields matching TC18 Table 18's own two registers exactly:
+`svr_responder_mem_size` (0x0010) and `svr_req_mem_size` (0x0012), both
+counted in 32-bit words on the wire -- the same "caller converts units,
+this field holds the register's own raw count" convention already
+established for `respqueue.h`'s `capacity_octets`/`queue_size`
+(`REQ-RMAP-059`, Phase 5d batch 3).
+
+Unlike batch 9 (a pure width/name correction on an already-single
+field), this item genuinely SPLITS one field into two -- the correct
+mutation-testing scope for a purely-additive/split struct change with
+no computed logic surrounding it (no function reads or writes either
+field beyond `rcp_regmap_general_init()`'s own blanket `memset`) is a
+single full-revert mutation, not a paired logic mutation -- there is no
+logic to mutate. Rewrote the deviation pin into a positive test proving
+both fields are 2 octets wide, independently settable, and independently
+zero-initialize; explicitly demonstrates the two limits "can now be told
+apart," directly answering the old pin's own stated deviation.
+
+`REQ-RMAP-027` moves `not-implemented` -> `partial` -- content now
+correctly modeled and distinguishable, still not wire-reachable
+(`REQ-RMAP-024`, unchanged, same boundary as every Group 1 item so far).
+
+Mutation-tested: full revert of the header alone with both test files'
+changes kept -- breaks the build (`no member named
+'svr_responder_mem_size'`/`'svr_req_mem_size'`). Restored clean, diff-
+verified byte-identical against pre-mutation backup. Full suite (65/65)
++ ASan/UBSan clean. Fresh `cfusa check` (0 errors) + all three separate
+`cfusa trace` invocations (100%/100%, 0 untested). 1030 requirements
+(unchanged), 110 `tc18-gap` entries remaining (unchanged -- narrowed
+from `not-implemented` to `partial`).
+
+**Phase 5d progress after batch 10**: 11/47 items addressed (12 counting
+`REQ-RMAP-061`'s own partial progress). Group 1: 4/18 items. Next:
+continue Group 1 in table order -- `REQ-RMAP-028` (`svr_sequencers_max`
+width and its 0-means-unsupported encoding unenforced).

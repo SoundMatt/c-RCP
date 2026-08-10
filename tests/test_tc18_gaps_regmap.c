@@ -124,7 +124,8 @@ static rcp_regmap_general_t populated_map(void)
     map.svr_req_stream_max        = 0xABu;
     map.svr_responder_streams_max = 0xCDu;
     map.svr_max_sequencers        = 0x0007u;
-    map.svr_memory_capacity       = 0x11223344u;
+    map.svr_responder_mem_size    = 0x1122u;
+    map.svr_req_mem_size          = 0x3344u;
     map.svr_implemented_options   = 0x0000003Fu;
     map.svr_root_client_index     = 0x0002u;
 
@@ -455,25 +456,31 @@ static void test_req_stream_max_and_responder_streams_max_are_now_correctly_size
     TEST_ASSERT_EQUAL_UINT((size_t)0x0Eu, RCP_DISCOVERY_GENERAL_SLICE_LEN);
 }
 
-/* TC18 §12.7.5 Table 18 defines TWO distinct 16-bit capacity registers,
- * both counted in 32-bit words: svr_responder_mem_size at 0x0010 and
- * svr_req_mem_size at 0x0012. Deviation: c-RCP carries one
- * undifferentiated 32-bit svr_memory_capacity with no unit and no
- * address, so the two limits cannot be told apart and neither is
- * readable. */
-static void test_memory_capacity_is_one_undifferentiated_field(void)
+/* REQ-RMAP-027 (TC18 §12.7.5 Table 18): two distinct 16-bit capacity
+ * registers, both counted in 32-bit words: svr_responder_mem_size at
+ * 0x0010 and svr_req_mem_size at 0x0012. rcp_regmap_general_t now
+ * carries both, distinctly addressed and separately settable, replacing
+ * the former undifferentiated 32-bit svr_memory_capacity that conflated
+ * them into one unaddressed field. Still open (REQ-RMAP-024, same as
+ * every other Group 1 item): both addresses fall past the discovery
+ * slice's 0x000D ceiling, already covered generically by
+ * test_general_map_wire_reach_stops_after_0x000d()'s span_is_zero(buf,
+ * 0x0E, 0x30) assertion -- not re-tested here. */
+static void test_responder_and_req_mem_size_are_now_distinctly_addressed(void)
 {
     rcp_regmap_general_t map = populated_map();
-    uint8_t              buf[0x14];
 
-    TEST_ASSERT_EQUAL_UINT((size_t)4u, sizeof(map.svr_memory_capacity));
-    TEST_ASSERT_EQUAL_HEX32(0x11223344u, map.svr_memory_capacity);
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_responder_mem_size));
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_req_mem_size));
 
-    read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x10, 0x13));
+    /* Distinctly set and distinctly readable in-process -- the two
+     * limits can now be told apart, unlike the former single field. */
+    TEST_ASSERT_EQUAL_HEX16(0x1122u, map.svr_responder_mem_size);
+    TEST_ASSERT_EQUAL_HEX16(0x3344u, map.svr_req_mem_size);
 
     rcp_regmap_general_init(&map);
-    TEST_ASSERT_EQUAL_HEX32(0u, map.svr_memory_capacity);
+    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_responder_mem_size);
+    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_req_mem_size);
 }
 
 /* TC18 §12.7.5 Table 18: svr_sequencers_max is an 8-bit R register at
@@ -1459,7 +1466,7 @@ int main(void)
     RUN_TEST(test_general_map_wire_reach_stops_after_0x000d);
     RUN_TEST(test_general_static_part_has_no_read_only_class);
     RUN_TEST(test_req_stream_max_and_responder_streams_max_are_now_correctly_sized);
-    RUN_TEST(test_memory_capacity_is_one_undifferentiated_field);
+    RUN_TEST(test_responder_and_req_mem_size_are_now_distinctly_addressed);
     RUN_TEST(test_sequencers_max_width_and_zero_encoding_unenforced);
     RUN_TEST(test_configuration_lock_register_is_absent);
     RUN_TEST(test_implemented_options_layout_is_invented);

@@ -8837,12 +8837,12 @@
     {
       "id": "REQ-RMAP-027",
       "title": "The two memory-capacity registers svr_responder_mem_size (0x0010) and svr_req_mem_size (0x0012) are missing",
-      "text": "NOT IMPLEMENTED: TC18 \u00a712.7.5 Table 18 defines two distinct 16-bit read-only capacity registers, both counted in 32-bit words: svr_responder_mem_size at absolute address 0x0010 (maximum responder-queue memory) and svr_req_mem_size at 0x0012 (maximum memory for EP request queues). c-RCP models neither; rcp_regmap_general_t carries one undifferentiated 32-bit svr_memory_capacity field (include/rcp/regmap.h:210) with no address, no unit and no consumer anywhere in src/. Consequence: a client cannot size its responder queues or its per-endpoint request storage against the server's real limits, and the two limits cannot be distinguished.",
+      "text": "PARTIAL: TC18 \u00a712.7.5 Table 18 defines two distinct 16-bit read-only capacity registers, both counted in 32-bit words: svr_responder_mem_size at absolute address 0x0010 (maximum responder-queue memory) and svr_req_mem_size at 0x0012 (maximum memory for EP request queues). rcp_regmap_general_t now models both distinctly, replacing the former undifferentiated 32-bit svr_memory_capacity field that conflated them into one unaddressed field with no unit. What remains open: both addresses (0x0010, 0x0012) fall past the discovery response's own 0x000D wire-reachability ceiling (REQ-RMAP-024, still open), so a client still cannot learn either limit over the wire -- only in-process consumers can read the now-correctly-modeled, now-distinguishable content.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.7.5 Table 18, TC18.txt L2543-2547"
     },
     {
