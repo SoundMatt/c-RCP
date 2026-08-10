@@ -32,6 +32,20 @@ the rationale.
 
 ## Releases
 
+### v0.146.0 -- 2026-08-09
+
+**Phase 5a batch 1: REQ-E2E-042 quadlet-alignment enforcement.** Issue
+#197. First real behavioral gap-closure fix (not a citation) since Phase
+2 concluded. `rcp_e2e_wrap()` now rejects a non-quadlet-aligned
+`acf_frame_len` instead of silently appending a misaligned CRC32 trailer
+-- TC18 §13.6 Figures 19/20 require the trailer to occupy the message's
+final whole quadlet. Mutation-tested, full test suite + ASan/UBSan clean,
+fresh `cfusa check`/`trace` (0 errors, 100%/100%). Also fixed three
+quadlet-misaligned synthetic test fixtures in `tests/test_e2e.c` the new
+enforcement correctly caught. See `ROADMAP.md` milestone 146 for full
+detail. 1028 requirements (unchanged count), 147 `tc18-gap` entries
+remaining (was 148).
+
 ### v0.145.0 -- 2026-08-07
 
 **Citation backfill, batch 25: TIMED.** Issue #164. Cited 6 of 7

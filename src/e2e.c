@@ -158,6 +158,15 @@ rcp_bytes_t rcp_e2e_wrap(uint64_t stream_id, uint32_t avtp_timestamp,
 
     if (!acf_frame && acf_frame_len > 0) return out;
     if (acf_frame_len > (size_t)-1 - RCP_E2E_CRC_LEN) return out;
+    /* TC18 §13.6 Figures 19/20: the CRC32 spans whole quadlets of the ACF
+     * message (header quadlets plus byte_msg_payload including its own
+     * 0x00 pad octets), so that the trailer itself occupies the message's
+     * final whole quadlet. A non-quadlet-aligned acf_frame_len means the
+     * caller handed this function an unpadded frame -- reject it rather
+     * than append a trailer that straddles a quadlet boundary and leaves
+     * the adapted acf_msg_length describing a length nothing on the wire
+     * actually has. */
+    if (acf_frame_len % 4u != 0u) return out;
 
     data = (uint8_t *)malloc(acf_frame_len + RCP_E2E_CRC_LEN);
     if (!data) return out;

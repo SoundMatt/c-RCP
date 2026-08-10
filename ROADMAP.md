@@ -7088,3 +7088,38 @@ were genuinely uncited before writing anything.
 
 Purely additive; no code or test changed. 1028 requirements (unchanged
 count), 100% traced+tested, 0 `cfusa check` errors.
+
+### 146. Phase 5a batch 1: REQ-E2E-042 quadlet-alignment enforcement (issue #197)
+
+First milestone of Phase 5 -- the post-Phase-2 real behavioral gap-closure
+effort (issues #197-201, replacing citation backfill as the active work;
+see the issue #164 closing comment and `ROADMAP.md`'s own commit history
+around this milestone for the full replan). Unlike every milestone since
+121, this is a genuine logic change, not an additive JSON citation --
+verified accordingly (mutation-tested, not just built and tested).
+
+`rcp_e2e_wrap()` now rejects (returns a zeroed `rcp_bytes_t`) any
+`acf_frame_len` that is not a whole quadlet (a multiple of 4), instead of
+silently appending its CRC32 trailer at a misaligned offset. TC18 §13.6
+Figures 19/20 require the CRC to span whole quadlets of the ACF message
+so the trailer itself occupies the message's final whole quadlet -- a
+non-quadlet-aligned input meant the trailer straddled a quadlet boundary
+and the already-adapted `acf_msg_length` no longer described the actual
+message. `REQ-E2E-042`'s `.fusa-reqs.json` entry flips from `tc18-gap`
+(status `partial`) to a normal cited `tc18` entry.
+
+`tests/test_tc18_gaps_e2e.c`'s own pinned-deviation test for this
+requirement is rewritten to assert the corrected behavior (misaligned
+input now fails safe; a properly quadlet-aligned, already-padded frame
+still wraps correctly) rather than documenting the gap. Fixing this also
+surfaced three quadlet-misaligned synthetic test fixtures in the older
+`tests/test_e2e.c` (14, 14, and 10-octet hand-built frames, none of them
+real ACF-encoder output) that the new enforcement correctly rejected --
+resized to 16/16/12 octets with a comment explaining why.
+
+Mutation-tested: reverted the fix, confirmed
+`test_crc_covers_pad_octets_and_alignment_is_enforced` fails exactly as
+expected, restored. Full test suite (64/64) + ASan/UBSan build both
+clean. Fresh `cfusa check` (0 errors) + `cfusa trace --req-coverage 100
+--sec-tested 100` (100%/100%). 1028 requirements (unchanged count), 147
+`tc18-gap` entries remaining (was 148).

@@ -208,7 +208,10 @@ static void make_test_acf_frame(uint8_t *out, size_t out_len)
 
 static void test_wrap_appends_crc_len_bytes(void)
 {
-    uint8_t acf_frame[14];
+    /* Must be quadlet-aligned (a multiple of 4) -- REQ-E2E-042's fix
+     * rejects wrap() calls that aren't, matching every real ACF-encoded
+     * frame's own already-padded length. */
+    uint8_t acf_frame[16];
     rcp_bytes_t out;
 
     make_test_acf_frame(acf_frame, sizeof(acf_frame));
@@ -247,7 +250,9 @@ static void test_wrap_too_short_for_length_field_fails_safe(void)
  * "round-trips at all" check below. */
 static void test_wrap_adapts_acf_msg_length_by_one_quadlet(void)
 {
-    uint8_t acf_frame[14];
+    /* Must be quadlet-aligned -- see test_wrap_appends_crc_len_bytes()'s
+     * own comment. */
+    uint8_t acf_frame[16];
     uint8_t original_type_bits;
     uint16_t original_len;
     uint8_t adapted_type_bits;
@@ -281,7 +286,9 @@ static void test_wrap_adapts_acf_msg_length_by_one_quadlet(void)
 
 static void test_wrap_unwrap_round_trip_ok(void)
 {
-    uint8_t acf_frame[10];
+    /* Must be quadlet-aligned -- see test_wrap_appends_crc_len_bytes()'s
+     * own comment. */
+    uint8_t acf_frame[12];
     rcp_bytes_t wrapped;
     rcp_bytes_t body = {0};
     rcp_e2e_errc_t rc;
