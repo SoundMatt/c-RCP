@@ -354,12 +354,26 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
     rcp_server_admit_t        admit;
     uint8_t                   request_type = 0;
     rcp_wire_error_t          error        = RCP_ERROR_NONE;
+    rcp_lifecycle_accept_t    accept;
 
     memset(out_response, 0, sizeof(*out_response));
 
-    if (!rcp_lifecycle_should_accept(srv->state, time_sync_supported, avtp_subtype, acf_msg_type,
-                                      byte_bus_id)) {
+    accept = rcp_lifecycle_should_accept(srv->state, time_sync_supported, avtp_subtype,
+                                          acf_msg_type, byte_bus_id);
+    if (accept == RCP_LIFECYCLE_DROP) {
         return RCP_MOCK_DISPATCH_DROPPED;
+    }
+    if (accept == RCP_LIFECYCLE_REJECT) {
+        /* REQ-LIFECYCLE-033: admitted far enough to identify (TC18 §12.7's
+         * own EP0-scoped rule), but answered with REQUEST_REJECTED rather
+         * than processed -- same transaction_num-recovery technique
+         * find_slot()'s own EP_NOT_FOUND path below uses. */
+        rcp_acf_byte_message_info_t hdr = {0};
+        if (request_len >= 8 && rcp_acf_unpack_header(request, &hdr) == RCP_ACF_OK) {
+            *out_response = rcp_acf_build_error_response(byte_bus_id, hdr.transaction_num,
+                                                          RCP_ERROR_REQUEST_REJECTED);
+        }
+        return RCP_MOCK_DISPATCH_REJECTED;
     }
 
     slot = find_slot(srv, byte_bus_id);

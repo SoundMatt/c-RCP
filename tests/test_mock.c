@@ -265,6 +265,49 @@ static void test_dispatch_dropped_by_lifecycle(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* REQ-LIFECYCLE-033: a GBB-framed request correctly addressed to EP0
+ * while HW_UNCONFIGURED is answered with RCP_ERROR_REQUEST_REJECTED
+ * (TC18 §12.7), not silently dropped -- rcp_mock_server_dispatch()'s own
+ * REJECT-handling branch, mirroring test_dispatch_unknown_bus_sends_
+ * ep_not_found_error()'s response-decoding style. */
+static void test_dispatch_rejected_by_lifecycle_sends_request_rejected_error(void)
+{
+    rcp_mock_server_t           *srv = rcp_mock_server_new(); /* still HW_UNCONFIGURED */
+    rcp_acf_byte_message_info_t  hdr = {0};
+    rcp_bytes_t                  frame, resp = {0};
+    rcp_acf_byte_message_info_t  resp_hdr;
+    const uint8_t                *payload;
+    size_t                        payload_len;
+
+    hdr.byte_bus_id     = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
+    hdr.transaction_num = 77;
+    frame = rcp_acf_encode_abb(&hdr, NULL, 0); /* frame bytes: irrelevant to
+                                                   should_accept()'s own
+                                                   msg-type classification,
+                                                   which is this call's own
+                                                   acf_msg_type parameter
+                                                   below, not decoded from
+                                                   the frame itself */
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+        rcp_mock_server_dispatch(srv, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_SUBTYPE_NTSCF,
+                                  RCP_ACF_MSG_TYPE_GBB, false, frame.data, frame.len, &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(resp.data, resp.len, &resp_hdr, &payload,
+                                                      &payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&resp_hdr));
+    TEST_ASSERT_EQUAL_UINT8(RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, resp_hdr.byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT8(77u, resp_hdr.transaction_num);
+    TEST_ASSERT_EQUAL_size_t(1, payload_len);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_REQUEST_REJECTED, payload[0]);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
 static void test_dispatch_unknown_bus_after_lifecycle_accepts(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -658,6 +701,7 @@ int main(void)
     RUN_TEST(test_queue_len_unknown_bus_is_zero);
 
     RUN_TEST(test_dispatch_dropped_by_lifecycle);
+    RUN_TEST(test_dispatch_rejected_by_lifecycle_sends_request_rejected_error);
     RUN_TEST(test_dispatch_unknown_bus_after_lifecycle_accepts);
     RUN_TEST(test_dispatch_unknown_bus_sends_ep_not_found_error);
     RUN_TEST(test_dispatch_ok_runs_handler_immediately);

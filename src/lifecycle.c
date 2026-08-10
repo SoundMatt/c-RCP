@@ -167,25 +167,37 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
 //cfusa:req REQ-LIFECYCLE-016
 //cfusa:req REQ-LIFECYCLE-017
 //cfusa:req REQ-LIFECYCLE-028
+//cfusa:req REQ-LIFECYCLE-029
 //cfusa:req REQ-LIFECYCLE-032
-bool rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
-                                  bool time_sync_supported,
-                                  uint8_t avtp_subtype,
-                                  uint8_t acf_msg_type,
-                                  rcp_byte_bus_id_t byte_bus_id)
+//cfusa:req REQ-LIFECYCLE-033
+rcp_lifecycle_accept_t rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
+                                                    bool time_sync_supported,
+                                                    uint8_t avtp_subtype,
+                                                    uint8_t acf_msg_type,
+                                                    rcp_byte_bus_id_t byte_bus_id)
 {
-    if (rcp_avtp_should_drop_tscf(time_sync_supported, avtp_subtype)) return false;
+    if (rcp_avtp_should_drop_tscf(time_sync_supported, avtp_subtype)) return RCP_LIFECYCLE_DROP;
 
     if (state == RCP_LIFECYCLE_HW_UNCONFIGURED) {
         /* TSCF's presentation-time semantics presuppose a configured
          * request stream, which cannot exist yet during bootstrap --
          * dropped outright regardless of the node's own time-sync
          * capability, unlike the general rule just applied above. */
-        if (avtp_subtype == RCP_AVTP_SUBTYPE_TSCF) return false;
+        if (avtp_subtype == RCP_AVTP_SUBTYPE_TSCF) return RCP_LIFECYCLE_DROP;
 
-        return avtp_subtype == RCP_AVTP_SUBTYPE_NTSCF &&
-               acf_msg_type == RCP_ACF_MSG_TYPE_ABB &&
-               byte_bus_id == RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
+        if (avtp_subtype != RCP_AVTP_SUBTYPE_NTSCF ||
+            byte_bus_id != RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID) {
+            return RCP_LIFECYCLE_DROP;
+        }
+
+        /* REQ-LIFECYCLE-033 (TC18 §12.7): addressed correctly to EP0 on
+         * the discovery byte_bus_id, a STANDARD (ACF_ABB) request is
+         * accepted; any other message type (ACF_GBB -- every conditional
+         * request kind, per this codebase's own wire encoding) gets
+         * REJECT, not the silent DROP this function returned before this
+         * fix -- see this function's own header doc comment for the full
+         * §12.7 citation. */
+        return (acf_msg_type == RCP_ACF_MSG_TYPE_ABB) ? RCP_LIFECYCLE_ACCEPT : RCP_LIFECYCLE_REJECT;
     }
 
     if (state == RCP_LIFECYCLE_HW_CONFIGURED) {
@@ -207,19 +219,6 @@ bool rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
          * either, regardless of the general time-sync rule already
          * applied at the top of this function.
          *
-         * The same section also requires dropping ACF_GBB-format requests
-         * addressed to EP0 in HW_CONFIGURED (REQ-LIFECYCLE-029) --
-         * deliberately NOT implemented here: every conditional request
-         * kind (compound/compound-wait/triggered/chained/timed/cancel,
-         * request_compound.h and siblings) is wire-encoded as ACF_GBB
-         * unconditionally (the mtv-repurposing scheme those modules' own
-         * file headers document at length). An unconditional ACF_GBB drop
-         * would only matter for a conditional request literally addressed
-         * to EP0 itself now that the byte_bus_id restriction just below
-         * already drops everything else -- a narrow, low-impact residual
-         * rather than this milestone's own concern; tracked as its own
-         * follow-up in issue #198, not attempted here.
-         *
          * TC18 §12.3.1.2 (further down the same section): "Request to EPs
          * other than EP0 that are not config requests will be ignored and
          * dropped without response." c-RCP has no wire-level encode/decode
@@ -240,11 +239,26 @@ bool rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
          * REQ-LIFECYCLE-025/034/036, this issue's remaining Group 2/3
          * items, for the finer-grained stream-identity/authorization
          * rules layered on top of this once register-map wire I/O
-         * eventually exists). */
-        if (avtp_subtype == RCP_AVTP_SUBTYPE_TSCF) return false;
-        if (byte_bus_id != RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID) return false;
+         * eventually exists). This is a plain DROP, not REJECT: §12.7's
+         * more specific EP0-scoped REJECT rule below does not reach a
+         * request that never made it to EP0 in the first place. */
+        if (avtp_subtype == RCP_AVTP_SUBTYPE_TSCF) return RCP_LIFECYCLE_DROP;
+        if (byte_bus_id != RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID) return RCP_LIFECYCLE_DROP;
 
-        return true;
+        /* REQ-LIFECYCLE-033/029 (TC18 §12.7 vs. §12.3.1.2): addressed to
+         * EP0, the same ACF_ABB-vs-other split as HW_UNCONFIGURED applies.
+         * §12.3.1.2 separately says ACF_GBB requests are "dropped without
+         * further response" -- REQ-LIFECYCLE-029's own original citation
+         * -- but §12.7's own text is more specific (named EP0 explicitly,
+         * scoped to exactly "no valid stream_id/byte_bus_id combinations
+         * ... defined", a condition this library's own architecture
+         * makes permanently true throughout HW_CONFIGURED, since no
+         * wire-level regmap read/write exists yet to ever establish one).
+         * The more specific rule governs for the EP0 case; §12.3.1.2's
+         * general drop rule above still governs every non-EP0 byte_bus_id,
+         * which never reaches this line. See this function's own header
+         * doc comment for the full reconciliation. */
+        return (acf_msg_type == RCP_ACF_MSG_TYPE_ABB) ? RCP_LIFECYCLE_ACCEPT : RCP_LIFECYCLE_REJECT;
     }
 
     /* RCP_CONFIGURED: frame-level acceptance beyond the time-sync rule
@@ -252,7 +266,7 @@ bool rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
      * register-level write filtering is rcp_lifecycle_field_writable()'s
      * job, and full endpoint/stream routing is milestone 62's
      * register-map job. */
-    return true;
+    return RCP_LIFECYCLE_ACCEPT;
 }
 
 /* ── Register-locking-by-state ─────────────────────────────────────────────── */

@@ -8314,3 +8314,100 @@ return type widened to a 3-state accept/drop/reject result, since ABB
 vs. GBB at the wire level already distinguishes STANDARD from every
 conditional-request kind without needing a separate `RCP_SCHED_KIND_*`
 input as the entry's own text originally assumed -- next batch).
+
+### 162. Phase 5b batch 10: REQ-LIFECYCLE-033 + REQ-LIFECYCLE-029 -- REQUEST_REJECTED for non-STANDARD EP0 requests (issue #198)
+
+The last two fully-open items in Phase 5b, closed together since they
+turned out to be the same code path with two conflicting TC18
+prescriptions.
+
+**REQ-LIFECYCLE-033 (implemented)**: `RCP_ERROR_REQUEST_REJECTED` (11)
+already existed in `errors.h` but was emitted nowhere. The entry's own
+text said a new `RCP_SCHED_KIND_*` input was needed to distinguish
+STANDARD from conditional requests -- primary-source re-verification
+found this unnecessary: this codebase already wire-encodes STANDARD
+requests as `ACF_ABB` and every conditional request kind (compound/
+compound-wait/triggered/chained/timed/cancel) as `ACF_GBB`
+unconditionally, and `rcp_lifecycle_should_accept()` already receives
+`acf_msg_type` as a parameter. `rcp_lifecycle_should_accept()`'s `bool`
+return widened to a three-way `rcp_lifecycle_accept_t`
+(`ACCEPT`/`DROP`/`REJECT`) -- a non-ABB message addressed correctly to
+EP0 (`RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID`) now returns `REJECT` in both
+`HW_UNCONFIGURED` and `HW_CONFIGURED` (this library's own architecture
+makes TC18 §12.7's "no valid stream_id/byte_bus_id combinations have
+been defined" condition permanently true throughout `HW_CONFIGURED`,
+since no wire-level regmap read/write exists yet to establish one).
+`rcp_mock_server_dispatch()` answers a `REJECT` with
+`RCP_ERROR_REQUEST_REJECTED`, reusing the pre-existing
+`RCP_MOCK_DISPATCH_REJECTED` result value (already used for a different
+rejection case, `RCP_SERVER_ADMIT_REJECTED`) -- same semantic, one enum
+value, no new mock-layer machinery needed.
+
+**REQ-LIFECYCLE-029 (implemented, resolved differently than
+originally scoped)**: this entry's own remaining residual after
+`REQ-LIFECYCLE-032`'s fix -- a conditional (`ACF_GBB`) request literally
+addressed to EP0 in `HW_CONFIGURED` -- turned out to be the exact same
+case `REQ-LIFECYCLE-033` governs, and TC18's two sections directly
+conflict for it: §12.3.1.2 says ACF_GBB requests are "dropped without
+further response"; §12.7 says EP0-addressed non-STANDARD requests get
+`REQUEST_REJECTED`. Reconciled by reading §12.3.1.2 as the general,
+non-EP0-scoped rule (still correctly enforced -- any non-EP0
+`byte_bus_id` drops unconditionally of `acf_msg_type`, via
+`REQ-LIFECYCLE-032`'s own restriction) and §12.7 as the more specific,
+EP0-scoped override that governs here -- the same specific-overrides-
+general reading TC18 uses elsewhere (e.g. Table 22's own `W*` legend
+narrowing the general `W` rule). `.fusa-reqs.json` text for both entries
+records this cross-reference explicitly.
+
+**New standing lesson**: two catalogued requirements can name the exact
+same code path with prescriptions that directly contradict each other
+when read in isolation -- resolving this needs comparing BOTH entries'
+primary-source citations side by side, not implementing either in
+isolation. Caught here specifically because scoping `-033` required
+re-reading `rcp_lifecycle_should_accept()`'s own existing `-029`
+deviation-pin comment, which already flagged the exact same EP0-GBB
+case as its own tracked residual.
+
+Test changes: `test_lifecycle.c` gained
+`test_hw_unconfigured_rejects_non_abb_message_type_addressed_to_ep0`
+and `test_hw_configured_rejects_non_abb_message_type_addressed_to_ep0`;
+every existing `TEST_ASSERT_TRUE`/`FALSE(rcp_lifecycle_should_accept(...))`
+call site across `test_lifecycle.c` and `test_tc18_gaps_server.c`
+rewritten to `TEST_ASSERT_EQUAL` against the specific
+`RCP_LIFECYCLE_ACCEPT`/`DROP`/`REJECT` value (implicit bool truthiness
+would otherwise silently invert every one of these assertions, since
+`RCP_LIFECYCLE_ACCEPT == 0` is C-false). `test_tc18_gaps_server.c`'s
+`test_hw_unconfigured_ignores_claimant_and_request_kind` renamed
+`test_hw_unconfigured_admission_ignores_claimant_but_writes_still_gated`
+and rewritten to demonstrate should_accept()'s frame-admission layer
+correctly not checking stream identity (that is `field_writable()`'s
+job, per `REQ-LIFECYCLE-026`/`035`'s own batch) alongside the new
+REJECT behavior; its own `test_hw_configured_admits_gbb_pending_
+lifecycle_029` renamed `test_hw_configured_rejects_gbb_addressed_to_ep0`
+and rewritten. `test_mock.c` gained
+`test_dispatch_rejected_by_lifecycle_sends_request_rejected_error`,
+decoding the actual wire response mock.c now builds.
+
+Mutation-tested two ways: a full revert of `src/lifecycle.c`,
+`src/mock.c` and `include/rcp/lifecycle.h` together breaks the BUILD
+(test files reference `RCP_LIFECYCLE_ACCEPT`/`DROP`/`REJECT`, undefined
+without the header change) -- stronger confirmation than a test failure
+alone, the same class of signal prior signature-changing batches (5, 7)
+produced; a precise single-line mutation (both `? RCP_LIFECYCLE_ACCEPT
+: RCP_LIFECYCLE_REJECT` ternaries replaced with an unconditional
+`RCP_LIFECYCLE_ACCEPT`) -> exactly the 4 tests pinning `REJECT`
+specifically fail, isolated from every other assertion. Both restored
+clean. Full test suite (64/64) + ASan/UBSan build both clean. Fresh
+`cfusa check` (0 errors) + `cfusa trace --gaps` / `--req-coverage 100`
+/ `--sec-tested 100` (all three separate invocations, matching CI;
+100%/100%, 0 untested). 1030 requirements (unchanged, no new REQ ids),
+130 `tc18-gap` entries remaining (was 132, two genuine closures).
+
+**Phase 5b progress after batch 10**: 12/16 items fully closed
+(`-023`/`-024`/`-026`/`-027`/`-028`/`-029`/`-030`/`-032`/`-033`/`-035`/
+`-036`/`-037`), 4 partial (`-022`/`-025`/`-031`/`-034`) -- the phase's
+full 16-item scope is now accounted for, all fixable-given-this-
+library's-architecture items closed and every remaining item honestly
+scoped `partial`/`tc18-gap` with its own architecture-limit citation.
+Phase 5b (issue #198) is effectively complete; Phase 5c (issue #199,
+PWRMODE sleep/wake handshake gaps) is the next phase.

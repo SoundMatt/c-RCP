@@ -214,11 +214,11 @@ static void test_hw_generic_covers_ep_generic_and_queue_config_with_locked_respo
  * admitted once RCP_CONFIGURED). */
 static void test_hw_configured_admits_only_ep0(void)
 {
-    TEST_ASSERT_FALSE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)42u));
-    TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
-    TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_RCP_CONFIGURED, false,
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_RCP_CONFIGURED, false,
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)42u));
 }
 
@@ -250,31 +250,50 @@ static void test_admit_takes_no_lifecycle_state_or_stream_identity(void)
 
 /* ── §12.3.1.1 / §12.7.2 / §12.7: HW_UNCONFIGURED admission ────────────────── */
 
-static void test_hw_unconfigured_ignores_claimant_and_request_kind(void)
+/* As of the REQ-LIFECYCLE-033 fix: the REQUEST_REJECTED half of what
+ * this test originally pinned as a gap is now closed. The should_accept()
+ * frame-admission half is NOT a gap after all, on closer reading: TC18's
+ * "only configuration via the discovery stream" rule (§12.3.1.1/§12.7.2,
+ * REQ-LIFECYCLE-026/035 -- closed) is a WRITE-authorization rule, and this
+ * codebase's established layering puts write authorization at
+ * rcp_lifecycle_field_writable(), not at should_accept()'s frame-level
+ * admission -- the same layering distinction REQ-LIFECYCLE-026/035's own
+ * batch corrected. should_accept() admitting B's frame on the same terms
+ * as claimant A's is therefore expected, not a bug: admission is not
+ * authorization. The full pipeline still correctly refuses B's actual
+ * configuration WRITE, demonstrated below by composing the claim query
+ * into a writer_ctx exactly as discovery.h's own file header describes. */
+static void test_hw_unconfigured_admission_ignores_claimant_but_writes_still_gated(void)
 {
-    rcp_discovery_claim_t claim;
-    rcp_stream_id_t       a = rcp_stream_id_make(MAC_A, 1u);
-    rcp_stream_id_t       b = rcp_stream_id_make(MAC_B, 2u);
+    rcp_discovery_claim_t      claim;
+    rcp_stream_id_t            a = rcp_stream_id_make(MAC_A, 1u);
+    rcp_stream_id_t            b = rcp_stream_id_make(MAC_B, 2u);
+    rcp_lifecycle_writer_ctx_t writer_a = {0};
+    rcp_lifecycle_writer_ctx_t writer_b = {0};
 
     rcp_discovery_claim_init(&claim, 20u);
     rcp_discovery_claim_note_request(&claim, a, 1000u);
     TEST_ASSERT_TRUE(rcp_discovery_claim_is_claimant(&claim, a, 1000u));
     TEST_ASSERT_FALSE(rcp_discovery_claim_is_claimant(&claim, b, 1000u));
 
-    /* TC18 §12.3.1.1 and §12.7.2 restrict HW_UNCONFIGURED configuration to
-     * the stream that claimed discovery. The claim above is modelled and
-     * correctly refuses B -- but rcp_lifecycle_should_accept() takes no
-     * stream_id and never consults it, so B's configuration request is
-     * admitted on exactly the same terms as claimant A's. */
-    TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_UNCONFIGURED, false,
+    /* Frame-level admission does not consult stream identity -- correctly
+     * so, since that is field_writable()'s job, not should_accept()'s. */
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_UNCONFIGURED, false,
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
+
+    /* ...but once admitted, the actual write is gated correctly: A (the
+     * claimant) may write HW_GENERIC, B may not (REQ-LIFECYCLE-026/035). */
+    writer_a.via_discovery_stream = rcp_discovery_claim_is_claimant(&claim, a, 1000u);
+    writer_b.via_discovery_stream = rcp_discovery_claim_is_claimant(&claim, b, 1000u);
+    TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_UNCONFIGURED,
+                                                  RCP_LIFECYCLE_FIELD_HW_GENERIC, writer_a));
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_UNCONFIGURED,
+                                                   RCP_LIFECYCLE_FIELD_HW_GENERIC, writer_b));
 
     /* TC18 §12.7 accepts only unconditional STANDARD requests at EP0 in this
      * condition and answers every other otherwise-valid EP0 request with
-     * REQUEST_REJECTED (wire code 11). Conditional requests are carried in
-     * ACF_GBB messages, which c-RCP drops in silence instead -- and no code
-     * path in the library ever produces that error code. */
-    TEST_ASSERT_FALSE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_UNCONFIGURED, false,
+     * REQUEST_REJECTED (wire code 11, REQ-LIFECYCLE-033 -- closed). */
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_REJECT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_UNCONFIGURED, false,
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
     TEST_ASSERT_EQUAL_INT(11, RCP_ERROR_REQUEST_REJECTED);
 }
@@ -334,9 +353,9 @@ static void test_hw_configured_write_access_now_requires_unicast_and_authorizati
      * lives. */
     TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
                                                     RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, broadcast));
-    TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_UNCONFIGURED, false,
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_UNCONFIGURED, false,
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
-    TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_RCP_CONFIGURED, false,
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_RCP_CONFIGURED, false,
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)9u));
 }
 
@@ -349,35 +368,32 @@ static void test_hw_configured_write_access_now_requires_unicast_and_authorizati
  * TSCF's presentation-time semantics presuppose. */
 static void test_hw_configured_drops_tscf(void)
 {
-    TEST_ASSERT_FALSE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, true,
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, true,
         RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u));
-    TEST_ASSERT_FALSE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
         RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u));
-    TEST_ASSERT_FALSE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_UNCONFIGURED, true,
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_UNCONFIGURED, true,
         RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
     /* The TSCF rule does not apply once RCP_CONFIGURED -- the mapping it
      * guards against not existing yet has, by then, been validated. */
-    TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_RCP_CONFIGURED, true,
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_RCP_CONFIGURED, true,
         RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u));
 }
 
-/* DEVIATION PIN (REQ-LIFECYCLE-029, not implemented): TC18 §12.3.1.2 also
- * requires dropping ACF_GBB-format requests addressed to EP0 in
- * HW_CONFIGURED, without response. Deliberately NOT fixed alongside
- * REQ-LIFECYCLE-028/032 above: every conditional request kind (compound/
- * compound-wait/triggered/chained/timed/cancel) is wire-encoded as
- * ACF_GBB unconditionally (the mtv-repurposing scheme
- * request_compound.h and siblings document). As of the REQ-LIFECYCLE-032
- * fix, HW_CONFIGURED already drops every non-EP0 byte_bus_id regardless
- * of acf_msg_type -- byte_bus_id 7 (used by this test's sibling above)
- * would now be dropped for that reason alone, no longer exercising this
- * pin at all, so this test targets RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID
- * (EP0) specifically: the one remaining case the byte_bus_id restriction
- * does not already cover. Tracked as its own follow-up batch in issue
- * #198. */
-static void test_hw_configured_admits_gbb_pending_lifecycle_029(void)
+/* As of the REQ-LIFECYCLE-033 fix: this test's own name is now the
+ * opposite of what it asserts, kept (renamed) rather than deleted, since
+ * it directly pins the correction. TC18 §12.3.1.2's "requests in
+ * ACF_GBB format[are dropped]" (REQ-LIFECYCLE-029's own citation) and
+ * §12.7's EP0-scoped REQUEST_REJECTED rule looked contradictory for this
+ * exact case -- reconciled by treating §12.3.1.2 as the general,
+ * non-EP0-scoped rule (byte_bus_id 7, this test's sibling above, is
+ * dropped for that reason, unchanged) and §12.7 as the more specific,
+ * EP0-scoped override that governs here. See rcp_lifecycle_should_accept()'s
+ * own header doc comment for the full reconciliation. REQ-LIFECYCLE-029's
+ * own `.fusa-reqs.json` text updated to record this resolution. */
+static void test_hw_configured_rejects_gbb_addressed_to_ep0(void)
 {
-    TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_REJECT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
 }
 
@@ -1008,10 +1024,10 @@ int main(void)
     RUN_TEST(test_hw_generic_covers_ep_generic_and_queue_config_with_locked_response);
     RUN_TEST(test_hw_configured_admits_only_ep0);
     RUN_TEST(test_admit_takes_no_lifecycle_state_or_stream_identity);
-    RUN_TEST(test_hw_unconfigured_ignores_claimant_and_request_kind);
+    RUN_TEST(test_hw_unconfigured_admission_ignores_claimant_but_writes_still_gated);
     RUN_TEST(test_hw_configured_write_access_now_requires_unicast_and_authorization);
     RUN_TEST(test_hw_configured_drops_tscf);
-    RUN_TEST(test_hw_configured_admits_gbb_pending_lifecycle_029);
+    RUN_TEST(test_hw_configured_rejects_gbb_addressed_to_ep0);
     RUN_TEST(test_discovery_write_authority_survives_rcp_configured);
 
     RUN_TEST(test_cold_start_target_and_standby_retention);
