@@ -32,6 +32,28 @@ the rationale.
 
 ## Releases
 
+### v0.180.0 -- 2026-08-10
+
+**Phase 5d batch 10: REQ-RMAP-027 -- svr_responder_mem_size/
+svr_req_mem_size distinctly addressed.** Issue #200. Second Group 1
+batch replacing an existing field: the single undifferentiated 32-bit
+`svr_memory_capacity` splits into two distinct 16-bit fields matching
+TC18 Table 18's own two registers exactly -- `svr_responder_mem_size`
+(0x0010) and `svr_req_mem_size` (0x0012), both counted in 32-bit words
+on the wire (same "caller converts units" convention as
+`respqueue.h`'s own `capacity_octets`/`queue_size`). Rewrote the
+deviation pin into a positive test proving both fields are 2 octets
+wide, independently settable, and independently zero-initialize.
+`REQ-RMAP-027` moves `not-implemented` -> `partial` -- content now
+correctly modeled and distinguishable, still not wire-reachable
+(`REQ-RMAP-024`). Mutation-tested: full header revert with tests kept
+breaks the build (the correct, sufficient rigor for a purely-additive
+struct split with no computed logic to mutate). Full suite (65/65) +
+ASan/UBSan clean. Fresh `cfusa check`/`trace` (0 errors, 100%/100%,
+three separate CI-matching invocations). See `ROADMAP.md` milestone 180
+for full detail. 1030 requirements (unchanged), 110 `tc18-gap` entries
+remaining (unchanged).
+
 ### v0.179.0 -- 2026-08-10
 
 **Phase 5d batch 9: REQ-RMAP-026 -- svr_req_stream_max/

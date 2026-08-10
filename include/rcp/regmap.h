@@ -299,7 +299,29 @@ typedef struct {
                                             content-modeling-only scope
                                             as svr_req_stream_max above. */
     uint16_t svr_max_sequencers;
-    uint32_t svr_memory_capacity;
+    uint16_t svr_responder_mem_size; /* REQ-RMAP-027 (TC18 §12.7.5 Table
+                                         18, relative address 0x0010, 16
+                                         bit, R): maximum responder-queue
+                                         memory, in 32-bit words -- same
+                                         "caller converts, this field
+                                         holds the register's own raw
+                                         quadlet count" convention as
+                                         respqueue.h's own
+                                         capacity_octets/queue_size
+                                         (REQ-RMAP-059). Replaces this
+                                         struct's former undifferentiated
+                                         32-bit svr_memory_capacity,
+                                         which conflated two distinct
+                                         TC18 registers into one
+                                         unaddressed field. Content
+                                         modeling only, same REQ-RMAP-024
+                                         wire-reachability boundary as
+                                         every other Group 1 item. */
+    uint16_t svr_req_mem_size; /* REQ-RMAP-027 (TC18 §12.7.5 Table 18,
+                                   relative address 0x0012, 16 bit, R):
+                                   maximum memory for EP request queues,
+                                   in 32-bit words. Same scope as
+                                   svr_responder_mem_size above. */
     uint32_t svr_implemented_options; /* RCP_REGMAP_OPT_* bitmask; see
                                           rcp_regmap_options_group_consistent() */
     uint16_t svr_root_client_index;   /* RCP_REGMAP_NO_ROOT_CLIENT if unset */
