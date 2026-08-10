@@ -9006,24 +9006,24 @@
     },
     {
       "id": "REQ-RMAP-042",
-      "title": "hw_pin_type bit layout contradicts Table 20 and omits open-source, drive strength and Schmitt-trigger",
-      "text": "NOT IMPLEMENTED (non-conforming): TC18 \u00a712.7.6 Table 20 defines the hw_pin_type octet as four packed sub-fields \u2014 Pull-Up at bits 1:0 (00b float, 01b pull down, 10b pull up), Output stage at bits 3:2 (00b input, 01b open drain, 10b open source, 11b push pull), Drive strength at bits 5:4 (00b input, 01b low, 10b medium, 11b high), reserved bit 6 reading 0, and Schmitt-Trigger enable at bit 7. c-RCP instead defines six independent one-hot flags of its own invention (RCP_REGMAP_PIN_PROP_OUTPUT/_INPUT/_OPEN_DRAIN/_PULL_UP/_PULL_DOWN/_ACTIVE_LOW, include/rcp/regmap.h:293-298), which occupy different bit positions, cannot express open source, any of the three drive strengths, the Schmitt-trigger selection, or the explicit float encoding, and add an ACTIVE_LOW property TC18 does not define. Consequence: a c-RCP-written hw_pin_type octet configures the wrong pin electrical properties on a conforming RC PHY \u2014 e.g. c-RCP's PULL_UP (bit 3) lands in the Output-stage field and reads as open drain.",
+      "title": "hw_pin_type now matches Table 20's own four-packed-sub-field bit layout",
+      "text": "TC18 \u00a712.7.6 Table 20 defines the hw_pin_type octet as four packed sub-fields \u2014 Pull at bits 1:0 (00b float, 01b pull down, 10b pull up), Output stage at bits 3:2 (00b input, 01b open drain, 10b open source, 11b push pull), Drive strength at bits 5:4 (00b input, 01b low, 10b medium, 11b high), reserved bit 6 reading 0, and Schmitt-Trigger enable at bit 7. Fixed: rcp_regmap_hw_pin_map_entry_t's own third field (renamed pin_property -> hw_pin_type, matching the wire register's own name) now uses a dedicated RCP_REGMAP_HW_PIN_* constant family at exactly these bit positions, primary-source verified directly against the TC18 v0.5.1_RC PDF (pdftotext -layout extraction, since no local TC18.txt was found this session). This is a distinct, separately-named family from RCP_REGMAP_PIN_PROP_* (ep_gpio.h's own, differently-shaped, per-pin runtime-adjustable field, REQ-GPIO-013 -- deliberately left untouched by this fix, since they are two different registers that happened to share one set of bit-position constants, not one register two ways). config.h/config.c's manifest JSON schema updated to match (hw_pin_map entries now use \"hw_pin_type\": [...] with Table-20-derived string values -- pull_down/pull_up, open_drain/open_source/push_pull, low_drive/medium_drive/high_drive, schmitt_trigger -- rather than the old six one-hot names).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "implemented",
       "tc18": "\u00a712.7.6 Table 20: IO-pin properties, TC18.txt L2738-2759"
     },
     {
       "id": "REQ-RMAP-043",
-      "title": "An output pin is always simultaneously an input",
-      "text": "NOT IMPLEMENTED (contradicted): TC18 \u00a712.7.6 states that the pin direction/drive entry is split into exactly four sub-fields (pull resistor, output stage, drive strength, Schmitt-trigger) and that ALL OUTPUTS ARE ALWAYS ALSO AN INPUT \u2014 output and input are not mutually exclusive pin states. c-RCP models RCP_REGMAP_PIN_PROP_OUTPUT and RCP_REGMAP_PIN_PROP_INPUT as two separate flags and rcp_ep_gpio_apply_reconfig() (src/ep_gpio.c:98) toggles a pin from one to the other, so a pin configured as an output ceases to be readable as an input. Consequence: read-back of an output pin's actual level \u2014 the standard way to detect a short or a stuck driver \u2014 is not expressible, and the four-section decomposition Table 20 mandates is absent.",
+      "title": "hw_pin_type's output stage has no separate, exclusive input flag to toggle away from",
+      "text": "TC18 \u00a712.7.6 states that the pin direction/drive entry is split into exactly four sub-fields (pull resistor, output stage, drive strength, Schmitt-trigger) and that ALL OUTPUTS ARE ALWAYS ALSO AN INPUT \u2014 output and input are not mutually exclusive pin states. Fixed: hw_pin_type's own output-stage field (RCP_REGMAP_HW_PIN_STAGE_*, REQ-RMAP-042) selects one of four drive modes (input/open-drain/open-source/push-pull) rather than toggling a separate exclusive INPUT/OUTPUT flag pair the way the old shared RCP_REGMAP_PIN_PROP_OUTPUT/_INPUT bits did -- there is structurally no \"pure output, unreadable\" state to represent, matching TC18's own prose exactly. Still open, and NOT resolved by this fix: ep_gpio.h's own, separate pin_property field and rcp_ep_gpio_apply_reconfig()'s OUTPUT<->INPUT toggle (REQ-GPIO-013) still have this exact problem for GPIO's own runtime-adjustable per-pin state -- that is a different register (this table's own hw_pin_type has no runtime-write path of its own at all, REQ-RMAP-041) with its own separate architecture question, not resolved here; see this session's own investigation note on issue #200 for the full analysis, including the discovery that GPIO's evt[2:0]=111b write semantics (RCP_EP_GPIO_WRITE_RECONFIG) itself appears to deviate from TC18's own generic EP_func-block-write definition (\u00a712.7.1/Figure 18), a larger, separate finding.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "implemented",
       "tc18": "\u00a712.7.6, TC18.txt L2720-2722"
     },
     {

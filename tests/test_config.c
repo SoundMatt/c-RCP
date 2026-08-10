@@ -132,7 +132,7 @@ static void test_parse_hw_pin_map_entries(void)
 {
     const char *json =
         "{ \"hw_pin_map\": ["
-        "  { \"hw_ep_nr\": 0, \"hw_ep_pin_nr\": 3, \"pin_property\": [\"output\", \"pull_up\"] },"
+        "  { \"hw_ep_nr\": 0, \"hw_ep_pin_nr\": 3, \"hw_pin_type\": [\"push_pull\", \"pull_up\"] },"
         "  { \"hw_ep_nr\": 1, \"hw_ep_pin_nr\": 4 }"
         "] }";
     rcp_config_manifest_t m;
@@ -142,12 +142,17 @@ static void test_parse_hw_pin_map_entries(void)
 
     TEST_ASSERT_EQUAL_UINT8(0, m.hw_pin_map[0].hw_ep_nr);
     TEST_ASSERT_EQUAL_UINT8(3, m.hw_pin_map[0].hw_ep_pin_nr);
-    TEST_ASSERT_TRUE((m.hw_pin_map[0].pin_property & RCP_REGMAP_PIN_PROP_OUTPUT) != 0);
-    TEST_ASSERT_TRUE((m.hw_pin_map[0].pin_property & RCP_REGMAP_PIN_PROP_PULL_UP) != 0);
-    TEST_ASSERT_FALSE((m.hw_pin_map[0].pin_property & RCP_REGMAP_PIN_PROP_INPUT) != 0);
+    TEST_ASSERT_EQUAL_HEX8(RCP_REGMAP_HW_PIN_STAGE_PUSH_PULL,
+                            (uint8_t)(m.hw_pin_map[0].hw_pin_type & RCP_REGMAP_HW_PIN_STAGE_MASK));
+    TEST_ASSERT_EQUAL_HEX8(RCP_REGMAP_HW_PIN_PULL_UP,
+                            (uint8_t)(m.hw_pin_map[0].hw_pin_type & RCP_REGMAP_HW_PIN_PULL_MASK));
+    /* Drive strength and Schmitt-Trigger weren't named -- both default. */
+    TEST_ASSERT_EQUAL_HEX8(RCP_REGMAP_HW_PIN_DRIVE_INPUT,
+                            (uint8_t)(m.hw_pin_map[0].hw_pin_type & RCP_REGMAP_HW_PIN_DRIVE_MASK));
+    TEST_ASSERT_FALSE((m.hw_pin_map[0].hw_pin_type & RCP_REGMAP_HW_PIN_SCHMITT_TRIGGER) != 0);
 
     TEST_ASSERT_EQUAL_UINT8(1, m.hw_pin_map[1].hw_ep_nr);
-    TEST_ASSERT_EQUAL_UINT8(0, m.hw_pin_map[1].pin_property); /* omitted -> 0 */
+    TEST_ASSERT_EQUAL_UINT8(0, m.hw_pin_map[1].hw_pin_type); /* omitted -> 0 */
 
     rcp_config_manifest_free(&m);
 }
@@ -298,7 +303,7 @@ static void test_full_manifest_round_trip(void)
     const char *json =
         "{"
         "  \"server\": { \"vendor_id\": 1, \"svr_implemented_options\": [\"enhanced_cancel\"] },"
-        "  \"hw_pin_map\": [{ \"hw_ep_nr\": 0, \"hw_ep_pin_nr\": 1, \"pin_property\": [\"input\"] }],"
+        "  \"hw_pin_map\": [{ \"hw_ep_nr\": 0, \"hw_ep_pin_nr\": 1, \"hw_pin_type\": [\"push_pull\"] }],"
         "  \"endpoints\": [{ \"byte_bus_id\": 9, \"ep_type\": 1, \"ep_enable\": true }],"
         "  \"streams\": [{ \"rx_stream_id\": 55 }]"
         "}";

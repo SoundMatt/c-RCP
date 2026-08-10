@@ -1008,11 +1008,17 @@ static void test_hw_config_table_has_no_server_side_storage(void)
  * R/W* registers per IO pin (hw_ep_nr, hw_ep_pin_nr, hw_pin_type), so IO
  * pin N begins at relative address 3*N, and R/W* means writable only
  * while HW_unconfigured. c-RCP's row carries the three 8-bit fields
- * (asserted) but spells the third pin_property, defines no 3-octet stride
- * and no encode/decode. Worse, the only setter that touches a pin's
- * property classifies it FUNCTIONAL_W, whose writability window is the
- * exact INVERSE of R/W*: refused in HW_UNCONFIGURED, granted in
- * HW_CONFIGURED. */
+ * (asserted, and correctly named hw_pin_type as of REQ-RMAP-042) but
+ * still defines no 3-octet stride and no encode/decode (REQ-RMAP-041,
+ * its own separate, still-open scope). The comparison below against
+ * ep_gpio.h's OWN, DIFFERENT, deliberately-runtime-adjustable
+ * pin_property field (REQ-GPIO-013, its own separate tracked concern,
+ * NOT this table's hw_pin_type) is retained as-is: that field's own
+ * FUNCTIONAL_W classification was never meant to match HW_config's own
+ * R/W* rule in the first place, since it is a different register by
+ * design -- see this session's own investigation note on issue #200
+ * for the full architecture question this raises, deliberately not
+ * resolved by this batch. */
 static void test_hw_config_row_stride_absent_and_access_class_inverted(void)
 {
     rcp_regmap_hw_pin_map_entry_t entry;
@@ -1020,7 +1026,7 @@ static void test_hw_config_row_stride_absent_and_access_class_inverted(void)
 
     TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(entry.hw_ep_nr));
     TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(entry.hw_ep_pin_nr));
-    TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(entry.pin_property));
+    TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(entry.hw_pin_type));
 
     /* Table 19's own access class, R/W* == HW_unconfigured-only, is what
      * RCP_LIFECYCLE_FIELD_HW_GENERIC expresses (DISCOVERY_WRITER, not
@@ -1041,36 +1047,99 @@ static void test_hw_config_row_stride_absent_and_access_class_inverted(void)
     TEST_ASSERT_EQUAL_HEX8(RCP_REGMAP_PIN_PROP_OUTPUT, cfg.pins[0].pin_property);
 }
 
-/* TC18 §12.7.6 Table 20 packs hw_pin_type as four sub-fields: pull-up
- * mode at bits 1:0 (00b float, 01b pull down, 10b pull up), output stage
- * at bits 3:2 (00b input, 01b open drain, 10b open source, 11b push
- * pull), drive strength at bits 5:4, reserved bit 6 reading 0, and
- * Schmitt-trigger enable at bit 7. Deviation: c-RCP defines six
- * independent one-hot flags at incompatible positions, with no open
- * source, no drive strength, no Schmitt trigger and no float encoding,
- * plus an ACTIVE_LOW property TC18 does not define. c-RCP's PULL_UP is
- * bit 3, which a conforming PHY decodes as output-stage value 10b. */
-static void test_pin_type_bit_layout_contradicts_table_20(void)
+/* TC18 §12.7.6 Table 20 packs hw_pin_type as four sub-fields: pull mode
+ * at bits 1:0 (00b float, 01b pull down, 10b pull up), output stage at
+ * bits 3:2 (00b input, 01b open drain, 10b open source, 11b push pull),
+ * drive strength at bits 5:4 (00b input, 01b low, 10b medium, 11b
+ * high), reserved bit 6 reading 0, and Schmitt-trigger enable at bit 7.
+ * Fixed (REQ-RMAP-042): rcp_regmap_hw_pin_map_entry_t.hw_pin_type now
+ * has its own dedicated RCP_REGMAP_HW_PIN_* constants at exactly these
+ * positions, primary-source verified against the TC18 v0.5.1_RC PDF
+ * directly -- separate from ep_gpio.h's own, differently-shaped
+ * RCP_REGMAP_PIN_PROP_* (REQ-GPIO-013's own concern, untouched here). */
+static void test_hw_pin_type_matches_table_20(void)
 {
-    uint8_t all;
+    uint8_t combined;
 
-    TEST_ASSERT_EQUAL_HEX8(0x01, RCP_REGMAP_PIN_PROP_OUTPUT);
-    TEST_ASSERT_EQUAL_HEX8(0x02, RCP_REGMAP_PIN_PROP_INPUT);
-    TEST_ASSERT_EQUAL_HEX8(0x04, RCP_REGMAP_PIN_PROP_OPEN_DRAIN);
-    TEST_ASSERT_EQUAL_HEX8(0x08, RCP_REGMAP_PIN_PROP_PULL_UP);
-    TEST_ASSERT_EQUAL_HEX8(0x10, RCP_REGMAP_PIN_PROP_PULL_DOWN);
-    TEST_ASSERT_EQUAL_HEX8(0x20, RCP_REGMAP_PIN_PROP_ACTIVE_LOW);
+    /* Pull field, bits 1:0. */
+    TEST_ASSERT_EQUAL_HEX8(0x00, RCP_REGMAP_HW_PIN_PULL_FLOAT);
+    TEST_ASSERT_EQUAL_HEX8(0x01, RCP_REGMAP_HW_PIN_PULL_DOWN);
+    TEST_ASSERT_EQUAL_HEX8(0x02, RCP_REGMAP_HW_PIN_PULL_UP);
+    TEST_ASSERT_EQUAL_HEX8(0x03, RCP_REGMAP_HW_PIN_PULL_MASK);
 
-    /* Nothing is defined at Table 20's reserved bit 6 or its
-     * Schmitt-trigger bit 7. */
-    all = (uint8_t)(RCP_REGMAP_PIN_PROP_OUTPUT | RCP_REGMAP_PIN_PROP_INPUT |
-                    RCP_REGMAP_PIN_PROP_OPEN_DRAIN | RCP_REGMAP_PIN_PROP_PULL_UP |
-                    RCP_REGMAP_PIN_PROP_PULL_DOWN | RCP_REGMAP_PIN_PROP_ACTIVE_LOW);
-    TEST_ASSERT_EQUAL_HEX8(0x3F, all);
-    TEST_ASSERT_EQUAL_HEX8(0x00, (uint8_t)(all & 0xC0u));
+    /* Output stage, bits 3:2. */
+    TEST_ASSERT_EQUAL_HEX8(0x00, RCP_REGMAP_HW_PIN_STAGE_INPUT);
+    TEST_ASSERT_EQUAL_HEX8(0x04, RCP_REGMAP_HW_PIN_STAGE_OPEN_DRAIN);
+    TEST_ASSERT_EQUAL_HEX8(0x08, RCP_REGMAP_HW_PIN_STAGE_OPEN_SOURCE);
+    TEST_ASSERT_EQUAL_HEX8(0x0C, RCP_REGMAP_HW_PIN_STAGE_PUSH_PULL);
+    TEST_ASSERT_EQUAL_HEX8(0x0C, RCP_REGMAP_HW_PIN_STAGE_MASK);
 
-    /* PULL_UP lands inside Table 20's output-stage sub-field (bits 3:2). */
-    TEST_ASSERT_EQUAL_HEX8(0x02, (uint8_t)((RCP_REGMAP_PIN_PROP_PULL_UP >> 2) & 0x03u));
+    /* Drive strength, bits 5:4. */
+    TEST_ASSERT_EQUAL_HEX8(0x00, RCP_REGMAP_HW_PIN_DRIVE_INPUT);
+    TEST_ASSERT_EQUAL_HEX8(0x10, RCP_REGMAP_HW_PIN_DRIVE_LOW);
+    TEST_ASSERT_EQUAL_HEX8(0x20, RCP_REGMAP_HW_PIN_DRIVE_MEDIUM);
+    TEST_ASSERT_EQUAL_HEX8(0x30, RCP_REGMAP_HW_PIN_DRIVE_HIGH);
+    TEST_ASSERT_EQUAL_HEX8(0x30, RCP_REGMAP_HW_PIN_DRIVE_MASK);
+
+    /* Schmitt-Trigger, bit 7; bit 6 is reserved and has no macro. */
+    TEST_ASSERT_EQUAL_HEX8(0x80, RCP_REGMAP_HW_PIN_SCHMITT_TRIGGER);
+
+    /* The four fields don't overlap and don't touch the reserved bit. */
+    combined = (uint8_t)(RCP_REGMAP_HW_PIN_PULL_MASK | RCP_REGMAP_HW_PIN_STAGE_MASK |
+                          RCP_REGMAP_HW_PIN_DRIVE_MASK | RCP_REGMAP_HW_PIN_SCHMITT_TRIGGER);
+    TEST_ASSERT_EQUAL_HEX8(0xBFu, combined); /* every bit except reserved bit 6 */
+    TEST_ASSERT_EQUAL_HEX8(0x00, (uint8_t)(combined & 0x40u));
+
+    /* A fully-specified value round-trips through a real entry. */
+    {
+        rcp_regmap_hw_pin_map_entry_t entry;
+        entry.hw_ep_nr     = 0u;
+        entry.hw_ep_pin_nr = 0u;
+        entry.hw_pin_type  = (uint8_t)(RCP_REGMAP_HW_PIN_PULL_UP |
+                                        RCP_REGMAP_HW_PIN_STAGE_PUSH_PULL |
+                                        RCP_REGMAP_HW_PIN_DRIVE_HIGH |
+                                        RCP_REGMAP_HW_PIN_SCHMITT_TRIGGER);
+        TEST_ASSERT_EQUAL_HEX8(RCP_REGMAP_HW_PIN_PULL_UP,
+                               (uint8_t)(entry.hw_pin_type & RCP_REGMAP_HW_PIN_PULL_MASK));
+        TEST_ASSERT_EQUAL_HEX8(RCP_REGMAP_HW_PIN_STAGE_PUSH_PULL,
+                               (uint8_t)(entry.hw_pin_type & RCP_REGMAP_HW_PIN_STAGE_MASK));
+        TEST_ASSERT_EQUAL_HEX8(RCP_REGMAP_HW_PIN_DRIVE_HIGH,
+                               (uint8_t)(entry.hw_pin_type & RCP_REGMAP_HW_PIN_DRIVE_MASK));
+        TEST_ASSERT_TRUE((entry.hw_pin_type & RCP_REGMAP_HW_PIN_SCHMITT_TRIGGER) != 0);
+    }
+}
+
+/* TC18 §12.7.6: ALL OUTPUTS ARE ALWAYS ALSO AN INPUT -- output and
+ * input are not mutually exclusive pin states for hw_pin_type, which is
+ * what makes read-back of an output pin's actual level (short/stuck-
+ * driver detection) possible. Fixed (REQ-RMAP-043): hw_pin_type's own
+ * output-stage field (RCP_REGMAP_HW_PIN_STAGE_*) selects ONE of four
+ * drive modes -- there is no separate, exclusive INPUT flag to toggle
+ * away from at all, so a push-pull/open-drain/open-source pin is
+ * structurally never "not an input" the way the old RCP_REGMAP_PIN_
+ * PROP_OUTPUT/_INPUT pair could represent. (ep_gpio.h's own, separate
+ * pin_property field and its rcp_ep_gpio_apply_reconfig() toggle are
+ * REQ-GPIO-013's own still-open concern, untouched by this fix -- see
+ * this session's investigation note on issue #200.) */
+static void test_hw_pin_output_stage_has_no_exclusive_input_flag(void)
+{
+    uint8_t pin = (uint8_t)(RCP_REGMAP_HW_PIN_STAGE_PUSH_PULL | RCP_REGMAP_HW_PIN_PULL_UP);
+
+    /* A push-pull-configured pin's own byte carries no bit anywhere that
+     * means "not readable as an input" -- the four STAGE_* values are
+     * the field's only four possible states, and none of them is a
+     * separate "output, therefore not input" flag. */
+    TEST_ASSERT_EQUAL_HEX8(RCP_REGMAP_HW_PIN_STAGE_PUSH_PULL,
+                           (uint8_t)(pin & RCP_REGMAP_HW_PIN_STAGE_MASK));
+    TEST_ASSERT_NOT_EQUAL_UINT8(RCP_REGMAP_HW_PIN_STAGE_INPUT,
+                                (uint8_t)(pin & RCP_REGMAP_HW_PIN_STAGE_MASK));
+    /* ...yet nothing about that byte is exclusive with being read as an
+     * input: unlike RCP_REGMAP_PIN_PROP_OUTPUT/_INPUT, there is no
+     * second, independent bit this field's own three non-input values
+     * ever clear or set to represent "readability" -- the pull
+     * configuration (an orthogonal field) is untouched either way. */
+    TEST_ASSERT_EQUAL_HEX8(RCP_REGMAP_HW_PIN_PULL_UP,
+                           (uint8_t)(pin & RCP_REGMAP_HW_PIN_PULL_MASK));
 }
 
 /* TC18 §12.7.6: ALL OUTPUTS ARE ALWAYS ALSO AN INPUT -- output and input
@@ -1909,7 +1978,8 @@ int main(void)
     RUN_TEST(test_four_optional_subsystem_pointer_pairs_are_now_present);
     RUN_TEST(test_hw_config_table_has_no_server_side_storage);
     RUN_TEST(test_hw_config_row_stride_absent_and_access_class_inverted);
-    RUN_TEST(test_pin_type_bit_layout_contradicts_table_20);
+    RUN_TEST(test_hw_pin_type_matches_table_20);
+    RUN_TEST(test_hw_pin_output_stage_has_no_exclusive_input_flag);
     RUN_TEST(test_output_pin_loses_its_input_capability);
     RUN_TEST(test_named_signal_index_covers_every_endpoint_type);
     RUN_TEST(test_request_stream_cfg_lacks_channel_and_stream_indices);

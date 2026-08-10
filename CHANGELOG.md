@@ -34,6 +34,38 @@ the rationale.
 
 ## Releases
 
+### v0.199.0 -- 2026-08-10
+
+**Phase 5d batch 29: `hw_pin_type` now matches TC18 Table 20's own bit
+layout.** Issue #200. `REQ-RMAP-042`/`-043`. Consumer investigation
+(continued from batch 28) confirmed HW_config's own `hw_pin_type` and
+GPIO's own separate, runtime-adjustable `pin_property` (`ep_gpio.h`)
+are genuinely two different registers, coupled only by sharing one set
+of bit-position constants -- not a functional dependency. Decoupled
+the fix: `rcp_regmap_hw_pin_map_entry_t`'s third field renamed
+`pin_property` -> `hw_pin_type` with a brand-new, dedicated
+`RCP_REGMAP_HW_PIN_*` constant family at Table 20's exact bit
+positions; `RCP_REGMAP_PIN_PROP_*` and every one of its consumers in
+`ep_gpio.c`/`ep_gpio.h` left completely untouched.
+`config.h`/`config.c`'s manifest JSON parser updated to match
+(`hw_pin_map` entries now use `"hw_pin_type"` with Table-20-derived
+string values). `REQ-RMAP-043` ("all outputs are always also an
+input") closes as a natural consequence: the output-stage field
+selects one of four drive modes with no separate exclusive
+INPUT/OUTPUT flag pair to toggle away from at all. **Bigger finding
+reported separately, not fixed this batch**: re-reading TC18 Table 30
+shows GPIO's own `evt[2:0]=111b` write semantics
+(`rcp_ep_gpio_apply_reconfig()`) appears to deviate from TC18's own
+generic EP_func-block-write definition (§12.7.1/Figure 18) --
+`ep_pwm.h`'s own sibling implementation already gets this right,
+GPIO's own doesn't. Posted to issue #200 and this session's own
+project memory; needs a larger, separate fix. Mutation-tested with two
+mutations (full revert -- fails to compile; isolated table-value swap
+-- caught). Full suite (65/65) + ASan/UBSan clean on both trees. Fresh
+`cfusa check`/`trace` (0 errors, 100%/100%, three separate CI-matching
+invocations). `REQ-RMAP-042`/`-043` both move to `implemented`. See
+`ROADMAP.md` milestone 199 for full detail.
+
 ### v0.198.0 -- 2026-08-10
 
 **Phase 5d batch 28: EP_Signal_Nr enumeration now covers all eleven

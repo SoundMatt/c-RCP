@@ -72,20 +72,34 @@ static bool find_bracket_span(const char *key_pos, const char **out_start, const
     return true;
 }
 
-/* ── pin_property array parsing ────────────────────────────────────────────── */
+/* ── hw_pin_type array parsing (REQ-RMAP-042) ──────────────────────────────── */
 
 typedef struct {
     const char *name;
     uint8_t     bit;
 } pin_prop_name_t;
 
+/* TC18 §12.7.6 Table 20's own hw_pin_type bit layout (regmap.h's
+ * RCP_REGMAP_HW_PIN_* family) -- each name's own "bit" value here is
+ * already shifted to its field's own position, so or_named_bits_u8()
+ * (unchanged, reused as-is) can OR them together directly: every
+ * field's own default (float/input/input/no-Schmitt) is 0, so an
+ * omitted name simply leaves that field at its default rather than
+ * needing an explicit "clear the field first" step. A manifest naming
+ * two values for the same field (e.g. both "pull_up" and "pull_down")
+ * is not validated against here, same as this parser's own established
+ * leniency elsewhere -- the resulting bitmask is whatever the OR
+ * produces, not silently "fixed" to one or the other. */
 static const pin_prop_name_t PIN_PROP_NAMES[] = {
-    {"output",     RCP_REGMAP_PIN_PROP_OUTPUT},
-    {"input",      RCP_REGMAP_PIN_PROP_INPUT},
-    {"open_drain", RCP_REGMAP_PIN_PROP_OPEN_DRAIN},
-    {"pull_up",    RCP_REGMAP_PIN_PROP_PULL_UP},
-    {"pull_down",  RCP_REGMAP_PIN_PROP_PULL_DOWN},
-    {"active_low", RCP_REGMAP_PIN_PROP_ACTIVE_LOW},
+    {"pull_down",      RCP_REGMAP_HW_PIN_PULL_DOWN},
+    {"pull_up",        RCP_REGMAP_HW_PIN_PULL_UP},
+    {"open_drain",     RCP_REGMAP_HW_PIN_STAGE_OPEN_DRAIN},
+    {"open_source",    RCP_REGMAP_HW_PIN_STAGE_OPEN_SOURCE},
+    {"push_pull",      RCP_REGMAP_HW_PIN_STAGE_PUSH_PULL},
+    {"low_drive",      RCP_REGMAP_HW_PIN_DRIVE_LOW},
+    {"medium_drive",   RCP_REGMAP_HW_PIN_DRIVE_MEDIUM},
+    {"high_drive",     RCP_REGMAP_HW_PIN_DRIVE_HIGH},
+    {"schmitt_trigger", RCP_REGMAP_HW_PIN_SCHMITT_TRIGGER},
 };
 #define PIN_PROP_NAMES_LEN (sizeof(PIN_PROP_NAMES) / sizeof(PIN_PROP_NAMES[0]))
 
@@ -252,12 +266,12 @@ static bool parse_pin_entry(const char *open, const char *close, rcp_config_hw_p
     }
     out->hw_ep_pin_nr = (uint8_t)v;
 
-    k = find_in_range(open, close + 1, "\"pin_property\"");
+    k = find_in_range(open, close + 1, "\"hw_pin_type\"");
     if (k) {
         const char *arr_start, *arr_end;
-        if (find_bracket_span(k + strlen("\"pin_property\""), &arr_start, &arr_end) &&
+        if (find_bracket_span(k + strlen("\"hw_pin_type\""), &arr_start, &arr_end) &&
             arr_end <= close) {
-            or_named_bits_u8(arr_start, arr_end, &out->pin_property, PIN_PROP_NAMES, PIN_PROP_NAMES_LEN);
+            or_named_bits_u8(arr_start, arr_end, &out->hw_pin_type, PIN_PROP_NAMES, PIN_PROP_NAMES_LEN);
         }
     }
     return true;

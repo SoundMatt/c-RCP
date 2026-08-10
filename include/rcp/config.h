@@ -28,7 +28,7 @@
  *       "svr_implemented_options": ["time_sync", "compound_bundles"]
  *     },
  *     "hw_pin_map": [
- *       {"hw_ep_nr": 0, "hw_ep_pin_nr": 3, "pin_property": ["output", "pull_up"]}
+ *       {"hw_ep_nr": 0, "hw_ep_pin_nr": 3, "hw_pin_type": ["push_pull", "pull_up"]}
  *     ],
  *     "endpoints": [
  *       {"byte_bus_id": 1, "ep_type": 1, "ep_enable": true}
@@ -107,7 +107,11 @@ typedef struct {
 typedef struct {
     uint8_t hw_ep_nr;
     uint8_t hw_ep_pin_nr;
-    uint8_t pin_property; /* RCP_REGMAP_PIN_PROP_* bitmask (regmap.h) */
+    uint8_t hw_pin_type; /* RCP_REGMAP_HW_PIN_* bitmask (regmap.h),
+                             REQ-RMAP-042 -- renamed from pin_property to
+                             match the wire register's own name (Table 19)
+                             and stop implying kinship with ep_gpio.h's
+                             differently-shaped, same-named field */
 } rcp_config_hw_pin_t;
 
 typedef struct {
