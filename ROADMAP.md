@@ -8102,3 +8102,91 @@ requirements (unchanged, no new REQ ids), 136 `tc18-gap` entries
 remaining (unchanged count -- three entries move `not-implemented`/
 `not-implemented`/`not-implemented` -> `partial`/`partial`/`partial`
 within the gap category, no full closures this batch).
+
+### 160. Phase 5b batch 8: REQ-LIFECYCLE-023 + LOCKED_MEM_ACCESS/UNAUTHORIZED_ACCESS correction to batch 6 (issue #198)
+
+Scoping `REQ-LIFECYCLE-023` (endpoint-generic + response-queue
+configuration locking) required re-reading Figure 16's own HW_CONFIGURED
+box once more, and it carried a transition batch 6 had not checked:
+"Request on discovery stream or known stream/bb_id for configuration to
+HW_CONFIG or QUEUE_CFG or EP_GEN_CFG -> send error response
+LOCKED_CONFIG_ACCESS". This directly contradicts batch 6's own
+conclusion (that every `rcp_lifecycle_field_writable()` denial maps to
+`RCP_ERROR_UNAUTHORIZED_ACCESS` uniformly, based on §13.7.1.2's prose
+alone) -- Figure 16 gives a second, more specific rule the prose alone
+did not surface, and batch 6's primary-source check, while genuine, was
+incomplete: it verified the prose but not the diagram.
+
+**REQ-LIFECYCLE-023 (implemented, no new code)**: `RCP_LIFECYCLE_FIELD_
+HW_GENERIC`'s existing writability rule (writable only in
+`HW_UNCONFIGURED`, for any writer) already exactly matches Figure 16's
+own HW_CONFIG/QUEUE_CFG/EP_GEN_CFG grouping -- these three blocks share
+one identical locking rule and one identical error response in the
+diagram, confirming they belong to one behavioral kind, not three (or a
+fourth new one). The fix is a documentation clarification only:
+`rcp_lifecycle_field_kind_t`'s own doc comment now explicitly states
+that `HW_GENERIC` covers the endpoint-generic
+(`rcp_regmap_ep_generic_cfg_t`) and response-queue/request-stream
+(`rcp_regmap_response_queue_cfg_t`/`rcp_regmap_request_stream_cfg_t`,
+where not already covered by Table 22's own separate
+`FUNCTIONAL_W_STAR` legend) blocks too, matching this codebase's own
+established convention (see `FUNCTIONAL_W` vs. `FUNCTIONAL_W_STAR`) of
+adding a distinct enum value only when behavior actually differs, not
+mirroring the register map's own struct boundaries one-for-one.
+
+**Correction to already-merged PR #214 (batch 6)**: `rcp_lifecycle_
+field_write_error()` (`REQ-WIREERR-004`) restored to its original
+two-tier design (comparing the real writer's verdict against a
+maximally-privileged writer's verdict for the same state/kind, to
+isolate whether a denial is state-driven or writer-driven) -- the exact
+design batch 6 initially had, then abandoned as an unnecessary
+"simplification" after checking only §13.7.1.2's prose. State-driven
+denials (every `HW_GENERIC` denial; `FUNCTIONAL_W_STAR` once
+`RCP_CONFIGURED`) now correctly return `RCP_ERROR_LOCKED_MEM_ACCESS` --
+the closest numbered wire code to Figure 16's diagram-only
+"LOCKED_CONFIG_ACCESS" name, unambiguous by elimination since it is the
+only one of the seventeen numbered codes with a semantically matching
+name (the same prose-vs-table naming variance already documented for
+`POCI_FAILURE`). Writer/frame-driven denials on top of an
+otherwise-permitting state still return `RCP_ERROR_UNAUTHORIZED_ACCESS`,
+matching §13.7.1.2's own narrower example -- batch 6's conclusion for
+that case was correct, just not universal. `REQ-LIFECYCLE-024`'s and
+`REQ-WIREERR-004`'s own `.fusa-reqs.json` text corrected a second time
+to record both the original mistake and this correction transparently,
+rather than silently overwriting the history.
+
+**Reusable lesson**: primary-source verification that checks only prose
+and skips an adjacent diagram (or vice versa) is not automatically
+complete just because it is genuine -- TC18 states some rules in one
+form only, others in both forms with complementary specificity, and a
+few (like this one) in both forms describing genuinely different
+cases. When a spec section has both prose and a diagram, check both
+before concluding a rule is fully understood, not just whichever form
+answers the immediate question fastest.
+
+Test changes: `test_lifecycle.c`'s and `test_tc18_gaps_regmap.c`'s own
+batch-6 tests (`test_field_write_error_maps_every_denial_to_
+unauthorized_access` / `test_field_write_error_matches_tc18_write_
+prohibited_example`) both renamed to `test_field_write_error_
+distinguishes_state_from_writer_denial` and rewritten to assert the
+corrected two-tier behavior, including a `FUNCTIONAL_W_STAR`-once-
+`RCP_CONFIGURED` case neither prior version exercised.
+`test_tc18_gaps_server.c`'s own `REQ-LIFECYCLE-023` deviation pin
+(`test_locked_config_write_has_no_kind_and_no_error_response`, which
+used a fabricated out-of-range `rcp_lifecycle_field_kind_t` value to
+demonstrate the gap) rewritten to `test_hw_generic_covers_ep_generic_
+and_queue_config_with_locked_response`, asserting `HW_GENERIC` directly
+covers the closed behavior.
+
+Mutation-tested two ways: a precise single-line mutation (returning
+`RCP_ERROR_UNAUTHORIZED_ACCESS` from the state-only branch instead of
+`RCP_ERROR_LOCKED_MEM_ACCESS`, signature untouched) -> exactly the 3
+rewritten pinned tests fail (`Expected 4 Was 3`) across all three
+files; a full-file revert of `src/lifecycle.c` -> build breaks
+(unrelated to this specific line, confirms the file is still exercised
+end to end). Both restored clean. Full test suite (64/64) + ASan/UBSan
+build both clean. Fresh `cfusa check` (0 errors) + `cfusa trace
+--req-coverage 100 --sec-tested 100` (100%/100%, all three gates
+verified as CI's own separate invocations). 1030 requirements
+(unchanged, no new REQ ids), 135 `tc18-gap` entries remaining (was
+136, one genuine closure -- `REQ-LIFECYCLE-023`).

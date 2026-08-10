@@ -158,35 +158,41 @@ static void test_transition_now_rejects_unauthorized_writer(void)
                             rcp_lifecycle_strerror(RCP_LIFECYCLE_ERR_UNAUTHORIZED)) != 0);
 }
 
-/* ── §12.3 register locking: missing field kinds, no error response ────────── */
+/* ── §12.3 register locking: field kinds and error response, both closed ───── */
 
-static void test_locked_config_write_has_no_kind_and_no_error_response(void)
+/* As of the REQ-LIFECYCLE-023 fix: rcp_lifecycle_field_kind_t's own doc
+ * comment now explicitly documents that RCP_LIFECYCLE_FIELD_HW_GENERIC
+ * covers the endpoint-generic (rcp_regmap_ep_generic_cfg_t) and
+ * response-queue/request-stream (rcp_regmap_response_queue_cfg_t /
+ * rcp_regmap_request_stream_cfg_t, where not already covered by Table
+ * 22's own separate FUNCTIONAL_W_STAR legend) blocks too -- TC18 Figure
+ * 16 groups all of HW_CONFIG/QUEUE_CFG/EP_GEN_CFG under one identical
+ * locking rule and one identical LOCKED_CONFIG_ACCESS response, and
+ * HW_GENERIC's own pre-existing writability rule (writable only in
+ * HW_UNCONFIGURED, for any writer) is already exactly that rule -- no
+ * new enum value or behavior change was needed, only recognizing that
+ * this kind's existing scope was under-documented, not that it was
+ * incomplete. The out-of-range placeholder kind this test previously
+ * used to demonstrate the gap is gone; HW_GENERIC itself now stands in
+ * directly for all three blocks. As of the REQ-LIFECYCLE-024/
+ * REQ-WIREERR-004 fix (corrected once already, see that function's own
+ * header doc comment): rcp_lifecycle_field_write_error() answers this
+ * exact denial with RCP_ERROR_LOCKED_MEM_ACCESS, the closest numbered
+ * wire code to Figure 16's own diagram-only "LOCKED_CONFIG_ACCESS"
+ * name. */
+static void test_hw_generic_covers_ep_generic_and_queue_config_with_locked_response(void)
 {
     rcp_lifecycle_writer_ctx_t root = {true, true};
-    /* Stand-in for the endpoint-generic (rcp_regmap_ep_generic_cfg_t) and
-     * response-queue (rcp_regmap_response_queue_cfg_t) blocks: TC18 §12.3
-     * locks both alongside HW_config once the server leaves HW_UNCONFIGURED,
-     * and §12.1 requires every parameter to be writable *while*
-     * HW_UNCONFIGURED. rcp_lifecycle_field_kind_t defines no kind for either
-     * block, so such a write is never lock-checked; the fail-safe default
-     * branch below denies it in all three states -- including the one state
-     * where TC18 requires it to be permitted. */
-    const rcp_lifecycle_field_kind_t ep_generic_or_queue = (rcp_lifecycle_field_kind_t)3;
 
-    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_UNCONFIGURED,
-                                                   ep_generic_or_queue, root));
-    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
-                                                   ep_generic_or_queue, root));
-    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_RCP_CONFIGURED,
-                                                   ep_generic_or_queue, root));
-
-    /* TC18 §12.3 answers a write to a locked configuration register with an
-     * error response carrying LOCKED_MEM_ACCESS (wire code 4). c-RCP's
-     * denial is a bare bool with no response-producing counterpart: the code
-     * exists in the table and nothing ever emits it, so the client cannot
-     * distinguish a locked register from a lost frame. */
+    TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_UNCONFIGURED,
+                                                  RCP_LIFECYCLE_FIELD_HW_GENERIC, root));
     TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
                                                    RCP_LIFECYCLE_FIELD_HW_GENERIC, root));
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_RCP_CONFIGURED,
+                                                   RCP_LIFECYCLE_FIELD_HW_GENERIC, root));
+
+    TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, rcp_lifecycle_field_write_error(
+        RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_HW_GENERIC, root));
     TEST_ASSERT_EQUAL_INT(4, RCP_ERROR_LOCKED_MEM_ACCESS);
     TEST_ASSERT_TRUE(strlen(rcp_wire_error_string(RCP_ERROR_LOCKED_MEM_ACCESS)) > 0);
 }
@@ -965,7 +971,7 @@ int main(void)
 
     RUN_TEST(test_transition_now_requires_idle_for_demotion);
     RUN_TEST(test_transition_now_rejects_unauthorized_writer);
-    RUN_TEST(test_locked_config_write_has_no_kind_and_no_error_response);
+    RUN_TEST(test_hw_generic_covers_ep_generic_and_queue_config_with_locked_response);
     RUN_TEST(test_hw_configured_admits_only_ep0);
     RUN_TEST(test_admit_takes_no_lifecycle_state_or_stream_identity);
     RUN_TEST(test_hw_unconfigured_ignores_claimant_and_request_kind);

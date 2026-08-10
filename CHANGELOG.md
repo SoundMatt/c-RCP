@@ -32,6 +32,32 @@ the rationale.
 
 ## Releases
 
+### v0.160.0 -- 2026-08-10
+
+**Phase 5b batch 8: REQ-LIFECYCLE-023 + LOCKED_MEM_ACCESS/UNAUTHORIZED_ACCESS
+correction to batch 6.** Issue #198. Scoping `REQ-LIFECYCLE-023`
+required re-reading Figure 16's HW_CONFIGURED box, which carries a
+transition batch 6 (v0.158.0) had not checked: writes to `HW_CONFIG`/
+`QUEUE_CFG`/`EP_GEN_CFG` map to a diagram-only "LOCKED_CONFIG_ACCESS"
+name -- unambiguously `RCP_ERROR_LOCKED_MEM_ACCESS` (4), contradicting
+batch 6's conclusion (based on §13.7.1.2's prose alone) that every
+denial maps to `UNAUTHORIZED_ACCESS` uniformly. `rcp_lifecycle_field_
+write_error()` restored to its original two-tier design: state-driven
+denials now correctly return `LOCKED_MEM_ACCESS`, writer/frame-driven
+denials on top of an otherwise-permitting state still return
+`UNAUTHORIZED_ACCESS` (batch 6's conclusion for that case was correct,
+just not universal). `REQ-LIFECYCLE-023` itself closed with no new
+code: `RCP_LIFECYCLE_FIELD_HW_GENERIC`'s existing rule already matches
+Figure 16's `HW_CONFIG`/`QUEUE_CFG`/`EP_GEN_CFG` grouping exactly --
+only its own doc comment needed to say so explicitly. `.fusa-reqs.json`
+entries corrected a second time to record both the original mistake and
+this correction transparently. Mutation-tested (a precise single-line
+mutation fails exactly the 3 rewritten pinned tests across three
+files). Full suite (64/64) + ASan/UBSan clean, fresh `cfusa check`/
+`trace` (0 errors, 100%/100%). See `ROADMAP.md` milestone 160 for full
+detail. 1030 requirements (unchanged), 135 `tc18-gap` entries remaining
+(was 136, one genuine closure).
+
 ### v0.159.0 -- 2026-08-10
 
 **Phase 5b batch 7: REQ-LIFECYCLE-022 EPs_NOT_IDLE gate, Figure 16

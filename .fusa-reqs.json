@@ -7675,8 +7675,8 @@
     },
     {
       "id": "REQ-WIREERR-004",
-      "title": "rcp_lifecycle_field_write_error() maps a denied write to UNAUTHORIZED_ACCESS",
-      "text": "rcp_lifecycle_field_write_error() shall return RCP_ERROR_NONE when rcp_lifecycle_field_writable(state, kind, writer) is true, and RCP_ERROR_UNAUTHORIZED_ACCESS otherwise -- the code TC18 §13.7.1.2's own concrete example assigns a write-prohibited-register write, uniformly regardless of whether the denial is state-driven or writer/frame-driven (REQ-LIFECYCLE-024). It shall never return RCP_ERROR_LOCKED_MEM_ACCESS, which corresponds to the separate, unmodeled svr_configuration_lock mechanism (TC18 §12.9).",
+      "title": "rcp_lifecycle_field_write_error() distinguishes LOCKED_MEM_ACCESS (state-locked) from UNAUTHORIZED_ACCESS (writer-denied)",
+      "text": "rcp_lifecycle_field_write_error() shall return RCP_ERROR_NONE when rcp_lifecycle_field_writable(state, kind, writer) is true; RCP_ERROR_LOCKED_MEM_ACCESS when the denial is state-driven (a maximally-privileged writer for the same state/kind would also be denied) -- the code closest in meaning to TC18 Figure 16's own diagram-only \"LOCKED_CONFIG_ACCESS\" transition, which names no numbered wire error code exactly but unambiguously matches LOCKED_MEM_ACCESS (4), the only numbered code with a semantically corresponding name; and RCP_ERROR_UNAUTHORIZED_ACCESS when the denial is specific to this writer or frame on top of an otherwise-permitting state -- TC18 §13.7.1.2's own separate, narrower concrete example (REQ-LIFECYCLE-024).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -8445,23 +8445,22 @@
     {
       "id": "REQ-LIFECYCLE-023",
       "title": "Endpoint-generic and response-queue configuration are locked alongside HW_config in HW_CONFIGURED",
-      "text": "NOT IMPLEMENTED: c-RCP locks only the HW-generic field kind once the server leaves HW_UNCONFIGURED (TC18 \u00a712.3, Figure 16; \u00a712.3.1.2). rcp_lifecycle_field_kind_t has no kind covering the endpoint generic configuration (rcp_regmap_ep_generic_cfg_t) or the response-queue/request-queue configuration (rcp_regmap_response_queue_cfg_t), so rcp_lifecycle_field_writable() cannot deny a write to those blocks in HW_CONFIGURED or RCP_CONFIGURED. Queue sizing and endpoint pin/type assignment can be changed after the plausibility check that validated them.",
-      "standard": "iso26262",
-      "level": "QM",
-      "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
-      "tc18": "\u00a712.3, TC18.txt L2110-L2113 (Figure 16)"
-    },
-    {
-      "id": "REQ-LIFECYCLE-024",
-      "title": "A write-prohibited configuration write is answered with an UNAUTHORIZED_ACCESS error response",
-      "text": "IMPLEMENTED: TC18 \u00a713.7.1.2's one concrete write-outcome example -- verified directly against the primary-source PDF, correcting this entry's own prior text, which cited RCP_ERROR_LOCKED_MEM_ACCESS -- reads: \"Writing data to read only registers has no effect and request is confirmed normally [err=0]. Writing to a write prohibited register (e.g. lock bit for map set) creates a response with err=1 and an error code UNAUTHORIZED_ACCESS.\" New rcp_lifecycle_field_write_error() maps rcp_lifecycle_field_writable()'s bool to RCP_ERROR_NONE (writable) or RCP_ERROR_UNAUTHORIZED_ACCESS (denied, for any reason -- state alone, or writer/frame authorization on top of an otherwise-permitting state) uniformly, since all three rcp_lifecycle_field_kind_t kinds are genuinely writable-in-principle configuration that becomes write-prohibited, not TC18's distinct \"read only by nature\" case. RCP_ERROR_LOCKED_MEM_ACCESS is deliberately not emitted -- it corresponds to the separate, still-unmodeled svr_configuration_lock register (TC18 \u00a712.9, Table 18 offset 0x0015; see REQ-RMAP's own test_configuration_lock_register_is_absent deviation), not this function's scope.",
+      "text": "IMPLEMENTED: verified directly against the primary-source PDF's own Figure 16 image (page 42) -- the diagram groups HW_CONFIG, QUEUE_CFG and EP_GEN_CFG under one identical transition: \"Request on discovery stream or known stream/bb_id for configuration to HW_CONFIG or QUEUE_CFG or EP_GEN_CFG -> send error response LOCKED_CONFIG_ACCESS\". RCP_LIFECYCLE_FIELD_HW_GENERIC's own pre-existing writability rule (writable only in HW_UNCONFIGURED, for any writer) is already exactly this rule -- no new rcp_lifecycle_field_kind_t value or behavior change was needed, only recognizing (now documented directly in that enum's own doc comment) that its scope already covers the endpoint-generic (rcp_regmap_ep_generic_cfg_t) and response-queue/request-stream (rcp_regmap_response_queue_cfg_t / rcp_regmap_request_stream_cfg_t, where not already covered by Table 22's own separate FUNCTIONAL_W_STAR legend) blocks, not just HW pin-mapping. A future caller wiring up write access to either block should classify it as RCP_LIFECYCLE_FIELD_HW_GENERIC.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18",
-      "tc18": "\u00a713.7.1.2, TC18.txt L4039-L4041"
+      "tc18": "\u00a712.3, TC18.txt L2110-L2113 (Figure 16, verified against primary-source PDF page 42's own image)"
+    },
+    {
+      "id": "REQ-LIFECYCLE-024",
+      "title": "A denied configuration write is answered with LOCKED_MEM_ACCESS (state-locked) or UNAUTHORIZED_ACCESS (writer-denied)",
+      "text": "IMPLEMENTED, corrected a second time after a closer primary-source re-reading: this entry's text previously (a) cited RCP_ERROR_LOCKED_MEM_ACCESS as the sole expected code, then (b) after checking only TC18 \u00a713.7.1.2's prose, concluded the opposite -- that every denial maps to RCP_ERROR_UNAUTHORIZED_ACCESS uniformly. Both were incomplete: checking Figure 16's own diagram (page 42) in addition to the prose reveals TC18 actually specifies two distinct cases. Figure 16's HW_CONFIGURED-box transition -- \"Request on discovery stream or known stream/bb_id for configuration to HW_CONFIG or QUEUE_CFG or EP_GEN_CFG -> send error response LOCKED_CONFIG_ACCESS\" -- covers an otherwise-authorized request denied purely because the target block is state-locked (every RCP_LIFECYCLE_FIELD_HW_GENERIC denial, and a FUNCTIONAL_W_STAR denial once RCP_CONFIGURED); LOCKED_CONFIG_ACCESS does not literally match any of the seventeen numbered wire error codes' own strings, but is unambiguously RCP_ERROR_LOCKED_MEM_ACCESS (4), the only numbered code with a semantically matching name (the same prose-vs-table naming variance already documented for POCI_FAILURE). \u00a713.7.1.2's own prose -- \"Writing to a write prohibited register (e.g. lock bit for map set) creates a response with err=1 and an error code UNAUTHORIZED_ACCESS\" -- is the separate, narrower case: a writer/frame-specific denial on top of an otherwise-permitting state. rcp_lifecycle_field_write_error() now distinguishes these (comparing the real writer's verdict against a maximally-privileged writer's verdict for the same state/kind, to isolate which case applies) rather than collapsing them to one code.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "tc18",
+      "tc18": "\u00a713.7.1.2, TC18.txt L4039-L4041; Figure 16, TC18.txt L2110-L2113 (verified against primary-source PDF page 42's own image)"
     },
     {
       "id": "REQ-LIFECYCLE-025",
