@@ -1104,33 +1104,54 @@ static void test_output_pin_loses_its_input_capability(void)
 /* TC18 §12.7.6 Table 21 enumerates EP_Signal_Nr for EVERY endpoint type
  * (UART 0..3, LIN 0..2, PWM_OUT 0..1, PWM_IN 0, ADC 0, DAC 0, CAN 0 RXD /
  * 1 TXD, ISELED 0..1, MDIO 0..1 besides GPIO/SPI/I2C), and restarts the
- * numbering at 0 for each type. Deviation: c-RCP enumerates only GPIO,
- * SPI and I2C, and numbers them in ONE flat global sequence, so SPI_CLK
- * (TC18 EP_Signal_Nr 0) is 32 -- outside the SPI type's whole 0..8 range
- * -- and I2C_SCL (TC18 0) is 41. No converter between the two numbering
- * schemes exists, and CAN's counter-intuitive RXD=0/TXD=1 is unrecorded. */
-static void test_named_signal_index_is_global_and_covers_three_types(void)
+ * numbering at 0 for each type. Fixed (REQ-RMAP-044): the enum now
+ * covers all eleven endpoint types. Fixed (REQ-RMAP-045):
+ * rcp_regmap_named_signal_ep_signal_nr() converts this enum's own flat
+ * ordinal into TC18's per-type-relative wire value. */
+static void test_named_signal_index_covers_every_endpoint_type(void)
 {
-    TEST_ASSERT_EQUAL_INT(0, (int)RCP_REGMAP_SIGNAL_GPIO0);
-    TEST_ASSERT_EQUAL_INT(31, (int)RCP_REGMAP_SIGNAL_GPIO31);
-    TEST_ASSERT_EQUAL_INT(32, (int)RCP_REGMAP_SIGNAL_SPI_CLK);
-    TEST_ASSERT_EQUAL_INT(41, (int)RCP_REGMAP_SIGNAL_I2C_SCL);
-    TEST_ASSERT_EQUAL_INT(42, (int)RCP_REGMAP_SIGNAL_I2C_SDA);
-    TEST_ASSERT_EQUAL_INT(43, (int)RCP_REGMAP_SIGNAL_COUNT);
-
-    /* Per-type numbering would put both of these at EP_Signal_Nr 0; each
-     * is instead outside its own type's whole signal range (SPI 0..8,
-     * I2C 0..1). */
-    TEST_ASSERT_TRUE((int)RCP_REGMAP_SIGNAL_SPI_CLK > 8);
-    TEST_ASSERT_TRUE((int)RCP_REGMAP_SIGNAL_I2C_SCL > 1);
-
-    /* The enumeration stops at I2C_SDA: UART_TX, LIN_TXD, PWM phases,
-     * ADC_IN, DAC_OUT, CAN RXD/TXD, ISELED ISP_P/N and MDIO MDC/MDIO all
-     * fall through to "unknown". */
-    TEST_ASSERT_EQUAL_STRING("I2C_SDA", rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_I2C_SDA));
+    /* Coverage: the enum no longer stops at I2C_SDA. */
+    TEST_ASSERT_EQUAL_STRING("UART_TX",     rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_UART_TX));
+    TEST_ASSERT_EQUAL_STRING("LIN_TXD",     rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_LIN_TXD));
+    TEST_ASSERT_EQUAL_STRING("PWM_OUT",     rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_PWM_OUT));
+    TEST_ASSERT_EQUAL_STRING("PWM_OUTN",    rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_PWM_OUTN));
+    TEST_ASSERT_EQUAL_STRING("PWM_IN",      rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_PWM_IN));
+    TEST_ASSERT_EQUAL_STRING("ADC_IN",      rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_ADC_IN));
+    TEST_ASSERT_EQUAL_STRING("DAC_OUT",     rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_DAC_OUT));
+    TEST_ASSERT_EQUAL_STRING("CAN_RXD",     rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_CAN_RXD));
+    TEST_ASSERT_EQUAL_STRING("CAN_TXD",     rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_CAN_TXD));
+    TEST_ASSERT_EQUAL_STRING("ISELED_ISP_P", rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_ISELED_ISP_P));
+    TEST_ASSERT_EQUAL_STRING("ISELED_ISP_N", rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_ISELED_ISP_N));
+    TEST_ASSERT_EQUAL_STRING("MDIO_MDC",    rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_MDIO_MDC));
+    TEST_ASSERT_EQUAL_STRING("MDIO_DATA",   rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_MDIO_DATA));
     TEST_ASSERT_EQUAL_STRING("unknown",
                              rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_COUNT));
-    TEST_ASSERT_EQUAL_STRING("unknown", rcp_regmap_named_signal_string((rcp_regmap_named_signal_t)44));
+
+    /* Per-type EP_Signal_Nr restarts at 0 for every type, even though
+     * this enum's own flat ordinal keeps climbing -- exactly the
+     * counter-example the old deviation pin cited (SPI_CLK/I2C_SCL
+     * would both be EP_Signal_Nr 0, not their flat ordinals 32/41). */
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_regmap_named_signal_ep_signal_nr(RCP_REGMAP_SIGNAL_SPI_CLK));
+    TEST_ASSERT_EQUAL_UINT8(8u, rcp_regmap_named_signal_ep_signal_nr(RCP_REGMAP_SIGNAL_SPI_CS5));
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_regmap_named_signal_ep_signal_nr(RCP_REGMAP_SIGNAL_I2C_SCL));
+    TEST_ASSERT_EQUAL_UINT8(1u, rcp_regmap_named_signal_ep_signal_nr(RCP_REGMAP_SIGNAL_I2C_SDA));
+    TEST_ASSERT_EQUAL_UINT8(31u, rcp_regmap_named_signal_ep_signal_nr(RCP_REGMAP_SIGNAL_GPIO31));
+
+    /* TC18's own counter-intuitive CAN ordering (RXD=0, TXD=1) is now
+     * recorded, not lost. */
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_regmap_named_signal_ep_signal_nr(RCP_REGMAP_SIGNAL_CAN_RXD));
+    TEST_ASSERT_EQUAL_UINT8(1u, rcp_regmap_named_signal_ep_signal_nr(RCP_REGMAP_SIGNAL_CAN_TXD));
+
+    /* Single-signal types are always EP_Signal_Nr 0. */
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_regmap_named_signal_ep_signal_nr(RCP_REGMAP_SIGNAL_PWM_IN));
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_regmap_named_signal_ep_signal_nr(RCP_REGMAP_SIGNAL_ADC_IN));
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_regmap_named_signal_ep_signal_nr(RCP_REGMAP_SIGNAL_DAC_OUT));
+
+    /* Out-of-range input (including a value below the enum's own first
+     * member) safely returns 0, per this function's own documented
+     * contract, not garbage. */
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_regmap_named_signal_ep_signal_nr(RCP_REGMAP_SIGNAL_COUNT));
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_regmap_named_signal_ep_signal_nr((rcp_regmap_named_signal_t)-1));
 }
 
 /* ── §12.7.7 Table 22: request-stream configuration ────────────────────────── */
@@ -1890,7 +1911,7 @@ int main(void)
     RUN_TEST(test_hw_config_row_stride_absent_and_access_class_inverted);
     RUN_TEST(test_pin_type_bit_layout_contradicts_table_20);
     RUN_TEST(test_output_pin_loses_its_input_capability);
-    RUN_TEST(test_named_signal_index_is_global_and_covers_three_types);
+    RUN_TEST(test_named_signal_index_covers_every_endpoint_type);
     RUN_TEST(test_request_stream_cfg_lacks_channel_and_stream_indices);
     RUN_TEST(test_watchdog_timeout_width_and_unit_deviate);
     RUN_TEST(test_table22_w_star_writable_in_both_pre_rcp_configured_states);

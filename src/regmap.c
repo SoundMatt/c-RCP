@@ -139,8 +139,69 @@ const char *rcp_regmap_named_signal_string(rcp_regmap_named_signal_t sig)
     case RCP_REGMAP_SIGNAL_SPI_CS5:  return "SPI_CS5";
     case RCP_REGMAP_SIGNAL_I2C_SCL:  return "I2C_SCL";
     case RCP_REGMAP_SIGNAL_I2C_SDA:  return "I2C_SDA";
+    case RCP_REGMAP_SIGNAL_UART_TX:  return "UART_TX";
+    case RCP_REGMAP_SIGNAL_UART_RX:  return "UART_RX";
+    case RCP_REGMAP_SIGNAL_UART_RTS: return "UART_RTS";
+    case RCP_REGMAP_SIGNAL_UART_CTS: return "UART_CTS";
+    case RCP_REGMAP_SIGNAL_LIN_TXD:  return "LIN_TXD";
+    case RCP_REGMAP_SIGNAL_LIN_RXD:  return "LIN_RXD";
+    case RCP_REGMAP_SIGNAL_LIN_NSLP: return "LIN_NSLP";
+    case RCP_REGMAP_SIGNAL_PWM_OUT:  return "PWM_OUT";
+    case RCP_REGMAP_SIGNAL_PWM_OUTN: return "PWM_OUTN";
+    case RCP_REGMAP_SIGNAL_PWM_IN:   return "PWM_IN";
+    case RCP_REGMAP_SIGNAL_ADC_IN:   return "ADC_IN";
+    case RCP_REGMAP_SIGNAL_DAC_OUT:  return "DAC_OUT";
+    case RCP_REGMAP_SIGNAL_CAN_RXD:  return "CAN_RXD";
+    case RCP_REGMAP_SIGNAL_CAN_TXD:  return "CAN_TXD";
+    case RCP_REGMAP_SIGNAL_ISELED_ISP_P: return "ISELED_ISP_P";
+    case RCP_REGMAP_SIGNAL_ISELED_ISP_N: return "ISELED_ISP_N";
+    case RCP_REGMAP_SIGNAL_MDIO_MDC:  return "MDIO_MDC";
+    case RCP_REGMAP_SIGNAL_MDIO_DATA: return "MDIO_DATA";
     default: return "unknown";
     }
+}
+
+//cfusa:req REQ-RMAP-045
+uint8_t rcp_regmap_named_signal_ep_signal_nr(rcp_regmap_named_signal_t sig)
+{
+    /* Explicit lower bound: RCP_REGMAP_SIGNAL_GPIO0 == 0, so the range
+     * checks below (each an upper-bound-only "sig <= ...") would
+     * otherwise treat a negative/garbage sig as if it were a small
+     * GPIO index, silently violating this function's own "0 for any
+     * out-of-range value" documented contract. */
+    if (sig < RCP_REGMAP_SIGNAL_GPIO0) return 0u;
+
+    if (sig <= RCP_REGMAP_SIGNAL_GPIO31) {
+        return (uint8_t)sig; /* GPIOn's own per-type number is n */
+    }
+    if (sig <= RCP_REGMAP_SIGNAL_SPI_CS5) {
+        return (uint8_t)(sig - RCP_REGMAP_SIGNAL_SPI_CLK);
+    }
+    if (sig <= RCP_REGMAP_SIGNAL_I2C_SDA) {
+        return (uint8_t)(sig - RCP_REGMAP_SIGNAL_I2C_SCL);
+    }
+    if (sig <= RCP_REGMAP_SIGNAL_UART_CTS) {
+        return (uint8_t)(sig - RCP_REGMAP_SIGNAL_UART_TX);
+    }
+    if (sig <= RCP_REGMAP_SIGNAL_LIN_NSLP) {
+        return (uint8_t)(sig - RCP_REGMAP_SIGNAL_LIN_TXD);
+    }
+    if (sig <= RCP_REGMAP_SIGNAL_PWM_OUTN) {
+        return (uint8_t)(sig - RCP_REGMAP_SIGNAL_PWM_OUT);
+    }
+    if (sig == RCP_REGMAP_SIGNAL_PWM_IN)  return 0u;
+    if (sig == RCP_REGMAP_SIGNAL_ADC_IN)  return 0u;
+    if (sig == RCP_REGMAP_SIGNAL_DAC_OUT) return 0u;
+    if (sig <= RCP_REGMAP_SIGNAL_CAN_TXD) {
+        return (uint8_t)(sig - RCP_REGMAP_SIGNAL_CAN_RXD);
+    }
+    if (sig <= RCP_REGMAP_SIGNAL_ISELED_ISP_N) {
+        return (uint8_t)(sig - RCP_REGMAP_SIGNAL_ISELED_ISP_P);
+    }
+    if (sig <= RCP_REGMAP_SIGNAL_MDIO_DATA) {
+        return (uint8_t)(sig - RCP_REGMAP_SIGNAL_MDIO_MDC);
+    }
+    return 0u; /* RCP_REGMAP_SIGNAL_COUNT or any other invalid value */
 }
 
 /* ── Request-stream and response/ack queue config ──────────────────────────── */

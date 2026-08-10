@@ -9028,24 +9028,24 @@
     },
     {
       "id": "REQ-RMAP-044",
-      "title": "The EP_Signal_Nr enumeration covers only GPIO, SPI and I2C",
-      "text": "NOT IMPLEMENTED (partial): TC18 \u00a712.7.6 Table 21 enumerates the EP_Signal_Nr values for every endpoint type \u2014 GPIO 0..31; SPI 0..8 (CLK, PICO, POCI, CS0..CS5); I2C 0..1 (SCL, SDA); UART 0..3 (TX, RX, RTS, CTS); LIN 0..2 (TXD, RXD, NSLP); PWM_OUT 0..1 (positive phase, inverted phase); PWM_IN 0; ADC 0 (ADC_IN); DAC 0 (DAC_OUT); CAN 0 RXD and 1 TXD; ISELED 0 ISP_P and 1 ISP_N; MDIO 0 MDC and 1 MDIO. c-RCP's rcp_regmap_named_signal_t (include/rcp/regmap.h:311-357) enumerates only GPIO, SPI and I2C, ending at RCP_REGMAP_SIGNAL_I2C_SDA. Consequence: the hw_ep_pin_nr value of a HW_config entry cannot be named or validated for the seven other endpoint types c-RCP implements, and CAN's counter-intuitive ordering (RXD = 0, TXD = 1) is nowhere recorded, inviting a transposed pin map.",
+      "title": "The EP_Signal_Nr enumeration now covers every endpoint type",
+      "text": "TC18 \u00a712.7.6 Table 21 enumerates the EP_Signal_Nr values for every endpoint type \u2014 GPIO 0..31; SPI 0..8 (CLK, PICO, POCI, CS0..CS5); I2C 0..1 (SCL, SDA); UART 0..3 (TX, RX, RTS, CTS); LIN 0..2 (TXD, RXD, NSLP); PWM_OUT 0..1 (positive phase, inverted phase); PWM_IN 0; ADC 0 (ADC_IN); DAC 0 (DAC_OUT); CAN 0 RXD and 1 TXD; ISELED 0 ISP_P and 1 ISP_N; MDIO 0 MDC and 1 MDIO. Fixed: rcp_regmap_named_signal_t (include/rcp/regmap.h) now enumerates all eleven endpoint types, matching Table 21's own signal names and order (primary-source verified directly against the TC18 v0.5.1_RC PDF before implementing, per standing policy on trusting tooling/derived text over the primary spec). CAN's counter-intuitive ordering (RXD = 0, TXD = 1) is recorded. Still open: this is a content/naming fix only \u2014 no wire encode/decode path for the HW_config table exists yet (REQ-RMAP-040/-041, this Group's own remaining items) to actually validate a hw_ep_pin_nr value against this enumeration.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "partial",
+      "status": "implemented",
       "tc18": "\u00a712.7.6 Table 21: Enumeration of signals at endpoints, TC18.txt L2779-2820"
     },
     {
       "id": "REQ-RMAP-045",
-      "title": "EP_Signal_Nr restarts at 0 for each endpoint type, but c-RCP numbers signals globally",
-      "text": "NOT IMPLEMENTED (contradicted): TC18 \u00a712.7.6 states the EP_Pin_Nr mapping is specific per endpoint type, and Table 21 accordingly restarts EP_Signal_Nr at 0 for every EP_Type \u2014 SPI_CLK is 0, I2C_SCL is 0, UART_TX is 0, CAN RXD is 0, and so on \u2014 so that hw_ep_pin_nr in a HW_config entry (Table 19, relative address 0x0001) is interpreted relative to the endpoint type named by hw_ep_nr. c-RCP's rcp_regmap_named_signal_t (include/rcp/regmap.h:311-357) is instead one flat global enumeration in which SPI_CLK is 32 and I2C_SCL is 41, and no function converts a global index to a per-type EP_Signal_Nr or back. Consequence: if a c-RCP value were written into hw_ep_pin_nr, a conforming RC PHY would bind the wrong endpoint signal \u2014 c-RCP's SPI_CLK (32) exceeds the SPI type's whole 0..8 signal range.",
+      "title": "EP_Signal_Nr restarts at 0 for each endpoint type; c-RCP now converts between the two numbering schemes",
+      "text": "TC18 \u00a712.7.6 states the EP_Pin_Nr mapping is specific per endpoint type, and Table 21 accordingly restarts EP_Signal_Nr at 0 for every EP_Type \u2014 SPI_CLK is 0, I2C_SCL is 0, UART_TX is 0, CAN RXD is 0, and so on \u2014 so that hw_ep_pin_nr in a HW_config entry (Table 19, relative address 0x0001) is interpreted relative to the endpoint type named by hw_ep_nr. c-RCP's rcp_regmap_named_signal_t (include/rcp/regmap.h) is a flat global enumeration in which SPI_CLK and I2C_SCL do not sit at ordinal 0 (primary-source verified directly against the TC18 v0.5.1_RC PDF before implementing). Fixed: rcp_regmap_named_signal_ep_signal_nr() (src/regmap.c) converts this enum's own flat ordinal into TC18's per-type-relative wire value \u2014 SPI_CLK/I2C_SCL/UART_TX/CAN_RXD/etc. all correctly convert to 0, restarting per type exactly as Table 21 requires. Still open: this is a content/conversion fix only \u2014 no wire encode/decode path for the HW_config table exists yet (REQ-RMAP-040/-041) to actually write a converted value into a real hw_ep_pin_nr register.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "implemented",
       "tc18": "\u00a712.7.6 Table 21 + Table 19 row hw_ep_pin_nr, TC18.txt L2704, L2764, L2779-2820"
     },
     {
