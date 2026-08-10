@@ -375,13 +375,20 @@ static void test_general_map_wire_reach_stops_after_0x000d(void)
     TEST_ASSERT_TRUE(span_is_zero(buf, 0x0E, 0x30));
 }
 
-/* TC18 §12.7.5 Table 18 marks every register of the general static part
- * access type R: a remote write must not take effect. Deviation: c-RCP
- * has no read-only register class at all. Each of the three modelled
- * field kinds is writable in at least one state, and
- * rcp_mock_server_regmap() hands out a directly mutable pointer to the
- * whole Table 18 block -- a write to vendor_id (0x0008, type R) simply
- * lands. */
+/* REQ-RMAP-025 (TC18 §12.7.5 Table 18, access type R): a remote write to
+ * the general static part must not take effect. lifecycle.h now models
+ * the classification primitive itself (RCP_LIFECYCLE_FIELD_READ_ONLY,
+ * proven unconditionally unwritable in every state by every writer --
+ * see test_lifecycle.c's own test_read_only_never_writable_in_any_
+ * state_by_any_writer()), distinguishing it from the three other kinds
+ * (each writable in at least one state, asserted below for contrast).
+ * Deviation that remains open: nothing in this codebase's wire dispatch
+ * layer classifies Table 18's own fields as READ_ONLY and gates a write
+ * attempt through it -- there IS no wire dispatch layer yet at all
+ * (REQ-RMAP-024, still open). rcp_mock_server_regmap() therefore still
+ * hands out a directly mutable pointer to the whole Table 18 block, with
+ * nothing in this test double consulting the new classification -- a
+ * write to vendor_id (0x0008, type R) simply lands, exactly as before. */
 static void test_general_static_part_has_no_read_only_class(void)
 {
     rcp_mock_server_t    *srv;

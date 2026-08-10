@@ -427,11 +427,22 @@ rcp_lifecycle_accept_t rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
  * FUNCTIONAL_W and FUNCTIONAL_W_STAR both cover functional configuration
  * but differ in what happens once RCP_CONFIGURED is reached -- modeled
  * as two distinct enum values rather than one writability bit, per this
- * milestone's explicit scope. */
+ * milestone's explicit scope.
+ *
+ * READ_ONLY (REQ-RMAP-025, TC18 §12.7.5 Table 18): the RC Server general
+ * (static) register map's own access type, "R" -- unwritable
+ * unconditionally, in every lifecycle state, by every writer, unlike
+ * every kind above (each of which is writable by SOME writer in SOME
+ * state). Genuinely different behavior from the other three kinds
+ * (state- and writer-INDEPENDENT denial, not just a narrower
+ * state/writer condition), so per this enum's own stated convention it
+ * gets its own explicit value rather than folding into an existing one
+ * or relying on the switch's own defensive default case. */
 typedef enum {
     RCP_LIFECYCLE_FIELD_HW_GENERIC        = 0,
     RCP_LIFECYCLE_FIELD_FUNCTIONAL_W      = 1,
     RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR = 2,
+    RCP_LIFECYCLE_FIELD_READ_ONLY         = 3,
 } rcp_lifecycle_field_kind_t;
 
 /* True iff a field of the given kind is writable while the server is in
@@ -463,6 +474,15 @@ typedef enum {
  *     just an unauthorized one) once RCP_CONFIGURED is reached -- this
  *     last distinction is the one the roadmap requires be modeled
  *     explicitly rather than collapsed into a single writability bit.
+ *   - RCP_LIFECYCLE_FIELD_READ_ONLY (REQ-RMAP-025): never writable, in
+ *     any state, by any writer -- TC18 §12.7.5 Table 18's own access
+ *     type "R" for the RC Server general (static) register map. A
+ *     remote write must not take effect regardless of authorization;
+ *     rcp_lifecycle_field_write_error() therefore always reports
+ *     RCP_ERROR_LOCKED_MEM_ACCESS for this kind (its own re-evaluation
+ *     against a maximally-privileged writer still finds it unwritable,
+ *     since no writer condition is consulted at all), never
+ *     RCP_ERROR_UNAUTHORIZED_ACCESS.
  *
  * Independently of all cases above: TC18 §12.3.1.1, §12.3.1.2 and
  * §12.3.1.3 each state (once per lifecycle state) that a write request is

@@ -276,6 +276,7 @@ rcp_lifecycle_accept_t rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
 //cfusa:req REQ-LIFECYCLE-020
 //cfusa:req REQ-LIFECYCLE-026
 //cfusa:req REQ-LIFECYCLE-035
+//cfusa:req REQ-RMAP-025
 bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
                                    rcp_lifecycle_field_kind_t kind,
                                    rcp_lifecycle_writer_ctx_t writer)
@@ -331,6 +332,14 @@ bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
         } else {
             writable = true; /* HW_UNCONFIGURED */
         }
+        break;
+
+    case RCP_LIFECYCLE_FIELD_READ_ONLY:
+        /* TC18 §12.7.5 Table 18's own access type "R" (REQ-RMAP-025):
+         * never writable, in any state, by any writer -- state and
+         * writer are both deliberately ignored here, unlike every case
+         * above. */
+        writable = false;
         break;
 
     default:

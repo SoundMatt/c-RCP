@@ -8815,12 +8815,12 @@
     {
       "id": "REQ-RMAP-025",
       "title": "Every register in the RC Server static part is read-only to a remote client",
-      "text": "NOT IMPLEMENTED: TC18 \u00a712.7.5 Table 18 marks every register of the RC Server general (static) part with access type R \u2014 a remote write to any of them must not take effect. c-RCP has no read-only register class: rcp_lifecycle_field_writable() (src/lifecycle.c) knows only RCP_LIFECYCLE_FIELD_HW_GENERIC, _FUNCTIONAL_W and _FUNCTIONAL_W_STAR, none of which denies a write in RCP_LIFECYCLE_HW_UNCONFIGURED, and rcp_regmap_general_t is handed out for unrestricted mutation (rcp_mock_server_regmap(), include/rcp/mock.h:174). Because no wire write path into the general register map exists at all (see the umbrella entry), the read-only property is presently unobservable rather than enforced; it must be stated and enforced when that path is added.",
+      "text": "PARTIAL: TC18 \u00a712.7.5 Table 18 marks every register of the RC Server general (static) part with access type R \u2014 a remote write to any of them must not take effect. rcp_lifecycle_field_writable() (src/lifecycle.c) now models this as its own explicit kind, RCP_LIFECYCLE_FIELD_READ_ONLY: unconditionally unwritable in every lifecycle state, by every writer (proven for a maximally-privileged writer too, not just an unprivileged one), and rcp_lifecycle_field_write_error() correctly reports RCP_ERROR_LOCKED_MEM_ACCESS for it (never RCP_ERROR_UNAUTHORIZED_ACCESS, since no writer condition is ever consulted). What remains open: no wire write path into the general register map exists at all yet (see the umbrella entry, REQ-RMAP-024), so nothing actually classifies Table 18's own fields as RCP_LIFECYCLE_FIELD_READ_ONLY and gates a write attempt through this primitive \u2014 rcp_mock_server_regmap() still hands out a directly, unconditionally mutable pointer to the whole block. The classification and its correct denial/error-code behavior are proven; live enforcement against a real write attempt is not, pending REQ-RMAP-024.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.7.5 Table 18, TC18.txt L2520-2521, L2661, L2664-2665"
     },
     {

@@ -21,6 +21,7 @@
 //cfusa:test REQ-LIFECYCLE-020
 //cfusa:test REQ-LIFECYCLE-021
 //cfusa:test REQ-WIREERR-004
+//cfusa:test REQ-RMAP-025
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -599,6 +600,39 @@ static void test_field_write_error_distinguishes_state_from_writer_denial(void)
         RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, root_multicast));
 }
 
+/* REQ-RMAP-025 (TC18 §12.7.5 Table 18, access type "R"): the RC Server
+ * general (static) register map is never writable, in any state, by any
+ * writer -- unlike every other field kind, no writer condition (root
+ * client, owning stream, discovery stream, even a maximally-privileged
+ * combination of all three) can make it writable. Proven across all
+ * three lifecycle states with both an unprivileged and a fully-
+ * privileged writer, and that the denial reports LOCKED_MEM_ACCESS (a
+ * pure state-driven lock, matching HW_GENERIC's and FUNCTIONAL_W_STAR's
+ * own reasoning above), never UNAUTHORIZED_ACCESS -- no writer could
+ * ever fix this denial, so it is never framed as an authorization
+ * failure. */
+static void test_read_only_never_writable_in_any_state_by_any_writer(void)
+{
+    rcp_lifecycle_writer_ctx_t stranger = {false, false, false, false};
+    rcp_lifecycle_writer_ctx_t everything = {true, true, false, true}; /* every
+                                                                           authorizing
+                                                                           condition
+                                                                           true,
+                                                                           unicast */
+
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(
+        RCP_LIFECYCLE_HW_UNCONFIGURED, RCP_LIFECYCLE_FIELD_READ_ONLY, everything));
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(
+        RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_READ_ONLY, everything));
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(
+        RCP_LIFECYCLE_RCP_CONFIGURED, RCP_LIFECYCLE_FIELD_READ_ONLY, everything));
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(
+        RCP_LIFECYCLE_HW_UNCONFIGURED, RCP_LIFECYCLE_FIELD_READ_ONLY, stranger));
+
+    TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, rcp_lifecycle_field_write_error(
+        RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_READ_ONLY, everything));
+}
+
 /* ── strerror ──────────────────────────────────────────────────────────────── */
 
 static void test_lifecycle_strerror_unique_nonempty(void)
@@ -666,6 +700,7 @@ int main(void)
     RUN_TEST(test_functional_w_star_permanently_locked_once_rcp_configured);
     RUN_TEST(test_field_writable_denies_non_unicast_frame_regardless_of_kind_or_authorization);
     RUN_TEST(test_field_write_error_distinguishes_state_from_writer_denial);
+    RUN_TEST(test_read_only_never_writable_in_any_state_by_any_writer);
 
     RUN_TEST(test_lifecycle_strerror_unique_nonempty);
 

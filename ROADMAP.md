@@ -9594,3 +9594,71 @@ already counted there and stays there, just narrowed from
 continue Group 1's remaining 16 items in table order, starting with
 `REQ-RMAP-025` (no read-only register class at all -- flagged
 security-relevant, pull-forward priority per issue #200's own text).
+
+### 178. Phase 5d batch 8: `REQ-RMAP-025` -- `RCP_LIFECYCLE_FIELD_READ_ONLY` classification primitive (issue #200)
+
+`REQ-RMAP-025`'s own pre-existing `.fusa-reqs.json` text already stated
+the key architectural fact explicitly: "Because no wire write path into
+the general register map exists at all..., the read-only property is
+presently unobservable rather than enforced; it must be stated and
+enforced when that path is added." That is exactly batch 7's own
+scoping conclusion restated from a different angle -- confirms rather
+than contradicts it. The achievable, real, testable work this batch
+*can* do without `REQ-RMAP-024` existing yet: add the CLASSIFICATION
+primitive a future wire dispatch will need, so that when `-024` lands it
+only needs to call `rcp_lifecycle_field_writable(state,
+RCP_LIFECYCLE_FIELD_READ_ONLY, writer)` against Table 18's fields and
+get the right answer, not invent the rule from scratch.
+
+New `RCP_LIFECYCLE_FIELD_READ_ONLY = 3` on `rcp_lifecycle_field_kind_t`
+(lifecycle.h) -- explicit, not the switch's own defensive `default`
+fallback, matching this enum's own stated convention ("add a new value
+only when behavior actually differs"): genuinely different from all
+three existing kinds, since it's the only one that's writable by NO
+writer in NO state at all, rather than a narrower state/writer
+condition. `rcp_lifecycle_field_writable()` gains one explicit case
+(`writable = false`, ignoring both `state` and `writer` entirely).
+Checked whether `rcp_lifecycle_field_write_error()` (REQ-WIREERR-004,
+REQ-LIFECYCLE-024) needed its own update before touching it: it doesn't
+-- that function has no per-kind switch of its own, it just re-evaluates
+`rcp_lifecycle_field_writable()` against a maximally-privileged writer
+and reports `RCP_ERROR_LOCKED_MEM_ACCESS` if STILL denied,
+`RCP_ERROR_UNAUTHORIZED_ACCESS` otherwise -- since READ_ONLY denies
+regardless of writer, it automatically and correctly reports
+`LOCKED_MEM_ACCESS` for free, with zero changes to that function. Also
+checked for any other exhaustive switch over `rcp_lifecycle_field_kind_t`
+elsewhere in the codebase that a silently-added enum value could break
+(the same additive-safety check Phase 5c batch 6 used for
+`RCP_SERVER_ADMIT_SUSPENDED`) -- found none; `lifecycle.c`'s own switch
+is the only one.
+
+Added a dedicated positive test (`test_read_only_never_writable_in_any_
+state_by_any_writer`, `test_lifecycle.c`) proving unconditional denial
+across all three states with both an unprivileged and a maximally-
+privileged writer, plus the `LOCKED_MEM_ACCESS` (never
+`UNAUTHORIZED_ACCESS`) error-code behavior. Narrowed the existing
+deviation pin (`test_general_static_part_has_no_read_only_class`,
+`test_tc18_gaps_regmap.c`) rather than declaring it closed: its own
+core observation -- `rcp_mock_server_regmap()` still hands out a
+directly, unconditionally mutable pointer, with nothing consulting the
+new classification at all -- remains completely true and unaffected by
+this batch, since there is still no wire dispatch layer to apply the
+classification through (`-024`, unchanged). `REQ-RMAP-025` moves
+`not-implemented` -> `partial`, matching this phase's now-familiar
+content/primitive-modeled-but-not-wire-enforced pattern.
+
+Mutation-tested two ways: (1) the new case's `writable = false` flipped
+to `true` -- fails the new dedicated test; (2) full revert of both
+production files (`lifecycle.h`/`lifecycle.c`) with the test files' own
+changes kept -- breaks the build (`use of undeclared identifier
+'RCP_LIFECYCLE_FIELD_READ_ONLY'`). Both restored clean, diff-verified
+byte-identical against pre-mutation backups. Full suite (65/65) +
+ASan/UBSan clean. Fresh `cfusa check` (0 errors) + all three separate
+`cfusa trace` invocations (100%/100%, 0 untested). 1030 requirements
+(unchanged), 110 `tc18-gap` entries remaining (unchanged -- narrowed
+from `not-implemented` to `partial`, not removed).
+
+**Phase 5d progress after batch 8**: 9/47 items addressed (10 counting
+`REQ-RMAP-061`'s own partial progress). Group 1: 2/18 items. Next:
+continue Group 1 in table order -- `REQ-RMAP-026` (`svr_req_stream_max`
+width/missing `svr_responder_streams_max`).
