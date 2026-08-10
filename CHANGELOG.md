@@ -33,6 +33,26 @@ the rationale.
 
 ## Releases
 
+### v0.190.0 -- 2026-08-10
+
+**Phase 5d batch 20: `svr_ep_bytebus_id_map_ptr`/`_capacity` now
+correctly sized and separately addressed.** Issue #200. Straightforward
+width/address fix, the class `-033`/`-034` already established --
+confirmed NOT the semantic-contradiction class `-036` needed, since
+the shape was already independently verified against the primary
+source during that batch's own read: the capacity really is an entry
+count here. Retyped `ep_id_bus_map` (`rcp_regmap_table_ref_t`) to two
+correctly-sized scalar fields. Split the remaining half of batch 19's
+own proactive combined-pin split into a new positive test and a
+narrowed remaining one for `-038`'s still-open fields. Found and fixed
+the same two "second usage site" categories every batch since 16 has
+needed. Mutation-tested: full header revert with every touched test
+file kept breaks the build. Full suite (65/65) + ASan/UBSan clean.
+Fresh `cfusa check`/`trace` (0 errors, 100%/100%, three separate
+CI-matching invocations). See `ROADMAP.md` milestone 190 for full
+detail. 1030 requirements (unchanged), 110 `tc18-gap` entries
+remaining (unchanged).
+
 ### v0.189.0 -- 2026-08-10
 
 **Phase 5d batch 19: `svr_ep_generic_cfg_ptr`/`_capacity` now
