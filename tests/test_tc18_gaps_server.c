@@ -462,9 +462,33 @@ static void test_discovery_write_authority_survives_rcp_configured(void)
                                                    RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, discovery));
 }
 
-/* ── §12.3 / §12.4: cold start and StandBy retention ───────────────────────── */
+/* ── §12.3 / §12.4.1: cold start recovers the configured lifecycle state ──── */
 
-static void test_cold_start_target_and_standby_retention(void)
+static void test_cold_start_target_recovers_the_configured_lifecycle_state(void)
+{
+    /* REQ-PWRMODE-014 (TC18 §12.3, §12.4.1): "After a cold start the RC
+     * Server will be in its configured lifecycle state" -- recovered from
+     * NVM, or from device defaults, which may themselves be an advanced
+     * state. rcp_pwrmode_cold_start_lifecycle_target() takes that
+     * already-recovered fact as a required parameter (this module owns no
+     * NVM access of its own -- the same "caller supplies already-
+     * classified inputs" convention as network_available) and returns it
+     * unchanged, so a server that reached RCP_CONFIGURED before a power
+     * cycle no longer silently loses it. */
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED,
+                      rcp_pwrmode_cold_start_lifecycle_target(RCP_LIFECYCLE_RCP_CONFIGURED));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_CONFIGURED,
+                      rcp_pwrmode_cold_start_lifecycle_target(RCP_LIFECYCLE_HW_CONFIGURED));
+
+    /* A device with nothing recovered (no NVM, no advanced default) still
+     * gets this function's own long-standing safe default. */
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED,
+                      rcp_pwrmode_cold_start_lifecycle_target(RCP_LIFECYCLE_HW_UNCONFIGURED));
+}
+
+/* ── §12.4: register-map config and wake sources survive StandBy ──────────── */
+
+static void test_standby_is_classified_hot_so_configuration_is_retained(void)
 {
     rcp_regmap_general_t           map;
     rcp_regmap_general_t           before;
@@ -473,13 +497,6 @@ static void test_cold_start_target_and_standby_retention(void)
     rcp_pwrmode_t                  mode = RCP_PWRMODE_NORMAL;
     rcp_pwrmode_start_kind_t       kind = RCP_PWRMODE_START_COLD;
 
-    /* TC18 §12.3 / §12.4.1: after a cold start the RC Server comes up in the
-     * lifecycle state it is configured in -- recovered from NVM, or from
-     * device defaults which may themselves be an advanced state. c-RCP has
-     * no persisted-state input at all and always names HW_UNCONFIGURED, so a
-     * server that reached RCP_CONFIGURED loses it on every power cycle. */
-    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, rcp_pwrmode_cold_start_lifecycle_target());
-
     rcp_regmap_general_init(&map);
     map.svr_ep_count = 4u;
     rcp_ep_wakeup_functional_cfg_init(&wake);
@@ -487,12 +504,17 @@ static void test_cold_start_target_and_standby_retention(void)
     memcpy(&before, &map, sizeof(before));
     memcpy(&wake_before, &wake, sizeof(wake_before));
 
-    /* TC18 §12.4: register-map configuration and configured wake sources
-     * survive StandBy, so the following hot start needs no reconfiguration.
-     * Both are indeed byte-identical afterwards -- but only because
-     * rcp_pwrmode_transition() is unaware of either structure: nothing in
-     * the library asserts, restores, or re-applies them, so retention rests
-     * entirely on the integrator. */
+    /* REQ-PWRMODE-015 (TC18 §12.4, §12.4.1): "only a transition classified
+     * RCP_PWRMODE_START_COLD may discard configuration." power.h owns no
+     * regmap/wake-source storage of its own (regmap.c/ep_wakeup.c do) --
+     * the guarantee this library actually provides, and the only one it
+     * architecturally can, is that Normal<->StandBy is correctly and
+     * always classified RCP_PWRMODE_START_HOT (this module's own doc
+     * comment on RCP_PWRMODE_START_HOT now states the retention
+     * obligation that classification carries explicitly), so an
+     * integrator that correctly withholds re-init on HOT never has a
+     * reason to touch either structure. Both are indeed byte-identical
+     * below, by construction, not merely by omission. */
     TEST_ASSERT_EQUAL(RCP_PWRMODE_OK, rcp_pwrmode_transition(&mode, RCP_PWRMODE_STANDBY, &kind));
     TEST_ASSERT_EQUAL(RCP_PWRMODE_START_HOT, kind);
     TEST_ASSERT_EQUAL(RCP_PWRMODE_OK, rcp_pwrmode_transition(&mode, RCP_PWRMODE_NORMAL, &kind));
@@ -1183,7 +1205,8 @@ int main(void)
     RUN_TEST(test_hw_configured_rejects_gbb_addressed_to_ep0);
     RUN_TEST(test_discovery_write_authority_survives_rcp_configured);
 
-    RUN_TEST(test_cold_start_target_and_standby_retention);
+    RUN_TEST(test_cold_start_target_recovers_the_configured_lifecycle_state);
+    RUN_TEST(test_standby_is_classified_hot_so_configuration_is_retained);
     RUN_TEST(test_hotstart_now_has_network_check_and_records_responder_stream);
     RUN_TEST(test_wakeup_repetition_ignores_other_valid_avtpdus);
     RUN_TEST(test_network_wake_now_requires_the_same_handshake_as_pin);

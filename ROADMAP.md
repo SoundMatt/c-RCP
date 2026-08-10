@@ -8972,3 +8972,86 @@ persistence, the last group) -- may share plumbing with LIFECYCLE's own
 config-locking work (issue #198, already closed), per this phase's
 original scoping note; verify that overlap before implementing rather
 than assuming it.
+
+### 170. Phase 5c batch 8: REQ-PWRMODE-014/015 close Group 4 -- Phase 5c is complete (issue #199)
+
+The last group. Overlap-verification against LIFECYCLE's own
+config-locking work (issue #198, closed in Phase 5b) done first, per
+this phase's own scoping note: that work governs WHO may WRITE a
+register field in a given `svr_lifecycle_state` (`rcp_lifecycle_field_
+writable()`/`rcp_lifecycle_transition()`), an orthogonal axis to what
+Group 4 concerns -- WHICH state a cold start recovers into, and whether
+a HOT-classified transition preserves already-written config. No shared
+plumbing to reuse; the two efforts target different questions.
+
+**REQ-PWRMODE-014 (closed)**: `rcp_pwrmode_cold_start_lifecycle_target()`
+gains a required `recovered_state` parameter -- TC18 §12.3/§12.4.1:
+"After a cold start the RC Server will be in its configured lifecycle
+state... recovered from... NVM... or... default settings which allow it
+to be also starting in an advanced state." This module owns no NVM
+access or default-configuration table of its own (the same
+`network_available` convention this phase has used throughout) --
+`recovered_state` is the caller's own already-recovered fact, returned
+unchanged when it names one of `lifecycle.h`'s three valid states.
+`RCP_LIFECYCLE_HW_UNCONFIGURED`, this function's own former
+unconditional return, is now its documented fail-safe default: returned
+for a genuinely unconfigured device (`recovered_state ==
+RCP_LIFECYCLE_HW_UNCONFIGURED`) AND for any other, unrecognized value
+(a defensive fallback this batch adds -- corrupt/garbled NVM is treated
+as "nothing recovered," never as an unvalidated advanced state one
+step away from admitting arbitrary requests).
+
+Only two call sites existed (both tests), confirmed by grep before
+changing the signature -- the smallest blast radius of any required-
+parameter change this phase has made.
+
+**REQ-PWRMODE-015 (closed, documentation + one doc-anchored test
+rewrite, zero new logic)**: re-verification found this module owns no
+register-map or wake-source storage of its own (`regmap.c`/`ep_wakeup.c`
+do) -- the guarantee this library actually provides, and the only one it
+architecturally can, is that `rcp_pwrmode_transition()` correctly and
+unconditionally classifies Normal<->StandBy `RCP_PWRMODE_START_HOT`,
+which it already did before this batch. The gap was that this
+obligation was never stated as a retention CONTRACT tied to that
+classification -- `RCP_PWRMODE_START_HOT`'s own enumerator comment now
+says so explicitly: "a caller must not discard register-map
+configuration or configured wake-up sources on a transition classified
+HOT; only COLD may." Same class of correction as `REQ-PWRMODE-018`/`025`
+and `REQ-LIFECYCLE-026`/`035`/`037`: the primitive was already correct;
+only its documented contract needed stating.
+
+Test changes: `test_tc18_gaps_server.c`'s combined `-014`/`-015`
+deviation pin (`test_cold_start_target_and_standby_retention`) split
+into `test_cold_start_target_recovers_the_configured_lifecycle_state`
+and `test_standby_is_classified_hot_so_configuration_is_retained`, both
+now positive conformance tests. `test_power.c`'s own
+`test_cold_start_target_is_hw_unconfigured` (the direct unit test for
+the changed function, separate from the deviation-pin file) split into
+three: the original safe-default case renamed
+`_with_nothing_recovered`, plus two new tests for the recovered-state
+pass-through and the unrecognized-value fallback.
+
+Mutation-tested TWO ways, since this batch changed both a signature and
+a logic branch: (1) a full revert of `power.h`/`power.c` breaks the
+BUILD (every rewritten/new test references the new `recovered_state`
+parameter, a compile error without it) -- signature coverage. (2) an
+isolated, signature-preserving mutation (the whole switch replaced with
+an unconditional `return RCP_LIFECYCLE_HW_UNCONFIGURED`, discarding
+`recovered_state`) leaves the build green but fails exactly
+`test_cold_start_target_recovers_the_configured_lifecycle_state` (`Expected
+170 Was 0`) and nothing else -- logic-branch coverage the build-break
+signal alone would have missed. Both mutations restored clean. Full
+suite (64/64) + ASan/UBSan clean, pre- and post-restore. Fresh `cfusa
+check` (0 errors) + `cfusa trace --gaps`/`--req-coverage 100`/
+`--sec-tested 100` (three separate CI-matching invocations; 100%/100%,
+0 untested). 1030 requirements (unchanged), 116 `tc18-gap` entries
+remaining (was 118).
+
+**Phase 5c is now complete: all 15 items across all 4 groups addressed**
+(14 closed outright, 1 -- `REQ-PWRMODE-019` -- left `partial` with a
+real architecture-limit citation from batch 1; every group is now fully
+closed, no items deferred). Issue #199 can be closed. **Next**: Phase 5d
+(issue #200, task #88, RMAP register-map exposure gaps, 47
+requirements) or Phase 5e (issue #201, task #89, remaining per-module
+gaps, 59 requirements) -- scope which one starts first before writing
+any code, per this phase's own standing discipline.

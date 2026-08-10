@@ -56,9 +56,30 @@ static void test_pwrmode_strerror_nonnull(void)
 
 /* ── rcp_pwrmode_cold_start_lifecycle_target ─────────────────────────────────── */
 
-static void test_cold_start_target_is_hw_unconfigured(void)
+static void test_cold_start_target_is_hw_unconfigured_with_nothing_recovered(void)
 {
-    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, rcp_pwrmode_cold_start_lifecycle_target());
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED,
+                      rcp_pwrmode_cold_start_lifecycle_target(RCP_LIFECYCLE_HW_UNCONFIGURED));
+}
+
+static void test_cold_start_target_returns_the_recovered_state_unchanged(void)
+{
+    /* REQ-PWRMODE-014 (TC18 §12.3, §12.4.1): "After a cold start the RC
+     * Server will be in its configured lifecycle state" -- recovered from
+     * NVM or device defaults, which may themselves be an advanced state. */
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_CONFIGURED,
+                      rcp_pwrmode_cold_start_lifecycle_target(RCP_LIFECYCLE_HW_CONFIGURED));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED,
+                      rcp_pwrmode_cold_start_lifecycle_target(RCP_LIFECYCLE_RCP_CONFIGURED));
+}
+
+static void test_cold_start_target_falls_back_on_an_unrecognized_recovered_state(void)
+{
+    /* Fail-safe: a corrupt/unrecognized recovered_state (e.g. a garbled
+     * NVM read) is treated as "nothing recovered," not as an unvalidated
+     * advanced state. */
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED,
+                      rcp_pwrmode_cold_start_lifecycle_target((rcp_lifecycle_state_t)0xFFu));
 }
 
 /* ── rcp_pwrmode_transition ──────────────────────────────────────────────────── */
@@ -456,7 +477,9 @@ int main(void)
     RUN_TEST(test_pwrmode_string_unknown_nonnull);
     RUN_TEST(test_pwrmode_strerror_nonnull);
 
-    RUN_TEST(test_cold_start_target_is_hw_unconfigured);
+    RUN_TEST(test_cold_start_target_is_hw_unconfigured_with_nothing_recovered);
+    RUN_TEST(test_cold_start_target_returns_the_recovered_state_unchanged);
+    RUN_TEST(test_cold_start_target_falls_back_on_an_unrecognized_recovered_state);
 
     RUN_TEST(test_transition_normal_to_standby_is_hot);
     RUN_TEST(test_transition_standby_to_normal_is_hot);
