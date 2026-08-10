@@ -1225,29 +1225,41 @@ static void test_table22_w_star_writable_in_both_pre_rcp_configured_states(void)
 
 /* ── §12.7.8 Table 23: EP_ID_config ────────────────────────────────────────── */
 
-/* TC18 §12.7.8 Table 23 makes one EP_ID_config row a TRIPLE --
- * Request_Stream_Index (row offset 0x0000, 8 bit), EP_Nr (0x0001, 8 bit),
- * BBID (0x0002, 16 bit) -- so the same byte_bus_id may reach different
- * endpoints on different request streams, and a Request_Stream_Index of 0
- * TERMINATES the table. Deviation: c-RCP's row is a (ep_id, byte_bus_id)
- * pair with no stream index, so neither the per-stream mapping nor the
- * sentinel is expressible: a trailing all-zero row is read as a real
- * mapping of BBID 0 to EP0 and, being non-ascending, drags the whole
- * table's diagnostic to false. */
-static void test_ep_id_row_lacks_request_stream_index_and_sentinel(void)
+/* REQ-RMAP-052 (TC18 §12.7.8 Table 23): one EP_ID_config row is a
+ * TRIPLE -- Request_Stream_Index (row offset 0x0000, 8 bit, R/W+),
+ * EP_Nr (0x0001, 8 bit, R/W+), BBID (0x0002, 16 bit, R/W+) -- so the
+ * same byte_bus_id may legally reach different endpoints on different
+ * request streams. rcp_regmap_ep_id_map_entry_t now declares
+ * request_stream_index, closing this field-content gap. Still open:
+ * a Request_Stream_Index of 0 is TC18's own end-of-table sentinel
+ * (REQ-RMAP-054, not addressed by this batch) -- no consumer in this
+ * codebase stops scanning at it yet, so a trailing all-zero row is
+ * still read as a real mapping of BBID 0 to EP0 rather than
+ * recognized as "table ends here". Also still open:
+ * rcp_regmap_ep_id_map_is_ascending() itself is deliberately NOT
+ * updated by this batch to consider the new field -- TC18 requires
+ * ascending order in the COMPOSITE key (request_stream_index,
+ * byte_bus_id), not byte_bus_id alone (REQ-RMAP-056, its own separate
+ * still-open scope, pinned by the very next test below). */
+static void test_ep_id_row_now_has_request_stream_index(void)
 {
     rcp_regmap_ep_id_map_entry_t rows[3];
 
     TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(rows[0].ep_id));
     TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(rows[0].byte_bus_id));
+    TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(rows[0].request_stream_index));
 
-    rows[0].ep_id = 5u; rows[0].byte_bus_id = 1u;
-    rows[1].ep_id = 6u; rows[1].byte_bus_id = 2u;
-    /* TC18's end-of-table sentinel row (Request_Stream_Index == 0). */
-    rows[2].ep_id = 0u; rows[2].byte_bus_id = 0u;
+    rows[0].ep_id = 5u; rows[0].byte_bus_id = 1u; rows[0].request_stream_index = 1u;
+    rows[1].ep_id = 6u; rows[1].byte_bus_id = 2u; rows[1].request_stream_index = 1u;
+    /* TC18's end-of-table sentinel row (Request_Stream_Index == 0) --
+     * now representable, though no consumer recognizes it yet
+     * (REQ-RMAP-054, still open). */
+    rows[2].ep_id = 0u; rows[2].byte_bus_id = 0u; rows[2].request_stream_index = 0u;
+    TEST_ASSERT_EQUAL_UINT8(0u, rows[2].request_stream_index);
 
     TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_is_ascending(rows, 2u));
-    /* No sentinel convention: the third row counts as a real mapping. */
+    /* No sentinel RECOGNITION yet (REQ-RMAP-054): the third row still
+     * counts as a real mapping to is_ascending() itself. */
     TEST_ASSERT_FALSE(rcp_regmap_ep_id_map_is_ascending(rows, 3u));
 }
 
@@ -1262,11 +1274,14 @@ static void test_ep_id_ordering_ignores_request_stream_index(void)
 {
     rcp_regmap_ep_id_map_entry_t rows[4];
 
-    /* stream 1: BBID 1,2 -- stream 2: BBID 1,2. Ascending per TC18. */
-    rows[0].ep_id = 10u; rows[0].byte_bus_id = 1u;
-    rows[1].ep_id = 11u; rows[1].byte_bus_id = 2u;
-    rows[2].ep_id = 20u; rows[2].byte_bus_id = 1u;
-    rows[3].ep_id = 21u; rows[3].byte_bus_id = 2u;
+    /* stream 1: BBID 1,2 -- stream 2: BBID 1,2. Ascending per TC18's
+     * own composite-key rule, now representable (REQ-RMAP-052) even
+     * though is_ascending() itself still doesn't consider it
+     * (REQ-RMAP-056, this test's own still-open scope). */
+    rows[0].ep_id = 10u; rows[0].byte_bus_id = 1u; rows[0].request_stream_index = 1u;
+    rows[1].ep_id = 11u; rows[1].byte_bus_id = 2u; rows[1].request_stream_index = 1u;
+    rows[2].ep_id = 20u; rows[2].byte_bus_id = 1u; rows[2].request_stream_index = 2u;
+    rows[3].ep_id = 21u; rows[3].byte_bus_id = 2u; rows[3].request_stream_index = 2u;
 
     TEST_ASSERT_FALSE(rcp_regmap_ep_id_map_is_ascending(rows, 4u));
 }
@@ -1283,15 +1298,18 @@ static void test_no_diagnostic_for_multi_client_or_heterogeneous_type(void)
     rcp_regmap_ep_id_map_entry_t shared_ep[2];
     rcp_regmap_ep_id_map_entry_t shared_bus[2];
 
-    /* One endpoint reachable from two rows (two clients, no warning). */
-    shared_ep[0].ep_id = 7u; shared_ep[0].byte_bus_id = 1u;
-    shared_ep[1].ep_id = 7u; shared_ep[1].byte_bus_id = 2u;
+    /* One endpoint reachable from two rows (two clients, no warning).
+     * Both rows on the same request stream -- this test's own concern
+     * is orthogonal to stream index, so a single, consistent value is
+     * used throughout rather than left indeterminate. */
+    shared_ep[0].ep_id = 7u; shared_ep[0].byte_bus_id = 1u; shared_ep[0].request_stream_index = 1u;
+    shared_ep[1].ep_id = 7u; shared_ep[1].byte_bus_id = 2u; shared_ep[1].request_stream_index = 1u;
     TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_is_ascending(shared_ep, 2u));
 
     /* Two different endpoints; nothing here carries an ep_type at all, so
      * a heterogeneous-type multicast group cannot even be detected. */
-    shared_bus[0].ep_id = 8u; shared_bus[0].byte_bus_id = 3u;
-    shared_bus[1].ep_id = 9u; shared_bus[1].byte_bus_id = 4u;
+    shared_bus[0].ep_id = 8u; shared_bus[0].byte_bus_id = 3u; shared_bus[0].request_stream_index = 1u;
+    shared_bus[1].ep_id = 9u; shared_bus[1].byte_bus_id = 4u; shared_bus[1].request_stream_index = 1u;
     TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_is_ascending(shared_bus, 2u));
     TEST_ASSERT_EQUAL_UINT(sizeof(rcp_regmap_ep_id_map_entry_t), sizeof(shared_bus[0]));
 }
@@ -1763,7 +1781,7 @@ int main(void)
     RUN_TEST(test_request_stream_cfg_lacks_channel_and_stream_indices);
     RUN_TEST(test_watchdog_timeout_width_and_unit_deviate);
     RUN_TEST(test_table22_w_star_writable_in_both_pre_rcp_configured_states);
-    RUN_TEST(test_ep_id_row_lacks_request_stream_index_and_sentinel);
+    RUN_TEST(test_ep_id_row_now_has_request_stream_index);
     RUN_TEST(test_ep_id_ordering_ignores_request_stream_index);
     RUN_TEST(test_no_diagnostic_for_multi_client_or_heterogeneous_type);
     RUN_TEST(test_byte_bus_id_is_eight_bits_wide);

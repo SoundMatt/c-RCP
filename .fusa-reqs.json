@@ -9116,13 +9116,13 @@
     },
     {
       "id": "REQ-RMAP-052",
-      "title": "EP_ID_config rows are (Request_Stream_Index, EP_Nr, BBID) triples, not (EP_Nr, BBID) pairs",
-      "text": "rcp_regmap_ep_id_map_entry_t shall model one full row of the EP_ID_config table (TC18 \u00a712.7.8 Table 23): a Request_Stream_Index (relative offset 0x0000 within the row, 8 bit, R/W+), an EP_Nr (0x0001, 8 bit, R/W+) and a BBID (0x0002, 16 bit, R/W+), so that the same byte_bus_id can be mapped to different endpoints on different request streams. NOT IMPLEMENTED: c-RCP's entry type omits Request_Stream_Index entirely (include/rcp/regmap.h:458-461), reducing the table to a global byte_bus_id \u2192 ep_id map. Consequence: the specification's central addressing rule \u2014 that a byte_bus_id is unique only within the stream_id it is paired with (as include/rcp/avtp.h:124-127 itself states) \u2014 cannot be represented, so two RC Clients on different streams cannot legally reuse a byte_bus_id, and the per-stream mapping \u00a712.9.1's lookup depends on does not exist.",
+      "title": "EP_ID_config rows are now (Request_Stream_Index, EP_Nr, BBID) triples, not (EP_Nr, BBID) pairs",
+      "text": "PARTIAL: rcp_regmap_ep_id_map_entry_t shall model one full row of the EP_ID_config table (TC18 \u00a712.7.8 Table 23): a Request_Stream_Index (relative offset 0x0000 within the row, 8 bit, R/W+), an EP_Nr (0x0001, 8 bit, R/W+) and a BBID (0x0002, 16 bit, R/W+), so that the same byte_bus_id can be mapped to different endpoints on different request streams. rcp_regmap_ep_id_map_entry_t now declares request_stream_index, closing this field-content gap -- the specification's central addressing rule that a byte_bus_id is unique only within the stream_id it is paired with (include/rcp/avtp.h's own note) is now representable in this codebase's own in-memory model. Deliberately placed as this struct's LAST field (TC18's own row puts it first, at row offset 0x0000) so every existing positional-initializer test call site kept compiling unchanged -- this struct is content modeling only, not a wire-order layout, so C field order carries no TC18 conformance obligation. What remains open: rcp_regmap_ep_id_map_is_ascending() is NOT updated by this field's addition to consider it -- ordering must be ascending in the COMPOSITE key (request_stream_index, byte_bus_id), not byte_bus_id alone (REQ-RMAP-056, its own separate still-open scope); a Request_Stream_Index of 0 (TC18's own end-of-table sentinel) is representable but not yet recognized by any consumer (REQ-RMAP-054, still open); and this codebase has no wire encode/decode path for this table at all yet, so the field cannot be written to or read from a real EP_ID_config exchange.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.7.8 Table 23, TC18.txt L2965, L2968, L2971"
     },
     {

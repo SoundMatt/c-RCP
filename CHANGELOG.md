@@ -33,6 +33,31 @@ the rationale.
 
 ## Releases
 
+### v0.193.0 -- 2026-08-10
+
+**Phase 5d batch 23: EP_ID_config row is now a (Request_Stream_Index,
+EP_Nr, BBID) triple -- Group 3 begins.** Issue #200. First Group 3
+batch. Blast-radius check found `rcp_regmap_ep_id_map_entry_t` touched
+in only 4 files -- dramatically smaller than `rcp_byte_bus_id_t` (this
+group's next item, ~40 files including every endpoint type), which
+needs its own dedicated investigation deferred rather than rushed.
+New `uint8_t request_stream_index` field, deliberately placed LAST
+(TC18 puts it first at row offset 0x0000, but this struct is content
+modeling only, not a wire-order layout) so existing positional-
+initializer test call sites kept compiling -- made the implicit
+zero-init explicit rather than relying on it silently, avoiding new
+warnings. Scoped to content only: `rcp_regmap_ep_id_map_is_ascending()`
+stays unaware of the new field (composite-key ordering is
+`REQ-RMAP-056`'s own separate scope); its existing deviation pin
+updated to set real values matching its own narrative, previously left
+indeterminate. Rewrote `REQ-RMAP-052`'s own deviation pin into a
+positive test. Mutation-tested: full header revert with every touched
+test file kept breaks the build. Full suite (65/65) + ASan/UBSan
+clean. Fresh `cfusa check`/`trace` (0 errors, 100%/100%, three
+separate CI-matching invocations). See `ROADMAP.md` milestone 193 for
+full detail. 1030 requirements (unchanged), 110 `tc18-gap` entries
+remaining (unchanged).
+
 ### v0.192.0 -- 2026-08-10
 
 **Phase 5d batch 22: all four optional-subsystem ptr/capacity pairs
