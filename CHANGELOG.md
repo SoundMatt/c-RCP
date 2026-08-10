@@ -32,6 +32,33 @@ the rationale.
 
 ## Releases
 
+### v0.178.0 -- 2026-08-10
+
+**Phase 5d batch 8: REQ-RMAP-025 -- RCP_LIFECYCLE_FIELD_READ_ONLY
+classification primitive.** Issue #200. New `RCP_LIFECYCLE_FIELD_
+READ_ONLY` on `rcp_lifecycle_field_kind_t` (lifecycle.h): unwritable
+unconditionally, in every state, by every writer -- genuinely different
+from the three existing kinds (each writable by some writer in some
+state), so it gets its own explicit case rather than the switch's
+defensive default. `rcp_lifecycle_field_write_error()` needed zero
+changes: it has no per-kind switch of its own, just a generic
+maximally-privileged-writer re-evaluation, so the new kind automatically
+and correctly reports `RCP_ERROR_LOCKED_MEM_ACCESS`. REQ-RMAP-025's own
+pre-existing text already named the real constraint ("the read-only
+property is presently unobservable rather than enforced... when [the
+wire write path] is added") -- this batch adds the classification
+primitive a future wire dispatch will need, while the requirement itself
+honestly moves `not-implemented` -> `partial`, matching REQ-RMAP-023/
+061/065's now-familiar pattern (rcp_mock_server_regmap() still hands out
+a directly mutable pointer; nothing wires the new classification to a
+real write attempt yet -- REQ-RMAP-024, unchanged). Mutation-tested two
+ways (flipped case value fails the new test; full production-code
+revert with tests kept breaks the build). Full suite (65/65) +
+ASan/UBSan clean. Fresh `cfusa check`/`trace` (0 errors, 100%/100%,
+three separate CI-matching invocations). See `ROADMAP.md` milestone 178
+for full detail. 1030 requirements (unchanged), 110 `tc18-gap` entries
+remaining (unchanged -- narrowed from `not-implemented` to `partial`).
+
 ### v0.177.0 -- 2026-08-10
 
 **Phase 5d batch 7: REQ-RMAP-023 -- svr_lifecycle_state register-map
