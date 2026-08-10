@@ -1136,7 +1136,7 @@ static void test_ep0_functional_block_and_discovery_timeout_absent(void)
  * denial for ANY of the three kinds, for ANY reason (state alone, or
  * writer/frame authorization on top of an otherwise-permitting state),
  * is TC18's "write prohibited register" case -- UNAUTHORIZED_ACCESS,
- * uniformly. Previously (REQ-LIFECYCLE-024, now closed):
+ * uniformly (REQ-WIREERR-004). Previously (REQ-LIFECYCLE-024, now closed):
  * rcp_lifecycle_field_writable() reported writability as one plain
  * bool with no wire-error-code mapping at all, and this test's own
  * prior form mislabeled HW_GENERIC-past-HW_UNCONFIGURED as TC18's

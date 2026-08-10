@@ -20,6 +20,7 @@
 //cfusa:test REQ-LIFECYCLE-019
 //cfusa:test REQ-LIFECYCLE-020
 //cfusa:test REQ-LIFECYCLE-021
+//cfusa:test REQ-WIREERR-004
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -478,8 +479,8 @@ static void test_field_writable_denies_non_unicast_frame_regardless_of_kind_or_a
         RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, w_star_multicast));
 }
 
-/* REQ-LIFECYCLE-024: rcp_lifecycle_field_write_error() maps every denial
- * rcp_lifecycle_field_writable() reports to RCP_ERROR_UNAUTHORIZED_ACCESS
+/* REQ-LIFECYCLE-024 / REQ-WIREERR-004: rcp_lifecycle_field_write_error()
+ * maps every denial rcp_lifecycle_field_writable() reports to RCP_ERROR_UNAUTHORIZED_ACCESS
  * -- per TC18 §13.7.1.2's own concrete example -- and RCP_ERROR_NONE
  * when writable, regardless of *why* a denial occurred (state alone, or
  * writer/frame on top of an otherwise-permitting state). Exercises one
