@@ -257,6 +257,23 @@ const char *rcp_ep_wakeup_strerror(rcp_ep_wakeup_errc_t e);
  * ROADMAP.md milestone-75 scope, not freshly derived here. */
 #define RCP_EP_WAKEUP_SLEEPCMD_OPCODE ((uint8_t)0xA5u)
 
+/* True iff writer is authorized to request StandBy/Sleep entry via a
+ * SleepCMD -- REQ-PWRMODE-023 (TC18 §12.5): "The RC Client that is
+ * allowed to access the RC Server endpoint can request the entire RC
+ * Server implementation to enter standby or sleep mode." This codebase's
+ * only concept of "an RC Client allowed to access [an] endpoint" is
+ * lifecycle.h's own root-client/discovery-stream writer classification
+ * (rcp_lifecycle_writer_ctx_t) -- true iff writer.via_root_client_ep0,
+ * mirroring rcp_lifecycle_transition()'s own RCP_CONFIGURED-state
+ * authorization rule (REQ-LIFECYCLE-037) for the same reason: once
+ * RCP_CONFIGURED (the only state a SleepCMD is meaningful in -- entering
+ * a low-power mode presupposes a configured server), only the root
+ * client, not an unqualified discovery-stream sender, may act on
+ * server-wide power state. A caller checks this BEFORE
+ * power.h's rcp_pwrmode_check_entry()/rcp_pwrmode_commit_entry() --
+ * an unauthorized writer's request never reaches that gate at all. */
+bool rcp_ep_wakeup_sleepcmd_writable(rcp_lifecycle_writer_ctx_t writer);
+
 /* Encodes an ACF_ABB SleepCMD request addressed to byte_bus_id: a 2-byte
  * payload of RCP_EP_WAKEUP_SLEEPCMD_OPCODE followed by target_mode's own
  * raw rcp_pwrmode_t value -- see the file header's wire-layout

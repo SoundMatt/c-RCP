@@ -23,6 +23,7 @@ const char *rcp_pwrmode_strerror(rcp_pwrmode_errc_t e)
     switch (e) {
     case RCP_PWRMODE_OK:                     return "rcp/power: success";
     case RCP_PWRMODE_ERR_INVALID_TRANSITION: return "rcp/power: invalid power-mode transition";
+    case RCP_PWRMODE_ERR_ENTRY_REFUSED:      return "rcp/power: standby/sleep entry refused";
     default:                                 return "rcp/power: unknown error";
     }
 }
@@ -174,6 +175,7 @@ rcp_pwrmode_errc_t rcp_pwrmode_wake_from_sleep(rcp_pwrmode_t *mode, rcp_pwrmode_
 /* ── Entry-refusal gating ─────────────────────────────────────────────────── */
 
 //cfusa:req REQ-PWRMODE-013
+//cfusa:req REQ-PWRMODE-025
 rcp_pwrmode_entry_result_t rcp_pwrmode_check_entry(const rcp_pwrmode_entry_gate_t *gate)
 {
     if (!gate) return RCP_PWRMODE_ENTRY_REFUSED;
@@ -182,4 +184,22 @@ rcp_pwrmode_entry_result_t rcp_pwrmode_check_entry(const rcp_pwrmode_entry_gate_
         return RCP_PWRMODE_ENTRY_REFUSED;
 
     return RCP_PWRMODE_ENTRY_OK;
+}
+
+//cfusa:req REQ-PWRMODE-024
+//cfusa:req REQ-PWRMODE-026
+rcp_pwrmode_errc_t rcp_pwrmode_commit_entry(rcp_pwrmode_t *mode, rcp_pwrmode_t target,
+                                             const rcp_pwrmode_entry_gate_t *gate,
+                                             bool response_sent,
+                                             rcp_pwrmode_start_kind_t *out_start_kind)
+{
+    if (rcp_pwrmode_check_entry(gate) != RCP_PWRMODE_ENTRY_OK) return RCP_PWRMODE_ERR_ENTRY_REFUSED;
+    if (!response_sent) return RCP_PWRMODE_ERR_ENTRY_REFUSED;
+
+    if ((*mode != RCP_PWRMODE_NORMAL && *mode != RCP_PWRMODE_STANDBY) ||
+        (target != RCP_PWRMODE_STANDBY && target != RCP_PWRMODE_SLEEP)) {
+        return RCP_PWRMODE_ERR_INVALID_TRANSITION;
+    }
+
+    return rcp_pwrmode_transition(mode, target, out_start_kind);
 }
