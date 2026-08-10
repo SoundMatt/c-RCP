@@ -1072,22 +1072,24 @@ typedef struct {
                                 order carries no TC18 conformance
                                 obligation of its own.
                                 rcp_regmap_ep_id_map_is_ascending()
-                                below is NOT updated by this field's
-                                addition to consider it -- TC18 requires
-                                ascending order in the COMPOSITE key
-                                (request_stream_index, byte_bus_id),
-                                not byte_bus_id alone; that is
-                                REQ-RMAP-056's own separate, still-open
-                                scope, deliberately deferred rather
-                                than folded into this batch. */
+                                below now DOES consider it (REQ-RMAP-056,
+                                closed as of this field's own follow-up
+                                batch): TC18 requires ascending order in
+                                the COMPOSITE key (request_stream_index,
+                                byte_bus_id), not byte_bus_id alone. */
 } rcp_regmap_ep_id_map_entry_t;
 
 /* Read-only diagnostic: true iff entries[0..count) is strictly ascending
- * by byte_bus_id (entries[i].byte_bus_id < entries[i+1].byte_bus_id for
- * every consecutive pair). Vacuously true for count == 0 or count == 1.
- * This is not, and must not be treated as, server-side enforcement -- see
- * the file header's "Known spec ambiguity" note. entries may be NULL iff
- * count == 0. */
+ * in the COMPOSITE key (request_stream_index, byte_bus_id) -- TC18
+ * §12.7.8's own required ordering (REQ-RMAP-056): request_stream_index
+ * must never decrease, and within one unchanged request_stream_index
+ * run, byte_bus_id must strictly increase. A higher request_stream_index
+ * always counts as "ascending" regardless of that row's own byte_bus_id
+ * value -- TC18 does not require byte_bus_id to reset or relate across
+ * different streams, only within one. Vacuously true for count == 0 or
+ * count == 1. This is not, and must not be treated as, server-side
+ * enforcement -- see the file header's "Known spec ambiguity" note.
+ * entries may be NULL iff count == 0. */
 bool rcp_regmap_ep_id_map_is_ascending(const rcp_regmap_ep_id_map_entry_t *entries,
                                         size_t count);
 

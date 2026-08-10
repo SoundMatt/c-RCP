@@ -9161,12 +9161,12 @@
     {
       "id": "REQ-RMAP-056",
       "title": "EP_ID_config ordering is ascending in (Request_Stream_Index, BBID), not BBID alone",
-      "text": "rcp_regmap_ep_id_map_is_ascending() shall report whether the EP_ID_config table is ordered ascending in the composite key (Request_Stream_Index, BBID), the ordering TC18 \u00a712.7.8 requires the configuring instance to maintain and whose violation the specification says can cause requests to be dropped because no endpoint is found. c-RCP's implementation checks only strictly increasing byte_bus_id and is structurally unable to consider Request_Stream_Index (include/rcp/regmap.h:458-461, 469). Consequence: a table that is correctly ordered per-stream but interleaves streams is reported non-ascending, and a table that is ascending in BBID but scrambled across streams is reported ascending \u2014 the diagnostic gives the wrong answer in both directions once more than one request stream is configured.",
+      "text": "rcp_regmap_ep_id_map_is_ascending() reports whether the EP_ID_config table is ordered ascending in the composite key (Request_Stream_Index, BBID), the ordering TC18 \u00a712.7.8 requires the configuring instance to maintain and whose violation the specification says can cause requests to be dropped because no endpoint is found. Fixed: the implementation (src/regmap.c) now compares request_stream_index first between consecutive rows \u2014 a decrease is always reported non-ascending, an increase is always reported ascending regardless of that row's own byte_bus_id (TC18 does not require byte_bus_id to reset or relate across different streams) \u2014 and falls back to the prior strict byte_bus_id comparison only when request_stream_index is unchanged between the two rows. A per-stream-ascending table that interleaves streams (e.g. stream 1 BBIDs 1,2 then stream 2 BBIDs 1,2 again) is now correctly reported ascending, and a table whose stream index goes backwards is correctly reported non-ascending regardless of BBID.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "partial",
+      "status": "implemented",
       "tc18": "\u00a712.7.8, TC18.txt L2979-L2981"
     },
     {

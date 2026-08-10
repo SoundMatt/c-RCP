@@ -1259,31 +1259,39 @@ static void test_ep_id_row_now_has_request_stream_index(void)
 
     TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_is_ascending(rows, 2u));
     /* No sentinel RECOGNITION yet (REQ-RMAP-054): the third row still
-     * counts as a real mapping to is_ascending() itself. */
+     * counts as a real mapping to is_ascending() itself -- and under the
+     * composite-key rule (REQ-RMAP-056) its request_stream_index (0) is
+     * a decrease from row 1's (1), so this is FALSE on that basis alone,
+     * independent of either row's byte_bus_id. */
     TEST_ASSERT_FALSE(rcp_regmap_ep_id_map_is_ascending(rows, 3u));
 }
 
 /* TC18 §12.7.8 requires the table to be ascending in the COMPOSITE key
  * (Request_Stream_Index, BBID), so a table that restarts its BBID run at
- * each new stream is correctly ordered. Deviation: c-RCP's diagnostic
- * checks strictly increasing BBID alone and is structurally unable to
- * consider a stream index -- so a per-stream-ascending table (BBIDs
- * 1,2 then 1,2 again on the next stream) is reported NON-ascending, the
- * wrong answer. */
-static void test_ep_id_ordering_ignores_request_stream_index(void)
+ * each new stream is correctly ordered. is_ascending() below now DOES
+ * consider the composite key (REQ-RMAP-056, closed as of this test's own
+ * follow-up batch): a per-stream-ascending table (BBIDs 1,2 then 1,2
+ * again on the next, higher stream) is correctly reported ascending, and
+ * a stream index that goes backwards is correctly reported non-ascending
+ * regardless of that row's own BBID. */
+static void test_ep_id_ordering_considers_request_stream_index(void)
 {
     rcp_regmap_ep_id_map_entry_t rows[4];
 
-    /* stream 1: BBID 1,2 -- stream 2: BBID 1,2. Ascending per TC18's
-     * own composite-key rule, now representable (REQ-RMAP-052) even
-     * though is_ascending() itself still doesn't consider it
-     * (REQ-RMAP-056, this test's own still-open scope). */
+    /* stream 1: BBID 1,2 -- stream 2: BBID 1,2. Ascending per TC18's own
+     * composite-key rule: the stream index increases between rows[1] and
+     * rows[2], so that transition is ascending regardless of BBID. */
     rows[0].ep_id = 10u; rows[0].byte_bus_id = 1u; rows[0].request_stream_index = 1u;
     rows[1].ep_id = 11u; rows[1].byte_bus_id = 2u; rows[1].request_stream_index = 1u;
     rows[2].ep_id = 20u; rows[2].byte_bus_id = 1u; rows[2].request_stream_index = 2u;
     rows[3].ep_id = 21u; rows[3].byte_bus_id = 2u; rows[3].request_stream_index = 2u;
 
-    TEST_ASSERT_FALSE(rcp_regmap_ep_id_map_is_ascending(rows, 4u));
+    TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_is_ascending(rows, 4u));
+
+    /* A stream index that goes backwards is non-ascending even though
+     * the BBID itself would look fine in isolation (1 < 2). */
+    rows[2].request_stream_index = 0u;
+    TEST_ASSERT_FALSE(rcp_regmap_ep_id_map_is_ascending(rows, 3u));
 }
 
 /* TC18 §12.7.8 recommends, for safety reasons, that an endpoint be mapped
@@ -1782,7 +1790,7 @@ int main(void)
     RUN_TEST(test_watchdog_timeout_width_and_unit_deviate);
     RUN_TEST(test_table22_w_star_writable_in_both_pre_rcp_configured_states);
     RUN_TEST(test_ep_id_row_now_has_request_stream_index);
-    RUN_TEST(test_ep_id_ordering_ignores_request_stream_index);
+    RUN_TEST(test_ep_id_ordering_considers_request_stream_index);
     RUN_TEST(test_no_diagnostic_for_multi_client_or_heterogeneous_type);
     RUN_TEST(test_byte_bus_id_is_eight_bits_wide);
     RUN_TEST(test_no_lockable_w_plus_field_kind);

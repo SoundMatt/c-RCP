@@ -177,7 +177,17 @@ bool rcp_regmap_ep_id_map_is_ascending(const rcp_regmap_ep_id_map_entry_t *entri
     if (count < 2) return true; /* vacuously ascending */
 
     for (i = 1; i < count; i++) {
-        if (!(entries[i - 1].byte_bus_id < entries[i].byte_bus_id)) return false;
+        const rcp_regmap_ep_id_map_entry_t *prev = &entries[i - 1];
+        const rcp_regmap_ep_id_map_entry_t *cur   = &entries[i];
+
+        if (prev->request_stream_index != cur->request_stream_index) {
+            /* A higher stream index always counts as ascending -- TC18
+             * does not require byte_bus_id to relate across different
+             * streams, only strictly increase within one (REQ-RMAP-056). */
+            if (!(prev->request_stream_index < cur->request_stream_index)) return false;
+            continue;
+        }
+        if (!(prev->byte_bus_id < cur->byte_bus_id)) return false;
     }
 
     return true;

@@ -33,6 +33,28 @@ the rationale.
 
 ## Releases
 
+### v0.194.0 -- 2026-08-10
+
+**Phase 5d batch 24: EP_ID_config ordering now checks the composite
+(Request_Stream_Index, BBID) key.** Issue #200. Direct follow-up to
+`REQ-RMAP-052` (batch 23's own new field): `rcp_regmap_ep_id_map_is_
+ascending()` previously compared `byte_bus_id` alone; TC18 §12.7.8
+requires ordering in the composite key, so a table that legitimately
+restarts its BBID run at each new, higher request stream was reported
+non-ascending. Rewrote the comparison: a `request_stream_index`
+decrease is always non-ascending, an increase is always ascending
+regardless of that pair's own BBID, and only an unchanged stream index
+falls back to the prior strict BBID comparison. Rewrote `REQ-RMAP-056`'s
+own deviation pin into a positive test; re-verified (not assumed) that
+every other existing consumer of the function still holds under the
+new logic. Mutation-tested with two independent mutations (full revert;
+isolated removal of the early `continue`) -- both correctly caught by
+the new test. Full suite (65/65) + ASan/UBSan clean on both trees.
+Fresh `cfusa check`/`trace` (0 errors, 100%/100%, three separate
+CI-matching invocations). `REQ-RMAP-056` moves `partial` ->
+`implemented`, fully closed. See `ROADMAP.md` milestone 194 for full
+detail.
+
 ### v0.193.0 -- 2026-08-10
 
 **Phase 5d batch 23: EP_ID_config row is now a (Request_Stream_Index,

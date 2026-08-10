@@ -10703,3 +10703,74 @@ noted for whoever closes this group out). Next: `REQ-RMAP-053`
 (`rcp_byte_bus_id_t` widened from 8 to enough bits for the full 11-bit
 BBID address space) -- needs its own dedicated investigation pass
 first, given its ~40-file footprint, before any code changes.
+
+### 194. Phase 5d batch 24: EP_ID_config ordering now checks the composite (Request_Stream_Index, BBID) key (issue #200)
+
+Direct follow-up to `REQ-RMAP-052` (batch 23's own new
+`request_stream_index` field): closes the deviation that field's own
+comment explicitly deferred. `rcp_regmap_ep_id_map_is_ascending()`
+previously compared `byte_bus_id` alone; TC18 §12.7.8 requires the
+table to be ascending in the COMPOSITE key `(request_stream_index,
+byte_bus_id)`, so a table that legitimately restarts its BBID run at
+each new, higher request stream was being reported non-ascending --
+the wrong answer.
+
+Rewrote the comparison loop: for each consecutive pair, if
+`request_stream_index` differs, a decrease is always non-ascending and
+an increase is always ascending regardless of that pair's own
+`byte_bus_id` (TC18 does not require BBID to reset or relate across
+different streams, only to strictly increase within one); only when
+`request_stream_index` is unchanged does the loop fall back to the
+prior strict `byte_bus_id` comparison. Blast-radius grep (same
+discipline every batch this phase has used) found the function has
+exactly one production consumer path today (none -- still no wire
+encode/decode or server-side enforcement calls it, per `REQ-RMAP-052`'s
+own still-open scope) and its own test suite, so the change is
+contained entirely to `src/regmap.c` and its tests.
+
+Rewrote `REQ-RMAP-056`'s own deviation pin
+(`test_ep_id_ordering_ignores_request_stream_index`, renamed
+`test_ep_id_ordering_considers_request_stream_index`) into a positive
+test: the same four-row, two-stream table it always used (stream 1
+BBIDs 1,2; stream 2 BBIDs 1,2) now asserts `TRUE`, plus a new
+assertion that forcing the third row's stream index backwards to 0
+correctly reports `FALSE` even though that row's own BBID (1) would
+look fine in isolation. Re-verified (not assumed) every other
+consumer of the function under the new composite-key logic:
+`test_ep_id_row_now_has_request_stream_index`'s three-row sentinel
+scenario keeps both its existing assertions (row 3's
+`request_stream_index == 0` is a decrease from row 2's `1`, so it's
+`FALSE` on that basis alone now, independent of BBID -- comment
+updated to say so explicitly); `test_no_diagnostic_for_multi_client_
+or_heterogeneous_type` uses one stream index throughout both of its
+scenarios, so the composite-key logic reduces to the prior
+BBID-only behavior for it, unaffected; `test_regmap.c`'s four
+`test_ep_id_map_ascending_*` tests all use `request_stream_index == 0`
+uniformly (from batch 23's own explicit-zero-init fix), so they too
+reduce to the prior behavior unchanged.
+
+Mutation-tested with two independent mutations, matching the rigor
+used for prior batches with real computed logic (not pure structural
+adds): (1) full revert of `src/regmap.c` to its pre-batch content with
+the new tests kept -- the new positive test fails
+(`Expected TRUE Was FALSE`) against the old BBID-only logic, as
+expected; (2) isolated mutation removing only the early `continue`
+so the loop falls through to the BBID check even after a stream-index
+increase -- the same new test fails the same way, confirming the
+`continue` branch itself is exercised and not vacuous. Restored the
+correct implementation after each, diff-verified byte-identical
+against a pre-mutation backup. Full suite (65/65) + ASan/UBSan clean
+on both trees. Fresh `cfusa check` (0 errors, only pre-existing
+unrelated `REQ-UART-03x` dangling-reference warnings in an untouched
+file) + all three separate `cfusa trace` invocations (100%/100%, 0
+untested). `REQ-RMAP-056` moves `partial` -> `implemented`, fully
+closed. 1030 requirements (unchanged), 109 `tc18-gap` entries
+remaining (down from 110).
+
+**Phase 5d progress after batch 24**: 25/47 items addressed (26
+counting `REQ-RMAP-061`'s own partial progress). Group 3: 2/6 items.
+Next: `REQ-RMAP-053` (`rcp_byte_bus_id_t` widened from 8 to enough
+bits for the full 11-bit BBID address space) -- still needs its own
+dedicated investigation pass first, given its ~40-file footprint and
+the live truncation bug already found in `src/acf.c`, before any code
+changes.
