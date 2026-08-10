@@ -1167,31 +1167,65 @@ static void test_flush_on_count_trigger_and_avtpdu_packing(void)
     rcp_respqueue_destroy(&q);
 }
 
-/* TC18 §12.7.9: Flush_time (0x0008, microseconds) forces transmission
- * once that interval elapses since the queue's last transmission, and
- * on expiry an EMPTY queue still emits a heartbeat AVTPDU so a client
- * can see the server is alive -- REQ-RMAP-064/065, still open (neither
- * is a queue-state-alone concern; both need a clock, which this module
- * deliberately has none of). Deviation: flush_time_us is inert, and the
- * only liveness machinery in the tree is the RECEIVE side
- * (rcp_deadline_config_t), the mirror image of the obligation. */
-static void test_flush_time_and_heartbeat_are_absent(void)
+/* REQ-RMAP-064/065 (TC18 §12.7.9): Flush_time (0x0008, microseconds)
+ * forces transmission once that interval elapses since the queue's last
+ * transmission, independently of flush_on_count, and on expiry an EMPTY
+ * queue still emits a heartbeat AVTPDU so a client can see the server is
+ * alive. respqueue.h's rcp_respqueue_should_flush_by_time() implements
+ * the trigger (REQ-RMAP-064, closed) and deliberately fires the same way
+ * whether the queue is empty or not; combined with
+ * rcp_respqueue_plan_batch() reporting 0 for an empty queue and
+ * avtp.h's rcp_avtp_encode_ntscf() already accepting payload_len == 0,
+ * the empty heartbeat AVTPDU is fully constructible (REQ-RMAP-065, the
+ * primitive-composition half). What remains open for REQ-RMAP-065 is
+ * exactly what REQ-SRV-017 (server.h) already states as this library's
+ * own scope boundary: actually SCHEDULING this composition against a
+ * real clock and driving a transport with it is an integrator concern,
+ * not this protocol library's -- so REQ-RMAP-065 stays catalogued
+ * "partial", not "implemented". */
+static void test_flush_time_trigger_and_empty_heartbeat_are_composable(void)
 {
     rcp_regmap_response_queue_cfg_t cfg;
-    rcp_deadline_config_t           dl;
+    rcp_respqueue_t                 q;
+    rcp_avtp_ntscf_header_t         hdr;
+    rcp_bytes_t                     heartbeat;
 
     rcp_regmap_response_queue_cfg_init(&cfg);
     TEST_ASSERT_EQUAL_UINT32(0u, cfg.flush_time_us);
 
-    cfg.flush_time_us = 1000u;
+    cfg.flush_time_us = 1000u; /* 1000 us */
     TEST_ASSERT_EQUAL_UINT32(1000u, cfg.flush_time_us);
 
-    /* Liveness is modelled only as a client-side deadline on heartbeats
-     * a peer sends, in milliseconds -- not as a server-side emitter on
-     * Flush_time microseconds. */
-    dl = rcp_deadline_default_config();
-    TEST_ASSERT_EQUAL_UINT64(50u, dl.default_deadline_ms);
-    TEST_ASSERT_EQUAL_UINT64(5u, dl.poll_interval_ms);
+    /* Below the interval: no trigger. At/past it: triggers, independently
+     * of flush_on_count (no push()/should_flush() call anywhere here). */
+    TEST_ASSERT_FALSE(rcp_respqueue_should_flush_by_time(999u, (uint64_t)cfg.flush_time_us));
+    TEST_ASSERT_TRUE(rcp_respqueue_should_flush_by_time(1000u, (uint64_t)cfg.flush_time_us));
+
+    /* An EMPTY queue still trips the trigger -- REQ-RMAP-065's own
+     * precondition for the heartbeat case. */
+    rcp_respqueue_init(&q, 0, 0);
+    TEST_ASSERT_TRUE(rcp_respqueue_should_flush_by_time(1000u, (uint64_t)cfg.flush_time_us));
+    TEST_ASSERT_EQUAL_UINT(0u, rcp_respqueue_plan_batch(&q, 0u));
+
+    /* Once triggered on an empty queue, the caller-composed heartbeat is
+     * exactly a zero-payload NTSCF AVTPDU -- the *only* header format an
+     * RC Server itself ever sends (avtp.h) -- proving the composition
+     * this codebase's tree makes available end to end. */
+    hdr.sv = 1;
+    hdr.version = 0;
+    hdr.sequence_num = 0;
+    hdr.stream_id = rcp_stream_id_make(SERVER_MAC, 0x0001);
+    heartbeat = rcp_avtp_encode_ntscf(&hdr, NULL, 0);
+    TEST_ASSERT_NOT_NULL(heartbeat.data);
+    TEST_ASSERT_EQUAL_UINT(RCP_AVTP_NTSCF_HEADER_LEN, heartbeat.len);
+    rcp_bytes_free(&heartbeat);
+
+    rcp_respqueue_destroy(&q);
+
+    /* Liveness on the RECEIVE side (rcp_deadline_config_t) is the mirror
+     * image of this obligation and is unaffected by it -- still real,
+     * still separate machinery. */
+    TEST_ASSERT_EQUAL_UINT64(50u, rcp_deadline_default_config().default_deadline_ms);
 }
 
 /* REQ-RMAP-062 (TC18 §12.7.9): a single ACF message that would push an
@@ -1403,7 +1437,7 @@ int main(void)
     RUN_TEST(test_response_queue_size_register_and_storage_now_exist);
     RUN_TEST(test_max_avtpdu_size_is_now_enforced_and_feeds_fragmentation);
     RUN_TEST(test_flush_on_count_trigger_and_avtpdu_packing);
-    RUN_TEST(test_flush_time_and_heartbeat_are_absent);
+    RUN_TEST(test_flush_time_trigger_and_empty_heartbeat_are_composable);
     RUN_TEST(test_transmit_fragmentation_now_uses_the_correct_octet_budget);
     RUN_TEST(test_ep0_functional_block_and_discovery_timeout_absent);
     RUN_TEST(test_field_write_error_distinguishes_state_from_writer_denial);

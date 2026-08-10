@@ -3,6 +3,8 @@
 //cfusa:req REQ-RMAP-061
 //cfusa:req REQ-RMAP-062
 //cfusa:req REQ-RMAP-063
+//cfusa:req REQ-RMAP-064
+//cfusa:req REQ-RMAP-065
 /*
  * respqueue.h -- per-response/acknowledge-stream transmit queue for the
  * TC18 Remote Control Protocol wire layer (ROADMAP.md gap-closure Phase
@@ -20,15 +22,26 @@
  * queue: REQ-RMAP-059's storage-and-capacity scope, REQ-RMAP-061's
  * per-message Max_AVTPDUsize ceiling, REQ-RMAP-062's fragmentation-
  * budget helper (all three the same "keep every transmitted AVTPDU
- * within Max_AVTPDUsize" concern), and REQ-RMAP-063's flush_on_count
- * packing trigger -- the four together being everything this queue's
- * OWN contents and state can decide, without needing a clock or a
- * caller to have transmitted anything. The remaining Group 4 items --
- * the Flush_time timer and its empty-queue heartbeat (REQ-RMAP-064/065,
- * which need a clock this module deliberately has none of), and
- * REQ-RMAP-061's own MTU-consistency-check and discovery-exposure
- * halves (a config-time check and a discovery.h change, neither a
- * per-message queue concern) -- are deliberately NOT modeled here.
+ * within Max_AVTPDUsize" concern), REQ-RMAP-063's flush_on_count packing
+ * trigger, and REQ-RMAP-064's Flush_time trigger (the four together
+ * being everything this queue's own contents and state can decide,
+ * without needing a clock or a caller to have transmitted anything --
+ * REQ-RMAP-064 included, since rcp_respqueue_should_flush_by_time()
+ * below takes elapsed time as a caller-supplied input, exactly like
+ * e2e.h's rcp_e2e_wd_evaluate(elapsed_since_last_kick_ms), rather than
+ * reading a clock of its own). REQ-RMAP-065 (the empty-queue heartbeat
+ * AVTPDU) is PARTIALLY modeled: the same should_flush_by_time() trigger
+ * deliberately fires the same way whether q is empty or not, and
+ * avtp.h's rcp_avtp_encode_ntscf() already accepts payload_len == 0 for
+ * exactly this case (see rcp_respqueue_should_flush_by_time()'s own doc
+ * comment for how a caller composes the two) -- but actually SCHEDULING
+ * and TRANSMITTING that heartbeat on a real clock stays outside this
+ * module's and this library's scope entirely (REQ-SRV-017 in server.h
+ * already states this same boundary: "c-RCP is a protocol library, not
+ * a scheduler; heartbeat emission is left to the integrator"). Also
+ * still open: REQ-RMAP-061's own MTU-consistency-check and discovery-
+ * exposure halves (a config-time check and a discovery.h change, neither
+ * a per-message queue concern).
  *
  * This module owns no register-map instance of its own (regmap.h's
  * rcp_regmap_response_queue_cfg_t.queue_size/max_avtpdu_size are the
@@ -204,6 +217,52 @@ bool rcp_respqueue_should_flush(const rcp_respqueue_t *q, size_t flush_on_count_
  * AVTPDU, matching this module's own fail-open convention for an
  * unconfigured ceiling. */
 size_t rcp_respqueue_plan_batch(const rcp_respqueue_t *q, size_t max_avtpdu_size_octets);
+
+/* ── Flush_time trigger + empty-queue heartbeat composition ────────────────── */
+
+/* REQ-RMAP-064 (TC18 §12.7.9, Table 24 relative address 0x0008, 16 bit,
+ * R/W+, microseconds, default 0, 0 meaning "flush only by count"): "The
+ * server shall initiate transmission from a response queue whenever the
+ * time since that queue's last transmission is equal to or greater than
+ * Flush_time, independently of flush_on_count." True iff flush_time_us
+ * is nonzero and elapsed_since_last_transmit_us has reached it.
+ * elapsed_since_last_transmit_us is a caller-tracked duration, not a
+ * timestamp this function reads itself -- this module owns no clock
+ * (see this header's own file comment), mirroring e2e.h's own
+ * rcp_e2e_wd_evaluate(elapsed_since_last_kick_ms) convention exactly:
+ * the caller measures elapsed time however it likes and hands in the
+ * result.
+ *
+ * Deliberately independent of q->entries_len -- unlike
+ * rcp_respqueue_should_flush() above (the flush_on_count trigger, which
+ * has nothing meaningful to report on an empty queue and so treats one
+ * as never due), this trigger fires the same way whether q is empty or
+ * not, because REQ-RMAP-065 requires the server to still transmit -- an
+ * empty heartbeat AVTPDU -- even when nothing is queued, so this
+ * queue's own emptiness must never suppress the Flush_time trigger.
+ *
+ * What that empty AVTPDU actually is stays outside this module's own
+ * no-ACF/AVTP-framing scope (see this header's file comment):
+ * avtp.h's rcp_avtp_encode_ntscf() already accepts payload_len == 0
+ * for exactly this case (its own doc comment: "payload may be NULL iff
+ * payload_len == 0"), and NTSCF is "the *only* AVTPDU header format an
+ * RC Server itself ever sends" (avtp.h). A caller composes the full
+ * REQ-RMAP-064/065 behaviour as: once this function returns true,
+ * either call rcp_respqueue_plan_batch()+drain+encode a real batch (a
+ * nonzero plan_batch() result), or -- if plan_batch() reports 0, i.e.
+ * q is empty -- call rcp_avtp_encode_ntscf(hdr, NULL, 0) directly for
+ * the heartbeat. This function and rcp_avtp_encode_ntscf() together are
+ * everything a caller needs to recognize the trigger and construct the
+ * correct wire frame either way; actually SCHEDULING that composition
+ * against a real clock (i.e. running it periodically and driving a real
+ * transport) is a caller/integrator concern this library deliberately
+ * does not take on, matching REQ-SRV-017's own already-accepted scope
+ * boundary (server.h): "c-RCP is a protocol library, not a scheduler;
+ * heartbeat emission is left to the integrator." REQ-RMAP-065 is
+ * therefore closed only as far as this module's own layer goes --
+ * catalogued "partial", not "implemented". */
+bool rcp_respqueue_should_flush_by_time(uint64_t elapsed_since_last_transmit_us,
+                                         uint64_t flush_time_us);
 
 #ifdef __cplusplus
 }

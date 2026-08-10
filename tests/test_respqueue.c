@@ -1,5 +1,7 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:test REQ-RMAP-059
+//cfusa:test REQ-RMAP-064
+//cfusa:test REQ-RMAP-065
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -279,6 +281,44 @@ static void test_plan_batch_packs_as_many_entries_as_fit(void)
     rcp_respqueue_destroy(&q);
 }
 
+/* ── REQ-RMAP-064/065: the Flush_time trigger, independent of queue state ─── */
+
+static void test_should_flush_by_time_zero_flush_time_means_count_only(void)
+{
+    /* flush_time_us == 0: "flush only by count" -- the time trigger never
+     * fires, no matter how much elapsed time is reported. */
+    TEST_ASSERT_FALSE(rcp_respqueue_should_flush_by_time(0u, 0u));
+    TEST_ASSERT_FALSE(rcp_respqueue_should_flush_by_time(1000000u, 0u));
+}
+
+static void test_should_flush_by_time_fires_at_or_past_the_configured_interval(void)
+{
+    TEST_ASSERT_FALSE(rcp_respqueue_should_flush_by_time(999u, 1000u));
+    TEST_ASSERT_TRUE(rcp_respqueue_should_flush_by_time(1000u, 1000u));
+    TEST_ASSERT_TRUE(rcp_respqueue_should_flush_by_time(1001u, 1000u));
+}
+
+static void test_should_flush_by_time_is_independent_of_queue_state(void)
+{
+    rcp_respqueue_t q;
+    uint8_t         frame[3] = {0};
+
+    /* REQ-RMAP-065: the Flush_time trigger must fire the same way whether
+     * the queue is empty or not -- an empty queue still needs to emit a
+     * heartbeat AVTPDU on expiry, so its own emptiness must never
+     * suppress this trigger (unlike rcp_respqueue_should_flush(), the
+     * flush_on_count trigger, which is false for an empty queue). */
+    rcp_respqueue_init(&q, 0, 0);
+    TEST_ASSERT_TRUE(rcp_respqueue_should_flush_by_time(2000u, 1000u));
+    TEST_ASSERT_EQUAL_UINT(0u, rcp_respqueue_plan_batch(&q, 100u));
+
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
+    TEST_ASSERT_TRUE(rcp_respqueue_should_flush_by_time(2000u, 1000u));
+    TEST_ASSERT_EQUAL_UINT(1u, rcp_respqueue_plan_batch(&q, 100u));
+
+    rcp_respqueue_destroy(&q);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -301,6 +341,10 @@ int main(void)
     RUN_TEST(test_plan_batch_is_zero_for_an_empty_queue);
     RUN_TEST(test_plan_batch_always_keeps_at_least_one_entry);
     RUN_TEST(test_plan_batch_packs_as_many_entries_as_fit);
+
+    RUN_TEST(test_should_flush_by_time_zero_flush_time_means_count_only);
+    RUN_TEST(test_should_flush_by_time_fires_at_or_past_the_configured_interval);
+    RUN_TEST(test_should_flush_by_time_is_independent_of_queue_state);
 
     return UNITY_END();
 }

@@ -32,6 +32,35 @@ the rationale.
 
 ## Releases
 
+### v0.176.0 -- 2026-08-10
+
+**Phase 5d batch 6: REQ-RMAP-064/065 -- the Flush_time trigger and
+empty-queue heartbeat composition close Group 4.** Issue #200. New
+`rcp_respqueue_should_flush_by_time(elapsed_since_last_transmit_us,
+flush_time_us)` on the `e2e.h` `rcp_e2e_wd_evaluate()` model (elapsed
+time as a caller-supplied input, no owned clock); closes `REQ-RMAP-064`
+outright. Deliberately independent of queue emptiness, so it fires the
+same way whether the queue is empty or not; combined with
+`rcp_respqueue_plan_batch()` already reporting 0 for an empty queue and
+`avtp.h`'s `rcp_avtp_encode_ntscf()` already accepting a zero-length
+payload, the empty heartbeat AVTPDU is fully constructible from
+existing primitives -- proven end to end by a new positive test.
+`REQ-RMAP-065` moves `not-implemented` -> `partial`: the primitive half
+closes, but scheduling this composition against a real clock and a real
+transport stays an integrator concern, matching this library's other
+liveness modules (`watchdog.c`, `deadline.c`). Cross-cutting discovery:
+a domain-term sweep found `REQ-SRV-017` (server.h, TC18 §13.7.1.1)
+pinning the identical gap under a different citation -- its own
+pre-existing text already stated the same scheduling-boundary language
+independently, confirming `partial` (not a full close) was the right
+target status; narrowed both entries' text. Mutation-tested two ways
+(both logic-only). Full suite (65/65, +3 new tests) + ASan/UBSan clean.
+Fresh `cfusa check`/`trace` (0 errors, 100%/100%, three separate
+CI-matching invocations). See `ROADMAP.md` milestone 176 for full
+detail. 1030 requirements (unchanged), 110 `tc18-gap` entries remaining
+(was 111). **Group 4 (response/ack queue config, issue #200) is now
+fully closed.**
+
 ### v0.175.0 -- 2026-08-10
 
 **Phase 5d batch 5: REQ-RMAP-063 -- flush_on_count trigger + AVTPDU
