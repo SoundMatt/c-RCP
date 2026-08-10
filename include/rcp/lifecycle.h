@@ -222,11 +222,27 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
  *     an NTSCF-headed frame is accepted only if it carries an ACF_ABB
  *     message addressed to RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID; everything
  *     else is silently dropped.
- *   - While HW_CONFIGURED or RCP_CONFIGURED: acceptance beyond the
- *     time-sync rule already applied above is unrestricted at this
- *     milestone -- fine-grained per-field write access is
- *     rcp_lifecycle_field_writable()'s job below, and full endpoint/stream
- *     routing is milestone 62's register-map job.
+ *   - While HW_CONFIGURED: a TSCF-headed frame is dropped outright too,
+ *     for the same reason and regardless of time_sync_supported --
+ *     TSCF's presentation-time semantics still presuppose a validated
+ *     stream/byte_bus_id mapping and response queues, which do not exist
+ *     until RCP_CONFIGURED (TC18 §12.3.1.2). Acceptance is otherwise
+ *     unrestricted beyond the rules already applied above (fine-grained
+ *     per-field write access is rcp_lifecycle_field_writable()'s job
+ *     below, and full endpoint/stream routing is milestone 62's
+ *     register-map job) -- including ACF_GBB-format requests, which TC18
+ *     §12.3.1.2 also requires dropped in this state but which this
+ *     function deliberately does not yet enforce: every conditional
+ *     request kind is wire-encoded as ACF_GBB unconditionally (see
+ *     request_compound.h and siblings), so this is entangled with
+ *     restricting HW_CONFIGURED to configuration-only traffic in the
+ *     first place -- tracked as its own follow-up, not this function's
+ *     current scope (see rcp_lifecycle_should_accept()'s own .c-file
+ *     comment for the full reasoning).
+ *   - While RCP_CONFIGURED: acceptance beyond the general time-sync rule
+ *     already applied above is unrestricted at this milestone -- the
+ *     validated mapping HW_CONFIGURED's TSCF rule is guarding against now
+ *     exists.
  *
  * avtp_subtype is one of RCP_AVTP_SUBTYPE_NTSCF/_TSCF (see avtp.h);
  * acf_msg_type is one of RCP_ACF_MSG_TYPE_ABB/_GBB (see acf.h), or any

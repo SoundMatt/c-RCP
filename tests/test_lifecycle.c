@@ -309,9 +309,17 @@ static void test_hw_configured_applies_ordinary_tscf_drop_rule(void)
         RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u));
 }
 
-static void test_hw_configured_accepts_tscf_when_time_sync_supported(void)
+/* As of the REQ-LIFECYCLE-028 fix (TC18 §12.3.1.2, issue #198), a
+ * TSCF-headed AVTPDU is dropped in HW_CONFIGURED unconditionally --
+ * regardless of time_sync_supported, the same rule already applied to
+ * HW_UNCONFIGURED -- not merely subject to the general time-sync rule.
+ * This function's own name is now the opposite of what it asserts: kept
+ * (renamed) rather than deleted, since the previous, more permissive
+ * behavior was this module's original (pre-gap-audit) design and is
+ * worth a test explicitly pinning that it no longer holds. */
+static void test_hw_configured_drops_tscf_even_when_time_sync_supported(void)
 {
-    TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(
+    TEST_ASSERT_FALSE(rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_CONFIGURED, true,
         RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u));
 }
@@ -428,7 +436,7 @@ int main(void)
     RUN_TEST(test_hw_unconfigured_drops_tscf_even_with_time_sync_supported);
     RUN_TEST(test_hw_unconfigured_drops_tscf_without_time_sync);
     RUN_TEST(test_hw_configured_applies_ordinary_tscf_drop_rule);
-    RUN_TEST(test_hw_configured_accepts_tscf_when_time_sync_supported);
+    RUN_TEST(test_hw_configured_drops_tscf_even_when_time_sync_supported);
     RUN_TEST(test_rcp_configured_accepts_ntscf_at_any_byte_bus_id);
 
     RUN_TEST(test_hw_generic_writable_only_in_hw_unconfigured);

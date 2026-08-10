@@ -277,22 +277,39 @@ static void test_hw_configured_write_access_is_unrestricted(void)
 
 /* ── §12.3.1.2: TSCF and ACF_GBB in HW_CONFIGURED ──────────────────────────── */
 
-static void test_hw_configured_admits_tscf_and_gbb(void)
+/* As of the REQ-LIFECYCLE-028 fix, TC18 §12.3.1.2's TSCF rule is enforced:
+ * a TSCF-headed AVTPDU is dropped unconditionally in HW_CONFIGURED, the
+ * same rule c-RCP already implemented for HW_UNCONFIGURED -- neither
+ * state has the validated stream/byte_bus_id mapping and response queues
+ * TSCF's presentation-time semantics presuppose. */
+static void test_hw_configured_drops_tscf(void)
 {
-    /* TC18 §12.3.1.2 drops TSCF-headed AVTPDUs in HW_CONFIGURED
-     * unconditionally -- the same rule c-RCP already implements for
-     * HW_UNCONFIGURED. Here it applies only rcp_avtp_should_drop_tscf()'s
-     * general time-sync rule, so a time-sync-capable server processes timed
-     * requests before its RCP configuration exists. */
-    TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, true,
+    TEST_ASSERT_FALSE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, true,
         RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u));
-    /* Contrast: HW_UNCONFIGURED does apply the unconditional rule. */
+    TEST_ASSERT_FALSE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
+        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u));
     TEST_ASSERT_FALSE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_UNCONFIGURED, true,
         RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
+    /* The TSCF rule does not apply once RCP_CONFIGURED -- the mapping it
+     * guards against not existing yet has, by then, been validated. */
+    TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_RCP_CONFIGURED, true,
+        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u));
+}
 
-    /* TC18 §12.3.1.2 also drops ACF_GBB-format requests in HW_CONFIGURED
-     * without response. acf_msg_type is inspected only in the
-     * HW_UNCONFIGURED branch, so a group-byte-bus request is admitted. */
+/* DEVIATION PIN (REQ-LIFECYCLE-029, not implemented): TC18 §12.3.1.2 also
+ * requires dropping ACF_GBB-format requests in HW_CONFIGURED, without
+ * response. Deliberately NOT fixed alongside REQ-LIFECYCLE-028 above:
+ * every conditional request kind (compound/compound-wait/triggered/
+ * chained/timed/cancel) is wire-encoded as ACF_GBB unconditionally (the
+ * mtv-repurposing scheme request_compound.h and siblings document), so an
+ * unconditional ACF_GBB drop here would make it impossible to ever admit
+ * a conditional request while HW_CONFIGURED -- entangled with
+ * REQ-LIFECYCLE-032 (HW_CONFIGURED traffic should be restricted to
+ * configuration requests only, not yet implemented either) rather than
+ * being a narrow, standalone fix. Tracked as its own follow-up batch in
+ * issue #198. */
+static void test_hw_configured_admits_gbb_pending_lifecycle_029(void)
+{
     TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, (rcp_byte_bus_id_t)7u));
 }
@@ -893,7 +910,8 @@ int main(void)
     RUN_TEST(test_hw_configured_admits_any_stream_and_any_endpoint);
     RUN_TEST(test_hw_unconfigured_ignores_claimant_and_request_kind);
     RUN_TEST(test_hw_configured_write_access_is_unrestricted);
-    RUN_TEST(test_hw_configured_admits_tscf_and_gbb);
+    RUN_TEST(test_hw_configured_drops_tscf);
+    RUN_TEST(test_hw_configured_admits_gbb_pending_lifecycle_029);
     RUN_TEST(test_discovery_write_authority_survives_rcp_configured);
 
     RUN_TEST(test_cold_start_target_and_standby_retention);

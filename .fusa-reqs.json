@@ -8482,18 +8482,17 @@
     {
       "id": "REQ-LIFECYCLE-028",
       "title": "HW_CONFIGURED drops TSCF-headed AVTPDUs regardless of time-sync support",
-      "text": "NOT IMPLEMENTED: c-RCP accepts TSCF-headed AVTPDUs in HW_CONFIGURED whenever the node advertises time-sync support (TC18 \u00a712.3.1.2). The specification states that in HW_CONFIGURED, TSCF-headed AVTPDUs are dropped without further response, unconditionally -- the same rule already implemented for HW_UNCONFIGURED at src/lifecycle.c:132. A time-sync-capable server therefore processes timed requests before its RCP configuration (stream/byte_bus_id mapping, response queues) exists.",
+      "text": "IMPLEMENTED: TC18 \u00a712.3.1.2 (whose own printed heading confusingly repeats \"HW_UNCONFIGURED\" -- verified against the primary-source PDF directly to rule out an extraction artifact; the section's actual content is unambiguously about HW_CONFIGURED, distinct from the correctly-labeled \u00a712.3.1.1 immediately preceding it) requires TSCF-headed AVTPDUs to be dropped in HW_CONFIGURED without further response, unconditionally. rcp_lifecycle_should_accept() now drops a TSCF-headed frame in HW_CONFIGURED regardless of time_sync_supported, the same unconditional rule already applied to HW_UNCONFIGURED.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
+      "scope": "tc18",
       "tc18": "\u00a712.3.1.2, TC18.txt L2180-L2181"
     },
     {
       "id": "REQ-LIFECYCLE-029",
       "title": "HW_CONFIGURED drops ACF_GBB-format requests without response",
-      "text": "NOT IMPLEMENTED: c-RCP does not drop ACF_GBB-format requests in HW_CONFIGURED (TC18 \u00a712.3.1.2). rcp_lifecycle_should_accept() only inspects acf_msg_type in its HW_UNCONFIGURED branch; in HW_CONFIGURED any ACF message type, including RCP_ACF_MSG_TYPE_GBB, is admitted. Group-byte-bus requests are therefore processed in a state whose stream/byte_bus_id mapping is not yet validated.",
+      "text": "NOT IMPLEMENTED: c-RCP does not drop ACF_GBB-format requests in HW_CONFIGURED (TC18 \u00a712.3.1.2). rcp_lifecycle_should_accept() only inspects acf_msg_type in its HW_UNCONFIGURED branch; in HW_CONFIGURED any ACF message type, including RCP_ACF_MSG_TYPE_GBB, is admitted. Group-byte-bus requests are therefore processed in a state whose stream/byte_bus_id mapping is not yet validated. Deliberately NOT fixed alongside sibling REQ-LIFECYCLE-028 (which closed the same section's TSCF rule): every conditional request kind (compound/compound-wait/triggered/chained/timed/cancel) is wire-encoded as ACF_GBB unconditionally (the mtv-repurposing scheme request_compound.h and siblings document), so an unconditional ACF_GBB drop here would make it impossible to ever admit a conditional request while HW_CONFIGURED. This is entangled with REQ-LIFECYCLE-032 (HW_CONFIGURED traffic should be restricted to configuration requests only -- also not yet implemented) rather than being a narrow, standalone fix; closing REQ-LIFECYCLE-032 first is expected to resolve this one too. See rcp_lifecycle_should_accept()'s own .c-file comment for the full reasoning.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
