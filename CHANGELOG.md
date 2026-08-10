@@ -33,6 +33,32 @@ the rationale.
 
 ## Releases
 
+### v0.189.0 -- 2026-08-10
+
+**Phase 5d batch 19: `svr_ep_generic_cfg_ptr`/`_capacity` now
+correctly sized, addressed, and UNIT-correct.** Issue #200. The batch
+issue #200 itself flagged for careful re-reading before fixing.
+Re-verified directly against the primary-source PDF before writing
+code: `svr_ep_generic_cfg_capacity` (0x0026, 16 bit) is explicitly
+"Length of EP config register section in bytes." The former
+`ep_generic_cfg` field (`rcp_regmap_table_ref_t`) documented its own
+capacity as an ENTRY COUNT -- the exact opposite unit, a genuine
+semantic contradiction, not merely a width mismatch. Retyped to two
+independent scalar fields matching TC18's own names/widths, so the
+unit distinction is structurally enforced rather than only documented.
+The same PDF read also independently re-confirmed the shapes of every
+remaining Group 1 item ahead of its own batch (`-037` through `-039`)
+-- no surprises found for any. Split the largest combined deviation
+pin this phase has found (three requirements, `-036`/`-037`/`-038`, in
+one test) into a new positive test and a narrowed remaining one; found
+and fixed the same two "second usage site" categories the prior two
+batches established. Mutation-tested: full header revert with every
+touched test file kept breaks the build. Full suite (65/65) + ASan/
+UBSan clean. Fresh `cfusa check`/`trace` (0 errors, 100%/100%, three
+separate CI-matching invocations). See `ROADMAP.md` milestone 189 for
+full detail. 1030 requirements (unchanged), 110 `tc18-gap` entries
+remaining (unchanged).
+
 ### v0.188.0 -- 2026-08-10
 
 **Phase 5d batch 18: `REQ-RMAP-035` -- reserved 16-bit register at

@@ -550,7 +550,38 @@ typedef struct {
                                 reserved_0x17. Content modeling only,
                                 same REQ-RMAP-024 wire-reachability
                                 boundary as every other Group 1 item. */
-    rcp_regmap_table_ref_t ep_generic_cfg;
+    uint16_t svr_ep_generic_cfg_ptr; /* REQ-RMAP-036 (TC18 §12.7.5 Table
+                                18, relative address 0x0024, 16 bit,
+                                R): the address of the EP_config
+                                register map (§13.2, generic part of
+                                the endpoint register map). Retyped
+                                from this field's own former shape
+                                (rcp_regmap_table_ref_t) to a bare
+                                16-bit register-address value, same
+                                class of fix as REQ-RMAP-033/-034. */
+    uint16_t svr_ep_generic_cfg_capacity; /* REQ-RMAP-036 (TC18
+                                §12.7.5 Table 18, relative address
+                                0x0026, 16 bit, R): the LENGTH OF THE
+                                EP CONFIG REGISTER SECTION IN BYTES --
+                                verified directly against the primary-
+                                source PDF (Table 18, page 52 of
+                                OA_TC18_specification_v_0.5.1_RC.pdf).
+                                A byte length, NOT an entry count --
+                                the exact opposite of what this
+                                field's former shared-type home
+                                (rcp_regmap_table_ref_t.capacity)
+                                documented for every field that used
+                                it. Deliberately its own distinct
+                                16-bit scalar (not reused from the
+                                shared type) so this unit distinction
+                                is structurally, not just textually,
+                                enforced -- a future caller cannot
+                                accidentally treat this value as an
+                                entry count the way the former shared
+                                field's own documentation would have
+                                invited. Content modeling only, same
+                                REQ-RMAP-024 wire-reachability boundary
+                                as every other Group 1 item. */
     rcp_regmap_table_ref_t ep_functional_cfg;
     rcp_regmap_table_ref_t ep_id_bus_map;
     rcp_regmap_table_ref_t sequencer_state;

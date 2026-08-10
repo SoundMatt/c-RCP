@@ -8940,14 +8940,14 @@
     },
     {
       "id": "REQ-RMAP-036",
-      "title": "svr_ep_generic_cfg_capacity (0x0026) is a byte length, but c-RCP models capacity as an entry count",
-      "text": "NOT IMPLEMENTED (partial, semantically contradictory): TC18 \u00a712.7.5 Table 18 defines svr_ep_generic_cfg_ptr as a 16-bit read-only pointer at absolute address 0x0024 to the generic endpoint register map (\u00a713.2), and svr_ep_generic_cfg_capacity as a 16-bit read-only register at 0x0026 giving the LENGTH OF THE EP CONFIG REGISTER SECTION IN BYTES. c-RCP represents both by rcp_regmap_general_t.ep_generic_cfg, an rcp_regmap_table_ref_t whose capacity member is explicitly documented as an entry count rather than an octet length (include/rcp/regmap.h:167-169). Consequence: if the field were ever encoded into 0x0026 as-is, a conforming client would compute the section extent wrongly by a factor of sizeof(one EP config entry).",
+      "title": "svr_ep_generic_cfg_ptr/_capacity are now correctly sized, addressed, and unit-correct",
+      "text": "PARTIAL: TC18 \u00a712.7.5 Table 18 defines svr_ep_generic_cfg_ptr as a 16-bit read-only pointer at absolute address 0x0024 to the generic endpoint register map (\u00a713.2), and svr_ep_generic_cfg_capacity as a 16-bit read-only register at 0x0026 giving the LENGTH OF THE EP CONFIG REGISTER SECTION IN BYTES (re-verified directly against the primary-source PDF, Table 18 page 52, per this requirement's own flagged need for careful re-reading before fixing). rcp_regmap_general_t now declares both as correctly-sized, correctly-UNITED scalar fields, replacing the former ep_generic_cfg field (rcp_regmap_table_ref_t, the shared pointer/capacity type most remaining sub-table refs still use) whose capacity member was documented as an ENTRY COUNT -- the exact opposite unit from what 0x0026 actually is. This was a genuine semantic contradiction, not merely a width/address mismatch like REQ-RMAP-033/-034. What remains open: this codebase has no real EP_config table storage anywhere yet for this pointer to meaningfully address, and this address range (0x0024-0x0027) falls past the discovery response's own 0x000D wire-reachability ceiling (REQ-RMAP-024, still open), so a client still cannot read these registers over the wire.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "\u00a712.7.5 Table 18, TC18.txt L2600-2603"
+      "tc18": "\u00a712.7.5 Table 18, TC18.txt L2600-2603 -- primary-source-verified against OA_TC18_specification_v_0.5.1_RC.pdf Table 18, page 52"
     },
     {
       "id": "REQ-RMAP-037",

@@ -82,7 +82,8 @@ static void test_general_init_zeroes_with_no_root_client(void)
     TEST_ASSERT_EQUAL_UINT8(0, map.svr_response_stream_cfg_capacity);
     TEST_ASSERT_EQUAL_UINT16(0, map.svr_request_stream_cfg_ptr);
     TEST_ASSERT_EQUAL_UINT16(0, map.svr_response_stream_cfg_ptr);
-    TEST_ASSERT_EQUAL_UINT32(0, map.ep_generic_cfg.offset);
+    TEST_ASSERT_EQUAL_UINT16(0, map.svr_ep_generic_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0, map.svr_ep_generic_cfg_capacity);
     TEST_ASSERT_EQUAL_UINT32(0, map.ep_functional_cfg.offset);
     TEST_ASSERT_EQUAL_UINT32(0, map.ep_id_bus_map.offset);
     TEST_ASSERT_EQUAL_UINT32(0, map.sequencer_state.offset);
