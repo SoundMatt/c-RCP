@@ -91,8 +91,8 @@
  *
  * rcp_timed_feature_enabled() reads (but the register map module itself
  * is not modified by this file) regmap.h's already-published
- * RCP_REGMAP_OPT_TIME_SYNC_TSCF/_PRESENTATION bits -- both must be set for
- * a server to accept Timed requests at all, since a Timed request is
+ * RCP_REGMAP_OPT_TIME_SYNC bit (REQ-RMAP-030) -- it must be set for a
+ * server to accept Timed requests at all, since a Timed request is
  * meaningless without the same underlying time-sync capability TSCF
  * itself depends on.
  */
@@ -144,10 +144,11 @@ const char *rcp_timed_strerror(rcp_timed_errc_t e);
 
 /* ── Feature gating ─────────────────────────────────────────────────────────── */
 
-/* True iff both RCP_REGMAP_OPT_TIME_SYNC_TSCF and
- * RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION are set in options -- see the
- * file header. */
-bool rcp_timed_feature_enabled(uint32_t options);
+/* True iff RCP_REGMAP_OPT_TIME_SYNC (regmap.h, REQ-RMAP-030's own
+ * single "d: time synch and timed requests" bit -- retyped from this
+ * function's own former two-bit-pair check, REQ-RMAP-030) is set in
+ * options -- see the file header. */
+bool rcp_timed_feature_enabled(uint8_t options);
 
 /* ── Timed request encode/decode ──────────────────────────────────────────── */
 

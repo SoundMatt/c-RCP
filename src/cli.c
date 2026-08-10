@@ -65,14 +65,19 @@ static void version_text(char *buf, size_t buf_len)
  * worked example includes them for single-protocol tools like this one.
  *
  * "features" (ROADMAP.md milestone 77, "Foundational test/config
- * satellites"; caveat added milestone 94, c-RCP-06/c-RCP-07): names, one
- * per group this build compiles the *API surface* for, regmap.h's own
- * svr_implemented_options feature-bundle groups (RCP_REGMAP_OPT_* --
- * "three all-or-nothing feature groups", src/regmap.c since v0.62.0):
- * time_sync (TSCF framing plus its presentation-timestamp companion),
- * enhanced_cancel (a cancellation request plus its acknowledgement,
- * request_cancel.h), compound_bundles (a bundle header plus per-segment
- * addressing, request_compound.h). This is a static, build-time answer --
+ * satellites"; caveat added milestone 94, c-RCP-06/c-RCP-07; bit layout
+ * corrected and trigger/chained added, REQ-RMAP-030): names, one per
+ * group this build compiles the *API surface* for, regmap.h's own
+ * svr_implemented_options bits (RCP_REGMAP_OPT_* -- five independent
+ * single bits, TC18 §12.7.5 Table 18, src/regmap.c since v0.62.0,
+ * corrected v0.183.0): time_sync (bit d: TSCF framing plus its
+ * presentation-timestamp companion), enhanced_cancel (bit e: a
+ * cancellation request plus its acknowledgement, request_cancel.h),
+ * compound_bundles (bit a: a bundle header plus per-segment addressing,
+ * request_compound.h), trigger (bit b, request_triggered.h) and chained
+ * (bit c, request_chained.h) -- the latter two previously had no
+ * advertisable bit at all despite this codebase implementing both, the
+ * exact gap REQ-RMAP-030 closes. This is a static, build-time answer --
  * this generic CLI tool never connects to a live RC Server (see
  * status_json()'s own "connected":false), so there is no live
  * svr_implemented_options value to report instead of the library's own
@@ -81,8 +86,10 @@ static void version_text(char *buf, size_t buf_len)
  * IMPORTANT -- "features" reports API-surface presence, not full TC18
  * wire conformance. A 2026-07-30 ecosystem audit (c-RCP-06) found, and
  * this milestone independently confirmed against the actual code, that
- * none of the three groups is fully wire-conformant yet despite each
- * having real, working code behind it:
+ * three of the five bits are not fully wire-conformant yet despite each
+ * having real, working code behind it (trigger and chained have no such
+ * caveat -- REQ-TRIG-nnn and REQ-CHAIN-nnn are fully closed in
+ * .fusa-reqs.json):
  *   - time_sync: request_timed.c's presentation_time sub-field is a
  *     plain uint32_t, narrower than the spec's own wider field.
  *   - enhanced_cancel: request_cancel.c's encoders hard-code the shared
@@ -101,41 +108,44 @@ static void version_text(char *buf, size_t buf_len)
  * caveat cannot be expressed in the JSON output itself -- it is recorded
  * here, and in README.md, for anyone auditing this self-report against
  * the actual code. RCP_CLI_IMPLEMENTED_OPTIONS below is derived from
- * three independently-named per-group predicates rather than one
+ * five independently-named per-bit predicates rather than one
  * monolithic "all" constant (c-RCP-07) precisely so that fixing any one
- * group's conformance gap has a single, obvious place to flip its
+ * bit's conformance gap has a single, obvious place to flip its
  * predicate to reflect that -- not because any predicate's value differs
  * from the others today.
  */
 #define RCP_CLI_HAS_TIME_SYNC_API        1
 #define RCP_CLI_HAS_ENHANCED_CANCEL_API  1
 #define RCP_CLI_HAS_COMPOUND_BUNDLES_API 1
+#define RCP_CLI_HAS_TRIGGER_API          1
+#define RCP_CLI_HAS_CHAINED_API          1
 
 #define RCP_CLI_IMPLEMENTED_OPTIONS                                                          \
-    ((RCP_CLI_HAS_TIME_SYNC_API                                                              \
-          ? (RCP_REGMAP_OPT_TIME_SYNC_TSCF | RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION) : 0u) |   \
-     (RCP_CLI_HAS_ENHANCED_CANCEL_API                                                        \
-          ? (RCP_REGMAP_OPT_ENH_CANCEL_REQUEST | RCP_REGMAP_OPT_ENH_CANCEL_ACK) : 0u) |       \
-     (RCP_CLI_HAS_COMPOUND_BUNDLES_API                                                       \
-          ? (RCP_REGMAP_OPT_COMPOUND_HEADER | RCP_REGMAP_OPT_COMPOUND_SEGMENT) : 0u))
+    ((RCP_CLI_HAS_TIME_SYNC_API        ? RCP_REGMAP_OPT_TIME_SYNC     : 0u) |                \
+     (RCP_CLI_HAS_ENHANCED_CANCEL_API  ? RCP_REGMAP_OPT_ENH_CANCEL    : 0u) |                \
+     (RCP_CLI_HAS_TRIGGER_API          ? RCP_REGMAP_OPT_TRIGGER       : 0u) |                \
+     (RCP_CLI_HAS_CHAINED_API          ? RCP_REGMAP_OPT_CHAINED       : 0u) |                \
+     (RCP_CLI_HAS_COMPOUND_BUNDLES_API ? RCP_REGMAP_OPT_COMPOUND_WAIT : 0u))
 
-/* Renders options' implemented feature-bundle groups as a JSON array of
- * strings into buf (e.g. "[\"time_sync\",\"enhanced_cancel\"]"). A group is
- * listed iff every bit belonging to it is set in options; per
- * rcp_regmap_options_group_consistent()'s own all-or-nothing invariant, a
- * caller-supplied options value would never set only some of a group's
- * bits, but this function checks the full group mask regardless, rather
- * than trusting that invariant silently. */
-static void features_json(uint32_t options, char *buf, size_t buf_len)
+/* Renders options' implemented feature bits as a JSON array of strings
+ * into buf (e.g. "[\"time_sync\",\"enhanced_cancel\"]"). A feature is
+ * listed iff its own single bit is set in options -- REQ-RMAP-030's
+ * five bits are independent, with no pairing/grouping invariant to
+ * trust or re-check (unlike this function's own former design, back
+ * when the now-removed rcp_regmap_options_group_consistent() enforced
+ * one). */
+static void features_json(uint8_t options, char *buf, size_t buf_len)
 {
     typedef struct {
         const char *name;
-        uint32_t    group;
-    } feature_group_t;
-    static const feature_group_t GROUPS[] = {
-        {"time_sync",        RCP_REGMAP_OPT_TIME_SYNC_TSCF | RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION},
-        {"enhanced_cancel",  RCP_REGMAP_OPT_ENH_CANCEL_REQUEST | RCP_REGMAP_OPT_ENH_CANCEL_ACK},
-        {"compound_bundles", RCP_REGMAP_OPT_COMPOUND_HEADER | RCP_REGMAP_OPT_COMPOUND_SEGMENT},
+        uint8_t     bit;
+    } feature_bit_t;
+    static const feature_bit_t FEATURES[] = {
+        {"time_sync",        RCP_REGMAP_OPT_TIME_SYNC},
+        {"enhanced_cancel",  RCP_REGMAP_OPT_ENH_CANCEL},
+        {"trigger",          RCP_REGMAP_OPT_TRIGGER},
+        {"chained",          RCP_REGMAP_OPT_CHAINED},
+        {"compound_bundles", RCP_REGMAP_OPT_COMPOUND_WAIT},
     };
     size_t i;
     size_t off = 0;
@@ -148,9 +158,9 @@ static void features_json(uint32_t options, char *buf, size_t buf_len)
     if (n < 0 || (size_t)n >= buf_len - off) return;
     off += (size_t)n;
 
-    for (i = 0; i < sizeof(GROUPS) / sizeof(GROUPS[0]); i++) {
-        if ((options & GROUPS[i].group) != GROUPS[i].group) continue;
-        n = snprintf(buf + off, buf_len - off, "%s\"%s\"", first ? "" : ",", GROUPS[i].name);
+    for (i = 0; i < sizeof(FEATURES) / sizeof(FEATURES[0]); i++) {
+        if ((options & FEATURES[i].bit) == 0) continue;
+        n = snprintf(buf + off, buf_len - off, "%s\"%s\"", first ? "" : ",", FEATURES[i].name);
         if (n < 0 || (size_t)n >= buf_len - off) return; /* truncated: leave buf as-is (invalid JSON,
                                                               but never an out-of-bounds write) */
         off += (size_t)n;
@@ -164,7 +174,7 @@ static void capabilities_json(char *buf, size_t buf_len)
 {
     char features[128];
 
-    features_json((uint32_t)RCP_CLI_IMPLEMENTED_OPTIONS, features, sizeof(features));
+    features_json((uint8_t)RCP_CLI_IMPLEMENTED_OPTIONS, features, sizeof(features));
 
     /* "transports" (c-RCP-05): "tls" dropped -- tls.h/tls.c were
      * DEPRECATE-removed outright at v0.78.0 (CHANGELOG.md's Deprecation &

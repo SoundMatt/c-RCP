@@ -225,27 +225,35 @@ typedef struct {
     uint16_t capacity;
 } rcp_regmap_table_ref_t;
 
-/* ── svr_implemented_options: three all-or-nothing feature groups ─────────── */
+/* ── svr_implemented_options: five independent single bits (REQ-RMAP-030) ─── */
 
-/* Time-sync group (TSCF framing plus its presentation-timestamp
- * companion). This module's own bit assignment -- see the file header. */
-#define RCP_REGMAP_OPT_TIME_SYNC_TSCF         ((uint32_t)1u << 0)
-#define RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION ((uint32_t)1u << 1)
-
-/* Enhanced-cancel group (a cancellation request plus its acknowledgement). */
-#define RCP_REGMAP_OPT_ENH_CANCEL_REQUEST ((uint32_t)1u << 2)
-#define RCP_REGMAP_OPT_ENH_CANCEL_ACK     ((uint32_t)1u << 3)
-
-/* Compound-bundles group (a bundle header plus per-segment addressing). */
-#define RCP_REGMAP_OPT_COMPOUND_HEADER  ((uint32_t)1u << 4)
-#define RCP_REGMAP_OPT_COMPOUND_SEGMENT ((uint32_t)1u << 5)
-
-/* True iff, for each of the three groups above, the bits belonging to
- * that group are either all set or all clear in options -- i.e. no group
- * is ever partially implemented. Bits outside all three groups are
- * ignored (forward-compatible with options this milestone does not yet
- * define). */
-bool rcp_regmap_options_group_consistent(uint32_t options);
+/* REQ-RMAP-030 (TC18 §12.7.5 Table 18, relative address 0x0016, 8 bit,
+ * R): five independent bits, one per optional feature, "abcdefgh" with
+ * bits f/g/h reserved -- verified directly against the primary-source
+ * PDF (Table 18, page 51 of OA_TC18_specification_v_0.5.1_RC.pdf):
+ *   a: compound & wait requests
+ *   b: trigger requests
+ *   c: chained requests
+ *   d: time synch and timed requests
+ *   e: enhanced request cancellation
+ * This replaces a prior design (REQ-RMAP-004..008, now retired -- see
+ * their own .fusa-reqs.json entries) that grouped six bits of this
+ * project's own invention into three all-or-nothing PAIRS, enforced by
+ * a now-removed rcp_regmap_options_group_consistent() function, citing
+ * §12.9.1.1 as justification. Primary-source verification (this
+ * milestone) found that citation incorrect: §12.9.1.1 ("Handling
+ * multiple requests in incoming messages") is entirely about an RC
+ * Server processing several ACF-type requests packed into one AVTPDU
+ * frame -- it says nothing about svr_implemented_options, feature
+ * advertisement, or any pairing rule at all. The prior design also had
+ * no bit at all for trigger or chained requests, even though this
+ * codebase implements both (request_triggered.c, request_chained.c) --
+ * REQ-RMAP-030's own named consequence. */
+#define RCP_REGMAP_OPT_COMPOUND_WAIT ((uint8_t)1u << 0) /* a */
+#define RCP_REGMAP_OPT_TRIGGER       ((uint8_t)1u << 1) /* b */
+#define RCP_REGMAP_OPT_CHAINED       ((uint8_t)1u << 2) /* c */
+#define RCP_REGMAP_OPT_TIME_SYNC     ((uint8_t)1u << 3) /* d */
+#define RCP_REGMAP_OPT_ENH_CANCEL    ((uint8_t)1u << 4) /* e */
 
 /* ── The general register map ──────────────────────────────────────────────── */
 
@@ -383,8 +391,12 @@ typedef struct {
                                    maximum memory for EP request queues,
                                    in 32-bit words. Same scope as
                                    svr_responder_mem_size above. */
-    uint32_t svr_implemented_options; /* RCP_REGMAP_OPT_* bitmask; see
-                                          rcp_regmap_options_group_consistent() */
+    uint8_t  svr_implemented_options; /* REQ-RMAP-030: RCP_REGMAP_OPT_*
+                                          bitmask, 8 bit on the wire --
+                                          see this field's own dedicated
+                                          section above for the full
+                                          primary-source-verified bit
+                                          layout and history. */
     uint16_t svr_root_client_index;   /* RCP_REGMAP_NO_ROOT_CLIENT if unset */
 
     rcp_regmap_table_ref_t hw_pin_map;

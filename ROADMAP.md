@@ -9896,3 +9896,128 @@ remaining (unchanged -- narrowed from `not-implemented` to `partial`).
 continue Group 1 in table order -- `REQ-RMAP-030` (`svr_implemented_options`,
 0x0016, invented 32-bit layout, cannot advertise trigger/other groups
 TC18's own bit assignment defines).
+
+### 183. Phase 5d batch 13: `REQ-RMAP-030` -- `svr_implemented_options` fixed to Table 18's real 8-bit, five-independent-bit layout; `REQ-RMAP-004..008` retired (issue #200)
+
+The largest and most invasive Group 1 batch to date, and the first to
+turn up a genuine conflict between two sets of already-closed,
+TC18-cited requirements rather than a straightforward implement-the-
+gap fix. `-030`'s own analysis (Table 18, `svr_implemented_options` is
+an 8-bit register, one independent bit per feature: a=compound&wait,
+b=trigger, c=chained, d=time synch/timed, e=enhanced cancellation)
+directly contradicted the design `REQ-RMAP-004` through `008`
+described and had already closed: a 32-bit field carrying six bits of
+this project's own invention, grouped into three all-or-nothing PAIRS
+and enforced by `rcp_regmap_options_group_consistent()`, citing
+§12.9.1.1 as its basis. Both readings could not be correct
+simultaneously, and self-verification couldn't resolve it (TC18.txt
+was unavailable this session; only line-range citations, not section
+content, were on hand for the older requirements). Surfaced to the
+user rather than guessed; the user chose to pause and verify against
+the actual specification text rather than let either side win by
+default.
+
+That verification located a primary source neither this session nor
+its predecessor had found: `OA_TC18_specification_v_0.5.1_RC.pdf`
+(117 pages, the actual TC18 specification -- prior searches had only
+ever checked for `.txt` files). Reading it directly:
+
+- **Table 18 (pages 51-53)** confirms `-030`'s reading exactly: 8-bit
+  register at 0x0016, "abcdefgh" with f/g/h reserved, a/b/c/d/e as
+  above, no pairing concept anywhere. It also re-confirms, independent
+  of this citation dispute, that every prior Group 1 batch's own field
+  widths and addresses (`svr_req_stream_max` through
+  `svr_configuration_lock`) were already correct.
+- **§12.9.1.1 (page 64)**, `REQ-RMAP-004..008`'s shared citation, is
+  titled "Handling multiple requests in incoming messages" and is
+  entirely about an RC Server processing several ACF-type requests
+  packed into one AVTPDU frame (multicast reception, byte_bus_id/
+  stream_id matching, TSCF/NTSCF header rules). It says nothing about
+  `svr_implemented_options`, feature advertisement, or any bit-pairing
+  rule. The exact phrase these five requirements quote ("Optional
+  support of compound requests comes as bundle of...") does not appear
+  anywhere in this section.
+
+Conclusion: `REQ-RMAP-004..008`'s citation is a genuine misattribution,
+not a stale-but-valid alternate reading. The pairing rule they describe
+has no TC18 basis and was retired outright, not preserved behind a
+compatibility shim.
+
+**Production changes.** `rcp_regmap_general_t.svr_implemented_options`
+retyped `uint32_t` -> `uint8_t`; the six invented, paired
+`RCP_REGMAP_OPT_*` constants replaced by five independent single-bit
+constants (`_COMPOUND_WAIT`/`_TRIGGER`/`_CHAINED`/`_TIME_SYNC`/
+`_ENH_CANCEL` at 0x01/0x02/0x04/0x08/0x10) matching Table 18's bit
+order exactly. `rcp_regmap_options_group_consistent()` removed
+outright (no replacement -- there is no pairing rule left to enforce).
+All three real consumers updated to match: `rcp_timed_feature_enabled()`
+(`request_timed.h`/`.c`) now takes `uint8_t` and checks the single
+`RCP_REGMAP_OPT_TIME_SYNC` bit; the CLI's `capabilities_json()`
+"features" array (`cli.c`) gained `RCP_CLI_HAS_TRIGGER_API`/
+`_CHAINED_API` alongside its existing time-sync/enhanced-cancel/
+compound flags, closing a real, previously-unadvertised capability gap
+-- c-RCP has always implemented both trigger requests
+(`request_triggered.c`) and chained requests (`request_chained.c`) in
+full, but had no bit, and so no "features" entry, to say so; the config
+manifest parser (`config.c`) gained "trigger"/"chained" names in its
+`OPTION_BIT_NAMES` table, and `rcp_config_server_t.svr_implemented_
+options` (`config.h`) retyped to match.
+
+**Test changes.** `test_regmap.c`'s four `rcp_regmap_options_group_
+consistent()` accept/reject tests removed, replaced by one test proving
+every bit is independently settable (no pairing). `test_tc18_gaps_
+regmap.c`'s deviation pin rewritten from a negative claim ("layout is
+invented") to a positive one ("now matches Table 18 exactly"), same
+function renamed to match. `test_request_timed.c` simplified to
+single-bit checks. `test_config.c` gained a dedicated test proving the
+parser accepts "trigger"/"chained". `test_cli.c` gained a genuinely new
+test, `test_capabilities_features_lists_all_five_table_18_names()` --
+no prior test in that file inspected the "features" array's content at
+all, so this closes a real, pre-existing test-coverage gap on top of
+the fix it verifies.
+
+**`.fusa-reqs.json`.** `REQ-RMAP-030` stays `partial`/`tc18-gap` (0x0016
+is still past the discovery slice's 0x000D wire-reachability ceiling,
+`REQ-RMAP-024`, still open) with fully rewritten text describing the
+fix and both primary-source findings. `REQ-RMAP-004` through `008` each
+gain a new `"retired"` status/scope pair (no precedent existed in this
+catalog for "citation found incorrect, requirement itself retired";
+`cfusa check` was empirically confirmed to tolerate an arbitrary status/
+scope string with 0 new errors before committing to this value) and
+fully rewritten text explaining the primary-source finding that
+invalidated their shared citation. Titles prefixed `RETIRED --` for
+visibility. None of the five needed re-tagging in code: their
+`//cfusa:req`/`//cfusa:test` tags already exist at file level in
+`regmap.h`/`regmap.c`/`test_regmap.c` and now anchor the retirement
+text instead of the removed function.
+
+Mutation-tested five ways, matching the batch's real risk (first Group
+1 item with production consumers across *four* separate `src/*.c`
+files, not just one): (1) inverted `rcp_timed_feature_enabled()`'s bit
+check -- caught by `test_request_timed`; (2) zeroed
+`RCP_CLI_HAS_TRIGGER_API` -- caught by the new
+`test_cli` capabilities-features test; (3) swapped `config.c`'s
+"trigger" name to the wrong bit -- caught by `test_config`; (4) full
+revert of all seven touched production files with every touched test
+file's changes kept -- breaks the build across `test_regmap.c`,
+`test_request_timed.c`, `test_config.c`, and `test_tc18_gaps_regmap.c`
+(undeclared `RCP_REGMAP_OPT_*` identifiers), confirming every one of
+those test files now depends on the real fix, not just on updated
+expectations. All four mutations restored clean, diff-verified
+byte-identical against pre-mutation backups. Full suite (65/65 ctest
+suites; net -1 individual test case across all touched files --
+`test_regmap.c` -3 [4 removed, 1 added], `test_config.c` +1,
+`test_cli.c` +1, `test_request_timed.c`/`test_tc18_gaps_regmap.c`
+unchanged [renamed in place]) + ASan/UBSan clean. Fresh `cfusa check`
+(0 errors) + all three separate `cfusa trace` invocations (100% req-
+coverage, 100% sec-tested, 0 untested). 1030 requirements (unchanged
+count -- five moved from `tc18`/implemented to a new `retired` scope/
+status, none added or removed), 110 `tc18-gap` entries remaining
+(unchanged -- `REQ-RMAP-004..008` were previously closed/`tc18`, not
+`tc18-gap`, so retiring them doesn't move this count; `REQ-RMAP-030`
+itself is still `tc18-gap`, narrowed text only).
+
+**Phase 5d progress after batch 13**: 14/47 items addressed (15
+counting `REQ-RMAP-061`'s own partial progress). Group 1: 7/18 items.
+Next: continue Group 1 in table order -- `REQ-RMAP-031` (reserved
+octet at 0x0017).

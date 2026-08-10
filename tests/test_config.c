@@ -54,22 +54,46 @@ static void test_parse_server_fields(void)
     rcp_config_manifest_free(&m);
 }
 
+/* REQ-RMAP-030: five independent single bits, no pairing -- "time_sync"
+ * and "compound_bundles" each set exactly their own one bit now,
+ * matching TC18 Table 18 exactly (formerly two paired bits each, an
+ * invented design REQ-RMAP-004..008 described and this milestone
+ * retired -- see test_regmap.c's own retirement note). */
 static void test_parse_server_implemented_options(void)
 {
     const char *json =
         "{ \"server\": { \"svr_implemented_options\": [\"time_sync\", \"compound_bundles\"] } }";
     rcp_config_manifest_t m;
-    uint32_t opts;
+    uint8_t opts;
 
     TEST_ASSERT_EQUAL(RCP_OK, rcp_config_parse_json(json, &m, NULL, 0));
     opts = m.server.svr_implemented_options;
 
-    TEST_ASSERT_TRUE((opts & RCP_REGMAP_OPT_TIME_SYNC_TSCF) != 0);
-    TEST_ASSERT_TRUE((opts & RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION) != 0);
-    TEST_ASSERT_TRUE((opts & RCP_REGMAP_OPT_COMPOUND_HEADER) != 0);
-    TEST_ASSERT_TRUE((opts & RCP_REGMAP_OPT_COMPOUND_SEGMENT) != 0);
-    TEST_ASSERT_FALSE((opts & RCP_REGMAP_OPT_ENH_CANCEL_REQUEST) != 0);
-    TEST_ASSERT_TRUE(rcp_regmap_options_group_consistent(opts));
+    TEST_ASSERT_TRUE((opts & RCP_REGMAP_OPT_TIME_SYNC) != 0);
+    TEST_ASSERT_TRUE((opts & RCP_REGMAP_OPT_COMPOUND_WAIT) != 0);
+    TEST_ASSERT_FALSE((opts & RCP_REGMAP_OPT_ENH_CANCEL) != 0);
+    TEST_ASSERT_FALSE((opts & RCP_REGMAP_OPT_TRIGGER) != 0);
+    TEST_ASSERT_FALSE((opts & RCP_REGMAP_OPT_CHAINED) != 0);
+    TEST_ASSERT_EQUAL_HEX8((uint8_t)(RCP_REGMAP_OPT_TIME_SYNC | RCP_REGMAP_OPT_COMPOUND_WAIT), opts);
+
+    rcp_config_manifest_free(&m);
+}
+
+/* REQ-RMAP-030: "trigger" and "chained" are new, previously-unparseable
+ * names -- proves the parser now accepts both. */
+static void test_parse_server_implemented_options_trigger_and_chained(void)
+{
+    const char *json =
+        "{ \"server\": { \"svr_implemented_options\": [\"trigger\", \"chained\"] } }";
+    rcp_config_manifest_t m;
+    uint8_t opts;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_config_parse_json(json, &m, NULL, 0));
+    opts = m.server.svr_implemented_options;
+
+    TEST_ASSERT_TRUE((opts & RCP_REGMAP_OPT_TRIGGER) != 0);
+    TEST_ASSERT_TRUE((opts & RCP_REGMAP_OPT_CHAINED) != 0);
+    TEST_ASSERT_EQUAL_HEX8((uint8_t)(RCP_REGMAP_OPT_TRIGGER | RCP_REGMAP_OPT_CHAINED), opts);
 
     rcp_config_manifest_free(&m);
 }
@@ -301,6 +325,7 @@ int main(void)
     RUN_TEST(test_parse_empty_object_succeeds);
     RUN_TEST(test_parse_server_fields);
     RUN_TEST(test_parse_server_implemented_options);
+    RUN_TEST(test_parse_server_implemented_options_trigger_and_chained);
 
     RUN_TEST(test_manifest_free_zeroes_the_struct_and_tolerates_double_free);
     RUN_TEST(test_parse_hw_pin_map_entries);

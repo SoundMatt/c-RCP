@@ -2588,53 +2588,58 @@
     },
     {
       "id": "REQ-RMAP-004",
-      "title": "svr_implemented_options bit assignments are pairwise distinct",
-      "text": "The six RCP_REGMAP_OPT_* bitmask constants (time-sync, enhanced-cancel, and compound-bundles groups) shall each occupy a distinct bit position.",
+      "title": "RETIRED -- svr_implemented_options bit assignments are pairwise distinct (citation found incorrect, see REQ-RMAP-030)",
+      "text": "RETIRED as of REQ-RMAP-030's primary-source verification milestone. This requirement's own shared citation (§12.9.1.1, TC18.txt L2033-2036, quoting \"Optional support of compound requests comes as bundle of...\") was checked directly against the primary-source PDF (OA_TC18_specification_v_0.5.1_RC.pdf, §12.9.1.1, page 64, \"Handling multiple requests in incoming messages\") and found to be a genuine misattribution: that section is entirely about an RC Server processing multiple ACF-type requests packed into one AVTPDU frame (multicast reception, byte_bus_id/stream_id matching, TSCF/NTSCF header rules) -- it says nothing about svr_implemented_options, feature advertisement, or any bit-pairing rule at all. The six-bit, three-forced-pair grouping this requirement (and its four siblings, REQ-RMAP-005..008) described, and the rcp_regmap_options_group_consistent() function (src/regmap.c) that enforced it, had no TC18 basis and have been removed outright (not deprecated-then-removed; there was no correct behavior to preserve a transition window for). This requirement's own specific claim (\"the six RCP_REGMAP_OPT_* bitmask constants shall each occupy a distinct bit position\") described an invented layout that no longer exists. The correct behavior -- five independent bits, matching TC18 §12.7.5 Table 18 exactly -- is now REQ-RMAP-030's own responsibility; see that entry.",
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A",
-      "scope": "tc18",
-      "tc18": "§12.9.1.1 (\"Optional support of compound requests comes as bundle of...\"), TC18.txt L2033-2036"
+      "scope": "retired",
+      "status": "retired",
+      "tc18": "§12.9.1.1 (citation found incorrect -- see text), TC18.txt L2033-2036"
     },
     {
       "id": "REQ-RMAP-005",
-      "title": "rcp_regmap_options_group_consistent() accepts an all-clear options value",
-      "text": "rcp_regmap_options_group_consistent() shall return true when options is 0.",
+      "title": "RETIRED -- rcp_regmap_options_group_consistent() accepts an all-clear options value (citation found incorrect, see REQ-RMAP-030)",
+      "text": "RETIRED as of REQ-RMAP-030's primary-source verification milestone. This requirement's own shared citation (§12.9.1.1, TC18.txt L2033-2036, quoting \"Optional support of compound requests comes as bundle of...\") was checked directly against the primary-source PDF (OA_TC18_specification_v_0.5.1_RC.pdf, §12.9.1.1, page 64, \"Handling multiple requests in incoming messages\") and found to be a genuine misattribution: that section is entirely about an RC Server processing multiple ACF-type requests packed into one AVTPDU frame (multicast reception, byte_bus_id/stream_id matching, TSCF/NTSCF header rules) -- it says nothing about svr_implemented_options, feature advertisement, or any bit-pairing rule at all. The six-bit, three-forced-pair grouping this requirement's sibling REQ-RMAP-004 described, and the rcp_regmap_options_group_consistent() function (src/regmap.c) that enforced it, had no TC18 basis and have been removed outright (not deprecated-then-removed; there was no correct behavior to preserve a transition window for). This requirement's own specific claim (\"rcp_regmap_options_group_consistent() shall return true when options is 0\") pinned one accept-case of a function that has now been deleted outright -- there is no pairing rule left to be consistent or inconsistent with. See REQ-RMAP-030 for the correct, primary-source-verified replacement design.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18",
-      "tc18": "§12.9.1.1 (\"Optional support of compound requests comes as bundle of...\"), TC18.txt L2033-2036"
+      "scope": "retired",
+      "status": "retired",
+      "tc18": "§12.9.1.1 (citation found incorrect -- see text), TC18.txt L2033-2036"
     },
     {
       "id": "REQ-RMAP-006",
-      "title": "rcp_regmap_options_group_consistent() accepts a fully-set feature group",
-      "text": "rcp_regmap_options_group_consistent() shall return true when options has every bit of one or more of the time-sync, enhanced-cancel, or compound-bundles groups set together.",
+      "title": "RETIRED -- rcp_regmap_options_group_consistent() accepts a fully-set feature group (citation found incorrect, see REQ-RMAP-030)",
+      "text": "RETIRED as of REQ-RMAP-030's primary-source verification milestone. This requirement's own shared citation (§12.9.1.1, TC18.txt L2033-2036, quoting \"Optional support of compound requests comes as bundle of...\") was checked directly against the primary-source PDF (OA_TC18_specification_v_0.5.1_RC.pdf, §12.9.1.1, page 64, \"Handling multiple requests in incoming messages\") and found to be a genuine misattribution: that section is entirely about an RC Server processing multiple ACF-type requests packed into one AVTPDU frame (multicast reception, byte_bus_id/stream_id matching, TSCF/NTSCF header rules) -- it says nothing about svr_implemented_options, feature advertisement, or any bit-pairing rule at all. The six-bit, three-forced-pair grouping this requirement's sibling REQ-RMAP-004 described, and the rcp_regmap_options_group_consistent() function (src/regmap.c) that enforced it, had no TC18 basis and have been removed outright (not deprecated-then-removed; there was no correct behavior to preserve a transition window for). This requirement's own specific claim (\"rcp_regmap_options_group_consistent() shall return true when options has every bit of one or more of the time-sync, enhanced-cancel, or compound-bundles groups set together\") pinned another accept-case of a function that has now been deleted outright, describing groups that themselves had no TC18 basis. See REQ-RMAP-030 for the correct, primary-source-verified replacement design.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18",
-      "tc18": "§12.9.1.1 (\"Optional support of compound requests comes as bundle of...\"), TC18.txt L2033-2036"
+      "scope": "retired",
+      "status": "retired",
+      "tc18": "§12.9.1.1 (citation found incorrect -- see text), TC18.txt L2033-2036"
     },
     {
       "id": "REQ-RMAP-007",
-      "title": "rcp_regmap_options_group_consistent() rejects a partially-set feature group",
-      "text": "rcp_regmap_options_group_consistent() shall return false when options has exactly one bit of any of the three feature groups set without that group's other bit.",
+      "title": "RETIRED -- rcp_regmap_options_group_consistent() rejects a partially-set feature group (citation found incorrect, see REQ-RMAP-030)",
+      "text": "RETIRED as of REQ-RMAP-030's primary-source verification milestone. This requirement's own shared citation (§12.9.1.1, TC18.txt L2033-2036, quoting \"Optional support of compound requests comes as bundle of...\") was checked directly against the primary-source PDF (OA_TC18_specification_v_0.5.1_RC.pdf, §12.9.1.1, page 64, \"Handling multiple requests in incoming messages\") and found to be a genuine misattribution: that section is entirely about an RC Server processing multiple ACF-type requests packed into one AVTPDU frame (multicast reception, byte_bus_id/stream_id matching, TSCF/NTSCF header rules) -- it says nothing about svr_implemented_options, feature advertisement, or any bit-pairing rule at all. The six-bit, three-forced-pair grouping this requirement's sibling REQ-RMAP-004 described, and the rcp_regmap_options_group_consistent() function (src/regmap.c) that enforced it, had no TC18 basis and have been removed outright (not deprecated-then-removed; there was no correct behavior to preserve a transition window for). This requirement's own specific claim (\"rcp_regmap_options_group_consistent() shall return false when options has exactly one bit of any of the three feature groups set without that group's other bit\") pinned the reject-case that most directly embodied the invented pairing rule -- a rule TC18 does not have. See REQ-RMAP-030 for the correct, primary-source-verified replacement design, under which every bit is independently settable.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18",
-      "tc18": "§12.9.1.1 (\"Optional support of compound requests comes as bundle of...\" -- a group's members are honestly claimed only together, not individually), TC18.txt L2033-2036"
+      "scope": "retired",
+      "status": "retired",
+      "tc18": "§12.9.1.1 (citation found incorrect -- see text), TC18.txt L2033-2036"
     },
     {
       "id": "REQ-RMAP-008",
-      "title": "rcp_regmap_options_group_consistent() accepts multiple independently-complete groups",
-      "text": "rcp_regmap_options_group_consistent() shall return true when options has two or more of the three feature groups fully set at once.",
+      "title": "RETIRED -- rcp_regmap_options_group_consistent() accepts multiple independently-complete groups (citation found incorrect, see REQ-RMAP-030)",
+      "text": "RETIRED as of REQ-RMAP-030's primary-source verification milestone. This requirement's own shared citation (§12.9.1.1, TC18.txt L2033-2036, quoting \"Optional support of compound requests comes as bundle of...\") was checked directly against the primary-source PDF (OA_TC18_specification_v_0.5.1_RC.pdf, §12.9.1.1, page 64, \"Handling multiple requests in incoming messages\") and found to be a genuine misattribution: that section is entirely about an RC Server processing multiple ACF-type requests packed into one AVTPDU frame (multicast reception, byte_bus_id/stream_id matching, TSCF/NTSCF header rules) -- it says nothing about svr_implemented_options, feature advertisement, or any bit-pairing rule at all. The six-bit, three-forced-pair grouping this requirement's sibling REQ-RMAP-004 described, and the rcp_regmap_options_group_consistent() function (src/regmap.c) that enforced it, had no TC18 basis and have been removed outright (not deprecated-then-removed; there was no correct behavior to preserve a transition window for). This requirement's own specific claim (\"rcp_regmap_options_group_consistent() shall return true when options has two or more of the three feature groups fully set at once\") pinned a multi-group accept-case of a function that has now been deleted outright. See REQ-RMAP-030 for the correct, primary-source-verified replacement design.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18",
-      "tc18": "§12.9.1.1 (\"Optional support of compound requests comes as bundle of...\" -- a group's members are honestly claimed only together, not individually), TC18.txt L2033-2036"
+      "scope": "retired",
+      "status": "retired",
+      "tc18": "§12.9.1.1 (citation found incorrect -- see text), TC18.txt L2033-2036"
     },
     {
       "id": "REQ-RMAP-009",
@@ -8869,14 +8874,14 @@
     },
     {
       "id": "REQ-RMAP-030",
-      "title": "svr_implemented_options (0x0016) uses an invented 32-bit layout and cannot advertise trigger or chained requests",
-      "text": "NOT IMPLEMENTED (partial, and non-conforming): TC18 \u00a712.7.5 Table 18 defines svr_implemented_options as an 8-bit read-only register at absolute address 0x0016 with one bit per optional feature: a = compound & wait requests, b = trigger requests, c = chained requests, d = time synch and timed requests, e = enhanced request cancellation. c-RCP instead declares rcp_regmap_general_t.svr_implemented_options as a 32-bit field (include/rcp/regmap.h:211) carrying six bits of this project's own invention, grouped into three all-or-nothing PAIRS (RCP_REGMAP_OPT_TIME_SYNC_TSCF/_PRESENTATION, _ENH_CANCEL_REQUEST/_ACK, _COMPOUND_HEADER/_SEGMENT, include/rcp/regmap.h:179-188) that correspond to no spec bit position. No bit exists for trigger requests (spec bit b) or chained requests (spec bit c), even though c-RCP implements both request types (src/request_triggered.c, src/request_chained.c). Consequences: (1) the register is unreadable/uninterpretable by a conforming RC Client, since the bit positions and the field width are both wrong; (2) a c-RCP server cannot advertise trigger or chained request support at all, so a conforming client must assume it has neither; (3) rcp_regmap_options_group_consistent() (src/regmap.c:20) enforces a pairing rule the specification does not have.",
+      "title": "svr_implemented_options (0x0016) is now 8-bit, five independent bits, matching Table 18 exactly (formerly an invented 32-bit, six-bit, three-pair design)",
+      "text": "PARTIAL: TC18 \u00a712.7.5 Table 18 defines svr_implemented_options as an 8-bit read-only register at absolute address 0x0016 with one independent bit per optional feature: a = compound & wait requests, b = trigger requests, c = chained requests, d = time synch and timed requests, e = enhanced request cancellation (bits f/g/h reserved). rcp_regmap_general_t now declares this field at its correct 8-bit width, with RCP_REGMAP_OPT_COMPOUND_WAIT/_TRIGGER/_CHAINED/_TIME_SYNC/_ENH_CANCEL (include/rcp/regmap.h) at bit values 0x01/0x02/0x04/0x08/0x10 -- five independent bits, verified directly against the primary-source PDF (OA_TC18_specification_v_0.5.1_RC.pdf, Table 18, page 51). This replaces a prior 32-bit field carrying six bits of this project's own invention, grouped into three all-or-nothing pairs and enforced by rcp_regmap_options_group_consistent() (both removed outright; see REQ-RMAP-004..008's own retirement text for the primary-source finding that invalidated their shared citation). This also closes a real, previously-unadvertised capability gap: c-RCP has always implemented both trigger requests (src/request_triggered.c) and chained requests (src/request_chained.c) in full, but the prior design had no bit for either -- a conforming client had no way to learn c-RCP supports them. All three real consumers now use the new bits: rcp_timed_feature_enabled() (src/request_timed.c, checks RCP_REGMAP_OPT_TIME_SYNC), the CLI's capabilities_json() \"features\" array (src/cli.c, RCP_CLI_IMPLEMENTED_OPTIONS macro), and the config manifest parser's \"svr_implemented_options\" array (src/config.c, OPTION_BIT_NAMES table, now including \"trigger\"/\"chained\" names). What remains open: this address (0x0016) falls past the discovery response's own 0x000D wire-reachability ceiling (REQ-RMAP-024, still open), so a client still cannot read this register over the wire; only in-process consumers see the correct value.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "\u00a712.7.5 Table 18, TC18.txt L2554-2560"
+      "tc18": "\u00a712.7.5 Table 18, TC18.txt L2554-2560 -- primary-source-verified against OA_TC18_specification_v_0.5.1_RC.pdf Table 18, page 51, and \u00a712.9.1.1, page 64 (this milestone)"
     },
     {
       "id": "REQ-RMAP-031",

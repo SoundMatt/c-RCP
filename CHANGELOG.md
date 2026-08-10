@@ -29,8 +29,59 @@ the rationale.
 | `sim.h`/`sim.c` (zone-controller simulator) | v0.91.0 | None in this repo; SiL/HIL simulation against the TC18 RC Server/Endpoint model can be built on `mock.h`/`mock.c` instead | v0.91.0 |
 | `rcp.h`/`rcp.c`'s pre-TC18 object model (`rcp_zone_t`, `rcp_command_t`, `rcp_response_t`, `rcp_status_t`, `rcp_controller_t`, `rcp_registry_t`) | v0.91.0 | The TC18 register-map/lifecycle/endpoint core (`regmap.h`, `lifecycle.h`, `ep_*.h`) | v0.91.0 |
 | `ep_lin.h`/`ep_lin.c`'s `rcp_ep_lin_compare_mode_t`/`rcp_ep_lin_compare_fires()` (an invented eight-value evt[2:0] comparison scheme, self-admittedly not spec-derived) | v0.112.0 | `rcp_acf_evt_row2_is_plain()` validation + `rcp_ep_lin_response_matches()` (delegates to acf.h's shared TC18 §13.5.1 exact-match primitive) | v0.112.0 |
+| `regmap.h`/`regmap.c`'s `rcp_regmap_options_group_consistent()` and its six paired `RCP_REGMAP_OPT_*` constants (an invented all-or-nothing-pair grouping for `svr_implemented_options`, citing a section that, on primary-source verification, does not describe it) | v0.183.0 | Five independent single-bit `RCP_REGMAP_OPT_*` constants matching TC18 §12.7.5 Table 18 exactly | v0.183.0 |
 
 ## Releases
+
+### v0.183.0 -- 2026-08-10
+
+**Phase 5d batch 13: `REQ-RMAP-030` -- `svr_implemented_options`
+fixed to Table 18's real 8-bit, five-independent-bit layout;
+`REQ-RMAP-004..008` retired.** Issue #200. `-030`'s own analysis
+(Table 18: 8-bit register, one independent bit per feature) directly
+contradicted the already-closed `REQ-RMAP-004..008`'s 32-bit,
+six-bit, three-forced-pair design (enforced by
+`rcp_regmap_options_group_consistent()`, citing §12.9.1.1). Neither
+side could self-verify (TC18.txt was unavailable this session);
+surfaced to the user, who chose to pause and verify against the
+actual specification rather than let either side win by default.
+That verification located a primary source neither this session nor
+its predecessor had found -- `OA_TC18_specification_v_0.5.1_RC.pdf`,
+the real 117-page TC18 spec (prior searches only ever checked for
+`.txt` files). Reading it directly: Table 18 (pages 51-53) confirms
+`-030`'s reading exactly -- 8-bit register, "abcdefgh" with f/g/h
+reserved, no pairing concept; §12.9.1.1 (page 64), `-004..008`'s
+shared citation, is titled "Handling multiple requests in incoming
+messages" and is entirely about an RC Server processing several
+ACF-type requests packed into one AVTPDU frame -- it says nothing
+about `svr_implemented_options`, feature advertisement, or any
+bit-pairing rule; the exact phrase these five requirements quote does
+not appear anywhere in the section. `REQ-RMAP-004..008`'s citation is
+a genuine misattribution, retired outright (new `"retired"` status/
+scope, empirically confirmed tolerated by `cfusa check` before
+committing to the value).
+
+`rcp_regmap_general_t.svr_implemented_options` retyped `uint32_t` ->
+`uint8_t`; five independent single-bit constants replace the six
+invented, paired ones; `rcp_regmap_options_group_consistent()` removed
+outright. All three real consumers updated:
+`rcp_timed_feature_enabled()` (single-bit check),
+`cli.c`'s `capabilities_json()` "features" array (gained
+"trigger"/"chained", closing a real, previously-unadvertised
+capability gap -- c-RCP has always implemented both request types in
+full but had no bit to advertise either), and `config.c`'s manifest
+parser (gained matching names). `test_cli.c` gained a genuinely new
+test inspecting "features" content -- no prior test in that file did.
+`REQ-RMAP-030` stays `partial`/`tc18-gap` (0x0016 is still past the
+0x000D wire-reachability ceiling, `REQ-RMAP-024`, still open) with
+fully rewritten text. Mutation-tested five ways (three isolated-logic,
+one full seven-file production revert with all four touched test
+files' changes kept -- breaks the build, confirming real dependency).
+Full suite (65/65 ctest suites, net -1 individual test case) + ASan/
+UBSan clean. Fresh `cfusa check`/`trace` (0 errors, 100%/100%, three
+separate CI-matching invocations). See `ROADMAP.md` milestone 183 for
+full detail. 1030 requirements (unchanged), 110 `tc18-gap` entries
+remaining (unchanged), 5 newly `retired`.
 
 ### v0.182.0 -- 2026-08-10
 
