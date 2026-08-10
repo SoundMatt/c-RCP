@@ -110,18 +110,31 @@
  * transition -- whether it is a hot or cold start depends on *how* the
  * wake happened, not just on the (from, to) mode pair:
  *
- *   - A network-level wake signal (RCP_PWRMODE_WAKE_VIA_NETWORK, this
- *     module's own name for the roadmap's TC14/TC10 wake path) always
- *     yields a hot start; the four-step handshake below is not just
- *     unnecessary but actively skipped for this path (see
- *     rcp_pwrmode_hotstart_required()).
- *   - A pin-level wake signal (RCP_PWRMODE_WAKE_VIA_PIN) yields a hot
- *     start only if the caller has already driven the
- *     rcp_pwrmode_handshake_t below to RCP_PWRMODE_HANDSHAKE_COMPLETE;
- *     otherwise (handshake not started, still in progress, or failed) the
- *     wake falls back to this module's own safe default -- an ordinary
- *     cold start, matching the "Sleep is always a cold start" baseline
- *     rule stated above for every other entry into or exit from Sleep.
+ *   - REQ-PWRMODE-020 (TC18 §12.4.1, corrected from this module's
+ *     original design): both a pin-level wake signal
+ *     (RCP_PWRMODE_WAKE_VIA_PIN) and a network-level one
+ *     (RCP_PWRMODE_WAKE_VIA_NETWORK, this module's own name for the
+ *     roadmap's TC14/TC10 wake path) run the SAME four-step handshake --
+ *     "If the wake-up source was a TC14/TC10 wake-up request on the
+ *     network this will also wake the RC Server, but it will directly
+ *     check for the network availability and proceed as before" (TC18's
+ *     own text: "proceed as before" means run the same hot-start
+ *     procedure just described for a pin/EP-signal wake, not skip it).
+ *     This module originally modeled a network wake as always-hot with
+ *     the handshake actively skipped -- primary-source re-verification
+ *     found that wrong; only step (a)'s literal network-interface
+ *     re-enable is unnecessary for a wake that arrived over the network
+ *     in the first place (the interface is, by construction, already up),
+ *     a hardware-level nuance this module's state machine does not need
+ *     to represent specially -- a network-path caller still calls
+ *     rcp_pwrmode_handshake_iface_reenabled() as a state-machine
+ *     formality. Either path yields a hot start only if the caller has
+ *     already driven the rcp_pwrmode_handshake_t below to
+ *     RCP_PWRMODE_HANDSHAKE_COMPLETE; otherwise (handshake not started,
+ *     still in progress, or failed) the wake falls back to this module's
+ *     own safe default -- an ordinary cold start, matching the "Sleep is
+ *     always a cold start" baseline rule stated above for every other
+ *     entry into or exit from Sleep.
  *
  * ── The four-step hot-start-from-Sleep handshake ────────────────────────────
  *
@@ -134,8 +147,10 @@
  *       echoed back, or a repeat-limit hit    (RCP_PWRMODE_HANDSHAKE_ECHOED /
  *                                               RCP_PWRMODE_HANDSHAKE_FAILED)
  *   (c) other response/ack queues resume  -- rcp_pwrmode_handshake_resume_queues()
- *   (d) skipped entirely for a network-   -- rcp_pwrmode_hotstart_required()
- *       level wake signal
+ *
+ * rcp_pwrmode_hotstart_required() (REQ-PWRMODE-020) is required for
+ * every wake path, not skipped for a network-level one -- see the "Hot
+ * vs. cold starts" section above for the primary-source correction.
  *
  * Steps must be driven in order (a, then repeated b, then c); each
  * function below documents which step(s) it requires the handshake to
@@ -236,10 +251,16 @@ typedef enum {
     RCP_PWRMODE_WAKE_VIA_NETWORK = 1, /* the roadmap's TC14/TC10 network-level wake signal */
 } rcp_pwrmode_wake_path_t;
 
-/* True iff the four-step handshake below is required at all for this wake
- * path -- false only for RCP_PWRMODE_WAKE_VIA_NETWORK, per the file
- * header's point (d): the handshake is skipped entirely for a network-
- * level wake, not merely fast-tracked. */
+/* True iff the handshake below is required for this wake path to be
+ * classified hot. As of REQ-PWRMODE-020, true unconditionally: TC18
+ * §12.4.1's own text ("a TC14/TC10 wake-up request on the network...
+ * will directly check for the network availability and proceed as
+ * before") requires RCP_PWRMODE_WAKE_VIA_NETWORK to run the same
+ * handshake as RCP_PWRMODE_WAKE_VIA_PIN, not skip it -- see the file
+ * header's "Hot vs. cold starts" section for the full primary-source
+ * correction. path is retained in the signature (rather than dropped)
+ * as the natural hook for any future wake path this module might need
+ * to model with genuinely different hot-start preconditions. */
 bool rcp_pwrmode_hotstart_required(rcp_pwrmode_wake_path_t path);
 
 typedef enum {
@@ -299,17 +320,18 @@ bool rcp_pwrmode_handshake_has_failed(const rcp_pwrmode_handshake_t *hs);
  * Fails with RCP_PWRMODE_ERR_INVALID_TRANSITION (leaving *mode unchanged)
  * if *mode != RCP_PWRMODE_SLEEP.
  *
- * For path == RCP_PWRMODE_WAKE_VIA_NETWORK: handshake is ignored (may be
- * NULL); always succeeds with *out_start_kind = RCP_PWRMODE_START_HOT,
- * per rcp_pwrmode_hotstart_required().
- *
- * For path == RCP_PWRMODE_WAKE_VIA_PIN: handshake must be non-NULL.
- * Succeeds with *out_start_kind = RCP_PWRMODE_START_HOT iff
+ * As of REQ-PWRMODE-020, path no longer changes this function's own
+ * classification rule -- rcp_pwrmode_hotstart_required() is
+ * unconditionally true for both RCP_PWRMODE_WAKE_VIA_PIN and
+ * RCP_PWRMODE_WAKE_VIA_NETWORK (see that function's own doc comment for
+ * the primary-source correction). Succeeds with *out_start_kind =
+ * RCP_PWRMODE_START_HOT iff handshake is non-NULL and
  * rcp_pwrmode_handshake_is_complete(handshake); otherwise still succeeds
  * (the wake itself is never refused by this function -- only its
- * hot/cold classification depends on the handshake) but with
- * *out_start_kind = RCP_PWRMODE_START_COLD, the module's documented safe
- * default whenever hot-start preconditions are not met. */
+ * hot/cold classification depends on the handshake, including a NULL
+ * handshake) but with *out_start_kind = RCP_PWRMODE_START_COLD, the
+ * module's documented safe default whenever hot-start preconditions are
+ * not met. */
 rcp_pwrmode_errc_t rcp_pwrmode_wake_from_sleep(rcp_pwrmode_t *mode, rcp_pwrmode_wake_path_t path,
                                                 const rcp_pwrmode_handshake_t *handshake,
                                                 rcp_pwrmode_start_kind_t *out_start_kind);

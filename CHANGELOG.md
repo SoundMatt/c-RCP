@@ -32,6 +32,34 @@ the rationale.
 
 ## Releases
 
+### v0.164.0 -- 2026-08-10
+
+**Phase 5c batch 2: REQ-PWRMODE-020 -- network wake now runs the same
+handshake as pin wake.** Issue #199. `rcp_pwrmode_hotstart_required()`
+previously returned `false` for a network wake, skipping the handshake
+entirely -- this module's own file header and `REQ-PWRMODE-005`'s own
+catalog text had encoded that as deliberate design, but primary-source
+re-verification (TC18 §12.4.1: a network wake "will directly check for
+the network availability and proceed as before") confirmed it was
+wrong -- "proceed as before" means run the same procedure a pin wake
+does, not skip it. Fixed: `rcp_pwrmode_hotstart_required()` now returns
+`true` unconditionally; `rcp_pwrmode_wake_from_sleep()` classifies a
+network wake by the same handshake-completion rule a pin wake already
+used. `REQ-PWRMODE-005`'s own text corrected in the same change (it had
+baked in the wrong behavior as a formal requirement). Found and fixed a
+second call site: `powerstate.c`'s legacy `rcp_powerstate_manager_
+wake_via_network()` relied on the old skip; now synthesizes and
+immediately completes a handshake locally to preserve its own
+documented "always hot for network" contract without touching its
+public signature. Mutation-tested two ways: full revert reproduces
+exactly the 3 targeted pinned failures; a precise single-line mutation
+isolated to `powerstate.c` alone confirms that fix's own independent
+coverage. Full suite (64/64) + ASan/UBSan clean, fresh `cfusa
+check`/`trace` (0 errors, 100%/100%, all three separate CI-matching
+invocations). See `ROADMAP.md` milestone 164 for full detail. 1030
+requirements (unchanged), 129 `tc18-gap` entries remaining (was 130,
+one genuine closure).
+
 ### v0.163.0 -- 2026-08-10
 
 **Phase 5c batch 1: REQ-PWRMODE-019 -- wake-handshake completion

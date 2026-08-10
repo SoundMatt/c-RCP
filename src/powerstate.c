@@ -218,6 +218,7 @@ rcp_powerstate_errc_t rcp_powerstate_manager_wake_via_network(rcp_powerstate_man
     endpoint_entry_t *e;
     rcp_pwrmode_errc_t ec;
     rcp_pwrmode_t mode_after;
+    rcp_pwrmode_handshake_t hs;
 
     rcp_mutex_lock(&m->mu);
     e = find_entry(m, addr);
@@ -225,7 +226,22 @@ rcp_powerstate_errc_t rcp_powerstate_manager_wake_via_network(rcp_powerstate_man
         rcp_mutex_unlock(&m->mu);
         return RCP_POWERSTATE_ERR_UNKNOWN_ENDPOINT;
     }
-    ec = rcp_pwrmode_wake_from_sleep(&e->mode, RCP_PWRMODE_WAKE_VIA_NETWORK, NULL, out_start_kind);
+    /* REQ-PWRMODE-020: power.h's rcp_pwrmode_hotstart_required() no
+     * longer special-cases a network wake as always-hot-with-no-
+     * handshake (primary-source correction: TC18 §12.4.1 has a network
+     * wake "proceed as before", i.e. run the same handshake a pin/EP-
+     * signal wake does). This function's own documented contract (see
+     * powerstate.h) is "always hot for a network wake" -- preserved here
+     * by driving a synthetic, immediately-completed handshake locally:
+     * this wrapper represents the whole network wake-up event (network
+     * already available, WakeUp already answered by construction of a
+     * *network*-sourced wake) happening atomically, not a caller-driven
+     * multi-step exchange the way the pin-wake path below is. */
+    rcp_pwrmode_handshake_init(&hs, 1u);
+    rcp_pwrmode_handshake_iface_reenabled(&hs);
+    rcp_pwrmode_handshake_wakeup_attempt(&hs, true);
+    rcp_pwrmode_handshake_resume_queues(&hs);
+    ec = rcp_pwrmode_wake_from_sleep(&e->mode, RCP_PWRMODE_WAKE_VIA_NETWORK, &hs, out_start_kind);
     mode_after = e->mode;
     rcp_mutex_unlock(&m->mu);
 

@@ -44,10 +44,14 @@
  *     remote RC Server enter RCP_PWRMODE_STANDBY/_SLEEP, applying
  *     power.h's own rcp_pwrmode_transition() once the matching response
  *     arrives.
- *   - rcp_powerstate_manager_wake_via_network() drives power.h's always-
- *     hot network-level wake path, requiring no wire exchange of its own
- *     (see power.h's file header: the handshake is skipped entirely for
- *     this path).
+ *   - rcp_powerstate_manager_wake_via_network() drives power.h's
+ *     network-level wake path, requiring no wire exchange or caller-
+ *     driven handshake of its own -- it synthesizes and immediately
+ *     completes one internally (REQ-PWRMODE-020: power.h no longer
+ *     models a network wake as handshake-free, since TC18 §12.4.1 has
+ *     it "proceed as before" through the same steps a pin wake does;
+ *     this function's own "always hot" contract is unchanged, only how
+ *     it is achieved against power.h's corrected primitive).
  *   - rcp_powerstate_manager_handshake_begin()/_encode_wakeup_probe()/
  *     _apply_wakeup_echo()/_handshake_resume_queues()/_wake_via_pin() are
  *     thin, addr-scoped pass-throughs over power.h's own

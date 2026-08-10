@@ -175,10 +175,13 @@ static void test_transition_out_start_kind_may_be_null(void)
 
 /* ── rcp_pwrmode_hotstart_required ───────────────────────────────────────────── */
 
-static void test_hotstart_required_true_for_pin_false_for_network(void)
+/* As of the REQ-PWRMODE-020 fix (TC18 §12.4.1: a network wake "will...
+ * proceed as before", i.e. the same handshake a pin wake runs, not a
+ * skip), true for every path -- not just RCP_PWRMODE_WAKE_VIA_PIN. */
+static void test_hotstart_required_true_for_every_path(void)
 {
     TEST_ASSERT_TRUE(rcp_pwrmode_hotstart_required(RCP_PWRMODE_WAKE_VIA_PIN));
-    TEST_ASSERT_FALSE(rcp_pwrmode_hotstart_required(RCP_PWRMODE_WAKE_VIA_NETWORK));
+    TEST_ASSERT_TRUE(rcp_pwrmode_hotstart_required(RCP_PWRMODE_WAKE_VIA_NETWORK));
 }
 
 /* ── rcp_pwrmode_handshake_* ──────────────────────────────────────────────────── */
@@ -281,13 +284,40 @@ static void test_wake_from_sleep_requires_sleep_mode(void)
                        rcp_pwrmode_wake_from_sleep(&mode, RCP_PWRMODE_WAKE_VIA_NETWORK, NULL, NULL));
 }
 
-static void test_wake_from_sleep_via_network_is_always_hot(void)
+/* As of the REQ-PWRMODE-020 fix, a network wake is classified by the
+ * SAME handshake-completion rule a pin wake already used -- a NULL
+ * handshake (this test's own former "always hot" pin) now correctly
+ * falls back to the module's documented safe default, COLD, matching
+ * test_wake_from_sleep_via_pin_hot_only_when_handshake_complete()'s own
+ * "handshake not yet complete -> cold" case exactly. */
+static void test_wake_from_sleep_via_network_cold_without_handshake(void)
 {
     rcp_pwrmode_t             mode = RCP_PWRMODE_SLEEP;
     rcp_pwrmode_start_kind_t  kind;
 
     TEST_ASSERT_EQUAL(RCP_PWRMODE_OK,
                        rcp_pwrmode_wake_from_sleep(&mode, RCP_PWRMODE_WAKE_VIA_NETWORK, NULL, &kind));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_NORMAL, mode);
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_START_COLD, kind);
+}
+
+/* ...but a completed handshake yields hot for a network wake exactly as
+ * it already did for a pin wake -- REQ-PWRMODE-020's own point: both
+ * paths now share one rule. */
+static void test_wake_from_sleep_via_network_hot_when_handshake_complete(void)
+{
+    rcp_pwrmode_t             mode = RCP_PWRMODE_SLEEP;
+    rcp_pwrmode_start_kind_t  kind;
+    rcp_pwrmode_handshake_t   hs;
+
+    rcp_pwrmode_handshake_init(&hs, 3);
+    rcp_pwrmode_handshake_iface_reenabled(&hs);
+    rcp_pwrmode_handshake_wakeup_attempt(&hs, true);
+    rcp_pwrmode_handshake_resume_queues(&hs);
+    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_is_complete(&hs));
+
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_OK,
+                       rcp_pwrmode_wake_from_sleep(&mode, RCP_PWRMODE_WAKE_VIA_NETWORK, &hs, &kind));
     TEST_ASSERT_EQUAL(RCP_PWRMODE_NORMAL, mode);
     TEST_ASSERT_EQUAL(RCP_PWRMODE_START_HOT, kind);
 }
@@ -409,7 +439,7 @@ int main(void)
     RUN_TEST(test_transition_standby_to_sleep_direct_via_standby_is_ok_but_skip_rejected);
     RUN_TEST(test_transition_out_start_kind_may_be_null);
 
-    RUN_TEST(test_hotstart_required_true_for_pin_false_for_network);
+    RUN_TEST(test_hotstart_required_true_for_every_path);
 
     RUN_TEST(test_handshake_init_state);
     RUN_TEST(test_handshake_full_success_sequence);
@@ -419,7 +449,8 @@ int main(void)
     RUN_TEST(test_handshake_steps_reject_out_of_order_calls);
 
     RUN_TEST(test_wake_from_sleep_requires_sleep_mode);
-    RUN_TEST(test_wake_from_sleep_via_network_is_always_hot);
+    RUN_TEST(test_wake_from_sleep_via_network_cold_without_handshake);
+    RUN_TEST(test_wake_from_sleep_via_network_hot_when_handshake_complete);
     RUN_TEST(test_wake_from_sleep_via_pin_hot_only_when_handshake_complete);
     RUN_TEST(test_wake_from_sleep_via_pin_cold_when_handshake_incomplete);
     RUN_TEST(test_wake_from_sleep_via_pin_cold_when_handshake_failed);
