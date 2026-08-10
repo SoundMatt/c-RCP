@@ -33,6 +33,31 @@ the rationale.
 
 ## Releases
 
+### v0.196.0 -- 2026-08-10
+
+**Phase 5d batch 26: multi-client and heterogeneous-shared-bus
+diagnostics for EP_ID_config.** Issue #200. `REQ-RMAP-057`/`-058`:
+TC18 §12.7.8 recommends an endpoint be mapped to at most one RC Client
+at a time, and endpoints sharing a byte_bus_id within one request
+stream share the same ep_type -- neither had a diagnostic. New
+`rcp_regmap_ep_id_map_has_single_client_per_ep()` (true iff no ep_id
+spans two different request_stream_index values) and
+`rcp_regmap_ep_id_map_shared_bus_homogeneous()` (true iff every group
+of rows sharing one (request_stream_index, byte_bus_id) has an
+identical caller-supplied ep_type). Found and fixed a pre-existing
+scenario-accuracy bug in the old shared deviation-pin test along the
+way: its "two clients" case put both rows on the same stream (not
+actually two clients) and its "shared bus" case used two different
+byte_bus_id values (not actually a shared bus) -- both corrected in
+the two new positive tests that replace it. Mutation-tested with three
+mutations (full revert; one isolated mutation per new function) --
+all caught. Full suite (65/65) + ASan/UBSan clean on both trees. Fresh
+`cfusa check`/`trace` (0 errors, 100%/100%, three separate CI-matching
+invocations). `REQ-RMAP-057`/`-058` both move `not-implemented` ->
+`partial`. **Group 3 (EP_ID_config) now 5/6 items addressed** -- only
+`REQ-RMAP-053` remains. See `ROADMAP.md` milestone 196 for full
+detail.
+
 ### v0.195.0 -- 2026-08-10
 
 **Phase 5d batch 25: EP_ID_config table's own end-of-table sentinel and

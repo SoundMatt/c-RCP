@@ -213,3 +213,41 @@ void rcp_regmap_ep_id_map_row_init_default(rcp_regmap_ep_id_map_entry_t *row)
     row->ep_id                = RCP_REGMAP_EP0_INDEX;
     row->byte_bus_id          = 0u;
 }
+
+//cfusa:req REQ-RMAP-057
+bool rcp_regmap_ep_id_map_has_single_client_per_ep(const rcp_regmap_ep_id_map_entry_t *entries,
+                                                    size_t count)
+{
+    size_t i, j;
+
+    for (i = 0; i < count; i++) {
+        for (j = i + 1; j < count; j++) {
+            if (entries[i].ep_id == entries[j].ep_id &&
+                entries[i].request_stream_index != entries[j].request_stream_index) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
+
+//cfusa:req REQ-RMAP-058
+bool rcp_regmap_ep_id_map_shared_bus_homogeneous(const rcp_regmap_ep_id_map_entry_t *entries,
+                                                  const uint8_t *ep_types,
+                                                  size_t count)
+{
+    size_t i, j;
+
+    for (i = 0; i < count; i++) {
+        for (j = i + 1; j < count; j++) {
+            if (entries[i].request_stream_index == entries[j].request_stream_index &&
+                entries[i].byte_bus_id == entries[j].byte_bus_id &&
+                ep_types[i] != ep_types[j]) {
+                return false;
+            }
+        }
+    }
+
+    return true;
+}
