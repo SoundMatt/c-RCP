@@ -95,9 +95,10 @@ rcp_lifecycle_state_t rcp_mock_server_state(const rcp_mock_server_t *srv)
 //cfusa:req REQ-MOCK-005
 rcp_lifecycle_errc_t rcp_mock_server_transition(rcp_mock_server_t *srv,
                                                  rcp_lifecycle_state_t target,
-                                                 const rcp_lifecycle_plausibility_snapshot_t *snap)
+                                                 const rcp_lifecycle_plausibility_snapshot_t *snap,
+                                                 rcp_lifecycle_writer_ctx_t writer)
 {
-    return rcp_lifecycle_transition(&srv->state, target, snap);
+    return rcp_lifecycle_transition(&srv->state, target, snap, writer);
 }
 
 //cfusa:req REQ-MOCK-006

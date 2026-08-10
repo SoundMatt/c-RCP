@@ -177,11 +177,12 @@ void rcp_mock_server_destroy(rcp_mock_server_t *srv);
 rcp_lifecycle_state_t rcp_mock_server_state(const rcp_mock_server_t *srv);
 
 /* Thin passthrough to lifecycle.h's rcp_lifecycle_transition(), operating
- * on srv's own state. See lifecycle.h for the permitted-transition table
- * and snap's role. */
+ * on srv's own state. See lifecycle.h for the permitted-transition table,
+ * snap's role, and writer's role (REQ-LIFECYCLE-031). */
 rcp_lifecycle_errc_t rcp_mock_server_transition(rcp_mock_server_t *srv,
                                                  rcp_lifecycle_state_t target,
-                                                 const rcp_lifecycle_plausibility_snapshot_t *snap);
+                                                 const rcp_lifecycle_plausibility_snapshot_t *snap,
+                                                 rcp_lifecycle_writer_ctx_t writer);
 
 /* Mutable access to srv's own register map: a test or this milestone's own
  * config.c manifest loader may freely set magic/vendor_id/device_id/

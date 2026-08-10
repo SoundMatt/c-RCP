@@ -130,6 +130,10 @@ typedef enum {
     RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT  = 1,
     RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT = 2,
     RCP_LIFECYCLE_ERR_INVALID_TRANSITION   = 3,
+    RCP_LIFECYCLE_ERR_UNAUTHORIZED         = 4, /* REQ-LIFECYCLE-031: writer
+                                                    not permitted to request
+                                                    this svr_lifecycle_state
+                                                    change */
 } rcp_lifecycle_errc_t;
 
 /* Human-readable message for an rcp_lifecycle_errc_t value. Never returns NULL. */
@@ -182,28 +186,87 @@ rcp_lifecycle_errc_t rcp_lifecycle_check_hw_cfg(const rcp_lifecycle_plausibility
  * NULL is treated as inconsistent, for the same fail-safe reason as above. */
 rcp_lifecycle_errc_t rcp_lifecycle_check_rcp_cfg(const rcp_lifecycle_plausibility_snapshot_t *snap);
 
+/* Identifies who is attempting a write -- a functional-config write (the
+ * once-RCP_CONFIGURED/HW_CONFIGURED authorization rule, see
+ * rcp_lifecycle_field_writable()) or a svr_lifecycle_state change (see
+ * rcp_lifecycle_transition()). Declared here, ahead of both consumers,
+ * since rcp_lifecycle_transition() now needs it too (REQ-LIFECYCLE-031).
+ * Any combination of members may be true (e.g. the root client happens
+ * to also be the owning stream); only one authorizing condition needs to
+ * be true for a given call's own authorization rule to be satisfied.
+ *
+ * via_non_unicast_frame and via_discovery_stream both default to false
+ * (the common, compliant-or-inapplicable case) on a plain {0}/partial-
+ * brace initializer, so every writer_ctx literal already in this
+ * codebase before their respective introduction (REQ-LIFECYCLE-027 and
+ * REQ-LIFECYCLE-030/036) continues to mean exactly what it meant before
+ * -- only a caller that actually needs to exercise the new rule has to
+ * set the relevant member explicitly. See rcp_lifecycle_field_writable()'s
+ * own doc comment and l2.h's rcp_l2_mac_is_unicast() for the primitive an
+ * integrator uses to classify a real frame's destination MAC before
+ * setting via_non_unicast_frame. */
+typedef struct {
+    bool via_root_client_ep0;   /* request arrived via EP0 from the root client */
+    bool via_owning_stream;     /* request arrived via the endpoint's own
+                                    registered request stream */
+    bool via_non_unicast_frame; /* true iff the request frame's destination
+                                    MAC was multicast or broadcast, not
+                                    unicast (REQ-LIFECYCLE-027) */
+    bool via_discovery_stream;  /* request arrived via the discovery stream
+                                    (REQ-LIFECYCLE-030/031/036) */
+} rcp_lifecycle_writer_ctx_t;
+
 /* ── Lifecycle transitions ─────────────────────────────────────────────────── */
 
-/* Attempts to move *state to target. On success, *state is updated to
- * target and RCP_LIFECYCLE_OK is returned; on failure *state is left
- * unchanged and the failure reason is returned. Permitted transitions:
+/* Attempts to move *state to target on behalf of writer. On success,
+ * *state is updated to target and RCP_LIFECYCLE_OK is returned; on
+ * failure *state is left unchanged and the failure reason is returned.
+ * Permitted transitions:
  *
  *   - HW_UNCONFIGURED -> HW_CONFIGURED: guarded by rcp_lifecycle_check_hw_cfg();
- *     failure returns RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT.
- *   - HW_CONFIGURED -> RCP_CONFIGURED: guarded by rcp_lifecycle_check_rcp_cfg();
+ *     failure returns RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT. writer is not
+ *     consulted for this transition -- TC18 §12.3.1.1 requires only that
+ *     the request travel via the discovery stream, already enforced one
+ *     layer up by rcp_lifecycle_should_accept()'s HW_UNCONFIGURED branch
+ *     (no root client can exist yet at this point in bring-up).
+ *   - HW_CONFIGURED -> RCP_CONFIGURED: guarded first by writer authorization
+ *     (see below), then by rcp_lifecycle_check_rcp_cfg(); a plausibility
  *     failure returns RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT.
  *   - HW_CONFIGURED -> HW_UNCONFIGURED and RCP_CONFIGURED ->
- *     HW_UNCONFIGURED: unconditional demotion (the discovery-stream/
- *     root-client reset path); snap is ignored for these two.
- *   - state -> the same state: always a no-op success; snap is ignored.
+ *     HW_UNCONFIGURED: the discovery-stream/root-client reset path,
+ *     guarded by the same writer authorization as the advance above; snap
+ *     is ignored for these two once authorized.
+ *   - state -> the same state: always a no-op success; writer and snap are
+ *     both ignored.
+ *
+ * Writer authorization (REQ-LIFECYCLE-031, TC18 §12.3.1.2): both the
+ * HW_CONFIGURED -> RCP_CONFIGURED advance and either reset-to-
+ * HW_UNCONFIGURED transition require writer.via_discovery_stream or
+ * writer.via_root_client_ep0 -- an unauthorized writer's request is
+ * rejected with RCP_LIFECYCLE_ERR_UNAUTHORIZED, *state left unchanged,
+ * before either transition's own plausibility guard runs. TC18's exact
+ * text additionally narrows the non-discovery-stream case further --
+ * "If a root client is configured only the root client's stream_id/
+ * byte_bus_id is accepted", implying any valid stream_id/byte_bus_id
+ * combination suffices only when no root client is configured at all --
+ * a distinction this library cannot yet express (no wire-level concept
+ * of "a valid stream_id/byte_bus_id combination" independent of a
+ * specific endpoint's own owning stream exists for a server-level field
+ * like svr_lifecycle_state; see REQ-LIFECYCLE-025/034's own architecture
+ * finding for the same underlying gap). This function conservatively
+ * requires via_root_client_ep0 in both cases until that classification
+ * exists, rather than accepting an unqualified stream this library
+ * cannot actually validate.
  *
  * Any other requested transition (e.g. skipping straight from
  * HW_UNCONFIGURED to RCP_CONFIGURED, or downgrading from RCP_CONFIGURED to
  * HW_CONFIGURED without first returning all the way to HW_UNCONFIGURED) is
- * rejected with RCP_LIFECYCLE_ERR_INVALID_TRANSITION. */
+ * rejected with RCP_LIFECYCLE_ERR_INVALID_TRANSITION, regardless of
+ * writer. */
 rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
                                                rcp_lifecycle_state_t target,
-                                               const rcp_lifecycle_plausibility_snapshot_t *snap);
+                                               const rcp_lifecycle_plausibility_snapshot_t *snap,
+                                               rcp_lifecycle_writer_ctx_t writer);
 
 /* ── Per-state request filtering ───────────────────────────────────────────── */
 
@@ -271,30 +334,6 @@ typedef enum {
     RCP_LIFECYCLE_FIELD_FUNCTIONAL_W      = 1,
     RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR = 2,
 } rcp_lifecycle_field_kind_t;
-
-/* Identifies who is attempting a functional-config write, for the
- * once-RCP_CONFIGURED authorization rule. Both members may be true
- * (e.g. the root client happens to also be the owning stream); only one
- * needs to be true for the write to be authorized.
- *
- * via_non_unicast_frame defaults to false (the common, compliant case)
- * on a plain {0}/partial-brace initializer so every writer_ctx literal
- * already in this codebase before REQ-LIFECYCLE-027 continues to mean
- * exactly what it meant before -- only a caller that actually needs to
- * exercise the new multicast/broadcast-write-rejection rule has to set
- * it explicitly. See rcp_lifecycle_field_writable()'s own doc comment
- * and l2.h's rcp_l2_mac_is_unicast() for the primitive an integrator
- * uses to classify a real frame's destination MAC before setting it. */
-typedef struct {
-    bool via_root_client_ep0;   /* request arrived via EP0 from the root client */
-    bool via_owning_stream;     /* request arrived via the endpoint's own
-                                    registered request stream */
-    bool via_non_unicast_frame; /* true iff the request frame's destination
-                                    MAC was multicast or broadcast, not
-                                    unicast (REQ-LIFECYCLE-027) */
-    bool via_discovery_stream;  /* request arrived via the discovery stream
-                                    (REQ-LIFECYCLE-030/036) */
-} rcp_lifecycle_writer_ctx_t;
 
 /* True iff a field of the given kind is writable while the server is in
  * state, by the given writer:

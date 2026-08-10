@@ -32,6 +32,30 @@ the rationale.
 
 ## Releases
 
+### v0.157.0 -- 2026-08-10
+
+**Phase 5b batch 5: REQ-LIFECYCLE-031 svr_lifecycle_state write
+authorization.** Issue #198. `rcp_lifecycle_transition()` gains a
+`rcp_lifecycle_writer_ctx_t writer` parameter and a new
+`RCP_LIFECYCLE_ERR_UNAUTHORIZED` error code -- TC18 §12.3.1.2 requires a
+`svr_lifecycle_state` write be accepted only via the discovery stream
+or the root client; previously any caller could promote or demote the
+server's lifecycle state unconditionally. Scoped `partial`, not
+`implemented`: TC18's further narrowing ("any valid stream when no root
+client is configured") can't yet be expressed given this library's
+current architecture (same gap as `REQ-LIFECYCLE-025`/`034`) --
+conservatively requires the root client in both cases rather than
+accept an unqualified stream. Blast radius small and fully enumerable
+this batch (a required parameter, unlike batches 3/4's additive struct
+field, forces every call site into view via compiler errors -- no
+shared-default surprise possible). Mutation-tested two ways (build
+break for the signature change, a precise single-line logic mutation
+for the authorization check itself). Full suite (64/64) + ASan/UBSan
+clean, fresh `cfusa check`/`trace` (0 errors, 100%/100%). See
+`ROADMAP.md` milestone 157 for full detail. 1029 requirements
+(unchanged), 137 `tc18-gap` entries remaining (unchanged count --
+status upgrade within the gap category).
+
 ### v0.156.0 -- 2026-08-10
 
 **Phase 5b batch 4: REQ-LIFECYCLE-030 + REQ-LIFECYCLE-036 HW_CONFIGURED

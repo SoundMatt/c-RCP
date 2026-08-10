@@ -8521,12 +8521,12 @@
     {
       "id": "REQ-LIFECYCLE-031",
       "title": "A lifecycle-state write is accepted only from the discovery stream, the root client, or (with no root client) any valid stream",
-      "text": "NOT IMPLEMENTED: c-RCP does not authorize the writer of a lifecycle-state change (TC18 \u00a712.3.1.2). rcp_lifecycle_transition() accepts no rcp_lifecycle_writer_ctx_t, and rcp_lifecycle_writer_ctx_t itself carries no via_discovery_stream flag, so the rule that a svr_lifecycle_state write must arrive via the discovery stream, or from the configured root client, or (only when no root client is configured) from any valid stream_id/byte_bus_id combination, cannot be expressed or enforced. Any client that can reach the server can promote or demote its lifecycle state.",
+      "text": "PARTIAL: rcp_lifecycle_transition() now takes an rcp_lifecycle_writer_ctx_t and rejects an unauthorized writer's request (RCP_LIFECYCLE_ERR_UNAUTHORIZED) for both the HW_CONFIGURED -> RCP_CONFIGURED advance and either reset-to-HW_UNCONFIGURED transition, requiring writer.via_discovery_stream or writer.via_root_client_ep0 (the new via_discovery_stream member added to rcp_lifecycle_writer_ctx_t in the same change). Not fully closed: TC18 \u00a712.3.1.2's exact text further narrows the non-discovery-stream case -- \"If a root client is configured only the root client's stream_id/byte_bus_id is accepted\" -- implying any valid stream_id/byte_bus_id combination should suffice when no root client is configured at all, a distinction this library cannot yet express (no wire-level concept of \"a valid stream_id/byte_bus_id combination\" independent of a specific endpoint's own owning stream exists for a server-level field like svr_lifecycle_state; same underlying architecture gap as REQ-LIFECYCLE-025/034). This function conservatively requires via_root_client_ep0 in both cases until that classification exists, rather than accepting an unqualified stream it cannot actually validate.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.3.1.2, TC18.txt L2187-L2189 and L2198-L2201"
     },
     {

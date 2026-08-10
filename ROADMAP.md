@@ -7855,3 +7855,89 @@ Restored clean. Full test suite (64/64) + ASan/UBSan build both clean.
 Fresh `cfusa check` (0 errors) + `cfusa trace --req-coverage 100
 --sec-tested 100` (100%/100%). 1029 requirements (unchanged count --
 no new REQ ids this batch), 137 `tc18-gap` entries remaining (was 139).
+
+### 157. Phase 5b batch 5: REQ-LIFECYCLE-031 svr_lifecycle_state write authorization (issue #198)
+
+A different call path than batches 3/4: TC18 §12.3.1.2 requires a
+`svr_lifecycle_state` write (the request that actually drives
+`rcp_lifecycle_transition()`) be accepted only via the discovery
+stream, from the configured root client, or -- with no root client
+configured -- from any valid stream_id/byte_bus_id combination.
+`rcp_lifecycle_transition()` previously accepted no writer input at
+all: any caller could promote or demote the server's lifecycle state
+unconditionally.
+
+**Fix**: `rcp_lifecycle_transition()` gains a `rcp_lifecycle_writer_ctx_t
+writer` parameter (moved the struct's own typedef earlier in the header,
+ahead of both its consumers now). A new `RCP_LIFECYCLE_ERR_UNAUTHORIZED`
+error code (value 4, additive) is returned, `*state` left unchanged,
+when `!(writer.via_discovery_stream || writer.via_root_client_ep0)` for
+the `HW_CONFIGURED -> RCP_CONFIGURED` advance or either reset-to-
+`HW_UNCONFIGURED` transition. The bootstrap `HW_UNCONFIGURED ->
+HW_CONFIGURED` advance deliberately does not consult `writer` at all --
+TC18 §12.3.1.1 requires only that the request travel via the discovery
+stream, already enforced one layer up by `rcp_lifecycle_should_accept()`'s
+own `HW_UNCONFIGURED` branch (no root client can even exist yet at this
+point in bring-up).
+
+**Honestly scoped as `partial`, not `implemented`**: TC18's exact text
+further narrows the non-discovery-stream case -- "If a root client is
+configured only the root client's stream_id/byte_bus_id is accepted" --
+implying any valid stream_id/byte_bus_id combination should suffice
+when no root client is configured at all. This library has no
+wire-level concept of "a valid stream_id/byte_bus_id combination"
+independent of a specific endpoint's own owning stream for a
+server-level field like `svr_lifecycle_state` (the same underlying
+architecture gap `REQ-LIFECYCLE-025`/`034` already identified and left
+open). `rcp_lifecycle_transition()` conservatively requires
+`via_root_client_ep0` in both the root-client-configured and
+no-root-client cases until that classification exists, rather than
+accepting an unqualified stream it cannot actually validate.
+
+**Blast radius small and fully enumerable this time, unlike batches
+3/4**: adding a *required* parameter (no default to silently preserve)
+to a function with only ~20 total call sites across production code
+(`src/mock.c`'s one passthrough wrapper) and 5 test files meant every
+affected site had to be visited explicitly by the compiler's own "too
+few arguments" errors -- no shared-default surprise was possible by
+construction, the opposite lesson from batch 4's `any_writer()`
+discovery: sometimes a required parameter is the right shape precisely
+*because* it forces every call site into view, where an additive
+struct field (right for batches 3/4, where the common case needed to
+stay silently unaffected) would have let some existing call sites
+silently drift out of sync with the new rule.
+
+Test changes: `mock.h`/`mock.c`'s `rcp_mock_server_transition()`
+passthrough gains the same parameter; its 7 test call sites (2
+`to_hw_configured()`/`to_rcp_configured()` helper pairs in
+`test_mock.c` and `test_tc18_gaps_e2e.c`, `test_conditional_dispatch.c`'s
+own `fixture()`) updated -- the bootstrap advance passes `{0}` (correct,
+not just convenient, since it's not consulted), the `RCP_CONFIGURED`
+advance passes an authorized `root` context. `test_lifecycle.c`'s 9
+direct `rcp_lifecycle_transition()` call sites updated individually,
+with 2 new dedicated authorization tests added
+(`test_transition_hw_configured_to_rcp_configured_requires_authorization`,
+covering both the reset-transition siblings). `test_tc18_gaps_server.c`'s
+own DEVIATION PIN (`test_transition_takes_neither_idle_nor_writer_input`)
+split into `test_transition_takes_no_idle_input` (the still-open
+`REQ-LIFECYCLE-022`/`023` EPs_NOT_IDLE gap, unaffected by this batch,
+kept as its own pin) and `test_transition_now_rejects_unauthorized_writer`
+(the closed half, rewritten to assert the corrected behavior and
+`RCP_LIFECYCLE_ERR_UNAUTHORIZED`'s own `strerror()` case rather than
+probing a still-unknown error code that this batch's new enum value
+would have collided with). `test_discovery_write_authority_survives_
+rcp_configured`'s own single transition call attributed to the
+discovery stream, matching its own discovery-claim narrative.
+
+Mutation-tested two ways: (1) `git stash` on `src/lifecycle.c` alone
+-> build breaks (`conflicting types`), the new-API signature-change
+signal; (2) a precise single-line mutation (`bool authorized = true;`,
+keeping the signature intact) isolates the authorization logic itself
+-> exactly the 4 new/rewritten pinned assertions fail
+(`Expected 4 Was 0`), every other test still passes. Both restored
+clean. Full suite (64/64) + ASan/UBSan build both clean. Fresh `cfusa
+check` (0 errors) + `cfusa trace --req-coverage 100 --sec-tested 100`
+(100%/100%). 1029 requirements (unchanged), 137 `tc18-gap` entries
+remaining (unchanged count -- `REQ-LIFECYCLE-031` moves
+`not-implemented` -> `partial` within the gap category, not a full
+closure).
