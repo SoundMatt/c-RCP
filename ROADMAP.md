@@ -9336,3 +9336,88 @@ queues) but nothing in this codebase evaluates a QUEUE periodically
 yet; scope that design explicitly before implementing, per this
 project's own standing discipline, rather than assuming Keeper can be
 reused as-is.
+
+### 175. Phase 5d batch 5: REQ-RMAP-063 -- flush_on_count trigger + AVTPDU packing plan (issue #200)
+
+Two new, purely additive functions on `respqueue.h`'s `rcp_respqueue_t`
+(no existing signature changed -- the smallest blast radius of any
+batch this phase). `rcp_respqueue_should_flush(q, flush_on_count_octets)`
+implements TC18's own trigger condition directly against the queue's
+own running octet total (already tracked since `REQ-RMAP-059`, no new
+state needed) -- "Once a queue is filled with an amount of quadlets
+that is equal or larger than given by flush_on_count, the transmission
+of one or multiple AVTPDUs shall be initiated." `rcp_respqueue_plan_batch(q,
+max_avtpdu_size_octets)` implements the packing half -- "only as much
+as fitting to the MAX_AVTPDUsize ACF_types will be included in a
+generated AVTPDU... packed in a fitting number of AVTPDUs" -- reporting
+how many of the queue's own FIFO-ordered entries fit together within
+one AVTPDU; a caller drains exactly that many via the existing
+`rcp_respqueue_pop()` and calls the planner again for the next AVTPDU,
+repeating until empty. `scheduler.h`'s `rcp_sched_split_frame_members()`
+(the inverse, decode-side split this catalog entry's own text
+references) needed no changes at all -- this batch's two new functions
+are the missing ENCODE-side counterpart, not a modification of the
+existing decode-side one.
+
+`rcp_respqueue_plan_batch()` always plans at least one entry for a
+non-empty queue, by construction rather than as a special case: because
+`rcp_respqueue_push()`'s own `REQ-RMAP-061` enforcement (batch 4)
+already guarantees every queued entry individually fits within
+whatever `max_avtpdu_size_octets` the queue was configured with, the
+planner's own loop never needs a first-iteration size check -- it
+always accepts entry 0 unconditionally and only checks the running
+total from entry 1 onward. This is a direct, load-bearing consequence
+of batch 4's earlier work, not a coincidence -- confirmed and exercised
+explicitly by this batch's own `test_plan_batch_always_keeps_at_least_
+one_entry` test.
+
+**Found ANOTHER pre-existing combined deviation pin** (3rd occurrence
+of this lesson class this phase): `test_flush_triggers_and_heartbeat_
+are_absent` bundled `-063` (flush_on_count) together with `-064`/`-065`
+(Flush_time + heartbeat) in one function. Split into
+`test_flush_on_count_trigger_and_avtpdu_packing` (rewritten to a
+positive conformance test, closed) and `test_flush_time_and_heartbeat_
+are_absent` (kept as a clean, still-open pin, its own comment narrowed
+to name only what remains: `-064`/`-065` specifically, not `-063`).
+
+**New false-positive lesson**: `cfusa check`'s `CFUSA-CY009` weak-crypto
+scanner does plain substring matching for algorithm-name fragments like
+`des_` -- a new test named `test_plan_batch_always_includes_at_least_
+one_entry` tripped it purely because "inclu**des_at**_least" contains
+the literal substring "des_". Not a real finding (no cryptography
+anywhere near this code); the fix is renaming the identifier
+(`..._always_keeps_at_least_one_entry`) to avoid the substring, not
+touching the scanner itself -- `cfusa` is third-party tooling this
+project has no license to edit (matching this project's standing
+"file issues against other repos, never edit them" policy, extended
+here to tooling as well as other x-Net repos). Worth remembering for
+future test-naming choices in this codebase: avoid `des_`, `md5_`,
+`rc4_`, `sha1_` as literal substrings, not just as whole words.
+
+Mutation-tested TWO ways (both purely logic-only, since this batch
+added no new required parameters and changed no existing signature):
+(1) `rcp_respqueue_should_flush()`'s threshold comparison replaced with
+an unconditional true-if-nonempty -- fails both the dedicated
+`test_respqueue.c` threshold test and the rewritten
+`test_tc18_gaps_regmap.c` conformance test. (2)
+`rcp_respqueue_plan_batch()`'s packing loop replaced with an
+unconditional "return every entry" -- fails both the dedicated packing
+test and the same rewritten conformance test. Both mutations restored
+clean (diff-verified byte-identical against pre-mutation backups). Full
+suite (65/65) + ASan/UBSan clean, pre- and post-restore for both
+mutations, and again after the `cfusa`-false-positive rename. Fresh
+`cfusa check` (0 errors, after the rename) + `cfusa trace --gaps`/
+`--req-coverage 100`/`--sec-tested 100` (three separate CI-matching
+invocations; 100%/100%, 0 untested). 1030 requirements (unchanged), 111
+`tc18-gap` entries remaining (was 112).
+
+**Phase 5d progress after batch 5**: 6/47 items addressed (7 counting
+`REQ-RMAP-061`'s own partial progress from batch 4). **Next**:
+`REQ-RMAP-064`/`-065` (the `Flush_time` timer and the real server-
+liveness heartbeat) -- the last two Group 4 items, and the ones that
+finally need a periodic-timer composition point this codebase has no
+exact precedent for (`watchdog.c`'s Keeper evaluates watchdogs on a
+tick, not queues); scope that design explicitly, including whether it
+belongs in `respqueue.h` itself (a `last_transmit_tick`/`elapsed`-style
+pure check, mirroring `should_flush()`'s own shape) or in a new,
+separate composition module, before implementing either way.

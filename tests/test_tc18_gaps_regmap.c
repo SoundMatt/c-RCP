@@ -1118,31 +1118,72 @@ static void test_max_avtpdu_size_is_now_enforced_and_feeds_fragmentation(void)
     TEST_ASSERT_EQUAL_UINT((size_t)14u, RCP_DISCOVERY_GENERAL_SLICE_LEN);
 }
 
-/* TC18 §12.7.9 Table 24: flush_on_count (0x0006) defaults to 1, meaning
- * immediate transmission, and its legal range is 1..queue_size;
- * Flush_time (0x0008, microseconds) forces transmission once that
- * interval elapses since the queue's last transmission, and on expiry an
- * EMPTY queue still emits a heartbeat AVTPDU so a client can see the
- * server is alive. Deviation: both fields are inert, and
- * rcp_regmap_response_queue_cfg_init() leaves flush_on_count at 0 -- a
- * value outside Table 24's own legal range, let alone its default. The
+/* REQ-RMAP-063 (TC18 §12.7.9 Table 24, relative address 0x0006, 16 bit,
+ * R/W+, default 1, legal range 1..queue_size): "Once a queue is filled
+ * with an amount of quadlets that is equal or larger than given by
+ * flush_on_count, the transmission of one or multiple AVTPDUs shall be
+ * initiated... only as much as fitting to the MAX_AVTPDUsize ACF_types
+ * will be included in a generated AVTPDU... packed in a fitting number
+ * of AVTPDUs." respqueue.h's rcp_respqueue_should_flush() implements
+ * the trigger; rcp_respqueue_plan_batch() implements the packing --
+ * both operate on the queue's own state alone, needing no clock. */
+static void test_flush_on_count_trigger_and_avtpdu_packing(void)
+{
+    rcp_regmap_response_queue_cfg_t cfg;
+    rcp_respqueue_t                 q;
+    uint8_t                         frame[5] = {0};
+    rcp_bytes_t                     out;
+    size_t                          i;
+
+    rcp_regmap_response_queue_cfg_init(&cfg);
+    cfg.flush_on_count = 2u; /* 2 quadlets = 8 octets */
+    rcp_respqueue_init(&q, 0, 0);
+
+    TEST_ASSERT_FALSE(rcp_respqueue_should_flush(&q, (size_t)cfg.flush_on_count * 4u));
+
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
+    TEST_ASSERT_FALSE(rcp_respqueue_should_flush(&q, (size_t)cfg.flush_on_count * 4u));
+
+    /* The push that crosses the threshold (5 + 5 = 10 >= 8 octets)
+     * itself triggers the flush -- "including the one which was
+     * exceeding the Flush_on_Count value." */
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
+    TEST_ASSERT_TRUE(rcp_respqueue_should_flush(&q, (size_t)cfg.flush_on_count * 4u));
+
+    /* Packing: a third, small entry plus a Max_AVTPDUsize of 12 octets
+     * means the first AVTPDU packs 2 entries (10 octets), the second
+     * AVTPDU packs the last one alone. */
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, rcp_respqueue_plan_batch(&q, 12u));
+    for (i = 0; i < 2u; i++) {
+        TEST_ASSERT_TRUE(rcp_respqueue_pop(&q, &out));
+        rcp_bytes_free(&out);
+    }
+    TEST_ASSERT_EQUAL_UINT((size_t)1u, rcp_respqueue_plan_batch(&q, 12u));
+    TEST_ASSERT_TRUE(rcp_respqueue_pop(&q, &out));
+    rcp_bytes_free(&out);
+    TEST_ASSERT_EQUAL_UINT(0u, rcp_respqueue_plan_batch(&q, 12u));
+
+    rcp_respqueue_destroy(&q);
+}
+
+/* TC18 §12.7.9: Flush_time (0x0008, microseconds) forces transmission
+ * once that interval elapses since the queue's last transmission, and
+ * on expiry an EMPTY queue still emits a heartbeat AVTPDU so a client
+ * can see the server is alive -- REQ-RMAP-064/065, still open (neither
+ * is a queue-state-alone concern; both need a clock, which this module
+ * deliberately has none of). Deviation: flush_time_us is inert, and the
  * only liveness machinery in the tree is the RECEIVE side
  * (rcp_deadline_config_t), the mirror image of the obligation. */
-static void test_flush_triggers_and_heartbeat_are_absent(void)
+static void test_flush_time_and_heartbeat_are_absent(void)
 {
     rcp_regmap_response_queue_cfg_t cfg;
     rcp_deadline_config_t           dl;
 
     rcp_regmap_response_queue_cfg_init(&cfg);
-    /* 0 is not merely the wrong default: it is outside Table 24's own
-     * legal range of 1..queue_size. */
-    TEST_ASSERT_EQUAL_UINT16(0u, cfg.flush_on_count);
     TEST_ASSERT_EQUAL_UINT32(0u, cfg.flush_time_us);
 
-    /* Values are stored and never acted on by anything. */
-    cfg.flush_on_count = 4u;
-    cfg.flush_time_us  = 1000u;
-    TEST_ASSERT_EQUAL_UINT16(4u, cfg.flush_on_count);
+    cfg.flush_time_us = 1000u;
     TEST_ASSERT_EQUAL_UINT32(1000u, cfg.flush_time_us);
 
     /* Liveness is modelled only as a client-side deadline on heartbeats
@@ -1361,7 +1402,8 @@ int main(void)
     RUN_TEST(test_response_queue_stream_id_is_configurable);
     RUN_TEST(test_response_queue_size_register_and_storage_now_exist);
     RUN_TEST(test_max_avtpdu_size_is_now_enforced_and_feeds_fragmentation);
-    RUN_TEST(test_flush_triggers_and_heartbeat_are_absent);
+    RUN_TEST(test_flush_on_count_trigger_and_avtpdu_packing);
+    RUN_TEST(test_flush_time_and_heartbeat_are_absent);
     RUN_TEST(test_transmit_fragmentation_now_uses_the_correct_octet_budget);
     RUN_TEST(test_ep0_functional_block_and_discovery_timeout_absent);
     RUN_TEST(test_field_write_error_distinguishes_state_from_writer_denial);

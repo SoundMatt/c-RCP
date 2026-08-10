@@ -93,3 +93,31 @@ size_t rcp_respqueue_max_fragment_payload(size_t max_avtpdu_size_octets, size_t 
 
     return max_avtpdu_size_octets - reserved;
 }
+
+//cfusa:req REQ-RMAP-063
+bool rcp_respqueue_should_flush(const rcp_respqueue_t *q, size_t flush_on_count_octets)
+{
+    if (q->entries_len == 0) return false;
+    if (flush_on_count_octets == 0) return true;
+
+    return q->octets >= flush_on_count_octets;
+}
+
+//cfusa:req REQ-RMAP-063
+size_t rcp_respqueue_plan_batch(const rcp_respqueue_t *q, size_t max_avtpdu_size_octets)
+{
+    size_t i;
+    size_t total = 0;
+
+    if (q->entries_len == 0) return 0;
+    if (max_avtpdu_size_octets == 0) return q->entries_len;
+
+    for (i = 0; i < q->entries_len; i++) {
+        size_t next_total = total + q->entries[i].len;
+
+        if (i > 0 && next_total > max_avtpdu_size_octets) break;
+        total = next_total;
+    }
+
+    return i;
+}

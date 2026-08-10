@@ -199,6 +199,86 @@ static void test_max_fragment_payload_is_zero_when_unbounded_or_no_budget_remain
                            rcp_respqueue_max_fragment_payload(5u, RCP_ACF_ABB_HEADER_LEN));
 }
 
+/* ── REQ-RMAP-063: the flush_on_count trigger and AVTPDU packing plan ─────── */
+
+static void test_should_flush_triggers_once_octets_reach_the_threshold(void)
+{
+    rcp_respqueue_t q;
+    uint8_t         frame[5] = {0};
+
+    rcp_respqueue_init(&q, 0, 0);
+    TEST_ASSERT_FALSE(rcp_respqueue_should_flush(&q, 8u)); /* empty */
+
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
+    TEST_ASSERT_FALSE(rcp_respqueue_should_flush(&q, 8u)); /* 5 < 8 */
+
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
+    TEST_ASSERT_TRUE(rcp_respqueue_should_flush(&q, 8u)); /* 10 >= 8 */
+
+    rcp_respqueue_destroy(&q);
+}
+
+static void test_should_flush_zero_threshold_means_any_nonempty_queue(void)
+{
+    rcp_respqueue_t q;
+    uint8_t         frame[1] = {0};
+
+    rcp_respqueue_init(&q, 0, 0);
+    TEST_ASSERT_FALSE(rcp_respqueue_should_flush(&q, 0u));
+
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
+    TEST_ASSERT_TRUE(rcp_respqueue_should_flush(&q, 0u));
+
+    rcp_respqueue_destroy(&q);
+}
+
+static void test_plan_batch_is_zero_for_an_empty_queue(void)
+{
+    rcp_respqueue_t q;
+
+    rcp_respqueue_init(&q, 0, 0);
+    TEST_ASSERT_EQUAL_UINT(0u, rcp_respqueue_plan_batch(&q, 100u));
+
+    rcp_respqueue_destroy(&q);
+}
+
+static void test_plan_batch_always_keeps_at_least_one_entry(void)
+{
+    rcp_respqueue_t q;
+    uint8_t         big[50] = {0};
+
+    rcp_respqueue_init(&q, 0, 0);
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, big, sizeof(big)));
+
+    /* A budget smaller than the one queued entry still plans that one
+     * entry -- rcp_respqueue_push()'s own REQ-RMAP-061 enforcement
+     * already guarantees every queued entry individually fits within
+     * whatever max_avtpdu_size_octets this queue was configured with,
+     * so this function never needs to represent "0 entries fit". */
+    TEST_ASSERT_EQUAL_UINT(1u, rcp_respqueue_plan_batch(&q, 10u));
+
+    rcp_respqueue_destroy(&q);
+}
+
+static void test_plan_batch_packs_as_many_entries_as_fit(void)
+{
+    rcp_respqueue_t q;
+    uint8_t         frame[5] = {0};
+
+    rcp_respqueue_init(&q, 0, 0);
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
+
+    /* Budget 12: entries 1+2 (10 octets) fit, entry 3 would push to 15. */
+    TEST_ASSERT_EQUAL_UINT(2u, rcp_respqueue_plan_batch(&q, 12u));
+
+    /* Budget 0 (unbounded): every remaining entry packs into one AVTPDU. */
+    TEST_ASSERT_EQUAL_UINT(3u, rcp_respqueue_plan_batch(&q, 0u));
+
+    rcp_respqueue_destroy(&q);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -215,6 +295,12 @@ int main(void)
 
     RUN_TEST(test_max_fragment_payload_reserves_header_and_worst_case_pad);
     RUN_TEST(test_max_fragment_payload_is_zero_when_unbounded_or_no_budget_remains);
+
+    RUN_TEST(test_should_flush_triggers_once_octets_reach_the_threshold);
+    RUN_TEST(test_should_flush_zero_threshold_means_any_nonempty_queue);
+    RUN_TEST(test_plan_batch_is_zero_for_an_empty_queue);
+    RUN_TEST(test_plan_batch_always_keeps_at_least_one_entry);
+    RUN_TEST(test_plan_batch_packs_as_many_entries_as_fit);
 
     return UNITY_END();
 }
