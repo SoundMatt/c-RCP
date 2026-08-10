@@ -440,7 +440,47 @@ typedef struct {
                                    as every other Group 1 item. */
     uint16_t svr_root_client_index;   /* RCP_REGMAP_NO_ROOT_CLIENT if unset */
 
-    rcp_regmap_table_ref_t hw_pin_map;
+    uint16_t svr_hw_cfg_ptr; /* REQ-RMAP-033 (TC18 §12.7.5 Table 18,
+                                 relative address 0x001A, 16 bit, R): the
+                                 address of the HW_config register map
+                                 (§12.7.6). Retyped from this field's own
+                                 former shape (rcp_regmap_table_ref_t, the
+                                 shared pointer/capacity-pair type every
+                                 other sub-table ref below still uses) to
+                                 a bare 16-bit register-address value,
+                                 matching TC18's own definition exactly:
+                                 svr_hw_cfg_ptr is a LONE pointer with no
+                                 adjacent capacity register of its own --
+                                 unlike the sub-table refs below, whose
+                                 own deviation (REQ-RMAP-034) is a
+                                 different shape mismatch (separate TC18
+                                 ptr+capacity REGISTER pairs, collapsed
+                                 into one struct), HW_config's extent
+                                 comes from a wholly separate, already-
+                                 modeled register (svr_io_pin_count,
+                                 REQ-RMAP-032) instead of a capacity
+                                 field bundled with this pointer at all.
+                                 The former rcp_regmap_table_ref_t shape
+                                 carried two compounding problems this
+                                 retype fixes together: (1) a spurious
+                                 capacity member with no TC18 basis for
+                                 THIS register, inviting a second,
+                                 contradictory source of truth for the
+                                 table's length alongside svr_io_pin_
+                                 count; (2) an offset expressed in this
+                                 project's own "register word" unit
+                                 (32 bit) rather than TC18's own 16-bit
+                                 register-map address, which could not
+                                 be encoded into its real wire slot
+                                 without an unwritten unit conversion.
+                                 Content modeling only, same REQ-RMAP-024
+                                 wire-reachability boundary as every
+                                 other Group 1 item -- and, like every
+                                 Group 1 item whose real HW_config table
+                                 storage does not exist yet (REQ-RMAP-040
+                                 through -045, Group 2), this pointer has
+                                 nothing real to point AT yet either;
+                                 that remains separately open. */
     rcp_regmap_table_ref_t request_stream_cfg;
     rcp_regmap_table_ref_t response_queue_cfg;
     rcp_regmap_table_ref_t ep_generic_cfg;
