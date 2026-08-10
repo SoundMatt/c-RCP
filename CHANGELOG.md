@@ -32,6 +32,32 @@ the rationale.
 
 ## Releases
 
+### v0.159.0 -- 2026-08-10
+
+**Phase 5b batch 7: REQ-LIFECYCLE-022 EPs_NOT_IDLE gate, Figure 16
+primary-source corrections.** Issue #198. Read TC18's Figure 16 as an
+actual PDF page image (the extracted text renders this diagram too
+poorly to trust) and found the `EPs_NOT_IDLE` gate applies to exactly
+the `HW_UNCONFIGURED <-> HW_CONFIGURED` transitions, not
+`HW_CONFIGURED -> RCP_CONFIGURED`. `rcp_lifecycle_transition()` gains
+an `all_other_eps_idle` parameter and a new `RCP_LIFECYCLE_ERR_EPS_NOT_IDLE`
+code, gating exactly those two transitions -- scoped `partial` since
+Figure 16's own diagram-only "EPs_NOT_IDLE" name maps to none of the
+seventeen numbered wire error codes anywhere in the spec, a genuine
+TC18 inconsistency. Same image inspection also revealed
+`RCP_CONFIGURED`'s own box has no equivalent "unknown stream/bb_id ->
+ignore" transition at all, unlike `HW_UNCONFIGURED`'s/`HW_CONFIGURED`'s
+-- corrected `REQ-LIFECYCLE-025`/`034`'s own catalog text to this
+finding (genuine spec silence, not an implementable gap) rather than
+leave them stale. Blast radius: 20 call sites via the same
+required-parameter/compiler-enumeration technique as batch 5, zero
+surprises. Mutation-tested two ways. Full suite (64/64) + ASan/UBSan
+clean, fresh `cfusa check`/`trace` (0 errors, 100%/100%, all three
+gates verified as CI's own separate invocations). See `ROADMAP.md`
+milestone 159 for full detail. 1030 requirements (unchanged), 136
+`tc18-gap` entries remaining (unchanged count -- three status upgrades
+within the gap category).
+
 ### v0.158.0 -- 2026-08-10
 
 **Phase 5b batch 6: REQ-LIFECYCLE-024 write-denial error response,

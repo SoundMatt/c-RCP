@@ -115,9 +115,9 @@ static rcp_mock_server_t *fixture(handler_log_t *log)
 
     memset(log, 0, sizeof(*log));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-        rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP, none));
+        rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP, none, true));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-        rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP, root));
+        rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP, root, true));
     TEST_ASSERT_EQUAL(RCP_MOCK_OK,
         rcp_mock_server_add_endpoint(srv, 1, 1, true /* ep_enable */, logging_handler, log));
     TEST_ASSERT_TRUE(rcp_mock_server_set_sequencer_count(srv, 4));

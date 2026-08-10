@@ -135,6 +135,22 @@ typedef enum {
                                                     not permitted to request
                                                     this svr_lifecycle_state
                                                     change */
+    RCP_LIFECYCLE_ERR_EPS_NOT_IDLE         = 5, /* REQ-LIFECYCLE-022: another
+                                                    endpoint still has an
+                                                    in-flight or queued
+                                                    request; TC18 Figure 16's
+                                                    own diagram-only "EPs_NOT_
+                                                    IDLE" outcome, which maps
+                                                    to none of the seventeen
+                                                    numbered wire error codes
+                                                    (errors.h) -- a genuine
+                                                    spec inconsistency, not
+                                                    something this library
+                                                    can resolve by inventing
+                                                    a mapping; this is a
+                                                    local-only error code
+                                                    until/unless TC18
+                                                    clarifies one */
 } rcp_lifecycle_errc_t;
 
 /* Human-readable message for an rcp_lifecycle_errc_t value. Never returns NULL. */
@@ -219,26 +235,29 @@ typedef struct {
 
 /* ── Lifecycle transitions ─────────────────────────────────────────────────── */
 
-/* Attempts to move *state to target on behalf of writer. On success,
- * *state is updated to target and RCP_LIFECYCLE_OK is returned; on
- * failure *state is left unchanged and the failure reason is returned.
- * Permitted transitions:
+/* Attempts to move *state to target on behalf of writer, given whether
+ * all_other_eps_idle. On success, *state is updated to target and
+ * RCP_LIFECYCLE_OK is returned; on failure *state is left unchanged and
+ * the failure reason is returned. Permitted transitions:
  *
- *   - HW_UNCONFIGURED -> HW_CONFIGURED: guarded by rcp_lifecycle_check_hw_cfg();
- *     failure returns RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT. writer is not
+ *   - HW_UNCONFIGURED -> HW_CONFIGURED: guarded by idleness (see below),
+ *     then by rcp_lifecycle_check_hw_cfg(); a plausibility failure
+ *     returns RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT. writer is not
  *     consulted for this transition -- TC18 §12.3.1.1 requires only that
  *     the request travel via the discovery stream, already enforced one
  *     layer up by rcp_lifecycle_should_accept()'s HW_UNCONFIGURED branch
  *     (no root client can exist yet at this point in bring-up).
  *   - HW_CONFIGURED -> RCP_CONFIGURED: guarded first by writer authorization
  *     (see below), then by rcp_lifecycle_check_rcp_cfg(); a plausibility
- *     failure returns RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT.
+ *     failure returns RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT. NOT
+ *     idle-gated -- see idleness paragraph below.
  *   - HW_CONFIGURED -> HW_UNCONFIGURED and RCP_CONFIGURED ->
  *     HW_UNCONFIGURED: the discovery-stream/root-client reset path,
- *     guarded by the same writer authorization as the advance above; snap
- *     is ignored for these two once authorized.
- *   - state -> the same state: always a no-op success; writer and snap are
- *     both ignored.
+ *     guarded by the same writer authorization as the advance above and
+ *     by idleness (see below); snap is ignored for these two once
+ *     authorized and idle.
+ *   - state -> the same state: always a no-op success; writer, snap and
+ *     all_other_eps_idle are all ignored.
  *
  * Writer authorization (REQ-LIFECYCLE-031, TC18 §12.3.1.2): both the
  * HW_CONFIGURED -> RCP_CONFIGURED advance and either reset-to-
@@ -259,15 +278,33 @@ typedef struct {
  * exists, rather than accepting an unqualified stream this library
  * cannot actually validate.
  *
+ * Idleness (REQ-LIFECYCLE-022, TC18 Figure 16): the HW_UNCONFIGURED ->
+ * HW_CONFIGURED advance and either reset-to-HW_UNCONFIGURED transition
+ * both require all_other_eps_idle -- an in-flight or queued request on
+ * another endpoint rejects the transition with
+ * RCP_LIFECYCLE_ERR_EPS_NOT_IDLE, *state left unchanged, checked before
+ * (for the advance) or after (for the reset, alongside writer
+ * authorization) each transition's own other guards. The
+ * HW_CONFIGURED -> RCP_CONFIGURED advance is deliberately NOT idle-
+ * gated: Figure 16's own label for that transition ("...& RCP_config
+ * consistent -> send positive response") makes no mention of endpoint
+ * idleness, unlike the two transitions above/below it. Figure 16 itself
+ * names this outcome "EPs_NOT_IDLE" but that name maps to none of the
+ * seventeen numbered wire error codes errors.h models (§12.9.6's own
+ * table) -- a genuine TC18 inconsistency this library cannot resolve by
+ * inventing a mapping, so RCP_LIFECYCLE_ERR_EPS_NOT_IDLE is a
+ * local-only error code for now.
+ *
  * Any other requested transition (e.g. skipping straight from
  * HW_UNCONFIGURED to RCP_CONFIGURED, or downgrading from RCP_CONFIGURED to
  * HW_CONFIGURED without first returning all the way to HW_UNCONFIGURED) is
  * rejected with RCP_LIFECYCLE_ERR_INVALID_TRANSITION, regardless of
- * writer. */
+ * writer or idleness. */
 rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
                                                rcp_lifecycle_state_t target,
                                                const rcp_lifecycle_plausibility_snapshot_t *snap,
-                                               rcp_lifecycle_writer_ctx_t writer);
+                                               rcp_lifecycle_writer_ctx_t writer,
+                                               bool all_other_eps_idle);
 
 /* ── Per-state request filtering ───────────────────────────────────────────── */
 

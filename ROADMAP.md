@@ -8015,3 +8015,90 @@ tests fail (`Expected 3 Was 4`). Both restored clean. Full test suite
 `cfusa trace --req-coverage 100 --sec-tested 100` (100%/100%). 1030
 requirements (was 1029, `REQ-WIREERR-004` added), 136 `tc18-gap`
 entries remaining (was 137, one genuine closure).
+
+### 159. Phase 5b batch 7: REQ-LIFECYCLE-022 EPs_NOT_IDLE gate, Figure 16 primary-source corrections (issue #198)
+
+TC18 Figure 16's extracted text (this project's own pre-existing
+`/tmp/tc18_full.txt` OCR/`pdftotext -layout` dump) is genuinely too
+garbled to trust for a design decision as consequential as this one --
+a state-machine diagram, not prose, does not survive `-layout`
+extraction cleanly. Before implementing anything, read the actual PDF
+page image directly (page 42) via the PDF-page-image capability rather
+than continuing to rely on jumbled extracted text. This produced two
+results this batch: a clean, implementable fix (`REQ-LIFECYCLE-022`)
+and a corrected, narrower understanding of two already-catalogued gaps
+(`REQ-LIFECYCLE-025`/`034`) that turned out not to have a clear
+implementable fix at all.
+
+**REQ-LIFECYCLE-022 (implemented, partial)**: the diagram confirms the
+`EPs_NOT_IDLE` gate applies to exactly two transitions -- the
+`HW_UNCONFIGURED -> HW_CONFIGURED` advance ("...& all other EPs are
+Idle -> send positive response") and either reset-to-`HW_UNCONFIGURED`
+transition ("...& other EPs are not Idle -> send error response
+EPs_NOT_IDLE") -- and explicitly does NOT apply to the `HW_CONFIGURED
+-> RCP_CONFIGURED` advance, whose own label makes no mention of
+idleness. `rcp_lifecycle_transition()` gains an `all_other_eps_idle`
+parameter and a new `RCP_LIFECYCLE_ERR_EPS_NOT_IDLE` error code (value
+5, additive), gating exactly those two transitions. Scoped `partial`
+rather than `implemented`: Figure 16 names this outcome `EPs_NOT_IDLE`
+but that name maps to none of the seventeen numbered wire error codes
+`errors.h` models (§12.9.6's own table lists both `UNSUPPORTED_CMD`
+through `CHAIN_ERROR` by number -- no `EPs_NOT_IDLE` anywhere) -- a
+genuine TC18 inconsistency this library cannot resolve by inventing a
+mapping, so the new error code is local-only for now, matching the
+`REQ-LIFECYCLE-031`/`RCP_LIFECYCLE_ERR_UNAUTHORIZED` precedent exactly.
+
+**Blast radius, third time using the required-parameter technique**:
+same playbook as batch 5 -- a required parameter (not an additive
+struct field, since there's no sensible default) forces every call
+site into view via the compiler's own "too few arguments" errors. 20
+call sites across `src/mock.c`'s one wrapper and 5 test files, all
+fixed from the compiler's own enumeration, zero surprise blast radius.
+`test_tc18_gaps_server.c`'s own `test_transition_takes_no_idle_input`
+deviation pin (from batch 5) rewritten to
+`test_transition_now_requires_idle_for_demotion`, asserting the closed
+behavior directly; a new dedicated test added for the
+`HW_UNCONFIGURED -> HW_CONFIGURED` half
+(`test_transition_hw_unconfigured_to_hw_configured_requires_idle`),
+since nothing had pinned that direction's gate yet.
+
+**REQ-LIFECYCLE-025/034 (narrowed from `not-implemented` to `partial`,
+no code change)**: the same Figure 16 image inspection revealed
+`RCP_CONFIGURED`'s own box has NO equivalent "unknown stream/bb_id ->
+ignore" transition anywhere in the diagram, unlike `HW_UNCONFIGURED`'s
+and `HW_CONFIGURED`'s boxes, which both have one explicitly.
+`HW_CONFIGURED`'s own version of this rule is already substantively
+satisfied by `REQ-LIFECYCLE-032`'s merged fix (EP0-only admission).
+`RCP_CONFIGURED`'s absence of an equivalent rule is genuine spec
+silence, not a straightforward c-RCP gap -- inventing an "unknown
+association -> drop" behavior for `RCP_CONFIGURED` that TC18's own
+diagram does not actually specify would risk introducing new
+non-conformant behavior, not fixing existing non-conformance, so no
+code change was made. Separately, re-verified `REQ-LIFECYCLE-034`'s own
+prose citation (TC18.txt L2458-2459) precisely: "Configuration requests
+directly to EPs are only allowed In RCP_CONFIGURED or in HW_CONFIGURED
+with valid stream_id/byte_bus_id configuration" -- read exactly, this
+means RCP_CONFIGURED direct-to-EP requests are allowed
+*unconditionally* (no per-request association check required there at
+all), narrower than this requirement's own original text implied; and
+HW_CONFIGURED's own half is, again, already conservatively satisfied by
+`-032`. Both `.fusa-reqs.json` entries corrected to reflect these
+precise findings (their own text is the artifact of record here, per
+the standing instruction to keep requirements current with new TC18
+discoveries) rather than left stale documenting an over-broad or
+imprecise gap.
+
+Mutation-tested two ways: `git stash` on `src/lifecycle.c` alone ->
+build breaks (`conflicting types`), the new-API signature-change
+signal; a precise mutation removing both `if (!all_other_eps_idle)
+return RCP_LIFECYCLE_ERR_EPS_NOT_IDLE;` checks (replaced with a no-op
+comment, signature untouched) -> exactly the 2 new/rewritten pinned
+tests fail (`Expected 5 Was 0`), every other test still passes. Both
+restored clean. Full test suite (64/64) + ASan/UBSan build both clean.
+Fresh `cfusa check` (0 errors) + `cfusa trace --req-coverage 100
+--sec-tested 100` (100%/100%, all three gates verified as the exact
+separate invocations CI uses, per batch 6's own lesson). 1030
+requirements (unchanged, no new REQ ids), 136 `tc18-gap` entries
+remaining (unchanged count -- three entries move `not-implemented`/
+`not-implemented`/`not-implemented` -> `partial`/`partial`/`partial`
+within the gap category, no full closures this batch).

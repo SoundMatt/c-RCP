@@ -8434,13 +8434,13 @@
     {
       "id": "REQ-LIFECYCLE-022",
       "title": "A lifecycle-state change is refused with EPs_NOT_IDLE while any other endpoint is busy",
-      "text": "NOT IMPLEMENTED: c-RCP does not gate lifecycle-state changes on endpoint idleness (TC18 \u00a712.3, Figure 16). rcp_lifecycle_transition() performs the demotion to RCP_LIFECYCLE_HW_UNCONFIGURED unconditionally and has no per-endpoint idle input, so a demotion (or a promotion to HW_CONFIGURED) is accepted while other endpoints still have in-flight or queued requests, instead of being rejected with an EPs_NOT_IDLE error response. Requests in flight on unrelated endpoints can therefore be torn down mid-execution by a lifecycle reset.",
+      "text": "PARTIAL: verified directly against the primary-source PDF's own Figure 16 image (not just the pre-existing text extraction, which renders this diagram too poorly to trust for a design decision) -- confirms the EPs_NOT_IDLE gate applies to exactly two transitions: the HW_UNCONFIGURED -> HW_CONFIGURED advance (\"...& all other EPs are Idle -> send positive response\") and either reset-to-HW_UNCONFIGURED transition (\"...& other EPs are not Idle -> send error response EPs_NOT_IDLE\"); the HW_CONFIGURED -> RCP_CONFIGURED advance's own label makes no mention of idleness and is correctly NOT gated. rcp_lifecycle_transition() now takes an all_other_eps_idle parameter and rejects with the new RCP_LIFECYCLE_ERR_EPS_NOT_IDLE for both gated transitions when false. Not fully IMPLEMENTED: TC18's own diagram names this outcome \"EPs_NOT_IDLE\" but that name maps to none of the seventeen numbered wire error codes errors.h models (\u00a712.9.6's own table) -- a genuine TC18 inconsistency (the diagram-only name has no corresponding numbered code anywhere in the specification) this library cannot resolve by inventing a mapping, so RCP_LIFECYCLE_ERR_EPS_NOT_IDLE remains a local-only lifecycle error code, not yet wired to a wire response.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
-      "tc18": "\u00a712.3, TC18.txt L2117-L2120 and L2129-L2131 (Figure 16)"
+      "status": "partial",
+      "tc18": "\u00a712.3, TC18.txt L2117-L2120 and L2129-L2131 (Figure 16, verified against primary-source PDF page 42's own image)"
     },
     {
       "id": "REQ-LIFECYCLE-023",
@@ -8466,13 +8466,13 @@
     {
       "id": "REQ-LIFECYCLE-025",
       "title": "Requests on an unknown stream/byte_bus_id are ignored in HW_CONFIGURED",
-      "text": "NOT IMPLEMENTED: c-RCP does not drop requests arriving on an unknown stream_id/byte_bus_id combination (TC18 \u00a712.3, Figure 16). rcp_lifecycle_should_accept() takes no stream identity and returns true for every frame in HW_CONFIGURED and RCP_CONFIGURED that survives the TSCF rule, so a frame from an unconfigured stream is admitted to the dispatch path instead of being ignored without response. An unauthorised or stale client can drive endpoints that were never associated with its stream.",
+      "text": "PARTIAL: verified directly against the primary-source PDF's own Figure 16 image (page 42; the pre-existing text extraction renders this diagram too poorly to trust for a design decision). Finding: HW_CONFIGURED's own box shows an explicit self-loop -- \"Non discovery request & discovery stream assigned or unknown stream/bb_id -> ignore\" -- which REQ-LIFECYCLE-032's already-merged fix (HW_CONFIGURED admits only byte_bus_id == EP0) substantively satisfies for the unknown-byte_bus_id half: any non-EP0 byte_bus_id is now dropped, matching this rule's intent, though not with full precision to the diagram's own \"non discovery request\" / \"discovery stream already assigned\" distinctions, which rcp_lifecycle_should_accept() still does not model separately. RCP_CONFIGURED's own box, by contrast, shows NO equivalent \"unknown stream/bb_id -> ignore\" transition anywhere in the diagram -- every one of its four transitions/self-loops is phrased as a positive \"Request via stream_id/bb_id...\" precondition, with no corresponding negative/ignore case drawn the way HW_UNCONFIGURED's and HW_CONFIGURED's boxes both have. This is genuine spec silence (Figure 16 itself does not specify RCP_CONFIGURED's unknown-association behavior), not a straightforward c-RCP gap to close by inference -- inventing behavior TC18 does not actually specify would risk introducing non-conformant behavior rather than fixing one. Tracked as an open architecture question, same underlying \"no wire-level concept of a valid stream_id/byte_bus_id association\" limitation as REQ-LIFECYCLE-034.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
-      "tc18": "\u00a712.3, TC18.txt L2101-L2105 (Figure 16)"
+      "status": "partial",
+      "tc18": "\u00a712.3, TC18.txt L2101-L2105 (Figure 16, verified against primary-source PDF page 42's own image)"
     },
     {
       "id": "REQ-LIFECYCLE-026",
@@ -8561,13 +8561,13 @@
     {
       "id": "REQ-LIFECYCLE-034",
       "title": "A direct-to-EP configuration request without a valid stream_id/byte_bus_id association must be dropped",
-      "text": "NOT IMPLEMENTED: c-RCP does not drop a configuration request addressed directly to an endpoint when the endpoint has no valid stream_id/byte_bus_id association. rcp_lifecycle_should_accept() (src/lifecycle.c:119) accepts any byte_bus_id unconditionally in RCP_LIFECYCLE_HW_CONFIGURED and RCP_LIFECYCLE_RCP_CONFIGURED, and consults no request-stream configuration at all (its only stream evidence, rcp_lifecycle_request_stream_plausibility_t, is used solely by the transition guards). TC18 \u00a712.7 requires that direct-to-EP configuration requests be permitted only in RCP_CONFIGURED, or in HW_CONFIGURED with a valid stream_id/byte_bus_id configuration, and dropped otherwise. Consequence: a client on an unregistered stream can reach an endpoint's configuration in HW_CONFIGURED.",
+      "text": "PARTIAL: re-verified TC18.txt L2458-2459's exact wording directly against the primary-source PDF: \"Configuration requests directly to EPs are only allowed In RCP_CONFIGURED or in HW_CONFIGURED with valid stream_id/byte_bus_id configuration. If the condition is not fulfilled, the request is dropped.\" Two distinct cases, read precisely: (a) in RCP_CONFIGURED, direct-to-EP configuration requests are allowed unconditionally by this sentence -- no per-request stream_id/byte_bus_id validity check is required here at all, so this requirement's own RCP_CONFIGURED half was mis-scoped in its original text; (b) in HW_CONFIGURED, a valid association is required. REQ-LIFECYCLE-032's already-merged fix (HW_CONFIGURED admits only byte_bus_id == EP0) satisfies (b) conservatively -- more strictly than \u00a712.7 literally asks for (a properly-associated non-EP0 request would also now be dropped, not just an unassociated one), but this library has no wire-level regmap encode/decode for a functional-configuration request at all yet (regmap.h's own file header defers this), so no such properly-associated non-EP0 traffic can exist in this codebase's current scope regardless -- the over-restriction has no practical effect today and is the safe, conservative choice pending that missing capability. Genuinely open only for the theoretical future case once wire-level configuration requests exist; not an active gap given current scope.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
-      "tc18": "\u00a712.7 Configuration, TC18.txt L2458-2459"
+      "status": "partial",
+      "tc18": "\u00a712.7 Configuration, TC18.txt L2458-2459 (re-verified against primary-source PDF)"
     },
     {
       "id": "REQ-LIFECYCLE-035",
