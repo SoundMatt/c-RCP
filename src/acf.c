@@ -117,6 +117,19 @@ uint8_t rcp_acf_pad_len(size_t unpadded_len)
     return (uint8_t)((4u - (unpadded_len % 4u)) % 4u);
 }
 
+//cfusa:req REQ-RMAP-069
+size_t rcp_acf_reg_write_len(uint16_t acf_msg_length, uint8_t pad)
+{
+    size_t total_octets;
+
+    if (acf_msg_length < 3u) return 0;
+
+    total_octets = (size_t)(acf_msg_length - 3u) * 4u;
+    if ((size_t)pad > total_octets) return 0;
+
+    return total_octets - (size_t)pad;
+}
+
 /* ── Response semantics ───────────────────────────────────────────────────── */
 
 //cfusa:req REQ-ACF-002

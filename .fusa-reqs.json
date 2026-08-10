@@ -9299,12 +9299,11 @@
     {
       "id": "REQ-RMAP-069",
       "title": "Effective register-write payload length = (acf_msg_length - 3) x 4 - pad",
-      "text": "NOT IMPLEMENTED: c-RCP provides no helper computing the effective number of register-write data bytes as (acf_msg_length - 3) x 4 - pad (TC18 13.7.1.2), the quantity a server needs to know how many octets of an EP0 register write are data rather than address/CRC/padding. rcp_acf_pad_len() computes the pad octet count only.",
+      "text": "acf.h's rcp_acf_reg_write_len(acf_msg_length, pad) computes the effective number of register-write data bytes exactly as (acf_msg_length - 3) x 4 - pad (TC18 13.7.1.2), the quantity a server needs to know how many octets of an EP0 register write are data rather than address/CRC/padding -- distinct from rcp_acf_pad_len(), which computes the pad octet count only, and from the ACF decoder's own payload_len, which spans the whole payload including the address/CRC region. Fail-safe on a malformed/adversarial frame: returns 0, never underflowing, if acf_msg_length is too small to hold the fixed 3-quadlet region or if pad exceeds what remains.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
+      "scope": "tc18",
       "tc18": "\u00a713.7.1.2, TC18.txt L4031-4032"
     },
     {
