@@ -584,23 +584,42 @@ static void test_wakeup_repetition_ignores_other_valid_avtpdus(void)
  * primitive, caller composes" layering -- lifecycle.h/discovery.h use
  * the identical pattern). The composition lives in mock.h's own
  * srv-aware rcp_mock_server_pwrmode_resume(), tested directly in
- * test_mock.c's test_pwrmode_resume_reenables_all_endpoints(). This
- * test keeps pinning the still-open REQ-PWRMODE-020 half only. */
-static void test_network_wake_skips_handshake_entirely(void)
+ * test_mock.c's test_pwrmode_resume_reenables_all_endpoints().
+ *
+ * As of the REQ-PWRMODE-020 fix: this test's own name is now the
+ * opposite of what it asserts, kept (renamed) rather than deleted, since
+ * it directly pins the correction. TC18 §12.4.1's "a TC14/TC10-network-
+ * woken server... will directly check for the network availability and
+ * proceed as before" means a network wake runs the SAME handshake a
+ * pin/EP-signal wake does (skipping only step (a)'s literal interface
+ * re-enable, a hardware-level nuance this module's state machine does
+ * not represent specially) -- not skip the handshake outright. */
+static void test_network_wake_now_requires_the_same_handshake_as_pin(void)
 {
-    rcp_pwrmode_t           mode = RCP_PWRMODE_SLEEP;
-    rcp_pwrmode_start_kind_t kind = RCP_PWRMODE_START_COLD;
+    rcp_pwrmode_t             mode = RCP_PWRMODE_SLEEP;
+    rcp_pwrmode_start_kind_t  kind = RCP_PWRMODE_START_HOT;
+    rcp_pwrmode_handshake_t   hs;
 
-    /* TC18 §12.4.1: a TC14/TC10-network-woken server skips ONLY the
-     * interface-enable step and then runs the rest of the sequence
-     * (network availability check, WakeUp repetition, endpoint re-enable
-     * once the sleep-request client responds). c-RCP skips the whole
-     * handshake for a network wake, so the client that put it to sleep is
-     * never told it is awake. */
-    TEST_ASSERT_FALSE(rcp_pwrmode_hotstart_required(RCP_PWRMODE_WAKE_VIA_NETWORK));
+    TEST_ASSERT_TRUE(rcp_pwrmode_hotstart_required(RCP_PWRMODE_WAKE_VIA_NETWORK));
+
+    /* No handshake driven yet -- falls back to the module's safe
+     * default, COLD, exactly like an incomplete pin-wake handshake. */
     TEST_ASSERT_EQUAL(RCP_PWRMODE_OK,
                       rcp_pwrmode_wake_from_sleep(&mode, RCP_PWRMODE_WAKE_VIA_NETWORK, NULL,
                                                   &kind));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_NORMAL, mode);
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_START_COLD, kind);
+
+    /* A completed handshake yields HOT, same as a pin wake. */
+    mode = RCP_PWRMODE_SLEEP;
+    rcp_pwrmode_handshake_init(&hs, 3u);
+    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_iface_reenabled(&hs));
+    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_wakeup_attempt(&hs, true));
+    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_resume_queues(&hs));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_OK,
+                      rcp_pwrmode_wake_from_sleep(&mode, RCP_PWRMODE_WAKE_VIA_NETWORK, &hs,
+                                                  &kind));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_NORMAL, mode);
     TEST_ASSERT_EQUAL(RCP_PWRMODE_START_HOT, kind);
 }
 
@@ -1019,7 +1038,7 @@ int main(void)
     RUN_TEST(test_cold_start_target_and_standby_retention);
     RUN_TEST(test_hotstart_has_no_network_check_and_no_responder_stream);
     RUN_TEST(test_wakeup_repetition_ignores_other_valid_avtpdus);
-    RUN_TEST(test_network_wake_skips_handshake_entirely);
+    RUN_TEST(test_network_wake_now_requires_the_same_handshake_as_pin);
     RUN_TEST(test_sleep_entry_is_request_only_with_no_network_path);
     RUN_TEST(test_sleep_request_moves_one_endpoint_only);
     RUN_TEST(test_entry_gate_is_not_rechecked_before_the_mode_change);

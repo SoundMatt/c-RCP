@@ -8489,3 +8489,77 @@ text to a more precisely-scoped `partial`, not a full closure).
 partial). **Next**: `REQ-PWRMODE-020` (network-wake handshake skip,
 already has a fresh deviation pin from this batch), then the rest of
 Group 1 (`-016`/`-017`/`-018`), per issue #199's own suggested order.
+
+### 164. Phase 5c batch 2: REQ-PWRMODE-020 -- network wake now runs the same handshake as pin wake (issue #199)
+
+**REQ-PWRMODE-020 (closed)**: `rcp_pwrmode_hotstart_required()`
+previously returned `false` for `RCP_PWRMODE_WAKE_VIA_NETWORK`,
+skipping the handshake entirely -- this module's OWN file header
+documented that as deliberate ("the four-step handshake below is not
+just unnecessary but actively skipped for this path"), and
+`REQ-PWRMODE-005`'s own catalog text encoded it as a formal
+requirement. Primary-source re-verification (TC18 §12.4.1, the same
+sentence `REQ-PWRMODE-005`'s own citation note already flagged as
+contradicting this design) confirmed the design was wrong: "a TC14/
+TC10 wake-up request on the network... will directly check for the
+network availability and proceed as before" -- "proceed as before"
+means run the SAME hot-start procedure a pin/EP-signal wake runs, not
+skip it.
+
+Fixed: `rcp_pwrmode_hotstart_required()` now returns `true`
+unconditionally (the `path` parameter kept in the signature as a
+future-extensibility hook, not dropped). `rcp_pwrmode_wake_from_sleep()`
+now classifies a network wake by the same handshake-completion rule a
+pin wake already used -- a `NULL` or incomplete handshake now correctly
+yields `RCP_PWRMODE_START_COLD` instead of an unconditional `HOT`.
+`REQ-PWRMODE-005`'s own `.fusa-reqs.json` text corrected in the same
+change (it had baked in the wrong behavior as a formal requirement,
+contradicting its own citation note).
+
+**Second call site found and fixed**: `powerstate.c` (the legacy
+client-side convenience wrapper, `superseded by power.h` per its own
+file header but still fully compiled/tested) has its own
+`rcp_powerstate_manager_wake_via_network()`, documented as "always hot
+for a network wake, no wire exchange of its own" -- it called
+`rcp_pwrmode_wake_from_sleep()` with a `NULL` handshake, relying
+entirely on the old always-skip behavior. Fixed by having this
+function synthesize and immediately complete a handshake locally
+before calling the (now-corrected) library primitive -- preserves its
+own documented "always hot" contract exactly (this wrapper represents
+the whole network wake-up event happening atomically, not a
+caller-driven multi-step exchange the way the pin-wake path is) without
+touching its public signature, so no test in `test_powerstate.c` needed
+to change.
+
+Test changes: `test_power.c`'s `test_hotstart_required_true_for_pin_
+false_for_network` renamed `test_hotstart_required_true_for_every_path`
+and rewritten; `test_wake_from_sleep_via_network_is_always_hot` split
+into `test_wake_from_sleep_via_network_cold_without_handshake` (NULL
+handshake -> COLD, the new safe default) and
+`test_wake_from_sleep_via_network_hot_when_handshake_complete`
+(completed handshake -> HOT, unified with the pin-wake rule).
+`test_tc18_gaps_server.c`'s own `test_network_wake_skips_handshake_
+entirely` (from batch 1) renamed `test_network_wake_now_requires_the_
+same_handshake_as_pin` and rewritten to assert both the COLD-without-
+handshake and HOT-with-handshake cases for the network path directly
+against the library primitive.
+
+Mutation-tested two ways: a full revert of `src/power.c`/`src/
+powerstate.c`/`include/rcp/power.h`/`include/rcp/powerstate.h` together
+reproduces exactly the 3 pinned failures the fix targets (`test_power.c`
+x2, `test_tc18_gaps_server.c` x1) -- `test_powerstate.c` itself stays
+green under the full revert, since reverting both `power.c` and
+`powerstate.c` together restores their original, internally-consistent
+pairing; a precise single-line mutation isolated to `powerstate.c`
+alone (the synthesized handshake's own `resume_queues()` call replaced
+with a no-op) isolates exactly `test_powerstate.c`'s own pinned test,
+confirming that fix is independently covered. Both restored clean.
+Full test suite (64/64) + ASan/UBSan build both clean. Fresh `cfusa
+check` (0 errors) + `cfusa trace --gaps` / `--req-coverage 100` /
+`--sec-tested 100` (all three separate invocations, matching CI;
+100%/100%, 0 untested). 1030 requirements (unchanged, no new REQ ids),
+129 `tc18-gap` entries remaining (was 130, one genuine closure).
+
+**Phase 5c progress after batch 2**: 2/15 items addressed (`-019`
+partial, `-020` closed). **Next**: the rest of Group 1
+(`-016`/`-017`/`-018`), per issue #199's own suggested order.

@@ -71,9 +71,17 @@ rcp_pwrmode_errc_t rcp_pwrmode_transition(rcp_pwrmode_t *mode, rcp_pwrmode_t tar
 /* ── Waking from Sleep ─────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-PWRMODE-005
+//cfusa:req REQ-PWRMODE-020
 bool rcp_pwrmode_hotstart_required(rcp_pwrmode_wake_path_t path)
 {
-    return path != RCP_PWRMODE_WAKE_VIA_NETWORK;
+    /* REQ-PWRMODE-020 (TC18 §12.4.1): a TC14/TC10 network wake "will
+     * directly check for the network availability and proceed as
+     * before" -- the same hot-start handshake a pin/EP-signal wake runs,
+     * not a skip. path is intentionally unused now (kept in the
+     * signature as a future extensibility hook -- see this function's
+     * own header doc comment). */
+    (void)path;
+    return true;
 }
 
 //cfusa:req REQ-PWRMODE-006

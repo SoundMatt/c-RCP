@@ -6856,13 +6856,13 @@
     },
     {
       "id": "REQ-PWRMODE-005",
-      "title": "rcp_pwrmode_hotstart_required() identifies the network-wake handshake bypass",
-      "text": "rcp_pwrmode_hotstart_required() shall return false for RCP_PWRMODE_WAKE_VIA_NETWORK and true for RCP_PWRMODE_WAKE_VIA_PIN.",
+      "title": "rcp_pwrmode_hotstart_required() is required for every wake path, network included",
+      "text": "CORRECTED by REQ-PWRMODE-020's fix: this entry's own original text (\"shall return false for RCP_PWRMODE_WAKE_VIA_NETWORK\") baked in the exact divergence its own citation note already flagged as a known gap -- rcp_pwrmode_hotstart_required() now shall return true for both RCP_PWRMODE_WAKE_VIA_PIN and RCP_PWRMODE_WAKE_VIA_NETWORK, matching TC18 §12.4.1's own \"proceed as before\" text (a network wake runs the same handshake a pin wake does, skipping only the literal interface-re-enable sub-step, a hardware-level nuance this module's state machine does not represent specially).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§12.4.1 (\"If the wake-up source was a TC14/TC10 wake-up request on the network this will also wake the RC Server, but it will directly check for the network availability and proceed as before.\"), TC18.txt L2304-2305 -- NOTE: TC18 requires a network wake to skip only the interface-enable step and still run the rest of the handshake, not bypass the whole handshake; that divergence is a known, separately-tracked gap, see REQ-PWRMODE-020"
+      "tc18": "§12.4.1 (\"If the wake-up source was a TC14/TC10 wake-up request on the network this will also wake the RC Server, but it will directly check for the network availability and proceed as before.\"), TC18.txt L2304-2305"
     },
     {
       "id": "REQ-PWRMODE-006",
@@ -8707,13 +8707,12 @@
     },
     {
       "id": "REQ-PWRMODE-020",
-      "title": "A network wake skips only the interface-enable step, not the rest of the hot-start sequence",
-      "text": "NOT IMPLEMENTED: c-RCP skips the entire hot-start handshake for a network wake (TC18 \u00a712.4.1). rcp_pwrmode_hotstart_required() returns false for RCP_PWRMODE_WAKE_VIA_NETWORK, so rcp_pwrmode_wake_from_sleep() declares a hot start immediately, whereas the specification requires a TC14/TC10-network-woken server to skip only the interface-enable step and then proceed exactly as a pin/EP wake does: check network availability, send the repetitive wake response to the sleep-request client, and re-enable endpoints and queues on its reply. A network-woken server therefore never tells the sleeping client it is awake.",
+      "title": "A network wake runs the same hot-start handshake a pin wake does, not a bypass",
+      "text": "IMPLEMENTED: rcp_pwrmode_hotstart_required() (REQ-PWRMODE-005) now returns true unconditionally, so rcp_pwrmode_wake_from_sleep() classifies RCP_PWRMODE_WAKE_VIA_NETWORK by the same handshake-completion rule RCP_PWRMODE_WAKE_VIA_PIN already used, matching TC18 \u00a712.4.1's own \"proceed as before\" text -- a network-woken server now runs the WakeUp-repetition exchange (steps b/c) and is no longer classified hot before the sleeping client has actually been told it is awake. power.h's own state machine still requires a step-(a) rcp_pwrmode_handshake_iface_reenabled() call before step (b) can run for either path, unchanged -- the spec's own nuance (a network wake's network-availability check is trivially satisfied, since the wake arrived via the network in the first place) does not need separate modeling here: no literal hardware action is implied by that call for either path, only a state-machine precondition. A second call site, powerstate.c's rcp_powerstate_manager_wake_via_network() (the legacy client-side convenience wrapper's own \"always hot for network\" contract), now synthesizes and immediately completes a handshake locally to preserve that documented contract against power.h's corrected primitive -- see that function's own doc comment.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
+      "scope": "tc18",
       "tc18": "\u00a712.4.1, TC18.txt L2304-L2305"
     },
     {
