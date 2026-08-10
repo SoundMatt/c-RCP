@@ -32,6 +32,30 @@ the rationale.
 
 ## Releases
 
+### v0.179.0 -- 2026-08-10
+
+**Phase 5d batch 9: REQ-RMAP-026 -- svr_req_stream_max/
+svr_responder_streams_max corrected to 8-bit width.** Issue #200. First
+Group 1 batch to retype/rename an existing field rather than only add
+new ones -- checked blast radius first (one declaration, five test-only
+usage sites, no `src/*.c` consumer). Retyped `uint16_t` -> `uint8_t`
+(matching TC18 Table 18's own register width; a value the real register
+could never hold is now impossible to construct) and renamed
+`svr_max_request_streams` -> `svr_req_stream_max` to match TC18's own
+register name. New `svr_responder_streams_max` (`uint8_t`) fills the
+previously-missing register. Rewrote the deviation pin (which
+specifically demonstrated the old 16-bit field accepting `0x0100`, now
+impossible) into a positive test proving both fields are 1 octet wide
+and round-trip `0xFF` correctly. `REQ-RMAP-026` stays `partial`
+(unchanged status, narrowed text) -- content now correct, still not
+wire-reachable (`REQ-RMAP-024`). Mutation-tested two ways (retype
+reverted fails the new `sizeof()` assertion; full header revert with
+tests kept breaks the build). Full suite (65/65) + ASan/UBSan clean.
+Fresh `cfusa check`/`trace` (0 errors, 100%/100%, three separate
+CI-matching invocations). See `ROADMAP.md` milestone 179 for full
+detail. 1030 requirements (unchanged), 110 `tc18-gap` entries remaining
+(unchanged).
+
 ### v0.178.0 -- 2026-08-10
 
 **Phase 5d batch 8: REQ-RMAP-025 -- RCP_LIFECYCLE_FIELD_READ_ONLY

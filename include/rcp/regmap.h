@@ -275,7 +275,29 @@ typedef struct {
                                       that requirement, and REQ-RMAP-023
                                       itself stays "partial" (not
                                       "implemented") until it does. */
-    uint16_t svr_max_request_streams;
+    uint8_t  svr_req_stream_max; /* REQ-RMAP-026 (TC18 §12.7.5 Table 18,
+                                     relative address 0x000E, 8 bit, R):
+                                     maximum number of request streams
+                                     usable to access this RC Server.
+                                     8 bit on the wire, not 16 -- renamed
+                                     from this field's own former name
+                                     (svr_max_request_streams) to match
+                                     TC18's own register name, and
+                                     retyped so an in-process value this
+                                     register's own width could never
+                                     represent is impossible to construct
+                                     in the first place. Content modeling
+                                     only, same REQ-RMAP-024 wire-
+                                     reachability boundary as
+                                     svr_lifecycle_state above. */
+    uint8_t  svr_responder_streams_max; /* REQ-RMAP-026 (TC18 §12.7.5
+                                            Table 18, relative address
+                                            0x000F, 8 bit, R): maximum
+                                            number of supported responder
+                                            queues for response and
+                                            acknowledge traffic. Same
+                                            content-modeling-only scope
+                                            as svr_req_stream_max above. */
     uint16_t svr_max_sequencers;
     uint32_t svr_memory_capacity;
     uint32_t svr_implemented_options; /* RCP_REGMAP_OPT_* bitmask; see

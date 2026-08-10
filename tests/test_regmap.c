@@ -67,7 +67,8 @@ static void test_general_init_zeroes_with_no_root_client(void)
     TEST_ASSERT_EQUAL_UINT16(0, map.vendor_id);
     TEST_ASSERT_EQUAL_UINT16(0, map.device_id);
     TEST_ASSERT_EQUAL_UINT16(0, map.svr_ep_count);
-    TEST_ASSERT_EQUAL_UINT16(0, map.svr_max_request_streams);
+    TEST_ASSERT_EQUAL_UINT8(0, map.svr_req_stream_max);
+    TEST_ASSERT_EQUAL_UINT8(0, map.svr_responder_streams_max);
     TEST_ASSERT_EQUAL_UINT16(0, map.svr_max_sequencers);
     TEST_ASSERT_EQUAL_UINT32(0, map.svr_memory_capacity);
     TEST_ASSERT_EQUAL_UINT32(0, map.svr_implemented_options);
