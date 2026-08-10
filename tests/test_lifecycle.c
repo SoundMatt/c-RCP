@@ -338,37 +338,60 @@ static void test_transition_same_state_is_noop_success(void)
 
 /* ── Per-state request filtering ───────────────────────────────────────────── */
 
+/* As of the REQ-LIFECYCLE-033 fix, rcp_lifecycle_should_accept() returns
+ * a three-way rcp_lifecycle_accept_t (ACCEPT/DROP/REJECT), not a bool --
+ * every call site below now asserts the specific value rather than
+ * relying on implicit truthiness (RCP_LIFECYCLE_ACCEPT == 0 would
+ * otherwise read as C-false, inverting every TEST_ASSERT_TRUE/FALSE
+ * call that predates this fix). */
 static void test_hw_unconfigured_accepts_discovery_abb_under_ntscf(void)
 {
-    TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_UNCONFIGURED, false,
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
 }
 
 static void test_hw_unconfigured_drops_wrong_byte_bus_id(void)
 {
-    TEST_ASSERT_FALSE(rcp_lifecycle_should_accept(
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_UNCONFIGURED, false,
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)1u));
 }
 
+/* REQ-LIFECYCLE-033: a non-ABB message type addressed correctly to EP0
+ * is REJECTed (TC18 §12.7's REQUEST_REJECTED), not silently DROPped as
+ * this test's own name still says -- kept (not renamed) as the direct
+ * predecessor of test_hw_unconfigured_rejects_non_abb_message_type_
+ * addressed_to_ep0 below, which pins the corrected behavior explicitly;
+ * this one now pins the wrong-byte-bus_id-AND-non-ABB combination, which
+ * is still a DROP (byte_bus_id mismatch checked first). */
 static void test_hw_unconfigured_drops_non_abb_message_type(void)
 {
-    TEST_ASSERT_FALSE(rcp_lifecycle_should_accept(
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
+        RCP_LIFECYCLE_HW_UNCONFIGURED, false,
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, (rcp_byte_bus_id_t)1u));
+}
+
+/* REQ-LIFECYCLE-033 (TC18 §12.7): a GBB-framed request correctly
+ * addressed to EP0 on the discovery byte_bus_id while HW_UNCONFIGURED is
+ * REJECTed with an error response, not silently dropped. */
+static void test_hw_unconfigured_rejects_non_abb_message_type_addressed_to_ep0(void)
+{
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_REJECT, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_UNCONFIGURED, false,
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
 }
 
 static void test_hw_unconfigured_drops_tscf_even_with_time_sync_supported(void)
 {
-    TEST_ASSERT_FALSE(rcp_lifecycle_should_accept(
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_UNCONFIGURED, true,
         RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
 }
 
 static void test_hw_unconfigured_drops_tscf_without_time_sync(void)
 {
-    TEST_ASSERT_FALSE(rcp_lifecycle_should_accept(
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_UNCONFIGURED, false,
         RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
 }
@@ -377,7 +400,7 @@ static void test_hw_configured_applies_ordinary_tscf_drop_rule(void)
 {
     /* Time-sync not supported -- TSCF still dropped, matching
      * rcp_avtp_should_drop_tscf()'s own general rule. */
-    TEST_ASSERT_FALSE(rcp_lifecycle_should_accept(
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_CONFIGURED, false,
         RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u));
 }
@@ -392,9 +415,19 @@ static void test_hw_configured_applies_ordinary_tscf_drop_rule(void)
  * worth a test explicitly pinning that it no longer holds. */
 static void test_hw_configured_drops_tscf_even_when_time_sync_supported(void)
 {
-    TEST_ASSERT_FALSE(rcp_lifecycle_should_accept(
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_CONFIGURED, true,
         RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u));
+}
+
+/* REQ-LIFECYCLE-033: a GBB-framed request addressed to EP0 while
+ * HW_CONFIGURED is also REJECTed, not accepted unconditionally as the
+ * pre-fix "unrestricted beyond byte_bus_id" rule read. */
+static void test_hw_configured_rejects_non_abb_message_type_addressed_to_ep0(void)
+{
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_REJECT, rcp_lifecycle_should_accept(
+        RCP_LIFECYCLE_HW_CONFIGURED, false,
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
 }
 
 static void test_rcp_configured_accepts_ntscf_at_any_byte_bus_id(void)
@@ -402,7 +435,7 @@ static void test_rcp_configured_accepts_ntscf_at_any_byte_bus_id(void)
     /* Frame-level acceptance beyond the TSCF/time-sync rule is unrestricted
      * at this milestone; register-level write locking is a separate,
      * directly-tested concern (rcp_lifecycle_field_writable()). */
-    TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_RCP_CONFIGURED, false,
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, (rcp_byte_bus_id_t)42u));
 }
@@ -618,10 +651,12 @@ int main(void)
     RUN_TEST(test_hw_unconfigured_accepts_discovery_abb_under_ntscf);
     RUN_TEST(test_hw_unconfigured_drops_wrong_byte_bus_id);
     RUN_TEST(test_hw_unconfigured_drops_non_abb_message_type);
+    RUN_TEST(test_hw_unconfigured_rejects_non_abb_message_type_addressed_to_ep0);
     RUN_TEST(test_hw_unconfigured_drops_tscf_even_with_time_sync_supported);
     RUN_TEST(test_hw_unconfigured_drops_tscf_without_time_sync);
     RUN_TEST(test_hw_configured_applies_ordinary_tscf_drop_rule);
     RUN_TEST(test_hw_configured_drops_tscf_even_when_time_sync_supported);
+    RUN_TEST(test_hw_configured_rejects_non_abb_message_type_addressed_to_ep0);
     RUN_TEST(test_rcp_configured_accepts_ntscf_at_any_byte_bus_id);
 
     RUN_TEST(test_hw_generic_writable_only_in_hw_unconfigured);

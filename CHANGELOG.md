@@ -32,6 +32,36 @@ the rationale.
 
 ## Releases
 
+### v0.162.0 -- 2026-08-10
+
+**Phase 5b batch 10: REQ-LIFECYCLE-033/029 -- REQUEST_REJECTED for
+non-STANDARD EP0 requests.** Issue #198. `RCP_ERROR_REQUEST_REJECTED`
+(11) existed but was emitted nowhere. `rcp_lifecycle_should_accept()`'s
+`bool` return widened to a three-way `rcp_lifecycle_accept_t`
+(`ACCEPT`/`DROP`/`REJECT`) -- no new parameter needed, since ABB
+(STANDARD) vs. GBB (every conditional request kind) at the wire level
+already fully determines the distinction via the existing `acf_msg_type`
+parameter, contrary to the catalog entry's own assumption that a
+`RCP_SCHED_KIND_*` input was required. A non-ABB message addressed to
+EP0 now REJECTs (with a real `RCP_ERROR_REQUEST_REJECTED` response, via
+`rcp_mock_server_dispatch()`) in both `HW_UNCONFIGURED` and
+`HW_CONFIGURED`, instead of silently dropping. This also resolves
+`REQ-LIFECYCLE-029`'s own residual, reconciling what looked like a
+direct conflict between TC18 §12.3.1.2's general ACF_GBB-drop rule and
+§12.7's more specific EP0-scoped REJECT rule -- the latter governs for
+the EP0 case, the former still governs every non-EP0 `byte_bus_id`.
+Every existing `should_accept()` call site rewritten from implicit-bool
+assertions to explicit `RCP_LIFECYCLE_ACCEPT`/`DROP`/`REJECT` comparisons
+(the old `bool` truthiness would otherwise silently invert, since
+`ACCEPT == 0`). Mutation-tested two ways: full revert breaks the BUILD
+(stronger signal than a test failure); a precise single-line mutation
+isolates exactly the 4 tests pinning `REJECT`. Full suite (64/64) +
+ASan/UBSan clean, fresh `cfusa check`/`trace` (0 errors, 100%/100%, all
+three separate CI-matching invocations). See `ROADMAP.md` milestone 162
+for full detail. 1030 requirements (unchanged), 130 `tc18-gap` entries
+remaining (was 132, two genuine closures). Phase 5b's full 16-item
+scope is now accounted for (12 closed, 4 honestly-scoped `partial`).
+
 ### v0.161.0 -- 2026-08-10
 
 **Phase 5b batch 9: REQ-LIFECYCLE-026/035/037 -- discovery-claim binding

@@ -326,17 +326,41 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
  * still HW_UNCONFIGURED. */
 #define RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID ((rcp_byte_bus_id_t)0u)
 
+/* rcp_lifecycle_should_accept()'s own three-way outcome (REQ-LIFECYCLE-033):
+ * a frame is either fully admitted, silently dropped with no response at
+ * all, or admitted far enough to answer with an error response but no
+ * further processing. TC18 distinguishes these explicitly -- §12.7's own
+ * "Other valid requests to EP0 will be rejected with an error response
+ * with error code REQUEST_REJECTED" is a different outcome than
+ * §12.3.1.1's/§12.3.1.2's "dropped without further response" -- so a plain
+ * bool cannot represent this function's full contract. */
+typedef enum {
+    RCP_LIFECYCLE_ACCEPT = 0, /* admit the frame for normal processing */
+    RCP_LIFECYCLE_DROP   = 1, /* silently discard, no response at all */
+    RCP_LIFECYCLE_REJECT = 2, /* answer with RCP_ERROR_REQUEST_REJECTED,
+                                  process no further */
+} rcp_lifecycle_accept_t;
+
 /* The per-state request-filtering rule, as its own directly-tested
  * function (mirroring avtp.c's rcp_avtp_should_drop_tscf() convention):
  *
  *   - Whatever the state, a TSCF-headed frame is first subject to
- *     rcp_avtp_should_drop_tscf()'s ordinary time-sync rule.
+ *     rcp_avtp_should_drop_tscf()'s ordinary time-sync rule (RCP_LIFECYCLE_DROP).
  *   - While HW_UNCONFIGURED: a TSCF-headed frame is dropped outright
  *     regardless of time_sync_supported (presentation-time semantics
- *     presuppose a configured request stream, which cannot exist yet), and
- *     an NTSCF-headed frame is accepted only if it carries an ACF_ABB
- *     message addressed to RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID; everything
- *     else is silently dropped.
+ *     presuppose a configured request stream, which cannot exist yet).
+ *     An NTSCF-headed frame not addressed to
+ *     RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID is dropped too. Addressed there,
+ *     an ACF_ABB (STANDARD) message is accepted; any other message type
+ *     (in particular ACF_GBB, this codebase's wire encoding for every
+ *     conditional request kind -- compound/compound-wait/triggered/
+ *     chained/timed/cancel, see request_compound.h and siblings) is
+ *     REQ-LIFECYCLE-033's own REJECT outcome, per TC18 §12.7: "As long as
+ *     the RC PHY is either in HW_UNCONFIGURED state or no valid
+ *     stream_id/byte_bus_id combinations have been defined only...
+ *     unconditional STANDARD requests are allowed... Other valid requests
+ *     to EP0 will be rejected with an error response with error code
+ *     REQUEST_REJECTED."
  *   - While HW_CONFIGURED: a TSCF-headed frame is dropped outright too,
  *     for the same reason and regardless of time_sync_supported --
  *     TSCF's presentation-time semantics still presuppose a validated
@@ -350,15 +374,26 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
  *     later phase), so every currently-decodable non-EP0 request is, by
  *     construction, operational -- the EP0-only restriction is the
  *     honestly-achievable form of that rule given this library's real
- *     current scope. This does not (yet) also drop ACF_GBB-format
- *     requests addressed to EP0 itself, which TC18 §12.3.1.2 separately
- *     requires: every conditional request kind is wire-encoded as
- *     ACF_GBB unconditionally (see request_compound.h and siblings), and
- *     with the byte_bus_id restriction above already excluding every
- *     other target, this residual only matters for a conditional request
- *     literally addressed to EP0 -- tracked as its own follow-up, not
- *     this function's current scope (see rcp_lifecycle_should_accept()'s
- *     own .c-file comment for the full reasoning).
+ *     current scope, and applies before the STANDARD-vs-other check below
+ *     (RCP_LIFECYCLE_DROP, not REJECT -- §12.3.1.2's own "ignored and
+ *     dropped without response" text for non-EP0 requests, a general rule
+ *     TC18 §12.7's more specific EP0-scoped REJECT does not override).
+ *     Addressed to EP0 itself, the same ACF_ABB-vs-other split as
+ *     HW_UNCONFIGURED applies: ACF_ABB is accepted, anything else
+ *     (REQ-LIFECYCLE-033) is REQ_LIFECYCLE_REJECT -- this library's own
+ *     "no valid stream_id/byte_bus_id combinations have been defined"
+ *     condition from TC18 §12.7's own text is permanently true throughout
+ *     HW_CONFIGURED, since no wire-level regmap read/write exists yet to
+ *     ever establish one (see REQ-LIFECYCLE-025/034's own architecture
+ *     finding for the same underlying gap), so this REJECT rule applies
+ *     for the whole of HW_CONFIGURED, not just an initial sub-window.
+ *     This reading reconciles what would otherwise be a direct conflict
+ *     with §12.3.1.2's own separate "requests in ACF_GBB format[are
+ *     dropped]" sentence (REQ-LIFECYCLE-029) by treating that as the
+ *     general, non-EP0-scoped rule and §12.7's REJECT as the more
+ *     specific, EP0-scoped override -- the same specific-overrides-
+ *     general reading TC18 uses throughout (e.g. Table 22's own W*
+ *     legend narrowing the general W rule).
  *   - While RCP_CONFIGURED: acceptance beyond the general time-sync rule
  *     already applied above is unrestricted at this milestone -- the
  *     validated mapping HW_CONFIGURED's rules are guarding against now
@@ -367,11 +402,11 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
  * avtp_subtype is one of RCP_AVTP_SUBTYPE_NTSCF/_TSCF (see avtp.h);
  * acf_msg_type is one of RCP_ACF_MSG_TYPE_ABB/_GBB (see acf.h), or any
  * other value for a message type this filtering rule does not special-case. */
-bool rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
-                                  bool time_sync_supported,
-                                  uint8_t avtp_subtype,
-                                  uint8_t acf_msg_type,
-                                  rcp_byte_bus_id_t byte_bus_id);
+rcp_lifecycle_accept_t rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
+                                                   bool time_sync_supported,
+                                                   uint8_t avtp_subtype,
+                                                   uint8_t acf_msg_type,
+                                                   rcp_byte_bus_id_t byte_bus_id);
 
 /* ── Register-locking-by-state ─────────────────────────────────────────────── */
 

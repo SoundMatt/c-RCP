@@ -8506,12 +8506,11 @@
     {
       "id": "REQ-LIFECYCLE-029",
       "title": "HW_CONFIGURED drops ACF_GBB-format requests without response",
-      "text": "NOT IMPLEMENTED (narrowed by REQ-LIFECYCLE-032's fix): c-RCP does not drop ACF_GBB-format requests addressed to EP0 in HW_CONFIGURED (TC18 \u00a712.3.1.2). Now that REQ-LIFECYCLE-032 restricts HW_CONFIGURED to RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID (EP0) only, every ACF_GBB request addressed to any OTHER byte_bus_id is already dropped for that reason alone -- the remaining exposure is narrow: a conditional request kind (compound/compound-wait/triggered/chained/timed/cancel, wire-encoded as ACF_GBB unconditionally per request_compound.h and siblings' mtv-repurposing scheme) literally addressed to EP0 itself is still admitted. Not fixed in this batch: EP0-addressed conditional requests are an unusual, low-impact edge case (conditional requests normally target an operational endpoint, not the register-map pseudo-endpoint), and no test in this codebase currently exercises one, so this residual is tracked but not prioritized. See rcp_lifecycle_should_accept()'s own .c-file comment for the full reasoning.",
+      "text": "IMPLEMENTED (resolved differently than originally scoped): this entry's own remaining exposure -- a conditional (ACF_GBB) request literally addressed to EP0 in HW_CONFIGURED, the one case REQ-LIFECYCLE-032's byte_bus_id restriction did not already cover -- turned out to directly conflict with TC18 \u00a712.7's own text once REQ-LIFECYCLE-033 was scoped: \u00a712.7 requires EP0-addressed non-STANDARD requests to be answered with REQUEST_REJECTED, not silently dropped as this entry's own \u00a712.3.1.2 citation demands. Resolved by reading \u00a712.3.1.2's \"requests in ACF_GBB format[are dropped]\" as the general, non-EP0-scoped rule (still correctly enforced -- any non-EP0 byte_bus_id is dropped by REQ-LIFECYCLE-032's own restriction, unconditionally of acf_msg_type) and \u00a712.7's REQUEST_REJECTED rule as the more specific, EP0-scoped override that governs for exactly this residual case. rcp_lifecycle_should_accept() now returns RCP_LIFECYCLE_REJECT (not RCP_LIFECYCLE_DROP) for a non-ABB message addressed to EP0 in HW_CONFIGURED -- see REQ-LIFECYCLE-033's own entry for the implementation detail, and that function's own header doc comment for the full reconciliation between the two TC18 sections.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
+      "scope": "tc18",
       "tc18": "\u00a712.3.1.2, TC18.txt L2181"
     },
     {
@@ -8548,12 +8547,11 @@
     {
       "id": "REQ-LIFECYCLE-033",
       "title": "Non-STANDARD requests to EP0 before full configuration must be answered with REQUEST_REJECTED, not dropped",
-      "text": "NOT IMPLEMENTED (partial): while the RC Server is HW_UNCONFIGURED, or while no valid stream_id/byte_bus_id combination has been defined, c-RCP admits only an NTSCF-framed ACF_ABB addressed to RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID (rcp_lifecycle_should_accept(), src/lifecycle.c:119) and silently drops every other frame. TC18 \u00a712.7 requires instead that only unconditional STANDARD requests be accepted at EP0 in this condition and that every OTHER otherwise-valid request to EP0 be answered with an error response carrying error code REQUEST_REJECTED. c-RCP never emits RCP_ERROR_REQUEST_REJECTED anywhere, and rcp_lifecycle_should_accept() has no request-kind (RCP_SCHED_KIND_*) input with which to distinguish a STANDARD request from a compound/wait, triggered, chained or timed one. A conforming client that probes EP0 with a conditional request therefore receives silence instead of the specified diagnostic error response.",
+      "text": "IMPLEMENTED: primary-source re-verification found the RCP_SCHED_KIND_* input this entry's own text said was needed is unnecessary machinery -- STANDARD-vs-conditional is already fully determined by the acf_msg_type parameter rcp_lifecycle_should_accept() already receives (ACF_ABB is this codebase's wire encoding for STANDARD requests; ACF_GBB is the encoding for every conditional request kind -- compound/compound-wait/triggered/chained/timed/cancel -- unconditionally, per request_compound.h and siblings' own mtv-repurposing scheme). Fixed: rcp_lifecycle_should_accept()'s bool return widened to a three-way rcp_lifecycle_accept_t (ACCEPT/DROP/REJECT); a non-ABB message type addressed to EP0 (RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID) while HW_UNCONFIGURED, or while HW_CONFIGURED (this library's own architecture makes TC18's \"no valid stream_id/byte_bus_id combinations have been defined\" condition permanently true throughout HW_CONFIGURED, since no wire-level regmap read/write exists yet to ever establish one), now returns REJECT instead of the prior silent DROP. rcp_mock_server_dispatch() answers a REJECT with RCP_ERROR_REQUEST_REJECTED (wire code 11) via the same rcp_acf_build_error_response() convention find_slot()'s own EP_NOT_FOUND path already used, and returns the pre-existing RCP_MOCK_DISPATCH_REJECTED result. This also resolves REQ-LIFECYCLE-029's own residual (see that entry) by treating \u00a712.7's EP0-scoped REJECT as the more specific rule overriding \u00a712.3.1.2's general ACF_GBB-drop rule for exactly this case.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
+      "scope": "tc18",
       "tc18": "\u00a712.7 Configuration, TC18.txt L2454-2457"
     },
     {
