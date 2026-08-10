@@ -117,6 +117,7 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
 //cfusa:req REQ-LIFECYCLE-016
 //cfusa:req REQ-LIFECYCLE-017
 //cfusa:req REQ-LIFECYCLE-028
+//cfusa:req REQ-LIFECYCLE-032
 bool rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
                                   bool time_sync_supported,
                                   uint8_t avtp_subtype,
@@ -157,19 +158,41 @@ bool rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
          * applied at the top of this function.
          *
          * The same section also requires dropping ACF_GBB-format requests
-         * in HW_CONFIGURED (REQ-LIFECYCLE-029) -- deliberately NOT
-         * implemented here: every conditional request kind (compound/
-         * compound-wait/triggered/chained/timed/cancel, request_compound.h
-         * and siblings) is wire-encoded as ACF_GBB unconditionally (the
-         * mtv-repurposing scheme those modules' own file headers document
-         * at length), so an unconditional ACF_GBB drop would make it
-         * impossible to ever admit a conditional request while
-         * HW_CONFIGURED -- entangled with REQ-LIFECYCLE-032 (HW_CONFIGURED
-         * traffic should be restricted to configuration requests only,
-         * not yet implemented either) rather than being this narrower
-         * TSCF fix's own concern. Tracked and scoped as its own follow-up
-         * batch in issue #198, not attempted here. */
+         * addressed to EP0 in HW_CONFIGURED (REQ-LIFECYCLE-029) --
+         * deliberately NOT implemented here: every conditional request
+         * kind (compound/compound-wait/triggered/chained/timed/cancel,
+         * request_compound.h and siblings) is wire-encoded as ACF_GBB
+         * unconditionally (the mtv-repurposing scheme those modules' own
+         * file headers document at length). An unconditional ACF_GBB drop
+         * would only matter for a conditional request literally addressed
+         * to EP0 itself now that the byte_bus_id restriction just below
+         * already drops everything else -- a narrow, low-impact residual
+         * rather than this milestone's own concern; tracked as its own
+         * follow-up in issue #198, not attempted here.
+         *
+         * TC18 §12.3.1.2 (further down the same section): "Request to EPs
+         * other than EP0 that are not config requests will be ignored and
+         * dropped without response." c-RCP has no wire-level encode/decode
+         * pair for a functional-configuration read/write request at all,
+         * for any endpoint type -- regmap.h's own file header documents
+         * this as deliberately deferred ("Exact on-wire encodings for the
+         * structures below are deliberately left unimplemented... wiring
+         * them to an actual byte_message_info read/write exchange is
+         * later phases' job"); confirmed by grepping for any regmap
+         * encode/decode pair anywhere in this codebase and finding none
+         * outside discovery.c's own read-only discovery-response encoder.
+         * Every wire request this library can currently decode for a
+         * non-EP0 endpoint is therefore, by construction, an operational
+         * one -- so the achievable, currently-correct interpretation of
+         * this rule, given that real scope, is simply: only EP0 is
+         * reachable in HW_CONFIGURED, the exact same byte_bus_id
+         * restriction HW_UNCONFIGURED's branch above already applies (see
+         * REQ-LIFECYCLE-025/034/036, this issue's remaining Group 2/3
+         * items, for the finer-grained stream-identity/authorization
+         * rules layered on top of this once register-map wire I/O
+         * eventually exists). */
         if (avtp_subtype == RCP_AVTP_SUBTYPE_TSCF) return false;
+        if (byte_bus_id != RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID) return false;
 
         return true;
     }

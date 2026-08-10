@@ -226,22 +226,27 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
  *     for the same reason and regardless of time_sync_supported --
  *     TSCF's presentation-time semantics still presuppose a validated
  *     stream/byte_bus_id mapping and response queues, which do not exist
- *     until RCP_CONFIGURED (TC18 §12.3.1.2). Acceptance is otherwise
- *     unrestricted beyond the rules already applied above (fine-grained
- *     per-field write access is rcp_lifecycle_field_writable()'s job
- *     below, and full endpoint/stream routing is milestone 62's
- *     register-map job) -- including ACF_GBB-format requests, which TC18
- *     §12.3.1.2 also requires dropped in this state but which this
- *     function deliberately does not yet enforce: every conditional
- *     request kind is wire-encoded as ACF_GBB unconditionally (see
- *     request_compound.h and siblings), so this is entangled with
- *     restricting HW_CONFIGURED to configuration-only traffic in the
- *     first place -- tracked as its own follow-up, not this function's
- *     current scope (see rcp_lifecycle_should_accept()'s own .c-file
- *     comment for the full reasoning).
+ *     until RCP_CONFIGURED (TC18 §12.3.1.2). Acceptance is further
+ *     restricted to RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID (EP0): TC18
+ *     §12.3.1.2 requires "requests to EPs other than EP0 that are not
+ *     config requests" to be dropped, and this library has no wire-level
+ *     encode/decode pair for a functional-configuration read/write
+ *     request at all yet (regmap.h's own file header defers that to a
+ *     later phase), so every currently-decodable non-EP0 request is, by
+ *     construction, operational -- the EP0-only restriction is the
+ *     honestly-achievable form of that rule given this library's real
+ *     current scope. This does not (yet) also drop ACF_GBB-format
+ *     requests addressed to EP0 itself, which TC18 §12.3.1.2 separately
+ *     requires: every conditional request kind is wire-encoded as
+ *     ACF_GBB unconditionally (see request_compound.h and siblings), and
+ *     with the byte_bus_id restriction above already excluding every
+ *     other target, this residual only matters for a conditional request
+ *     literally addressed to EP0 -- tracked as its own follow-up, not
+ *     this function's current scope (see rcp_lifecycle_should_accept()'s
+ *     own .c-file comment for the full reasoning).
  *   - While RCP_CONFIGURED: acceptance beyond the general time-sync rule
  *     already applied above is unrestricted at this milestone -- the
- *     validated mapping HW_CONFIGURED's TSCF rule is guarding against now
+ *     validated mapping HW_CONFIGURED's rules are guarding against now
  *     exists.
  *
  * avtp_subtype is one of RCP_AVTP_SUBTYPE_NTSCF/_TSCF (see avtp.h);

@@ -97,7 +97,14 @@ static void logging_handler(const uint8_t *request, size_t request_len, rcp_byte
 }
 
 /* A server with one enabled endpoint at byte_bus_id 1, a 4-register
- * sequencer table, and the logging handler attached. */
+ * sequencer table, and the logging handler attached.
+ *
+ * RCP_CONFIGURED, not HW_CONFIGURED: as of the REQ-LIFECYCLE-032 fix,
+ * HW_CONFIGURED admits only requests to EP0 (byte_bus_id 0) -- this
+ * fixture's whole point is dispatching conditional requests to byte_bus_id
+ * 1, which needs the fully-operational state. EMPTY_SNAP's zero endpoint/
+ * request-stream counts trivially satisfy both plausibility checks along
+ * the way, the same technique already used to reach HW_CONFIGURED below. */
 static rcp_mock_server_t *fixture(handler_log_t *log)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -105,6 +112,8 @@ static rcp_mock_server_t *fixture(handler_log_t *log)
     memset(log, 0, sizeof(*log));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
         rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+        rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP));
     TEST_ASSERT_EQUAL(RCP_MOCK_OK,
         rcp_mock_server_add_endpoint(srv, 1, 1, true /* ep_enable */, logging_handler, log));
     TEST_ASSERT_TRUE(rcp_mock_server_set_sequencer_count(srv, 4));
