@@ -33,6 +33,24 @@ the rationale.
 
 ## Releases
 
+### v0.188.0 -- 2026-08-10
+
+**Phase 5d batch 18: `REQ-RMAP-035` -- reserved 16-bit register at
+0x0022 now explicitly modeled.** Issue #200. Second reserved-register
+batch this phase, applying `REQ-RMAP-031`'s own `reserved_0x17`
+precedent exactly: TC18 §12.7.5 Table 18 reserves this 16-bit
+register, must read 0x00 -- already true today via generic zero-fill,
+but now explicitly documented as deliberate. New `uint16_t
+reserved_0x22` field, zero-initializing for free, no setter anywhere
+in this codebase. Closes the still-open half of batch 14's own
+proactive combined-pin split (that batch closed 0x0017, left 0x0022
+deliberately open). Mutation-tested: full header revert with tests
+kept breaks the build. Full suite (65/65) + ASan/UBSan clean. Fresh
+`cfusa check`/`trace` (0 errors, 100%/100%, three separate CI-matching
+invocations). See `ROADMAP.md` milestone 188 for full detail. 1030
+requirements (unchanged), 110 `tc18-gap` entries remaining (unchanged
+-- narrowed from `not-implemented` to `partial`).
+
 ### v0.187.0 -- 2026-08-10
 
 **Phase 5d batch 17: `REQ-RMAP-034` -- request/response stream config

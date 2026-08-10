@@ -653,25 +653,31 @@ static void test_reserved_octet_at_0x17_is_now_explicitly_modeled(void)
     TEST_ASSERT_TRUE(span_is_zero(buf, 0x17, 0x17));
 }
 
-/* TC18 §12.7.5 Table 18 also reserves the 16-bit register at 0x0022
- * (REQ-RMAP-035, still open, not addressed by this batch). It reads
- * back zero here only because everything past 0x000D is undifferentiated
- * zero-fill, not because a reserved register is modelled -- unlike
- * 0x0017 above (REQ-RMAP-031), which now IS explicitly modelled. The
- * distinguishing assertion is that svr_req_stream_max at 0x000E, a REAL
- * Table 18 register holding 0xAB in this map, reads back as zero too. A
- * conforming implementation would return 0xAB at 0x000E and a modelled
- * zero at 0x0022. */
-static void test_reserved_register_at_0x22_is_indistinguishable_from_zero_fill(void)
+/* REQ-RMAP-035 (TC18 §12.7.5 Table 18): the 16-bit register at 0x0022
+ * is reserved and must read 0x00. rcp_regmap_general_t now explicitly
+ * models this span (reserved_0x22) rather than leaving it implicitly
+ * absent -- it zero-inits for free via rcp_regmap_general_init()'s own
+ * memset, and no setter exists anywhere in this codebase to construct
+ * a nonzero value. Still open (REQ-RMAP-024, same as every other Group
+ * 1 item): 0x0022 falls past the discovery slice's 0x000D
+ * wire-reachability ceiling, so the correct zero this test observes is
+ * still produced by read_general()'s generic buffer zero-fill, not by
+ * this new field being dispatched onto the wire yet -- but the field's
+ * own existence now documents that this is deliberate, not an
+ * accidental byproduct, matching reserved_0x17's own REQ-RMAP-031
+ * precedent exactly. */
+static void test_reserved_register_at_0x22_is_now_explicitly_modeled(void)
 {
-    rcp_regmap_general_t map = populated_map();
+    rcp_regmap_general_t map;
     uint8_t              buf[0x24];
 
-    TEST_ASSERT_EQUAL_UINT8(0xABu, map.svr_req_stream_max);
-    read_general(&map, (uint8_t)sizeof(buf), buf);
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.reserved_0x22));
 
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x22, 0x23)); /* TC18 reserved, 16 bit */
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x0E, 0x0E)); /* a real register: also 0 */
+    rcp_regmap_general_init(&map);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.reserved_0x22);
+
+    read_general(&map, (uint8_t)sizeof(buf), buf);
+    TEST_ASSERT_TRUE(span_is_zero(buf, 0x22, 0x23));
 }
 
 /* REQ-RMAP-032 (TC18 §12.7.5 Table 18): svr_io_pin_count is a 16-bit R
@@ -1618,7 +1624,7 @@ int main(void)
     RUN_TEST(test_configuration_lock_not_yet_consulted_by_field_writable);
     RUN_TEST(test_implemented_options_now_matches_table_18_exactly);
     RUN_TEST(test_reserved_octet_at_0x17_is_now_explicitly_modeled);
-    RUN_TEST(test_reserved_register_at_0x22_is_indistinguishable_from_zero_fill);
+    RUN_TEST(test_reserved_register_at_0x22_is_now_explicitly_modeled);
     RUN_TEST(test_io_pin_count_is_now_explicitly_modeled);
     RUN_TEST(test_hw_cfg_ptr_is_now_correctly_shaped);
     RUN_TEST(test_stream_cfg_registers_are_now_correctly_sized);

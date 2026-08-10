@@ -10310,3 +10310,51 @@ items. Next: continue Group 1 in table order -- `REQ-RMAP-035`
 (reserved 16-bit register at 0x0022, still open from batch 14's own
 deferred scope -- the second half of the combined pin batch 14 split,
 narrowed but not yet closed).
+
+### 188. Phase 5d batch 18: `REQ-RMAP-035` -- reserved 16-bit register at 0x0022 now explicitly modeled (issue #200)
+
+The second reserved-register batch this phase, applying `REQ-RMAP-031`'s
+own `reserved_0x17` precedent exactly, unchanged: TC18 §12.7.5 Table 18
+reserves the 16-bit register at 0x0022 and requires it to read 0x00 --
+already true today, but only as an accidental byproduct of
+`rcp_discovery_encode_response()`'s generic zero-fill beyond the
+discovery slice, not because anything in `rcp_regmap_general_t` named
+this span as deliberately reserved. New `uint16_t reserved_0x22`
+field, zero-initializing for free via the existing `memset`; no setter
+exists anywhere in this codebase, so a caller cannot construct a
+nonzero value in the first place -- `populated_map()` deliberately
+does not set it, same convention as `reserved_0x17`.
+
+This closes the still-open half of batch 14's own proactive split:
+that batch's combined deviation pin bundled 0x0017 (closed then) with
+this 0x0022 span (deliberately left open, `-035` not yet in scope) --
+this batch simply completes what that split anticipated, no new
+splitting work needed this time. Rewrote the remaining deviation pin
+(`test_reserved_register_at_0x22_is_indistinguishable_from_zero_fill`)
+into a positive test (`test_reserved_register_at_0x22_is_now_
+explicitly_modeled`), dropping the "a real register also reads zero
+here" illustrative comparison this test previously carried (that
+wire-reachability point is already independently covered by
+`test_general_map_wire_reach_stops_after_0x000d`) -- same shape as
+`reserved_0x17`'s own positive-test rewrite.
+
+Mutation-tested: full header-only revert with the touched test file
+kept -- breaks the build (`no member named 'reserved_0x22'`) --
+sufficient rigor for a field with zero computed logic, matching
+`reserved_0x17`'s own precedent (and batches 10/12/14's, more
+generally). Restored clean, diff-verified byte-identical against a
+pre-mutation backup. Full suite (65/65) + ASan/UBSan clean. Fresh
+`cfusa check` (0 errors) + all three separate `cfusa trace`
+invocations (100%/100%, 0 untested). `REQ-RMAP-035` moves
+`not-implemented` -> `partial` (not fully closed -- still blocked on
+`REQ-RMAP-024`'s wire-reachability gap like every other Group 1 item).
+1030 requirements (unchanged), 110 `tc18-gap` entries remaining
+(unchanged -- narrowed from `not-implemented` to `partial`).
+
+**Phase 5d progress after batch 18**: 19/47 items addressed (20
+counting `REQ-RMAP-061`'s own partial progress). Group 1: 12/18
+items. Next: continue Group 1 in table order -- `REQ-RMAP-036`
+(`svr_ep_generic_cfg_ptr`, 0x0024, partial and semantically
+contradictory -- issue #200 itself flags this one for careful
+re-reading of Table 18 before fixing, not a mechanical repeat of
+`-033`/`-034`'s pattern).
