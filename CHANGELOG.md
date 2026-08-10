@@ -33,6 +33,32 @@ the rationale.
 
 ## Releases
 
+### v0.186.0 -- 2026-08-10
+
+**Phase 5d batch 16: `REQ-RMAP-033` -- `svr_hw_cfg_ptr` retyped to a
+bare, correctly-shaped 16-bit pointer.** Issue #200. First Group 1
+batch that's a real structural change rather than a pure addition or
+width/rename fix, and the first to touch a shared type
+(`rcp_regmap_table_ref_t`) rather than one field alone. `svr_hw_cfg_
+ptr` (TC18 §12.7.5 Table 18, 0x001A) is a LONE 16-bit pointer with no
+adjacent capacity register -- HW_config's extent comes from `svr_io_
+pin_count` (`REQ-RMAP-032`) instead, so the field's former shared-type
+shape (32-bit "register word" offset + a spurious capacity member) was
+retyped to a bare `uint16_t`, matching TC18's own width exactly.
+Blast-radius check (grep across `src/*.c`) found zero real consumers,
+confirming safe to retype. Found and fixed three separate existing
+test call sites this touched beyond its own deviation pin: a general
+zero-init test (plus an unrelated, harmless type-macro nit fixed
+opportunistically while already there), and two OTHER requirements'
+own deviation pins (`REQ-RMAP-039`, `REQ-RMAP-040`) that referenced
+the old field shape as supporting evidence for their own separate
+claims -- both claims stay true, only the field reference updated.
+Mutation-tested: full header revert with every touched test file kept
+breaks the build. Full suite (65/65) + ASan/UBSan clean. Fresh `cfusa
+check`/`trace` (0 errors, 100%/100%, three separate CI-matching
+invocations). See `ROADMAP.md` milestone 186 for full detail. 1030
+requirements (unchanged), 110 `tc18-gap` entries remaining (unchanged).
+
 ### v0.185.0 -- 2026-08-10
 
 **Phase 5d batch 15: `REQ-RMAP-032` -- `svr_io_pin_count` now

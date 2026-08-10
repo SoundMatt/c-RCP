@@ -10140,3 +10140,103 @@ counting `REQ-RMAP-061`'s own partial progress). Group 1: 9/18 items.
 Next: continue Group 1 in table order -- `REQ-RMAP-033`
 (`svr_hw_cfg_ptr`, 0x001A, partial -- pointer modeled with the wrong
 shape, offset unit and an extra capacity member TC18 does not define).
+
+### 186. Phase 5d batch 16: `REQ-RMAP-033` -- `svr_hw_cfg_ptr` retyped to a bare, correctly-shaped 16-bit pointer (issue #200)
+
+The first Group 1 batch that is a real structural change rather than a
+pure field addition or a width/rename correction on an already-scalar
+field -- and the first to require checking a shared type's blast
+radius across every field that reuses it, not just one field's own
+consumers. `svr_hw_cfg_ptr` (TC18 §12.7.5 Table 18, 0x001A) is a LONE
+16-bit R pointer with no adjacent capacity register of its own --
+unlike `request_stream_cfg`/`response_queue_cfg`/etc. below it (whose
+own still-open deviation, `REQ-RMAP-034`, is a different shape mismatch:
+separate TC18 ptr+capacity REGISTER pairs collapsed into one struct),
+HW_config's extent comes from a wholly separate register,
+`svr_io_pin_count` (`REQ-RMAP-032`, added last batch), not a capacity
+field bundled with this pointer at all. `rcp_regmap_general_t` had
+instead modeled `hw_pin_map` using the shared `rcp_regmap_table_ref_t`
+type (32-bit "register word" offset + a capacity member) every other
+sub-table ref below it also uses -- carrying two compounding problems:
+a spurious capacity member with no TC18 basis for this specific
+register, inviting a second, contradictory source of truth for the
+table's length alongside `svr_io_pin_count`; and an offset in this
+project's own unit rather than TC18's own 16-bit register-map address,
+which could not be encoded into its real wire slot without an
+unwritten unit conversion.
+
+**Blast-radius check before touching anything** (established
+discipline, applied to a shared TYPE for the first time in Group 1
+rather than a single field): grepped every `rcp_regmap_general_t.
+hw_pin_map` usage across `src/*.c` and found ZERO real consumers --
+every reference was test-only (`populated_map()`'s own setup, three
+deviation-pin tests, one general zero-init test). Confirmed safe to
+retype. (`src/config.c`'s own `hw_pin_map` references are a
+completely different, unrelated struct -- `rcp_config_manifest_t.
+hw_pin_map`, a `rcp_config_hw_pin_t*` array parsed from a manifest's
+own `"hw_pin_map"` JSON key -- confirmed by reading, not assumed from
+the name alone.)
+
+Retyped `rcp_regmap_general_t.hw_pin_map` (`rcp_regmap_table_ref_t`)
+to `svr_hw_cfg_ptr` (`uint16_t`), matching TC18's own register name
+and width exactly -- the first Group 1 field to be renamed to drop the
+shared-type convention entirely rather than staying within it. Six
+`rcp_regmap_table_ref_t` sub-table refs remain unchanged.
+
+**Found and fixed three separate existing test call sites this
+retype touched, beyond the deviation pin itself** -- the largest count
+of "second usage site" fixes any single Group 1 batch has needed so
+far, confirming the value of grepping the type/field broadly rather
+than trusting a single citation's file reference:
+1. `test_regmap.c`'s general zero-init test (`test_general_init_zeroes_
+   with_no_root_client`) -- two `hw_pin_map.offset`/`.capacity`
+   assertions collapsed into one `svr_hw_cfg_ptr` check. Also fixed an
+   unrelated, harmless-but-imprecise pre-existing nit found immediately
+   adjacent while editing this same function: `svr_implemented_options`
+   (retyped `uint8_t` back in batch 13, `REQ-RMAP-030`) was still being
+   asserted with `TEST_ASSERT_EQUAL_UINT32` -- numerically correct via
+   integer promotion, never a real bug, but imprecise; corrected to
+   `TEST_ASSERT_EQUAL_UINT8` to match the field's actual type, since
+   this function was already open for this batch's own edit.
+2. `REQ-RMAP-039`'s own deviation pin (`test_four_optional_subsystem_
+   pointer_pairs_are_absent`) enumerates every existing sub-table ref
+   as its own anchor for "exactly this many exist, four more don't" --
+   narrowed from seven `rcp_regmap_table_ref_t` fields to six plus
+   `svr_hw_cfg_ptr`'s own single-field check; the requirement's own
+   core claim (four optional-subsystem pairs are missing) stays
+   unaffected.
+3. `REQ-RMAP-040`'s own deviation pin (`test_hw_config_table_has_no_
+   server_side_storage`) asserted `rcp_mock_server_regmap(srv)->
+   hw_pin_map.offset/.capacity` both stay zero after config parsing,
+   as evidence "no table exists to hold it" -- updated to the single
+   `svr_hw_cfg_ptr` check; the underlying claim (nothing syncs a
+   parsed HW pin back into the regmap) stays exactly as true as before,
+   only the field reference changed.
+
+Rewrote the batch's own deviation pin (`test_hw_cfg_ptr_mis_shaped`)
+into a positive test (`test_hw_cfg_ptr_is_now_correctly_shaped`)
+proving the field is 2 octets, zero-inits, and round-trips a test
+value -- same shape as every prior Group 1 positive-test rewrite.
+
+Mutation-tested: full header-only revert with every touched test file
+kept -- breaks the build (`no member named 'svr_hw_cfg_ptr'` in
+`test_regmap.c`, the first file Clang's error output pointed at,
+confirming the retype is load-bearing across multiple files at once
+given how many call sites this batch touched). Restored clean, diff-
+verified byte-identical against a pre-mutation backup. Full suite
+(65/65) + ASan/UBSan clean. Fresh `cfusa check` (0 errors) + all three
+separate `cfusa trace` invocations (100%/100%, 0 untested). `REQ-RMAP-
+033` stays `partial` (unchanged status -- narrowed text; still blocked
+on `REQ-RMAP-024`'s wire-reachability gap AND Group 2's still-open
+HW_config table-storage gap, `REQ-RMAP-040` through `-045`, for this
+pointer to meaningfully address anything). 1030 requirements
+(unchanged), 110 `tc18-gap` entries remaining (unchanged).
+
+**Phase 5d progress after batch 16**: 17/47 items addressed (18
+counting `REQ-RMAP-061`'s own partial progress). Group 1: 10/18 items.
+Next: continue Group 1 in table order -- `REQ-RMAP-034` (four
+non-adjacent stream-config sub-table pointer/capacity registers
+collapsed into `rcp_regmap_table_ref_t` pairs) -- the same shared-type
+"separate TC18 registers, one c-RCP struct" deviation `-033` itself
+named as the DIFFERENT shape mismatch it does NOT share, now up next
+in table order for the six remaining `rcp_regmap_table_ref_t` fields.

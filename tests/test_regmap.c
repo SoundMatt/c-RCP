@@ -74,11 +74,10 @@ static void test_general_init_zeroes_with_no_root_client(void)
     TEST_ASSERT_EQUAL_UINT8(0, map.svr_configuration_lock);
     TEST_ASSERT_EQUAL_UINT16(0, map.svr_responder_mem_size);
     TEST_ASSERT_EQUAL_UINT16(0, map.svr_req_mem_size);
-    TEST_ASSERT_EQUAL_UINT32(0, map.svr_implemented_options);
+    TEST_ASSERT_EQUAL_UINT8(0, map.svr_implemented_options);
     TEST_ASSERT_EQUAL_UINT16(RCP_REGMAP_NO_ROOT_CLIENT, map.svr_root_client_index);
 
-    TEST_ASSERT_EQUAL_UINT32(0, map.hw_pin_map.offset);
-    TEST_ASSERT_EQUAL_UINT16(0, map.hw_pin_map.capacity);
+    TEST_ASSERT_EQUAL_UINT16(0, map.svr_hw_cfg_ptr);
     TEST_ASSERT_EQUAL_UINT32(0, map.request_stream_cfg.offset);
     TEST_ASSERT_EQUAL_UINT32(0, map.response_queue_cfg.offset);
     TEST_ASSERT_EQUAL_UINT32(0, map.ep_generic_cfg.offset);

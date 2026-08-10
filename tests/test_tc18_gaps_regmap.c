@@ -129,10 +129,10 @@ static rcp_regmap_general_t populated_map(void)
     map.svr_req_mem_size          = 0x3344u;
     map.svr_implemented_options   = 0x1Fu; /* all five REQ-RMAP-030 bits set */
     map.svr_root_client_index     = 0x0002u;
+    map.svr_hw_cfg_ptr            = 0x0060u;
 
     ref.offset = 0x00000040u;
     ref.capacity = 0x0008u;
-    map.hw_pin_map = ref;
     map.request_stream_cfg = ref;
     map.response_queue_cfg = ref;
     map.ep_generic_cfg = ref;
@@ -698,21 +698,30 @@ static void test_io_pin_count_is_now_explicitly_modeled(void)
     TEST_ASSERT_TRUE(span_is_zero(buf, 0x18, 0x19)); /* svr_io_pin_count */
 }
 
-/* TC18 §12.7.5 Table 18: svr_hw_cfg_ptr is a 16-bit R pointer at 0x001A
- * (REQ-RMAP-033, still open, not addressed by this batch). Deviation:
- * c-RCP models the pointer as an rcp_regmap_table_ref_t whose offset is
- * 32 bit in this project's own "register word" unit (not a 16-bit octet
- * address) and which carries an extra capacity member TC18 does not
- * define for HW_config. */
-static void test_hw_cfg_ptr_mis_shaped(void)
+/* REQ-RMAP-033 (TC18 §12.7.5 Table 18): svr_hw_cfg_ptr is a 16-bit R
+ * pointer at 0x001A, the address of the HW_config register map
+ * (§12.7.6). rcp_regmap_general_t now declares this field at its
+ * correct 16-bit width, with no spurious capacity member -- HW_config's
+ * extent comes from svr_io_pin_count (REQ-RMAP-032) instead, so a
+ * bundled capacity would have been a second, contradictory source of
+ * truth for the table's length. Still open: this codebase has no real
+ * HW_config table storage anywhere yet (Group 2's own separate scope,
+ * REQ-RMAP-040 through -045) for this pointer to meaningfully address,
+ * and the same REQ-RMAP-024 wire-reachability boundary as every other
+ * Group 1 item applies -- this test still observes 0x001A-0x001B
+ * reading back as zero, produced by read_general()'s generic buffer
+ * zero-fill rather than the field being dispatched onto the wire yet. */
+static void test_hw_cfg_ptr_is_now_correctly_shaped(void)
 {
-    rcp_regmap_general_t map = populated_map();
+    rcp_regmap_general_t map;
     uint8_t              buf[0x1C];
 
-    TEST_ASSERT_EQUAL_UINT((size_t)4u, sizeof(map.hw_pin_map.offset));
-    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.hw_pin_map.capacity));
-    TEST_ASSERT_EQUAL_HEX32(0x00000040u, map.hw_pin_map.offset);
-    TEST_ASSERT_EQUAL_HEX16(0x0008u, map.hw_pin_map.capacity);
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_hw_cfg_ptr));
+
+    rcp_regmap_general_init(&map);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_hw_cfg_ptr);
+    map.svr_hw_cfg_ptr = 0x0060u;
+    TEST_ASSERT_EQUAL_UINT16(0x0060u, map.svr_hw_cfg_ptr);
 
     read_general(&map, (uint8_t)sizeof(buf), buf);
     TEST_ASSERT_TRUE(span_is_zero(buf, 0x1A, 0x1B)); /* svr_hw_cfg_ptr */
@@ -776,9 +785,12 @@ static void test_ep_cfg_and_bytebus_map_pointers_are_mis_shaped(void)
  * layer, time synch, security -- where a zero pointer is the defined
  * encoding for "subsystem not supported" and a section spans pointer..
  * pointer+capacity. Deviation: rcp_regmap_general_t declares exactly
- * seven sub-table refs and none of these four, so a capacity of 0
- * ("section empty") cannot be told from "unadvertised". Pinned by
- * rcp_regmap_general_init() zeroing exactly the seven that exist. */
+ * six rcp_regmap_table_ref_t sub-table refs (svr_hw_cfg_ptr, REQ-RMAP-033,
+ * is now its own distinct 16-bit field rather than a seventh table ref --
+ * see that field's own comment for why) and none of these four missing
+ * pairs, so a capacity of 0 ("section empty") cannot be told from
+ * "unadvertised". Pinned by rcp_regmap_general_init() zeroing exactly
+ * the fields that exist. */
 static void test_four_optional_subsystem_pointer_pairs_are_absent(void)
 {
     rcp_regmap_general_t map;
@@ -786,8 +798,7 @@ static void test_four_optional_subsystem_pointer_pairs_are_absent(void)
     memset(&map, 0xAA, sizeof(map));
     rcp_regmap_general_init(&map);
 
-    TEST_ASSERT_EQUAL_HEX32(0u, map.hw_pin_map.offset);
-    TEST_ASSERT_EQUAL_HEX16(0u, map.hw_pin_map.capacity);
+    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_hw_cfg_ptr);
     TEST_ASSERT_EQUAL_HEX32(0u, map.request_stream_cfg.offset);
     TEST_ASSERT_EQUAL_HEX16(0u, map.request_stream_cfg.capacity);
     TEST_ASSERT_EQUAL_HEX32(0u, map.response_queue_cfg.offset);
@@ -830,8 +841,7 @@ static void test_hw_config_table_has_no_server_side_storage(void)
     TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_config_apply_to_mock(&m, srv));
 
     /* The parsed pin never reaches the server: no table exists to hold it. */
-    TEST_ASSERT_EQUAL_HEX32(0u, rcp_mock_server_regmap(srv)->hw_pin_map.offset);
-    TEST_ASSERT_EQUAL_HEX16(0u, rcp_mock_server_regmap(srv)->hw_pin_map.capacity);
+    TEST_ASSERT_EQUAL_HEX16(0u, rcp_mock_server_regmap(srv)->svr_hw_cfg_ptr);
 
     rcp_mock_server_destroy(srv);
     rcp_config_manifest_free(&m);
@@ -1582,7 +1592,7 @@ int main(void)
     RUN_TEST(test_reserved_octet_at_0x17_is_now_explicitly_modeled);
     RUN_TEST(test_reserved_register_at_0x22_is_indistinguishable_from_zero_fill);
     RUN_TEST(test_io_pin_count_is_now_explicitly_modeled);
-    RUN_TEST(test_hw_cfg_ptr_mis_shaped);
+    RUN_TEST(test_hw_cfg_ptr_is_now_correctly_shaped);
     RUN_TEST(test_stream_cfg_pointer_capacity_pairs_are_collapsed);
     RUN_TEST(test_ep_cfg_and_bytebus_map_pointers_are_mis_shaped);
     RUN_TEST(test_four_optional_subsystem_pointer_pairs_are_absent);
