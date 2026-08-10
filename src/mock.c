@@ -846,11 +846,31 @@ size_t rcp_mock_server_dispatch_frame_e2e(rcp_mock_server_t *srv, uint8_t avtp_s
 /* ── Conditional-request execution (TC18 §11.2.2) ─────────────────────────── */
 
 //cfusa:req REQ-MOCK-022
+//cfusa:req REQ-RMAP-028
 bool rcp_mock_server_set_sequencer_count(rcp_mock_server_t *srv, uint16_t count)
 {
+    bool     ok;
+    uint16_t actual;
+
     rcp_sequencer_table_free(&srv->sequencers);
     srv->sequencers = rcp_sequencer_table_new(count);
-    return count == 0u || srv->sequencers.state != NULL;
+    ok = count == 0u || srv->sequencers.state != NULL;
+    /* Sync from srv->sequencers.count (the table's own ACTUAL size),
+     * never the raw count argument -- on an allocation failure for a
+     * nonzero count, rcp_sequencer_table_new() returns a zeroed table
+     * (count=0) per its own doc comment, and the register field must
+     * reflect that same "unsupported" reality, not the caller's
+     * unmet request. Mirrors rcp_mock_server_transition()'s own
+     * "sync from the authoritative post-call value" convention
+     * (REQ-RMAP-023). svr_sequencers_max (REQ-RMAP-028) is 8 bit on the
+     * wire -- an actual count this test double's own uint16_t API could
+     * in principle produce but the real register could never hold is
+     * capped at the register's own representable maximum (0xFF), never
+     * silently truncated/wrapped, so the recorded value is never
+     * smaller than the truth. */
+    actual = srv->sequencers.count;
+    srv->regmap.svr_sequencers_max = (actual > 0xFFu) ? (uint8_t)0xFFu : (uint8_t)actual;
+    return ok;
 }
 
 //cfusa:req REQ-MOCK-022

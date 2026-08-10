@@ -48,9 +48,10 @@
  * the roadmap's explicit instruction, rather than folding it into
  * request_compound.c as a private implementation detail.
  *
- * regmap.h's rcp_regmap_general_t.svr_max_sequencers (a register field
- * reserved, but inert, since milestone 62) is this module's own
- * "svr_sequencers_max" register value by another name -- the count of
+ * regmap.h's rcp_regmap_general_t.svr_sequencers_max (REQ-RMAP-028,
+ * a register field reserved, but inert on its own, since milestone 62 --
+ * mock.c's rcp_mock_server_set_sequencer_count() is the one caller that
+ * keeps it synced with the table below) is the count of
  * sequencers rcp_sequencer_table_new() below is expected to be called
  * with. regmap.h's rcp_regmap_general_t.sequencer_state
  * (rcp_regmap_table_ref_t) is the register map's own wire-facing
@@ -87,7 +88,7 @@ extern "C" {
 
 /* A heap-allocated table of count independent 8-bit sequencer-state
  * registers -- this module's own dynamic-size representation, sized at
- * runtime from a server's own svr_max_sequencers register value rather
+ * runtime from a server's own svr_sequencers_max register value rather
  * than a compile-time cap, matching rcp.h's rcp_bytes_t convention for
  * other runtime-sized buffers in this codebase. state is NULL iff
  * count == 0. */

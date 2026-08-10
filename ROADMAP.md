@@ -9762,3 +9762,75 @@ from `not-implemented` to `partial`).
 `REQ-RMAP-061`'s own partial progress). Group 1: 4/18 items. Next:
 continue Group 1 in table order -- `REQ-RMAP-028` (`svr_sequencers_max`
 width and its 0-means-unsupported encoding unenforced).
+
+### 181. Phase 5d batch 11: `REQ-RMAP-028` -- `svr_sequencers_max` corrected width, synced from the real sequencer table (issue #200)
+
+Third Group 1 batch to touch an existing field, but the FIRST one with
+a real, already-wired `src/*.c` consumer -- `request_sequencer.h`'s own
+file header already named `svr_max_sequencers` as "this module's own
+`svr_sequencers_max` register value by another name," and
+`mock.c`'s `rcp_mock_server_set_sequencer_count()` was the concrete,
+already-existing composition point (same pattern as batch 7's
+`rcp_mock_server_transition()`), just never actually reading or writing
+the register field at all -- confirmed by grep before assuming any new
+composition point was needed.
+
+Renamed+retyped the field (same batch-9/10 pattern:
+`svr_max_sequencers` `uint16_t` -> `svr_sequencers_max` `uint8_t`,
+matching TC18's own register name and 8-bit width). The genuinely new
+part: `rcp_mock_server_set_sequencer_count()` gains a sync step keeping
+`regmap.svr_sequencers_max` equal to the ACTUAL post-call
+`rcp_sequencer_table_t.count` (not the caller's raw `count` argument --
+on an allocation failure for a nonzero count,
+`rcp_sequencer_table_new()` already documents returning a zeroed table,
+count=0, and the register must reflect that same reality, not the
+unmet request; mirrors batch 7's "sync from the authoritative post-call
+value, not the target" lesson exactly). Since the test double's own API
+accepts a `uint16_t` count but the real register is only 8 bits,
+`syncing` caps at `0xFF` rather than silently truncating/wrapping a
+larger count into a misleadingly small one -- the recorded value is
+never smaller than the truth.
+
+**Key design insight, avoiding invented "enforcement" logic**:
+`request_sequencer.h` already has `rcp_sequencer_table_unsupported()`
+(`table->count == 0`) implementing TC18's exact "0 means sequencer
+operation not supported" rule -- just applied to the table's own
+`count`, not the register field directly. Once the register is kept
+synced with that same `count`, it correctly reflects the rule BY
+CONSTRUCTION, with zero new "is this the unsupported sentinel"
+predicate needed anywhere. This is the second time this phase a
+"missing enforcement" deviation resolved into "the rule already exists
+one layer down, wire the missing sync" rather than genuinely new logic
+(the first: batch 6/-064's Flush_time trigger composing with existing
+primitives).
+
+Rewrote the deviation pin into a positive test proving, through a real
+`rcp_mock_server_t` (not a bare struct): a fresh server reads 0 and
+`rcp_sequencer_table_unsupported()` agrees; setting count=7 updates both
+in lockstep and `unsupported()` correctly flips to false; setting count
+back to 0 re-establishes "unsupported" in both places. Found and fixed
+a SECOND, unrelated pin (`test_sequencer_zero_state_ownership_and_
+regmap_wiring`, `test_tc18_gaps_server.c`, a different requirement about
+register/table binding using a bare, non-mock struct+table pair) that
+also referenced the old field name/width -- narrowed its own comment to
+clarify its "no binding" claim is specifically about the bare-primitive
+case, since a real binding (mock.c) now exists elsewhere; its own
+assertions stayed accurate unchanged.
+
+Mutation-tested two ways: (1) the sync line's actual assignment removed
+(computed but discarded, isolated logic mutation) -- fails the new
+composition test alone; (2) full revert of the header alone with all
+three affected test files' changes kept -- breaks the build, this time
+in `src/mock.c` itself (`no member named 'svr_sequencers_max'`),
+confirming -- for the first time in Group 1 -- that a REAL `src/*.c`
+consumer, not just tests, depends on the field. Both restored clean,
+diff-verified byte-identical against pre-mutation backups. Full suite
+(65/65) + ASan/UBSan clean. Fresh `cfusa check` (0 errors) + all three
+separate `cfusa trace` invocations (100%/100%, 0 untested). 1030
+requirements (unchanged), 110 `tc18-gap` entries remaining (unchanged --
+still `partial`, text narrowed).
+
+**Phase 5d progress after batch 11**: 12/47 items addressed (13 counting
+`REQ-RMAP-061`'s own partial progress). Group 1: 5/18 items. Next:
+continue Group 1 in table order -- `REQ-RMAP-029` (`svr_configuration_lock`,
+0x0015, entirely missing -- R/W+ writes are never lock-gated).

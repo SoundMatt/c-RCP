@@ -1100,11 +1100,16 @@ static void test_sequencer_zero_state_ownership_and_regmap_wiring(void)
     TEST_ASSERT_TRUE(rcp_sequencer_get_state(&table, 0u, &state));
     TEST_ASSERT_EQUAL_UINT8(9u, state);
 
-    /* And neither register that would expose this table over EP0 is bound to
-     * it: svr_max_sequencers and the sequencer_state sub-table reference stay
-     * at their initialized zeros while a 4-sequencer table exists. */
+    /* This bare pair -- a freshly-init'd regmap struct and a separately-
+     * created table, with no mock server tying them together -- is
+     * exactly this test's own point: neither register that would expose
+     * this table over EP0 is bound to it by the primitives alone.
+     * svr_sequencers_max (REQ-RMAP-028, kept synced only by mock.c's
+     * rcp_mock_server_set_sequencer_count(), not consulted here) and the
+     * sequencer_state sub-table reference stay at their initialized
+     * zeros while a 4-sequencer table exists. */
     rcp_regmap_general_init(&map);
-    TEST_ASSERT_EQUAL_UINT16(0u, map.svr_max_sequencers);
+    TEST_ASSERT_EQUAL_UINT8(0u, map.svr_sequencers_max);
     TEST_ASSERT_EQUAL_UINT16(0u, map.sequencer_state.capacity);
 
     rcp_sequencer_table_free(&table);
