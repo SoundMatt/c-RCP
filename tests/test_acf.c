@@ -199,7 +199,7 @@ static void test_unpack_header_is_pack_header_inverse(void)
     TEST_ASSERT_EQUAL_UINT16(0x1FFu, out.acf_msg_length);
     TEST_ASSERT_EQUAL_UINT8(hdr.pad, out.pad);
     TEST_ASSERT_EQUAL_UINT8(hdr.mtv, out.mtv);
-    TEST_ASSERT_EQUAL_UINT8(hdr.byte_bus_id, out.byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT16(hdr.byte_bus_id, out.byte_bus_id);
     TEST_ASSERT_EQUAL_UINT8(hdr.evt, out.evt);
     TEST_ASSERT_EQUAL_UINT8(hdr.hs, out.hs);
     TEST_ASSERT_EQUAL_UINT8(hdr.cs, out.cs);
@@ -211,14 +211,41 @@ static void test_unpack_header_is_pack_header_inverse(void)
     TEST_ASSERT_EQUAL_UINT16(hdr.read_size_or_segment_num, out.read_size_or_segment_num);
 }
 
-static void test_unpack_header_rejects_bus_id_overflow(void)
+/* REQ-RMAP-053/REQ-ACF-020: byte_bus_id is 11 bits wide on the wire
+ * (octet 2 bits [2:0] carry [10:8], octet 3 carries [7:0]).
+ * rcp_byte_bus_id_t (avtp.h) now holds the full 0-2047 range, so a
+ * wire value whose [10:8] bits are nonzero decodes correctly instead
+ * of being rejected. */
+static void test_unpack_header_reads_full_11_bit_bus_id(void)
 {
     uint8_t                       raw[8] = {0};
+    rcp_acf_byte_message_info_t   hdr    = {0};
     rcp_acf_byte_message_info_t   out    = {0};
 
-    raw[2] = 0x01u; /* busid[10:8] = 001, nonzero -> exceeds 8-bit rcp_byte_bus_id_t */
+    /* Hand-craft the maximum representable value, 0x7FF (endpoint 2047):
+     * octet 2 bits [2:0] = 111, octet 3 = 0xFF. */
+    raw[2] = 0x07u;
+    raw[3] = 0xFFu;
 
-    TEST_ASSERT_EQUAL(RCP_ACF_ERR_BUS_ID_OVERFLOW, rcp_acf_unpack_header(raw, &out));
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_unpack_header(raw, &out));
+    TEST_ASSERT_EQUAL_UINT16(0x7FFu, out.byte_bus_id);
+
+    /* Round-trip the same value through pack_header too. */
+    hdr.byte_bus_id = 0x7FFu;
+    hdr.op          = RCP_ACF_OP_WRITE;
+    rcp_acf_pack_header(raw, RCP_ACF_MSG_TYPE_ABB, 2u, &hdr);
+    TEST_ASSERT_EQUAL_HEX8(0x07u, (uint8_t)(raw[2] & 0x07u));
+    TEST_ASSERT_EQUAL_HEX8(0xFFu, raw[3]);
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_unpack_header(raw, &out));
+    TEST_ASSERT_EQUAL_UINT16(0x7FFu, out.byte_bus_id);
+
+    /* A mid-range value above the old 8-bit ceiling (256) also
+     * round-trips: this is exactly the address space that was
+     * previously unreachable. */
+    hdr.byte_bus_id = 0x321u; /* 801 */
+    rcp_acf_pack_header(raw, RCP_ACF_MSG_TYPE_ABB, 2u, &hdr);
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_unpack_header(raw, &out));
+    TEST_ASSERT_EQUAL_UINT16(0x321u, out.byte_bus_id);
 }
 
 static void test_pad_len(void)
@@ -949,7 +976,6 @@ static void test_acf_strerror_unique_nonempty(void)
 {
     const rcp_acf_errc_t codes[] = {
         RCP_ACF_OK, RCP_ACF_ERR_SHORT_FRAME, RCP_ACF_ERR_BAD_MSG_TYPE,
-        RCP_ACF_ERR_BUS_ID_OVERFLOW,
     };
     const size_t n = sizeof(codes) / sizeof(codes[0]);
     size_t i, j;
@@ -976,7 +1002,7 @@ int main(void)
 
     RUN_TEST(test_pack_header_bit_positions);
     RUN_TEST(test_unpack_header_is_pack_header_inverse);
-    RUN_TEST(test_unpack_header_rejects_bus_id_overflow);
+    RUN_TEST(test_unpack_header_reads_full_11_bit_bus_id);
     RUN_TEST(test_pad_len);
 
     RUN_TEST(test_op_none_wire_bit_is_write_roundtrip);

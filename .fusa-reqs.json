@@ -8154,13 +8154,13 @@
     },
     {
       "id": "REQ-ACF-020",
-      "title": "byte_bus_id is 11 bits on the wire; c-RCP represents only the low 8",
-      "text": "byte_message_info's byte_bus_id field is 11 bits wide on the wire (byte_bus_id[10:8] in octet 2 bits 2:0 and byte_bus_id[7:0] in octet 3), per TC18 \u00a711.2.1 Figure 7 / Table 4. c-RCP's rcp_byte_bus_id_t represents only the low 8 bits: rcp_acf_unpack_header() shall return RCP_ACF_ERR_BUS_ID_OVERFLOW, rather than silently truncating, for any wire value whose byte_bus_id[10:8] is nonzero. NOT FULLY IMPLEMENTED: endpoint identifiers 256-2047 cannot be addressed or represented at all.",
+      "title": "byte_bus_id is 11 bits on the wire; c-RCP now represents the full range",
+      "text": "byte_message_info's byte_bus_id field is 11 bits wide on the wire (byte_bus_id[10:8] in octet 2 bits 2:0 and byte_bus_id[7:0] in octet 3), per TC18 \u00a711.2.1 Figure 7 / Table 4. Fixed: rcp_byte_bus_id_t (avtp.h) is now uint16_t, wide enough to hold the full 0-2047 range, so rcp_acf_pack_header()/rcp_acf_unpack_header() (acf.c) encode and decode every bit of the field -- endpoint identifiers 0-2047 are all addressable and representable. rcp_acf_unpack_header() no longer returns an overflow error for a high byte_bus_id: RCP_ACF_ERR_BUS_ID_OVERFLOW is retired outright (removed from rcp_acf_errc_t), since the condition it represented -- a decoded value the type couldn't hold -- can no longer occur (the wire field's own 3-bit-plus-8-bit extraction is mathematically bounded to 0x7FF, a value the widened type always represents).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "partial",
+      "status": "implemented",
       "tc18": "\u00a711.2.1, TC18.txt L1142 (Figure 7) and L1158 (Table 4)"
     },
     {
@@ -9127,13 +9127,13 @@
     },
     {
       "id": "REQ-RMAP-053",
-      "title": "byte_bus_id is an 11-bit address; the 8-bit rcp_byte_bus_id_t cannot represent addresses 256..2047",
-      "text": "rcp_byte_bus_id_t shall be wide enough to hold the full 11-bit byte_bus_id the EP_ID_config table's BBID register carries (TC18 \u00a712.7.8 Table 23, row offset 0x0002, 16 bit register, \"Byte_bus_id [11bit]\") and that the ACF byte_message_info header transports across octet 2 bits [2:0] and octet 3 (REQ-ACF-016). NOT IMPLEMENTED: rcp_byte_bus_id_t is uint8_t (include/rcp/avtp.h:127), so byte_bus_id[10:8] is structurally always zero on encode (src/acf.c:65) and cannot be recovered on decode. Consequence: c-RCP can address only 256 of the 2048 endpoints per stream the protocol defines, and REQ-ACF-016's header-layout obligation is unsatisfiable for any address above 255 \u2014 a peer legitimately using BBID 0x100..0x7FF is unaddressable and its frames are mis-decoded to the low 8 bits.",
+      "title": "byte_bus_id is an 11-bit address; rcp_byte_bus_id_t now represents the full 0..2047 range",
+      "text": "rcp_byte_bus_id_t shall be wide enough to hold the full 11-bit byte_bus_id the EP_ID_config table's BBID register carries (TC18 \u00a712.7.8 Table 23, row offset 0x0002, 16 bit register, \"Byte_bus_id [11bit]\") and that the ACF byte_message_info header transports across octet 2 bits [2:0] and octet 3 (REQ-ACF-016). Fixed: rcp_byte_bus_id_t is now uint16_t (include/rcp/avtp.h), and byte_bus_id[10:8] is a real, encoded/decoded value on both the pack and unpack paths (src/acf.c) rather than structurally always zero. Full \"read every consumer\" investigation performed first (~55 files touching the type): every endpoint type module, the conditional-request layer, config.c, lifecycle.c, mock.c, and server.c were all confirmed to be simple pass-through consumers needing no logic changes; two real consumer-side fixes were needed and made alongside the type change -- adapt.c's byte_bus_id-to-string buffer (char[4], sized for \"255\"+NUL) was widened to char[6] (\"2047\"+NUL), and test_mock.c's own decode-failure test needed a new stimulus (an over-declared pad count) since its old one (a high byte_bus_id) no longer fails to decode. REQ-ACF-020's own companion requirement (the same underlying gap, viewed from the ACF wire layer) is fixed by the same change; RCP_ACF_ERR_BUS_ID_OVERFLOW is retired outright, not left as dead code, since the condition it represented can no longer occur. c-RCP can now address all 2048 endpoints per stream the protocol defines.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "implemented",
       "tc18": "\u00a712.7.8 Table 23, TC18.txt L2967, L2970"
     },
     {

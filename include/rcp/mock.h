@@ -377,11 +377,13 @@ typedef struct {
  * are dispatched (mirroring rcp_sched_split_frame_members()'s own
  * out_offsets truncation) -- pass an out_results/out_cap pair of at least
  * RCP_MOCK_MAX_FRAME_MEMBERS to be certain no real frame is truncated. If
- * a member's own byte_message_info header fails to decode (e.g. its
- * byte_bus_id exceeds this build's 8-bit rcp_byte_bus_id_t range --
- * RCP_ACF_ERR_BUS_ID_OVERFLOW, acf.h), that member's result is
- * RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS with byte_bus_id left at 0 and no
- * handler run, rather than dispatching against a bogus address. */
+ * a member's own byte_message_info header fails to decode as either
+ * ACF_ABB or ACF_GBB (e.g. an unrecognized acf_msg_type -- byte_bus_id
+ * itself can no longer be the cause, now that rcp_byte_bus_id_t holds
+ * the full 11-bit wire range, REQ-RMAP-053/REQ-ACF-020), that member's
+ * result is RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS with byte_bus_id left at
+ * 0 and no handler run, rather than dispatching against a bogus
+ * address. */
 size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subtype,
                                        bool time_sync_supported, const uint8_t *frame,
                                        size_t frame_len,

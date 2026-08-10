@@ -175,14 +175,22 @@ extern "C" {
  * length field this module no longer has -- see the file header. */
 #define RCP_ACF_MAX_PAYLOAD RCP_ACF_GBB_MAX_PAYLOAD
 
+/* RCP_ACF_ERR_BUS_ID_OVERFLOW (formerly =3, decoded byte_bus_id[10:8]
+ * nonzero exceeding what rcp_byte_bus_id_t could hold) is RETIRED as of
+ * REQ-RMAP-053/REQ-ACF-020's own fix batch -- see .fusa-reqs.json for
+ * both entries' full retirement/rewrite text. rcp_byte_bus_id_t
+ * (avtp.h) now holds the full 11-bit wire range, so the condition this
+ * code represented can no longer occur: busid_full's own bit-extraction
+ * (rcp_acf_unpack_header(), acf.c) is mathematically bounded to 0x7FF,
+ * a value the widened type always represents. Removed outright, not
+ * deprecated-then-removed -- nothing in this codebase (including
+ * errors.c's TC18 Table 27 wire-error mapping, checked) referenced it
+ * for anything but this now-impossible condition, and it was this
+ * enum's last value, so no other member's numeric value changes. */
 typedef enum {
-    RCP_ACF_OK                  = 0,
-    RCP_ACF_ERR_SHORT_FRAME     = 1,
-    RCP_ACF_ERR_BAD_MSG_TYPE    = 2,
-    /* Decoded byte_bus_id[10:8] is nonzero: the wire value exceeds what
-     * rcp_byte_bus_id_t (8 bits wide -- see avtp.h) can represent. Mirrors
-     * go-RCP's ErrByteBusIDOverflow for the same underlying limitation. */
-    RCP_ACF_ERR_BUS_ID_OVERFLOW = 3,
+    RCP_ACF_OK               = 0,
+    RCP_ACF_ERR_SHORT_FRAME  = 1,
+    RCP_ACF_ERR_BAD_MSG_TYPE = 2,
 } rcp_acf_errc_t;
 
 /* Human-readable message for an rcp_acf_errc_t value. Never returns NULL. */
@@ -393,9 +401,12 @@ void rcp_acf_pack_header(uint8_t out[8], uint8_t acf_msg_type, uint16_t acf_msg_
  * (every field, including acf_msg_type and acf_msg_length). Reserved bits
  * (rsv at octet 2 bits 4:3 and octet 4 bits 3:2) are not validated -- a
  * peer that sets them is tolerated, not rejected, per this module's
- * decode-leniency convention. Returns RCP_ACF_ERR_BUS_ID_OVERFLOW,
- * leaving *out_hdr partially populated, if the decoded byte_bus_id[10:8]
- * bits are nonzero (see rcp_byte_bus_id_t's 8-bit width, avtp.h). */
+ * decode-leniency convention. Always succeeds (returns RCP_ACF_OK): the
+ * full 11-bit byte_bus_id[10:8]+[7:0] decodes into *out_hdr->byte_bus_id
+ * unconditionally -- rcp_byte_bus_id_t (avtp.h) is wide enough to hold
+ * the entire wire range, so there is no overflow case left to reject
+ * (REQ-RMAP-053/REQ-ACF-020; this function used to return
+ * RCP_ACF_ERR_BUS_ID_OVERFLOW here, now retired). */
 rcp_acf_errc_t rcp_acf_unpack_header(const uint8_t in[8], rcp_acf_byte_message_info_t *out_hdr);
 
 /* Returns the number of zero pad octets (0-3) needed to bring unpadded_len
@@ -475,8 +486,7 @@ rcp_bytes_t rcp_acf_encode_abb(const rcp_acf_byte_message_info_t *hdr,
  * shorter than that quadlet-derived total length, or if pad exceeds the
  * payload region it is declared to trail. Returns
  * RCP_ACF_ERR_BAD_MSG_TYPE if the decoded acf_msg_type is not
- * RCP_ACF_MSG_TYPE_ABB. Returns RCP_ACF_ERR_BUS_ID_OVERFLOW per
- * rcp_acf_unpack_header(). */
+ * RCP_ACF_MSG_TYPE_ABB. */
 rcp_acf_errc_t rcp_acf_decode_abb(const uint8_t *b, size_t len,
                                   rcp_acf_byte_message_info_t *out_hdr,
                                   const uint8_t **out_payload, size_t *out_payload_len);

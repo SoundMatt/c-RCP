@@ -111,19 +111,16 @@ static void test_acf_msg_type_constants_and_op_wire_bit(void)
  * make the 12-bit read_size_or_segment_num field mean read_size when op == 0
  * (read) and segment_num otherwise. A conforming API would report which of
  * the two a caller is looking at; c-RCP exposes one uninterpreted slot whose
- * decoded value is identical under either op sense.
- * REQ-ACF-020 (partial) DEVIATION PIN: byte_bus_id is 11 bits on the wire
- * (Figure 7: [10:8] in octet 2 bits 2:0, [7:0] in octet 3). rcp_byte_bus_id_t
- * is 8 bits, so endpoint identifiers 256-2047 cannot be represented at all;
- * a wire value with [10:8] nonzero is rejected rather than truncated. */
-static void test_acf_read_size_slot_and_bus_id_width(void)
+ * decoded value is identical under either op sense. (This test used to also
+ * carry REQ-ACF-020's own byte_bus_id-width deviation pin -- split out into
+ * test_acf_bus_id_is_now_eleven_bits_wide below once that gap closed, so
+ * this test's own remaining scope is exactly its own single requirement.) */
+static void test_acf_read_size_slot_is_ambiguous(void)
 {
     rcp_acf_byte_message_info_t hdr    = {0};
     rcp_acf_byte_message_info_t out    = {0};
-    uint8_t                     raw[8] = {0};
     uint8_t                     packed[8];
 
-    hdr.byte_bus_id              = 0xFFu;
     hdr.read_size_or_segment_num = 0x1321u; /* 12-bit field: 0x321 survives */
 
     hdr.op = RCP_ACF_OP_READ;
@@ -136,15 +133,28 @@ static void test_acf_read_size_slot_and_bus_id_width(void)
     TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_unpack_header(packed, &out));
     /* Same slot, same value: nothing selects the segment_num reading. */
     TEST_ASSERT_EQUAL_HEX16(0x321u, out.read_size_or_segment_num);
+}
 
-    /* The full 8 bits this type can hold land in octet 3; octet 2's
-     * byte_bus_id[10:8] bits are always encoded zero. */
-    TEST_ASSERT_EQUAL_UINT(1u, sizeof(rcp_byte_bus_id_t));
+/* REQ-ACF-020: byte_bus_id is 11 bits on the wire (Figure 7: [10:8] in
+ * octet 2 bits 2:0, [7:0] in octet 3). Fixed (REQ-RMAP-053's own
+ * companion requirement): rcp_byte_bus_id_t is now wide enough to hold
+ * the full range, so endpoint identifiers up to 2047 are representable,
+ * encodable, and decodable -- split out of the combined test above,
+ * which used to also pin this as a still-open deviation. */
+static void test_acf_bus_id_is_now_eleven_bits_wide(void)
+{
+    rcp_acf_byte_message_info_t hdr    = {0};
+    rcp_acf_byte_message_info_t out    = {0};
+    uint8_t                     packed[8];
+
+    hdr.byte_bus_id = 0x1FFu; /* endpoint 511 -- above the old 8-bit ceiling */
+    hdr.op          = RCP_ACF_OP_WRITE;
+    rcp_acf_pack_header(packed, RCP_ACF_MSG_TYPE_ABB, 2u, &hdr);
+    TEST_ASSERT_EQUAL_HEX8(0x01u, (uint8_t)(packed[2] & 0x07u)); /* [10:8] now real */
     TEST_ASSERT_EQUAL_HEX8(0xFFu, packed[3]);
-    TEST_ASSERT_EQUAL_HEX8(0x00u, (uint8_t)(packed[2] & 0x07u));
 
-    raw[2] = 0x01u; /* byte_bus_id[10:8] = 001b -> endpoint 256 */
-    TEST_ASSERT_EQUAL(RCP_ACF_ERR_BUS_ID_OVERFLOW, rcp_acf_unpack_header(raw, &out));
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_unpack_header(packed, &out));
+    TEST_ASSERT_EQUAL_UINT16(0x1FFu, out.byte_bus_id);
 }
 
 /* REQ-ACF-021 (partial) DEVIATION PIN: TC18 11.2.1 Table 4 / 11.2.2.3 Table 8
@@ -1082,7 +1092,8 @@ int main(void)
     UNITY_BEGIN();
 
     RUN_TEST(test_acf_msg_type_constants_and_op_wire_bit);
-    RUN_TEST(test_acf_read_size_slot_and_bus_id_width);
+    RUN_TEST(test_acf_read_size_slot_is_ambiguous);
+    RUN_TEST(test_acf_bus_id_is_now_eleven_bits_wide);
     RUN_TEST(test_acf_request_flags_round_trip_unconstrained);
 
     RUN_TEST(test_gpio_request_payload_is_four_octets);

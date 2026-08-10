@@ -123,8 +123,14 @@ typedef struct {
 
 /* Endpoint-within-stream address. Unique only within the stream_id it is
  * paired with (see rcp_avtp_addr_t) -- never globally, and never on its
- * own. */
-typedef uint8_t rcp_byte_bus_id_t;
+ * own. TC18's own BBID field is 11 bits wide (0-2047, ACF byte_message_
+ * info octet 2 bits [2:0] carrying [10:8] and octet 3 carrying [7:0],
+ * see acf.h; also the EP_ID_config table's own BBID register, regmap.h)
+ * -- uint16_t comfortably holds the full range (REQ-RMAP-053/REQ-ACF-020,
+ * fixed as of this typedef's own follow-up batch; values above 2047 are
+ * simply never produced by any encoder/decoder in this codebase, not a
+ * distinct wire representation this type needs to reject on its own). */
+typedef uint16_t rcp_byte_bus_id_t;
 
 /* Builds a stream_id from a 6-byte MAC and a caller-assigned unique_id. */
 rcp_stream_id_t rcp_stream_id_make(const uint8_t mac[6], uint16_t unique_id);

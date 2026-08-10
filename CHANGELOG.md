@@ -30,8 +30,38 @@ the rationale.
 | `rcp.h`/`rcp.c`'s pre-TC18 object model (`rcp_zone_t`, `rcp_command_t`, `rcp_response_t`, `rcp_status_t`, `rcp_controller_t`, `rcp_registry_t`) | v0.91.0 | The TC18 register-map/lifecycle/endpoint core (`regmap.h`, `lifecycle.h`, `ep_*.h`) | v0.91.0 |
 | `ep_lin.h`/`ep_lin.c`'s `rcp_ep_lin_compare_mode_t`/`rcp_ep_lin_compare_fires()` (an invented eight-value evt[2:0] comparison scheme, self-admittedly not spec-derived) | v0.112.0 | `rcp_acf_evt_row2_is_plain()` validation + `rcp_ep_lin_response_matches()` (delegates to acf.h's shared TC18 §13.5.1 exact-match primitive) | v0.112.0 |
 | `regmap.h`/`regmap.c`'s `rcp_regmap_options_group_consistent()` and its six paired `RCP_REGMAP_OPT_*` constants (an invented all-or-nothing-pair grouping for `svr_implemented_options`, citing a section that, on primary-source verification, does not describe it) | v0.183.0 | Five independent single-bit `RCP_REGMAP_OPT_*` constants matching TC18 §12.7.5 Table 18 exactly | v0.183.0 |
+| `acf.h`'s `RCP_ACF_ERR_BUS_ID_OVERFLOW` (`rcp_acf_errc_t`'s last value; signaled a decoded `byte_bus_id[10:8]` the 8-bit-wide `rcp_byte_bus_id_t` couldn't represent) | v0.197.0 | None -- `rcp_byte_bus_id_t` (`avtp.h`) is now `uint16_t`, wide enough for the full 11-bit wire field, so the condition this code represented can no longer occur | v0.197.0 |
 
 ## Releases
+
+### v0.197.0 -- 2026-08-10
+
+**Phase 5d batch 27: `rcp_byte_bus_id_t` widened to the full 11-bit
+wire range -- Group 3 fully complete.** Issue #200. `REQ-RMAP-053`/
+`REQ-ACF-020`. Full "read every consumer" investigation performed
+first (~55 files) before any code change, per this item's own
+standing flag. `rcp_byte_bus_id_t` (`avtp.h`) widened `uint8_t` ->
+`uint16_t`. `rcp_acf_unpack_header()`'s overflow check removed (now
+provably dead code -- the wire extraction is mathematically bounded to
+0x7FF); `RCP_ACF_ERR_BUS_ID_OVERFLOW` retired outright from
+`rcp_acf_errc_t`. Two real consumer-side fixes found and made
+alongside: `adapt.c`'s byte_bus_id-to-string buffer widened
+(`char[4]` -> `char[6]`), and `test_mock.c`'s own decode-failure test
+given a new, still-valid stimulus (an over-declared `pad` count)
+since its old one (a high byte_bus_id) no longer fails to decode.
+Rewrote three width/reject-pinning deviation tests into positive
+round-trip tests; split one combined test that used to also cover
+`REQ-ACF-018`'s own unrelated, still-open deviation. Renamed one new
+test after `cfusa check` flagged a `CFUSA-CY009` substring false
+positive ("deco**des_**full" matching the DES-cipher pattern).
+Mutation-tested with three independent mutations (full typedef
+revert; isolated decode-truncation; isolated encode-masking) -- all
+caught by the same three tests from different angles. Full suite
+(65/65, net +2 tests) + ASan/UBSan clean on both trees. Fresh `cfusa
+check`/`trace` (0 errors, 100%/100%, three separate CI-matching
+invocations). `REQ-RMAP-053` and `REQ-ACF-020` both move to
+`implemented`. **Group 3 (EP_ID_config) is now COMPLETE: 6/6 items.**
+See `ROADMAP.md` milestone 197 for full detail.
 
 ### v0.196.0 -- 2026-08-10
 
