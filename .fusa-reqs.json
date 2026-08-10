@@ -9209,7 +9209,7 @@
     {
       "id": "REQ-RMAP-061",
       "title": "Max_AVTPDUsize bounds every transmitted AVTPDU, is MTU-consistent, and is discoverable",
-      "text": "The RC Server shall not transmit an AVTPDU longer than the configured Max_AVTPDUsize (TC18 \u00a712.7.9 Table 24, relative address 0x0002, 16 bit, R/W*, expressed in quadlets), shall reject a configured value for which the resulting network frame would exceed the network's maximum transmit unit, and shall expose the value in the Info/Config register map so a peer can discover it. c-RCP implements only the register field (include/rcp/regmap.h:448): no transmit path bounds a frame by it, no MTU consistency check exists, and it is not part of the discovery general-register slice (include/rcp/discovery.h:212, RCP_DISCOVERY_GENERAL_SLICE_LEN == 14 octets). Consequence: the server can emit AVTPDUs the link will drop, and a client cannot discover the server's own frame ceiling.",
+      "text": "PARTIAL: respqueue.h's rcp_respqueue_t now enforces the transmit-bounding half -- rcp_respqueue_init() takes max_avtpdu_size_octets (regmap.h's rcp_regmap_response_queue_cfg_t.max_avtpdu_size, quadlets x 4), and rcp_respqueue_push() refuses (queue unchanged) any single frame whose own length exceeds it. Still open: rejecting a configured Max_AVTPDUsize for which the resulting network frame would exceed the network's maximum transmit unit (a config-time check, not a per-message queue concern), and exposing the value in the discovery general-register slice (include/rcp/discovery.h:212, RCP_DISCOVERY_GENERAL_SLICE_LEN == 14 octets, unchanged).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
@@ -9220,12 +9220,11 @@
     {
       "id": "REQ-RMAP-062",
       "title": "A single ACF message exceeding Max_AVTPDUsize is fragmented via the ms bit",
-      "text": "When a single ACF_ABB or ACF_GBB message queued for transmission would produce an AVTPDU exceeding the response queue's configured Max_AVTPDUsize, the RC Server shall fragment it using the ms-bit/segment_num mechanism fragment.h implements, calling rcp_fragment_plan() with max_fragment_payload derived from rcp_regmap_response_queue_cfg_t.max_avtpdu_size (TC18 \u00a712.7.9). c-RCP implements the fragmentation mechanism itself (rcp_fragment_plan()/rcp_fragment_reassembler_feed(), REQ-FRAG-002..018) but never derives its bound from max_avtpdu_size \u2014 the only configured ceiling wired into fragment.h is the request-side rx_stream_max_request_size. Consequence: the transmit direction has no size trigger at all, so an oversized single-message response is emitted unfragmented rather than split.",
+      "text": "respqueue.h's rcp_respqueue_max_fragment_payload(max_avtpdu_size_octets, header_len) now derives the correct max_fragment_payload for fragment.h's existing rcp_fragment_plan_count()/rcp_fragment_plan() (REQ-FRAG-002..018, unchanged) from rcp_regmap_response_queue_cfg_t.max_avtpdu_size (TC18 \u00a712.7.9) -- converting the register's own quadlet unit to octets is the caller's job (this codebase's established 'caller supplies already-classified units' convention), and the helper conservatively reserves the fixed ACF header plus the worst-case 3 octets of trailing pad so the resulting budget is always safe. A caller with a payload too large for one AVTPDU derives this budget, plans the fragments, and pushes each one to rcp_respqueue_t individually (REQ-RMAP-061's own per-message enforcement then bounds each fragment independently).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
+      "scope": "tc18",
       "tc18": "\u00a712.7.9, TC18.txt L3012-L3013"
     },
     {

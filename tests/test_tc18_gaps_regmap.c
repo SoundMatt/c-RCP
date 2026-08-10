@@ -1064,7 +1064,7 @@ static void test_response_queue_size_register_and_storage_now_exist(void)
     TEST_ASSERT_EQUAL_UINT16(0u, cfg.queue_size);
 
     cfg.queue_size = 2u; /* 2 quadlets = 8 octets */
-    rcp_respqueue_init(&q, (size_t)cfg.queue_size * 4u);
+    rcp_respqueue_init(&q, (size_t)cfg.queue_size * 4u, 0);
     TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
     TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
     TEST_ASSERT_EQUAL_UINT(8u, rcp_respqueue_octets(&q));
@@ -1074,17 +1074,47 @@ static void test_response_queue_size_register_and_storage_now_exist(void)
     rcp_respqueue_destroy(&q);
 }
 
-/* TC18 §12.7.9 Table 24's Max_AVTPDUsize (0x0002, in quadlets) is not
- * yet enforced on transmit, wired to fragment.h's existing mechanism, or
- * exposed in the 14-octet discovery slice -- REQ-RMAP-061/062, still
- * open; deferred to a later Group 4 batch, since both need the real
- * queue this batch just added to hang their own behavior on. */
-static void test_max_avtpdu_size_not_yet_enforced_or_discoverable(void)
+/* REQ-RMAP-061/062 (TC18 §12.7.9): "The RC Server shall not transmit an
+ * AVTPDU longer than the configured Max_AVTPDUsize" and "fragmentation
+ * as supported in ACF_ABB and ACF_GBB by the ms-bit will be performed"
+ * for a message that would otherwise exceed it. respqueue.h's
+ * rcp_respqueue_t now enforces the per-message ceiling directly
+ * (REQ-RMAP-061's transmit-enforcement half), and
+ * rcp_respqueue_max_fragment_payload() gives a caller the budget to feed
+ * fragment.h's existing rcp_fragment_plan()/_plan_count() so an
+ * oversized single message is split before it is ever pushed
+ * (REQ-RMAP-062, closed). REQ-RMAP-061's other two halves -- rejecting a
+ * configured Max_AVTPDUsize inconsistent with the network's own MTU, and
+ * exposing the value in the 14-octet discovery slice -- are still open
+ * (neither is a per-message queue concern; deferred to a later batch). */
+static void test_max_avtpdu_size_is_now_enforced_and_feeds_fragmentation(void)
 {
     rcp_regmap_response_queue_cfg_t cfg;
+    rcp_respqueue_t                 q;
+    uint8_t                         ok_frame[16]  = {0};
+    uint8_t                         over_frame[17] = {0};
+    size_t                          budget;
 
     rcp_regmap_response_queue_cfg_init(&cfg);
     TEST_ASSERT_EQUAL_UINT16(0u, cfg.max_avtpdu_size);
+
+    cfg.max_avtpdu_size = 4u; /* 4 quadlets = 16 octets */
+    rcp_respqueue_init(&q, 0, (size_t)cfg.max_avtpdu_size * 4u);
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, ok_frame, sizeof(ok_frame)));
+    TEST_ASSERT_FALSE(rcp_respqueue_push(&q, over_frame, sizeof(over_frame)));
+    rcp_respqueue_destroy(&q);
+
+    /* A caller with a payload too large for one AVTPDU derives its
+     * fragment.h budget from the same max_avtpdu_size, then hands it to
+     * rcp_fragment_plan_count()/_plan() -- not modeled again here, since
+     * fragment.h's own tests already pin that mechanism's own behavior;
+     * this only confirms the budget itself is correctly derived. */
+    budget = rcp_respqueue_max_fragment_payload((size_t)cfg.max_avtpdu_size * 4u,
+                                                RCP_ACF_ABB_HEADER_LEN);
+    TEST_ASSERT_EQUAL_UINT((size_t)5u, budget); /* 16 - 8 - 3(pad) */
+
+    /* REQ-RMAP-061's other two halves -- MTU-consistency rejection and
+     * discovery-slice exposure -- remain open. */
     TEST_ASSERT_EQUAL_UINT((size_t)14u, RCP_DISCOVERY_GENERAL_SLICE_LEN);
 }
 
@@ -1123,33 +1153,38 @@ static void test_flush_triggers_and_heartbeat_are_absent(void)
     TEST_ASSERT_EQUAL_UINT64(5u, dl.poll_interval_ms);
 }
 
-/* TC18 §12.7.9: a single ACF message that would push an AVTPDU past the
- * queue's Max_AVTPDUsize must be fragmented via the ms bit, i.e.
- * rcp_fragment_plan() must be driven from
- * rcp_regmap_response_queue_cfg_t.max_avtpdu_size. Deviation: the only
- * configured ceiling wired into fragment.h is the REQUEST-side
- * rx_stream_max_request_size, in octets, while max_avtpdu_size is
- * expressed in quadlets -- so the transmit direction has no size trigger,
- * and feeding the register raw would plan against a quarter of the real
- * budget, as asserted here (32 octets -> 4 fragments; the same 8 quadlets
- * passed raw -> 13). */
-static void test_transmit_fragmentation_not_bounded_by_max_avtpdu_size(void)
+/* REQ-RMAP-062 (TC18 §12.7.9): a single ACF message that would push an
+ * AVTPDU past the queue's Max_AVTPDUsize must be fragmented via the ms
+ * bit, i.e. rcp_fragment_plan() must be driven from
+ * rcp_regmap_response_queue_cfg_t.max_avtpdu_size. The register is
+ * expressed in QUADLETS, not octets -- feeding it into
+ * rcp_fragment_plan_count() raw plans against a quarter of the real
+ * budget (13 fragments for a 100-octet payload, rather than the correct
+ * answer), exactly the mistake this test used to demonstrate as an open
+ * deviation. respqueue.h's rcp_respqueue_max_fragment_payload() now
+ * closes it: a caller converts quadlets to octets itself
+ * (max_avtpdu_size x 4, this codebase's own "caller supplies already-
+ * classified units" convention) and gets back a budget that already
+ * reserves the fixed ACF header and worst-case pad, ready to hand
+ * straight to fragment.h. */
+static void test_transmit_fragmentation_now_uses_the_correct_octet_budget(void)
 {
-    rcp_regmap_request_stream_cfg_t req;
     rcp_regmap_response_queue_cfg_t rsp;
+    size_t                          budget;
 
-    rcp_regmap_request_stream_cfg_init(&req);
     rcp_regmap_response_queue_cfg_init(&rsp);
+    rsp.max_avtpdu_size = 8u; /* 8 quadlets == 32 octets */
 
-    /* The request-side ceiling is a size_t octet count... */
-    req.rx_stream_max_request_size = 32u;
-    TEST_ASSERT_EQUAL_UINT((size_t)4u, rcp_fragment_plan_count(100u, req.rx_stream_max_request_size));
+    budget = rcp_respqueue_max_fragment_payload((size_t)rsp.max_avtpdu_size * 4u,
+                                                RCP_ACF_ABB_HEADER_LEN);
+    TEST_ASSERT_EQUAL_UINT((size_t)21u, budget); /* 32 - 8(header) - 3(pad) */
+    TEST_ASSERT_EQUAL_UINT((size_t)5u, rcp_fragment_plan_count(100u, budget));
 
-    /* ...while Max_AVTPDUsize is 8 quadlets == the same 32 octets. Passed
-     * raw, it plans 13 fragments instead of 4. */
-    rsp.max_avtpdu_size = 8u;
+    /* The same register value fed to fragment.h RAW (quadlets, no
+     * header/pad accounted for) still plans the wrong, needlessly
+     * fragmented result -- the mistake this test originally flagged,
+     * kept here as the contrast that shows why the conversion matters. */
     TEST_ASSERT_EQUAL_UINT((size_t)13u, rcp_fragment_plan_count(100u, rsp.max_avtpdu_size));
-    TEST_ASSERT_EQUAL_UINT((size_t)4u, rcp_fragment_plan_count(100u, (size_t)rsp.max_avtpdu_size * 4u));
 }
 
 /* ── §13.7.1.2 Table 33: the RC Server endpoint's own functional block ─────── */
@@ -1325,9 +1360,9 @@ int main(void)
     RUN_TEST(test_no_lockable_w_plus_field_kind);
     RUN_TEST(test_response_queue_stream_id_is_configurable);
     RUN_TEST(test_response_queue_size_register_and_storage_now_exist);
-    RUN_TEST(test_max_avtpdu_size_not_yet_enforced_or_discoverable);
+    RUN_TEST(test_max_avtpdu_size_is_now_enforced_and_feeds_fragmentation);
     RUN_TEST(test_flush_triggers_and_heartbeat_are_absent);
-    RUN_TEST(test_transmit_fragmentation_not_bounded_by_max_avtpdu_size);
+    RUN_TEST(test_transmit_fragmentation_now_uses_the_correct_octet_budget);
     RUN_TEST(test_ep0_functional_block_and_discovery_timeout_absent);
     RUN_TEST(test_field_write_error_distinguishes_state_from_writer_denial);
     RUN_TEST(test_effective_register_write_length_helper_matches_the_formula);

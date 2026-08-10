@@ -5,10 +5,13 @@
 #include <string.h>
 
 //cfusa:req REQ-RMAP-059
-void rcp_respqueue_init(rcp_respqueue_t *q, size_t capacity_octets)
+//cfusa:req REQ-RMAP-061
+void rcp_respqueue_init(rcp_respqueue_t *q, size_t capacity_octets,
+                         size_t max_avtpdu_size_octets)
 {
     memset(q, 0, sizeof(*q));
-    q->capacity_octets = capacity_octets;
+    q->capacity_octets        = capacity_octets;
+    q->max_avtpdu_size_octets = max_avtpdu_size_octets;
 }
 
 //cfusa:req REQ-RMAP-059
@@ -27,10 +30,12 @@ void rcp_respqueue_destroy(rcp_respqueue_t *q)
 }
 
 //cfusa:req REQ-RMAP-059
+//cfusa:req REQ-RMAP-061
 bool rcp_respqueue_push(rcp_respqueue_t *q, const uint8_t *frame, size_t frame_len)
 {
     rcp_bytes_t *grown;
 
+    if (q->max_avtpdu_size_octets != 0 && frame_len > q->max_avtpdu_size_octets) return false;
     if (q->capacity_octets != 0 && frame_len > q->capacity_octets - q->octets) return false;
 
     if (q->entries_len == q->entries_cap) {
@@ -74,4 +79,17 @@ size_t rcp_respqueue_len(const rcp_respqueue_t *q)
 size_t rcp_respqueue_octets(const rcp_respqueue_t *q)
 {
     return q->octets;
+}
+
+//cfusa:req REQ-RMAP-062
+size_t rcp_respqueue_max_fragment_payload(size_t max_avtpdu_size_octets, size_t header_len)
+{
+    size_t reserved;
+
+    if (max_avtpdu_size_octets == 0) return 0;
+
+    reserved = header_len + 3u; /* fixed header + worst-case trailing pad */
+    if (reserved >= max_avtpdu_size_octets) return 0;
+
+    return max_avtpdu_size_octets - reserved;
 }
