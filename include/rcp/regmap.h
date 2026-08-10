@@ -528,6 +528,28 @@ typedef struct {
                                 only, same REQ-RMAP-024 wire-
                                 reachability boundary as every other
                                 Group 1 item. */
+    uint16_t reserved_0x22; /* REQ-RMAP-035 (TC18 §12.7.5 Table 18,
+                                relative address 0x0022, 16 bit):
+                                reserved for future use; must read
+                                0x00. Explicitly modeled -- not merely
+                                absent -- for the same reasons
+                                reserved_0x17 (REQ-RMAP-031) is: it
+                                documents this span as deliberately
+                                unused, not forgotten, and gives a
+                                future REQ-RMAP-024 wire-dispatch
+                                implementation a concrete field to
+                                write zero from. Zero-inits for free
+                                via the existing memset in
+                                rcp_regmap_general_init(); no setter is
+                                provided anywhere in this codebase, so
+                                a caller cannot construct a nonzero
+                                value here in the first place --
+                                populated_map() (tests/
+                                test_tc18_gaps_regmap.c) deliberately
+                                does NOT set it, same convention as
+                                reserved_0x17. Content modeling only,
+                                same REQ-RMAP-024 wire-reachability
+                                boundary as every other Group 1 item. */
     rcp_regmap_table_ref_t ep_generic_cfg;
     rcp_regmap_table_ref_t ep_functional_cfg;
     rcp_regmap_table_ref_t ep_id_bus_map;

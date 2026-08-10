@@ -8929,13 +8929,13 @@
     },
     {
       "id": "REQ-RMAP-035",
-      "title": "The reserved 16-bit register at 0x0022 must be preserved as reserved",
-      "text": "NOT IMPLEMENTED: TC18 \u00a712.7.5 Table 18 reserves the 16-bit read-only register at absolute address 0x0022. c-RCP models no reserved field in rcp_regmap_general_t and has no absolute-address layout for the general register map, so a read of 0x0022 returns nothing defined and the address is free to be reused by mistake. Consequence: forward compatibility with a future TC18 revision that assigns this register is not preserved.",
+      "title": "The reserved 16-bit register at 0x0022 is now explicitly modeled and preserved as reserved",
+      "text": "PARTIAL: TC18 \u00a712.7.5 Table 18 reserves the 16-bit read-only register at absolute address 0x0022. rcp_regmap_general_t now declares an explicit reserved_0x22 field for this span, zero-initializing for free via the existing memset in rcp_regmap_general_init(); no setter exists anywhere in this codebase to construct a nonzero value. This documents the span as deliberately reserved (not merely forgotten) and gives a future wire-dispatch implementation a concrete field to write 0x00 from, matching the reserved_0x17 precedent (REQ-RMAP-031). What remains open: this address (0x0022) falls past the discovery response's own 0x000D wire-reachability ceiling (REQ-RMAP-024, still open), so a client still cannot read this register over the wire; the correct zero value observed today is still produced by the encoder's own generic buffer zero-fill beyond that ceiling, not by this field being dispatched.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.7.5 Table 18, TC18.txt L2599"
     },
     {
