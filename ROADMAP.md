@@ -10621,3 +10621,85 @@ text has consistently named throughout this phase. Per issue #200's
 own suggested order, Group 3 (EP_ID_config, §12.7.8 Table 23, 6 items)
 is next -- flagged as depending on Group 1's `svr_io_pin_count`/
 pointer work, now fully in place.
+
+### 193. Phase 5d batch 23: EP_ID_config row is now a (Request_Stream_Index, EP_Nr, BBID) triple -- Group 3 begins (issue #200)
+
+First Group 3 batch. Blast-radius check before touching anything
+(same discipline every prior batch this phase has used): grepped
+`rcp_regmap_ep_id_map_entry_t` across the whole codebase and found
+only four files touch it at all (`regmap.h`/`regmap.c` and two test
+files) -- a dramatically smaller footprint than `rcp_byte_bus_id_t`
+(the type `REQ-RMAP-053`, this group's next item, would need to
+widen), which is used across roughly 40 files including every
+endpoint type and the whole conditional-request layer. Confirmed
+`-052` was tractable as its own batch; `-053` needs its own dedicated
+investigation given that footprint, deferred rather than rushed.
+
+TC18 §12.7.8 Table 23 makes one EP_ID_config row a TRIPLE --
+Request_Stream_Index (row offset 0x0000, 8 bit, R/W+), EP_Nr (0x0001,
+8 bit, R/W+), BBID (0x0002, 16 bit, R/W+) -- so the same byte_bus_id
+may legally reach different endpoints on different request streams
+(the same per-stream scoping `avtp.h`'s own byte_bus_id-uniqueness
+note already states). `rcp_regmap_ep_id_map_entry_t` previously
+modeled only `(ep_id, byte_bus_id)`, reducing the table to a global
+map with no per-stream concept at all.
+
+New `uint8_t request_stream_index` field, deliberately placed as this
+struct's LAST field even though TC18's own row puts it FIRST at row
+offset 0x0000 -- this struct is content modeling only, not a wire-order
+layout dereferenced over the wire (the file's own established
+distinction), so C field order carries no TC18 conformance obligation.
+Placing it last meant every existing POSITIONAL-initializer test call
+site (`{ep_id, byte_bus_id}`, four in `test_regmap.c`) kept compiling
+unchanged -- C's own rule that a brace initializer with fewer values
+than fields implicitly zero-initializes the rest. Made this explicit
+rather than relying on the implicit behavior silently: added `, 0` to
+each of the four initializers, avoiding eight new
+`-Wmissing-field-initializers` warnings this batch would otherwise
+have introduced.
+
+Deliberately scoped to CONTENT only, matching every Group 1 batch's
+own boundary, extended here to Group 3: `rcp_regmap_ep_id_map_is_
+ascending()` is NOT updated to consider the new field -- TC18 requires
+ascending order in the COMPOSITE key (request_stream_index,
+byte_bus_id), not byte_bus_id alone, which is `REQ-RMAP-056`'s own
+separate, still-open scope (its own existing deviation pin,
+`test_ep_id_ordering_ignores_request_stream_index`, updated to set
+real `request_stream_index` values matching its own "stream 1... 
+stream 2..." narrative, previously left indeterminate). Also updated
+`REQ-RMAP-057`/`-058`'s shared deviation pin
+(`test_no_diagnostic_for_multi_client_or_heterogeneous_type`) the same
+way for internal coherence, though its own concern is orthogonal to
+stream index. A Request_Stream_Index of 0 (TC18's own end-of-table
+sentinel) is now representable but still not recognized by any
+consumer (`REQ-RMAP-054`, still open).
+
+Rewrote `REQ-RMAP-052`'s own deviation pin into a positive test
+proving the field exists at the correct width and round-trips,
+including the sentinel value, while explicitly re-pinning that
+`is_ascending()` itself still doesn't recognize it as anything special
+(the honest, still-open half of the picture).
+
+Mutation-tested: full header-only revert with every touched test file
+kept -- breaks the build (13 `no member named 'request_stream_index'`
+errors across `test_tc18_gaps_regmap.c`). Restored clean, diff-verified
+byte-identical against a pre-mutation backup. Full suite (65/65) +
+ASan/UBSan clean. Fresh `cfusa check` (0 errors) + all three separate
+`cfusa trace` invocations (100%/100%, 0 untested). `REQ-RMAP-052`
+moves `not-implemented` -> `partial` (not fully closed -- still
+blocked on `REQ-RMAP-054`'s sentinel-recognition gap, `REQ-RMAP-056`'s
+composite-key ordering gap, and this table's own complete absence of
+a wire encode/decode path). 1030 requirements (unchanged), 110
+`tc18-gap` entries remaining (unchanged -- narrowed from
+`not-implemented` to `partial`).
+
+**Phase 5d progress after batch 23**: 24/47 items addressed (25
+counting `REQ-RMAP-061`'s own partial progress). Group 3: 1/6 items
+(using issue #200's own count; `REQ-RMAP-052` through `-058` is 7 ids
+but the issue's own header states 6 items for this group -- likely
+`REQ-RMAP-055`'s "shared plumbing" status, spanning both Group 3 and
+Group 4, being counted once rather than per-group; not resolved here,
+noted for whoever closes this group out). Next: `REQ-RMAP-053`
+(`rcp_byte_bus_id_t` widened from 8 to enough bits for the full 11-bit
+BBID address space) -- needs its own dedicated investigation pass
+first, given its ~40-file footprint, before any code changes.

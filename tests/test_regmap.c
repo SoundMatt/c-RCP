@@ -381,9 +381,9 @@ static void test_response_queue_cfg_init_zeroes(void)
 static void test_ep_id_map_ascending_true_for_strictly_increasing(void)
 {
     rcp_regmap_ep_id_map_entry_t entries[3] = {
-        {0, 1},
-        {1, 5},
-        {2, 9},
+        {0, 1, 0},
+        {1, 5, 0},
+        {2, 9, 0},
     };
 
     TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_is_ascending(entries, 3));
@@ -392,8 +392,8 @@ static void test_ep_id_map_ascending_true_for_strictly_increasing(void)
 static void test_ep_id_map_ascending_false_for_equal_adjacent(void)
 {
     rcp_regmap_ep_id_map_entry_t entries[2] = {
-        {0, 4},
-        {1, 4},
+        {0, 4, 0},
+        {1, 4, 0},
     };
 
     TEST_ASSERT_FALSE(rcp_regmap_ep_id_map_is_ascending(entries, 2));
@@ -402,8 +402,8 @@ static void test_ep_id_map_ascending_false_for_equal_adjacent(void)
 static void test_ep_id_map_ascending_false_for_descending(void)
 {
     rcp_regmap_ep_id_map_entry_t entries[2] = {
-        {0, 9},
-        {1, 2},
+        {0, 9, 0},
+        {1, 2, 0},
     };
 
     TEST_ASSERT_FALSE(rcp_regmap_ep_id_map_is_ascending(entries, 2));
@@ -411,7 +411,7 @@ static void test_ep_id_map_ascending_false_for_descending(void)
 
 static void test_ep_id_map_ascending_vacuous_for_zero_or_one(void)
 {
-    rcp_regmap_ep_id_map_entry_t one[1] = {{0, 3}};
+    rcp_regmap_ep_id_map_entry_t one[1] = {{0, 3, 0}};
 
     TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_is_ascending(NULL, 0));
     TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_is_ascending(one, 1));

@@ -1041,6 +1041,45 @@ rcp_stream_id_t rcp_regmap_response_queue_stream_id(const rcp_regmap_response_qu
 typedef struct {
     uint16_t          ep_id;
     rcp_byte_bus_id_t byte_bus_id;
+    uint8_t           request_stream_index; /* REQ-RMAP-052 (TC18
+                                §12.7.8 Table 23, row offset 0x0000, 8
+                                bit, R/W+): which request stream this
+                                row's mapping applies to -- the same
+                                byte_bus_id may legally be mapped to
+                                different endpoints on different
+                                request streams (avtp.h's own
+                                byte_bus_id-uniqueness note already
+                                states this is scoped per stream_id,
+                                not global). A value of 0 is TC18's own
+                                defined end-of-table sentinel (still
+                                open, REQ-RMAP-054 -- no consumer in
+                                this codebase stops scanning at it
+                                yet); the power-on default row set
+                                (request_stream_index=1, ep_id=0,
+                                byte_bus_id=0, permitting EP0 access
+                                before any configuration is written)
+                                is also still open, same requirement.
+                                Placed as this struct's LAST field
+                                (TC18's own row puts it first, at
+                                offset 0x0000) so every existing
+                                positional-initializer test call site
+                                in this codebase keeps compiling
+                                unchanged -- this struct is this
+                                module's in-memory content model, not a
+                                wire-order layout dereferenced over the
+                                wire (see this file's own header for
+                                that standing distinction), so C field
+                                order carries no TC18 conformance
+                                obligation of its own.
+                                rcp_regmap_ep_id_map_is_ascending()
+                                below is NOT updated by this field's
+                                addition to consider it -- TC18 requires
+                                ascending order in the COMPOSITE key
+                                (request_stream_index, byte_bus_id),
+                                not byte_bus_id alone; that is
+                                REQ-RMAP-056's own separate, still-open
+                                scope, deliberately deferred rather
+                                than folded into this batch. */
 } rcp_regmap_ep_id_map_entry_t;
 
 /* Read-only diagnostic: true iff entries[0..count) is strictly ascending
