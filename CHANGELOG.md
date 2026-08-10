@@ -32,6 +32,33 @@ the rationale.
 
 ## Releases
 
+### v0.174.0 -- 2026-08-10
+
+**Phase 5d batch 4: REQ-RMAP-061/062 -- Max_AVTPDUsize transmit
+enforcement + fragmentation budget.** Issue #200. `respqueue.h`'s
+`rcp_respqueue_t` gains a second, independent ceiling alongside `-059`'s
+aggregate capacity: `max_avtpdu_size_octets` (TC18 §12.7.9 Table 24).
+`rcp_respqueue_init()` gains a required third parameter;
+`rcp_respqueue_push()` refuses (queue unchanged) any single frame whose
+own length exceeds it -- `REQ-RMAP-061`'s transmit-enforcement half
+(the MTU-consistency-check and discovery-exposure halves remain open;
+`-061` stays `partial`). New function
+`rcp_respqueue_max_fragment_payload()` closes `REQ-RMAP-062`: a pure
+helper deriving the correct budget for `fragment.h`'s existing,
+unchanged `rcp_fragment_plan()` mechanism, conservatively reserving the
+fixed ACF header plus worst-case trailing pad. Found and rewrote TWO
+more pre-existing deviation pins this batch's grep sweep surfaced
+(one predating this phase entirely) -- reinforces last batch's lesson
+that a domain-term grep across the whole suite, not just the file a
+citation points at, is needed before declaring a sweep complete.
+Mutation-tested THREE ways (full revert breaks the build; an isolated
+per-message-ceiling removal fails 2 tests; an isolated pad-reservation
+removal fails 3 tests across both files). Full suite (65/65) +
+ASan/UBSan clean. Fresh `cfusa check`/`trace` (0 errors, 100%/100%,
+three separate CI-matching invocations). See `ROADMAP.md` milestone 174
+for full detail. 1030 requirements (unchanged), 112 `tc18-gap` entries
+remaining (was 113).
+
 ### v0.173.0 -- 2026-08-10
 
 **Phase 5d batch 3: `respqueue.h`/`respqueue.c` -- the response/ack

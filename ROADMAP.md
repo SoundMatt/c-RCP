@@ -9242,3 +9242,97 @@ requirements (unchanged), 113 `tc18-gap` entries remaining (was 114).
 `fragment.h`'s existing `rcp_fragment_plan()` mechanism, plus discovery
 exposure) -- the queue this batch added now gives them something real
 to bound.
+
+### 174. Phase 5d batch 4: REQ-RMAP-061/062 -- Max_AVTPDUsize transmit enforcement + fragmentation budget (issue #200)
+
+`respqueue.h`'s `rcp_respqueue_t` gains a SECOND, independent ceiling
+alongside `-059`'s aggregate `capacity_octets`: `max_avtpdu_size_octets`
+(TC18 §12.7.9 Table 24, relative address 0x0002, 16 bit, R/W*,
+"Maximum length of an AVTPDU generated in quadlets"). `rcp_respqueue_init()`
+gains a required third parameter; `rcp_respqueue_push()` now checks it
+FIRST, refusing (queue unchanged) any single frame whose own length
+exceeds it -- REQ-RMAP-061's own transmit-enforcement half, "the RC
+Server shall not transmit an AVTPDU longer than the configured
+Max_AVTPDUsize." REQ-RMAP-061's other two halves (rejecting a
+Max_AVTPDUsize inconsistent with the network's own MTU; exposing the
+value in the discovery general-register slice) are config-time and
+discovery-layer concerns, not this queue's own, and remain open --
+`-061` stays `partial`, its text narrowed to name exactly what closed.
+
+New function `rcp_respqueue_max_fragment_payload(max_avtpdu_size_octets,
+header_len)` closes `REQ-RMAP-062`: "In case an AVTPDU containing a
+single ACF_type would exceed the Max_AVTPDUsize, fragmentation... by
+the ms-bit will be performed." A pure arithmetic helper (this module's
+"own small pure primitives" scope, unchanged) that derives the correct
+`max_fragment_payload` for `fragment.h`'s EXISTING, already-built
+`rcp_fragment_plan_count()`/`rcp_fragment_plan()` -- the mechanism
+itself needed no changes, only a correctly-derived bound, matching
+`REQ-RMAP-069`'s own "caller supplies already-classified units"
+precedent (the register's own quadlet unit is converted to octets by
+the caller, not this function). Conservatively reserves the fixed ACF
+header plus the worst-case 3 octets of trailing pad, so the resulting
+budget is safe regardless of a given fragment's actual pad, at the cost
+of a few fewer payload octets per fragment than the theoretical
+maximum -- the same fail-safe-over-optimal tradeoff this codebase has
+made throughout (e.g. batch 8 of Phase 5c's `RCP_LIFECYCLE_HW_UNCONFIGURED`
+fallback for a corrupt recovered state).
+
+**Found TWO more pre-existing deviation pins on the same second grep
+pass this batch's own scoping work prompted** (a direct continuation of
+batch 3's "grep the literal id string is not enough" lesson):
+`test_max_avtpdu_size_not_yet_enforced_or_discoverable` (in the file
+already, added last batch as `-061`/`-062`'s own placeholder) and,
+found only by grepping `max_avtpdu` case-insensitively across every
+test file rather than just the file already known to hold Group 4
+pins, `test_transmit_fragmentation_not_bounded_by_max_avtpdu_size` (in
+`test_tc18_gaps_regmap.c`, added at an EARLIER milestone, unrelated to
+this phase's own batches, demonstrating the exact quadlet-vs-octet unit
+mismatch `rcp_respqueue_max_fragment_payload()` now fixes). Both
+rewritten to positive conformance tests. **Reinforced lesson**: before
+declaring a batch's deviation-pin sweep complete, grep the RELEVANT
+DOMAIN TERMS (here, `max_avtpdu` and the register field name) across
+the WHOLE test suite, not just the one file the batch's own citation
+happens to point at -- a relevant pin can predate the phase currently
+closing it by many milestones.
+
+New tests: `test_respqueue.c` gained 4 (zero-ceiling-is-unbounded,
+per-message refusal independent of aggregate capacity, and two for the
+fragment-budget helper's own header/pad-reservation math and its two
+zero-return cases). `test_tc18_gaps_regmap.c`'s two rewritten pins now
+demonstrate the queue-level enforcement and the corrected quadlet-
+to-octet fragmentation math respectively.
+
+Mutation-tested THREE ways, since this batch both changed a signature
+and added two independent pieces of new logic: (1) full revert (`git
+stash`) breaks the BUILD (7 call sites across 2 test files reference
+the changed `rcp_respqueue_init()` signature and the new function).
+(2) an isolated removal of the `max_avtpdu_size_octets` push-check
+leaves the build green but fails BOTH the dedicated per-message-ceiling
+test in `test_respqueue.c` and the rewritten enforcement conformance
+test in `test_tc18_gaps_regmap.c`. (3) an isolated removal of the
+worst-case-pad reservation (`header_len + 3u` -> `header_len`) leaves
+the build green but fails the fragment-budget test in `test_respqueue.c`
+AND BOTH rewritten fragmentation tests in `test_tc18_gaps_regmap.c` (3
+independent failures from one mutation) -- confirming the pad-safety
+margin itself, not just the helper's existence, is pinned in every
+place that exercises it. All three mutations restored clean (diff-
+verified byte-identical against pre-mutation backups). Full suite
+(65/65) + ASan/UBSan clean, pre- and post-restore for all three
+mutations. Fresh `cfusa check` (0 errors) + `cfusa trace --gaps`/
+`--req-coverage 100`/`--sec-tested 100` (three separate CI-matching
+invocations; 100%/100%, 0 untested). 1030 requirements (unchanged), 112
+`tc18-gap` entries remaining (was 113) -- `-062` closed outright, `-061`
+remains honestly `partial`.
+
+**Phase 5d progress after batch 4**: 4/47 items addressed (5 counting
+`-061`'s partial progress, though it stays counted as open until fully
+closed). **Next**: `REQ-RMAP-063` (the `flush_on_count` packing trigger
+-- draining the queue once it holds enough quadlets, packing as many
+ACF messages as fit into each AVTPDU), then `-064`/`-065` (the
+`Flush_time` timer and the real server-liveness heartbeat gap) once a
+periodic-timer composition point is designed -- `watchdog.c`'s Keeper
+is the closest existing precedent (evaluates watchdogs on a tick, not
+queues) but nothing in this codebase evaluates a QUEUE periodically
+yet; scope that design explicitly before implementing, per this
+project's own standing discipline, rather than assuming Keeper can be
+reused as-is.
