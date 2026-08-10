@@ -203,3 +203,14 @@ rcp_pwrmode_errc_t rcp_pwrmode_commit_entry(rcp_pwrmode_t *mode, rcp_pwrmode_t t
 
     return rcp_pwrmode_transition(mode, target, out_start_kind);
 }
+
+//cfusa:req REQ-PWRMODE-021
+//cfusa:req REQ-PWRMODE-022
+//cfusa:req REQ-PWRMODE-027
+rcp_pwrmode_errc_t rcp_pwrmode_commit_network_sleep(rcp_pwrmode_t *mode,
+                                                     const rcp_pwrmode_entry_gate_t *gate,
+                                                     bool response_sent,
+                                                     rcp_pwrmode_start_kind_t *out_start_kind)
+{
+    return rcp_pwrmode_commit_entry(mode, RCP_PWRMODE_SLEEP, gate, response_sent, out_start_kind);
+}
