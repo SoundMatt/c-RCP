@@ -8699,3 +8699,127 @@ handshake) is now fully closed out. **Next**: Group 2 (§12.5 sleep-entry
 races/scope errors: `-023`/`-024`/`-025`/`-026`/`-028`), starting with
 `-024` (the lost-wakeup race), flagged by issue #199 itself as
 higher-severity than its item count suggests.
+
+### 167. Phase 5c batch 5: REQ-PWRMODE-023/024/025/026 -- `rcp_pwrmode_commit_entry()`, server-wide gate scoping, SleepCMD authorization (issue #199)
+
+Group 2 of Phase 5c (§12.5 sleep-entry races/scope errors), four of its
+five items. Primary source re-read at TC18 §12.5 in full and §13.7.2.3
+(the companion three-step admission sequence) confirmed every one of
+the five catalogued findings word-for-word before any code changed.
+
+**REQ-PWRMODE-024 (closed) + REQ-PWRMODE-026 (closed)**: the lost-wakeup
+race and the response-before-transition ordering requirement are both
+closed by one new function, `power.h`'s `rcp_pwrmode_commit_entry(mode,
+target, gate, response_sent, out_start_kind)` -- the authoritative
+second half of a two-step admission a caller now runs instead of a
+single `rcp_pwrmode_check_entry()` call: (1) check a first-sampled gate
+to decide whether to send an OK or REQUEST_CANCELED response at all,
+then (2) only once that response has actually been transmitted, call
+`commit_entry()` with a FRESHLY re-sampled gate and `response_sent =
+true`. `commit_entry()` re-validates the gate itself (closing
+`REQ-PWRMODE-024`'s race by construction -- any wake-source event the
+re-sample picked up refuses the call exactly as it would have refused
+step 1) and separately requires `response_sent` to be true
+(`REQ-PWRMODE-026` -- "The RC Server enters standby or sleep mode, as
+soon as the go to sleep/standby response... has been sent"), mirroring
+`rcp_pwrmode_handshake_iface_reenabled()`'s own `network_available`
+convention: this library does no I/O of its own and cannot observe
+transmission completion directly, so a caller that has not yet sent the
+response passes `false` and the entry is refused
+(`RCP_PWRMODE_ERR_ENTRY_REFUSED`, a new `rcp_pwrmode_errc_t` value). On
+success, `commit_entry()` delegates to the existing
+`rcp_pwrmode_transition()` for its hot/cold classification, so its own
+behavior for that part is unchanged and unduplicated.
+
+Considered and rejected: adding the re-check directly to
+`rcp_pwrmode_transition()` itself -- that function is too generic
+(Normal<->StandBy, ->Unpowered, Unpowered->Normal are none of them
+subject to entry gating at all), so folding gate logic into it would
+either silently gate transitions TC18 never gates or require a parallel
+ungated path anyway. A new, narrower function scoped to exactly the
+StandBy/Sleep-entry set was the smaller, more honest change.
+
+**REQ-PWRMODE-025 (closed, documentation-only, zero new logic)**:
+re-verification found `rcp_pwrmode_entry_gate_t.endpoint_idle` /
+`.response_queue_empty` were ALWAYS plain caller-supplied opaque bools
+with no code-level scope restriction -- `rcp_pwrmode_check_entry()`
+simply ANDs whatever the caller supplies underneath, never itself
+narrowing to "the wake-up endpoint's own" anything. The actual gap was
+the pre-fix doc comments' own wording (built around a single wake-up
+endpoint), which invited exactly the narrow, non-conformant usage the
+catalog entry flagged. Both fields' doc comments now state explicitly
+that a caller must AND every endpoint's idleness / every responder
+queue's emptiness server-wide into the one bool, matching TC18 §12.5's
+own "AT LEAST ONE EP" / "AT LEAST ONE responder queue" wording. Same
+class of correction as `REQ-PWRMODE-018` (batch 4) and
+`REQ-LIFECYCLE-026`/`035`/`037` (Phase 5b): a catalog entry named a real
+gap, but at the wrong enforcement point.
+
+**REQ-PWRMODE-023 (closed)**: two independent sub-claims, verified
+separately against the codebase's actual architecture before either was
+addressed. (a) "an accepted request puts the entire RC Server
+implementation into standby/sleep" is satisfied by construction once a
+real server-side caller uses `rcp_pwrmode_check_entry()`/
+`rcp_pwrmode_commit_entry()`, since both already operate on a single
+`rcp_pwrmode_t` -- this module's existing whole-server representation,
+never a per-endpoint one; `rcp_powerstate_manager_t`'s own per-`addr`
+mode tracking (unchanged) is this library's CLIENT-side bookkeeping of
+multiple DIFFERENT remote peers, each with its own real, independent
+mode -- not a per-endpoint model of one server's own state, and
+therefore not itself a TC18 deviation (a mistaken reading corrected in
+`test_sleep_request_moves_one_endpoint_only`'s own updated comment).
+(b) the authorization gap was real: nothing checked that a SleepCMD's
+sender was allowed to request it. `ep_wakeup.h` gains
+`rcp_ep_wakeup_sleepcmd_writable(rcp_lifecycle_writer_ctx_t writer)` --
+true iff `writer.via_root_client_ep0`, mirroring
+`rcp_lifecycle_transition()`'s own RCP_CONFIGURED-state root-client
+authorization rule (`REQ-LIFECYCLE-037`) for the identical reason: once
+RCP_CONFIGURED (the only state a SleepCMD is meaningful in), only the
+root client, not an unqualified discovery-stream sender, may act on
+server-wide power state. A caller checks this BEFORE consulting either
+gate function at all.
+
+Test changes: `test_tc18_gaps_server.c`'s three deviation-pin functions
+that had each combined multiple requirement ids in one body (an
+anti-pattern flagged after batch 4's own `-016`/`-017` staleness
+incident) were split so each closed id gets its own rewritten,
+positive-conformance test and each still-open id keeps its own clean
+deviation pin: `test_entry_gate_is_not_rechecked_before_the_mode_change`
+-> `test_commit_entry_re_checks_the_gate_and_aborts_the_race` (-024);
+`test_mode_change_is_unordered_against_the_response` split into
+`test_commit_entry_requires_the_response_to_have_been_sent` (-026,
+closed) and `test_network_sleep_refusal_cannot_suppress_the_lps_
+confirmation` (-027, still open, Group 3); `test_entry_gate_is_scoped_
+to_one_endpoint_and_one_queue` kept its name but now demonstrates
+correct server-wide gate composition (-025, closed) and lost its
+admission-suspend assertion, moved into new
+`test_admission_is_not_suspended_during_the_sleep_drain` (-028, still
+open, deferred -- needs `server.h` admission-path surgery, a larger,
+riskier change than this batch's `power.h`/`ep_wakeup.h` scope).
+`test_sleep_request_moves_one_endpoint_only` kept its assertions
+unchanged (still valid) but its comment rewritten per (a) above; new
+`test_sleepcmd_requires_root_client_authorization` added per (b).
+
+Mutation-tested: reverting all 4 touched source/header files together
+(`power.h`, `power.c`, `ep_wakeup.h`, `ep_wakeup.c`) breaks the BUILD --
+the rewritten tests reference `rcp_pwrmode_commit_entry()`,
+`RCP_PWRMODE_ERR_ENTRY_REFUSED`, and `rcp_ep_wakeup_sleepcmd_writable()`,
+none of which exist pre-fix, so every reference is an undeclared-symbol
+compile error. Build-break is treated as a stronger signal than a test
+failure per this phase's own established convention. Full test suite
+(64/64) + ASan/UBSan build both clean, pre- and post-mutation-restore.
+Fresh `cfusa check` (0 errors) + `cfusa trace --gaps` /
+`--req-coverage 100` / `--sec-tested 100` (all three separate
+invocations, matching CI; 100%/100%, 0 untested). 1030 requirements
+(unchanged, no new REQ ids), 122 `tc18-gap` entries remaining (was 126,
+four genuine closures).
+
+**Phase 5c progress after batch 5**: 9/15 items addressed (`-016`/
+`-017`/`-018`/`-020`/`-023`/`-024`/`-025`/`-026` closed, `-019`
+partial). Group 2 (§12.5/§13.7.2.3) is now closed except
+`REQ-PWRMODE-028` (admission-suspend, deferred -- needs `server.h`
+surgery). **Next**: either `-028` as its own small follow-on batch, or
+Group 3 (`-021`/`-022`/`-027`, network-level sleep coordination) --
+issue #199's own text warns Group 3 "may require a network/PHY
+signaling surface this codebase doesn't have; scope this sub-group
+explicitly before implementing, don't assume."

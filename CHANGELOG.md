@@ -32,6 +32,44 @@ the rationale.
 
 ## Releases
 
+### v0.167.0 -- 2026-08-10
+
+**Phase 5c batch 5: REQ-PWRMODE-023/024/025/026 -- `rcp_pwrmode_commit_entry()`,
+server-wide gate scoping, SleepCMD authorization.** Issue #199. Four of
+Group 2's five items (§12.5 sleep-entry races/scope errors).
+`REQ-PWRMODE-024`/`-026` closed by one new function, `power.h`'s
+`rcp_pwrmode_commit_entry(mode, target, gate, response_sent,
+out_start_kind)`: a caller now runs a two-step admission (check a
+first-sampled gate to decide what response to send, then commit against
+a FRESHLY re-sampled gate only once that response has actually been
+transmitted), closing the lost-wakeup race by re-validating the gate at
+the actual transition point and enforcing response-before-transition
+ordering via a required `response_sent` bool (no I/O of its own, so the
+caller supplies proof, mirroring `network_available`'s own precedent).
+`REQ-PWRMODE-025` closed via documentation-only correction: the gate's
+`endpoint_idle`/`response_queue_empty` fields were always opaque
+caller-supplied bools with no code-level single-endpoint restriction --
+only the pre-fix docs invited a narrow reading; now explicit that both
+are server-wide aggregates. `REQ-PWRMODE-023` closed: the "entire RC
+Server" concern is satisfied by construction (`commit_entry()` already
+operates on one whole-server `rcp_pwrmode_t`, `rcp_powerstate_manager_t`'s
+own per-peer tracking being legitimate CLIENT-side bookkeeping of
+multiple different remote servers, not a gap); the authorization gap was
+real and is now closed by `ep_wakeup.h`'s new
+`rcp_ep_wakeup_sleepcmd_writable()`, gating SleepCMD admission on
+`writer.via_root_client_ep0`. Three deviation-pin tests that had each
+combined multiple requirement ids in one body were split so closed and
+still-open ids each get their own clean test, avoiding the staleness
+class caught in batch 4. Mutation-tested: full revert of all 4 touched
+files breaks the BUILD (rewritten tests reference symbols that don't
+exist pre-fix). Full suite (64/64) + ASan/UBSan clean, fresh `cfusa
+check`/`trace` (0 errors, 100%/100%, all three separate CI-matching
+invocations). See `ROADMAP.md` milestone 167 for full detail. 1030
+requirements (unchanged), 122 `tc18-gap` entries remaining (was 126,
+four genuine closures) -- Group 2 of Phase 5c is now closed except
+`REQ-PWRMODE-028` (admission-suspend, deferred to a follow-on batch --
+needs `server.h` admission-path surgery, out of this batch's scope).
+
 ### v0.166.0 -- 2026-08-10
 
 **Phase 5c batch 4: REQ-PWRMODE-017/018 -- responder-stream recording

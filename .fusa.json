@@ -2,7 +2,7 @@
   "configVersion": "1.0",
   "project": {
     "name": "c-RCP",
-    "version": "0.166.0"
+    "version": "0.167.0"
   },
   "standard": "iso26262",
   "strict": false,

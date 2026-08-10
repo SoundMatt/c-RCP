@@ -24,6 +24,12 @@ bool rcp_ep_wakeup_functional_cfg_writable(rcp_lifecycle_state_t state,
     return rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, writer);
 }
 
+//cfusa:req REQ-PWRMODE-023
+bool rcp_ep_wakeup_sleepcmd_writable(rcp_lifecycle_writer_ctx_t writer)
+{
+    return writer.via_root_client_ep0;
+}
+
 //cfusa:req REQ-WAKEUP-003
 bool rcp_ep_wakeup_source_asserted(rcp_ep_wakeup_source_cfg_t cfg, bool pin_level)
 {

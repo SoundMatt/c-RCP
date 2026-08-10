@@ -8737,45 +8737,41 @@
     {
       "id": "REQ-PWRMODE-023",
       "title": "A sleep/standby request from an authorized client applies to the entire RC Server",
-      "text": "NOT IMPLEMENTED: c-RCP treats a sleep/standby request as a per-endpoint operation and applies no authorization to it (TC18 \u00a712.5). rcp_powerstate_manager_encode_entry_request()/_apply_entry_response() track and mutate the power mode of one addressed endpoint, whereas the specification says an accepted request puts the entire RC Server implementation into standby or sleep; and nothing checks that the requesting client is one allowed to access the RC Server's wake-up endpoint. An unauthorized client can address the wake-up endpoint, and an authorized one cannot express a whole-server sleep.",
+      "text": "c-RCP gates SleepCMD admission on client authorization via ep_wakeup.h's rcp_ep_wakeup_sleepcmd_writable() (true iff writer.via_root_client_ep0, mirroring rcp_lifecycle_transition()'s own RCP_CONFIGURED-state root-client rule) before power.h's rcp_pwrmode_check_entry()/rcp_pwrmode_commit_entry() is ever consulted. Those two functions operate on a single rcp_pwrmode_t, this module's existing whole-server mode representation, not a per-endpoint one -- a real server-side composition points *mode at its own one server-wide variable, satisfying TC18's 'entire RC Server implementation' wording by construction. rcp_powerstate_manager_t's own per-addr mode tracking (unchanged) is this library's CLIENT-side bookkeeping of multiple distinct remote peers, not a per-endpoint model of one server's own state.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
+      "scope": "tc18",
       "tc18": "\u00a712.5, TC18.txt L2320-L2321"
     },
     {
       "id": "REQ-PWRMODE-024",
       "title": "A wake-source event during sleep-request processing aborts the sleep entry",
-      "text": "NOT IMPLEMENTED: c-RCP does not abort a sleep entry on a wake-source event that arrives while the request is being processed (TC18 \u00a712.5). rcp_pwrmode_check_entry() evaluates its gate once, at the start, and nothing re-checks rcp_ep_wakeup_any_source_asserted()/rcp_ep_wakeup_wup_status_is_clear() before the mode actually changes, so a wake event racing the sleep request is lost and the server sleeps through the very condition that should have kept it awake. This is a lost-wakeup hazard, not merely a missed optimization.",
+      "text": "power.h's rcp_pwrmode_commit_entry() re-validates a freshly re-sampled rcp_pwrmode_entry_gate_t (via rcp_pwrmode_check_entry() internally) immediately before the mode actually changes -- a caller that admitted the request against a gate sampled at arrival time and re-samples it again just before committing sees any wake-source event that occurred in between, refuses the entry (RCP_PWRMODE_ERR_ENTRY_REFUSED), and leaves the mode unchanged, closing the lost-wakeup race a single up-front rcp_pwrmode_check_entry() call would leave open.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
+      "scope": "tc18",
       "tc18": "\u00a712.5, TC18.txt L2325-L2326"
     },
     {
       "id": "REQ-PWRMODE-025",
       "title": "The sleep/standby refusal conditions are evaluated server-wide, across every EP and every responder queue",
-      "text": "NOT IMPLEMENTED: c-RCP's sleep/standby entry gate is scoped to a single endpoint and a single queue (TC18 \u00a712.5). rcp_pwrmode_entry_gate_t.endpoint_idle is documented as the wake-up endpoint's own idleness and response_queue_empty as one queue's emptiness, whereas the specification refuses entry when AT LEAST ONE endpoint of the whole server is not idle or AT LEAST ONE responder queue still holds a message pending transmission. A server can therefore be put to sleep with other endpoints mid-request and undelivered responses still queued, losing both.",
+      "text": "power.h's rcp_pwrmode_entry_gate_t.endpoint_idle/.response_queue_empty are documented as server-wide aggregates -- true iff EVERY endpoint/responder queue on the RC Server is idle/empty, not just the endpoint the request arrived on -- matching TC18 \u00a712.5's 'AT LEAST ONE EP is not idle' / 'AT LEAST ONE responder queue' refusal conditions. Both fields were always caller-supplied opaque bools with no code-level scope restriction; the pre-fix reading of their doc comments (worded around a single wake-up endpoint) was the actual gap, not rcp_pwrmode_check_entry()'s own logic, which already ANDs whatever the caller supplies.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
+      "scope": "tc18",
       "tc18": "\u00a712.5, TC18.txt L2330-L2332"
     },
     {
       "id": "REQ-PWRMODE-026",
       "title": "The mode change happens only after the sleep/standby response has been transmitted",
-      "text": "NOT IMPLEMENTED: c-RCP imposes no ordering between emitting the sleep/standby response and performing the mode transition (TC18 \u00a712.5). rcp_ep_wakeup_encode_sleepcmd_response() and rcp_pwrmode_transition() are unrelated calls, so a caller may legitimately change mode before the response has left the interface. Entering Sleep before the response is transmitted loses the acknowledgement the client needs to know the server complied, and can strand the client waiting on a server that is already powered down.",
+      "text": "power.h's rcp_pwrmode_commit_entry() takes a required response_sent bool and refuses the entry (RCP_PWRMODE_ERR_ENTRY_REFUSED, mode left unchanged) unless it is true, mirroring rcp_pwrmode_handshake_iface_reenabled()'s own network_available convention -- this library does no I/O of its own and cannot observe transmission completion directly, so response_sent is the caller's own proof that the sleep/standby response has actually been transmitted before the mode transition it gates is permitted to run.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
+      "scope": "tc18",
       "tc18": "\u00a712.5, TC18.txt L2334-L2335"
     },
     {

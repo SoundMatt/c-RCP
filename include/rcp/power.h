@@ -172,13 +172,36 @@
  * own, differently-shaped cancellation domain; the two are deliberately
  * not the same enum, since this module's gate is a yes/no admission check,
  * not a cancellation-lifecycle outcome) whenever any of the three named
- * conditions holds: wup_status has not been cleared, the wakeup endpoint
- * itself is not idle, or a response/ack-queue message is still unsent.
+ * conditions holds: wup_status has not been cleared, at least one endpoint
+ * of the whole RC Server is not idle, or at least one responder queue
+ * server-wide still holds a message pending transmission (REQ-PWRMODE-025,
+ * TC18 §12.5: "At least one EP is not idle" / "In at least one responder
+ * queue there is a message pending for transmission" -- both conditions
+ * are server-wide, not scoped to the one endpoint the request arrived on).
  * This function takes plain bools rather than reaching into ep_wakeup.h's
  * or any queue module's own state directly, keeping this module
  * endpoint-agnostic; a caller wires up ep_wakeup.h's own
- * rcp_ep_wakeup_wup_status_is_clear() (and whatever it uses for endpoint-
- * idle / queue-empty) into the gate struct's fields itself.
+ * rcp_ep_wakeup_wup_status_is_clear() into wup_status_clear, and its own
+ * logical AND of every endpoint's idleness / every responder queue's
+ * emptiness into endpoint_idle / response_queue_empty -- see those
+ * fields' own doc comments below.
+ *
+ * rcp_pwrmode_commit_entry() is the authoritative second half of that same
+ * admission -- see its own doc comment for why a single
+ * rcp_pwrmode_check_entry() call at request-arrival time is not enough
+ * (REQ-PWRMODE-024, REQ-PWRMODE-026).
+ *
+ * Neither function knows anything about which RC Client sent the request
+ * or whether it was authorized to; per REQ-PWRMODE-023 (TC18 §12.5: "The
+ * RC Client that is allowed to access the RC Server endpoint can request
+ * the entire RC Server implementation to enter standby or sleep mode"),
+ * that check is ep_wakeup.h's own rcp_ep_wakeup_sleepcmd_writable(), run
+ * before either of these -- see that function's own doc comment. Both
+ * functions here operate on a single rcp_pwrmode_t, this module's
+ * existing whole-server mode representation (never a per-endpoint one);
+ * a caller composing the entire admitted sequence points *mode at its own
+ * one server-wide power-mode variable, satisfying TC18's "entire RC
+ * Server implementation" wording by construction.
  */
 #ifndef RCP_POWER_H
 #define RCP_POWER_H
@@ -207,8 +230,10 @@ const char *rcp_pwrmode_string(rcp_pwrmode_t mode);
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 
 typedef enum {
-    RCP_PWRMODE_OK                    = 0,
+    RCP_PWRMODE_OK                     = 0,
     RCP_PWRMODE_ERR_INVALID_TRANSITION = 1,
+    RCP_PWRMODE_ERR_ENTRY_REFUSED      = 2, /* rcp_pwrmode_commit_entry() only --
+                                                see that function's own doc comment. */
 } rcp_pwrmode_errc_t;
 
 /* Human-readable message for an rcp_pwrmode_errc_t value. Never returns NULL. */
@@ -371,8 +396,17 @@ rcp_pwrmode_errc_t rcp_pwrmode_wake_from_sleep(rcp_pwrmode_t *mode, rcp_pwrmode_
 
 typedef struct {
     bool wup_status_clear;     /* the wakeup endpoint's own wup_status has been cleared */
-    bool endpoint_idle;        /* the wakeup endpoint itself has no in-flight transaction */
-    bool response_queue_empty; /* no unsent response/ack-queue message is pending */
+    bool endpoint_idle;        /* REQ-PWRMODE-025: server-wide -- true iff EVERY
+                                   endpoint on this RC Server is idle, not just the
+                                   one the request arrived on. A caller ANDs every
+                                   endpoint's own idleness into this single bool
+                                   before calling rcp_pwrmode_check_entry()/
+                                   rcp_pwrmode_commit_entry(); this module reads no
+                                   endpoint table of its own. */
+    bool response_queue_empty; /* REQ-PWRMODE-025: server-wide -- true iff EVERY
+                                   responder queue on this RC Server is empty, not
+                                   just one. A caller ANDs every queue's own
+                                   emptiness into this single bool the same way. */
 } rcp_pwrmode_entry_gate_t;
 
 typedef enum {
@@ -385,8 +419,67 @@ typedef enum {
  * false (!wup_status_clear, !endpoint_idle, or !response_queue_empty);
  * RCP_PWRMODE_ENTRY_OK iff all three are true. gate == NULL is treated as
  * "nothing known" and therefore refused (fail-safe, mirroring
- * lifecycle.h's own NULL-snapshot-is-inconsistent convention). */
+ * lifecycle.h's own NULL-snapshot-is-inconsistent convention).
+ *
+ * This is the FIRST of two gate evaluations a caller admitting a
+ * StandBy/Sleep request runs -- see rcp_pwrmode_commit_entry() for the
+ * second, authoritative one immediately before the mode actually
+ * changes, and why a single check here is not sufficient by itself. */
 rcp_pwrmode_entry_result_t rcp_pwrmode_check_entry(const rcp_pwrmode_entry_gate_t *gate);
+
+/* The authoritative StandBy/Sleep-entry commit -- REQ-PWRMODE-024,
+ * REQ-PWRMODE-026 (TC18 §12.5).
+ *
+ * A single rcp_pwrmode_check_entry() call at request-arrival time is not
+ * enough: TC18 §12.5 requires that "if an event defined as wake-up source
+ * in the wake-up endpoint occurs during the processing of the
+ * sleep-request, the request is not executed" (REQ-PWRMODE-024 -- the
+ * processing window between an initial admission check and the actual
+ * mode change is exactly where such an event would otherwise be lost),
+ * and separately that "the RC Server enters standby or sleep mode, as
+ * soon as the go to sleep/standby response... has been sent"
+ * (REQ-PWRMODE-026 -- the response must already be on the wire before the
+ * mode changes, not merely queued to be sent).
+ *
+ * A caller therefore runs a two-step sequence, not one check:
+ *   1. rcp_pwrmode_check_entry() against a gate sampled when the request
+ *      arrives, to decide whether to encode+send an OK
+ *      (RCP_PWRMODE_ENTRY_OK) or a REQUEST_CANCELED
+ *      (RCP_PWRMODE_ENTRY_REFUSED) response at all.
+ *   2. Only once step 1 said OK AND that response has actually been
+ *      transmitted, call this function with target, a FRESHLY re-sampled
+ *      gate (a new sample, not the same struct reused from step 1 --
+ *      reusing it would silently reopen the very race this function
+ *      exists to close), and response_sent = true.
+ *
+ * gate is re-validated internally via rcp_pwrmode_check_entry() itself
+ * (closing REQ-PWRMODE-024's race by construction: any wake-source event
+ * the caller's re-sample picked up refuses this call exactly as it would
+ * have refused step 1). response_sent is this library's own caller-
+ * supplied proof of REQ-PWRMODE-026's ordering precondition -- mirroring
+ * rcp_pwrmode_handshake_iface_reenabled()'s own network_available
+ * argument, this module does no I/O of its own and cannot observe
+ * transmission completion directly, so a caller that has not yet sent the
+ * response must pass false (or simply not call this function yet).
+ *
+ * On success (*mode is RCP_PWRMODE_NORMAL or RCP_PWRMODE_STANDBY, target
+ * is RCP_PWRMODE_STANDBY or RCP_PWRMODE_SLEEP, gate is non-NULL and
+ * passes rcp_pwrmode_check_entry(), and response_sent is true), *mode is
+ * updated to target, *out_start_kind (if non-NULL) is set via the same
+ * rule rcp_pwrmode_transition() itself uses, and RCP_PWRMODE_OK is
+ * returned.
+ *
+ * Otherwise *mode is left unchanged: RCP_PWRMODE_ERR_ENTRY_REFUSED is
+ * returned if gate is NULL, or fails rcp_pwrmode_check_entry(), or if
+ * response_sent is false; RCP_PWRMODE_ERR_INVALID_TRANSITION is returned
+ * if *mode/target fall outside the admitted StandBy/Sleep-entry set
+ * (mirroring rcp_pwrmode_transition()'s own fail-closed convention for
+ * structurally invalid moves) -- checked only once the gate/response_sent
+ * preconditions above have already passed. */
+rcp_pwrmode_errc_t rcp_pwrmode_commit_entry(rcp_pwrmode_t *mode, rcp_pwrmode_t target,
+                                             const rcp_pwrmode_entry_gate_t *gate,
+                                             bool response_sent,
+                                             rcp_pwrmode_start_kind_t *out_start_kind);
 
 #ifdef __cplusplus
 }

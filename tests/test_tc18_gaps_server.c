@@ -678,7 +678,7 @@ static void test_sleep_entry_is_request_only_with_no_network_path(void)
     rcp_bytes_free(&req);
 }
 
-/* ── §12.5: a sleep request is per-endpoint and unauthenticated ────────────── */
+/* ── §12.5: a sleep request tracked per remote peer, and now authorized ────── */
 
 static void test_sleep_request_moves_one_endpoint_only(void)
 {
@@ -702,11 +702,16 @@ static void test_sleep_request_moves_one_endpoint_only(void)
                       rcp_powerstate_manager_apply_entry_response(m, sleeper, resp.data,
                                                                   resp.len));
 
-    /* TC18 §12.5: an accepted sleep/standby request from an authorized
-     * client puts the ENTIRE RC Server implementation into that mode.
-     * c-RCP's model is per-endpoint -- the unaddressed endpoint stays in
-     * Normal -- and no authorization check guards the wake-up endpoint, so
-     * an unauthorized client's request is applied just the same. */
+    /* Not a TC18 deviation: rcp_powerstate_manager_t is this library's own
+     * CLIENT-side bookkeeping of multiple different remote peers, one
+     * endpoint_entry_t per registered addr -- "the entire RC Server
+     * implementation" TC18 §12.5 describes is each of THOSE remote
+     * servers' own, single, internal mode, which a real server-side
+     * composition (power.h's rcp_pwrmode_commit_entry(), operating on one
+     * rcp_pwrmode_t) models correctly -- see that function's own doc
+     * comment. sleeper/other below are two DIFFERENT remote servers this
+     * client happens to track, not two endpoints of the same server, so
+     * each keeping its own mode is the intended design, not a gap. */
     TEST_ASSERT_EQUAL(RCP_PWRMODE_SLEEP, rcp_powerstate_manager_mode(m, sleeper));
     TEST_ASSERT_EQUAL(RCP_PWRMODE_NORMAL, rcp_powerstate_manager_mode(m, other));
 
@@ -715,9 +720,29 @@ static void test_sleep_request_moves_one_endpoint_only(void)
     rcp_powerstate_manager_destroy(m);
 }
 
-/* ── §12.5: the entry gate is a one-shot snapshot ──────────────────────────── */
+static void test_sleepcmd_requires_root_client_authorization(void)
+{
+    rcp_lifecycle_writer_ctx_t authorized;
+    rcp_lifecycle_writer_ctx_t unauthorized;
 
-static void test_entry_gate_is_not_rechecked_before_the_mode_change(void)
+    memset(&authorized, 0, sizeof(authorized));
+    memset(&unauthorized, 0, sizeof(unauthorized));
+    authorized.via_root_client_ep0  = true;
+    unauthorized.via_discovery_stream = true;
+
+    /* REQ-PWRMODE-023 (TC18 §12.5): "The RC Client that is allowed to
+     * access the RC Server endpoint can request the entire RC Server
+     * implementation to enter standby or sleep mode." Only
+     * via_root_client_ep0 authorizes a SleepCMD; an unqualified
+     * discovery-stream sender -- sufficient for configuration during
+     * bring-up, per lifecycle.h -- is not the same authorized client. */
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_sleepcmd_writable(authorized));
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_sleepcmd_writable(unauthorized));
+}
+
+/* ── §12.5: commit_entry re-checks the gate, closing the lost-wakeup race ──── */
+
+static void test_commit_entry_re_checks_the_gate_and_aborts_the_race(void)
 {
     rcp_pwrmode_entry_gate_t gate = {true, true, true};
     rcp_pwrmode_t            mode = RCP_PWRMODE_NORMAL;
@@ -725,42 +750,63 @@ static void test_entry_gate_is_not_rechecked_before_the_mode_change(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_ENTRY_OK, rcp_pwrmode_check_entry(&gate));
 
     /* A wake source asserts while the sleep request is still being
-     * processed -- TC18 §12.5 requires the sleep entry to be aborted. */
+     * processed, so a caller re-samples the gate before calling
+     * rcp_pwrmode_commit_entry() -- and gets a fresh REFUSED reading. */
     gate.wup_status_clear = false;
-    TEST_ASSERT_EQUAL(RCP_PWRMODE_ENTRY_REFUSED, rcp_pwrmode_check_entry(&gate));
 
-    /* But the gate is a stateless snapshot with no re-check hook: the mode
-     * change is an entirely independent call that still succeeds against the
-     * now-refusing gate, so the server sleeps through the very wake event
-     * that should have kept it awake. This is a lost-wakeup hazard. */
-    TEST_ASSERT_EQUAL(RCP_PWRMODE_OK, rcp_pwrmode_transition(&mode, RCP_PWRMODE_SLEEP, NULL));
-    TEST_ASSERT_EQUAL(RCP_PWRMODE_SLEEP, mode);
+    /* REQ-PWRMODE-024 (TC18 §12.5): "If an event defined as wake-up source
+     * in the wake-up endpoint occurs during the processing of the
+     * sleep-request, the request is not executed." commit_entry()
+     * re-validates the (freshly re-sampled) gate itself immediately before
+     * the mode would change, closing the race a single up-front
+     * rcp_pwrmode_check_entry() call would leave open: the entry is
+     * refused and the mode is left unchanged, unlike plain
+     * rcp_pwrmode_transition(), which has no gate of its own at all. */
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_ERR_ENTRY_REFUSED,
+                      rcp_pwrmode_commit_entry(&mode, RCP_PWRMODE_SLEEP, &gate, true, NULL));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_NORMAL, mode);
 }
 
-/* ── §12.5: response-before-transition ordering, and the LPS confirmation ──── */
+/* ── §12.5: the mode change happens only once the response has been sent ──── */
 
-static void test_mode_change_is_unordered_against_the_response(void)
+static void test_commit_entry_requires_the_response_to_have_been_sent(void)
+{
+    rcp_pwrmode_entry_gate_t gate = {true, true, true};
+    rcp_pwrmode_t            mode = RCP_PWRMODE_NORMAL;
+    rcp_pwrmode_start_kind_t kind;
+
+    /* REQ-PWRMODE-026 (TC18 §12.5): "The RC Server enters standby or
+     * sleep mode, as soon as the go to sleep/standby response to the
+     * standby/sleep request has been sent." response_sent is this
+     * library's own caller-supplied proof of that precondition -- the
+     * gate alone is satisfied here, but the entry is still refused because
+     * the response has not (yet) been transmitted. */
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_ERR_ENTRY_REFUSED,
+                      rcp_pwrmode_commit_entry(&mode, RCP_PWRMODE_SLEEP, &gate, false, NULL));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_NORMAL, mode);
+
+    /* Once the caller has actually sent the response, the same gate now
+     * commits the transition. */
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_OK,
+                      rcp_pwrmode_commit_entry(&mode, RCP_PWRMODE_SLEEP, &gate, true, &kind));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_SLEEP, mode);
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_START_COLD, kind);
+}
+
+/* ── §12.5: TC14/TC10 network sleep refusal has no LPS-suppression signal ──── */
+
+static void test_network_sleep_refusal_cannot_suppress_the_lps_confirmation(void)
 {
     rcp_pwrmode_entry_gate_t refusing = {false, true, true};
-    rcp_pwrmode_t            mode     = RCP_PWRMODE_NORMAL;
     rcp_bytes_t              resp;
 
-    /* TC18 §12.5: the mode change happens only AFTER the sleep/standby
-     * response has been transmitted. rcp_pwrmode_transition() and
-     * rcp_ep_wakeup_encode_sleepcmd_response() are unrelated calls with no
-     * ordering relationship, so the server can enter Sleep here with the
-     * response not merely untransmitted but not yet even encoded. */
-    TEST_ASSERT_EQUAL(RCP_PWRMODE_OK, rcp_pwrmode_transition(&mode, RCP_PWRMODE_SLEEP, NULL));
-    TEST_ASSERT_EQUAL(RCP_PWRMODE_SLEEP, mode);
-    resp = rcp_ep_wakeup_encode_sleepcmd_response((rcp_byte_bus_id_t)3u, RCP_PWRMODE_ENTRY_OK, 1u);
-    TEST_ASSERT_NOT_NULL(resp.data);
-    rcp_bytes_free(&resp);
-
-    /* TC18 §12.5 further requires a refused network sleep request to
-     * suppress the TC14/TC10 LPS confirmation. A refusal's entire
-     * observable output is this two-valued enum plus the encoded response
-     * byte -- there is no PHY/LPS signalling surface to suppress, so an
-     * upstream node can never learn this node declined to sleep. */
+    /* REQ-PWRMODE-027 (TC18 §12.5): a sleep request refused via TC14/TC10
+     * must suppress the network PHY's own LPS confirmation signal. A
+     * refusal's entire observable output in this library is a two-valued
+     * enum plus the encoded response byte -- there is no PHY/LPS
+     * signalling surface to suppress, so an upstream node can never learn
+     * this node declined to sleep. This is Group 3's network-level gap
+     * (issue #199), not addressed by this batch's commit_entry() fix. */
     TEST_ASSERT_EQUAL(RCP_PWRMODE_ENTRY_REFUSED, rcp_pwrmode_check_entry(&refusing));
     TEST_ASSERT_EQUAL_INT(0, RCP_PWRMODE_ENTRY_OK);
     TEST_ASSERT_EQUAL_INT(1, RCP_PWRMODE_ENTRY_REFUSED);
@@ -770,15 +816,14 @@ static void test_mode_change_is_unordered_against_the_response(void)
     rcp_bytes_free(&resp);
 }
 
-/* ── §12.5 / §13.7.2.3: gate scope, and the missing admission suspend ──────── */
+/* ── §12.5: the gate's fields are documented server-wide aggregates ───────── */
 
 static void test_entry_gate_is_scoped_to_one_endpoint_and_one_queue(void)
 {
-    rcp_pwrmode_entry_gate_t gate = {true, true, true};
+    rcp_pwrmode_entry_gate_t gate;
     rcp_server_endpoint_t    wakeup_ep;
     rcp_server_endpoint_t    busy_ep;
     rcp_bytes_t              frame = standard_abb((rcp_byte_bus_id_t)5u, 1u);
-    uint8_t                  request_type = 0xFFu;
 
     TEST_ASSERT_NOT_NULL(frame.data);
     rcp_server_endpoint_init(&wakeup_ep, true);
@@ -788,25 +833,52 @@ static void test_entry_gate_is_scoped_to_one_endpoint_and_one_queue(void)
     TEST_ASSERT_FALSE(rcp_server_endpoint_submit(&busy_ep, frame.data, frame.len));
     TEST_ASSERT_EQUAL_UINT(1u, rcp_server_endpoint_queue_len(&busy_ep));
 
-    /* TC18 §12.5 refuses entry when AT LEAST ONE endpoint of the whole
-     * server is not idle, or AT LEAST ONE responder queue still holds an
-     * untransmitted message. c-RCP's gate is three singular bools scoped to
-     * the wake-up endpoint and one queue, with no all-endpoints or
-     * all-queues aggregate anywhere, so the busy endpoint above is invisible
-     * and entry is admitted -- losing its request and any queued response. */
-    TEST_ASSERT_EQUAL(RCP_PWRMODE_ENTRY_OK, rcp_pwrmode_check_entry(&gate));
+    /* REQ-PWRMODE-025 (TC18 §12.5): entry is refused when AT LEAST ONE
+     * endpoint of the whole server is not idle, or AT LEAST ONE responder
+     * queue still holds an untransmitted message -- power.h's
+     * endpoint_idle/response_queue_empty fields are documented as those
+     * server-wide aggregates, not one endpoint's/one queue's own state. A
+     * caller that correctly ANDs every endpoint's idleness into
+     * endpoint_idle (rather than reporting only the wake-up endpoint's
+     * own, as a narrower reading of this struct's pre-fix docs invited)
+     * sees the busy second endpoint here and refuses entry. */
+    gate.wup_status_clear     = true;
+    gate.endpoint_idle        = (rcp_server_endpoint_queue_len(&wakeup_ep) == 0u) &&
+                                 (rcp_server_endpoint_queue_len(&busy_ep) == 0u);
+    gate.response_queue_empty = true;
+    TEST_ASSERT_FALSE(gate.endpoint_idle);
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_ENTRY_REFUSED, rcp_pwrmode_check_entry(&gate));
 
-    /* TC18 §13.7.2.3 step 1: on receipt of a sleep request the server stops
-     * entering newly arriving requests into endpoint queues while the drain
-     * proceeds. There is no admission-suspend state to set, so a request
-     * arriving mid-drain is still admitted and executed normally. */
+    rcp_bytes_free(&frame);
+    rcp_server_endpoint_destroy(&wakeup_ep);
+    rcp_server_endpoint_destroy(&busy_ep);
+}
+
+/* ── §13.7.2.3 step 1: the missing admission-suspend state ─────────────────── */
+
+static void test_admission_is_not_suspended_during_the_sleep_drain(void)
+{
+    rcp_server_endpoint_t wakeup_ep;
+    rcp_bytes_t           frame = standard_abb((rcp_byte_bus_id_t)5u, 1u);
+    uint8_t               request_type = 0xFFu;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    rcp_server_endpoint_init(&wakeup_ep, true);
+
+    /* REQ-PWRMODE-028 (TC18 §13.7.2.3): "on receipt of a sleep request the
+     * server shall stop entering newly arriving requests into endpoint
+     * queues while the drain proceeds" (step 1, ahead of step 3's
+     * rcp_pwrmode_check_entry()/rcp_pwrmode_commit_entry() preconditions,
+     * both now implemented). server.h exposes no admission-suspend state,
+     * so a request arriving mid-drain is still admitted and executed
+     * normally -- deferred to a follow-on batch (server.h admission-path
+     * surgery, out of this batch's power.h/ep_wakeup.h scope). */
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_EXECUTE_NOW,
                       rcp_server_endpoint_admit(&wakeup_ep, frame.data, frame.len, 0u,
                                                 &request_type, NULL, NULL));
 
     rcp_bytes_free(&frame);
     rcp_server_endpoint_destroy(&wakeup_ep);
-    rcp_server_endpoint_destroy(&busy_ep);
 }
 
 /* ── §12.3.1.3: requests arriving at a disabled endpoint ───────────────────── */
@@ -1062,9 +1134,12 @@ int main(void)
     RUN_TEST(test_network_wake_now_requires_the_same_handshake_as_pin);
     RUN_TEST(test_sleep_entry_is_request_only_with_no_network_path);
     RUN_TEST(test_sleep_request_moves_one_endpoint_only);
-    RUN_TEST(test_entry_gate_is_not_rechecked_before_the_mode_change);
-    RUN_TEST(test_mode_change_is_unordered_against_the_response);
+    RUN_TEST(test_sleepcmd_requires_root_client_authorization);
+    RUN_TEST(test_commit_entry_re_checks_the_gate_and_aborts_the_race);
+    RUN_TEST(test_commit_entry_requires_the_response_to_have_been_sent);
+    RUN_TEST(test_network_sleep_refusal_cannot_suppress_the_lps_confirmation);
     RUN_TEST(test_entry_gate_is_scoped_to_one_endpoint_and_one_queue);
+    RUN_TEST(test_admission_is_not_suspended_during_the_sleep_drain);
 
     RUN_TEST(test_disabled_endpoint_queues_config_requests_without_ack);
     RUN_TEST(test_response_queue_flush_period_is_carried_but_inert);
