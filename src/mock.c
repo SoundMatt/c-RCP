@@ -102,6 +102,32 @@ rcp_lifecycle_errc_t rcp_mock_server_transition(rcp_mock_server_t *srv,
     return rcp_lifecycle_transition(&srv->state, target, snap, writer, all_other_eps_idle);
 }
 
+//cfusa:req REQ-PWRMODE-019
+bool rcp_mock_server_pwrmode_resume(rcp_mock_server_t *srv, rcp_pwrmode_handshake_t *hs)
+{
+    size_t i;
+
+    if (!rcp_pwrmode_handshake_resume_queues(hs)) return false;
+
+    /* TC18 §12.4.1: "After reception of valid message from the sleep
+     * request Client all used endpoints and response queues will be
+     * enabled." power.h's own rcp_pwrmode_handshake_resume_queues()
+     * deliberately never touches server.h (that module's own file header:
+     * "driving the actual re-init sequence... remains a caller's job") --
+     * this srv-aware wrapper is that caller, re-enabling every registered
+     * endpoint's queue the same way rcp_mock_server_set_endpoint_enable()
+     * does one at a time. Response-queue objects and heartbeat-stream
+     * re-emission have no implementation anywhere in this codebase yet
+     * (see test_flush_triggers_and_heartbeat_are_absent()) -- a separate,
+     * already-tracked gap this function cannot close. */
+    for (i = 0; i < RCP_MOCK_MAX_ENDPOINTS; i++) {
+        if (srv->endpoints[i].in_use) {
+            rcp_server_endpoint_set_enable(&srv->endpoints[i].queue, true);
+        }
+    }
+    return true;
+}
+
 //cfusa:req REQ-MOCK-006
 rcp_regmap_general_t *rcp_mock_server_regmap(rcp_mock_server_t *srv)
 {

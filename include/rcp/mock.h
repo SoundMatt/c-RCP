@@ -109,6 +109,7 @@
 #define RCP_MOCK_H
 
 #include "rcp/lifecycle.h"
+#include "rcp/power.h"
 #include "rcp/rcp.h"
 #include "rcp/regmap.h"
 #include "rcp/request_sequencer.h"
@@ -185,6 +186,23 @@ rcp_lifecycle_errc_t rcp_mock_server_transition(rcp_mock_server_t *srv,
                                                  const rcp_lifecycle_plausibility_snapshot_t *snap,
                                                  rcp_lifecycle_writer_ctx_t writer,
                                                  bool all_other_eps_idle);
+
+/* REQ-PWRMODE-019: calls power.h's own rcp_pwrmode_handshake_resume_queues(hs)
+ * first; power.h deliberately never touches server.h itself (see that
+ * module's own file header -- "driving the actual re-init sequence
+ * through lifecycle.h remains a caller's job", the same statement applies
+ * to server.h), so this srv-aware wrapper is where TC18 §12.4.1's "all
+ * used endpoints and response queues will be enabled" actually happens for
+ * this test double: every registered endpoint slot's queue is re-enabled
+ * (rcp_server_endpoint_set_enable(), matching a disabled endpoint's own
+ * pre-load-then-drain semantics) iff the handshake's own resume-queues
+ * step reports success. Returns that same bool. Response-queue objects
+ * and heartbeat-stream re-emission are NOT modeled by this fix -- neither
+ * concept has ANY implementation anywhere in this codebase yet (see
+ * test_flush_triggers_and_heartbeat_are_absent(), tests/test_tc18_gaps_
+ * regmap.c), a separate, already-tracked architecture gap this function
+ * cannot close. */
+bool rcp_mock_server_pwrmode_resume(rcp_mock_server_t *srv, rcp_pwrmode_handshake_t *hs);
 
 /* Mutable access to srv's own register map: a test or this milestone's own
  * config.c manifest loader may freely set magic/vendor_id/device_id/

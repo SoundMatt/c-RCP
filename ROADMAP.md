@@ -8411,3 +8411,81 @@ library's-architecture items closed and every remaining item honestly
 scoped `partial`/`tc18-gap` with its own architecture-limit citation.
 Phase 5b (issue #198) is effectively complete; Phase 5c (issue #199,
 PWRMODE sleep/wake handshake gaps) is the next phase.
+
+### 163. Phase 5c batch 1: REQ-PWRMODE-019 -- wake-handshake completion actually re-enables endpoints (issue #199)
+
+First batch of the new phase: 15 requirements across 4 groups (issue
+#199). Started with Group 1's own highest-severity item, flagged in the
+issue itself: "a woken server reports a completed hot start while
+every endpoint stays disabled."
+
+**REQ-PWRMODE-019 (partial)**: `rcp_pwrmode_handshake_resume_queues()`
+(`power.h`) advances only a state enum, by design -- that module's own
+file header states it never touches `server.h` at all ("driving the
+actual re-init sequence... remains a caller's job"), the identical
+"pure primitive, caller composes" layering `lifecycle.h`/`discovery.h`
+already established and this session has repeatedly relied on (most
+recently for `REQ-LIFECYCLE-026`/`035`). The real gap was that NO
+caller anywhere in this codebase ever performed that composition.
+Fixed: `mock.h` gains `rcp_mock_server_pwrmode_resume(srv, hs)` --
+calls `rcp_pwrmode_handshake_resume_queues(hs)` first, then (iff it
+succeeds) calls `rcp_server_endpoint_set_enable()` on every registered
+endpoint slot, mirroring the pre-existing per-endpoint
+`rcp_mock_server_set_endpoint_enable()` but for all of them at once.
+Kept `status: "partial"`, not fully closed: response-queue objects
+(`rcp_regmap_response_queue_cfg_t` is inert -- no `STREAM_UID`/
+`queue_size`/storage) and heartbeat-stream re-emission have no
+implementation anywhere in this codebase yet (both already-tracked,
+separate architecture gaps this fix cannot close -- see
+`test_response_queue_has_no_identity_size_or_storage()` and
+`test_flush_triggers_and_heartbeat_are_absent()`, `tests/test_tc18_
+gaps_regmap.c`).
+
+**Primary-source verification**: read TC18 §12.4.1 (Power-On/Wake-Up/
+Start-Up behavior) directly. Confirmed the exact quoted text: "After
+reception of valid message from the sleep request Client all used
+endpoints and response queues will be enabled." Also surfaced, but
+deliberately NOT acted on this batch: the section's OPENING sentence
+classifies "wake-up from sleep" as a COLD start and "wake-up from
+StandBy" as a HOT start, which appears to contradict the detailed
+"Hot-start-up procedure" text immediately following it (network
+re-enable, WakeUp-message repetition) -- a procedure that, by its own
+physical-layer details (re-enabling the network interface, matching
+Sleep's own "only part of the network PHY... powered" characteristic),
+reads more like a Sleep-wake procedure than a StandBy-wake one, despite
+being filed under "hot-start." This looks like a genuine internal TC18
+terminology inconsistency, not a c-RCP gap -- flagged here rather than
+resolved, since issue #199 itself does not name it as a tracked item
+and the existing `rcp_pwrmode_wake_from_sleep()`/handshake design
+(REQ-PWRMODE-005 through -012, all already `IMPLEMENTED`) is built on
+the detailed-procedure reading. Re-architecting that foundational
+classification is out of scope for a single batch and needs explicit
+scoping of its own before any change -- noted here so it isn't lost.
+
+Test changes: `test_tc18_gaps_server.c`'s own
+`test_wake_completion_reenables_nothing_and_network_skips_all` split in
+two -- the REQ-PWRMODE-019 half moved to `test_mock.c` (where
+`rcp_mock_server_pwrmode_resume()` naturally lives) as two new tests,
+`test_pwrmode_resume_reenables_all_endpoints` and
+`test_pwrmode_resume_returns_false_before_handshake_echoed`; the
+remaining `REQ-PWRMODE-020` half stays in `test_tc18_gaps_server.c`,
+renamed `test_network_wake_skips_handshake_entirely` (still an open
+deviation pin -- not fixed this batch).
+
+Mutation-tested two ways: a full revert of `src/mock.c`/`include/rcp/
+mock.h` alone (test files unchanged) breaks the BUILD (`test_mock.c`
+references the new function, undeclared without it); a precise
+single-line mutation (the `rcp_server_endpoint_set_enable()` call
+replaced with a no-op) isolates exactly the one test pinning the real
+enable behavior. Both restored clean. Full test suite (64/64) +
+ASan/UBSan build both clean. Fresh `cfusa check` (0 errors) + `cfusa
+trace --gaps` / `--req-coverage 100` / `--sec-tested 100` (all three
+separate invocations, matching CI; 100%/100%, 0 untested). 1030
+requirements (unchanged, no new REQ ids), 130 `tc18-gap` entries
+remaining (unchanged count -- `-019` moved `not-implemented`-equivalent
+text to a more precisely-scoped `partial`, not a full closure).
+
+**Phase 5c progress after batch 1**: 1/15 items addressed (`-019`,
+partial). **Next**: `REQ-PWRMODE-020` (network-wake handshake skip,
+already has a fresh deviation pin from this batch), then the rest of
+Group 1 (`-016`/`-017`/`-018`), per issue #199's own suggested order.
