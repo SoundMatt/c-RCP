@@ -130,11 +130,13 @@ static rcp_regmap_general_t populated_map(void)
     map.svr_implemented_options   = 0x1Fu; /* all five REQ-RMAP-030 bits set */
     map.svr_root_client_index     = 0x0002u;
     map.svr_hw_cfg_ptr            = 0x0060u;
+    map.svr_request_stream_cfg_capacity  = 0x08u;
+    map.svr_response_stream_cfg_capacity = 0x04u;
+    map.svr_request_stream_cfg_ptr       = 0x0070u;
+    map.svr_response_stream_cfg_ptr      = 0x0090u;
 
     ref.offset = 0x00000040u;
     ref.capacity = 0x0008u;
-    map.request_stream_cfg = ref;
-    map.response_queue_cfg = ref;
     map.ep_generic_cfg = ref;
     map.ep_functional_cfg = ref;
     map.ep_id_bus_map = ref;
@@ -727,26 +729,51 @@ static void test_hw_cfg_ptr_is_now_correctly_shaped(void)
     TEST_ASSERT_TRUE(span_is_zero(buf, 0x1A, 0x1B)); /* svr_hw_cfg_ptr */
 }
 
-/* TC18 §12.7.5 Table 18 defines FOUR separate, non-adjacent registers for
- * the stream-configuration sub-tables: svr_request_stream_cfg_capacity
- * (8 bit, 0x001C), svr_response_stream_cfg_capacity (8 bit, 0x001D),
+/* REQ-RMAP-034 (TC18 §12.7.5 Table 18): FOUR separate, non-adjacent
+ * registers exist for the stream-configuration sub-tables:
+ * svr_request_stream_cfg_capacity (8 bit, 0x001C),
+ * svr_response_stream_cfg_capacity (8 bit, 0x001D),
  * svr_request_stream_cfg_ptr (16 bit, 0x001E) and
- * svr_response_stream_cfg_ptr (16 bit, 0x0020). Deviation: c-RCP
- * collapses each pointer/capacity pair into one rcp_regmap_table_ref_t of
- * identical shape, so a 16-bit capacity stands where TC18 wants 8 bits,
- * and none of the four is bound to an address or encoded. */
-static void test_stream_cfg_pointer_capacity_pairs_are_collapsed(void)
+ * svr_response_stream_cfg_ptr (16 bit, 0x0020). rcp_regmap_general_t
+ * now declares these as four correctly-sized scalar fields, replacing
+ * the former request_stream_cfg/response_queue_cfg pair
+ * (rcp_regmap_table_ref_t, the shared pointer/capacity type most
+ * sub-table refs below still use) -- the same class of shape mismatch
+ * REQ-RMAP-033 fixed for svr_hw_cfg_ptr, here doubled across both
+ * stream directions. A capacity value TC18's real 8-bit registers
+ * could never hold (e.g. 0x0100) is now impossible to construct in
+ * the first place, rather than merely untrue-but-representable. Still
+ * open: this codebase has no real request/response-stream config
+ * table storage anywhere yet for these pointers to meaningfully
+ * address (Group 3/Group 4's own separate scope), and the same
+ * REQ-RMAP-024 wire-reachability boundary as every other Group 1 item
+ * applies -- this test still observes 0x001C-0x0021 reading back as
+ * zero, produced by read_general()'s generic buffer zero-fill rather
+ * than these fields being dispatched onto the wire yet. */
+static void test_stream_cfg_registers_are_now_correctly_sized(void)
 {
-    rcp_regmap_general_t map = populated_map();
+    rcp_regmap_general_t map;
     uint8_t              buf[0x22];
 
-    TEST_ASSERT_EQUAL_UINT(sizeof(rcp_regmap_table_ref_t), sizeof(map.request_stream_cfg));
-    TEST_ASSERT_EQUAL_UINT(sizeof(map.request_stream_cfg), sizeof(map.response_queue_cfg));
+    TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(map.svr_request_stream_cfg_capacity));
+    TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(map.svr_response_stream_cfg_capacity));
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_request_stream_cfg_ptr));
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_response_stream_cfg_ptr));
 
-    /* A 16-bit capacity accepts 0x0100, which TC18's 8-bit
-     * svr_request_stream_cfg_capacity at 0x001C cannot hold. */
-    map.request_stream_cfg.capacity = 0x0100u;
-    TEST_ASSERT_EQUAL_HEX16(0x0100u, map.request_stream_cfg.capacity);
+    rcp_regmap_general_init(&map);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, map.svr_request_stream_cfg_capacity);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, map.svr_response_stream_cfg_capacity);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_request_stream_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_response_stream_cfg_ptr);
+
+    map.svr_request_stream_cfg_capacity  = 0x08u;
+    map.svr_response_stream_cfg_capacity = 0x04u;
+    map.svr_request_stream_cfg_ptr       = 0x0070u;
+    map.svr_response_stream_cfg_ptr      = 0x0090u;
+    TEST_ASSERT_EQUAL_UINT8(0x08u, map.svr_request_stream_cfg_capacity);
+    TEST_ASSERT_EQUAL_UINT8(0x04u, map.svr_response_stream_cfg_capacity);
+    TEST_ASSERT_EQUAL_UINT16(0x0070u, map.svr_request_stream_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0x0090u, map.svr_response_stream_cfg_ptr);
 
     read_general(&map, (uint8_t)sizeof(buf), buf);
     TEST_ASSERT_TRUE(span_is_zero(buf, 0x1C, 0x21));
@@ -785,10 +812,11 @@ static void test_ep_cfg_and_bytebus_map_pointers_are_mis_shaped(void)
  * layer, time synch, security -- where a zero pointer is the defined
  * encoding for "subsystem not supported" and a section spans pointer..
  * pointer+capacity. Deviation: rcp_regmap_general_t declares exactly
- * six rcp_regmap_table_ref_t sub-table refs (svr_hw_cfg_ptr, REQ-RMAP-033,
- * is now its own distinct 16-bit field rather than a seventh table ref --
- * see that field's own comment for why) and none of these four missing
- * pairs, so a capacity of 0 ("section empty") cannot be told from
+ * four rcp_regmap_table_ref_t sub-table refs (svr_hw_cfg_ptr,
+ * REQ-RMAP-033, and the stream-config quartet, REQ-RMAP-034, are now
+ * their own distinct scalar fields rather than table refs -- see each
+ * one's own comment for why) and none of these four missing pairs, so
+ * a capacity of 0 ("section empty") cannot be told from
  * "unadvertised". Pinned by rcp_regmap_general_init() zeroing exactly
  * the fields that exist. */
 static void test_four_optional_subsystem_pointer_pairs_are_absent(void)
@@ -799,10 +827,10 @@ static void test_four_optional_subsystem_pointer_pairs_are_absent(void)
     rcp_regmap_general_init(&map);
 
     TEST_ASSERT_EQUAL_HEX16(0u, map.svr_hw_cfg_ptr);
-    TEST_ASSERT_EQUAL_HEX32(0u, map.request_stream_cfg.offset);
-    TEST_ASSERT_EQUAL_HEX16(0u, map.request_stream_cfg.capacity);
-    TEST_ASSERT_EQUAL_HEX32(0u, map.response_queue_cfg.offset);
-    TEST_ASSERT_EQUAL_HEX16(0u, map.response_queue_cfg.capacity);
+    TEST_ASSERT_EQUAL_HEX8(0u, map.svr_request_stream_cfg_capacity);
+    TEST_ASSERT_EQUAL_HEX8(0u, map.svr_response_stream_cfg_capacity);
+    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_request_stream_cfg_ptr);
+    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_response_stream_cfg_ptr);
     TEST_ASSERT_EQUAL_HEX32(0u, map.ep_generic_cfg.offset);
     TEST_ASSERT_EQUAL_HEX16(0u, map.ep_generic_cfg.capacity);
     TEST_ASSERT_EQUAL_HEX32(0u, map.ep_functional_cfg.offset);
@@ -1593,7 +1621,7 @@ int main(void)
     RUN_TEST(test_reserved_register_at_0x22_is_indistinguishable_from_zero_fill);
     RUN_TEST(test_io_pin_count_is_now_explicitly_modeled);
     RUN_TEST(test_hw_cfg_ptr_is_now_correctly_shaped);
-    RUN_TEST(test_stream_cfg_pointer_capacity_pairs_are_collapsed);
+    RUN_TEST(test_stream_cfg_registers_are_now_correctly_sized);
     RUN_TEST(test_ep_cfg_and_bytebus_map_pointers_are_mis_shaped);
     RUN_TEST(test_four_optional_subsystem_pointer_pairs_are_absent);
     RUN_TEST(test_hw_config_table_has_no_server_side_storage);

@@ -33,6 +33,34 @@ the rationale.
 
 ## Releases
 
+### v0.187.0 -- 2026-08-10
+
+**Phase 5d batch 17: `REQ-RMAP-034` -- request/response stream config
+registers now correctly sized and separately addressed.** Issue #200.
+Same class of structural fix as v0.186.0's `REQ-RMAP-033`, doubled
+across two fields: TC18 §12.7.5 Table 18 defines four separate,
+non-adjacent registers for the stream-config sub-tables (`svr_request_
+stream_cfg_capacity`/`svr_response_stream_cfg_capacity`, 8 bit each;
+`svr_request_stream_cfg_ptr`/`svr_response_stream_cfg_ptr`, 16 bit
+each), while `rcp_regmap_general_t` had collapsed each pointer/capacity
+pair into one `rcp_regmap_table_ref_t`, carrying the identical
+compounding problems `-033` already fixed: a 16-bit capacity able to
+hold values TC18's real 8-bit registers cannot, and an offset in this
+project's own unit rather than TC18's own register-map address.
+Blast-radius check found zero real consumers, confirmed safe to
+retype -- explicitly distinguished from this codebase's separate,
+unrelated `rcp_regmap_request_stream_cfg_t`/`rcp_regmap_response_
+queue_cfg_t` CONTENT structs, which share a name but are a completely
+different concern. Replaced with four correctly-sized scalar fields.
+Found and fixed the same two "second usage site" categories batch 16
+established, doubled across two fields (a general zero-init test, and
+`REQ-RMAP-039`'s own deviation pin). Mutation-tested: full header
+revert with every touched test file kept breaks the build. Full suite
+(65/65) + ASan/UBSan clean. Fresh `cfusa check`/`trace` (0 errors,
+100%/100%, three separate CI-matching invocations). See `ROADMAP.md`
+milestone 187 for full detail. 1030 requirements (unchanged), 110
+`tc18-gap` entries remaining (unchanged).
+
 ### v0.186.0 -- 2026-08-10
 
 **Phase 5d batch 16: `REQ-RMAP-033` -- `svr_hw_cfg_ptr` retyped to a

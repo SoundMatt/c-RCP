@@ -481,8 +481,53 @@ typedef struct {
                                  through -045, Group 2), this pointer has
                                  nothing real to point AT yet either;
                                  that remains separately open. */
-    rcp_regmap_table_ref_t request_stream_cfg;
-    rcp_regmap_table_ref_t response_queue_cfg;
+    uint8_t  svr_request_stream_cfg_capacity; /* REQ-RMAP-034 (TC18
+                                §12.7.5 Table 18, relative address
+                                0x001C, 8 bit, R): number of usable
+                                entries in the request-stream config
+                                table (§12.7.7 Table 22). */
+    uint8_t  svr_response_stream_cfg_capacity; /* REQ-RMAP-034 (TC18
+                                §12.7.5 Table 18, relative address
+                                0x001D, 8 bit, R): number of usable
+                                entries in the response/ack-stream
+                                config table (§12.7.9 Table 24). */
+    uint16_t svr_request_stream_cfg_ptr; /* REQ-RMAP-034 (TC18 §12.7.5
+                                Table 18, relative address 0x001E, 16
+                                bit, R): the address of the
+                                request-stream config table. */
+    uint16_t svr_response_stream_cfg_ptr; /* REQ-RMAP-034 (TC18 §12.7.5
+                                Table 18, relative address 0x0020, 16
+                                bit, R): the address of the
+                                response/ack-stream config table.
+
+                                These four fields replace this struct's
+                                former request_stream_cfg/response_
+                                queue_cfg pair (each an
+                                rcp_regmap_table_ref_t, the shared
+                                pointer/capacity type most sub-table
+                                refs below still use), matching the
+                                same class of shape mismatch
+                                REQ-RMAP-033 fixed for svr_hw_cfg_ptr,
+                                but affecting two fields at once rather
+                                than one: TC18 defines FOUR separate,
+                                non-adjacent 8/16-bit registers here
+                                (0x001C/0x001D/0x001E/0x0020), not two
+                                structs each bundling a 32-bit
+                                "register word" offset with a 16-bit
+                                capacity. A 16-bit capacity could
+                                represent a value (e.g. 0x0100) TC18's
+                                real 8-bit svr_request_stream_cfg_
+                                capacity register could never hold, and
+                                neither former field's offset could be
+                                encoded into its real 16-bit wire slot
+                                without an unwritten unit conversion --
+                                the same two compounding problems
+                                REQ-RMAP-033 already fixed for
+                                svr_hw_cfg_ptr, here doubled across two
+                                stream directions. Content modeling
+                                only, same REQ-RMAP-024 wire-
+                                reachability boundary as every other
+                                Group 1 item. */
     rcp_regmap_table_ref_t ep_generic_cfg;
     rcp_regmap_table_ref_t ep_functional_cfg;
     rcp_regmap_table_ref_t ep_id_bus_map;
