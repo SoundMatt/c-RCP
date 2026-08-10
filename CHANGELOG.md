@@ -33,6 +33,32 @@ the rationale.
 
 ## Releases
 
+### v0.192.0 -- 2026-08-10
+
+**Phase 5d batch 22: all four optional-subsystem ptr/capacity pairs
+now declared -- Group 1 COMPLETE.** Issue #200. The LAST Group 1 item.
+TC18 §12.7.5 Table 18's continued part defines four further 16-bit
+ptr/capacity pairs -- network interface, physical layer, time synch,
+security -- none of which `rcp_regmap_general_t` declared at all.
+Unlike every batch since `REQ-RMAP-033`, entirely NEW fields, not a
+retype. Re-read the primary source PDF's own continuation page a
+second time for this batch: confirmed Table 18's own "Absolute
+address" column is genuinely blank for all eight registers -- a real
+gap in TC18's own table, not an extraction failure. Inferred addresses
+(`0x0030`-`0x003F`) from the visible continuation marker plus the
+table's own consistent, gap-free, sequential-address convention
+(verified true for every other register in Table 18 without
+exception), explicitly flagged as inferred rather than directly read
+throughout. Rewrote the requirement's own deviation pin into a
+positive test -- unlike every other Group 1 rewrite this phase, the
+whole test became the positive proof, since its prior claim was now
+entirely false. Mutation-tested: full header revert with every touched
+test file kept breaks the build. Full suite (65/65) + ASan/UBSan
+clean. Fresh `cfusa check`/`trace` (0 errors, 100%/100%, three
+separate CI-matching invocations). See `ROADMAP.md` milestone 192 for
+full detail. 1030 requirements (unchanged), 110 `tc18-gap` entries
+remaining (unchanged).
+
 ### v0.191.0 -- 2026-08-10
 
 **Phase 5d batch 21: `svr_ep_functional_cfg_ptr`/`svr_sequencer_

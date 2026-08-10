@@ -902,37 +902,72 @@ static void test_functional_cfg_and_sequencer_state_ptrs_are_now_correctly_shape
 /* TC18 §12.7.5 Table 18 (continued) and §12.7.11-§12.7.14 define four
  * further pointer/capacity register pairs -- network interface, physical
  * layer, time synch, security -- where a zero pointer is the defined
- * encoding for "subsystem not supported" and a section spans pointer..
- * pointer+capacity. Deviation: rcp_regmap_general_t declares none of
- * these four pairs, so a capacity of 0 ("section empty") cannot be
- * told from "unadvertised". Every one of the general map's original
- * seven rcp_regmap_table_ref_t sub-table refs has by now been retyped
- * to its own distinct scalar field(s) (svr_hw_cfg_ptr, REQ-RMAP-033;
- * the stream-config quartet, REQ-RMAP-034; svr_ep_generic_cfg_ptr/
- * _capacity, REQ-RMAP-036; svr_ep_bytebus_id_map_ptr/_capacity,
- * REQ-RMAP-037; svr_ep_functional_cfg_ptr and svr_sequencer_state_ptr,
- * REQ-RMAP-038 -- see each one's own comment for why), so
- * rcp_regmap_table_ref_t itself is no longer used by any field in this
- * struct at all. Pinned by rcp_regmap_general_init() zeroing exactly
- * the fields that exist. */
-static void test_four_optional_subsystem_pointer_pairs_are_absent(void)
+ * encoding for "subsystem not supported" (confirmed for physical layer,
+ * time synch, and security; TC18's own table gives no such note for
+ * network interface -- flagged, not assumed by analogy) and a section
+ * spans pointer..pointer+capacity. rcp_regmap_general_t now declares
+ * all four pairs (REQ-RMAP-039, the LAST Group 1 item), closing Group
+ * 1 entirely: every one of the general map's original seven
+ * rcp_regmap_table_ref_t sub-table refs was already retyped
+ * (svr_hw_cfg_ptr, REQ-RMAP-033; the stream-config quartet,
+ * REQ-RMAP-034; svr_ep_generic_cfg_ptr/_capacity, REQ-RMAP-036;
+ * svr_ep_bytebus_id_map_ptr/_capacity, REQ-RMAP-037;
+ * svr_ep_functional_cfg_ptr and svr_sequencer_state_ptr, REQ-RMAP-038),
+ * and these eight fields are the first genuinely NEW Group 1 fields
+ * since REQ-RMAP-033. TC18's own "Absolute address" column is blank
+ * for all eight on the primary-source PDF's own continuation page (a
+ * genuine spec gap, not an extraction failure -- see
+ * svr_network_interface_cfg_ptr's own comment in regmap.h for the full
+ * explanation), so this test uses each field's INFERRED address
+ * (0x0030-0x003F) rather than a directly-read one -- still the best
+ * available answer, and honestly documented as such throughout. */
+static void test_four_optional_subsystem_pointer_pairs_are_now_present(void)
 {
     rcp_regmap_general_t map;
+    uint8_t              buf[0x40];
 
-    memset(&map, 0xAA, sizeof(map));
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_network_interface_cfg_ptr));
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_network_interface_cfg_capacity));
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_physical_layer_cfg_ptr));
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_physical_layer_cfg_capacity));
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_time_synch_cfg_ptr));
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_time_synch_cfg_capacity));
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_security_cfg_ptr));
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_security_cfg_capacity));
+
     rcp_regmap_general_init(&map);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_network_interface_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_network_interface_cfg_capacity);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_physical_layer_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_physical_layer_cfg_capacity);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_time_synch_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_time_synch_cfg_capacity);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_security_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_security_cfg_capacity);
 
-    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_hw_cfg_ptr);
-    TEST_ASSERT_EQUAL_HEX8(0u, map.svr_request_stream_cfg_capacity);
-    TEST_ASSERT_EQUAL_HEX8(0u, map.svr_response_stream_cfg_capacity);
-    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_request_stream_cfg_ptr);
-    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_response_stream_cfg_ptr);
-    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_ep_generic_cfg_ptr);
-    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_ep_generic_cfg_capacity);
-    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_ep_bytebus_id_map_ptr);
-    TEST_ASSERT_EQUAL_HEX8(0u, map.svr_ep_bytebus_id_map_capacity);
-    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_ep_functional_cfg_ptr);
-    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_sequencer_state_ptr);
+    /* 0x0000 is TC18's own defined encoding for "not supported" on
+     * three of the four pointers (network interface has no such note)
+     * -- the correct, safe default this codebase's own established
+     * "fail-open to the honest answer" convention already uses
+     * elsewhere (e.g. svr_configuration_lock's 0x00 == unlocked). */
+    map.svr_physical_layer_cfg_ptr = 0x0000u; /* still "not supported" */
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_physical_layer_cfg_ptr);
+
+    map.svr_network_interface_cfg_ptr      = 0x0050u;
+    map.svr_network_interface_cfg_capacity = 0x0004u;
+    map.svr_time_synch_cfg_ptr             = 0x0060u;
+    map.svr_time_synch_cfg_capacity        = 0x0002u;
+    map.svr_security_cfg_ptr               = 0x0070u;
+    map.svr_security_cfg_capacity          = 0x0008u;
+    TEST_ASSERT_EQUAL_UINT16(0x0050u, map.svr_network_interface_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0x0004u, map.svr_network_interface_cfg_capacity);
+    TEST_ASSERT_EQUAL_UINT16(0x0060u, map.svr_time_synch_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0x0002u, map.svr_time_synch_cfg_capacity);
+    TEST_ASSERT_EQUAL_UINT16(0x0070u, map.svr_security_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0x0008u, map.svr_security_cfg_capacity);
+
+    read_general(&map, (uint8_t)sizeof(buf), buf);
+    TEST_ASSERT_TRUE(span_is_zero(buf, 0x30, 0x3F));
     TEST_ASSERT_EQUAL_HEX16(RCP_REGMAP_NO_ROOT_CLIENT, map.svr_root_client_index);
 }
 
@@ -1719,7 +1754,7 @@ int main(void)
     RUN_TEST(test_ep_generic_cfg_ptr_and_capacity_are_now_correctly_shaped);
     RUN_TEST(test_ep_bytebus_id_map_ptr_and_capacity_are_now_correctly_shaped);
     RUN_TEST(test_functional_cfg_and_sequencer_state_ptrs_are_now_correctly_shaped);
-    RUN_TEST(test_four_optional_subsystem_pointer_pairs_are_absent);
+    RUN_TEST(test_four_optional_subsystem_pointer_pairs_are_now_present);
     RUN_TEST(test_hw_config_table_has_no_server_side_storage);
     RUN_TEST(test_hw_config_row_stride_absent_and_access_class_inverted);
     RUN_TEST(test_pin_type_bit_layout_contradicts_table_20);

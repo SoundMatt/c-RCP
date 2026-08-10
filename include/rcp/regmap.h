@@ -644,6 +644,115 @@ typedef struct {
                                 the same way. Content modeling only,
                                 same REQ-RMAP-024 wire-reachability
                                 boundary as every other Group 1 item. */
+    uint16_t svr_network_interface_cfg_ptr; /* REQ-RMAP-039 (TC18
+                                §12.7.5 Table 18 continued, relative
+                                address 0x0030, 16 bit, R): the address
+                                of the Network_config register map
+                                (§12.7.11). Verified directly against
+                                the primary-source PDF (Table 18, page
+                                53 of OA_TC18_specification_v_0.5.1_
+                                RC.pdf) during REQ-RMAP-036's own batch,
+                                re-confirmed by reading page 53 a second
+                                time for this batch specifically. TC18's
+                                own "Absolute address" column is BLANK
+                                for every register on this continuation
+                                page -- a genuine gap in the primary
+                                source itself, not an extraction
+                                failure -- so 0x0030 (this field) through
+                                0x003E (svr_security_cfg_capacity below)
+                                are INFERRED, not directly read: derived
+                                from the visible 0x0030 marker
+                                terminating the prior page's table (the
+                                natural next address after
+                                svr_sequencer_state_ptr's own 16-bit
+                                register ending at 0x002F) plus this
+                                whole table's consistent, gap-free,
+                                sequential-address convention (every
+                                other register in Table 18, without
+                                exception, sits at offset = previous
+                                register's own offset + previous
+                                register's own width) -- flagged
+                                honestly as inferred, not assumed to be
+                                risk-free.
+
+                                These eight fields (four ptr/capacity
+                                pairs -- network interface, physical
+                                layer, time synch, security) are the
+                                LAST Group 1 item (issue #200):
+                                rcp_regmap_general_t previously declared
+                                none of them at all, so a c-RCP server
+                                could not advertise -- and a c-RCP
+                                client could not discover -- whether any
+                                of these four optional subsystems is
+                                present, including the "not supported"
+                                answer TC18 requires be expressible as
+                                a zero pointer for three of the four
+                                (see each pointer's own comment below).
+                                Unlike every other Group 1 batch since
+                                REQ-RMAP-033, these are genuinely NEW
+                                fields, not a retype of an existing one
+                                -- rcp_regmap_table_ref_t (already
+                                unused by this struct as of
+                                REQ-RMAP-038) is deliberately NOT reused
+                                here either, since each pair's ptr/
+                                capacity are two independently-
+                                addressed 16-bit TC18 registers, the
+                                same shape every other Group 1 pair this
+                                phase has fixed already uses. Content
+                                modeling only, same REQ-RMAP-024
+                                wire-reachability boundary as every
+                                other Group 1 item. */
+    uint16_t svr_network_interface_cfg_capacity; /* REQ-RMAP-039 (TC18
+                                §12.7.5 Table 18 continued, INFERRED
+                                relative address 0x0032, 16 bit, R):
+                                the Network_config register map's own
+                                capacity. Unlike the three pairs below,
+                                TC18's own table gives no explicit "0
+                                means not supported" note for this
+                                specific pointer -- flagged honestly
+                                rather than assumed to match the other
+                                three by analogy. */
+    uint16_t svr_physical_layer_cfg_ptr; /* REQ-RMAP-039 (TC18 §12.7.5
+                                Table 18 continued, INFERRED relative
+                                address 0x0034, 16 bit, R): the address
+                                of the physical-layer configuration
+                                register map (§12.7.12). A pointer
+                                value of 0 is TC18's own defined
+                                encoding for "physical layer
+                                configuration is not supported". */
+    uint16_t svr_physical_layer_cfg_capacity; /* REQ-RMAP-039 (TC18
+                                §12.7.5 Table 18 continued, INFERRED
+                                relative address 0x0036, 16 bit, R):
+                                the physical-layer configuration
+                                register map's own capacity. */
+    uint16_t svr_time_synch_cfg_ptr; /* REQ-RMAP-039 (TC18 §12.7.5
+                                Table 18 continued, INFERRED relative
+                                address 0x0038, 16 bit, R): the address
+                                of the PTP_config register map
+                                (§12.7.13). A pointer value of 0 is
+                                TC18's own defined encoding for "time
+                                synch is not supported". */
+    uint16_t svr_time_synch_cfg_capacity; /* REQ-RMAP-039 (TC18
+                                §12.7.5 Table 18 continued, INFERRED
+                                relative address 0x003A, 16 bit, R):
+                                the PTP_config register map's own
+                                capacity. */
+    uint16_t svr_security_cfg_ptr; /* REQ-RMAP-039 (TC18 §12.7.5 Table
+                                18 continued, INFERRED relative address
+                                0x003C, 16 bit, R): the address of the
+                                security configuration register map
+                                (§12.7.14). A pointer value of 0 is
+                                TC18's own defined encoding for
+                                "security is not supported". */
+    uint16_t svr_security_cfg_capacity; /* REQ-RMAP-039 (TC18 §12.7.5
+                                Table 18 continued, INFERRED relative
+                                address 0x003E, 16 bit, R): the
+                                security configuration register map's
+                                own capacity -- see svr_network_
+                                interface_cfg_ptr's own comment above
+                                for the full explanation of why every
+                                address in this group is inferred
+                                rather than directly read. */
 } rcp_regmap_general_t;
 
 /* Zero-initializes every field of map except svr_root_client_index, which

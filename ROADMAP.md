@@ -10546,3 +10546,78 @@ pointer/capacity register pairs -- network interface, physical layer,
 time synch, security -- all real 16-bit ptr+capacity PAIRS per the
 primary source, entirely new fields, not a retype of anything
 existing).
+
+### 192. Phase 5d batch 22: all four optional-subsystem ptr/capacity pairs now declared -- Group 1 COMPLETE (issue #200)
+
+The LAST Group 1 item. TC18 §12.7.5 Table 18's continued part defines
+four further 16-bit ptr/capacity register pairs -- network interface
+(§12.7.11), physical layer (§12.7.12), time synch (§12.7.13), security
+(§12.7.14) -- where a zero pointer is the defined encoding for
+"subsystem not supported" on three of the four (network interface has
+no such note in TC18's own table). `rcp_regmap_general_t` previously
+declared none of the eight registers at all. Unlike every batch since
+`REQ-RMAP-033`, this is entirely NEW fields, not a retype -- the
+already-unused `rcp_regmap_table_ref_t` (as of batch 21) stays unused,
+each pair getting its own independent scalar ptr/capacity fields
+matching the shape every other Group 1 pair this phase has fixed
+already uses.
+
+**Re-read the primary source PDF's own continuation page a second
+time specifically for this batch**, rather than trusting batch 19's
+own summary of it: confirmed Table 18's "Absolute address" column is
+genuinely BLANK for all eight of these registers on their own page --
+a real gap in TC18's own table, not an extraction artifact from
+either read. Rather than leaving the addresses unspecified or
+guessing silently, inferred them from (1) the visible `0x0030`
+continuation marker the prior page's own table ends on (the natural
+next address after `svr_sequencer_state_ptr`'s own 16-bit register
+ending at `0x002F`) and (2) this whole table's consistent, gap-free,
+sequential-address convention -- verified true for EVERY OTHER
+register in Table 18, without a single exception, across all 18 Group
+1 items closed this phase. Documented as `0x0030`-`0x003F`, but
+explicitly flagged as INFERRED rather than directly read, in both the
+header's own field comments and `.fusa-reqs.json`'s text -- this
+project's own standing "verify against primary source, and be honest
+about what that verification actually established" discipline applied
+even when the primary source itself has a real gap, not just when a
+citation might be wrong.
+
+Rewrote `REQ-RMAP-039`'s own deviation pin
+(`test_four_optional_subsystem_pointer_pairs_are_absent`) into a
+positive test (`test_four_optional_subsystem_pointer_pairs_are_now_
+present`) -- this test's entire prior claim ("these four pairs are
+absent") is now false, so unlike every other Group 1 rewrite this
+phase, there was no "narrow the remaining half" step; the whole test
+became the positive proof. Proves all eight fields are correctly
+sized, zero-init (0x0000 is TC18's own "not supported" encoding for
+three of the four pointers -- this codebase's own established
+fail-open-to-the-honest-answer default, same convention
+`svr_configuration_lock`'s 0x00 already uses), and round-trip
+distinctive values. Also added the same eight fields to
+`test_regmap.c`'s general zero-init test, matching the established
+convention for real (non-reserved) content fields.
+
+Mutation-tested: full header-only revert with every touched test file
+kept -- breaks the build (8 `no member named 'svr_..._cfg_ptr/
+_capacity'` errors in `test_regmap.c`). Restored clean, diff-verified
+byte-identical against a pre-mutation backup. Full suite (65/65) +
+ASan/UBSan clean. Fresh `cfusa check` (0 errors) + all three separate
+`cfusa trace` invocations (100%/100%, 0 untested). `REQ-RMAP-039`
+moves `not-implemented` -> `partial` (not fully closed -- still
+blocked on `REQ-RMAP-024`'s wire-reachability gap and this codebase's
+still-absent storage for any of the four optional subsystems). 1030
+requirements (unchanged), 110 `tc18-gap` entries remaining (unchanged
+-- narrowed from `not-implemented` to `partial`).
+
+**Phase 5d progress after batch 22**: 23/47 items addressed (24
+counting `REQ-RMAP-061`'s own partial progress). **Group 1: 18/18 --
+COMPLETE.** Every register in TC18 §12.7.5 Table 18 (the RC Server
+general register map) that `rcp_regmap_general_t` did not already
+correctly model is now content-modeled, matching TC18's own names,
+widths, and (where the primary source states one) semantics -- all
+still bounded by the single, deliberately-sequenced
+`REQ-RMAP-024` wire-reachability gap that every Group 1 item's own
+text has consistently named throughout this phase. Per issue #200's
+own suggested order, Group 3 (EP_ID_config, §12.7.8 Table 23, 6 items)
+is next -- flagged as depending on Group 1's `svr_io_pin_count`/
+pointer work, now fully in place.
