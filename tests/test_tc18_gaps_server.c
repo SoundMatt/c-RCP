@@ -250,45 +250,59 @@ static void test_hw_unconfigured_ignores_claimant_and_request_kind(void)
 
 /* ── §12.3.1.x / §12.7.3: who may write, and over what framing ─────────────── */
 
-static void test_hw_configured_write_access_is_unrestricted(void)
+/* As of REQ-LIFECYCLE-027 (unicast) and REQ-LIFECYCLE-030/036
+ * (authorization), both halves of what this test originally pinned as an
+ * open gap are now closed -- renamed and rewritten to assert the
+ * corrected behavior directly, rather than left stale documenting a bug
+ * that no longer exists. */
+static void test_hw_configured_write_access_now_requires_unicast_and_authorization(void)
 {
-    rcp_lifecycle_writer_ctx_t stranger = {false, false};
-    rcp_lifecycle_writer_ctx_t root     = {true, false};
+    rcp_lifecycle_writer_ctx_t stranger    = {false, false, false, false};
+    rcp_lifecycle_writer_ctx_t root        = {true, false, false, false};
+    rcp_lifecycle_writer_ctx_t discovery   = {false, false, false, true};
+    rcp_lifecycle_writer_ctx_t broadcast   = {true, false, true, false}; /* authorized
+                                                                             root client,
+                                                                             but non-unicast */
 
     /* TC18 §12.3.1.2 permits EP0 write access to another endpoint's
      * configuration only for the configured root client or via the discovery
      * stream, and §12.7.3 permits configuration access in HW_CONFIGURED only
-     * over the discovery stream or a known stream_id/byte_bus_id pair.
-     * c-RCP grants it to every writer context in this state. */
+     * over the discovery stream or a known stream_id/byte_bus_id pair. As of
+     * REQ-LIFECYCLE-030/036, c-RCP now enforces exactly this: an unauthorized
+     * "stranger" is refused, while the root client (via EP0) or the
+     * discovery stream are each independently sufficient. */
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
+                                                   RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, stranger));
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
+                                                   RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
+                                                   stranger));
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
-                                                  RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, stranger));
+                                                  RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, root));
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
-                                                  RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
-                                                  stranger));
+                                                  RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, discovery));
 
-    /* RCP_CONFIGURED is the one state where the writer is consulted at all,
-     * which is what makes the permissiveness above a policy gap rather than
-     * an unmodelled parameter. */
+    /* RCP_CONFIGURED's own authorization rule (pre-existing, unchanged by
+     * this batch) is narrower: the discovery stream alone does not suffice
+     * there (a distinct, still-open §12.7.4 concern -- see this file's own
+     * deviation pin below), only root-client-via-EP0 or the owning stream. */
     TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_RCP_CONFIGURED,
                                                    RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, stranger));
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_RCP_CONFIGURED,
                                                   RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, root));
 
     /* TC18 §12.3.1.1, §12.3.1.2 and §12.3.1.3 each restate that a write is
-     * accepted only from a unicast frame. As of the REQ-LIFECYCLE-027 fix,
-     * rcp_lifecycle_field_writable() now takes exactly that input via its
-     * writer_ctx's via_non_unicast_frame member and denies an otherwise-
-     * writable field once it is set -- see test_lifecycle.c's own
-     * test_field_writable_denies_non_unicast_frame_regardless_of_kind_or_
-     * authorization() for the dedicated coverage; stranger/root above both
-     * use the 2-element brace form, which zero-initializes that new
-     * member to false (unicast/compliant), so their assertions are
-     * unaffected. rcp_lifecycle_should_accept() (below) still takes no
-     * destination-MAC input at all -- deliberately so: TC18's rule is
-     * scoped to write requests specifically, not general frame admission,
-     * so should_accept's frame-level acceptance is correctly unicast-
-     * agnostic; only a WRITE attempt is gated, and only at the
-     * field_writable() layer where TC18 §12.7's write path already lives. */
+     * accepted only from a unicast frame (REQ-LIFECYCLE-027) -- independent
+     * of and composed with the authorization gate above: an otherwise-
+     * authorized root-client writer is still refused once its frame is
+     * flagged non-unicast. rcp_lifecycle_should_accept() (below) still
+     * takes no destination-MAC input at all -- deliberately so: TC18's
+     * unicast rule is scoped to write requests specifically, not general
+     * frame admission, so should_accept's frame-level acceptance is
+     * correctly unicast-agnostic; only a WRITE attempt is gated, and only
+     * at the field_writable() layer where TC18 §12.7's write path already
+     * lives. */
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
+                                                    RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, broadcast));
     TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_UNCONFIGURED, false,
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
     TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_RCP_CONFIGURED, false,
@@ -932,7 +946,7 @@ int main(void)
     RUN_TEST(test_hw_configured_admits_only_ep0);
     RUN_TEST(test_admit_takes_no_lifecycle_state_or_stream_identity);
     RUN_TEST(test_hw_unconfigured_ignores_claimant_and_request_kind);
-    RUN_TEST(test_hw_configured_write_access_is_unrestricted);
+    RUN_TEST(test_hw_configured_write_access_now_requires_unicast_and_authorization);
     RUN_TEST(test_hw_configured_drops_tscf);
     RUN_TEST(test_hw_configured_admits_gbb_pending_lifecycle_029);
     RUN_TEST(test_discovery_write_authority_survives_rcp_configured);

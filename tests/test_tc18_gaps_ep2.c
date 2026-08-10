@@ -93,12 +93,20 @@ static size_t changed_octets(const uint8_t *before, const uint8_t *after, size_t
     return changed;
 }
 
-/* An authorized functional-config writer in a state that permits the write
- * (RCP_LIFECYCLE_HW_CONFIGURED accepts any writer -- lifecycle.h). */
+/* An authorized functional-config writer in a state that permits the
+ * write. As of REQ-LIFECYCLE-030/036, RCP_LIFECYCLE_HW_CONFIGURED no
+ * longer accepts any writer unconditionally -- it requires the same
+ * root-client/owning-stream authorization RCP_CONFIGURED already did
+ * (lifecycle.h) -- so this helper explicitly grants via_owning_stream to
+ * stay authorized; every one of this file's tests uses it purely to get
+ * past the writability gate on the way to testing something else
+ * entirely (block layout, register width, etc.), not to exercise
+ * lifecycle authorization policy itself. */
 static rcp_lifecycle_writer_ctx_t any_writer(void)
 {
     rcp_lifecycle_writer_ctx_t w = {0};
 
+    w.via_owning_stream = true;
     return w;
 }
 

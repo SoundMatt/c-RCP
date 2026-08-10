@@ -7765,3 +7765,93 @@ the signature) isolates the assignment itself -> exactly the new
 `cfusa trace --req-coverage 100 --sec-tested 100` (100%/100%). 1029
 requirements (was 1028, `REQ-L2-011` added), 139 `tc18-gap` entries
 remaining (was 140).
+
+### 156. Phase 5b batch 4: REQ-LIFECYCLE-030 + REQ-LIFECYCLE-036 HW_CONFIGURED write authorization (issue #198)
+
+Both requirements reduce to the identical condition once examined
+closely: TC18 §12.3.1.2 (REQ-LIFECYCLE-030, EP0 cross-endpoint access)
+and §12.7.3 (REQ-LIFECYCLE-036, direct-to-endpoint access) each require
+HW_CONFIGURED functional-config write access be gated on the root
+client via EP0, the endpoint's own owning stream, or the discovery
+stream -- `rcp_lifecycle_field_writable()`'s `HW_CONFIGURED` branches
+for `FUNCTIONAL_W`/`FUNCTIONAL_W_STAR` previously `return true`
+unconditionally. Closed both in one change: a new
+`via_discovery_stream` member on `rcp_lifecycle_writer_ctx_t` (the
+`§12.7.3(a)` case; `via_owning_stream`, already modeled, is `(b)`'s
+"known stream_id/byte_bus_id pair"), and `HW_CONFIGURED`'s two branches
+now gate on `authorized || writer.via_discovery_stream` (`authorized`
+being the same `via_root_client_ep0 || via_owning_stream` formula
+`RCP_CONFIGURED` already used) rather than unconditional `true`.
+`RCP_CONFIGURED`'s own rule is deliberately left untouched -- it does
+not (yet) admit the discovery stream on its own, a distinct, still-open
+§12.7.4 concern this batch does not attempt.
+
+**Blast-radius check applied proactively, following batch 3's own
+discipline, and it paid off**: grepped every `HW_CONFIGURED` +
+`FUNCTIONAL_W`/writability call site before writing any code. Found a
+real, larger-than-`-027` blast radius up front -- 11 `test_ep_*.c`
+files (23 raw `writer = {0}` declarations, 14 bare/unauthorized-as-
+declared), `test_lifecycle.c`'s own bug-documenting test, a DEVIATION
+PIN in `test_tc18_gaps_server.c`, a shared `any_writer()` helper in
+`test_tc18_gaps_ep2.c` used by ~20 unrelated tests, and 3 sites in
+`test_tc18_gaps_regmap.c` -- and posted the finding to issue #198
+*before* touching any implementation code, per the standing lesson from
+`REQ-LIFECYCLE-032`'s revert-and-redo. Applying the fix and using the
+resulting failure list (rather than hand-enumeration) to drive the
+migration kept every fix targeted and verified:
+
+  - `test_tc18_gaps_ep2.c`'s `any_writer()` -- a single shared helper
+    used by ~20 tests whose real purpose is testing block layout/
+    register width, not lifecycle policy -- fixed once
+    (`w.via_owning_stream = true`), clearing every one of its call
+    sites in one edit.
+  - 20 `test_ep_*.c` "applies_when_authorized" tests across 9 files, all
+    following an identical shape (a bare `writer = {0}` convenience
+    default for testing the endpoint's own setter validation, not
+    authorization policy -- the real authorization test lives in each
+    file's separate `..._rejects_unauthorized`/`..._requires_
+    authorization` sibling) -- migrated mechanically via a script that
+    locates each named function and inserts `writer.via_owning_stream =
+    true;` after its declaration.
+  - 11 `test_ep_*.c` "any_writer" DEVIATION-PIN-style tests, one per
+    endpoint type, all sharing the identical
+    `test_functional_cfg_writable_true_hw_configured_any_writer` naming
+    convention -- rewritten (scripted, per-file, extracting each file's
+    own wrapper function name) into
+    `..._hw_configured_requires_authorization_or_discovery_stream`,
+    asserting `FALSE` for `none`, `TRUE` for `via_ep0`/`via_stream`/
+    `via_discovery`, mirroring each file's own pre-existing
+    `RCP_CONFIGURED`-requires-authorization sibling's shape.
+  - `test_lifecycle.c`'s own `test_functional_w_writable_by_anyone_in_
+    hw_configured` (name documented the bug directly) split into
+    `test_functional_w_not_writable_in_hw_unconfigured` (unaffected,
+    kept as-is) and a new
+    `test_functional_w_hw_configured_requires_authorization_or_
+    discovery_stream`.
+  - `test_tc18_gaps_server.c`'s `test_hw_configured_write_access_is_
+    unrestricted` -- a DEVIATION PIN documenting exactly this gap
+    (plus the unicast half batch 3 already closed) -- renamed to
+    `test_hw_configured_write_access_now_requires_unicast_and_
+    authorization` and rewritten to assert the corrected, composed
+    behavior: authorization alone, unicast alone, and both together
+    (an authorized-but-non-unicast writer still refused).
+  - `test_tc18_gaps_regmap.c`'s 3 sites -- 2 swapped `PLAIN_WRITER` for
+    `ROOT_WRITER` where the test's real point was a state-only property
+    (no read-only class exists; Table 22's W*-vs-read-only-by-state
+    shape) unrelated to writer authorization; 1
+    (`test_configuration_lock_register_is_absent`) rewritten to compare
+    two *differently-authorized* writer contexts instead of an
+    authorized-vs-unauthorized pair, preserving its real point (no
+    separate lock byte exists -- the answer depends only on state and
+    authorization, not on which authorized path was used) while also
+    keeping (not dropping) a `PLAIN_WRITER`-refused assertion to
+    document the now-real authorization behavior explicitly.
+
+Mutation-tested: `git stash` on `src/lifecycle.c` alone reproduces
+exactly the same 13-binary failure set the pre-fix build showed before
+any test migration -- confirms every rewritten/migrated test correctly
+pins the new behavior rather than accidentally becoming a tautology.
+Restored clean. Full test suite (64/64) + ASan/UBSan build both clean.
+Fresh `cfusa check` (0 errors) + `cfusa trace --req-coverage 100
+--sec-tested 100` (100%/100%). 1029 requirements (unchanged count --
+no new REQ ids this batch), 137 `tc18-gap` entries remaining (was 139).

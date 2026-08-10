@@ -178,12 +178,25 @@ static void test_functional_cfg_writable_false_hw_unconfigured(void)
         RCP_LIFECYCLE_HW_UNCONFIGURED, writer));
 }
 
-static void test_functional_cfg_writable_true_hw_configured_any_writer(void)
+static void test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream(void)
 {
-    rcp_lifecycle_writer_ctx_t writer = {0};
+    rcp_lifecycle_writer_ctx_t none          = {0};
+    rcp_lifecycle_writer_ctx_t via_ep0       = {0};
+    rcp_lifecycle_writer_ctx_t via_stream    = {0};
+    rcp_lifecycle_writer_ctx_t via_discovery = {0};
 
-    TEST_ASSERT_TRUE(rcp_ep_can_functional_cfg_writable(
-        RCP_LIFECYCLE_HW_CONFIGURED, writer));
+    via_ep0.via_root_client_ep0        = true;
+    via_stream.via_owning_stream       = true;
+    via_discovery.via_discovery_stream = true;
+
+    /* REQ-LIFECYCLE-030/036: HW_CONFIGURED functional-config write access
+     * now requires the root client via EP0, the endpoint's own owning
+     * stream, or the discovery stream -- no longer any writer
+     * unconditionally. */
+    TEST_ASSERT_FALSE(rcp_ep_can_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, none));
+    TEST_ASSERT_TRUE(rcp_ep_can_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, via_ep0));
+    TEST_ASSERT_TRUE(rcp_ep_can_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, via_stream));
+    TEST_ASSERT_TRUE(rcp_ep_can_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, via_discovery));
 }
 
 static void test_set_arbitration_timing_rejects_unauthorized(void)
@@ -204,6 +217,7 @@ static void test_set_arbitration_timing_applies_when_authorized(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
     rcp_lifecycle_writer_ctx_t     writer = {0};
+    writer.via_owning_stream = true;
     rcp_ep_can_bit_timing_t     timing = {0};
 
     rcp_ep_can_functional_cfg_init(&cfg);
@@ -223,6 +237,7 @@ static void test_set_fd_data_timing_applies_when_authorized(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
     rcp_lifecycle_writer_ctx_t     writer = {0};
+    writer.via_owning_stream = true;
     rcp_ep_can_bit_timing_t     timing = {0};
 
     rcp_ep_can_functional_cfg_init(&cfg);
@@ -238,6 +253,7 @@ static void test_set_xl_data_timing_applies_when_authorized(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
     rcp_lifecycle_writer_ctx_t     writer = {0};
+    writer.via_owning_stream = true;
     rcp_ep_can_bit_timing_t     timing = {0};
 
     rcp_ep_can_functional_cfg_init(&cfg);
@@ -252,6 +268,7 @@ static void test_set_delay_compensation_applies_when_authorized(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
     rcp_lifecycle_writer_ctx_t     writer = {0};
+    writer.via_owning_stream = true;
 
     rcp_ep_can_functional_cfg_init(&cfg);
 
@@ -278,6 +295,7 @@ static void test_set_exec_delay_clk_divider_applies_when_authorized(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
     rcp_lifecycle_writer_ctx_t     writer = {0};
+    writer.via_owning_stream = true;
 
     rcp_ep_can_functional_cfg_init(&cfg);
 
@@ -302,6 +320,7 @@ static void test_set_xl_filter_applies_when_authorized(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
     rcp_lifecycle_writer_ctx_t     writer = {0};
+    writer.via_owning_stream = true;
     rcp_ep_can_xl_filter_t      filter = {0};
 
     rcp_ep_can_functional_cfg_init(&cfg);
@@ -1017,7 +1036,7 @@ int main(void)
 
     RUN_TEST(test_functional_cfg_init_zeroes);
     RUN_TEST(test_functional_cfg_writable_false_hw_unconfigured);
-    RUN_TEST(test_functional_cfg_writable_true_hw_configured_any_writer);
+    RUN_TEST(test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream);
 
     RUN_TEST(test_set_arbitration_timing_rejects_unauthorized);
     RUN_TEST(test_set_arbitration_timing_applies_when_authorized);

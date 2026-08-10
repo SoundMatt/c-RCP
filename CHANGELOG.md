@@ -32,6 +32,30 @@ the rationale.
 
 ## Releases
 
+### v0.156.0 -- 2026-08-10
+
+**Phase 5b batch 4: REQ-LIFECYCLE-030 + REQ-LIFECYCLE-036 HW_CONFIGURED
+write authorization.** Issue #198. Both requirements reduce to the same
+condition: TC18 §12.3.1.2/§12.7.3 require HW_CONFIGURED functional-
+config write access be gated on the root client via EP0, the
+endpoint's own owning stream, or the discovery stream --
+`rcp_lifecycle_field_writable()`'s `HW_CONFIGURED` branches previously
+granted access unconditionally. New `via_discovery_stream` member on
+`rcp_lifecycle_writer_ctx_t`; `HW_CONFIGURED` now gates on `authorized
+|| writer.via_discovery_stream`. Blast-radius checked proactively
+before writing code (this batch's own explicit lesson from batch 3) --
+found and migrated ~35 affected tests across 14 files (a shared
+`any_writer()` helper fix cleared ~20 at once; 11 DEVIATION-PIN-style
+tests rewritten to assert the corrected behavior; 3
+`test_tc18_gaps_regmap.c` sites individually reworked to preserve their
+real point without depending on the now-authorization-gated default).
+Mutation-tested (reverting `src/lifecycle.c` alone reproduces the exact
+same 13-binary failure set the pre-fix build showed, confirming every
+rewritten test actually pins the new behavior). Full suite (64/64) +
+ASan/UBSan clean, fresh `cfusa check`/`trace` (0 errors, 100%/100%).
+See `ROADMAP.md` milestone 156 for full detail. 1029 requirements
+(unchanged), 137 `tc18-gap` entries remaining (was 139).
+
 ### v0.155.0 -- 2026-08-10
 
 **Phase 5b batch 3: REQ-LIFECYCLE-027 write requests unicast-only.**

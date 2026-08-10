@@ -331,13 +331,21 @@ static void test_general_static_part_has_no_read_only_class(void)
     rcp_mock_server_t    *srv;
     rcp_regmap_general_t *map;
 
+    /* HW_GENERIC's HW_UNCONFIGURED writability takes no writer input at
+     * all, so PLAIN_WRITER still isolates the state-only property being
+     * tested here. FUNCTIONAL_W/_STAR's HW_CONFIGURED writability now
+     * requires authorization (REQ-LIFECYCLE-030/036) -- ROOT_WRITER
+     * keeps these two assertions about "not read-only by state", not
+     * about writer authorization, which test_functional_cfg_writable_
+     * hw_configured_requires_authorization_or_discovery_stream()-style
+     * tests elsewhere already cover directly. */
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_UNCONFIGURED,
                                                   RCP_LIFECYCLE_FIELD_HW_GENERIC, PLAIN_WRITER));
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
-                                                  RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, PLAIN_WRITER));
+                                                  RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, ROOT_WRITER));
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
                                                   RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
-                                                  PLAIN_WRITER));
+                                                  ROOT_WRITER));
 
     srv = rcp_mock_server_new();
     TEST_ASSERT_NOT_NULL(srv);
@@ -416,20 +424,31 @@ static void test_sequencers_max_width_and_zero_encoding_unenforced(void)
  * 0x0015; 0x00 permits writes to R/W+ parameters, any other value causes
  * them to be rejected. Deviation: no such field exists and
  * rcp_lifecycle_field_writable() takes no lock input, so its verdict for
- * an R/W+ (FUNCTIONAL_W_STAR) field depends only on state and writer --
- * asserted here by the two writer contexts producing the identical
- * answer in HW_CONFIGURED, where a latched lock would have to refuse. */
+ * an R/W+ (FUNCTIONAL_W_STAR) field depends only on state and writer
+ * authorization, never on a separate latched-lock byte -- asserted here
+ * by two differently-authorized writer contexts (root-client-via-EP0 vs.
+ * owning-stream) producing the identical TRUE answer in HW_CONFIGURED,
+ * where a real lock register would still have to refuse regardless of
+ * which authorized path granted access. (As of REQ-LIFECYCLE-030/036,
+ * an *unauthorized* writer is now correctly refused here too -- that is
+ * the authorization gate working as intended, not a lock register; see
+ * PLAIN_WRITER's own FALSE assertion below, kept to document the
+ * distinction rather than silently dropped.) */
 static void test_configuration_lock_register_is_absent(void)
 {
     rcp_regmap_general_t map = populated_map();
     uint8_t              buf[0x17];
+    const rcp_lifecycle_writer_ctx_t owning_stream_writer = {false, true, false, false};
 
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
                                                   RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
                                                   ROOT_WRITER));
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
                                                   RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
-                                                  PLAIN_WRITER));
+                                                  owning_stream_writer));
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
+                                                   RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
+                                                   PLAIN_WRITER));
     read_general(&map, (uint8_t)sizeof(buf), buf);
     TEST_ASSERT_TRUE(span_is_zero(buf, 0x15, 0x15));
 }
@@ -816,10 +835,16 @@ static void test_watchdog_timeout_width_and_unit_deviate(void)
  * read-only. (As indicated by W*)" -- every R/W* field is writable in
  * BOTH HW_UNCONFIGURED and HW_CONFIGURED and read-only only once
  * RCP_CONFIGURED is reached. Fixed: rcp_lifecycle_field_writable() now
- * matches this for all three states. (No caller yet classifies the
- * request-stream table as FUNCTIONAL_W_STAR, so this primitive being
- * correct doesn't by itself mean Table 22 is wired up end to end --
- * that's a separate, still-open gap.) */
+ * matches this for all three states -- HW_UNCONFIGURED unconditionally
+ * (no association/root-client concept exists that early), HW_CONFIGURED
+ * now additionally subject to REQ-LIFECYCLE-030/036's authorization gate
+ * (ROOT_WRITER used below rather than PLAIN_WRITER, since this test's own
+ * point is the per-state W-star-vs-read-only shape, not writer authorization --
+ * that is covered directly by test_functional_w_hw_configured_requires_
+ * authorization_or_discovery_stream() in test_lifecycle.c). (No caller
+ * yet classifies the request-stream table as FUNCTIONAL_W_STAR, so this
+ * primitive being correct doesn't by itself mean Table 22 is wired up
+ * end to end -- that's a separate, still-open gap.) */
 static void test_table22_w_star_writable_in_both_pre_rcp_configured_states(void)
 {
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_UNCONFIGURED,
@@ -830,7 +855,7 @@ static void test_table22_w_star_writable_in_both_pre_rcp_configured_states(void)
                                                   PLAIN_WRITER));
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
                                                   RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
-                                                  PLAIN_WRITER));
+                                                  ROOT_WRITER));
     TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_RCP_CONFIGURED,
                                                    RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
                                                    ROOT_WRITER));

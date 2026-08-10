@@ -349,14 +349,38 @@ static void test_hw_generic_writable_only_in_hw_unconfigured(void)
         RCP_LIFECYCLE_RCP_CONFIGURED, RCP_LIFECYCLE_FIELD_HW_GENERIC, root));
 }
 
-static void test_functional_w_writable_by_anyone_in_hw_configured(void)
+/* As of the REQ-LIFECYCLE-030/036 fix, HW_CONFIGURED is no longer
+ * writable by any writer unconditionally: TC18 §12.3.1.2/§12.7.3
+ * require the same root-client/owning-stream authorization RCP_CONFIGURED
+ * already applies, plus a discovery-stream alternative neither state
+ * modeled before this fix. */
+static void test_functional_w_not_writable_in_hw_unconfigured(void)
 {
     rcp_lifecycle_writer_ctx_t none = {0};
 
     TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(
         RCP_LIFECYCLE_HW_UNCONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, none));
-    TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(
+}
+
+static void test_functional_w_hw_configured_requires_authorization_or_discovery_stream(void)
+{
+    rcp_lifecycle_writer_ctx_t none          = {0};
+    rcp_lifecycle_writer_ctx_t via_ep0       = {0};
+    rcp_lifecycle_writer_ctx_t via_stream    = {0};
+    rcp_lifecycle_writer_ctx_t via_discovery = {0};
+
+    via_ep0.via_root_client_ep0        = true;
+    via_stream.via_owning_stream       = true;
+    via_discovery.via_discovery_stream = true;
+
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(
         RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, none));
+    TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(
+        RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, via_ep0));
+    TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(
+        RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, via_stream));
+    TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(
+        RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, via_discovery));
 }
 
 static void test_functional_w_requires_authorized_writer_once_rcp_configured(void)
@@ -471,7 +495,8 @@ int main(void)
     RUN_TEST(test_rcp_configured_accepts_ntscf_at_any_byte_bus_id);
 
     RUN_TEST(test_hw_generic_writable_only_in_hw_unconfigured);
-    RUN_TEST(test_functional_w_writable_by_anyone_in_hw_configured);
+    RUN_TEST(test_functional_w_not_writable_in_hw_unconfigured);
+    RUN_TEST(test_functional_w_hw_configured_requires_authorization_or_discovery_stream);
     RUN_TEST(test_functional_w_requires_authorized_writer_once_rcp_configured);
     RUN_TEST(test_functional_w_star_permanently_locked_once_rcp_configured);
     RUN_TEST(test_field_writable_denies_non_unicast_frame_regardless_of_kind_or_authorization);
