@@ -91,22 +91,28 @@ static const pin_prop_name_t PIN_PROP_NAMES[] = {
 
 typedef struct {
     const char *name;
-    uint32_t    bits;
-} option_group_name_t;
+    uint8_t     bit;
+} option_bit_name_t;
 
-static const option_group_name_t OPTION_GROUP_NAMES[] = {
-    {"time_sync",        RCP_REGMAP_OPT_TIME_SYNC_TSCF | RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION},
-    {"enhanced_cancel",  RCP_REGMAP_OPT_ENH_CANCEL_REQUEST | RCP_REGMAP_OPT_ENH_CANCEL_ACK},
-    {"compound_bundles", RCP_REGMAP_OPT_COMPOUND_HEADER | RCP_REGMAP_OPT_COMPOUND_SEGMENT},
+/* REQ-RMAP-030: five independent single bits, matching TC18 Table 18
+ * exactly -- see regmap.h's own dedicated section for the full
+ * primary-source-verified bit layout and this table's own former
+ * three-paired-group design (retired, REQ-RMAP-004..008). "trigger" and
+ * "chained" are new names this parser did not previously accept at
+ * all, even though c-RCP implements both request types. */
+static const option_bit_name_t OPTION_BIT_NAMES[] = {
+    {"time_sync",        RCP_REGMAP_OPT_TIME_SYNC},
+    {"enhanced_cancel",  RCP_REGMAP_OPT_ENH_CANCEL},
+    {"trigger",          RCP_REGMAP_OPT_TRIGGER},
+    {"chained",          RCP_REGMAP_OPT_CHAINED},
+    {"compound_bundles", RCP_REGMAP_OPT_COMPOUND_WAIT},
 };
-#define OPTION_GROUP_NAMES_LEN (sizeof(OPTION_GROUP_NAMES) / sizeof(OPTION_GROUP_NAMES[0]))
+#define OPTION_BIT_NAMES_LEN (sizeof(OPTION_BIT_NAMES) / sizeof(OPTION_BIT_NAMES[0]))
 
-/* Ors into *out the bit(s)/group named by each quoted string found within
+/* Ors into *out the bit(s) named by each quoted string found within
  * [start, end); unrecognized names are silently ignored (forward-
- * compatible with a future name this parser doesn't know yet, matching
- * regmap.h's own "bits outside all three groups are ignored" convention
- * for rcp_regmap_options_group_consistent()). names/name_count is one of
- * the two static tables above; bit_of selects which member to OR in. */
+ * compatible with a future name this parser doesn't know yet).
+ * names/name_count is one of the two static tables above. */
 static void or_named_bits_u8(const char *start, const char *end, uint8_t *out,
                               const pin_prop_name_t *names, size_t name_count)
 {
@@ -131,8 +137,8 @@ static void or_named_bits_u8(const char *start, const char *end, uint8_t *out,
     }
 }
 
-static void or_named_bits_u32(const char *start, const char *end, uint32_t *out,
-                               const option_group_name_t *names, size_t name_count)
+static void or_named_bits_options(const char *start, const char *end, uint8_t *out,
+                                   const option_bit_name_t *names, size_t name_count)
 {
     const char *p = start;
     while (p < end) {
@@ -147,7 +153,7 @@ static void or_named_bits_u32(const char *start, const char *end, uint32_t *out,
         len = (size_t)(q2 - q1 - 1);
         for (i = 0; i < name_count; i++) {
             if (strlen(names[i].name) == len && memcmp(names[i].name, q1 + 1, len) == 0) {
-                *out |= names[i].bits;
+                *out = (uint8_t)(*out | names[i].bit);
                 break;
             }
         }
@@ -213,8 +219,8 @@ static void parse_server_fields(const char *json, rcp_config_server_t *out)
     if (k) {
         const char *arr_start, *arr_end;
         if (find_bracket_span(k + strlen("\"svr_implemented_options\""), &arr_start, &arr_end)) {
-            or_named_bits_u32(arr_start, arr_end, &out->svr_implemented_options,
-                               OPTION_GROUP_NAMES, OPTION_GROUP_NAMES_LEN);
+            or_named_bits_options(arr_start, arr_end, &out->svr_implemented_options,
+                                   OPTION_BIT_NAMES, OPTION_BIT_NAMES_LEN);
         }
     }
 }

@@ -127,7 +127,7 @@ static rcp_regmap_general_t populated_map(void)
     map.svr_sequencers_max        = 0x07u;
     map.svr_responder_mem_size    = 0x1122u;
     map.svr_req_mem_size          = 0x3344u;
-    map.svr_implemented_options   = 0x0000003Fu;
+    map.svr_implemented_options   = 0x1Fu; /* all five REQ-RMAP-030 bits set */
     map.svr_root_client_index     = 0x0002u;
 
     ref.offset = 0x00000040u;
@@ -582,34 +582,46 @@ static void test_configuration_lock_not_yet_consulted_by_field_writable(void)
                                                    PLAIN_WRITER));
 }
 
-/* TC18 §12.7.5 Table 18: svr_implemented_options is an 8-bit R register
- * at 0x0016 with one bit per optional feature (a compound&wait, b trigger
- * requests, c chained requests, d time synch/timed, e enhanced
- * cancellation). Deviation: c-RCP's field is 32 bit and carries six bits
- * of its own invention grouped into three all-or-nothing PAIRS -- a
- * pairing rule TC18 does not have -- with NO bit for trigger requests and
- * none for chained requests even though both are implemented. */
-static void test_implemented_options_layout_is_invented(void)
+/* REQ-RMAP-030 (TC18 §12.7.5 Table 18): svr_implemented_options is an
+ * 8-bit R register at 0x0016 with one bit per optional feature (a
+ * compound&wait, b trigger requests, c chained requests, d time
+ * synch/timed, e enhanced cancellation) -- verified directly against
+ * the primary-source PDF (Table 18, page 51 of
+ * OA_TC18_specification_v_0.5.1_RC.pdf). rcp_regmap_general_t's field
+ * is now 8 bit and carries exactly these five independent bits,
+ * replacing a prior 32-bit, six-bit, three-forced-pair design
+ * (REQ-RMAP-004..008, now retired -- see test_regmap.c's own
+ * retirement note) whose citation for the pairing rule (§12.9.1.1) was
+ * found, on the same primary-source check, to say nothing about this
+ * register at all: that section is entirely about handling multiple
+ * ACF-type requests packed into one AVTPDU frame. The prior design also
+ * had no bit at all for trigger or chained requests, even though this
+ * codebase implements both -- this test proves that gap is closed too.
+ * Still open (REQ-RMAP-024, same as every other Group 1 item): the
+ * address falls past the discovery slice's 0x000D ceiling, already
+ * covered generically by test_general_map_wire_reach_stops_after_0x000d(). */
+static void test_implemented_options_now_matches_table_18_exactly(void)
 {
-    rcp_regmap_general_t map = populated_map();
-    uint8_t              buf[0x18];
+    rcp_regmap_general_t map;
 
-    TEST_ASSERT_EQUAL_UINT((size_t)4u, sizeof(map.svr_implemented_options));
-    TEST_ASSERT_EQUAL_HEX32(0x01u, RCP_REGMAP_OPT_TIME_SYNC_TSCF);
-    TEST_ASSERT_EQUAL_HEX32(0x02u, RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION);
-    TEST_ASSERT_EQUAL_HEX32(0x04u, RCP_REGMAP_OPT_ENH_CANCEL_REQUEST);
-    TEST_ASSERT_EQUAL_HEX32(0x08u, RCP_REGMAP_OPT_ENH_CANCEL_ACK);
-    TEST_ASSERT_EQUAL_HEX32(0x10u, RCP_REGMAP_OPT_COMPOUND_HEADER);
-    TEST_ASSERT_EQUAL_HEX32(0x20u, RCP_REGMAP_OPT_COMPOUND_SEGMENT);
+    rcp_regmap_general_init(&map);
+    TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(map.svr_implemented_options));
 
-    /* Every defined bit fits in 0x3F: nothing is left for trigger (spec
-     * bit b) or chained (spec bit c) requests. */
-    TEST_ASSERT_TRUE(rcp_regmap_options_group_consistent(0x3Fu));
-    /* The invented pairing rule: half a group is rejected. */
-    TEST_ASSERT_FALSE(rcp_regmap_options_group_consistent(RCP_REGMAP_OPT_TIME_SYNC_TSCF));
+    TEST_ASSERT_EQUAL_HEX8(0x01u, RCP_REGMAP_OPT_COMPOUND_WAIT); /* a */
+    TEST_ASSERT_EQUAL_HEX8(0x02u, RCP_REGMAP_OPT_TRIGGER);       /* b -- previously unrepresentable */
+    TEST_ASSERT_EQUAL_HEX8(0x04u, RCP_REGMAP_OPT_CHAINED);       /* c -- previously unrepresentable */
+    TEST_ASSERT_EQUAL_HEX8(0x08u, RCP_REGMAP_OPT_TIME_SYNC);     /* d */
+    TEST_ASSERT_EQUAL_HEX8(0x10u, RCP_REGMAP_OPT_ENH_CANCEL);    /* e */
 
-    read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x16, 0x17));
+    /* Every bit is independently settable -- no pairing invariant to
+     * satisfy, unlike the retired design. */
+    map.svr_implemented_options = RCP_REGMAP_OPT_TRIGGER;
+    TEST_ASSERT_EQUAL_HEX8(RCP_REGMAP_OPT_TRIGGER, map.svr_implemented_options);
+
+    map.svr_implemented_options = (uint8_t)(RCP_REGMAP_OPT_COMPOUND_WAIT | RCP_REGMAP_OPT_TRIGGER |
+                                             RCP_REGMAP_OPT_CHAINED | RCP_REGMAP_OPT_TIME_SYNC |
+                                             RCP_REGMAP_OPT_ENH_CANCEL);
+    TEST_ASSERT_EQUAL_HEX8(0x1Fu, map.svr_implemented_options); /* all five, matching Table 18's own count */
 }
 
 /* TC18 §12.7.5 Table 18 reserves the 8-bit register at 0x0017 (must read
@@ -1515,7 +1527,7 @@ int main(void)
     RUN_TEST(test_sequencers_max_is_now_correctly_sized_and_synced_from_the_table);
     RUN_TEST(test_configuration_lock_register_now_exists_and_defaults_unlocked);
     RUN_TEST(test_configuration_lock_not_yet_consulted_by_field_writable);
-    RUN_TEST(test_implemented_options_layout_is_invented);
+    RUN_TEST(test_implemented_options_now_matches_table_18_exactly);
     RUN_TEST(test_reserved_registers_are_indistinguishable_from_zero_fill);
     RUN_TEST(test_io_pin_count_absent_and_hw_cfg_ptr_mis_shaped);
     RUN_TEST(test_stream_cfg_pointer_capacity_pairs_are_collapsed);

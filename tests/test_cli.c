@@ -149,6 +149,30 @@ static void test_capabilities_transports_lists_real_backends(void)
     TEST_ASSERT_NOT_NULL(strstr(transports, "\"tsn\""));
 }
 
+/* REQ-RMAP-030: this codebase implements trigger requests
+ * (request_triggered.c) and chained requests (request_chained.c) in
+ * full, but before this fix had no RCP_REGMAP_OPT_* bit -- and so no
+ * "features" entry -- to advertise either one. This test pins that the
+ * capabilities document's "features" array now lists all five Table 18
+ * feature names, closing that previously-unadvertised-capability gap on
+ * this real consumer surface (no prior test in this file inspected
+ * "features" content at all). */
+static void test_capabilities_features_lists_all_five_table_18_names(void)
+{
+    char *argv[] = {"capabilities"};
+    char out[512], err[512];
+    const char *features;
+
+    TEST_ASSERT_EQUAL(RCP_CLI_OK, run_capture(1, argv, out, sizeof(out), err, sizeof(err)));
+    features = strstr(out, "\"features\":[");
+    TEST_ASSERT_NOT_NULL(features);
+    TEST_ASSERT_NOT_NULL(strstr(features, "\"time_sync\""));
+    TEST_ASSERT_NOT_NULL(strstr(features, "\"enhanced_cancel\""));
+    TEST_ASSERT_NOT_NULL(strstr(features, "\"trigger\""));
+    TEST_ASSERT_NOT_NULL(strstr(features, "\"chained\""));
+    TEST_ASSERT_NOT_NULL(strstr(features, "\"compound_bundles\""));
+}
+
 /* ── status ────────────────────────────────────────────────────────────────── */
 
 static void test_status_json_has_required_fields(void)
@@ -227,6 +251,7 @@ int main(void)
     RUN_TEST(test_capabilities_honestly_omits_send);
     RUN_TEST(test_capabilities_transports_honestly_omits_tls);
     RUN_TEST(test_capabilities_transports_lists_real_backends);
+    RUN_TEST(test_capabilities_features_lists_all_five_table_18_names);
 
     RUN_TEST(test_status_json_has_required_fields);
     RUN_TEST(test_status_text_form);

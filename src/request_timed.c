@@ -41,10 +41,10 @@ const char *rcp_timed_strerror(rcp_timed_errc_t e)
 /* ── Feature gating ─────────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-TIMED-002
-bool rcp_timed_feature_enabled(uint32_t options)
+//cfusa:req REQ-RMAP-030
+bool rcp_timed_feature_enabled(uint8_t options)
 {
-    uint32_t need = RCP_REGMAP_OPT_TIME_SYNC_TSCF | RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION;
-    return (options & need) == need;
+    return (options & RCP_REGMAP_OPT_TIME_SYNC) != 0;
 }
 
 /* ── Timed request encode/decode ──────────────────────────────────────────── */

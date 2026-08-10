@@ -7,6 +7,7 @@
 //cfusa:test REQ-RMAP-006
 //cfusa:test REQ-RMAP-007
 //cfusa:test REQ-RMAP-008
+//cfusa:test REQ-RMAP-030
 //cfusa:test REQ-RMAP-009
 //cfusa:test REQ-RMAP-010
 //cfusa:test REQ-RMAP-011
@@ -86,21 +87,25 @@ static void test_general_init_zeroes_with_no_root_client(void)
     TEST_ASSERT_EQUAL_UINT32(0, map.sequencer_state.offset);
 }
 
-/* ── svr_implemented_options bit assignments ───────────────────────────────── */
+/* ── svr_implemented_options bit assignments (REQ-RMAP-030) ───────────────── */
 
+/* REQ-RMAP-004: the five TC18 Table 18 bits (0x0016) are pairwise
+ * distinct -- still a genuinely worthwhile correctness property to
+ * assert directly, independent of REQ-RMAP-004's own former (incorrect)
+ * §12.9.1.1 citation; see this file's own retirement note just below
+ * for the primary-source finding that corrected it. */
 static void test_option_bits_are_pairwise_distinct(void)
 {
-    uint32_t bits[6] = {
-        RCP_REGMAP_OPT_TIME_SYNC_TSCF,
-        RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION,
-        RCP_REGMAP_OPT_ENH_CANCEL_REQUEST,
-        RCP_REGMAP_OPT_ENH_CANCEL_ACK,
-        RCP_REGMAP_OPT_COMPOUND_HEADER,
-        RCP_REGMAP_OPT_COMPOUND_SEGMENT,
+    uint8_t bits[5] = {
+        RCP_REGMAP_OPT_COMPOUND_WAIT,
+        RCP_REGMAP_OPT_TRIGGER,
+        RCP_REGMAP_OPT_CHAINED,
+        RCP_REGMAP_OPT_TIME_SYNC,
+        RCP_REGMAP_OPT_ENH_CANCEL,
     };
     size_t i, j;
 
-    for (i = 0; i < 6; i++) {
+    for (i = 0; i < 5; i++) {
         TEST_ASSERT_NOT_EQUAL(0, bits[i]);
         for (j = 0; j < i; j++) {
             TEST_ASSERT_TRUE(bits[i] != bits[j]);
@@ -108,39 +113,36 @@ static void test_option_bits_are_pairwise_distinct(void)
     }
 }
 
-/* ── rcp_regmap_options_group_consistent() ─────────────────────────────────── */
+/* ── REQ-RMAP-005..008 retired ──────────────────────────────────────────────── */
 
-static void test_options_consistent_when_all_clear(void)
+/* REQ-RMAP-005..008 (formerly: rcp_regmap_options_group_consistent()'s
+ * four accept/reject behaviors for an invented three-pair grouping of
+ * svr_implemented_options' bits) are RETIRED as of REQ-RMAP-030.
+ * Primary-source verification (OA_TC18_specification_v_0.5.1_RC.pdf,
+ * §12.9.1.1, page 64) found their shared citation incorrect: that
+ * section is entirely about an RC Server handling multiple ACF-type
+ * requests packed into one AVTPDU frame, and says nothing about this
+ * register, feature advertisement, or bit pairing. Each of the five
+ * real bits is independently settable with no sibling requirement --
+ * proven directly here rather than via a retired consistency-checker
+ * function that no longer exists. */
+static void test_option_bits_are_independently_settable_no_pairing_required(void)
 {
-    TEST_ASSERT_TRUE(rcp_regmap_options_group_consistent(0));
-}
+    rcp_regmap_general_t map;
 
-static void test_options_consistent_when_one_group_fully_set(void)
-{
-    TEST_ASSERT_TRUE(rcp_regmap_options_group_consistent(
-        RCP_REGMAP_OPT_TIME_SYNC_TSCF | RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION));
-    TEST_ASSERT_TRUE(rcp_regmap_options_group_consistent(
-        RCP_REGMAP_OPT_ENH_CANCEL_REQUEST | RCP_REGMAP_OPT_ENH_CANCEL_ACK));
-    TEST_ASSERT_TRUE(rcp_regmap_options_group_consistent(
-        RCP_REGMAP_OPT_COMPOUND_HEADER | RCP_REGMAP_OPT_COMPOUND_SEGMENT));
-}
+    rcp_regmap_general_init(&map);
 
-static void test_options_inconsistent_when_group_partially_set(void)
-{
-    TEST_ASSERT_FALSE(rcp_regmap_options_group_consistent(RCP_REGMAP_OPT_TIME_SYNC_TSCF));
-    TEST_ASSERT_FALSE(rcp_regmap_options_group_consistent(RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION));
-    TEST_ASSERT_FALSE(rcp_regmap_options_group_consistent(RCP_REGMAP_OPT_ENH_CANCEL_REQUEST));
-    TEST_ASSERT_FALSE(rcp_regmap_options_group_consistent(RCP_REGMAP_OPT_ENH_CANCEL_ACK));
-    TEST_ASSERT_FALSE(rcp_regmap_options_group_consistent(RCP_REGMAP_OPT_COMPOUND_HEADER));
-    TEST_ASSERT_FALSE(rcp_regmap_options_group_consistent(RCP_REGMAP_OPT_COMPOUND_SEGMENT));
-}
+    map.svr_implemented_options = RCP_REGMAP_OPT_TRIGGER; /* just one bit -- no sibling needed */
+    TEST_ASSERT_EQUAL_HEX8(RCP_REGMAP_OPT_TRIGGER, map.svr_implemented_options);
 
-static void test_options_consistent_when_multiple_groups_fully_set(void)
-{
-    uint32_t options = RCP_REGMAP_OPT_TIME_SYNC_TSCF | RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION |
-                        RCP_REGMAP_OPT_COMPOUND_HEADER | RCP_REGMAP_OPT_COMPOUND_SEGMENT;
+    map.svr_implemented_options = RCP_REGMAP_OPT_COMPOUND_WAIT | RCP_REGMAP_OPT_CHAINED;
+    TEST_ASSERT_EQUAL_HEX8((uint8_t)(RCP_REGMAP_OPT_COMPOUND_WAIT | RCP_REGMAP_OPT_CHAINED),
+                           map.svr_implemented_options);
 
-    TEST_ASSERT_TRUE(rcp_regmap_options_group_consistent(options));
+    map.svr_implemented_options = (uint8_t)(RCP_REGMAP_OPT_COMPOUND_WAIT | RCP_REGMAP_OPT_TRIGGER |
+                                             RCP_REGMAP_OPT_CHAINED | RCP_REGMAP_OPT_TIME_SYNC |
+                                             RCP_REGMAP_OPT_ENH_CANCEL);
+    TEST_ASSERT_EQUAL_HEX8(0x1Fu, map.svr_implemented_options); /* all five bits, 0b00011111 */
 }
 
 /* ── rcp_regmap_writer_ctx() ────────────────────────────────────────────────── */
@@ -415,10 +417,7 @@ int main(void)
     RUN_TEST(test_general_init_zeroes_with_no_root_client);
 
     RUN_TEST(test_option_bits_are_pairwise_distinct);
-    RUN_TEST(test_options_consistent_when_all_clear);
-    RUN_TEST(test_options_consistent_when_one_group_fully_set);
-    RUN_TEST(test_options_inconsistent_when_group_partially_set);
-    RUN_TEST(test_options_consistent_when_multiple_groups_fully_set);
+    RUN_TEST(test_option_bits_are_independently_settable_no_pairing_required);
 
     RUN_TEST(test_writer_ctx_grants_root_client_via_ep0);
     RUN_TEST(test_writer_ctx_denies_root_client_when_wrong_stream_or_not_ep0);

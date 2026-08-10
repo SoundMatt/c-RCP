@@ -11,29 +11,29 @@ bool rcp_regmap_is_ep0(uint16_t ep_index)
     return ep_index == RCP_REGMAP_EP0_INDEX;
 }
 
-/* ── svr_implemented_options: three all-or-nothing feature groups ─────────── */
+/* ── svr_implemented_options: REQ-RMAP-004..008 retired (REQ-RMAP-030) ────── */
 
+//cfusa:req REQ-RMAP-004
 //cfusa:req REQ-RMAP-005
 //cfusa:req REQ-RMAP-006
 //cfusa:req REQ-RMAP-007
 //cfusa:req REQ-RMAP-008
-bool rcp_regmap_options_group_consistent(uint32_t options)
-{
-    static const uint32_t groups[3] = {
-        RCP_REGMAP_OPT_TIME_SYNC_TSCF | RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION,
-        RCP_REGMAP_OPT_ENH_CANCEL_REQUEST | RCP_REGMAP_OPT_ENH_CANCEL_ACK,
-        RCP_REGMAP_OPT_COMPOUND_HEADER | RCP_REGMAP_OPT_COMPOUND_SEGMENT,
-    };
-    size_t i;
-
-    for (i = 0; i < 3; i++) {
-        uint32_t bits = options & groups[i];
-
-        if (bits != 0 && bits != groups[i]) return false;
-    }
-
-    return true;
-}
+/* REQ-RMAP-004..008 (formerly: "svr_implemented_options bit assignments
+ * are pairwise distinct" / rcp_regmap_options_group_consistent()'s own
+ * four accept/reject behaviors) are RETIRED as of this milestone --
+ * see .fusa-reqs.json for each entry's own full retirement text. Direct
+ * primary-source verification (OA_TC18_specification_v_0.5.1_RC.pdf,
+ * §12.9.1.1, page 64) found their shared citation incorrect: that
+ * section is entirely about an RC Server handling multiple ACF-type
+ * requests packed into one AVTPDU frame -- it says nothing about
+ * svr_implemented_options, feature advertisement, or any bit-pairing
+ * rule. The all-or-nothing-pair grouping these five requirements
+ * described, and the rcp_regmap_options_group_consistent() function
+ * that enforced it, had no TC18 basis and are removed outright (not
+ * deprecated-then-removed; there is no correct behavior to preserve a
+ * transition window for). REQ-RMAP-030's own field comment (regmap.h)
+ * gives the correct, primary-source-verified replacement: five
+ * independent single bits, matching Table 18 exactly. */
 
 /* ── The general register map ──────────────────────────────────────────────── */
 

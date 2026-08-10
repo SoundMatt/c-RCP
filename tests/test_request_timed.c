@@ -54,16 +54,15 @@ static void test_strerror_never_null_and_distinct(void)
 
 /* ── Feature gating ────────────────────────────────────────────────────────── */
 
-static void test_feature_enabled_requires_both_bits(void)
+/* REQ-RMAP-030: a single bit now, not a required pair (this function's
+ * own former two-bit-pair check retired alongside REQ-RMAP-004..008). */
+static void test_feature_enabled_requires_the_time_sync_bit(void)
 {
     TEST_ASSERT_FALSE(rcp_timed_feature_enabled(0));
-    TEST_ASSERT_FALSE(rcp_timed_feature_enabled(RCP_REGMAP_OPT_TIME_SYNC_TSCF));
-    TEST_ASSERT_FALSE(rcp_timed_feature_enabled(RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION));
-    TEST_ASSERT_TRUE(rcp_timed_feature_enabled(RCP_REGMAP_OPT_TIME_SYNC_TSCF |
-                                                RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION));
-    TEST_ASSERT_TRUE(rcp_timed_feature_enabled(RCP_REGMAP_OPT_TIME_SYNC_TSCF |
-                                                RCP_REGMAP_OPT_TIME_SYNC_PRESENTATION |
-                                                RCP_REGMAP_OPT_ENH_CANCEL_REQUEST));
+    TEST_ASSERT_FALSE(rcp_timed_feature_enabled(RCP_REGMAP_OPT_COMPOUND_WAIT));
+    TEST_ASSERT_TRUE(rcp_timed_feature_enabled(RCP_REGMAP_OPT_TIME_SYNC));
+    TEST_ASSERT_TRUE(rcp_timed_feature_enabled((uint8_t)(RCP_REGMAP_OPT_TIME_SYNC |
+                                                          RCP_REGMAP_OPT_ENH_CANCEL)));
 }
 
 /* ── encode/decode round trip ─────────────────────────────────────────────── */
@@ -350,7 +349,7 @@ int main(void)
     UNITY_BEGIN();
 
     RUN_TEST(test_strerror_never_null_and_distinct);
-    RUN_TEST(test_feature_enabled_requires_both_bits);
+    RUN_TEST(test_feature_enabled_requires_the_time_sync_bit);
 
     RUN_TEST(test_timed_request_round_trip);
     RUN_TEST(test_timed_request_zero_payload);

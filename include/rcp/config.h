@@ -98,11 +98,10 @@ typedef struct {
     uint16_t vendor_id;
     uint16_t device_id;
     uint32_t magic;
-    uint32_t svr_implemented_options; /* RCP_REGMAP_OPT_* bitmask (regmap.h);
-                                          always group-consistent (see
-                                          rcp_regmap_options_group_consistent()) --
-                                          this parser only ever sets both
-                                          bits of a named group together */
+    uint8_t  svr_implemented_options; /* REQ-RMAP-030: RCP_REGMAP_OPT_*
+                                          bitmask (regmap.h), 8 bit --
+                                          five independent bits, no
+                                          pairing */
 } rcp_config_server_t;
 
 typedef struct {
