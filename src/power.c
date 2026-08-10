@@ -93,9 +93,16 @@ void rcp_pwrmode_handshake_init(rcp_pwrmode_handshake_t *hs, uint32_t repeat_lim
 }
 
 //cfusa:req REQ-PWRMODE-007
-bool rcp_pwrmode_handshake_iface_reenabled(rcp_pwrmode_handshake_t *hs)
+//cfusa:req REQ-PWRMODE-016
+bool rcp_pwrmode_handshake_iface_reenabled(rcp_pwrmode_handshake_t *hs, bool network_available)
 {
     if (hs->step != RCP_PWRMODE_HANDSHAKE_NOT_STARTED) return false;
+    /* REQ-PWRMODE-016 (TC18 §12.4.1): the interface is enabled, then
+     * network availability is checked, before any WakeUp message is
+     * sent -- a caller polls this again (a cheap, uncounted "not yet")
+     * until network_available is true, only then does step (b)'s own
+     * wakeup_repeat_limit-bounded budget start being spent. */
+    if (!network_available) return false;
 
     hs->step = RCP_PWRMODE_HANDSHAKE_IFACE_REENABLED;
     return true;

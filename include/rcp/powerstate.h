@@ -183,10 +183,13 @@ rcp_powerstate_errc_t rcp_powerstate_manager_wake_via_network(rcp_powerstate_man
 /* ── Pin-wake hot-start handshake (thin pass-throughs over power.h) ────────── */
 
 /* Step (a). (Re)initializes addr's handshake with wakeup_repeat_limit and
- * attempts rcp_pwrmode_handshake_iface_reenabled() on it. Returns false if
- * addr was not registered with m. */
+ * attempts rcp_pwrmode_handshake_iface_reenabled() on it with the given
+ * network_available (REQ-PWRMODE-016 -- see that function's own doc
+ * comment in power.h). Returns false if addr was not registered with m,
+ * or if network_available is false (retriable: call again once the
+ * network is up; this does not consume any of wakeup_repeat_limit). */
 bool rcp_powerstate_manager_handshake_begin(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
-                                             uint32_t wakeup_repeat_limit);
+                                             uint32_t wakeup_repeat_limit, bool network_available);
 
 /* Encodes one WakeUp-message probe for addr's step (b) -- a thin wrapper
  * over rcp_ep_wakeup_encode_wakeup_message(). Returns a zeroed rcp_bytes_t

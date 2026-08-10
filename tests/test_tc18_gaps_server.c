@@ -519,7 +519,7 @@ static void test_hotstart_has_no_network_check_and_no_responder_stream(void)
      * is not. c-RCP's handshake has no network-availability input anywhere,
      * so step (b) is entered -- and a WakeUp burned -- unconditionally. */
     rcp_pwrmode_handshake_init(&hs, 3u);
-    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_iface_reenabled(&hs));
+    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_iface_reenabled(&hs, true));
     TEST_ASSERT_TRUE(rcp_pwrmode_handshake_wakeup_attempt(&hs, false));
     TEST_ASSERT_EQUAL_UINT32(1u, hs.wakeup_attempts);
 
@@ -534,7 +534,7 @@ static void test_hotstart_has_no_network_check_and_no_responder_stream(void)
     TEST_ASSERT_NOT_NULL(m);
     req = rcp_powerstate_manager_encode_entry_request(m, sleeper, RCP_PWRMODE_SLEEP, 7u);
     TEST_ASSERT_NOT_NULL(req.data);
-    TEST_ASSERT_TRUE(rcp_powerstate_manager_handshake_begin(m, other, 3u));
+    TEST_ASSERT_TRUE(rcp_powerstate_manager_handshake_begin(m, other, 3u, true));
     probe = rcp_powerstate_manager_encode_wakeup_probe(m, other, 7u);
     TEST_ASSERT_NOT_NULL(probe.data);
 
@@ -565,7 +565,7 @@ static void test_wakeup_repetition_ignores_other_valid_avtpdus(void)
      * implementation-added repeat limit is exhausted, degrading a hot start
      * that TC18 would have considered complete into a cold one. */
     rcp_pwrmode_handshake_init(&hs, 2u);
-    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_iface_reenabled(&hs));
+    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_iface_reenabled(&hs, true));
     TEST_ASSERT_TRUE(rcp_pwrmode_handshake_wakeup_attempt(&hs, false));
     TEST_ASSERT_FALSE(rcp_pwrmode_handshake_has_failed(&hs));
     TEST_ASSERT_FALSE(rcp_pwrmode_handshake_wakeup_attempt(&hs, false));
@@ -613,7 +613,7 @@ static void test_network_wake_now_requires_the_same_handshake_as_pin(void)
     /* A completed handshake yields HOT, same as a pin wake. */
     mode = RCP_PWRMODE_SLEEP;
     rcp_pwrmode_handshake_init(&hs, 3u);
-    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_iface_reenabled(&hs));
+    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_iface_reenabled(&hs, true));
     TEST_ASSERT_TRUE(rcp_pwrmode_handshake_wakeup_attempt(&hs, true));
     TEST_ASSERT_TRUE(rcp_pwrmode_handshake_resume_queues(&hs));
     TEST_ASSERT_EQUAL(RCP_PWRMODE_OK,

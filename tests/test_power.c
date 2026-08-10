@@ -204,7 +204,7 @@ static void test_handshake_full_success_sequence(void)
 
     rcp_pwrmode_handshake_init(&hs, 3);
 
-    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_iface_reenabled(&hs));
+    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_iface_reenabled(&hs, true));
     TEST_ASSERT_EQUAL(RCP_PWRMODE_HANDSHAKE_IFACE_REENABLED, hs.step);
 
     TEST_ASSERT_TRUE(rcp_pwrmode_handshake_wakeup_attempt(&hs, true));
@@ -222,7 +222,7 @@ static void test_handshake_wakeup_attempt_pending_before_limit(void)
     rcp_pwrmode_handshake_t hs;
 
     rcp_pwrmode_handshake_init(&hs, 3);
-    rcp_pwrmode_handshake_iface_reenabled(&hs);
+    rcp_pwrmode_handshake_iface_reenabled(&hs, true);
 
     TEST_ASSERT_TRUE(rcp_pwrmode_handshake_wakeup_attempt(&hs, false));
     TEST_ASSERT_EQUAL(RCP_PWRMODE_HANDSHAKE_IFACE_REENABLED, hs.step); /* still pending */
@@ -237,7 +237,7 @@ static void test_handshake_wakeup_attempt_fails_at_repeat_limit(void)
     rcp_pwrmode_handshake_t hs;
 
     rcp_pwrmode_handshake_init(&hs, 2);
-    rcp_pwrmode_handshake_iface_reenabled(&hs);
+    rcp_pwrmode_handshake_iface_reenabled(&hs, true);
 
     TEST_ASSERT_TRUE(rcp_pwrmode_handshake_wakeup_attempt(&hs, false));  /* attempt 1/2, pending */
     TEST_ASSERT_FALSE(rcp_pwrmode_handshake_wakeup_attempt(&hs, false)); /* attempt 2/2, failed */
@@ -250,10 +250,40 @@ static void test_handshake_zero_repeat_limit_fails_first_attempt(void)
     rcp_pwrmode_handshake_t hs;
 
     rcp_pwrmode_handshake_init(&hs, 0);
-    rcp_pwrmode_handshake_iface_reenabled(&hs);
+    rcp_pwrmode_handshake_iface_reenabled(&hs, true);
 
     TEST_ASSERT_FALSE(rcp_pwrmode_handshake_wakeup_attempt(&hs, false));
     TEST_ASSERT_EQUAL(RCP_PWRMODE_HANDSHAKE_FAILED, hs.step);
+}
+
+/* REQ-PWRMODE-016 (TC18 §12.4.1): the interface is enabled, then network
+ * availability is checked, before any WakeUp message is sent -- a false
+ * network_available leaves hs at NOT_STARTED (a cheap, uncounted "not
+ * yet", not a failure), and does not consume any of
+ * wakeup_repeat_limit's budget (that governs step (b)'s own WakeUp-
+ * message repetition, which cannot even begin until step (a) actually
+ * advances). Repeated false polls stay retriable indefinitely; the
+ * first true poll then advances normally. */
+static void test_handshake_iface_reenabled_retries_until_network_available(void)
+{
+    rcp_pwrmode_handshake_t hs;
+
+    rcp_pwrmode_handshake_init(&hs, 1);
+
+    TEST_ASSERT_FALSE(rcp_pwrmode_handshake_iface_reenabled(&hs, false));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_HANDSHAKE_NOT_STARTED, hs.step);
+    TEST_ASSERT_EQUAL_UINT32(0, hs.wakeup_attempts); /* not consumed */
+
+    TEST_ASSERT_FALSE(rcp_pwrmode_handshake_iface_reenabled(&hs, false));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_HANDSHAKE_NOT_STARTED, hs.step); /* still retriable */
+
+    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_iface_reenabled(&hs, true));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_HANDSHAKE_IFACE_REENABLED, hs.step);
+
+    /* wakeup_repeat_limit (1) is untouched by the network-availability
+     * polling above -- the one attempt it allows is still available. */
+    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_wakeup_attempt(&hs, true));
+    TEST_ASSERT_EQUAL_UINT32(1, hs.wakeup_attempts);
 }
 
 static void test_handshake_steps_reject_out_of_order_calls(void)
@@ -269,9 +299,9 @@ static void test_handshake_steps_reject_out_of_order_calls(void)
     /* resume_queues before echoed */
     TEST_ASSERT_FALSE(rcp_pwrmode_handshake_resume_queues(&hs));
 
-    rcp_pwrmode_handshake_iface_reenabled(&hs);
+    rcp_pwrmode_handshake_iface_reenabled(&hs, true);
     /* iface_reenabled again -- already past NOT_STARTED */
-    TEST_ASSERT_FALSE(rcp_pwrmode_handshake_iface_reenabled(&hs));
+    TEST_ASSERT_FALSE(rcp_pwrmode_handshake_iface_reenabled(&hs, true));
 }
 
 /* ── rcp_pwrmode_wake_from_sleep ─────────────────────────────────────────────── */
@@ -311,7 +341,7 @@ static void test_wake_from_sleep_via_network_hot_when_handshake_complete(void)
     rcp_pwrmode_handshake_t   hs;
 
     rcp_pwrmode_handshake_init(&hs, 3);
-    rcp_pwrmode_handshake_iface_reenabled(&hs);
+    rcp_pwrmode_handshake_iface_reenabled(&hs, true);
     rcp_pwrmode_handshake_wakeup_attempt(&hs, true);
     rcp_pwrmode_handshake_resume_queues(&hs);
     TEST_ASSERT_TRUE(rcp_pwrmode_handshake_is_complete(&hs));
@@ -329,7 +359,7 @@ static void test_wake_from_sleep_via_pin_hot_only_when_handshake_complete(void)
     rcp_pwrmode_handshake_t   hs;
 
     rcp_pwrmode_handshake_init(&hs, 3);
-    rcp_pwrmode_handshake_iface_reenabled(&hs);
+    rcp_pwrmode_handshake_iface_reenabled(&hs, true);
     rcp_pwrmode_handshake_wakeup_attempt(&hs, true);
     rcp_pwrmode_handshake_resume_queues(&hs);
     TEST_ASSERT_TRUE(rcp_pwrmode_handshake_is_complete(&hs));
@@ -363,7 +393,7 @@ static void test_wake_from_sleep_via_pin_cold_when_handshake_failed(void)
     rcp_pwrmode_handshake_t   hs;
 
     rcp_pwrmode_handshake_init(&hs, 1);
-    rcp_pwrmode_handshake_iface_reenabled(&hs);
+    rcp_pwrmode_handshake_iface_reenabled(&hs, true);
     rcp_pwrmode_handshake_wakeup_attempt(&hs, false); /* limit == 1, fails immediately */
     TEST_ASSERT_TRUE(rcp_pwrmode_handshake_has_failed(&hs));
 
@@ -446,6 +476,7 @@ int main(void)
     RUN_TEST(test_handshake_wakeup_attempt_pending_before_limit);
     RUN_TEST(test_handshake_wakeup_attempt_fails_at_repeat_limit);
     RUN_TEST(test_handshake_zero_repeat_limit_fails_first_attempt);
+    RUN_TEST(test_handshake_iface_reenabled_retries_until_network_available);
     RUN_TEST(test_handshake_steps_reject_out_of_order_calls);
 
     RUN_TEST(test_wake_from_sleep_requires_sleep_mode);

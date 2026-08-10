@@ -32,6 +32,33 @@ the rationale.
 
 ## Releases
 
+### v0.165.0 -- 2026-08-10
+
+**Phase 5c batch 3: REQ-PWRMODE-016 -- hot start now checks network
+availability before spending its WakeUp budget.** Issue #199.
+`rcp_pwrmode_handshake_iface_reenabled()` previously advanced
+unconditionally, with no network-availability input at all, so step
+(b)'s WakeUp-message repetition could be driven immediately regardless
+of whether the network was actually up -- TC18 §12.4.1 requires
+enabling the interface, THEN checking network availability, and only
+starting the message repetition once it is. Fixed:
+`rcp_pwrmode_handshake_iface_reenabled()` gains a `network_available`
+parameter; `false` leaves the handshake at `NOT_STARTED` (a cheap,
+uncounted "not yet," not a failure) so the WakeUp-repeat budget is
+never touched until the network is actually available.
+`rcp_powerstate_manager_handshake_begin()` threads the same parameter
+through. Required-parameter change touched 13 call sites across 6
+files (the "compiler enumerates every site" technique) -- every
+existing test represents the happy path and updated mechanically with
+zero behavioral change, plus one genuinely new test pinning the gate
+itself. Mutation-tested two ways: full revert breaks the build; a
+precise single-line mutation isolates exactly the new test. Full suite
+(64/64) + ASan/UBSan clean, fresh `cfusa check`/`trace` (0 errors,
+100%/100%, all three separate CI-matching invocations). See
+`ROADMAP.md` milestone 165 for full detail. 1030 requirements
+(unchanged), 128 `tc18-gap` entries remaining (was 129, one genuine
+closure).
+
 ### v0.164.0 -- 2026-08-10
 
 **Phase 5c batch 2: REQ-PWRMODE-020 -- network wake now runs the same
