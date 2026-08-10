@@ -32,6 +32,37 @@ the rationale.
 
 ## Releases
 
+### v0.161.0 -- 2026-08-10
+
+**Phase 5b batch 9: REQ-LIFECYCLE-026/035/037 -- discovery-claim binding
+to the HW_UNCONFIGURED and RCP_CONFIGURED gates.** Issue #198.
+`REQ-LIFECYCLE-026`/`-035` were literal duplicates of one gap
+(`RCP_LIFECYCLE_FIELD_HW_GENERIC` writable by any writer while
+HW_UNCONFIGURED, no authorization check at all) -- both entries had
+also named the wrong enforcement point (`rcp_lifecycle_should_accept()`,
+a frame-admission filter) instead of the real one
+(`rcp_lifecycle_field_writable()`, this codebase's established
+write-authorization layer). Fixed: HW_GENERIC now requires
+`writer.via_discovery_stream` while HW_UNCONFIGURED. `REQ-LIFECYCLE-037`
+similarly named the wrong mechanism (`rcp_discovery_claim_note_
+config_write()`/`_release()`, pure bookkeeping primitives that
+correctly never consult lifecycle state) -- the real, confirmed gap was
+`rcp_lifecycle_transition()`'s RCP_CONFIGURED -> HW_UNCONFIGURED reset
+sharing one authorization check with the HW_CONFIGURED -> HW_UNCONFIGURED
+reset, letting a bare discovery-stream writer demote a fully
+RCP_CONFIGURED server -- forbidden by TC18 §12.7.4's "Changes in
+configuration via a discovery request are no longer allowed." Fixed:
+that specific reset now requires `writer.via_root_client_ep0`
+specifically. `rcp_lifecycle_field_writable()`'s own RCP_CONFIGURED
+field-write gate was already correct before this fix. Mutation-tested
+two ways (full revert -> exactly 3 pinned tests fail; a precise
+single-line mutation isolates the 2 tests pinning `-037` specifically).
+Full suite (64/64) + ASan/UBSan clean, fresh `cfusa check`/`trace` (0
+errors, 100%/100%, all three separate CI-matching invocations). See
+`ROADMAP.md` milestone 161 for full detail. 1030 requirements
+(unchanged), 132 `tc18-gap` entries remaining (was 135, three genuine
+closures).
+
 ### v0.160.0 -- 2026-08-10
 
 **Phase 5b batch 8: REQ-LIFECYCLE-023 + LOCKED_MEM_ACCESS/UNAUTHORIZED_ACCESS

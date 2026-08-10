@@ -8476,12 +8476,11 @@
     {
       "id": "REQ-LIFECYCLE-026",
       "title": "In HW_UNCONFIGURED only the discovery claimant's stream may configure the server",
-      "text": "NOT IMPLEMENTED: c-RCP does not restrict HW_UNCONFIGURED configuration requests to the discovery claimant's stream (TC18 \u00a712.3.1.1). rcp_lifecycle_should_accept() admits any NTSCF/ACF_ABB request addressed to RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID regardless of which stream_id it arrived on, and never consults rcp_discovery_claim_is_claimant(). Any client on the network can therefore configure a server that a different client is in the middle of discovering and configuring.",
+      "text": "IMPLEMENTED: primary-source re-verification found the enforcement point this entry originally named was wrong -- rcp_lifecycle_should_accept() is a frame-admission filter (subtype/msg-type/byte_bus_id only), not where TC18's own write-authorization rules live in this codebase (that is rcp_lifecycle_field_writable(), the same layering REQ-LIFECYCLE-027/030/036 already established). The real gap was RCP_LIFECYCLE_FIELD_HW_GENERIC's HW_UNCONFIGURED branch admitting any writer unconditionally, with no authorization concept at all. Fixed: HW_GENERIC is now writable in HW_UNCONFIGURED only when writer.via_discovery_stream is set, matching TC18 \u00a712.3.1.1's \"All configurations must be run via the stream which was used for discovery.\" Deriving via_discovery_stream from a real frame's stream_id against rcp_discovery_claim_is_claimant() (src/discovery.c) is caller composition, per discovery.h's own documented architecture -- the same division of responsibility REQ-LIFECYCLE-027's via_non_unicast_frame member already established for this library.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
+      "scope": "tc18",
       "tc18": "\u00a712.3.1.1, TC18.txt L2161"
     },
     {
@@ -8571,12 +8570,11 @@
     {
       "id": "REQ-LIFECYCLE-035",
       "title": "In HW_UNCONFIGURED only the claimed discovery stream may configure the server",
-      "text": "NOT IMPLEMENTED (partial): c-RCP models the discovery-stream claim (rcp_discovery_claim_note_request()/rcp_discovery_claim_is_claimant(), src/discovery.c:387/399) but no code path binds it to the HW_UNCONFIGURED state as TC18 \u00a712.7.2 requires. rcp_lifecycle_should_accept() (src/lifecycle.c:119) admits a frame in HW_UNCONFIGURED on the strength of its byte_bus_id alone, never comparing the frame's stream_id against the current discovery claimant, and rcp_discovery_claim_is_claimant() is a pure query no accept/reject path calls. Consequence: while HW_UNCONFIGURED, a configuration write arriving on any stream is accepted, not only one on the discovery stream assigned in answer to a discovery request.",
+      "text": "IMPLEMENTED: the same underlying gap as REQ-LIFECYCLE-026 (this entry's own \"claimed discovery stream\" framing and that entry's \"discovery claimant's stream\" framing describe one code path, RCP_LIFECYCLE_FIELD_HW_GENERIC's HW_UNCONFIGURED writability), closed by the same fix -- see REQ-LIFECYCLE-026's own text for the full correction (the enforcement point is rcp_lifecycle_field_writable(), not rcp_lifecycle_should_accept() as originally assumed here too). rcp_discovery_claim_note_request()/rcp_discovery_claim_is_claimant() (src/discovery.c) remain pure primitives a caller composes into writer.via_discovery_stream, per discovery.h's own documented architecture -- unchanged by this fix, and correctly so.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
+      "scope": "tc18",
       "tc18": "\u00a712.7.2 Configuration in HW_UNCONFIGURED state, TC18.txt L2488-2489"
     },
     {
@@ -8592,12 +8590,11 @@
     {
       "id": "REQ-LIFECYCLE-037",
       "title": "Once RCP_CONFIGURED, a discovery request may no longer change configuration although it is still answered",
-      "text": "NOT IMPLEMENTED (partial): c-RCP answers discovery requests in every lifecycle state as TC18 \u00a712.7.4 requires, but does not disable the discovery stream's configuration-write authority once RCP_LIFECYCLE_RCP_CONFIGURED is reached. rcp_discovery_claim_note_config_write() (src/discovery.c:409) takes only (claim, writer, now_ms) \u2014 no lifecycle state \u2014 so it will still refresh and confirm a discovery claimant's write authorization in RCP_CONFIGURED, and rcp_discovery_claim_release() is never called on the HW_CONFIGURED -> RCP_CONFIGURED transition (src/lifecycle.c rcp_lifecycle_transition() touches no discovery claim). Consequence: a client holding the discovery claim retains configuration authority into RCP_CONFIGURED, where the specification grants configuration access only to a configured stream_id/byte_bus_id combination or the root client.",
+      "text": "IMPLEMENTED: primary-source re-verification found this entry had actually conflated two different things -- rcp_lifecycle_field_writable()'s FUNCTIONAL_W RCP_CONFIGURED branch already correctly excluded via_discovery_stream before this fix (authorized there is via_root_client_ep0 || via_owning_stream only), so field WRITES were never actually leaking discovery-stream authority into RCP_CONFIGURED. The real, confirmed gap was in rcp_lifecycle_transition()'s own RCP_CONFIGURED -> HW_UNCONFIGURED reset path: it shared one `authorized` (via_discovery_stream || via_root_client_ep0) computation with the HW_CONFIGURED -> HW_UNCONFIGURED reset, so a bare discovery-stream writer could still demote a fully RCP_CONFIGURED server -- itself a configuration change TC18 \u00a712.7.4's \"Changes in configuration via a discovery request are no longer allowed\" forbids. Fixed: the RCP_CONFIGURED -> HW_UNCONFIGURED reset now requires writer.via_root_client_ep0 specifically (the HW_CONFIGURED -> HW_UNCONFIGURED reset keeps the wider rule, since \u00a712.7.3 still permits the discovery stream while HW_CONFIGURED). rcp_discovery_claim_note_config_write()/rcp_discovery_claim_release() (src/discovery.c) remain pure claim-bookkeeping primitives that deliberately do not consult lifecycle state, per discovery.h's own documented architecture -- the claim primitive still refreshes for the claimant regardless of state, but that no longer translates into actual write or transition authority once RCP_CONFIGURED, since both real gates (field_writable() and transition()) now independently close that door.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
+      "scope": "tc18",
       "tc18": "\u00a712.7.4 Configuration in RCP_CONFIGURED state, TC18.txt L2498-2500"
     },
     {

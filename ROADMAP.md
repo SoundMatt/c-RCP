@@ -8190,3 +8190,127 @@ build both clean. Fresh `cfusa check` (0 errors) + `cfusa trace
 verified as CI's own separate invocations). 1030 requirements
 (unchanged, no new REQ ids), 135 `tc18-gap` entries remaining (was
 136, one genuine closure -- `REQ-LIFECYCLE-023`).
+
+### 161. Phase 5b batch 9: REQ-LIFECYCLE-026/035/037 -- discovery-claim binding to the HW_UNCONFIGURED and RCP_CONFIGURED gates (issue #198)
+
+Group 3's discovery-claim binding items. `REQ-LIFECYCLE-026` and
+`REQ-LIFECYCLE-035` turned out to be literal duplicates -- both name
+the exact same gap (`RCP_LIFECYCLE_FIELD_HW_GENERIC`'s HW_UNCONFIGURED
+writability, at two different TC18 citations, §12.3.1.1 and §12.7.2)
+and are closed by one fix. `REQ-LIFECYCLE-037` is a structurally
+different fix in a different function, batched together since both are
+compact, no-signature-change logic corrections in the same "discovery
+stream authorization scope" family.
+
+**REQ-LIFECYCLE-026/035 (implemented)**: both entries' own text blamed
+`rcp_lifecycle_should_accept()` for not checking the frame's stream_id
+against the discovery claimant -- primary-source re-verification found
+that was the wrong enforcement point. `should_accept()` is a
+frame-admission filter (subtype/msg-type/byte_bus_id only, no op or
+stream-identity input); TC18's own write-authorization rules live at
+`rcp_lifecycle_field_writable()` in this codebase, the same layering
+`REQ-LIFECYCLE-027`/`030`/`036` already established. The real gap:
+`RCP_LIFECYCLE_FIELD_HW_GENERIC`'s HW_UNCONFIGURED branch admitted any
+writer unconditionally -- `writable = (state ==
+RCP_LIFECYCLE_HW_UNCONFIGURED)`, no authorization concept at all, even
+though HW_GENERIC models exactly the HW_config block TC18 §12.3.1.1
+says "must be run via the stream which was used for discovery." Fixed:
+`writable = (state == RCP_LIFECYCLE_HW_UNCONFIGURED) &&
+writer.via_discovery_stream` -- no root client or owning stream can
+exist yet this early in bring-up, so via_discovery_stream is the only
+authorizing condition available. Deriving that bit from a real frame's
+stream_id against `rcp_discovery_claim_is_claimant()` (`src/discovery.c`)
+remains caller composition, per `discovery.h`'s own documented
+architecture ("this module deliberately does not itself decide whether
+a given register field is writable... a caller combines [its answer]
+with [`rcp_lifecycle_field_writable()`]") -- the identical division of
+responsibility `REQ-LIFECYCLE-027`'s `via_non_unicast_frame` member
+already established for this library, and already closed at the
+library layer under that same convention.
+
+**REQ-LIFECYCLE-037 (implemented)**: this entry's own text also named
+the wrong mechanism -- it blamed `rcp_discovery_claim_note_config_write()`
+never consulting lifecycle state and `rcp_discovery_claim_release()`
+never being called on the HW_CONFIGURED -> RCP_CONFIGURED transition.
+Direct code reading found `rcp_lifecycle_field_writable()`'s
+`FUNCTIONAL_W` RCP_CONFIGURED branch already correctly excluded
+`via_discovery_stream` before this fix (`authorized` there is
+`via_root_client_ep0 || via_owning_stream` only) -- field WRITES were
+never actually leaking discovery-stream authority into RCP_CONFIGURED.
+The real, confirmed gap was in `rcp_lifecycle_transition()`'s own
+RCP_CONFIGURED -> HW_UNCONFIGURED reset path: it shared one
+`authorized` computation (`via_discovery_stream || via_root_client_ep0`)
+with the HW_CONFIGURED -> HW_UNCONFIGURED reset, so a bare
+discovery-stream writer could still demote a fully RCP_CONFIGURED
+server -- a live pinned test,
+`test_transition_rcp_configured_to_hw_unconfigured_is_unconditional_
+once_authorized`, asserted exactly this as passing behavior. That is
+itself a configuration change TC18 §12.7.4's "Changes in configuration
+via a discovery request are no longer allowed" forbids. Fixed: the
+RCP_CONFIGURED -> HW_UNCONFIGURED reset now requires
+`writer.via_root_client_ep0` specifically; the HW_CONFIGURED ->
+HW_UNCONFIGURED reset keeps the wider discovery-stream-or-root-client
+rule, since §12.7.3 still permits the discovery stream while
+HW_CONFIGURED. `rcp_discovery_claim_note_config_write()`/
+`rcp_discovery_claim_release()` remain pure claim-bookkeeping
+primitives that deliberately do not consult lifecycle state, per
+`discovery.h`'s own documented architecture -- the claim primitive
+still refreshes for the claimant regardless of state, but that no
+longer translates into actual write or transition authority once
+RCP_CONFIGURED, since both real gates now independently close that
+door.
+
+**Reusable lesson, third instance this phase**: a `.fusa-reqs.json`
+entry's own text naming a specific function as the enforcement point is
+not itself evidence that function is where the real gate belongs (or is
+even missing one) -- this codebase's established should_accept()
+(frame admission) vs. field_writable()/transition() (write/state
+authorization) layering means the audit that first wrote these three
+entries guessed the wrong layer for all three. Verifying against the
+actual code structure, not just the requirement text, caught this
+before any of the three fixes landed in the wrong function.
+
+Test changes: `test_lifecycle.c` gained a `discovery` writer to
+`test_hw_generic_writable_only_in_hw_unconfigured` and
+`test_field_write_error_distinguishes_state_from_writer_denial`, and
+`test_transition_rcp_configured_to_hw_unconfigured_is_unconditional_
+once_authorized` was renamed
+`test_transition_rcp_configured_to_hw_unconfigured_requires_root_client`
+and rewritten to assert the corrected rejection. `test_tc18_gaps_
+regmap.c` gained a `DISCOVERY_WRITER` constant alongside `ROOT_WRITER`/
+`PLAIN_WRITER`, used in `test_general_static_part_has_no_read_only_
+class`, `test_hw_config_row_stride_absent_and_access_class_inverted`
+and `test_field_write_error_distinguishes_state_from_writer_denial`.
+`test_tc18_gaps_server.c`'s `test_hw_generic_covers_ep_generic_and_
+queue_config_with_locked_response` gained a discovery writer for its
+HW_UNCONFIGURED assertion, and
+`test_discovery_write_authority_survives_rcp_configured` was extended
+(not replaced) to demonstrate both the still-honest claim-bookkeeping
+residual and the two real gates now correctly closing RCP_CONFIGURED
+against a bare discovery writer.
+
+Mutation-tested two ways: a full-file revert of `src/lifecycle.c` ->
+exactly 3 pinned tests fail
+(`test_hw_generic_writable_only_in_hw_unconfigured`,
+`test_transition_rcp_configured_to_hw_unconfigured_requires_root_client`,
+`test_discovery_write_authority_survives_rcp_configured`), each pinning
+a distinct closed requirement; a precise single-line mutation (the
+RCP_CONFIGURED-from reset's `!writer.via_root_client_ep0` check swapped
+back to `!authorized`) -> exactly the 2 tests pinning `REQ-LIFECYCLE-037`
+fail, isolated from the HW_GENERIC fix. Both restored clean. Full test
+suite (64/64) + ASan/UBSan build both clean. Fresh `cfusa check` (0
+errors) + `cfusa trace --gaps` / `--req-coverage 100` / `--sec-tested
+100` (all three separate invocations, matching CI; 100%/100%, 0
+untested). 1030 requirements (unchanged, no new REQ ids), 132
+`tc18-gap` entries remaining (was 135, three genuine closures).
+
+**Phase 5b progress after batch 9**: 10/16 items fully closed
+(`-023`/`-024`/`-026`/`-027`/`-028`/`-030`/`-032`/`-035`/`-036`/`-037`),
+4 partial (`-022`/`-025`/`-031`/`-034`). Remaining fully open: `-029`
+(deliberately deferred, see `rcp_lifecycle_should_accept()`'s own doc
+comment) and `-033` (REQUEST_REJECTED for non-STANDARD requests to EP0
+before full configuration -- needs `rcp_lifecycle_should_accept()`'s
+return type widened to a 3-state accept/drop/reject result, since ABB
+vs. GBB at the wire level already distinguishes STANDARD from every
+conditional-request kind without needing a separate `RCP_SCHED_KIND_*`
+input as the entry's own text originally assumed -- next batch).

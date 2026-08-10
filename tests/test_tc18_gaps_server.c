@@ -182,10 +182,14 @@ static void test_transition_now_rejects_unauthorized_writer(void)
  * name. */
 static void test_hw_generic_covers_ep_generic_and_queue_config_with_locked_response(void)
 {
-    rcp_lifecycle_writer_ctx_t root = {true, true};
+    rcp_lifecycle_writer_ctx_t root      = {true, true};
+    /* HW_UNCONFIGURED writability requires the discovery claimant
+     * specifically (REQ-LIFECYCLE-026/035) -- no root client can exist
+     * yet this early in bring-up. */
+    rcp_lifecycle_writer_ctx_t discovery = {false, false, false, true};
 
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_UNCONFIGURED,
-                                                  RCP_LIFECYCLE_FIELD_HW_GENERIC, root));
+                                                  RCP_LIFECYCLE_FIELD_HW_GENERIC, discovery));
     TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
                                                    RCP_LIFECYCLE_FIELD_HW_GENERIC, root));
     TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_RCP_CONFIGURED,
@@ -379,6 +383,25 @@ static void test_hw_configured_admits_gbb_pending_lifecycle_029(void)
 
 /* ── §12.7.4: discovery-stream write authority after RCP_CONFIGURED ────────── */
 
+/* As of the REQ-LIFECYCLE-037 fix: the real write-authorization gates
+ * (rcp_lifecycle_transition()'s RCP_CONFIGURED->HW_UNCONFIGURED demotion
+ * and rcp_lifecycle_field_writable()'s FUNCTIONAL_W RCP_CONFIGURED
+ * branch, the latter already correct before this fix) both now reject
+ * bare writer.via_discovery_stream once RCP_CONFIGURED, per §12.7.4's
+ * "Changes in configuration via a discovery request are no longer
+ * allowed... only allowed via configured stream_id/byte_bus_id
+ * combinations to the EP or via the root client." Still-honest residual,
+ * not itself a conformance gap: rcp_discovery_claim_note_config_write()
+ * (discovery.h) is a pure claim/timeout bookkeeping primitive that
+ * deliberately does not consult lifecycle state at all -- see that
+ * module's own file header, "this module deliberately does not itself
+ * decide whether a given register field is writable... a caller
+ * combines [its answer] with [rcp_lifecycle_field_writable()] as one
+ * more input". It keeps refreshing the claim's own Discovery_TimeOut
+ * regardless of lifecycle state, but that refreshed claim no longer
+ * translates into actual write authority once RCP_CONFIGURED, since the
+ * two real gates above now both close that door independently of
+ * whether the claim primitive itself still says "held". */
 static void test_discovery_write_authority_survives_rcp_configured(void)
 {
     rcp_discovery_claim_t claim;
@@ -388,6 +411,7 @@ static void test_discovery_write_authority_survives_rcp_configured(void)
     rcp_lifecycle_request_stream_plausibility_t rs[1] = {{true, true}};
     rcp_lifecycle_plausibility_snapshot_t snap;
     rcp_lifecycle_writer_ctx_t discovery = {false, false, false, true};
+    rcp_lifecycle_writer_ctx_t root      = {true, false, false, false};
 
     snap.endpoints            = eps;
     snap.endpoint_count       = 1u;
@@ -402,14 +426,24 @@ static void test_discovery_write_authority_survives_rcp_configured(void)
                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_RCP_CONFIGURED, &snap, discovery, true));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state);
 
-    /* TC18 §12.7.4: once RCP_CONFIGURED, a discovery request is still
-     * answered but may no longer change configuration. c-RCP's transition
-     * releases no claim, and rcp_discovery_claim_note_config_write() takes
-     * no lifecycle state, so the claimant's write authorization is still
-     * granted -- and refreshed for another Discovery_TimeOut -- in a state
-     * where only a configured stream or the root client may configure. */
+    /* The claim primitive itself still refreshes/confirms for the
+     * claimant, by design (it takes no lifecycle state -- see this
+     * test's own header comment). */
     TEST_ASSERT_TRUE(rcp_discovery_claim_note_config_write(&claim, a, 1010u));
     TEST_ASSERT_TRUE(rcp_discovery_claim_is_claimant(&claim, a, 1010u));
+
+    /* ...but neither real gate honors that claim once RCP_CONFIGURED:
+     * the demotion transition rejects a bare discovery writer... */
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_UNAUTHORIZED,
+                      rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, discovery, true));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state); /* unchanged */
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                      rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, root, true));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, state);
+
+    /* ...and FUNCTIONAL_W field writes reject it too. */
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_RCP_CONFIGURED,
+                                                   RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, discovery));
 }
 
 /* ── §12.3 / §12.4: cold start and StandBy retention ───────────────────────── */

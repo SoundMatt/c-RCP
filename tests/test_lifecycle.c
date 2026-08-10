@@ -271,18 +271,32 @@ static void test_transition_hw_configured_to_hw_unconfigured_is_unconditional_on
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, state);
 }
 
-static void test_transition_rcp_configured_to_hw_unconfigured_is_unconditional_once_authorized(void)
+/* REQ-LIFECYCLE-037 (TC18 §12.7.4): "Changes in configuration via a
+ * discovery request are no longer allowed" once RCP_CONFIGURED. Unlike
+ * the HW_CONFIGURED->HW_UNCONFIGURED reset (still HW_CONFIGURED at the
+ * time of the request, where the discovery stream remains a valid
+ * authorizer -- see the next test), a demotion FROM RCP_CONFIGURED
+ * requires writer.via_root_client_ep0 specifically; via_discovery_stream
+ * alone -- previously sufficient, the REQ-LIFECYCLE-037 gap this test
+ * used to pin -- is now rejected with RCP_LIFECYCLE_ERR_UNAUTHORIZED. */
+static void test_transition_rcp_configured_to_hw_unconfigured_requires_root_client(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_RCP_CONFIGURED;
-    rcp_lifecycle_writer_ctx_t stranger = {0};
+    rcp_lifecycle_writer_ctx_t stranger  = {0};
     rcp_lifecycle_writer_ctx_t discovery = {false, false, false, true};
+    rcp_lifecycle_writer_ctx_t root      = {true, false, false, false};
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_UNAUTHORIZED,
                        rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, stranger, true));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state); /* unchanged */
 
-    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_UNAUTHORIZED,
                        rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, discovery, true));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state); /* unchanged -- discovery stream no
+                                                                longer suffices once RCP_CONFIGURED */
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, root, true));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, state);
 }
 
@@ -395,13 +409,23 @@ static void test_rcp_configured_accepts_ntscf_at_any_byte_bus_id(void)
 
 /* ── Register-locking-by-state ─────────────────────────────────────────────── */
 
+/* As of the REQ-LIFECYCLE-026/035 fix: HW_GENERIC's HW_UNCONFIGURED
+ * writability now requires writer.via_discovery_stream (TC18
+ * §12.3.1.1/§12.7.2 -- "All configurations must be run via the stream
+ * which was used for discovery" / "only configuration via the discovery
+ * stream assigned due to a discovery request is feasible"). none (no
+ * discovery-stream bit set) is no longer writable there; only a writer
+ * that is the discovery claimant is. */
 static void test_hw_generic_writable_only_in_hw_unconfigured(void)
 {
-    rcp_lifecycle_writer_ctx_t none = {0};
-    rcp_lifecycle_writer_ctx_t root = { true, false };
+    rcp_lifecycle_writer_ctx_t none      = {0};
+    rcp_lifecycle_writer_ctx_t root      = { true, false };
+    rcp_lifecycle_writer_ctx_t discovery = { false, false, false, true };
 
-    TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(
         RCP_LIFECYCLE_HW_UNCONFIGURED, RCP_LIFECYCLE_FIELD_HW_GENERIC, none));
+    TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(
+        RCP_LIFECYCLE_HW_UNCONFIGURED, RCP_LIFECYCLE_FIELD_HW_GENERIC, discovery));
     TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(
         RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_HW_GENERIC, root));
     TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(
@@ -508,12 +532,16 @@ static void test_field_writable_denies_non_unicast_frame_regardless_of_kind_or_a
 static void test_field_write_error_distinguishes_state_from_writer_denial(void)
 {
     rcp_lifecycle_writer_ctx_t root           = { true, false, false, false };
+    rcp_lifecycle_writer_ctx_t discovery      = { false, false, false, true };
     rcp_lifecycle_writer_ctx_t stranger        = { false, false, false, false };
     rcp_lifecycle_writer_ctx_t root_multicast  = { true, false, true, false };
 
-    /* Writable: RCP_ERROR_NONE. */
+    /* Writable: RCP_ERROR_NONE. HW_GENERIC in HW_UNCONFIGURED requires
+     * writer.via_discovery_stream as of the REQ-LIFECYCLE-026/035 fix --
+     * root alone (no root client can exist yet this early in bring-up) no
+     * longer suffices here. */
     TEST_ASSERT_EQUAL(RCP_ERROR_NONE, rcp_lifecycle_field_write_error(
-        RCP_LIFECYCLE_HW_UNCONFIGURED, RCP_LIFECYCLE_FIELD_HW_GENERIC, root));
+        RCP_LIFECYCLE_HW_UNCONFIGURED, RCP_LIFECYCLE_FIELD_HW_GENERIC, discovery));
 
     /* State-only denial: even root can't write HW_GENERIC once past
      * HW_UNCONFIGURED -- LOCKED_MEM_ACCESS (Figure 16's
@@ -582,7 +610,7 @@ int main(void)
     RUN_TEST(test_transition_hw_configured_to_rcp_configured_fails_when_implausible);
     RUN_TEST(test_transition_hw_configured_to_rcp_configured_requires_authorization);
     RUN_TEST(test_transition_hw_configured_to_hw_unconfigured_is_unconditional_once_authorized);
-    RUN_TEST(test_transition_rcp_configured_to_hw_unconfigured_is_unconditional_once_authorized);
+    RUN_TEST(test_transition_rcp_configured_to_hw_unconfigured_requires_root_client);
     RUN_TEST(test_transition_rejects_skipping_hw_configured);
     RUN_TEST(test_transition_rejects_rcp_configured_to_hw_configured);
     RUN_TEST(test_transition_same_state_is_noop_success);

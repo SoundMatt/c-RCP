@@ -97,8 +97,12 @@ static const uint8_t CLIENT_A_MAC[6] = {0x02, 0x00, 0x00, 0x00, 0x00, 0xA1};
 static const uint8_t CLIENT_B_MAC[6] = {0x02, 0x00, 0x00, 0x00, 0x00, 0xB2};
 
 /* Writable/unauthorized writer contexts, reused throughout. */
-static const rcp_lifecycle_writer_ctx_t ROOT_WRITER  = {true, true};
-static const rcp_lifecycle_writer_ctx_t PLAIN_WRITER = {false, false};
+static const rcp_lifecycle_writer_ctx_t ROOT_WRITER      = {true, true};
+static const rcp_lifecycle_writer_ctx_t PLAIN_WRITER     = {false, false};
+/* The discovery claimant -- the only writer HW_GENERIC's HW_UNCONFIGURED
+ * branch admits as of the REQ-LIFECYCLE-026/035 fix (see lifecycle.c's
+ * own doc comment). */
+static const rcp_lifecycle_writer_ctx_t DISCOVERY_WRITER = {false, false, false, true};
 
 /* ── Helpers ───────────────────────────────────────────────────────────────── */
 
@@ -331,16 +335,19 @@ static void test_general_static_part_has_no_read_only_class(void)
     rcp_mock_server_t    *srv;
     rcp_regmap_general_t *map;
 
-    /* HW_GENERIC's HW_UNCONFIGURED writability takes no writer input at
-     * all, so PLAIN_WRITER still isolates the state-only property being
-     * tested here. FUNCTIONAL_W/_STAR's HW_CONFIGURED writability now
+    /* As of the REQ-LIFECYCLE-026/035 fix, HW_GENERIC's HW_UNCONFIGURED
+     * writability now requires writer.via_discovery_stream -- DISCOVERY_WRITER
+     * isolates the state-only property being tested here (any writer that
+     * IS the discovery claimant, not about the claim-consultation
+     * plumbing itself, which is a caller composition -- see
+     * discovery.h). FUNCTIONAL_W/_STAR's HW_CONFIGURED writability
      * requires authorization (REQ-LIFECYCLE-030/036) -- ROOT_WRITER
      * keeps these two assertions about "not read-only by state", not
      * about writer authorization, which test_functional_cfg_writable_
      * hw_configured_requires_authorization_or_discovery_stream()-style
      * tests elsewhere already cover directly. */
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_UNCONFIGURED,
-                                                  RCP_LIFECYCLE_FIELD_HW_GENERIC, PLAIN_WRITER));
+                                                  RCP_LIFECYCLE_FIELD_HW_GENERIC, DISCOVERY_WRITER));
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
                                                   RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, ROOT_WRITER));
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
@@ -664,9 +671,12 @@ static void test_hw_config_row_stride_absent_and_access_class_inverted(void)
     TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(entry.pin_property));
 
     /* Table 19's own access class, R/W* == HW_unconfigured-only, is what
-     * RCP_LIFECYCLE_FIELD_HW_GENERIC expresses: */
+     * RCP_LIFECYCLE_FIELD_HW_GENERIC expresses (DISCOVERY_WRITER, not
+     * ROOT_WRITER, since the REQ-LIFECYCLE-026/035 fix restricts
+     * HW_UNCONFIGURED writability to the discovery claimant -- no root
+     * client can exist yet this early in bring-up): */
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_UNCONFIGURED,
-                                                  RCP_LIFECYCLE_FIELD_HW_GENERIC, ROOT_WRITER));
+                                                  RCP_LIFECYCLE_FIELD_HW_GENERIC, DISCOVERY_WRITER));
     TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
                                                    RCP_LIFECYCLE_FIELD_HW_GENERIC, ROOT_WRITER));
 
@@ -1166,9 +1176,12 @@ static void test_field_write_error_distinguishes_state_from_writer_denial(void)
     TEST_ASSERT_EQUAL(RCP_ERROR_UNAUTHORIZED_ACCESS, rcp_lifecycle_field_write_error(
         RCP_LIFECYCLE_RCP_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, PLAIN_WRITER));
 
-    /* An actually-writable case: RCP_ERROR_NONE. */
+    /* An actually-writable case: RCP_ERROR_NONE. HW_GENERIC's HW_UNCONFIGURED
+     * writability requires the discovery claimant specifically
+     * (REQ-LIFECYCLE-026/035) -- DISCOVERY_WRITER, not ROOT_WRITER (no
+     * root client can exist yet this early in bring-up). */
     TEST_ASSERT_EQUAL(RCP_ERROR_NONE, rcp_lifecycle_field_write_error(
-        RCP_LIFECYCLE_HW_UNCONFIGURED, RCP_LIFECYCLE_FIELD_HW_GENERIC, ROOT_WRITER));
+        RCP_LIFECYCLE_HW_UNCONFIGURED, RCP_LIFECYCLE_FIELD_HW_GENERIC, DISCOVERY_WRITER));
 
     TEST_ASSERT_EQUAL_INT(3, (int)RCP_ERROR_UNAUTHORIZED_ACCESS);
     TEST_ASSERT_EQUAL_INT(4, (int)RCP_ERROR_LOCKED_MEM_ACCESS);

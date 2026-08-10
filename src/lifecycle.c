@@ -75,6 +75,7 @@ rcp_lifecycle_errc_t rcp_lifecycle_check_rcp_cfg(const rcp_lifecycle_plausibilit
 //cfusa:req REQ-LIFECYCLE-013
 //cfusa:req REQ-LIFECYCLE-022
 //cfusa:req REQ-LIFECYCLE-031
+//cfusa:req REQ-LIFECYCLE-037
 rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
                                                rcp_lifecycle_state_t target,
                                                const rcp_lifecycle_plausibility_snapshot_t *snap,
@@ -126,11 +127,28 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
      * authorized and idle; snap is not consulted for a reset.
      * REQ-LIFECYCLE-022: TC18 Figure 16 -- "Root Client access via EP0 to
      * set state to HW_UNCONFIGURED & other EPs are not Idle -> send error
-     * response EPs_NOT_IDLE" -- gates exactly this transition. */
-    if (target == RCP_LIFECYCLE_HW_UNCONFIGURED &&
-        (from == RCP_LIFECYCLE_HW_CONFIGURED ||
-         from == RCP_LIFECYCLE_RCP_CONFIGURED)) {
+     * response EPs_NOT_IDLE" -- gates exactly this transition.
+     *
+     * REQ-LIFECYCLE-037 (TC18 §12.7.4): "Changes in configuration via a
+     * discovery request are no longer allowed" once RCP_CONFIGURED --
+     * unlike the HW_CONFIGURED->RCP_CONFIGURED advance above (still
+     * HW_CONFIGURED at the time of that request, where §12.7.3 explicitly
+     * permits the discovery stream), a demotion FROM RCP_CONFIGURED is a
+     * configuration change made while already RCP_CONFIGURED, so
+     * writer.via_discovery_stream alone no longer suffices there -- only
+     * writer.via_root_client_ep0 does, matching §12.7.4's own "...or via
+     * the root client" exception. The from==HW_CONFIGURED demotion keeps
+     * the wider authorized (discovery-stream-or-root-client) rule, since
+     * that reset happens while still HW_CONFIGURED. */
+    if (target == RCP_LIFECYCLE_HW_UNCONFIGURED && from == RCP_LIFECYCLE_HW_CONFIGURED) {
         if (!authorized) return RCP_LIFECYCLE_ERR_UNAUTHORIZED;
+        if (!all_other_eps_idle) return RCP_LIFECYCLE_ERR_EPS_NOT_IDLE;
+        *state = target;
+        return RCP_LIFECYCLE_OK;
+    }
+
+    if (target == RCP_LIFECYCLE_HW_UNCONFIGURED && from == RCP_LIFECYCLE_RCP_CONFIGURED) {
+        if (!writer.via_root_client_ep0) return RCP_LIFECYCLE_ERR_UNAUTHORIZED;
         if (!all_other_eps_idle) return RCP_LIFECYCLE_ERR_EPS_NOT_IDLE;
         *state = target;
         return RCP_LIFECYCLE_OK;
@@ -242,6 +260,8 @@ bool rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
 //cfusa:req REQ-LIFECYCLE-018
 //cfusa:req REQ-LIFECYCLE-019
 //cfusa:req REQ-LIFECYCLE-020
+//cfusa:req REQ-LIFECYCLE-026
+//cfusa:req REQ-LIFECYCLE-035
 bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
                                    rcp_lifecycle_field_kind_t kind,
                                    rcp_lifecycle_writer_ctx_t writer)
@@ -258,9 +278,19 @@ bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
 
     switch (kind) {
     case RCP_LIFECYCLE_FIELD_HW_GENERIC:
-        /* Read-only the moment the server leaves HW_UNCONFIGURED, for any
-         * writer. */
-        writable = (state == RCP_LIFECYCLE_HW_UNCONFIGURED);
+        /* TC18 §12.3.1.1/§12.7.2 (REQ-LIFECYCLE-026/035): "All
+         * configurations must be run via the stream which was used for
+         * discovery" -- while HW_UNCONFIGURED, HW_GENERIC is writable only
+         * via the discovery-claimant stream, not by any writer as this
+         * branch previously read. No root client or owning stream can
+         * exist yet this early in bring-up (see
+         * rcp_lifecycle_transition()'s own HW_UNCONFIGURED -> HW_CONFIGURED
+         * doc comment), so via_discovery_stream is the only authorizing
+         * condition available here -- a caller derives it from
+         * discovery.h's rcp_discovery_claim_is_claimant(), the same
+         * composition that module's own file header documents. Read-only
+         * the moment the server leaves HW_UNCONFIGURED, for any writer. */
+        writable = (state == RCP_LIFECYCLE_HW_UNCONFIGURED) && writer.via_discovery_stream;
         break;
 
     case RCP_LIFECYCLE_FIELD_FUNCTIONAL_W:
