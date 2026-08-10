@@ -53,14 +53,15 @@
  * mock.c's rcp_mock_server_set_sequencer_count() is the one caller that
  * keeps it synced with the table below) is the count of
  * sequencers rcp_sequencer_table_new() below is expected to be called
- * with. regmap.h's rcp_regmap_general_t.sequencer_state
- * (rcp_regmap_table_ref_t) is the register map's own wire-facing
- * pointer/capacity pair for exposing this same table over EP0; wiring an
- * actual byte_message_info read/write exchange to it is out of this
- * milestone's scope (regmap.h's own file header already documents that
- * exact deferral for every sub-table it declares) -- this header's table
- * type is this module's in-memory model only, deliberately independent of
- * that wire representation.
+ * with. regmap.h's rcp_regmap_general_t.svr_sequencer_state_ptr
+ * (REQ-RMAP-038, a bare pointer -- TC18 defines no adjacent capacity
+ * register for this one, unlike most other Group 1 sub-table refs) is
+ * the register map's own wire-facing address for exposing this same
+ * table over EP0; wiring an actual byte_message_info read/write
+ * exchange to it is out of this milestone's scope (regmap.h's own file
+ * header already documents that exact deferral for every sub-table it
+ * declares) -- this header's table type is this module's in-memory
+ * model only, deliberately independent of that wire representation.
  *
  * ── Power-on default and the "0 sequencers" sentinel ────────────────────────
  *

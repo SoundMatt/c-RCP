@@ -114,7 +114,6 @@ static const rcp_lifecycle_writer_ctx_t DISCOVERY_WRITER = {false, false, false,
 static rcp_regmap_general_t populated_map(void)
 {
     rcp_regmap_general_t map;
-    rcp_regmap_table_ref_t ref;
 
     rcp_regmap_general_init(&map);
     map.magic                     = 0xC0FFEE01u;
@@ -138,11 +137,9 @@ static rcp_regmap_general_t populated_map(void)
     map.svr_ep_generic_cfg_capacity      = 0x0140u; /* bytes, not entries */
     map.svr_ep_bytebus_id_map_ptr        = 0x00B0u;
     map.svr_ep_bytebus_id_map_capacity   = 0x10u; /* entries */
+    map.svr_ep_functional_cfg_ptr        = 0x00C0u;
+    map.svr_sequencer_state_ptr          = 0x00D0u;
 
-    ref.offset = 0x00000040u;
-    ref.capacity = 0x0008u;
-    map.ep_functional_cfg = ref;
-    map.sequencer_state = ref;
     return map;
 }
 
@@ -863,23 +860,40 @@ static void test_ep_bytebus_id_map_ptr_and_capacity_are_now_correctly_shaped(voi
     TEST_ASSERT_TRUE(span_is_zero(buf, 0x28, 0x2A));
 }
 
-/* TC18 §12.7.5 Table 18: svr_ep_functional_cfg_ptr (16 bit, 0x002C)
- * and svr_sequencer_state_ptr (16 bit, 0x002E) -- both lone pointers,
- * TC18 defines no adjacent capacity register for either (REQ-RMAP-038,
- * still open, not addressed by this batch) -- verified directly
+/* REQ-RMAP-038 (TC18 §12.7.5 Table 18): svr_ep_functional_cfg_ptr (16
+ * bit, 0x002C) points to the EP_FUNC_config register map (§13.7.1.2
+ * Server); svr_sequencer_state_ptr (16 bit, 0x002E) points to the
+ * Sequencer_config register map (§12.7.10) -- both LONE pointers, TC18
+ * defines no adjacent capacity register for either, verified directly
  * against the primary-source PDF (Table 18, page 52) during
- * REQ-RMAP-036's own batch. Deviation: both collapse into two
- * identically shaped rcp_regmap_table_ref_t members with a 32-bit
- * word-unit offset and a spurious capacity member, neither bound to
- * an address -- the same class of shape mismatch REQ-RMAP-033 already
- * fixed for svr_hw_cfg_ptr. */
-static void test_functional_cfg_and_sequencer_state_ptrs_are_mis_shaped(void)
+ * REQ-RMAP-036's own batch. rcp_regmap_general_t now declares both as
+ * bare, correctly-sized scalar fields, replacing the former ep_
+ * functional_cfg/sequencer_state fields (rcp_regmap_table_ref_t,
+ * the shared pointer/capacity type -- now unused by any field in this
+ * struct, since every one of the seven original sub-table refs has
+ * been retyped across REQ-RMAP-033/-034/-036/-037/-038) whose spurious
+ * capacity members had no TC18 basis for either register -- the same
+ * class of fix REQ-RMAP-033 already established for svr_hw_cfg_ptr.
+ * Still open: this codebase has no real EP_FUNC_config or Sequencer_
+ * config table storage anywhere yet for either pointer to meaningfully
+ * address, and the same REQ-RMAP-024 wire-reachability boundary as
+ * every other Group 1 item applies. */
+static void test_functional_cfg_and_sequencer_state_ptrs_are_now_correctly_shaped(void)
 {
-    rcp_regmap_general_t map = populated_map();
+    rcp_regmap_general_t map;
     uint8_t              buf[0x30];
 
-    TEST_ASSERT_EQUAL_UINT(sizeof(rcp_regmap_table_ref_t), sizeof(map.ep_functional_cfg));
-    TEST_ASSERT_EQUAL_UINT(sizeof(rcp_regmap_table_ref_t), sizeof(map.sequencer_state));
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_ep_functional_cfg_ptr));
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_sequencer_state_ptr));
+
+    rcp_regmap_general_init(&map);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_ep_functional_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_sequencer_state_ptr);
+
+    map.svr_ep_functional_cfg_ptr = 0x00C0u;
+    map.svr_sequencer_state_ptr   = 0x00D0u;
+    TEST_ASSERT_EQUAL_UINT16(0x00C0u, map.svr_ep_functional_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0x00D0u, map.svr_sequencer_state_ptr);
 
     read_general(&map, (uint8_t)sizeof(buf), buf);
     TEST_ASSERT_TRUE(span_is_zero(buf, 0x2C, 0x2F));
@@ -889,15 +903,18 @@ static void test_functional_cfg_and_sequencer_state_ptrs_are_mis_shaped(void)
  * further pointer/capacity register pairs -- network interface, physical
  * layer, time synch, security -- where a zero pointer is the defined
  * encoding for "subsystem not supported" and a section spans pointer..
- * pointer+capacity. Deviation: rcp_regmap_general_t declares exactly
- * two rcp_regmap_table_ref_t sub-table refs (svr_hw_cfg_ptr,
- * REQ-RMAP-033; the stream-config quartet, REQ-RMAP-034;
- * svr_ep_generic_cfg_ptr/_capacity, REQ-RMAP-036; and svr_ep_bytebus_
- * id_map_ptr/_capacity, REQ-RMAP-037, are now their own distinct
- * scalar fields rather than table refs -- see each one's own comment
- * for why) and none of these four missing pairs, so a capacity of 0
- * ("section empty") cannot be told from "unadvertised". Pinned by
- * rcp_regmap_general_init() zeroing exactly the fields that exist. */
+ * pointer+capacity. Deviation: rcp_regmap_general_t declares none of
+ * these four pairs, so a capacity of 0 ("section empty") cannot be
+ * told from "unadvertised". Every one of the general map's original
+ * seven rcp_regmap_table_ref_t sub-table refs has by now been retyped
+ * to its own distinct scalar field(s) (svr_hw_cfg_ptr, REQ-RMAP-033;
+ * the stream-config quartet, REQ-RMAP-034; svr_ep_generic_cfg_ptr/
+ * _capacity, REQ-RMAP-036; svr_ep_bytebus_id_map_ptr/_capacity,
+ * REQ-RMAP-037; svr_ep_functional_cfg_ptr and svr_sequencer_state_ptr,
+ * REQ-RMAP-038 -- see each one's own comment for why), so
+ * rcp_regmap_table_ref_t itself is no longer used by any field in this
+ * struct at all. Pinned by rcp_regmap_general_init() zeroing exactly
+ * the fields that exist. */
 static void test_four_optional_subsystem_pointer_pairs_are_absent(void)
 {
     rcp_regmap_general_t map;
@@ -914,10 +931,8 @@ static void test_four_optional_subsystem_pointer_pairs_are_absent(void)
     TEST_ASSERT_EQUAL_HEX16(0u, map.svr_ep_generic_cfg_capacity);
     TEST_ASSERT_EQUAL_HEX16(0u, map.svr_ep_bytebus_id_map_ptr);
     TEST_ASSERT_EQUAL_HEX8(0u, map.svr_ep_bytebus_id_map_capacity);
-    TEST_ASSERT_EQUAL_HEX32(0u, map.ep_functional_cfg.offset);
-    TEST_ASSERT_EQUAL_HEX16(0u, map.ep_functional_cfg.capacity);
-    TEST_ASSERT_EQUAL_HEX32(0u, map.sequencer_state.offset);
-    TEST_ASSERT_EQUAL_HEX16(0u, map.sequencer_state.capacity);
+    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_ep_functional_cfg_ptr);
+    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_sequencer_state_ptr);
     TEST_ASSERT_EQUAL_HEX16(RCP_REGMAP_NO_ROOT_CLIENT, map.svr_root_client_index);
 }
 
@@ -1703,7 +1718,7 @@ int main(void)
     RUN_TEST(test_stream_cfg_registers_are_now_correctly_sized);
     RUN_TEST(test_ep_generic_cfg_ptr_and_capacity_are_now_correctly_shaped);
     RUN_TEST(test_ep_bytebus_id_map_ptr_and_capacity_are_now_correctly_shaped);
-    RUN_TEST(test_functional_cfg_and_sequencer_state_ptrs_are_mis_shaped);
+    RUN_TEST(test_functional_cfg_and_sequencer_state_ptrs_are_now_correctly_shaped);
     RUN_TEST(test_four_optional_subsystem_pointer_pairs_are_absent);
     RUN_TEST(test_hw_config_table_has_no_server_side_storage);
     RUN_TEST(test_hw_config_row_stride_absent_and_access_class_inverted);

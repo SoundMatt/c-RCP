@@ -8962,14 +8962,14 @@
     },
     {
       "id": "REQ-RMAP-038",
-      "title": "svr_ep_functional_cfg_ptr (0x002C) and svr_sequencer_state_ptr (0x002E) are 32-bit word offsets with no addresses",
-      "text": "NOT IMPLEMENTED (partial): TC18 \u00a712.7.5 Table 18 defines svr_ep_functional_cfg_ptr as a 16-bit read-only pointer at absolute address 0x002C to the EP_FUNC_config register map, and svr_sequencer_state_ptr as a 16-bit read-only pointer at 0x002E to the sequencer state registers (\u00a712.7.10). c-RCP represents both as rcp_regmap_table_ref_t members (include/rcp/regmap.h:219,221) carrying a 32-bit offset in this implementation's own register-word units plus a capacity member the specification does not define for either pointer, none of it bound to an address or encoded on the wire. Consequence: a client cannot locate the endpoint functional-configuration section \u2014 the section \u00a712.7.1's configuration request exists to write \u2014 nor the sequencer state registers.",
+      "title": "svr_ep_functional_cfg_ptr/svr_sequencer_state_ptr are now correctly sized and separately addressed",
+      "text": "PARTIAL: TC18 \u00a712.7.5 Table 18 defines svr_ep_functional_cfg_ptr as a 16-bit read-only pointer at absolute address 0x002C to the EP_FUNC_config register map, and svr_sequencer_state_ptr as a 16-bit read-only pointer at 0x002E to the sequencer state registers (\u00a712.7.10) -- both lone pointers, with no adjacent capacity register defined for either (re-verified directly against the primary-source PDF, Table 18 page 52, during REQ-RMAP-036's own batch). rcp_regmap_general_t now declares both as bare, correctly-sized scalar fields, replacing the former ep_functional_cfg/sequencer_state fields (rcp_regmap_table_ref_t, the shared pointer/capacity type -- now unused by any field in this struct, since every one of the seven original sub-table refs has been retyped across REQ-RMAP-033/-034/-036/-037/-038) whose 32-bit offset and spurious capacity member had no TC18 basis for either register -- the same class of fix REQ-RMAP-033 already established for svr_hw_cfg_ptr. What remains open: this codebase has no real EP_FUNC_config or Sequencer_config table storage anywhere yet for either pointer to meaningfully address, and this address range (0x002C-0x002F) falls past the discovery response's own 0x000D wire-reachability ceiling (REQ-RMAP-024, still open), so a client still cannot read these registers over the wire.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "\u00a712.7.5 Table 18, TC18.txt L2610-2615"
+      "tc18": "\u00a712.7.5 Table 18, TC18.txt L2610-2615 -- primary-source-verified against OA_TC18_specification_v_0.5.1_RC.pdf Table 18, page 52"
     },
     {
       "id": "REQ-RMAP-039",
