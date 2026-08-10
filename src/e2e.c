@@ -145,6 +145,13 @@ size_t rcp_e2e_length_with_crc(size_t payload_len)
     return payload_len + RCP_E2E_CRC_LEN;
 }
 
+//cfusa:req REQ-E2E-037
+size_t rcp_e2e_data_length_for_protected_members(size_t protected_member_count)
+{
+    if (protected_member_count > (size_t)-1 / RCP_E2E_CRC_LEN) return (size_t)-1;
+    return protected_member_count * RCP_E2E_CRC_LEN;
+}
+
 /* ── wrap / unwrap ─────────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-E2E-005

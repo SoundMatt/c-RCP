@@ -7393,3 +7393,47 @@ errors) + `cfusa trace --req-coverage 100 --sec-tested 100`
 (100%/100%). 1028 requirements (unchanged count), 143 `tc18-gap`
 entries remaining (was 146 -- three genuinely closed this batch, the
 first net decrease since Phase 5a began).
+
+### 151. Phase 5a batch 6: REQ-E2E-037 AVTPDU data-length adjustment helper (issue #197)
+
+TC18 §13.6 requires an AVTPDU's `ntscf_data_length`/`stream_data_length`
+field to grow by 4 octets for every E2E-protected ACF message its
+payload carries. Unlike every other item closed in Phase 5a so far,
+this one turned out not to be a behavioral defect at all:
+`rcp_avtp_encode_ntscf()`/`_encode_tscf()` already recompute the length
+field from the actual payload buffer they're given, never from a
+caller-supplied value (proven by the existing test, which deliberately
+passes a bogus `hdr.ntscf_data_length` and confirms the encoder ignores
+it) -- so the +4-per-protected-member accounting was already correct
+by construction whenever a caller concatenated `rcp_e2e_wrap()`'s own
+output per protected member first. What was actually missing, per the
+requirement's own text, was purely that "no function expresses the
+adjustment" -- the rule had no named, callable, testable form of its
+own.
+
+Adds `rcp_e2e_data_length_for_protected_members(size_t
+protected_member_count)` to `e2e.h`/`e2e.c`, right alongside
+`rcp_e2e_length_with_crc()` (the existing precedent for "a pure
+arithmetic expression of a length-accounting rule, for a caller that
+wants to reason about or pre-validate it independently of actually
+building the payload"): `protected_member_count * RCP_E2E_CRC_LEN`,
+saturating at `SIZE_MAX` on overflow rather than wrapping, same
+discipline as its neighbor.
+
+`tests/test_tc18_gaps_e2e.c`'s `REQ-E2E-037` test is updated to assert
+against the new named function instead of a bare `2u *
+RCP_E2E_CRC_LEN` literal, plus a new direct test of the function itself
+(zero members, one member, five members, and the overflow-saturation
+case).
+
+`.fusa-reqs.json`'s `REQ-E2E-037` moves `scope: "tc18-gap"`/`status:
+"partial"` -> `scope: "tc18"` (fully implemented, no `status` field).
+
+Mutation-tested: reverting the fix (`git stash` on `src/e2e.c`,
+`include/rcp/e2e.h`) fails the test file's *build* (`call to
+undeclared function 'rcp_e2e_data_length_for_protected_members'`) --
+restoring the fix rebuilds and passes clean again. Full test suite
+(64/64) + ASan/UBSan build both clean. Fresh `cfusa check` (0 errors) +
+`cfusa trace --req-coverage 100 --sec-tested 100` (100%/100%). 1028
+requirements (unchanged count), 142 `tc18-gap` entries remaining (was
+143).
