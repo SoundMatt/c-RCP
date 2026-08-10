@@ -251,17 +251,21 @@ typedef struct {
  *     (see below), then by rcp_lifecycle_check_rcp_cfg(); a plausibility
  *     failure returns RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT. NOT
  *     idle-gated -- see idleness paragraph below.
- *   - HW_CONFIGURED -> HW_UNCONFIGURED and RCP_CONFIGURED ->
- *     HW_UNCONFIGURED: the discovery-stream/root-client reset path,
- *     guarded by the same writer authorization as the advance above and
- *     by idleness (see below); snap is ignored for these two once
- *     authorized and idle.
+ *   - HW_CONFIGURED -> HW_UNCONFIGURED: the discovery-stream/root-client
+ *     reset path, guarded by the same writer authorization as the advance
+ *     above and by idleness (see below); snap is ignored once authorized
+ *     and idle.
+ *   - RCP_CONFIGURED -> HW_UNCONFIGURED: the same reset path, but from
+ *     RCP_CONFIGURED specifically -- guarded by writer.via_root_client_ep0
+ *     ALONE (REQ-LIFECYCLE-037, TC18 §12.7.4) and by idleness; snap is
+ *     ignored once authorized and idle. See the writer-authorization
+ *     paragraph below for why this differs from the HW_CONFIGURED case.
  *   - state -> the same state: always a no-op success; writer, snap and
  *     all_other_eps_idle are all ignored.
  *
- * Writer authorization (REQ-LIFECYCLE-031, TC18 §12.3.1.2): both the
- * HW_CONFIGURED -> RCP_CONFIGURED advance and either reset-to-
- * HW_UNCONFIGURED transition require writer.via_discovery_stream or
+ * Writer authorization (REQ-LIFECYCLE-031, TC18 §12.3.1.2): the
+ * HW_CONFIGURED -> RCP_CONFIGURED advance and the HW_CONFIGURED ->
+ * HW_UNCONFIGURED reset both require writer.via_discovery_stream or
  * writer.via_root_client_ep0 -- an unauthorized writer's request is
  * rejected with RCP_LIFECYCLE_ERR_UNAUTHORIZED, *state left unchanged,
  * before either transition's own plausibility guard runs. TC18's exact
@@ -277,6 +281,16 @@ typedef struct {
  * requires via_root_client_ep0 in both cases until that classification
  * exists, rather than accepting an unqualified stream this library
  * cannot actually validate.
+ *
+ * The RCP_CONFIGURED -> HW_UNCONFIGURED reset is narrower still
+ * (REQ-LIFECYCLE-037, TC18 §12.7.4): "Changes in configuration via a
+ * discovery request are no longer allowed" once RCP_CONFIGURED, so
+ * writer.via_discovery_stream alone -- sufficient for the
+ * HW_CONFIGURED -> HW_UNCONFIGURED reset above, and for the
+ * HW_CONFIGURED -> RCP_CONFIGURED advance (still HW_CONFIGURED at the
+ * time of THAT request, where §12.7.3 explicitly permits the discovery
+ * stream) -- no longer suffices once already RCP_CONFIGURED. Only
+ * writer.via_root_client_ep0 authorizes this specific reset.
  *
  * Idleness (REQ-LIFECYCLE-022, TC18 Figure 16): the HW_UNCONFIGURED ->
  * HW_CONFIGURED advance and either reset-to-HW_UNCONFIGURED transition
@@ -388,8 +402,13 @@ typedef enum {
 /* True iff a field of the given kind is writable while the server is in
  * state, by the given writer:
  *
- *   - RCP_LIFECYCLE_FIELD_HW_GENERIC: writable only in HW_UNCONFIGURED --
- *     read-only from the moment the server reaches HW_CONFIGURED, for any
+ *   - RCP_LIFECYCLE_FIELD_HW_GENERIC: writable only in HW_UNCONFIGURED, and
+ *     only when writer indicates the discovery stream (TC18
+ *     §12.3.1.1/§12.7.2 -- "All configurations must be run via the stream
+ *     which was used for discovery"; REQ-LIFECYCLE-026/035) -- no root
+ *     client or owning stream can exist yet this early in bring-up, so
+ *     via_discovery_stream is the only authorizing condition available.
+ *     Read-only from the moment the server reaches HW_CONFIGURED, for any
  *     writer.
  *   - RCP_LIFECYCLE_FIELD_FUNCTIONAL_W: not writable in HW_UNCONFIGURED
  *     (functional configuration presupposes a hardware mapping); while
@@ -397,10 +416,11 @@ typedef enum {
  *     via EP0, the endpoint's own owning stream, or the discovery stream
  *     (TC18 §12.3.1.2/§12.7.3 -- REQ-LIFECYCLE-030/036); once
  *     RCP_CONFIGURED, writable only when writer indicates the endpoint's
- *     own stream or the root client via EP0 (the discovery stream no
- *     longer suffices on its own at this state -- a distinct, still-open
- *     concern tracked separately, see test_tc18_gaps_server.c's own
- *     §12.7.4 deviation pin).
+ *     own stream or the root client via EP0 -- the discovery stream no
+ *     longer suffices on its own at this state (TC18 §12.7.4;
+ *     REQ-LIFECYCLE-037 closes the matching gap in
+ *     rcp_lifecycle_transition()'s own reset-to-HW_UNCONFIGURED path,
+ *     see that function's own header doc comment).
  *   - RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR: writable unconditionally
  *     while HW_UNCONFIGURED; the same root-client/owning-stream/
  *     discovery-stream authorization as FUNCTIONAL_W above while
