@@ -298,7 +298,32 @@ typedef struct {
                                             acknowledge traffic. Same
                                             content-modeling-only scope
                                             as svr_req_stream_max above. */
-    uint16_t svr_max_sequencers;
+    uint8_t  svr_sequencers_max; /* REQ-RMAP-028 (TC18 §12.7.5 Table 18,
+                                     relative address 0x0014, 8 bit, R):
+                                     0 means "sequencer operation not
+                                     supported"; 1..n gives the number of
+                                     available sequencer state registers.
+                                     Renamed from this field's own former
+                                     name (svr_max_sequencers) and
+                                     retyped to match TC18's own register
+                                     name and width, same as
+                                     svr_req_stream_max (REQ-RMAP-026).
+                                     mock.c's rcp_mock_server_set_
+                                     sequencer_count() keeps this synced
+                                     with the actual
+                                     rcp_sequencer_table_t.count it
+                                     allocates -- request_sequencer.h's
+                                     own rcp_sequencer_table_unsupported()
+                                     (table->count == 0) already
+                                     implements the "0 means unsupported"
+                                     rule this register describes; once
+                                     synced, this field correctly
+                                     reflects that same rule by
+                                     construction, not by a second,
+                                     separate check. Content modeling
+                                     only, same REQ-RMAP-024 wire-
+                                     reachability boundary as every other
+                                     Group 1 item. */
     uint16_t svr_responder_mem_size; /* REQ-RMAP-027 (TC18 §12.7.5 Table
                                          18, relative address 0x0010, 16
                                          bit, R): maximum responder-queue

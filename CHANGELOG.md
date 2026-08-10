@@ -32,6 +32,35 @@ the rationale.
 
 ## Releases
 
+### v0.181.0 -- 2026-08-10
+
+**Phase 5d batch 11: REQ-RMAP-028 -- svr_sequencers_max corrected
+width, synced from the real sequencer table.** Issue #200. Third
+Group 1 batch to touch an existing field, but the first with a real,
+already-wired `src/*.c` consumer. Renamed+retyped
+`svr_max_sequencers` (`uint16_t`) -> `svr_sequencers_max` (`uint8_t`),
+matching TC18's own register name and width. `mock.c`'s
+`rcp_mock_server_set_sequencer_count()` -- the concrete, already-
+existing composition point request_sequencer.h's own file header had
+already named -- gains a sync step keeping the register equal to the
+table's actual post-call count (not the caller's raw request, which
+may exceed what allocation actually produced), capped at `0xFF` rather
+than truncated/wrapped. Key design insight: `request_sequencer.h`
+already has `rcp_sequencer_table_unsupported()` implementing TC18's
+exact "0 means not supported" rule against the table's own count --
+once the register is kept synced with that same count, it reflects
+the rule by construction, with zero new predicate needed. Rewrote the
+deviation pin into a positive test proving the sync through a real
+`rcp_mock_server_t`; found and fixed a second, unrelated pin
+referencing the old field name. Mutation-tested two ways (sync-line
+removal fails the new test; full header revert with tests kept breaks
+the build -- for the first time in Group 1, inside `src/mock.c`
+itself, confirming a real consumer depends on it). Full suite (65/65)
++ ASan/UBSan clean. Fresh `cfusa check`/`trace` (0 errors, 100%/100%,
+three separate CI-matching invocations). See `ROADMAP.md` milestone
+181 for full detail. 1030 requirements (unchanged), 110 `tc18-gap`
+entries remaining (unchanged).
+
 ### v0.180.0 -- 2026-08-10
 
 **Phase 5d batch 10: REQ-RMAP-027 -- svr_responder_mem_size/

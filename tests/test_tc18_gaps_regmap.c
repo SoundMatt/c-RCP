@@ -82,6 +82,7 @@
 #include <rcp/discovery.h>
 #include <rcp/config.h>
 #include <rcp/mock.h>
+#include <rcp/request_sequencer.h>
 #include <rcp/ep_gpio.h>
 #include <rcp/ep_pwm.h>
 #include <rcp/e2e.h>
@@ -123,7 +124,7 @@ static rcp_regmap_general_t populated_map(void)
     map.svr_ep_count              = 0x0009u;
     map.svr_req_stream_max        = 0xABu;
     map.svr_responder_streams_max = 0xCDu;
-    map.svr_max_sequencers        = 0x0007u;
+    map.svr_sequencers_max        = 0x07u;
     map.svr_responder_mem_size    = 0x1122u;
     map.svr_req_mem_size          = 0x3344u;
     map.svr_implemented_options   = 0x0000003Fu;
@@ -483,25 +484,49 @@ static void test_responder_and_req_mem_size_are_now_distinctly_addressed(void)
     TEST_ASSERT_EQUAL_HEX16(0u, map.svr_req_mem_size);
 }
 
-/* TC18 §12.7.5 Table 18: svr_sequencers_max is an 8-bit R register at
- * 0x0014 whose value 0 means "sequencer operation not supported".
- * Deviation: the field is 16 bit, unaddressed and unreadable, and no
- * predicate anywhere treats 0 as unsupported -- pinned here by showing
- * that a map advertising 7 sequencers reads back as zeros at 0x0014, so a
- * client cannot distinguish 7 from "unsupported". */
-static void test_sequencers_max_width_and_zero_encoding_unenforced(void)
+/* REQ-RMAP-028 (TC18 §12.7.5 Table 18): svr_sequencers_max is an 8-bit R
+ * register at 0x0014 whose value 0 means "sequencer operation not
+ * supported"; 1..n gives the number of available sequencer state
+ * registers. rcp_regmap_general_t now carries this field at the correct
+ * width, and mock.c's rcp_mock_server_set_sequencer_count() keeps it
+ * synced with the actual rcp_sequencer_table_t.count it allocates --
+ * request_sequencer.h's own rcp_sequencer_table_unsupported()
+ * (table->count == 0) already implements the "0 means unsupported"
+ * rule this register describes, so once synced, the register correctly
+ * reflects that same rule by construction. Still open (REQ-RMAP-024,
+ * same as every other Group 1 item): the address falls past the
+ * discovery slice's 0x000D ceiling, already covered generically by
+ * test_general_map_wire_reach_stops_after_0x000d(). */
+static void test_sequencers_max_is_now_correctly_sized_and_synced_from_the_table(void)
 {
-    rcp_regmap_general_t map = populated_map();
-    uint8_t              buf[0x16];
+    rcp_mock_server_t *srv;
 
-    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_max_sequencers));
-    TEST_ASSERT_EQUAL_UINT16(0x0007u, map.svr_max_sequencers);
-    read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x14, 0x14));
+    TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(((rcp_regmap_general_t *)0)->svr_sequencers_max));
 
-    map.svr_max_sequencers = 0u; /* TC18: "sequencer operation not supported" */
-    read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x14, 0x14)); /* indistinguishable */
+    srv = rcp_mock_server_new();
+    TEST_ASSERT_NOT_NULL(srv);
+
+    /* A freshly-constructed server has no sequencers: the register
+     * already reads 0 ("not supported"), matching
+     * rcp_sequencer_table_unsupported()'s own verdict on the table it
+     * was never given a count for. */
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_mock_server_regmap(srv)->svr_sequencers_max);
+    TEST_ASSERT_TRUE(rcp_sequencer_table_unsupported(rcp_mock_server_sequencers(srv)));
+
+    /* Setting a nonzero count updates both the table and the register in
+     * lockstep. */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_sequencer_count(srv, 7u));
+    TEST_ASSERT_EQUAL_UINT8(7u, rcp_mock_server_regmap(srv)->svr_sequencers_max);
+    TEST_ASSERT_FALSE(rcp_sequencer_table_unsupported(rcp_mock_server_sequencers(srv)));
+
+    /* Setting the count back to 0 re-establishes "not supported" in both
+     * places -- the exact deviation the old pin demonstrated (7 and
+     * "unsupported" being indistinguishable) is now impossible. */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_sequencer_count(srv, 0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_mock_server_regmap(srv)->svr_sequencers_max);
+    TEST_ASSERT_TRUE(rcp_sequencer_table_unsupported(rcp_mock_server_sequencers(srv)));
+
+    rcp_mock_server_destroy(srv);
 }
 
 /* TC18 §12.7.5 Table 18: svr_configuration_lock is an 8-bit R register at
@@ -1467,7 +1492,7 @@ int main(void)
     RUN_TEST(test_general_static_part_has_no_read_only_class);
     RUN_TEST(test_req_stream_max_and_responder_streams_max_are_now_correctly_sized);
     RUN_TEST(test_responder_and_req_mem_size_are_now_distinctly_addressed);
-    RUN_TEST(test_sequencers_max_width_and_zero_encoding_unenforced);
+    RUN_TEST(test_sequencers_max_is_now_correctly_sized_and_synced_from_the_table);
     RUN_TEST(test_configuration_lock_register_is_absent);
     RUN_TEST(test_implemented_options_layout_is_invented);
     RUN_TEST(test_reserved_registers_are_indistinguishable_from_zero_fill);
