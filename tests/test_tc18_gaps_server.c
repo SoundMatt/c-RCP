@@ -1007,9 +1007,15 @@ static void test_response_queue_flush_period_is_carried_but_inert(void)
      * every flush period, and specifically an EMPTY NTSCF-only PDU -- an
      * NTSCF header carrying no ACF messages at all -- when the period
      * elapses with an empty response queue. c-RCP carries the periodicity
-     * register faithfully (it round-trips as plain R/W data below) but ships
-     * no heartbeat emitter at all: nothing in the library ever reads
-     * flush_time_us, so a client watching for liveness sees nothing. */
+     * register faithfully (it round-trips as plain R/W data below), and
+     * respqueue.h's rcp_respqueue_should_flush_by_time() now reads
+     * flush_time_us to recognize the trigger (REQ-RMAP-064) and composes
+     * with rcp_avtp_encode_ntscf(hdr, NULL, 0) to construct the empty PDU
+     * itself (REQ-RMAP-065's primitive half; see test_tc18_gaps_regmap.c's
+     * test_flush_time_trigger_and_empty_heartbeat_are_composable()) -- but
+     * this library still ships no emitter that SCHEDULES that composition
+     * against a real clock: a client watching for liveness still sees
+     * nothing unless an integrator drives it. */
     cfg.flush_time_us  = 20000u;
     cfg.flush_on_count = 8u;
     TEST_ASSERT_EQUAL_UINT32(20000u, cfg.flush_time_us);

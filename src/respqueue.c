@@ -121,3 +121,13 @@ size_t rcp_respqueue_plan_batch(const rcp_respqueue_t *q, size_t max_avtpdu_size
 
     return i;
 }
+
+//cfusa:req REQ-RMAP-064
+//cfusa:req REQ-RMAP-065
+bool rcp_respqueue_should_flush_by_time(uint64_t elapsed_since_last_transmit_us,
+                                         uint64_t flush_time_us)
+{
+    if (flush_time_us == 0) return false;
+
+    return elapsed_since_last_transmit_us >= flush_time_us;
+}

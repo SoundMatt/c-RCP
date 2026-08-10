@@ -9421,3 +9421,95 @@ tick, not queues); scope that design explicitly, including whether it
 belongs in `respqueue.h` itself (a `last_transmit_tick`/`elapsed`-style
 pure check, mirroring `should_flush()`'s own shape) or in a new,
 separate composition module, before implementing either way.
+
+### 176. Phase 5d batch 6: `REQ-RMAP-064`/`065` -- the Flush_time trigger and empty-queue heartbeat composition close Group 4 (issue #200)
+
+Scoped the periodic-timer question batch 5 deferred by re-reading
+`respqueue.h`'s own file header (its "deliberately NOT modeled here"
+list) and this codebase's two existing periodic-liveness precedents,
+`watchdog.c`'s Keeper and `deadline.c`'s monitor -- both own a real
+background thread, unlike every other module touched this phase, which
+stays a pure "caller composes" primitive. The deciding evidence:
+`e2e.h`'s `rcp_e2e_wd_evaluate(elapsed_since_last_kick_ms, ...)` already
+establishes the exact shape needed here -- a pure function taking
+*elapsed time* as a caller-supplied input rather than reading a clock of
+its own -- for the structurally identical "has too much time passed"
+question. `respqueue.h` gains one function on that model:
+`rcp_respqueue_should_flush_by_time(elapsed_since_last_transmit_us,
+flush_time_us)`. `flush_time_us == 0` always returns false ("flush only
+by count", TC18's own documented meaning for the zero case); otherwise
+true once `elapsed_since_last_transmit_us` reaches it. Closes
+`REQ-RMAP-064` outright.
+
+**Deliberately independent of `q->entries_len`** -- unlike
+`rcp_respqueue_should_flush()` (the `-063` count trigger, which has
+nothing to report on an empty queue and stays false), this trigger fires
+identically whether the queue is empty or not, because `REQ-RMAP-065`
+requires the server to still transmit -- an empty heartbeat AVTPDU --
+even when nothing is queued. Checked `avtp.h` before assuming any new
+encode machinery was needed (the same discipline batch 2 used for
+`STREAM_UID`): `rcp_avtp_encode_ntscf()`'s own doc comment already says
+"payload may be NULL iff payload_len == 0", and NTSCF is "the *only*
+AVTPDU header format an RC Server itself ever sends" -- so the empty
+heartbeat AVTPDU was already constructible with zero code changes to
+`avtp.h`. Added a positive test
+(`test_flush_time_trigger_and_empty_heartbeat_are_composable`,
+replacing the old deviation pin) that proves the full composition end
+to end: `should_flush_by_time()` true on an empty queue,
+`plan_batch()` reporting 0, and `rcp_avtp_encode_ntscf(hdr, NULL, 0)`
+producing a valid header-only frame.
+
+**`REQ-RMAP-065` stays `partial`, not `implemented`** -- this batch
+closes the *primitive* half (recognizing the trigger and constructing
+the frame) but not the *scheduling* half (actually running this
+composition against a real clock and driving a real transport
+periodically), which this library has never taken on for any of its
+liveness concerns. That boundary was already stated, independently, by
+a requirement this batch didn't even set out to touch:
+
+**Cross-cutting discovery -- REQ-SRV-017 is the same gap under a
+different TC18 citation.** A domain-term sweep (`flush_time`,
+`heartbeat`, `liveness`) across the whole test suite -- the now-standing
+per-batch discipline, reinforced a fourth time this phase -- turned up
+`test_response_queue_flush_period_is_carried_but_inert` in
+`test_tc18_gaps_server.c`, tagged under `REQ-SRV-017` (not any
+`REQ-RMAP-*` id), citing TC18 §13.7.1.1 rather than §12.7.9, but pinning
+the identical behavioural gap: no emitter drives the cyclic heartbeat.
+`REQ-SRV-017`'s own pre-existing text already stated exactly the scope
+boundary this batch's design lands on independently: "c-RCP is a
+protocol library, not a scheduler; heartbeat emission is left to the
+integrator" -- it was already catalogued `partial`, not
+`not-implemented`, confirming this was the right target status for
+`REQ-RMAP-065` too rather than a full close. Narrowed both entries'
+`.fusa-reqs.json` text to name the primitives now provided vs. the
+scheduling boundary that remains, and updated
+`test_response_queue_flush_period_is_carried_but_inert`'s own comment
+to stop claiming "nothing in the library ever reads flush_time_us"
+(no longer true) while keeping its assertions unchanged, since they
+still correctly pin the register's own plain-data round-trip. This is
+the first batch this phase to touch a requirement belonging to Phase 5e
+(issue #201) as an intentional side effect of closing a Phase 5d item
+correctly -- documented on both tracking issues rather than only #200.
+
+Mutation-tested two ways, both logic-only (purely additive function, no
+signature to full-revert against): (1) the `flush_time_us == 0` early
+return removed -- fails the dedicated zero-threshold test; (2) `>=`
+weakened to `>` at the boundary -- fails both the dedicated boundary
+test and the rewritten `test_tc18_gaps_regmap.c` conformance test. Both
+restored clean, diff-verified byte-identical against pre-mutation
+backups. Full suite (65/65, +3 new tests in `test_respqueue.c`) +
+ASan/UBSan clean. Fresh `cfusa check` (0 errors) + all three separate
+`cfusa trace` invocations (100%/100%, 0 untested). 1030 requirements
+(unchanged), 110 `tc18-gap` entries remaining (was 111; `REQ-RMAP-065`
+and `REQ-SRV-017` were already counted there and stay `tc18-gap`, only
+`REQ-RMAP-064` newly closes out of it).
+
+**Phase 5d progress after batch 6**: 7/47 items addressed (8 counting
+`REQ-RMAP-061`'s own partial progress) -- **Group 4 (response/ack queue
+config) is now fully closed: 6 items closed outright, 1
+(`REQ-RMAP-061`) honestly partial, its remaining halves (MTU-consistency
+rejection, discovery-slice exposure) deferred alongside Group 3's own
+discovery-adjacent work.** Per issue #200's own suggested order, next is
+Group 1 (§12.7.5 Table 18, RC Server general register map, 17 items,
+the largest group, splittable into sub-batches like the citation-backfill
+work in Phase 2).
