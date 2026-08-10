@@ -122,6 +122,20 @@ bool rcp_l2_frame_decode(const uint8_t *frame, size_t frame_len,
                           uint8_t out_dst_mac[6], uint8_t out_src_mac[6],
                           const uint8_t **out_avtpdu, size_t *out_avtpdu_len);
 
+/* True iff mac is a unicast address: the I/G (individual/group) bit --
+ * the least-significant bit of the first octet -- is 0. False for any
+ * multicast address, including the all-ones broadcast address
+ * (ff:ff:ff:ff:ff:ff), which is itself a special case of multicast under
+ * this same bit test -- standard IEEE 802.3 addressing, not a TC18-
+ * specific rule. lifecycle.h's rcp_lifecycle_writer_ctx_t is the
+ * intended caller: TC18 §12.3.1.1/.2/.3 (REQ-LIFECYCLE-027) requires a
+ * write request be accepted only when its frame's destination MAC is
+ * unicast, and this is the primitive an integrator uses to classify a
+ * frame's destination MAC (obtained from rcp_l2_frame_decode()'s own
+ * out_dst_mac, or the transport-specific equivalent for a non-l2.h
+ * carrier) before constructing that writer context. */
+bool rcp_l2_mac_is_unicast(const uint8_t mac[6]);
+
 /* ── Transport ─────────────────────────────────────────────────────────────── */
 
 /* Opens a raw Ethernet socket on network interface ifname, reads that

@@ -32,6 +32,37 @@ the rationale.
 
 ## Releases
 
+### v0.155.0 -- 2026-08-10
+
+**Phase 5b batch 3: REQ-LIFECYCLE-027 write requests unicast-only.**
+Issue #198, the batch's own flagged highest-severity item ("a single
+broadcast/multicast write frame can reconfigure every RC Server on the
+network at once"). `rcp_lifecycle_writer_ctx_t` gains
+`via_non_unicast_frame`; `rcp_lifecycle_field_writable()` now denies an
+otherwise-writable field (any of `HW_GENERIC`/`FUNCTIONAL_W`/
+`FUNCTIONAL_W_STAR`, any state) whenever it is set, per TC18
+§12.3.1.1/§12.3.1.2/§12.3.1.3's identical restated rule.
+`rcp_regmap_writer_ctx()` gains a `via_unicast` parameter, the one
+production derivation path this library has, closing the loop. New
+`rcp_l2_mac_is_unicast()` primitive (`REQ-L2-011`) classifies a real
+destination MAC via the IEEE 802.3 individual/group bit for callers
+that need one. `rcp_lifecycle_should_accept()` deliberately untouched
+-- TC18's rule is scoped to write requests, not general frame
+admission, so the gate belongs at `field_writable()` alone. Blast-radius
+checked before scoping (this batch's own explicit lesson from batch 2):
+adding a *struct field* rather than a bare parameter means ~150
+existing writer_ctx literals across the test suite needed zero changes,
+C's partial-brace-init rule zero-initializing the new member to
+"unicast/compliant" by default; only `rcp_regmap_writer_ctx()`'s 8 call
+sites needed updating. Mutation-tested three ways (new-API build break
+for `l2.c`, runtime assertion failure for `lifecycle.c`'s behavior
+change, and a precise single-line assignment-inversion mutation for
+`regmap.c` isolating the plumbing itself from its signature). Full
+suite (64/64) + ASan/UBSan clean, fresh `cfusa check`/`trace` (0
+errors, 100%/100%). See `ROADMAP.md` milestone 155 for full detail.
+1029 requirements (was 1028, `REQ-L2-011` added), 139 `tc18-gap`
+entries remaining (was 140).
+
 ### v0.154.0 -- 2026-08-10
 
 **Phase 5b batch 2: REQ-LIFECYCLE-032 HW_CONFIGURED admits only EP0.**

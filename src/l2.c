@@ -72,6 +72,12 @@ bool rcp_l2_frame_decode(const uint8_t *frame, size_t frame_len,
     return true;
 }
 
+//cfusa:req REQ-L2-011
+bool rcp_l2_mac_is_unicast(const uint8_t mac[6])
+{
+    return (mac[0] & 0x01u) == 0u;
+}
+
 #if defined(__linux__)
 
 #include <arpa/inet.h>

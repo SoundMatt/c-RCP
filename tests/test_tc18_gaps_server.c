@@ -275,10 +275,20 @@ static void test_hw_configured_write_access_is_unrestricted(void)
                                                   RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, root));
 
     /* TC18 §12.3.1.1, §12.3.1.2 and §12.3.1.3 each restate that a write is
-     * accepted only from a unicast frame. Neither writability nor frame
-     * acceptance takes any destination-MAC input, so an identical write
-     * carried in a multicast or broadcast frame is processed the same way in
-     * every state. */
+     * accepted only from a unicast frame. As of the REQ-LIFECYCLE-027 fix,
+     * rcp_lifecycle_field_writable() now takes exactly that input via its
+     * writer_ctx's via_non_unicast_frame member and denies an otherwise-
+     * writable field once it is set -- see test_lifecycle.c's own
+     * test_field_writable_denies_non_unicast_frame_regardless_of_kind_or_
+     * authorization() for the dedicated coverage; stranger/root above both
+     * use the 2-element brace form, which zero-initializes that new
+     * member to false (unicast/compliant), so their assertions are
+     * unaffected. rcp_lifecycle_should_accept() (below) still takes no
+     * destination-MAC input at all -- deliberately so: TC18's rule is
+     * scoped to write requests specifically, not general frame admission,
+     * so should_accept's frame-level acceptance is correctly unicast-
+     * agnostic; only a WRITE attempt is gated, and only at the
+     * field_writable() layer where TC18 §12.7's write path already lives. */
     TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_UNCONFIGURED, false,
         RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
     TEST_ASSERT_TRUE(rcp_lifecycle_should_accept(RCP_LIFECYCLE_RCP_CONFIGURED, false,

@@ -7677,3 +7677,91 @@ Full test suite (64/64) + ASan/UBSan build both clean. Fresh `cfusa
 check` (0 errors) + `cfusa trace --req-coverage 100 --sec-tested 100`
 (100%/100%). 1028 requirements (unchanged count), 140 `tc18-gap`
 entries remaining (was 141).
+
+### 155. Phase 5b batch 3: REQ-LIFECYCLE-027 write requests unicast-only (issue #198)
+
+TC18 §12.3.1.1, §12.3.1.2 and §12.3.1.3 each restate (once per
+lifecycle state) that a write request is accepted only when carried in
+a unicast frame -- "A single broadcast/multicast write frame can
+therefore reconfigure every RC Server on the network at once" is the
+issue's own framing for why this was flagged the single highest-
+severity item in the whole phase. Neither `rcp_lifecycle_should_accept()`
+nor `rcp_lifecycle_field_writable()` took any destination-MAC input at
+all, so an identical write carried in a multicast or broadcast frame
+was processed exactly like a unicast one.
+
+**Blast-radius check done before committing to scope** (the batch-2
+lesson applied directly this time): `rcp_lifecycle_field_writable()` is
+called from 12 endpoint `_writable()` wrappers across every endpoint
+type, but every one of them just forwards an already-constructed
+`rcp_lifecycle_writer_ctx_t writer` parameter -- none of them construct
+one locally. The only real (non-test) construction site in the whole
+codebase is `rcp_regmap_writer_ctx()`, with 8 call sites, all in
+`tests/test_regmap.c`. Adding a *field* to `rcp_lifecycle_writer_ctx_t`
+rather than a new bare function parameter, and naming it so its
+zero-initialized default means "unicast/compliant" rather than
+"non-unicast", means every one of the ~150 existing `{...}`/`{0}`
+writer_ctx literals across every `test_ep_*.c`/`test_lifecycle.c`/
+`test_tc18_gaps_*.c` file needs **no changes at all** -- C's partial-
+brace-initializer rule zero-initializes a struct's unlisted trailing
+members, so `{true, false}` for the now-3-field struct still means
+exactly what it meant before. Only `rcp_regmap_writer_ctx()`'s 8 call
+sites (a new function *parameter*, not a struct literal) needed
+updating, to `true` (preserving their currently-tested unicast/
+compliant behavior) -- confirmed by `grep -rn` for both symbols before
+writing a single line, per the standing post-batch-2 checklist.
+
+**New primitive**: `rcp_l2_mac_is_unicast()` (`l2.h`/`l2.c`,
+`REQ-L2-011`) -- the IEEE 802.3 individual/group bit (LSB of the first
+octet) classifier a real integrator needs to turn a frame's destination
+MAC (from `rcp_l2_frame_decode()`'s `out_dst_mac` or a transport's own
+equivalent) into the new writer_ctx field. The all-ones broadcast
+address is correctly classified not-unicast as a special case of
+multicast under the same bit test, no separate check needed.
+
+**The fix itself**: `rcp_lifecycle_writer_ctx_t` gains
+`via_non_unicast_frame`; `rcp_lifecycle_field_writable()` computes its
+existing per-kind/per-state `writable` verdict exactly as before, then
+returns `writable && !writer.via_non_unicast_frame` -- one trailing AND
+rather than duplicating the check across three kinds and every state,
+covering `HW_GENERIC` (the write path actually exercised during
+`HW_UNCONFIGURED`, per TC18 §12.3.1.1's own paragraph), `FUNCTIONAL_W`
+and `FUNCTIONAL_W_STAR` uniformly. `rcp_regmap_writer_ctx()` gains a
+`via_unicast` parameter and sets `ctx.via_non_unicast_frame =
+!via_unicast` -- the one production derivation path this library has
+today, closing the loop from a real classified MAC through to the
+gate. `rcp_lifecycle_should_accept()` deliberately still takes no
+destination-MAC input: TC18's unicast rule is scoped to write requests
+specifically, not general frame admission, so gating only at
+`field_writable()` -- where the write path already lives -- is the
+architecturally correct split, not a shortcut.
+
+New tests: `test_l2.c` pins the unicast/multicast/broadcast
+classification (including the all-zero MAC, I/G bit clear, correctly
+still unicast); `test_lifecycle.c` pins `field_writable()` denying an
+otherwise-writable field across all three kinds purely on
+`via_non_unicast_frame`, independent of authorization; `test_regmap.c`
+pins `via_unicast` plumbing straight through to
+`via_non_unicast_frame`, independent of root-client/owning-stream
+authorization. `test_tc18_gaps_server.c`'s pre-existing
+`test_hw_configured_write_access_is_unrestricted()` comment, which had
+described this exact gap, updated to record its closure and point at
+the new dedicated coverage rather than left stale.
+
+Mutation-tested three ways: (1) `git stash` on `src/l2.c` alone ->
+build breaks (`Undefined symbols ... _rcp_l2_mac_is_unicast`), the
+new-API build-break signature; (2) `git stash` on `src/lifecycle.c`
+alone -> exactly one runtime failure, the new pinned
+`test_field_writable_denies_non_unicast_frame_regardless_of_kind_or_
+authorization` (`Expected FALSE Was TRUE`), all 31 other
+`test_lifecycle.c` tests still pass; (3) `git stash` on `src/regmap.c`
+alone -> build breaks (`conflicting types for 'rcp_regmap_writer_ctx'`,
+header/impl signature mismatch), plus a further precise single-line
+mutation (inverting `!via_unicast` to `via_unicast` without touching
+the signature) isolates the assignment itself -> exactly the new
+`test_writer_ctx_plumbs_via_unicast_to_non_unicast_frame_flag` fails
+(`Expected FALSE Was TRUE`). All three restored clean. Full test suite
+(64/64) + ASan/UBSan build both clean. Fresh `cfusa check` (0 errors) +
+`cfusa trace --req-coverage 100 --sec-tested 100` (100%/100%). 1029
+requirements (was 1028, `REQ-L2-011` added), 139 `tc18-gap` entries
+remaining (was 140).
