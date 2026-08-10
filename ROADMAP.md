@@ -10240,3 +10240,73 @@ collapsed into `rcp_regmap_table_ref_t` pairs) -- the same shared-type
 "separate TC18 registers, one c-RCP struct" deviation `-033` itself
 named as the DIFFERENT shape mismatch it does NOT share, now up next
 in table order for the six remaining `rcp_regmap_table_ref_t` fields.
+
+### 187. Phase 5d batch 17: `REQ-RMAP-034` -- request/response stream config registers now correctly sized and separately addressed (issue #200)
+
+Same class of structural fix as batch 16 (`REQ-RMAP-033`), but
+affecting TWO fields at once rather than one, since TC18 §12.7.5
+Table 18 defines FOUR separate, non-adjacent registers for the
+stream-configuration sub-tables -- `svr_request_stream_cfg_capacity`
+(8 bit, 0x001C), `svr_response_stream_cfg_capacity` (8 bit, 0x001D),
+`svr_request_stream_cfg_ptr` (16 bit, 0x001E) and
+`svr_response_stream_cfg_ptr` (16 bit, 0x0020) -- while
+`rcp_regmap_general_t` collapsed each pointer/capacity pair into one
+`rcp_regmap_table_ref_t` (`request_stream_cfg`/`response_queue_cfg`),
+carrying the identical two compounding problems `-033` already fixed
+for `svr_hw_cfg_ptr`: a 16-bit capacity that could represent a value
+(e.g. 0x0100) TC18's real 8-bit capacity registers could never hold,
+and an offset in this project's own "register word" unit rather than
+TC18's own 16-bit register-map address, unencodable into its real wire
+slot without an unwritten unit conversion.
+
+Blast-radius check (same discipline as `-033`, applied again before
+touching anything): grepped every `rcp_regmap_general_t.request_
+stream_cfg`/`.response_queue_cfg` usage across `src/*.c` and found
+ZERO real consumers -- test-only, confirmed safe to retype. (This
+codebase's separate, unrelated `rcp_regmap_request_stream_cfg_t`/
+`rcp_regmap_response_queue_cfg_t` CONTENT structs -- the actual per-row
+Table 22/24 field shapes, already wired to real E2E/watchdog/queue
+behavior in earlier phases -- share a name with `rcp_regmap_general_t`'s
+former pointer/capacity fields but are a completely different concern;
+confirmed by reading, not assumed from the name, same caution `-033`
+applied to `config.c`'s own unrelated `hw_pin_map`.)
+
+Replaced `request_stream_cfg`/`response_queue_cfg` with four
+correctly-sized scalar fields matching TC18's own names and widths
+exactly, declared in TC18 address order. Four `rcp_regmap_table_ref_t`
+sub-table refs remain (`ep_generic_cfg`, `ep_functional_cfg`,
+`ep_id_bus_map`, `sequencer_state`).
+
+**Found and fixed the same two "second usage site" categories batch
+16 already established a precedent for, this time doubled across two
+fields**: `test_regmap.c`'s general zero-init test (four assertions
+replacing two), and `REQ-RMAP-039`'s own deviation pin
+(`test_four_optional_subsystem_pointer_pairs_are_absent`), which
+enumerated every existing sub-table ref as its own "exactly this many
+exist" anchor -- narrowed from six to four `rcp_regmap_table_ref_t`
+fields plus the now five distinct scalar fields (`svr_hw_cfg_ptr` +
+this batch's four), core claim unaffected. Rewrote the batch's own
+deviation pin (`test_stream_cfg_pointer_capacity_pairs_are_collapsed`)
+into a positive test (`test_stream_cfg_registers_are_now_correctly_
+sized`) proving all four fields are correctly sized, zero-init, and
+round-trip test values.
+
+Mutation-tested: full header-only revert with every touched test file
+kept -- breaks the build (`no member named 'svr_request_stream_cfg_
+capacity'` in `test_regmap.c`, the first file Clang's error output
+pointed at). Restored clean, diff-verified byte-identical against a
+pre-mutation backup. Full suite (65/65) + ASan/UBSan clean. Fresh
+`cfusa check` (0 errors) + all three separate `cfusa trace`
+invocations (100%/100%, 0 untested). `REQ-RMAP-034` stays `partial`
+(unchanged status -- narrowed text; still blocked on `REQ-RMAP-024`'s
+wire-reachability gap and this codebase's still-absent
+request/response-stream config table storage for these pointers to
+meaningfully address anything). 1030 requirements (unchanged), 110
+`tc18-gap` entries remaining (unchanged).
+
+**Phase 5d progress after batch 17**: 18/47 items addressed (19
+counting `REQ-RMAP-061`'s own partial progress). Group 1: 11/18
+items. Next: continue Group 1 in table order -- `REQ-RMAP-035`
+(reserved 16-bit register at 0x0022, still open from batch 14's own
+deferred scope -- the second half of the combined pin batch 14 split,
+narrowed but not yet closed).
