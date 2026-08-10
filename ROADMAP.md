@@ -7160,3 +7160,63 @@ assertion failure. Full test suite (64/64) + ASan/UBSan build both
 clean. Fresh `cfusa check` (0 errors) + `cfusa trace --req-coverage 100
 --sec-tested 100` (100%/100%). 1028 requirements (unchanged count), 146
 `tc18-gap` entries remaining (was 147).
+
+### 148. Phase 5a batch 3: REQ-E2E-030 request-storage-overflow error code (issue #197)
+
+TC18 §12.7.7 Table 22 relative address 0x000D bit 5
+(`rx_ovrflw_safestate_enable`) requires that an overflow of any one
+endpoint's request storage bring every endpoint bound to that request
+stream into its configured safe state. `rcp_server_endpoint_admit()`
+already detected the condition (`claim_slot()` returning NULL) but
+reported it as a bare `RCP_SERVER_ADMIT_REJECTED` with `*out_error`
+left at `RCP_ERROR_NONE` -- the request was dropped silently, with
+nothing a caller could turn into a real Table 27 error response.
+
+This is a genuine architecture boundary, not an oversight: this
+library's `rcp_server_endpoint_t` type is scoped to one endpoint, and
+TC18's rule requires action across every *other* endpoint sharing the
+request stream -- a concept this codebase's data model has no type for
+(the same boundary `e2e.h`'s file header already documents for
+`rcp_e2e_watchdog_purge_should_keep()`/`_classify()`). Rather than
+overclaim full conformance or leave the gap untouched, this fix does
+the honestly-achievable per-request half and documents the rest:
+
+  - `rcp_server_endpoint_admit()`'s `claim_slot()`-exhausted path now
+    sets `*out_error = RCP_ERROR_REQUEST_STORAGE_OVERFLOW` (already
+    defined in `errors.h`, previously unused anywhere) before
+    returning `RCP_SERVER_ADMIT_REJECTED`. `mock.c`'s
+    `finish_admission()` already builds a full conformant error
+    response from any non-`RCP_ERROR_NONE` `*out_error` via
+    `rcp_acf_unpack_header()` + `rcp_acf_build_error_response()`, so no
+    `mock.c` change was needed for this to be fully functional and
+    testable end to end.
+  - `rcp_e2e_overflow_should_enter_safe_state(bool
+    rx_ovrflw_safestate_enable)` is a new pure primitive in `e2e.c`/
+    `e2e.h`, the same "own small pure helper" shape as
+    `rcp_e2e_wd_evaluate()`: trivially `rx_ovrflw_safestate_enable`,
+    gated on nothing else since overflow has already happened by
+    construction when it's called. It is the caller-facing decision a
+    future cross-endpoint, stream-wide orchestrator would consult to
+    perform the escalation this single-endpoint call cannot.
+
+`.fusa-reqs.json`'s `REQ-E2E-030` moves from `status: "not-implemented"`
+to `status: "partial"` (stays `scope: "tc18-gap"` -- the stream-wide
+escalation is still genuinely missing), text rewritten to describe
+exactly what's now implemented and what remains architecturally out of
+this library's current scope.
+
+`tests/test_tc18_gaps_ep.c`'s `REQ-E2E-030` deviation-pin test is
+rewritten to assert the new `*out_error` value on overflow (previously
+untestable, since nothing set it), plus a new direct test of
+`rcp_e2e_overflow_should_enter_safe_state()`.
+
+Mutation-tested: reverting the fix (`git stash` on `src/server.c`,
+`src/e2e.c`, `include/rcp/e2e.h`) fails the test file's *build*, not
+just a runtime assertion (`call to undeclared function
+'rcp_e2e_overflow_should_enter_safe_state'`) -- restoring the fix
+rebuilds and passes clean again. Full test suite (64/64) + ASan/UBSan
+build both clean. Fresh `cfusa check` (0 errors) + `cfusa trace
+--req-coverage 100 --sec-tested 100` (100%/100%). 1028 requirements
+(unchanged count), 146 `tc18-gap` entries remaining (unchanged count --
+this one stays a gap entry, now `partial` instead of
+`not-implemented`).

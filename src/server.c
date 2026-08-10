@@ -161,7 +161,22 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
     if (kind == RCP_SCHED_KIND_CANCELLATION) return RCP_SERVER_ADMIT_CANCELLATION;
 
     slot = claim_slot(ep);
-    if (!slot) return RCP_SERVER_ADMIT_REJECTED;
+    if (!slot) {
+        /* TC18 §12.7.7 Table 22's rx_ovrflw_safestate_enable names this
+         * condition -- an endpoint's own request storage exhausted -- as
+         * one that (when configured) shall bring every endpoint bound to
+         * the request stream into its configured safe state, not merely
+         * fail the one rejected request silently. This function reports
+         * only the per-request half: unlike most of this function's other
+         * rejection paths, request_type is already known here (set just
+         * above), so this one *can* set a real TC18 Table 27 code -- see
+         * rcp_e2e_overflow_should_enter_safe_state() for the caller-driven
+         * stream-wide escalation this half does not, and cannot from
+         * inside a single rcp_server_endpoint_t, perform itself (see that
+         * function's own doc comment). */
+        if (out_error) *out_error = RCP_ERROR_REQUEST_STORAGE_OVERFLOW;
+        return RCP_SERVER_ADMIT_REJECTED;
+    }
 
     slot->kind         = kind;
     slot->request_type = request_type;

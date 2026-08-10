@@ -873,18 +873,26 @@ static void test_e2e_safe_state_only_reachable_via_watchdog(void)
     TEST_ASSERT_FALSE(r.enter_safe_state);
 }
 
-/* REQ-E2E-030 (not-implemented) DEVIATION PIN: TC18 12.7.7 Table 22 relative
+/* REQ-E2E-030 (partial) DEVIATION PIN: TC18 12.7.7 Table 22 relative
  * address 0x000D bit 5 (rx_ovrflw_safestate_enable) brings every endpoint
  * bound to the request stream into its configured safe state when any one
- * endpoint's request storage overflows. c-RCP detects the condition and
- * silently drops the request: admission simply reports REJECTED, the store
- * stays at capacity, and no safe-state escalation of any kind is available
- * to attach to it. */
-static void test_e2e_request_store_overflow_is_silently_rejected(void)
+ * endpoint's request storage overflows. rcp_server_endpoint_admit() now
+ * reports the per-request half conformantly -- *out_error is
+ * RCP_ERROR_REQUEST_STORAGE_OVERFLOW, letting a caller build a real Table 27
+ * error response via rcp_acf_build_error_response() (see mock.c's
+ * finish_admission() for a worked example) -- but the stream-wide safe-state
+ * escalation itself is still not performed by this call: this library's
+ * rcp_server_endpoint_t type has no notion of "every other endpoint bound to
+ * the same request stream" for a single endpoint's admit() to reach across
+ * into. rcp_e2e_overflow_should_enter_safe_state() is the pure decision a
+ * caller-owned orchestrator would consult to actually perform that
+ * escalation once such a caller exists. */
+static void test_e2e_request_store_overflow_reports_error_code_but_not_escalation(void)
 {
     rcp_server_endpoint_t ep;
     rcp_bytes_t           frame;
     uint8_t               request_type = 0;
+    rcp_wire_error_t      err          = RCP_ERROR_NONE;
     size_t                i;
 
     frame = rcp_timed_encode_request(3u, 0x2000u, 0x41u, NULL, 0u);
@@ -894,19 +902,34 @@ static void test_e2e_request_store_overflow_is_silently_rejected(void)
     for (i = 0; i < RCP_SERVER_MAX_PENDING; i++) {
         TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
                           rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, &request_type,
-                                                    NULL, NULL));
+                                                    NULL, &err));
+        TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
     }
     TEST_ASSERT_EQUAL_UINT(RCP_SERVER_MAX_PENDING, rcp_server_endpoint_pending_count(&ep));
 
-    /* Overflow: rejected and dropped, with no configured safety reaction. */
+    /* Overflow: rejected and dropped, but now with a real Table 27 code a
+     * caller can turn into a conformant error response. */
+    err = RCP_ERROR_NONE;
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_REJECTED,
                       rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, &request_type,
-                                                NULL, NULL));
+                                                NULL, &err));
+    TEST_ASSERT_EQUAL(RCP_ERROR_REQUEST_STORAGE_OVERFLOW, err);
     TEST_ASSERT_EQUAL_UINT(RCP_SERVER_MAX_PENDING, rcp_server_endpoint_pending_count(&ep));
     TEST_ASSERT_EQUAL_UINT(0u, rcp_server_endpoint_queue_len(&ep));
 
     rcp_server_endpoint_destroy(&ep);
     rcp_bytes_free(&frame);
+}
+
+/* REQ-E2E-030: the pure escalation-decision primitive a stream-wide
+ * orchestrator (not yet part of this codebase -- see the deviation pin
+ * above) would consult once request-storage overflow has already been
+ * detected. Trivially rx_ovrflw_safestate_enable, gated on nothing else,
+ * since the overflow condition is a given by the time this is called. */
+static void test_e2e_overflow_should_enter_safe_state_is_gated_only_on_the_config_bit(void)
+{
+    TEST_ASSERT_TRUE(rcp_e2e_overflow_should_enter_safe_state(true));
+    TEST_ASSERT_FALSE(rcp_e2e_overflow_should_enter_safe_state(false));
 }
 
 int main(void)
@@ -939,7 +962,8 @@ int main(void)
 
     RUN_TEST(test_e2e_replayed_request_is_admitted_again);
     RUN_TEST(test_e2e_safe_state_only_reachable_via_watchdog);
-    RUN_TEST(test_e2e_request_store_overflow_is_silently_rejected);
+    RUN_TEST(test_e2e_request_store_overflow_reports_error_code_but_not_escalation);
+    RUN_TEST(test_e2e_overflow_should_enter_safe_state_is_gated_only_on_the_config_bit);
 
     return UNITY_END();
 }

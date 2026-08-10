@@ -338,6 +338,14 @@ rcp_e2e_wd_result_t rcp_e2e_wd_evaluate(bool rx_wd_enable, uint32_t rx_wd_timeou
     return r;
 }
 
+/* ── Request-storage overflow ──────────────────────────────────────────────── */
+
+//cfusa:req REQ-E2E-030
+bool rcp_e2e_overflow_should_enter_safe_state(bool rx_ovrflw_safestate_enable)
+{
+    return rx_ovrflw_safestate_enable;
+}
+
 /* ── rx_enforce_e2e: single-request drop vs. whole-stream latch-to-fault ────── */
 
 //cfusa:req REQ-E2E-020
