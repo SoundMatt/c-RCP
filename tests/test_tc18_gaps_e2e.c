@@ -538,16 +538,14 @@ static void test_crc_mismatch_skips_execution_without_error_response(void)
 
 /* ── REQ-E2E-042: pad coverage and quadlet alignment ───────────────────────── */
 
-/* Half implemented, half deviation. TC18 sec. 13.6 Figures 19/20 compute
- * the CRC over whole quadlets -- header quadlets plus byte_msg_payload
- * INCLUDING the 0x00 pad octets -- so that the CRC itself occupies the
- * message's final whole quadlet. The pad octets are covered (mutating one
- * changes the CRC). Alignment, though, is not enforced: rcp_e2e_wrap()
- * accepts any acf_frame_len >= 2 and appends the trailer at that offset,
- * so a caller passing an unpadded frame gets a misaligned trailer whose
- * adapted acf_msg_length no longer describes the message. A conforming
- * implementation would reject a frame that is not a whole quadlet. */
-static void test_crc_covers_pad_octets_but_alignment_is_unenforced(void)
+/* TC18 sec. 13.6 Figures 19/20 compute the CRC over whole quadlets --
+ * header quadlets plus byte_msg_payload INCLUDING the 0x00 pad octets --
+ * so that the CRC itself occupies the message's final whole quadlet. The
+ * pad octets are covered (mutating one changes the CRC), and as of the
+ * REQ-E2E-042 fix, alignment is enforced too: rcp_e2e_wrap() rejects any
+ * acf_frame_len that is not a whole quadlet (data=NULL, len=0) rather than
+ * appending a trailer that straddles a quadlet boundary. */
+static void test_crc_covers_pad_octets_and_alignment_is_enforced(void)
 {
     const uint8_t               pl[5] = {0x01, 0x02, 0x03, 0x04, 0x05};
     rcp_bytes_t                 frame = make_abb(0, 0, 0, pl, sizeof(pl));
@@ -557,6 +555,7 @@ static void test_crc_covers_pad_octets_but_alignment_is_unenforced(void)
     uint32_t                    with_zero_pad;
     uint8_t                     misaligned[6] = {0x1Cu, 0x02u, 0, 0, 0, 0};
     rcp_bytes_t                 mis;
+    rcp_bytes_t                 aligned_ok;
 
     /* 8 + 5 = 13 octets, so 3 pad octets bring it to 4 whole quadlets. */
     TEST_ASSERT_EQUAL_UINT(16u, frame.len);
@@ -572,13 +571,19 @@ static void test_crc_covers_pad_octets_but_alignment_is_unenforced(void)
     TEST_ASSERT_TRUE(rcp_e2e_compute_crc(TEST_SID, TEST_TS, frame.data, frame.len) !=
                      with_zero_pad);
 
-    /* Unenforced: 6 octets is not a whole quadlet, yet wrap() succeeds and
-     * puts the trailer at octets 6..9, straddling a quadlet boundary. */
+    /* Enforced: 6 octets is not a whole quadlet, so wrap() now fails safe
+     * instead of appending a trailer that straddles a quadlet boundary. */
     mis = rcp_e2e_wrap(TEST_SID, TEST_TS, misaligned, sizeof(misaligned));
-    TEST_ASSERT_NOT_NULL(mis.data);
-    TEST_ASSERT_EQUAL_UINT(10u, mis.len);
-    TEST_ASSERT_EQUAL_UINT(2u, mis.len % 4u);
+    TEST_ASSERT_NULL(mis.data);
+    TEST_ASSERT_EQUAL_UINT(0u, mis.len);
 
+    /* A properly quadlet-aligned, already-padded frame still wraps fine. */
+    frame.data[15] = 0u;
+    aligned_ok = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    TEST_ASSERT_NOT_NULL(aligned_ok.data);
+    TEST_ASSERT_EQUAL_UINT(frame.len + RCP_E2E_CRC_LEN, aligned_ok.len);
+
+    rcp_bytes_free(&aligned_ok);
     rcp_bytes_free(&mis);
     rcp_bytes_free(&frame);
 }
@@ -596,6 +601,6 @@ int main(void)
     RUN_TEST(test_fragmented_crc_covers_only_the_last_fragment);
     RUN_TEST(test_ms_bit_to_carries_crc_binding_is_not_enforced);
     RUN_TEST(test_crc_mismatch_skips_execution_without_error_response);
-    RUN_TEST(test_crc_covers_pad_octets_but_alignment_is_unenforced);
+    RUN_TEST(test_crc_covers_pad_octets_and_alignment_is_enforced);
     return UNITY_END();
 }

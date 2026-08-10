@@ -9731,12 +9731,11 @@
     {
       "id": "REQ-E2E-042",
       "title": "CRC coverage includes the byte_msg_payload's pad octets and the trailer lands on a quadlet boundary",
-      "text": "The CRC32 shall be computed over whole quadlets of the ACF message: the byte_message_info header quadlets and the byte_msg_payload including the 0x00 pad octets acf.h's rcp_acf_pad_len() appends, so that the CRC32 itself occupies the message's final whole quadlet (TC18 \u00a713.6 Figures 19 and 20). NOT ENFORCED: rcp_e2e_wrap() accepts any acf_frame_len of at least 2 octets and appends its 4-octet trailer at that offset, so a caller passing a non-quadlet-aligned (unpadded) frame produces a message whose CRC is misaligned and whose adapted acf_msg_length no longer describes it.",
+      "text": "The CRC32 shall be computed over whole quadlets of the ACF message: the byte_message_info header quadlets and the byte_msg_payload including the 0x00 pad octets acf.h's rcp_acf_pad_len() appends, so that the CRC32 itself occupies the message's final whole quadlet (TC18 \u00a713.6 Figures 19 and 20). rcp_e2e_wrap() enforces this by rejecting (zeroed rcp_bytes_t) any acf_frame_len that is not a whole quadlet, rather than appending a trailer that would straddle a quadlet boundary.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
+      "scope": "tc18",
       "tc18": "\u00a713.6 Figures 19 and 20, TC18.txt L3854-3863, L3872-3881"
     },
     {

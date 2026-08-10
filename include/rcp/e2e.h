@@ -334,10 +334,15 @@ size_t rcp_e2e_length_with_crc(size_t payload_len);
  * acf_msg_length field) for the adaptation to have anywhere to write;
  * shorter non-NULL frames fail safe (data=NULL, len=0), as does an
  * acf_msg_length value already at its 9-bit field's maximum (0x1FF).
- * Caller owns acf_frame throughout -- it is read, never modified. Returns
- * a freshly heap-allocated, owned rcp_bytes_t (data=NULL, len=0 on
- * allocation failure or any of the above); caller frees the result with
- * rcp_bytes_free(). */
+ * acf_frame_len must also be a whole quadlet (a multiple of 4) -- TC18
+ * §13.6 Figures 19/20 compute the CRC over whole quadlets of the ACF
+ * message so the trailer itself occupies the message's final whole
+ * quadlet; a non-quadlet-aligned acf_frame_len fails safe the same way
+ * (data=NULL, len=0) rather than appending a trailer that straddles a
+ * quadlet boundary. Caller owns acf_frame throughout -- it is read, never
+ * modified. Returns a freshly heap-allocated, owned rcp_bytes_t (data=NULL,
+ * len=0 on allocation failure or any of the above); caller frees the
+ * result with rcp_bytes_free(). */
 rcp_bytes_t rcp_e2e_wrap(uint64_t stream_id, uint32_t avtp_timestamp,
                           const uint8_t *acf_frame, size_t acf_frame_len);
 
