@@ -10429,3 +10429,51 @@ already confirmed against the primary source this batch: 16-bit
 pointer + 8-bit entry-count capacity, matching this codebase's
 existing `ep_id_bus_map.capacity` unit convention exactly, unlike
 `-036`).
+
+### 190. Phase 5d batch 20: `REQ-RMAP-037` -- `svr_ep_bytebus_id_map_ptr`/`_capacity` now correctly sized and separately addressed (issue #200)
+
+Straightforward width/address fix, the class `-033`/`-034` already
+established -- confirmed NOT the semantic-contradiction class `-036`
+needed, since the shape was already independently verified against
+the primary source during that batch's own read: `svr_ep_bytebus_id_
+map_capacity` (0x002A, 8 bit) really is an entry count, matching this
+codebase's own `rcp_regmap_table_ref_t.capacity` convention -- no unit
+mismatch to resolve here, unlike `-036`'s `svr_ep_generic_cfg_
+capacity`.
+
+Retyped `ep_id_bus_map` (`rcp_regmap_table_ref_t`) to `svr_ep_bytebus_
+id_map_ptr` (`uint16_t`, 0x0028) + `svr_ep_bytebus_id_map_capacity`
+(`uint8_t`, 0x002A), matching TC18's own names and widths exactly.
+
+**Split the remaining half of batch 19's own proactive split**: that
+batch's own combined pin covered `-037` and `-038` together (after
+already splitting `-036` out); this batch splits that remainder into
+a new positive test for `-037` alone and a narrowed remaining test
+for `-038`'s still-open fields (`svr_ep_functional_cfg_ptr`,
+`svr_sequencer_state_ptr` -- both LONE pointers with no capacity
+register, same shape as `-033`'s own `svr_hw_cfg_ptr`, confirmed
+against the primary source during batch 19's own read). Found and
+fixed the same two "second usage site" categories every batch since
+16 has needed: `test_regmap.c`'s general zero-init test, and
+`REQ-RMAP-039`'s own deviation pin's sub-table-ref enumeration
+(narrowed from three to two `rcp_regmap_table_ref_t` fields plus a
+seventh distinct scalar pair, claim unaffected).
+
+Mutation-tested: full header-only revert with every touched test file
+kept -- breaks the build (`no member named 'svr_ep_bytebus_id_map_
+ptr'` in `test_regmap.c`). Restored clean, diff-verified byte-identical
+against a pre-mutation backup. Full suite (65/65) + ASan/UBSan clean.
+Fresh `cfusa check` (0 errors) + all three separate `cfusa trace`
+invocations (100%/100%, 0 untested). `REQ-RMAP-037` stays `partial`
+(unchanged status -- narrowed text; still blocked on `REQ-RMAP-024`'s
+wire-reachability gap and this codebase's still-absent EP-byte_bus_id
+mapping table storage). 1030 requirements (unchanged), 110 `tc18-gap`
+entries remaining (unchanged).
+
+**Phase 5d progress after batch 20**: 21/47 items addressed (22
+counting `REQ-RMAP-061`'s own partial progress). Group 1: 14/18
+items. Next: continue Group 1 in table order -- `REQ-RMAP-038`
+(`svr_ep_functional_cfg_ptr`/`svr_sequencer_state_ptr`, 0x002C/0x002E
+-- shape already confirmed against the primary source, both LONE
+16-bit pointers with no capacity register, same class of fix as
+`-033`'s own `svr_hw_cfg_ptr`).

@@ -583,7 +583,35 @@ typedef struct {
                                 REQ-RMAP-024 wire-reachability boundary
                                 as every other Group 1 item. */
     rcp_regmap_table_ref_t ep_functional_cfg;
-    rcp_regmap_table_ref_t ep_id_bus_map;
+    uint16_t svr_ep_bytebus_id_map_ptr; /* REQ-RMAP-037 (TC18 §12.7.5
+                                Table 18, relative address 0x0028, 16
+                                bit, R): the address of the EP -
+                                byte_bus_id mapping table (§12.7.8) --
+                                the table an RC Client needs before it
+                                may address an endpoint directly. */
+    uint8_t  svr_ep_bytebus_id_map_capacity; /* REQ-RMAP-037 (TC18
+                                §12.7.5 Table 18, relative address
+                                0x002A, 8 bit, R): max number of
+                                entries in the EP - byte_bus_id map
+                                table -- verified directly against the
+                                primary-source PDF (Table 18, page 52
+                                of OA_TC18_specification_v_0.5.1_RC.pdf)
+                                during REQ-RMAP-036's own batch. An
+                                entry COUNT, matching this struct's own
+                                rcp_regmap_table_ref_t.capacity
+                                convention (unlike REQ-RMAP-036's
+                                svr_ep_generic_cfg_capacity, which is a
+                                byte length) -- this is purely the
+                                width/address class of fix
+                                REQ-RMAP-033/-034 already established,
+                                not a semantic contradiction. Retyped
+                                from this field's own former shape
+                                (rcp_regmap_table_ref_t) to bare
+                                16-bit/8-bit scalars matching TC18's
+                                own widths exactly. Content modeling
+                                only, same REQ-RMAP-024
+                                wire-reachability boundary as every
+                                other Group 1 item. */
     rcp_regmap_table_ref_t sequencer_state;
 } rcp_regmap_general_t;
 

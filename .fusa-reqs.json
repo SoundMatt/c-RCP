@@ -8951,14 +8951,14 @@
     },
     {
       "id": "REQ-RMAP-037",
-      "title": "svr_ep_bytebus_id_map_ptr (0x0028) / _capacity (0x002A) have the wrong widths and no addresses",
-      "text": "NOT IMPLEMENTED (partial): TC18 \u00a712.7.5 Table 18 defines svr_ep_bytebus_id_map_ptr as a 16-bit read-only pointer at absolute address 0x0028 to the EP-to-byte_bus_id mapping table, and svr_ep_bytebus_id_map_capacity as an 8-bit read-only register at 0x002A giving that table's maximum entry count. c-RCP folds both into rcp_regmap_general_t.ep_id_bus_map (include/rcp/regmap.h:220), an rcp_regmap_table_ref_t with a 32-bit word-unit offset and a 16-bit capacity, bound to no address and encoded nowhere. Consequence: a client cannot locate or size the mapping table that tells it which byte_bus_id reaches which endpoint \u2014 the very table it needs before it may address an endpoint directly (\u00a712.7).",
+      "title": "svr_ep_bytebus_id_map_ptr/_capacity are now correctly sized and separately addressed",
+      "text": "PARTIAL: TC18 \u00a712.7.5 Table 18 defines svr_ep_bytebus_id_map_ptr as a 16-bit read-only pointer at absolute address 0x0028 to the EP-to-byte_bus_id mapping table, and svr_ep_bytebus_id_map_capacity as an 8-bit read-only register at 0x002A giving that table's maximum entry count (re-verified directly against the primary-source PDF, Table 18 page 52, during REQ-RMAP-036's own batch). rcp_regmap_general_t now declares both as correctly-sized scalar fields, replacing the former ep_id_bus_map field (rcp_regmap_table_ref_t, the shared pointer/capacity type most remaining sub-table refs still use) whose 32-bit word-unit offset and 16-bit capacity could not represent TC18's own narrower widths or be encoded into their real wire slots without an unwritten unit conversion -- the same class of fix REQ-RMAP-033/-034 already applied (unlike REQ-RMAP-036, this capacity really is an entry count, matching the former shared field's own documented meaning -- no semantic contradiction to resolve here). What remains open: this codebase has no real EP-byte_bus_id mapping table storage anywhere yet for this pointer to meaningfully address, and this address range (0x0028-0x002A) falls past the discovery response's own 0x000D wire-reachability ceiling (REQ-RMAP-024, still open), so a client still cannot read these registers over the wire.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "\u00a712.7.5 Table 18, TC18.txt L2604-2609"
+      "tc18": "\u00a712.7.5 Table 18, TC18.txt L2604-2609 -- primary-source-verified against OA_TC18_specification_v_0.5.1_RC.pdf Table 18, page 52"
     },
     {
       "id": "REQ-RMAP-038",
