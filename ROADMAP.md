@@ -7514,3 +7514,78 @@ remain deliberately `partial`, each with a clearly documented
 architecture boundary (cross-endpoint escalation, or a dispatch
 integration surface that does not exist yet) rather than an
 overclaimed status.
+
+### 153. Phase 5b batch 1: REQ-LIFECYCLE-028 HW_CONFIGURED drops TSCF unconditionally (issue #198)
+
+First batch of Phase 5b (LIFECYCLE access-control gaps, issue #198, 16
+requirements). `rcp_lifecycle_should_accept()` accepted TSCF-headed
+AVTPDUs in `HW_CONFIGURED` whenever the node advertised time-sync
+support (only the general `rcp_avtp_should_drop_tscf()` rule applied),
+whereas TC18 §12.3.1.2 requires them dropped unconditionally in that
+state too, the same rule already correctly applied to
+`HW_UNCONFIGURED`.
+
+**Primary-source verification finding, worth recording**: §12.3.1.2's
+own printed heading in the real TC18 PDF confusingly repeats
+"Lifecycle state HW_UNCONFIGURED" (the same heading as the correctly-
+labeled §12.3.1.1 immediately above it) -- a genuine typo in the
+source document, not a `pdftotext`/`TC18.txt`-extraction artifact
+(checked by re-extracting the raw PDF pages directly, not just the
+pre-existing line-numbered text dump, before trusting it). The
+section's actual *content* is unambiguous regardless of the wrong
+heading: "access to the HW_config...shall have been concluded and
+locked", advancing `svr_lifecycle_state` to `RCP_CONFIGURED`, root-
+client write access -- all `HW_CONFIGURED` concepts, none of them
+`HW_UNCONFIGURED`'s. `.fusa-reqs.json`'s own pre-existing citation
+already correctly attributed this text to `HW_CONFIGURED` despite the
+heading; this milestone's fix confirms that attribution against the
+primary source before implementing it, per this project's standing
+"verify tools/citations against primary sources" discipline.
+
+**Scope split from the sibling REQ-LIFECYCLE-029 finding, deliberately
+not implemented together**: §12.3.1.2 also requires dropping ACF_GBB-
+format requests in `HW_CONFIGURED`. Implementing that alongside this
+TSCF fix was attempted first and immediately reverted: every
+conditional request kind (compound/compound-wait/triggered/chained/
+timed/cancel) is wire-encoded as ACF_GBB unconditionally (the mtv-
+repurposing scheme `request_compound.h` and siblings document), so an
+unconditional ACF_GBB drop in `HW_CONFIGURED` would make it impossible
+to ever admit a conditional request there at all -- breaking 25 of 27
+tests in `test_conditional_dispatch.c`, whose entire fixture submits
+conditional requests against a `HW_CONFIGURED` server. This is
+entangled with `REQ-LIFECYCLE-032` (HW_CONFIGURED traffic should be
+restricted to configuration requests only -- not yet implemented
+either): closing `-032` first is expected to resolve `-029` largely for
+free, the same "shared plumbing first" reasoning issue #198's own
+suggested implementation order already calls for. `REQ-LIFECYCLE-029`
+stays `not-implemented`, its `.fusa-reqs.json` text updated to record
+this reasoning for whichever batch tackles it next.
+
+Fixing REQ-LIFECYCLE-028 alone also surfaced and required updating:
+`tests/test_lifecycle.c`'s own pre-existing (pre-gap-audit,
+milestone-61-era) `test_hw_configured_accepts_tscf_when_time_sync_
+supported`, which asserted the now-superseded permissive behavior as
+correct -- renamed and rewritten to assert the new, spec-verified
+behavior instead, the same "an older test can itself be wrong, not
+just a deviation pin" pattern REQ-E2E-042 first established in Phase
+5a. Also required moving two `test_tc18_gaps_e2e.c` fixtures (added in
+Phase 5a batch 5, dispatching real nonzero-timestamp TSCF-framed
+traffic against a `HW_CONFIGURED` server) to `RCP_CONFIGURED` instead,
+via a new `to_rcp_configured()` helper -- TSCF is unrestricted again
+once `RCP_CONFIGURED`, where the mapping HW_CONFIGURED's new rule
+guards against not existing yet has, by then, been validated.
+
+`.fusa-reqs.json`'s `REQ-LIFECYCLE-028` moves `scope: "tc18-gap"`/
+`status: "not-implemented"` -> `scope: "tc18"` (fully implemented, no
+`status` field).
+
+Mutation-tested: reverting the fix (`git stash` on `src/lifecycle.c`,
+`include/rcp/lifecycle.h`) fails `test_hw_configured_drops_tscf`'s own
+new assertion (`Expected FALSE Was TRUE`) and the renamed
+`test_lifecycle.c` test, a runtime assertion failure rather than a
+build break (no new function/type was added, only a branch's
+behavior) -- restoring the fix passes clean again. Full test suite
+(64/64) + ASan/UBSan build both clean. Fresh `cfusa check` (0 errors)
++ `cfusa trace --req-coverage 100 --sec-tested 100` (100%/100%). 1028
+requirements (unchanged count), 141 `tc18-gap` entries remaining (was
+142).

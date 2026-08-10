@@ -32,6 +32,28 @@ the rationale.
 
 ## Releases
 
+### v0.153.0 -- 2026-08-10
+
+**Phase 5b batch 1: REQ-LIFECYCLE-028 HW_CONFIGURED drops TSCF
+unconditionally.** Issue #198. `rcp_lifecycle_should_accept()` now
+drops a TSCF-headed AVTPDU in `HW_CONFIGURED` regardless of
+time-sync support (TC18 §12.3.1.2), the same unconditional rule
+already applied to `HW_UNCONFIGURED`. Primary-source verification
+caught a real typo in the TC18 spec PDF itself (§12.3.1.2's heading
+wrongly repeats "HW_UNCONFIGURED"; its content is unambiguously about
+HW_CONFIGURED) before trusting the citation. The sibling
+REQ-LIFECYCLE-029 (ACF_GBB drop, same section) was deliberately NOT
+implemented alongside this: every conditional request kind is
+wire-encoded as ACF_GBB unconditionally, so dropping it in
+HW_CONFIGURED would make conditional requests unsubmittable there at
+all -- entangled with the not-yet-implemented REQ-LIFECYCLE-032
+instead. Also updates a pre-existing (pre-gap-audit) `test_lifecycle.c`
+test that asserted the now-superseded permissive behavior. Mutation-
+tested, full suite (64/64) + ASan/UBSan clean, fresh `cfusa
+check`/`trace` (0 errors, 100%/100%). See `ROADMAP.md` milestone 153
+for full detail. 1028 requirements (unchanged count), 141 `tc18-gap`
+entries remaining (was 142).
+
 ### v0.152.0 -- 2026-08-09
 
 **Phase 5a batch 7 (final): REQ-E2E-038 fragmented-message CRC

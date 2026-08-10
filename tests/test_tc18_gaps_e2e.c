@@ -95,6 +95,19 @@ static void to_hw_configured(rcp_mock_server_t *srv)
                       rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP));
 }
 
+/* As of the REQ-LIFECYCLE-028 fix, HW_CONFIGURED unconditionally drops
+ * TSCF-headed AVTPDUs (TC18 §12.3.1.2) -- a fixture dispatching real,
+ * nonzero-timestamp TSCF-framed traffic needs RCP_CONFIGURED instead.
+ * EMPTY_SNAP's zero endpoint/request-stream counts trivially satisfy both
+ * plausibility checks along the way, the same way to_hw_configured()
+ * already relies on for its own single transition. */
+static void to_rcp_configured(rcp_mock_server_t *srv)
+{
+    to_hw_configured(srv);
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                      rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP));
+}
+
 static bool g_handler_called;
 
 static void counting_handler(const uint8_t *request, size_t request_len, rcp_bytes_t *out_response,
@@ -151,7 +164,11 @@ static void test_dispatch_e2e_safe_mode_executes_a_validly_wrapped_request(void)
     rcp_bytes_t          wrapped =
         rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_TS, plain.data, plain.len);
 
-    to_hw_configured(srv);
+    /* RCP_CONFIGURED, not HW_CONFIGURED: TSCF-framed traffic (real,
+     * nonzero avtp_timestamp) is unconditionally dropped in HW_CONFIGURED
+     * as of the REQ-LIFECYCLE-028 fix (TC18 §12.3.1.2) -- see
+     * to_rcp_configured()'s own comment. */
+    to_rcp_configured(srv);
     rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
     TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
 
@@ -460,7 +477,10 @@ static void test_dispatch_frame_e2e_verifies_each_member_independently(void)
     memcpy(joined + w1.len, w2.data, w2.len);
     joined[31] ^= 0xFFu; /* corrupt only the second member's trailer */
 
-    to_hw_configured(srv);
+    /* RCP_CONFIGURED, not HW_CONFIGURED -- see to_rcp_configured()'s own
+     * comment (TSCF-framed traffic is unconditionally dropped in
+     * HW_CONFIGURED as of the REQ-LIFECYCLE-028 fix). */
+    to_rcp_configured(srv);
     rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
     TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
 

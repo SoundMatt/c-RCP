@@ -116,6 +116,7 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
 //cfusa:req REQ-LIFECYCLE-015
 //cfusa:req REQ-LIFECYCLE-016
 //cfusa:req REQ-LIFECYCLE-017
+//cfusa:req REQ-LIFECYCLE-028
 bool rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
                                   bool time_sync_supported,
                                   uint8_t avtp_subtype,
@@ -136,11 +137,48 @@ bool rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
                byte_bus_id == RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
     }
 
-    /* HW_CONFIGURED / RCP_CONFIGURED: frame-level acceptance beyond the
-     * time-sync rule already applied above is unrestricted at this
-     * milestone -- register-level write filtering is
-     * rcp_lifecycle_field_writable()'s job, and full endpoint/stream routing
-     * is milestone 62's register-map job. */
+    if (state == RCP_LIFECYCLE_HW_CONFIGURED) {
+        /* TC18 §12.3.1.2 (a section whose own printed heading confusingly
+         * repeats "HW_UNCONFIGURED" -- verified against the primary-source
+         * PDF directly, not just the pre-extracted TC18.txt line range, to
+         * rule out an extraction artifact before trusting it; the
+         * section's actual content -- "access to HW_config...shall have
+         * been concluded and locked", advancing state to RCP_CONFIGURED,
+         * root-client write access -- is unambiguously HW_CONFIGURED's
+         * behavior, not HW_UNCONFIGURED's, whose own correctly-labeled
+         * §12.3.1.1 immediately precedes it and already matches this
+         * function's HW_UNCONFIGURED branch above): a TSCF-headed AVTPDU
+         * is dropped unconditionally, the same rule HW_UNCONFIGURED
+         * already applies above -- TSCF's presentation-time semantics
+         * still presuppose configuration (stream/byte_bus_id mapping,
+         * response queues) that does not exist until RCP_CONFIGURED, so a
+         * time-sync-capable server must not process timed requests here
+         * either, regardless of the general time-sync rule already
+         * applied at the top of this function.
+         *
+         * The same section also requires dropping ACF_GBB-format requests
+         * in HW_CONFIGURED (REQ-LIFECYCLE-029) -- deliberately NOT
+         * implemented here: every conditional request kind (compound/
+         * compound-wait/triggered/chained/timed/cancel, request_compound.h
+         * and siblings) is wire-encoded as ACF_GBB unconditionally (the
+         * mtv-repurposing scheme those modules' own file headers document
+         * at length), so an unconditional ACF_GBB drop would make it
+         * impossible to ever admit a conditional request while
+         * HW_CONFIGURED -- entangled with REQ-LIFECYCLE-032 (HW_CONFIGURED
+         * traffic should be restricted to configuration requests only,
+         * not yet implemented either) rather than being this narrower
+         * TSCF fix's own concern. Tracked and scoped as its own follow-up
+         * batch in issue #198, not attempted here. */
+        if (avtp_subtype == RCP_AVTP_SUBTYPE_TSCF) return false;
+
+        return true;
+    }
+
+    /* RCP_CONFIGURED: frame-level acceptance beyond the time-sync rule
+     * already applied above is unrestricted at this milestone --
+     * register-level write filtering is rcp_lifecycle_field_writable()'s
+     * job, and full endpoint/stream routing is milestone 62's
+     * register-map job. */
     return true;
 }
 
