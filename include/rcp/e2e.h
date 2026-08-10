@@ -480,6 +480,30 @@ rcp_e2e_wd_result_t rcp_e2e_wd_evaluate(bool rx_wd_enable, uint32_t rx_wd_timeou
                                          bool rx_wd_info_enable,
                                          uint64_t elapsed_since_last_kick_ms);
 
+/* ── Request-storage overflow ────────────────────────────────────────────── */
+
+//cfusa:req REQ-E2E-030
+/* TC18 §12.7.7 Table 22's rx_ovrflw_safestate_enable, evaluated the same
+ * shape as rcp_e2e_wd_evaluate() above: overflow has already happened by
+ * construction when a caller reaches this function (an endpoint's request
+ * storage is exhausted -- see rcp_server_endpoint_admit()'s
+ * RCP_ERROR_REQUEST_STORAGE_OVERFLOW path in server.c), so this is
+ * trivially rx_ovrflw_safestate_enable gated on nothing else. It exists as
+ * its own named, pure, directly-testable predicate -- rather than an
+ * inline `if (rx_ovrflw_safestate_enable)` at each call site -- because
+ * TC18 names it as a distinct configured behavior, and because the one
+ * caller currently in this codebase (rcp_server_endpoint_admit()) can only
+ * ever act on a single rcp_server_endpoint_t: TC18 requires this decision
+ * to drive every endpoint bound to the affected request stream into its
+ * configured safe state, and this library's current data model has no
+ * type representing "all endpoints on a stream" for a single endpoint's
+ * admit() call to reach across into. That escalation is therefore left to
+ * whichever future phase gives request streams their own cross-endpoint
+ * management (the same boundary e2e.h's file header already documents for
+ * rcp_e2e_watchdog_purge_should_keep()/_classify()); this function is the
+ * caller-facing decision such an orchestrator would consult. */
+bool rcp_e2e_overflow_should_enter_safe_state(bool rx_ovrflw_safestate_enable);
+
 /* ── rx_enforce_e2e: single-request drop vs. whole-stream latch-to-fault ───── */
 
 typedef enum {

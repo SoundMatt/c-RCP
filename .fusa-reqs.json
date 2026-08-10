@@ -8328,12 +8328,12 @@
     {
       "id": "REQ-E2E-030",
       "title": "request-storage-overflow safe-state escalation (rx_ovrflw_safestate_enable)",
-      "text": "NOT IMPLEMENTED: c-RCP does not implement rx_ovrflw_safestate_enable (TC18 \u00a712.7.7 Table 22, relative address 0x000D bit 5, 1 bit, R/W*), under which an overflow of any one endpoint's request storage shall bring all endpoints bound to that request stream into their configured safe state. server.h already detects the condition (a request-store-full admission outcome, include/rcp/server.h:216) but drops the request silently and never escalates. Consequence: an endpoint whose request storage is overrun loses requests with no configured safety reaction, so a client flooding one endpoint can silently desynchronize an entire stream's endpoint set.",
+      "text": "PARTIAL: c-RCP now reports rx_ovrflw_safestate_enable's (TC18 \u00a712.7.7 Table 22, relative address 0x000D bit 5, 1 bit, R/W*) triggering condition conformantly at the single-endpoint scope it owns -- rcp_server_endpoint_admit() sets *out_error = RCP_ERROR_REQUEST_STORAGE_OVERFLOW on a request-store-full admission outcome (src/server.c), which mock.c's finish_admission() (and any caller following the same pattern) turns into a real Table 27 error response via rcp_acf_build_error_response(). rcp_e2e_overflow_should_enter_safe_state() (include/rcp/e2e.h, src/e2e.c) is the pure rx_ovrflw_safestate_enable decision such escalation would be gated on. What remains not implemented: the stream-wide half of the rule -- bringing every OTHER endpoint bound to the same request stream into its configured safe state -- which rcp_server_endpoint_t's single-endpoint scope has no way to perform from inside admit() itself; TC18 \u00a713.6's per-stream rcp_server_endpoint_t model has no type representing \"all endpoints on a stream\" for this or any other module to reach across into. That escalation needs a caller-owned, cross-endpoint orchestrator that does not yet exist in this codebase.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.7.7 Table 22, TC18.txt L2880-L2882"
     },
     {

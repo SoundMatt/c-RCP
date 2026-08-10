@@ -32,6 +32,29 @@ the rationale.
 
 ## Releases
 
+### v0.148.0 -- 2026-08-09
+
+**Phase 5a batch 3: REQ-E2E-030 request-storage-overflow error code.**
+Issue #197. `rcp_server_endpoint_admit()` now sets
+`*out_error = RCP_ERROR_REQUEST_STORAGE_OVERFLOW` when an endpoint's
+request storage is full (TC18 §12.7.7 Table 22
+`rx_ovrflw_safestate_enable`), so a caller can build a real Table 27
+error response instead of the request being dropped with no
+diagnostic (`mock.c`'s `finish_admission()` already does this
+generically -- no `mock.c` change needed). Also adds
+`rcp_e2e_overflow_should_enter_safe_state()`, the pure decision
+primitive a future cross-endpoint orchestrator would consult to
+perform the stream-wide safe-state escalation TC18 also requires --
+which this single-endpoint call cannot itself perform, an honest
+architecture boundary documented in code and in `.fusa-reqs.json`
+(status moves `not-implemented` → `partial`, stays a tracked
+`tc18-gap`, not claimed `implemented`). Mutation-tested (the test file
+fails to build without the fix), full test suite + ASan/UBSan clean,
+fresh `cfusa check`/`trace` (0 errors, 100%/100%). See `ROADMAP.md`
+milestone 148 for full detail. 1028 requirements (unchanged count), 146
+`tc18-gap` entries remaining (unchanged count -- this one stays a gap
+entry, now `partial`).
+
 ### v0.147.0 -- 2026-08-09
 
 **Phase 5a batch 2: REQ-E2E-035 NTSCF-framed wrappers.** Issue #197.
