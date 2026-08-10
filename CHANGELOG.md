@@ -32,6 +32,30 @@ the rationale.
 
 ## Releases
 
+### v0.177.0 -- 2026-08-10
+
+**Phase 5d batch 7: REQ-RMAP-023 -- svr_lifecycle_state register-map
+field, Group 1 begins.** Issue #200. New `uint8_t svr_lifecycle_state`
+field on `rcp_regmap_general_t` (content modeling only). Scoping finding
+first: the only wire path into the general register map today
+(`rcp_discovery_encode_response()`) is deliberately scoped to just its
+leading 14-octet device-recognition slice -- REQ-RMAP-024's own separate,
+still-open gap -- so Group 1's items, this one included, are about
+register *content* correctness, not wire reachability; REQ-RMAP-023
+moves `not-implemented` -> `partial` accordingly, matching REQ-RMAP-061/
+065's own established split. `mock.h`'s `rcp_mock_server_t` (already
+holding both a bare `rcp_lifecycle_state_t` and an `rcp_regmap_general_t`
+side by side) is the concrete composition point: `rcp_mock_server_
+transition()` gains one line keeping the new field synced with the
+authoritative state on every transition, success or failure. Mutation-
+tested two ways (isolated sync-line removal fails the new test alone;
+full production-code revert with tests kept breaks the build). Full
+suite (65/65) + ASan/UBSan clean. Fresh `cfusa check`/`trace` (0 errors,
+100%/100%, three separate CI-matching invocations). See `ROADMAP.md`
+milestone 177 for full detail. 1030 requirements (unchanged), 110
+`tc18-gap` entries remaining (unchanged -- narrowed from
+`not-implemented` to `partial`, not removed).
+
 ### v0.176.0 -- 2026-08-10
 
 **Phase 5d batch 6: REQ-RMAP-064/065 -- the Flush_time trigger and

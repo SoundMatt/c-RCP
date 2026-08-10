@@ -9513,3 +9513,84 @@ discovery-adjacent work.** Per issue #200's own suggested order, next is
 Group 1 (§12.7.5 Table 18, RC Server general register map, 17 items,
 the largest group, splittable into sub-batches like the citation-backfill
 work in Phase 2).
+
+### 177. Phase 5d batch 7: `REQ-RMAP-023` -- `svr_lifecycle_state` register-map field, Group 1 begins (issue #200)
+
+**Scoping finding, before any code change**: re-reading `regmap.h`'s own
+file header and `discovery.h`'s exhaustive doc comments turned up an
+important dependency this milestone almost got backwards. The one and
+only wire path into `rcp_regmap_general_t` today is
+`rcp_discovery_encode_response()` (`discovery.c`), and it is
+*deliberately, explicitly* scoped to just the leading
+`RCP_DISCOVERY_GENERAL_SLICE_LEN` (14) octets -- "anything
+vendor/device-specific beyond that generic slice is explicitly out of
+this exchange's scope," per `discovery.h`'s own file header. That 14-
+octet ceiling, and the complete absence of any OTHER generic register
+read/write dispatch mechanism, is exactly `REQ-RMAP-024`'s own separate,
+already-catalogued, still-open item -- not something this batch (or any
+single Group 1 item) should try to fix as a side effect. Concluded: `-023`
+and the rest of Group 1's items (`-025` through `-039`, `-046`) are, like
+every completed item in this phase so far, about modeling register
+*content* correctly (matching `regmap.h`'s own stated "content now, wire
+dispatch is later phases' job" scope) -- NOT about making that content
+wire-reachable, which stays `-024`'s job and can be sequenced after Group
+1's content items settle (rewriting the wire-encode function once, after
+the struct's shape is final, rather than repeatedly as each item lands).
+
+New `uint8_t svr_lifecycle_state` field on `rcp_regmap_general_t`
+(regmap.h's own copy of `rcp_lifecycle_state_t`, not the authoritative
+one in `lifecycle.h`) closes `-023`'s content half. Zero-initializes
+correctly for free (0x00 == `RCP_LIFECYCLE_HW_UNCONFIGURED`, already
+covered by `rcp_regmap_general_init()`'s existing `memset`). Found the
+concrete, already-existing composition point rather than inventing one:
+`mock.h`'s `rcp_mock_server_t` already holds BOTH a bare
+`rcp_lifecycle_state_t state` AND an `rcp_regmap_general_t regmap` side
+by side -- the reference "caller composes" point this whole codebase's
+convention describes. `rcp_mock_server_transition()` gains one line
+syncing `regmap.svr_lifecycle_state` from `srv->state` unconditionally
+after every `rcp_lifecycle_transition()` call (correct on both success
+and failure, since `srv->state` itself already reflects the right
+post-call value either way per that function's own doc comment).
+
+**Honestly `partial`, not `implemented`** -- per the scoping finding
+above, a remote client still cannot read or write this field at all
+(it's outside the 14-octet slice `-024` still gates), so `REQ-RMAP-023`
+moves `not-implemented` -> `partial`, matching this phase's now-
+established pattern for a content-modeled-but-not-wire-reachable split
+(`REQ-RMAP-061`, `REQ-RMAP-065`).
+
+Rewrote the deviation pin (`test_lifecycle_state_is_not_a_register_map_
+entry`, whose own claim "rcp_regmap_general_t has no lifecycle-state
+field" is now false) into
+`test_lifecycle_state_register_field_tracks_the_authoritative_state`: a
+fresh server's field already matches its state's own default by
+construction; a rejected transition (`HW_UNCONFIGURED` ->
+`RCP_CONFIGURED`, skipping a state -- the one transition unconditionally
+invalid regardless of writer/idleness, chosen so the test needs no extra
+gating setup) leaves both fields untouched; a legal transition
+(`HW_UNCONFIGURED` -> `HW_CONFIGURED`) updates both.
+`REQ-RMAP-024`'s own dedicated pin
+(`test_general_map_wire_reach_stops_after_0x000d`) is untouched and
+still correctly failing -- this new field isn't wired into the discovery
+slice, so it doesn't disturb that test's own "everything past 0x000D
+reads back zero" assertion.
+
+Mutation-tested two ways: (1) an isolated removal of `mock.c`'s sync
+line (struct field kept, logic removed) -- fails the new test alone,
+confirming the SYNC behavior specifically is pinned, not just the
+field's existence; (2) full revert of the three production files
+(`regmap.h`/`regmap.c`/`mock.c`) with the test file's own changes kept
+-- breaks the BUILD (`no member named 'svr_lifecycle_state'`), confirming
+the whole change is load-bearing. Both restored clean, diff-verified
+byte-identical against pre-mutation backups. Full suite (65/65) +
+ASan/UBSan clean. Fresh `cfusa check` (0 errors) + all three separate
+`cfusa trace` invocations (100%/100%, 0 untested). 1030 requirements
+(unchanged), 110 `tc18-gap` entries remaining (unchanged -- `-023` was
+already counted there and stays there, just narrowed from
+`not-implemented` to `partial`).
+
+**Phase 5d progress after batch 7**: 8/47 items addressed (9 counting
+`REQ-RMAP-061`'s own partial progress). **Group 1 has begun.** Next:
+continue Group 1's remaining 16 items in table order, starting with
+`REQ-RMAP-025` (no read-only register class at all -- flagged
+security-relevant, pull-forward priority per issue #200's own text).

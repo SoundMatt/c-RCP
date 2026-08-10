@@ -258,6 +258,23 @@ typedef struct {
     uint16_t vendor_id;
     uint16_t device_id;
     uint16_t svr_ep_count;
+    uint8_t  svr_lifecycle_state; /* REQ-RMAP-023 (TC18 §12.3.1.1/§12.3.1.2):
+                                      the server's own rcp_lifecycle_state_t
+                                      (regmap.h's own copy, not lifecycle.h's
+                                      authoritative one -- a caller such as
+                                      mock.c's rcp_mock_server_t keeps the
+                                      two in sync after every successful
+                                      rcp_lifecycle_transition(), matching
+                                      this whole module's "caller composes"
+                                      convention). Content modeling only:
+                                      making this field actually READABLE
+                                      over the wire is REQ-RMAP-024's own
+                                      separate, still-open general
+                                      register-read-dispatch gap -- this
+                                      field's mere existence does not close
+                                      that requirement, and REQ-RMAP-023
+                                      itself stays "partial" (not
+                                      "implemented") until it does. */
     uint16_t svr_max_request_streams;
     uint16_t svr_max_sequencers;
     uint32_t svr_memory_capacity;

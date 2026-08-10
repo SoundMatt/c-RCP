@@ -38,10 +38,14 @@ bool rcp_regmap_options_group_consistent(uint32_t options)
 /* ── The general register map ──────────────────────────────────────────────── */
 
 //cfusa:req REQ-RMAP-003
+//cfusa:req REQ-RMAP-023
 void rcp_regmap_general_init(rcp_regmap_general_t *map)
 {
     memset(map, 0, sizeof(*map));
     map->svr_root_client_index = RCP_REGMAP_NO_ROOT_CLIENT;
+    /* svr_lifecycle_state == 0 == RCP_LIFECYCLE_HW_UNCONFIGURED, the
+     * correct default -- matches every real server's own starting
+     * rcp_lifecycle_state_t (see server.h/mock.h). */
 }
 
 /* ── Root-client / per-EP-restricted-client model ──────────────────────────── */

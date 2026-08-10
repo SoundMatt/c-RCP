@@ -8793,12 +8793,12 @@
     {
       "id": "REQ-RMAP-023",
       "title": "The lifecycle state is exposed as the svr_lifecycle_state register-map entry",
-      "text": "NOT IMPLEMENTED: c-RCP does not expose the lifecycle state as a register-map entry (TC18 \u00a712.3.1.1, \u00a712.3.1.2, \u00a712.4.1). rcp_regmap_general_t has no svr_lifecycle_state field, so a client can neither read the server's current lifecycle state (required after a cold start to decide whether further configuration is needed) nor drive a transition by writing it -- the only entry point is the in-process rcp_lifecycle_transition() call. Discovery of a server's readiness over the wire is therefore impossible.",
+      "text": "PARTIAL: the lifecycle state must be exposed as a register-map entry (TC18 \u00a712.3.1.1, \u00a712.3.1.2, \u00a712.4.1). rcp_regmap_general_t now carries a svr_lifecycle_state field (content modeling only), kept in sync with the authoritative rcp_lifecycle_state_t by rcp_mock_server_transition() -- the one caller today composing rcp_lifecycle_transition() with a regmap.h general block -- on every transition attempt, success or failure. What remains open: this field is not yet reachable over the wire at all (the discovery response only ever serializes the leading RCP_DISCOVERY_GENERAL_SLICE_LEN==14 octets, REQ-RMAP-024's own separate, still-open general-register-wire-exposure gap; svr_lifecycle_state falls outside that slice). A remote client therefore still cannot read this server's readiness or drive a transition by writing it over the wire -- only in-process consumers of the field can.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.3.1.1/\u00a712.3.1.2, TC18.txt L2167, L2186, L2198 (also \u00a712.4.1 L2291)"
     },
     {
