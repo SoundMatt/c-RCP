@@ -32,6 +32,31 @@ the rationale.
 
 ## Releases
 
+### v0.150.0 -- 2026-08-09
+
+**Phase 5a batch 5: REQ-E2E-031/033/041 CRC verification wired into
+mock.c's dispatch path.** Issue #197. Adds `rcp_mock_server_dispatch_e2e()`/
+`_dispatch_frame_e2e()`, new additive E2E-aware counterparts to
+`rcp_mock_server_dispatch()`/`_dispatch_frame()` (existing signatures
+untouched) that consult a new per-endpoint `req_crc_enable` flag
+(`rcp_mock_server_set_endpoint_req_crc_enable()`) and, when set, verify
+each request's CRC32 via `rcp_e2e_unwrap_framed()` before admission: a
+mismatch is never even admitted and produces a real Table 27
+`POCI_FAILURE` error response (`rcp_acf_build_error_response()`); a
+match dispatches the unwrapped payload normally. The frame variant
+verifies each member of a multi-ACF frame independently. This closes
+the "biggest architecture decision in the phase" flagged since batch 1:
+the two pure primitives added in batches 3-4 were correct but
+unreachable from any real call path until now. `.fusa-reqs.json`'s
+`REQ-E2E-031`/`REQ-E2E-033`/`REQ-E2E-041` move `tc18-gap`/`partial` ->
+`tc18` (fully implemented). Mutation-tested (the test file fails to
+build without the fix, 12 errors), full suite + ASan/UBSan clean
+(first batch this session adding new heap alloc/free paths), fresh
+`cfusa check`/`trace` (0 errors, 100%/100%). See `ROADMAP.md` milestone
+150 for full detail. 1028 requirements (unchanged count), 143
+`tc18-gap` entries remaining (was 146 -- the first net decrease since
+Phase 5a began).
+
 ### v0.149.0 -- 2026-08-09
 
 **Phase 5a batch 4: REQ-E2E-028/029 sequence-number enforcement

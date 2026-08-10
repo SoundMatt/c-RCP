@@ -7291,3 +7291,105 @@ restoring the fix rebuilds and passes clean again. Full test suite
 `cfusa trace --req-coverage 100 --sec-tested 100` (100%/100%). 1028
 requirements (unchanged count), 146 `tc18-gap` entries remaining
 (unchanged count -- both stay gap entries, now `partial`).
+
+### 150. Phase 5a batch 5: REQ-E2E-031/033/041 CRC verification wired into mock.c's dispatch path (issue #197)
+
+Batches 3-4 both landed real, correct, pure primitives
+(`rcp_e2e_overflow_should_enter_safe_state()`,
+`rcp_e2e_seq_evaluate()`) that turned out to be unreachable from any
+real call path: `mock.c`'s dispatch pipeline
+(`rcp_mock_server_dispatch()`/`_dispatch_frame()`) never threads
+AVTP-level context (`stream_id`, `avtp_timestamp`, `sequence_num`) down
+to where `rcp_server_endpoint_admit()` or any E2E primitive could
+consume it -- the AVTPDU header is decoded and discarded by whatever
+caller demultiplexes a frame, one layer above `dispatch_frame()`. This
+batch is the deferred "biggest architecture decision in the phase":
+wiring CRC verification into a real dispatch path for the first time.
+
+TC18 §13.6's CRC-mismatch handling was already correct at the
+primitive level (`rcp_e2e_unwrap()` reports `RCP_E2E_ERR_CRC_MISMATCH`,
+`rcp_e2e_wire_error()` maps it to `RCP_ERROR_POCI_FAILURE`) -- what was
+missing was any caller and any error-response emitter
+(`REQ-E2E-041`), any code path consulting `ep_req_crc_enable`
+(`REQ-E2E-031`), and any per-member verification across a multi-ACF
+frame (`REQ-E2E-033`).
+
+Following the established API-safety pattern (never break
+`rcp_mock_server_dispatch()`/`_dispatch_frame()`'s existing signatures
+-- 4 real call sites across the test suite depend on them unchanged),
+this batch adds:
+
+  - `rcp_mock_server_set_endpoint_req_crc_enable()`: a new setter
+    storing this test double's own in-process stand-in for TC18
+    §12.7.1's `ep_req_crc_enable` on a new field of the internal
+    (non-public) `rcp_mock_endpoint_slot_t`. Necessary because
+    `ep_req_crc_enable` lives in `rcp_regmap_ep_functional_cfg_t`,
+    which every concrete endpoint type's own cfg struct composes as a
+    different concrete type -- `mock.c`'s type-erased dispatch layer
+    has no generic way to read it, the same architecture reason every
+    other config field `mock.c` models (`ep_enable`, `ep_delay_time`,
+    ...) is already its own direct C-API setter rather than a
+    register-map read.
+  - `RCP_MOCK_DISPATCH_CRC_ERROR`: a new, additive
+    `rcp_mock_dispatch_result_t` enum value (appended, not
+    renumbering).
+  - `rcp_mock_server_dispatch_e2e()`: `rcp_mock_server_dispatch()`'s
+    E2E-aware counterpart. For an endpoint with `req_crc_enable` set,
+    `request` is first run through `rcp_e2e_unwrap_framed()`
+    (`is_ntscf_framed` derived from `avtp_subtype ==
+    RCP_AVTP_SUBTYPE_NTSCF`, not a separate parameter, so a caller
+    cannot pass an inconsistent combination of the two). On
+    `RCP_E2E_ERR_CRC_MISMATCH`: `rcp_server_endpoint_admit()` is never
+    called at all (not admitted, not merely not-executed) and
+    `rcp_acf_build_error_response()` builds a genuine Table 27
+    `POCI_FAILURE` response, byte_bus_id/transaction_num read back out
+    of the request's own (CRC-failure-unaffected) header via
+    `rcp_acf_unpack_header()` -- the exact pattern `finish_admission()`
+    already established for other determined error codes. On
+    `RCP_E2E_ERR_SHORT_FRAME`: same rejection, but `*out_response` is
+    left zeroed (too short to read a `transaction_num` from, the same
+    "`RCP_ERROR_NONE` means no determined code" convention this
+    codebase already follows elsewhere). On `RCP_E2E_OK`: dispatch
+    proceeds against the unwrapped header-and-payload region via the
+    existing `rcp_mock_server_dispatch()`, unchanged otherwise. An
+    endpoint without `req_crc_enable` set (including an unknown
+    `byte_bus_id`) delegates to `rcp_mock_server_dispatch()` outright --
+    "plain command mode" is untouched.
+  - `rcp_mock_server_dispatch_frame_e2e()`: `rcp_mock_server_dispatch_frame()`'s
+    E2E-aware counterpart -- identical member-splitting/chaining logic,
+    but each member routed through `rcp_mock_server_dispatch_e2e()`
+    instead, so each E2E-protected member of a multi-ACF frame is
+    verified against its own CRC32 individually (`REQ-E2E-033`): a
+    corrupted second member does not block, and is not masked by, a
+    valid first member.
+
+`.fusa-reqs.json`'s `REQ-E2E-031`/`REQ-E2E-033`/`REQ-E2E-041` all move
+`scope: "tc18-gap"`/`status: "partial"` -> `scope: "tc18"` (no
+`status` field, matching this file's dominant convention for a fully
+implemented entry -- see this milestone's own verification note below
+for why the earlier `REQ-E2E-035`/`REQ-E2E-042` fixes' `status`-field
+removal, not `"implemented"` retained, is the correct precedent to
+follow: 849 of 882 `scope: "tc18"` entries in this file have no
+`status` field at all).
+
+7 new tests in `tests/test_tc18_gaps_e2e.c`: plain-mode-executes,
+safe-mode-executes-a-valid-request, safe-mode-rejects-an-unprotected-
+request, dispatch_frame_e2e-verifies-each-member-independently, and
+dispatch_e2e-crc-mismatch-yields-a-real-error-response -- replacing the
+three now-obsolete "DEVIATION PIN" tests (which asserted the exact
+absence this batch fixes) while keeping the underlying raw-primitive
+assertions those tests also made (still accurate, unchanged
+contracts).
+
+Mutation-tested: reverting the fix (`git stash` on `src/mock.c`,
+`include/rcp/mock.h`) fails the test file's *build* (12 errors:
+undeclared `rcp_mock_server_dispatch_e2e`/`_dispatch_frame_e2e`/
+`_set_endpoint_req_crc_enable`, undeclared `RCP_MOCK_DISPATCH_CRC_ERROR`)
+-- restoring the fix rebuilds and passes clean again. Full test suite
+(64/64) + ASan/UBSan build both clean (this batch is the first to add
+new heap-allocating/freeing code paths this session, making the ASan
+pass especially load-bearing here -- clean). Fresh `cfusa check` (0
+errors) + `cfusa trace --req-coverage 100 --sec-tested 100`
+(100%/100%). 1028 requirements (unchanged count), 143 `tc18-gap`
+entries remaining (was 146 -- three genuinely closed this batch, the
+first net decrease since Phase 5a began).
