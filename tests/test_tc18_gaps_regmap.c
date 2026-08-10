@@ -672,14 +672,39 @@ static void test_reserved_register_at_0x22_is_indistinguishable_from_zero_fill(v
     TEST_ASSERT_TRUE(span_is_zero(buf, 0x0E, 0x0E)); /* a real register: also 0 */
 }
 
-/* TC18 §12.7.5 Table 18: svr_io_pin_count is a 16-bit R register at
- * 0x0018 and is the authoritative extent of the §12.7.6 HW_config table;
- * svr_hw_cfg_ptr is a 16-bit R pointer at 0x001A. Deviation: c-RCP has no
- * svr_io_pin_count at all, and models the pointer as an
- * rcp_regmap_table_ref_t whose offset is 32 bit in this project's own
- * "register word" unit (not a 16-bit octet address) and which carries an
- * extra capacity member TC18 does not define for HW_config. */
-static void test_io_pin_count_absent_and_hw_cfg_ptr_mis_shaped(void)
+/* REQ-RMAP-032 (TC18 §12.7.5 Table 18): svr_io_pin_count is a 16-bit R
+ * register at 0x0018, the §12.7.6-authoritative extent of the HW_config
+ * table (Table 19). rcp_regmap_general_t now declares this field. Still
+ * open: nothing in this codebase yet allocates or bounds a real
+ * HW_config table against it (Group 2's own scope, issue #200 items
+ * -040 through -045) -- content modeling only, same REQ-RMAP-024
+ * wire-reachability boundary as every other Group 1 item, so this test
+ * still observes 0x0018-0x0019 reading back as zero, produced by
+ * read_general()'s generic buffer zero-fill rather than the field being
+ * dispatched onto the wire yet. */
+static void test_io_pin_count_is_now_explicitly_modeled(void)
+{
+    rcp_regmap_general_t map;
+    uint8_t              buf[0x1A];
+
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_io_pin_count));
+
+    rcp_regmap_general_init(&map);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_io_pin_count);
+    map.svr_io_pin_count = 0x0020u;
+    TEST_ASSERT_EQUAL_UINT16(0x0020u, map.svr_io_pin_count);
+
+    read_general(&map, (uint8_t)sizeof(buf), buf);
+    TEST_ASSERT_TRUE(span_is_zero(buf, 0x18, 0x19)); /* svr_io_pin_count */
+}
+
+/* TC18 §12.7.5 Table 18: svr_hw_cfg_ptr is a 16-bit R pointer at 0x001A
+ * (REQ-RMAP-033, still open, not addressed by this batch). Deviation:
+ * c-RCP models the pointer as an rcp_regmap_table_ref_t whose offset is
+ * 32 bit in this project's own "register word" unit (not a 16-bit octet
+ * address) and which carries an extra capacity member TC18 does not
+ * define for HW_config. */
+static void test_hw_cfg_ptr_mis_shaped(void)
 {
     rcp_regmap_general_t map = populated_map();
     uint8_t              buf[0x1C];
@@ -690,7 +715,6 @@ static void test_io_pin_count_absent_and_hw_cfg_ptr_mis_shaped(void)
     TEST_ASSERT_EQUAL_HEX16(0x0008u, map.hw_pin_map.capacity);
 
     read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x18, 0x19)); /* svr_io_pin_count */
     TEST_ASSERT_TRUE(span_is_zero(buf, 0x1A, 0x1B)); /* svr_hw_cfg_ptr */
 }
 
@@ -1557,7 +1581,8 @@ int main(void)
     RUN_TEST(test_implemented_options_now_matches_table_18_exactly);
     RUN_TEST(test_reserved_octet_at_0x17_is_now_explicitly_modeled);
     RUN_TEST(test_reserved_register_at_0x22_is_indistinguishable_from_zero_fill);
-    RUN_TEST(test_io_pin_count_absent_and_hw_cfg_ptr_mis_shaped);
+    RUN_TEST(test_io_pin_count_is_now_explicitly_modeled);
+    RUN_TEST(test_hw_cfg_ptr_mis_shaped);
     RUN_TEST(test_stream_cfg_pointer_capacity_pairs_are_collapsed);
     RUN_TEST(test_ep_cfg_and_bytebus_map_pointers_are_mis_shaped);
     RUN_TEST(test_four_optional_subsystem_pointer_pairs_are_absent);
