@@ -169,6 +169,27 @@ static bool span_is_zero(const uint8_t *buf, size_t from, size_t to)
     return true;
 }
 
+/* ── §13.7.1.2: effective register-write payload length ───────────────────── */
+
+static void test_reg_write_len_matches_the_formula(void)
+{
+    /* REQ-RMAP-069 (TC18 §13.7.1.2): "Effective number of bytes to be
+     * written = (acf_msg_length - 3) x 4 - pad." acf_msg_length=3 (the
+     * fixed address(+CRC) region alone, no data) with no pad yields 0
+     * data octets. acf_msg_length=5 (2 quadlets = 8 octets of data
+     * region) with pad=2 yields 8-2=6 data octets. */
+    TEST_ASSERT_EQUAL_UINT(0u, rcp_acf_reg_write_len(3u, 0u));
+    TEST_ASSERT_EQUAL_UINT(6u, rcp_acf_reg_write_len(5u, 2u));
+    TEST_ASSERT_EQUAL_UINT(4u, rcp_acf_reg_write_len(4u, 0u));
+
+    /* Fail-safe: a malformed/adversarial frame (acf_msg_length too small
+     * to hold the fixed region, or pad exceeding what remains) never
+     * underflows to a huge size_t -- it reads as 0 effective octets. */
+    TEST_ASSERT_EQUAL_UINT(0u, rcp_acf_reg_write_len(2u, 0u));
+    TEST_ASSERT_EQUAL_UINT(0u, rcp_acf_reg_write_len(0u, 0u));
+    TEST_ASSERT_EQUAL_UINT(0u, rcp_acf_reg_write_len(4u, 5u));
+}
+
 /* ── §12.7.1: the generic evt[2:0] == 111b configuration request ──────────── */
 
 /* TC18 §12.7.1 / Figure 18 defines ONE generic configuration request --
@@ -1187,21 +1208,23 @@ static void test_field_write_error_distinguishes_state_from_writer_denial(void)
     TEST_ASSERT_EQUAL_INT(4, (int)RCP_ERROR_LOCKED_MEM_ACCESS);
 }
 
-/* TC18 §13.7.1.2 gives the effective number of register-write DATA octets
- * as (acf_msg_length - 3) x 4 - pad. Deviation: c-RCP has no such helper;
- * rcp_acf_pad_len() computes padding only, and a caller recovers the data
- * length from the decoder's own payload_len instead. Asserted here on a
- * real 5-octet ACF_ABB payload: pad and acf_msg_length are both carried
- * correctly, the decoder reports 5 octets, and the spec's own formula
- * evaluates to 1 against this encoding -- so the two are not
- * interchangeable and the helper genuinely does not exist. */
-static void test_effective_register_write_length_helper_absent(void)
+/* REQ-RMAP-069 (TC18 §13.7.1.2): the effective number of register-write
+ * DATA octets is (acf_msg_length - 3) x 4 - pad -- distinct from, and not
+ * interchangeable with, the raw ACF payload_len rcp_acf_decode_abb()
+ * reports (which spans the whole payload, address/CRC region included).
+ * rcp_acf_reg_write_len() now provides this formula directly; asserted
+ * here against a real 5-octet ACF_ABB encoding, confirming pad and
+ * acf_msg_length are carried correctly and the helper's own answer
+ * matches the spec formula exactly (by construction) while remaining
+ * genuinely different from the decoder's own payload_len -- the two
+ * numbers answer different questions, and a caller must not conflate
+ * them. */
+static void test_effective_register_write_length_helper_matches_the_formula(void)
 {
     rcp_acf_byte_message_info_t hdr;
     rcp_bytes_t                 msg;
     const uint8_t              *payload;
     size_t                      payload_len;
-    long                        by_formula;
     const uint8_t               data[5] = {1, 2, 3, 4, 5};
 
     TEST_ASSERT_EQUAL_UINT8(0u, rcp_acf_pad_len(8u));
@@ -1220,9 +1243,10 @@ static void test_effective_register_write_length_helper_absent(void)
     TEST_ASSERT_EQUAL_UINT8(3u, hdr.pad);
     TEST_ASSERT_EQUAL_UINT16(4u, hdr.acf_msg_length);
 
-    by_formula = ((long)hdr.acf_msg_length - 3) * 4 - (long)hdr.pad;
-    TEST_ASSERT_EQUAL_INT(1, (int)by_formula);
-    TEST_ASSERT_NOT_EQUAL((int)payload_len, (int)by_formula);
+    TEST_ASSERT_EQUAL_UINT((size_t)1u,
+                           rcp_acf_reg_write_len(hdr.acf_msg_length, hdr.pad));
+    TEST_ASSERT_NOT_EQUAL((int)payload_len,
+                          (int)rcp_acf_reg_write_len(hdr.acf_msg_length, hdr.pad));
     rcp_bytes_free(&msg);
 }
 
@@ -1230,6 +1254,7 @@ int main(void)
 {
     UNITY_BEGIN();
 
+    RUN_TEST(test_reg_write_len_matches_the_formula);
     RUN_TEST(test_generic_config_request_is_pwm_out_only);
     RUN_TEST(test_ep_len_overrun_rule_exists_only_for_pwm_out);
     RUN_TEST(test_discovery_claim_refusal_is_unreportable);
@@ -1264,7 +1289,7 @@ int main(void)
     RUN_TEST(test_transmit_fragmentation_not_bounded_by_max_avtpdu_size);
     RUN_TEST(test_ep0_functional_block_and_discovery_timeout_absent);
     RUN_TEST(test_field_write_error_distinguishes_state_from_writer_denial);
-    RUN_TEST(test_effective_register_write_length_helper_absent);
+    RUN_TEST(test_effective_register_write_length_helper_matches_the_formula);
 
     return UNITY_END();
 }

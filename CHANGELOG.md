@@ -32,6 +32,29 @@ the rationale.
 
 ## Releases
 
+### v0.171.0 -- 2026-08-10
+
+**Phase 5d batch 1: REQ-RMAP-069 -- effective register-write payload
+length helper.** Issue #200. First batch of Phase 5d (RMAP register-map
+exposure gaps, chosen to go next over Phase 5e since issue #200 already
+gives a concrete implementation order). The suggested warm-up: new
+`acf.h` function `rcp_acf_reg_write_len(acf_msg_length, pad)` -- TC18
+§13.7.1.2's "Effective number of bytes to be written = (acf_msg_length
+- 3) x 4 - pad," a pure arithmetic helper alongside the existing
+`rcp_acf_pad_len()`. Fail-safe on a malformed frame: returns 0, never
+underflowing, for a too-small `acf_msg_length` or a `pad` exceeding
+what remains. Purely additive -- no existing signature changed. Found
+and rewrote a pre-existing deviation pin
+(`test_effective_register_write_length_helper_absent`) that an initial
+grep for the requirement id's literal string had missed (it cited the
+TC18 section number in its own comment instead). Mutation-tested two
+ways: full revert breaks the BUILD; a signature-preserving logic
+mutation (pad ignored) fails both tests exercising a nonzero pad. Full
+suite (64/64) + ASan/UBSan clean. Fresh `cfusa check`/`trace` (0
+errors, 100%/100%, three separate CI-matching invocations). See
+`ROADMAP.md` milestone 171 for full detail. 1030 requirements
+(unchanged), 115 `tc18-gap` entries remaining (was 116).
+
 ### v0.170.0 -- 2026-08-10
 
 **Phase 5c batch 8: REQ-PWRMODE-014/015 close Group 4 -- Phase 5c is

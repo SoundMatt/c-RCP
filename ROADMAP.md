@@ -9050,8 +9050,69 @@ remaining (was 118).
 **Phase 5c is now complete: all 15 items across all 4 groups addressed**
 (14 closed outright, 1 -- `REQ-PWRMODE-019` -- left `partial` with a
 real architecture-limit citation from batch 1; every group is now fully
-closed, no items deferred). Issue #199 can be closed. **Next**: Phase 5d
-(issue #200, task #88, RMAP register-map exposure gaps, 47
-requirements) or Phase 5e (issue #201, task #89, remaining per-module
-gaps, 59 requirements) -- scope which one starts first before writing
-any code, per this phase's own standing discipline.
+closed, no items deferred). Issue #199 can be closed.
+
+**Phase 5d chosen to go next** (issue #200, task #88, RMAP register-map
+exposure gaps, 47 requirements across 6 groups) over Phase 5e (issue
+#201, 59 requirements) -- issue #200 itself gives a concrete,
+already-scoped implementation order (its own "Suggested implementation
+order" section), whereas #201's per-module gap list has no equivalent
+sequencing yet; following an author's own stated order is lower-risk
+than inventing one. Issue #200's suggested order starts with Group 5's
+`REQ-RMAP-069` as a small, isolated warm-up.
+
+### 171. Phase 5d batch 1: REQ-RMAP-069 -- effective register-write payload length helper (issue #200)
+
+The suggested warm-up. TC18 §13.7.1.2 re-read in full: "Effective number
+of bytes to be written = (acf_msg_length - 3) x 4 – pad." New `acf.h`
+function `rcp_acf_reg_write_len(acf_msg_length, pad)` -- a pure
+arithmetic helper, the same scope class as the existing
+`rcp_acf_pad_len()` it sits beside (added, not modified). Fail-safe on a
+malformed/adversarial frame: returns 0, never underflowing to a huge
+`size_t`, if `acf_msg_length` is too small to hold the fixed 3-quadlet
+region the formula subtracts, or if `pad` exceeds what remains after
+subtracting it.
+
+Purely additive (no existing function's signature changed, no existing
+call site touched) -- the smallest-blast-radius kind of change this
+phase's predecessor (Phase 5c) repeatedly favored when available.
+
+**Found a pre-existing deviation pin I'd missed on first grep**:
+`test_tc18_gaps_regmap.c`'s own `test_effective_register_write_length_helper_absent()`
+already demonstrated this exact gap (grep for the requirement id's own
+tag comment missed it, since the function's own comment cited the TC18
+section number rather than the literal "REQ-RMAP-069" string) --
+rewritten to `test_effective_register_write_length_helper_matches_the_formula()`,
+now asserting the new helper's output directly against a real 5-octet
+ACF_ABB encoding, while keeping its own original, valuable point: the
+new helper's answer is NOT the same number as the ACF decoder's own
+`payload_len` (which spans the whole payload including the
+address/CRC region) -- the two answer different questions and must not
+be conflated. A second, purely synthetic unit test
+(`test_reg_write_len_matches_the_formula`) added separately, exercising
+the formula's edge cases (zero-length, exact-fit, and the two
+fail-safe underflow guards) without needing a real wire encoding.
+**Lesson for the rest of this phase**: grep for a requirement id's
+literal string in test files is not sufficient to find every existing
+deviation pin for it -- some pins (like this one) cite the TC18 section
+number in their own comment instead of the catalog id. Read each
+group's test file's own section-comment headers, not just its
+`//cfusa:test` id list, before assuming no prior pin exists.
+
+Mutation-tested TWO ways: (1) a full revert of `acf.h`/`acf.c` breaks
+the BUILD (both tests reference the new function, undeclared without
+it); (2) a signature-preserving logic mutation (`pad` ignored,
+formula's subtraction dropped) leaves the build green but fails BOTH
+tests that exercise a nonzero `pad` (the synthetic test's `pad=2` case
+and the real-encoding test's `pad=3` case) -- confirming the pad
+subtraction itself, not just the function's existence, is pinned. Full
+suite (64/64) + ASan/UBSan clean, pre- and post-restore for both
+mutations. Fresh `cfusa check` (0 errors) + `cfusa trace --gaps`/
+`--req-coverage 100`/`--sec-tested 100` (three separate CI-matching
+invocations; 100%/100%, 0 untested). 1030 requirements (unchanged), 115
+`tc18-gap` entries remaining (was 116).
+
+**Phase 5d progress after batch 1**: 1/47 items addressed. **Next**:
+Group 4 (§12.7.9 Table 24, response/ack queue config, 7 items) per
+issue #200's own suggested order -- self-contained, includes the real
+server-liveness-heartbeat gap (`REQ-RMAP-065`).

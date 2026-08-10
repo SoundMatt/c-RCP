@@ -405,6 +405,28 @@ rcp_acf_errc_t rcp_acf_unpack_header(const uint8_t in[8], rcp_acf_byte_message_i
  * same pad/quadlet accounting rcp_acf_encode_abb()/_gbb() use internally. */
 uint8_t rcp_acf_pad_len(size_t unpadded_len);
 
+/* The effective number of octets to be written by an EP0 register-write
+ * request -- REQ-RMAP-069 (TC18 §13.7.1.2): "Effective number of bytes to
+ * be written = (acf_msg_length - 3) x 4 - pad." acf_msg_length is the
+ * decoded header field of the same name (this function does no decoding
+ * of its own -- a caller passes hdr.acf_msg_length/hdr.pad straight
+ * through, mirroring rcp_acf_pad_len()'s own "small pure arithmetic
+ * helper" scope); the fixed 3-quadlet region this formula subtracts is
+ * the 16-bit address plus (in safe mode) its CRC, per TC18's own Figure
+ * 21 -- this function does not itself distinguish safe-mode framing from
+ * plain, since the formula is the same regardless of what fills that
+ * region.
+ *
+ * Returns 0, never underflowing to a huge size_t, if acf_msg_length is
+ * too small to contain the fixed 3-quadlet region at all (< 3), or if
+ * pad exceeds what remains after subtracting it -- both cases describe a
+ * malformed or adversarial frame, and 0 effective data octets is this
+ * function's own fail-safe reading of that, not an out-of-band error
+ * code (this is a pure arithmetic helper, like rcp_acf_pad_len(); a
+ * caller wanting frame-level rejection uses rcp_acf_unpack_header()'s own
+ * validation first). */
+size_t rcp_acf_reg_write_len(uint16_t acf_msg_length, uint8_t pad);
+
 /* ── ACF_ABB ───────────────────────────────────────────────────────────────── */
 
 /* Encodes hdr plus a payload of payload_len octets (payload may be NULL
