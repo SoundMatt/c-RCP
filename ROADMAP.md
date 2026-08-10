@@ -10021,3 +10021,77 @@ itself is still `tc18-gap`, narrowed text only).
 counting `REQ-RMAP-061`'s own partial progress). Group 1: 7/18 items.
 Next: continue Group 1 in table order -- `REQ-RMAP-031` (reserved
 octet at 0x0017).
+
+### 184. Phase 5d batch 14: `REQ-RMAP-031` -- reserved octet at 0x0017 now explicitly modeled (issue #200)
+
+A small, contained batch after batch 13's outsized one, deliberately
+scoped to exactly the reserved-register question and nothing more.
+Verified `rcp_discovery_encode_response()`'s implementation directly
+before writing any code, to rule out a real concern raised by batch
+13's `svr_implemented_options` field shrink (`uint32_t` -> `uint8_t`,
+a 3-octet reduction): if the encoder packed the general register map
+by literal struct layout (a plain `memcpy` of the whole struct, field
+order determining wire position), that shrink could have silently
+shifted every later field's absolute address by -3 octets, breaking
+this and every subsequent Group 1 item's own documented TC18 address
+without any test catching it. It does not -- `rcp_discovery_encode_
+response()` only ever writes five named fields (`magic`/`svr_version`/
+`vendor_id`/`device_id`/`svr_ep_count`) into the leading
+`RCP_DISCOVERY_GENERAL_SLICE_LEN` (0x000D) octets and `memset`s
+everything else in its 256-octet scratch buffer to zero; nothing in
+this codebase is wire-packed by struct layout at all yet -- that is
+exactly `REQ-RMAP-024`'s own still-open gap. Confirmed, not assumed.
+
+TC18 §12.7.5 Table 18 reserves the 8-bit register at 0x0017 and
+requires it to read 0x00. Before this batch that was already
+functionally true, but only as an accidental byproduct of the
+encoder's generic zero-fill beyond the discovery slice -- nothing in
+`rcp_regmap_general_t` named or documented this octet as deliberately
+reserved. New `uint8_t reserved_0x17` field, zero-initializing for
+free via the struct's existing `memset`; no setter exists anywhere in
+this codebase, so a caller cannot construct a nonzero value in the
+first place (`populated_map()`, the test helper that gives every OTHER
+field in this struct a distinctive nonzero value, deliberately leaves
+this one alone). This documents the octet as intentional, and gives a
+future `REQ-RMAP-024` wire-dispatch implementation a concrete field to
+write zero from, rather than depending on whatever generic buffer
+zero-fill happens to still exist in the encoder at that point --
+without this field, a future encoder rewrite (e.g. moving from
+"zero-fill then overwrite known fields" to a real per-register
+field-by-field encoder) has nothing in the struct signaling this octet
+needs an explicit zero write, and could silently drop the reserved
+guarantee.
+
+**Split a stale-prone combined deviation pin proactively**, applying
+this phase's own established "split before it's stale" discipline
+(first used Phase 5d batch 2): the existing test bundled the 0x0017
+reserved octet (this batch) with the SEPARATE 0x0022 reserved register
+(`REQ-RMAP-035`, still open) in one function. Split into
+`test_reserved_octet_at_0x17_is_now_explicitly_modeled()` (new,
+positive -- proves the field exists, is 1 octet, zero-inits, and still
+reads correctly through `read_general()`) and
+`test_reserved_register_at_0x22_is_indistinguishable_from_zero_fill()`
+(kept, narrowed to `-035` only, dropping the now-closed 0x0017
+assertion but keeping the illustrative "a real register also reads
+zero here" comparison point, since that observation is still valid and
+useful for `-035`'s own remaining gap).
+
+Mutation-tested: full header-only revert with the split test file kept
+-- breaks the build (`no member named 'reserved_0x17'`) -- sufficient
+rigor for a field with zero computed logic, matching batches 10/12's
+established precedent (not the paired-mutation treatment used for
+fields with real sync/derivation logic, since a reserved octet has
+none). Restored clean, diff-verified byte-identical against a
+pre-mutation backup. Full suite (65/65, net +1 test) + ASan/UBSan
+clean. Fresh `cfusa check` (0 errors) + all three separate `cfusa
+trace` invocations (100%/100%, 0 untested). `REQ-RMAP-031` moves
+`not-implemented` -> `partial` (not fully closed -- still blocked on
+`REQ-RMAP-024`'s wire-reachability gap like every other Group 1 item).
+1030 requirements (unchanged), 110 `tc18-gap` entries remaining
+(unchanged -- narrowed from `not-implemented` to `partial`).
+
+**Phase 5d progress after batch 14**: 15/47 items addressed (16
+counting `REQ-RMAP-061`'s own partial progress). Group 1: 8/18 items.
+Next: continue Group 1 in table order -- `REQ-RMAP-032`
+(`svr_io_pin_count`, 0x0018, missing -- also the authority §12.7.6's
+HW_config table depends on).

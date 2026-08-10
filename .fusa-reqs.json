@@ -8885,13 +8885,13 @@
     },
     {
       "id": "REQ-RMAP-031",
-      "title": "The reserved octet at 0x0017 must read 0x00",
-      "text": "NOT IMPLEMENTED: TC18 \u00a712.7.5 Table 18 reserves the 8-bit register at absolute address 0x0017 and requires it to read 0x00. c-RCP models no reserved field in rcp_regmap_general_t and no absolute-address layout for the general register map, so a read of 0x0017 returns nothing defined. Consequence: forward compatibility is not preserved \u2014 a client that reads the block cannot rely on the reserved octet being zero.",
+      "title": "The reserved octet at 0x0017 is now explicitly modeled and reads 0x00",
+      "text": "PARTIAL: TC18 \u00a712.7.5 Table 18 reserves the 8-bit register at absolute address 0x0017 and requires it to read 0x00. rcp_regmap_general_t now declares an explicit reserved_0x17 field for this octet, zero-initializing for free via the existing memset in rcp_regmap_general_init(); no setter exists anywhere in this codebase to construct a nonzero value. This documents the octet as deliberately reserved (not merely forgotten) and gives a future wire-dispatch implementation a concrete field to write 0x00 from. What remains open: this address (0x0017) falls past the discovery response's own 0x000D wire-reachability ceiling (REQ-RMAP-024, still open), so a client still cannot read this octet over the wire; the correct zero value observed today is still produced by the encoder's own generic buffer zero-fill beyond that ceiling, not by this field being dispatched.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.7.5 Table 18, TC18.txt L2562"
     },
     {
