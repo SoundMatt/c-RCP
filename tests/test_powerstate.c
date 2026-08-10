@@ -286,7 +286,7 @@ static void test_wake_via_pin_hot_when_handshake_complete(void)
 
     put_to_sleep(m, ADDR, 1);
 
-    TEST_ASSERT_TRUE(rcp_powerstate_manager_handshake_begin(m, ADDR, 3));
+    TEST_ASSERT_TRUE(rcp_powerstate_manager_handshake_begin(m, ADDR, 3, true));
 
     probe = rcp_powerstate_manager_encode_wakeup_probe(m, ADDR, 9);
     TEST_ASSERT_NOT_NULL(probe.data);
@@ -338,7 +338,7 @@ static void test_apply_wakeup_echo_wrong_txn_not_echoed(void)
     rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(endpoints, 1);
     rcp_bytes_t echo;
 
-    TEST_ASSERT_TRUE(rcp_powerstate_manager_handshake_begin(m, ADDR, 1));
+    TEST_ASSERT_TRUE(rcp_powerstate_manager_handshake_begin(m, ADDR, 1, true));
 
     echo = rcp_ep_wakeup_encode_wakeup_message(ADDR.byte_bus_id, 1);
     /* sent_transaction_num (2) doesn't match the echo's own txn (1): not
@@ -353,7 +353,7 @@ static void test_apply_wakeup_echo_wrong_txn_not_echoed(void)
 static void test_handshake_begin_unknown_endpoint(void)
 {
     rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(NULL, 0);
-    TEST_ASSERT_FALSE(rcp_powerstate_manager_handshake_begin(m, ADDR, 3));
+    TEST_ASSERT_FALSE(rcp_powerstate_manager_handshake_begin(m, ADDR, 3, true));
     rcp_powerstate_manager_destroy(m);
 }
 

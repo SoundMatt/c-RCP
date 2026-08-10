@@ -330,7 +330,7 @@ static void test_pwrmode_resume_reenables_all_endpoints(void)
                                 see to_rcp_configured()'s own comment */
 
     rcp_pwrmode_handshake_init(&hs, 3u);
-    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_iface_reenabled(&hs));
+    TEST_ASSERT_TRUE(rcp_pwrmode_handshake_iface_reenabled(&hs, true));
     TEST_ASSERT_TRUE(rcp_pwrmode_handshake_wakeup_attempt(&hs, true));
 
     /* Still disabled -- resume hasn't happened yet: a request pre-loads

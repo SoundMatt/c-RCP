@@ -8563,3 +8563,59 @@ check` (0 errors) + `cfusa trace --gaps` / `--req-coverage 100` /
 **Phase 5c progress after batch 2**: 2/15 items addressed (`-019`
 partial, `-020` closed). **Next**: the rest of Group 1
 (`-016`/`-017`/`-018`), per issue #199's own suggested order.
+
+### 165. Phase 5c batch 3: REQ-PWRMODE-016 -- hot start now checks network availability before spending its WakeUp budget (issue #199)
+
+**REQ-PWRMODE-016 (closed)**: `rcp_pwrmode_handshake_iface_reenabled()`
+previously advanced the handshake unconditionally, with no input at all
+about whether the network was actually available -- `rcp_pwrmode_
+handshake_wakeup_attempt()` (step (b)'s own WakeUp-message repetition,
+bounded by `wakeup_repeat_limit`) could then be driven immediately,
+regardless. TC18 §12.4.1 requires enabling the interface, THEN checking
+network availability, and only starting the WakeUp-message repetition
+once it is actually up -- confirmed by direct re-read: "it will first
+enable the network interface, check if the network is available and if
+not initiate a WakeUp... As soon as the network is available (BEACONs
+detected by the PHY) the RC Server will send... a repetitive
+response."
+
+Fixed: `rcp_pwrmode_handshake_iface_reenabled()` gains a
+`network_available` parameter (this codebase's established "caller
+supplies already-classified inputs" convention -- this module never
+reads hardware itself). A `false` leaves the handshake at
+`RCP_PWRMODE_HANDSHAKE_NOT_STARTED` -- a cheap, uncounted "not yet" a
+caller polls again, not a failure -- so `wakeup_attempt()` (which
+requires `IFACE_REENABLED`) cannot even be called, and its own
+`wakeup_repeat_limit` budget is never touched, until the network is
+actually available. `rcp_powerstate_manager_handshake_begin()`
+(`powerstate.c`) threads the same parameter through to its own caller.
+
+Required-parameter blast radius (the same "let the compiler enumerate
+every call site" technique this session has used repeatedly): 13 call
+sites across `power.c`, `powerstate.c`, `test_power.c`,
+`test_powerstate.c`, `test_tc18_gaps_server.c`, and `test_mock.c` --
+every existing test represents the "network already available" happy
+path, so all were mechanically updated to pass `true` with zero
+behavioral change, plus one genuinely new test
+(`test_handshake_iface_reenabled_retries_until_network_available`)
+pinning the new gate itself (repeated `false` polls stay retriable
+without consuming `wakeup_attempts`; the first `true` poll advances
+normally, and the full `wakeup_repeat_limit` budget is still available
+afterward).
+
+Mutation-tested two ways: a full revert of the 4 core files breaks the
+BUILD (test files call the new 2-arg signature against the reverted
+1-arg declaration); a precise single-line mutation (the `if
+(!network_available) return false;` guard replaced with a no-op)
+isolates exactly the one new test pinning the gate. Both restored
+clean. Full test suite (64/64) + ASan/UBSan build both clean. Fresh
+`cfusa check` (0 errors) + `cfusa trace --gaps` / `--req-coverage 100`
+/ `--sec-tested 100` (all three separate invocations, matching CI;
+100%/100%, 0 untested). 1030 requirements (unchanged, no new REQ ids),
+128 `tc18-gap` entries remaining (was 129, one genuine closure).
+
+**Phase 5c progress after batch 3**: 3/15 items addressed (`-016`/`-020`
+closed, `-019` partial). **Next**: `REQ-PWRMODE-017`/`REQ-PWRMODE-018`
+-- both entangled around the same missing piece (the responder stream
+of the original sleep/standby request is never recorded), scope
+together as one batch rather than splitting.

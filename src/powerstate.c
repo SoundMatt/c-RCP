@@ -238,7 +238,10 @@ rcp_powerstate_errc_t rcp_powerstate_manager_wake_via_network(rcp_powerstate_man
      * *network*-sourced wake) happening atomically, not a caller-driven
      * multi-step exchange the way the pin-wake path below is. */
     rcp_pwrmode_handshake_init(&hs, 1u);
-    rcp_pwrmode_handshake_iface_reenabled(&hs);
+    /* Network availability is trivially true here: the wake-up signal
+     * arrived over the network in the first place (REQ-PWRMODE-016's
+     * own precondition is already satisfied by construction). */
+    rcp_pwrmode_handshake_iface_reenabled(&hs, true);
     rcp_pwrmode_handshake_wakeup_attempt(&hs, true);
     rcp_pwrmode_handshake_resume_queues(&hs);
     ec = rcp_pwrmode_wake_from_sleep(&e->mode, RCP_PWRMODE_WAKE_VIA_NETWORK, &hs, out_start_kind);
@@ -255,8 +258,9 @@ rcp_powerstate_errc_t rcp_powerstate_manager_wake_via_network(rcp_powerstate_man
 }
 
 //cfusa:req REQ-PWR-006
+//cfusa:req REQ-PWRMODE-016
 bool rcp_powerstate_manager_handshake_begin(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
-                                             uint32_t wakeup_repeat_limit)
+                                             uint32_t wakeup_repeat_limit, bool network_available)
 {
     endpoint_entry_t *e;
     bool ok;
@@ -268,7 +272,12 @@ bool rcp_powerstate_manager_handshake_begin(rcp_powerstate_manager_t *m, rcp_avt
         return false;
     }
     rcp_pwrmode_handshake_init(&e->handshake, wakeup_repeat_limit);
-    ok = rcp_pwrmode_handshake_iface_reenabled(&e->handshake);
+    /* REQ-PWRMODE-016: network_available is this caller's own
+     * already-classified answer (e.g. BEACONs detected by the PHY) --
+     * see rcp_pwrmode_handshake_iface_reenabled()'s own doc comment. A
+     * caller whose network is not yet available calls this again once
+     * it is; this module never polls hardware itself. */
+    ok = rcp_pwrmode_handshake_iface_reenabled(&e->handshake, network_available);
     rcp_mutex_unlock(&m->mu);
     return ok;
 }

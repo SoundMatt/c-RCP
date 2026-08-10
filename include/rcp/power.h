@@ -285,9 +285,20 @@ typedef struct {
 void rcp_pwrmode_handshake_init(rcp_pwrmode_handshake_t *hs, uint32_t repeat_limit);
 
 /* Step (a). Requires hs->step == RCP_PWRMODE_HANDSHAKE_NOT_STARTED;
- * returns false (leaving hs unchanged) otherwise. On success, advances
+ * returns false (leaving hs unchanged) otherwise. REQ-PWRMODE-016 (TC18
+ * §12.4.1): the interface is enabled, then network availability is
+ * checked, before any WakeUp message is sent -- network_available is
+ * that already-classified check's own result (e.g. "BEACONs detected by
+ * the PHY", this module's own primitives do not read hardware
+ * themselves, matching the rest of this codebase's "caller supplies
+ * already-classified inputs" convention). false leaves hs at
+ * NOT_STARTED (a cheap, retriable "not yet" -- a caller polls this
+ * again once the network comes up; these retries are NOT counted
+ * against wakeup_repeat_limit, which governs only step (b)'s own
+ * WakeUp-message repetition once step (a) has actually advanced). On
+ * success (hs->step was NOT_STARTED AND network_available), advances
  * hs->step to RCP_PWRMODE_HANDSHAKE_IFACE_REENABLED and returns true. */
-bool rcp_pwrmode_handshake_iface_reenabled(rcp_pwrmode_handshake_t *hs);
+bool rcp_pwrmode_handshake_iface_reenabled(rcp_pwrmode_handshake_t *hs, bool network_available);
 
 /* Step (b), one repeat of "send WakeUp, see if it comes back". Requires
  * hs->step == RCP_PWRMODE_HANDSHAKE_IFACE_REENABLED; returns false
