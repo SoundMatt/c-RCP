@@ -88,6 +88,14 @@ static void test_general_init_zeroes_with_no_root_client(void)
     TEST_ASSERT_EQUAL_UINT16(0, map.svr_ep_bytebus_id_map_ptr);
     TEST_ASSERT_EQUAL_UINT8(0, map.svr_ep_bytebus_id_map_capacity);
     TEST_ASSERT_EQUAL_UINT16(0, map.svr_sequencer_state_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0, map.svr_network_interface_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0, map.svr_network_interface_cfg_capacity);
+    TEST_ASSERT_EQUAL_UINT16(0, map.svr_physical_layer_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0, map.svr_physical_layer_cfg_capacity);
+    TEST_ASSERT_EQUAL_UINT16(0, map.svr_time_synch_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0, map.svr_time_synch_cfg_capacity);
+    TEST_ASSERT_EQUAL_UINT16(0, map.svr_security_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0, map.svr_security_cfg_capacity);
 }
 
 /* ── svr_implemented_options bit assignments (REQ-RMAP-030) ───────────────── */
