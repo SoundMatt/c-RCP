@@ -215,17 +215,24 @@ bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
                                    rcp_lifecycle_writer_ctx_t writer)
 {
     bool authorized = writer.via_root_client_ep0 || writer.via_owning_stream;
+    bool writable;
 
     switch (kind) {
     case RCP_LIFECYCLE_FIELD_HW_GENERIC:
         /* Read-only the moment the server leaves HW_UNCONFIGURED, for any
          * writer. */
-        return state == RCP_LIFECYCLE_HW_UNCONFIGURED;
+        writable = (state == RCP_LIFECYCLE_HW_UNCONFIGURED);
+        break;
 
     case RCP_LIFECYCLE_FIELD_FUNCTIONAL_W:
-        if (state == RCP_LIFECYCLE_HW_UNCONFIGURED) return false;
-        if (state == RCP_LIFECYCLE_RCP_CONFIGURED) return authorized;
-        return true; /* HW_CONFIGURED */
+        if (state == RCP_LIFECYCLE_HW_UNCONFIGURED) {
+            writable = false;
+        } else if (state == RCP_LIFECYCLE_RCP_CONFIGURED) {
+            writable = authorized;
+        } else {
+            writable = true; /* HW_CONFIGURED */
+        }
+        break;
 
     case RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR:
         /* TC18 Table 22's own legend: "This configuration table can only be
@@ -233,10 +240,18 @@ bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
          * In RCP_CONFIGURED ... this is read-only. (As indicated by W*)" --
          * writable in both HW_UNCONFIGURED and HW_CONFIGURED, locked only
          * once RCP_CONFIGURED is reached. */
-        if (state == RCP_LIFECYCLE_RCP_CONFIGURED) return false; /* permanently locked */
-        return true; /* HW_UNCONFIGURED or HW_CONFIGURED */
+        writable = (state != RCP_LIFECYCLE_RCP_CONFIGURED); /* permanently locked once reached */
+        break;
 
     default:
-        return false;
+        writable = false;
+        break;
     }
+
+    /* TC18 §12.3.1.1/§12.3.1.2/§12.3.1.3 (REQ-LIFECYCLE-027): a write
+     * request is accepted only when sent in a unicast frame, restated
+     * once per lifecycle state. ANDed in uniformly here rather than
+     * duplicated per branch above -- see this function's own header
+     * doc comment. */
+    return writable && !writer.via_non_unicast_frame;
 }

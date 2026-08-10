@@ -294,15 +294,19 @@ typedef struct {
 /* Derives an rcp_lifecycle_writer_ctx_t (server.h) from this register map's
  * root-client/owning-stream data for a request arriving on
  * requesting_stream_index. via_ep0 must be true iff the request actually
- * arrived through EP0 (RCP_REGMAP_EP0_INDEX); this function does not
- * re-derive that from an address itself, matching acf.h/avtp.h's
- * convention of taking already-classified inputs rather than re-parsing
- * a frame. ep_client may be NULL, meaning "this endpoint has no owning
- * stream on record" (via_owning_stream is then always false). */
+ * arrived through EP0 (RCP_REGMAP_EP0_INDEX); via_unicast must be true
+ * iff the request's frame had a unicast destination MAC (see l2.h's
+ * rcp_l2_mac_is_unicast() for the primitive that classifies one) --
+ * this function does not re-derive either from an address itself,
+ * matching acf.h/avtp.h's convention of taking already-classified
+ * inputs rather than re-parsing a frame. ep_client may be NULL, meaning
+ * "this endpoint has no owning stream on record" (via_owning_stream is
+ * then always false). */
 rcp_lifecycle_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map,
                                                const rcp_regmap_ep_client_t *ep_client,
                                                uint16_t requesting_stream_index,
-                                               bool via_ep0);
+                                               bool via_ep0,
+                                               bool via_unicast);
 
 /* ── The generic-vs-functional per-endpoint config split ───────────────────── */
 

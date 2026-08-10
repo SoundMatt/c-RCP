@@ -275,11 +275,23 @@ typedef enum {
 /* Identifies who is attempting a functional-config write, for the
  * once-RCP_CONFIGURED authorization rule. Both members may be true
  * (e.g. the root client happens to also be the owning stream); only one
- * needs to be true for the write to be authorized. */
+ * needs to be true for the write to be authorized.
+ *
+ * via_non_unicast_frame defaults to false (the common, compliant case)
+ * on a plain {0}/partial-brace initializer so every writer_ctx literal
+ * already in this codebase before REQ-LIFECYCLE-027 continues to mean
+ * exactly what it meant before -- only a caller that actually needs to
+ * exercise the new multicast/broadcast-write-rejection rule has to set
+ * it explicitly. See rcp_lifecycle_field_writable()'s own doc comment
+ * and l2.h's rcp_l2_mac_is_unicast() for the primitive an integrator
+ * uses to classify a real frame's destination MAC before setting it. */
 typedef struct {
-    bool via_root_client_ep0; /* request arrived via EP0 from the root client */
-    bool via_owning_stream;   /* request arrived via the endpoint's own
-                                  registered request stream */
+    bool via_root_client_ep0;   /* request arrived via EP0 from the root client */
+    bool via_owning_stream;     /* request arrived via the endpoint's own
+                                    registered request stream */
+    bool via_non_unicast_frame; /* true iff the request frame's destination
+                                    MAC was multicast or broadcast, not
+                                    unicast (REQ-LIFECYCLE-027) */
 } rcp_lifecycle_writer_ctx_t;
 
 /* True iff a field of the given kind is writable while the server is in
@@ -297,7 +309,14 @@ typedef struct {
  *     HW_CONFIGURED, but permanently locked (unwritable by any writer, not
  *     just an unauthorized one) once RCP_CONFIGURED is reached -- this is
  *     the distinction the roadmap requires be modeled explicitly rather
- *     than collapsed into a single writability bit. */
+ *     than collapsed into a single writability bit.
+ *
+ * Independently of all three cases above: TC18 §12.3.1.1, §12.3.1.2 and
+ * §12.3.1.3 each state (once per lifecycle state) that a write request is
+ * accepted only when sent in a unicast frame. This is ANDed in uniformly
+ * across every kind/state rather than duplicated per-branch above --
+ * whatever else applies, a field otherwise writable is unwritable when
+ * writer.via_non_unicast_frame is true (REQ-LIFECYCLE-027). */
 bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
                                    rcp_lifecycle_field_kind_t kind,
                                    rcp_lifecycle_writer_ctx_t writer);

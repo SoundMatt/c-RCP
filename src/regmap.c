@@ -53,7 +53,8 @@ void rcp_regmap_general_init(rcp_regmap_general_t *map)
 rcp_lifecycle_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map,
                                                const rcp_regmap_ep_client_t *ep_client,
                                                uint16_t requesting_stream_index,
-                                               bool via_ep0)
+                                               bool via_ep0,
+                                               bool via_unicast)
 {
     rcp_lifecycle_writer_ctx_t ctx;
 
@@ -64,6 +65,8 @@ rcp_lifecycle_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map
     ctx.via_owning_stream = ep_client != NULL &&
                             ep_client->has_owning_stream &&
                             requesting_stream_index == ep_client->owning_stream_index;
+
+    ctx.via_non_unicast_frame = !via_unicast;
 
     return ctx;
 }

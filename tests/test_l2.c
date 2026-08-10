@@ -15,6 +15,7 @@
 //cfusa:test REQ-L2-005
 //cfusa:test REQ-L2-009
 //cfusa:test REQ-L2-010
+//cfusa:test REQ-L2-011
 #include "unity.h"
 
 #include <rcp/avtp.h>
@@ -139,6 +140,28 @@ static void test_frame_decode_rejects_wrong_ethertype(void)
  * header comment). A real send()/recv() round trip is this project's own
  * Linux-only, elevated-privilege CI job's job, not this cross-platform
  * unit test's. */
+/* REQ-LIFECYCLE-027's write-request unicast gate is built directly on
+ * this classifier -- the I/G bit is the least-significant bit of the
+ * first octet: 0 == unicast, 1 == multicast (broadcast is the all-ones
+ * special case of multicast). */
+static void test_mac_is_unicast_classifies_unicast_multicast_broadcast(void)
+{
+    static const uint8_t unicast[6]   = {0x02, 0x00, 0x00, 0x00, 0x00, 0x01}; /* locally
+                                                                                  administered
+                                                                                  unicast */
+    static const uint8_t multicast[6] = {0x01, 0x00, 0x5E, 0x00, 0x00, 0x01}; /* IPv4
+                                                                                  multicast
+                                                                                  range */
+    static const uint8_t broadcast[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+    static const uint8_t all_zero[6]  = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00}; /* I/G bit
+                                                                                  clear too */
+
+    TEST_ASSERT_TRUE(rcp_l2_mac_is_unicast(unicast));
+    TEST_ASSERT_FALSE(rcp_l2_mac_is_unicast(multicast));
+    TEST_ASSERT_FALSE(rcp_l2_mac_is_unicast(broadcast));
+    TEST_ASSERT_TRUE(rcp_l2_mac_is_unicast(all_zero));
+}
+
 static void test_transport_new_ok_or_gracefully_unavailable(void)
 {
     rcp_avtp_transport_t *t = rcp_l2_avtp_transport_new("lo", k_dst_mac, false);
@@ -179,6 +202,7 @@ int main(void)
     RUN_TEST(test_frame_encode_empty_avtpdu);
     RUN_TEST(test_frame_decode_rejects_short_frame);
     RUN_TEST(test_frame_decode_rejects_wrong_ethertype);
+    RUN_TEST(test_mac_is_unicast_classifies_unicast_multicast_broadcast);
     RUN_TEST(test_transport_new_ok_or_gracefully_unavailable);
     RUN_TEST(test_transport_new_bad_interface_is_not_ok);
 

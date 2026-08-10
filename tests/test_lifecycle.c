@@ -383,6 +383,37 @@ static void test_functional_w_star_permanently_locked_once_rcp_configured(void)
         RCP_LIFECYCLE_RCP_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, everyone));
 }
 
+/* REQ-LIFECYCLE-027: TC18 §12.3.1.1/§12.3.1.2/§12.3.1.3 each require a
+ * write request be accepted only when carried in a unicast frame, once
+ * per lifecycle state. Verified across all three field kinds and every
+ * state/authorization combination that would otherwise be writable --
+ * via_non_unicast_frame alone flips each of these from writable to
+ * unwritable, with every other input held identical to an already-
+ * writable case above. */
+static void test_field_writable_denies_non_unicast_frame_regardless_of_kind_or_authorization(void)
+{
+    rcp_lifecycle_writer_ctx_t hw_generic_multicast  = { false, false, true };
+    rcp_lifecycle_writer_ctx_t functional_w_multicast = { false, false, true };
+    rcp_lifecycle_writer_ctx_t root_client_multicast  = { true, false, true }; /* root client
+                                                                                   AND non-
+                                                                                   unicast */
+    rcp_lifecycle_writer_ctx_t w_star_multicast       = { true, true, true }; /* fully
+                                                                                  authorized AND
+                                                                                  non-unicast */
+
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(
+        RCP_LIFECYCLE_HW_UNCONFIGURED, RCP_LIFECYCLE_FIELD_HW_GENERIC, hw_generic_multicast));
+
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(
+        RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, functional_w_multicast));
+
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(
+        RCP_LIFECYCLE_RCP_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, root_client_multicast));
+
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(
+        RCP_LIFECYCLE_HW_CONFIGURED, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, w_star_multicast));
+}
+
 /* ── strerror ──────────────────────────────────────────────────────────────── */
 
 static void test_lifecycle_strerror_unique_nonempty(void)
@@ -443,6 +474,7 @@ int main(void)
     RUN_TEST(test_functional_w_writable_by_anyone_in_hw_configured);
     RUN_TEST(test_functional_w_requires_authorized_writer_once_rcp_configured);
     RUN_TEST(test_functional_w_star_permanently_locked_once_rcp_configured);
+    RUN_TEST(test_field_writable_denies_non_unicast_frame_regardless_of_kind_or_authorization);
 
     RUN_TEST(test_lifecycle_strerror_unique_nonempty);
 
