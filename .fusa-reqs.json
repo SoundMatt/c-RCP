@@ -9683,12 +9683,12 @@
     {
       "id": "REQ-E2E-038",
       "title": "A fragmented message's CRC covers the first fragment's AVTPDU/ACF header plus every segment's payload",
-      "text": "For a fragmented request or response the CRC32 shall be computed over the stream_id and avtp_timestamp of the FIRST AVTPDU and the FIRST fragment's ACF header, followed by the concatenated byte_msg_payload of ALL segments in order; the resulting CRC shall be appended only to the last segment's message, and only that last message's acf_msg_length and only that last AVTPDU's data-length field shall be adapted (TC18 \u00a713.6). NOT IMPLEMENTED: c-RCP's documented integration wraps only the final fragment's own encoded bytes, so its CRC covers the final fragment's header and payload alone and the earlier segments are entirely unprotected.",
+      "text": "For a fragmented request or response the CRC32 shall be computed over the stream_id and avtp_timestamp of the FIRST AVTPDU and the FIRST fragment's ACF header, followed by the concatenated byte_msg_payload of ALL segments in order; the resulting CRC shall be appended only to the last segment's message, and only that last message's acf_msg_length and only that last AVTPDU's data-length field shall be adapted (TC18 \u00a713.6). PARTIAL (was not-implemented): rcp_e2e_compute_fragmented_crc() (e2e.h/e2e.c) now computes exactly the required span -- stream_id + avtp_timestamp + the first fragment's ACF header + the full concatenated payload of every segment, the same running-CRC technique rcp_e2e_compute_crc() itself already uses for its own three regions. What remains not implemented: nothing in this codebase calls it yet. c-RCP's documented integration (fragment.h) still only ever wraps the final fragment's own encoded bytes via rcp_e2e_wrap(), and mock.c has no fragmented-message dispatch path at all (protected or not) to wire the new primitive into -- a materially larger, separate architecture item (building fragmented-message dispatch in mock.c from scratch) than adding this one CRC-arithmetic primitive.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a713.6, TC18.txt L3816-3819"
     },
     {

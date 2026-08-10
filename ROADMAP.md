@@ -7437,3 +7437,80 @@ restoring the fix rebuilds and passes clean again. Full test suite
 `cfusa trace --req-coverage 100 --sec-tested 100` (100%/100%). 1028
 requirements (unchanged count), 142 `tc18-gap` entries remaining (was
 143).
+
+### 152. Phase 5a batch 7 (final): REQ-E2E-038 fragmented-message CRC coverage primitive (issue #197)
+
+TC18 §13.6 requires a fragmented message's CRC32 to span the stream_id
+and avtp_timestamp of the FIRST AVTPDU, the FIRST fragment's ACF
+header, and the concatenated `byte_msg_payload` of EVERY segment in
+order -- appended only to the last segment's message, with only that
+last message's `acf_msg_length` and only the last AVTPDU's data-length
+field adapted. c-RCP's documented integration (`fragment.h`'s own file
+header) wraps only the final fragment's own encoded bytes via
+`rcp_e2e_wrap()`, so its CRC covers the final fragment's header and
+payload alone -- every earlier segment is entirely unprotected.
+
+This is the largest, most architecturally involved item in Phase 5a,
+flagged from the very first batch as deferred pending clearer picture
+of the full integration surface. Now that batches 1-6 have mapped that
+surface thoroughly (culminating in batch 5's discovery that `mock.c`
+has no AVTP-context-aware dispatch machinery at all), the honest scope
+for this batch is clear: add the missing CRC-arithmetic primitive
+correctly and completely; do not attempt to also build a
+fragmented-message dispatch path in `mock.c` from scratch (there isn't
+even an *unprotected* one to extend -- `dispatch_frame()`/
+`_dispatch_frame_e2e()` both split multiple ACF messages *within one
+AVTPDU*, not one message split *across* multiple AVTPDUs, which is
+what fragment.h's own mechanism produces). That's a materially larger,
+separate architecture item, not a natural extension of this batch.
+
+Adds `rcp_e2e_compute_fragmented_crc(stream_id, avtp_timestamp,
+first_fragment_header, first_fragment_header_len,
+reassembled_payload, reassembled_payload_len)` to `e2e.h`/`e2e.c`,
+right alongside `rcp_e2e_fragment_carries_crc()` in the "Fragmentation/
+CRC interaction" section: the same running-CRC-over-several-regions
+technique `rcp_e2e_compute_crc()` itself already uses for its own three
+regions (stream_id/avtp_timestamp/acf_frame), extended to four
+(stream_id/avtp_timestamp/first-fragment-header/reassembled-payload).
+`fragment.h`'s own `rcp_fragment_reassembler_get()` already produces
+exactly the "concatenated payload of every segment in order" this
+function's `reassembled_payload` parameter needs on the decode side;
+an encode-side caller assembles the same by concatenating each
+`rcp_fragment_plan()` segment's own payload slice in order.
+
+`tests/test_tc18_gaps_e2e.c`'s `REQ-E2E-038` test is updated to build
+its "what a conforming implementation would compute" reference value
+via the new named function instead of a hand-rolled byte-concatenation
+buffer, keeping the same two behavioral assertions (segment-0
+corruption moves the conforming CRC; `rcp_e2e_wrap()`-based
+verification still doesn't notice). A new direct test confirms the
+function is equivalent to concatenating header++payload and calling
+`rcp_e2e_compute_crc()` once, and is sensitive to a change anywhere in
+either region (not just the payload's tail, where the old,
+pre-REQ-E2E-042 `rcp_e2e_wrap()`-only approach would have been blind).
+
+`.fusa-reqs.json`'s `REQ-E2E-038` moves `status: "not-implemented"` ->
+`"partial"` (stays `scope: "tc18-gap"` -- the primitive is correct, but
+still genuinely uncalled from anywhere in this codebase; not
+overclaimed as `implemented`).
+
+Mutation-tested: reverting the fix (`git stash` on `src/e2e.c`,
+`include/rcp/e2e.h`) fails the test file's *build* (`call to
+undeclared function 'rcp_e2e_compute_fragmented_crc'`) -- restoring the
+fix rebuilds and passes clean again. Full test suite (64/64) +
+ASan/UBSan build both clean. Fresh `cfusa check` (0 errors) + `cfusa
+trace --req-coverage 100 --sec-tested 100` (100%/100%). 1028
+requirements (unchanged count), 142 `tc18-gap` entries remaining
+(unchanged count -- stays a gap entry, now `partial` instead of
+`not-implemented`).
+
+**Phase 5a (issue #197) is functionally complete as of this milestone**:
+all 12 originally catalogued items (`REQ-E2E-028` through `-042`, minus
+the `-032`/`-034`/`-036`/`-040`/`-042`-numbering already-implemented
+entries not needing a fix) have real, tested, mutation-verified fixes
+landed across 7 PRs (#202-#207 plus this one). Every fix that could be
+honestly claimed `implemented` was; three (`REQ-E2E-029`/`-030`/`-038`)
+remain deliberately `partial`, each with a clearly documented
+architecture boundary (cross-endpoint escalation, or a dispatch
+integration surface that does not exist yet) rather than an
+overclaimed status.
