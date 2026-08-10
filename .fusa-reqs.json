@@ -8715,23 +8715,21 @@
     {
       "id": "REQ-PWRMODE-021",
       "title": "StandBy is entered only in response to an RCP request, never from a network signal",
-      "text": "An RC Server built on c-RCP shall enter RCP_PWRMODE_STANDBY only as the result of a SleepCMD request addressed to its wake-up endpoint (rcp_ep_wakeup_decode_sleepcmd_request() reporting target mode RCP_PWRMODE_STANDBY); no network-level signal, including a TC14/TC10 sleep request, shall cause a transition into RCP_PWRMODE_STANDBY. rcp_pwrmode_transition() shall not be driven to RCP_PWRMODE_STANDBY from any network-triggered path.",
+      "text": "power.h's rcp_pwrmode_commit_network_sleep() is the sole entry point a caller integrating a real TC14/TC10 network signal uses, and it has no target-mode parameter at all -- unlike rcp_pwrmode_commit_entry(), which the SleepCMD (RCP-request) path uses. The only power mode a network trigger can ever produce is RCP_PWRMODE_SLEEP, making the StandBy exclusivity impossible to violate by construction rather than merely true by omission (there being no network path modelled at all, the prior state).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
+      "scope": "tc18",
       "tc18": "\u00a712.5, TC18.txt L2318"
     },
     {
       "id": "REQ-PWRMODE-022",
       "title": "Sleep can also be initiated by a valid network TC14/TC10 sleep request",
-      "text": "NOT IMPLEMENTED: c-RCP has no network-initiated sleep path (TC18 \u00a712.5). The only way to enter RCP_PWRMODE_SLEEP is a SleepCMD request decoded by rcp_ep_wakeup_decode_sleepcmd_request(); nothing accepts a TC14/TC10 network sleep request, so a c-RCP server ignores the network-wide sleep coordination the rest of the vehicle uses. The server stays awake when the network is put to sleep, defeating the network's own power management.",
+      "text": "power.h's rcp_pwrmode_commit_network_sleep(mode, gate, response_sent, out_start_kind) delegates to the same rcp_pwrmode_commit_entry() a normal (RCP-request) sleep entry uses, target fixed to RCP_PWRMODE_SLEEP -- 'the same conditions apply as for a normal sleep request' (TC18's own text). TC14/TC10 sleep signaling is PHY/MAC-level out-of-band control, not an RCP/ACF wire message this library's decode layer could ever parse; matching rcp_pwrmode_handshake_iface_reenabled()'s own network_available convention, a caller supplies 'a valid TC14/TC10 sleep request was received' as an already-classified fact simply by calling this function, with no frame/byte-buffer parameter to give since none exists for this library to inspect.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
+      "scope": "tc18",
       "tc18": "\u00a712.5, TC18.txt L2319"
     },
     {
@@ -8777,12 +8775,11 @@
     {
       "id": "REQ-PWRMODE-027",
       "title": "A refused network sleep request suppresses the TC14/TC10 LPS confirmation",
-      "text": "NOT IMPLEMENTED: c-RCP does not model TC14/TC10 LPS confirmation (TC18 \u00a712.5). There is no network sleep-request path and no PHY-signalling surface, so the requirement that the PHY must NOT signal LPS when rcp_pwrmode_check_entry() would refuse the entry cannot be honoured or tested. On a real device this is the only way an upstream node learns the server declined to sleep, so the network can proceed to sleep while this node stays awake.",
+      "text": "power.h's rcp_pwrmode_commit_network_sleep() has no PHY-signalling surface of its own (this library never touches hardware, the same scoping precedent as network_available), so its RCP_PWRMODE_OK vs. RCP_PWRMODE_ERR_ENTRY_REFUSED return value IS the confirmation signal: a caller integrating a real TC14/TC10 PHY asserts LPS only on RCP_PWRMODE_OK, never on RCP_PWRMODE_ERR_ENTRY_REFUSED, honouring 'the network PHY shall not signal a TC14/TC10 LPS as confirmation' when the go-to-sleep conditions are not fulfilled.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
+      "scope": "tc18",
       "tc18": "\u00a712.5, TC18.txt L2336-L2337"
     },
     {

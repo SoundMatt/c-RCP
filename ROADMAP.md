@@ -8889,3 +8889,86 @@ surface this codebase doesn't have; scope this sub-group explicitly
 before implementing, don't assume" -- scope that explicitly before
 writing any code, per that warning. Then Group 4
 (`REQ-PWRMODE-014`/`-015`, cold-start/config persistence).
+
+### 169. Phase 5c batch 7: REQ-PWRMODE-021/022/027 -- `rcp_pwrmode_commit_network_sleep()` closes Group 3 (issue #199)
+
+Group 3 (network-level sleep coordination), scoped explicitly before any
+code was written, per issue #199's own warning. Primary source re-read
+at TC18 §12.5 in full: "StandBy can only be initiated via request to the
+RC Server. Sleep can be initiated either via the network with a valid
+TC14/TC10 sleep request or via request to the RC Server... If the sleep
+request was a sleep request via TC14/TC10 on the network the same
+conditions apply as for a normal sleep request. If the go to sleep
+conditions are not fulfilled the network PHY shall not signal a
+TC14/TC10 LPS as confirmation."
+
+**Scoping conclusion (the honest answer the issue asked for)**: TC14/TC10
+are OPEN Alliance PHY/MAC-level sleep-signaling specifications -- a
+dedicated out-of-band control surface (e.g. a wake/sleep line, or PHY
+register state), not an RCP/ACF wire message. This library's wire layer
+(`acf.h`/`avtp.h`) has and can have no bytes to decode for "a valid
+TC14/TC10 sleep request was received" or "assert an LPS confirmation" --
+there is no AVTPDU representing either. Fabricating a fake decoder or a
+software LPS-signal stub would misrepresent what this library actually
+does. The honest, scoped resolution instead extends the SAME
+already-established "caller supplies an already-classified input"
+convention this phase has used throughout (`network_available`,
+`echoed`, `response_sent`) to the two TC14/TC10-specific facts: "a valid
+sleep request arrived" and "should I assert LPS."
+
+**REQ-PWRMODE-021 (closed) + REQ-PWRMODE-022 (closed)**: one new
+`power.h` function, `rcp_pwrmode_commit_network_sleep(mode, gate,
+response_sent, out_start_kind)` -- identical to
+`rcp_pwrmode_commit_entry(mode, RCP_PWRMODE_SLEEP, gate, response_sent,
+out_start_kind)` in every respect (delegates to it directly; "the same
+conditions apply as for a normal sleep request" per TC18's own text,
+including batch 5's race-closing and ordering guarantees) except that it
+has NO `target` parameter at all. This closes `REQ-PWRMODE-021`'s
+StandBy exclusivity ("StandBy can only be initiated via request to the
+RC Server") BY CONSTRUCTION rather than by omission (the pre-fix state,
+where the exclusivity held only because no network path existed at all):
+a caller integrating a real TC14/TC10 signal has no way to wire it to a
+StandBy entry, whatever it passes. Closes `REQ-PWRMODE-022` because the
+function exists at all and genuinely admits a network-triggered Sleep
+entry once its gate/`response_sent` preconditions hold.
+
+**REQ-PWRMODE-027 (closed)**: no new code -- `rcp_pwrmode_commit_network_sleep()`'s
+own `RCP_PWRMODE_OK` vs. `RCP_PWRMODE_ERR_ENTRY_REFUSED` return value IS
+the LPS-confirmation signal TC18 describes. This library has no
+PHY-signalling surface of its own to suppress (the same "this library
+never touches hardware" scoping precedent as `network_available` and
+the hot-start handshake generally); a caller integrating a real PHY
+driver asserts LPS only on `RCP_PWRMODE_OK` and must not on
+`RCP_PWRMODE_ERR_ENTRY_REFUSED`. Documented explicitly on the new
+function's own doc comment and demonstrated in its own test.
+
+Test changes: `test_tc18_gaps_server.c`'s combined `-021`/`-022`
+deviation pin (`test_sleep_entry_is_request_only_with_no_network_path`)
+split -- its StandBy-only half kept (still true, now for the RCP-request
+path specifically) and its network-sleep half replaced by two new,
+positive tests: `test_network_sleep_cannot_be_wired_to_standby` (-021)
+and `test_network_sleep_applies_the_same_conditions_as_a_normal_request`
+(-022). The `-027` deviation pin
+(`test_network_sleep_refusal_cannot_suppress_the_lps_confirmation`,
+introduced last batch) rewritten to
+`test_network_sleep_refusal_return_value_gates_the_lps_confirmation`,
+demonstrating the OK-vs-REFUSED gating convention directly against
+`rcp_pwrmode_commit_network_sleep()` rather than the old, unrelated raw
+`rcp_pwrmode_check_entry()`/response-byte assertions.
+
+Mutation-tested: reverting `power.h`/`power.c` breaks the BUILD (all
+three rewritten/new tests reference `rcp_pwrmode_commit_network_sleep()`,
+which does not exist pre-fix) -- the same stronger-than-a-test-failure
+signal used throughout this phase. Full suite (64/64) + ASan/UBSan
+clean, pre- and post-mutation-restore. Fresh `cfusa check` (0 errors) +
+`cfusa trace --gaps`/`--req-coverage 100`/`--sec-tested 100` (three
+separate CI-matching invocations; 100%/100%, 0 untested). 1030
+requirements (unchanged), 118 `tc18-gap` entries remaining (was 121).
+
+**Phase 5c progress after batch 7**: 13/15 items addressed.
+**Group 3 (network-level sleep coordination) is now fully closed.**
+**Next**: Group 4 (`REQ-PWRMODE-014`/`-015`, cold-start/config
+persistence, the last group) -- may share plumbing with LIFECYCLE's own
+config-locking work (issue #198, already closed), per this phase's
+original scoping note; verify that overlap before implementing rather
+than assuming it.

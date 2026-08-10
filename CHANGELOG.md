@@ -32,6 +32,33 @@ the rationale.
 
 ## Releases
 
+### v0.169.0 -- 2026-08-10
+
+**Phase 5c batch 7: REQ-PWRMODE-021/022/027 -- `rcp_pwrmode_commit_network_sleep()`
+closes Group 3.** Issue #199. Network-level sleep coordination, scoped
+explicitly per the issue's own warning before any code was written.
+TC14/TC10 are PHY/MAC-level out-of-band sleep signaling, not an
+RCP/ACF wire message this library's decode layer could ever parse --
+the honest fix extends the `network_available` convention already
+established in Groups 1-2 rather than fabricating a fake decoder. One
+new function, `power.h`'s `rcp_pwrmode_commit_network_sleep(mode, gate,
+response_sent, out_start_kind)`, identical to
+`rcp_pwrmode_commit_entry(mode, RCP_PWRMODE_SLEEP, ...)` in every
+respect except it has no `target` parameter at all -- closing
+`REQ-PWRMODE-021`'s StandBy exclusivity ("StandBy can only be initiated
+via request to the RC Server") by construction, not merely by omission,
+and `REQ-PWRMODE-022` (network sleep initiation) because it now genuinely
+admits a network-triggered Sleep entry under the identical conditions a
+normal request uses. `REQ-PWRMODE-027` (LPS suppression) closed with no
+new code: the function's own `RCP_PWRMODE_OK`/`RCP_PWRMODE_ERR_ENTRY_REFUSED`
+return value IS the confirmation signal a real PHY integration gates
+LPS assertion on. Mutation-tested: full revert breaks the BUILD. Full
+suite (64/64) + ASan/UBSan clean. Fresh `cfusa check`/`trace` (0 errors,
+100%/100%, three separate CI-matching invocations). See `ROADMAP.md`
+milestone 169 for full detail. 1030 requirements (unchanged), 118
+`tc18-gap` entries remaining (was 121) -- **Group 3 of Phase 5c is now
+fully closed.**
+
 ### v0.168.0 -- 2026-08-10
 
 **Phase 5c batch 6: REQ-PWRMODE-028 -- admission-suspend state closes

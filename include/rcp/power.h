@@ -481,6 +481,54 @@ rcp_pwrmode_errc_t rcp_pwrmode_commit_entry(rcp_pwrmode_t *mode, rcp_pwrmode_t t
                                              bool response_sent,
                                              rcp_pwrmode_start_kind_t *out_start_kind);
 
+/* ── Network-triggered sleep entry (TC14/TC10) ───────────────────────────────── */
+
+/* Attempts a Sleep entry specifically via a network TC14/TC10 sleep
+ * request -- REQ-PWRMODE-021, REQ-PWRMODE-022, REQ-PWRMODE-027 (TC18
+ * §12.5): "Sleep can be initiated either via the network with a valid
+ * TC14/TC10 sleep request or via request to the RC Server," but "StandBy
+ * can only be initiated via request to the RC Server" -- a network
+ * trigger may only ever result in Sleep, never StandBy.
+ *
+ * TC14/TC10 sleep signaling is PHY/MAC-level out-of-band control (e.g. a
+ * dedicated wake/sleep line, or a PHY register indication), not an
+ * RCP/ACF wire message -- this library's wire layer (acf.h/avtp.h) has no
+ * bytes to decode for "a valid TC14/TC10 sleep request was received."
+ * Matching rcp_pwrmode_handshake_iface_reenabled()'s own network_available
+ * convention, a caller supplies that already-classified fact simply by
+ * calling this function at all; there is no frame or byte buffer
+ * parameter to give one, deliberately, since none exists for this library
+ * to inspect.
+ *
+ * Identical in every other respect to
+ * rcp_pwrmode_commit_entry(mode, RCP_PWRMODE_SLEEP, gate, response_sent,
+ * out_start_kind) -- see that function's own doc comment for the full
+ * two-step-admission contract (a first rcp_pwrmode_check_entry() call to
+ * decide what response to send, this call only once that response has
+ * actually been transmitted, against a freshly re-sampled gate) and its
+ * REQ-PWRMODE-024/026 race-closing and ordering guarantees, both of
+ * which apply here unchanged ("the same conditions apply as for a normal
+ * sleep request," TC18's own words). This function exists ONLY to make
+ * REQ-PWRMODE-021's StandBy exclusivity impossible to violate BY
+ * CONSTRUCTION: unlike rcp_pwrmode_commit_entry(), there is no target
+ * parameter here at all, so a caller integrating a real TC14/TC10 signal
+ * cannot accidentally wire it to a StandBy entry, whatever gate it
+ * passes.
+ *
+ * REQ-PWRMODE-027 ("the network PHY shall not signal a TC14/TC10 LPS as
+ * confirmation" when refused): this function's own RCP_PWRMODE_OK vs.
+ * RCP_PWRMODE_ERR_ENTRY_REFUSED return IS that confirmation signal --
+ * this library has no PHY-signalling surface of its own (see the file
+ * header's "Hot vs. cold starts" section for the same "caller supplies
+ * already-classified inputs, this library never touches hardware"
+ * scoping precedent), so a caller integrating a real PHY only asserts
+ * LPS when this function returns RCP_PWRMODE_OK, and must NOT assert it
+ * on RCP_PWRMODE_ERR_ENTRY_REFUSED. */
+rcp_pwrmode_errc_t rcp_pwrmode_commit_network_sleep(rcp_pwrmode_t *mode,
+                                                     const rcp_pwrmode_entry_gate_t *gate,
+                                                     bool response_sent,
+                                                     rcp_pwrmode_start_kind_t *out_start_kind);
+
 #ifdef __cplusplus
 }
 #endif

@@ -656,9 +656,9 @@ static void test_sleep_entry_is_request_only_with_no_network_path(void)
     uint8_t                 tn     = 0u;
 
     /* TC18 §12.5: StandBy is entered only in response to an RCP request,
-     * never from a network signal. The SleepCMD exchange is indeed the only
-     * modelled entry, and a target mode outside {StandBy, Sleep} is refused
-     * outright -- so the exclusivity holds, by omission. */
+     * never from a network signal -- the SleepCMD exchange is the only
+     * modelled StandBy entry, and a target mode outside {StandBy, Sleep}
+     * is refused outright. */
     TEST_ASSERT_NOT_NULL(req.data);
     TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_OK,
                       rcp_ep_wakeup_decode_sleepcmd_request(req.data, req.len, bus, &target, &tn));
@@ -667,15 +667,51 @@ static void test_sleep_entry_is_request_only_with_no_network_path(void)
     bad = rcp_ep_wakeup_encode_sleepcmd_request(bus, RCP_PWRMODE_NORMAL, 4u);
     TEST_ASSERT_NULL(bad.data);
 
-    /* TC18 §12.5 also allows Sleep to be initiated by a valid TC14/TC10
-     * network sleep request. c-RCP has no such decoder: the only
-     * network-level message it recognizes at all is the WakeUp echo, which
-     * rejects the SleepCMD frame above as a bad opcode. A c-RCP server
-     * therefore stays awake when the network is put to sleep. */
-    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_ERR_BAD_OPCODE,
-                      rcp_ep_wakeup_decode_wakeup_message(req.data, req.len, bus, &tn));
-
     rcp_bytes_free(&req);
+}
+
+static void test_network_sleep_cannot_be_wired_to_standby(void)
+{
+    rcp_pwrmode_entry_gate_t gate = {true, true, true};
+    rcp_pwrmode_t            mode = RCP_PWRMODE_NORMAL;
+    rcp_pwrmode_start_kind_t kind;
+
+    /* REQ-PWRMODE-021 (TC18 §12.5): "StandBy can only be initiated via
+     * request to the RC Server" -- power.h's rcp_pwrmode_commit_network_sleep()
+     * is the ONLY entry point a caller integrating a real TC14/TC10 signal
+     * uses, and it has no target parameter at all: the only power mode it
+     * can ever produce is RCP_PWRMODE_SLEEP. This makes the exclusivity
+     * impossible to violate by construction, not merely true by omission
+     * (there being no network path modelled at all, as the pre-fix reading
+     * of this deviation pin observed). */
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_OK,
+                      rcp_pwrmode_commit_network_sleep(&mode, &gate, true, &kind));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_SLEEP, mode);
+    TEST_ASSERT_NOT_EQUAL(RCP_PWRMODE_STANDBY, mode);
+}
+
+static void test_network_sleep_applies_the_same_conditions_as_a_normal_request(void)
+{
+    rcp_pwrmode_entry_gate_t satisfied = {true, true, true};
+    rcp_pwrmode_entry_gate_t refusing  = {false, true, true};
+    rcp_pwrmode_t            mode      = RCP_PWRMODE_STANDBY;
+
+    /* REQ-PWRMODE-022 (TC18 §12.5): "Sleep can be initiated either via the
+     * network with a valid TC14/TC10 sleep request or via request to the
+     * RC Server." rcp_pwrmode_commit_network_sleep() delegates to the exact
+     * same rcp_pwrmode_commit_entry() a normal (RCP-request) sleep entry
+     * uses -- "the same conditions apply as for a normal sleep request"
+     * (TC18's own words): the lost-wakeup race is closed and the
+     * response-sent ordering is enforced identically, and a network
+     * trigger is refused under the identical gate a normal request would
+     * be refused under. */
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_ERR_ENTRY_REFUSED,
+                      rcp_pwrmode_commit_network_sleep(&mode, &refusing, true, NULL));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_STANDBY, mode);
+
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_OK,
+                      rcp_pwrmode_commit_network_sleep(&mode, &satisfied, true, NULL));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_SLEEP, mode);
 }
 
 /* ── §12.5: a sleep request tracked per remote peer, and now authorized ────── */
@@ -793,27 +829,31 @@ static void test_commit_entry_requires_the_response_to_have_been_sent(void)
     TEST_ASSERT_EQUAL(RCP_PWRMODE_START_COLD, kind);
 }
 
-/* ── §12.5: TC14/TC10 network sleep refusal has no LPS-suppression signal ──── */
+/* ── §12.5: the network-sleep return value IS the LPS-suppression signal ──── */
 
-static void test_network_sleep_refusal_cannot_suppress_the_lps_confirmation(void)
+static void test_network_sleep_refusal_return_value_gates_the_lps_confirmation(void)
 {
-    rcp_pwrmode_entry_gate_t refusing = {false, true, true};
-    rcp_bytes_t              resp;
+    rcp_pwrmode_entry_gate_t refusing  = {false, true, true};
+    rcp_pwrmode_entry_gate_t satisfied = {true, true, true};
+    rcp_pwrmode_t            refused_mode = RCP_PWRMODE_NORMAL;
+    rcp_pwrmode_t            ok_mode      = RCP_PWRMODE_NORMAL;
 
-    /* REQ-PWRMODE-027 (TC18 §12.5): a sleep request refused via TC14/TC10
-     * must suppress the network PHY's own LPS confirmation signal. A
-     * refusal's entire observable output in this library is a two-valued
-     * enum plus the encoded response byte -- there is no PHY/LPS
-     * signalling surface to suppress, so an upstream node can never learn
-     * this node declined to sleep. This is Group 3's network-level gap
-     * (issue #199), not addressed by this batch's commit_entry() fix. */
-    TEST_ASSERT_EQUAL(RCP_PWRMODE_ENTRY_REFUSED, rcp_pwrmode_check_entry(&refusing));
-    TEST_ASSERT_EQUAL_INT(0, RCP_PWRMODE_ENTRY_OK);
-    TEST_ASSERT_EQUAL_INT(1, RCP_PWRMODE_ENTRY_REFUSED);
-    resp = rcp_ep_wakeup_encode_sleepcmd_response((rcp_byte_bus_id_t)3u,
-                                                  RCP_PWRMODE_ENTRY_REFUSED, 1u);
-    TEST_ASSERT_NOT_NULL(resp.data);
-    rcp_bytes_free(&resp);
+    /* REQ-PWRMODE-027 (TC18 §12.5): "If the go to sleep conditions are not
+     * fulfilled the network PHY shall not signal a TC14/TC10 LPS as
+     * confirmation." This library has no PHY-signalling surface of its
+     * own (see rcp_pwrmode_commit_network_sleep()'s own doc comment for
+     * why, and the same scoping precedent as network_available) -- its
+     * RCP_PWRMODE_OK vs. RCP_PWRMODE_ERR_ENTRY_REFUSED return value IS the
+     * signal an integrator's own PHY driver gates LPS assertion on: only
+     * assert LPS when this function returns RCP_PWRMODE_OK, never on
+     * RCP_PWRMODE_ERR_ENTRY_REFUSED. */
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_ERR_ENTRY_REFUSED,
+                      rcp_pwrmode_commit_network_sleep(&refused_mode, &refusing, true, NULL));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_NORMAL, refused_mode); /* PHY: do NOT signal LPS */
+
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_OK,
+                      rcp_pwrmode_commit_network_sleep(&ok_mode, &satisfied, true, NULL));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_SLEEP, ok_mode); /* PHY: safe to signal LPS */
 }
 
 /* ── §12.5: the gate's fields are documented server-wide aggregates ───────── */
@@ -1148,11 +1188,13 @@ int main(void)
     RUN_TEST(test_wakeup_repetition_ignores_other_valid_avtpdus);
     RUN_TEST(test_network_wake_now_requires_the_same_handshake_as_pin);
     RUN_TEST(test_sleep_entry_is_request_only_with_no_network_path);
+    RUN_TEST(test_network_sleep_cannot_be_wired_to_standby);
+    RUN_TEST(test_network_sleep_applies_the_same_conditions_as_a_normal_request);
     RUN_TEST(test_sleep_request_moves_one_endpoint_only);
     RUN_TEST(test_sleepcmd_requires_root_client_authorization);
     RUN_TEST(test_commit_entry_re_checks_the_gate_and_aborts_the_race);
     RUN_TEST(test_commit_entry_requires_the_response_to_have_been_sent);
-    RUN_TEST(test_network_sleep_refusal_cannot_suppress_the_lps_confirmation);
+    RUN_TEST(test_network_sleep_refusal_return_value_gates_the_lps_confirmation);
     RUN_TEST(test_entry_gate_is_scoped_to_one_endpoint_and_one_queue);
     RUN_TEST(test_admission_is_suspended_during_the_sleep_drain);
 
