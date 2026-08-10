@@ -10358,3 +10358,74 @@ items. Next: continue Group 1 in table order -- `REQ-RMAP-036`
 contradictory -- issue #200 itself flags this one for careful
 re-reading of Table 18 before fixing, not a mechanical repeat of
 `-033`/`-034`'s pattern).
+
+### 189. Phase 5d batch 19: `REQ-RMAP-036` -- `svr_ep_generic_cfg_ptr`/`_capacity` now correctly sized, addressed, and UNIT-correct (issue #200)
+
+The batch issue #200 itself flagged for careful re-reading before
+fixing -- not a mechanical repeat of `-033`/`-034`'s width/address fix,
+but a genuine semantic contradiction. Re-verified directly against the
+primary-source PDF before writing any code (Table 18, page 52 of
+`OA_TC18_specification_v_0.5.1_RC.pdf`, at its current location
+alongside the repo directories): `svr_ep_generic_cfg_capacity` (0x0026,
+16 bit) is explicitly "Length of EP config register section in
+**bytes**." `rcp_regmap_general_t`'s former `ep_generic_cfg` field
+(`rcp_regmap_table_ref_t`) documented its own `capacity` member as an
+ENTRY COUNT -- the exact opposite unit. This is a different class of
+bug than `-033`/`-034`'s pure width/address mismatch: even a
+byte-perfect 16-bit encoding of the old field's `capacity` value would
+have told a client the wrong thing entirely, not just failed to fit in
+its wire slot.
+
+The same PDF read also independently re-confirmed every remaining
+Group 1 item's own shape ahead of its own batch: `svr_ep_bytebus_id_
+map_ptr`/`_capacity` (0x0028/0x002A, 16-bit ptr + 8-bit entry-count
+capacity, `-037`), `svr_ep_functional_cfg_ptr` and `svr_sequencer_
+state_ptr` (0x002C/0x002E, both LONE 16-bit pointers with no capacity
+register at all, `-038` -- same shape as `-033`'s own `svr_hw_cfg_ptr`
+fix) and Table 18's continuation (network interface / physical layer /
+time synch / security, all real 16-bit ptr+capacity pairs, `-039`'s
+own scope). No surprises found for any of them -- worth having done
+this read now rather than deferring it batch-by-batch, since it
+resolves ambiguity for three future batches at once.
+
+Retyped `ep_generic_cfg` to `svr_ep_generic_cfg_ptr`/`svr_ep_generic_
+cfg_capacity` (both `uint16_t`, matching TC18's own names/widths
+exactly) -- deliberately two independent scalar fields, not reused
+from the shared type, so the byte-vs-entry-count unit distinction is
+structurally enforced going forward, not just documented in a comment
+a future edit could silently invalidate.
+
+**Split the combined three-requirement deviation pin this batch's own
+field belonged to** (`test_ep_cfg_and_bytebus_map_pointers_are_mis_
+shaped` previously covered `-036`, `-037`, AND `-038` all at once --
+the largest combined pin found and split so far this phase): new
+positive test for `-036` alone
+(`test_ep_generic_cfg_ptr_and_capacity_are_now_correctly_shaped`), and
+a narrowed remaining test
+(`test_bytebus_map_and_functional_ptrs_are_mis_shaped`) covering only
+`-037`/`-038`'s still-open fields. Found and fixed the same two
+"second usage site" categories as batches 16/17: `test_regmap.c`'s
+general zero-init test, and `REQ-RMAP-039`'s own deviation pin's
+sub-table-ref enumeration (narrowed from four to three
+`rcp_regmap_table_ref_t` fields plus a sixth distinct scalar pair,
+claim unaffected).
+
+Mutation-tested: full header-only revert with every touched test file
+kept -- breaks the build (`no member named 'svr_ep_generic_cfg_ptr'`
+in `test_regmap.c`). Restored clean, diff-verified byte-identical
+against a pre-mutation backup. Full suite (65/65) + ASan/UBSan clean.
+Fresh `cfusa check` (0 errors) + all three separate `cfusa trace`
+invocations (100%/100%, 0 untested). `REQ-RMAP-036` stays `partial`
+(unchanged status -- narrowed text; still blocked on `REQ-RMAP-024`'s
+wire-reachability gap and this codebase's still-absent EP_config
+table storage). 1030 requirements (unchanged), 110 `tc18-gap` entries
+remaining (unchanged).
+
+**Phase 5d progress after batch 19**: 20/47 items addressed (21
+counting `REQ-RMAP-061`'s own partial progress). Group 1: 13/18
+items. Next: continue Group 1 in table order -- `REQ-RMAP-037`
+(`svr_ep_bytebus_id_map_ptr`/`_capacity`, 0x0028/0x002A -- shape
+already confirmed against the primary source this batch: 16-bit
+pointer + 8-bit entry-count capacity, matching this codebase's
+existing `ep_id_bus_map.capacity` unit convention exactly, unlike
+`-036`).

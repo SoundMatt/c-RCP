@@ -134,10 +134,11 @@ static rcp_regmap_general_t populated_map(void)
     map.svr_response_stream_cfg_capacity = 0x04u;
     map.svr_request_stream_cfg_ptr       = 0x0070u;
     map.svr_response_stream_cfg_ptr      = 0x0090u;
+    map.svr_ep_generic_cfg_ptr           = 0x00A0u;
+    map.svr_ep_generic_cfg_capacity      = 0x0140u; /* bytes, not entries */
 
     ref.offset = 0x00000040u;
     ref.capacity = 0x0008u;
-    map.ep_generic_cfg = ref;
     map.ep_functional_cfg = ref;
     map.ep_id_bus_map = ref;
     map.sequencer_state = ref;
@@ -785,32 +786,67 @@ static void test_stream_cfg_registers_are_now_correctly_sized(void)
     TEST_ASSERT_TRUE(span_is_zero(buf, 0x1C, 0x21));
 }
 
-/* TC18 §12.7.5 Table 18: svr_ep_generic_cfg_ptr (16 bit, 0x0024) and
- * svr_ep_generic_cfg_capacity (16 bit, 0x0026, "length of the EP config
- * register section in BYTES"); svr_ep_bytebus_id_map_ptr (16 bit, 0x0028)
- * and svr_ep_bytebus_id_map_capacity (8 bit, 0x002A);
- * svr_ep_functional_cfg_ptr (16 bit, 0x002C) and svr_sequencer_state_ptr
- * (16 bit, 0x002E). Deviation: all six collapse into four identically
- * shaped rcp_regmap_table_ref_t members whose capacity is documented as
- * an ENTRY COUNT, not an octet length -- the exact opposite of 0x0026 --
- * and none is bound to an address. */
-static void test_ep_cfg_and_bytebus_map_pointers_are_mis_shaped(void)
+/* REQ-RMAP-036 (TC18 §12.7.5 Table 18): svr_ep_generic_cfg_ptr (16
+ * bit, 0x0024) points to the EP_config register map (§13.2);
+ * svr_ep_generic_cfg_capacity (16 bit, 0x0026) is "the LENGTH OF THE
+ * EP CONFIG REGISTER SECTION IN BYTES" -- verified directly against
+ * the primary-source PDF (Table 18, page 52). rcp_regmap_general_t
+ * now declares both as correctly-sized, correctly-UNITED scalar
+ * fields, replacing the former ep_generic_cfg field
+ * (rcp_regmap_table_ref_t, the shared pointer/capacity type most
+ * remaining sub-table refs still use) whose capacity member was
+ * documented as an ENTRY COUNT -- the exact opposite unit from what
+ * 0x0026 actually is. This was a genuine semantic contradiction, not
+ * just a width mismatch (the same class of bug REQ-RMAP-033/-034 fixed
+ * was purely about width/address; here the OLD shared field's own
+ * documented MEANING was backwards for this specific register). Still
+ * open: this codebase has no real EP_config table storage anywhere
+ * yet for this pointer to meaningfully address, and the same
+ * REQ-RMAP-024 wire-reachability boundary as every other Group 1 item
+ * applies. */
+static void test_ep_generic_cfg_ptr_and_capacity_are_now_correctly_shaped(void)
+{
+    rcp_regmap_general_t map;
+    uint8_t              buf[0x28];
+
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_ep_generic_cfg_ptr));
+    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_ep_generic_cfg_capacity));
+
+    rcp_regmap_general_init(&map);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_ep_generic_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_ep_generic_cfg_capacity);
+
+    map.svr_ep_generic_cfg_ptr      = 0x00A0u;
+    map.svr_ep_generic_cfg_capacity = 0x0140u; /* bytes, e.g. 320 octets -- not
+                                                   an entry count */
+    TEST_ASSERT_EQUAL_UINT16(0x00A0u, map.svr_ep_generic_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT16(0x0140u, map.svr_ep_generic_cfg_capacity);
+
+    read_general(&map, (uint8_t)sizeof(buf), buf);
+    TEST_ASSERT_TRUE(span_is_zero(buf, 0x24, 0x27));
+}
+
+/* TC18 §12.7.5 Table 18: svr_ep_bytebus_id_map_ptr (16 bit, 0x0028) and
+ * svr_ep_bytebus_id_map_capacity (8 bit, 0x002A); svr_ep_functional_
+ * cfg_ptr (16 bit, 0x002C) and svr_sequencer_state_ptr (16 bit,
+ * 0x002E) -- both lone pointers, TC18 defines no adjacent capacity
+ * register for either (REQ-RMAP-037/-038, still open, not addressed
+ * by this batch). Deviation: all three collapse into three identically
+ * shaped rcp_regmap_table_ref_t members with a 32-bit word-unit
+ * offset, and (for ep_id_bus_map) a 16-bit capacity where TC18 defines
+ * an 8-bit entry count -- none bound to an address. */
+static void test_bytebus_map_and_functional_ptrs_are_mis_shaped(void)
 {
     rcp_regmap_general_t map = populated_map();
     uint8_t              buf[0x30];
 
-    TEST_ASSERT_EQUAL_UINT(sizeof(rcp_regmap_table_ref_t), sizeof(map.ep_generic_cfg));
     TEST_ASSERT_EQUAL_UINT(sizeof(rcp_regmap_table_ref_t), sizeof(map.ep_id_bus_map));
     TEST_ASSERT_EQUAL_UINT(sizeof(rcp_regmap_table_ref_t), sizeof(map.ep_functional_cfg));
     TEST_ASSERT_EQUAL_UINT(sizeof(rcp_regmap_table_ref_t), sizeof(map.sequencer_state));
-
-    /* One capacity shape for all four, so an 8-bit entry count (0x002A)
-     * and a 16-bit octet length (0x0026) are the same C field. */
     TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.ep_id_bus_map.capacity));
-    TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.ep_generic_cfg.capacity));
 
     read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x24, 0x2F));
+    TEST_ASSERT_TRUE(span_is_zero(buf, 0x28, 0x2F));
 }
 
 /* TC18 §12.7.5 Table 18 (continued) and §12.7.11-§12.7.14 define four
@@ -818,13 +854,13 @@ static void test_ep_cfg_and_bytebus_map_pointers_are_mis_shaped(void)
  * layer, time synch, security -- where a zero pointer is the defined
  * encoding for "subsystem not supported" and a section spans pointer..
  * pointer+capacity. Deviation: rcp_regmap_general_t declares exactly
- * four rcp_regmap_table_ref_t sub-table refs (svr_hw_cfg_ptr,
- * REQ-RMAP-033, and the stream-config quartet, REQ-RMAP-034, are now
- * their own distinct scalar fields rather than table refs -- see each
- * one's own comment for why) and none of these four missing pairs, so
- * a capacity of 0 ("section empty") cannot be told from
- * "unadvertised". Pinned by rcp_regmap_general_init() zeroing exactly
- * the fields that exist. */
+ * three rcp_regmap_table_ref_t sub-table refs (svr_hw_cfg_ptr,
+ * REQ-RMAP-033; the stream-config quartet, REQ-RMAP-034; and
+ * svr_ep_generic_cfg_ptr/_capacity, REQ-RMAP-036, are now their own
+ * distinct scalar fields rather than table refs -- see each one's own
+ * comment for why) and none of these four missing pairs, so a capacity
+ * of 0 ("section empty") cannot be told from "unadvertised". Pinned by
+ * rcp_regmap_general_init() zeroing exactly the fields that exist. */
 static void test_four_optional_subsystem_pointer_pairs_are_absent(void)
 {
     rcp_regmap_general_t map;
@@ -837,8 +873,8 @@ static void test_four_optional_subsystem_pointer_pairs_are_absent(void)
     TEST_ASSERT_EQUAL_HEX8(0u, map.svr_response_stream_cfg_capacity);
     TEST_ASSERT_EQUAL_HEX16(0u, map.svr_request_stream_cfg_ptr);
     TEST_ASSERT_EQUAL_HEX16(0u, map.svr_response_stream_cfg_ptr);
-    TEST_ASSERT_EQUAL_HEX32(0u, map.ep_generic_cfg.offset);
-    TEST_ASSERT_EQUAL_HEX16(0u, map.ep_generic_cfg.capacity);
+    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_ep_generic_cfg_ptr);
+    TEST_ASSERT_EQUAL_HEX16(0u, map.svr_ep_generic_cfg_capacity);
     TEST_ASSERT_EQUAL_HEX32(0u, map.ep_functional_cfg.offset);
     TEST_ASSERT_EQUAL_HEX16(0u, map.ep_functional_cfg.capacity);
     TEST_ASSERT_EQUAL_HEX32(0u, map.ep_id_bus_map.offset);
@@ -1628,7 +1664,8 @@ int main(void)
     RUN_TEST(test_io_pin_count_is_now_explicitly_modeled);
     RUN_TEST(test_hw_cfg_ptr_is_now_correctly_shaped);
     RUN_TEST(test_stream_cfg_registers_are_now_correctly_sized);
-    RUN_TEST(test_ep_cfg_and_bytebus_map_pointers_are_mis_shaped);
+    RUN_TEST(test_ep_generic_cfg_ptr_and_capacity_are_now_correctly_shaped);
+    RUN_TEST(test_bytebus_map_and_functional_ptrs_are_mis_shaped);
     RUN_TEST(test_four_optional_subsystem_pointer_pairs_are_absent);
     RUN_TEST(test_hw_config_table_has_no_server_side_storage);
     RUN_TEST(test_hw_config_row_stride_absent_and_access_class_inverted);
