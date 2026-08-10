@@ -153,6 +153,13 @@ void rcp_regmap_response_queue_cfg_init(rcp_regmap_response_queue_cfg_t *cfg)
     memset(cfg, 0, sizeof(*cfg));
 }
 
+//cfusa:req REQ-RMAP-060
+rcp_stream_id_t rcp_regmap_response_queue_stream_id(const rcp_regmap_response_queue_cfg_t *cfg,
+                                                     const uint8_t mac[6])
+{
+    return rcp_stream_id_make(mac, cfg->stream_uid);
+}
+
 /* ── EP-ID / byte_bus_id map ────────────────────────────────────────────────── */
 
 //cfusa:req REQ-RMAP-020

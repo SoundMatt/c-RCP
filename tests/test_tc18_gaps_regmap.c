@@ -1018,19 +1018,43 @@ static void test_no_lockable_w_plus_field_kind(void)
 
 /* ── §12.7.9 Table 24: response/acknowledge queues ─────────────────────────── */
 
-/* TC18 §12.7.9 Table 24 gives each response/acknowledge queue a
- * STREAM_UID (0x0000, 16 bit, supplying stream_id bits [63:48]), a
- * Max_AVTPDUsize (0x0002, in quadlets), a queue_size (0x0004, 16 bit, in
- * 32-bit words) and real reserved transmit memory behind it. Deviation:
- * rcp_regmap_response_queue_cfg_t is exactly three inert fields -- no
- * STREAM_UID, no queue_size, no storage -- so a queue has no identity for
- * rx_ack/resp_stream_index to point at, and Max_AVTPDUsize is not in the
- * 14-octet discovery slice either, so a peer cannot discover the frame
- * ceiling. */
-static void test_response_queue_has_no_identity_size_or_storage(void)
+/* REQ-RMAP-060 (TC18 §12.7.9 Table 24, relative address 0x0000, 16 bit,
+ * R/W+): STREAM_UID supplies bits [63:48] of the stream_id a response
+ * queue transmits on. rcp_regmap_response_queue_cfg_t.stream_uid now
+ * carries that register directly, and
+ * rcp_regmap_response_queue_stream_id() combines it with the interface's
+ * own mac exactly as rcp_stream_id_make() would -- a queue now has an
+ * identity rx_ack_stream_index/rx_resp_stream_index (Table 22) can point
+ * at. */
+static void test_response_queue_stream_id_is_configurable(void)
 {
     rcp_regmap_response_queue_cfg_t cfg;
-    rcp_stream_id_t                 sid = rcp_stream_id_make(SERVER_MAC, 0x1234u);
+    rcp_stream_id_t                 sid;
+
+    rcp_regmap_response_queue_cfg_init(&cfg);
+    TEST_ASSERT_EQUAL_UINT16(0u, cfg.stream_uid);
+
+    cfg.stream_uid = 0x1234u;
+    sid            = rcp_regmap_response_queue_stream_id(&cfg, SERVER_MAC);
+    TEST_ASSERT_EQUAL_HEX16(0x1234u, sid.unique_id);
+    TEST_ASSERT_EQUAL_MEMORY(SERVER_MAC, sid.mac, sizeof(SERVER_MAC));
+    TEST_ASSERT_TRUE(rcp_stream_id_equal(sid, rcp_stream_id_make(SERVER_MAC, 0x1234u)));
+}
+
+/* TC18 §12.7.9 Table 24 also gives each response/acknowledge queue a
+ * Max_AVTPDUsize (0x0002, in quadlets), a queue_size (0x0004, 16 bit, in
+ * 32-bit words) and real reserved transmit memory behind it. Deviation
+ * (REQ-RMAP-059, still open): rcp_regmap_response_queue_cfg_t has
+ * max_avtpdu_size (a register) but no queue_size register and, more
+ * fundamentally, no actual queue -- no storage a caller pushes framed
+ * responses into or drains from -- exists anywhere in this codebase; the
+ * only queue in the codebase (server.h's ep_enable pre-load queue) holds
+ * inbound requests, not outbound responses. Max_AVTPDUsize is also not
+ * in the 14-octet discovery slice, so a peer cannot discover the frame
+ * ceiling either (REQ-RMAP-061). */
+static void test_response_queue_has_no_size_register_or_storage(void)
+{
+    rcp_regmap_response_queue_cfg_t cfg;
 
     memset(&cfg, 0xAA, sizeof(cfg));
     rcp_regmap_response_queue_cfg_init(&cfg);
@@ -1038,14 +1062,12 @@ static void test_response_queue_has_no_identity_size_or_storage(void)
     TEST_ASSERT_EQUAL_UINT16(0u, cfg.flush_on_count);
     TEST_ASSERT_EQUAL_UINT32(0u, cfg.flush_time_us);
 
-    /* Only three registers' worth of struct: 2 + 2 + 4 octets. There is
-     * no room for, and no member corresponding to, STREAM_UID or
-     * queue_size. */
-    TEST_ASSERT_EQUAL_UINT((size_t)8u, sizeof(rcp_regmap_response_queue_cfg_t));
+    /* stream_uid(2) + max_avtpdu_size(2) + flush_on_count(2) +
+     * flush_time_us(4), padded to a 4-byte alignment boundary: 12 octets.
+     * There is no room for, and no member corresponding to, queue_size,
+     * nor any storage array/pointer for the queue's own contents. */
+    TEST_ASSERT_EQUAL_UINT((size_t)12u, sizeof(rcp_regmap_response_queue_cfg_t));
 
-    /* The stream_id machinery a STREAM_UID would feed does exist -- it
-     * just has no register to read the unique_id half from. */
-    TEST_ASSERT_EQUAL_HEX16(0x1234u, sid.unique_id);
     TEST_ASSERT_EQUAL_UINT((size_t)14u, RCP_DISCOVERY_GENERAL_SLICE_LEN);
 }
 
@@ -1284,7 +1306,8 @@ int main(void)
     RUN_TEST(test_no_diagnostic_for_multi_client_or_heterogeneous_type);
     RUN_TEST(test_byte_bus_id_is_eight_bits_wide);
     RUN_TEST(test_no_lockable_w_plus_field_kind);
-    RUN_TEST(test_response_queue_has_no_identity_size_or_storage);
+    RUN_TEST(test_response_queue_stream_id_is_configurable);
+    RUN_TEST(test_response_queue_has_no_size_register_or_storage);
     RUN_TEST(test_flush_triggers_and_heartbeat_are_absent);
     RUN_TEST(test_transmit_fragmentation_not_bounded_by_max_avtpdu_size);
     RUN_TEST(test_ep0_functional_block_and_discovery_timeout_absent);

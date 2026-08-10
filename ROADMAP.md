@@ -9116,3 +9116,58 @@ invocations; 100%/100%, 0 untested). 1030 requirements (unchanged), 115
 Group 4 (§12.7.9 Table 24, response/ack queue config, 7 items) per
 issue #200's own suggested order -- self-contained, includes the real
 server-liveness-heartbeat gap (`REQ-RMAP-065`).
+
+### 172. Phase 5d batch 2: REQ-RMAP-060 -- response queue STREAM_UID register (issue #200)
+
+Group 4's smallest, most self-contained item, taken first: architecture
+read confirmed Group 4's other 6 items (`-059`, `-061`-`-065`) all
+require a genuinely new transmit-queue subsystem (no storage, no
+flush/heartbeat timer, no fragmentation wiring exist anywhere in this
+codebase for the response/acknowledge direction) -- too large for one
+batch, and `-060` is the one item in the group that is NOT blocked on
+that larger design, so it goes first on its own.
+
+`regmap.h`'s `rcp_regmap_response_queue_cfg_t` gains a `stream_uid`
+field (TC18 §12.7.9 Table 24, relative address 0x0000, 16 bit, R/W+) and
+a new `rcp_regmap_response_queue_stream_id(cfg, mac)` helper combining
+it with the interface's own `mac` exactly as `avtp.h`'s existing
+`rcp_stream_id_make()` would -- confirmed by reading `avtp.h` first: the
+`unique_id` parameter `rcp_stream_id_make()` already takes IS the
+STREAM_UID register TC18 describes; the real gap was that
+`rcp_regmap_response_queue_cfg_t` had nowhere to persist a configured
+value for it, not that the wire-level stream_id-construction mechanism
+was missing. The new helper is therefore a thin, directly-testable named
+wrapper, not new construction logic.
+
+Purely additive field (default 0 via the existing `memset()`-based
+`rcp_regmap_response_queue_cfg_init()`). Struct grows from 8 to 12 octets
+(two uint16_t fields plus the existing uint16_t/uint32_t pair, padded to
+a 4-byte alignment boundary) -- confirmed by compiling a small standalone
+`sizeof()` probe against the built `librcp.a` rather than hand-computing
+padding rules, avoiding a wrong guess landing in a test assertion.
+
+Found the pre-existing combined `-059`/`-060` deviation pin
+(`test_response_queue_has_no_identity_size_or_storage`) and split it:
+`test_response_queue_stream_id_is_configurable` (new, `-060`, closed) and
+`test_response_queue_has_no_size_register_or_storage` (rewritten,
+`-059`, still open) -- the same "split before it's stale" discipline
+Phase 5c established, applied here on the very first Group 4 batch
+rather than waiting for a second requirement in the same pin to close
+later.
+
+Mutation-tested: reverting `regmap.h`/`regmap.c` together breaks the
+BUILD (the new test references the new field and function, undeclared
+without them). Full suite (64/64) + ASan/UBSan clean, pre- and
+post-restore. Fresh `cfusa check` (0 errors) + `cfusa trace --gaps`/
+`--req-coverage 100`/`--sec-tested 100` (three separate CI-matching
+invocations; 100%/100%, 0 untested). 1030 requirements (unchanged), 114
+`tc18-gap` entries remaining (was 115).
+
+**Phase 5d progress after batch 2**: 2/47 items addressed. **Next**:
+design the actual response/ack transmit-queue subsystem Group 4's
+remaining 6 items need (likely a new `respqueue.h`/`respqueue.c` module,
+mirroring `server.h`'s existing per-endpoint-queue shape but for the
+OUTBOUND direction) -- start with `-059` (the storage + `queue_size`
+register itself), since `-061`-`-065` (MTU enforcement, fragmentation
+wiring, flush triggers, heartbeat) all need a real queue to hang their
+own behavior on.
