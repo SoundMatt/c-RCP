@@ -362,11 +362,23 @@ bool rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
 /* ── Register-locking-by-state ─────────────────────────────────────────────── */
 
 /* Which broad category a register field falls into for locking purposes.
- * HW_GENERIC covers HW-pin-mapping and other generic (vendor-agnostic)
- * configuration; FUNCTIONAL_W and FUNCTIONAL_W_STAR both cover functional
- * configuration but differ in what happens once RCP_CONFIGURED is reached
- * -- modeled as two distinct enum values rather than one writability bit,
- * per this milestone's explicit scope. */
+ * HW_GENERIC covers HW-pin-mapping (TC18 Figure 16's "HW_CONFIG") and
+ * every other block Figure 16 groups under the identical HW_UNCONFIGURED-
+ * only locking rule and identical LOCKED_CONFIG_ACCESS response --
+ * REQ-LIFECYCLE-023: this includes the endpoint-generic configuration
+ * (rcp_regmap_ep_generic_cfg_t, Figure 16's "EP_GEN_CFG") and the
+ * response-queue/request-stream configuration (rcp_regmap_response_
+ * queue_cfg_t / rcp_regmap_request_stream_cfg_t not already covered by
+ * Table 22's own separate W* legend, Figure 16's "QUEUE_CFG") -- these
+ * are deliberately NOT modeled as distinct enum values, since their
+ * writability rule is identical to HW_GENERIC's own, and this codebase's
+ * own convention (see FUNCTIONAL_W vs. FUNCTIONAL_W_STAR immediately
+ * below) is to add a new enum value only when behavior actually differs,
+ * not to mirror the register map's own struct boundaries one-for-one.
+ * FUNCTIONAL_W and FUNCTIONAL_W_STAR both cover functional configuration
+ * but differ in what happens once RCP_CONFIGURED is reached -- modeled
+ * as two distinct enum values rather than one writability bit, per this
+ * milestone's explicit scope. */
 typedef enum {
     RCP_LIFECYCLE_FIELD_HW_GENERIC        = 0,
     RCP_LIFECYCLE_FIELD_FUNCTIONAL_W      = 1,
@@ -407,33 +419,46 @@ bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
                                    rcp_lifecycle_field_kind_t kind,
                                    rcp_lifecycle_writer_ctx_t writer);
 
-/* REQ-LIFECYCLE-024: TC18 §13.7.1.2 gives the one concrete write-outcome
- * example this codebase has: "Writing data to read only registers has no
- * effect and request is confirmed normally [err=0]. Writing to a write
- * prohibited register (e.g. lock bit for map set) creates a response
- * with err=1 and an error code UNAUTHORIZED_ACCESS." None of the three
- * rcp_lifecycle_field_kind_t kinds are "read only by nature" registers
- * (those -- e.g. vendor_id -- sit entirely outside this writability
- * model, per rcp_lifecycle_field_writable()'s own scope); all three are
- * genuinely writable-in-principle configuration that becomes
- * write-prohibited under certain lifecycle-state/authorization
- * conditions -- exactly TC18's "write prohibited register" case,
- * regardless of *why* the write is denied (state alone, or writer
- * authorization/frame origin on top of a state that would otherwise
- * permit it). This function therefore maps every denial
- * rcp_lifecycle_field_writable() reports to RCP_ERROR_UNAUTHORIZED_ACCESS
- * uniformly, per the spec's own concrete example -- RCP_ERROR_NONE
- * otherwise.
+/* REQ-LIFECYCLE-024: distinguishes WHY rcp_lifecycle_field_writable()
+ * denied a write, mapping to the wire error code TC18 actually assigns
+ * each reason -- RCP_ERROR_NONE if it did not deny it.
  *
- * RCP_ERROR_LOCKED_MEM_ACCESS is deliberately NOT emitted by this
- * function: it corresponds to a *different* TC18 mechanism this library
- * does not model at all -- the separate svr_configuration_lock register
- * (TC18 §12.9's "safety configuration data can be locked to be read
- * only via the RC Server's configuration", Table 18 offset 0x0015; see
- * test_tc18_gaps_regmap.c's own test_configuration_lock_register_is_
- * absent() deviation pin), not the lifecycle-state/writer-authorization
- * rules this function's inputs actually describe. Conflating the two
- * would misreport a code this library cannot yet honestly emit. */
+ * Two distinct TC18 sources, both verified directly against the
+ * primary-source PDF (initially only §13.7.1.2's prose was checked,
+ * which is necessary but not sufficient -- Figure 16's own diagram
+ * gives a second, more specific rule the prose alone does not surface):
+ *
+ *   - RCP_ERROR_LOCKED_MEM_ACCESS: state alone forbids the write -- even
+ *     a maximally-privileged writer (root client, owning stream,
+ *     discovery stream, unicast frame) would still be denied. This is
+ *     Figure 16's own HW_CONFIGURED-box transition: "Request on
+ *     discovery stream or known stream/bb_id for configuration to
+ *     HW_CONFIG or QUEUE_CFG or EP_GEN_CFG -> send error response
+ *     LOCKED_CONFIG_ACCESS" -- a diagram-only name that does not
+ *     literally match any of the seventeen numbered wire error codes'
+ *     own strings (§12.9.6's table), but is unambiguously the same
+ *     concept as RCP_ERROR_LOCKED_MEM_ACCESS (4), the only numbered
+ *     code with a semantically matching name -- the same kind of
+ *     prose-vs-table naming variance already documented for
+ *     POCI_FAILURE (rcp_e2e_wire_error()'s own doc comment). Every
+ *     RCP_LIFECYCLE_FIELD_HW_GENERIC denial is exactly this case (its
+ *     own writability rule has no authorization concept at all, only a
+ *     state one -- REQ-LIFECYCLE-023's HW_CONFIG/QUEUE_CFG/EP_GEN_CFG
+ *     blocks all fall under this kind, per rcp_lifecycle_field_kind_t's
+ *     own doc comment); FUNCTIONAL_W_STAR once RCP_CONFIGURED is the
+ *     same case for a different kind.
+ *   - RCP_ERROR_UNAUTHORIZED_ACCESS: state would otherwise permit the
+ *     write, but writer specifically is not authorized for it (an
+ *     unauthorized writer identity, or a non-unicast frame,
+ *     REQ-LIFECYCLE-027/030/031/036) -- TC18 §13.7.1.2's own separate,
+ *     narrower example: "Writing to a write prohibited register (e.g.
+ *     lock bit for map set) creates a response with err=1 and an error
+ *     code UNAUTHORIZED_ACCESS."
+ *
+ * Implemented via two calls to rcp_lifecycle_field_writable() itself
+ * (the real writer, then a maximally-privileged one) rather than a
+ * second, separately-maintained copy of its state/kind table -- the two
+ * can never drift out of sync with each other by construction. */
 rcp_wire_error_t rcp_lifecycle_field_write_error(rcp_lifecycle_state_t state,
                                                   rcp_lifecycle_field_kind_t kind,
                                                   rcp_lifecycle_writer_ctx_t writer);

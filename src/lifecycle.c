@@ -307,9 +307,20 @@ rcp_wire_error_t rcp_lifecycle_field_write_error(rcp_lifecycle_state_t state,
                                                   rcp_lifecycle_field_kind_t kind,
                                                   rcp_lifecycle_writer_ctx_t writer)
 {
-    /* TC18 §13.7.1.2's one concrete example maps every write-prohibited
-     * denial to UNAUTHORIZED_ACCESS uniformly -- see this function's own
-     * header doc comment for why LOCKED_MEM_ACCESS does not apply here. */
+    rcp_lifecycle_writer_ctx_t best;
+
     if (rcp_lifecycle_field_writable(state, kind, writer)) return RCP_ERROR_NONE;
+
+    /* Re-evaluate with a maximally-privileged writer (every authorizing
+     * condition true, frame unicast) to isolate whether the denial above
+     * was purely state-driven -- see this function's own header doc
+     * comment for the full rationale, corrected against TC18 Figure 16's
+     * own LOCKED_CONFIG_ACCESS transition. */
+    best.via_root_client_ep0   = true;
+    best.via_owning_stream     = true;
+    best.via_non_unicast_frame = false;
+    best.via_discovery_stream  = true;
+
+    if (!rcp_lifecycle_field_writable(state, kind, best)) return RCP_ERROR_LOCKED_MEM_ACCESS;
     return RCP_ERROR_UNAUTHORIZED_ACCESS;
 }
