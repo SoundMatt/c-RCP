@@ -8823,3 +8823,69 @@ Group 3 (`-021`/`-022`/`-027`, network-level sleep coordination) --
 issue #199's own text warns Group 3 "may require a network/PHY
 signaling surface this codebase doesn't have; scope this sub-group
 explicitly before implementing, don't assume."
+
+### 168. Phase 5c batch 6: REQ-PWRMODE-028 -- admission-suspend state closes Group 2 (issue #199)
+
+The deferred fifth item of Group 2. `server.h`'s `rcp_server_endpoint_t`
+gains an additive `admission_suspended` bool field (default `false` via
+the existing `memset()`-based `rcp_server_endpoint_init()`, so every
+pre-existing caller is silently unaffected) and a new setter,
+`rcp_server_endpoint_set_admission_suspended(ep, suspended)`.
+`rcp_server_endpoint_admit()` checks it FIRST -- before
+`frame`/`frame_len` are inspected at all -- and returns a new
+`rcp_server_admit_t` outcome, `RCP_SERVER_ADMIT_SUSPENDED`, when set:
+neither queued nor executed, implementing TC18 §13.7.2.3 step 1 ("stop
+entering incoming requests into endpoint queues") ahead of step 3's
+preconditions, which `power.h`'s `rcp_pwrmode_check_entry()`/
+`rcp_pwrmode_commit_entry()` (batch 5, `REQ-PWRMODE-024`/`026`) already
+implement as part of the same drain a caller runs.
+
+Design choices, verified before writing any code: (a) the new field uses
+a safe-default-additive-field shape, not a required parameter, since the
+common case (no sleep request in flight) is meant to stay silently
+unaffected -- the opposite of batch 3/4's `network_available`/
+`resp_stream_id` precedent, where no safe default existed. (b)
+`rcp_server_endpoint_submit()` itself is deliberately left unconsuming
+of the new flag -- it is the lower-level queue primitive
+`rcp_server_endpoint_admit()` is built on (and delegates to for standard
+requests); a caller wanting TC18 §13.7.2.3 admission-suspend semantics
+must route requests through `admit()`, the higher-level TC18-aware
+entrypoint, not call `submit()` directly. Both choices are stated
+explicitly in the new field's and function's own doc comments. (c) the
+new enum value is additive and was confirmed compiler-safe before
+adding it: this codebase builds with `-Wall -Wextra -Wpedantic` but no
+`-Werror`/`-Wswitch`-as-error, and `mock.c`'s own
+`finish_admission()` -- the one place in this codebase that switches
+over `rcp_server_admit_t` -- already has a `default:` case that
+correctly absorbs any new value (folds it into the REJECTED-shaped
+response path), so no other file needed touching for this batch to
+compile and behave sanely everywhere.
+
+Test changes: `test_tc18_gaps_server.c`'s `-028` deviation pin
+(`test_admission_is_not_suspended_during_the_sleep_drain`) rewritten to
+`test_admission_is_suspended_during_the_sleep_drain`, now demonstrating
+the full lifecycle -- normal admission before suspension, `SUSPENDED`
+during it (with an explicit assertion that the queue itself never grew),
+and a resumed normal admission after clearing the flag (the "entry
+ultimately refused" recovery path TC18 implies but does not name).
+
+Mutation-tested: reverting `server.h`/`server.c` together breaks the
+BUILD (the rewritten test references `rcp_server_endpoint_set_
+admission_suspended()` and `RCP_SERVER_ADMIT_SUSPENDED`, neither of
+which exists pre-fix) -- the same stronger-than-a-test-failure signal
+this phase has used throughout. Full suite (64/64) + ASan/UBSan clean,
+pre- and post-mutation-restore; no new `-Wswitch`/`-Wall`/`-Wextra`
+warnings anywhere in the codebase from the new enum value, confirming
+(c) above empirically as well as by inspection. Fresh `cfusa check` (0
+errors) + `cfusa trace --gaps`/`--req-coverage 100`/`--sec-tested 100`
+(three separate CI-matching invocations; 100%/100%, 0 untested). 1030
+requirements (unchanged), 121 `tc18-gap` entries remaining (was 122).
+
+**Phase 5c progress after batch 6**: 10/15 items addressed. **Group 2
+(§12.5/§13.7.2.3) is now fully closed.** **Next**: Group 3
+(`REQ-PWRMODE-021`/`-022`/`-027`, network-level sleep coordination) --
+issue #199's own text warns this "may require a network/PHY signaling
+surface this codebase doesn't have; scope this sub-group explicitly
+before implementing, don't assume" -- scope that explicitly before
+writing any code, per that warning. Then Group 4
+(`REQ-PWRMODE-014`/`-015`, cold-start/config persistence).
