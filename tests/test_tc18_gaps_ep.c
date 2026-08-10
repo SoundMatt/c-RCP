@@ -809,12 +809,22 @@ static void test_wakeup_status_latch_and_source_cfg_reduced(void)
 
 /* ── E2E request-stream configuration (TC18 12.7.7 Table 22) ──────────────── */
 
-/* REQ-E2E-028 (not-implemented) DEVIATION PIN: TC18 12.7.7 Table 22 relative
- * address 0x000D bit 1 (rx_enforce_seq) files a request for execution only if
- * the sequence number carried in its AVTPDU has increased relative to the
- * previously accepted request on that stream. c-RCP has neither the
- * configuration bit nor the per-stream sequence counter: the very same frame
- * replayed byte-for-byte is admitted and stored a second time. */
+/* REQ-E2E-028/029 (partial) DEVIATION PIN: TC18 12.7.7 Table 22 relative
+ * address 0x000D bits 1/2 (rx_enforce_seq/rx_seq_safestate_enable) require
+ * rejecting a request whose AVTPDU sequence number has not increased, and
+ * escalating every endpoint on the stream to its configured safe state on a
+ * discontinuity. rcp_e2e_seq_evaluate() (e2e.h) now implements both
+ * decisions as a pure, directly-testable primitive -- see the tests below --
+ * but rcp_server_endpoint_admit() itself still has no sequence_num input at
+ * all (it operates on the ACF payload only; the AVTPDU header, including
+ * sequence_num, is decoded and discarded one layer above it, in whatever
+ * caller demultiplexes an AVTP frame before handing admit() the ACF
+ * message). Wiring rcp_e2e_seq_evaluate() into the actual admission path
+ * therefore needs sequence_num threaded through that caller -- e.g.
+ * mock.c's rcp_mock_server_dispatch_frame()/rcp_mock_server_dispatch() --
+ * which is a larger, separate integration change, not done here. The very
+ * same frame replayed byte-for-byte is still admitted and stored a second
+ * time by admit() itself. */
 static void test_e2e_replayed_request_is_admitted_again(void)
 {
     rcp_server_endpoint_t ep;
@@ -830,7 +840,8 @@ static void test_e2e_replayed_request_is_admitted_again(void)
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
                       rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, &request_type,
                                                 &index, NULL));
-    /* Identical AVTPDU content, no sequence advance: filed again anyway. */
+    /* Identical AVTPDU content, no sequence advance: filed again anyway --
+     * admit() itself still has no sequence_num input to gate on. */
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
                       rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, &request_type,
                                                 &index, NULL));
@@ -840,12 +851,13 @@ static void test_e2e_replayed_request_is_admitted_again(void)
     rcp_bytes_free(&frame);
 }
 
-/* REQ-E2E-029 (not-implemented) DEVIATION PIN: TC18 12.7.7 Table 22 relative
- * address 0x000D bit 2 (rx_seq_safestate_enable) brings every endpoint bound
- * to a request stream into its configured safe state on a sequence-number
- * discontinuity. c-RCP's only safe-state entry path is the watchdog:
- * rcp_e2e_wd_evaluate() takes no sequence number, and with the watchdog
- * disabled no elapsed time whatsoever produces enter_safe_state. */
+/* Companion to the deviation pin above: the watchdog remains the only
+ * safe-state entry path admit()'s own call chain can reach; rcp_e2e_wd_evaluate()
+ * still takes no sequence number, and with the watchdog disabled no elapsed
+ * time whatsoever produces enter_safe_state. rcp_e2e_seq_evaluate()'s own
+ * enter_safe_state field (tested separately below) is the sequence-driven
+ * counterpart, available as a primitive but not yet wired into any
+ * admission call chain -- see the deviation pin above. */
 static void test_e2e_safe_state_only_reachable_via_watchdog(void)
 {
     rcp_e2e_wd_result_t r;
@@ -871,6 +883,139 @@ static void test_e2e_safe_state_only_reachable_via_watchdog(void)
     r = rcp_e2e_wd_evaluate(true, 10u, true, true, 9u);
     TEST_ASSERT_FALSE(r.overflowed);
     TEST_ASSERT_FALSE(r.enter_safe_state);
+}
+
+/* REQ-E2E-028: the first call on a fresh tracker has nothing to compare
+ * against, so it always accepts and is never a discontinuity, regardless
+ * of what seq it's given or how rx_enforce_seq/rx_seq_safestate_enable are
+ * set. */
+static void test_e2e_seq_evaluate_first_call_always_accepts(void)
+{
+    rcp_e2e_seq_tracker_t t;
+    rcp_e2e_seq_result_t  r;
+
+    rcp_e2e_seq_tracker_init(&t);
+    TEST_ASSERT_FALSE(t.has_prev);
+
+    r = rcp_e2e_seq_evaluate(&t, true, true, 200u);
+    TEST_ASSERT_TRUE(r.accept);
+    TEST_ASSERT_FALSE(r.discontinuity);
+    TEST_ASSERT_FALSE(r.enter_safe_state);
+    TEST_ASSERT_TRUE(t.has_prev);
+    TEST_ASSERT_EQUAL_UINT8(200u, t.prev_seq);
+}
+
+/* REQ-E2E-028: a single-increment sequence always accepts and is never a
+ * discontinuity, with rx_enforce_seq on. */
+static void test_e2e_seq_evaluate_single_increment_is_clean(void)
+{
+    rcp_e2e_seq_tracker_t t;
+    rcp_e2e_seq_result_t  r;
+
+    rcp_e2e_seq_tracker_init(&t);
+    (void)rcp_e2e_seq_evaluate(&t, true, true, 10u);
+
+    r = rcp_e2e_seq_evaluate(&t, true, true, 11u);
+    TEST_ASSERT_TRUE(r.accept);
+    TEST_ASSERT_FALSE(r.discontinuity);
+    TEST_ASSERT_FALSE(r.enter_safe_state);
+    TEST_ASSERT_EQUAL_UINT8(11u, t.prev_seq);
+}
+
+/* REQ-E2E-028/029: a gap (increase by more than one) still accepts -- order
+ * was preserved, just not every seq in between -- but IS a discontinuity,
+ * so enter_safe_state tracks rx_seq_safestate_enable independently of
+ * accept. */
+static void test_e2e_seq_evaluate_gap_accepts_but_is_a_discontinuity(void)
+{
+    rcp_e2e_seq_tracker_t t;
+    rcp_e2e_seq_result_t  r;
+
+    rcp_e2e_seq_tracker_init(&t);
+    (void)rcp_e2e_seq_evaluate(&t, true, true, 10u);
+
+    r = rcp_e2e_seq_evaluate(&t, true, true, 13u); /* skipped 11, 12 */
+    TEST_ASSERT_TRUE(r.accept);
+    TEST_ASSERT_TRUE(r.discontinuity);
+    TEST_ASSERT_TRUE(r.enter_safe_state);
+    TEST_ASSERT_EQUAL_UINT8(13u, t.prev_seq);
+
+    /* Same gap, but rx_seq_safestate_enable off: still a discontinuity,
+     * just no escalation. */
+    rcp_e2e_seq_tracker_init(&t);
+    (void)rcp_e2e_seq_evaluate(&t, true, false, 10u);
+    r = rcp_e2e_seq_evaluate(&t, true, false, 13u);
+    TEST_ASSERT_TRUE(r.accept);
+    TEST_ASSERT_TRUE(r.discontinuity);
+    TEST_ASSERT_FALSE(r.enter_safe_state);
+}
+
+/* REQ-E2E-028: a stale/replayed or reordered-backward seq is rejected when
+ * rx_enforce_seq is on, and the tracker's prev_seq does NOT move -- a
+ * rejected replay must not become the new reference point (see this
+ * primitive's own doc comment for why). */
+static void test_e2e_seq_evaluate_replay_is_rejected_and_does_not_move_tracker(void)
+{
+    rcp_e2e_seq_tracker_t t;
+    rcp_e2e_seq_result_t  r;
+
+    rcp_e2e_seq_tracker_init(&t);
+    (void)rcp_e2e_seq_evaluate(&t, true, true, 50u);
+
+    /* Exact replay of the same seq. */
+    r = rcp_e2e_seq_evaluate(&t, true, true, 50u);
+    TEST_ASSERT_FALSE(r.accept);
+    TEST_ASSERT_EQUAL_UINT8(50u, t.prev_seq); /* unmoved */
+
+    /* An older seq (reordered-backward). */
+    r = rcp_e2e_seq_evaluate(&t, true, true, 40u);
+    TEST_ASSERT_FALSE(r.accept);
+    TEST_ASSERT_EQUAL_UINT8(50u, t.prev_seq); /* still unmoved */
+
+    /* The genuine next seq is still correctly accepted afterward -- the
+     * rejected replays never displaced the real reference point. */
+    r = rcp_e2e_seq_evaluate(&t, true, true, 51u);
+    TEST_ASSERT_TRUE(r.accept);
+    TEST_ASSERT_FALSE(r.discontinuity);
+}
+
+/* REQ-E2E-028: rx_enforce_seq off means every seq accepts regardless of
+ * direction (a real replay included), while discontinuity/enter_safe_state
+ * are still computed and reported -- rx_enforce_seq and
+ * rx_seq_safestate_enable are independent bits, per this primitive's own
+ * doc comment. */
+static void test_e2e_seq_evaluate_enforce_off_always_accepts(void)
+{
+    rcp_e2e_seq_tracker_t t;
+    rcp_e2e_seq_result_t  r;
+
+    rcp_e2e_seq_tracker_init(&t);
+    (void)rcp_e2e_seq_evaluate(&t, false, true, 50u);
+
+    r = rcp_e2e_seq_evaluate(&t, false, true, 10u); /* a real backward jump */
+    TEST_ASSERT_TRUE(r.accept);
+    TEST_ASSERT_TRUE(r.discontinuity);
+    TEST_ASSERT_TRUE(r.enter_safe_state);
+    TEST_ASSERT_EQUAL_UINT8(10u, t.prev_seq); /* advances: this call accepted */
+}
+
+/* REQ-E2E-028: sequence_num is an 8-bit free-running counter (avtp.h) that
+ * wraps 0xFF -> 0x00 over any long-lived stream; that wrap is a single
+ * increment, not a discontinuity -- see this primitive's own doc comment
+ * for the RFC 1982 comparison technique this relies on. */
+static void test_e2e_seq_evaluate_wraparound_is_a_clean_single_increment(void)
+{
+    rcp_e2e_seq_tracker_t t;
+    rcp_e2e_seq_result_t  r;
+
+    rcp_e2e_seq_tracker_init(&t);
+    (void)rcp_e2e_seq_evaluate(&t, true, true, 0xFFu);
+
+    r = rcp_e2e_seq_evaluate(&t, true, true, 0x00u);
+    TEST_ASSERT_TRUE(r.accept);
+    TEST_ASSERT_FALSE(r.discontinuity);
+    TEST_ASSERT_FALSE(r.enter_safe_state);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, t.prev_seq);
 }
 
 /* REQ-E2E-030 (partial) DEVIATION PIN: TC18 12.7.7 Table 22 relative
@@ -962,6 +1107,12 @@ int main(void)
 
     RUN_TEST(test_e2e_replayed_request_is_admitted_again);
     RUN_TEST(test_e2e_safe_state_only_reachable_via_watchdog);
+    RUN_TEST(test_e2e_seq_evaluate_first_call_always_accepts);
+    RUN_TEST(test_e2e_seq_evaluate_single_increment_is_clean);
+    RUN_TEST(test_e2e_seq_evaluate_gap_accepts_but_is_a_discontinuity);
+    RUN_TEST(test_e2e_seq_evaluate_replay_is_rejected_and_does_not_move_tracker);
+    RUN_TEST(test_e2e_seq_evaluate_enforce_off_always_accepts);
+    RUN_TEST(test_e2e_seq_evaluate_wraparound_is_a_clean_single_increment);
     RUN_TEST(test_e2e_request_store_overflow_reports_error_code_but_not_escalation);
     RUN_TEST(test_e2e_overflow_should_enter_safe_state_is_gated_only_on_the_config_bit);
 

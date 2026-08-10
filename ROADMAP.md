@@ -7220,3 +7220,74 @@ build both clean. Fresh `cfusa check` (0 errors) + `cfusa trace
 (unchanged count), 146 `tc18-gap` entries remaining (unchanged count --
 this one stays a gap entry, now `partial` instead of
 `not-implemented`).
+
+### 149. Phase 5a batch 4: REQ-E2E-028/029 sequence-number enforcement primitive (issue #197)
+
+TC18 §12.7.7 Table 22 relative address 0x000D bits 1/2
+(`rx_enforce_seq`/`rx_seq_safestate_enable`) define two independent
+reactions to a request stream's AVTPDU `sequence_num`: reject a request
+whose sequence did not increase relative to the last accepted one
+(`rx_enforce_seq`), and separately escalate every endpoint on the
+stream to its configured safe state on any discontinuity -- a sequence
+that advanced by more than one increment -- regardless of whether that
+gap was itself accepted (`rx_seq_safestate_enable`). Neither bit nor
+the per-stream sequence-counter state they gate existed anywhere in
+this codebase.
+
+This batch adds:
+
+  - `rx_enforce_seq`/`rx_seq_safestate_enable` bool fields on
+    `rcp_regmap_request_stream_cfg_t` (`regmap.h`), completing Table
+    22's 0x000D byte alongside the fields Phase 18 already wired.
+  - `rcp_e2e_seq_tracker_t` (`e2e.h`/`e2e.c`): a caller-owned per-stream
+    tracker holding the last *accepted* `sequence_num`, the same
+    "small stateful helper alongside this module's pure functions"
+    shape as `rcp_e2e_stream_fault_t`.
+  - `rcp_e2e_seq_evaluate()`: the pure decision function, returning
+    `accept` (per `rx_enforce_seq`), `discontinuity` (a gap of more
+    than one increment, independent of `accept`), and
+    `enter_safe_state` (`discontinuity && rx_seq_safestate_enable`).
+    Uses RFC 1982 serial-number comparison (forward distance in
+    `[1, 127]` of the 256-value space) so `sequence_num`'s 8-bit
+    wraparound (0xFF -> 0x00) reads as a clean single increment rather
+    than a spurious rejection -- TC18's own prose does not specify
+    modular comparison, but a literal always-greater-than reading would
+    reject every request once the counter first wraps on any
+    long-lived stream, which cannot be the intended behavior of a
+    mechanism meant to run indefinitely.
+  - The tracker's `prev_seq` advances **only on accept** -- a design
+    decision, not an oversight: advancing on a rejected/replayed seq
+    would drag the reference point backward and let a replay weaken
+    detection of the genuine next request. Verified directly: a
+    rejected replay leaves `prev_seq` unmoved, and the real next
+    sequence number is still correctly accepted afterward.
+
+What remains not implemented, and is documented as such rather than
+overclaimed: `rcp_server_endpoint_admit()` has no `sequence_num` input
+at all. The AVTPDU header (including `sequence_num`) is decoded and
+discarded by whatever caller demultiplexes a frame before handing
+`admit()` just the ACF payload -- e.g. `mock.c`'s
+`rcp_mock_server_dispatch_frame()`. Wiring `rcp_e2e_seq_evaluate()`
+into a real admission path needs `sequence_num` threaded through that
+caller, a larger, separate integration change not undertaken here.
+`rx_seq_safestate_enable`'s escalation itself also shares
+`REQ-E2E-030`'s already-documented cross-endpoint architecture
+boundary. `.fusa-reqs.json`'s `REQ-E2E-028`/`REQ-E2E-029` both move
+`not-implemented` -> `partial`.
+
+`tests/test_tc18_gaps_ep.c` gains 6 new direct tests of
+`rcp_e2e_seq_evaluate()` (first call, single increment, gap-with/without
+escalation, replay-rejected-tracker-unmoved, `rx_enforce_seq` off,
+wraparound) plus updated doc comments on the two existing
+admission-level deviation pins clarifying they're still accurate (the
+primitive exists; nothing calls it yet).
+
+Mutation-tested: reverting the fix (`git stash` on `src/e2e.c`,
+`include/rcp/e2e.h`, `include/rcp/regmap.h`) fails the test file's
+*build* (20 errors: undeclared `rcp_e2e_seq_tracker_init`/
+`rcp_e2e_seq_evaluate`, unknown type `rcp_e2e_seq_tracker_t`) --
+restoring the fix rebuilds and passes clean again. Full test suite
+(64/64) + ASan/UBSan build both clean. Fresh `cfusa check` (0 errors) +
+`cfusa trace --req-coverage 100 --sec-tested 100` (100%/100%). 1028
+requirements (unchanged count), 146 `tc18-gap` entries remaining
+(unchanged count -- both stay gap entries, now `partial`).

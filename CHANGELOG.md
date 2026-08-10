@@ -32,6 +32,27 @@ the rationale.
 
 ## Releases
 
+### v0.149.0 -- 2026-08-09
+
+**Phase 5a batch 4: REQ-E2E-028/029 sequence-number enforcement
+primitive.** Issue #197. Adds `rx_enforce_seq`/`rx_seq_safestate_enable`
+to `rcp_regmap_request_stream_cfg_t` (TC18 §12.7.7 Table 22) and a new
+pure primitive, `rcp_e2e_seq_evaluate()` with caller-owned
+`rcp_e2e_seq_tracker_t` state, deciding whether an AVTPDU's
+`sequence_num` should be accepted and whether it constitutes a
+safety-relevant discontinuity -- using RFC 1982 serial-number
+comparison so the 8-bit counter's wraparound is handled correctly. The
+tracker advances only on accept, so a rejected replay can't drag the
+reference point backward. Not yet wired into any admission path
+(`rcp_server_endpoint_admit()` has no `sequence_num` input; that
+integration is a separate, larger change) -- documented honestly as
+`partial`, not `implemented`. Mutation-tested (the test file fails to
+build without the fix), full suite + ASan/UBSan clean, fresh `cfusa
+check`/`trace` (0 errors, 100%/100%). See `ROADMAP.md` milestone 149
+for full detail. 1028 requirements (unchanged count), 146 `tc18-gap`
+entries remaining (unchanged count -- both stay gap entries, now
+`partial`).
+
 ### v0.148.0 -- 2026-08-09
 
 **Phase 5a batch 3: REQ-E2E-030 request-storage-overflow error code.**

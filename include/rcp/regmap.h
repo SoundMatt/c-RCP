@@ -442,6 +442,26 @@ typedef struct {
                                     (RCP_E2E_CRC_ACTION_LATCH_STREAM_FAULT)
                                     -- see rcp_e2e_crc_error_action(). */
 
+    /* ── Per-stream sequence-number enforcement (e2e.h) ─────────────── */
+    bool     rx_enforce_seq;          /* true: a request is only filed for
+                                          execution if its AVTPDU's
+                                          sequence_num has increased
+                                          relative to the last accepted
+                                          one on this stream -- see
+                                          rcp_e2e_seq_evaluate()'s accept
+                                          field. */
+    bool     rx_seq_safestate_enable; /* true: a sequence_num that did not
+                                          advance by exactly one increment
+                                          drives every endpoint bound to
+                                          this stream toward its
+                                          configured safe state -- see
+                                          rcp_e2e_seq_evaluate()'s
+                                          enter_safe_state field, and
+                                          rcp_e2e_overflow_should_enter_safe_state()'s
+                                          own doc comment for the same
+                                          cross-endpoint escalation
+                                          boundary this shares. */
+
     /* ── Per-stream watchdog (e2e.h) ────────────────────────────────── */
     bool     rx_wd_enable;            /* watchdog active on this stream at all */
     uint32_t rx_wd_timeout_ms;        /* elapsed-since-last-kick overflow threshold */
