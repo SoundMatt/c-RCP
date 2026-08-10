@@ -397,6 +397,31 @@ typedef struct {
                                           section above for the full
                                           primary-source-verified bit
                                           layout and history. */
+    uint8_t  reserved_0x17; /* REQ-RMAP-031 (TC18 §12.7.5 Table 18,
+                                relative address 0x0017, 8 bit): reserved
+                                for future use; must read 0x00. Explicitly
+                                modeled -- not merely absent -- so intent
+                                is documented (this octet is deliberately
+                                unused, not forgotten) and so a future
+                                wire-dispatch implementation of
+                                REQ-RMAP-024 has a concrete field to write
+                                zero from, rather than depending on
+                                whatever generic buffer zero-fill happens
+                                to exist at that point in the encoder.
+                                Zero-inits for free via the existing
+                                memset in rcp_regmap_general_init(); no
+                                setter is provided anywhere in this
+                                codebase, so a caller cannot construct a
+                                nonzero value here in the first place --
+                                the only way this field could ever read
+                                nonzero is a direct out-of-convention
+                                struct-literal assignment, which
+                                populated_map() (tests/
+                                test_tc18_gaps_regmap.c) deliberately
+                                does NOT do, unlike every other field in
+                                that helper. Content modeling only, same
+                                REQ-RMAP-024 wire-reachability boundary as
+                                every other Group 1 item. */
     uint16_t svr_root_client_index;   /* RCP_REGMAP_NO_ROOT_CLIENT if unset */
 
     rcp_regmap_table_ref_t hw_pin_map;

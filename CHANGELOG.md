@@ -33,6 +33,31 @@ the rationale.
 
 ## Releases
 
+### v0.184.0 -- 2026-08-10
+
+**Phase 5d batch 14: `REQ-RMAP-031` -- reserved octet at 0x0017 now
+explicitly modeled.** Issue #200. Verified `rcp_discovery_encode_
+response()` directly before writing code, to rule out a concern raised
+by v0.183.0's `svr_implemented_options` field shrink (`uint32_t` ->
+`uint8_t`, -3 octets): confirmed the encoder writes only 5 named
+fields into its leading 0x000D-octet slice and zero-fills the rest of
+its scratch buffer -- nothing is wire-packed by struct layout, so the
+shrink could not have silently shifted any later field's documented
+address. New `uint8_t reserved_0x17` field on `rcp_regmap_general_t`
+(no setter anywhere in this codebase), zero-initializing for free.
+Documents the octet as deliberately reserved rather than merely
+absent, and gives a future wire-dispatch implementation a concrete
+field to write zero from. Split a stale-prone combined deviation pin
+(0x0017 + the separate, still-open 0x0022 register) into a new
+positive test and a narrowed remaining one. Mutation-tested: full
+header revert with tests kept breaks the build (sufficient rigor for a
+field with no computed logic, matching batches 10/12's precedent).
+Full suite (65/65, +1 test) + ASan/UBSan clean. Fresh `cfusa
+check`/`trace` (0 errors, 100%/100%, three separate CI-matching
+invocations). See `ROADMAP.md` milestone 184 for full detail. 1030
+requirements (unchanged), 110 `tc18-gap` entries remaining (unchanged
+-- narrowed from `not-implemented` to `partial`).
+
 ### v0.183.0 -- 2026-08-10
 
 **Phase 5d batch 13: `REQ-RMAP-030` -- `svr_implemented_options`
