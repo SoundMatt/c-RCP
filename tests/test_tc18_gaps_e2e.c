@@ -90,13 +90,15 @@ static const rcp_lifecycle_plausibility_snapshot_t EMPTY_SNAP = {NULL, 0, NULL, 
 
 /* Any byte_bus_id passes rcp_lifecycle_should_accept() once HW_CONFIGURED.
  * HW_UNCONFIGURED -> HW_CONFIGURED does not consult writer, so a plain
- * {0} is correct here, not just a convenience default. */
+ * {0} is correct here, not just a convenience default. As of the
+ * REQ-LIFECYCLE-022 fix, this advance also requires all_other_eps_idle
+ * -- true here, since this fixture is not itself testing idleness. */
 static void to_hw_configured(rcp_mock_server_t *srv)
 {
     rcp_lifecycle_writer_ctx_t none = {0};
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-                      rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP, none));
+                      rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP, none, true));
 }
 
 /* As of the REQ-LIFECYCLE-028 fix, HW_CONFIGURED unconditionally drops
@@ -106,14 +108,14 @@ static void to_hw_configured(rcp_mock_server_t *srv)
  * plausibility checks along the way, the same way to_hw_configured()
  * already relies on for its own single transition. As of the
  * REQ-LIFECYCLE-031 fix, the HW_CONFIGURED -> RCP_CONFIGURED advance
- * also requires an authorized writer. */
+ * also requires an authorized writer (not idle-gated, per Figure 16). */
 static void to_rcp_configured(rcp_mock_server_t *srv)
 {
     rcp_lifecycle_writer_ctx_t root = {true, false, false, false};
 
     to_hw_configured(srv);
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-                      rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP, root));
+                      rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP, root, true));
 }
 
 static bool g_handler_called;

@@ -47,13 +47,16 @@ static const rcp_lifecycle_plausibility_snapshot_t EMPTY_SNAP = {NULL, 0, NULL, 
 
 /* HW_UNCONFIGURED -> HW_CONFIGURED does not consult writer (see
  * lifecycle.h's own rcp_lifecycle_transition() doc comment), so a plain
- * {0} is sufficient and correct here, not just a convenience default. */
+ * {0} is sufficient and correct here, not just a convenience default.
+ * As of the REQ-LIFECYCLE-022 fix, this advance also requires
+ * all_other_eps_idle -- true here, since this fixture is not itself
+ * testing idleness. */
 static void to_hw_configured(rcp_mock_server_t *srv)
 {
     rcp_lifecycle_writer_ctx_t none = {0};
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-        rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP, none));
+        rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP, none, true));
 }
 
 /* As of the REQ-LIFECYCLE-032 fix, HW_CONFIGURED admits only requests to
@@ -62,15 +65,16 @@ static void to_hw_configured(rcp_mock_server_t *srv)
  * trivially satisfy both plausibility checks along the way, same as
  * to_hw_configured() already relies on for its own single transition. As
  * of the REQ-LIFECYCLE-031 fix, the HW_CONFIGURED -> RCP_CONFIGURED
- * advance also requires an authorized writer -- root is used here since
- * this fixture is not itself testing lifecycle authorization policy. */
+ * advance also requires an authorized writer (not idle-gated, per
+ * Figure 16) -- root is used here since this fixture is not itself
+ * testing lifecycle authorization policy. */
 static void to_rcp_configured(rcp_mock_server_t *srv)
 {
     rcp_lifecycle_writer_ctx_t root = {true, false, false, false};
 
     to_hw_configured(srv);
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-        rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP, root));
+        rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP, root, true));
 }
 
 /* ── Server lifecycle ──────────────────────────────────────────────────────── */
@@ -96,7 +100,7 @@ static void test_transition_passthrough_rejects_invalid(void)
     rcp_lifecycle_writer_ctx_t root = {true, false, false, false};
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_INVALID_TRANSITION,
-        rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP, root));
+        rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP, root, true));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, rcp_mock_server_state(srv));
     rcp_mock_server_destroy(srv);
 }

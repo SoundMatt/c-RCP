@@ -109,22 +109,25 @@ static rcp_bytes_t standard_abb(rcp_byte_bus_id_t bus, uint8_t transaction_num)
     return rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
 }
 
-/* ── §12.3 lifecycle transitions: no idleness input; writer authorization now enforced ── */
+/* ── §12.3 lifecycle transitions: idleness and writer authorization both now enforced ── */
 
-/* DEVIATION PIN (REQ-LIFECYCLE-022/023, not implemented): TC18 §12.3
- * (Figure 16) refuses a lifecycle-state change with an EPs_NOT_IDLE
- * error while any other endpoint still has an in-flight or queued
- * request. rcp_lifecycle_transition() takes no endpoint-idle input at
- * all, so an authorized demotion still tears down every in-flight
- * request unconditionally rather than being refused. Tracked as its own
- * still-open Group 4 item in issue #198, not attempted here. */
-static void test_transition_takes_no_idle_input(void)
+/* As of the REQ-LIFECYCLE-022 fix, TC18 Figure 16's "Root Client access
+ * via EP0 to set state to HW_UNCONFIGURED & other EPs are not Idle ->
+ * send error response EPs_NOT_IDLE" transition is enforced directly:
+ * rcp_lifecycle_transition() now takes an all_other_eps_idle input and
+ * refuses an otherwise-authorized demotion while it is false, rather
+ * than tearing down in-flight requests unconditionally. */
+static void test_transition_now_requires_idle_for_demotion(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_RCP_CONFIGURED;
     rcp_lifecycle_writer_ctx_t root = {true, false, false, false};
 
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_EPS_NOT_IDLE,
+                      rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, root, false));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state); /* unchanged */
+
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-                      rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, root));
+                      rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, root, true));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, state);
 }
 
@@ -141,7 +144,7 @@ static void test_transition_now_rejects_unauthorized_writer(void)
     const char                *unknown;
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_UNAUTHORIZED,
-                      rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, stranger));
+                      rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, stranger, true));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state); /* unchanged */
     TEST_ASSERT_TRUE(strlen(rcp_lifecycle_strerror(RCP_LIFECYCLE_ERR_UNAUTHORIZED)) > 0);
 
@@ -390,7 +393,7 @@ static void test_discovery_write_authority_survives_rcp_configured(void)
     TEST_ASSERT_TRUE(rcp_discovery_claim_note_config_write(&claim, a, 1005u));
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-                      rcp_lifecycle_transition(&state, RCP_LIFECYCLE_RCP_CONFIGURED, &snap, discovery));
+                      rcp_lifecycle_transition(&state, RCP_LIFECYCLE_RCP_CONFIGURED, &snap, discovery, true));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state);
 
     /* TC18 §12.7.4: once RCP_CONFIGURED, a discovery request is still
@@ -960,7 +963,7 @@ int main(void)
 {
     UNITY_BEGIN();
 
-    RUN_TEST(test_transition_takes_no_idle_input);
+    RUN_TEST(test_transition_now_requires_idle_for_demotion);
     RUN_TEST(test_transition_now_rejects_unauthorized_writer);
     RUN_TEST(test_locked_config_write_has_no_kind_and_no_error_response);
     RUN_TEST(test_hw_configured_admits_only_ep0);

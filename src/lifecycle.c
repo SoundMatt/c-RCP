@@ -10,6 +10,7 @@ const char *rcp_lifecycle_strerror(rcp_lifecycle_errc_t e)
     case RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT: return "rcp/lifecycle: RCP configuration inconsistent";
     case RCP_LIFECYCLE_ERR_INVALID_TRANSITION:   return "rcp/lifecycle: invalid lifecycle transition";
     case RCP_LIFECYCLE_ERR_UNAUTHORIZED:         return "rcp/lifecycle: writer not authorized for this transition";
+    case RCP_LIFECYCLE_ERR_EPS_NOT_IDLE:         return "rcp/lifecycle: another endpoint is not idle";
     default:                                     return "rcp/lifecycle: unknown error";
     }
 }
@@ -72,11 +73,13 @@ rcp_lifecycle_errc_t rcp_lifecycle_check_rcp_cfg(const rcp_lifecycle_plausibilit
 //cfusa:req REQ-LIFECYCLE-011
 //cfusa:req REQ-LIFECYCLE-012
 //cfusa:req REQ-LIFECYCLE-013
+//cfusa:req REQ-LIFECYCLE-022
 //cfusa:req REQ-LIFECYCLE-031
 rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
                                                rcp_lifecycle_state_t target,
                                                const rcp_lifecycle_plausibility_snapshot_t *snap,
-                                               rcp_lifecycle_writer_ctx_t writer)
+                                               rcp_lifecycle_writer_ctx_t writer,
+                                               bool all_other_eps_idle)
 {
     rcp_lifecycle_state_t from = *state;
     /* TC18 §12.3.1.2 (REQ-LIFECYCLE-031): a svr_lifecycle_state write is
@@ -87,13 +90,18 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
      * narrowing given this library's current architecture. */
     bool authorized = writer.via_discovery_stream || writer.via_root_client_ep0;
 
-    if (target == from) return RCP_LIFECYCLE_OK; /* no-op; writer not consulted */
+    if (target == from) return RCP_LIFECYCLE_OK; /* no-op; writer/idleness not consulted */
 
     if (from == RCP_LIFECYCLE_HW_UNCONFIGURED &&
         target == RCP_LIFECYCLE_HW_CONFIGURED) {
         /* writer not consulted for this transition -- see header doc
-         * comment: already enforced one layer up by should_accept(). */
-        rcp_lifecycle_errc_t rc = rcp_lifecycle_check_hw_cfg(snap);
+         * comment: already enforced one layer up by should_accept().
+         * REQ-LIFECYCLE-022: Figure 16's own diagram requires "all other
+         * EPs are Idle" for this advance too, not just the demotion
+         * below. */
+        rcp_lifecycle_errc_t rc;
+        if (!all_other_eps_idle) return RCP_LIFECYCLE_ERR_EPS_NOT_IDLE;
+        rc = rcp_lifecycle_check_hw_cfg(snap);
         if (rc != RCP_LIFECYCLE_OK) return rc;
         *state = target;
         return RCP_LIFECYCLE_OK;
@@ -101,6 +109,10 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
 
     if (from == RCP_LIFECYCLE_HW_CONFIGURED &&
         target == RCP_LIFECYCLE_RCP_CONFIGURED) {
+        /* Not idle-gated -- Figure 16's own label for this transition
+         * ("...& RCP_config consistent -> send positive response") makes
+         * no mention of endpoint idleness, unlike the HW_UNCONFIGURED <->
+         * HW_CONFIGURED transitions above/below. */
         rcp_lifecycle_errc_t rc;
         if (!authorized) return RCP_LIFECYCLE_ERR_UNAUTHORIZED;
         rc = rcp_lifecycle_check_rcp_cfg(snap);
@@ -111,18 +123,22 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
 
     /* Demotion back to HW_UNCONFIGURED via the discovery-stream/root-client
      * reset path -- from either configured state -- is unconditional once
-     * authorized; snap is not consulted for a reset. */
+     * authorized and idle; snap is not consulted for a reset.
+     * REQ-LIFECYCLE-022: TC18 Figure 16 -- "Root Client access via EP0 to
+     * set state to HW_UNCONFIGURED & other EPs are not Idle -> send error
+     * response EPs_NOT_IDLE" -- gates exactly this transition. */
     if (target == RCP_LIFECYCLE_HW_UNCONFIGURED &&
         (from == RCP_LIFECYCLE_HW_CONFIGURED ||
          from == RCP_LIFECYCLE_RCP_CONFIGURED)) {
         if (!authorized) return RCP_LIFECYCLE_ERR_UNAUTHORIZED;
+        if (!all_other_eps_idle) return RCP_LIFECYCLE_ERR_EPS_NOT_IDLE;
         *state = target;
         return RCP_LIFECYCLE_OK;
     }
 
     /* Everything else -- skipping a state on the way up, or downgrading
      * from RCP_CONFIGURED to HW_CONFIGURED directly -- is not a modeled
-     * transition, regardless of writer. */
+     * transition, regardless of writer or idleness. */
     return RCP_LIFECYCLE_ERR_INVALID_TRANSITION;
 }
 
