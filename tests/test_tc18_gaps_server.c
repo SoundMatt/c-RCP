@@ -1106,11 +1106,11 @@ static void test_sequencer_zero_state_ownership_and_regmap_wiring(void)
      * this table over EP0 is bound to it by the primitives alone.
      * svr_sequencers_max (REQ-RMAP-028, kept synced only by mock.c's
      * rcp_mock_server_set_sequencer_count(), not consulted here) and the
-     * sequencer_state sub-table reference stay at their initialized
-     * zeros while a 4-sequencer table exists. */
+     * svr_sequencer_state_ptr register (REQ-RMAP-038) stay at their
+     * initialized zeros while a 4-sequencer table exists. */
     rcp_regmap_general_init(&map);
     TEST_ASSERT_EQUAL_UINT8(0u, map.svr_sequencers_max);
-    TEST_ASSERT_EQUAL_UINT16(0u, map.sequencer_state.capacity);
+    TEST_ASSERT_EQUAL_UINT16(0u, map.svr_sequencer_state_ptr);
 
     rcp_sequencer_table_free(&table);
 }

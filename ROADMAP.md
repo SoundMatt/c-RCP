@@ -10477,3 +10477,72 @@ items. Next: continue Group 1 in table order -- `REQ-RMAP-038`
 -- shape already confirmed against the primary source, both LONE
 16-bit pointers with no capacity register, same class of fix as
 `-033`'s own `svr_hw_cfg_ptr`).
+
+### 191. Phase 5d batch 21: `svr_ep_functional_cfg_ptr`/`svr_sequencer_state_ptr` now correctly sized and separately addressed (issue #200)
+
+Closes out the last two `rcp_regmap_table_ref_t`-typed sub-table refs
+that needed retyping -- `svr_ep_functional_cfg_ptr` (TC18 §12.7.5
+Table 18, 0x002C) points to the EP_FUNC_config register map
+(§13.7.1.2 Server, the section §12.7.1's configuration request exists
+to write); `svr_sequencer_state_ptr` (0x002E) points to the
+Sequencer_config register map (§12.7.10). Both LONE pointers, TC18
+defines no adjacent capacity register for either -- re-confirmed
+against the primary source during `-036`'s own batch, same shape as
+`svr_hw_cfg_ptr` (`REQ-RMAP-033`). Retyped both away from the shared
+`rcp_regmap_table_ref_t` type to bare 16-bit scalars.
+
+**With this batch, `rcp_regmap_table_ref_t` is no longer used by any
+field in `rcp_regmap_general_t` at all** -- every one of the struct's
+original seven sub-table refs has now been retyped across
+`REQ-RMAP-033`/`-034`/`-036`/`-037`/`-038`. The type itself is left in
+place (still documented extensively across every prior batch's own
+comments as the pattern that was replaced, and still a legitimate
+general-purpose type this module could reuse); removing it outright is
+a separate, out-of-scope cleanup decision deferred rather than made
+as a drive-by here.
+
+**Found a genuine second usage site in a THIRD test file** --
+`test_tc18_gaps_server.c`'s `test_sequencer_zero_state_ownership_and_
+regmap_wiring()` (last touched by Phase 5d batch 11) referenced
+`map.sequencer_state.capacity` as evidence that "neither register that
+would expose this table over EP0 is bound to it by the primitives
+alone" -- updated to the new `svr_sequencer_state_ptr` field name, the
+claim itself unaffected. This is the first Group 1 batch to touch a
+usage site outside `test_regmap.c`/`test_tc18_gaps_regmap.c`,
+underscoring why the broad-grep-before-editing discipline (not just
+grepping the file a citation names) has held up across every batch
+this phase.
+
+Also updated a stale cross-file doc comment in `request_sequencer.h`
+that described `sequencer_state` as "the register map's own wire-
+facing pointer/capacity pair" -- both the field name and the
+"pointer/capacity pair" characterization were now factually wrong;
+corrected to name `svr_sequencer_state_ptr` and describe it accurately
+as a bare address.
+
+Rewrote the remaining half of batch 20's own combined `-037`/`-038`
+pin into a positive test proving both fields correctly sized/zero-
+init/round-trip. `REQ-RMAP-039`'s own deviation pin (enumerating every
+existing sub-table ref) now correctly states rcp_regmap_table_ref_t is
+entirely unused by the struct.
+
+Mutation-tested: full header-only revert with every touched test file
+kept -- breaks the build (`no member named 'svr_ep_functional_cfg_
+ptr'` in `test_regmap.c`). Restored clean, diff-verified byte-identical
+against a pre-mutation backup. Full suite (65/65) + ASan/UBSan clean.
+Fresh `cfusa check` (0 errors) + all three separate `cfusa trace`
+invocations (100%/100%, 0 untested). `REQ-RMAP-038` stays `partial`
+(unchanged status -- narrowed text; still blocked on `REQ-RMAP-024`'s
+wire-reachability gap and this codebase's still-absent EP_FUNC_config/
+Sequencer_config table storage). 1030 requirements (unchanged), 110
+`tc18-gap` entries remaining (unchanged).
+
+**Phase 5d progress after batch 21**: 22/47 items addressed (23
+counting `REQ-RMAP-061`'s own partial progress). **Group 1: 15/18
+items -- every `rcp_regmap_table_ref_t` shape/width/address mismatch
+this phase set out to fix is now closed.** Next: continue Group 1 in
+table order -- `REQ-RMAP-039` (four missing optional-subsystem
+pointer/capacity register pairs -- network interface, physical layer,
+time synch, security -- all real 16-bit ptr+capacity PAIRS per the
+primary source, entirely new fields, not a retype of anything
+existing).

@@ -582,7 +582,26 @@ typedef struct {
                                 invited. Content modeling only, same
                                 REQ-RMAP-024 wire-reachability boundary
                                 as every other Group 1 item. */
-    rcp_regmap_table_ref_t ep_functional_cfg;
+    uint16_t svr_ep_functional_cfg_ptr; /* REQ-RMAP-038 (TC18 §12.7.5
+                                Table 18, relative address 0x002C, 16
+                                bit, R): the address of the EP_FUNC_
+                                config register map (§13.7.1.2 Server)
+                                -- the section §12.7.1's configuration
+                                request exists to write. A LONE
+                                pointer, same as svr_hw_cfg_ptr
+                                (REQ-RMAP-033): TC18 defines no
+                                adjacent capacity register for this
+                                one either -- verified directly against
+                                the primary-source PDF (Table 18, page
+                                52) during REQ-RMAP-036's own batch.
+                                Retyped from this field's own former
+                                shape (rcp_regmap_table_ref_t) to a
+                                bare 16-bit register-address value,
+                                dropping the spurious capacity member
+                                the same way REQ-RMAP-033 already did.
+                                Content modeling only, same
+                                REQ-RMAP-024 wire-reachability boundary
+                                as every other Group 1 item. */
     uint16_t svr_ep_bytebus_id_map_ptr; /* REQ-RMAP-037 (TC18 §12.7.5
                                 Table 18, relative address 0x0028, 16
                                 bit, R): the address of the EP -
@@ -612,7 +631,19 @@ typedef struct {
                                 only, same REQ-RMAP-024
                                 wire-reachability boundary as every
                                 other Group 1 item. */
-    rcp_regmap_table_ref_t sequencer_state;
+    uint16_t svr_sequencer_state_ptr; /* REQ-RMAP-038 (TC18 §12.7.5
+                                Table 18, relative address 0x002E, 16
+                                bit, R): the address of the Sequencer_
+                                config register map (§12.7.10). Also a
+                                LONE pointer, same shape as
+                                svr_ep_functional_cfg_ptr above and
+                                svr_hw_cfg_ptr (REQ-RMAP-033) -- no
+                                adjacent capacity register defined by
+                                TC18. Retyped from this field's own
+                                former shape (rcp_regmap_table_ref_t)
+                                the same way. Content modeling only,
+                                same REQ-RMAP-024 wire-reachability
+                                boundary as every other Group 1 item. */
 } rcp_regmap_general_t;
 
 /* Zero-initializes every field of map except svr_root_client_index, which

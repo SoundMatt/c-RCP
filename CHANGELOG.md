@@ -33,6 +33,28 @@ the rationale.
 
 ## Releases
 
+### v0.191.0 -- 2026-08-10
+
+**Phase 5d batch 21: `svr_ep_functional_cfg_ptr`/`svr_sequencer_
+state_ptr` now correctly sized and separately addressed.** Issue #200.
+Closes out the last two `rcp_regmap_table_ref_t`-typed sub-table refs
+that needed retyping -- both LONE pointers (TC18 defines no adjacent
+capacity register for either), same shape as `svr_hw_cfg_ptr`
+(`REQ-RMAP-033`). **With this batch, `rcp_regmap_table_ref_t` is no
+longer used by any field in `rcp_regmap_general_t` at all** -- every
+one of the struct's original seven sub-table refs has now been
+retyped. Found a genuine second usage site in a THIRD test file
+(`test_tc18_gaps_server.c`) -- the first Group 1 batch to touch a
+usage site outside the two regmap test files. Also corrected a stale
+cross-file doc comment in `request_sequencer.h` that had become
+factually wrong (both the old field name and its "pointer/capacity
+pair" description). Mutation-tested: full header revert with every
+touched test file kept breaks the build. Full suite (65/65) + ASan/
+UBSan clean. Fresh `cfusa check`/`trace` (0 errors, 100%/100%, three
+separate CI-matching invocations). See `ROADMAP.md` milestone 191 for
+full detail. 1030 requirements (unchanged), 110 `tc18-gap` entries
+remaining (unchanged).
+
 ### v0.190.0 -- 2026-08-10
 
 **Phase 5d batch 20: `svr_ep_bytebus_id_map_ptr`/`_capacity` now
