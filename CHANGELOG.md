@@ -32,6 +32,26 @@ the rationale.
 
 ## Releases
 
+### v0.172.0 -- 2026-08-10
+
+**Phase 5d batch 2: REQ-RMAP-060 -- response queue STREAM_UID
+register.** Issue #200. Group 4's smallest, most self-contained item,
+taken first since the group's other 6 items all require a genuinely new
+transmit-queue subsystem that doesn't exist yet. `regmap.h`'s
+`rcp_regmap_response_queue_cfg_t` gains a `stream_uid` field (TC18
+§12.7.9 Table 24) and a new `rcp_regmap_response_queue_stream_id(cfg,
+mac)` helper -- `avtp.h`'s existing `rcp_stream_id_make()` already takes
+a `unique_id` argument that IS the STREAM_UID register; the gap was
+that the config struct had nowhere to persist a configured value for
+it. Purely additive (default 0). Found and split a pre-existing
+combined `-059`/`-060` deviation pin into a closed positive test and a
+still-open one, applying Phase 5c's "split before it's stale"
+discipline on the first Group 4 batch. Mutation-tested (full revert
+breaks the build). Full suite (64/64) + ASan/UBSan clean. Fresh `cfusa
+check`/`trace` (0 errors, 100%/100%, three separate CI-matching
+invocations). See `ROADMAP.md` milestone 172 for full detail. 1030
+requirements (unchanged), 114 `tc18-gap` entries remaining (was 115).
+
 ### v0.171.0 -- 2026-08-10
 
 **Phase 5d batch 1: REQ-RMAP-069 -- effective register-write payload

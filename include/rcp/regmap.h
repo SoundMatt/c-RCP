@@ -522,6 +522,16 @@ typedef struct {
 void rcp_regmap_request_stream_cfg_init(rcp_regmap_request_stream_cfg_t *cfg);
 
 typedef struct {
+    uint16_t stream_uid;      /* REQ-RMAP-060 (TC18 §12.7.9 Table 24, relative
+                                  address 0x0000, 16 bit, R/W+): supplies bits
+                                  [63:48] of the stream_id this queue transmits
+                                  responses/acknowledges on -- the unique_id
+                                  half rcp_stream_id_make() (avtp.h) takes as
+                                  its own second argument. This struct owns no
+                                  MAC of its own (that is the interface's, not
+                                  a per-queue property); see
+                                  rcp_regmap_response_queue_stream_id() below
+                                  for combining the two. */
     uint16_t max_avtpdu_size;
     uint16_t flush_on_count;
     uint32_t flush_time_us;
@@ -529,6 +539,14 @@ typedef struct {
 
 /* Zero-initializes cfg. */
 void rcp_regmap_response_queue_cfg_init(rcp_regmap_response_queue_cfg_t *cfg);
+
+/* Builds the full stream_id cfg's queue transmits on, given the
+ * interface's own mac -- REQ-RMAP-060: cfg->stream_uid supplies
+ * rcp_stream_id_make()'s unique_id argument; this is a thin, directly-
+ * testable named wrapper over that existing avtp.h primitive, not new
+ * stream_id-construction logic of its own. */
+rcp_stream_id_t rcp_regmap_response_queue_stream_id(const rcp_regmap_response_queue_cfg_t *cfg,
+                                                     const uint8_t mac[6]);
 
 /* ── EP-ID / byte_bus_id map ────────────────────────────────────────────────── */
 

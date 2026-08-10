@@ -9200,12 +9200,11 @@
     {
       "id": "REQ-RMAP-060",
       "title": "response queue's STREAM_UID (the unique_id half of the queue's outgoing stream_id)",
-      "text": "NOT IMPLEMENTED: c-RCP does not model the STREAM_UID register (TC18 \u00a712.7.9 Table 24, relative address 0x0000, 16 bit, R/W+), which supplies bits [63:48] of the stream_id a response queue transmits on \u2014 the unique_id half of the MAC-plus-unique_id stream_id rcp_stream_id_make() (include/rcp/avtp.h:130) already builds. rcp_regmap_response_queue_cfg_t carries no such field. Consequence: a response queue has no identity, responses cannot be addressed to a specific outgoing stream, and rx_ack_stream_index/rx_resp_stream_index (Table 22) have nothing to point at.",
+      "text": "regmap.h's rcp_regmap_response_queue_cfg_t gains a stream_uid field (TC18 \u00a712.7.9 Table 24, relative address 0x0000, 16 bit, R/W+) and a new rcp_regmap_response_queue_stream_id(cfg, mac) helper that combines it with the interface's own mac exactly as rcp_stream_id_make() (avtp.h) would \u2014 a thin, directly-testable named wrapper, not new stream_id-construction logic. A response queue now has an identity rx_ack_stream_index/rx_resp_stream_index (Table 22) can point at.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
+      "scope": "tc18",
       "tc18": "\u00a712.7.9 Table 24, TC18.txt L3029"
     },
     {
