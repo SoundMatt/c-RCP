@@ -312,7 +312,27 @@ bool rcp_pwrmode_handshake_iface_reenabled(rcp_pwrmode_handshake_t *hs, bool net
  * a cold start). If echoed is false and the limit has not yet been
  * reached, hs->step is left at RCP_PWRMODE_HANDSHAKE_IFACE_REENABLED and
  * true is returned (still pending; the caller should repeat the WakeUp
- * message and call this function again). */
+ * message and call this function again).
+ *
+ * REQ-PWRMODE-018 (TC18 §12.4.1): despite its name, echoed's real
+ * meaning is broader than "an exact echo of the WakeUp message" -- the
+ * specification's own termination condition is "a valid AVTPDU from the
+ * sleep request Client", of which a literal WakeUp echo
+ * (ep_wakeup.h's rcp_ep_wakeup_is_wakeup_echo(), and
+ * powerstate.h's rcp_powerstate_manager_apply_wakeup_echo() built on
+ * it) is one concrete, directly-testable example, not the only one --
+ * this module's own name choice ("echoed"/RCP_PWRMODE_HANDSHAKE_ECHOED)
+ * predates that closer reading and is kept for API stability, but a
+ * caller that itself recognizes some OTHER valid, already-demultiplexed
+ * frame from the sleep-request client (any operational or SleepCMD
+ * request this library's own dispatch already routed to that client's
+ * addr, not specifically a WakeUp echo) should pass echoed=true for it
+ * too, satisfying step (b) exactly as the specification requires. There
+ * is deliberately no separate repeat limit on TC18's own side -- the
+ * wakeup_repeat_limit field and its FAILED outcome are this
+ * implementation's own added safety bound, not spec-derived; TC18
+ * itself defines no limit and expects the repetition to continue until
+ * a valid response actually arrives. */
 bool rcp_pwrmode_handshake_wakeup_attempt(rcp_pwrmode_handshake_t *hs, bool echoed);
 
 /* Step (c). Requires hs->step == RCP_PWRMODE_HANDSHAKE_ECHOED; returns

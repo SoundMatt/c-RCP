@@ -504,7 +504,12 @@ static void test_cold_start_target_and_standby_retention(void)
 
 /* ── §12.4.1: the hot-start sequence's missing inputs ──────────────────────── */
 
-static void test_hotstart_has_no_network_check_and_no_responder_stream(void)
+/* As of the REQ-PWRMODE-016 fix (batch 3) and the REQ-PWRMODE-017 fix
+ * (this batch), this test's own name is now the opposite of what it
+ * asserts -- kept (renamed) rather than deleted, since it directly pins
+ * both corrections together, matching how the two gaps were originally
+ * discovered as one combined deviation pin. */
+static void test_hotstart_now_has_network_check_and_records_responder_stream(void)
 {
     rcp_pwrmode_handshake_t   hs;
     rcp_avtp_addr_t           sleeper = addr_of(MAC_A, 1u, (rcp_byte_bus_id_t)3u);
@@ -513,29 +518,45 @@ static void test_hotstart_has_no_network_check_and_no_responder_stream(void)
     rcp_powerstate_manager_t *m;
     rcp_bytes_t               req;
     rcp_bytes_t               probe;
+    rcp_stream_id_t           sleeper_resp = rcp_stream_id_make(MAC_A, 100u);
+    rcp_stream_id_t           got_stream;
 
-    /* TC18 §12.4.1 step (b): the server enables its interface, tests whether
-     * the network is already available, and initiates a WakeUp only when it
-     * is not. c-RCP's handshake has no network-availability input anywhere,
-     * so step (b) is entered -- and a WakeUp burned -- unconditionally. */
+    /* TC18 §12.4.1 step (a)/(b): the server enables its interface, tests
+     * whether the network is already available, and only spends a
+     * WakeUp attempt once it is. REQ-PWRMODE-016: a false
+     * network_available leaves the handshake retriable without
+     * consuming wakeup_attempts. */
     rcp_pwrmode_handshake_init(&hs, 3u);
+    TEST_ASSERT_FALSE(rcp_pwrmode_handshake_iface_reenabled(&hs, false));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_HANDSHAKE_NOT_STARTED, hs.step);
     TEST_ASSERT_TRUE(rcp_pwrmode_handshake_iface_reenabled(&hs, true));
     TEST_ASSERT_TRUE(rcp_pwrmode_handshake_wakeup_attempt(&hs, false));
     TEST_ASSERT_EQUAL_UINT32(1u, hs.wakeup_attempts);
 
-    /* TC18 §12.4.1 also sends the repetitive wake response on the responder
-     * stream configured for the original sleep/standby request. Nothing
-     * records that stream: the pending sleep request below belongs to
-     * `sleeper`, yet a wake probe is happily produced for an unrelated
-     * endpoint that never asked the server to sleep. */
+    /* TC18 §12.4.1 also sends the repetitive wake response on the
+     * responder stream configured for the original sleep/standby
+     * request. REQ-PWRMODE-017: rcp_powerstate_manager_handshake_begin()
+     * now records that stream per-endpoint (sleeper's own resp stream,
+     * distinct from sleeper's own request stream, `sleeper.stream_id`),
+     * and rcp_powerstate_manager_wake_response_stream_id() returns it --
+     * `other`, a different endpoint that never asked the server to
+     * sleep, gets its own, independently-recorded stream. */
     eps[0] = sleeper;
     eps[1] = other;
     m      = rcp_powerstate_manager_new(eps, 2u);
     TEST_ASSERT_NOT_NULL(m);
     req = rcp_powerstate_manager_encode_entry_request(m, sleeper, RCP_PWRMODE_SLEEP, 7u);
     TEST_ASSERT_NOT_NULL(req.data);
-    TEST_ASSERT_TRUE(rcp_powerstate_manager_handshake_begin(m, other, 3u, true));
-    probe = rcp_powerstate_manager_encode_wakeup_probe(m, other, 7u);
+    TEST_ASSERT_TRUE(rcp_powerstate_manager_handshake_begin(m, sleeper, 3u, true, sleeper_resp));
+    TEST_ASSERT_TRUE(rcp_powerstate_manager_wake_response_stream_id(m, sleeper, &got_stream));
+    TEST_ASSERT_TRUE(rcp_stream_id_equal(sleeper_resp, got_stream));
+    TEST_ASSERT_FALSE(rcp_stream_id_equal(sleeper.stream_id, got_stream));
+
+    /* `other` was never given a handshake -- no responder stream is
+     * recorded for it, correctly distinguishing it from `sleeper`. */
+    TEST_ASSERT_FALSE(rcp_powerstate_manager_wake_response_stream_id(m, other, &got_stream));
+
+    probe = rcp_powerstate_manager_encode_wakeup_probe(m, sleeper, 7u);
     TEST_ASSERT_NOT_NULL(probe.data);
 
     rcp_bytes_free(&req);
@@ -1036,7 +1057,7 @@ int main(void)
     RUN_TEST(test_discovery_write_authority_survives_rcp_configured);
 
     RUN_TEST(test_cold_start_target_and_standby_retention);
-    RUN_TEST(test_hotstart_has_no_network_check_and_no_responder_stream);
+    RUN_TEST(test_hotstart_now_has_network_check_and_records_responder_stream);
     RUN_TEST(test_wakeup_repetition_ignores_other_valid_avtpdus);
     RUN_TEST(test_network_wake_now_requires_the_same_handshake_as_pin);
     RUN_TEST(test_sleep_entry_is_request_only_with_no_network_path);

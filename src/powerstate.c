@@ -23,6 +23,14 @@ typedef struct {
     rcp_avtp_addr_t         addr;
     rcp_pwrmode_t           mode;
     rcp_pwrmode_handshake_t handshake;
+    /* REQ-PWRMODE-017: the responder stream configured for the original
+     * standby/sleep request, recorded by rcp_powerstate_manager_
+     * handshake_begin(). Meaningless (all-zero) until has_resp_stream_id
+     * is set -- distinguished explicitly rather than relying on an
+     * all-zero rcp_stream_id_t sentinel, since an all-zero StreamID is
+     * not itself provably invalid. */
+    rcp_stream_id_t         resp_stream_id;
+    bool                    has_resp_stream_id;
 
     bool          request_pending;
     rcp_pwrmode_t pending_target;
@@ -259,8 +267,10 @@ rcp_powerstate_errc_t rcp_powerstate_manager_wake_via_network(rcp_powerstate_man
 
 //cfusa:req REQ-PWR-006
 //cfusa:req REQ-PWRMODE-016
+//cfusa:req REQ-PWRMODE-017
 bool rcp_powerstate_manager_handshake_begin(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
-                                             uint32_t wakeup_repeat_limit, bool network_available)
+                                             uint32_t wakeup_repeat_limit, bool network_available,
+                                             rcp_stream_id_t resp_stream_id)
 {
     endpoint_entry_t *e;
     bool ok;
@@ -272,6 +282,13 @@ bool rcp_powerstate_manager_handshake_begin(rcp_powerstate_manager_t *m, rcp_avt
         return false;
     }
     rcp_pwrmode_handshake_init(&e->handshake, wakeup_repeat_limit);
+    /* REQ-PWRMODE-017: recorded regardless of network_available below --
+     * a caller retrying this call once the network comes up should not
+     * have to re-supply the same resp_stream_id, and recording it here
+     * costs nothing even on the calls that don't yet advance the
+     * handshake itself. */
+    e->resp_stream_id     = resp_stream_id;
+    e->has_resp_stream_id = true;
     /* REQ-PWRMODE-016: network_available is this caller's own
      * already-classified answer (e.g. BEACONs detected by the PHY) --
      * see rcp_pwrmode_handshake_iface_reenabled()'s own doc comment. A
@@ -280,6 +297,21 @@ bool rcp_powerstate_manager_handshake_begin(rcp_powerstate_manager_t *m, rcp_avt
     ok = rcp_pwrmode_handshake_iface_reenabled(&e->handshake, network_available);
     rcp_mutex_unlock(&m->mu);
     return ok;
+}
+
+//cfusa:req REQ-PWRMODE-017
+bool rcp_powerstate_manager_wake_response_stream_id(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
+                                                     rcp_stream_id_t *out_resp_stream_id)
+{
+    endpoint_entry_t *e;
+    bool has;
+
+    rcp_mutex_lock(&m->mu);
+    e = find_entry(m, addr);
+    has = e && e->has_resp_stream_id;
+    if (has && out_resp_stream_id) *out_resp_stream_id = e->resp_stream_id;
+    rcp_mutex_unlock(&m->mu);
+    return has;
 }
 
 //cfusa:req REQ-PWR-013
