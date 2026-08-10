@@ -485,14 +485,15 @@ static void test_dispatch_frame_e2e_verifies_each_member_independently(void)
 
 /* ── REQ-E2E-037: the AVTPDU data-length adjustment ────────────────────────── */
 
-/* DEVIATION PIN (partial). TC18 sec. 13.6 requires the AVTPDU's
- * ntscf_data_length / stream_data_length to be raised by 4 octets for
- * every E2E-protected ACF message it carries. In c-RCP that is implicit
- * only: rcp_avtp_encode_ntscf() recomputes the field from whatever
+/* TC18 sec. 13.6 requires the AVTPDU's ntscf_data_length /
+ * stream_data_length to be raised by 4 octets for every E2E-protected ACF
+ * message it carries. rcp_avtp_encode_ntscf() already satisfies this
+ * automatically and correctly -- it recomputes the field from whatever
  * payload it is handed (it ignores hdr.ntscf_data_length entirely, as the
- * bogus value below shows), so the +4-per-protected-member accounting is
- * right if and only if the caller wrapped every protected member first.
- * No function expresses the adjustment and nothing checks it. */
+ * bogus value below shows), so the +4-per-protected-member accounting was
+ * already right as long as the caller wrapped every protected member
+ * first. As of the REQ-E2E-037 fix, that rule now also has its own named,
+ * pure, directly-testable expression: rcp_e2e_data_length_for_protected_members(). */
 static void test_avtpdu_data_length_grows_four_octets_per_protected_member(void)
 {
     const uint8_t             p[4] = {0xC1, 0xC2, 0xC3, 0xC4};
@@ -527,13 +528,30 @@ static void test_avtpdu_data_length_grows_four_octets_per_protected_member(void)
     TEST_ASSERT_EQUAL_UINT16(24u, got.ntscf_data_length);
     TEST_ASSERT_EQUAL_INT(RCP_AVTP_OK,
                           rcp_avtp_decode_ntscf(enc_safe.data, enc_safe.len, &got, &pl, &len));
-    /* Two protected members: exactly 2 * RCP_E2E_CRC_LEN more. */
-    TEST_ASSERT_EQUAL_UINT16(24u + 2u * RCP_E2E_CRC_LEN, got.ntscf_data_length);
+    /* Two protected members: exactly rcp_e2e_data_length_for_protected_members(2)
+     * more than the plain-mode length -- the named rule matches the
+     * encoder's own actual behavior. */
+    TEST_ASSERT_EQUAL_UINT16(24u + (uint16_t)rcp_e2e_data_length_for_protected_members(2u),
+                             got.ntscf_data_length);
 
     rcp_bytes_free(&enc_safe);
     rcp_bytes_free(&enc_plain);
     rcp_bytes_free(&w);
     rcp_bytes_free(&m);
+}
+
+/* Direct tests of rcp_e2e_data_length_for_protected_members() itself. */
+static void test_data_length_for_protected_members_is_pure_arithmetic(void)
+{
+    TEST_ASSERT_EQUAL_UINT(0u, rcp_e2e_data_length_for_protected_members(0u));
+    TEST_ASSERT_EQUAL_UINT((size_t)RCP_E2E_CRC_LEN,
+                           rcp_e2e_data_length_for_protected_members(1u));
+    TEST_ASSERT_EQUAL_UINT((size_t)RCP_E2E_CRC_LEN * 5u,
+                           rcp_e2e_data_length_for_protected_members(5u));
+    /* Saturates at SIZE_MAX on overflow, same discipline as
+     * rcp_e2e_length_with_crc(). */
+    TEST_ASSERT_EQUAL_UINT((size_t)-1,
+                           rcp_e2e_data_length_for_protected_members((size_t)-1));
 }
 
 /* ── REQ-E2E-038: the fragmentation coverage rule ──────────────────────────── */
@@ -781,6 +799,7 @@ int main(void)
     RUN_TEST(test_each_member_of_a_multi_acf_frame_carries_its_own_crc);
     RUN_TEST(test_dispatch_frame_e2e_verifies_each_member_independently);
     RUN_TEST(test_avtpdu_data_length_grows_four_octets_per_protected_member);
+    RUN_TEST(test_data_length_for_protected_members_is_pure_arithmetic);
     RUN_TEST(test_fragmented_crc_covers_only_the_last_fragment);
     RUN_TEST(test_ms_bit_to_carries_crc_binding_is_not_enforced);
     RUN_TEST(test_crc_mismatch_skips_execution_without_error_response);

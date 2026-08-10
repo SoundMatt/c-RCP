@@ -319,6 +319,27 @@ uint32_t rcp_e2e_compute_crc(uint64_t stream_id, uint32_t avtp_timestamp,
  * within RCP_E2E_CRC_LEN of SIZE_MAX. */
 size_t rcp_e2e_length_with_crc(size_t payload_len);
 
+//cfusa:req REQ-E2E-037
+/* TC18 §13.6: an AVTPDU's ntscf_data_length (NTSCF) or stream_data_length
+ * (TSCF) field must grow by RCP_E2E_CRC_LEN (4 octets) for every
+ * E2E-protected ACF message its payload carries. avtp.c's
+ * rcp_avtp_encode_ntscf()/_encode_tscf() already satisfy this
+ * automatically and correctly -- both recompute the field from the
+ * actual length of the payload buffer they are given, never from a
+ * caller-supplied value, so the +4-per-protected-member accounting is
+ * always right as long as the caller concatenated rcp_e2e_wrap()'s (or
+ * _wrap_framed()'s) own output for each protected member before calling
+ * either encoder. This function exists because, until now, nothing in
+ * this codebase gave that same rule its own name: protected_member_count
+ * * RCP_E2E_CRC_LEN, saturating at SIZE_MAX on overflow (the same
+ * discipline rcp_e2e_length_with_crc() already follows) rather than
+ * wrapping. Useful to a caller that wants to reason about, or
+ * pre-validate, the expected delta independently of actually building
+ * the payload -- e.g. sizing a buffer up front, or cross-checking a
+ * peer's own encoded ntscf_data_length/stream_data_length against how
+ * many protected members it claims to carry. */
+size_t rcp_e2e_data_length_for_protected_members(size_t protected_member_count);
+
 /* ── wrap / unwrap ─────────────────────────────────────────────────────────── */
 
 /* The composed encode entry point: adapts a copy of acf_frame (an

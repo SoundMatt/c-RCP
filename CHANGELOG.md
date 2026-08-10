@@ -32,6 +32,21 @@ the rationale.
 
 ## Releases
 
+### v0.151.0 -- 2026-08-09
+
+**Phase 5a batch 6: REQ-E2E-037 AVTPDU data-length adjustment helper.**
+Issue #197. `rcp_avtp_encode_ntscf()`/`_encode_tscf()` already computed
+the +4-octets-per-protected-member length adjustment TC18 §13.6
+requires correctly and automatically (proven by the existing test's
+bogus-header-value check) -- what was missing was purely that no
+function gave the rule its own name. Adds
+`rcp_e2e_data_length_for_protected_members()`, a pure arithmetic
+helper alongside `rcp_e2e_length_with_crc()`. Mutation-tested (the
+test file fails to build without the fix), full suite + ASan/UBSan
+clean, fresh `cfusa check`/`trace` (0 errors, 100%/100%). See
+`ROADMAP.md` milestone 151 for full detail. 1028 requirements
+(unchanged count), 142 `tc18-gap` entries remaining (was 143).
+
 ### v0.150.0 -- 2026-08-09
 
 **Phase 5a batch 5: REQ-E2E-031/033/041 CRC verification wired into

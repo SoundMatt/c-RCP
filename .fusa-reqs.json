@@ -9673,12 +9673,11 @@
     {
       "id": "REQ-E2E-037",
       "title": "AVTPDU data length grows by 4 octets for every E2E-protected ACF message it carries",
-      "text": "An AVTPDU carrying E2E-protected ACF messages shall have its ntscf_data_length (NTSCF header) or stream_data_length (TSCF header) increased by 4 octets for every ACF message in its payload that is E2E-protected (TC18 \u00a713.6). ONLY IMPLICIT in c-RCP: rcp_avtp_encode_ntscf()/rcp_avtp_encode_tscf() recompute the length field from the payload buffer they are given, so the adjustment is correct only if the caller has already wrapped every protected member; c-RCP provides no function expressing the adjustment and no check that the encoded length matches the number of protected members.",
+      "text": "An AVTPDU carrying E2E-protected ACF messages shall have its ntscf_data_length (NTSCF header) or stream_data_length (TSCF header) increased by 4 octets for every ACF message in its payload that is E2E-protected (TC18 \u00a713.6). IMPLEMENTED: rcp_avtp_encode_ntscf()/rcp_avtp_encode_tscf() already satisfied this correctly and automatically -- both recompute the length field from the actual payload buffer they are given (never from a caller-supplied value), so the adjustment is right whenever the caller concatenated rcp_e2e_wrap()'s own output per protected member first. As of this fix, that rule also has its own named, pure, directly-testable expression: rcp_e2e_data_length_for_protected_members(protected_member_count), returning protected_member_count * RCP_E2E_CRC_LEN (saturating on overflow) -- usable by a caller wanting to pre-size a buffer or independently cross-check a peer's own encoded length.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
+      "scope": "tc18",
       "tc18": "\u00a713.6, TC18.txt L3814-3815"
     },
     {
