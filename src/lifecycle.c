@@ -9,6 +9,7 @@ const char *rcp_lifecycle_strerror(rcp_lifecycle_errc_t e)
     case RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT:  return "rcp/lifecycle: HW configuration inconsistent";
     case RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT: return "rcp/lifecycle: RCP configuration inconsistent";
     case RCP_LIFECYCLE_ERR_INVALID_TRANSITION:   return "rcp/lifecycle: invalid lifecycle transition";
+    case RCP_LIFECYCLE_ERR_UNAUTHORIZED:         return "rcp/lifecycle: writer not authorized for this transition";
     default:                                     return "rcp/lifecycle: unknown error";
     }
 }
@@ -71,16 +72,27 @@ rcp_lifecycle_errc_t rcp_lifecycle_check_rcp_cfg(const rcp_lifecycle_plausibilit
 //cfusa:req REQ-LIFECYCLE-011
 //cfusa:req REQ-LIFECYCLE-012
 //cfusa:req REQ-LIFECYCLE-013
+//cfusa:req REQ-LIFECYCLE-031
 rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
                                                rcp_lifecycle_state_t target,
-                                               const rcp_lifecycle_plausibility_snapshot_t *snap)
+                                               const rcp_lifecycle_plausibility_snapshot_t *snap,
+                                               rcp_lifecycle_writer_ctx_t writer)
 {
     rcp_lifecycle_state_t from = *state;
+    /* TC18 §12.3.1.2 (REQ-LIFECYCLE-031): a svr_lifecycle_state write is
+     * accepted only via the discovery stream or the root client -- see
+     * this function's own header doc comment for why via_root_client_ep0
+     * alone (not a general "any valid stream" case) is the honestly-
+     * achievable form of TC18's further root-client-configured-vs-not
+     * narrowing given this library's current architecture. */
+    bool authorized = writer.via_discovery_stream || writer.via_root_client_ep0;
 
-    if (target == from) return RCP_LIFECYCLE_OK; /* no-op */
+    if (target == from) return RCP_LIFECYCLE_OK; /* no-op; writer not consulted */
 
     if (from == RCP_LIFECYCLE_HW_UNCONFIGURED &&
         target == RCP_LIFECYCLE_HW_CONFIGURED) {
+        /* writer not consulted for this transition -- see header doc
+         * comment: already enforced one layer up by should_accept(). */
         rcp_lifecycle_errc_t rc = rcp_lifecycle_check_hw_cfg(snap);
         if (rc != RCP_LIFECYCLE_OK) return rc;
         *state = target;
@@ -89,24 +101,28 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
 
     if (from == RCP_LIFECYCLE_HW_CONFIGURED &&
         target == RCP_LIFECYCLE_RCP_CONFIGURED) {
-        rcp_lifecycle_errc_t rc = rcp_lifecycle_check_rcp_cfg(snap);
+        rcp_lifecycle_errc_t rc;
+        if (!authorized) return RCP_LIFECYCLE_ERR_UNAUTHORIZED;
+        rc = rcp_lifecycle_check_rcp_cfg(snap);
         if (rc != RCP_LIFECYCLE_OK) return rc;
         *state = target;
         return RCP_LIFECYCLE_OK;
     }
 
     /* Demotion back to HW_UNCONFIGURED via the discovery-stream/root-client
-     * reset path is unconditional -- from either configured state. */
+     * reset path -- from either configured state -- is unconditional once
+     * authorized; snap is not consulted for a reset. */
     if (target == RCP_LIFECYCLE_HW_UNCONFIGURED &&
         (from == RCP_LIFECYCLE_HW_CONFIGURED ||
          from == RCP_LIFECYCLE_RCP_CONFIGURED)) {
+        if (!authorized) return RCP_LIFECYCLE_ERR_UNAUTHORIZED;
         *state = target;
         return RCP_LIFECYCLE_OK;
     }
 
     /* Everything else -- skipping a state on the way up, or downgrading
      * from RCP_CONFIGURED to HW_CONFIGURED directly -- is not a modeled
-     * transition. */
+     * transition, regardless of writer. */
     return RCP_LIFECYCLE_ERR_INVALID_TRANSITION;
 }
 

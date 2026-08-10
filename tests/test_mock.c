@@ -45,22 +45,32 @@ void tearDown(void) {}
  * regmap-backed fixture. */
 static const rcp_lifecycle_plausibility_snapshot_t EMPTY_SNAP = {NULL, 0, NULL, 0};
 
+/* HW_UNCONFIGURED -> HW_CONFIGURED does not consult writer (see
+ * lifecycle.h's own rcp_lifecycle_transition() doc comment), so a plain
+ * {0} is sufficient and correct here, not just a convenience default. */
 static void to_hw_configured(rcp_mock_server_t *srv)
 {
+    rcp_lifecycle_writer_ctx_t none = {0};
+
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-        rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP));
+        rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP, none));
 }
 
 /* As of the REQ-LIFECYCLE-032 fix, HW_CONFIGURED admits only requests to
  * EP0 (byte_bus_id 0) -- a fixture dispatching to any other endpoint needs
  * RCP_CONFIGURED instead. EMPTY_SNAP's zero endpoint/request-stream counts
  * trivially satisfy both plausibility checks along the way, same as
- * to_hw_configured() already relies on for its own single transition. */
+ * to_hw_configured() already relies on for its own single transition. As
+ * of the REQ-LIFECYCLE-031 fix, the HW_CONFIGURED -> RCP_CONFIGURED
+ * advance also requires an authorized writer -- root is used here since
+ * this fixture is not itself testing lifecycle authorization policy. */
 static void to_rcp_configured(rcp_mock_server_t *srv)
 {
+    rcp_lifecycle_writer_ctx_t root = {true, false, false, false};
+
     to_hw_configured(srv);
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-        rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP));
+        rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP, root));
 }
 
 /* ── Server lifecycle ──────────────────────────────────────────────────────── */
@@ -83,8 +93,10 @@ static void test_transition_passthrough_valid(void)
 static void test_transition_passthrough_rejects_invalid(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_lifecycle_writer_ctx_t root = {true, false, false, false};
+
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_INVALID_TRANSITION,
-        rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP));
+        rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP, root));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, rcp_mock_server_state(srv));
     rcp_mock_server_destroy(srv);
 }

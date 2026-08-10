@@ -108,12 +108,16 @@ static void logging_handler(const uint8_t *request, size_t request_len, rcp_byte
 static rcp_mock_server_t *fixture(handler_log_t *log)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_lifecycle_writer_ctx_t none = {0}; /* not consulted for HW_UNCONFIGURED -> HW_CONFIGURED */
+    rcp_lifecycle_writer_ctx_t root = {true, false, false, false}; /* REQ-LIFECYCLE-031:
+                                                                       required for the
+                                                                       RCP_CONFIGURED advance */
 
     memset(log, 0, sizeof(*log));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-        rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP));
+        rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &EMPTY_SNAP, none));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-        rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP));
+        rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &EMPTY_SNAP, root));
     TEST_ASSERT_EQUAL(RCP_MOCK_OK,
         rcp_mock_server_add_endpoint(srv, 1, 1, true /* ep_enable */, logging_handler, log));
     TEST_ASSERT_TRUE(rcp_mock_server_set_sequencer_count(srv, 4));

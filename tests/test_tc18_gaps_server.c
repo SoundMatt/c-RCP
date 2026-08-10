@@ -109,32 +109,50 @@ static rcp_bytes_t standard_abb(rcp_byte_bus_id_t bus, uint8_t transaction_num)
     return rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
 }
 
-/* ── §12.3 lifecycle transitions: no idleness, no writer authorization ─────── */
+/* ── §12.3 lifecycle transitions: no idleness input; writer authorization now enforced ── */
 
-static void test_transition_takes_neither_idle_nor_writer_input(void)
+/* DEVIATION PIN (REQ-LIFECYCLE-022/023, not implemented): TC18 §12.3
+ * (Figure 16) refuses a lifecycle-state change with an EPs_NOT_IDLE
+ * error while any other endpoint still has an in-flight or queued
+ * request. rcp_lifecycle_transition() takes no endpoint-idle input at
+ * all, so an authorized demotion still tears down every in-flight
+ * request unconditionally rather than being refused. Tracked as its own
+ * still-open Group 4 item in issue #198, not attempted here. */
+static void test_transition_takes_no_idle_input(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_RCP_CONFIGURED;
-    const char           *unknown;
+    rcp_lifecycle_writer_ctx_t root = {true, false, false, false};
 
-    /* TC18 §12.3 (Figure 16) refuses a lifecycle-state change with an
-     * EPs_NOT_IDLE error while any other endpoint still has an in-flight or
-     * queued request, and §12.3.1.2 accepts a svr_lifecycle_state write only
-     * via the discovery stream, from the configured root client, or -- with
-     * no root client configured -- from any valid stream. c-RCP's
-     * rcp_lifecycle_transition() takes neither an endpoint-idle input nor a
-     * writer context, so the demotion below succeeds unconditionally from an
-     * anonymous caller and tears down every in-flight request with it. */
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-                      rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL));
+                      rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, root));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, state);
+}
 
-    /* And there is no EPs_NOT_IDLE outcome to report even if one were
-     * detected: rcp_lifecycle_errc_t stops at 3 (INVALID_TRANSITION). */
-    unknown = rcp_lifecycle_strerror((rcp_lifecycle_errc_t)4);
-    TEST_ASSERT_EQUAL_STRING(rcp_lifecycle_strerror((rcp_lifecycle_errc_t)99), unknown);
+/* As of the REQ-LIFECYCLE-031 fix, rcp_lifecycle_transition() does take a
+ * writer context, and does reject an anonymous/unauthorized caller's
+ * demotion request -- the second half of this test's original title no
+ * longer describes a gap, so RCP_LIFECYCLE_ERR_UNAUTHORIZED's own
+ * strerror() case is asserted directly instead of a still-unknown-error-
+ * code probe (rcp_lifecycle_errc_t now covers 0-4, not 0-3). */
+static void test_transition_now_rejects_unauthorized_writer(void)
+{
+    rcp_lifecycle_state_t state = RCP_LIFECYCLE_RCP_CONFIGURED;
+    rcp_lifecycle_writer_ctx_t stranger = {0};
+    const char                *unknown;
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_UNAUTHORIZED,
+                      rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, stranger));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state); /* unchanged */
+    TEST_ASSERT_TRUE(strlen(rcp_lifecycle_strerror(RCP_LIFECYCLE_ERR_UNAUTHORIZED)) > 0);
+
+    /* A truly unknown code (rcp_lifecycle_errc_t now covers 0-4) still
+     * falls through to the generic "unknown error" message. */
+    unknown = rcp_lifecycle_strerror((rcp_lifecycle_errc_t)99);
     TEST_ASSERT_TRUE(strcmp(unknown, rcp_lifecycle_strerror(RCP_LIFECYCLE_OK)) != 0);
     TEST_ASSERT_TRUE(strcmp(unknown,
                             rcp_lifecycle_strerror(RCP_LIFECYCLE_ERR_INVALID_TRANSITION)) != 0);
+    TEST_ASSERT_TRUE(strcmp(unknown,
+                            rcp_lifecycle_strerror(RCP_LIFECYCLE_ERR_UNAUTHORIZED)) != 0);
 }
 
 /* ── §12.3 register locking: missing field kinds, no error response ────────── */
@@ -360,6 +378,7 @@ static void test_discovery_write_authority_survives_rcp_configured(void)
     rcp_lifecycle_endpoint_plausibility_t eps[1]     = {{true, true, true, true}};
     rcp_lifecycle_request_stream_plausibility_t rs[1] = {{true, true}};
     rcp_lifecycle_plausibility_snapshot_t snap;
+    rcp_lifecycle_writer_ctx_t discovery = {false, false, false, true};
 
     snap.endpoints            = eps;
     snap.endpoint_count       = 1u;
@@ -371,7 +390,7 @@ static void test_discovery_write_authority_survives_rcp_configured(void)
     TEST_ASSERT_TRUE(rcp_discovery_claim_note_config_write(&claim, a, 1005u));
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-                      rcp_lifecycle_transition(&state, RCP_LIFECYCLE_RCP_CONFIGURED, &snap));
+                      rcp_lifecycle_transition(&state, RCP_LIFECYCLE_RCP_CONFIGURED, &snap, discovery));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state);
 
     /* TC18 §12.7.4: once RCP_CONFIGURED, a discovery request is still
@@ -941,7 +960,8 @@ int main(void)
 {
     UNITY_BEGIN();
 
-    RUN_TEST(test_transition_takes_neither_idle_nor_writer_input);
+    RUN_TEST(test_transition_takes_no_idle_input);
+    RUN_TEST(test_transition_now_rejects_unauthorized_writer);
     RUN_TEST(test_locked_config_write_has_no_kind_and_no_error_response);
     RUN_TEST(test_hw_configured_admits_only_ep0);
     RUN_TEST(test_admit_takes_no_lifecycle_state_or_stream_identity);

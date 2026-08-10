@@ -169,9 +169,10 @@ static void test_transition_hw_unconfigured_to_hw_configured_succeeds_when_plaus
     rcp_lifecycle_request_stream_plausibility_t rs;
     rcp_lifecycle_plausibility_snapshot_t snap = plausible_snapshot(&ep, &rs);
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_HW_UNCONFIGURED;
+    rcp_lifecycle_writer_ctx_t none = {0}; /* not consulted for this transition */
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_CONFIGURED, &snap));
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_CONFIGURED, &snap, none));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_CONFIGURED, state);
 }
 
@@ -180,12 +181,13 @@ static void test_transition_hw_unconfigured_to_hw_configured_fails_when_implausi
     rcp_lifecycle_endpoint_plausibility_t eps[1] = { { true, false, true, false } };
     rcp_lifecycle_plausibility_snapshot_t snap = {0};
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_HW_UNCONFIGURED;
+    rcp_lifecycle_writer_ctx_t none = {0}; /* not consulted for this transition */
 
     snap.endpoints      = eps;
     snap.endpoint_count = 1;
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT,
-                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_CONFIGURED, &snap));
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_CONFIGURED, &snap, none));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, state); /* unchanged */
 }
 
@@ -195,9 +197,10 @@ static void test_transition_hw_configured_to_rcp_configured_succeeds_when_plausi
     rcp_lifecycle_request_stream_plausibility_t rs;
     rcp_lifecycle_plausibility_snapshot_t snap = plausible_snapshot(&ep, &rs);
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_HW_CONFIGURED;
+    rcp_lifecycle_writer_ctx_t root = {true, false, false, false};
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_RCP_CONFIGURED, &snap));
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_RCP_CONFIGURED, &snap, root));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state);
 }
 
@@ -206,30 +209,61 @@ static void test_transition_hw_configured_to_rcp_configured_fails_when_implausib
     rcp_lifecycle_endpoint_plausibility_t eps[1] = { { true, true, true, false } };
     rcp_lifecycle_plausibility_snapshot_t snap = {0};
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_HW_CONFIGURED;
+    rcp_lifecycle_writer_ctx_t root = {true, false, false, false};
 
     snap.endpoints      = eps;
     snap.endpoint_count = 1;
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT,
-                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_RCP_CONFIGURED, &snap));
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_RCP_CONFIGURED, &snap, root));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_CONFIGURED, state); /* unchanged */
 }
 
-static void test_transition_hw_configured_to_hw_unconfigured_is_unconditional(void)
+static void test_transition_hw_configured_to_rcp_configured_requires_authorization(void)
 {
+    rcp_lifecycle_endpoint_plausibility_t ep;
+    rcp_lifecycle_request_stream_plausibility_t rs;
+    rcp_lifecycle_plausibility_snapshot_t snap = plausible_snapshot(&ep, &rs);
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_HW_CONFIGURED;
+    rcp_lifecycle_writer_ctx_t stranger  = {0};
+    rcp_lifecycle_writer_ctx_t discovery = {false, false, false, true};
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_UNAUTHORIZED,
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_RCP_CONFIGURED, &snap, stranger));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_CONFIGURED, state); /* unchanged */
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL));
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_RCP_CONFIGURED, &snap, discovery));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state);
+}
+
+static void test_transition_hw_configured_to_hw_unconfigured_is_unconditional_once_authorized(void)
+{
+    rcp_lifecycle_state_t state = RCP_LIFECYCLE_HW_CONFIGURED;
+    rcp_lifecycle_writer_ctx_t stranger = {0};
+    rcp_lifecycle_writer_ctx_t root     = {true, false, false, false};
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_UNAUTHORIZED,
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, stranger));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_CONFIGURED, state); /* unchanged */
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, root));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, state);
 }
 
-static void test_transition_rcp_configured_to_hw_unconfigured_is_unconditional(void)
+static void test_transition_rcp_configured_to_hw_unconfigured_is_unconditional_once_authorized(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_RCP_CONFIGURED;
+    rcp_lifecycle_writer_ctx_t stranger = {0};
+    rcp_lifecycle_writer_ctx_t discovery = {false, false, false, true};
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_UNAUTHORIZED,
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, stranger));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state); /* unchanged */
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL));
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, discovery));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, state);
 }
 
@@ -239,27 +273,33 @@ static void test_transition_rejects_skipping_hw_configured(void)
     rcp_lifecycle_request_stream_plausibility_t rs;
     rcp_lifecycle_plausibility_snapshot_t snap = plausible_snapshot(&ep, &rs);
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_HW_UNCONFIGURED;
+    rcp_lifecycle_writer_ctx_t root = {true, false, false, false};
 
+    /* Invalid-transition-topology is rejected before writer authorization
+     * is even consulted -- true regardless of writer, asserted here with
+     * an authorized one to isolate the topology check specifically. */
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_INVALID_TRANSITION,
-                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_RCP_CONFIGURED, &snap));
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_RCP_CONFIGURED, &snap, root));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, state);
 }
 
 static void test_transition_rejects_rcp_configured_to_hw_configured(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_RCP_CONFIGURED;
+    rcp_lifecycle_writer_ctx_t root = {true, false, false, false};
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_INVALID_TRANSITION,
-                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_CONFIGURED, NULL));
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_CONFIGURED, NULL, root));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state);
 }
 
 static void test_transition_same_state_is_noop_success(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_HW_CONFIGURED;
+    rcp_lifecycle_writer_ctx_t none = {0}; /* not consulted for a no-op */
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
-                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_CONFIGURED, NULL));
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_CONFIGURED, NULL, none));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_CONFIGURED, state);
 }
 
@@ -479,8 +519,9 @@ int main(void)
     RUN_TEST(test_transition_hw_unconfigured_to_hw_configured_fails_when_implausible);
     RUN_TEST(test_transition_hw_configured_to_rcp_configured_succeeds_when_plausible);
     RUN_TEST(test_transition_hw_configured_to_rcp_configured_fails_when_implausible);
-    RUN_TEST(test_transition_hw_configured_to_hw_unconfigured_is_unconditional);
-    RUN_TEST(test_transition_rcp_configured_to_hw_unconfigured_is_unconditional);
+    RUN_TEST(test_transition_hw_configured_to_rcp_configured_requires_authorization);
+    RUN_TEST(test_transition_hw_configured_to_hw_unconfigured_is_unconditional_once_authorized);
+    RUN_TEST(test_transition_rcp_configured_to_hw_unconfigured_is_unconditional_once_authorized);
     RUN_TEST(test_transition_rejects_skipping_hw_configured);
     RUN_TEST(test_transition_rejects_rcp_configured_to_hw_configured);
     RUN_TEST(test_transition_same_state_is_noop_success);
