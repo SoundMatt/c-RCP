@@ -14198,3 +14198,113 @@ REQ-RMAP-040/041), Group 3's remaining items (REQ-RMAP-052/054/055/
 (REQ-RMAP-047/048/049/050/051/066/067/068, including Table 33's own
 wire codec -- the real home for REQ-RMAP-023/067's svr_lifecycle_
 state/svr_root_client_index).
+
+### v0.235.0 -- 2026-08-11
+
+**Phase 5d Group 2 (issue #200): HW_config gets real server-side
+storage and a correct 3-octet-per-pin wire layout.**
+
+Read TC18 §12.7.6's own text directly before writing any code (the
+same discipline the WakeUp/MDIO/CAN dedicated investigations already
+established): "This configuration table can only be changed in the
+life-cycle state HW_unconfigured. In other states of the life cycle
+this is read-only... The number of IO-pins that are available is a
+constant that can be read from the general part of the servers
+register map" -- confirming `svr_io_pin_count` (Table 18,
+REQ-RMAP-032, already closed) really is HW_config's own extent
+authority. Table 19's own address column is headed "Relative
+Address", not absolute, and every register is R/W* -- matching
+`RCP_LIFECYCLE_FIELD_HW_GENERIC`'s exact semantics
+(`lifecycle.h`, "writable only in HW_UNCONFIGURED, and only when
+writer indicates the discovery stream").
+
+**A genuine architectural question found, and deliberately NOT
+resolved by guessing.** HW_config is not Table 18 (reached via a
+plain read always addressed at relative address 0) and it is not an
+endpoint's own EP_func block either (§12.7.1's Figure 18
+configuration-request mechanism is described entirely in terms of
+"the respective EP" -- an endpoint's own functional-config section,
+reached via that endpoint's own byte_bus_id). HW_config is a
+*third* kind of thing: a standalone table pointed to by Table 18's
+own `svr_hw_cfg_ptr` register. Precisely how a client's own request
+address relates to that pointer's value -- added to it? used as a
+base a generic mechanism targets directly? something else TC18
+doesn't spell out for this specific case? -- is not determined by
+anything read this batch. Rather than invent an answer, the ACF_ABB
+wire request/response wrapper is deliberately NOT implemented here.
+REQ-RMAP-040/041 both stay `partial`, not `implemented`, specifically
+because of this open question -- documented at length in
+`regmap.h`'s own new file-header section so a future batch doesn't
+need to re-derive it.
+
+**What's real now, closing the half of each requirement that WAS
+tractable:**
+
+- `rcp_mock_server_t` carries an actual, bounded HW_config table
+  (`rcp_regmap_hw_pin_map_entry_t
+  hw_pin_map[RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES]`, new constant = 64,
+  matching `RCP_MOCK_MAX_ENDPOINTS`'s own precedent scale --
+  `mock.h`/`mock.c`, `rcp_mock_server_set_hw_pin_map()`/
+  `_hw_pin_map()`) where none existed before at all.
+- `rcp_config_apply_to_mock()` no longer silently discards the
+  parsed manifest's own `hw_pin_map` (`rcp_config_hw_pin_t`,
+  `config.h`) -- it now populates the new table for real. The two
+  types (`rcp_config_hw_pin_t` and `rcp_regmap_hw_pin_map_entry_t`)
+  are field-for-field identical (`hw_ep_nr`/`hw_ep_pin_nr`/
+  `hw_pin_type`), so this is a straight per-element copy, no
+  conversion logic needed -- the fix really was just the missing
+  storage call.
+- `rcp_regmap_hw_pin_map_render()` (`regmap.h`/`regmap.c`)
+  serializes a real table at TC18's own exact 3-octet-per-pin stride
+  (IO_Pin N at relative address 3*N) -- proven directly via a
+  byte-offset test across two consecutive rows, not merely inferred
+  from the struct's own field order the way earlier batches sometimes
+  had to settle for.
+- `rcp_mock_server_set_hw_pin_map()` deliberately does NOT itself
+  consult `rcp_lifecycle_field_writable()`/
+  `RCP_LIFECYCLE_FIELD_HW_GENERIC` -- mirrors
+  `rcp_mock_server_regmap()`'s own existing "caller may freely set
+  fields directly" convention for every other general-register-map
+  field, consistent with it rather than a one-off exception. That
+  authorization gate belongs at the real wire-write dispatch layer
+  (still not implemented, per the open question above) -- the exact
+  same layering REQ-RMAP-025's own fix already established for Table
+  18's write-rejection path.
+
+**Tests**: two of Group 2's three pre-existing deviation-pin tests
+rewritten positive
+(`test_hw_config_table_now_has_real_server_side_storage`,
+`test_hw_config_row_stride_now_modeled_gpio_access_class_still_diverges`
+-- the latter's own comparison against `ep_gpio.h`'s separate,
+deliberately-runtime-adjustable `pin_property` field, tracked
+against REQ-GPIO-013 as its own distinct architecture question, is
+retained unchanged, since this batch doesn't touch that question at
+all). One new test proves `rcp_mock_server_set_hw_pin_map()` rejects
+an oversized table outright, leaving the server's existing data
+intact.
+
+Mutation-tested two ways: removing the oversized-table bounds check
+corrupted adjacent struct data (the overflow write lands within the
+same heap allocation as `rcp_mock_server_t`'s own other fields, not
+past the allocation's own edge, so this manifested as a clean,
+deterministic assertion failure rather than an ASan-visible
+overflow -- the test's own explicit return-value check is what
+actually catches it, a useful reminder that "no ASan abort" doesn't
+by itself mean "no real bug"). Narrowing the render function's own
+byte stride for one field (`3u * i` to `2u * i`) produced a clean,
+deterministic assertion failure. Both reverted, full suite
+re-verified clean.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 errors.
+`cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100`/
+`--sec-tested 100`: both 100%.
+
+**Progress**: Group 2 (HW_config, issue #200) is now fully addressed
+-- REQ-RMAP-042/043/044/045 already `implemented` (earlier batches),
+REQ-RMAP-040/041 now honestly `partial` (storage + structural layout
+real, wire dispatch genuinely open) rather than `not-implemented`/
+lacking any storage at all. **Next**: Group 3's remaining items
+(REQ-RMAP-052/054/055/057/058), Group 4's remaining items
+(REQ-RMAP-061/065), Group 5
+(REQ-RMAP-047/048/049/050/051/066/067/068, including Table 33's own
+wire codec).

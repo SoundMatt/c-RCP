@@ -256,6 +256,21 @@ rcp_regmap_general_errc_t rcp_regmap_general_decode_write_request(const uint8_t 
     return RCP_REGMAP_GENERAL_OK;
 }
 
+/* ── HW_config server-side storage + wire codec (REQ-RMAP-040/041) ────────── */
+
+//cfusa:req REQ-RMAP-041
+void rcp_regmap_hw_pin_map_render(const rcp_regmap_hw_pin_map_entry_t *entries, size_t len,
+                                   uint8_t *out)
+{
+    size_t i;
+
+    for (i = 0; i < len; i++) {
+        out[3u * i + 0u] = entries[i].hw_ep_nr;
+        out[3u * i + 1u] = entries[i].hw_ep_pin_nr;
+        out[3u * i + 2u] = entries[i].hw_pin_type;
+    }
+}
+
 /* ── Root-client / per-EP-restricted-client model ──────────────────────────── */
 
 //cfusa:req REQ-RMAP-009

@@ -415,6 +415,24 @@ rcp_mock_errc_t rcp_config_apply_to_mock(const rcp_config_manifest_t *m, rcp_moc
     if (m->server.magic != 0) map->magic = m->server.magic;
     map->svr_implemented_options |= m->server.svr_implemented_options;
 
+    /* REQ-RMAP-040: the parsed HW_config table used to be discarded here
+     * entirely -- rcp_config_hw_pin_t (this file's own manifest-parse
+     * shape) and rcp_regmap_hw_pin_map_entry_t (regmap.h's own wire-row
+     * shape) are field-for-field identical (hw_ep_nr/hw_ep_pin_nr/
+     * hw_pin_type), so a straight per-element copy is enough -- no
+     * conversion logic needed, just the storage call that was missing. */
+    if (m->hw_pin_map_len > 0) {
+        rcp_regmap_hw_pin_map_entry_t rows[RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES];
+
+        if (m->hw_pin_map_len > RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES) return RCP_MOCK_ERR_CAPACITY;
+        for (i = 0; i < m->hw_pin_map_len; i++) {
+            rows[i].hw_ep_nr     = m->hw_pin_map[i].hw_ep_nr;
+            rows[i].hw_ep_pin_nr = m->hw_pin_map[i].hw_ep_pin_nr;
+            rows[i].hw_pin_type  = m->hw_pin_map[i].hw_pin_type;
+        }
+        if (!rcp_mock_server_set_hw_pin_map(srv, rows, m->hw_pin_map_len)) return RCP_MOCK_ERR_CAPACITY;
+    }
+
     for (i = 0; i < m->endpoints_len; i++) {
         const rcp_config_endpoint_t *ep = &m->endpoints[i];
         rcp_mock_errc_t ec = rcp_mock_server_add_endpoint(srv, ep->byte_bus_id, ep->ep_type,

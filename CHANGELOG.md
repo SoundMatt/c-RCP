@@ -34,6 +34,20 @@ the rationale.
 
 ## Releases
 
+### v0.235.0 -- 2026-08-11
+
+**Phase 5d Group 2 (issue #200): HW_config now has real server-side storage and a correct 3-octet-per-pin wire layout.**
+
+Investigated §12.7.6's own text directly before writing code: HW_config is a *separate* table from Table 18, pointed to by Table 18's own `svr_hw_cfg_ptr` register, with Table 19's own address column headed "Relative Address" (not absolute) and R/W* access ("This configuration table can only be changed in the life-cycle state HW_unconfigured"). Unlike Table 18 -- reached via a plain read always addressed at 0 -- precisely how a client's request address relates to `svr_hw_cfg_ptr`'s own value is a genuine, unresolved architectural question (TC18's own §12.7.1 Figure 18 configuration-request mechanism is described in per-*endpoint* EP_func terms; HW_config isn't an endpoint's EP_func at all). Rather than guess, the ACF_ABB wire wrapper is deliberately **not** attempted this batch -- REQ-RMAP-040/041 both stay `partial`, not `implemented`, for exactly this reason.
+
+What **is** real now: `rcp_mock_server_t` carries an actual bounded HW_config table (`rcp_mock_server_set_hw_pin_map()`/`_hw_pin_map()`, mock.h/mock.c, `RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES` = 64) instead of no storage at all, and `rcp_config_apply_to_mock()` no longer silently discards the parsed manifest's `hw_pin_map` -- it populates the new table for real (`rcp_config_hw_pin_t` and `rcp_regmap_hw_pin_map_entry_t` are field-for-field identical, so this is a straight copy, no conversion logic needed). `rcp_regmap_hw_pin_map_render()` (regmap.h/regmap.c) serializes a real table at TC18's own exact 3-octet-per-pin stride (IO_Pin N at relative address 3*N), proven directly via a byte-offset test across two rows rather than merely inferred from field order.
+
+Two of the three pre-existing Group 2 deviation-pin tests rewritten positive (`test_hw_config_table_now_has_real_server_side_storage`, `test_hw_config_row_stride_now_modeled_gpio_access_class_still_diverges` -- the latter's own GPIO-vs-HW_config access-class comparison, a separate architecture question tracked against REQ-GPIO-013, is retained unchanged); one new test (`test_hw_pin_map_rejects_oversized_table_leaving_existing_data_intact`).
+
+Mutation-tested two ways: removing the oversized-table bounds check corrupted adjacent struct data, caught as a clean, deterministic assertion failure (not always ASan-visible, since the overflow write lands within the same heap allocation, not past its edge -- the test's own explicit return-value check is what catches it). Narrowing the render function's own byte stride (`3u * i` → `2u * i` for one field) produced a clean, deterministic assertion failure. Both reverted, full suite re-verified clean.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.234.0 -- 2026-08-11
 
 **Phase 5d Group 1 (issue #200): the RC Server general register map's full TC18 §12.7.5 Table 18 extent is now wire-reachable, not just its leading 14-octet discovery slice.** Closes REQ-RMAP-024, the umbrella wire-reachability gap that kept 15 sibling requirements' own field-level fixes stuck at `partial` despite their in-memory content already being correct.
