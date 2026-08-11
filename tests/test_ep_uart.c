@@ -30,6 +30,8 @@
 //cfusa:test REQ-UART-029
 //cfusa:test REQ-UART-030
 //cfusa:test REQ-UART-031
+//cfusa:test REQ-UART-039
+//cfusa:test REQ-UART-040
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -116,6 +118,13 @@ static void test_functional_cfg_init_zeroes_except_nr_bits(void)
     TEST_ASSERT_EQUAL_UINT16(0, cfg.ep_rx_buffer_size);
     TEST_ASSERT_EQUAL_UINT32(0, cfg.uart_timeout_ms);
     TEST_ASSERT_EQUAL_UINT8(RCP_EP_UART_NR_BITS_MAX, cfg.uart_nr_bits);
+    TEST_ASSERT_EQUAL_UINT16(0, cfg.ep_status);
+    TEST_ASSERT_EQUAL_UINT16(0, cfg.baud_rate_kbps);
+    TEST_ASSERT_FALSE(cfg.rts_enable);
+    TEST_ASSERT_FALSE(cfg.cts_enable);
+    TEST_ASSERT_FALSE(cfg.half_duplex);
+    TEST_ASSERT_EQUAL_UINT8(0, cfg.wire_timeout_bit_times);
+    TEST_ASSERT_EQUAL_UINT8(0, cfg.trail);
 }
 
 static void test_functional_cfg_writable_false_hw_unconfigured(void)
@@ -283,6 +292,200 @@ static void test_set_timeout_applies_when_authorized(void)
     TEST_ASSERT_TRUE(rcp_ep_uart_set_timeout(
         &cfg, 50, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT32(50, cfg.uart_timeout_ms);
+}
+
+/* ── The EP_func register block ────────────────────────────────────────────── */
+
+static void test_render_registers_matches_table_offsets(void)
+{
+    rcp_ep_uart_functional_cfg_t cfg;
+    uint8_t                      out[RCP_EP_UART_EP_FUNC_LEN];
+
+    rcp_ep_uart_functional_cfg_init(&cfg);
+    cfg.common.ep_enable = true;
+    cfg.ep_status         = 0x1234;
+    cfg.baud_rate_kbps    = 0x5566;
+    cfg.uart_nr_bits      = 7;
+    cfg.parity            = (uint8_t)RCP_EP_UART_PARITY_EVEN;
+    cfg.rts_enable        = true;
+    cfg.cts_enable        = true;
+    cfg.half_duplex       = true;
+    cfg.stop_bits         = (uint8_t)RCP_EP_UART_STOP_BITS_TWO;
+    cfg.wire_timeout_bit_times = 9;
+    cfg.trail                  = 10;
+
+    rcp_ep_uart_render_registers(&cfg, out);
+
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_EP_FUNC_LEN, out[RCP_EP_UART_REG_EP_LEN]);
+    TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_UART_REG_RESERVED_01]);
+    TEST_ASSERT_TRUE((out[RCP_EP_UART_REG_EP_ENABLE_CLR] & 0x01u) != 0u);
+    TEST_ASSERT_EQUAL_UINT8(0x12u, out[RCP_EP_UART_REG_EP_STATUS]);
+    TEST_ASSERT_EQUAL_UINT8(0x34u, out[RCP_EP_UART_REG_EP_STATUS + 1]);
+    TEST_ASSERT_EQUAL_UINT8(0x55u, out[RCP_EP_UART_REG_BAUD_RATE]);
+    TEST_ASSERT_EQUAL_UINT8(0x66u, out[RCP_EP_UART_REG_BAUD_RATE + 1]);
+    TEST_ASSERT_EQUAL_UINT8(7, out[RCP_EP_UART_REG_NR_BITS]);
+    TEST_ASSERT_EQUAL_UINT8(
+        RCP_EP_UART_FLAG_PARITY_ENABLE | RCP_EP_UART_FLAG_PARITY_POL |
+            RCP_EP_UART_FLAG_RTS_ENABLE | RCP_EP_UART_FLAG_CTS_ENABLE |
+            RCP_EP_UART_FLAG_HALF_DUPLEX,
+        out[RCP_EP_UART_REG_FLAGS]);
+    TEST_ASSERT_EQUAL_UINT8(4, out[RCP_EP_UART_REG_STOP_BITS]); /* TWO -> half units 4 */
+    TEST_ASSERT_EQUAL_UINT8(9, out[RCP_EP_UART_REG_TIMEOUT]);
+    TEST_ASSERT_EQUAL_UINT8(10, out[RCP_EP_UART_REG_TRAIL]);
+
+    TEST_ASSERT_EQUAL_UINT16(0x000Du, RCP_EP_UART_EP_FUNC_LEN);
+}
+
+static void test_apply_reconfig_writes_multi_register_span(void)
+{
+    rcp_ep_uart_functional_cfg_t cfg;
+    uint8_t                      payload[2 + 7];
+
+    rcp_ep_uart_functional_cfg_init(&cfg);
+
+    payload[0] = 0x00;
+    payload[1] = (uint8_t)RCP_EP_UART_REG_BAUD_RATE;
+    payload[2] = 0xAB; payload[3] = 0xCD; /* baud_rate */
+    payload[4] = 6;                       /* nr_bits */
+    payload[5] = RCP_EP_UART_FLAG_PARITY_ENABLE | RCP_EP_UART_FLAG_RTS_ENABLE; /* odd parity, RTS */
+    payload[6] = 4;                       /* stop_bits half units -> TWO */
+    payload[7] = 11;                      /* timeout */
+    payload[8] = 12;                      /* trail */
+
+    TEST_ASSERT_EQUAL(RCP_EP_UART_RECONFIG_OK,
+        rcp_ep_uart_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_EQUAL_UINT16(0xABCD, cfg.baud_rate_kbps);
+    TEST_ASSERT_EQUAL_UINT8(6, cfg.uart_nr_bits);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_PARITY_ODD, cfg.parity);
+    TEST_ASSERT_TRUE(cfg.rts_enable);
+    TEST_ASSERT_FALSE(cfg.cts_enable);
+    TEST_ASSERT_FALSE(cfg.half_duplex);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_STOP_BITS_TWO, cfg.stop_bits);
+    TEST_ASSERT_EQUAL_UINT8(11, cfg.wire_timeout_bit_times);
+    TEST_ASSERT_EQUAL_UINT8(12, cfg.trail);
+}
+
+static void test_apply_reconfig_stop_bits_half_unit_rounding(void)
+{
+    rcp_ep_uart_functional_cfg_t cfg;
+    uint8_t                      payload_low[3]  = {0x00, (uint8_t)RCP_EP_UART_REG_STOP_BITS, 2};
+    uint8_t                      payload_mid[3]  = {0x00, (uint8_t)RCP_EP_UART_REG_STOP_BITS, 3};
+    uint8_t                      payload_high[3] = {0x00, (uint8_t)RCP_EP_UART_REG_STOP_BITS, 4};
+
+    rcp_ep_uart_functional_cfg_init(&cfg);
+    TEST_ASSERT_EQUAL(RCP_EP_UART_RECONFIG_OK,
+        rcp_ep_uart_apply_reconfig(&cfg, payload_low, sizeof(payload_low)));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_STOP_BITS_ONE, cfg.stop_bits);
+
+    rcp_ep_uart_functional_cfg_init(&cfg);
+    TEST_ASSERT_EQUAL(RCP_EP_UART_RECONFIG_OK,
+        rcp_ep_uart_apply_reconfig(&cfg, payload_mid, sizeof(payload_mid)));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_STOP_BITS_TWO, cfg.stop_bits);
+
+    rcp_ep_uart_functional_cfg_init(&cfg);
+    TEST_ASSERT_EQUAL(RCP_EP_UART_RECONFIG_OK,
+        rcp_ep_uart_apply_reconfig(&cfg, payload_high, sizeof(payload_high)));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_STOP_BITS_TWO, cfg.stop_bits);
+}
+
+static void test_apply_reconfig_ignores_read_only_registers(void)
+{
+    rcp_ep_uart_functional_cfg_t cfg;
+    uint8_t                      payload[2 + 2];
+
+    rcp_ep_uart_functional_cfg_init(&cfg);
+
+    payload[0] = 0x00;
+    payload[1] = 0x00;
+    payload[2] = 0xFF;
+    payload[3] = 0xFF;
+
+    TEST_ASSERT_EQUAL(RCP_EP_UART_RECONFIG_OK,
+        rcp_ep_uart_apply_reconfig(&cfg, payload, sizeof(payload)));
+
+    {
+        uint8_t out[RCP_EP_UART_EP_FUNC_LEN];
+
+        rcp_ep_uart_render_registers(&cfg, out);
+        TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_EP_FUNC_LEN, out[RCP_EP_UART_REG_EP_LEN]);
+        TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_UART_REG_RESERVED_01]);
+    }
+}
+
+static void test_apply_reconfig_rejects_write_past_ep_len(void)
+{
+    rcp_ep_uart_functional_cfg_t cfg;
+    uint8_t                      payload[3];
+
+    rcp_ep_uart_functional_cfg_init(&cfg);
+
+    payload[0] = 0x00;
+    payload[1] = 0x0D; /* == RCP_EP_UART_EP_FUNC_LEN -- one past the last
+                           valid offset */
+    payload[2] = 0xFF;
+
+    TEST_ASSERT_EQUAL(RCP_EP_UART_RECONFIG_ERR_OUT_OF_RANGE,
+        rcp_ep_uart_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_EQUAL_UINT8(0, cfg.trail);
+}
+
+static void test_apply_reconfig_rejects_payload_without_data(void)
+{
+    rcp_ep_uart_functional_cfg_t cfg;
+    uint8_t                      addr_only[2] = {0x00, 0x06};
+
+    rcp_ep_uart_functional_cfg_init(&cfg);
+
+    TEST_ASSERT_EQUAL(RCP_EP_UART_RECONFIG_ERR_SHORT,
+        rcp_ep_uart_apply_reconfig(&cfg, addr_only, sizeof(addr_only)));
+    TEST_ASSERT_EQUAL(RCP_EP_UART_RECONFIG_ERR_SHORT,
+        rcp_ep_uart_apply_reconfig(&cfg, NULL, 0));
+}
+
+static void test_reconfig_request_round_trip(void)
+{
+    rcp_bytes_t                 frame;
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    uint8_t                      data[2] = {0xAB, 0xCD};
+
+    frame = rcp_ep_uart_encode_reconfig_request(0x03, 0x0006, data, sizeof(data), 7);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(frame.data, frame.len, &hdr, &payload, &payload_len));
+    TEST_ASSERT_EQUAL_UINT8(0x03, hdr.byte_bus_id);
+    TEST_ASSERT_EQUAL(RCP_ACF_OP_WRITE, hdr.op);
+    TEST_ASSERT_EQUAL_UINT8(0x7u, hdr.evt);
+    TEST_ASSERT_EQUAL_UINT8(7, hdr.transaction_num);
+    TEST_ASSERT_EQUAL_UINT32(4, payload_len);
+    TEST_ASSERT_EQUAL_UINT8(0x00, payload[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x06, payload[1]);
+    TEST_ASSERT_EQUAL_UINT8(0xAB, payload[2]);
+    TEST_ASSERT_EQUAL_UINT8(0xCD, payload[3]);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_encode_reconfig_request_rejects_empty_data(void)
+{
+    rcp_bytes_t frame = rcp_ep_uart_encode_reconfig_request(0x00, 0, NULL, 0, 0);
+
+    TEST_ASSERT_NULL(frame.data);
+}
+
+static void test_reconfig_strerror_never_null(void)
+{
+    rcp_ep_uart_reconfig_errc_t codes[] = {
+        RCP_EP_UART_RECONFIG_OK, RCP_EP_UART_RECONFIG_ERR_SHORT,
+        RCP_EP_UART_RECONFIG_ERR_OUT_OF_RANGE,
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof(codes) / sizeof(codes[0]); i++) {
+        TEST_ASSERT_NOT_NULL(rcp_ep_uart_reconfig_strerror(codes[i]));
+    }
+    TEST_ASSERT_NOT_NULL(rcp_ep_uart_reconfig_strerror((rcp_ep_uart_reconfig_errc_t)99));
 }
 
 /* ── strerror ───────────────────────────────────────────────────────────────── */
@@ -730,6 +933,16 @@ int main(void)
     RUN_TEST(test_set_rx_buffer_size_applies_when_authorized);
     RUN_TEST(test_set_timeout_rejects_unauthorized);
     RUN_TEST(test_set_timeout_applies_when_authorized);
+
+    RUN_TEST(test_render_registers_matches_table_offsets);
+    RUN_TEST(test_apply_reconfig_writes_multi_register_span);
+    RUN_TEST(test_apply_reconfig_stop_bits_half_unit_rounding);
+    RUN_TEST(test_apply_reconfig_ignores_read_only_registers);
+    RUN_TEST(test_apply_reconfig_rejects_write_past_ep_len);
+    RUN_TEST(test_apply_reconfig_rejects_payload_without_data);
+    RUN_TEST(test_reconfig_request_round_trip);
+    RUN_TEST(test_encode_reconfig_request_rejects_empty_data);
+    RUN_TEST(test_reconfig_strerror_never_null);
 
     RUN_TEST(test_strerror_never_null_and_distinct);
 

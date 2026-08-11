@@ -114,7 +114,20 @@ static rcp_lifecycle_writer_ctx_t any_writer(void)
 
 /* ── UART (§13.7.8) ────────────────────────────────────────────────────────── */
 
-static void test_uart_functional_block_has_no_len_or_status_register(void)
+/* FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-UART-038):
+ * renamed from `..._has_no_len_or_status_register` -- the block now has
+ * both, plus the four previously-missing R/W fields, all reachable via
+ * the new rcp_ep_uart_apply_reconfig()/_render_registers() register-block
+ * path (REQ-UART-039/040, tests/test_ep_uart.c). This test's own "13
+ * octets changed" assertion below still holds and is still meaningful:
+ * it confirms the four *legacy*, per-field setters this module already
+ * had (set_baud_rate/_frame_format/_rx_buffer_size/_timeout) remain
+ * narrowly scoped to exactly the fields they always touched -- the new
+ * fields are deliberately NOT wired into those setters (matching every
+ * other endpoint type's own precedent: PWM_OUT's/GPIO's/SPI's/I2C's own
+ * register-block-only fields have no dedicated named setter either, only
+ * the generic §12.7.1 write path). */
+static void test_uart_functional_block_now_has_full_register_coverage(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
     uint8_t                      before[sizeof(rcp_ep_uart_functional_cfg_t)];
@@ -134,25 +147,49 @@ static void test_uart_functional_block_has_no_len_or_status_register(void)
     TEST_ASSERT_TRUE(rcp_ep_uart_set_timeout(&cfg, 0x55667788u,
                                              RCP_LIFECYCLE_HW_CONFIGURED, w));
 
-    /* DEVIATION -- TC18 §13.7.8.2 Table 48 fixes uart_ep_len at relative
-     * address 0x0000 (8 bit, R), a reserved octet at 0x0001 (reads 0x00)
-     * and uart_ep_status at 0x0004 (16 bit, R/W). A conforming endpoint
-     * would serialize this block at those addresses. c-RCP's block is a
-     * plain C struct with no serializer: relative address 0x0000 holds the
-     * shared common flags, and the entire endpoint-specific surface any
-     * client can reach is 13 octets -- baud_rate(4) + uart_nr_bits(1) +
-     * parity(1) + stop_bits(1) + ep_rx_buffer_size(2) + uart_timeout_ms(4)
-     * -- with no length and no status register among them.
-     *
-     * DEVIATION PIN (REQ-UART-038, not implemented): this same 13-octet
-     * total, having already exercised every setter this module defines,
-     * also proves Table 48's uart_rts_enable/uart_cts_enable/
-     * uart_half_duplex (0x0009.2-4) and uart_trail (0x000C) have no
-     * representation at all -- if any of the four existed, this count
-     * would exceed 13. */
+    /* TC18 §13.7.8.2 Table 48's whole register block -- uart_ep_len
+     * (0x0000, R), a reserved octet (0x0001, R), uart_ep_status (0x0004,
+     * R/W), uart_rts_enable/uart_cts_enable/uart_half_duplex (0x0009.2-4)
+     * and uart_trail (0x000C) included -- is now reachable via
+     * rcp_ep_uart_render_registers()/_apply_reconfig() (REQ-UART-039/040,
+     * tests/test_ep_uart.c's own dedicated register-block test section).
+     * c-RCP's struct is still a plain C struct rather than a wire image
+     * (as every other endpoint type's own functional-config struct also
+     * is), but that struct now carries every one of Table 48's fields --
+     * confirmed positively here rather than by the old test's absence
+     * check. */
     TEST_ASSERT_EQUAL_size_t(0u, offsetof(rcp_ep_uart_functional_cfg_t, common));
+
+    /* The four *legacy* setters this test exercises above remain
+     * narrowly scoped to exactly the 13 octets they always touched --
+     * the fields the new register-block path added (ep_status,
+     * baud_rate_kbps, rts_enable, cts_enable, half_duplex,
+     * wire_timeout_bit_times, trail) are untouched by them, by design. */
     TEST_ASSERT_EQUAL_size_t(13u, changed_octets(before, (const uint8_t *)&cfg,
                                                  sizeof(before)));
+
+    /* Positive assertion: the new fields exist and are independently
+     * writable via the register-block path (exercised end-to-end in
+     * tests/test_ep_uart.c; here we just confirm the struct has room). */
+    {
+        rcp_ep_uart_functional_cfg_t cfg2;
+
+        rcp_ep_uart_functional_cfg_init(&cfg2);
+        cfg2.ep_status              = 0x1234u;
+        cfg2.baud_rate_kbps         = 0x5678u;
+        cfg2.rts_enable             = true;
+        cfg2.cts_enable             = true;
+        cfg2.half_duplex            = true;
+        cfg2.wire_timeout_bit_times = 0x42u;
+        cfg2.trail                  = 0x24u;
+        TEST_ASSERT_EQUAL_UINT16(0x1234u, cfg2.ep_status);
+        TEST_ASSERT_EQUAL_UINT16(0x5678u, cfg2.baud_rate_kbps);
+        TEST_ASSERT_TRUE(cfg2.rts_enable);
+        TEST_ASSERT_TRUE(cfg2.cts_enable);
+        TEST_ASSERT_TRUE(cfg2.half_duplex);
+        TEST_ASSERT_EQUAL_UINT8(0x42u, cfg2.wire_timeout_bit_times);
+        TEST_ASSERT_EQUAL_UINT8(0x24u, cfg2.trail);
+    }
 }
 
 static void test_uart_rx_fifo_size_bounds_nothing_at_all(void)
@@ -805,7 +842,7 @@ int main(void)
 {
     UNITY_BEGIN();
 
-    RUN_TEST(test_uart_functional_block_has_no_len_or_status_register);
+    RUN_TEST(test_uart_functional_block_now_has_full_register_coverage);
     RUN_TEST(test_uart_rx_fifo_size_bounds_nothing_at_all);
     RUN_TEST(test_uart_compound_wait_now_resolved_via_generic_primitive);
     RUN_TEST(test_uart_read_size_truncates_above_one_octet);
