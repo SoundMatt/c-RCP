@@ -8380,8 +8380,8 @@
     },
     {
       "id": "REQ-CFG-011",
-      "title": "The evt[2:0]=111b EP_func configuration request is implemented for PWM_OUT, GPIO, and SPI only",
-      "text": "NOT IMPLEMENTED (partial; narrowed 2026-08-11, c-RCP-AUDIT-06, issue #256 Group I, REQ-SPI-035): TC18 \u00a712.7.1 Figure 18 defines one generic configuration request \u2014 evt[2:0] = 111b, byte_msg_payload = a relative register start address within the addressed endpoint's EP_func section followed by configuration data \u2014 usable against EVERY endpoint type either through the RC Server (EP0) register map or directly by byte_bus_id. c-RCP now implements this shape for three endpoint types: rcp_ep_pwm_out_apply_reconfig() (src/ep_pwm.c), rcp_ep_gpio_apply_reconfig() (src/ep_gpio.c), and rcp_ep_spi_apply_reconfig() (src/ep_spi.c, new \u2014 SPI's own Table 30 row additionally uses evt[2:0] 000b-101b for channel selection on ordinary transfer requests, unlike PWM_OUT/GPIO, but 111b carries the identical generic configuration-write meaning). Every other endpoint type (I2C, UART, LIN, CAN, ADC, ISELED, MDIO, wakeup) still exposes no EP_func addressed-write path, and no server-side dispatcher classifies an incoming evt==7 request as a configuration request and routes it to the addressed endpoint. Consequence: endpoint functional configuration is unreachable over the wire for 8 of 11 endpoint types.",
+      "title": "The evt[2:0]=111b EP_func configuration request is implemented for PWM_OUT, GPIO, SPI, and I2C only",
+      "text": "NOT IMPLEMENTED (partial; narrowed 2026-08-11, c-RCP-AUDIT-06, issue #256 Group I, REQ-I2C-019): TC18 \u00a712.7.1 Figure 18 defines one generic configuration request \u2014 evt[2:0] = 111b, byte_msg_payload = a relative register start address within the addressed endpoint's EP_func section followed by configuration data \u2014 usable against EVERY endpoint type either through the RC Server (EP0) register map or directly by byte_bus_id. c-RCP now implements this shape for four endpoint types: rcp_ep_pwm_out_apply_reconfig() (src/ep_pwm.c), rcp_ep_gpio_apply_reconfig() (src/ep_gpio.c), rcp_ep_spi_apply_reconfig() (src/ep_spi.c), and rcp_ep_i2c_apply_reconfig() (src/ep_i2c.c, new \u2014 I2C's own decode_transfer_request() already correctly rejected evt=111b as not a plain transfer via acf.h's rcp_acf_evt_row2_is_plain(), but had no counterpart implementing that path at all). Every other endpoint type (UART, LIN, CAN, ADC, ISELED, MDIO, wakeup) still exposes no EP_func addressed-write path, and no server-side dispatcher classifies an incoming evt==7 request as a configuration request and routes it to the addressed endpoint. Consequence: endpoint functional configuration is unreachable over the wire for 7 of 11 endpoint types.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
@@ -8392,7 +8392,7 @@
     {
       "id": "REQ-CFG-012",
       "title": "Every endpoint must publish EP_LEN at EP_func offset 0x00 and ignore a write overrunning it",
-      "text": "NOT IMPLEMENTED (partial; narrowed 2026-08-11, c-RCP-AUDIT-06, issue #256 Group I, REQ-SPI-035): TC18 \u00a712.7.1 requires that every endpoint publish its EP_LEN parameter at EP_func relative start_address 0x00, and that any byte_msg_payload whose length plus start_address exceeds EP_LEN be ignored in its entirety. c-RCP now satisfies this for PWM_OUT, GPIO, and SPI \u2014 RCP_EP_PWM_OUT_REG_EP_LEN at 0x0000 (include/rcp/ep_pwm.h), RCP_EP_GPIO_REG_EP_LEN at 0x0000 (include/rcp/ep_gpio.h), RCP_EP_SPI_REG_EP_LEN at 0x0000 (include/rcp/ep_spi.h, new), with the out-of-range rejection in each module's own apply_reconfig(). No other endpoint type in c-RCP defines an EP_LEN register or enforces the overrun rule, because no other endpoint type has an addressed EP_func write path at all (see REQ-CFG-011). Consequence: the specification's one universal bounds check on configuration writes exists at 3 of the eleven endpoint types.",
+      "text": "NOT IMPLEMENTED (partial; narrowed 2026-08-11, c-RCP-AUDIT-06, issue #256 Group I, REQ-I2C-019): TC18 \u00a712.7.1 requires that every endpoint publish its EP_LEN parameter at EP_func relative start_address 0x00, and that any byte_msg_payload whose length plus start_address exceeds EP_LEN be ignored in its entirety. c-RCP now satisfies this for PWM_OUT, GPIO, SPI, and I2C \u2014 RCP_EP_PWM_OUT_REG_EP_LEN at 0x0000 (include/rcp/ep_pwm.h), RCP_EP_GPIO_REG_EP_LEN at 0x0000 (include/rcp/ep_gpio.h), RCP_EP_SPI_REG_EP_LEN at 0x0000 (include/rcp/ep_spi.h), RCP_EP_I2C_REG_EP_LEN at 0x0000 (include/rcp/ep_i2c.h, new), with the out-of-range rejection in each module's own apply_reconfig(). No other endpoint type in c-RCP defines an EP_LEN register or enforces the overrun rule, because no other endpoint type has an addressed EP_func write path at all (see REQ-CFG-011). Consequence: the specification's one universal bounds check on configuration writes exists at 4 of the eleven endpoint types.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
@@ -8510,13 +8510,13 @@
     },
     {
       "id": "REQ-I2C-019",
-      "title": "I2C functional-config registers beyond i2c_mode, and the missing Ultra-fast preset",
-      "text": "NOT IMPLEMENTED (partial): c-RCP's rcp_ep_i2c_functional_cfg_t models TC18 Table 46 only as i2c_mode. i2c_clock_divider (0x0006), i2c_trail (0x0008, minimum trail time between two transactions in I2C clock cycles), i2c_base_clk and i2c_ep_status are absent, and rcp_ep_i2c_mode_valid() accepts only presets 0..3 -- Ultra-fast mode (value 4, 5 Mbit/s) is rejected as invalid. Table 46 numbers two distinct rows '3' (High-speed 1.7 and 3.4 Mbit/s), an ambiguity ep_i2c.h resolves conservatively in favour of the lower numbering.",
+      "title": "I2C functional-config registers beyond i2c_mode, and the Ultra-fast preset, are now modeled",
+      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): c-RCP's rcp_ep_i2c_functional_cfg_t now carries i2c_clock_divider, i2c_trail (minimum trail time between two transactions in I2C clock cycles), and i2c_ep_status alongside i2c_mode (i2c_base_clk is not itself stored -- it has no setter and always renders 0, the same \"no real clock source modelled\" honesty ep_gpio.h's own gpio_base_clk already commits to); rcp_ep_i2c_mode_valid() now accepts Ultra-fast mode (value 4, 5 Mbit/s). rcp_ep_i2c_render_registers()/_apply_reconfig() implement the whole Table 46 block at corrected addresses: Table 46's own printed relative-address column collides i2c_ep_enable&clr (0x0002) with i2c_base_clk (also printed at 0x0002) and i2c_base_clk's second octet with i2c_ep_status (both printed at 0x0004) -- confirmed via direct visual inspection of the source PDF (physical page 99), not a text-extraction artifact. PWM_OUT's, GPIO's, and SPI's own common EP_func prefixes all place the same five conceptual fields (EP_LEN / a reserved-or-count octet / enable&clr / options / a 16-bit read-only base-clock register) at the identical address sequence 0x0000/0x0001/0x0002/0x0003/0x0004-0x0005, followed by a 16-bit ep_status at 0x0006-0x0007 -- that cross-table pattern is authoritative here too, so i2c_base_clk is placed at 0x0004-0x0005 (not the table's own printed 0x0002), pushing i2c_ep_status to 0x0006-0x0007, i2c_clock_divider to 0x0008, i2c_mode to 0x0009, and i2c_trail to 0x000A (RCP_EP_I2C_EP_FUNC_LEN = 0x000B, 11 octets total). Table 46 still numbers two distinct rows '3' (High-speed 1.7 and 3.4 Mbit/s), an ambiguity ep_i2c.h resolves conservatively in favour of the lower numbering -- this remains unresolved pending spec errata, unrelated to the fixes above.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "partial",
+      "status": "implemented",
       "tc18": "\u00a713.7.7.2 Table 46, TC18.txt L4800-4823"
     },
     {
@@ -8529,6 +8529,28 @@
       "scope": "tc18",
       "status": "implemented",
       "tc18": "\u00a713.7.7.3, TC18.txt L4831-4833"
+    },
+    {
+      "id": "REQ-I2C-021",
+      "title": "rcp_ep_i2c_render_registers()/_encode_reconfig_request() implement the generic \u00a712.7.1 configuration request for I2C",
+      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): TC18 \u00a712.7.1 Figure 18 defines one generic configuration request -- evt[2:0] = 111b, byte_msg_payload = a relative register start address within the addressed endpoint's EP_func section followed by configuration data -- usable against every endpoint type. rcp_ep_i2c_decode_transfer_request() already correctly rejected evt[2:0] = 111b as not a plain transfer (RCP_EP_I2C_ERR_BAD_EVT, via acf.h's rcp_acf_evt_row2_is_plain()), but no counterpart function implemented that path at all. rcp_ep_i2c_render_registers() serializes cfg's whole (corrected-address) Table 46 block; rcp_ep_i2c_encode_reconfig_request() encodes an ACF_ABB write request (op=WRITE, evt=111b) carrying a 16-bit big-endian start address followed by data, matching PWM_OUT's/GPIO's/SPI's own encode_reconfig_request() shape.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "tc18-gap",
+      "status": "implemented",
+      "tc18": "\u00a712.7.1 Configuration of endpoints + Figure 18, TC18.txt L2463-2484"
+    },
+    {
+      "id": "REQ-I2C-022",
+      "title": "rcp_ep_i2c_apply_reconfig()/_reconfig_strerror() apply the addressed configuration write and never return NULL for a status message",
+      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): rcp_ep_i2c_apply_reconfig() decodes the address+data payload TC18 \u00a712.7.1 defines and patches cfg's Table 46 register block at octet granularity, then adopts the whole block atomically -- a write whose start_address+length exceeds RCP_EP_I2C_EP_FUNC_LEN is rejected and cfg left entirely unchanged (RCP_EP_I2C_RECONFIG_ERR_OUT_OF_RANGE), matching \u00a712.7.1's own 'such a payload is to be ignored' rule; octets landing on a read-only register (EP_LEN, the reserved octet, or base_clk) are silently skipped while the rest of the span is still applied. rcp_ep_i2c_reconfig_strerror() never returns NULL, including for an unrecognized error code.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "tc18-gap",
+      "status": "implemented",
+      "tc18": "\u00a712.7.1 Configuration of endpoints, TC18.txt L2463-2484"
     },
     {
       "id": "REQ-LIFECYCLE-022",

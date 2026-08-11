@@ -12444,3 +12444,101 @@ D 16 + F 7 + E 4 + C 16 + G 2 + I 5 = 83). Group I's own count moves
 from 4 to 5; unlike the prior batch's overcounting incident, this
 number was verified against the group's own itemized list before
 being written down.
+
+### v0.218.0 -- 2026-08-11
+
+**Full-catalog audit follow-up, batch 19 (Group I, real fix):
+REQ-I2C-019's "modeled only in reduced form" finding closed -- I2C's
+own §12.7.1 EP_func register block (Table 46) implemented for the
+first time, resuming the same-shaped investigation the SPI batch
+started (SPI/I2C/UART/LIN/CAN/ADC/ISELED/MDIO/wakeup -- which of the
+9 remaining endpoint types share the missing-reconfig-path gap).**
+
+`rcp_ep_i2c_decode_transfer_request()` already correctly rejected
+evt[2:0] = 111b as not a plain transfer -- it delegates to acf.h's
+shared `rcp_acf_evt_row2_is_plain()` (`(evt & 0x7) == 0`), the same
+primitive Group A's own investigation (v0.209.0) confirmed is the
+right, worked-example-consistent reading of Table 30 for this whole
+endpoint-type group. So unlike SPI's own investigation, there was no
+enforcement question to resolve here at all: the gap was purely that
+nothing implemented the 111b path once correctly routed there.
+
+**Third genuine spec-table editorial defect this audit has found and
+resolved, using the same cross-table-pattern method each time**: TC18
+§13.7.7.2 Table 46 (confirmed via direct visual inspection of the
+source PDF, physical page 99 -- not a text-extraction artifact) prints
+`i2c_ep_enable&clr` (8 bit) AND `i2c_base_clk` (16 bit) both at
+relative address 0x0002, and then `i2c_base_clk`'s own second octet
+AND `i2c_ep_status` (16 bit) both at 0x0004 -- two overlapping address
+collisions in the table's own printed column. PWM_OUT's, GPIO's, and
+SPI's own common EP_func prefixes all place the same five conceptual
+fields (EP_LEN / a reserved-or-count octet / enable&clr / options / a
+16-bit read-only base-clock register) at the identical address
+sequence 0x0000/0x0001/0x0002/0x0003/0x0004-0x0005, followed by a
+16-bit ep_status at 0x0006-0x0007 -- consistent across three
+independent tables, so that pattern is authoritative here too:
+`i2c_base_clk` moves to 0x0004-0x0005 (not the table's own printed
+0x0002), `i2c_ep_status` to 0x0006-0x0007, `i2c_clock_divider` to
+0x0008, `i2c_mode` to 0x0009, `i2c_trail` to 0x000A
+(`RCP_EP_I2C_EP_FUNC_LEN` = 0x000B, 11 octets total). Unlike the two
+prior defects (PWM_OUT's EP_LEN citation, GPIO's debounce address),
+this one wasn't a single inconsistent label vs. an otherwise-clean
+table -- it was a genuine internal collision in the table's own
+printed values, the strongest case yet for trusting the cross-table
+structural pattern over a single table's own arithmetic.
+
+**Fix**: `rcp_ep_i2c_functional_cfg_t` gained `ep_status`/
+`clock_divider`/`trail`. New `rcp_ep_i2c_render_registers()`/
+`rcp_ep_i2c_apply_reconfig()`/`rcp_ep_i2c_reconfig_strerror()`/
+`rcp_ep_i2c_encode_reconfig_request()` mirror `ep_pwm.c`'s/
+`ep_gpio.c`'s/`ep_spi.c`'s own implementations exactly (same
+octet-granularity patch-then-adopt pattern, same read-only-offset
+handling, same "whole write ignored on overrun" rule). `i2c_base_clk`
+itself is not stored (no setter, no meaningful derivable value) and
+always renders 0, the same "no real clock source modelled" honesty
+`ep_gpio.h`'s own `gpio_base_clk` already commits to.
+
+**Bonus fix, bundled into the same REQ-I2C-019 finding since the
+original audit's own text named both gaps together**: Table 46's own
+fifth row, Ultra-fast mode (`i2c_mode` value 4, ~5 Mbit/s), carries no
+numbering ambiguity of its own (unlike the pre-existing, still-open
+High-speed-preset numbering question `ep_i2c.h`'s file header already
+flags) -- it was simply missing from `rcp_ep_i2c_mode_t` and
+unconditionally rejected by `rcp_ep_i2c_mode_valid()`. Added
+`RCP_EP_I2C_MODE_ULTRA_FAST = 4`; `rcp_ep_i2c_mode_valid()` now
+accepts 0..4.
+
+Two pre-existing deviation-pin tests independently anticipated this
+exact finding: `test_generic_config_request_implemented_endpoints`
+and `test_ep_len_overrun_rule_implemented_endpoints`
+(`tests/test_tc18_gaps_regmap.c`, renamed away from the
+ever-growing `..._is_pwm_out_gpio_and_spi` name this batch -- future
+endpoint-type fixes extend these same two tests without renaming them
+again), both extended with I2C's own now-correct assertions.
+`test_i2c_mode_presets_and_register_block` (`tests/test_tc18_gaps_ep.c`)
+previously pinned "no clock_divider/trail/base clock/status register,
+Ultra-fast rejected" as a deviation -- rewritten to confirm the struct
+*has* exactly that room now and Ultra-fast is accepted.
+`REQ-CFG-011`/`REQ-CFG-012` (the cross-endpoint generic evt=111b
+tracking entries) narrowed from "PWM_OUT, GPIO, and SPI" to "PWM_OUT,
+GPIO, SPI, and I2C" -- 4 of 11 endpoint types now implement it;
+UART/LIN/CAN/ADC/ISELED/MDIO/wakeup (7 remaining) are next.
+
+Mutation-tested: loosening the out-of-range bounds check by 4 octets
+reproduced the identical class of finding SPI's and GPIO's own
+equivalent checks produced in v0.216.0/v0.217.0 -- a real stack
+buffer overflow in the block-patching loop (silent SIGABRT, no test
+output at all, exit code 134), not a clean test failure. Restored,
+re-verified. Full suite (35/35 in `test_ep_i2c` alone, 65/65 overall)
+both trees (native + ASan/UBSan). `cfusa check` (CI-pinned v0.5.50):
+0 errors. `cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100`
+/ `--sec-tested 100`: both 100% (1024/1024) -- same pre-existing,
+non-blocking dangling-test-reference warnings and
+`REQ-LIFECYCLE-038`/`REQ-ADC-037` secondary-diagnostic entries as
+every prior batch this session; `REQ-I2C-021`/`REQ-I2C-022` (this
+batch's own new entries) do NOT appear in either list, confirming
+their test tags resolved correctly.
+
+**Progress: 84/156 findings resolved** (Groups H 12 + B 4 + A 17 +
+D 16 + F 7 + E 4 + C 16 + G 2 + I 6 = 84). Group I's own count moves
+from 5 to 6.

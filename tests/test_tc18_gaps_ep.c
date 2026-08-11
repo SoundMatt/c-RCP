@@ -488,11 +488,13 @@ static void test_spi_read_size_unused_and_no_error_latch(void)
 
 /* ── I2C endpoint (TC18 13.7.7) ───────────────────────────────────────────── */
 
-/* REQ-I2C-019 (partial) DEVIATION PIN: TC18 13.7.7.2 Table 46 defines an
- * Ultra-fast (5 Mbit/s) preset at i2c_mode value 4, which this library
- * rejects as invalid, and adds i2c_clock_divider (0x0006), i2c_trail
- * (0x0008), i2c_base_clk and i2c_ep_status -- none of which is modelled. The
- * functional config is the shared prefix plus i2c_mode and nothing else. */
+/* REQ-I2C-019 FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): TC18
+ * §13.7.7.2 Table 46's Ultra-fast (5 Mbit/s) preset at i2c_mode value 4 is
+ * now accepted, and the register block (i2c_clock_divider/i2c_trail/
+ * i2c_base_clk/i2c_ep_status) is now modelled via
+ * rcp_ep_i2c_render_registers()/_apply_reconfig() -- see
+ * ep_i2c.h's file header for the Table 46 address-collision resolution
+ * this required. */
 static void test_i2c_mode_presets_and_register_block(void)
 {
     rcp_ep_i2c_functional_cfg_t cfg;
@@ -504,21 +506,23 @@ static void test_i2c_mode_presets_and_register_block(void)
     TEST_ASSERT_TRUE(rcp_ep_i2c_mode_valid(1u));
     TEST_ASSERT_TRUE(rcp_ep_i2c_mode_valid(2u));
     TEST_ASSERT_TRUE(rcp_ep_i2c_mode_valid(3u));
-    /* Table 46's Ultra-fast (5 Mbit/s) preset: a conforming implementation
-     * accepts value 4. */
-    TEST_ASSERT_FALSE(rcp_ep_i2c_mode_valid(4u));
+    /* Table 46's Ultra-fast (5 Mbit/s) preset, value 4: now accepted. */
+    TEST_ASSERT_TRUE(rcp_ep_i2c_mode_valid(4u));
     TEST_ASSERT_FALSE(rcp_ep_i2c_mode_valid(5u));
     /* The two Table 46 rows both numbered 3 are resolved conservatively to
      * the lower numbering: High-speed sits immediately after Fast mode plus. */
     TEST_ASSERT_EQUAL_INT(2, (int)RCP_EP_I2C_MODE_FAST_PLUS);
     TEST_ASSERT_EQUAL_INT(3, (int)RCP_EP_I2C_MODE_HIGH_SPEED);
+    TEST_ASSERT_EQUAL_INT(4, (int)RCP_EP_I2C_MODE_ULTRA_FAST);
 
-    /* Struct exhaustiveness: prefix + i2c_mode, no divider/trail/base
-     * clock/status register. */
-    TEST_ASSERT_EQUAL_UINT(sizeof(rcp_regmap_ep_functional_cfg_t),
-                           offsetof(rcp_ep_i2c_functional_cfg_t, i2c_mode));
-    TEST_ASSERT_EQUAL_UINT(sizeof(cfg),
-                           offsetof(rcp_ep_i2c_functional_cfg_t, i2c_mode) + sizeof(cfg.i2c_mode));
+    /* Struct now HAS room for ep_status/clock_divider/trail beyond
+     * i2c_mode. */
+    cfg.ep_status     = 0x1234u;
+    cfg.clock_divider = 5u;
+    cfg.trail         = 6u;
+    TEST_ASSERT_EQUAL_UINT16(0x1234u, cfg.ep_status);
+    TEST_ASSERT_EQUAL_UINT8(5u, cfg.clock_divider);
+    TEST_ASSERT_EQUAL_UINT8(6u, cfg.trail);
 }
 
 /* REQ-I2C-020 (implemented): TC18 13.7.7.3 makes byte_msg_payload the
