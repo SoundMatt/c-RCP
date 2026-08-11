@@ -11821,3 +11821,88 @@ Issue #256's Group D is now fully closed (16/16, resolved without a
 fix). Moving to Group E next (WAKEUP SleepCMD wire format, 4
 findings -- also needs primary-source verification before any fix,
 following this same discipline).
+
+### v0.211.0 -- 2026-08-10
+
+**Full-catalog audit follow-up, batch 12 (Group E, real fix): SleepCMD
+request codec corrected to TC18 Figure 22's actual 1-byte wire form,
+issue #256.**
+
+Investigated Group E (`REQ-WAKEUP-010/011/012/013`). `pdftotext -layout`
+extraction of TC18 §13.7.2.3 Figure 22 ("Endpoint sleep request") did
+not capture bit-level structure the way it did for Figures 33/42, so
+the PDF page itself (physical page 85 of this codebase's own copy of
+the specification) was rendered and read directly: Figure 22 shows a
+SleepCMD request as exactly a 1-byte opcode followed by an
+undifferentiated "padding" region, with no second field of any kind.
+`ep_wakeup.h`/`.c` instead encoded/required a 2-byte payload -- opcode
+plus a second byte selecting a target `rcp_pwrmode_t` (Standby vs
+Sleep) -- that Figure 22 does not define at all. This was a real,
+interop-breaking bug, not a documentation gap: a genuinely conformant
+peer's own Figure-22-shaped SleepCMD request (opcode + zero-padding)
+would decode as `RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE` against the old,
+invented field. SleepCMD's own request/response text (§13.7.2.3) never
+once mentions Standby, only "bring the RC Server implementation to
+sleep mode" (twice) -- so the wire message is now modeled as meaning
+Sleep unconditionally.
+
+Fixed `rcp_ep_wakeup_encode_sleepcmd_request()`/
+`rcp_ep_wakeup_decode_sleepcmd_request()` (`ep_wakeup.h`/`.c`) to drop
+the `target_mode`/`out_target_mode` parameter entirely and encode/
+require only the fixed opcode byte; retired
+`RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE` (value 5 not reused, so no
+already-serialized error code silently changes meaning). SleepCMD's
+*response* side (`rcp_ep_wakeup_encode_sleepcmd_response()`/
+`_decode_sleepcmd_response()`) is unchanged -- TC18 defines no response
+wire format at all (the pre-existing gap `REQ-WAKEUP-019` already
+tracks that divergence honestly), so REQ-WAKEUP-012/013 needed no
+change.
+
+`rcp_powerstate_manager_encode_entry_request()` (`powerstate.c`,
+REQ-PWR-001) updated to match: a `RCP_PWRMODE_STANDBY` target now fails
+the same way an unregistered endpoint does (zeroed `rcp_bytes_t`, no
+pending state recorded) rather than silently routing Standby through a
+wire message that only ever means Sleep. TC18 §12.5 does describe a
+general RC-Client-initiated Standby-entry mechanism, but no wire
+encoding for it is defined anywhere this codebase's own copy of the
+specification covers -- a genuine, separately-tracked gap, not
+something this fix invents a new encoding for. The function's public
+signature is unchanged (still accepts `target_mode`); only its
+internal behavior for Standby changed from silently-wrong to
+honestly-failing. `adapt.c`'s `RCP_ADAPT_OP_WAKEUP_SLEEPCMD` encode
+case updated to match (no longer reads a now-meaningless
+`"rcp.wakeup.target_mode"` metadata field).
+
+Test fallout addressed across three files: `test_ep_wakeup.c` (dropped
+the Standby round-trip and NORMAL/UNPOWERED-rejection tests, which no
+longer apply at this layer; replaced the retired bad-target-mode test
+with `test_sleepcmd_request_decode_ignores_padding_content`, confirming
+byte 9's content genuinely doesn't affect decoding); `test_powerstate.c`
+(added `test_encode_entry_request_rejects_standby`, a new dedicated
+test for a *registered* endpoint -- distinct from the pre-existing
+unknown-endpoint test -- confirming Standby fails purely on mode, not
+on endpoint lookup; the STANDBY-assuming request/response round-trip
+tests switched to SLEEP); `test_tc18_gaps_server.c`
+(`test_sleep_entry_is_request_only_with_no_network_path` rewritten to
+test only what remains true at the ep_wakeup layer -- SleepCMD has no
+alternate network-triggered encoding -- since the StandBy-vs-Sleep
+selection itself now lives one layer up, in `powerstate.c`).
+
+Both real logic changes mutation-tested: reverting
+`rcp_ep_wakeup_decode_sleepcmd_request()` to its old 2-byte requirement
+was caught (3 failures); reverting
+`rcp_powerstate_manager_encode_entry_request()`'s Standby rejection to
+an unconditional pass-through was caught (1 failure, the new
+dedicated test). Full suite (65/65) both trees re-run after each
+revert-and-restore. `.fusa-reqs.json` unchanged count (1024 total,
+100% traced/tested per `cfusa trace`, 0 errors per `cfusa check`) --
+REQ-WAKEUP-010/011/REQ-PWR-001 rewritten as genuine, now-conformant
+fixes; REQ-WAKEUP-012/013 left as-is (already honestly citing the
+response-format gap via REQ-WAKEUP-019).
+
+Issue #256's Group E is now fully closed (4/4, a real fix). Moving to
+Group C next (the invented single-selectable "trigger" field, ~15
+findings -- an architecture question similar to the deferred GPIO
+`pin_property` precedent, likely needing the same
+investigate/document/possibly-defer treatment as this and the
+preceding groups).

@@ -5,8 +5,15 @@
 
 /* ── Wire-layout constants (this module's own choice; see the file header) ── */
 
-#define SLEEPCMD_PAYLOAD_LEN ((size_t)2u) /* opcode(1) + target_mode(1) */
-#define WAKEUP_PAYLOAD_LEN   ((size_t)1u) /* opcode(1) */
+/* REQ-WAKEUP-010/011 (corrected 2026-08-10, c-RCP-AUDIT-06, issue #256
+ * Group E): the request payload is 1 byte (opcode only, padded to the
+ * next quadlet by rcp_acf_encode_abb() itself) -- TC18 §13.7.2.3 Figure
+ * 22 shows no second payload byte at all; the response's own 2-byte
+ * (opcode + result) layout remains this module's own original design
+ * (TC18 defines no response wire format), so it keeps its own constant. */
+#define SLEEPCMD_REQUEST_PAYLOAD_LEN  ((size_t)1u) /* opcode(1) */
+#define SLEEPCMD_RESPONSE_PAYLOAD_LEN ((size_t)2u) /* opcode(1) + result(1) */
+#define WAKEUP_PAYLOAD_LEN            ((size_t)1u) /* opcode(1) */
 
 /* ── Wake-source pin configuration/monitoring ────────────────────────────────── */
 
@@ -91,7 +98,6 @@ const char *rcp_ep_wakeup_strerror(rcp_ep_wakeup_errc_t e)
     case RCP_EP_WAKEUP_ERR_BAD_MSG_TYPE:    return "rcp/ep_wakeup: unexpected ACF message type";
     case RCP_EP_WAKEUP_ERR_WRONG_BUS:       return "rcp/ep_wakeup: wrong byte_bus_id";
     case RCP_EP_WAKEUP_ERR_BAD_OPCODE:      return "rcp/ep_wakeup: wrong fixed opcode byte";
-    case RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE: return "rcp/ep_wakeup: invalid SleepCMD target mode";
     default:                                return "rcp/ep_wakeup: unknown error";
     }
 }
@@ -100,17 +106,12 @@ const char *rcp_ep_wakeup_strerror(rcp_ep_wakeup_errc_t e)
 
 //cfusa:req REQ-WAKEUP-010
 rcp_bytes_t rcp_ep_wakeup_encode_sleepcmd_request(rcp_byte_bus_id_t byte_bus_id,
-                                                   rcp_pwrmode_t target_mode,
                                                    uint8_t transaction_num)
 {
-    rcp_bytes_t                 frame = {0};
     rcp_acf_byte_message_info_t hdr   = {0};
-    uint8_t                     payload[SLEEPCMD_PAYLOAD_LEN];
-
-    if (target_mode != RCP_PWRMODE_STANDBY && target_mode != RCP_PWRMODE_SLEEP) return frame;
+    uint8_t                     payload[SLEEPCMD_REQUEST_PAYLOAD_LEN];
 
     payload[0] = RCP_EP_WAKEUP_SLEEPCMD_OPCODE;
-    payload[1] = (uint8_t)target_mode;
 
     hdr.byte_bus_id     = byte_bus_id;
     hdr.op              = RCP_ACF_OP_NONE;
@@ -122,28 +123,21 @@ rcp_bytes_t rcp_ep_wakeup_encode_sleepcmd_request(rcp_byte_bus_id_t byte_bus_id,
 //cfusa:req REQ-WAKEUP-011
 rcp_ep_wakeup_errc_t rcp_ep_wakeup_decode_sleepcmd_request(const uint8_t *b, size_t len,
                                                             rcp_byte_bus_id_t expected_bus_id,
-                                                            rcp_pwrmode_t *out_target_mode,
                                                             uint8_t *out_transaction_num)
 {
     rcp_acf_byte_message_info_t hdr;
     const uint8_t               *payload;
     size_t                       payload_len;
     rcp_acf_errc_t               acf_rc;
-    uint8_t                      raw_mode;
 
     acf_rc = rcp_acf_decode_abb(b, len, &hdr, &payload, &payload_len);
     if (acf_rc == RCP_ACF_ERR_SHORT_FRAME) return RCP_EP_WAKEUP_ERR_SHORT_FRAME;
     if (acf_rc != RCP_ACF_OK) return RCP_EP_WAKEUP_ERR_BAD_MSG_TYPE;
 
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_WAKEUP_ERR_WRONG_BUS;
-    if (payload_len < SLEEPCMD_PAYLOAD_LEN) return RCP_EP_WAKEUP_ERR_SHORT_FRAME;
+    if (payload_len < SLEEPCMD_REQUEST_PAYLOAD_LEN) return RCP_EP_WAKEUP_ERR_SHORT_FRAME;
     if (payload[0] != RCP_EP_WAKEUP_SLEEPCMD_OPCODE) return RCP_EP_WAKEUP_ERR_BAD_OPCODE;
 
-    raw_mode = payload[1];
-    if (raw_mode != (uint8_t)RCP_PWRMODE_STANDBY && raw_mode != (uint8_t)RCP_PWRMODE_SLEEP)
-        return RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE;
-
-    *out_target_mode     = (rcp_pwrmode_t)raw_mode;
     *out_transaction_num = hdr.transaction_num;
     return RCP_EP_WAKEUP_OK;
 }
@@ -154,7 +148,7 @@ rcp_bytes_t rcp_ep_wakeup_encode_sleepcmd_response(rcp_byte_bus_id_t byte_bus_id
                                                     uint8_t transaction_num)
 {
     rcp_acf_byte_message_info_t hdr = {0};
-    uint8_t                     payload[SLEEPCMD_PAYLOAD_LEN];
+    uint8_t                     payload[SLEEPCMD_RESPONSE_PAYLOAD_LEN];
 
     payload[0] = RCP_EP_WAKEUP_SLEEPCMD_OPCODE;
     payload[1] = (uint8_t)result;
@@ -183,7 +177,7 @@ rcp_ep_wakeup_errc_t rcp_ep_wakeup_decode_sleepcmd_response(const uint8_t *b, si
     if (acf_rc != RCP_ACF_OK) return RCP_EP_WAKEUP_ERR_BAD_MSG_TYPE;
 
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_WAKEUP_ERR_WRONG_BUS;
-    if (payload_len < SLEEPCMD_PAYLOAD_LEN) return RCP_EP_WAKEUP_ERR_SHORT_FRAME;
+    if (payload_len < SLEEPCMD_RESPONSE_PAYLOAD_LEN) return RCP_EP_WAKEUP_ERR_SHORT_FRAME;
     if (payload[0] != RCP_EP_WAKEUP_SLEEPCMD_OPCODE) return RCP_EP_WAKEUP_ERR_BAD_OPCODE;
 
     *out_result = (payload[1] == (uint8_t)RCP_PWRMODE_ENTRY_OK) ? RCP_PWRMODE_ENTRY_OK

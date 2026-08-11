@@ -41,9 +41,11 @@
  *
  *   - rcp_powerstate_manager_encode_entry_request() /
  *     _apply_entry_response() drive a client-initiated request that a
- *     remote RC Server enter RCP_PWRMODE_STANDBY/_SLEEP, applying
- *     power.h's own rcp_pwrmode_transition() once the matching response
- *     arrives.
+ *     remote RC Server enter RCP_PWRMODE_SLEEP (RCP_PWRMODE_STANDBY has
+ *     no wire encoding this function can produce -- corrected
+ *     2026-08-10, c-RCP-AUDIT-06, issue #256; see that function's own
+ *     doc comment below), applying power.h's own rcp_pwrmode_transition()
+ *     once the matching response arrives.
  *   - rcp_powerstate_manager_wake_via_network() drives power.h's
  *     network-level wake path, consulting addr's own real handshake
  *     state exactly as _wake_via_pin() does below -- REQ-PWRMODE-020:
@@ -140,13 +142,21 @@ rcp_pwrmode_t rcp_powerstate_manager_mode(rcp_powerstate_manager_t *m, rcp_avtp_
 
 /* ── Client-initiated StandBy/Sleep entry ─────────────────────────────────── */
 
-/* Encodes a SleepCMD request asking addr to enter target_mode
- * (RCP_PWRMODE_STANDBY or RCP_PWRMODE_SLEEP), remembering target_mode and
- * transaction_num internally so a later _apply_entry_response() call can
- * apply the right transition. Returns a zeroed rcp_bytes_t (data=NULL) if
- * addr was not registered with m, if target_mode is neither StandBy nor
- * Sleep, or on allocation failure; in every such case no pending state is
- * recorded. Caller sends the returned bytes over whatever
+/* Encodes a SleepCMD request asking addr to enter target_mode,
+ * remembering target_mode and transaction_num internally so a later
+ * _apply_entry_response() call can apply the right transition. Returns a
+ * zeroed rcp_bytes_t (data=NULL) if addr was not registered with m, if
+ * target_mode is not RCP_PWRMODE_SLEEP, or on allocation failure; in
+ * every such case no pending state is recorded. Corrected 2026-08-10
+ * (c-RCP-AUDIT-06, issue #256 Group E): target_mode == RCP_PWRMODE_STANDBY
+ * now always fails -- the WakeUp endpoint's own SleepCMD wire message
+ * (ep_wakeup.h, TC18 §13.7.2.3 Figure 22) has no target-mode field at
+ * all and only ever means Sleep; TC18 §12.5 describes a general
+ * RC-Client-initiated Standby-entry mechanism, but no wire encoding for
+ * it is defined anywhere this codebase's own copy of the specification
+ * covers, so this function cannot honestly produce one -- it previously
+ * silently routed a Standby request through the sleep-only wire
+ * message instead. Caller sends the returned bytes over whatever
  * rcp_avtp_transport_t (framed as an AVTPDU first, via avtp.h) it owns. */
 rcp_bytes_t rcp_powerstate_manager_encode_entry_request(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
                                                           rcp_pwrmode_t target_mode, uint8_t transaction_num);

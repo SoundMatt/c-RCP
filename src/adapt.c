@@ -379,13 +379,14 @@ rcp_bytes_t rcp_message_to_request(rcp_adapt_op_t op, rcp_byte_bus_id_t byte_bus
         break;
     }
 
-    case RCP_ADAPT_OP_WAKEUP_SLEEPCMD: {
-        uint32_t target_mode;
-        if (!meta_get_u32(msg, "rcp.wakeup.target_mode", &target_mode)) return fail_encode(out_err);
-        result = rcp_ep_wakeup_encode_sleepcmd_request(byte_bus_id, (rcp_pwrmode_t)target_mode,
-                                                        transaction_num);
+    case RCP_ADAPT_OP_WAKEUP_SLEEPCMD:
+        /* REQ-WAKEUP-010 (corrected 2026-08-10, c-RCP-AUDIT-06, issue
+         * #256 Group E): the WakeUp endpoint's own SleepCMD wire message
+         * carries no target-mode field at all (TC18 §13.7.2.3 Figure 22)
+         * -- this op no longer reads a "rcp.wakeup.target_mode" metadata
+         * field, since there is nothing left to select. */
+        result = rcp_ep_wakeup_encode_sleepcmd_request(byte_bus_id, transaction_num);
         break;
-    }
 
     case RCP_ADAPT_OP_WAKEUP_WAKEUP:
         result = rcp_ep_wakeup_encode_wakeup_message(byte_bus_id, transaction_num);

@@ -34,6 +34,10 @@ the rationale.
 
 ## Releases
 
+### v0.211.0 -- 2026-08-10
+
+Full-catalog audit follow-up, batch 12 (Group E, real fix): the WakeUp endpoint's SleepCMD request wire codec dropped its invented 2-byte (opcode + target_mode) payload for the TC18 §13.7.2.3 Figure 22-conformant 1-byte (opcode only) form, confirmed directly against the rendered PDF page image -- SleepCMD now unconditionally means Sleep, closing a real interop-breaking bug (a genuinely conformant peer's own request would previously have been rejected as RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE, a code now retired). `rcp_powerstate_manager_encode_entry_request()` correspondingly now honestly fails for a `RCP_PWRMODE_STANDBY` target (no wire encoding exists for it) instead of silently routing it through a wire message that only ever means Sleep. REQ-WAKEUP-010/011/REQ-PWR-001 rewritten as genuine fixes; REQ-WAKEUP-012/013 (the response side, still original design, TC18 defines no response format at all) left unchanged. Issue #256 Group E now fully closed (4/4). See `ROADMAP.md` for full detail.
+
 ### v0.210.0 -- 2026-08-10
 
 Full-catalog audit follow-up, batch 11 (Group D, no code change): MDIO's 16 findings closed by honest citation/cross-reference correction, not a wire-format rewrite. Issue #256 Group D now fully closed. See `ROADMAP.md` for full detail.
