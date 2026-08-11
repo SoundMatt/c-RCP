@@ -149,116 +149,94 @@ static void test_strerror_nonnull_for_every_code(void)
     TEST_ASSERT_NOT_NULL(rcp_ep_wakeup_strerror(RCP_EP_WAKEUP_ERR_BAD_MSG_TYPE));
     TEST_ASSERT_NOT_NULL(rcp_ep_wakeup_strerror(RCP_EP_WAKEUP_ERR_WRONG_BUS));
     TEST_ASSERT_NOT_NULL(rcp_ep_wakeup_strerror(RCP_EP_WAKEUP_ERR_BAD_OPCODE));
-    TEST_ASSERT_NOT_NULL(rcp_ep_wakeup_strerror(RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE));
+    /* RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE retired 2026-08-10 (c-RCP-AUDIT-06,
+     * issue #256 Group E) -- see include/rcp/ep_wakeup.h. */
     TEST_ASSERT_NOT_NULL(rcp_ep_wakeup_strerror((rcp_ep_wakeup_errc_t)99));
 }
 
 /* ── SleepCMD request round trip ──────────────────────────────────────────────── */
 
-static void test_sleepcmd_request_round_trip_standby(void)
+/* TC18 §13.7.2.3 Figure 22: SleepCMD is a 1-byte opcode + padding, with
+ * no target-mode field at all -- corrected 2026-08-10 (c-RCP-AUDIT-06,
+ * issue #256 Group E). This request unconditionally means Sleep; the
+ * former test_sleepcmd_request_round_trip_standby() and
+ * test_sleepcmd_request_encode_rejects_normal_and_unpowered() no longer
+ * apply, since there is no mode parameter left to be Standby, Normal, or
+ * Unpowered. */
+static void test_sleepcmd_request_round_trip(void)
 {
-    rcp_bytes_t          frame;
-    rcp_pwrmode_t        out_mode;
-    uint8_t              out_tn;
+    rcp_bytes_t frame;
+    uint8_t     out_tn;
 
-    frame = rcp_ep_wakeup_encode_sleepcmd_request(BUS_ID, RCP_PWRMODE_STANDBY, 5);
+    frame = rcp_ep_wakeup_encode_sleepcmd_request(BUS_ID, 9);
     TEST_ASSERT_NOT_NULL(frame.data);
     TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_SLEEPCMD_OPCODE, frame.data[8]); /* payload starts right after ABB header */
 
     TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_OK,
-                       rcp_ep_wakeup_decode_sleepcmd_request(frame.data, frame.len, BUS_ID, &out_mode, &out_tn));
-    TEST_ASSERT_EQUAL(RCP_PWRMODE_STANDBY, out_mode);
-    TEST_ASSERT_EQUAL_UINT8(5, out_tn);
+                       rcp_ep_wakeup_decode_sleepcmd_request(frame.data, frame.len, BUS_ID, &out_tn));
+    TEST_ASSERT_EQUAL_UINT8(9, out_tn);
 
     rcp_bytes_free(&frame);
-}
-
-static void test_sleepcmd_request_round_trip_sleep(void)
-{
-    rcp_bytes_t   frame;
-    rcp_pwrmode_t out_mode;
-    uint8_t       out_tn;
-
-    frame = rcp_ep_wakeup_encode_sleepcmd_request(BUS_ID, RCP_PWRMODE_SLEEP, 9);
-    TEST_ASSERT_NOT_NULL(frame.data);
-
-    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_OK,
-                       rcp_ep_wakeup_decode_sleepcmd_request(frame.data, frame.len, BUS_ID, &out_mode, &out_tn));
-    TEST_ASSERT_EQUAL(RCP_PWRMODE_SLEEP, out_mode);
-
-    rcp_bytes_free(&frame);
-}
-
-static void test_sleepcmd_request_encode_rejects_normal_and_unpowered(void)
-{
-    rcp_bytes_t frame;
-
-    frame = rcp_ep_wakeup_encode_sleepcmd_request(BUS_ID, RCP_PWRMODE_NORMAL, 0);
-    TEST_ASSERT_NULL(frame.data);
-
-    frame = rcp_ep_wakeup_encode_sleepcmd_request(BUS_ID, RCP_PWRMODE_UNPOWERED, 0);
-    TEST_ASSERT_NULL(frame.data);
 }
 
 static void test_sleepcmd_request_decode_wrong_bus(void)
 {
-    rcp_bytes_t   frame;
-    rcp_pwrmode_t out_mode;
-    uint8_t       out_tn;
+    rcp_bytes_t frame;
+    uint8_t     out_tn;
 
-    frame = rcp_ep_wakeup_encode_sleepcmd_request(BUS_ID, RCP_PWRMODE_SLEEP, 1);
+    frame = rcp_ep_wakeup_encode_sleepcmd_request(BUS_ID, 1);
     TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_ERR_WRONG_BUS,
-                       rcp_ep_wakeup_decode_sleepcmd_request(frame.data, frame.len, BUS_ID + 1, &out_mode, &out_tn));
+                       rcp_ep_wakeup_decode_sleepcmd_request(frame.data, frame.len, BUS_ID + 1, &out_tn));
     rcp_bytes_free(&frame);
 }
 
 static void test_sleepcmd_request_decode_short_frame(void)
 {
-    rcp_pwrmode_t out_mode;
-    uint8_t       out_tn;
-    uint8_t       tiny[3] = {0};
+    uint8_t out_tn;
+    uint8_t tiny[3] = {0};
 
     TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_ERR_SHORT_FRAME,
-                       rcp_ep_wakeup_decode_sleepcmd_request(tiny, sizeof(tiny), BUS_ID, &out_mode, &out_tn));
+                       rcp_ep_wakeup_decode_sleepcmd_request(tiny, sizeof(tiny), BUS_ID, &out_tn));
 }
 
 static void test_sleepcmd_request_decode_bad_opcode(void)
 {
-    rcp_bytes_t   frame;
-    rcp_pwrmode_t out_mode;
-    uint8_t       out_tn;
+    rcp_bytes_t frame;
+    uint8_t     out_tn;
 
-    frame = rcp_ep_wakeup_encode_sleepcmd_request(BUS_ID, RCP_PWRMODE_SLEEP, 1);
+    frame = rcp_ep_wakeup_encode_sleepcmd_request(BUS_ID, 1);
     frame.data[8] = 0x00; /* corrupt the fixed opcode byte */
 
     TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_ERR_BAD_OPCODE,
-                       rcp_ep_wakeup_decode_sleepcmd_request(frame.data, frame.len, BUS_ID, &out_mode, &out_tn));
+                       rcp_ep_wakeup_decode_sleepcmd_request(frame.data, frame.len, BUS_ID, &out_tn));
     rcp_bytes_free(&frame);
 }
 
-static void test_sleepcmd_request_decode_bad_target_mode(void)
+/* Figure 22's own padding region carries no meaning at all -- decoding
+ * must succeed regardless of its content, confirming this fix actually
+ * removed the byte-9 validation the old (wrong) target-mode check
+ * performed. Replaces the retired test_sleepcmd_request_decode_bad_target_mode(). */
+static void test_sleepcmd_request_decode_ignores_padding_content(void)
 {
-    rcp_bytes_t   frame;
-    rcp_pwrmode_t out_mode;
-    uint8_t       out_tn;
+    rcp_bytes_t frame;
+    uint8_t     out_tn;
 
-    frame = rcp_ep_wakeup_encode_sleepcmd_request(BUS_ID, RCP_PWRMODE_SLEEP, 1);
-    frame.data[9] = (uint8_t)RCP_PWRMODE_NORMAL; /* corrupt the target-mode byte */
+    frame = rcp_ep_wakeup_encode_sleepcmd_request(BUS_ID, 1);
+    frame.data[9] = 0xFFu; /* arbitrary padding content -- must not affect the outcome */
 
-    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE,
-                       rcp_ep_wakeup_decode_sleepcmd_request(frame.data, frame.len, BUS_ID, &out_mode, &out_tn));
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_OK,
+                       rcp_ep_wakeup_decode_sleepcmd_request(frame.data, frame.len, BUS_ID, &out_tn));
     rcp_bytes_free(&frame);
 }
 
 static void test_sleepcmd_request_decode_wrong_msg_type(void)
 {
-    rcp_pwrmode_t out_mode;
-    uint8_t       out_tn;
-    uint8_t       gbb[16 + 2] = {0};
+    uint8_t out_tn;
+    uint8_t gbb[16 + 2] = {0};
 
     gbb[0] = RCP_ACF_MSG_TYPE_GBB;
     TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_ERR_BAD_MSG_TYPE,
-                       rcp_ep_wakeup_decode_sleepcmd_request(gbb, sizeof(gbb), BUS_ID, &out_mode, &out_tn));
+                       rcp_ep_wakeup_decode_sleepcmd_request(gbb, sizeof(gbb), BUS_ID, &out_tn));
 }
 
 /* ── SleepCMD response round trip ─────────────────────────────────────────────── */
@@ -380,7 +358,7 @@ static void test_is_wakeup_echo_false_on_decode_failure(void)
 
 static void test_is_wakeup_echo_false_for_sleepcmd_frame(void)
 {
-    rcp_bytes_t frame = rcp_ep_wakeup_encode_sleepcmd_request(BUS_ID, RCP_PWRMODE_SLEEP, 17);
+    rcp_bytes_t frame = rcp_ep_wakeup_encode_sleepcmd_request(BUS_ID, 17);
 
     TEST_ASSERT_FALSE(rcp_ep_wakeup_is_wakeup_echo(frame.data, frame.len, BUS_ID, 17));
     rcp_bytes_free(&frame);
@@ -402,13 +380,11 @@ int main(void)
 
     RUN_TEST(test_strerror_nonnull_for_every_code);
 
-    RUN_TEST(test_sleepcmd_request_round_trip_standby);
-    RUN_TEST(test_sleepcmd_request_round_trip_sleep);
-    RUN_TEST(test_sleepcmd_request_encode_rejects_normal_and_unpowered);
+    RUN_TEST(test_sleepcmd_request_round_trip);
     RUN_TEST(test_sleepcmd_request_decode_wrong_bus);
     RUN_TEST(test_sleepcmd_request_decode_short_frame);
     RUN_TEST(test_sleepcmd_request_decode_bad_opcode);
-    RUN_TEST(test_sleepcmd_request_decode_bad_target_mode);
+    RUN_TEST(test_sleepcmd_request_decode_ignores_padding_content);
     RUN_TEST(test_sleepcmd_request_decode_wrong_msg_type);
 
     RUN_TEST(test_sleepcmd_response_round_trip_ok);

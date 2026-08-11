@@ -89,21 +89,42 @@
  * as a request kind fixed and distinct from it. This module therefore
  * gives SleepCMD its own dedicated wire encoding entirely outside that
  * shared byte-repurposing convention: an ordinary ACF_ABB message (op =
- * RCP_ACF_OP_NONE) whose payload is exactly two octets -- the fixed
- * `RCP_EP_WAKEUP_SLEEPCMD_OPCODE` (0xA5) marker byte, then one byte
- * carrying the requested target rcp_pwrmode_t (power.h) value, which must
- * be RCP_PWRMODE_STANDBY or RCP_PWRMODE_SLEEP (SleepCMD's own purpose is
- * requesting entry into one of the two low-power modes; it is not a
- * general-purpose mode-set command -- Normal/Unpowered targets are
- * rejected with RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE). A SleepCMD response
- * carries the same marker byte followed by one byte encoding the
- * power.h rcp_pwrmode_entry_result_t outcome of
+ * RCP_ACF_OP_NONE) whose payload is exactly the fixed
+ * `RCP_EP_WAKEUP_SLEEPCMD_OPCODE` (0xA5) marker byte, then padding to the
+ * next quadlet boundary -- TC18 §13.7.2.3 Figure 22 ("Endpoint sleep
+ * request") shows a single-byte SleepCMD followed by a plain, generic
+ * "padding" region with no further structure, directly confirmed against
+ * the rendered PDF page image (not just its text extraction). CORRECTED
+ * 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group E): this codec previously
+ * encoded/required a second payload byte selecting a target rcp_pwrmode_t
+ * (STANDBY vs SLEEP) that Figure 22 does not define at all -- a real
+ * interop-breaking bug, since a genuinely conformant peer's own
+ * Figure-22-shaped SleepCMD request (opcode + zero-padding) would decode
+ * as RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE against the old, invented field.
+ * SleepCMD's own request/response text (§13.7.2.3) never once mentions
+ * Standby -- only "bring the RC Server implementation to sleep mode",
+ * twice -- so this wire message is now modeled as meaning Sleep
+ * unconditionally; TC18's separate §12.5 ("Goto Sleep / Goto Standby
+ * behavior") does describe a general RC-Client-initiated Standby-entry
+ * mechanism, but no text found in this codebase's own copy of the
+ * specification defines that mechanism's own wire encoding (a genuine,
+ * separately-tracked gap -- see rcp_powerstate_manager_encode_entry_request()
+ * in powerstate.h, REQ-PWR-001, which now honestly fails for a
+ * RCP_PWRMODE_STANDBY target rather than routing it through this
+ * sleep-only wire message as before).
+ *
+ * A SleepCMD response carries the same marker byte followed by one byte
+ * encoding the power.h rcp_pwrmode_entry_result_t outcome of
  * rcp_pwrmode_check_entry() -- RCP_PWRMODE_ENTRY_OK or
  * RCP_PWRMODE_ENTRY_REFUSED (the roadmap's REQUEST_CANCELED) -- letting a
  * caller apply that gate (power.h) and report its outcome back over this
  * same dedicated request/response pair, entirely independent of
  * request_cancel.h's own, differently-shaped cancellation-result
- * reporting.
+ * reporting. Unlike the request, TC18 defines NO wire format at all for
+ * this acknowledge -- §13.7.2.3 says only "send an acknowledge to sleep
+ * request" in prose, with no figure or table of its own -- so this
+ * response byte layout remains this module's own original design choice,
+ * not a TC18-derived one, same as before this correction.
  *
  * ── WakeUp-message emission replaces the generic trigger-signal table ───────
  *
@@ -244,7 +265,12 @@ typedef enum {
     RCP_EP_WAKEUP_ERR_BAD_MSG_TYPE    = 2,
     RCP_EP_WAKEUP_ERR_WRONG_BUS       = 3,
     RCP_EP_WAKEUP_ERR_BAD_OPCODE      = 4,
-    RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE = 5,
+    /* RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE = 5 retired 2026-08-10
+     * (c-RCP-AUDIT-06, issue #256 Group E): the target-mode byte it
+     * guarded never existed on the wire per TC18 Figure 22 -- see the
+     * file header. Value 5 is not reused, to avoid silently changing the
+     * meaning of any already-serialized error code a caller might have
+     * logged or compared against. */
 } rcp_ep_wakeup_errc_t;
 
 /* Human-readable message for an rcp_ep_wakeup_errc_t value. Never returns NULL. */
@@ -274,29 +300,29 @@ const char *rcp_ep_wakeup_strerror(rcp_ep_wakeup_errc_t e);
  * an unauthorized writer's request never reaches that gate at all. */
 bool rcp_ep_wakeup_sleepcmd_writable(rcp_lifecycle_writer_ctx_t writer);
 
-/* Encodes an ACF_ABB SleepCMD request addressed to byte_bus_id: a 2-byte
- * payload of RCP_EP_WAKEUP_SLEEPCMD_OPCODE followed by target_mode's own
- * raw rcp_pwrmode_t value -- see the file header's wire-layout
- * discussion. Returns a zeroed rcp_bytes_t (data=NULL) if target_mode is
- * neither RCP_PWRMODE_STANDBY nor RCP_PWRMODE_SLEEP, or on allocation
- * failure. */
+/* Encodes an ACF_ABB SleepCMD request addressed to byte_bus_id: a 1-byte
+ * payload of RCP_EP_WAKEUP_SLEEPCMD_OPCODE, padded to the next quadlet
+ * boundary by rcp_acf_encode_abb() itself -- see the file header's
+ * wire-layout discussion (TC18 §13.7.2.3 Figure 22). Unconditionally
+ * requests Sleep entry; there is no target-mode selector on this wire
+ * message (corrected 2026-08-10, c-RCP-AUDIT-06, issue #256 Group E --
+ * see the file header). Returns a zeroed rcp_bytes_t (data=NULL) only on
+ * allocation failure. */
 rcp_bytes_t rcp_ep_wakeup_encode_sleepcmd_request(rcp_byte_bus_id_t byte_bus_id,
-                                                   rcp_pwrmode_t target_mode,
                                                    uint8_t transaction_num);
 
 /* Decodes and validates an ACF-level SleepCMD request from b[0..len).
  * Fails with RCP_EP_WAKEUP_ERR_SHORT_FRAME if b is shorter than the
- * ACF_ABB fixed header or its declared 2-byte payload;
+ * ACF_ABB fixed header or its declared 1-byte payload;
  * RCP_EP_WAKEUP_ERR_BAD_MSG_TYPE if b is not an ACF_ABB message;
  * RCP_EP_WAKEUP_ERR_WRONG_BUS if its byte_bus_id != expected_bus_id;
  * RCP_EP_WAKEUP_ERR_BAD_OPCODE if the payload's first byte is not
- * RCP_EP_WAKEUP_SLEEPCMD_OPCODE; RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE if the
- * decoded target mode is neither RCP_PWRMODE_STANDBY nor
- * RCP_PWRMODE_SLEEP. On RCP_EP_WAKEUP_OK, *out_target_mode and
- * *out_transaction_num are populated. */
+ * RCP_EP_WAKEUP_SLEEPCMD_OPCODE. On RCP_EP_WAKEUP_OK, *out_transaction_num
+ * is populated. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group
+ * E): no target-mode byte is validated or returned anymore -- see the
+ * file header. */
 rcp_ep_wakeup_errc_t rcp_ep_wakeup_decode_sleepcmd_request(const uint8_t *b, size_t len,
                                                             rcp_byte_bus_id_t expected_bus_id,
-                                                            rcp_pwrmode_t *out_target_mode,
                                                             uint8_t *out_transaction_num);
 
 /* Encodes an ACF_ABB SleepCMD response carrying result (power.h's

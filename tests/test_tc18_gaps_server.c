@@ -671,23 +671,26 @@ static void test_network_wake_now_requires_the_same_handshake_as_pin(void)
 static void test_sleep_entry_is_request_only_with_no_network_path(void)
 {
     const rcp_byte_bus_id_t bus = (rcp_byte_bus_id_t)3u;
-    rcp_bytes_t             req = rcp_ep_wakeup_encode_sleepcmd_request(bus,
-                                                                       RCP_PWRMODE_STANDBY, 4u);
-    rcp_bytes_t             bad;
-    rcp_pwrmode_t           target = RCP_PWRMODE_NORMAL;
-    uint8_t                 tn     = 0u;
+    rcp_bytes_t             req = rcp_ep_wakeup_encode_sleepcmd_request(bus, 4u);
+    uint8_t                 tn  = 0u;
 
     /* TC18 §12.5: StandBy is entered only in response to an RCP request,
-     * never from a network signal -- the SleepCMD exchange is the only
-     * modelled StandBy entry, and a target mode outside {StandBy, Sleep}
-     * is refused outright. */
+     * never from a network signal. Corrected 2026-08-10 (c-RCP-AUDIT-06,
+     * issue #256 Group E): TC18 §13.7.2.3 Figure 22's SleepCMD wire
+     * message carries no target-mode field at all -- it unconditionally
+     * means Sleep, so there is no longer a wire-level "target mode
+     * outside {StandBy, Sleep}" for this layer to refuse. The
+     * StandBy-vs-Sleep selection (and StandBy's outright rejection, since
+     * it has no wire encoding at all) now lives one layer up, in
+     * rcp_powerstate_manager_encode_entry_request() -- see
+     * test_encode_entry_request_rejects_standby() in test_powerstate.c.
+     * What remains true and testable at *this* layer is the other half of
+     * the deviation pin: SleepCMD is a fixed request/response exchange
+     * with no alternate network-triggered wire encoding at all. */
     TEST_ASSERT_NOT_NULL(req.data);
     TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_OK,
-                      rcp_ep_wakeup_decode_sleepcmd_request(req.data, req.len, bus, &target, &tn));
-    TEST_ASSERT_EQUAL(RCP_PWRMODE_STANDBY, target);
+                      rcp_ep_wakeup_decode_sleepcmd_request(req.data, req.len, bus, &tn));
     TEST_ASSERT_EQUAL_UINT8(4u, tn);
-    bad = rcp_ep_wakeup_encode_sleepcmd_request(bus, RCP_PWRMODE_NORMAL, 4u);
-    TEST_ASSERT_NULL(bad.data);
 
     rcp_bytes_free(&req);
 }

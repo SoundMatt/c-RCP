@@ -102,6 +102,24 @@ static void test_mode_unknown_endpoint_is_normal(void)
 static void test_encode_entry_request_unknown_endpoint_is_zeroed(void)
 {
     rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(NULL, 0);
+    rcp_bytes_t frame = rcp_powerstate_manager_encode_entry_request(m, ADDR, RCP_PWRMODE_SLEEP, 1);
+
+    TEST_ASSERT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(0, frame.len);
+
+    rcp_powerstate_manager_destroy(m);
+}
+
+/* REQ-WAKEUP-010 (corrected 2026-08-10, c-RCP-AUDIT-06, issue #256 Group
+ * E): SleepCMD's TC18 wire form (§13.7.2.3 Figure 22) has no
+ * target-mode field at all and unconditionally means Sleep, so
+ * RCP_PWRMODE_STANDBY can no longer be encoded onto the wire by this
+ * function -- even for an endpoint that is otherwise known/registered. */
+//cfusa:test REQ-PWR-001
+static void test_encode_entry_request_rejects_standby(void)
+{
+    rcp_avtp_addr_t endpoints[] = {ADDR};
+    rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(endpoints, 1);
     rcp_bytes_t frame = rcp_powerstate_manager_encode_entry_request(m, ADDR, RCP_PWRMODE_STANDBY, 1);
 
     TEST_ASSERT_NULL(frame.data);
@@ -116,7 +134,6 @@ static void test_encode_entry_request_round_trips_via_ep_wakeup(void)
     rcp_avtp_addr_t endpoints[] = {ADDR};
     rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(endpoints, 1);
     rcp_bytes_t frame;
-    rcp_pwrmode_t out_mode;
     uint8_t out_txn;
 
     frame = rcp_powerstate_manager_encode_entry_request(m, ADDR, RCP_PWRMODE_SLEEP, 7);
@@ -124,8 +141,7 @@ static void test_encode_entry_request_round_trips_via_ep_wakeup(void)
 
     TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_OK,
                        rcp_ep_wakeup_decode_sleepcmd_request(frame.data, frame.len, ADDR.byte_bus_id,
-                                                              &out_mode, &out_txn));
-    TEST_ASSERT_EQUAL(RCP_PWRMODE_SLEEP, out_mode);
+                                                              &out_txn));
     TEST_ASSERT_EQUAL(7, out_txn);
 
     rcp_bytes_free(&frame);
@@ -139,7 +155,7 @@ static void test_apply_entry_response_ok_transitions_mode(void)
     rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(endpoints, 1);
     rcp_bytes_t req, resp;
 
-    req = rcp_powerstate_manager_encode_entry_request(m, ADDR, RCP_PWRMODE_STANDBY, 3);
+    req = rcp_powerstate_manager_encode_entry_request(m, ADDR, RCP_PWRMODE_SLEEP, 3);
     TEST_ASSERT_NOT_NULL(req.data);
     rcp_bytes_free(&req);
 
@@ -148,7 +164,7 @@ static void test_apply_entry_response_ok_transitions_mode(void)
 
     TEST_ASSERT_EQUAL(RCP_POWERSTATE_OK,
                        rcp_powerstate_manager_apply_entry_response(m, ADDR, resp.data, resp.len));
-    TEST_ASSERT_EQUAL(RCP_PWRMODE_STANDBY, rcp_powerstate_manager_mode(m, ADDR));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_SLEEP, rcp_powerstate_manager_mode(m, ADDR));
 
     rcp_bytes_free(&resp);
     rcp_powerstate_manager_destroy(m);
@@ -181,7 +197,7 @@ static void test_apply_entry_response_wrong_txn_rejected(void)
     rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(endpoints, 1);
     rcp_bytes_t req, resp;
 
-    req = rcp_powerstate_manager_encode_entry_request(m, ADDR, RCP_PWRMODE_STANDBY, 5);
+    req = rcp_powerstate_manager_encode_entry_request(m, ADDR, RCP_PWRMODE_SLEEP, 5);
     rcp_bytes_free(&req);
 
     resp = rcp_ep_wakeup_encode_sleepcmd_response(ADDR.byte_bus_id, RCP_PWRMODE_ENTRY_OK, 6 /* wrong */);
@@ -463,7 +479,7 @@ static void test_subscribe_fires_on_every_attempted_transition(void)
     TEST_ASSERT_EQUAL(RCP_POWERSTATE_OK, g_last_err);
 
     /* A refused entry request still fires an event, with a non-OK err. */
-    req = rcp_powerstate_manager_encode_entry_request(m, ADDR, RCP_PWRMODE_STANDBY, 2);
+    req = rcp_powerstate_manager_encode_entry_request(m, ADDR, RCP_PWRMODE_SLEEP, 2);
     rcp_bytes_free(&req);
     resp = rcp_ep_wakeup_encode_sleepcmd_response(ADDR.byte_bus_id, RCP_PWRMODE_ENTRY_REFUSED, 2);
     rcp_powerstate_manager_apply_entry_response(m, ADDR, resp.data, resp.len);
@@ -484,6 +500,7 @@ int main(void)
     RUN_TEST(test_mode_starts_normal);
     RUN_TEST(test_mode_unknown_endpoint_is_normal);
     RUN_TEST(test_encode_entry_request_unknown_endpoint_is_zeroed);
+    RUN_TEST(test_encode_entry_request_rejects_standby);
     RUN_TEST(test_encode_entry_request_round_trips_via_ep_wakeup);
     RUN_TEST(test_apply_entry_response_ok_transitions_mode);
     RUN_TEST(test_apply_entry_response_refused_leaves_mode_unchanged);

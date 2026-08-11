@@ -1083,11 +1083,12 @@
     {
       "id": "REQ-PWR-001",
       "title": "encode_entry_request() records a pending request",
-      "text": "rcp_powerstate_manager_encode_entry_request() shall encode a SleepCMD request via ep_wakeup.h and, on success, remember its target_mode and transaction_num for the addressed endpoint; it shall return a zeroed rcp_bytes_t for an unregistered endpoint or an invalid target_mode, recording no pending state.",
+      "text": "rcp_powerstate_manager_encode_entry_request() shall encode a SleepCMD request via ep_wakeup.h and, on success, remember its transaction_num for the addressed endpoint; it shall return a zeroed rcp_bytes_t, recording no pending state, for an unregistered endpoint or for any target_mode other than RCP_PWRMODE_SLEEP -- including RCP_PWRMODE_STANDBY, which has no SleepCMD wire encoding at all (TC18 §13.7.2.3 Figure 22; see REQ-WAKEUP-010).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.2.3 Figure 22 (Endpoint sleep request), TC18.txt L4160-4166 -- corrected 2026-08-10, c-RCP-AUDIT-06, issue #256 Group E, superseding this entry's prior (incorrect) reading of target_mode as wire-encodable"
     },
     {
       "id": "REQ-PWR-002",
@@ -7089,22 +7090,22 @@
     {
       "id": "REQ-WAKEUP-010",
       "title": "rcp_ep_wakeup_encode_sleepcmd_request() encodes a fixed-opcode SleepCMD request",
-      "text": "rcp_ep_wakeup_encode_sleepcmd_request() shall return a zeroed rcp_bytes_t when target_mode is neither RCP_PWRMODE_STANDBY nor RCP_PWRMODE_SLEEP, and otherwise encode an ACF_ABB message with op RCP_ACF_OP_NONE whose 2-byte payload is RCP_EP_WAKEUP_SLEEPCMD_OPCODE followed by target_mode's raw value.",
+      "text": "rcp_ep_wakeup_encode_sleepcmd_request() shall encode an ACF_ABB message with op RCP_ACF_OP_NONE whose 1-byte payload is RCP_EP_WAKEUP_SLEEPCMD_OPCODE, padded to the next quadlet by rcp_acf_encode_abb() itself; the request carries no target-mode field and unconditionally means Sleep.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.2.3 Figure 22 (Endpoint sleep request), TC18.txt L4160-4166; \"SleepCMD is coded as 0xA5.\", TC18.txt L4168; target_mode restricted to Standby/Sleep per §12.5's Goto Sleep/Standby entry gating (established PWRMODE basis)"
+      "tc18": "§13.7.2.3 Figure 22 (Endpoint sleep request), TC18.txt L4160-4166, directly confirmed against the rendered PDF page image: a 1-byte SleepCMD opcode followed by an undifferentiated padding region with no target-mode field; \"SleepCMD is coded as 0xA5.\", TC18.txt L4168; \"bring the RC Server implementation to sleep mode\" (never Standby), TC18.txt L4157-4158 -- corrected 2026-08-10, c-RCP-AUDIT-06, issue #256 Group E, superseding this entry's prior (incorrect) reading of a 2-byte, target_mode-selecting payload"
     },
     {
       "id": "REQ-WAKEUP-011",
       "title": "rcp_ep_wakeup_decode_sleepcmd_request() validates and decodes a SleepCMD request",
-      "text": "rcp_ep_wakeup_decode_sleepcmd_request() shall return RCP_EP_WAKEUP_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header or its declared 2-byte payload; RCP_EP_WAKEUP_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_WAKEUP_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_WAKEUP_ERR_BAD_OPCODE when the first payload byte is not RCP_EP_WAKEUP_SLEEPCMD_OPCODE; RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE when the second payload byte is neither RCP_PWRMODE_STANDBY nor RCP_PWRMODE_SLEEP; and otherwise RCP_EP_WAKEUP_OK with the target mode and transaction number populated.",
+      "text": "rcp_ep_wakeup_decode_sleepcmd_request() shall return RCP_EP_WAKEUP_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header or its declared 1-byte payload; RCP_EP_WAKEUP_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_WAKEUP_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_WAKEUP_ERR_BAD_OPCODE when the payload byte is not RCP_EP_WAKEUP_SLEEPCMD_OPCODE; and otherwise RCP_EP_WAKEUP_OK with the transaction number populated, ignoring any bytes past the opcode (undifferentiated padding, not a validated field).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.2.3 Figure 22 (Endpoint sleep request), TC18.txt L4160-4166; \"SleepCMD is coded as 0xA5.\", TC18.txt L4168"
+      "tc18": "§13.7.2.3 Figure 22 (Endpoint sleep request), TC18.txt L4160-4166, directly confirmed against the rendered PDF page image; \"SleepCMD is coded as 0xA5.\", TC18.txt L4168 -- corrected 2026-08-10, c-RCP-AUDIT-06, issue #256 Group E, superseding this entry's prior (incorrect) RCP_EP_WAKEUP_ERR_BAD_TARGET_MODE validation path against a field TC18 never defines"
     },
     {
       "id": "REQ-WAKEUP-012",

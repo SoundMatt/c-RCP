@@ -143,6 +143,22 @@ rcp_bytes_t rcp_powerstate_manager_encode_entry_request(rcp_powerstate_manager_t
     endpoint_entry_t *e;
     rcp_bytes_t frame;
 
+    /* REQ-WAKEUP-010 (corrected 2026-08-10, c-RCP-AUDIT-06, issue #256
+     * Group E): the WakeUp endpoint's own SleepCMD wire message (TC18
+     * §13.7.2.3 Figure 22) has no target-mode field at all and only ever
+     * means Sleep -- TC18 §12.5 describes a general RC-Client-initiated
+     * Standby-entry mechanism, but no wire encoding for it is defined
+     * anywhere this codebase's own copy of the specification covers.
+     * A RCP_PWRMODE_STANDBY target therefore has no wire representation
+     * this function can produce; it fails the same way an unregistered
+     * addr does, rather than silently routing Standby through a wire
+     * message that only ever means Sleep, which this function did before
+     * this correction. */
+    if (target_mode != RCP_PWRMODE_SLEEP) {
+        rcp_bytes_t zero = {0};
+        return zero;
+    }
+
     rcp_mutex_lock(&m->mu);
     e = find_entry(m, addr);
     rcp_mutex_unlock(&m->mu);
@@ -151,7 +167,7 @@ rcp_bytes_t rcp_powerstate_manager_encode_entry_request(rcp_powerstate_manager_t
         return zero;
     }
 
-    frame = rcp_ep_wakeup_encode_sleepcmd_request(addr.byte_bus_id, target_mode, transaction_num);
+    frame = rcp_ep_wakeup_encode_sleepcmd_request(addr.byte_bus_id, transaction_num);
     if (frame.data) {
         rcp_mutex_lock(&m->mu);
         e->request_pending = true;
