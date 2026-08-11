@@ -12737,3 +12737,108 @@ from 7 to 8.
 
 **Next**: CAN's own §12.7.1 reconfig-path investigation (Group I's
 remaining candidates: CAN/ADC/ISELED/MDIO/wakeup).
+
+### v0.221.0 -- 2026-08-11
+
+**Full-catalog audit follow-up, batch 22 (Group I, real fix):
+REQ-ADC-035/REQ-ADC-036's register-block finding closed -- ADC's own
+§12.7.1 EP_func register block (Table 51) implemented, plus CAN
+investigated and responsibly deferred.**
+
+`rcp_ep_adc_decode_read_request()` already correctly rejected
+evt[2:0]=111b as not a plain read request, but no counterpart
+implemented that §12.7.1 path. Read TC18 §13.7.9.2 Table 51 directly:
+a clean, thirteen-entry register block with no address-collision
+editorial defect (unlike GPIO's/I2C's own source tables) -- 0x0000
+adc_ep_len(R), 0x0001 reserved(R), 0x0002/0x0003 common entries,
+0x0004 16-bit adc_base_clk(R), 0x0006 16-bit adc_ep_status(R/W),
+0x0008 8-bit adc_base_clk_divider(R/W), 0x0009 8-bit
+adc_sample_interval(R/W), 0x000A 8-bit adc_avg_intervals_per_request
+(R/W), 0x000B 8-bit adc_samples_per_avg_interval(R/W), 0x000C 8-bit
+adc_combine_avg_values(R/W), 0x000D 8-bit adc_resolution(R/W),
+0x000E-0x000F 16-bit adc_trigger_min(R/W), 0x0010-0x0011 16-bit
+adc_trigger_max(R/W); EP_FUNC_LEN=0x0012.
+
+**A deliberate deviation from every prior register-block batch this
+session (SPI/GPIO/I2C/UART/LIN)**: those all added NEW, parallel
+fields rather than reinterpret an existing one whose own documented
+semantics diverged from the real wire register. ADC's case is
+different in kind, not degree: `adc_samples_per_avg_interval`,
+`adc_avg_intervals_per_request`, and `adc_combine_avg_values` already
+share Table 51's own register names exactly, and this catalog's own
+prior text (REQ-ADC-035/-036) already treated them as the same
+underlying quantity being described twice, not two different things.
+Adding parallel fields here would have created genuine ambiguity
+(which of two same-named fields does a caller mean?) where the
+SPI/UART/LIN cases had none. The three existing fields are reused
+directly, with one honestly-documented cost: two of them are
+`uint16_t` in the struct but only 8 bits wide on the wire, and their
+existing setters (`rcp_ep_adc_set_samples_per_avg_interval()` etc.)
+apply no range validation -- so `rcp_ep_adc_render_registers()`
+truncates to the low octet (`& 0xFFu`) rather than silently misencode
+or newly reject a value no prior release ever rejected. A dedicated
+test (`test_render_registers_truncates_wide_fields`) pins this
+behavior explicitly (0x0155 -> 0x55) so it cannot regress unnoticed.
+
+**Fix**: `rcp_ep_adc_functional_cfg_t` gained `ep_status`/
+`base_clk_divider`/`sample_interval`/`resolution`/`trigger_min`/
+`trigger_max`. New `rcp_ep_adc_render_registers()`/`_apply_reconfig()`/
+`_reconfig_strerror()`/`_encode_reconfig_request()` mirror the
+established pattern. `REQ-ADC-035`/`REQ-ADC-036` move to
+`implemented`. ADC is now 7 of 11 endpoint types with the generic
+mechanism.
+
+**A genuinely new finding, not folded into 035/036**: `resolution`/
+`trigger_min`/`trigger_max` (TC18.txt L5114-5122) are registers
+neither REQ-ADC-035's nor REQ-ADC-036's own citations ever named --
+tracked as a new `REQ-ADC-040` instead of stretching an existing
+entry's citation to cover text it doesn't actually reference.
+Implemented alongside the same batch since it lives in the identical
+register block and would be artificial to split into a later PR.
+
+**A real tagging gap caught before this batch could be considered
+complete**: the first `cfusa trace --gaps`/`--req-coverage 100`/
+`--sec-tested 100` run after adding `REQ-ADC-040` reported it as
+genuinely untested (1/1024 -- distinct from the usual 2-3-entry
+pre-existing UART/LIFECYCLE/ADC-037 dangling-reference quirk this
+session has repeatedly confirmed harmless). Root cause: the new
+requirement entry was added to `.fusa-reqs.json` but the corresponding
+`//cfusa:req REQ-ADC-040` tags were never added to the implementing
+functions, and no `//cfusa:test REQ-ADC-040` tag existed in the test
+file. Fixed by adding both; re-verified clean (0/1024 untested,
+100%/100% coverage) before proceeding.
+
+**CAN investigated this batch, deliberately deferred (not fixed)**:
+read TC18's Table 53 (CAN functional configuration) directly.
+Confirmed a genuine, third editorial defect in a TC18 source table
+(acceptance filters 3 and 4 both printed at 0x002C; receive filter 1
+also printed at what should be filter 4's own address 0x0030) --
+resolvable via the same cross-table pattern used for GPIO's/I2C's own
+defects. But unlike those cases, CAN also has a genuine ambiguity
+blocker with no established resolution method: three opaque 32-bit
+"CAN bit time register" fields with no TC18-given sub-bit layout,
+making it impossible to map `rcp_ep_can_bit_timing_t`'s 5 named
+sub-fields (`prescaler`/`prop_seg`/`phase_seg1`/`phase_seg2`/
+`sync_jump_width`) onto them without inventing an unverified bit
+scheme -- the exact class of problem the MDIO investigation (Group D)
+already established needs its own dedicated session rather than a
+guess folded into a routine batch. Deferred accordingly.
+
+Mutation-tested: loosening the out-of-range bounds check by 4 octets
+reproduced the identical class of finding every prior register-block
+batch this session has produced -- a real stack buffer overflow
+(`index 18 out of bounds for type 'uint8_t[18]'`, silent SIGABRT,
+exit code 134). Restored, re-verified. Full suite (49/49 in
+`test_ep_adc` alone, 65/65 overall) both trees (native + ASan/UBSan).
+`cfusa check` (CI-pinned v0.5.50): 0 errors. `cfusa trace --gaps`:
+0/1024 untested; `--req-coverage 100` / `--sec-tested 100`: both 100%
+(1024/1024) -- same pre-existing, non-blocking UART dangling-reference
+diagnostics as every prior batch.
+
+**Progress: 87/156 findings resolved** (Groups H 12 + B 4 + A 17 +
+D 16 + F 7 + E 4 + C 16 + G 2 + I 9 = 87). Group I's own count moves
+from 8 to 9.
+
+**Next**: ISELED, MDIO, and wakeup remain in Group I (CAN deliberately
+deferred, per above, pending its own dedicated investigation session
+matching the MDIO/Group D precedent).

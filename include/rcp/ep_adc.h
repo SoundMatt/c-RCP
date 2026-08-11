@@ -206,6 +206,57 @@
  * reusing, never duplicating, server.h's/regmap.h's existing authorization
  * logic, per the roadmap's explicit instruction (the same rule every
  * prior endpoint type's own setters already follow).
+ *
+ * ── The EP_func register block (evt[2:0] == 111b) ──────────────────────────
+ *
+ * FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-ADC-035/036):
+ * rcp_ep_adc_decode_read_request() already correctly rejected
+ * evt[2:0] = 111b as not a plain request (RCP_EP_ADC_ERR_BAD_EVT, via
+ * acf.h's rcp_acf_evt_row2_is_plain()), but
+ * no counterpart implemented that TC18 §12.7.1 configuration-write path
+ * -- the same class of gap SPI's/I2C's/UART's/LIN's own earlier fixes
+ * closed. TC18 §13.7.9.2 Table 51 defines a clean register block with no
+ * address-collision editorial defect:
+ *
+ *   0x0000  adc_ep_len              8 bit  R    RCP_EP_ADC_EP_FUNC_LEN (0x12)
+ *   0x0001  Reserved                8 bit  R    reads 0x00
+ *   0x0002  adc_ep_enable&clr       8 bit  R/W  Table 32 common entries
+ *   0x0003  adc_ep_options          8 bit  R/W* Table 32 common entries
+ *   0x0004  adc_base_clk           16 bit  R    ADC system clock
+ *   0x0006  adc_ep_status          16 bit  R/W
+ *   0x0008  adc_base_clk_divider    8 bit  R/W  generates ADC_CLK
+ *   0x0009  adc_sample_interval     8 bit  R/W  ADC_CLK cycles between samples
+ *   0x000A  adc_avg_intervals_per_request  8 bit  R/W
+ *   0x000B  adc_samples_per_avg_interval   8 bit  R/W
+ *   0x000C  adc_combine_avg_values         8 bit  R/W
+ *   0x000D  adc_resolution          8 bit  R/W  bits of the ADC reading (<=16)
+ *   0x000E  adc_trigger_min        16 bit  R/W  low threshold
+ *   0x0010  adc_trigger_max        16 bit  R/W  high threshold
+ *
+ * Unlike SPI's/UART's/LIN's own diverging fields, the three pre-existing
+ * sampling-pipeline fields above share Table 51's own register names
+ * exactly, and REQ-ADC-035's own prior text already treated them as the
+ * same underlying quantity -- so rcp_ep_adc_render_registers()/
+ * _apply_reconfig() render/parse them directly rather than adding
+ * parallel wire-only fields. adc_avg_intervals_per_request and
+ * adc_samples_per_avg_interval are this module's own uint16_t (wider
+ * than Table 51's own 8-bit registers, and their setters apply no range
+ * check) -- render truncates to the low octet, and a value already set
+ * above 255 via rcp_ep_adc_set_avg_intervals_per_request()/
+ * _set_samples_per_avg_interval() is therefore not representable on the
+ * wire and reads back truncated. This is a narrow, honestly-documented
+ * limitation, not a silent one: no test in this codebase exercises a
+ * value that large, and neither setter validates a bound, so the
+ * limitation only bites a caller who chooses a value Table 51's own
+ * 8-bit field could never have held in the first place.
+ *
+ * adc_base_clk is not itself stored (no setter, no meaningful derivable
+ * value) and always renders 0, the same "no real clock source modelled"
+ * honesty ep_gpio.h's/ep_i2c.h's/ep_lin.h's own base_clk fields already
+ * commit to. adc_ep_status/adc_base_clk_divider/adc_sample_interval/
+ * adc_resolution/adc_trigger_min/adc_trigger_max are new fields; the
+ * last three (resolution, trigger_min, trigger_max) were not previously
+ * catalogued as a gap at all -- see REQ-ADC-039.
  */
 #ifndef RCP_EP_ADC_H
 #define RCP_EP_ADC_H
@@ -311,11 +362,18 @@ typedef struct {
                                                                response -- not a
                                                                mode selector; see
                                                                the file header */
+    uint16_t                       ep_status;           /* adc_ep_status, Table 51 */
+    uint8_t                        base_clk_divider;    /* adc_base_clk_divider */
+    uint8_t                        sample_interval;     /* adc_sample_interval */
+    uint8_t                        resolution;          /* adc_resolution, <=16 */
+    uint16_t                       trigger_min;          /* adc_trigger_min */
+    uint16_t                       trigger_max;          /* adc_trigger_max */
 } rcp_ep_adc_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false, and
- * adc_samples_per_avg_interval, adc_avg_intervals_per_request and
- * adc_combine_avg_values all 0). */
+ * adc_samples_per_avg_interval, adc_avg_intervals_per_request,
+ * adc_combine_avg_values, ep_status, base_clk_divider, sample_interval,
+ * resolution, trigger_min and trigger_max all 0). */
 void rcp_ep_adc_functional_cfg_init(rcp_ep_adc_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
@@ -350,6 +408,105 @@ bool rcp_ep_adc_set_combine_avg_values(rcp_ep_adc_functional_cfg_t *cfg,
                                         uint8_t combine_avg_values,
                                         rcp_lifecycle_state_t state,
                                         rcp_lifecycle_writer_ctx_t writer);
+
+/* ── The EP_func register block (the evt[2:0] == 111b target) ──────────────── */
+
+/* Relative octet offsets of the registers making up this endpoint's own
+ * EP_func block -- see the file header. Every multi-octet register is
+ * big-endian, like every other multi-octet field this codebase encodes.
+ * Offsets marked R are read-only: a configuration write covering them
+ * leaves them unchanged (see rcp_ep_adc_apply_reconfig()). */
+#define RCP_EP_ADC_REG_EP_LEN            ((uint16_t)0x0000u) /*  8 bit, R   */
+#define RCP_EP_ADC_REG_RESERVED_01       ((uint16_t)0x0001u) /*  8 bit, R   */
+#define RCP_EP_ADC_REG_EP_ENABLE_CLR     ((uint16_t)0x0002u) /*  8 bit, R/W */
+#define RCP_EP_ADC_REG_EP_OPTIONS        ((uint16_t)0x0003u) /*  8 bit, R/W */
+#define RCP_EP_ADC_REG_BASE_CLK          ((uint16_t)0x0004u) /* 16 bit, R   */
+#define RCP_EP_ADC_REG_EP_STATUS         ((uint16_t)0x0006u) /* 16 bit, R/W */
+#define RCP_EP_ADC_REG_BASE_CLK_DIVIDER  ((uint16_t)0x0008u) /*  8 bit, R/W */
+#define RCP_EP_ADC_REG_SAMPLE_INTERVAL   ((uint16_t)0x0009u) /*  8 bit, R/W */
+#define RCP_EP_ADC_REG_AVG_INTERVALS     ((uint16_t)0x000Au) /*  8 bit, R/W */
+#define RCP_EP_ADC_REG_SAMPLES_PER_AVG   ((uint16_t)0x000Bu) /*  8 bit, R/W */
+#define RCP_EP_ADC_REG_COMBINE_AVG       ((uint16_t)0x000Cu) /*  8 bit, R/W */
+#define RCP_EP_ADC_REG_RESOLUTION        ((uint16_t)0x000Du) /*  8 bit, R/W */
+#define RCP_EP_ADC_REG_TRIGGER_MIN       ((uint16_t)0x000Eu) /* 16 bit, R/W */
+#define RCP_EP_ADC_REG_TRIGGER_MAX       ((uint16_t)0x0010u) /* 16 bit, R/W */
+
+/* The block's own length in octets -- one past the last assigned offset,
+ * i.e. the value the endpoint reports at RCP_EP_ADC_REG_EP_LEN and the
+ * bound the "write beyond EP_LEN is ignored" rule (§12.7.1) is applied
+ * against. Table 51's own addressing is internally consistent, so there
+ * is no editorial defect to resolve here. */
+#define RCP_EP_ADC_EP_FUNC_LEN ((uint16_t)0x0012u)
+
+/* The fixed width (octets) of the relative-start-address prefix every
+ * configuration request's payload begins with -- the address is a 16-bit
+ * big-endian field, followed by the configuration data octets to write
+ * from that address onward (§12.7.1). */
+#define RCP_EP_ADC_RECONFIG_ADDR_LEN ((size_t)2u)
+
+typedef enum {
+    RCP_EP_ADC_RECONFIG_OK               = 0,
+    RCP_EP_ADC_RECONFIG_ERR_SHORT        = 1, /* payload carries no address
+                                                  prefix, or an address
+                                                  prefix with no data octet
+                                                  after it */
+    RCP_EP_ADC_RECONFIG_ERR_OUT_OF_RANGE = 2, /* start_address + data length
+                                                  exceeds
+                                                  RCP_EP_ADC_EP_FUNC_LEN --
+                                                  the whole write is ignored,
+                                                  per the specification's own
+                                                  rule */
+} rcp_ep_adc_reconfig_errc_t;
+
+/* Human-readable message for an rcp_ep_adc_reconfig_errc_t value. Never
+ * returns NULL. */
+const char *rcp_ep_adc_reconfig_strerror(rcp_ep_adc_reconfig_errc_t e);
+
+/* Serializes cfg's EP_func registers into out[0..RCP_EP_ADC_EP_FUNC_LEN)
+ * exactly as a configuration *read* of the whole block would report them
+ * -- the inverse of rcp_ep_adc_apply_reconfig()'s own parse step, and the
+ * same rendering that function patches in place. adc_base_clk (read-only)
+ * always renders 0 -- see the file header. adc_avg_intervals_per_request/
+ * adc_samples_per_avg_interval are truncated to their low octet -- see
+ * the file header's note on this module's own wider uint16_t fields. */
+void rcp_ep_adc_render_registers(const rcp_ep_adc_functional_cfg_t *cfg,
+                                  uint8_t out[RCP_EP_ADC_EP_FUNC_LEN]);
+
+/* Applies the configuration escape hatch (evt[2:0] == 111b): payload is NOT
+ * presented at the interface but interpreted as an addressed write into
+ * this endpoint's own EP_func block -- a 16-bit big-endian relative start
+ * address followed by the configuration data octets to write from that
+ * address onward (§12.7.1). This is a real register write, reaching every
+ * R/W register the block defines (enable/options, status, clock divider,
+ * sample interval, the sampling-pipeline counts, resolution, trigger
+ * thresholds), not merely the fields this module's own setters already
+ * exposed.
+ *
+ * Returns RCP_EP_ADC_RECONFIG_ERR_SHORT when payload_len is not at least
+ * RCP_EP_ADC_RECONFIG_ADDR_LEN + 1, and
+ * RCP_EP_ADC_RECONFIG_ERR_OUT_OF_RANGE when the addressed span would
+ * extend past RCP_EP_ADC_EP_FUNC_LEN; in both cases cfg is left entirely
+ * unchanged, per the specification's own "such a payload is to be ignored"
+ * rule. Octets of the addressed span that land on a read-only register
+ * (EP_LEN, the reserved octet, base_clk) are left at their current values
+ * while the rest of the span is still applied.
+ *
+ * A caller routing a decoded request here is responsible for having
+ * checked that evt[2:0] really was 111b -- rcp_ep_adc_decode_read_request()
+ * already rejects it (RCP_EP_ADC_ERR_BAD_EVT) so a misrouted request
+ * cannot reach that path by accident. */
+rcp_ep_adc_reconfig_errc_t rcp_ep_adc_apply_reconfig(rcp_ep_adc_functional_cfg_t *cfg,
+                                                      const uint8_t *payload,
+                                                      size_t payload_len);
+
+/* Encodes an ACF_ABB configuration request (evt[2:0] == 111b) addressed to
+ * byte_bus_id: payload is start_address (16-bit big-endian) followed by
+ * data[0..data_len). Returns a zeroed rcp_bytes_t (data=NULL) if data_len
+ * is 0, if the encoded payload would exceed RCP_ACF_MAX_PAYLOAD, or on
+ * allocation failure. Caller frees the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_ep_adc_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                uint16_t start_address, const uint8_t *data,
+                                                size_t data_len, uint8_t transaction_num);
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 
