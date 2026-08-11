@@ -119,7 +119,16 @@
  * the two underlying clock-polarity/-phase bits from that mode, directly
  * testable in isolation), bit order (MSB-first / LSB-first), a clock
  * divider, chip-select active-polarity, and inter-byte/inter-transfer
- * timing delays (nanoseconds; this module's own unit choice). Composing
+ * timing delays (nanoseconds; this module's own unit choice). NOTED
+ * 2026-08-10 (c-RCP-AUDIT-06, issue #256): bit order has no counterpart
+ * in TC18 §13.7.3.2 Table 39 at all -- that table's per-channel register
+ * block defines clock polarity/phase, CS polarity, CS-sharing, lead/
+ * trail timing, max-consecutive-bits, and inter-transfer pause, but no
+ * MSB-first/LSB-first selector of any kind; this field is this module's
+ * own original addition, not derived from or wire-mapped to any TC18
+ * register (this module implements no functional-config register
+ * render/parse path at all -- see the trigger-signals note, below, for
+ * the same point about `trigger`). Composing
  * regmap.h's rcp_regmap_ep_functional_cfg_t as its own first member follows
  * that module's documented convention (and ep_gpio.h's precedent);
  * rcp_ep_spi_functional_cfg_writable() is, likewise, a thin, named wrapper
@@ -139,6 +148,23 @@
  * an SPI controller channel actually produces. rcp_ep_spi_trigger_fires()
  * is the pure, directly-testable evaluation of one such event against a
  * selected trigger mode.
+ *
+ * CLARIFIED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group C): TC18
+ * §13.7.3.1 Table 38 names 14 distinct, always-on hardware trigger
+ * signals per SPI endpoint (execution-done, plus an assert/de-assert
+ * pair for each of CS0 through CS5) -- Table 39 (this endpoint's own
+ * per-channel functional-config register block) defines no register
+ * field that selects among them, so nothing in the specification
+ * suggests a client configures which one(s) are active. This module's
+ * `rcp_ep_spi_trigger_t` collapses that 14-signal, per-CS-channel table
+ * into 4 generic values (NONE + transfer-done + a single CS-assert/
+ * CS-deassert pair with no per-channel distinction) -- an original
+ * simplification, not a literal reproduction of Table 38, and one that
+ * cannot distinguish "CS2 asserted" from "CS5 asserted" the way TC18's
+ * own signal set can. `cfg->channels[i].trigger` is never rendered onto
+ * the wire (this module implements no functional-config register
+ * render/parse path at all), so this simplification has no wire-format
+ * consequence.
  *
  * ── Compound-wait against an SPI endpoint ───────────────────────────────────
  *
