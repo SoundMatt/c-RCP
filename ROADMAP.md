@@ -12963,3 +12963,106 @@ batch's arithmetic, not just re-reading the latest merged text.
 **Next**: ISELED, MDIO, and wakeup remain in Group I (CAN deliberately
 deferred, per above, pending its own dedicated investigation session
 matching the MDIO/Group D precedent).
+
+### v0.223.0 -- 2026-08-11
+
+**Full-catalog audit follow-up, batch 24 (Group I, real fix, plus
+retirement of a second stale-duplicate finding): ISELED's own §12.7.1
+EP_func register block (Table 55) implemented, fourth instance of the
+address-collision editorial defect resolved, and REQ-ISELED-028
+retired as a stale duplicate of the already-fixed REQ-ISELED-007.**
+
+`rcp_ep_iseled_decode_command_request()` already correctly rejected
+evt[2:0]=111b (`RCP_EP_ISELED_ERR_BAD_EVT`, via acf.h's
+`rcp_acf_evt_row2_is_plain()`), but no counterpart implemented that
+§12.7.1 path. Read TC18 §13.7.12.2 Table 55 directly: a genuine
+address-collision editorial defect, the fourth this audit has found
+(after PWM_OUT's/GPIO's/I2C's own) -- `iseled_base_clk` (16 bit, R) is
+printed at relative address 0x0001, one octet after `iseled_ep_len`,
+with no reserved octet at 0x0001 the way every other endpoint type's
+own Table prints one, so its own two octets (0x0001-0x0002) collide
+with `iseled_ep_enable&clr`, separately printed at 0x0002. Resolved
+via the same cross-table structural precedent already established:
+`iseled_base_clk` moves to 0x0004-0x0005 (the common EP_LEN/reserved/
+enable&clr/options/base_clk prefix sequence every other table uses),
+pushing every later field down by three octets in the table's own row
+order: `iseled_ep_status` to 0x0006-0x0007, `iseled_clk_divider` to
+0x0008, the bitfield octet (`iseled_collect_resp` bit 3,
+`iseled_use_rcv_clk` bit 4) to 0x0009, `iseled_nr_leds` to
+0x000A-0x000B, `iseled_rcv_timeout` to 0x000C-0x000D
+(`RCP_EP_ISELED_EP_FUNC_LEN` = 0x000E).
+
+**Fix**: `rcp_ep_iseled_functional_cfg_t` gained `base_clk`/
+`ep_status`/`wire_clk_divider`/`collect_resp`/`nr_leds`/`rcv_timeout`.
+New `rcp_ep_iseled_render_registers()`/`_apply_reconfig()`/
+`_reconfig_strerror()`/`_encode_reconfig_request()` mirror the
+established pattern exactly. ISELED is now 8 of 11 endpoint types with
+the generic mechanism. `iseled_use_rcv_clk` is reused directly for the
+block's own flags bit -- it already names that exact wire bit (fixed
+for the correct polarity in Group G, REQ-ISELED-007). Per this audit's
+established "don't silently redefine an existing field whose own
+semantics diverge from the real wire register" rule,
+`iseled_bit_clk_divider` (uint32_t, this module's own outbound-
+transmission clock choice) stays deliberately distinct from the new,
+uint8_t `wire_clk_divider`. `iseled_crc_enable` (this module's own
+original, second, independent CRC-8 integrity layer, explicitly
+disclosed as such in the file header) is deliberately NOT part of the
+register block -- Table 55 defines no register for it, confirmed by a
+dedicated test (`test_render_registers_ignores_crc_enable`) that
+toggling it produces byte-identical rendered output either way.
+
+`REQ-ISELED-026` (iseled_collect_resp) and `REQ-ISELED-027`
+(iseled_nr_leds/iseled_rcv_timeout) -- previously honest, tracked
+not-implemented struct-field gaps -- move to `implemented`.
+`REQ-ISELED-025` (the response-*aggregation behavior* §13.7.12.1
+describes -- actually splitting a chain read across multiple ACF
+messages, bounded by these newly-modeled fields) remains a distinct,
+deeper runtime-behavior gap this batch does not close, same
+distinction the ADC batch drew between register modeling
+(REQ-ADC-035/036) and cadence orchestration (REQ-ADC-037, still open).
+
+**A second stale-duplicate finding, caught while scoping this batch**
+(the first was `REQ-RMAP-046`, Group H): `REQ-ISELED-028` described
+the exact same `rcp_ep_iseled_requires_isp_n()` inverted-polarity bug
+as `REQ-ISELED-007`, still marked "not-implemented" -- but
+`REQ-ISELED-007` was already fixed in Group G (PR #270, v0.213.0) and
+carries no `not-implemented`/`partial` status marker at all (an
+ordinary implemented entry, per this codebase's own convention). This
+entry's own text was simply never updated or retired after the real
+fix landed. Retired with `status: "retired"`, matching `REQ-RMAP-046`'s
+own precedent exactly -- no code change, text-only correction.
+
+A pre-existing deviation test,
+`test_iseled_block_lacks_collect_resp_nr_leds_and_rcv_timeout`
+(`tests/test_tc18_gaps_ep2.c`), was renamed to
+`..._block_now_has_collect_resp_nr_leds_and_rcv_timeout` and rewritten
+from a footprint-diffing negative assertion to a positive one, matching
+every prior batch's own convention. `tests/test_ep_iseled.c` gained a
+full parallel register-block test suite (9 new tests) mirroring
+ADC's/PWM_IN's own dedicated-file coverage.
+
+`REQ-CFG-011`/`REQ-CFG-012` narrowed accordingly (8 endpoint types now
+covered: PWM_OUT, PWM_IN, GPIO, SPI, I2C, UART, LIN, ADC, ISELED; CAN,
+MDIO, wakeup remain -- CAN deliberately deferred, per the earlier ADC
+batch's own investigation).
+
+Mutation-tested: loosening the out-of-range bounds check by 4 octets
+reproduced the identical class of finding every prior register-block
+batch this session has produced -- a real stack buffer overflow
+(`index 14 out of bounds for type 'uint8_t[14]'`, silent SIGABRT, exit
+code 134). Restored, re-verified. Full suite (49/49 in
+`test_ep_iseled` alone, 65/65 overall) both trees (native +
+ASan/UBSan). `cfusa check` (CI-pinned v0.5.50): 0 errors. `cfusa trace
+--gaps`: 0/1024 untested; `--req-coverage 100` / `--sec-tested 100`:
+both 100% (1024/1024) -- same pre-existing, non-blocking UART
+dangling-reference diagnostics as every prior batch.
+
+**Progress: 89/156 findings resolved** (Groups H 12 + B 4 + A 17 +
+D 16 + F 7 + E 4 + C 16 + G 2 + I 11 = 89). Group I's own count moves
+from 10 to 11 -- REQ-ISELED-026/027/029 close together (findings, not
+fixes-per-PR, per this issue's own accounting convention); the
+REQ-ISELED-028 retirement is a catalog-precision correction, not a new
+finding, so it does not add to this count.
+
+**Next**: MDIO and wakeup remain in Group I (CAN deliberately
+deferred, pending its own dedicated investigation session).

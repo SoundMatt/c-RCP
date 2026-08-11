@@ -4,6 +4,20 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* ── Byte-order helpers (this TU's own copy -- see ep_pwm.c's/ep_adc.c's
+ * own identical copies for the same house convention) ──────────────────── */
+
+static void put_u16(uint8_t *p, uint16_t v)
+{
+    p[0] = (uint8_t)((v >> 8) & 0xFFu);
+    p[1] = (uint8_t)(v & 0xFFu);
+}
+
+static uint16_t get_u16(const uint8_t *p)
+{
+    return (uint16_t)(((uint16_t)p[0] << 8) | (uint16_t)p[1]);
+}
+
 /* ── Native 4-bit/5-bit bit framing ──────────────────────────────────────── */
 
 static uint8_t popcount4(uint8_t n)
@@ -140,8 +154,10 @@ void rcp_ep_iseled_functional_cfg_init(rcp_ep_iseled_functional_cfg_t *cfg)
     memset(cfg, 0, sizeof(*cfg));
     rcp_regmap_ep_functional_cfg_init(&cfg->common);
     /* iseled_bit_clk_divider is already 0, iseled_use_rcv_clk and
-     * iseled_crc_enable are already false, and trigger is already
-     * RCP_EP_ISELED_TRIGGER_NONE (0) via the memset above. */
+     * iseled_crc_enable are already false, trigger is already
+     * RCP_EP_ISELED_TRIGGER_NONE (0), and every EP_func register
+     * (base_clk/ep_status/wire_clk_divider/collect_resp/nr_leds/
+     * rcv_timeout) is already 0/false via the memset above. */
 }
 
 //cfusa:req REQ-ISELED-010
@@ -191,6 +207,170 @@ bool rcp_ep_iseled_set_trigger(rcp_ep_iseled_functional_cfg_t *cfg,
 
     cfg->trigger = (uint8_t)trigger;
     return true;
+}
+
+/* ── The EP_func register block (evt[2:0] == 111b) ─────────────────────────── */
+
+/* The EP-common enable&clr (0x0002) and options (0x0003) octets -- same
+ * house convention and same "regmap.h modeling gap" caveat as ep_pwm.c's
+ * own copy. */
+#define ISELED_ENABLE_CLR_BIT_ENABLE ((uint8_t)(1u << 0))
+#define ISELED_ENABLE_CLR_BIT_CLEAR  ((uint8_t)(1u << 4))
+#define ISELED_OPTIONS_BIT_REQ_CRC   ((uint8_t)(1u << 0))
+#define ISELED_OPTIONS_BIT_RESP_TS   ((uint8_t)(1u << 3))
+#define ISELED_OPTIONS_BIT_SUPPRESS  ((uint8_t)(1u << 7))
+
+//cfusa:req REQ-ISELED-029
+void rcp_ep_iseled_render_registers(const rcp_ep_iseled_functional_cfg_t *cfg,
+                                     uint8_t out[RCP_EP_ISELED_EP_FUNC_LEN])
+{
+    uint8_t enable_clr = 0u;
+    uint8_t options    = 0u;
+    uint8_t flags      = 0u;
+
+    if (cfg->common.ep_enable) enable_clr |= ISELED_ENABLE_CLR_BIT_ENABLE;
+    if (cfg->common.ep_clear_req_storage) enable_clr |= ISELED_ENABLE_CLR_BIT_CLEAR;
+    if (cfg->common.ep_req_crc_enable) options |= ISELED_OPTIONS_BIT_REQ_CRC;
+    if (cfg->common.ep_response_ts_enable) options |= ISELED_OPTIONS_BIT_RESP_TS;
+    if (cfg->common.ep_suppress_response) options |= ISELED_OPTIONS_BIT_SUPPRESS;
+    if (cfg->collect_resp) flags |= RCP_EP_ISELED_FLAG_COLLECT_RESP;
+    if (cfg->iseled_use_rcv_clk) flags |= RCP_EP_ISELED_FLAG_USE_RCV_CLK;
+
+    out[RCP_EP_ISELED_REG_EP_LEN]        = (uint8_t)RCP_EP_ISELED_EP_FUNC_LEN;
+    out[RCP_EP_ISELED_REG_RESERVED_01]   = 0u;
+    out[RCP_EP_ISELED_REG_EP_ENABLE_CLR] = enable_clr;
+    out[RCP_EP_ISELED_REG_EP_OPTIONS]    = options;
+    put_u16(&out[RCP_EP_ISELED_REG_BASE_CLK], cfg->base_clk);
+    put_u16(&out[RCP_EP_ISELED_REG_EP_STATUS], cfg->ep_status);
+    out[RCP_EP_ISELED_REG_CLK_DIVIDER] = cfg->wire_clk_divider;
+    out[RCP_EP_ISELED_REG_FLAGS]       = flags;
+    put_u16(&out[RCP_EP_ISELED_REG_NR_LEDS], cfg->nr_leds);
+    put_u16(&out[RCP_EP_ISELED_REG_RCV_TIMEOUT], cfg->rcv_timeout);
+}
+
+/* The inverse of render -- same "read-only offsets not read back" design as
+ * ep_pwm.c's own parse_registers(). */
+static void parse_iseled_registers(rcp_ep_iseled_functional_cfg_t *cfg,
+                                    const uint8_t in[RCP_EP_ISELED_EP_FUNC_LEN])
+{
+    uint8_t enable_clr = in[RCP_EP_ISELED_REG_EP_ENABLE_CLR];
+    uint8_t options    = in[RCP_EP_ISELED_REG_EP_OPTIONS];
+    uint8_t flags      = in[RCP_EP_ISELED_REG_FLAGS];
+
+    cfg->common.ep_enable             = (enable_clr & ISELED_ENABLE_CLR_BIT_ENABLE) != 0u;
+    cfg->common.ep_clear_req_storage  = (enable_clr & ISELED_ENABLE_CLR_BIT_CLEAR) != 0u;
+    cfg->common.ep_req_crc_enable     = (options & ISELED_OPTIONS_BIT_REQ_CRC) != 0u;
+    cfg->common.ep_response_ts_enable = (options & ISELED_OPTIONS_BIT_RESP_TS) != 0u;
+    cfg->common.ep_suppress_response  = (options & ISELED_OPTIONS_BIT_SUPPRESS) != 0u;
+    cfg->collect_resp                 = (flags & RCP_EP_ISELED_FLAG_COLLECT_RESP) != 0u;
+    cfg->iseled_use_rcv_clk           = (flags & RCP_EP_ISELED_FLAG_USE_RCV_CLK) != 0u;
+
+    cfg->ep_status        = get_u16(&in[RCP_EP_ISELED_REG_EP_STATUS]);
+    cfg->wire_clk_divider = in[RCP_EP_ISELED_REG_CLK_DIVIDER];
+    cfg->nr_leds          = get_u16(&in[RCP_EP_ISELED_REG_NR_LEDS]);
+    cfg->rcv_timeout      = get_u16(&in[RCP_EP_ISELED_REG_RCV_TIMEOUT]);
+}
+
+/* True iff the octet at relative offset addr belongs to a read-only
+ * register of the block -- EP_LEN, the reserved octet, and both octets of
+ * base_clk. */
+static bool iseled_reg_offset_read_only(uint16_t addr)
+{
+    return addr == RCP_EP_ISELED_REG_EP_LEN ||
+           addr == RCP_EP_ISELED_REG_RESERVED_01 ||
+           addr == RCP_EP_ISELED_REG_BASE_CLK ||
+           addr == (uint16_t)(RCP_EP_ISELED_REG_BASE_CLK + 1u);
+}
+
+//cfusa:req REQ-ISELED-029
+const char *rcp_ep_iseled_reconfig_strerror(rcp_ep_iseled_reconfig_errc_t e)
+{
+    switch (e) {
+    case RCP_EP_ISELED_RECONFIG_OK:
+        return "rcp/ep_iseled: configuration write applied";
+    case RCP_EP_ISELED_RECONFIG_ERR_SHORT:
+        return "rcp/ep_iseled: configuration write has no address and data";
+    case RCP_EP_ISELED_RECONFIG_ERR_OUT_OF_RANGE:
+        return "rcp/ep_iseled: configuration write extends past the EP_func block";
+    default:
+        return "rcp/ep_iseled: unknown configuration-write error";
+    }
+}
+
+//cfusa:req REQ-ISELED-029
+rcp_ep_iseled_reconfig_errc_t
+rcp_ep_iseled_apply_reconfig(rcp_ep_iseled_functional_cfg_t *cfg,
+                              const uint8_t *payload, size_t payload_len)
+{
+    uint8_t  block[RCP_EP_ISELED_EP_FUNC_LEN];
+    uint16_t start_address;
+    size_t   data_len;
+    size_t   i;
+
+    if (payload_len <= RCP_EP_ISELED_RECONFIG_ADDR_LEN) {
+        return RCP_EP_ISELED_RECONFIG_ERR_SHORT;
+    }
+
+    start_address = get_u16(payload);
+    data_len      = payload_len - RCP_EP_ISELED_RECONFIG_ADDR_LEN;
+
+    /* "Any payload whose length plus the start address exceeds EP_LEN is
+     * to be ignored" -- the whole write, not just its overhanging tail
+     * (extraction §3.7.1). */
+    if ((size_t)start_address + data_len > (size_t)RCP_EP_ISELED_EP_FUNC_LEN) {
+        return RCP_EP_ISELED_RECONFIG_ERR_OUT_OF_RANGE;
+    }
+
+    rcp_ep_iseled_render_registers(cfg, block);
+    for (i = 0; i < data_len; i++) {
+        uint16_t addr = (uint16_t)(start_address + i);
+
+        if (iseled_reg_offset_read_only(addr)) continue; /* write ignored */
+        block[addr] = payload[RCP_EP_ISELED_RECONFIG_ADDR_LEN + i];
+    }
+    parse_iseled_registers(cfg, block);
+
+    return RCP_EP_ISELED_RECONFIG_OK;
+}
+
+//cfusa:req REQ-ISELED-029
+rcp_bytes_t rcp_ep_iseled_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                   uint16_t start_address,
+                                                   const uint8_t *data, size_t data_len,
+                                                   uint8_t transaction_num)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 empty = {0};
+    uint8_t                    *payload;
+    size_t                      payload_len;
+    rcp_bytes_t                 frame;
+
+    if (data_len == 0 || data == NULL) return empty;
+
+    payload_len = RCP_EP_ISELED_RECONFIG_ADDR_LEN + data_len;
+    if (payload_len > RCP_ACF_MAX_PAYLOAD) return empty;
+
+    payload = (uint8_t *)malloc(payload_len);
+    if (!payload) return empty;
+
+    put_u16(payload, start_address);
+    memcpy(payload + RCP_EP_ISELED_RECONFIG_ADDR_LEN, data, data_len);
+
+    hdr.byte_bus_id     = byte_bus_id;
+    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.evt             = 0x7u; /* the reconfiguration escape hatch -- ISELED
+                                    has no named write-semantics enum of its
+                                    own (it belongs to the ADC/I2C/LIN/CAN/
+                                    UART/PWM_IN/MDIO reserved-range group,
+                                    not PWM_OUT's/GPIO's own eight-value
+                                    write-semantics group), so the raw value
+                                    is used directly, matching ep_adc.c's/
+                                    ep_pwm.c's own equivalent encoders. */
+    hdr.transaction_num = transaction_num;
+
+    frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
+    free(payload);
+    return frame;
 }
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */

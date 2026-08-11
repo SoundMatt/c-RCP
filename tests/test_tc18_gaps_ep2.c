@@ -15,6 +15,7 @@
 //cfusa:test REQ-ISELED-026
 //cfusa:test REQ-ISELED-027
 //cfusa:test REQ-ISELED-028
+//cfusa:test REQ-ISELED-029
 //cfusa:test REQ-LINEP-023
 //cfusa:test REQ-LINEP-024
 //cfusa:test REQ-MDIO-020
@@ -738,15 +739,21 @@ static void test_iseled_response_has_no_read_size_ceiling(void)
     rcp_bytes_free(&f);
 }
 
-static void test_iseled_block_lacks_collect_resp_nr_leds_and_rcv_timeout(void)
+/* FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-ISELED-026/027/
+ * 029): TC18 §13.7.12.2 Table 55's iseled_collect_resp, iseled_nr_leds and
+ * iseled_rcv_timeout registers are now all reachable via the generic
+ * evt[2:0]=111b register-block mechanism, same as every other endpoint
+ * type. iseled_crc_enable stays deliberately outside the block (this
+ * module's own original, second, independent CRC-8 layer -- see
+ * ep_iseled.h's file header); iseled_bit_clk_divider stays a distinct,
+ * non-wire field from the new wire_clk_divider. */
+static void test_iseled_block_now_has_collect_resp_nr_leds_and_rcv_timeout(void)
 {
     rcp_ep_iseled_functional_cfg_t cfg;
-    uint8_t                        before[sizeof(rcp_ep_iseled_functional_cfg_t)];
     rcp_lifecycle_writer_ctx_t     w = any_writer();
+    uint8_t                        block[RCP_EP_ISELED_EP_FUNC_LEN];
 
-    TEST_ASSERT_EQUAL_size_t(1u, sizeof(bool)); /* footprint counting precondition */
     rcp_ep_iseled_functional_cfg_init(&cfg);
-    memcpy(before, &cfg, sizeof(before));
 
     TEST_ASSERT_TRUE(rcp_ep_iseled_set_bit_clk_divider(&cfg, 0x11223344u,
                                                        RCP_LIFECYCLE_HW_CONFIGURED, w));
@@ -755,20 +762,27 @@ static void test_iseled_block_lacks_collect_resp_nr_leds_and_rcv_timeout(void)
     TEST_ASSERT_TRUE(rcp_ep_iseled_set_trigger(&cfg, RCP_EP_ISELED_TRIGGER_TX_COMPLETE,
                                                RCP_LIFECYCLE_HW_CONFIGURED, w));
 
-    /* DEVIATION -- TC18 §13.7.12.2 Table 55 fixes iseled_collect_resp at
-     * 0x0007 bit 3 (1 bit, R/W -- the multi-response-per-ACF collection
-     * enable), iseled_nr_leds at 0x0008 (16 bit, R/W -- the chain length
-     * bounding how many responses a read expects) and iseled_rcv_timeout at
-     * 0x000A (16 bit, R/W -- the ISELED-clock-tic receive timeout after
-     * which reception ends and the endpoint returns to IDLE). The whole
-     * reachable surface here is 7 octets -- iseled_bit_clk_divider(4) +
-     * iseled_use_rcv_clk(1) + iseled_crc_enable(1) + trigger(1) -- so an
-     * ISELED read has no completion bound in either the count dimension or
-     * the time dimension, and §13.7.12.1's aggregation has no on/off
-     * control. */
-    TEST_ASSERT_EQUAL_size_t(0u, offsetof(rcp_ep_iseled_functional_cfg_t, common));
-    TEST_ASSERT_EQUAL_size_t(7u, changed_octets(before, (const uint8_t *)&cfg,
-                                                sizeof(before)));
+    /* Now positively confirm the register block itself round-trips the
+     * three previously-missing fields, reachable only via
+     * apply_reconfig() -- like every other endpoint type's own
+     * register-block fields, these have no individual set_X() convenience
+     * function. */
+    cfg.collect_resp = true;
+    cfg.nr_leds       = 0x1234u;
+    cfg.rcv_timeout    = 0x5678u;
+
+    rcp_ep_iseled_render_registers(&cfg, block);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_ISELED_EP_FUNC_LEN, block[RCP_EP_ISELED_REG_EP_LEN]);
+    TEST_ASSERT_TRUE((block[RCP_EP_ISELED_REG_FLAGS] & RCP_EP_ISELED_FLAG_COLLECT_RESP) != 0u);
+    TEST_ASSERT_TRUE((block[RCP_EP_ISELED_REG_FLAGS] & RCP_EP_ISELED_FLAG_USE_RCV_CLK) != 0u);
+    TEST_ASSERT_EQUAL_HEX16(0x1234u, (uint16_t)((block[RCP_EP_ISELED_REG_NR_LEDS] << 8) |
+                                                block[RCP_EP_ISELED_REG_NR_LEDS + 1]));
+    TEST_ASSERT_EQUAL_HEX16(0x5678u, (uint16_t)((block[RCP_EP_ISELED_REG_RCV_TIMEOUT] << 8) |
+                                                block[RCP_EP_ISELED_REG_RCV_TIMEOUT + 1]));
+
+    /* iseled_crc_enable is NOT rendered onto the wire -- see the file
+     * header -- so the block's own length is unaffected by it. */
+    TEST_ASSERT_EQUAL_UINT16(0x000Eu, RCP_EP_ISELED_EP_FUNC_LEN);
 }
 
 /* ── MDIO (§13.7.13) ───────────────────────────────────────────────────────── */
@@ -886,7 +900,7 @@ int main(void)
     RUN_TEST(test_can_new_physical_layer_is_selected_per_frame);
 
     RUN_TEST(test_iseled_response_has_no_read_size_ceiling);
-    RUN_TEST(test_iseled_block_lacks_collect_resp_nr_leds_and_rcv_timeout);
+    RUN_TEST(test_iseled_block_now_has_collect_resp_nr_leds_and_rcv_timeout);
 
     RUN_TEST(test_mdio_block_is_exactly_the_common_prefix);
     RUN_TEST(test_mdio_request_prefix_carries_no_two_bit_mode_field);
