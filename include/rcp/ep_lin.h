@@ -164,6 +164,14 @@
  * rcp_ep_lin_trigger_fires() is the pure, directly-testable evaluation of
  * that event against a selected trigger mode.
  *
+ * NOTED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group C): unlike SPI/
+ * PWM_OUT/PWM_IN, TC18 defines no "lin trigger outputs" table at all --
+ * this endpoint type's trigger concept has no TC18 basis whatsoever, not
+ * even the fixed-hardware-signal basis SPI/PWM_OUT/PWM_IN each have (see
+ * their own file headers). It is entirely this module's own original
+ * design, reusing ep_spi.h's evaluation-function *shape* only. Never
+ * wire-serialized.
+ *
  * ── Functional configuration: lin_clk_divider bit-time clock ───────────────
  *
  * rcp_ep_lin_functional_cfg_t composes regmap.h's

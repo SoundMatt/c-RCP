@@ -3386,12 +3386,12 @@
     {
       "id": "REQ-SPI-006",
       "title": "rcp_ep_spi_trigger_fires() never fires for RCP_EP_SPI_TRIGGER_NONE",
-      "text": "rcp_ep_spi_trigger_fires() shall return false for trigger == RCP_EP_SPI_TRIGGER_NONE regardless of event.",
+      "text": "rcp_ep_spi_trigger_fires() shall return false for trigger == RCP_EP_SPI_TRIGGER_NONE regardless of event. CLARIFIED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group C): NONE, and this module's entire 4-value rcp_ep_spi_trigger_t, is an original simplification -- TC18 Table 38 documents 14 fixed, always-on, per-CS-channel trigger signals (execution-done plus an assert/de-assert pair for each of CS0-CS5) with no off/none state and no client-selectable register at all (Table 39 has no trigger-select field). See ep_spi.h's own file header for the full clarification.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.3.1 Table 38 (\"An SPI endpoint creates the following trigger events\"), TC18.txt L4204-4219"
+      "tc18": "§13.7.3.1 Table 38 (\"An SPI endpoint creates the following trigger events\"), TC18.txt L4204-4219 -- names 14 fixed, per-CS-channel hardware signals, not a client-configurable field this module's 4-value enum reproduces"
     },
     {
       "id": "REQ-SPI-007",
@@ -3485,12 +3485,12 @@
     {
       "id": "REQ-SPI-016",
       "title": "rcp_ep_spi_set_channel_bit_order() rejects an invalid channel or an unauthorized write without mutating cfg",
-      "text": "rcp_ep_spi_set_channel_bit_order() shall return false and leave cfg unchanged when channel is not rcp_ep_spi_channel_valid() or the write is not authorized by rcp_ep_spi_functional_cfg_writable().",
+      "text": "rcp_ep_spi_set_channel_bit_order() shall return false and leave cfg unchanged when channel is not rcp_ep_spi_channel_valid() or the write is not authorized by rcp_ep_spi_functional_cfg_writable(). CORRECTED (2026-08-10, c-RCP-AUDIT-06, issue #256): the prior citation named Table 39 fields (spi_clk_polarity0/spi_clk_phase0) as \"bit-order-adjacent\", implying bit_order has a TC18 counterpart nearby -- it does not. Table 39 defines no bit-order field at all (MSB-first/LSB-first is this module's own original addition); the channel-validity/authorization behavior this requirement actually describes is correctly implemented and is what §12.3.1.3's W* marker convention governs. See ep_spi.h's own file header.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.3.2 Table 39 (per-channel functional configuration, e.g. bit-order-adjacent fields such as spi_clk_polarity0/spi_clk_phase0), TC18.txt L4260-4291; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- governs the write-authorization behavior; bit_order itself has no TC18 basis (see ep_spi.h's file header)"
     },
     {
       "id": "REQ-SPI-017",
@@ -3565,12 +3565,12 @@
     {
       "id": "REQ-SPI-024",
       "title": "rcp_ep_spi_set_channel_trigger() rejects an invalid channel or an unauthorized write without mutating cfg",
-      "text": "rcp_ep_spi_set_channel_trigger() shall return false and leave cfg unchanged when channel is not rcp_ep_spi_channel_valid() or the write is not authorized by rcp_ep_spi_functional_cfg_writable().",
+      "text": "rcp_ep_spi_set_channel_trigger() shall return false and leave cfg unchanged when channel is not rcp_ep_spi_channel_valid() or the write is not authorized by rcp_ep_spi_functional_cfg_writable(). CLARIFIED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group C): the channel-validity/authorization behavior this requirement describes is correctly implemented and governed by §12.3.1.3's W* marker convention; the `trigger` concept being written is this module's own original simplification of Table 38's 14 fixed hardware signals -- see REQ-SPI-006 and ep_spi.h's own file header.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.3.1 Table 38 (trigger outputs), TC18.txt L4204-4219; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- governs the write-authorization behavior; Table 38 (trigger outputs), TC18.txt L4204-4219, is the fixed-signal basis `trigger` simplifies (see REQ-SPI-006)"
     },
     {
       "id": "REQ-SPI-025",
@@ -4201,42 +4201,42 @@
     {
       "id": "REQ-PWM-012",
       "title": "rcp_ep_pwm_out_trigger_fires() never fires for RCP_EP_PWM_OUT_TRIGGER_NONE",
-      "text": "rcp_ep_pwm_out_trigger_fires() shall return false for trigger == RCP_EP_PWM_OUT_TRIGGER_NONE regardless of event.",
+      "text": "rcp_ep_pwm_out_trigger_fires() shall return false for trigger == RCP_EP_PWM_OUT_TRIGGER_NONE regardless of event. CLARIFIED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group C): NONE is this module's own original addition -- TC18 Table 42 documents three fixed, always-on trigger signals with no off/none state, and Table 43 defines no client-selectable register for choosing among them at all. See ep_pwm.h's own file header for the full clarification.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.5.1 Table 42 (\"A PWM endpoint creates three trigger events\"), TC18.txt L4525-4537"
+      "tc18": "§13.7.5.1 Table 42 (\"A PWM endpoint creates three trigger events\"), TC18.txt L4525-4537 -- names three fixed hardware signals, not a client-configurable field; Table 43 (pwmo functional configuration), TC18.txt L4562-4602, defines no trigger-select register"
     },
     {
       "id": "REQ-PWM-013",
       "title": "rcp_ep_pwm_out_trigger_fires() implements RCP_EP_PWM_OUT_TRIGGER_CYCLE_START",
-      "text": "rcp_ep_pwm_out_trigger_fires() shall return true for trigger == RCP_EP_PWM_OUT_TRIGGER_CYCLE_START iff event == RCP_EP_PWM_OUT_EVENT_CYCLE_START.",
+      "text": "rcp_ep_pwm_out_trigger_fires() shall return true for trigger == RCP_EP_PWM_OUT_TRIGGER_CYCLE_START iff event == RCP_EP_PWM_OUT_EVENT_CYCLE_START. CLARIFIED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group C): this evaluates one of Table 42's three fixed hardware signals against a caller-selected mode -- an original single-select simplification of TC18's own always-on, non-selectable signal model; see ep_pwm.h's own file header.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.5.1 Table 42 (trigger signal 1, \"at the start of the cycle\"), TC18.txt L4534"
+      "tc18": "§13.7.5.1 Table 42 (trigger signal 1, \"at the start of the cycle\"), TC18.txt L4534 -- a fixed hardware signal, not a client-configurable field"
     },
     {
       "id": "REQ-PWM-014",
       "title": "rcp_ep_pwm_out_trigger_fires() implements RCP_EP_PWM_OUT_TRIGGER_MID_PULSE",
-      "text": "rcp_ep_pwm_out_trigger_fires() shall return true for trigger == RCP_EP_PWM_OUT_TRIGGER_MID_PULSE iff event == RCP_EP_PWM_OUT_EVENT_MID_PULSE.",
+      "text": "rcp_ep_pwm_out_trigger_fires() shall return true for trigger == RCP_EP_PWM_OUT_TRIGGER_MID_PULSE iff event == RCP_EP_PWM_OUT_EVENT_MID_PULSE. CLARIFIED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group C): this evaluates one of Table 42's three fixed hardware signals against a caller-selected mode -- an original single-select simplification of TC18's own always-on, non-selectable signal model; see ep_pwm.h's own file header.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.5.1 Table 42 (trigger signal 2, \"in the middle of the active pulse\"), TC18.txt L4535"
+      "tc18": "§13.7.5.1 Table 42 (trigger signal 2, \"in the middle of the active pulse\"), TC18.txt L4535 -- a fixed hardware signal, not a client-configurable field"
     },
     {
       "id": "REQ-PWM-015",
       "title": "rcp_ep_pwm_out_trigger_fires() implements RCP_EP_PWM_OUT_TRIGGER_DONE",
-      "text": "rcp_ep_pwm_out_trigger_fires() shall return true for trigger == RCP_EP_PWM_OUT_TRIGGER_DONE iff event == RCP_EP_PWM_OUT_EVENT_DONE.",
+      "text": "rcp_ep_pwm_out_trigger_fires() shall return true for trigger == RCP_EP_PWM_OUT_TRIGGER_DONE iff event == RCP_EP_PWM_OUT_EVENT_DONE. CLARIFIED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group C): this evaluates one of Table 42's three fixed hardware signals against a caller-selected mode -- an original single-select simplification of TC18's own always-on, non-selectable signal model; see ep_pwm.h's own file header.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.5.1 Table 42 (trigger signal 0, \"PWM request exec done (requested values applied)\"), TC18.txt L4533"
+      "tc18": "§13.7.5.1 Table 42 (trigger signal 0, \"PWM request exec done (requested values applied)\"), TC18.txt L4533 -- a fixed hardware signal, not a client-configurable field"
     },
     {
       "id": "REQ-PWM-016",
@@ -4399,32 +4399,32 @@
     {
       "id": "REQ-PWM-032",
       "title": "rcp_ep_pwm_in_trigger_fires() never fires for RCP_EP_PWM_IN_TRIGGER_NONE",
-      "text": "rcp_ep_pwm_in_trigger_fires() shall return false for trigger == RCP_EP_PWM_IN_TRIGGER_NONE regardless of the level transition.",
+      "text": "rcp_ep_pwm_in_trigger_fires() shall return false for trigger == RCP_EP_PWM_IN_TRIGGER_NONE regardless of the level transition. CLARIFIED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group C): NONE is this module's own original addition -- TC18 Table 44 documents two fixed, always-on trigger signals with no off/none state and no client-selectable register at all (PWM_IN's functional config has no trigger-select field). See ep_pwm.h's own file header.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.6.1 Table 44 (\"The PWM_IN endpoint generates two trigger events\"), TC18.txt L4673-4676"
+      "tc18": "§13.7.6.1 Table 44 (\"The PWM_IN endpoint generates two trigger events\"), TC18.txt L4673-4676 -- names two fixed hardware signals, not a client-configurable field"
     },
     {
       "id": "REQ-PWM-033",
       "title": "rcp_ep_pwm_in_trigger_fires() implements RCP_EP_PWM_IN_TRIGGER_RISING",
-      "text": "rcp_ep_pwm_in_trigger_fires() shall return true for trigger == RCP_EP_PWM_IN_TRIGGER_RISING iff prev_level is false and new_level is true.",
+      "text": "rcp_ep_pwm_in_trigger_fires() shall return true for trigger == RCP_EP_PWM_IN_TRIGGER_RISING iff prev_level is false and new_level is true. CLARIFIED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group C): this evaluates one of Table 44's two fixed hardware signals against a caller-selected mode -- an original single-select simplification; see ep_pwm.h's own file header.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.6.1 Table 44 (trigger signal 0, \"rising edge of PWM_IN signal\"), TC18.txt L4674"
+      "tc18": "§13.7.6.1 Table 44 (trigger signal 0, \"rising edge of PWM_IN signal\"), TC18.txt L4674 -- a fixed hardware signal, not a client-configurable field"
     },
     {
       "id": "REQ-PWM-034",
       "title": "rcp_ep_pwm_in_trigger_fires() implements RCP_EP_PWM_IN_TRIGGER_FALLING",
-      "text": "rcp_ep_pwm_in_trigger_fires() shall return true for trigger == RCP_EP_PWM_IN_TRIGGER_FALLING iff prev_level is true and new_level is false.",
+      "text": "rcp_ep_pwm_in_trigger_fires() shall return true for trigger == RCP_EP_PWM_IN_TRIGGER_FALLING iff prev_level is true and new_level is false. CLARIFIED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group C): this evaluates one of Table 44's two fixed hardware signals against a caller-selected mode -- an original single-select simplification; see ep_pwm.h's own file header.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.6.1 Table 44 (trigger signal 1, \"falling edge of PWM_IN signal\"), TC18.txt L4675"
+      "tc18": "§13.7.6.1 Table 44 (trigger signal 1, \"falling edge of PWM_IN signal\"), TC18.txt L4675 -- a fixed hardware signal, not a client-configurable field"
     },
     {
       "id": "REQ-PWM-035",
@@ -6146,20 +6146,22 @@
     {
       "id": "REQ-LINEP-013",
       "title": "rcp_ep_lin_set_trigger() rejects an unauthorized write",
-      "text": "rcp_ep_lin_set_trigger() shall leave cfg->trigger unchanged and return false when rcp_ep_lin_functional_cfg_writable() denies the write for the given state/writer.",
+      "text": "rcp_ep_lin_set_trigger() shall leave cfg->trigger unchanged and return false when rcp_ep_lin_functional_cfg_writable() denies the write for the given state/writer. CLARIFIED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group C): the write-authorization behavior is TC18-derived (§12.3.1.3's W* marker convention, delegated via rcp_ep_lin_functional_cfg_writable()); `trigger` itself has no TC18 basis at all -- unlike SPI/PWM_OUT/PWM_IN, TC18 defines no trigger-outputs table for LIN. See ep_lin.h's own file header.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- governs the write-authorization behavior; `trigger` itself is this module's own original design with no TC18 counterpart (see ep_lin.h's file header)"
     },
     {
       "id": "REQ-LINEP-014",
       "title": "rcp_ep_lin_set_trigger() applies an authorized write",
-      "text": "rcp_ep_lin_set_trigger() shall set cfg->trigger to trigger and return true when rcp_ep_lin_functional_cfg_writable() authorizes the write for the given state/writer.",
+      "text": "rcp_ep_lin_set_trigger() shall set cfg->trigger to trigger and return true when rcp_ep_lin_functional_cfg_writable() authorizes the write for the given state/writer. CLARIFIED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group C): the write-authorization behavior is TC18-derived (§12.3.1.3's W* marker convention); `trigger` itself has no TC18 basis at all -- see REQ-LINEP-013 and ep_lin.h's own file header.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- governs the write-authorization behavior; `trigger` itself is this module's own original design with no TC18 counterpart (see ep_lin.h's file header)"
     },
     {
       "id": "REQ-LINEP-015",

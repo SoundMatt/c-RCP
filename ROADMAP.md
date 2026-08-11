@@ -11906,3 +11906,76 @@ findings -- an architecture question similar to the deferred GPIO
 `pin_property` precedent, likely needing the same
 investigate/document/possibly-defer treatment as this and the
 preceding groups).
+
+### v0.212.0 -- 2026-08-10
+
+**Full-catalog audit follow-up, batch 13 (Group C, no code change):
+`trigger`'s single-select shape clarified as an original, non-wire-
+affecting simplification of TC18's fixed hardware signal tables, issue
+#256.**
+
+Investigated Group C, all 16 of the audit's own list
+(`REQ-PWM-012/013/014/015/020/021/032/033/034/039/040`,
+`REQ-SPI-006/016/024`, `REQ-LINEP-013/014`). Of these, `REQ-PWM-020/
+021/039/040` were re-checked and found already honest -- they cite
+only §12.3.1.3's W* write-authorization convention, which is genuinely
+what they describe, not `trigger`'s own shape -- so no edit was needed
+for those 4 (a smaller-scale echo of Group A's own false-positive
+pattern, this time within a single group rather than across all 17
+findings). Read TC18 §13.7.3.1 Table 38 (SPI), §13.7.5.1
+Table 42 (PWM_OUT), and §13.7.6.1 Table 44 (PWM_IN) directly: each
+names *fixed, always-on hardware trigger signals* the endpoint
+"creates" (SPI: 14 signals, execution-done plus an assert/de-assert
+pair for each of CS0 through CS5; PWM_OUT: 3; PWM_IN: 2) -- none with
+an off/none state, and none paired with any client-configurable
+register. Confirmed by reading each endpoint's own functional-config
+register table (SPI Table 39, PWM_OUT Table 43; PWM_IN has no
+functional-config register block for triggers at all) that no
+trigger-select field exists anywhere in any of the three, and by
+reading each module's own `render_registers()`/`parse_registers()`
+path (SPI has none at all; PWM_OUT's never touches `cfg->trigger`)
+that `trigger` is never serialized onto the wire in any of the three
+modules.
+
+This is a real, previously-undocumented mismatch between the code's
+model (a single exclusive selection, plus an invented NONE/off state,
+collapsing SPI's 14 per-CS-channel signals down to 4 generic values
+with no channel distinction) and TC18's own model (multiple
+simultaneous, always-active, non-configurable signals) -- but because
+none of it reaches the wire, it is an internal-API simplification, not
+an interop-breaking bug like Group E's SleepCMD finding was. `ep_lin.h`
+already disclosed its own trigger concept as original design (TC18
+defines no trigger-outputs table for LIN at all, unlike SPI/PWM_OUT/
+PWM_IN); `ep_pwm.h`/`ep_spi.h` did not yet make the SPI/PWM
+fixed-vs-selectable and per-channel-granularity mismatch explicit.
+
+A second, distinct issue surfaced during the SPI investigation and
+fixed alongside it: `REQ-SPI-016`'s own citation named Table 39 fields
+(`spi_clk_polarity0`/`spi_clk_phase0`) as "bit-order-adjacent",
+implying `bit_order` (MSB-first/LSB-first) has a nearby TC18
+counterpart -- reading Table 39 directly found no bit-order field of
+any kind anywhere in it. `bit_order` is this module's own original
+addition with no TC18 basis at all, same class of finding as
+`trigger` itself. (`REQ-SPI-017`, its sibling apply-the-write entry,
+was checked too and found already honest -- it cites only the W*
+convention -- so needed no edit.)
+
+Fixed by adding honest clarification to `ep_pwm.h`'s (both PWM_OUT and
+PWM_IN sections), `ep_spi.h`'s (both the per-channel-config and
+trigger-signals sections), and `ep_lin.h`'s file headers, and
+correcting citations/text for the 12 entries that actually needed it
+(`REQ-PWM-012/013/014/015/032/033/034`, `REQ-SPI-006/016/024`,
+`REQ-LINEP-013/014`) -- no code change, since the existing
+single-select design is a reasonable, internally-consistent,
+non-wire-affecting choice this codebase made, not a defect.
+
+No mutation-testing needed (doc/citation-only, same as Groups A/D/F).
+Full suite (65/65) both trees re-run to confirm inertness.
+`.fusa-reqs.json` unchanged count (1024 total, 100% traced/tested per
+`cfusa trace`, 0 errors per `cfusa check`).
+
+Issue #256's Group C is now fully closed (16/16). **Progress: 76/156
+findings resolved** (Groups H 12 + B 4 + A 17 + D 16 + F 7 + E 4 + C
+16 = 76). Moving to Group G next (ISELED polarity inversion, 2
+findings, a real contained code bug -- the same class of finding as
+REQ-GPIO-013, not yet fixed).

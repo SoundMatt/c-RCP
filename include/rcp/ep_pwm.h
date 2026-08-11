@@ -163,6 +163,23 @@
  * phase-locking is a caller-level (RC Server) concern outside this
  * milestone's scope.
  *
+ * CLARIFIED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group C): TC18
+ * §13.7.5.1 Table 42 names its three trigger signals (exec-done,
+ * cycle-start, mid-pulse) as fixed hardware output lines an endpoint
+ * "creates" -- Table 43 (this endpoint's own functional-config register
+ * block) defines no register field that selects among them, so nothing
+ * in the specification suggests a client ever configures which one is
+ * active; the natural reading is that a real implementation exposes all
+ * three simultaneously. rcp_ep_pwm_out_trigger_t's single, mutually-
+ * exclusive `trigger` field (plus a NONE/off state neither Table 42 nor
+ * 43 defines) is this module's own original simplification, letting a
+ * caller name the one event it cares about rather than modeling three
+ * independent always-on signals. `cfg->trigger` is never rendered onto
+ * the wire (rcp_ep_pwm_out_render_registers() does not touch it) -- this
+ * simplification has no wire-format consequence, unlike the WAKEUP
+ * SleepCMD case (issue #256 Group E) where an analogous simplification
+ * did.
+ *
  * ── PWM_IN: response-only capture, PWM_IN_NO_SIGNAL on timeout ─────────────
  *
  * PWM_IN has no write request of its own -- a caller only ever issues a
@@ -179,7 +196,15 @@
  * timeout marker rather than declaring a second, potentially
  * inconsistent, sentinel of its own -- see ep_adc.h's file header.
  * rcp_ep_pwm_in_trigger_t names PWM_IN's own two edge-trigger modes
- * (rising/falling), plus NONE.
+ * (rising/falling), plus NONE. CLARIFIED 2026-08-10 (c-RCP-AUDIT-06,
+ * issue #256 Group C): TC18 §13.7.6.1 Table 44 names these as PWM_IN's
+ * two fixed, always-on hardware trigger signals, not a client-selectable
+ * register field (PWM_IN has no functional-config register block for
+ * triggers at all in this codebase, matching TC18's own silence on any
+ * such register) -- the exclusive-select `trigger` field (plus a
+ * NONE/off state Table 44 doesn't define) is this module's own original
+ * simplification, exactly like PWM_OUT's (see that section's own note,
+ * above). Never wire-serialized.
  *
  * ── Compound-wait's numeric ≥/≤ comparison modes against PWM_IN ────────────
  *
