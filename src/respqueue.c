@@ -53,6 +53,14 @@ bool rcp_respqueue_push(rcp_respqueue_t *q, const uint8_t *frame, size_t frame_l
     return true;
 }
 
+//cfusa:req REQ-RMAP-061
+bool rcp_respqueue_max_avtpdu_size_within_mtu(size_t max_avtpdu_size_octets,
+                                               size_t mtu_budget_octets)
+{
+    if (max_avtpdu_size_octets == 0) return mtu_budget_octets == 0;
+    return max_avtpdu_size_octets <= mtu_budget_octets;
+}
+
 //cfusa:req REQ-RMAP-059
 bool rcp_respqueue_pop(rcp_respqueue_t *q, rcp_bytes_t *out_frame)
 {

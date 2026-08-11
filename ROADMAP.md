@@ -14398,3 +14398,91 @@ Group 5 (REQ-RMAP-047/048/049/050/051/066/067/068, including Table
 33's own wire codec -- which, once resolved, may also finally answer
 the shared HW_config/EP_ID_config addressing question, since all
 three tables are reached the same pointer-into-EP0's-own-space way).
+
+### v0.237.0 -- 2026-08-11
+
+**Phase 5d Group 4 remainder (issue #200): REQ-RMAP-061's own
+MTU-consistency-check half closed; REQ-RMAP-065 reviewed, already
+honest.**
+
+Read TC18 §12.7.9's own text directly (TC18.txt L3010-3011): "The
+Max_AVTPDUsize shall always be configured such that the final
+network frame does not exceed the maximum transmit unit size of the
+network." Confirmed TC18 defines no fixed MTU value of its own --
+network deployment is genuinely out of its scope -- so the design
+mirrors `rcp_respqueue_max_fragment_payload()`'s own precedent: the
+caller supplies an already-adjusted budget rather than this codebase
+inventing or assuming an Ethernet-standard 1500-octet constant (or
+any other) it has no citation for.
+
+**New**: `rcp_respqueue_max_avtpdu_size_within_mtu()`
+(`respqueue.h`/`respqueue.c`) -- a config-time check a caller runs
+BEFORE ever calling `rcp_respqueue_init()`, distinct from
+`rcp_respqueue_push()`'s own already-implemented, unrelated
+per-message transmit-bounding check. `max_avtpdu_size_octets == 0`
+(this module's own established "unbounded" convention, matching
+`rcp_respqueue_init()`'s own doc comment) is deliberately NOT treated
+as trivially "within any budget" -- an unbounded ceiling has no upper
+bound at all, so it cannot be verified MTU-safe against a finite
+budget by definition. The one exception: both sides unbounded (0, 0)
+is treated as vacuously true, since "no ceiling configured" is
+consistent with "no MTU budget configured either," not a real
+conformance answer either way.
+
+**REQ-RMAP-061 stays `partial` overall**, for the same reason
+REQ-RMAP-040/041 (HW_config) and REQ-RMAP-052/054 (EP_ID_config) do:
+TC18 §12.7.9's own Table 24 (the whole response/ack queue config
+block, including Max_AVTPDUsize) is a separate table pointed to by
+Table 18's own `svr_response_stream_cfg_ptr` register (REQ-RMAP-034,
+already `implemented`), not reached via Table 18 itself or an
+endpoint's own EP_func block -- the identical, genuine, unresolved
+ACF_ABB addressing question, not re-litigated or re-guessed a third
+time.
+
+**A stale framing corrected**: this requirement's own prior text
+described its remaining gap as "exposing the value in the discovery
+general-register slice." That predates this codebase's own later
+discovery (during the REQ-RMAP-024/Table-18 wire-codec work,
+v0.234.0) that Table 24 was never part of the 14-octet discovery
+slice at all -- it is a separate, pointer-addressed table like
+HW_config and EP_ID_config. `respqueue.h`'s own file header, the
+`test_max_avtpdu_size_is_now_enforced_and_feeds_fragmentation()`
+test's own doc comment, and `.fusa-reqs.json` itself all corrected
+to match.
+
+**REQ-RMAP-065 (empty-queue heartbeat AVTPDU) reviewed, confirmed
+already honestly scoped -- no code change.** Its own remaining gap
+("actually SCHEDULING and TRANSMITTING that heartbeat on a real
+clock stays outside this module's and this library's scope
+entirely") is a genuine integrator responsibility, matching
+REQ-SRV-017's own already-established "c-RCP is a protocol library,
+not a scheduler" precedent -- not a gap this codebase could or
+should close on its own.
+
+New test: `test_max_avtpdu_size_within_mtu_check` -- ordinary case
+(fits), exact boundary (fits, confirming `<=` not `<`), one octet
+over (rejected), the unbounded-ceiling-vs-finite-budget case
+(rejected), and the both-unbounded degenerate case (vacuously true).
+
+Mutation-tested: relaxing the unbounded-ceiling special case
+(`if (max_avtpdu_size_octets == 0) return true;` instead of `return
+mtu_budget_octets == 0;`) produced a clean, deterministic assertion
+failure. Reverted, full suite re-verified clean.
+
+65/65 both trees (native + ASan/UBSan, unaffected -- new additive
+code with no existing caller). `cfusa check`: 0 errors. `cfusa
+trace --gaps`: 0/1024 untested; `--req-coverage 100`/
+`--sec-tested 100`: both 100%.
+
+**Progress**: Group 4 (response/ack queue config, issue #200) is
+now fully addressed as far as it honestly can be without resolving
+the shared Table-18-pointed-to-table addressing question --
+REQ-RMAP-059/060/062/063/064 already `implemented`, REQ-RMAP-065
+already honestly `partial` with a correctly-described integrator
+boundary, REQ-RMAP-061 now `partial` with both its own sub-halves
+(transmit-bounding, MTU-consistency) real and tested instead of one
+being genuinely missing. **Next**: Group 5
+(REQ-RMAP-047/048/049/050/051/066/067/068, including Table 33's own
+wire codec), and REQ-RMAP-055 (the W+ lockable-access-type
+primitive) on its own, still the two largest remaining pieces of
+Phase 5d.

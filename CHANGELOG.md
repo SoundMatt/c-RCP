@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.237.0 -- 2026-08-11
+
+**Phase 5d Group 4 remainder (issue #200): REQ-RMAP-061's own MTU-consistency-check half closed.**
+
+`rcp_respqueue_max_avtpdu_size_within_mtu()` (respqueue.h/respqueue.c) is the config-time check TC18 §12.7.9 requires ("the Max_AVTPDUsize shall always be configured such that the final network frame does not exceed the maximum transmit unit size of the network", TC18.txt L3010-3011) — run before ever calling `rcp_respqueue_init()`. TC18 defines no fixed MTU value of its own, so `mtu_budget_octets` is the caller's own already-adjusted ceiling, matching this module's established "caller supplies already-classified units" convention throughout. `max_avtpdu_size_octets == 0` (this module's own "unbounded" convention) is never within budget for a nonzero MTU budget — an unbounded ceiling cannot be MTU-safe by definition — except the degenerate case where both are 0.
+
+REQ-RMAP-061 stays `partial` overall: TC18 §12.7.9's own Table 24 is a separate table pointed to by Table 18's own `svr_response_stream_cfg_ptr`, not reached via Table 18 itself or an endpoint's own EP_func block — the same genuine, unresolved ACF_ABB addressing question already documented for HW_config and EP_ID_config. **Also corrected**: this requirement's own prior text described the remaining gap as "exposing the value in the discovery general-register slice" — that framing predates this codebase's own later discovery that Table 24 was never part of the 14-octet discovery slice at all.
+
+REQ-RMAP-065 (empty-queue heartbeat) reviewed and confirmed already honestly scoped — its own remaining gap is a real integrator responsibility (this is a protocol library, not a scheduler, matching REQ-SRV-017's own precedent), not a code gap. No change.
+
+New test: `test_max_avtpdu_size_within_mtu_check` covers the ordinary/boundary/over cases plus both unbounded-input edge cases.
+
+Mutation-tested: relaxing the unbounded-ceiling special case to always return `true` produced a clean, deterministic assertion failure. Reverted, full suite re-verified clean.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.236.0 -- 2026-08-11 (doc + structural, no behavior change to any existing consumer)
 
 **Phase 5d Group 3 remainder (issue #200): EP_ID_config gets a correct 4-octet-per-row wire stride, and a stale cross-reference is corrected.**
