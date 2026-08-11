@@ -54,11 +54,13 @@ void rcp_regmap_general_init(rcp_regmap_general_t *map)
 //cfusa:req REQ-RMAP-010
 //cfusa:req REQ-RMAP-011
 //cfusa:req REQ-RMAP-012
+//cfusa:req REQ-RMAP-070
 rcp_lifecycle_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map,
                                                const rcp_regmap_ep_client_t *ep_client,
                                                uint16_t requesting_stream_index,
                                                bool via_ep0,
-                                               bool via_unicast)
+                                               bool via_unicast,
+                                               bool via_discovery_stream)
 {
     rcp_lifecycle_writer_ctx_t ctx;
 
@@ -71,6 +73,13 @@ rcp_lifecycle_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map
                             requesting_stream_index == ep_client->owning_stream_index;
 
     ctx.via_non_unicast_frame = !via_unicast;
+
+    /* REQ-RMAP-070: pass through, matching via_ep0/via_unicast's own
+     * already-classified-input convention -- this function has no wire
+     * data of its own from which "arrived via the discovery stream"
+     * could be re-derived. Explicitly assigned so every member of ctx
+     * is set (REQ-RMAP-009's own fix: previously left uninitialized). */
+    ctx.via_discovery_stream = via_discovery_stream;
 
     return ctx;
 }

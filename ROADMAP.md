@@ -11255,3 +11255,50 @@ touching the same struct twice in flight). The GPIO `evt[2:0]=111b`/
 `REQ-GPIO-013`/`REQ-GPIO-035` finding from this batch remains posted
 to issue #200 and this session's own project memory, awaiting a
 decision before any further work touches it.
+
+### v0.200.0 -- 2026-08-10
+
+**Full-catalog audit follow-up, batch 1 (Group H): REQ-RMAP-009/-046/-070, issue #256.**
+
+This is the first fix batch from the 156-finding full `.fusa-reqs.json`
+re-audit against the TC18 PDF (issue #256, memory
+`project_crcp_catalog_audit_202608.md`). Two standalone, well-contained
+Group H findings closed:
+
+`REQ-RMAP-046` was a stale duplicate of `REQ-RMAP-039` -- both
+described the same four product-specific configuration-section
+pointer/capacity pairs (network/physical-layer/time-synch/security,
+TC18 §12.7.11-.14), but `-046` still said "not-implemented" while
+`-039` (already fixed, batch 22) correctly says "partial, registers
+declared". Retired `-046`, text now cross-references `-039`. No code
+change.
+
+`REQ-RMAP-009` (`rcp_regmap_writer_ctx()`) never assigned
+`ctx.via_discovery_stream` before returning -- a real uninitialized-
+field defect flowing into an ASIL-B write-authorization decision
+(`rcp_lifecycle_field_writable()`/`rcp_lifecycle_transition()`),
+currently latent only because no production caller exists yet in
+`src/*.c` (only this function's own unit tests call it). Fixed by
+adding a sixth parameter, `via_discovery_stream`, matching `via_ep0`/
+`via_unicast`'s own "already-classified input, not re-derived from a
+frame" convention -- the function now explicitly assigns every member
+of the returned `rcp_lifecycle_writer_ctx_t`. New requirement
+`REQ-RMAP-070` documents the "every member explicitly assigned"
+contract. Breaking API change (extra parameter); all 10 existing
+`test_regmap.c` call sites updated to pass `false` (none of them were
+testing discovery-stream behavior), plus one new dedicated test,
+`test_writer_ctx_plumbs_via_discovery_stream`, confirming true/false
+pass-through with every other authorizing condition held false.
+
+Mutation-tested: removed the new `ctx.via_discovery_stream = ...`
+assignment, confirmed `test_writer_ctx_plumbs_via_discovery_stream`
+fails (`Expected TRUE Was FALSE`), restored, diff-verified byte-
+identical against the pre-mutation backup. Full suite (65/65) green on
+both the native and ASan/UBSan trees. 1031 requirements (+1 for
+`REQ-RMAP-070`).
+
+Issue #256's Group H has 8 more findings remaining (`REQ-CANCEL-012`,
+`REQ-CMP-018`/`REQ-CANCEL-004`, `REQ-SRV-006`/`-013`, `REQ-PWR-005`,
+`REQ-E2E-021`, `REQ-MOCK-030`, `REQ-LIFECYCLE-001`/`-017`/`-018`/
+`-019`/`-020`) before moving to Group B (PWM_IN's inverted compound-
+wait comparisons).
