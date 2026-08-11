@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/ep_gpio.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 /* ── Byte-order helpers (this TU's own copy, matching acf.c's/discovery.c's
@@ -18,6 +19,17 @@ static uint32_t get_u32(const uint8_t *p)
 {
     return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) |
            ((uint32_t)p[2] << 8)  |  (uint32_t)p[3];
+}
+
+static void put_u16(uint8_t *p, uint16_t v)
+{
+    p[0] = (uint8_t)((v >> 8) & 0xFFu);
+    p[1] = (uint8_t)(v & 0xFFu);
+}
+
+static uint16_t get_u16(const uint8_t *p)
+{
+    return (uint16_t)(((uint16_t)p[0] << 8) | (uint16_t)p[1]);
 }
 
 /* ── Pin addressing ────────────────────────────────────────────────────────── */
@@ -94,13 +106,17 @@ uint32_t rcp_ep_gpio_apply_write(uint32_t current, uint32_t request,
     }
 }
 
+/* RENAMED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group G, REQ-GPIO-013):
+ * formerly rcp_ep_gpio_apply_reconfig() -- see ep_gpio.h's file header and
+ * this function's own declaration for why this is no longer described as
+ * evt[2:0]==111b's handler. */
 //cfusa:req REQ-GPIO-013
-void rcp_ep_gpio_apply_reconfig(uint8_t pins[RCP_EP_GPIO_MAX_PINS], uint32_t reconfig_mask)
+void rcp_ep_gpio_toggle_pin_direction(uint8_t pins[RCP_EP_GPIO_MAX_PINS], uint32_t toggle_mask)
 {
     uint8_t i;
 
     for (i = 0; i < RCP_EP_GPIO_MAX_PINS; i++) {
-        if ((reconfig_mask & rcp_ep_gpio_pin_mask(i)) == 0) continue;
+        if ((toggle_mask & rcp_ep_gpio_pin_mask(i)) == 0) continue;
 
         if ((pins[i] & RCP_REGMAP_PIN_PROP_OUTPUT) != 0) {
             pins[i] = (uint8_t)((pins[i] & ~(unsigned)RCP_REGMAP_PIN_PROP_OUTPUT) |
@@ -191,6 +207,172 @@ bool rcp_ep_gpio_set_pin_trigger(rcp_ep_gpio_functional_cfg_t *cfg, uint8_t pin_
 
     cfg->pins[pin_index].trigger = (uint8_t)trigger;
     return true;
+}
+
+/* ── The EP_func register block (evt[2:0] == 111b) -- see the file header ──── */
+
+/* The EP-common enable&clr (0x0002) and options (0x0003) octets, packed
+ * from / unpacked into the flags regmap.h's shared functional-config
+ * prefix already models -- the same Table 32 common-entries bit positions
+ * ep_pwm.c's own PWM_OUT_ENABLE_CLR_BIT_ and PWM_OUT_OPTIONS_BIT_ constants
+ * use, since both endpoint types cite the identical shared table. */
+#define GPIO_ENABLE_CLR_BIT_ENABLE ((uint8_t)(1u << 0))
+#define GPIO_ENABLE_CLR_BIT_CLEAR  ((uint8_t)(1u << 4))
+#define GPIO_OPTIONS_BIT_REQ_CRC   ((uint8_t)(1u << 0))
+#define GPIO_OPTIONS_BIT_RESP_TS   ((uint8_t)(1u << 3))
+#define GPIO_OPTIONS_BIT_SUPPRESS  ((uint8_t)(1u << 7))
+
+//cfusa:req REQ-GPIO-038
+void rcp_ep_gpio_render_registers(const rcp_ep_gpio_functional_cfg_t *cfg,
+                                   uint8_t out[RCP_EP_GPIO_EP_FUNC_LEN])
+{
+    uint8_t enable_clr = 0u;
+    uint8_t options    = 0u;
+    uint8_t i;
+
+    if (cfg->common.ep_enable) enable_clr |= GPIO_ENABLE_CLR_BIT_ENABLE;
+    if (cfg->common.ep_clear_req_storage) enable_clr |= GPIO_ENABLE_CLR_BIT_CLEAR;
+    if (cfg->common.ep_req_crc_enable) options |= GPIO_OPTIONS_BIT_REQ_CRC;
+    if (cfg->common.ep_response_ts_enable) options |= GPIO_OPTIONS_BIT_RESP_TS;
+    if (cfg->common.ep_suppress_response) options |= GPIO_OPTIONS_BIT_SUPPRESS;
+
+    out[RCP_EP_GPIO_REG_EP_LEN]        = (uint8_t)RCP_EP_GPIO_EP_FUNC_LEN;
+    out[RCP_EP_GPIO_REG_IO_MAX]        = RCP_EP_GPIO_MAX_PINS;
+    out[RCP_EP_GPIO_REG_EP_ENABLE_CLR] = enable_clr;
+    out[RCP_EP_GPIO_REG_EP_OPTIONS]    = options;
+    put_u16(&out[RCP_EP_GPIO_REG_BASE_CLK], 0u); /* read-only, this module
+                                                     defines no GPIO clock
+                                                     source -- see the file
+                                                     header */
+    put_u16(&out[RCP_EP_GPIO_REG_EP_STATUS], cfg->ep_status);
+    out[RCP_EP_GPIO_REG_CLK_DIVIDER] = cfg->clk_divider;
+    for (i = 0; i < RCP_EP_GPIO_MAX_PINS; i++) {
+        out[RCP_EP_GPIO_REG_DEBOUNCE_IO0 + i] = cfg->debounce[i];
+    }
+}
+
+/* The inverse of render: adopts every R/W register from an already patched
+ * block image. The read-only offsets (EP_LEN, IO_MAX, base_clk) are
+ * deliberately not read back -- apply_reconfig() re-renders them from cfg
+ * before patching, so a write covering them is a no-op. */
+static void parse_registers(rcp_ep_gpio_functional_cfg_t *cfg,
+                             const uint8_t in[RCP_EP_GPIO_EP_FUNC_LEN])
+{
+    uint8_t enable_clr = in[RCP_EP_GPIO_REG_EP_ENABLE_CLR];
+    uint8_t options    = in[RCP_EP_GPIO_REG_EP_OPTIONS];
+    uint8_t i;
+
+    cfg->common.ep_enable            = (enable_clr & GPIO_ENABLE_CLR_BIT_ENABLE) != 0u;
+    cfg->common.ep_clear_req_storage = (enable_clr & GPIO_ENABLE_CLR_BIT_CLEAR) != 0u;
+    cfg->common.ep_req_crc_enable    = (options & GPIO_OPTIONS_BIT_REQ_CRC) != 0u;
+    cfg->common.ep_response_ts_enable = (options & GPIO_OPTIONS_BIT_RESP_TS) != 0u;
+    cfg->common.ep_suppress_response  = (options & GPIO_OPTIONS_BIT_SUPPRESS) != 0u;
+
+    cfg->ep_status   = get_u16(&in[RCP_EP_GPIO_REG_EP_STATUS]);
+    cfg->clk_divider = in[RCP_EP_GPIO_REG_CLK_DIVIDER];
+    for (i = 0; i < RCP_EP_GPIO_MAX_PINS; i++) {
+        cfg->debounce[i] = in[RCP_EP_GPIO_REG_DEBOUNCE_IO0 + i];
+    }
+}
+
+/* True iff the octet at relative offset addr belongs to a read-only
+ * register of the block -- EP_LEN, IO_MAX, and both octets of base_clk. */
+static bool reg_offset_read_only(uint16_t addr)
+{
+    return addr == RCP_EP_GPIO_REG_EP_LEN ||
+           addr == RCP_EP_GPIO_REG_IO_MAX ||
+           addr == RCP_EP_GPIO_REG_BASE_CLK ||
+           addr == (uint16_t)(RCP_EP_GPIO_REG_BASE_CLK + 1u);
+}
+
+//cfusa:req REQ-GPIO-039
+const char *rcp_ep_gpio_reconfig_strerror(rcp_ep_gpio_reconfig_errc_t e)
+{
+    switch (e) {
+    case RCP_EP_GPIO_RECONFIG_OK:
+        return "rcp/ep_gpio: GPIO configuration write applied";
+    case RCP_EP_GPIO_RECONFIG_ERR_SHORT:
+        return "rcp/ep_gpio: GPIO configuration write has no address and data";
+    case RCP_EP_GPIO_RECONFIG_ERR_OUT_OF_RANGE:
+        return "rcp/ep_gpio: GPIO configuration write extends past the EP_func block";
+    default:
+        return "rcp/ep_gpio: GPIO unknown configuration-write error";
+    }
+}
+
+//cfusa:req REQ-GPIO-013
+//cfusa:req REQ-GPIO-038
+//cfusa:req REQ-GPIO-039
+rcp_ep_gpio_reconfig_errc_t
+rcp_ep_gpio_apply_reconfig(rcp_ep_gpio_functional_cfg_t *cfg,
+                            const uint8_t *payload, size_t payload_len)
+{
+    uint8_t  block[RCP_EP_GPIO_EP_FUNC_LEN];
+    uint16_t start_address;
+    size_t   data_len;
+    size_t   i;
+
+    if (payload_len <= RCP_EP_GPIO_RECONFIG_ADDR_LEN) {
+        return RCP_EP_GPIO_RECONFIG_ERR_SHORT;
+    }
+
+    start_address = get_u16(payload);
+    data_len      = payload_len - RCP_EP_GPIO_RECONFIG_ADDR_LEN;
+
+    /* "Any payload whose length plus the start address exceeds EP_LEN is
+     * to be ignored" -- the whole write, not just its overhanging tail
+     * (extraction §3.7.1). */
+    if ((size_t)start_address + data_len > (size_t)RCP_EP_GPIO_EP_FUNC_LEN) {
+        return RCP_EP_GPIO_RECONFIG_ERR_OUT_OF_RANGE;
+    }
+
+    /* Patch the block's current image at octet granularity, then adopt it
+     * wholesale -- so a write covering only part of a multi-octet register
+     * updates exactly the octets it addresses and leaves that register's
+     * other octets alone. */
+    rcp_ep_gpio_render_registers(cfg, block);
+    for (i = 0; i < data_len; i++) {
+        uint16_t addr = (uint16_t)(start_address + i);
+
+        if (reg_offset_read_only(addr)) continue; /* write ignored */
+        block[addr] = payload[RCP_EP_GPIO_RECONFIG_ADDR_LEN + i];
+    }
+    parse_registers(cfg, block);
+
+    return RCP_EP_GPIO_RECONFIG_OK;
+}
+
+//cfusa:req REQ-GPIO-038
+rcp_bytes_t rcp_ep_gpio_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                 uint16_t start_address,
+                                                 const uint8_t *data, size_t data_len,
+                                                 uint8_t transaction_num)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 empty = {0};
+    uint8_t                     *payload;
+    size_t                       payload_len;
+    rcp_bytes_t                  frame;
+
+    if (data_len == 0 || data == NULL) return empty;
+
+    payload_len = RCP_EP_GPIO_RECONFIG_ADDR_LEN + data_len;
+    if (payload_len > RCP_ACF_MAX_PAYLOAD) return empty;
+
+    payload = (uint8_t *)malloc(payload_len);
+    if (!payload) return empty;
+
+    put_u16(payload, start_address);
+    memcpy(payload + RCP_EP_GPIO_RECONFIG_ADDR_LEN, data, data_len);
+
+    hdr.byte_bus_id     = byte_bus_id;
+    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.evt             = (uint8_t)RCP_EP_GPIO_WRITE_RECONFIG;
+    hdr.transaction_num = transaction_num;
+
+    frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
+    free(payload);
+    return frame;
 }
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */

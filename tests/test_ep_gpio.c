@@ -33,6 +33,8 @@
 //cfusa:test REQ-GPIO-031
 //cfusa:test REQ-GPIO-032
 //cfusa:test REQ-GPIO-037
+//cfusa:test REQ-GPIO-038
+//cfusa:test REQ-GPIO-039
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -190,7 +192,7 @@ static void test_apply_write_wire_value_6_is_sub(void)
         rcp_ep_gpio_apply_write(20u, 30u, (rcp_ep_gpio_write_semantics_t)6u));
 }
 
-static void test_apply_reconfig_toggles_only_flagged_pins(void)
+static void test_toggle_pin_direction_toggles_only_flagged_pins(void)
 {
     uint8_t pins[RCP_EP_GPIO_MAX_PINS];
 
@@ -200,7 +202,7 @@ static void test_apply_reconfig_toggles_only_flagged_pins(void)
     pins[2] = RCP_REGMAP_PIN_PROP_OUTPUT;
 
     /* Flag pins 0 and 1 only; pin 2 must be left untouched. */
-    rcp_ep_gpio_apply_reconfig(pins, (1u << 0) | (1u << 1));
+    rcp_ep_gpio_toggle_pin_direction(pins, (1u << 0) | (1u << 1));
 
     TEST_ASSERT_EQUAL_UINT8(RCP_REGMAP_PIN_PROP_INPUT | RCP_REGMAP_PIN_PROP_PULL_UP, pins[0]);
     TEST_ASSERT_EQUAL_UINT8(RCP_REGMAP_PIN_PROP_OUTPUT, pins[1]);
@@ -322,6 +324,12 @@ static void test_functional_cfg_init_zeroes(void)
         TEST_ASSERT_EQUAL_UINT8(0, cfg.pins[i].pin_property);
         TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_GPIO_TRIGGER_NONE, cfg.pins[i].trigger);
     }
+
+    TEST_ASSERT_EQUAL_UINT(0u, cfg.ep_status);
+    TEST_ASSERT_EQUAL_UINT8(0u, cfg.clk_divider);
+    for (i = 0; i < RCP_EP_GPIO_MAX_PINS; i++) {
+        TEST_ASSERT_EQUAL_UINT8(0u, cfg.debounce[i]);
+    }
 }
 
 static void test_functional_cfg_writable_false_hw_unconfigured(void)
@@ -431,6 +439,134 @@ static void test_set_pin_trigger_applies_when_authorized(void)
     TEST_ASSERT_TRUE(rcp_ep_gpio_set_pin_trigger(
         &cfg, 9, RCP_EP_GPIO_TRIGGER_FALLING, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_GPIO_TRIGGER_FALLING, cfg.pins[9].trigger);
+}
+
+/* ── The EP_func register block (evt[2:0] == 111b) ────────────────────────────
+ * ADDED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group G, REQ-GPIO-013). */
+
+static void test_render_registers_matches_table_offsets(void)
+{
+    rcp_ep_gpio_functional_cfg_t cfg;
+    uint8_t                      block[RCP_EP_GPIO_EP_FUNC_LEN];
+
+    rcp_ep_gpio_functional_cfg_init(&cfg);
+    cfg.common.ep_enable = true;
+    cfg.ep_status         = 0x1234u;
+    cfg.clk_divider       = 0x05u;
+    cfg.debounce[0]       = 0x11u;
+    cfg.debounce[31]      = 0x22u;
+
+    rcp_ep_gpio_render_registers(&cfg, block);
+
+    TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_EP_GPIO_EP_FUNC_LEN, block[0x00]); /* gpio_ep_len */
+    TEST_ASSERT_EQUAL_HEX8(RCP_EP_GPIO_MAX_PINS, block[0x01]);            /* gpio_io_max */
+    TEST_ASSERT_EQUAL_HEX8(0x01u, block[0x02]);                          /* enable&clr: ep_enable bit */
+    TEST_ASSERT_EQUAL_HEX8(0x00u, block[0x03]);                          /* options */
+    TEST_ASSERT_EQUAL_HEX8(0x00u, block[0x04]);                          /* base_clk hi */
+    TEST_ASSERT_EQUAL_HEX8(0x00u, block[0x05]);                          /* base_clk lo */
+    TEST_ASSERT_EQUAL_HEX8(0x12u, block[0x06]);                          /* ep_status hi */
+    TEST_ASSERT_EQUAL_HEX8(0x34u, block[0x07]);                          /* ep_status lo */
+    TEST_ASSERT_EQUAL_HEX8(0x05u, block[0x08]);                          /* clk_divider */
+    TEST_ASSERT_EQUAL_HEX8(0x11u, block[0x09]);                          /* debounce_IO0 */
+    TEST_ASSERT_EQUAL_HEX8(0x22u, block[0x28]);                          /* debounce_IO31 */
+}
+
+static void test_apply_reconfig_writes_clk_divider(void)
+{
+    rcp_ep_gpio_functional_cfg_t cfg;
+    const uint8_t                 write[3] = {0x00, 0x08, 0x2Au};
+
+    rcp_ep_gpio_functional_cfg_init(&cfg);
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RECONFIG_OK, rcp_ep_gpio_apply_reconfig(&cfg, write, sizeof(write)));
+    TEST_ASSERT_EQUAL_HEX8(0x2Au, cfg.clk_divider);
+}
+
+static void test_apply_reconfig_writes_multi_register_span(void)
+{
+    rcp_ep_gpio_functional_cfg_t cfg;
+    /* start 0x08 (clk_divider), then debounce_IO0/IO1 */
+    const uint8_t                 write[5] = {0x00, 0x08, 0x07u, 0xAAu, 0xBBu};
+
+    rcp_ep_gpio_functional_cfg_init(&cfg);
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RECONFIG_OK, rcp_ep_gpio_apply_reconfig(&cfg, write, sizeof(write)));
+    TEST_ASSERT_EQUAL_HEX8(0x07u, cfg.clk_divider);
+    TEST_ASSERT_EQUAL_HEX8(0xAAu, cfg.debounce[0]);
+    TEST_ASSERT_EQUAL_HEX8(0xBBu, cfg.debounce[1]);
+}
+
+static void test_apply_reconfig_ignores_read_only_registers(void)
+{
+    rcp_ep_gpio_functional_cfg_t cfg;
+    /* Targets EP_LEN(0x00, R), IO_MAX(0x01, R), and base_clk(0x04-0x05, R)
+     * simultaneously with a real write starting at 0x00; only the
+     * read-only offsets are ignored. */
+    const uint8_t                 write[7] = {0x00, 0x00, 0xFFu, 0xFFu, 0xFFu, 0xFFu, 0xFFu};
+
+    rcp_ep_gpio_functional_cfg_init(&cfg);
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RECONFIG_OK, rcp_ep_gpio_apply_reconfig(&cfg, write, sizeof(write)));
+
+    {
+        uint8_t block[RCP_EP_GPIO_EP_FUNC_LEN];
+        rcp_ep_gpio_render_registers(&cfg, block);
+        TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_EP_GPIO_EP_FUNC_LEN, block[0x00]); /* untouched */
+        TEST_ASSERT_EQUAL_HEX8(RCP_EP_GPIO_MAX_PINS, block[0x01]);            /* untouched */
+        TEST_ASSERT_EQUAL_HEX8(0x00u, block[0x04]);                          /* untouched */
+        TEST_ASSERT_EQUAL_HEX8(0x00u, block[0x05]);                          /* untouched */
+    }
+    /* The one writable octet in the span (0x02, ep_enable&clr) DID apply. */
+    TEST_ASSERT_TRUE(cfg.common.ep_enable);
+}
+
+static void test_apply_reconfig_rejects_write_past_ep_len(void)
+{
+    rcp_ep_gpio_functional_cfg_t cfg;
+    /* 0x28 (gpio_debounce_IO31) + 2 octets overruns 0x29. */
+    const uint8_t                 overrun[4] = {0x00, 0x28, 0xAAu, 0xBBu};
+
+    rcp_ep_gpio_functional_cfg_init(&cfg);
+    cfg.debounce[31] = 0x99u;
+
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RECONFIG_ERR_OUT_OF_RANGE,
+                      rcp_ep_gpio_apply_reconfig(&cfg, overrun, sizeof(overrun)));
+    TEST_ASSERT_EQUAL_HEX8(0x99u, cfg.debounce[31]); /* whole write ignored */
+}
+
+static void test_apply_reconfig_rejects_payload_without_data(void)
+{
+    rcp_ep_gpio_functional_cfg_t cfg;
+    const uint8_t                 addr_only[2] = {0x00, 0x08};
+
+    rcp_ep_gpio_functional_cfg_init(&cfg);
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RECONFIG_ERR_SHORT,
+                      rcp_ep_gpio_apply_reconfig(&cfg, addr_only, sizeof(addr_only)));
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RECONFIG_ERR_SHORT,
+                      rcp_ep_gpio_apply_reconfig(&cfg, NULL, 0));
+}
+
+static void test_reconfig_request_round_trip(void)
+{
+    const uint8_t data[2] = {0x11u, 0x22u};
+    rcp_bytes_t   frame;
+    rcp_ep_gpio_functional_cfg_t cfg;
+
+    frame = rcp_ep_gpio_encode_reconfig_request(3u, 0x0008u, data, sizeof(data), 7u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    rcp_ep_gpio_functional_cfg_init(&cfg);
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RECONFIG_OK,
+                      rcp_ep_gpio_apply_reconfig(&cfg, frame.data + 8, frame.len - 8));
+    TEST_ASSERT_EQUAL_HEX8(0x11u, cfg.clk_divider);
+    TEST_ASSERT_EQUAL_HEX8(0x22u, cfg.debounce[0]);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_reconfig_strerror_never_null(void)
+{
+    TEST_ASSERT_NOT_NULL(rcp_ep_gpio_reconfig_strerror(RCP_EP_GPIO_RECONFIG_OK));
+    TEST_ASSERT_NOT_NULL(rcp_ep_gpio_reconfig_strerror(RCP_EP_GPIO_RECONFIG_ERR_SHORT));
+    TEST_ASSERT_NOT_NULL(rcp_ep_gpio_reconfig_strerror(RCP_EP_GPIO_RECONFIG_ERR_OUT_OF_RANGE));
+    TEST_ASSERT_NOT_NULL(rcp_ep_gpio_reconfig_strerror((rcp_ep_gpio_reconfig_errc_t)99));
 }
 
 /* ── strerror ───────────────────────────────────────────────────────────────── */
@@ -713,7 +849,7 @@ int main(void)
     RUN_TEST(test_apply_write_wire_value_4_is_reserved_noop);
     RUN_TEST(test_apply_write_wire_value_5_is_add);
     RUN_TEST(test_apply_write_wire_value_6_is_sub);
-    RUN_TEST(test_apply_reconfig_toggles_only_flagged_pins);
+    RUN_TEST(test_toggle_pin_direction_toggles_only_flagged_pins);
     RUN_TEST(test_apply_masked_write_replace_preserves_input_pins);
     RUN_TEST(test_apply_masked_write_or_and_only_affect_output_pins);
     RUN_TEST(test_apply_masked_write_add_saturation_still_respects_mask);
@@ -732,6 +868,15 @@ int main(void)
     RUN_TEST(test_set_pin_property_applies_when_authorized);
     RUN_TEST(test_set_pin_trigger_rejects_invalid_pin_or_unauthorized);
     RUN_TEST(test_set_pin_trigger_applies_when_authorized);
+
+    RUN_TEST(test_render_registers_matches_table_offsets);
+    RUN_TEST(test_apply_reconfig_writes_clk_divider);
+    RUN_TEST(test_apply_reconfig_writes_multi_register_span);
+    RUN_TEST(test_apply_reconfig_ignores_read_only_registers);
+    RUN_TEST(test_apply_reconfig_rejects_write_past_ep_len);
+    RUN_TEST(test_apply_reconfig_rejects_payload_without_data);
+    RUN_TEST(test_reconfig_request_round_trip);
+    RUN_TEST(test_reconfig_strerror_never_null);
 
     RUN_TEST(test_strerror_never_null_and_distinct);
 
