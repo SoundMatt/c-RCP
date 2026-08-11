@@ -14657,3 +14657,78 @@ type) on its own, and the underlying bit-level write-outcome
 mechanism REQ-RMAP-068 depends on, if a future session decides it's
 worth building generically rather than staying a documented,
 honestly-partial gap.
+
+### v0.240.0 -- 2026-08-11 (additive, zero blast radius to existing
+callers)
+
+**Phase 5d Group 5 batch 3, closing out issue #200's originally-scoped
+RMAP work: REQ-RMAP-055, the W+ lockable access type.**
+
+`rcp_lifecycle_field_writable_w_plus()`/
+`rcp_lifecycle_field_write_error_w_plus()` (lifecycle.h/lifecycle.c)
+implement TC18's W+ access type (§12.7.8 Table 23's EP_ID_config
+rows; §12.7.9 Table 24's STREAM_UID/flush_on_count/Flush_time queue
+registers): the same lifecycle-state/writer rule as
+`RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR`, plus an independent lock the
+configuring instance may set at any time to protect the table from
+further modification "independently of the lifecycle state that
+governs W and W*" (TC18's own words, §12.7.8, TC18.txt L2977).
+
+Deliberately implemented as a SEPARATE function pair, not a new
+`rcp_lifecycle_field_kind_t` enum value threaded through
+`rcp_lifecycle_field_writable()`'s own signature. That function has
+roughly 90 existing call sites (12 endpoint types' own writability
+gates -- one apiece except PWM's two -- 2 internal uses in
+lifecycle.c itself, regmap.c, and every test exercising any of
+them), none of which have any use for a lock concept. A standalone
+pair delivers the identical TC18-conformant primitive with zero risk
+to any existing caller, reusing (not re-deriving) the existing
+FUNCTIONAL_W_STAR state/writer rule internally rather than
+duplicating it -- matching this whole phase's own established
+additive, zero-blast-radius precedent (e.g.
+`rcp_regmap_hw_pin_map_render()`, `rcp_regmap_wd_timeout_ms_to_ticks()`).
+
+REQ-RMAP-055 moves `not-implemented` -> `partial`: the primitive is
+real and tested, but no register-map write path in the codebase
+calls it yet -- EP_ID_config and the Table 24 queue registers are
+both still content-modeling-only (REQ-RMAP-052/054/061/065), the
+same deferred ACF_ABB-wire-wrapper gap as the rest of this phase.
+
+New test: `test_w_plus_field_now_has_a_real_lockable_primitive`
+(replaces the old gap-documentation test, which also incorrectly
+characterized `rcp_lifecycle_field_kind_t`'s pre-existing
+`READ_ONLY = 3` value as "unrecognized" -- a separate, pre-existing
+test inaccuracy also corrected here in passing).
+
+Mutation-tested two ways: removing the independent-lock check, and
+swapping the reused state rule from FUNCTIONAL_W_STAR to plain
+FUNCTIONAL_W -- both produced clean, deterministic assertion
+failures. Reverted, full suite re-verified byte-identical.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
+0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
+**RMAP status after this batch (70 total requirements, issue #200)**:
+45 `implemented`, 25 `partial` (each honestly gated on a documented,
+separate architecture/dispatch gap), **0 remaining
+`not-implemented`**. Every item originally scoped into issue #200's
+6 groups has now been addressed to the maximum honest degree
+possible without resolving genuinely unresolved primary-source
+ambiguities (Table 33/36's own address collision) or building
+mechanisms this codebase doesn't have yet (bit-level register
+writes, ACF_ABB pointer-table dispatch for HW_config/EP_ID_config/
+response-queue).
+
+**Phase 5d (issue #200) is now closed as a routine-batch stream.**
+The 25 remaining `partial` entries and their underlying architecture
+gaps (the shared Table-18-pointed-to-table addressing question for
+HW_config/EP_ID_config/response-queue; Table 33/36's own confirmed
+address collision and EP_FUNC-block-existence contradiction; the
+bit-level register-write mechanism REQ-RMAP-068 depends on) are each
+individually documented, cross-referenced from their own requirement
+text, and not silently dropped -- but none is a routine next batch;
+each needs either a genuine architecture decision (how does a client
+address a table reached via a Table-18 pointer rather than an
+endpoint's own EP_func block?) or new infrastructure this codebase
+doesn't have yet, not incremental content modeling. Phase 5e (issue
+#201, task #89) is the next queued item in the standing roadmap.

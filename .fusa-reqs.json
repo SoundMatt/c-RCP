@@ -9279,12 +9279,12 @@
     {
       "id": "REQ-RMAP-055",
       "title": "the W+ lockable access type for EP_ID_config and the Table 24 W+ queue fields",
-      "text": "NOT IMPLEMENTED: c-RCP models no W+ (explicitly lockable) register access type. TC18 marks every EP_ID_config row R/W+ (\u00a712.7.8 Table 23) and the STREAM_UID/flush_on_count/Flush_time queue registers R/W+ (\u00a712.7.9 Table 24); W+ means the table may be locked by the configuring instance to protect against unwanted later modification, independently of the lifecycle state that governs W and W*. rcp_lifecycle_field_kind_t (include/rcp/lifecycle.h:227-229) defines only HW_GENERIC, FUNCTIONAL_W and FUNCTIONAL_W_STAR, and rcp_lifecycle_field_writable() takes no lock state. Consequence: a client that has finished configuring the endpoint map has no way to latch it, so a later erroneous or malicious write can silently re-point byte_bus_ids at different endpoints while the server remains in a state that permits W+ writes.",
+      "text": "PARTIAL: rcp_lifecycle_field_writable_w_plus()/_write_error_w_plus() (lifecycle.h/lifecycle.c) now implement TC18's W+ (explicitly lockable) register access type -- EP_ID_config rows (\u00a712.7.8 Table 23) and the STREAM_UID/flush_on_count/Flush_time queue registers (\u00a712.7.9 Table 24) are both marked R/W+: the table may be locked by the configuring instance to protect against unwanted later modification, independently of the lifecycle state that governs W and W*. Deliberately a SEPARATE function rather than a new rcp_lifecycle_field_kind_t value threaded through rcp_lifecycle_field_writable()'s own signature -- that function has roughly 90 existing call sites across every endpoint type, 2 internal uses, and every test exercising any of them, none of which need a lock concept; a standalone function delivers the same primitive with zero blast radius to existing callers, reusing (not re-deriving) the existing FUNCTIONAL_W_STAR state/writer rule internally. STILL OPEN: no register-map write path in the codebase calls this new primitive yet -- EP_ID_config and the Table 24 queue registers are both still content-modeling-only (REQ-RMAP-052/054/061/065), the same deferred ACF_ABB-wire-wrapper gap as the rest of this phase, so a client still has no way to actually latch either table over the wire.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.7.8, TC18.txt L2977"
     },
     {

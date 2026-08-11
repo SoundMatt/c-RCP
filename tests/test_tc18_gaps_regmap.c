@@ -1996,25 +1996,50 @@ static void test_ep_id_map_render_matches_table_23_byte_offsets(void)
 /* TC18 §12.7.8/§12.7.9 mark EP_ID_config rows and the Table 24
  * STREAM_UID/flush_on_count/Flush_time registers R/W+ -- explicitly
  * LOCKABLE by the configuring instance, independently of the lifecycle
- * state that governs W and W*. Deviation: rcp_lifecycle_field_kind_t
- * defines exactly three kinds (0 HW_GENERIC, 1 FUNCTIONAL_W,
- * 2 FUNCTIONAL_W_STAR) and rcp_lifecycle_field_writable() takes no lock
- * input; the value 3, where a W+ kind would sit, is unwritable in every
- * state -- an unrecognized kind, not a lockable one. */
-static void test_no_lockable_w_plus_field_kind(void)
+ * state that governs W and W*. FIXED (REQ-RMAP-055): a real, tested W+
+ * primitive now exists -- rcp_lifecycle_field_writable_w_plus()/
+ * _write_error_w_plus() (lifecycle.h/lifecycle.c) -- deliberately a
+ * SEPARATE function rather than a new rcp_lifecycle_field_kind_t value
+ * threaded through rcp_lifecycle_field_writable()'s own ~90-call-site
+ * signature (see lifecycle.h's own doc comment for the full blast-
+ * radius rationale). STILL PARTIAL: no register-map write path in the
+ * codebase classifies EP_ID_config or the Table 24 queue registers as
+ * W+ yet -- the same deferred-ACF_ABB-wrapper gap already tracked for
+ * both tables themselves (REQ-RMAP-052/054/061/065), so this
+ * now-correct primitive is not yet wired to either table anywhere. */
+static void test_w_plus_field_now_has_a_real_lockable_primitive(void)
 {
-    const rcp_lifecycle_field_kind_t w_plus = (rcp_lifecycle_field_kind_t)3;
+    /* Same underlying state/writer rule as FUNCTIONAL_W_STAR when
+     * unlocked: writable in HW_UNCONFIGURED, authorized-writer-only in
+     * HW_CONFIGURED, permanently locked once RCP_CONFIGURED. */
+    TEST_ASSERT_TRUE(rcp_lifecycle_field_writable_w_plus(
+        RCP_LIFECYCLE_HW_UNCONFIGURED, PLAIN_WRITER, false));
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable_w_plus(
+        RCP_LIFECYCLE_HW_CONFIGURED, PLAIN_WRITER, false));
+    TEST_ASSERT_TRUE(rcp_lifecycle_field_writable_w_plus(
+        RCP_LIFECYCLE_HW_CONFIGURED, ROOT_WRITER, false));
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable_w_plus(
+        RCP_LIFECYCLE_RCP_CONFIGURED, ROOT_WRITER, false));
 
-    TEST_ASSERT_EQUAL_INT(0, (int)RCP_LIFECYCLE_FIELD_HW_GENERIC);
-    TEST_ASSERT_EQUAL_INT(1, (int)RCP_LIFECYCLE_FIELD_FUNCTIONAL_W);
-    TEST_ASSERT_EQUAL_INT(2, (int)RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR);
+    /* The independent lock: unwritable in EVERY state, even
+     * HW_UNCONFIGURED with a fully-authorized writer, once locked --
+     * TC18's own "independently of the lifecycle state" wording. */
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable_w_plus(
+        RCP_LIFECYCLE_HW_UNCONFIGURED, ROOT_WRITER, true));
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable_w_plus(
+        RCP_LIFECYCLE_HW_CONFIGURED, ROOT_WRITER, true));
 
-    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_UNCONFIGURED, w_plus,
-                                                   ROOT_WRITER));
-    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED, w_plus,
-                                                   ROOT_WRITER));
-    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_RCP_CONFIGURED, w_plus,
-                                                   ROOT_WRITER));
+    /* Error classification mirrors rcp_lifecycle_field_write_error()'s
+     * own two-code split, with the lock folded in as its own
+     * unconditional LOCKED_MEM_ACCESS case. */
+    TEST_ASSERT_EQUAL(RCP_ERROR_NONE, rcp_lifecycle_field_write_error_w_plus(
+        RCP_LIFECYCLE_HW_UNCONFIGURED, PLAIN_WRITER, false));
+    TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, rcp_lifecycle_field_write_error_w_plus(
+        RCP_LIFECYCLE_HW_UNCONFIGURED, ROOT_WRITER, true));
+    TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, rcp_lifecycle_field_write_error_w_plus(
+        RCP_LIFECYCLE_RCP_CONFIGURED, ROOT_WRITER, false));
+    TEST_ASSERT_EQUAL(RCP_ERROR_UNAUTHORIZED_ACCESS, rcp_lifecycle_field_write_error_w_plus(
+        RCP_LIFECYCLE_HW_CONFIGURED, PLAIN_WRITER, false));
 }
 
 /* ── §12.7.9 Table 24: response/acknowledge queues ─────────────────────────── */
@@ -2507,7 +2532,7 @@ int main(void)
     RUN_TEST(test_ep_id_map_flags_heterogeneous_shared_bus);
     RUN_TEST(test_byte_bus_id_is_now_eleven_bits_wide);
     RUN_TEST(test_ep_id_map_render_matches_table_23_byte_offsets);
-    RUN_TEST(test_no_lockable_w_plus_field_kind);
+    RUN_TEST(test_w_plus_field_now_has_a_real_lockable_primitive);
     RUN_TEST(test_response_queue_stream_id_is_configurable);
     RUN_TEST(test_response_queue_size_register_and_storage_now_exist);
     RUN_TEST(test_max_avtpdu_size_is_now_enforced_and_feeds_fragmentation);
