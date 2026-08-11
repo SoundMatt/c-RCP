@@ -13657,3 +13657,56 @@ RC-server §12.7.7 `rx_enforce_*` register overhaul (task #97, touches
 ASIL-relevant `e2e.h`/`deadline.h` extensively) and the SPI
 channel-selection mechanism (evt-bits vs. BBID-based, batch 2 +
 this batch's own Table 26 finding).
+
+### v0.230.0 -- 2026-08-11 (doc-only)
+
+**SPI channel-selection mechanism, dedicated investigation
+(task #98), RESOLVED -- no code change needed.**
+
+Closes the question flagged and deferred across batches 2 (v0.228.0)
+and 3 (v0.229.0): does SPI channel selection move from evt-bits to
+the new BBID-based `Channel_selection` field (Table 26)?
+
+Read TC18 §13.5's own per-endpoint-type evt[2:0] table directly --
+this is the specification's own explicitly-stated authoritative
+reference for evt-bit behavior ("The detailed behavior of each
+endpoint based on the evt[2:0] is described in the following
+table"), not merely one of several places the topic is mentioned.
+Its SPI row is completely unchanged as of 0.5.1_RC5: still "selects
+channel 0 ... 5, the interface settings are to be applied according
+to this selection, the CSN pin assigned to this selection is to be
+asserted." Its own attached tracked-change comment reads, verbatim:
+"051RC4: new concept: selection of SPI channel via Stream_id(index)/
+byte_bus_id (not via evt-bits) => this becomes obsolete IF new
+concept is accepted." This is unambiguous, directly-quoted
+conditional language, and as of 0.5.1_RC5 that condition is not met.
+
+§13.7.3.1's own running prose -- the earlier-flagged apparent
+inconsistency from batch 2 -- has, in fact, already been edited in
+place (RC4) to describe the new concept as though it were adopted.
+This is a genuine, if minor, internal inconsistency in the RC5
+draft itself: one section's prose already anticipates a decision the
+document's own authoritative reference table explicitly marks as
+not yet made. Not an extraction error on this codebase's own part --
+confirmed by reading both passages directly on the rendered PDF.
+
+`ep_spi.h`'s existing evt-bits channel-selection implementation
+(`RCP_EP_SPI_MAX_CHANNELS`=6, unchanged since PR #274) is confirmed
+correct and fully conformant with the current, authoritative
+specification content. No code, test, or `.fusa-reqs.json` change is
+warranted -- REQ-SPI-035 through REQ-SPI-040's own existing citations
+were never wrong about this. A durable doc note recording the full
+resolution (with the exact conditional quote, so a future reader
+doesn't need to re-derive it from the PDF) added to `ep_spi.h`'s own
+file header, flagged for revisiting if a future spec revision
+resolves the proposal as accepted.
+
+65/65 both trees (unaffected, comment-only change). `cfusa check`
+(CI-pinned v0.5.50): 0 errors.
+
+**This closes out the SPI channel-selection portion of the spec
+rebaseline entirely.** Only one item remains from the whole ~63-marker
+triage: the RC-server §12.7.7 `rx_enforce_*` register overhaul (task
+#97), still deliberately deferred pending its own dedicated session
+given its depth of overlap with this codebase's own ASIL-relevant
+`e2e.h`/`deadline.h` API.

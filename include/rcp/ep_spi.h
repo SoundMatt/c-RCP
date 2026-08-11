@@ -82,6 +82,32 @@
  * *channel number* (0-5, extraction §4.5 Group A); values 6 and 7 select no
  * defined channel and are rejected on decode (RCP_EP_SPI_ERR_BAD_CHANNEL).
  *
+ * INVESTIGATED 2026-08-11 (spec rebaseline to TC18 0.5.1_RC5, c-RCP-AUDIT-06,
+ * task #98): a competing BBID-based channel-selection concept exists in the
+ * 0.5.1_RC5 draft -- a new Table 26 "BBID control bits" defines a real,
+ * complete, footnoted Channel_selection[3:0] field per BBID row (in
+ * EP_ID_config's own new Ctrl1/Ctrl2 field), explicitly footnoted as being
+ * for SPI's own channel selection, and §13.7.3.1's own running prose has
+ * already been edited in place (RC4) to describe byte_bus_id-based
+ * selection replacing evt-bits entirely. CONFIRMED, via the table that is
+ * this endpoint type's own authoritative evt[2:0] reference (§13.5's own
+ * per-endpoint-type table, "The detailed behavior of each endpoint based
+ * on the evt[2:0] is described in the following table"), that this evt-bit
+ * channel-selection scheme is still current and NOT superseded: that
+ * table's own SPI row is completely unchanged (still "selects channel
+ * 0...5"), and its own attached tracked-change comment reads, verbatim,
+ * "051RC4: new concept: selection of SPI channel via Stream_id(index)/
+ * byte_bus_id (not via evt-bits) => this becomes obsolete IF new concept
+ * is accepted" -- explicitly conditional, and as of RC5 that condition has
+ * not been met. §13.7.3.1's own already-edited prose is running ahead of
+ * this still-undecided proposal, a real (if minor) internal inconsistency
+ * in the RC5 draft itself, not an extraction error on this codebase's own
+ * part. This module's existing evt-bits implementation remains correct and
+ * fully conformant; no code change is warranted by this investigation. If
+ * a future spec revision resolves the proposal as accepted, this
+ * conclusion (and the whole channel-selection model below) will need
+ * revisiting.
+ *
  * ── Request/response payload: a full-duplex byte-for-byte transfer ─────────
  *
  * Unlike ep_gpio.h's fixed 4-byte bitmask shape, an SPI transfer's payload
