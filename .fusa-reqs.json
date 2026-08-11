@@ -2572,7 +2572,7 @@
     {
       "id": "REQ-RMAP-002",
       "title": "EP0 shares its index with the discovery byte_bus_id",
-      "text": "RCP_REGMAP_EP0_INDEX shall equal RCP_SERVER_DISCOVERY_BYTE_BUS_ID, since EP0 and the discovery channel are reached through the same address.",
+      "text": "RCP_REGMAP_EP0_INDEX shall equal RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, since EP0 and the discovery channel are reached through the same address.",
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A",
@@ -2790,7 +2790,7 @@
     {
       "id": "REQ-DISC-002",
       "title": "rcp_discovery_encode_request() builds an NTSCF-framed ACF_ABB read at the discovery bus",
-      "text": "rcp_discovery_encode_request() shall encode a full NTSCF-framed ACF_ABB message addressed to RCP_SERVER_DISCOVERY_BYTE_BUS_ID with op READ, carrying the given read_size and transaction_num and no payload.",
+      "text": "rcp_discovery_encode_request() shall encode a full NTSCF-framed ACF_ABB message addressed to RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID with op READ, carrying the given read_size and transaction_num and no payload.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -2830,7 +2830,7 @@
     {
       "id": "REQ-DISC-006",
       "title": "rcp_discovery_decode_request() rejects the wrong byte_bus_id",
-      "text": "rcp_discovery_decode_request() shall return RCP_DISCOVERY_ERR_WRONG_BUS when the ACF header's byte_bus_id is not RCP_SERVER_DISCOVERY_BYTE_BUS_ID.",
+      "text": "rcp_discovery_decode_request() shall return RCP_DISCOVERY_ERR_WRONG_BUS when the ACF header's byte_bus_id is not RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -2885,7 +2885,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§12.6.2 (\"...length being determined by the read_size in the discovery request.\"), TC18.txt L2403-2404"
+      "tc18": "§12.6.2 (\"...length being determined by the read_size in the discovery request.\"), TC18.txt L2402-2403"
     },
     {
       "id": "REQ-DISC-012",
@@ -3217,7 +3217,7 @@
     {
       "id": "REQ-GPIO-019",
       "title": "rcp_ep_gpio_functional_cfg_writable() is unwritable while HW_UNCONFIGURED",
-      "text": "rcp_ep_gpio_functional_cfg_writable() shall return false while state is RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, for every writer context.",
+      "text": "rcp_ep_gpio_functional_cfg_writable() shall return false while state is RCP_LIFECYCLE_HW_UNCONFIGURED, for every writer context.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -3227,7 +3227,7 @@
     {
       "id": "REQ-GPIO-020",
       "title": "rcp_ep_gpio_functional_cfg_writable() requires an authorized writer while HW_CONFIGURED",
-      "text": "rcp_ep_gpio_functional_cfg_writable() shall return true while state is RCP_SERVER_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"for every writer context\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (issue #198) -- the code and this module's own test (test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_gpio.c) were already correct; only this entry's own text had gone stale.",
+      "text": "rcp_ep_gpio_functional_cfg_writable() shall return true while state is RCP_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"for every writer context\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (issue #198) -- the code and this module's own test (test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_gpio.c) were already correct; only this entry's own text had gone stale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -3237,7 +3237,7 @@
     {
       "id": "REQ-GPIO-021",
       "title": "rcp_ep_gpio_functional_cfg_writable() requires authorization once RCP_CONFIGURED",
-      "text": "rcp_ep_gpio_functional_cfg_writable() shall, while state is RCP_SERVER_LIFECYCLE_RCP_CONFIGURED, return true if and only if writer.via_root_client_ep0 or writer.via_owning_stream is true.",
+      "text": "rcp_ep_gpio_functional_cfg_writable() shall, while state is RCP_LIFECYCLE_RCP_CONFIGURED, return true if and only if writer.via_root_client_ep0 or writer.via_owning_stream is true.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -3441,7 +3441,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.3.1 Table 38 (trigger signals 3/5/7/9/11/13, \"CSn de-asserted\"), TC18.txt L4208-4218"
+      "tc18": "§13.7.3.1 Table 38 (trigger signals 3/5/7/9/11/13, \"CS0 de-asserted\"/\"CS1 de-asserted\"/.../\"CS5 de-asserted\"), TC18.txt L4209-4219"
     },
     {
       "id": "REQ-SPI-010",
@@ -3455,7 +3455,7 @@
     {
       "id": "REQ-SPI-011",
       "title": "rcp_ep_spi_functional_cfg_writable() is unwritable while HW_UNCONFIGURED",
-      "text": "rcp_ep_spi_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED regardless of writer.",
+      "text": "rcp_ep_spi_functional_cfg_writable() shall return false for state == RCP_LIFECYCLE_HW_UNCONFIGURED regardless of writer.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -3465,7 +3465,7 @@
     {
       "id": "REQ-SPI-012",
       "title": "rcp_ep_spi_functional_cfg_writable() requires an authorized writer while HW_CONFIGURED",
-      "text": "rcp_ep_spi_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (v0.156.0, issue #198) -- the code and this module's own test (test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_spi.c) were already correct; only this entry's own text had gone stale.",
+      "text": "rcp_ep_spi_functional_cfg_writable() shall return true for state == RCP_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (v0.156.0, issue #198) -- the code and this module's own test (test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_spi.c) were already correct; only this entry's own text had gone stale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -3475,7 +3475,7 @@
     {
       "id": "REQ-SPI-013",
       "title": "rcp_ep_spi_functional_cfg_writable() requires authorization once RCP_CONFIGURED",
-      "text": "rcp_ep_spi_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_RCP_CONFIGURED when writer indicates neither via_root_client_ep0 nor via_owning_stream, and true when either is set.",
+      "text": "rcp_ep_spi_functional_cfg_writable() shall return false for state == RCP_LIFECYCLE_RCP_CONFIGURED when writer indicates neither via_root_client_ep0 nor via_owning_stream, and true when either is set.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -3570,7 +3570,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.3.2 Table 39 (\"spi_cs_clk_leadtime0\"/\"spi_clk_cs_trailtime0\"/\"spi_bits_max0\"/\"spi_pause_min0\" timing fields), TC18.txt L4272-4282; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
+      "tc18": "§13.7.3.2 Table 39 (\"spi_cs_clk_leadtime0\"/\"spi_clk_cs_trailtime0\"/\"spi_bits_max0\"/\"spi_pause_min0\" timing fields), TC18.txt L4276-4285; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
     },
     {
       "id": "REQ-SPI-023",
@@ -3674,7 +3674,7 @@
     {
       "id": "REQ-I2C-003",
       "title": "rcp_ep_i2c_functional_cfg_writable() is false while HW_UNCONFIGURED",
-      "text": "rcp_ep_i2c_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, for any writer, by delegating to rcp_server_field_writable() with kind RCP_SERVER_FIELD_FUNCTIONAL_W.",
+      "text": "rcp_ep_i2c_functional_cfg_writable() shall return false for state == RCP_LIFECYCLE_HW_UNCONFIGURED, for any writer, by delegating to rcp_server_field_writable() with kind RCP_LIFECYCLE_FIELD_FUNCTIONAL_W.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -3684,7 +3684,7 @@
     {
       "id": "REQ-I2C-004",
       "title": "rcp_ep_i2c_functional_cfg_writable() requires an authorized writer while HW_CONFIGURED",
-      "text": "rcp_ep_i2c_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer's contents\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (issue #198) -- the code and this module's own test (test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_i2c.c) were already correct; only this entry's own text had gone stale.",
+      "text": "rcp_ep_i2c_functional_cfg_writable() shall return true for state == RCP_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer's contents\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (issue #198) -- the code and this module's own test (test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_i2c.c) were already correct; only this entry's own text had gone stale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -3694,7 +3694,7 @@
     {
       "id": "REQ-I2C-005",
       "title": "rcp_ep_i2c_functional_cfg_writable() requires authorization once RCP_CONFIGURED",
-      "text": "rcp_ep_i2c_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_RCP_CONFIGURED when writer has neither via_root_client_ep0 nor via_owning_stream set, and true when either is set.",
+      "text": "rcp_ep_i2c_functional_cfg_writable() shall return false for state == RCP_LIFECYCLE_RCP_CONFIGURED when writer has neither via_root_client_ep0 nor via_owning_stream set, and true when either is set.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -3872,7 +3872,7 @@
     {
       "id": "REQ-UART-005",
       "title": "rcp_ep_uart_functional_cfg_writable() is false while HW_UNCONFIGURED",
-      "text": "rcp_ep_uart_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED, for any writer, by delegating to rcp_server_field_writable() with kind RCP_SERVER_FIELD_FUNCTIONAL_W.",
+      "text": "rcp_ep_uart_functional_cfg_writable() shall return false for state == RCP_LIFECYCLE_HW_UNCONFIGURED, for any writer, by delegating to rcp_server_field_writable() with kind RCP_LIFECYCLE_FIELD_FUNCTIONAL_W.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -3882,7 +3882,7 @@
     {
       "id": "REQ-UART-006",
       "title": "rcp_ep_uart_functional_cfg_writable() requires an authorized writer while HW_CONFIGURED",
-      "text": "rcp_ep_uart_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer's contents\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (issue #198) -- the code was already correct; only this entry's own text had gone stale.",
+      "text": "rcp_ep_uart_functional_cfg_writable() shall return true for state == RCP_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer's contents\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (issue #198) -- the code was already correct; only this entry's own text had gone stale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -3892,7 +3892,7 @@
     {
       "id": "REQ-UART-007",
       "title": "rcp_ep_uart_functional_cfg_writable() requires authorization once RCP_CONFIGURED",
-      "text": "rcp_ep_uart_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_RCP_CONFIGURED when writer has neither via_root_client_ep0 nor via_owning_stream set, and true when either is set.",
+      "text": "rcp_ep_uart_functional_cfg_writable() shall return false for state == RCP_LIFECYCLE_RCP_CONFIGURED when writer has neither via_root_client_ep0 nor via_owning_stream set, and true when either is set.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -3947,7 +3947,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.8.2 Table 48 (\"uart_nr_bits\"/\"uart_parity_enable\"/\"uart_parity_pol\"/\"uart_stop_bits\" fields), TC18.txt L4930, L4938-4943, L4951"
+      "tc18": "§13.7.8.2 Table 48 (\"uart_nr_bits\"/\"uart_parity_enable\"/\"uart_parity_pol\"/\"uart_stop_bits\" fields), TC18.txt L4930, L4933, L4937, L4951"
     },
     {
       "id": "REQ-UART-013",
@@ -4270,7 +4270,7 @@
     {
       "id": "REQ-PWM-017",
       "title": "rcp_ep_pwm_out_functional_cfg_writable() is unwritable while HW_UNCONFIGURED",
-      "text": "rcp_ep_pwm_out_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED regardless of writer.",
+      "text": "rcp_ep_pwm_out_functional_cfg_writable() shall return false for state == RCP_LIFECYCLE_HW_UNCONFIGURED regardless of writer.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4280,7 +4280,7 @@
     {
       "id": "REQ-PWM-018",
       "title": "rcp_ep_pwm_out_functional_cfg_writable() requires an authorized writer while HW_CONFIGURED",
-      "text": "rcp_ep_pwm_out_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (issue #198) -- the code and this module's own test (test_out_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_pwm.c) were already correct; only this entry's own text had gone stale.",
+      "text": "rcp_ep_pwm_out_functional_cfg_writable() shall return true for state == RCP_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (issue #198) -- the code and this module's own test (test_out_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_pwm.c) were already correct; only this entry's own text had gone stale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4290,7 +4290,7 @@
     {
       "id": "REQ-PWM-019",
       "title": "rcp_ep_pwm_out_functional_cfg_writable() requires authorization once RCP_CONFIGURED",
-      "text": "rcp_ep_pwm_out_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_RCP_CONFIGURED when writer indicates neither via_root_client_ep0 nor via_owning_stream, and true when either is set.",
+      "text": "rcp_ep_pwm_out_functional_cfg_writable() shall return false for state == RCP_LIFECYCLE_RCP_CONFIGURED when writer indicates neither via_root_client_ep0 nor via_owning_stream, and true when either is set.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4458,7 +4458,7 @@
     {
       "id": "REQ-PWM-036",
       "title": "rcp_ep_pwm_in_functional_cfg_writable() is unwritable while HW_UNCONFIGURED",
-      "text": "rcp_ep_pwm_in_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED regardless of writer.",
+      "text": "rcp_ep_pwm_in_functional_cfg_writable() shall return false for state == RCP_LIFECYCLE_HW_UNCONFIGURED regardless of writer.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4468,7 +4468,7 @@
     {
       "id": "REQ-PWM-037",
       "title": "rcp_ep_pwm_in_functional_cfg_writable() requires an authorized writer while HW_CONFIGURED",
-      "text": "rcp_ep_pwm_in_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer\", the same staleness as REQ-PWM-018's PWM_OUT counterpart -- the code and this module's own test (test_in_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_pwm.c) were already correct; only this entry's own text had gone stale.",
+      "text": "rcp_ep_pwm_in_functional_cfg_writable() shall return true for state == RCP_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer\", the same staleness as REQ-PWM-018's PWM_OUT counterpart -- the code and this module's own test (test_in_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_pwm.c) were already correct; only this entry's own text had gone stale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4478,7 +4478,7 @@
     {
       "id": "REQ-PWM-038",
       "title": "rcp_ep_pwm_in_functional_cfg_writable() requires authorization once RCP_CONFIGURED",
-      "text": "rcp_ep_pwm_in_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_RCP_CONFIGURED when writer indicates neither via_root_client_ep0 nor via_owning_stream, and true when either is set.",
+      "text": "rcp_ep_pwm_in_functional_cfg_writable() shall return false for state == RCP_LIFECYCLE_RCP_CONFIGURED when writer indicates neither via_root_client_ep0 nor via_owning_stream, and true when either is set.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4708,7 +4708,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.9.1 Table 51 (\"adc_combine_avg_values ... Nr of output values to be combined in one response\"), TC18.txt L5106"
+      "tc18": "§13.7.9.2 Table 51 (\"adc_combine_avg_values ... Nr of output values to be combined in one response\"), TC18.txt L5110-5111"
     },
     {
       "id": "REQ-ADC-008",
@@ -4718,7 +4718,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.9.1 (\"When adc_combine_avg_values < adc_avg_intervals_per_request, then there are multiple responses per request execution.\"), TC18.txt L5131-5132"
+      "tc18": "§13.7.9.2 (\"When adc_combine_avg_values < adc_avg_intervals_per_request, then there are multiple responses per request execution.\"), TC18.txt L5132-5133"
     },
     {
       "id": "REQ-ADC-009",
@@ -4781,7 +4781,7 @@
     {
       "id": "REQ-ADC-015",
       "title": "rcp_ep_adc_functional_cfg_writable() is unwritable while HW_UNCONFIGURED",
-      "text": "rcp_ep_adc_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED regardless of writer.",
+      "text": "rcp_ep_adc_functional_cfg_writable() shall return false for state == RCP_LIFECYCLE_HW_UNCONFIGURED regardless of writer.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4791,7 +4791,7 @@
     {
       "id": "REQ-ADC-016",
       "title": "rcp_ep_adc_functional_cfg_writable() is writable by any writer while HW_CONFIGURED",
-      "text": "rcp_ep_adc_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED regardless of writer.",
+      "text": "rcp_ep_adc_functional_cfg_writable() shall return true for state == RCP_LIFECYCLE_HW_CONFIGURED regardless of writer.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4801,7 +4801,7 @@
     {
       "id": "REQ-ADC-017",
       "title": "rcp_ep_adc_functional_cfg_writable() requires authorization once RCP_CONFIGURED",
-      "text": "rcp_ep_adc_functional_cfg_writable() shall return false for state == RCP_SERVER_LIFECYCLE_RCP_CONFIGURED when writer indicates neither via_root_client_ep0 nor via_owning_stream, and true when either is set.",
+      "text": "rcp_ep_adc_functional_cfg_writable() shall return false for state == RCP_LIFECYCLE_RCP_CONFIGURED when writer indicates neither via_root_client_ep0 nor via_owning_stream, and true when either is set.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4816,7 +4816,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.9.2 Table 51 (\"an implementation may decide to fix\" adc_samples_per_avg_interval read-only; this implementation instead makes it writable, the more general of the two spec-permitted choices), TC18.txt L5040, L5107"
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same authorization basis as REQ-ADC-019 (corrected 2026-08-11, c-RCP-AUDIT-06, issue #256 Group J: this entry previously cited §13.7.9.1's own averaging-interval prose, TC18.txt L5040/L5107 -- background on why this field is writable at all, not the authorization-rejection behavior this requirement actually describes; REQ-ADC-019's own citation already correctly names this entry as sharing its W*-marker basis, so this entry's citation was the one out of step)"
     },
     {
       "id": "REQ-ADC-019",
@@ -4836,7 +4836,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.9.2 Table 51 (\"adc_avg_intervals_per_request ... Intervals to be captures per measurement cycle\"), TC18.txt L5101-5102; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
+      "tc18": "§13.7.9.2 Table 51 (\"adc_avg_intervals_per_request ... Intervals to be captures per measurement cycle\"), TC18.txt L5102-5103; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
     },
     {
       "id": "REQ-ADC-021",
@@ -4856,7 +4856,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.9.2 Table 51 (\"adc_combine_avg_values ... Nr of output values to be combined in one response\"), TC18.txt L5106; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
+      "tc18": "§13.7.9.2 Table 51 (\"adc_combine_avg_values ... Nr of output values to be combined in one response\"), TC18.txt L5110-5111; §12.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
     },
     {
       "id": "REQ-ADC-023",
@@ -6116,7 +6116,7 @@
     {
       "id": "REQ-LINEP-008",
       "title": "rcp_ep_lin_functional_cfg_writable() denies every writer while HW_UNCONFIGURED",
-      "text": "rcp_ep_lin_functional_cfg_writable() shall return false for lifecycle state RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED regardless of writer.",
+      "text": "rcp_ep_lin_functional_cfg_writable() shall return false for lifecycle state RCP_LIFECYCLE_HW_UNCONFIGURED regardless of writer.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -6126,7 +6126,7 @@
     {
       "id": "REQ-LINEP-009",
       "title": "rcp_ep_lin_functional_cfg_writable() requires an authorized writer while HW_CONFIGURED",
-      "text": "rcp_ep_lin_functional_cfg_writable() shall return true for lifecycle state RCP_SERVER_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (issue #198) -- the code and this module's own test (test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_lin.c) were already correct; only this entry's own text had gone stale.",
+      "text": "rcp_ep_lin_functional_cfg_writable() shall return true for lifecycle state RCP_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (issue #198) -- the code and this module's own test (test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_lin.c) were already correct; only this entry's own text had gone stale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -6136,7 +6136,7 @@
     {
       "id": "REQ-LINEP-010",
       "title": "rcp_ep_lin_functional_cfg_writable() requires authorization while RCP_CONFIGURED",
-      "text": "rcp_ep_lin_functional_cfg_writable() shall return false for lifecycle state RCP_SERVER_LIFECYCLE_RCP_CONFIGURED when writer has neither via_root_client_ep0 nor via_owning_stream set, and true when either is set.",
+      "text": "rcp_ep_lin_functional_cfg_writable() shall return false for lifecycle state RCP_LIFECYCLE_RCP_CONFIGURED when writer has neither via_root_client_ep0 nor via_owning_stream set, and true when either is set.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -6335,7 +6335,7 @@
     {
       "id": "REQ-CANEP-008",
       "title": "rcp_ep_can_functional_cfg_writable() reuses server.h's field-writability authorization",
-      "text": "rcp_ep_can_functional_cfg_writable() shall return exactly rcp_server_field_writable(state, RCP_SERVER_FIELD_FUNCTIONAL_W, writer).",
+      "text": "rcp_ep_can_functional_cfg_writable() shall return exactly rcp_server_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, writer).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -6567,7 +6567,7 @@
     {
       "id": "REQ-ISELED-010",
       "title": "rcp_ep_iseled_functional_cfg_writable() wraps server.h's field-writability authorization",
-      "text": "rcp_ep_iseled_functional_cfg_writable() shall return the result of rcp_server_field_writable() called with kind RCP_SERVER_FIELD_FUNCTIONAL_W.",
+      "text": "rcp_ep_iseled_functional_cfg_writable() shall return the result of rcp_server_field_writable() called with kind RCP_LIFECYCLE_FIELD_FUNCTIONAL_W.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -6798,7 +6798,7 @@
     {
       "id": "REQ-MDIO-010",
       "title": "rcp_ep_mdio_functional_cfg_writable() delegates to the shared field-authorization logic",
-      "text": "rcp_ep_mdio_functional_cfg_writable() shall return rcp_server_field_writable(state, RCP_SERVER_FIELD_FUNCTIONAL_W, writer).",
+      "text": "rcp_ep_mdio_functional_cfg_writable() shall return rcp_server_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, writer).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -10254,7 +10254,7 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "not-implemented",
-      "tc18": "\u00a713.7.13.3 Figure 42 and Table 57, TC18.txt L5664-5681"
+      "tc18": "\u00a713.7.13.3 Figure 42 and Table 57, TC18.txt L5664-5684 (corrected 2026-08-11, c-RCP-AUDIT-06, issue #256 Group J: the prior range's own end, L5681, truncated Table 57's own mdio_payload row and its caption, both of which run through L5684)"
     },
     {
       "id": "REQ-MDIO-022",

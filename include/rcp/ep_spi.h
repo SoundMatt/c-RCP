@@ -29,8 +29,6 @@
 //cfusa:req REQ-SPI-028
 //cfusa:req REQ-SPI-029
 //cfusa:req REQ-SPI-030
-//cfusa:req REQ-SPI-031
-//cfusa:req REQ-SPI-032
 
 /* TC18 requirements-corpus completeness pass (v0.105.0): the ids below
  * are catalogued in .fusa-reqs.json with a "tc18" citation and a
