@@ -739,19 +739,32 @@ bool rcp_ep_pwm_in_compound_wait_compare(rcp_ep_pwm_value_t captured,
                                           rcp_ep_pwm_in_compound_wait_mode_t mode,
                                           uint16_t threshold)
 {
+    /* TC18 §13.5.1: evt[2:0]=100b/110b ("GE") is met when byte_msg_payload
+     * (threshold) is >= the current interface status (captured) -- i.e.
+     * threshold >= captured, equivalently captured <= threshold. evt=101b/
+     * 111b ("LE") is the mirror: threshold <= captured, i.e.
+     * captured >= threshold. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue
+     * #256 Group B): this function previously computed captured >=
+     * threshold for the GE case and captured <= threshold for LE -- the
+     * reverse of TC18's own rule in both cases. src/acf.c's
+     * rcp_acf_compound_wait_match() (this same §13.5.1 rule's own
+     * reference implementation, COMPOUND_WAIT_MODE_HI_GE/_LE) always got
+     * this right: payload compared directly against status, never
+     * swapped -- this function's own copy of the identical rule was the
+     * one that diverged. */
     switch (mode) {
     case RCP_EP_PWM_IN_CMP_PERIOD_GE:
         if (captured.period == RCP_EP_PWM_IN_NO_SIGNAL) return false;
-        return captured.period >= threshold;
+        return captured.period <= threshold;
     case RCP_EP_PWM_IN_CMP_PERIOD_LE:
         if (captured.period == RCP_EP_PWM_IN_NO_SIGNAL) return false;
-        return captured.period <= threshold;
+        return captured.period >= threshold;
     case RCP_EP_PWM_IN_CMP_DUTY_GE:
         if (captured.active_duration == RCP_EP_PWM_IN_NO_SIGNAL) return false;
-        return captured.active_duration >= threshold;
+        return captured.active_duration <= threshold;
     case RCP_EP_PWM_IN_CMP_DUTY_LE:
         if (captured.active_duration == RCP_EP_PWM_IN_NO_SIGNAL) return false;
-        return captured.active_duration <= threshold;
+        return captured.active_duration >= threshold;
     default:
         return false;
     }
