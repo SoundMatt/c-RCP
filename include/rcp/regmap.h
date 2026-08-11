@@ -182,6 +182,18 @@
  * a read-only diagnostic for tooling that wants to notice the condition;
  * it is not invoked by, and must not be mistaken for, server-side
  * enforcement -- there is deliberately no such thing to call it from.
+ *
+ * UPDATED 2026-08-11 (spec rebaseline to TC18 0.5.1_RC5): the ascending-
+ * order sentence this whole section is built on ("The parameters
+ * Request_Stream_Index and BBID shall occur in ascending order...") is
+ * entirely DELETED as of spec revision 0.5.1_RC4 (confirmed against the
+ * rendered PDF, tracked-change tag 051RC4 "sentence deleted as
+ * discussed") -- current TC18 §12.7.8 no longer states or implies any
+ * ordering requirement at all. rcp_regmap_ep_id_map_is_ascending() and
+ * its own REQ-RMAP-020/021/022/056 remain correct, harmless, purely-
+ * diagnostic code (nothing here ever enforced the old rule either), but
+ * no longer trace to a live TC18 MUST -- see those requirements' own
+ * updated citations for the primary-source evidence.
  */
 #ifndef RCP_REGMAP_H
 #define RCP_REGMAP_H
@@ -1184,9 +1196,15 @@ typedef struct {
                                 rcp_regmap_ep_id_map_is_ascending()
                                 below now DOES consider it (REQ-RMAP-056,
                                 closed as of this field's own follow-up
-                                batch): TC18 requires ascending order in
-                                the COMPOSITE key (request_stream_index,
-                                byte_bus_id), not byte_bus_id alone. */
+                                batch): the ordering this codebase's own
+                                diagnostic checks is the COMPOSITE key
+                                (request_stream_index, byte_bus_id), not
+                                byte_bus_id alone -- TC18 0.5.1_RC's own
+                                text required exactly this composite
+                                ordering, though that requirement is
+                                since removed from the spec entirely
+                                (0.5.1_RC4; see the file header's own
+                                "UPDATED 2026-08-11" note). */
 } rcp_regmap_ep_id_map_entry_t;
 
 /* Read-only diagnostic: true iff entries[0..count) is strictly ascending
