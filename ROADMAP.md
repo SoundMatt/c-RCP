@@ -14842,3 +14842,64 @@ signature change made so far this phase which had zero production
 callers) or documenting this as a genuine integrator responsibility,
 matching REQ-SRV-017's own established precedent -- then CFG
 (2 items) and TIMED (2 items).
+
+### v0.243.0 -- 2026-08-11 (additive, zero blast radius to existing
+callers)
+
+**Phase 5e batch 3 (issue #201): REQ-TIMED-013, the missing
+ACF_ABB-over-TSCF timed-request encoder.**
+
+`rcp_timed_encode_request_tscf()` (request_timed.h/request_timed.c)
+provides TC18 §11.2/§11.2.1's second encoding path for a timed
+request: a plain ACF_ABB message (no request_type opcode, no
+repurposing trick, unlike `rcp_timed_encode_request()`'s own
+NTSCF-only path) wrapped in a TSCF header whose `avtp_timestamp`
+carries the presentation time and whose `tv` bit is set valid. A
+thin, named composition of two already-existing, independently
+tested primitives (`rcp_acf_encode_abb()`, `rcp_avtp_encode_tscf()`)
+-- a caller could already compose them directly (confirmed by
+`tests/test_discovery.c`'s own TSCF-wrapped-ABB construction), but
+`request_timed.h` is where a caller reasoning about "timed requests"
+as a concept should find both of TC18's own encoding paths, not just
+the NTSCF one.
+
+REQ-TIMED-013 stays `partial`: the wire shape is now correctly
+produced, but nothing on the decode/admission side interprets it as
+a timed request yet. `rcp_tsn_classify_frame()` (tsn.c) correctly
+classifies a TSCF-wrapped ACF_ABB frame as `RCP_SCHED_KIND_STANDARD`
+at the request-kind level -- confirmed correct, not a bug: "timed"
+is an orthogonal AVTP-header-level property (NTSCF vs. TSCF), not a
+distinct request kind, so `rcp_sched_classify()` itself needs no
+change here. REQ-TIMED-012's own separate, much larger gap (TSCF's
+`avtp_timestamp` never reaches the admission/due-selection path at
+all -- "the specification's primary timed-request mechanism does
+not work") is what actually blocks a server built on this library
+from honouring the presentation time this encoder now correctly
+transmits. REQ-TIMED-012 remains its own, deliberately deferred
+item -- not attempted in this batch, since it touches admission
+broadly rather than being an additive, contained fix.
+
+New tests (`tests/test_request_timed.c`): `test_tscf_request_round_trip`
+(full decode-both-layers verification: TSCF header's
+`avtp_timestamp`/`tv`/`sequence_num`/`stream_id`, ACF_ABB's own
+`byte_bus_id`/`op`/`transaction_num`/`mtv`/payload),
+`test_tscf_request_zero_payload`,
+`test_tscf_request_rejects_oversized_payload` (caught a real
+pre-existing-knowledge gap during test-writing: `rcp_acf_encode_abb()`
+rejects against `RCP_ACF_ABB_MAX_PAYLOAD`, not the smaller
+`RCP_ACF_MAX_PAYLOAD` macro alias for GBB's own shorter-header-derived
+capacity -- an easy mistake this test's own first draft made and
+caught itself against, fixed before merge).
+
+Mutation-tested: forcing `tv` (timestamp-valid) to 0 regardless of
+the function's own intent produced a clean, deterministic assertion
+failure. Reverted, full suite re-verified byte-identical.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
+0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
+**Progress**: TIMED group (issue #201) partially addressed --
+`REQ-TIMED-013` closed as far as it honestly can be without
+REQ-TIMED-012's own separate scheduling-integration work.
+`REQ-TIMED-012` itself remains open, correctly still flagged as a
+larger, non-routine item.

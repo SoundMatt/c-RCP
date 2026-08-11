@@ -34,6 +34,20 @@ the rationale.
 
 ## Releases
 
+### v0.243.0 -- 2026-08-11 (additive, zero blast radius to existing callers)
+
+**Phase 5e batch 3 (issue #201): REQ-TIMED-013, the missing ACF_ABB-over-TSCF timed-request encoder.**
+
+`rcp_timed_encode_request_tscf()` (request_timed.h/request_timed.c) provides TC18 §11.2/§11.2.1's second encoding path for a timed request: a plain ACF_ABB message (no request_type opcode, no repurposing trick, unlike `rcp_timed_encode_request()`'s own NTSCF-only path) wrapped in a TSCF header whose `avtp_timestamp` carries the presentation time. A thin, named composition of two already-existing, independently tested primitives (`rcp_acf_encode_abb()`, `rcp_avtp_encode_tscf()`) — a caller could already compose them directly, but `request_timed.h` is where a caller reasoning about "timed requests" as a concept should find both of TC18's own encoding paths.
+
+REQ-TIMED-013 stays `partial`: the wire shape is now correctly produced, but nothing on the decode/admission side interprets it as a timed request yet — `rcp_tsn_classify_frame()` correctly classifies a TSCF-wrapped ACF_ABB frame as `RCP_SCHED_KIND_STANDARD` at the request-kind level ("timed" is an orthogonal AVTP-header-level property, not a distinct kind), and REQ-TIMED-012's own separate, larger gap (TSCF's `avtp_timestamp` never reaches the admission/due-selection path) means a server built on this library doesn't yet honour the presentation time this encoder now correctly transmits. REQ-TIMED-012 remains its own, substantially larger, deliberately deferred item.
+
+New tests (`tests/test_request_timed.c`): `test_tscf_request_round_trip` (full decode-both-layers verification: TSCF header's `avtp_timestamp`/`tv`/`sequence_num`/`stream_id`, ACF_ABB's own `byte_bus_id`/`op`/`transaction_num`/`mtv`/payload), `test_tscf_request_zero_payload`, `test_tscf_request_rejects_oversized_payload`.
+
+Mutation-tested: forcing `tv` (timestamp-valid) to 0 regardless of the function's own intent produced a clean, deterministic assertion failure. Reverted, full suite re-verified byte-identical.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.242.0 -- 2026-08-11 (behavioral fix, tests-only blast radius)
 
 **Phase 5e batch 2 (issue #201): REQ-LINEP-023, the LIN transmission-done trigger now honours the required AND condition. REQ-I2C-019 and REQ-LINEP-024 confirmed already `implemented` -- their groups' remaining item counts in issue #201 were stale.**

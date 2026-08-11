@@ -113,6 +113,82 @@ static void test_timed_request_zero_payload(void)
     rcp_bytes_free(&frame);
 }
 
+static const uint8_t kTscfMac[6] = {0x02, 0x11, 0x22, 0x33, 0x44, 0x55};
+
+/* REQ-TIMED-013: TC18's OTHER encoding path -- a plain ACF_ABB request
+ * wrapped in a TSCF header, presentation time carried by the header's own
+ * avtp_timestamp rather than packed into the payload. */
+static void test_tscf_request_round_trip(void)
+{
+    rcp_bytes_t                  frame;
+    rcp_acf_byte_message_info_t  hdr = {0};
+    rcp_acf_byte_message_info_t  out_hdr;
+    rcp_avtp_tscf_header_t       out_tscf;
+    const uint8_t               *acf_payload;
+    size_t                       acf_payload_len;
+    const uint8_t               *tscf_payload;
+    size_t                       tscf_payload_len;
+    rcp_stream_id_t              sid = rcp_stream_id_make(kTscfMac, 7u);
+    uint8_t                      body[3] = {0xAA, 0xBB, 0xCC};
+
+    hdr.byte_bus_id     = 9;
+    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.transaction_num = 42;
+
+    frame = rcp_timed_encode_request_tscf(&hdr, body, sizeof(body), sid, 0xDEADBEEFu, 3u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    TEST_ASSERT_EQUAL_INT(RCP_AVTP_OK,
+                           rcp_avtp_decode_tscf(frame.data, frame.len, &out_tscf,
+                                                 &tscf_payload, &tscf_payload_len));
+    TEST_ASSERT_EQUAL_UINT32(0xDEADBEEFu, out_tscf.avtp_timestamp);
+    TEST_ASSERT_EQUAL_UINT8(1u, out_tscf.tv); /* timestamp valid -- this function's own point */
+    TEST_ASSERT_EQUAL_UINT8(3u, out_tscf.sequence_num);
+    TEST_ASSERT_TRUE(rcp_stream_id_equal(sid, out_tscf.stream_id));
+
+    TEST_ASSERT_EQUAL_INT(RCP_ACF_OK,
+                           rcp_acf_decode_abb(tscf_payload, tscf_payload_len, &out_hdr,
+                                               &acf_payload, &acf_payload_len));
+    /* A PLAIN ACF_ABB message -- no request_type opcode, no repurposing
+     * trick, unlike rcp_timed_encode_request()'s own NTSCF path. */
+    TEST_ASSERT_EQUAL_UINT8(9u, out_hdr.byte_bus_id);
+    TEST_ASSERT_EQUAL_INT(RCP_ACF_OP_WRITE, out_hdr.op);
+    TEST_ASSERT_EQUAL_UINT8(42u, out_hdr.transaction_num);
+    TEST_ASSERT_EQUAL_INT(RCP_ACF_MTV_UNTIMED, out_hdr.mtv);
+    TEST_ASSERT_EQUAL_size_t(sizeof(body), acf_payload_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(body, acf_payload, sizeof(body));
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_tscf_request_zero_payload(void)
+{
+    rcp_bytes_t                  frame;
+    rcp_acf_byte_message_info_t  hdr = {0};
+    rcp_stream_id_t              sid = {0};
+
+    frame = rcp_timed_encode_request_tscf(&hdr, NULL, 0, sid, 0u, 0u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    rcp_bytes_free(&frame);
+}
+
+/* Failure at the ACF_ABB layer (oversized payload) must propagate as a
+ * zeroed rcp_bytes_t, not a TSCF frame wrapping garbage. rcp_acf_encode_abb()
+ * itself rejects against RCP_ACF_ABB_MAX_PAYLOAD, not the smaller
+ * RCP_ACF_MAX_PAYLOAD (which aliases GBB's own, shorter-header-derived
+ * capacity) -- see acf.h's own file header for why the two differ. */
+static void test_tscf_request_rejects_oversized_payload(void)
+{
+    rcp_bytes_t                  frame;
+    rcp_acf_byte_message_info_t  hdr = {0};
+    rcp_stream_id_t              sid = {0};
+    static uint8_t                too_big[RCP_ACF_ABB_MAX_PAYLOAD + 1];
+
+    memset(too_big, 0, sizeof(too_big));
+    frame = rcp_timed_encode_request_tscf(&hdr, too_big, sizeof(too_big), sid, 0u, 0u);
+    TEST_ASSERT_NULL(frame.data);
+}
+
 static void test_decode_rejects_short_frame(void)
 {
     uint8_t buf[4] = {0};
@@ -353,6 +429,9 @@ int main(void)
 
     RUN_TEST(test_timed_request_round_trip);
     RUN_TEST(test_timed_request_zero_payload);
+    RUN_TEST(test_tscf_request_round_trip);
+    RUN_TEST(test_tscf_request_zero_payload);
+    RUN_TEST(test_tscf_request_rejects_oversized_payload);
     RUN_TEST(test_decode_rejects_short_frame);
     RUN_TEST(test_decode_rejects_unknown_request_type);
 
