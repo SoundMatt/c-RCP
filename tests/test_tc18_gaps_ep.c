@@ -268,11 +268,13 @@ static void test_gpio_request_payload_is_four_octets(void)
  * per pin IOn: 3n+1 change, 3n+2 rising, 3n+3 falling, up to 96 for IO31
  * falling) is not represented -- the selector is a 4-value per-pin enum whose
  * whole range is 0..3, so no Table 40 signal number above 3 can be named.
- * REQ-GPIO-035 (not-implemented) DEVIATION PIN: none of Table 41's
- * gpio_base_clk / gpio_clk_divider / gpio_ep_status / the 32 per-pin
- * gpio_debounce_IOn registers is modelled, and no debounce filtering exists:
- * the functional config is exactly the shared prefix plus 32 x
- * {pin_property, trigger}. */
+ * REQ-GPIO-035 (partial) DEVIATION PIN: FIXED 2026-08-11 (issue #256 Group
+ * G, REQ-GPIO-013) as far as storage goes -- ep_status/clk_divider/
+ * debounce[32] now exist and are wire-addressable via the real EP_func
+ * mechanism (see ep_gpio.h's own file header). Still not implemented:
+ * gpio_base_clk always renders 0 (this module defines no real GPIO clock
+ * source), and no debounce FILTERING logic exists anywhere -- the
+ * registers hold values but nothing samples against them. */
 static void test_gpio_trigger_numbering_and_functional_cfg_gaps(void)
 {
     rcp_ep_gpio_functional_cfg_t cfg;
@@ -288,14 +290,21 @@ static void test_gpio_trigger_numbering_and_functional_cfg_gaps(void)
     rcp_ep_gpio_functional_cfg_init(&cfg);
     TEST_ASSERT_EQUAL_UINT8(0u, cfg.pins[0].pin_property);
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_GPIO_TRIGGER_NONE, cfg.pins[31].trigger);
-    /* Struct exhaustiveness: the shared prefix, then pins[32], then nothing
-     * -- no room for a base clock, a divider, a status word or 32 debounce
-     * registers. */
+    TEST_ASSERT_EQUAL_UINT(2u * (size_t)RCP_EP_GPIO_MAX_PINS, sizeof(cfg.pins));
+
+    /* FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group G, REQ-GPIO-013):
+     * this test used to pin the struct's exhaustiveness at pins[32] --
+     * "no room for a base clock, a divider, a status word or 32 debounce
+     * registers" -- as a deviation. The struct now has exactly that room:
+     * ep_status, clk_divider, and debounce[32] give the EP_func register
+     * block (see ep_gpio.h's own file header) somewhere real to live. */
     TEST_ASSERT_EQUAL_UINT(sizeof(rcp_regmap_ep_functional_cfg_t),
                            offsetof(rcp_ep_gpio_functional_cfg_t, pins));
-    TEST_ASSERT_EQUAL_UINT(sizeof(cfg),
-                           offsetof(rcp_ep_gpio_functional_cfg_t, pins) + sizeof(cfg.pins));
-    TEST_ASSERT_EQUAL_UINT(2u * (size_t)RCP_EP_GPIO_MAX_PINS, sizeof(cfg.pins));
+    TEST_ASSERT_EQUAL_UINT(0u, cfg.ep_status);
+    TEST_ASSERT_EQUAL_UINT8(0u, cfg.clk_divider);
+    TEST_ASSERT_EQUAL_UINT8(0u, cfg.debounce[0]);
+    TEST_ASSERT_EQUAL_UINT8(0u, cfg.debounce[RCP_EP_GPIO_MAX_PINS - 1]);
+    TEST_ASSERT_EQUAL_UINT((size_t)RCP_EP_GPIO_MAX_PINS, sizeof(cfg.debounce));
 }
 
 /* REQ-GPIO-036 (not-implemented) DEVIATION PIN: TC18 13.7.4.3 makes GPIO

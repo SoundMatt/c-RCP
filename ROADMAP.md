@@ -12210,3 +12210,131 @@ behavior, and WakeUp's wake-source debounce time) remain for a future
 session, per the standing practice of sizing each batch to what full
 verification rigor can actually cover rather than rushing a whole
 group through in one pass.
+
+### v0.216.0 -- 2026-08-11
+
+**Full-catalog audit follow-up, batch 17 (Group G's second and final
+finding, real fix): REQ-GPIO-013's invented pin-direction-toggle
+mechanism replaced with the real TC18 §12.7.1 EP_func register block.**
+
+**Correction to this file's own prior record**: the v0.213.0 entry
+above states "Issue #256's Group G is now fully closed (2/2, a real
+fix)" -- that was inaccurate. Group G's own 2 findings, per the
+original 156-finding audit, were REQ-ISELED-007 *and* REQ-GPIO-013;
+v0.213.0/PR #270 fixed only the first. REQ-GPIO-013 -- itself already
+flagged, unfixed, back at Phase 5d batch 29 ("GPIO's evt[2:0]=111b...
+has the WRONG semantics for a real, TC18-defined wire value... ep_pwm.h's
+own sibling implementation already does this correctly, GPIO's
+doesn't") -- was never actually touched until this batch. Discovered
+while investigating Group I's SPI reconfig-path lead: reading GPIO's
+own `rcp_ep_gpio_apply_reconfig()` to compare against SPI's missing
+mechanism surfaced that GPIO's OWN "reconfig" function had exactly the
+same problem SPI has, just with an invented implementation filling the
+gap instead of no implementation at all.
+
+Read TC18 §13.7.4.2 Table 41 (GPIO functional configuration) directly,
+confirmed against the rendered PDF page image (physical pages 90-91):
+gpio_ep_len(0x0000,R)/gpio_io_max(0x0001,R)/gpio_ep_enable&clr(0x0002)/
+gpio_ep_options(0x0003)/gpio_base_clk(0x0004,R)/gpio_ep_status(0x0006)/
+gpio_clk_divider(0x0008)/gpio_debounce_IO0..IO31(0x0009 onward, one
+octet each). No per-pin direction field exists anywhere in this table
+-- direction lives in HW_config's own `hw_pin_type` (regmap.h), a
+different subsystem entirely, configured only in HW_UNCONFIGURED state
+via a completely different mechanism, never via a per-request evt
+value. `rcp_ep_gpio_apply_reconfig()`'s existing bitmask-toggle
+behavior corresponded to no TC18 register or mechanism at all --
+confirmed by its own file header, which (before this fix) already and
+honestly labelled it "this module's own original design for what the
+escape hatch accomplishes". That candor was the tell that prompted
+re-deriving what the escape hatch *should* do from §12.7.1/Figure 18
+directly, the same generic addressed-EP_func-write mechanism
+`ep_pwm.c`'s PWM_OUT already implements correctly (established as the
+reference implementation back in this audit's own architecture-inventory
+phase).
+
+**Genuine spec-table editorial defect, resolved the same way `ep_pwm.h`'s
+own analogous EP_LEN defect already established as precedent**: Table
+41's own explicit, non-elided rows put gpio_debounce_IO0 at 0x0009 and
+gpio_debounce_IO1 at 0x000A -- one octet per register, in pin order --
+but the table's own summary label for the elided range's last entry
+reads "0x0024 gpio_debounce_IO31", arithmetically inconsistent with
+that same stated pattern (0x0009 + 31 = 0x0028, not 0x0024) for an
+endpoint the table's own prose says handles "up to 32 IOs". The
+explicit, non-elided starting rows are the authoritative statement of
+the pattern, so gpio_debounce_IO31 is placed at the
+arithmetically-consistent 0x0028 (RCP_EP_GPIO_EP_FUNC_LEN = 0x0029, 41
+octets total) rather than at the table's own inconsistent elided-row
+label.
+
+**Fix**: `rcp_ep_gpio_functional_cfg_t` gained `ep_status`/
+`clk_divider`/`debounce[32]` fields. New
+`rcp_ep_gpio_render_registers()`/`rcp_ep_gpio_apply_reconfig()`/
+`rcp_ep_gpio_reconfig_strerror()`/`rcp_ep_gpio_encode_reconfig_request()`
+mirror `ep_pwm.c`'s own PWM_OUT implementation exactly (same octet-
+granularity patch-then-adopt pattern, same read-only-offset handling,
+same "whole write ignored on overrun" rule). `gpio_io_max` renders as
+`RCP_EP_GPIO_MAX_PINS` (32) -- this module's own reading of "the
+maximum IO Pin number supported" as a count, since the table doesn't
+itself disambiguate a count from a max index. The old invented
+pin-direction-toggle function is retained, under the honest name
+`rcp_ep_gpio_toggle_pin_direction()`, as a real but purely caller-side
+convenience no longer described as, or reachable from, evt[2:0]=111b
+-- its own test coverage (in `test_ep_gpio.c` and the two structural
+deviation-pin tests in `test_tc18_gaps_regmap.c` documenting the
+*separate*, still-open `pin_property`-vs-`hw_pin_type` structural
+question) renamed and re-commented accordingly, not deleted.
+
+Two pre-existing deviation-pin tests independently confirmed this
+exact finding before this session even started investigating it:
+`test_generic_config_request_is_pwm_out_only` and
+`test_ep_len_overrun_rule_exists_only_for_pwm_out`
+(`tests/test_tc18_gaps_regmap.c`), both already explicitly naming GPIO
+among the endpoint types lacking the real mechanism. Both renamed
+(`_and_gpio`) and extended with GPIO's own now-correct assertions;
+`test_gpio_trigger_numbering_and_functional_cfg_gaps`
+(`tests/test_tc18_gaps_ep.c`) previously pinned "no room for a base
+clock, a divider, a status word or 32 debounce registers" as a
+deviation -- now confirms the struct *has* exactly that room.
+`REQ-GPIO-035` (Table 41 registers) downgraded from `not-implemented`
+to `partial`: the register storage now exists and is wire-addressable,
+but `gpio_base_clk` still always renders 0 (no real clock source
+modelled) and no debounce *filtering* logic exists anywhere -- the
+registers hold values but nothing samples against them, a distinct,
+still-open gap. `REQ-CFG-011`/`REQ-CFG-012` (the cross-endpoint
+"generic evt=111b mechanism" tracking entries) narrowed from "PWM_OUT
+only" to "PWM_OUT and GPIO" -- 2 of 11 endpoint types now implement
+it; SPI/I2C/UART/LIN/CAN/ADC/ISELED/MDIO/wakeup remain open, the same
+scope Group I's own SPI investigation had already independently
+surfaced.
+
+Mutation-tested: loosening the out-of-range bounds check by 4 octets
+did not produce a clean test failure -- it reproduced a real stack
+buffer overflow in the block-patching loop, aborting immediately
+(SIGABRT). This is a *stronger* confirmation than a clean FAIL would
+have been: it demonstrates the original bounds check prevents an
+actual memory-safety violation, not merely a logical assertion
+mismatch. Restored, re-verified. Full suite (65/65) both trees.
+`cfusa check`: 0 errors (using the CI-pinned c-FuSa v0.5.50 binary
+directly, since the session's earlier scratch copy at
+`/private/tmp/cfusa_build` had been cleared -- rebuilt from
+`/Users/matt/Documents/Coding/SoundMatt/c-FuSa`'s own already-built
+`build/cfusa`, confirmed at the correct pinned version before use).
+`cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100` /
+`--sec-tested 100`: both 100% (1024/1024) -- `REQ-LIFECYCLE-038`/
+`REQ-ADC-037` still show in the secondary "UNTRACED" diagnostic (the
+same pre-existing, non-blocking tag-parsing quirk confirmed harmless
+by PR #272's own real CI run); `REQ-GPIO-038`/`REQ-GPIO-039` (this
+batch's own new entries) do NOT show in that list, confirming their
+test tags resolved correctly.
+
+Issue #256's Group G is now genuinely, fully closed (2/2:
+REQ-ISELED-007 + REQ-GPIO-013). **Progress: 82/156 findings resolved**
+(Groups H 12 + B 4 + A 17 + D 16 + F 7 + E 4 + C 16 + G 2 + I 4 = 82).
+Note this is the same "82" total previously stated after Group I's own
+batch -- that earlier count already, incorrectly, credited Group G
+with 2/2 (following v0.213.0's own inaccurate claim), so it was
+actually overcounting by one real finding (REQ-GPIO-013, not yet
+fixed at that point) even as its arithmetic looked consistent. This
+batch's real fix now genuinely earns the count the total already,
+prematurely, included -- the headline number is unchanged, but it is
+correct now in a way it was not before.

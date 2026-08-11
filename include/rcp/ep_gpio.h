@@ -112,12 +112,30 @@
  * against cpp-RCP's own WriteSemantics enum (derived from the same
  * structured spec extraction this module cites) and corrected accordingly
  * -- see issue #104. The eighth, RCP_EP_GPIO_WRITE_RECONFIG (value 7), is the
- * "reconfiguration escape hatch": rather than writing the bitmask register,
- * it reinterprets the same 32-bit payload as a per-pin selector and toggles
- * each selected pin's direction (RCP_REGMAP_PIN_PROP_OUTPUT <->
- * RCP_REGMAP_PIN_PROP_INPUT, regmap.h) -- see
- * rcp_ep_gpio_apply_reconfig() below, this module's own original design for
- * what the escape hatch accomplishes.
+ * "reconfiguration escape hatch" -- see rcp_ep_gpio_apply_reconfig(), below,
+ * for what it actually does.
+ *
+ * CORRECTED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group G, REQ-GPIO-013):
+ * this escape hatch previously reinterpreted the 32-bit payload as a
+ * per-pin selector and toggled each selected pin's direction
+ * (RCP_REGMAP_PIN_PROP_OUTPUT <-> RCP_REGMAP_PIN_PROP_INPUT, regmap.h) --
+ * a mechanism this file's own header, before this fix, already and
+ * honestly labelled "this module's own original design for what the
+ * escape hatch accomplishes". That candor was the tell: TC18 §12.7.1
+ * (Figure 18, "Configuration request") defines exactly one mechanism for
+ * evt[2:0]=111b, common to every endpoint type -- the byte_msg_payload is
+ * a relative start address into the endpoint's own EP_func register block
+ * followed by the data octets to patch there -- and ep_pwm.h's
+ * rcp_ep_pwm_out_apply_reconfig() already implements it correctly. The
+ * old pin-direction-toggle behavior corresponded to no TC18 mechanism at
+ * all (Table 41, the GPIO functional-configuration register block, has no
+ * per-pin direction field whatsoever -- direction lives in HW_config's
+ * own hw_pin_type, a different subsystem entirely, configured only in
+ * HW_UNCONFIGURED state, not via a per-request evt value). Retained, under
+ * an honestly-scoped new name (rcp_ep_gpio_toggle_pin_direction(), below)
+ * since it is still a real, useful caller-side convenience -- but it is no
+ * longer described as, or reachable from, the evt[2:0]=111b wire
+ * mechanism. rcp_ep_gpio_apply_reconfig() now names the real one.
  *
  * Add and subtract saturate at the bitmask's own 32-bit boundaries
  * (0x00000000 / 0xFFFFFFFF) rather than wrapping -- this module's own
@@ -157,6 +175,45 @@
  * -- never duplicating -- server.h's/regmap.h's existing authorization
  * logic (rcp_lifecycle_field_writable()/rcp_regmap_writer_ctx()), per the
  * roadmap's explicit instruction.
+ *
+ * ── The EP_func register block (evt[2:0] == 111b) ──────────────────────────
+ *
+ * ADDED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group G, REQ-GPIO-013):
+ * rcp_ep_gpio_functional_cfg_t's ep_status/clk_divider/debounce fields and
+ * rcp_ep_gpio_render_registers()/rcp_ep_gpio_apply_reconfig() give GPIO the
+ * same real EP_func register block ep_pwm.h's PWM_OUT already has, at the
+ * widths and order TC18's own GPIO functional-configuration register table
+ * assigns them (relative addresses 0x0000 gpio_ep_len through 0x0028
+ * gpio_debounce_IO31): gpio_ep_len(R)/gpio_io_max(R)/gpio_ep_enable&clr/
+ * gpio_ep_options (both regmap.h's shared common-entries prefix)/
+ * gpio_base_clk(R)/gpio_ep_status/gpio_clk_divider/gpio_debounce_IO0..IO31
+ * (32 independent 8-bit debounce registers, one per pin).
+ *
+ * Known editorial defect in the source table, resolved the same way
+ * ep_pwm.h's own file header resolves its analogous EP_LEN defect: the
+ * table's own explicit, non-elided rows establish gpio_debounce_IO0 at
+ * 0x0009 and gpio_debounce_IO1 at 0x000A -- one octet per register, in
+ * pin order -- but the table's own summary label for the elided range's
+ * last entry reads "0x0024 gpio_debounce_IO31", which is arithmetically
+ * inconsistent with that same stated pattern (0x0009 + 31 = 0x0028, not
+ * 0x0024) for an endpoint the table's own prose says handles "up to 32
+ * IOs". The explicit, non-elided starting rows are the authoritative
+ * statement of the pattern, so this module places gpio_debounce_IO31 at
+ * the arithmetically-consistent 0x0028 (RCP_EP_GPIO_EP_FUNC_LEN = 0x0029,
+ * 41 octets total) rather than at the table's own inconsistent elided-row
+ * label.
+ *
+ * gpio_io_max(0x0001, R) is rendered as RCP_EP_GPIO_MAX_PINS (32) -- this
+ * module's own reading of "the maximum IO Pin number supported by the
+ * GPIO EP" as a pin *count* (matching how RCP_EP_GPIO_MAX_PINS is used as
+ * a count everywhere else in this module), since the register table does
+ * not itself disambiguate a count from a maximum zero-based index.
+ *
+ * The old evt[2:0]=111b pin-direction-toggle behavior (this module's own
+ * invented mechanism, corresponding to no TC18 register at all -- see the
+ * "eight write-semantics variants" section, above) is retained as
+ * rcp_ep_gpio_toggle_pin_direction(), an honestly-scoped caller-side
+ * convenience no longer described as, or reachable from, evt[2:0]=111b.
  */
 #ifndef RCP_EP_GPIO_H
 #define RCP_EP_GPIO_H
@@ -221,14 +278,20 @@ bool rcp_ep_gpio_write_semantics_valid(uint8_t v);
 uint32_t rcp_ep_gpio_apply_write(uint32_t current, uint32_t request,
                                   rcp_ep_gpio_write_semantics_t evt);
 
-/* Applies the reconfiguration escape hatch (evt[2:0] == 7): for every pin
- * index i in 0..RCP_EP_GPIO_MAX_PINS-1 whose bit is set in reconfig_mask,
- * toggles pins[i] between RCP_REGMAP_PIN_PROP_OUTPUT and
- * RCP_REGMAP_PIN_PROP_INPUT (regmap.h), preserving pins[i]'s other
- * pin_property bits unchanged; every pin whose bit is clear in
- * reconfig_mask is left entirely untouched. pins must point to an array of
- * exactly RCP_EP_GPIO_MAX_PINS entries. */
-void rcp_ep_gpio_apply_reconfig(uint8_t pins[RCP_EP_GPIO_MAX_PINS], uint32_t reconfig_mask);
+/* RENAMED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group G, REQ-GPIO-013):
+ * this was formerly named rcp_ep_gpio_apply_reconfig() and documented as
+ * the evt[2:0]==7 handler; it is neither -- it corresponds to no TC18
+ * register or mechanism at all (see the file header's "EP_func register
+ * block" section for what evt[2:0]==7 actually does now, and its own
+ * corrected note in "the eight write-semantics variants" section for why).
+ * Retained under this honest name as a real, still-useful, purely
+ * caller-side convenience: for every pin index i in
+ * 0..RCP_EP_GPIO_MAX_PINS-1 whose bit is set in toggle_mask, toggles
+ * pins[i] between RCP_REGMAP_PIN_PROP_OUTPUT and RCP_REGMAP_PIN_PROP_INPUT
+ * (regmap.h), preserving pins[i]'s other pin_property bits unchanged;
+ * every pin whose bit is clear in toggle_mask is left entirely untouched.
+ * pins must point to an array of exactly RCP_EP_GPIO_MAX_PINS entries. */
+void rcp_ep_gpio_toggle_pin_direction(uint8_t pins[RCP_EP_GPIO_MAX_PINS], uint32_t toggle_mask);
 
 /* rcp_ep_gpio_apply_write() plus TC18 13.7.4.3's input-pin write rule ("A
  * write request to an input pin is ignored for this input pin"): computes
@@ -237,9 +300,10 @@ void rcp_ep_gpio_apply_reconfig(uint8_t pins[RCP_EP_GPIO_MAX_PINS], uint32_t rec
  * RCP_REGMAP_PIN_PROP_OUTPUT set, leaving current's bit unchanged wherever
  * pins[i] does not (issue #105). evt == RCP_EP_GPIO_WRITE_RECONFIG is
  * accepted -- rcp_ep_gpio_apply_write() already returns current unchanged
- * for it, so masking is a no-op -- but callers still needing to actually
- * apply a reconfiguration must call rcp_ep_gpio_apply_reconfig() themselves;
- * this function never touches pins. pins must point to an array of exactly
+ * for it, so masking is a no-op; a caller routing a decoded write request
+ * here is responsible for having checked evt[2:0] and, for
+ * RCP_EP_GPIO_WRITE_RECONFIG, routed to rcp_ep_gpio_apply_reconfig()
+ * instead (below) rather than here. pins must point to an array of exactly
  * RCP_EP_GPIO_MAX_PINS entries. */
 uint32_t rcp_ep_gpio_apply_masked_write(uint32_t current, uint32_t request,
                                          rcp_ep_gpio_write_semantics_t evt,
@@ -275,10 +339,16 @@ typedef struct {
                                                first member -- see the file
                                                header */
     rcp_ep_gpio_pin_cfg_t          pins[RCP_EP_GPIO_MAX_PINS];
+    uint16_t                       ep_status;               /* gpio_ep_status */
+    uint8_t                        clk_divider;              /* gpio_clk_divider */
+    uint8_t                        debounce[RCP_EP_GPIO_MAX_PINS]; /* gpio_debounce_IO0..IO31,
+                                                                        see the file header */
 } rcp_ep_gpio_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false, every pin's pin_property
- * 0 and trigger RCP_EP_GPIO_TRIGGER_NONE). */
+ * 0 and trigger RCP_EP_GPIO_TRIGGER_NONE, ep_status 0, clk_divider 0, every
+ * debounce entry 0 -- "0: no debounce", per the file header's own register
+ * table). */
 void rcp_ep_gpio_functional_cfg_init(rcp_ep_gpio_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
@@ -301,6 +371,104 @@ bool rcp_ep_gpio_set_pin_property(rcp_ep_gpio_functional_cfg_t *cfg, uint8_t pin
 bool rcp_ep_gpio_set_pin_trigger(rcp_ep_gpio_functional_cfg_t *cfg, uint8_t pin_index,
                                   rcp_ep_gpio_trigger_t trigger, rcp_lifecycle_state_t state,
                                   rcp_lifecycle_writer_ctx_t writer);
+
+/* ── The EP_func register block (evt[2:0] == 111b) -- see the file header ──── */
+
+/* Relative addresses within this endpoint's own EP_func block, at the
+ * widths and in the order TC18's own GPIO functional-configuration
+ * register table assigns them -- see the file header for the
+ * gpio_debounce_IO31 offset's own resolved editorial defect. Offsets
+ * marked R are read-only: a configuration write covering them leaves them
+ * unchanged (see rcp_ep_gpio_apply_reconfig()). */
+#define RCP_EP_GPIO_REG_EP_LEN          ((uint16_t)0x0000u) /*  8 bit, R   */
+#define RCP_EP_GPIO_REG_IO_MAX          ((uint16_t)0x0001u) /*  8 bit, R   */
+#define RCP_EP_GPIO_REG_EP_ENABLE_CLR   ((uint16_t)0x0002u) /*  8 bit, R/W */
+#define RCP_EP_GPIO_REG_EP_OPTIONS      ((uint16_t)0x0003u) /*  8 bit, R/W */
+#define RCP_EP_GPIO_REG_BASE_CLK        ((uint16_t)0x0004u) /* 16 bit, R   */
+#define RCP_EP_GPIO_REG_EP_STATUS       ((uint16_t)0x0006u) /* 16 bit, R/W */
+#define RCP_EP_GPIO_REG_CLK_DIVIDER     ((uint16_t)0x0008u) /*  8 bit, R/W */
+#define RCP_EP_GPIO_REG_DEBOUNCE_IO0    ((uint16_t)0x0009u) /*  8 bit, R/W;
+                                                                 IO(n) at
+                                                                 0x0009+n */
+
+/* The block's own length in octets -- one past the last assigned offset
+ * (gpio_debounce_IO31 at 0x0028, see the file header), i.e. the value the
+ * endpoint reports at RCP_EP_GPIO_REG_EP_LEN and the bound the "write
+ * beyond EP_LEN is ignored" rule (extraction §3.7.1) is applied against. */
+#define RCP_EP_GPIO_EP_FUNC_LEN         ((uint16_t)0x0029u)
+
+/* The fixed width (octets) of the relative-start-address prefix every
+ * configuration request's payload begins with -- the address is a 16-bit
+ * big-endian field, followed by the configuration data octets to write
+ * from that address onward (extraction §3.7.1), matching ep_pwm.h's own
+ * RCP_EP_PWM_OUT_RECONFIG_ADDR_LEN convention. */
+#define RCP_EP_GPIO_RECONFIG_ADDR_LEN   ((size_t)2u)
+
+typedef enum {
+    RCP_EP_GPIO_RECONFIG_OK               = 0,
+    RCP_EP_GPIO_RECONFIG_ERR_SHORT        = 1, /* payload carries no address
+                                                    prefix, or an address
+                                                    prefix with no data
+                                                    octet after it */
+    RCP_EP_GPIO_RECONFIG_ERR_OUT_OF_RANGE = 2, /* start_address + data
+                                                    length exceeds
+                                                    RCP_EP_GPIO_EP_FUNC_LEN
+                                                    -- the whole write is
+                                                    ignored, per the
+                                                    specification's own
+                                                    rule */
+} rcp_ep_gpio_reconfig_errc_t;
+
+/* Human-readable message for an rcp_ep_gpio_reconfig_errc_t value. Never
+ * returns NULL. */
+const char *rcp_ep_gpio_reconfig_strerror(rcp_ep_gpio_reconfig_errc_t e);
+
+/* Serializes cfg's EP_func registers into out[0..RCP_EP_GPIO_EP_FUNC_LEN)
+ * exactly as a configuration *read* of the whole block would report them
+ * -- the inverse of rcp_ep_gpio_apply_reconfig()'s own parse step, and the
+ * same rendering that function patches in place. */
+void rcp_ep_gpio_render_registers(const rcp_ep_gpio_functional_cfg_t *cfg,
+                                   uint8_t out[RCP_EP_GPIO_EP_FUNC_LEN]);
+
+/* Applies the real configuration escape hatch (evt[2:0] == 111b): payload
+ * is NOT presented at the interface but interpreted as an addressed write
+ * into this endpoint's own EP_func block -- a 16-bit big-endian relative
+ * start address followed by the configuration data octets to write from
+ * that address onward (extraction §3.7.1, TC18 §12.7.1 Figure 18). This is
+ * a real register write, reaching every R/W register the block defines
+ * (enable/options, status, clock divider, all 32 per-pin debounce
+ * registers) -- not the invented pin-direction toggle this function used
+ * to be (see rcp_ep_gpio_toggle_pin_direction(), above, and the file
+ * header).
+ *
+ * Returns RCP_EP_GPIO_RECONFIG_ERR_SHORT when payload_len is not at least
+ * RCP_EP_GPIO_RECONFIG_ADDR_LEN + 1, and
+ * RCP_EP_GPIO_RECONFIG_ERR_OUT_OF_RANGE when the addressed span would
+ * extend past RCP_EP_GPIO_EP_FUNC_LEN; in both cases cfg is left entirely
+ * unchanged, per the specification's own "such a payload is to be
+ * ignored" rule. Octets of the addressed span that land on a read-only
+ * register (EP_LEN, IO_MAX, base_clk) are left at their current values
+ * while the rest of the span is still applied. Partially-covered
+ * multi-octet registers are handled correctly: the write is applied at
+ * octet granularity over the block's rendered image.
+ *
+ * A caller routing a decoded write request here is responsible for having
+ * checked that evt[2:0] really was RCP_EP_GPIO_WRITE_RECONFIG;
+ * rcp_ep_gpio_apply_write() deliberately no-ops for that evt value so a
+ * misrouted request cannot silently corrupt the data registers. */
+rcp_ep_gpio_reconfig_errc_t
+rcp_ep_gpio_apply_reconfig(rcp_ep_gpio_functional_cfg_t *cfg,
+                            const uint8_t *payload, size_t payload_len);
+
+/* Encodes an ACF_ABB configuration request (evt[2:0] == 111b) addressed to
+ * byte_bus_id: payload is start_address (16-bit big-endian) followed by
+ * data[0..data_len). Returns a zeroed rcp_bytes_t (data=NULL) if data_len
+ * is 0, if the encoded payload would exceed RCP_ACF_MAX_PAYLOAD, or on
+ * allocation failure. Caller frees the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_ep_gpio_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                 uint16_t start_address,
+                                                 const uint8_t *data, size_t data_len,
+                                                 uint8_t transaction_num);
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 

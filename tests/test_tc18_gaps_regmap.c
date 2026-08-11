@@ -201,45 +201,51 @@ static void test_reg_write_len_matches_the_formula(void)
  * evt[2:0] = 111b, payload = a 16-bit relative start address within the
  * addressed endpoint's EP_func section followed by configuration data --
  * usable against EVERY endpoint type. c-RCP implements that shape for
- * PWM_OUT only (asserted first, spec-literally: clk_divider at relative
- * 0x0008, signal_flags at 0x0009). The deviation is asserted second:
- * GPIO's reconfiguration entry point takes a pin BITMASK and carries no
- * relative start address at all, so no address-addressed EP_func write
- * exists for GPIO -- nor for SPI/I2C/UART/LIN/CAN/ADC/ISELED/MDIO/wakeup,
- * none of which has a reconfig entry point of any kind. A conforming
- * implementation would decode the same address+data payload for all of
- * them. */
-static void test_generic_config_request_is_pwm_out_only(void)
+ * PWM_OUT (asserted first, spec-literally: clk_divider at relative
+ * 0x0008, signal_flags at 0x0009). FIXED 2026-08-11 (c-RCP-AUDIT-06,
+ * issue #256 Group G, REQ-GPIO-013): GPIO now implements the identical
+ * shape (asserted second: clk_divider at relative 0x0008, matching
+ * PWM_OUT's own offset for the same register) -- its former
+ * rcp_ep_gpio_apply_reconfig() (a pin-direction-toggle bitmask, no
+ * relative start address at all) is retired from this role and renamed
+ * rcp_ep_gpio_toggle_pin_direction() (see ep_gpio.h's own file header).
+ * The deviation, narrowed but not closed: SPI/I2C/UART/LIN/CAN/ADC/
+ * ISELED/MDIO/wakeup still have no reconfig entry point of any kind. A
+ * conforming implementation would decode the same address+data payload
+ * for all of them -- REQ-CFG-011 tracks the remaining 9. */
+static void test_generic_config_request_is_pwm_out_and_gpio(void)
 {
-    rcp_ep_pwm_out_functional_cfg_t cfg;
-    const uint8_t                   write[4] = {0x00, 0x08, 0x33, 0x05};
-    uint8_t                         pins[RCP_EP_GPIO_MAX_PINS];
+    rcp_ep_pwm_out_functional_cfg_t pwm_cfg;
+    rcp_ep_gpio_functional_cfg_t    gpio_cfg;
+    const uint8_t                   pwm_write[4]  = {0x00, 0x08, 0x33, 0x05};
+    const uint8_t                   gpio_write[3] = {0x00, 0x08, 0x77};
 
-    rcp_ep_pwm_out_functional_cfg_init(&cfg);
+    rcp_ep_pwm_out_functional_cfg_init(&pwm_cfg);
     TEST_ASSERT_EQUAL(RCP_EP_PWM_OUT_RECONFIG_OK,
-                      rcp_ep_pwm_out_apply_reconfig(&cfg, write, sizeof(write)));
+                      rcp_ep_pwm_out_apply_reconfig(&pwm_cfg, pwm_write, sizeof(pwm_write)));
     TEST_ASSERT_EQUAL_UINT16((uint16_t)0x0008u, RCP_EP_PWM_OUT_REG_CLK_DIVIDER);
-    TEST_ASSERT_EQUAL_HEX8(0x33, cfg.clk_divider);
-    TEST_ASSERT_EQUAL_HEX8(0x05, cfg.signal_flags);
+    TEST_ASSERT_EQUAL_HEX8(0x33, pwm_cfg.clk_divider);
+    TEST_ASSERT_EQUAL_HEX8(0x05, pwm_cfg.signal_flags);
 
-    memset(pins, 0, sizeof(pins));
-    pins[0] = RCP_REGMAP_PIN_PROP_OUTPUT;
-    /* Deviation: the argument is a bitmask over pins, not a start address.
-     * Bit 0 selects pin 0; there is no octet of the payload that could be
-     * a relative EP_func address. */
-    rcp_ep_gpio_apply_reconfig(pins, 0x00000001u);
-    TEST_ASSERT_EQUAL_HEX8(RCP_REGMAP_PIN_PROP_INPUT, pins[0]);
+    rcp_ep_gpio_functional_cfg_init(&gpio_cfg);
+    TEST_ASSERT_EQUAL_UINT16((uint16_t)0x0008u, RCP_EP_GPIO_REG_CLK_DIVIDER);
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RECONFIG_OK,
+                      rcp_ep_gpio_apply_reconfig(&gpio_cfg, gpio_write, sizeof(gpio_write)));
+    TEST_ASSERT_EQUAL_HEX8(0x77, gpio_cfg.clk_divider);
 }
 
 /* TC18 §12.7.1 requires EVERY endpoint to publish EP_LEN at EP_func
  * relative address 0x0000 and to ignore, in its entirety, a write whose
  * start_address + length exceeds it. PWM_OUT satisfies this literally
  * (asserted here: EP_LEN lives at 0x0000, reports 0x0F, and a write of 2
- * octets at 0x000E is refused whole). Deviation: `grep -rn EP_LEN src`
- * matches ep_pwm.c alone -- no other endpoint type defines an EP_LEN
- * register or enforces the overrun rule, because none has an addressed
- * EP_func write path at all (see the test above). */
-static void test_ep_len_overrun_rule_exists_only_for_pwm_out(void)
+ * octets at 0x000E is refused whole). FIXED 2026-08-11 (issue #256 Group
+ * G, REQ-GPIO-013): GPIO now does too (EP_LEN at 0x0000 reports 0x29, a
+ * write past it is refused whole). Deviation, narrowed but not closed:
+ * `grep -rn EP_LEN src` now matches ep_pwm.c and ep_gpio.c -- SPI/I2C/
+ * UART/LIN/CAN/ADC/ISELED/MDIO/wakeup still define no EP_LEN register or
+ * overrun rule, because none has an addressed EP_func write path at all
+ * (see the test above; REQ-CFG-012 tracks the remaining 9). */
+static void test_ep_len_overrun_rule_exists_for_pwm_out_and_gpio(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
     uint8_t                         block[RCP_EP_PWM_OUT_EP_FUNC_LEN];
@@ -257,6 +263,26 @@ static void test_ep_len_overrun_rule_exists_only_for_pwm_out(void)
     TEST_ASSERT_EQUAL(RCP_EP_PWM_OUT_RECONFIG_ERR_OUT_OF_RANGE,
                       rcp_ep_pwm_out_apply_reconfig(&cfg, overrun, sizeof(overrun)));
     TEST_ASSERT_EQUAL_HEX8(0x42, cfg.skew);
+
+    {
+        rcp_ep_gpio_functional_cfg_t gpio_cfg;
+        uint8_t                      gpio_block[RCP_EP_GPIO_EP_FUNC_LEN];
+        /* 0x0028 (the last real register, gpio_debounce_IO31) + 2 octets
+         * overruns 0x0029: the whole write is ignored. */
+        const uint8_t                gpio_overrun[4] = {0x00, 0x28, 0xAA, 0xBB};
+
+        rcp_ep_gpio_functional_cfg_init(&gpio_cfg);
+        gpio_cfg.debounce[31] = 0x42u;
+
+        TEST_ASSERT_EQUAL_UINT16((uint16_t)0x0000u, RCP_EP_GPIO_REG_EP_LEN);
+        rcp_ep_gpio_render_registers(&gpio_cfg, gpio_block);
+        TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_EP_GPIO_EP_FUNC_LEN, gpio_block[RCP_EP_GPIO_REG_EP_LEN]);
+        TEST_ASSERT_EQUAL_HEX8(0x29, gpio_block[RCP_EP_GPIO_REG_EP_LEN]);
+
+        TEST_ASSERT_EQUAL(RCP_EP_GPIO_RECONFIG_ERR_OUT_OF_RANGE,
+                          rcp_ep_gpio_apply_reconfig(&gpio_cfg, gpio_overrun, sizeof(gpio_overrun)));
+        TEST_ASSERT_EQUAL_HEX8(0x42, gpio_cfg.debounce[31]);
+    }
 }
 
 /* ── §12.3: discovery-stream occupancy ─────────────────────────────────────── */
@@ -1118,9 +1144,14 @@ static void test_hw_pin_type_matches_table_20(void)
  * away from at all, so a push-pull/open-drain/open-source pin is
  * structurally never "not an input" the way the old RCP_REGMAP_PIN_
  * PROP_OUTPUT/_INPUT pair could represent. (ep_gpio.h's own, separate
- * pin_property field and its rcp_ep_gpio_apply_reconfig() toggle are
- * REQ-GPIO-013's own still-open concern, untouched by this fix -- see
- * this session's investigation note on issue #200.) */
+ * pin_property field and its rcp_ep_gpio_toggle_pin_direction() helper --
+ * renamed 2026-08-11 from rcp_ep_gpio_apply_reconfig(), issue #256 Group G,
+ * once REQ-GPIO-013's real, unrelated wire-mechanism bug was fixed and
+ * this function was found to correspond to no TC18 register at all -- are
+ * a separate, still-open structural concern of their own: this module's
+ * local pin_property model duplicates, and diverges from, HW_config's own
+ * hw_pin_type model. See this session's investigation note on issue
+ * #200.) */
 static void test_hw_pin_output_stage_has_no_exclusive_input_flag(void)
 {
     uint8_t pin = (uint8_t)(RCP_REGMAP_HW_PIN_STAGE_PUSH_PULL | RCP_REGMAP_HW_PIN_PULL_UP);
@@ -1146,9 +1177,9 @@ static void test_hw_pin_output_stage_has_no_exclusive_input_flag(void)
  * are not mutually exclusive pin states, which is what makes read-back of
  * an output pin's actual level (short/stuck-driver detection) possible.
  * Deviation: c-RCP models OUTPUT and INPUT as two independent flags and
- * rcp_ep_gpio_apply_reconfig() TOGGLES a pin from one to the other, so a
- * pin configured as an output ceases to be readable as an input, and back
- * again. */
+ * rcp_ep_gpio_toggle_pin_direction() TOGGLES a pin from one to the other,
+ * so a pin configured as an output ceases to be readable as an input, and
+ * back again. */
 static void test_output_pin_loses_its_input_capability(void)
 {
     uint8_t pins[RCP_EP_GPIO_MAX_PINS];
@@ -1156,12 +1187,12 @@ static void test_output_pin_loses_its_input_capability(void)
     memset(pins, 0, sizeof(pins));
     pins[0] = (uint8_t)(RCP_REGMAP_PIN_PROP_OUTPUT | RCP_REGMAP_PIN_PROP_PULL_UP);
 
-    rcp_ep_gpio_apply_reconfig(pins, 0x00000001u);
+    rcp_ep_gpio_toggle_pin_direction(pins, 0x00000001u);
     TEST_ASSERT_EQUAL_HEX8(0x00, (uint8_t)(pins[0] & RCP_REGMAP_PIN_PROP_OUTPUT));
     TEST_ASSERT_EQUAL_HEX8(RCP_REGMAP_PIN_PROP_INPUT,
                            (uint8_t)(pins[0] & RCP_REGMAP_PIN_PROP_INPUT));
 
-    rcp_ep_gpio_apply_reconfig(pins, 0x00000001u);
+    rcp_ep_gpio_toggle_pin_direction(pins, 0x00000001u);
     TEST_ASSERT_EQUAL_HEX8(RCP_REGMAP_PIN_PROP_OUTPUT,
                            (uint8_t)(pins[0] & RCP_REGMAP_PIN_PROP_OUTPUT));
     TEST_ASSERT_EQUAL_HEX8(0x00, (uint8_t)(pins[0] & RCP_REGMAP_PIN_PROP_INPUT));
@@ -1955,8 +1986,8 @@ int main(void)
     UNITY_BEGIN();
 
     RUN_TEST(test_reg_write_len_matches_the_formula);
-    RUN_TEST(test_generic_config_request_is_pwm_out_only);
-    RUN_TEST(test_ep_len_overrun_rule_exists_only_for_pwm_out);
+    RUN_TEST(test_generic_config_request_is_pwm_out_and_gpio);
+    RUN_TEST(test_ep_len_overrun_rule_exists_for_pwm_out_and_gpio);
     RUN_TEST(test_discovery_claim_refusal_is_unreportable);
     RUN_TEST(test_lifecycle_state_register_field_tracks_the_authoritative_state);
     RUN_TEST(test_general_map_wire_reach_stops_after_0x000d);
