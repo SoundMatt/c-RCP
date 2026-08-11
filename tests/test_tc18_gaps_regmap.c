@@ -2020,10 +2020,14 @@ static void test_response_queue_size_register_and_storage_now_exist(void)
  * rcp_respqueue_max_fragment_payload() gives a caller the budget to feed
  * fragment.h's existing rcp_fragment_plan()/_plan_count() so an
  * oversized single message is split before it is ever pushed
- * (REQ-RMAP-062, closed). REQ-RMAP-061's other two halves -- rejecting a
- * configured Max_AVTPDUsize inconsistent with the network's own MTU, and
- * exposing the value in the 14-octet discovery slice -- are still open
- * (neither is a per-message queue concern; deferred to a later batch). */
+ * (REQ-RMAP-062, closed). REQ-RMAP-061's own MTU-consistency-check half
+ * is also now closed (see the dedicated test below,
+ * rcp_respqueue_max_avtpdu_size_within_mtu()) -- REQ-RMAP-061 stays
+ * `partial` overall only because Table 24 (this whole register block)
+ * has no ACF_ABB wire request/response wrapper yet, the same genuine,
+ * unresolved addressing question already documented for HW_config and
+ * EP_ID_config, not a per-message queue concern this module could close
+ * on its own. */
 static void test_max_avtpdu_size_is_now_enforced_and_feeds_fragmentation(void)
 {
     rcp_regmap_response_queue_cfg_t cfg;
@@ -2049,10 +2053,34 @@ static void test_max_avtpdu_size_is_now_enforced_and_feeds_fragmentation(void)
     budget = rcp_respqueue_max_fragment_payload((size_t)cfg.max_avtpdu_size * 4u,
                                                 RCP_ACF_ABB_HEADER_LEN);
     TEST_ASSERT_EQUAL_UINT((size_t)5u, budget); /* 16 - 8 - 3(pad) */
+}
 
-    /* REQ-RMAP-061's other two halves -- MTU-consistency rejection and
-     * discovery-slice exposure -- remain open. */
-    TEST_ASSERT_EQUAL_UINT((size_t)14u, RCP_DISCOVERY_GENERAL_SLICE_LEN);
+/* REQ-RMAP-061 CLOSED (MTU-consistency half): TC18 §12.7.9 (TC18.txt
+ * L3010-3011) requires "the Max_AVTPDUsize shall always be configured
+ * such that the final network frame does not exceed the maximum
+ * transmit unit size of the network." rcp_respqueue_max_avtpdu_size_
+ * within_mtu() (respqueue.h/respqueue.c) is the config-time check a
+ * caller runs before ever calling rcp_respqueue_init(). TC18 defines no
+ * fixed MTU value of its own -- mtu_budget_octets is the caller's own
+ * already-adjusted ceiling, matching this module's established
+ * "caller supplies already-classified units" convention throughout. */
+static void test_max_avtpdu_size_within_mtu_check(void)
+{
+    /* Ordinary case: fits. */
+    TEST_ASSERT_TRUE(rcp_respqueue_max_avtpdu_size_within_mtu(1400u, 1500u));
+    /* Exactly at the boundary: fits (the check is <=, not <). */
+    TEST_ASSERT_TRUE(rcp_respqueue_max_avtpdu_size_within_mtu(1500u, 1500u));
+    /* One octet over: rejected. */
+    TEST_ASSERT_FALSE(rcp_respqueue_max_avtpdu_size_within_mtu(1501u, 1500u));
+
+    /* max_avtpdu_size_octets == 0 means "unbounded" (matching
+     * rcp_respqueue_init()'s own convention) -- an unbounded ceiling can
+     * never be MTU-safe against a finite budget. */
+    TEST_ASSERT_FALSE(rcp_respqueue_max_avtpdu_size_within_mtu(0u, 1500u));
+    /* Both unbounded is the one degenerate case this function treats as
+     * vacuously true -- "no ceiling configured" is consistent with "no
+     * MTU budget configured either", not a real conformance answer. */
+    TEST_ASSERT_TRUE(rcp_respqueue_max_avtpdu_size_within_mtu(0u, 0u));
 }
 
 /* REQ-RMAP-063 (TC18 §12.7.9 Table 24, relative address 0x0006, 16 bit,
@@ -2393,6 +2421,7 @@ int main(void)
     RUN_TEST(test_response_queue_stream_id_is_configurable);
     RUN_TEST(test_response_queue_size_register_and_storage_now_exist);
     RUN_TEST(test_max_avtpdu_size_is_now_enforced_and_feeds_fragmentation);
+    RUN_TEST(test_max_avtpdu_size_within_mtu_check);
     RUN_TEST(test_flush_on_count_trigger_and_avtpdu_packing);
     RUN_TEST(test_flush_time_trigger_and_empty_heartbeat_are_composable);
     RUN_TEST(test_transmit_fragmentation_now_uses_the_correct_octet_budget);

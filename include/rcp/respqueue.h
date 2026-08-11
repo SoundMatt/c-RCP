@@ -38,10 +38,24 @@
  * and TRANSMITTING that heartbeat on a real clock stays outside this
  * module's and this library's scope entirely (REQ-SRV-017 in server.h
  * already states this same boundary: "c-RCP is a protocol library, not
- * a scheduler; heartbeat emission is left to the integrator"). Also
- * still open: REQ-RMAP-061's own MTU-consistency-check and discovery-
- * exposure halves (a config-time check and a discovery.h change, neither
- * a per-message queue concern).
+ * a scheduler; heartbeat emission is left to the integrator").
+ * REQ-RMAP-061's own remaining "MTU-consistency" half is now closed too
+ * (rcp_respqueue_max_avtpdu_size_within_mtu() below, a config-time check
+ * a caller uses before ever calling rcp_respqueue_init(), not a
+ * per-message queue concern). REQ-RMAP-061 still stays `partial`
+ * overall, for a reason that has nothing to do with this module: TC18
+ * §12.7.9's own Table 24 (response/ack queue config, including
+ * Max_AVTPDUsize) is a separate table pointed to by Table 18's own
+ * svr_response_stream_cfg_ptr register (REQ-RMAP-034, already
+ * implemented) -- exactly the same genuine, unresolved ACF_ABB
+ * addressing question REQ-RMAP-040/041 (HW_config) and REQ-RMAP-052/054
+ * (EP_ID_config) already document applies here too. An earlier revision
+ * of this requirement's own catalog text described the gap as
+ * "exposing the value in the discovery general-register slice" -- that
+ * framing predates this codebase's own later discovery that Table 24
+ * was never part of the 14-octet discovery slice at all (it is a
+ * separate, pointer-addressed table like the other two), and has been
+ * corrected in `.fusa-reqs.json` accordingly.
  *
  * This module owns no register-map instance of its own (regmap.h's
  * rcp_regmap_response_queue_cfg_t.queue_size/max_avtpdu_size are the
@@ -137,6 +151,38 @@ void rcp_respqueue_destroy(rcp_respqueue_t *q);
  *     past it (REQ-RMAP-059); or
  *   - the internal copy/array-growth allocation fails. */
 bool rcp_respqueue_push(rcp_respqueue_t *q, const uint8_t *frame, size_t frame_len);
+
+/* REQ-RMAP-061's own remaining "MTU-consistency" half (TC18 §12.7.9,
+ * TC18.txt L3010-3011: "The Max_AVTPDUsize shall always be configured
+ * such that the final network frame does not exceed the maximum
+ * transmit unit size of the network"). This is a config-time check, not
+ * a per-message queue concern -- rcp_respqueue_push() (above) already
+ * enforces the transmit-bounding half against a fixed, already-accepted
+ * max_avtpdu_size_octets; this function is what a caller uses BEFORE
+ * ever calling rcp_respqueue_init(), to decide whether a candidate
+ * Max_AVTPDUsize value is even acceptable for its own network in the
+ * first place.
+ *
+ * TC18 defines no fixed MTU value of its own (network deployment is out
+ * of its scope) and does not say whether "the final network frame"
+ * means max_avtpdu_size_octets directly or that value plus some further
+ * header overhead this codebase has no citation for -- so, matching
+ * rcp_respqueue_max_fragment_payload()'s own "caller supplies already-
+ * classified units" convention, mtu_budget_octets is the caller's own
+ * already-adjusted ceiling (whatever it determines "how many
+ * Max_AVTPDUsize octets fit under this deployment's real MTU" to be,
+ * netted of any header overhead its own network stack adds) -- this
+ * function does not itself add or assume any such overhead.
+ *
+ * Returns true iff max_avtpdu_size_octets does not exceed
+ * mtu_budget_octets. max_avtpdu_size_octets == 0 (unbounded, matching
+ * rcp_respqueue_init()'s own convention) is never within budget for a
+ * nonzero mtu_budget_octets -- an unbounded ceiling cannot be MTU-safe
+ * by definition -- and is vacuously true only when mtu_budget_octets is
+ * also 0 (both "no ceiling configured" on both sides, a degenerate
+ * caller error this function does not itself further diagnose). */
+bool rcp_respqueue_max_avtpdu_size_within_mtu(size_t max_avtpdu_size_octets,
+                                               size_t mtu_budget_octets);
 
 /* Dequeues q's oldest entry (FIFO) into *out_frame (caller takes
  * ownership; free with rcp_bytes_free()) and shrinks q->octets by its
