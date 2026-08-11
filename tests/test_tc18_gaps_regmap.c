@@ -1256,20 +1256,26 @@ static void test_four_optional_subsystem_pointer_pairs_are_now_present(void)
 
 /* ── §12.7.6 Tables 19-21: HW pin mapping ──────────────────────────────────── */
 
-/* TC18 §12.7.6 requires an actual HW_config table holding, per used
- * physical IO-pin, its endpoint-signal assignment and pin properties.
- * Deviation: c-RCP models a single row's shape and a pointer/capacity
- * descriptor but keeps no storage, and rcp_config_apply_to_mock()
- * deliberately DISCARDS the parsed hw_pin_map -- asserted here: the
- * manifest carries one pin, the server's hw_pin_map descriptor stays
- * {0, 0} after applying it. */
-static void test_hw_config_table_has_no_server_side_storage(void)
+/* REQ-RMAP-040 CLOSED (storage half): TC18 §12.7.6 requires an actual
+ * HW_config table holding, per used physical IO-pin, its endpoint-signal
+ * assignment and pin properties. rcp_mock_server_t now carries real
+ * storage (rcp_mock_server_set_hw_pin_map()/_hw_pin_map(), mock.h/
+ * mock.c), and rcp_config_apply_to_mock() no longer discards the parsed
+ * manifest data -- asserted here: the manifest carries one pin, the
+ * server's own table holds it after applying, field for field. The wire
+ * ACF_ABB request/response mechanism itself is NOT part of this fix --
+ * see regmap.h's own file-header note on rcp_regmap_hw_pin_map_render()
+ * for the genuine, still-unresolved addressing question that keeps
+ * REQ-RMAP-040/041 at `partial`, not `implemented`. */
+static void test_hw_config_table_now_has_real_server_side_storage(void)
 {
     static const char json[] =
         "{\"hw_pin_map\":[{\"hw_ep_nr\":4,\"hw_ep_pin_nr\":3,"
         "\"pin_property\":[\"output\",\"pull_up\"]}]}";
-    rcp_config_manifest_t m;
-    rcp_mock_server_t    *srv;
+    rcp_config_manifest_t                 m;
+    rcp_mock_server_t                    *srv;
+    const rcp_regmap_hw_pin_map_entry_t  *stored;
+    size_t                                stored_len;
 
     TEST_ASSERT_EQUAL_INT(RCP_OK, rcp_config_parse_json(json, &m, NULL, 0));
     TEST_ASSERT_EQUAL_UINT((size_t)1u, m.hw_pin_map_len);
@@ -1278,38 +1284,94 @@ static void test_hw_config_table_has_no_server_side_storage(void)
 
     srv = rcp_mock_server_new();
     TEST_ASSERT_NOT_NULL(srv);
+
+    /* A freshly-constructed server's table starts empty -- not merely
+     * absent, an explicit, observable zero length. */
+    stored = rcp_mock_server_hw_pin_map(srv, &stored_len);
+    TEST_ASSERT_NOT_NULL(stored);
+    TEST_ASSERT_EQUAL_UINT((size_t)0u, stored_len);
+
     TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_config_apply_to_mock(&m, srv));
 
-    /* The parsed pin never reaches the server: no table exists to hold it. */
-    TEST_ASSERT_EQUAL_HEX16(0u, rcp_mock_server_regmap(srv)->svr_hw_cfg_ptr);
+    /* The parsed pin now DOES reach the server -- stored, not discarded. */
+    stored = rcp_mock_server_hw_pin_map(srv, &stored_len);
+    TEST_ASSERT_EQUAL_UINT((size_t)1u, stored_len);
+    TEST_ASSERT_EQUAL_HEX8(4, stored[0].hw_ep_nr);
+    TEST_ASSERT_EQUAL_HEX8(3, stored[0].hw_ep_pin_nr);
 
     rcp_mock_server_destroy(srv);
     rcp_config_manifest_free(&m);
 }
 
-/* TC18 §12.7.6 Table 19 lays HW_config out as three consecutive 8-bit
- * R/W* registers per IO pin (hw_ep_nr, hw_ep_pin_nr, hw_pin_type), so IO
- * pin N begins at relative address 3*N, and R/W* means writable only
- * while HW_unconfigured. c-RCP's row carries the three 8-bit fields
- * (asserted, and correctly named hw_pin_type as of REQ-RMAP-042) but
- * still defines no 3-octet stride and no encode/decode (REQ-RMAP-041,
- * its own separate, still-open scope). The comparison below against
- * ep_gpio.h's OWN, DIFFERENT, deliberately-runtime-adjustable
- * pin_property field (REQ-GPIO-013, its own separate tracked concern,
- * NOT this table's hw_pin_type) is retained as-is: that field's own
- * FUNCTIONAL_W classification was never meant to match HW_config's own
- * R/W* rule in the first place, since it is a different register by
- * design -- see this session's own investigation note on issue #200
- * for the full architecture question this raises, deliberately not
- * resolved by this batch. */
-static void test_hw_config_row_stride_absent_and_access_class_inverted(void)
+/* rcp_mock_server_set_hw_pin_map() rejects a table larger than
+ * RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES (regmap.h) outright, leaving srv's
+ * own existing table untouched -- proven by first populating one real
+ * entry, then attempting (and failing) an oversized replacement, then
+ * confirming the original single entry survived. */
+static void test_hw_pin_map_rejects_oversized_table_leaving_existing_data_intact(void)
+{
+    rcp_mock_server_t             *srv;
+    rcp_regmap_hw_pin_map_entry_t  one[1]     = {{4, 3, 0x0Cu}};
+    rcp_regmap_hw_pin_map_entry_t  oversized[RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES + 1];
+    const rcp_regmap_hw_pin_map_entry_t *stored;
+    size_t                          stored_len;
+
+    memset(oversized, 0, sizeof(oversized));
+
+    srv = rcp_mock_server_new();
+    TEST_ASSERT_NOT_NULL(srv);
+
+    TEST_ASSERT_TRUE(rcp_mock_server_set_hw_pin_map(srv, one, 1));
+    TEST_ASSERT_FALSE(rcp_mock_server_set_hw_pin_map(srv, oversized,
+                                                      RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES + 1));
+
+    stored = rcp_mock_server_hw_pin_map(srv, &stored_len);
+    TEST_ASSERT_EQUAL_UINT((size_t)1u, stored_len);
+    TEST_ASSERT_EQUAL_HEX8(4, stored[0].hw_ep_nr);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-RMAP-041 CLOSED (row-stride half): TC18 §12.7.6 Table 19 lays
+ * HW_config out as three consecutive 8-bit R/W* registers per IO pin
+ * (hw_ep_nr, hw_ep_pin_nr, hw_pin_type), so IO pin N begins at relative
+ * address 3*N, and R/W* means writable only while HW_unconfigured.
+ * c-RCP's row carries the three 8-bit fields (correctly named
+ * hw_pin_type as of REQ-RMAP-042) and now also serializes them at
+ * exactly this 3-octet stride via rcp_regmap_hw_pin_map_render()
+ * (regmap.h/regmap.c) -- asserted below via a direct byte-offset
+ * check across two rows. The wire ACF_ABB request/response mechanism
+ * itself is still not implemented (see regmap.h's own file-header
+ * note); this test proves the STRUCTURAL layout only.
+ *
+ * The comparison below against ep_gpio.h's OWN, DIFFERENT,
+ * deliberately-runtime-adjustable pin_property field (REQ-GPIO-013, its
+ * own separate tracked concern, NOT this table's hw_pin_type) is
+ * retained as-is: that field's own FUNCTIONAL_W classification was
+ * never meant to match HW_config's own R/W* rule in the first place,
+ * since it is a different register by design -- see this session's own
+ * investigation note on issue #200 for the full architecture question
+ * this raises, deliberately not resolved by this batch. */
+static void test_hw_config_row_stride_now_modeled_gpio_access_class_still_diverges(void)
 {
     rcp_regmap_hw_pin_map_entry_t entry;
     rcp_ep_gpio_functional_cfg_t  cfg;
+    rcp_regmap_hw_pin_map_entry_t rows[2] = {{0x11u, 0x22u, 0x33u}, {0x44u, 0x55u, 0x66u}};
+    uint8_t                       img[6];
 
     TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(entry.hw_ep_nr));
     TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(entry.hw_ep_pin_nr));
     TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(entry.hw_pin_type));
+
+    /* IO_Pin 1 at relative address 0x0000-0x0002, IO_Pin 2 immediately
+     * following at 0x0003-0x0005 -- the exact TC18-cited 3*N stride. */
+    rcp_regmap_hw_pin_map_render(rows, 2, img);
+    TEST_ASSERT_EQUAL_HEX8(0x11u, img[0]);
+    TEST_ASSERT_EQUAL_HEX8(0x22u, img[1]);
+    TEST_ASSERT_EQUAL_HEX8(0x33u, img[2]);
+    TEST_ASSERT_EQUAL_HEX8(0x44u, img[3]);
+    TEST_ASSERT_EQUAL_HEX8(0x55u, img[4]);
+    TEST_ASSERT_EQUAL_HEX8(0x66u, img[5]);
 
     /* Table 19's own access class, R/W* == HW_unconfigured-only, is what
      * RCP_LIFECYCLE_FIELD_HW_GENERIC expresses (DISCOVERY_WRITER, not
@@ -2273,8 +2335,9 @@ int main(void)
     RUN_TEST(test_ep_bytebus_id_map_ptr_and_capacity_are_now_correctly_shaped);
     RUN_TEST(test_functional_cfg_and_sequencer_state_ptrs_are_now_correctly_shaped);
     RUN_TEST(test_four_optional_subsystem_pointer_pairs_are_now_present);
-    RUN_TEST(test_hw_config_table_has_no_server_side_storage);
-    RUN_TEST(test_hw_config_row_stride_absent_and_access_class_inverted);
+    RUN_TEST(test_hw_config_table_now_has_real_server_side_storage);
+    RUN_TEST(test_hw_pin_map_rejects_oversized_table_leaving_existing_data_intact);
+    RUN_TEST(test_hw_config_row_stride_now_modeled_gpio_access_class_still_diverges);
     RUN_TEST(test_hw_pin_type_matches_table_20);
     RUN_TEST(test_hw_pin_output_stage_has_no_exclusive_input_flag);
     RUN_TEST(test_output_pin_loses_its_input_capability);

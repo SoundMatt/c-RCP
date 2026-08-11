@@ -1100,6 +1100,56 @@ typedef struct {
                              field. */
 } rcp_regmap_hw_pin_map_entry_t;
 
+/* ── HW_config server-side storage + wire codec (REQ-RMAP-040/041) ──────────
+ *
+ * Row shape (rcp_regmap_hw_pin_map_entry_t) and per-row bit layout
+ * (RCP_REGMAP_HW_PIN_* above) were already correct as of REQ-RMAP-042/
+ * -043/-044/-045's own earlier batches -- this section closes the two
+ * remaining Group 2 items: no server-side STORAGE existed anywhere for a
+ * real table of these rows (rcp_config_apply_to_mock() deliberately
+ * discarded the parsed manifest data, per its own prior doc comment), and
+ * no function serialized a real table into TC18 §12.7.6 Table 19's own
+ * 3-octets-per-pin layout (IO_Pin N at relative address 3*N/3*N+1/3*N+2).
+ *
+ * Deliberately NOT closed here: the ACF_ABB request/response wrapper
+ * (an encode_read_response()/decode_write_request() pair, mirroring
+ * regmap.h's own rcp_regmap_general_* pair for Table 18). Unlike Table 18
+ * -- reached via a plain read always addressed at relative address 0,
+ * confirmed directly against TC18 §12.7's own text -- HW_config is a
+ * SEPARATE table pointed to by Table 18's own svr_hw_cfg_ptr register,
+ * with Table 19's own address column headed "Relative Address" (not
+ * absolute), and R/W* access (write-prohibited outside HW_UNCONFIGURED,
+ * TC18 §12.7.6's own opening sentence: "This configuration table can
+ * only be changed in the life-cycle state HW_unconfigured"). Precisely
+ * how a client's own request address relates to svr_hw_cfg_ptr's value
+ * (added to it? used as a base a generic EP_func-shaped request targets
+ * directly? some other convention?) is a genuine, unresolved
+ * architectural question -- TC18's own §12.7.1 Figure 18 configuration-
+ * request mechanism is described in EP_func terms (an ENDPOINT's own
+ * functional-config block, reached via that endpoint's own byte_bus_id),
+ * and HW_config is not an endpoint's EP_func at all. Rather than guess,
+ * this is left open, matching this codebase's own "genuinely ambiguous,
+ * honestly flagged, not force-resolved" discipline -- REQ-RMAP-040/041
+ * both stay `partial`, not `implemented`, for exactly this reason. */
+
+/* This module's own chosen upper bound on HW_config table rows -- not a
+ * spec-derived number (TC18's own svr_io_pin_count, Table 18, is a
+ * 16-bit register with no fixed upper bound at all); matches
+ * RCP_MOCK_MAX_ENDPOINTS' own scale (mock.h) as a plausible real-device
+ * IO-pin count. */
+#define RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES ((size_t)64u)
+
+/* Serializes entries[0..len) into out at each row's own TC18-cited
+ * 3-octet stride (hw_ep_nr/hw_ep_pin_nr/hw_pin_type per IO pin, relative
+ * address 3*N onward) -- out must have room for at least 3*len octets.
+ * len beyond RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES is the caller's own
+ * responsibility to have already bounded (this function does not itself
+ * clamp len; every real caller in this codebase sources len from a
+ * table already bounded at construction, e.g.
+ * rcp_mock_server_set_hw_pin_map()). */
+void rcp_regmap_hw_pin_map_render(const rcp_regmap_hw_pin_map_entry_t *entries, size_t len,
+                                   uint8_t *out);
+
 /* ── Per-endpoint-type named-signal index ──────────────────────────────────── */
 
 /* The full named-signal index shared by every endpoint type, written once

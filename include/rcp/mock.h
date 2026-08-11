@@ -214,6 +214,31 @@ bool rcp_mock_server_pwrmode_resume(rcp_mock_server_t *srv, rcp_pwrmode_handshak
  * valid for srv's own lifetime; never NULL for a non-NULL srv. */
 rcp_regmap_general_t *rcp_mock_server_regmap(rcp_mock_server_t *srv);
 
+/* ── HW_config table (REQ-RMAP-040/041) ────────────────────────────────────── */
+
+/* Replaces srv's own HW_config table wholesale with a copy of
+ * entries[0..len). Returns false (srv's own table left unchanged) if len
+ * exceeds RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES (regmap.h); true otherwise.
+ * TC18 §12.7.6's own "only changeable in HW_UNCONFIGURED" rule is NOT
+ * enforced here -- this mirrors rcp_mock_server_regmap()'s own existing
+ * "caller may freely set... directly" convention for every other
+ * general-register-map field, deliberately consistent with it rather
+ * than a one-off exception; a real wire-write dispatch path (not yet
+ * implemented, see regmap.h's own file-header note on this whole
+ * section) is where that lifecycle-state gate belongs, the same way
+ * REQ-RMAP-025's own gate lives in rcp_regmap_general_decode_write_
+ * request(), not in rcp_mock_server_regmap()'s own direct-pointer
+ * access. */
+bool rcp_mock_server_set_hw_pin_map(rcp_mock_server_t *srv,
+                                     const rcp_regmap_hw_pin_map_entry_t *entries, size_t len);
+
+/* srv's own current HW_config table and its length. The returned pointer
+ * is valid for srv's own lifetime (or until the next
+ * rcp_mock_server_set_hw_pin_map() call); never NULL for a non-NULL srv,
+ * even when *out_len is 0. */
+const rcp_regmap_hw_pin_map_entry_t *rcp_mock_server_hw_pin_map(const rcp_mock_server_t *srv,
+                                                                  size_t *out_len);
+
 /* ── Endpoint registration ─────────────────────────────────────────────────── */
 
 /* Adds one endpoint slot addressed at byte_bus_id, with generic config

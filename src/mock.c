@@ -41,6 +41,10 @@ struct rcp_mock_server {
     rcp_regmap_general_t     regmap;
     rcp_mock_endpoint_slot_t endpoints[RCP_MOCK_MAX_ENDPOINTS];
     size_t                   endpoint_count;
+    /* HW_config table (REQ-RMAP-040/041) -- see mock.h's own doc comment
+     * on rcp_mock_server_set_hw_pin_map()/_hw_pin_map(). */
+    rcp_regmap_hw_pin_map_entry_t hw_pin_map[RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES];
+    size_t                        hw_pin_map_len;
     /* The sequencer-state registers compound/compound-wait requests read
      * and advance. Server-wide rather than per-endpoint: a sequencer is a
      * server register, and requests on different endpoints routinely
@@ -143,6 +147,25 @@ bool rcp_mock_server_pwrmode_resume(rcp_mock_server_t *srv, rcp_pwrmode_handshak
 rcp_regmap_general_t *rcp_mock_server_regmap(rcp_mock_server_t *srv)
 {
     return &srv->regmap;
+}
+
+//cfusa:req REQ-RMAP-040
+bool rcp_mock_server_set_hw_pin_map(rcp_mock_server_t *srv,
+                                     const rcp_regmap_hw_pin_map_entry_t *entries, size_t len)
+{
+    if (len > RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES) return false;
+
+    if (len > 0) memcpy(srv->hw_pin_map, entries, len * sizeof(*entries));
+    srv->hw_pin_map_len = len;
+    return true;
+}
+
+//cfusa:req REQ-RMAP-040
+const rcp_regmap_hw_pin_map_entry_t *rcp_mock_server_hw_pin_map(const rcp_mock_server_t *srv,
+                                                                  size_t *out_len)
+{
+    *out_len = srv->hw_pin_map_len;
+    return srv->hw_pin_map;
 }
 
 /* Finds the slot addressed at byte_bus_id, or NULL if none is registered. */
