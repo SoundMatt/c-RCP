@@ -14044,3 +14044,157 @@ three items issue #256 itself named as deliberately outside its own
 156-finding count. RMAP's own Phase 5d (issue #200, task #88)
 remains separately open -- a distinct, older, still-ongoing effort,
 not part of this lineage.
+
+### v0.234.0 -- 2026-08-11
+
+**Phase 5d Group 1 (issue #200): the RC Server general register
+map's full TC18 §12.7.5 Table 18 extent is now wire-reachable.**
+
+This is the biggest remaining bucket in the whole audit lineage --
+34 open findings across RMAP alone (6 not-implemented, 28 partial),
+the largest of any single module. Investigated the actual dispatch
+architecture before writing any code (`ep_pwm.c`/`ep_gpio.c`/
+`ep_wakeup.c`'s own `render_registers()`/`apply_reconfig()` pattern
+only covers the WRITE direction of a per-endpoint EP_func block;
+nothing in this codebase reads one back over the wire, for any
+endpoint type -- a separate, broader finding, noted but out of this
+batch's scope). Table 18 (the RC Server's own general/static part)
+turned out to need neither of those: it's 100% read-only, and its
+own request/response shape is already exactly what
+`rcp_discovery_encode_request()`/`_decode_request()` build --
+confirmed directly against TC18 §12.7's own text ("Access to the
+configuration and status information is per ABB or GBB messages...
+the RC Server exposes itself as endpoint0 (EP0)") -- so this closes
+via a natural generalization of the discovery mechanism, not a new
+wire concept.
+
+**REQ-RMAP-024, the umbrella wire-reachability gap, closed.** 15
+sibling requirements (026-039, excluding 023) had their own
+field-level content already fixed across earlier Group 1 batches
+(REQ-RMAP-026 through -039, all pre-dating this session), but stayed
+`partial` purely because `rcp_discovery_encode_response()` never
+served more than its own hardcoded `RCP_DISCOVERY_GENERAL_SLICE_LEN`
+(14) octets regardless of what a client's own `read_size` asked for
+-- everything past address 0x000D was zero-filled, not really
+absent, but not reachable either.
+
+**New wire codec** (`include/rcp/regmap.h`, `src/regmap.c`):
+- `rcp_regmap_general_render()` -- serializes every genuine Table 18
+  field (magic through `svr_security_cfg_capacity`) at its own
+  TC18-cited address into a `RCP_REGMAP_GENERAL_LEN` (0x0040-byte)
+  wire image, mirroring the `render_registers()` pattern every
+  register-block endpoint already uses, just for a ~35-field block
+  instead of ~10.
+- `rcp_regmap_general_encode_read_response()`/`_decode_read_response()`
+  -- the same ACF_ABB read shape discovery already uses (byte_bus_id
+  0, op=READ), generalized to serve the FULL block; a short
+  `read_size` still works, leaving the caller's own un-carried fields
+  untouched (the same partial-population convention every
+  `apply_reconfig()` decoder already follows).
+- `rcp_regmap_general_decode_write_request()` -- Table 18 is 100%
+  read-only (TC18's own access-type column, confirmed), so this never
+  applies a write; it recognizes any write attempt into EP0's general
+  register space and reports `RCP_ERROR_LOCKED_MEM_ACCESS` every
+  time, via `rcp_lifecycle_field_write_error()` against
+  `RCP_LIFECYCLE_FIELD_READ_ONLY` (already fully proven,
+  unconditionally unwritable in every state by every writer, since
+  REQ-RMAP-025's own earlier batch) -- reused, not duplicated.
+
+**Two fields deliberately excluded from the render, not force-mapped
+onto an invented address.** `rcp_regmap_general_t` carries
+`svr_lifecycle_state` and `svr_root_client_index` as struct fields,
+but NEITHER has a genuine TC18 §12.7.5 Table 18 address -- confirmed
+directly against the primary source: Table 18's own address sequence
+runs `svr_ep_count` (0x000C, 16-bit) directly into
+`svr_req_stream_max` (0x000E) with no room for
+`svr_lifecycle_state`, and `svr_io_pin_count` (0x0018, 16-bit)
+directly into `svr_hw_cfg_ptr` (0x001A) with no room for
+`svr_root_client_index`. Cross-referencing TC18 §13.7.1.1/§13.7.1.2's
+own text ("The configuration of the RC Server is stored in the
+SERVER_config register map... the RC Server as endpoint is not
+included in the EP_FUNC_config register maps") against a raw
+extraction of Table 33 (the RC Server's own separate "functional
+configuration" block, reached via §12.7.1's pointer-addressed
+mechanism rather than Table 18's own plain-read mechanism) found
+both fields' real citations there instead -- `svr_root_client_index`
+and (per Table 33's own row, garbled by a two-column PDF layout
+`pdftotext` merged into one linear stream, not yet fully resolved)
+`svr_lifecycle_state` too. Rendering either into this Table 18 image
+at a made-up address would have been a real conformance defect, not
+a harmless placeholder -- deliberately not attempted. REQ-RMAP-023's
+own gap (svr_lifecycle_state) stays open, now cross-referencing Table
+33/REQ-RMAP-067 instead of the now-closed REQ-RMAP-024. Table 33's
+own wire codec is real, separate, future work -- not attempted this
+batch.
+
+**One further honestly-flagged gap in the primary source itself**:
+a one-byte span at relative address 0x002B (between
+`svr_ep_bytebus_id_map_capacity`'s own 0x002A and
+`svr_ep_functional_cfg_ptr`'s own 0x002C) has no explicit "reserved"
+row in TC18's own table, unlike 0x0017 and 0x0022 (both explicitly
+labeled). Written as 0x00 in the render, documented as an inferred,
+unconfirmed alignment gap rather than assumed risk-free the way the
+two explicitly-labeled reserved octets already were.
+
+**Requirement outcomes**: 9 move to `implemented` --
+REQ-RMAP-024/025/026/027/028/029/030/031/035, every one of which had
+no remaining gap beyond wire-reachability once this codec landed. 8
+stay honestly `partial`, text updated to drop the now-closed
+REQ-RMAP-024 dependency but keep their own real, separate gaps:
+REQ-RMAP-023 (Table 33, not this table -- see above), REQ-RMAP-032/033
+(Group 2's own HW_config table storage doesn't exist yet),
+REQ-RMAP-034/036/037/038/039 (Group 3/4's own sub-table storage
+doesn't exist yet) -- each now honestly says "wire-readable but
+currently always reads 0" instead of "unreachable."
+
+**Tests** (`tests/test_tc18_gaps_regmap.c`): a byte-offset spot-check
+of `rcp_regmap_general_render()`'s raw output, deliberately separate
+from the round-trip test below -- a round trip through the decoder
+alone would not catch a render bug that writes a real field's value
+into the wrong slot (e.g. the unnamed 0x002B gap) if the decoder
+itself never reads that slot either. A full round-trip test across
+every genuine Table 18 field, with the two deliberately-excluded
+fields poisoned beforehand to prove the exclusion is real, not a
+coincidental zero. A short-`read_size` partial-population test. New
+`strerror`/malformed-frame decode-path tests (short frame, wrong
+bus, wrong op). The write-rejection test, rewritten from its own
+prior form (which only proved `rcp_mock_server_regmap()`'s pointer
+was directly mutable -- true, but no longer the interesting question)
+to prove the real wire path now rejects every write attempt. A new,
+separate test isolates that pointer's own continued in-process
+mutability as a distinct, deliberate test-double design choice, not
+a remaining conformance gap -- no code path routes a real wire write
+through it.
+
+12 of the pre-existing Group 1 deviation-pin tests (each originally
+proving *unreachability* via a `read_general()`/`span_is_zero()`
+helper pair, both now dead code with zero remaining callers, removed
+outright) had their own doc comments -- and, where one existed, a
+now-redundant tail assertion -- updated to cross-reference the new
+central round-trip test instead of re-testing wire-reachability
+field by field.
+
+Mutation-tested two ways: loosening the short-response bounds clamp
+in `rcp_regmap_general_decode_read_response()` (unconditionally
+`have = RCP_REGMAP_GENERAL_LEN` instead of clamping to the real
+`payload_len`) produced a silent ASan heap-buffer-overflow abort on
+the short-`read_size` test -- a real buffer over-read, proving the
+clamp is load-bearing, not just test-satisfying. Inverting the
+write-request decoder's own op check (`RCP_ACF_OP_WRITE` swapped for
+`RCP_ACF_OP_READ`) produced a clean, deterministic `Expected 0 Was 4`
+Unity assertion failure. Both reverted, full suite re-verified clean.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 errors.
+`cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100`/
+`--sec-tested 100`: both 100%.
+
+**Progress**: Group 1's own 17-item list (issue #200) is now 9
+`implemented` / 8 honestly `partial` (down from 17 `partial`, 0
+`implemented`, at the start of this batch) -- every remaining `partial`
+item has a real, separately-tracked, non-wire-reachability gap of its
+own. **Next**: Group 2 (HW_config, 2 remaining items:
+REQ-RMAP-040/041), Group 3's remaining items (REQ-RMAP-052/054/055/
+057/058), Group 4's remaining items (REQ-RMAP-061/065), Group 5
+(REQ-RMAP-047/048/049/050/051/066/067/068, including Table 33's own
+wire codec -- the real home for REQ-RMAP-023/067's svr_lifecycle_
+state/svr_root_client_index).

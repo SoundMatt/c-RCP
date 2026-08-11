@@ -839,6 +839,130 @@ typedef struct {
  * correct default while the server is still HW_UNCONFIGURED). */
 void rcp_regmap_general_init(rcp_regmap_general_t *map);
 
+/* ── Table 18 wire codec (REQ-RMAP-024) ──────────────────────────────────────
+ *
+ * Every field above is documented against its own TC18 §12.7.5 Table 18
+ * relative address (each field's own comment cites it), but until this
+ * section, nothing in this codebase actually serialized that address
+ * layout onto the wire -- rcp_discovery_encode_response()/_decode_response()
+ * (discovery.h) only ever populate/parse a hardcoded 14-octet, 5-field
+ * slice (RCP_DISCOVERY_GENERAL_SLICE_LEN), even when a real read_size asks
+ * for more. The functions below close that gap: they are the SAME wire
+ * mechanism discovery already uses (a plain ACF_ABB read addressed to
+ * byte_bus_id 0 / EP0, response = however many octets of the register map
+ * starting at relative address 0 the requester's read_size asked for --
+ * confirmed directly against the primary source, §12.7's own text:
+ * "Access to the configuration and status information is per ABB or GBB
+ * messages... explained in the endpoint section for... RC Server, since
+ * the RC Server exposes itself as endpoint0 (EP0)"), just generalized to
+ * serve this struct's real, full Table 18 extent instead of the discovery
+ * handshake's own deliberately narrow 5-field identity slice.
+ * rcp_discovery_encode_request()/_decode_request() are reused unchanged
+ * for the request side -- a "read the general register map" request and a
+ * discovery request are, per the primary source, the identical wire
+ * message; only how much of the response a caller actually inspects
+ * differs. discovery.h's own narrower 5-field API is untouched by this
+ * section and remains the right choice for a caller that only needs the
+ * discovery handshake's own identity fields. */
+
+/* Total wire length (bytes) of the general register map's TC18 §12.7.5
+ * Table 18 extent, relative address 0x0000 through 0x003F inclusive --
+ * see rcp_regmap_general_render()'s own doc comment for exactly which
+ * struct fields this covers and which two it deliberately excludes. */
+#define RCP_REGMAP_GENERAL_LEN ((size_t)0x0040u)
+
+/* Serializes map's Table 18 fields into out[0..RCP_REGMAP_GENERAL_LEN) at
+ * each field's own TC18-documented relative address (this struct's own
+ * field comments above cite each one individually).
+ *
+ * Deliberately excludes svr_lifecycle_state and svr_root_client_index:
+ * neither has a genuine Table 18 address -- both are this struct's own
+ * convenience placement of what TC18 §13.7.1.2 Table 33 (the RC Server's
+ * own EP_func block, reached via a *different*, pointer-addressed
+ * mechanism -- svr_ep_functional_cfg_ptr, §12.7.1's configuration
+ * request) actually owns. Table 18's own address sequence has no room for
+ * either field at all (0x000C's 16-bit svr_ep_count runs directly into
+ * 0x000E's svr_req_stream_max; 0x0018's 16-bit svr_io_pin_count runs
+ * directly into 0x001A's svr_hw_cfg_ptr) -- confirmed directly against
+ * the rendered primary-source PDF, not assumed. Rendering either field
+ * into this Table 18 image at an invented address would be a real
+ * conformance defect, not a harmless placeholder, so this function does
+ * not attempt it: REQ-RMAP-023's own gap (svr_lifecycle_state) stays open
+ * until Table 33's own wire codec (issue #200 Group 5, still
+ * unimplemented) exists to give it -- and svr_root_client_index -- a real
+ * home.
+ *
+ * The one-byte gap at relative address 0x002B (between
+ * svr_ep_bytebus_id_map_capacity's own 0x002A and svr_ep_functional_cfg_
+ * ptr's own 0x002C) is written as 0x00: TC18's own table has no explicit
+ * "reserved" row there the way 0x0017 and 0x0022 both do -- so this is an
+ * unconfirmed, inferred single-octet alignment gap, not a directly-cited
+ * reserved register, flagged here rather than silently assumed
+ * risk-free. */
+void rcp_regmap_general_render(const rcp_regmap_general_t *map,
+                                uint8_t out[RCP_REGMAP_GENERAL_LEN]);
+
+typedef enum {
+    RCP_REGMAP_GENERAL_OK               = 0,
+    RCP_REGMAP_GENERAL_ERR_SHORT_FRAME  = 1,
+    RCP_REGMAP_GENERAL_ERR_BAD_MSG_TYPE = 2,
+    RCP_REGMAP_GENERAL_ERR_WRONG_BUS    = 3,
+    RCP_REGMAP_GENERAL_ERR_WRONG_OP     = 4,
+} rcp_regmap_general_errc_t;
+
+/* Human-readable message for a rcp_regmap_general_errc_t value. Never
+ * returns NULL. */
+const char *rcp_regmap_general_strerror(rcp_regmap_general_errc_t e);
+
+/* Encodes an ACF_ABB read RESPONSE addressed to byte_bus_id 0 (EP0),
+ * carrying min(read_size, RCP_REGMAP_GENERAL_LEN) octets of map's own
+ * rcp_regmap_general_render() image starting at relative address 0, with
+ * any remaining requested octets (up to read_size) zero-filled -- the
+ * exact same "response spans exactly read_size octets" convention
+ * rcp_discovery_encode_response() already establishes for its own
+ * narrower slice. Returns a zeroed rcp_bytes_t (data=NULL) on allocation
+ * failure. Caller frees the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_regmap_general_encode_read_response(const rcp_regmap_general_t *map,
+                                                      uint8_t read_size,
+                                                      uint8_t transaction_num);
+
+/* Decodes and validates an ACF_ABB general-register-map read RESPONSE
+ * from b[0..len). On RCP_REGMAP_GENERAL_OK, *out_map has every Table 18
+ * field rcp_regmap_general_render() populates overwritten from whichever
+ * prefix of RCP_REGMAP_GENERAL_LEN the response payload actually carries
+ * -- a short response (fewer octets than the full extent) leaves the
+ * remaining, un-carried fields of *out_map untouched, so a caller must
+ * rcp_regmap_general_init() (or otherwise define) *out_map before calling
+ * this, the same partial-population convention every register-block
+ * apply_reconfig() in this codebase already follows. svr_lifecycle_state
+ * and svr_root_client_index are never touched, for the same reason
+ * rcp_regmap_general_render() never renders them. Fails with
+ * ..._ERR_SHORT_FRAME if b is shorter than the ACF_ABB fixed header or
+ * its declared payload length; ..._ERR_BAD_MSG_TYPE if b is not an
+ * ACF_ABB message; ..._ERR_WRONG_BUS if its byte_bus_id is not EP0;
+ * ..._ERR_WRONG_OP if its op is not RCP_ACF_OP_READ. */
+rcp_regmap_general_errc_t rcp_regmap_general_decode_read_response(const uint8_t *b, size_t len,
+                                                                    rcp_regmap_general_t *out_map);
+
+/* Decodes an ACF_ABB WRITE request from b[0..len) addressed to byte_bus_id
+ * 0 (EP0) targeting the Table 18 general register map. Every one of
+ * Table 18's registers is TC18-defined access type R (REQ-RMAP-025), so
+ * this never applies a write -- it exists only to recognize a genuine
+ * write attempt and report the correct wire error for it. On
+ * RCP_REGMAP_GENERAL_OK, *out_error is always RCP_ERROR_LOCKED_MEM_ACCESS
+ * (derived via rcp_lifecycle_field_write_error() against
+ * RCP_LIFECYCLE_FIELD_READ_ONLY -- reusing, not duplicating, that
+ * already-proven primitive) and *out_transaction_num is populated; the
+ * caller builds the actual error response via
+ * rcp_acf_build_error_response(byte_bus_id, *out_transaction_num,
+ * *out_error). Fails with the same ACF-level errc values as
+ * rcp_regmap_general_decode_read_response() (short frame / bad msg type /
+ * wrong bus) if the frame itself is malformed before authorization is
+ * even reached, or ..._ERR_WRONG_OP if op is not RCP_ACF_OP_WRITE. */
+rcp_regmap_general_errc_t rcp_regmap_general_decode_write_request(const uint8_t *b, size_t len,
+                                                                    rcp_wire_error_t *out_error,
+                                                                    uint8_t *out_transaction_num);
+
 /* ── Root-client / per-EP-restricted-client model ──────────────────────────── */
 
 /* One endpoint's write-restriction: the single stream (if any) authorized
