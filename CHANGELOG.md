@@ -34,6 +34,20 @@ the rationale.
 
 ## Releases
 
+### v0.236.0 -- 2026-08-11 (doc + structural, no behavior change to any existing consumer)
+
+**Phase 5d Group 3 remainder (issue #200): EP_ID_config gets a correct 4-octet-per-row wire stride, and a stale cross-reference is corrected.**
+
+`rcp_regmap_ep_id_map_render()` (regmap.h/regmap.c) serializes a real table at TC18 §12.7.8 Table 23's own exact 4-octet-per-row stride (request_stream_index/ep_id/byte_bus_id at row offset 4*N), proven via a byte-offset test — including `ep_id`'s own honest truncation to the wire's real 8-bit EP_Nr width (this module's own in-memory `ep_id` is 16-bit, matching every other endpoint-index field in this codebase), the same documented-truncation convention ADC's own render path already established.
+
+Same architecture caveat as HW_config (v0.235.0): the ACF_ABB wire request/response wrapper is **not** implemented. EP_ID_config is a separate table pointed to by Table 18's own `svr_ep_bytebus_id_map_ptr` (REQ-RMAP-037), not reached the way Table 18 itself or an endpoint's own EP_func block are — the exact same genuine, unresolved addressing question. REQ-RMAP-052/054 both stay `partial`, not `implemented`.
+
+**Also fixed**: REQ-RMAP-052's own `.fusa-reqs.json` text cited REQ-RMAP-056 as "its own separate still-open scope" — REQ-RMAP-056 was actually already closed in an earlier batch (confirmed both by `.fusa-reqs.json`'s own current status and by `regmap.h`'s own field comment, which already correctly said "closed as of this field's own follow-up batch"). The catalog text alone was stale; corrected.
+
+Mutation-tested: swapping which field the render function writes at row offset 0 (`request_stream_index` → `ep_id`) produced a clean, deterministic assertion failure. Reverted, full suite re-verified clean.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.235.0 -- 2026-08-11
 
 **Phase 5d Group 2 (issue #200): HW_config now has real server-side storage and a correct 3-octet-per-pin wire layout.**

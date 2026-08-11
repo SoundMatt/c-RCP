@@ -1894,6 +1894,42 @@ static void test_byte_bus_id_is_now_eleven_bits_wide(void)
     TEST_ASSERT_EQUAL_UINT16(0x7FFu, hdr.byte_bus_id);
 }
 
+/* REQ-RMAP-052/054 (row-stride half): TC18 §12.7.8 Table 23 lays each
+ * row out as four consecutive octets -- request_stream_index (0x0000),
+ * ep_id/EP_Nr (0x0001), byte_bus_id/BBID (0x0002, 16 bit) -- so row N
+ * begins at relative address 4*N. rcp_regmap_ep_id_map_render()
+ * (regmap.h/regmap.c) now serializes a real table at exactly this
+ * stride, proven directly via a byte-offset check across two rows --
+ * including ep_id's own honest truncation to the wire's real 8-bit
+ * EP_Nr width (this module's own in-memory ep_id is 16 bit). The
+ * ACF_ABB wire request/response wrapper itself is still not
+ * implemented -- see regmap.h's own file-header note on the same
+ * genuine, unresolved addressing question REQ-RMAP-040/041 (HW_config)
+ * already documents. */
+static void test_ep_id_map_render_matches_table_23_byte_offsets(void)
+{
+    rcp_regmap_ep_id_map_entry_t rows[2];
+    uint8_t                      img[8];
+
+    rows[0].request_stream_index = 0x11u;
+    rows[0].ep_id                = 0x1234u; /* truncates to 0x34 on render */
+    rows[0].byte_bus_id          = 0x0056u;
+    rows[1].request_stream_index = 0x22u;
+    rows[1].ep_id                = 0x0078u;
+    rows[1].byte_bus_id          = 0x009Au;
+
+    rcp_regmap_ep_id_map_render(rows, 2, img);
+
+    TEST_ASSERT_EQUAL_HEX8(0x11u, img[0]);
+    TEST_ASSERT_EQUAL_HEX8(0x34u, img[1]); /* truncated from 0x1234 */
+    TEST_ASSERT_EQUAL_HEX8(0x00u, img[2]);
+    TEST_ASSERT_EQUAL_HEX8(0x56u, img[3]);
+    TEST_ASSERT_EQUAL_HEX8(0x22u, img[4]);
+    TEST_ASSERT_EQUAL_HEX8(0x78u, img[5]);
+    TEST_ASSERT_EQUAL_HEX8(0x00u, img[6]);
+    TEST_ASSERT_EQUAL_HEX8(0x9Au, img[7]);
+}
+
 /* TC18 §12.7.8/§12.7.9 mark EP_ID_config rows and the Table 24
  * STREAM_UID/flush_on_count/Flush_time registers R/W+ -- explicitly
  * LOCKABLE by the configuring instance, independently of the lifecycle
@@ -2352,6 +2388,7 @@ int main(void)
     RUN_TEST(test_ep_id_map_flags_multi_client_ep);
     RUN_TEST(test_ep_id_map_flags_heterogeneous_shared_bus);
     RUN_TEST(test_byte_bus_id_is_now_eleven_bits_wide);
+    RUN_TEST(test_ep_id_map_render_matches_table_23_byte_offsets);
     RUN_TEST(test_no_lockable_w_plus_field_kind);
     RUN_TEST(test_response_queue_stream_id_is_configurable);
     RUN_TEST(test_response_queue_size_register_and_storage_now_exist);

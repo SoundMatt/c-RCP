@@ -1518,6 +1518,43 @@ size_t rcp_regmap_ep_id_map_effective_count(const rcp_regmap_ep_id_map_entry_t *
  * write. row must not be NULL. */
 void rcp_regmap_ep_id_map_row_init_default(rcp_regmap_ep_id_map_entry_t *row);
 
+/* ── EP_ID_config wire stride (REQ-RMAP-052/054) ─────────────────────────────
+ *
+ * TC18 §12.7.8 Table 23 lays each row out as four consecutive octets --
+ * request_stream_index (8 bit, relative row offset 0x0000),
+ * ep_id/EP_Nr (8 bit, 0x0001), byte_bus_id/BBID (16 bit, 0x0002) -- so
+ * row N begins at relative address 4*N, confirmed directly against the
+ * primary source (the printed row-1/row-2/row-3 examples begin at
+ * 0x0000/0x0004/0x0008).
+ *
+ * Deliberately NOT closed here: the ACF_ABB request/response wrapper
+ * around this render function. Exactly the same genuine, unresolved
+ * addressing question REQ-RMAP-040/041 (HW_config, this file's own
+ * earlier section) already documents applies here too: EP_ID_config is
+ * a separate table pointed to by Table 18's own
+ * svr_ep_bytebus_id_map_ptr register (REQ-RMAP-037), not reached via
+ * Table 18's own always-address-0 mechanism and not an endpoint's own
+ * EP_func block either. Precisely how a client's request address
+ * relates to that pointer's value is not specified anywhere in the
+ * primary source for this case, so it is not guessed here -- see
+ * HW_config's own file-header section for the fuller explanation,
+ * equally applicable to this table. REQ-RMAP-052/054 both stay
+ * `partial`, not `implemented`, for exactly this reason. */
+
+/* Serializes entries[0..count) into out at each row's own TC18-cited
+ * 4-octet stride -- out must have room for at least 4*count octets.
+ * ep_id is this module's own 16-bit in-memory representation (matching
+ * every other endpoint-index field in this codebase, e.g.
+ * rcp_regmap_is_ep0()'s own uint16_t parameter), truncated to the
+ * wire's real 8-bit EP_Nr width on render -- the same honest,
+ * documented truncation convention REQ-ADC-035/036's own render path
+ * already established for its own wider in-memory fields. count beyond
+ * what a real caller has bounded its own table to is the caller's own
+ * responsibility, matching rcp_regmap_hw_pin_map_render()'s own
+ * convention. */
+void rcp_regmap_ep_id_map_render(const rcp_regmap_ep_id_map_entry_t *entries, size_t count,
+                                  uint8_t *out);
+
 /* REQ-RMAP-057: TC18 §12.7.8 recommends, for safety reasons, that an
  * endpoint be mapped to at most one RC Client at a time. In this
  * table's own terms, one RC Client corresponds to one request stream
