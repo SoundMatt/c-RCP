@@ -492,9 +492,10 @@ static void test_adc_has_no_trigger_outputs_and_no_retained_average(void)
  * register block, including lin_ep_len/lin_base_clk/lin_ep_status, is
  * now reachable via rcp_ep_lin_render_registers()/_apply_reconfig()
  * (REQ-LINEP-028/029, tests/test_ep_lin.c's own dedicated
- * register-block test section). The trailing-time deviation below is
- * unrelated and still genuinely open. */
-static void test_lin_trigger_ignores_trailing_time_and_block_now_has_registers(void)
+ * register-block test section). The trailing-time gap below is ALSO
+ * FIXED 2026-08-11 (Phase 5e batch 2, issue #201, REQ-LINEP-023) --
+ * further renamed accordingly. */
+static void test_lin_trigger_now_honours_trailing_time_and_block_has_registers(void)
 {
     rcp_ep_lin_functional_cfg_t cfg;
     uint8_t                     before[sizeof(rcp_ep_lin_functional_cfg_t)];
@@ -509,16 +510,20 @@ static void test_lin_trigger_ignores_trailing_time_and_block_now_has_registers(v
     TEST_ASSERT_TRUE(rcp_ep_lin_set_trigger(&cfg, RCP_EP_LIN_TRIGGER_TX_DONE,
                                             RCP_LIFECYCLE_HW_CONFIGURED, w));
 
-    /* DEVIATION -- TC18 §13.7.10.1 requires the LIN transmission-done
+    /* FIXED -- TC18 §13.7.10.1 requires the LIN transmission-done
      * trigger to fire only once BOTH the transmission has been finalized
-     * AND the configured trailing time has expired. c-RCP's predicate takes
-     * the finalized event as its only argument -- there is no trailing-time
-     * parameter to pass and no trailing-time field to configure -- so it
-     * fires the instant transmission completes, and a repeated
-     * self-trigger produces back-to-back frames with no inter-frame gap. */
-    TEST_ASSERT_TRUE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_TX_DONE, true));
-    TEST_ASSERT_FALSE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_TX_DONE, false));
-    TEST_ASSERT_FALSE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_NONE, true));
+     * AND the configured trailing time has expired. rcp_ep_lin_trigger_fires()
+     * now takes trailing_time_expired as a second, caller-classified boolean
+     * input and ANDs it with tx_done_event -- Table 52 defines no dedicated
+     * wire register for "the configured trailing time" (like this endpoint
+     * type's own trigger concept as a whole, this remains this module's own
+     * original, non-wire-serialized design; see ep_lin.h's own file
+     * header). */
+    TEST_ASSERT_TRUE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_TX_DONE, true, true));
+    TEST_ASSERT_FALSE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_TX_DONE, true, false));
+    TEST_ASSERT_FALSE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_TX_DONE, false, true));
+    TEST_ASSERT_FALSE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_TX_DONE, false, false));
+    TEST_ASSERT_FALSE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_NONE, true, true));
 
     /* TC18 §13.7.10.2 Table 52's whole register block -- lin_ep_len
      * (0x0000, R), a reserved octet (0x0001, R), lin_base_clk (0x0004,
@@ -906,7 +911,7 @@ int main(void)
     RUN_TEST(test_adc_inter_sample_spacing_is_unconstrained);
     RUN_TEST(test_adc_has_no_trigger_outputs_and_no_retained_average);
 
-    RUN_TEST(test_lin_trigger_ignores_trailing_time_and_block_now_has_registers);
+    RUN_TEST(test_lin_trigger_now_honours_trailing_time_and_block_has_registers);
 
     RUN_TEST(test_can_frame_format_values_match_table_54);
     RUN_TEST(test_can_base_identifier_is_right_aligned_and_data_only);

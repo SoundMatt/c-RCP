@@ -259,9 +259,21 @@ typedef enum {
     RCP_EP_LIN_TRIGGER_TX_DONE  = 1,
 } rcp_ep_lin_trigger_t;
 
-/* True iff tx_done_event satisfies trigger: never for NONE; for TX_DONE
- * iff tx_done_event is true. */
-bool rcp_ep_lin_trigger_fires(rcp_ep_lin_trigger_t trigger, bool tx_done_event);
+/* True iff tx_done_event and trailing_time_expired together satisfy
+ * trigger: never for NONE; for TX_DONE iff BOTH are true -- TC18
+ * §13.7.10.1's own text (REQ-LINEP-023): "The LIN EP issues a trigger
+ * when a transmission has been finalized, AND the configured trailing
+ * time has expired." Table 52 (§13.7.10.2) defines no dedicated wire
+ * register for "the configured trailing time" -- like this endpoint
+ * type's own trigger concept as a whole (see the file header: "TC18
+ * defines no 'lin trigger outputs' table at all... entirely this
+ * module's own original design"), trailing_time_expired is a
+ * caller-classified boolean input this module does not itself derive
+ * from a clock or a wire-configured duration, matching the same
+ * pure-function, caller-supplies-already-classified-inputs convention
+ * every other endpoint type's own trigger-evaluation function uses. */
+bool rcp_ep_lin_trigger_fires(rcp_ep_lin_trigger_t trigger, bool tx_done_event,
+                               bool trailing_time_expired);
 
 /* ── Functional config ─────────────────────────────────────────────────────── */
 
