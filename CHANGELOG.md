@@ -34,6 +34,24 @@ the rationale.
 
 ## Releases
 
+### v0.238.0 -- 2026-08-11
+
+**Phase 5d Group 5 batch 1 (issue #200): Table 22's three remaining routing indices modeled, watchdog tick/millisecond conversion added.**
+
+`rcp_regmap_request_stream_cfg_t` (regmap.h) gains `rx_secure_channel_index` (REQ-RMAP-047, TC18 §12.7.7 Table 22, 0x000C), `rx_ack_stream_index` (REQ-RMAP-048, 0x0010), and `rx_resp_stream_index` (REQ-RMAP-049, 0x0011). All three zero-initialize except `rx_resp_stream_index`, which `rcp_regmap_request_stream_cfg_init()` now sets to 1 — TC18's own deliberate bootstrap guarantee (a freshly reset server can answer a discovery request before any configuration has been written). Content modeling only: the same deferred ACF_ABB-wire-wrapper gap already tracked for HW_config/EP_ID_config/response-queue applies here too, so REQ-RMAP-047/048/049 all stay `partial`, not `implemented`.
+
+**Requirement-text conflict caught and fixed before implementing**: REQ-RMAP-018's own existing text ("rcp_regmap_request_stream_cfg_init() shall set configured to false and every other field of its argument to 0") directly contradicted the planned `rx_resp_stream_index = 1` default. Resolved by correcting REQ-RMAP-018's own text to carve out the one deliberate exception, per this project's standing "verify against current requirement state before implementing" discipline.
+
+REQ-RMAP-050 (watchdog timeout register width/unit): `rcp_regmap_wd_timeout_ms_to_ticks()`/`_ticks_to_ms()` (regmap.h/regmap.c) perform the ms↔clock-tic conversion and 16-bit bounds check TC18 §12.7.7 Table 22 requires at the register-write boundary for `rx_wd_timeout_intervall` (0x000A). TC18 names no fixed clock-tick rate for this register anywhere near its own definition (unlike, e.g., PWM's own endpoint-local "clock selected for this endpoint" phrasing), so both functions take the tick duration as a caller-supplied parameter, matching the established caller-supplies-already-classified-units convention (`rcp_acf_reg_write_len()`, `rcp_respqueue_max_avtpdu_size_within_mtu()`). ms-to-ticks rounds down, not up: a requested watchdog period that does not divide evenly into whole tics is truncated, so the register's enforced period is never longer than requested — a safety-integrity register should never silently grant more slack than asked for. Stays `partial`: no register-write code path calls these functions yet, the same deferred-dispatch gap as the rest of Table 22.
+
+New tests: `test_request_stream_cfg_now_has_channel_and_stream_indices` (replaces the old "lacks" gap-documentation test), `test_watchdog_timeout_internal_unit_is_still_milliseconds` (replaces the old "deviate" gap-documentation test), `test_wd_timeout_ms_to_ticks_rounds_down_and_bounds_checks`, `test_wd_timeout_ticks_to_ms_round_trips`.
+
+Mutation-tested: removing the 16-bit ceiling check produced a clean, deterministic assertion failure; changing ms-to-ticks rounding from down to up (`(timeout_ms + ms_per_tick - 1) / ms_per_tick`) also produced a clean, deterministic assertion failure. Both reverted, full suite re-verified byte-identical.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
+Table 33 (REQ-RMAP-066/067/068) deliberately deferred to a separate batch: zero existing content model plus a still-unresolved primary-source address-layout ambiguity (a two-column PDF extraction issue flagged in an earlier session) that needs direct PDF-page verification, not `pdftotext -layout` extraction, before any implementation is attempted.
+
 ### v0.237.0 -- 2026-08-11
 
 **Phase 5d Group 4 remainder (issue #200): REQ-RMAP-061's own MTU-consistency-check half closed.**

@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/regmap.h"
 
+#include <stdint.h>
 #include <string.h>
 
 /* ── EP0 ────────────────────────────────────────────────────────────────────── */
@@ -456,15 +457,62 @@ uint8_t rcp_regmap_named_signal_ep_signal_nr(rcp_regmap_named_signal_t sig)
 /* ── Request-stream and response/ack queue config ──────────────────────────── */
 
 //cfusa:req REQ-RMAP-018
+//cfusa:req REQ-RMAP-049
 void rcp_regmap_request_stream_cfg_init(rcp_regmap_request_stream_cfg_t *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
+    /* REQ-RMAP-049: rx_resp_stream_index's own power-on default is 1, not
+     * 0 -- TC18's own deliberate bootstrap guarantee (a freshly reset
+     * server can answer a discovery request before any configuration has
+     * been written) requires this one field to be the sole, explicit
+     * exception to every other field's own zero default. See this
+     * field's own doc comment (regmap.h) and REQ-RMAP-018's own
+     * corrected text for why "zero everything" is no longer the whole
+     * rule as of this field's own addition. */
+    cfg->rx_resp_stream_index = 1u;
 }
 
 //cfusa:req REQ-RMAP-019
 void rcp_regmap_response_queue_cfg_init(rcp_regmap_response_queue_cfg_t *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
+}
+
+//cfusa:req REQ-RMAP-050
+bool rcp_regmap_wd_timeout_ms_to_ticks(uint32_t timeout_ms,
+                                        uint32_t ms_per_tick,
+                                        uint16_t *out_ticks)
+{
+    uint32_t ticks;
+
+    if (ms_per_tick == 0u) return false; /* no register value for a zero-length tick */
+
+    /* Round down: a requested watchdog period that does not divide evenly
+     * into whole tics is truncated, not rounded up, so the register's
+     * enforced period is never longer than the caller asked for -- a
+     * safety-integrity register should never silently grant more slack
+     * than requested. */
+    ticks = timeout_ms / ms_per_tick;
+    if (ticks > (uint32_t)UINT16_MAX) return false; /* REQ-RMAP-050: 16-bit register width */
+
+    *out_ticks = (uint16_t)ticks;
+    return true;
+}
+
+//cfusa:req REQ-RMAP-050
+bool rcp_regmap_wd_timeout_ticks_to_ms(uint16_t ticks,
+                                        uint32_t ms_per_tick,
+                                        uint32_t *out_timeout_ms)
+{
+    uint64_t product;
+
+    if (ms_per_tick == 0u) return false; /* no meaningful conversion for a zero-length tick */
+
+    product = (uint64_t)ticks * (uint64_t)ms_per_tick;
+    if (product > (uint64_t)UINT32_MAX) return false;
+
+    *out_timeout_ms = (uint32_t)product;
+    return true;
 }
 
 //cfusa:req REQ-RMAP-060

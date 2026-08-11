@@ -1579,16 +1579,19 @@ static void test_named_signal_index_covers_every_endpoint_type(void)
  * default 0 = MACsec uncontrolled port), rx_ack_stream_index (0x0010,
  * 8 bit, 0 = send no acknowledge) and rx_resp_stream_index (0x0011,
  * 8 bit, POWER-ON DEFAULT 1 so a discovery request can be answered before
- * any configuration is written). Deviation: none of the three is
- * modelled, and rcp_regmap_request_stream_cfg_init() zeroes the struct
- * byte for byte -- asserted here -- so there is no field that could carry
- * the mandated default of 1. */
-static void test_request_stream_cfg_lacks_channel_and_stream_indices(void)
+ * any configuration is written). Fixed (REQ-RMAP-047/048/049): all three
+ * are now modelled fields, and rcp_regmap_request_stream_cfg_init() sets
+ * rx_resp_stream_index to 1 as its sole deliberate exception to
+ * zero-initializing everything else -- content modeling only, no ACF_ABB
+ * wire wrapper reaches these fields yet (same deferred-wire-dispatch
+ * scope as HW_config/EP_ID_config/response-queue; see regmap.h's own
+ * file-header note). */
+static void test_request_stream_cfg_now_has_channel_and_stream_indices(void)
 {
     rcp_regmap_request_stream_cfg_t cfg;
     const uint8_t                  *raw = (const uint8_t *)&cfg;
     size_t                          i;
-    bool                            any_nonzero = false;
+    bool                            any_other_nonzero = false;
 
     memset(&cfg, 0xAA, sizeof(cfg));
     rcp_regmap_request_stream_cfg_init(&cfg);
@@ -1600,20 +1603,34 @@ static void test_request_stream_cfg_lacks_channel_and_stream_indices(void)
     TEST_ASSERT_EQUAL_UINT32(0u, cfg.rx_wd_timeout_ms);
     TEST_ASSERT_EQUAL_UINT((size_t)0u, cfg.rx_stream_max_request_size);
 
+    /* REQ-RMAP-047/048: default to 0 ("uncontrolled port" / "no ack"). */
+    TEST_ASSERT_EQUAL_UINT8(0u, cfg.rx_secure_channel_index);
+    TEST_ASSERT_EQUAL_UINT8(0u, cfg.rx_ack_stream_index);
+    /* REQ-RMAP-049: the one deliberate non-zero power-on default. */
+    TEST_ASSERT_EQUAL_UINT8(1u, cfg.rx_resp_stream_index);
+
     for (i = 0; i < sizeof(cfg); i++) {
-        if (raw[i] != 0u) any_nonzero = true;
+        const uint8_t *field = (const uint8_t *)&cfg.rx_resp_stream_index;
+        if (&raw[i] >= field && &raw[i] < field + sizeof(cfg.rx_resp_stream_index)) continue;
+        if (raw[i] != 0u) any_other_nonzero = true;
     }
-    /* Not one octet survives at 1: no rx_resp_stream_index default. */
-    TEST_ASSERT_FALSE(any_nonzero);
+    /* Every octet outside rx_resp_stream_index is still 0. */
+    TEST_ASSERT_FALSE(any_other_nonzero);
 }
 
 /* TC18 §12.7.7 Table 22: rx_wd_timeout_intervall is a 16-bit R/W*
- * register at relative 0x000A expressed in CLOCK TICS. Deviation: c-RCP
- * stores a 32-bit MILLISECOND value, applies no tick/millisecond
- * conversion at the write boundary, and rejects nothing above 0xFFFF --
- * asserted here by 0x10000 ms being accepted and honoured exactly as a
- * 65536 ms threshold, a value the specified register cannot even hold. */
-static void test_watchdog_timeout_width_and_unit_deviate(void)
+ * register at relative 0x000A expressed in CLOCK TICS. c-RCP still
+ * stores rx_wd_timeout_ms as a 32-bit MILLISECOND value internally
+ * (rcp_e2e_wd_evaluate()'s own unit) -- asserted here by 0x10000 ms
+ * still being accepted and honoured exactly as a 65536 ms threshold in
+ * that internal representation, a value the wire register itself cannot
+ * hold. Fixed (REQ-RMAP-050): the conversion and 16-bit bounds check
+ * TC18 requires at the register-write boundary now exist as an explicit
+ * caller-supplied-tick-duration function pair (rcp_regmap_wd_timeout_ms_to_ticks()/
+ * _ticks_to_ms()), matching the MTU-budget design precedent
+ * (rcp_respqueue_max_avtpdu_size_within_mtu()) since TC18 names no fixed
+ * clock-tick rate for this register. */
+static void test_watchdog_timeout_internal_unit_is_still_milliseconds(void)
 {
     rcp_regmap_request_stream_cfg_t cfg;
     rcp_e2e_wd_result_t             r;
@@ -1629,6 +1646,52 @@ static void test_watchdog_timeout_width_and_unit_deviate(void)
     TEST_ASSERT_FALSE(r.overflowed);
     r = rcp_e2e_wd_evaluate(cfg.rx_wd_enable, cfg.rx_wd_timeout_ms, false, false, 65536u);
     TEST_ASSERT_TRUE(r.overflowed);
+}
+
+/* REQ-RMAP-050: ms -> ticks rounds down (never grants a longer enforced
+ * watchdog period than requested) and rejects anything that would not
+ * fit the register's 16-bit width. */
+static void test_wd_timeout_ms_to_ticks_rounds_down_and_bounds_checks(void)
+{
+    uint16_t ticks = 0xFFFFu;
+
+    TEST_ASSERT_TRUE(rcp_regmap_wd_timeout_ms_to_ticks(1000u, 10u, &ticks));
+    TEST_ASSERT_EQUAL_UINT16(100u, ticks);
+
+    /* 1005 ms / 10 ms-per-tick = 100.5 ticks -> rounds down to 100, not 101. */
+    ticks = 0xFFFFu;
+    TEST_ASSERT_TRUE(rcp_regmap_wd_timeout_ms_to_ticks(1005u, 10u, &ticks));
+    TEST_ASSERT_EQUAL_UINT16(100u, ticks);
+
+    /* Exactly the register's own ceiling still fits. */
+    ticks = 0u;
+    TEST_ASSERT_TRUE(rcp_regmap_wd_timeout_ms_to_ticks(65535u, 1u, &ticks));
+    TEST_ASSERT_EQUAL_UINT16(65535u, ticks);
+
+    /* One tick past the ceiling is rejected, not silently truncated. */
+    ticks = 42u;
+    TEST_ASSERT_FALSE(rcp_regmap_wd_timeout_ms_to_ticks(65536u, 1u, &ticks));
+    TEST_ASSERT_EQUAL_UINT16(42u, ticks); /* untouched on rejection */
+
+    /* A zero-length tick has no meaningful register value. */
+    ticks = 42u;
+    TEST_ASSERT_FALSE(rcp_regmap_wd_timeout_ms_to_ticks(1000u, 0u, &ticks));
+    TEST_ASSERT_EQUAL_UINT16(42u, ticks);
+}
+
+/* REQ-RMAP-050: ticks -> ms is the plain inverse, used when populating
+ * rx_wd_timeout_ms from a value read off the wire; rejects a zero-length
+ * tick the same way. */
+static void test_wd_timeout_ticks_to_ms_round_trips(void)
+{
+    uint32_t ms = 0xFFFFFFFFu;
+
+    TEST_ASSERT_TRUE(rcp_regmap_wd_timeout_ticks_to_ms(100u, 10u, &ms));
+    TEST_ASSERT_EQUAL_UINT32(1000u, ms);
+
+    ms = 999u;
+    TEST_ASSERT_FALSE(rcp_regmap_wd_timeout_ticks_to_ms(100u, 0u, &ms));
+    TEST_ASSERT_EQUAL_UINT32(999u, ms); /* untouched on rejection */
 }
 
 /* TC18 §12.7.7 Table 22's own legend (TC18.txt:2929-2931): "This
@@ -2406,8 +2469,10 @@ int main(void)
     RUN_TEST(test_hw_pin_output_stage_has_no_exclusive_input_flag);
     RUN_TEST(test_output_pin_loses_its_input_capability);
     RUN_TEST(test_named_signal_index_covers_every_endpoint_type);
-    RUN_TEST(test_request_stream_cfg_lacks_channel_and_stream_indices);
-    RUN_TEST(test_watchdog_timeout_width_and_unit_deviate);
+    RUN_TEST(test_request_stream_cfg_now_has_channel_and_stream_indices);
+    RUN_TEST(test_watchdog_timeout_internal_unit_is_still_milliseconds);
+    RUN_TEST(test_wd_timeout_ms_to_ticks_rounds_down_and_bounds_checks);
+    RUN_TEST(test_wd_timeout_ticks_to_ms_round_trips);
     RUN_TEST(test_table22_w_star_writable_in_both_pre_rcp_configured_states);
     RUN_TEST(test_ep_id_row_now_has_request_stream_index);
     RUN_TEST(test_ep_id_map_effective_count_stops_at_sentinel);

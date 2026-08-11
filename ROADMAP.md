@@ -14486,3 +14486,72 @@ being genuinely missing. **Next**: Group 5
 wire codec), and REQ-RMAP-055 (the W+ lockable-access-type
 primitive) on its own, still the two largest remaining pieces of
 Phase 5d.
+
+### v0.238.0 -- 2026-08-11
+
+**Phase 5d Group 5 batch 1 (issue #200): Table 22's three remaining
+routing indices modeled; watchdog tick/millisecond conversion
+added.**
+
+`rcp_regmap_request_stream_cfg_t` (regmap.h) gains three fields, all
+TC18 §12.7.7 Table 22, all content-modeling-only (the same deferred
+ACF_ABB-wire-wrapper gap already tracked for HW_config/EP_ID_config/
+response-queue): `rx_secure_channel_index` (REQ-RMAP-047, 0x000C),
+`rx_ack_stream_index` (REQ-RMAP-048, 0x0010), `rx_resp_stream_index`
+(REQ-RMAP-049, 0x0011). The first two zero-initialize (TC18's own
+"uncontrolled port"/"no ack" defaults); `rx_resp_stream_index` is the
+one deliberate exception, set to 1 by
+`rcp_regmap_request_stream_cfg_init()` -- TC18's own bootstrap
+guarantee that a freshly reset server can answer discovery before any
+configuration has been written. All three stay `partial`, not
+`implemented`.
+
+**Requirement-text conflict caught and fixed before writing any
+code**: REQ-RMAP-018's own existing text ("...every other field of
+its argument to 0") directly contradicted the planned
+`rx_resp_stream_index = 1` default -- caught by this project's
+standing "verify against current requirement state before
+implementing" discipline, applied here to a *requirement*'s own text
+for once, not just to a TC18 citation. Fixed by correcting
+REQ-RMAP-018's own text to name the one deliberate exception, before
+touching `rcp_regmap_request_stream_cfg_init()`'s own code.
+
+REQ-RMAP-050 (watchdog register width/unit): `rcp_regmap_wd_timeout_ms_to_ticks()`/
+`_ticks_to_ms()` (regmap.h/regmap.c) implement the ms↔clock-tic
+conversion and 16-bit bounds check TC18 requires at the
+register-write boundary for `rx_wd_timeout_intervall` (0x000A). TC18
+names no fixed clock-tick rate for this register anywhere near its
+own definition (confirmed via direct TC18.txt read, unlike PWM's own
+endpoint-local "clock selected for this endpoint" phrasing), so both
+functions take the tick duration as a caller-supplied parameter,
+matching the established caller-supplies-already-classified-units
+convention (`rcp_acf_reg_write_len()`,
+`rcp_respqueue_max_avtpdu_size_within_mtu()`). ms-to-ticks rounds
+DOWN, not up -- a requested period that does not divide evenly into
+whole tics is truncated, so the register's own enforced period is
+never longer than requested, matching this codebase's general bias
+toward the more conservative reading for anything watchdog/safety
+adjacent. Stays `partial`: no register-write path calls these
+functions yet.
+
+New tests: `test_request_stream_cfg_now_has_channel_and_stream_indices`,
+`test_watchdog_timeout_internal_unit_is_still_milliseconds` (both
+replace older gap-documentation tests that now correctly fail once
+the gap closed), `test_wd_timeout_ms_to_ticks_rounds_down_and_bounds_checks`,
+`test_wd_timeout_ticks_to_ms_round_trips`.
+
+Mutation-tested: removing the 16-bit ceiling check produced a clean,
+deterministic assertion failure; changing the rounding direction from
+down to up produced a second clean, deterministic assertion failure.
+Both reverted, full suite re-verified byte-identical.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
+0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
+**Deliberately deferred**: Table 33 (REQ-RMAP-066/067/068) -- zero
+existing content model, plus a still-unresolved primary-source
+address-layout ambiguity (a two-column PDF extraction issue flagged
+in an earlier session) that needs direct PDF-page verification, not
+`pdftotext -layout` extraction, before implementation is safe to
+attempt. **Next**: that Table 33 investigation, as its own dedicated
+batch.

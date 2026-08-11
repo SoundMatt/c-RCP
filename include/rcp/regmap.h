@@ -1278,6 +1278,53 @@ typedef struct {
                                     listens on; same addressing model as
                                     avtp.h */
 
+    /* ── Secure channel / acknowledge & response routing ────────────── */
+    uint8_t  rx_secure_channel_index; /* REQ-RMAP-047 (TC18 §12.7.7 Table
+                                          22, relative address 0x000C, 8
+                                          bit, R/W*): which secure channel
+                                          this request stream is carried
+                                          on. 0 (this field's own
+                                          zero-init default) is TC18's own
+                                          defined "no cyber security,
+                                          MACsec uncontrolled port"
+                                          encoding -- content modeling
+                                          only, no code path in this
+                                          codebase yet selects a MACsec
+                                          channel from it (this library
+                                          has no MACsec layer of its own
+                                          to select one in). */
+    uint8_t  rx_ack_stream_index;     /* REQ-RMAP-048 (TC18 §12.7.7 Table
+                                          22, relative address 0x0010, 8
+                                          bit, R/W*): the index of the
+                                          response/ack stream (Table 24,
+                                          respqueue.h) endpoints bound to
+                                          this request stream send their
+                                          acknowledges on. 0 (this field's
+                                          own zero-init default) is TC18's
+                                          own defined "no acknowledge is
+                                          to be sent" encoding -- content
+                                          modeling only, no code path
+                                          routes an acknowledgement to a
+                                          selected queue from this field
+                                          yet. */
+    uint8_t  rx_resp_stream_index;    /* REQ-RMAP-049 (TC18 §12.7.7 Table
+                                          22, relative address 0x0011, 8
+                                          bit, R/W*): the index of the
+                                          response/ack stream endpoints
+                                          bound to this request stream
+                                          send their responses on. 0 is
+                                          TC18's own defined "no response
+                                          is to be sent" encoding; the
+                                          power-on default is 1 (not 0),
+                                          so a freshly reset server can
+                                          answer a discovery request
+                                          before any configuration has
+                                          been written -- see
+                                          rcp_regmap_request_stream_cfg_init()'s
+                                          own doc comment. Content
+                                          modeling only, same scope as
+                                          rx_ack_stream_index above. */
+
     /* ── E2E (e2e.h CRC32 safe points) ──────────────────────────────── */
     bool     rx_enforce_e2e;    /* false: a CRC_ERROR drops only the
                                     single offending request
@@ -1388,8 +1435,45 @@ typedef struct {
                                              before Phase 20. */
 } rcp_regmap_request_stream_cfg_t;
 
-/* Zero-initializes cfg (configured = false, everything else 0). */
+/* Zero-initializes cfg (configured = false, everything else 0), with one
+ * deliberate exception: rx_resp_stream_index is set to 1, not 0 -- see
+ * that field's own doc comment (REQ-RMAP-049) and REQ-RMAP-018's own
+ * corrected text for why "zero everything" is no longer the whole rule
+ * as of this field's own addition. */
 void rcp_regmap_request_stream_cfg_init(rcp_regmap_request_stream_cfg_t *cfg);
+
+/* REQ-RMAP-050 (TC18 §12.7.7 Table 22, relative address 0x000A, 16 bit,
+ * R/W*): rx_wd_timeout_intervall is expressed in clock tics, but TC18
+ * names no fixed clock-tick rate for this register anywhere near its own
+ * definition (unlike, e.g., PWM's endpoint-local "clock selected for
+ * this endpoint" phrasing) -- so, matching the same caller-supplies-
+ * already-classified-units convention already established for
+ * rcp_acf_reg_write_len()/rcp_respqueue_max_fragment_payload()/
+ * rcp_respqueue_max_avtpdu_size_within_mtu(), these two functions accept
+ * the tick duration as a caller-supplied parameter rather than this
+ * library inventing or hardcoding a rate TC18 never specifies.
+ *
+ * rcp_regmap_wd_timeout_ms_to_ticks() converts a
+ * rcp_regmap_request_stream_cfg_t.rx_wd_timeout_ms value into the
+ * register's own clock-tic unit given the caller-supplied duration of
+ * one tick, and reports whether the converted value fits the register's
+ * 16-bit width (out_ticks is only meaningful when this returns true;
+ * REQ-RMAP-050's own "a written value shall be rejected if it does not
+ * fit the register's 16-bit width" requirement). ms_per_tick == 0 is
+ * rejected (division by zero has no register value): returns false and
+ * leaves *out_ticks unchanged. */
+bool rcp_regmap_wd_timeout_ms_to_ticks(uint32_t timeout_ms,
+                                        uint32_t ms_per_tick,
+                                        uint16_t *out_ticks);
+
+/* The inverse conversion: register clock-tic count -> milliseconds, for
+ * populating rcp_regmap_request_stream_cfg_t.rx_wd_timeout_ms from a
+ * value read off the wire. ms_per_tick == 0 is rejected the same way
+ * (returns false, *out_timeout_ms left unchanged) -- there is no
+ * meaningful conversion for a zero-length tick. */
+bool rcp_regmap_wd_timeout_ticks_to_ms(uint16_t ticks,
+                                        uint32_t ms_per_tick,
+                                        uint32_t *out_timeout_ms);
 
 typedef struct {
     uint16_t stream_uid;      /* REQ-RMAP-060 (TC18 §12.7.9 Table 24, relative
