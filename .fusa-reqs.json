@@ -6004,12 +6004,13 @@
     },
     {
       "id": "REQ-E2E-021",
-      "title": "rcp_e2e_stream_fault_on_crc_error() always signals skip-this-request and latches under rx_enforce_e2e",
-      "text": "rcp_e2e_stream_fault_on_crc_error() shall always return true, and shall additionally set f->faulted to true whenever rcp_e2e_crc_error_action(rx_enforce_e2e) == RCP_E2E_CRC_ACTION_LATCH_STREAM_FAULT.",
+      "title": "PARTIAL: rcp_e2e_stream_fault_on_crc_error() always signals skip-this-request and latches under rx_enforce_e2e, but nothing in the dispatch path calls it",
+      "text": "PARTIAL: rcp_e2e_stream_fault_on_crc_error() shall always return true, and shall additionally set f->faulted to true whenever rcp_e2e_crc_error_action(rx_enforce_e2e) == RCP_E2E_CRC_ACTION_LATCH_STREAM_FAULT. This primitive itself is correct and directly unit-tested, but rcp_mock_server_dispatch_e2e() (src/mock.c) handles a CRC mismatch by building an error response and returning RCP_MOCK_DISPATCH_CRC_ERROR without ever calling rcp_e2e_crc_error_action()/rcp_e2e_stream_fault_on_crc_error(), and no caller anywhere checks rcp_e2e_stream_fault_is_faulted() before admitting a subsequent request. So on a stream configured with rx_enforce_e2e=true, TC18's \"stream is blocked until released\" consequence never actually blocks anything in this codebase today -- a second, third, Nth request on the same stream after a CRC failure is processed completely normally. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): this entry previously carried no partial/tc18-gap status, unlike sibling entries in this exact same cluster (REQ-E2E-028/029/030/038/039, REQ-WDG-010) that honestly flag the identical \"pure primitive exists but nothing calls it\" situation. REQ-E2E-020/022/023/043/044 describe the same family of pure, individually-correct primitives (crc_error_action's own mapping, the drop-request non-latching case, reset, init, is_faulted) and are still accurately implemented as written -- only this entry's own broader claim (that the enforcement actually happens) needed the honest gap flag.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18",
+      "scope": "tc18-gap",
+      "status": "partial",
       "tc18": "§12.7.7 Table 22 (\"rx_enforce_e2e ... 1b: stream is blocked until released, when CRC check at EP fails. Safe state will be entered\"), TC18.txt L2865-2867"
     },
     {
@@ -8063,13 +8064,13 @@
     },
     {
       "id": "REQ-SRV-013",
-      "title": "The cancellation functions remove exactly the requests their own opcode names",
-      "text": "rcp_server_endpoint_cancel_all() shall remove every stored conditional request and return how many; rcp_server_endpoint_cancel_single() shall report rcp_cancel_attempt()'s outcome and remove the stored request whose transaction_num equals clear_transaction_num only when that outcome is RCP_CANCEL_RESULT_CANCELED; rcp_server_endpoint_cancel_non_safestate() shall remove every stored request that is not safety-tagged, leaving the safety-tagged ones in place, and return how many were removed. Each shall free the byte copy of every request it removes.",
+      "title": "The cancellation functions remove exactly the requests their own opcode names, but rcp_server_endpoint_cancel_single() does not cascade to chained successors",
+      "text": "rcp_server_endpoint_cancel_all() shall remove every stored conditional request and return how many; rcp_server_endpoint_cancel_single() shall report rcp_cancel_attempt()'s outcome and remove the stored request whose transaction_num equals clear_transaction_num only when that outcome is RCP_CANCEL_RESULT_CANCELED; rcp_server_endpoint_cancel_non_safestate() shall remove every stored request that is not safety-tagged, leaving the safety-tagged ones in place, and return how many were removed. Each shall free the byte copy of every request it removes. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group H): TC18 §11.2.3's general cancellation rule additionally requires that cancelling a request also cancel any request chained to it, but rcp_server_endpoint_cancel_single() does not implement this cascade -- it removes only the single matching transaction_num. rcp_cancel_chain_should_cascade() (REQ-CANCEL-012) already implements the correct cascade *decision* but has zero callers anywhere in src/, a known, separately-tracked gap (see REQ-CANCEL-012's own entry, status: partial). This entry's own claim about what the three cancellation functions remove remains accurate as written; the chain-cascade gap is additional, not a contradiction of it.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§11.2.3.1/.2 clear-all/clear-single cancellation request handling, TC18.txt L1681, L1735-1738, L1794 (established Phase 1 basis, issue #163)"
+      "tc18": "§11.2.3.1/.2 clear-all/clear-single cancellation request handling, TC18.txt L1681, L1735-1738, L1794 (established Phase 1 basis, issue #163); §11.2.3 chain-cascade rule, TC18.txt L1674-1675 (see REQ-CANCEL-012)"
     },
     {
       "id": "REQ-SRV-014",

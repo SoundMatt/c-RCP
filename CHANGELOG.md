@@ -34,6 +34,10 @@ the rationale.
 
 ## Releases
 
+### v0.206.0 -- 2026-08-10
+
+Full-catalog audit follow-up, batch 7 (Group H, final -- doc-only): REQ-SRV-013 cross-reference + REQ-E2E-021 honest gap-flag. Issue #256 Group H now fully closed. See `ROADMAP.md` for full detail.
+
 ### v0.205.0 -- 2026-08-10
 
 Full-catalog audit follow-up, batch 6 (Group H): network wake now requires the same real handshake a pin wake does (REQ-PWR-005). Issue #256. See `ROADMAP.md` for full detail.
