@@ -13588,3 +13588,72 @@ Group H `REQ-MOCK-030` fix), and the remaining ~15 individual
 markers not yet read (MDIO Cetitec_032 correction, UART AVTPDU
 clarification sentence, several explicitly-unsettled "to be
 discussed" fields, and others).
+
+### v0.229.0 -- 2026-08-11 (doc-only)
+
+**Spec rebaseline to TC18 0.5.1_RC5, batch 3**: §12.7.8 EP_ID_config
+(renumbered Table 23 → Table 25). Doc-only, no code behavior change.
+
+**Real citation correction**: `REQ-RMAP-020`/`021`/`022` (ASIL-A) and
+`REQ-RMAP-056` (QM) all cite TC18's own sentence "The parameters
+Request_Stream_Index and BBID shall occur in ascending order. This
+has to be ensured by the instance that is sending the configuration
+to this table." as the TC18 basis for
+`rcp_regmap_ep_id_map_is_ascending()`. Confirmed directly against
+the rendered PDF (page 68): this sentence is entirely deleted as of
+spec revision 0.5.1_RC4 (shown struck through, tagged `051RC4:
+sentence deleted as discussed`) -- current TC18 §12.7.8 states no
+ordering requirement at all. The function's own well-defined
+behavior (composite-key ascending-order detection) is unaffected --
+`regmap.h`'s own file header already correctly framed it as a
+harmless, read-only diagnostic, never invoked for server-side
+enforcement, so nothing was ever built on the deleted rule actually
+being enforced. It simply no longer traces to a live TC18 MUST. All
+four requirements' `text`/`tc18` fields updated with the deletion
+evidence; `regmap.h`'s file header and the affected struct field's
+own doc comment corrected to match, replacing present-tense "TC18
+requires ascending order" language that was no longer accurate.
+
+**Real new-capability finding, investigated and folded into the
+existing SPI channel-selection deferred item rather than duplicated**:
+while reading Table 25 for the citation fix, found Table 25 itself
+gained a new `Ctrl1`/`Ctrl2` 5-bit field per BBID row (RC4) with no
+counterpart at all in the 0.5.1_RC baseline -- confirmed via direct
+side-by-side comparison of the old and new table text: the old
+baseline's own `1_BBID`/`2_BBID` were plain, unsplit 16-bit fields.
+A new Table 26 "BBID control bits" defines the 5 bits: bits [3:0]
+`Channel_selection` (RC4, footnoted "*in this version of the
+specification the SPI EP is the only EP that has channels..." --
+i.e. explicitly the mechanism for per-BBID SPI channel selection)
+and bit [4] `CRC_required` (RC5, ticket NXP_101, with a second
+footnote clarifying it's "don't care" for EP0 access since EP0 is
+always CRC-protected regardless). This is materially stronger
+evidence for the SPI channel-selection question already flagged and
+deferred in batch 2 (v0.228.0) -- Table 26 is a real, complete,
+footnoted, adopted table, not merely a floating draft comment like
+the earlier "New proposal" trigger-request harmonization language.
+Folded into that same deferred investigation (not a new task) since
+it's the identical underlying mechanism; NOT implemented this batch
+-- still touches live request routing, still needs the dedicated
+session Table 33's own unreconciled evt-bits SPI row (a genuine,
+unresolved internal inconsistency in the primary source as of RC5)
+requires before any code change.
+
+65/65 both trees (native + ASan/UBSan, unaffected -- comments/JSON
+text only). `cfusa check` (CI-pinned v0.5.50): 0 errors. `cfusa
+trace --gaps`: 0/1024 untested; `--req-coverage 100` /
+`--sec-tested 100`: both 100%.
+
+**Next**: continue the marker-by-marker triage -- the "trigger
+generation now optional" wording sweep across SPI/GPIO/PWM_OUT/
+PWM_IN/ADC + the generic RC-server section (likely wording-only, not
+yet individually verified against code), the new EP_NOT_FOUND-
+defining table (cross-check against `REQ-MOCK-030`, PR #261), and
+the remaining ~15 individual markers not yet read (MDIO Cetitec_032
+correction, UART AVTPDU clarification sentence, several explicitly-
+unsettled "to be discussed" fields, and others). Two items remain
+deliberately deferred pending their own dedicated sessions: the
+RC-server §12.7.7 `rx_enforce_*` register overhaul (task #97, touches
+ASIL-relevant `e2e.h`/`deadline.h` extensively) and the SPI
+channel-selection mechanism (evt-bits vs. BBID-based, batch 2 +
+this batch's own Table 26 finding).

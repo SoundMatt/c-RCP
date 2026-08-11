@@ -2750,32 +2750,32 @@
     {
       "id": "REQ-RMAP-020",
       "title": "rcp_regmap_ep_id_map_is_ascending() recognizes a strictly ascending table",
-      "text": "rcp_regmap_ep_id_map_is_ascending() shall return true when every consecutive pair of entries has a strictly increasing byte_bus_id.",
+      "text": "rcp_regmap_ep_id_map_is_ascending() shall return true when every consecutive pair of entries has a strictly increasing byte_bus_id. UPDATED 2026-08-11 (spec rebaseline to TC18 0.5.1_RC5): the ascending-order sentence this function's own behavior was originally derived from is entirely DELETED as of spec revision 0.5.1_RC4 (tracked-change tag 051RC4, \"sentence deleted as discussed\") -- the current TC18 §12.7.8 Table 25 (renumbered from Table 23) no longer states or implies any ordering requirement at all. This function remains a harmless, correct, purely-diagnostic helper (regmap.h's own file header already correctly frames it as read-only tooling, never invoked for server-side enforcement) -- its own well-defined behavior (detecting strictly increasing byte_bus_id) is unaffected by the deletion, but it no longer traces to a live TC18 MUST.",
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A",
       "scope": "tc18",
-      "tc18": "§13.2 Table 23 (\"The parameters Request_Stream_Index and BBID shall occur in ascending order. This has to be ensured by the instance that is sending the configuration to this table.\"), TC18.txt L2979"
+      "tc18": "§13.2 Table 23 (\"The parameters Request_Stream_Index and BBID shall occur in ascending order. This has to be ensured by the instance that is sending the configuration to this table.\"), TC18.txt L2979 -- REMOVED in spec revision 0.5.1_RC4, TC18 PDF 0.5.1_RC5 p.68 (sentence shown struck through, 051RC4 tag)"
     },
     {
       "id": "REQ-RMAP-021",
       "title": "rcp_regmap_ep_id_map_is_ascending() recognizes a non-ascending table",
-      "text": "rcp_regmap_ep_id_map_is_ascending() shall return false when any consecutive pair of entries has an equal or decreasing byte_bus_id.",
+      "text": "rcp_regmap_ep_id_map_is_ascending() shall return false when any consecutive pair of entries has an equal or decreasing byte_bus_id. UPDATED 2026-08-11 (spec rebaseline to TC18 0.5.1_RC5): see REQ-RMAP-020's own note -- the ordering sentence this function traces to is deleted as of spec revision 0.5.1_RC4; the function's own well-defined behavior is unaffected, but it no longer traces to a live TC18 MUST.",
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A",
       "scope": "tc18",
-      "tc18": "§13.2 Table 23 (\"The parameters Request_Stream_Index and BBID shall occur in ascending order. This has to be ensured by the instance that is sending the configuration to this table.\"), TC18.txt L2979"
+      "tc18": "§13.2 Table 23 (\"The parameters Request_Stream_Index and BBID shall occur in ascending order. This has to be ensured by the instance that is sending the configuration to this table.\"), TC18.txt L2979 -- REMOVED in spec revision 0.5.1_RC4, TC18 PDF 0.5.1_RC5 p.68 (sentence shown struck through, 051RC4 tag)"
     },
     {
       "id": "REQ-RMAP-022",
       "title": "rcp_regmap_ep_id_map_is_ascending() is vacuously true for 0 or 1 entries",
-      "text": "rcp_regmap_ep_id_map_is_ascending() shall return true when count is 0 or 1.",
+      "text": "rcp_regmap_ep_id_map_is_ascending() shall return true when count is 0 or 1. UPDATED 2026-08-11 (spec rebaseline to TC18 0.5.1_RC5): see REQ-RMAP-020's own note -- the ordering sentence this function traces to is deleted as of spec revision 0.5.1_RC4; the function's own well-defined behavior is unaffected, but it no longer traces to a live TC18 MUST.",
       "standard": "iso26262",
       "level": "ASIL-A",
       "asil": "ASIL-A",
       "scope": "tc18",
-      "tc18": "§13.2 Table 23 (\"The parameters Request_Stream_Index and BBID shall occur in ascending order.\"), TC18.txt L2979"
+      "tc18": "§13.2 Table 23 (\"The parameters Request_Stream_Index and BBID shall occur in ascending order.\"), TC18.txt L2979 -- REMOVED in spec revision 0.5.1_RC4, TC18 PDF 0.5.1_RC5 p.68 (sentence shown struck through, 051RC4 tag)"
     },
     {
       "id": "REQ-DISC-001",
@@ -9299,13 +9299,13 @@
     {
       "id": "REQ-RMAP-056",
       "title": "EP_ID_config ordering is ascending in (Request_Stream_Index, BBID), not BBID alone",
-      "text": "rcp_regmap_ep_id_map_is_ascending() reports whether the EP_ID_config table is ordered ascending in the composite key (Request_Stream_Index, BBID), the ordering TC18 \u00a712.7.8 requires the configuring instance to maintain and whose violation the specification says can cause requests to be dropped because no endpoint is found. Fixed: the implementation (src/regmap.c) now compares request_stream_index first between consecutive rows \u2014 a decrease is always reported non-ascending, an increase is always reported ascending regardless of that row's own byte_bus_id (TC18 does not require byte_bus_id to reset or relate across different streams) \u2014 and falls back to the prior strict byte_bus_id comparison only when request_stream_index is unchanged between the two rows. A per-stream-ascending table that interleaves streams (e.g. stream 1 BBIDs 1,2 then stream 2 BBIDs 1,2 again) is now correctly reported ascending, and a table whose stream index goes backwards is correctly reported non-ascending regardless of BBID.",
+      "text": "rcp_regmap_ep_id_map_is_ascending() reports whether the EP_ID_config table is ordered ascending in the composite key (Request_Stream_Index, BBID), the ordering TC18 \u00a712.7.8 requires the configuring instance to maintain and whose violation the specification says can cause requests to be dropped because no endpoint is found. Fixed: the implementation (src/regmap.c) now compares request_stream_index first between consecutive rows \u2014 a decrease is always reported non-ascending, an increase is always reported ascending regardless of that row's own byte_bus_id (TC18 does not require byte_bus_id to reset or relate across different streams) \u2014 and falls back to the prior strict byte_bus_id comparison only when request_stream_index is unchanged between the two rows. A per-stream-ascending table that interleaves streams (e.g. stream 1 BBIDs 1,2 then stream 2 BBIDs 1,2 again) is now correctly reported ascending, and a table whose stream index goes backwards is correctly reported non-ascending regardless of BBID. UPDATED 2026-08-11 (spec rebaseline to TC18 0.5.1_RC5): see REQ-RMAP-020's own note -- the ordering requirement itself is deleted from TC18 as of spec revision 0.5.1_RC4; this function's own composite-key comparison logic remains correct and harmless (pure diagnostic, no server-side enforcement), but no longer traces to a live TC18 MUST.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.8, TC18.txt L2979-L2981"
+      "tc18": "\u00a712.7.8, TC18.txt L2979-L2981 -- REMOVED in spec revision 0.5.1_RC4, TC18 PDF 0.5.1_RC5 p.68 (sentence shown struck through, 051RC4 tag)"
     },
     {
       "id": "REQ-RMAP-057",
