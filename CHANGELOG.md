@@ -34,6 +34,10 @@ the rationale.
 
 ## Releases
 
+### v0.205.0 -- 2026-08-10
+
+Full-catalog audit follow-up, batch 6 (Group H): network wake now requires the same real handshake a pin wake does (REQ-PWR-005). Issue #256. See `ROADMAP.md` for full detail.
+
 ### v0.204.0 -- 2026-08-10
 
 Full-catalog audit follow-up, batch 5 (Group H): unregistered byte_bus_id is now dropped silently, not answered with EP_NOT_FOUND (REQ-MOCK-030). Issue #256. See `ROADMAP.md` for full detail.

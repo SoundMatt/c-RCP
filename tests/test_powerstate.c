@@ -244,8 +244,46 @@ static void put_to_sleep(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr, uint
     rcp_bytes_free(&resp);
 }
 
+/* REQ-PWRMODE-020 (TC18 §12.4.1, "proceed as before"): a network wake now
+ * requires the same real, caller-driven handshake a pin wake does --
+ * mirrors test_wake_via_pin_hot_when_handshake_complete() exactly, using
+ * rcp_powerstate_manager_wake_via_network() in place of _wake_via_pin().
+ * Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): this used to
+ * be test_wake_via_network_from_sleep_is_hot(), asserting HOT with no
+ * handshake driven at all -- the real bug this entry now closes. */
 //cfusa:test REQ-PWR-005
-static void test_wake_via_network_from_sleep_is_hot(void)
+static void test_wake_via_network_hot_when_handshake_complete(void)
+{
+    rcp_avtp_addr_t endpoints[] = {ADDR};
+    rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(endpoints, 1);
+    rcp_bytes_t probe, echo;
+    rcp_pwrmode_start_kind_t kind;
+
+    put_to_sleep(m, ADDR, 1);
+
+    TEST_ASSERT_TRUE(rcp_powerstate_manager_handshake_begin(m, ADDR, 3, true, RESP_STREAM));
+
+    probe = rcp_powerstate_manager_encode_wakeup_probe(m, ADDR, 9);
+    TEST_ASSERT_NOT_NULL(probe.data);
+    echo = rcp_ep_wakeup_encode_wakeup_message(ADDR.byte_bus_id, 9);
+    TEST_ASSERT_TRUE(rcp_powerstate_manager_apply_wakeup_echo(m, ADDR, echo.data, echo.len, 9));
+    rcp_bytes_free(&probe);
+    rcp_bytes_free(&echo);
+
+    TEST_ASSERT_TRUE(rcp_powerstate_manager_handshake_resume_queues(m, ADDR));
+
+    TEST_ASSERT_EQUAL(RCP_POWERSTATE_OK, rcp_powerstate_manager_wake_via_network(m, ADDR, &kind));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_NORMAL, rcp_powerstate_manager_mode(m, ADDR));
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_START_HOT, kind);
+
+    rcp_powerstate_manager_destroy(m);
+}
+
+/* Mirrors test_wake_via_pin_cold_when_handshake_not_started(): with no
+ * handshake driven at all, a network wake is now COLD, not the
+ * unconditional HOT this function used to fabricate. REQ-PWR-005. */
+//cfusa:test REQ-PWR-005
+static void test_wake_via_network_cold_when_handshake_not_started(void)
 {
     rcp_avtp_addr_t endpoints[] = {ADDR};
     rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(endpoints, 1);
@@ -256,7 +294,7 @@ static void test_wake_via_network_from_sleep_is_hot(void)
 
     TEST_ASSERT_EQUAL(RCP_POWERSTATE_OK, rcp_powerstate_manager_wake_via_network(m, ADDR, &kind));
     TEST_ASSERT_EQUAL(RCP_PWRMODE_NORMAL, rcp_powerstate_manager_mode(m, ADDR));
-    TEST_ASSERT_EQUAL(RCP_PWRMODE_START_HOT, kind);
+    TEST_ASSERT_EQUAL(RCP_PWRMODE_START_COLD, kind);
 
     rcp_powerstate_manager_destroy(m);
 }
@@ -453,7 +491,8 @@ int main(void)
     RUN_TEST(test_apply_entry_response_no_pending_request_rejected);
     RUN_TEST(test_apply_entry_response_unknown_endpoint);
     RUN_TEST(test_apply_entry_response_decode_failure);
-    RUN_TEST(test_wake_via_network_from_sleep_is_hot);
+    RUN_TEST(test_wake_via_network_hot_when_handshake_complete);
+    RUN_TEST(test_wake_via_network_cold_when_handshake_not_started);
     RUN_TEST(test_wake_via_network_requires_sleep);
     RUN_TEST(test_wake_via_network_unknown_endpoint);
     RUN_TEST(test_wake_via_pin_hot_when_handshake_complete);

@@ -1118,12 +1118,14 @@
     },
     {
       "id": "REQ-PWR-005",
-      "title": "wake_via_network() is always a hot start",
-      "text": "rcp_powerstate_manager_wake_via_network() shall move a Sleep-ing endpoint to RCP_PWRMODE_NORMAL with RCP_PWRMODE_START_HOT, and shall return RCP_POWERSTATE_ERR_TRANSITION without changing mode if the endpoint is not currently in RCP_PWRMODE_SLEEP.",
+      "title": "wake_via_network() classifies hot/cold from the endpoint's own real handshake state, matching wake_via_pin()",
+      "text": "rcp_powerstate_manager_wake_via_network() shall move a Sleep-ing endpoint to RCP_PWRMODE_NORMAL, reporting RCP_PWRMODE_START_HOT iff the endpoint's own handshake state (as built up by rcp_powerstate_manager_handshake_begin()/_apply_wakeup_echo()/_handshake_resume_queues(), the same path-agnostic three-step API rcp_powerstate_manager_wake_via_pin() requires) is complete, and RCP_PWRMODE_START_COLD otherwise; it shall return RCP_POWERSTATE_ERR_TRANSITION without changing mode if the endpoint is not currently in RCP_PWRMODE_SLEEP. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): this entry previously required an unconditional RCP_PWRMODE_START_HOT report, matching a real bug where the function fabricated an always-immediately-complete handshake internally instead of consulting the endpoint's real state -- a genuine safety-relevant divergence from TC18 §12.4.1's own requirement that a network wake run the identical real handshake a pin wake does (REQ-PWRMODE-020's own primary-source correction, which this function never got updated to match).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§12.4.1 (\"a TC14/TC10 wake-up request on the network...will directly check for the network availability and proceed as before\"), TC18.txt L2304-L2305 -- same basis as REQ-PWRMODE-020's own correction"
     },
     {
       "id": "REQ-PWR-006",
