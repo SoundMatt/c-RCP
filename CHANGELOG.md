@@ -34,6 +34,10 @@ the rationale.
 
 ## Releases
 
+### v0.209.0 -- 2026-08-10
+
+Full-catalog audit follow-up, batch 10 (Group A resolution, no code change): the audit's own "evt[2:0]=000b is illegal" findings refuted by TC18's own Figure 33 worked example (REQ-ACF-023 citation strengthened). Issue #256 Group A now fully closed (17/17, resolved without a fix). See `ROADMAP.md` for full detail.
+
 ### v0.208.0 -- 2026-08-10
 
 Full-catalog audit follow-up, batch 9 (Group F, fully doc-only): `*_functional_cfg_writable()` "regardless of writer" staleness across 7 endpoint-type requirements (REQ-GPIO-020, REQ-SPI-012, REQ-I2C-004, REQ-UART-006, REQ-PWM-018/-037, REQ-LINEP-009). Issue #256 Group F now fully closed. See `ROADMAP.md` for full detail.
