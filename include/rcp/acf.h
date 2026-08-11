@@ -418,24 +418,38 @@ uint8_t rcp_acf_pad_len(size_t unpadded_len);
 
 /* The effective number of octets to be written by an EP0 register-write
  * request -- REQ-RMAP-069 (TC18 §13.7.1.2): "Effective number of bytes to
- * be written = (acf_msg_length - 3) x 4 - pad." acf_msg_length is the
- * decoded header field of the same name (this function does no decoding
- * of its own -- a caller passes hdr.acf_msg_length/hdr.pad straight
- * through, mirroring rcp_acf_pad_len()'s own "small pure arithmetic
- * helper" scope); the fixed 3-quadlet region this formula subtracts is
- * the 16-bit address plus (in safe mode) its CRC, per TC18's own Figure
- * 21 -- this function does not itself distinguish safe-mode framing from
- * plain, since the formula is the same regardless of what fills that
- * region.
+ * be written to register map = (acf_msg_length - 3) x 4 - pad - 2."
+ * acf_msg_length is the decoded header field of the same name (this
+ * function does no decoding of its own -- a caller passes
+ * hdr.acf_msg_length/hdr.pad straight through, mirroring
+ * rcp_acf_pad_len()'s own "small pure arithmetic helper" scope).
+ *
+ * FIXED 2026-08-11 (spec rebaseline to TC18 0.5.1_RC5): the old baseline
+ * spec's formula (0.5.1_RC, 2026-07-14) omitted a trailing "- 2" term,
+ * and this function matched that omission exactly. Spec revision RC5
+ * corrects the formula and, per its own updated Figure 22, the "- 2"
+ * subtracts the 2-octet register start address that leads the byte
+ * payload -- the 3-quadlet region this formula already subtracts is the
+ * fixed 2-quadlet ACF byte_message_info header plus one further quadlet
+ * of framing, and does NOT itself include the address (unlike this
+ * function's own pre-fix doc comment incorrectly assumed). This function
+ * does not attempt to additionally exclude any trailing CRC octets from
+ * a safe-command-mode write -- RC5 also newly clarifies EP0 is *always*
+ * accessed in safe command mode (no longer conditional on the request),
+ * which may mean CRC octets need their own accounting here too; that
+ * question is flagged, not yet resolved, since no production caller of
+ * this function exists yet to depend on either answer (see REQ-RMAP-069
+ * and this session's own spec-rebaseline project notes for the open
+ * question).
  *
  * Returns 0, never underflowing to a huge size_t, if acf_msg_length is
  * too small to contain the fixed 3-quadlet region at all (< 3), or if
- * pad exceeds what remains after subtracting it -- both cases describe a
- * malformed or adversarial frame, and 0 effective data octets is this
- * function's own fail-safe reading of that, not an out-of-band error
- * code (this is a pure arithmetic helper, like rcp_acf_pad_len(); a
- * caller wanting frame-level rejection uses rcp_acf_unpack_header()'s own
- * validation first). */
+ * pad plus the 2-octet address exceeds what remains after subtracting
+ * it -- both cases describe a malformed or adversarial frame, and 0
+ * effective data octets is this function's own fail-safe reading of
+ * that, not an out-of-band error code (this is a pure arithmetic helper,
+ * like rcp_acf_pad_len(); a caller wanting frame-level rejection uses
+ * rcp_acf_unpack_header()'s own validation first). */
 size_t rcp_acf_reg_write_len(uint16_t acf_msg_length, uint8_t pad);
 
 /* ── ACF_ABB ───────────────────────────────────────────────────────────────── */
