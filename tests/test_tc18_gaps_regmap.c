@@ -86,6 +86,7 @@
 #include <rcp/ep_gpio.h>
 #include <rcp/ep_pwm.h>
 #include <rcp/ep_spi.h>
+#include <rcp/ep_i2c.h>
 #include <rcp/e2e.h>
 #include <rcp/fragment.h>
 #include <rcp/deadline.h>
@@ -217,18 +218,28 @@ static void test_reg_write_len_matches_the_formula(void)
  * 000b-101b for its normal transfer requests, per Table 30's own SPI row;
  * that channel-selection design was already correct and is untouched --
  * only the previously entirely-missing 111b reconfig path is new here).
- * The deviation, narrowed but not closed: I2C/UART/LIN/CAN/ADC/ISELED/
- * MDIO/wakeup still have no reconfig entry point of any kind. A
- * conforming implementation would decode the same address+data payload
- * for all of them -- REQ-CFG-011 tracks the remaining 8. */
-static void test_generic_config_request_is_pwm_out_gpio_and_spi(void)
+ * FIXED 2026-08-11 (issue #256 Group I, REQ-I2C-019): I2C now implements
+ * the identical shape too (asserted fourth: i2c_clock_divider at relative
+ * 0x0008 -- Table 46's own printed address for this register, 0x0006,
+ * collides with i2c_base_clk's own printed address and was corrected via
+ * cross-table pattern matching against PWM_OUT's/GPIO's/SPI's own common
+ * prefixes; see ep_i2c.h's file header). This test was renamed from
+ * `..._is_pwm_out_gpio_and_spi` to avoid an ever-growing name as each
+ * endpoint type gets its own fix -- see the (now shrinking) remaining
+ * list below instead. Deviation, narrowed but not closed: UART/LIN/CAN/
+ * ADC/ISELED/MDIO/wakeup still have no reconfig entry point of any kind.
+ * A conforming implementation would decode the same address+data payload
+ * for all of them -- REQ-CFG-011 tracks the remaining 7. */
+static void test_generic_config_request_implemented_endpoints(void)
 {
     rcp_ep_pwm_out_functional_cfg_t pwm_cfg;
     rcp_ep_gpio_functional_cfg_t    gpio_cfg;
     rcp_ep_spi_functional_cfg_t     spi_cfg;
+    rcp_ep_i2c_functional_cfg_t     i2c_cfg;
     const uint8_t                   pwm_write[4]  = {0x00, 0x08, 0x33, 0x05};
     const uint8_t                   gpio_write[3] = {0x00, 0x08, 0x77};
     const uint8_t                   spi_write[4]  = {0x00, 0x0E, 0x12, 0x34};
+    const uint8_t                   i2c_write[3]  = {0x00, 0x08, 0x09};
 
     rcp_ep_pwm_out_functional_cfg_init(&pwm_cfg);
     TEST_ASSERT_EQUAL(RCP_EP_PWM_OUT_RECONFIG_OK,
@@ -249,6 +260,12 @@ static void test_generic_config_request_is_pwm_out_gpio_and_spi(void)
     TEST_ASSERT_EQUAL(RCP_EP_SPI_RECONFIG_OK,
                       rcp_ep_spi_apply_reconfig(&spi_cfg, spi_write, sizeof(spi_write)));
     TEST_ASSERT_EQUAL_HEX16(0x1234, spi_cfg.channels[1].baud_rate_kbps);
+
+    rcp_ep_i2c_functional_cfg_init(&i2c_cfg);
+    TEST_ASSERT_EQUAL_UINT16((uint16_t)0x0008u, RCP_EP_I2C_REG_CLOCK_DIVIDER);
+    TEST_ASSERT_EQUAL(RCP_EP_I2C_RECONFIG_OK,
+                      rcp_ep_i2c_apply_reconfig(&i2c_cfg, i2c_write, sizeof(i2c_write)));
+    TEST_ASSERT_EQUAL_HEX8(0x09, i2c_cfg.clock_divider);
 }
 
 /* TC18 §12.7.1 requires EVERY endpoint to publish EP_LEN at EP_func
@@ -261,12 +278,15 @@ static void test_generic_config_request_is_pwm_out_gpio_and_spi(void)
  * REQ-SPI-035): SPI now does too (EP_LEN at 0x0000 reports 0x36, a write
  * at the block's own last valid offset is refused whole -- note SPI's
  * block additionally publishes spi_nr_cs at 0x0001, also read-only and
- * also exercised here). Deviation, narrowed but not closed: `grep -rn
- * EP_LEN src` now matches ep_pwm.c, ep_gpio.c, and ep_spi.c -- I2C/UART/
- * LIN/CAN/ADC/ISELED/MDIO/wakeup still define no EP_LEN register or
- * overrun rule, because none has an addressed EP_func write path at all
- * (see the test above; REQ-CFG-012 tracks the remaining 8). */
-static void test_ep_len_overrun_rule_exists_for_pwm_out_gpio_and_spi(void)
+ * also exercised here). FIXED 2026-08-11 (issue #256 Group I,
+ * REQ-I2C-019): I2C now does too (EP_LEN at 0x0000 reports 0x0B, a write
+ * at the block's own last valid offset is refused whole). Deviation,
+ * narrowed but not closed: `grep -rn EP_LEN src` now matches ep_pwm.c,
+ * ep_gpio.c, ep_spi.c, and ep_i2c.c -- UART/LIN/CAN/ADC/ISELED/MDIO/
+ * wakeup still define no EP_LEN register or overrun rule, because none
+ * has an addressed EP_func write path at all (see the test above;
+ * REQ-CFG-012 tracks the remaining 7). */
+static void test_ep_len_overrun_rule_implemented_endpoints(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
     uint8_t                         block[RCP_EP_PWM_OUT_EP_FUNC_LEN];
@@ -325,6 +345,26 @@ static void test_ep_len_overrun_rule_exists_for_pwm_out_gpio_and_spi(void)
         TEST_ASSERT_EQUAL(RCP_EP_SPI_RECONFIG_ERR_OUT_OF_RANGE,
                           rcp_ep_spi_apply_reconfig(&spi_cfg, spi_overrun, sizeof(spi_overrun)));
         TEST_ASSERT_EQUAL_HEX8(0x42, spi_cfg.channels[5].pause_min);
+    }
+
+    {
+        rcp_ep_i2c_functional_cfg_t i2c_cfg;
+        uint8_t                     i2c_block[RCP_EP_I2C_EP_FUNC_LEN];
+        /* 0x000B == RCP_EP_I2C_EP_FUNC_LEN itself -- one past the last
+         * valid offset, so even a single-octet write there overruns. */
+        const uint8_t                i2c_overrun[3] = {0x00, 0x0B, 0xAA};
+
+        rcp_ep_i2c_functional_cfg_init(&i2c_cfg);
+        i2c_cfg.trail = 0x42u;
+
+        TEST_ASSERT_EQUAL_UINT16((uint16_t)0x0000u, RCP_EP_I2C_REG_EP_LEN);
+        rcp_ep_i2c_render_registers(&i2c_cfg, i2c_block);
+        TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_EP_I2C_EP_FUNC_LEN, i2c_block[RCP_EP_I2C_REG_EP_LEN]);
+        TEST_ASSERT_EQUAL_HEX8(0x0B, i2c_block[RCP_EP_I2C_REG_EP_LEN]);
+
+        TEST_ASSERT_EQUAL(RCP_EP_I2C_RECONFIG_ERR_OUT_OF_RANGE,
+                          rcp_ep_i2c_apply_reconfig(&i2c_cfg, i2c_overrun, sizeof(i2c_overrun)));
+        TEST_ASSERT_EQUAL_HEX8(0x42, i2c_cfg.trail);
     }
 }
 
@@ -2029,8 +2069,8 @@ int main(void)
     UNITY_BEGIN();
 
     RUN_TEST(test_reg_write_len_matches_the_formula);
-    RUN_TEST(test_generic_config_request_is_pwm_out_gpio_and_spi);
-    RUN_TEST(test_ep_len_overrun_rule_exists_for_pwm_out_gpio_and_spi);
+    RUN_TEST(test_generic_config_request_implemented_endpoints);
+    RUN_TEST(test_ep_len_overrun_rule_implemented_endpoints);
     RUN_TEST(test_discovery_claim_refusal_is_unreportable);
     RUN_TEST(test_lifecycle_state_register_field_tracks_the_authoritative_state);
     RUN_TEST(test_general_map_wire_reach_stops_after_0x000d);

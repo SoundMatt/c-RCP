@@ -25,6 +25,8 @@
  * this module does NOT provide; their tests pin the deviation. */
 //cfusa:req REQ-I2C-019
 //cfusa:req REQ-I2C-020
+//cfusa:req REQ-I2C-021
+//cfusa:req REQ-I2C-022
 /*
  * ep_i2c.h -- I2C endpoint for the TC18 Remote Control Protocol wire layer
  * (ROADMAP.md Phase 16, "Basic Endpoints", milestone 66).
@@ -143,27 +145,73 @@
  *
  * ── i2c_mode: bus-speed presets, and a flagged spec ambiguity ──────────────
  *
- * rcp_ep_i2c_mode_t names this endpoint's four bus-speed presets
- * (extraction §5.7, §7). The specification extraction available to this
- * implementation carries two internally inconsistent numberings for where
- * its highest-speed preset sits relative to the "Fast mode plus" preset
- * immediately below it -- an apparent drafting inconsistency in the
- * source material, not a deliberate reserved gap between the two. Rather
- * than silently pick one reading, this module deliberately implements the
- * *lower*-numbered of the two candidate positions (RCP_EP_I2C_MODE_HIGH_SPEED
- * = 3, immediately following RCP_EP_I2C_MODE_FAST_PLUS with no reserved
- * value skipped between them) as the more conservative reading -- flagged
+ * rcp_ep_i2c_mode_t names this endpoint's five bus-speed presets
+ * (extraction §5.7, §7 / TC18 §13.7.7.2 Table 46). The specification
+ * extraction available to this implementation carries two internally
+ * inconsistent numberings for where its highest-speed preset sits
+ * relative to the "Fast mode plus" preset immediately below it -- an
+ * apparent drafting inconsistency in the source material, not a
+ * deliberate reserved gap between the two. Rather than silently pick one
+ * reading, this module deliberately implements the *lower*-numbered of
+ * the two candidate positions (RCP_EP_I2C_MODE_HIGH_SPEED = 3,
+ * immediately following RCP_EP_I2C_MODE_FAST_PLUS with no reserved value
+ * skipped between them) as the more conservative reading -- flagged
  * here, explicitly, as pending resolution by spec errata rather than
  * guessed at. A future errata resolution that assigns a different numeric
  * value to this preset will need this enum (and any wire-compatibility
  * shims built on top of it) revisited; see rcp_ep_i2c_mode_valid().
+ * FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-I2C-019):
+ * Table 46's own fifth row, RCP_EP_I2C_MODE_ULTRA_FAST (value 4, ~5
+ * MHz-class), carries no such ambiguity -- it was simply missing from
+ * this enum and unconditionally rejected by rcp_ep_i2c_mode_valid()
+ * entirely, a separate, uncontroversial gap now closed alongside the
+ * register-block fix below.
+ *
+ * ── The EP_func register block (evt[2:0] == 111b) ──────────────────────────
+ *
+ * FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-I2C-021):
+ * rcp_ep_i2c_decode_transfer_request() already correctly rejects evt !=
+ * 0b000 (RCP_EP_I2C_ERR_BAD_EVT, via acf.h's rcp_acf_evt_row2_is_plain())
+ * -- that includes evt[2:0] = 111b, TC18 §12.7.1/Table 30's generic
+ * configuration-write value, exactly as it should (a config-write request
+ * is not a plain transfer). What was missing, matching SPI's own
+ * before-this-fix gap, was any counterpart function actually implementing
+ * that 111b path: this endpoint type's Table 46 functional-configuration
+ * register block was modeled only in reduced form (a bare `i2c_mode`
+ * field, no wire render/parse path at all).
+ *
+ * A second, distinct genuine spec-table editorial defect, resolved the
+ * same way `ep_pwm.h`'s EP_LEN defect and `ep_gpio.h`'s debounce address
+ * defect already established as precedent: TC18 §13.7.7.2 Table 46's own
+ * printed relative-address column collides two entries at 0x0002
+ * (`i2c_ep_enable&clr`, 8 bit, and `i2c_base_clk`, 16 bit) and two more at
+ * 0x0004 (`i2c_base_clk`'s own second octet and `i2c_ep_status`, 16 bit)
+ * -- confirmed by direct visual inspection of the source PDF (physical
+ * page 99), not a text-extraction artifact. PWM_OUT's, GPIO's, and now
+ * SPI's own common EP_func prefixes all place their table's exact same
+ * five conceptual fields (EP_LEN / a reserved-or-count octet / enable&clr
+ * / options / a 16-bit read-only base-clock register) at the identical
+ * address sequence 0x0000/0x0001/0x0002/0x0003/0x0004-0x0005, followed by
+ * a 16-bit ep_status at 0x0006-0x0007 -- that cross-table pattern is
+ * authoritative here too, so `i2c_base_clk` is placed at 0x0004-0x0005
+ * (not the table's own printed 0x0002), pushing `i2c_ep_status` to
+ * 0x0006-0x0007, `i2c_clock_divider` to 0x0008, `i2c_mode` to 0x0009, and
+ * `i2c_trail` to 0x000A (RCP_EP_I2C_EP_FUNC_LEN = 0x000B, 11 octets
+ * total) rather than the table's own colliding addresses. `i2c_base_clk`
+ * is not itself stored (it has no setter, no meaningful value this module
+ * can derive, and always renders 0 -- the same "no real clock source
+ * modelled" honesty ep_gpio.h's own `gpio_base_clk` already commits to);
+ * the reserved octet at 0x0001 likewise always renders 0, matching
+ * ep_pwm.h's own reserved-octet convention.
  *
  * ── Functional configuration ────────────────────────────────────────────────
  *
  * rcp_ep_i2c_functional_cfg_t composes regmap.h's
  * rcp_regmap_ep_functional_cfg_t as its own first member (per that
  * module's documented convention, same as ep_gpio.h/ep_spi.h) and adds
- * this endpoint's one runtime-adjustable field: i2c_mode.
+ * this endpoint's runtime-adjustable fields: i2c_mode, ep_status,
+ * clock_divider, and trail (the last three new, added for the register
+ * block above).
  * rcp_ep_i2c_functional_cfg_writable() is, likewise, a thin, named wrapper
  * over server.h's rcp_lifecycle_field_writable() (RCP_LIFECYCLE_FIELD_FUNCTIONAL_W),
  * and rcp_ep_i2c_set_mode() consults it before ever touching cfg -- reusing,
@@ -198,10 +246,17 @@ typedef enum {
     RCP_EP_I2C_MODE_HIGH_SPEED = 3, /* conservative, lower-numbered reading;
                                         pending spec errata -- see the file
                                         header */
+    RCP_EP_I2C_MODE_ULTRA_FAST = 4, /* ~5 MHz-class preset -- Table 46's own
+                                        fifth row, unambiguous (no numbering
+                                        clash unlike RCP_EP_I2C_MODE_HIGH_SPEED
+                                        above); FIXED 2026-08-11
+                                        (c-RCP-AUDIT-06, issue #256 Group I,
+                                        REQ-I2C-019) -- previously rejected
+                                        by rcp_ep_i2c_mode_valid() entirely */
 } rcp_ep_i2c_mode_t;
 
 /* True iff v (a raw i2c_mode value, e.g. as decoded from a register) is
- * one of the four defined presets, i.e. v <= 3. */
+ * one of the five defined presets, i.e. v <= 4. */
 bool rcp_ep_i2c_mode_valid(uint8_t v);
 
 /* ── Functional config ─────────────────────────────────────────────────────── */
@@ -212,10 +267,13 @@ typedef struct {
                                                first member -- see the file
                                                header */
     uint8_t                        i2c_mode; /* rcp_ep_i2c_mode_t */
+    uint16_t                       ep_status;      /* i2c_ep_status, Table 46 */
+    uint8_t                        clock_divider;  /* i2c_clock_divider, Table 46 */
+    uint8_t                        trail;          /* i2c_trail, Table 46 */
 } rcp_ep_i2c_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false, i2c_mode
- * RCP_EP_I2C_MODE_STANDARD). */
+ * RCP_EP_I2C_MODE_STANDARD, ep_status/clock_divider/trail all 0). */
 void rcp_ep_i2c_functional_cfg_init(rcp_ep_i2c_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
@@ -231,6 +289,102 @@ bool rcp_ep_i2c_functional_cfg_writable(rcp_lifecycle_state_t state,
  * when it returns false. */
 bool rcp_ep_i2c_set_mode(rcp_ep_i2c_functional_cfg_t *cfg, rcp_ep_i2c_mode_t mode,
                           rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer);
+
+/* ── The EP_func register block (the evt[2:0] == 111b target) ──────────────── */
+
+/* Relative octet offsets of the registers making up this endpoint's own
+ * EP_func block, at the corrected addresses -- see the file header's
+ * note on Table 46's own printed address collisions. Every multi-octet
+ * register is big-endian, like every other multi-octet field this
+ * codebase encodes. Offsets marked R are read-only: a configuration
+ * write covering them leaves them unchanged (see
+ * rcp_ep_i2c_apply_reconfig()). */
+#define RCP_EP_I2C_REG_EP_LEN         ((uint16_t)0x0000u) /*  8 bit, R   */
+#define RCP_EP_I2C_REG_RESERVED_01    ((uint16_t)0x0001u) /*  8 bit, R   */
+#define RCP_EP_I2C_REG_EP_ENABLE_CLR  ((uint16_t)0x0002u) /*  8 bit, R/W */
+#define RCP_EP_I2C_REG_EP_OPTIONS     ((uint16_t)0x0003u) /*  8 bit, R/W */
+#define RCP_EP_I2C_REG_BASE_CLK       ((uint16_t)0x0004u) /* 16 bit, R   */
+#define RCP_EP_I2C_REG_EP_STATUS      ((uint16_t)0x0006u) /* 16 bit, R/W */
+#define RCP_EP_I2C_REG_CLOCK_DIVIDER  ((uint16_t)0x0008u) /*  8 bit, R/W */
+#define RCP_EP_I2C_REG_MODE           ((uint16_t)0x0009u) /*  8 bit, R/W */
+#define RCP_EP_I2C_REG_TRAIL          ((uint16_t)0x000Au) /*  8 bit, R/W */
+
+/* The block's own length in octets -- one past the last assigned offset,
+ * i.e. the value the endpoint reports at RCP_EP_I2C_REG_EP_LEN and the
+ * bound the "write beyond EP_LEN is ignored" rule (§12.7.1) is applied
+ * against. */
+#define RCP_EP_I2C_EP_FUNC_LEN ((uint16_t)0x000Bu)
+
+/* The fixed width (octets) of the relative-start-address prefix every
+ * configuration request's payload begins with -- the address is a 16-bit
+ * big-endian field, followed by the configuration data octets to write
+ * from that address onward (§12.7.1). */
+#define RCP_EP_I2C_RECONFIG_ADDR_LEN ((size_t)2u)
+
+typedef enum {
+    RCP_EP_I2C_RECONFIG_OK               = 0,
+    RCP_EP_I2C_RECONFIG_ERR_SHORT        = 1, /* payload carries no address
+                                                  prefix, or an address
+                                                  prefix with no data octet
+                                                  after it */
+    RCP_EP_I2C_RECONFIG_ERR_OUT_OF_RANGE = 2, /* start_address + data length
+                                                  exceeds
+                                                  RCP_EP_I2C_EP_FUNC_LEN --
+                                                  the whole write is ignored,
+                                                  per the specification's own
+                                                  rule */
+} rcp_ep_i2c_reconfig_errc_t;
+
+/* Human-readable message for an rcp_ep_i2c_reconfig_errc_t value. Never
+ * returns NULL. */
+const char *rcp_ep_i2c_reconfig_strerror(rcp_ep_i2c_reconfig_errc_t e);
+
+/* Serializes cfg's EP_func registers into out[0..RCP_EP_I2C_EP_FUNC_LEN)
+ * exactly as a configuration *read* of the whole block would report them
+ * -- the inverse of rcp_ep_i2c_apply_reconfig()'s own parse step, and the
+ * same rendering that function patches in place. i2c_base_clk (read-only)
+ * always renders 0 -- see the file header. */
+void rcp_ep_i2c_render_registers(const rcp_ep_i2c_functional_cfg_t *cfg,
+                                  uint8_t out[RCP_EP_I2C_EP_FUNC_LEN]);
+
+/* Applies the configuration escape hatch (evt[2:0] == 111b): payload is NOT
+ * presented at the interface but interpreted as an addressed write into
+ * this endpoint's own EP_func block -- a 16-bit big-endian relative start
+ * address followed by the configuration data octets to write from that
+ * address onward (§12.7.1). This is a real register write, reaching every
+ * R/W register the block defines (enable/options, status, clock divider,
+ * mode, trail), not merely i2c_mode.
+ *
+ * Returns RCP_EP_I2C_RECONFIG_ERR_SHORT when payload_len is not at least
+ * RCP_EP_I2C_RECONFIG_ADDR_LEN + 1, and
+ * RCP_EP_I2C_RECONFIG_ERR_OUT_OF_RANGE when the addressed span would extend
+ * past RCP_EP_I2C_EP_FUNC_LEN; in both cases cfg is left entirely
+ * unchanged, per the specification's own "such a payload is to be ignored"
+ * rule. Octets of the addressed span that land on a read-only register
+ * (EP_LEN, the reserved octet, base_clk) are left at their current values
+ * while the rest of the span is still applied. Note that a write covering
+ * RCP_EP_I2C_REG_MODE with a value that is not rcp_ep_i2c_mode_valid() is
+ * still applied verbatim (this function has no i2c_mode-specific
+ * validation of its own, matching every other register's plain-octet
+ * treatment); callers reading i2c_mode back out should still apply
+ * rcp_ep_i2c_mode_valid() themselves if that distinction matters to them.
+ *
+ * A caller routing a decoded request here is responsible for having
+ * checked that evt[2:0] really was 111b -- rcp_ep_i2c_decode_transfer_request()
+ * already rejects it (RCP_EP_I2C_ERR_BAD_EVT) so a misrouted request
+ * cannot reach that path by accident. */
+rcp_ep_i2c_reconfig_errc_t rcp_ep_i2c_apply_reconfig(rcp_ep_i2c_functional_cfg_t *cfg,
+                                                      const uint8_t *payload,
+                                                      size_t payload_len);
+
+/* Encodes an ACF_ABB configuration request (evt[2:0] == 111b) addressed to
+ * byte_bus_id: payload is start_address (16-bit big-endian) followed by
+ * data[0..data_len). Returns a zeroed rcp_bytes_t (data=NULL) if data_len
+ * is 0, if the encoded payload would exceed RCP_ACF_MAX_PAYLOAD, or on
+ * allocation failure. Caller frees the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_ep_i2c_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                uint16_t start_address, const uint8_t *data,
+                                                size_t data_len, uint8_t transaction_num);
 
 /* ── Transfer direction ────────────────────────────────────────────────────── */
 
