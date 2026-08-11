@@ -13394,3 +13394,115 @@ known extraction-reliability risk already flagged once during Group
 E), and the full TC18 spec-revision reconciliation project (deferred
 by explicit prior user decision until Group I/J/K completed -- now
 satisfied).
+
+### v0.227.0 -- 2026-08-11
+
+**Spec rebaseline to TC18 0.5.1_RC5, batch 1** (`c-RCP-AUDIT-06`).
+User directive: move to a systematic reconciliation between this
+codebase's TC18 baseline (0.5.1_RC, 2026-07-14, 117pp -- what every
+prior conformance PR this session has read against) and a newer
+revision, 0.5.1_RC5 (2026-07-31, 125pp), which supersedes it through
+4 intermediate point-releases.
+
+**Method**: the PDF's own front-matter "Version and Restriction
+History" table (pages 2-4) lists every dated delta with a short
+description and, for RC5, a bare list of ticket IDs (TI_032, TI_033,
+TI_037, TI_058, TI_066, TI_088, TI_103, NXP_100, NXP_101, NXP_102,
+Renesas_029-33) without individual descriptions. Cross-referenced
+against `pdftotext -layout`'s own extraction of all ~63 `Commented
+[XXX]` tracked-change markers still present in the document body
+(each anchored to specific text, most tagged with the same ticket
+IDs the front table lists) to build a full map of what actually
+changed and where. Each marker triaged individually: genuinely
+normative (adopted) delta needing a code/`.fusa-reqs.json` fix, a
+wording-only clarification needing no change, or a still-draft
+proposal explicitly marked as such in the document (e.g. RC3's new
+"trigger request"/"compare request" harmonization, meant to replace
+Compound/Compound-wait/Triggered/Chained -- tagged "New proposal"
+with "requests to be replaced are not yet deleted from spec", i.e.
+not yet adopted; matches the precedent already established for
+SPI's own proposed BBID-based channel-selection concept, spot-checked
+in an earlier session and confirmed still draft-stage as of RC5).
+
+**Page-numbering caveat re-confirmed**: the PDF's own "Page | N"
+footer marks the *bottom* of the page it appears on -- text
+immediately following a footer in `pdftotext -layout`'s own linear
+extraction belongs to the *next* page, not the one the footer names.
+This tripped up the very first real finding of this batch (see
+below) and is the same off-by-one risk `[[feedback_verify_against_pdf_and_reqs_json]]`
+already documents; resolved by reading the adjacent page directly
+with the `Read` tool's own `pages` parameter until the marker's real
+context was found.
+
+**Real bug found and fixed**: `acf.h`'s `rcp_acf_reg_write_len()`
+computes the effective number of data octets in an EP0 register-map
+write, per TC18 §13.7.1.2's own formula. The 0.5.1_RC baseline reads
+"Effective number of bytes to be written = (acf_msg_length - 3) x 4
+- pad" -- and `rcp_acf_reg_write_len()` matched this exactly. RC5
+corrects the formula (tagged `051RC5: Formular corrected`, ticket
+NXP_101) to "... - pad - 2", the "-2" accounting for the 2-octet
+register start address that leads the payload per the same figure
+(Figure 22) both revisions render. The same passage also drops a
+conditional ("a CRC if safe mode is requested") in favor of an
+unconditional one ("a CRC, since EP0 is always accessed in safe
+command mode") -- a second, related clarification. Its full code
+impact (whether a corresponding CRC-byte term also needs adding to
+this formula, or to a different part of the register-write path
+entirely) is flagged, not resolved, in this batch: `rcp_acf_reg_write_len()`
+has zero production callers today (confirmed by grep across
+`src/*.c`), so nothing currently depends on either answer, and this
+batch scoped itself to the one change the primary source states
+unambiguously.
+
+Fixed the formula to add the "-2" term; rewrote `acf.h`'s own doc
+comment, which had speculated (incorrectly, per RC5) that the
+existing 3-quadlet subtraction already covered the address -- it
+does not, the "-2" is additional. `REQ-RMAP-069`'s title/text/citation
+updated to match, with an explicit note recording what changed and
+why. The existing golden-vector test
+(`test_effective_register_write_length_helper_matches_the_formula`)
+changes its expected result from 1 to 0 for its own fixed 5-octet
+input -- a real, concrete behavior change, not merely an edge case
+recount. A new boundary assertion in `test_reg_write_len_matches_the_formula`
+(`acf_msg_length=4, pad=3`) specifically proves the "-2" changes a
+result that was non-zero under the old formula, not just an
+already-zero edge case. Mutation-tested: reverting the "-2" term
+alone reproduces both failures exactly and deterministically
+(`Expected 4 Was 6`, `Expected 0 Was 1`) -- confirmed the tests
+catch its removal, reverted, re-verified clean.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check` (CI-pinned
+v0.5.50): 0 errors. `cfusa trace --gaps`: 0/1024 untested;
+`--req-coverage 100` / `--sec-tested 100`: both 100% (1024/1024).
+
+**Triage status of the remaining ~62 tracked-change markers, for
+resuming without re-reading the PDF**: not yet exhaustively worked
+through. Already read in detail and understood this batch (beyond
+the one fixed above): the CRC32P4 polynomial/width/init/final-XOR/
+reflection parameters (Table 34, §13.6) are confirmed **unchanged**
+across all RC revisions (0xF4ACFB13, 32-bit, init/final-XOR
+0xFFFFFFFF, input/output reflection TRUE) -- this session's own
+extensive prior CRC32P4 fix work across all 4 x-RCP repos remains
+valid, nothing to redo there. A separate CRC-related figure (Figure
+22, RC5-tagged `figure updated to 32bit CRC`) is confirmed to be an
+*example diagram* correction only, not a new normative width (Table
+34 already specified 32-bit). Not yet triaged: the RC-server request-
+stream-configuration `rx_enforce_crc`/`rx_stream_status` register
+changes (§12.7.7), the BBID control register relocation (§12.7.8),
+the "trigger generation now optional" wording across 6+ endpoint
+types (SPI/GPIO/PWM_OUT/PWM_IN/ADC + the generic RC-server section),
+the SPI CS-count widening + new `spi_deassert_cs_pause` bit (both
+already confirmed real gaps in already-merged PR #274, per
+`[[project_tc18_spec_revision_202608]]`'s earlier spot-check), the
+possible SPI channel-selection concept change (BBID-based vs.
+evt-bits -- confirmed still draft/proposal as of RC5, not yet
+adopted, so no fix needed, but worth a final re-check once other
+items are done in case RC6+ adopts it), the new EP_NOT_FOUND-defining
+table, and roughly 15 more individual markers not yet read at all
+(MDIO Cetitec_032 correction, UART AVTPDU clarification sentence,
+several "to be discussed" open-question fields explicitly marked as
+NOT yet settled, and others). **Next**: continue the same
+marker-by-marker triage, prioritizing the SPI Table 42 items already
+known-real from the earlier spot-check (batch 2 candidate), then the
+RC-server config-register changes given their overlap with this
+session's own extensive E2E/lifecycle work.

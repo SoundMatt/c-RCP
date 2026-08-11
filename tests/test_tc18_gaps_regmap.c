@@ -180,21 +180,30 @@ static bool span_is_zero(const uint8_t *buf, size_t from, size_t to)
 
 static void test_reg_write_len_matches_the_formula(void)
 {
-    /* REQ-RMAP-069 (TC18 §13.7.1.2): "Effective number of bytes to be
-     * written = (acf_msg_length - 3) x 4 - pad." acf_msg_length=3 (the
-     * fixed address(+CRC) region alone, no data) with no pad yields 0
-     * data octets. acf_msg_length=5 (2 quadlets = 8 octets of data
-     * region) with pad=2 yields 8-2=6 data octets. */
+    /* REQ-RMAP-069 (TC18 §13.7.1.2, corrected in spec revision 0.5.1_RC5):
+     * "Effective number of bytes to be written to register map =
+     * (acf_msg_length - 3) x 4 - pad - 2" -- the trailing "- 2" subtracts
+     * the 2-octet register start address that leads the byte payload
+     * (RC5's own Figure 22), a term the pre-fix formula omitted entirely.
+     * acf_msg_length=3 (the fixed region alone, no data) with no pad
+     * yields 0 data octets regardless. acf_msg_length=5 (2 quadlets = 8
+     * octets of data region) with pad=2 yields 8-2-2=4 data octets. */
     TEST_ASSERT_EQUAL_UINT(0u, rcp_acf_reg_write_len(3u, 0u));
-    TEST_ASSERT_EQUAL_UINT(6u, rcp_acf_reg_write_len(5u, 2u));
-    TEST_ASSERT_EQUAL_UINT(4u, rcp_acf_reg_write_len(4u, 0u));
+    TEST_ASSERT_EQUAL_UINT(4u, rcp_acf_reg_write_len(5u, 2u));
+    TEST_ASSERT_EQUAL_UINT(2u, rcp_acf_reg_write_len(4u, 0u));
 
     /* Fail-safe: a malformed/adversarial frame (acf_msg_length too small
-     * to hold the fixed region, or pad exceeding what remains) never
+     * to hold the fixed region, or pad+2 exceeding what remains) never
      * underflows to a huge size_t -- it reads as 0 effective octets. */
     TEST_ASSERT_EQUAL_UINT(0u, rcp_acf_reg_write_len(2u, 0u));
     TEST_ASSERT_EQUAL_UINT(0u, rcp_acf_reg_write_len(0u, 0u));
     TEST_ASSERT_EQUAL_UINT(0u, rcp_acf_reg_write_len(4u, 5u));
+
+    /* New boundary case: pad alone would fit under the OLD formula
+     * (pad(3) <= total_octets(4), which used to return 4-3=1), but
+     * pad+2 does not (3+2=5 > 4) -- proves the "-2" term changes real
+     * results, not just edge cases that were already 0 either way. */
+    TEST_ASSERT_EQUAL_UINT(0u, rcp_acf_reg_write_len(4u, 3u));
 }
 
 /* ── §12.7.1: the generic evt[2:0] == 111b configuration request ──────────── */
@@ -2022,8 +2031,9 @@ static void test_field_write_error_distinguishes_state_from_writer_denial(void)
     TEST_ASSERT_EQUAL_INT(4, (int)RCP_ERROR_LOCKED_MEM_ACCESS);
 }
 
-/* REQ-RMAP-069 (TC18 §13.7.1.2): the effective number of register-write
- * DATA octets is (acf_msg_length - 3) x 4 - pad -- distinct from, and not
+/* REQ-RMAP-069 (TC18 §13.7.1.2, corrected in spec revision 0.5.1_RC5): the
+ * effective number of register-write DATA octets is
+ * (acf_msg_length - 3) x 4 - pad - 2 -- distinct from, and not
  * interchangeable with, the raw ACF payload_len rcp_acf_decode_abb()
  * reports (which spans the whole payload, address/CRC region included).
  * rcp_acf_reg_write_len() now provides this formula directly; asserted
@@ -2032,7 +2042,10 @@ static void test_field_write_error_distinguishes_state_from_writer_denial(void)
  * matches the spec formula exactly (by construction) while remaining
  * genuinely different from the decoder's own payload_len -- the two
  * numbers answer different questions, and a caller must not conflate
- * them. */
+ * them. FIXED 2026-08-11: under the OLD (pre-RC5) formula this case
+ * returned 1 (pad(3) <= total_octets(4)); the corrected formula returns
+ * 0, since pad(3) plus the address's 2 octets (5) now exceeds
+ * total_octets(4). */
 static void test_effective_register_write_length_helper_matches_the_formula(void)
 {
     rcp_acf_byte_message_info_t hdr;
@@ -2057,7 +2070,7 @@ static void test_effective_register_write_length_helper_matches_the_formula(void
     TEST_ASSERT_EQUAL_UINT8(3u, hdr.pad);
     TEST_ASSERT_EQUAL_UINT16(4u, hdr.acf_msg_length);
 
-    TEST_ASSERT_EQUAL_UINT((size_t)1u,
+    TEST_ASSERT_EQUAL_UINT((size_t)0u,
                            rcp_acf_reg_write_len(hdr.acf_msg_length, hdr.pad));
     TEST_ASSERT_NOT_EQUAL((int)payload_len,
                           (int)rcp_acf_reg_write_len(hdr.acf_msg_length, hdr.pad));

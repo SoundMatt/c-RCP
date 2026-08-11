@@ -123,13 +123,19 @@ uint8_t rcp_acf_pad_len(size_t unpadded_len)
 size_t rcp_acf_reg_write_len(uint16_t acf_msg_length, uint8_t pad)
 {
     size_t total_octets;
+    size_t overhead;
 
     if (acf_msg_length < 3u) return 0;
 
     total_octets = (size_t)(acf_msg_length - 3u) * 4u;
-    if ((size_t)pad > total_octets) return 0;
+    /* pad plus the 2-octet register start address that leads the payload
+     * (TC18 §13.7.1.2, corrected in spec revision 0.5.1_RC5: "Effective
+     * number of bytes to be written to register map = (acf_msg_length -
+     * 3) x 4 - pad - 2" -- see REQ-RMAP-069's own doc comment in acf.h). */
+    overhead = (size_t)pad + 2u;
+    if (overhead > total_octets) return 0;
 
-    return total_octets - (size_t)pad;
+    return total_octets - overhead;
 }
 
 /* ── Response semantics ───────────────────────────────────────────────────── */
