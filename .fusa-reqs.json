@@ -9394,30 +9394,30 @@
     },
     {
       "id": "REQ-RMAP-066",
-      "title": "svr_discovery_timeout register (Table 33, 0x0004, 16 bit, R/W*)",
-      "text": "NOT IMPLEMENTED: c-RCP's RC Server functional-configuration model carries no svr_discovery_timeout register (TC18 Table 33, relative address 0x0004, 16 bit, R/W*, microseconds, default 20000 = 20 ms). Consequently the TC18 12.6 rule that an unused discovery stream is dropped after Discovery_TimeOut is not enforced by this library.",
-      "standard": "iso26262",
-      "level": "QM",
-      "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
-      "tc18": "\u00a713.7.1.2 Table 33, TC18.txt L3990"
-    },
-    {
-      "id": "REQ-RMAP-067",
-      "title": "RC Server endpoint functional-config block (Table 33) incl. svr_enable always 1 / read-only",
-      "text": "NOT IMPLEMENTED: c-RCP does not model the RC Server endpoint's own functional-configuration block of TC18 Table 33 (svr_ep_len 0x0000 R, svr_ep_enable&clr 0x0002 R/W with svr_enable permanently 1 and read-only, svr_ep_options 0x0003 R/W*, svr_ep_status 0x0004 R/W). The shared rcp_regmap_ep_functional_cfg_t prefix models the enable&clr / options octets for ordinary endpoints only, and does not special-case EP0's always-enabled rule.",
+      "title": "svr_discovery_timeout register (Table 33/36, RC-Server-specific block, 16 bit, R/W*)",
+      "text": "PARTIAL: rcp_regmap_svr_ep_cfg_t now carries svr_discovery_timeout (TC18 \u00a713.7.1.2's own RC-Server functional-configuration table -- Table 33 in the RC1 baseline, renumbered Table 36 in the current RC5 baseline this project treats as authoritative, confirmed the same table via direct PDF page-image reads of both revisions; 16 bit, R/W*, microseconds), defaulting to TC18's own stated 20000 (20 ms) via rcp_regmap_svr_ep_cfg_init(). Content modeling only, same deferred ACF_ABB-wire-wrapper gap as HW_config/EP_ID_config/response-queue/Table 22 -- and this register is also NOT yet wired to rcp_discovery_claim_t's own Discovery_TimeOut (a separate, caller-supplied-milliseconds constructor argument), so the TC18 \u00a712.6 rule that an unused discovery stream is dropped after Discovery_TimeOut is still not enforced from this register. This table's own relative-address column also carries a real, confirmed primary-source defect (see regmap.h's own file-header note) that does not affect this field, which sits outside the collision.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "\u00a713.7.1.2 Table 33, TC18.txt L3980-3996"
+      "tc18": "\u00a713.7.1.2 Table 36 (Table 33 in RC1), TC18.txt L3990"
+    },
+    {
+      "id": "REQ-RMAP-067",
+      "title": "RC Server endpoint functional-config block (Table 33/36) incl. svr_enable always 1 / read-only",
+      "text": "PARTIAL: rcp_regmap_svr_ep_cfg_t now carries svr_ep_status (TC18 \u00a713.7.1.2's Table 33/36, RC-Server-specific block, 16 bit, R/W, no further bit-level breakdown given). DELIBERATELY STILL NOT MODELED: the table's own generic EP_FUNC-common-header fields (svr_ep_len 0x0000 R, reserved, svr_ep_enable&clr with svr_enable permanently 1 and read-only, svr_ep_options R/W*) -- \u00a713.7.1.1's own prose, immediately preceding this table, states \"the RC Server as endpoint is not included in the EP_FUNC_config register maps\", directly contradicting the table listing these fields for the RC Server anyway. Modeling them would mean silently picking a side of a stated, unresolved spec self-contradiction (see regmap.h's own file-header note for the full investigation, including a real, confirmed-on-both-PDF-revisions address collision in this same table, independent of this contradiction). The shared rcp_regmap_ep_functional_cfg_t prefix continues to model those four fields generically for every OTHER endpoint type only, unchanged.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "tc18-gap",
+      "status": "partial",
+      "tc18": "\u00a713.7.1.2 Table 36 (Table 33 in RC1), TC18.txt L3980-3996"
     },
     {
       "id": "REQ-RMAP-068",
       "title": "Register-write outcome: read-only register succeeds silently, write-prohibited register errors",
-      "text": "NOT IMPLEMENTED: c-RCP does not distinguish TC18 13.7.1.2's two register-write outcomes at the response level -- a write addressed at a read-only register shall have no effect yet be confirmed with an ordinary (err=0) response, while a write at a write-prohibited register shall produce err=1 with error code UNAUTHORIZED_ACCESS. rcp_lifecycle_field_writable() reports writability but no code path maps the two cases onto different response encodings.",
+      "text": "PARTIAL, reassessed: TC18 \u00a713.7.1.2's prose gives a state-vs-writer distinction (\"Writing to a write prohibited register... creates a response with err=1 and error code UNAUTHORIZED_ACCESS\") that REQ-WIREERR-004/REQ-LIFECYCLE-024 (rcp_lifecycle_field_write_error(), src/lifecycle.c) already implement, correctly distinguishing RCP_ERROR_LOCKED_MEM_ACCESS (state-locked, per TC18 Figure 16) from RCP_ERROR_UNAUTHORIZED_ACCESS (writer-denied, per this same \u00a713.7.1.2 passage) -- this requirement's own prior text (\"no code path maps the two cases\") was stale and is corrected. STILL OPEN: the SAME paragraph's immediately preceding sentence -- \"Writing data to read only registers has no effect and request is confirmed normally\" -- describes a THIRD outcome (err=0, silent no-op) that neither of the two implemented codes produce; every current denial in this codebase becomes an err=1 error response. UNCONFIRMED HYPOTHESIS, not coded as fact: this sentence most likely describes individual READ-ONLY BITS within an otherwise-writable register (the same paragraph's immediately preceding OR/AND/XOR/SET register-write-operation discussion, e.g. \"byte_msg_payload 0x00000000 and evt=x001 (OR) results in no effect\"), a bit-level masking concern distinct from REQ-RMAP-025's own whole-register-map, Figure-16-governed access-control case (already correctly LOCKED_MEM_ACCESS, twice independently verified, deliberately NOT changed here) -- not yet implementable since no register-write dispatch mechanism in this codebase currently operates at that bit level (every register-map write path today is whole-struct-field decode, not per-bit OR/AND/XOR against a live register image).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
