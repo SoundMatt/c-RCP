@@ -11657,3 +11657,44 @@ Issue #256's Group B is now fully closed (4/4 findings). Moving to
 Group F next (`*_functional_cfg_writable()` "regardless of writer"
 staleness, ~7 findings, likely doc-only -- verify code is actually
 already correct per-entry first).
+
+### v0.208.0 -- 2026-08-10
+
+**Full-catalog audit follow-up, batch 9 (Group F, fully doc-only):
+`*_functional_cfg_writable()` "regardless of writer" staleness across 7
+endpoint-type requirements, issue #256.**
+
+Every one of these 7 entries followed the identical pattern: text
+claiming HW_CONFIGURED functional-config writes succeed "regardless of
+writer" -- true before this session's own earlier
+REQ-LIFECYCLE-030/036 fix (issue #198, v0.156.0), which tightened
+`rcp_lifecycle_field_writable()`'s HW_CONFIGURED branch to require
+`writer.via_root_client_ep0`, `writer.via_owning_stream`, or
+`writer.via_discovery_stream`. Every affected module's own code was
+already correct, and every one already had its own dedicated test
+(`test_*_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream`)
+proving the correct, gated behavior -- only the sibling requirement
+text, describing the same code path each module's own
+`*_functional_cfg_writable()` delegates through, was never updated
+after the fix landed.
+
+Corrected: `REQ-GPIO-020`, `REQ-SPI-012`, `REQ-I2C-004`, `REQ-UART-006`,
+`REQ-PWM-018` (PWM_OUT), `REQ-PWM-037` (PWM_IN), `REQ-LINEP-009`. Each
+entry's citation also corrected from the general §12.3.1.2 "locked"
+sentence to the specific authorization sentence
+("Write access via EP0 to other EPs configuration is only possible
+for a configured 'root client' of via the discovery stream.") that
+actually governs this rule.
+
+No code or test changes -- every module's own code and dedicated test
+were already correct. Full suite (65/65) both trees re-run to confirm
+inertness. 1036 requirements (unchanged count -- text rewrites of 7
+existing entries).
+
+Issue #256's Group F is now fully closed (7/7 findings). Moving to
+Group A next (`REQ-UART-018/020/025`, `REQ-ADC-026`,
+`REQ-CANEP-016/017/020/031`, `REQ-ACF-023`,
+`REQ-LINEP-016/017/018/025/026/027`, `REQ-I2C-010/011/012` -- the
+systemic Table 30 "evt[2:0]=000b is the only legal value"
+misreading, ~17 findings; needs a code-behavior check first, not just
+a doc fix, since it could be a real multi-endpoint conformance bug).

@@ -3205,13 +3205,13 @@
     },
     {
       "id": "REQ-GPIO-020",
-      "title": "rcp_ep_gpio_functional_cfg_writable() is writable by any writer while HW_CONFIGURED",
-      "text": "rcp_ep_gpio_functional_cfg_writable() shall return true while state is RCP_SERVER_LIFECYCLE_HW_CONFIGURED, for every writer context.",
+      "title": "rcp_ep_gpio_functional_cfg_writable() requires an authorized writer while HW_CONFIGURED",
+      "text": "rcp_ep_gpio_functional_cfg_writable() shall return true while state is RCP_SERVER_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"for every writer context\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (issue #198) -- the code and this module's own test (test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_gpio.c) were already correct; only this entry's own text had gone stale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§12.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178 -- writable once concluded (i.e. HW_CONFIGURED)"
+      "tc18": "§12.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2184"
     },
     {
       "id": "REQ-GPIO-021",
@@ -3443,13 +3443,13 @@
     },
     {
       "id": "REQ-SPI-012",
-      "title": "rcp_ep_spi_functional_cfg_writable() is writable by any writer while HW_CONFIGURED",
-      "text": "rcp_ep_spi_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED regardless of writer.",
+      "title": "rcp_ep_spi_functional_cfg_writable() requires an authorized writer while HW_CONFIGURED",
+      "text": "rcp_ep_spi_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (v0.156.0, issue #198) -- the code and this module's own test (test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_spi.c) were already correct; only this entry's own text had gone stale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§12.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178 -- writable once concluded (i.e. HW_CONFIGURED)"
+      "tc18": "§12.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2184"
     },
     {
       "id": "REQ-SPI-013",
@@ -3662,13 +3662,13 @@
     },
     {
       "id": "REQ-I2C-004",
-      "title": "rcp_ep_i2c_functional_cfg_writable() is true while HW_CONFIGURED for any writer",
-      "text": "rcp_ep_i2c_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED regardless of writer's contents.",
+      "title": "rcp_ep_i2c_functional_cfg_writable() requires an authorized writer while HW_CONFIGURED",
+      "text": "rcp_ep_i2c_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer's contents\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (issue #198) -- the code and this module's own test (test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_i2c.c) were already correct; only this entry's own text had gone stale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§12.3.1.2, TC18.txt L2177-2178 -- writable once concluded (i.e. HW_CONFIGURED)"
+      "tc18": "§12.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2184"
     },
     {
       "id": "REQ-I2C-005",
@@ -3860,13 +3860,13 @@
     },
     {
       "id": "REQ-UART-006",
-      "title": "rcp_ep_uart_functional_cfg_writable() is true while HW_CONFIGURED for any writer",
-      "text": "rcp_ep_uart_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED regardless of writer's contents.",
+      "title": "rcp_ep_uart_functional_cfg_writable() requires an authorized writer while HW_CONFIGURED",
+      "text": "rcp_ep_uart_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer's contents\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (issue #198) -- the code was already correct; only this entry's own text had gone stale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§12.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178 -- writable once concluded (i.e. HW_CONFIGURED)"
+      "tc18": "§12.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2184"
     },
     {
       "id": "REQ-UART-007",
@@ -4258,13 +4258,13 @@
     },
     {
       "id": "REQ-PWM-018",
-      "title": "rcp_ep_pwm_out_functional_cfg_writable() is writable by any writer while HW_CONFIGURED",
-      "text": "rcp_ep_pwm_out_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED regardless of writer.",
+      "title": "rcp_ep_pwm_out_functional_cfg_writable() requires an authorized writer while HW_CONFIGURED",
+      "text": "rcp_ep_pwm_out_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (issue #198) -- the code and this module's own test (test_out_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_pwm.c) were already correct; only this entry's own text had gone stale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§12.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178 -- writable once concluded (i.e. HW_CONFIGURED)"
+      "tc18": "§12.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2184"
     },
     {
       "id": "REQ-PWM-019",
@@ -4446,13 +4446,13 @@
     },
     {
       "id": "REQ-PWM-037",
-      "title": "rcp_ep_pwm_in_functional_cfg_writable() is writable by any writer while HW_CONFIGURED",
-      "text": "rcp_ep_pwm_in_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED regardless of writer.",
+      "title": "rcp_ep_pwm_in_functional_cfg_writable() requires an authorized writer while HW_CONFIGURED",
+      "text": "rcp_ep_pwm_in_functional_cfg_writable() shall return true for state == RCP_SERVER_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer\", the same staleness as REQ-PWM-018's PWM_OUT counterpart -- the code and this module's own test (test_in_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_pwm.c) were already correct; only this entry's own text had gone stale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§12.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178 -- writable once concluded (i.e. HW_CONFIGURED)"
+      "tc18": "§12.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2184"
     },
     {
       "id": "REQ-PWM-038",
@@ -6104,13 +6104,13 @@
     },
     {
       "id": "REQ-LINEP-009",
-      "title": "rcp_ep_lin_functional_cfg_writable() allows every writer while HW_CONFIGURED",
-      "text": "rcp_ep_lin_functional_cfg_writable() shall return true for lifecycle state RCP_SERVER_LIFECYCLE_HW_CONFIGURED regardless of writer.",
+      "title": "rcp_ep_lin_functional_cfg_writable() requires an authorized writer while HW_CONFIGURED",
+      "text": "rcp_ep_lin_functional_cfg_writable() shall return true for lifecycle state RCP_SERVER_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true, and false for an unauthorized writer. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group F): this entry previously claimed \"regardless of writer\", superseded by REQ-LIFECYCLE-030/036's authorization-gating fix (issue #198) -- the code and this module's own test (test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream, tests/test_ep_lin.c) were already correct; only this entry's own text had gone stale.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§12.3.1.2, TC18.txt L2177-2178 -- writable once concluded (i.e. HW_CONFIGURED)"
+      "tc18": "§12.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2184"
     },
     {
       "id": "REQ-LINEP-010",

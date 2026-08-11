@@ -34,6 +34,10 @@ the rationale.
 
 ## Releases
 
+### v0.208.0 -- 2026-08-10
+
+Full-catalog audit follow-up, batch 9 (Group F, fully doc-only): `*_functional_cfg_writable()` "regardless of writer" staleness across 7 endpoint-type requirements (REQ-GPIO-020, REQ-SPI-012, REQ-I2C-004, REQ-UART-006, REQ-PWM-018/-037, REQ-LINEP-009). Issue #256 Group F now fully closed. See `ROADMAP.md` for full detail.
+
 ### v0.207.0 -- 2026-08-10
 
 Full-catalog audit follow-up, batch 8 (Group B): PWM_IN's compound-wait comparisons now compare in the correct direction (REQ-PWM-049/-050/-051/-052). Issue #256 Group B now fully closed. See `ROADMAP.md` for full detail.
