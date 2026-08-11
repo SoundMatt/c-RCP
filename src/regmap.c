@@ -48,6 +48,214 @@ void rcp_regmap_general_init(rcp_regmap_general_t *map)
      * rcp_lifecycle_state_t (see server.h/mock.h). */
 }
 
+/* ── Table 18 wire codec (REQ-RMAP-024) ──────────────────────────────────────
+ * This TU's own copy of the byte-order helpers, matching acf.c's/avtp.c's/
+ * discovery.c's house convention of not sharing one across modules. */
+
+static void put_u16(uint8_t *p, uint16_t v)
+{
+    p[0] = (uint8_t)(v >> 8);
+    p[1] = (uint8_t)(v & 0xFFu);
+}
+
+static uint16_t get_u16(const uint8_t *p)
+{
+    return (uint16_t)(((uint16_t)p[0] << 8) | (uint16_t)p[1]);
+}
+
+static void put_u32(uint8_t *p, uint32_t v)
+{
+    p[0] = (uint8_t)((v >> 24) & 0xFFu);
+    p[1] = (uint8_t)((v >> 16) & 0xFFu);
+    p[2] = (uint8_t)((v >> 8) & 0xFFu);
+    p[3] = (uint8_t)(v & 0xFFu);
+}
+
+static uint32_t get_u32(const uint8_t *p)
+{
+    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) |
+           ((uint32_t)p[2] << 8)  |  (uint32_t)p[3];
+}
+
+//cfusa:req REQ-RMAP-024
+void rcp_regmap_general_render(const rcp_regmap_general_t *map, uint8_t out[RCP_REGMAP_GENERAL_LEN])
+{
+    memset(out, 0, RCP_REGMAP_GENERAL_LEN);
+
+    put_u32(&out[0x0000], map->magic);
+    put_u32(&out[0x0004], map->svr_version);
+    put_u16(&out[0x0008], map->vendor_id);
+    put_u16(&out[0x000A], map->device_id);
+    put_u16(&out[0x000C], map->svr_ep_count);
+    /* 0x000E..0x000F: svr_lifecycle_state deliberately NOT rendered here --
+     * see this function's own doc comment (regmap.h). */
+    out[0x000E] = map->svr_req_stream_max;
+    out[0x000F] = map->svr_responder_streams_max;
+    put_u16(&out[0x0010], map->svr_responder_mem_size);
+    put_u16(&out[0x0012], map->svr_req_mem_size);
+    out[0x0014] = map->svr_sequencers_max;
+    out[0x0015] = map->svr_configuration_lock;
+    out[0x0016] = map->svr_implemented_options;
+    out[0x0017] = map->reserved_0x17;
+    put_u16(&out[0x0018], map->svr_io_pin_count);
+    /* svr_root_client_index deliberately NOT rendered here -- same
+     * exclusion as svr_lifecycle_state, see this function's own doc
+     * comment (regmap.h). */
+    put_u16(&out[0x001A], map->svr_hw_cfg_ptr);
+    out[0x001C] = map->svr_request_stream_cfg_capacity;
+    out[0x001D] = map->svr_response_stream_cfg_capacity;
+    put_u16(&out[0x001E], map->svr_request_stream_cfg_ptr);
+    put_u16(&out[0x0020], map->svr_response_stream_cfg_ptr);
+    put_u16(&out[0x0022], map->reserved_0x22);
+    put_u16(&out[0x0024], map->svr_ep_generic_cfg_ptr);
+    put_u16(&out[0x0026], map->svr_ep_generic_cfg_capacity);
+    put_u16(&out[0x0028], map->svr_ep_bytebus_id_map_ptr);
+    out[0x002A] = map->svr_ep_bytebus_id_map_capacity;
+    /* 0x002B: inferred, unconfirmed one-octet alignment gap -- left 0x00
+     * by the memset above, see this function's own doc comment (regmap.h). */
+    put_u16(&out[0x002C], map->svr_ep_functional_cfg_ptr);
+    put_u16(&out[0x002E], map->svr_sequencer_state_ptr);
+    put_u16(&out[0x0030], map->svr_network_interface_cfg_ptr);
+    put_u16(&out[0x0032], map->svr_network_interface_cfg_capacity);
+    put_u16(&out[0x0034], map->svr_physical_layer_cfg_ptr);
+    put_u16(&out[0x0036], map->svr_physical_layer_cfg_capacity);
+    put_u16(&out[0x0038], map->svr_time_synch_cfg_ptr);
+    put_u16(&out[0x003A], map->svr_time_synch_cfg_capacity);
+    put_u16(&out[0x003C], map->svr_security_cfg_ptr);
+    put_u16(&out[0x003E], map->svr_security_cfg_capacity);
+}
+
+//cfusa:req REQ-RMAP-024
+const char *rcp_regmap_general_strerror(rcp_regmap_general_errc_t e)
+{
+    switch (e) {
+    case RCP_REGMAP_GENERAL_OK:               return "rcp/regmap: success";
+    case RCP_REGMAP_GENERAL_ERR_SHORT_FRAME:  return "rcp/regmap: frame too short";
+    case RCP_REGMAP_GENERAL_ERR_BAD_MSG_TYPE: return "rcp/regmap: unexpected ACF message type";
+    case RCP_REGMAP_GENERAL_ERR_WRONG_BUS:    return "rcp/regmap: wrong byte_bus_id";
+    case RCP_REGMAP_GENERAL_ERR_WRONG_OP:     return "rcp/regmap: wrong ACF op";
+    default:                                  return "rcp/regmap: unknown error";
+    }
+}
+
+//cfusa:req REQ-RMAP-024
+rcp_bytes_t rcp_regmap_general_encode_read_response(const rcp_regmap_general_t *map,
+                                                      uint8_t read_size,
+                                                      uint8_t transaction_num)
+{
+    uint8_t                     image[RCP_REGMAP_GENERAL_LEN];
+    uint8_t                     payload[256];
+    size_t                      copy_len;
+    rcp_acf_byte_message_info_t hdr = {0};
+
+    rcp_regmap_general_render(map, image);
+
+    memset(payload, 0, sizeof(payload));
+    copy_len = ((size_t)read_size < RCP_REGMAP_GENERAL_LEN) ? (size_t)read_size
+                                                             : RCP_REGMAP_GENERAL_LEN;
+    memcpy(payload, image, copy_len);
+
+    hdr.byte_bus_id              = RCP_REGMAP_EP0_INDEX;
+    hdr.op                       = RCP_ACF_OP_READ;
+    hdr.rsp                      = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
+    hdr.read_size_or_segment_num = read_size;
+    hdr.transaction_num          = transaction_num;
+
+    return rcp_acf_encode_abb(&hdr, payload, read_size);
+}
+
+//cfusa:req REQ-RMAP-024
+rcp_regmap_general_errc_t rcp_regmap_general_decode_read_response(const uint8_t *b, size_t len,
+                                                                    rcp_regmap_general_t *out_map)
+{
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    rcp_acf_errc_t               acf_rc;
+    uint8_t                      image[RCP_REGMAP_GENERAL_LEN];
+    size_t                       have;
+
+    acf_rc = rcp_acf_decode_abb(b, len, &hdr, &payload, &payload_len);
+    if (acf_rc == RCP_ACF_ERR_SHORT_FRAME) return RCP_REGMAP_GENERAL_ERR_SHORT_FRAME;
+    if (acf_rc != RCP_ACF_OK) return RCP_REGMAP_GENERAL_ERR_BAD_MSG_TYPE;
+
+    if (hdr.byte_bus_id != RCP_REGMAP_EP0_INDEX) return RCP_REGMAP_GENERAL_ERR_WRONG_BUS;
+    if (hdr.op != RCP_ACF_OP_READ) return RCP_REGMAP_GENERAL_ERR_WRONG_OP;
+
+    /* A short response (read_size smaller than the full extent) is not an
+     * error -- it just carries fewer trailing fields; only the fields that
+     * fit are overwritten, matching this function's own doc comment. */
+    memset(image, 0, sizeof(image));
+    have = (payload_len < RCP_REGMAP_GENERAL_LEN) ? payload_len : RCP_REGMAP_GENERAL_LEN;
+    memcpy(image, payload, have);
+
+    out_map->magic       = get_u32(&image[0x0000]);
+    out_map->svr_version = get_u32(&image[0x0004]);
+    out_map->vendor_id   = get_u16(&image[0x0008]);
+    out_map->device_id   = get_u16(&image[0x000A]);
+    out_map->svr_ep_count = get_u16(&image[0x000C]);
+    if (have <= 0x000E) return RCP_REGMAP_GENERAL_OK;
+    out_map->svr_req_stream_max         = image[0x000E];
+    out_map->svr_responder_streams_max  = image[0x000F];
+    out_map->svr_responder_mem_size     = get_u16(&image[0x0010]);
+    out_map->svr_req_mem_size           = get_u16(&image[0x0012]);
+    out_map->svr_sequencers_max         = image[0x0014];
+    out_map->svr_configuration_lock     = image[0x0015];
+    out_map->svr_implemented_options    = image[0x0016];
+    out_map->reserved_0x17              = image[0x0017];
+    out_map->svr_io_pin_count           = get_u16(&image[0x0018]);
+    out_map->svr_hw_cfg_ptr             = get_u16(&image[0x001A]);
+    out_map->svr_request_stream_cfg_capacity  = image[0x001C];
+    out_map->svr_response_stream_cfg_capacity = image[0x001D];
+    out_map->svr_request_stream_cfg_ptr       = get_u16(&image[0x001E]);
+    out_map->svr_response_stream_cfg_ptr      = get_u16(&image[0x0020]);
+    out_map->reserved_0x22                    = get_u16(&image[0x0022]);
+    out_map->svr_ep_generic_cfg_ptr           = get_u16(&image[0x0024]);
+    out_map->svr_ep_generic_cfg_capacity      = get_u16(&image[0x0026]);
+    out_map->svr_ep_bytebus_id_map_ptr        = get_u16(&image[0x0028]);
+    out_map->svr_ep_bytebus_id_map_capacity   = image[0x002A];
+    out_map->svr_ep_functional_cfg_ptr        = get_u16(&image[0x002C]);
+    out_map->svr_sequencer_state_ptr          = get_u16(&image[0x002E]);
+    out_map->svr_network_interface_cfg_ptr      = get_u16(&image[0x0030]);
+    out_map->svr_network_interface_cfg_capacity = get_u16(&image[0x0032]);
+    out_map->svr_physical_layer_cfg_ptr         = get_u16(&image[0x0034]);
+    out_map->svr_physical_layer_cfg_capacity    = get_u16(&image[0x0036]);
+    out_map->svr_time_synch_cfg_ptr             = get_u16(&image[0x0038]);
+    out_map->svr_time_synch_cfg_capacity        = get_u16(&image[0x003A]);
+    out_map->svr_security_cfg_ptr               = get_u16(&image[0x003C]);
+    out_map->svr_security_cfg_capacity          = get_u16(&image[0x003E]);
+    return RCP_REGMAP_GENERAL_OK;
+}
+
+//cfusa:req REQ-RMAP-025
+rcp_regmap_general_errc_t rcp_regmap_general_decode_write_request(const uint8_t *b, size_t len,
+                                                                    rcp_wire_error_t *out_error,
+                                                                    uint8_t *out_transaction_num)
+{
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    rcp_acf_errc_t               acf_rc;
+    rcp_lifecycle_writer_ctx_t   writer = {0};
+
+    acf_rc = rcp_acf_decode_abb(b, len, &hdr, &payload, &payload_len);
+    if (acf_rc == RCP_ACF_ERR_SHORT_FRAME) return RCP_REGMAP_GENERAL_ERR_SHORT_FRAME;
+    if (acf_rc != RCP_ACF_OK) return RCP_REGMAP_GENERAL_ERR_BAD_MSG_TYPE;
+
+    if (hdr.byte_bus_id != RCP_REGMAP_EP0_INDEX) return RCP_REGMAP_GENERAL_ERR_WRONG_BUS;
+    if (hdr.op != RCP_ACF_OP_WRITE) return RCP_REGMAP_GENERAL_ERR_WRONG_OP;
+
+    /* RCP_LIFECYCLE_FIELD_READ_ONLY is unconditional -- state/writer never
+     * change the outcome (see lifecycle.c's own switch case) -- so which
+     * concrete state/writer is passed here does not matter; any value
+     * yields the same RCP_ERROR_LOCKED_MEM_ACCESS, exactly as
+     * REQ-RMAP-025 (regmap.h's own field comment) already documents. */
+    *out_error = rcp_lifecycle_field_write_error(RCP_LIFECYCLE_RCP_CONFIGURED,
+                                                  RCP_LIFECYCLE_FIELD_READ_ONLY, writer);
+    *out_transaction_num = hdr.transaction_num;
+    return RCP_REGMAP_GENERAL_OK;
+}
+
 /* ── Root-client / per-EP-restricted-client model ──────────────────────────── */
 
 //cfusa:req REQ-RMAP-009

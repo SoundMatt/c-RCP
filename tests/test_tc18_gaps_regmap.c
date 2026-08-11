@@ -126,9 +126,11 @@ static rcp_regmap_general_t populated_map(void)
     map.svr_req_stream_max        = 0xABu;
     map.svr_responder_streams_max = 0xCDu;
     map.svr_sequencers_max        = 0x07u;
+    map.svr_configuration_lock    = 0x01u; /* nonzero -- distinguishable from the unlocked default */
     map.svr_responder_mem_size    = 0x1122u;
     map.svr_req_mem_size          = 0x3344u;
     map.svr_implemented_options   = 0x1Fu; /* all five REQ-RMAP-030 bits set */
+    map.svr_io_pin_count          = 0x0020u;
     map.svr_root_client_index     = 0x0002u;
     map.svr_hw_cfg_ptr            = 0x0060u;
     map.svr_request_stream_cfg_capacity  = 0x08u;
@@ -141,39 +143,50 @@ static rcp_regmap_general_t populated_map(void)
     map.svr_ep_bytebus_id_map_capacity   = 0x10u; /* entries */
     map.svr_ep_functional_cfg_ptr        = 0x00C0u;
     map.svr_sequencer_state_ptr          = 0x00D0u;
+    map.svr_network_interface_cfg_ptr      = 0x0050u;
+    map.svr_network_interface_cfg_capacity = 0x0004u;
+    map.svr_physical_layer_cfg_ptr         = 0x0058u;
+    map.svr_physical_layer_cfg_capacity    = 0x0002u;
+    map.svr_time_synch_cfg_ptr             = 0x0060u;
+    map.svr_time_synch_cfg_capacity        = 0x0002u;
+    map.svr_security_cfg_ptr               = 0x0070u;
+    map.svr_security_cfg_capacity          = 0x0008u;
 
     return map;
 }
 
-/* The whole of the general register map that is actually reachable over
- * ACF_ABB: encodes a discovery read response of read_size octets and
- * copies the response payload into out[0..read_size). */
-static void read_general(const rcp_regmap_general_t *map, uint8_t read_size, uint8_t *out)
+/* The whole Table 18 general register map, via the REQ-RMAP-024 wire
+ * codec: encodes a read response of read_size octets and decodes it back
+ * into *out (which the caller must have already defined, e.g. via
+ * rcp_regmap_general_init() -- a short response leaves the remaining
+ * fields of *out exactly as the caller left them, matching
+ * rcp_regmap_general_decode_read_response()'s own doc comment). */
+static rcp_regmap_general_errc_t read_general_full(const rcp_regmap_general_t *map,
+                                                     uint8_t read_size,
+                                                     rcp_regmap_general_t *out)
 {
-    rcp_stream_id_t             server = rcp_stream_id_make(SERVER_MAC, 1);
-    rcp_bytes_t                 frame  = rcp_discovery_encode_response(map, read_size, 7, server);
-    rcp_avtp_ntscf_header_t     ntscf;
-    rcp_acf_byte_message_info_t hdr;
-    const uint8_t              *np, *p;
-    size_t                      nlen, plen;
+    rcp_bytes_t                frame = rcp_regmap_general_encode_read_response(map, read_size, 7);
+    rcp_regmap_general_errc_t  rc;
 
     TEST_ASSERT_NOT_NULL(frame.data);
-    TEST_ASSERT_EQUAL(RCP_AVTP_OK, rcp_avtp_decode_ntscf(frame.data, frame.len, &ntscf, &np, &nlen));
-    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(np, nlen, &hdr, &p, &plen));
-    TEST_ASSERT_EQUAL_UINT((size_t)read_size, plen);
-    memcpy(out, p, plen);
+    rc = rcp_regmap_general_decode_read_response(frame.data, frame.len, out);
     rcp_bytes_free(&frame);
+    return rc;
 }
 
-/* True iff buf[from..to] is all zero -- "nothing is readable here". */
-static bool span_is_zero(const uint8_t *buf, size_t from, size_t to)
+/* This TU's own big-endian read helpers, for spot-checking
+ * rcp_regmap_general_render()'s raw output directly -- matching every
+ * production TU's own house convention of not sharing a byte-order util
+ * across modules. */
+static uint16_t get_test_u16(const uint8_t *p)
 {
-    size_t i;
+    return (uint16_t)(((uint16_t)p[0] << 8) | (uint16_t)p[1]);
+}
 
-    for (i = from; i <= to; i++) {
-        if (buf[i] != 0u) return false;
-    }
-    return true;
+static uint32_t get_test_u32(const uint8_t *p)
+{
+    return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) |
+           ((uint32_t)p[2] << 8)  |  (uint32_t)p[3];
 }
 
 /* ── §13.7.1.2: effective register-write payload length ───────────────────── */
@@ -472,63 +485,230 @@ static void test_lifecycle_state_register_field_tracks_the_authoritative_state(v
     rcp_mock_server_destroy(srv);
 }
 
-/* TC18 §12.7 requires EP0 to be a fully addressable register space.
- * Deviation: the discovery read response is the only ACF_ABB path into
- * rcp_regmap_general_t and it carries exactly the leading
- * RCP_DISCOVERY_GENERAL_SLICE_LEN == 14 octets, absolute addresses
- * 0x0000..0x000D. Everything from 0x000E (svr_req_stream_max) onward is
- * zero-fill, asserted here against a map in which every one of those
- * registers holds a distinctive nonzero value. */
-static void test_general_map_wire_reach_stops_after_0x000d(void)
+/* REQ-RMAP-024 CLOSED: TC18 §12.7 requires EP0 to be a fully addressable
+ * register space. rcp_regmap_general_encode_read_response()/
+ * _decode_read_response() (regmap.h) are the real wire codec that closes
+ * this -- the same ACF_ABB read mechanism rcp_discovery_encode_response()
+ * already used for its own narrower 14-octet slice, generalized to serve
+ * every Table 18 field at its own documented address. Proves the FULL
+ * extent round-trips correctly against a map in which every field holds a
+ * distinctive nonzero value, and that the two fields with no genuine
+ * Table 18 address (svr_lifecycle_state, svr_root_client_index) are
+ * deliberately left untouched by the decode, not silently zeroed or
+ * mis-addressed -- see rcp_regmap_general_render()'s own doc comment. */
+/* Direct byte-offset spot-check of rcp_regmap_general_render()'s own
+ * output -- distinct from the round-trip test below, and deliberately so:
+ * a round trip through the decoder alone would not catch a render bug
+ * that writes a real field's value into the wrong slot (e.g. the
+ * unnamed, deliberately-excluded 0x002B gap, or over svr_lifecycle_
+ * state's own would-be slot at the 0x000D..0x000E boundary) if the
+ * decoder itself never reads that slot either -- only inspecting the
+ * raw rendered bytes at their exact TC18-cited addresses proves the
+ * layout, not just that decode(encode(x)) happens to equal x. */
+static void test_general_map_render_matches_table_18_byte_offsets(void)
 {
     rcp_regmap_general_t map = populated_map();
-    uint8_t              buf[0x31];
+    uint8_t              img[RCP_REGMAP_GENERAL_LEN];
 
-    TEST_ASSERT_EQUAL_UINT((size_t)14u, RCP_DISCOVERY_GENERAL_SLICE_LEN);
-    read_general(&map, (uint8_t)sizeof(buf), buf);
+    rcp_regmap_general_render(&map, img);
 
-    /* 0x0000 magic, 0x0004 svr_version, 0x0008 vendor_id, 0x000A
-     * device_id, 0x000C svr_ep_count -- the readable part. */
-    TEST_ASSERT_EQUAL_HEX8(0xC0, buf[0x00]);
-    TEST_ASSERT_EQUAL_HEX8(0x05, buf[0x06]);
-    TEST_ASSERT_EQUAL_HEX8(0x12, buf[0x08]);
-    TEST_ASSERT_EQUAL_HEX8(0x56, buf[0x0A]);
-    TEST_ASSERT_EQUAL_HEX8(0x09, buf[0x0D]);
-
-    /* 0x000E..0x0030: every remaining Table 18 register reads back 0. */
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x0E, 0x30));
+    TEST_ASSERT_EQUAL_HEX32(map.magic, get_test_u32(&img[0x0000]));
+    TEST_ASSERT_EQUAL_HEX32(map.svr_version, get_test_u32(&img[0x0004]));
+    TEST_ASSERT_EQUAL_HEX16(map.vendor_id, get_test_u16(&img[0x0008]));
+    TEST_ASSERT_EQUAL_HEX16(map.device_id, get_test_u16(&img[0x000A]));
+    TEST_ASSERT_EQUAL_HEX16(map.svr_ep_count, get_test_u16(&img[0x000C]));
+    /* svr_lifecycle_state has no Table 18 slot -- 0x000E is
+     * svr_req_stream_max's own address, immediately after svr_ep_count's
+     * 16 bits, with no gap for it. */
+    TEST_ASSERT_EQUAL_HEX8(map.svr_req_stream_max, img[0x000E]);
+    TEST_ASSERT_EQUAL_HEX8(map.svr_responder_streams_max, img[0x000F]);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_responder_mem_size, get_test_u16(&img[0x0010]));
+    TEST_ASSERT_EQUAL_HEX16(map.svr_req_mem_size, get_test_u16(&img[0x0012]));
+    TEST_ASSERT_EQUAL_HEX8(map.svr_sequencers_max, img[0x0014]);
+    TEST_ASSERT_EQUAL_HEX8(map.svr_configuration_lock, img[0x0015]);
+    TEST_ASSERT_EQUAL_HEX8(map.svr_implemented_options, img[0x0016]);
+    TEST_ASSERT_EQUAL_HEX8(0x00u, img[0x0017]);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_io_pin_count, get_test_u16(&img[0x0018]));
+    /* svr_root_client_index has no Table 18 slot either -- 0x001A is
+     * svr_hw_cfg_ptr's own address, immediately after svr_io_pin_count's
+     * 16 bits, with no gap for it. */
+    TEST_ASSERT_EQUAL_HEX16(map.svr_hw_cfg_ptr, get_test_u16(&img[0x001A]));
+    TEST_ASSERT_EQUAL_HEX8(map.svr_request_stream_cfg_capacity, img[0x001C]);
+    TEST_ASSERT_EQUAL_HEX8(map.svr_response_stream_cfg_capacity, img[0x001D]);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_request_stream_cfg_ptr, get_test_u16(&img[0x001E]));
+    TEST_ASSERT_EQUAL_HEX16(map.svr_response_stream_cfg_ptr, get_test_u16(&img[0x0020]));
+    TEST_ASSERT_EQUAL_HEX16(0x0000u, get_test_u16(&img[0x0022]));
+    TEST_ASSERT_EQUAL_HEX16(map.svr_ep_generic_cfg_ptr, get_test_u16(&img[0x0024]));
+    TEST_ASSERT_EQUAL_HEX16(map.svr_ep_generic_cfg_capacity, get_test_u16(&img[0x0026]));
+    TEST_ASSERT_EQUAL_HEX16(map.svr_ep_bytebus_id_map_ptr, get_test_u16(&img[0x0028]));
+    TEST_ASSERT_EQUAL_HEX8(map.svr_ep_bytebus_id_map_capacity, img[0x002A]);
+    /* The inferred, unconfirmed alignment gap -- see
+     * rcp_regmap_general_render()'s own doc comment. */
+    TEST_ASSERT_EQUAL_HEX8(0x00u, img[0x002B]);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_ep_functional_cfg_ptr, get_test_u16(&img[0x002C]));
+    TEST_ASSERT_EQUAL_HEX16(map.svr_sequencer_state_ptr, get_test_u16(&img[0x002E]));
+    TEST_ASSERT_EQUAL_HEX16(map.svr_network_interface_cfg_ptr, get_test_u16(&img[0x0030]));
+    TEST_ASSERT_EQUAL_HEX16(map.svr_network_interface_cfg_capacity, get_test_u16(&img[0x0032]));
+    TEST_ASSERT_EQUAL_HEX16(map.svr_physical_layer_cfg_ptr, get_test_u16(&img[0x0034]));
+    TEST_ASSERT_EQUAL_HEX16(map.svr_physical_layer_cfg_capacity, get_test_u16(&img[0x0036]));
+    TEST_ASSERT_EQUAL_HEX16(map.svr_time_synch_cfg_ptr, get_test_u16(&img[0x0038]));
+    TEST_ASSERT_EQUAL_HEX16(map.svr_time_synch_cfg_capacity, get_test_u16(&img[0x003A]));
+    TEST_ASSERT_EQUAL_HEX16(map.svr_security_cfg_ptr, get_test_u16(&img[0x003C]));
+    TEST_ASSERT_EQUAL_HEX16(map.svr_security_cfg_capacity, get_test_u16(&img[0x003E]));
 }
 
-/* REQ-RMAP-025 (TC18 §12.7.5 Table 18, access type R): a remote write to
- * the general static part must not take effect. lifecycle.h now models
- * the classification primitive itself (RCP_LIFECYCLE_FIELD_READ_ONLY,
- * proven unconditionally unwritable in every state by every writer --
- * see test_lifecycle.c's own test_read_only_never_writable_in_any_
- * state_by_any_writer()), distinguishing it from the three other kinds
- * (each writable in at least one state, asserted below for contrast).
- * Deviation that remains open: nothing in this codebase's wire dispatch
- * layer classifies Table 18's own fields as READ_ONLY and gates a write
- * attempt through it -- there IS no wire dispatch layer yet at all
- * (REQ-RMAP-024, still open). rcp_mock_server_regmap() therefore still
- * hands out a directly mutable pointer to the whole Table 18 block, with
- * nothing in this test double consulting the new classification -- a
- * write to vendor_id (0x0008, type R) simply lands, exactly as before. */
-static void test_general_static_part_has_no_read_only_class(void)
+static void test_general_map_wire_reach_now_covers_full_table_18(void)
 {
-    rcp_mock_server_t    *srv;
-    rcp_regmap_general_t *map;
+    rcp_regmap_general_t      map = populated_map();
+    rcp_regmap_general_t      out;
+    rcp_regmap_general_errc_t rc;
 
-    /* As of the REQ-LIFECYCLE-026/035 fix, HW_GENERIC's HW_UNCONFIGURED
-     * writability now requires writer.via_discovery_stream -- DISCOVERY_WRITER
-     * isolates the state-only property being tested here (any writer that
-     * IS the discovery claimant, not about the claim-consultation
-     * plumbing itself, which is a caller composition -- see
-     * discovery.h). FUNCTIONAL_W/_STAR's HW_CONFIGURED writability
-     * requires authorization (REQ-LIFECYCLE-030/036) -- ROOT_WRITER
-     * keeps these two assertions about "not read-only by state", not
-     * about writer authorization, which test_functional_cfg_writable_
-     * hw_configured_requires_authorization_or_discovery_stream()-style
-     * tests elsewhere already cover directly. */
+    rcp_regmap_general_init(&out);
+    out.svr_root_client_index = 0x0009u; /* poisoned -- decode must not touch it */
+    out.svr_lifecycle_state   = (uint8_t)RCP_LIFECYCLE_HW_CONFIGURED; /* likewise */
+
+    rc = read_general_full(&map, (uint8_t)RCP_REGMAP_GENERAL_LEN, &out);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_GENERAL_OK, rc);
+
+    TEST_ASSERT_EQUAL_HEX32(map.magic, out.magic);
+    TEST_ASSERT_EQUAL_HEX32(map.svr_version, out.svr_version);
+    TEST_ASSERT_EQUAL_HEX16(map.vendor_id, out.vendor_id);
+    TEST_ASSERT_EQUAL_HEX16(map.device_id, out.device_id);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_ep_count, out.svr_ep_count);
+    TEST_ASSERT_EQUAL_UINT8(map.svr_req_stream_max, out.svr_req_stream_max);
+    TEST_ASSERT_EQUAL_UINT8(map.svr_responder_streams_max, out.svr_responder_streams_max);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_responder_mem_size, out.svr_responder_mem_size);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_req_mem_size, out.svr_req_mem_size);
+    TEST_ASSERT_EQUAL_UINT8(map.svr_sequencers_max, out.svr_sequencers_max);
+    TEST_ASSERT_EQUAL_UINT8(map.svr_configuration_lock, out.svr_configuration_lock);
+    TEST_ASSERT_EQUAL_UINT8(map.svr_implemented_options, out.svr_implemented_options);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, out.reserved_0x17);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_io_pin_count, out.svr_io_pin_count);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_hw_cfg_ptr, out.svr_hw_cfg_ptr);
+    TEST_ASSERT_EQUAL_UINT8(map.svr_request_stream_cfg_capacity, out.svr_request_stream_cfg_capacity);
+    TEST_ASSERT_EQUAL_UINT8(map.svr_response_stream_cfg_capacity, out.svr_response_stream_cfg_capacity);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_request_stream_cfg_ptr, out.svr_request_stream_cfg_ptr);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_response_stream_cfg_ptr, out.svr_response_stream_cfg_ptr);
+    TEST_ASSERT_EQUAL_HEX16(0x0000u, out.reserved_0x22);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_ep_generic_cfg_ptr, out.svr_ep_generic_cfg_ptr);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_ep_generic_cfg_capacity, out.svr_ep_generic_cfg_capacity);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_ep_bytebus_id_map_ptr, out.svr_ep_bytebus_id_map_ptr);
+    TEST_ASSERT_EQUAL_UINT8(map.svr_ep_bytebus_id_map_capacity, out.svr_ep_bytebus_id_map_capacity);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_ep_functional_cfg_ptr, out.svr_ep_functional_cfg_ptr);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_sequencer_state_ptr, out.svr_sequencer_state_ptr);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_network_interface_cfg_ptr, out.svr_network_interface_cfg_ptr);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_network_interface_cfg_capacity, out.svr_network_interface_cfg_capacity);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_physical_layer_cfg_ptr, out.svr_physical_layer_cfg_ptr);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_physical_layer_cfg_capacity, out.svr_physical_layer_cfg_capacity);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_time_synch_cfg_ptr, out.svr_time_synch_cfg_ptr);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_time_synch_cfg_capacity, out.svr_time_synch_cfg_capacity);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_security_cfg_ptr, out.svr_security_cfg_ptr);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_security_cfg_capacity, out.svr_security_cfg_capacity);
+
+    /* Deliberately unpopulated fields survive the decode untouched --
+     * proof the exclusion is real, not a coincidental zero. */
+    TEST_ASSERT_EQUAL_HEX16(0x0009u, out.svr_root_client_index);
+    TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_LIFECYCLE_HW_CONFIGURED, out.svr_lifecycle_state);
+}
+
+/* A read_size shorter than RCP_REGMAP_GENERAL_LEN carries only a prefix
+ * of the map -- fields beyond what fits are left exactly as the caller's
+ * *out already had them, matching rcp_regmap_general_decode_read_response()'s
+ * own doc comment (the same "short response, partial population" contract
+ * every register-block apply_reconfig() in this codebase already
+ * follows). Also proves discovery's own narrower 14-octet slice
+ * (RCP_DISCOVERY_GENERAL_SLICE_LEN) still equals the read_size boundary
+ * this test uses for its own short-response case, so the two codecs stay
+ * mutually consistent. */
+static void test_general_map_short_read_size_leaves_the_remainder_untouched(void)
+{
+    rcp_regmap_general_t      map = populated_map();
+    rcp_regmap_general_t      out;
+    rcp_regmap_general_errc_t rc;
+
+    TEST_ASSERT_EQUAL_UINT((size_t)14u, RCP_DISCOVERY_GENERAL_SLICE_LEN);
+
+    rcp_regmap_general_init(&out);
+    out.svr_req_stream_max = 0x5Au; /* poisoned -- past the 14-octet slice */
+
+    rc = read_general_full(&map, (uint8_t)RCP_DISCOVERY_GENERAL_SLICE_LEN, &out);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_GENERAL_OK, rc);
+
+    /* The 5-field discovery-identity prefix IS carried by a 14-octet
+     * response and IS updated. */
+    TEST_ASSERT_EQUAL_HEX32(map.magic, out.magic);
+    TEST_ASSERT_EQUAL_HEX16(map.svr_ep_count, out.svr_ep_count);
+    /* svr_req_stream_max (0x000E) falls one octet past the 14-octet
+     * (0x0000..0x000D) slice -- left exactly as poisoned. */
+    TEST_ASSERT_EQUAL_UINT8(0x5Au, out.svr_req_stream_max);
+}
+
+//cfusa:test REQ-RMAP-024
+static void test_general_map_strerror_never_null_and_distinct(void)
+{
+    rcp_regmap_general_errc_t e;
+
+    for (e = RCP_REGMAP_GENERAL_OK; e <= RCP_REGMAP_GENERAL_ERR_WRONG_OP;
+         e = (rcp_regmap_general_errc_t)((int)e + 1)) {
+        TEST_ASSERT_NOT_NULL(rcp_regmap_general_strerror(e));
+    }
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(rcp_regmap_general_strerror(RCP_REGMAP_GENERAL_ERR_WRONG_BUS),
+                                     rcp_regmap_general_strerror(RCP_REGMAP_GENERAL_ERR_WRONG_OP)));
+}
+
+//cfusa:test REQ-RMAP-024
+static void test_general_map_read_response_decode_rejects_malformed_frames(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    rcp_regmap_general_t        out;
+    uint8_t                     short_frame[2] = {0, 0};
+
+    TEST_ASSERT_EQUAL(RCP_REGMAP_GENERAL_ERR_SHORT_FRAME,
+                      rcp_regmap_general_decode_read_response(short_frame, sizeof(short_frame), &out));
+
+    /* Wrong bus: byte_bus_id != EP0. */
+    hdr.byte_bus_id     = 3;
+    hdr.op              = RCP_ACF_OP_READ;
+    hdr.rsp             = 1;
+    hdr.transaction_num = 1;
+    frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_GENERAL_ERR_WRONG_BUS,
+                      rcp_regmap_general_decode_read_response(frame.data, frame.len, &out));
+    rcp_bytes_free(&frame);
+
+    /* Wrong op: a WRITE frame is not a read response. */
+    hdr.byte_bus_id = RCP_REGMAP_EP0_INDEX;
+    hdr.op          = RCP_ACF_OP_WRITE;
+    frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_GENERAL_ERR_WRONG_OP,
+                      rcp_regmap_general_decode_read_response(frame.data, frame.len, &out));
+    rcp_bytes_free(&frame);
+}
+
+/* REQ-RMAP-025 CLOSED: TC18 §12.7.5 Table 18, access type R -- a remote
+ * write to the general static part must not take effect. lifecycle.h's
+ * RCP_LIFECYCLE_FIELD_READ_ONLY (proven unconditionally unwritable in
+ * every state by every writer, test_lifecycle.c) is now actually
+ * consulted by a real wire-dispatch decode path:
+ * rcp_regmap_general_decode_write_request() (regmap.h) recognizes any
+ * ACF_ABB WRITE addressed to EP0 and reports RCP_ERROR_LOCKED_MEM_ACCESS
+ * every time -- proven directly below, reusing (not duplicating)
+ * rcp_lifecycle_field_write_error()'s own already-tested primitive. The
+ * three other field kinds stay writable in at least one state (asserted
+ * for contrast, unchanged from this test's own prior form) -- READ_ONLY
+ * is the one kind for which no state/writer combination ever succeeds. */
+static void test_general_static_part_write_attempts_are_now_rejected_over_the_wire(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                  frame;
+    rcp_wire_error_t              err;
+    uint8_t                       tn;
+    rcp_regmap_general_errc_t     rc;
+    uint8_t                       payload[2] = {0xBE, 0xEF};
+
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_UNCONFIGURED,
                                                   RCP_LIFECYCLE_FIELD_HW_GENERIC, DISCOVERY_WRITER));
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
@@ -536,6 +716,36 @@ static void test_general_static_part_has_no_read_only_class(void)
     TEST_ASSERT_TRUE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
                                                   RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
                                                   ROOT_WRITER));
+    TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_RCP_CONFIGURED,
+                                                   RCP_LIFECYCLE_FIELD_READ_ONLY, ROOT_WRITER));
+
+    hdr.byte_bus_id     = RCP_REGMAP_EP0_INDEX;
+    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.transaction_num = 9;
+
+    frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    rc = rcp_regmap_general_decode_write_request(frame.data, frame.len, &err, &tn);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_GENERAL_OK, rc);
+    TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, err);
+    TEST_ASSERT_EQUAL_UINT8(9u, tn);
+
+    rcp_bytes_free(&frame);
+}
+
+/* rcp_mock_server_regmap() itself still hands back a directly mutable
+ * in-process pointer -- a deliberate, separate design choice for this
+ * test double's own convenience API (setting up fixture state), not a
+ * remaining conformance gap: no code path routes a REAL wire write
+ * through that pointer -- the wire path is
+ * rcp_regmap_general_decode_write_request() above, which never applies
+ * a write at all. Kept as its own test, distinct from the wire-rejection
+ * one above, so the two concerns are never conflated. */
+static void test_mock_server_regmap_pointer_is_still_directly_mutable_in_process(void)
+{
+    rcp_mock_server_t    *srv;
+    rcp_regmap_general_t *map;
 
     srv = rcp_mock_server_new();
     TEST_ASSERT_NOT_NULL(srv);
@@ -551,12 +761,10 @@ static void test_general_static_part_has_no_read_only_class(void)
  * 8-bit R register at 0x000F. rcp_regmap_general_t now carries both at
  * the correct width -- uint8_t, so a value neither register could hold
  * on the wire (e.g. 256) can no longer be constructed in the first
- * place, and svr_responder_streams_max exists at all. Still open (same
- * REQ-RMAP-024 wire-reachability boundary as every other Group 1 item):
- * 0x000E and 0x000F both fall past the discovery slice's own 0x000D
- * ceiling, already covered generically by
- * test_general_map_wire_reach_stops_after_0x000d()'s span_is_zero(buf,
- * 0x0E, 0x30) assertion -- not re-tested here. */
+ * place, and svr_responder_streams_max exists at all. Now wire-reachable
+ * (REQ-RMAP-024 CLOSED, proven generically by
+ * test_general_map_wire_reach_now_covers_full_table_18(), not re-tested
+ * here). */
 static void test_req_stream_max_and_responder_streams_max_are_now_correctly_sized(void)
 {
     rcp_regmap_general_t map = populated_map();
@@ -583,11 +791,10 @@ static void test_req_stream_max_and_responder_streams_max_are_now_correctly_size
  * 0x0010 and svr_req_mem_size at 0x0012. rcp_regmap_general_t now
  * carries both, distinctly addressed and separately settable, replacing
  * the former undifferentiated 32-bit svr_memory_capacity that conflated
- * them into one unaddressed field. Still open (REQ-RMAP-024, same as
- * every other Group 1 item): both addresses fall past the discovery
- * slice's 0x000D ceiling, already covered generically by
- * test_general_map_wire_reach_stops_after_0x000d()'s span_is_zero(buf,
- * 0x0E, 0x30) assertion -- not re-tested here. */
+ * them into one unaddressed field. Now wire-reachable (REQ-RMAP-024
+ * CLOSED, proven generically by
+ * test_general_map_wire_reach_now_covers_full_table_18(), not re-tested
+ * here). */
 static void test_responder_and_req_mem_size_are_now_distinctly_addressed(void)
 {
     rcp_regmap_general_t map = populated_map();
@@ -750,26 +957,18 @@ static void test_implemented_options_now_matches_table_18_exactly(void)
  * models this octet (reserved_0x17) rather than leaving it implicitly
  * absent -- it zero-inits for free via rcp_regmap_general_init()'s own
  * memset, and no setter exists anywhere in this codebase to construct a
- * nonzero value. Still open (REQ-RMAP-024, same as every other Group 1
- * item): 0x0017 falls past the discovery slice's 0x000D
- * wire-reachability ceiling, so the correct zero this test observes is
- * still produced by read_general()'s generic buffer zero-fill, not by
- * this new field being dispatched onto the wire yet -- but the field's
- * own existence now documents that this is deliberate, not an
- * accidental byproduct, and gives a future wire-dispatch implementation
- * a concrete place to write 0x00 from. */
+ * nonzero value. Wire-reachability (REQ-RMAP-024) is CLOSED -- proven
+ * generically by test_general_map_wire_reach_now_covers_full_table_18()'s
+ * own `TEST_ASSERT_EQUAL_UINT8(0x00u, out.reserved_0x17)` assertion, not
+ * re-tested here. */
 static void test_reserved_octet_at_0x17_is_now_explicitly_modeled(void)
 {
     rcp_regmap_general_t map;
-    uint8_t              buf[0x18];
 
     TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(map.reserved_0x17));
 
     rcp_regmap_general_init(&map);
     TEST_ASSERT_EQUAL_UINT8(0x00u, map.reserved_0x17);
-
-    read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x17, 0x17));
 }
 
 /* REQ-RMAP-035 (TC18 §12.7.5 Table 18): the 16-bit register at 0x0022
@@ -777,42 +976,32 @@ static void test_reserved_octet_at_0x17_is_now_explicitly_modeled(void)
  * models this span (reserved_0x22) rather than leaving it implicitly
  * absent -- it zero-inits for free via rcp_regmap_general_init()'s own
  * memset, and no setter exists anywhere in this codebase to construct
- * a nonzero value. Still open (REQ-RMAP-024, same as every other Group
- * 1 item): 0x0022 falls past the discovery slice's 0x000D
- * wire-reachability ceiling, so the correct zero this test observes is
- * still produced by read_general()'s generic buffer zero-fill, not by
- * this new field being dispatched onto the wire yet -- but the field's
- * own existence now documents that this is deliberate, not an
- * accidental byproduct, matching reserved_0x17's own REQ-RMAP-031
- * precedent exactly. */
+ * a nonzero value. Wire-reachability (REQ-RMAP-024) is CLOSED -- proven
+ * generically by test_general_map_wire_reach_now_covers_full_table_18()'s
+ * own `TEST_ASSERT_EQUAL_HEX16(0x0000u, out.reserved_0x22)` assertion,
+ * not re-tested here. */
 static void test_reserved_register_at_0x22_is_now_explicitly_modeled(void)
 {
     rcp_regmap_general_t map;
-    uint8_t              buf[0x24];
 
     TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.reserved_0x22));
 
     rcp_regmap_general_init(&map);
     TEST_ASSERT_EQUAL_UINT16(0x0000u, map.reserved_0x22);
-
-    read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x22, 0x23));
 }
 
 /* REQ-RMAP-032 (TC18 §12.7.5 Table 18): svr_io_pin_count is a 16-bit R
  * register at 0x0018, the §12.7.6-authoritative extent of the HW_config
- * table (Table 19). rcp_regmap_general_t now declares this field. Still
- * open: nothing in this codebase yet allocates or bounds a real
- * HW_config table against it (Group 2's own scope, issue #200 items
- * -040 through -045) -- content modeling only, same REQ-RMAP-024
- * wire-reachability boundary as every other Group 1 item, so this test
- * still observes 0x0018-0x0019 reading back as zero, produced by
- * read_general()'s generic buffer zero-fill rather than the field being
- * dispatched onto the wire yet. */
+ * table (Table 19). rcp_regmap_general_t now declares this field, and
+ * it is now wire-reachable (REQ-RMAP-024 CLOSED, proven generically by
+ * test_general_map_wire_reach_now_covers_full_table_18(), not re-tested
+ * here). Still open: nothing in this codebase yet allocates or bounds a
+ * real HW_config table against it (Group 2's own scope, issue #200
+ * items -040 through -045) -- content modeling, wire-reachable, but no
+ * real HW_config table to point at yet. */
 static void test_io_pin_count_is_now_explicitly_modeled(void)
 {
     rcp_regmap_general_t map;
-    uint8_t              buf[0x1A];
 
     TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_io_pin_count));
 
@@ -820,9 +1009,6 @@ static void test_io_pin_count_is_now_explicitly_modeled(void)
     TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_io_pin_count);
     map.svr_io_pin_count = 0x0020u;
     TEST_ASSERT_EQUAL_UINT16(0x0020u, map.svr_io_pin_count);
-
-    read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x18, 0x19)); /* svr_io_pin_count */
 }
 
 /* REQ-RMAP-033 (TC18 §12.7.5 Table 18): svr_hw_cfg_ptr is a 16-bit R
@@ -831,17 +1017,14 @@ static void test_io_pin_count_is_now_explicitly_modeled(void)
  * correct 16-bit width, with no spurious capacity member -- HW_config's
  * extent comes from svr_io_pin_count (REQ-RMAP-032) instead, so a
  * bundled capacity would have been a second, contradictory source of
- * truth for the table's length. Still open: this codebase has no real
- * HW_config table storage anywhere yet (Group 2's own separate scope,
- * REQ-RMAP-040 through -045) for this pointer to meaningfully address,
- * and the same REQ-RMAP-024 wire-reachability boundary as every other
- * Group 1 item applies -- this test still observes 0x001A-0x001B
- * reading back as zero, produced by read_general()'s generic buffer
- * zero-fill rather than the field being dispatched onto the wire yet. */
+ * truth for the table's length. Now wire-reachable (REQ-RMAP-024
+ * CLOSED, proven generically, not re-tested here). Still open: this
+ * codebase has no real HW_config table storage anywhere yet (Group 2's
+ * own separate scope, REQ-RMAP-040 through -045) for this pointer to
+ * meaningfully address. */
 static void test_hw_cfg_ptr_is_now_correctly_shaped(void)
 {
     rcp_regmap_general_t map;
-    uint8_t              buf[0x1C];
 
     TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_hw_cfg_ptr));
 
@@ -849,9 +1032,6 @@ static void test_hw_cfg_ptr_is_now_correctly_shaped(void)
     TEST_ASSERT_EQUAL_UINT16(0x0000u, map.svr_hw_cfg_ptr);
     map.svr_hw_cfg_ptr = 0x0060u;
     TEST_ASSERT_EQUAL_UINT16(0x0060u, map.svr_hw_cfg_ptr);
-
-    read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x1A, 0x1B)); /* svr_hw_cfg_ptr */
 }
 
 /* REQ-RMAP-034 (TC18 §12.7.5 Table 18): FOUR separate, non-adjacent
@@ -867,18 +1047,15 @@ static void test_hw_cfg_ptr_is_now_correctly_shaped(void)
  * REQ-RMAP-033 fixed for svr_hw_cfg_ptr, here doubled across both
  * stream directions. A capacity value TC18's real 8-bit registers
  * could never hold (e.g. 0x0100) is now impossible to construct in
- * the first place, rather than merely untrue-but-representable. Still
- * open: this codebase has no real request/response-stream config
- * table storage anywhere yet for these pointers to meaningfully
- * address (Group 3/Group 4's own separate scope), and the same
- * REQ-RMAP-024 wire-reachability boundary as every other Group 1 item
- * applies -- this test still observes 0x001C-0x0021 reading back as
- * zero, produced by read_general()'s generic buffer zero-fill rather
- * than these fields being dispatched onto the wire yet. */
+ * the first place, rather than merely untrue-but-representable. Now
+ * wire-reachable (REQ-RMAP-024 CLOSED, proven generically by
+ * test_general_map_wire_reach_now_covers_full_table_18(), not re-tested
+ * here). Still open: this codebase has no real request/response-stream
+ * config table storage anywhere yet for these pointers to meaningfully
+ * address (Group 3/Group 4's own separate scope). */
 static void test_stream_cfg_registers_are_now_correctly_sized(void)
 {
     rcp_regmap_general_t map;
-    uint8_t              buf[0x22];
 
     TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(map.svr_request_stream_cfg_capacity));
     TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(map.svr_response_stream_cfg_capacity));
@@ -899,9 +1076,6 @@ static void test_stream_cfg_registers_are_now_correctly_sized(void)
     TEST_ASSERT_EQUAL_UINT8(0x04u, map.svr_response_stream_cfg_capacity);
     TEST_ASSERT_EQUAL_UINT16(0x0070u, map.svr_request_stream_cfg_ptr);
     TEST_ASSERT_EQUAL_UINT16(0x0090u, map.svr_response_stream_cfg_ptr);
-
-    read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x1C, 0x21));
 }
 
 /* REQ-RMAP-036 (TC18 §12.7.5 Table 18): svr_ep_generic_cfg_ptr (16
@@ -917,15 +1091,14 @@ static void test_stream_cfg_registers_are_now_correctly_sized(void)
  * 0x0026 actually is. This was a genuine semantic contradiction, not
  * just a width mismatch (the same class of bug REQ-RMAP-033/-034 fixed
  * was purely about width/address; here the OLD shared field's own
- * documented MEANING was backwards for this specific register). Still
- * open: this codebase has no real EP_config table storage anywhere
- * yet for this pointer to meaningfully address, and the same
- * REQ-RMAP-024 wire-reachability boundary as every other Group 1 item
- * applies. */
+ * documented MEANING was backwards for this specific register). Now
+ * wire-reachable (REQ-RMAP-024 CLOSED, proven generically by
+ * test_general_map_wire_reach_now_covers_full_table_18(), not re-tested
+ * here). Still open: this codebase has no real EP_config table storage
+ * anywhere yet for this pointer to meaningfully address. */
 static void test_ep_generic_cfg_ptr_and_capacity_are_now_correctly_shaped(void)
 {
     rcp_regmap_general_t map;
-    uint8_t              buf[0x28];
 
     TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_ep_generic_cfg_ptr));
     TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_ep_generic_cfg_capacity));
@@ -939,9 +1112,6 @@ static void test_ep_generic_cfg_ptr_and_capacity_are_now_correctly_shaped(void)
                                                    an entry count */
     TEST_ASSERT_EQUAL_UINT16(0x00A0u, map.svr_ep_generic_cfg_ptr);
     TEST_ASSERT_EQUAL_UINT16(0x0140u, map.svr_ep_generic_cfg_capacity);
-
-    read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x24, 0x27));
 }
 
 /* REQ-RMAP-037 (TC18 §12.7.5 Table 18): svr_ep_bytebus_id_map_ptr (16
@@ -955,14 +1125,13 @@ static void test_ep_generic_cfg_ptr_and_capacity_are_now_correctly_shaped(void)
  * convention -- no semantic contradiction to resolve. rcp_regmap_
  * general_t now declares both as correctly-sized scalar fields,
  * replacing the former ep_id_bus_map field (rcp_regmap_table_ref_t).
- * Still open: this codebase has no real EP-byte_bus_id mapping table
- * storage anywhere yet for this pointer to meaningfully address, and
- * the same REQ-RMAP-024 wire-reachability boundary as every other
- * Group 1 item applies. */
+ * Now wire-reachable (REQ-RMAP-024 CLOSED, proven generically by
+ * test_general_map_wire_reach_now_covers_full_table_18(), not re-tested
+ * here). Still open: this codebase has no real EP-byte_bus_id mapping
+ * table storage anywhere yet for this pointer to meaningfully address. */
 static void test_ep_bytebus_id_map_ptr_and_capacity_are_now_correctly_shaped(void)
 {
     rcp_regmap_general_t map;
-    uint8_t              buf[0x2C];
 
     TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_ep_bytebus_id_map_ptr));
     TEST_ASSERT_EQUAL_UINT((size_t)1u, sizeof(map.svr_ep_bytebus_id_map_capacity));
@@ -975,9 +1144,6 @@ static void test_ep_bytebus_id_map_ptr_and_capacity_are_now_correctly_shaped(voi
     map.svr_ep_bytebus_id_map_capacity = 0x10u;
     TEST_ASSERT_EQUAL_UINT16(0x00B0u, map.svr_ep_bytebus_id_map_ptr);
     TEST_ASSERT_EQUAL_UINT8(0x10u, map.svr_ep_bytebus_id_map_capacity);
-
-    read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x28, 0x2A));
 }
 
 /* REQ-RMAP-038 (TC18 §12.7.5 Table 18): svr_ep_functional_cfg_ptr (16
@@ -994,14 +1160,14 @@ static void test_ep_bytebus_id_map_ptr_and_capacity_are_now_correctly_shaped(voi
  * been retyped across REQ-RMAP-033/-034/-036/-037/-038) whose spurious
  * capacity members had no TC18 basis for either register -- the same
  * class of fix REQ-RMAP-033 already established for svr_hw_cfg_ptr.
- * Still open: this codebase has no real EP_FUNC_config or Sequencer_
- * config table storage anywhere yet for either pointer to meaningfully
- * address, and the same REQ-RMAP-024 wire-reachability boundary as
- * every other Group 1 item applies. */
+ * Now wire-reachable (REQ-RMAP-024 CLOSED, proven generically by
+ * test_general_map_wire_reach_now_covers_full_table_18(), not re-tested
+ * here). Still open: this codebase has no real EP_FUNC_config or
+ * Sequencer_config table storage anywhere yet for either pointer to
+ * meaningfully address. */
 static void test_functional_cfg_and_sequencer_state_ptrs_are_now_correctly_shaped(void)
 {
     rcp_regmap_general_t map;
-    uint8_t              buf[0x30];
 
     TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_ep_functional_cfg_ptr));
     TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_sequencer_state_ptr));
@@ -1014,9 +1180,6 @@ static void test_functional_cfg_and_sequencer_state_ptrs_are_now_correctly_shape
     map.svr_sequencer_state_ptr   = 0x00D0u;
     TEST_ASSERT_EQUAL_UINT16(0x00C0u, map.svr_ep_functional_cfg_ptr);
     TEST_ASSERT_EQUAL_UINT16(0x00D0u, map.svr_sequencer_state_ptr);
-
-    read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x2C, 0x2F));
 }
 
 /* TC18 §12.7.5 Table 18 (continued) and §12.7.11-§12.7.14 define four
@@ -1040,11 +1203,14 @@ static void test_functional_cfg_and_sequencer_state_ptrs_are_now_correctly_shape
  * svr_network_interface_cfg_ptr's own comment in regmap.h for the full
  * explanation), so this test uses each field's INFERRED address
  * (0x0030-0x003F) rather than a directly-read one -- still the best
- * available answer, and honestly documented as such throughout. */
+ * available answer, and honestly documented as such throughout. Now
+ * wire-reachable at those inferred addresses (REQ-RMAP-024 CLOSED,
+ * proven generically by
+ * test_general_map_wire_reach_now_covers_full_table_18(), not re-tested
+ * here). */
 static void test_four_optional_subsystem_pointer_pairs_are_now_present(void)
 {
     rcp_regmap_general_t map;
-    uint8_t              buf[0x40];
 
     TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_network_interface_cfg_ptr));
     TEST_ASSERT_EQUAL_UINT((size_t)2u, sizeof(map.svr_network_interface_cfg_capacity));
@@ -1085,9 +1251,6 @@ static void test_four_optional_subsystem_pointer_pairs_are_now_present(void)
     TEST_ASSERT_EQUAL_UINT16(0x0002u, map.svr_time_synch_cfg_capacity);
     TEST_ASSERT_EQUAL_UINT16(0x0070u, map.svr_security_cfg_ptr);
     TEST_ASSERT_EQUAL_UINT16(0x0008u, map.svr_security_cfg_capacity);
-
-    read_general(&map, (uint8_t)sizeof(buf), buf);
-    TEST_ASSERT_TRUE(span_is_zero(buf, 0x30, 0x3F));
     TEST_ASSERT_EQUAL_HEX16(RCP_REGMAP_NO_ROOT_CLIENT, map.svr_root_client_index);
 }
 
@@ -2088,8 +2251,13 @@ int main(void)
     RUN_TEST(test_ep_len_overrun_rule_implemented_endpoints);
     RUN_TEST(test_discovery_claim_refusal_is_unreportable);
     RUN_TEST(test_lifecycle_state_register_field_tracks_the_authoritative_state);
-    RUN_TEST(test_general_map_wire_reach_stops_after_0x000d);
-    RUN_TEST(test_general_static_part_has_no_read_only_class);
+    RUN_TEST(test_general_map_render_matches_table_18_byte_offsets);
+    RUN_TEST(test_general_map_wire_reach_now_covers_full_table_18);
+    RUN_TEST(test_general_map_short_read_size_leaves_the_remainder_untouched);
+    RUN_TEST(test_general_map_strerror_never_null_and_distinct);
+    RUN_TEST(test_general_map_read_response_decode_rejects_malformed_frames);
+    RUN_TEST(test_general_static_part_write_attempts_are_now_rejected_over_the_wire);
+    RUN_TEST(test_mock_server_regmap_pointer_is_still_directly_mutable_in_process);
     RUN_TEST(test_req_stream_max_and_responder_streams_max_are_now_correctly_sized);
     RUN_TEST(test_responder_and_req_mem_size_are_now_distinctly_addressed);
     RUN_TEST(test_sequencers_max_is_now_correctly_sized_and_synced_from_the_table);
