@@ -396,13 +396,21 @@ static void test_ep_len_overrun_rule_implemented_endpoints(void)
 
 /* TC18 §12.3 / Figure 16: a discovery request arriving while the
  * discovery stream is already claimed is answered with a stream-occupied
- * error. Deviation: rcp_discovery_claim_note_request() returns void, so a
- * refused claim is indistinguishable from a granted one at the call site
- * -- pinned here by claimant identity, the only observable difference --
- * and rcp_wire_error_t stops at RCP_ERROR_CHAIN_ERROR (17) with no
- * DISCOVERY_STREAM_OCCUPIED code to send back. A conforming server would
- * report the occupied condition to client B. */
-static void test_discovery_claim_refusal_is_unreportable(void)
+ * error. FIXED (REQ-DISC-029): rcp_discovery_claim_note_request() now
+ * returns bool -- true when the claim was open and granted, false when
+ * refused because it was already held by an unlapsed claimant (Figure
+ * 16's own two "Discovery request received" transitions carve out no
+ * exception for requester identity, so this applies uniformly whether a
+ * different client or the current claimant itself re-requests). STILL
+ * OPEN: DISCOVERY_STREAM_OCCUPIED is a Figure-16-diagram-only label with
+ * no corresponding numbered code in TC18 §12.9.6 Table 27
+ * (rcp_wire_error_t stops at RCP_ERROR_CHAIN_ERROR, 17) -- unlike
+ * LOCKED_CONFIG_ACCESS (which cleanly maps onto RCP_ERROR_LOCKED_MEM_ACCESS),
+ * no numbered code here has an obviously matching meaning, so this
+ * codebase does not invent one; a caller has a real bool signal to act
+ * on, but which wire error code (if any) to send is left genuinely
+ * unresolved. */
+static void test_discovery_claim_refusal_now_returns_a_real_signal(void)
 {
     rcp_discovery_claim_t claim;
     rcp_stream_id_t       a = rcp_stream_id_make(CLIENT_A_MAC, 1);
@@ -411,16 +419,22 @@ static void test_discovery_claim_refusal_is_unreportable(void)
     rcp_discovery_claim_init(&claim, RCP_DISCOVERY_DEFAULT_TIMEOUT_MS);
     TEST_ASSERT_EQUAL_UINT32(20u, claim.timeout_ms);
 
-    rcp_discovery_claim_note_request(&claim, a, 100u);
+    TEST_ASSERT_TRUE(rcp_discovery_claim_note_request(&claim, a, 100u));
     TEST_ASSERT_TRUE(rcp_discovery_claim_is_claimant(&claim, a, 105u));
 
-    /* B's request is silently declined: no return value, no error code. */
-    rcp_discovery_claim_note_request(&claim, b, 105u);
+    /* B's request is refused -- the caller now has a real signal to act on. */
+    TEST_ASSERT_FALSE(rcp_discovery_claim_note_request(&claim, b, 105u));
     TEST_ASSERT_TRUE(rcp_discovery_claim_is_claimant(&claim, a, 106u));
     TEST_ASSERT_FALSE(rcp_discovery_claim_is_claimant(&claim, b, 106u));
 
-    /* 17 is the last assigned wire error; 18 -- where a
-     * DISCOVERY_STREAM_OCCUPIED code would sit -- is not assigned. */
+    /* A re-requesting while still the claimant is ALSO refused (Figure
+     * 16's own text carves out no requester-identity exception) -- and
+     * still does not itself refresh the deadline, matching
+     * rcp_discovery_claim_note_config_write()'s own separate mechanism. */
+    TEST_ASSERT_FALSE(rcp_discovery_claim_note_request(&claim, a, 110u));
+
+    /* 17 is still the last assigned wire error; 18 -- where a
+     * DISCOVERY_STREAM_OCCUPIED code would sit -- is still not assigned. */
     TEST_ASSERT_EQUAL_INT(17, (int)RCP_ERROR_CHAIN_ERROR);
     TEST_ASSERT_EQUAL_STRING(rcp_wire_error_string((rcp_wire_error_t)19),
                              rcp_wire_error_string((rcp_wire_error_t)18));
@@ -2488,7 +2502,7 @@ int main(void)
     RUN_TEST(test_reg_write_len_matches_the_formula);
     RUN_TEST(test_generic_config_request_implemented_endpoints);
     RUN_TEST(test_ep_len_overrun_rule_implemented_endpoints);
-    RUN_TEST(test_discovery_claim_refusal_is_unreportable);
+    RUN_TEST(test_discovery_claim_refusal_now_returns_a_real_signal);
     RUN_TEST(test_lifecycle_state_register_field_tracks_the_authoritative_state);
     RUN_TEST(test_general_map_render_matches_table_18_byte_offsets);
     RUN_TEST(test_general_map_wire_reach_now_covers_full_table_18);

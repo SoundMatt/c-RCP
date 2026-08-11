@@ -386,15 +386,18 @@ bool rcp_discovery_claim_is_open(const rcp_discovery_claim_t *claim, uint64_t no
 
 //cfusa:req REQ-DISC-017
 //cfusa:req REQ-DISC-018
-void rcp_discovery_claim_note_request(rcp_discovery_claim_t *claim,
-                                      rcp_stream_id_t requester, uint64_t now_ms)
+//cfusa:req REQ-DISC-029
+bool rcp_discovery_claim_note_request(rcp_discovery_claim_t *claim,
+                                       rcp_stream_id_t requester, uint64_t now_ms)
 {
-    if (!rcp_discovery_claim_is_open(claim, now_ms)) return; /* held by an
-        unlapsed different claimant -- not preempted, see the file header */
+    if (!rcp_discovery_claim_is_open(claim, now_ms)) return false; /* REQ-DISC-029:
+        already held by an unlapsed claimant -- not preempted, DISCOVERY_STREAM_OCCUPIED
+        per Figure 16, see this function's own header doc comment */
 
     claim->held        = true;
     claim->claimant     = requester;
     claim->deadline_ms  = now_ms + (uint64_t)claim->timeout_ms;
+    return true;
 }
 
 //cfusa:req REQ-DISC-019

@@ -8412,12 +8412,12 @@
     {
       "id": "REQ-DISC-029",
       "title": "A discovery request while the discovery stream is already claimed is answered with a stream-occupied error",
-      "text": "NOT IMPLEMENTED: c-RCP does not report a discovery-stream-occupied condition (TC18 \u00a712.3, Figure 16). rcp_discovery_claim_note_request() is a void function that silently declines to preempt a held claim, so a caller cannot tell a granted claim from a refused one, and there is no DISCOVERY_STREAM_OCCUPIED error code in rcp_error_code_t to send back. A second RC Client attempting discovery in HW_UNCONFIGURED or HW_CONFIGURED gets no indication that another client owns the configuration stream.",
+      "text": "PARTIAL: rcp_discovery_claim_note_request() (discovery.h/discovery.c) now returns bool -- true when the discovery claim was open and granted, false when refused because it was already held by an unlapsed claimant (TC18 \u00a712.3, Figure 16's own two \"Discovery request received\" transitions, applied uniformly regardless of requester identity: a different client or the current claimant re-requesting are both refused). A caller now has a real signal to act on instead of an unreportable silent decline. STILL OPEN: DISCOVERY_STREAM_OCCUPIED is a Figure-16-diagram-only label with no corresponding numbered code in TC18 \u00a712.9.6 Table 27 (rcp_wire_error_t stops at RCP_ERROR_CHAIN_ERROR, 17) -- unlike LOCKED_CONFIG_ACCESS (which cleanly maps onto RCP_ERROR_LOCKED_MEM_ACCESS, the only numbered code with a semantically matching name), no numbered code here has an obviously corresponding meaning, so this codebase does not invent one; which wire error code (if any) a caller should send for the false case remains a genuine, unresolved ambiguity (same class as REQ-ACF-012's RCP_ACF_MTV_UNCERTAIN).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.3, TC18.txt L2072-L2075 and L2106-L2108 (Figure 16)"
     },
     {
