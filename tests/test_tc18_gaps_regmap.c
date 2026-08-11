@@ -2290,36 +2290,61 @@ static void test_transmit_fragmentation_now_uses_the_correct_octet_budget(void)
     TEST_ASSERT_EQUAL_UINT((size_t)13u, rcp_fragment_plan_count(100u, rsp.max_avtpdu_size));
 }
 
-/* ── §13.7.1.2 Table 33: the RC Server endpoint's own functional block ─────── */
+/* ── §13.7.1.2 Table 33/36: the RC Server's own functional-config content ── */
 
-/* TC18 Table 33 gives the RC Server endpoint its own functional-config
- * block: svr_ep_len (0x0000, R), svr_ep_enable&clr (0x0002, R/W, with
- * svr_enable permanently 1 AND READ-ONLY), svr_ep_options (0x0003, R/W*),
- * svr_ep_status (0x0004, R/W) and svr_discovery_timeout (0x0004 of the
- * same table, 16 bit, R/W*, microseconds, default 20000 = 20 ms).
- * Deviation: no EP0-specific block exists -- EP0 shares the ordinary
- * five-flag prefix whose init zeroes ep_enable, and Discovery_TimeOut is
- * a caller-supplied constructor argument in MILLISECONDS, not a register.
- */
-static void test_ep0_functional_block_and_discovery_timeout_absent(void)
+/* TC18 §13.7.1.2's own table (Table 33 in the RC1 baseline, renumbered
+ * Table 36 in the current RC5 baseline -- confirmed the same table via
+ * direct PDF page-image reads of both) lists svr_ep_len/reserved/
+ * svr_ep_enable&clr/svr_ep_options (the generic EP_FUNC common-header
+ * shape) AND svr_root_client_index/svr_lifecycle_state/
+ * svr_discovery_timeout/svr_ep_status (RC-Server-specific), with a real,
+ * confirmed-on-both-revisions address collision between the two groups
+ * -- see regmap.h's own file-header note for the full investigation.
+ * REQ-RMAP-066/067: rcp_regmap_svr_ep_cfg_t now models the two fields
+ * free of both the collision and the "does the RC Server even have an
+ * EP_FUNC block" self-contradiction: svr_discovery_timeout and
+ * svr_ep_status. Deliberately still NOT modeled: the four common-header
+ * fields (§13.7.1.1's own prose says the RC Server "is not included in
+ * the EP_FUNC_config register maps" -- directly contradicting Table
+ * 33/36 listing them anyway) and svr_root_client_index/svr_lifecycle_state
+ * (already correctly modeled at their own uncontested Table 18
+ * addresses -- REQ-RMAP-038/023 -- not duplicated here under this
+ * table's own disputed local addressing).
+ *
+ * Separately, rcp_discovery_claim_t's own Discovery_TimeOut remains a
+ * caller-supplied constructor argument in MILLISECONDS (RCP_DISCOVERY_
+ * DEFAULT_TIMEOUT_MS), not read from rcp_regmap_svr_ep_cfg_t's own
+ * microsecond register -- the two are not yet wired together (same
+ * deferred-wire-dispatch scope as the rest of this table). */
+static void test_svr_ep_cfg_now_models_discovery_timeout_and_status(void)
 {
-    rcp_regmap_ep_functional_cfg_t cfg;
-    rcp_discovery_claim_t          claim;
+    rcp_regmap_svr_ep_cfg_t cfg;
+    rcp_discovery_claim_t   claim;
 
     TEST_ASSERT_TRUE(rcp_regmap_is_ep0(RCP_REGMAP_EP0_INDEX));
 
     memset(&cfg, 0xAA, sizeof(cfg));
-    rcp_regmap_ep_functional_cfg_init(&cfg);
-    /* Table 33: svr_enable is always 1. The shared init zeroes it, and
-     * there is no EP0 special case to put it back. */
-    TEST_ASSERT_FALSE(cfg.ep_enable);
-    TEST_ASSERT_FALSE(cfg.ep_clear_req_storage);
-    TEST_ASSERT_FALSE(cfg.ep_req_crc_enable);
-    TEST_ASSERT_FALSE(cfg.ep_response_ts_enable);
-    TEST_ASSERT_FALSE(cfg.ep_suppress_response);
+    rcp_regmap_svr_ep_cfg_init(&cfg);
 
-    /* Discovery_TimeOut: a constructor argument in ms, not a 16-bit
-     * microsecond register whose default is 20000. */
+    /* REQ-RMAP-066: TC18's own stated power-on default, 20000 us = 20 ms. */
+    TEST_ASSERT_EQUAL_UINT16(20000u, cfg.svr_discovery_timeout);
+    /* REQ-RMAP-067: svr_ep_status, no TC18 bit-level breakdown given. */
+    TEST_ASSERT_EQUAL_UINT16(0u, cfg.svr_ep_status);
+
+    /* Table 33/36's common-header fields (svr_enable etc.) are NOT
+     * modeled for the RC Server -- the generic prefix's own init still
+     * zeroes ep_enable and there is no RC-Server special case to put it
+     * back, matching this deliberate scope-exclusion. */
+    {
+        rcp_regmap_ep_functional_cfg_t generic;
+        memset(&generic, 0xAA, sizeof(generic));
+        rcp_regmap_ep_functional_cfg_init(&generic);
+        TEST_ASSERT_FALSE(generic.ep_enable);
+    }
+
+    /* Discovery_TimeOut: still a constructor argument in ms, not read
+     * from the register modeled above -- the two are not yet wired
+     * together. */
     rcp_discovery_claim_init(&claim, RCP_DISCOVERY_DEFAULT_TIMEOUT_MS);
     TEST_ASSERT_EQUAL_UINT32(20u, claim.timeout_ms);
     TEST_ASSERT_EQUAL_UINT32(20u, RCP_DISCOVERY_DEFAULT_TIMEOUT_MS);
@@ -2490,7 +2515,7 @@ int main(void)
     RUN_TEST(test_flush_on_count_trigger_and_avtpdu_packing);
     RUN_TEST(test_flush_time_trigger_and_empty_heartbeat_are_composable);
     RUN_TEST(test_transmit_fragmentation_now_uses_the_correct_octet_budget);
-    RUN_TEST(test_ep0_functional_block_and_discovery_timeout_absent);
+    RUN_TEST(test_svr_ep_cfg_now_models_discovery_timeout_and_status);
     RUN_TEST(test_field_write_error_distinguishes_state_from_writer_denial);
     RUN_TEST(test_effective_register_write_length_helper_matches_the_formula);
 

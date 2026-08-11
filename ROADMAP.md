@@ -14555,3 +14555,105 @@ in an earlier session) that needs direct PDF-page verification, not
 `pdftotext -layout` extraction, before implementation is safe to
 attempt. **Next**: that Table 33 investigation, as its own dedicated
 batch.
+
+### v0.239.0 -- 2026-08-11 (doc + content, no behavior change to any
+existing consumer)
+
+**Phase 5d Group 5 batch 2 (issue #200): Table 33/36 investigated
+directly against the PDF page image -- the deferred ambiguity was
+real, but not what it was assumed to be.**
+
+Direct PDF page-image reads (not `pdftotext` extraction) of TC18
+§13.7.1.2's own table on both the RC1 baseline (p.81, "Table 33")
+and the current RC5 baseline (p.91, renumbered "Table 36" by RC5's
+own added content) show the earlier "two-column PDF garbling"
+suspicion was WRONG -- `pdftotext -layout` extracted the table
+correctly. The table itself has a genuine, primary-source address
+collision present in BOTH revisions: `0x0002`/`0x0003`/`0x0004` are
+each assigned twice, once to the generic EP_FUNC common-entries
+fields (`svr_ep_enable&clr`/`svr_ep_options`) and once to
+RC-Server-specific fields (`svr_root_client_index`/
+`svr_lifecycle_state`/`svr_ep_status`) -- the same class of defect
+already documented for CAN's Table 53/56. A SECOND, independent
+contradiction was also found: §13.7.1.1's own prose, immediately
+preceding this table, states "the RC Server as endpoint is not
+included in the EP_FUNC_config register maps" -- yet the table
+lists the generic EP_FUNC common-header fields for the RC Server
+anyway, directly contradicting the sentence right before it.
+
+**New**: `rcp_regmap_svr_ep_cfg_t` (regmap.h/regmap.c) models only
+the two fields free of both defects: `svr_discovery_timeout`
+(REQ-RMAP-066, defaults to TC18's own stated 20000 microseconds =
+20 ms via `rcp_regmap_svr_ep_cfg_init()`) and `svr_ep_status`
+(REQ-RMAP-067). Deliberately NOT modeled: the four common-header
+fields (would mean silently picking a side of the stated
+self-contradiction) and `svr_root_client_index`/`svr_lifecycle_state`
+(already correctly modeled at their own uncontested Table 18
+addresses -- REQ-RMAP-038/023 -- not duplicated under this table's
+own disputed local addressing). regmap.h's own new file-header
+section documents the full investigation, including a working,
+UNCONFIRMED hypothesis for the collision (an off-by-4,
+forgot-the-common-header-offset authoring error, consistent with
+every other endpoint type's own layout) -- explicitly flagged as an
+inference, not coded as settled fact.
+
+**REQ-RMAP-068 reassessed, not force-implemented -- a real,
+substantive finding, not a routine content-model win.** Its own
+citation (§13.7.1.2's prose) actually describes TWO separate things.
+The state-vs-writer distinction ("Writing to a write prohibited
+register... err=1... UNAUTHORIZED_ACCESS") is ALREADY correctly
+implemented by `rcp_lifecycle_field_write_error()`
+(REQ-WIREERR-004/REQ-LIFECYCLE-024) -- this requirement's own prior
+text claiming "no code path maps the two cases" was simply stale,
+now corrected. What remains genuinely open is a THIRD outcome the
+same paragraph's immediately preceding sentence describes ("Writing
+data to read only registers has no effect and request is confirmed
+normally" -- err=0, not an error at all) that neither implemented
+code produces; every denial in this codebase today becomes an err=1
+response. Working hypothesis, NOT a correction to existing code:
+this sentence most likely describes individual READ-ONLY BITS within
+an otherwise-writable register (the same paragraph's own immediately
+preceding OR/AND/XOR/SET register-write-operation discussion), a
+bit-level masking concern distinct from -- and deliberately NOT
+conflated with -- REQ-RMAP-025's own already-correct, twice
+independently primary-source-verified whole-register-map access
+control (`RCP_LIFECYCLE_FIELD_READ_ONLY` -> `LOCKED_MEM_ACCESS`,
+per TC18 Figure 16), which stays completely unchanged. Considered
+and deliberately rejected: implementing something that would make
+`RCP_LIFECYCLE_FIELD_READ_ONLY` denials return err=0 instead of
+`LOCKED_MEM_ACCESS` -- that would directly regress REQ-RMAP-025's
+own careful, twice-corrected finding on a hypothesis, not a
+confirmed fact. Not implementable yet regardless: no register-write
+dispatch mechanism in this codebase currently operates at the bit
+level (every register-map write path today is whole-struct-field
+decode, not per-bit OR/AND/XOR against a live register image).
+
+New test: `test_svr_ep_cfg_now_models_discovery_timeout_and_status`
+(replaces the old gap-documentation test for REQ-RMAP-066/067,
+which now correctly fails once the gap partially closed).
+
+Mutation-tested: reverting `rcp_regmap_svr_ep_cfg_init()`'s power-on
+default produced a clean, deterministic assertion failure -- a
+single full-revert mutation, matching batch 10's own established
+"pure field addition, no surrounding logic" calibration (no paired
+logic mutation needed, since there is no computed logic to break
+beyond the one default assignment). Reverted, full suite
+re-verified byte-identical.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
+0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
+**Deliberately deferred, unchanged**: REQ-RMAP-055 (W+ lockable
+access type) remains its own separate, out-of-scope item -- needs a
+`rcp_lifecycle_field_writable()` signature change touching every
+endpoint type's own call sites.
+
+**Progress**: Group 5 is now addressed as far as it honestly can be
+without resolving either of Table 33/36's own two confirmed spec
+defects, or building a bit-level register-write dispatch mechanism
+that does not exist anywhere in this codebase yet. **RMAP scope
+remaining after this batch**: REQ-RMAP-055 (W+ lockable access
+type) on its own, and the underlying bit-level write-outcome
+mechanism REQ-RMAP-068 depends on, if a future session decides it's
+worth building generically rather than staying a documented,
+honestly-partial gap.

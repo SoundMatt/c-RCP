@@ -999,6 +999,92 @@ rcp_lifecycle_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map
                                                bool via_unicast,
                                                bool via_discovery_stream);
 
+/* ── RC Server's own functional-configuration content (TC18 §13.7.1.2) ─────
+ *
+ * TC18 §13.7.1.2 ("Server functional configuration") describes a table
+ * numbered "Table 33: RC Server functional configuration" in the RC1
+ * baseline (OA_TC18_specification_v_0.5.1_RC.pdf, p.81) and renumbered
+ * "Table 36" in the current RC5 baseline this project treats as
+ * authoritative (OA_TC18_specification_v_0.5.1_RC_5_3624.pdf, p.91,
+ * table renumbered upward by RC5's own inserted content -- confirmed by
+ * direct PDF page-image reads of BOTH revisions, not `pdftotext`
+ * extraction, per this codebase's established "verify against the page
+ * image" discipline -- see REQ-CANEP-029's own doc comment (ep_can.h)
+ * for the earlier, sibling case this reuses the same discipline from).
+ *
+ * TWO SEPARATE, GENUINE PRIMARY-SOURCE DEFECTS were confirmed present in
+ * BOTH revisions (not a transient RC1-only issue later fixed), neither
+ * force-resolved here -- documented, not guessed:
+ *
+ *   1. ADDRESS COLLISION: the table lists 8 register rows sharing only
+ *      5 distinct relative addresses. 0x0002 is assigned to BOTH
+ *      svr_ep_enable&clr (an EP_FUNC-common-entries-style register,
+ *      §12.7.1/Table 32-or-35's own generic header) AND
+ *      svr_root_client_index (an RC-Server-specific register); 0x0003
+ *      likewise to BOTH svr_ep_options AND svr_lifecycle_state; 0x0004
+ *      to BOTH svr_discovery_timeout AND svr_ep_status. Same class of
+ *      defect as CAN's Table 53/56 (ep_can.h's own file header) and the
+ *      RC-server rx_enforce_* terminology drift (respqueue.h's own
+ *      §12.7.7 history) -- a real, uncorrected spec table, not a
+ *      rendering artifact of either PDF revision.
+ *
+ *      WORKING HYPOTHESIS, NOT CONFIRMED, NOT CODED AS FACT: every other
+ *      endpoint type's own EP_FUNC block places its type-specific fields
+ *      immediately after the shared 4-octet common header (i.e. at
+ *      0x0004 onward, never overlapping 0x0000-0x0003 -- see every
+ *      concrete ep_*.h's own functional-config layout). The
+ *      RC-Server-specific block's own four rows (svr_root_client_index/
+ *      svr_lifecycle_state/svr_discovery_timeout/svr_ep_status) read as
+ *      though their printed addresses (0x0002-0x0004) should instead
+ *      read 0x0004 onward -- an off-by-4, forgot-the-common-header-
+ *      offset authoring error consistent with every sibling endpoint's
+ *      own layout. This is a plausible reconciliation, not a stated
+ *      TC18 fact; a future investigation with a stronger primary-source
+ *      basis (e.g. a later spec erratum) should confirm or refute it
+ *      before any code treats it as settled.
+ *
+ *   2. EP_FUNC-BLOCK EXISTENCE CONTRADICTS ITSELF: §13.7.1.1's own prose,
+ *      immediately preceding Table 33/36, states plainly: "the RC Server
+ *      as endpoint is not included in the EP_FUNC_config register maps"
+ *      -- yet Table 33/36 itself lists the generic EP_FUNC common-header
+ *      fields (svr_ep_len/reserved/svr_ep_enable&clr/svr_ep_options,
+ *      the same four fields rcp_regmap_ep_functional_cfg_t already
+ *      models generically for every OTHER endpoint type) for the RC
+ *      Server anyway, directly contradicting the sentence that
+ *      immediately precedes the table. Given this codebase already has
+ *      no evidence the RC Server is dispatched through the generic
+ *      per-endpoint EP_FUNC mechanism anywhere (server.c never composes
+ *      an rcp_regmap_ep_functional_cfg_t for the server itself), this
+ *      codebase does NOT model those four common-header fields for the
+ *      RC Server -- modeling them would require silently picking a side
+ *      of a stated, unresolved spec self-contradiction. rcp_regmap_svr_ep_cfg_t
+ *      below models ONLY the two fields free of both defects above:
+ *      svr_discovery_timeout and svr_ep_status -- neither collides with
+ *      an already-elsewhere-modeled field (svr_root_client_index/
+ *      svr_lifecycle_state are already correctly modeled at their own,
+ *      uncontested Table 18 addresses -- REQ-RMAP-038/023 -- so this
+ *      struct deliberately does NOT duplicate them under this table's
+ *      own disputed local addressing), and neither depends on resolving
+ *      contradiction #2. */
+
+/* REQ-RMAP-066/067 (content-modeling scope only -- see the section note
+ * above for what is deliberately excluded and why). svr_discovery_timeout
+ * is TC18's own Discovery_TimeOut: how long an unused discovery stream
+ * is kept before being dropped (TC18 §12.6); svr_ep_status is the RC
+ * Server's own 16-bit status register, TC18 giving no further bit-level
+ * breakdown for it at this citation. */
+typedef struct {
+    uint16_t svr_discovery_timeout; /* REQ-RMAP-066: microseconds; TC18's
+                                        own stated default is 20000 (20
+                                        ms) -- see
+                                        rcp_regmap_svr_ep_cfg_init(). */
+    uint16_t svr_ep_status;         /* REQ-RMAP-067 */
+} rcp_regmap_svr_ep_cfg_t;
+
+/* Sets svr_discovery_timeout to TC18's own stated power-on default,
+ * 20000 (20 ms in microseconds); svr_ep_status to 0. */
+void rcp_regmap_svr_ep_cfg_init(rcp_regmap_svr_ep_cfg_t *cfg);
+
 /* ── The generic-vs-functional per-endpoint config split ───────────────────── */
 
 /* Server-owned generic per-endpoint config: fields a client's functional

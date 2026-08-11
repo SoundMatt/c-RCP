@@ -34,6 +34,24 @@ the rationale.
 
 ## Releases
 
+### v0.239.0 -- 2026-08-11 (doc + content, no behavior change to any existing consumer)
+
+**Phase 5d Group 5 batch 2 (issue #200): Table 33/36 (RC Server functional configuration) investigated and content-modeled where honest to do so; a prior "PDF garbling" assumption corrected.**
+
+Direct PDF page-image reads (not `pdftotext` extraction) of TC18 §13.7.1.2's own table on both the RC1 baseline (p.81, "Table 33") and the current RC5 baseline (p.91, renumbered "Table 36" by RC5's own added content) confirm the earlier-session "two-column PDF garbling" suspicion for this table was **wrong**: the table has a genuine, primary-source address collision present in both revisions -- `0x0002`/`0x0003`/`0x0004` are each assigned twice, once to the generic EP_FUNC common-entries fields (`svr_ep_enable&clr`/`svr_ep_options`) and once to RC-Server-specific fields (`svr_root_client_index`/`svr_lifecycle_state`/`svr_ep_status`) -- the same class of defect already documented for CAN's Table 53/56. A second, independent contradiction was also found: §13.7.1.1's own prose, immediately preceding this table, states "the RC Server as endpoint is not included in the EP_FUNC_config register maps" -- yet the table lists the generic EP_FUNC common-header fields for the RC Server anyway.
+
+**New**: `rcp_regmap_svr_ep_cfg_t` (regmap.h/regmap.c) models only the two fields free of both defects: `svr_discovery_timeout` (REQ-RMAP-066, defaults to TC18's own stated 20000 µs = 20 ms) and `svr_ep_status` (REQ-RMAP-067). Deliberately NOT modeled: the four common-header fields (would require silently picking a side of the stated self-contradiction) and `svr_root_client_index`/`svr_lifecycle_state` (already correctly modeled at their own uncontested Table 18 addresses -- REQ-RMAP-038/023 -- not duplicated under this table's own disputed local addressing). regmap.h's own new file-header section documents the full investigation, including a working-but-unconfirmed hypothesis (an off-by-4, forgot-the-common-header-offset authoring error) for the collision, explicitly not coded as fact.
+
+**REQ-RMAP-068 reassessed, not force-implemented.** Its own citation (§13.7.1.2's prose) turns out to describe two things, not one: the state-vs-writer distinction (`RCP_ERROR_LOCKED_MEM_ACCESS` vs `RCP_ERROR_UNAUTHORIZED_ACCESS`) is already correctly implemented by `rcp_lifecycle_field_write_error()` (REQ-WIREERR-004/REQ-LIFECYCLE-024) -- this requirement's own prior text claiming "no code path maps the two cases" was stale, now corrected. What remains genuinely open is a THIRD outcome the same paragraph's preceding sentence describes ("read only registers has no effect and request is confirmed normally", err=0, not an error at all) that neither implemented code produces. Working hypothesis: this describes individual read-only BITS within an otherwise-writable register (the same paragraph's OR/AND/XOR/SET register-write-operation discussion), a bit-level concern distinct from -- and NOT a correction to -- REQ-RMAP-025's own already-correct, twice-independently-verified whole-register-map access control (Figure 16, `RCP_LIFECYCLE_FIELD_READ_ONLY` → `LOCKED_MEM_ACCESS`), which is deliberately left unchanged. Not implementable yet regardless: no register-write dispatch mechanism in this codebase currently operates at the bit level.
+
+New test: `test_svr_ep_cfg_now_models_discovery_timeout_and_status` (replaces the old gap-documentation test for REQ-RMAP-066/067, which now correctly fails once the gap partially closed).
+
+Mutation-tested: reverting `rcp_regmap_svr_ep_cfg_init()`'s power-on default produced a clean, deterministic assertion failure (single full-revert mutation, matching batch 10's own established "pure field addition, no surrounding logic" calibration -- no paired logic mutation needed). Reverted, full suite re-verified byte-identical.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
+**Deliberately deferred, unchanged**: REQ-RMAP-055 (W+ lockable access type) remains its own separate, out-of-scope item.
+
 ### v0.238.0 -- 2026-08-11
 
 **Phase 5d Group 5 batch 1 (issue #200): Table 22's three remaining routing indices modeled, watchdog tick/millisecond conversion added.**

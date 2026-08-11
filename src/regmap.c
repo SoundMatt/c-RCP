@@ -339,6 +339,15 @@ void rcp_regmap_ep_functional_cfg_init(rcp_regmap_ep_functional_cfg_t *cfg)
     memset(cfg, 0, sizeof(*cfg));
 }
 
+//cfusa:req REQ-RMAP-066
+//cfusa:req REQ-RMAP-067
+void rcp_regmap_svr_ep_cfg_init(rcp_regmap_svr_ep_cfg_t *cfg)
+{
+    memset(cfg, 0, sizeof(*cfg));
+    cfg->svr_discovery_timeout = 20000u; /* REQ-RMAP-066: TC18's own stated
+                                             default, 20000 us = 20 ms */
+}
+
 /* ── Per-endpoint-type named-signal index ──────────────────────────────────── */
 
 //cfusa:req REQ-RMAP-014
