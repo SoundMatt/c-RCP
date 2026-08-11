@@ -681,22 +681,6 @@ static void test_iseled_block_lacks_collect_resp_nr_leds_and_rcv_timeout(void)
                                                 sizeof(before)));
 }
 
-static void test_iseled_requires_isp_n_polarity_is_inverted(void)
-{
-    /* DEVIATION (BUG) -- TC18 §13.7.12.2: iseled_use_rcv_clk selects the
-     * clock provided by the first ISELED device instead of the Freq_Sync
-     * pattern, and that device-provided clock arrives on ISP_N; the spec
-     * states it is only when Freq_Sync is used that ISP_N need not be
-     * connected to a physical pin. So ISP_N is required if and only if
-     * iseled_use_rcv_clk is TRUE. c-RCP returns the exact opposite, as
-     * asserted below: pin-mapping validation built on this predicate will
-     * accept a recovered-clock endpoint with no ISP_N pin bound, leaving
-     * the receiver with no clock source. A conforming implementation would
-     * return true for true and false for false. */
-    TEST_ASSERT_FALSE(rcp_ep_iseled_requires_isp_n(true));
-    TEST_ASSERT_TRUE(rcp_ep_iseled_requires_isp_n(false));
-}
-
 /* ── MDIO (§13.7.13) ───────────────────────────────────────────────────────── */
 
 static void test_mdio_block_is_exactly_the_common_prefix(void)
@@ -813,7 +797,6 @@ int main(void)
 
     RUN_TEST(test_iseled_response_has_no_read_size_ceiling);
     RUN_TEST(test_iseled_block_lacks_collect_resp_nr_leds_and_rcv_timeout);
-    RUN_TEST(test_iseled_requires_isp_n_polarity_is_inverted);
 
     RUN_TEST(test_mdio_block_is_exactly_the_common_prefix);
     RUN_TEST(test_mdio_request_prefix_carries_no_two_bit_mode_field);

@@ -105,10 +105,19 @@ uint8_t rcp_ep_iseled_crc8(const uint8_t *data, size_t len)
 
 /* ── Recovered-clock mode ──────────────────────────────────────────────────── */
 
+/* CORRECTED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group G): TC18 Table 55
+ * documents 0x0007.4 iseled_use_rcv_clk itself as "Use clock provided by
+ * ISELED 1st device instead of FreqSync pattern" -- true selects the
+ * device-provided clock, which arrives on ISP_N (§13.7.12.2: ISP_N need
+ * not be wired only when the Freq_Sync pattern is used instead). ISP_N is
+ * therefore required exactly when use_rcv_clk is true, the opposite of
+ * what this function returned before this fix -- see the (now-removed)
+ * pinned deviation test in tests/test_tc18_gaps_ep2.c for the prior,
+ * already-diagnosed-but-uncorrected state of this bug. */
 //cfusa:req REQ-ISELED-007
 bool rcp_ep_iseled_requires_isp_n(bool use_rcv_clk)
 {
-    return !use_rcv_clk;
+    return use_rcv_clk;
 }
 
 /* ── Transmission-complete trigger ─────────────────────────────────────────── */

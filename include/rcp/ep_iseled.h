@@ -171,23 +171,31 @@
  *
  * ── Recovered-clock mode: iseled_use_rcv_clk and the unwired ISP_N case ─────
  *
- * `rcp_ep_iseled_functional_cfg_t.iseled_use_rcv_clk`, when true, puts this
- * endpoint into a mode where it recovers its own receive bit clock
- * directly from edges on the ISP_P/ISP_N signal itself rather than from a
- * locally divided clock -- the same even-parity bit framing above
- * guarantees the transition density such recovery needs, since a symbol's
- * all-zero and all-one nibble values (0x0 and 0xF) are given *different*
- * parity bits and therefore never encode to the same repeated bit pattern
- * back to back. In this mode the ISP_N pin does not need to be wired or
- * mapped in the hardware pin map (regmap.h's rcp_regmap_hw_pin_map_entry_t
- * table, untouched by this milestone) at all -- rcp_ep_iseled_requires_isp_n()
- * is this module's own small, pure, directly-testable statement of that
- * invariant (false iff iseled_use_rcv_clk is true), provided for any later
- * pin-mapping validation logic to consult rather than re-derive. This mode
- * governs *receive* clock recovery only: `iseled_bit_clk_divider` remains
- * meaningful in both modes, since this endpoint's own outbound
- * transmission is always locally clocked regardless of how it recovers a
- * clock for what it receives back.
+ * `rcp_ep_iseled_functional_cfg_t.iseled_use_rcv_clk` names TC18 §13.7.12.2
+ * Table 55's own 0x0007.4 register bit directly: "Use clock provided by
+ * ISELED 1st device instead of FreqSync pattern". CORRECTED 2026-08-10
+ * (c-RCP-AUDIT-06, issue #256 Group G): this file previously described the
+ * opposite polarity (claiming true meant *recovering* the clock via
+ * Freq_Sync and needing no ISP_N wiring) -- backwards from what Table 55's
+ * own bit description and §13.7.12.2's own prose both say. True selects
+ * the *device*-provided clock (arriving on ISP_N, the "clock provided on
+ * the ISP_N pin" §13.7.12.2 names); false selects the Freq_Sync pattern
+ * instead, the one case where §13.7.12.2 says "it is not necessary to
+ * connect the ISP_N of the EP to a physical Pin". ISP_N is therefore
+ * required exactly when iseled_use_rcv_clk is true --
+ * rcp_ep_iseled_requires_isp_n() is this module's own small, pure,
+ * directly-testable statement of that invariant (true iff
+ * iseled_use_rcv_clk is true), provided for any later pin-mapping
+ * validation logic to consult rather than re-derive. The Freq_Sync
+ * pattern's own clock recovery (the iseled_use_rcv_clk == false case) is
+ * what the same even-parity bit framing above guarantees the transition
+ * density for, since a symbol's all-zero and all-one nibble values (0x0
+ * and 0xF) are given *different* parity bits and therefore never encode
+ * to the same repeated bit pattern back to back. This mode governs
+ * *receive* clock recovery only: `iseled_bit_clk_divider` remains
+ * meaningful regardless of which clock source feeds reception, since this
+ * endpoint's own outbound transmission is always locally clocked
+ * regardless of how it derives a clock for what it receives back.
  *
  * ── Single trigger: transmission-complete ───────────────────────────────────
  *
@@ -285,8 +293,9 @@ uint8_t rcp_ep_iseled_crc8(const uint8_t *data, size_t len);
 /* ── Recovered-clock mode ──────────────────────────────────────────────────── */
 
 /* True iff the ISP_N pin must be wired/mapped for this endpoint to
- * operate -- false iff use_rcv_clk is true (recovered-clock mode; see the
- * file header), true otherwise. */
+ * operate -- true iff use_rcv_clk is true (device-provided clock, which
+ * arrives on ISP_N; see the file header), false iff the Freq_Sync pattern
+ * is used instead. */
 bool rcp_ep_iseled_requires_isp_n(bool use_rcv_clk);
 
 /* ── Transmission-complete trigger ─────────────────────────────────────────── */

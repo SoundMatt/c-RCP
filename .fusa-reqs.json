@@ -6517,13 +6517,13 @@
     },
     {
       "id": "REQ-ISELED-007",
-      "title": "rcp_ep_iseled_requires_isp_n() reflects recovered-clock mode",
-      "text": "rcp_ep_iseled_requires_isp_n() shall return false iff use_rcv_clk is true.",
+      "title": "rcp_ep_iseled_requires_isp_n() reflects the device-provided-clock mode",
+      "text": "rcp_ep_iseled_requires_isp_n() shall return true iff use_rcv_clk is true. CORRECTED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group G): this entry previously stated the opposite polarity (false iff use_rcv_clk is true), matching a real inverted-polarity bug in rcp_ep_iseled_requires_isp_n()'s own implementation that this fix corrects. TC18 Table 55 documents iseled_use_rcv_clk itself as \"Use clock provided by ISELED 1st device instead of FreqSync pattern\" -- true selects the device-provided clock, which arrives on ISP_N; ISP_N is unneeded only in the false case (Freq_Sync pattern).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.12.2 (\"For receiving ISELED frames on the ISP_P Pin of the interface either a clock synchronization via the Freq_Sync pattern can be done or data sampling based on the clock provided on the ISP_N pin. If the Freq_Sync pattern is used it is not necessary to connect the ISP_N of the EP to a physical Pin.\"), TC18.txt L5549-5551"
+      "tc18": "§13.7.12.2 Table 55, TC18.txt L5534-5535 (\"iseled_use_rcv_clk ... Use clock provided by ISELED 1st device instead of FreqSync pattern\"); §13.7.12.2 (\"For receiving ISELED frames on the ISP_P Pin of the interface either a clock synchronization via the Freq_Sync pattern can be done or data sampling based on the clock provided on the ISP_N pin. If the Freq_Sync pattern is used it is not necessary to connect the ISP_N of the EP to a physical Pin.\"), TC18.txt L5549-5551"
     },
     {
       "id": "REQ-ISELED-008",
