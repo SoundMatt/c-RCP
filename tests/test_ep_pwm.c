@@ -1062,38 +1062,47 @@ static void test_compound_wait_mode_valid_accepts_exactly_4_to_7(void)
     TEST_ASSERT_FALSE(rcp_ep_pwm_in_compound_wait_mode_valid(255));
 }
 
+/* TC18 §13.5.1: evt=100b ("GE") is met when byte_msg_payload (threshold)
+ * >= current interface status (captured), i.e. captured <= threshold.
+ * Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group B) -- this test
+ * previously pinned the reverse (captured >= threshold). */
 static void test_compound_wait_period_ge(void)
 {
     rcp_ep_pwm_value_t captured = {1000, 500};
 
     TEST_ASSERT_TRUE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_PERIOD_GE, 1000));
-    TEST_ASSERT_TRUE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_PERIOD_GE, 999));
-    TEST_ASSERT_FALSE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_PERIOD_GE, 1001));
+    TEST_ASSERT_TRUE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_PERIOD_GE, 1001));
+    TEST_ASSERT_FALSE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_PERIOD_GE, 999));
 }
 
+/* evt=101b ("LE"): threshold <= captured, i.e. captured >= threshold. */
 static void test_compound_wait_period_le(void)
 {
     rcp_ep_pwm_value_t captured = {1000, 500};
 
     TEST_ASSERT_TRUE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_PERIOD_LE, 1000));
-    TEST_ASSERT_TRUE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_PERIOD_LE, 1001));
-    TEST_ASSERT_FALSE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_PERIOD_LE, 999));
+    TEST_ASSERT_TRUE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_PERIOD_LE, 999));
+    TEST_ASSERT_FALSE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_PERIOD_LE, 1001));
 }
 
+/* evt=110b ("GE"), duty-cycle sub-field: captured <= threshold. */
 static void test_compound_wait_duty_ge(void)
 {
     rcp_ep_pwm_value_t captured = {1000, 500};
 
     TEST_ASSERT_TRUE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_DUTY_GE, 500));
-    TEST_ASSERT_FALSE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_DUTY_GE, 501));
+    TEST_ASSERT_TRUE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_DUTY_GE, 501));
+    TEST_ASSERT_FALSE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_DUTY_GE, 499));
 }
 
+/* evt=111b ("LE"), duty-cycle sub-field: captured >= threshold. */
 static void test_compound_wait_duty_le(void)
 {
     rcp_ep_pwm_value_t captured = {1000, 500};
 
     TEST_ASSERT_TRUE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_DUTY_LE, 500));
-    TEST_ASSERT_FALSE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_DUTY_LE, 499));
+    TEST_ASSERT_TRUE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_DUTY_LE, 499));
+    TEST_ASSERT_FALSE(rcp_ep_pwm_in_compound_wait_compare(captured, RCP_EP_PWM_IN_CMP_DUTY_LE, 501));
 }
 
 static void test_compound_wait_invalid_mode_returns_false(void)

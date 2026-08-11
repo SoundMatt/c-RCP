@@ -34,6 +34,10 @@ the rationale.
 
 ## Releases
 
+### v0.207.0 -- 2026-08-10
+
+Full-catalog audit follow-up, batch 8 (Group B): PWM_IN's compound-wait comparisons now compare in the correct direction (REQ-PWM-049/-050/-051/-052). Issue #256 Group B now fully closed. See `ROADMAP.md` for full detail.
+
 ### v0.206.0 -- 2026-08-10
 
 Full-catalog audit follow-up, batch 7 (Group H, final -- doc-only): REQ-SRV-013 cross-reference + REQ-E2E-021 honest gap-flag. Issue #256 Group H now fully closed. See `ROADMAP.md` for full detail.

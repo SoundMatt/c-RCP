@@ -684,8 +684,13 @@ bool rcp_ep_pwm_in_compound_wait_mode_valid(uint8_t v);
  * header. Compares captured.period (modes PERIOD_GE/PERIOD_LE) or
  * captured.active_duration (modes DUTY_GE/DUTY_LE, this module's own
  * reading of "duty-cycle sub-field" -- see the file header) against
- * threshold using the >= or <= operator the mode selects. Returns false
- * (never an error code -- this module's fail-safe treatment, mirroring
+ * threshold, per TC18 §13.5.1's own GE/LE naming (evt[2:0]=100b/110b,
+ * 101b/111b): "GE" means the wire's byte_msg_payload (threshold) is >=
+ * the current interface status (captured) -- i.e. captured <= threshold
+ * -- and "LE" is the mirror, captured >= threshold, matching src/acf.c's
+ * rcp_acf_compound_wait_match() reference implementation of this same
+ * rule (COMPOUND_WAIT_MODE_HI_GE/_LE). Returns false (never an error
+ * code -- this module's fail-safe treatment, mirroring
  * rcp_ep_spi_compound_wait_status_equal()'s own too-short-buffer case) for
  * an invalid mode, and equally false whenever the relevant captured
  * sub-field itself equals RCP_EP_PWM_IN_NO_SIGNAL -- a "no signal"

@@ -11610,3 +11610,50 @@ REQ-E2E-021), and 3 real behavioral bug fixes (REQ-SRV-006 compound
 idle gate, REQ-MOCK-030 EP_NOT_FOUND-to-silent-drop, REQ-PWR-005
 network-wake real handshake). Moving to Group B next: `REQ-PWM-049`-
 `052` (PWM_IN's inverted compound-wait comparisons).
+
+### v0.207.0 -- 2026-08-10
+
+**Full-catalog audit follow-up, batch 8 (Group B, first item): PWM_IN's
+compound-wait comparisons now compare in the correct direction, issue
+#256.**
+
+Confirmed `REQ-PWM-049` through `052` directly against TC18 §13.5.1's
+primary-source text (read fresh from the PDF): evt[2:0]=100b/110b
+("GE") means "byte_msg_payload (the wire's threshold value) is larger
+or equal to the current interface status (captured)" -- i.e.
+`threshold >= captured`, equivalently `captured <= threshold`. evt=101b/
+111b ("LE") is the mirror: `captured >= threshold`.
+`rcp_ep_pwm_in_compound_wait_compare()` (`src/ep_pwm.c`) had all four
+modes computing the reverse direction (`captured >= threshold` for GE,
+`captured <= threshold` for LE) -- a genuine, well-evidenced bug,
+corroborated by this codebase's own reference implementation of the
+identical §13.5.1 rule, `rcp_acf_compound_wait_match()` (`src/acf.c`,
+`COMPOUND_WAIT_MODE_HI_GE`/`_LE`), which always compares
+`payload >= status` / `payload <= status` directly, never swapped.
+Any real compound-wait consumer of this function targeting a PWM_IN
+endpoint would wait on the wrong side of every threshold.
+
+Fixed by swapping the `>=`/`<=` operators in all four cases (the
+`RCP_EP_PWM_IN_NO_SIGNAL` fail-safe guard is unchanged in every case).
+Both `include/rcp/ep_pwm.h`'s function doc comment and all four
+requirement entries corrected to state the right direction explicitly,
+citing the exact primary-source wording. All four existing unit tests
+(`test_compound_wait_period_ge`/`_le`, `test_compound_wait_duty_ge`/`_le`)
+had pinned the wrong (inverted) direction -- rewritten with corrected
+truth tables, matching the fixed comparisons; the DUTY GE/LE tests
+also gained a third assertion each for symmetry with the PERIOD
+tests' own 3-case coverage. `test_compound_wait_no_signal_never_matches`
+needed no change (the NO_SIGNAL guard is direction-independent).
+
+Mutation-tested: reverted all four comparison directions with the
+corrected tests kept, confirmed all 4 (`test_compound_wait_period_ge`/
+`_le`, `test_compound_wait_duty_ge`/`_le`) fail (`Expected TRUE Was
+FALSE`), restored, diff-verified byte-identical against the
+pre-mutation backup. Full suite (65/65) both trees. 1036 requirements
+(unchanged count -- text rewrite of 4 existing entries, no new
+entries).
+
+Issue #256's Group B is now fully closed (4/4 findings). Moving to
+Group F next (`*_functional_cfg_writable()` "regardless of writer"
+staleness, ~7 findings, likely doc-only -- verify code is actually
+already correct per-entry first).

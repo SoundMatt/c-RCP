@@ -4565,7 +4565,7 @@
     {
       "id": "REQ-PWM-049",
       "title": "rcp_ep_pwm_in_compound_wait_compare() implements RCP_EP_PWM_IN_CMP_PERIOD_GE",
-      "text": "rcp_ep_pwm_in_compound_wait_compare() shall, for mode == RCP_EP_PWM_IN_CMP_PERIOD_GE, return true iff captured.period is not RCP_EP_PWM_IN_NO_SIGNAL and captured.period >= threshold.",
+      "text": "rcp_ep_pwm_in_compound_wait_compare() shall, for mode == RCP_EP_PWM_IN_CMP_PERIOD_GE, return true iff captured.period is not RCP_EP_PWM_IN_NO_SIGNAL and captured.period <= threshold (threshold is TC18's byte_msg_payload, captured.period is the current interface status -- \"GE\" describes payload >= status, not status >= threshold). Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group B): this entry, and the code it described, previously had the comparison reversed (captured.period >= threshold), contradicted by both the primary source and this codebase's own reference implementation of the identical §13.5.1 rule, rcp_acf_compound_wait_match() (src/acf.c).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4575,7 +4575,7 @@
     {
       "id": "REQ-PWM-050",
       "title": "rcp_ep_pwm_in_compound_wait_compare() implements RCP_EP_PWM_IN_CMP_PERIOD_LE",
-      "text": "rcp_ep_pwm_in_compound_wait_compare() shall, for mode == RCP_EP_PWM_IN_CMP_PERIOD_LE, return true iff captured.period is not RCP_EP_PWM_IN_NO_SIGNAL and captured.period <= threshold.",
+      "text": "rcp_ep_pwm_in_compound_wait_compare() shall, for mode == RCP_EP_PWM_IN_CMP_PERIOD_LE, return true iff captured.period is not RCP_EP_PWM_IN_NO_SIGNAL and captured.period >= threshold (threshold is TC18's byte_msg_payload, captured.period is the current interface status -- \"LE\" describes payload <= status, not status <= threshold). Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group B): this entry, and the code it described, previously had the comparison reversed (captured.period <= threshold), the mirror of REQ-PWM-049's own correction.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4585,7 +4585,7 @@
     {
       "id": "REQ-PWM-051",
       "title": "rcp_ep_pwm_in_compound_wait_compare() implements RCP_EP_PWM_IN_CMP_DUTY_GE",
-      "text": "rcp_ep_pwm_in_compound_wait_compare() shall, for mode == RCP_EP_PWM_IN_CMP_DUTY_GE, return true iff captured.active_duration is not RCP_EP_PWM_IN_NO_SIGNAL and captured.active_duration >= threshold.",
+      "text": "rcp_ep_pwm_in_compound_wait_compare() shall, for mode == RCP_EP_PWM_IN_CMP_DUTY_GE, return true iff captured.active_duration is not RCP_EP_PWM_IN_NO_SIGNAL and captured.active_duration <= threshold (threshold is TC18's byte_msg_payload, captured.active_duration is the current interface status -- \"GE\" describes payload >= status, not status >= threshold). Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group B): this entry, and the code it described, previously had the comparison reversed (captured.active_duration >= threshold), the same class of error as REQ-PWM-049.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4595,7 +4595,7 @@
     {
       "id": "REQ-PWM-052",
       "title": "rcp_ep_pwm_in_compound_wait_compare() implements RCP_EP_PWM_IN_CMP_DUTY_LE",
-      "text": "rcp_ep_pwm_in_compound_wait_compare() shall, for mode == RCP_EP_PWM_IN_CMP_DUTY_LE, return true iff captured.active_duration is not RCP_EP_PWM_IN_NO_SIGNAL and captured.active_duration <= threshold.",
+      "text": "rcp_ep_pwm_in_compound_wait_compare() shall, for mode == RCP_EP_PWM_IN_CMP_DUTY_LE, return true iff captured.active_duration is not RCP_EP_PWM_IN_NO_SIGNAL and captured.active_duration >= threshold (threshold is TC18's byte_msg_payload, captured.active_duration is the current interface status -- \"LE\" describes payload <= status, not status <= threshold). Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group B): this entry, and the code it described, previously had the comparison reversed (captured.active_duration <= threshold), the mirror of REQ-PWM-051's own correction.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
