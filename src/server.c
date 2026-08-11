@@ -335,6 +335,17 @@ static bool auxiliary_condition_met(const rcp_server_pending_t *slot,
                                             slot->compound_wait_target.len,
                                             ctx->current_status, ctx->current_status_len);
 
+    case RCP_SCHED_KIND_COMPOUND:
+        /* TC18 Table 26's own Compound row: "the state advances to RE as
+         * soon as the EP is idle and no request with higher priority is
+         * pending" -- the same idle gate as Triggered/Chained. Compound
+         * WAIT's own row above has no such gate ("immediately advances
+         * from RS to RE"); the two share delay_expired()'s cmp_exec_delay
+         * check but not this one (REQ-SRV-006). The "no higher priority"
+         * half is rcp_server_endpoint_select_due()'s own job -- it always
+         * picks the best-ranked due candidate when several qualify. */
+        return ctx->endpoint_idle;
+
     case RCP_SCHED_KIND_TRIGGERED:
     case RCP_SCHED_KIND_CHAINED:
         return ctx->endpoint_idle;
