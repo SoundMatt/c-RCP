@@ -9,6 +9,7 @@
 //cfusa:test REQ-RMAP-008
 //cfusa:test REQ-RMAP-030
 //cfusa:test REQ-RMAP-009
+//cfusa:test REQ-RMAP-070
 //cfusa:test REQ-RMAP-010
 //cfusa:test REQ-RMAP-011
 //cfusa:test REQ-RMAP-012
@@ -166,7 +167,7 @@ static void test_writer_ctx_grants_root_client_via_ep0(void)
     rcp_regmap_general_init(&map);
     map.svr_root_client_index = 7;
 
-    ctx = rcp_regmap_writer_ctx(&map, NULL, 7, true, true);
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 7, true, true, false);
     TEST_ASSERT_TRUE(ctx.via_root_client_ep0);
     TEST_ASSERT_FALSE(ctx.via_owning_stream);
 }
@@ -179,10 +180,10 @@ static void test_writer_ctx_denies_root_client_when_wrong_stream_or_not_ep0(void
     rcp_regmap_general_init(&map);
     map.svr_root_client_index = 7;
 
-    ctx = rcp_regmap_writer_ctx(&map, NULL, 8, true, true);
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 8, true, true, false);
     TEST_ASSERT_FALSE(ctx.via_root_client_ep0);
 
-    ctx = rcp_regmap_writer_ctx(&map, NULL, 7, false, true);
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 7, false, true, false);
     TEST_ASSERT_FALSE(ctx.via_root_client_ep0);
 }
 
@@ -193,7 +194,7 @@ static void test_writer_ctx_denies_root_client_when_none_granted(void)
 
     rcp_regmap_general_init(&map); /* svr_root_client_index == RCP_REGMAP_NO_ROOT_CLIENT */
 
-    ctx = rcp_regmap_writer_ctx(&map, NULL, RCP_REGMAP_NO_ROOT_CLIENT, true, true);
+    ctx = rcp_regmap_writer_ctx(&map, NULL, RCP_REGMAP_NO_ROOT_CLIENT, true, true, false);
     TEST_ASSERT_FALSE(ctx.via_root_client_ep0);
 }
 
@@ -207,7 +208,7 @@ static void test_writer_ctx_grants_owning_stream(void)
     owner.has_owning_stream   = true;
     owner.owning_stream_index = 3;
 
-    ctx = rcp_regmap_writer_ctx(&map, &owner, 3, false, true);
+    ctx = rcp_regmap_writer_ctx(&map, &owner, 3, false, true, false);
     TEST_ASSERT_TRUE(ctx.via_owning_stream);
     TEST_ASSERT_FALSE(ctx.via_root_client_ep0);
 }
@@ -220,17 +221,17 @@ static void test_writer_ctx_denies_owning_stream_when_no_owner_or_null(void)
 
     rcp_regmap_general_init(&map);
 
-    ctx = rcp_regmap_writer_ctx(&map, NULL, 3, false, true);
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 3, false, true, false);
     TEST_ASSERT_FALSE(ctx.via_owning_stream);
 
     owner.has_owning_stream   = false;
     owner.owning_stream_index = 3;
-    ctx = rcp_regmap_writer_ctx(&map, &owner, 3, false, true);
+    ctx = rcp_regmap_writer_ctx(&map, &owner, 3, false, true, false);
     TEST_ASSERT_FALSE(ctx.via_owning_stream);
 
     owner.has_owning_stream   = true;
     owner.owning_stream_index = 3;
-    ctx = rcp_regmap_writer_ctx(&map, &owner, 4, false, true);
+    ctx = rcp_regmap_writer_ctx(&map, &owner, 4, false, true, false);
     TEST_ASSERT_FALSE(ctx.via_owning_stream);
 }
 
@@ -248,15 +249,38 @@ static void test_writer_ctx_plumbs_via_unicast_to_non_unicast_frame_flag(void)
     rcp_regmap_general_init(&map);
     map.svr_root_client_index = 7;
 
-    ctx = rcp_regmap_writer_ctx(&map, NULL, 7, true, true);
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 7, true, true, false);
     TEST_ASSERT_FALSE(ctx.via_non_unicast_frame);
     TEST_ASSERT_TRUE(ctx.via_root_client_ep0); /* unaffected by unicast-ness */
 
-    ctx = rcp_regmap_writer_ctx(&map, NULL, 7, true, false);
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 7, true, false, false);
     TEST_ASSERT_TRUE(ctx.via_non_unicast_frame);
     TEST_ASSERT_TRUE(ctx.via_root_client_ep0); /* still granted -- these are independent
                                                    axes; rcp_lifecycle_field_writable() is
                                                    what combines them */
+}
+
+/* REQ-RMAP-070: via_discovery_stream is an already-classified input this
+ * function passes straight through (same convention as via_unicast
+ * above), independent of root-client/owning-stream authorization --
+ * and, critically, it is now ALWAYS explicitly assigned rather than
+ * left uninitialized (REQ-RMAP-009's own fix). Constructing ctx with
+ * every other member false confirms the field is genuinely set, not
+ * just coincidentally zero from stack/memset luck. */
+static void test_writer_ctx_plumbs_via_discovery_stream(void)
+{
+    rcp_regmap_general_t map;
+    rcp_lifecycle_writer_ctx_t ctx;
+
+    rcp_regmap_general_init(&map); /* no root client, no owning stream */
+
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 3, false, true, true);
+    TEST_ASSERT_TRUE(ctx.via_discovery_stream);
+    TEST_ASSERT_FALSE(ctx.via_root_client_ep0);
+    TEST_ASSERT_FALSE(ctx.via_owning_stream);
+
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 3, false, true, false);
+    TEST_ASSERT_FALSE(ctx.via_discovery_stream);
 }
 
 /* ── HW pin-property bit assignments ───────────────────────────────────────── */
@@ -436,6 +460,7 @@ int main(void)
     RUN_TEST(test_writer_ctx_grants_owning_stream);
     RUN_TEST(test_writer_ctx_denies_owning_stream_when_no_owner_or_null);
     RUN_TEST(test_writer_ctx_plumbs_via_unicast_to_non_unicast_frame_flag);
+    RUN_TEST(test_writer_ctx_plumbs_via_discovery_stream);
 
     RUN_TEST(test_pin_property_bits_are_pairwise_distinct);
 

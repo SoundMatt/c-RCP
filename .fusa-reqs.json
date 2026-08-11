@@ -9050,14 +9050,14 @@
     },
     {
       "id": "REQ-RMAP-046",
-      "title": "the four product-specific configuration-section pointer/capacity pairs in the general register map",
-      "text": "NOT IMPLEMENTED: rcp_regmap_general_t declares no pointer/capacity pairs for the four product-specific configuration sections TC18 defines: svr_network_interface_cfg_ptr/svr_network_interface_cfg_capacity (\u00a712.7.11, the entire MAC configuration for an Ethernet interface), svr_physical_layer_cfg_ptr/svr_physical_layer_cfg_capacity (\u00a712.7.12, which may be empty for MDIO Manageable Devices reachable through an MDIO endpoint instead), svr_time_synch_cfg_ptr/svr_timesynch_cfg_capacity (\u00a712.7.13, typically gPTP per IEEE 802.1AS), and svr_security_cfg_ptr/svr_security_cfg_capacity (\u00a712.7.14, typically MACsec per IEEE 802.1AE and its key agreement). Each section shall start at its pointer register and span to pointer + capacity. Consequence: four of the eleven sub-tables a conforming general register map advertises are absent, so a client discovering a c-RCP server cannot locate its MAC, PHY, time-sync or security configuration, and cannot tell that a section is empty (capacity 0) as opposed to unadvertised.",
+      "title": "RETIRED -- merged into REQ-RMAP-039, which already covers this",
+      "text": "RETIRED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group H): this entry was a stale duplicate of REQ-RMAP-039. It described the same four product-specific configuration-section pointer/capacity pairs (network/physical-layer/time-synch/security, TC18 \u00a712.7.11-.14) as \"NOT IMPLEMENTED\", but REQ-RMAP-039 (batch 22, this session) already declared all eight registers in rcp_regmap_general_t and marked the pair PARTIAL -- this entry's own text was simply never updated to match, leaving a requirement that flatly contradicted its own sibling entry about the identical fields. See REQ-RMAP-039 for the current, accurate status (registers declared; still no real config-table storage behind the pointers, and the address range is past the discovery response's own wire-reachability ceiling, REQ-RMAP-024). No code change from this retirement -- text-only correction.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
-      "tc18": "\u00a712.7.11 L3115-L3116; \u00a712.7.12 L3123-L3124; \u00a712.7.13 L3132-L3133; \u00a712.7.14 L3139-L3140"
+      "scope": "retired",
+      "status": "retired",
+      "tc18": "see REQ-RMAP-039"
     },
     {
       "id": "REQ-RMAP-047",
@@ -9305,6 +9305,17 @@
       "asil": "QM",
       "scope": "tc18",
       "tc18": "\u00a713.7.1.2, TC18.txt L4031-4032"
+    },
+    {
+      "id": "REQ-RMAP-070",
+      "title": "rcp_regmap_writer_ctx() explicitly assigns every member of the returned writer_ctx, including via_discovery_stream",
+      "text": "rcp_regmap_writer_ctx() shall set via_discovery_stream to the caller-supplied, already-classified via_discovery_stream argument (pass-through, matching via_ep0/via_unicast's own convention), and every member of the returned rcp_lifecycle_writer_ctx_t shall be explicitly assigned before return -- none left uninitialized. Added 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H / REQ-RMAP-009): this function previously left via_discovery_stream unassigned, a genuine defect since its return value flows directly into ASIL-B write-authorization decisions (rcp_lifecycle_field_writable()/rcp_lifecycle_transition()) that read every member. Currently latent -- no production caller exists yet in src/*.c, only this function's own unit tests -- but the defect was real regardless of whether a caller happened to read the uninitialized field yet.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a712.3.1.2, TC18.txt L2184 (same basis as REQ-RMAP-009 -- this entry covers the writer_ctx construction contract as a whole, not a new TC18 clause)"
     },
     {
       "id": "REQ-SEQ-012",

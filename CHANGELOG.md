@@ -34,6 +34,10 @@ the rationale.
 
 ## Releases
 
+### v0.200.0 -- 2026-08-10
+
+Full-catalog audit follow-up, batch 1 (Group H: REQ-RMAP-009/-046/-070). Issue #256. See `ROADMAP.md` for full detail.
+
 ### v0.199.0 -- 2026-08-10
 
 **Phase 5d batch 29: `hw_pin_type` now matches TC18 Table 20's own bit
