@@ -34,6 +34,10 @@ the rationale.
 
 ## Releases
 
+### v0.203.0 -- 2026-08-10
+
+Full-catalog audit follow-up, batch 4 (Group H): compound requests now respect the endpoint-idle execution gate (REQ-SRV-006). Issue #256. See `ROADMAP.md` for full detail.
+
 ### v0.202.0 -- 2026-08-10
 
 Full-catalog audit follow-up, batch 3 (Group H, doc-only): LIFECYCLE stale-text corrections (REQ-LIFECYCLE-001/-017/-018/-019/-020) + REQ-CANCEL-012 honest gap-flag. Issue #256. See `ROADMAP.md` for full detail.

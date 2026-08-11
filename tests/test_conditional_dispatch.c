@@ -241,6 +241,36 @@ static void test_compound_waits_for_its_sequencer_state(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* Table 26's Compound row: "the state advances to RE as soon as the EP
+ * is idle" -- the same gate test_triggered_never_fires_while_endpoint_busy()
+ * exercises for Triggered. REQ-SRV-006. */
+//cfusa:test REQ-SRV-006
+static void test_compound_never_fires_while_endpoint_busy(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    /* start_state 1 == the power-on state, so the start condition holds
+     * from admission and the (zero) delay is already elapsed -- only
+     * ctx.endpoint_idle stands in the way. */
+    rcp_bytes_t frame = make_compound(RCP_REQUEST_TYPE_COMPOUND, 0,
+                                       RCP_SEQUENCER_POWER_ON_STATE, 4, 0, 0, 13);
+    rcp_server_tick_ctx_t ctx = base_ctx(0);
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &frame));
+
+    ctx.endpoint_idle = false;
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(0, log.count);
+
+    ctx.endpoint_idle = true;
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(1, log.count);
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
 static void test_compound_exec_delay_holds_execution_back(void)
 {
     handler_log_t log;
@@ -1083,6 +1113,7 @@ int main(void)
     RUN_TEST(test_standard_request_still_executes_immediately);
 
     RUN_TEST(test_compound_waits_for_its_sequencer_state);
+    RUN_TEST(test_compound_never_fires_while_endpoint_busy);
     RUN_TEST(test_compound_exec_delay_holds_execution_back);
     RUN_TEST(test_compound_wait_requires_the_wait_condition);
     RUN_TEST(test_two_pending_compound_waits_have_independent_targets);

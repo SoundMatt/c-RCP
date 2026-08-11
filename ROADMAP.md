@@ -11418,3 +11418,46 @@ text-only edits to existing entries).
 Issue #256's Group H is now down to 6 remaining findings: `REQ-SRV-006`/
 `-013`, `REQ-PWR-005`, `REQ-E2E-021`, `REQ-MOCK-030`. (`REQ-CANCEL-012`
 closed via honest gap-flag above, not a code fix.)
+
+### v0.203.0 -- 2026-08-10
+
+**Full-catalog audit follow-up, batch 4 (Group H): compound requests now
+respect the endpoint-idle execution gate, issue #256.**
+
+Confirmed `REQ-SRV-006` directly against TC18 Table 26 (§12.9.3, read
+fresh from the primary-source PDF): the Compound row states "the state
+advances to RE as soon as the EP is idle and no request with higher
+priority is pending" -- the identical idle-and-priority gate Triggered
+and Chained already apply, and explicitly distinct from Compound WAIT's
+own row two lines below it ("immediately advances from RS to RE", no
+idle gate at all). `auxiliary_condition_met()`'s switch (`src/server.c`)
+grouped `RCP_SCHED_KIND_COMPOUND` with `RCP_SCHED_KIND_COMPOUND_WAIT`'s
+own idle-gate-free `default: return true` case -- a real bug: a
+Compound request could be selected as due and executed while its
+endpoint was still busy with another request, in violation of TC18's
+own execution-serialization rule. The "no request with higher priority
+is pending" half was never at risk -- `rcp_server_endpoint_select_due()`
+already always picks the single best-ranked due candidate across every
+kind, satisfying that half implicitly.
+
+Fixed by giving `RCP_SCHED_KIND_COMPOUND` its own case, returning
+`ctx->endpoint_idle` (matching Triggered/Chained), leaving
+`COMPOUND_WAIT` on its own unchanged, gate-free path. New test
+`test_compound_never_fires_while_endpoint_busy` in
+`test_conditional_dispatch.c`, mirroring the existing
+`test_triggered_never_fires_while_endpoint_busy()` pattern exactly.
+`REQ-SRV-006`'s own text rewritten to describe both rows accurately
+(also fixed a citation gap: added the Table 26 Compound-row citation
+this idle-gate claim needed, which the entry never had).
+
+Mutation-tested: removed the new `RCP_SCHED_KIND_COMPOUND` case,
+confirmed `test_compound_never_fires_while_endpoint_busy` fails
+(`Expected FALSE Was TRUE` -- the request executed while busy),
+restored, diff-verified byte-identical against the pre-mutation
+backup. Full suite (65/65) both trees. 1036 requirements (unchanged
+count -- text rewrite of an existing entry, no new entry needed since
+REQ-SRV-006 already existed and just needed correcting).
+
+Issue #256's Group H is down to 4 remaining: `REQ-SRV-013` (doc-only,
+cross-references the already-flagged `REQ-CANCEL-012` chain-cascade
+gap), `REQ-PWR-005`, `REQ-E2E-021`, `REQ-MOCK-030`.
