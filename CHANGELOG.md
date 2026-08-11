@@ -34,6 +34,12 @@ the rationale.
 
 ## Releases
 
+### v0.230.0 -- 2026-08-11 (doc-only)
+
+**SPI channel-selection mechanism, dedicated investigation RESOLVED, no code change** (`c-RCP-AUDIT-06`, task #98): closes the question flagged and deferred across batches 2 and 3 of the spec rebaseline -- whether SPI channel selection should move from evt-bits to a new BBID-based `Channel_selection` field (Table 26). Read TC18 §13.5's own authoritative per-endpoint-type evt[2:0] table directly (the table whose own intro states "the detailed behavior of each endpoint based on the evt[2:0] is described in the following table"): the SPI row is completely unchanged in 0.5.1_RC5 (still "selects channel 0...5"), and its own attached tracked-change comment reads, verbatim, "051RC4: new concept: selection of SPI channel via Stream_id(index)/byte_bus_id (not via evt-bits) => this becomes obsolete IF new concept is accepted" -- explicitly conditional, and that condition is not met as of RC5. §13.7.3.1's own running prose (the earlier-flagged apparent inconsistency) has already been edited in place to describe the new concept as though adopted -- a real, minor internal inconsistency in the RC5 draft itself, not an extraction error. `ep_spi.h`'s existing evt-bits implementation is confirmed correct and fully conformant; a durable doc note recording this resolution (with the exact conditional quote) added to the file header so a future reader doesn't need to re-derive it from the PDF.
+
+65/65 both trees (unaffected, comment-only). `cfusa check`: 0 errors.
+
 ### v0.229.0 -- 2026-08-11 (doc-only)
 
 **Spec rebaseline to TC18 0.5.1_RC5, batch 3** (§12.7.8 EP_ID_config, doc-only, no code behavior change): confirmed the "Request_Stream_Index and BBID shall occur in ascending order" sentence `REQ-RMAP-020`/`021`/`022`/`056` (ASIL-A/QM) cite as their TC18 basis for `rcp_regmap_ep_id_map_is_ascending()` is entirely **deleted** as of spec revision 0.5.1_RC4 (rendered PDF, tracked-change tag `051RC4: sentence deleted as discussed`) -- current TC18 no longer states or implies any EP_ID_config ordering requirement at all. The function's own behavior is unaffected and remains a correct, harmless, purely-diagnostic helper (`regmap.h`'s own file header already correctly framed it as read-only tooling, never server-side enforcement) -- it simply no longer traces to a live TC18 MUST. All four requirements' `text`/`tc18` fields updated to record the deletion with primary-source evidence; `regmap.h`'s file header and the affected field's own doc comment updated to match.
