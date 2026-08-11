@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/ep_wakeup.h"
 
+#include <stdlib.h>
 #include <string.h>
 
 /* ── Wire-layout constants (this module's own choice; see the file header) ── */
@@ -15,6 +16,20 @@
 #define SLEEPCMD_RESPONSE_PAYLOAD_LEN ((size_t)2u) /* opcode(1) + result(1) */
 #define WAKEUP_PAYLOAD_LEN            ((size_t)1u) /* opcode(1) */
 
+/* ── Byte-order helpers (this TU's own copy, matching acf.c's/ep_mdio.c's
+ * house convention of not sharing a byte-order util across modules) ────── */
+
+static void put_u16(uint8_t *p, uint16_t v)
+{
+    p[0] = (uint8_t)((v >> 8) & 0xFFu);
+    p[1] = (uint8_t)(v & 0xFFu);
+}
+
+static uint16_t get_u16(const uint8_t *p)
+{
+    return (uint16_t)(((uint16_t)p[0] << 8) | (uint16_t)p[1]);
+}
+
 /* ── Wake-source pin configuration/monitoring ────────────────────────────────── */
 
 //cfusa:req REQ-WAKEUP-001
@@ -22,6 +37,7 @@ void rcp_ep_wakeup_functional_cfg_init(rcp_ep_wakeup_functional_cfg_t *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
     rcp_regmap_ep_functional_cfg_init(&cfg->common);
+    rcp_ep_wakeup_wup_status_init(&cfg->wup_status);
 }
 
 //cfusa:req REQ-WAKEUP-002
@@ -237,4 +253,182 @@ bool rcp_ep_wakeup_is_wakeup_echo(const uint8_t *b, size_t len, rcp_byte_bus_id_
     if (rc != RCP_EP_WAKEUP_OK) return false;
 
     return transaction_num == sent_transaction_num;
+}
+
+/* ── The EP_func register block (evt[2:0] == 111b) ─────────────────────────── */
+
+//cfusa:req REQ-WAKEUP-021
+//cfusa:req REQ-WAKEUP-022
+void rcp_ep_wakeup_render_registers(const rcp_ep_wakeup_functional_cfg_t *cfg,
+                                     uint8_t out[RCP_EP_WAKEUP_EP_FUNC_LEN])
+{
+    size_t i;
+
+    out[RCP_EP_WAKEUP_REG_EP_LEN]         = (uint8_t)RCP_EP_WAKEUP_EP_FUNC_LEN;
+    out[RCP_EP_WAKEUP_REG_NR_IO_PINS_MAX] = (uint8_t)RCP_EP_WAKEUP_MAX_SOURCES;
+    put_u16(&out[RCP_EP_WAKEUP_REG_EP_STATUS], cfg->ep_status);
+    /* wup_status: only bit 0 is rendered (this module's own single-
+     * aggregate-latch simplification -- see the file header). */
+    put_u16(&out[RCP_EP_WAKEUP_REG_WUP_STATUS],
+            cfg->wup_status.latched ? 0x0001u : 0x0000u);
+
+    for (i = 0; i < RCP_EP_WAKEUP_MAX_SOURCES; i++) {
+        const rcp_ep_wakeup_source_cfg_t *src = &cfg->sources[i];
+        uint16_t base = (uint16_t)(RCP_EP_WAKEUP_REG_SOURCE_BASE +
+                                    (uint16_t)i * RCP_EP_WAKEUP_REG_SOURCE_SPAN);
+        uint8_t  io_src;
+        uint16_t reg;
+
+        if (!src->enabled) io_src = RCP_EP_WAKEUP_IO_SRC_INACTIVE;
+        else io_src = src->active_high ? RCP_EP_WAKEUP_IO_SRC_HIGH_LEVEL
+                                        : RCP_EP_WAKEUP_IO_SRC_LOW_LEVEL;
+
+        reg = (uint16_t)(((uint16_t)(io_src & 0x1Fu) << 11) |
+                          (src->pin_number & 0x07FFu));
+        put_u16(&out[base], reg);
+    }
+}
+
+/* The inverse of render: adopts every R/W register from an already patched
+ * block image. The read-only offsets (EP_LEN, NR_IO_PINS_MAX) are
+ * deliberately not read back -- rcp_ep_wakeup_apply_reconfig() re-renders
+ * them from cfg before patching, so a write covering them is a no-op. */
+static void parse_wakeup_registers(rcp_ep_wakeup_functional_cfg_t *cfg,
+                                    const uint8_t in[RCP_EP_WAKEUP_EP_FUNC_LEN])
+{
+    uint16_t wup;
+    size_t   i;
+
+    cfg->ep_status = get_u16(&in[RCP_EP_WAKEUP_REG_EP_STATUS]);
+
+    /* write-1-to-clear (TC18 §13.7.2.2's own rule): the written value's
+     * bit 0 set clears the latch; any other bit pattern (including 0) is
+     * a no-op -- writing 0 does not itself set the latch, matching the
+     * pre-existing rcp_ep_wakeup_wup_status_t API's own semantics (only
+     * a real wake-source assertion calls _latch()). */
+    wup = get_u16(&in[RCP_EP_WAKEUP_REG_WUP_STATUS]);
+    if ((wup & 0x0001u) != 0u) rcp_ep_wakeup_wup_status_clear(&cfg->wup_status);
+
+    for (i = 0; i < RCP_EP_WAKEUP_MAX_SOURCES; i++) {
+        rcp_ep_wakeup_source_cfg_t *src = &cfg->sources[i];
+        uint16_t base = (uint16_t)(RCP_EP_WAKEUP_REG_SOURCE_BASE +
+                                    (uint16_t)i * RCP_EP_WAKEUP_REG_SOURCE_SPAN);
+        uint16_t reg  = get_u16(&in[base]);
+        uint8_t  io_src = (uint8_t)((reg >> 11) & 0x1Fu);
+
+        src->pin_number = (uint16_t)(reg & 0x07FFu);
+
+        switch (io_src) {
+        case RCP_EP_WAKEUP_IO_SRC_INACTIVE:
+            src->enabled = false;
+            break;
+        case RCP_EP_WAKEUP_IO_SRC_HIGH_LEVEL:
+            src->enabled     = true;
+            src->active_high = true;
+            break;
+        case RCP_EP_WAKEUP_IO_SRC_LOW_LEVEL:
+            src->enabled     = true;
+            src->active_high = false;
+            break;
+        default:
+            /* Edge-triggered (0x01-0x03) or reserved (0x06-0x1F): this
+             * module cannot represent it -- enabled/active_high are left
+             * exactly as they were, an honest "cannot apply" rather than
+             * a silently wrong reinterpretation as a level mode. See the
+             * file header's own register-block note. */
+            break;
+        }
+    }
+}
+
+/* True iff the octet at relative offset addr belongs to a read-only
+ * register of the block -- EP_LEN or NR_IO_PINS_MAX. */
+static bool wakeup_reg_offset_read_only(uint16_t addr)
+{
+    return addr == RCP_EP_WAKEUP_REG_EP_LEN ||
+           addr == RCP_EP_WAKEUP_REG_NR_IO_PINS_MAX;
+}
+
+//cfusa:req REQ-WAKEUP-021
+const char *rcp_ep_wakeup_reconfig_strerror(rcp_ep_wakeup_reconfig_errc_t e)
+{
+    switch (e) {
+    case RCP_EP_WAKEUP_RECONFIG_OK:
+        return "rcp/ep_wakeup: configuration write applied";
+    case RCP_EP_WAKEUP_RECONFIG_ERR_SHORT:
+        return "rcp/ep_wakeup: configuration write has no address and data";
+    case RCP_EP_WAKEUP_RECONFIG_ERR_OUT_OF_RANGE:
+        return "rcp/ep_wakeup: configuration write extends past the EP_func block";
+    default:
+        return "rcp/ep_wakeup: unknown configuration-write error";
+    }
+}
+
+//cfusa:req REQ-WAKEUP-021
+//cfusa:req REQ-WAKEUP-022
+rcp_ep_wakeup_reconfig_errc_t rcp_ep_wakeup_apply_reconfig(rcp_ep_wakeup_functional_cfg_t *cfg,
+                                                            const uint8_t *payload,
+                                                            size_t payload_len)
+{
+    uint8_t  block[RCP_EP_WAKEUP_EP_FUNC_LEN];
+    uint16_t start_address;
+    size_t   data_len;
+    size_t   i;
+
+    if (payload_len <= RCP_EP_WAKEUP_RECONFIG_ADDR_LEN) {
+        return RCP_EP_WAKEUP_RECONFIG_ERR_SHORT;
+    }
+
+    start_address = get_u16(payload);
+    data_len      = payload_len - RCP_EP_WAKEUP_RECONFIG_ADDR_LEN;
+
+    /* "Any payload whose length plus the start address exceeds EP_LEN is
+     * to be ignored" -- the whole write, not just its overhanging tail
+     * (§12.7.1). */
+    if ((size_t)start_address + data_len > (size_t)RCP_EP_WAKEUP_EP_FUNC_LEN) {
+        return RCP_EP_WAKEUP_RECONFIG_ERR_OUT_OF_RANGE;
+    }
+
+    rcp_ep_wakeup_render_registers(cfg, block);
+    for (i = 0; i < data_len; i++) {
+        uint16_t addr = (uint16_t)(start_address + i);
+
+        if (wakeup_reg_offset_read_only(addr)) continue; /* write ignored */
+        block[addr] = payload[RCP_EP_WAKEUP_RECONFIG_ADDR_LEN + i];
+    }
+    parse_wakeup_registers(cfg, block);
+
+    return RCP_EP_WAKEUP_RECONFIG_OK;
+}
+
+//cfusa:req REQ-WAKEUP-021
+rcp_bytes_t rcp_ep_wakeup_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                   uint16_t start_address, const uint8_t *data,
+                                                   size_t data_len, uint8_t transaction_num)
+{
+    rcp_acf_byte_message_info_t hdr   = {0};
+    rcp_bytes_t                 empty = {0};
+    uint8_t                     *payload;
+    size_t                       payload_len;
+    rcp_bytes_t                  frame;
+
+    if (data_len == 0 || data == NULL) return empty;
+
+    payload_len = RCP_EP_WAKEUP_RECONFIG_ADDR_LEN + data_len;
+    if (payload_len > RCP_ACF_MAX_PAYLOAD) return empty;
+
+    payload = (uint8_t *)malloc(payload_len);
+    if (!payload) return empty;
+
+    put_u16(payload, start_address);
+    memcpy(payload + RCP_EP_WAKEUP_RECONFIG_ADDR_LEN, data, data_len);
+
+    hdr.byte_bus_id     = byte_bus_id;
+    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.evt             = 0x7u; /* evt[2:0] == 111b, §12.7.1 */
+    hdr.transaction_num = transaction_num;
+
+    frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
+    free(payload);
+    return frame;
 }
