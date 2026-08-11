@@ -34,6 +34,10 @@ the rationale.
 
 ## Releases
 
+### v0.214.0 -- 2026-08-10
+
+Full-catalog audit follow-up, batch 15 (Group I, partial): added `rcp_e2e_crc_error_should_enter_safe_state()` -- TC18 §12.7.7 Table 22's own rx_enforce_e2e description names two consequences for its 1b value in the same sentence ("stream is blocked until released... Safe state will be entered"), but only the first (the stream-fault latch) had a primitive at all; the second was entirely uncited and unimplemented. New pure decision function added, mirroring the existing `rcp_e2e_overflow_should_enter_safe_state()` precedent exactly, with the same honest "pure primitive exists, cross-endpoint escalation orchestration does not yet" gap disclosure. New `REQ-E2E-045` (status: partial). Mutation-tested. Issue #256 Group I (~10 items) begun; this closes 1 of them. See `ROADMAP.md` for full detail.
+
 ### v0.213.0 -- 2026-08-10
 
 Full-catalog audit follow-up, batch 14 (Group G, real fix): `rcp_ep_iseled_requires_isp_n()` had its polarity backwards -- TC18 Table 55 documents `iseled_use_rcv_clk` itself as "Use clock provided by ISELED 1st device instead of FreqSync pattern", meaning true selects the device-provided clock (which arrives on ISP_N), not the Freq_Sync self-recovery mode this codebase's own docs, code, and requirement entry all previously (and consistently) claimed. A pinned deviation test already named and explained this exact bug (`test_iseled_requires_isp_n_polarity_is_inverted`, added in an earlier audit pass but never acted on) -- issue #256's Group G confirmed it was still uncorrected and still accepted without a gap flag. Fixed the function body, `ep_iseled.h`'s file header, `REQ-ISELED-007`, and the two affected tests; the now-obsolete deviation-pinning test removed. Mutation-tested (revert → confirm failure → restore). Issue #256 Group G now fully closed. See `ROADMAP.md` for full detail.

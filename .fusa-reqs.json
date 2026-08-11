@@ -9830,6 +9830,17 @@
       "tc18": "§12.7.7 Table 22 (\"rx_enforce_e2e ... 1b: stream is blocked until released, when CRC check at EP fails.\"), TC18.txt L2865-2867"
     },
     {
+      "id": "REQ-E2E-045",
+      "title": "PARTIAL: rcp_e2e_crc_error_should_enter_safe_state() names rx_enforce_e2e's second consequence, but nothing drives the cross-endpoint escalation",
+      "text": "PARTIAL: rcp_e2e_crc_error_should_enter_safe_state() shall return rx_enforce_e2e unchanged. ADDED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group I): TC18 §12.7.7 Table 22's own 0x000D.0 rx_enforce_e2e description names two distinct consequences for its 1b value in the same sentence -- \"stream is blocked until released, when CRC check at EP fails\" (REQ-E2E-021's rcp_e2e_stream_fault_on_crc_error()/rcp_e2e_stream_fault_t) AND \"Safe state will be entered\" -- and only the first had a primitive at all before this entry; the second was entirely uncited and unimplemented. This function is the pure, directly-testable decision such an escalation would be gated on, matching REQ-E2E-030's own rcp_e2e_overflow_should_enter_safe_state() precedent exactly (rx_enforce_e2e carries no separate _safestate_enable bit of its own -- unlike rx_wd_safestate_enable/rx_ovrflw_safestate_enable/rx_seq_safestate_enable, the single rx_enforce_e2e bit gates both consequences at once, so this decision is simply rx_enforce_e2e's own value). What remains not implemented, identically to REQ-E2E-030's and REQ-E2E-021's own admissions: the stream-wide half of the rule -- bringing every OTHER endpoint bound to the same request stream into its configured safe state -- which this library's current single-endpoint-scoped data model has no type representing \"all endpoints on a stream\" to perform from inside any single endpoint's own admission/dispatch path. That escalation needs a caller-owned, cross-endpoint orchestrator that does not yet exist in this codebase.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18-gap",
+      "status": "partial",
+      "tc18": "§12.7.7 Table 22 (\"rx_enforce_e2e ... 1b: stream is blocked until released, when CRC check at EP fails. Safe state will be entered.\"), TC18.txt L2865-2867"
+    },
+    {
       "id": "REQ-ADC-031",
       "title": "the ADC endpoint's five trigger output signals",
       "text": "NOT IMPLEMENTED: c-RCP defines none of the five ADC trigger outputs TC18 \u00a713.7.9.1 Table 50 enumerates. The ADC endpoint shall generate trigger 0 when the averaged output value falls below adc_trigger_min, trigger 1 when it rises above adc_trigger_min, trigger 2 when it falls below adc_trigger_max, trigger 3 when it rises above adc_trigger_max, and trigger 4 when it finishes a measurement interval. ep_adc.h has no trigger enumeration, no threshold registers, and no evaluation function. Consequence: threshold-crossing detection is impossible, and the spec's own documented cyclic-ADC pattern \u2014 'configured to generate responses cyclically ... by using a trigger request which triggers on the ADC EP itself having finished a measurement' (L5033-5034) \u2014 cannot be built, because trigger 4 does not exist.",

@@ -28,6 +28,7 @@
 //cfusa:test REQ-E2E-028
 //cfusa:test REQ-E2E-029
 //cfusa:test REQ-E2E-030
+//cfusa:test REQ-E2E-045
 
 /* test_tc18_gaps_ep.c -- a spec-literal conformance-and-deviation suite for
  * the TC18 clauses catalogued by the v0.105.0 requirements-corpus
@@ -1087,6 +1088,26 @@ static void test_e2e_overflow_should_enter_safe_state_is_gated_only_on_the_confi
     TEST_ASSERT_FALSE(rcp_e2e_overflow_should_enter_safe_state(false));
 }
 
+/* REQ-E2E-045 (partial) DEVIATION PIN: TC18 §12.7.7 Table 22's own
+ * 0x000D.0 rx_enforce_e2e description names two consequences for its 1b
+ * value in the same sentence -- "stream is blocked until released, when
+ * CRC check at EP fails" (the rcp_e2e_stream_fault_t latch, REQ-E2E-021 --
+ * itself also only a pure primitive nothing in the dispatch path calls
+ * yet) AND "Safe state will be entered". This library's data model has
+ * the same "no type for every other endpoint bound to this stream" gap
+ * REQ-E2E-030's own deviation pin (above) documents for
+ * rx_ovrflw_safestate_enable -- rcp_e2e_crc_error_should_enter_safe_state()
+ * is the pure decision a caller-owned orchestrator would consult to
+ * actually perform that escalation once such a caller exists. Unlike
+ * rx_ovrflw_safestate_enable, rx_enforce_e2e carries no separate
+ * safestate-enable bit of its own: the one bit gates both consequences,
+ * so this decision is simply rx_enforce_e2e's own value. */
+static void test_e2e_crc_error_should_enter_safe_state_is_gated_only_on_rx_enforce_e2e(void)
+{
+    TEST_ASSERT_TRUE(rcp_e2e_crc_error_should_enter_safe_state(true));
+    TEST_ASSERT_FALSE(rcp_e2e_crc_error_should_enter_safe_state(false));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -1126,6 +1147,7 @@ int main(void)
     RUN_TEST(test_e2e_seq_evaluate_wraparound_is_a_clean_single_increment);
     RUN_TEST(test_e2e_request_store_overflow_reports_error_code_but_not_escalation);
     RUN_TEST(test_e2e_overflow_should_enter_safe_state_is_gated_only_on_the_config_bit);
+    RUN_TEST(test_e2e_crc_error_should_enter_safe_state_is_gated_only_on_rx_enforce_e2e);
 
     return UNITY_END();
 }

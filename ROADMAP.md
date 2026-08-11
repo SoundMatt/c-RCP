@@ -12039,3 +12039,91 @@ Issue #256's Group G is now fully closed (2/2, a real fix).
 16 + F 7 + E 4 + C 16 + G 2 = 78). Moving to Group I next (~10 genuine
 uncited gaps needing new requirement entries -- extraction work, not
 a defect-fix).
+
+### v0.214.0 -- 2026-08-10
+
+**Full-catalog audit follow-up, batch 15 (Group I item 1 of ~10):
+rx_enforce_e2e's own second, previously-uncited safe-state consequence
+given a real primitive, issue #256.**
+
+Started Group I (~10 genuine uncited gaps flagged by the audit as
+needing new requirement entries, not fixes to existing ones). Read
+TC18 §12.7.7 Table 22 directly: 0x000D.0 `rx_enforce_e2e`'s own 1b
+value is documented as triggering two consequences in the same
+sentence -- "stream is blocked until released, when CRC check at EP
+fails" AND "Safe state will be entered". Only the first had a
+primitive anywhere in this codebase
+(`rcp_e2e_stream_fault_on_crc_error()`/`rcp_e2e_stream_fault_t`,
+REQ-E2E-021 -- itself already honestly flagged partial, since nothing
+in the dispatch path calls it either). The second consequence had no
+primitive, no citation, nothing -- confirmed by direct comparison
+against `rcp_e2e_wd_evaluate()`/`rcp_e2e_seq_evaluate()`, both of
+which return an `enter_safe_state` field as part of their own result,
+and `rcp_e2e_overflow_should_enter_safe_state()`, a dedicated pure
+decision function -- `rx_enforce_e2e`'s own sibling had no such
+counterpart at all.
+
+Added `rcp_e2e_crc_error_should_enter_safe_state(bool rx_enforce_e2e)`
+(`e2e.h`/`e2e.c`), a pure one-line decision mirroring
+`rcp_e2e_overflow_should_enter_safe_state()`'s own exact shape.
+Unlike `rx_wd_safestate_enable`/`rx_ovrflw_safestate_enable`/
+`rx_seq_safestate_enable`, `rx_enforce_e2e` carries no separate
+dedicated safestate-enable bit of its own -- the single bit gates both
+consequences at once -- so the new function simply returns
+`rx_enforce_e2e` unchanged. New `REQ-E2E-045`, `status: "partial"`,
+given the identical honest treatment `REQ-E2E-030`'s own precedent
+established: the pure decision primitive is correct and tested, but
+actually wiring it into a real cross-endpoint safe-state escalation
+needs an orchestrator type ("every endpoint bound to this request
+stream") that does not yet exist anywhere in this codebase -- the same
+architectural gap `REQ-E2E-021`/`REQ-E2E-030` already document for
+their own consequences.
+
+Added `test_e2e_crc_error_should_enter_safe_state_is_gated_only_on_rx_enforce_e2e()`
+to `tests/test_tc18_gaps_ep.c` (the same file `REQ-E2E-030`'s own
+deviation-pin test lives in), mirroring that test's exact two-assertion
+shape and DEVIATION-PIN comment style. Mutation-tested (forced the
+function to always return
+`false`, confirmed the new test catches it with 1 failure, restored).
+Full suite (65/65) both trees. `cfusa check`: 0 errors. `cfusa trace`:
+100% traced, 100% sec-tested, 0 gaps (the new partial-status entry
+does not shift the 1024 denominator, consistent with this tool's
+established tolerance for honestly-flagged not-implemented/partial
+entries -- see `feedback_verify_tools_against_primary_source`-class
+prior confirmation this session).
+
+Issue #256's Group I is 1/~10 items addressed (a genuine, real
+addition — not just a documentation fix, unlike most of this group's
+remaining items are expected to be). Remaining Group I items, each
+independently verified against primary source but not yet acted on in
+this batch: `RCP_CFG_INCONSISTENT`'s own missing 2nd plausibility
+bullet (§12.3.1.2, "For each configured stream at least one
+stream_id/byte_bus_id is configured" -- confirmed absent from
+`rcp_lifecycle_check_rcp_cfg()`, no matching `.fusa-reqs.json` entry
+either); the GPIO/PWM_OUT `evt[2:0]=100b` rule's own already-cited but
+only-half-implemented UNSUPPORTED_CMD error-response half
+(`REQ-GPIO-012`/`REQ-PWM-008` cite the full two-part TC18 rule but
+their own shall-statements commit only to the no-op half); and SPI's
+`evt[2:0]=110b`/`111b` handling, where `rcp_ep_spi_channel_valid()`
+correctly rejects both as invalid but a real gap was found beyond what
+the audit itself named: SPI has **no §12.7.1 configuration-write
+decode path at all** (no `rcp_ep_spi_apply_reconfig()`-equivalent,
+unlike GPIO/PWM_OUT's own), so evt=111b -- a legitimate, TC18-defined
+operation, not an error -- is currently indistinguishable from
+evt=110b's genuine reserved/reject case; both return
+`RCP_EP_SPI_ERR_BAD_CHANNEL` uniformly. This last finding may extend
+beyond SPI: only GPIO and PWM_OUT of this codebase's endpoint types
+implement an `apply_reconfig()`-shaped register-write path at all,
+raising the question of whether ADC/PWM_IN/I2C/LIN/CAN/UART/ISELED/
+MDIO share the same gap or handle §12.7.1 configuration writes some
+other, not-yet-identified way -- flagged here for a dedicated
+follow-up investigation rather than assumed. UART Table 48's uncovered
+registers, ADC's `adc_combine_avg_values`/`adc_avg_intervals_per_request`
+MUST rule, ISELED Table 55's register block, the Cancel-family Ack
+sub-field (Tables 11/12/13), GPIO's read-with-payload behavior
+(§13.7.4.3), and WakeUp's wake-source debounce time (§13.7.2.2)
+remain entirely uninvestigated in this batch.
+
+**Progress: 79/156 findings resolved** (Groups H 12 + B 4 + A 17 + D
+16 + F 7 + E 4 + C 16 + G 2 + I(partial) 1 = 79). Group I continues
+next.
