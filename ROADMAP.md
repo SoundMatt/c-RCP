@@ -14732,3 +14732,58 @@ address a table reached via a Table-18 pointer rather than an
 endpoint's own EP_func block?) or new infrastructure this codebase
 doesn't have yet, not incremental content modeling. Phase 5e (issue
 #201, task #89) is the next queued item in the standing roadmap.
+
+### v0.241.0 -- 2026-08-11 (zero production blast radius -- no prior
+caller existed)
+
+**Phase 5e batch 1 (issue #201): REQ-DISC-029, discovery-stream-
+occupied refusal now has a real signal.**
+
+`rcp_discovery_claim_note_request()` (discovery.h/discovery.c)
+changes `void` -> `bool`: `true` when the discovery claim was open
+and granted, `false` when refused because it was already held by an
+unlapsed claimant. TC18 §12.3 Figure 16's own two "Discovery request
+received" transitions -- read directly against TC18.txt -- carve out
+no exception for requester identity, so this refusal applies
+uniformly whether a different client or the current claimant itself
+re-requests.
+
+Zero production blast radius: this function had no caller anywhere
+in the codebase besides its own definition before this change --
+still true after (no wire-dispatch path calls it yet, same
+deferred-dispatch pattern as the rest of this project's TC18-gap
+work). Every existing test call site (11 across 3 test files)
+compiles unchanged, since C permits silently discarding a return
+value.
+
+**Genuinely left open, not force-resolved**: `DISCOVERY_STREAM_OCCUPIED`
+is a Figure-16-diagram-only label -- TC18 §12.9.6 Table 27's own 17
+numbered wire error codes (`rcp_wire_error_t`) do not include it.
+Unlike `LOCKED_CONFIG_ACCESS` (which cleanly maps onto
+`RCP_ERROR_LOCKED_MEM_ACCESS`, the only numbered code with a
+semantically matching name), no numbered code here has an obviously
+corresponding meaning, so none is invented. Which wire error code
+(if any) a future caller should send for the `false` case remains a
+genuine, unresolved ambiguity, same class as `REQ-ACF-012`'s
+`RCP_ACF_MTV_UNCERTAIN`.
+
+New test: `test_discovery_claim_refusal_now_returns_a_real_signal`
+(replaces the old gap-documentation test, which is now stale since
+the refusal is no longer "unreportable" -- it also newly exercises
+the same-claimant-re-request case, which the old test never
+covered).
+
+Mutation-tested: granting the claim unconditionally regardless of
+`rcp_discovery_claim_is_open()`'s answer produced a clean,
+deterministic assertion failure. Reverted, full suite re-verified
+byte-identical.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
+0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
+**Progress**: DISC group (issue #201) now fully addressed --
+`REQ-DISC-029` was its only item. **Next**: I2C, WDG, CFG (2 items),
+TIMED (2 items), LINEP (2 items) -- the remaining smallest/
+most-isolated modules, per issue #201's own suggested build-momentum
+ordering, before the larger endpoint-type clusters (ADC, SPI, UART,
+GPIO, PWM, ISELED, CANEP, MDIO).

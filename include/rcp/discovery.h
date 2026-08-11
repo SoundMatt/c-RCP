@@ -370,15 +370,31 @@ bool rcp_discovery_claim_is_open(const rcp_discovery_claim_t *claim, uint64_t no
  * for that state check -- this function does not consult
  * rcp_lifecycle_state_t itself, matching this codebase's convention of
  * taking already-classified inputs). If the claim is open, grants it to
- * requester and starts a fresh Discovery_TimeOut window. If the claim is
- * already held by a not-yet-lapsed different claimant, this is a no-op:
- * the existing claimant is not preempted, and this requester's own read
- * is still answered as ordinary concurrent discovery -- see the file
- * header. Requesting again while already the claimant is also a no-op
- * here (it does not itself refresh the deadline -- only an actual
- * configuration write does, via rcp_discovery_claim_note_config_write()). */
-void rcp_discovery_claim_note_request(rcp_discovery_claim_t *claim,
-                                      rcp_stream_id_t requester, uint64_t now_ms);
+ * requester, starts a fresh Discovery_TimeOut window, and returns true --
+ * the caller answers with an ordinary discovery response. If the claim is
+ * already held by a not-yet-lapsed claimant (REQ-DISC-029), this is a
+ * no-op on claim's own state and returns false: TC18 Figure 16's own two
+ * "Discovery request received" transitions read literally --
+ * "& no discovery stream assigned -> assign discovery stream -> send
+ * discovery response" versus "& discovery stream assigned -> send error
+ * response DISCOVERY_STREAM_OCCUPIED" -- with no carve-out for requester
+ * identity, so this refusal applies uniformly whether requester is a
+ * different claimant or the current one re-requesting (re-requesting
+ * does not itself refresh the deadline either way -- only an actual
+ * configuration write does, via rcp_discovery_claim_note_config_write()).
+ *
+ * DISCOVERY_STREAM_OCCUPIED is a Figure-16-diagram-only label: TC18
+ * §12.9.6 Table 27's own 17 numbered wire error codes (rcp_wire_error_t,
+ * errors.h) do not include it, and unlike LOCKED_CONFIG_ACCESS (which
+ * cleanly maps onto RCP_ERROR_LOCKED_MEM_ACCESS, the only numbered code
+ * with a semantically matching name), no numbered code here has an
+ * obviously corresponding meaning -- flagged as a genuine, unresolved
+ * ambiguity (same class as REQ-ACF-012's RCP_ACF_MTV_UNCERTAIN), not
+ * force-mapped. This function's own bool return is therefore as far as
+ * this codebase goes: which numbered wire error code (if any) a caller
+ * should send for the false case is not decided here. */
+bool rcp_discovery_claim_note_request(rcp_discovery_claim_t *claim,
+                                       rcp_stream_id_t requester, uint64_t now_ms);
 
 /* True iff claim is currently held by writer specifically (not lapsed) as
  * of now_ms. A pure query: does not mutate claim. One input a caller
