@@ -550,6 +550,54 @@ rcp_wire_error_t rcp_lifecycle_field_write_error(rcp_lifecycle_state_t state,
                                                   rcp_lifecycle_field_kind_t kind,
                                                   rcp_lifecycle_writer_ctx_t writer);
 
+/* REQ-RMAP-055: TC18's own W+ (explicitly lockable) access type
+ * (§12.7.8 Table 23 -- every EP_ID_config row; §12.7.9 Table 24 --
+ * STREAM_UID/flush_on_count/Flush_time) -- distinct from every kind
+ * rcp_lifecycle_field_kind_t already models. A W+ field follows the
+ * SAME lifecycle-state/writer rule as RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR
+ * (writable in HW_UNCONFIGURED; authorized-writer-only in HW_CONFIGURED;
+ * permanently locked once RCP_CONFIGURED), PLUS an INDEPENDENT lock the
+ * configuring instance may set at any time to protect the table from
+ * further modification, "independently of the lifecycle state that
+ * governs W and W*" (TC18's own words, §12.7.8, TC18.txt L2977).
+ * `locked` is that additional, caller-supplied bit -- true always
+ * overrides whatever the state/writer rule below would otherwise
+ * permit, in any lifecycle state.
+ *
+ * Deliberately a SEPARATE function, not a new rcp_lifecycle_field_kind_t
+ * enum value threaded through rcp_lifecycle_field_writable()'s own
+ * signature: that function has roughly 90 existing call sites (12
+ * endpoint types' own writability gates, 2 internal uses, regmap.c,
+ * and every test exercising any of them) that would each need a
+ * mechanical-but-wide edit for a lock concept that, per REQ-RMAP-055's
+ * own text, has no wire-write dispatch path calling it yet anywhere --
+ * EP_ID_config and the Table 24 queue registers are both still
+ * content-modeling-only, same deferred-ACF_ABB-wrapper gap as every
+ * other Group 5 table (REQ-RMAP-052/054/061/065). A standalone
+ * function delivers the same TC18-conformant primitive with none of
+ * that blast radius, matching this phase's own established additive,
+ * zero-risk-to-existing-callers precedent (e.g.
+ * rcp_regmap_hw_pin_map_render(), rcp_regmap_wd_timeout_ms_to_ticks())
+ * -- it reuses (not re-derives) rcp_lifecycle_field_writable()'s own
+ * FUNCTIONAL_W_STAR branch internally. */
+bool rcp_lifecycle_field_writable_w_plus(rcp_lifecycle_state_t state,
+                                          rcp_lifecycle_writer_ctx_t writer,
+                                          bool locked);
+
+/* The REQ-WIREERR-004-style error classification for a W+ field,
+ * matching rcp_lifecycle_field_write_error()'s own two-code split, with
+ * a third input (`locked`) folded in: RCP_ERROR_LOCKED_MEM_ACCESS when
+ * `locked` is true (this field's own explicit lock always wins,
+ * unconditionally, the same way RCP_LIFECYCLE_FIELD_READ_ONLY's state-
+ * and writer-independent denial does) OR the underlying
+ * FUNCTIONAL_W_STAR state rule would deny even a maximally-privileged
+ * writer; RCP_ERROR_UNAUTHORIZED_ACCESS when the underlying state
+ * would otherwise permit the write but writer specifically does not;
+ * RCP_ERROR_NONE when writable. */
+rcp_wire_error_t rcp_lifecycle_field_write_error_w_plus(rcp_lifecycle_state_t state,
+                                                          rcp_lifecycle_writer_ctx_t writer,
+                                                          bool locked);
+
 #ifdef __cplusplus
 }
 #endif

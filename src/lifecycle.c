@@ -377,3 +377,36 @@ rcp_wire_error_t rcp_lifecycle_field_write_error(rcp_lifecycle_state_t state,
     if (!rcp_lifecycle_field_writable(state, kind, best)) return RCP_ERROR_LOCKED_MEM_ACCESS;
     return RCP_ERROR_UNAUTHORIZED_ACCESS;
 }
+
+//cfusa:req REQ-RMAP-055
+bool rcp_lifecycle_field_writable_w_plus(rcp_lifecycle_state_t state,
+                                          rcp_lifecycle_writer_ctx_t writer,
+                                          bool locked)
+{
+    if (locked) return false; /* the field's own explicit lock always wins */
+    return rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer);
+}
+
+//cfusa:req REQ-RMAP-055
+rcp_wire_error_t rcp_lifecycle_field_write_error_w_plus(rcp_lifecycle_state_t state,
+                                                          rcp_lifecycle_writer_ctx_t writer,
+                                                          bool locked)
+{
+    rcp_lifecycle_writer_ctx_t best;
+
+    if (rcp_lifecycle_field_writable_w_plus(state, writer, locked)) return RCP_ERROR_NONE;
+
+    if (locked) return RCP_ERROR_LOCKED_MEM_ACCESS; /* explicit lock, unconditional */
+
+    /* Re-evaluate with a maximally-privileged writer (unlocked, every
+     * authorizing condition true, frame unicast) to isolate whether the
+     * denial above was purely state-driven -- same technique as
+     * rcp_lifecycle_field_write_error()'s own doc comment. */
+    best.via_root_client_ep0   = true;
+    best.via_owning_stream     = true;
+    best.via_non_unicast_frame = false;
+    best.via_discovery_stream  = true;
+
+    if (!rcp_lifecycle_field_writable_w_plus(state, best, false)) return RCP_ERROR_LOCKED_MEM_ACCESS;
+    return RCP_ERROR_UNAUTHORIZED_ACCESS;
+}
