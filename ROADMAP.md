@@ -11509,3 +11509,61 @@ of an existing entry).
 
 Issue #256's Group H is down to 3 remaining: `REQ-SRV-013` (doc-only,
 ready), `REQ-PWR-005`, `REQ-E2E-021`.
+
+### v0.205.0 -- 2026-08-10
+
+**Full-catalog audit follow-up, batch 6 (Group H, final real code fix):
+network wake now requires the same real handshake a pin wake does,
+issue #256.**
+
+Confirmed `REQ-PWR-005` against the primary-source PDF and this
+session's own prior `REQ-PWRMODE-020` fix: TC18 §12.4.1 states a
+TC14/TC10 network-level wake-up request "will directly check for the
+network availability and proceed as before" -- the same real handshake
+a pin/EP-signal wake runs, not a shortcut.
+`rcp_pwrmode_hotstart_required(RCP_PWRMODE_WAKE_VIA_NETWORK)` has
+returned `true` unconditionally since REQ-PWRMODE-020's own fix
+(`src/power.c`), but `rcp_powerstate_manager_wake_via_network()`
+(`src/powerstate.c`) never got updated to match -- it fabricated a
+throwaway, always-immediately-complete `rcp_pwrmode_handshake_t`
+locally purely to preserve its own pre-existing "always hot" contract,
+reproducing at the client-convenience-wrapper layer the exact bug
+REQ-PWRMODE-020 already fixed at the protocol-core layer underneath
+it. A caller invoking a network wake got `RCP_PWRMODE_START_HOT`
+regardless of whether any real handshake round-trip actually occurred
+-- a genuine safety-relevant divergence, since hot/cold classification
+governs what re-initialization work a caller skips.
+
+Fixed by using the endpoint's own real, caller-driven `e->handshake`
+state -- exactly the field `rcp_powerstate_manager_wake_via_pin()`
+already consults -- instead of the fabricated local one. The public
+three-step handshake API
+(`rcp_powerstate_manager_handshake_begin()`/`_apply_wakeup_echo()`/
+`_handshake_resume_queues()`) was already path-agnostic (keyed only by
+`addr`), so no new API surface was needed; a caller doing a network
+wake now drives the identical steps a pin wake already required.
+`REQ-PWR-005`'s own text, and both doc comments (file header +
+function) in `powerstate.h`, corrected to match.
+
+`test_wake_via_network_from_sleep_is_hot` (which pinned the wrong
+behavior -- HOT with zero handshake steps driven) split into
+`test_wake_via_network_hot_when_handshake_complete` (mirrors
+`test_wake_via_pin_hot_when_handshake_complete()` exactly) and
+`test_wake_via_network_cold_when_handshake_not_started` (mirrors
+`test_wake_via_pin_cold_when_handshake_not_started()`). Grepped for
+every other `wake_via_network` reference in the test tree -- none
+found outside `test_powerstate.c`.
+
+Mutation-tested: restored the fabricated-handshake code with the new
+tests kept, confirmed `test_wake_via_network_cold_when_handshake_not_started`
+fails (`Expected 1 Was 0` -- reported HOT instead of COLD with no
+handshake driven), reverted, diff-verified byte-identical against the
+pre-mutation backup. Full suite (65/65) both trees. 1036 requirements
+(unchanged count -- text rewrite of an existing entry).
+
+**Issue #256's Group H is now down to 2 remaining, both doc-only and
+ready**: `REQ-SRV-013` (cross-references the already-flagged
+`REQ-CANCEL-012` chain-cascade gap) and `REQ-E2E-021` (honest
+`status: "partial"`/`scope: "tc18-gap"` flag, matching the
+already-established `REQ-E2E-028/029/030`/`REQ-WDG-010` precedent for
+"pure primitive exists but nothing calls it").

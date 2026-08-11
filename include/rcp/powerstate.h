@@ -45,13 +45,16 @@
  *     power.h's own rcp_pwrmode_transition() once the matching response
  *     arrives.
  *   - rcp_powerstate_manager_wake_via_network() drives power.h's
- *     network-level wake path, requiring no wire exchange or caller-
- *     driven handshake of its own -- it synthesizes and immediately
- *     completes one internally (REQ-PWRMODE-020: power.h no longer
- *     models a network wake as handshake-free, since TC18 §12.4.1 has
- *     it "proceed as before" through the same steps a pin wake does;
- *     this function's own "always hot" contract is unchanged, only how
- *     it is achieved against power.h's corrected primitive).
+ *     network-level wake path, consulting addr's own real handshake
+ *     state exactly as _wake_via_pin() does below -- REQ-PWRMODE-020:
+ *     power.h no longer models a network wake as handshake-free, since
+ *     TC18 §12.4.1 has it "proceed as before" through the same steps a
+ *     pin wake does, so this function requires the same caller-driven
+ *     handshake a pin wake does too (corrected 2026-08-10,
+ *     c-RCP-AUDIT-06, issue #256 -- this function previously fabricated
+ *     an always-immediately-complete handshake internally to preserve
+ *     an incorrect "always hot" contract of its own, rather than
+ *     actually requiring the real handshake TC18 now mandates).
  *   - rcp_powerstate_manager_handshake_begin()/_encode_wakeup_probe()/
  *     _apply_wakeup_echo()/_handshake_resume_queues()/_wake_via_pin() are
  *     thin, addr-scoped pass-throughs over power.h's own
@@ -170,13 +173,24 @@ rcp_powerstate_errc_t rcp_powerstate_manager_apply_entry_response(rcp_powerstate
 
 /* ── Waking from Sleep ─────────────────────────────────────────────────────── */
 
-/* Wakes addr from Sleep back to Normal via the always-hot network-level
- * wake path (power.h's RCP_PWRMODE_WAKE_VIA_NETWORK) -- no wire exchange
- * of this module's own is involved; see the file header.
- * *out_start_kind (if non-NULL) is always RCP_PWRMODE_START_HOT on
- * success. Returns RCP_POWERSTATE_ERR_UNKNOWN_ENDPOINT if addr was not
- * registered; RCP_POWERSTATE_ERR_TRANSITION if addr's mirrored mode isn't
- * currently RCP_PWRMODE_SLEEP. */
+/* Wakes addr from Sleep back to Normal via the network-level wake path
+ * (power.h's RCP_PWRMODE_WAKE_VIA_NETWORK), driven by addr's own
+ * handshake state exactly as rcp_powerstate_manager_wake_via_pin() is --
+ * TC18 §12.4.1's own text ("a TC14/TC10 wake-up request on the network
+ * ... will directly check for the network availability and proceed as
+ * before") requires the same real handshake a pin/EP-signal wake runs,
+ * not a shortcut (REQ-PWRMODE-020). Corrected 2026-08-10
+ * (c-RCP-AUDIT-06, issue #256): this function previously fabricated an
+ * always-immediately-complete handshake internally and reported
+ * *out_start_kind as unconditionally RCP_PWRMODE_START_HOT; a caller
+ * now drives the same three-step API (rcp_powerstate_manager_handshake_begin()/
+ * _apply_wakeup_echo()/_handshake_resume_queues() above, all
+ * path-agnostic) before calling this function for the wake to be
+ * classified hot -- calling it with no handshake driven correctly
+ * reports RCP_PWRMODE_START_COLD, per rcp_pwrmode_wake_from_sleep()'s
+ * own rule (power.h). Returns RCP_POWERSTATE_ERR_UNKNOWN_ENDPOINT if
+ * addr was not registered; RCP_POWERSTATE_ERR_TRANSITION if addr's
+ * mirrored mode isn't currently RCP_PWRMODE_SLEEP. */
 rcp_powerstate_errc_t rcp_powerstate_manager_wake_via_network(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr,
                                                                 rcp_pwrmode_start_kind_t *out_start_kind);
 

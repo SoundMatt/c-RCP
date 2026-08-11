@@ -226,7 +226,6 @@ rcp_powerstate_errc_t rcp_powerstate_manager_wake_via_network(rcp_powerstate_man
     endpoint_entry_t *e;
     rcp_pwrmode_errc_t ec;
     rcp_pwrmode_t mode_after;
-    rcp_pwrmode_handshake_t hs;
 
     rcp_mutex_lock(&m->mu);
     e = find_entry(m, addr);
@@ -234,25 +233,24 @@ rcp_powerstate_errc_t rcp_powerstate_manager_wake_via_network(rcp_powerstate_man
         rcp_mutex_unlock(&m->mu);
         return RCP_POWERSTATE_ERR_UNKNOWN_ENDPOINT;
     }
-    /* REQ-PWRMODE-020: power.h's rcp_pwrmode_hotstart_required() no
-     * longer special-cases a network wake as always-hot-with-no-
-     * handshake (primary-source correction: TC18 §12.4.1 has a network
-     * wake "proceed as before", i.e. run the same handshake a pin/EP-
-     * signal wake does). This function's own documented contract (see
-     * powerstate.h) is "always hot for a network wake" -- preserved here
-     * by driving a synthetic, immediately-completed handshake locally:
-     * this wrapper represents the whole network wake-up event (network
-     * already available, WakeUp already answered by construction of a
-     * *network*-sourced wake) happening atomically, not a caller-driven
-     * multi-step exchange the way the pin-wake path below is. */
-    rcp_pwrmode_handshake_init(&hs, 1u);
-    /* Network availability is trivially true here: the wake-up signal
-     * arrived over the network in the first place (REQ-PWRMODE-016's
-     * own precondition is already satisfied by construction). */
-    rcp_pwrmode_handshake_iface_reenabled(&hs, true);
-    rcp_pwrmode_handshake_wakeup_attempt(&hs, true);
-    rcp_pwrmode_handshake_resume_queues(&hs);
-    ec = rcp_pwrmode_wake_from_sleep(&e->mode, RCP_PWRMODE_WAKE_VIA_NETWORK, &hs, out_start_kind);
+    /* REQ-PWRMODE-020 (TC18 §12.4.1, "proceed as before"): a network
+     * wake now requires the same real handshake a pin/EP-signal wake
+     * does -- rcp_pwrmode_hotstart_required(RCP_PWRMODE_WAKE_VIA_NETWORK)
+     * is unconditionally true. This function used to fabricate a
+     * throwaway, always-immediately-complete local handshake here
+     * purely to force RCP_PWRMODE_START_HOT regardless of what actually
+     * happened on the wire -- corrected 2026-08-10 (c-RCP-AUDIT-06,
+     * issue #256 Group H) to instead consult addr's own real handshake
+     * state, e->handshake, exactly as rcp_powerstate_manager_wake_via_pin()
+     * already does below. A caller must now drive the same three-step
+     * handshake API (rcp_powerstate_manager_handshake_begin()/
+     * _apply_wakeup_echo()/_handshake_resume_queues(), all
+     * path-agnostic -- see powerstate.h) before calling this function
+     * for the wake to be classified hot; calling it with no handshake
+     * driven at all now correctly reports RCP_PWRMODE_START_COLD, the
+     * same as an undriven pin wake does. */
+    ec = rcp_pwrmode_wake_from_sleep(&e->mode, RCP_PWRMODE_WAKE_VIA_NETWORK, &e->handshake,
+                                      out_start_kind);
     mode_after = e->mode;
     rcp_mutex_unlock(&m->mu);
 
