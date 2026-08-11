@@ -461,3 +461,9 @@ void rcp_e2e_stream_fault_reset(rcp_e2e_stream_fault_t *f)
 {
     f->faulted = false;
 }
+
+//cfusa:req REQ-E2E-045
+bool rcp_e2e_crc_error_should_enter_safe_state(bool rx_enforce_e2e)
+{
+    return rx_enforce_e2e;
+}

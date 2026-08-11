@@ -247,6 +247,15 @@
  * living alongside this module's otherwise-pure functions" shape the
  * pre-replacement content used for its own replay-guard.
  *
+ * ADDED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group I):
+ * rcp_e2e_crc_error_should_enter_safe_state() names rx_enforce_e2e's own
+ * second, previously-uncovered consequence -- TC18 §12.7.7 Table 22
+ * documents 0x000D.0 rx_enforce_e2e's 1b value as triggering BOTH "stream
+ * is blocked until released" (the latch above) AND, in the same sentence,
+ * "Safe state will be entered". Unlike its wd/overflow/seq siblings,
+ * rx_enforce_e2e has no separate dedicated safestate-enable bit of its
+ * own gating this -- the one bit drives both consequences.
+ *
  * Note for downstream security/safety documentation: this module does not
  * reimplement the pre-replacement content's sequence-counter/replay-window
  * mechanism (there was no rx_enforce_seq-equivalent in this milestone's
@@ -687,6 +696,27 @@ bool rcp_e2e_stream_fault_on_crc_error(rcp_e2e_stream_fault_t *f, bool rx_enforc
 
 /* True iff f is currently latched faulted. */
 bool rcp_e2e_stream_fault_is_faulted(const rcp_e2e_stream_fault_t *f);
+
+/* ADDED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group I): TC18 §12.7.7
+ * Table 22's own 0x000D.0 rx_enforce_e2e description names two distinct
+ * consequences for its 1b value -- "stream is blocked until released,
+ * when CRC check at EP fails" (rcp_e2e_stream_fault_on_crc_error()/
+ * rcp_e2e_stream_fault_t, above) AND "Safe state will be entered". Unlike
+ * its siblings (rx_wd_safestate_enable, rx_ovrflw_safestate_enable,
+ * rx_seq_safestate_enable), rx_enforce_e2e carries no separate
+ * "_safestate_enable" bit of its own -- the single rx_enforce_e2e bit
+ * gates both consequences at once -- so this decision is simply
+ * rx_enforce_e2e's own value, not a second input ANDed against it.
+ * Exactly like rcp_e2e_overflow_should_enter_safe_state() (this
+ * function's own direct analogue, above): TC18 requires this decision to
+ * drive every endpoint bound to the affected request stream into its
+ * configured safe state, and this library's current data model has no
+ * type representing "all endpoints on a stream" for a single endpoint's
+ * admission/dispatch path to reach across into -- that escalation is
+ * left to whichever future phase gives request streams their own
+ * cross-endpoint management; this function is the caller-facing decision
+ * such an orchestrator would consult. */
+bool rcp_e2e_crc_error_should_enter_safe_state(bool rx_enforce_e2e);
 
 /* Clears f back to the not-faulted state. */
 void rcp_e2e_stream_fault_reset(rcp_e2e_stream_fault_t *f);
