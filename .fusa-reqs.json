@@ -2326,7 +2326,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§12.3 (\"The three lifecycle states the device may be in are...\"), TC18.txt L2063"
+      "tc18": "§13.7.1.2 Table 33, svr_lifecycle_state row (\"0x00: HW_UNCONFIGURED / 0x55: HW_CONFIGURED / 0xAA: RCP_CONFIGURED\"), TC18.txt L3990-3992 -- corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256): the prior citation (§12.3, TC18.txt L2063) pointed only to the sentence naming the three states, not to where their numeric wire values are actually defined; code itself (include/rcp/lifecycle.h:122-124) was always correct against the right source, only the citation was wrong"
     },
     {
       "id": "REQ-LIFECYCLE-002",
@@ -2479,43 +2479,43 @@
     },
     {
       "id": "REQ-LIFECYCLE-017",
-      "title": "HW_CONFIGURED and RCP_CONFIGURED apply the ordinary TSCF/time-sync drop rule",
-      "text": "rcp_lifecycle_should_accept() shall return false for RCP_LIFECYCLE_HW_CONFIGURED and RCP_LIFECYCLE_RCP_CONFIGURED whenever rcp_avtp_should_drop_tscf() would return true for the given time_sync_supported and avtp_subtype, and shall otherwise return true for those two states.",
+      "title": "RCP_CONFIGURED applies the ordinary TSCF/time-sync drop rule; HW_CONFIGURED drops TSCF unconditionally",
+      "text": "rcp_lifecycle_should_accept() shall return false for RCP_LIFECYCLE_RCP_CONFIGURED whenever rcp_avtp_should_drop_tscf() would return true for the given time_sync_supported and avtp_subtype, and shall otherwise return true for that state. RCP_LIFECYCLE_HW_CONFIGURED instead drops every TSCF-headed frame unconditionally, regardless of what rcp_avtp_should_drop_tscf() would return -- see REQ-LIFECYCLE-028 for that stricter, separately-tracked rule. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256): this entry's own formal \"shall\" text and title previously claimed the ordinary rule applied to HW_CONFIGURED too, which the code has never done since REQ-LIFECYCLE-028 landed (src/lifecycle.c:245, `if (avtp_subtype == RCP_AVTP_SUBTYPE_TSCF) return RCP_LIFECYCLE_DROP;`, inside the HW_CONFIGURED branch, unconditional) -- only this entry's own citation footnote acknowledged the divergence in prose; the normative text did not.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§11.1 (\"In case time-synchronization is not supported, AVTPDUs having a TSCF header are dropped, and no response send.\"), TC18.txt L1074 -- same general rule as REQ-AVTP-014; TC18 §12.3.1.2 separately specifies HW_CONFIGURED drops TSCF unconditionally regardless of time-sync support, a known divergence tracked at REQ-LIFECYCLE-028"
+      "tc18": "§11.1 (\"In case time-synchronization is not supported, AVTPDUs having a TSCF header are dropped, and no response send.\"), TC18.txt L1074 -- same general rule as REQ-AVTP-014, now correctly scoped to RCP_CONFIGURED only; TC18 §12.3.1.2 separately specifies HW_CONFIGURED drops TSCF unconditionally regardless of time-sync support, formally tracked at REQ-LIFECYCLE-028"
     },
     {
       "id": "REQ-LIFECYCLE-018",
-      "title": "HW_GENERIC fields become read-only once HW_CONFIGURED",
-      "text": "rcp_lifecycle_field_writable() shall return true for RCP_LIFECYCLE_FIELD_HW_GENERIC only when state is RCP_LIFECYCLE_HW_UNCONFIGURED, for every writer context, and shall return false for that field kind in both RCP_LIFECYCLE_HW_CONFIGURED and RCP_LIFECYCLE_RCP_CONFIGURED.",
+      "title": "HW_GENERIC fields are writable only via the discovery stream while HW_UNCONFIGURED, and read-only thereafter",
+      "text": "rcp_lifecycle_field_writable() shall return true for RCP_LIFECYCLE_FIELD_HW_GENERIC only when state is RCP_LIFECYCLE_HW_UNCONFIGURED and writer.via_discovery_stream is true, shall return false for that field kind for any other writer context while still RCP_LIFECYCLE_HW_UNCONFIGURED, and shall return false for that field kind unconditionally in both RCP_LIFECYCLE_HW_CONFIGURED and RCP_LIFECYCLE_RCP_CONFIGURED. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256): this entry's own text previously said HW_UNCONFIGURED writability held \"for every writer context\", which stopped being true once REQ-LIFECYCLE-026/035's fix (src/lifecycle.c:308) gated it on writer.via_discovery_stream -- the HW_CONFIGURED/RCP_CONFIGURED read-only half of this entry's own text was, and remains, correct.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§12.3.1.2 (\"In this state access to the HW configuration of the RC Server shall have been concluded and as such all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178"
+      "tc18": "§12.3.1.2 (\"In this state access to the HW configuration of the RC Server shall have been concluded and as such all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178; §12.3.1.1 (\"All configurations must be run via the stream which was used for discovery.\"), TC18.txt L2161, the basis for the HW_UNCONFIGURED via_discovery_stream gate (REQ-LIFECYCLE-026/035)"
     },
     {
       "id": "REQ-LIFECYCLE-019",
-      "title": "FUNCTIONAL_W fields require an authorized writer once RCP_CONFIGURED",
-      "text": "rcp_lifecycle_field_writable() shall return true for RCP_LIFECYCLE_FIELD_FUNCTIONAL_W in RCP_LIFECYCLE_HW_CONFIGURED for every writer context, shall return false in RCP_LIFECYCLE_HW_UNCONFIGURED for every writer context, and shall return true in RCP_LIFECYCLE_RCP_CONFIGURED if and only if writer.via_root_client_ep0 or writer.via_owning_stream is true.",
+      "title": "FUNCTIONAL_W fields require an authorized writer once HW_CONFIGURED or RCP_CONFIGURED",
+      "text": "rcp_lifecycle_field_writable() shall return false for RCP_LIFECYCLE_FIELD_FUNCTIONAL_W in RCP_LIFECYCLE_HW_UNCONFIGURED for every writer context; shall return true in RCP_LIFECYCLE_RCP_CONFIGURED if and only if writer.via_root_client_ep0 or writer.via_owning_stream is true; and shall return true in RCP_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true -- one condition wider than the RCP_CONFIGURED case. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256): this entry's own text previously claimed HW_CONFIGURED writability held \"for every writer context\", contradicted by both the code (REQ-LIFECYCLE-030/036's authorization gate, src/lifecycle.c:284-291,311-319) and this project's own test (test_lifecycle.c's test_functional_w_hw_configured_requires_authorization_or_discovery_stream()).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§12.3.1.3 (\"...only write access to the EP's functional configurations is allowed via their dedicated stream_id/byte_bus_id combinations or via root client access EP0... Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables.\"), TC18.txt L2203-2206, L2225-2226"
+      "tc18": "§12.3.1.3 (\"...only write access to the EP's functional configurations is allowed via their dedicated stream_id/byte_bus_id combinations or via root client access EP0... Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables.\"), TC18.txt L2203-2206, L2225-2226; §12.3.1.2 (TC18.txt L2184), the basis for HW_CONFIGURED's wider via_discovery_stream allowance (REQ-LIFECYCLE-030/036)"
     },
     {
       "id": "REQ-LIFECYCLE-020",
-      "title": "FUNCTIONAL_W_STAR fields are permanently locked once RCP_CONFIGURED",
-      "text": "rcp_lifecycle_field_writable() shall return false for RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR in RCP_LIFECYCLE_RCP_CONFIGURED for every writer context, including one with both via_root_client_ep0 and via_owning_stream set, while returning true for that field kind in RCP_LIFECYCLE_HW_CONFIGURED.",
+      "title": "FUNCTIONAL_W_STAR fields require the same authorized writer as FUNCTIONAL_W while HW_CONFIGURED, and are permanently locked once RCP_CONFIGURED",
+      "text": "rcp_lifecycle_field_writable() shall return false for RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR in RCP_LIFECYCLE_RCP_CONFIGURED for every writer context, including one with both via_root_client_ep0 and via_owning_stream set; shall return true unconditionally in RCP_LIFECYCLE_HW_UNCONFIGURED; and shall return true in RCP_LIFECYCLE_HW_CONFIGURED if and only if writer.via_root_client_ep0, writer.via_owning_stream, or writer.via_discovery_stream is true -- the same gate REQ-LIFECYCLE-019 applies to FUNCTIONAL_W. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256): this entry's own text previously claimed unconditional HW_CONFIGURED writability, contradicted by REQ-LIFECYCLE-036's later fix (src/lifecycle.c:321-335), which gated this same branch identically to FUNCTIONAL_W's own HW_CONFIGURED case. The RCP_CONFIGURED permanent-lock half of this entry's own text was, and remains, correct.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§12.3.1.3 (\"Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables (W*: write prohibited in depending on lifecycle state.)\"), TC18.txt L2225-2226 -- TC18's W* marker is general; c-RCP's split into FUNCTIONAL_W (conditionally writable via authorization) versus FUNCTIONAL_W_STAR (unconditionally locked) is this implementation's own refinement of which W* fields fall into which case, not itself named in the cited text"
+      "tc18": "§12.3.1.3 (\"Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables (W*: write prohibited in depending on lifecycle state.)\"), TC18.txt L2225-2226 -- TC18's W* marker is general; c-RCP's split into FUNCTIONAL_W (conditionally writable via authorization) versus FUNCTIONAL_W_STAR (unconditionally locked once RCP_CONFIGURED) is this implementation's own refinement of which W* fields fall into which case, not itself named in the cited text"
     },
     {
       "id": "REQ-SRV-001",
@@ -5681,11 +5681,12 @@
     {
       "id": "REQ-CANCEL-012",
       "title": "rcp_cancel_chain_should_cascade() cascades to a chain member's own position and every position after it",
-      "text": "rcp_cancel_chain_should_cascade() shall return true iff member_position >= canceled_position.",
+      "text": "rcp_cancel_chain_should_cascade() shall return true iff member_position >= canceled_position. PARTIAL as of 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): the function itself is correct and directly unit-tested, but no real dispatch path calls it -- src/mock.c's apply_cancellation() cancels only the single targeted transaction on a clear-single (0x07) request; it never checks whether other queued requests are chained to the one being cancelled, so TC18's own cascade rule (quoted below) is not actually enforced by this server's reference implementation. Wiring this correctly needs real chain-position tracking across the request queue (which member is chained to which, and each member's own position), a larger feature than this requirement's own narrow scope -- tracked here as a known gap rather than silently claimed complete.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18",
+      "scope": "tc18-gap",
+      "status": "partial",
       "tc18": "§11.2.3 (\"If a request is cancelled to which a request is chained, then the chained successors shall be cancelled by the RC Server as well.\"), TC18.txt L1674-1675"
     },
     {

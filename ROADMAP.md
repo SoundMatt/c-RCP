@@ -11365,3 +11365,56 @@ Issue #256's Group H has 7 more findings remaining: `REQ-SRV-006`/`-013`,
 `-018`/`-019`/`-020` (REQ-CANCEL-012 itself still needs its own
 dispatch-wiring investigation, separate from this batch's decode-layer
 fix).
+
+### v0.202.0 -- 2026-08-10
+
+**Full-catalog audit follow-up, batch 3 (Group H, doc-only): LIFECYCLE
+stale-text corrections + REQ-CANCEL-012 honest gap-flag, issue #256.**
+
+Pure `.fusa-reqs.json` text corrections, no code or test changes -- every
+one of these five entries' underlying code was already correct; only
+the requirement text had gone stale against later fixes, or cited the
+wrong TC18 location.
+
+- `REQ-LIFECYCLE-001`: citation corrected from §12.3 (which only names
+  the three lifecycle states) to §13.7.1.2 Table 33's svr_lifecycle_state
+  row, where the 0x00/0x55/0xAA wire values this entry actually asserts
+  are defined. Re-verified both the code (`include/rcp/lifecycle.h:122-124`)
+  and the new citation directly against the primary-source PDF.
+- `REQ-LIFECYCLE-017`: title and "shall" text previously claimed the
+  ordinary time-sync-based TSCF drop rule applied to both HW_CONFIGURED
+  and RCP_CONFIGURED. It never has, since REQ-LIFECYCLE-028's fix --
+  HW_CONFIGURED drops every TSCF frame unconditionally
+  (`src/lifecycle.c:245`). Narrowed to RCP_CONFIGURED only; HW_CONFIGURED's
+  real, stricter rule is now stated directly rather than left to a
+  citation footnote.
+- `REQ-LIFECYCLE-018`: text said HW_UNCONFIGURED writability held "for
+  every writer context". REQ-LIFECYCLE-026/035's fix gated it on
+  `writer.via_discovery_stream` (`src/lifecycle.c:308`); text corrected
+  to match.
+- `REQ-LIFECYCLE-019`: text said HW_CONFIGURED writability held "for
+  every writer context". REQ-LIFECYCLE-030/036's fix gated it on
+  `hw_configured_authorized` (root client, owning stream, or discovery
+  stream); text corrected to state the real three-way gate.
+- `REQ-LIFECYCLE-020`: same staleness as -019, for FUNCTIONAL_W_STAR's
+  HW_CONFIGURED case (`src/lifecycle.c:321-335`); corrected identically.
+
+`REQ-CANCEL-012` (`rcp_cancel_chain_should_cascade()`): investigated per
+issue #256's own listing. The function itself is correct and directly
+unit-tested, but genuinely unwired -- `src/mock.c`'s `apply_cancellation()`
+never calls it, so a clear-single cancellation never cascades to a
+cancelled request's own chained successors as TC18 §11.2.3 requires.
+Wiring this needs real chain-position tracking across the request
+queue, a larger feature than a contained fix -- flagged honestly
+(`scope: "tc18-gap"`, `status: "partial"`) rather than attempted as a
+rushed addition to this doc-only batch. Deferred to a future dedicated
+pass.
+
+No mutation testing needed (no logic changed). Full suite (65/65) on
+both trees re-run to confirm the change is genuinely inert. Fresh
+`cfusa check`/`trace` clean. 1036 requirements (unchanged count --
+text-only edits to existing entries).
+
+Issue #256's Group H is now down to 6 remaining findings: `REQ-SRV-006`/
+`-013`, `REQ-PWR-005`, `REQ-E2E-021`, `REQ-MOCK-030`. (`REQ-CANCEL-012`
+closed via honest gap-flag above, not a code fix.)
