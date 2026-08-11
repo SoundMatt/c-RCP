@@ -395,12 +395,16 @@ static void test_spi_six_channels_selected_by_evt(void)
  * 4-value per-channel selector whose whole range is 0..3 and whose evaluation
  * takes no chip-select index at all, so signals 4..13 cannot be named and no
  * CS transition is a trigger source.
- * REQ-SPI-035 (partial) DEVIATION PIN: Table 39's per-channel register block
- * is modelled in reduced form -- CPOL/CPHA are folded into one `mode` byte
- * instead of spi_clk_polarityN/spi_clk_phaseN, there is no spi_baud_rateN in
- * kbit/s, no spi_use_csN, no spi_bits_maxN, and the lead/trail times are
- * nanoseconds rather than multiples of spi_clk cycles. */
-static void test_spi_trigger_numbering_and_channel_cfg_reduced(void)
+ * REQ-SPI-035 FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): Table
+ * 39's per-channel register block used to be modelled only in reduced form
+ * (no spi_baud_rateN, spi_use_csN, spi_bits_maxN, or spi_clk-cycle lead/
+ * trail/pause times, and no wire render/parse path reaching any of it at
+ * all). rcp_ep_spi_render_registers()/_apply_reconfig() (evt[2:0] == 111b,
+ * TC18 Table 30's own SPI row + §12.7.1) now model the whole block; this
+ * test pins that rcp_ep_spi_channel_cfg_t carries every field the wire
+ * register block needs, and that CPOL/CPHA still round-trip losslessly
+ * through the existing `mode` byte rather than needing two new fields. */
+static void test_spi_trigger_numbering_and_channel_cfg_full(void)
 {
     rcp_ep_spi_channel_cfg_t ch = {0};
 
@@ -415,19 +419,29 @@ static void test_spi_trigger_numbering_and_channel_cfg_reduced(void)
     TEST_ASSERT_FALSE(rcp_ep_spi_trigger_fires(RCP_EP_SPI_TRIGGER_NONE,
                                                RCP_EP_SPI_EVENT_TRANSFER_DONE));
 
-    /* CPOL and CPHA are derived from one folded mode byte, not held as the
-     * two separate Table 39 registers. */
+    /* CPOL and CPHA are derived from one folded mode byte -- a deliberate,
+     * lossless representation choice (rcp_ep_spi_render_registers() derives
+     * the two wire bits from it, and parsing recovers the mode exactly),
+     * not a missing pair of fields. */
     TEST_ASSERT_FALSE(rcp_ep_spi_mode_cpol(RCP_EP_SPI_MODE_1));
     TEST_ASSERT_TRUE(rcp_ep_spi_mode_cpha(RCP_EP_SPI_MODE_1));
     TEST_ASSERT_TRUE(rcp_ep_spi_mode_cpol(RCP_EP_SPI_MODE_2));
     TEST_ASSERT_FALSE(rcp_ep_spi_mode_cpha(RCP_EP_SPI_MODE_2));
 
-    /* Struct exhaustiveness: the block ends at inter_transfer_delay_ns. */
-    ch.inter_transfer_delay_ns = 1000u;
-    TEST_ASSERT_EQUAL_UINT32(1000u, ch.inter_transfer_delay_ns);
-    TEST_ASSERT_EQUAL_UINT(sizeof(ch), offsetof(rcp_ep_spi_channel_cfg_t,
-                                                inter_transfer_delay_ns)
-                                            + sizeof(ch.inter_transfer_delay_ns));
+    /* Struct now HAS room for every Table 39 per-channel field the old
+     * "reduced form" deviation flagged as missing. */
+    ch.baud_rate_kbps  = 12345u;
+    ch.use_common_cs   = true;
+    ch.cs_clk_leadtime  = 7u;
+    ch.clk_cs_trailtime = 8u;
+    ch.bits_max         = 9u;
+    ch.pause_min        = 10u;
+    TEST_ASSERT_EQUAL_UINT16(12345u, ch.baud_rate_kbps);
+    TEST_ASSERT_TRUE(ch.use_common_cs);
+    TEST_ASSERT_EQUAL_UINT8(7u, ch.cs_clk_leadtime);
+    TEST_ASSERT_EQUAL_UINT8(8u, ch.clk_cs_trailtime);
+    TEST_ASSERT_EQUAL_UINT8(9u, ch.bits_max);
+    TEST_ASSERT_EQUAL_UINT8(10u, ch.pause_min);
 }
 
 /* REQ-SPI-036 (not-implemented) DEVIATION PIN: TC18 13.7.3.3 derives the
@@ -1131,7 +1145,7 @@ int main(void)
     RUN_TEST(test_gpio_response_timing_is_not_modelled);
 
     RUN_TEST(test_spi_six_channels_selected_by_evt);
-    RUN_TEST(test_spi_trigger_numbering_and_channel_cfg_reduced);
+    RUN_TEST(test_spi_trigger_numbering_and_channel_cfg_full);
     RUN_TEST(test_spi_read_size_unused_and_no_error_latch);
 
     RUN_TEST(test_i2c_mode_presets_and_register_block);

@@ -166,6 +166,62 @@
  * render/parse path at all), so this simplification has no wire-format
  * consequence.
  *
+ * ── The EP_func register block (evt[2:0] == 111b) ──────────────────────────
+ *
+ * FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-CFG-011/012):
+ * TC18 §13.5 Table 30's own SPI row is a *third*, distinct evt[2:0] grouping
+ * -- neither the "ADC/PWM_IN/I2C/LIN/CAN/UART/ISELED/MDIO" group (evt[2:0]
+ * 000b-110b all reserved, 111b = config-write) nor the "GPIO/PWM_OUT" group
+ * (evt[2:0] carries write semantics). SPI's own row: evt[2:0] 000b-101b
+ * (0-5, exactly rcp_ep_spi_channel_valid()'s existing range) selects one of
+ * the six pre-configured channels and asserts that channel's CSN pin --
+ * this module's existing channel-selection design was already correct, not
+ * a deviation. evt[2:0] = 110b is reserved (request rejected with error
+ * code UNSUPPORTED_CMD). evt[2:0] = 111b is the same generic §12.7.1
+ * EP_func addressed-configuration-write mechanism PWM_OUT
+ * (rcp_ep_pwm_out_apply_reconfig(), ep_pwm.h) and GPIO
+ * (rcp_ep_gpio_apply_reconfig(), ep_gpio.h) already implement -- until now,
+ * SPI had no counterpart at all: rcp_ep_spi_channel_valid() rejected evt=6
+ * and evt=7 identically as RCP_EP_SPI_ERR_BAD_CHANNEL, so an evt=111b
+ * request had no path through this module and TC18 Table 39's own SPI
+ * functional-configuration register block (§13.7.3.2) was reachable
+ * nowhere in the API even though rcp_ep_spi_channel_cfg_t already stored
+ * most of the same information in a different (non-wire-mapped) shape --
+ * this is exactly REQ-SPI-035's previously-recorded "modeled only in
+ * reduced form" gap, closed by the register block below.
+ *
+ * Table 39's layout (channel c's block starts at
+ * RCP_EP_SPI_REG_CHANNEL_BASE + c * RCP_EP_SPI_REG_CHANNEL_SPAN):
+ *
+ *   0x0000  spi_ep_len        8 bit  R    RCP_EP_SPI_EP_FUNC_LEN (0x36)
+ *   0x0001  spi_nr_cs         8 bit  R    RCP_EP_SPI_MAX_CHANNELS (6)
+ *   0x0002  spi_ep_enable&clr 8 bit  R/W  Table 32 common entries
+ *   0x0003  spi_ep_options    8 bit  R/W* Table 32 common entries
+ *   0x0004  spi_ep_status    16 bit  R/W
+ *   0x0006  channel 0's own 8-octet block (channel 1's own starts at
+ *           0x000E, and so on through channel 5's at 0x002E):
+ *     +0x00 spi_baud_rateN   16 bit  R/W  kbit/s
+ *     +0x02 bit 0 spi_clk_polarityN, bit 1 spi_clk_phaseN, bit 2
+ *           spi_cs_polarityN, bit 3 spi_use_csN, bits 4-7 reserved
+ *                              8 bit  R/W
+ *     +0x03 spi_cs_clk_leadtimeN     8 bit  R/W  spi_clk cycles
+ *     +0x04 spi_clk_cs_trailtimeN    8 bit  R/W  spi_clk cycles
+ *     +0x05 spi_bits_maxN            8 bit  R/W
+ *     +0x06 spi_pause_minN           8 bit  R/W  spi_clk cycles
+ *     +0x07 reserved                 8 bit  R
+ *
+ * clk_polarityN/clk_phaseN round-trip through this module's existing
+ * rcp_ep_spi_mode_t (rcp_ep_spi_mode_cpol()/_cpha() render the two bits; a
+ * local inverse on parse recovers the mode -- the mapping is bijective, so
+ * nothing is lost either direction). spi_cs_clk_leadtimeN/
+ * spi_clk_cs_trailtimeN/spi_pause_minN are new, distinct fields from this
+ * module's own pre-existing inter_byte_delay_ns/inter_transfer_delay_ns --
+ * those remain this module's own nanosecond-denominated original addition
+ * (per the file header note on `bit_order`/`trigger`, below) while the new
+ * fields carry the wire's own spi_clk-cycle-denominated values. bit_order
+ * and trigger, like PWM_OUT's/GPIO's own non-wire-mapped fields, are never
+ * rendered onto the wire and are left untouched by a configuration write.
+ *
  * ── Compound-wait against an SPI endpoint ───────────────────────────────────
  *
  * v0.111.0 removed this file's own rcp_ep_spi_compound_wait_status_equal()
@@ -283,6 +339,19 @@ typedef struct {
     uint32_t clock_divider;
     uint32_t inter_byte_delay_ns;
     uint32_t inter_transfer_delay_ns;
+    uint16_t baud_rate_kbps;           /* spi_baud_rateN, Table 39 -- see the
+                                           "EP_func register block" section
+                                           of the file header */
+    bool     use_common_cs;            /* spi_use_csN: false = this
+                                           channel's own CSN is used (the
+                                           wire's 0b default), true = the
+                                           common CS0 is used instead */
+    uint8_t  cs_clk_leadtime;          /* spi_cs_clk_leadtimeN, spi_clk
+                                           cycles */
+    uint8_t  clk_cs_trailtime;         /* spi_clk_cs_trailtimeN, spi_clk
+                                           cycles */
+    uint8_t  bits_max;                 /* spi_bits_maxN */
+    uint8_t  pause_min;                /* spi_pause_minN, spi_clk cycles */
 } rcp_ep_spi_channel_cfg_t;
 
 typedef struct {
@@ -291,11 +360,14 @@ typedef struct {
                                                first member -- see the file
                                                header */
     rcp_ep_spi_channel_cfg_t       channels[RCP_EP_SPI_MAX_CHANNELS];
+    uint16_t                       ep_status; /* spi_ep_status, Table 39 */
 } rcp_ep_spi_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false; every channel's mode
  * MODE_0, bit_order MSB_FIRST, cs_polarity ACTIVE_LOW, trigger NONE,
- * clock_divider/inter_byte_delay_ns/inter_transfer_delay_ns all 0). */
+ * clock_divider/inter_byte_delay_ns/inter_transfer_delay_ns/
+ * baud_rate_kbps/cs_clk_leadtime/clk_cs_trailtime/bits_max/pause_min all 0,
+ * use_common_cs false; ep_status 0). */
 void rcp_ep_spi_functional_cfg_init(rcp_ep_spi_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
@@ -345,6 +417,131 @@ bool rcp_ep_spi_set_channel_timing(rcp_ep_spi_functional_cfg_t *cfg, uint8_t cha
 bool rcp_ep_spi_set_channel_trigger(rcp_ep_spi_functional_cfg_t *cfg, uint8_t channel,
                                      rcp_ep_spi_trigger_t trigger, rcp_lifecycle_state_t state,
                                      rcp_lifecycle_writer_ctx_t writer);
+
+/* ── The EP_func register block (the evt[2:0] == 111b target) ──────────────── */
+
+/* Relative octet offsets of the registers making up the common (non-
+ * per-channel) prefix of an SPI endpoint's own EP_func block -- see the
+ * file header. Every multi-octet register is big-endian, like every other
+ * multi-octet field this codebase encodes. Offsets marked R are read-only:
+ * a configuration write covering them leaves them unchanged (see
+ * rcp_ep_spi_apply_reconfig()). */
+#define RCP_EP_SPI_REG_EP_LEN        ((uint16_t)0x0000u) /*  8 bit, R   */
+#define RCP_EP_SPI_REG_NR_CS         ((uint16_t)0x0001u) /*  8 bit, R   */
+#define RCP_EP_SPI_REG_EP_ENABLE_CLR ((uint16_t)0x0002u) /*  8 bit, R/W */
+#define RCP_EP_SPI_REG_EP_OPTIONS    ((uint16_t)0x0003u) /*  8 bit, R/W */
+#define RCP_EP_SPI_REG_EP_STATUS     ((uint16_t)0x0004u) /* 16 bit, R/W */
+
+/* Channel c's own 8-octet block starts at RCP_EP_SPI_REG_CHANNEL_BASE + c *
+ * RCP_EP_SPI_REG_CHANNEL_SPAN; the RCP_EP_SPI_CHREG_* offsets below are
+ * relative to that channel's own base. */
+#define RCP_EP_SPI_REG_CHANNEL_BASE ((uint16_t)0x0006u)
+#define RCP_EP_SPI_REG_CHANNEL_SPAN ((uint16_t)0x0008u)
+
+#define RCP_EP_SPI_CHREG_BAUD_RATE    ((uint16_t)0x00u) /* 16 bit, R/W */
+#define RCP_EP_SPI_CHREG_CFG          ((uint16_t)0x02u) /*  8 bit, R/W --
+                                                             clk_polarity(0)/
+                                                             clk_phase(1)/
+                                                             cs_polarity(2)/
+                                                             use_cs(3),
+                                                             bits 4-7
+                                                             reserved */
+#define RCP_EP_SPI_CHREG_CS_LEADTIME  ((uint16_t)0x03u) /*  8 bit, R/W */
+#define RCP_EP_SPI_CHREG_CS_TRAILTIME ((uint16_t)0x04u) /*  8 bit, R/W */
+#define RCP_EP_SPI_CHREG_BITS_MAX     ((uint16_t)0x05u) /*  8 bit, R/W */
+#define RCP_EP_SPI_CHREG_PAUSE_MIN    ((uint16_t)0x06u) /*  8 bit, R/W */
+#define RCP_EP_SPI_CHREG_RESERVED     ((uint16_t)0x07u) /*  8 bit, R   */
+
+/* Bit masks within a channel's RCP_EP_SPI_CHREG_CFG octet. */
+#define RCP_EP_SPI_CFG_BIT_CLK_POLARITY ((uint8_t)(1u << 0))
+#define RCP_EP_SPI_CFG_BIT_CLK_PHASE    ((uint8_t)(1u << 1))
+#define RCP_EP_SPI_CFG_BIT_CS_POLARITY  ((uint8_t)(1u << 2))
+#define RCP_EP_SPI_CFG_BIT_USE_CS       ((uint8_t)(1u << 3))
+
+/* The block's own length in octets -- one past the last assigned offset,
+ * i.e. the value the endpoint reports at RCP_EP_SPI_REG_EP_LEN and the
+ * bound the "write beyond EP_LEN is ignored" rule (§12.7.1) is applied
+ * against: the 6-octet common prefix plus RCP_EP_SPI_MAX_CHANNELS 8-octet
+ * per-channel blocks (0x36 = 54 octets). Unlike PWM_OUT's/GPIO's own source
+ * tables, Table 39's own elided per-channel rows (channel 1's
+ * spi_baud_rate1 explicitly at 0x000E = 0x0006 + 8) are internally
+ * consistent with this arithmetic, so there is no editorial defect to
+ * resolve here. */
+#define RCP_EP_SPI_EP_FUNC_LEN \
+    ((uint16_t)(RCP_EP_SPI_REG_CHANNEL_BASE + \
+                (uint16_t)RCP_EP_SPI_MAX_CHANNELS * RCP_EP_SPI_REG_CHANNEL_SPAN))
+
+/* The fixed width (octets) of the relative-start-address prefix every
+ * configuration request's payload begins with -- the address is a 16-bit
+ * big-endian field, followed by the configuration data octets to write
+ * from that address onward (§12.7.1). */
+#define RCP_EP_SPI_RECONFIG_ADDR_LEN ((size_t)2u)
+
+typedef enum {
+    RCP_EP_SPI_RECONFIG_OK               = 0,
+    RCP_EP_SPI_RECONFIG_ERR_SHORT        = 1, /* payload carries no address
+                                                  prefix, or an address
+                                                  prefix with no data octet
+                                                  after it */
+    RCP_EP_SPI_RECONFIG_ERR_OUT_OF_RANGE = 2, /* start_address + data length
+                                                  exceeds
+                                                  RCP_EP_SPI_EP_FUNC_LEN --
+                                                  the whole write is ignored,
+                                                  per the specification's own
+                                                  rule */
+} rcp_ep_spi_reconfig_errc_t;
+
+/* Human-readable message for an rcp_ep_spi_reconfig_errc_t value. Never
+ * returns NULL. */
+const char *rcp_ep_spi_reconfig_strerror(rcp_ep_spi_reconfig_errc_t e);
+
+/* Serializes cfg's EP_func registers into out[0..RCP_EP_SPI_EP_FUNC_LEN)
+ * exactly as a configuration *read* of the whole block would report them
+ * -- the inverse of rcp_ep_spi_apply_reconfig()'s own parse step, and the
+ * same rendering that function patches in place. mode's CPOL/CPHA bits are
+ * rendered via rcp_ep_spi_mode_cpol()/_cpha(); bit_order and trigger have
+ * no wire counterpart in Table 39 (see the file header) and are not
+ * rendered. */
+void rcp_ep_spi_render_registers(const rcp_ep_spi_functional_cfg_t *cfg,
+                                  uint8_t out[RCP_EP_SPI_EP_FUNC_LEN]);
+
+/* Applies the configuration escape hatch (evt[2:0] == 111b): payload is NOT
+ * presented at the interface but interpreted as an addressed write into
+ * this endpoint's own EP_func block -- a 16-bit big-endian relative start
+ * address followed by the configuration data octets to write from that
+ * address onward (§12.7.1). This is a real register write, reaching every
+ * R/W register the block defines for every channel (enable/options,
+ * status, per-channel baud rate/clock config/CS timing/pause), not merely
+ * the channel-selection this module already supported.
+ *
+ * Returns RCP_EP_SPI_RECONFIG_ERR_SHORT when payload_len is not at least
+ * RCP_EP_SPI_RECONFIG_ADDR_LEN + 1, and
+ * RCP_EP_SPI_RECONFIG_ERR_OUT_OF_RANGE when the addressed span would extend
+ * past RCP_EP_SPI_EP_FUNC_LEN; in both cases cfg is left entirely
+ * unchanged, per the specification's own "such a payload is to be ignored"
+ * rule. Octets of the addressed span that land on a read-only register
+ * (EP_LEN, NR_CS, or a channel's own reserved octet) are left at their
+ * current values while the rest of the span is still applied. Partially-
+ * covered multi-octet registers are handled correctly: the write is
+ * applied at octet granularity over the block's rendered image.
+ *
+ * A caller routing a decoded request here is responsible for having
+ * checked that evt[2:0] really was 111b -- this endpoint type's other
+ * decoders (rcp_ep_spi_decode_transfer_request()/_decode_response()) both
+ * already reject evt values 6 and 7 as RCP_EP_SPI_ERR_BAD_CHANNEL, so a
+ * misrouted request cannot reach either path by accident. */
+rcp_ep_spi_reconfig_errc_t rcp_ep_spi_apply_reconfig(rcp_ep_spi_functional_cfg_t *cfg,
+                                                      const uint8_t *payload,
+                                                      size_t payload_len);
+
+/* Encodes an ACF_ABB configuration request (evt[2:0] == 111b) addressed to
+ * byte_bus_id: payload is start_address (16-bit big-endian) followed by
+ * data[0..data_len). Returns a zeroed rcp_bytes_t (data=NULL) if data_len
+ * is 0, if the encoded payload would exceed RCP_ACF_MAX_PAYLOAD, or on
+ * allocation failure. Caller frees the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_ep_spi_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                uint16_t start_address, const uint8_t *data,
+                                                size_t data_len, uint8_t transaction_num);
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 

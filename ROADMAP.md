@@ -12338,3 +12338,109 @@ fixed at that point) even as its arithmetic looked consistent. This
 batch's real fix now genuinely earns the count the total already,
 prematurely, included -- the headline number is unchanged, but it is
 correct now in a way it was not before.
+
+### v0.217.0 -- 2026-08-11
+
+**Full-catalog audit follow-up, batch 18 (Group I, real fix):
+REQ-SPI-035's "modeled only in reduced form" finding closed -- SPI's
+own §12.7.1 EP_func register block (Table 39) implemented for the
+first time, resuming the SPI-reconfig-path investigation that was
+diverted into fixing GPIO's own Group G finding in v0.216.0.**
+
+Read TC18 §13.5 Table 30 directly (`TC18.txt` L3677-3684, the same
+extraction already used for GPIO's/PWM_OUT's own rows): SPI occupies a
+*third*, distinct evt[2:0] grouping, neither PWM_OUT/GPIO's
+write-semantics group nor the ADC/PWM_IN/I2C/LIN/CAN/UART/ISELED/MDIO
+all-reserved group. SPI's own row: evt[2:0] 000b-101b (0-5) selects
+one of six pre-configured channel configurations and asserts that
+channel's CSN pin -- exactly `rcp_ep_spi_channel_valid()`'s existing
+`channel < 6` range, confirming this module's channel-selection design
+was *already correct*, not a deviation this batch needed to touch.
+evt[2:0] = 110b is reserved (request rejected with error code
+UNSUPPORTED_CMD). evt[2:0] = 111b is the same generic §12.7.1 EP_func
+addressed-configuration-write mechanism PWM_OUT and GPIO already
+implement -- and this is where the real gap was: `channel_valid()`
+rejected evt=6 and evt=7 identically as `RCP_EP_SPI_ERR_BAD_CHANNEL`,
+so an evt=111b request had no path through this module at all, and
+Table 39's own SPI functional-configuration register block
+(`TC18.txt` L4237-4300) was reachable nowhere in the API -- even
+though `rcp_ep_spi_channel_cfg_t` already stored most of the same
+information in a different, non-wire-mapped shape (exactly
+REQ-SPI-035's previously-recorded "reduced form" gap).
+
+Read TC18 §13.7.3.2 Table 39 directly: a 6-octet common prefix
+(spi_ep_len 0x0000 R, spi_nr_cs 0x0001 R, spi_ep_enable&clr 0x0002 R/W,
+spi_ep_options 0x0003 R/W, spi_ep_status 0x0004 16-bit R/W) followed by
+six 8-octet per-channel blocks starting at 0x0006 (channel 1's own
+`spi_baud_rate1` explicitly at 0x000E = 0x0006 + 8, channel 2's
+implied at 0x0016, and so on) -- each channel block holding
+spi_baud_rate (16-bit, kbit/s), one bit-packed configuration octet
+(clk_polarity/clk_phase/cs_polarity/use_cs), spi_cs_clk_leadtime,
+spi_clk_cs_trailtime, spi_bits_max, spi_pause_min, and a reserved
+octet. Unlike PWM_OUT's/GPIO's own source tables, this table's
+explicit per-channel addressing is internally consistent with its own
+8-octet-per-channel arithmetic throughout -- **no second editorial
+defect to resolve this batch**, unlike the two-for-two streak so far
+(`ep_pwm.h`'s EP_LEN, `ep_gpio.h`'s debounce_IO31 address).
+
+**Fix**: `rcp_ep_spi_channel_cfg_t` gained `baud_rate_kbps`/
+`use_common_cs`/`cs_clk_leadtime`/`clk_cs_trailtime`/`bits_max`/
+`pause_min`; `rcp_ep_spi_functional_cfg_t` gained `ep_status`. New
+`rcp_ep_spi_render_registers()`/`rcp_ep_spi_apply_reconfig()`/
+`rcp_ep_spi_reconfig_strerror()`/`rcp_ep_spi_encode_reconfig_request()`
+mirror `ep_pwm.c`'s/`ep_gpio.c`'s own implementations exactly (same
+octet-granularity patch-then-adopt pattern, same read-only-offset
+handling via a channel-span modulus rather than a fixed list, same
+"whole write ignored on overrun" rule). CPOL/CPHA continue to
+round-trip losslessly through the pre-existing `mode` byte via
+`rcp_ep_spi_mode_cpol()`/`_cpha()` and a new static inverse
+(`mode_from_bits()`) -- a deliberate representation choice, not a
+missing pair of fields, since the mapping is bijective. `bit_order`
+and `trigger` remain non-wire-mapped, exactly as documented before
+this fix (Table 39 has no bit-order register at all, and Table 38's
+14-signal trigger table has no per-channel selector register either).
+
+Unlike GPIO's own Group G fix, which left `REQ-GPIO-035` at `partial`
+(GPIO's `gpio_base_clk` still renders a fake 0 and no debounce
+*filtering* logic exists), **REQ-SPI-035 moves all the way to
+`implemented`**: every field its own citation named as missing --
+spi_baud_rateN, the separate clk_polarity/clk_phase bits, spi_use_csN,
+spi_bits_maxN, spi_clk-cycle-denominated lead/trail times, spi_ep_len,
+spi_nr_cs, spi_ep_status -- is now modeled and wire-reachable.
+
+Two pre-existing deviation-pin tests independently anticipated this
+exact finding: `test_generic_config_request_is_pwm_out_and_gpio` and
+`test_ep_len_overrun_rule_exists_for_pwm_out_and_gpio`
+(`tests/test_tc18_gaps_regmap.c`), both renamed (`_and_spi` ->
+`_gpio_and_spi`) and extended with SPI's own now-correct assertions.
+`test_spi_trigger_numbering_and_channel_cfg_reduced`
+(`tests/test_tc18_gaps_ep.c`) previously pinned "no
+spi_baud_rateN/spi_use_csN/spi_bits_maxN, nanoseconds instead of
+spi_clk cycles" as a deviation -- renamed
+`_channel_cfg_full` and rewritten to confirm the struct *has* exactly
+that room now. `REQ-CFG-011`/`REQ-CFG-012` (the cross-endpoint generic
+evt=111b tracking entries) narrowed from "PWM_OUT and GPIO" to
+"PWM_OUT, GPIO, and SPI" -- 3 of 11 endpoint types now implement it;
+I2C/UART/LIN/CAN/ADC/ISELED/MDIO/wakeup (8 remaining) are next.
+
+Mutation-tested: loosening the out-of-range bounds check by 4 octets
+reproduced the identical class of finding GPIO's own equivalent check
+produced in v0.216.0 -- a real stack buffer overflow in the
+block-patching loop (silent SIGABRT, no test output at all, exit code
+134), not a clean test failure. Restored, re-verified. Full suite
+(48/48 in `test_ep_spi` alone, 65/65 overall) both trees (native +
+ASan/UBSan). `cfusa check` (CI-pinned v0.5.50,
+`/Users/matt/Documents/Coding/SoundMatt/c-FuSa/build/cfusa`): 0 errors.
+`cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100` /
+`--sec-tested 100`: both 100% (1024/1024) -- the same pre-existing,
+non-blocking dangling-test-reference warnings and
+`REQ-LIFECYCLE-038`/`REQ-ADC-037` secondary-diagnostic entries as
+every prior batch this session, unrelated to SPI; `REQ-SPI-038`/
+`REQ-SPI-039` (this batch's own new entries) do NOT appear in either
+list, confirming their test tags resolved correctly.
+
+**Progress: 83/156 findings resolved** (Groups H 12 + B 4 + A 17 +
+D 16 + F 7 + E 4 + C 16 + G 2 + I 5 = 83). Group I's own count moves
+from 4 to 5; unlike the prior batch's overcounting incident, this
+number was verified against the group's own itemized list before
+being written down.
