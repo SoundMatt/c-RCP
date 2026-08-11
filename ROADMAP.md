@@ -13174,3 +13174,139 @@ deliberately deferred pending its own dedicated investigation session
 mechanical fixes) per the issue's own suggested order, or open the CAN/
 wakeup dedicated-investigation sessions if the user prioritizes those
 first.
+
+### v0.225.0 -- 2026-08-11 (doc-only)
+
+**Full-catalog audit follow-up, batch 26 (Group J, citation-precision,
+doc-only): with Group I's planned item list complete, moved to Group
+J's own ~20 low-risk mechanical citation fixes -- verified every entry
+directly against TC18.txt before touching it, the same discipline that
+already caught Group A's 17 and Group C's 16 false positives earlier
+this audit.**
+
+**1. Two genuinely dangling `//cfusa:req` tags found and removed.**
+`ep_spi.h`'s file-level tag block still listed `REQ-SPI-031` and
+`REQ-SPI-032`, but `git log -S` confirmed both requirements were
+deleted from `.fusa-reqs.json` back in v0.111.0 (PR #157, superseded
+by the generic compound-wait dispatch wiring -- `ep_spi.h`'s own file
+header already documents this removal in prose) -- the code-side tags
+were simply never cleaned up to match. Neither id appears anywhere
+else in `src/`/`tests/` either. Removed both tag lines; no
+`.fusa-reqs.json` change needed since there is no identifiable
+requirement or function left to describe.
+
+**2. Stale-identifier sweep, expanded from the issue's own 5 named
+examples to its full actual scope.** The issue named
+`REQ-RMAP-002`/`UART-005`/`UART-007`/`DISC-002`/`DISC-006` as
+containing dead `RCP_SERVER_*` identifiers from before the
+`RCP_LIFECYCLE_*` rename. A full regex sweep of every `.fusa-reqs.json`
+entry's own text/title found **30** affected entries across 12
+endpoint-type modules (GPIO/SPI/I2C/UART/PWM/ADC/LIN/CANEP/ISELED/
+MDIO, plus RMAP/DISC), not just the 5 named as examples --
+`RCP_SERVER_DISCOVERY_BYTE_BUS_ID`,
+`RCP_SERVER_LIFECYCLE_HW_UNCONFIGURED`,
+`RCP_SERVER_LIFECYCLE_HW_CONFIGURED`,
+`RCP_SERVER_LIFECYCLE_RCP_CONFIGURED`, and
+`RCP_SERVER_FIELD_FUNCTIONAL_W` -- none of which exist anywhere in the
+actual codebase (confirmed via `grep -rn` across `include/`/`src/`
+before touching anything). Corrected all 30 to their real, current
+`RCP_LIFECYCLE_*` names via a single targeted `sed` pass (verified
+minimal diff: exactly 30 changed lines, one per entry, since each
+JSON `text` field is a single line in this file's own formatting
+convention). **A related identifier family, `RCP_SERVER_ADMIT_*` and
+`RCP_SERVER_MAX_PENDING` (`REQ-SRV-004`/`005`/`019`,
+`REQ-PWRMODE-028`), was checked and confirmed to be a *different*,
+still-valid family -- these identifiers genuinely still exist in
+`server.h` today and were correctly excluded from the sweep after
+verification, not swept blindly on regex match alone.**
+
+**3. Nine imprecise/wrong-section/off-by-a-few-lines citations
+corrected**, each individually verified against `TC18.txt` line
+numbers via direct `grep -n`:
+- `REQ-UART-012`: the parity-field sub-range `L4938-4943` didn't match
+  `uart_parity_enable`'s/`uart_parity_pol`'s real lines (4933, 4937) at
+  all -- corrected to cite the real lines directly.
+- `REQ-ADC-007`/`008`: both wrongly cited `§13.7.9.1` (ADC basic
+  concept) for content that is actually in `§13.7.9.2` (ADC EP
+  functional configuration, where Table 51 and its own multi-response
+  prose both live) -- corrected the section number on both, plus
+  `REQ-ADC-007`'s own line range (`L5106`→`L5110-5111`) and
+  `REQ-ADC-008`'s (`L5131-5132`→`L5132-5133`).
+- `REQ-ADC-020`: `L5101-5102`→`L5102-5103` (off by one).
+- `REQ-ADC-022`: found while checking `REQ-ADC-007`'s own sibling
+  (same quoted phrase, same table row) -- carried the identical
+  `L5106` bug; corrected to `L5110-5111` alongside it, though not one
+  of the issue's own named examples.
+- `REQ-SPI-009`: cited a paraphrased `"CSn de-asserted"` that doesn't
+  appear verbatim anywhere in TC18.txt (the real text is six separate
+  rows, `"CS0 de-asserted"` through `"CS5 de-asserted"`) plus an
+  off-by-one line range (`L4208-4218`→`L4209-4219`) -- corrected both.
+- `REQ-SPI-022`: `L4272-4282`→`L4276-4285` (the four timing fields'
+  real lines are 4276/4279/4282/4285, not spanned by the old range).
+- `REQ-MDIO-021`: the range's own end, `L5681`, truncated Table 57's
+  own `mdio_payload` row and its caption, both of which run through
+  `L5684` -- extended to `L5664-5684`.
+- `REQ-DISC-011`: `L2403-2404`→`L2402-2403` (off by one -- confirmed
+  via direct `grep -n` on the exact quoted sentence).
+
+**4. `REQ-ADC-018`'s citation was entirely mismatched to its own
+requirement**, not just imprecise. The requirement text is purely
+about write-authorization rejection (`rcp_ep_adc_set_samples_per_avg_
+interval() rejects an unauthorized write`), but its citation quoted
+TC18's averaging-interval design-choice prose (`"an implementation may
+decide to fix"` read-only) -- unrelated content. The bug surfaced
+because `REQ-ADC-019` (`applies the write when authorized`, the exact
+authorization-rejection sibling) already says, in its own citation,
+`"same authorization basis as REQ-ADC-018"` -- but REQ-ADC-018 itself
+never cited that §12.3.1.3 W*-marker basis at all, a cross-reference
+pointing at nothing. Corrected `REQ-ADC-018`'s citation to the real
+§12.3.1.3 W*-marker basis, matching `REQ-ADC-019`'s/`REQ-ADC-020`'s/
+`REQ-ADC-022`'s own identical pattern.
+
+**5. Eight entries verified as false positives in the original Group J
+list** -- `REQ-ACF-012`, `REQ-LINEP-015`, `REQ-FRAG-003`/`006`,
+`REQ-MOCK-012`/`013`, `REQ-CFG-003`, `REQ-WDG-002` -- each flagged for
+an empty `tc18` field, but a targeted check against sibling
+`strerror()`-distinctness requirements across every endpoint type
+(`REQ-I2C-009`, `REQ-UART-017`, `REQ-TRIG-002`, `REQ-CHAIN-001`,
+`REQ-TIMED-001`, `REQ-CANCEL-001`, `REQ-E2E-001`, `REQ-CANEP-015`,
+`REQ-ISELED-015`, `REQ-FRAG-001`, all likewise `tc18: null`) confirmed
+this is the codebase's own established, correct convention: a pure
+internal-API-contract requirement (this codebase's own design choice,
+not derived from any TC18 clause) legitimately has no citation to
+give. All eight were also confirmed correctly, individually tagged in
+their own module's `src`/`tests`/`include` files -- no dangling-tag
+issue either. Same class of false-positive resolution as Group A's 17
+and Group C's 16, on a much smaller scale.
+
+**6. Remaining named entries verified accurate, no change needed**:
+`REQ-CANEP-003` (Table 54's own header-through-caption range,
+`L5447-5456`, is correct as originally cited), `REQ-WIREERR-001`
+(Table 27's own header row is exactly at `L3414`), `REQ-SEQ-001`
+(`L3473` matches exactly), `REQ-SEQ-014` (`L3068-L3069, L3072-L3074`
+both spans verified against the exact quoted phrases), `REQ-PWRMODE-
+003`/`004`/`019` (all three verified exact), `REQ-DISC-002`/`006`/
+`010`/`012`/`026` (verified exact or acceptably inclusive of
+surrounding context), `REQ-RMAP-002`/`003` (both exact, once their
+stale identifiers were corrected per item 2 above).
+
+No code behavior change in this batch -- pure `.fusa-reqs.json` text
+corrections plus two dangling comment-tag removals in `ep_spi.h`. Full
+suite (65/65) both trees (native + ASan/UBSan) -- unaffected, since
+nothing but comments and JSON text changed. `cfusa check` (CI-pinned
+v0.5.50): 0 errors. `cfusa trace --gaps`: 0/1024 untested;
+`--req-coverage 100` / `--sec-tested 100`: both 100% (1024/1024) --
+same pre-existing, non-blocking UART dangling-reference diagnostics as
+every prior batch (unaffected by the REQ-SPI-031/032 tag removal,
+since those were never part of that particular quirk).
+
+**Progress note**: Group J is not tracked in issue #256's own
+"findings resolved" running count the way Groups A-I are (its own
+~20 items are citation-precision corrections, a different accounting
+class from the 156-finding headline total) -- no change to the
+90/156 figure from this batch. **Next**: Group K (misc triage:
+`REQ-SCHED-001..008` reclassification, `REQ-FRAG-003/006` wire-width
+verification -- the latter already touched tangentially in this
+batch's own false-positive check, but the wire-width question itself
+remains open), or the CAN/wakeup dedicated-investigation sessions if
+prioritized first.
