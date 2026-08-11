@@ -82,8 +82,27 @@
  * mechanism is a strict superset of "no fragmentation", not a parallel
  * wire format.
  *
- * Because segment_num is one octet wide, at most
- * RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS (256) ms=1 fragments can precede
+ * FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group K): segment_num is 12
+ * bits wide, not one octet -- acf.h's own byte_message_info bit layout
+ * gives read_size_or_segment_num[11:8] in byte 6 bits 3:0 and
+ * read_size_or_segment_num[7:0] in byte 7 bits 7:0 (see acf.h's own file
+ * header), a 4+8 = 12-bit field. This module's own prior text and its
+ * RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS constant both wrongly assumed an
+ * 8-bit field despite this same file header already, correctly, calling
+ * read_size_or_segment_num "the dual-purpose read_size_or_segment_num
+ * field" shared with acf.h -- the 8-bit assumption was never checked
+ * against that field's own documented width. Worse than a citation error:
+ * segment_num was stored as uint8_t throughout this module (the
+ * rcp_fragment_segment_t/rcp_fragment_reassembler_t struct fields and the
+ * rcp_fragment_reassembler_feed() parameter), silently truncating any
+ * caller-supplied decoded value above 255 -- a real wire-compatibility
+ * bug, not merely an artificially low capacity ceiling. Both are now
+ * corrected: segment_num is uint16_t throughout, and
+ * RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS is 4096 (0..4095), matching the
+ * real 12-bit field exactly.
+ *
+ * Because segment_num is 12 bits wide, at most
+ * RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS (4096) ms=1 fragments can precede
  * the one final ms=0 fragment -- see that macro's own comment for the
  * arithmetic. rcp_fragment_plan_count() reports 0 (a value no valid plan
  * ever produces) when a payload cannot be represented within that bound,
@@ -153,7 +172,7 @@ typedef enum {
                                                   a single fragment */
     RCP_FRAGMENT_ERR_TOO_MANY_SEGMENTS  = 2, /* the split would need more
                                                   intermediate segments than
-                                                  segment_num's one-octet
+                                                  segment_num's 12-bit
                                                   width can address */
     RCP_FRAGMENT_ERR_BAD_SEGMENT_COUNT  = 3, /* segment_count passed to
                                                   rcp_fragment_plan() does not
@@ -167,14 +186,20 @@ typedef enum {
 const char *rcp_fragment_strerror(rcp_fragment_errc_t e);
 
 /* The largest number of ms=1 (intermediate) fragments a single
- * reassembled message can be split into: segment_num is one octet wide
- * (acf.h's read_size_or_segment_num), giving 256 distinct values (0..255)
- * -- every one of them usable by an intermediate fragment, since (unlike
- * the final fragment) an intermediate fragment's segment_num is always
- * this module's own sequence index, never anything else. A representable
- * message therefore spans at most this many intermediate fragments plus
- * exactly one final (ms=0) fragment. */
-#define RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS ((size_t)256u)
+ * reassembled message can be split into: segment_num is 12 bits wide
+ * (acf.h's read_size_or_segment_num[11:0] -- see acf.h's own file header
+ * bit layout, and src/acf.c's own 0x0Fu/0xFFu high-nibble/low-octet split
+ * in rcp_acf_pack_header()/_unpack_header(), already golden-vector tested
+ * against TC18's own Figure 19/20 worked examples), giving 4096 distinct
+ * values (0..4095) -- every one of them usable by an intermediate
+ * fragment, since (unlike the final fragment) an intermediate fragment's
+ * segment_num is always this module's own sequence index, never anything
+ * else. A representable message therefore spans at most this many
+ * intermediate fragments plus exactly one final (ms=0) fragment. FIXED
+ * 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group K): this constant and
+ * segment_num's own storage type both wrongly assumed an 8-bit field --
+ * see the file header's own FIXED note. */
+#define RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS ((size_t)4096u)
 
 /* One planned fragment: which slice [offset, offset+len) of the original
  * payload it carries, whether it is an intermediate (ms=true) or the
@@ -184,10 +209,10 @@ const char *rcp_fragment_strerror(rcp_fragment_errc_t e);
  * wire slot means something else once ms=0, and it is the caller's job to
  * fill it in appropriately for the message kind involved. */
 typedef struct {
-    size_t  offset;
-    size_t  len;
-    bool    ms;
-    uint8_t segment_num;
+    size_t   offset;
+    size_t   len;
+    bool     ms;
+    uint16_t segment_num;
 } rcp_fragment_segment_t;
 
 /* The number of fragments rcp_fragment_plan() would produce for payload_len
@@ -259,7 +284,7 @@ const char *rcp_fragment_reasm_result_string(rcp_fragment_reasm_result_t r);
  * a caller. */
 typedef struct {
     bool     collecting;
-    uint8_t  expected_segment_num;
+    uint16_t expected_segment_num;
     uint8_t *buf;
     size_t   len;
     size_t   cap;
@@ -304,7 +329,7 @@ void rcp_fragment_reassembler_destroy(rcp_fragment_reassembler_t *r);
  * max_total_len; RCP_FRAGMENT_REASM_ERR_ALLOC is returned, r likewise
  * left untouched, if this module's internal buffer growth fails. */
 rcp_fragment_reasm_result_t rcp_fragment_reassembler_feed(rcp_fragment_reassembler_t *r,
-                                                            bool ms, uint8_t segment_num,
+                                                            bool ms, uint16_t segment_num,
                                                             const uint8_t *payload,
                                                             size_t payload_len);
 

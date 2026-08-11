@@ -102,16 +102,23 @@ static void test_plan_count_remainder(void)
 
 static void test_plan_count_too_many_segments(void)
 {
-    /* 258 fragments of 1 byte each needs 257 intermediate segments, one
-     * more than RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS (256) allows. */
-    TEST_ASSERT_EQUAL_UINT(0, rcp_fragment_plan_count(258, 1));
+    /* RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS + 2 fragments of 1 byte each
+     * needs RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS + 1 intermediate
+     * segments, one more than segment_num's own 12-bit wire width
+     * (0..4095) allows -- see the macro's own FIXED note (issue #256
+     * Group K: this constant was 256 before the fix, matching an 8-bit
+     * assumption acf.h's own field never actually had). */
+    TEST_ASSERT_EQUAL_UINT(0, rcp_fragment_plan_count(
+        RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS + 2, 1));
 }
 
 static void test_plan_count_exactly_at_max_intermediate_boundary(void)
 {
-    /* 257 fragments of 1 byte: 256 intermediate + 1 final -- exactly at
-     * the boundary, must succeed. */
-    TEST_ASSERT_EQUAL_UINT(257, rcp_fragment_plan_count(257, 1));
+    /* RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS + 1 fragments of 1 byte:
+     * RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS intermediate + 1 final --
+     * exactly at the boundary, must succeed. */
+    TEST_ASSERT_EQUAL_UINT(RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS + 1,
+        rcp_fragment_plan_count(RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS + 1, 1));
 }
 
 /* ── plan ──────────────────────────────────────────────────────────────────── */
@@ -153,16 +160,39 @@ static void test_plan_multi_segment_layout_and_numbering(void)
     TEST_ASSERT_EQUAL_UINT(0, segs[0].offset);
     TEST_ASSERT_EQUAL_UINT(10, segs[0].len);
     TEST_ASSERT_TRUE(segs[0].ms);
-    TEST_ASSERT_EQUAL_UINT8(0, segs[0].segment_num);
+    TEST_ASSERT_EQUAL_UINT16(0, segs[0].segment_num);
 
     TEST_ASSERT_EQUAL_UINT(10, segs[1].offset);
     TEST_ASSERT_EQUAL_UINT(10, segs[1].len);
     TEST_ASSERT_TRUE(segs[1].ms);
-    TEST_ASSERT_EQUAL_UINT8(1, segs[1].segment_num);
+    TEST_ASSERT_EQUAL_UINT16(1, segs[1].segment_num);
 
     TEST_ASSERT_EQUAL_UINT(20, segs[2].offset);
     TEST_ASSERT_EQUAL_UINT(5, segs[2].len);
     TEST_ASSERT_FALSE(segs[2].ms);
+}
+
+/* FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group K): segment_num is
+ * 12 bits wide (0..4095), not one octet -- this test proves a segment_num
+ * above 255 (previously silently truncated by the old uint8_t storage)
+ * now plans and round-trips correctly. 300 fragments of 1 byte each: 299
+ * intermediate (segment_num 0..298, well past the old 8-bit ceiling) plus
+ * 1 final. */
+static void test_plan_segment_num_above_255_does_not_truncate(void)
+{
+    static rcp_fragment_segment_t segs[300];
+    rcp_fragment_errc_t           rc;
+    size_t                        count = rcp_fragment_plan_count(300, 1);
+
+    TEST_ASSERT_EQUAL_UINT(300, count);
+    rc = rcp_fragment_plan(300, 1, segs, count);
+    TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_OK, rc);
+
+    TEST_ASSERT_TRUE(segs[255].ms);
+    TEST_ASSERT_EQUAL_UINT16(255, segs[255].segment_num);
+    TEST_ASSERT_TRUE(segs[298].ms);
+    TEST_ASSERT_EQUAL_UINT16(298, segs[298].segment_num);
+    TEST_ASSERT_FALSE(segs[299].ms);
 }
 
 static void test_plan_covers_entire_payload_contiguously(void)
@@ -184,7 +214,7 @@ static void test_plan_covers_entire_payload_contiguously(void)
         covered += segs[i].len;
         if (i + 1 < count) {
             TEST_ASSERT_TRUE(segs[i].ms);
-            TEST_ASSERT_EQUAL_UINT8((uint8_t)i, segs[i].segment_num);
+            TEST_ASSERT_EQUAL_UINT16((uint16_t)i, segs[i].segment_num);
         } else {
             TEST_ASSERT_FALSE(segs[i].ms);
         }
@@ -201,8 +231,15 @@ static void test_plan_disabled(void)
 
 static void test_plan_too_many_segments(void)
 {
-    rcp_fragment_segment_t segs[258];
-    rcp_fragment_errc_t    rc = rcp_fragment_plan(258, 1, segs, 258);
+    /* rcp_fragment_plan_count() returns 0 (hence ERR_TOO_MANY_SEGMENTS)
+     * before ever consulting segment_count or writing to out_segments --
+     * same reasoning as test_plan_disabled()'s own single-element dummy
+     * array, avoiding a RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS-sized
+     * stack allocation for a value that is never actually used. */
+    rcp_fragment_segment_t seg;
+    rcp_fragment_errc_t    rc = rcp_fragment_plan(
+        RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS + 2, 1, &seg,
+        RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS + 2);
     TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_ERR_TOO_MANY_SEGMENTS, rc);
 }
 
@@ -486,6 +523,7 @@ int main(void)
     RUN_TEST(test_plan_single_segment_no_fragmentation_needed);
     RUN_TEST(test_plan_empty_payload);
     RUN_TEST(test_plan_multi_segment_layout_and_numbering);
+    RUN_TEST(test_plan_segment_num_above_255_does_not_truncate);
     RUN_TEST(test_plan_covers_entire_payload_contiguously);
     RUN_TEST(test_plan_disabled);
     RUN_TEST(test_plan_too_many_segments);
