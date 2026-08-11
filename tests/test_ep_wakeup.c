@@ -15,6 +15,8 @@
 //cfusa:test REQ-WAKEUP-014
 //cfusa:test REQ-WAKEUP-015
 //cfusa:test REQ-WAKEUP-016
+//cfusa:test REQ-WAKEUP-021
+//cfusa:test REQ-WAKEUP-022
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -51,7 +53,11 @@ static void test_functional_cfg_init_zeroes_everything(void)
     for (i = 0; i < RCP_EP_WAKEUP_MAX_SOURCES; i++) {
         TEST_ASSERT_FALSE(cfg.sources[i].enabled);
         TEST_ASSERT_FALSE(cfg.sources[i].active_high);
+        TEST_ASSERT_EQUAL_UINT16(0u, cfg.sources[i].pin_number);
     }
+
+    TEST_ASSERT_EQUAL_UINT16(0u, cfg.ep_status);
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_wup_status_is_clear(&cfg.wup_status));
 }
 
 static void test_functional_cfg_writable_matches_lifecycle_functional_w(void)
@@ -67,9 +73,9 @@ static void test_functional_cfg_writable_matches_lifecycle_functional_w(void)
 
 static void test_source_asserted_requires_enabled_and_matching_polarity(void)
 {
-    rcp_ep_wakeup_source_cfg_t disabled = { false, true };
-    rcp_ep_wakeup_source_cfg_t active_high = { true, true };
-    rcp_ep_wakeup_source_cfg_t active_low  = { true, false };
+    rcp_ep_wakeup_source_cfg_t disabled = { false, true, 0 };
+    rcp_ep_wakeup_source_cfg_t active_high = { true, true, 0 };
+    rcp_ep_wakeup_source_cfg_t active_low  = { true, false, 0 };
 
     TEST_ASSERT_FALSE(rcp_ep_wakeup_source_asserted(disabled, true));
 
@@ -364,6 +370,237 @@ static void test_is_wakeup_echo_false_for_sleepcmd_frame(void)
     rcp_bytes_free(&frame);
 }
 
+/* ── The EP_func register block (evt[2:0] == 111b) ───────────────────────────
+ * ADDED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I dedicated
+ * investigation, task #95): see ep_wakeup.h's own "register block" file
+ * header note for the full address-collision-resolution rationale and
+ * the two deliberate, honestly disclosed simplifications (wup_status is
+ * a single aggregate bit, not a per-source bitmask; IO_SRC only
+ * represents 3 of Table 37's 6 values). */
+
+static void test_render_registers_matches_table_offsets(void)
+{
+    rcp_ep_wakeup_functional_cfg_t cfg;
+    uint8_t                        out[RCP_EP_WAKEUP_EP_FUNC_LEN];
+
+    rcp_ep_wakeup_functional_cfg_init(&cfg);
+    cfg.ep_status = 0x1234;
+    rcp_ep_wakeup_wup_status_latch(&cfg.wup_status);
+    cfg.sources[0].enabled     = true;
+    cfg.sources[0].active_high = true;
+    cfg.sources[0].pin_number  = 0x0041u; /* fits in 11 bits */
+
+    rcp_ep_wakeup_render_registers(&cfg, out);
+
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_WAKEUP_EP_FUNC_LEN, out[RCP_EP_WAKEUP_REG_EP_LEN]);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_WAKEUP_MAX_SOURCES,
+                             out[RCP_EP_WAKEUP_REG_NR_IO_PINS_MAX]);
+    TEST_ASSERT_EQUAL_UINT8(0x12u, out[RCP_EP_WAKEUP_REG_EP_STATUS]);
+    TEST_ASSERT_EQUAL_UINT8(0x34u, out[RCP_EP_WAKEUP_REG_EP_STATUS + 1]);
+    /* Address collision resolved: wup_status (0x0004-5) and slot 0's own
+     * wup_io_scr1 (0x0006-7) render to distinct addresses. */
+    TEST_ASSERT_EQUAL_UINT8(0x00u, out[RCP_EP_WAKEUP_REG_WUP_STATUS]);
+    TEST_ASSERT_EQUAL_UINT8(0x01u, out[RCP_EP_WAKEUP_REG_WUP_STATUS + 1]);
+    /* io_src=HIGH_LEVEL(0x04) << 11 == 0x2000, | pin_number(0x0041). */
+    TEST_ASSERT_EQUAL_UINT8(0x20u, out[RCP_EP_WAKEUP_REG_SOURCE_BASE]);
+    TEST_ASSERT_EQUAL_UINT8(0x41u, out[RCP_EP_WAKEUP_REG_SOURCE_BASE + 1]);
+
+    TEST_ASSERT_EQUAL_UINT16(0x0016u, RCP_EP_WAKEUP_EP_FUNC_LEN);
+}
+
+static void test_apply_reconfig_writes_ep_status(void)
+{
+    rcp_ep_wakeup_functional_cfg_t cfg;
+    uint8_t                        payload[4];
+
+    rcp_ep_wakeup_functional_cfg_init(&cfg);
+
+    payload[0] = 0x00; payload[1] = 0x02; /* address = RCP_EP_WAKEUP_REG_EP_STATUS */
+    payload[2] = 0xAB; payload[3] = 0xCD;
+
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_RECONFIG_OK,
+        rcp_ep_wakeup_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_EQUAL_UINT16(0xABCD, cfg.ep_status);
+}
+
+static void test_apply_reconfig_wup_status_write_one_clears(void)
+{
+    rcp_ep_wakeup_functional_cfg_t cfg;
+    uint8_t                        payload[4];
+
+    rcp_ep_wakeup_functional_cfg_init(&cfg);
+    rcp_ep_wakeup_wup_status_latch(&cfg.wup_status);
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_is_clear(&cfg.wup_status));
+
+    /* Writing bit 0 == 0 is a no-op -- it must not itself clear or set
+     * the latch. */
+    payload[0] = 0x00; payload[1] = RCP_EP_WAKEUP_REG_WUP_STATUS & 0xFFu;
+    payload[2] = 0x00; payload[3] = 0x00;
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_RECONFIG_OK,
+        rcp_ep_wakeup_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_is_clear(&cfg.wup_status));
+
+    /* Writing bit 0 == 1 clears it (write-1-to-clear, TC18 §13.7.2.2). */
+    payload[2] = 0x00; payload[3] = 0x01;
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_RECONFIG_OK,
+        rcp_ep_wakeup_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_wup_status_is_clear(&cfg.wup_status));
+}
+
+static void test_apply_reconfig_writes_source_slot(void)
+{
+    rcp_ep_wakeup_functional_cfg_t cfg;
+    uint8_t                        payload[4];
+    uint16_t                       reg;
+
+    rcp_ep_wakeup_functional_cfg_init(&cfg);
+
+    /* Slot 2's own register = RCP_EP_WAKEUP_REG_SOURCE_BASE + 2*2. LOW_LEVEL
+     * (0x05) << 11 | pin_number(0x0064). */
+    reg = (uint16_t)((RCP_EP_WAKEUP_IO_SRC_LOW_LEVEL << 11) | 0x0064u);
+    payload[0] = 0x00;
+    payload[1] = (uint8_t)(RCP_EP_WAKEUP_REG_SOURCE_BASE + 2u * RCP_EP_WAKEUP_REG_SOURCE_SPAN);
+    payload[2] = (uint8_t)(reg >> 8);
+    payload[3] = (uint8_t)(reg & 0xFFu);
+
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_RECONFIG_OK,
+        rcp_ep_wakeup_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_TRUE(cfg.sources[2].enabled);
+    TEST_ASSERT_FALSE(cfg.sources[2].active_high);
+    TEST_ASSERT_EQUAL_UINT16(0x0064u, cfg.sources[2].pin_number);
+    /* Untouched slots. */
+    TEST_ASSERT_FALSE(cfg.sources[0].enabled);
+    TEST_ASSERT_FALSE(cfg.sources[1].enabled);
+}
+
+/* REQ-WAKEUP-022's own remaining, honestly disclosed gap: an edge-
+ * triggered or reserved io_src value cannot be represented by this
+ * module's own level-only rcp_ep_wakeup_source_asserted() predicate, so
+ * a configuration write encoding one leaves enabled/active_high
+ * untouched rather than silently misinterpreting it as a level mode --
+ * pin_number still updates regardless, since it is always representable. */
+static void test_apply_reconfig_edge_triggered_io_src_leaves_enabled_unchanged(void)
+{
+    rcp_ep_wakeup_functional_cfg_t cfg;
+    uint8_t                        payload[4];
+    uint16_t                       reg;
+
+    rcp_ep_wakeup_functional_cfg_init(&cfg);
+    cfg.sources[0].enabled     = true;
+    cfg.sources[0].active_high = true;
+
+    /* io_src = 0x01 (rising edge) -- not representable. */
+    reg = (uint16_t)((0x01u << 11) | 0x0007u);
+    payload[0] = 0x00; payload[1] = (uint8_t)RCP_EP_WAKEUP_REG_SOURCE_BASE;
+    payload[2] = (uint8_t)(reg >> 8);
+    payload[3] = (uint8_t)(reg & 0xFFu);
+
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_RECONFIG_OK,
+        rcp_ep_wakeup_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_TRUE(cfg.sources[0].enabled);      /* unchanged */
+    TEST_ASSERT_TRUE(cfg.sources[0].active_high);  /* unchanged */
+    TEST_ASSERT_EQUAL_UINT16(0x0007u, cfg.sources[0].pin_number); /* updated */
+}
+
+static void test_apply_reconfig_ignores_read_only_registers(void)
+{
+    rcp_ep_wakeup_functional_cfg_t cfg;
+    uint8_t                        payload[2 + 2];
+
+    rcp_ep_wakeup_functional_cfg_init(&cfg);
+
+    /* Cover EP_LEN (0x00) and NR_IO_PINS_MAX (0x01) -- both read-only. */
+    payload[0] = 0x00; payload[1] = 0x00;
+    payload[2] = 0xFF; payload[3] = 0xFF;
+
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_RECONFIG_OK,
+        rcp_ep_wakeup_apply_reconfig(&cfg, payload, sizeof(payload)));
+
+    {
+        uint8_t out[RCP_EP_WAKEUP_EP_FUNC_LEN];
+
+        rcp_ep_wakeup_render_registers(&cfg, out);
+        TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_WAKEUP_EP_FUNC_LEN, out[RCP_EP_WAKEUP_REG_EP_LEN]);
+        TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_WAKEUP_MAX_SOURCES,
+                                 out[RCP_EP_WAKEUP_REG_NR_IO_PINS_MAX]);
+    }
+}
+
+static void test_apply_reconfig_rejects_short_payload(void)
+{
+    rcp_ep_wakeup_functional_cfg_t cfg;
+    uint8_t                        payload[2]; /* address only, no data */
+
+    rcp_ep_wakeup_functional_cfg_init(&cfg);
+    payload[0] = 0x00; payload[1] = 0x00;
+
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_RECONFIG_ERR_SHORT,
+        rcp_ep_wakeup_apply_reconfig(&cfg, payload, sizeof(payload)));
+}
+
+static void test_apply_reconfig_rejects_out_of_range(void)
+{
+    rcp_ep_wakeup_functional_cfg_t cfg;
+    uint8_t                        payload[3];
+
+    rcp_ep_wakeup_functional_cfg_init(&cfg);
+    cfg.sources[7].pin_number = 0x42u;
+
+    /* 0x0016 == RCP_EP_WAKEUP_EP_FUNC_LEN itself -- one past the last
+     * valid offset, so even a single-octet write there overruns. */
+    payload[0] = 0x00; payload[1] = 0x16;
+    payload[2] = 0xAA;
+
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_RECONFIG_ERR_OUT_OF_RANGE,
+        rcp_ep_wakeup_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_EQUAL_UINT16(0x42u, cfg.sources[7].pin_number); /* untouched */
+}
+
+static void test_reconfig_strerror_never_null_and_distinct(void)
+{
+    const char *ok    = rcp_ep_wakeup_reconfig_strerror(RCP_EP_WAKEUP_RECONFIG_OK);
+    const char *short_ = rcp_ep_wakeup_reconfig_strerror(RCP_EP_WAKEUP_RECONFIG_ERR_SHORT);
+    const char *range  = rcp_ep_wakeup_reconfig_strerror(RCP_EP_WAKEUP_RECONFIG_ERR_OUT_OF_RANGE);
+    const char *unknown = rcp_ep_wakeup_reconfig_strerror((rcp_ep_wakeup_reconfig_errc_t)99);
+
+    TEST_ASSERT_NOT_NULL(ok);
+    TEST_ASSERT_NOT_NULL(short_);
+    TEST_ASSERT_NOT_NULL(range);
+    TEST_ASSERT_NOT_NULL(unknown);
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(ok, short_));
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(short_, range));
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(range, unknown));
+}
+
+static void test_encode_reconfig_request_round_trip(void)
+{
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    const uint8_t                data[2] = {0xDE, 0xAD};
+    rcp_bytes_t                  frame;
+
+    frame = rcp_ep_wakeup_encode_reconfig_request(BUS_ID, RCP_EP_WAKEUP_REG_EP_STATUS,
+                                                   data, sizeof(data), 3u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_ACF_OK,
+        rcp_acf_decode_abb(frame.data, frame.len, &hdr, &payload, &payload_len));
+    TEST_ASSERT_EQUAL_UINT(4u, payload_len); /* address(2) + data(2) */
+    TEST_ASSERT_EQUAL_HEX8(0x00u, payload[0]);
+    TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_EP_WAKEUP_REG_EP_STATUS, payload[1]);
+    TEST_ASSERT_EQUAL_HEX8(0xDEu, payload[2]);
+    TEST_ASSERT_EQUAL_HEX8(0xADu, payload[3]);
+    TEST_ASSERT_EQUAL_UINT8(0x7u, hdr.evt); /* evt[2:0] == 111b */
+    rcp_bytes_free(&frame);
+}
+
+static void test_encode_reconfig_request_rejects_empty_data(void)
+{
+    rcp_bytes_t frame = rcp_ep_wakeup_encode_reconfig_request(BUS_ID, 0u, NULL, 0u, 1u);
+
+    TEST_ASSERT_NULL(frame.data);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -400,6 +637,18 @@ int main(void)
     RUN_TEST(test_is_wakeup_echo_false_when_transaction_num_differs);
     RUN_TEST(test_is_wakeup_echo_false_on_decode_failure);
     RUN_TEST(test_is_wakeup_echo_false_for_sleepcmd_frame);
+
+    RUN_TEST(test_render_registers_matches_table_offsets);
+    RUN_TEST(test_apply_reconfig_writes_ep_status);
+    RUN_TEST(test_apply_reconfig_wup_status_write_one_clears);
+    RUN_TEST(test_apply_reconfig_writes_source_slot);
+    RUN_TEST(test_apply_reconfig_edge_triggered_io_src_leaves_enabled_unchanged);
+    RUN_TEST(test_apply_reconfig_ignores_read_only_registers);
+    RUN_TEST(test_apply_reconfig_rejects_short_payload);
+    RUN_TEST(test_apply_reconfig_rejects_out_of_range);
+    RUN_TEST(test_reconfig_strerror_never_null_and_distinct);
+    RUN_TEST(test_encode_reconfig_request_round_trip);
+    RUN_TEST(test_encode_reconfig_request_rejects_empty_data);
 
     return UNITY_END();
 }

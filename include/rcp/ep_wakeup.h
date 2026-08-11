@@ -176,6 +176,66 @@
  * for that wiring, keeping the dependency one-directional (ep_wakeup.h
  * depends on power.h for rcp_pwrmode_t/rcp_pwrmode_entry_result_t in the
  * SleepCMD codec above; power.h does not depend back on ep_wakeup.h).
+ *
+ * ── The EP_func register block (evt[2:0] == 111b), added 2026-08-11 ────────
+ *
+ * FIXED/ADDED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I dedicated
+ * investigation, task #95): this endpoint type had no §12.7.1 register-
+ * block wire mapping at all until now -- deferred initially because its
+ * own TC18 §13.7.2.2 table (unlike every other endpoint's own fixed-width
+ * register block) has a genuine, literal address collision between
+ * `wup_status` and the wake-source array's own first entry, both printed
+ * at the same relative address. Confirmed via the RENDERED page image on
+ * both the 0.5.1_RC baseline and the 0.5.1_RC5 revision (identical on
+ * both -- not an extraction artifact, and not independently corrected by
+ * the spec committee the way the MDIO Table 56/59 collision was) that
+ * `wup_status` (a fixed, single 16-bit register) is meant to occupy its
+ * own slot before the variable-length wake-source array begins,
+ * resolved via this session's own established cross-table pattern:
+ * `wup_status` at its own printed address, the array shifted to start
+ * immediately after it, one slot per RCP_EP_WAKEUP_MAX_SOURCES (this
+ * module's own pre-existing upper bound, matching the wire's own
+ * `wup_nr_io_pins_max` register exactly).
+ *
+ * Two further gaps, beyond the address collision itself, are handled
+ * conservatively rather than with an from-scratch redesign:
+ *   1. `wup_ep_status` (a 16-bit R/W register TC18 documents only as
+ *      "Status of WUP-endpoint", no further structure given) is added as
+ *      a new opaque `ep_status` field -- same treatment every other
+ *      endpoint type's own `ep_status`/`svr_ep_status` field gets.
+ *   2. Each wake-source's own wire register encodes a 5-bit IO_SRC
+ *      behavior code (TC18's own Table 37/40: inactive, rising edge,
+ *      falling edge, both edges, high level, low level, else reserved) --
+ *      this module's own pre-existing `rcp_ep_wakeup_source_cfg_t` only
+ *      ever modeled 2 of those 6 states (`active_high`, a level-only
+ *      predicate `rcp_ep_wakeup_source_asserted()` already implements and
+ *      is already tested). Rather than redesigning that detection logic
+ *      to add edge-triggering (which would need previous-level state
+ *      this module's own existing, tested API doesn't carry, and would
+ *      ripple into every caller's own calling convention), the register
+ *      block below renders/parses exactly the 2 states this module can
+ *      already represent (io_src 0x04 = high level, 0x05 = low level,
+ *      0x00 = disabled) faithfully, and a configuration write encoding
+ *      an edge-triggered or reserved io_src value (0x01-0x03, 0x06-0x1F)
+ *      leaves that source's own `enabled`/`active_high` fields UNCHANGED
+ *      (its `pin_number` still updates) -- honestly representing "this
+ *      implementation cannot act on that request" rather than silently
+ *      misinterpreting an edge-triggered request as a level-triggered
+ *      one, which would be actively wrong instead of merely incomplete.
+ *      `rcp_ep_wakeup_source_asserted()`'s own existing signature,
+ *      semantics, and tests are entirely unchanged by this addition.
+ *
+ * `wup_status` itself keeps its own pre-existing, already-tested
+ * single-aggregate-latch-bit API and shape entirely unchanged too (see
+ * above) -- TC18's own register is a 16-bit bitmask, "each bit represents
+ * a wake-up source", but this module has never modeled a per-source
+ * latch (only "has ANY source woken the device"). The register block
+ * renders/parses only bit 0 of the wire's wup_status word (1 = latched,
+ * matching this module's own existing meaning); bits [15:1] always read
+ * 0 and a write's bit 0 clears the latch (matching the spec's own
+ * "writing '1' clears the flag" rule) while any other written bit
+ * pattern is a no-op -- an honestly disclosed simplification, not a
+ * silently wrong one, exactly like the IO_SRC treatment above.
  */
 #ifndef RCP_EP_WAKEUP_H
 #define RCP_EP_WAKEUP_H
@@ -202,9 +262,27 @@ extern "C" {
 
 #define RCP_EP_WAKEUP_MAX_SOURCES ((size_t)8u)
 
+/* Moved above rcp_ep_wakeup_functional_cfg_t (2026-08-11) so that struct
+ * can embed one as a field -- see the file header's own register-block
+ * note. Function declarations for this type stay in their own "wup_status
+ * latch" section below, unmoved. */
 typedef struct {
-    bool enabled;     /* this wake-source slot participates in wake detection */
-    bool active_high; /* true: a high pin level asserts wake; false: a low level does */
+    bool latched;
+} rcp_ep_wakeup_wup_status_t;
+
+typedef struct {
+    bool     enabled;     /* this wake-source slot participates in wake detection */
+    bool     active_high; /* true: a high pin level asserts wake; false: a low level does */
+    uint16_t pin_number;  /* ADDED 2026-08-11: wup_io_scrN's own [10:0] wire
+                              field -- the physical IO pin this slot
+                              observes. 0 is the wire's own "unconfigured/
+                              end of table" value for a slot; see the file
+                              header's own register-block note. Does not
+                              itself affect rcp_ep_wakeup_source_asserted()
+                              (which only ever consults enabled/
+                              active_high), it is purely the wire-visible
+                              identity of which physical pin enabled/
+                              active_high describe. */
 } rcp_ep_wakeup_source_cfg_t;
 
 typedef struct {
@@ -212,10 +290,28 @@ typedef struct {
                                                config prefix -- see the file
                                                header */
     rcp_ep_wakeup_source_cfg_t     sources[RCP_EP_WAKEUP_MAX_SOURCES];
+    uint16_t                       ep_status;  /* ADDED 2026-08-11: wup_ep_status
+                                                    -- see the file header's own
+                                                    register-block note */
+    rcp_ep_wakeup_wup_status_t     wup_status; /* ADDED 2026-08-11: embeds the
+                                                    pre-existing, unchanged
+                                                    rcp_ep_wakeup_wup_status_t
+                                                    latch so the whole register
+                                                    block lives in one struct,
+                                                    matching every other
+                                                    endpoint type's own
+                                                    convention -- see the file
+                                                    header's own register-block
+                                                    note. The standalone type
+                                                    remains usable on its own
+                                                    exactly as before; this is
+                                                    an additional way to reach
+                                                    it, not a replacement. */
 } rcp_ep_wakeup_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false; every source entry
- * disabled with active_high == false). */
+ * disabled with active_high == false and pin_number == 0; ep_status == 0;
+ * wup_status cleared). */
 void rcp_ep_wakeup_functional_cfg_init(rcp_ep_wakeup_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
@@ -238,10 +334,6 @@ bool rcp_ep_wakeup_any_source_asserted(const rcp_ep_wakeup_functional_cfg_t *fcf
                                         const bool *pin_levels, size_t pin_level_count);
 
 /* ── wup_status latch ─────────────────────────────────────────────────────────── */
-
-typedef struct {
-    bool latched;
-} rcp_ep_wakeup_wup_status_t;
 
 /* Initializes *s to cleared (latched = false). */
 void rcp_ep_wakeup_wup_status_init(rcp_ep_wakeup_wup_status_t *s);
@@ -376,6 +468,113 @@ rcp_ep_wakeup_errc_t rcp_ep_wakeup_decode_wakeup_message(const uint8_t *b, size_
  * failure or transaction-number mismatch. */
 bool rcp_ep_wakeup_is_wakeup_echo(const uint8_t *b, size_t len, rcp_byte_bus_id_t expected_bus_id,
                                    uint8_t sent_transaction_num);
+
+/* ── The EP_func register block (the evt[2:0] == 111b target) ──────────────── */
+
+/* Relative octet offsets of this endpoint's own EP_func block -- see the
+ * file header's own "register block" note. Every multi-octet register is
+ * big-endian, like every other multi-octet field this codebase encodes.
+ * Offsets marked R are read-only: a configuration write covering them
+ * leaves them unchanged (see rcp_ep_wakeup_apply_reconfig()). */
+#define RCP_EP_WAKEUP_REG_EP_LEN         ((uint16_t)0x0000u) /*  8 bit, R   */
+#define RCP_EP_WAKEUP_REG_NR_IO_PINS_MAX ((uint16_t)0x0001u) /*  8 bit, R   */
+#define RCP_EP_WAKEUP_REG_EP_STATUS      ((uint16_t)0x0002u) /* 16 bit, R/W */
+#define RCP_EP_WAKEUP_REG_WUP_STATUS     ((uint16_t)0x0004u) /* 16 bit, R/W */
+
+/* Wake-source slot i's own 2-octet wup_io_scrN register lives at
+ * RCP_EP_WAKEUP_REG_SOURCE_BASE + i * RCP_EP_WAKEUP_REG_SOURCE_SPAN,
+ * i in [0, RCP_EP_WAKEUP_MAX_SOURCES). Encodes IO_SRC[15:11] (5 bit) in
+ * the high bits, pin_number[10:0] (11 bit) in the low bits -- see the
+ * RCP_EP_WAKEUP_IO_SRC_* values below. */
+#define RCP_EP_WAKEUP_REG_SOURCE_BASE ((uint16_t)0x0006u)
+#define RCP_EP_WAKEUP_REG_SOURCE_SPAN ((uint16_t)0x0002u)
+
+/* The 3 IO_SRC[15:11] values this module can represent -- see the file
+ * header's own register-block note for why the other TC18-defined values
+ * (rising/falling/both-edges, 0x01-0x03) and the reserved range
+ * (0x06-0x1F) are not representable here. */
+#define RCP_EP_WAKEUP_IO_SRC_INACTIVE   ((uint8_t)0x00u)
+#define RCP_EP_WAKEUP_IO_SRC_HIGH_LEVEL ((uint8_t)0x04u)
+#define RCP_EP_WAKEUP_IO_SRC_LOW_LEVEL  ((uint8_t)0x05u)
+
+/* The block's own length in octets -- one past the last assigned offset,
+ * i.e. the value this endpoint reports at RCP_EP_WAKEUP_REG_EP_LEN and
+ * the bound the "write beyond EP_LEN is ignored" rule (§12.7.1) is
+ * applied against: the 6-octet common prefix (len/nr_pins_max/ep_status/
+ * wup_status) plus RCP_EP_WAKEUP_MAX_SOURCES 2-octet source registers. */
+#define RCP_EP_WAKEUP_EP_FUNC_LEN \
+    ((uint16_t)(RCP_EP_WAKEUP_REG_SOURCE_BASE + \
+                (uint16_t)RCP_EP_WAKEUP_MAX_SOURCES * RCP_EP_WAKEUP_REG_SOURCE_SPAN))
+
+/* The fixed width (octets) of the relative-start-address prefix every
+ * configuration request's payload begins with -- the address is a 16-bit
+ * big-endian field, followed by the configuration data octets to write
+ * from that address onward (§12.7.1). */
+#define RCP_EP_WAKEUP_RECONFIG_ADDR_LEN ((size_t)2u)
+
+typedef enum {
+    RCP_EP_WAKEUP_RECONFIG_OK               = 0,
+    RCP_EP_WAKEUP_RECONFIG_ERR_SHORT        = 1, /* payload carries no address
+                                                     prefix, or an address
+                                                     prefix with no data octet
+                                                     after it */
+    RCP_EP_WAKEUP_RECONFIG_ERR_OUT_OF_RANGE = 2, /* start_address + data length
+                                                     exceeds
+                                                     RCP_EP_WAKEUP_EP_FUNC_LEN --
+                                                     the whole write is ignored,
+                                                     per the specification's own
+                                                     rule */
+} rcp_ep_wakeup_reconfig_errc_t;
+
+/* Human-readable message for an rcp_ep_wakeup_reconfig_errc_t value. Never
+ * returns NULL. */
+const char *rcp_ep_wakeup_reconfig_strerror(rcp_ep_wakeup_reconfig_errc_t e);
+
+/* Serializes cfg's EP_func registers into out[0..RCP_EP_WAKEUP_EP_FUNC_LEN)
+ * exactly as a configuration *read* of the whole block would report them
+ * -- the inverse of rcp_ep_wakeup_apply_reconfig()'s own parse step, and
+ * the same rendering that function patches in place. wup_status renders
+ * only bit 0 (bits [15:1] always 0); each source slot renders exactly one
+ * of RCP_EP_WAKEUP_IO_SRC_INACTIVE/_HIGH_LEVEL/_LOW_LEVEL, derived from
+ * enabled/active_high -- see the file header's own register-block note
+ * for both simplifications. */
+void rcp_ep_wakeup_render_registers(const rcp_ep_wakeup_functional_cfg_t *cfg,
+                                     uint8_t out[RCP_EP_WAKEUP_EP_FUNC_LEN]);
+
+/* Applies the configuration escape hatch (evt[2:0] == 111b): payload is a
+ * 16-bit big-endian relative start address followed by the configuration
+ * data octets to write from that address onward (§12.7.1). This is a real
+ * register write, reaching every R/W register the block defines (ep_status,
+ * wup_status, and every source slot's own wup_io_scrN).
+ *
+ * Returns RCP_EP_WAKEUP_RECONFIG_ERR_SHORT when payload_len is not at
+ * least RCP_EP_WAKEUP_RECONFIG_ADDR_LEN + 1, and
+ * RCP_EP_WAKEUP_RECONFIG_ERR_OUT_OF_RANGE when the addressed span would
+ * extend past RCP_EP_WAKEUP_EP_FUNC_LEN; in both cases cfg is left
+ * entirely unchanged, per the specification's own "such a payload is to
+ * be ignored" rule. Octets landing on a read-only register (EP_LEN or
+ * NR_IO_PINS_MAX) are left at their current values while the rest of the
+ * span is still applied. A write to wup_status sets bit 0 clear iff the
+ * written value's own bit 0 is set (write-1-to-clear, matching §13.7.2.2's
+ * own rule); any other written bit pattern in that register is a no-op.
+ * A write to a source slot encoding an IO_SRC value this module cannot
+ * represent (see RCP_EP_WAKEUP_IO_SRC_* above) leaves that slot's own
+ * enabled/active_high unchanged while still updating its pin_number --
+ * see the file header's own register-block note for why. Partially-
+ * covered multi-octet registers are handled correctly: the write is
+ * applied at octet granularity over the block's rendered image. */
+rcp_ep_wakeup_reconfig_errc_t rcp_ep_wakeup_apply_reconfig(rcp_ep_wakeup_functional_cfg_t *cfg,
+                                                            const uint8_t *payload,
+                                                            size_t payload_len);
+
+/* Encodes an ACF_ABB configuration request (evt[2:0] == 111b) addressed to
+ * byte_bus_id: payload is start_address (16-bit big-endian) followed by
+ * data[0..data_len). Returns a zeroed rcp_bytes_t (data=NULL) if data_len
+ * is 0, if the encoded payload would exceed RCP_ACF_MAX_PAYLOAD, or on
+ * allocation failure. Caller frees the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_ep_wakeup_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                   uint16_t start_address, const uint8_t *data,
+                                                   size_t data_len, uint8_t transaction_num);
 
 #ifdef __cplusplus
 }

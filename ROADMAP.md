@@ -13710,3 +13710,121 @@ triage: the RC-server §12.7.7 `rx_enforce_*` register overhaul (task
 #97), still deliberately deferred pending its own dedicated session
 given its depth of overlap with this codebase's own ASIL-relevant
 `e2e.h`/`deadline.h` API.
+
+### v0.231.0 -- 2026-08-11
+
+**WakeUp §12.7.1 register block implemented, dedicated investigation
+closed (issue #256 Group I, task #95)**: this endpoint type was
+deferred back in Group I's own original pass because its TC18
+§13.7.2.2 Table 36 looked, at first read, uniquely intractable among
+the 11 endpoint types -- no fixed common-prefix layout at all,
+instead a variable-length repeating array of per-pin descriptors
+("Pin number = 0 denotes end of table"), plus a genuine, literal
+address collision between `wup_status` and the array's own first
+entry (`wup_io_scr1`), both printed at 0x0004.
+
+**Address-collision confirmation**: rendered the actual PDF page
+image for this table on *both* PDFs this session has access to --
+the 0.5.1_RC baseline (page 84) and the 0.5.1_RC5 revision (page
+93) -- and found byte-for-byte identical content on both. This
+rules out the extraction-artifact hypothesis this endpoint type's
+own SleepCMD bug (Group E) had already made plausible, and also
+means (unlike MDIO's own Table 56/59 collision) the spec committee
+has *not* independently fixed this one between revisions -- it is a
+genuine, still-live defect in the primary source itself as of RC5.
+
+**Resolution**: applied this session's own established cross-table
+pattern -- `wup_status` keeps its own printed address (0x0004), the
+wake-source array shifts to start immediately after it (0x0006).
+The "variable-length, no natural fixed bound" concern that
+originally justified deferral turned out to be resolvable: this
+module already has its own fixed upper bound,
+`RCP_EP_WAKEUP_MAX_SOURCES` (8), which matches the wire's own
+`wup_nr_io_pins_max` register exactly -- so the array is modeled as
+8 fixed slots, each independently terminable via a pin_number == 0
+sentinel, rather than a truly unbounded structure.
+
+**Implementation**: `rcp_ep_wakeup_render_registers()`/
+`_apply_reconfig()`/`_reconfig_strerror()`/`_encode_reconfig_request()`,
+mirroring every other Group I endpoint's own register-block pattern
+exactly. New `wup_ep_status` field (TC18 documents it only as
+"Status of WUP-endpoint", no further structure given -- modeled as
+an opaque 16-bit value, same treatment every other endpoint type's
+own `ep_status` field gets). New `pin_number` field on
+`rcp_ep_wakeup_source_cfg_t` (the wire's own `[10:0]` field,
+identifying which physical pin a slot observes).
+
+**Two further gaps, deliberately handled conservatively rather than
+with a from-scratch redesign** -- both remain honestly `partial`,
+not force-fit to `implemented`:
+1. `wup_status` is a 16-bit register, "each bit represents a
+   wake-up source", per TC18's own text. This module has never
+   modeled a *per-source* latch, only "has ANY source woken the
+   device" (`rcp_ep_wakeup_wup_status_t`, a single bool). Rather
+   than redesigning that pre-existing, already-tested API's own
+   shape, the register block renders/parses only bit 0 of the wire
+   word (bits `[15:1]` always read 0), with a write's own bit 0
+   clearing the latch (matching the spec's own "writing '1' clears
+   the flag" rule) and any other written bit pattern a no-op. The
+   standalone `rcp_ep_wakeup_wup_status_t` type and its own 4
+   functions are entirely unchanged.
+2. Each `wup_io_scrN` register encodes a 5-bit IO_SRC behavior code
+   (Table 37: inactive, rising edge, falling edge, both edges, high
+   level, low level, else reserved). This module's own pre-existing
+   `rcp_ep_wakeup_source_cfg_t`/`rcp_ep_wakeup_source_asserted()`
+   only ever modeled 2 of those 6 states (`active_high`, a
+   level-only predicate). Redesigning that predicate to add
+   edge-triggering would need previous-pin-level state its own
+   existing, already-tested API doesn't carry, and would ripple
+   into every caller's own calling convention -- deliberately not
+   attempted. The register block renders/parses exactly the 3
+   states this module can already represent (`io_src` 0x00 =
+   disabled, 0x04 = high level, 0x05 = low level); a configuration
+   write encoding an edge-triggered (0x01-0x03) or reserved
+   (0x06-0x1F) value leaves that slot's own `enabled`/`active_high`
+   UNCHANGED -- an honest "cannot apply" rather than a silently
+   wrong reinterpretation as a level mode -- while `pin_number`
+   still updates, since it is always representable regardless of
+   `io_src`.
+
+`REQ-WAKEUP-021` (register block, was `partial`) and `REQ-WAKEUP-022`
+(IO_SRC encoding, was `not-implemented`) both move to `partial` --
+honestly reflecting that the mechanism now exists but the two
+content simplifications above remain, matching the precedent already
+established for GPIO's own `REQ-GPIO-035` in an earlier batch.
+`REQ-CFG-011`/`012` (the cross-endpoint tracking entries) updated to
+credit WakeUp -- 10 of 11 endpoint types now have the generic
+§12.7.1 mechanism (PWM_OUT, PWM_IN, GPIO, SPI, I2C, UART, LIN, ADC,
+ISELED, MDIO, WakeUp); only CAN remains, still deliberately deferred
+(task #94, opaque bit-timing registers + its own address collision).
+
+New tests in `test_ep_wakeup.c`: full register-block coverage
+(offset verification, round-trip, write-1-to-clear semantics,
+edge-triggered-value preservation, read-only-octet skip, short/
+out-of-range payload rejection, `reconfig_strerror`/
+`encode_reconfig_request`). The pre-existing deviation-pin test in
+`test_tc18_gaps_ep.c` rewritten positive, matching every prior Group
+I batch's own convention.
+
+Mutation-tested three separate ways, since this fix has more
+genuinely novel judgment calls than a typical register-block batch:
+loosening the bounds check by 8 octets produces a silent ASan abort
+(a real stack-buffer overrun in a test's own single-element buffer,
+matching every prior Group I batch's own bounds-check confirmation);
+removing the write-1-to-clear bit-0 gate (so every write clears
+unconditionally) produces a clean, deterministic `Expected FALSE Was
+TRUE` failure; forcing the edge-triggered-value branch to overwrite
+`enabled`/`active_high` anyway (instead of leaving them alone)
+produces a clean, deterministic `Expected TRUE Was FALSE` failure.
+All three reverted, full suite re-confirmed clean after each.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check` (CI-pinned
+v0.5.50): 0 errors. `cfusa trace --gaps`: 0/1024 untested;
+`--req-coverage 100` / `--sec-tested 100`: both 100%.
+
+**This closes task #95 (issue #256's own WakeUp deferred item) in
+full.** Remaining deferred work in this whole audit lineage: task
+#94 (CAN, issue #256 Group D) and task #97 (RC-server §12.7.7
+`rx_enforce_*` register overhaul, the TC18 0.5.1_RC5 spec-rebaseline
+project's own last remaining item) -- both still need their own
+dedicated sessions.

@@ -736,10 +736,23 @@ static void test_wakeup_message_and_repetition_time_gaps(void)
 
     rcp_ep_wakeup_functional_cfg_init(&cfg);
     TEST_ASSERT_EQUAL_UINT(8u, RCP_EP_WAKEUP_MAX_SOURCES);
-    TEST_ASSERT_EQUAL_UINT(sizeof(rcp_regmap_ep_functional_cfg_t),
-                           offsetof(rcp_ep_wakeup_functional_cfg_t, sources));
-    TEST_ASSERT_EQUAL_UINT(sizeof(cfg), offsetof(rcp_ep_wakeup_functional_cfg_t, sources)
-                                            + sizeof(cfg.sources));
+    /* ADDED 2026-08-11: sources no longer immediately follows common with
+     * zero padding -- rcp_ep_wakeup_source_cfg_t now contains a uint16_t
+     * (pin_number), which forces 2-byte alignment, so the compiler pads
+     * common (5 bytes) up to the next even offset before sources starts.
+     * This is ordinary C struct layout, not a bug: the offset is now
+     * >= sizeof(common), not necessarily ==. */
+    TEST_ASSERT_TRUE(offsetof(rcp_ep_wakeup_functional_cfg_t, sources) >=
+                     sizeof(rcp_regmap_ep_functional_cfg_t));
+    /* ep_status/wup_status now follow sources -- see REQ-WAKEUP-021's own
+     * updated text and the register-block work below. sources is no
+     * longer the struct's own last field; wup_status is, modulo ordinary
+     * C trailing padding (the struct's own 2-byte alignment requirement,
+     * from its uint16_t-containing members, can round total size up by
+     * one more byte than offsetof(wup_status)+sizeof(wup_status) alone --
+     * hence ">=", not "=="). */
+    TEST_ASSERT_TRUE(sizeof(cfg) >= offsetof(rcp_ep_wakeup_functional_cfg_t, wup_status)
+                                        + sizeof(cfg.wup_status));
 }
 
 /* REQ-WAKEUP-019 (not-implemented) DEVIATION PIN: TC18 12.5 requires a
@@ -813,49 +826,86 @@ static void test_wakeup_codec_accepts_any_bus_id(void)
     TEST_ASSERT_EQUAL_HEX8(0x01u, RCP_EP_WAKEUP_EP_TYPE);
 }
 
-/* REQ-WAKEUP-021 (partial) DEVIATION PIN: TC18 13.7.2.2 Table 36 makes
- * wup_status a 16-bit register with one bit per wake-up source, cleared by
- * writing a 1 to that bit, and wup_io_scrN a packed [10:0] IO pin number plus
- * [15:11] IO behaviour with pin number 0 terminating the table; wup_ep_len
- * and wup_nr_io_pins_max also exist. c-RCP has a single boolean latch cleared
- * wholesale, and a source table of {enabled, active_high} pairs.
- * REQ-WAKEUP-022 (not-implemented) DEVIATION PIN: Table 37's IO_SRC[15:11]
- * behaviour encoding (0b00000 inactive, 0b00001 rising, 0b00010 falling,
- * 0b00011 both edges, 0b00100 high level, 0b00101 low level, rest reserved)
- * collapses to a level-only polarity bit: assertion is a function of the
- * CURRENT pin level alone, no edge mode is expressible, and no reserved
- * encoding is rejected because none can be expressed. */
-static void test_wakeup_status_latch_and_source_cfg_reduced(void)
+/* REQ-WAKEUP-021 (partial) / REQ-WAKEUP-022 (partial): FIXED 2026-08-11
+ * (c-RCP-AUDIT-06, issue #256 Group I dedicated investigation, task #95).
+ * TC18 §13.7.2.2 Table 36 has a genuine, literal address collision between
+ * wup_status and the wake-source array's own first entry (wup_io_scr1),
+ * both printed at the same relative address -- confirmed via the rendered
+ * page image on both the 0.5.1_RC baseline and the 0.5.1_RC5 revision
+ * (identical on both, not an extraction artifact, not independently
+ * corrected by the spec committee the way MDIO's own Table 56/59 collision
+ * was). Resolved via this session's own established cross-table pattern:
+ * wup_status keeps its own printed address, the source array shifts to
+ * start immediately after it. rcp_ep_wakeup_render_registers()/
+ * _apply_reconfig() now implement the whole collision-free block --
+ * wup_ep_len/wup_nr_io_pins_max/wup_ep_status/wup_status/wup_io_scrN are
+ * all reachable via the generic evt[2:0]==111b configuration mechanism.
+ *
+ * Two things remain deliberately, honestly simplified rather than fully
+ * redesigned (still partial, not fully implemented -- see
+ * ep_wakeup.h's own "register block" file-header note for the full
+ * reasoning): wup_status still renders/parses only its own bit 0 (this
+ * module's pre-existing single-aggregate-latch API, unchanged), not a
+ * true per-source bitmask; and each wup_io_scrN register renders/parses
+ * only 3 of Table 37's 6 IO_SRC values (inactive/high level/low level) --
+ * the pre-existing rcp_ep_wakeup_source_asserted() predicate is level-only
+ * and unchanged, so edge-triggered modes remain unrepresentable, and a
+ * configuration write encoding one leaves that slot's own enabled/
+ * active_high untouched (only pin_number always updates) rather than
+ * silently misinterpreting it. */
+static void test_wakeup_register_block_has_collision_free_layout(void)
 {
     rcp_ep_wakeup_wup_status_t     status;
-    rcp_ep_wakeup_source_cfg_t     high = {true, true};
-    rcp_ep_wakeup_source_cfg_t     low  = {true, false};
+    rcp_ep_wakeup_source_cfg_t     high = {true, true, 0};
+    rcp_ep_wakeup_source_cfg_t     low  = {true, false, 0};
     rcp_ep_wakeup_functional_cfg_t cfg;
     bool                           levels[2] = {false, true};
+    uint8_t                        out[RCP_EP_WAKEUP_EP_FUNC_LEN];
 
     rcp_ep_wakeup_wup_status_init(&status);
     TEST_ASSERT_TRUE(rcp_ep_wakeup_wup_status_is_clear(&status));
     rcp_ep_wakeup_wup_status_latch(&status);
     TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_is_clear(&status));
-    /* One wholesale clear, not a per-source write-1-to-clear bit. */
+    /* One wholesale clear, not a per-source write-1-to-clear bit -- the
+     * standalone rcp_ep_wakeup_wup_status_t API itself is unchanged; only
+     * the register block built on top of it (below) gained write-1-to-
+     * clear wire semantics. */
     rcp_ep_wakeup_wup_status_clear(&status);
     TEST_ASSERT_TRUE(rcp_ep_wakeup_wup_status_is_clear(&status));
     TEST_ASSERT_EQUAL_UINT(sizeof(bool), sizeof(status));
 
     /* Level modes only: the predicate takes the current level and nothing
-     * else, so rising/falling/both-edges have no representation. */
+     * else, so rising/falling/both-edges have no representation -- still
+     * true, unchanged by the register-block addition. */
     TEST_ASSERT_TRUE(rcp_ep_wakeup_source_asserted(high, true));
     TEST_ASSERT_FALSE(rcp_ep_wakeup_source_asserted(high, false));
     TEST_ASSERT_TRUE(rcp_ep_wakeup_source_asserted(low, false));
     TEST_ASSERT_FALSE(rcp_ep_wakeup_source_asserted(low, true));
-    TEST_ASSERT_EQUAL_UINT(2u * sizeof(bool), sizeof(rcp_ep_wakeup_source_cfg_t));
 
-    /* No IO pin number and no end-of-table sentinel: a source is addressed
-     * by its table index, and a disabled slot never asserts. */
     rcp_ep_wakeup_functional_cfg_init(&cfg);
     TEST_ASSERT_FALSE(rcp_ep_wakeup_any_source_asserted(&cfg, levels, 2u));
     cfg.sources[1] = high;
     TEST_ASSERT_TRUE(rcp_ep_wakeup_any_source_asserted(&cfg, levels, 2u));
+
+    /* The collision is now resolved: wup_status (0x0004-5) and
+     * wup_io_scr1 (0x0006-7, no longer 0x0004) render to distinct,
+     * non-overlapping addresses. */
+    TEST_ASSERT_EQUAL_UINT16(0x0004u, RCP_EP_WAKEUP_REG_WUP_STATUS);
+    TEST_ASSERT_EQUAL_UINT16(0x0006u, RCP_EP_WAKEUP_REG_SOURCE_BASE);
+    TEST_ASSERT_EQUAL_UINT16(0x0016u, RCP_EP_WAKEUP_EP_FUNC_LEN);
+
+    cfg.sources[1].pin_number = 5u;
+    rcp_ep_wakeup_wup_status_latch(&cfg.wup_status);
+    rcp_ep_wakeup_render_registers(&cfg, out);
+    TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_EP_WAKEUP_EP_FUNC_LEN, out[RCP_EP_WAKEUP_REG_EP_LEN]);
+    TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_EP_WAKEUP_MAX_SOURCES,
+                            out[RCP_EP_WAKEUP_REG_NR_IO_PINS_MAX]);
+    TEST_ASSERT_EQUAL_HEX8(0x00u, out[RCP_EP_WAKEUP_REG_WUP_STATUS]);
+    TEST_ASSERT_EQUAL_HEX8(0x01u, out[RCP_EP_WAKEUP_REG_WUP_STATUS + 1]); /* bit 0 latched */
+    /* Slot 1's own register: io_src=HIGH_LEVEL(0x04) in bits [15:11],
+     * pin_number=5 in bits [10:0] -> (0x04 << 11) | 5 == 0x2005. */
+    TEST_ASSERT_EQUAL_HEX8(0x20u, out[RCP_EP_WAKEUP_REG_SOURCE_BASE + 2]);
+    TEST_ASSERT_EQUAL_HEX8(0x05u, out[RCP_EP_WAKEUP_REG_SOURCE_BASE + 3]);
 }
 
 /* ── E2E request-stream configuration (TC18 12.7.7 Table 22) ──────────────── */
@@ -1175,7 +1225,7 @@ int main(void)
     RUN_TEST(test_wakeup_message_and_repetition_time_gaps);
     RUN_TEST(test_wakeup_refusal_is_positive_response_not_error);
     RUN_TEST(test_wakeup_codec_accepts_any_bus_id);
-    RUN_TEST(test_wakeup_status_latch_and_source_cfg_reduced);
+    RUN_TEST(test_wakeup_register_block_has_collision_free_layout);
 
     RUN_TEST(test_e2e_replayed_request_is_admitted_again);
     RUN_TEST(test_e2e_safe_state_only_reachable_via_watchdog);
