@@ -33,6 +33,7 @@
 //cfusa:req REQ-ISELED-026
 //cfusa:req REQ-ISELED-027
 //cfusa:req REQ-ISELED-028
+//cfusa:req REQ-ISELED-029
 /*
  * ep_iseled.h -- ISELED endpoint for the TC18 Remote Control Protocol wire
  * layer (ROADMAP.md Phase 19, "Remaining Endpoint Types", milestone 73).
@@ -197,6 +198,65 @@
  * endpoint's own outbound transmission is always locally clocked
  * regardless of how it derives a clock for what it receives back.
  *
+ * ── The EP_func register block (evt[2:0] == 111b) ──────────────────────────
+ *
+ * FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-ISELED-026/027/
+ * 029): rcp_ep_iseled_decode_command_request() already correctly rejected
+ * evt[2:0] = 111b (RCP_EP_ISELED_ERR_BAD_EVT, via acf.h's
+ * rcp_acf_evt_row2_is_plain()), but no counterpart implemented that TC18
+ * §12.7.1 configuration-write path -- the same class of gap SPI's/I2C's/
+ * UART's/LIN's/ADC's/PWM_IN's own earlier fixes closed.
+ *
+ * TC18 §13.7.12.2 Table 55 defines the register block, but -- like GPIO's,
+ * I2C's, and PWM_OUT's own source tables -- with a genuine address-
+ * collision editorial defect (visually confirmed on the PDF, not an
+ * extraction artifact): iseled_base_clk (16 bit, R) is printed at relative
+ * address 0x0001, one octet after iseled_ep_len, with no reserved octet at
+ * 0x0001 the way every other endpoint type's own Table prints one -- so
+ * iseled_base_clk's own two octets (0x0001-0x0002) collide with
+ * iseled_ep_enable&clr, itself separately printed at 0x0002. Resolved via
+ * the same cross-table structural precedent already used for
+ * ep_pwm.h's/ep_gpio.h's/ep_i2c.h's own analogous defects: every endpoint
+ * type's own common EP_func prefix places EP_LEN/reserved/enable&clr/
+ * options/a 16-bit base_clk at the identical address sequence
+ * (0x0000/0x0001/0x0002/0x0003/0x0004-0x0005), so iseled_base_clk moves to
+ * 0x0004-0x0005, pushing every field the table lists after it (in the
+ * table's own row order, each keeping its own width) down by three octets:
+ * iseled_ep_status to 0x0006-0x0007, iseled_clk_divider to 0x0008, the
+ * bitfield octet (iseled_collect_resp bit 3, iseled_use_rcv_clk bit 4) to
+ * 0x0009, iseled_nr_leds to 0x000A-0x000B, iseled_rcv_timeout to
+ * 0x000C-0x000D (RCP_EP_ISELED_EP_FUNC_LEN = 0x000E).
+ *
+ * rcp_ep_iseled_functional_cfg_t gains ep_status/wire_clk_divider/
+ * collect_resp/nr_leds/rcv_timeout. `iseled_use_rcv_clk` is reused
+ * directly for the register block's own 0x0009.4 bit -- it already names
+ * that exact wire bit (see the "Recovered-clock mode" section above,
+ * fixed for the correct polarity in Group G). `iseled_bit_clk_divider`
+ * (uint32_t, unit-unspecified, this module's own outbound-transmission
+ * clock choice -- see the "Bit-time clock" discussion elsewhere in this
+ * header) is kept deliberately distinct from the new, uint8_t
+ * `wire_clk_divider` field carrying the real 0x0008 wire register, per
+ * this audit's established "don't silently redefine an existing field
+ * whose own documented semantics diverge from the real wire register"
+ * rule (SPI's baud_rate_kbps-vs-clock_divider split, UART's/LIN's own
+ * equivalents). `iseled_crc_enable` is explicitly NOT part of this
+ * register block -- it gates this module's own original, second,
+ * independent CRC-8 integrity layer (see the "ISELED-level CRC" section
+ * above), which Table 55 does not define a register for at all, so it is
+ * never rendered onto or parsed from the wire here.
+ *
+ * New rcp_ep_iseled_render_registers()/_apply_reconfig()/
+ * _reconfig_strerror()/_encode_reconfig_request() mirror the established
+ * pattern exactly. REQ-ISELED-026 (iseled_collect_resp) and REQ-ISELED-027
+ * (iseled_nr_leds/iseled_rcv_timeout) -- previously honest, not-implemented
+ * struct-field gaps -- are now implemented; REQ-ISELED-025 (the
+ * response-*aggregation behavior* §13.7.12.1 describes, i.e. actually
+ * splitting a chain read across multiple ACF messages) is a distinct,
+ * deeper runtime-behavior gap this batch does not close and remains
+ * honestly not-implemented, same distinction Group I's own ADC batch drew
+ * between REQ-ADC-035/036 (register modeling) and REQ-ADC-037 (cadence
+ * orchestration behavior).
+ *
  * ── Single trigger: transmission-complete ───────────────────────────────────
  *
  * rcp_ep_iseled_trigger_t names this endpoint type's one asynchronous-event
@@ -330,11 +390,18 @@ typedef struct {
                                                                  see the file
                                                                  header */
     uint8_t                        trigger;                 /* rcp_ep_iseled_trigger_t */
+    uint16_t                       base_clk;         /* 0x0004, R   */
+    uint16_t                       ep_status;        /* 0x0006, R/W */
+    uint8_t                        wire_clk_divider; /* 0x0008, R/W; see the
+                                                          file header */
+    bool                           collect_resp;     /* 0x0009.3, R/W */
+    uint16_t                       nr_leds;          /* 0x000A, R/W */
+    uint16_t                       rcv_timeout;      /* 0x000C, R/W */
 } rcp_ep_iseled_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false; iseled_bit_clk_divider
  * 0; iseled_use_rcv_clk and iseled_crc_enable false; trigger
- * RCP_EP_ISELED_TRIGGER_NONE). */
+ * RCP_EP_ISELED_TRIGGER_NONE; every EP_func register 0). */
 void rcp_ep_iseled_functional_cfg_init(rcp_ep_iseled_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
@@ -365,6 +432,93 @@ bool rcp_ep_iseled_set_crc_enable(rcp_ep_iseled_functional_cfg_t *cfg, bool enab
 bool rcp_ep_iseled_set_trigger(rcp_ep_iseled_functional_cfg_t *cfg,
                                 rcp_ep_iseled_trigger_t trigger, rcp_lifecycle_state_t state,
                                 rcp_lifecycle_writer_ctx_t writer);
+
+/* ── The EP_func register block (evt[2:0] == 111b) ─────────────────────────── */
+
+/* Relative octet offsets of the registers making up an ISELED endpoint's
+ * own EP_func block, at the widths TC18 §13.7.12.2 Table 55 assigns them,
+ * corrected for the address-collision editorial defect -- see the file
+ * header. */
+#define RCP_EP_ISELED_REG_EP_LEN        ((uint16_t)0x0000u) /*  8 bit, R   */
+#define RCP_EP_ISELED_REG_RESERVED_01   ((uint16_t)0x0001u) /*  8 bit, R   */
+#define RCP_EP_ISELED_REG_EP_ENABLE_CLR ((uint16_t)0x0002u) /*  8 bit, R/W */
+#define RCP_EP_ISELED_REG_EP_OPTIONS    ((uint16_t)0x0003u) /*  8 bit, R/W */
+#define RCP_EP_ISELED_REG_BASE_CLK      ((uint16_t)0x0004u) /* 16 bit, R   */
+#define RCP_EP_ISELED_REG_EP_STATUS     ((uint16_t)0x0006u) /* 16 bit, R/W */
+#define RCP_EP_ISELED_REG_CLK_DIVIDER   ((uint16_t)0x0008u) /*  8 bit, R/W */
+#define RCP_EP_ISELED_REG_FLAGS         ((uint16_t)0x0009u) /*  8 bit, R/W */
+#define RCP_EP_ISELED_REG_NR_LEDS       ((uint16_t)0x000Au) /* 16 bit, R/W */
+#define RCP_EP_ISELED_REG_RCV_TIMEOUT   ((uint16_t)0x000Cu) /* 16 bit, R/W */
+
+/* The block's own length in octets -- one past the last assigned offset. */
+#define RCP_EP_ISELED_EP_FUNC_LEN       ((uint16_t)0x000Eu)
+
+/* Bit masks within the RCP_EP_ISELED_REG_FLAGS octet -- Table 55's own two
+ * named single-bit parameters (iseled_collect_resp, iseled_use_rcv_clk),
+ * at the same relative bit positions the table's own row order assigns
+ * (0x0007.3/0x0007.4 in the table's own uncorrected numbering, shifted to
+ * 0x0009.3/0x0009.4 by the address-collision fix above); the remaining
+ * bits are reserved and always read 0. */
+#define RCP_EP_ISELED_FLAG_COLLECT_RESP ((uint8_t)(1u << 3))
+#define RCP_EP_ISELED_FLAG_USE_RCV_CLK  ((uint8_t)(1u << 4))
+
+/* The fixed width (octets) of the relative-start-address prefix every
+ * configuration request's payload begins with -- see
+ * RCP_EP_PWM_OUT_RECONFIG_ADDR_LEN's own identical note (ep_pwm.h). */
+#define RCP_EP_ISELED_RECONFIG_ADDR_LEN ((size_t)2u)
+
+typedef enum {
+    RCP_EP_ISELED_RECONFIG_OK               = 0,
+    RCP_EP_ISELED_RECONFIG_ERR_SHORT        = 1, /* payload carries no
+                                                      address prefix, or an
+                                                      address prefix with no
+                                                      data octet after it */
+    RCP_EP_ISELED_RECONFIG_ERR_OUT_OF_RANGE = 2, /* start_address + data
+                                                      length exceeds
+                                                      RCP_EP_ISELED_EP_FUNC_LEN
+                                                      -- the whole write is
+                                                      ignored, per the
+                                                      specification's own
+                                                      rule */
+} rcp_ep_iseled_reconfig_errc_t;
+
+/* Human-readable message for an rcp_ep_iseled_reconfig_errc_t value. Never
+ * returns NULL. */
+const char *rcp_ep_iseled_reconfig_strerror(rcp_ep_iseled_reconfig_errc_t e);
+
+/* Serializes cfg's EP_func registers into
+ * out[0..RCP_EP_ISELED_EP_FUNC_LEN) exactly as a configuration *read* of
+ * the whole block would report them -- the inverse of
+ * rcp_ep_iseled_apply_reconfig()'s own parse step. iseled_crc_enable is
+ * NOT part of this block (see the file header) and is never touched
+ * here. */
+void rcp_ep_iseled_render_registers(const rcp_ep_iseled_functional_cfg_t *cfg,
+                                     uint8_t out[RCP_EP_ISELED_EP_FUNC_LEN]);
+
+/* Applies the configuration escape hatch (evt[2:0] == 111b): payload is an
+ * addressed write into this endpoint's own EP_func block -- a 16-bit
+ * big-endian relative start address followed by the configuration data
+ * octets to write from that address onward (extraction §3.7.1). See
+ * rcp_ep_pwm_out_apply_reconfig()'s own doc comment (ep_pwm.h) for the
+ * read-only-offset-skipping, octet-granularity-patch, and
+ * out-of-range-ignores-the-whole-write rules -- identical here.
+ *
+ * A caller routing a decoded request here is responsible for having
+ * checked that evt[2:0] really was 111b, e.g. via
+ * !rcp_acf_evt_row2_is_plain(). */
+rcp_ep_iseled_reconfig_errc_t
+rcp_ep_iseled_apply_reconfig(rcp_ep_iseled_functional_cfg_t *cfg,
+                              const uint8_t *payload, size_t payload_len);
+
+/* Encodes an ACF_ABB configuration request (evt[2:0] == 111b) addressed to
+ * byte_bus_id: payload is start_address (16-bit big-endian) followed by
+ * data[0..data_len). Returns a zeroed rcp_bytes_t (data=NULL) if data_len
+ * is 0, if the encoded payload would exceed RCP_ACF_MAX_PAYLOAD, or on
+ * allocation failure. Caller frees the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_ep_iseled_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                   uint16_t start_address,
+                                                   const uint8_t *data, size_t data_len,
+                                                   uint8_t transaction_num);
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 
