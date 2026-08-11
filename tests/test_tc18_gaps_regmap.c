@@ -349,7 +349,9 @@ static void test_ep_len_overrun_rule_implemented_endpoints(void)
         rcp_ep_spi_render_registers(&spi_cfg, spi_block);
         TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_EP_SPI_EP_FUNC_LEN, spi_block[RCP_EP_SPI_REG_EP_LEN]);
         TEST_ASSERT_EQUAL_HEX8(0x36, spi_block[RCP_EP_SPI_REG_EP_LEN]);
-        TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_EP_SPI_MAX_CHANNELS, spi_block[RCP_EP_SPI_REG_NR_CS]);
+        /* TC18 0.5.1_RC5: spi_nr_cs is a 4-bit "(count - 1)" field, not a
+         * plain count -- see ep_spi.h's own "FIXED 2026-08-11" note. */
+        TEST_ASSERT_EQUAL_HEX8((uint8_t)(RCP_EP_SPI_MAX_CHANNELS - 1u), spi_block[RCP_EP_SPI_REG_NR_CS]);
 
         TEST_ASSERT_EQUAL(RCP_EP_SPI_RECONFIG_ERR_OUT_OF_RANGE,
                           rcp_ep_spi_apply_reconfig(&spi_cfg, spi_overrun, sizeof(spi_overrun)));

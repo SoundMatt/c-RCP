@@ -209,6 +209,7 @@ static rcp_ep_spi_mode_t mode_from_bits(bool cpol, bool cpha)
 }
 
 //cfusa:req REQ-SPI-038
+//cfusa:req REQ-SPI-040
 void rcp_ep_spi_render_registers(const rcp_ep_spi_functional_cfg_t *cfg,
                                   uint8_t out[RCP_EP_SPI_EP_FUNC_LEN])
 {
@@ -223,7 +224,10 @@ void rcp_ep_spi_render_registers(const rcp_ep_spi_functional_cfg_t *cfg,
     if (cfg->common.ep_suppress_response) options |= SPI_OPTIONS_BIT_SUPPRESS;
 
     out[RCP_EP_SPI_REG_EP_LEN]        = (uint8_t)RCP_EP_SPI_EP_FUNC_LEN;
-    out[RCP_EP_SPI_REG_NR_CS]         = (uint8_t)RCP_EP_SPI_MAX_CHANNELS;
+    /* TC18 0.5.1_RC5: spi_nr_cs is a 4-bit "(count - 1)" field in bits
+     * [3:0], upper nibble reserved -- see the file header's own "FIXED
+     * 2026-08-11" note. RCP_EP_SPI_MAX_CHANNELS (6) renders as 0x05. */
+    out[RCP_EP_SPI_REG_NR_CS]         = (uint8_t)((RCP_EP_SPI_MAX_CHANNELS - 1u) & 0x0Fu);
     out[RCP_EP_SPI_REG_EP_ENABLE_CLR] = enable_clr;
     out[RCP_EP_SPI_REG_EP_OPTIONS]    = options;
     put_u16(&out[RCP_EP_SPI_REG_EP_STATUS], cfg->ep_status);
@@ -238,6 +242,7 @@ void rcp_ep_spi_render_registers(const rcp_ep_spi_functional_cfg_t *cfg,
         if (rcp_ep_spi_mode_cpha((rcp_ep_spi_mode_t)ch->mode)) cfg_byte |= RCP_EP_SPI_CFG_BIT_CLK_PHASE;
         if (ch->cs_polarity == (uint8_t)RCP_EP_SPI_CS_ACTIVE_HIGH) cfg_byte |= RCP_EP_SPI_CFG_BIT_CS_POLARITY;
         if (ch->use_common_cs) cfg_byte |= RCP_EP_SPI_CFG_BIT_USE_CS;
+        if (ch->deassert_cs_pause) cfg_byte |= RCP_EP_SPI_CFG_BIT_DEASSERT_CS_PAUSE;
 
         put_u16(&out[base + RCP_EP_SPI_CHREG_BAUD_RATE], ch->baud_rate_kbps);
         out[base + RCP_EP_SPI_CHREG_CFG]          = cfg_byte;
@@ -284,6 +289,7 @@ static void parse_registers(rcp_ep_spi_functional_cfg_t *cfg,
                                  ? (uint8_t)RCP_EP_SPI_CS_ACTIVE_HIGH
                                  : (uint8_t)RCP_EP_SPI_CS_ACTIVE_LOW;
         ch->use_common_cs = (cfg_byte & RCP_EP_SPI_CFG_BIT_USE_CS) != 0u;
+        ch->deassert_cs_pause = (cfg_byte & RCP_EP_SPI_CFG_BIT_DEASSERT_CS_PAUSE) != 0u;
 
         ch->baud_rate_kbps  = get_u16(&in[base + RCP_EP_SPI_CHREG_BAUD_RATE]);
         ch->cs_clk_leadtime = in[base + RCP_EP_SPI_CHREG_CS_LEADTIME];
