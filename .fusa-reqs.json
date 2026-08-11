@@ -8247,13 +8247,13 @@
     {
       "id": "REQ-ACF-023",
       "title": "rcp_acf_evt_row2_is_plain() implements Table 30's shared ADC/PWM_IN/I2C/LIN/CAN/UART/ISELED/MDIO rule",
-      "text": "rcp_acf_evt_row2_is_plain(evt) shall return true iff (evt & 0x7) == 0, per TC18 \u00a713.5 Table 30's rule for the {ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO} endpoint-type row: evt[2:0] = 000b is the only value a plain (non-configuration) request in this row may carry; every other value is either reserved (001b-110b, reject with UNSUPPORTED_CMD) or selects a configuration-write-shaped request instead (111b, \u00a712.7.1).",
+      "text": "rcp_acf_evt_row2_is_plain(evt) shall return true iff (evt & 0x7) == 0, per TC18 \u00a713.5 Table 30's rule for the {ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO} endpoint-type row: evt[2:0] = 000b is the only value a plain (non-configuration) request in this row may carry; every other value is either reserved (001b-110b, reject with UNSUPPORTED_CMD) or selects a configuration-write-shaped request instead (111b, \u00a712.7.1). RESOLVED AMBIGUITY (2026-08-10, c-RCP-AUDIT-06, issue #256 Group A): Table 30's own literal text groups evt[2:0]=000b together with 001b-110b as a single \"reserved -- reject\" range, which read in isolation would make evt=000b illegal too. That reading is directly contradicted by TC18's own \u00a713.7.9.3 Figure 33 (\"RC Client sends a standard read request\"), a labeled, bit-level worked example for the ADC endpoint (a member of this exact row) showing evt[2:0]=000b used in a request the spec's own next figure (34) shows succeeding normally, not being rejected. Table 30's prose and the spec's own concrete worked example directly conflict for the same endpoint type -- a genuine internal inconsistency in this Release Candidate draft. This implementation follows the worked example (evt=000b is the ordinary, successful case), since a reading that made every plain request illegal for eight endpoint types would leave those endpoints permanently unusable for normal operation, which the spec's own examples contradict. An earlier full-catalog audit pass (issue #256) flagged this function as non-conformant based on Table 30's prose alone, without cross-checking Figure 33; that finding is refuted by this evidence and no code change was made.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 30, TC18.txt L3666-3710"
+      "tc18": "\u00a713.5 Table 30, TC18.txt L3666-3710 (the reserved-range wording); \u00a713.7.9.3 Figure 33/34 (\"RC Client sends a standard read request\" / ADC response with 8 measurements), the corroborating worked example resolving the ambiguity in Table 30's own favor for evt=000b"
     },
     {
       "id": "REQ-ACF-024",

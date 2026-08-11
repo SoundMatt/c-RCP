@@ -11698,3 +11698,62 @@ Group A next (`REQ-UART-018/020/025`, `REQ-ADC-026`,
 systemic Table 30 "evt[2:0]=000b is the only legal value"
 misreading, ~17 findings; needs a code-behavior check first, not just
 a doc fix, since it could be a real multi-endpoint conformance bug).
+
+### v0.209.0 -- 2026-08-10
+
+**Full-catalog audit follow-up, batch 10 (Group A resolution -- no code
+change, citation strengthened): the audit's own "evt[2:0]=000b is
+illegal" findings refuted by a primary-source worked example, issue
+#256.**
+
+Investigated Group A's 17 findings (`REQ-UART-018/020/025`,
+`REQ-ADC-026`, `REQ-CANEP-016/017/020/031`, `REQ-ACF-023`,
+`REQ-LINEP-016/017/018/025/026/027`, `REQ-I2C-010/011/012`), which
+claimed `rcp_acf_evt_row2_is_plain()` (the shared primitive all 8
+ADC/PWM_IN/I2C/LIN/CAN/UART/ISELED/MDIO endpoint types delegate to)
+wrongly accepts `evt[2:0]=000b` as a legal plain-request value, since
+TC18 Table 30's own prose groups `000b` together with `001b-110b` as a
+single "reserved -- reject with UNSUPPORTED_CMD" range for that row.
+
+Found decisive counter-evidence directly in the primary source: TC18
+§13.7.9.3 Figure 33, a labeled, bit-level worked example titled "RC
+Client sends a standard read request" for the ADC endpoint (a member
+of this exact row), shows the real wire bits for `evt` as `0000b` --
+i.e. `evt[2:0]=000b`, the exact value Table 30's prose says must be
+rejected -- and the very next figure (34) shows the ADC responding
+with real measurement data, not an error. Table 30's literal wording
+and the spec's own concrete worked example directly contradict each
+other for the same endpoint type: a genuine internal inconsistency in
+this Release Candidate draft, not a c-RCP bug. The current
+implementation already follows the worked example (which is what
+makes ordinary reads/writes across all 8 endpoint types function at
+all) -- a reading that made every plain request illegal for eight
+endpoint types would leave them all permanently unusable, which the
+spec's own examples contradict.
+
+**Conclusion: all 17 Group A findings are false positives.** The
+original full-catalog audit's finder and adversarial-verify agents
+both checked Table 30's prose but never cross-referenced it against
+Figure 33 elsewhere in the same document -- a real gap in that audit
+pass's own methodology, now recorded as a lesson for future
+primary-source verification (cross-check a table's literal wording
+against worked examples/figures in the same document, especially for
+a draft/RC spec, before trusting the table standalone).
+
+No code change. `REQ-ACF-023`'s own text and citation updated to
+document the Table 30/Figure 33 tension and the resolution, so a
+future reader (or auditor) doesn't have to rediscover this. The other
+16 Group A entries were not individually re-cited -- they all inherit
+their conformance from the same shared `rcp_acf_evt_row2_is_plain()`
+primitive REQ-ACF-023 documents, so one well-documented resolution at
+the shared root covers all of them; no per-entry duplication needed.
+
+Full suite (65/65) both trees re-run to confirm inertness (no code or
+test changes). 1036 requirements (unchanged count -- text update to
+one existing entry).
+
+Issue #256's Group A is now closed (17/17, resolved without a code
+change). Moving to Group D next (MDIO wire layout, ~16 findings, the
+single biggest remaining cluster -- needs a dedicated read-TC18-first
+investigation before any code change, matching this batch's own
+discipline).
