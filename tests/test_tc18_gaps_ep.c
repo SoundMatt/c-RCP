@@ -659,24 +659,22 @@ static void test_pwm_out_request_semantics_are_verbatim_setpoints(void)
     rcp_bytes_free(&frame);
 }
 
-/* REQ-PWM-058 (not-implemented) DEVIATION PIN: none of TC18 13.7.6.2
- * Table 45's PWM_IN registers exists -- pwmi_polarity, pwmi_err_on_max_period,
- * pwmi_continuous_mode, pwmi_max_period, pwmi_base_clk, pwmi_clk_divider and
- * pwmi_ep_status are all absent. The functional config is the shared prefix
- * plus a trigger selector, and the measurement-timeout sentinel is the only
- * other related surface. */
-static void test_pwm_in_functional_cfg_is_trigger_only(void)
+/* REQ-PWM-058 (implemented, FIXED 2026-08-11, issue #256 Group I): TC18
+ * §13.7.6.2 Table 45's PWM_IN registers -- pwmi_polarity,
+ * pwmi_err_on_max_period, pwmi_continuous_mode, pwmi_max_period,
+ * pwmi_base_clk, pwmi_clk_divider and pwmi_ep_status -- now all exist,
+ * reachable via the evt[2:0]=111b register-block mechanism, same as every
+ * other endpoint type. `trigger` remains a non-wire, module-own field (see
+ * ep_pwm.h's file header); the measurement-timeout sentinel is unrelated to
+ * the register block and untouched. */
+static void test_pwm_in_functional_cfg_has_full_register_coverage(void)
 {
     rcp_ep_pwm_in_functional_cfg_t cfg;
+    uint8_t                        block[RCP_EP_PWM_IN_EP_FUNC_LEN];
 
     rcp_ep_pwm_in_functional_cfg_init(&cfg);
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_PWM_IN_TRIGGER_NONE, cfg.trigger);
     TEST_ASSERT_FALSE(cfg.common.ep_enable);
-
-    TEST_ASSERT_EQUAL_UINT(sizeof(rcp_regmap_ep_functional_cfg_t),
-                           offsetof(rcp_ep_pwm_in_functional_cfg_t, trigger));
-    TEST_ASSERT_EQUAL_UINT(sizeof(cfg), offsetof(rcp_ep_pwm_in_functional_cfg_t, trigger)
-                                            + sizeof(cfg.trigger));
 
     /* No pwmi_polarity: the capture-edge selector is the only polarity-like
      * control, and it is a two-edge enum, not an active-phase level. */
@@ -684,9 +682,24 @@ static void test_pwm_in_functional_cfg_is_trigger_only(void)
     TEST_ASSERT_FALSE(rcp_ep_pwm_in_trigger_fires(RCP_EP_PWM_IN_TRIGGER_RISING, true, false));
     TEST_ASSERT_TRUE(rcp_ep_pwm_in_trigger_fires(RCP_EP_PWM_IN_TRIGGER_FALLING, true, false));
 
-    /* No pwmi_max_period register to exceed: the timeout is reported only as
-     * this sentinel measurement value. */
+    /* The timeout is still reported only via this sentinel measurement
+     * value, unrelated to pwmi_max_period's own register. */
     TEST_ASSERT_EQUAL_HEX16(0xFFFFu, RCP_EP_PWM_IN_NO_SIGNAL);
+
+    /* Now positively confirm Table 45's registers round-trip. */
+    cfg.ep_status   = 0x1234u;
+    cfg.clk_divider = 7u;
+    cfg.flags       = RCP_EP_PWM_IN_FLAG_POLARITY | RCP_EP_PWM_IN_FLAG_CONTINUOUS_MODE;
+    cfg.max_period  = 0xBEEFu;
+
+    rcp_ep_pwm_in_render_registers(&cfg, block);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_PWM_IN_EP_FUNC_LEN, block[RCP_EP_PWM_IN_REG_EP_LEN]);
+    TEST_ASSERT_EQUAL_HEX16(0x1234u, (uint16_t)((block[RCP_EP_PWM_IN_REG_EP_STATUS] << 8) |
+                                                block[RCP_EP_PWM_IN_REG_EP_STATUS + 1]));
+    TEST_ASSERT_EQUAL_UINT8(7u, block[RCP_EP_PWM_IN_REG_CLK_DIVIDER]);
+    TEST_ASSERT_EQUAL_UINT8(cfg.flags, block[RCP_EP_PWM_IN_REG_FLAGS]);
+    TEST_ASSERT_EQUAL_HEX16(0xBEEFu, (uint16_t)((block[RCP_EP_PWM_IN_REG_MAX_PERIOD] << 8) |
+                                                block[RCP_EP_PWM_IN_REG_MAX_PERIOD + 1]));
 }
 
 /* ── WakeUp endpoint (TC18 12.4 / 12.5 / 13.7.2) ──────────────────────────── */
@@ -1157,7 +1170,7 @@ int main(void)
 
     RUN_TEST(test_pwm_out_trigger_and_duty_cap_gaps);
     RUN_TEST(test_pwm_out_request_semantics_are_verbatim_setpoints);
-    RUN_TEST(test_pwm_in_functional_cfg_is_trigger_only);
+    RUN_TEST(test_pwm_in_functional_cfg_has_full_register_coverage);
 
     RUN_TEST(test_wakeup_message_and_repetition_time_gaps);
     RUN_TEST(test_wakeup_refusal_is_positive_response_not_error);

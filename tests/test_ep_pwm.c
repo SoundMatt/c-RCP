@@ -53,6 +53,8 @@
 //cfusa:test REQ-PWM-052
 //cfusa:test REQ-PWM-053
 //cfusa:test REQ-PWM-054
+//cfusa:test REQ-PWM-058
+//cfusa:test REQ-PWM-059
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -855,6 +857,11 @@ static void test_in_functional_cfg_init_zeroes(void)
 
     TEST_ASSERT_FALSE(cfg.common.ep_enable);
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_PWM_IN_TRIGGER_NONE, cfg.trigger);
+    TEST_ASSERT_EQUAL_UINT16(0, cfg.base_clk);
+    TEST_ASSERT_EQUAL_UINT16(0, cfg.ep_status);
+    TEST_ASSERT_EQUAL_UINT8(0, cfg.clk_divider);
+    TEST_ASSERT_EQUAL_UINT8(0, cfg.flags);
+    TEST_ASSERT_EQUAL_UINT16(0, cfg.max_period);
 }
 
 static void test_in_functional_cfg_writable_false_hw_unconfigured(void)
@@ -929,6 +936,7 @@ static void test_in_strerror_never_null_and_distinct(void)
         RCP_EP_PWM_IN_OK,               RCP_EP_PWM_IN_ERR_SHORT_FRAME,
         RCP_EP_PWM_IN_ERR_BAD_MSG_TYPE, RCP_EP_PWM_IN_ERR_WRONG_BUS,
         RCP_EP_PWM_IN_ERR_WRONG_OP,     RCP_EP_PWM_IN_ERR_BAD_PAYLOAD_LEN,
+        RCP_EP_PWM_IN_ERR_BAD_EVT,
     };
     size_t i;
     size_t j;
@@ -965,6 +973,191 @@ static void test_in_read_request_rejects_short_frame(void)
     rcp_ep_pwm_in_errc_t rc = rcp_ep_pwm_in_decode_read_request(NULL, 0, 2, &out_tn);
 
     TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_ERR_SHORT_FRAME, rc);
+}
+
+/* REQ-PWM-059 (FIXED 2026-08-11, issue #256 Group I): before this fix,
+ * rcp_ep_pwm_in_decode_read_request() never checked evt[2:0] at all, so a
+ * real evt=111b configuration-write request from a conforming peer would
+ * have been silently misinterpreted as an ordinary read. See the file
+ * header. */
+static void test_in_read_request_rejects_bad_evt(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    uint8_t                     out_tn;
+    rcp_ep_pwm_in_errc_t        rc;
+
+    hdr.byte_bus_id     = 2;
+    hdr.op              = RCP_ACF_OP_READ;
+    hdr.evt             = 0x7u; /* the reconfig escape hatch, not a plain read */
+    hdr.transaction_num = 5;
+
+    frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    rc = rcp_ep_pwm_in_decode_read_request(frame.data, frame.len, 2, &out_tn);
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_ERR_BAD_EVT, rc);
+
+    rcp_bytes_free(&frame);
+}
+
+/* ── PWM_IN: the EP_func register block ──────────────────────────────────── */
+
+static void test_in_render_registers_matches_table_offsets(void)
+{
+    rcp_ep_pwm_in_functional_cfg_t cfg;
+    uint8_t                        out[RCP_EP_PWM_IN_EP_FUNC_LEN];
+
+    rcp_ep_pwm_in_functional_cfg_init(&cfg);
+    cfg.common.ep_enable = true;
+    cfg.ep_status         = 0x1234;
+    cfg.clk_divider       = 0x55;
+    cfg.flags             = RCP_EP_PWM_IN_FLAG_POLARITY | RCP_EP_PWM_IN_FLAG_ERR_ON_MAX_PERIOD;
+    cfg.max_period         = 0xABCD;
+
+    rcp_ep_pwm_in_render_registers(&cfg, out);
+
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_PWM_IN_EP_FUNC_LEN, out[RCP_EP_PWM_IN_REG_EP_LEN]);
+    TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_PWM_IN_REG_RESERVED_01]);
+    TEST_ASSERT_TRUE((out[RCP_EP_PWM_IN_REG_EP_ENABLE_CLR] & 0x01u) != 0u);
+    TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_PWM_IN_REG_BASE_CLK]);
+    TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_PWM_IN_REG_BASE_CLK + 1]);
+    TEST_ASSERT_EQUAL_UINT8(0x12u, out[RCP_EP_PWM_IN_REG_EP_STATUS]);
+    TEST_ASSERT_EQUAL_UINT8(0x34u, out[RCP_EP_PWM_IN_REG_EP_STATUS + 1]);
+    TEST_ASSERT_EQUAL_UINT8(0x55, out[RCP_EP_PWM_IN_REG_CLK_DIVIDER]);
+    TEST_ASSERT_EQUAL_UINT8(cfg.flags, out[RCP_EP_PWM_IN_REG_FLAGS]);
+    TEST_ASSERT_EQUAL_UINT8(0xABu, out[RCP_EP_PWM_IN_REG_MAX_PERIOD]);
+    TEST_ASSERT_EQUAL_UINT8(0xCDu, out[RCP_EP_PWM_IN_REG_MAX_PERIOD + 1]);
+
+    TEST_ASSERT_EQUAL_UINT16(0x000Cu, RCP_EP_PWM_IN_EP_FUNC_LEN);
+}
+
+static void test_in_apply_reconfig_writes_multi_register_span(void)
+{
+    rcp_ep_pwm_in_functional_cfg_t cfg;
+    uint8_t                        payload[2 + 6];
+
+    rcp_ep_pwm_in_functional_cfg_init(&cfg);
+
+    payload[0] = 0x00;
+    payload[1] = (uint8_t)RCP_EP_PWM_IN_REG_EP_STATUS;
+    payload[2] = 0xAB; payload[3] = 0xCD; /* ep_status */
+    payload[4] = 0x11;                    /* clk_divider */
+    payload[5] = RCP_EP_PWM_IN_FLAG_CONTINUOUS_MODE; /* flags */
+    payload[6] = 0x22; payload[7] = 0x33; /* max_period */
+
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_RECONFIG_OK,
+        rcp_ep_pwm_in_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_EQUAL_UINT16(0xABCD, cfg.ep_status);
+    TEST_ASSERT_EQUAL_UINT8(0x11, cfg.clk_divider);
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_PWM_IN_FLAG_CONTINUOUS_MODE, cfg.flags);
+    TEST_ASSERT_EQUAL_UINT16(0x2233, cfg.max_period);
+}
+
+static void test_in_apply_reconfig_ignores_read_only_registers(void)
+{
+    rcp_ep_pwm_in_functional_cfg_t cfg;
+    uint8_t                        payload[2 + 4];
+
+    rcp_ep_pwm_in_functional_cfg_init(&cfg);
+
+    /* Cover EP_LEN (0x00), the reserved octet (0x01), and both octets of
+     * base_clk (0x04-0x05) -- all read-only. */
+    payload[0] = 0x00;
+    payload[1] = 0x00;
+    payload[2] = 0xFF;
+    payload[3] = 0xFF;
+    payload[4] = 0xFF;
+    payload[5] = 0xFF;
+
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_RECONFIG_OK,
+        rcp_ep_pwm_in_apply_reconfig(&cfg, payload, sizeof(payload)));
+
+    {
+        uint8_t out[RCP_EP_PWM_IN_EP_FUNC_LEN];
+
+        rcp_ep_pwm_in_render_registers(&cfg, out);
+        TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_PWM_IN_EP_FUNC_LEN, out[RCP_EP_PWM_IN_REG_EP_LEN]);
+        TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_PWM_IN_REG_RESERVED_01]);
+        TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_PWM_IN_REG_BASE_CLK]);
+        TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_PWM_IN_REG_BASE_CLK + 1]);
+    }
+}
+
+static void test_in_apply_reconfig_rejects_write_past_ep_len(void)
+{
+    rcp_ep_pwm_in_functional_cfg_t cfg;
+    uint8_t                        payload[3];
+
+    rcp_ep_pwm_in_functional_cfg_init(&cfg);
+
+    payload[0] = 0x00;
+    payload[1] = 0x0C; /* == RCP_EP_PWM_IN_EP_FUNC_LEN -- one past the last
+                           valid offset */
+    payload[2] = 0xFF;
+
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_RECONFIG_ERR_OUT_OF_RANGE,
+        rcp_ep_pwm_in_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_EQUAL_UINT16(0, cfg.max_period);
+}
+
+static void test_in_apply_reconfig_rejects_payload_without_data(void)
+{
+    rcp_ep_pwm_in_functional_cfg_t cfg;
+    uint8_t                        addr_only[2] = {0x00, 0x08};
+
+    rcp_ep_pwm_in_functional_cfg_init(&cfg);
+
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_RECONFIG_ERR_SHORT,
+        rcp_ep_pwm_in_apply_reconfig(&cfg, addr_only, sizeof(addr_only)));
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_RECONFIG_ERR_SHORT,
+        rcp_ep_pwm_in_apply_reconfig(&cfg, NULL, 0));
+}
+
+static void test_in_reconfig_request_round_trip(void)
+{
+    rcp_bytes_t                 frame;
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    uint8_t                      data[2] = {0xAB, 0xCD};
+
+    frame = rcp_ep_pwm_in_encode_reconfig_request(0x03, 0x0006, data, sizeof(data), 7);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(frame.data, frame.len, &hdr, &payload, &payload_len));
+    TEST_ASSERT_EQUAL_UINT8(0x03, hdr.byte_bus_id);
+    TEST_ASSERT_EQUAL(RCP_ACF_OP_WRITE, hdr.op);
+    TEST_ASSERT_EQUAL_UINT8(0x7u, hdr.evt);
+    TEST_ASSERT_EQUAL_UINT8(7, hdr.transaction_num);
+    TEST_ASSERT_EQUAL_UINT32(4, payload_len);
+    TEST_ASSERT_EQUAL_UINT8(0x00, payload[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x06, payload[1]);
+    TEST_ASSERT_EQUAL_UINT8(0xAB, payload[2]);
+    TEST_ASSERT_EQUAL_UINT8(0xCD, payload[3]);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_in_encode_reconfig_request_rejects_empty_data(void)
+{
+    rcp_bytes_t frame = rcp_ep_pwm_in_encode_reconfig_request(0x00, 0, NULL, 0, 0);
+
+    TEST_ASSERT_NULL(frame.data);
+}
+
+static void test_in_reconfig_strerror_never_null(void)
+{
+    rcp_ep_pwm_in_reconfig_errc_t codes[] = {
+        RCP_EP_PWM_IN_RECONFIG_OK, RCP_EP_PWM_IN_RECONFIG_ERR_SHORT,
+        RCP_EP_PWM_IN_RECONFIG_ERR_OUT_OF_RANGE,
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof(codes) / sizeof(codes[0]); i++) {
+        TEST_ASSERT_NOT_NULL(rcp_ep_pwm_in_reconfig_strerror(codes[i]));
+    }
+    TEST_ASSERT_NOT_NULL(rcp_ep_pwm_in_reconfig_strerror((rcp_ep_pwm_in_reconfig_errc_t)99));
 }
 
 /* ── PWM_IN: response ──────────────────────────────────────────────────────── */
@@ -1195,6 +1388,16 @@ int main(void)
 
     RUN_TEST(test_in_read_request_round_trip);
     RUN_TEST(test_in_read_request_rejects_short_frame);
+    RUN_TEST(test_in_read_request_rejects_bad_evt);
+
+    RUN_TEST(test_in_render_registers_matches_table_offsets);
+    RUN_TEST(test_in_apply_reconfig_writes_multi_register_span);
+    RUN_TEST(test_in_apply_reconfig_ignores_read_only_registers);
+    RUN_TEST(test_in_apply_reconfig_rejects_write_past_ep_len);
+    RUN_TEST(test_in_apply_reconfig_rejects_payload_without_data);
+    RUN_TEST(test_in_reconfig_request_round_trip);
+    RUN_TEST(test_in_encode_reconfig_request_rejects_empty_data);
+    RUN_TEST(test_in_reconfig_strerror_never_null);
 
     RUN_TEST(test_in_response_round_trip_untimed);
     RUN_TEST(test_in_response_round_trip_timed);

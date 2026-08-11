@@ -12842,3 +12842,124 @@ from 8 to 9.
 **Next**: ISELED, MDIO, and wakeup remain in Group I (CAN deliberately
 deferred, per above, pending its own dedicated investigation session
 matching the MDIO/Group D precedent).
+
+### v0.222.0 -- 2026-08-11
+
+**Full-catalog audit follow-up, batch 23 (Group I, real fix, PLUS a
+newly-discovered scope gap in the audit's own accounting): PWM_IN had
+been silently omitted from every prior batch's own "N of 11 endpoint
+types" tally -- fixed, and worse than any prior finding, a real
+conformance bug came with it.**
+
+While scoping the next Group I candidate (checking `REQ-CFG-011`'s
+current text before starting ISELED/MDIO), re-derived the 11 TC18
+endpoint types directly from this codebase's own module list
+(`include/rcp/ep_*.h`: adc/can/gpio/i2c/iseled/lin/mdio/pwm/spi/uart/
+wakeup -- 11 files) and cross-checked it against `REQ-CFG-011`'s own
+"seven of eleven ... CAN, ISELED, MDIO, wakeup remain" text. The
+`pwm.c` module's own slot in that tally had been marked done once
+PWM_OUT's own register-block fix landed (an earlier milestone,
+predating this audit) -- but PWM_OUT and PWM_IN are two functionally
+distinct endpoint types that happen to share one source file, each
+with its own TC18 table (PWM_OUT: §13.7.5.2 Table 43; PWM_IN:
+§13.7.6.2 Table 45), and nothing had ever separately verified PWM_IN
+got the identical fix. It hadn't:
+`rcp_ep_pwm_in_functional_cfg_t` modeled only a `trigger` selector --
+already tracked, verbatim, as the existing `REQ-PWM-058` (not-
+implemented) with its own deviation-pin test in
+`tests/test_tc18_gaps_ep.c` (`test_pwm_in_functional_cfg_is_trigger_only`)
+-- but that tracked gap's own text was never cross-referenced against
+`REQ-CFG-011`/`012`'s "N of 11" accounting, so the two catalog entries
+silently disagreed about whether PWM_IN's register block existed.
+
+**Worse than every prior Group I register-block finding**: this was
+not merely an unreachable path (ADC's own decode function correctly
+rejected evt=111b with no counterpart implementing it) but a live,
+previously-undetected conformance bug.
+`rcp_ep_pwm_in_decode_read_request()` never checked `evt[2:0]` at
+all -- no `rcp_acf_evt_row2_is_plain()` call, no `BAD_EVT` error code
+in `rcp_ep_pwm_in_errc_t` -- so a real `evt=111b` configuration-write
+request from a conforming peer would have been silently
+misinterpreted as an ordinary read request instead of being rejected
+or routed to a reconfiguration handler. Confirmed
+`rcp_ep_pwm_in_encode_read_request()`'s own `hdr = {0}` always
+produces `evt=0` (the one value `rcp_acf_evt_row2_is_plain()` accepts,
+matching Group A's own resolution: 000b is the sole legal plain-request
+value in this endpoint-type grouping), so the fix has no behavioral
+effect on this module's own normal request path -- confirmed by the
+full suite passing unchanged.
+
+**Fix, in two parts, tracked as two requirements (058 reused, 059
+new, not both folded into one)**:
+1. `REQ-PWM-059` (new): added the missing `rcp_acf_evt_row2_is_plain()`
+   check to `rcp_ep_pwm_in_decode_read_request()`, plus
+   `RCP_EP_PWM_IN_ERR_BAD_EVT`.
+2. `REQ-PWM-058` (existing, rewritten `not-implemented` ->
+   `implemented`, not duplicated): implemented TC18 Table 45's clean,
+   ten-entry register block -- no address-collision editorial defect,
+   unlike GPIO's/I2C's own source tables. 0x0000 pwmi_ep_len(R), 0x0001
+   reserved(R), 0x0002/0x0003 common entries, 0x0004 16-bit
+   pwmi_base_clk(R), 0x0006 16-bit pwmi_ep_status(R/W), 0x0008 8-bit
+   pwmi_clk_divider(R/W), 0x0009 a bitfield octet (pwmi_polarity bit 0,
+   pwmi_err_on_max_period bit 1, pwmi_continuous_mode bit 2, packed at
+   the table's own row order -- new `RCP_EP_PWM_IN_FLAG_*` masks),
+   0x000A 16-bit pwmi_max_period(R/W); `EP_FUNC_LEN`=0x000C.
+   `rcp_ep_pwm_in_functional_cfg_t` gains `ep_status`/`clk_divider`/
+   `flags`/`max_period`/`base_clk`; `trigger` untouched, still never
+   wire-serialized (Group C's own resolution, unaffected). New
+   `rcp_ep_pwm_in_render_registers()`/`_apply_reconfig()`/
+   `_reconfig_strerror()`/`_encode_reconfig_request()` mirror the
+   established pattern exactly.
+
+The pre-existing deviation-pin test
+(`test_pwm_in_functional_cfg_is_trigger_only`,
+`tests/test_tc18_gaps_ep.c`) was renamed to
+`test_pwm_in_functional_cfg_has_full_register_coverage` and rewritten
+from negative to positive, matching every prior batch's own
+convention. `tests/test_ep_pwm.c` gained a full parallel test suite
+(`test_in_read_request_rejects_bad_evt` plus 8 register-block tests)
+mirroring ADC's/LIN's own dedicated-file coverage.
+
+**`REQ-CFG-011`/`REQ-CFG-012` corrected, not renumbered**: both now
+credit PWM_IN alongside PWM_OUT explicitly. The headline "7 of 11"
+count is UNCHANGED (`pwm.c` was already counted as one of the seven
+covered slots before this fix) -- this batch corrects what "PWM done"
+actually meant, not the count itself. The remaining-4 list (CAN,
+ISELED, MDIO, wakeup) is unaffected.
+
+Mutation-tested: loosening the out-of-range bounds check by 4 octets
+reproduced the identical class of finding every prior register-block
+batch this session has produced -- a real stack buffer overflow
+(`index 12 out of bounds for type 'uint8_t[12]'`, silent SIGABRT, exit
+code 134). Restored, re-verified. Full suite (78/78 in `test_ep_pwm`
+alone, 65/65 overall) both trees (native + ASan/UBSan). `cfusa check`
+(CI-pinned v0.5.50): 0 errors. `cfusa trace --gaps`: 0/1024 untested;
+`--req-coverage 100` / `--sec-tested 100`: both 100% (1024/1024) --
+same pre-existing, non-blocking UART dangling-reference diagnostics as
+every prior batch.
+
+**Progress: 88/156 findings resolved** (Groups H 12 + B 4 + A 17 +
+D 16 + F 7 + E 4 + C 16 + G 2 + I 10 = 88). Group I's own count moves
+from 9 to 10 -- both REQ-PWM-058 and REQ-PWM-059 close in this one
+batch, so the count increments by 1 (findings, not fixes-per-PR) per
+this issue's own accounting convention, matching the UART/LIN batches'
+own precedent for a single batch closing two related requirement ids.
+
+**METHODOLOGICAL LESSON**: a cross-cutting tracking entry
+(`REQ-CFG-011`/`012`'s own "N of 11" tally) can silently drift out of
+sync with an individual module's own, correctly-tracked gap
+(`REQ-PWM-058` was never wrong on its own terms -- it honestly said
+"not implemented" the whole time) if nothing ever cross-references the
+two. This is the same class of self-correction this audit already
+demonstrated once this session (the UART batch's own claimed-but-
+unexecuted `REQ-CFG-011`/`012` narrowing, caught by the very next
+batch) -- but this time the drift was worse: an entire endpoint type
+silently absent from a "N of 11" headline count for the whole
+duration of Group I so far, not just one batch's own text lagging
+behind its own edit. Worth re-deriving any "N of M" accounting
+directly from the codebase's own module list before trusting a prior
+batch's arithmetic, not just re-reading the latest merged text.
+
+**Next**: ISELED, MDIO, and wakeup remain in Group I (CAN deliberately
+deferred, per above, pending its own dedicated investigation session
+matching the MDIO/Group D precedent).

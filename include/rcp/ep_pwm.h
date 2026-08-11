@@ -63,6 +63,7 @@
 //cfusa:req REQ-PWM-056
 //cfusa:req REQ-PWM-057
 //cfusa:req REQ-PWM-058
+//cfusa:req REQ-PWM-059
 /*
  * ep_pwm.h -- PWM_OUT + PWM_IN endpoints for the TC18 Remote Control
  * Protocol wire layer (ROADMAP.md Phase 16, "Basic Endpoints", milestone
@@ -205,6 +206,46 @@
  * NONE/off state Table 44 doesn't define) is this module's own original
  * simplification, exactly like PWM_OUT's (see that section's own note,
  * above). Never wire-serialized.
+ *
+ * ── PWM_IN: the EP_func register block (evt[2:0] == 111b) ──────────────────
+ *
+ * FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): this endpoint type
+ * was entirely missing from every prior batch's own "N of 11 endpoint
+ * types" accounting for the generic §12.7.1 mechanism -- REQ-CFG-011's/
+ * REQ-CFG-012's own text enumerated PWM_OUT, GPIO, SPI, I2C, UART, LIN, and
+ * ADC as "seven of eleven", counting the pwm.c module as fully done once
+ * PWM_OUT's own fix (issue #256, earlier milestone) landed, without ever
+ * separately checking whether PWM_IN -- a functionally distinct endpoint
+ * type sharing this same source file, with its own TC18 table -- needed the
+ * identical fix. It did: rcp_ep_pwm_in_functional_cfg_t modeled only
+ * `trigger` (this module's own original, non-wire field -- see above), with
+ * no counterpart for any of TC18 §13.7.6.2 Table 45's real registers.
+ *
+ * Worse than every prior batch's own finding in this Group: this was not
+ * merely an unreachable path (like ADC's own decode_read_request()
+ * correctly rejecting evt=111b with no counterpart implementing it) but a
+ * live conformance bug. rcp_ep_pwm_in_decode_read_request() never checked
+ * evt[2:0] at all -- neither rcp_acf_evt_row2_is_plain() nor any BAD_EVT
+ * error code existed for this endpoint type -- so a real evt=111b
+ * configuration-write request from a conforming peer would have been
+ * silently misinterpreted as an ordinary read request instead of being
+ * rejected or routed to a reconfiguration handler. Fixed by adding the same
+ * rcp_acf_evt_row2_is_plain() check every other endpoint type in this
+ * endpoint-type group (ADC/I2C/LIN/CAN/UART/ISELED/MDIO) already has, plus
+ * a new RCP_EP_PWM_IN_ERR_BAD_EVT value.
+ *
+ * TC18 §13.7.6.2 Table 45 defines a clean, ten-entry register block with no
+ * address-collision editorial defect (unlike GPIO's/I2C's own source
+ * tables): 0x0000 pwmi_ep_len(R), 0x0001 reserved(R), 0x0002/0x0003 common
+ * entries, 0x0004 16-bit pwmi_base_clk(R), 0x0006 16-bit pwmi_ep_status
+ * (R/W), 0x0008 8-bit pwmi_clk_divider(R/W), 0x0009 a bitfield octet
+ * (pwmi_polarity bit 0, pwmi_err_on_max_period bit 1, pwmi_continuous_mode
+ * bit 2, 5 reserved bits -- see RCP_EP_PWM_IN_FLAG_* below), 0x000A 16-bit
+ * pwmi_max_period(R/W); EP_FUNC_LEN=0x000C. rcp_ep_pwm_in_functional_cfg_t
+ * gains ep_status/clk_divider/flags/max_period; `trigger` is untouched,
+ * still never wire-serialized, per the section above. New
+ * rcp_ep_pwm_in_render_registers()/_apply_reconfig()/_reconfig_strerror()/
+ * _encode_reconfig_request() mirror PWM_OUT's/ADC's own pattern exactly.
  *
  * ── Compound-wait's numeric ≥/≤ comparison modes against PWM_IN ────────────
  *
@@ -614,12 +655,26 @@ bool rcp_ep_pwm_in_trigger_fires(rcp_ep_pwm_in_trigger_t trigger, bool prev_leve
 /* ── PWM_IN: functional config ─────────────────────────────────────────────── */
 
 typedef struct {
-    rcp_regmap_ep_functional_cfg_t common; /* see the file header */
-    uint8_t                        trigger; /* rcp_ep_pwm_in_trigger_t */
+    rcp_regmap_ep_functional_cfg_t common; /* regmap.h's shared functional-
+                                               config prefix, composed as the
+                                               first member -- see the file
+                                               header. Carries the block's
+                                               enable&clr (0x0002) and
+                                               options (0x0003) octets. */
+    uint8_t                        trigger; /* rcp_ep_pwm_in_trigger_t; this
+                                                module's own field, not part
+                                                of the EP_func block */
+    uint16_t                       base_clk;        /* 0x0004, R   */
+    uint16_t                       ep_status;       /* 0x0006, R/W */
+    uint8_t                        clk_divider;     /* 0x0008, R/W */
+    uint8_t                        flags;           /* 0x0009, R/W; see the
+                                                        RCP_EP_PWM_IN_FLAG_*
+                                                        masks */
+    uint16_t                       max_period;      /* 0x000A, R/W */
 } rcp_ep_pwm_in_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false, trigger
- * RCP_EP_PWM_IN_TRIGGER_NONE). */
+ * RCP_EP_PWM_IN_TRIGGER_NONE, and every EP_func register 0). */
 void rcp_ep_pwm_in_functional_cfg_init(rcp_ep_pwm_in_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
@@ -634,6 +689,86 @@ bool rcp_ep_pwm_in_set_trigger(rcp_ep_pwm_in_functional_cfg_t *cfg,
                                 rcp_ep_pwm_in_trigger_t trigger, rcp_lifecycle_state_t state,
                                 rcp_lifecycle_writer_ctx_t writer);
 
+/* ── PWM_IN: the EP_func register block (evt[2:0] == 111b) ────────────────── */
+
+/* Relative octet offsets of the registers making up a PWM_IN endpoint's own
+ * EP_func block, at the widths and in the order TC18 §13.7.6.2 Table 45
+ * assigns them. See the file header. */
+#define RCP_EP_PWM_IN_REG_EP_LEN        ((uint16_t)0x0000u) /*  8 bit, R   */
+#define RCP_EP_PWM_IN_REG_RESERVED_01   ((uint16_t)0x0001u) /*  8 bit, R   */
+#define RCP_EP_PWM_IN_REG_EP_ENABLE_CLR ((uint16_t)0x0002u) /*  8 bit, R/W */
+#define RCP_EP_PWM_IN_REG_EP_OPTIONS    ((uint16_t)0x0003u) /*  8 bit, R/W */
+#define RCP_EP_PWM_IN_REG_BASE_CLK      ((uint16_t)0x0004u) /* 16 bit, R   */
+#define RCP_EP_PWM_IN_REG_EP_STATUS     ((uint16_t)0x0006u) /* 16 bit, R/W */
+#define RCP_EP_PWM_IN_REG_CLK_DIVIDER   ((uint16_t)0x0008u) /*  8 bit, R/W */
+#define RCP_EP_PWM_IN_REG_FLAGS         ((uint16_t)0x0009u) /*  8 bit, R/W */
+#define RCP_EP_PWM_IN_REG_MAX_PERIOD    ((uint16_t)0x000Au) /* 16 bit, R/W */
+
+/* The block's own length in octets -- one past the last assigned offset. */
+#define RCP_EP_PWM_IN_EP_FUNC_LEN       ((uint16_t)0x000Cu)
+
+/* Bit masks within the RCP_EP_PWM_IN_REG_FLAGS octet -- Table 45's own three
+ * named single-bit parameters (polarity, err_on_max_period,
+ * continuous_mode), packed at the offsets the table's own row order
+ * assigns; the remaining 5 bits are reserved and always read 0. */
+#define RCP_EP_PWM_IN_FLAG_POLARITY          ((uint8_t)(1u << 0))
+#define RCP_EP_PWM_IN_FLAG_ERR_ON_MAX_PERIOD ((uint8_t)(1u << 1))
+#define RCP_EP_PWM_IN_FLAG_CONTINUOUS_MODE   ((uint8_t)(1u << 2))
+
+/* The fixed width (octets) of the relative-start-address prefix every
+ * configuration request's payload begins with -- see
+ * RCP_EP_PWM_OUT_RECONFIG_ADDR_LEN's own identical note. */
+#define RCP_EP_PWM_IN_RECONFIG_ADDR_LEN ((size_t)2u)
+
+typedef enum {
+    RCP_EP_PWM_IN_RECONFIG_OK               = 0,
+    RCP_EP_PWM_IN_RECONFIG_ERR_SHORT        = 1, /* payload carries no
+                                                      address prefix, or an
+                                                      address prefix with no
+                                                      data octet after it */
+    RCP_EP_PWM_IN_RECONFIG_ERR_OUT_OF_RANGE = 2, /* start_address + data
+                                                      length exceeds
+                                                      RCP_EP_PWM_IN_EP_FUNC_LEN
+                                                      -- the whole write is
+                                                      ignored, per the
+                                                      specification's own
+                                                      rule */
+} rcp_ep_pwm_in_reconfig_errc_t;
+
+/* Human-readable message for an rcp_ep_pwm_in_reconfig_errc_t value. Never
+ * returns NULL. */
+const char *rcp_ep_pwm_in_reconfig_strerror(rcp_ep_pwm_in_reconfig_errc_t e);
+
+/* Serializes cfg's EP_func registers into out[0..RCP_EP_PWM_IN_EP_FUNC_LEN)
+ * exactly as a configuration *read* of the whole block would report them --
+ * the inverse of rcp_ep_pwm_in_apply_reconfig()'s own parse step. */
+void rcp_ep_pwm_in_render_registers(const rcp_ep_pwm_in_functional_cfg_t *cfg,
+                                     uint8_t out[RCP_EP_PWM_IN_EP_FUNC_LEN]);
+
+/* Applies the configuration escape hatch (evt[2:0] == 111b): payload is an
+ * addressed write into this endpoint's own EP_func block -- a 16-bit
+ * big-endian relative start address followed by the configuration data
+ * octets to write from that address onward (extraction §3.7.1). See
+ * rcp_ep_pwm_out_apply_reconfig()'s own doc comment for the read-only-
+ * offset-skipping, octet-granularity-patch, and out-of-range-ignores-the-
+ * whole-write rules -- identical here.
+ *
+ * A caller routing a decoded request here is responsible for having checked
+ * that evt[2:0] really was 111b, e.g. via !rcp_acf_evt_row2_is_plain(). */
+rcp_ep_pwm_in_reconfig_errc_t
+rcp_ep_pwm_in_apply_reconfig(rcp_ep_pwm_in_functional_cfg_t *cfg,
+                              const uint8_t *payload, size_t payload_len);
+
+/* Encodes an ACF_ABB configuration request (evt[2:0] == 111b) addressed to
+ * byte_bus_id: payload is start_address (16-bit big-endian) followed by
+ * data[0..data_len). Returns a zeroed rcp_bytes_t (data=NULL) if data_len
+ * is 0, if the encoded payload would exceed RCP_ACF_MAX_PAYLOAD, or on
+ * allocation failure. Caller frees the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_ep_pwm_in_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                   uint16_t start_address,
+                                                   const uint8_t *data, size_t data_len,
+                                                   uint8_t transaction_num);
+
 /* ── PWM_IN: error codes ───────────────────────────────────────────────────── */
 
 typedef enum {
@@ -643,6 +778,17 @@ typedef enum {
     RCP_EP_PWM_IN_ERR_WRONG_BUS       = 3,
     RCP_EP_PWM_IN_ERR_WRONG_OP        = 4,
     RCP_EP_PWM_IN_ERR_BAD_PAYLOAD_LEN = 5,
+    RCP_EP_PWM_IN_ERR_BAD_EVT         = 6, /* evt[2:0] is not one of the
+                                               plain-request values
+                                               rcp_acf_evt_row2_is_plain()
+                                               accepts -- FIXED 2026-08-11,
+                                               issue #256 Group I: this
+                                               endpoint type previously never
+                                               checked evt[2:0] at all, so a
+                                               real evt=111b configuration
+                                               request was silently
+                                               misinterpreted as an ordinary
+                                               read. See the file header. */
 } rcp_ep_pwm_in_errc_t;
 
 /* Human-readable message for an rcp_ep_pwm_in_errc_t value. Never returns
@@ -659,8 +805,11 @@ rcp_bytes_t rcp_ep_pwm_in_encode_read_request(rcp_byte_bus_id_t byte_bus_id,
                                                uint8_t transaction_num);
 
 /* Decodes and validates an ACF-level PWM_IN read request from b[0..len).
- * Same failure modes as rcp_ep_pwm_out_decode_read_request(). On
- * RCP_EP_PWM_IN_OK, *out_transaction_num is populated. */
+ * Same failure modes as rcp_ep_pwm_out_decode_read_request(), plus
+ * RCP_EP_PWM_IN_ERR_BAD_EVT when hdr.evt is not one of the plain-request
+ * values rcp_acf_evt_row2_is_plain() accepts -- FIXED 2026-08-11, issue
+ * #256 Group I; see the file header. On RCP_EP_PWM_IN_OK,
+ * *out_transaction_num is populated. */
 rcp_ep_pwm_in_errc_t rcp_ep_pwm_in_decode_read_request(const uint8_t *b, size_t len,
                                                         rcp_byte_bus_id_t expected_bus_id,
                                                         uint8_t *out_transaction_num);
