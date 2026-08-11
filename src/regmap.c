@@ -271,6 +271,23 @@ void rcp_regmap_hw_pin_map_render(const rcp_regmap_hw_pin_map_entry_t *entries, 
     }
 }
 
+/* ── EP_ID_config wire stride (REQ-RMAP-052/054) ───────────────────────────── */
+
+//cfusa:req REQ-RMAP-052
+void rcp_regmap_ep_id_map_render(const rcp_regmap_ep_id_map_entry_t *entries, size_t count,
+                                  uint8_t *out)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        out[4u * i + 0u] = entries[i].request_stream_index;
+        out[4u * i + 1u] = (uint8_t)entries[i].ep_id; /* truncated -- see this
+                                                          function's own doc
+                                                          comment (regmap.h) */
+        put_u16(&out[4u * i + 2u], (uint16_t)entries[i].byte_bus_id);
+    }
+}
+
 /* ── Root-client / per-EP-restricted-client model ──────────────────────────── */
 
 //cfusa:req REQ-RMAP-009

@@ -14308,3 +14308,93 @@ lacking any storage at all. **Next**: Group 3's remaining items
 (REQ-RMAP-061/065), Group 5
 (REQ-RMAP-047/048/049/050/051/066/067/068, including Table 33's own
 wire codec).
+
+### v0.236.0 -- 2026-08-11 (doc + structural)
+
+**Phase 5d Group 3 remainder (issue #200): EP_ID_config's own
+4-octet-per-row wire stride, and a stale catalog cross-reference
+corrected.**
+
+Reviewed the remaining open Group 3 items (REQ-RMAP-052/054/055/
+057/058) against their own current text before touching anything.
+REQ-RMAP-057/058 were already honestly scoped -- both have real
+diagnostic functions
+(`rcp_regmap_ep_id_map_has_single_client_per_ep()`/
+`_shared_bus_homogeneous()`) with their own remaining gaps correctly
+described as "no server-side rejection... spec itself defines no
+corrective action" and "nothing yet calls this diagnostic with real
+data" respectively -- no staleness, no action needed. REQ-RMAP-055
+(the W+ lockable-access-type primitive) remains its own genuinely
+separate, much larger piece of work: it needs a new
+`rcp_lifecycle_field_kind_t` value AND a lock-state parameter added
+to `rcp_lifecycle_field_writable()`'s own signature, which would
+touch every existing call site across every endpoint type in this
+codebase -- explicitly out of scope for this batch, not attempted.
+
+**REQ-RMAP-052's own citation found genuinely stale**: its text
+said `rcp_regmap_ep_id_map_is_ascending()` "is NOT updated... (REQ-
+RMAP-056, its own separate still-open scope)" -- but REQ-RMAP-056
+was already closed in an earlier batch (confirmed both by
+`.fusa-reqs.json`'s own current `status` field and by `regmap.h`'s
+own field comment on `request_stream_index`, which already
+correctly said "closed as of this field's own follow-up batch").
+The catalog TEXT alone was stale, the field comment was already
+right -- exactly the class of drift this whole audit lineage exists
+to catch, just this time a one-line correction rather than a real
+behavioral bug. Fixed.
+
+**New**: `rcp_regmap_ep_id_map_render()` (`regmap.h`/`regmap.c`)
+serializes a real EP_ID_config table at TC18 §12.7.8 Table 23's own
+exact 4-octet-per-row stride (`request_stream_index`/`ep_id`/
+`byte_bus_id` at row offset `4*N`, confirmed directly against the
+primary source's own printed row-1/row-2/row-3 examples beginning
+at `0x0000`/`0x0004`/`0x0008`) -- proven via a byte-offset test
+across two rows. `ep_id` is this module's own 16-bit in-memory
+representation (matching every other endpoint-index field in this
+codebase, e.g. `rcp_regmap_is_ep0()`'s own `uint16_t` parameter);
+render honestly truncates it to the wire's real 8-bit `EP_Nr` width
+-- the exact same documented-truncation convention REQ-ADC-035/036's
+own render path already established for its own wider in-memory
+fields, deliberately reused rather than inventing a new pattern.
+
+**Deliberately NOT implemented, for the identical reason
+REQ-RMAP-040/041 (HW_config, v0.235.0) already documents**: the
+ACF_ABB wire request/response wrapper around this render function.
+EP_ID_config is a separate table pointed to by Table 18's own
+`svr_ep_bytebus_id_map_ptr` register (REQ-RMAP-037, already
+`implemented`) -- not reached via Table 18's own always-address-0
+mechanism, and not an endpoint's own EP_func block either. The same
+genuine, unresolved addressing question applies here without
+modification, so it is not re-litigated or re-guessed -- `regmap.h`'s
+own new doc comment cross-references HW_config's own fuller
+explanation rather than duplicating it. REQ-RMAP-052/054 both stay
+`partial`, not `implemented`, for exactly this reason.
+
+New test: a byte-offset spot-check of the render function's own raw
+output across two rows, including the `ep_id` truncation case
+(`0x1234` renders as `0x34`).
+
+Mutation-tested: swapping which field the render function writes at
+row offset 0 (`entries[i].request_stream_index` to
+`entries[i].ep_id`) produced a clean, deterministic assertion
+failure (`Expected 0x11 Was 0x34`). Reverted, full suite
+re-verified clean.
+
+65/65 both trees (native + ASan/UBSan, unaffected -- the render
+function is new, additive code with no existing caller). `cfusa
+check`: 0 errors. `cfusa trace --gaps`: 0/1024 untested;
+`--req-coverage 100`/`--sec-tested 100`: both 100%.
+
+**Progress**: Group 3 (EP_ID_config, issue #200) is now fully
+addressed as far as it honestly can be without resolving the shared
+HW_config/EP_ID_config addressing question -- REQ-RMAP-053/056
+already `implemented`, REQ-RMAP-057/058 already honestly `partial`
+with real diagnostics and correctly-described remaining gaps,
+REQ-RMAP-052/054 now `partial` with a real, tested wire-layout
+render function instead of "no encode/decode path at all."
+REQ-RMAP-055 remains genuinely open, its own separate, larger
+primitive. **Next**: Group 4's remaining items (REQ-RMAP-061/065),
+Group 5 (REQ-RMAP-047/048/049/050/051/066/067/068, including Table
+33's own wire codec -- which, once resolved, may also finally answer
+the shared HW_config/EP_ID_config addressing question, since all
+three tables are reached the same pointer-into-EP0's-own-space way).
