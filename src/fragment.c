@@ -66,7 +66,7 @@ rcp_fragment_errc_t rcp_fragment_plan(size_t payload_len, size_t max_fragment_pa
         out_segments[i].offset      = off;
         out_segments[i].len         = max_fragment_payload;
         out_segments[i].ms          = true;
-        out_segments[i].segment_num = (uint8_t)i;
+        out_segments[i].segment_num = (uint16_t)i;
         off += max_fragment_payload;
     }
 
@@ -153,7 +153,7 @@ static bool append(rcp_fragment_reassembler_t *r, const uint8_t *payload, size_t
 //cfusa:req REQ-FRAG-015
 //cfusa:req REQ-FRAG-016
 rcp_fragment_reasm_result_t rcp_fragment_reassembler_feed(rcp_fragment_reassembler_t *r,
-                                                            bool ms, uint8_t segment_num,
+                                                            bool ms, uint16_t segment_num,
                                                             const uint8_t *payload,
                                                             size_t payload_len)
 {
@@ -180,7 +180,7 @@ rcp_fragment_reasm_result_t rcp_fragment_reassembler_feed(rcp_fragment_reassembl
     if (!append(r, payload, payload_len)) return RCP_FRAGMENT_REASM_ERR_ALLOC;
 
     if (ms) {
-        r->expected_segment_num = (uint8_t)(r->expected_segment_num + 1);
+        r->expected_segment_num = (uint16_t)(r->expected_segment_num + 1);
         return RCP_FRAGMENT_REASM_CONTINUE;
     }
 

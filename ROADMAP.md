@@ -13310,3 +13310,87 @@ verification -- the latter already touched tangentially in this
 batch's own false-positive check, but the wire-width question itself
 remains open), or the CAN/wakeup dedicated-investigation sessions if
 prioritized first.
+
+### v0.226.0 -- 2026-08-11
+
+**Full-catalog audit follow-up, batch 27 (Group K, misc triage, issue
+#256)**: both of Group K's own listed items resolved, closing the
+group.
+
+**1. Real bug fix -- `RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS` /
+`segment_num` 8-bit-vs-12-bit width.** `fragment.h`'s own file header
+and the `RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS` macro's own doc
+comment claimed `segment_num` is "one octet wide... giving 256
+distinct values (0..255)". `acf.h`'s own documented bit layout
+(`read_size_or_segment_num[11:8]` in byte 6 bits 3:0,
+`read_size_or_segment_num[7:0]` in byte 7 bits 7:0) is unambiguously
+12 bits wide (0..4095) -- independently confirmed by `src/acf.c`'s
+own already-tested `0x0Fu`/`0xFFu` bit-masking split in
+`rcp_acf_pack_header()`/`_unpack_header()`, and additionally checked
+directly against the rendered TC18 PDF page for this figure (the
+page's own resolution was too low to count exact bit-column
+boundaries pixel-by-pixel, so the code-corroboration method served as
+the deciding evidence, per [[feedback_verify_against_pdf_and_reqs_json]]'s
+own documented fallback). Worse than a stale comment: `segment_num`
+was stored as `uint8_t` throughout `fragment.h`/`fragment.c`
+(`rcp_fragment_segment_t.segment_num`,
+`rcp_fragment_reassembler_t.expected_segment_num`, and the
+`rcp_fragment_reassembler_feed()` parameter), silently truncating any
+real decoded value above 255 -- a genuine wire-compatibility bug, not
+merely an artificially low capacity ceiling.
+
+Fixed: widened all three fields to `uint16_t`; corrected
+`RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS` from `256u` to `4096u`;
+updated every doc comment describing the field's width (file header,
+macro comment, `RCP_FRAGMENT_ERR_TOO_MANY_SEGMENTS` enum comment).
+`REQ-FRAG-002`/`003`/`004`/`005`/`006` are all phrased generically
+against the macro's own name, not a hardcoded width, so none needed a
+`.fusa-reqs.json` change -- only the code and its comments were
+wrong. New test `test_plan_segment_num_above_255_does_not_truncate`
+plans 300 one-byte fragments and asserts segment 255 and segment 298
+both round-trip correctly (values that silently wrapped under the old
+`uint8_t` storage). Two boundary tests
+(`test_plan_count_too_many_segments`,
+`test_plan_count_exactly_at_max_intermediate_boundary`) rewritten to
+reference the symbolic constant instead of hardcoded 256/257/258
+literals, future-proofing against the constant changing again; three
+`TEST_ASSERT_EQUAL_UINT8` assertions on the now-wider field corrected
+to `TEST_ASSERT_EQUAL_UINT16`.
+
+Mutation-tested twice, matching this session's own established
+discipline: (a) reverting `rcp_fragment_segment_t.segment_num` alone
+back to `uint8_t` produces a clean, deterministic `Expected 298 Was
+42` Unity assertion failure (298 & 0xFF == 42) -- the new test really
+does catch the regression; (b) separately loosening
+`rcp_fragment_plan_count()`'s own bounds check by 4 produces an
+immediate SIGSEGV (exit 139) -- a genuine stack-buffer overrun into
+`test_plan_too_many_segments`'s single-element test buffer, proving
+the bounds check itself is load-bearing, not just its return value.
+Both mutations reverted and the full suite re-confirmed clean
+afterward.
+
+**2. False positive, verified, no fix needed -- `REQ-SCHED-001..008`.**
+The original Group K finding suggested these 8 entries may have been
+"handed to the RELAY-generic sanity-sweep cluster" and might need
+`scope` correction to `tc18`. Checked the current `.fusa-reqs.json`
+directly: all 8 already have `scope: "tc18"` with substantive,
+individually-verified-accurate TC18 citations, created in a single
+commit (v0.69.0) and never modified since. The finding did not match
+the current file state -- a false positive, no change made.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check` (CI-pinned
+v0.5.50): 0 errors. `cfusa trace --gaps`: 0/1024 untested;
+`--req-coverage 100` / `--sec-tested 100`: both 100% (1024/1024) --
+same pre-existing, non-blocking UART dangling-reference diagnostics as
+every prior batch.
+
+**This closes Group K, and with it, Groups H through K of issue
+#256's 156-finding catalog in full.** Remaining, deliberately
+deferred: the CAN dedicated-investigation session (Table 53's opaque
+32-bit bit-timing registers plus a real address collision), the
+wakeup dedicated-investigation session (Table 36's variable-length
+IO-pin-config register array, its own address collision, and a
+known extraction-reliability risk already flagged once during Group
+E), and the full TC18 spec-revision reconciliation project (deferred
+by explicit prior user decision until Group I/J/K completed -- now
+satisfied).
