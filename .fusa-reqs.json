@@ -9512,14 +9512,14 @@
     },
     {
       "id": "REQ-SPI-035",
-      "title": "SPI functional-config register block (Table 39) is fully modeled",
-      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): rcp_ep_spi_channel_cfg_t now carries every Table 39 per-channel field this module previously omitted -- baud_rate_kbps (spi_baud_rateN, kbit/s), use_common_cs (spi_use_csN), cs_clk_leadtime/clk_cs_trailtime (spi_cs_clk_leadtimeN/spi_clk_cs_trailtimeN, in spi_clk cycles, distinct from this module's own pre-existing nanosecond-denominated inter_byte_delay_ns/inter_transfer_delay_ns), and bits_max (spi_bits_maxN); rcp_ep_spi_functional_cfg_t gained ep_status (spi_ep_status). CPOL/CPHA continue to round-trip losslessly through the pre-existing mode byte via rcp_ep_spi_mode_cpol()/_cpha() and a new inverse. rcp_ep_spi_render_registers()/_apply_reconfig() (evt[2:0] == 111b, Table 30's SPI row + \u00a712.7.1) now serialize/parse the whole block -- spi_ep_len and spi_nr_cs are rendered from RCP_EP_SPI_EP_FUNC_LEN/RCP_EP_SPI_MAX_CHANNELS and are read-only, matching PWM_OUT's/GPIO's own EP_LEN convention.",
+      "title": "SPI functional-config register block (Table 39/42) is fully modeled",
+      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): rcp_ep_spi_channel_cfg_t now carries every Table 39 per-channel field this module previously omitted -- baud_rate_kbps (spi_baud_rateN, kbit/s), use_common_cs (spi_use_csN), cs_clk_leadtime/clk_cs_trailtime (spi_cs_clk_leadtimeN/spi_clk_cs_trailtimeN, in spi_clk cycles, distinct from this module's own pre-existing nanosecond-denominated inter_byte_delay_ns/inter_transfer_delay_ns), and bits_max (spi_bits_maxN); rcp_ep_spi_functional_cfg_t gained ep_status (spi_ep_status). CPOL/CPHA continue to round-trip losslessly through the pre-existing mode byte via rcp_ep_spi_mode_cpol()/_cpha() and a new inverse. rcp_ep_spi_render_registers()/_apply_reconfig() (evt[2:0] == 111b, Table 30's SPI row + \u00a712.7.1) now serialize/parse the whole block -- spi_ep_len and spi_nr_cs are rendered from RCP_EP_SPI_EP_FUNC_LEN/RCP_EP_SPI_MAX_CHANNELS and are read-only, matching PWM_OUT's/GPIO's own EP_LEN convention. UPDATED 2026-08-11 (spec rebaseline to TC18 0.5.1_RC5): spi_nr_cs (renumbered Table 39 -> Table 42) was narrowed from a plain 8-bit count to a 4-bit \"(count - 1)\" field (bits [3:0], upper nibble reserved) by spec revision RC4 -- rcp_ep_spi_render_registers() now renders (RCP_EP_SPI_MAX_CHANNELS - 1) & 0x0F (0x05) instead of the plain count (0x06). See REQ-SPI-040 for the new spi_deassert_cs_pauseN bit RC5 adds to the same block.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.3.2 Table 39, TC18.txt L4246-4300"
+      "tc18": "\u00a713.7.3.2 Table 39 (0.5.1_RC baseline)/Table 42 (0.5.1_RC5), TC18.txt L4246-4300; spi_nr_cs width corrected per RC5 PDF p.96 (051RC4 tag, ticket unlabeled -- \"this standard limits the number of CS line per EP to 32\")"
     },
     {
       "id": "REQ-SPI-036",
@@ -9564,6 +9564,17 @@
       "scope": "tc18-gap",
       "status": "implemented",
       "tc18": "\u00a712.7.1 Configuration of endpoints, TC18.txt L2463-2484"
+    },
+    {
+      "id": "REQ-SPI-040",
+      "title": "spi_deassert_cs_pauseN (Table 42, new in spec revision 0.5.1_RC5) is modeled",
+      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, spec rebaseline to TC18 0.5.1_RC5): spi_deassert_cs_pauseN is a new configuration bit (bit 4 of a channel's own +0x02 cfg octet, ticket NXP_100) with no counterpart at all in the 0.5.1_RC baseline this module was originally built against -- \"0b: no de-assertion during break / 1b: de-assertion during break\" during the pause window spi_cs_clk_leadtimeN/spi_pause_minN/spi_clk_cs_trailtimeN define. rcp_ep_spi_channel_cfg_t gains a new deassert_cs_pause field (RCP_EP_SPI_CFG_BIT_DEASSERT_CS_PAUSE); rcp_ep_spi_render_registers()/parse_registers() (the rcp_ep_spi_apply_reconfig() inverse) render/parse it, leaving every pre-existing cfg bit (clk_polarity/clk_phase/cs_polarity/use_cs) untouched -- the same 'new field, existing fields left alone' rule already established for every prior Group I register-block fix this session.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "tc18-gap",
+      "status": "implemented",
+      "tc18": "\u00a713.7.3.2 Table 42, spec revision 0.5.1_RC5 PDF p.96 (ticket NXP_100, tags 051RC5 \"new configuration, optional\" + \"added for clarification\")"
     },
     {
       "id": "REQ-SRV-015",

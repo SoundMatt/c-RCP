@@ -191,22 +191,50 @@
  * Table 39's layout (channel c's block starts at
  * RCP_EP_SPI_REG_CHANNEL_BASE + c * RCP_EP_SPI_REG_CHANNEL_SPAN):
  *
- *   0x0000  spi_ep_len        8 bit  R    RCP_EP_SPI_EP_FUNC_LEN (0x36)
- *   0x0001  spi_nr_cs         8 bit  R    RCP_EP_SPI_MAX_CHANNELS (6)
- *   0x0002  spi_ep_enable&clr 8 bit  R/W  Table 32 common entries
- *   0x0003  spi_ep_options    8 bit  R/W* Table 32 common entries
- *   0x0004  spi_ep_status    16 bit  R/W
- *   0x0006  channel 0's own 8-octet block (channel 1's own starts at
- *           0x000E, and so on through channel 5's at 0x002E):
+ *   0x0000     spi_ep_len        8 bit  R    RCP_EP_SPI_EP_FUNC_LEN (0x36)
+ *   0x0001.3:0 spi_nr_cs         4 bit  R    RCP_EP_SPI_MAX_CHANNELS-1 (5)
+ *   0x0001.7:4 reserved          4 bit  R    Reads: 0000b
+ *   0x0002     spi_ep_enable&clr 8 bit  R/W  Table 32 common entries
+ *   0x0003     spi_ep_options    8 bit  R/W* Table 32 common entries
+ *   0x0004     spi_ep_status    16 bit  R/W
+ *   0x0006     channel 0's own 8-octet block (channel 1's own starts at
+ *              0x000E, and so on through channel 5's at 0x002E):
  *     +0x00 spi_baud_rateN   16 bit  R/W  kbit/s
  *     +0x02 bit 0 spi_clk_polarityN, bit 1 spi_clk_phaseN, bit 2
- *           spi_cs_polarityN, bit 3 spi_use_csN, bits 4-7 reserved
+ *           spi_cs_polarityN, bit 3 spi_use_csN, bit 4
+ *           spi_deassert_cs_pauseN, bits 5-7 reserved
  *                              8 bit  R/W
  *     +0x03 spi_cs_clk_leadtimeN     8 bit  R/W  spi_clk cycles
  *     +0x04 spi_clk_cs_trailtimeN    8 bit  R/W  spi_clk cycles
  *     +0x05 spi_bits_maxN            8 bit  R/W
  *     +0x06 spi_pause_minN           8 bit  R/W  spi_clk cycles
  *     +0x07 reserved                 8 bit  R
+ *
+ * FIXED 2026-08-11 (spec rebaseline to TC18 0.5.1_RC5, c-RCP-AUDIT-06):
+ * two real deltas found via the PDF's own front-matter revision-history
+ * table (0.5.1_RC4's own entry, cross-referenced against the RC4/RC5
+ * tracked-change markers in the document body):
+ *   1. spi_nr_cs (0x0001) was, in the 0.5.1_RC baseline this codebase
+ *      originally read against, a plain 8-bit count -- rendered here as
+ *      the full RCP_EP_SPI_MAX_CHANNELS byte (6). RC4 narrows it to a
+ *      4-bit "(count - 1)" field (tagged "this standard limits the
+ *      number of CS line per EP to 32"), leaving the upper nibble
+ *      reserved. Fixed to render (RCP_EP_SPI_MAX_CHANNELS - 1) & 0xF
+ *      (0x05) in the low nibble, 0 in the high.
+ *   2. spi_deassert_cs_pauseN (bit 4 of the +0x02 octet) is a new bit
+ *      (RC5, ticket NXP_100) with no counterpart at all in the baseline
+ *      this module was built against -- "0b: no de-assertion during
+ *      break / 1b: de-assertion during break" (during the pause window
+ *      spi_cs_clk_leadtimeN/spi_pause_minN/spi_clk_cs_trailtimeN
+ *      define). Added as a new rcp_ep_spi_channel_cfg_t field,
+ *      following the same "new field, existing field left untouched"
+ *      rule already established for every other Group I register-block
+ *      fix this session (never silently redefine an existing field).
+ *      The SPI channel-selection mechanism itself (evt-bits vs.
+ *      byte_bus_id) is a separate, larger, and still internally
+ *      inconsistent question across the document as of RC5 -- flagged
+ *      for its own dedicated investigation, deliberately NOT resolved
+ *      by this fix, which touches only register content, not routing.
  *
  * clk_polarityN/clk_phaseN round-trip through this module's existing
  * rcp_ep_spi_mode_t (rcp_ep_spi_mode_cpol()/_cpha() render the two bits; a
@@ -350,6 +378,18 @@ typedef struct {
                                            cycles */
     uint8_t  bits_max;                 /* spi_bits_maxN */
     uint8_t  pause_min;                /* spi_pause_minN, spi_clk cycles */
+    bool     deassert_cs_pause;        /* spi_deassert_cs_pauseN (added TC18
+                                           spec revision 0.5.1_RC5, ticket
+                                           NXP_100 -- see the file header's
+                                           own "FIXED 2026-08-11" note):
+                                           false = no de-assertion during
+                                           the pause (the wire's 0b
+                                           default), true = CS is
+                                           de-asserted during the pause
+                                           window between
+                                           spi_cs_clk_leadtimeN and
+                                           spi_cs_clk_leadtimeN +
+                                           spi_pause_minN */
 } rcp_ep_spi_channel_cfg_t;
 
 typedef struct {
@@ -365,7 +405,7 @@ typedef struct {
  * MODE_0, bit_order MSB_FIRST, cs_polarity ACTIVE_LOW, trigger NONE,
  * clock_divider/inter_byte_delay_ns/inter_transfer_delay_ns/
  * baud_rate_kbps/cs_clk_leadtime/clk_cs_trailtime/bits_max/pause_min all 0,
- * use_common_cs false; ep_status 0). */
+ * use_common_cs false, deassert_cs_pause false; ep_status 0). */
 void rcp_ep_spi_functional_cfg_init(rcp_ep_spi_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
@@ -425,7 +465,16 @@ bool rcp_ep_spi_set_channel_trigger(rcp_ep_spi_functional_cfg_t *cfg, uint8_t ch
  * a configuration write covering them leaves them unchanged (see
  * rcp_ep_spi_apply_reconfig()). */
 #define RCP_EP_SPI_REG_EP_LEN        ((uint16_t)0x0000u) /*  8 bit, R   */
-#define RCP_EP_SPI_REG_NR_CS         ((uint16_t)0x0001u) /*  8 bit, R   */
+#define RCP_EP_SPI_REG_NR_CS         ((uint16_t)0x0001u) /*  8 bit, R -- only
+                                                              bits [3:0] carry
+                                                              spi_nr_cs
+                                                              (count - 1);
+                                                              [7:4] reserved,
+                                                              see the file
+                                                              header's own
+                                                              "FIXED
+                                                              2026-08-11"
+                                                              note */
 #define RCP_EP_SPI_REG_EP_ENABLE_CLR ((uint16_t)0x0002u) /*  8 bit, R/W */
 #define RCP_EP_SPI_REG_EP_OPTIONS    ((uint16_t)0x0003u) /*  8 bit, R/W */
 #define RCP_EP_SPI_REG_EP_STATUS     ((uint16_t)0x0004u) /* 16 bit, R/W */
@@ -441,8 +490,9 @@ bool rcp_ep_spi_set_channel_trigger(rcp_ep_spi_functional_cfg_t *cfg, uint8_t ch
                                                              clk_polarity(0)/
                                                              clk_phase(1)/
                                                              cs_polarity(2)/
-                                                             use_cs(3),
-                                                             bits 4-7
+                                                             use_cs(3)/
+                                                             deassert_cs_pause(4),
+                                                             bits 5-7
                                                              reserved */
 #define RCP_EP_SPI_CHREG_CS_LEADTIME  ((uint16_t)0x03u) /*  8 bit, R/W */
 #define RCP_EP_SPI_CHREG_CS_TRAILTIME ((uint16_t)0x04u) /*  8 bit, R/W */
@@ -451,10 +501,13 @@ bool rcp_ep_spi_set_channel_trigger(rcp_ep_spi_functional_cfg_t *cfg, uint8_t ch
 #define RCP_EP_SPI_CHREG_RESERVED     ((uint16_t)0x07u) /*  8 bit, R   */
 
 /* Bit masks within a channel's RCP_EP_SPI_CHREG_CFG octet. */
-#define RCP_EP_SPI_CFG_BIT_CLK_POLARITY ((uint8_t)(1u << 0))
-#define RCP_EP_SPI_CFG_BIT_CLK_PHASE    ((uint8_t)(1u << 1))
-#define RCP_EP_SPI_CFG_BIT_CS_POLARITY  ((uint8_t)(1u << 2))
-#define RCP_EP_SPI_CFG_BIT_USE_CS       ((uint8_t)(1u << 3))
+#define RCP_EP_SPI_CFG_BIT_CLK_POLARITY      ((uint8_t)(1u << 0))
+#define RCP_EP_SPI_CFG_BIT_CLK_PHASE         ((uint8_t)(1u << 1))
+#define RCP_EP_SPI_CFG_BIT_CS_POLARITY       ((uint8_t)(1u << 2))
+#define RCP_EP_SPI_CFG_BIT_USE_CS            ((uint8_t)(1u << 3))
+/* Added TC18 spec revision 0.5.1_RC5, ticket NXP_100 -- see the file
+ * header's own "FIXED 2026-08-11" note. */
+#define RCP_EP_SPI_CFG_BIT_DEASSERT_CS_PAUSE ((uint8_t)(1u << 4))
 
 /* The block's own length in octets -- one past the last assigned offset,
  * i.e. the value the endpoint reports at RCP_EP_SPI_REG_EP_LEN and the

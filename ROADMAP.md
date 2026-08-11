@@ -13506,3 +13506,85 @@ marker-by-marker triage, prioritizing the SPI Table 42 items already
 known-real from the earlier spot-check (batch 2 candidate), then the
 RC-server config-register changes given their overlap with this
 session's own extensive E2E/lifecycle work.
+
+### v0.228.0 -- 2026-08-11
+
+**Spec rebaseline to TC18 0.5.1_RC5, batch 2**: SPI Table 42
+(renumbered from Table 39 -- pure renumbering, confirmed by title
+match, per this session's own earlier table-numbering diff). Both
+items already flagged real in the earlier spot-check are confirmed
+directly against the rendered PDF pages (94-97) and fixed.
+
+**1. `spi_nr_cs` (0x0001) narrowed to a 4-bit `(count - 1)` field.**
+The 0.5.1_RC baseline's own Table 39 documented `spi_nr_cs` as a
+plain 8-bit count; `rcp_ep_spi_render_registers()` rendered
+`RCP_EP_SPI_MAX_CHANNELS` (6) there directly. Spec revision RC4
+narrows the field to bits [3:0] holding `(count - 1)`, leaving bits
+[7:4] reserved (tagged "this standard limits the number of CS line
+per EP to 32" -- the wider 32-line standard limit is a separate fact
+from what this one endpoint's own 4-bit field can represent, 16).
+Fixed: renders `(RCP_EP_SPI_MAX_CHANNELS - 1) & 0x0F` (0x05) instead
+of the plain count (0x06). `REQ-SPI-035` updated with the correction
+and a cross-reference to `REQ-SPI-040` below.
+
+**2. New `spi_deassert_cs_pauseN` bit.** Bit 4 of a channel's own
++0x02 cfg octet (RC5, ticket NXP_100) -- "0b: no de-assertion during
+break / 1b: de-assertion during break" during the pause window
+`spi_cs_clk_leadtimeN`/`spi_pause_minN`/`spi_clk_cs_trailtimeN`
+define. No counterpart existed in the baseline this module was
+originally built against (bits 4-7 were all reserved). Added a new
+`deassert_cs_pause` field to `rcp_ep_spi_channel_cfg_t`, a new
+`RCP_EP_SPI_CFG_BIT_DEASSERT_CS_PAUSE` bit mask, rendered/parsed
+alongside the pre-existing cfg bits -- clk_polarity/clk_phase/
+cs_polarity/use_cs are all left completely untouched by the
+addition, matching this session's own "new field, existing field
+never silently redefined" rule. New `REQ-SPI-040`.
+
+**Deliberately NOT touched by this batch**: the SPI channel-selection
+mechanism itself. §13.7.3.1's own running prose has, as of RC4,
+already been edited in place (strikethrough + insertion, not a
+floating comment) to describe byte_bus_id-based channel selection
+replacing the evt-field method -- but TC18's own Table 33 (the
+generic evt[2:0] Table 30 equivalent) still documents the OLD
+evt-bits scheme for SPI's own row, unchanged, with only a *separate*
+comment marking a byte_bus_id-based alternative "becomes obsolete IF
+new concept is accepted" (draft language). These two passages
+directly contradict each other as of RC5 -- one already treats the
+new concept as adopted running text, the other still treats it as a
+conditional future proposal. This is a genuine, unresolved internal
+inconsistency in the primary source itself, not a citation or
+extraction error on this codebase's part, and touches a live routing
+mechanism (which channel a request addresses) rather than register
+content -- exactly the class of change this session's own "big,
+needs its own dedicated investigation session" precedent (CAN,
+MDIO/Group D, wakeup) exists for. Flagged, not acted on; the register
+CONTENT fixes above (spi_nr_cs width, spi_deassert_cs_pause) are
+independent of which selection mechanism ultimately wins and are
+safe to ship regardless of how that question resolves.
+
+New tests: a reserved-nibble-zero assertion on the rendered
+`spi_nr_cs` byte; a dedicated round-trip test for
+`deassert_cs_pause` through the *parse* path
+(`rcp_ep_spi_apply_reconfig()`, not just render), proving it
+round-trips independently of the other three cfg bits and that
+setting it does not disturb an unrelated channel. Mutation-tested
+both changes: reverting the nr_cs encoding alone reproduces 3 clean,
+deterministic failures across 2 test files (`Expected 5 Was 6` /
+`Expected 0x05 Was 0x06`); reverting the `deassert_cs_pause` parse
+line alone reproduces a clean `Expected TRUE Was FALSE`. Both
+reverted, full suite re-confirmed clean.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check` (CI-pinned
+v0.5.50): 0 errors. `cfusa trace --gaps`: 0/1024 untested;
+`--req-coverage 100` / `--sec-tested 100`: both 100%.
+
+**Next**: continue the marker-by-marker triage -- RC-server
+stream-config register changes (§12.7.7 `rx_enforce_crc`/
+`rx_stream_status`), BBID control register relocation (§12.7.8), the
+"trigger generation now optional" wording sweep across
+SPI/GPIO/PWM_OUT/PWM_IN/ADC + the generic RC-server section, the new
+EP_NOT_FOUND-defining table (cross-check against this session's own
+Group H `REQ-MOCK-030` fix), and the remaining ~15 individual
+markers not yet read (MDIO Cetitec_032 correction, UART AVTPDU
+clarification sentence, several explicitly-unsettled "to be
+discussed" fields, and others).

@@ -31,6 +31,7 @@
 //cfusa:test REQ-SPI-030
 //cfusa:test REQ-SPI-038
 //cfusa:test REQ-SPI-039
+//cfusa:test REQ-SPI-040
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -145,6 +146,7 @@ static void test_functional_cfg_init_zeroes(void)
         TEST_ASSERT_EQUAL_UINT8(0, cfg.channels[i].clk_cs_trailtime);
         TEST_ASSERT_EQUAL_UINT8(0, cfg.channels[i].bits_max);
         TEST_ASSERT_EQUAL_UINT8(0, cfg.channels[i].pause_min);
+        TEST_ASSERT_FALSE(cfg.channels[i].deassert_cs_pause);
     }
 }
 
@@ -383,11 +385,16 @@ static void test_render_registers_matches_table_offsets(void)
     cfg.channels[0].clk_cs_trailtime = 4;
     cfg.channels[0].bits_max         = 5;
     cfg.channels[0].pause_min        = 6;
+    cfg.channels[0].deassert_cs_pause = true;
 
     rcp_ep_spi_render_registers(&cfg, out);
 
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_SPI_EP_FUNC_LEN, out[RCP_EP_SPI_REG_EP_LEN]);
-    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_SPI_MAX_CHANNELS, out[RCP_EP_SPI_REG_NR_CS]);
+    /* TC18 0.5.1_RC5: spi_nr_cs is a 4-bit "(count - 1)" field, upper
+     * nibble reserved -- RCP_EP_SPI_MAX_CHANNELS (6) renders as 0x05, not
+     * a plain 6, per the file header's own "FIXED 2026-08-11" note. */
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)(RCP_EP_SPI_MAX_CHANNELS - 1u), out[RCP_EP_SPI_REG_NR_CS]);
+    TEST_ASSERT_EQUAL_UINT8(0u, out[RCP_EP_SPI_REG_NR_CS] & 0xF0u); /* reserved nibble */
     TEST_ASSERT_TRUE((out[RCP_EP_SPI_REG_EP_ENABLE_CLR] & 0x01u) != 0u);
     TEST_ASSERT_EQUAL_UINT8(0x12u, out[RCP_EP_SPI_REG_EP_STATUS]);
     TEST_ASSERT_EQUAL_UINT8(0x34u, out[RCP_EP_SPI_REG_EP_STATUS + 1]);
@@ -397,7 +404,8 @@ static void test_render_registers_matches_table_offsets(void)
     TEST_ASSERT_EQUAL_UINT8(0x66u, out[0x0007]);
     TEST_ASSERT_EQUAL_UINT8(
         RCP_EP_SPI_CFG_BIT_CLK_POLARITY | RCP_EP_SPI_CFG_BIT_CLK_PHASE |
-            RCP_EP_SPI_CFG_BIT_CS_POLARITY | RCP_EP_SPI_CFG_BIT_USE_CS,
+            RCP_EP_SPI_CFG_BIT_CS_POLARITY | RCP_EP_SPI_CFG_BIT_USE_CS |
+            RCP_EP_SPI_CFG_BIT_DEASSERT_CS_PAUSE,
         out[0x0008]);
     TEST_ASSERT_EQUAL_UINT8(3, out[0x0009]);
     TEST_ASSERT_EQUAL_UINT8(4, out[0x000A]);
@@ -429,6 +437,35 @@ static void test_apply_reconfig_writes_baud_rate(void)
         rcp_ep_spi_apply_reconfig(&cfg, payload, sizeof(payload)));
     TEST_ASSERT_EQUAL_UINT16(0x1234, cfg.channels[1].baud_rate_kbps);
     TEST_ASSERT_EQUAL_UINT16(0, cfg.channels[0].baud_rate_kbps); /* untouched */
+}
+
+/* TC18 0.5.1_RC5, ticket NXP_100 (see the file header's own "FIXED
+ * 2026-08-11" note): spi_deassert_cs_pauseN is bit 4 of a channel's own
+ * +0x02 cfg octet -- proves it round-trips through the parse path
+ * (rcp_ep_spi_apply_reconfig(), not just render), and that the other
+ * three cfg bits are unaffected by setting or clearing it. */
+static void test_apply_reconfig_writes_deassert_cs_pause_bit(void)
+{
+    rcp_ep_spi_functional_cfg_t cfg;
+    uint8_t                     payload[3];
+
+    rcp_ep_spi_functional_cfg_init(&cfg);
+
+    payload[0] = 0x00;
+    payload[1] = 0x08; /* address = channel 0's own cfg octet (0x0006+0x02) */
+    payload[2] = RCP_EP_SPI_CFG_BIT_DEASSERT_CS_PAUSE | RCP_EP_SPI_CFG_BIT_CLK_PHASE;
+
+    TEST_ASSERT_EQUAL(RCP_EP_SPI_RECONFIG_OK,
+        rcp_ep_spi_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_TRUE(cfg.channels[0].deassert_cs_pause);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_SPI_MODE_1, cfg.channels[0].mode); /* cpha only */
+    TEST_ASSERT_FALSE(cfg.channels[0].use_common_cs);
+    TEST_ASSERT_FALSE(cfg.channels[1].deassert_cs_pause); /* untouched */
+
+    payload[2] = 0x00;
+    TEST_ASSERT_EQUAL(RCP_EP_SPI_RECONFIG_OK,
+        rcp_ep_spi_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_FALSE(cfg.channels[0].deassert_cs_pause);
 }
 
 static void test_apply_reconfig_writes_multi_channel_span(void)
@@ -486,7 +523,7 @@ static void test_apply_reconfig_ignores_read_only_registers(void)
 
         rcp_ep_spi_render_registers(&cfg, out);
         TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_SPI_EP_FUNC_LEN, out[RCP_EP_SPI_REG_EP_LEN]);
-        TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_SPI_MAX_CHANNELS, out[RCP_EP_SPI_REG_NR_CS]);
+        TEST_ASSERT_EQUAL_UINT8((uint8_t)(RCP_EP_SPI_MAX_CHANNELS - 1u), out[RCP_EP_SPI_REG_NR_CS]);
     }
 }
 
@@ -935,6 +972,7 @@ int main(void)
 
     RUN_TEST(test_render_registers_matches_table_offsets);
     RUN_TEST(test_apply_reconfig_writes_baud_rate);
+    RUN_TEST(test_apply_reconfig_writes_deassert_cs_pause_bit);
     RUN_TEST(test_apply_reconfig_writes_multi_channel_span);
     RUN_TEST(test_apply_reconfig_ignores_read_only_registers);
     RUN_TEST(test_apply_reconfig_ignores_channel_reserved_octet);
