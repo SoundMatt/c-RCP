@@ -111,6 +111,7 @@ void rcp_ep_mdio_functional_cfg_init(rcp_ep_mdio_functional_cfg_t *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
     rcp_regmap_ep_functional_cfg_init(&cfg->common);
+    /* ep_status is already 0 via the memset above. */
 }
 
 //cfusa:req REQ-MDIO-010
@@ -118,6 +119,157 @@ bool rcp_ep_mdio_functional_cfg_writable(rcp_lifecycle_state_t state,
                                           rcp_lifecycle_writer_ctx_t writer)
 {
     return rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, writer);
+}
+
+/* ── The EP_func register block (evt[2:0] == 111b) ─────────────────────────── */
+
+/* The EP-common enable&clr (0x0002) and options (0x0003) octets -- same
+ * house convention and same "regmap.h modeling gap" caveat as ep_pwm.c's
+ * own copy. */
+#define MDIO_ENABLE_CLR_BIT_ENABLE ((uint8_t)(1u << 0))
+#define MDIO_ENABLE_CLR_BIT_CLEAR  ((uint8_t)(1u << 4))
+#define MDIO_OPTIONS_BIT_REQ_CRC   ((uint8_t)(1u << 0))
+#define MDIO_OPTIONS_BIT_RESP_TS   ((uint8_t)(1u << 3))
+#define MDIO_OPTIONS_BIT_SUPPRESS  ((uint8_t)(1u << 7))
+
+//cfusa:req REQ-MDIO-023
+void rcp_ep_mdio_render_registers(const rcp_ep_mdio_functional_cfg_t *cfg,
+                                   uint8_t out[RCP_EP_MDIO_EP_FUNC_LEN])
+{
+    uint8_t enable_clr = 0u;
+    uint8_t options    = 0u;
+
+    if (cfg->common.ep_enable) enable_clr |= MDIO_ENABLE_CLR_BIT_ENABLE;
+    if (cfg->common.ep_clear_req_storage) enable_clr |= MDIO_ENABLE_CLR_BIT_CLEAR;
+    if (cfg->common.ep_req_crc_enable) options |= MDIO_OPTIONS_BIT_REQ_CRC;
+    if (cfg->common.ep_response_ts_enable) options |= MDIO_OPTIONS_BIT_RESP_TS;
+    if (cfg->common.ep_suppress_response) options |= MDIO_OPTIONS_BIT_SUPPRESS;
+
+    out[RCP_EP_MDIO_REG_EP_LEN]        = (uint8_t)RCP_EP_MDIO_EP_FUNC_LEN;
+    out[RCP_EP_MDIO_REG_RESERVED_01]   = 0u;
+    out[RCP_EP_MDIO_REG_EP_ENABLE_CLR] = enable_clr;
+    out[RCP_EP_MDIO_REG_EP_OPTIONS]    = options;
+    put_u16(&out[RCP_EP_MDIO_REG_EP_STATUS], cfg->ep_status);
+}
+
+/* The inverse of render -- same "read-only offsets not read back" design as
+ * ep_pwm.c's own parse_registers(). Here that set is just EP_LEN and the
+ * reserved octet -- there is no base_clk row to skip, see the file
+ * header. */
+static void parse_mdio_registers(rcp_ep_mdio_functional_cfg_t *cfg,
+                                  const uint8_t in[RCP_EP_MDIO_EP_FUNC_LEN])
+{
+    uint8_t enable_clr = in[RCP_EP_MDIO_REG_EP_ENABLE_CLR];
+    uint8_t options    = in[RCP_EP_MDIO_REG_EP_OPTIONS];
+
+    cfg->common.ep_enable             = (enable_clr & MDIO_ENABLE_CLR_BIT_ENABLE) != 0u;
+    cfg->common.ep_clear_req_storage  = (enable_clr & MDIO_ENABLE_CLR_BIT_CLEAR) != 0u;
+    cfg->common.ep_req_crc_enable     = (options & MDIO_OPTIONS_BIT_REQ_CRC) != 0u;
+    cfg->common.ep_response_ts_enable = (options & MDIO_OPTIONS_BIT_RESP_TS) != 0u;
+    cfg->common.ep_suppress_response  = (options & MDIO_OPTIONS_BIT_SUPPRESS) != 0u;
+
+    cfg->ep_status = get_u16(&in[RCP_EP_MDIO_REG_EP_STATUS]);
+}
+
+/* True iff the octet at relative offset addr belongs to a read-only
+ * register of the block -- EP_LEN and the reserved octet (no base_clk row
+ * here, see the file header). */
+static bool mdio_reg_offset_read_only(uint16_t addr)
+{
+    return addr == RCP_EP_MDIO_REG_EP_LEN ||
+           addr == RCP_EP_MDIO_REG_RESERVED_01;
+}
+
+//cfusa:req REQ-MDIO-023
+const char *rcp_ep_mdio_reconfig_strerror(rcp_ep_mdio_reconfig_errc_t e)
+{
+    switch (e) {
+    case RCP_EP_MDIO_RECONFIG_OK:
+        return "rcp/ep_mdio: configuration write applied";
+    case RCP_EP_MDIO_RECONFIG_ERR_SHORT:
+        return "rcp/ep_mdio: configuration write has no address and data";
+    case RCP_EP_MDIO_RECONFIG_ERR_OUT_OF_RANGE:
+        return "rcp/ep_mdio: configuration write extends past the EP_func block";
+    default:
+        return "rcp/ep_mdio: unknown configuration-write error";
+    }
+}
+
+//cfusa:req REQ-MDIO-023
+rcp_ep_mdio_reconfig_errc_t
+rcp_ep_mdio_apply_reconfig(rcp_ep_mdio_functional_cfg_t *cfg,
+                            const uint8_t *payload, size_t payload_len)
+{
+    uint8_t  block[RCP_EP_MDIO_EP_FUNC_LEN];
+    uint16_t start_address;
+    size_t   data_len;
+    size_t   i;
+
+    if (payload_len <= RCP_EP_MDIO_RECONFIG_ADDR_LEN) {
+        return RCP_EP_MDIO_RECONFIG_ERR_SHORT;
+    }
+
+    start_address = get_u16(payload);
+    data_len      = payload_len - RCP_EP_MDIO_RECONFIG_ADDR_LEN;
+
+    /* "Any payload whose length plus the start address exceeds EP_LEN is
+     * to be ignored" -- the whole write, not just its overhanging tail
+     * (extraction §3.7.1). */
+    if ((size_t)start_address + data_len > (size_t)RCP_EP_MDIO_EP_FUNC_LEN) {
+        return RCP_EP_MDIO_RECONFIG_ERR_OUT_OF_RANGE;
+    }
+
+    rcp_ep_mdio_render_registers(cfg, block);
+    for (i = 0; i < data_len; i++) {
+        uint16_t addr = (uint16_t)(start_address + i);
+
+        if (mdio_reg_offset_read_only(addr)) continue; /* write ignored */
+        block[addr] = payload[RCP_EP_MDIO_RECONFIG_ADDR_LEN + i];
+    }
+    parse_mdio_registers(cfg, block);
+
+    return RCP_EP_MDIO_RECONFIG_OK;
+}
+
+//cfusa:req REQ-MDIO-023
+rcp_bytes_t rcp_ep_mdio_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                 uint16_t start_address,
+                                                 const uint8_t *data, size_t data_len,
+                                                 uint8_t transaction_num)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 empty = {0};
+    uint8_t                    *payload;
+    size_t                      payload_len;
+    rcp_bytes_t                 frame;
+
+    if (data_len == 0 || data == NULL) return empty;
+
+    payload_len = RCP_EP_MDIO_RECONFIG_ADDR_LEN + data_len;
+    if (payload_len > RCP_ACF_MAX_PAYLOAD) return empty;
+
+    payload = (uint8_t *)malloc(payload_len);
+    if (!payload) return empty;
+
+    put_u16(payload, start_address);
+    memcpy(payload + RCP_EP_MDIO_RECONFIG_ADDR_LEN, data, data_len);
+
+    hdr.byte_bus_id     = byte_bus_id;
+    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.evt             = 0x7u; /* the reconfiguration escape hatch -- MDIO
+                                    has no named write-semantics enum of
+                                    its own (it belongs to the ADC/I2C/
+                                    LIN/CAN/UART/PWM_IN/ISELED reserved-
+                                    range group, not PWM_OUT's/GPIO's own
+                                    eight-value write-semantics group), so
+                                    the raw value is used directly,
+                                    matching ep_adc.c's/ep_pwm.c's own
+                                    equivalent encoders. */
+    hdr.transaction_num = transaction_num;
+
+    frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
+    free(payload);
+    return frame;
 }
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
