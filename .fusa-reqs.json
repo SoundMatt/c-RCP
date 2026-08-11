@@ -10072,13 +10072,13 @@
     {
       "id": "REQ-CANEP-029",
       "title": "the CAN endpoint's receive ID filters, which are separate from the CAN XL acceptance filters and valid for all CAN variants",
-      "text": "NOT IMPLEMENTED: c-RCP conflates two distinct filter tables TC18 \u00a713.7.11.2 keeps separate. Table 53 defines acceptance filters 1..4 (0x0024..0x0030, 32 bit R/W) as 'acceptance filter for CAN XL' AND receive filters 1..4 (0x0030..0x003C, 32 bit R/W) as 'ID filter for frame reception', the latter explicitly 'valid for all CAN variants' per the \u00a713.7.11.2 bullet list. c-RCP implements only one table \u2014 rcp_ep_can_functional_cfg_t.xl_filters[RCP_EP_CAN_XL_MAX_FILTERS], written by rcp_ep_can_set_xl_filter() (REQ-CANEP-014) \u2014 and its own header describes it as the CAN-XL acceptance/ID filter set. Consequence: Classical CAN, CAN FD and CAN FD light traffic cannot be ID-filtered on reception at all through this endpoint; the only filter table available is scoped to CAN XL.",
+      "text": "NOT IMPLEMENTED: c-RCP conflates two distinct filter tables TC18 \u00a713.7.11.2 keeps separate, AND that table's own printed addresses for one of them are internally inconsistent. Table 53/56 prints acceptance filter 1 at 0x0024, filter 2 at 0x0028, and BOTH filter 3 and filter 4 at 0x002C (a genuine address collision, re-verified against the rendered PDF page image on both the baseline and newest available revision, not an extraction artifact) as 'acceptance filter for CAN XL', immediately followed by receive filters 1..4 at 0x0030..0x003C as 'ID filter for frame reception', the latter explicitly 'valid for all CAN variants' per the \u00a713.7.11.2 bullet list. Which of two readings is intended -- only 3 real acceptance filters with the receive-filter table already correctly addressed, or 4 real acceptance filters requiring every receive-filter address to shift forward by one slot -- is undecidable from the primary source alone; see ep_can.h's own file header for the full analysis. c-RCP implements only one filter table \u2014 rcp_ep_can_functional_cfg_t.xl_filters[RCP_EP_CAN_XL_MAX_FILTERS], written by rcp_ep_can_set_xl_filter() (REQ-CANEP-014) \u2014 and its own header describes it as the CAN-XL acceptance/ID filter set; no code anywhere serializes either table's byte offsets, so the address ambiguity itself carries no live wire-conformance risk today. Consequence: Classical CAN, CAN FD and CAN FD light traffic cannot be ID-filtered on reception at all through this endpoint; the only filter table available is scoped to CAN XL.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "not-implemented",
-      "tc18": "\u00a713.7.11.2, TC18.txt L5355 and Table 53, TC18.txt L5415-5418"
+      "tc18": "\u00a713.7.11.2, TC18.txt L5355 and Table 53 (acceptance filter 3/4 address collision at 0x002C, receive filter 1..4), TC18.txt L5385-5418"
     },
     {
       "id": "REQ-CANEP-030",

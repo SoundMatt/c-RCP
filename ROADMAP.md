@@ -13952,6 +13952,95 @@ real fix, was confirmed no-action-needed with primary-source
 evidence, or (this task, plus the earlier-deferred SPI
 channel-selection question, task #98, already resolved) was
 investigated thoroughly enough to make a well-justified, honest
-scoping decision. Only task #94 (CAN, issue #256 Group D) remains
-across this whole audit lineage, still deliberately deferred pending
-its own dedicated investigation session.
+scoping decision. Only task #94 (CAN, issue #256's own
+dedicated-investigation deferral list) remains across this whole
+audit lineage, still deliberately deferred pending its own dedicated
+investigation session.
+
+### v0.233.0 -- 2026-08-11 (doc-only)
+
+**CAN Table 53/56 register-block address defect -- dedicated
+session (task #94), scoped and closed.**
+
+Rescoped this task per explicit user directive ("check again st
+pdf, scope and action" for the sibling task #97, then "update #94
+to be just spec - remove non-spec compliant code" for this one):
+strip the architecture tangent that had accumulated on this task's
+own description (RCP-over-CAN vs. CAN-over-RCP -- fully answered
+elsewhere, see `reference_rcp_transport_is_ethernet_only` in
+project memory) and re-verify the actual spec-conformance finding
+against the rendered PDF directly, on both revisions, before acting.
+
+TC18 §13.7.11.2's own functional-configuration register table
+(Table 53 in the 0.5.1_RC baseline, renumbered Table 56 in
+0.5.1_RC5 -- identical content on both, confirmed via direct
+side-by-side read) has a genuine, still-unresolved defect: the
+"acceptance filter 3" and "acceptance filter 4" rows are both
+printed at the same relative address, 0x002C -- verified against the
+actual rendered page image, not text extraction alone, on both
+revisions. A receive-filter table follows immediately at the
+address one of those two rows would occupy if simply shifted
+forward by one slot. The primary source gives no way to decide
+between two readings: only as many acceptance filters exist as
+there are non-colliding addresses (the colliding row a stray
+duplicate, receive filters already correctly addressed), or one
+more acceptance filter really exists than that reading allows
+(belonging at the colliding address), in which case every
+receive-filter address would also need a uniform shift. Separately:
+the three bit-timing registers (Classical/FD/XL, each an opaque
+32-bit value) have no sub-field bit-layout published anywhere near
+this table in either revision -- not an extraction gap, the primary
+source itself never publishes one, unlike this same endpoint's own
+request/response format which does get a companion field-level
+figure (Figure 39/40).
+
+**Fresh code audit, zero non-spec-compliant code found.** Walked
+`ep_can.c`'s `write_prefix()`/`read_prefix()`/
+`encode_preconditions_ok()` against Figure 39/40's actual field
+layout (frame_format top 3 bits, 29-bit arbitration id, the XL
+variants' own 6-byte SDT/VCID/AF prefix) -- conformant. The one
+historical non-conformant bug in this module (frame_format packed
+into evt[2:0] instead of the payload's leading quadlet) was already
+fixed at v0.109.0, well before this session. Grepped every function
+in `ep_can.c` for byte-level (de)serialization of Table 53/56's own
+register addresses: none exists anywhere. `rcp_ep_can_functional_cfg_t`
+(bit timings, delay compensation, the execution-delay divider, the
+XL filter table) is a pure in-memory, caller-populated API, never
+encoded to or decoded from wire bytes at any of this table's
+offsets -- the exact "no wire (de)serialization = no live
+conformance risk" pattern task #97 established for the RC-server
+register block. Both defects above therefore carry zero live
+wire-conformance risk today.
+
+**Action, scoped to documentation only**, matching task #97's own
+precedent -- there is no wire model to fix: a new file-header
+section in `ep_can.h` documents the collision and both possible
+readings without force-resolving which is correct, so a future
+implementer of a real register-block codec for this endpoint (the
+`render_registers()`/`apply_reconfig()` shape every other endpoint
+in this codebase with a modeled register block already uses) must
+resolve the ambiguity deliberately rather than silently copying
+whichever address ordering seems convenient.
+`RCP_EP_CAN_XL_MAX_FILTERS` (4) is untouched -- it was already
+documented as this module's own independently chosen count, not
+read off this table, so nothing about this finding changes it.
+`REQ-CANEP-029`'s own `tc18` citation corrected: it previously
+implied a clean, non-colliding 0x0024..0x0030 address range for the
+acceptance-filter table, glossing over the real collision: now
+states it explicitly, with a pointer to `ep_can.h`'s own file
+header for the full analysis.
+
+65/65 both trees (native + ASan/UBSan, unaffected -- comment/citation
+text only). `cfusa check` (CI-pinned v0.5.50): 0 errors. `cfusa
+trace --gaps`: 0/1024 untested; `--req-coverage 100` /
+`--sec-tested 100`: both 100%.
+
+**This closes every dedicated-investigation item this whole audit
+lineage ever deferred.** Issue #256's own 156-finding catalog
+(Groups A-K) was already fully closed; the TC18 0.5.1_RC5
+spec-rebaseline project (tasks #96/#97) and the wakeup dedicated
+session (task #95) were already closed; this was the last of the
+three items issue #256 itself named as deliberately outside its own
+156-finding count. RMAP's own Phase 5d (issue #200, task #88)
+remains separately open -- a distinct, older, still-ongoing effort,
+not part of this lineage.
