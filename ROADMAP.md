@@ -12658,3 +12658,82 @@ non-normative wording clarification for `uart_stop_bits` already
 consistent with what was implemented). Flagged for the user's own
 prioritization call before further Group I/J/K work proceeds against
 the wrong spec baseline.
+
+**User decision**: finish Group I/J/K against the old spec baseline
+first; run a dedicated spec-reconciliation project afterward. Do not
+pivot mid-audit. Continuing below.
+
+### v0.220.0 -- 2026-08-11
+
+**Full-catalog audit follow-up, batch 21 (Group I, real fix):
+REQ-LINEP-024's register-block finding closed -- LIN's own §12.7.1
+EP_func register block (Table 52) implemented, the same class of fix
+SPI's/I2C's/UART's own earlier fixes delivered.**
+
+`rcp_ep_lin_decode_command_request()` already correctly rejected
+evt[2:0]=111b as not a plain command request (`RCP_EP_LIN_ERR_BAD_EVT`,
+via acf.h's shared `rcp_acf_evt_row2_is_plain()`), but no counterpart
+implemented that §12.7.1 path. Read TC18 §13.7.10.2 Table 52 directly:
+a clean, five-entry register block with no address-collision editorial
+defect (unlike GPIO's/I2C's own source tables) -- 0x0000 lin_ep_len(R),
+0x0001 reserved(R), 0x0002/0x0003 common entries, 0x0004 16-bit
+lin_base_clk(R), 0x0006 16-bit lin_ep_status(R/W), 0x0008 8-bit
+lin_clk_divider(R/W); EP_FUNC_LEN=0x0009.
+
+**A genuine catalog-precision correction, caught while scoping this
+batch**: `REQ-LINEP-024`'s own prior text credited the pre-existing
+`rcp_ep_lin_functional_cfg_t.lin_clk_divider` field with already
+covering the wire's 8-bit `lin_clk_divider` register -- but that field
+is `uint32_t`, unit-unspecified, and `ep_lin.h`'s own file header
+already documented it as "this module's own unit choice... matching
+`ep_spi.h`'s own `clock_divider` field shape" -- i.e. explicitly
+analogous to SPI's own *non*-wire field, not a literal register
+stand-in. Rather than reinterpret the existing field (which would
+silently redefine its meaning for the two existing setters/tests
+already relying on it), a new, distinct `wire_clk_divider` (uint8_t)
+field carries the real register instead -- the third instance of the
+"don't silently redefine an existing public field" caution this audit
+has now applied (after SPI's `baud_rate_kbps`-vs-`clock_divider` split
+and UART's `baud_rate_kbps`-vs-`baud_rate` split).
+
+**Fix**: `rcp_ep_lin_functional_cfg_t` gained `ep_status` and
+`wire_clk_divider`. New `rcp_ep_lin_render_registers()`/
+`_apply_reconfig()`/`_reconfig_strerror()`/`_encode_reconfig_request()`
+mirror the established pattern exactly. LIN is now 6 of 11 endpoint
+types with the generic mechanism.
+
+**Also corrects the record**: the UART batch (v0.219.0) claimed in its
+own text that `REQ-CFG-011`/`REQ-CFG-012` were narrowed to credit
+UART -- the actual `.fusa-reqs.json` edit was never made at the time
+(confirmed by re-reading the merged entries before starting this
+batch: they still said "PWM_OUT, GPIO, SPI, and I2C only"). This
+batch's own edit is the first that genuinely credits both UART and
+LIN together, 6 of 11 endpoint types, 5 remaining (CAN/ADC/ISELED/
+MDIO/wakeup). Treated the same way the earlier v0.213.0 Group G
+over-claim was: not silently rewritten in a past release's own
+CHANGELOG entry, corrected forward with an explicit note instead.
+
+A pre-existing deviation test,
+`test_lin_trigger_ignores_trailing_time_and_block_lacks_registers`
+(`tests/test_tc18_gaps_ep2.c`), was renamed to
+`..._block_now_has_registers` and its register-block half rewritten
+from a negative to a positive assertion (its unrelated
+trailing-time-deviation half is untouched and still genuinely open).
+
+Mutation-tested: loosening the out-of-range bounds check by 4 octets
+reproduced the identical class of finding every prior register-block
+batch this session has produced -- a real stack buffer overflow
+(silent SIGABRT, exit code 134). Restored, re-verified. Full suite
+(33/33 in `test_ep_lin` alone, 65/65 overall) both trees (native +
+ASan/UBSan). `cfusa check` (CI-pinned v0.5.50): 0 errors. `cfusa trace
+--gaps`: 0/1024 untested; `--req-coverage 100` / `--sec-tested 100`:
+both 100% (1024/1024) -- same pre-existing, non-blocking diagnostics
+as every prior batch; `REQ-LINEP-028`/`REQ-LINEP-029` (this batch's
+own new entries) do NOT appear in either list.
+
+**Progress: 86/156 findings resolved** (Groups H 12 + B 4 + A 17 +
+D 16 + F 7 + E 4 + C 16 + G 2 + I 8 = 86). Group I's own count moves
+from 7 to 8.
+
+**Next**: CAN's own §12.7.1 reconfig-path investigation (Group I's
+remaining candidates: CAN/ADC/ISELED/MDIO/wakeup).
