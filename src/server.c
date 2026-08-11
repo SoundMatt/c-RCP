@@ -178,14 +178,20 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
          * condition -- an endpoint's own request storage exhausted -- as
          * one that (when configured) shall bring every endpoint bound to
          * the request stream into its configured safe state, not merely
-         * fail the one rejected request silently. This function reports
-         * only the per-request half: unlike most of this function's other
-         * rejection paths, request_type is already known here (set just
-         * above), so this one *can* set a real TC18 Table 27 code -- see
-         * rcp_e2e_overflow_should_enter_safe_state() for the caller-driven
-         * stream-wide escalation this half does not, and cannot from
-         * inside a single rcp_server_endpoint_t, perform itself (see that
-         * function's own doc comment). */
+         * fail the one rejected request silently. TC18 0.5.1_RC5's own
+         * Table 24 renames/collapses this bit into rx_enforce_request_filing
+         * (a single combined bit also gating whether overflow blocks the
+         * stream at all, not just whether it enters safe state) -- see
+         * regmap.h's own "terminology drift" file-header note (task #97);
+         * not restructured here, since this codebase's own separately-
+         * configurable enable/safestate model remains a safe superset.
+         * This function reports only the per-request half: unlike most of
+         * this function's other rejection paths, request_type is already
+         * known here (set just above), so this one *can* set a real TC18
+         * Table 27 code -- see rcp_e2e_overflow_should_enter_safe_state()
+         * for the caller-driven stream-wide escalation this half does
+         * not, and cannot from inside a single rcp_server_endpoint_t,
+         * perform itself (see that function's own doc comment). */
         if (out_error) *out_error = RCP_ERROR_REQUEST_STORAGE_OVERFLOW;
         return RCP_SERVER_ADMIT_REJECTED;
     }

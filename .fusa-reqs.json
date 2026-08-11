@@ -9938,6 +9938,17 @@
       "tc18": "§12.7.7 Table 22 (\"rx_enforce_e2e ... 1b: stream is blocked until released, when CRC check at EP fails. Safe state will be entered.\"), TC18.txt L2865-2867"
     },
     {
+      "id": "REQ-E2E-046",
+      "title": "NOT IMPLEMENTED: rx_stream_status aggregate blocked-status bit (new in TC18 0.5.1_RC5)",
+      "text": "NOT IMPLEMENTED (spec rebaseline to TC18 0.5.1_RC5, c-RCP-AUDIT-06, task #97): TC18 0.5.1_RC5's own Table 24 (§12.7.7, renumbered from the 0.5.1_RC baseline's Table 22) adds a new read-only rx_stream_status bit at 0x000D.7 with no counterpart at all in the baseline this codebase was originally built against -- \"0b: stream is active / 1b: stream is blocked, requests are rejected\", set automatically as a reaction to a CRC error, sequence error, watchdog overflow, or EP request-storage overflow, whichever of those four is enabled. This is a genuinely new, passive, client-polled aggregate status covering all four fault classes uniformly -- distinct from, and not directly implementable by, this module's own existing per-cause primitives: rcp_e2e_stream_fault_t (e2e.h) already provides a persisted latch for the CRC case specifically, but sequence-number discontinuity (rcp_e2e_seq_evaluate()), watchdog overflow (rcp_e2e_wd_evaluate()), and request-storage overflow (rcp_e2e_overflow_should_enter_safe_state()) each currently report only a per-call \"should enter safe state now\" decision, with no equivalent persisted \"stream is currently blocked\" latch of their own to aggregate into one combined status bit. Implementing this correctly needs a new, cross-cutting per-stream aggregate-latch primitive this codebase does not yet have; not attempted in this batch, to avoid a rushed design of new ASIL-relevant state-tracking infrastructure. See regmap.h's own \"TC18 0.5.1_RC5 terminology drift\" file-header note (task #97) for the full investigation this entry is part of.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18-gap",
+      "status": "not-implemented",
+      "tc18": "§12.7.7 Table 24, spec revision 0.5.1_RC5 PDF p.67 (\"0x000D.7 rx_stream_status ... set automatically as a reaction to either CRC error, sequence error, watchdog overflow, EP overflow, when enabled\", ticket-tagged 051RC4 \"config bit added\")"
+    },
+    {
       "id": "REQ-ADC-031",
       "title": "the ADC endpoint's five trigger output signals",
       "text": "NOT IMPLEMENTED: c-RCP defines none of the five ADC trigger outputs TC18 \u00a713.7.9.1 Table 50 enumerates. The ADC endpoint shall generate trigger 0 when the averaged output value falls below adc_trigger_min, trigger 1 when it rises above adc_trigger_min, trigger 2 when it falls below adc_trigger_max, trigger 3 when it rises above adc_trigger_max, and trigger 4 when it finishes a measurement interval. ep_adc.h has no trigger enumeration, no threshold registers, and no evaluation function. Consequence: threshold-crossing detection is impossible, and the spec's own documented cyclic-ADC pattern \u2014 'configured to generate responses cyclically ... by using a trigger request which triggers on the ADC EP itself having finished a measurement' (L5033-5034) \u2014 cannot be built, because trigger 4 does not exist.",

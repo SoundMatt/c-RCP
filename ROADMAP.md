@@ -13828,3 +13828,130 @@ full.** Remaining deferred work in this whole audit lineage: task
 `rx_enforce_*` register overhaul, the TC18 0.5.1_RC5 spec-rebaseline
 project's own last remaining item) -- both still need their own
 dedicated sessions.
+
+### v0.232.0 -- 2026-08-11 (mostly doc-only)
+
+**RC-server §12.7.7 stream-config terminology drift -- dedicated
+session (task #97), scoped and closed conservatively.**
+
+Re-read TC18's own Table 22 (0.5.1_RC baseline, page 57) and Table
+24 (0.5.1_RC5, renumbered, page 67) side by side, field by field,
+before deciding anything. The baseline's 0x000D octet has 8
+independently-configurable bits: `rx_enforce_e2e`, `rx_enforce_seq`,
+`rx_seq_safestate_enable`, `rx_wd_enable`, `rx_wd_safestate_enable`,
+`rx_ovrflw_safestate_enable`, `rx_safety_measure`, `rx_wd_info_enable`.
+RC5's own revision collapses these into 4 combined bits --
+`rx_enforce_crc`, `rx_enforce_sequence`, `rx_enforce_watchdog`,
+`rx_enforce_request_filing` -- plus 3 reserved bits and a new
+read-only `rx_stream_status` bit at 0x000D.7.
+
+**The single most important finding, checked before anything else**:
+`rcp_regmap_request_stream_cfg_t` has **zero wire (de)serialization
+code anywhere in this codebase** -- confirmed via a repo-wide grep;
+only its own `_init()` exists. Nothing decodes a real 0x000D byte
+from the wire today. This eliminated the wire-compatibility risk
+this task was originally deferred over: there is no live conformance
+defect the old-vs-new bit layout could cause, since nothing reads
+that byte from the wire at all. This changed the whole risk
+calculus for the rest of the investigation -- the question became
+"should this in-memory API's own shape and documentation be updated"
+rather than "is there a live bug".
+
+**Bit-by-bit comparison, both PDFs read directly**:
+
+- `rx_enforce_e2e` -> `rx_enforce_crc`: a pure rename. Both are
+  already single bits whose 1-value gates BOTH "block the stream"
+  AND "enter safe state" simultaneously (confirmed identical wording
+  in both revisions' own table cells) -- zero semantic change, matches
+  `e2e.h`'s own pre-existing analysis exactly ("rx_enforce_e2e carries
+  no separate safestate-enable bit of its own -- the single bit gates
+  both consequences at once").
+- `rx_enforce_seq` + `rx_seq_safestate_enable` -> `rx_enforce_sequence`;
+  `rx_wd_enable` + `rx_wd_safestate_enable` -> `rx_enforce_watchdog`;
+  `rx_ovrflw_safestate_enable` (paired with an implicit always-on
+  detection in the baseline) -> `rx_enforce_request_filing`: each of
+  these 3 new bits collapses what were two independently-configurable
+  dimensions (an enforce/enable bit, and a separate bit choosing
+  whether a violation additionally escalates to safe-state) into one
+  combined bit. `e2e.h`'s own `rcp_e2e_seq_evaluate()`/`_wd_evaluate()`/
+  `_overflow_should_enter_safe_state()` deliberately keep those two
+  dimensions independently expressible today -- verbatim, from that
+  module's own file header: "TC18 §12.7.7 Table 22 defines two
+  independently-configurable reactions... evaluated together here
+  because both compare the same incoming seq against the same tracked
+  state, but deliberately NOT collapsed into one bool: they answer
+  different questions and either can be enabled without the other."
+  This codebase's own model remains a strict, safe SUPERSET of what
+  RC5's collapsed wire encoding can express -- a real RC5-conformant
+  peer can only ever request the "coupled" subset (both dimensions
+  set to the same value), which this model already represents
+  correctly. Narrowing the API to match RC5's own reduced expressivity
+  would be a pure loss of capability, not a conformance fix.
+- `rx_safety_measure` (choosing between the high-impedance and
+  sequencer-based safe-state mechanisms) and `rx_wd_info_enable` (the
+  repetitive-notification-on-overflow feature): neither has a clear
+  1:1 replacement anywhere in RC5's own 4-bit scheme. Searched the
+  rest of the RC5 document for either concept resurfacing elsewhere --
+  found nothing. Genuinely unresolved, not force-resolved here.
+- The octet's own surrounding registers (`rx_safestate_sequencer`/
+  `rx_safe_sequencer_state`, 0x000E/0x000F) are themselves flagged, in
+  the SAME RC5 revision, as subject to a separate, still-draft
+  "trigger request" harmonization proposal -- the exact proposal
+  already confirmed still-draft (not adopted) in this rebaseline
+  project's own earlier SPI channel-selection investigation (task
+  #98). Their own eventual shape is not yet settled either, which
+  further reinforces that restructuring this whole octet now would be
+  premature -- part of it is still actively in flux in the primary
+  source itself.
+
+**Decision: no structural code change.** Given (a) zero live
+wire-compatibility risk, (b) this codebase's own model is a safe
+superset for 3 of the 4 collapsed bits, not a defect, and (c) two of
+the eight original bits have a genuinely unresolved fate that
+touches ASIL-relevant safe-state configuration -- the responsible,
+well-scoped action is documentation, not a rushed structural rewrite
+of already carefully-designed safety code. Terminology
+cross-references added to `regmap.h`'s own file header (a new
+"TC18 0.5.1_RC5 terminology drift" section) and each affected
+field's own doc comment, `e2e.h`'s file header, and `server.c`'s own
+`rx_ovrflw_safestate_enable` comment.
+
+**One genuinely new capability found, honestly tracked as
+not-implemented rather than force-fit**: `rx_stream_status`
+("set automatically as a reaction to either CRC error, sequence
+error, watchdog overflow, EP overflow, when enabled") has no
+counterpart at all in the baseline. New `REQ-E2E-046` documents why
+implementing it correctly isn't a quick addition: this module has a
+real asymmetry between its own per-cause mechanisms.
+`rcp_e2e_stream_fault_t` already provides a persisted latch for the
+CRC case specifically -- `rcp_e2e_stream_fault_is_faulted()` can be
+queried again later, independent of any new CRC error. No equivalent
+persisted state exists for sequence discontinuity, watchdog overflow,
+or request-storage overflow -- each of those three report only a
+per-call decision at the moment of the triggering event, with nothing
+a caller can query afterward. A correct `rx_stream_status`
+implementation needs a new, cross-cutting per-stream aggregate-latch
+primitive spanning all four causes uniformly, which does not exist
+yet -- not attempted in this batch, to avoid rushing new ASIL-relevant
+state-tracking design. New deviation-pin test
+`test_e2e_has_no_aggregate_stream_blocked_status_across_all_four_fault_causes`
+demonstrates this asymmetry directly (CRC's own persisted latch
+round-trips through init/set/query; the other three causes have no
+equivalent to exercise the same way).
+
+65/65 both trees (native + ASan/UBSan, unaffected -- comments/JSON
+text plus one new test using only existing, already-tested
+functions). `cfusa check` (CI-pinned v0.5.50): 0 errors. `cfusa
+trace --gaps`: 0/1024 untested; `--req-coverage 100` /
+`--sec-tested 100`: both 100%.
+
+**This closes task #97 -- the TC18 0.5.1_RC5 spec-rebaseline
+project's own last remaining item.** The whole ~63-marker triage
+from that project is now complete: every marker either shipped a
+real fix, was confirmed no-action-needed with primary-source
+evidence, or (this task, plus the earlier-deferred SPI
+channel-selection question, task #98, already resolved) was
+investigated thoroughly enough to make a well-justified, honest
+scoping decision. Only task #94 (CAN, issue #256 Group D) remains
+across this whole audit lineage, still deliberately deferred pending
+its own dedicated investigation session.

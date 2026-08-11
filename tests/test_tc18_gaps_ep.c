@@ -29,6 +29,7 @@
 //cfusa:test REQ-E2E-029
 //cfusa:test REQ-E2E-030
 //cfusa:test REQ-E2E-045
+//cfusa:test REQ-E2E-046
 
 /* test_tc18_gaps_ep.c -- a spec-literal conformance-and-deviation suite for
  * the TC18 clauses catalogued by the v0.105.0 requirements-corpus
@@ -1198,6 +1199,51 @@ static void test_e2e_crc_error_should_enter_safe_state_is_gated_only_on_rx_enfor
     TEST_ASSERT_FALSE(rcp_e2e_crc_error_should_enter_safe_state(false));
 }
 
+/* REQ-E2E-046 (not-implemented) DEVIATION PIN: TC18 0.5.1_RC5's own Table
+ * 24 (§12.7.7, renumbered from the 0.5.1_RC baseline's Table 22) adds a
+ * new rx_stream_status read bit with no counterpart at all in the
+ * baseline this codebase was built against -- a passive, client-polled
+ * aggregate "is this stream currently blocked" status covering all four
+ * fault classes (CRC/sequence/watchdog/overflow) uniformly. This module
+ * has no equivalent aggregate primitive: it has a genuine asymmetry
+ * between its own per-cause mechanisms that this test pins directly.
+ * rcp_e2e_stream_fault_t IS a persisted latch for the CRC case
+ * specifically -- once rcp_e2e_stream_fault_on_crc_error() latches it,
+ * rcp_e2e_stream_fault_is_faulted() can be queried again later,
+ * independent of any new CRC error, to learn "is this stream still
+ * blocked from a past fault". No equivalent persisted type exists for
+ * sequence discontinuity, watchdog overflow, or request-storage overflow
+ * -- rcp_e2e_seq_evaluate()/_wd_evaluate()/_overflow_should_enter_safe_state()
+ * each report only a per-call decision at the moment of the triggering
+ * event, with nothing a caller can query afterward to learn whether the
+ * stream remains blocked from one of those three causes. Implementing
+ * rx_stream_status correctly needs a new, cross-cutting per-stream
+ * aggregate-latch primitive spanning all four causes uniformly -- see
+ * regmap.h's own "TC18 0.5.1_RC5 terminology drift" file-header note
+ * (task #97) for the full investigation. */
+static void test_e2e_has_no_aggregate_stream_blocked_status_across_all_four_fault_causes(void)
+{
+    rcp_e2e_stream_fault_t f;
+
+    rcp_e2e_stream_fault_init(&f);
+    TEST_ASSERT_FALSE(rcp_e2e_stream_fault_is_faulted(&f));
+
+    /* CRC: persisted, queryable after the fact. */
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_on_crc_error(&f, true));
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_is_faulted(&f));
+
+    /* Sequence/watchdog/overflow: each only a per-call decision, nothing
+     * persisted to query later -- rcp_e2e_seq_result_t/rcp_e2e_wd_result_t
+     * are both caller-transient return values, not stateful latches like
+     * rcp_e2e_stream_fault_t above, and
+     * rcp_e2e_overflow_should_enter_safe_state() returns a plain bool
+     * with no state at all. There is no function anywhere in this module
+     * that, given only a stream identity, answers "is this stream
+     * currently blocked" the way rcp_e2e_stream_fault_is_faulted() does
+     * for the CRC cause alone. */
+    TEST_ASSERT_TRUE(rcp_e2e_overflow_should_enter_safe_state(true)); /* per-call only */
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -1238,6 +1284,7 @@ int main(void)
     RUN_TEST(test_e2e_request_store_overflow_reports_error_code_but_not_escalation);
     RUN_TEST(test_e2e_overflow_should_enter_safe_state_is_gated_only_on_the_config_bit);
     RUN_TEST(test_e2e_crc_error_should_enter_safe_state_is_gated_only_on_rx_enforce_e2e);
+    RUN_TEST(test_e2e_has_no_aggregate_stream_blocked_status_across_all_four_fault_causes);
 
     return UNITY_END();
 }

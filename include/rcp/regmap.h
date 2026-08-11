@@ -168,6 +168,73 @@
  * entry refers to -- see that field's own comment and fragment.h's file
  * header for the fragmentation mechanism it configures.
  *
+ * ── TC18 0.5.1_RC5 terminology drift (investigated, NOT restructured) ──────
+ *
+ * INVESTIGATED 2026-08-11 (spec rebaseline to TC18 0.5.1_RC5,
+ * c-RCP-AUDIT-06, task #97): spec revision 0.5.1_RC4 renames and
+ * restructures this whole 0x000D octet. The 8 independently-configurable
+ * bits this codebase's own rx_enforce_e2e/rx_enforce_seq/
+ * rx_seq_safestate_enable/rx_wd_enable/rx_wd_safestate_enable/
+ * rx_ovrflw_safestate_enable/rx_safety_measure/rx_wd_info_enable were
+ * originally modeled against become, in RC5's own Table 24 (renumbered
+ * from Table 22), 4 combined bits -- rx_enforce_crc, rx_enforce_sequence,
+ * rx_enforce_watchdog, rx_enforce_request_filing -- plus 3 reserved bits
+ * and a new read-only rx_stream_status bit at 0x000D.7.
+ *
+ * No code change was made here, for three reasons, checked directly
+ * against the rendered PDF on both spec revisions before concluding:
+ *
+ *   1. This struct has NO wire (de)serialization anywhere in this
+ *      codebase (confirmed via grep across every .c file under src/) -- only
+ *      rcp_regmap_request_stream_cfg_t's own _init() exists. Nothing
+ *      decodes a real 0x000D byte from the wire today, so there is no
+ *      live conformance defect the old-vs-new bit layout could cause;
+ *      this is a pure in-memory, caller-populated API surface.
+ *
+ *   2. rx_enforce_e2e's own RC5 rename (rx_enforce_crc) is a pure
+ *      synonym -- both are already single bits whose 1-value gates BOTH
+ *      "block the stream" AND "enter safe state" at once (see e2e.h's
+ *      own file header, "rx_enforce_e2e: single-request drop vs.
+ *      whole-stream latch-to-fault"); zero semantic change. The other 3
+ *      new bits each collapse what were TWO independently-configurable
+ *      dimensions in the 0.5.1_RC baseline (an enforce/enable bit plus a
+ *      separate safestate-consequence bit) into ONE combined bit. e2e.h's
+ *      own rcp_e2e_seq_evaluate()/_wd_evaluate()/
+ *      _overflow_should_enter_safe_state() deliberately keep those two
+ *      dimensions independently expressible ("deliberately NOT collapsed
+ *      into one bool: they answer different questions and either can be
+ *      enabled without the other" -- e2e.h's own words). This codebase's
+ *      own richer model remains a strict, safe SUPERSET of what RC5's
+ *      collapsed wire encoding can express (a real RC5-conformant peer
+ *      can only ever request the "coupled" subset -- both dimensions the
+ *      same value -- which this model already represents correctly), not
+ *      a conformance defect requiring narrowing.
+ *
+ *   3. rx_safety_measure (the high-impedance-vs-sequencer safe-state
+ *      selector) and rx_wd_info_enable (the repetitive-notification-on-
+ *      overflow feature) have NO clear 1:1 replacement in RC5's own
+ *      4-bit scheme -- genuinely ambiguous, not resolved here. The new
+ *      rx_stream_status bit ("will be set automatically as a reaction to
+ *      either CRC error, sequence error, watchdog overflow, EP overflow,
+ *      when enabled") is a different mechanism entirely (a passive,
+ *      client-polled aggregate status covering all four fault classes
+ *      uniformly, not an active per-cause notification push) and would
+ *      need a new cross-cutting "is this stream currently blocked by any
+ *      of its four independent fault latches" primitive this codebase
+ *      does not yet have -- CRC has its own persisted
+ *      rcp_e2e_stream_fault_t latch, but sequence/watchdog/overflow
+ *      currently report only a per-call "should enter safe state now"
+ *      result, with no equivalent persisted "stream is currently
+ *      blocked" state of their own to aggregate against.
+ *      The rest of this octet's own surrounding registers
+ *      (rx_safestate_sequencer/rx_safe_sequencer_state, 0x000E/0x000F)
+ *      are themselves flagged, in the same RC5 revision, as subject to a
+ *      separate, still-draft "trigger request" harmonization proposal
+ *      (see ep_spi.h's own file header for that proposal's own
+ *      confirmed-still-draft status) -- their own eventual shape is not
+ *      yet settled either, reinforcing that a full structural rewrite of
+ *      this whole octet would be premature.
+ *
  * ── Known spec ambiguity: EP-ID/byte_bus_id ordering is not enforced ───────
  *
  * rcp_regmap_ep_id_map_entry_t models one row of the table associating an
@@ -1044,7 +1111,12 @@ typedef struct {
                                     true: the first CRC_ERROR latches the
                                     whole stream to a faulted state
                                     (RCP_E2E_CRC_ACTION_LATCH_STREAM_FAULT)
-                                    -- see rcp_e2e_crc_error_action(). */
+                                    -- see rcp_e2e_crc_error_action().
+                                    Wire name as of TC18 0.5.1_RC5:
+                                    rx_enforce_crc -- a pure rename, same
+                                    single-bit semantics; see the file
+                                    header's own "terminology drift"
+                                    note. */
 
     /* ── Per-stream sequence-number enforcement (e2e.h) ─────────────── */
     bool     rx_enforce_seq;          /* true: a request is only filed for
@@ -1053,7 +1125,13 @@ typedef struct {
                                           relative to the last accepted
                                           one on this stream -- see
                                           rcp_e2e_seq_evaluate()'s accept
-                                          field. */
+                                          field. Together with
+                                          rx_seq_safestate_enable below,
+                                          this pair corresponds to TC18
+                                          0.5.1_RC5's own single combined
+                                          rx_enforce_sequence bit -- see
+                                          the file header's own
+                                          "terminology drift" note. */
     bool     rx_seq_safestate_enable; /* true: a sequence_num that did not
                                           advance by exactly one increment
                                           drives every endpoint bound to
@@ -1067,18 +1145,36 @@ typedef struct {
                                           boundary this shares. */
 
     /* ── Per-stream watchdog (e2e.h) ────────────────────────────────── */
-    bool     rx_wd_enable;            /* watchdog active on this stream at all */
+    bool     rx_wd_enable;            /* watchdog active on this stream at
+                                          all. Together with
+                                          rx_wd_safestate_enable below,
+                                          this pair corresponds to TC18
+                                          0.5.1_RC5's own single combined
+                                          rx_enforce_watchdog bit -- see
+                                          the file header's own
+                                          "terminology drift" note. */
     uint32_t rx_wd_timeout_ms;        /* elapsed-since-last-kick overflow threshold */
     uint8_t  rx_wd_action;            /* caller-defined; round-tripped only */
     bool     rx_wd_safestate_enable;  /* overflow drives the endpoint toward
                                           its configured safe state */
     bool     rx_wd_info_enable;       /* overflow raises an informational
                                           status/event, independent of
-                                          rx_wd_safestate_enable */
+                                          rx_wd_safestate_enable. TC18
+                                          0.5.1_RC5's own 4-bit scheme has
+                                          no clear 1:1 replacement for this
+                                          bit -- see the file header's own
+                                          "terminology drift" note,
+                                          reason 3. */
 
     /* ── Configured safe state (e2e.h) ──────────────────────────────── */
     uint8_t  rx_safety_measure;         /* RCP_E2E_MEASURE_FORCE_HIGH_IMPEDANCE (0)
-                                            or RCP_E2E_MEASURE_SEQUENCER (1) */
+                                            or RCP_E2E_MEASURE_SEQUENCER (1).
+                                            TC18 0.5.1_RC5's own 4-bit
+                                            scheme has no clear 1:1
+                                            replacement for this selector
+                                            either -- see the file
+                                            header's own "terminology
+                                            drift" note, reason 3. */
     uint16_t rx_safestate_sequencer;    /* request_sequencer.h table index the
                                             RCP_E2E_MEASURE_SEQUENCER measure
                                             polls; meaningless otherwise */
