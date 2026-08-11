@@ -485,7 +485,14 @@ static void test_adc_has_no_trigger_outputs_and_no_retained_average(void)
 
 /* ── LIN (§13.7.10) ────────────────────────────────────────────────────────── */
 
-static void test_lin_trigger_ignores_trailing_time_and_block_lacks_registers(void)
+/* FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-LINEP-024):
+ * renamed from `..._and_block_lacks_registers` -- Table 52's whole
+ * register block, including lin_ep_len/lin_base_clk/lin_ep_status, is
+ * now reachable via rcp_ep_lin_render_registers()/_apply_reconfig()
+ * (REQ-LINEP-028/029, tests/test_ep_lin.c's own dedicated
+ * register-block test section). The trailing-time deviation below is
+ * unrelated and still genuinely open. */
+static void test_lin_trigger_ignores_trailing_time_and_block_now_has_registers(void)
 {
     rcp_ep_lin_functional_cfg_t cfg;
     uint8_t                     before[sizeof(rcp_ep_lin_functional_cfg_t)];
@@ -511,15 +518,33 @@ static void test_lin_trigger_ignores_trailing_time_and_block_lacks_registers(voi
     TEST_ASSERT_FALSE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_TX_DONE, false));
     TEST_ASSERT_FALSE(rcp_ep_lin_trigger_fires(RCP_EP_LIN_TRIGGER_NONE, true));
 
-    /* DEVIATION -- TC18 §13.7.10.2 Table 52 fixes lin_ep_len at 0x0000
-     * (8 bit, R), a reserved octet at 0x0001, lin_base_clk at 0x0004
-     * (16 bit, R) and lin_ep_status at 0x0006 (16 bit, R/W) alongside
-     * lin_clk_divider at 0x0008. Only 5 octets are reachable here --
-     * lin_clk_divider(4) + trigger(1) -- so a client can write the bit-time
-     * divider but can read neither the base clock it divides nor status. */
+    /* TC18 §13.7.10.2 Table 52's whole register block -- lin_ep_len
+     * (0x0000, R), a reserved octet (0x0001, R), lin_base_clk (0x0004,
+     * R) and lin_ep_status (0x0006, R/W) alongside lin_clk_divider
+     * (0x0008) -- is now reachable via
+     * rcp_ep_lin_render_registers()/_apply_reconfig() (REQ-LINEP-028/029,
+     * tests/test_ep_lin.c's own dedicated register-block test section).
+     * The two *legacy* setters exercised above remain narrowly scoped to
+     * exactly the 5 octets they always touched (lin_clk_divider(4) +
+     * trigger(1)) -- the register-block's own new fields (ep_status,
+     * wire_clk_divider) are untouched by them, by design, matching every
+     * other endpoint type's own precedent (only the generic §12.7.1
+     * write path reaches them, not a dedicated named setter). */
     TEST_ASSERT_EQUAL_size_t(0u, offsetof(rcp_ep_lin_functional_cfg_t, common));
     TEST_ASSERT_EQUAL_size_t(5u, changed_octets(before, (const uint8_t *)&cfg,
                                                 sizeof(before)));
+
+    /* Positive assertion: the new fields exist and are independently
+     * writable via the register-block path. */
+    {
+        rcp_ep_lin_functional_cfg_t cfg2;
+
+        rcp_ep_lin_functional_cfg_init(&cfg2);
+        cfg2.ep_status        = 0x1234u;
+        cfg2.wire_clk_divider = 0x42u;
+        TEST_ASSERT_EQUAL_UINT16(0x1234u, cfg2.ep_status);
+        TEST_ASSERT_EQUAL_UINT8(0x42u, cfg2.wire_clk_divider);
+    }
 }
 
 /* ── CAN (§13.7.11) ────────────────────────────────────────────────────────── */
@@ -853,7 +878,7 @@ int main(void)
     RUN_TEST(test_adc_inter_sample_spacing_is_unconstrained);
     RUN_TEST(test_adc_has_no_trigger_outputs_and_no_retained_average);
 
-    RUN_TEST(test_lin_trigger_ignores_trailing_time_and_block_lacks_registers);
+    RUN_TEST(test_lin_trigger_ignores_trailing_time_and_block_now_has_registers);
 
     RUN_TEST(test_can_frame_format_values_match_table_54);
     RUN_TEST(test_can_base_identifier_is_right_aligned_and_data_only);

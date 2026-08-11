@@ -188,6 +188,40 @@
  * reusing, never duplicating, server.h's/regmap.h's existing authorization
  * logic, per the roadmap's explicit instruction (the same rule every prior
  * endpoint type's own setters already follow).
+ *
+ * ── The EP_func register block (evt[2:0] == 111b) ──────────────────────────
+ *
+ * FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-LINEP-024):
+ * rcp_ep_lin_decode_command_request() already correctly rejected evt[2:0]
+ * = 111b as not a plain command request (RCP_EP_LIN_ERR_BAD_EVT, via
+ * acf.h's rcp_acf_evt_row2_is_plain()), but no counterpart implemented
+ * that TC18 §12.7.1 configuration-write path -- the same class of gap
+ * SPI's/I2C's/UART's own earlier fixes closed. TC18 §13.7.10.2 Table 52
+ * defines a clean, five-entry register block with no address-collision
+ * editorial defect (unlike GPIO's/I2C's own source tables):
+ *
+ *   0x0000  lin_ep_len       8 bit  R    RCP_EP_LIN_EP_FUNC_LEN (0x09)
+ *   0x0001  Reserved         8 bit  R    reads 0x00
+ *   0x0002  lin_ep_enable&clr 8 bit R/W  Table 32 common entries
+ *   0x0003  lin_ep_options   8 bit  R/W* Table 32 common entries
+ *   0x0004  lin_base_clk    16 bit  R    LIN system clock
+ *   0x0006  lin_ep_status   16 bit  R/W
+ *   0x0008  lin_clk_divider  8 bit  R/W  generates the LIN bit time
+ *
+ * REQ-LINEP-024's own prior text credited the pre-existing
+ * lin_clk_divider field (above) with already covering this last
+ * register -- imprecisely: that field is this module's own original,
+ * uint32_t, unit-unspecified design (explicitly documented, above, as
+ * matching ep_spi.h's own non-wire clock_divider shape), not a literal
+ * 8-bit wire register. Rather than reinterpret it -- the same
+ * "don't silently redefine an existing public field" caution SPI's own
+ * baud_rate_kbps-vs-clock_divider split and UART's own
+ * baud_rate_kbps-vs-baud_rate split already established -- a new,
+ * distinct wire_clk_divider (uint8_t) field carries the real register;
+ * lin_base_clk is not itself stored (no setter, no meaningful derivable
+ * value) and always renders 0, the same "no real clock source
+ * modelled" honesty ep_gpio.h's/ep_i2c.h's own base_clk fields already
+ * commit to.
  */
 #ifndef RCP_EP_LIN_H
 #define RCP_EP_LIN_H
@@ -239,10 +273,13 @@ typedef struct {
     uint32_t                       lin_clk_divider; /* bit-time clock divider;
                                                          see the file header */
     uint8_t                        trigger;         /* rcp_ep_lin_trigger_t */
+    uint16_t                       ep_status;         /* lin_ep_status, Table 52 */
+    uint8_t                        wire_clk_divider;  /* lin_clk_divider, Table 52 --
+                                                           see the file header */
 } rcp_ep_lin_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false, lin_clk_divider 0,
- * trigger RCP_EP_LIN_TRIGGER_NONE). */
+ * trigger RCP_EP_LIN_TRIGGER_NONE, ep_status/wire_clk_divider 0). */
 void rcp_ep_lin_functional_cfg_init(rcp_ep_lin_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
@@ -263,6 +300,94 @@ bool rcp_ep_lin_set_clk_divider(rcp_ep_lin_functional_cfg_t *cfg, uint32_t lin_c
  * cfg->trigger. */
 bool rcp_ep_lin_set_trigger(rcp_ep_lin_functional_cfg_t *cfg, rcp_ep_lin_trigger_t trigger,
                              rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer);
+
+/* ── The EP_func register block (the evt[2:0] == 111b target) ──────────────── */
+
+/* Relative octet offsets of the registers making up this endpoint's own
+ * EP_func block -- see the file header. Every multi-octet register is
+ * big-endian, like every other multi-octet field this codebase encodes.
+ * Offsets marked R are read-only: a configuration write covering them
+ * leaves them unchanged (see rcp_ep_lin_apply_reconfig()). */
+#define RCP_EP_LIN_REG_EP_LEN        ((uint16_t)0x0000u) /*  8 bit, R   */
+#define RCP_EP_LIN_REG_RESERVED_01   ((uint16_t)0x0001u) /*  8 bit, R   */
+#define RCP_EP_LIN_REG_EP_ENABLE_CLR ((uint16_t)0x0002u) /*  8 bit, R/W */
+#define RCP_EP_LIN_REG_EP_OPTIONS    ((uint16_t)0x0003u) /*  8 bit, R/W */
+#define RCP_EP_LIN_REG_BASE_CLK      ((uint16_t)0x0004u) /* 16 bit, R   */
+#define RCP_EP_LIN_REG_EP_STATUS     ((uint16_t)0x0006u) /* 16 bit, R/W */
+#define RCP_EP_LIN_REG_CLK_DIVIDER   ((uint16_t)0x0008u) /*  8 bit, R/W */
+
+/* The block's own length in octets -- one past the last assigned offset,
+ * i.e. the value the endpoint reports at RCP_EP_LIN_REG_EP_LEN and the
+ * bound the "write beyond EP_LEN is ignored" rule (§12.7.1) is applied
+ * against. Table 52's own addressing is internally consistent, so there
+ * is no editorial defect to resolve here. */
+#define RCP_EP_LIN_EP_FUNC_LEN ((uint16_t)0x0009u)
+
+/* The fixed width (octets) of the relative-start-address prefix every
+ * configuration request's payload begins with -- the address is a 16-bit
+ * big-endian field, followed by the configuration data octets to write
+ * from that address onward (§12.7.1). */
+#define RCP_EP_LIN_RECONFIG_ADDR_LEN ((size_t)2u)
+
+typedef enum {
+    RCP_EP_LIN_RECONFIG_OK               = 0,
+    RCP_EP_LIN_RECONFIG_ERR_SHORT        = 1, /* payload carries no address
+                                                  prefix, or an address
+                                                  prefix with no data octet
+                                                  after it */
+    RCP_EP_LIN_RECONFIG_ERR_OUT_OF_RANGE = 2, /* start_address + data length
+                                                  exceeds
+                                                  RCP_EP_LIN_EP_FUNC_LEN --
+                                                  the whole write is ignored,
+                                                  per the specification's own
+                                                  rule */
+} rcp_ep_lin_reconfig_errc_t;
+
+/* Human-readable message for an rcp_ep_lin_reconfig_errc_t value. Never
+ * returns NULL. */
+const char *rcp_ep_lin_reconfig_strerror(rcp_ep_lin_reconfig_errc_t e);
+
+/* Serializes cfg's EP_func registers into out[0..RCP_EP_LIN_EP_FUNC_LEN)
+ * exactly as a configuration *read* of the whole block would report them
+ * -- the inverse of rcp_ep_lin_apply_reconfig()'s own parse step, and the
+ * same rendering that function patches in place. lin_base_clk (read-only)
+ * always renders 0 -- see the file header. */
+void rcp_ep_lin_render_registers(const rcp_ep_lin_functional_cfg_t *cfg,
+                                  uint8_t out[RCP_EP_LIN_EP_FUNC_LEN]);
+
+/* Applies the configuration escape hatch (evt[2:0] == 111b): payload is NOT
+ * presented at the interface but interpreted as an addressed write into
+ * this endpoint's own EP_func block -- a 16-bit big-endian relative start
+ * address followed by the configuration data octets to write from that
+ * address onward (§12.7.1). This is a real register write, reaching every
+ * R/W register the block defines (enable/options, status, clock
+ * divider), not merely lin_clk_divider.
+ *
+ * Returns RCP_EP_LIN_RECONFIG_ERR_SHORT when payload_len is not at least
+ * RCP_EP_LIN_RECONFIG_ADDR_LEN + 1, and
+ * RCP_EP_LIN_RECONFIG_ERR_OUT_OF_RANGE when the addressed span would
+ * extend past RCP_EP_LIN_EP_FUNC_LEN; in both cases cfg is left entirely
+ * unchanged, per the specification's own "such a payload is to be ignored"
+ * rule. Octets of the addressed span that land on a read-only register
+ * (EP_LEN, the reserved octet, base_clk) are left at their current values
+ * while the rest of the span is still applied.
+ *
+ * A caller routing a decoded request here is responsible for having
+ * checked that evt[2:0] really was 111b -- rcp_ep_lin_decode_command_request()
+ * already rejects it (RCP_EP_LIN_ERR_BAD_EVT) so a misrouted request
+ * cannot reach that path by accident. */
+rcp_ep_lin_reconfig_errc_t rcp_ep_lin_apply_reconfig(rcp_ep_lin_functional_cfg_t *cfg,
+                                                      const uint8_t *payload,
+                                                      size_t payload_len);
+
+/* Encodes an ACF_ABB configuration request (evt[2:0] == 111b) addressed to
+ * byte_bus_id: payload is start_address (16-bit big-endian) followed by
+ * data[0..data_len). Returns a zeroed rcp_bytes_t (data=NULL) if data_len
+ * is 0, if the encoded payload would exceed RCP_ACF_MAX_PAYLOAD, or on
+ * allocation failure. Caller frees the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_ep_lin_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                uint16_t start_address, const uint8_t *data,
+                                                size_t data_len, uint8_t transaction_num);
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 

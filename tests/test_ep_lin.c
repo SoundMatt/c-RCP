@@ -19,6 +19,8 @@
 //cfusa:test REQ-LINEP-025
 //cfusa:test REQ-LINEP-026
 //cfusa:test REQ-LINEP-027
+//cfusa:test REQ-LINEP-028
+//cfusa:test REQ-LINEP-029
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -86,6 +88,8 @@ static void test_functional_cfg_init_zeroes(void)
     TEST_ASSERT_FALSE(cfg.common.ep_suppress_response);
     TEST_ASSERT_EQUAL_UINT32(0, cfg.lin_clk_divider);
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_LIN_TRIGGER_NONE, cfg.trigger);
+    TEST_ASSERT_EQUAL_UINT16(0, cfg.ep_status);
+    TEST_ASSERT_EQUAL_UINT8(0, cfg.wire_clk_divider);
 }
 
 static void test_functional_cfg_writable_false_hw_unconfigured(void)
@@ -185,6 +189,174 @@ static void test_set_trigger_applies_when_authorized(void)
     TEST_ASSERT_TRUE(rcp_ep_lin_set_trigger(
         &cfg, RCP_EP_LIN_TRIGGER_TX_DONE, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_LIN_TRIGGER_TX_DONE, cfg.trigger);
+}
+
+/* ── The EP_func register block ────────────────────────────────────────────── */
+
+static void test_render_registers_matches_table_offsets(void)
+{
+    rcp_ep_lin_functional_cfg_t cfg;
+    uint8_t                     out[RCP_EP_LIN_EP_FUNC_LEN];
+
+    rcp_ep_lin_functional_cfg_init(&cfg);
+    cfg.common.ep_enable = true;
+    cfg.ep_status         = 0x1234;
+    cfg.wire_clk_divider  = 0x55;
+
+    rcp_ep_lin_render_registers(&cfg, out);
+
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_LIN_EP_FUNC_LEN, out[RCP_EP_LIN_REG_EP_LEN]);
+    TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_LIN_REG_RESERVED_01]);
+    TEST_ASSERT_TRUE((out[RCP_EP_LIN_REG_EP_ENABLE_CLR] & 0x01u) != 0u);
+    TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_LIN_REG_BASE_CLK]);
+    TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_LIN_REG_BASE_CLK + 1]);
+    TEST_ASSERT_EQUAL_UINT8(0x12u, out[RCP_EP_LIN_REG_EP_STATUS]);
+    TEST_ASSERT_EQUAL_UINT8(0x34u, out[RCP_EP_LIN_REG_EP_STATUS + 1]);
+    TEST_ASSERT_EQUAL_UINT8(0x55, out[RCP_EP_LIN_REG_CLK_DIVIDER]);
+
+    TEST_ASSERT_EQUAL_UINT16(0x0009u, RCP_EP_LIN_EP_FUNC_LEN);
+}
+
+static void test_apply_reconfig_writes_clk_divider(void)
+{
+    rcp_ep_lin_functional_cfg_t cfg;
+    uint8_t                     payload[3];
+
+    rcp_ep_lin_functional_cfg_init(&cfg);
+
+    payload[0] = 0x00;
+    payload[1] = (uint8_t)RCP_EP_LIN_REG_CLK_DIVIDER;
+    payload[2] = 0x42;
+
+    TEST_ASSERT_EQUAL(RCP_EP_LIN_RECONFIG_OK,
+        rcp_ep_lin_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_EQUAL_UINT8(0x42, cfg.wire_clk_divider);
+    TEST_ASSERT_EQUAL_UINT32(0, cfg.lin_clk_divider); /* untouched -- see the
+                                                           file header */
+}
+
+static void test_apply_reconfig_writes_multi_register_span(void)
+{
+    rcp_ep_lin_functional_cfg_t cfg;
+    uint8_t                     payload[2 + 3];
+
+    rcp_ep_lin_functional_cfg_init(&cfg);
+
+    payload[0] = 0x00;
+    payload[1] = (uint8_t)RCP_EP_LIN_REG_EP_STATUS;
+    payload[2] = 0xAB; payload[3] = 0xCD; /* ep_status */
+    payload[4] = 0x77;                    /* clk_divider */
+
+    TEST_ASSERT_EQUAL(RCP_EP_LIN_RECONFIG_OK,
+        rcp_ep_lin_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_EQUAL_UINT16(0xABCD, cfg.ep_status);
+    TEST_ASSERT_EQUAL_UINT8(0x77, cfg.wire_clk_divider);
+}
+
+static void test_apply_reconfig_ignores_read_only_registers(void)
+{
+    rcp_ep_lin_functional_cfg_t cfg;
+    uint8_t                     payload[2 + 4];
+
+    rcp_ep_lin_functional_cfg_init(&cfg);
+
+    /* Cover EP_LEN (0x00), the reserved octet (0x01), and both octets of
+     * base_clk (0x04-0x05) -- all read-only. */
+    payload[0] = 0x00;
+    payload[1] = 0x00;
+    payload[2] = 0xFF;
+    payload[3] = 0xFF;
+    payload[4] = 0xFF;
+    payload[5] = 0xFF;
+
+    TEST_ASSERT_EQUAL(RCP_EP_LIN_RECONFIG_OK,
+        rcp_ep_lin_apply_reconfig(&cfg, payload, sizeof(payload)));
+
+    {
+        uint8_t out[RCP_EP_LIN_EP_FUNC_LEN];
+
+        rcp_ep_lin_render_registers(&cfg, out);
+        TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_LIN_EP_FUNC_LEN, out[RCP_EP_LIN_REG_EP_LEN]);
+        TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_LIN_REG_RESERVED_01]);
+        TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_LIN_REG_BASE_CLK]);
+        TEST_ASSERT_EQUAL_UINT8(0, out[RCP_EP_LIN_REG_BASE_CLK + 1]);
+    }
+}
+
+static void test_apply_reconfig_rejects_write_past_ep_len(void)
+{
+    rcp_ep_lin_functional_cfg_t cfg;
+    uint8_t                     payload[3];
+
+    rcp_ep_lin_functional_cfg_init(&cfg);
+
+    payload[0] = 0x00;
+    payload[1] = 0x09; /* == RCP_EP_LIN_EP_FUNC_LEN -- one past the last
+                           valid offset */
+    payload[2] = 0xFF;
+
+    TEST_ASSERT_EQUAL(RCP_EP_LIN_RECONFIG_ERR_OUT_OF_RANGE,
+        rcp_ep_lin_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_EQUAL_UINT8(0, cfg.wire_clk_divider);
+}
+
+static void test_apply_reconfig_rejects_payload_without_data(void)
+{
+    rcp_ep_lin_functional_cfg_t cfg;
+    uint8_t                     addr_only[2] = {0x00, 0x06};
+
+    rcp_ep_lin_functional_cfg_init(&cfg);
+
+    TEST_ASSERT_EQUAL(RCP_EP_LIN_RECONFIG_ERR_SHORT,
+        rcp_ep_lin_apply_reconfig(&cfg, addr_only, sizeof(addr_only)));
+    TEST_ASSERT_EQUAL(RCP_EP_LIN_RECONFIG_ERR_SHORT,
+        rcp_ep_lin_apply_reconfig(&cfg, NULL, 0));
+}
+
+static void test_reconfig_request_round_trip(void)
+{
+    rcp_bytes_t                 frame;
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    uint8_t                      data[2] = {0xAB, 0xCD};
+
+    frame = rcp_ep_lin_encode_reconfig_request(0x03, 0x0006, data, sizeof(data), 7);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(frame.data, frame.len, &hdr, &payload, &payload_len));
+    TEST_ASSERT_EQUAL_UINT8(0x03, hdr.byte_bus_id);
+    TEST_ASSERT_EQUAL(RCP_ACF_OP_WRITE, hdr.op);
+    TEST_ASSERT_EQUAL_UINT8(0x7u, hdr.evt);
+    TEST_ASSERT_EQUAL_UINT8(7, hdr.transaction_num);
+    TEST_ASSERT_EQUAL_UINT32(4, payload_len);
+    TEST_ASSERT_EQUAL_UINT8(0x00, payload[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x06, payload[1]);
+    TEST_ASSERT_EQUAL_UINT8(0xAB, payload[2]);
+    TEST_ASSERT_EQUAL_UINT8(0xCD, payload[3]);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_encode_reconfig_request_rejects_empty_data(void)
+{
+    rcp_bytes_t frame = rcp_ep_lin_encode_reconfig_request(0x00, 0, NULL, 0, 0);
+
+    TEST_ASSERT_NULL(frame.data);
+}
+
+static void test_reconfig_strerror_never_null(void)
+{
+    rcp_ep_lin_reconfig_errc_t codes[] = {
+        RCP_EP_LIN_RECONFIG_OK, RCP_EP_LIN_RECONFIG_ERR_SHORT,
+        RCP_EP_LIN_RECONFIG_ERR_OUT_OF_RANGE,
+    };
+    size_t i;
+
+    for (i = 0; i < sizeof(codes) / sizeof(codes[0]); i++) {
+        TEST_ASSERT_NOT_NULL(rcp_ep_lin_reconfig_strerror(codes[i]));
+    }
+    TEST_ASSERT_NOT_NULL(rcp_ep_lin_reconfig_strerror((rcp_ep_lin_reconfig_errc_t)99));
 }
 
 /* ── strerror ───────────────────────────────────────────────────────────────── */
@@ -466,6 +638,16 @@ int main(void)
     RUN_TEST(test_set_clk_divider_applies_when_authorized);
     RUN_TEST(test_set_trigger_rejects_unauthorized);
     RUN_TEST(test_set_trigger_applies_when_authorized);
+
+    RUN_TEST(test_render_registers_matches_table_offsets);
+    RUN_TEST(test_apply_reconfig_writes_clk_divider);
+    RUN_TEST(test_apply_reconfig_writes_multi_register_span);
+    RUN_TEST(test_apply_reconfig_ignores_read_only_registers);
+    RUN_TEST(test_apply_reconfig_rejects_write_past_ep_len);
+    RUN_TEST(test_apply_reconfig_rejects_payload_without_data);
+    RUN_TEST(test_reconfig_request_round_trip);
+    RUN_TEST(test_encode_reconfig_request_rejects_empty_data);
+    RUN_TEST(test_reconfig_strerror_never_null);
 
     RUN_TEST(test_strerror_never_null_and_distinct);
 
