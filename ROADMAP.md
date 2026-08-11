@@ -11567,3 +11567,46 @@ ready**: `REQ-SRV-013` (cross-references the already-flagged
 `status: "partial"`/`scope: "tc18-gap"` flag, matching the
 already-established `REQ-E2E-028/029/030`/`REQ-WDG-010` precedent for
 "pure primitive exists but nothing calls it").
+
+### v0.206.0 -- 2026-08-10
+
+**Full-catalog audit follow-up, batch 7 (Group H, final batch -- doc-only):
+REQ-SRV-013 cross-reference + REQ-E2E-021 honest gap-flag, issue #256.**
+
+Both entries' underlying code and own narrow claims were already
+correct; each needed an honest gap acknowledgment matching this
+codebase's established `status: "partial"`/`scope: "tc18-gap"`
+convention.
+
+- `REQ-SRV-013`: text now cross-references `REQ-CANCEL-012`'s already-
+  tracked finding -- `rcp_server_endpoint_cancel_single()` does not
+  cascade to a cancelled request's chained successors, per TC18
+  §11.2.3's general cancellation rule. `rcp_cancel_chain_should_cascade()`
+  already implements the correct cascade decision but has zero callers.
+  This entry's own description of what the three cancellation functions
+  remove remains accurate; the cascade gap is additional, not a
+  contradiction.
+- `REQ-E2E-021`: given the same honest `PARTIAL`/`status:"partial"`/
+  `scope:"tc18-gap"` treatment already used for `REQ-E2E-028/029/030/038/039`
+  and `REQ-WDG-010` in this exact same cluster -- the "pure primitive
+  exists, correctly, but nothing in the real dispatch path
+  (`rcp_mock_server_dispatch_e2e()`) ever calls it" pattern. TC18's
+  rx_enforce_e2e "stream is blocked until released" consequence does
+  not actually block anything in this codebase today. `REQ-E2E-020/022/023/043/044`
+  (the sibling pure-primitive entries in the same family) remain
+  accurately implemented as written -- only this entry's broader
+  enforcement claim needed the flag.
+
+No code or test changes. Full suite (65/65) both trees re-run to
+confirm inertness. 1036 requirements (unchanged count -- text edits to
+existing entries).
+
+**Issue #256's Group H is now fully closed** -- all 12 findings
+addressed across 7 batches (PRs #257-#263): 2 uninitialized-field/
+missing-validation fixes (REQ-RMAP-009/-070, cancel-family evt/hs/cs),
+5 doc-only stale-text/citation/gap-flag corrections
+(REQ-LIFECYCLE-001/-017/-018/-019/-020, REQ-CANCEL-012, REQ-SRV-013,
+REQ-E2E-021), and 3 real behavioral bug fixes (REQ-SRV-006 compound
+idle gate, REQ-MOCK-030 EP_NOT_FOUND-to-silent-drop, REQ-PWR-005
+network-wake real handshake). Moving to Group B next: `REQ-PWM-049`-
+`052` (PWM_IN's inverted compound-wait comparisons).
