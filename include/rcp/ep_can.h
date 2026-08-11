@@ -302,6 +302,52 @@
  * lifecycle.h's/regmap.h's existing authorization logic, per the roadmap's
  * explicit instruction (the same rule every prior endpoint type's own
  * setters already follow).
+ *
+ * ── TC18 functional-configuration register-block address defect (investigated, no wire model exists) ──
+ *
+ * TC18's own functional-configuration register table for this endpoint
+ * type has a genuine, still-unresolved address defect, independently
+ * re-verified against the rendered PDF page image (not just text
+ * extraction) on both the baseline revision and the newest available
+ * revision: two consecutive acceptance-filter table rows are both printed
+ * at the same relative address, with a receive-filter table immediately
+ * following at the address one of those two rows would need if it were
+ * simply shifted forward by one slot. The primary source gives no way to
+ * decide between two readings: either only as many acceptance filters
+ * exist as there are non-colliding addresses before the collision (the
+ * colliding row being a stray duplicate, and the receive-filter table
+ * already correctly addressed right after), or one more acceptance filter
+ * really exists than that reading allows (belonging at the colliding
+ * address after all), in which case every receive-filter address would
+ * also need a uniform shift to make room. This module deliberately does
+ * NOT force-resolve that ambiguity by picking one reading -- see below for
+ * why it doesn't need to yet.
+ *
+ * This has zero effect on this module's own conformance today: nothing in
+ * ep_can.c serializes or deserializes this register block's byte offsets
+ * at all -- rcp_ep_can_functional_cfg_t (bit timings, delay compensation,
+ * the execution-delay divider, and the XL filter table above) is a pure
+ * in-memory, caller-populated API, never encoded to or decoded from wire
+ * bytes at any of this table's addresses. RCP_EP_CAN_XL_MAX_FILTERS (4)
+ * stays exactly what it already was -- it is this module's own
+ * independently chosen count (see above), not read off this defective
+ * table, so nothing about this finding changes it. Anyone who later adds a
+ * real register-block codec for this endpoint (the render_registers()/
+ * apply_reconfig() shape ep_gpio.c/ep_spi.c/ep_wakeup.c/ep_mdio.c already
+ * use) must resolve this ambiguity first, deliberately, rather than
+ * silently copying whichever address ordering seems more convenient.
+ *
+ * Separately, and also independently re-verified against both PDF
+ * revisions: this table's three bit-timing registers (arbitration phase,
+ * FD data phase, XL data phase) are each a single opaque 32-bit value with
+ * no sub-field bit-layout published anywhere near that table in either
+ * revision -- unlike this endpoint's own request/response format, which
+ * does get a companion field-level figure. This is not an extraction gap;
+ * the primary source itself simply never publishes that breakdown, in
+ * either revision. rcp_ep_can_bit_timing_t's own five-field shape above is
+ * this module's own standard, publicly documented Bosch-CAN-style
+ * modeling choice for that reason, not a spec-derived layout -- already
+ * noted above, restated here only to tie it to this same investigation.
  */
 #ifndef RCP_EP_CAN_H
 #define RCP_EP_CAN_H
