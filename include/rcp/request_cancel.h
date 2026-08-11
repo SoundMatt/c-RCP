@@ -112,6 +112,16 @@ typedef enum {
                                            called recognizes */
     RCP_CANCEL_ERR_RESERVED_NONZERO = 5, /* a reserved sub-field octet
                                              carries a set bit */
+    RCP_CANCEL_ERR_EVT_HS_CS_NONZERO = 6, /* the ACF byte_message_info
+                                              header's evt[2:0], hs, or cs
+                                              bits are set -- TC18 Tables
+                                              11/13 require all three be
+                                              zero for clear-all/-single
+                                              (REQ-CANCEL-013/-015); a
+                                              distinct wire field from
+                                              RESERVED_NONZERO's
+                                              message_timestamp octets
+                                              above */
 } rcp_cancel_errc_t;
 
 /* ── wire sub-field layout ───────────────────────────────────────────────────
@@ -151,9 +161,12 @@ rcp_bytes_t rcp_cancel_encode_clear_all(rcp_byte_bus_id_t byte_bus_id, uint8_t t
 /* Decodes and validates a clear-all request from b[0..len). Same
  * failure-mode conventions as rcp_compound_decode_clear_non_safestate()
  * (request_compound.h), with RCP_CANCEL_ERR_UNKNOWN_TYPE returned whenever the
- * decoded opcode byte is not RCP_REQUEST_TYPE_CLEAR_ALL. On
- * RCP_CANCEL_OK, *out_byte_bus_id and *out_transaction_num are
- * populated. */
+ * decoded opcode byte is not RCP_REQUEST_TYPE_CLEAR_ALL,
+ * RCP_CANCEL_ERR_RESERVED_NONZERO when any of message_timestamp's 7
+ * trailing octets carries a set bit (REQ-CANCEL-013), and
+ * RCP_CANCEL_ERR_EVT_HS_CS_NONZERO when evt[2:0], hs, or cs is nonzero
+ * (TC18 Table 11; REQ-CANCEL-014). On RCP_CANCEL_OK, *out_byte_bus_id
+ * and *out_transaction_num are populated. */
 rcp_cancel_errc_t rcp_cancel_decode_clear_all(const uint8_t *b, size_t len,
                                                rcp_byte_bus_id_t *out_byte_bus_id,
                                                uint8_t *out_transaction_num);
@@ -176,9 +189,11 @@ rcp_bytes_t rcp_cancel_encode_clear_single(rcp_byte_bus_id_t byte_bus_id,
 /* Decodes and validates a clear-single request from b[0..len). Same
  * failure-mode conventions as rcp_cancel_decode_clear_all(), with
  * RCP_CANCEL_ERR_UNKNOWN_TYPE returned whenever the decoded opcode byte
- * is not RCP_REQUEST_TYPE_CLEAR_SINGLE. On RCP_CANCEL_OK,
- * *out_byte_bus_id, *out_clear_transaction_num, and *out_transaction_num
- * are populated. */
+ * is not RCP_REQUEST_TYPE_CLEAR_SINGLE, RCP_CANCEL_ERR_RESERVED_NONZERO
+ * per REQ-CANCEL-007's own contract, and RCP_CANCEL_ERR_EVT_HS_CS_NONZERO
+ * when evt[2:0], hs, or cs is nonzero (TC18 Table 13; REQ-CANCEL-015).
+ * On RCP_CANCEL_OK, *out_byte_bus_id, *out_clear_transaction_num, and
+ * *out_transaction_num are populated. */
 rcp_cancel_errc_t rcp_cancel_decode_clear_single(const uint8_t *b, size_t len,
                                                   rcp_byte_bus_id_t *out_byte_bus_id,
                                                   uint8_t *out_clear_transaction_num,

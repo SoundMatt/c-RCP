@@ -11,6 +11,9 @@
 //cfusa:test REQ-CANCEL-010
 //cfusa:test REQ-CANCEL-011
 //cfusa:test REQ-CANCEL-012
+//cfusa:test REQ-CANCEL-013
+//cfusa:test REQ-CANCEL-014
+//cfusa:test REQ-CANCEL-015
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -91,6 +94,53 @@ static void test_clear_all_decode_rejects_short_frame(void)
 
     TEST_ASSERT_EQUAL_INT(RCP_CANCEL_ERR_SHORT_FRAME,
                            rcp_cancel_decode_clear_all(buf, sizeof(buf), &bbid, &txn));
+}
+
+/* Table 11: reserved "All bits shall be written as 0, else the request
+ * shall be rejected" -- clear-all carries no sub-field, so all 7
+ * trailing message_timestamp octets are reserved. REQ-CANCEL-013. */
+static void test_clear_all_decode_rejects_nonzero_reserved(void)
+{
+    size_t offsets[7] = {1, 2, 3, 4, 5, 6, 7};
+    size_t i;
+
+    for (i = 0; i < 7; i++) {
+        rcp_bytes_t frame;
+        rcp_byte_bus_id_t bbid = 0;
+        uint8_t txn = 0;
+
+        frame = rcp_cancel_encode_clear_all(0, 0);
+        TEST_ASSERT_NOT_NULL(frame.data);
+        frame.data[RCP_ACF_ABB_HEADER_LEN + offsets[i]] = 0x01u;
+
+        TEST_ASSERT_EQUAL_INT(RCP_CANCEL_ERR_RESERVED_NONZERO,
+                               rcp_cancel_decode_clear_all(frame.data, frame.len, &bbid, &txn));
+        rcp_bytes_free(&frame);
+    }
+}
+
+/* Table 11: evt is only ever 0000b/1000b (evt[2:0]=0), hs=0b, cs=0b.
+ * Octet 4 of the ACF byte_message_info header packs evt[3:0] in bits
+ * 7:4, hs in bit 1, cs in bit 0 (acf.c's rcp_acf_pack_header()).
+ * REQ-CANCEL-014. */
+static void test_clear_all_decode_rejects_nonzero_evt_hs_cs(void)
+{
+    uint8_t masks[3] = {0x10u, 0x02u, 0x01u}; /* evt[0], hs, cs */
+    size_t  i;
+
+    for (i = 0; i < 3; i++) {
+        rcp_bytes_t frame;
+        rcp_byte_bus_id_t bbid = 0;
+        uint8_t txn = 0;
+
+        frame = rcp_cancel_encode_clear_all(0, 0);
+        TEST_ASSERT_NOT_NULL(frame.data);
+        frame.data[4] |= masks[i];
+
+        TEST_ASSERT_EQUAL_INT(RCP_CANCEL_ERR_EVT_HS_CS_NONZERO,
+                               rcp_cancel_decode_clear_all(frame.data, frame.len, &bbid, &txn));
+        rcp_bytes_free(&frame);
+    }
 }
 
 /* ── clear-single (0x07) ──────────────────────────────────────────────────── */
@@ -274,6 +324,29 @@ static void test_clear_single_decode_rejects_nonzero_reserved(void)
     }
 }
 
+/* Table 13: "Evt, hs and cs shall be zero." REQ-CANCEL-015. */
+static void test_clear_single_decode_rejects_nonzero_evt_hs_cs(void)
+{
+    uint8_t masks[3] = {0x10u, 0x02u, 0x01u}; /* evt[0], hs, cs */
+    size_t  i;
+
+    for (i = 0; i < 3; i++) {
+        rcp_bytes_t frame;
+        rcp_byte_bus_id_t bbid = 0;
+        uint8_t clear_txn = 0;
+        uint8_t txn = 0;
+
+        frame = rcp_cancel_encode_clear_single(0, 9, 0);
+        TEST_ASSERT_NOT_NULL(frame.data);
+        frame.data[4] |= masks[i];
+
+        TEST_ASSERT_EQUAL_INT(RCP_CANCEL_ERR_EVT_HS_CS_NONZERO,
+                               rcp_cancel_decode_clear_single(frame.data, frame.len, &bbid,
+                                                               &clear_txn, &txn));
+        rcp_bytes_free(&frame);
+    }
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -283,6 +356,8 @@ int main(void)
     RUN_TEST(test_clear_all_round_trip);
     RUN_TEST(test_clear_all_decode_rejects_clear_single);
     RUN_TEST(test_clear_all_decode_rejects_short_frame);
+    RUN_TEST(test_clear_all_decode_rejects_nonzero_reserved);
+    RUN_TEST(test_clear_all_decode_rejects_nonzero_evt_hs_cs);
 
     RUN_TEST(test_clear_single_round_trip);
     RUN_TEST(test_clear_single_decode_rejects_clear_all);
@@ -290,6 +365,7 @@ int main(void)
     RUN_TEST(test_clear_single_wire_sub_field_offsets);
     RUN_TEST(test_clear_single_decode_reads_hand_built_spec_layout);
     RUN_TEST(test_clear_single_decode_rejects_nonzero_reserved);
+    RUN_TEST(test_clear_single_decode_rejects_nonzero_evt_hs_cs);
 
     RUN_TEST(test_is_cancellable_only_when_queued);
     RUN_TEST(test_attempt_not_found);

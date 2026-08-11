@@ -32,6 +32,8 @@ const char *rcp_cancel_strerror(rcp_cancel_errc_t e)
     case RCP_CANCEL_ERR_UNKNOWN_TYPE:   return "rcp/cancel: unrecognized request_type";
     case RCP_CANCEL_ERR_RESERVED_NONZERO:
         return "rcp/cancel: reserved sub-field octet is not zero";
+    case RCP_CANCEL_ERR_EVT_HS_CS_NONZERO:
+        return "rcp/cancel: evt[2:0], hs, or cs is not zero";
     default:                            return "rcp/cancel: unknown error";
     }
 }
@@ -76,6 +78,8 @@ rcp_bytes_t rcp_cancel_encode_clear_all(rcp_byte_bus_id_t byte_bus_id, uint8_t t
 
 //cfusa:req REQ-CANCEL-003
 //cfusa:req REQ-CANCEL-004
+//cfusa:req REQ-CANCEL-013
+//cfusa:req REQ-CANCEL-014
 rcp_cancel_errc_t rcp_cancel_decode_clear_all(const uint8_t *b, size_t len,
                                                rcp_byte_bus_id_t *out_byte_bus_id,
                                                uint8_t *out_transaction_num)
@@ -94,6 +98,19 @@ rcp_cancel_errc_t rcp_cancel_decode_clear_all(const uint8_t *b, size_t len,
 
     rt = (uint8_t)((hdr.message_timestamp >> 56) & 0xFFu);
     if (rt != RCP_REQUEST_TYPE_CLEAR_ALL) return RCP_CANCEL_ERR_UNKNOWN_TYPE;
+
+    /* REQ-CANCEL-013: clear-all carries no sub-field of its own -- all 7
+     * trailing octets of message_timestamp are reserved (TC18 Table 11). */
+    if ((hdr.message_timestamp & 0x00FFFFFFFFFFFFFFull) != 0ull) {
+        return RCP_CANCEL_ERR_RESERVED_NONZERO;
+    }
+
+    /* REQ-CANCEL-014: TC18 Table 11 -- evt is either 0000b (no ack) or
+     * 1000b (ack requested), so evt[2:0] must be zero; hs and cs are
+     * always zero. */
+    if ((hdr.info.evt & 0x07u) != 0u || hdr.info.hs != 0u || hdr.info.cs != 0u) {
+        return RCP_CANCEL_ERR_EVT_HS_CS_NONZERO;
+    }
 
     *out_byte_bus_id     = hdr.info.byte_bus_id;
     *out_transaction_num = hdr.info.transaction_num;
@@ -118,6 +135,7 @@ rcp_bytes_t rcp_cancel_encode_clear_single(rcp_byte_bus_id_t byte_bus_id,
 
 //cfusa:req REQ-CANCEL-006
 //cfusa:req REQ-CANCEL-007
+//cfusa:req REQ-CANCEL-015
 rcp_cancel_errc_t rcp_cancel_decode_clear_single(const uint8_t *b, size_t len,
                                                   rcp_byte_bus_id_t *out_byte_bus_id,
                                                   uint8_t *out_clear_transaction_num,
@@ -142,6 +160,12 @@ rcp_cancel_errc_t rcp_cancel_decode_clear_single(const uint8_t *b, size_t len,
      * 0x00000000FFFFFFFF) must all be zero. */
     if ((hdr.message_timestamp & 0x00FFFF00FFFFFFFFull) != 0ull) {
         return RCP_CANCEL_ERR_RESERVED_NONZERO;
+    }
+
+    /* REQ-CANCEL-015: TC18 Table 13 -- "Evt, hs and cs shall be zero"
+     * (same evt[3]-is-the-only-free-bit rule as clear-all/Table 11). */
+    if ((hdr.info.evt & 0x07u) != 0u || hdr.info.hs != 0u || hdr.info.cs != 0u) {
+        return RCP_CANCEL_ERR_EVT_HS_CS_NONZERO;
     }
 
     *out_clear_transaction_num = (uint8_t)((hdr.message_timestamp >> 32) & 0xFFu);

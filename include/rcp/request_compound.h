@@ -193,6 +193,18 @@ typedef enum {
                                              request_type this module
                                              recognizes for the function
                                              called */
+    RCP_COMPOUND_ERR_RESERVED_NONZERO = 5, /* a reserved message_timestamp
+                                                sub-field octet carries a
+                                                set bit (REQ-CMP-028) */
+    RCP_COMPOUND_ERR_EVT_HS_CS_NONZERO = 6, /* the ACF byte_message_info
+                                                 header's evt[2:0], hs, or
+                                                 cs bits are set -- TC18
+                                                 Table 12 requires all
+                                                 three be zero for
+                                                 clear-non-safestate,
+                                                 rejecting with wire error
+                                                 UNSUPPORTED_CMD
+                                                 (REQ-CMP-029) */
 } rcp_compound_errc_t;
 
 /* Human-readable message for an rcp_compound_errc_t value. Never returns NULL. */
@@ -308,8 +320,12 @@ rcp_bytes_t rcp_compound_encode_clear_non_safestate(rcp_byte_bus_id_t byte_bus_i
 /* Decodes and validates an ACF-level clear-non-safestate request from
  * b[0..len). Same failure modes as rcp_compound_decode_request(), with
  * RCP_COMPOUND_ERR_UNKNOWN_TYPE returned whenever the decoded opcode byte
- * is not RCP_REQUEST_TYPE_CLEAR_NON_SAFESTATE. On RCP_COMPOUND_OK,
- * *out_byte_bus_id and *out_transaction_num are populated. */
+ * is not RCP_REQUEST_TYPE_CLEAR_NON_SAFESTATE,
+ * RCP_COMPOUND_ERR_RESERVED_NONZERO when any of message_timestamp's 7
+ * trailing octets carries a set bit (REQ-CMP-028), and
+ * RCP_COMPOUND_ERR_EVT_HS_CS_NONZERO when evt[2:0], hs, or cs is nonzero
+ * (TC18 Table 12; REQ-CMP-029). On RCP_COMPOUND_OK, *out_byte_bus_id and
+ * *out_transaction_num are populated. */
 rcp_compound_errc_t rcp_compound_decode_clear_non_safestate(const uint8_t *b, size_t len,
                                                              rcp_byte_bus_id_t *out_byte_bus_id,
                                                              uint8_t *out_transaction_num);
