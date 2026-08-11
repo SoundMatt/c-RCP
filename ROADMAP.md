@@ -13066,3 +13066,111 @@ finding, so it does not add to this count.
 
 **Next**: MDIO and wakeup remain in Group I (CAN deliberately
 deferred, pending its own dedicated investigation session).
+
+### v0.224.0 -- 2026-08-11
+
+**Full-catalog audit follow-up, batch 25 (Group I, real fix, plus
+wakeup investigated and deferred): MDIO's own §12.7.1 EP_func register
+block (Table 56) implemented, fifth instance of the address-collision
+editorial defect resolved, and wakeup's own Table 36 confirmed
+structurally different from every other endpoint type -- deferred
+pending its own dedicated investigation session.**
+
+`rcp_ep_mdio_decode_read_request()`/`_decode_write_request()` already
+correctly rejected evt[2:0]=111b (`RCP_EP_MDIO_ERR_BAD_EVT`, via
+acf.h's `rcp_acf_evt_row2_is_plain()`), but no counterpart implemented
+that §12.7.1 path -- no `rcp_ep_mdio_apply_reconfig()` existed at all.
+Read TC18 §13.7.13.2 Table 56 directly: "The MDIO EP does not have any
+configurable parameters" -- a claim about what a *write* can change,
+not about whether the block is *readable*. A genuine address-collision
+editorial defect, the FIFTH this audit has found (after
+ep_pwm.h's/ep_gpio.h's/ep_i2c.h's/ep_iseled.h's own): `mdio_ep_status`
+(16 bit, R/W) is printed at relative address 0x0002, identical to
+`mdio_ep_enable&clr`, separately printed at the same address.
+
+**Simpler than every prior instance of this defect**: unlike every
+other endpoint type's own table, Table 56 defines no `base_clk` row at
+all (consistent with "no configurable parameters" -- there is
+genuinely no system clock register to expose here), so the minimal,
+table-literal-following fix places `mdio_ep_status` at the next
+unclaimed offset after `options`: 0x0004, one register width narrower
+than every other endpoint type's own common prefix (which reserves
+0x0004-0x0005 for a `base_clk` row this table never lists).
+`RCP_EP_MDIO_EP_FUNC_LEN` = 0x0006.
+
+**Fix**: `rcp_ep_mdio_functional_cfg_t` gains `ep_status` -- the only
+field this module adds, still not "configurable" in the file header's
+own sense (no `set_ep_status()` mutator; reachable only via
+`rcp_ep_mdio_apply_reconfig()`, matching every register-block field in
+every other endpoint type). New `rcp_ep_mdio_render_registers()`/
+`_apply_reconfig()`/`_reconfig_strerror()`/`_encode_reconfig_request()`
+mirror the established pattern exactly. MDIO is now 9 of 11 endpoint
+types with the generic mechanism.
+
+**Tracking, following the established "mechanism gets its own id,
+content gets the pre-existing one" convention** (REQ-PWM-058/059,
+REQ-ISELED-026/027/029): `REQ-MDIO-020` -- already honestly tracked as
+`not-implemented`, describing exactly this gap -- moves to
+`implemented`, reusing its existing id rather than duplicating under a
+new one. New `REQ-MDIO-023` tracks the register-block mechanism
+itself.
+
+A pre-existing deviation test,
+`test_mdio_block_is_exactly_the_common_prefix`
+(`tests/test_tc18_gaps_ep2.c`), was renamed to
+`..._block_now_exposes_ep_status_via_reconfig` and rewritten from a
+negative to a positive assertion, matching every prior batch's own
+convention. `tests/test_ep_mdio.c` gained a full parallel register-
+block test suite (7 new tests) mirroring ISELED's/ADC's own dedicated-
+file coverage.
+
+**Wakeup investigated this batch, deliberately deferred (not fixed)**:
+read TC18 §13.7.2.2 Table 36 directly. Structurally unlike every other
+endpoint type's own register block: no common EP_LEN/reserved/
+enable&clr/options/base_clk prefix at all -- instead
+`wup_ep_len`(0x0000)/`wup_nr_io_pins_max`(0x0001)/`wup_ep_status`
+(0x0002)/`wup_status`(0x0004), followed by a **variable-length
+repeating array** of per-pin `wup_io_scr1`/`wup_io_scr2` descriptor
+pairs ("Pin number = 0 denotes end of table") -- a shape none of this
+audit's prior fixed-length register-block fixes has had to handle. A
+genuine, literal address collision exists (`wup_status` and
+`wup_io_scr1` both printed at 0x0004), but unlike the five prior
+instances of this defect, there is no obvious minimal correction here
+-- the collision sits inside a variable-length structure, not a fixed
+common prefix, so the established "move the offending field to the
+next unclaimed common-prefix slot" resolution method does not
+straightforwardly apply. Compounding this, this exact endpoint type's
+own extraction reliability was already flagged as a limiting factor
+once before, in this audit's own Group E WAKEUP SleepCMD fix
+(`pdftotext -layout` did not capture Figure 22's bit structure
+correctly; a rendered PDF page image was needed instead) -- the same
+risk plausibly applies to Table 36's own complex, non-standard layout.
+Deferred pending its own dedicated investigation session, matching the
+CAN/MDIO (Group D) precedent -- not attempted as a routine batch.
+
+`REQ-CFG-011`/`REQ-CFG-012` narrowed accordingly (9 endpoint types now
+covered: PWM_OUT, PWM_IN, GPIO, SPI, I2C, UART, LIN, ADC, ISELED,
+MDIO; CAN and wakeup remain, both deliberately deferred).
+
+Mutation-tested: loosening the out-of-range bounds check by 4 octets
+reproduced the identical class of finding every prior register-block
+batch this session has produced -- a real stack buffer overflow
+(`index 6 out of bounds for type 'uint8_t[6]'`, silent SIGABRT, exit
+code 134). Restored, re-verified. Full suite (both trees, native +
+ASan/UBSan) 65/65. `cfusa check` (CI-pinned v0.5.50): 0 errors. `cfusa
+trace --gaps`: 0/1024 untested; `--req-coverage 100` /
+`--sec-tested 100`: both 100% (1024/1024) -- same pre-existing,
+non-blocking UART dangling-reference diagnostics as every prior batch.
+
+**Progress: 90/156 findings resolved** (Groups H 12 + B 4 + A 17 +
+D 16 + F 7 + E 4 + C 16 + G 2 + I 12 = 90). Group I's own count moves
+from 11 to 12 -- REQ-MDIO-020/023 close together (findings, not
+fixes-per-PR, per this issue's own accounting convention).
+
+**Group I is now effectively complete for this batch series**: every
+originally-planned item is either fixed (9 endpoint types) or
+deliberately deferred pending its own dedicated investigation session
+(CAN, wakeup). **Next**: proceed to Group J (~20 citation-precision
+mechanical fixes) per the issue's own suggested order, or open the CAN/
+wakeup dedicated-investigation sessions if the user prioritizes those
+first.

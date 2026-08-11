@@ -27,6 +27,7 @@
 //cfusa:req REQ-MDIO-020
 //cfusa:req REQ-MDIO-021
 //cfusa:req REQ-MDIO-022
+//cfusa:req REQ-MDIO-023
 /*
  * ep_mdio.h -- MDIO management endpoint for the TC18 Remote Control
  * Protocol wire layer (ROADMAP.md Phase 19, "Remaining Endpoint Types",
@@ -181,18 +182,20 @@
  *
  * Unlike ep_can.h's three separate bit-timing register sets or
  * ep_iseled.h's clk-divider/crc-enable/trigger fields,
- * rcp_ep_mdio_functional_cfg_t adds *nothing* of its own beyond composing
- * regmap.h's rcp_regmap_ep_functional_cfg_t as its sole member. This is a
+ * rcp_ep_mdio_functional_cfg_t adds *nothing type-specific* of its own
+ * beyond composing regmap.h's rcp_regmap_ep_functional_cfg_t. This is a
  * deliberate, documented "nothing more to add" finding, not an oversight:
  * per extraction §5.10-5.13, this endpoint type's register-map footprint
  * is fully covered by the common enable/clear/CRC/timestamp/suppress-
  * response flags every endpoint type already shares, with no MDIO-
- * specific runtime-adjustable register of its own. Consequently there are
- * no rcp_ep_mdio_set_*() mutators in this file at all: no endpoint type in
- * this codebase exposes a setter for the common block's own fields either
- * (those are the generic register-map layer's job, not any one endpoint
- * type's), so with no fields of its own to add, this module has nothing
- * left to set. rcp_ep_mdio_functional_cfg_init() and
+ * specific runtime-adjustable register of its own -- TC18 §13.7.13.2
+ * itself opens with "The MDIO EP does not have any configurable
+ * parameters." Consequently there are no rcp_ep_mdio_set_*() mutators in
+ * this file at all: no endpoint type in this codebase exposes a setter
+ * for the common block's own fields either (those are the generic
+ * register-map layer's job, not any one endpoint type's), so with no
+ * *configurable* fields of its own to add, this module has nothing left
+ * to set. rcp_ep_mdio_functional_cfg_init() and
  * rcp_ep_mdio_functional_cfg_writable() are still provided, matching every
  * other endpoint type's own init/writable pair, purely for that
  * consistency -- rcp_ep_mdio_functional_cfg_writable() is, like every
@@ -200,11 +203,46 @@
  * lifecycle.h's rcp_lifecycle_field_writable() (RCP_LIFECYCLE_FIELD_FUNCTIONAL_W),
  * reusing rather than duplicating that authorization logic. Anyone
  * extending this file later who finds themselves reaching for an
- * MDIO-specific functional-config field should stop and re-read this
+ * MDIO-specific *configurable* field should stop and re-read this
  * paragraph first -- it is this milestone's documented scope, the same
  * "roadmap and spec both agree there is simply nothing to add" position
  * ep_can.h's own file header already states for its own missing trigger
  * table (see below).
+ *
+ * ── The EP_func register block IS still exposed, though nothing in it is
+ *    configurable ──────────────────────────────────────────────────────────
+ *
+ * FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-MDIO-020/023):
+ * "no configurable parameters" (above) describes what a *write* can
+ * change -- it says nothing about whether the block is *readable*. TC18
+ * §13.7.13.2 Table 56 still fixes a real register block every endpoint
+ * type exposes via evt[2:0]=111b (extraction §12.7.1): mdio_ep_len
+ * (0x0000, R), the reserved octet (0x0001, R), the common enable&clr/
+ * options octets (0x0002/0x0003, shared with every other endpoint type),
+ * and mdio_ep_status (16 bit, R/W, "To be defined" -- the specification
+ * itself does not yet define this register's own contents).
+ *
+ * A genuine address-collision editorial defect, the FIFTH this audit has
+ * found (after ep_pwm.h's/ep_gpio.h's/ep_i2c.h's/ep_iseled.h's own):
+ * mdio_ep_status is printed at relative address 0x0002 in Table 56 --
+ * identical to mdio_ep_enable&clr, separately printed at the same
+ * address. Unlike every other endpoint type's own table, Table 56 prints
+ * no base_clk row at all (consistent with "MDIO EP does not have any
+ * configurable parameters" -- there is genuinely no system clock
+ * register to expose here), so the minimal, table-literal-following fix
+ * is simply to place mdio_ep_status at the next unclaimed offset after
+ * options: 0x0004, one register width narrower than every other endpoint
+ * type's common prefix (which reserves 0x0004-0x0005 for a base_clk row
+ * this table never lists). RCP_EP_MDIO_EP_FUNC_LEN = 0x0006.
+ *
+ * rcp_ep_mdio_functional_cfg_t gains ep_status (uint16_t) -- the ONLY
+ * field this module adds, still nothing "configurable" in the sense the
+ * section above means (no rcp_ep_mdio_set_ep_status() mutator; the
+ * register-block's own generic addressed-write mechanism,
+ * rcp_ep_mdio_apply_reconfig(), is the only way to change it, exactly
+ * like every register-block field in every other endpoint type). New
+ * rcp_ep_mdio_render_registers()/_apply_reconfig()/_reconfig_strerror()/
+ * _encode_reconfig_request() mirror the established pattern exactly.
  *
  * ── No trigger-signal table ───────────────────────────────────────────────
  *
@@ -331,11 +369,19 @@ uint16_t rcp_ep_mdio_unpack_word_at(const uint8_t *data, size_t word_index);
 typedef struct {
     rcp_regmap_ep_functional_cfg_t common; /* regmap.h's shared functional-
                                                config prefix, composed as the
-                                               first (and, deliberately, only)
-                                               member -- see the file header */
+                                               first member -- see the file
+                                               header */
+    uint16_t                       ep_status; /* 0x0004, R/W; see the file
+                                                  header -- the only field
+                                                  this module adds, and not
+                                                  "configurable" in the
+                                                  sense the file header's
+                                                  own "no type-specific
+                                                  functional config"
+                                                  section means */
 } rcp_ep_mdio_functional_cfg_t;
 
-/* Zero-initializes cfg (common's flags all false). */
+/* Zero-initializes cfg (common's flags all false; ep_status 0). */
 void rcp_ep_mdio_functional_cfg_init(rcp_ep_mdio_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
@@ -345,6 +391,77 @@ void rcp_ep_mdio_functional_cfg_init(rcp_ep_mdio_functional_cfg_t *cfg);
  * logic. */
 bool rcp_ep_mdio_functional_cfg_writable(rcp_lifecycle_state_t state,
                                           rcp_lifecycle_writer_ctx_t writer);
+
+/* ── The EP_func register block (evt[2:0] == 111b) ─────────────────────────── */
+
+/* Relative octet offsets of the registers making up an MDIO endpoint's own
+ * EP_func block, at the widths TC18 §13.7.13.2 Table 56 assigns them,
+ * corrected for the address-collision editorial defect -- see the file
+ * header. Note there is no base_clk row here, unlike every other endpoint
+ * type's own common prefix -- Table 56 genuinely defines none. */
+#define RCP_EP_MDIO_REG_EP_LEN        ((uint16_t)0x0000u) /*  8 bit, R   */
+#define RCP_EP_MDIO_REG_RESERVED_01   ((uint16_t)0x0001u) /*  8 bit, R   */
+#define RCP_EP_MDIO_REG_EP_ENABLE_CLR ((uint16_t)0x0002u) /*  8 bit, R/W */
+#define RCP_EP_MDIO_REG_EP_OPTIONS    ((uint16_t)0x0003u) /*  8 bit, R/W */
+#define RCP_EP_MDIO_REG_EP_STATUS     ((uint16_t)0x0004u) /* 16 bit, R/W */
+
+/* The block's own length in octets -- one past the last assigned offset. */
+#define RCP_EP_MDIO_EP_FUNC_LEN       ((uint16_t)0x0006u)
+
+/* The fixed width (octets) of the relative-start-address prefix every
+ * configuration request's payload begins with -- see
+ * RCP_EP_PWM_OUT_RECONFIG_ADDR_LEN's own identical note (ep_pwm.h). */
+#define RCP_EP_MDIO_RECONFIG_ADDR_LEN ((size_t)2u)
+
+typedef enum {
+    RCP_EP_MDIO_RECONFIG_OK               = 0,
+    RCP_EP_MDIO_RECONFIG_ERR_SHORT        = 1, /* payload carries no address
+                                                    prefix, or an address
+                                                    prefix with no data
+                                                    octet after it */
+    RCP_EP_MDIO_RECONFIG_ERR_OUT_OF_RANGE = 2, /* start_address + data
+                                                    length exceeds
+                                                    RCP_EP_MDIO_EP_FUNC_LEN
+                                                    -- the whole write is
+                                                    ignored, per the
+                                                    specification's own
+                                                    rule */
+} rcp_ep_mdio_reconfig_errc_t;
+
+/* Human-readable message for an rcp_ep_mdio_reconfig_errc_t value. Never
+ * returns NULL. */
+const char *rcp_ep_mdio_reconfig_strerror(rcp_ep_mdio_reconfig_errc_t e);
+
+/* Serializes cfg's EP_func registers into out[0..RCP_EP_MDIO_EP_FUNC_LEN)
+ * exactly as a configuration *read* of the whole block would report them
+ * -- the inverse of rcp_ep_mdio_apply_reconfig()'s own parse step. */
+void rcp_ep_mdio_render_registers(const rcp_ep_mdio_functional_cfg_t *cfg,
+                                   uint8_t out[RCP_EP_MDIO_EP_FUNC_LEN]);
+
+/* Applies the configuration escape hatch (evt[2:0] == 111b): payload is an
+ * addressed write into this endpoint's own EP_func block -- a 16-bit
+ * big-endian relative start address followed by the configuration data
+ * octets to write from that address onward (extraction §3.7.1). See
+ * rcp_ep_pwm_out_apply_reconfig()'s own doc comment (ep_pwm.h) for the
+ * read-only-offset-skipping, octet-granularity-patch, and
+ * out-of-range-ignores-the-whole-write rules -- identical here.
+ *
+ * A caller routing a decoded request here is responsible for having
+ * checked that evt[2:0] really was 111b, e.g. via
+ * !rcp_acf_evt_row2_is_plain(). */
+rcp_ep_mdio_reconfig_errc_t
+rcp_ep_mdio_apply_reconfig(rcp_ep_mdio_functional_cfg_t *cfg,
+                            const uint8_t *payload, size_t payload_len);
+
+/* Encodes an ACF_ABB configuration request (evt[2:0] == 111b) addressed to
+ * byte_bus_id: payload is start_address (16-bit big-endian) followed by
+ * data[0..data_len). Returns a zeroed rcp_bytes_t (data=NULL) if data_len
+ * is 0, if the encoded payload would exceed RCP_ACF_MAX_PAYLOAD, or on
+ * allocation failure. Caller frees the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_ep_mdio_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                 uint16_t start_address,
+                                                 const uint8_t *data, size_t data_len,
+                                                 uint8_t transaction_num);
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 

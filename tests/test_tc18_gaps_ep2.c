@@ -21,6 +21,7 @@
 //cfusa:test REQ-MDIO-020
 //cfusa:test REQ-MDIO-021
 //cfusa:test REQ-MDIO-022
+//cfusa:test REQ-MDIO-023
 //cfusa:test REQ-UART-032
 //cfusa:test REQ-UART-033
 //cfusa:test REQ-UART-034
@@ -787,28 +788,41 @@ static void test_iseled_block_now_has_collect_resp_nr_leds_and_rcv_timeout(void)
 
 /* ── MDIO (§13.7.13) ───────────────────────────────────────────────────────── */
 
-static void test_mdio_block_is_exactly_the_common_prefix(void)
+/* FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-MDIO-020/023):
+ * "no configurable parameters" (TC18 §13.7.13.2's own prose) describes
+ * what a *write* can change -- it never said the block isn't *readable*.
+ * Table 56's mdio_ep_len/reserved/mdio_ep_status rows are now all
+ * reachable via the generic evt[2:0]=111b register-block mechanism, same
+ * as every other endpoint type -- the fifth address-collision editorial
+ * defect this audit has found (mdio_ep_status was printed at the same
+ * address as mdio_ep_enable&clr) resolved the same way as the prior four. */
+static void test_mdio_block_now_exposes_ep_status_via_reconfig(void)
 {
     rcp_ep_mdio_functional_cfg_t cfg;
     rcp_lifecycle_writer_ctx_t   w = any_writer();
+    uint8_t                      block[RCP_EP_MDIO_EP_FUNC_LEN];
 
     rcp_ep_mdio_functional_cfg_init(&cfg);
 
-    /* IMPLEMENTED half -- TC18 §13.7.13.2: "The MDIO EP does not have any
-     * configurable parameters", and this block indeed adds nothing beyond
-     * the shared common prefix.
-     *
-     * DEVIATION -- Table 56 nevertheless fixes three rows this block does
-     * not model: mdio_ep_len at 0x0000 (8 bit, R), a reserved octet at
-     * 0x0001 reading 0x00, and a 16-bit R/W mdio_ep_status. The block is
-     * byte-for-byte the common prefix and nothing else, so it is not
-     * enumerable at the addresses Table 56 fixes and its status register is
-     * unreadable. */
-    TEST_ASSERT_EQUAL_size_t(sizeof(rcp_regmap_ep_functional_cfg_t),
-                             sizeof(rcp_ep_mdio_functional_cfg_t));
+    /* Still true: no *type-specific configurable* field exists -- the
+     * struct's own "nothing more to add" design is unchanged, and the
+     * common prefix is still the struct's own leading (now not sole)
+     * member. */
     TEST_ASSERT_EQUAL_size_t(0u, offsetof(rcp_ep_mdio_functional_cfg_t, common));
     TEST_ASSERT_FALSE(cfg.common.ep_enable);
     TEST_ASSERT_TRUE(rcp_ep_mdio_functional_cfg_writable(RCP_LIFECYCLE_HW_CONFIGURED, w));
+
+    /* Now positively confirm the register block round-trips ep_status --
+     * no base_clk row exists in this table, unlike every other endpoint
+     * type's own common prefix, so the block is one register width
+     * narrower. */
+    cfg.ep_status = 0xBEEFu;
+    rcp_ep_mdio_render_registers(&cfg, block);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_MDIO_EP_FUNC_LEN, block[RCP_EP_MDIO_REG_EP_LEN]);
+    TEST_ASSERT_EQUAL_UINT8(0, block[RCP_EP_MDIO_REG_RESERVED_01]);
+    TEST_ASSERT_EQUAL_UINT8(0xBEu, block[RCP_EP_MDIO_REG_EP_STATUS]);
+    TEST_ASSERT_EQUAL_UINT8(0xEFu, block[RCP_EP_MDIO_REG_EP_STATUS + 1]);
+    TEST_ASSERT_EQUAL_UINT16(0x0006u, RCP_EP_MDIO_EP_FUNC_LEN);
 }
 
 static void test_mdio_request_prefix_carries_no_two_bit_mode_field(void)
@@ -902,7 +916,7 @@ int main(void)
     RUN_TEST(test_iseled_response_has_no_read_size_ceiling);
     RUN_TEST(test_iseled_block_now_has_collect_resp_nr_leds_and_rcv_timeout);
 
-    RUN_TEST(test_mdio_block_is_exactly_the_common_prefix);
+    RUN_TEST(test_mdio_block_now_exposes_ep_status_via_reconfig);
     RUN_TEST(test_mdio_request_prefix_carries_no_two_bit_mode_field);
     RUN_TEST(test_mdio_data_fields_are_unconditionally_sixteen_bit);
 
