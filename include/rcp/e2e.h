@@ -47,6 +47,7 @@
 //cfusa:req REQ-E2E-040
 //cfusa:req REQ-E2E-041
 //cfusa:req REQ-E2E-042
+//cfusa:req REQ-E2E-046
 /*
  * e2e.h -- CRC32 safe points and safety-request execution gating for the
  * TC18 Remote Control Protocol wire layer (ROADMAP.md Phase 18, "E2E
@@ -268,6 +269,22 @@
  * judgment call, not a naming fix, and is out of scope for issue #87 --
  * left for a dedicated follow-up, matching the same latent gap already
  * present in cpp-RCP's shipped tara.md/CYBERSECURITY.md/SAFETY_PLAN.md.
+ *
+ * ── TC18 0.5.1_RC5 terminology drift ────────────────────────────────────────
+ *
+ * INVESTIGATED 2026-08-11 (spec rebaseline to TC18 0.5.1_RC5,
+ * c-RCP-AUDIT-06, task #97): rx_enforce_e2e/rx_enforce_seq/
+ * rx_seq_safestate_enable/rx_wd_enable/rx_wd_safestate_enable/
+ * rx_ovrflw_safestate_enable/rx_safety_measure/rx_wd_info_enable (this
+ * whole file's own wire-terminology vocabulary) are renamed and partly
+ * collapsed in TC18 0.5.1_RC5 -- see regmap.h's own file header for the
+ * full investigation and rationale for NOT restructuring this module's
+ * own API to match. Summary: rx_enforce_e2e's own rename (rx_enforce_crc)
+ * is a pure synonym; the enable/safestate pairs this module's own
+ * functions deliberately keep independently expressible collapse to one
+ * combined bit each on the wire, but this module's richer model remains a
+ * safe superset, not a defect; rx_safety_measure and rx_wd_info_enable
+ * have no clear 1:1 wire replacement, genuinely unresolved.
  */
 #ifndef RCP_E2E_H
 #define RCP_E2E_H
