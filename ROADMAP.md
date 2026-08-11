@@ -11979,3 +11979,63 @@ findings resolved** (Groups H 12 + B 4 + A 17 + D 16 + F 7 + E 4 + C
 16 = 76). Moving to Group G next (ISELED polarity inversion, 2
 findings, a real contained code bug -- the same class of finding as
 REQ-GPIO-013, not yet fixed).
+
+### v0.213.0 -- 2026-08-10
+
+**Full-catalog audit follow-up, batch 14 (Group G, real fix):
+rcp_ep_iseled_requires_isp_n()'s polarity corrected to match TC18
+Table 55's own bit description, issue #256.**
+
+Investigated Group G (`REQ-ISELED-007`). Read TC18 §13.7.12.2 Table 55
+directly: register bit 0x0007.4 `iseled_use_rcv_clk` is documented, in
+the table itself, as "Use clock provided by ISELED 1st device instead
+of FreqSync pattern" -- true selects the *device*-provided clock
+(which arrives on the ISP_N pin, per §13.7.12.2's own prose: "data
+sampling based on the clock provided on the ISP_N pin"); false selects
+the Freq_Sync pattern instead, the one case §13.7.12.2 says makes
+ISP_N unnecessary to wire ("If the Freq_Sync pattern is used it is not
+necessary to connect the ISP_N of the EP to a physical Pin").
+
+`rcp_ep_iseled_requires_isp_n()` had this backwards: `return
+!use_rcv_clk` returned false (ISP_N not required) exactly when
+use_rcv_clk was true (device-provided clock, which *does* need
+ISP_N), and true exactly when Freq_Sync was selected (which does
+*not*). `ep_iseled.h`'s own file header, and `REQ-ISELED-007` itself,
+both independently described the same (wrong) polarity, consistently
+with the code -- the class of error this whole audit exists to catch,
+where code/docs/requirement entry all silently agree with each other
+while all three disagree with the primary source.
+
+This bug was not newly discovered: an earlier audit pass had already
+diagnosed it exactly and pinned it as
+`test_iseled_requires_isp_n_polarity_is_inverted()` in
+`tests/test_tc18_gaps_ep2.c`, complete with a `DEVIATION (BUG)`
+comment spelling out the fix ("A conforming implementation would
+return true for true and false for false") -- but the underlying
+function itself was never actually corrected, and `REQ-ISELED-007`
+was never flagged as a gap, so the deviation stayed live and
+unactioned until this batch's re-audit surfaced it again.
+
+Fixed `rcp_ep_iseled_requires_isp_n()` to `return use_rcv_clk`
+directly. `ep_iseled.h`'s file header corrected (the transition-density
+justification for Freq_Sync-based recovery, previously misattached to
+the wrong branch, reattached to the `use_rcv_clk == false` case where
+it actually applies) and the function's own doc comment flipped.
+`REQ-ISELED-007` rewritten with the real Table 55 citation.
+`tests/test_ep_iseled.c`'s `test_requires_isp_n()` assertions swapped
+to the correct polarity; the now-obsolete
+`test_iseled_requires_isp_n_polarity_is_inverted()` deviation-pinning
+test removed from `tests/test_tc18_gaps_ep2.c` (the gap it pinned no
+longer exists).
+
+Mutation-tested: reverted the fix back to `!use_rcv_clk`, confirmed
+`test_ep_iseled`'s new assertion catches it (1 failure), restored.
+Full suite (65/65) both trees. `.fusa-reqs.json` unchanged count (1024
+total, 100% traced/tested per `cfusa trace`, 0 errors per
+`cfusa check`).
+
+Issue #256's Group G is now fully closed (2/2, a real fix).
+**Progress: 78/156 findings resolved** (Groups H 12 + B 4 + A 17 + D
+16 + F 7 + E 4 + C 16 + G 2 = 78). Moving to Group I next (~10 genuine
+uncited gaps needing new requirement entries -- extraction work, not
+a defect-fix).

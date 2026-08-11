@@ -218,10 +218,14 @@ static void test_crc8_empty_input(void)
 
 /* ── requires_isp_n ─────────────────────────────────────────────────────────── */
 
+/* CORRECTED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group G): true selects
+ * the device-provided clock (TC18 Table 55), which arrives on ISP_N --
+ * ISP_N is therefore required when use_rcv_clk is true, not when it is
+ * false. See ep_iseled.h's own file header for the full citation. */
 static void test_requires_isp_n(void)
 {
-    TEST_ASSERT_FALSE(rcp_ep_iseled_requires_isp_n(true));
-    TEST_ASSERT_TRUE(rcp_ep_iseled_requires_isp_n(false));
+    TEST_ASSERT_TRUE(rcp_ep_iseled_requires_isp_n(true));
+    TEST_ASSERT_FALSE(rcp_ep_iseled_requires_isp_n(false));
 }
 
 /* ── Transmission-complete trigger ─────────────────────────────────────────── */
