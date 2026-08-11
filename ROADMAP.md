@@ -11461,3 +11461,51 @@ REQ-SRV-006 already existed and just needed correcting).
 Issue #256's Group H is down to 4 remaining: `REQ-SRV-013` (doc-only,
 cross-references the already-flagged `REQ-CANCEL-012` chain-cascade
 gap), `REQ-PWR-005`, `REQ-E2E-021`, `REQ-MOCK-030`.
+
+### v0.204.0 -- 2026-08-10
+
+**Full-catalog audit follow-up, batch 5 (Group H): unregistered
+byte_bus_id is now dropped silently, not answered with EP_NOT_FOUND,
+issue #256.**
+
+Re-confirmed `REQ-MOCK-030` directly against the primary-source PDF:
+TC18 §12.9.1 states plainly, "If the lookup of the byte_bus_id in the
+context of the stream_id does not point to an Endpoint, the request is
+dropped without further notification." `rcp_mock_server_dispatch()`'s
+own `find_slot() == NULL` branch instead built and sent a real TC18
+Table 27 `EP_NOT_FOUND` (8) wire error response -- a genuine
+conformance bug this session's own earlier Phase 1 work (issue #163,
+PR #170) introduced, having misapplied Table 27's own EP_NOT_FOUND row
+("if a Trigger request refers to a nonexisting EP" -- a Trigger
+request's own `trigger_source_ep` sub-field naming a nonexistent EP,
+which this codebase does not implement at all, per ROADMAP.md
+milestone 120's own honest note -- a completely different case from
+the addressed endpoint of the request itself).
+
+Fixed by removing the response-building entirely from that branch;
+`out_response` now stays zeroed (its value at function entry) exactly
+as TC18 requires. `RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS`'s own internal
+dispatch-result semantics are unaffected -- `rcp_mock_server_dispatch_frame()`'s
+chained-request cascade logic (`prev_errored`) keys off the result enum
+value alone, never off whether a response was actually built, so this
+change is scoped precisely to the wire behavior, not the internal
+control flow.
+
+`test_dispatch_unknown_bus_sends_ep_not_found_error` rewritten to
+`test_dispatch_unknown_bus_is_dropped_silently`, now asserting
+`resp.data == NULL` for a fully-decodable request (previously it
+asserted the response payload carried `RCP_ERROR_EP_NOT_FOUND`).
+Grepped for every other test referencing `RCP_ERROR_EP_NOT_FOUND` --
+only `test_errors.c`'s own enum-value/uniqueness check remains, which
+this change doesn't touch. `REQ-MOCK-030`'s own text and citation
+rewritten to state and cite the corrected rule.
+
+Mutation-tested: restored the removed response-building code with the
+new test kept, confirmed `test_dispatch_unknown_bus_is_dropped_silently`
+fails (`Expected NULL`, a real response was sent), reverted, diff-
+verified byte-identical against the pre-mutation backup. Full suite
+(65/65) both trees. 1036 requirements (unchanged count -- text rewrite
+of an existing entry).
+
+Issue #256's Group H is down to 3 remaining: `REQ-SRV-013` (doc-only,
+ready), `REQ-PWR-005`, `REQ-E2E-021`.

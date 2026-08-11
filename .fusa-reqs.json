@@ -8166,14 +8166,14 @@
     },
     {
       "id": "REQ-MOCK-030",
-      "title": "rcp_mock_server_dispatch() sends EP_NOT_FOUND when byte_bus_id names no registered endpoint",
-      "text": "rcp_mock_server_dispatch(), when byte_bus_id names no registered endpoint (find_slot() returns NULL) and the request is at least long enough to carry a decodable transaction_num, shall populate out_response with a real TC18 error response (rcp_acf_build_error_response()) carrying RCP_ERROR_EP_NOT_FOUND, the addressed (unregistered) byte_bus_id, and the request's own transaction_num.",
+      "title": "rcp_mock_server_dispatch() drops a request silently when byte_bus_id names no registered endpoint",
+      "text": "rcp_mock_server_dispatch(), when byte_bus_id names no registered endpoint (find_slot() returns NULL), shall leave out_response zeroed (no response sent) and return RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): this entry previously required a wire EP_NOT_FOUND error response for this case, a real conformance bug introduced by an earlier milestone (issue #163 Phase 1) that misapplied TC18 Table 27's EP_NOT_FOUND (8) code -- that code's own Table 27 description is scoped to \"if a Trigger request refers to a nonexisting EP\" (a Trigger request's own trigger_source_ep sub-field naming a nonexistent EP, a case this codebase does not implement at all, per ROADMAP.md milestone 120's own note), not to the addressed endpoint of the request itself. TC18 §12.9.1 explicitly and unambiguously requires the opposite of what this entry previously claimed: an unregistered byte_bus_id is dropped with no response. RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS's own internal dispatch-result semantics (distinguishing this case for chained-request cascade purposes in rcp_mock_server_dispatch_frame()) are unaffected -- only the wire response this function used to send has been removed.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "Table 27 (\"EP_NOT_FOUND\", 8), TC18.txt L3425-3426"
+      "tc18": "§12.9.1 (\"If the lookup of the byte_bus_id in the context of the stream_id does not point to an Endpoint, the request is dropped without further notification.\"), TC18.txt L3195-3197 -- Table 27's EP_NOT_FOUND (8) row (TC18.txt L3425-3426), previously miscited here, describes a different, unimplemented scenario (a Trigger request's own trigger_source_ep naming a nonexistent EP)"
     },
     {
       "id": "REQ-ACF-017",

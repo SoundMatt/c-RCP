@@ -403,8 +403,9 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
     if (accept == RCP_LIFECYCLE_REJECT) {
         /* REQ-LIFECYCLE-033: admitted far enough to identify (TC18 §12.7's
          * own EP0-scoped rule), but answered with REQUEST_REJECTED rather
-         * than processed -- same transaction_num-recovery technique
-         * find_slot()'s own EP_NOT_FOUND path below uses. */
+         * than processed -- same transaction_num-recovery technique this
+         * function used to use for its own (now-removed) EP_NOT_FOUND
+         * path; see REQ-MOCK-030's own history below. */
         rcp_acf_byte_message_info_t hdr = {0};
         if (request_len >= 8 && rcp_acf_unpack_header(request, &hdr) == RCP_ACF_OK) {
             *out_response = rcp_acf_build_error_response(byte_bus_id, hdr.transaction_num,
@@ -415,16 +416,18 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
 
     slot = find_slot(srv, byte_bus_id);
     if (!slot) {
-        /* byte_bus_id itself is a real, decoded value (this function's own
-         * parameter) even though it names no registered endpoint --
-         * TC18 Table 27's EP_NOT_FOUND (8) is exactly this case. transaction_num
-         * is read back out of the request frame's own header, same technique
-         * finish_admission() already uses. */
-        rcp_acf_byte_message_info_t hdr = {0};
-        if (request_len >= 8 && rcp_acf_unpack_header(request, &hdr) == RCP_ACF_OK) {
-            *out_response =
-                rcp_acf_build_error_response(byte_bus_id, hdr.transaction_num, RCP_ERROR_EP_NOT_FOUND);
-        }
+        /* TC18 §12.9.1: "If the lookup of the byte_bus_id in the context
+         * of the stream_id does not point to an Endpoint, the request is
+         * dropped without further notification." No response is sent --
+         * out_response stays zeroed, per this function's own entry
+         * memset() above (REQ-MOCK-030, corrected 2026-08-10,
+         * c-RCP-AUDIT-06 issue #256: this branch previously sent a
+         * Table 27 EP_NOT_FOUND response for exactly this case, but
+         * Table 27's own EP_NOT_FOUND row is scoped to a different,
+         * unimplemented scenario -- "if a Trigger request refers to a
+         * nonexisting EP", a Trigger request's own trigger_source_ep
+         * sub-field naming a nonexistent EP, not the addressed
+         * byte_bus_id of the request itself). */
         return RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS;
     }
 

@@ -34,6 +34,10 @@ the rationale.
 
 ## Releases
 
+### v0.204.0 -- 2026-08-10
+
+Full-catalog audit follow-up, batch 5 (Group H): unregistered byte_bus_id is now dropped silently, not answered with EP_NOT_FOUND (REQ-MOCK-030). Issue #256. See `ROADMAP.md` for full detail.
+
 ### v0.203.0 -- 2026-08-10
 
 Full-catalog audit follow-up, batch 4 (Group H): compound requests now respect the endpoint-idle execution gate (REQ-SRV-006). Issue #256. See `ROADMAP.md` for full detail.
