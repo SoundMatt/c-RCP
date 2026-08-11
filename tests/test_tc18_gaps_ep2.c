@@ -5,6 +5,7 @@
 //cfusa:test REQ-ADC-034
 //cfusa:test REQ-ADC-035
 //cfusa:test REQ-ADC-036
+//cfusa:test REQ-ADC-037
 //cfusa:test REQ-CANEP-028
 //cfusa:test REQ-CANEP-029
 //cfusa:test REQ-CANEP-030
@@ -25,6 +26,7 @@
 //cfusa:test REQ-UART-035
 //cfusa:test REQ-UART-036
 //cfusa:test REQ-UART-037
+//cfusa:test REQ-UART-038
 
 /*
  * test_tc18_gaps_ep2.c -- spec-literal conformance-and-deviation suite for
@@ -140,7 +142,14 @@ static void test_uart_functional_block_has_no_len_or_status_register(void)
      * shared common flags, and the entire endpoint-specific surface any
      * client can reach is 13 octets -- baud_rate(4) + uart_nr_bits(1) +
      * parity(1) + stop_bits(1) + ep_rx_buffer_size(2) + uart_timeout_ms(4)
-     * -- with no length and no status register among them. */
+     * -- with no length and no status register among them.
+     *
+     * DEVIATION PIN (REQ-UART-038, not implemented): this same 13-octet
+     * total, having already exercised every setter this module defines,
+     * also proves Table 48's uart_rts_enable/uart_cts_enable/
+     * uart_half_duplex (0x0009.2-4) and uart_trail (0x000C) have no
+     * representation at all -- if any of the four existed, this count
+     * would exceed 13. */
     TEST_ASSERT_EQUAL_size_t(0u, offsetof(rcp_ep_uart_functional_cfg_t, common));
     TEST_ASSERT_EQUAL_size_t(13u, changed_octets(before, (const uint8_t *)&cfg,
                                                  sizeof(before)));
@@ -416,6 +425,25 @@ static void test_adc_has_no_trigger_outputs_and_no_retained_average(void)
      * against and no request-execution state to gate sampling on. */
     TEST_ASSERT_EQUAL_UINT16(RCP_EP_PWM_IN_NO_SIGNAL, empty.value);
     TEST_ASSERT_EQUAL_UINT64(0u, rcp_ep_adc_capture_moment_timestamp(NULL, 0u));
+
+    /* DEVIATION PIN (REQ-ADC-037, not implemented): TC18 §13.7.9.2 states
+     * three cadence cases comparing adc_combine_avg_values against
+     * adc_avg_intervals_per_request (multi-request-to-one-response,
+     * one-to-one, one-to-multi-response). rcp_ep_adc_collect_response_values()
+     * takes only avg_count/value_count as plain parameters -- neither
+     * adc_combine_avg_values nor adc_avg_intervals_per_request is anywhere
+     * in its signature -- and simply packs min(avg_count, value_count)
+     * values regardless of what either config field says, proving this
+     * pure packer has no cadence awareness at all; nothing else in this
+     * module does either. */
+    {
+        rcp_ep_adc_avg_value_t five[5] = {0};
+        uint16_t                packed[3];
+        size_t                  n;
+
+        n = rcp_ep_adc_collect_response_values(five, 5u, packed, 3u);
+        TEST_ASSERT_EQUAL_size_t(3u, n); /* min(5, 3) -- min() only, no cadence logic */
+    }
 }
 
 /* ── LIN (§13.7.10) ────────────────────────────────────────────────────────── */

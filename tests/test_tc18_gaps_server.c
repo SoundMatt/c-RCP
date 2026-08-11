@@ -15,6 +15,7 @@
 //cfusa:test REQ-LIFECYCLE-035
 //cfusa:test REQ-LIFECYCLE-036
 //cfusa:test REQ-LIFECYCLE-037
+//cfusa:test REQ-LIFECYCLE-038
 //cfusa:test REQ-PWRMODE-014
 //cfusa:test REQ-PWRMODE-015
 //cfusa:test REQ-PWRMODE-016
@@ -246,6 +247,33 @@ static void test_admit_takes_no_lifecycle_state_or_stream_identity(void)
 
     rcp_bytes_free(&frame);
     rcp_server_endpoint_destroy(&ep);
+}
+
+/* DEVIATION PIN (REQ-LIFECYCLE-038, not implemented): TC18 §12.3.1.2's
+ * RCP_CFG_INCONSISTENT plausibility check names three bullets;
+ * rcp_lifecycle_check_rcp_cfg() implements only two (has_stream_assoc per
+ * used endpoint, has_response_stream per configured request stream). The
+ * third -- "For each configured stream at least one stream_id/byte_bus_id
+ * is configured", i.e. no request stream is left orphaned with zero
+ * endpoints actually using it -- has no counterpart at all: a snapshot
+ * with zero endpoints and one "configured" request stream (already
+ * satisfying has_response_stream) is indistinguishable from a plausible
+ * configuration today. */
+static void test_rcp_cfg_inconsistent_does_not_catch_an_orphaned_stream(void)
+{
+    rcp_lifecycle_request_stream_plausibility_t streams[1] = {
+        { true, true }, /* configured, has_response_stream -- both "satisfied" */
+    };
+    rcp_lifecycle_plausibility_snapshot_t snap = {0};
+
+    /* No endpoints at all reference this stream -- TC18's own bullet 2
+     * would reject this as RCP_CFG_INCONSISTENT; this check does not. */
+    snap.endpoints            = NULL;
+    snap.endpoint_count       = 0;
+    snap.request_streams      = streams;
+    snap.request_stream_count = 1;
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK, rcp_lifecycle_check_rcp_cfg(&snap));
 }
 
 /* ── §12.3.1.1 / §12.7.2 / §12.7: HW_UNCONFIGURED admission ────────────────── */
@@ -1213,6 +1241,7 @@ int main(void)
     RUN_TEST(test_hw_generic_covers_ep_generic_and_queue_config_with_locked_response);
     RUN_TEST(test_hw_configured_admits_only_ep0);
     RUN_TEST(test_admit_takes_no_lifecycle_state_or_stream_identity);
+    RUN_TEST(test_rcp_cfg_inconsistent_does_not_catch_an_orphaned_stream);
     RUN_TEST(test_hw_unconfigured_admission_ignores_claimant_but_writes_still_gated);
     RUN_TEST(test_hw_configured_write_access_now_requires_unicast_and_authorization);
     RUN_TEST(test_hw_configured_drops_tscf);

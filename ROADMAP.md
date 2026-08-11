@@ -12127,3 +12127,86 @@ remain entirely uninvestigated in this batch.
 **Progress: 79/156 findings resolved** (Groups H 12 + B 4 + A 17 + D
 16 + F 7 + E 4 + C 16 + G 2 + I(partial) 1 = 79). Group I continues
 next.
+
+### v0.215.0 -- 2026-08-10
+
+**Full-catalog audit follow-up, batch 16 (Group I items 2-4 of ~10,
+extraction-only): three more genuine, primary-source-verified gaps
+given honest requirement entries, issue #256.**
+
+Continued Group I with three items fully investigated and closed as
+honest documentation additions (no code change -- these are the
+"extraction work" character Group I was expected to have, unlike item
+1's real code addition):
+
+**`REQ-LIFECYCLE-038`** (§12.3.1.2): TC18's RCP_CFG_INCONSISTENT
+plausibility check names three bullets; `rcp_lifecycle_check_rcp_cfg()`
+implements exactly two (`has_stream_assoc` per used endpoint,
+`has_response_stream` per configured request stream). The third --
+"For each configured stream at least one stream_id/byte_bus_id is
+configured", the mirror-image completeness check that no request
+stream is left orphaned with zero endpoints using it -- has no
+counterpart at all: `rcp_lifecycle_request_stream_plausibility_t`
+carries no field for it. New deviation-pin test
+(`test_rcp_cfg_inconsistent_does_not_catch_an_orphaned_stream`,
+`tests/test_tc18_gaps_server.c`) demonstrates a snapshot with zero
+endpoints and one "configured" stream (already satisfying the other
+two bullets) still returns `RCP_LIFECYCLE_OK` today.
+
+**`REQ-ADC-037`** (§13.7.9.2): the three cadence cases comparing
+`adc_combine_avg_values` against `adc_avg_intervals_per_request`
+(multi-request-to-one-response / one-to-one / one-to-multi-response)
+are already honestly discussed in `ep_adc.h`'s own file header prose
+("this module models the codec and the arithmetic, never the
+scheduling") -- but no `.fusa-reqs.json` entry had ever formally cited
+this MUST rule until now, and no function anywhere decides which case
+applies or drives the accumulation. New pin appended to the existing
+`test_adc_has_no_trigger_outputs_and_no_retained_average()`
+(`tests/test_tc18_gaps_ep2.c`): `rcp_ep_adc_collect_response_values()`
+takes plain `avg_count`/`value_count` parameters -- neither config
+field appears in its signature at all -- and just packs
+`min(avg_count, value_count)`, proving it has no cadence awareness.
+Same class of caller-owned-orchestration gap already tracked for
+REQ-E2E-021/030/045 and REQ-CANCEL-012.
+
+**`REQ-UART-038`** (Table 48): four further R/W fields --
+`uart_rts_enable`/`uart_cts_enable` (hardware RTS/CTS flow control),
+`uart_half_duplex` (full- vs. half-duplex), and `uart_trail`
+(inter-transmission trail time) -- have no field, setter, or round-trip
+of any kind in `rcp_ep_uart_functional_cfg_t`. Rather than a new test
+function, the existing
+`test_uart_functional_block_has_no_len_or_status_register()`
+(`tests/test_tc18_gaps_ep2.c`) already exhaustively exercises every
+setter this module defines and counts exactly 13 changed octets --
+that count itself, unmodified, is the proof none of the four exist
+(if any did, the count would exceed 13); a comment was added
+explaining this rather than duplicating the exercise.
+
+All three: file header disclosure added (`lifecycle.h`, `ep_adc.h`,
+`ep_uart.h`), `.fusa-reqs.json` entries added (`status:
+"not-implemented"`, `scope: "tc18-gap"`), deviation-pin tests
+added/extended. No mutation-testing needed (no production logic
+changed -- pure additions plus pins of already-existing, unmodified
+behavior). Full suite (65/65) both trees. `cfusa check`: 0 errors.
+`cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100` and
+`--sec-tested 100`: both 100% (1024/1024), exit 0 -- two of the three
+new entries (`REQ-LIFECYCLE-038`, `REQ-ADC-037`) print in a secondary
+"UNTRACED" diagnostic listing despite having `//cfusa:test` tags, the
+same non-blocking, pre-existing tag-parsing quirk this file
+(`test_tc18_gaps_ep2.c`) has shown for the `REQ-UART-032`..`037`
+block (and `REQ-LINEP-023/024`, `REQ-ISELED-028`, `REQ-MDIO-020/021/022`)
+unchanged throughout this entire session's prior batches -- confirmed
+non-blocking by exit code 0 and an unaffected "100% (1024/1024)"
+top-line metric both times.
+
+Issue #256's Group I is 4/~10 items addressed (1 real addition + 3
+honest documentation additions). **Progress: 82/156 findings
+resolved** (Groups H 12 + B 4 + A 17 + D 16 + F 7 + E 4 + C 16 + G 2 +
+I 4 = 82). Group I's remaining items (SPI's missing §12.7.1
+reconfig path plus the cross-endpoint question it raises, GPIO/PWM_OUT's
+`evt[2:0]=100b` error-response half, ISELED Table 55's register
+block, the Cancel-family Ack sub-field, GPIO's read-with-payload
+behavior, and WakeUp's wake-source debounce time) remain for a future
+session, per the standing practice of sizing each batch to what full
+verification rigor can actually cover rather than rushing a whole
+group through in one pass.
