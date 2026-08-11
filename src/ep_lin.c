@@ -31,10 +31,12 @@ bool rcp_ep_lin_response_matches(const uint8_t *tx_data, size_t tx_len,
 /* ── Transmission-done trigger ─────────────────────────────────────────────── */
 
 //cfusa:req REQ-LINEP-006
-bool rcp_ep_lin_trigger_fires(rcp_ep_lin_trigger_t trigger, bool tx_done_event)
+//cfusa:req REQ-LINEP-023
+bool rcp_ep_lin_trigger_fires(rcp_ep_lin_trigger_t trigger, bool tx_done_event,
+                               bool trailing_time_expired)
 {
     switch (trigger) {
-    case RCP_EP_LIN_TRIGGER_TX_DONE: return tx_done_event;
+    case RCP_EP_LIN_TRIGGER_TX_DONE: return tx_done_event && trailing_time_expired;
     case RCP_EP_LIN_TRIGGER_NONE:
     default:                         return false;
     }

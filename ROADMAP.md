@@ -14787,3 +14787,58 @@ TIMED (2 items), LINEP (2 items) -- the remaining smallest/
 most-isolated modules, per issue #201's own suggested build-momentum
 ordering, before the larger endpoint-type clusters (ADC, SPI, UART,
 GPIO, PWM, ISELED, CANEP, MDIO).
+
+### v0.242.0 -- 2026-08-11 (behavioral fix, tests-only blast radius)
+
+**Phase 5e batch 2 (issue #201): REQ-LINEP-023, the LIN
+transmission-done trigger now honours the required AND condition.
+REQ-I2C-019 and REQ-LINEP-024 confirmed already `implemented` --
+their groups' remaining item counts in issue #201 were stale
+(closed by an earlier same-day audit batch, c-RCP-AUDIT-06).**
+
+`rcp_ep_lin_trigger_fires()` (ep_lin.h/ep_lin.c) gains a second
+parameter, `trailing_time_expired`, ANDed with `tx_done_event` for
+`RCP_EP_LIN_TRIGGER_TX_DONE` -- TC18 §13.7.10.1's own text, verified
+directly against TC18.txt (line 5278): "The LIN EP issues a trigger
+when a transmission has been finalized, and the configured trailing
+time has expired." Table 52 (§13.7.10.2) defines no dedicated wire
+register for "the configured trailing time" itself -- like this
+endpoint type's own trigger concept as a whole (already documented
+as having no TC18 basis, entirely this module's own original
+design), the caller supplies this as an already-classified boolean,
+matching the same convention every endpoint module's own
+trigger-evaluation function already uses. REQ-LINEP-023 moves
+`partial` -> `implemented`: the previously-missing AND condition was
+the requirement's whole remaining scope, and it's now correctly
+modeled.
+
+Blast radius: 7 existing test call sites (2 files) needed updating
+for the new parameter (a compile-time argument-count mismatch, not
+silently discardable like a bool return); no production caller
+existed.
+
+New tests: `test_trigger_fires` (test_ep_lin.c) extended to the full
+2x2 matrix for TX_DONE;
+`test_lin_trigger_now_honours_trailing_time_and_block_has_registers`
+(test_tc18_gaps_ep2.c, renamed from `..._ignores_trailing_time_...`)
+rewritten to assert the fix rather than pin the deviation.
+
+Mutation-tested: removing the `&&` (fires on `tx_done_event` alone)
+produced clean, deterministic assertion failures in both affected
+test files. Reverted, full suite re-verified byte-identical.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
+0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
+**Progress**: LINEP group (issue #201) now fully addressed --
+`REQ-LINEP-023` was its only remaining item; `REQ-LINEP-024` already
+closed. I2C group also confirmed fully addressed
+(`REQ-I2C-019` already closed). **Next**: WDG (`REQ-WDG-010`) --
+flagged as needing a scope decision before implementation, since
+wiring `rcp_watchdog_keeper_kick()` into the request-reception path
+means either a signature change to `rcp_server_endpoint_admit()`/
+`_submit()` (both widely-used production entry points, unlike every
+signature change made so far this phase which had zero production
+callers) or documenting this as a genuine integrator responsibility,
+matching REQ-SRV-017's own established precedent -- then CFG
+(2 items) and TIMED (2 items).

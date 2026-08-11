@@ -10162,12 +10162,12 @@
     {
       "id": "REQ-LINEP-023",
       "title": "The LIN transmission-done trigger fires only after the configured trailing time has also expired",
-      "text": "NOT IMPLEMENTED (partially): TC18 \u00a713.7.10.1 requires the LIN endpoint's trigger to fire when BOTH conditions hold \u2014 the transmission has been finalized AND the configured trailing time has expired. c-RCP's rcp_ep_lin_trigger_fires() (src/ep_lin.c) evaluates only the transmission-finalized half, returning tx_done_event unchanged for RCP_EP_LIN_TRIGGER_TX_DONE, and rcp_ep_lin_functional_cfg_t declares no trailing-time field for the second half to consult. Consequence: a LIN endpoint configured with a repeated trigger request on its own trigger \u2014 the spec's own documented way to send cyclically on the LIN bus \u2014 will re-fire before the inter-frame trail time has elapsed, producing back-to-back LIN frames with no gap.",
+      "text": "FIXED 2026-08-11 (Phase 5e batch 2, issue #201): TC18 \u00a713.7.10.1 requires the LIN endpoint's trigger to fire when BOTH conditions hold \u2014 the transmission has been finalized AND the configured trailing time has expired. rcp_ep_lin_trigger_fires() (src/ep_lin.c) now takes trailing_time_expired as a second, caller-classified boolean parameter and ANDs it with tx_done_event for RCP_EP_LIN_TRIGGER_TX_DONE \u2014 the same caller-supplies-already-classified-inputs convention every endpoint module in this codebase already follows for its own trigger evaluation. Table 52 (\u00a713.7.10.2) defines no dedicated wire register for \"the configured trailing time\" itself \u2014 like this endpoint type's own trigger concept as a whole (no TC18 basis at all, entirely this module's own original design \u2014 see ep_lin.h's own file header), a wire-configurable duration was never something TC18 gives this codebase a register to model; the caller classifying trailing-time-expired is this module's established architecture, not a remaining gap.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "partial",
+      "status": "implemented",
       "tc18": "\u00a713.7.10.1, TC18.txt L5278-5279"
     },
     {
