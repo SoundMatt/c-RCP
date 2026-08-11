@@ -4,6 +4,21 @@
 #include <stdlib.h>
 #include <string.h>
 
+/* ── Byte-order helpers (this TU's own copy, matching acf.c's/ep_pwm.c's/
+ * ep_gpio.c's/ep_spi.c's/ep_i2c.c's house convention of not sharing a
+ * byte-order util across modules) ─────────────────────────────────────── */
+
+static void put_u16(uint8_t *p, uint16_t v)
+{
+    p[0] = (uint8_t)((v >> 8) & 0xFFu);
+    p[1] = (uint8_t)(v & 0xFFu);
+}
+
+static uint16_t get_u16(const uint8_t *p)
+{
+    return (uint16_t)(((uint16_t)p[0] << 8) | (uint16_t)p[1]);
+}
+
 /* ── Word format: data bits, parity, stop bits ──────────────────────────────── */
 
 //cfusa:req REQ-UART-001
@@ -43,7 +58,9 @@ void rcp_ep_uart_functional_cfg_init(rcp_ep_uart_functional_cfg_t *cfg)
     /* parity is already RCP_EP_UART_PARITY_NONE (0) and stop_bits already
      * RCP_EP_UART_STOP_BITS_ONE (0) via the memset above. uart_nr_bits
      * cannot be left at that memset's 0, since 0 is not itself
-     * rcp_ep_uart_nr_bits_valid() -- see the file header. */
+     * rcp_ep_uart_nr_bits_valid() -- see the file header. ep_status/
+     * baud_rate_kbps/wire_timeout_bit_times/trail are already 0 and
+     * rts_enable/cts_enable/half_duplex already false, via the memset. */
     cfg->uart_nr_bits = RCP_EP_UART_NR_BITS_MAX;
 }
 
@@ -103,6 +120,206 @@ bool rcp_ep_uart_set_timeout(rcp_ep_uart_functional_cfg_t *cfg, uint32_t timeout
 
     cfg->uart_timeout_ms = timeout_ms;
     return true;
+}
+
+/* ── The EP_func register block (evt[2:0] == 111b) ─────────────────────────── */
+
+/* The EP-common enable&clr (0x0002) and options (0x0003) octets, packed
+ * from / unpacked into the flags regmap.h's shared functional-config
+ * prefix already models -- same bit positions as ep_pwm.c's/ep_gpio.c's/
+ * ep_spi.c's/ep_i2c.c's own copies, since Table 32's common entries are
+ * shared across every endpoint type. Only the bits regmap.h models are
+ * represented; see ep_pwm.c's identical note for why the rest read back
+ * as 0. */
+#define UART_ENABLE_CLR_BIT_ENABLE ((uint8_t)(1u << 0))
+#define UART_ENABLE_CLR_BIT_CLEAR  ((uint8_t)(1u << 4))
+#define UART_OPTIONS_BIT_REQ_CRC   ((uint8_t)(1u << 0))
+#define UART_OPTIONS_BIT_RESP_TS   ((uint8_t)(1u << 3))
+#define UART_OPTIONS_BIT_SUPPRESS  ((uint8_t)(1u << 7))
+
+/* uart_stop_bits's own half-stop-bit units <-> rcp_ep_uart_stop_bits_t --
+ * see the file header for the documented, deliberately lossy mapping. */
+static uint8_t stop_bits_to_half_units(uint8_t stop_bits)
+{
+    return stop_bits == (uint8_t)RCP_EP_UART_STOP_BITS_TWO ? 4u : 2u;
+}
+
+static uint8_t half_units_to_stop_bits(uint8_t half_units)
+{
+    return half_units >= 3u ? (uint8_t)RCP_EP_UART_STOP_BITS_TWO
+                             : (uint8_t)RCP_EP_UART_STOP_BITS_ONE;
+}
+
+//cfusa:req REQ-UART-039
+void rcp_ep_uart_render_registers(const rcp_ep_uart_functional_cfg_t *cfg,
+                                   uint8_t out[RCP_EP_UART_EP_FUNC_LEN])
+{
+    uint8_t enable_clr = 0u;
+    uint8_t options    = 0u;
+    uint8_t flags       = 0u;
+
+    if (cfg->common.ep_enable) enable_clr |= UART_ENABLE_CLR_BIT_ENABLE;
+    if (cfg->common.ep_clear_req_storage) enable_clr |= UART_ENABLE_CLR_BIT_CLEAR;
+    if (cfg->common.ep_req_crc_enable) options |= UART_OPTIONS_BIT_REQ_CRC;
+    if (cfg->common.ep_response_ts_enable) options |= UART_OPTIONS_BIT_RESP_TS;
+    if (cfg->common.ep_suppress_response) options |= UART_OPTIONS_BIT_SUPPRESS;
+
+    if (cfg->parity != (uint8_t)RCP_EP_UART_PARITY_NONE) flags |= RCP_EP_UART_FLAG_PARITY_ENABLE;
+    if (cfg->parity == (uint8_t)RCP_EP_UART_PARITY_EVEN) flags |= RCP_EP_UART_FLAG_PARITY_POL;
+    if (cfg->rts_enable) flags |= RCP_EP_UART_FLAG_RTS_ENABLE;
+    if (cfg->cts_enable) flags |= RCP_EP_UART_FLAG_CTS_ENABLE;
+    if (cfg->half_duplex) flags |= RCP_EP_UART_FLAG_HALF_DUPLEX;
+
+    out[RCP_EP_UART_REG_EP_LEN]        = (uint8_t)RCP_EP_UART_EP_FUNC_LEN;
+    out[RCP_EP_UART_REG_RESERVED_01]   = 0u;
+    out[RCP_EP_UART_REG_EP_ENABLE_CLR] = enable_clr;
+    out[RCP_EP_UART_REG_EP_OPTIONS]    = options;
+    put_u16(&out[RCP_EP_UART_REG_EP_STATUS], cfg->ep_status);
+    put_u16(&out[RCP_EP_UART_REG_BAUD_RATE], cfg->baud_rate_kbps);
+    out[RCP_EP_UART_REG_NR_BITS]   = cfg->uart_nr_bits;
+    out[RCP_EP_UART_REG_FLAGS]     = flags;
+    out[RCP_EP_UART_REG_STOP_BITS] = stop_bits_to_half_units(cfg->stop_bits);
+    out[RCP_EP_UART_REG_TIMEOUT]   = cfg->wire_timeout_bit_times;
+    out[RCP_EP_UART_REG_TRAIL]     = cfg->trail;
+}
+
+/* The inverse of render: adopts every R/W register from an already
+ * patched block image. The read-only offsets (EP_LEN, the reserved
+ * octet) are deliberately not read back -- apply_reconfig() re-renders
+ * them from cfg before patching, so a write covering them is a no-op. */
+static void parse_registers(rcp_ep_uart_functional_cfg_t *cfg,
+                             const uint8_t in[RCP_EP_UART_EP_FUNC_LEN])
+{
+    uint8_t enable_clr = in[RCP_EP_UART_REG_EP_ENABLE_CLR];
+    uint8_t options    = in[RCP_EP_UART_REG_EP_OPTIONS];
+    uint8_t flags       = in[RCP_EP_UART_REG_FLAGS];
+    bool    parity_enable = (flags & RCP_EP_UART_FLAG_PARITY_ENABLE) != 0u;
+    bool    parity_pol    = (flags & RCP_EP_UART_FLAG_PARITY_POL) != 0u;
+
+    cfg->common.ep_enable             = (enable_clr & UART_ENABLE_CLR_BIT_ENABLE) != 0u;
+    cfg->common.ep_clear_req_storage  = (enable_clr & UART_ENABLE_CLR_BIT_CLEAR) != 0u;
+    cfg->common.ep_req_crc_enable     = (options & UART_OPTIONS_BIT_REQ_CRC) != 0u;
+    cfg->common.ep_response_ts_enable = (options & UART_OPTIONS_BIT_RESP_TS) != 0u;
+    cfg->common.ep_suppress_response  = (options & UART_OPTIONS_BIT_SUPPRESS) != 0u;
+
+    cfg->ep_status      = get_u16(&in[RCP_EP_UART_REG_EP_STATUS]);
+    cfg->baud_rate_kbps = get_u16(&in[RCP_EP_UART_REG_BAUD_RATE]);
+    cfg->uart_nr_bits   = in[RCP_EP_UART_REG_NR_BITS];
+
+    if (!parity_enable) {
+        cfg->parity = (uint8_t)RCP_EP_UART_PARITY_NONE;
+    } else {
+        cfg->parity = parity_pol ? (uint8_t)RCP_EP_UART_PARITY_EVEN
+                                  : (uint8_t)RCP_EP_UART_PARITY_ODD;
+    }
+    cfg->rts_enable  = (flags & RCP_EP_UART_FLAG_RTS_ENABLE) != 0u;
+    cfg->cts_enable  = (flags & RCP_EP_UART_FLAG_CTS_ENABLE) != 0u;
+    cfg->half_duplex = (flags & RCP_EP_UART_FLAG_HALF_DUPLEX) != 0u;
+
+    cfg->stop_bits              = half_units_to_stop_bits(in[RCP_EP_UART_REG_STOP_BITS]);
+    cfg->wire_timeout_bit_times = in[RCP_EP_UART_REG_TIMEOUT];
+    cfg->trail                  = in[RCP_EP_UART_REG_TRAIL];
+}
+
+/* True iff the octet at relative offset addr belongs to a read-only
+ * register of the block -- EP_LEN or the reserved octet. */
+static bool reg_offset_read_only(uint16_t addr)
+{
+    return addr == RCP_EP_UART_REG_EP_LEN || addr == RCP_EP_UART_REG_RESERVED_01;
+}
+
+//cfusa:req REQ-UART-040
+const char *rcp_ep_uart_reconfig_strerror(rcp_ep_uart_reconfig_errc_t e)
+{
+    switch (e) {
+    case RCP_EP_UART_RECONFIG_OK:
+        return "rcp/ep_uart: UART configuration write applied";
+    case RCP_EP_UART_RECONFIG_ERR_SHORT:
+        return "rcp/ep_uart: UART configuration write has no address and data";
+    case RCP_EP_UART_RECONFIG_ERR_OUT_OF_RANGE:
+        return "rcp/ep_uart: UART configuration write extends past the EP_func block";
+    default:
+        return "rcp/ep_uart: UART unknown configuration-write error";
+    }
+}
+
+//cfusa:req REQ-UART-039
+//cfusa:req REQ-UART-040
+rcp_ep_uart_reconfig_errc_t rcp_ep_uart_apply_reconfig(rcp_ep_uart_functional_cfg_t *cfg,
+                                                        const uint8_t *payload,
+                                                        size_t payload_len)
+{
+    uint8_t  block[RCP_EP_UART_EP_FUNC_LEN];
+    uint16_t start_address;
+    size_t   data_len;
+    size_t   i;
+
+    if (payload_len <= RCP_EP_UART_RECONFIG_ADDR_LEN) {
+        return RCP_EP_UART_RECONFIG_ERR_SHORT;
+    }
+
+    start_address = get_u16(payload);
+    data_len      = payload_len - RCP_EP_UART_RECONFIG_ADDR_LEN;
+
+    /* "Any payload whose length plus the start address exceeds EP_LEN is
+     * to be ignored" -- the whole write, not just its overhanging tail
+     * (§12.7.1). */
+    if ((size_t)start_address + data_len > (size_t)RCP_EP_UART_EP_FUNC_LEN) {
+        return RCP_EP_UART_RECONFIG_ERR_OUT_OF_RANGE;
+    }
+
+    /* Patch the block's current image at octet granularity, then adopt it
+     * wholesale -- so a write covering only part of a multi-octet
+     * register updates exactly the octets it addresses and leaves that
+     * register's other octets alone. */
+    rcp_ep_uart_render_registers(cfg, block);
+    for (i = 0; i < data_len; i++) {
+        uint16_t addr = (uint16_t)(start_address + i);
+
+        if (reg_offset_read_only(addr)) continue; /* write ignored */
+        block[addr] = payload[RCP_EP_UART_RECONFIG_ADDR_LEN + i];
+    }
+    parse_registers(cfg, block);
+
+    return RCP_EP_UART_RECONFIG_OK;
+}
+
+//cfusa:req REQ-UART-039
+rcp_bytes_t rcp_ep_uart_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                 uint16_t start_address, const uint8_t *data,
+                                                 size_t data_len, uint8_t transaction_num)
+{
+    rcp_acf_byte_message_info_t hdr   = {0};
+    rcp_bytes_t                 empty = {0};
+    uint8_t                     *payload;
+    size_t                       payload_len;
+    rcp_bytes_t                  frame;
+
+    if (data_len == 0 || data == NULL) return empty;
+
+    payload_len = RCP_EP_UART_RECONFIG_ADDR_LEN + data_len;
+    if (payload_len > RCP_ACF_MAX_PAYLOAD) return empty;
+
+    payload = (uint8_t *)malloc(payload_len);
+    if (!payload) return empty;
+
+    put_u16(payload, start_address);
+    memcpy(payload + RCP_EP_UART_RECONFIG_ADDR_LEN, data, data_len);
+
+    hdr.byte_bus_id     = byte_bus_id;
+    hdr.op              = RCP_ACF_OP_WRITE; /* §12.7.1 Figure 18: "the data
+                                                of the byte_msg_payload from
+                                                a write request is written
+                                                into" the EP_func block --
+                                                matches PWM_OUT's/GPIO's/
+                                                SPI's/I2C's own
+                                                encode_reconfig_request(). */
+    hdr.evt             = 0x7u; /* evt[2:0] = 111b */
+    hdr.transaction_num = transaction_num;
+
+    frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
+    free(payload);
+    return frame;
 }
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */

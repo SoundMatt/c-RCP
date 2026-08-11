@@ -166,13 +166,16 @@
  * ep_rx_buffer_size (the RX FIFO's size in octets), and uart_timeout_ms
  * (the read-completion race's timeout half -- see above).
  *
- * NOT IMPLEMENTED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group I,
- * REQ-UART-038): four further TC18 §13.7.8.2 Table 48 R/W fields have no
- * counterpart here at all -- uart_rts_enable/uart_cts_enable (hardware
+ * FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-UART-038):
+ * the four TC18 §13.7.8.2 Table 48 R/W fields this struct previously had
+ * no counterpart for at all -- uart_rts_enable/uart_cts_enable (hardware
  * RTS/CTS flow control), uart_half_duplex (full- vs. half-duplex
  * operation), and uart_trail (inter-transmission trail time in bit
- * times). No field, setter, or round-trip of any kind exists for any of
- * the four.
+ * times) -- are now modelled (rts_enable/cts_enable/half_duplex/trail),
+ * alongside the whole Table 48 register block itself (see "The EP_func
+ * register block" below). Unlike GPIO's/I2C's own source tables, Table
+ * 48 is internally consistent -- no address-collision editorial defect
+ * to resolve here.
  * rcp_ep_uart_functional_cfg_writable() is, likewise, a thin, named
  * wrapper over server.h's rcp_lifecycle_field_writable()
  * (RCP_LIFECYCLE_FIELD_FUNCTIONAL_W), and every rcp_ep_uart_set_*() mutator
@@ -180,6 +183,70 @@
  * server.h's/regmap.h's existing authorization logic, per the roadmap's
  * explicit instruction (the same rule every prior endpoint type's own
  * setters already follow).
+ *
+ * ── The EP_func register block (evt[2:0] == 111b) ──────────────────────────
+ *
+ * FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-UART-038):
+ * rcp_ep_uart_decode_write_request()/_decode_read_request() already
+ * correctly reject evt[2:0] = 111b as RCP_EP_UART_ERR_BAD_EVT (via acf.h's
+ * shared rcp_acf_evt_row2_is_plain()) -- exactly right, since a
+ * config-write request is not a plain transfer. What was missing, the
+ * same class of gap SPI's and I2C's own earlier fixes closed, was any
+ * counterpart implementing that §12.7.1 path: this endpoint's Table 48
+ * register block had no wire render/parse path of any kind.
+ *
+ * Table 48's own layout (unlike GPIO's/I2C's own source tables, this one
+ * has no address-collision editorial defect -- its printed addresses are
+ * internally consistent throughout):
+ *
+ *   0x0000  uart_ep_len       8 bit  R    RCP_EP_UART_EP_FUNC_LEN (0x0D)
+ *   0x0001  Reserved          8 bit  R    reads 0x00
+ *   0x0002  uart_ep_enable&clr 8 bit R/W  Table 32 common entries
+ *   0x0003  uart_ep_options   8 bit  R/W* Table 32 common entries
+ *   0x0004  uart_ep_status   16 bit  R/W
+ *   0x0006  uart_baud_rate   16 bit  R/W  kbit/s
+ *   0x0008  uart_nr_bits      8 bit  R/W  number of data bits
+ *   0x0009  bit 0 uart_parity_enable, bit 1 uart_parity_pol, bit 2
+ *           uart_rts_enable, bit 3 uart_cts_enable, bit 4
+ *           uart_half_duplex, bits 5-7 reserved      8 bit  R/W
+ *   0x000A  uart_stop_bits    8 bit  R/W  in HALF stop bits (Table 48's
+ *           own units: 1 stop bit = 2, 2 stop bits = 4)
+ *   0x000B  uart_timeout      8 bit  R/W  receiver timeout, bit times
+ *   0x000C  uart_trail        8 bit  R/W  inter-transmission trail time,
+ *           bit times
+ *
+ * Three fields render/parse through a genuinely different representation
+ * than this module's own pre-existing, differently-scoped fields of a
+ * similar name -- kept as new, separate struct fields rather than
+ * reinterpreting the existing ones, the same "don't silently redefine an
+ * existing public field's meaning" caution SPI's own baud_rate_kbps-vs-
+ * clock_divider split already established:
+ *
+ *   - baud_rate_kbps (new, 16 bit, kbit/s) is the wire's own uart_baud_rate
+ *     register; the pre-existing baud_rate (uint32_t, unit unspecified in
+ *     this module's own original design, predating this fix) is left
+ *     untouched and is not itself derived from or written to by the
+ *     register block.
+ *   - wire_timeout_bit_times (new, 8 bit) is the wire's own uart_timeout
+ *     register -- a receiver idle-timeout measured in UART bit periods,
+ *     genuinely distinct from the pre-existing uart_timeout_ms (a
+ *     wall-clock read-completion race timeout at a different layer
+ *     entirely -- see this file header's own RX section above). Neither
+ *     field is derived from the other.
+ *   - stop_bits (the pre-existing rcp_ep_uart_stop_bits_t enum, ONE/TWO)
+ *     round-trips through uart_stop_bits's half-stop-bit units via a
+ *     documented, lossy simplification: render emits 2 for ONE and 4 for
+ *     TWO; parse maps any value >= 3 to TWO and anything else to ONE.
+ *     This enum has no representation for an intermediate half-stop-bit
+ *     count (e.g. 1.5 stop bits, register value 3) -- the >= 3 threshold
+ *     rounds such a value up to the more conservative TWO rather than
+ *     truncating it down to ONE, matching this codebase's general
+ *     fail-safe convention of not silently under-specifying a timing
+ *     margin.
+ *
+ * uart_nr_bits (0x0008) maps directly, byte-for-byte, onto the
+ * pre-existing uart_nr_bits field -- both are literally "the number of
+ * data bits", no scaling needed.
  */
 #ifndef RCP_EP_UART_H
 #define RCP_EP_UART_H
@@ -251,14 +318,24 @@ typedef struct {
     uint32_t                       uart_timeout_ms;   /* read-completion race
                                                            timeout -- see the
                                                            file header */
+    uint16_t                       ep_status;         /* uart_ep_status, Table 48 */
+    uint16_t                       baud_rate_kbps;    /* uart_baud_rate, Table 48 --
+                                                           see the file header */
+    bool                           rts_enable;        /* uart_rts_enable, Table 48 */
+    bool                           cts_enable;        /* uart_cts_enable, Table 48 */
+    bool                           half_duplex;       /* uart_half_duplex, Table 48 */
+    uint8_t                        wire_timeout_bit_times; /* uart_timeout, Table 48 --
+                                                                see the file header */
+    uint8_t                        trail;             /* uart_trail, Table 48 */
 } rcp_ep_uart_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false, baud_rate 0, parity
  * RCP_EP_UART_PARITY_NONE, stop_bits RCP_EP_UART_STOP_BITS_ONE,
- * ep_rx_buffer_size 0, uart_timeout_ms 0) -- except uart_nr_bits, which is
- * explicitly set to 8 (the only sane power-on default: 0 is not itself a
- * rcp_ep_uart_nr_bits_valid() value, unlike every other zero-valued field
- * above). */
+ * ep_rx_buffer_size 0, uart_timeout_ms 0, ep_status/baud_rate_kbps/
+ * wire_timeout_bit_times/trail 0, rts_enable/cts_enable/half_duplex
+ * false) -- except uart_nr_bits, which is explicitly set to 8 (the only
+ * sane power-on default: 0 is not itself a rcp_ep_uart_nr_bits_valid()
+ * value, unlike every other zero-valued field above). */
 void rcp_ep_uart_functional_cfg_init(rcp_ep_uart_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
@@ -294,6 +371,119 @@ bool rcp_ep_uart_set_rx_buffer_size(rcp_ep_uart_functional_cfg_t *cfg, uint16_t 
  * cfg->uart_timeout_ms. */
 bool rcp_ep_uart_set_timeout(rcp_ep_uart_functional_cfg_t *cfg, uint32_t timeout_ms,
                               rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer);
+
+/* ── The EP_func register block (the evt[2:0] == 111b target) ──────────────── */
+
+/* Relative octet offsets of the registers making up this endpoint's own
+ * EP_func block -- see the file header. Every multi-octet register is
+ * big-endian, like every other multi-octet field this codebase encodes.
+ * Offsets marked R are read-only: a configuration write covering them
+ * leaves them unchanged (see rcp_ep_uart_apply_reconfig()). */
+#define RCP_EP_UART_REG_EP_LEN        ((uint16_t)0x0000u) /*  8 bit, R   */
+#define RCP_EP_UART_REG_RESERVED_01   ((uint16_t)0x0001u) /*  8 bit, R   */
+#define RCP_EP_UART_REG_EP_ENABLE_CLR ((uint16_t)0x0002u) /*  8 bit, R/W */
+#define RCP_EP_UART_REG_EP_OPTIONS    ((uint16_t)0x0003u) /*  8 bit, R/W */
+#define RCP_EP_UART_REG_EP_STATUS     ((uint16_t)0x0004u) /* 16 bit, R/W */
+#define RCP_EP_UART_REG_BAUD_RATE     ((uint16_t)0x0006u) /* 16 bit, R/W */
+#define RCP_EP_UART_REG_NR_BITS       ((uint16_t)0x0008u) /*  8 bit, R/W */
+#define RCP_EP_UART_REG_FLAGS         ((uint16_t)0x0009u) /*  8 bit, R/W --
+                                                               parity_enable(0)/
+                                                               parity_pol(1)/
+                                                               rts_enable(2)/
+                                                               cts_enable(3)/
+                                                               half_duplex(4),
+                                                               bits 5-7
+                                                               reserved */
+#define RCP_EP_UART_REG_STOP_BITS     ((uint16_t)0x000Au) /*  8 bit, R/W --
+                                                               half stop bits */
+#define RCP_EP_UART_REG_TIMEOUT       ((uint16_t)0x000Bu) /*  8 bit, R/W --
+                                                               bit times */
+#define RCP_EP_UART_REG_TRAIL         ((uint16_t)0x000Cu) /*  8 bit, R/W --
+                                                               bit times */
+
+/* Bit masks within RCP_EP_UART_REG_FLAGS. */
+#define RCP_EP_UART_FLAG_PARITY_ENABLE ((uint8_t)(1u << 0))
+#define RCP_EP_UART_FLAG_PARITY_POL    ((uint8_t)(1u << 1))
+#define RCP_EP_UART_FLAG_RTS_ENABLE    ((uint8_t)(1u << 2))
+#define RCP_EP_UART_FLAG_CTS_ENABLE    ((uint8_t)(1u << 3))
+#define RCP_EP_UART_FLAG_HALF_DUPLEX   ((uint8_t)(1u << 4))
+
+/* The block's own length in octets -- one past the last assigned offset,
+ * i.e. the value the endpoint reports at RCP_EP_UART_REG_EP_LEN and the
+ * bound the "write beyond EP_LEN is ignored" rule (§12.7.1) is applied
+ * against. Table 48's own addressing is internally consistent (unlike
+ * GPIO's/I2C's own source tables), so there is no editorial defect to
+ * resolve here. */
+#define RCP_EP_UART_EP_FUNC_LEN ((uint16_t)0x000Du)
+
+/* The fixed width (octets) of the relative-start-address prefix every
+ * configuration request's payload begins with -- the address is a 16-bit
+ * big-endian field, followed by the configuration data octets to write
+ * from that address onward (§12.7.1). */
+#define RCP_EP_UART_RECONFIG_ADDR_LEN ((size_t)2u)
+
+typedef enum {
+    RCP_EP_UART_RECONFIG_OK               = 0,
+    RCP_EP_UART_RECONFIG_ERR_SHORT        = 1, /* payload carries no address
+                                                   prefix, or an address
+                                                   prefix with no data octet
+                                                   after it */
+    RCP_EP_UART_RECONFIG_ERR_OUT_OF_RANGE = 2, /* start_address + data length
+                                                   exceeds
+                                                   RCP_EP_UART_EP_FUNC_LEN --
+                                                   the whole write is ignored,
+                                                   per the specification's own
+                                                   rule */
+} rcp_ep_uart_reconfig_errc_t;
+
+/* Human-readable message for an rcp_ep_uart_reconfig_errc_t value. Never
+ * returns NULL. */
+const char *rcp_ep_uart_reconfig_strerror(rcp_ep_uart_reconfig_errc_t e);
+
+/* Serializes cfg's EP_func registers into out[0..RCP_EP_UART_EP_FUNC_LEN)
+ * exactly as a configuration *read* of the whole block would report them
+ * -- the inverse of rcp_ep_uart_apply_reconfig()'s own parse step, and
+ * the same rendering that function patches in place. parity_enable/
+ * parity_pol are derived from cfg->parity; uart_stop_bits is derived from
+ * cfg->stop_bits via the half-stop-bit mapping documented in the file
+ * header. */
+void rcp_ep_uart_render_registers(const rcp_ep_uart_functional_cfg_t *cfg,
+                                   uint8_t out[RCP_EP_UART_EP_FUNC_LEN]);
+
+/* Applies the configuration escape hatch (evt[2:0] == 111b): payload is NOT
+ * presented at the interface but interpreted as an addressed write into
+ * this endpoint's own EP_func block -- a 16-bit big-endian relative start
+ * address followed by the configuration data octets to write from that
+ * address onward (§12.7.1). This is a real register write, reaching every
+ * R/W register the block defines (enable/options, status, baud rate,
+ * word format, flow-control flags, stop bits, timeout, trail), not merely
+ * the fields this module's own setters already exposed.
+ *
+ * Returns RCP_EP_UART_RECONFIG_ERR_SHORT when payload_len is not at least
+ * RCP_EP_UART_RECONFIG_ADDR_LEN + 1, and
+ * RCP_EP_UART_RECONFIG_ERR_OUT_OF_RANGE when the addressed span would
+ * extend past RCP_EP_UART_EP_FUNC_LEN; in both cases cfg is left entirely
+ * unchanged, per the specification's own "such a payload is to be ignored"
+ * rule. Octets of the addressed span that land on a read-only register
+ * (EP_LEN or the reserved octet) are left at their current values while
+ * the rest of the span is still applied.
+ *
+ * A caller routing a decoded request here is responsible for having
+ * checked that evt[2:0] really was 111b -- rcp_ep_uart_decode_write_request()/
+ * _decode_read_request() both already reject it (RCP_EP_UART_ERR_BAD_EVT)
+ * so a misrouted request cannot reach either path by accident. */
+rcp_ep_uart_reconfig_errc_t rcp_ep_uart_apply_reconfig(rcp_ep_uart_functional_cfg_t *cfg,
+                                                        const uint8_t *payload,
+                                                        size_t payload_len);
+
+/* Encodes an ACF_ABB configuration request (evt[2:0] == 111b) addressed to
+ * byte_bus_id: payload is start_address (16-bit big-endian) followed by
+ * data[0..data_len). Returns a zeroed rcp_bytes_t (data=NULL) if data_len
+ * is 0, if the encoded payload would exceed RCP_ACF_MAX_PAYLOAD, or on
+ * allocation failure. Caller frees the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_ep_uart_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
+                                                 uint16_t start_address, const uint8_t *data,
+                                                 size_t data_len, uint8_t transaction_num);
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 

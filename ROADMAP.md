@@ -12542,3 +12542,119 @@ their test tags resolved correctly.
 **Progress: 84/156 findings resolved** (Groups H 12 + B 4 + A 17 +
 D 16 + F 7 + E 4 + C 16 + G 2 + I 6 = 84). Group I's own count moves
 from 5 to 6.
+
+### v0.219.0 -- 2026-08-11
+
+**Full-catalog audit follow-up, batch 20 (Group I, real fix):
+REQ-UART-038's register-block finding closed, plus the separately-
+tracked REQ-UART-037 (unit divergence) as a bonus -- both addressed
+by the same underlying fix.**
+
+`rcp_ep_uart_decode_write_request()`/`_decode_read_request()` already
+correctly rejected evt[2:0]=111b as `RCP_EP_UART_ERR_BAD_EVT` (via
+acf.h's shared `rcp_acf_evt_row2_is_plain()`), but no counterpart
+implemented that §12.7.1 path -- the same class of gap SPI's and
+I2C's own earlier fixes closed. Read TC18 §13.7.8.2 Table 48 directly:
+unlike GPIO's/I2C's own source tables, this one has no address-
+collision editorial defect -- its printed addresses (0x0000 EP_LEN,
+0x0001 reserved, 0x0002/0x0003 common entries, 0x0004 16-bit status,
+0x0006 16-bit baud_rate, 0x0008 nr_bits, 0x0009 bit-packed parity/
+RTS/CTS/half-duplex flags, 0x000A stop_bits, 0x000B timeout, 0x000C
+trail; EP_FUNC_LEN=0x000D) are internally consistent throughout.
+
+**Fix**: `rcp_ep_uart_functional_cfg_t` gained `ep_status`/
+`rts_enable`/`cts_enable`/`half_duplex`/`trail`. New
+`rcp_ep_uart_render_registers()`/`_apply_reconfig()`/
+`_reconfig_strerror()`/`_encode_reconfig_request()` mirror the
+established pattern. UART is now 5 of 11 endpoint types with the
+generic mechanism (`REQ-CFG-011`/`REQ-CFG-012` narrowed accordingly,
+6 remaining: LIN/CAN/ADC/ISELED/MDIO/wakeup).
+
+**Bonus closure**: REQ-UART-037 (a separate, pre-existing finding
+this audit hadn't yet reached) flagged that `baud_rate`/`stop_bits`/
+`uart_timeout_ms` used different units than Table 48's own registers.
+Rather than reinterpret those existing public fields (which would
+silently redefine their meaning for any caller already relying on
+them), two new, distinct wire-unit fields were added instead --
+`baud_rate_kbps` (kbit/s) and `wire_timeout_bit_times` (bit times) --
+matching the same "don't silently redefine an existing field" caution
+SPI's own `baud_rate_kbps`-vs-`clock_divider` split already
+established. `stop_bits` itself round-trips through the pre-existing
+two-valued `rcp_ep_uart_stop_bits_t` enum via a documented,
+deliberately lossy mapping: render emits 2 (half-units) for ONE and 4
+for TWO; parse maps any value >= 3 to TWO and anything else to ONE.
+1.5 stop bits (wire value 3) has no representation in this enum and
+rounds up to TWO on parse -- the more conservative of the two
+representable values, and an honestly-documented residual limitation
+rather than a full fix; REQ-UART-037 is marked `partial`, not
+`implemented`, for exactly this reason.
+
+Mutation-tested: loosening the out-of-range bounds check by 4 octets
+reproduced the identical class of finding every prior register-block
+batch this session has produced -- a real stack buffer overflow in
+the block-patching loop (silent SIGABRT, no test output, exit code
+134). Restored, re-verified. Full suite (44/44 in `test_ep_uart`
+alone, 65/65 overall) both trees (native + ASan/UBSan). `cfusa check`
+(CI-pinned v0.5.50): 0 errors. `cfusa trace --gaps`: 0/1024 untested;
+`--req-coverage 100` / `--sec-tested 100`: both 100% (1024/1024) --
+`REQ-UART-037`/`REQ-UART-038` now additionally show the same
+pre-existing, non-blocking dangling-test-reference/UNTRACED quirk
+already documented earlier this session for other entries in
+`test_tc18_gaps_ep2.c`'s file-level tag block (confirmed via exit
+code 0 both invocations, not a new regression); `REQ-UART-039`/
+`REQ-UART-040` (this batch's own new entries) do NOT appear in either
+list, confirming their test tags resolved correctly.
+
+A pre-existing deviation test,
+`test_uart_functional_block_has_no_len_or_status_register`
+(`tests/test_tc18_gaps_ep2.c`), was renamed to
+`..._now_has_full_register_coverage` and rewritten from a negative
+("this doesn't exist") to a positive ("this exists and works")
+assertion, plus a new positive sub-block confirming every new field
+is independently settable -- its own "13 octets changed by the four
+legacy setters" assertion is retained and still meaningful (it
+confirms those four setters remain narrowly scoped, by design, to
+exactly the fields they always touched; the new fields are reachable
+only through the register-block path, matching every other endpoint
+type's own precedent).
+
+**Progress: 85/156 findings resolved** (Groups H 12 + B 4 + A 17 +
+D 16 + F 7 + E 4 + C 16 + G 2 + I 7 = 85). Group I's own count moves
+from 6 to 7 -- both REQ-UART-037 and REQ-UART-038 close in this one
+batch, so the count increments by 1 (findings, not fixes-per-PR) per
+this issue's own accounting convention (REQ-UART-037 was not itself
+one of the original 156 confirmed findings' Group I members needing
+separate credit here; it is a related, pre-existing catalog entry
+this fix happened to also resolve, tracked for completeness but not
+double-counted against the 156 headline total).
+
+**⚠ IMPORTANT DISCOVERY, NOT YET ACTED ON**: mid-batch, the user
+supplied an updated TC18 source PDF
+(`OA_TC18_specification_v_0.5.1_RC_5_3624.pdf`, dated 2026-07-31,
+125 pages vs. the 117-page 2026-07-14 revision this entire session's
+work -- including every already-merged PR -- has been read against).
+This is a genuine, substantive spec revision (051RC4/051RC5 tracked-
+changes markers throughout), not a cosmetic one: confirmed real
+normative deltas include SPI's `spi_nr_cs` register changing from a
+plain 8-bit count to a 4-bit (count-1) field with the CS-count ceiling
+raised, a brand-new `spi_deassert_cs_pause` configuration bit at
+0x0008.4 (previously reserved) with no counterpart in the already-
+*merged* PR #274, a renumbered-but-content-preserved Table 30->33
+(confirmed unchanged for the specific rows this session's work
+depends on: SPI channel-selection is still evt[2:0]=000b-101b/6
+channels, and the I2C/GPIO/UART table defects already fixed this
+session are all still present, unaffected, in the new revision), and
+a wide scatter of "optionally" qualifiers added to trigger-generation
+prose across SPI/GPIO/PWM_OUT/PWM_IN/ADC/the generic RC-server section
+(a possible normative shift from mandatory to optional trigger
+support -- not yet investigated for code impact), plus RC-server-level
+register-map changes (renamed/added bits in the request-stream
+configuration block, a new EP_NOT_FOUND table, a corrected CRC
+formula) entirely outside this session's endpoint-type-by-endpoint-
+type scope so far. This UART batch's own content was specifically
+verified unaffected (Table 48's address layout and field meanings
+are byte-for-byte identical in both revisions, differing only in a
+non-normative wording clarification for `uart_stop_bits` already
+consistent with what was implemented). Flagged for the user's own
+prioritization call before further Group I/J/K work proceeds against
+the wrong spec baseline.
