@@ -11757,3 +11757,67 @@ change). Moving to Group D next (MDIO wire layout, ~16 findings, the
 single biggest remaining cluster -- needs a dedicated read-TC18-first
 investigation before any code change, matching this batch's own
 discipline).
+
+### v0.210.0 -- 2026-08-10
+
+**Full-catalog audit follow-up, batch 11 (Group D, no code change):
+MDIO's 16 findings closed by honest citation/cross-reference
+correction, issue #256.**
+
+Investigated Group D (`REQ-MDIO-001/002/003/004/005/007/008/012/013/
+014/015/016/017/018/019/021`, the single biggest cluster in the
+audit). Read TC18 §13.7.13 (Figure 42, Table 57) fully and directly:
+TC18's own MDIO request payload is `reserved bits + 2-bit mdio_mode +
+mdio_address + mdio_payload`, with `mdio_address` deferred to "the
+IEEE & OA SPI spec" (an external reference this codebase does not
+reproduce) and no burst/word_count concept at all. c-RCP's own MDIO
+module instead uses a `clause`/`prtad`/`devad`/`regad`/`word_count`
+layout built on IEEE 802.3 Clause 22/45's own independently-public
+addressing widths -- a genuinely different, original design.
+
+Confirmed this is exactly what `ep_mdio.h`'s own file header already,
+honestly discloses ("this module's own original design... no spec
+prose, bit layout, or numeric constant is reproduced") -- and exactly
+what the pre-existing `REQ-MDIO-021` entry already tracks as a real,
+open gap ("c-RCP's MDIO requests are not wire-compatible with a
+conforming peer"). The catalog's actual problem wasn't that the code
+was wrong -- it's correctly implemented against its own documented
+contract -- but that most of the individual `.fusa-reqs.json` entries
+either carried NO citation at all (7 pure address/byte-math helpers:
+001-005/007/008) or claimed full ASIL-B TC18 wire-format conformance
+with no acknowledgment of `REQ-MDIO-021`'s own already-tracked gap (8
+encode/decode functions: 012-019) -- the same "silently codified
+divergence with no gap flag" pattern that originally triggered this
+whole audit (REQ-GPIO-013).
+
+Fixed by adding real citations and honest cross-references to every
+one of the 16 entries: the 7 helpers now cite §13.7.13.1 (attribution
+for the endpoint's own existence, not these specific field-width
+choices, matching `ep_iseled.h`'s own precedent for admittedly-original
+designs); the 8 encode/decode functions now cite Figure 42/Table 57
+directly and cross-reference `REQ-MDIO-021`'s own gap rather than
+silently implying conformance; `REQ-MDIO-013`/`017`'s own
+over-claiming "Table 30's only legal value" language corrected to
+point to `REQ-ACF-023`'s now-resolved discussion (Group A) instead of
+re-asserting a claim Table 30's own text doesn't unambiguously support
+standalone; `REQ-MDIO-021`'s own stale code self-citation
+(`ep_mdio.h:137-141`, drifted after a header edit/reflow) corrected to
+the real location (`:145-163`).
+
+No code or test changes -- every helper and encode/decode function is
+already correctly implemented against its own documented (non-TC18)
+contract; only the catalog's own honesty about what that contract is
+needed fixing. `REQ-MDIO-002` through `019`'s ASIL-B classification
+deliberately left unchanged (considered and rejected downgrading to
+QM, to stay consistent with `ep_iseled.h`'s own established precedent
+of keeping ASIL-B for a module's admittedly-original engineering
+design that a real endpoint type still directly relies on).
+
+Full suite (65/65) both trees re-run to confirm inertness. 1036
+requirements (unchanged count -- text/citation updates to 16 existing
+entries).
+
+Issue #256's Group D is now fully closed (16/16, resolved without a
+fix). Moving to Group E next (WAKEUP SleepCMD wire format, 4
+findings -- also needs primary-source verification before any fix,
+following this same discipline).

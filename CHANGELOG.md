@@ -34,6 +34,10 @@ the rationale.
 
 ## Releases
 
+### v0.210.0 -- 2026-08-10
+
+Full-catalog audit follow-up, batch 11 (Group D, no code change): MDIO's 16 findings closed by honest citation/cross-reference correction, not a wire-format rewrite. Issue #256 Group D now fully closed. See `ROADMAP.md` for full detail.
+
 ### v0.209.0 -- 2026-08-10
 
 Full-catalog audit follow-up, batch 10 (Group A resolution, no code change): the audit's own "evt[2:0]=000b is illegal" findings refuted by TC18's own Figure 33 worked example (REQ-ACF-023 citation strengthened). Issue #256 Group A now fully closed (17/17, resolved without a fix). See `ROADMAP.md` for full detail.

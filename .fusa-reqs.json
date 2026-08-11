@@ -6687,48 +6687,52 @@
     {
       "id": "REQ-MDIO-001",
       "title": "rcp_ep_mdio_addr_valid() validates a Clause-22/Clause-45 MDIO address",
-      "text": "rcp_ep_mdio_addr_valid() shall return false for any prtad above RCP_EP_MDIO_PRTAD_MAX, for a RCP_EP_MDIO_CLAUSE_22 address with a nonzero devad or a regad above RCP_EP_MDIO_CLAUSE22_REGAD_MAX, for a RCP_EP_MDIO_CLAUSE_45 address with devad above RCP_EP_MDIO_DEVAD_MAX, and for any other clause value; true otherwise.",
+      "text": "rcp_ep_mdio_addr_valid() shall return false for any prtad above RCP_EP_MDIO_PRTAD_MAX, for a RCP_EP_MDIO_CLAUSE_22 address with a nonzero devad or a regad above RCP_EP_MDIO_CLAUSE22_REGAD_MAX, for a RCP_EP_MDIO_CLAUSE_45 address with devad above RCP_EP_MDIO_DEVAD_MAX, and for any other clause value; true otherwise. CORRECTED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): the field widths this function validates (5-bit prtad/devad/Clause-22-regad) are independently public knowledge of IEEE 802.3 Clause 22/45, per ep_mdio.h's own file header (\"Two addressing modes: Clause-22 MMD and Clause-45 MMS\") -- not values TC18 §13.7.13 itself defines (TC18's own mdio_address field is only described as \"As per IEEE & OA SPI spec\", §13.7.13.3 Table 57, with no field-width breakdown of its own). The previous citation (\"An RC Server implementation with an integrated PHY may allow access...\") described an unrelated sentence about integrated-PHY access, not address-field validation; corrected to cite the actual TC18 basis for this endpoint's existence and its own honest field-width disclosure.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.13.1 (\"An RC Server implementation with an integrated PHY may allow access to the integrated PHY via this MDIO EP\"), TC18.txt L5631"
+      "tc18": "§13.7.13.1, TC18.txt L5629-5632 (MDIO EP's own existence and topic area); §13.7.13.3 Table 57 (mdio_address: \"As per IEEE & OA SPI spec\"), TC18.txt L5664-5681 -- TC18 defers this field's own width to an external IEEE/OA reference this codebase does not reproduce, per ep_mdio.h's own file header"
     },
     {
       "id": "REQ-MDIO-002",
       "title": "rcp_ep_mdio_burst_next_regad() computes the next burst register address",
-      "text": "rcp_ep_mdio_burst_next_regad() shall return regad+1 wrapped modulo 32 for RCP_EP_MDIO_CLAUSE_22, regad+1 wrapped modulo 65536 for RCP_EP_MDIO_CLAUSE_45, and regad unchanged for any other clause value.",
+      "text": "rcp_ep_mdio_burst_next_regad() shall return regad+1 wrapped modulo 32 for RCP_EP_MDIO_CLAUSE_22, regad+1 wrapped modulo 65536 for RCP_EP_MDIO_CLAUSE_45, and regad unchanged for any other clause value. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): this wraparound rule -- and the whole burst/post-increment-addressing concept it implements -- is this module's own original engineering design (ep_mdio.h's own file header, \"Single-word and burst addressing\": \"this module's own generalization of the well-known MDIO post-increment addressing idiom... not a spec-mandated behavior\"), not derived from TC18 §13.7.13's own text, which describes no burst/word_count concept at all -- Table 57's mdio_mode field instead selects access width via 4 discrete values. Corrected from carrying no citation at all (implying an undisclosed TC18 conformance basis) to an honestly-cited entry, matching ep_iseled.h's own precedent of keeping ASIL-B for a module's original engineering design that is nonetheless directly relied upon by this endpoint type's own safety-relevant address-space bounds.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.13.1, TC18.txt L5629-5632 (cited only as attribution for which general topic area -- MDIO management access -- motivated this endpoint type's existence, per ep_mdio.h's own file header; not as a source for this specific burst-addressing design)"
     },
     {
       "id": "REQ-MDIO-003",
       "title": "rcp_ep_mdio_word_encode() encodes a 16-bit register word as two big-endian octets",
-      "text": "rcp_ep_mdio_word_encode() shall write word's high byte to out[0] and word's low byte to out[1].",
+      "text": "rcp_ep_mdio_word_encode() shall write word's high byte to out[0] and word's low byte to out[1]. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): the big-endian byte order this encodes is this module's own original engineering choice (ep_mdio.h's own file header, \"Wire layout\"), consistent with -- but not itself specified by -- TC18 §13.7.13.3's mdio_payload field, whose own internal byte order TC18 does not spell out. Corrected from carrying no citation at all to an honestly-cited entry.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.13.3 Table 57 (mdio_payload field), TC18.txt L5664-5681 -- this module's own byte-order choice for that field, not itself specified by the cited text"
     },
     {
       "id": "REQ-MDIO-004",
       "title": "rcp_ep_mdio_word_decode() decodes two big-endian octets as a 16-bit register word",
-      "text": "rcp_ep_mdio_word_decode() shall return (in[0] << 8) | in[1].",
+      "text": "rcp_ep_mdio_word_decode() shall return (in[0] << 8) | in[1]. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): the inverse of REQ-MDIO-003's own byte-order choice -- see that entry's own note.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.13.3 Table 57 (mdio_payload field), TC18.txt L5664-5681 -- this module's own byte-order choice for that field, not itself specified by the cited text"
     },
     {
       "id": "REQ-MDIO-005",
       "title": "rcp_ep_mdio_pack_len() computes the packed byte length of a word count",
-      "text": "rcp_ep_mdio_pack_len() shall return word_count * 2.",
+      "text": "rcp_ep_mdio_pack_len() shall return word_count * 2. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): pure arithmetic over this module's own word_count/burst concept -- see REQ-MDIO-002's own note on that concept's non-TC18-derived origin. Corrected from carrying no citation at all to an honestly-cited entry.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.13.1, TC18.txt L5629-5632 (cited only as attribution for which general topic area motivated this endpoint type's existence; see REQ-MDIO-002)"
     },
     {
       "id": "REQ-MDIO-006",
@@ -6742,20 +6746,22 @@
     {
       "id": "REQ-MDIO-007",
       "title": "rcp_ep_mdio_word_count_of() derives a word count from a packed byte length",
-      "text": "rcp_ep_mdio_word_count_of() shall return false and leave *out_word_count untouched when byte_len is odd, and otherwise return true with *out_word_count set to byte_len / 2.",
+      "text": "rcp_ep_mdio_word_count_of() shall return false and leave *out_word_count untouched when byte_len is odd, and otherwise return true with *out_word_count set to byte_len / 2. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): the inverse of REQ-MDIO-005's own word-count/byte-length relationship -- see that entry's own note. Corrected from carrying no citation at all to an honestly-cited entry.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.13.1, TC18.txt L5629-5632 (cited only as attribution for which general topic area motivated this endpoint type's existence; see REQ-MDIO-002/005)"
     },
     {
       "id": "REQ-MDIO-008",
       "title": "rcp_ep_mdio_unpack_word_at() reads one packed register word by index",
-      "text": "rcp_ep_mdio_unpack_word_at() shall return rcp_ep_mdio_word_decode() applied to data[2*word_index .. 2*word_index+2).",
+      "text": "rcp_ep_mdio_unpack_word_at() shall return rcp_ep_mdio_word_decode() applied to data[2*word_index .. 2*word_index+2). NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): a pure index-into-packed-words helper over this module's own word-packing layout -- see REQ-MDIO-002/003's own notes. Corrected from carrying no citation at all to an honestly-cited entry.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.13.1, TC18.txt L5629-5632 (cited only as attribution for which general topic area motivated this endpoint type's existence; see REQ-MDIO-002/003/005)"
     },
     {
       "id": "REQ-MDIO-009",
@@ -6786,77 +6792,83 @@
     },
     {
       "id": "REQ-MDIO-012",
-      "title": "rcp_ep_mdio_encode_read_request() encodes an ACF_ABB MDIO read request",
-      "text": "rcp_ep_mdio_encode_read_request() shall return a zeroed rcp_bytes_t when !rcp_ep_mdio_addr_valid(addr) or word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS, and otherwise encode an ACF_ABB message with op RCP_ACF_OP_READ whose payload is addr's clause/prtad/devad/regad fields followed by word_count, all as specified.",
+      "title": "rcp_ep_mdio_encode_read_request() encodes this module's own ACF_ABB MDIO read request payload",
+      "text": "rcp_ep_mdio_encode_read_request() shall return a zeroed rcp_bytes_t when !rcp_ep_mdio_addr_valid(addr) or word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS, and otherwise encode an ACF_ABB message with op RCP_ACF_OP_READ whose payload is addr's clause/prtad/devad/regad fields followed by word_count, all as specified. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): this payload layout is this module's own original design (clause/prtad/devad/regad/word_count), NOT TC18 §13.7.13.3 Figure 42/Table 57's own wire layout (reserved bits + 2-bit mdio_mode + mdio_address + mdio_payload) -- see REQ-MDIO-021, which already tracks this as a real, not-yet-closed wire-incompatibility gap (\"c-RCP's MDIO requests are not wire-compatible with a conforming peer\"). This entry's own function is correctly implemented against its own documented (non-TC18) contract; the gap is that the contract itself doesn't match TC18's wire bytes, tracked at REQ-MDIO-021 rather than duplicated here.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.13.3 Figure 42/Table 57, TC18.txt L5664-5681 -- the real TC18 wire layout this function's own payload does not match; see REQ-MDIO-021"
     },
     {
       "id": "REQ-MDIO-013",
-      "title": "rcp_ep_mdio_decode_read_request() validates and decodes an ACF-level MDIO read request",
-      "text": "rcp_ep_mdio_decode_read_request() shall return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header, its declared payload, or the 7-byte request prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_MDIO_ERR_WRONG_OP for an op other than RCP_ACF_OP_READ; RCP_EP_MDIO_ERR_BAD_EVT when evt[2:0] is not 0b000 (TC18 §13.5 Table 30's only legal value for a plain request in MDIO's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer); RCP_EP_MDIO_ERR_BAD_ADDR when the decoded address fails rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT when the decoded word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS; and otherwise RCP_EP_MDIO_OK with the address, word count, and transaction number populated.",
+      "title": "rcp_ep_mdio_decode_read_request() validates and decodes this module's own ACF-level MDIO read request payload",
+      "text": "rcp_ep_mdio_decode_read_request() shall return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header, its declared payload, or the 7-byte request prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_MDIO_ERR_WRONG_OP for an op other than RCP_ACF_OP_READ; RCP_EP_MDIO_ERR_BAD_EVT when evt[2:0] is not 0b000 (the value REQ-ACF-023 resolves, after cross-checking TC18's own Figure 33 worked example, as the legal plain-request value for this Table 30 row -- see that entry for the full resolution of Table 30's own apparent internal inconsistency); RCP_EP_MDIO_ERR_BAD_ADDR when the decoded address fails rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT when the decoded word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS; and otherwise RCP_EP_MDIO_OK with the address, word count, and transaction number populated. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): the payload layout this decodes is this module's own original design, not TC18's own wire layout -- see REQ-MDIO-012's own note and REQ-MDIO-021.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710 (evt[2:0] legality, resolved at REQ-ACF-023); §13.7.13.3 Figure 42/Table 57, TC18.txt L5664-5681 (the real wire layout this function's own payload does not match; see REQ-MDIO-021)"
     },
     {
       "id": "REQ-MDIO-014",
-      "title": "rcp_ep_mdio_encode_read_response() encodes timed and untimed MDIO read responses",
-      "text": "rcp_ep_mdio_encode_read_response() shall return a zeroed rcp_bytes_t when word_count exceeds RCP_EP_MDIO_MAX_BURST_WORDS or on allocation failure, and otherwise encode an ACF_GBB frame with message_timestamp set to timestamp and mtv RCP_ACF_MTV_VALID when timed is true, or an ACF_ABB frame otherwise, in both cases with payload rcp_ep_mdio_pack_words(words, word_count) and op RCP_ACF_OP_READ.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B",
-      "scope": "tc18"
-    },
-    {
-      "id": "REQ-MDIO-015",
-      "title": "rcp_ep_mdio_decode_read_response() validates and decodes either ACF_ABB or ACF_GBB MDIO read responses",
-      "text": "rcp_ep_mdio_decode_read_response() shall accept either an ACF_ABB or ACF_GBB frame, return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame too short for the applicable header or declared payload, RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id, RCP_EP_MDIO_ERR_BAD_WORD_COUNT for an odd payload length or more than RCP_EP_MDIO_MAX_BURST_WORDS words, and otherwise RCP_EP_MDIO_OK with the packed word bytes, word count, transaction number, and timed/timestamp populated.",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B",
-      "scope": "tc18"
-    },
-    {
-      "id": "REQ-MDIO-016",
-      "title": "rcp_ep_mdio_encode_write_request() encodes an ACF_ABB MDIO write request",
-      "text": "rcp_ep_mdio_encode_write_request() shall return a zeroed rcp_bytes_t when !rcp_ep_mdio_addr_valid(addr), word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS, or on allocation failure, and otherwise encode an ACF_ABB message with op RCP_ACF_OP_WRITE whose payload is addr's clause/prtad/devad/regad fields followed by rcp_ep_mdio_pack_words(words, word_count).",
-      "standard": "iso26262",
-      "level": "ASIL-B",
-      "asil": "ASIL-B",
-      "scope": "tc18"
-    },
-    {
-      "id": "REQ-MDIO-017",
-      "title": "rcp_ep_mdio_decode_write_request() validates and decodes an ACF-level MDIO write request",
-      "text": "rcp_ep_mdio_decode_write_request() shall return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header, its declared payload, or the 5-byte address prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_MDIO_ERR_WRONG_OP for an op other than RCP_ACF_OP_WRITE; RCP_EP_MDIO_ERR_BAD_EVT when evt[2:0] is not 0b000 (TC18 §13.5 Table 30's only legal value for a plain request in MDIO's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer); RCP_EP_MDIO_ERR_BAD_ADDR when the decoded address fails rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT when the trailing words region's byte length is odd, is 0, or represents more than RCP_EP_MDIO_MAX_BURST_WORDS words; and otherwise RCP_EP_MDIO_OK with the address, packed word bytes, word count, and transaction number populated.",
+      "title": "rcp_ep_mdio_encode_read_response() encodes timed and untimed MDIO read responses using this module's own packed-words payload",
+      "text": "rcp_ep_mdio_encode_read_response() shall return a zeroed rcp_bytes_t when word_count exceeds RCP_EP_MDIO_MAX_BURST_WORDS or on allocation failure, and otherwise encode an ACF_GBB frame with message_timestamp set to timestamp and mtv RCP_ACF_MTV_VALID when timed is true, or an ACF_ABB frame otherwise, in both cases with payload rcp_ep_mdio_pack_words(words, word_count) and op RCP_ACF_OP_READ. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): the response payload's own packed-word layout is this module's own original design, paired with REQ-MDIO-012's own request-side gap -- see that entry's note and REQ-MDIO-021.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
+      "tc18": "§13.7.13.3 Figure 42/Table 57, TC18.txt L5664-5681 (the real TC18 mdio_payload field this response's own packed-word layout does not literally match in framing, though the underlying 16/32-bit register data is the same concept; see REQ-MDIO-021)"
+    },
+    {
+      "id": "REQ-MDIO-015",
+      "title": "rcp_ep_mdio_decode_read_response() validates and decodes either ACF_ABB or ACF_GBB MDIO read responses in this module's own packed-words layout",
+      "text": "rcp_ep_mdio_decode_read_response() shall accept either an ACF_ABB or ACF_GBB frame, return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame too short for the applicable header or declared payload, RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id, RCP_EP_MDIO_ERR_BAD_WORD_COUNT for an odd payload length or more than RCP_EP_MDIO_MAX_BURST_WORDS words, and otherwise RCP_EP_MDIO_OK with the packed word bytes, word count, transaction number, and timed/timestamp populated. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): see REQ-MDIO-014's own note and REQ-MDIO-021 for this payload layout's own non-TC18-wire-format basis.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "tc18": "§13.7.13.3 Figure 42/Table 57, TC18.txt L5664-5681 (see REQ-MDIO-021)"
+    },
+    {
+      "id": "REQ-MDIO-016",
+      "title": "rcp_ep_mdio_encode_write_request() encodes this module's own ACF_ABB MDIO write request payload",
+      "text": "rcp_ep_mdio_encode_write_request() shall return a zeroed rcp_bytes_t when !rcp_ep_mdio_addr_valid(addr), word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS, or on allocation failure, and otherwise encode an ACF_ABB message with op RCP_ACF_OP_WRITE whose payload is addr's clause/prtad/devad/regad fields followed by rcp_ep_mdio_pack_words(words, word_count). NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): the write-side counterpart of REQ-MDIO-012 -- see that entry's own note and REQ-MDIO-021 for this payload layout's non-TC18-wire-format basis.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "tc18": "§13.7.13.3 Figure 42/Table 57, TC18.txt L5664-5681 (see REQ-MDIO-021)"
+    },
+    {
+      "id": "REQ-MDIO-017",
+      "title": "rcp_ep_mdio_decode_write_request() validates and decodes this module's own ACF-level MDIO write request payload",
+      "text": "rcp_ep_mdio_decode_write_request() shall return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header, its declared payload, or the 5-byte address prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_MDIO_ERR_WRONG_OP for an op other than RCP_ACF_OP_WRITE; RCP_EP_MDIO_ERR_BAD_EVT when evt[2:0] is not 0b000 (the value REQ-ACF-023 resolves, after cross-checking TC18's own Figure 33 worked example, as the legal plain-request value for this Table 30 row -- see that entry for the full resolution of Table 30's own apparent internal inconsistency); RCP_EP_MDIO_ERR_BAD_ADDR when the decoded address fails rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT when the trailing words region's byte length is odd, is 0, or represents more than RCP_EP_MDIO_MAX_BURST_WORDS words; and otherwise RCP_EP_MDIO_OK with the address, packed word bytes, word count, and transaction number populated. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): the payload layout this decodes is this module's own original design, not TC18's own wire layout -- see REQ-MDIO-016's own note and REQ-MDIO-021.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "tc18": "§13.5 Table 30, TC18.txt L3666-3710 (evt[2:0] legality, resolved at REQ-ACF-023); §13.7.13.3 Figure 42/Table 57, TC18.txt L5664-5681 (see REQ-MDIO-021)"
     },
     {
       "id": "REQ-MDIO-018",
-      "title": "rcp_ep_mdio_encode_write_response() encodes timed and untimed MDIO write responses",
-      "text": "rcp_ep_mdio_encode_write_response() shall return a zeroed rcp_bytes_t when accepted_word_count exceeds RCP_EP_MDIO_MAX_BURST_WORDS or on allocation failure, and otherwise encode an ACF_GBB frame with message_timestamp set to timestamp and mtv RCP_ACF_MTV_VALID when timed is true, or an ACF_ABB frame otherwise, in both cases with payload rcp_ep_mdio_pack_words(accepted_words, accepted_word_count) and op RCP_ACF_OP_WRITE.",
+      "title": "rcp_ep_mdio_encode_write_response() encodes timed and untimed MDIO write responses using this module's own packed-words payload",
+      "text": "rcp_ep_mdio_encode_write_response() shall return a zeroed rcp_bytes_t when accepted_word_count exceeds RCP_EP_MDIO_MAX_BURST_WORDS or on allocation failure, and otherwise encode an ACF_GBB frame with message_timestamp set to timestamp and mtv RCP_ACF_MTV_VALID when timed is true, or an ACF_ABB frame otherwise, in both cases with payload rcp_ep_mdio_pack_words(accepted_words, accepted_word_count) and op RCP_ACF_OP_WRITE. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): the write-response counterpart of REQ-MDIO-014 -- see that entry's own note and REQ-MDIO-021.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.13.3 Figure 42/Table 57, TC18.txt L5664-5681 (see REQ-MDIO-021)"
     },
     {
       "id": "REQ-MDIO-019",
-      "title": "rcp_ep_mdio_decode_write_response() validates and decodes either ACF_ABB or ACF_GBB MDIO write responses",
-      "text": "rcp_ep_mdio_decode_write_response() shall accept either an ACF_ABB or ACF_GBB frame, return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame too short for the applicable header or declared payload, RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id, RCP_EP_MDIO_ERR_BAD_WORD_COUNT for an odd payload length or more than RCP_EP_MDIO_MAX_BURST_WORDS words, and otherwise RCP_EP_MDIO_OK with the accepted packed word bytes, word count, transaction number, and timed/timestamp populated.",
+      "title": "rcp_ep_mdio_decode_write_response() validates and decodes either ACF_ABB or ACF_GBB MDIO write responses in this module's own packed-words layout",
+      "text": "rcp_ep_mdio_decode_write_response() shall accept either an ACF_ABB or ACF_GBB frame, return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame too short for the applicable header or declared payload, RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id, RCP_EP_MDIO_ERR_BAD_WORD_COUNT for an odd payload length or more than RCP_EP_MDIO_MAX_BURST_WORDS words, and otherwise RCP_EP_MDIO_OK with the accepted packed word bytes, word count, transaction number, and timed/timestamp populated. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): see REQ-MDIO-018's own note and REQ-MDIO-021 for this payload layout's own non-TC18-wire-format basis.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
-      "scope": "tc18"
+      "scope": "tc18",
+      "tc18": "§13.7.13.3 Figure 42/Table 57, TC18.txt L5664-5681 (see REQ-MDIO-021)"
     },
     {
       "id": "REQ-PWRMODE-001",
@@ -10048,7 +10060,7 @@
     {
       "id": "REQ-MDIO-021",
       "title": "the 2-bit mdio_mode selector and the Figure 42 request payload layout",
-      "text": "NOT IMPLEMENTED: c-RCP's MDIO request payload layout does not match TC18 \u00a713.7.13.3. Figure 42 lays the payload out as reserved bits, a 2-bit mdio_mode field, mdio_address, then mdio_payload, where Table 57 gives mdio_mode four meanings \u2014 MMD single-word access, MMD multiple-byte access, MMS single-word access (10b) and MMS multiple (double) word access (11b) \u2014 and mdio_address follows the IEEE and OA SPI specifications. c-RCP instead uses its own 5-byte prefix of a 1-octet clause selector (RCP_EP_MDIO_CLAUSE_22 / _45), a 1-octet prtad, a 1-octet devad and a big-endian 2-octet regad (ep_mdio.h:137-141), with no mdio_mode field at all and no distinction between single-access and multiple-access modes \u2014 its burst behavior is instead carried by a separate 2-octet word_count. Consequence: c-RCP's MDIO requests are not wire-compatible with a conforming peer, and the single-word vs multiple-access selection is inexpressible.",
+      "text": "NOT IMPLEMENTED: c-RCP's MDIO request payload layout does not match TC18 \u00a713.7.13.3. Figure 42 lays the payload out as reserved bits, a 2-bit mdio_mode field, mdio_address, then mdio_payload, where Table 57 gives mdio_mode four meanings \u2014 MMD single-word access, MMD multiple-byte access, MMS single-word access (10b) and MMS multiple (double) word access (11b) \u2014 and mdio_address follows the IEEE and OA SPI specifications. c-RCP instead uses its own 5-byte prefix of a 1-octet clause selector (RCP_EP_MDIO_CLAUSE_22 / _45), a 1-octet prtad, a 1-octet devad and a big-endian 2-octet regad (ep_mdio.h:145-163, the header's own \"Wire layout\" section -- corrected 2026-08-10, c-RCP-AUDIT-06, issue #256: this citation previously pointed to ep_mdio.h:137-141, the unrelated RCP_EP_MDIO_MAX_BURST_WORDS/AVTPDU-sizing discussion, drifted after a header edit/reflow), with no mdio_mode field at all and no distinction between single-access and multiple-access modes \u2014 its burst behavior is instead carried by a separate 2-octet word_count. Consequence: c-RCP's MDIO requests are not wire-compatible with a conforming peer, and the single-word vs multiple-access selection is inexpressible. See REQ-MDIO-012 through REQ-MDIO-019, whose own entries now cross-reference this gap directly rather than silently claiming full TC18 wire conformance.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
