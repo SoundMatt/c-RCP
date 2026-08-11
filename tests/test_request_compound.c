@@ -26,6 +26,8 @@
 //cfusa:test REQ-CMP-025
 //cfusa:test REQ-CMP-026
 //cfusa:test REQ-CMP-027
+//cfusa:test REQ-CMP-028
+//cfusa:test REQ-CMP-029
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -365,6 +367,55 @@ static void test_clear_non_safestate_decode_rejects_compound_request(void)
                                                                     &out_tn));
 
     rcp_bytes_free(&frame);
+}
+
+/* Table 12: reserved "All bits shall be written as 0, else the request
+ * shall be rejected" -- clear-non-safestate carries no sub-field, so
+ * all 7 trailing message_timestamp octets are reserved. REQ-CMP-028. */
+static void test_clear_non_safestate_decode_rejects_nonzero_reserved(void)
+{
+    size_t offsets[7] = {1, 2, 3, 4, 5, 6, 7};
+    size_t i;
+
+    for (i = 0; i < 7; i++) {
+        rcp_bytes_t frame;
+        rcp_byte_bus_id_t out_bus = 0;
+        uint8_t out_tn = 0;
+
+        frame = rcp_compound_encode_clear_non_safestate(0, 0);
+        TEST_ASSERT_NOT_NULL(frame.data);
+        frame.data[RCP_ACF_ABB_HEADER_LEN + offsets[i]] = 0x01u;
+
+        TEST_ASSERT_EQUAL_INT(RCP_COMPOUND_ERR_RESERVED_NONZERO,
+                               rcp_compound_decode_clear_non_safestate(frame.data, frame.len,
+                                                                        &out_bus, &out_tn));
+        rcp_bytes_free(&frame);
+    }
+}
+
+/* Table 12: "evt[2:0], hs, cs: All bits shall be written as 0, else the
+ * request shall be rejected with error code = UNSUPPORTED_CMD." Octet 4
+ * packs evt[3:0] in bits 7:4, hs in bit 1, cs in bit 0 (acf.c's
+ * rcp_acf_pack_header()). REQ-CMP-029. */
+static void test_clear_non_safestate_decode_rejects_nonzero_evt_hs_cs(void)
+{
+    uint8_t masks[3] = {0x10u, 0x02u, 0x01u}; /* evt[0], hs, cs */
+    size_t  i;
+
+    for (i = 0; i < 3; i++) {
+        rcp_bytes_t frame;
+        rcp_byte_bus_id_t out_bus = 0;
+        uint8_t out_tn = 0;
+
+        frame = rcp_compound_encode_clear_non_safestate(0, 0);
+        TEST_ASSERT_NOT_NULL(frame.data);
+        frame.data[4] |= masks[i];
+
+        TEST_ASSERT_EQUAL_INT(RCP_COMPOUND_ERR_EVT_HS_CS_NONZERO,
+                               rcp_compound_decode_clear_non_safestate(frame.data, frame.len,
+                                                                        &out_bus, &out_tn));
+        rcp_bytes_free(&frame);
+    }
 }
 
 /* ── The advance guard, delay timer, and tick ─────────────────────────────── */
@@ -774,6 +825,8 @@ int main(void)
 
     RUN_TEST(test_clear_non_safestate_round_trip);
     RUN_TEST(test_clear_non_safestate_decode_rejects_compound_request);
+    RUN_TEST(test_clear_non_safestate_decode_rejects_nonzero_reserved);
+    RUN_TEST(test_clear_non_safestate_decode_rejects_nonzero_evt_hs_cs);
 
     RUN_TEST(test_advance_guard_true_when_in_start_state);
     RUN_TEST(test_advance_guard_false_when_not_in_start_state);

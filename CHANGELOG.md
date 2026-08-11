@@ -34,6 +34,10 @@ the rationale.
 
 ## Releases
 
+### v0.201.0 -- 2026-08-10
+
+Full-catalog audit follow-up, batch 2 (Group H): cancel-family evt[2:0]/hs/cs + reserved-byte validation (REQ-CANCEL-013/-014/-015, REQ-CMP-028/-029). Issue #256. See `ROADMAP.md` for full detail.
+
 ### v0.200.0 -- 2026-08-10
 
 Full-catalog audit follow-up, batch 1 (Group H: REQ-RMAP-009/-046/-070). Issue #256. See `ROADMAP.md` for full detail.

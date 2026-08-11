@@ -11302,3 +11302,66 @@ Issue #256's Group H has 8 more findings remaining (`REQ-CANCEL-012`,
 `REQ-E2E-021`, `REQ-MOCK-030`, `REQ-LIFECYCLE-001`/`-017`/`-018`/
 `-019`/`-020`) before moving to Group B (PWM_IN's inverted compound-
 wait comparisons).
+
+### v0.201.0 -- 2026-08-10
+
+**Full-catalog audit follow-up, batch 2 (Group H, part): cancel-family
+evt[2:0]/hs/cs + reserved-byte validation, issue #256.**
+
+Started as an investigation of `REQ-CANCEL-012`, `REQ-CMP-018`, and
+`REQ-CANCEL-004` (the audit's two named findings) and expanded to a
+broader, well-evidenced gap once TC18 Tables 11/12/13 were read fresh
+from the primary-source PDF: all three cancel-family GBB request types
+-- clear-all (0x05, Table 11), clear-non-safestate (0x06, Table 12),
+clear-single (0x07, Table 13) -- require `evt[2:0]`/`hs`/`cs` all zero
+("Evt, hs and cs shall be zero", Table 12 additionally naming
+`UNSUPPORTED_CMD` as the specific TC18 Table 27 wire error code), but
+none of the three decode functions validated this ACF byte_message_info
+header field before this milestone. `rcp_cancel_decode_clear_all()`
+additionally never validated `message_timestamp`'s own 7 reserved
+trailing octets at all (only `clear_single` already did, via the
+pre-existing `RCP_CANCEL_ERR_RESERVED_NONZERO`).
+
+Fixed all three decode functions consistently:
+- `rcp_cancel_decode_clear_all()`: now checks both the reserved
+  `message_timestamp` octets (new `REQ-CANCEL-013`) and evt[2:0]/hs/cs
+  (new `REQ-CANCEL-014`).
+- `rcp_cancel_decode_clear_single()`: gained the evt[2:0]/hs/cs check
+  (new `REQ-CANCEL-015`) -- its own reserved-octet check already
+  existed (`REQ-CANCEL-007`).
+- `rcp_compound_decode_clear_non_safestate()`: now checks both the
+  reserved `message_timestamp` octets (new `REQ-CMP-028`) and
+  evt[2:0]/hs/cs (new `REQ-CMP-029`).
+
+New error values: `RCP_CANCEL_ERR_EVT_HS_CS_NONZERO` (6) and
+`RCP_COMPOUND_ERR_RESERVED_NONZERO` (5) / `RCP_COMPOUND_ERR_EVT_HS_CS_NONZERO`
+(6) -- `rcp_compound_errc_t` previously had no reserved/evt-hs-cs value
+at all, an asymmetry against `rcp_cancel_errc_t`'s pre-existing
+(but, for clear-all, unused) `RCP_CANCEL_ERR_RESERVED_NONZERO`.
+
+10 new tests (3 in `test_request_cancel.c`, 2 in `test_request_compound.c`,
+each covering the 3 masked-bit cases (evt[0]/hs/cs) or 7 reserved-octet
+offsets as applicable). Mutation-tested: reverted both implementation
+files to their pre-batch state with the new tests kept, confirmed all 5
+new checks' tests fail (`Expected 5/6 Was 0`), restored, diff-verified
+byte-identical. Full suite (65/65) green on both native and ASan/UBSan
+trees. 1036 requirements (+5).
+
+**Known follow-on, not fixed this batch**: `src/mock.c`'s own reference
+dispatcher (`apply_cancellation()`) doesn't actually call
+`rcp_cancel_decode_clear_all()`/`rcp_compound_decode_clear_non_safestate()`
+for the clear-all/clear-non-safestate cases at all -- it dispatches
+straight to `rcp_server_endpoint_cancel_all()`/`_non_safestate()` once
+`request_type` is already known from an earlier peek, so these new
+validations exist in the library but aren't wired into the reference
+server's own request-admission path for those two request kinds (only
+`clear_single` actually calls its own decode function). This is a
+separate, dispatch-layer wiring gap, not part of what issue #256's
+`REQ-CMP-018`/`REQ-CANCEL-004` findings named -- noted here for a
+future batch, not expanded into scope now.
+
+Issue #256's Group H has 7 more findings remaining: `REQ-SRV-006`/`-013`,
+`REQ-PWR-005`, `REQ-E2E-021`, `REQ-MOCK-030`, `REQ-LIFECYCLE-001`/`-017`/
+`-018`/`-019`/`-020` (REQ-CANCEL-012 itself still needs its own
+dispatch-wiring investigation, separate from this batch's decode-layer
+fix).

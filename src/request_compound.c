@@ -53,6 +53,10 @@ const char *rcp_compound_strerror(rcp_compound_errc_t e)
     case RCP_COMPOUND_ERR_BAD_MSG_TYPE:   return "rcp/compound: unexpected ACF message type";
     case RCP_COMPOUND_ERR_NOT_REPURPOSED: return "rcp/compound: message_timestamp not repurposed";
     case RCP_COMPOUND_ERR_UNKNOWN_TYPE:   return "rcp/compound: unrecognized request_type";
+    case RCP_COMPOUND_ERR_RESERVED_NONZERO:
+        return "rcp/compound: reserved sub-field octet is not zero";
+    case RCP_COMPOUND_ERR_EVT_HS_CS_NONZERO:
+        return "rcp/compound: evt[2:0], hs, or cs is not zero";
     default:                              return "rcp/compound: unknown error";
     }
 }
@@ -230,6 +234,8 @@ rcp_bytes_t rcp_compound_encode_clear_non_safestate(rcp_byte_bus_id_t byte_bus_i
 
 //cfusa:req REQ-CMP-017
 //cfusa:req REQ-CMP-018
+//cfusa:req REQ-CMP-028
+//cfusa:req REQ-CMP-029
 rcp_compound_errc_t rcp_compound_decode_clear_non_safestate(const uint8_t *b, size_t len,
                                                              rcp_byte_bus_id_t *out_byte_bus_id,
                                                              uint8_t *out_transaction_num)
@@ -248,6 +254,20 @@ rcp_compound_errc_t rcp_compound_decode_clear_non_safestate(const uint8_t *b, si
 
     rt = (uint8_t)((hdr.message_timestamp >> 56) & 0xFFu);
     if (rt != RCP_REQUEST_TYPE_CLEAR_NON_SAFESTATE) return RCP_COMPOUND_ERR_UNKNOWN_TYPE;
+
+    /* REQ-CMP-028: clear-non-safestate carries no sub-field of its own --
+     * all 7 trailing octets of message_timestamp are reserved (TC18
+     * Table 12). */
+    if ((hdr.message_timestamp & 0x00FFFFFFFFFFFFFFull) != 0ull) {
+        return RCP_COMPOUND_ERR_RESERVED_NONZERO;
+    }
+
+    /* REQ-CMP-029: TC18 Table 12 states explicitly -- "evt[2:0], hs, cs:
+     * All bits shall be written as 0, else the request shall be rejected
+     * with error code = UNSUPPORTED_CMD". */
+    if ((hdr.info.evt & 0x07u) != 0u || hdr.info.hs != 0u || hdr.info.cs != 0u) {
+        return RCP_COMPOUND_ERR_EVT_HS_CS_NONZERO;
+    }
 
     *out_byte_bus_id     = hdr.info.byte_bus_id;
     *out_transaction_num = hdr.info.transaction_num;
