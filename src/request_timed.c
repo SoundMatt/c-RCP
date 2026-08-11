@@ -97,6 +97,30 @@ rcp_bytes_t rcp_timed_encode_request(rcp_byte_bus_id_t byte_bus_id, uint64_t pre
     return frame;
 }
 
+//cfusa:req REQ-TIMED-013
+rcp_bytes_t rcp_timed_encode_request_tscf(const rcp_acf_byte_message_info_t *hdr,
+                                           const uint8_t *payload, size_t payload_len,
+                                           rcp_stream_id_t stream_id,
+                                           uint32_t avtp_timestamp, uint8_t sequence_num)
+{
+    rcp_bytes_t             acf_frame;
+    rcp_bytes_t             frame = {0};
+    rcp_avtp_tscf_header_t  tscf_hdr = {0};
+
+    acf_frame = rcp_acf_encode_abb(hdr, payload, payload_len);
+    if (!acf_frame.data) return frame;
+
+    tscf_hdr.sv             = 1;
+    tscf_hdr.stream_id      = stream_id;
+    tscf_hdr.tv             = 1; /* avtp_timestamp valid -- this function's own point */
+    tscf_hdr.avtp_timestamp = avtp_timestamp;
+    tscf_hdr.sequence_num   = sequence_num;
+
+    frame = rcp_avtp_encode_tscf(&tscf_hdr, acf_frame.data, acf_frame.len);
+    rcp_bytes_free(&acf_frame);
+    return frame;
+}
+
 //cfusa:req REQ-TIMED-004
 //cfusa:req REQ-TIMED-005
 //cfusa:req REQ-TIMED-009

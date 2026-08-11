@@ -168,6 +168,42 @@ rcp_bytes_t rcp_timed_encode_request(rcp_byte_bus_id_t byte_bus_id, uint64_t pre
                                       uint8_t transaction_num, const uint8_t *payload,
                                       size_t payload_len);
 
+/* REQ-TIMED-013: the OTHER of TC18 §11.2/§11.2.1's own two ways to time a
+ * request -- see the file header's "A per-request alternative to a TSCF
+ * header" section. rcp_timed_encode_request() above is the NTSCF-only
+ * path (no TSCF header needed, presentation_time packed into the ACF_GBB
+ * payload's own repurposed message_timestamp region). This function is
+ * the TSCF-header path: it encodes byte_bus_id/evt/op/payload as a
+ * PLAIN ACF_ABB message -- a standard request shape, no request_type
+ * opcode byte, no repurposing trick at all -- via acf.h's
+ * rcp_acf_encode_abb(), then wraps that frame in a TSCF header (avtp.h's
+ * rcp_avtp_encode_tscf()) whose own avtp_timestamp carries
+ * presentation_time and whose tv (timestamp-valid) bit is set. TC18's
+ * own text is explicit that a timed request under a TSCF header "shall
+ * likewise be encoded as an ACF_ABB message" rather than ACF_GBB, unlike
+ * this module's other, NTSCF-only encoder above.
+ *
+ * A thin, named convenience composing two already-existing, independently
+ * tested primitives (acf.h's rcp_acf_encode_abb(), avtp.h's
+ * rcp_avtp_encode_tscf()) rather than duplicating either -- a caller
+ * could already compose them directly (see tests/test_discovery.c's own
+ * TSCF-wrapped-ABB construction), but request_timed.h is where a caller
+ * reasoning about "timed requests" as a concept should find both of
+ * TC18's own encoding paths, not just the NTSCF one.
+ *
+ * hdr is the caller-supplied ACF_ABB header (byte_bus_id/op/evt/etc.);
+ * mtv is forced to RCP_ACF_MTV_UNTIMED by rcp_acf_encode_abb() itself,
+ * matching every other ABB encode in this codebase (ABB has no
+ * timestamp field of its own to validate -- the TSCF header's own
+ * avtp_timestamp is the timing signal here, not mtv). payload may be
+ * NULL iff payload_len == 0. Returns a zeroed rcp_bytes_t (data=NULL) on
+ * any encode failure at either layer (oversized payload, allocation
+ * failure). Caller frees the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_timed_encode_request_tscf(const rcp_acf_byte_message_info_t *hdr,
+                                           const uint8_t *payload, size_t payload_len,
+                                           rcp_stream_id_t stream_id,
+                                           uint32_t avtp_timestamp, uint8_t sequence_num);
+
 /* Decodes and validates a timed request from b[0..len). Same failure-mode
  * conventions as rcp_compound_decode_request() (request_compound.h), with
  * RCP_TIMED_ERR_UNKNOWN_TYPE returned whenever the decoded opcode byte is
