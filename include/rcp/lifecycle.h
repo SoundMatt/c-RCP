@@ -200,7 +200,19 @@ rcp_lifecycle_errc_t rcp_lifecycle_check_hw_cfg(const rcp_lifecycle_plausibility
 /* The RCP_CFG_INCONSISTENT plausibility check: returns RCP_LIFECYCLE_OK iff
  * every endpoint with ep_used set has has_stream_assoc set, and every
  * request stream with configured set has has_response_stream set. snap ==
- * NULL is treated as inconsistent, for the same fail-safe reason as above. */
+ * NULL is treated as inconsistent, for the same fail-safe reason as above.
+ *
+ * NOTED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group I, REQ-LIFECYCLE-038):
+ * TC18 §12.3.1.2 actually names a THIRD RCP_CFG_INCONSISTENT bullet this
+ * function does not check at all: "For each configured stream at least
+ * one stream_id/byte_bus_id is configured" -- the mirror-image of the
+ * has_stream_assoc check above (that check catches a used endpoint with no
+ * stream; this missing one would catch a configured stream with no
+ * endpoint using it). rcp_lifecycle_request_stream_plausibility_t has no
+ * field for it -- see that struct's own declaration, above -- since doing
+ * so needs a caller-supplied snapshot that actually cross-references
+ * endpoint-to-stream bindings, which this library's flat, unlinked
+ * endpoints[]/request_streams[] arrays cannot express. */
 rcp_lifecycle_errc_t rcp_lifecycle_check_rcp_cfg(const rcp_lifecycle_plausibility_snapshot_t *snap);
 
 /* Identifies who is attempting a write -- a functional-config write (the

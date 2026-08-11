@@ -34,6 +34,10 @@ the rationale.
 
 ## Releases
 
+### v0.215.0 -- 2026-08-10
+
+Full-catalog audit follow-up, batch 16 (Group I, 3 more items, extraction-only): three genuine, verified-against-primary-source gaps added as honest `.fusa-reqs.json` entries -- `REQ-LIFECYCLE-038` (`RCP_CFG_INCONSISTENT`'s own third plausibility bullet, "every configured stream has at least one endpoint using it", entirely unchecked by `rcp_lifecycle_check_rcp_cfg()`); `REQ-ADC-037` (the request/response cadence scheduling `adc_combine_avg_values` vs. `adc_avg_intervals_per_request` implies -- already honestly discussed in `ep_adc.h`'s own file header prose, but never formally tracked); `REQ-UART-038` (four Table 48 register fields -- `uart_rts_enable`/`uart_cts_enable`/`uart_half_duplex`/`uart_trail` -- with no field, setter, or round-trip of any kind). No code change (extraction work); deviation-pin tests added for each. Issue #256 Group I now 4/~10 items addressed. See `ROADMAP.md` for full detail.
+
 ### v0.214.0 -- 2026-08-10
 
 Full-catalog audit follow-up, batch 15 (Group I, partial): added `rcp_e2e_crc_error_should_enter_safe_state()` -- TC18 §12.7.7 Table 22's own rx_enforce_e2e description names two consequences for its 1b value in the same sentence ("stream is blocked until released... Safe state will be entered"), but only the first (the stream-fault latch) had a primitive at all; the second was entirely uncited and unimplemented. New pure decision function added, mirroring the existing `rcp_e2e_overflow_should_enter_safe_state()` precedent exactly, with the same honest "pure primitive exists, cross-endpoint escalation orchestration does not yet" gap disclosure. New `REQ-E2E-045` (status: partial). Mutation-tested. Issue #256 Group I (~10 items) begun; this closes 1 of them. See `ROADMAP.md` for full detail.

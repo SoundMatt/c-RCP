@@ -133,6 +133,16 @@
  * there is one response per execution; when it is smaller, one execution
  * yields several responses.
  *
+ * TRACKED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group I, REQ-ADC-037):
+ * this paragraph's own "need no code of their own here" claim is honest
+ * about scope, but until this entry no .fusa-reqs.json requirement
+ * actually cited these three cadence cases at all -- a caller integrating
+ * this module still needs to decide which case applies and drive the
+ * multi-request-to-one-response or one-request-to-multi-response
+ * accumulation itself, and no type in this library represents that
+ * caller-side state today (the same class of orchestration gap already
+ * tracked for REQ-E2E-021/030/045 and REQ-CANCEL-012).
+ *
  * Each stage is its own small, pure, directly-testable function operating
  * on caller-supplied arrays -- this module never itself owns sample
  * storage, matching every prior endpoint type's "consume already-gathered,

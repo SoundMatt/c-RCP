@@ -8675,6 +8675,17 @@
       "tc18": "\u00a712.7.4 Configuration in RCP_CONFIGURED state, TC18.txt L2498-2500"
     },
     {
+      "id": "REQ-LIFECYCLE-038",
+      "title": "NOT IMPLEMENTED: RCP_CFG_INCONSISTENT's own third plausibility bullet -- every configured request stream has at least one endpoint using it",
+      "text": "NOT IMPLEMENTED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group I): TC18 \u00a712.3.1.2's RCP_CFG_INCONSISTENT plausibility check names three bullets for the HW_CONFIGURED -> RCP_CONFIGURED transition: (1) \"Each EP used has at least one stream_id/byte_bus_id association\" -- REQ-LIFECYCLE-005/007; (2) \"For each configured stream at least one stream_id/byte_bus_id is configured\" -- the mirror-image completeness check, that no request stream is left configured with zero endpoints actually using it; (3) \"Each response stream configured is assigned to at least one request stream\" -- REQ-LIFECYCLE-006. Bullet 2 has no counterpart in rcp_lifecycle_check_rcp_cfg() at all: rcp_lifecycle_request_stream_plausibility_t carries only `configured` and `has_response_stream`, with no field representing whether any endpoint actually references that specific stream. A request stream marked `configured = true` with zero endpoints bound to it -- an orphaned, unused stream slot -- passes rcp_lifecycle_check_rcp_cfg() today exactly as if it were legitimately in use. Implementing this needs a new per-request-stream field (e.g. `has_bound_endpoint`) and a caller-supplied snapshot that actually cross-references endpoint-to-stream bindings, which this library's current single-flat-array snapshot model does not construct anywhere.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "tc18-gap",
+      "status": "not-implemented",
+      "tc18": "\u00a712.3.1.2 (\"Only if the configuration so far is plausible the state will be advanced. Plausibility check contains a check that: ... For each configured stream at least one stream_id/byte_bus_id is configured ... If not plausible the request will be rejected and an error response sent with RCP_CFG_INCONSITENT\"), TC18.txt L2190-2196"
+    },
+    {
       "id": "REQ-PWM-055",
       "title": "PWM_OUT trigger events are derived from the skew-delayed signal and fire at 0% duty",
       "text": "NOT IMPLEMENTED: c-RCP enumerates the three TC18 Table 42 PWM_OUT trigger events (rcp_ep_pwm_out_trigger_t: DONE, CYCLE_START, MID_PULSE) and carries the pwmo_skew register, but implements neither of the two rules governing them -- that trigger signals are generated from the SKEW-DELAYED output rather than the undelayed one (TC18 13.7.5.1, the break-before-make provision for half/full-bridge drivers), and that the mid-active-pulse trigger fires even when the duty cycle is 0%.",
@@ -9907,6 +9918,17 @@
       "tc18": "\u00a713.7.9.2 Table 51, TC18.txt L5100-5101"
     },
     {
+      "id": "REQ-ADC-037",
+      "title": "NOT IMPLEMENTED: the request/response cadence scheduling adc_combine_avg_values vs. adc_avg_intervals_per_request implies",
+      "text": "NOT IMPLEMENTED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group I): TC18 \u00a713.7.9.2 (immediately below Table 51) states three cadence cases comparing adc_combine_avg_values against adc_avg_intervals_per_request: when combine_avg_values > avg_intervals_per_request, several request executions must be accumulated before one response is generated (that response carrying the transaction_num of the request that produced its first included average value); when they are equal, exactly one response per request execution; when combine_avg_values < avg_intervals_per_request, one request execution yields multiple responses. ep_adc.h's own file header already honestly documents all three cases in prose (\"The three documented cadence cases follow directly from the two counts and need no code of their own here -- this module models the codec and the arithmetic, never the scheduling\"), but no function anywhere in this module -- nor any .fusa-reqs.json entry until this one -- decides which of the three cases applies for a given (combine_avg_values, avg_intervals_per_request) pair, or computes how many request executions a multi-request response should span, or which transaction_num such a response should carry. rcp_ep_adc_collect_response_values() packs whatever avg_values array a caller already assembled; it does not itself decide when that array is \"ready\" to become a response under any of the three cases. This is the same class of caller-owned-orchestration gap already tracked for REQ-E2E-021/030/045 and REQ-CANCEL-012 -- a real scheduling decision TC18 requires, with no type in this library representing the caller-side state (multiple in-flight request executions feeding one pending response, or one execution's values fanning out across several) such logic would need.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "tc18-gap",
+      "status": "not-implemented",
+      "tc18": "\u00a713.7.9.2 (\"When adc_combine_avg_values > adc_avg_intervals_per_request... When adc_combine_avg_values = adc_avg_intervals_per_request... When adc_combine_avg_values < adc_avg_intervals_per_request...\"), TC18.txt L5128-5133"
+    },
+    {
       "id": "REQ-CANEP-028",
       "title": "can_ep_len, can_base_clk and the CAN endpoint's three status registers",
       "text": "NOT IMPLEMENTED: c-RCP does not model the CAN functional-configuration block's descriptor, clock and status registers (TC18 \u00a713.7.11.2 Table 53): can_ep_len (0x0000, 8 bit, R), the reserved octet at 0x0001 (8 bit, R, reads 0x00), can_base_clk (0x0004, 16 bit, R \u2014 the CAN system clock), can_ep_status (0x0006, 16 bit, R/W), the 32-bit CAN EP status at 0x001C (R/W), and the 32-bit FIFO status at 0x0020 (R/W). rcp_ep_can_functional_cfg_t holds only bit timings, delay compensation, the execution-delay divider and the XL filter table. Consequence: bus-off, error-passive and FIFO-overflow conditions \u2014 the states those status registers exist to report \u2014 are unobservable through this endpoint, and the base clock the three bit-timing register sets divide cannot be read.",
@@ -10158,6 +10180,17 @@
       "scope": "tc18-gap",
       "status": "partial",
       "tc18": "\u00a713.7.8.2 Table 48, TC18.txt L4929, L4951, L4953, L4956"
+    },
+    {
+      "id": "REQ-UART-038",
+      "title": "NOT IMPLEMENTED: uart_rts_enable, uart_cts_enable, uart_half_duplex, and uart_trail (Table 48)",
+      "text": "NOT IMPLEMENTED (2026-08-10, c-RCP-AUDIT-06, issue #256 Group I): TC18 \u00a713.7.8.2 Table 48 defines four further R/W fields rcp_ep_uart_functional_cfg_t carries no counterpart for at all: uart_rts_enable (relative address 0x0009.2, 1 bit -- \"1b: RTS will be generated before data transmission\"), uart_cts_enable (0x0009.3, 1 bit -- \"1b: after CTS data transmission starts\"), uart_half_duplex (0x0009.4, 1 bit -- \"1b: half-duplex operation\"), and uart_trail (0x000C, 8 bit -- \"trail time between two transmissions in bit times\"). rcp_ep_uart_functional_cfg_t models only baud_rate, uart_nr_bits/parity/stop_bits, ep_rx_buffer_size, and uart_timeout_ms -- these four bits/octet have no field, no setter, and no round-trip of any kind. Consequence: hardware/RTS-CTS flow control cannot be configured or discovered at all, half-duplex operation cannot be selected, and the inter-transmission trail time (relevant to bus-turnaround timing on a shared/half-duplex line) is unconfigurable.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "tc18-gap",
+      "status": "not-implemented",
+      "tc18": "\u00a713.7.8.2 Table 48, TC18.txt L4937-4949 (uart_rts_enable/uart_cts_enable/uart_half_duplex), L4954-4955 (uart_trail)"
     }
   ],
   "catalogNote": "Phase 22 re-certification pass (ROADMAP.md milestone 85, v0.85.0): every requirement below was individually reviewed against the source file its //cfusa:req tag actually appears in (a per-prefix audit, not a blind carry-over) and classified via the \"scope\" field. scope=\"tc18\" entries (779 of 854) describe the actual implemented TC18 behavior -- register-map access control, lifecycle transitions, E2E CRC32 safe points, per-endpoint-type request/response shapes, discovery, power-mode transitions, and every ADAPT-class satellite -- and are this project's own ISO 26262 ASIL-B safety-case basis going forward. scope=\"legacy-compat\" entries (75 of 854) describe the retired pre-TC18 Zone/Command surface (rcp.h/rcp.c and tests/legacy_mock.* only); they are demoted to level/asil \"QM\" and their text is prefixed accordingly, but kept -- not deleted or renumbered -- because that legacy surface is out of scope for this milestone to touch (ROADMAP.md's v0.84.0 milestone already confirmed it is the last consumer of those retired types anywhere in src/) and still carries //cfusa:req tags naming these ids; deleting the catalog entries out from under a surviving tag would only trade one inaccuracy (an unqualified legacy requirement) for another (a dangling reference cfusa trace would then report). Only the tc18 subset is this project's claimed certification basis, and it is complete against Phases 13-21 as actually shipped -- not a forward-declared placeholder the way the legacy program's own catalog was at its v0.2.0, since unlike v0.2.0 this catalog was not written before the code it describes. TC18 requirements-corpus completeness pass (v0.105.0): 158 entries were added by a clause-by-clause sweep of TC18 sections 10 through 13.7.13 for normative clauses, tables and figures that no existing entry covered. Every added entry carries a \"tc18\" field citing the exact section (and the line of the specification text it was read from) and a \"status\" field: \"implemented\" (behaviour c-RCP provides, scope \"tc18\", ASIL-B), or \"partial\"/\"not-implemented\" (a normative obligation c-RCP does NOT meet -- scope \"tc18-gap\", level/asil \"QM\", text opening with \"NOT IMPLEMENTED\", and a test that pins the deviation rather than pretending it is absent). A tc18-gap entry is deliberately NOT part of the ASIL-B safety-case basis; it exists so the catalog is an honest map of the specification's normative surface instead of a map of this implementation only."

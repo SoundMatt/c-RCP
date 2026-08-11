@@ -165,6 +165,14 @@
  * and adds baud_rate, uart_nr_bits/parity/stop_bits (the word format),
  * ep_rx_buffer_size (the RX FIFO's size in octets), and uart_timeout_ms
  * (the read-completion race's timeout half -- see above).
+ *
+ * NOT IMPLEMENTED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group I,
+ * REQ-UART-038): four further TC18 §13.7.8.2 Table 48 R/W fields have no
+ * counterpart here at all -- uart_rts_enable/uart_cts_enable (hardware
+ * RTS/CTS flow control), uart_half_duplex (full- vs. half-duplex
+ * operation), and uart_trail (inter-transmission trail time in bit
+ * times). No field, setter, or round-trip of any kind exists for any of
+ * the four.
  * rcp_ep_uart_functional_cfg_writable() is, likewise, a thin, named
  * wrapper over server.h's rcp_lifecycle_field_writable()
  * (RCP_LIFECYCLE_FIELD_FUNCTIONAL_W), and every rcp_ep_uart_set_*() mutator
