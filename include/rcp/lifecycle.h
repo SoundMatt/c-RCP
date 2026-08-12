@@ -170,6 +170,28 @@ typedef struct {
                                  for this endpoint */
     bool has_stream_assoc;   /* a stream/byte_bus_id association exists for
                                  this endpoint */
+    size_t request_stream_index; /* REQ-LIFECYCLE-038 (issue #201): which
+                                 snap->request_streams[] slot this
+                                 endpoint's own has_stream_assoc refers to
+                                 -- meaningless while has_stream_assoc is
+                                 false. Placed as this struct's own LAST
+                                 field, matching this codebase's
+                                 established convention (see e.g.
+                                 rcp_regmap_ep_id_map_entry_t's own
+                                 request_stream_index field comment,
+                                 regmap.h) so every existing positional-
+                                 initializer test call site keeps
+                                 compiling unchanged -- a brace-list
+                                 initializer shorter than this struct's
+                                 own field count zero-initializes this
+                                 trailing field, and 0 is a safe default
+                                 (it only matters when has_stream_assoc
+                                 is also explicitly set true, which no
+                                 pre-existing call site combines with an
+                                 intentionally-nonzero stream index; see
+                                 rcp_lifecycle_check_rcp_cfg()'s own new
+                                 bullet-2 cross-reference this field
+                                 exists to feed). */
 } rcp_lifecycle_endpoint_plausibility_t;
 
 /* One request stream's configuration state, as far as the RCP_CFG_INCONSISTENT
@@ -198,21 +220,23 @@ typedef struct {
 rcp_lifecycle_errc_t rcp_lifecycle_check_hw_cfg(const rcp_lifecycle_plausibility_snapshot_t *snap);
 
 /* The RCP_CFG_INCONSISTENT plausibility check: returns RCP_LIFECYCLE_OK iff
- * every endpoint with ep_used set has has_stream_assoc set, and every
- * request stream with configured set has has_response_stream set. snap ==
+ * (1) every endpoint with ep_used set has has_stream_assoc set, (2) every
+ * request stream with configured set has has_response_stream set, and (3)
+ * every request stream with configured set is referenced by at least one
+ * endpoint's own request_stream_index (only endpoints with has_stream_assoc
+ * set are consulted for (3) -- an endpoint with has_stream_assoc false has
+ * no meaningful request_stream_index to reference anything with). snap ==
  * NULL is treated as inconsistent, for the same fail-safe reason as above.
  *
- * NOTED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group I, REQ-LIFECYCLE-038):
- * TC18 §12.3.1.2 actually names a THIRD RCP_CFG_INCONSISTENT bullet this
- * function does not check at all: "For each configured stream at least
- * one stream_id/byte_bus_id is configured" -- the mirror-image of the
- * has_stream_assoc check above (that check catches a used endpoint with no
- * stream; this missing one would catch a configured stream with no
- * endpoint using it). rcp_lifecycle_request_stream_plausibility_t has no
- * field for it -- see that struct's own declaration, above -- since doing
- * so needs a caller-supplied snapshot that actually cross-references
- * endpoint-to-stream bindings, which this library's flat, unlinked
- * endpoints[]/request_streams[] arrays cannot express. */
+ * FIXED 2026-08-12 (issue #201, REQ-LIFECYCLE-038): TC18 §12.3.1.2 names a
+ * THIRD RCP_CFG_INCONSISTENT bullet, "For each configured stream at least
+ * one stream_id/byte_bus_id is configured" -- the mirror-image of check
+ * (1) above (that check catches a used endpoint with no stream; this one
+ * catches a configured stream with no endpoint using it, an orphaned,
+ * unused stream slot). rcp_lifecycle_endpoint_plausibility_t's own new
+ * request_stream_index field (see that struct's own declaration, above)
+ * is the caller-supplied cross-reference this check needed and did not
+ * have before this fix. */
 rcp_lifecycle_errc_t rcp_lifecycle_check_rcp_cfg(const rcp_lifecycle_plausibility_snapshot_t *snap);
 
 /* Identifies who is attempting a write -- a functional-config write (the
