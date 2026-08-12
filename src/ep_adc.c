@@ -172,6 +172,45 @@ bool rcp_ep_adc_set_combine_avg_values(rcp_ep_adc_functional_cfg_t *cfg,
     return true;
 }
 
+/* ── Trigger outputs (Table 50), REQ-ADC-031 ─────────────────────────────── */
+
+//cfusa:req REQ-ADC-031
+void rcp_ep_adc_trigger_state_init(rcp_ep_adc_trigger_state_t *s)
+{
+    s->has_previous   = false;
+    s->previous_value = 0;
+}
+
+//cfusa:req REQ-ADC-031
+uint8_t rcp_ep_adc_trigger_evaluate(rcp_ep_adc_trigger_state_t *s, uint16_t value,
+                                     uint16_t trigger_min, uint16_t trigger_max,
+                                     bool measurement_finished)
+{
+    uint8_t fired = 0;
+
+    if (s->has_previous) {
+        if (s->previous_value >= trigger_min && value < trigger_min) {
+            fired |= RCP_EP_ADC_TRIGGER_BELOW_MIN;
+        }
+        if (s->previous_value <= trigger_min && value > trigger_min) {
+            fired |= RCP_EP_ADC_TRIGGER_ABOVE_MIN;
+        }
+        if (s->previous_value >= trigger_max && value < trigger_max) {
+            fired |= RCP_EP_ADC_TRIGGER_BELOW_MAX;
+        }
+        if (s->previous_value <= trigger_max && value > trigger_max) {
+            fired |= RCP_EP_ADC_TRIGGER_ABOVE_MAX;
+        }
+    }
+
+    if (measurement_finished) fired |= RCP_EP_ADC_TRIGGER_MEASUREMENT_FINISHED;
+
+    s->previous_value = value;
+    s->has_previous    = true;
+
+    return fired;
+}
+
 /* ── The EP_func register block (evt[2:0] == 111b) ─────────────────────────── */
 
 /* The EP-common enable&clr (0x0002) and options (0x0003) octets, packed

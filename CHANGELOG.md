@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.262.0 -- 2026-08-12 (issue #201 batch: `REQ-ADC-031`, the ADC endpoint's five Table 50 trigger outputs)
+
+**New `rcp_ep_adc_trigger_state_t`/`rcp_ep_adc_trigger_evaluate()` (ep_adc.h/ep_adc.c) model all 5 of TC18 §13.7.9.1 Table 50's ADC trigger outputs -- status flips to `implemented`.**
+
+`rcp_ep_adc_trigger_state_t` is a small caller-owned per-endpoint tracker holding the one piece of state edge detection needs (the previously observed averaged output value), matching the same caller-owned-data architecture already established by `rcp_watchdog_keeper_t`/`rcp_e2e_seq_tracker_t`/`rcp_e2e_stream_fault_tracker_t`. `rcp_ep_adc_trigger_evaluate()` takes one newly acquired averaged value plus `adc_trigger_min`/`adc_trigger_max` (`rcp_ep_adc_functional_cfg_t`'s own existing fields) and a caller-supplied `measurement_finished` bool, returning a bitmask of whichever triggers fire: triggers 0-3 are genuinely edge-triggered (a transition relative to the tracked previous value -- matching Table 50's own "falls below"/"rises above" wording exactly, not a level comparison against the current value alone); trigger 4 has no threshold concept at all and composes independently with any of 0-3 in the same call.
+
+**Mutation-testing found and fixed a real test-coverage gap, not just a mutation-testing formality**: the first round of 2 mutations (bypassing the `has_previous` guard; loosening one boundary comparison) caught only 1 of 2 cleanly -- a boundary off-by-one on `ABOVE_MIN` (`>` loosened to `>=`) passed all existing tests undetected, because no test exercised a value moving exactly *to* (not past) a threshold from the covering direction. Added 4 new discriminating tests (one per trigger direction) and confirmed all 4 corresponding boundary mutations are now caught cleanly.
+
+Wiring this primitive into a real Trigger-request dispatch path (the caller-side integration TC18's own cyclic-ADC pattern ultimately needs) remains a separate, not-yet-attempted integration concern, matching the same disposition already established for this codebase's other pure caller-driven primitives before their own dispatch-side wiring.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.261.0 -- 2026-08-12 (issue #201 batch: `REQ-E2E-021`, a CRC error on an `rx_enforce_e2e` stream now actually blocks the stream)
 
 **New `rcp_e2e_stream_fault_tracker_t` (e2e.h/e2e.c) wired into `rcp_mock_server_dispatch_e2e()`/`_dispatch_frame_e2e()` closes `REQ-E2E-021` fully (TC18 §12.7.7 Table 22: `rx_enforce_e2e`'s "stream is blocked until released" consequence) -- status flips to `implemented`, ASIL-B.**

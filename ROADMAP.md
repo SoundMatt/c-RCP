@@ -15205,6 +15205,38 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.262.0 -- 2026-08-12 (issue #201 batch: `REQ-ADC-031`, the ADC
+endpoint's five Table 50 trigger outputs)
+
+**New `rcp_ep_adc_trigger_state_t`/`rcp_ep_adc_trigger_evaluate()`
+model all 5 of TC18 §13.7.9.1 Table 50's ADC trigger outputs --
+status flips to `implemented`.**
+
+A small caller-owned per-endpoint tracker holds the one piece of
+state edge detection needs (the previously observed averaged value),
+matching the same architecture already established by
+`rcp_watchdog_keeper_t`/`rcp_e2e_seq_tracker_t`/
+`rcp_e2e_stream_fault_tracker_t`. The evaluate function takes one new
+averaged value plus the endpoint's own existing trigger_min/max
+fields and a caller-supplied measurement-finished bool, returning a
+bitmask of whichever triggers fire: 0-3 are genuinely edge-triggered
+(a transition relative to the previous value, matching Table 50's own
+"falls below"/"rises above" wording); trigger 4 has no threshold
+concept and composes independently with 0-3.
+
+**Mutation-testing found and fixed a real test-coverage gap**: a
+boundary off-by-one on one trigger direction passed all existing
+tests undetected -- no test exercised a value moving exactly *to*
+(not past) a threshold. Added 4 new discriminating tests (one per
+direction); all 4 corresponding mutations now caught cleanly.
+
+Wiring into a real Trigger-request dispatch path remains a separate,
+not-yet-attempted integration concern, matching this codebase's other
+pure caller-driven primitives before their own dispatch-side wiring.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.261.0 -- 2026-08-12 (issue #201 batch: `REQ-E2E-021`, a CRC
 error on an `rx_enforce_e2e` stream now actually blocks the stream)
 

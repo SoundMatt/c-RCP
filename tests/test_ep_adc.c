@@ -29,6 +29,7 @@
 //cfusa:test REQ-ADC-028
 //cfusa:test REQ-ADC-029
 //cfusa:test REQ-ADC-030
+//cfusa:test REQ-ADC-031
 //cfusa:test REQ-ADC-038
 //cfusa:test REQ-ADC-039
 //cfusa:test REQ-ADC-040
@@ -391,6 +392,161 @@ static void test_set_combine_avg_values_applies_when_authorized(void)
     TEST_ASSERT_TRUE(rcp_ep_adc_set_combine_avg_values(&cfg, 255,
                                                         RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT8(255, cfg.adc_combine_avg_values);
+}
+
+/* ── Trigger outputs (Table 50), REQ-ADC-031 ─────────────────────────────── */
+
+static void test_trigger_state_init_has_no_previous_value(void)
+{
+    rcp_ep_adc_trigger_state_t s;
+    rcp_ep_adc_trigger_state_init(&s);
+    TEST_ASSERT_FALSE(s.has_previous);
+}
+
+/* The very first evaluate() call ever (no previous value tracked yet)
+ * cannot fire any of the edge-triggered signals 0-3, regardless of
+ * value -- there is nothing to detect a transition against. Trigger 4
+ * (measurement_finished) is unaffected, since it has no previous-value
+ * concept at all. */
+static void test_trigger_evaluate_first_call_never_fires_edge_triggers(void)
+{
+    rcp_ep_adc_trigger_state_t s;
+    rcp_ep_adc_trigger_state_init(&s);
+
+    /* Even a value far outside [min, max] fires nothing edge-related. */
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_ep_adc_trigger_evaluate(&s, 0, 100, 200, false));
+    TEST_ASSERT_TRUE(s.has_previous);
+
+    /* But it DOES now have a previous value, and measurement_finished
+     * still fires independently of any of that. */
+    rcp_ep_adc_trigger_state_init(&s);
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_ADC_TRIGGER_MEASUREMENT_FINISHED,
+                            rcp_ep_adc_trigger_evaluate(&s, 9999, 100, 200, true));
+}
+
+/* A genuine downward crossing of trigger_min fires BELOW_MIN exactly
+ * once, on the call where the crossing happens -- not on every
+ * subsequent call that stays below it. */
+static void test_trigger_evaluate_below_min_fires_once_per_crossing(void)
+{
+    rcp_ep_adc_trigger_state_t s;
+    rcp_ep_adc_trigger_state_init(&s);
+
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_ep_adc_trigger_evaluate(&s, 150, 100, 200, false)); /* seed: in range */
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_ADC_TRIGGER_BELOW_MIN,
+                            rcp_ep_adc_trigger_evaluate(&s, 50, 100, 200, false)); /* crosses below min */
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_ep_adc_trigger_evaluate(&s, 40, 100, 200, false)); /* stays below: no re-fire */
+}
+
+/* The symmetric upward crossing of trigger_min. */
+static void test_trigger_evaluate_above_min_fires_on_upward_crossing(void)
+{
+    rcp_ep_adc_trigger_state_t s;
+    rcp_ep_adc_trigger_state_init(&s);
+
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_ep_adc_trigger_evaluate(&s, 50, 100, 200, false)); /* seed: below min */
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_ADC_TRIGGER_ABOVE_MIN,
+                            rcp_ep_adc_trigger_evaluate(&s, 150, 100, 200, false)); /* crosses above min */
+}
+
+/* trigger_max's own two crossings, independent of trigger_min's. */
+static void test_trigger_evaluate_max_crossings(void)
+{
+    rcp_ep_adc_trigger_state_t s;
+    rcp_ep_adc_trigger_state_init(&s);
+
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_ep_adc_trigger_evaluate(&s, 150, 100, 200, false)); /* seed: in range */
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_ADC_TRIGGER_ABOVE_MAX,
+                            rcp_ep_adc_trigger_evaluate(&s, 250, 100, 200, false)); /* crosses above max */
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_ADC_TRIGGER_BELOW_MAX,
+                            rcp_ep_adc_trigger_evaluate(&s, 150, 100, 200, false)); /* back below max */
+}
+
+/* A value sitting exactly AT a threshold, then moving strictly away
+ * from it, still counts as a genuine crossing (the ">="/"<=" boundary
+ * inclusion on the PREVIOUS side, not the current side). */
+static void test_trigger_evaluate_exact_threshold_value_still_crosses(void)
+{
+    rcp_ep_adc_trigger_state_t s;
+    rcp_ep_adc_trigger_state_init(&s);
+
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_ep_adc_trigger_evaluate(&s, 100, 100, 200, false)); /* seed: exactly at min */
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_ADC_TRIGGER_BELOW_MIN,
+                            rcp_ep_adc_trigger_evaluate(&s, 99, 100, 200, false)); /* strictly below now */
+}
+
+/* The symmetric direction: a value that moves UP to (not past) a
+ * threshold from below must NOT fire the "rises above" trigger -- only
+ * a value that becomes STRICTLY greater than the threshold does. This
+ * is the discriminating case that distinguishes a strict ">" comparison
+ * from an off-by-one ">=" on rcp_ep_adc_trigger_evaluate()'s own
+ * current-value side. */
+static void test_trigger_evaluate_moving_exactly_to_threshold_does_not_fire_above(void)
+{
+    rcp_ep_adc_trigger_state_t s;
+    rcp_ep_adc_trigger_state_init(&s);
+
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_ep_adc_trigger_evaluate(&s, 50, 100, 200, false)); /* seed: below min */
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_ep_adc_trigger_evaluate(&s, 100, 100, 200, false)); /* AT min, not above it */
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_ADC_TRIGGER_ABOVE_MIN,
+                            rcp_ep_adc_trigger_evaluate(&s, 101, 100, 200, false)); /* NOW strictly above */
+}
+
+/* The symmetric downward case: a value that moves DOWN to (not past) a
+ * threshold from above must NOT fire the "falls below" trigger. */
+static void test_trigger_evaluate_moving_exactly_to_threshold_does_not_fire_below(void)
+{
+    rcp_ep_adc_trigger_state_t s;
+    rcp_ep_adc_trigger_state_init(&s);
+
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_ep_adc_trigger_evaluate(&s, 150, 100, 200, false)); /* seed: above min */
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_ep_adc_trigger_evaluate(&s, 100, 100, 200, false)); /* AT min, not below it */
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_ADC_TRIGGER_BELOW_MIN,
+                            rcp_ep_adc_trigger_evaluate(&s, 99, 100, 200, false)); /* NOW strictly below */
+}
+
+/* trigger_max's own two symmetric "moves exactly to, not past" cases. */
+static void test_trigger_evaluate_max_moving_exactly_to_threshold_does_not_fire(void)
+{
+    rcp_ep_adc_trigger_state_t s;
+    rcp_ep_adc_trigger_state_init(&s);
+
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_ep_adc_trigger_evaluate(&s, 150, 100, 200, false)); /* seed: below max */
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_ep_adc_trigger_evaluate(&s, 200, 100, 200, false)); /* AT max, not above it */
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_ADC_TRIGGER_ABOVE_MAX,
+                            rcp_ep_adc_trigger_evaluate(&s, 201, 100, 200, false)); /* NOW strictly above */
+
+    rcp_ep_adc_trigger_state_init(&s);
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_ep_adc_trigger_evaluate(&s, 250, 100, 200, false)); /* seed: above max */
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_ep_adc_trigger_evaluate(&s, 200, 100, 200, false)); /* AT max, not below it */
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_ADC_TRIGGER_BELOW_MAX,
+                            rcp_ep_adc_trigger_evaluate(&s, 199, 100, 200, false)); /* NOW strictly below */
+}
+
+/* A jump that crosses BOTH min and max in a single call (e.g. from deep
+ * below min to deep above max) fires every threshold trigger whose own
+ * direction the jump satisfies -- not just one. */
+static void test_trigger_evaluate_large_jump_fires_multiple_triggers(void)
+{
+    rcp_ep_adc_trigger_state_t s;
+    uint8_t                     fired;
+    rcp_ep_adc_trigger_state_init(&s);
+
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_ep_adc_trigger_evaluate(&s, 0, 100, 200, false)); /* seed: below min */
+    fired = rcp_ep_adc_trigger_evaluate(&s, 9999, 100, 200, false); /* jumps clear past max */
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_ADC_TRIGGER_ABOVE_MIN | RCP_EP_ADC_TRIGGER_ABOVE_MAX, fired);
+}
+
+/* Trigger 4 composes with any of triggers 0-3 in the same call --
+ * Table 50's own 5 signals are independent, not mutually exclusive. */
+static void test_trigger_evaluate_measurement_finished_composes_with_edge_triggers(void)
+{
+    rcp_ep_adc_trigger_state_t s;
+    rcp_ep_adc_trigger_state_init(&s);
+
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_ep_adc_trigger_evaluate(&s, 150, 100, 200, false));
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_ADC_TRIGGER_BELOW_MIN | RCP_EP_ADC_TRIGGER_MEASUREMENT_FINISHED,
+                            rcp_ep_adc_trigger_evaluate(&s, 50, 100, 200, true));
 }
 
 /* ── The EP_func register block ────────────────────────────────────────────── */
@@ -970,6 +1126,17 @@ int main(void)
     RUN_TEST(test_set_avg_intervals_per_request_applies_when_authorized);
     RUN_TEST(test_set_combine_avg_values_rejects_unauthorized);
     RUN_TEST(test_set_combine_avg_values_applies_when_authorized);
+    RUN_TEST(test_trigger_state_init_has_no_previous_value);
+    RUN_TEST(test_trigger_evaluate_first_call_never_fires_edge_triggers);
+    RUN_TEST(test_trigger_evaluate_below_min_fires_once_per_crossing);
+    RUN_TEST(test_trigger_evaluate_above_min_fires_on_upward_crossing);
+    RUN_TEST(test_trigger_evaluate_max_crossings);
+    RUN_TEST(test_trigger_evaluate_exact_threshold_value_still_crosses);
+    RUN_TEST(test_trigger_evaluate_moving_exactly_to_threshold_does_not_fire_above);
+    RUN_TEST(test_trigger_evaluate_moving_exactly_to_threshold_does_not_fire_below);
+    RUN_TEST(test_trigger_evaluate_max_moving_exactly_to_threshold_does_not_fire);
+    RUN_TEST(test_trigger_evaluate_large_jump_fires_multiple_triggers);
+    RUN_TEST(test_trigger_evaluate_measurement_finished_composes_with_edge_triggers);
 
     RUN_TEST(test_render_registers_matches_table_offsets);
     RUN_TEST(test_render_registers_truncates_wide_fields);
