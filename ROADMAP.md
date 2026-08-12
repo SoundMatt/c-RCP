@@ -15205,6 +15205,40 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.265.0 -- 2026-08-12 (issue #201 batch: `REQ-GPIO-033`, GPIO
+payload-length violation now maps to the TC18 wire error code)
+
+**New `rcp_ep_gpio_wire_error()` maps
+`RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN` to `RCP_ERROR_INVALID_PARAMETER`
+-- status flips to `implemented`, matching this codebase's
+established `rcp_<module>_wire_error()` convention
+(`rcp_e2e_wire_error()`, `REQ-WIREERR-003`).**
+
+TC18 §13.7.4.1: "A request not having exactly four bytes is
+rejected and an error response with error code = INVALID_PARAMETER
+will be sent." c-RCP always enforced the four-octet length, but
+only ever reported the violation as the module-local
+`RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN` -- the numbered wire code TC18
+names was never reachable from this path. The new function closes
+that gap: a caller building an Error Response frame now has the
+TC18-conformant code available. Every other `rcp_ep_gpio_errc_t`
+value maps to `RCP_ERROR_NONE`, matching `rcp_e2e_wire_error()`'s
+own disposition for its analogous local-only codes.
+
+**The requirement's other half -- "an endpoint supporting fewer
+than 32 pins shall map its pins onto the least-significant bits" --
+turned out to already be fully conformant, no code change needed**:
+this module's bit-index `n` <-> pin `IOn` encoding is fixed
+regardless of how many pins a real instance physically has, so pin
+0 always occupies bit 0. Added a test making this explicit rather
+than relying on indirect coverage.
+
+2 tests (1 rewritten, 1 new). Mutation-tested (bypassing the
+mapping): caught cleanly.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.264.0 -- 2026-08-12 (issue #201 batch: `REQ-LIFECYCLE-038`,
 RCP_CFG_INCONSISTENT's third plausibility bullet -- orphaned request
 streams now caught)

@@ -484,6 +484,21 @@ typedef enum {
 /* Human-readable message for an rcp_ep_gpio_errc_t value. Never returns NULL. */
 const char *rcp_ep_gpio_strerror(rcp_ep_gpio_errc_t e);
 
+/* FIXED 2026-08-12 (issue #201, REQ-GPIO-033): maps e to its numbered wire
+ * error code (errors.h), for a caller building an Error Response frame
+ * (e.g. via acf.h's rcp_acf_build_error_response()) once a request has
+ * failed to decode. Returns RCP_ERROR_INVALID_PARAMETER for
+ * RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN -- TC18 §13.7.4.1's own numbered code
+ * for "a request not having exactly four bytes" -- and RCP_ERROR_NONE for
+ * every other rcp_ep_gpio_errc_t value: RCP_EP_GPIO_OK means nothing went
+ * wrong, and RCP_EP_GPIO_ERR_SHORT_FRAME/_BAD_MSG_TYPE/_WRONG_BUS/_WRONG_OP
+ * are all local framing/routing outcomes a caller resolves before a
+ * GPIO-specific Response frame -- addressed via this same byte_bus_id --
+ * would even be constructible, matching rcp_e2e_wire_error()'s own
+ * disposition for its analogous local-only codes (e2e.h). Matches this
+ * codebase's established rcp_<module>_wire_error() naming convention. */
+rcp_wire_error_t rcp_ep_gpio_wire_error(rcp_ep_gpio_errc_t e);
+
 /* ── Request/response payload length ───────────────────────────────────────── */
 
 /* The fixed payload length (octets) of a write request or a response --

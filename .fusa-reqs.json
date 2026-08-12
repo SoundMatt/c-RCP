@@ -8456,12 +8456,12 @@
     {
       "id": "REQ-GPIO-033",
       "title": "GPIO request payload is exactly four bytes, mapped LSB-first for endpoints with fewer than 32 pins",
-      "text": "rcp_ep_gpio_decode_write_request() and rcp_ep_gpio_decode_request() shall reject any GPIO request whose byte_msg_payload is not exactly RCP_EP_GPIO_PAYLOAD_LEN (4) octets with RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN -- the condition TC18 13.7.4.1 answers on the wire with error code INVALID_PARAMETER -- and an endpoint supporting fewer than RCP_EP_GPIO_MAX_PINS (32) pins shall map its pins onto the least-significant bits of that 32-bit payload.",
+      "text": "IMPLEMENTED (2026-08-12, issue #201 Phase 5e): rcp_ep_gpio_decode_write_request() and rcp_ep_gpio_decode_request() reject any GPIO request whose byte_msg_payload is not exactly RCP_EP_GPIO_PAYLOAD_LEN (4) octets with RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN; the new rcp_ep_gpio_wire_error() maps that local code to the numbered wire code TC18 13.7.4.1 answers with, RCP_ERROR_INVALID_PARAMETER, for a caller building an Error Response frame (acf.h's rcp_acf_build_error_response()) -- closing the deviation this entry previously pinned (the wire code was never reachable from this path). The LSB-first bit-to-pin mapping for an endpoint supporting fewer than RCP_EP_GPIO_MAX_PINS (32) pins was already conformant by construction: this module's fixed bit-index n <-> pin IOn encoding (rcp_ep_gpio_pin_mask()/_pin_get()) never changes based on how many pins a real instance physically has, so pin 0 is always bit 0 regardless -- no code change was needed for that half, only test coverage confirming it explicitly.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "partial",
+      "status": "implemented",
       "tc18": "\u00a713.7.4.1, TC18.txt L4381-4392"
     },
     {

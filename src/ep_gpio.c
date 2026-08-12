@@ -391,6 +391,21 @@ const char *rcp_ep_gpio_strerror(rcp_ep_gpio_errc_t e)
     }
 }
 
+//cfusa:req REQ-GPIO-033
+rcp_wire_error_t rcp_ep_gpio_wire_error(rcp_ep_gpio_errc_t e)
+{
+    switch (e) {
+    /* TC18 §13.7.4.1: "A request not having exactly four bytes is
+     * rejected and an error response with error code = INVALID_PARAMETER
+     * will be sent." */
+    case RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN: return RCP_ERROR_INVALID_PARAMETER;
+    /* RCP_EP_GPIO_OK and the remaining error codes are all local
+     * framing/routing outcomes with no numbered wire-error-code
+     * counterpart -- see this function's own doc comment (ep_gpio.h). */
+    default: return RCP_ERROR_NONE;
+    }
+}
+
 /* ── Read request ──────────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-GPIO-026

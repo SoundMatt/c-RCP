@@ -209,13 +209,17 @@ static void test_acf_request_flags_round_trip_unconstrained(void)
 
 /* ── GPIO endpoint (TC18 13.7.4) ──────────────────────────────────────────── */
 
-/* REQ-GPIO-033 (partial): TC18 13.7.4.1 fixes the GPIO request payload at
- * exactly four octets, with an endpoint of fewer than 32 pins mapped onto the
- * least-significant bits. c-RCP enforces the length; the DEVIATION is that a
- * violation is reported only as the module-local code
- * RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN -- the numbered wire code the clause calls
- * for, RCP_ERROR_INVALID_PARAMETER, is a different value and is never
- * produced from this path. */
+/* FIXED 2026-08-12 (issue #201, REQ-GPIO-033): TC18 13.7.4.1 fixes the GPIO
+ * request payload at exactly four octets, with an endpoint of fewer than
+ * 32 pins mapped onto the least-significant bits (this codebase's fixed
+ * bit-index n <-> pin IOn encoding satisfies that trivially, regardless of
+ * how many pins a real instance physically has -- verified below), and
+ * rejects a violation with error code INVALID_PARAMETER. c-RCP always
+ * enforced the length; what was missing was a way to produce the correct
+ * numbered wire code for that rejection -- rcp_ep_gpio_wire_error() now
+ * maps RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN to RCP_ERROR_INVALID_PARAMETER, so
+ * a caller building an Error Response frame (acf.h's
+ * rcp_acf_build_error_response()) has the TC18-conformant code available. */
 static void test_gpio_request_payload_is_four_octets(void)
 {
     rcp_acf_byte_message_info_t hdr        = {0};
@@ -248,20 +252,33 @@ static void test_gpio_request_payload_is_four_octets(void)
     TEST_ASSERT_EQUAL(RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN,
                       rcp_ep_gpio_decode_write_request(frame.data, frame.len, 7u, &bitmask, &evt,
                                                        &tn));
-    /* The wire code TC18 13.7.4.1 names for this case is a different,
-     * unreachable value. */
+    /* The numbered wire code TC18 13.7.4.1 names for this case is now
+     * reachable via rcp_ep_gpio_wire_error(). */
     {
         /* Held in ints, not compared as their own enum types: MSVC's C5287
-         * rejects a direct comparison of two different enumerations, and
-         * the point here is precisely that these are two unrelated
-         * numbering schemes. */
-        const int wire_code  = (int)RCP_ERROR_INVALID_PARAMETER;
-        const int local_code = (int)RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN;
+         * rejects a direct comparison of two different enumerations. */
+        const int wire_code = (int)rcp_ep_gpio_wire_error(RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN);
 
         TEST_ASSERT_EQUAL_INT(15, wire_code);
-        TEST_ASSERT_NOT_EQUAL_INT(wire_code, local_code);
+        TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_INVALID_PARAMETER, wire_code);
     }
     rcp_bytes_free(&frame);
+}
+
+/* Every other rcp_ep_gpio_errc_t value is a local framing/routing outcome
+ * with no numbered wire-error-code counterpart -- see
+ * rcp_ep_gpio_wire_error()'s own doc comment (ep_gpio.h). */
+static void test_gpio_wire_error_is_none_for_local_only_codes(void)
+{
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_NONE, (int)rcp_ep_gpio_wire_error(RCP_EP_GPIO_OK));
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_NONE,
+                          (int)rcp_ep_gpio_wire_error(RCP_EP_GPIO_ERR_SHORT_FRAME));
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_NONE,
+                          (int)rcp_ep_gpio_wire_error(RCP_EP_GPIO_ERR_BAD_MSG_TYPE));
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_NONE,
+                          (int)rcp_ep_gpio_wire_error(RCP_EP_GPIO_ERR_WRONG_BUS));
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_NONE,
+                          (int)rcp_ep_gpio_wire_error(RCP_EP_GPIO_ERR_WRONG_OP));
 }
 
 /* REQ-GPIO-034 (partial) DEVIATION PIN: the three trigger CONDITIONS exist,
@@ -1399,6 +1416,7 @@ int main(void)
     RUN_TEST(test_acf_request_flags_round_trip_unconstrained);
 
     RUN_TEST(test_gpio_request_payload_is_four_octets);
+    RUN_TEST(test_gpio_wire_error_is_none_for_local_only_codes);
     RUN_TEST(test_gpio_trigger_numbering_and_functional_cfg_gaps);
     RUN_TEST(test_gpio_response_timing_is_not_modelled);
 
