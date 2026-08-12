@@ -378,6 +378,36 @@ typedef enum {
  * RCP_EP_SPI_EVENT_CS_DEASSERT. */
 bool rcp_ep_spi_trigger_fires(rcp_ep_spi_trigger_t trigger, rcp_ep_spi_event_t event);
 
+/* REQ-SPI-034: TC18 §13.7.3.1's own Table 41 "spi trigger outputs" (RC5;
+ * the .fusa-reqs.json record's own citation of "Table 38" is stale --
+ * RC5's own Table 38 is the unrelated RC-Server worked example, confirmed
+ * directly against the current RC5 baseline PDF; the real trigger-outputs
+ * table is Table 41, running "signal 0: SPI execution done / signal 1:
+ * reserved / signal 2+2n: CSn asserted / signal 3+2n: CSn de-asserted (0
+ * <= n < 16)"). Signal 0 is a whole-endpoint trigger (analogous to
+ * ep_gpio.h's own signal 0) this per-channel function deliberately does
+ * not model. This module's own RCP_EP_SPI_MAX_CHANNELS (6) narrows
+ * Table 41's own n < 16 ceiling to this endpoint's real channel count,
+ * the same way ep_gpio.h's RCP_EP_GPIO_MAX_PINS (32) narrows Table 43's
+ * IOn range.
+ *
+ * This is a pure numbering computation, entirely independent of
+ * rcp_ep_spi_trigger_t's own deliberately-collapsed, non-wire-rendered
+ * per-channel trigger mode (see the file header's "Per-channel trigger
+ * signals" section) -- adding it does not touch that design decision or
+ * this module's "no wire-format consequence" property, it only lets a
+ * caller resolve a Table 41 signal number for a (channel, CS-edge) pair
+ * that names one.
+ *
+ * Returns true and populates *out_signal_number iff channel <
+ * RCP_EP_SPI_MAX_CHANNELS and trigger is CS_ASSERT or CS_DEASSERT (never
+ * TRANSFER_DONE, which is signal 0's whole-endpoint concept and has no
+ * per-channel Table 41 entry, nor NONE, which names no trigger event and
+ * therefore no signal number); returns false (*out_signal_number left
+ * unchanged) otherwise. */
+bool rcp_ep_spi_trigger_signal_number(uint8_t channel, rcp_ep_spi_trigger_t trigger,
+                                       uint8_t *out_signal_number);
+
 /* ── Functional config ─────────────────────────────────────────────────────── */
 
 /* One channel's runtime-adjustable functional configuration -- see the

@@ -34,6 +34,24 @@ the rationale.
 
 ## Releases
 
+### v0.280.0 -- 2026-08-12 (issue #336 batch: `REQ-SPI-034`, SPI trigger output numbering)
+
+**`REQ-SPI-034` flips `not-implemented` -> `implemented`.**
+
+New `rcp_ep_spi_trigger_signal_number()` (`ep_spi.h`/`ep_spi.c`) computes TC18 §13.7.3.1's own Table 41 "spi trigger outputs" per-channel signal numbers: signal 0 is the whole-endpoint "SPI execution done" trigger (not modelled by this per-channel function, the same treatment as `REQ-GPIO-034`'s own signal 0), signal 1 is reserved, and signal `2+2n`/`3+2n` is CSn asserted/de-asserted, for `0 <= n < 16` narrowed to this module's own `RCP_EP_SPI_MAX_CHANNELS` (6) -- exactly the requirement's own "signals 2..13" range.
+
+**Citation correction found and fixed alongside this fix**: the `.fusa-reqs.json` record (and this module's own gap-pinning test comment) cited "Table 38" -- confirmed directly against the current RC5 baseline PDF that Table 38 is now the unrelated RC-Server worked example (`13.7.1.4`, itself a `TABLE TO BE UPDATED` placeholder), not the trigger-outputs table. The real table is Table 41; both `.fusa-reqs.json` and the test comment now cite it correctly.
+
+This is a pure, additive numbering computation, entirely independent of `rcp_ep_spi_trigger_t`'s own deliberately-collapsed, non-wire-rendered per-channel trigger mode (documented in `ep_spi.h`'s own file header, c-RCP-AUDIT-06/issue #256 Group C) -- that design decision, and its "no wire-format consequence" property, are unaffected by this fix.
+
+Returns `false` (leaving the output unchanged) for `channel >= RCP_EP_SPI_MAX_CHANNELS`, `TRANSFER_DONE` (signal 0's whole-endpoint concept, no per-channel Table 41 entry), or `NONE` (names no trigger event), rather than fabricating a signal number.
+
+New `test_spi_trigger_signal_numbering` asserts channel 0's pair (2/3), channel 1's first signal (4), channel 5's pair (12/13, this module's own highest channel), and all three `false` cases.
+
+Mutation-tested: both the channel boundary (`>=` weakened to `>`) and the signal-number formula (the `2+` offset dropped) are independently caught by the new test.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 new *classes* of finding -- 8 new instances of the same pre-existing `CFUSA-L004` recursion-rule false positive already carried on `main` (confirmed non-recursive by inspection: the rule flags every *call site* of a newly-introduced function name, not just its definition, once the function has multiple call sites in a test file). `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.279.0 -- 2026-08-12 (issue #336 batch: `REQ-GPIO-034`, GPIO trigger signal numbering)
 
 **`REQ-GPIO-034` flips `partial` -> `implemented`.**
