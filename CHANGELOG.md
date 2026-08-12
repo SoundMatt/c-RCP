@@ -34,6 +34,14 @@ the rationale.
 
 ## Releases
 
+### v0.266.0 -- 2026-08-12 (issue #201 doc-only batch: `REQ-SPI-033` was already implemented, stale catalog entry corrected)
+
+**`REQ-SPI-033` flips `partial` -> `implemented` -- a `.fusa-reqs.json` text correction, not a code change.**
+
+TC18 §13.7.3.1/§13.7.3.2 give the SPI endpoint six independently pre-configured channels, selected by a request's `evt[2:0]`. `rcp_ep_spi_decode_transfer_request()` already extracts and validates the requesting channel from `evt[2:0]` (`rcp_ep_spi_channel_valid()`), returning it for a caller to index `cfg->channels[]` with -- the same evt-bits mechanism this codebase's own dedicated SPI channel-selection investigation (issue #256, task #98) independently confirmed correct against Table 26/§13.5. This entry's own catalogue text simply never caught up to the already-implemented behavior. Same stale-catalog-entry pattern found and fixed 4+ times already this session (`REQ-UART-036` and others) -- caught this time by the gap-pinning test's own comment already stating "the DEVIATION is only that the catalogue, not the code, was missing that statement."
+
+No functional code change; 65/65 both trees unchanged. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.265.0 -- 2026-08-12 (issue #201 batch: `REQ-GPIO-033`, GPIO payload-length violation now maps to the TC18 wire error code)
 
 **New `rcp_ep_gpio_wire_error()` (ep_gpio.h/ep_gpio.c) maps `RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN` to `RCP_ERROR_INVALID_PARAMETER` -- status flips to `implemented`, matching this codebase's established `rcp_<module>_wire_error()` convention (`rcp_e2e_wire_error()`, `REQ-WIREERR-003`).**

@@ -15205,6 +15205,29 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.266.0 -- 2026-08-12 (issue #201 doc-only batch: `REQ-SPI-033`
+was already implemented, stale catalog entry corrected)
+
+**`REQ-SPI-033` flips `partial` -> `implemented` -- a
+`.fusa-reqs.json` text correction, not a code change.**
+
+TC18 §13.7.3.1/§13.7.3.2 give the SPI endpoint six independently
+pre-configured channels, selected by a request's `evt[2:0]`.
+`rcp_ep_spi_decode_transfer_request()` already extracts and
+validates the requesting channel from `evt[2:0]`, returning it for
+a caller to index `cfg->channels[]` with -- the same evt-bits
+mechanism this codebase's own dedicated SPI channel-selection
+investigation (issue #256, task #98) independently confirmed
+correct. This entry's own catalogue text simply never caught up.
+Same stale-catalog-entry pattern found and fixed 4+ times already
+this session -- caught this time by the gap-pinning test's own
+comment already stating the deviation was in the catalogue, not the
+code.
+
+No functional code change; 65/65 both trees unchanged. `cfusa
+check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested
+100`: both 100%.
+
 ### v0.265.0 -- 2026-08-12 (issue #201 batch: `REQ-GPIO-033`, GPIO
 payload-length violation now maps to the TC18 wire error code)
 

@@ -9592,12 +9592,12 @@
     {
       "id": "REQ-SPI-033",
       "title": "evt[2:0] selects which of the six SPI channel configurations a request uses",
-      "text": "The SPI endpoint shall carry up to RCP_EP_SPI_MAX_CHANNELS (6) independently pre-configured channel configurations (rcp_ep_spi_functional_cfg_t::channels), and the configuration a given SPI request executes under shall be selected by that request's evt[2:0] field, per TC18 13.7.3.1/13.7.3.2.",
+      "text": "IMPLEMENTED (2026-08-12, issue #201 Phase 5e): the SPI endpoint carries RCP_EP_SPI_MAX_CHANNELS (6) independently pre-configured channel configurations (rcp_ep_spi_functional_cfg_t::channels), and rcp_ep_spi_decode_transfer_request() already extracts and validates the requesting channel from the request's evt[2:0] field (rcp_ep_spi_channel_valid()), returning it for a caller to index cfg->channels[] with, per TC18 13.7.3.1/13.7.3.2 -- the same evt-bits mechanism this codebase's own dedicated SPI channel-selection investigation (issue #256, task #98) independently confirmed correct against Table 26/\u00a713.5. This entry's own catalogue text simply never caught up to the already-implemented behavior -- same stale-catalog-entry pattern found and fixed 4+ times this session (REQ-UART-036 and others). No code change: the deviation was in the catalogue, not the code.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "partial",
+      "status": "implemented",
       "tc18": "\u00a713.7.3.1, TC18.txt L4192-4194 and \u00a713.7.3.2 L4231-4233"
     },
     {
