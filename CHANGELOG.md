@@ -34,6 +34,26 @@ the rationale.
 
 ## Releases
 
+### v0.249.0 -- 2026-08-11 (issue #308: EP0 write dispatcher now enforces lifecycle/writer/lock authorization for all 4 pointed-to tables)
+
+**`rcp_regmap_ep0_decode_write_request()` (issues #301/#306) applied writes to HW_config, EP_ID_config, response-queue-config, and request-stream-cfg without consulting lifecycle state, writer identity, or the `svr_configuration_lock` W+ lock at all — any writer in any lifecycle state could rewrite any of them. Found while reviewing the RMAP requirement set's own remaining `partial` entries (REQ-RMAP-040/041/047/048/049/052/054/061 all cited the same gap independently).**
+
+The dispatcher's own signature now takes `rcp_lifecycle_state_t state` and `rcp_lifecycle_writer_ctx_t writer` (matching every other write path in this codebase), and each of its 4 routing blocks authorizes before applying, per that table's own TC18-derived access type: HW_config uses `RCP_LIFECYCLE_FIELD_HW_GENERIC`; EP_ID_config uses `rcp_lifecycle_field_writable_w_plus()` against `svr_configuration_lock`; request-stream-cfg uses `RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR`; response-queue-config — whose own 10-octet row mixes W+ octets (STREAM_UID, flush_on_count, Flush_time) with W* octets (Max_AVTPDUsize, queue_size) within one table — gets a new `respqueue_cfg_row_write_authorize()` helper that classifies every touched octet's row-relative offset and requires whichever type(s) the write's own byte span actually touches to independently authorize.
+
+**A genuine conformance bug caught and fixed before merge**: HW_config was initially wired to `FUNCTIONAL_W_STAR`, matching its own generic "R/W*" wire-table column legend. Re-checking TC18 §12.7.6's own surrounding prose ("This configuration table can only be changed in the life-cycle state HW_unconfigured. In other states of the life cycle this is read-only") showed this is a table-specific override narrower than `FUNCTIONAL_W_STAR`'s own general rule, and exactly what `RCP_LIFECYCLE_FIELD_HW_GENERIC` already models (writable only in `HW_UNCONFIGURED`, only via a discovery-stream writer). Fixed before merge, with the general lesson recorded: never trust a table's own generic wire-column legend without checking that table's own surrounding prose for a narrower override.
+
+`svr_configuration_lock` (Table 18, REQ-RMAP-029, already-existing storage) resolved as the single shared "locked" parameter every W+ check in this dispatcher consults — no new storage was needed. Per `rcp_lifecycle_field_write_error_w_plus()`'s own documented precedence, an active lock always yields `RCP_ERROR_LOCKED_MEM_ACCESS` regardless of writer identity or state, never `RCP_ERROR_UNAUTHORIZED_ACCESS` (reserved for writer-specific denial when the underlying state would otherwise permit).
+
+REQ-RMAP-040/041/051/052/054/055/061 flip to `implemented` (authorization was their own last remaining gap — REQ-RMAP-051/055 tracked the FUNCTIONAL_W_STAR/W+ primitives themselves being unwired from any register-map write path at all, closed by this same dispatcher change). REQ-RMAP-047/048/049 stay `partial` — authorization is closed for all three, but each has its own separate, unrelated remaining gap (no MACsec layer; no ack-routing runtime logic; no response-routing runtime logic). New REQ-RMAP-072 tracks the authorization mechanism itself.
+
+**A real memory leak caught by CI's own Linux LeakSanitizer, invisible locally** (macOS's ASan build does not support LeakSanitizer at all — confirmed via `detect_leaks is not supported on this platform`): the new authorization test's own HW_config-permitted-write sub-case encoded a frame via `rcp_acf_encode_abb()` and never freed it before reassigning `frame` in the next sub-case. Fixed by adding the missing `rcp_bytes_free(&frame)` call; verified by an explicit encode/free call-count balance check across the whole test function (8/8) since local ASan couldn't re-confirm the fix directly.
+
+New test `test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bounds_checking` (6 sub-cases: `RCP_CONFIGURED` denies each of the 3 single-classification tables; `HW_UNCONFIGURED` with the lock set denies EP_ID_config while still permitting HW_config via a discovery-stream writer; response-queue-config denies its own W* and W+ sub-ranges independently, and denies a write spanning both sub-ranges via the touched, locked W+ octet). All 13 existing write-dispatcher call sites updated to pass `state`/`writer`.
+
+Mutation-tested five ways (one per authorization check — HW_config, EP_ID_config, response-queue-config's row-offset boundary, request-stream-cfg, plus a re-test of HW_config after the HW_GENERIC fix); all five caught cleanly.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.248.0 -- 2026-08-11 (issue #306: request-stream-cfg, a fourth pointed-to table with the same finding, closed)
 
 **REQ-RMAP-047/048/049 (request-stream-cfg) gain a full bidirectional wire codec, the same as issue #301's own three tables. A fourth pointed-to table, found while reviewing the RMAP requirement set's own remaining 25 `partial` entries, closed with the identical rigor.**

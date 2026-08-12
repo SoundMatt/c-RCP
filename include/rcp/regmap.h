@@ -2153,12 +2153,51 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
  *     map->svr_request_stream_cfg_ptr + 24*request_stream_cfg_count):
  *     request-stream-cfg -- routed to
  *     rcp_regmap_request_stream_cfg_apply_reconfig() the identical way.
- *   - For any pointed-to table, *out_error is RCP_ERROR_NONE on
- *     success, RCP_ERROR_INVALID_PARAMETER if the write's own
- *     address+length extends past that table's own current extent (the
- *     closest of TC18 Table 27's 17 numbered codes to "address range not
- *     entirely addressable" -- no code with a more specific name
- *     exists).
+ *   - For any pointed-to table, the write is first subject to lifecycle-
+ *     state/writer authorization (issue #308) before being applied.
+ *     HW_config is NOT its own "R/W*" column legend despite appearances
+ *     -- direct verification of TC18 §12.7.6's own surrounding prose
+ *     ("This configuration table can only be changed in the life-cycle
+ *     state HW_unconfigured. In other states of the life cycle this is
+ *     read-only") finds a narrower, table-specific override matching
+ *     RCP_LIFECYCLE_FIELD_HW_GENERIC's own shape, not
+ *     RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR's -- checked via
+ *     rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_HW_GENERIC, writer),
+ *     which in turn means via_discovery_stream is the only writer
+ *     condition that ever authorizes it (see that kind's own doc
+ *     comment, lifecycle.h). request-stream-cfg has no such
+ *     table-specific override in its own surrounding prose (confirmed
+ *     the same way -- its own TC18 §12.7.7 prose explicitly names BOTH
+ *     HW_UNCONFIGURED and HW_CONFIGURED as writable states, matching
+ *     FUNCTIONAL_W_STAR exactly) so it genuinely IS entirely TC18 R/W*
+ *     (checked via rcp_lifecycle_field_writable(state,
+ *     RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer)); EP_ID_config is
+ *     entirely R/W+ (checked via
+ *     rcp_lifecycle_field_writable_w_plus(state, writer,
+ *     map->svr_configuration_lock != 0) -- REQ-RMAP-029's own field IS
+ *     TC18's own single, global W+ lock, "0x00: write access to R/W+
+ *     type parameters allowed; else: rejected", not a new per-table
+ *     lock this codebase invents); response-queue-config is MIXED
+ *     per-field (STREAM_UID/flush_on_count/Flush_time are R/W+,
+ *     Max_AVTPDUsize/queue_size are R/W*) -- every row-relative
+ *     sub-range the write's own [relative, relative+data_len) touches
+ *     must pass its own corresponding check, the more specific denial
+ *     (LOCKED_MEM_ACCESS over UNAUTHORIZED_ACCESS) reported if more
+ *     than one sub-range is touched and denied for different reasons.
+ *     An authorization denial produces *out_error = the wire error
+ *     rcp_lifecycle_field_write_error()/_write_error_w_plus() itself
+ *     reports (RCP_ERROR_LOCKED_MEM_ACCESS or
+ *     RCP_ERROR_UNAUTHORIZED_ACCESS) WITHOUT applying the write or
+ *     consulting that table's own bounds check at all -- authorization
+ *     is checked before the out-of-range check below, matching every
+ *     other write path in this codebase's own established "authorize
+ *     first" ordering (e.g. rcp_regmap_general_decode_write_request()'s
+ *     own REQ-RMAP-025 check).
+ *   - Once authorized, *out_error is RCP_ERROR_NONE on success,
+ *     RCP_ERROR_INVALID_PARAMETER if the write's own address+length
+ *     extends past that table's own current extent (the closest of
+ *     TC18 Table 27's 17 numbered codes to "address range not entirely
+ *     addressable" -- no code with a more specific name exists).
  *   - Any other address: *out_error is RCP_ERROR_EP_NOT_FOUND (the
  *     closest available Table 27 code to "nothing lives at this
  *     address" -- genuinely imprecise for a non-endpoint address, but no
@@ -2175,6 +2214,9 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
  * rcp_regmap_general_decode_write_request() already fails, or
  * RCP_REGMAP_EP0_ERR_SHORT_PAYLOAD if the payload has no room for its own
  * leading 2-octet address, before authorization/routing is even reached.
+ * state/writer are the same already-established types every endpoint
+ * type's own writability gate already takes -- a caller already has
+ * both to hand for any other write path.
  * hw_pin_map/hw_pin_map_count, ep_id_map/ep_id_map_count,
  * response_queue_cfg/response_queue_cfg_count, and
  * request_stream_cfg/request_stream_cfg_count describe the
@@ -2184,6 +2226,8 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
 rcp_regmap_ep0_errc_t
 rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      const rcp_regmap_general_t *map,
+                                     rcp_lifecycle_state_t state,
+                                     rcp_lifecycle_writer_ctx_t writer,
                                      rcp_regmap_hw_pin_map_entry_t *hw_pin_map,
                                      size_t hw_pin_map_count,
                                      rcp_regmap_ep_id_map_entry_t *ep_id_map,
