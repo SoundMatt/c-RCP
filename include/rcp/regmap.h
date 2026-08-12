@@ -1553,6 +1553,31 @@ typedef struct {
                                           "terminology drift" note,
                                           reason 3. */
 
+    /* ── Request-storage overflow (e2e.h) ───────────────────────────── */
+    bool     rx_ovrflw_safestate_enable; /* REQ-RMAP-071 (TC18 §12.7.7
+                                          Table 22, relative address
+                                          0x000D bit 5, 1 bit, R/W*):
+                                          true drives every endpoint bound
+                                          to this stream toward its
+                                          configured safe state if one
+                                          endpoint's own request storage
+                                          overflows -- see
+                                          rcp_e2e_overflow_should_enter_safe_state()
+                                          (e2e.h), the pure decision
+                                          function this field is the
+                                          register-map source for.
+                                          Content modeling only, closing a
+                                          gap this file's own
+                                          "terminology drift" section
+                                          (above) already NAMED as one of
+                                          this codebase's own eight
+                                          independent bits but never
+                                          actually added as a struct
+                                          field until now -- REQ-E2E-030's
+                                          own separate, still-open
+                                          cross-endpoint-orchestrator gap
+                                          is unaffected by adding it. */
+
     /* ── Configured safe state (e2e.h) ──────────────────────────────── */
     uint8_t  rx_safety_measure;         /* RCP_E2E_MEASURE_FORCE_HIGH_IMPEDANCE (0)
                                             or RCP_E2E_MEASURE_SEQUENCER (1).
@@ -1640,6 +1665,111 @@ bool rcp_regmap_wd_timeout_ms_to_ticks(uint32_t timeout_ms,
 bool rcp_regmap_wd_timeout_ticks_to_ms(uint16_t ticks,
                                         uint32_t ms_per_tick,
                                         uint32_t *out_timeout_ms);
+
+/* ── request-stream-cfg wire codec (issue #306, REQ-RMAP-047/048/049) ──────
+ *
+ * request-stream-cfg (TC18 §12.7.7 Table 22, pointed to by Table 18's own
+ * svr_request_stream_cfg_ptr) is a FOURTH pointed-to table sharing issue
+ * #301's own already-resolved addressing finding (svr_request_stream_cfg_ptr's
+ * own value is an absolute address in the same EP0-scoped space Table 18
+ * itself lives in), filed and closed separately (issue #306) since it was
+ * never brought into issue #301's own original scope.
+ *
+ * Direct primary-source verification, both spec revisions (RC1 PDF pages
+ * 57-58; RC5 PDF page 66, "Table 24: Request stream configuration" --
+ * renumbered due to RC5's added SPI content, same table): confirms a
+ * 24-octet-per-request-stream wire stride, addresses/widths for every
+ * field below IDENTICAL across both revisions.
+ *
+ * Three fields deliberately NOT wire-mapped by this render()/
+ * apply_reconfig() pair:
+ *
+ *   - rx_wd_action: confirmed via direct page-image read of Table 22 on
+ *     BOTH revisions that no corresponding register exists anywhere in
+ *     this table (or elsewhere in TC18) -- this struct's own field is
+ *     round-tripped, caller-defined, with no TC18 wire basis at all.
+ *   - configured: a codebase-internal bookkeeping flag (whether this
+ *     struct represents a configured request stream), not a TC18 concept
+ *     -- no corresponding register.
+ *   - rx_wd_timeout_ms (relative address 0x000A, 16 bit, "WatchDog time
+ *     out for this Stream in clock tics"): rcp_regmap_wd_timeout_ms_to_ticks()/
+ *     _ticks_to_ms() (REQ-RMAP-050, above) already exist for exactly this
+ *     conversion but need a caller-supplied ms_per_tick this table's own
+ *     render()/apply_reconfig() signature has no natural place for.
+ *     Unlike REQ-RMAP-061's own analogous rx_stream_max_request_size/
+ *     rx_safestate_sequencer width mismatches below, a conversion
+ *     failure here is safety-relevant (this register gates watchdog
+ *     safe-state entry, not a liveness heartbeat) -- silently saturating
+ *     in either direction could itself be an unsafe choice depending on
+ *     which direction is "fail-safe" for a given deployment, not a
+ *     judgment this library should make unilaterally. Left as a
+ *     deliberate follow-up needing its own scope decision, not forced
+ *     into this batch. This register's own two octets always render as
+ *     0x0000 and are ignored (not re-derived into rx_stream_max_request_size)
+ *     on parse -- the same "reserved, left zero" treatment REQ-RMAP-024's
+ *     own HW_config render() already established for its own single
+ *     unconfirmed alignment octet.
+ *
+ * Two genuine content/wire width mismatches, both resolved the same way
+ * REQ-RMAP-061's own flush_time_us mismatch was: saturate (never wrap) on
+ * render, since wraparound would silently alias onto ANOTHER valid,
+ * meaningfully-different value (0 for a size ceiling meaning "no
+ * fragmentation"; some other, unrelated, actually-existing sequencer
+ * index for rx_safestate_sequencer -- both worse outcomes than a
+ * deterministic, easily-recognized saturated maximum):
+ *
+ *   - rx_stream_max_request_size is size_t internally (fragment.h's own
+ *     byte-count convention) vs. a 16-bit wire register.
+ *   - rx_safestate_sequencer is uint16_t internally (a
+ *     request_sequencer.h table index) vs. an 8-bit wire register.
+ *
+ * The 8 independently-configurable bits at relative address 0x000D
+ * (rx_enforce_e2e/rx_enforce_seq/rx_seq_safestate_enable/rx_wd_enable/
+ * rx_wd_safestate_enable/rx_ovrflw_safestate_enable/rx_safety_measure/
+ * rx_wd_info_enable) are serialized using this codebase's OWN existing
+ * RC1-baseline 8-independent-bit content model, not RC5's own later
+ * 4-combined-bit restructuring -- already investigated and deliberately
+ * NOT restructured (task #97, see this file's own "TC18 0.5.1_RC5
+ * terminology drift" section above): this codebase's own richer model is
+ * a strict, lossless superset of what RC5's collapsed encoding can
+ * express, so serializing it directly (one struct field per bit) is both
+ * simpler and loses nothing a real RC5-conformant peer could otherwise
+ * distinguish. */
+void rcp_regmap_request_stream_cfg_render(const rcp_regmap_request_stream_cfg_t *entries,
+                                           size_t count, uint8_t *out);
+
+typedef enum {
+    RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_OK = 0,
+    RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_ERR_SHORT,
+    RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_ERR_OUT_OF_RANGE
+} rcp_regmap_request_stream_cfg_reconfig_errc_t;
+
+const char *
+rcp_regmap_request_stream_cfg_reconfig_strerror(rcp_regmap_request_stream_cfg_reconfig_errc_t e);
+
+/* The parse-side inverse of rcp_regmap_request_stream_cfg_render() above --
+ * identical patch-then-reparse idiom to every other pointed-to table's own
+ * apply_reconfig(). relative_start_address/data are relative to this
+ * table's own start (svr_request_stream_cfg_ptr's own current value), not
+ * to Table 18. A write landing on the reserved rx_wd_timeout_ms octets
+ * (0x000A/0x000B) or the 3 reserved trailing octets (0x0012-0x0017) is
+ * accepted (every octet in this table is R/W*, TC18 defines no read-only
+ * subrange) but has no effect on any struct field -- it patches the
+ * transient image this function builds internally, which is then
+ * discarded rather than re-parsed back into anything, since those octets
+ * correspond to no struct field. */
+rcp_regmap_request_stream_cfg_reconfig_errc_t
+rcp_regmap_request_stream_cfg_apply_reconfig(rcp_regmap_request_stream_cfg_t *entries,
+                                              size_t count,
+                                              uint16_t relative_start_address,
+                                              const uint8_t *data, size_t data_len);
+
+/* Not itself TC18-derived -- an implementation ceiling on how many
+ * request-stream rows this codebase's own fixed-size wire-codec buffers
+ * support, matching the same scale as
+ * RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES/RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES/
+ * RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES. */
+#define RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES ((size_t)64u)
 
 typedef struct {
     uint16_t stream_uid;      /* REQ-RMAP-060 (TC18 §12.7.9 Table 24, relative
@@ -1958,7 +2088,7 @@ bool rcp_regmap_ep_id_map_shared_bus_homogeneous(const rcp_regmap_ep_id_map_entr
                                                   const uint8_t *ep_types,
                                                   size_t count);
 
-/* ── EP0 address-routed dispatcher (issue #301) ─────────────────────────────
+/* ── EP0 address-routed dispatcher (issue #301, issue #306) ────────────────
  *
  * Generalizes rcp_regmap_general_decode_write_request() (which only
  * ever recognized a write landing within Table 18's own
@@ -1966,17 +2096,21 @@ bool rcp_regmap_ep_id_map_shared_bus_homogeneous(const rcp_regmap_ep_id_map_entr
  * route by absolute address across Table 18's own extent AND every
  * pointed-to table this codebase currently has a wire codec for. As of
  * this milestone that is HW_config (svr_hw_cfg_ptr), EP_ID_config
- * (svr_ep_bytebus_id_map_ptr), and response-queue-config
- * (svr_response_stream_cfg_ptr). Table 33/36 (svr_ep_functional_cfg_ptr)
- * is deliberately never routed here: its own address-collision defect
- * (documented in this file's own "RC Server functional-configuration
- * content" section) is a separate, still-unresolved primary-source
- * ambiguity this dispatcher's own finding does not resolve.
+ * (svr_ep_bytebus_id_map_ptr), response-queue-config
+ * (svr_response_stream_cfg_ptr), and request-stream-cfg
+ * (svr_request_stream_cfg_ptr) -- the fourth pointed-to table, found and
+ * closed separately (issue #306) after issue #301's own original four
+ * batches. Table 33/36 (svr_ep_functional_cfg_ptr) is deliberately never
+ * routed here: its own address-collision defect (documented in this
+ * file's own "RC Server functional-configuration content" section) is a
+ * separate, still-unresolved primary-source ambiguity neither issue's
+ * own finding resolves.
  *
- * Declared here, after HW_config's, EP_ID_config's, and response-queue-
- * config's own sections, because its own signature references
- * rcp_regmap_hw_pin_map_entry_t, rcp_regmap_ep_id_map_entry_t, and
- * rcp_regmap_response_queue_cfg_t -- C requires each to already be
+ * Declared here, after HW_config's, EP_ID_config's, response-queue-
+ * config's, and request-stream-cfg's own sections, because its own
+ * signature references rcp_regmap_hw_pin_map_entry_t,
+ * rcp_regmap_ep_id_map_entry_t, rcp_regmap_response_queue_cfg_t, and
+ * rcp_regmap_request_stream_cfg_t -- C requires each to already be
  * declared at this point; this dispatcher cannot live any earlier in
  * this header than the last of the tables it routes to. */
 
@@ -2015,6 +2149,10 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
  *     map->svr_response_stream_cfg_ptr + 10*response_queue_cfg_count):
  *     response-queue-config -- routed to
  *     rcp_regmap_response_queue_cfg_apply_reconfig() the identical way.
+ *   - Within [map->svr_request_stream_cfg_ptr,
+ *     map->svr_request_stream_cfg_ptr + 24*request_stream_cfg_count):
+ *     request-stream-cfg -- routed to
+ *     rcp_regmap_request_stream_cfg_apply_reconfig() the identical way.
  *   - For any pointed-to table, *out_error is RCP_ERROR_NONE on
  *     success, RCP_ERROR_INVALID_PARAMETER if the write's own
  *     address+length extends past that table's own current extent (the
@@ -2037,8 +2175,9 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
  * rcp_regmap_general_decode_write_request() already fails, or
  * RCP_REGMAP_EP0_ERR_SHORT_PAYLOAD if the payload has no room for its own
  * leading 2-octet address, before authorization/routing is even reached.
- * hw_pin_map/hw_pin_map_count, ep_id_map/ep_id_map_count, and
- * response_queue_cfg/response_queue_cfg_count describe the
+ * hw_pin_map/hw_pin_map_count, ep_id_map/ep_id_map_count,
+ * response_queue_cfg/response_queue_cfg_count, and
+ * request_stream_cfg/request_stream_cfg_count describe the
  * currently-configured tables this call may patch in place; any count
  * may be 0 (that table then has no address range at all, and any write
  * targeting it falls through to the "unknown address" case). */
@@ -2051,6 +2190,8 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      size_t ep_id_map_count,
                                      rcp_regmap_response_queue_cfg_t *response_queue_cfg,
                                      size_t response_queue_cfg_count,
+                                     rcp_regmap_request_stream_cfg_t *request_stream_cfg,
+                                     size_t request_stream_cfg_count,
                                      rcp_wire_error_t *out_error,
                                      uint8_t *out_transaction_num);
 
@@ -2065,7 +2206,7 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
  * rcp_regmap_general_encode_read_response()'s own established
  * precedent (not the ACF header's own wider 12-bit
  * read_size_or_segment_num field) -- every one of this dispatcher's own
- * four routable extents comfortably fits this codebase's real,
+ * five routable extents comfortably fits this codebase's real,
  * non-adversarial configurations well under 256 octets; widening this
  * type asymmetrically for just these two new functions, when every
  * sibling read-response function in this codebase already uses uint8_t,
@@ -2090,10 +2231,10 @@ rcp_regmap_ep0_decode_read_request(const uint8_t *b, size_t len,
 
 /* Encodes an ACF_ABB READ response for a request decoded by
  * rcp_regmap_ep0_decode_read_request() above. Routes addr across the
- * identical four extents rcp_regmap_ep0_decode_write_request() routes
- * (Table 18 itself, HW_config, EP_ID_config, response-queue-config),
- * reusing this dispatcher's own already-proven per-table render()
- * functions, not a second copy of that wire codec.
+ * identical five extents rcp_regmap_ep0_decode_write_request() routes
+ * (Table 18 itself, HW_config, EP_ID_config, response-queue-config,
+ * request-stream-cfg), reusing this dispatcher's own already-proven
+ * per-table render() functions, not a second copy of that wire codec.
  *
  * On a known extent: *out_error is RCP_ERROR_NONE and the returned
  * rcp_bytes_t carries min(read_size, that extent's own remaining length
@@ -2132,6 +2273,8 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      size_t ep_id_map_count,
                                      const rcp_regmap_response_queue_cfg_t *response_queue_cfg,
                                      size_t response_queue_cfg_count,
+                                     const rcp_regmap_request_stream_cfg_t *request_stream_cfg,
+                                     size_t request_stream_cfg_count,
                                      rcp_wire_error_t *out_error);
 
 #ifdef __cplusplus
