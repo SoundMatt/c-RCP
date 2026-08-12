@@ -359,6 +359,49 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e)
     }
 }
 
+/* response-queue-config's own 10-octet row is MIXED per-field (issue
+ * #308): STREAM_UID [0,2) and flush_on_count/Flush_time [6,10) are
+ * TC18 R/W+; Max_AVTPDUsize/queue_size [2,6) are R/W*. A single write
+ * may span more than one field (or even more than one row, since every
+ * row repeats the identical pattern), so this walks every octet the
+ * write's own [relative_start_address, relative_start_address+data_len)
+ * range touches and requires whichever access type(s) it actually
+ * touches to authorize -- not just the first octet's own type. Returns
+ * RCP_ERROR_NONE if authorized (both, if both types are touched and
+ * both permit), else the first denial found, checked W+ before W* (an
+ * arbitrary but deterministic tie-break when a write touches both and
+ * only one permits). */
+//cfusa:req REQ-RMAP-061
+static rcp_wire_error_t respqueue_cfg_row_write_authorize(rcp_lifecycle_state_t state,
+                                                            rcp_lifecycle_writer_ctx_t writer,
+                                                            bool locked,
+                                                            uint16_t relative_start_address,
+                                                            size_t data_len)
+{
+    bool   touches_w_plus = false;
+    bool   touches_w_star = false;
+    size_t i;
+
+    for (i = 0; i < data_len; i++) {
+        size_t row_offset = ((size_t)relative_start_address + i) % 10u;
+
+        if (row_offset < 2u || row_offset >= 6u) {
+            touches_w_plus = true;
+        } else {
+            touches_w_star = true;
+        }
+    }
+
+    if (touches_w_plus && !rcp_lifecycle_field_writable_w_plus(state, writer, locked)) {
+        return rcp_lifecycle_field_write_error_w_plus(state, writer, locked);
+    }
+    if (touches_w_star && !rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer)) {
+        return rcp_lifecycle_field_write_error(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer);
+    }
+
+    return RCP_ERROR_NONE;
+}
+
 //cfusa:req REQ-RMAP-040
 //cfusa:req REQ-RMAP-041
 //cfusa:req REQ-RMAP-047
@@ -368,9 +411,12 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e)
 //cfusa:req REQ-RMAP-052
 //cfusa:req REQ-RMAP-054
 //cfusa:req REQ-RMAP-061
+//cfusa:req REQ-RMAP-072
 rcp_regmap_ep0_errc_t
 rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      const rcp_regmap_general_t *map,
+                                     rcp_lifecycle_state_t state,
+                                     rcp_lifecycle_writer_ctx_t writer,
                                      rcp_regmap_hw_pin_map_entry_t *hw_pin_map,
                                      size_t hw_pin_map_count,
                                      rcp_regmap_ep_id_map_entry_t *ep_id_map,
@@ -386,13 +432,13 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
     const uint8_t               *payload;
     size_t                       payload_len;
     rcp_acf_errc_t               acf_rc;
-    rcp_lifecycle_writer_ctx_t   writer = {0};
     uint16_t                     addr;
     size_t                       data_len;
     size_t                       hw_cfg_len;
     size_t                       ep_id_map_len;
     size_t                       response_queue_cfg_len;
     size_t                       request_stream_cfg_len;
+    bool                         locked;
 
     acf_rc = rcp_acf_decode_abb(b, len, &hdr, &payload, &payload_len);
     if (acf_rc == RCP_ACF_ERR_SHORT_FRAME) return RCP_REGMAP_EP0_ERR_SHORT_FRAME;
@@ -410,7 +456,11 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
         /* Table 18's own extent -- unconditionally read-only (REQ-RMAP-025),
          * reusing rcp_lifecycle_field_write_error() exactly as
          * rcp_regmap_general_decode_write_request() already does, not a
-         * second, separately-maintained copy of that logic. */
+         * second, separately-maintained copy of that logic. writer's own
+         * identity is irrelevant to a READ_ONLY kind's own outcome (see
+         * that kind's own doc comment, lifecycle.h) -- passing the real
+         * caller-supplied writer here rather than a dummy is simpler and
+         * equally correct. */
         *out_error = rcp_lifecycle_field_write_error(RCP_LIFECYCLE_RCP_CONFIGURED,
                                                       RCP_LIFECYCLE_FIELD_READ_ONLY, writer);
         return RCP_REGMAP_EP0_OK;
@@ -421,6 +471,28 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
         (size_t)addr < (size_t)map->svr_hw_cfg_ptr + hw_cfg_len) {
         uint16_t relative = (uint16_t)((size_t)addr - map->svr_hw_cfg_ptr);
         rcp_regmap_hw_pin_map_reconfig_errc_t rc;
+
+        /* HW_config is NOT FUNCTIONAL_W_STAR despite its own "R/W*" column
+         * legend (issue #308) -- direct primary-source verification of
+         * this table's own surrounding prose (TC18 §12.7.6, immediately
+         * before Table 19/21) finds a narrower, table-specific override:
+         * "This configuration table can only be changed in the
+         * life-cycle state HW_unconfigured. In other states of the life
+         * cycle this is read-only" -- no HW_CONFIGURED-with-authorization
+         * writable window at all, unlike FUNCTIONAL_W_STAR's own generic
+         * rule. This is exactly RCP_LIFECYCLE_FIELD_HW_GENERIC's own
+         * shape, and matches this codebase's own already-established
+         * REQ-RMAP-040 citation (written independently, before this
+         * dispatcher existed) -- see HW_GENERIC's own doc comment
+         * (lifecycle.h). request-stream-cfg and response-queue-config's
+         * own W-star/W-plus fields have no such table-specific override in their
+         * own surrounding prose (confirmed the same way), so they
+         * correctly use the generic FUNCTIONAL_W_STAR/W_PLUS rule below. */
+        if (!rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_HW_GENERIC, writer)) {
+            *out_error = rcp_lifecycle_field_write_error(state, RCP_LIFECYCLE_FIELD_HW_GENERIC,
+                                                          writer);
+            return RCP_REGMAP_EP0_OK;
+        }
 
         rc = rcp_regmap_hw_pin_map_apply_reconfig(hw_pin_map, hw_pin_map_count, relative,
                                                     &payload[2], data_len);
@@ -435,6 +507,16 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
         uint16_t relative = (uint16_t)((size_t)addr - map->svr_ep_bytebus_id_map_ptr);
         rcp_regmap_ep_id_map_reconfig_errc_t rc;
 
+        /* EP_ID_config is entirely TC18 R/W+ (issue #308). locked is
+         * REQ-RMAP-029's own svr_configuration_lock -- TC18's own single,
+         * global W+ lock ("0x00: write access to R/W+ type parameters
+         * allowed; else: rejected"), not a new per-table lock. */
+        locked = map->svr_configuration_lock != 0u;
+        if (!rcp_lifecycle_field_writable_w_plus(state, writer, locked)) {
+            *out_error = rcp_lifecycle_field_write_error_w_plus(state, writer, locked);
+            return RCP_REGMAP_EP0_OK;
+        }
+
         rc = rcp_regmap_ep_id_map_apply_reconfig(ep_id_map, ep_id_map_count, relative,
                                                    &payload[2], data_len);
         *out_error = (rc == RCP_REGMAP_EP_ID_MAP_RECONFIG_OK) ? RCP_ERROR_NONE
@@ -447,6 +529,20 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
         (size_t)addr < (size_t)map->svr_response_stream_cfg_ptr + response_queue_cfg_len) {
         uint16_t relative = (uint16_t)((size_t)addr - map->svr_response_stream_cfg_ptr);
         rcp_regmap_response_queue_cfg_reconfig_errc_t rc;
+        rcp_wire_error_t auth_err;
+
+        /* response-queue-config is MIXED per-field within its own
+         * 10-octet-per-row stride (issue #308): STREAM_UID [0,2) and
+         * flush_on_count/Flush_time [6,10) are R/W+; Max_AVTPDUsize/
+         * queue_size [2,6) are R/W*. Every row-relative sub-range the
+         * write's own [row_relative, row_relative+data_len) touches must
+         * pass its own corresponding check. */
+        locked = map->svr_configuration_lock != 0u;
+        auth_err = respqueue_cfg_row_write_authorize(state, writer, locked, relative, data_len);
+        if (auth_err != RCP_ERROR_NONE) {
+            *out_error = auth_err;
+            return RCP_REGMAP_EP0_OK;
+        }
 
         rc = rcp_regmap_response_queue_cfg_apply_reconfig(response_queue_cfg, response_queue_cfg_count,
                                                              relative, &payload[2], data_len);
@@ -460,6 +556,13 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
         (size_t)addr < (size_t)map->svr_request_stream_cfg_ptr + request_stream_cfg_len) {
         uint16_t relative = (uint16_t)((size_t)addr - map->svr_request_stream_cfg_ptr);
         rcp_regmap_request_stream_cfg_reconfig_errc_t rc;
+
+        /* request-stream-cfg is entirely TC18 R/W* (issue #308). */
+        if (!rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer)) {
+            *out_error = rcp_lifecycle_field_write_error(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
+                                                          writer);
+            return RCP_REGMAP_EP0_OK;
+        }
 
         rc = rcp_regmap_request_stream_cfg_apply_reconfig(request_stream_cfg, request_stream_cfg_count,
                                                              relative, &payload[2], data_len);
