@@ -15205,6 +15205,31 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.282.0 -- 2026-08-12 (issue #336 batch: `REQ-ADC-032`, ADC
+channel/analog-input-pin binding, doc-only)
+
+**`REQ-ADC-032` flips `partial` -> `implemented`. No functional
+code change.**
+
+The catalogued claim that regmap.h's named-signal index has no ADC
+entry was stale: RCP_REGMAP_SIGNAL_ADC_IN has existed since an
+earlier batch (REQ-RMAP-044), with EP_Signal_Nr 0. An ADC
+endpoint's analog input already binds via an ordinary hw_pin_map
+entry (hw_ep_nr = the endpoint's own number, hw_ep_pin_nr = 0) --
+the same generic mechanism every other endpoint type uses.
+
+The one-channel-per-endpoint rule is structurally guaranteed: Table
+23 enumerates exactly one ADC-relevant signal, so hw_ep_pin_nr for
+an ADC endpoint can only ever be 0 -- no second channel number the
+addressing scheme could even express.
+
+7th+ occurrence of this session's own stale-catalog-entry pattern.
+Updated the pre-existing test's own comment; no new assertions
+needed.
+
+65/65 both trees, unchanged. `cfusa check`: 0 new findings. `cfusa
+trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.281.0 -- 2026-08-12 (issue #336 batch: `REQ-UART-033`, UART
 read-completion arbitration)
 

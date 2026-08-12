@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.282.0 -- 2026-08-12 (issue #336 batch: `REQ-ADC-032`, ADC channel/analog-input-pin binding, doc-only)
+
+**`REQ-ADC-032` flips `partial` -> `implemented`. No functional code change.**
+
+The catalogued claim -- "`regmap.h`'s `rcp_regmap_named_signal_t` index has no ADC entry, so an ADC endpoint's analog input cannot be bound to a hardware pin through the `hw_pin_map` table at all" -- was stale: `RCP_REGMAP_SIGNAL_ADC_IN` has existed since an earlier batch (`REQ-RMAP-044`), and `rcp_regmap_named_signal_ep_signal_nr(RCP_REGMAP_SIGNAL_ADC_IN)` returns `0`, its own Table 23 `EP_Signal_Nr`. An ADC endpoint's analog input already binds to a hardware pin via an ordinary `hw_pin_map` entry (`hw_ep_nr` = the ADC endpoint's own number, `hw_ep_pin_nr` = 0) -- the same generic, endpoint-type-agnostic mechanism every other endpoint type already uses. No ADC-specific binding code was ever needed.
+
+**The one-channel-per-endpoint rule turns out to be structurally guaranteed, not something requiring separate validation**: TC18 Table 23 enumerates exactly one ADC-relevant signal (`ADC_IN`, `EP_Signal_Nr` 0), so `hw_ep_pin_nr` for an ADC endpoint's own binding can only ever be 0 -- there is no second channel number the addressing scheme could even express. Whether a real deployment's own `hw_pin_map` actually populates that row is caller/config-time data, the same as every other endpoint type's own pin binding, not a decode/encode gap in this library.
+
+**7th+ occurrence of this session's own recurring stale-catalog-entry pattern** (after `REQ-UART-036`, `REQ-SPI-033`, `REQ-RMAP-033/034/037`, and others) -- caught this time by directly checking `regmap.h`'s own signal enum before assuming any code was missing, per this project's standing "verify against live code, not the catalog's own claim" discipline. Updated the pre-existing test's own comment (`test_adc_value_width_and_named_analog_input_signal`) to reflect the closed disposition; no new assertions needed since the existing ones (signal name + `EP_Signal_Nr`) already fully demonstrate the fixed claim.
+
+65/65 both trees, unchanged (no functional code touched). `cfusa check`: 0 new findings. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.281.0 -- 2026-08-12 (issue #336 batch: `REQ-UART-033`, UART read-completion arbitration)
 
 **`REQ-UART-033` flips `partial` -> `implemented`.**

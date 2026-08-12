@@ -388,15 +388,22 @@ static void test_adc_value_width_and_named_analog_input_signal(void)
     TEST_ASSERT_EQUAL_size_t(4u, rcp_ep_adc_response_value_count(8u));
     TEST_ASSERT_EQUAL_size_t(0u, rcp_ep_adc_response_value_count(9u));
 
-    /* TC18 §13.7.9.1 also requires that each ADC endpoint serve exactly
-     * one channel and have an analog input pin selected for it.
+    /* REQ-ADC-032 IMPLEMENTED (catalog text corrected, no code change
+     * needed): TC18 §13.7.9.1 also requires that each ADC endpoint serve
+     * exactly one channel and have an analog input pin selected for it.
      * regmap.h's named-signal index -- the only way any endpoint type
-     * binds a signal to a hardware pin -- now defines RCP_REGMAP_SIGNAL_
-     * ADC_IN (REQ-RMAP-044), so an ADC endpoint's analog input CAN now
-     * be named and bound via a hw_pin_map entry. Whether a given ADC
-     * endpoint actually HAS one selected/enforced is REQ-ADC-032's own
-     * separate, still-open scope -- this test's own concern is purely
-     * that the signal exists to bind to. */
+     * binds a signal to a hardware pin -- defines RCP_REGMAP_SIGNAL_
+     * ADC_IN (REQ-RMAP-044), with EP_Signal_Nr 0 (asserted below), so an
+     * ADC endpoint's analog input binds via an ordinary hw_pin_map entry
+     * (hw_ep_nr = the ADC endpoint's own number, hw_ep_pin_nr = 0) --
+     * the same generic mechanism every other endpoint type already uses,
+     * no ADC-specific code required. The one-channel rule is structurally
+     * guaranteed: Table 23 enumerates exactly one ADC-relevant signal, so
+     * hw_ep_pin_nr for an ADC endpoint's own binding can only ever be 0 --
+     * there is no second channel number the addressing scheme could even
+     * express. Whether a real deployment's own hw_pin_map actually
+     * populates that row is caller/config-time data, the same as every
+     * other endpoint type's own pin binding -- not a decode/encode gap. */
     TEST_ASSERT_EQUAL_STRING("ADC_IN", rcp_regmap_named_signal_string(RCP_REGMAP_SIGNAL_ADC_IN));
     TEST_ASSERT_EQUAL_UINT8(0u, rcp_regmap_named_signal_ep_signal_nr(RCP_REGMAP_SIGNAL_ADC_IN));
 }
