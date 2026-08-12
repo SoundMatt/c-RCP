@@ -15205,6 +15205,41 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.259.0 -- 2026-08-12 (issue #201 batch: `REQ-WAKEUP-018`,
+WakeUp repetition-time configurability)
+
+**New `repetition_time_us` field on `rcp_ep_wakeup_functional_cfg_t`
+closes the "neither discoverable nor settable" half of
+`REQ-WAKEUP-018` (TC18 §12.4.1: repetition time is configurable
+"inside the WakeUp EP").**
+
+Zero-init default 0, discoverable and settable over this module's own
+in-memory API. **Stays `partial`**: TC18 §13.7.2.2 Table 36 (this
+endpoint's own functional-config register block, already fully mapped
+by `REQ-WAKEUP-021`) defines no field for a repetition interval at
+all, so this value has no wire-register address. The only other TC18
+mention of a WakeUp timing concept is §13.7.2.1's own parenthetical
+"(flush_time)", naming a register on a *different* table entirely
+(`rcp_regmap_response_queue_cfg_t::flush_time_us`, TC18 §12.7.9 Table
+24, `REQ-RMAP-064`) associated with the response queue -- reusing that
+field would require reaching into a different endpoint's own
+response-queue row by lookup, a real architectural decision
+deliberately not made unilaterally here. `power.c`'s own
+`rcp_pwrmode_handshake_t` still counts attempts rather than tracking a
+time interval; the new field's own doc comment names it as the value
+a caller should consult for retry cadence, without power.h taking on
+a dependency back on ep_wakeup.h.
+
+`test_tc18_gaps_ep.c`'s own combined `REQ-WAKEUP-017`/`-018`
+deviation-pin test is split: one keeps pinning `-017`'s still-open
+deviation unchanged; a new test asserts the new field's own conforming
+(partial) behavior.
+
+Mutation-tested 1 way (non-zero init default) -- caught cleanly.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.258.0 -- 2026-08-12 (issue #201 batch: `REQ-WAKEUP-019`,
 refused sleep/standby is now a genuine error response)
 
