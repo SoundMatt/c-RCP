@@ -15205,6 +15205,52 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.267.0 -- 2026-08-12 (issue #201 batch: `REQ-SPI-036`, the SPI
+transfer-length rule -- zero-fill/full-PICO -- now implemented)
+
+**`rcp_ep_spi_{en,de}code_transfer_request()` now carry `read_size`
+through the ACF header's own `read_size_or_segment_num` field, and
+a new `rcp_ep_spi_transfer_length()` computes TC18 §13.7.3.3's own
+transfer-length rule -- status flips to `implemented`.**
+
+TC18 §13.7.3.3: "The SPI EP shall append zeros in case the
+read_size is larger than the number of bytes in the
+byte_msg_payload. The byte_msg_payload will be presented on PICO in
+full, even if the read_size is less than the number of bytes in the
+byte_msg_payload." `rcp_ep_spi_transfer_length(tx_len, read_size)`
+computes `max(tx_len, read_size)`: a caller driving real SPI
+hardware clocks `tx_data[0..tx_len)` verbatim followed by zero
+octets up to the returned length when `read_size` exceeds `tx_len`,
+and always clocks at least the full `tx_len`-byte payload on PICO
+even when `read_size` is smaller (never truncated).
+
+This is a real signature change to two existing functions with
+real callers, not an additive fix: `read_size` was not previously
+extracted or carried at all. Updated every call site:
+`src/adapt.c`'s `RCP_ADAPT_OP_SPI_TRANSFER` (defaults an absent
+`rcp.spi.read_size` meta key to the payload's own length), plus
+every test call site across three test files.
+
+**Mutation-testing result, including one correctly-identified
+equivalent mutant**: dropping `read_size` on encode and bypassing
+the `max()` computation entirely both caught cleanly. A third
+mutation, loosening the boundary comparison from `>` to `>=`, was
+NOT caught -- investigated and confirmed a genuine equivalent
+mutant, not a coverage gap: at `read_size == tx_len` both branches
+return the identical numeric value, so no test of the return value
+can discriminate the two operators there.
+
+Split the pre-existing combined `REQ-SPI-036`/`REQ-SPI-037`
+gap-pinning test into two: one rewritten to the FIXED convention,
+one still pinning `REQ-SPI-037` (genuinely deferred -- needs a
+caller-owned fault-tracker plus dispatch wiring this endpoint
+doesn't have yet, the same shape `REQ-E2E-021` needed before its
+own fix). 3 new tests verify `rcp_ep_spi_transfer_length()`
+directly.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.266.0 -- 2026-08-12 (issue #201 doc-only batch: `REQ-SPI-033`
 was already implemented, stale catalog entry corrected)
 

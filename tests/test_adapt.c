@@ -331,6 +331,7 @@ static void test_spi_transfer_request_maps_channel_meta_and_payload(void)
     uint8_t out_channel = 0xFF;
     const uint8_t *out_tx = NULL;
     size_t out_tx_len = 0;
+    uint16_t out_read_size = 0;
     uint8_t out_txn = 0;
 
     relay_message_init(&msg);
@@ -343,10 +344,14 @@ static void test_spi_transfer_request_maps_channel_meta_and_payload(void)
 
     TEST_ASSERT_EQUAL(RCP_EP_SPI_OK,
                        rcp_ep_spi_decode_transfer_request(req.data, req.len, 2, &out_channel,
-                                                           &out_tx, &out_tx_len, &out_txn));
+                                                           &out_tx, &out_tx_len, &out_read_size,
+                                                           &out_txn));
     TEST_ASSERT_EQUAL_UINT8(3, out_channel);
     TEST_ASSERT_EQUAL_UINT(sizeof(tx), out_tx_len);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(tx, out_tx, sizeof(tx));
+    /* rcp.spi.read_size wasn't set -- defaults to the payload's own
+     * length (see the encode side's own doc comment, src/adapt.c). */
+    TEST_ASSERT_EQUAL_UINT16(sizeof(tx), out_read_size);
 
     rcp_bytes_free(&req);
     relay_message_free(&msg);

@@ -424,9 +424,10 @@ const char *rcp_ep_spi_strerror(rcp_ep_spi_errc_t e)
 /* ── Transfer request ──────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-SPI-026
+//cfusa:req REQ-SPI-036
 rcp_bytes_t rcp_ep_spi_encode_transfer_request(rcp_byte_bus_id_t byte_bus_id, uint8_t channel,
                                                 const uint8_t *tx_data, size_t tx_len,
-                                                uint8_t transaction_num)
+                                                uint16_t read_size, uint8_t transaction_num)
 {
     rcp_acf_byte_message_info_t hdr = {0};
 
@@ -439,21 +440,24 @@ rcp_bytes_t rcp_ep_spi_encode_transfer_request(rcp_byte_bus_id_t byte_bus_id, ui
      * the general request-handling rule in §3.9.1). Encoding this as a
      * write (op=1) told a conforming peer "no data response expected",
      * i.e. the exact opposite of what the request means. */
-    hdr.byte_bus_id     = byte_bus_id;
-    hdr.op              = RCP_ACF_OP_READ;
-    hdr.evt             = (uint8_t)(channel & 0x7u);
-    hdr.transaction_num = transaction_num;
+    hdr.byte_bus_id              = byte_bus_id;
+    hdr.op                       = RCP_ACF_OP_READ;
+    hdr.evt                      = (uint8_t)(channel & 0x7u);
+    hdr.read_size_or_segment_num = read_size;
+    hdr.transaction_num          = transaction_num;
 
     return rcp_acf_encode_abb(&hdr, tx_data, tx_len);
 }
 
 //cfusa:req REQ-SPI-026
 //cfusa:req REQ-SPI-027
+//cfusa:req REQ-SPI-036
 rcp_ep_spi_errc_t rcp_ep_spi_decode_transfer_request(const uint8_t *b, size_t len,
                                                       rcp_byte_bus_id_t expected_bus_id,
                                                       uint8_t *out_channel,
                                                       const uint8_t **out_tx_data,
                                                       size_t *out_tx_len,
+                                                      uint16_t *out_read_size,
                                                       uint8_t *out_transaction_num)
 {
     rcp_acf_byte_message_info_t hdr;
@@ -476,8 +480,15 @@ rcp_ep_spi_errc_t rcp_ep_spi_decode_transfer_request(const uint8_t *b, size_t le
     *out_channel         = channel;
     *out_tx_data         = payload;
     *out_tx_len          = payload_len;
+    *out_read_size       = hdr.read_size_or_segment_num;
     *out_transaction_num = hdr.transaction_num;
     return RCP_EP_SPI_OK;
+}
+
+//cfusa:req REQ-SPI-036
+size_t rcp_ep_spi_transfer_length(size_t tx_len, uint16_t read_size)
+{
+    return (read_size > tx_len) ? (size_t)read_size : tx_len;
 }
 
 /* ── Response ───────────────────────────────────────────────────────────────── */

@@ -29,6 +29,7 @@
 //cfusa:test REQ-SPI-028
 //cfusa:test REQ-SPI-029
 //cfusa:test REQ-SPI-030
+//cfusa:test REQ-SPI-036
 //cfusa:test REQ-SPI-038
 //cfusa:test REQ-SPI-039
 //cfusa:test REQ-SPI-040
@@ -668,7 +669,8 @@ static void test_strerror_never_null_and_distinct(void)
 static void test_transfer_request_uses_read_direction_op(void)
 {
     uint8_t                     tx[1] = {0x55};
-    rcp_bytes_t                 frame = rcp_ep_spi_encode_transfer_request(4, 3, tx, sizeof(tx), 3);
+    rcp_bytes_t                 frame = rcp_ep_spi_encode_transfer_request(4, 3, tx, sizeof(tx),
+                                                                            0, 3);
     rcp_acf_byte_message_info_t hdr;
     const uint8_t              *payload;
     size_t                      payload_len;
@@ -682,22 +684,28 @@ static void test_transfer_request_uses_read_direction_op(void)
     rcp_bytes_free(&frame);
 }
 
+/* §13.7.3.3's own worked example, Figure 23: "write 20 bytes and get a
+ * response with 10 on SPI channel 3" -- evt = 0101b, op=0, read_size =
+ * 0x0A. Verifies read_size itself now round-trips through the ACF
+ * header's read_size_or_segment_num field. */
 static void test_transfer_request_round_trip(void)
 {
     uint8_t     tx[3] = {0x01, 0x02, 0x03};
-    rcp_bytes_t frame = rcp_ep_spi_encode_transfer_request(4, 2, tx, sizeof(tx), 9);
+    rcp_bytes_t frame = rcp_ep_spi_encode_transfer_request(4, 2, tx, sizeof(tx), 0x0Au, 9);
     uint8_t     channel = 0xFF;
     const uint8_t *out_tx = NULL;
     size_t      out_tx_len = 0;
+    uint16_t    out_read_size = 0;
     uint8_t     txn = 0;
 
     TEST_ASSERT_NOT_NULL(frame.data);
     TEST_ASSERT_EQUAL(RCP_EP_SPI_OK,
         rcp_ep_spi_decode_transfer_request(frame.data, frame.len, 4, &channel, &out_tx,
-                                            &out_tx_len, &txn));
+                                            &out_tx_len, &out_read_size, &txn));
     TEST_ASSERT_EQUAL_UINT8(2, channel);
     TEST_ASSERT_EQUAL_UINT32(sizeof(tx), out_tx_len);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(tx, out_tx, sizeof(tx));
+    TEST_ASSERT_EQUAL_UINT16(0x0Au, out_read_size);
     TEST_ASSERT_EQUAL_UINT8(9, txn);
 
     rcp_bytes_free(&frame);
@@ -705,16 +713,17 @@ static void test_transfer_request_round_trip(void)
 
 static void test_transfer_request_round_trip_empty_payload(void)
 {
-    rcp_bytes_t frame = rcp_ep_spi_encode_transfer_request(4, 0, NULL, 0, 1);
+    rcp_bytes_t frame = rcp_ep_spi_encode_transfer_request(4, 0, NULL, 0, 0, 1);
     uint8_t     channel = 0xFF;
     const uint8_t *out_tx = NULL;
     size_t      out_tx_len = 1;
+    uint16_t    out_read_size = 0;
     uint8_t     txn = 0;
 
     TEST_ASSERT_NOT_NULL(frame.data);
     TEST_ASSERT_EQUAL(RCP_EP_SPI_OK,
         rcp_ep_spi_decode_transfer_request(frame.data, frame.len, 4, &channel, &out_tx,
-                                            &out_tx_len, &txn));
+                                            &out_tx_len, &out_read_size, &txn));
     TEST_ASSERT_EQUAL_UINT8(0, channel);
     TEST_ASSERT_EQUAL_UINT32(0, out_tx_len);
 
@@ -724,15 +733,16 @@ static void test_transfer_request_round_trip_empty_payload(void)
 static void test_transfer_request_rejects_wrong_bus(void)
 {
     uint8_t     tx[1] = {0xAB};
-    rcp_bytes_t frame = rcp_ep_spi_encode_transfer_request(4, 1, tx, sizeof(tx), 0);
+    rcp_bytes_t frame = rcp_ep_spi_encode_transfer_request(4, 1, tx, sizeof(tx), 0, 0);
     uint8_t     channel;
     const uint8_t *out_tx;
     size_t      out_tx_len;
+    uint16_t    out_read_size;
     uint8_t     txn;
 
     TEST_ASSERT_EQUAL(RCP_EP_SPI_ERR_WRONG_BUS,
         rcp_ep_spi_decode_transfer_request(frame.data, frame.len, 5, &channel, &out_tx,
-                                            &out_tx_len, &txn));
+                                            &out_tx_len, &out_read_size, &txn));
 
     rcp_bytes_free(&frame);
 }
@@ -747,6 +757,7 @@ static void test_transfer_request_rejects_wrong_op(void)
     uint8_t                     channel;
     const uint8_t               *out_tx;
     size_t                       out_tx_len;
+    uint16_t                     out_read_size;
     uint8_t                      txn;
 
     hdr.byte_bus_id = 4;
@@ -755,7 +766,7 @@ static void test_transfer_request_rejects_wrong_op(void)
 
     TEST_ASSERT_EQUAL(RCP_EP_SPI_ERR_WRONG_OP,
         rcp_ep_spi_decode_transfer_request(frame.data, frame.len, 4, &channel, &out_tx,
-                                            &out_tx_len, &txn));
+                                            &out_tx_len, &out_read_size, &txn));
 
     rcp_bytes_free(&frame);
 }
@@ -774,6 +785,7 @@ static void test_transfer_request_rejects_bad_channel(void)
     uint8_t                     channel;
     const uint8_t               *out_tx;
     size_t                       out_tx_len;
+    uint16_t                     out_read_size;
     uint8_t                      txn;
 
     hdr.byte_bus_id = 4;
@@ -783,7 +795,7 @@ static void test_transfer_request_rejects_bad_channel(void)
 
     TEST_ASSERT_EQUAL(RCP_EP_SPI_ERR_BAD_CHANNEL,
         rcp_ep_spi_decode_transfer_request(frame.data, frame.len, 4, &channel, &out_tx,
-                                            &out_tx_len, &txn));
+                                            &out_tx_len, &out_read_size, &txn));
 
     rcp_bytes_free(&frame);
 }
@@ -795,6 +807,7 @@ static void test_transfer_request_rejects_bad_msg_type(void)
     uint8_t              channel;
     const uint8_t        *out_tx;
     size_t                out_tx_len;
+    uint16_t              out_read_size;
     uint8_t               txn;
 
     gbb_hdr.info.byte_bus_id = 4;
@@ -803,7 +816,7 @@ static void test_transfer_request_rejects_bad_msg_type(void)
 
     TEST_ASSERT_EQUAL(RCP_EP_SPI_ERR_BAD_MSG_TYPE,
         rcp_ep_spi_decode_transfer_request(frame.data, frame.len, 4, &channel, &out_tx,
-                                            &out_tx_len, &txn));
+                                            &out_tx_len, &out_read_size, &txn));
 
     rcp_bytes_free(&frame);
 }
@@ -814,11 +827,32 @@ static void test_transfer_request_rejects_short_frame(void)
     uint8_t        channel;
     const uint8_t  *out_tx;
     size_t          out_tx_len;
+    uint16_t        out_read_size;
     uint8_t         txn;
 
     TEST_ASSERT_EQUAL(RCP_EP_SPI_ERR_SHORT_FRAME,
         rcp_ep_spi_decode_transfer_request(too_short, sizeof(too_short), 4, &channel, &out_tx,
-                                            &out_tx_len, &txn));
+                                            &out_tx_len, &out_read_size, &txn));
+}
+
+/* FIXED 2026-08-12 (issue #201, REQ-SPI-036): TC18 §13.7.3.3's own
+ * transfer-length rule -- zero-fill when read_size exceeds the payload,
+ * full payload on PICO otherwise -- verified directly against
+ * rcp_ep_spi_transfer_length(), one case per direction plus the
+ * exactly-equal boundary. */
+static void test_spi_transfer_length_zero_fills_when_read_size_exceeds_payload(void)
+{
+    TEST_ASSERT_EQUAL_UINT(10u, rcp_ep_spi_transfer_length(3u, 10u));
+}
+
+static void test_spi_transfer_length_presents_full_payload_when_read_size_is_smaller(void)
+{
+    TEST_ASSERT_EQUAL_UINT(10u, rcp_ep_spi_transfer_length(10u, 3u));
+}
+
+static void test_spi_transfer_length_equal_case(void)
+{
+    TEST_ASSERT_EQUAL_UINT(5u, rcp_ep_spi_transfer_length(5u, 5u));
 }
 
 /* ── Response round trip ───────────────────────────────────────────────────── */
@@ -992,6 +1026,9 @@ int main(void)
     RUN_TEST(test_transfer_request_rejects_bad_channel);
     RUN_TEST(test_transfer_request_rejects_bad_msg_type);
     RUN_TEST(test_transfer_request_rejects_short_frame);
+    RUN_TEST(test_spi_transfer_length_zero_fills_when_read_size_exceeds_payload);
+    RUN_TEST(test_spi_transfer_length_presents_full_payload_when_read_size_is_smaller);
+    RUN_TEST(test_spi_transfer_length_equal_case);
 
     RUN_TEST(test_response_round_trip_untimed);
     RUN_TEST(test_response_round_trip_timed);

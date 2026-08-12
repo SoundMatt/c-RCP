@@ -385,6 +385,7 @@ static void test_spi_six_channels_selected_by_evt(void)
     const uint8_t               tx[2] = {0xAAu, 0x55u};
     const uint8_t              *rx    = NULL;
     size_t                      rx_len = 0;
+    uint16_t                    read_size = 0;
     uint8_t                     channel = 0xFFu, tn = 0;
 
     TEST_ASSERT_EQUAL_UINT8(6u, RCP_EP_SPI_MAX_CHANNELS);
@@ -396,13 +397,13 @@ static void test_spi_six_channels_selected_by_evt(void)
     rcp_ep_spi_functional_cfg_init(&cfg);
     TEST_ASSERT_EQUAL_UINT(6u * sizeof(rcp_ep_spi_channel_cfg_t), sizeof(cfg.channels));
 
-    frame = rcp_ep_spi_encode_transfer_request(9u, 5u, tx, sizeof(tx), 0x31u);
+    frame = rcp_ep_spi_encode_transfer_request(9u, 5u, tx, sizeof(tx), 0u, 0x31u);
     TEST_ASSERT_NOT_NULL(frame.data);
     /* evt occupies octet 4 bits 7:4; its low three bits carry the channel. */
     TEST_ASSERT_EQUAL_UINT8(5u, (uint8_t)((frame.data[4] >> 4) & 0x07u));
     TEST_ASSERT_EQUAL(RCP_EP_SPI_OK,
                       rcp_ep_spi_decode_transfer_request(frame.data, frame.len, 9u, &channel, &rx,
-                                                         &rx_len, &tn));
+                                                         &rx_len, &read_size, &tn));
     TEST_ASSERT_EQUAL_UINT8(5u, channel);
     TEST_ASSERT_EQUAL_UINT(sizeof(tx), rx_len);
     rcp_bytes_free(&frame);
@@ -463,32 +464,57 @@ static void test_spi_trigger_numbering_and_channel_cfg_full(void)
     TEST_ASSERT_EQUAL_UINT8(10u, ch.pause_min);
 }
 
-/* REQ-SPI-036 (not-implemented) DEVIATION PIN: TC18 13.7.3.3 derives the
+/* FIXED 2026-08-12 (issue #201, REQ-SPI-036): TC18 13.7.3.3 derives the
  * transfer length from read_size and the payload -- zero octets are appended
  * when read_size exceeds the byte_msg_payload, and the whole payload still
- * goes out on PICO when read_size is smaller. c-RCP's request encoder has no
- * read_size parameter at all: the header slot stays 0 whatever the payload
- * length, so no transfer length is derived and nothing is zero-filled.
- * REQ-SPI-037 (not-implemented) DEVIATION PIN: TC18 13.7.3.3 requires a
+ * goes out on PICO when read_size is smaller. rcp_ep_spi_{en,de}code_
+ * transfer_request() now carry read_size through the ACF header's own
+ * read_size_or_segment_num field, and rcp_ep_spi_transfer_length() computes
+ * the resulting bus transfer length (see tests/test_ep_spi.c's own
+ * dedicated tests for that primitive's own case-by-case verification;
+ * this test's own job is just the request-level round trip). */
+static void test_spi_read_size_round_trips_through_transfer_request(void)
+{
+    rcp_acf_byte_message_info_t hdr       = {0};
+    const uint8_t                tx[2]     = {0x01u, 0x02u};
+    const uint8_t                *rx       = NULL;
+    size_t                        rx_len   = 0;
+    uint16_t                      read_size = 0;
+    rcp_bytes_t                   frame;
+    uint8_t                       channel = 0, tn = 0;
+
+    frame = rcp_ep_spi_encode_transfer_request(9u, 1u, tx, sizeof(tx), 0x0Au, 0x44u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_unpack_header(frame.data, &hdr));
+    TEST_ASSERT_EQUAL_UINT8(RCP_ACF_OP_READ, hdr.op); /* read sense: the slot is read_size */
+    TEST_ASSERT_EQUAL_HEX16(0x0Au, hdr.read_size_or_segment_num);
+
+    TEST_ASSERT_EQUAL(RCP_EP_SPI_OK,
+                      rcp_ep_spi_decode_transfer_request(frame.data, frame.len, 9u, &channel, &rx,
+                                                         &rx_len, &read_size, &tn));
+    TEST_ASSERT_EQUAL_UINT(sizeof(tx), rx_len);
+    TEST_ASSERT_EQUAL_UINT16(0x0Au, read_size);
+    TEST_ASSERT_EQUAL_UINT(0x0Au, rcp_ep_spi_transfer_length(rx_len, read_size));
+    rcp_bytes_free(&frame);
+}
+
+/* REQ-SPI-037 (not-implemented) DEVIATION PIN: TC18 13.7.3.3 requires a
  * stopped SPI endpoint to latch an error state with its EP_config enable bit
  * RESET (the client must clear it and re-enable), and a clamped IO pin to set
  * the err flag in every subsequent response. c-RCP's codec is stateless: a
  * rejected request leaves the endpoint's enable bit exactly as it was. */
-static void test_spi_read_size_unused_and_no_error_latch(void)
+static void test_spi_no_error_latch(void)
 {
-    rcp_acf_byte_message_info_t hdr    = {0};
     rcp_ep_spi_functional_cfg_t cfg;
-    const uint8_t               tx[2]  = {0x01u, 0x02u};
-    const uint8_t              *rx     = NULL;
-    size_t                      rx_len = 0;
-    rcp_bytes_t                 frame;
-    uint8_t                     channel = 0, tn = 0;
+    const uint8_t                tx[2]  = {0x01u, 0x02u};
+    const uint8_t                *rx     = NULL;
+    size_t                        rx_len = 0;
+    uint16_t                      read_size = 0;
+    rcp_bytes_t                   frame;
+    uint8_t                       channel = 0, tn = 0;
 
-    frame = rcp_ep_spi_encode_transfer_request(9u, 1u, tx, sizeof(tx), 0x44u);
+    frame = rcp_ep_spi_encode_transfer_request(9u, 1u, tx, sizeof(tx), 0u, 0x44u);
     TEST_ASSERT_NOT_NULL(frame.data);
-    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_unpack_header(frame.data, &hdr));
-    TEST_ASSERT_EQUAL_UINT8(RCP_ACF_OP_READ, hdr.op); /* read sense: the slot is read_size */
-    TEST_ASSERT_EQUAL_HEX16(0u, hdr.read_size_or_segment_num);
 
     rcp_ep_spi_functional_cfg_init(&cfg);
     cfg.common.ep_enable = true;
@@ -496,11 +522,11 @@ static void test_spi_read_size_unused_and_no_error_latch(void)
      * clears the endpoint's enable bit. */
     TEST_ASSERT_EQUAL(RCP_EP_SPI_ERR_WRONG_BUS,
                       rcp_ep_spi_decode_transfer_request(frame.data, frame.len, 10u, &channel, &rx,
-                                                         &rx_len, &tn));
+                                                         &rx_len, &read_size, &tn));
     TEST_ASSERT_TRUE(cfg.common.ep_enable);
     TEST_ASSERT_EQUAL(RCP_EP_SPI_OK,
                       rcp_ep_spi_decode_transfer_request(frame.data, frame.len, 9u, &channel, &rx,
-                                                         &rx_len, &tn));
+                                                         &rx_len, &read_size, &tn));
     TEST_ASSERT_EQUAL_UINT(sizeof(tx), rx_len);
     rcp_bytes_free(&frame);
 }
@@ -1423,7 +1449,8 @@ int main(void)
 
     RUN_TEST(test_spi_six_channels_selected_by_evt);
     RUN_TEST(test_spi_trigger_numbering_and_channel_cfg_full);
-    RUN_TEST(test_spi_read_size_unused_and_no_error_latch);
+    RUN_TEST(test_spi_read_size_round_trips_through_transfer_request);
+    RUN_TEST(test_spi_no_error_latch);
 
     RUN_TEST(test_i2c_mode_presets_and_register_block);
     RUN_TEST(test_i2c_payload_address_carried_verbatim);
