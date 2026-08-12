@@ -15205,6 +15205,24 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.271.0 -- 2026-08-12 (issue #200 doc-only batch: 9 RMAP
+entries missing their own `status` field, corrected)
+
+**`REQ-RMAP-024/025/026/027/028/029/030/031/035` gain
+`"status": "implemented"` -- a `.fusa-reqs.json` data-hygiene
+correction, not a code change.**
+
+Found while auditing the full gap catalog for a status report:
+these 9 entries' own `text` already began `"IMPLEMENTED: ..."` and
+described real, complete, tested work from the earlier RMAP
+wire-dispatch lineage, but carried no `status` key at all. Spot-
+verified all 9 against actual code and test tags before trusting
+the text -- all 9 confirmed genuinely implemented and tested.
+
+No functional code change; 65/65 both trees unchanged. `cfusa
+check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested
+100`: both 100%.
+
 ### v0.270.0 -- 2026-08-12 (issue #201 batch: `REQ-PWM-056`,
 PWM_OUT duty-cycle limits now cap the requested active time)
 
