@@ -139,19 +139,19 @@
  * the top 3 bits of the request/response's leading quadlet, sharing that
  * quadlet with a 29-bit CAN ID (right-aligned for an 11-bit base id, per
  * TC18 §13.7.11.3's own note) -- NOT into evt[2:0], which for CAN (a
- * member of TC18 §13.5 Table 30's {ADC, PWM_IN, I2C, LIN, CAN, UART,
+ * member of TC18 §13.5 Table 33's {ADC, PWM_IN, I2C, LIN, CAN, UART,
  * ISELED, MDIO} row) has the same ordinary meaning every other endpoint in
  * that row gives it: 000b for a plain request/response, 111b for a
  * configuration write (§12.7.1), every other value rejected with error
  * code UNSUPPORTED_CMD (see rcp_acf_evt_row2_is_plain(), acf.h). An earlier
  * revision of this module packed frame_format into evt[2:0] instead --
  * modeled on ep_spi.h's real, TC18-sanctioned evt[2:0] channel-selector
- * row -- without checking that CAN belongs to the *other* Table 30 row,
+ * row -- without checking that CAN belongs to the *other* Table 33 row,
  * whose evt[2:0] values TC18 reserves. That was wrong: it accepted
- * evt[2:0] values Table 30 requires this endpoint type to reject, and put
+ * evt[2:0] values Table 33 requires this endpoint type to reject, and put
  * FrameFormat at a wire position no compliant peer reads it from. Fixed
  * (v0.109.0) by moving frame_format into the payload's leading quadlet, per
- * Figure 39, and giving evt[2:0] its ordinary Table 30 meaning.
+ * Figure 39, and giving evt[2:0] its ordinary Table 33 meaning.
  *
  * rcp_ep_can_frame_format_t names the six frame variants TC18's own Table
  * 54 enumerates -- Classical Base/Extended Frame Format (CBFF/CEFF), FD
@@ -551,7 +551,7 @@ typedef enum {
      * Table 54) are not one of Table 54's six defined values -- see the
      * file header's "FrameFormat selection" section. */
     RCP_EP_CAN_ERR_BAD_FRAME_FORMAT  = 5,
-    /* evt[2:0] is not 0b000, TC18 §13.5 Table 30's only legal value for a
+    /* evt[2:0] is not 0b000, TC18 §13.5 Table 33's only legal value for a
      * plain (non-configuration) request/response in CAN's endpoint-type
      * row -- caller shall respond with error code UNSUPPORTED_CMD (see
      * rcp_acf_evt_row2_is_plain()). */
@@ -569,7 +569,7 @@ const char *rcp_ep_can_strerror(rcp_ep_can_errc_t e);
 /* ── Frame request ─────────────────────────────────────────────────────────── */
 
 /* Encodes an ACF_ABB frame request addressed to byte_bus_id: evt is left
- * entirely 0 (TC18 §13.5 Table 30's ordinary "plain request" value for
+ * entirely 0 (TC18 §13.5 Table 33's ordinary "plain request" value for
  * CAN's endpoint-type row), and the payload is TC18 §13.7.11.3 Figure 39's
  * layout -- see the file header -- of frame_format+arbitration_id (the
  * leading quadlet), xl_header (only when frame_format is a CAN XL
@@ -596,7 +596,7 @@ rcp_bytes_t rcp_ep_can_encode_frame_request(rcp_byte_bus_id_t byte_bus_id,
  * RCP_EP_CAN_ERR_WRONG_BUS if its byte_bus_id != expected_bus_id;
  * RCP_EP_CAN_ERR_WRONG_OP if its op is not RCP_ACF_OP_WRITE;
  * RCP_EP_CAN_ERR_BAD_EVT if its evt[2:0] is not 0b000
- * (rcp_acf_evt_row2_is_plain(), TC18 §13.5 Table 30 -- the caller shall
+ * (rcp_acf_evt_row2_is_plain(), TC18 §13.5 Table 33 -- the caller shall
  * respond with error code UNSUPPORTED_CMD); RCP_EP_CAN_ERR_BAD_FRAME_FORMAT
  * if the decoded frame_format is not rcp_ep_can_frame_format_valid();
  * RCP_EP_CAN_ERR_BAD_ARBITRATION_ID if the decoded arbitration_id is not

@@ -3063,7 +3063,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (\"evt[2:0]\" GPIO/PWM_OUT row, values 000b-111b), TC18.txt L3690-3717"
+      "tc18": "§13.5 Table 33 (\"evt[2:0]\" GPIO/PWM_OUT row, values 000b-111b), TC18.txt L3690-3717"
     },
     {
       "id": "REQ-GPIO-006",
@@ -3073,7 +3073,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=000b: \"The byte_msg_payload is presented at the interface\"), TC18.txt L3694"
+      "tc18": "§13.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=000b: \"The byte_msg_payload is presented at the interface\"), TC18.txt L3694"
     },
     {
       "id": "REQ-GPIO-007",
@@ -3083,7 +3083,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=001b: \"The 'byte_msg_payload' bitwise OR 'current interface status' is written to the interface (example: with a byte_msg_payload of 0x0000 0002 the second IO pin will be set, while other IO pins remain unchanged)\"), TC18.txt L3695-3698"
+      "tc18": "§13.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=001b: \"The 'byte_msg_payload' bitwise OR 'current interface status' is written to the interface (example: with a byte_msg_payload of 0x0000 0002 the second IO pin will be set, while other IO pins remain unchanged)\"), TC18.txt L3695-3698"
     },
     {
       "id": "REQ-GPIO-008",
@@ -3093,7 +3093,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=010b: \"The 'byte_msg_payload' bitwise AND 'current interface status' is written to the interface (example: with a byte_msg_payload of 0xFFFF FFFE the first IO pin will be reset, while other IO pins remain unchanged)\"), TC18.txt L3699-3702"
+      "tc18": "§13.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=010b: \"The 'byte_msg_payload' bitwise AND 'current interface status' is written to the interface (example: with a byte_msg_payload of 0xFFFF FFFE the first IO pin will be reset, while other IO pins remain unchanged)\"), TC18.txt L3699-3702"
     },
     {
       "id": "REQ-GPIO-009",
@@ -3103,7 +3103,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=011b: \"The 'byte_msg_payload' bitwise XOR 'current interface status' is written to the interface (example: with a byte_msg_payload of 0x0000 0002 the second IO pin will be toggled, while other IO pins remain unchanged)\"), TC18.txt L3703-3706"
+      "tc18": "§13.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=011b: \"The 'byte_msg_payload' bitwise XOR 'current interface status' is written to the interface (example: with a byte_msg_payload of 0x0000 0002 the second IO pin will be toggled, while other IO pins remain unchanged)\"), TC18.txt L3703-3706"
     },
     {
       "id": "REQ-GPIO-010",
@@ -3113,7 +3113,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=101b: \"The 'byte_msg_payload' plus 'current interface status' is written to the interface\"), TC18.txt L3709-3711; saturation rule, TC18.txt L3719-3720"
+      "tc18": "§13.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=101b: \"The 'byte_msg_payload' plus 'current interface status' is written to the interface\"), TC18.txt L3709-3711; saturation rule, TC18.txt L3719-3720"
     },
     {
       "id": "REQ-GPIO-011",
@@ -3123,7 +3123,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=110b: \"'byte_msg_payload' minus 'current interface status' is written as is to interface\"), TC18.txt L3712-3714; saturation rule, TC18.txt L3719-3720"
+      "tc18": "§13.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=110b: \"'byte_msg_payload' minus 'current interface status' is written as is to interface\"), TC18.txt L3712-3714; saturation rule, TC18.txt L3719-3720"
     },
     {
       "id": "REQ-GPIO-012",
@@ -3133,7 +3133,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=100b: \"reserved -request shall be ignored and an err-response with error code = UNSUPPORTED_CMD shall be sent\"), TC18.txt L3707-3708"
+      "tc18": "§13.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=100b: \"reserved -request shall be ignored and an err-response with error code = UNSUPPORTED_CMD shall be sent\"), TC18.txt L3707-3708"
     },
     {
       "id": "REQ-GPIO-013",
@@ -3292,7 +3292,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.4.1 (\"A request not having exactly four bytes is rejected and an error response with error code = INVALID_PARAMETER will be sent.\"), TC18.txt L4391-4392; general ACF frame basis, §13.5 Table 30, TC18.txt L3666-3710"
+      "tc18": "§13.7.4.1 (\"A request not having exactly four bytes is rejected and an error response with error code = INVALID_PARAMETER will be sent.\"), TC18.txt L4391-4392; general ACF frame basis, §13.5 Table 33, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-GPIO-027",
@@ -3302,7 +3302,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710 (general ACF frame-validation basis)"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3710 (general ACF frame-validation basis)"
     },
     {
       "id": "REQ-GPIO-028",
@@ -3312,7 +3312,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.4.1 (\"A request not having exactly four bytes is rejected and an error response with error code = INVALID_PARAMETER will be sent.\"), TC18.txt L4391-4392; evt[2:0] semantics per §13.5 Table 30, TC18.txt L3690-3717"
+      "tc18": "§13.7.4.1 (\"A request not having exactly four bytes is rejected and an error response with error code = INVALID_PARAMETER will be sent.\"), TC18.txt L4391-4392; evt[2:0] semantics per §13.5 Table 33, TC18.txt L3690-3717"
     },
     {
       "id": "REQ-GPIO-029",
@@ -3352,7 +3352,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710 (general ACF frame-validation basis)"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3710 (general ACF frame-validation basis)"
     },
     {
       "id": "REQ-SPI-001",
@@ -3371,7 +3371,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (SPI row, \"selects channel 0 … 5\"), TC18.txt L3678; §13.7.3.1 (\"the SPI endpoint may support up to 6 pre-configurable sets of SPI configurations\"), TC18.txt L4192-4193"
+      "tc18": "§13.5 Table 33 (SPI row, \"selects channel 0 … 5\"), TC18.txt L3678; §13.7.3.1 (\"the SPI endpoint may support up to 6 pre-configurable sets of SPI configurations\"), TC18.txt L4192-4193"
     },
     {
       "id": "REQ-SPI-003",
@@ -3610,7 +3610,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.3.3 (\"...even if the read_size is less than the number of bytes in the byte_msg_payload.\"), Figure 23 worked example (\"write 20 bytes and get a response with 10 on SPI channel 3\", op=0/read direction), TC18.txt L4355-4375; channel selection per §13.5 Table 30 SPI row, TC18.txt L3678-3680"
+      "tc18": "§13.7.3.3 (\"...even if the read_size is less than the number of bytes in the byte_msg_payload.\"), Figure 23 worked example (\"write 20 bytes and get a response with 10 on SPI channel 3\", op=0/read direction), TC18.txt L4355-4375; channel selection per §13.5 Table 33 SPI row, TC18.txt L3678-3680"
     },
     {
       "id": "REQ-SPI-027",
@@ -3620,7 +3620,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3693 (general ACF frame-validation basis, SPI row for channel selection)"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3693 (general ACF frame-validation basis, SPI row for channel selection)"
     },
     {
       "id": "REQ-SPI-028",
@@ -3650,7 +3650,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3693 (general ACF frame-validation basis, SPI row for channel selection)"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3693 (general ACF frame-validation basis, SPI row for channel selection)"
     },
     {
       "id": "REQ-I2C-001",
@@ -3748,7 +3748,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.7.3 Figure 29 (i2c request format), TC18.txt L4829-4846; \"no channel selector\" per §13.5 Table 30 (I2C's row-2 group, only evt=111b defined), TC18.txt L3684-3693"
+      "tc18": "§13.7.7.3 Figure 29 (i2c request format), TC18.txt L4829-4846; \"no channel selector\" per §13.5 Table 33 (I2C's row-2 group, only evt=111b defined), TC18.txt L3684-3693"
     },
     {
       "id": "REQ-I2C-011",
@@ -3758,17 +3758,17 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.7.3 Figure 29 (i2c request format), TC18.txt L4829-4846; §13.7.7.1 (\"Requests are accepted in ACF_ABB and ACF_GBB.\"), TC18.txt L4790-4791; evt[2:0] validation per §13.5 Table 30 (I2C's row-2 group, only evt=111b defined), TC18.txt L3684-3693"
+      "tc18": "§13.7.7.3 Figure 29 (i2c request format), TC18.txt L4829-4846; §13.7.7.1 (\"Requests are accepted in ACF_ABB and ACF_GBB.\"), TC18.txt L4790-4791; evt[2:0] validation per §13.5 Table 33 (I2C's row-2 group, only evt=111b defined), TC18.txt L3684-3693"
     },
     {
       "id": "REQ-I2C-012",
       "title": "rcp_ep_i2c_decode_transfer_request() rejects a malformed or misaddressed frame and accepts both directions",
-      "text": "rcp_ep_i2c_decode_transfer_request() shall return RCP_EP_I2C_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length, RCP_EP_I2C_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_I2C_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, and RCP_EP_I2C_ERR_BAD_EVT when evt[2:0] is not 0b000 -- TC18 §13.5 Table 30's only legal value for a plain request in I2C's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer. It shall accept BOTH op senses -- an I2C transfer is half duplex and either-directional, so neither is malformed -- and report which via *out_direction.",
+      "text": "rcp_ep_i2c_decode_transfer_request() shall return RCP_EP_I2C_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length, RCP_EP_I2C_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_I2C_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, and RCP_EP_I2C_ERR_BAD_EVT when evt[2:0] is not 0b000 -- TC18 §13.5 Table 33's only legal value for a plain request in I2C's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer. It shall accept BOTH op senses -- an I2C transfer is half duplex and either-directional, so neither is malformed -- and report which via *out_direction.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-I2C-013",
@@ -3828,7 +3828,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.7.3 Figure 29 (i2c request format), TC18.txt L4829-4846; \"no channel selector\" per §13.5 Table 30 (I2C's row-2 group, only evt=111b defined), TC18.txt L3684-3693"
+      "tc18": "§13.7.7.3 Figure 29 (i2c request format), TC18.txt L4829-4846; \"no channel selector\" per §13.5 Table 33 (I2C's row-2 group, only evt=111b defined), TC18.txt L3684-3693"
     },
     {
       "id": "REQ-UART-001",
@@ -4006,7 +4006,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (ADC/PWM_IN/I²C/LIN/CAN/UART/ISELED/MDIO row, evt[2:0]=000b-110b reserved so ordinary requests carry evt=0), TC18.txt L3684-3693; §13.7.8.1 (\"A write request leads to a transmission of data to an external connected device.\"), TC18.txt L4883"
+      "tc18": "§13.5 Table 33 (ADC/PWM_IN/I²C/LIN/CAN/UART/ISELED/MDIO row, evt[2:0]=000b-110b reserved so ordinary requests carry evt=0), TC18.txt L3684-3693; §13.7.8.1 (\"A write request leads to a transmission of data to an external connected device.\"), TC18.txt L4883"
     },
     {
       "id": "REQ-UART-019",
@@ -4016,17 +4016,17 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (ADC/PWM_IN/I²C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L3684-3693"
+      "tc18": "§13.5 Table 33 (ADC/PWM_IN/I²C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L3684-3693"
     },
     {
       "id": "REQ-UART-020",
       "title": "rcp_ep_uart_decode_write_request() rejects a malformed, misaddressed, misdirected, or wrong-evt frame",
-      "text": "rcp_ep_uart_decode_write_request() shall return RCP_EP_UART_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length, RCP_EP_UART_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_UART_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, RCP_EP_UART_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE, and RCP_EP_UART_ERR_BAD_EVT when evt[2:0] is not 0b000 -- TC18 §13.5 Table 30's only legal value for a plain request in UART's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer.",
+      "text": "rcp_ep_uart_decode_write_request() shall return RCP_EP_UART_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header or its declared payload length, RCP_EP_UART_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_UART_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, RCP_EP_UART_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE, and RCP_EP_UART_ERR_BAD_EVT when evt[2:0] is not 0b000 -- TC18 §13.5 Table 33's only legal value for a plain request in UART's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-UART-021",
@@ -4066,17 +4066,17 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (ADC/PWM_IN/I²C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L3684-3693"
+      "tc18": "§13.5 Table 33 (ADC/PWM_IN/I²C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L3684-3693"
     },
     {
       "id": "REQ-UART-025",
       "title": "rcp_ep_uart_decode_read_request() rejects a payload-bearing read request with RCP_EP_UART_ERR_UNKNOWN_CMD",
-      "text": "rcp_ep_uart_decode_read_request() shall return RCP_EP_UART_ERR_UNKNOWN_CMD, rather than RCP_EP_UART_OK, when an otherwise well-formed read request carries a non-empty payload -- the deliberate asymmetry against GPIO/PWM_OUT request types documented in ep_uart.h. It shall also return RCP_EP_UART_ERR_BAD_EVT when evt[2:0] is not 0b000 -- TC18 §13.5 Table 30's only legal value for a plain request in UART's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer.",
+      "text": "rcp_ep_uart_decode_read_request() shall return RCP_EP_UART_ERR_UNKNOWN_CMD, rather than RCP_EP_UART_OK, when an otherwise well-formed read request carries a non-empty payload -- the deliberate asymmetry against GPIO/PWM_OUT request types documented in ep_uart.h. It shall also return RCP_EP_UART_ERR_BAD_EVT when evt[2:0] is not 0b000 -- TC18 §13.5 Table 33's only legal value for a plain request in UART's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-UART-026",
@@ -4106,7 +4106,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (ADC/PWM_IN/I²C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L3684-3693"
+      "tc18": "§13.5 Table 33 (ADC/PWM_IN/I²C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L3684-3693"
     },
     {
       "id": "REQ-PWM-001",
@@ -4116,7 +4116,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (\"evt[2:0]\" GPIO/PWM_OUT row, values 000b-111b), TC18.txt L3690-3717"
+      "tc18": "§13.5 Table 33 (\"evt[2:0]\" GPIO/PWM_OUT row, values 000b-111b), TC18.txt L3690-3717"
     },
     {
       "id": "REQ-PWM-002",
@@ -4126,7 +4126,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=000b: \"The byte_msg_payload is presented at the interface\"), TC18.txt L3694"
+      "tc18": "§13.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=000b: \"The byte_msg_payload is presented at the interface\"), TC18.txt L3694"
     },
     {
       "id": "REQ-PWM-003",
@@ -4136,7 +4136,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=001b: \"The 'byte_msg_payload' bitwise OR 'current interface status' is written to the interface\"), TC18.txt L3695-3698"
+      "tc18": "§13.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=001b: \"The 'byte_msg_payload' bitwise OR 'current interface status' is written to the interface\"), TC18.txt L3695-3698"
     },
     {
       "id": "REQ-PWM-004",
@@ -4146,7 +4146,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=010b: \"The 'byte_msg_payload' bitwise AND 'current interface status' is written to the interface\"), TC18.txt L3699-3702"
+      "tc18": "§13.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=010b: \"The 'byte_msg_payload' bitwise AND 'current interface status' is written to the interface\"), TC18.txt L3699-3702"
     },
     {
       "id": "REQ-PWM-005",
@@ -4156,7 +4156,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=011b: \"The 'byte_msg_payload' bitwise XOR 'current interface status' is written to the interface\"), TC18.txt L3703-3706"
+      "tc18": "§13.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=011b: \"The 'byte_msg_payload' bitwise XOR 'current interface status' is written to the interface\"), TC18.txt L3703-3706"
     },
     {
       "id": "REQ-PWM-006",
@@ -4166,7 +4166,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=101b: \"The 'byte_msg_payload' plus 'current interface status' is written to the interface\"), TC18.txt L3709-3711; saturation rule, TC18.txt L3719-3720"
+      "tc18": "§13.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=101b: \"The 'byte_msg_payload' plus 'current interface status' is written to the interface\"), TC18.txt L3709-3711; saturation rule, TC18.txt L3719-3720"
     },
     {
       "id": "REQ-PWM-007",
@@ -4176,7 +4176,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=110b: \"'byte_msg_payload' minus 'current interface status' is written as is to interface\"), TC18.txt L3712-3714; saturation rule, TC18.txt L3719-3720"
+      "tc18": "§13.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=110b: \"'byte_msg_payload' minus 'current interface status' is written as is to interface\"), TC18.txt L3712-3714; saturation rule, TC18.txt L3719-3720"
     },
     {
       "id": "REQ-PWM-008",
@@ -4186,7 +4186,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=100b: \"reserved -request shall be ignored and an err-response with error code = UNSUPPORTED_CMD shall be sent\"), TC18.txt L3707-3708"
+      "tc18": "§13.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=100b: \"reserved -request shall be ignored and an err-response with error code = UNSUPPORTED_CMD shall be sent\"), TC18.txt L3707-3708"
     },
     {
       "id": "REQ-PWM-009",
@@ -4196,7 +4196,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (GPIO/PWM_OUT row, evt[2:0]=111b: \"The byte_msg_payload is not presented to the interface but used to change the configuration of the endpoint (see 12.7.1).\"), TC18.txt L3715-3717"
+      "tc18": "§13.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=111b: \"The byte_msg_payload is not presented to the interface but used to change the configuration of the endpoint (see 12.7.1).\"), TC18.txt L3715-3717"
     },
     {
       "id": "REQ-PWM-010",
@@ -4354,7 +4354,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710 (general ACF frame-validation basis for the request/response wire format)"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3710 (general ACF frame-validation basis for the request/response wire format)"
     },
     {
       "id": "REQ-PWM-026",
@@ -4364,7 +4364,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-PWM-027",
@@ -4374,7 +4374,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.5.3 (\"The PWM_out request and response contain two values in the payload. The active time of the PWM signal as well as the period of the signal in clock ticks of the clock selected for this PWM_out endpoint.\"), TC18.txt L4621-4623; evt[2:0] semantics per §13.5 Table 30, TC18.txt L3690-3717"
+      "tc18": "§13.7.5.3 (\"The PWM_out request and response contain two values in the payload. The active time of the PWM signal as well as the period of the signal in clock ticks of the clock selected for this PWM_out endpoint.\"), TC18.txt L4621-4623; evt[2:0] semantics per §13.5 Table 33, TC18.txt L3690-3717"
     },
     {
       "id": "REQ-PWM-028",
@@ -4414,7 +4414,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710 (general ACF frame-validation basis)"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3710 (general ACF frame-validation basis)"
     },
     {
       "id": "REQ-PWM-032",
@@ -4532,7 +4532,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710 (general ACF frame-validation basis)"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3710 (general ACF frame-validation basis)"
     },
     {
       "id": "REQ-PWM-044",
@@ -4562,7 +4562,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710 (general ACF frame-validation basis)"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3710 (general ACF frame-validation basis)"
     },
     {
       "id": "REQ-PWM-047",
@@ -4890,12 +4890,12 @@
     {
       "id": "REQ-ADC-026",
       "title": "rcp_ep_adc_decode_read_request() rejects a malformed, misaddressed, wrong-op, or wrong-evt frame",
-      "text": "rcp_ep_adc_decode_read_request() shall return RCP_EP_ADC_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB fixed header, RCP_EP_ADC_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, RCP_EP_ADC_ERR_WRONG_OP when op is not RCP_ACF_OP_READ, and RCP_EP_ADC_ERR_BAD_EVT when evt[2:0] is not 0b000 -- TC18 §13.5 Table 30's only legal value for a plain request in ADC's endpoint-type row (ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO); every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer.",
+      "text": "rcp_ep_adc_decode_read_request() shall return RCP_EP_ADC_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB fixed header, RCP_EP_ADC_ERR_WRONG_BUS when byte_bus_id != expected_bus_id, RCP_EP_ADC_ERR_WRONG_OP when op is not RCP_ACF_OP_READ, and RCP_EP_ADC_ERR_BAD_EVT when evt[2:0] is not 0b000 -- TC18 §13.5 Table 33's only legal value for a plain request in ADC's endpoint-type row (ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO); every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-ADC-027",
@@ -4925,7 +4925,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (ADC/PWM_IN/I²C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L3684-3693"
+      "tc18": "§13.5 Table 33 (ADC/PWM_IN/I²C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L3684-3693"
     },
     {
       "id": "REQ-ADC-030",
@@ -6026,7 +6026,7 @@
     {
       "id": "REQ-E2E-021",
       "title": "PARTIAL: rcp_e2e_stream_fault_on_crc_error() always signals skip-this-request and latches under rx_enforce_e2e, but nothing in the dispatch path calls it",
-      "text": "IMPLEMENTED, FIXED 2026-08-12 (issue #201 batch 9): rcp_e2e_stream_fault_on_crc_error() itself was always correct and directly unit-tested; the gap was that nothing in the dispatch path called it. New rcp_e2e_stream_fault_tracker_t (e2e.h/e2e.c) is a caller-owned, keyed-by-stream_id wrapper holding one rcp_e2e_stream_fault_t per stream (a real server may have more than one). rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e() now (1) check rcp_e2e_stream_fault_tracker_is_faulted() for stream_id BEFORE plain-command-mode delegation, CRC validation, or admission -- returning the new RCP_MOCK_DISPATCH_STREAM_FAULTED with a real Table 27 POCI_FAILURE error response -- and (2) record every CRC mismatch they detect via rcp_e2e_stream_fault_tracker_on_crc_error(), keyed to a new per-endpoint rcp_mock_server_set_endpoint_rx_enforce_e2e() stand-in bit (this test double's own in-process stand-in for the real per-request-stream register, matching req_crc_enable's own established stand-in pattern). Wiring is opt-in via rcp_mock_server_set_stream_fault_tracker() (tracker may be NULL, the default, to disable entirely). This closes the \"stream is blocked until released\" half of rx_enforce_e2e's Table 22 consequence -- a second, third, Nth request on a faulted stream is now genuinely rejected until rcp_e2e_stream_fault_tracker_reset() releases it. The Table 22 sentence's OTHER consequence, \"Safe state will be entered,\" is REQ-E2E-045's own separate, still-open gap (a cross-endpoint safe-state escalation this library's single-endpoint-scoped data model has no orchestrator for) -- not addressed by this fix, and not conflated with it.",
+      "text": "IMPLEMENTED, FIXED 2026-08-12 (issue #201 batch 9): rcp_e2e_stream_fault_on_crc_error() itself was always correct and directly unit-tested; the gap was that nothing in the dispatch path called it. New rcp_e2e_stream_fault_tracker_t (e2e.h/e2e.c) is a caller-owned, keyed-by-stream_id wrapper holding one rcp_e2e_stream_fault_t per stream (a real server may have more than one). rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e() now (1) check rcp_e2e_stream_fault_tracker_is_faulted() for stream_id BEFORE plain-command-mode delegation, CRC validation, or admission -- returning the new RCP_MOCK_DISPATCH_STREAM_FAULTED with a real Table 30 POCI_FAILURE error response -- and (2) record every CRC mismatch they detect via rcp_e2e_stream_fault_tracker_on_crc_error(), keyed to a new per-endpoint rcp_mock_server_set_endpoint_rx_enforce_e2e() stand-in bit (this test double's own in-process stand-in for the real per-request-stream register, matching req_crc_enable's own established stand-in pattern). Wiring is opt-in via rcp_mock_server_set_stream_fault_tracker() (tracker may be NULL, the default, to disable entirely). This closes the \"stream is blocked until released\" half of rx_enforce_e2e's Table 22 consequence -- a second, third, Nth request on a faulted stream is now genuinely rejected until rcp_e2e_stream_fault_tracker_reset() releases it. The Table 22 sentence's OTHER consequence, \"Safe state will be entered,\" is REQ-E2E-045's own separate, still-open gap (a cross-endpoint safe-state escalation this library's single-endpoint-scoped data model has no orchestrator for) -- not addressed by this fix, and not conflated with it.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -6195,13 +6195,13 @@
     {
       "id": "REQ-LINEP-016",
       "title": "rcp_ep_lin_encode_command_request() encodes the read direction, evt=0, and carries the raw payload unmodified",
-      "text": "rcp_ep_lin_encode_command_request() shall encode an ACF_ABB message addressed to byte_bus_id with op RCP_ACF_OP_READ (the reply-expected direction), evt = 0 (Table 30 constrains a plain LIN request's evt[2:0] to 000b; there is no client-selectable comparison mode), transaction_num set to transaction_num, and payload equal to tx_data[0..tx_len) byte for byte.",
+      "text": "rcp_ep_lin_encode_command_request() shall encode an ACF_ABB message addressed to byte_bus_id with op RCP_ACF_OP_READ (the reply-expected direction), evt = 0 (Table 33 constrains a plain LIN request's evt[2:0] to 000b; there is no client-selectable comparison mode), transaction_num set to transaction_num, and payload equal to tx_data[0..tx_len) byte for byte.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-LINEP-017",
@@ -6211,7 +6211,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.7.10.3 Figure 38 (lin request/response format), TC18.txt L5304-5320; \"the LIN endpoint checks each received message against the byte_msg_payload and if a match under the conditions given by evt[2:0] is found a reply is sent if op = 0\" (§13.7.10.1), TC18.txt L5275-5277; evt[2:0] plain-request rule per §13.5 Table 30 (LIN's row-2 group, only evt=111b defined), TC18.txt L3684-3693"
+      "tc18": "§13.7.10.3 Figure 38 (lin request/response format), TC18.txt L5304-5320; \"the LIN endpoint checks each received message against the byte_msg_payload and if a match under the conditions given by evt[2:0] is found a reply is sent if op = 0\" (§13.7.10.1), TC18.txt L5275-5277; evt[2:0] plain-request rule per §13.5 Table 33 (LIN's row-2 group, only evt=111b defined), TC18.txt L3684-3693"
     },
     {
       "id": "REQ-LINEP-018",
@@ -6414,7 +6414,7 @@
     {
       "id": "REQ-CANEP-016",
       "title": "rcp_ep_can_encode_frame_request() enforces frame-format, id, length, and xl_header preconditions",
-      "text": "rcp_ep_can_encode_frame_request() shall return a zeroed rcp_bytes_t if frame_format is not rcp_ep_can_frame_format_valid(), arbitration_id is not rcp_ep_can_arbitration_id_valid() for frame_format, tx_len exceeds rcp_ep_can_frame_format_max_data_len(frame_format), or xl_header's presence does not match rcp_ep_can_frame_format_is_xl(frame_format); otherwise it shall encode an ACF_ABB request with evt left at 0 (TC18 Table 30's plain-request value for CAN's endpoint-type row) and frame_format packed into the payload's leading quadlet's top 3 bits alongside arbitration_id (TC18 §13.7.11.3 Figure 39), followed by this module's own xl-header/data layout. FIXED (v0.109.0): previously packed frame_format into evt[2:0] instead, a wire position TC18 does not assign it (see REQ-CANEP-031's corrected text).",
+      "text": "rcp_ep_can_encode_frame_request() shall return a zeroed rcp_bytes_t if frame_format is not rcp_ep_can_frame_format_valid(), arbitration_id is not rcp_ep_can_arbitration_id_valid() for frame_format, tx_len exceeds rcp_ep_can_frame_format_max_data_len(frame_format), or xl_header's presence does not match rcp_ep_can_frame_format_is_xl(frame_format); otherwise it shall encode an ACF_ABB request with evt left at 0 (TC18 Table 33's plain-request value for CAN's endpoint-type row) and frame_format packed into the payload's leading quadlet's top 3 bits alongside arbitration_id (TC18 §13.7.11.3 Figure 39), followed by this module's own xl-header/data layout. FIXED (v0.109.0): previously packed frame_format into evt[2:0] instead, a wire position TC18 does not assign it (see REQ-CANEP-031's corrected text).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -6424,7 +6424,7 @@
     {
       "id": "REQ-CANEP-017",
       "title": "rcp_ep_can_decode_frame_request() rejects a malformed, misaddressed, wrong-evt, malformed-selector, or bad-arbitration-id frame",
-      "text": "rcp_ep_can_decode_frame_request() shall return RCP_EP_CAN_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header, its declared payload length, the 4-byte leading quadlet, or the full frame_format-dependent prefix length; RCP_EP_CAN_ERR_BAD_MSG_TYPE if b is not an ACF_ABB message; RCP_EP_CAN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id; RCP_EP_CAN_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE; RCP_EP_CAN_ERR_BAD_EVT when evt[2:0] is not 0b000 (TC18 §13.5 Table 30's only legal value for a plain request in CAN's endpoint-type row); RCP_EP_CAN_ERR_BAD_FRAME_FORMAT when the leading quadlet's top 3 bits are not rcp_ep_can_frame_format_valid(); and RCP_EP_CAN_ERR_BAD_ARBITRATION_ID when the leading quadlet's low 29 bits are not rcp_ep_can_arbitration_id_valid() for that frame_format.",
+      "text": "rcp_ep_can_decode_frame_request() shall return RCP_EP_CAN_ERR_SHORT_FRAME for a frame too short for the ACF_ABB fixed header, its declared payload length, the 4-byte leading quadlet, or the full frame_format-dependent prefix length; RCP_EP_CAN_ERR_BAD_MSG_TYPE if b is not an ACF_ABB message; RCP_EP_CAN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id; RCP_EP_CAN_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE; RCP_EP_CAN_ERR_BAD_EVT when evt[2:0] is not 0b000 (TC18 §13.5 Table 33's only legal value for a plain request in CAN's endpoint-type row); RCP_EP_CAN_ERR_BAD_FRAME_FORMAT when the leading quadlet's top 3 bits are not rcp_ep_can_frame_format_valid(); and RCP_EP_CAN_ERR_BAD_ARBITRATION_ID when the leading quadlet's low 29 bits are not rcp_ep_can_arbitration_id_valid() for that frame_format.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -6454,7 +6454,7 @@
     {
       "id": "REQ-CANEP-020",
       "title": "rcp_ep_can_decode_frame_response() rejects a malformed, misaddressed, wrong-evt, malformed-selector, or bad-arbitration-id frame across both ACF_ABB and ACF_GBB",
-      "text": "rcp_ep_can_decode_frame_response() shall return RCP_EP_CAN_ERR_SHORT_FRAME for a frame too short for the applicable fixed header, its declared payload length, the 4-byte leading quadlet, or the full frame_format-dependent prefix length; RCP_EP_CAN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id; RCP_EP_CAN_ERR_BAD_EVT when evt[2:0] is not 0b000 (TC18 §13.5 Table 30's only legal value for a plain response in CAN's endpoint-type row); RCP_EP_CAN_ERR_BAD_FRAME_FORMAT when the leading quadlet's top 3 bits are not rcp_ep_can_frame_format_valid(); and RCP_EP_CAN_ERR_BAD_ARBITRATION_ID when the leading quadlet's low 29 bits are not rcp_ep_can_arbitration_id_valid() for that frame_format -- regardless of whether the message is ACF_ABB or ACF_GBB.",
+      "text": "rcp_ep_can_decode_frame_response() shall return RCP_EP_CAN_ERR_SHORT_FRAME for a frame too short for the applicable fixed header, its declared payload length, the 4-byte leading quadlet, or the full frame_format-dependent prefix length; RCP_EP_CAN_ERR_WRONG_BUS when byte_bus_id != expected_bus_id; RCP_EP_CAN_ERR_BAD_EVT when evt[2:0] is not 0b000 (TC18 §13.5 Table 33's only legal value for a plain response in CAN's endpoint-type row); RCP_EP_CAN_ERR_BAD_FRAME_FORMAT when the leading quadlet's top 3 bits are not rcp_ep_can_frame_format_valid(); and RCP_EP_CAN_ERR_BAD_ARBITRATION_ID when the leading quadlet's low 29 bits are not rcp_ep_can_arbitration_id_valid() for that frame_format -- regardless of whether the message is ACF_ABB or ACF_GBB.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -6680,12 +6680,12 @@
     {
       "id": "REQ-ISELED-022",
       "title": "rcp_ep_iseled_decode_command_request() validates and decodes an ACF-level command request",
-      "text": "rcp_ep_iseled_decode_command_request() shall return RCP_EP_ISELED_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header or its declared payload, RCP_EP_ISELED_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_ISELED_ERR_WRONG_BUS for a mismatched byte_bus_id, RCP_EP_ISELED_ERR_WRONG_OP for an op other than RCP_ACF_OP_WRITE, RCP_EP_ISELED_ERR_BAD_EVT when evt[2:0] is not 0b000 (TC18 §13.5 Table 30's only legal value for a plain request in ISELED's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer), and otherwise RCP_EP_ISELED_OK with the plain payload and transaction number populated.",
+      "text": "rcp_ep_iseled_decode_command_request() shall return RCP_EP_ISELED_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header or its declared payload, RCP_EP_ISELED_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_ISELED_ERR_WRONG_BUS for a mismatched byte_bus_id, RCP_EP_ISELED_ERR_WRONG_OP for an op other than RCP_ACF_OP_WRITE, RCP_EP_ISELED_ERR_BAD_EVT when evt[2:0] is not 0b000 (TC18 §13.5 Table 33's only legal value for a plain request in ISELED's endpoint-type row; every other value shall be rejected with error code UNSUPPORTED_CMD at the dispatch layer), and otherwise RCP_EP_ISELED_OK with the plain payload and transaction number populated.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-ISELED-023",
@@ -6826,12 +6826,12 @@
     {
       "id": "REQ-MDIO-013",
       "title": "rcp_ep_mdio_decode_read_request() validates and decodes this module's own ACF-level MDIO read request payload",
-      "text": "rcp_ep_mdio_decode_read_request() shall return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header, its declared payload, or the 7-byte request prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_MDIO_ERR_WRONG_OP for an op other than RCP_ACF_OP_READ; RCP_EP_MDIO_ERR_BAD_EVT when evt[2:0] is not 0b000 (the value REQ-ACF-023 resolves, after cross-checking TC18's own Figure 33 worked example, as the legal plain-request value for this Table 30 row -- see that entry for the full resolution of Table 30's own apparent internal inconsistency); RCP_EP_MDIO_ERR_BAD_ADDR when the decoded address fails rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT when the decoded word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS; and otherwise RCP_EP_MDIO_OK with the address, word count, and transaction number populated. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): the payload layout this decodes is this module's own original design, not TC18's own wire layout -- see REQ-MDIO-012's own note and REQ-MDIO-021.",
+      "text": "rcp_ep_mdio_decode_read_request() shall return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header, its declared payload, or the 7-byte request prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_MDIO_ERR_WRONG_OP for an op other than RCP_ACF_OP_READ; RCP_EP_MDIO_ERR_BAD_EVT when evt[2:0] is not 0b000 (the value REQ-ACF-023 resolves, after cross-checking TC18's own Figure 33 worked example, as the legal plain-request value for this Table 33 row -- see that entry for the full resolution of Table 33's own apparent internal inconsistency); RCP_EP_MDIO_ERR_BAD_ADDR when the decoded address fails rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT when the decoded word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS; and otherwise RCP_EP_MDIO_OK with the address, word count, and transaction number populated. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): the payload layout this decodes is this module's own original design, not TC18's own wire layout -- see REQ-MDIO-012's own note and REQ-MDIO-021.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710 (evt[2:0] legality, resolved at REQ-ACF-023); §13.7.13.3 Figure 42/Table 57, TC18.txt L5664-5681 (the real wire layout this function's own payload does not match; see REQ-MDIO-021)"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3710 (evt[2:0] legality, resolved at REQ-ACF-023); §13.7.13.3 Figure 42/Table 57, TC18.txt L5664-5681 (the real wire layout this function's own payload does not match; see REQ-MDIO-021)"
     },
     {
       "id": "REQ-MDIO-014",
@@ -6866,12 +6866,12 @@
     {
       "id": "REQ-MDIO-017",
       "title": "rcp_ep_mdio_decode_write_request() validates and decodes this module's own ACF-level MDIO write request payload",
-      "text": "rcp_ep_mdio_decode_write_request() shall return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header, its declared payload, or the 5-byte address prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_MDIO_ERR_WRONG_OP for an op other than RCP_ACF_OP_WRITE; RCP_EP_MDIO_ERR_BAD_EVT when evt[2:0] is not 0b000 (the value REQ-ACF-023 resolves, after cross-checking TC18's own Figure 33 worked example, as the legal plain-request value for this Table 30 row -- see that entry for the full resolution of Table 30's own apparent internal inconsistency); RCP_EP_MDIO_ERR_BAD_ADDR when the decoded address fails rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT when the trailing words region's byte length is odd, is 0, or represents more than RCP_EP_MDIO_MAX_BURST_WORDS words; and otherwise RCP_EP_MDIO_OK with the address, packed word bytes, word count, and transaction number populated. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): the payload layout this decodes is this module's own original design, not TC18's own wire layout -- see REQ-MDIO-016's own note and REQ-MDIO-021.",
+      "text": "rcp_ep_mdio_decode_write_request() shall return RCP_EP_MDIO_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header, its declared payload, or the 5-byte address prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame; RCP_EP_MDIO_ERR_WRONG_BUS for a mismatched byte_bus_id; RCP_EP_MDIO_ERR_WRONG_OP for an op other than RCP_ACF_OP_WRITE; RCP_EP_MDIO_ERR_BAD_EVT when evt[2:0] is not 0b000 (the value REQ-ACF-023 resolves, after cross-checking TC18's own Figure 33 worked example, as the legal plain-request value for this Table 33 row -- see that entry for the full resolution of Table 33's own apparent internal inconsistency); RCP_EP_MDIO_ERR_BAD_ADDR when the decoded address fails rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT when the trailing words region's byte length is odd, is 0, or represents more than RCP_EP_MDIO_MAX_BURST_WORDS words; and otherwise RCP_EP_MDIO_OK with the address, packed word bytes, word count, and transaction number populated. NOTE (2026-08-10, c-RCP-AUDIT-06, issue #256 Group D): the payload layout this decodes is this module's own original design, not TC18's own wire layout -- see REQ-MDIO-016's own note and REQ-MDIO-021.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30, TC18.txt L3666-3710 (evt[2:0] legality, resolved at REQ-ACF-023); §13.7.13.3 Figure 42/Table 57, TC18.txt L5664-5681 (see REQ-MDIO-021)"
+      "tc18": "§13.5 Table 33, TC18.txt L3666-3710 (evt[2:0] legality, resolved at REQ-ACF-023); §13.7.13.3 Figure 42/Table 57, TC18.txt L5664-5681 (see REQ-MDIO-021)"
     },
     {
       "id": "REQ-MDIO-018",
@@ -7418,7 +7418,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§13.5 Table 30 (ADC/PWM_IN/I²C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L3684-3693"
+      "tc18": "§13.5 Table 33 (ADC/PWM_IN/I²C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L3684-3693"
     },
     {
       "id": "REQ-DISC-025",
@@ -7730,7 +7730,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "\u00a712.9.6 Table 27, TC18.txt L3414-3446"
+      "tc18": "\u00a712.9.6 Table 30, TC18.txt L3414-3446"
     },
     {
       "id": "REQ-WIREERR-002",
@@ -7949,7 +7949,7 @@
     {
       "id": "REQ-CMP-029",
       "title": "rcp_compound_decode_clear_non_safestate() rejects nonzero evt[2:0], hs, or cs",
-      "text": "rcp_compound_decode_clear_non_safestate() shall return RCP_COMPOUND_ERR_EVT_HS_CS_NONZERO when the decoded ACF byte_message_info header's evt[2:0], hs, or cs is nonzero, per TC18 Table 12's explicit prose (\"evt[2:0], hs, cs: All bits shall be written as 0, else the request shall be rejected with error code = UNSUPPORTED_CMD\"). Added 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): this ACF-header-level field was entirely unvalidated before this milestone -- Table 12 is the only one of the three cancel-family tables (11/12/13) to name a specific TC18 Table 27 wire error code for this violation, which a caller wiring this into a real response should reuse (RCP_ERROR_UNSUPPORTED_CMD, errors.h) rather than inventing its own mapping.",
+      "text": "rcp_compound_decode_clear_non_safestate() shall return RCP_COMPOUND_ERR_EVT_HS_CS_NONZERO when the decoded ACF byte_message_info header's evt[2:0], hs, or cs is nonzero, per TC18 Table 12's explicit prose (\"evt[2:0], hs, cs: All bits shall be written as 0, else the request shall be rejected with error code = UNSUPPORTED_CMD\"). Added 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): this ACF-header-level field was entirely unvalidated before this milestone -- Table 12 is the only one of the three cancel-family tables (11/12/13) to name a specific TC18 Table 30 wire error code for this violation, which a caller wiring this into a real response should reuse (RCP_ERROR_UNSUPPORTED_CMD, errors.h) rather than inventing its own mapping.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -8205,13 +8205,13 @@
     {
       "id": "REQ-MOCK-030",
       "title": "rcp_mock_server_dispatch() drops a request silently when byte_bus_id names no registered endpoint",
-      "text": "rcp_mock_server_dispatch(), when byte_bus_id names no registered endpoint (find_slot() returns NULL), shall leave out_response zeroed (no response sent) and return RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): this entry previously required a wire EP_NOT_FOUND error response for this case, a real conformance bug introduced by an earlier milestone (issue #163 Phase 1) that misapplied TC18 Table 27's EP_NOT_FOUND (8) code -- that code's own Table 27 description is scoped to \"if a Trigger request refers to a nonexisting EP\" (a Trigger request's own trigger_source_ep sub-field naming a nonexistent EP, a case this codebase does not implement at all, per ROADMAP.md milestone 120's own note), not to the addressed endpoint of the request itself. TC18 §12.9.1 explicitly and unambiguously requires the opposite of what this entry previously claimed: an unregistered byte_bus_id is dropped with no response. RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS's own internal dispatch-result semantics (distinguishing this case for chained-request cascade purposes in rcp_mock_server_dispatch_frame()) are unaffected -- only the wire response this function used to send has been removed.",
+      "text": "rcp_mock_server_dispatch(), when byte_bus_id names no registered endpoint (find_slot() returns NULL), shall leave out_response zeroed (no response sent) and return RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): this entry previously required a wire EP_NOT_FOUND error response for this case, a real conformance bug introduced by an earlier milestone (issue #163 Phase 1) that misapplied TC18 Table 30's EP_NOT_FOUND (8) code -- that code's own Table 30 description is scoped to \"if a Trigger request refers to a nonexisting EP\" (a Trigger request's own trigger_source_ep sub-field naming a nonexistent EP, a case this codebase does not implement at all, per ROADMAP.md milestone 120's own note), not to the addressed endpoint of the request itself. TC18 §12.9.1 explicitly and unambiguously requires the opposite of what this entry previously claimed: an unregistered byte_bus_id is dropped with no response. RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS's own internal dispatch-result semantics (distinguishing this case for chained-request cascade purposes in rcp_mock_server_dispatch_frame()) are unaffected -- only the wire response this function used to send has been removed.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.9.1 (\"If the lookup of the byte_bus_id in the context of the stream_id does not point to an Endpoint, the request is dropped without further notification.\"), TC18.txt L3195-3197 -- Table 27's EP_NOT_FOUND (8) row (TC18.txt L3425-3426), previously miscited here, describes a different, unimplemented scenario (a Trigger request's own trigger_source_ep naming a nonexistent EP)"
+      "tc18": "§12.9.1 (\"If the lookup of the byte_bus_id in the context of the stream_id does not point to an Endpoint, the request is dropped without further notification.\"), TC18.txt L3195-3197 -- Table 30's EP_NOT_FOUND (8) row (TC18.txt L3425-3426), previously miscited here, describes a different, unimplemented scenario (a Trigger request's own trigger_source_ep naming a nonexistent EP)"
     },
     {
       "id": "REQ-ACF-017",
@@ -8281,19 +8281,19 @@
     },
     {
       "id": "REQ-ACF-023",
-      "title": "rcp_acf_evt_row2_is_plain() implements Table 30's shared ADC/PWM_IN/I2C/LIN/CAN/UART/ISELED/MDIO rule",
-      "text": "rcp_acf_evt_row2_is_plain(evt) shall return true iff (evt & 0x7) == 0, per TC18 \u00a713.5 Table 30's rule for the {ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO} endpoint-type row: evt[2:0] = 000b is the only value a plain (non-configuration) request in this row may carry; every other value is either reserved (001b-110b, reject with UNSUPPORTED_CMD) or selects a configuration-write-shaped request instead (111b, \u00a712.7.1). RESOLVED AMBIGUITY (2026-08-10, c-RCP-AUDIT-06, issue #256 Group A): Table 30's own literal text groups evt[2:0]=000b together with 001b-110b as a single \"reserved -- reject\" range, which read in isolation would make evt=000b illegal too. That reading is directly contradicted by TC18's own \u00a713.7.9.3 Figure 33 (\"RC Client sends a standard read request\"), a labeled, bit-level worked example for the ADC endpoint (a member of this exact row) showing evt[2:0]=000b used in a request the spec's own next figure (34) shows succeeding normally, not being rejected. Table 30's prose and the spec's own concrete worked example directly conflict for the same endpoint type -- a genuine internal inconsistency in this Release Candidate draft. This implementation follows the worked example (evt=000b is the ordinary, successful case), since a reading that made every plain request illegal for eight endpoint types would leave those endpoints permanently unusable for normal operation, which the spec's own examples contradict. An earlier full-catalog audit pass (issue #256) flagged this function as non-conformant based on Table 30's prose alone, without cross-checking Figure 33; that finding is refuted by this evidence and no code change was made.",
+      "title": "rcp_acf_evt_row2_is_plain() implements Table 33's shared ADC/PWM_IN/I2C/LIN/CAN/UART/ISELED/MDIO rule",
+      "text": "rcp_acf_evt_row2_is_plain(evt) shall return true iff (evt & 0x7) == 0, per TC18 \u00a713.5 Table 33's rule for the {ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO} endpoint-type row: evt[2:0] = 000b is the only value a plain (non-configuration) request in this row may carry; every other value is either reserved (001b-110b, reject with UNSUPPORTED_CMD) or selects a configuration-write-shaped request instead (111b, \u00a712.7.1). RESOLVED AMBIGUITY (2026-08-10, c-RCP-AUDIT-06, issue #256 Group A): Table 33's own literal text groups evt[2:0]=000b together with 001b-110b as a single \"reserved -- reject\" range, which read in isolation would make evt=000b illegal too. That reading is directly contradicted by TC18's own \u00a713.7.9.3 Figure 33 (\"RC Client sends a standard read request\"), a labeled, bit-level worked example for the ADC endpoint (a member of this exact row) showing evt[2:0]=000b used in a request the spec's own next figure (34) shows succeeding normally, not being rejected. Table 33's prose and the spec's own concrete worked example directly conflict for the same endpoint type -- a genuine internal inconsistency in this Release Candidate draft. This implementation follows the worked example (evt=000b is the ordinary, successful case), since a reading that made every plain request illegal for eight endpoint types would leave those endpoints permanently unusable for normal operation, which the spec's own examples contradict. An earlier full-catalog audit pass (issue #256) flagged this function as non-conformant based on Table 33's prose alone, without cross-checking Figure 33; that finding is refuted by this evidence and no code change was made.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 30, TC18.txt L3666-3710 (the reserved-range wording); \u00a713.7.9.3 Figure 33/34 (\"RC Client sends a standard read request\" / ADC response with 8 measurements), the corroborating worked example resolving the ambiguity in Table 30's own favor for evt=000b"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L3666-3710 (the reserved-range wording); \u00a713.7.9.3 Figure 33/34 (\"RC Client sends a standard read request\" / ADC response with 8 measurements), the corroborating worked example resolving the ambiguity in Table 33's own favor for evt=000b"
     },
     {
       "id": "REQ-ACF-024",
       "title": "rcp_acf_compound_wait_evt_valid() rejects exactly the reserved 011b value",
-      "text": "rcp_acf_compound_wait_evt_valid(evt) shall return true iff (evt & 0x7) != 0x3, per TC18 \u00a713.5.1: a compound-wait request's evt[2:0] selects one of eight comparison modes, of which 011b is reserved -- a request carrying it shall be ignored and an err-response with error code UNSUPPORTED_CMD sent. This rule is endpoint-type-independent, unlike Table 30's per-row rule (rcp_acf_evt_row2_is_plain()).",
+      "text": "rcp_acf_compound_wait_evt_valid(evt) shall return true iff (evt & 0x7) != 0x3, per TC18 \u00a713.5.1: a compound-wait request's evt[2:0] selects one of eight comparison modes, of which 011b is reserved -- a request carrying it shall be ignored and an err-response with error code UNSUPPORTED_CMD sent. This rule is endpoint-type-independent, unlike Table 33's per-row rule (rcp_acf_evt_row2_is_plain()).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -8412,7 +8412,7 @@
     {
       "id": "REQ-DISC-029",
       "title": "A discovery request while the discovery stream is already claimed is answered with a stream-occupied error",
-      "text": "PARTIAL: rcp_discovery_claim_note_request() (discovery.h/discovery.c) now returns bool -- true when the discovery claim was open and granted, false when refused because it was already held by an unlapsed claimant (TC18 \u00a712.3, Figure 16's own two \"Discovery request received\" transitions, applied uniformly regardless of requester identity: a different client or the current claimant re-requesting are both refused). A caller now has a real signal to act on instead of an unreportable silent decline. STILL OPEN: DISCOVERY_STREAM_OCCUPIED is a Figure-16-diagram-only label with no corresponding numbered code in TC18 \u00a712.9.6 Table 27 (rcp_wire_error_t stops at RCP_ERROR_CHAIN_ERROR, 17) -- unlike LOCKED_CONFIG_ACCESS (which cleanly maps onto RCP_ERROR_LOCKED_MEM_ACCESS, the only numbered code with a semantically matching name), no numbered code here has an obviously corresponding meaning, so this codebase does not invent one; which wire error code (if any) a caller should send for the false case remains a genuine, unresolved ambiguity (same class as REQ-ACF-012's RCP_ACF_MTV_UNCERTAIN).",
+      "text": "PARTIAL: rcp_discovery_claim_note_request() (discovery.h/discovery.c) now returns bool -- true when the discovery claim was open and granted, false when refused because it was already held by an unlapsed claimant (TC18 \u00a712.3, Figure 16's own two \"Discovery request received\" transitions, applied uniformly regardless of requester identity: a different client or the current claimant re-requesting are both refused). A caller now has a real signal to act on instead of an unreportable silent decline. STILL OPEN: DISCOVERY_STREAM_OCCUPIED is a Figure-16-diagram-only label with no corresponding numbered code in TC18 \u00a712.9.6 Table 30 (rcp_wire_error_t stops at RCP_ERROR_CHAIN_ERROR, 17) -- unlike LOCKED_CONFIG_ACCESS (which cleanly maps onto RCP_ERROR_LOCKED_MEM_ACCESS, the only numbered code with a semantically matching name), no numbered code here has an obviously corresponding meaning, so this codebase does not invent one; which wire error code (if any) a caller should send for the false case remains a genuine, unresolved ambiguity (same class as REQ-ACF-012's RCP_ACF_MTV_UNCERTAIN).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
@@ -8445,7 +8445,7 @@
     {
       "id": "REQ-E2E-030",
       "title": "request-storage-overflow safe-state escalation (rx_ovrflw_safestate_enable)",
-      "text": "PARTIAL: c-RCP now reports rx_ovrflw_safestate_enable's (TC18 \u00a712.7.7 Table 22, relative address 0x000D bit 5, 1 bit, R/W*) triggering condition conformantly at the single-endpoint scope it owns -- rcp_server_endpoint_admit() sets *out_error = RCP_ERROR_REQUEST_STORAGE_OVERFLOW on a request-store-full admission outcome (src/server.c), which mock.c's finish_admission() (and any caller following the same pattern) turns into a real Table 27 error response via rcp_acf_build_error_response(). rcp_e2e_overflow_should_enter_safe_state() (include/rcp/e2e.h, src/e2e.c) is the pure rx_ovrflw_safestate_enable decision such escalation would be gated on. What remains not implemented: the stream-wide half of the rule -- bringing every OTHER endpoint bound to the same request stream into its configured safe state -- which rcp_server_endpoint_t's single-endpoint scope has no way to perform from inside admit() itself; TC18 \u00a713.6's per-stream rcp_server_endpoint_t model has no type representing \"all endpoints on a stream\" for this or any other module to reach across into. That escalation needs a caller-owned, cross-endpoint orchestrator that does not yet exist in this codebase.",
+      "text": "PARTIAL: c-RCP now reports rx_ovrflw_safestate_enable's (TC18 \u00a712.7.7 Table 22, relative address 0x000D bit 5, 1 bit, R/W*) triggering condition conformantly at the single-endpoint scope it owns -- rcp_server_endpoint_admit() sets *out_error = RCP_ERROR_REQUEST_STORAGE_OVERFLOW on a request-store-full admission outcome (src/server.c), which mock.c's finish_admission() (and any caller following the same pattern) turns into a real Table 30 error response via rcp_acf_build_error_response(). rcp_e2e_overflow_should_enter_safe_state() (include/rcp/e2e.h, src/e2e.c) is the pure rx_ovrflw_safestate_enable decision such escalation would be gated on. What remains not implemented: the stream-wide half of the rule -- bringing every OTHER endpoint bound to the same request stream into its configured safe state -- which rcp_server_endpoint_t's single-endpoint scope has no way to perform from inside admit() itself; TC18 \u00a713.6's per-stream rcp_server_endpoint_t model has no type representing \"all endpoints on a stream\" for this or any other module to reach across into. That escalation needs a caller-owned, cross-endpoint orchestrator that does not yet exist in this codebase.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
@@ -8774,13 +8774,13 @@
     {
       "id": "REQ-PWM-059",
       "title": "PWM_IN read-request decode validates evt[2:0]",
-      "text": "IMPLEMENTED (FIXED 2026-08-11, c-RCP-AUDIT-06, issue #256 Group I): rcp_ep_pwm_in_decode_read_request() shall reject a frame whose evt[2:0] is not one of the plain-request values rcp_acf_evt_row2_is_plain() accepts, returning RCP_EP_PWM_IN_ERR_BAD_EVT -- matching the check every other endpoint type in this Table 30 grouping (ADC/I2C/LIN/CAN/UART/ISELED/MDIO) already performs. Before this fix, this endpoint type never checked evt[2:0] at all: a real evt=111b configuration-write request from a conforming peer would have been silently misinterpreted as an ordinary read request rather than being rejected or routed to rcp_ep_pwm_in_apply_reconfig() -- a live conformance bug, distinct from (and worse than) every prior Group I register-block finding, which found only an unreachable path, never a misinterpreted one.",
+      "text": "IMPLEMENTED (FIXED 2026-08-11, c-RCP-AUDIT-06, issue #256 Group I): rcp_ep_pwm_in_decode_read_request() shall reject a frame whose evt[2:0] is not one of the plain-request values rcp_acf_evt_row2_is_plain() accepts, returning RCP_EP_PWM_IN_ERR_BAD_EVT -- matching the check every other endpoint type in this Table 33 grouping (ADC/I2C/LIN/CAN/UART/ISELED/MDIO) already performs. Before this fix, this endpoint type never checked evt[2:0] at all: a real evt=111b configuration-write request from a conforming peer would have been silently misinterpreted as an ordinary read request rather than being rejected or routed to rcp_ep_pwm_in_apply_reconfig() -- a live conformance bug, distinct from (and worse than) every prior Group I register-block finding, which found only an unreachable path, never a misinterpreted one.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 30, TC18.txt L2530-2560; \u00a713.7.6.2 Table 45, TC18.txt L4700-4750"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L2530-2560; \u00a713.7.6.2 Table 45, TC18.txt L4700-4750"
     },
     {
       "id": "REQ-PWRMODE-014",
@@ -9623,7 +9623,7 @@
     {
       "id": "REQ-SPI-035",
       "title": "SPI functional-config register block (Table 39/42) is fully modeled",
-      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): rcp_ep_spi_channel_cfg_t now carries every Table 39 per-channel field this module previously omitted -- baud_rate_kbps (spi_baud_rateN, kbit/s), use_common_cs (spi_use_csN), cs_clk_leadtime/clk_cs_trailtime (spi_cs_clk_leadtimeN/spi_clk_cs_trailtimeN, in spi_clk cycles, distinct from this module's own pre-existing nanosecond-denominated inter_byte_delay_ns/inter_transfer_delay_ns), and bits_max (spi_bits_maxN); rcp_ep_spi_functional_cfg_t gained ep_status (spi_ep_status). CPOL/CPHA continue to round-trip losslessly through the pre-existing mode byte via rcp_ep_spi_mode_cpol()/_cpha() and a new inverse. rcp_ep_spi_render_registers()/_apply_reconfig() (evt[2:0] == 111b, Table 30's SPI row + \u00a712.7.1) now serialize/parse the whole block -- spi_ep_len and spi_nr_cs are rendered from RCP_EP_SPI_EP_FUNC_LEN/RCP_EP_SPI_MAX_CHANNELS and are read-only, matching PWM_OUT's/GPIO's own EP_LEN convention. UPDATED 2026-08-11 (spec rebaseline to TC18 0.5.1_RC5): spi_nr_cs (renumbered Table 39 -> Table 42) was narrowed from a plain 8-bit count to a 4-bit \"(count - 1)\" field (bits [3:0], upper nibble reserved) by spec revision RC4 -- rcp_ep_spi_render_registers() now renders (RCP_EP_SPI_MAX_CHANNELS - 1) & 0x0F (0x05) instead of the plain count (0x06). See REQ-SPI-040 for the new spi_deassert_cs_pauseN bit RC5 adds to the same block.",
+      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): rcp_ep_spi_channel_cfg_t now carries every Table 39 per-channel field this module previously omitted -- baud_rate_kbps (spi_baud_rateN, kbit/s), use_common_cs (spi_use_csN), cs_clk_leadtime/clk_cs_trailtime (spi_cs_clk_leadtimeN/spi_clk_cs_trailtimeN, in spi_clk cycles, distinct from this module's own pre-existing nanosecond-denominated inter_byte_delay_ns/inter_transfer_delay_ns), and bits_max (spi_bits_maxN); rcp_ep_spi_functional_cfg_t gained ep_status (spi_ep_status). CPOL/CPHA continue to round-trip losslessly through the pre-existing mode byte via rcp_ep_spi_mode_cpol()/_cpha() and a new inverse. rcp_ep_spi_render_registers()/_apply_reconfig() (evt[2:0] == 111b, Table 33's SPI row + \u00a712.7.1) now serialize/parse the whole block -- spi_ep_len and spi_nr_cs are rendered from RCP_EP_SPI_EP_FUNC_LEN/RCP_EP_SPI_MAX_CHANNELS and are read-only, matching PWM_OUT's/GPIO's own EP_LEN convention. UPDATED 2026-08-11 (spec rebaseline to TC18 0.5.1_RC5): spi_nr_cs (renumbered Table 39 -> Table 42) was narrowed from a plain 8-bit count to a 4-bit \"(count - 1)\" field (bits [3:0], upper nibble reserved) by spec revision RC4 -- rcp_ep_spi_render_registers() now renders (RCP_EP_SPI_MAX_CHANNELS - 1) & 0x0F (0x05) instead of the plain count (0x06). See REQ-SPI-040 for the new spi_deassert_cs_pauseN bit RC5 adds to the same block.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
@@ -9656,13 +9656,13 @@
     {
       "id": "REQ-SPI-038",
       "title": "rcp_ep_spi_render_registers()/_encode_reconfig_request() implement the generic \u00a712.7.1 configuration request for SPI",
-      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): TC18 \u00a712.7.1 Figure 18 defines one generic configuration request -- evt[2:0] = 111b, byte_msg_payload = a relative register start address within the addressed endpoint's EP_func section followed by configuration data -- usable against every endpoint type. SPI's own Table 30 row confirms 111b carries this exact meaning (distinct from evt[2:0] 000b-101b, which select one of SPI's six pre-configured channels, and 110b, which is reserved/UNSUPPORTED_CMD). rcp_ep_spi_render_registers() serializes cfg's whole Table 39 block (the 6-octet common prefix plus six 8-octet per-channel blocks); rcp_ep_spi_encode_reconfig_request() encodes an ACF_ABB write request (op=WRITE, evt=111b) carrying a 16-bit big-endian start address followed by data, matching PWM_OUT's/GPIO's own encode_reconfig_request() shape.",
+      "text": "FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): TC18 \u00a712.7.1 Figure 18 defines one generic configuration request -- evt[2:0] = 111b, byte_msg_payload = a relative register start address within the addressed endpoint's EP_func section followed by configuration data -- usable against every endpoint type. SPI's own Table 33 row confirms 111b carries this exact meaning (distinct from evt[2:0] 000b-101b, which select one of SPI's six pre-configured channels, and 110b, which is reserved/UNSUPPORTED_CMD). rcp_ep_spi_render_registers() serializes cfg's whole Table 39 block (the 6-octet common prefix plus six 8-octet per-channel blocks); rcp_ep_spi_encode_reconfig_request() encodes an ACF_ABB write request (op=WRITE, evt=111b) carrying a 16-bit big-endian start address followed by data, matching PWM_OUT's/GPIO's own encode_reconfig_request() shape.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.1 Configuration of endpoints + Figure 18, TC18.txt L2463-2484; \u00a713.5 Table 30 (SPI row), TC18.txt L3677-3684"
+      "tc18": "\u00a712.7.1 Configuration of endpoints + Figure 18, TC18.txt L2463-2484; \u00a713.5 Table 33 (SPI row), TC18.txt L3677-3684"
     },
     {
       "id": "REQ-SPI-039",
@@ -9999,7 +9999,7 @@
     {
       "id": "REQ-E2E-041",
       "title": "A CRC mismatch on a protected stream generates an error response as well as skipping execution",
-      "text": "When a request arrives on an E2E-protected stream and its CRC32 does not match, the RC Server shall not execute the request AND shall generate an error response carrying the CRC-mismatch wire error code (RCP_ERROR_POCI_FAILURE, 12 \u2014 the code TC18 \u00a712.9.6 Table 27 assigns a CRC mismatch, spelled CRC_ERROR in \u00a713.6's prose) (TC18 \u00a713.6). IMPLEMENTED: rcp_e2e_unwrap() already reported RCP_E2E_ERR_CRC_MISMATCH and rcp_e2e_wire_error() already mapped it; rcp_mock_server_dispatch_e2e() is now the caller and error-response emitter that were missing -- on a mismatch it never calls rcp_server_endpoint_admit() at all (not admitted, not merely not-executed) and builds a genuine TC18 \u00a712.9.6 Error Response (err=1, rsp=1, payload=RCP_ERROR_POCI_FAILURE, byte_bus_id/transaction_num carried through from the request) via rcp_acf_build_error_response().",
+      "text": "When a request arrives on an E2E-protected stream and its CRC32 does not match, the RC Server shall not execute the request AND shall generate an error response carrying the CRC-mismatch wire error code (RCP_ERROR_POCI_FAILURE, 12 \u2014 the code TC18 \u00a712.9.6 Table 30 assigns a CRC mismatch, spelled CRC_ERROR in \u00a713.6's prose) (TC18 \u00a713.6). IMPLEMENTED: rcp_e2e_unwrap() already reported RCP_E2E_ERR_CRC_MISMATCH and rcp_e2e_wire_error() already mapped it; rcp_mock_server_dispatch_e2e() is now the caller and error-response emitter that were missing -- on a mismatch it never calls rcp_server_endpoint_admit() at all (not admitted, not merely not-executed) and builds a genuine TC18 \u00a712.9.6 Error Response (err=1, rsp=1, payload=RCP_ERROR_POCI_FAILURE, byte_bus_id/transaction_num carried through from the request) via rcp_acf_build_error_response().",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
@@ -10204,7 +10204,7 @@
     {
       "id": "REQ-CANEP-031",
       "title": "The FrameFormat selector's numeric code assignment (CBFF 0 through XL new-PL 5, with 6 and 7 reserved), carried in the payload's leading quadlet",
-      "text": "rcp_ep_can_frame_format_t shall assign exactly the FrameFormat codes TC18 \u00a713.7.11.3 Table 54 fixes: RCP_EP_CAN_FRAME_CBFF = 0, RCP_EP_CAN_FRAME_CEFF = 1, RCP_EP_CAN_FRAME_FBFF = 2, RCP_EP_CAN_FRAME_FEFF = 3, RCP_EP_CAN_FRAME_XL_CLASSICAL_PL = 4 (XL over the classical physical layer), and RCP_EP_CAN_FRAME_XL_NEW_PL = 5 (XL over the new physical layer); codes 6 and 7 are reserved and rcp_ep_can_frame_format_valid() shall reject them, causing rcp_ep_can_decode_frame_request()/_decode_frame_response()/_decode_reassembled_frame_response() to return RCP_EP_CAN_ERR_BAD_FRAME_FORMAT. The selector shall be carried in the top 3 bits of the payload's leading quadlet (TC18 \u00a713.7.11.3 Figure 39), sharing that quadlet with a 29-bit arbitration_id. CORRECTED (v0.109.0): this requirement previously (and incorrectly) asserted the selector was carried in the ACF byte_message_info evt field's low three bits -- verified against Figure 39 directly, that claim was never true of TC18 and was itself the bug (evt[2:0] instead carries CAN's ordinary TC18 \u00a713.5 Table 30 Row-2 meaning: 000b plain, 111b configuration-write, else UNSUPPORTED_CMD). Found and fixed while investigating this repo's Table 30 centralization.",
+      "text": "rcp_ep_can_frame_format_t shall assign exactly the FrameFormat codes TC18 \u00a713.7.11.3 Table 54 fixes: RCP_EP_CAN_FRAME_CBFF = 0, RCP_EP_CAN_FRAME_CEFF = 1, RCP_EP_CAN_FRAME_FBFF = 2, RCP_EP_CAN_FRAME_FEFF = 3, RCP_EP_CAN_FRAME_XL_CLASSICAL_PL = 4 (XL over the classical physical layer), and RCP_EP_CAN_FRAME_XL_NEW_PL = 5 (XL over the new physical layer); codes 6 and 7 are reserved and rcp_ep_can_frame_format_valid() shall reject them, causing rcp_ep_can_decode_frame_request()/_decode_frame_response()/_decode_reassembled_frame_response() to return RCP_EP_CAN_ERR_BAD_FRAME_FORMAT. The selector shall be carried in the top 3 bits of the payload's leading quadlet (TC18 \u00a713.7.11.3 Figure 39), sharing that quadlet with a 29-bit arbitration_id. CORRECTED (v0.109.0): this requirement previously (and incorrectly) asserted the selector was carried in the ACF byte_message_info evt field's low three bits -- verified against Figure 39 directly, that claim was never true of TC18 and was itself the bug (evt[2:0] instead carries CAN's ordinary TC18 \u00a713.5 Table 33 Row-2 meaning: 000b plain, 111b configuration-write, else UNSUPPORTED_CMD). Found and fixed while investigating this repo's Table 33 centralization.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -10325,7 +10325,7 @@
     {
       "id": "REQ-LINEP-025",
       "title": "rcp_ep_lin_response_matches() delegates to acf.h's shared TC18 \u00a713.5.1 exact-match primitive",
-      "text": "rcp_ep_lin_response_matches(tx_data, tx_len, rx_data, rx_len) shall return rcp_acf_compound_wait_match(0, tx_data, tx_len, rx_data, rx_len) -- the exact-match mode (evt[2:0] = 000b) of acf.h's shared TC18 \u00a713.5.1 comparison primitive, including its length-capping rule. This is the only comparison a plain LIN command request's evt[2:0] can select, since Table 30 constrains it to 000b (REQ-LINEP-027).",
+      "text": "rcp_ep_lin_response_matches(tx_data, tx_len, rx_data, rx_len) shall return rcp_acf_compound_wait_match(0, tx_data, tx_len, rx_data, rx_len) -- the exact-match mode (evt[2:0] = 000b) of acf.h's shared TC18 \u00a713.5.1 comparison primitive, including its length-capping rule. This is the only comparison a plain LIN command request's evt[2:0] can select, since Table 33 constrains it to 000b (REQ-LINEP-027).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -10342,18 +10342,18 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 30, TC18.txt L3666-3710"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L3666-3710"
     },
     {
       "id": "REQ-LINEP-027",
       "title": "rcp_ep_lin_decode_command_request() rejects evt[2:0] != 000b with RCP_EP_LIN_ERR_BAD_EVT",
-      "text": "rcp_ep_lin_decode_command_request() shall return RCP_EP_LIN_ERR_BAD_EVT when rcp_acf_evt_row2_is_plain(hdr.evt) is false, per TC18 \u00a713.5 Table 30's rule for the {ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO} endpoint-type row: evt[2:0] = 000b is the only value a plain (non-configuration) LIN command request may carry. LIN is not called out as an exception anywhere in Table 30, and TC18 \u00a713.7.10.1's own reference to \"the conditions given by evt[2:0]\" describes the same universal \u00a713.5.1 vocabulary Table 30 constrains to 000b here, not a LIN-private multi-mode scheme.",
+      "text": "rcp_ep_lin_decode_command_request() shall return RCP_EP_LIN_ERR_BAD_EVT when rcp_acf_evt_row2_is_plain(hdr.evt) is false, per TC18 \u00a713.5 Table 33's rule for the {ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO} endpoint-type row: evt[2:0] = 000b is the only value a plain (non-configuration) LIN command request may carry. LIN is not called out as an exception anywhere in Table 33, and TC18 \u00a713.7.10.1's own reference to \"the conditions given by evt[2:0]\" describes the same universal \u00a713.5.1 vocabulary Table 33 constrains to 000b here, not a LIN-private multi-mode scheme.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 30, TC18.txt L3666-3710; \u00a713.7.10.1, TC18.txt L5278-5280"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L3666-3710; \u00a713.7.10.1, TC18.txt L5278-5280"
     },
     {
       "id": "REQ-MDIO-020",

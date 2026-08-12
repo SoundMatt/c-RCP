@@ -384,7 +384,7 @@ bool rcp_discovery_claim_is_open(const rcp_discovery_claim_t *claim, uint64_t no
  * configuration write does, via rcp_discovery_claim_note_config_write()).
  *
  * DISCOVERY_STREAM_OCCUPIED is a Figure-16-diagram-only label: TC18
- * §12.9.6 Table 27's own 17 numbered wire error codes (rcp_wire_error_t,
+ * §12.9.6 Table 30's own 17 numbered wire error codes (rcp_wire_error_t,
  * errors.h) do not include it, and unlike LOCKED_CONFIG_ACCESS (which
  * cleanly maps onto RCP_ERROR_LOCKED_MEM_ACCESS, the only numbered code
  * with a semantically matching name), no numbered code here has an

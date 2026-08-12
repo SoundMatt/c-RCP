@@ -15205,6 +15205,48 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.274.0 -- 2026-08-12 (c-RCP-AUDIT-07 doc-only batch: `Table
+30`/`Table 27` citation drift corrected, issue #339)
+
+**Documentation-only correction, no functional code change.**
+
+Confirmed by direct comparison of the RC1 extraction (`TC18.txt`)
+against a fresh RC5 `pdftotext -layout` extraction: RC5 uniformly
+renumbers tables from RC1's Table 24 onward by +3 -- the same shift
+already correctly applied to the seven §13.7 endpoint-table
+renumberings during the earlier "TC18 spec rebaseline to 0.5.1_RC5"
+pass (task #96). Two tables cited pervasively in code-comment prose,
+rather than scoped to a single endpoint's own functional-config
+table, were missed by that pass:
+
+- RC1 Table 30 "EP specific usage of evt-field" (§13.5) -> RC5 Table
+  33. 52 occurrences across `acf.h` and every `ep_*.h`/`ep_*.c` file
+  whose evt[2:0] handling references it.
+- RC1 Table 27 "Error codes in responses" (§12.9.6) -> RC5 Table 30.
+  14 occurrences across `discovery.h`, `regmap.h`, `acf.h`, `mock.h`,
+  `server.h`, `server.c`, `mock.c`.
+
+**Ordering hazard resolved correctly**: `Table 27`'s new number (30)
+is exactly `Table 30`'s old number, so a blind find-replace in either
+direction would have corrupted the result. Did the 52 `Table 30`->
+`Table 33` replacements first (verified none referred to anything but
+the evt-field table via full-context grep before touching any file),
+then the 14 `Table 27`->`Table 30` replacements. `.fusa-reqs.json`
+got the same two-phase correction (93 `Table 33` + 9 `Table 30` after,
+both counts independently verified against the pre-fix totals).
+
+**Scope note**: a broader table-number census across the whole
+codebase (`Table 18`, `22`, `19`, `23`, `24`, `25`, `26`, `28`, `31`,
+`32`, ...) turned up hundreds more citations, some already RC5-correct
+(from earlier per-endpoint sweeps), some still RC1-stale -- a mixed,
+inconsistent state needing per-citation context verification, not a
+blind remap (which would double-correct the already-fixed ones).
+Deliberately not attempted in this batch; tracked as a much larger
+follow-up investigation.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 errors.
+`cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.273.0 -- 2026-08-12 (issue #337 batch: `REQ-ACF-018`/
 `REQ-ACF-021` -- read_size/segment_num classifier + request
 fixed-value enforcement)

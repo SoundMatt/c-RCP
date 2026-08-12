@@ -409,7 +409,7 @@ static void apply_cancellation(rcp_mock_endpoint_slot_t *slot, uint8_t request_t
  *
  * error is rcp_server_endpoint_admit()'s *out_error: RCP_ERROR_NONE for
  * every outcome except the rejection paths that determined a specific
- * TC18 Table 27 code (see that function's own doc comment for which
+ * TC18 Table 30 code (see that function's own doc comment for which
  * paths currently do). When non-RCP_ERROR_NONE, out_response is
  * populated with a real TC18 sec 12.9.6 error response
  * (rcp_acf_build_error_response()) instead of being left zeroed --
@@ -494,8 +494,8 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
          * out_response stays zeroed, per this function's own entry
          * memset() above (REQ-MOCK-030, corrected 2026-08-10,
          * c-RCP-AUDIT-06 issue #256: this branch previously sent a
-         * Table 27 EP_NOT_FOUND response for exactly this case, but
-         * Table 27's own EP_NOT_FOUND row is scoped to a different,
+         * Table 30 EP_NOT_FOUND response for exactly this case, but
+         * Table 30's own EP_NOT_FOUND row is scoped to a different,
          * unimplemented scenario -- "if a Trigger request refers to a
          * nonexisting EP", a Trigger request's own trigger_source_ep
          * sub-field naming a nonexistent EP, not the addressed
@@ -550,7 +550,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
      * the block is a whole-STREAM property (this tracker is keyed by
      * stream_id, not byte_bus_id), so it applies uniformly regardless
      * of whether the addressed endpoint itself has req_crc_enable set.
-     * *out_response carries a real Table 27 POCI_FAILURE error response
+     * *out_response carries a real Table 30 POCI_FAILURE error response
      * (the same code CRC_ERROR itself uses -- the block's own root
      * cause is a CRC failure) when the frame is at least long enough to
      * read a transaction_num back out of. */

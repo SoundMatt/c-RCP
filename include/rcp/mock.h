@@ -405,7 +405,7 @@ typedef enum {
      * addressed endpoint has req_crc_enable set (see
      * rcp_mock_server_set_endpoint_req_crc_enable()) and request's
      * trailing CRC32 (e2e.h) did not validate -- TC18 §13.6: the request
-     * is NOT executed. *out_response carries a real Table 27
+     * is NOT executed. *out_response carries a real Table 30
      * POCI_FAILURE error response when the frame was at least long
      * enough to read a transaction_num back out of (RCP_ERROR_NONE
      * otherwise -- nothing conformant to build a response from). */
@@ -419,7 +419,7 @@ typedef enum {
      * stand-in set). Checked, and can fire, BEFORE any CRC validation
      * of THIS request even happens -- distinct from RCP_MOCK_DISPATCH_
      * CRC_ERROR above, which means THIS request's own CRC failed.
-     * *out_response carries the same real Table 27 POCI_FAILURE error
+     * *out_response carries the same real Table 30 POCI_FAILURE error
      * response CRC_ERROR itself uses (the block's own root cause is a
      * CRC failure), under the same "frame long enough to read a
      * transaction_num back out of" condition. */
@@ -516,7 +516,7 @@ size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subty
  *   - RCP_E2E_ERR_CRC_MISMATCH: the request is NOT executed and NOT
  *     admitted at all (rcp_server_endpoint_admit() is never called) --
  *     RCP_MOCK_DISPATCH_CRC_ERROR is returned, and *out_response carries
- *     a real Table 27 POCI_FAILURE (e2e.h's own spelling of CRC_ERROR;
+ *     a real Table 30 POCI_FAILURE (e2e.h's own spelling of CRC_ERROR;
  *     see errors.h's file header) error response, built the same way
  *     finish_admission() already builds one from a determined
  *     rcp_wire_error_t: byte_bus_id is this call's own parameter,

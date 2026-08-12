@@ -322,7 +322,7 @@ typedef enum {
  * response to carry the request's own byte_bus_id and transaction_num --
  * most of this function's rejection paths reject *before* those fields
  * (or the request's own opcode-specific fields needed to pick the
- * precise Table 27 code) are known, so *out_error is RCP_ERROR_NONE for
+ * precise Table 30 code) are known, so *out_error is RCP_ERROR_NONE for
  * those (nothing conformant can be built; the caller has nothing to
  * respond to). Only the one rejection path with everything already
  * decoded -- a compound-wait request whose evt[2:0] is the reserved
@@ -335,7 +335,7 @@ typedef enum {
  * rejection paths' error-response wiring is tracked separately
  * (github.com/SoundMatt/c-RCP/issues/163) -- do not assume
  * RCP_ERROR_NONE means "no error occurred", only "this function did not
- * determine a specific Table 27 code for it". */
+ * determine a specific Table 30 code for it". */
 rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
                                               const uint8_t *frame, size_t frame_len,
                                               uint32_t now, uint8_t *out_request_type,

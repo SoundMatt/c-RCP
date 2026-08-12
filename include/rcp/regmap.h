@@ -2478,10 +2478,10 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
  *   - Once authorized, *out_error is RCP_ERROR_NONE on success,
  *     RCP_ERROR_INVALID_PARAMETER if the write's own address+length
  *     extends past that table's own current extent (the closest of
- *     TC18 Table 27's 17 numbered codes to "address range not entirely
+ *     TC18 Table 30's 17 numbered codes to "address range not entirely
  *     addressable" -- no code with a more specific name exists).
  *   - Any other address: *out_error is RCP_ERROR_EP_NOT_FOUND (the
- *     closest available Table 27 code to "nothing lives at this
+ *     closest available Table 30 code to "nothing lives at this
  *     address" -- genuinely imprecise for a non-endpoint address, but no
  *     better numbered code exists; flagged here rather than silently
  *     assumed correct).

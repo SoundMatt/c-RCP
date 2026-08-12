@@ -193,7 +193,7 @@
  * ── The EP_func register block (evt[2:0] == 111b) ──────────────────────────
  *
  * FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-CFG-011/012):
- * TC18 §13.5 Table 30's own SPI row is a *third*, distinct evt[2:0] grouping
+ * TC18 §13.5 Table 33's own SPI row is a *third*, distinct evt[2:0] grouping
  * -- neither the "ADC/PWM_IN/I2C/LIN/CAN/UART/ISELED/MDIO" group (evt[2:0]
  * 000b-110b all reserved, 111b = config-write) nor the "GPIO/PWM_OUT" group
  * (evt[2:0] carries write semantics). SPI's own row: evt[2:0] 000b-101b
