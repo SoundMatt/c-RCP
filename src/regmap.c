@@ -1029,6 +1029,81 @@ void rcp_regmap_ep_generic_cfg_render(const rcp_regmap_ep_generic_cfg_t *entries
     }
 }
 
+//cfusa:req REQ-RMAP-079
+const char *
+rcp_regmap_ep_generic_cfg_reconfig_strerror(rcp_regmap_ep_generic_cfg_reconfig_errc_t e)
+{
+    switch (e) {
+    case RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK:
+        return "rcp/regmap: ep_generic_cfg write applied";
+    case RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_ERR_SHORT:
+        return "rcp/regmap: ep_generic_cfg write has no data";
+    case RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_ERR_OUT_OF_RANGE:
+        return "rcp/regmap: ep_generic_cfg write extends past the table's own current extent";
+    default:
+        return "rcp/regmap: ep_generic_cfg unknown configuration-write error";
+    }
+}
+
+//cfusa:req REQ-RMAP-079
+rcp_regmap_ep_generic_cfg_reconfig_errc_t
+rcp_regmap_ep_generic_cfg_apply_reconfig(rcp_regmap_ep_generic_cfg_t *entries, size_t count,
+                                          uint16_t relative_start_address,
+                                          const uint8_t *data, size_t data_len)
+{
+    size_t touched_start, touched_end;
+    size_t row_start_idx, row_end_idx;
+    size_t row_i;
+
+    if (data_len == 0u) return RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_ERR_SHORT;
+
+    touched_start = relative_start_address;
+    touched_end   = touched_start + data_len;
+    if (touched_end > count * 12u) return RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_ERR_OUT_OF_RANGE;
+
+    row_start_idx = touched_start / 12u;
+    row_end_idx   = (touched_end - 1u) / 12u; /* inclusive */
+
+    /* PER-FIELD, not whole-row/whole-buffer -- see this function's own doc
+     * comment (regmap.h) for why the whole-buffer render/patch/reparse
+     * idiom every sibling apply_reconfig() uses is unsafe here. Each field
+     * below is updated ONLY if [row_base+offset, row_base+offset+width) is
+     * entirely within [touched_start, touched_end); ep_type (offset 0) is
+     * never updated at all, matching TC18 §13.7.1.2's own "no effect"
+     * rule for read-only registers. */
+    for (row_i = row_start_idx; row_i <= row_end_idx; row_i++) {
+        size_t row_base = row_i * 12u;
+
+        if (touched_start <= row_base + 1u && row_base + 1u + 1u <= touched_end) {
+            uint8_t octet1 = data[(row_base + 1u) - touched_start];
+
+            entries[row_i].ep_used       = (octet1 & 0x01u) != 0u;
+            entries[row_i].ep_delay_time =
+                rcp_regmap_ep_delay_time_reg_to_us((uint8_t)((octet1 >> 4) & 0x3u));
+        }
+
+        if (touched_start <= row_base + 2u && row_base + 2u + 2u <= touched_end) {
+            uint16_t words = get_u16(&data[(row_base + 2u) - touched_start]);
+
+            entries[row_i].ep_req_storage_size = rcp_regmap_ep_req_storage_size_words_to_octets(words);
+        }
+
+        if (touched_start <= row_base + 4u && row_base + 4u + 4u <= touched_end) {
+            entries[row_i].ep_description = get_u32(&data[(row_base + 4u) - touched_start]);
+        }
+
+        if (touched_start <= row_base + 8u && row_base + 8u + 2u <= touched_end) {
+            entries[row_i].ep_tx_buffer_size = get_u16(&data[(row_base + 8u) - touched_start]);
+        }
+
+        if (touched_start <= row_base + 10u && row_base + 10u + 2u <= touched_end) {
+            entries[row_i].ep_rx_buffer_size = get_u16(&data[(row_base + 10u) - touched_start]);
+        }
+    }
+
+    return RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK;
+}
+
 //cfusa:req REQ-RMAP-017
 void rcp_regmap_ep_functional_cfg_init(rcp_regmap_ep_functional_cfg_t *cfg)
 {
