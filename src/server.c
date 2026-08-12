@@ -41,10 +41,14 @@ void rcp_server_endpoint_destroy(rcp_server_endpoint_t *ep)
 
 //cfusa:req REQ-SRV-001
 //cfusa:req REQ-SRV-002
+//cfusa:req REQ-SRV-016
 bool rcp_server_endpoint_submit(rcp_server_endpoint_t *ep,
-                                const uint8_t *frame, size_t frame_len)
+                                const uint8_t *frame, size_t frame_len,
+                                rcp_bytes_t *out_ack)
 {
     rcp_bytes_t *grown;
+
+    if (out_ack) *out_ack = (rcp_bytes_t){0};
 
     if (ep->ep_enable) return true; /* caller must execute this now */
 
@@ -59,6 +63,21 @@ bool rcp_server_endpoint_submit(rcp_server_endpoint_t *ep,
 
     ep->queue[ep->queue_len] = rcp_bytes_dup(frame, frame_len);
     ep->queue_len++;
+
+    /* REQ-SRV-016 (TC18 §12.3.1.3): "Nevertheless if requested an
+     * acknowledge us sent after storing the request." evt[3] is the
+     * universal (endpoint-type-independent) acknowledge-request bit --
+     * see rcp_acf_evt_requests_acknowledge()'s own doc comment (acf.h).
+     * Fail-safe if frame is too short to even hold a header: no ack is
+     * fabricated for a request this module cannot actually decode. */
+    if (out_ack && frame_len >= 8) {
+        rcp_acf_byte_message_info_t hdr;
+
+        if (rcp_acf_unpack_header(frame, &hdr) == RCP_ACF_OK &&
+            rcp_acf_evt_requests_acknowledge(hdr.evt)) {
+            *out_ack = rcp_acf_build_acknowledge_response(hdr.byte_bus_id, hdr.transaction_num);
+        }
+    }
     return false;
 }
 
@@ -156,8 +175,12 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
     /* Not a repurposed-timestamp ACF_GBB at all: a standard request, and
      * the original submit path handles it unchanged. */
     if (rcp_compound_peek_request_type(frame, frame_len, &request_type) != RCP_COMPOUND_OK) {
-        return rcp_server_endpoint_submit(ep, frame, frame_len) ? RCP_SERVER_ADMIT_EXECUTE_NOW
-                                                                 : RCP_SERVER_ADMIT_QUEUED;
+        /* NULL: admit()'s own signature does not yet propagate a queuing
+         * acknowledge to its caller -- a separate, not-yet-attempted
+         * integration step (REQ-SRV-016's own primitive is complete and
+         * directly reachable via rcp_server_endpoint_submit() itself). */
+        return rcp_server_endpoint_submit(ep, frame, frame_len, NULL) ? RCP_SERVER_ADMIT_EXECUTE_NOW
+                                                                       : RCP_SERVER_ADMIT_QUEUED;
     }
 
     kind = rcp_sched_classify(true, request_type);
@@ -165,8 +188,12 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
         /* A repurposed region carrying an opcode byte this build does not
          * recognize: treated as standard, never over-privileged (see
          * rcp_sched_classify()'s own fail-safe rule). */
-        return rcp_server_endpoint_submit(ep, frame, frame_len) ? RCP_SERVER_ADMIT_EXECUTE_NOW
-                                                                 : RCP_SERVER_ADMIT_QUEUED;
+        /* NULL: admit()'s own signature does not yet propagate a queuing
+         * acknowledge to its caller -- a separate, not-yet-attempted
+         * integration step (REQ-SRV-016's own primitive is complete and
+         * directly reachable via rcp_server_endpoint_submit() itself). */
+        return rcp_server_endpoint_submit(ep, frame, frame_len, NULL) ? RCP_SERVER_ADMIT_EXECUTE_NOW
+                                                                       : RCP_SERVER_ADMIT_QUEUED;
     }
 
     *out_request_type = request_type;

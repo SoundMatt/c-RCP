@@ -487,6 +487,34 @@ rcp_bytes_t rcp_acf_build_error_response(rcp_byte_bus_id_t byte_bus_id,
                                           uint8_t transaction_num,
                                           rcp_wire_error_t error_code);
 
+/* FIXED 2026-08-12 (issue #201, REQ-SRV-016): TC18 §13.5's own opening
+ * statement, before its per-endpoint-type evt[2:0] table: "evt[3] is used
+ * to request an acknowledge. I.e. evt[3]=1 requests acknowledge." This is
+ * universal across every endpoint type (unlike evt[2:0], which Table 30
+ * gives a different meaning per row) -- a caller anywhere in the request-
+ * admission path can check it without knowing which endpoint type it is
+ * looking at. Returns (evt & 0x08u) != 0. */
+bool rcp_acf_evt_requests_acknowledge(uint8_t evt);
+
+/* FIXED 2026-08-12 (issue #201, REQ-SRV-016): builds a genuine
+ * Acknowledge response -- rcp_acf_classify_response()'s own
+ * RCP_ACF_RESP_ACKNOWLEDGE, evt = RCP_ACF_EVT_ACKNOWLEDGE (0x0F) -- for a
+ * request already known to carry byte_bus_id and transaction_num, and
+ * whose own evt[3] asked for one (rcp_acf_evt_requests_acknowledge()).
+ * hdr fields not explicitly listed here: err = 0 (the request was
+ * accepted, just not executed yet -- see TC18 §12.3.1.3's "if requested
+ * an acknowledge is sent after storing the request", the specific case
+ * this function exists for), rsp = 1, op = RCP_ACF_OP_NONE (op does not
+ * affect classification once evt[3:0] == 0x0F -- see
+ * rcp_acf_classify_response()'s own doc comment, which checks evt before
+ * op). Encoded as ACF_ABB (no timestamp), mirroring
+ * rcp_acf_build_error_response()'s own ABB/GBB-split convention. Returns
+ * a zeroed rcp_bytes_t (data=NULL) only on allocation failure -- there is
+ * no payload, always within RCP_ACF_ABB_MAX_PAYLOAD. Caller frees the
+ * result with rcp_bytes_free(). */
+rcp_bytes_t rcp_acf_build_acknowledge_response(rcp_byte_bus_id_t byte_bus_id,
+                                                uint8_t transaction_num);
+
 rcp_bytes_t rcp_acf_encode_abb(const rcp_acf_byte_message_info_t *hdr,
                                 const uint8_t *payload, size_t payload_len);
 

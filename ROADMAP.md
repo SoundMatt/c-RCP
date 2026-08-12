@@ -15205,6 +15205,51 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.268.0 -- 2026-08-12 (issue #201 batch: `REQ-SRV-016`, a
+disabled endpoint's request queuing now emits the requested
+acknowledge)
+
+**New `rcp_acf_evt_requests_acknowledge()`/
+`rcp_acf_build_acknowledge_response()` plus a new `out_ack`
+parameter on `rcp_server_endpoint_submit()` -- status flips to
+`implemented`.**
+
+TC18 §12.3.1.3: "Nevertheless if requested an acknowledge us sent
+after storing the request." `evt[3]` is TC18 §13.5's own universal,
+endpoint-type-independent acknowledge-request bit -- verified
+directly against TC18.txt, distinct from the per-endpoint-type
+`evt[2:0]` meaning. `rcp_server_endpoint_submit()` now populates its
+new `out_ack` output parameter with a genuine Acknowledge response
+whenever a request is queued and its own `evt[3]` requested one,
+left zeroed otherwise.
+
+**Real signature change to a function with real callers**: updated
+every call site across `src/server.c` (`admit()`'s own two internal
+calls, passed `NULL` -- see scope note below), plus 11 test call
+sites.
+
+**Deliberately scoped to `submit()` itself, not `admit()`**:
+`admit()`'s own signature is unchanged and its two internal
+`submit()` calls pass `NULL` for `out_ack` -- the mechanism is
+complete and directly testable, but not yet propagated up through
+`admit()` to `mock.c`'s real dispatch. A separate, not-yet-attempted
+integration step, matching this codebase's established disposition
+for primitives whose dispatch-side wiring is distinct (e.g.
+`REQ-GPIO-033`, `REQ-ADC-031`). Does **not** resolve `REQ-SRV-015`'s
+own separate, still-open gap (config-vs-operational classification
+at a disabled endpoint) -- `evt[3]` is universal, but that
+classification needs per-endpoint-type knowledge this codebase
+doesn't have.
+
+Split the pre-existing combined `REQ-SRV-015`/`REQ-SRV-016`
+gap-pinning test into two. Mutation-tested 3 ways: bypassing the
+acknowledge-request check, bypassing ack production entirely, and
+always populating the ack regardless of queuing/`evt[3]` -- all 3
+caught cleanly.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.267.0 -- 2026-08-12 (issue #201 batch: `REQ-SPI-036`, the SPI
 transfer-length rule -- zero-fill/full-PICO -- now implemented)
 

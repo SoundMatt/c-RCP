@@ -9691,12 +9691,12 @@
     {
       "id": "REQ-SRV-016",
       "title": "Queuing a request on a disabled endpoint still emits the requested acknowledge",
-      "text": "NOT IMPLEMENTED: c-RCP does not emit an acknowledge when a request is stored for a disabled endpoint (TC18 \u00a712.3.1.3). rcp_server_endpoint_submit() copies the frame into the pre-load queue and returns false with no acknowledge, so a client that asked for an acknowledge receives nothing until the endpoint is enabled and the request eventually executes. The client cannot distinguish a stored request from a dropped one.",
+      "text": "IMPLEMENTED (2026-08-12, issue #201 Phase 5e): TC18 \u00a712.3.1.3: \"Nevertheless if requested an acknowledge us sent after storing the request.\" evt[3] is TC18 \u00a713.5's own universal (endpoint-type-independent) acknowledge-request bit -- new rcp_acf_evt_requests_acknowledge() (acf.h) checks it, and new rcp_acf_build_acknowledge_response() builds a genuine Acknowledge (evt = RCP_ACF_EVT_ACKNOWLEDGE). rcp_server_endpoint_submit() gained a new out_ack parameter: when the request is queued (ep->ep_enable is false) and its own evt[3] requested an acknowledge, *out_ack is set to that Acknowledge response, addressed to the request's own byte_bus_id/transaction_num; left zeroed otherwise. Deliberately scoped to submit() itself, not admit(): admit()'s own two internal submit() call sites currently pass NULL for out_ack, so the mechanism is complete and directly testable but not yet propagated to admit()'s own callers (mock.c's real dispatch) -- a separate, not-yet-attempted integration step, matching this codebase's established disposition for primitives whose dispatch-side wiring is a distinct concern (e.g. REQ-GPIO-033, REQ-ADC-031). Does not resolve REQ-SRV-015's own separate, still-open gap (distinguishing a configuration request from an operational one, which needs an endpoint-type-generic classifier this codebase does not have -- evt[3] is universal, but evt[2:0]'s per-endpoint meaning is not).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "implemented",
       "tc18": "\u00a712.3.1.3, TC18.txt L2220-L2221"
     },
     {

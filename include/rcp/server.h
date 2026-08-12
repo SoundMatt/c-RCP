@@ -206,9 +206,30 @@ void rcp_server_endpoint_destroy(rcp_server_endpoint_t *ep);
  * meaning the request has been queued rather than executed. Returns false
  * (still meaning "queued") without actually growing the queue if the
  * internal reallocation fails -- callers relying on eventual delivery under
- * allocation failure must check rcp_server_endpoint_queue_len() themselves. */
+ * allocation failure must check rcp_server_endpoint_queue_len() themselves.
+ *
+ * FIXED 2026-08-12 (issue #201, REQ-SRV-016): TC18 §12.3.1.3 -- "as long
+ * as EPs are not enabled they will only execute config requests.
+ * Operational requests will be stored in the EP's queue... Nevertheless
+ * if requested an acknowledge us sent after storing the request." out_ack
+ * may be NULL if the caller doesn't want this. When the request is
+ * queued (ep->ep_enable is false) and its own evt[3] requested an
+ * acknowledge (rcp_acf_evt_requests_acknowledge(), acf.h), *out_ack is
+ * set to a genuine Acknowledge response (rcp_acf_build_acknowledge_
+ * response()) addressed to the request's own byte_bus_id/transaction_num
+ * -- caller frees it with rcp_bytes_free(). Left zeroed (data=NULL)
+ * otherwise (ep->ep_enable is true, evt[3] wasn't set, or frame is
+ * shorter than the fixed ACF header and its evt[3] cannot be read at
+ * all -- fail-safe: no ack is fabricated for a header this module cannot
+ * actually decode). This function does not distinguish a configuration
+ * request from an operational one (REQ-SRV-015's own separate, still-
+ * open gap: a disabled endpoint's config requests should execute
+ * immediately rather than queue at all) -- every request reaching this
+ * function while ep->ep_enable is false is queued exactly as before;
+ * this fix only adds the acknowledge TC18 requires for that queuing. */
 bool rcp_server_endpoint_submit(rcp_server_endpoint_t *ep,
-                                const uint8_t *frame, size_t frame_len);
+                                const uint8_t *frame, size_t frame_len,
+                                rcp_bytes_t *out_ack);
 
 /* Sets ep->ep_enable. Toggling it does not itself execute or discard
  * anything queued; call rcp_server_endpoint_drain_one() afterward to pull
