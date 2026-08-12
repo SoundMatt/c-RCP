@@ -8227,12 +8227,12 @@
     {
       "id": "REQ-ACF-018",
       "title": "read_size/segment_num interpretation is selected by the op bit",
-      "text": "The 12-bit read_size_or_segment_num field of byte_message_info shall be interpreted as read_size when the op bit is 0 (RCP_ACF_OP_READ, a request expecting a data response) and as segment_num otherwise, per TC18 \u00a711.2.1 Table 4 and \u00a711.2.2.1 Table 6. c-RCP shall expose that selection to callers rather than leaving the field an uninterpreted round-tripped slot.",
+      "text": "IMPLEMENTED (issue #337): the 12-bit read_size_or_segment_num field of byte_message_info shall be interpreted as read_size when the op bit is 0 (RCP_ACF_OP_READ, a request expecting a data response) and as segment_num otherwise, per TC18 \u00a711.2.1 Table 4 and \u00a711.2.2.1 Table 6. rcp_acf_read_size_or_segment_num_kind() (acf.h/acf.c) is the shared, directly-testable classifier -- op == RCP_ACF_OP_READ selects RCP_ACF_RSS_READ_SIZE, every other op value (RCP_ACF_OP_WRITE and the encode-only RCP_ACF_OP_NONE, both write-sense on the wire) selects RCP_ACF_RSS_SEGMENT_NUM -- exposing the selection to callers instead of leaving the field an uninterpreted round-tripped slot every caller would otherwise have to reimplement the op check to use correctly.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "partial",
+      "status": "implemented",
       "tc18": "\u00a711.2.1, TC18.txt L1169 (Table 4); \u00a711.2.2.1, TC18.txt L1280 (Table 6)"
     },
     {
@@ -8260,12 +8260,12 @@
     {
       "id": "REQ-ACF-021",
       "title": "A request carries rsv=00b, hs=0b, cs=0b, rsp=0b and err=0b unless its own kind assigns the bit a meaning",
-      "text": "An encoded RCP request shall carry rsv = 00b, hs = 0b, err = 0b, and rsp = 0b (rsp = 0b is what identifies an ACF_ABB or ACF_GBB message as a request rather than a response), and cs = 0b except where the request kind assigns cs its own meaning (compound-wait per TC18 \u00a711.2.2.2 Table 7, chained per \u00a711.2.2.4 Table 9); a received message whose rsp bit is set shall not be admitted as a request. c-RCP currently forces only rsv to zero and round-trips hs, cs, rsp and err without constraint.",
+      "text": "IMPLEMENTED (issue #337): an encoded RCP request shall carry rsv = 00b, hs = 0b, err = 0b, and rsp = 0b (rsp = 0b is what identifies an ACF_ABB or ACF_GBB message as a request rather than a response), and cs = 0b except where the request kind assigns cs its own meaning (compound-wait per TC18 \u00a711.2.2.2 Table 7, chained per \u00a711.2.2.4 Table 9); a received message whose rsp bit is set shall not be admitted as a request. rsv remains the one field rcp_acf_pack_header() forces to zero unconditionally on every encode (shared by request AND response encoding). The other four fields cannot be forced unconditionally by the same shared encode path -- rcp_acf_build_error_response()/_build_acknowledge_response() deliberately set rsp=1/err=1 on purpose -- so two new primitives close the gap at the two points that actually know which shape they're building: rcp_acf_request_header_constraints_valid(hdr, cs_has_meaning) (acf.h/acf.c) is the pure validator a caller building a request can check before encoding (hs/rsp/err must be 0 unconditionally; cs must be 0 unless cs_has_meaning is true); rcp_acf_header_is_request(hdr) is the decode-side rsp==0 check. rcp_server_endpoint_admit() (server.c) now calls the latter on every arriving frame before any further classification and refuses admission (RCP_SERVER_ADMIT_REJECTED, RCP_ERROR_INVALID_PARAMETER) when rsp is set -- TC18's own admission rule is now enforced, not just documented. Mutation-tested: inverting the admission check's sense causes test_acf_request_flags_round_trip_but_admission_now_rejects_rsp and 4 further pre-existing tests to fail.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "partial",
+      "status": "implemented",
       "tc18": "\u00a711.2.1, TC18.txt L1156-1167 (Table 4); \u00a711.2.2.3, TC18.txt L1468-1474 (Table 8)"
     },
     {

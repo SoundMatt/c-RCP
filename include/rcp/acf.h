@@ -306,6 +306,62 @@ typedef struct {
  * with op left at its zero value and no evt set either. */
 rcp_acf_response_kind_t rcp_acf_classify_response(const rcp_acf_byte_message_info_t *hdr);
 
+/* ── REQ-ACF-018: read_size_or_segment_num's dual interpretation ──────────── */
+
+/* Which interpretation the 12-bit read_size_or_segment_num field (Table 4
+ * octet 6:7) carries -- a function of op alone, per TC18 §11.2.1 Table 4 /
+ * §11.2.2.1 Table 6: the read sense (RCP_ACF_OP_READ, wire op=0, "expects
+ * a data response") means the field is read_size; every other op value
+ * means it is segment_num instead. Previously left for every caller to
+ * reimplement this same op check itself (or, worse, to read the field
+ * without checking op at all) -- this is the single, shared, directly-
+ * testable classification. */
+typedef enum {
+    RCP_ACF_RSS_READ_SIZE   = 0,
+    RCP_ACF_RSS_SEGMENT_NUM = 1,
+} rcp_acf_rss_kind_t;
+
+/* hdr->read_size_or_segment_num is read_size iff hdr->op ==
+ * RCP_ACF_OP_READ; otherwise it is segment_num (RCP_ACF_OP_WRITE and the
+ * encode-only RCP_ACF_OP_NONE both select the write sense on the wire --
+ * see rcp_acf_op_t's own doc comment -- so both classify as segment_num
+ * here, matching what a real decoded peer would see). */
+rcp_acf_rss_kind_t rcp_acf_read_size_or_segment_num_kind(const rcp_acf_byte_message_info_t *hdr);
+
+/* ── REQ-ACF-021: fixed-value fields on an encoded request ─────────────────── */
+
+/* True iff hdr's hs/rsp/err fields are the fixed value TC18 requires on an
+ * encoded REQUEST (rsv is already always forced to 0 by
+ * rcp_acf_pack_header() itself; see the file header): hs=0b, rsp=0b,
+ * err=0b unconditionally, and cs=0b UNLESS cs_has_meaning is true --
+ * compound-wait (TC18 §11.2.2.2 Table 7) and chained (§11.2.2.4 Table 9)
+ * are the only two request kinds that assign cs a meaning of its own, so a
+ * caller building one of those two kinds passes true; every other request
+ * kind passes false.
+ *
+ * This is a pure, directly-testable validator, not an encode-time
+ * enforcement rcp_acf_encode_abb()/_gbb() perform themselves -- those two
+ * functions are shared by request AND response encoding (e.g.
+ * rcp_acf_build_error_response() deliberately sets rsp=1/err=1), so they
+ * cannot force these fields to their request-only fixed values
+ * unconditionally. A caller building a request -- the conditional-request
+ * modules (request_compound.c/_triggered.c/_chained.c/_timed.c/_cancel.c)
+ * and every endpoint's own request encoder -- is the one place that knows
+ * it is building a request rather than a response, and can assert this
+ * before encoding. */
+bool rcp_acf_request_header_constraints_valid(const rcp_acf_byte_message_info_t *hdr,
+                                               bool cs_has_meaning);
+
+/* True iff hdr's rsp bit is 0 -- TC18's own rsp field description (Table 4)
+ * states rsp=1b identifies a response; a decoded message with rsp=1 set
+ * must not be admitted as a request. A caller decoding an inbound frame it
+ * intends to treat as a request (as opposed to a response it sent itself
+ * and is now receiving back, e.g. over a loopback or multicast-style
+ * transport) should call this before admission and refuse the frame if it
+ * returns false, rather than silently processing what TC18 itself labels
+ * a response as though it were a request. */
+bool rcp_acf_header_is_request(const rcp_acf_byte_message_info_t *hdr);
+
 /* TC18 §13.5 Table 30's shared rule for the {ADC, PWM_IN, I2C, LIN, CAN,
  * UART, ISELED, MDIO} endpoint-type row: evt[2:0] = 000b is the only
  * value a plain (non-configuration) request in this row may carry --

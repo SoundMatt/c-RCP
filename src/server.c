@@ -149,20 +149,22 @@ static rcp_server_pending_t *claim_slot(rcp_server_endpoint_t *ep)
 //cfusa:req REQ-SRV-019
 //cfusa:req REQ-SRV-022
 //cfusa:req REQ-PWRMODE-028
+//cfusa:req REQ-ACF-021
 rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
                                               const uint8_t *frame, size_t frame_len,
                                               uint32_t now, uint8_t *out_request_type,
                                               size_t *out_index, rcp_wire_error_t *out_error)
 {
-    uint8_t               request_type = 0;
-    rcp_sched_kind_t      kind;
-    rcp_server_pending_t *slot;
-    const uint8_t        *payload;
-    size_t                payload_len;
-    uint8_t               decoded_rt;
-    uint8_t               decoded_evt;
-    rcp_byte_bus_id_t     bus;
-    uint8_t               tn;
+    uint8_t                     request_type = 0;
+    rcp_sched_kind_t            kind;
+    rcp_server_pending_t       *slot;
+    const uint8_t              *payload;
+    size_t                      payload_len;
+    uint8_t                     decoded_rt;
+    uint8_t                     decoded_evt;
+    rcp_byte_bus_id_t           bus;
+    uint8_t                     tn;
+    rcp_acf_byte_message_info_t peek_hdr;
 
     *out_request_type = 0;
     if (out_error) *out_error = RCP_ERROR_NONE;
@@ -171,6 +173,19 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
      * inspected at all -- a request arriving during a sleep-request drain
      * never reaches submit()/the request store, whatever kind it is. */
     if (ep->admission_suspended) return RCP_SERVER_ADMIT_SUSPENDED;
+
+    /* REQ-ACF-021: TC18's own rsp field description (Table 4) states
+     * rsp=1b identifies a response -- a frame carrying one must never be
+     * admitted as a request, whatever its kind. A frame too short to hold
+     * even byte_message_info is left to the ordinary short-frame rejection
+     * every decode path below already performs; this check only fires
+     * once a header can actually be unpacked, mirroring
+     * rcp_server_endpoint_submit()'s own REQ-SRV-016 header peek. */
+    if (frame_len >= 8 && rcp_acf_unpack_header(frame, &peek_hdr) == RCP_ACF_OK &&
+        !rcp_acf_header_is_request(&peek_hdr)) {
+        if (out_error) *out_error = RCP_ERROR_INVALID_PARAMETER;
+        return RCP_SERVER_ADMIT_REJECTED;
+    }
 
     /* Not a repurposed-timestamp ACF_GBB at all: a standard request, and
      * the original submit path handles it unchanged. */
