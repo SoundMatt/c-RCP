@@ -230,7 +230,7 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
          * This function reports only the per-request half: unlike most of
          * this function's other rejection paths, request_type is already
          * known here (set just above), so this one *can* set a real TC18
-         * Table 27 code -- see rcp_e2e_overflow_should_enter_safe_state()
+         * Table 30 code -- see rcp_e2e_overflow_should_enter_safe_state()
          * for the caller-driven stream-wide escalation this half does
          * not, and cannot from inside a single rcp_server_endpoint_t,
          * perform itself (see that function's own doc comment). */

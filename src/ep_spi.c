@@ -397,7 +397,7 @@ rcp_bytes_t rcp_ep_spi_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
                                                 into" the EP_func block --
                                                 matches PWM_OUT's/GPIO's own
                                                 encode_reconfig_request(). */
-    hdr.evt             = 0x7u; /* evt[2:0] = 111b, TC18 Table 30 SPI row */
+    hdr.evt             = 0x7u; /* evt[2:0] = 111b, TC18 Table 33 SPI row */
     hdr.transaction_num = transaction_num;
 
     frame = rcp_acf_encode_abb(&hdr, payload, payload_len);

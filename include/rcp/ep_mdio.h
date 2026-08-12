@@ -474,7 +474,7 @@ typedef enum {
     RCP_EP_MDIO_ERR_BAD_ADDR        = 5,
     RCP_EP_MDIO_ERR_BAD_WORD_COUNT  = 6,
     RCP_EP_MDIO_ERR_ALLOC           = 7,
-    /* evt[2:0] is not 0b000, TC18 §13.5 Table 30's only legal value for a
+    /* evt[2:0] is not 0b000, TC18 §13.5 Table 33's only legal value for a
      * plain (non-configuration) request in MDIO's endpoint-type row --
      * caller shall respond with error code UNSUPPORTED_CMD (see
      * rcp_acf_evt_row2_is_plain()). */
@@ -506,7 +506,7 @@ rcp_bytes_t rcp_ep_mdio_encode_read_request(rcp_byte_bus_id_t byte_bus_id,
  * rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT if the decoded
  * word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS;
  * RCP_EP_MDIO_ERR_BAD_EVT if its evt[2:0] is not 0b000
- * (rcp_acf_evt_row2_is_plain(), TC18 §13.5 Table 30 -- the caller shall
+ * (rcp_acf_evt_row2_is_plain(), TC18 §13.5 Table 33 -- the caller shall
  * respond with error code UNSUPPORTED_CMD). On
  * RCP_EP_MDIO_OK, *out_addr, *out_word_count, and *out_transaction_num
  * are populated. */
@@ -575,7 +575,7 @@ rcp_bytes_t rcp_ep_mdio_encode_write_request(rcp_byte_bus_id_t byte_bus_id,
  * region's own byte length is odd, is 0, or represents more than
  * RCP_EP_MDIO_MAX_BURST_WORDS words; RCP_EP_MDIO_ERR_BAD_EVT if its
  * evt[2:0] is not 0b000 (rcp_acf_evt_row2_is_plain(), TC18 §13.5
- * Table 30 -- the caller shall respond with error code UNSUPPORTED_CMD).
+ * Table 33 -- the caller shall respond with error code UNSUPPORTED_CMD).
  * On RCP_EP_MDIO_OK, *out_addr and
  * *out_transaction_num are populated, and *out_words_data /
  * *out_word_count are set to a *borrowed* view into b (not copied) of the

@@ -172,7 +172,7 @@
  * FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-I2C-021):
  * rcp_ep_i2c_decode_transfer_request() already correctly rejects evt !=
  * 0b000 (RCP_EP_I2C_ERR_BAD_EVT, via acf.h's rcp_acf_evt_row2_is_plain())
- * -- that includes evt[2:0] = 111b, TC18 §12.7.1/Table 30's generic
+ * -- that includes evt[2:0] = 111b, TC18 §12.7.1/Table 33's generic
  * configuration-write value, exactly as it should (a config-write request
  * is not a plain transfer). What was missing, matching SPI's own
  * before-this-fix gap, was any counterpart function actually implementing
@@ -415,7 +415,7 @@ typedef enum {
      * this module: both op senses are valid on an I2C transfer (see the
      * file header), so there is no longer a "wrong" one to reject. */
     RCP_EP_I2C_ERR_WRONG_OP     = 4,
-    /* evt[2:0] is not 0b000, TC18 §13.5 Table 30's only legal value for a
+    /* evt[2:0] is not 0b000, TC18 §13.5 Table 33's only legal value for a
      * plain (non-configuration) request in I2C's endpoint-type row --
      * caller shall respond with error code UNSUPPORTED_CMD (see
      * rcp_acf_evt_row2_is_plain()). */
@@ -459,7 +459,7 @@ rcp_bytes_t rcp_ep_i2c_encode_transfer_request(rcp_byte_bus_id_t byte_bus_id,
  * fixed header or its declared payload length; RCP_EP_I2C_ERR_BAD_MSG_TYPE
  * if b is not an ACF_ABB message; RCP_EP_I2C_ERR_WRONG_BUS if its
  * byte_bus_id != expected_bus_id; RCP_EP_I2C_ERR_BAD_EVT if its evt[2:0]
- * is not 0b000 (rcp_acf_evt_row2_is_plain(), TC18 §13.5 Table 30 -- the
+ * is not 0b000 (rcp_acf_evt_row2_is_plain(), TC18 §13.5 Table 33 -- the
  * caller shall respond with error code UNSUPPORTED_CMD). Both op senses
  * are accepted -- see the file header -- and reported via *out_direction.
  *

@@ -504,7 +504,7 @@ typedef enum {
     RCP_EP_UART_ERR_WRONG_OP     = 4,
     RCP_EP_UART_ERR_UNKNOWN_CMD  = 5, /* payload-bearing read request -- see
                                           the file header */
-    /* evt[2:0] is not 0b000, TC18 §13.5 Table 30's only legal value for a
+    /* evt[2:0] is not 0b000, TC18 §13.5 Table 33's only legal value for a
      * plain (non-configuration) request in UART's endpoint-type row --
      * caller shall respond with error code UNSUPPORTED_CMD (see
      * rcp_acf_evt_row2_is_plain()). */
@@ -532,7 +532,7 @@ rcp_bytes_t rcp_ep_uart_encode_write_request(rcp_byte_bus_id_t byte_bus_id,
  * if b is not an ACF_ABB message; RCP_EP_UART_ERR_WRONG_BUS if its
  * byte_bus_id != expected_bus_id; RCP_EP_UART_ERR_WRONG_OP if its op is not
  * RCP_ACF_OP_WRITE; RCP_EP_UART_ERR_BAD_EVT if its evt[2:0] is not 0b000
- * (rcp_acf_evt_row2_is_plain(), TC18 §13.5 Table 30 -- the caller shall
+ * (rcp_acf_evt_row2_is_plain(), TC18 §13.5 Table 33 -- the caller shall
  * respond with error code UNSUPPORTED_CMD). On RCP_EP_UART_OK,
  * *out_transaction_num is populated,
  * and *out_tx_data / *out_tx_len are set to a *borrowed* view into b (not
@@ -604,7 +604,7 @@ rcp_bytes_t rcp_ep_uart_encode_read_request(rcp_byte_bus_id_t byte_bus_id, uint1
  * RCP_EP_UART_ERR_UNKNOWN_CMD if it carries any payload at all -- the
  * deliberate asymmetry documented in the file header; RCP_EP_UART_ERR_BAD_EVT
  * if its evt[2:0] is not 0b000 (rcp_acf_evt_row2_is_plain(), TC18 §13.5
- * Table 30 -- the caller shall respond with error code UNSUPPORTED_CMD).
+ * Table 33 -- the caller shall respond with error code UNSUPPORTED_CMD).
  * On RCP_EP_UART_OK,
  * *out_read_size and *out_transaction_num are populated.
  *

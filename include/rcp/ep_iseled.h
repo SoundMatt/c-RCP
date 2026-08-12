@@ -532,7 +532,7 @@ typedef enum {
     RCP_EP_ISELED_ERR_CRC_MISMATCH    = 6,
     RCP_EP_ISELED_ERR_ODD_SYMBOL_COUNT = 7,
     RCP_EP_ISELED_ERR_ALLOC           = 8,
-    /* evt[2:0] is not 0b000, TC18 §13.5 Table 30's only legal value for a
+    /* evt[2:0] is not 0b000, TC18 §13.5 Table 33's only legal value for a
      * plain (non-configuration) request in ISELED's endpoint-type row --
      * caller shall respond with error code UNSUPPORTED_CMD (see
      * rcp_acf_evt_row2_is_plain()). */
@@ -580,7 +580,7 @@ rcp_bytes_t rcp_ep_iseled_encode_command_request(rcp_byte_bus_id_t byte_bus_id,
  * RCP_EP_ISELED_ERR_WRONG_BUS if its byte_bus_id != expected_bus_id;
  * RCP_EP_ISELED_ERR_WRONG_OP if its op is not RCP_ACF_OP_WRITE;
  * RCP_EP_ISELED_ERR_BAD_EVT if its evt[2:0] is not 0b000
- * (rcp_acf_evt_row2_is_plain(), TC18 §13.5 Table 30 -- the caller shall
+ * (rcp_acf_evt_row2_is_plain(), TC18 §13.5 Table 33 -- the caller shall
  * respond with error code UNSUPPORTED_CMD). On
  * RCP_EP_ISELED_OK, *out_transaction_num is populated, and *out_tx_data /
  * *out_tx_len are set to a *borrowed* view into b (not copied) of the raw

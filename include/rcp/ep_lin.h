@@ -120,28 +120,28 @@
  * raw payloads are borrowed rather than copied: a variable-length payload
  * has no natural fixed-size out-parameter to copy into.
  *
- * ── evt[2:0]: LIN sits in Table 30's plain-request row, like every other
+ * ── evt[2:0]: LIN sits in Table 33's plain-request row, like every other
  *    non-SPI/GPIO/PWM_OUT endpoint ─────────────────────────────────────────
  *
  * v0.112.0 REMOVED this module's own invented eight-value
  * rcp_ep_lin_compare_mode_t: an earlier milestone's own file header
  * admitted it was "this module's own original design... rather than on
  * any spec-derived enumeration -- there being no such enumeration cited
- * by the roadmap to derive one from." There is one: TC18 §13.5 Table 30
+ * by the roadmap to derive one from." There is one: TC18 §13.5 Table 33
  * places LIN in the same {ADC, PWM_IN, I2C, LIN, CAN, UART, ISELED, MDIO}
  * row as every endpoint type acf.h's rcp_acf_evt_row2_is_plain() already
  * governs -- evt[2:0] = 000b is the only value a plain (non-configuration)
  * LIN command request may carry; every other value is either reserved
  * (rejected with UNSUPPORTED_CMD) or the config-write shape (111b,
  * §12.7.1, out of this module's scope). LIN is not called out as an
- * exception anywhere in Table 30 (pixel-verified against the rendered
+ * exception anywhere in Table 33 (pixel-verified against the rendered
  * specification page, same pass that found CAN's Figure 39 defect).
  *
  * §13.7.10.1's own prose -- "the LIN endpoint checks each received message
  * against the byte_msg_payload and if a match under the conditions given
  * by evt[2:0] is found a reply is sent" -- describes the SAME universal
- * evt[2:0] vocabulary Table 30/§13.5.1 define everywhere else, not a
- * LIN-private one: since Table 30 constrains a plain LIN request's
+ * evt[2:0] vocabulary Table 33/§13.5.1 define everywhere else, not a
+ * LIN-private one: since Table 33 constrains a plain LIN request's
  * evt[2:0] to 000b, the only "condition" that can ever apply to an
  * ordinary (non-compound-wait) LIN command request is §13.5.1 mode 000b,
  * exact match -- which is exactly what a LIN commander's own physical
@@ -240,12 +240,12 @@
 extern "C" {
 #endif
 
-/* ── evt[2:0]: exact-match, per Table 30's plain-request row ─────────────── */
+/* ── evt[2:0]: exact-match, per Table 33's plain-request row ─────────────── */
 
 /* True iff a received-bus-data buffer rx_data[0..rx_len) matches the
  * outgoing command request's own tx_data[0..tx_len) under TC18 §13.5.1
  * mode 000b (exact match, length-capped) -- the only comparison a plain
- * LIN command request's evt[2:0] can ever select (Table 30 constrains it
+ * LIN command request's evt[2:0] can ever select (Table 33 constrains it
  * to 000b). A thin, named wrapper over acf.h's
  * rcp_acf_compound_wait_match(0, ...); see the file header. tx_data/
  * rx_data may be NULL iff their respective length is 0. */
@@ -409,7 +409,7 @@ typedef enum {
     RCP_EP_LIN_ERR_BAD_MSG_TYPE = 2,
     RCP_EP_LIN_ERR_WRONG_BUS    = 3,
     RCP_EP_LIN_ERR_WRONG_OP     = 4,
-    /* evt[2:0] != 000b on a decoded command request -- Table 30 reserves
+    /* evt[2:0] != 000b on a decoded command request -- Table 33 reserves
      * every value but 000b (plain) and 111b (config-write, out of this
      * module's scope) for this endpoint-type row; see the file header. */
     RCP_EP_LIN_ERR_BAD_EVT      = 5,
@@ -425,7 +425,7 @@ const char *rcp_ep_lin_strerror(rcp_ep_lin_errc_t e);
  * bus for this transaction -- every LIN-frame semantic (identifier/PID,
  * checksum, schedule position) already constructed into these bytes by the
  * caller, and never parsed or validated by this module (see the file
- * header). evt is always encoded 0 -- Table 30 constrains a plain LIN
+ * header). evt is always encoded 0 -- Table 33 constrains a plain LIN
  * command request's evt[2:0] to 000b (see the file header); there is no
  * client-selectable comparison mode. tx_data may be NULL iff tx_len == 0.
  * Returns a zeroed rcp_bytes_t (data=NULL) if tx_len exceeds

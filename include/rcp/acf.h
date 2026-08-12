@@ -184,7 +184,7 @@ extern "C" {
  * (rcp_acf_unpack_header(), acf.c) is mathematically bounded to 0x7FF,
  * a value the widened type always represents. Removed outright, not
  * deprecated-then-removed -- nothing in this codebase (including
- * errors.c's TC18 Table 27 wire-error mapping, checked) referenced it
+ * errors.c's TC18 Table 30 wire-error mapping, checked) referenced it
  * for anything but this now-impossible condition, and it was this
  * enum's last value, so no other member's numeric value changes. */
 typedef enum {
@@ -362,7 +362,7 @@ bool rcp_acf_request_header_constraints_valid(const rcp_acf_byte_message_info_t 
  * a response as though it were a request. */
 bool rcp_acf_header_is_request(const rcp_acf_byte_message_info_t *hdr);
 
-/* TC18 §13.5 Table 30's shared rule for the {ADC, PWM_IN, I2C, LIN, CAN,
+/* TC18 §13.5 Table 33's shared rule for the {ADC, PWM_IN, I2C, LIN, CAN,
  * UART, ISELED, MDIO} endpoint-type row: evt[2:0] = 000b is the only
  * value a plain (non-configuration) request in this row may carry --
  * every other value is either reserved (001b-110b, request shall be
@@ -374,8 +374,8 @@ bool rcp_acf_header_is_request(const rcp_acf_byte_message_info_t *hdr);
  * silently accepts wire values TC18 requires it to refuse.
  *
  * Returns true iff (evt & 0x7) == 0. Not meaningful for SPI (its own
- * dedicated Table 30 row, a real 6-value channel selector) or GPIO/
- * PWM_OUT (their own dedicated Table 30 row, the 8-value write-semantics
+ * dedicated Table 33 row, a real 6-value channel selector) or GPIO/
+ * PWM_OUT (their own dedicated Table 33 row, the 8-value write-semantics
  * selector) -- see rcp_ep_gpio_write_semantics_valid()/
  * rcp_ep_spi_channel_valid() for those rows' own rules instead. */
 bool rcp_acf_evt_row2_is_plain(uint8_t evt);
@@ -383,10 +383,10 @@ bool rcp_acf_evt_row2_is_plain(uint8_t evt);
 /* ── TC18 §13.5.1: compound-wait's own, endpoint-type-independent evt[2:0] rule ─ */
 
 /* TC18 §13.5.1 gives evt[2:0] an entirely different meaning for a
- * compound-wait request than Table 30 gives it for a Standard request:
+ * compound-wait request than Table 33 gives it for a Standard request:
  * here it selects one of eight ways to compare that request's own
  * byte_msg_payload against the addressed endpoint's current status, and
- * this rule is the SAME across every endpoint type -- unlike Table 30,
+ * this rule is the SAME across every endpoint type -- unlike Table 33,
  * there is no per-endpoint-type row. rcp_acf_evt_row2_is_plain() and
  * rcp_ep_spi_channel_valid()/rcp_ep_gpio_write_semantics_valid() (Table
  * 30's own per-row rules) do not apply to a compound-wait request's evt;
@@ -546,7 +546,7 @@ rcp_bytes_t rcp_acf_build_error_response(rcp_byte_bus_id_t byte_bus_id,
 /* FIXED 2026-08-12 (issue #201, REQ-SRV-016): TC18 §13.5's own opening
  * statement, before its per-endpoint-type evt[2:0] table: "evt[3] is used
  * to request an acknowledge. I.e. evt[3]=1 requests acknowledge." This is
- * universal across every endpoint type (unlike evt[2:0], which Table 30
+ * universal across every endpoint type (unlike evt[2:0], which Table 33
  * gives a different meaning per row) -- a caller anywhere in the request-
  * admission path can check it without knowing which endpoint type it is
  * looking at. Returns (evt & 0x08u) != 0. */

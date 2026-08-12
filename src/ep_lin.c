@@ -19,7 +19,7 @@ static uint16_t get_u16(const uint8_t *p)
     return (uint16_t)(((uint16_t)p[0] << 8) | (uint16_t)p[1]);
 }
 
-/* ── evt[2:0]: exact-match, per Table 30's plain-request row ─────────────── */
+/* ── evt[2:0]: exact-match, per Table 33's plain-request row ─────────────── */
 
 //cfusa:req REQ-LINEP-025
 bool rcp_ep_lin_response_matches(const uint8_t *tx_data, size_t tx_len,
@@ -282,7 +282,7 @@ rcp_bytes_t rcp_ep_lin_encode_command_request(rcp_byte_bus_id_t byte_bus_id,
      * §5.10.1, and the general request-handling rule in §3.9.1).
      * Encoding this as a write (op=1) told a conforming peer "no data
      * response expected", i.e. the exact opposite of what the request
-     * means. evt is left 0 -- Table 30 constrains a plain LIN request's
+     * means. evt is left 0 -- Table 33 constrains a plain LIN request's
      * evt[2:0] to 000b; see the file header. */
     hdr.byte_bus_id     = byte_bus_id;
     hdr.op              = RCP_ACF_OP_READ;
@@ -312,7 +312,7 @@ rcp_ep_lin_errc_t rcp_ep_lin_decode_command_request(const uint8_t *b, size_t len
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_LIN_ERR_WRONG_BUS;
     /* Read direction -- see rcp_ep_lin_encode_command_request() above. */
     if (hdr.op != RCP_ACF_OP_READ) return RCP_EP_LIN_ERR_WRONG_OP;
-    /* Table 30's plain-request row rule; see the file header. */
+    /* Table 33's plain-request row rule; see the file header. */
     if (!rcp_acf_evt_row2_is_plain(hdr.evt)) return RCP_EP_LIN_ERR_BAD_EVT;
 
     /* payload is round-tripped verbatim, byte for byte, with no
