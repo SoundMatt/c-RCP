@@ -818,34 +818,51 @@ static void test_pwm_out_duty_cap(void)
     TEST_ASSERT_EQUAL_UINT16(100u, cfg.duty_cycle_min);
 }
 
-/* REQ-PWM-057 (not-implemented) DEVIATION PIN: TC18 13.7.5.3 gives a PWM_OUT
- * request four rules c-RCP applies none of -- PWM_Period == 0 stops signal
- * generation; PWM_active == 0 with PWM_Period > 0 keeps the endpoint running
- * with the output disabled but the trigger signals still generated; a trigger
- * configuration request reads its first two payload octets as a PHASE SHIFT
- * rather than a period; and the output pin is read back during generation
- * with an error signalled if it does not toggle. Both fields are opaque
- * 16-bit setpoints stored verbatim, and the first two payload octets are
- * always decoded as the period. */
+/* REQ-PWM-057 IMPLEMENTED (issue #336, 2 of TC18 13.7.5.3's own 4 request
+ * rules): rcp_ep_pwm_out_generation_state() classifies the endpoint's
+ * signal-generation state purely from its own {period, active_duration}
+ * pair -- period == 0 stops generation; active_duration == 0 with period
+ * != 0 keeps the endpoint running with the output disabled (triggers still
+ * fire); otherwise ordinary running generation. This is a pure classifier
+ * over caller-supplied values, not a change to how rcp_ep_pwm_out_apply_write()
+ * itself stores the two fields (still opaque 16-bit setpoints, as before --
+ * see the module's own doc comment on rcp_ep_pwm_out_generation_state()). */
+static void test_pwm_out_generation_state(void)
+{
+    /* period == 0: stopped, regardless of active_duration. */
+    TEST_ASSERT_EQUAL_INT(RCP_EP_PWM_OUT_GEN_STOPPED,
+                          rcp_ep_pwm_out_generation_state((rcp_ep_pwm_value_t){0u, 400u}));
+    TEST_ASSERT_EQUAL_INT(RCP_EP_PWM_OUT_GEN_STOPPED,
+                          rcp_ep_pwm_out_generation_state((rcp_ep_pwm_value_t){0u, 0u}));
+
+    /* active_duration == 0, period != 0: running with output disabled. */
+    TEST_ASSERT_EQUAL_INT(RCP_EP_PWM_OUT_GEN_OUTPUT_DISABLED,
+                          rcp_ep_pwm_out_generation_state((rcp_ep_pwm_value_t){800u, 0u}));
+
+    /* Both nonzero: ordinary running generation. */
+    TEST_ASSERT_EQUAL_INT(RCP_EP_PWM_OUT_GEN_RUNNING,
+                          rcp_ep_pwm_out_generation_state((rcp_ep_pwm_value_t){1000u, 400u}));
+}
+
+/* REQ-PWM-057 DEVIATION PIN (the other 2 of TC18 13.7.5.3's own 4 request
+ * rules -- genuinely deferred, not routine): a trigger configuration
+ * request reads its first two payload octets as a PHASE SHIFT rather than
+ * a period, and the output pin is read back during generation with an
+ * error signalled if it does not toggle. Neither is tractable here: the
+ * phase-shift rule depends on the conditional-request layer's own
+ * request-kind classification (request_compound.h/_triggered.h/_chained.h),
+ * which this endpoint's decode path has no connection to today, AND the
+ * TC18 spec-defects report's own items 11-12 document a live, currently-
+ * unresolved request_type code collision in exactly that harmonization
+ * effort -- "which request even counts as a trigger configuration" is
+ * itself an open spec question. The pin-readback rule needs real physical
+ * IO this protocol-codec library has never modelled for any endpoint
+ * type. The first two payload octets are always decoded as the period. */
 static void test_pwm_out_request_semantics_are_verbatim_setpoints(void)
 {
-    rcp_ep_pwm_value_t current = {1000u, 400u};
-    rcp_ep_pwm_value_t out;
     rcp_ep_pwm_value_t decoded = {0u, 0u};
     rcp_bytes_t        frame;
     uint8_t            evt = 0xFFu, tn = 0;
-
-    /* Period 0: stored, not treated as "stop signal generation". */
-    out = rcp_ep_pwm_out_apply_write(current, (rcp_ep_pwm_value_t){0u, 400u},
-                                     RCP_EP_PWM_OUT_WRITE_REPLACE, 0u, 0xFFFFu);
-    TEST_ASSERT_EQUAL_UINT16(0u, out.period);
-    TEST_ASSERT_EQUAL_UINT16(400u, out.active_duration);
-
-    /* Active 0 with period > 0: stored, with no output-disabled state. */
-    out = rcp_ep_pwm_out_apply_write(current, (rcp_ep_pwm_value_t){800u, 0u},
-                                     RCP_EP_PWM_OUT_WRITE_REPLACE, 0u, 0xFFFFu);
-    TEST_ASSERT_EQUAL_UINT16(800u, out.period);
-    TEST_ASSERT_EQUAL_UINT16(0u, out.active_duration);
 
     /* The first two payload octets are always the period, never a phase
      * shift, whatever the request is meant to configure. */
@@ -1619,6 +1636,7 @@ int main(void)
 
     RUN_TEST(test_pwm_out_trigger_gaps);
     RUN_TEST(test_pwm_out_duty_cap);
+    RUN_TEST(test_pwm_out_generation_state);
     RUN_TEST(test_pwm_out_request_semantics_are_verbatim_setpoints);
     RUN_TEST(test_pwm_in_functional_cfg_has_full_register_coverage);
 

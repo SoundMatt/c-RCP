@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.284.0 -- 2026-08-12 (issue #336 batch: `REQ-PWM-057`, PWM_OUT generation-state classifier)
+
+**`REQ-PWM-057` flips `not-implemented` -> `partial` (2 of TC18 §13.7.5.3's own 4 request rules).**
+
+New `rcp_ep_pwm_out_generation_state()` (`ep_pwm.h`/`ep_pwm.c`) classifies the endpoint's own signal-generation state purely from its `{period, active_duration}` pair -- `period == 0` stops generation; `active_duration == 0` with `period != 0` keeps the endpoint running with the output disabled while trigger signals still fire; otherwise ordinary running generation. Pure, caller-driven classifier over the existing setpoint pair -- `rcp_ep_pwm_out_apply_write()` itself is unaffected, both fields remain opaque 16-bit setpoints stored verbatim, matching every other caller-driven primitive in this codebase.
+
+**The other 2 of the 4 rules investigated and correctly scoped out, not routine**: a trigger-configuration request's first two payload octets carrying a PHASE SHIFT instead of a period depends on the conditional-request layer's own request-kind classification (`request_compound.h`/`_triggered.h`/`_chained.h`), which this endpoint's decode path has no connection to today -- and the TC18 spec-defects report's own items 11-12 document a live, currently-unresolved `request_type` code collision in exactly that harmonization effort, making "which request even counts as a trigger configuration" itself an open spec question, not just an unwired integration. The output-pin-readback rule needs real physical IO this protocol-codec library has never modelled for any endpoint type.
+
+Split the pre-existing `REQ-PWM-057` gap-pinning test (`test_pwm_out_request_semantics_are_verbatim_setpoints`) into two: a new `test_pwm_out_generation_state` asserting the fixed classifier, and the original narrowed to pin only the remaining phase-shift/pin-readback deviation.
+
+Mutation-tested 2 ways (period boundary `0`->`1`; active_duration boundary `0`->`1`) -- both caught cleanly.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 net new findings (142 errors both before and after -- confirmed by direct comparison, not just count). `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
+**Housekeeping**: a byte-identical stray duplicate `src/ep_pwm 2.c` (macOS filesystem-sync artifact) was caught and removed before committing, same class as this session's earlier `src/ep_spi 2.c` incident.
+
 ### v0.283.0 -- 2026-08-12 (issue #336 batch: `REQ-ADC-033`, ADC sample-cadence catalog fix + stale REQ-ADC-035/036 test found and fixed)
 
 **`REQ-ADC-033` flips `not-implemented` -> `partial`. `REQ-ADC-035`/`REQ-ADC-036`'s own test suite gains its own, separate fix. No functional code change.**

@@ -115,6 +115,14 @@ rcp_ep_pwm_value_t rcp_ep_pwm_out_apply_write(rcp_ep_pwm_value_t current,
     return result;
 }
 
+//cfusa:req REQ-PWM-057
+rcp_ep_pwm_out_generation_state_t rcp_ep_pwm_out_generation_state(rcp_ep_pwm_value_t value)
+{
+    if (value.period == 0u) return RCP_EP_PWM_OUT_GEN_STOPPED;
+    if (value.active_duration == 0u) return RCP_EP_PWM_OUT_GEN_OUTPUT_DISABLED;
+    return RCP_EP_PWM_OUT_GEN_RUNNING;
+}
+
 /* ── PWM_OUT: the EP_func register block (evt[2:0] == 111b) ────────────────── */
 
 /* The EP-common enable&clr (0x0002) and options (0x0003) octets, packed
