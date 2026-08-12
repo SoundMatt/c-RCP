@@ -34,6 +34,20 @@ the rationale.
 
 ## Releases
 
+### v0.285.0 -- 2026-08-12 (issue #336 batch: `REQ-SRV-015`, disabled-endpoint config-request execution for ABB requests)
+
+**`REQ-SRV-015` flips `not-implemented` -> `partial` (ABB/Standard requests only).**
+
+`rcp_server_endpoint_submit()` now inspects an ABB request's own `evt[2:0]` (TC18 §12.3.1.3): `111b` -- Table 33's own universal per-row "EP_func configuration write" meaning, §12.7.1 -- is executed immediately even while the endpoint is disabled, including the write that would set `ep_enable` itself; any other `evt[2:0]` value (an operational request) is still queued, as before.
+
+**Deliberately NOT applied to GBB (Conditional) frames, for a real reason surfaced during investigation**: a GBB frame might be a Compound Wait request, whose own `evt[2:0]` means an entirely different thing under §13.5.1 (an 8-way comparison-operator selector -- see `acf.h`'s `rcp_acf_compound_wait_match()` -- not a configuration-write signal), and `rcp_server_endpoint_submit()` has no request-kind decode (that lives in `request_compound.h`/`_triggered.h`/`_chained.h`/`_timed.h`, which it has no connection to) to tell a Compound Wait's own `evt[2:0]=111b` apart from any other conditional kind's config-write use of the same value. Misclassifying the former would execute an operational request immediately on a disabled endpoint -- exactly the bug this fix exists to close, not one to introduce. GBB frames remain queued unconditionally, the still-open remainder of this requirement.
+
+Split the pre-existing gap-pinning test into two: a new `test_disabled_endpoint_executes_abb_config_requests_immediately` asserting the fix, and the original narrowed/renamed to `test_disabled_endpoint_still_queues_operational_and_gbb_requests`, pinning the remaining ABB-operational and GBB-unconditional deviations. `REQ-SRV-016`'s own cross-reference to this requirement's "still-open gap" updated to reflect the partial resolution.
+
+Mutation-tested 2 ways (ABB message-type check flipped to GBB; `evt[2:0]` target value `0x07`→`0x00`) -- both caught cleanly, the second cascading into 3 other pre-existing tests as expected (confirming the fix's own correctness is load-bearing for behavior those tests already depend on).
+
+65/65 both trees (native + ASan/UBSan, full suite run under both given this touches core `server.c`). `cfusa check`: 1 new instance of the same pre-existing `CFUSA-L004` false positive (the tool's naive name-matching flags one of `rcp_server_endpoint_admit()`'s two pre-existing calls to `rcp_server_endpoint_submit()` as "function 'submit' appears recursive" -- confirmed non-recursive by inspection, `submit()` is called only from `admit()`, never from itself). `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.284.0 -- 2026-08-12 (issue #336 batch: `REQ-PWM-057`, PWM_OUT generation-state classifier)
 
 **`REQ-PWM-057` flips `not-implemented` -> `partial` (2 of TC18 §13.7.5.3's own 4 request rules).**

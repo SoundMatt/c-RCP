@@ -1107,18 +1107,46 @@ static void test_admission_is_suspended_during_the_sleep_drain(void)
 
 /* ── §12.3.1.3: requests arriving at a disabled endpoint ───────────────────── */
 
-/* REQ-SRV-015 (not-implemented) DEVIATION PIN: TC18 §12.3.1.3: a disabled
- * endpoint still executes CONFIGURATION requests immediately and queues
- * only operational ones. c-RCP branches on ep_enable alone and never
- * inspects the request, so a configuration request -- including the
- * write that would set ep_enable itself -- is queued instead of executed,
- * and the endpoint can never be re-enabled over the wire. Still open:
- * closing it needs a way to classify a decoded request as "configuration"
- * that's correct across all 13 heterogeneous endpoint types (Table 30's
- * own evt[2:0]=111b "EP_func" convention is not itself universal the way
- * evt[3]'s acknowledge-request bit is -- see REQ-SRV-016's own fix,
- * below, for the one piece of §12.3.1.3 that IS endpoint-type-generic). */
-static void test_disabled_endpoint_still_queues_config_requests(void)
+/* REQ-SRV-015 IMPLEMENTED for ABB (Standard) requests (issue #336): TC18
+ * §12.3.1.3: a disabled endpoint still executes CONFIGURATION requests
+ * immediately and queues only operational ones. rcp_server_endpoint_
+ * submit() now inspects an ABB request's own evt[2:0]: 111b (TC18 Table
+ * 33's own universal "EP_func configuration write" meaning, §12.7.1) is
+ * executed immediately even while disabled -- including, per this rule,
+ * the very write that would set ep_enable itself; any other evt[2:0]
+ * value (an operational request) is still queued, as before. */
+static void test_disabled_endpoint_executes_abb_config_requests_immediately(void)
+{
+    rcp_server_endpoint_t       ep;
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 config_frame;
+
+    hdr.byte_bus_id     = (rcp_byte_bus_id_t)5u;
+    hdr.transaction_num = 0x42u;
+    hdr.evt             = 0x07u; /* evt[2:0] = 111b: configuration write */
+    config_frame        = rcp_acf_encode_abb(&hdr, NULL, 0);
+    TEST_ASSERT_NOT_NULL(config_frame.data);
+
+    rcp_server_endpoint_init(&ep, false);
+    TEST_ASSERT_TRUE(rcp_server_endpoint_submit(&ep, config_frame.data, config_frame.len, NULL));
+    TEST_ASSERT_EQUAL_UINT(0u, rcp_server_endpoint_queue_len(&ep));
+
+    rcp_bytes_free(&config_frame);
+    rcp_server_endpoint_destroy(&ep);
+}
+
+/* REQ-SRV-015 DEVIATION PIN (still genuinely open, not routine): TC18
+ * §12.3.1.3's own rule needs a way to tell a configuration request apart
+ * from an operational one for GBB (Conditional) requests too, not just
+ * ABB. It is deliberately NOT applied to GBB frames here: a GBB frame
+ * might be a Compound Wait request, whose own evt[2:0] means an 8-way
+ * comparison-operator selector under §13.5.1 -- NOT a configuration-write
+ * signal -- and this function has no request-kind decode (that lives in
+ * request_compound.h/_triggered.h/_chained.h/_timed.h) to tell a Compound
+ * Wait's own evt[2:0]=111b apart from any other conditional kind's
+ * config-write use of the same value. An ordinary ABB operational request
+ * (evt[2:0] != 111b) is also still queued, unaffected by this fix. */
+static void test_disabled_endpoint_still_queues_operational_and_gbb_requests(void)
 {
     rcp_server_endpoint_t ep;
     rcp_bytes_t           frame = standard_abb((rcp_byte_bus_id_t)5u, 0x42u);
@@ -1127,6 +1155,7 @@ static void test_disabled_endpoint_still_queues_config_requests(void)
     TEST_ASSERT_NOT_NULL(frame.data);
     rcp_server_endpoint_init(&ep, false);
 
+    /* Operational ABB request (evt[2:0] == 0, not 111b): still queued. */
     TEST_ASSERT_FALSE(rcp_server_endpoint_submit(&ep, frame.data, frame.len, NULL));
     TEST_ASSERT_EQUAL_UINT(1u, rcp_server_endpoint_queue_len(&ep));
 
@@ -1440,7 +1469,8 @@ int main(void)
     RUN_TEST(test_entry_gate_is_scoped_to_one_endpoint_and_one_queue);
     RUN_TEST(test_admission_is_suspended_during_the_sleep_drain);
 
-    RUN_TEST(test_disabled_endpoint_still_queues_config_requests);
+    RUN_TEST(test_disabled_endpoint_executes_abb_config_requests_immediately);
+    RUN_TEST(test_disabled_endpoint_still_queues_operational_and_gbb_requests);
     RUN_TEST(test_disabled_endpoint_queuing_emits_requested_acknowledge);
     RUN_TEST(test_response_queue_flush_period_is_carried_but_inert);
     RUN_TEST(test_gptp_lock_transition_issues_no_trigger_signal);
