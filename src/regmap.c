@@ -412,6 +412,14 @@ static rcp_wire_error_t respqueue_cfg_row_write_authorize(rcp_lifecycle_state_t 
 //cfusa:req REQ-RMAP-054
 //cfusa:req REQ-RMAP-061
 //cfusa:req REQ-RMAP-072
+//cfusa:req REQ-RMAP-073
+//cfusa:req REQ-RMAP-074
+//cfusa:req REQ-RMAP-075
+//cfusa:req REQ-RMAP-076
+//cfusa:req REQ-RMAP-077
+//cfusa:req REQ-RMAP-078
+//cfusa:req REQ-RMAP-079
+//cfusa:req REQ-RMAP-080
 rcp_regmap_ep0_errc_t
 rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      const rcp_regmap_general_t *map,
@@ -425,6 +433,8 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      size_t response_queue_cfg_count,
                                      rcp_regmap_request_stream_cfg_t *request_stream_cfg,
                                      size_t request_stream_cfg_count,
+                                     rcp_regmap_ep_generic_cfg_t *ep_generic_cfg,
+                                     size_t ep_generic_cfg_count,
                                      rcp_wire_error_t *out_error,
                                      uint8_t *out_transaction_num)
 {
@@ -438,6 +448,7 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
     size_t                       ep_id_map_len;
     size_t                       response_queue_cfg_len;
     size_t                       request_stream_cfg_len;
+    size_t                       ep_generic_cfg_len;
     bool                         locked;
 
     acf_rc = rcp_acf_decode_abb(b, len, &hdr, &payload, &payload_len);
@@ -571,9 +582,38 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
         return RCP_REGMAP_EP0_OK;
     }
 
+    ep_generic_cfg_len = ep_generic_cfg_count * 12u;
+    if ((size_t)addr >= map->svr_ep_generic_cfg_ptr &&
+        (size_t)addr < (size_t)map->svr_ep_generic_cfg_ptr + ep_generic_cfg_len) {
+        uint16_t relative = (uint16_t)((size_t)addr - map->svr_ep_generic_cfg_ptr);
+        rcp_regmap_ep_generic_cfg_reconfig_errc_t rc;
+
+        /* ep_generic_cfg is entirely TC18 R/W* for authorization purposes
+         * (issue #311 batch 5) -- direct primary-source verification of
+         * this table's own surrounding prose (TC18 §13.2, immediately
+         * before Table 28/31) finds no table-specific lifecycle-state
+         * override the way §12.7.6 does for HW_config, so the generic
+         * FUNCTIONAL_W_STAR rule applies to the row as a whole. ep_type's
+         * own read-only status (relative 0x0000 within each row) is a
+         * SEPARATE, per-field concern already enforced inside
+         * rcp_regmap_ep_generic_cfg_apply_reconfig() itself (issue #311
+         * batch 4), independent of this row-level authorization. */
+        if (!rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer)) {
+            *out_error = rcp_lifecycle_field_write_error(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
+                                                          writer);
+            return RCP_REGMAP_EP0_OK;
+        }
+
+        rc = rcp_regmap_ep_generic_cfg_apply_reconfig(ep_generic_cfg, ep_generic_cfg_count,
+                                                         relative, &payload[2], data_len);
+        *out_error = (rc == RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK) ? RCP_ERROR_NONE
+                                                                     : RCP_ERROR_INVALID_PARAMETER;
+        return RCP_REGMAP_EP0_OK;
+    }
+
     /* Neither Table 18's own extent nor any known pointed-to table --
      * see this function's own header doc comment for which tables this
-     * milestone routes (issue #301, issue #306). */
+     * milestone routes (issue #301, issue #306, issue #311). */
     *out_error = RCP_ERROR_EP_NOT_FOUND;
     return RCP_REGMAP_EP0_OK;
 }
@@ -649,6 +689,13 @@ static rcp_bytes_t ep0_read_response_from_slice(const uint8_t *table_image, size
 //cfusa:req REQ-RMAP-052
 //cfusa:req REQ-RMAP-054
 //cfusa:req REQ-RMAP-061
+//cfusa:req REQ-RMAP-073
+//cfusa:req REQ-RMAP-074
+//cfusa:req REQ-RMAP-075
+//cfusa:req REQ-RMAP-076
+//cfusa:req REQ-RMAP-077
+//cfusa:req REQ-RMAP-078
+//cfusa:req REQ-RMAP-080
 rcp_bytes_t
 rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      uint8_t transaction_num,
@@ -661,12 +708,15 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      size_t response_queue_cfg_count,
                                      const rcp_regmap_request_stream_cfg_t *request_stream_cfg,
                                      size_t request_stream_cfg_count,
+                                     const rcp_regmap_ep_generic_cfg_t *ep_generic_cfg,
+                                     size_t ep_generic_cfg_count,
                                      rcp_wire_error_t *out_error)
 {
     size_t hw_cfg_len;
     size_t ep_id_map_len;
     size_t response_queue_cfg_len;
     size_t request_stream_cfg_len;
+    size_t ep_generic_cfg_len;
 
     if ((size_t)addr < RCP_REGMAP_GENERAL_LEN) {
         uint8_t image[RCP_REGMAP_GENERAL_LEN];
@@ -722,6 +772,18 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
         *out_error = RCP_ERROR_NONE;
         return ep0_read_response_from_slice(image, request_stream_cfg_len,
                                              (size_t)addr - map->svr_request_stream_cfg_ptr,
+                                             read_size, transaction_num);
+    }
+
+    ep_generic_cfg_len = ep_generic_cfg_count * 12u;
+    if ((size_t)addr >= map->svr_ep_generic_cfg_ptr &&
+        (size_t)addr < (size_t)map->svr_ep_generic_cfg_ptr + ep_generic_cfg_len) {
+        uint8_t image[RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES * 12u];
+
+        rcp_regmap_ep_generic_cfg_render(ep_generic_cfg, ep_generic_cfg_count, image);
+        *out_error = RCP_ERROR_NONE;
+        return ep0_read_response_from_slice(image, ep_generic_cfg_len,
+                                             (size_t)addr - map->svr_ep_generic_cfg_ptr,
                                              read_size, transaction_num);
     }
 
