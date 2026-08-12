@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.250.0 -- 2026-08-11 (`.fusa-reqs.json` staleness correction: 3 RMAP entries claimed missing storage that issues #301/#306/#308 had already built)
+
+**Documentation-only correction, no code change.** While scoping the next RMAP batch after issue #308, direct comparison of REQ-RMAP-032 through REQ-RMAP-039's own current text against `src/regmap.c`'s actual dispatcher routing conditions found 3 entries whose text had never been revisited after the table they describe was built in a later PR:
+
+- **REQ-RMAP-033** (`svr_hw_cfg_ptr`, 0x001A): text claimed "no real HW_config table storage anywhere yet... currently always reads 0". `svr_hw_cfg_ptr` is the exact field HW_config's own dispatcher routing block addresses (issues #301/#308) — confirmed directly in `src/regmap.c`'s routing conditions, not by name similarity alone. Flips to `implemented` (this requirement's own scope is pointer-only, no adjacent capacity register).
+- **REQ-RMAP-034** (request/response stream config pointers + capacities, 0x001C-0x0021): text claimed the same for both `svr_request_stream_cfg_ptr` and `svr_response_stream_cfg_ptr` — both are now the exact fields request-stream-cfg's (issue #306) and response-queue-config's (issue #301) own dispatcher routing blocks address. Stays `partial`: the two capacity registers in this same requirement's scope are not yet cross-checked against the dispatcher's own caller-supplied count parameters, the same narrower gap REQ-RMAP-032 already tracks for `svr_io_pin_count`.
+- **REQ-RMAP-037** (`svr_ep_bytebus_id_map_ptr`/`_capacity`, 0x0028-0x002A): text claimed the same for EP_ID_config's own pointer, which issue #301 batch 2 already wired. Stays `partial` for the identical capacity-cross-check reason as REQ-RMAP-034 (this requirement's own scope also bundles pointer + capacity, unlike REQ-RMAP-033's pointer-only scope).
+
+**Lesson for this codebase's own ongoing audit discipline**: a requirement's "what remains open" clause can silently go stale the moment a *different*, later requirement's own PR closes the gap it names — grep for a pointer/field's own name across every requirement mentioning it, not just the requirement bearing its own ID, before scoping new work as if a text's claim were still current. This is the third time this pattern has surfaced this session (see also REQ-RMAP-051/055, closed the same way inside PR #309).
+
+`cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%. No rebuild required (no source/test changes).
+
 ### v0.249.0 -- 2026-08-11 (issue #308: EP0 write dispatcher now enforces lifecycle/writer/lock authorization for all 4 pointed-to tables)
 
 **`rcp_regmap_ep0_decode_write_request()` (issues #301/#306) applied writes to HW_config, EP_ID_config, response-queue-config, and request-stream-cfg without consulting lifecycle state, writer identity, or the `svr_configuration_lock` W+ lock at all — any writer in any lifecycle state could rewrite any of them. Found while reviewing the RMAP requirement set's own remaining `partial` entries (REQ-RMAP-040/041/047/048/049/052/054/061 all cited the same gap independently).**
