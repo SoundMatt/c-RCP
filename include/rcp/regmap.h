@@ -1246,15 +1246,16 @@ bool rcp_regmap_ep_req_storage_size_octets_to_words(uint32_t octets,
 
 /* ── ep_generic_cfg wire codec, READ side (issue #311 batch 3) ──────────────
  *
- * The write side (apply_reconfig()) is deliberately NOT built in this same
- * batch: TC18 §13.2 Table 28/31 marks ep_type (relative address 0x0000)
- * plain R -- read-only -- unlike every other field in this row (all R/W*).
- * Every other render()/apply_reconfig() pair in this codebase (HW_config,
- * EP_ID_config, response-queue-config, request-stream-cfg) has no
- * read-only field mixed into an otherwise-writable row; ep_generic_cfg is
- * the first, and apply_reconfig() rejecting-or-preserving a write that
- * touches 0x0000 needs its own dedicated design pass, not a rushed
- * extension of this batch. */
+ * The write side (apply_reconfig(), issue #311 batch 4, below) was
+ * deliberately NOT built in this same batch: TC18 §13.2 Table 28/31 marks
+ * ep_type (relative address 0x0000) plain R -- read-only -- unlike every
+ * other field in this row (all R/W*). Every other render()/
+ * apply_reconfig() pair in this codebase (HW_config, EP_ID_config,
+ * response-queue-config, request-stream-cfg) has no read-only field mixed
+ * into an otherwise-writable row; ep_generic_cfg is the first, and needed
+ * its own dedicated design pass -- see apply_reconfig()'s own doc comment
+ * below for what that pass found (a second, more serious problem beyond
+ * ep_type's own read-only status). */
 
 /* RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES is not itself a TC18-derived
  * value (TC18 defines no fixed endpoint count) -- matches every sibling
@@ -1303,6 +1304,71 @@ bool rcp_regmap_ep_req_storage_size_octets_to_words(uint32_t octets,
  * rounded up -- the same "never grant more than configured" bias). */
 void rcp_regmap_ep_generic_cfg_render(const rcp_regmap_ep_generic_cfg_t *entries,
                                        size_t count, uint8_t *out);
+
+/* ── ep_generic_cfg wire codec, WRITE side (issue #311 batch 4) ─────────────
+ *
+ * NOT the render()-then-patch-then-reparse-the-whole-buffer idiom every
+ * sibling apply_reconfig() (HW_config/EP_ID_config/response-queue-config/
+ * request-stream-cfg) uses -- that idiom is safe ONLY because their own
+ * render() is a lossless 1:1 round-trip. rcp_regmap_ep_generic_cfg_render()
+ * is NOT lossless (its own defensive ep_delay_time fallback and
+ * ep_req_storage_size clamp, see that function's own doc comment above):
+ * reparsing a whole rendered-then-patched row would silently "launder"
+ * any already-invalid field through its own fallback/clamp on every
+ * write, even for a row/field the write never touched at all -- a real
+ * corruption with no basis in the actual incoming write. Found and
+ * documented (issue #311, comment thread) before implementing, not
+ * discovered by a failing test after the fact. */
+typedef enum {
+    RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK              = 0,
+    RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_ERR_SHORT        = 1, /* data_len == 0 */
+    RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_ERR_OUT_OF_RANGE = 2, /* relative_start_address
+                                                                  + data_len exceeds
+                                                                  count*12 */
+} rcp_regmap_ep_generic_cfg_reconfig_errc_t;
+
+/* Human-readable message for an rcp_regmap_ep_generic_cfg_reconfig_errc_t
+ * value. Never returns NULL. */
+const char *
+rcp_regmap_ep_generic_cfg_reconfig_strerror(rcp_regmap_ep_generic_cfg_reconfig_errc_t e);
+
+/* Applies an incoming write of data[0..data_len) at relative_start_address
+ * to entries[0..count) -- entries[i] is row i's own 12-octet stride,
+ * matching rcp_regmap_ep_generic_cfg_render()'s own layout.
+ *
+ * PER-FIELD, not per-buffer: for each of the 5 writable fields in each
+ * row this write's own byte span overlaps (ep_used+ep_delay_time,
+ * ep_req_storage_size, ep_description, ep_tx_buffer_size,
+ * ep_rx_buffer_size), the field is updated ONLY if the write's own byte
+ * span FULLY covers that field's own octet range within the row -- a
+ * write that only partially covers a multi-octet field leaves that
+ * field entirely unchanged (the same "do not silently corrupt what
+ * wasn't fully specified" principle applied to the render()-lossiness
+ * problem above, extended to ordinary partial-field writes).
+ *
+ * ep_type (relative 0x0000 within each row) is NEVER updated, regardless
+ * of whether the write's own byte span covers it: TC18 §13.7.1.2
+ * (TC18.txt L4039-4040, identical RC1/RC5) states, in general terms,
+ * "Writing data to read only registers has no effect and request is
+ * confirmed normally" -- ep_type is R, not R/W*, the one read-only
+ * field mixed into this otherwise fully-writable row. A write touching
+ * ONLY ep_type's own byte (and no other writable field) still returns
+ * RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK, matching TC18's own "confirmed
+ * normally" language -- this is not an error case.
+ *
+ * Reserved bits within octet 0x0001 (bits 1:3 and 6:7, either side of
+ * ep_delay_time) have no corresponding struct field and are never
+ * consulted -- only ep_used (bit 0) and ep_delay_time (bits 4:5) are
+ * ever extracted from that octet.
+ *
+ * Returns RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_ERR_SHORT if data_len is 0,
+ * or RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_ERR_OUT_OF_RANGE if the write's
+ * own span exceeds count*12 -- entries is left entirely unchanged in
+ * either error case. */
+rcp_regmap_ep_generic_cfg_reconfig_errc_t
+rcp_regmap_ep_generic_cfg_apply_reconfig(rcp_regmap_ep_generic_cfg_t *entries, size_t count,
+                                          uint16_t relative_start_address,
+                                          const uint8_t *data, size_t data_len);
 
 /* The functional-config prefix common to every endpoint type. Every
  * concrete endpoint type built in Phase 16/19 composes this struct as its

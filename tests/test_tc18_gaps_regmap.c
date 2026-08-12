@@ -57,6 +57,7 @@
 //cfusa:test REQ-RMAP-076
 //cfusa:test REQ-RMAP-077
 //cfusa:test REQ-RMAP-078
+//cfusa:test REQ-RMAP-079
 
 /*
  * test_tc18_gaps_regmap.c -- spec-literal conformance-and-deviation suite
@@ -1911,6 +1912,147 @@ static void test_ep_generic_cfg_render_clamps_non_multiple_of_4_req_storage_size
 
     TEST_ASSERT_EQUAL_UINT8(0x00u, out[2]);
     TEST_ASSERT_EQUAL_UINT8(0x02u, out[3]);
+}
+
+/* REQ-RMAP-079 (issue #311 batch 4): the WRITE side of ep_generic_cfg's
+ * own wire codec -- see rcp_regmap_ep_generic_cfg_apply_reconfig()'s own
+ * doc comment (regmap.h) for why this is a per-field, not per-buffer,
+ * implementation. */
+static void test_ep_generic_cfg_apply_reconfig_patches_addressed_octets_only(void)
+{
+    rcp_regmap_ep_generic_cfg_t rows[2];
+    uint8_t                     patch[12] = {
+        0xFFu,        /* ep_type -- must have NO effect, per TC18 §13.7.1.2 */
+        0x21u,        /* ep_used=1, delay_reg=2 (20us) */
+        0x00u, 0x02u, /* ep_req_storage_size: 2 words = 8 octets */
+        0x11u, 0x22u, 0x33u, 0x44u, /* ep_description */
+        0x55u, 0x66u, /* ep_tx_buffer_size */
+        0x77u, 0x88u, /* ep_rx_buffer_size */
+    };
+    rcp_regmap_ep_generic_cfg_reconfig_errc_t rc;
+
+    rcp_regmap_ep_generic_cfg_init(&rows[0]);
+    rcp_regmap_ep_generic_cfg_init(&rows[1]);
+    rows[0].ep_type = 0xAAu; /* the row's own original ep_type, must survive */
+
+    rc = rcp_regmap_ep_generic_cfg_apply_reconfig(rows, 2, 0u, patch, sizeof(patch));
+
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK, rc);
+    TEST_ASSERT_EQUAL_UINT8(0xAAu, rows[0].ep_type); /* unchanged -- read-only */
+    TEST_ASSERT_TRUE(rows[0].ep_used);
+    TEST_ASSERT_EQUAL_UINT32(20u, rows[0].ep_delay_time);
+    TEST_ASSERT_EQUAL_UINT32(8u, rows[0].ep_req_storage_size);
+    TEST_ASSERT_EQUAL_UINT32(0x11223344u, rows[0].ep_description);
+    TEST_ASSERT_EQUAL_UINT16(0x5566u, rows[0].ep_tx_buffer_size);
+    TEST_ASSERT_EQUAL_UINT16(0x7788u, rows[0].ep_rx_buffer_size);
+    /* row 1 (relative 12-23) entirely untouched by this write */
+    TEST_ASSERT_EQUAL_UINT8(0u, rows[1].ep_type);
+    TEST_ASSERT_FALSE(rows[1].ep_used);
+}
+
+static void test_ep_generic_cfg_apply_reconfig_write_touching_only_ep_type_is_a_no_op_confirmed_normally(void)
+{
+    rcp_regmap_ep_generic_cfg_t row;
+    uint8_t                     patch[1] = {0xFFu};
+    rcp_regmap_ep_generic_cfg_reconfig_errc_t rc;
+
+    rcp_regmap_ep_generic_cfg_init(&row);
+    row.ep_type = 0x03u;
+
+    rc = rcp_regmap_ep_generic_cfg_apply_reconfig(&row, 1, 0u, patch, sizeof(patch));
+
+    /* TC18 §13.7.1.2: "Writing data to read only registers has no effect
+     * and request is confirmed normally" -- OK, not an error, and the
+     * field itself is untouched. */
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK, rc);
+    TEST_ASSERT_EQUAL_UINT8(0x03u, row.ep_type);
+}
+
+static void test_ep_generic_cfg_apply_reconfig_leaves_partially_covered_field_unchanged(void)
+{
+    rcp_regmap_ep_generic_cfg_t row;
+    uint8_t                     patch[1] = {0x99u}; /* only byte 0 of the 2-byte
+                                                         ep_req_storage_size field
+                                                         (relative 0x0002-0x0003) */
+    rcp_regmap_ep_generic_cfg_reconfig_errc_t rc;
+
+    rcp_regmap_ep_generic_cfg_init(&row);
+    row.ep_req_storage_size = 40u; /* pre-existing value */
+
+    rc = rcp_regmap_ep_generic_cfg_apply_reconfig(&row, 1, 2u, patch, sizeof(patch));
+
+    /* A write covering only HALF of a multi-octet field must leave that
+     * field entirely unchanged, not apply a corrupted partial value. */
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK, rc);
+    TEST_ASSERT_EQUAL_UINT32(40u, row.ep_req_storage_size);
+}
+
+static void test_ep_generic_cfg_apply_reconfig_does_not_launder_an_untouched_rows_own_invalid_delay_time(void)
+{
+    rcp_regmap_ep_generic_cfg_t rows[2];
+    uint8_t                     patch[1] = {0xBBu}; /* row 1's own ep_type -- itself a no-op */
+    rcp_regmap_ep_generic_cfg_reconfig_errc_t rc;
+
+    rcp_regmap_ep_generic_cfg_init(&rows[0]);
+    rcp_regmap_ep_generic_cfg_init(&rows[1]);
+    /* row 0's own ep_delay_time is already NOT one of TC18's 4 allowed
+     * values -- exactly the state rcp_regmap_ep_generic_cfg_render()'s
+     * own fallback exists for. This is the motivating correctness case
+     * from issue #311's own batch 4 scoping: a write to a DIFFERENT row
+     * must never silently "correct" this via a render()-then-reparse
+     * round trip. */
+    rows[0].ep_delay_time = 999999u;
+
+    rc = rcp_regmap_ep_generic_cfg_apply_reconfig(rows, 2, 12u, patch, sizeof(patch));
+
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK, rc);
+    /* row 0 is untouched by this write (it targets row 1's own relative
+     * 12) -- its own invalid ep_delay_time must survive exactly as-is,
+     * NOT be silently laundered to 1us via render()'s own fallback. */
+    TEST_ASSERT_EQUAL_UINT32(999999u, rows[0].ep_delay_time);
+}
+
+static void test_ep_generic_cfg_apply_reconfig_extracts_delay_time_register_value(void)
+{
+    rcp_regmap_ep_generic_cfg_t row;
+    uint8_t                     patch[1] = {0x30u}; /* bits 4:5 = 11b = 50us */
+    rcp_regmap_ep_generic_cfg_reconfig_errc_t rc;
+
+    rcp_regmap_ep_generic_cfg_init(&row);
+
+    rc = rcp_regmap_ep_generic_cfg_apply_reconfig(&row, 1, 1u, patch, sizeof(patch));
+
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK, rc);
+    TEST_ASSERT_EQUAL_UINT32(50u, row.ep_delay_time);
+    TEST_ASSERT_FALSE(row.ep_used); /* bit 0 of 0x30 is 0 */
+}
+
+static void test_ep_generic_cfg_apply_reconfig_rejects_short_payload(void)
+{
+    rcp_regmap_ep_generic_cfg_t row;
+    rcp_regmap_ep_generic_cfg_reconfig_errc_t rc;
+
+    rcp_regmap_ep_generic_cfg_init(&row);
+
+    rc = rcp_regmap_ep_generic_cfg_apply_reconfig(&row, 1, 0u, NULL, 0u);
+
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_ERR_SHORT, rc);
+}
+
+static void test_ep_generic_cfg_apply_reconfig_rejects_out_of_range_leaving_table_untouched(void)
+{
+    rcp_regmap_ep_generic_cfg_t row;
+    uint8_t                     patch[1] = {0xFFu};
+    rcp_regmap_ep_generic_cfg_reconfig_errc_t rc;
+
+    rcp_regmap_ep_generic_cfg_init(&row);
+    row.ep_description = 0x12345678u;
+
+    /* 1 row = 12 octets, relative address 12 is one past the extent */
+    rc = rcp_regmap_ep_generic_cfg_apply_reconfig(&row, 1, 12u, patch, sizeof(patch));
+
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_ERR_OUT_OF_RANGE, rc);
+    TEST_ASSERT_EQUAL_UINT32(0x12345678u, row.ep_description); /* untouched */
 }
 
 /* REQ-RMAP-047/048/049 CLOSED (write-dispatch half, issue #306): same
@@ -3867,6 +4009,13 @@ int main(void)
     RUN_TEST(test_ep_generic_cfg_render_falls_back_to_1us_for_any_disallowed_delay_value);
     RUN_TEST(test_ep_generic_cfg_render_clamps_oversized_req_storage_size_without_wrapping);
     RUN_TEST(test_ep_generic_cfg_render_clamps_non_multiple_of_4_req_storage_size);
+    RUN_TEST(test_ep_generic_cfg_apply_reconfig_patches_addressed_octets_only);
+    RUN_TEST(test_ep_generic_cfg_apply_reconfig_write_touching_only_ep_type_is_a_no_op_confirmed_normally);
+    RUN_TEST(test_ep_generic_cfg_apply_reconfig_leaves_partially_covered_field_unchanged);
+    RUN_TEST(test_ep_generic_cfg_apply_reconfig_does_not_launder_an_untouched_rows_own_invalid_delay_time);
+    RUN_TEST(test_ep_generic_cfg_apply_reconfig_extracts_delay_time_register_value);
+    RUN_TEST(test_ep_generic_cfg_apply_reconfig_rejects_short_payload);
+    RUN_TEST(test_ep_generic_cfg_apply_reconfig_rejects_out_of_range_leaving_table_untouched);
     RUN_TEST(test_request_stream_cfg_apply_reconfig_patches_addressed_octets_only);
     RUN_TEST(test_request_stream_cfg_apply_reconfig_rejects_out_of_range_leaving_table_untouched);
     RUN_TEST(test_request_stream_cfg_render_saturates_oversized_max_request_size_without_wrapping);

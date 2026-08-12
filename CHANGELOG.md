@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.254.0 -- 2026-08-12 (issue #311 batch 4: `rcp_regmap_ep_generic_cfg_apply_reconfig()`, the WRITE side of ep_generic_cfg's wire codec)
+
+**`rcp_regmap_ep_generic_cfg_apply_reconfig()` closes the write side of ep_generic_cfg's wire codec, using a genuinely different design than every sibling `apply_reconfig()` in this codebase.**
+
+**Two design decisions, both scoped via a comment on issue #311 before implementation, not decided ad hoc:**
+
+1. **`ep_type` (relative 0x0000) is never updated**, regardless of whether the write's own byte span covers it. TC18 §13.7.1.2 (TC18.txt L4039-4040, identical RC1/RC5) states in general terms — not scoped to the surrounding paragraph's own OR/AND/XOR bit-operation mechanism — "Writing data to read only registers has no effect and request is confirmed normally." A write touching only `ep_type` returns success, not an error. **This directly confirms REQ-RMAP-068's own long-standing "UNCONFIRMED HYPOTHESIS"** (that read-only-register writes are silently no-effect, distinct from write-prohibited → `UNAUTHORIZED_ACCESS`) — ep_generic_cfg is the first table in the codebase where that hypothesis becomes directly testable; REQ-RMAP-068's own text is updated accordingly.
+
+2. **This function does NOT use the render()-then-patch-then-reparse-the-whole-buffer idiom** every sibling `apply_reconfig()` (HW_config/EP_ID_config/response-queue-config/request-stream-cfg) uses — that idiom is safe for them only because their own `render()` is a lossless round-trip. `rcp_regmap_ep_generic_cfg_render()` (batch 3) is **not** lossless (its own defensive `ep_delay_time` fallback and `ep_req_storage_size` clamp): reparsing a whole rendered-then-patched row would silently "launder" any already-invalid field through its own fallback/clamp, even for a row/field the write never touched — a real corruption with no basis in the actual write. Instead, each of the 5 writable fields is updated **only if the write's own byte span fully covers that field's own octet range** — a write only partially covering a multi-octet field leaves that field entirely unchanged, extending the same "do not silently corrupt what wasn't fully specified" principle from the render()-lossiness problem to ordinary partial-field writes.
+
+**7 new tests**, including a dedicated case proving an already-invalid `ep_delay_time` in an **untouched row** survives a write to a *different* row unchanged (the motivating correctness scenario) — and a partial-field-write test that, when a boundary-check mutation was applied during testing, produced a genuine stack-buffer-overflow (caught by both a normal assertion failure and AddressSanitizer), confirming this isn't a theoretical concern.
+
+**A false-positive security-linter finding, found and fixed**: `cfusa check` flagged two `[ERROR] CFUSA-CY009 CWE-327: weak/broken cryptographic function 'des_'` findings — both were the substring `"des_"` inside a test function's own name (`..._decodes_delay_time...`), not any cryptographic code at all. Renamed (`decodes` → `extracts`) rather than fighting the linter's own crude substring match.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.253.0 -- 2026-08-12 (issue #311 batch 3: `rcp_regmap_ep_generic_cfg_render()`, the READ side of ep_generic_cfg's wire codec)
 
 **`rcp_regmap_ep_generic_cfg_render()` serializes ep_generic_cfg's own 12-octet-per-endpoint stride (TC18 §13.2 Table 28/31), the READ side of issue #311's remaining wire-codec/dispatcher work.**
