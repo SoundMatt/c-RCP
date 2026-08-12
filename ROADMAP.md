@@ -15205,6 +15205,40 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.278.0 -- 2026-08-12 (issue #334 batch: `REQ-SEQ-014`,
+sequencer_state now readable over EP0)
+
+**`REQ-SEQ-014` flips `partial` -> `implemented`.**
+
+`rcp_regmap_ep0_encode_read_response()` now routes an incoming EP0
+read across a seventh extent -- `sequencer_state`, addressed via
+`svr_sequencer_state_ptr` the same way the six existing pointed-to
+tables (HW_config/EP_ID_config/response-queue-config/
+request-stream-cfg/ep_generic_cfg) already are. No dedicated
+`render()` step was needed: `rcp_sequencer_table_t.state` is already
+TC18's own one-octet-per-sequencer `Seq_state` wire image, so the raw
+bytes pass straight through. `regmap.h` takes a bare `uint8_t`
+pointer and count rather than `request_sequencer.h`'s own struct
+type, preserving that module's documented no-cross-dependency
+layering. A caller with no sequencer table (`rcp_sequencer_table_
+unsupported()`) passes `NULL`/`0`, falling through correctly to the
+existing unknown-extent `RCP_ERROR_EP_NOT_FOUND` case.
+
+The other half of this requirement (`svr_sequencers_max` synced with
+the live table's count) was already done via `mock.c`'s pre-existing
+`rcp_mock_server_set_sequencer_count()` -- the `.fusa-reqs.json` text
+describing it as unwired was stale, corrected alongside this fix.
+
+Write access to `sequencer_state` remains a separate, still-open gap
+-- this closes the read path only, matching the requirement's own
+original scope.
+
+Mutation-tested: the new extent's own boundary check (`>=` weakened
+to `>`) is caught by the new test.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 errors.
+`cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.277.0 -- 2026-08-12 (c-RCP-AUDIT-10 doc-only batch: `Table
 19`/`Table 21` disambiguated -- HW_config vs. signal-enumeration,
 issue #341)
