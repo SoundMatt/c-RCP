@@ -9800,12 +9800,12 @@
     {
       "id": "REQ-WAKEUP-018",
       "title": "The WakeUp endpoint's functional config carries the WakeUp repetition time",
-      "text": "NOT IMPLEMENTED: c-RCP's wake-up endpoint has no configurable WakeUp repetition time (TC18 \u00a712.4.1). rcp_ep_wakeup_functional_cfg_t exposes only the wake-source table, and the handshake in power.c counts attempts without any notion of an interval, so a client cannot configure how often the repetitive wake response is retransmitted. Repetition rate is left entirely to the caller and is neither discoverable nor settable over the protocol.",
+      "text": "PARTIAL, UPDATED 2026-08-12 (issue #201 batch 7): TC18 \u00a712.4.1 makes the WakeUp repetition time part of the endpoint's functional configuration. rcp_ep_wakeup_functional_cfg_t now carries a repetition_time_us field (ep_wakeup.h), zero-init default 0 -- discoverable and settable over this module's own in-memory API, closing the specific 'neither discoverable nor settable' complaint this text previously raised. Remains PARTIAL, not fully implemented: TC18 \u00a713.7.2.2 Table 36 (this endpoint's own functional-config register block, fully mapped by REQ-WAKEUP-021) defines no field for it at all, so this value has no wire-register address. The only other TC18 mention of a WakeUp repetition/timing concept is \u00a713.7.2.1's own parenthetical '(flush_time)', naming a register on a DIFFERENT table entirely (rcp_regmap_response_queue_cfg_t::flush_time_us, TC18 \u00a712.7.9 Table 24, REQ-RMAP-064) associated with the response queue, not this endpoint's own functional config -- reusing that field here would require this module to reach into a different endpoint's own response-queue row by ep_id/byte_bus_id lookup, a real architectural decision deliberately not made unilaterally by this fix. power.c's own rcp_pwrmode_handshake_t still counts attempts (wakeup_attempts/wakeup_repeat_limit) rather than tracking a time interval -- a caller now has a value (repetition_time_us) to consult for how often to retry, but nothing in this codebase enforces that cadence itself, matching this codebase's own established caller-driven architecture for this handshake.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a712.4.1, TC18.txt L2301-L2302"
     },
     {

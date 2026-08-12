@@ -328,11 +328,51 @@ typedef struct {
                                                     exactly as before; this is
                                                     an additional way to reach
                                                     it, not a replacement. */
+    uint32_t                       repetition_time_us; /* REQ-WAKEUP-018
+                                (issue #201): TC18 §12.4.1 ("Repetition
+                                time of the message can be configured
+                                inside the WakeUp EP") -- how often, in
+                                microseconds, a caller should retry
+                                rcp_pwrmode_handshake_wakeup_attempt()
+                                (power.h) while a hot-start handshake is
+                                pending. Zero-init default 0 means "no
+                                configured interval" (a caller falls back
+                                to its own choice), matching every other
+                                zero-init default in this struct.
+                                DISCOVERABLE and SETTABLE over this
+                                module's own in-memory API (closing the
+                                specific complaint REQ-WAKEUP-018's own
+                                text raised), but NOT wire-reachable: TC18
+                                §13.7.2.2 Table 36 (the WakeUp EP's own
+                                functional-config register block, already
+                                fully mapped by REQ-WAKEUP-021 above)
+                                defines no field for it at all -- the
+                                *only* other TC18 mention of a WakeUp
+                                repetition/timing concept is §13.7.2.1's
+                                own parenthetical "(flush_time)", naming a
+                                register that lives on a DIFFERENT table
+                                entirely (rcp_regmap_response_queue_cfg_t
+                                ::flush_time_us, TC18 §12.7.9 Table 24,
+                                REQ-RMAP-064) associated with the response
+                                QUEUE, not this endpoint's own functional
+                                config -- reusing that field here would
+                                require this module to reach into a
+                                different endpoint's own response-queue
+                                row by ep_id/byte_bus_id lookup, a real
+                                architectural decision this fix
+                                deliberately does not make unilaterally.
+                                This field's own remaining wire-mapping
+                                gap is therefore left honestly open,
+                                exactly like every other Table-36-omits-
+                                a-field finding in this same module (see
+                                the file header's own register-block
+                                note) rather than inventing a wire address
+                                TC18 does not define. */
 } rcp_ep_wakeup_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false; every source entry
  * disabled with active_high == false and pin_number == 0; ep_status == 0;
- * wup_status cleared). */
+ * wup_status cleared; repetition_time_us == 0). */
 void rcp_ep_wakeup_functional_cfg_init(rcp_ep_wakeup_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by

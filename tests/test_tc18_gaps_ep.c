@@ -709,14 +709,9 @@ static void test_pwm_in_functional_cfg_has_full_register_coverage(void)
  * repetitive wake response to convey both a WakeUp message AND the WakeUp
  * source that caused the wake. c-RCP's WakeUp message is a single opcode
  * octet and its decoder recovers only the transaction number, so a client
- * cannot learn which configured source woke the server.
- * REQ-WAKEUP-018 (not-implemented) DEVIATION PIN: TC18 12.4.1 also makes the
- * WakeUp repetition time part of the endpoint's functional configuration.
- * The config is the shared prefix plus the wake-source table and nothing
- * else -- there is no interval field to configure or discover. */
-static void test_wakeup_message_and_repetition_time_gaps(void)
+ * cannot learn which configured source woke the server. */
+static void test_wakeup_message_has_no_source_field(void)
 {
-    rcp_ep_wakeup_functional_cfg_t cfg;
     rcp_acf_byte_message_info_t    hdr         = {0};
     const uint8_t                 *payload     = NULL;
     size_t                         payload_len = 0;
@@ -734,8 +729,32 @@ static void test_wakeup_message_and_repetition_time_gaps(void)
                       rcp_ep_wakeup_decode_wakeup_message(frame.data, frame.len, 2u, &tn));
     TEST_ASSERT_EQUAL_UINT8(0x77u, tn);
     rcp_bytes_free(&frame);
+}
+
+/* REQ-WAKEUP-018, PARTIAL as of 2026-08-12 (issue #201 batch 7): TC18
+ * §12.4.1 makes the WakeUp repetition time part of the endpoint's
+ * functional configuration. rcp_ep_wakeup_functional_cfg_t now carries a
+ * repetition_time_us field -- discoverable and settable over this
+ * module's own in-memory API, zero-init default 0 -- closing the
+ * specific "not discoverable, not settable" complaint this requirement's
+ * own text raised. Remains PARTIAL, not fully implemented: TC18 §13.7.2.2
+ * Table 36 (this endpoint's own functional-config register block,
+ * already fully mapped by REQ-WAKEUP-021) defines no field for it at
+ * all, so this value has no wire-register address -- see the field's own
+ * doc comment (ep_wakeup.h) for the full citation trail, including why
+ * reusing response_queue_cfg's own unrelated flush_time_us field was
+ * deliberately not done unilaterally. */
+static void test_wakeup_repetition_time_is_configurable_but_not_wire_reachable(void)
+{
+    rcp_ep_wakeup_functional_cfg_t cfg;
 
     rcp_ep_wakeup_functional_cfg_init(&cfg);
+    TEST_ASSERT_EQUAL_UINT32(0u, cfg.repetition_time_us);
+
+    /* Discoverable and settable, over this module's own in-memory API. */
+    cfg.repetition_time_us = 25000u; /* 25 ms, an arbitrary but plausible value */
+    TEST_ASSERT_EQUAL_UINT32(25000u, cfg.repetition_time_us);
+
     TEST_ASSERT_EQUAL_UINT(8u, RCP_EP_WAKEUP_MAX_SOURCES);
     /* ADDED 2026-08-11: sources no longer immediately follows common with
      * zero padding -- rcp_ep_wakeup_source_cfg_t now contains a uint16_t
@@ -745,15 +764,15 @@ static void test_wakeup_message_and_repetition_time_gaps(void)
      * >= sizeof(common), not necessarily ==. */
     TEST_ASSERT_TRUE(offsetof(rcp_ep_wakeup_functional_cfg_t, sources) >=
                      sizeof(rcp_regmap_ep_functional_cfg_t));
-    /* ep_status/wup_status now follow sources -- see REQ-WAKEUP-021's own
-     * updated text and the register-block work below. sources is no
-     * longer the struct's own last field; wup_status is, modulo ordinary
-     * C trailing padding (the struct's own 2-byte alignment requirement,
-     * from its uint16_t-containing members, can round total size up by
-     * one more byte than offsetof(wup_status)+sizeof(wup_status) alone --
-     * hence ">=", not "=="). */
-    TEST_ASSERT_TRUE(sizeof(cfg) >= offsetof(rcp_ep_wakeup_functional_cfg_t, wup_status)
-                                        + sizeof(cfg.wup_status));
+    /* ep_status/wup_status/repetition_time_us now follow sources -- see
+     * REQ-WAKEUP-021's own updated text and the register-block work
+     * below. sources is no longer the struct's own last field;
+     * repetition_time_us is (as of this batch), modulo ordinary C
+     * trailing padding (the struct's own alignment requirements can round
+     * total size up by more than offsetof(repetition_time_us) +
+     * sizeof(repetition_time_us)) alone -- hence ">=", not "=="). */
+    TEST_ASSERT_TRUE(sizeof(cfg) >= offsetof(rcp_ep_wakeup_functional_cfg_t, repetition_time_us)
+                                        + sizeof(cfg.repetition_time_us));
 }
 
 /* REQ-WAKEUP-019, FIXED 2026-08-12 (issue #201 batch 6): TC18 §12.5
@@ -1289,7 +1308,8 @@ int main(void)
     RUN_TEST(test_pwm_out_request_semantics_are_verbatim_setpoints);
     RUN_TEST(test_pwm_in_functional_cfg_has_full_register_coverage);
 
-    RUN_TEST(test_wakeup_message_and_repetition_time_gaps);
+    RUN_TEST(test_wakeup_message_has_no_source_field);
+    RUN_TEST(test_wakeup_repetition_time_is_configurable_but_not_wire_reachable);
     RUN_TEST(test_wakeup_refusal_is_a_genuine_error_response);
     RUN_TEST(test_wakeup_decode_rejects_an_unrelated_error_code);
     RUN_TEST(test_wakeup_codec_accepts_any_bus_id);

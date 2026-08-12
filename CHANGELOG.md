@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.259.0 -- 2026-08-12 (issue #201 batch: `REQ-WAKEUP-018`, WakeUp repetition-time configurability)
+
+**New `repetition_time_us` field on `rcp_ep_wakeup_functional_cfg_t` closes the "neither discoverable nor settable" half of `REQ-WAKEUP-018` (TC18 §12.4.1: "Repetition time of the message can be configured inside the WakeUp EP").**
+
+Zero-init default 0, discoverable and settable over this module's own in-memory API -- a caller now has a value to read/write directly, closing the specific complaint this requirement's own text raised. **Stays `partial`, not `implemented`**: TC18 §13.7.2.2 Table 36 (this endpoint's own functional-config register block, already fully mapped by `REQ-WAKEUP-021`) defines no field for a repetition interval at all, so this value has no wire-register address. The only other TC18 mention of a WakeUp timing concept is §13.7.2.1's own parenthetical "(flush_time)", naming a register on a *different* table entirely (`rcp_regmap_response_queue_cfg_t::flush_time_us`, TC18 §12.7.9 Table 24, `REQ-RMAP-064`) associated with the response queue, not this endpoint's own functional config -- reusing that field would require this module to reach into a different endpoint's own response-queue row by `ep_id`/`byte_bus_id` lookup, a real architectural decision this fix deliberately does not make unilaterally. `power.c`'s own `rcp_pwrmode_handshake_t` still counts attempts (`wakeup_attempts`/`wakeup_repeat_limit`) rather than tracking a time interval; the new field's own doc comment names it as the value a caller should consult for retry cadence, without power.h taking on a dependency back on ep_wakeup.h (preserving the file header's own established one-directional dependency rule).
+
+`test_tc18_gaps_ep.c`'s own combined `REQ-WAKEUP-017`/`-018` deviation-pin test is split: `test_wakeup_message_has_no_source_field` keeps pinning `-017`'s still-open deviation unchanged; a new `test_wakeup_repetition_time_is_configurable_but_not_wire_reachable` asserts the new field's own conforming (partial) behavior.
+
+Mutation-tested 1 way (non-zero init default) -- caught cleanly.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.258.0 -- 2026-08-12 (issue #201 batch: `REQ-WAKEUP-019`, refused sleep/standby is now a genuine error response)
 
 **`rcp_ep_wakeup_encode_sleepcmd_response()`/`_decode_sleepcmd_response()` now signal a refused standby/sleep entry as a genuine ACF Error Response carrying `REQUEST_CANCELED`, closing `REQ-WAKEUP-019` (TC18 §12.5) fully -- status flips to `implemented`.**
