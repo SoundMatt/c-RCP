@@ -619,22 +619,13 @@ static void test_i2c_payload_address_carried_verbatim(void)
  * provision for half/full-bridge drivers) and fires the mid-active-pulse
  * trigger even at 0% duty cycle. c-RCP's trigger evaluation is a pure
  * selector-vs-event match taking neither the skew register nor the duty
- * cycle as an input, so pwmo_skew is stored and never consulted.
- * REQ-PWM-056 (partial) DEVIATION PIN: TC18 13.7.5.2 Table 43 requires a
- * requested active time below pwmo_duty_cycle_min or above
- * pwmo_duty_cycle_max to be CAPPED to that limit. c-RCP stores both
- * registers and applies neither: the requested active duration is returned
- * verbatim, outside the configured window in both directions. */
-static void test_pwm_out_trigger_and_duty_cap_gaps(void)
+ * cycle as an input, so pwmo_skew is stored and never consulted. */
+static void test_pwm_out_trigger_gaps(void)
 {
     rcp_ep_pwm_out_functional_cfg_t cfg;
-    rcp_ep_pwm_value_t              current = {1000u, 400u};
-    rcp_ep_pwm_value_t              out;
 
     rcp_ep_pwm_out_functional_cfg_init(&cfg);
-    cfg.skew           = 0x2Au;
-    cfg.duty_cycle_min = 100u;
-    cfg.duty_cycle_max = 500u;
+    cfg.skew = 0x2Au;
 
     TEST_ASSERT_TRUE(rcp_ep_pwm_out_trigger_fires(RCP_EP_PWM_OUT_TRIGGER_MID_PULSE,
                                                   RCP_EP_PWM_OUT_EVENT_MID_PULSE));
@@ -645,17 +636,42 @@ static void test_pwm_out_trigger_and_duty_cap_gaps(void)
     TEST_ASSERT_FALSE(rcp_ep_pwm_out_trigger_fires(RCP_EP_PWM_OUT_TRIGGER_NONE,
                                                    RCP_EP_PWM_OUT_EVENT_DONE));
     TEST_ASSERT_EQUAL_UINT8(0x2Au, cfg.skew); /* held, never consulted above */
+}
 
-    /* Above pwmo_duty_cycle_max (500): a conforming endpoint caps to 500. */
+/* FIXED 2026-08-12 (issue #201, REQ-PWM-056): TC18 13.7.5.2 Table 43
+ * requires a requested active time below pwmo_duty_cycle_min or above
+ * pwmo_duty_cycle_max to be CAPPED to that limit, not applied verbatim.
+ * rcp_ep_pwm_out_apply_write() now takes duty_cycle_min/duty_cycle_max
+ * and clamps the resulting active_duration into that range. */
+static void test_pwm_out_duty_cap(void)
+{
+    rcp_ep_pwm_out_functional_cfg_t cfg;
+    rcp_ep_pwm_value_t              current = {1000u, 400u};
+    rcp_ep_pwm_value_t              out;
+
+    rcp_ep_pwm_out_functional_cfg_init(&cfg);
+    cfg.duty_cycle_min = 100u;
+    cfg.duty_cycle_max = 500u;
+
+    /* Above pwmo_duty_cycle_max (500): capped to 500. */
     out = rcp_ep_pwm_out_apply_write(current, (rcp_ep_pwm_value_t){2000u, 900u},
-                                     RCP_EP_PWM_OUT_WRITE_REPLACE);
-    TEST_ASSERT_EQUAL_UINT16(900u, out.active_duration);
-    TEST_ASSERT_EQUAL_UINT16(2000u, out.period);
+                                     RCP_EP_PWM_OUT_WRITE_REPLACE, cfg.duty_cycle_min,
+                                     cfg.duty_cycle_max);
+    TEST_ASSERT_EQUAL_UINT16(500u, out.active_duration);
+    TEST_ASSERT_EQUAL_UINT16(2000u, out.period); /* period is not capped */
 
-    /* Below pwmo_duty_cycle_min (100): a conforming endpoint caps to 100. */
+    /* Below pwmo_duty_cycle_min (100): capped to 100. */
     out = rcp_ep_pwm_out_apply_write(current, (rcp_ep_pwm_value_t){2000u, 10u},
-                                     RCP_EP_PWM_OUT_WRITE_REPLACE);
-    TEST_ASSERT_EQUAL_UINT16(10u, out.active_duration);
+                                     RCP_EP_PWM_OUT_WRITE_REPLACE, cfg.duty_cycle_min,
+                                     cfg.duty_cycle_max);
+    TEST_ASSERT_EQUAL_UINT16(100u, out.active_duration);
+
+    /* Within the window: passes through unchanged. */
+    out = rcp_ep_pwm_out_apply_write(current, (rcp_ep_pwm_value_t){2000u, 300u},
+                                     RCP_EP_PWM_OUT_WRITE_REPLACE, cfg.duty_cycle_min,
+                                     cfg.duty_cycle_max);
+    TEST_ASSERT_EQUAL_UINT16(300u, out.active_duration);
+
     TEST_ASSERT_EQUAL_UINT16(500u, cfg.duty_cycle_max);
     TEST_ASSERT_EQUAL_UINT16(100u, cfg.duty_cycle_min);
 }
@@ -679,13 +695,13 @@ static void test_pwm_out_request_semantics_are_verbatim_setpoints(void)
 
     /* Period 0: stored, not treated as "stop signal generation". */
     out = rcp_ep_pwm_out_apply_write(current, (rcp_ep_pwm_value_t){0u, 400u},
-                                     RCP_EP_PWM_OUT_WRITE_REPLACE);
+                                     RCP_EP_PWM_OUT_WRITE_REPLACE, 0u, 0xFFFFu);
     TEST_ASSERT_EQUAL_UINT16(0u, out.period);
     TEST_ASSERT_EQUAL_UINT16(400u, out.active_duration);
 
     /* Active 0 with period > 0: stored, with no output-disabled state. */
     out = rcp_ep_pwm_out_apply_write(current, (rcp_ep_pwm_value_t){800u, 0u},
-                                     RCP_EP_PWM_OUT_WRITE_REPLACE);
+                                     RCP_EP_PWM_OUT_WRITE_REPLACE, 0u, 0xFFFFu);
     TEST_ASSERT_EQUAL_UINT16(800u, out.period);
     TEST_ASSERT_EQUAL_UINT16(0u, out.active_duration);
 
@@ -1455,7 +1471,8 @@ int main(void)
     RUN_TEST(test_i2c_mode_presets_and_register_block);
     RUN_TEST(test_i2c_payload_address_carried_verbatim);
 
-    RUN_TEST(test_pwm_out_trigger_and_duty_cap_gaps);
+    RUN_TEST(test_pwm_out_trigger_gaps);
+    RUN_TEST(test_pwm_out_duty_cap);
     RUN_TEST(test_pwm_out_request_semantics_are_verbatim_setpoints);
     RUN_TEST(test_pwm_in_functional_cfg_has_full_register_coverage);
 

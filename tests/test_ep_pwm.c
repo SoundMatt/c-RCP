@@ -85,7 +85,7 @@ static void test_out_apply_write_replace(void)
 {
     rcp_ep_pwm_value_t current = {100, 50};
     rcp_ep_pwm_value_t request = {200, 75};
-    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request, RCP_EP_PWM_OUT_WRITE_REPLACE);
+    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request, RCP_EP_PWM_OUT_WRITE_REPLACE, 0u, 0xFFFFu);
 
     TEST_ASSERT_EQUAL_UINT16(200, result.period);
     TEST_ASSERT_EQUAL_UINT16(75, result.active_duration);
@@ -95,7 +95,7 @@ static void test_out_apply_write_or(void)
 {
     rcp_ep_pwm_value_t current = {0x00F0, 0x0F00};
     rcp_ep_pwm_value_t request = {0x000F, 0x00F0};
-    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request, RCP_EP_PWM_OUT_WRITE_OR);
+    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request, RCP_EP_PWM_OUT_WRITE_OR, 0u, 0xFFFFu);
 
     TEST_ASSERT_EQUAL_UINT16(0x00FF, result.period);
     TEST_ASSERT_EQUAL_UINT16(0x0FF0, result.active_duration);
@@ -105,7 +105,7 @@ static void test_out_apply_write_and(void)
 {
     rcp_ep_pwm_value_t current = {0x00FF, 0x0FF0};
     rcp_ep_pwm_value_t request = {0x000F, 0x0FF0};
-    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request, RCP_EP_PWM_OUT_WRITE_AND);
+    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request, RCP_EP_PWM_OUT_WRITE_AND, 0u, 0xFFFFu);
 
     TEST_ASSERT_EQUAL_UINT16(0x000F, result.period);
     TEST_ASSERT_EQUAL_UINT16(0x0FF0, result.active_duration);
@@ -115,7 +115,7 @@ static void test_out_apply_write_xor(void)
 {
     rcp_ep_pwm_value_t current = {0x00FF, 0x0F0F};
     rcp_ep_pwm_value_t request = {0x000F, 0x00FF};
-    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request, RCP_EP_PWM_OUT_WRITE_XOR);
+    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request, RCP_EP_PWM_OUT_WRITE_XOR, 0u, 0xFFFFu);
 
     TEST_ASSERT_EQUAL_UINT16(0x00F0, result.period);
     TEST_ASSERT_EQUAL_UINT16(0x0FF0, result.active_duration);
@@ -125,7 +125,7 @@ static void test_out_apply_write_add_saturates(void)
 {
     rcp_ep_pwm_value_t current = {0xFFF0, 100};
     rcp_ep_pwm_value_t request = {0x0020, 50};
-    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request, RCP_EP_PWM_OUT_WRITE_ADD);
+    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request, RCP_EP_PWM_OUT_WRITE_ADD, 0u, 0xFFFFu);
 
     TEST_ASSERT_EQUAL_UINT16(0xFFFF, result.period); /* saturates, not wraps */
     TEST_ASSERT_EQUAL_UINT16(150, result.active_duration);
@@ -155,7 +155,7 @@ static void test_out_apply_write_sub_is_request_minus_current_and_saturates(void
 {
     rcp_ep_pwm_value_t current = {10, 200};
     rcp_ep_pwm_value_t request = {50, 50};
-    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request, RCP_EP_PWM_OUT_WRITE_SUB);
+    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request, RCP_EP_PWM_OUT_WRITE_SUB, 0u, 0xFFFFu);
 
     TEST_ASSERT_EQUAL_UINT16(40, result.period);
     TEST_ASSERT_EQUAL_UINT16(0, result.active_duration); /* saturates at 0x0000, no wrap */
@@ -169,7 +169,7 @@ static void test_out_apply_write_sub_operand_order_is_observable(void)
 {
     rcp_ep_pwm_value_t current = {0x0001, 0x0001};
     rcp_ep_pwm_value_t request = {0x0100, 0x0100};
-    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request, RCP_EP_PWM_OUT_WRITE_SUB);
+    rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request, RCP_EP_PWM_OUT_WRITE_SUB, 0u, 0xFFFFu);
 
     TEST_ASSERT_EQUAL_UINT16(0x00FF, result.period);
     TEST_ASSERT_EQUAL_UINT16(0x00FF, result.active_duration);
@@ -180,7 +180,7 @@ static void test_out_apply_write_reserved4_is_noop(void)
     rcp_ep_pwm_value_t current = {123, 456};
     rcp_ep_pwm_value_t request = {999, 999};
     rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request,
-                                                              RCP_EP_PWM_OUT_WRITE_RESERVED4);
+                                                              RCP_EP_PWM_OUT_WRITE_RESERVED4, 0u, 0xFFFFu);
 
     TEST_ASSERT_EQUAL_UINT16(123, result.period);
     TEST_ASSERT_EQUAL_UINT16(456, result.active_duration);
@@ -196,7 +196,7 @@ static void test_out_apply_write_wire_value_4_is_reserved_noop(void)
     rcp_ep_pwm_value_t current = {123, 456};
     rcp_ep_pwm_value_t request = {999, 999};
     rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request,
-                                                              (rcp_ep_pwm_out_write_semantics_t)4u);
+                                                              (rcp_ep_pwm_out_write_semantics_t)4u, 0u, 0xFFFFu);
 
     TEST_ASSERT_EQUAL_UINT16(123, result.period);
     TEST_ASSERT_EQUAL_UINT16(456, result.active_duration);
@@ -207,7 +207,7 @@ static void test_out_apply_write_wire_value_5_is_add(void)
     rcp_ep_pwm_value_t current = {10, 200};
     rcp_ep_pwm_value_t request = {20, 50};
     rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request,
-                                                              (rcp_ep_pwm_out_write_semantics_t)5u);
+                                                              (rcp_ep_pwm_out_write_semantics_t)5u, 0u, 0xFFFFu);
 
     TEST_ASSERT_EQUAL_UINT16(30, result.period);
     TEST_ASSERT_EQUAL_UINT16(250, result.active_duration);
@@ -222,7 +222,7 @@ static void test_out_apply_write_wire_value_6_is_sub(void)
     rcp_ep_pwm_value_t current = {30, 250};
     rcp_ep_pwm_value_t request = {100, 300};
     rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request,
-                                                              (rcp_ep_pwm_out_write_semantics_t)6u);
+                                                              (rcp_ep_pwm_out_write_semantics_t)6u, 0u, 0xFFFFu);
 
     TEST_ASSERT_EQUAL_UINT16(70, result.period);
     TEST_ASSERT_EQUAL_UINT16(50, result.active_duration);
@@ -233,7 +233,7 @@ static void test_out_apply_write_reconfig_misrouted_is_noop(void)
     rcp_ep_pwm_value_t current = {123, 456};
     rcp_ep_pwm_value_t request = {999, 999};
     rcp_ep_pwm_value_t result  = rcp_ep_pwm_out_apply_write(current, request,
-                                                              RCP_EP_PWM_OUT_WRITE_RECONFIG);
+                                                              RCP_EP_PWM_OUT_WRITE_RECONFIG, 0u, 0xFFFFu);
 
     TEST_ASSERT_EQUAL_UINT16(123, result.period);
     TEST_ASSERT_EQUAL_UINT16(456, result.active_duration);

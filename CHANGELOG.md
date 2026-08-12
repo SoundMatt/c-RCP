@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.270.0 -- 2026-08-12 (issue #201 batch: `REQ-PWM-056`, PWM_OUT duty-cycle limits now cap the requested active time)
+
+**`rcp_ep_pwm_out_apply_write()` now takes `duty_cycle_min`/`duty_cycle_max` and clamps the resulting `active_duration` into that range -- status flips to `implemented`.**
+
+TC18 Table 43: "Min value of PWM active in clock cycles, requests with lower values will be capped to this limit" / "Max value of PWM active in clock cycles, requests with higher values will be capped to this limit." `rcp_ep_pwm_out_functional_cfg_t` already stored `duty_cycle_min`/`duty_cycle_max` but nothing consulted them; the requested active duration was returned verbatim, outside the configured window in both directions. The cap is applied after `evt`'s own write semantics (REPLACE/OR/AND/XOR/ADD/SUB) have already computed the new value, matching Table 43's own wording -- capped, not rejected, not applied verbatim. `period` is unaffected, since Table 43 names only "PWM active."
+
+**Real signature change to a function with real callers**: updated every call site -- 12 in `tests/test_ep_pwm.c` (passed `[0, 0xFFFF]` no-op limits, unaffected by their own existing assertions) and 5 in `tests/test_tc18_gaps_ep.c`. Split the pre-existing combined `REQ-PWM-055`/`REQ-PWM-056` gap-pinning test into two -- `REQ-PWM-055` (trigger-signal generation from the skew-delayed output, mid-pulse firing at 0% duty) remains a genuine, still-open deviation pin: it needs a real timing/signal-generation model this protocol-codec library does not have.
+
+**Mutation-tested 3 ways, including one correctly-identified equivalent mutant**: bypassing capping entirely (caught); the min-boundary comparison reversed to the wrong direction (caught heavily, 11+2 failures); the min-boundary's own `<` vs `<=` operator (NOT caught -- investigated and confirmed a genuine equivalent mutant, same class as `REQ-SPI-036`'s own earlier finding this session: assigning `duty_cycle_min` to a value already equal to `duty_cycle_min` is a no-op, so no test of the output can discriminate the two operators there).
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.269.0 -- 2026-08-12 (issue #201 batch: `REQ-UART-034`, UART read_size widened to the ACF header's full 12-bit field)
 
 **`rcp_ep_uart_encode_read_request()`/`_decode_read_request()`'s `read_size` is now `uint16_t`, matching the ACF header's own 12-bit `read_size_or_segment_num` field -- status flips to `implemented`.**
