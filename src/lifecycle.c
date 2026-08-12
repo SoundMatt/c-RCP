@@ -42,6 +42,7 @@ rcp_lifecycle_errc_t rcp_lifecycle_check_hw_cfg(const rcp_lifecycle_plausibility
 //cfusa:req REQ-LIFECYCLE-005
 //cfusa:req REQ-LIFECYCLE-006
 //cfusa:req REQ-LIFECYCLE-007
+//cfusa:req REQ-LIFECYCLE-038
 rcp_lifecycle_errc_t rcp_lifecycle_check_rcp_cfg(const rcp_lifecycle_plausibility_snapshot_t *snap)
 {
     size_t i;
@@ -57,9 +58,31 @@ rcp_lifecycle_errc_t rcp_lifecycle_check_rcp_cfg(const rcp_lifecycle_plausibilit
 
     for (i = 0; i < snap->request_stream_count; i++) {
         const rcp_lifecycle_request_stream_plausibility_t *rs = &snap->request_streams[i];
+        bool has_bound_endpoint;
+        size_t j;
 
         if (!rs->configured) continue;
         if (!rs->has_response_stream) return RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT;
+
+        /* REQ-LIFECYCLE-038: TC18 §12.3.1.2's third bullet -- a
+         * configured stream with no endpoint referencing it (an
+         * orphaned, unused stream slot) is also inconsistent. ep_used
+         * is checked here too, not just has_stream_assoc -- an unused
+         * endpoint slot (ep_used == false) is skipped by the bullet-1
+         * loop above entirely, so its own has_stream_assoc/
+         * request_stream_index values are never validated by anything
+         * and must not be trusted to "cover" an otherwise-orphaned
+         * stream here; only a genuinely in-use endpoint counts. */
+        has_bound_endpoint = false;
+        for (j = 0; j < snap->endpoint_count; j++) {
+            const rcp_lifecycle_endpoint_plausibility_t *ep = &snap->endpoints[j];
+
+            if (ep->ep_used && ep->has_stream_assoc && ep->request_stream_index == i) {
+                has_bound_endpoint = true;
+                break;
+            }
+        }
+        if (!has_bound_endpoint) return RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT;
     }
 
     return RCP_LIFECYCLE_OK;

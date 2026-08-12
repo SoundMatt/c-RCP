@@ -15205,6 +15205,64 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.264.0 -- 2026-08-12 (issue #201 batch: `REQ-LIFECYCLE-038`,
+RCP_CFG_INCONSISTENT's third plausibility bullet -- orphaned request
+streams now caught)
+
+**New `request_stream_index` field on
+`rcp_lifecycle_endpoint_plausibility_t` plus a new bullet-2
+cross-reference scan in `rcp_lifecycle_check_rcp_cfg()` closes
+`REQ-LIFECYCLE-038` -- status flips to `implemented`, ASIL-B
+(matching sibling bullets `REQ-LIFECYCLE-005`/`006`/`007`, which
+this check completes).**
+
+TC18 §12.3.1.2's RCP_CFG_INCONSISTENT check names three bullets for
+the HW_CONFIGURED -> RCP_CONFIGURED transition. Bullets 1 and 3 were
+already implemented; bullet 2 -- "For each configured stream at
+least one stream_id/byte_bus_id is configured," the mirror-image
+completeness check that no request stream is left configured with
+zero endpoints actually using it -- had no counterpart at all. A
+request stream marked `configured = true` with zero endpoints bound
+to it (an orphaned, unused stream slot) passed the check exactly as
+if legitimately in use. `request_stream_index` is placed as the
+struct's own last field so every existing positional-initializer
+test call site keeps compiling unchanged, this codebase's
+established backward-compatibility convention. The new scan
+requires, for each configured request stream `i`, at least one
+endpoint with `ep_used && has_stream_assoc && request_stream_index
+== i`.
+
+**Mutation-testing caught a real production-code correctness gap,
+not just a test-coverage one**: the first draft's bullet-2 scan
+omitted the `ep_used` check. This passed every test written up to
+that point, because the one test exercising a bullet-1 failure
+(`has_stream_assoc = false`) never reached bullet 2's logic at all
+-- it's already rejected by bullet 1's own earlier loop.
+Investigating why the mutation wasn't caught surfaced the actual
+gap: a stale/unused endpoint slot (`ep_used = false`, skipped
+entirely by bullet 1's own loop, its `has_stream_assoc`/
+`request_stream_index` never validated by anything) could
+incorrectly "cover" an otherwise-orphaned stream if it happened to
+carry leftover `has_stream_assoc = true` and a matching index.
+Fixed by adding `ep->ep_used &&` to the bullet-2 condition and a new
+dedicated test that isolates exactly this gate.
+
+Rewrote the pre-existing gap-pinning test (this codebase's standing
+convention for a fixed deviation) and added 3 new tests. 5 tests
+total; systematic mutation-testing across 3 mutations (bypass bullet
+2 entirely; ignore `request_stream_index`; ignore `ep_used`) -- all
+3 caught cleanly after the fix.
+
+**Found in passing, not part of this fix**: `cfusa trace` reports 54
+pre-existing dangling test references in `tests/test_tc18_gaps_ep2.c`
+(test tags citing req IDs that no longer exist in `.fusa-reqs.json`)
+-- confirmed present on `main` before this batch, unrelated, and
+non-blocking. Flagged as a candidate for a future stale-catalog-entry
+batch.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.263.0 -- 2026-08-12 (issue #201 doc-only batch: `REQ-UART-036`
 was already implemented, stale catalog entry corrected)
 

@@ -249,17 +249,18 @@ static void test_admit_takes_no_lifecycle_state_or_stream_identity(void)
     rcp_server_endpoint_destroy(&ep);
 }
 
-/* DEVIATION PIN (REQ-LIFECYCLE-038, not implemented): TC18 §12.3.1.2's
+/* FIXED 2026-08-12 (issue #201, REQ-LIFECYCLE-038): TC18 §12.3.1.2's
  * RCP_CFG_INCONSISTENT plausibility check names three bullets;
- * rcp_lifecycle_check_rcp_cfg() implements only two (has_stream_assoc per
- * used endpoint, has_response_stream per configured request stream). The
- * third -- "For each configured stream at least one stream_id/byte_bus_id
- * is configured", i.e. no request stream is left orphaned with zero
- * endpoints actually using it -- has no counterpart at all: a snapshot
- * with zero endpoints and one "configured" request stream (already
- * satisfying has_response_stream) is indistinguishable from a plausible
- * configuration today. */
-static void test_rcp_cfg_inconsistent_does_not_catch_an_orphaned_stream(void)
+ * rcp_lifecycle_check_rcp_cfg() now implements all three (has_stream_assoc
+ * per used endpoint, has_response_stream per configured request stream,
+ * and -- as of this fix -- at least one endpoint's own request_stream_index
+ * referencing every configured request stream, so no stream is left
+ * orphaned with zero endpoints actually using it). This test used to pin
+ * the deviation (a snapshot with zero endpoints and one "configured"
+ * stream passed as plausible); it now asserts the conforming rejection,
+ * per this file's own documented convention that a gap-pinning test
+ * failing after a fix means "rewrite it to the conforming expectation." */
+static void test_rcp_cfg_inconsistent_catches_an_orphaned_stream(void)
 {
     rcp_lifecycle_request_stream_plausibility_t streams[1] = {
         { true, true }, /* configured, has_response_stream -- both "satisfied" */
@@ -267,13 +268,128 @@ static void test_rcp_cfg_inconsistent_does_not_catch_an_orphaned_stream(void)
     rcp_lifecycle_plausibility_snapshot_t snap = {0};
 
     /* No endpoints at all reference this stream -- TC18's own bullet 2
-     * would reject this as RCP_CFG_INCONSISTENT; this check does not. */
+     * now correctly rejects this as RCP_CFG_INCONSISTENT. */
     snap.endpoints            = NULL;
     snap.endpoint_count       = 0;
     snap.request_streams      = streams;
     snap.request_stream_count = 1;
 
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT, rcp_lifecycle_check_rcp_cfg(&snap));
+}
+
+/* The positive case: an endpoint whose own request_stream_index correctly
+ * references the configured stream satisfies bullet 2, and the whole
+ * snapshot is plausible (matching test_rcp_cfg_consistent_when_satisfied's
+ * own single-stream shape, but exercising this specific field to prove
+ * it is actually consulted, not merely present). */
+static void test_rcp_cfg_inconsistent_a_bound_endpoint_satisfies_bullet_two(void)
+{
+    rcp_lifecycle_endpoint_plausibility_t eps[1];
+    rcp_lifecycle_request_stream_plausibility_t streams[1] = {
+        { true, true },
+    };
+    rcp_lifecycle_plausibility_snapshot_t snap = {0};
+
+    eps[0].ep_used              = true;
+    eps[0].hw_pin_mapped        = true;
+    eps[0].has_request_stream   = true;
+    eps[0].has_stream_assoc     = true;
+    eps[0].request_stream_index = 0;
+
+    snap.endpoints            = eps;
+    snap.endpoint_count       = 1;
+    snap.request_streams      = streams;
+    snap.request_stream_count = 1;
+
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK, rcp_lifecycle_check_rcp_cfg(&snap));
+}
+
+/* Two configured streams; only one has a bound endpoint. The unbound
+ * stream is still caught, even in the presence of an otherwise-plausible
+ * sibling stream -- bullet 2 is evaluated per-stream, not in aggregate. */
+static void test_rcp_cfg_inconsistent_catches_the_specific_orphaned_stream_among_several(void)
+{
+    rcp_lifecycle_endpoint_plausibility_t eps[1];
+    rcp_lifecycle_request_stream_plausibility_t streams[2] = {
+        { true, true }, /* stream 0: bound below */
+        { true, true }, /* stream 1: configured, but nothing references it */
+    };
+    rcp_lifecycle_plausibility_snapshot_t snap = {0};
+
+    eps[0].ep_used              = true;
+    eps[0].hw_pin_mapped        = true;
+    eps[0].has_request_stream   = true;
+    eps[0].has_stream_assoc     = true;
+    eps[0].request_stream_index = 0;
+
+    snap.endpoints            = eps;
+    snap.endpoint_count       = 1;
+    snap.request_streams      = streams;
+    snap.request_stream_count = 2;
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT, rcp_lifecycle_check_rcp_cfg(&snap));
+}
+
+/* An endpoint with has_stream_assoc FALSE is never consulted for bullet
+ * 2, regardless of what its own request_stream_index happens to hold --
+ * that field is meaningless without has_stream_assoc, per its own doc
+ * comment (lifecycle.h). Confirms this endpoint's own already-failing
+ * bullet 1 (a used endpoint with no stream association) is what's
+ * actually caught here, not a false-positive bullet-2 match. */
+static void test_rcp_cfg_inconsistent_ignores_stream_index_without_stream_assoc(void)
+{
+    rcp_lifecycle_endpoint_plausibility_t eps[1];
+    rcp_lifecycle_request_stream_plausibility_t streams[1] = {
+        { true, true },
+    };
+    rcp_lifecycle_plausibility_snapshot_t snap = {0};
+
+    eps[0].ep_used              = true;
+    eps[0].hw_pin_mapped        = true;
+    eps[0].has_request_stream   = true;
+    eps[0].has_stream_assoc     = false; /* bullet 1 already fails on this */
+    eps[0].request_stream_index = 0;     /* would satisfy bullet 2 if consulted */
+
+    snap.endpoints            = eps;
+    snap.endpoint_count       = 1;
+    snap.request_streams      = streams;
+    snap.request_stream_count = 1;
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT, rcp_lifecycle_check_rcp_cfg(&snap));
+}
+
+/* A stale/unused endpoint slot (ep_used == false) with leftover
+ * has_stream_assoc == true and a matching request_stream_index must NOT
+ * be able to "cover" an otherwise-orphaned stream for bullet 2 -- an
+ * unused slot's own has_stream_assoc/request_stream_index values are
+ * never validated by bullet 1 (its own loop skips unused endpoints
+ * entirely via `continue`), so bullet 2 must not trust them either.
+ * This is the discriminating case that isolates bullet 2's own ep_used
+ * gate from bullet 1's own has_stream_assoc requirement -- unlike
+ * test_rcp_cfg_inconsistent_ignores_stream_index_without_stream_assoc
+ * above (ep_used == true, masked by bullet 1's own earlier check), this
+ * endpoint passes bullet 1 trivially (skipped) and reaches bullet 2 with
+ * has_stream_assoc == true, so only the ep_used check can catch it. */
+static void test_rcp_cfg_inconsistent_an_unused_endpoint_does_not_cover_a_stream(void)
+{
+    rcp_lifecycle_endpoint_plausibility_t eps[1];
+    rcp_lifecycle_request_stream_plausibility_t streams[1] = {
+        { true, true }, /* configured, has_response_stream */
+    };
+    rcp_lifecycle_plausibility_snapshot_t snap = {0};
+
+    eps[0].ep_used              = false; /* unused -- skipped by bullet 1 entirely */
+    eps[0].hw_pin_mapped        = false;
+    eps[0].has_request_stream   = false;
+    eps[0].has_stream_assoc     = true; /* stale leftover value on an unused slot */
+    eps[0].request_stream_index = 0;    /* matches streams[0] -- must NOT count */
+
+    snap.endpoints            = eps;
+    snap.endpoint_count       = 1;
+    snap.request_streams      = streams;
+    snap.request_stream_count = 1;
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT, rcp_lifecycle_check_rcp_cfg(&snap));
 }
 
 /* ── §12.3.1.1 / §12.7.2 / §12.7: HW_UNCONFIGURED admission ────────────────── */
@@ -1241,7 +1357,11 @@ int main(void)
     RUN_TEST(test_hw_generic_covers_ep_generic_and_queue_config_with_locked_response);
     RUN_TEST(test_hw_configured_admits_only_ep0);
     RUN_TEST(test_admit_takes_no_lifecycle_state_or_stream_identity);
-    RUN_TEST(test_rcp_cfg_inconsistent_does_not_catch_an_orphaned_stream);
+    RUN_TEST(test_rcp_cfg_inconsistent_catches_an_orphaned_stream);
+    RUN_TEST(test_rcp_cfg_inconsistent_a_bound_endpoint_satisfies_bullet_two);
+    RUN_TEST(test_rcp_cfg_inconsistent_catches_the_specific_orphaned_stream_among_several);
+    RUN_TEST(test_rcp_cfg_inconsistent_ignores_stream_index_without_stream_assoc);
+    RUN_TEST(test_rcp_cfg_inconsistent_an_unused_endpoint_does_not_cover_a_stream);
     RUN_TEST(test_hw_unconfigured_admission_ignores_claimant_but_writes_still_gated);
     RUN_TEST(test_hw_configured_write_access_now_requires_unicast_and_authorization);
     RUN_TEST(test_hw_configured_drops_tscf);
