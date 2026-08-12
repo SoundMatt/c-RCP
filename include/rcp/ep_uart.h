@@ -651,6 +651,55 @@ rcp_ep_uart_errc_t rcp_ep_uart_decode_read_response(const uint8_t *b, size_t len
                                                      uint64_t *out_timestamp,
                                                      uint8_t *out_transaction_num);
 
+/* ── Read-completion arbitration (REQ-UART-033) ──────────────────────────────
+ *
+ * TC18 §13.7.8.1's own three read-completion triggers, verbatim: "A read
+ * request will be started as soon as the fifo-rx-buffer is filled with as
+ * many bytes as requested in the read_size or when the uart_timeout has
+ * expired or in case the read_size is larger than the uart_rx_fifo_size,
+ * when the fifo is full. In the latter case the response is fragmented."
+ * This module already supplies all three ingredients (read_size in the ACF
+ * header, cfg->uart_timeout_ms, and rcp_ep_uart_encode_read_response_
+ * fragmented()) but previously never arbitrated between them -- the choice
+ * was left entirely to an unspecified caller, so two conforming c-RCP-based
+ * servers could answer identical read requests with materially different
+ * response cadence and fragmentation (the exact deviation REQ-UART-033
+ * used to pin). rcp_ep_uart_read_completion_decision() is that arbitration,
+ * as a pure, directly-testable function over caller-tracked counters --
+ * this module still does not itself own a real FIFO or a clock, matching
+ * every other caller-driven primitive in this codebase (e.g. ep_spi.h's
+ * rcp_ep_spi_transfer_length()) rather than inventing timer/buffer state
+ * this protocol-codec library has no business owning. */
+typedef enum {
+    RCP_EP_UART_READ_NOT_YET_COMPLETE   = 0, /* keep waiting */
+    RCP_EP_UART_READ_RESPOND_NORMAL     = 1, /* emit a normal (possibly
+                                                 short) response now */
+    RCP_EP_UART_READ_RESPOND_FRAGMENTED = 2, /* emit via
+                                                 rcp_ep_uart_encode_read_
+                                                 response_fragmented() now */
+} rcp_ep_uart_read_completion_t;
+
+/* Decides which of the three TC18 §13.7.8.1 triggers, if any, has fired for
+ * a read request in progress: bytes_available is the caller-tracked count
+ * currently held in the fifo-rx-buffer; read_size is the request's own
+ * requested byte count; elapsed_ms is wall-clock time since the request
+ * began; uart_timeout_ms/rx_fifo_size are cfg->uart_timeout_ms/
+ * cfg->ep_rx_buffer_size (passed explicitly rather than as a struct
+ * pointer, since neither is mutated and a caller may be tracking several
+ * in-flight reads against one shared cfg). Checked in the spec's own
+ * stated order: the fragmentation trigger (read_size exceeds rx_fifo_size,
+ * AND the fifo has actually filled to capacity) is checked first, since it
+ * is the more specific condition -- the read_size-satisfied trigger can
+ * never itself fire when read_size > rx_fifo_size (bytes_available cannot
+ * exceed rx_fifo_size), so the ordering only matters for documentation
+ * clarity, not correctness. elapsed_ms >= uart_timeout_ms with
+ * uart_timeout_ms == 0 completes immediately (no waiting), matching "as
+ * soon as... the uart_timeout has expired" read literally for a
+ * zero-length timeout. */
+rcp_ep_uart_read_completion_t rcp_ep_uart_read_completion_decision(
+    uint16_t bytes_available, uint16_t read_size, uint32_t elapsed_ms,
+    uint32_t uart_timeout_ms, uint16_t rx_fifo_size);
+
 /* ── Fragmented read response (Phase 20, fragment.h) ───────────────────────── */
 
 /* The number of ACF frames rcp_ep_uart_encode_read_response_fragmented()

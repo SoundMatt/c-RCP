@@ -10413,12 +10413,12 @@
     {
       "id": "REQ-UART-033",
       "title": "UART read-response completion is triggered by read_size satisfied, uart_timeout expiry, or a full RX FIFO",
-      "text": "NOT IMPLEMENTED: c-RCP does not implement the UART read-request completion rule (TC18 \u00a713.7.8.1) \u2014 a read response shall be emitted as soon as (a) the fifo-rx-buffer holds as many octets as the request's read_size, or (b) uart_timeout has expired, or (c) read_size exceeds uart_rx_fifo_size and the FIFO is full, in which case the response shall be fragmented via rcp_ep_uart_encode_read_response_fragmented(). c-RCP supplies the three ingredients (read_size in the ACF header, cfg->uart_timeout_ms, and the fragmenting encoder) but never arbitrates between them; the choice is left entirely to an unspecified caller. Consequence: two conforming c-RCP-based servers can answer identical read requests with materially different response cadence and fragmentation.",
+      "text": "c-RCP now implements the UART read-request completion arbitration (TC18 \u00a713.7.8.1) via rcp_ep_uart_read_completion_decision() \u2014 a pure, caller-driven function deciding, from (bytes_available, read_size, elapsed_ms, uart_timeout_ms, rx_fifo_size), which of the three triggers has fired: (a) the fifo-rx-buffer holds as many octets as the request's read_size, or (b) uart_timeout has expired, or (c) read_size exceeds uart_rx_fifo_size and the fifo has filled to capacity, in which case the response must be emitted via the pre-existing rcp_ep_uart_encode_read_response_fragmented(). This module still owns no real FIFO or clock (matching every other caller-driven primitive in this codebase, e.g. rcp_ep_spi_transfer_length()), so a caller supplies the current counters rather than this function tracking state itself.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "partial",
+      "status": "implemented",
       "tc18": "\u00a713.7.8.1, TC18.txt L4884-4886"
     },
     {
