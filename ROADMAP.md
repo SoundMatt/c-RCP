@@ -15205,6 +15205,47 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.255.0 -- 2026-08-12 (issue #311 batch 5: EP0 dispatcher wiring
+for `svr_ep_generic_cfg_ptr` -- issue #311 CLOSED)
+
+**`rcp_regmap_ep0_decode_write_request()`/`_encode_read_response()`
+gain a 6th and final routing block, targeting `svr_ep_generic_cfg_ptr`'s
+own extent -- closing issue #311 in full, all 5 batches complete.**
+
+The write dispatcher authorizes via `rcp_lifecycle_field_writable(state,
+RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer)` against the row as a
+whole before calling `rcp_regmap_ep_generic_cfg_apply_reconfig()`
+(#315) -- confirmed via direct primary-source verification that TC18
+§13.2's own surrounding prose names no table-specific lifecycle-state
+override the way §12.7.6 does for HW_config, so the generic
+FUNCTIONAL_W_STAR rule genuinely applies here. `ep_type`'s own
+read-only handling stays entirely inside `apply_reconfig()` itself,
+independent of this row-level authorization. The read dispatcher
+routes the identical extent to `rcp_regmap_ep_generic_cfg_render()`
+(#314) directly, matching every sibling extent's own established
+pattern -- no authorization gate on the read side, matching every
+other extent.
+
+New dedicated tests added to all 3 of the existing dispatcher-level
+test functions: a genuine read+write round trip through the new
+extent plus its own routing-boundary case, and an
+authorization-denial case. Mutation-tested 3 ways (bypassing the
+authorization check, loosening the write-side routing boundary,
+loosening the read-side routing boundary); all three caught cleanly.
+
+**REQ-RMAP-073 through -079 all flip to `implemented`** (dispatcher
+routing was the shared last gap every one of them tracked); new
+REQ-RMAP-080 tracks the dispatcher wiring itself.
+
+**A tag-coverage gap repeated**: `cfusa trace --sec-tested` initially
+reported 99% after adding REQ-RMAP-080's own `//cfusa:req` tags
+without the matching `//cfusa:test` tag in the test file's own
+top-of-file list -- the same pattern hit earlier this session with
+REQ-RMAP-071. Fixed by adding the missing test tag.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.254.0 -- 2026-08-12 (issue #311 batch 4:
 `rcp_regmap_ep_generic_cfg_apply_reconfig()`, the WRITE side of
 ep_generic_cfg's wire codec)

@@ -2392,6 +2392,14 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
  *     map->svr_request_stream_cfg_ptr + 24*request_stream_cfg_count):
  *     request-stream-cfg -- routed to
  *     rcp_regmap_request_stream_cfg_apply_reconfig() the identical way.
+ *   - Within [map->svr_ep_generic_cfg_ptr, map->svr_ep_generic_cfg_ptr
+ *     + 12*ep_generic_cfg_count): ep_generic_cfg -- routed to
+ *     rcp_regmap_ep_generic_cfg_apply_reconfig() the identical way
+ *     (issue #311 batch 5). ep_generic_cfg's own read-only ep_type
+ *     octet (relative 0x0000 within each row) is handled entirely
+ *     inside that function itself, per its own doc comment -- this
+ *     dispatcher's own authorization check below applies to the row
+ *     as a whole, not per-field.
  *   - For any pointed-to table, the write is first subject to lifecycle-
  *     state/writer authorization (issue #308) before being applied.
  *     HW_config is NOT its own "R/W*" column legend despite appearances
@@ -2422,7 +2430,17 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
  *     sub-range the write's own [relative, relative+data_len) touches
  *     must pass its own corresponding check, the more specific denial
  *     (LOCKED_MEM_ACCESS over UNAUTHORIZED_ACCESS) reported if more
- *     than one sub-range is touched and denied for different reasons.
+ *     than one sub-range is touched and denied for different reasons;
+ *     ep_generic_cfg is entirely R/W* for authorization purposes
+ *     (checked via rcp_lifecycle_field_writable(state,
+ *     RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer) against the row
+ *     as a whole) -- confirmed via direct primary-source verification
+ *     of TC18 §13.2's own surrounding prose, which names no
+ *     table-specific lifecycle-state override the way §12.7.6 does
+ *     for HW_config; ep_type's own read-only status is a SEPARATE,
+ *     per-field concern already enforced inside
+ *     rcp_regmap_ep_generic_cfg_apply_reconfig() itself, independent
+ *     of whether the row as a whole is authorized.
  *     An authorization denial produces *out_error = the wire error
  *     rcp_lifecycle_field_write_error()/_write_error_w_plus() itself
  *     reports (RCP_ERROR_LOCKED_MEM_ACCESS or
@@ -2457,11 +2475,12 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
  * type's own writability gate already takes -- a caller already has
  * both to hand for any other write path.
  * hw_pin_map/hw_pin_map_count, ep_id_map/ep_id_map_count,
- * response_queue_cfg/response_queue_cfg_count, and
- * request_stream_cfg/request_stream_cfg_count describe the
- * currently-configured tables this call may patch in place; any count
- * may be 0 (that table then has no address range at all, and any write
- * targeting it falls through to the "unknown address" case). */
+ * response_queue_cfg/response_queue_cfg_count,
+ * request_stream_cfg/request_stream_cfg_count, and
+ * ep_generic_cfg/ep_generic_cfg_count describe the currently-configured
+ * tables this call may patch in place; any count may be 0 (that table
+ * then has no address range at all, and any write targeting it falls
+ * through to the "unknown address" case). */
 rcp_regmap_ep0_errc_t
 rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      const rcp_regmap_general_t *map,
@@ -2475,6 +2494,8 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      size_t response_queue_cfg_count,
                                      rcp_regmap_request_stream_cfg_t *request_stream_cfg,
                                      size_t request_stream_cfg_count,
+                                     rcp_regmap_ep_generic_cfg_t *ep_generic_cfg,
+                                     size_t ep_generic_cfg_count,
                                      rcp_wire_error_t *out_error,
                                      uint8_t *out_transaction_num);
 
@@ -2489,7 +2510,7 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
  * rcp_regmap_general_encode_read_response()'s own established
  * precedent (not the ACF header's own wider 12-bit
  * read_size_or_segment_num field) -- every one of this dispatcher's own
- * five routable extents comfortably fits this codebase's real,
+ * six routable extents comfortably fits this codebase's real,
  * non-adversarial configurations well under 256 octets; widening this
  * type asymmetrically for just these two new functions, when every
  * sibling read-response function in this codebase already uses uint8_t,
@@ -2514,9 +2535,10 @@ rcp_regmap_ep0_decode_read_request(const uint8_t *b, size_t len,
 
 /* Encodes an ACF_ABB READ response for a request decoded by
  * rcp_regmap_ep0_decode_read_request() above. Routes addr across the
- * identical five extents rcp_regmap_ep0_decode_write_request() routes
+ * identical six extents rcp_regmap_ep0_decode_write_request() routes
  * (Table 18 itself, HW_config, EP_ID_config, response-queue-config,
- * request-stream-cfg), reusing this dispatcher's own already-proven
+ * request-stream-cfg, ep_generic_cfg -- issue #311 batch 5 adds the
+ * last of these), reusing this dispatcher's own already-proven
  * per-table render() functions, not a second copy of that wire codec.
  *
  * On a known extent: *out_error is RCP_ERROR_NONE and the returned
@@ -2528,7 +2550,8 @@ rcp_regmap_ep0_decode_read_request(const uint8_t *b, size_t len,
  * Table 18 alone, now generalized to whichever of the four extents
  * addr's own starting position falls within.
  *
- * On an address matching none of the four known extents: *out_error is
+ * On an address matching none of the five known pointed-to-table
+ * extents: *out_error is
  * RCP_ERROR_EP_NOT_FOUND (the identical code the write dispatcher
  * already uses for the same condition) and the returned rcp_bytes_t is
  * zeroed (data=NULL) -- the caller builds the actual error response via
@@ -2558,6 +2581,8 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      size_t response_queue_cfg_count,
                                      const rcp_regmap_request_stream_cfg_t *request_stream_cfg,
                                      size_t request_stream_cfg_count,
+                                     const rcp_regmap_ep_generic_cfg_t *ep_generic_cfg,
+                                     size_t ep_generic_cfg_count,
                                      rcp_wire_error_t *out_error);
 
 #ifdef __cplusplus
