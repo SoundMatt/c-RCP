@@ -163,6 +163,29 @@ bool rcp_ep_gpio_trigger_fires(rcp_ep_gpio_trigger_t trigger, bool prev_level, b
     }
 }
 
+//cfusa:req REQ-GPIO-034
+bool rcp_ep_gpio_trigger_signal_number(uint8_t pin_index, rcp_ep_gpio_trigger_t trigger,
+                                        uint8_t *out_signal_number)
+{
+    if (pin_index >= RCP_EP_GPIO_MAX_PINS) return false;
+
+    switch (trigger) {
+    case RCP_EP_GPIO_TRIGGER_ANY_CHANGE:
+    case RCP_EP_GPIO_TRIGGER_RISING:
+    case RCP_EP_GPIO_TRIGGER_FALLING:
+        /* Table 43's own 3n+{1,2,3} pattern -- rcp_ep_gpio_trigger_t's
+         * ordinals (ANY_CHANGE=1/RISING=2/FALLING=3) are exactly the
+         * table's own +1/+2/+3 offset, by this module's own design (see
+         * the header's doc comment), so no per-case arithmetic is
+         * needed. */
+        *out_signal_number = (uint8_t)(3u * pin_index + (uint8_t)trigger);
+        return true;
+    case RCP_EP_GPIO_TRIGGER_NONE:
+    default:
+        return false;
+    }
+}
+
 /* ── Functional config ─────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-GPIO-018

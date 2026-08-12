@@ -380,6 +380,46 @@ static void test_gpio_trigger_numbering_and_functional_cfg_gaps(void)
     TEST_ASSERT_EQUAL_UINT((size_t)RCP_EP_GPIO_MAX_PINS, sizeof(cfg.debounce));
 }
 
+/* REQ-GPIO-034 IMPLEMENTED (issue #336): TC18 Table 40 (RC1)/Table 43
+ * (RC5)'s own trigger signal numbering -- signal 3n+1/3n+2/3n+3 for pin
+ * n's ANY_CHANGE/RISING/FALLING trigger, up to signal 96 for IO31's own
+ * FALLING entry. Signal 0 ("GPIO EP request execution done") is a
+ * whole-endpoint trigger this per-pin function deliberately does not
+ * model -- see rcp_ep_gpio_trigger_signal_number()'s own doc comment. */
+static void test_gpio_trigger_signal_numbering(void)
+{
+    uint8_t signal;
+
+    /* Pin 0's own three trigger signals: the table's first three
+     * non-zero rows, verbatim. */
+    TEST_ASSERT_TRUE(rcp_ep_gpio_trigger_signal_number(0u, RCP_EP_GPIO_TRIGGER_ANY_CHANGE,
+                                                        &signal));
+    TEST_ASSERT_EQUAL_UINT8(1u, signal);
+    TEST_ASSERT_TRUE(rcp_ep_gpio_trigger_signal_number(0u, RCP_EP_GPIO_TRIGGER_RISING, &signal));
+    TEST_ASSERT_EQUAL_UINT8(2u, signal);
+    TEST_ASSERT_TRUE(rcp_ep_gpio_trigger_signal_number(0u, RCP_EP_GPIO_TRIGGER_FALLING, &signal));
+    TEST_ASSERT_EQUAL_UINT8(3u, signal);
+
+    /* Pin 1's own first signal (4) -- confirms the table's own "IO1
+     * signal change" row, one pin over from pin 0's own three. */
+    TEST_ASSERT_TRUE(rcp_ep_gpio_trigger_signal_number(1u, RCP_EP_GPIO_TRIGGER_ANY_CHANGE,
+                                                        &signal));
+    TEST_ASSERT_EQUAL_UINT8(4u, signal);
+
+    /* The table's own last, highest-numbered row: IO31 falling edge, 96 --
+     * the upper bound this codebase's own RCP_EP_GPIO_MAX_PINS (32) and
+     * the table's own explicit "…96 IO31 falling edge" row agree on. */
+    TEST_ASSERT_TRUE(rcp_ep_gpio_trigger_signal_number(31u, RCP_EP_GPIO_TRIGGER_FALLING,
+                                                        &signal));
+    TEST_ASSERT_EQUAL_UINT8(96u, signal);
+
+    /* Out-of-range pin index and the NONE trigger both correctly report
+     * "no such signal" rather than fabricating a number. */
+    TEST_ASSERT_FALSE(rcp_ep_gpio_trigger_signal_number(32u, RCP_EP_GPIO_TRIGGER_ANY_CHANGE,
+                                                         &signal));
+    TEST_ASSERT_FALSE(rcp_ep_gpio_trigger_signal_number(0u, RCP_EP_GPIO_TRIGGER_NONE, &signal));
+}
+
 /* REQ-GPIO-036 (not-implemented) DEVIATION PIN: TC18 13.7.4.3 makes GPIO
  * response timing depend on the request -- a read carrying no
  * byte_msg_payload responds immediately on execution, while a payload-bearing
@@ -1518,6 +1558,7 @@ int main(void)
     RUN_TEST(test_gpio_request_payload_is_four_octets);
     RUN_TEST(test_gpio_wire_error_is_none_for_local_only_codes);
     RUN_TEST(test_gpio_trigger_numbering_and_functional_cfg_gaps);
+    RUN_TEST(test_gpio_trigger_signal_numbering);
     RUN_TEST(test_gpio_response_timing_is_not_modelled);
 
     RUN_TEST(test_spi_six_channels_selected_by_evt);

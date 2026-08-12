@@ -8467,13 +8467,13 @@
     {
       "id": "REQ-GPIO-034",
       "title": "GPIO trigger signal numbering (Table 40)",
-      "text": "NOT IMPLEMENTED: c-RCP implements the three GPIO trigger conditions (rcp_ep_gpio_trigger_fires() for change, rising and falling edges) but assigns them no trigger signal numbers, so TC18 Table 40's numbering -- signal 0 'GPIO EP request execution done' and, for each pin IOn, signal 3n+1 change / 3n+2 rising / 3n+3 falling up to signal 96 for IO31 falling -- is not represented. A triggered request naming a Table 40 signal number cannot be resolved by this library.",
+      "text": "c-RCP implements the three GPIO trigger conditions (rcp_ep_gpio_trigger_fires() for change, rising and falling edges) and now also assigns them TC18 Table 40 (RC1)/Table 43 (RC5) trigger signal numbers via rcp_ep_gpio_trigger_signal_number(): signal 0 is the whole-endpoint 'GPIO EP request execution done' trigger (not modelled by this per-pin function) and, for each pin IOn, signal 3n+1/3n+2/3n+3 is ANY_CHANGE/RISING/FALLING, up to signal 96 for IO31 FALLING. A triggered request naming a Table 40/43 signal number can now be resolved against a (pin_index, trigger) pair by this library.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "partial",
-      "tc18": "\u00a713.7.4.1 Table 40, TC18.txt L4408-4419"
+      "status": "implemented",
+      "tc18": "\u00a713.7.4.1 Table 40 (RC1)/Table 43 (RC5), TC18.txt L4408-4419"
     },
     {
       "id": "REQ-GPIO-035",
