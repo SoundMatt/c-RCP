@@ -342,7 +342,7 @@ bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
         break;
 
     case RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR:
-        /* TC18 Table 22's own legend: "This configuration table can only be
+        /* TC18 Table 24's own legend: "This configuration table can only be
          * changed in the life-cycle states HW_UNCONFIGURED and HW_CONFIGURED.
          * In RCP_CONFIGURED ... this is read-only. (As indicated by W*)" --
          * writable in both HW_UNCONFIGURED and HW_CONFIGURED (the latter
@@ -358,7 +358,7 @@ bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
         break;
 
     case RCP_LIFECYCLE_FIELD_READ_ONLY:
-        /* TC18 §12.7.5 Table 18's own access type "R" (REQ-RMAP-025):
+        /* TC18 §12.7.5 Table 20's own access type "R" (REQ-RMAP-025):
          * never writable, in any state, by any writer -- state and
          * writer are both deliberately ignored here, unlike every case
          * above. */

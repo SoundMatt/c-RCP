@@ -15205,6 +15205,48 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.275.0 -- 2026-08-12 (c-RCP-AUDIT-08 doc-only batch: `Table
+18`/`Table 22` citation drift corrected -- highest-value slice of
+issue #341)
+
+**Documentation-only correction, no functional code change.** First
+batch of issue #341's broader table-number census -- the two
+highest-count stale citations, both content-verified (not just
+number pattern-matching) against both spec revisions.
+
+- RC1 Table 18 "RC Server configuration static part" (§12.7.5) -> RC5
+  Table 20. 62 occurrences (`regmap.h`, `respqueue.h`, `lifecycle.h`,
+  `cli.c`, `regmap.c`, `config.c`, `lifecycle.c`, `.fusa-reqs.json`).
+  Content-verified against RC5's own Table 20 (page 60-61) field-for-
+  field: `svr_io_pin_count` at 0x0018, `svr_hw_cfg_ptr`,
+  `svr_request_stream_cfg_capacity`, `svr_ep_generic_cfg_ptr`, etc.
+- RC1 Table 22 "Request stream configuration" (§12.7.7) -> RC5 Table
+  24. 42 occurrences (`regmap.h`, `lifecycle.h`, `mock.h`, `e2e.h`,
+  `server.c`, `lifecycle.c`, `mock.c`, `.fusa-reqs.json`).
+  Content-verified against `rx_enforce_crc`/`rx_enforce_sequence`/
+  `rx_enforce_watchdog`/`rx_ovrflw_safestate_enable`/`rx_wd_action`.
+
+**A genuinely mixed, inconsistent state found and deliberately left
+alone**: `regmap.h`'s own request-stream-cfg wire-codec comment block
+(issue #306, a more recent pass) already correctly cited `Table 24`
+for this table in one paragraph, while the immediately preceding
+paragraph of the SAME block still said `Table 22` -- confirms both
+numbers appeared for the identical real-world table even within one
+contiguous comment. Separately, `respqueue.h`'s own `Table 24`
+citations (`STREAM_UID`, `max_avtpdu_size`, `queue_size`,
+`flush_time_us`) are for an entirely DIFFERENT table (RC1's own
+Table 24 "Responder QUEUE_config" -> RC5 Table 27) -- confirmed stale
+but deliberately NOT touched in this batch, since fixing it means
+introducing new `Table 27` text into a codebase that doesn't yet
+consistently distinguish it from the `Table 24` this batch just
+finished fixing; tracked in issue #341. A separate, already-broken
+`Table 20` citation for `hw_pin_type` (`config.c`/`regmap.h`, §12.7.6,
+should be `Table 21`) was also found and also deliberately left
+alone -- same reasoning, same tracking issue.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 errors.
+`cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.274.0 -- 2026-08-12 (c-RCP-AUDIT-07 doc-only batch: `Table
 30`/`Table 27` citation drift corrected, issue #339)
 

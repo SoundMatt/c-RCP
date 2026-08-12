@@ -287,7 +287,7 @@ bool rcp_mock_server_set_endpoint_req_crc_enable(rcp_mock_server_t *srv,
                                                   rcp_byte_bus_id_t byte_bus_id, bool enable);
 
 /* REQ-E2E-021 (issue #201): this test double's own in-process stand-in
- * for TC18 §12.7.7 Table 22's own rx_enforce_e2e -- a per-REQUEST-
+ * for TC18 §12.7.7 Table 24's own rx_enforce_e2e -- a per-REQUEST-
  * STREAM config bit in the real spec, kept here as a per-endpoint
  * stand-in for the exact same "type-erased slot has no way to read a
  * real config table generically" reason

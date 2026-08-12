@@ -69,7 +69,7 @@ static void version_text(char *buf, size_t buf_len)
  * corrected and trigger/chained added, REQ-RMAP-030): names, one per
  * group this build compiles the *API surface* for, regmap.h's own
  * svr_implemented_options bits (RCP_REGMAP_OPT_* -- five independent
- * single bits, TC18 §12.7.5 Table 18, src/regmap.c since v0.62.0,
+ * single bits, TC18 §12.7.5 Table 20, src/regmap.c since v0.62.0,
  * corrected v0.183.0): time_sync (bit d: TSCF framing plus its
  * presentation-timestamp companion), enhanced_cancel (bit e: a
  * cancellation request plus its acknowledgement, request_cancel.h),

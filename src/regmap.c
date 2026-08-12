@@ -34,7 +34,7 @@ bool rcp_regmap_is_ep0(uint16_t ep_index)
  * deprecated-then-removed; there is no correct behavior to preserve a
  * transition window for). REQ-RMAP-030's own field comment (regmap.h)
  * gives the correct, primary-source-verified replacement: five
- * independent single bits, matching Table 18 exactly. */
+ * independent single bits, matching Table 20 exactly. */
 
 /* ── The general register map ──────────────────────────────────────────────── */
 
@@ -49,7 +49,7 @@ void rcp_regmap_general_init(rcp_regmap_general_t *map)
      * rcp_lifecycle_state_t (see server.h/mock.h). */
 }
 
-/* ── Table 18 wire codec (REQ-RMAP-024) ──────────────────────────────────────
+/* ── Table 20 wire codec (REQ-RMAP-024) ──────────────────────────────────────
  * This TU's own copy of the byte-order helpers, matching acf.c's/avtp.c's/
  * discovery.c's house convention of not sharing one across modules. */
 
@@ -464,7 +464,7 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
     *out_transaction_num = hdr.transaction_num;
 
     if ((size_t)addr < RCP_REGMAP_GENERAL_LEN) {
-        /* Table 18's own extent -- unconditionally read-only (REQ-RMAP-025),
+        /* Table 20's own extent -- unconditionally read-only (REQ-RMAP-025),
          * reusing rcp_lifecycle_field_write_error() exactly as
          * rcp_regmap_general_decode_write_request() already does, not a
          * second, separately-maintained copy of that logic. writer's own
@@ -611,7 +611,7 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
         return RCP_REGMAP_EP0_OK;
     }
 
-    /* Neither Table 18's own extent nor any known pointed-to table --
+    /* Neither Table 20's own extent nor any known pointed-to table --
      * see this function's own header doc comment for which tables this
      * milestone routes (issue #301, issue #306, issue #311). */
     *out_error = RCP_ERROR_EP_NOT_FOUND;
@@ -654,7 +654,7 @@ rcp_regmap_ep0_decode_read_request(const uint8_t *b, size_t len,
  * octets from table_image starting at offset, zero-fills the rest up to
  * read_size, and encodes the ACF_ABB READ response -- the identical
  * body rcp_regmap_general_encode_read_response() already establishes
- * for Table 18 alone, generalized to an arbitrary source image/offset. */
+ * for Table 20 alone, generalized to an arbitrary source image/offset. */
 static rcp_bytes_t ep0_read_response_from_slice(const uint8_t *table_image, size_t table_len,
                                                  size_t offset, uint8_t read_size,
                                                  uint8_t transaction_num)
@@ -787,7 +787,7 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                              read_size, transaction_num);
     }
 
-    /* Neither Table 18's own extent nor any known pointed-to table --
+    /* Neither Table 20's own extent nor any known pointed-to table --
      * same fallback the write dispatcher already uses for the identical
      * condition. */
     *out_error = RCP_ERROR_EP_NOT_FOUND;

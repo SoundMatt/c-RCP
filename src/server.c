@@ -216,7 +216,7 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
 
     slot = claim_slot(ep);
     if (!slot) {
-        /* TC18 §12.7.7 Table 22's rx_ovrflw_safestate_enable names this
+        /* TC18 §12.7.7 Table 24's rx_ovrflw_safestate_enable names this
          * condition -- an endpoint's own request storage exhausted -- as
          * one that (when configured) shall bring every endpoint bound to
          * the request stream into its configured safe state, not merely
