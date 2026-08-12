@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.256.0 -- 2026-08-12 (issue #201 batch: `REQ-WDG-010`, wiring the per-stream watchdog kick into `dispatch_e2e()`)
+
+**`rcp_mock_server_dispatch_e2e()`/`_dispatch_frame_e2e()` now call `rcp_watchdog_keeper_kick()` for every request they receive on a stream, closing the "no production call site" half of `REQ-WDG-010` (TC18 §12.7.7: "the watchdog is reset with each request received from this RC Client").**
+
+`rcp_watchdog_keeper_kick()` (`watchdog.h`) has always been individually correct (`REQ-WDG-003`) but, before this fix, only tests called it — a live, perfectly responsive RC Client would still overflow a real integration's watchdog on a fixed schedule, exactly as `test_tc18_gaps_server.c`'s own `test_watchdog_overflows_despite_continuous_requests()` pins for the lower-level `rcp_server_endpoint_submit()` path.
+
+`rcp_watchdog_keeper_t` (`watchdog.h`) is architected as a thin, caller-driven satellite package operating on caller-owned data — its own file header states plainly that a caller drives `rcp_watchdog_keeper_kick()` itself and that the module sends no wire traffic and owns no transport. Direct TC18.txt verification (§12.7.7, both RC1 and RC5, "the watchdog is reset with each request received from this RC Client") confirmed the rule is about RECEIPT, not successful validation or execution: a new `rcp_mock_server_set_watchdog_keeper()` associates a caller-owned `rcp_watchdog_keeper_t*` with an `rcp_mock_server_t` (not owned by `srv` — the caller keeps its own `rcp_watchdog_keeper_new()`/`_destroy()` lifecycle, matching every other satellite-package pointer this module holds without owning), and `rcp_mock_server_dispatch_e2e()` kicks unconditionally as the very first statement in the function, before "plain command mode" delegation, CRC validation, or admission are even attempted — a request this call goes on to reject (unknown `byte_bus_id`, CRC mismatch, full queue) still means the RC Client is alive and talking on that stream.
+
+**Deliberately scoped out**: the plain, non-E2E `rcp_mock_server_dispatch()`/`_dispatch_frame()` path has no `stream_id` parameter at all to key a kick by, and widening its own signature would ripple across every existing call site in this codebase's own test suite far beyond this fix's narrow justified scope — left as a real, separate, still-open gap, documented in `REQ-WDG-010`'s own updated `.fusa-reqs.json` text (which stays `partial`) rather than silently implied. `server.h`'s own core `rcp_server_endpoint_submit()` likewise remains entirely unkicked.
+
+Three new tests (`tests/test_tc18_gaps_e2e.c`) mirror `test_watchdog.c`'s own `test_kick_resets_timer_prevents_overflow()` pattern against a real `rcp_watchdog_keeper_t`: repeated admitted dispatches inside the configured timeout never overflow; a single CRC-mismatch (rejected) dispatch, sandwiched between two waits each consuming most of the timeout budget, still prevents overflow — proving the kick fires on receipt even when the request is rejected, and proving it independent of the constructor's own implicit initial kick (a single-dispatch test can't tell the two apart, since `rcp_watchdog_keeper_new()` itself sets `last_kick_ms` at construction); and a no-keeper-set case confirms `dispatch_e2e()` still dispatches normally when nothing is wired.
+
+Mutation-tested 2 ways: bypassing the kick guard entirely, and moving the kick to only the request's own success path (simulating "kick on validation" instead of "kick on receipt") — both caught cleanly. The second mutation required strengthening the rejection test above the ordering-generic form it started with, since a single post-construction dispatch call could not distinguish the two.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.255.0 -- 2026-08-12 (issue #311 batch 5: EP0 dispatcher wiring for `svr_ep_generic_cfg_ptr` -- issue #311 CLOSED)
 
 **`rcp_regmap_ep0_decode_write_request()`/`_encode_read_response()` gain a 6th and final routing block, targeting `svr_ep_generic_cfg_ptr`'s own extent -- closing issue #311 in full, all 5 batches complete.**

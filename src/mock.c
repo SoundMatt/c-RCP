@@ -50,6 +50,12 @@ struct rcp_mock_server {
      * server register, and requests on different endpoints routinely
      * drive the same one. */
     rcp_sequencer_table_t    sequencers;
+    /* REQ-WDG-010 (issue #201): not owned by srv -- see
+     * rcp_mock_server_set_watchdog_keeper()'s own doc comment (mock.h)
+     * for the full lifecycle contract. NULL (every slot starts zeroed,
+     * srv itself is calloc()'d) disables kicking entirely, the default
+     * for every rcp_mock_server_t. */
+    rcp_watchdog_keeper_t   *watchdog;
 };
 
 //cfusa:req REQ-MOCK-001
@@ -268,6 +274,13 @@ bool rcp_mock_server_set_endpoint_req_crc_enable(rcp_mock_server_t *srv,
     return true;
 }
 
+//cfusa:req REQ-WDG-010
+void rcp_mock_server_set_watchdog_keeper(rcp_mock_server_t *srv,
+                                          rcp_watchdog_keeper_t *keeper)
+{
+    srv->watchdog = keeper;
+}
+
 //cfusa:req REQ-MOCK-011
 size_t rcp_mock_server_endpoint_queue_len(const rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id)
 {
@@ -469,6 +482,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
 
 //cfusa:req REQ-E2E-031
 //cfusa:req REQ-E2E-041
+//cfusa:req REQ-WDG-010
 rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
                                                           rcp_byte_bus_id_t byte_bus_id,
                                                           uint8_t avtp_subtype, uint8_t acf_msg_type,
@@ -483,6 +497,15 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
     rcp_mock_dispatch_result_t result;
 
     memset(out_response, 0, sizeof(*out_response));
+
+    /* REQ-WDG-010: kicked unconditionally, before any of the checks
+     * below -- TC18 §12.7.7's own rule is about RECEIPT ("the watchdog
+     * is reset with each request received from this RC Client"), not
+     * successful validation or admission. A request this call goes on
+     * to reject via plain-command-mode delegation, CRC mismatch, or
+     * admission failure still means the RC Client is alive and talking
+     * on this stream, which is the watchdog's own entire concern. */
+    if (srv->watchdog != NULL) rcp_watchdog_keeper_kick(srv->watchdog, stream_id);
 
     /* "plain command mode" (TC18 §13.6): an endpoint with req_crc_enable
      * not set, or an unknown byte_bus_id, is untouched by this function

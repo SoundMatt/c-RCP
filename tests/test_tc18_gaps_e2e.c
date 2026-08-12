@@ -11,6 +11,7 @@
 //cfusa:test REQ-E2E-040
 //cfusa:test REQ-E2E-041
 //cfusa:test REQ-E2E-042
+//cfusa:test REQ-WDG-010
 
 /*
  * test_tc18_gaps_e2e.c -- spec-literal conformance-and-deviation suite for
@@ -40,10 +41,12 @@
 
 #include <rcp/acf.h>
 #include <rcp/avtp.h>
+#include <rcp/clock.h>
 #include <rcp/e2e.h>
 #include <rcp/mock.h>
 #include <rcp/regmap.h>
 #include <rcp/scheduler.h>
+#include <rcp/watchdog.h>
 
 #include <string.h>
 
@@ -809,6 +812,159 @@ static void test_dispatch_e2e_crc_mismatch_yields_real_error_response(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* ── REQ-WDG-010: rcp_mock_server_dispatch_e2e() kicks the per-stream
+ * watchdog ──────────────────────────────────────────────────────────────── */
+
+static void wdg_busy_wait_ms(unsigned ms)
+{
+    uint64_t start = rcp_monotonic_ms();
+
+    while (rcp_monotonic_ms() - start < ms) {
+        /* busy-wait: no sleep primitive is exported by rcp/clock.h, same
+         * as every other timing-based test in this codebase (see
+         * test_watchdog.c's own test_sleep_ms() / test_tc18_gaps_server.c's
+         * own busy_wait_ms()). */
+    }
+}
+
+/* As of the REQ-WDG-010 fix, rcp_mock_server_dispatch_e2e() calls
+ * rcp_watchdog_keeper_kick() on every request it receives on the
+ * associated stream, so a client dispatching well inside its configured
+ * timeout never overflows -- the exact scenario
+ * test_tc18_gaps_server.c's own test_watchdog_overflows_despite_
+ * continuous_requests() pins as broken for the lower-level
+ * rcp_server_endpoint_submit() path (still true; that fix is deliberately
+ * out of scope here, see rcp_mock_server_set_watchdog_keeper()'s own doc
+ * comment). Mirrors test_watchdog.c's own
+ * test_kick_resets_timer_prevents_overflow(): a 40 ms timeout, dispatched
+ * every 10 ms for 100 ms total -- far longer than 40 ms would survive
+ * without kicking. */
+static void test_dispatch_e2e_kicks_the_watchdog_on_every_admitted_request(void)
+{
+    rcp_mock_server_t         *srv = rcp_mock_server_new();
+    rcp_watchdog_stream_cfg_t  stream = {TEST_SID, true, 40u, true, true};
+    rcp_watchdog_config_t      cfg    = rcp_watchdog_default_config();
+    rcp_watchdog_keeper_t     *k;
+    const uint8_t               pl[4] = {0x01, 0x02, 0x03, 0x04};
+    rcp_bytes_t                 plain = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t                 wrapped;
+    int                          i;
+
+    cfg.poll_interval_ms = 5;
+    k = rcp_watchdog_keeper_new(cfg, &stream, 1u);
+    TEST_ASSERT_NOT_NULL(k);
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+    rcp_mock_server_set_watchdog_keeper(srv, k);
+
+    for (i = 0; i < 10; i++) {
+        rcp_bytes_t resp = {0};
+
+        wrapped = rcp_e2e_wrap_framed(TEST_SID, false, TEST_TS, plain.data, plain.len);
+        TEST_ASSERT_NOT_NULL(wrapped.data);
+
+        wdg_busy_wait_ms(10u);
+        TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                          rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                        RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                        TEST_TS, wrapped.data, wrapped.len, &resp));
+        TEST_ASSERT_FALSE(rcp_watchdog_keeper_status(k, TEST_SID).overflowed);
+
+        rcp_bytes_free(&resp);
+        rcp_bytes_free(&wrapped);
+    }
+
+    rcp_watchdog_keeper_destroy(k);
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+/* The "receipt not validation" half of the design: a request that
+ * dispatch_e2e() goes on to REJECT (a CRC mismatch, here -- the same
+ * fixture as test_dispatch_e2e_crc_mismatch_yields_real_error_response())
+ * still means the RC Client is alive and talking on this stream, so it
+ * must still kick. A single dispatch call right after construction can't
+ * tell the two orderings apart -- rcp_watchdog_keeper_new() itself sets
+ * last_kick_ms at construction time, so "overflowed" would read false
+ * either way with almost no elapsed time. Instead this test spends most
+ * of the 60 ms timeout BEFORE dispatching the rejected request, then
+ * spends most of it again AFTER: only a kick actually caused by the
+ * rejected dispatch call (not the constructor's own initial kick) can
+ * keep the stream from overflowing across both waits. If the kick were
+ * placed after CRC validation instead of before it (a plausible but
+ * wrong ordering), this test fails -- that ordering is exactly what
+ * mutation-testing this fix caught. */
+static void test_dispatch_e2e_kicks_the_watchdog_even_when_the_request_is_rejected(void)
+{
+    rcp_mock_server_t         *srv = rcp_mock_server_new();
+    rcp_watchdog_stream_cfg_t  stream = {TEST_SID, true, 60u, true, true};
+    rcp_watchdog_config_t      cfg    = rcp_watchdog_default_config();
+    rcp_watchdog_keeper_t     *k;
+    const uint8_t               pl[4] = {0x9A, 0x9B, 0x9C, 0x9D};
+    rcp_bytes_t                 frame = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t                 w     = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_bytes_t                 resp  = {0};
+
+    TEST_ASSERT_NOT_NULL(w.data);
+    w.data[w.len - 1u] ^= 0xFFu; /* corrupt the trailer's last octet */
+
+    cfg.poll_interval_ms = 5;
+    k = rcp_watchdog_keeper_new(cfg, &stream, 1u);
+    TEST_ASSERT_NOT_NULL(k);
+
+    to_hw_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+    rcp_mock_server_set_watchdog_keeper(srv, k);
+
+    wdg_busy_wait_ms(40u); /* consume most of the 60 ms budget from construction */
+    TEST_ASSERT_FALSE(rcp_watchdog_keeper_status(k, TEST_SID).overflowed);
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, TEST_TS,
+                                                    w.data, w.len, &resp));
+    TEST_ASSERT_FALSE(g_handler_called); /* rejected, not executed ... */
+
+    wdg_busy_wait_ms(40u); /* would overflow (80 ms > 60 ms) without a kick just now */
+    TEST_ASSERT_FALSE(rcp_watchdog_keeper_status(k, TEST_SID).overflowed); /* ... but still kicked */
+
+    rcp_watchdog_keeper_destroy(k);
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&w);
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* No keeper set (rcp_mock_server_new()'s own default, unchanged by every
+ * test above this one in this file) -- dispatch_e2e() must not crash or
+ * otherwise misbehave; it just has nothing to kick. */
+static void test_dispatch_e2e_with_no_watchdog_keeper_set_dispatches_normally(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t        pl[4] = {0x01, 0x02, 0x03, 0x04};
+    rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    /* rcp_mock_server_set_watchdog_keeper() deliberately never called. */
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, TEST_TS,
+                                                    plain.data, plain.len, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── REQ-E2E-042: pad coverage and quadlet alignment ───────────────────────── */
 
 /* TC18 sec. 13.6 Figures 19/20 compute the CRC over whole quadlets --
@@ -880,6 +1036,9 @@ int main(void)
     RUN_TEST(test_ms_bit_to_carries_crc_binding_is_not_enforced);
     RUN_TEST(test_crc_mismatch_skips_execution_without_error_response);
     RUN_TEST(test_dispatch_e2e_crc_mismatch_yields_real_error_response);
+    RUN_TEST(test_dispatch_e2e_kicks_the_watchdog_on_every_admitted_request);
+    RUN_TEST(test_dispatch_e2e_kicks_the_watchdog_even_when_the_request_is_rejected);
+    RUN_TEST(test_dispatch_e2e_with_no_watchdog_keeper_set_dispatches_normally);
     RUN_TEST(test_crc_covers_pad_octets_and_alignment_is_enforced);
     return UNITY_END();
 }

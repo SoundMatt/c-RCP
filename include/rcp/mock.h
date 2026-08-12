@@ -114,6 +114,7 @@
 #include "rcp/regmap.h"
 #include "rcp/request_sequencer.h"
 #include "rcp/server.h"
+#include "rcp/watchdog.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -283,6 +284,36 @@ bool rcp_mock_server_set_endpoint_enable(rcp_mock_server_t *srv, rcp_byte_bus_id
  * names a registered endpoint. */
 bool rcp_mock_server_set_endpoint_req_crc_enable(rcp_mock_server_t *srv,
                                                   rcp_byte_bus_id_t byte_bus_id, bool enable);
+
+/* REQ-WDG-010 (issue #201): associates keeper with srv so that
+ * rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e() call
+ * rcp_watchdog_keeper_kick(keeper, stream_id) for every request they
+ * receive on that stream -- TC18 §12.7.7: "the watchdog is reset with
+ * each request received from this RC Client." Kicked unconditionally at
+ * the top of dispatch_e2e(), before "plain command mode" delegation,
+ * CRC validation, or admission are even attempted: the rule is about
+ * RECEIPT, not successful validation or execution -- a request this
+ * server goes on to reject (unknown byte_bus_id, CRC mismatch, full
+ * queue) still means the RC Client is alive and talking, which is all
+ * the watchdog's own liveness concern is about.
+ *
+ * Deliberately does NOT touch the plain rcp_mock_server_dispatch()/
+ * _dispatch_frame() -- neither takes a stream_id parameter at all (no
+ * key to kick by), and widening their own signature would be a much
+ * larger, more invasive change across every existing call site in this
+ * codebase's own test suite than this fix's own narrow scope justifies.
+ * A caller reaching endpoints only through the plain dispatch path gets
+ * no watchdog kicking; this is a real, separate, still-open gap,
+ * documented rather than silently left implicit (REQ-WDG-010's own
+ * .fusa-reqs.json text).
+ *
+ * keeper may be NULL (the default for every rcp_mock_server_t) to
+ * disable kicking entirely -- srv does NOT take ownership of keeper;
+ * the caller remains responsible for its own rcp_watchdog_keeper_new()/
+ * _destroy() lifecycle, matching every other satellite-package pointer
+ * this module holds without owning (see this file's own header). */
+void rcp_mock_server_set_watchdog_keeper(rcp_mock_server_t *srv,
+                                          rcp_watchdog_keeper_t *keeper);
 
 /* Number of requests currently queued (awaiting drain) on the endpoint at
  * byte_bus_id, or 0 if byte_bus_id names no registered endpoint. */
