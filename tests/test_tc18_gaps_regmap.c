@@ -51,6 +51,12 @@
 //cfusa:test REQ-RMAP-069
 //cfusa:test REQ-RMAP-071
 //cfusa:test REQ-RMAP-072
+//cfusa:test REQ-RMAP-073
+//cfusa:test REQ-RMAP-074
+//cfusa:test REQ-RMAP-075
+//cfusa:test REQ-RMAP-076
+//cfusa:test REQ-RMAP-077
+//cfusa:test REQ-RMAP-078
 
 /*
  * test_tc18_gaps_regmap.c -- spec-literal conformance-and-deviation suite
@@ -1794,6 +1800,117 @@ static void test_response_queue_cfg_render_saturates_oversized_flush_time_us_wit
      * encoding. */
     TEST_ASSERT_EQUAL_UINT8(0xFFu, out[8]);
     TEST_ASSERT_EQUAL_UINT8(0xFFu, out[9]);
+}
+
+/* REQ-RMAP-073/074/075/076/077/078 (issue #311 batch 3): the READ side
+ * of ep_generic_cfg's own wire codec -- see rcp_regmap_ep_generic_cfg_render()'s
+ * own doc comment (regmap.h) for why apply_reconfig() is deliberately not
+ * built in this same batch (ep_type is TC18's first read-only field mixed
+ * into an otherwise R/W* row anywhere in this codebase). */
+static void test_ep_generic_cfg_render_matches_table_28_byte_offsets(void)
+{
+    rcp_regmap_ep_generic_cfg_t row;
+    uint8_t                     out[12];
+
+    rcp_regmap_ep_generic_cfg_init(&row);
+    row.ep_type             = 0x03u; /* SPI, per Table 29/30's own ep_type enum */
+    row.ep_used              = true;
+    row.ep_delay_time        = 20u;  /* one of the 4 allowed values -- register 10b */
+    row.ep_req_storage_size  = 8u;   /* 2 words */
+    row.ep_description       = 0x11223344u;
+    row.ep_tx_buffer_size    = 0x5566u;
+    row.ep_rx_buffer_size    = 0x7788u;
+
+    rcp_regmap_ep_generic_cfg_render(&row, 1, out);
+
+    TEST_ASSERT_EQUAL_UINT8(0x03u, out[0]);              /* ep_type */
+    TEST_ASSERT_EQUAL_UINT8(0x21u, out[1]);              /* ep_used=1 (bit0) | delay_reg=2 (bits4:5) */
+    TEST_ASSERT_EQUAL_UINT8(0x00u, out[2]);              /* ep_req_storage_size hi (2 words) */
+    TEST_ASSERT_EQUAL_UINT8(0x02u, out[3]);              /* ep_req_storage_size lo */
+    TEST_ASSERT_EQUAL_UINT8(0x11u, out[4]);              /* ep_description */
+    TEST_ASSERT_EQUAL_UINT8(0x22u, out[5]);
+    TEST_ASSERT_EQUAL_UINT8(0x33u, out[6]);
+    TEST_ASSERT_EQUAL_UINT8(0x44u, out[7]);
+    TEST_ASSERT_EQUAL_UINT8(0x55u, out[8]);              /* ep_tx_buffer_size */
+    TEST_ASSERT_EQUAL_UINT8(0x66u, out[9]);
+    TEST_ASSERT_EQUAL_UINT8(0x77u, out[10]);             /* ep_rx_buffer_size */
+    TEST_ASSERT_EQUAL_UINT8(0x88u, out[11]);
+}
+
+static void test_ep_generic_cfg_render_uses_12_octet_stride_across_entries(void)
+{
+    rcp_regmap_ep_generic_cfg_t rows[2];
+    uint8_t                     out[24];
+
+    rcp_regmap_ep_generic_cfg_init(&rows[0]);
+    rcp_regmap_ep_generic_cfg_init(&rows[1]);
+    rows[0].ep_type = 0xAAu;
+    rows[1].ep_type = 0xBBu;
+
+    rcp_regmap_ep_generic_cfg_render(rows, 2, out);
+
+    TEST_ASSERT_EQUAL_UINT8(0xAAu, out[0]);  /* EP0's ep_type at relative 0x0000 */
+    TEST_ASSERT_EQUAL_UINT8(0xBBu, out[12]); /* EP1's ep_type at relative 0x000C */
+}
+
+static void test_ep_generic_cfg_render_falls_back_to_1us_for_unconfigured_delay_time(void)
+{
+    rcp_regmap_ep_generic_cfg_t row;
+    uint8_t                     out[12];
+
+    rcp_regmap_ep_generic_cfg_init(&row); /* ep_delay_time left at its own zero-init
+                                              default, 0us -- NOT one of TC18's 4
+                                              allowed register values */
+
+    rcp_regmap_ep_generic_cfg_render(&row, 1, out);
+
+    /* Falls back to register 0 (1us), not an assertion failure or an
+     * arbitrary bit pattern -- every freshly-initialized, not-yet-
+     * configured endpoint must render cleanly. */
+    TEST_ASSERT_EQUAL_UINT8(0x00u, (uint8_t)(out[1] & 0x30u));
+}
+
+static void test_ep_generic_cfg_render_falls_back_to_1us_for_any_disallowed_delay_value(void)
+{
+    rcp_regmap_ep_generic_cfg_t row;
+    uint8_t                     out[12];
+
+    rcp_regmap_ep_generic_cfg_init(&row);
+    row.ep_delay_time = 999999u; /* not one of {1,10,20,50} */
+
+    rcp_regmap_ep_generic_cfg_render(&row, 1, out);
+
+    TEST_ASSERT_EQUAL_UINT8(0x00u, (uint8_t)(out[1] & 0x30u)); /* falls back to 0 (1us), same as unconfigured */
+}
+
+static void test_ep_generic_cfg_render_clamps_oversized_req_storage_size_without_wrapping(void)
+{
+    rcp_regmap_ep_generic_cfg_t row;
+    uint8_t                     out[12];
+
+    rcp_regmap_ep_generic_cfg_init(&row);
+    row.ep_req_storage_size = 262144u; /* one word (4 octets) past the register's own max */
+
+    rcp_regmap_ep_generic_cfg_render(&row, 1, out);
+
+    /* Clamped to the register's own max word count (0xFFFF), not wrapped
+     * to a small or zero value. */
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, out[2]);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, out[3]);
+}
+
+static void test_ep_generic_cfg_render_clamps_non_multiple_of_4_req_storage_size(void)
+{
+    rcp_regmap_ep_generic_cfg_t row;
+    uint8_t                     out[12];
+
+    rcp_regmap_ep_generic_cfg_init(&row);
+    row.ep_req_storage_size = 9u; /* not an exact multiple of 4 -- floors to 2 words (8 octets) */
+
+    rcp_regmap_ep_generic_cfg_render(&row, 1, out);
+
+    TEST_ASSERT_EQUAL_UINT8(0x00u, out[2]);
+    TEST_ASSERT_EQUAL_UINT8(0x02u, out[3]);
 }
 
 /* REQ-RMAP-047/048/049 CLOSED (write-dispatch half, issue #306): same
@@ -3744,6 +3861,12 @@ int main(void)
     RUN_TEST(test_response_queue_cfg_apply_reconfig_patches_addressed_octets_only);
     RUN_TEST(test_response_queue_cfg_apply_reconfig_rejects_out_of_range_leaving_table_untouched);
     RUN_TEST(test_response_queue_cfg_render_saturates_oversized_flush_time_us_without_wrapping);
+    RUN_TEST(test_ep_generic_cfg_render_matches_table_28_byte_offsets);
+    RUN_TEST(test_ep_generic_cfg_render_uses_12_octet_stride_across_entries);
+    RUN_TEST(test_ep_generic_cfg_render_falls_back_to_1us_for_unconfigured_delay_time);
+    RUN_TEST(test_ep_generic_cfg_render_falls_back_to_1us_for_any_disallowed_delay_value);
+    RUN_TEST(test_ep_generic_cfg_render_clamps_oversized_req_storage_size_without_wrapping);
+    RUN_TEST(test_ep_generic_cfg_render_clamps_non_multiple_of_4_req_storage_size);
     RUN_TEST(test_request_stream_cfg_apply_reconfig_patches_addressed_octets_only);
     RUN_TEST(test_request_stream_cfg_apply_reconfig_rejects_out_of_range_leaving_table_untouched);
     RUN_TEST(test_request_stream_cfg_render_saturates_oversized_max_request_size_without_wrapping);

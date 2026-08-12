@@ -34,6 +34,20 @@ the rationale.
 
 ## Releases
 
+### v0.253.0 -- 2026-08-12 (issue #311 batch 3: `rcp_regmap_ep_generic_cfg_render()`, the READ side of ep_generic_cfg's wire codec)
+
+**`rcp_regmap_ep_generic_cfg_render()` serializes ep_generic_cfg's own 12-octet-per-endpoint stride (TC18 §13.2 Table 28/31), the READ side of issue #311's remaining wire-codec/dispatcher work.**
+
+`ep_type` (0x0000) and `ep_description`/`ep_tx_buffer_size`/`ep_rx_buffer_size` (0x0004-0x000B) serialize directly. `ep_used`/`ep_delay_time` pack into octet 0x0001 (bit 0 and bits 4:5 respectively, reserved bits left 0). `ep_req_storage_size` (0x0002-0x0003) and `ep_delay_time`'s own 2-bit encoding both go through their batch-2 boundary-conversion functions.
+
+**`ep_delay_time`'s own conversion can fail (not every internal value is one of TC18's 4 allowed ones) — render() falls back to register value 0 (1µs) rather than erroring**, matching every sibling render() function's own established non-fallible convention (HW_config/EP_ID_config/response-queue-config/request-stream-cfg all render unconditionally). This is not a rare edge case: `rcp_regmap_ep_generic_cfg_init()`'s own zero-init default (0µs) is itself not a valid register value, so every not-yet-configured endpoint hits this fallback until something explicitly sets a valid value. `ep_req_storage_size` gets the analogous treatment — clamped down to the nearest representable word count (never rounded up) rather than failing.
+
+**`apply_reconfig()` (write side) is deliberately NOT built in this batch**: `ep_type` (0x0000) is plain R per TC18 — the first read-only field mixed into an otherwise fully-writable (R/W*) row anywhere in this codebase's wire-codec family. Correctly rejecting-or-preserving a write that touches it needs its own dedicated design pass, not a rushed extension of this batch. EP0 dispatcher routing (both directions) is also deferred.
+
+6 new tests (byte-offset layout, 12-octet stride across multiple entries, both fallback/clamp cases). Mutation-tested 3 ways (the delay-time fallback value, the req-storage-size clamp boundary, the bit-packing shift); all caught cleanly.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.252.0 -- 2026-08-11 (issue #311 batch 2: `ep_delay_time`/`ep_req_storage_size` boundary-conversion pairs)
 
 **Two boundary-conversion function pairs close the unit/encoding mismatches issue #311's own batch 1 documented but deliberately left unfixed.**

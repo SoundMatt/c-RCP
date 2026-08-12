@@ -1244,6 +1244,66 @@ uint32_t rcp_regmap_ep_req_storage_size_words_to_octets(uint16_t words);
 bool rcp_regmap_ep_req_storage_size_octets_to_words(uint32_t octets,
                                                       uint16_t *out_words);
 
+/* ── ep_generic_cfg wire codec, READ side (issue #311 batch 3) ──────────────
+ *
+ * The write side (apply_reconfig()) is deliberately NOT built in this same
+ * batch: TC18 §13.2 Table 28/31 marks ep_type (relative address 0x0000)
+ * plain R -- read-only -- unlike every other field in this row (all R/W*).
+ * Every other render()/apply_reconfig() pair in this codebase (HW_config,
+ * EP_ID_config, response-queue-config, request-stream-cfg) has no
+ * read-only field mixed into an otherwise-writable row; ep_generic_cfg is
+ * the first, and apply_reconfig() rejecting-or-preserving a write that
+ * touches 0x0000 needs its own dedicated design pass, not a rushed
+ * extension of this batch. */
+
+/* RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES is not itself a TC18-derived
+ * value (TC18 defines no fixed endpoint count) -- matches every sibling
+ * table's own identical, not-spec-derived bound
+ * (RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES/RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES/
+ * RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES/
+ * RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES). */
+#define RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES ((size_t)64u)
+
+/* Serializes entries[0..count) into out at each row's own TC18-cited
+ * 12-octet stride (relative address 12*N onward per endpoint N) --
+ * out must have room for at least 12*count octets. len beyond
+ * RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES is the caller's own
+ * responsibility to have already bounded, matching every sibling
+ * render()'s own convention.
+ *
+ * ep_type (0x0000, R), ep_description (0x0004-0x0007, R/W*),
+ * ep_tx_buffer_size (0x0008-0x0009, R/W*), and ep_rx_buffer_size
+ * (0x000A-0x000B, R/W*) are all serialized directly -- ep_type is a
+ * plain octet passthrough, and the latter three already store their
+ * own wire-native unit internally (see each field's own comment,
+ * above). ep_used (0x0001 bit 0) and the two reserved 3-bit/2-bit
+ * spans either side of ep_delay_time (0x0001 bits 1:3 and 6:7) are
+ * packed into the same octet as ep_delay_time below.
+ *
+ * ep_delay_time (0x0001 bits 4:5) uses rcp_regmap_ep_delay_time_us_to_reg().
+ * DEFENSIVE FALLBACK: if the internal microsecond value is not exactly
+ * one of TC18's own 4 allowed values, this function does NOT fail or
+ * assert (every render() in this codebase is unconditional, matching
+ * the established convention) -- it falls back to register value 0
+ * (1us, the shortest/smallest valid delay). This is not a rare edge
+ * case: rcp_regmap_ep_generic_cfg_init()'s own memset(0) leaves
+ * ep_delay_time at 0us, which is NOT one of the 4 allowed values, so
+ * every freshly-initialized, not-yet-configured endpoint hits this
+ * fallback until something explicitly sets a valid value -- consistent
+ * with the "never grant more delay than configured" bias already
+ * established by rcp_regmap_wd_timeout_ms_to_ticks()'s own round-down
+ * convention (a too-short realized delay is the conservative direction
+ * for an execution-timing field, unlike an too-long one).
+ *
+ * ep_req_storage_size (0x0002-0x0003) uses
+ * rcp_regmap_ep_req_storage_size_octets_to_words() where possible;
+ * an internal value that is not an exact multiple of 4, or whose word
+ * count exceeds the register's own 16-bit width, is defensively
+ * clamped down to the nearest representable word count (never
+ * rounded up -- the same "never grant more than configured" bias). */
+void rcp_regmap_ep_generic_cfg_render(const rcp_regmap_ep_generic_cfg_t *entries,
+                                       size_t count, uint8_t *out);
+
 /* The functional-config prefix common to every endpoint type. Every
  * concrete endpoint type built in Phase 16/19 composes this struct as its
  * own first member rather than re-declaring these five fields itself --
