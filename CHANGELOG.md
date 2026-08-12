@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.261.0 -- 2026-08-12 (issue #201 batch: `REQ-E2E-021`, a CRC error on an `rx_enforce_e2e` stream now actually blocks the stream)
+
+**New `rcp_e2e_stream_fault_tracker_t` (e2e.h/e2e.c) wired into `rcp_mock_server_dispatch_e2e()`/`_dispatch_frame_e2e()` closes `REQ-E2E-021` fully (TC18 §12.7.7 Table 22: `rx_enforce_e2e`'s "stream is blocked until released" consequence) -- status flips to `implemented`, ASIL-B.**
+
+`rcp_e2e_stream_fault_on_crc_error()`/`rcp_e2e_stream_fault_t` (the single-stream fault latch) were always correct and directly unit-tested; the gap was that nothing in the dispatch path ever called them. The new tracker is a caller-owned, keyed-by-`stream_id` wrapper holding one `rcp_e2e_stream_fault_t` per stream (a real server may have more than one), matching the same caller-owned-data architecture already established by `rcp_watchdog_keeper_t` and `rcp_e2e_seq_tracker_t`.
+
+`dispatch_e2e()` now (1) checks `rcp_e2e_stream_fault_tracker_is_faulted()` for `stream_id` **before** plain-command-mode delegation, CRC validation, or admission -- returning a new `RCP_MOCK_DISPATCH_STREAM_FAULTED` with a real Table 27 POCI_FAILURE error response, since the block is a whole-STREAM property (checked before any single request's own outcome is even considered); and (2) records every CRC mismatch it detects via `rcp_e2e_stream_fault_tracker_on_crc_error()`, keyed to a new per-endpoint `rcp_mock_server_set_endpoint_rx_enforce_e2e()` stand-in bit -- this test double's own in-process stand-in for the real per-request-stream register bit, matching `req_crc_enable`'s own already-established stand-in pattern (TC18's real `rx_enforce_e2e` lives on a different, per-stream table this type-erased slot has no way to read generically).
+
+Wiring is entirely opt-in via `rcp_mock_server_set_stream_fault_tracker()` -- `tracker` may be `NULL` (the default) to disable stream-fault blocking entirely, not owned by `srv`, matching `rcp_mock_server_set_watchdog_keeper()`'s own lifecycle contract.
+
+**Deliberately out of scope, not conflated with this fix**: Table 22's OTHER `rx_enforce_e2e` consequence, "Safe state will be entered," is `REQ-E2E-045`'s own separate, still-open gap -- a cross-endpoint safe-state escalation this library's single-endpoint-scoped data model has no orchestrator for, unlike the blocking half this fix closes (which only needs to reject future requests on the SAME stream, well within `dispatch_e2e()`'s own existing scope).
+
+4 new tests in `tests/test_e2e.c` (the pure tracker: registration/isolation, reset, capacity exhaustion honestly reported) and 3 new tests in `tests/test_tc18_gaps_e2e.c` (the real integration: blocks-then-releases, `rx_enforce_e2e=false` does not block, no-tracker-set is a no-op). Mutation-tested 3 ways (bypass the pre-dispatch block check; bypass the CRC-error recording; hardcode `rx_enforce_e2e=true` regardless of endpoint config) -- all three caught cleanly.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.260.0 -- 2026-08-12 (issue #201 batch: `REQ-WAKEUP-017`, WakeUp message now carries the wake-up source -- WAKEUP group fully addressed)
 
 **New `rcp_ep_wakeup_encode_wakeup_message_with_source()`/`_decode_wakeup_message_with_source()` close `REQ-WAKEUP-017` fully (TC18 §12.4.1: the repetitive wake response must convey both a WakeUp message and the WakeUp source) -- status flips to `implemented`, and this closes the last of WAKEUP's 4 not-implemented items.**

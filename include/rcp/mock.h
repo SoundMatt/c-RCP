@@ -108,6 +108,7 @@
 #ifndef RCP_MOCK_H
 #define RCP_MOCK_H
 
+#include "rcp/e2e.h"
 #include "rcp/lifecycle.h"
 #include "rcp/power.h"
 #include "rcp/rcp.h"
@@ -285,6 +286,23 @@ bool rcp_mock_server_set_endpoint_enable(rcp_mock_server_t *srv, rcp_byte_bus_id
 bool rcp_mock_server_set_endpoint_req_crc_enable(rcp_mock_server_t *srv,
                                                   rcp_byte_bus_id_t byte_bus_id, bool enable);
 
+/* REQ-E2E-021 (issue #201): this test double's own in-process stand-in
+ * for TC18 §12.7.7 Table 22's own rx_enforce_e2e -- a per-REQUEST-
+ * STREAM config bit in the real spec, kept here as a per-endpoint
+ * stand-in for the exact same "type-erased slot has no way to read a
+ * real config table generically" reason
+ * rcp_mock_server_set_endpoint_req_crc_enable()'s own doc comment
+ * already gives. Consulted only when rcp_mock_server_dispatch_e2e()/
+ * _dispatch_frame_e2e() detects a CRC mismatch on the addressed
+ * endpoint: true means that mismatch also latches the whole stream
+ * faulted (rcp_e2e_stream_fault_tracker_on_crc_error(), e2e.h), not
+ * just this one request. Has no effect without a stream fault tracker
+ * also being set (rcp_mock_server_set_stream_fault_tracker() below).
+ * Defaults false, matching req_crc_enable's own default disposition.
+ * Returns true iff byte_bus_id names a registered endpoint. */
+bool rcp_mock_server_set_endpoint_rx_enforce_e2e(rcp_mock_server_t *srv,
+                                                  rcp_byte_bus_id_t byte_bus_id, bool enable);
+
 /* REQ-WDG-010 (issue #201): associates keeper with srv so that
  * rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e() call
  * rcp_watchdog_keeper_kick(keeper, stream_id) for every request they
@@ -314,6 +332,29 @@ bool rcp_mock_server_set_endpoint_req_crc_enable(rcp_mock_server_t *srv,
  * this module holds without owning (see this file's own header). */
 void rcp_mock_server_set_watchdog_keeper(rcp_mock_server_t *srv,
                                           rcp_watchdog_keeper_t *keeper);
+
+/* REQ-E2E-021 (issue #201): associates tracker with srv so that
+ * rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e() (a) reject EVERY
+ * request on a stream tracker reports faulted
+ * (rcp_e2e_stream_fault_tracker_is_faulted()) with
+ * RCP_MOCK_DISPATCH_STREAM_FAULTED, checked before plain-command-mode
+ * delegation, CRC validation, or admission -- TC18 §12.7.7's own "stream
+ * is blocked until released" is a whole-STREAM property (this tracker
+ * is keyed by stream_id, not byte_bus_id), so the block applies
+ * uniformly regardless of the addressed endpoint's own req_crc_enable;
+ * and (b) record every CRC mismatch they detect against tracker via
+ * rcp_e2e_stream_fault_tracker_on_crc_error(), latching the stream
+ * faulted iff the addressed endpoint's own rx_enforce_e2e stand-in is
+ * set (rcp_mock_server_set_endpoint_rx_enforce_e2e() above).
+ *
+ * tracker may be NULL (the default for every rcp_mock_server_t) to
+ * disable stream-fault blocking entirely -- srv does NOT take ownership
+ * of tracker; the caller remains responsible for its own
+ * rcp_e2e_stream_fault_tracker_init() lifecycle (a plain, non-heap-
+ * allocated struct -- no separate _destroy() exists), matching every
+ * other satellite-package pointer this module holds without owning. */
+void rcp_mock_server_set_stream_fault_tracker(rcp_mock_server_t *srv,
+                                               rcp_e2e_stream_fault_tracker_t *tracker);
 
 /* Number of requests currently queued (awaiting drain) on the endpoint at
  * byte_bus_id, or 0 if byte_bus_id names no registered endpoint. */
@@ -369,6 +410,20 @@ typedef enum {
      * enough to read a transaction_num back out of (RCP_ERROR_NONE
      * otherwise -- nothing conformant to build a response from). */
     RCP_MOCK_DISPATCH_CRC_ERROR       = 9,
+    /* REQ-E2E-021 (issue #201): rcp_mock_server_dispatch_e2e()/
+     * _dispatch_frame_e2e() only -- a stream fault tracker is set
+     * (rcp_mock_server_set_stream_fault_tracker()) and reports
+     * stream_id already latched faulted (TC18 §12.7.7's own "stream is
+     * blocked until released" consequence of an earlier CRC error on
+     * this stream, with the addressed endpoint's own rx_enforce_e2e
+     * stand-in set). Checked, and can fire, BEFORE any CRC validation
+     * of THIS request even happens -- distinct from RCP_MOCK_DISPATCH_
+     * CRC_ERROR above, which means THIS request's own CRC failed.
+     * *out_response carries the same real Table 27 POCI_FAILURE error
+     * response CRC_ERROR itself uses (the block's own root cause is a
+     * CRC failure), under the same "frame long enough to read a
+     * transaction_num back out of" condition. */
+    RCP_MOCK_DISPATCH_STREAM_FAULTED  = 10,
 } rcp_mock_dispatch_result_t;
 
 /* Runs one already-framed request through srv: first

@@ -521,6 +521,79 @@ static void test_stream_fault_latches_and_stays_latched_until_reset(void)
     TEST_ASSERT_FALSE(rcp_e2e_stream_fault_is_faulted(&f));
 }
 
+/* ── per-stream fault tracker (issue #201, REQ-E2E-021) ─────────────────────── */
+
+//cfusa:test REQ-E2E-021
+static void test_stream_fault_tracker_never_seen_stream_is_not_faulted(void)
+{
+    rcp_e2e_stream_fault_tracker_t t;
+    rcp_e2e_stream_fault_tracker_init(&t);
+
+    TEST_ASSERT_FALSE(rcp_e2e_stream_fault_tracker_is_faulted(&t, 0x1122334455667788ULL));
+}
+
+//cfusa:test REQ-E2E-021
+static void test_stream_fault_tracker_registers_and_isolates_streams(void)
+{
+    rcp_e2e_stream_fault_tracker_t t;
+    rcp_e2e_stream_fault_tracker_init(&t);
+
+    /* Stream A latches (rx_enforce_e2e=true); stream B never does. */
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_on_crc_error(&t, 1u, true));
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_is_faulted(&t, 1u));
+    TEST_ASSERT_FALSE(rcp_e2e_stream_fault_tracker_is_faulted(&t, 2u));
+
+    /* A drop-mode CRC error on B never latches it, regardless of A's
+     * own already-latched state. */
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_on_crc_error(&t, 2u, false));
+    TEST_ASSERT_FALSE(rcp_e2e_stream_fault_tracker_is_faulted(&t, 2u));
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_is_faulted(&t, 1u));
+}
+
+//cfusa:test REQ-E2E-021
+static void test_stream_fault_tracker_reset_clears_only_that_stream(void)
+{
+    rcp_e2e_stream_fault_tracker_t t;
+    rcp_e2e_stream_fault_tracker_init(&t);
+
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_on_crc_error(&t, 1u, true));
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_on_crc_error(&t, 2u, true));
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_is_faulted(&t, 1u));
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_is_faulted(&t, 2u));
+
+    rcp_e2e_stream_fault_tracker_reset(&t, 1u);
+    TEST_ASSERT_FALSE(rcp_e2e_stream_fault_tracker_is_faulted(&t, 1u));
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_is_faulted(&t, 2u));
+
+    /* A no-op, not an error, for a never-seen stream_id. */
+    rcp_e2e_stream_fault_tracker_reset(&t, 999u);
+}
+
+//cfusa:test REQ-E2E-021
+static void test_stream_fault_tracker_capacity_exhaustion_is_honestly_reported(void)
+{
+    rcp_e2e_stream_fault_tracker_t t;
+    size_t                          i;
+
+    rcp_e2e_stream_fault_tracker_init(&t);
+
+    /* Fill every slot with a distinct, drop-mode (non-latching) stream. */
+    for (i = 0; i < RCP_E2E_STREAM_FAULT_TRACKER_MAX_STREAMS; i++) {
+        TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_on_crc_error(&t, (uint64_t)i, false));
+    }
+
+    /* One more, brand-new stream_id: capacity exhausted, honestly false. */
+    TEST_ASSERT_FALSE(rcp_e2e_stream_fault_tracker_on_crc_error(
+        &t, (uint64_t)RCP_E2E_STREAM_FAULT_TRACKER_MAX_STREAMS, true));
+    TEST_ASSERT_FALSE(rcp_e2e_stream_fault_tracker_is_faulted(
+        &t, (uint64_t)RCP_E2E_STREAM_FAULT_TRACKER_MAX_STREAMS));
+
+    /* An ALREADY-tracked stream (not a new one) still works fine even
+     * at full capacity -- only registering a NEW stream_id can fail. */
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_on_crc_error(&t, 0u, true));
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_is_faulted(&t, 0u));
+}
+
 /* ── per-stream watchdog ───────────────────────────────────────────────────── */
 
 static void test_wd_evaluate_disabled_never_overflows(void)
@@ -656,6 +729,10 @@ int main(void)
     RUN_TEST(test_crc_error_action_maps_rx_enforce_e2e);
     RUN_TEST(test_stream_fault_drop_request_never_latches);
     RUN_TEST(test_stream_fault_latches_and_stays_latched_until_reset);
+    RUN_TEST(test_stream_fault_tracker_never_seen_stream_is_not_faulted);
+    RUN_TEST(test_stream_fault_tracker_registers_and_isolates_streams);
+    RUN_TEST(test_stream_fault_tracker_reset_clears_only_that_stream);
+    RUN_TEST(test_stream_fault_tracker_capacity_exhaustion_is_honestly_reported);
 
     RUN_TEST(test_wd_evaluate_disabled_never_overflows);
     RUN_TEST(test_wd_evaluate_below_timeout_no_overflow);

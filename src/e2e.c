@@ -467,3 +467,78 @@ bool rcp_e2e_crc_error_should_enter_safe_state(bool rx_enforce_e2e)
 {
     return rx_enforce_e2e;
 }
+
+/* ── Per-stream fault tracker (issue #201, REQ-E2E-021) ─────────────────────── */
+
+static rcp_e2e_stream_fault_tracker_slot_t *
+stream_fault_tracker_find(rcp_e2e_stream_fault_tracker_t *t, uint64_t stream_id)
+{
+    size_t i;
+
+    for (i = 0; i < RCP_E2E_STREAM_FAULT_TRACKER_MAX_STREAMS; i++) {
+        if (t->slots[i].used && t->slots[i].stream_id == stream_id) return &t->slots[i];
+    }
+    return NULL;
+}
+
+static rcp_e2e_stream_fault_tracker_slot_t *
+stream_fault_tracker_find_free(rcp_e2e_stream_fault_tracker_t *t)
+{
+    size_t i;
+
+    for (i = 0; i < RCP_E2E_STREAM_FAULT_TRACKER_MAX_STREAMS; i++) {
+        if (!t->slots[i].used) return &t->slots[i];
+    }
+    return NULL;
+}
+
+//cfusa:req REQ-E2E-021
+void rcp_e2e_stream_fault_tracker_init(rcp_e2e_stream_fault_tracker_t *t)
+{
+    size_t i;
+
+    for (i = 0; i < RCP_E2E_STREAM_FAULT_TRACKER_MAX_STREAMS; i++) {
+        t->slots[i].used      = false;
+        t->slots[i].stream_id = 0;
+        rcp_e2e_stream_fault_init(&t->slots[i].fault);
+    }
+}
+
+//cfusa:req REQ-E2E-021
+bool rcp_e2e_stream_fault_tracker_on_crc_error(rcp_e2e_stream_fault_tracker_t *t,
+                                                uint64_t stream_id, bool rx_enforce_e2e)
+{
+    rcp_e2e_stream_fault_tracker_slot_t *slot = stream_fault_tracker_find(t, stream_id);
+
+    if (!slot) {
+        slot = stream_fault_tracker_find_free(t);
+        if (!slot) return false; /* capacity exhausted -- t left entirely unchanged */
+        slot->used      = true;
+        slot->stream_id = stream_id;
+        rcp_e2e_stream_fault_init(&slot->fault);
+    }
+
+    return rcp_e2e_stream_fault_on_crc_error(&slot->fault, rx_enforce_e2e);
+}
+
+//cfusa:req REQ-E2E-021
+bool rcp_e2e_stream_fault_tracker_is_faulted(const rcp_e2e_stream_fault_tracker_t *t,
+                                              uint64_t stream_id)
+{
+    size_t i;
+
+    for (i = 0; i < RCP_E2E_STREAM_FAULT_TRACKER_MAX_STREAMS; i++) {
+        if (t->slots[i].used && t->slots[i].stream_id == stream_id) {
+            return rcp_e2e_stream_fault_is_faulted(&t->slots[i].fault);
+        }
+    }
+    return false; /* never seen -- vacuously not faulted */
+}
+
+//cfusa:req REQ-E2E-021
+void rcp_e2e_stream_fault_tracker_reset(rcp_e2e_stream_fault_tracker_t *t, uint64_t stream_id)
+{
+    rcp_e2e_stream_fault_tracker_slot_t *slot = stream_fault_tracker_find(t, stream_id);
+
+    if (slot) rcp_e2e_stream_fault_reset(&slot->fault);
+}

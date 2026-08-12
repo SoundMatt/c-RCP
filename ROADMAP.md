@@ -15205,6 +15205,43 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.261.0 -- 2026-08-12 (issue #201 batch: `REQ-E2E-021`, a CRC
+error on an `rx_enforce_e2e` stream now actually blocks the stream)
+
+**New `rcp_e2e_stream_fault_tracker_t` wired into
+`rcp_mock_server_dispatch_e2e()`/`_dispatch_frame_e2e()` closes
+`REQ-E2E-021` fully (TC18 §12.7.7 Table 22's own "stream is blocked
+until released" consequence) -- status flips to `implemented`,
+ASIL-B.**
+
+`rcp_e2e_stream_fault_on_crc_error()`/`rcp_e2e_stream_fault_t` were
+always correct and directly unit-tested; the gap was that nothing in
+the dispatch path ever called them. The new tracker is a caller-owned,
+keyed-by-`stream_id` wrapper holding one fault latch per stream,
+matching the same architecture already established by
+`rcp_watchdog_keeper_t` and `rcp_e2e_seq_tracker_t`.
+
+`dispatch_e2e()` now (1) checks whether `stream_id` is already latched
+faulted BEFORE plain-command-mode delegation, CRC validation, or
+admission -- returning a new `RCP_MOCK_DISPATCH_STREAM_FAULTED` with a
+real Table 27 POCI_FAILURE error response; and (2) records every CRC
+mismatch it detects, keyed to a new per-endpoint `rx_enforce_e2e`
+stand-in bit (matching `req_crc_enable`'s own established stand-in
+pattern). Wiring is opt-in via a new setter -- `NULL` (the default)
+disables stream-fault blocking entirely.
+
+**Deliberately out of scope**: Table 22's OTHER consequence, "Safe
+state will be entered," is `REQ-E2E-045`'s own separate, still-open
+cross-endpoint escalation gap -- not conflated with this fix, which
+only needs to reject future requests on the SAME stream.
+
+4 new tests (pure tracker) + 3 new tests (real integration).
+Mutation-tested 3 ways (bypass the block check; bypass the recording;
+hardcode `rx_enforce_e2e=true`) -- all three caught cleanly.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.260.0 -- 2026-08-12 (issue #201 batch: `REQ-WAKEUP-017`,
 WakeUp message now carries the wake-up source -- WAKEUP group fully
 addressed)

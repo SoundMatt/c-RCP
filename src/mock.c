@@ -32,6 +32,18 @@ typedef struct {
      * rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e(); the plain
      * dispatch()/dispatch_frame() ignore it. */
     bool                         req_crc_enable;
+    /* REQ-E2E-021 (issue #201): this test double's own stand-in for
+     * TC18 §12.7.7 Table 22's own rx_enforce_e2e (a per-REQUEST-STREAM
+     * config bit in the real spec, not per-endpoint -- kept here as a
+     * per-endpoint stand-in for the same "type-erased slot has no way
+     * to read a real config table generically" reason
+     * req_crc_enable's own doc comment already gives). Defaults false
+     * (RCP_E2E_CRC_ACTION_DROP_REQUEST), matching req_crc_enable's own
+     * default disposition. Consulted only by
+     * rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e() on a CRC
+     * mismatch, to decide whether that mismatch also latches the whole
+     * stream faulted (see rcp_mock_server_set_stream_fault_tracker()). */
+    bool                         rx_enforce_e2e;
 } rcp_mock_endpoint_slot_t;
 
 /* ── The server double ─────────────────────────────────────────────────────── */
@@ -56,6 +68,12 @@ struct rcp_mock_server {
      * srv itself is calloc()'d) disables kicking entirely, the default
      * for every rcp_mock_server_t. */
     rcp_watchdog_keeper_t   *watchdog;
+    /* REQ-E2E-021 (issue #201): not owned by srv, same lifecycle
+     * contract as watchdog above -- see
+     * rcp_mock_server_set_stream_fault_tracker()'s own doc comment
+     * (mock.h). NULL disables stream-fault blocking entirely, the
+     * default for every rcp_mock_server_t. */
+    rcp_e2e_stream_fault_tracker_t *stream_fault_tracker;
 };
 
 //cfusa:req REQ-MOCK-001
@@ -274,11 +292,29 @@ bool rcp_mock_server_set_endpoint_req_crc_enable(rcp_mock_server_t *srv,
     return true;
 }
 
+//cfusa:req REQ-E2E-021
+bool rcp_mock_server_set_endpoint_rx_enforce_e2e(rcp_mock_server_t *srv,
+                                                  rcp_byte_bus_id_t byte_bus_id, bool enable)
+{
+    rcp_mock_endpoint_slot_t *slot = find_slot(srv, byte_bus_id);
+    if (!slot) return false;
+
+    slot->rx_enforce_e2e = enable;
+    return true;
+}
+
 //cfusa:req REQ-WDG-010
 void rcp_mock_server_set_watchdog_keeper(rcp_mock_server_t *srv,
                                           rcp_watchdog_keeper_t *keeper)
 {
     srv->watchdog = keeper;
+}
+
+//cfusa:req REQ-E2E-021
+void rcp_mock_server_set_stream_fault_tracker(rcp_mock_server_t *srv,
+                                               rcp_e2e_stream_fault_tracker_t *tracker)
+{
+    srv->stream_fault_tracker = tracker;
 }
 
 //cfusa:req REQ-MOCK-011
@@ -480,6 +516,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
                              out_response);
 }
 
+//cfusa:req REQ-E2E-021
 //cfusa:req REQ-E2E-031
 //cfusa:req REQ-E2E-041
 //cfusa:req REQ-WDG-010
@@ -507,6 +544,26 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
      * on this stream, which is the watchdog's own entire concern. */
     if (srv->watchdog != NULL) rcp_watchdog_keeper_kick(srv->watchdog, stream_id);
 
+    /* REQ-E2E-021 (TC18 §12.7.7 Table 22, rx_enforce_e2e's "stream is
+     * blocked until released" consequence): checked BEFORE
+     * plain-command-mode delegation, CRC validation, or admission --
+     * the block is a whole-STREAM property (this tracker is keyed by
+     * stream_id, not byte_bus_id), so it applies uniformly regardless
+     * of whether the addressed endpoint itself has req_crc_enable set.
+     * *out_response carries a real Table 27 POCI_FAILURE error response
+     * (the same code CRC_ERROR itself uses -- the block's own root
+     * cause is a CRC failure) when the frame is at least long enough to
+     * read a transaction_num back out of. */
+    if (srv->stream_fault_tracker != NULL &&
+        rcp_e2e_stream_fault_tracker_is_faulted(srv->stream_fault_tracker, stream_id)) {
+        rcp_acf_byte_message_info_t hdr = {0};
+        if (request_len >= 8 && rcp_acf_unpack_header(request, &hdr) == RCP_ACF_OK) {
+            *out_response =
+                rcp_acf_build_error_response(byte_bus_id, hdr.transaction_num, RCP_ERROR_POCI_FAILURE);
+        }
+        return RCP_MOCK_DISPATCH_STREAM_FAULTED;
+    }
+
     /* "plain command mode" (TC18 §13.6): an endpoint with req_crc_enable
      * not set, or an unknown byte_bus_id, is untouched by this function
      * -- delegate outright, including its own EP_NOT_FOUND handling. */
@@ -529,6 +586,16 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
             if (request_len >= 8 && rcp_acf_unpack_header(request, &hdr) == RCP_ACF_OK) {
                 *out_response = rcp_acf_build_error_response(byte_bus_id, hdr.transaction_num, werr);
             }
+        }
+        /* REQ-E2E-021: records this CRC error against stream_id's own
+         * tracked fault state -- latches the whole stream faulted iff
+         * slot->rx_enforce_e2e (this test double's own per-endpoint
+         * stand-in for the real per-request-stream register bit; see
+         * its own doc comment). A future request on this same stream_id
+         * hits the check above before reaching this point again. */
+        if (srv->stream_fault_tracker != NULL) {
+            (void)rcp_e2e_stream_fault_tracker_on_crc_error(srv->stream_fault_tracker, stream_id,
+                                                              slot->rx_enforce_e2e);
         }
         rcp_bytes_free(&unwrapped);
         return RCP_MOCK_DISPATCH_CRC_ERROR;
