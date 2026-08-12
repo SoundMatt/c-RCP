@@ -15205,6 +15205,63 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.256.0 -- 2026-08-12 (issue #201 batch: `REQ-WDG-010`, wiring
+the per-stream watchdog kick into `dispatch_e2e()`)
+
+**`rcp_mock_server_dispatch_e2e()`/`_dispatch_frame_e2e()` now call
+`rcp_watchdog_keeper_kick()` for every request they receive on a
+stream, closing the "no production call site" half of `REQ-WDG-010`
+(TC18 §12.7.7: "the watchdog is reset with each request received
+from this RC Client").**
+
+`rcp_watchdog_keeper_kick()` has always been individually correct
+(`REQ-WDG-003`) but, before this fix, only tests called it -- a live,
+responsive RC Client would still overflow a real integration's
+watchdog on a fixed schedule, exactly as `test_tc18_gaps_server.c`'s
+own `test_watchdog_overflows_despite_continuous_requests()` pins for
+the lower-level `rcp_server_endpoint_submit()` path.
+
+`rcp_watchdog_keeper_t` is architected as a thin, caller-driven
+satellite package operating on caller-owned data (`watchdog.h`'s own
+file header: it sends no wire traffic and owns no transport). Direct
+TC18.txt verification (§12.7.7, both RC1 and RC5) confirmed the rule
+is about RECEIPT, not successful validation or execution: a new
+`rcp_mock_server_set_watchdog_keeper()` associates a caller-owned
+`rcp_watchdog_keeper_t*` with an `rcp_mock_server_t` (not owned by
+`srv`, matching every other satellite-package pointer this module
+holds), and `dispatch_e2e()` kicks unconditionally as its very first
+statement, before "plain command mode" delegation, CRC validation, or
+admission -- a request this call goes on to reject still means the RC
+Client is alive and talking on that stream.
+
+**Deliberately scoped out**: the plain, non-E2E
+`rcp_mock_server_dispatch()`/`_dispatch_frame()` path has no
+`stream_id` parameter at all to key a kick by, and widening its own
+signature would ripple across every existing call site in this
+codebase's own test suite far beyond this fix's narrow scope -- left
+as a real, separate, still-open gap in `REQ-WDG-010`'s own updated
+`.fusa-reqs.json` text (stays `partial`). `server.h`'s own core
+`rcp_server_endpoint_submit()` likewise remains unkicked.
+
+Three new tests mirror `test_watchdog.c`'s own
+`test_kick_resets_timer_prevents_overflow()` pattern against a real
+`rcp_watchdog_keeper_t`: repeated admitted dispatches inside the
+timeout never overflow; a rejected (CRC-mismatch) dispatch, sandwiched
+between two waits each consuming most of the timeout budget, still
+prevents overflow -- proving the kick fires on receipt even when
+rejected, and independent of the constructor's own implicit initial
+kick; a no-keeper-set case confirms normal dispatch is unaffected.
+
+Mutation-tested 2 ways: bypassing the kick guard entirely, and moving
+the kick to only the success path (simulating "kick on validation").
+Both caught cleanly -- the second required strengthening the
+rejection test past its first, ordering-insensitive draft, since a
+single post-construction dispatch call couldn't distinguish the two
+orderings from the constructor's own initial kick.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.255.0 -- 2026-08-12 (issue #311 batch 5: EP0 dispatcher wiring
 for `svr_ep_generic_cfg_ptr` -- issue #311 CLOSED)
 
