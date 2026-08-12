@@ -438,21 +438,40 @@ rcp_ep_wakeup_errc_t rcp_ep_wakeup_decode_sleepcmd_request(const uint8_t *b, siz
                                                             rcp_byte_bus_id_t expected_bus_id,
                                                             uint8_t *out_transaction_num);
 
-/* Encodes an ACF_ABB SleepCMD response carrying result (power.h's
- * rcp_pwrmode_entry_result_t) as its second payload byte, echoing
- * transaction_num. Returns a zeroed rcp_bytes_t (data=NULL) on allocation
- * failure. */
+/* Encodes an ACF_ABB SleepCMD response for result (power.h's
+ * rcp_pwrmode_entry_result_t). RCP_PWRMODE_ENTRY_OK encodes this
+ * module's own positive-form payload (RCP_EP_WAKEUP_SLEEPCMD_OPCODE
+ * followed by the result byte), echoing transaction_num, exactly as
+ * before. RCP_PWRMODE_ENTRY_REFUSED instead returns a genuine ACF
+ * Error Response carrying RCP_ERROR_REQUEST_CANCELED (via
+ * rcp_acf_build_error_response()) -- REQ-WAKEUP-019, TC18 §12.5: "The
+ * RC Server will reject requests to enter sleep or standby mode and
+ * send an error message with error code = REQUEST_CANCELED." A
+ * conformant RC Client watching for an error response (not a
+ * this-module-specific positive-form byte it has no reason to expect)
+ * now sees the refusal. Returns a zeroed rcp_bytes_t (data=NULL) on
+ * allocation failure either way. */
 rcp_bytes_t rcp_ep_wakeup_encode_sleepcmd_response(rcp_byte_bus_id_t byte_bus_id,
                                                     rcp_pwrmode_entry_result_t result,
                                                     uint8_t transaction_num);
 
-/* Decodes and validates an ACF-level SleepCMD response from b[0..len),
- * with the same fixed-opcode/short-frame/wrong-bus/wrong-message-type
- * failure modes as rcp_ep_wakeup_decode_sleepcmd_request(). Any second
- * payload byte other than RCP_PWRMODE_ENTRY_OK/_REFUSED's own raw values
- * decodes as RCP_PWRMODE_ENTRY_REFUSED (fail-safe: an unrecognized result
- * byte is never treated as an admitted entry). On RCP_EP_WAKEUP_OK,
- * *out_result and *out_transaction_num are populated. */
+/* Decodes and validates an ACF-level SleepCMD response from b[0..len).
+ * REQ-WAKEUP-019: an Error Response (hdr.err set) is now recognized as
+ * the refused-entry half of this pair -- *out_result is set to
+ * RCP_PWRMODE_ENTRY_REFUSED iff its payload carries
+ * RCP_ERROR_REQUEST_CANCELED (the only code this function's own encode
+ * counterpart ever builds); any other err payload is
+ * RCP_EP_WAKEUP_ERR_BAD_OPCODE, not silently reinterpreted. A non-error
+ * response is decoded exactly as before -- the same fixed-opcode/
+ * short-frame/wrong-bus/wrong-message-type failure modes as
+ * rcp_ep_wakeup_decode_sleepcmd_request(), and any second payload byte
+ * other than RCP_PWRMODE_ENTRY_OK/_REFUSED's own raw values decodes as
+ * RCP_PWRMODE_ENTRY_REFUSED (fail-safe: an unrecognized result byte is
+ * never treated as an admitted entry) -- kept for tolerance of a
+ * non-conformant peer's own old-style positive-form refusal, though
+ * this module's own encode side no longer produces one. On
+ * RCP_EP_WAKEUP_OK, *out_result and *out_transaction_num are
+ * populated. */
 rcp_ep_wakeup_errc_t rcp_ep_wakeup_decode_sleepcmd_response(const uint8_t *b, size_t len,
                                                              rcp_byte_bus_id_t expected_bus_id,
                                                              rcp_pwrmode_entry_result_t *out_result,
