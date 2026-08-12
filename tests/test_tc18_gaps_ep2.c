@@ -408,13 +408,24 @@ static void test_adc_value_width_and_named_analog_input_signal(void)
     TEST_ASSERT_EQUAL_UINT8(0u, rcp_regmap_named_signal_ep_signal_nr(RCP_REGMAP_SIGNAL_ADC_IN));
 }
 
-static void test_adc_block_has_no_clock_status_or_interval_registers(void)
+/* REQ-ADC-035/036 RESOLVED (stale test found and fixed alongside REQ-ADC-032/
+ * -033's own catalog corrections, 2026-08-12): this test used to pin exactly
+ * the gap REQ-ADC-035/-036's own earlier batch (2026-08-11) already closed --
+ * it kept asserting the pre-fix struct footprint (5 octets) and a comment
+ * claiming none of Table 51's clock/status/interval registers existed, when
+ * rcp_ep_adc_functional_cfg_t has carried ep_status/base_clk_divider/
+ * sample_interval/resolution/trigger_min/trigger_max (9 more octets) and a
+ * real rcp_ep_adc_render_registers()/_apply_reconfig() round-trip ever since
+ * -- already thoroughly covered by test_ep_adc.c's own dedicated register-
+ * block tests. This test now positively confirms the fields exist and are
+ * distinct from the three original sampling-pipeline fields, rather than
+ * re-duplicating test_ep_adc.c's own full round-trip coverage. */
+static void test_adc_functional_cfg_has_clock_status_and_interval_fields(void)
 {
     rcp_ep_adc_functional_cfg_t cfg;
     uint8_t                     before[sizeof(rcp_ep_adc_functional_cfg_t)];
     rcp_lifecycle_writer_ctx_t  w = any_writer();
 
-    TEST_ASSERT_EQUAL_size_t(1u, sizeof(bool)); /* footprint counting precondition */
     rcp_ep_adc_functional_cfg_init(&cfg);
     memcpy(before, &cfg, sizeof(before));
 
@@ -424,18 +435,23 @@ static void test_adc_block_has_no_clock_status_or_interval_registers(void)
                                                               RCP_LIFECYCLE_HW_CONFIGURED, w));
     TEST_ASSERT_TRUE(rcp_ep_adc_set_combine_avg_values(&cfg, 0x55u,
                                                        RCP_LIFECYCLE_HW_CONFIGURED, w));
+    /* No dedicated setters exist for these (matching every other
+     * register-block-only field's own convention, REQ-ADC-036's own text) --
+     * set directly, the same way rcp_ep_adc_apply_reconfig() would after
+     * parsing a real wire write. */
+    cfg.ep_status        = 0x6677u;
+    cfg.base_clk_divider = 0x88u;
+    cfg.sample_interval  = 0x99u;
+    cfg.resolution        = 12u;
+    cfg.trigger_min       = 0xAABBu;
+    cfg.trigger_max       = 0xCCDDu;
 
-    /* DEVIATION -- TC18 §13.7.9.2 Table 51 fixes adc_ep_len at 0x0000
-     * (8 bit, R), a reserved octet at 0x0001, adc_base_clk at 0x0004
-     * (16 bit, R), adc_ep_status at 0x0006 (16 bit, R/W),
-     * adc_base_clk_divider at 0x0008 (8 bit, R/W) and adc_sample_interval
-     * at 0x0009 (8 bit, R/W). The whole endpoint-specific surface a client
-     * can reach here is 5 octets -- adc_samples_per_avg_interval(2) +
-     * adc_avg_intervals_per_request(2) + adc_combine_avg_values(1) -- so
-     * none of those six rows exists, and ADC_CLK cannot be derived. */
     TEST_ASSERT_EQUAL_size_t(0u, offsetof(rcp_ep_adc_functional_cfg_t, common));
-    TEST_ASSERT_EQUAL_size_t(5u, changed_octets(before, (const uint8_t *)&cfg,
-                                                sizeof(before)));
+    /* 5 octets from the three original sampling-pipeline fields, plus 9
+     * more from the six fields REQ-ADC-035/036 added -- the full 14-octet
+     * footprint this struct actually carries today. */
+    TEST_ASSERT_EQUAL_size_t(14u, changed_octets(before, (const uint8_t *)&cfg,
+                                                 sizeof(before)));
 }
 
 static void test_adc_inter_sample_spacing_is_unconstrained(void)
@@ -460,13 +476,24 @@ static void test_adc_inter_sample_spacing_is_unconstrained(void)
     a = rcp_ep_adc_average_interval(even, 3u);
     b = rcp_ep_adc_average_interval(ragged, 3u);
 
-    /* DEVIATION -- TC18 §13.7.9.1 requires successive samples to be exactly
-     * one adc_sample_interval apart, that interval being a multiple of
+    /* REQ-ADC-033 DEVIATION PIN (still genuinely open, not a routine gap):
+     * TC18 §13.7.9.1 requires successive samples to be exactly one
+     * adc_sample_interval apart, that interval being a multiple of
      * adc_base_clk scaled by adc_base_clk_divider, whenever more than one
-     * sample is taken. c-RCP models no cadence whatever: the two intervals
-     * above have completely different sample spacing and are nevertheless
-     * indistinguishable at this module's only output, so nothing here can
-     * reject, or even notice, a stream that violates the interval. */
+     * sample is taken. adc_sample_interval and adc_base_clk_divider are now
+     * real, wire-reachable config fields (REQ-ADC-035/036, see
+     * test_adc_functional_cfg_has_clock_status_and_interval_fields above),
+     * but adc_base_clk itself is deliberately never modelled as a real
+     * value (always renders 0, the same honest "no real clock source"
+     * stance ep_gpio.h's/ep_i2c.h's/ep_lin.h's own base_clk fields commit
+     * to) -- so this module has no way to convert a cycle count into real
+     * wall-clock spacing, and rcp_ep_adc_average_interval() still consumes
+     * caller-supplied samples with no timing validation whatsoever: the two
+     * intervals below have completely different sample spacing and are
+     * nevertheless indistinguishable at this module's only output.
+     * Enforcing this would mean inventing a clock model this codebase
+     * deliberately doesn't have for any endpoint type, not a field-wiring
+     * fix. */
     TEST_ASSERT_EQUAL_UINT16(100u, a.value);
     TEST_ASSERT_EQUAL_UINT16(a.value, b.value);
     TEST_ASSERT_EQUAL_UINT64(2000u, a.timestamp);
@@ -959,7 +986,7 @@ int main(void)
     RUN_TEST(test_uart_register_units_diverge_from_table_48);
 
     RUN_TEST(test_adc_value_width_and_named_analog_input_signal);
-    RUN_TEST(test_adc_block_has_no_clock_status_or_interval_registers);
+    RUN_TEST(test_adc_functional_cfg_has_clock_status_and_interval_fields);
     RUN_TEST(test_adc_inter_sample_spacing_is_unconstrained);
     RUN_TEST(test_adc_has_no_trigger_outputs_and_no_retained_average);
 

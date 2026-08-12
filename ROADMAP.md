@@ -15205,6 +15205,33 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.283.0 -- 2026-08-12 (issue #336 batch: `REQ-ADC-033`, ADC
+sample-cadence catalog fix + stale REQ-ADC-035/036 test fixed)
+
+**`REQ-ADC-033` flips `not-implemented` -> `partial`. No
+functional code change.**
+
+The catalogued claim that rcp_ep_adc_functional_cfg_t carries
+neither adc_sample_interval nor adc_base_clk_divider was stale --
+both have existed as real config fields since REQ-ADC-035/036's
+earlier batch. What remains genuinely unimplemented: adc_base_clk
+itself is deliberately never modelled as a real value, so this
+module has no way to convert a cycle count into real wall-clock
+spacing -- inventing a clock model this codebase deliberately
+doesn't have for any endpoint type, not a field-wiring fix.
+
+**Found and fixed in passing**: test_adc_block_has_no_clock_
+status_or_interval_registers was itself a stale gap-pinning test
+for REQ-ADC-035/036, still asserting the pre-fix struct footprint
+a day after those requirements were fixed. Rewrote it positively
+confirming all 6 added fields exist. 8th+ occurrence of this
+session's own stale-catalog-entry pattern, this time on the test
+side.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 new
+findings. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both
+100%.
+
 ### v0.282.0 -- 2026-08-12 (issue #336 batch: `REQ-ADC-032`, ADC
 channel/analog-input-pin binding, doc-only)
 

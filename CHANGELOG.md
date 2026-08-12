@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.283.0 -- 2026-08-12 (issue #336 batch: `REQ-ADC-033`, ADC sample-cadence catalog fix + stale REQ-ADC-035/036 test found and fixed)
+
+**`REQ-ADC-033` flips `not-implemented` -> `partial`. `REQ-ADC-035`/`REQ-ADC-036`'s own test suite gains its own, separate fix. No functional code change.**
+
+The catalogued claim that `rcp_ep_adc_functional_cfg_t` "carries neither `adc_sample_interval` nor `adc_base_clk` nor `adc_base_clk_divider`" was stale: `sample_interval`/`base_clk_divider` have existed as real config fields, wired to Table 51's own register block, since `REQ-ADC-035`/`REQ-ADC-036`'s earlier batch (2026-08-11). What remains genuinely unimplemented, and for a documented reason rather than an oversight: `adc_base_clk` itself is deliberately never modelled as a real value (always renders 0, the same "no real clock source" honesty `ep_gpio.h`'s/`ep_i2c.h`'s/`ep_lin.h`'s own `base_clk` fields already commit to), so this module has no way to convert `adc_sample_interval`'s own cycle count into real wall-clock spacing, and `rcp_ep_adc_average_interval()` still consumes caller-supplied samples with zero timing validation. Enforcing the temporal geometry would mean inventing a clock model this codebase deliberately doesn't have for *any* endpoint type -- not a routine field-wiring fix, so the requirement stays `partial`, not `implemented`.
+
+**Found and fixed in passing, while investigating this requirement's own neighborhood**: `test_adc_block_has_no_clock_status_or_interval_registers` (`test_tc18_gaps_ep2.c`) was itself a stale gap-pinning test for `REQ-ADC-035`/`REQ-ADC-036` -- it still asserted the pre-fix struct footprint (5 octets) and a comment claiming none of Table 51's clock/status/interval registers existed, a full session-day after those two requirements were already fixed and independently, thoroughly covered by `test_ep_adc.c`'s own dedicated register-block round-trip tests. Rewrote it as `test_adc_functional_cfg_has_clock_status_and_interval_fields`, positively confirming all 6 added fields exist (14-octet footprint) rather than re-duplicating `test_ep_adc.c`'s own coverage. **8th+ occurrence of this session's own recurring stale-catalog-entry pattern**, this time on the test side rather than the `.fusa-reqs.json` side.
+
+Updated `test_adc_inter_sample_spacing_is_unconstrained`'s own deviation-pin comment to correctly attribute the remaining gap to the deliberate no-real-clock-model architecture, not a missing field.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 new findings (same 1 pre-existing `CFUSA-L004` false positive, only line-shifted). `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.282.0 -- 2026-08-12 (issue #336 batch: `REQ-ADC-032`, ADC channel/analog-input-pin binding, doc-only)
 
 **`REQ-ADC-032` flips `partial` -> `implemented`. No functional code change.**
