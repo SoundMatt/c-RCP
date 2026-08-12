@@ -15205,6 +15205,36 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.285.0 -- 2026-08-12 (issue #336 batch: `REQ-SRV-015`,
+disabled-endpoint config-request execution for ABB requests)
+
+**`REQ-SRV-015` flips `not-implemented` -> `partial` (ABB/Standard
+requests only).**
+
+rcp_server_endpoint_submit() now inspects an ABB request's own
+evt[2:0] (TC18 §12.3.1.3): 111b -- Table 33's own universal
+per-row "EP_func configuration write" meaning -- is executed
+immediately even while the endpoint is disabled, including the
+write that would set ep_enable itself; any other evt[2:0] value is
+still queued, as before.
+
+**Deliberately NOT applied to GBB frames**: a GBB frame might be a
+Compound Wait request, whose own evt[2:0] means an entirely
+different thing under §13.5.1 (a comparison-operator selector, not
+config-write), and this function has no request-kind decode to
+tell the two apart -- misclassifying would execute an operational
+request immediately on a disabled endpoint, the exact bug this fix
+closes, not one to introduce.
+
+Split the pre-existing gap-pinning test into two. Mutation-tested 2
+ways -- both caught cleanly, one cascading into 3 other pre-existing
+tests as expected.
+
+65/65 both trees (native + ASan/UBSan, full suite under both given
+this touches core server.c). `cfusa check`: 1 new instance of the
+same pre-existing false positive (confirmed non-recursive). `cfusa
+trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.284.0 -- 2026-08-12 (issue #336 batch: `REQ-PWM-057`, PWM_OUT
 generation-state classifier)
 
