@@ -1,12 +1,12 @@
-# Safety Case — c-RCP v0.99.0
+# Safety Case — c-RCP v0.225.0
 
-**Standard:** iso26262  |  **Generated:** 2026-07-31T00:35:57Z
+**Standard:** iso26262  |  **Generated:** 2026-08-12T23:45:33Z
 
 ---
 
 ## G1 — goal
 
-> c-RCP v0.99.0 has no unmitigated hazard from .fusa-hara.json and no unresolved ERROR finding from `cfusa check` at the iso26262 analysis boundary
+> c-RCP v0.225.0 has no unmitigated hazard from .fusa-hara.json and no unresolved ERROR finding from `cfusa check` at the iso26262 analysis boundary
 
 ## St1 — strategy
 
