@@ -428,7 +428,7 @@ typedef enum {
  *     dropped]" sentence (REQ-LIFECYCLE-029) by treating that as the
  *     general, non-EP0-scoped rule and §12.7's REJECT as the more
  *     specific, EP0-scoped override -- the same specific-overrides-
- *     general reading TC18 uses throughout (e.g. Table 22's own W*
+ *     general reading TC18 uses throughout (e.g. Table 24's own W*
  *     legend narrowing the general W rule).
  *   - While RCP_CONFIGURED: acceptance beyond the general time-sync rule
  *     already applied above is unrestricted at this milestone -- the
@@ -454,7 +454,7 @@ rcp_lifecycle_accept_t rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
  * (rcp_regmap_ep_generic_cfg_t, Figure 16's "EP_GEN_CFG") and the
  * response-queue/request-stream configuration (rcp_regmap_response_
  * queue_cfg_t / rcp_regmap_request_stream_cfg_t not already covered by
- * Table 22's own separate W* legend, Figure 16's "QUEUE_CFG") -- these
+ * Table 24's own separate W* legend, Figure 16's "QUEUE_CFG") -- these
  * are deliberately NOT modeled as distinct enum values, since their
  * writability rule is identical to HW_GENERIC's own, and this codebase's
  * own convention (see FUNCTIONAL_W vs. FUNCTIONAL_W_STAR immediately
@@ -465,7 +465,7 @@ rcp_lifecycle_accept_t rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
  * as two distinct enum values rather than one writability bit, per this
  * milestone's explicit scope.
  *
- * READ_ONLY (REQ-RMAP-025, TC18 §12.7.5 Table 18): the RC Server general
+ * READ_ONLY (REQ-RMAP-025, TC18 §12.7.5 Table 20): the RC Server general
  * (static) register map's own access type, "R" -- unwritable
  * unconditionally, in every lifecycle state, by every writer, unlike
  * every kind above (each of which is writable by SOME writer in SOME
@@ -511,7 +511,7 @@ typedef enum {
  *     last distinction is the one the roadmap requires be modeled
  *     explicitly rather than collapsed into a single writability bit.
  *   - RCP_LIFECYCLE_FIELD_READ_ONLY (REQ-RMAP-025): never writable, in
- *     any state, by any writer -- TC18 §12.7.5 Table 18's own access
+ *     any state, by any writer -- TC18 §12.7.5 Table 20's own access
  *     type "R" for the RC Server general (static) register map. A
  *     remote write must not take effect regardless of authorization;
  *     rcp_lifecycle_field_write_error() therefore always reports

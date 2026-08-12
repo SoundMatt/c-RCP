@@ -108,7 +108,7 @@ typedef struct {
     uint8_t     bit;
 } option_bit_name_t;
 
-/* REQ-RMAP-030: five independent single bits, matching TC18 Table 18
+/* REQ-RMAP-030: five independent single bits, matching TC18 Table 20
  * exactly -- see regmap.h's own dedicated section for the full
  * primary-source-verified bit layout and this table's own former
  * three-paired-group design (retired, REQ-RMAP-004..008). "trigger" and

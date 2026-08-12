@@ -177,7 +177,7 @@
  * rx_seq_safestate_enable/rx_wd_enable/rx_wd_safestate_enable/
  * rx_ovrflw_safestate_enable/rx_safety_measure/rx_wd_info_enable were
  * originally modeled against become, in RC5's own Table 24 (renumbered
- * from Table 22), 4 combined bits -- rx_enforce_crc, rx_enforce_sequence,
+ * from Table 24), 4 combined bits -- rx_enforce_crc, rx_enforce_sequence,
  * rx_enforce_watchdog, rx_enforce_request_filing -- plus 3 reserved bits
  * and a new read-only rx_stream_status bit at 0x000D.7.
  *
@@ -306,10 +306,10 @@ typedef struct {
 
 /* ── svr_implemented_options: five independent single bits (REQ-RMAP-030) ─── */
 
-/* REQ-RMAP-030 (TC18 §12.7.5 Table 18, absolute address 0x0016, 8 bit,
+/* REQ-RMAP-030 (TC18 §12.7.5 Table 20, absolute address 0x0016, 8 bit,
  * R): five independent bits, one per optional feature, "abcdefgh" with
  * bits f/g/h reserved -- verified directly against the primary-source
- * PDF (Table 18, page 51 of OA_TC18_specification_v_0.5.1_RC.pdf):
+ * PDF (Table 20, page 51 of OA_TC18_specification_v_0.5.1_RC.pdf):
  *   a: compound & wait requests
  *   b: trigger requests
  *   c: chained requests
@@ -362,7 +362,7 @@ typedef struct {
                                       that requirement, and REQ-RMAP-023
                                       itself stays "partial" (not
                                       "implemented") until it does. */
-    uint8_t  svr_req_stream_max; /* REQ-RMAP-026 (TC18 §12.7.5 Table 18,
+    uint8_t  svr_req_stream_max; /* REQ-RMAP-026 (TC18 §12.7.5 Table 20,
                                      absolute address 0x000E, 8 bit, R):
                                      maximum number of request streams
                                      usable to access this RC Server.
@@ -378,14 +378,14 @@ typedef struct {
                                      reachability boundary as
                                      svr_lifecycle_state above. */
     uint8_t  svr_responder_streams_max; /* REQ-RMAP-026 (TC18 §12.7.5
-                                            Table 18, absolute address
+                                            Table 20, absolute address
                                             0x000F, 8 bit, R): maximum
                                             number of supported responder
                                             queues for response and
                                             acknowledge traffic. Same
                                             content-modeling-only scope
                                             as svr_req_stream_max above. */
-    uint8_t  svr_sequencers_max; /* REQ-RMAP-028 (TC18 §12.7.5 Table 18,
+    uint8_t  svr_sequencers_max; /* REQ-RMAP-028 (TC18 §12.7.5 Table 20,
                                      absolute address 0x0014, 8 bit, R):
                                      0 means "sequencer operation not
                                      supported"; 1..n gives the number of
@@ -465,7 +465,7 @@ typedef struct {
                                          modeling only, same REQ-RMAP-024
                                          wire-reachability boundary as
                                          every other Group 1 item. */
-    uint16_t svr_req_mem_size; /* REQ-RMAP-027 (TC18 §12.7.5 Table 18,
+    uint16_t svr_req_mem_size; /* REQ-RMAP-027 (TC18 §12.7.5 Table 20,
                                    absolute address 0x0012, 16 bit, R):
                                    maximum memory for EP request queues,
                                    in 32-bit words. Same scope as
@@ -476,7 +476,7 @@ typedef struct {
                                           section above for the full
                                           primary-source-verified bit
                                           layout and history. */
-    uint8_t  reserved_0x17; /* REQ-RMAP-031 (TC18 §12.7.5 Table 18,
+    uint8_t  reserved_0x17; /* REQ-RMAP-031 (TC18 §12.7.5 Table 20,
                                 absolute address 0x0017, 8 bit): reserved
                                 for future use; must read 0x00. Explicitly
                                 modeled -- not merely absent -- so intent
@@ -501,7 +501,7 @@ typedef struct {
                                 that helper. Content modeling only, same
                                 REQ-RMAP-024 wire-reachability boundary as
                                 every other Group 1 item. */
-    uint16_t svr_io_pin_count; /* REQ-RMAP-032 (TC18 §12.7.5 Table 18,
+    uint16_t svr_io_pin_count; /* REQ-RMAP-032 (TC18 §12.7.5 Table 20,
                                    absolute address 0x0018, 16 bit, R):
                                    number of assignable I/O pins --
                                    §12.7.6's own authoritative source for
@@ -519,7 +519,7 @@ typedef struct {
                                    as every other Group 1 item. */
     uint16_t svr_root_client_index;   /* RCP_REGMAP_NO_ROOT_CLIENT if unset */
 
-    uint16_t svr_hw_cfg_ptr; /* REQ-RMAP-033 (TC18 §12.7.5 Table 18,
+    uint16_t svr_hw_cfg_ptr; /* REQ-RMAP-033 (TC18 §12.7.5 Table 20,
                                  absolute address 0x001A, 16 bit, R): the
                                  address of the HW_config register map
                                  (§12.7.6). Retyped from this field's own
@@ -561,21 +561,21 @@ typedef struct {
                                  nothing real to point AT yet either;
                                  that remains separately open. */
     uint8_t  svr_request_stream_cfg_capacity; /* REQ-RMAP-034 (TC18
-                                §12.7.5 Table 18, absolute address
+                                §12.7.5 Table 20, absolute address
                                 0x001C, 8 bit, R): number of usable
                                 entries in the request-stream config
-                                table (§12.7.7 Table 22). */
+                                table (§12.7.7 Table 24). */
     uint8_t  svr_response_stream_cfg_capacity; /* REQ-RMAP-034 (TC18
-                                §12.7.5 Table 18, absolute address
+                                §12.7.5 Table 20, absolute address
                                 0x001D, 8 bit, R): number of usable
                                 entries in the response/ack-stream
                                 config table (§12.7.9 Table 24). */
     uint16_t svr_request_stream_cfg_ptr; /* REQ-RMAP-034 (TC18 §12.7.5
-                                Table 18, absolute address 0x001E, 16
+                                Table 20, absolute address 0x001E, 16
                                 bit, R): the address of the
                                 request-stream config table. */
     uint16_t svr_response_stream_cfg_ptr; /* REQ-RMAP-034 (TC18 §12.7.5
-                                Table 18, absolute address 0x0020, 16
+                                Table 20, absolute address 0x0020, 16
                                 bit, R): the address of the
                                 response/ack-stream config table.
 
@@ -607,7 +607,7 @@ typedef struct {
                                 only, same REQ-RMAP-024 wire-
                                 reachability boundary as every other
                                 Group 1 item. */
-    uint16_t reserved_0x22; /* REQ-RMAP-035 (TC18 §12.7.5 Table 18,
+    uint16_t reserved_0x22; /* REQ-RMAP-035 (TC18 §12.7.5 Table 20,
                                 absolute address 0x0022, 16 bit):
                                 reserved for future use; must read
                                 0x00. Explicitly modeled -- not merely
@@ -639,11 +639,11 @@ typedef struct {
                                 16-bit register-address value, same
                                 class of fix as REQ-RMAP-033/-034. */
     uint16_t svr_ep_generic_cfg_capacity; /* REQ-RMAP-036 (TC18
-                                §12.7.5 Table 18, absolute address
+                                §12.7.5 Table 20, absolute address
                                 0x0026, 16 bit, R): the LENGTH OF THE
                                 EP CONFIG REGISTER SECTION IN BYTES --
                                 verified directly against the primary-
-                                source PDF (Table 18, page 52 of
+                                source PDF (Table 20, page 52 of
                                 OA_TC18_specification_v_0.5.1_RC.pdf).
                                 A byte length, NOT an entry count --
                                 the exact opposite of what this
@@ -662,7 +662,7 @@ typedef struct {
                                 REQ-RMAP-024 wire-reachability boundary
                                 as every other Group 1 item. */
     uint16_t svr_ep_functional_cfg_ptr; /* REQ-RMAP-038 (TC18 §12.7.5
-                                Table 18, absolute address 0x002C, 16
+                                Table 20, absolute address 0x002C, 16
                                 bit, R): the address of the EP_FUNC_
                                 config register map (§13.7.1.2 Server)
                                 -- the section §12.7.1's configuration
@@ -671,7 +671,7 @@ typedef struct {
                                 (REQ-RMAP-033): TC18 defines no
                                 adjacent capacity register for this
                                 one either -- verified directly against
-                                the primary-source PDF (Table 18, page
+                                the primary-source PDF (Table 20, page
                                 52) during REQ-RMAP-036's own batch.
                                 Retyped from this field's own former
                                 shape (rcp_regmap_table_ref_t) to a
@@ -682,17 +682,17 @@ typedef struct {
                                 REQ-RMAP-024 wire-reachability boundary
                                 as every other Group 1 item. */
     uint16_t svr_ep_bytebus_id_map_ptr; /* REQ-RMAP-037 (TC18 §12.7.5
-                                Table 18, absolute address 0x0028, 16
+                                Table 20, absolute address 0x0028, 16
                                 bit, R): the address of the EP -
                                 byte_bus_id mapping table (§12.7.8) --
                                 the table an RC Client needs before it
                                 may address an endpoint directly. */
     uint8_t  svr_ep_bytebus_id_map_capacity; /* REQ-RMAP-037 (TC18
-                                §12.7.5 Table 18, absolute address
+                                §12.7.5 Table 20, absolute address
                                 0x002A, 8 bit, R): max number of
                                 entries in the EP - byte_bus_id map
                                 table -- verified directly against the
-                                primary-source PDF (Table 18, page 52
+                                primary-source PDF (Table 20, page 52
                                 of OA_TC18_specification_v_0.5.1_RC.pdf)
                                 during REQ-RMAP-036's own batch. An
                                 entry COUNT, matching this struct's own
@@ -711,7 +711,7 @@ typedef struct {
                                 wire-reachability boundary as every
                                 other Group 1 item. */
     uint16_t svr_sequencer_state_ptr; /* REQ-RMAP-038 (TC18 §12.7.5
-                                Table 18, absolute address 0x002E, 16
+                                Table 20, absolute address 0x002E, 16
                                 bit, R): the address of the Sequencer_
                                 config register map (§12.7.10). Also a
                                 LONE pointer, same shape as
@@ -724,11 +724,11 @@ typedef struct {
                                 same REQ-RMAP-024 wire-reachability
                                 boundary as every other Group 1 item. */
     uint16_t svr_network_interface_cfg_ptr; /* REQ-RMAP-039 (TC18
-                                §12.7.5 Table 18 continued, relative
+                                §12.7.5 Table 20 continued, relative
                                 address 0x0030, 16 bit, R): the address
                                 of the Network_config register map
                                 (§12.7.11). Verified directly against
-                                the primary-source PDF (Table 18, page
+                                the primary-source PDF (Table 20, page
                                 53 of OA_TC18_specification_v_0.5.1_
                                 RC.pdf) during REQ-RMAP-036's own batch,
                                 re-confirmed by reading page 53 a second
@@ -747,7 +747,7 @@ typedef struct {
                                 register ending at 0x002F) plus this
                                 whole table's consistent, gap-free,
                                 sequential-address convention (every
-                                other register in Table 18, without
+                                other register in Table 20, without
                                 exception, sits at offset = previous
                                 register's own offset + previous
                                 register's own width) -- flagged
@@ -782,7 +782,7 @@ typedef struct {
                                 wire-reachability boundary as every
                                 other Group 1 item. */
     uint16_t svr_network_interface_cfg_capacity; /* REQ-RMAP-039 (TC18
-                                §12.7.5 Table 18 continued, INFERRED
+                                §12.7.5 Table 20 continued, INFERRED
                                 absolute address 0x0032, 16 bit, R):
                                 the Network_config register map's own
                                 capacity. Unlike the three pairs below,
@@ -792,7 +792,7 @@ typedef struct {
                                 rather than assumed to match the other
                                 three by analogy. */
     uint16_t svr_physical_layer_cfg_ptr; /* REQ-RMAP-039 (TC18 §12.7.5
-                                Table 18 continued, INFERRED relative
+                                Table 20 continued, INFERRED relative
                                 address 0x0034, 16 bit, R): the address
                                 of the physical-layer configuration
                                 register map (§12.7.12). A pointer
@@ -800,19 +800,19 @@ typedef struct {
                                 encoding for "physical layer
                                 configuration is not supported". */
     uint16_t svr_physical_layer_cfg_capacity; /* REQ-RMAP-039 (TC18
-                                §12.7.5 Table 18 continued, INFERRED
+                                §12.7.5 Table 20 continued, INFERRED
                                 absolute address 0x0036, 16 bit, R):
                                 the physical-layer configuration
                                 register map's own capacity. */
     uint16_t svr_time_synch_cfg_ptr; /* REQ-RMAP-039 (TC18 §12.7.5
-                                Table 18 continued, INFERRED relative
+                                Table 20 continued, INFERRED relative
                                 address 0x0038, 16 bit, R): the address
                                 of the PTP_config register map
                                 (§12.7.13). A pointer value of 0 is
                                 TC18's own defined encoding for "time
                                 synch is not supported". */
     uint16_t svr_time_synch_cfg_capacity; /* REQ-RMAP-039 (TC18
-                                §12.7.5 Table 18 continued, INFERRED
+                                §12.7.5 Table 20 continued, INFERRED
                                 absolute address 0x003A, 16 bit, R):
                                 the PTP_config register map's own
                                 capacity. */
@@ -824,7 +824,7 @@ typedef struct {
                                 TC18's own defined encoding for
                                 "security is not supported". */
     uint16_t svr_security_cfg_capacity; /* REQ-RMAP-039 (TC18 §12.7.5
-                                Table 18 continued, INFERRED relative
+                                Table 20 continued, INFERRED relative
                                 address 0x003E, 16 bit, R): the
                                 security configuration register map's
                                 own capacity -- see svr_network_
@@ -839,9 +839,9 @@ typedef struct {
  * correct default while the server is still HW_UNCONFIGURED). */
 void rcp_regmap_general_init(rcp_regmap_general_t *map);
 
-/* ── Table 18 wire codec (REQ-RMAP-024) ──────────────────────────────────────
+/* ── Table 20 wire codec (REQ-RMAP-024) ──────────────────────────────────────
  *
- * Every field above is documented against its own TC18 §12.7.5 Table 18
+ * Every field above is documented against its own TC18 §12.7.5 Table 20
  * absolute address (each field's own comment cites it), but until this
  * section, nothing in this codebase actually serialized that address
  * layout onto the wire -- rcp_discovery_encode_response()/_decode_response()
@@ -855,7 +855,7 @@ void rcp_regmap_general_init(rcp_regmap_general_t *map);
  * "Access to the configuration and status information is per ABB or GBB
  * messages... explained in the endpoint section for... RC Server, since
  * the RC Server exposes itself as endpoint0 (EP0)"), just generalized to
- * serve this struct's real, full Table 18 extent instead of the discovery
+ * serve this struct's real, full Table 20 extent instead of the discovery
  * handshake's own deliberately narrow 5-field identity slice.
  * rcp_discovery_encode_request()/_decode_request() are reused unchanged
  * for the request side -- a "read the general register map" request and a
@@ -869,10 +869,10 @@ void rcp_regmap_general_init(rcp_regmap_general_t *map);
  * user-directed): every prior citation in this struct's own field
  * comments said "relative address" -- WRONG. Direct verification against
  * the current RC5 baseline PDF (OA_TC18_specification_v_0.5.1_RC_5_3624.pdf,
- * page 61) shows Table 18's own address column is explicitly headed
+ * page 61) shows Table 20's own address column is explicitly headed
  * "Absolute address", not "Relative Address". This is not a cosmetic
  * word choice: it is TC18's own confirmation that every register in
- * Table 18 -- including every "_ptr" field (svr_hw_cfg_ptr,
+ * Table 20 -- including every "_ptr" field (svr_hw_cfg_ptr,
  * svr_ep_bytebus_id_map_ptr, svr_response_stream_cfg_ptr,
  * svr_ep_functional_cfg_ptr, svr_sequencer_state_ptr) -- shares ONE
  * continuous address space scoped to EP0/byte_bus_id=0, not five
@@ -895,26 +895,26 @@ void rcp_regmap_general_init(rcp_regmap_general_t *map);
  * built (issue #301). */
 
 /* Total wire length (bytes) of the general register map's TC18 §12.7.5
- * Table 18 extent, absolute address 0x0000 through 0x003F inclusive --
+ * Table 20 extent, absolute address 0x0000 through 0x003F inclusive --
  * see rcp_regmap_general_render()'s own doc comment for exactly which
  * struct fields this covers and which two it deliberately excludes. */
 #define RCP_REGMAP_GENERAL_LEN ((size_t)0x0040u)
 
-/* Serializes map's Table 18 fields into out[0..RCP_REGMAP_GENERAL_LEN) at
+/* Serializes map's Table 20 fields into out[0..RCP_REGMAP_GENERAL_LEN) at
  * each field's own TC18-documented absolute address (this struct's own
  * field comments above cite each one individually).
  *
  * Deliberately excludes svr_lifecycle_state and svr_root_client_index:
- * neither has a genuine Table 18 address -- both are this struct's own
+ * neither has a genuine Table 20 address -- both are this struct's own
  * convenience placement of what TC18 §13.7.1.2 Table 33 (the RC Server's
  * own EP_func block, reached via a *different*, pointer-addressed
  * mechanism -- svr_ep_functional_cfg_ptr, §12.7.1's configuration
- * request) actually owns. Table 18's own address sequence has no room for
+ * request) actually owns. Table 20's own address sequence has no room for
  * either field at all (0x000C's 16-bit svr_ep_count runs directly into
  * 0x000E's svr_req_stream_max; 0x0018's 16-bit svr_io_pin_count runs
  * directly into 0x001A's svr_hw_cfg_ptr) -- confirmed directly against
  * the rendered primary-source PDF, not assumed. Rendering either field
- * into this Table 18 image at an invented address would be a real
+ * into this Table 20 image at an invented address would be a real
  * conformance defect, not a harmless placeholder, so this function does
  * not attempt it: REQ-RMAP-023's own gap (svr_lifecycle_state) stays open
  * until Table 33's own wire codec (issue #200 Group 5, still
@@ -956,7 +956,7 @@ rcp_bytes_t rcp_regmap_general_encode_read_response(const rcp_regmap_general_t *
                                                       uint8_t transaction_num);
 
 /* Decodes and validates an ACF_ABB general-register-map read RESPONSE
- * from b[0..len). On RCP_REGMAP_GENERAL_OK, *out_map has every Table 18
+ * from b[0..len). On RCP_REGMAP_GENERAL_OK, *out_map has every Table 20
  * field rcp_regmap_general_render() populates overwritten from whichever
  * prefix of RCP_REGMAP_GENERAL_LEN the response payload actually carries
  * -- a short response (fewer octets than the full extent) leaves the
@@ -974,8 +974,8 @@ rcp_regmap_general_errc_t rcp_regmap_general_decode_read_response(const uint8_t 
                                                                     rcp_regmap_general_t *out_map);
 
 /* Decodes an ACF_ABB WRITE request from b[0..len) addressed to byte_bus_id
- * 0 (EP0) targeting the Table 18 general register map. Every one of
- * Table 18's registers is TC18-defined access type R (REQ-RMAP-025), so
+ * 0 (EP0) targeting the Table 20 general register map. Every one of
+ * Table 20's registers is TC18-defined access type R (REQ-RMAP-025), so
  * this never applies a write -- it exists only to recognize a genuine
  * write attempt and report the correct wire error for it. On
  * RCP_REGMAP_GENERAL_OK, *out_error is always RCP_ERROR_LOCKED_MEM_ACCESS
@@ -1091,7 +1091,7 @@ rcp_lifecycle_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map
  *      svr_discovery_timeout and svr_ep_status -- neither collides with
  *      an already-elsewhere-modeled field (svr_root_client_index/
  *      svr_lifecycle_state are already correctly modeled at their own,
- *      uncontested Table 18 addresses -- REQ-RMAP-038/023 -- so this
+ *      uncontested Table 20 addresses -- REQ-RMAP-038/023 -- so this
  *      struct deliberately does NOT duplicate them under this table's
  *      own disputed local addressing), and neither depends on resolving
  *      contradiction #2. */
@@ -1466,9 +1466,9 @@ typedef struct {
  * 3-octets-per-pin layout (IO_Pin N at relative address 3*N/3*N+1/3*N+2).
  *
  * RESOLVED 2026-08-11 (issue #301, user-directed re-investigation):
- * unlike Table 18 -- reached via a plain read always addressed at
+ * unlike Table 20 -- reached via a plain read always addressed at
  * absolute address 0, confirmed directly against TC18 §12.7's own text
- * -- HW_config is a SEPARATE table pointed to by Table 18's own
+ * -- HW_config is a SEPARATE table pointed to by Table 20's own
  * svr_hw_cfg_ptr register, with Table 21's own address column headed
  * "Relative Address" (relative to HW_config's own start, i.e. to
  * svr_hw_cfg_ptr's own current value), and R/W* access
@@ -1481,7 +1481,7 @@ typedef struct {
  * directly against the current RC5 baseline PDF, page 61, not the
  * "relative address" this codebase's own comments previously
  * mis-cited), confirming every "_ptr" field's own value is an absolute
- * address in the SAME EP0-scoped space Table 18 itself lives in -- a
+ * address in the SAME EP0-scoped space Table 20 itself lives in -- a
  * client reaches HW_config by issuing an ordinary evt[2:0]=111b
  * configuration request (TC18 §12.7.1 Figure 19, the same generic
  * mechanism every endpoint type already has its own client-side
@@ -1495,7 +1495,7 @@ typedef struct {
  * same issue. */
 
 /* This module's own chosen upper bound on HW_config table rows -- not a
- * spec-derived number (TC18's own svr_io_pin_count, Table 18, is a
+ * spec-derived number (TC18's own svr_io_pin_count, Table 20, is a
  * 16-bit register with no fixed upper bound at all); matches
  * RCP_MOCK_MAX_ENDPOINTS' own scale (mock.h) as a plausible real-device
  * IO-pin count. */
@@ -1529,7 +1529,7 @@ const char *rcp_regmap_hw_pin_map_reconfig_strerror(rcp_regmap_hw_pin_map_reconf
 /* The inverse of rcp_regmap_hw_pin_map_render(): patches entries[0..count)
  * (the currently-configured HW_config table, unchanged in row COUNT by
  * this call -- count itself is svr_io_pin_count, a separate, read-only
- * Table 18 register this function never touches) at relative_start_address
+ * Table 20 register this function never touches) at relative_start_address
  * (relative to HW_config's own start, i.e. to svr_hw_cfg_ptr's own current
  * value -- NOT an EP0-absolute address; a caller routing an incoming
  * request here, e.g. rcp_regmap_ep0_decode_write_request(), has already
@@ -1794,7 +1794,7 @@ typedef struct {
 
     /* ── Request-storage overflow (e2e.h) ───────────────────────────── */
     bool     rx_ovrflw_safestate_enable; /* REQ-RMAP-071 (TC18 §12.7.7
-                                          Table 22, relative address
+                                          Table 24, relative address
                                           0x000D bit 5, 1 bit, R/W*):
                                           true drives every endpoint bound
                                           to this stream toward its
@@ -1872,7 +1872,7 @@ typedef struct {
  * as of this field's own addition. */
 void rcp_regmap_request_stream_cfg_init(rcp_regmap_request_stream_cfg_t *cfg);
 
-/* REQ-RMAP-050 (TC18 §12.7.7 Table 22, relative address 0x000A, 16 bit,
+/* REQ-RMAP-050 (TC18 §12.7.7 Table 24, relative address 0x000A, 16 bit,
  * R/W*): rx_wd_timeout_intervall is expressed in clock tics, but TC18
  * names no fixed clock-tick rate for this register anywhere near its own
  * definition (unlike, e.g., PWM's endpoint-local "clock selected for
@@ -1907,10 +1907,10 @@ bool rcp_regmap_wd_timeout_ticks_to_ms(uint16_t ticks,
 
 /* ── request-stream-cfg wire codec (issue #306, REQ-RMAP-047/048/049) ──────
  *
- * request-stream-cfg (TC18 §12.7.7 Table 22, pointed to by Table 18's own
+ * request-stream-cfg (TC18 §12.7.7 Table 24, pointed to by Table 20's own
  * svr_request_stream_cfg_ptr) is a FOURTH pointed-to table sharing issue
  * #301's own already-resolved addressing finding (svr_request_stream_cfg_ptr's
- * own value is an absolute address in the same EP0-scoped space Table 18
+ * own value is an absolute address in the same EP0-scoped space Table 20
  * itself lives in), filed and closed separately (issue #306) since it was
  * never brought into issue #301's own original scope.
  *
@@ -1923,7 +1923,7 @@ bool rcp_regmap_wd_timeout_ticks_to_ms(uint16_t ticks,
  * Three fields deliberately NOT wire-mapped by this render()/
  * apply_reconfig() pair:
  *
- *   - rx_wd_action: confirmed via direct page-image read of Table 22 on
+ *   - rx_wd_action: confirmed via direct page-image read of Table 24 on
  *     BOTH revisions that no corresponding register exists anywhere in
  *     this table (or elsewhere in TC18) -- this struct's own field is
  *     round-tripped, caller-defined, with no TC18 wire basis at all.
@@ -1990,7 +1990,7 @@ rcp_regmap_request_stream_cfg_reconfig_strerror(rcp_regmap_request_stream_cfg_re
  * identical patch-then-reparse idiom to every other pointed-to table's own
  * apply_reconfig(). relative_start_address/data are relative to this
  * table's own start (svr_request_stream_cfg_ptr's own current value), not
- * to Table 18. A write landing on the reserved rx_wd_timeout_ms octets
+ * to Table 20. A write landing on the reserved rx_wd_timeout_ms octets
  * (0x000A/0x000B) or the 3 reserved trailing octets (0x0012-0x0017) is
  * accepted (every octet in this table is R/W*, TC18 defines no read-only
  * subrange) but has no effect on any struct field -- it patches the
@@ -2086,7 +2086,7 @@ rcp_stream_id_t rcp_regmap_response_queue_stream_id(const rcp_regmap_response_qu
 
 /* RESOLVED 2026-08-11 (issue #301 batch 3, same finding as HW_config's
  * and EP_ID_config's own sections): response-queue-config is a separate
- * table pointed to by Table 18's own svr_response_stream_cfg_ptr
+ * table pointed to by Table 20's own svr_response_stream_cfg_ptr
  * register (REQ-RMAP-034), reached the identical way HW_config and
  * EP_ID_config now are -- an ordinary evt[2:0]=111b request to
  * byte_bus_id=0 at an absolute address inside svr_response_stream_cfg_ptr's
@@ -2113,7 +2113,7 @@ rcp_regmap_response_queue_cfg_reconfig_strerror(rcp_regmap_response_queue_cfg_re
  * rcp_regmap_hw_pin_map_apply_reconfig()/rcp_regmap_ep_id_map_apply_reconfig().
  * relative_start_address/data are relative to this table's own start
  * (i.e. to svr_response_stream_cfg_ptr's own current value), not to
- * Table 18. A value parsed back for flush_time_us can never itself
+ * Table 20. A value parsed back for flush_time_us can never itself
  * exceed 0xFFFF (the wire register's own full range), so no saturation
  * is needed on this direction, unlike render()'s own. */
 rcp_regmap_response_queue_cfg_reconfig_errc_t
@@ -2235,8 +2235,8 @@ void rcp_regmap_ep_id_map_row_init_default(rcp_regmap_ep_id_map_entry_t *row);
  * section above): EP_ID_config is a separate table pointed to by Table
  * 18's own svr_ep_bytebus_id_map_ptr register (REQ-RMAP-037), reached
  * the identical way HW_config now is -- svr_ep_bytebus_id_map_ptr's own
- * value is an absolute address in the same EP0-scoped space Table 18
- * itself lives in (Table 18's own address column is headed "Absolute
+ * value is an absolute address in the same EP0-scoped space Table 20
+ * itself lives in (Table 20's own address column is headed "Absolute
  * address" in the current RC5 baseline PDF, confirmed directly). See
  * rcp_regmap_ep_id_map_apply_reconfig() below and
  * rcp_regmap_ep0_decode_write_request()'s own routing of it. */
@@ -2355,9 +2355,9 @@ bool rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id(const rcp_regmap_ep_id_map_ent
 /* ── EP0 address-routed dispatcher (issue #301, issue #306) ────────────────
  *
  * Generalizes rcp_regmap_general_decode_write_request() (which only
- * ever recognized a write landing within Table 18's own
+ * ever recognized a write landing within Table 20's own
  * [0x0000, RCP_REGMAP_GENERAL_LEN) extent, always rejecting it) to
- * route by absolute address across Table 18's own extent AND every
+ * route by absolute address across Table 20's own extent AND every
  * pointed-to table this codebase currently has a wire codec for. As of
  * this milestone that is HW_config (svr_hw_cfg_ptr), EP_ID_config
  * (svr_ep_bytebus_id_map_ptr), response-queue-config
@@ -2398,7 +2398,7 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
  * leading 2-octet big-endian absolute address, followed by the write's
  * own data. Routes by that address:
  *
- *   - Within [0x0000, RCP_REGMAP_GENERAL_LEN): Table 18 itself -- always
+ *   - Within [0x0000, RCP_REGMAP_GENERAL_LEN): Table 20 itself -- always
  *     denied, *out_error set to RCP_ERROR_LOCKED_MEM_ACCESS (reusing, not
  *     duplicating, rcp_regmap_general_decode_write_request()'s own
  *     already-proven REQ-RMAP-025 logic).
@@ -2561,7 +2561,7 @@ rcp_regmap_ep0_decode_read_request(const uint8_t *b, size_t len,
 /* Encodes an ACF_ABB READ response for a request decoded by
  * rcp_regmap_ep0_decode_read_request() above. Routes addr across the
  * identical six extents rcp_regmap_ep0_decode_write_request() routes
- * (Table 18 itself, HW_config, EP_ID_config, response-queue-config,
+ * (Table 20 itself, HW_config, EP_ID_config, response-queue-config,
  * request-stream-cfg, ep_generic_cfg -- issue #311 batch 5 adds the
  * last of these), reusing this dispatcher's own already-proven
  * per-table render() functions, not a second copy of that wire codec.
@@ -2572,7 +2572,7 @@ rcp_regmap_ep0_decode_read_request(const uint8_t *b, size_t len,
  * identical "response spans exactly read_size octets, zero-filled past
  * the source's own extent" convention
  * rcp_regmap_general_encode_read_response() already establishes for
- * Table 18 alone, now generalized to whichever of the four extents
+ * Table 20 alone, now generalized to whichever of the four extents
  * addr's own starting position falls within.
  *
  * On an address matching none of the five known pointed-to-table

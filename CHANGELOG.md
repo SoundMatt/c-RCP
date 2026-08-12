@@ -34,6 +34,17 @@ the rationale.
 
 ## Releases
 
+### v0.275.0 -- 2026-08-12 (c-RCP-AUDIT-08 doc-only batch: `Table 18`/`Table 22` citation drift corrected -- highest-value slice of issue #341)
+
+**Documentation-only correction, no functional code change.** First batch of issue #341's broader table-number census -- the two highest-count stale citations, both confirmed via direct content cross-check (not just number pattern-matching) against both spec revisions.
+
+- **RC1 Table 18 "RC Server configuration static part" (§12.7.5) -> RC5 Table 20.** 62 occurrences (`regmap.h`, `respqueue.h`, `lifecycle.h`, `cli.c`, `regmap.c`, `config.c`, `lifecycle.c`, `.fusa-reqs.json`). Content-verified: RC5's own Table 20 (page 60-61) matches field-for-field against every citation's own described content (`svr_io_pin_count` at 0x0018, `svr_hw_cfg_ptr`, `svr_request_stream_cfg_capacity`, `svr_ep_generic_cfg_ptr`, etc.) -- this is the RC-Server's own general register map, referenced by nearly every `REQ-RMAP-0*`/`REQ-LIFECYCLE-0*` requirement.
+- **RC1 Table 22 "Request stream configuration" (§12.7.7) -> RC5 Table 24.** 42 occurrences (`regmap.h`, `lifecycle.h`, `mock.h`, `e2e.h`, `server.c`, `lifecycle.c`, `mock.c`, `.fusa-reqs.json`). Content-verified against `rx_enforce_crc`/`rx_enforce_sequence`/`rx_enforce_watchdog`/`rx_ovrflw_safestate_enable`/`rx_wd_action` -- every citation's own described field lives in this exact table on both revisions.
+
+**A genuinely mixed, inconsistent state found and deliberately left alone**: `regmap.h`'s own `request-stream-cfg` wire-codec comment block (added by issue #306, a more recent and more careful pass) already correctly cited `Table 24` for this exact table in one paragraph, while the immediately preceding paragraph of the SAME comment block still said `Table 22` -- confirms both numbers can appear for the identical real-world table even within one contiguous comment, and confirms this fix's own target (all remaining `Table 22`) needed correcting without disturbing the pre-existing correct `Table 24`. Separately, `respqueue.h`'s own `Table 24` citations (`STREAM_UID`, `max_avtpdu_size`, `queue_size`, `flush_time_us`) are for an entirely DIFFERENT table (RC1's own Table 24 "Responder QUEUE_config" -> RC5 Table 27) -- confirmed stale but **deliberately not touched in this batch**, since correcting it means introducing new `Table 27` text into a codebase that doesn't yet consistently distinguish it from the `Table 24` this batch just finished fixing; tracked as its own follow-up item in issue #341's own text. A separate, already-broken `Table 20` citation for `hw_pin_type` (`config.c`/`regmap.h`, §12.7.6, should be `Table 21`) was also found and also deliberately left alone -- same reasoning, same tracking issue.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.274.0 -- 2026-08-12 (c-RCP-AUDIT-07 doc-only batch: `Table 30`/`Table 27` citation drift corrected, issue #339)
 
 **Documentation-only correction, no functional code change.** Every source citation of `Table 30` and `Table 27` across the codebase corrected to the current TC18 0.5.1_RC5 table numbers.

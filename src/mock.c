@@ -33,7 +33,7 @@ typedef struct {
      * dispatch()/dispatch_frame() ignore it. */
     bool                         req_crc_enable;
     /* REQ-E2E-021 (issue #201): this test double's own stand-in for
-     * TC18 §12.7.7 Table 22's own rx_enforce_e2e (a per-REQUEST-STREAM
+     * TC18 §12.7.7 Table 24's own rx_enforce_e2e (a per-REQUEST-STREAM
      * config bit in the real spec, not per-endpoint -- kept here as a
      * per-endpoint stand-in for the same "type-erased slot has no way
      * to read a real config table generically" reason
@@ -544,7 +544,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
      * on this stream, which is the watchdog's own entire concern. */
     if (srv->watchdog != NULL) rcp_watchdog_keeper_kick(srv->watchdog, stream_id);
 
-    /* REQ-E2E-021 (TC18 §12.7.7 Table 22, rx_enforce_e2e's "stream is
+    /* REQ-E2E-021 (TC18 §12.7.7 Table 24, rx_enforce_e2e's "stream is
      * blocked until released" consequence): checked BEFORE
      * plain-command-mode delegation, CRC validation, or admission --
      * the block is a whole-STREAM property (this tracker is keyed by

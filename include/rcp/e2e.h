@@ -250,7 +250,7 @@
  *
  * ADDED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group I):
  * rcp_e2e_crc_error_should_enter_safe_state() names rx_enforce_e2e's own
- * second, previously-uncovered consequence -- TC18 §12.7.7 Table 22
+ * second, previously-uncovered consequence -- TC18 §12.7.7 Table 24
  * documents 0x000D.0 rx_enforce_e2e's 1b value as triggering BOTH "stream
  * is blocked until released" (the latch above) AND, in the same sentence,
  * "Safe state will be entered". Unlike its wd/overflow/seq siblings,
@@ -577,7 +577,7 @@ rcp_e2e_wd_result_t rcp_e2e_wd_evaluate(bool rx_wd_enable, uint32_t rx_wd_timeou
 /* ── Request-storage overflow ────────────────────────────────────────────── */
 
 //cfusa:req REQ-E2E-030
-/* TC18 §12.7.7 Table 22's rx_ovrflw_safestate_enable, evaluated the same
+/* TC18 §12.7.7 Table 24's rx_ovrflw_safestate_enable, evaluated the same
  * shape as rcp_e2e_wd_evaluate() above: overflow has already happened by
  * construction when a caller reaches this function (an endpoint's request
  * storage is exhausted -- see rcp_server_endpoint_admit()'s
@@ -601,7 +601,7 @@ bool rcp_e2e_overflow_should_enter_safe_state(bool rx_ovrflw_safestate_enable);
 /* ── Per-stream sequence-number enforcement ──────────────────────────────── */
 
 /* Caller-owned per-stream tracker: the "previously accepted request on this
- * stream" state TC18 §12.7.7 Table 22's rx_enforce_seq/rx_seq_safestate_enable
+ * stream" state TC18 §12.7.7 Table 24's rx_enforce_seq/rx_seq_safestate_enable
  * are both defined against. Same "own small stateful helper living alongside
  * this module's otherwise-pure functions" shape as rcp_e2e_stream_fault_t
  * above -- one instance per configured request stream, caller-allocated,
@@ -630,7 +630,7 @@ typedef struct {
 
 //cfusa:req REQ-E2E-028
 //cfusa:req REQ-E2E-029
-/* TC18 §12.7.7 Table 22 defines two independently-configurable reactions
+/* TC18 §12.7.7 Table 24 defines two independently-configurable reactions
  * to a request stream's AVTPDU sequence_num, evaluated together here
  * because both compare the same incoming seq against the same tracked
  * state, but deliberately NOT collapsed into one bool: they answer
@@ -715,7 +715,7 @@ bool rcp_e2e_stream_fault_on_crc_error(rcp_e2e_stream_fault_t *f, bool rx_enforc
 bool rcp_e2e_stream_fault_is_faulted(const rcp_e2e_stream_fault_t *f);
 
 /* ADDED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group I): TC18 §12.7.7
- * Table 22's own 0x000D.0 rx_enforce_e2e description names two distinct
+ * Table 24's own 0x000D.0 rx_enforce_e2e description names two distinct
  * consequences for its 1b value -- "stream is blocked until released,
  * when CRC check at EP fails" (rcp_e2e_stream_fault_on_crc_error()/
  * rcp_e2e_stream_fault_t, above) AND "Safe state will be entered". Unlike

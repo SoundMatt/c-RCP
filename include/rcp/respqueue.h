@@ -45,7 +45,7 @@
  * per-message queue concern). REQ-RMAP-061 still stays `partial`
  * overall, for a reason that has nothing to do with this module: TC18
  * §12.7.9's own Table 24 (response/ack queue config, including
- * Max_AVTPDUsize) is a separate table pointed to by Table 18's own
+ * Max_AVTPDUsize) is a separate table pointed to by Table 20's own
  * svr_response_stream_cfg_ptr register (REQ-RMAP-034, already
  * implemented) -- exactly the same genuine, unresolved ACF_ABB
  * addressing question REQ-RMAP-040/041 (HW_config) and REQ-RMAP-052/054
