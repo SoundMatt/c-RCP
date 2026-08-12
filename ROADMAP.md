@@ -14976,3 +14976,64 @@ dispatcher (REQ-RMAP-052/054), then response-queue-config's own
 render function built and wired in (REQ-RMAP-061/065), then the READ
 side of the dispatcher (all of REQ-RMAP-040/041/052/054/061/065's
 own remaining scope).
+
+### v0.245.0 -- 2026-08-11 (issue #301 batch 2: EP_ID_config write
+dispatch)
+
+**REQ-RMAP-052/054 (EP_ID_config) closed the same way REQ-RMAP-040/041
+(HW_config) closed in v0.244.0 -- same finding, same batch-ordered
+plan, next table in line.**
+
+New `rcp_regmap_ep_id_map_apply_reconfig()` (the parse-side inverse of
+the already-existing `rcp_regmap_ep_id_map_render()`, identical
+patch-then-reparse idiom to `rcp_regmap_hw_pin_map_apply_reconfig()`).
+`rcp_regmap_ep0_decode_write_request()` gains two new parameters
+(`ep_id_map`, `ep_id_map_count`) and a new routing block targeting
+`svr_ep_bytebus_id_map_ptr`'s own extent, inserted between the
+HW_config routing block and the final unknown-address fallback. A
+remote client can now write EP_ID_config over the wire, the same way
+it could already write HW_config.
+
+Required relocating the entire "EP0 address-routed dispatcher" section
+in `regmap.h` to the very end of the file, immediately before the
+closing `#ifdef __cplusplus` boilerplate: the dispatcher's own
+signature now references both `rcp_regmap_hw_pin_map_entry_t` and
+`rcp_regmap_ep_id_map_entry_t`, and C requires each to already be
+declared at the point of use -- this dispatcher cannot live any
+earlier in the header than the last of the tables it routes to.
+
+Still open, matching REQ-RMAP-040/041's own precedent: the READ side
+(an address-routed `rcp_regmap_ep0_encode_read_response()`) doesn't
+exist yet for any pointed-to table, and this dispatcher doesn't itself
+enforce EP_ID_config's own access type via
+`rcp_lifecycle_field_writable()` (deferred to whatever caller
+eventually owns lifecycle-state context).
+
+New tests:
+`test_ep_id_map_apply_reconfig_patches_addressed_octets_only`,
+`test_ep_id_map_apply_reconfig_rejects_out_of_range_leaving_table_untouched`,
+and the existing dispatcher test renamed/extended to
+`test_ep0_dispatcher_routes_table18_hw_config_ep_id_config_and_unknown_addresses`
+(7 sub-cases, including a boundary case one octet past EP_ID_config's
+own extent -- added specifically because a mutation-testing pass
+found the dispatcher's own upper-bound routing condition was NOT
+independently exercised by any other case: `apply_reconfig()`'s own
+internal bounds check happened to mask a loosened routing condition
+for addresses that were merely still out-of-range within the (wrongly)
+widened window).
+
+Mutation-tested two ways: loosening
+`rcp_regmap_ep_id_map_apply_reconfig()`'s own out-of-range bounds
+check, and loosening the dispatcher's own EP_ID_config address-range
+routing condition -- both produced clean, deterministic assertion
+failures once the boundary test above was added. Reverted, full suite
+re-verified byte-identical both times.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
+0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
+**Progress**: EP_ID_config's own write half now closed. **Next**
+(issue #301's own batch order): response-queue-config's own render
+function built from scratch and wired into the same dispatcher
+(REQ-RMAP-061/065), then the READ side of the dispatcher (all of
+REQ-RMAP-040/041/052/054/061/065's own remaining scope).

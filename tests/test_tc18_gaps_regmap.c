@@ -1398,7 +1398,14 @@ static void test_hw_pin_map_apply_reconfig_rejects_out_of_range_leaving_table_un
                        rcp_regmap_hw_pin_map_apply_reconfig(rows, 1, 0u, data, 0u));
 }
 
-static void test_ep0_dispatcher_routes_table18_hw_config_and_unknown_addresses(void)
+/* REQ-RMAP-052/054 CLOSED (write-dispatch half, issue #301 batch 2):
+ * same finding as HW_config's own, applied to EP_ID_config --
+ * svr_ep_bytebus_id_map_ptr's own value is an absolute address in the
+ * same EP0-scoped space Table 18 itself lives in. New
+ * rcp_regmap_ep_id_map_apply_reconfig() is the parse-side inverse of
+ * rcp_regmap_ep_id_map_render(); rcp_regmap_ep0_decode_write_request()
+ * now routes to it the identical way it already routes to HW_config. */
+static void test_ep0_dispatcher_routes_table18_hw_config_ep_id_config_and_unknown_addresses(void)
 {
     rcp_acf_byte_message_info_t   hdr = {0};
     rcp_bytes_t                   frame;
@@ -1407,26 +1414,32 @@ static void test_ep0_dispatcher_routes_table18_hw_config_and_unknown_addresses(v
         {1, 2, 0x03u},
         {4, 5, 0x06u},
     };
+    rcp_regmap_ep_id_map_entry_t  ep_id_map[2] = {
+        {10u, 20u, 1u},
+        {30u, 40u, 1u},
+    };
     rcp_wire_error_t              err;
     uint8_t                       tn = 0;
     rcp_regmap_ep0_errc_t         rc;
 
     rcp_regmap_general_init(&map);
-    map.svr_hw_cfg_ptr = 0x0100u; /* arbitrary, past Table 18's own 0x40 extent */
+    map.svr_hw_cfg_ptr             = 0x0100u; /* arbitrary, past Table 18's own 0x40 extent */
+    map.svr_ep_bytebus_id_map_ptr  = 0x0200u; /* arbitrary, clear of HW_config's own range */
 
     hdr.byte_bus_id     = RCP_REGMAP_EP0_INDEX;
     hdr.op              = RCP_ACF_OP_WRITE;
     hdr.transaction_num = 11;
 
     /* 1) An address within Table 18's own extent -- always denied,
-     * regardless of what HW_config's own pointer/table say. */
+     * regardless of what either pointed-to table's own pointer/table
+     * say. */
     {
         uint8_t payload[3] = {0x00u, 0x10u, 0xFFu}; /* addr=0x0010, 1 data octet */
 
         frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
-                                                   hw_pin_map, 2u, &err, &tn);
+                                                   hw_pin_map, 2u, ep_id_map, 2u, &err, &tn);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, err);
         TEST_ASSERT_EQUAL_UINT8(11, tn);
@@ -1445,7 +1458,7 @@ static void test_ep0_dispatcher_routes_table18_hw_config_and_unknown_addresses(v
         frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
-                                                   hw_pin_map, 2u, &err, &tn);
+                                                   hw_pin_map, 2u, ep_id_map, 2u, &err, &tn);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_EQUAL_UINT8(0x77u, hw_pin_map[0].hw_pin_type);
@@ -1465,33 +1478,97 @@ static void test_ep0_dispatcher_routes_table18_hw_config_and_unknown_addresses(v
         frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
-                                                   hw_pin_map, 2u, &err, &tn);
+                                                   hw_pin_map, 2u, ep_id_map, 2u, &err, &tn);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_INVALID_PARAMETER, err);
         rcp_bytes_free(&frame);
     }
 
-    /* 4) An address that lands in neither Table 18 nor HW_config. */
+    /* 4) An address within EP_ID_config's own extent -- applied. Row 1's
+     * own byte_bus_id (2 octets) is at svr_ep_bytebus_id_map_ptr + 6
+     * (row 1 begins at +4; byte_bus_id is that row's own octets 2-3). */
+    {
+        uint8_t payload[4];
+
+        put_test_u16(payload, (uint16_t)(map.svr_ep_bytebus_id_map_ptr + 6u));
+        put_test_u16(&payload[2], 99u);
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   hw_pin_map, 2u, ep_id_map, 2u, &err, &tn);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
+        TEST_ASSERT_EQUAL_UINT16(99u, (uint16_t)ep_id_map[1].byte_bus_id);
+        TEST_ASSERT_EQUAL_UINT16(30u, ep_id_map[1].ep_id); /* untouched */
+        TEST_ASSERT_EQUAL_UINT8(1u, ep_id_map[1].request_stream_index); /* untouched */
+        rcp_bytes_free(&frame);
+    }
+
+    /* 5) A write into EP_ID_config's own range but extending past its
+     * current extent (count=2 -> 8 octets; address+len = 7+2 = 9). */
+    {
+        uint8_t payload[4];
+
+        put_test_u16(payload, (uint16_t)(map.svr_ep_bytebus_id_map_ptr + 7u));
+        payload[2] = 0xCCu;
+        payload[3] = 0xDDu;
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   hw_pin_map, 2u, ep_id_map, 2u, &err, &tn);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_INVALID_PARAMETER, err);
+        rcp_bytes_free(&frame);
+    }
+
+    /* 5b) An address exactly one past EP_ID_config's own current extent
+     * (count=2 -> 8 octets; ptr+8 is the first address NOT in range) --
+     * must fall through to the unknown-address case (EP_NOT_FOUND), NOT
+     * be routed into EP_ID_config's own apply_reconfig() at all. This is
+     * the dispatcher's own routing boundary, distinct from (and not
+     * substitutable by) apply_reconfig()'s own internal bounds check in
+     * case 5 above -- a mutation-testing pass confirmed loosening the
+     * dispatcher's own upper-bound comparison is NOT caught by any other
+     * case in this function, since the inner function's own bounds check
+     * happens to mask it for still-out-of-range addresses. */
+    {
+        uint8_t payload[2];
+
+        put_test_u16(payload, (uint16_t)(map.svr_ep_bytebus_id_map_ptr + 8u));
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   hw_pin_map, 2u, ep_id_map, 2u, &err, &tn);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
+        rcp_bytes_free(&frame);
+    }
+
+    /* 6) An address that lands in none of Table 18, HW_config, or
+     * EP_ID_config. */
     {
         uint8_t payload[3] = {0x00u, 0x50u, 0x00u}; /* 0x0050: past Table 18, before svr_hw_cfg_ptr */
 
         frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
-                                                   hw_pin_map, 2u, &err, &tn);
+                                                   hw_pin_map, 2u, ep_id_map, 2u, &err, &tn);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         rcp_bytes_free(&frame);
     }
 
-    /* 5) ACF-level failures still propagate correctly. */
+    /* 7) ACF-level failures still propagate correctly. */
     {
         uint8_t payload[1] = {0x00u}; /* too short for its own leading address */
 
         frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
-                                                   hw_pin_map, 2u, &err, &tn);
+                                                   hw_pin_map, 2u, ep_id_map, 2u, &err, &tn);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_ERR_SHORT_PAYLOAD, rc);
         rcp_bytes_free(&frame);
     }
@@ -1501,6 +1578,43 @@ static void test_ep0_dispatcher_routes_table18_hw_config_and_unknown_addresses(v
     TEST_ASSERT_NOT_EQUAL(0, strcmp(rcp_regmap_ep0_strerror(RCP_REGMAP_EP0_OK),
                                      rcp_regmap_ep0_strerror(RCP_REGMAP_EP0_ERR_WRONG_BUS)));
     TEST_ASSERT_NOT_NULL(rcp_regmap_hw_pin_map_reconfig_strerror(RCP_REGMAP_HW_PIN_MAP_RECONFIG_OK));
+    TEST_ASSERT_NOT_NULL(rcp_regmap_ep_id_map_reconfig_strerror(RCP_REGMAP_EP_ID_MAP_RECONFIG_OK));
+}
+
+static void test_ep_id_map_apply_reconfig_patches_addressed_octets_only(void)
+{
+    rcp_regmap_ep_id_map_entry_t rows[2] = {
+        {1u, 2u, 3u},
+        {4u, 5u, 6u},
+    };
+    uint8_t patch_row1_stream_index[1] = {0x09u};
+
+    /* Patch only row 1's own request_stream_index octet (relative
+     * address 4 = 4*1+0). */
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP_ID_MAP_RECONFIG_OK,
+                       rcp_regmap_ep_id_map_apply_reconfig(rows, 2, 4u,
+                                                            patch_row1_stream_index, 1u));
+    TEST_ASSERT_EQUAL_UINT16(1u, rows[0].ep_id); /* row 0 untouched */
+    TEST_ASSERT_EQUAL_UINT8(3u, rows[0].request_stream_index);
+    TEST_ASSERT_EQUAL_UINT16(4u, rows[1].ep_id);        /* row 1's other octets untouched */
+    TEST_ASSERT_EQUAL_UINT16(5u, (uint16_t)rows[1].byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT8(0x09u, rows[1].request_stream_index); /* patched */
+}
+
+static void test_ep_id_map_apply_reconfig_rejects_out_of_range_leaving_table_untouched(void)
+{
+    rcp_regmap_ep_id_map_entry_t rows[1] = {{7u, 8u, 9u}};
+    uint8_t data[2] = {0x11u, 0x22u};
+
+    /* count=1 -> block_len=4; address 3 + data_len 2 = 5 > 4. */
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_OUT_OF_RANGE,
+                       rcp_regmap_ep_id_map_apply_reconfig(rows, 1, 3u, data, 2u));
+    TEST_ASSERT_EQUAL_UINT16(7u, rows[0].ep_id); /* entirely unchanged */
+    TEST_ASSERT_EQUAL_UINT16(8u, (uint16_t)rows[0].byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT8(9u, rows[0].request_stream_index);
+
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_SHORT,
+                       rcp_regmap_ep_id_map_apply_reconfig(rows, 1, 0u, data, 0u));
 }
 
 /* REQ-RMAP-041 CLOSED (row-stride half): TC18 §12.7.6 Table 19 lays
@@ -2687,7 +2801,9 @@ int main(void)
     RUN_TEST(test_hw_pin_map_rejects_oversized_table_leaving_existing_data_intact);
     RUN_TEST(test_hw_pin_map_apply_reconfig_patches_addressed_octets_only);
     RUN_TEST(test_hw_pin_map_apply_reconfig_rejects_out_of_range_leaving_table_untouched);
-    RUN_TEST(test_ep0_dispatcher_routes_table18_hw_config_and_unknown_addresses);
+    RUN_TEST(test_ep0_dispatcher_routes_table18_hw_config_ep_id_config_and_unknown_addresses);
+    RUN_TEST(test_ep_id_map_apply_reconfig_patches_addressed_octets_only);
+    RUN_TEST(test_ep_id_map_apply_reconfig_rejects_out_of_range_leaving_table_untouched);
     RUN_TEST(test_hw_config_row_stride_now_modeled_gpio_access_class_still_diverges);
     RUN_TEST(test_hw_pin_type_matches_table_20);
     RUN_TEST(test_hw_pin_output_stage_has_no_exclusive_input_flag);
