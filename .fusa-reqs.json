@@ -8752,12 +8752,12 @@
     {
       "id": "REQ-PWM-057",
       "title": "PWM_OUT request semantics: stop on period 0, output-off on active 0, phase shift, readback check",
-      "text": "NOT IMPLEMENTED: c-RCP applies none of TC18 13.7.5.3's four PWM_OUT request rules -- a request with PWM_Period == 0 shall stop signal generation; a request with PWM_active == 0 and PWM_Period > 0 shall keep the endpoint running with the output disabled while still generating trigger signals; a request that is a trigger configuration shall have its first two payload octets read as a PHASE SHIFT rather than a period (for fixed-phase synchronisation to another PWM_OUT endpoint); and during generation the output pin shall be read back and an error signaled if it does not actually toggle. rcp_ep_pwm_out_apply_write() stores both fields verbatim.",
+      "text": "PARTIAL (2 of TC18 13.7.5.3's own 4 PWM_OUT request rules): rcp_ep_pwm_out_generation_state() now classifies the endpoint's own signal-generation state purely from its {period, active_duration} pair -- period == 0 stops generation; active_duration == 0 with period != 0 keeps the endpoint running with the output disabled while trigger signals still fire; otherwise ordinary running generation. rcp_ep_pwm_out_apply_write() itself is unaffected -- both fields remain opaque 16-bit setpoints stored verbatim, this is a separate, additive classifier a caller applies to the result. The other 2 rules remain genuinely out of scope, not routine: a trigger-configuration request's first two payload octets carrying a PHASE SHIFT instead of a period depends on the conditional-request layer's own request-kind classification (request_compound.h/_triggered.h/_chained.h), which this endpoint's decode path has no connection to today, and the TC18 spec-defects report's own items 11-12 document a live, currently-unresolved request_type code collision in exactly that harmonization effort -- \"which request even counts as a trigger configuration\" is itself an open spec question; and checking that the output pin actually toggles needs real physical IO readback this protocol-codec library has never modelled for any endpoint type.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a713.7.5.3, TC18.txt L4641-4650"
     },
     {

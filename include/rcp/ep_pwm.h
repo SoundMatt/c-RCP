@@ -368,6 +368,45 @@ rcp_ep_pwm_value_t rcp_ep_pwm_out_apply_write(rcp_ep_pwm_value_t current,
                                                uint16_t duty_cycle_min,
                                                uint16_t duty_cycle_max);
 
+/* REQ-PWM-057 (partial -- two of TC18 §13.7.5.3's four request rules): the
+ * PWM_OUT endpoint's own signal-generation state, purely a function of the
+ * current {period, active_duration} pair. §13.7.5.3's own text, verbatim:
+ * "the request the PWM endpoint is started and generates continuously a PWM
+ * signal ... until stopped. To stop PWM signal generation a request with
+ * PWM_Period of '0' shall be issued. With a request with PWM_active = 0 and
+ * PWM_Period > 0 the PWM remains active, however, the output is disabled,
+ * but trigger signals are still generated." A pure classifier, matching
+ * every other caller-driven primitive in this codebase (e.g. ep_adc.h's
+ * rcp_ep_adc_trigger_evaluate()) rather than this module owning any signal-
+ * generation hardware itself.
+ *
+ * The other two rules in the same TC18 subsection are deliberately NOT
+ * covered here, for reasons this codebase cannot resolve unilaterally: (1)
+ * a "trigger configuration" request's first two payload octets carrying a
+ * phase shift instead of a period depends on the conditional-request
+ * layer's own request-kind classification (request_compound.h/_triggered.h/
+ * _chained.h), which this endpoint's own decode path has no connection to
+ * today -- and the TC18 spec-defects report's own items 11-12 document a
+ * live, currently-unresolved request_type code collision in exactly that
+ * harmonization effort, making "which request even counts as a trigger
+ * configuration" itself an open spec question, not just an unwired
+ * integration; (2) checking that the output pin actually toggles requires
+ * real physical IO readback this protocol-codec library has never modelled
+ * for any endpoint type (the same "no hardware" honesty every other
+ * endpoint's own base_clk/timer fields already commit to). */
+typedef enum {
+    RCP_EP_PWM_OUT_GEN_STOPPED         = 0, /* period == 0 */
+    RCP_EP_PWM_OUT_GEN_OUTPUT_DISABLED = 1, /* active_duration == 0,
+                                                period != 0 -- still
+                                                running, triggers still
+                                                fire, output pin held low */
+    RCP_EP_PWM_OUT_GEN_RUNNING         = 2, /* period != 0 and
+                                                active_duration != 0 --
+                                                ordinary generation */
+} rcp_ep_pwm_out_generation_state_t;
+
+rcp_ep_pwm_out_generation_state_t rcp_ep_pwm_out_generation_state(rcp_ep_pwm_value_t value);
+
 /* ── PWM_OUT: triggers ──────────────────────────────────────────────────────── */
 
 typedef enum {
