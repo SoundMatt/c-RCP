@@ -183,6 +183,12 @@ static uint16_t get_test_u16(const uint8_t *p)
     return (uint16_t)(((uint16_t)p[0] << 8) | (uint16_t)p[1]);
 }
 
+static void put_test_u16(uint8_t *p, uint16_t v)
+{
+    p[0] = (uint8_t)(v >> 8);
+    p[1] = (uint8_t)(v & 0xFFu);
+}
+
 static uint32_t get_test_u32(const uint8_t *p)
 {
     return ((uint32_t)p[0] << 24) | ((uint32_t)p[1] << 16) |
@@ -1344,6 +1350,157 @@ static void test_hw_pin_map_rejects_oversized_table_leaving_existing_data_intact
     TEST_ASSERT_EQUAL_HEX8(4, stored[0].hw_ep_nr);
 
     rcp_mock_server_destroy(srv);
+}
+
+/* REQ-RMAP-040/041 CLOSED (wire-dispatch half, issue #301): direct
+ * verification of the current RC5 baseline PDF (page 61) shows Table
+ * 18's own address column is headed "Absolute address", confirming
+ * every "_ptr" field's own value is an absolute address in the SAME
+ * EP0-scoped space Table 18 itself lives in -- see regmap.h's own
+ * "HW_config server-side storage + wire codec" file-header section for
+ * the full finding. rcp_regmap_hw_pin_map_apply_reconfig() is the
+ * inverse of rcp_regmap_hw_pin_map_render(); rcp_regmap_ep0_decode_write_request()
+ * is the address-routed dispatcher unifying Table 18's own already-correct
+ * read-only rejection with HW_config's own newly-writable range. */
+static void test_hw_pin_map_apply_reconfig_patches_addressed_octets_only(void)
+{
+    rcp_regmap_hw_pin_map_entry_t rows[2] = {
+        {1, 2, 0x03u},
+        {4, 5, 0x06u},
+    };
+    uint8_t patch_row1_type[1] = {0x99u};
+
+    /* Patch only row 1's own hw_pin_type octet (relative address 5 = 3*1+2). */
+    TEST_ASSERT_EQUAL(RCP_REGMAP_HW_PIN_MAP_RECONFIG_OK,
+                       rcp_regmap_hw_pin_map_apply_reconfig(rows, 2, 5u,
+                                                             patch_row1_type, 1u));
+    TEST_ASSERT_EQUAL_UINT8(1, rows[0].hw_ep_nr); /* row 0 untouched */
+    TEST_ASSERT_EQUAL_UINT8(2, rows[0].hw_ep_pin_nr);
+    TEST_ASSERT_EQUAL_UINT8(0x03u, rows[0].hw_pin_type);
+    TEST_ASSERT_EQUAL_UINT8(4, rows[1].hw_ep_nr);     /* row 1's other octets untouched */
+    TEST_ASSERT_EQUAL_UINT8(5, rows[1].hw_ep_pin_nr);
+    TEST_ASSERT_EQUAL_UINT8(0x99u, rows[1].hw_pin_type); /* patched */
+}
+
+static void test_hw_pin_map_apply_reconfig_rejects_out_of_range_leaving_table_untouched(void)
+{
+    rcp_regmap_hw_pin_map_entry_t rows[1] = {{7, 8, 0x0Au}};
+    uint8_t data[2] = {0x11u, 0x22u};
+
+    /* count=1 -> block_len=3; address 2 + data_len 2 = 4 > 3. */
+    TEST_ASSERT_EQUAL(RCP_REGMAP_HW_PIN_MAP_RECONFIG_ERR_OUT_OF_RANGE,
+                       rcp_regmap_hw_pin_map_apply_reconfig(rows, 1, 2u, data, 2u));
+    TEST_ASSERT_EQUAL_UINT8(7, rows[0].hw_ep_nr); /* entirely unchanged */
+    TEST_ASSERT_EQUAL_UINT8(8, rows[0].hw_ep_pin_nr);
+    TEST_ASSERT_EQUAL_UINT8(0x0Au, rows[0].hw_pin_type);
+
+    TEST_ASSERT_EQUAL(RCP_REGMAP_HW_PIN_MAP_RECONFIG_ERR_SHORT,
+                       rcp_regmap_hw_pin_map_apply_reconfig(rows, 1, 0u, data, 0u));
+}
+
+static void test_ep0_dispatcher_routes_table18_hw_config_and_unknown_addresses(void)
+{
+    rcp_acf_byte_message_info_t   hdr = {0};
+    rcp_bytes_t                   frame;
+    rcp_regmap_general_t          map;
+    rcp_regmap_hw_pin_map_entry_t hw_pin_map[2] = {
+        {1, 2, 0x03u},
+        {4, 5, 0x06u},
+    };
+    rcp_wire_error_t              err;
+    uint8_t                       tn = 0;
+    rcp_regmap_ep0_errc_t         rc;
+
+    rcp_regmap_general_init(&map);
+    map.svr_hw_cfg_ptr = 0x0100u; /* arbitrary, past Table 18's own 0x40 extent */
+
+    hdr.byte_bus_id     = RCP_REGMAP_EP0_INDEX;
+    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.transaction_num = 11;
+
+    /* 1) An address within Table 18's own extent -- always denied,
+     * regardless of what HW_config's own pointer/table say. */
+    {
+        uint8_t payload[3] = {0x00u, 0x10u, 0xFFu}; /* addr=0x0010, 1 data octet */
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   hw_pin_map, 2u, &err, &tn);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, err);
+        TEST_ASSERT_EQUAL_UINT8(11, tn);
+        rcp_bytes_free(&frame);
+    }
+
+    /* 2) An address within HW_config's own extent -- applied, and the
+     * table is actually patched. Row 0's own hw_pin_type is at
+     * svr_hw_cfg_ptr + 2. */
+    {
+        uint8_t payload[3];
+
+        put_test_u16(payload, (uint16_t)(map.svr_hw_cfg_ptr + 2u));
+        payload[2] = 0x77u;
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   hw_pin_map, 2u, &err, &tn);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
+        TEST_ASSERT_EQUAL_UINT8(0x77u, hw_pin_map[0].hw_pin_type);
+        TEST_ASSERT_EQUAL_UINT8(1, hw_pin_map[0].hw_ep_nr); /* untouched */
+        rcp_bytes_free(&frame);
+    }
+
+    /* 3) A write into HW_config's own range but extending past its
+     * current extent (count=2 -> 6 octets; address+len = 5+2 = 7). */
+    {
+        uint8_t payload[4];
+
+        put_test_u16(payload, (uint16_t)(map.svr_hw_cfg_ptr + 5u));
+        payload[2] = 0xAAu;
+        payload[3] = 0xBBu;
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   hw_pin_map, 2u, &err, &tn);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_INVALID_PARAMETER, err);
+        rcp_bytes_free(&frame);
+    }
+
+    /* 4) An address that lands in neither Table 18 nor HW_config. */
+    {
+        uint8_t payload[3] = {0x00u, 0x50u, 0x00u}; /* 0x0050: past Table 18, before svr_hw_cfg_ptr */
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   hw_pin_map, 2u, &err, &tn);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
+        rcp_bytes_free(&frame);
+    }
+
+    /* 5) ACF-level failures still propagate correctly. */
+    {
+        uint8_t payload[1] = {0x00u}; /* too short for its own leading address */
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   hw_pin_map, 2u, &err, &tn);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_ERR_SHORT_PAYLOAD, rc);
+        rcp_bytes_free(&frame);
+    }
+
+    /* strerror() never NULL, distinct across at least two values. */
+    TEST_ASSERT_NOT_NULL(rcp_regmap_ep0_strerror(RCP_REGMAP_EP0_OK));
+    TEST_ASSERT_NOT_EQUAL(0, strcmp(rcp_regmap_ep0_strerror(RCP_REGMAP_EP0_OK),
+                                     rcp_regmap_ep0_strerror(RCP_REGMAP_EP0_ERR_WRONG_BUS)));
+    TEST_ASSERT_NOT_NULL(rcp_regmap_hw_pin_map_reconfig_strerror(RCP_REGMAP_HW_PIN_MAP_RECONFIG_OK));
 }
 
 /* REQ-RMAP-041 CLOSED (row-stride half): TC18 §12.7.6 Table 19 lays
@@ -2528,6 +2685,9 @@ int main(void)
     RUN_TEST(test_four_optional_subsystem_pointer_pairs_are_now_present);
     RUN_TEST(test_hw_config_table_now_has_real_server_side_storage);
     RUN_TEST(test_hw_pin_map_rejects_oversized_table_leaving_existing_data_intact);
+    RUN_TEST(test_hw_pin_map_apply_reconfig_patches_addressed_octets_only);
+    RUN_TEST(test_hw_pin_map_apply_reconfig_rejects_out_of_range_leaving_table_untouched);
+    RUN_TEST(test_ep0_dispatcher_routes_table18_hw_config_and_unknown_addresses);
     RUN_TEST(test_hw_config_row_stride_now_modeled_gpio_access_class_still_diverges);
     RUN_TEST(test_hw_pin_type_matches_table_20);
     RUN_TEST(test_hw_pin_output_stage_has_no_exclusive_input_flag);

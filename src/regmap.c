@@ -272,6 +272,132 @@ void rcp_regmap_hw_pin_map_render(const rcp_regmap_hw_pin_map_entry_t *entries, 
     }
 }
 
+//cfusa:req REQ-RMAP-040
+const char *rcp_regmap_hw_pin_map_reconfig_strerror(rcp_regmap_hw_pin_map_reconfig_errc_t e)
+{
+    switch (e) {
+    case RCP_REGMAP_HW_PIN_MAP_RECONFIG_OK:
+        return "rcp/regmap: HW_config write applied";
+    case RCP_REGMAP_HW_PIN_MAP_RECONFIG_ERR_SHORT:
+        return "rcp/regmap: HW_config write has no data";
+    case RCP_REGMAP_HW_PIN_MAP_RECONFIG_ERR_OUT_OF_RANGE:
+        return "rcp/regmap: HW_config write extends past the table's own current extent";
+    default:
+        return "rcp/regmap: HW_config unknown configuration-write error";
+    }
+}
+
+//cfusa:req REQ-RMAP-040
+rcp_regmap_hw_pin_map_reconfig_errc_t
+rcp_regmap_hw_pin_map_apply_reconfig(rcp_regmap_hw_pin_map_entry_t *entries, size_t count,
+                                      uint16_t relative_start_address,
+                                      const uint8_t *data, size_t data_len)
+{
+    uint8_t block[RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES * 3u];
+    size_t  block_len = count * 3u;
+    size_t  i;
+
+    if (data_len == 0u) return RCP_REGMAP_HW_PIN_MAP_RECONFIG_ERR_SHORT;
+
+    if ((size_t)relative_start_address + data_len > block_len) {
+        return RCP_REGMAP_HW_PIN_MAP_RECONFIG_ERR_OUT_OF_RANGE;
+    }
+
+    /* Same "render current image, patch the addressed octets, re-parse
+     * the whole image back" idiom every other endpoint type's own
+     * apply_reconfig() already uses -- see this function's own header
+     * doc comment. */
+    rcp_regmap_hw_pin_map_render(entries, count, block);
+    for (i = 0; i < data_len; i++) {
+        block[relative_start_address + i] = data[i]; /* every octet R/W*, none read-only */
+    }
+    for (i = 0; i < count; i++) {
+        entries[i].hw_ep_nr     = block[3u * i + 0u];
+        entries[i].hw_ep_pin_nr = block[3u * i + 1u];
+        entries[i].hw_pin_type  = block[3u * i + 2u];
+    }
+
+    return RCP_REGMAP_HW_PIN_MAP_RECONFIG_OK;
+}
+
+/* ── EP0 address-routed dispatcher (issue #301) ─────────────────────────────── */
+
+//cfusa:req REQ-RMAP-040
+//cfusa:req REQ-RMAP-041
+const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e)
+{
+    switch (e) {
+    case RCP_REGMAP_EP0_OK:                return "rcp/regmap: success";
+    case RCP_REGMAP_EP0_ERR_SHORT_FRAME:   return "rcp/regmap: frame too short";
+    case RCP_REGMAP_EP0_ERR_BAD_MSG_TYPE:  return "rcp/regmap: unexpected ACF message type";
+    case RCP_REGMAP_EP0_ERR_WRONG_BUS:     return "rcp/regmap: wrong byte_bus_id";
+    case RCP_REGMAP_EP0_ERR_WRONG_OP:      return "rcp/regmap: wrong ACF op";
+    case RCP_REGMAP_EP0_ERR_SHORT_PAYLOAD: return "rcp/regmap: payload has no room for its own leading address";
+    default:                               return "rcp/regmap: unknown error";
+    }
+}
+
+//cfusa:req REQ-RMAP-040
+//cfusa:req REQ-RMAP-041
+rcp_regmap_ep0_errc_t
+rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
+                                     const rcp_regmap_general_t *map,
+                                     rcp_regmap_hw_pin_map_entry_t *hw_pin_map,
+                                     size_t hw_pin_map_count,
+                                     rcp_wire_error_t *out_error,
+                                     uint8_t *out_transaction_num)
+{
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    rcp_acf_errc_t               acf_rc;
+    rcp_lifecycle_writer_ctx_t   writer = {0};
+    uint16_t                     addr;
+    size_t                       data_len;
+    size_t                       hw_cfg_len;
+
+    acf_rc = rcp_acf_decode_abb(b, len, &hdr, &payload, &payload_len);
+    if (acf_rc == RCP_ACF_ERR_SHORT_FRAME) return RCP_REGMAP_EP0_ERR_SHORT_FRAME;
+    if (acf_rc != RCP_ACF_OK) return RCP_REGMAP_EP0_ERR_BAD_MSG_TYPE;
+
+    if (hdr.byte_bus_id != RCP_REGMAP_EP0_INDEX) return RCP_REGMAP_EP0_ERR_WRONG_BUS;
+    if (hdr.op != RCP_ACF_OP_WRITE) return RCP_REGMAP_EP0_ERR_WRONG_OP;
+    if (payload_len < 2u) return RCP_REGMAP_EP0_ERR_SHORT_PAYLOAD;
+
+    addr     = get_u16(payload);
+    data_len = payload_len - 2u;
+    *out_transaction_num = hdr.transaction_num;
+
+    if ((size_t)addr < RCP_REGMAP_GENERAL_LEN) {
+        /* Table 18's own extent -- unconditionally read-only (REQ-RMAP-025),
+         * reusing rcp_lifecycle_field_write_error() exactly as
+         * rcp_regmap_general_decode_write_request() already does, not a
+         * second, separately-maintained copy of that logic. */
+        *out_error = rcp_lifecycle_field_write_error(RCP_LIFECYCLE_RCP_CONFIGURED,
+                                                      RCP_LIFECYCLE_FIELD_READ_ONLY, writer);
+        return RCP_REGMAP_EP0_OK;
+    }
+
+    hw_cfg_len = hw_pin_map_count * 3u;
+    if ((size_t)addr >= map->svr_hw_cfg_ptr &&
+        (size_t)addr < (size_t)map->svr_hw_cfg_ptr + hw_cfg_len) {
+        uint16_t relative = (uint16_t)((size_t)addr - map->svr_hw_cfg_ptr);
+        rcp_regmap_hw_pin_map_reconfig_errc_t rc;
+
+        rc = rcp_regmap_hw_pin_map_apply_reconfig(hw_pin_map, hw_pin_map_count, relative,
+                                                    &payload[2], data_len);
+        *out_error = (rc == RCP_REGMAP_HW_PIN_MAP_RECONFIG_OK) ? RCP_ERROR_NONE
+                                                                : RCP_ERROR_INVALID_PARAMETER;
+        return RCP_REGMAP_EP0_OK;
+    }
+
+    /* Neither Table 18's own extent nor (yet) any known pointed-to table
+     * -- see this function's own header doc comment for which tables
+     * this milestone routes and which remain future work (issue #301). */
+    *out_error = RCP_ERROR_EP_NOT_FOUND;
+    return RCP_REGMAP_EP0_OK;
+}
+
 /* ── EP_ID_config wire stride (REQ-RMAP-052/054) ───────────────────────────── */
 
 //cfusa:req REQ-RMAP-052
