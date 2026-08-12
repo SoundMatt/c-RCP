@@ -610,6 +610,35 @@ rcp_ep_uart_errc_t rcp_ep_uart_decode_read_response(const uint8_t *b, size_t len
     return RCP_EP_UART_OK;
 }
 
+/* ── Read-completion arbitration (REQ-UART-033) ─────────────────────────────── */
+
+//cfusa:req REQ-UART-033
+rcp_ep_uart_read_completion_t rcp_ep_uart_read_completion_decision(
+    uint16_t bytes_available, uint16_t read_size, uint32_t elapsed_ms,
+    uint32_t uart_timeout_ms, uint16_t rx_fifo_size)
+{
+    /* THIRD trigger: read_size larger than the fifo's own capacity, and the
+     * fifo has filled to that capacity -- fragmentation is required because
+     * a single response can never carry the whole request's worth of data. */
+    if (read_size > rx_fifo_size && bytes_available >= rx_fifo_size) {
+        return RCP_EP_UART_READ_RESPOND_FRAGMENTED;
+    }
+
+    /* FIRST trigger: the fifo already holds everything the request asked
+     * for. */
+    if (bytes_available >= read_size) {
+        return RCP_EP_UART_READ_RESPOND_NORMAL;
+    }
+
+    /* SECOND trigger: uart_timeout has expired -- whatever is in the fifo
+     * right now (possibly nothing) goes out as a short read. */
+    if (elapsed_ms >= uart_timeout_ms) {
+        return RCP_EP_UART_READ_RESPOND_NORMAL;
+    }
+
+    return RCP_EP_UART_READ_NOT_YET_COMPLETE;
+}
+
 /* ── Fragmented read response (Phase 20, fragment.h) ───────────────────────── */
 
 //cfusa:req REQ-UART-029

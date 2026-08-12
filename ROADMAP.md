@@ -15205,6 +15205,40 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.281.0 -- 2026-08-12 (issue #336 batch: `REQ-UART-033`, UART
+read-completion arbitration)
+
+**`REQ-UART-033` flips `partial` -> `implemented`.**
+
+New `rcp_ep_uart_read_completion_decision()` arbitrates TC18
+§13.7.8.1's own three UART read-completion triggers -- read_size
+satisfied, uart_timeout expired, or (when read_size exceeds
+uart_rx_fifo_size) the fifo filled to capacity, requiring a
+fragmented response. This module already supplied all three
+ingredients but never arbitrated between them.
+
+Pure, caller-driven computation over explicit counters -- no real
+FIFO or clock owned here, matching every other caller-driven
+primitive in this codebase (rcp_ep_spi_transfer_length(),
+rcp_ep_adc_trigger_evaluate(), etc.).
+
+**Investigated and correctly scoped out**: REQ-UART-032 (RX FIFO
+overflow flagging) needs a bit position within uart_ep_status TC18
+never defines -- the same spec-silence pattern found in several
+other endpoint types' own _ep_status registers. Left open rather
+than inventing a bit position unilaterally.
+
+Split the pre-existing combined REQ-UART-032/REQ-UART-033
+gap-pinning test into two.
+
+Mutation-tested 3 ways (each boundary in turn) -- all 3 caught
+cleanly.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 new
+classes of finding (8 new instances of the same pre-existing
+CFUSA-L004 false positive, confirmed non-recursive). `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.280.0 -- 2026-08-12 (issue #336 batch: `REQ-SPI-034`, SPI
 trigger output numbering)
 

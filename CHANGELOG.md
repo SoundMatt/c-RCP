@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.281.0 -- 2026-08-12 (issue #336 batch: `REQ-UART-033`, UART read-completion arbitration)
+
+**`REQ-UART-033` flips `partial` -> `implemented`.**
+
+New `rcp_ep_uart_read_completion_decision()` (`ep_uart.h`/`ep_uart.c`) arbitrates TC18 §13.7.8.1's own three UART read-completion triggers -- read_size satisfied, uart_timeout expired, or (when read_size exceeds `uart_rx_fifo_size`) the fifo has filled to capacity, requiring a fragmented response. This module already supplied all three ingredients (`read_size` in the ACF header, `cfg->uart_timeout_ms`, and the pre-existing `rcp_ep_uart_encode_read_response_fragmented()`) but never arbitrated between them -- two conforming c-RCP-based servers could answer identical read requests with materially different response cadence and fragmentation.
+
+Pure, caller-driven computation over explicit counters (`bytes_available`, `read_size`, `elapsed_ms`, `uart_timeout_ms`, `rx_fifo_size`) -- this module still owns no real FIFO or clock, matching every other caller-driven primitive in this codebase (`rcp_ep_spi_transfer_length()`, `rcp_ep_adc_trigger_evaluate()`, etc.) rather than inventing timer/buffer state a protocol-codec library has no business owning.
+
+**Investigated and correctly scoped out of this batch**: `REQ-UART-032` (RX FIFO overflow flagging) needs a bit position within `uart_ep_status` that TC18 never defines (`"Overflow is flagged in the UART EP status register"` with no bit-level breakdown given anywhere) -- the same spec-silence pattern already found in several other endpoint types' own `_ep_status` registers (see the TC18 spec-defects report's item 23). Implementing it would mean inventing a bit position unilaterally; left open, and the pre-existing deviation-pin test narrowed to cover only this remaining half.
+
+Split the pre-existing combined `REQ-UART-032`/`REQ-UART-033` gap-pinning test (`test_uart_rx_fifo_size_bounds_nothing_at_all`) into two -- the original narrowed to pin only the `-032` deviation, plus a new dedicated `test_uart_read_completion_decision` covering all three triggers and the not-yet-complete case.
+
+Mutation-tested 3 ways (each boundary `>=`/`>` in turn: fragmentation-fifo-full, read_size-satisfied, timeout-expired) -- all 3 caught cleanly.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 new *classes* of finding -- 8 new instances of the same pre-existing `CFUSA-L004` recursion-rule false positive already carried on `main` (this time the tool's naive name-matching flags a call to a function whose name ends in "decision" as recursive; confirmed non-recursive by inspection -- single definition, no self-call). `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.280.0 -- 2026-08-12 (issue #336 batch: `REQ-SPI-034`, SPI trigger output numbering)
 
 **`REQ-SPI-034` flips `not-implemented` -> `implemented`.**

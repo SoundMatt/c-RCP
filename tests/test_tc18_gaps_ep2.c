@@ -210,13 +210,18 @@ static void test_uart_rx_fifo_size_bounds_nothing_at_all(void)
     TEST_ASSERT_TRUE(rcp_ep_uart_set_rx_buffer_size(&cfg, 4u, RCP_LIFECYCLE_HW_CONFIGURED, w));
     memset(rx, 0xA5, sizeof(rx));
 
-    /* DEVIATION -- TC18 §13.7.8.1 requires a read response to be emitted
-     * when read_size is satisfied, when uart_timeout expires, or when the
-     * fifo-rx-buffer fills (fragmenting in the last case), and requires an
-     * RX FIFO overflow to be flagged in uart_ep_status. c-RCP arbitrates
-     * none of that: a response four times the configured FIFO size encodes
-     * happily, in exactly one unfragmented frame, with no overflow signal
-     * on any surface -- ep_rx_buffer_size is inert. */
+    /* REQ-UART-032 DEVIATION PIN (still open): TC18 §13.7.8.1 requires an
+     * RX FIFO overflow to be flagged in uart_ep_status -- TC18 never
+     * defines which bit of that 16-bit register carries the flag (the same
+     * "_ep_status has no printed bit layout" spec-silence pattern found
+     * across CAN/WakeUp/several other endpoint types' own status
+     * registers), so this module has no bit position to wire to without
+     * inventing one unilaterally. A response four times the configured
+     * FIFO size still encodes happily, in exactly one unfragmented frame,
+     * with no overflow signal on any surface -- ep_rx_buffer_size is inert
+     * for this purpose (REQ-UART-033's own read-COMPLETION arbitration,
+     * covered by the deviation this test used to also pin, is resolved
+     * separately below by rcp_ep_uart_read_completion_decision()). */
     f = rcp_ep_uart_encode_read_response(0x11u, rx, sizeof(rx), 3u, false, 0u);
     TEST_ASSERT_NOT_NULL(f.data);
     TEST_ASSERT_EQUAL_size_t(1u, rcp_ep_uart_read_response_fragment_count(sizeof(rx), 64u));
@@ -226,6 +231,45 @@ static void test_uart_rx_fifo_size_bounds_nothing_at_all(void)
     TEST_ASSERT_EQUAL_size_t(sizeof(rx), out_len);
     TEST_ASSERT_GREATER_THAN_UINT16(cfg.ep_rx_buffer_size, (uint16_t)out_len);
     rcp_bytes_free(&f);
+}
+
+/* REQ-UART-033 IMPLEMENTED (issue #336): TC18 §13.7.8.1's own three
+ * read-completion triggers, arbitrated by rcp_ep_uart_read_completion_
+ * decision() -- see that function's own doc comment for the exact rule. */
+static void test_uart_read_completion_decision(void)
+{
+    /* read_size satisfied before either the fifo fills to capacity or the
+     * timeout expires -- a normal (non-fragmented) response. */
+    TEST_ASSERT_EQUAL_INT(RCP_EP_UART_READ_RESPOND_NORMAL,
+                          rcp_ep_uart_read_completion_decision(4u, 4u, 0u, 250u, 8u));
+
+    /* Not yet satisfied, timeout not yet expired, and read_size fits
+     * within the fifo's own capacity -- still waiting. */
+    TEST_ASSERT_EQUAL_INT(RCP_EP_UART_READ_NOT_YET_COMPLETE,
+                          rcp_ep_uart_read_completion_decision(2u, 4u, 100u, 250u, 8u));
+
+    /* uart_timeout expires with fewer bytes than requested still in the
+     * fifo -- a short read, emitted as a normal (non-fragmented) response
+     * carrying only what's actually available. */
+    TEST_ASSERT_EQUAL_INT(RCP_EP_UART_READ_RESPOND_NORMAL,
+                          rcp_ep_uart_read_completion_decision(2u, 4u, 250u, 250u, 8u));
+
+    /* read_size exceeds the fifo's own capacity, and the fifo has filled
+     * to that capacity -- fragmentation is required. */
+    TEST_ASSERT_EQUAL_INT(RCP_EP_UART_READ_RESPOND_FRAGMENTED,
+                          rcp_ep_uart_read_completion_decision(8u, 20u, 0u, 250u, 8u));
+
+    /* read_size exceeds the fifo's own capacity, but the fifo hasn't
+     * filled yet, and the timeout hasn't expired -- still waiting, not
+     * yet fragmented. */
+    TEST_ASSERT_EQUAL_INT(RCP_EP_UART_READ_NOT_YET_COMPLETE,
+                          rcp_ep_uart_read_completion_decision(3u, 20u, 50u, 250u, 8u));
+
+    /* A zero-length timeout completes immediately, matching "as soon
+     * as... uart_timeout has expired" read literally for uart_timeout_ms
+     * == 0. */
+    TEST_ASSERT_EQUAL_INT(RCP_EP_UART_READ_RESPOND_NORMAL,
+                          rcp_ep_uart_read_completion_decision(0u, 4u, 0u, 0u, 8u));
 }
 
 /* RESOLVED (v0.110.0/v0.111.0) -- this test previously pinned a real gap:
@@ -902,6 +946,7 @@ int main(void)
 
     RUN_TEST(test_uart_functional_block_now_has_full_register_coverage);
     RUN_TEST(test_uart_rx_fifo_size_bounds_nothing_at_all);
+    RUN_TEST(test_uart_read_completion_decision);
     RUN_TEST(test_uart_compound_wait_now_resolved_via_generic_primitive);
     RUN_TEST(test_uart_read_size_above_one_octet_round_trips);
     RUN_TEST(test_uart_register_units_diverge_from_table_48);
