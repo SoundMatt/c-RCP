@@ -34,6 +34,20 @@ the rationale.
 
 ## Releases
 
+### v0.267.0 -- 2026-08-12 (issue #201 batch: `REQ-SPI-036`, the SPI transfer-length rule -- zero-fill/full-PICO -- now implemented)
+
+**`rcp_ep_spi_{en,de}code_transfer_request()` now carry `read_size` through the ACF header's own `read_size_or_segment_num` field, and a new `rcp_ep_spi_transfer_length()` computes TC18 §13.7.3.3's own transfer-length rule -- status flips to `implemented`.**
+
+TC18 §13.7.3.3: "The SPI EP shall append zeros in case the read_size is larger than the number of bytes in the byte_msg_payload. The byte_msg_payload will be presented on PICO in full, even if the read_size is less than the number of bytes in the byte_msg_payload." `rcp_ep_spi_transfer_length(tx_len, read_size)` computes `max(tx_len, read_size)`: a caller driving real SPI hardware clocks `tx_data[0..tx_len)` verbatim followed by zero octets up to the returned length when `read_size` exceeds `tx_len`, and always clocks at least the full `tx_len`-byte payload on PICO even when `read_size` is smaller (never truncated) -- POCI is captured for the same length.
+
+This is a real signature change to two existing functions with real callers, not an additive fix: `read_size` was not previously extracted or carried at all (the header slot stayed 0 regardless of payload length). Updated every call site: `src/adapt.c`'s `RCP_ADAPT_OP_SPI_TRANSFER` (defaults an absent `rcp.spi.read_size` meta key to the payload's own length -- an unannotated request still asks for exactly what it sends back, matching `rcp_ep_spi_transfer_length()`'s own no-zero-fill/no-truncation behavior for that case), plus every test call site across `tests/test_ep_spi.c`, `tests/test_adapt.c`, and `tests/test_tc18_gaps_ep.c`.
+
+**Mutation-testing result, including one correctly-identified equivalent mutant**: dropping `read_size` on encode (caught, 1/1/1 failures across `test_ep_spi`/`test_tc18_gaps_ep`/`test_adapt`) and bypassing the `max()` computation entirely (caught, 1/1 failures) both caught cleanly. A third mutation, loosening the boundary comparison from `>` to `>=`, was NOT caught -- investigated and confirmed a genuine equivalent mutant, not a coverage gap: at `read_size == tx_len` both branches return the identical numeric value (`read_size` and `tx_len` are equal at that exact point), so no test of the return value can discriminate the two operators there. The two directional tests (`read_size > tx_len`, `read_size < tx_len`) already fully specify the function's behavior everywhere the operator choice is observable.
+
+Split the pre-existing combined `REQ-SPI-036`/`REQ-SPI-037` gap-pinning test into two: `test_spi_read_size_round_trips_through_transfer_request` (rewritten to the FIXED convention) and `test_spi_no_error_latch` (still pins `REQ-SPI-037`, genuinely deferred -- needs a caller-owned fault-tracker plus dispatch wiring this endpoint doesn't have yet, the same shape `REQ-E2E-021` needed before its own fix). 3 new tests in `test_ep_spi.c` verify `rcp_ep_spi_transfer_length()` directly (zero-fill direction, full-PICO direction, exact-equal boundary).
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.266.0 -- 2026-08-12 (issue #201 doc-only batch: `REQ-SPI-033` was already implemented, stale catalog entry corrected)
 
 **`REQ-SPI-033` flips `partial` -> `implemented` -- a `.fusa-reqs.json` text correction, not a code change.**

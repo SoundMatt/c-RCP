@@ -9625,12 +9625,12 @@
     {
       "id": "REQ-SPI-036",
       "title": "SPI zero-fill when read_size exceeds the payload, full payload on PICO otherwise",
-      "text": "NOT IMPLEMENTED: c-RCP does not apply TC18 13.7.3.3's transfer-length rule -- an SPI endpoint shall append zero octets when read_size exceeds the byte_msg_payload length (so the bus clocks read_size octets), and shall still present the whole byte_msg_payload on PICO when read_size is smaller than it. The library's SPI request codec carries payload and read_size as independent fields and derives no transfer length from their relation.",
+      "text": "IMPLEMENTED (2026-08-12, issue #201 Phase 5e): rcp_ep_spi_encode_transfer_request()/_decode_transfer_request() now carry read_size through the ACF header's own read_size_or_segment_num field (previously unwired), and the new rcp_ep_spi_transfer_length(tx_len, read_size) computes TC18 13.7.3.3's own transfer-length rule -- max(tx_len, read_size): a caller driving real SPI hardware clocks tx_data[0..tx_len) verbatim followed by zero octets up to the returned length when read_size exceeds tx_len (the bus clocks read_size octets total), and always clocks at least the full tx_len-byte payload on PICO even when read_size is smaller (never truncated). All existing call sites (src/adapt.c's RCP_ADAPT_OP_SPI_TRANSFER, plus test call sites) updated for the new parameter; adapt.c defaults an absent rcp.spi.read_size meta key to the payload's own length, matching a request that asks for exactly what it sends back. Mutation-tested: dropping read_size on encode and bypassing the max() computation both caught cleanly; a `>` vs `>=` boundary mutation at read_size==tx_len is a provably equivalent mutant (both branches return the identical numeric value at that exact point) and needs no discriminating test.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "implemented",
       "tc18": "\u00a713.7.3.3, TC18.txt L4368-4370"
     },
     {

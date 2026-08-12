@@ -638,14 +638,17 @@ const char *rcp_ep_spi_strerror(rcp_ep_spi_errc_t e);
 
 /* Encodes an ACF_ABB transfer request addressed to byte_bus_id: evt's low
  * three bits carry channel (0..RCP_EP_SPI_MAX_CHANNELS-1; any other bits of
- * the ACF header's evt field are left 0), and the payload is exactly
+ * the ACF header's evt field are left 0), the payload is exactly
  * tx_data[0..tx_len) (the PICO-out bytes to shift out; tx_data may be NULL
- * iff tx_len == 0). Returns a zeroed rcp_bytes_t (data=NULL) if tx_len
- * exceeds RCP_ACF_MAX_PAYLOAD or on allocation failure. Caller frees the
- * result with rcp_bytes_free(). */
+ * iff tx_len == 0), and read_size carries the ACF header's own
+ * read_size_or_segment_num field (TC18 §13.7.3.3's own read_size -- see
+ * rcp_ep_spi_transfer_length()'s own doc comment for what it means for the
+ * actual bus transfer length). Returns a zeroed rcp_bytes_t (data=NULL) if
+ * tx_len exceeds RCP_ACF_MAX_PAYLOAD or on allocation failure. Caller
+ * frees the result with rcp_bytes_free(). */
 rcp_bytes_t rcp_ep_spi_encode_transfer_request(rcp_byte_bus_id_t byte_bus_id, uint8_t channel,
                                                 const uint8_t *tx_data, size_t tx_len,
-                                                uint8_t transaction_num);
+                                                uint16_t read_size, uint8_t transaction_num);
 
 /* Decodes and validates an ACF-level SPI transfer request from b[0..len).
  * Fails with RCP_EP_SPI_ERR_SHORT_FRAME if b is shorter than the ACF_ABB
@@ -654,15 +657,35 @@ rcp_bytes_t rcp_ep_spi_encode_transfer_request(rcp_byte_bus_id_t byte_bus_id, ui
  * byte_bus_id != expected_bus_id; RCP_EP_SPI_ERR_WRONG_OP if its op is not
  * RCP_ACF_OP_READ; RCP_EP_SPI_ERR_BAD_CHANNEL if evt[2:0] is not
  * rcp_ep_spi_channel_valid(). On RCP_EP_SPI_OK, *out_channel,
- * *out_transaction_num are populated, and *out_tx_data / *out_tx_len are
- * set to a *borrowed* view into b (not copied -- see the file header) of
- * the PICO-out payload. */
+ * *out_read_size, *out_transaction_num are populated, and *out_tx_data /
+ * *out_tx_len are set to a *borrowed* view into b (not copied -- see the
+ * file header) of the PICO-out payload. See rcp_ep_spi_transfer_length()
+ * for combining *out_tx_len and *out_read_size into the actual bus
+ * transfer length TC18 §13.7.3.3 requires. */
 rcp_ep_spi_errc_t rcp_ep_spi_decode_transfer_request(const uint8_t *b, size_t len,
                                                       rcp_byte_bus_id_t expected_bus_id,
                                                       uint8_t *out_channel,
                                                       const uint8_t **out_tx_data,
                                                       size_t *out_tx_len,
+                                                      uint16_t *out_read_size,
                                                       uint8_t *out_transaction_num);
+
+/* FIXED 2026-08-12 (issue #201, REQ-SPI-036): computes the actual SPI bus
+ * transfer length in octets for a transfer request carrying tx_len bytes
+ * of PICO-out payload and a read_size of read_size, per TC18 §13.7.3.3's
+ * own rule: "The SPI EP shall append zeros in case the read_size is
+ * larger than the number of bytes in the byte_msg_payload. The
+ * byte_msg_payload will be presented on PICO in full, even if the
+ * read_size is less than the number of bytes in the byte_msg_payload." A
+ * caller driving real SPI hardware clocks exactly this many octets:
+ * tx_data[0..tx_len) verbatim, followed by (return value - tx_len) zero
+ * octets when read_size > tx_len; POCI is captured for the same length.
+ * Equivalently, max(tx_len, read_size) -- but expressed as its own named
+ * primitive (not inlined at each call site) both for readability and
+ * because tx_len is a size_t while read_size is the ACF header's own
+ * 12-bit-wide uint16_t, two different-width types a bare max() macro
+ * would silently promote past their own domains' intent. */
+size_t rcp_ep_spi_transfer_length(size_t tx_len, uint16_t read_size);
 
 /* ── Response ───────────────────────────────────────────────────────────────── */
 

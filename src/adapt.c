@@ -243,10 +243,16 @@ rcp_bytes_t rcp_message_to_request(rcp_adapt_op_t op, rcp_byte_bus_id_t byte_bus
     }
 
     case RCP_ADAPT_OP_SPI_TRANSFER: {
-        uint32_t channel = meta_get_u32_default(msg, "rcp.spi.channel", 0);
+        /* read_size (TC18 §13.7.3.3) defaults to the payload's own length
+         * when absent -- an unannotated request still asks for exactly
+         * what it sends back, the same "no zero-fill, no truncation"
+         * behavior rcp_ep_spi_transfer_length() computes for that case. */
+        uint32_t channel   = meta_get_u32_default(msg, "rcp.spi.channel", 0);
+        uint32_t read_size = meta_get_u32_default(msg, "rcp.spi.read_size",
+                                                    (uint32_t)msg->payload.len);
         result = rcp_ep_spi_encode_transfer_request(byte_bus_id, (uint8_t)channel,
                                                      msg->payload.data, msg->payload.len,
-                                                     transaction_num);
+                                                     (uint16_t)read_size, transaction_num);
         break;
     }
 
