@@ -339,11 +339,15 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e)
 
 //cfusa:req REQ-RMAP-040
 //cfusa:req REQ-RMAP-041
+//cfusa:req REQ-RMAP-052
+//cfusa:req REQ-RMAP-054
 rcp_regmap_ep0_errc_t
 rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      const rcp_regmap_general_t *map,
                                      rcp_regmap_hw_pin_map_entry_t *hw_pin_map,
                                      size_t hw_pin_map_count,
+                                     rcp_regmap_ep_id_map_entry_t *ep_id_map,
+                                     size_t ep_id_map_count,
                                      rcp_wire_error_t *out_error,
                                      uint8_t *out_transaction_num)
 {
@@ -355,6 +359,7 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
     uint16_t                     addr;
     size_t                       data_len;
     size_t                       hw_cfg_len;
+    size_t                       ep_id_map_len;
 
     acf_rc = rcp_acf_decode_abb(b, len, &hdr, &payload, &payload_len);
     if (acf_rc == RCP_ACF_ERR_SHORT_FRAME) return RCP_REGMAP_EP0_ERR_SHORT_FRAME;
@@ -391,6 +396,19 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
         return RCP_REGMAP_EP0_OK;
     }
 
+    ep_id_map_len = ep_id_map_count * 4u;
+    if ((size_t)addr >= map->svr_ep_bytebus_id_map_ptr &&
+        (size_t)addr < (size_t)map->svr_ep_bytebus_id_map_ptr + ep_id_map_len) {
+        uint16_t relative = (uint16_t)((size_t)addr - map->svr_ep_bytebus_id_map_ptr);
+        rcp_regmap_ep_id_map_reconfig_errc_t rc;
+
+        rc = rcp_regmap_ep_id_map_apply_reconfig(ep_id_map, ep_id_map_count, relative,
+                                                   &payload[2], data_len);
+        *out_error = (rc == RCP_REGMAP_EP_ID_MAP_RECONFIG_OK) ? RCP_ERROR_NONE
+                                                               : RCP_ERROR_INVALID_PARAMETER;
+        return RCP_REGMAP_EP0_OK;
+    }
+
     /* Neither Table 18's own extent nor (yet) any known pointed-to table
      * -- see this function's own header doc comment for which tables
      * this milestone routes and which remain future work (issue #301). */
@@ -413,6 +431,57 @@ void rcp_regmap_ep_id_map_render(const rcp_regmap_ep_id_map_entry_t *entries, si
                                                           comment (regmap.h) */
         put_u16(&out[4u * i + 2u], (uint16_t)entries[i].byte_bus_id);
     }
+}
+
+//cfusa:req REQ-RMAP-052
+//cfusa:req REQ-RMAP-054
+const char *rcp_regmap_ep_id_map_reconfig_strerror(rcp_regmap_ep_id_map_reconfig_errc_t e)
+{
+    switch (e) {
+    case RCP_REGMAP_EP_ID_MAP_RECONFIG_OK:
+        return "rcp/regmap: EP_ID_config write applied";
+    case RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_SHORT:
+        return "rcp/regmap: EP_ID_config write has no data";
+    case RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_OUT_OF_RANGE:
+        return "rcp/regmap: EP_ID_config write extends past the table's own current extent";
+    default:
+        return "rcp/regmap: EP_ID_config unknown configuration-write error";
+    }
+}
+
+//cfusa:req REQ-RMAP-052
+//cfusa:req REQ-RMAP-054
+rcp_regmap_ep_id_map_reconfig_errc_t
+rcp_regmap_ep_id_map_apply_reconfig(rcp_regmap_ep_id_map_entry_t *entries, size_t count,
+                                     uint16_t relative_start_address,
+                                     const uint8_t *data, size_t data_len)
+{
+    uint8_t block[RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES * 4u];
+    size_t  block_len = count * 4u;
+    size_t  i;
+
+    if (data_len == 0u) return RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_SHORT;
+
+    if ((size_t)relative_start_address + data_len > block_len) {
+        return RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_OUT_OF_RANGE;
+    }
+
+    /* Same "render current image, patch the addressed octets, re-parse
+     * the whole image back" idiom rcp_regmap_hw_pin_map_apply_reconfig()
+     * and every endpoint type's own apply_reconfig() already use. */
+    rcp_regmap_ep_id_map_render(entries, count, block);
+    for (i = 0; i < data_len; i++) {
+        block[relative_start_address + i] = data[i]; /* every octet R/W+, none read-only */
+    }
+    for (i = 0; i < count; i++) {
+        entries[i].request_stream_index = block[4u * i + 0u];
+        entries[i].ep_id                = block[4u * i + 1u]; /* zero-extends -- see this
+                                                                   struct's own ep_id field
+                                                                   comment (regmap.h) */
+        entries[i].byte_bus_id           = (rcp_byte_bus_id_t)get_u16(&block[4u * i + 2u]);
+    }
+
+    return RCP_REGMAP_EP_ID_MAP_RECONFIG_OK;
 }
 
 /* ── Root-client / per-EP-restricted-client model ──────────────────────────── */

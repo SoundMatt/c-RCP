@@ -1316,80 +1316,6 @@ rcp_regmap_hw_pin_map_apply_reconfig(rcp_regmap_hw_pin_map_entry_t *entries, siz
                                       uint16_t relative_start_address,
                                       const uint8_t *data, size_t data_len);
 
-/* ── EP0 address-routed dispatcher (issue #301) ─────────────────────────────
- *
- * Generalizes rcp_regmap_general_decode_write_request() (which only
- * ever recognized a write landing within Table 18's own
- * [0x0000, RCP_REGMAP_GENERAL_LEN) extent, always rejecting it) to
- * route by absolute address across Table 18's own extent AND every
- * pointed-to table this codebase currently has a wire codec for. As of
- * this milestone that is HW_config alone (svr_hw_cfg_ptr) -- EP_ID_config
- * and response-queue-config remain routed to
- * RCP_REGMAP_EP0_ERR_UNKNOWN_ADDRESS until their own batches (issue
- * #301) wire them in the same way. Table 33/36 (svr_ep_functional_cfg_ptr)
- * is deliberately never routed here: its own address-collision defect
- * (documented in this file's own "RC Server functional-configuration
- * content" section) is a separate, still-unresolved primary-source
- * ambiguity this dispatcher's own finding does not resolve. */
-
-typedef enum {
-    RCP_REGMAP_EP0_OK                    = 0,
-    RCP_REGMAP_EP0_ERR_SHORT_FRAME       = 1,
-    RCP_REGMAP_EP0_ERR_BAD_MSG_TYPE      = 2,
-    RCP_REGMAP_EP0_ERR_WRONG_BUS         = 3,
-    RCP_REGMAP_EP0_ERR_WRONG_OP          = 4,
-    RCP_REGMAP_EP0_ERR_SHORT_PAYLOAD     = 5, /* payload shorter than the
-                                                  leading 2-octet address */
-} rcp_regmap_ep0_errc_t;
-
-/* Human-readable message for an rcp_regmap_ep0_errc_t value. Never
- * returns NULL. */
-const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
-
-/* Decodes an ACF_ABB WRITE request from b[0..len) addressed to byte_bus_id
- * 0 (EP0), with a payload shaped exactly like every other endpoint type's
- * own evt[2:0]=111b configuration write (TC18 §12.7.1 Figure 19): a
- * leading 2-octet big-endian absolute address, followed by the write's
- * own data. Routes by that address:
- *
- *   - Within [0x0000, RCP_REGMAP_GENERAL_LEN): Table 18 itself -- always
- *     denied, *out_error set to RCP_ERROR_LOCKED_MEM_ACCESS (reusing, not
- *     duplicating, rcp_regmap_general_decode_write_request()'s own
- *     already-proven REQ-RMAP-025 logic).
- *   - Within [map->svr_hw_cfg_ptr, map->svr_hw_cfg_ptr + 3*hw_pin_map_count):
- *     HW_config -- routed to rcp_regmap_hw_pin_map_apply_reconfig()
- *     (relative_start_address = the request's own absolute address minus
- *     map->svr_hw_cfg_ptr). *out_error is RCP_ERROR_NONE on success,
- *     RCP_ERROR_INVALID_PARAMETER if the write's own address+length
- *     extends past HW_config's own current extent (the closest of TC18
- *     Table 27's 17 numbered codes to "address range not entirely
- *     addressable" -- no code with a more specific name exists).
- *   - Any other address: *out_error is RCP_ERROR_EP_NOT_FOUND (the
- *     closest available Table 27 code to "nothing lives at this
- *     address" -- genuinely imprecise for a non-endpoint address, but no
- *     better numbered code exists; flagged here rather than silently
- *     assumed correct).
- *
- * On RCP_REGMAP_EP0_OK, *out_transaction_num is always populated and
- * *out_error reflects one of the three outcomes above -- the caller
- * builds the actual ACF response via rcp_acf_build_error_response() (for
- * a denial) or an ordinary positive response (for RCP_ERROR_NONE), the
- * same split every other decode_write_request()-style function in this
- * codebase already uses. Fails with RCP_REGMAP_EP0_ERR_SHORT_FRAME /
- * _BAD_MSG_TYPE / _WRONG_BUS / _WRONG_OP for the same ACF-level reasons
- * rcp_regmap_general_decode_write_request() already fails, or
- * RCP_REGMAP_EP0_ERR_SHORT_PAYLOAD if the payload has no room for its own
- * leading 2-octet address, before authorization/routing is even
- * reached. hw_pin_map/hw_pin_map_count describe the currently-configured
- * HW_config table this call may patch in place. */
-rcp_regmap_ep0_errc_t
-rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
-                                     const rcp_regmap_general_t *map,
-                                     rcp_regmap_hw_pin_map_entry_t *hw_pin_map,
-                                     size_t hw_pin_map_count,
-                                     rcp_wire_error_t *out_error,
-                                     uint8_t *out_transaction_num);
-
 /* ── Per-endpoint-type named-signal index ──────────────────────────────────── */
 
 /* The full named-signal index shared by every endpoint type, written once
@@ -1801,6 +1727,13 @@ typedef struct {
                                 "UPDATED 2026-08-11" note). */
 } rcp_regmap_ep_id_map_entry_t;
 
+/* This module's own chosen upper bound on EP_ID_config table rows -- not
+ * a spec-derived number (TC18 gives this table no fixed capacity of its
+ * own), matching RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES'/RCP_MOCK_MAX_ENDPOINTS'
+ * own scale (mock.h) as a plausible real-device row count -- used only to
+ * size rcp_regmap_ep_id_map_apply_reconfig()'s own fixed stack buffer. */
+#define RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES ((size_t)64u)
+
 /* Read-only diagnostic: true iff entries[0..count) is strictly ascending
  * in the COMPOSITE key (request_stream_index, byte_bus_id) -- TC18
  * §12.7.8's own required ordering (REQ-RMAP-056): request_stream_index
@@ -1851,19 +1784,15 @@ void rcp_regmap_ep_id_map_row_init_default(rcp_regmap_ep_id_map_entry_t *row);
  * primary source (the printed row-1/row-2/row-3 examples begin at
  * 0x0000/0x0004/0x0008).
  *
- * Deliberately NOT closed here: the ACF_ABB request/response wrapper
- * around this render function. Exactly the same genuine, unresolved
- * addressing question REQ-RMAP-040/041 (HW_config, this file's own
- * earlier section) already documents applies here too: EP_ID_config is
- * a separate table pointed to by Table 18's own
- * svr_ep_bytebus_id_map_ptr register (REQ-RMAP-037), not reached via
- * Table 18's own always-address-0 mechanism and not an endpoint's own
- * EP_func block either. Precisely how a client's request address
- * relates to that pointer's value is not specified anywhere in the
- * primary source for this case, so it is not guessed here -- see
- * HW_config's own file-header section for the fuller explanation,
- * equally applicable to this table. REQ-RMAP-052/054 both stay
- * `partial`, not `implemented`, for exactly this reason. */
+ * RESOLVED 2026-08-11 (issue #301, same finding as HW_config's own
+ * section above): EP_ID_config is a separate table pointed to by Table
+ * 18's own svr_ep_bytebus_id_map_ptr register (REQ-RMAP-037), reached
+ * the identical way HW_config now is -- svr_ep_bytebus_id_map_ptr's own
+ * value is an absolute address in the same EP0-scoped space Table 18
+ * itself lives in (Table 18's own address column is headed "Absolute
+ * address" in the current RC5 baseline PDF, confirmed directly). See
+ * rcp_regmap_ep_id_map_apply_reconfig() below and
+ * rcp_regmap_ep0_decode_write_request()'s own routing of it. */
 
 /* Serializes entries[0..count) into out at each row's own TC18-cited
  * 4-octet stride -- out must have room for at least 4*count octets.
@@ -1878,6 +1807,40 @@ void rcp_regmap_ep_id_map_row_init_default(rcp_regmap_ep_id_map_entry_t *row);
  * convention. */
 void rcp_regmap_ep_id_map_render(const rcp_regmap_ep_id_map_entry_t *entries, size_t count,
                                   uint8_t *out);
+
+typedef enum {
+    RCP_REGMAP_EP_ID_MAP_RECONFIG_OK               = 0,
+    RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_SHORT        = 1,
+    RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_OUT_OF_RANGE = 2,
+} rcp_regmap_ep_id_map_reconfig_errc_t;
+
+/* Human-readable message for an rcp_regmap_ep_id_map_reconfig_errc_t
+ * value. Never returns NULL. */
+const char *rcp_regmap_ep_id_map_reconfig_strerror(rcp_regmap_ep_id_map_reconfig_errc_t e);
+
+/* The inverse of rcp_regmap_ep_id_map_render(): patches entries[0..count)
+ * at relative_start_address (relative to EP_ID_config's own start, i.e.
+ * to svr_ep_bytebus_id_map_ptr's own current value -- NOT an
+ * EP0-absolute address; a caller routing an incoming request here has
+ * already subtracted svr_ep_bytebus_id_map_ptr's own value from the
+ * request's own absolute address). Same "render current image, patch
+ * the addressed octets, re-parse the whole image back" idiom
+ * rcp_regmap_hw_pin_map_apply_reconfig() and every endpoint type's own
+ * apply_reconfig() already use -- reused, not reinvented. Every octet of
+ * every row is R/W+ (no read-only sub-fields within a row), so no octet
+ * is ever silently skipped. count itself (the table's own current row
+ * count) is never changed by this call.
+ *
+ * Returns RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_SHORT if data_len is 0;
+ * RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_OUT_OF_RANGE if
+ * relative_start_address + data_len would exceed count*4 octets --
+ * entries is left entirely unchanged in that case, matching every
+ * sibling apply_reconfig()'s own "ignore in its entirety" TC18 §12.7.1
+ * rule. */
+rcp_regmap_ep_id_map_reconfig_errc_t
+rcp_regmap_ep_id_map_apply_reconfig(rcp_regmap_ep_id_map_entry_t *entries, size_t count,
+                                     uint16_t relative_start_address,
+                                     const uint8_t *data, size_t data_len);
 
 /* REQ-RMAP-057: TC18 §12.7.8 recommends, for safety reasons, that an
  * endpoint be mapped to at most one RC Client at a time. In this
@@ -1916,6 +1879,95 @@ bool rcp_regmap_ep_id_map_has_single_client_per_ep(const rcp_regmap_ep_id_map_en
 bool rcp_regmap_ep_id_map_shared_bus_homogeneous(const rcp_regmap_ep_id_map_entry_t *entries,
                                                   const uint8_t *ep_types,
                                                   size_t count);
+
+/* ── EP0 address-routed dispatcher (issue #301) ─────────────────────────────
+ *
+ * Generalizes rcp_regmap_general_decode_write_request() (which only
+ * ever recognized a write landing within Table 18's own
+ * [0x0000, RCP_REGMAP_GENERAL_LEN) extent, always rejecting it) to
+ * route by absolute address across Table 18's own extent AND every
+ * pointed-to table this codebase currently has a wire codec for. As of
+ * this milestone that is HW_config (svr_hw_cfg_ptr) and EP_ID_config
+ * (svr_ep_bytebus_id_map_ptr) -- response-queue-config remains routed to
+ * RCP_ERROR_EP_NOT_FOUND until its own batch (issue #301) wires it in
+ * the same way. Table 33/36 (svr_ep_functional_cfg_ptr) is deliberately
+ * never routed here: its own address-collision defect (documented in
+ * this file's own "RC Server functional-configuration content" section)
+ * is a separate, still-unresolved primary-source ambiguity this
+ * dispatcher's own finding does not resolve.
+ *
+ * Declared here, after both HW_config's and EP_ID_config's own sections,
+ * because its own signature references both rcp_regmap_hw_pin_map_entry_t
+ * and rcp_regmap_ep_id_map_entry_t -- C requires each to already be
+ * declared at this point; this dispatcher cannot live any earlier in
+ * this header than the last of the tables it routes to. */
+
+typedef enum {
+    RCP_REGMAP_EP0_OK                    = 0,
+    RCP_REGMAP_EP0_ERR_SHORT_FRAME       = 1,
+    RCP_REGMAP_EP0_ERR_BAD_MSG_TYPE      = 2,
+    RCP_REGMAP_EP0_ERR_WRONG_BUS         = 3,
+    RCP_REGMAP_EP0_ERR_WRONG_OP          = 4,
+    RCP_REGMAP_EP0_ERR_SHORT_PAYLOAD     = 5, /* payload shorter than the
+                                                  leading 2-octet address */
+} rcp_regmap_ep0_errc_t;
+
+/* Human-readable message for an rcp_regmap_ep0_errc_t value. Never
+ * returns NULL. */
+const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
+
+/* Decodes an ACF_ABB WRITE request from b[0..len) addressed to byte_bus_id
+ * 0 (EP0), with a payload shaped exactly like every other endpoint type's
+ * own evt[2:0]=111b configuration write (TC18 §12.7.1 Figure 19): a
+ * leading 2-octet big-endian absolute address, followed by the write's
+ * own data. Routes by that address:
+ *
+ *   - Within [0x0000, RCP_REGMAP_GENERAL_LEN): Table 18 itself -- always
+ *     denied, *out_error set to RCP_ERROR_LOCKED_MEM_ACCESS (reusing, not
+ *     duplicating, rcp_regmap_general_decode_write_request()'s own
+ *     already-proven REQ-RMAP-025 logic).
+ *   - Within [map->svr_hw_cfg_ptr, map->svr_hw_cfg_ptr + 3*hw_pin_map_count):
+ *     HW_config -- routed to rcp_regmap_hw_pin_map_apply_reconfig()
+ *     (relative_start_address = the request's own absolute address minus
+ *     map->svr_hw_cfg_ptr).
+ *   - Within [map->svr_ep_bytebus_id_map_ptr, map->svr_ep_bytebus_id_map_ptr
+ *     + 4*ep_id_map_count): EP_ID_config -- routed to
+ *     rcp_regmap_ep_id_map_apply_reconfig() the identical way.
+ *   - For either pointed-to table, *out_error is RCP_ERROR_NONE on
+ *     success, RCP_ERROR_INVALID_PARAMETER if the write's own
+ *     address+length extends past that table's own current extent (the
+ *     closest of TC18 Table 27's 17 numbered codes to "address range not
+ *     entirely addressable" -- no code with a more specific name
+ *     exists).
+ *   - Any other address: *out_error is RCP_ERROR_EP_NOT_FOUND (the
+ *     closest available Table 27 code to "nothing lives at this
+ *     address" -- genuinely imprecise for a non-endpoint address, but no
+ *     better numbered code exists; flagged here rather than silently
+ *     assumed correct).
+ *
+ * On RCP_REGMAP_EP0_OK, *out_transaction_num is always populated and
+ * *out_error reflects one of the outcomes above -- the caller builds the
+ * actual ACF response via rcp_acf_build_error_response() (for a denial)
+ * or an ordinary positive response (for RCP_ERROR_NONE), the same split
+ * every other decode_write_request()-style function in this codebase
+ * already uses. Fails with RCP_REGMAP_EP0_ERR_SHORT_FRAME /
+ * _BAD_MSG_TYPE / _WRONG_BUS / _WRONG_OP for the same ACF-level reasons
+ * rcp_regmap_general_decode_write_request() already fails, or
+ * RCP_REGMAP_EP0_ERR_SHORT_PAYLOAD if the payload has no room for its own
+ * leading 2-octet address, before authorization/routing is even reached.
+ * hw_pin_map/hw_pin_map_count and ep_id_map/ep_id_map_count describe the
+ * currently-configured tables this call may patch in place; either count
+ * may be 0 (that table then has no address range at all, and any write
+ * targeting it falls through to the "unknown address" case). */
+rcp_regmap_ep0_errc_t
+rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
+                                     const rcp_regmap_general_t *map,
+                                     rcp_regmap_hw_pin_map_entry_t *hw_pin_map,
+                                     size_t hw_pin_map_count,
+                                     rcp_regmap_ep_id_map_entry_t *ep_id_map,
+                                     size_t ep_id_map_count,
+                                     rcp_wire_error_t *out_error,
+                                     uint8_t *out_transaction_num);
 
 #ifdef __cplusplus
 }
