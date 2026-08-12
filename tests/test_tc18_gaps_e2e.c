@@ -1025,6 +1025,7 @@ static void test_dispatch_e2e_crc_error_with_rx_enforce_e2e_blocks_the_whole_str
     TEST_ASSERT_EQUAL_UINT8(1u, hdr.err);
     TEST_ASSERT_EQUAL_UINT(1u, out_len);
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_POCI_FAILURE, out_pl[0]);
+    rcp_bytes_free(&resp2); /* free the STREAM_FAULTED response before resp2 is reused below */
 
     /* Released: the same valid request now succeeds normally. */
     rcp_e2e_stream_fault_tracker_reset(&tracker, TEST_SID);
