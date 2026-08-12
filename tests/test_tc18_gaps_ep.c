@@ -373,10 +373,11 @@ static void test_gpio_response_timing_is_not_modelled(void)
 
 /* ── SPI endpoint (TC18 13.7.3) ───────────────────────────────────────────── */
 
-/* REQ-SPI-033 (partial): TC18 13.7.3.1/13.7.3.2 give the SPI endpoint six
- * independently pre-configured channels, selected by a request's evt[2:0].
- * Six channel configurations exist and evt[2:0] selects them; the DEVIATION
- * is only that the catalogue, not the code, was missing that statement. */
+/* FIXED 2026-08-12 (issue #201, REQ-SPI-033): TC18 13.7.3.1/13.7.3.2 give
+ * the SPI endpoint six independently pre-configured channels, selected by
+ * a request's evt[2:0]. Six channel configurations exist and evt[2:0]
+ * selects them; the deviation was only that the catalogue, not the code,
+ * was missing that statement -- fixed as a text/status-only correction. */
 static void test_spi_six_channels_selected_by_evt(void)
 {
     rcp_ep_spi_functional_cfg_t cfg;
