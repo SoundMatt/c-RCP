@@ -15,6 +15,8 @@
 #define SLEEPCMD_REQUEST_PAYLOAD_LEN  ((size_t)1u) /* opcode(1) */
 #define SLEEPCMD_RESPONSE_PAYLOAD_LEN ((size_t)2u) /* opcode(1) + result(1) */
 #define WAKEUP_PAYLOAD_LEN            ((size_t)1u) /* opcode(1) */
+#define WAKEUP_WITH_SOURCE_PAYLOAD_LEN ((size_t)3u) /* opcode(1) + source(1) + source_index(1) --
+                                                         REQ-WAKEUP-017 */
 
 /* ── Byte-order helpers (this TU's own copy, matching acf.c's/ep_mdio.c's
  * house convention of not sharing a byte-order util across modules) ────── */
@@ -281,6 +283,63 @@ bool rcp_ep_wakeup_is_wakeup_echo(const uint8_t *b, size_t len, rcp_byte_bus_id_
     if (rc != RCP_EP_WAKEUP_OK) return false;
 
     return transaction_num == sent_transaction_num;
+}
+
+//cfusa:req REQ-WAKEUP-017
+rcp_bytes_t rcp_ep_wakeup_encode_wakeup_message_with_source(rcp_byte_bus_id_t byte_bus_id,
+                                                              uint8_t transaction_num,
+                                                              rcp_ep_wakeup_source_t source,
+                                                              uint8_t source_index)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    uint8_t                     payload[WAKEUP_WITH_SOURCE_PAYLOAD_LEN];
+
+    payload[0] = RCP_EP_WAKEUP_WAKEUP_OPCODE;
+    payload[1] = (uint8_t)source;
+    payload[2] = source_index;
+
+    hdr.byte_bus_id     = byte_bus_id;
+    hdr.op              = RCP_ACF_OP_NONE;
+    hdr.transaction_num = transaction_num;
+
+    return rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+}
+
+//cfusa:req REQ-WAKEUP-017
+rcp_ep_wakeup_errc_t
+rcp_ep_wakeup_decode_wakeup_message_with_source(const uint8_t *b, size_t len,
+                                                 rcp_byte_bus_id_t expected_bus_id,
+                                                 uint8_t *out_transaction_num,
+                                                 rcp_ep_wakeup_source_t *out_source,
+                                                 uint8_t *out_source_index)
+{
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    rcp_acf_errc_t               acf_rc;
+
+    acf_rc = rcp_acf_decode_abb(b, len, &hdr, &payload, &payload_len);
+    if (acf_rc == RCP_ACF_ERR_SHORT_FRAME) return RCP_EP_WAKEUP_ERR_SHORT_FRAME;
+    if (acf_rc != RCP_ACF_OK) return RCP_EP_WAKEUP_ERR_BAD_MSG_TYPE;
+
+    if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_WAKEUP_ERR_WRONG_BUS;
+    if (payload_len < WAKEUP_WITH_SOURCE_PAYLOAD_LEN) return RCP_EP_WAKEUP_ERR_SHORT_FRAME;
+    if (payload[0] != RCP_EP_WAKEUP_WAKEUP_OPCODE) return RCP_EP_WAKEUP_ERR_BAD_OPCODE;
+
+    switch (payload[1]) {
+    case (uint8_t)RCP_EP_WAKEUP_SOURCE_UNKNOWN:
+    case (uint8_t)RCP_EP_WAKEUP_SOURCE_IO:
+    case (uint8_t)RCP_EP_WAKEUP_SOURCE_WAKEPIN:
+    case (uint8_t)RCP_EP_WAKEUP_SOURCE_NETWORK:
+        break;
+    default:
+        return RCP_EP_WAKEUP_ERR_BAD_OPCODE;
+    }
+
+    *out_transaction_num = hdr.transaction_num;
+    *out_source          = (rcp_ep_wakeup_source_t)payload[1];
+    *out_source_index    = payload[2];
+    return RCP_EP_WAKEUP_OK;
 }
 
 /* ── The EP_func register block (evt[2:0] == 111b) ─────────────────────────── */

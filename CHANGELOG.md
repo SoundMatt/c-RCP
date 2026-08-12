@@ -34,6 +34,20 @@ the rationale.
 
 ## Releases
 
+### v0.260.0 -- 2026-08-12 (issue #201 batch: `REQ-WAKEUP-017`, WakeUp message now carries the wake-up source -- WAKEUP group fully addressed)
+
+**New `rcp_ep_wakeup_encode_wakeup_message_with_source()`/`_decode_wakeup_message_with_source()` close `REQ-WAKEUP-017` fully (TC18 §12.4.1: the repetitive wake response must convey both a WakeUp message and the WakeUp source) -- status flips to `implemented`, and this closes the last of WAKEUP's 4 not-implemented items.**
+
+Added as a strictly additive extension, not a modification of the pre-existing 1-byte-payload `rcp_ep_wakeup_encode_wakeup_message()`/`_decode_wakeup_message()`/`_is_wakeup_echo()` trio, which keep their own original shape and behavior entirely unchanged -- avoiding a signature-widening ripple across their own real call sites (`src/adapt.c`, `src/powerstate.c`, and several test files). The new pair's own 3-byte payload (opcode + a new `rcp_ep_wakeup_source_t` classification byte + a `source_index` byte) is forward-compatible with the plain decoder (which only ever checks `payload_len >= 1` and `payload[0]`, tolerating but not requiring the longer shape) -- confirmed directly by test, not just asserted.
+
+Covers all 3 wake-source classes TC18 §12.4.1's own text names: a configured wake-source pin (`RCP_EP_WAKEUP_SOURCE_IO`, with `source_index` into `rcp_ep_wakeup_functional_cfg_t::sources[]`), "the dedicated wakepin" (`RCP_EP_WAKEUP_SOURCE_WAKEPIN`, named separately in that text from the configured pin table, so kept as its own distinct classification rather than folded into `_IO`), and a TC14/TC10 network wake-up request (`RCP_EP_WAKEUP_SOURCE_NETWORK`), plus `RCP_EP_WAKEUP_SOURCE_UNKNOWN` for a caller with no source information to report. TC18 defines no wire encoding for this classification (same disclaimer as SleepCMD's own response payload) -- this enum and byte layout are this module's own original design.
+
+Mutation-tested 2 ways (remove source-byte validation entirely; loosen the length check to accept the plain 1-byte shape) -- both caught cleanly; the second mutation also surfaced that a loosened length check would silently misread ACF quadlet-padding zero bytes as a valid `RCP_EP_WAKEUP_SOURCE_UNKNOWN` classification, confirming the length check is a real safety gate, not a redundant one.
+
+**WAKEUP group (6 items total) is now fully addressed**: `REQ-WAKEUP-017`/`-019` fully `implemented`; `REQ-WAKEUP-018`/`-020` honestly `partial` (real, documented TC18 wire-format gaps, not oversights); `REQ-WAKEUP-021`/`-022` already `partial` from an earlier session (issue #256 Group I).
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.259.0 -- 2026-08-12 (issue #201 batch: `REQ-WAKEUP-018`, WakeUp repetition-time configurability)
 
 **New `repetition_time_us` field on `rcp_ep_wakeup_functional_cfg_t` closes the "neither discoverable nor settable" half of `REQ-WAKEUP-018` (TC18 §12.4.1: "Repetition time of the message can be configured inside the WakeUp EP").**

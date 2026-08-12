@@ -549,6 +549,70 @@ rcp_ep_wakeup_errc_t rcp_ep_wakeup_decode_wakeup_message(const uint8_t *b, size_
 bool rcp_ep_wakeup_is_wakeup_echo(const uint8_t *b, size_t len, rcp_byte_bus_id_t expected_bus_id,
                                    uint8_t sent_transaction_num);
 
+/* REQ-WAKEUP-017 (issue #201): TC18 §12.4.1 requires the repetitive wake
+ * response to convey both a WakeUp message AND the WakeUp source that
+ * caused the wake -- three classes of source appear in that section's
+ * own text: "an internal EP signal" (a configured wake-source pin,
+ * rcp_ep_wakeup_source_cfg_t), "the dedicated wakepin" (named
+ * separately from the configured pin table, so treated here as its own
+ * distinct classification, not folded into RCP_EP_WAKEUP_SOURCE_IO), and
+ * "a TC14/TC10 wake-up request on the network". TC18 defines no wire
+ * encoding for this classification (same disclaimer as SleepCMD's own
+ * response payload, this file's own header) -- this enum and the 3-byte
+ * message shape below are this module's own original design. */
+typedef enum {
+    RCP_EP_WAKEUP_SOURCE_UNKNOWN = 0, /* no wake-source information available/applicable --
+                                          matches the plain rcp_ep_wakeup_encode_wakeup_message()'s
+                                          own implicit meaning */
+    RCP_EP_WAKEUP_SOURCE_IO      = 1, /* a configured wake-source pin -- see source_index */
+    RCP_EP_WAKEUP_SOURCE_WAKEPIN = 2, /* TC18 §12.4.1's own "the dedicated wakepin" */
+    RCP_EP_WAKEUP_SOURCE_NETWORK = 3  /* TC18 §12.4.1's own "TC14/TC10 wake-up request on the network" */
+} rcp_ep_wakeup_source_t;
+
+/* source_index's own sentinel for "not applicable to this source
+ * classification" -- every classification other than
+ * RCP_EP_WAKEUP_SOURCE_IO carries this value. */
+#define RCP_EP_WAKEUP_SOURCE_INDEX_NA ((uint8_t)0xFFu)
+
+/* Encodes an ACF_ABB WakeUp message the same way as
+ * rcp_ep_wakeup_encode_wakeup_message(), but with 2 additional payload
+ * bytes: source (this enum, one octet) and source_index (one octet --
+ * meaningful only when source == RCP_EP_WAKEUP_SOURCE_IO, in which case
+ * it names the asserting rcp_ep_wakeup_functional_cfg_t::sources[]
+ * index; RCP_EP_WAKEUP_SOURCE_INDEX_NA otherwise). The plain
+ * rcp_ep_wakeup_decode_wakeup_message()/rcp_ep_wakeup_is_wakeup_echo()
+ * pair still decodes a message built by this function correctly (they
+ * only ever check payload_len >= 1 and payload[0], never reject a
+ * longer payload) -- this is a strictly additive wire extension, not a
+ * breaking change to the existing 1-byte message shape or any of its
+ * own existing callers. Returns a zeroed rcp_bytes_t (data=NULL) on
+ * allocation failure. */
+rcp_bytes_t rcp_ep_wakeup_encode_wakeup_message_with_source(rcp_byte_bus_id_t byte_bus_id,
+                                                              uint8_t transaction_num,
+                                                              rcp_ep_wakeup_source_t source,
+                                                              uint8_t source_index);
+
+/* Decodes and validates the 3-byte WakeUp-message shape
+ * rcp_ep_wakeup_encode_wakeup_message_with_source() builds, with the
+ * same short-frame/wrong-bus/wrong-message-type/bad-opcode failure
+ * modes as rcp_ep_wakeup_decode_wakeup_message(), plus
+ * RCP_EP_WAKEUP_ERR_BAD_OPCODE if the source byte is not one of this
+ * enum's own 4 defined values (fail-safe: an unrecognized source byte
+ * is never silently reinterpreted as RCP_EP_WAKEUP_SOURCE_UNKNOWN). A
+ * message built by the plain rcp_ep_wakeup_encode_wakeup_message()
+ * (only 1 payload byte) is REJECTED here with
+ * RCP_EP_WAKEUP_ERR_SHORT_FRAME -- this decoder's own contract is the
+ * 3-byte shape specifically, the mirror image of how the plain decoder
+ * tolerates (but does not require) the longer shape. On
+ * RCP_EP_WAKEUP_OK, *out_transaction_num, *out_source, and
+ * *out_source_index are all populated. */
+rcp_ep_wakeup_errc_t
+rcp_ep_wakeup_decode_wakeup_message_with_source(const uint8_t *b, size_t len,
+                                                 rcp_byte_bus_id_t expected_bus_id,
+                                                 uint8_t *out_transaction_num,
+                                                 rcp_ep_wakeup_source_t *out_source,
+                                                 uint8_t *out_source_index);
+
 /* ── The EP_func register block (the evt[2:0] == 111b target) ──────────────── */
 
 /* Relative octet offsets of this endpoint's own EP_func block -- see the

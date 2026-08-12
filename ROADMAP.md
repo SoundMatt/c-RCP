@@ -15205,6 +15205,43 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.260.0 -- 2026-08-12 (issue #201 batch: `REQ-WAKEUP-017`,
+WakeUp message now carries the wake-up source -- WAKEUP group fully
+addressed)
+
+**New `rcp_ep_wakeup_encode_wakeup_message_with_source()`/
+`_decode_wakeup_message_with_source()` close `REQ-WAKEUP-017` fully
+(TC18 §12.4.1) -- status flips to `implemented`, closing the last of
+WAKEUP's 4 not-implemented items.**
+
+Added as a strictly additive extension, not a modification of the
+pre-existing 1-byte-payload trio, which keeps its own original shape
+and behavior entirely unchanged -- avoiding a signature-widening
+ripple across its own real call sites (`adapt.c`, `powerstate.c`,
+several test files). The new pair's own 3-byte payload (opcode +
+source classification + `source_index`) is forward-compatible with
+the plain decoder, confirmed directly by test.
+
+Covers all 3 wake-source classes TC18 §12.4.1's own text names: a
+configured wake-source pin (with `source_index`), "the dedicated
+wakepin" (named separately in that text, kept as its own distinct
+classification), and a TC14/TC10 network wake-up request, plus an
+UNKNOWN default. TC18 defines no wire encoding for this
+classification -- this enum and byte layout are this module's own
+original design.
+
+Mutation-tested 2 ways (remove source-byte validation; loosen the
+length check) -- both caught cleanly; the second also surfaced that a
+loosened check would silently misread ACF padding as a valid UNKNOWN
+classification, confirming a real safety gate.
+
+**WAKEUP group (6 items) now fully addressed**: `-017`/`-019` fully
+`implemented`; `-018`/`-020` honestly `partial` (real, documented gaps);
+`-021`/`-022` already `partial` from an earlier session.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.259.0 -- 2026-08-12 (issue #201 batch: `REQ-WAKEUP-018`,
 WakeUp repetition-time configurability)
 
