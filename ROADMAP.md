@@ -15091,3 +15091,61 @@ re-verified byte-identical all three times.
 complete: all three pointed-to tables can be written over the wire.**
 **Next**: batch 4, the READ side of the dispatcher, for all three
 tables at once.
+
+### v0.247.0 -- 2026-08-11 (issue #301 batch 4: EP0 dispatcher READ
+side, batch 1-4 all closed)
+
+**REQ-RMAP-040/041 (HW_config), REQ-RMAP-052/054 (EP_ID_config), and
+REQ-RMAP-061 (response-queue-config) all gain their READ side, closing
+the last shared gap issue #301's own finding left open. All four
+batches of issue #301 are now complete.**
+
+New `rcp_regmap_ep0_decode_read_request()` decodes an incoming
+ACF_ABB READ request addressed to EP0 (same leading-2-octet-address
+payload shape as the write dispatcher's own request; the requested
+`read_size` comes from the ACF header's own
+`read_size_or_segment_num` field). New
+`rcp_regmap_ep0_encode_read_response()` routes the decoded address
+across the identical four extents the write dispatcher already
+routes, reusing each table's own already-proven `render()` function --
+no second copy of any wire codec. On a known extent, the response
+carries real octets followed by zero-fill up to `read_size` -- the
+identical convention `rcp_regmap_general_encode_read_response()`
+already established for Table 18 alone, now generalized. On an
+unknown address, `*out_error` is `RCP_ERROR_EP_NOT_FOUND` and the
+returned `rcp_bytes_t` is zeroed, the same split the write dispatcher
+already uses.
+
+`read_size` is deliberately `uint8_t`, matching
+`rcp_regmap_general_encode_read_response()`'s own established
+precedent rather than the ACF header's wider 12-bit field -- every
+one of this dispatcher's own four routable extents comfortably fits
+real configurations well under 256 octets.
+
+**Deliberately does NOT compose data across more than one extent**
+even when `addr + read_size` would span into a second one -- TC18
+defines no rule for combining two distinct pointed-to tables into one
+response, and inventing one here would not be primary-source-derived.
+
+New tests: `test_ep0_read_dispatcher_routes_all_four_extents_and_unknown_addresses`
+(10 sub-cases, every routing-boundary case written in from the start,
+per batch 2/3's own established mutation-testing lesson).
+
+Mutation-tested two ways: disabling the shared response-slice
+helper's own zero-fill/bounds computation (caught by both a clean
+assertion failure AND a genuine ASan stack-buffer-overflow abort --
+the mutation was a real out-of-bounds read, not just a logic bug),
+and loosening the HW_config routing condition's own upper bound
+(caught cleanly by its own dedicated boundary case). Reverted, full
+suite re-verified byte-identical both times.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
+0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
+**Issue #301 is now fully closed: all four batches complete.** All
+three pointed-to tables can be both written and read over the wire,
+using one shared, address-routed dispatcher generalizing Table 18's
+own already-established wire codec. Remaining gaps in each affected
+requirement are now narrowed to lifecycle-state write authorization
+alone -- no addressing or wire-format ambiguity remains anywhere in
+this lineage.

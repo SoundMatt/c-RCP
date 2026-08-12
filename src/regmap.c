@@ -433,6 +433,144 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
     return RCP_REGMAP_EP0_OK;
 }
 
+//cfusa:req REQ-RMAP-040
+//cfusa:req REQ-RMAP-041
+//cfusa:req REQ-RMAP-052
+//cfusa:req REQ-RMAP-054
+//cfusa:req REQ-RMAP-061
+rcp_regmap_ep0_errc_t
+rcp_regmap_ep0_decode_read_request(const uint8_t *b, size_t len,
+                                    uint16_t *out_addr, uint8_t *out_read_size,
+                                    uint8_t *out_transaction_num)
+{
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    rcp_acf_errc_t               acf_rc;
+
+    acf_rc = rcp_acf_decode_abb(b, len, &hdr, &payload, &payload_len);
+    if (acf_rc == RCP_ACF_ERR_SHORT_FRAME) return RCP_REGMAP_EP0_ERR_SHORT_FRAME;
+    if (acf_rc != RCP_ACF_OK) return RCP_REGMAP_EP0_ERR_BAD_MSG_TYPE;
+
+    if (hdr.byte_bus_id != RCP_REGMAP_EP0_INDEX) return RCP_REGMAP_EP0_ERR_WRONG_BUS;
+    if (hdr.op != RCP_ACF_OP_READ) return RCP_REGMAP_EP0_ERR_WRONG_OP;
+    if (payload_len < 2u) return RCP_REGMAP_EP0_ERR_SHORT_PAYLOAD;
+
+    *out_addr             = get_u16(payload);
+    *out_read_size        = (uint8_t)hdr.read_size_or_segment_num; /* truncated -- see this
+                                                                        function's own doc
+                                                                        comment (regmap.h) */
+    *out_transaction_num  = hdr.transaction_num;
+    return RCP_REGMAP_EP0_OK;
+}
+
+/* Shared body for rcp_regmap_ep0_encode_read_response()'s own four
+ * known-extent cases: copies min(read_size, table_len - offset) real
+ * octets from table_image starting at offset, zero-fills the rest up to
+ * read_size, and encodes the ACF_ABB READ response -- the identical
+ * body rcp_regmap_general_encode_read_response() already establishes
+ * for Table 18 alone, generalized to an arbitrary source image/offset. */
+static rcp_bytes_t ep0_read_response_from_slice(const uint8_t *table_image, size_t table_len,
+                                                 size_t offset, uint8_t read_size,
+                                                 uint8_t transaction_num)
+{
+    uint8_t                     payload[256]; /* read_size is uint8_t --
+                                                   always <= 255, see this
+                                                   dispatcher's own
+                                                   read-side file-header
+                                                   note (regmap.h) */
+    size_t                      avail    = (offset < table_len) ? (table_len - offset) : 0u;
+    size_t                      copy_len = (avail < (size_t)read_size) ? avail : (size_t)read_size;
+    rcp_acf_byte_message_info_t hdr      = {0};
+
+    memset(payload, 0, sizeof(payload));
+    if (copy_len > 0u) memcpy(payload, &table_image[offset], copy_len);
+
+    hdr.byte_bus_id              = RCP_REGMAP_EP0_INDEX;
+    hdr.op                       = RCP_ACF_OP_READ;
+    hdr.rsp                      = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
+    hdr.read_size_or_segment_num = read_size;
+    hdr.transaction_num          = transaction_num;
+
+    return rcp_acf_encode_abb(&hdr, payload, read_size);
+}
+
+//cfusa:req REQ-RMAP-040
+//cfusa:req REQ-RMAP-041
+//cfusa:req REQ-RMAP-052
+//cfusa:req REQ-RMAP-054
+//cfusa:req REQ-RMAP-061
+rcp_bytes_t
+rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
+                                     uint8_t transaction_num,
+                                     const rcp_regmap_general_t *map,
+                                     const rcp_regmap_hw_pin_map_entry_t *hw_pin_map,
+                                     size_t hw_pin_map_count,
+                                     const rcp_regmap_ep_id_map_entry_t *ep_id_map,
+                                     size_t ep_id_map_count,
+                                     const rcp_regmap_response_queue_cfg_t *response_queue_cfg,
+                                     size_t response_queue_cfg_count,
+                                     rcp_wire_error_t *out_error)
+{
+    size_t hw_cfg_len;
+    size_t ep_id_map_len;
+    size_t response_queue_cfg_len;
+
+    if ((size_t)addr < RCP_REGMAP_GENERAL_LEN) {
+        uint8_t image[RCP_REGMAP_GENERAL_LEN];
+
+        rcp_regmap_general_render(map, image);
+        *out_error = RCP_ERROR_NONE;
+        return ep0_read_response_from_slice(image, RCP_REGMAP_GENERAL_LEN, (size_t)addr,
+                                             read_size, transaction_num);
+    }
+
+    hw_cfg_len = hw_pin_map_count * 3u;
+    if ((size_t)addr >= map->svr_hw_cfg_ptr &&
+        (size_t)addr < (size_t)map->svr_hw_cfg_ptr + hw_cfg_len) {
+        uint8_t image[RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES * 3u];
+
+        rcp_regmap_hw_pin_map_render(hw_pin_map, hw_pin_map_count, image);
+        *out_error = RCP_ERROR_NONE;
+        return ep0_read_response_from_slice(image, hw_cfg_len,
+                                             (size_t)addr - map->svr_hw_cfg_ptr,
+                                             read_size, transaction_num);
+    }
+
+    ep_id_map_len = ep_id_map_count * 4u;
+    if ((size_t)addr >= map->svr_ep_bytebus_id_map_ptr &&
+        (size_t)addr < (size_t)map->svr_ep_bytebus_id_map_ptr + ep_id_map_len) {
+        uint8_t image[RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES * 4u];
+
+        rcp_regmap_ep_id_map_render(ep_id_map, ep_id_map_count, image);
+        *out_error = RCP_ERROR_NONE;
+        return ep0_read_response_from_slice(image, ep_id_map_len,
+                                             (size_t)addr - map->svr_ep_bytebus_id_map_ptr,
+                                             read_size, transaction_num);
+    }
+
+    response_queue_cfg_len = response_queue_cfg_count * 10u;
+    if ((size_t)addr >= map->svr_response_stream_cfg_ptr &&
+        (size_t)addr < (size_t)map->svr_response_stream_cfg_ptr + response_queue_cfg_len) {
+        uint8_t image[RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES * 10u];
+
+        rcp_regmap_response_queue_cfg_render(response_queue_cfg, response_queue_cfg_count, image);
+        *out_error = RCP_ERROR_NONE;
+        return ep0_read_response_from_slice(image, response_queue_cfg_len,
+                                             (size_t)addr - map->svr_response_stream_cfg_ptr,
+                                             read_size, transaction_num);
+    }
+
+    /* Neither Table 18's own extent nor any known pointed-to table --
+     * same fallback the write dispatcher already uses for the identical
+     * condition. */
+    *out_error = RCP_ERROR_EP_NOT_FOUND;
+    {
+        rcp_bytes_t zero = {0};
+        return zero;
+    }
+}
+
 /* ── EP_ID_config wire stride (REQ-RMAP-052/054) ───────────────────────────── */
 
 //cfusa:req REQ-RMAP-052
