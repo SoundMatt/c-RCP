@@ -113,6 +113,20 @@ rcp_acf_errc_t rcp_acf_unpack_header(const uint8_t in[8], rcp_acf_byte_message_i
     return RCP_ACF_OK;
 }
 
+//cfusa:req REQ-ACF-032
+bool rcp_acf_peek_gbb_request_type(const uint8_t *frame, size_t frame_len,
+                                    uint8_t *out_request_type)
+{
+    rcp_acf_byte_message_info_t hdr;
+
+    if (frame_len < 9u) return false;
+    if (rcp_acf_unpack_header(frame, &hdr) != RCP_ACF_OK) return false;
+    if (hdr.acf_msg_type != RCP_ACF_MSG_TYPE_GBB) return false;
+
+    *out_request_type = frame[8];
+    return true;
+}
+
 //cfusa:req REQ-ACF-016
 uint8_t rcp_acf_pad_len(size_t unpadded_len)
 {

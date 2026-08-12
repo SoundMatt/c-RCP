@@ -60,29 +60,39 @@ bool rcp_server_endpoint_submit(rcp_server_endpoint_t *ep,
      * universal per-row meaning for that value, §12.7.1) immediately;
      * only an operational request is queued.
      *
-     * Deliberately scoped to ABB (Standard) requests only: Table 33's own
-     * evt[2:0] == 111b meaning is universal across every endpoint type
-     * for a Standard request, but a GBB (Conditional) frame might be a
-     * Compound Wait request, whose own evt[2:0] means something entirely
+     * evt[2:0] == 111b means configuration-write for a Standard (ABB)
+     * request AND for every conditional (GBB) request kind EXCEPT
+     * Compound Wait -- whose own evt[2:0] means something entirely
      * different under §13.5.1 (an 8-way comparison-operator selector, not
      * a configuration-write signal -- see acf.h's rcp_acf_compound_wait_
-     * match()) -- this function has no request-kind decode (that lives in
-     * request_compound.h/_triggered.h/_chained.h/_timed.h, which it has
-     * no connection to), so it cannot safely tell a Compound Wait's own
-     * evt[2:0]=111b apart from any other conditional kind's config-write
-     * use of the same value. Misclassifying the former as a configuration
+     * match()). Misclassifying a Compound Wait request as a configuration
      * request would execute an operational request immediately on a
      * disabled endpoint -- exactly the bug this fix exists to close, not
-     * one to introduce. GBB frames are conservatively left queued, the
-     * same as before this fix, until a caller here can supply the
-     * request-kind information needed to resolve this unambiguously. */
+     * one to introduce -- so a GBB frame's own request_type is peeked
+     * (rcp_acf_peek_gbb_request_type(), REQ-ACF-032, added specifically
+     * to close this gap) and Compound Wait is excluded by name; every
+     * other GBB request_type (Compound, Triggered, Chained, Timed) is
+     * treated the same as an ABB request. A GBB frame whose request_type
+     * cannot be peeked at all (too short, or genuinely not one of the six
+     * currently-defined values) is conservatively queued, the same
+     * fail-safe default this function already applies to a too-short ABB
+     * frame. */
     if (frame_len >= 8) {
         rcp_acf_byte_message_info_t cfg_hdr;
 
         if (rcp_acf_unpack_header(frame, &cfg_hdr) == RCP_ACF_OK &&
-            cfg_hdr.acf_msg_type == RCP_ACF_MSG_TYPE_ABB &&
             (cfg_hdr.evt & 0x07u) == 0x07u) {
-            return true; /* configuration request: caller must execute this now */
+            if (cfg_hdr.acf_msg_type == RCP_ACF_MSG_TYPE_ABB) {
+                return true; /* configuration request: caller must execute this now */
+            }
+            if (cfg_hdr.acf_msg_type == RCP_ACF_MSG_TYPE_GBB) {
+                uint8_t request_type;
+
+                if (rcp_acf_peek_gbb_request_type(frame, frame_len, &request_type) &&
+                    !rcp_request_type_is_compound_wait(request_type)) {
+                    return true; /* configuration request: caller must execute this now */
+                }
+            }
         }
     }
 

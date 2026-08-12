@@ -248,6 +248,38 @@ static void test_unpack_header_reads_full_11_bit_bus_id(void)
     TEST_ASSERT_EQUAL_UINT16(0x321u, out.byte_bus_id);
 }
 
+/* REQ-ACF-032: rcp_acf_peek_gbb_request_type() reads a GBB frame's own
+ * request_type (frame offset 8, the message_timestamp region's own
+ * repurposed leading octet) without decoding into any specific
+ * conditional-request kind's own struct. */
+static void test_peek_gbb_request_type(void)
+{
+    uint8_t                     frame[9] = {0};
+    rcp_acf_byte_message_info_t hdr      = {0};
+    uint8_t                     request_type = 0xFFu;
+
+    /* A genuine GBB frame: request_type lives at the fixed offset 8. */
+    rcp_acf_pack_header(frame, RCP_ACF_MSG_TYPE_GBB, 2u, &hdr);
+    frame[8] = 0x0Fu; /* RCP_REQUEST_TYPE_COMPOUND, request_compound.h */
+    TEST_ASSERT_TRUE(rcp_acf_peek_gbb_request_type(frame, sizeof(frame), &request_type));
+    TEST_ASSERT_EQUAL_HEX8(0x0Fu, request_type);
+
+    /* An ABB frame has no request_type concept at all -- rejected even
+     * though byte 8 exists and is nonzero. */
+    request_type = 0xFFu;
+    rcp_acf_pack_header(frame, RCP_ACF_MSG_TYPE_ABB, 2u, &hdr);
+    frame[8] = 0x0Fu;
+    TEST_ASSERT_FALSE(rcp_acf_peek_gbb_request_type(frame, sizeof(frame), &request_type));
+    TEST_ASSERT_EQUAL_HEX8(0xFFu, request_type); /* left unchanged */
+
+    /* A GBB frame too short to hold byte_message_info(8) + request_type(1)
+     * is rejected, not read out of bounds. */
+    request_type = 0xFFu;
+    rcp_acf_pack_header(frame, RCP_ACF_MSG_TYPE_GBB, 2u, &hdr);
+    TEST_ASSERT_FALSE(rcp_acf_peek_gbb_request_type(frame, 8u, &request_type));
+    TEST_ASSERT_EQUAL_HEX8(0xFFu, request_type);
+}
+
 static void test_pad_len(void)
 {
     TEST_ASSERT_EQUAL_UINT8(0, rcp_acf_pad_len(8));
@@ -1003,6 +1035,7 @@ int main(void)
     RUN_TEST(test_pack_header_bit_positions);
     RUN_TEST(test_unpack_header_is_pack_header_inverse);
     RUN_TEST(test_unpack_header_reads_full_11_bit_bus_id);
+    RUN_TEST(test_peek_gbb_request_type);
     RUN_TEST(test_pad_len);
 
     RUN_TEST(test_op_none_wire_bit_is_write_roundtrip);

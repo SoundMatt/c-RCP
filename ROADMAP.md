@@ -15205,6 +15205,69 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.286.0 -- 2026-08-12 (issue #336 batch: `REQ-ACF-032` shared
+GBB request_type peek + `REQ-SRV-015` GBB half)
+
+**New shared primitive: `rcp_acf_peek_gbb_request_type()`
+(`REQ-ACF-032`, acf.h/acf.c).**
+
+Every conditional-request module (compound/triggered/chained/timed)
+independently repurposes ACF_GBB's own 8-byte message_timestamp
+region (frame offset 8, §11.2.2) identically: octet 0 carries a
+1-byte request_type opcode, common to every conditional kind.
+Nothing in this codebase previously let a caller classify a GBB
+frame's own request kind without already knowing, and calling into,
+one specific conditional-request module's own decoder -- a real,
+recurring gap that had blocked more than one fix needing only to
+classify a GBB frame, not fully decode it. The new function reads
+frame[8] after confirming frame_len >= 9 and acf_msg_type is GBB;
+returns false for an ABB frame or a too-short frame.
+
+**`REQ-SRV-015` flips `partial` -> `implemented`: the GBB half is
+now closed.**
+
+rcp_server_endpoint_submit()'s existing ABB-only evt[2:0]==111b
+fast path now also covers GBB frames using the new primitive:
+Compound Wait is excluded by name via the pre-existing
+rcp_request_type_is_compound_wait() predicate, since its own
+evt[2:0] means an 8-way comparison-operator selector under §13.5.1,
+never a configuration-write signal, even when its bit pattern
+happens to equal 111b. Every other GBB request_type (Compound,
+Triggered, Chained, Timed) is treated the same as an ABB request. A
+GBB frame whose request_type can't be peeked at all is
+conservatively queued, the same fail-safe default already applied
+to a too-short ABB frame. REQ-SRV-016's own cross-reference updated
+to reflect full (not partial) resolution.
+
+Root-caused and closed a memory-flagged "3 items blocked by the
+same conditional-request decode gap" finding: on investigation,
+only REQ-SRV-015's GBB half was actually unblocked by this
+primitive. REQ-PWM-057's phase-shift rule remains blocked by TC18's
+own live, unresolved request_type wire-format collision (0x0F/0x8F
+and 0x0E/0x8E both currently double-assigned in the spec's own
+text) -- not a decode-infrastructure gap, not fixable locally
+without a spec ruling. REQ-ADC-037 was a mis-association: an
+unrelated response-cadence/orchestration gap.
+
+Split the pre-existing gap-pinning tests into two (ABB+GBB-Compound
+executes-immediately; ABB-operational+GBB-Compound-Wait
+still-queues), plus a new direct test of the primitive itself.
+Mutation-tested 3 ways -- all three caught cleanly.
+
+65/65 both trees (native + ASan/UBSan, full suite under both given
+this touches core server.c). `cfusa check`: 0 errors both trees.
+`cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100% --
+though see SoundMatt/c-FuSa#99, a real defect found in `cfusa`
+itself while investigating this batch's own trace output:
+cmd_trace.c's hardcoded MAX_REQS=1024 silently truncates
+.fusa-reqs.json parsing past the 1024th entry (no error emitted),
+so this repo's own catalog (now 1069 entries) has had its tail
+silently unchecked by `cfusa trace` for some time; the "100%"
+figure is against the capped 1024, not the true total. Confirmed
+via direct JSON parsing that every requirement the tool called
+"dangling" genuinely exists in the file. Not a c-RCP catalog defect
+-- filed against the tool, not worked around here.
+
 ### v0.285.0 -- 2026-08-12 (issue #336 batch: `REQ-SRV-015`,
 disabled-endpoint config-request execution for ABB requests)
 
