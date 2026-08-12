@@ -8741,12 +8741,12 @@
     {
       "id": "REQ-PWM-056",
       "title": "PWM_OUT duty-cycle limits cap the requested active time",
-      "text": "NOT IMPLEMENTED: c-RCP stores pwmo_duty_cycle_min (0x000A) and pwmo_duty_cycle_max (0x000C) in rcp_ep_pwm_out_functional_cfg_t but applies neither -- TC18 Table 43 requires a request whose active time falls below the minimum or exceeds the maximum to be CAPPED to that limit (not rejected, and not applied verbatim). rcp_ep_pwm_out_apply_write() computes the new (period, active_duration) pair without consulting either register.",
+      "text": "IMPLEMENTED (2026-08-12, issue #201 Phase 5e): rcp_ep_pwm_out_apply_write() now takes duty_cycle_min/duty_cycle_max parameters (the endpoint's own pwmo_duty_cycle_min/pwmo_duty_cycle_max register values) and clamps the resulting active_duration into [duty_cycle_min, duty_cycle_max] after evt's own write semantics have already been applied, per TC18 Table 43's own wording (\"requests with lower values will be capped to this limit\" / \"requests with higher values will be capped to this limit\") -- capped, not rejected and not applied verbatim. period is unaffected, since Table 43 names only \"PWM active\" (the active-phase duration). Real signature change to a function with real callers: updated every call site (12 in tests/test_ep_pwm.c with no-op [0, 0xFFFF] limits that don't affect their own existing assertions, 5 in tests/test_tc18_gaps_ep.c). Split the pre-existing combined REQ-PWM-055/REQ-PWM-056 gap-pinning test into two -- REQ-PWM-055 (trigger-signal generation from the skew-delayed output, mid-pulse firing at 0% duty) remains a genuine, still-open deviation pin, since it needs a real timing/signal-generation model this protocol-codec library does not have. Mutation-tested 3 ways: bypassing capping entirely (caught), the min-boundary comparison reversed to the wrong direction (caught heavily), and the min-boundary's own < vs <= operator (a provably equivalent mutant -- assigning duty_cycle_min to a value already equal to duty_cycle_min is a no-op, so no test of the output can discriminate the two operators there).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "partial",
+      "status": "implemented",
       "tc18": "\u00a713.7.5.2 Table 43, TC18.txt L4560-4610"
     },
     {

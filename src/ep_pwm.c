@@ -95,14 +95,23 @@ bool rcp_ep_pwm_out_write_semantics_valid(uint8_t v)
 //cfusa:req REQ-PWM-007
 //cfusa:req REQ-PWM-008
 //cfusa:req REQ-PWM-009
+//cfusa:req REQ-PWM-056
 rcp_ep_pwm_value_t rcp_ep_pwm_out_apply_write(rcp_ep_pwm_value_t current,
                                                rcp_ep_pwm_value_t request,
-                                               rcp_ep_pwm_out_write_semantics_t evt)
+                                               rcp_ep_pwm_out_write_semantics_t evt,
+                                               uint16_t duty_cycle_min,
+                                               uint16_t duty_cycle_max)
 {
     rcp_ep_pwm_value_t result;
 
     result.period          = apply_write_field(current.period, request.period, evt);
     result.active_duration = apply_write_field(current.active_duration, request.active_duration, evt);
+
+    /* REQ-PWM-056 (TC18 Table 43): cap, don't reject -- see the header's
+     * own doc comment. */
+    if (result.active_duration < duty_cycle_min) result.active_duration = duty_cycle_min;
+    if (result.active_duration > duty_cycle_max) result.active_duration = duty_cycle_max;
+
     return result;
 }
 

@@ -342,10 +342,31 @@ bool rcp_ep_pwm_out_write_semantics_valid(uint8_t v);
  * at 0xFFFF/0x0000 respectively rather than wrapping or carrying into the
  * other field. RCP_EP_PWM_OUT_WRITE_RESERVED4 returns current unchanged;
  * so, fail-safe, does RCP_EP_PWM_OUT_WRITE_RECONFIG itself, for a caller
- * that violates the "never RECONFIG here" contract. */
+ * that violates the "never RECONFIG here" contract.
+ *
+ * FIXED 2026-08-12 (issue #201, REQ-PWM-056): duty_cycle_min/duty_cycle_max
+ * are the endpoint's own rcp_ep_pwm_out_functional_cfg_t fields of the
+ * same name (TC18 Table 43: "Min/Max value of PWM active in clock cycles,
+ * requests with lower/higher values will be capped to this limit"). The
+ * resulting active_duration -- after evt's own write semantics have
+ * already been applied -- is CAPPED into [duty_cycle_min, duty_cycle_max]
+ * rather than rejected or applied verbatim, per that table's own wording.
+ * period is not affected -- Table 43 names only "PWM active" (the active
+ * phase duration), not the whole period. Applied unconditionally,
+ * including for RCP_EP_PWM_OUT_WRITE_RESERVED4/_RECONFIG's own "current
+ * unchanged" cases: idempotent if current already satisfied the limits,
+ * and self-correcting (rather than silently leaving a now-out-of-range
+ * value in place) if the limits themselves changed since active_duration
+ * was last written. A caller passing duty_cycle_min > duty_cycle_max (an
+ * inverted, malformed configuration this function does not itself
+ * validate) gets duty_cycle_min applied last and so wins -- the same
+ * "later cap always wins" fail-safe behavior a caller relying on either
+ * limit alone would see from a single clamp. */
 rcp_ep_pwm_value_t rcp_ep_pwm_out_apply_write(rcp_ep_pwm_value_t current,
                                                rcp_ep_pwm_value_t request,
-                                               rcp_ep_pwm_out_write_semantics_t evt);
+                                               rcp_ep_pwm_out_write_semantics_t evt,
+                                               uint16_t duty_cycle_min,
+                                               uint16_t duty_cycle_max);
 
 /* ── PWM_OUT: triggers ──────────────────────────────────────────────────────── */
 

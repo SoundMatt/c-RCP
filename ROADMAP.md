@@ -15205,6 +15205,39 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.270.0 -- 2026-08-12 (issue #201 batch: `REQ-PWM-056`,
+PWM_OUT duty-cycle limits now cap the requested active time)
+
+**`rcp_ep_pwm_out_apply_write()` now takes
+`duty_cycle_min`/`duty_cycle_max` and clamps the resulting
+`active_duration` into that range -- status flips to
+`implemented`.**
+
+TC18 Table 43: requests below `duty_cycle_min` or above
+`duty_cycle_max` are capped to that limit, not rejected and not
+applied verbatim. Both registers already existed in
+`rcp_ep_pwm_out_functional_cfg_t` but nothing consulted them. The
+cap is applied after `evt`'s own write semantics have already
+computed the new value. `period` is unaffected.
+
+**Real signature change to a function with real callers**: updated
+every call site -- 12 in `tests/test_ep_pwm.c` (no-op `[0, 0xFFFF]`
+limits) and 5 in `tests/test_tc18_gaps_ep.c`. Split the pre-existing
+combined `REQ-PWM-055`/`REQ-PWM-056` gap-pinning test into two --
+`REQ-PWM-055` (trigger generation from the skew-delayed output)
+remains genuinely deferred, needing a real timing/signal-generation
+model this library doesn't have.
+
+**Mutation-tested 3 ways, including one correctly-identified
+equivalent mutant**: bypassing capping entirely (caught); the
+min-boundary reversed to the wrong direction (caught heavily); the
+min-boundary's own `<` vs `<=` (NOT caught -- confirmed a genuine
+equivalent mutant, same class as `REQ-SPI-036`'s own earlier
+finding this session).
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.269.0 -- 2026-08-12 (issue #201 batch: `REQ-UART-034`, UART
 read_size widened to the ACF header's full 12-bit field)
 
