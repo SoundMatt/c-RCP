@@ -10083,12 +10083,12 @@
     {
       "id": "REQ-ADC-033",
       "title": "ADC inter-sample spacing is one adc_sample_interval, in multiples of adc_base_clk x adc_base_clk_divider",
-      "text": "NOT IMPLEMENTED: c-RCP does not model the ADC sampling cadence TC18 \u00a713.7.9.1 defines. When adc_avg_intervals_per_request x adc_samples_per_avg_interval exceeds 1, successive samples shall be taken one adc_sample_interval apart, where that interval is expressed in multiples of adc_base_clk scaled by adc_base_clk_divider. rcp_ep_adc_functional_cfg_t carries neither adc_sample_interval nor adc_base_clk nor adc_base_clk_divider, and rcp_ep_adc_average_interval() consumes caller-supplied samples whose spacing this module never constrains. Consequence: the temporal geometry of an ADC response (the entire point of the sample_interval/averaging model) is undefined in this implementation.",
+      "text": "PARTIAL (catalogued field claim corrected): TC18 \u00a713.7.9.1 requires that when adc_avg_intervals_per_request x adc_samples_per_avg_interval exceeds 1, successive samples be taken one adc_sample_interval apart, where that interval is expressed in multiples of adc_base_clk scaled by adc_base_clk_divider. The earlier claim that rcp_ep_adc_functional_cfg_t carries neither adc_sample_interval nor adc_base_clk_divider is stale: both exist as real config fields (sample_interval/base_clk_divider), wired to Table 51's own register block since an earlier batch (REQ-ADC-035/036). What remains genuinely unimplemented, and for a documented reason rather than an oversight: adc_base_clk itself is deliberately NOT modelled as a real value (rcp_ep_adc_render_registers() always renders it 0, the same 'no real clock source' honesty ep_gpio.h's/ep_i2c.h's/ep_lin.h's own base_clk fields already commit to) -- so this module has no way to convert adc_sample_interval (a count of ADC_CLK cycles) into actual wall-clock spacing, and rcp_ep_adc_average_interval() still consumes caller-supplied samples without validating their real-time spacing. Enforcing the temporal geometry would mean inventing a clock model this codebase deliberately doesn't have for any endpoint type, not a routine field-wiring fix.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a713.7.9.1, TC18.txt L5036-5039"
     },
     {
