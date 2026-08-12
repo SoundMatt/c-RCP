@@ -15205,6 +15205,47 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.277.0 -- 2026-08-12 (c-RCP-AUDIT-10 doc-only batch: `Table
+19`/`Table 21` disambiguated -- HW_config vs. signal-enumeration,
+issue #341)
+
+**Documentation-only correction, no functional code change.**
+Genuinely intricate slice of issue #341: §12.7.6 ("HW pin mapping
+configuration") contains three consecutive RC1 tables -- 19
+(HW_config), 20 (IO-pin properties), 21 (Enumeration of signals) --
+that all shift +2 to RC5 21/22/23. `regmap.h` used the raw number 19
+for HW_config in 5 spots and the raw number 21 for signal-enumeration
+content in 9 spots, **while simultaneously already using the correct
+RC5 number 21 for HW_config in 5 other spots** -- `Table 21` alone
+was ambiguous between two different real tables, sometimes within
+the same comment block.
+
+Resolved by individual content verification, not number
+pattern-matching: every citation read and classified as HW_config
+(svr_hw_cfg_ptr, hw_ep_nr/hw_ep_pin_nr/hw_pin_type, pin-mapping
+addressing) or signal-enumeration (EP_Signal_Nr,
+`RCP_REGMAP_SIGNAL_*` names/order) before touching it. `Table 19` ->
+`Table 21` (5 in `regmap.h`, 5 in `.fusa-reqs.json` -- one required
+repairing a redundant `Table 21/21` this batch's own intermediate
+step briefly introduced, caught by the standing `json.load()`
+validation step and fixed before commit). `Table 21` -> `Table 23`
+(9 in `regmap.h`, 4 in `.fusa-reqs.json`), leaving the 12
+already-correct `Table 21` HW_config citations untouched.
+
+**Self-caught methodology bug, again**: the same BSD `sed`-vs-`\b`
+incompatibility from earlier in this citation-drift lineage silently
+no-opped the first `Table 19`->`21` attempt on `regmap.h` -- caught
+immediately by re-grepping for the target string post-edit rather
+than trusting the command's own silent success.
+
+Deliberately still open, tracked in issue #341: the `hw_pin_type`
+citation (`config.c`/`regmap.h`) says "§12.7.6 Table 20" -- wrong
+under both RC1 and RC5 numbering, needs its own dedicated
+investigation, not a shift.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 errors.
+`cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.276.0 -- 2026-08-12 (c-RCP-AUDIT-09 doc-only fix: 11
 line-wrapped table citations missed by PRs #342/#343)
 

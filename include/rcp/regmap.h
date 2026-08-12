@@ -506,7 +506,7 @@ typedef struct {
                                    number of assignable I/O pins --
                                    §12.7.6's own authoritative source for
                                    how many IO-pin entries the HW_config
-                                   table (Table 19) contains. Nothing in
+                                   table (Table 21) contains. Nothing in
                                    this codebase currently allocates or
                                    bounds a real HW_config table against
                                    this count (that is Group 2's own
@@ -1445,7 +1445,7 @@ void rcp_regmap_ep_functional_cfg_init(rcp_regmap_ep_functional_cfg_t *cfg);
 typedef struct {
     uint8_t hw_ep_nr;
     uint8_t hw_ep_pin_nr;
-    uint8_t hw_pin_type; /* TC18's own register name (Table 19); RCP_
+    uint8_t hw_pin_type; /* TC18's own register name (Table 21); RCP_
                              REGMAP_HW_PIN_* bitmask above, REQ-RMAP-042.
                              Renamed from this field's earlier name,
                              pin_property, to match the wire register
@@ -1462,7 +1462,7 @@ typedef struct {
  * remaining Group 2 items: no server-side STORAGE existed anywhere for a
  * real table of these rows (rcp_config_apply_to_mock() deliberately
  * discarded the parsed manifest data, per its own prior doc comment), and
- * no function serialized a real table into TC18 §12.7.6 Table 19's own
+ * no function serialized a real table into TC18 §12.7.6 Table 21's own
  * 3-octets-per-pin layout (IO_Pin N at relative address 3*N/3*N+1/3*N+2).
  *
  * RESOLVED 2026-08-11 (issue #301, user-directed re-investigation):
@@ -1560,14 +1560,14 @@ rcp_regmap_hw_pin_map_apply_reconfig(rcp_regmap_hw_pin_map_entry_t *entries, siz
 /* The full named-signal index shared by every endpoint type, written once
  * here and reused unmodified by every endpoint type added later (see the
  * file header). This is one flat enumeration for human-readable naming
- * (rcp_regmap_named_signal_string()) -- TC18 §12.7.6 Table 21's own
+ * (rcp_regmap_named_signal_string()) -- TC18 §12.7.6 Table 23's own
  * EP_Signal_Nr wire value is NOT this enum's own ordinal; it restarts at
  * 0 for every endpoint type (REQ-RMAP-045). rcp_regmap_named_signal_
  * ep_signal_nr() below is the converter between the two: this enum's
  * flat ordinal (for naming/identity) and TC18's own per-type-relative
- * wire value (for hw_ep_pin_nr, TC18 §12.7.6 Table 19). Values are
+ * wire value (for hw_ep_pin_nr, TC18 §12.7.6 Table 21). Values are
  * grouped by endpoint type, in the same order and per-type numbering
- * Table 21 itself uses, so that converter can compute an offset from
+ * Table 23 itself uses, so that converter can compute an offset from
  * each group's own first member rather than needing a second, parallel
  * lookup table. */
 typedef enum {
@@ -1614,10 +1614,10 @@ typedef enum {
     RCP_REGMAP_SIGNAL_SPI_CS5,
     RCP_REGMAP_SIGNAL_I2C_SCL,
     RCP_REGMAP_SIGNAL_I2C_SDA,
-    /* REQ-RMAP-044: TC18 §12.7.6 Table 21 enumerates EP_Signal_Nr for
+    /* REQ-RMAP-044: TC18 §12.7.6 Table 23 enumerates EP_Signal_Nr for
      * every endpoint type this codebase implements, not just GPIO/SPI/
      * I2C -- the eight groups below close that coverage gap, each in
-     * Table 21's own signal order. */
+     * Table 23's own signal order. */
     RCP_REGMAP_SIGNAL_UART_TX,
     RCP_REGMAP_SIGNAL_UART_RX,
     RCP_REGMAP_SIGNAL_UART_RTS,
@@ -1625,18 +1625,18 @@ typedef enum {
     RCP_REGMAP_SIGNAL_LIN_TXD,
     RCP_REGMAP_SIGNAL_LIN_RXD,
     RCP_REGMAP_SIGNAL_LIN_NSLP,
-    RCP_REGMAP_SIGNAL_PWM_OUT,  /* positive phase -- Table 21's own name */
-    RCP_REGMAP_SIGNAL_PWM_OUTN, /* inverted phase -- Table 21's own name */
+    RCP_REGMAP_SIGNAL_PWM_OUT,  /* positive phase -- Table 23's own name */
+    RCP_REGMAP_SIGNAL_PWM_OUTN, /* inverted phase -- Table 23's own name */
     RCP_REGMAP_SIGNAL_PWM_IN,
     RCP_REGMAP_SIGNAL_ADC_IN,
     RCP_REGMAP_SIGNAL_DAC_OUT,
     RCP_REGMAP_SIGNAL_CAN_RXD,
     RCP_REGMAP_SIGNAL_CAN_TXD, /* TC18's own counter-intuitive order:
-                                   RXD=0, TXD=1 (Table 21) */
+                                   RXD=0, TXD=1 (Table 23) */
     RCP_REGMAP_SIGNAL_ISELED_ISP_P,
     RCP_REGMAP_SIGNAL_ISELED_ISP_N,
     RCP_REGMAP_SIGNAL_MDIO_MDC,
-    RCP_REGMAP_SIGNAL_MDIO_DATA, /* Table 21 names this signal "MDIO"
+    RCP_REGMAP_SIGNAL_MDIO_DATA, /* Table 23 names this signal "MDIO"
                                      itself, identical to the endpoint
                                      type name -- disambiguated here to
                                      _DATA to avoid an enum-identifier
@@ -1651,8 +1651,8 @@ typedef enum {
 const char *rcp_regmap_named_signal_string(rcp_regmap_named_signal_t sig);
 
 /* REQ-RMAP-045: converts sig's own flat enum ordinal into TC18 §12.7.6
- * Table 21's per-endpoint-type EP_Signal_Nr wire value -- the value
- * hw_ep_pin_nr (Table 19) actually carries, which restarts at 0 for
+ * Table 23's per-endpoint-type EP_Signal_Nr wire value -- the value
+ * hw_ep_pin_nr (Table 21) actually carries, which restarts at 0 for
  * every endpoint type rather than continuing this enum's own flat
  * numbering. Returns 0 for RCP_REGMAP_SIGNAL_COUNT or any other value
  * outside 0..RCP_REGMAP_SIGNAL_COUNT-1 (there is no meaningful
