@@ -9191,7 +9191,7 @@
     {
       "id": "REQ-RMAP-047",
       "title": "Request-stream config carries a per-stream secure-channel index selecting the MACsec channel",
-      "text": "PARTIAL: rcp_regmap_request_stream_cfg_t now carries rx_secure_channel_index (TC18 \u00a712.7.7 Table 22, relative address 0x000C, 8 bit, R/W*), zero-initialized to TC18's own defined \"no cyber security, MACsec uncontrolled port\" default. This is content modeling only: no ACF_ABB wire wrapper reaches this field yet (the same deferred-dispatch gap already tracked for HW_config/EP_ID_config/response-queue -- see regmap.h's own file-header note), and this library has no MACsec layer of its own that would act on a selected channel.",
+      "text": "PARTIAL: rcp_regmap_request_stream_cfg_t now carries rx_secure_channel_index (TC18 \u00a712.7.7 Table 22, relative address 0x000C, 8 bit, R/W*), zero-initialized to TC18's own defined \"no cyber security, MACsec uncontrolled port\" default. WIRE DISPATCH CLOSED 2026-08-11 (issue #306, same finding as issue #301's own HW_config/EP_ID_config/response-queue-config): request-stream-cfg is a fourth pointed-to table sharing that same absolute-address finding -- svr_request_stream_cfg_ptr's own value is an absolute address in the same EP0-scoped space Table 18 itself lives in. New rcp_regmap_request_stream_cfg_render()/_apply_reconfig() (regmap.h/regmap.c) give this table its own wire codec (24-octet-per-row stride, confirmed via direct read of both the RC1 PDF pages 57-58 and the current RC5 PDF page 66); rcp_regmap_ep0_decode_write_request()/_encode_read_response() now route to it the identical way as the other three tables. A client can now write AND read rx_secure_channel_index over the wire. STILL PARTIAL: this library has no MACsec layer of its own that would act on a selected channel, and the write dispatcher does not itself consult rcp_lifecycle_field_writable() for this table's own R/W* access type (deferred to whatever caller eventually owns lifecycle-state context, matching REQ-RMAP-040/041's own established precedent).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
@@ -9202,7 +9202,7 @@
     {
       "id": "REQ-RMAP-048",
       "title": "request stream's acknowledge-stream pointer (rx_ack_stream_index)",
-      "text": "PARTIAL: rcp_regmap_request_stream_cfg_t now carries rx_ack_stream_index (TC18 \u00a712.7.7 Table 22, relative address 0x0010, 8 bit, R/W*), the index of the stream on which endpoints bound to this request stream shall send their acknowledges, zero-initialized to TC18's own defined \"no acknowledge is to be sent\" default. Content modeling only: no code path yet routes an acknowledgement to a selected response queue from this field (same deferred-dispatch gap as REQ-RMAP-047).",
+      "text": "PARTIAL: rcp_regmap_request_stream_cfg_t now carries rx_ack_stream_index (TC18 \u00a712.7.7 Table 22, relative address 0x0010, 8 bit, R/W*), the index of the stream on which endpoints bound to this request stream shall send their acknowledges, zero-initialized to TC18's own defined \"no acknowledge is to be sent\" default. WIRE DISPATCH CLOSED 2026-08-11 (issue #306): see REQ-RMAP-047's own text -- the identical wire codec now serves this field too; a client can now write AND read rx_ack_stream_index over the wire. STILL PARTIAL: no code path yet routes an acknowledgement to a selected response queue from this field -- a genuinely separate, still-open gap about runtime behavior consuming the field, not about wire reachability.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
@@ -9213,7 +9213,7 @@
     {
       "id": "REQ-RMAP-049",
       "title": "request stream's response-stream pointer and its discovery-enabling default of 1 (rx_resp_stream_index)",
-      "text": "PARTIAL: rcp_regmap_request_stream_cfg_t now carries rx_resp_stream_index (TC18 \u00a712.7.7 Table 22, relative address 0x0011, 8 bit, R/W*), the index of the stream on which endpoints bound to this request stream shall send their responses, with 0 meaning \"no response is to be sent\". FIXED: rcp_regmap_request_stream_cfg_init() now sets this one field to 1 (not 0), reproducing the specification's own bootstrap guarantee that a freshly reset server can answer a discovery request before any configuration has been written -- REQ-RMAP-018's own text was corrected to carve out this deliberate exception to its \"zero everything\" rule. STILL PARTIAL: rcp_lifecycle_check_rcp_cfg() still only checks a boolean has_response_stream (src/lifecycle.c:59), which records that some response stream exists but not which one, and no code path yet routes a response to the selected stream from this field (same deferred-dispatch gap as REQ-RMAP-047/048).",
+      "text": "PARTIAL: rcp_regmap_request_stream_cfg_t now carries rx_resp_stream_index (TC18 \u00a712.7.7 Table 22, relative address 0x0011, 8 bit, R/W*), the index of the stream on which endpoints bound to this request stream shall send their responses, with 0 meaning \"no response is to be sent\". FIXED: rcp_regmap_request_stream_cfg_init() now sets this one field to 1 (not 0), reproducing the specification's own bootstrap guarantee that a freshly reset server can answer a discovery request before any configuration has been written -- REQ-RMAP-018's own text was corrected to carve out this deliberate exception to its \"zero everything\" rule. WIRE DISPATCH CLOSED 2026-08-11 (issue #306): see REQ-RMAP-047's own text -- the identical wire codec now serves this field too; a client can now write AND read rx_resp_stream_index over the wire. STILL PARTIAL: rcp_lifecycle_check_rcp_cfg() still only checks a boolean has_response_stream (src/lifecycle.c:59), which records that some response stream exists but not which one, and no code path yet routes a response to the selected stream from this field -- a genuinely separate, still-open gap about runtime behavior consuming the field, not about wire reachability.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
@@ -9445,6 +9445,17 @@
       "scope": "tc18",
       "status": "implemented",
       "tc18": "\u00a712.3.1.2, TC18.txt L2184 (same basis as REQ-RMAP-009 -- this entry covers the writer_ctx construction contract as a whole, not a new TC18 clause)"
+    },
+    {
+      "id": "REQ-RMAP-071",
+      "title": "rcp_regmap_request_stream_cfg_t carries rx_ovrflw_safestate_enable, closing a gap this file's own terminology-drift note had already named but never added",
+      "text": "PARTIAL: rcp_regmap_request_stream_cfg_t shall carry rx_ovrflw_safestate_enable (TC18 \u00a712.7.7 Table 22, relative address 0x000D bit 5, 1 bit, R/W*): true drives every endpoint bound to this stream toward its configured safe state if one endpoint's own request storage overflows. Found 2026-08-11 while implementing issue #306's own request-stream-cfg wire codec: regmap.h's own \"TC18 0.5.1_RC5 terminology drift\" section (added earlier, task #97) already NAMED rx_ovrflw_safestate_enable as one of this codebase's own eight independent 0x000D bits, but the struct itself never actually had the field -- a genuine, previously-unflagged content-modeling gap. rcp_e2e_overflow_should_enter_safe_state() (e2e.h/e2e.c, REQ-E2E-030) already existed as the pure decision function this field is the register-map source for, with no struct field to source it from until now. FIXED: the field is added, zero-initialized to false (matching TC18's own implied \"not blocked upon EP overflow\" default and every sibling boolean field's own zero-init convention), and is now part of rcp_regmap_request_stream_cfg_render()/_apply_reconfig()'s own wire codec (issue #306) at the same bit position. REQ-E2E-030's own separate, still-open cross-endpoint-orchestrator gap (bringing every OTHER endpoint on the stream into safe state, which rcp_server_endpoint_t's single-endpoint scope cannot perform) is unaffected by adding this field -- this entry closes the content-modeling/wire-reachability half only, not that orchestration gap.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "tc18-gap",
+      "status": "partial",
+      "tc18": "\u00a712.7.7 Table 22, TC18.txt L2880-L2882 (same citation as REQ-E2E-030's own -- this entry covers the register-map content-modeling half, REQ-E2E-030 covers the runtime-decision half)"
     },
     {
       "id": "REQ-SEQ-012",

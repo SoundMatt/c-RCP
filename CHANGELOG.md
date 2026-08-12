@@ -34,6 +34,26 @@ the rationale.
 
 ## Releases
 
+### v0.248.0 -- 2026-08-11 (issue #306: request-stream-cfg, a fourth pointed-to table with the same finding, closed)
+
+**REQ-RMAP-047/048/049 (request-stream-cfg) gain a full bidirectional wire codec, the same as issue #301's own three tables. A fourth pointed-to table, found while reviewing the RMAP requirement set's own remaining 25 `partial` entries, closed with the identical rigor.**
+
+Direct primary-source verification of TC18 §12.7.7 Table 22 on both spec revisions (RC1 PDF pages 57-58; RC5 PDF page 66, renumbered "Table 24" due to RC5's own added SPI content — same table, addresses/widths identical across both revisions) confirms a 24-octet-per-request-stream wire stride. New `rcp_regmap_request_stream_cfg_render()`/`_apply_reconfig()` (regmap.h/regmap.c) give this table its own wire codec; `rcp_regmap_ep0_decode_write_request()`/`_encode_read_response()` gain a fifth/fourth routing block respectively, targeting `svr_request_stream_cfg_ptr`'s own extent.
+
+**Three fields deliberately excluded from the wire codec, each with its own documented reasoning**: `rx_wd_action` (confirmed via direct page-image read of Table 22 on both revisions — no corresponding register exists anywhere in TC18); `configured` (a codebase-internal bookkeeping flag, not a TC18 concept); `rx_wd_timeout_ms` (its own existing `rcp_regmap_wd_timeout_ms_to_ticks()`/`_ticks_to_ms()` conversion, REQ-RMAP-050, needs a caller-supplied `ms_per_tick` this table's render/apply_reconfig signature has no natural place for, and unlike the width mismatches below, a conversion failure here is safety-relevant — left as its own deliberate follow-up).
+
+**Two more content/wire width mismatches, both resolved via the established saturating precedent** (`flush_time_us`, issue #301 batch 3): `rx_stream_max_request_size` (`size_t` vs. 16-bit register) and `rx_safestate_sequencer` (`uint16_t` vs. 8-bit register) both saturate rather than wrap — wraparound would silently alias onto another valid, meaningfully-different value (0 meaning "no fragmentation supported"; some other actually-existing sequencer index for a safety-relevant field).
+
+**The 8 independently-configurable bits at relative address 0x000D** are serialized using this codebase's own existing RC1-baseline 8-independent-bit content model, not RC5's later 4-combined-bit restructuring — already investigated and deliberately not restructured (task #97): this codebase's own richer model is a strict, lossless superset of RC5's collapsed encoding.
+
+**A real, previously-unflagged content-modeling gap found and fixed along the way (REQ-RMAP-071)**: `rcp_regmap_request_stream_cfg_t` was missing `rx_ovrflw_safestate_enable` entirely — `regmap.h`'s own terminology-drift section (task #97) had already NAMED it as one of this codebase's own eight bits, and `rcp_e2e_overflow_should_enter_safe_state()` (e2e.h, REQ-E2E-030) already existed ready to consume it, but the struct itself never got the field. Added, zero-initialized to false, now part of the new wire codec.
+
+New tests: `test_request_stream_cfg_apply_reconfig_patches_addressed_octets_only`, `test_request_stream_cfg_apply_reconfig_rejects_out_of_range_leaving_table_untouched`, `test_request_stream_cfg_render_saturates_oversized_max_request_size_without_wrapping`, `test_request_stream_cfg_render_saturates_oversized_safestate_sequencer_without_wrapping`, `test_request_stream_cfg_render_packs_all_eight_bits_at_0x000d`, `test_request_stream_cfg_render_leaves_rx_wd_timeout_and_reserved_octets_zero`, and both dispatcher tests extended with a 5th/4th table's own apply+boundary cases.
+
+Mutation-tested six ways (both saturation clamps, the packed-bit encode, the apply_reconfig bounds check, and both dispatcher routing conditions); all six caught cleanly. **A real ASan stack-buffer-overflow was also caught and fixed during this batch** — a test's own comparison buffer was sized for one row's worth of `rcp_regmap_request_stream_cfg_render()` output but called with `count=2`; fixed by sizing the buffer to match, not by weakening the assertion.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.247.0 -- 2026-08-11 (issue #301 batch 4: EP0 dispatcher READ side, batch 1-4 all closed)
 
 **REQ-RMAP-040/041 (HW_config), REQ-RMAP-052/054 (EP_ID_config), and REQ-RMAP-061 (response-queue-config) all gain their READ side, closing the last shared gap issue #301's own finding left open. All four batches of issue #301 are now complete.**

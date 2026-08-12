@@ -78,6 +78,28 @@ static uint32_t get_u32(const uint8_t *p)
            ((uint32_t)p[2] << 8)  |  (uint32_t)p[3];
 }
 
+/* Added for request-stream-cfg's own rx_stream_id (64 bit, issue #306) --
+ * no prior table in this TU needed a field this wide. */
+static void put_u64(uint8_t *p, uint64_t v)
+{
+    p[0] = (uint8_t)((v >> 56) & 0xFFu);
+    p[1] = (uint8_t)((v >> 48) & 0xFFu);
+    p[2] = (uint8_t)((v >> 40) & 0xFFu);
+    p[3] = (uint8_t)((v >> 32) & 0xFFu);
+    p[4] = (uint8_t)((v >> 24) & 0xFFu);
+    p[5] = (uint8_t)((v >> 16) & 0xFFu);
+    p[6] = (uint8_t)((v >> 8)  & 0xFFu);
+    p[7] = (uint8_t)(v & 0xFFu);
+}
+
+static uint64_t get_u64(const uint8_t *p)
+{
+    return ((uint64_t)p[0] << 56) | ((uint64_t)p[1] << 48) |
+           ((uint64_t)p[2] << 40) | ((uint64_t)p[3] << 32) |
+           ((uint64_t)p[4] << 24) | ((uint64_t)p[5] << 16) |
+           ((uint64_t)p[6] << 8)  |  (uint64_t)p[7];
+}
+
 //cfusa:req REQ-RMAP-024
 void rcp_regmap_general_render(const rcp_regmap_general_t *map, uint8_t out[RCP_REGMAP_GENERAL_LEN])
 {
@@ -339,6 +361,10 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e)
 
 //cfusa:req REQ-RMAP-040
 //cfusa:req REQ-RMAP-041
+//cfusa:req REQ-RMAP-047
+//cfusa:req REQ-RMAP-048
+//cfusa:req REQ-RMAP-049
+//cfusa:req REQ-RMAP-071
 //cfusa:req REQ-RMAP-052
 //cfusa:req REQ-RMAP-054
 //cfusa:req REQ-RMAP-061
@@ -351,6 +377,8 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      size_t ep_id_map_count,
                                      rcp_regmap_response_queue_cfg_t *response_queue_cfg,
                                      size_t response_queue_cfg_count,
+                                     rcp_regmap_request_stream_cfg_t *request_stream_cfg,
+                                     size_t request_stream_cfg_count,
                                      rcp_wire_error_t *out_error,
                                      uint8_t *out_transaction_num)
 {
@@ -364,6 +392,7 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
     size_t                       hw_cfg_len;
     size_t                       ep_id_map_len;
     size_t                       response_queue_cfg_len;
+    size_t                       request_stream_cfg_len;
 
     acf_rc = rcp_acf_decode_abb(b, len, &hdr, &payload, &payload_len);
     if (acf_rc == RCP_ACF_ERR_SHORT_FRAME) return RCP_REGMAP_EP0_ERR_SHORT_FRAME;
@@ -426,9 +455,22 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
         return RCP_REGMAP_EP0_OK;
     }
 
+    request_stream_cfg_len = request_stream_cfg_count * 24u;
+    if ((size_t)addr >= map->svr_request_stream_cfg_ptr &&
+        (size_t)addr < (size_t)map->svr_request_stream_cfg_ptr + request_stream_cfg_len) {
+        uint16_t relative = (uint16_t)((size_t)addr - map->svr_request_stream_cfg_ptr);
+        rcp_regmap_request_stream_cfg_reconfig_errc_t rc;
+
+        rc = rcp_regmap_request_stream_cfg_apply_reconfig(request_stream_cfg, request_stream_cfg_count,
+                                                             relative, &payload[2], data_len);
+        *out_error = (rc == RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_OK) ? RCP_ERROR_NONE
+                                                                        : RCP_ERROR_INVALID_PARAMETER;
+        return RCP_REGMAP_EP0_OK;
+    }
+
     /* Neither Table 18's own extent nor any known pointed-to table --
      * see this function's own header doc comment for which tables this
-     * milestone routes (issue #301). */
+     * milestone routes (issue #301, issue #306). */
     *out_error = RCP_ERROR_EP_NOT_FOUND;
     return RCP_REGMAP_EP0_OK;
 }
@@ -497,6 +539,10 @@ static rcp_bytes_t ep0_read_response_from_slice(const uint8_t *table_image, size
 
 //cfusa:req REQ-RMAP-040
 //cfusa:req REQ-RMAP-041
+//cfusa:req REQ-RMAP-047
+//cfusa:req REQ-RMAP-048
+//cfusa:req REQ-RMAP-049
+//cfusa:req REQ-RMAP-071
 //cfusa:req REQ-RMAP-052
 //cfusa:req REQ-RMAP-054
 //cfusa:req REQ-RMAP-061
@@ -510,11 +556,14 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      size_t ep_id_map_count,
                                      const rcp_regmap_response_queue_cfg_t *response_queue_cfg,
                                      size_t response_queue_cfg_count,
+                                     const rcp_regmap_request_stream_cfg_t *request_stream_cfg,
+                                     size_t request_stream_cfg_count,
                                      rcp_wire_error_t *out_error)
 {
     size_t hw_cfg_len;
     size_t ep_id_map_len;
     size_t response_queue_cfg_len;
+    size_t request_stream_cfg_len;
 
     if ((size_t)addr < RCP_REGMAP_GENERAL_LEN) {
         uint8_t image[RCP_REGMAP_GENERAL_LEN];
@@ -558,6 +607,18 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
         *out_error = RCP_ERROR_NONE;
         return ep0_read_response_from_slice(image, response_queue_cfg_len,
                                              (size_t)addr - map->svr_response_stream_cfg_ptr,
+                                             read_size, transaction_num);
+    }
+
+    request_stream_cfg_len = request_stream_cfg_count * 24u;
+    if ((size_t)addr >= map->svr_request_stream_cfg_ptr &&
+        (size_t)addr < (size_t)map->svr_request_stream_cfg_ptr + request_stream_cfg_len) {
+        uint8_t image[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES * 24u];
+
+        rcp_regmap_request_stream_cfg_render(request_stream_cfg, request_stream_cfg_count, image);
+        *out_error = RCP_ERROR_NONE;
+        return ep0_read_response_from_slice(image, request_stream_cfg_len,
+                                             (size_t)addr - map->svr_request_stream_cfg_ptr,
                                              read_size, transaction_num);
     }
 
@@ -959,6 +1020,149 @@ bool rcp_regmap_wd_timeout_ticks_to_ms(uint16_t ticks,
 
     *out_timeout_ms = (uint32_t)product;
     return true;
+}
+
+/* ── request-stream-cfg wire codec (issue #306, REQ-RMAP-047/048/049) ──────
+ * See this function's own doc comment (regmap.h) for the full field-by-
+ * field mapping and the three deliberately-excluded fields' own reasoning. */
+
+//cfusa:req REQ-RMAP-047
+//cfusa:req REQ-RMAP-048
+//cfusa:req REQ-RMAP-049
+//cfusa:req REQ-RMAP-071
+void rcp_regmap_request_stream_cfg_render(const rcp_regmap_request_stream_cfg_t *entries,
+                                           size_t count, uint8_t *out)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        const rcp_regmap_request_stream_cfg_t *e = &entries[i];
+        uint8_t                                bits_0x000d;
+        uint16_t                               max_request_size_wire;
+        uint8_t                                safestate_sequencer_wire;
+
+        put_u64(&out[24u * i + 0x0000u], e->rx_stream_id);
+
+        max_request_size_wire = (e->rx_stream_max_request_size > 0xFFFFu)
+                                     ? (uint16_t)0xFFFFu
+                                     : (uint16_t)e->rx_stream_max_request_size; /* saturate --
+                                                                                    see this
+                                                                                    function's
+                                                                                    own doc
+                                                                                    comment
+                                                                                    (regmap.h) */
+        put_u16(&out[24u * i + 0x0008u], max_request_size_wire);
+
+        out[24u * i + 0x000Au] = 0x00u; /* rx_wd_timeout_ms reserved, not wire-mapped this batch --
+                                            see this function's own doc comment (regmap.h) */
+        out[24u * i + 0x000Bu] = 0x00u;
+
+        out[24u * i + 0x000Cu] = e->rx_secure_channel_index;
+
+        bits_0x000d  = (uint8_t)(e->rx_enforce_e2e            ? 0x01u : 0x00u);
+        bits_0x000d |= (uint8_t)(e->rx_enforce_seq             ? 0x02u : 0x00u);
+        bits_0x000d |= (uint8_t)(e->rx_seq_safestate_enable    ? 0x04u : 0x00u);
+        bits_0x000d |= (uint8_t)(e->rx_wd_enable               ? 0x08u : 0x00u);
+        bits_0x000d |= (uint8_t)(e->rx_wd_safestate_enable     ? 0x10u : 0x00u);
+        bits_0x000d |= (uint8_t)(e->rx_ovrflw_safestate_enable ? 0x20u : 0x00u);
+        bits_0x000d |= (uint8_t)(e->rx_safety_measure          ? 0x40u : 0x00u);
+        bits_0x000d |= (uint8_t)(e->rx_wd_info_enable          ? 0x80u : 0x00u);
+        out[24u * i + 0x000Du] = bits_0x000d;
+
+        safestate_sequencer_wire = (e->rx_safestate_sequencer > 0xFFu)
+                                        ? (uint8_t)0xFFu
+                                        : (uint8_t)e->rx_safestate_sequencer; /* saturate --
+                                                                                  see this
+                                                                                  function's
+                                                                                  own doc
+                                                                                  comment
+                                                                                  (regmap.h) */
+        out[24u * i + 0x000Eu] = safestate_sequencer_wire;
+
+        out[24u * i + 0x000Fu] = e->rx_safe_sequencer_state;
+        out[24u * i + 0x0010u] = e->rx_ack_stream_index;
+        out[24u * i + 0x0011u] = e->rx_resp_stream_index;
+
+        out[24u * i + 0x0012u] = 0x00u; /* reserved (16 bit) */
+        out[24u * i + 0x0013u] = 0x00u;
+        out[24u * i + 0x0014u] = 0x00u; /* reserved (32 bit) */
+        out[24u * i + 0x0015u] = 0x00u;
+        out[24u * i + 0x0016u] = 0x00u;
+        out[24u * i + 0x0017u] = 0x00u;
+    }
+}
+
+//cfusa:req REQ-RMAP-047
+//cfusa:req REQ-RMAP-048
+//cfusa:req REQ-RMAP-049
+//cfusa:req REQ-RMAP-071
+const char *
+rcp_regmap_request_stream_cfg_reconfig_strerror(rcp_regmap_request_stream_cfg_reconfig_errc_t e)
+{
+    switch (e) {
+    case RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_OK:
+        return "rcp/regmap: request-stream-cfg write applied";
+    case RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_ERR_SHORT:
+        return "rcp/regmap: request-stream-cfg write has no data";
+    case RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_ERR_OUT_OF_RANGE:
+        return "rcp/regmap: request-stream-cfg write extends past the table's own current extent";
+    default:
+        return "rcp/regmap: request-stream-cfg unknown configuration-write error";
+    }
+}
+
+//cfusa:req REQ-RMAP-047
+//cfusa:req REQ-RMAP-048
+//cfusa:req REQ-RMAP-049
+//cfusa:req REQ-RMAP-071
+rcp_regmap_request_stream_cfg_reconfig_errc_t
+rcp_regmap_request_stream_cfg_apply_reconfig(rcp_regmap_request_stream_cfg_t *entries,
+                                              size_t count,
+                                              uint16_t relative_start_address,
+                                              const uint8_t *data, size_t data_len)
+{
+    uint8_t block[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES * 24u];
+    size_t  block_len = count * 24u;
+    size_t  i;
+
+    if (data_len == 0u) return RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_ERR_SHORT;
+
+    if ((size_t)relative_start_address + data_len > block_len) {
+        return RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_ERR_OUT_OF_RANGE;
+    }
+
+    /* Same "render current image, patch the addressed octets, re-parse
+     * the whole image back" idiom every other pointed-to table's own
+     * apply_reconfig() already uses. */
+    rcp_regmap_request_stream_cfg_render(entries, count, block);
+    for (i = 0; i < data_len; i++) {
+        block[relative_start_address + i] = data[i]; /* every octet R/W*, none read-only */
+    }
+    for (i = 0; i < count; i++) {
+        uint8_t bits_0x000d = block[24u * i + 0x000Du];
+
+        entries[i].rx_stream_id               = get_u64(&block[24u * i + 0x0000u]);
+        entries[i].rx_stream_max_request_size = (size_t)get_u16(&block[24u * i + 0x0008u]);
+        /* 24*i + 0x000A/0x000B (rx_wd_timeout_ms) deliberately not re-derived --
+           see this function's own doc comment (regmap.h) */
+        entries[i].rx_secure_channel_index    = block[24u * i + 0x000Cu];
+
+        entries[i].rx_enforce_e2e             = (bits_0x000d & 0x01u) != 0u;
+        entries[i].rx_enforce_seq             = (bits_0x000d & 0x02u) != 0u;
+        entries[i].rx_seq_safestate_enable    = (bits_0x000d & 0x04u) != 0u;
+        entries[i].rx_wd_enable               = (bits_0x000d & 0x08u) != 0u;
+        entries[i].rx_wd_safestate_enable     = (bits_0x000d & 0x10u) != 0u;
+        entries[i].rx_ovrflw_safestate_enable = (bits_0x000d & 0x20u) != 0u;
+        entries[i].rx_safety_measure          = (uint8_t)((bits_0x000d & 0x40u) != 0u);
+        entries[i].rx_wd_info_enable          = (bits_0x000d & 0x80u) != 0u;
+
+        entries[i].rx_safestate_sequencer     = (uint16_t)block[24u * i + 0x000Eu];
+        entries[i].rx_safe_sequencer_state    = block[24u * i + 0x000Fu];
+        entries[i].rx_ack_stream_index        = block[24u * i + 0x0010u];
+        entries[i].rx_resp_stream_index       = block[24u * i + 0x0011u];
+    }
+
+    return RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_OK;
 }
 
 //cfusa:req REQ-RMAP-060

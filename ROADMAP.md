@@ -15149,3 +15149,58 @@ own already-established wire codec. Remaining gaps in each affected
 requirement are now narrowed to lifecycle-state write authorization
 alone -- no addressing or wire-format ambiguity remains anywhere in
 this lineage.
+
+### v0.248.0 -- 2026-08-11 (issue #306: request-stream-cfg, a fourth
+pointed-to table with the same finding, closed)
+
+**REQ-RMAP-047/048/049 (request-stream-cfg) gain a full bidirectional
+wire codec, the same as issue #301's own three tables.** Found while
+reviewing the RMAP requirement set's own remaining 25 `partial`
+entries: a fourth pointed-to table, never brought into issue #301's
+own scope.
+
+Direct primary-source verification of TC18 §12.7.7 Table 22 on both
+spec revisions (RC1 PDF pages 57-58; RC5 PDF page 66, renumbered
+"Table 24" due to RC5's own added SPI content -- same table, addresses/
+widths identical across both revisions) confirms a 24-octet-per-
+request-stream wire stride. New `rcp_regmap_request_stream_cfg_render()`/
+`_apply_reconfig()` give this table its own wire codec; the EP0
+dispatcher gains a fifth/fourth routing block.
+
+**Three fields deliberately excluded**, each with its own documented
+reasoning: `rx_wd_action` (confirmed via direct page-image read on
+both revisions -- no corresponding register exists anywhere in TC18);
+`configured` (codebase-internal bookkeeping, not a TC18 concept);
+`rx_wd_timeout_ms` (needs a caller-supplied `ms_per_tick` this table's
+signature has no natural place for, and a conversion failure here is
+safety-relevant -- left as its own deliberate follow-up).
+
+**Two more width mismatches**, both resolved via the established
+saturating precedent (`flush_time_us`, issue #301 batch 3):
+`rx_stream_max_request_size` (`size_t` vs. 16-bit) and
+`rx_safestate_sequencer` (`uint16_t` vs. 8-bit).
+
+**The 8 bits at 0x000D** are serialized using this codebase's own
+existing RC1-baseline 8-independent-bit model, not RC5's later
+4-combined-bit restructuring -- already investigated and deliberately
+not restructured (task #97).
+
+**A real, previously-unflagged content-modeling gap found and fixed
+(REQ-RMAP-071)**: `rcp_regmap_request_stream_cfg_t` was missing
+`rx_ovrflw_safestate_enable` entirely -- `regmap.h`'s own
+terminology-drift section had already NAMED it, and
+`rcp_e2e_overflow_should_enter_safe_state()` (REQ-E2E-030) already
+existed ready to consume it, but the struct itself never got the
+field. Added, now part of the new wire codec.
+
+New tests: 6 dedicated tests for the new render/apply_reconfig pair,
+plus both dispatcher tests extended with a 5th/4th table's own apply+
+boundary cases.
+
+Mutation-tested six ways; all six caught cleanly. **A real ASan
+stack-buffer-overflow was also caught and fixed** -- a test's own
+comparison buffer was sized for one row but called with `count=2`;
+fixed by sizing the buffer correctly, not by weakening the assertion.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
+0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
