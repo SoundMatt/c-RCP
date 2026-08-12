@@ -10072,12 +10072,12 @@
     {
       "id": "REQ-ADC-032",
       "title": "An ADC endpoint serves exactly one channel, is limited to 16-bit resolution, and requires a selected analog input pin",
-      "text": "NOT IMPLEMENTED (partially): c-RCP fixes an ADC measurement value at 16 bits (RCP_EP_ADC_VALUE_LEN == 2, ep_adc.h:211) consistent with TC18 \u00a713.7.9.1's 16-bit ceiling, but it does not model the one-channel-per-endpoint rule nor the required selection of an analog input pin for each ADC EP. regmap.h's rcp_regmap_named_signal_t index has no ADC entry, so an ADC endpoint's analog input cannot be bound to a hardware pin through the hw_pin_map table at all. Consequence: an RC Client can configure and read an ADC endpoint that is not wired to any physical input, with no way to discover or set which channel it serves.",
+      "text": "c-RCP fixes an ADC measurement value at 16 bits (RCP_EP_ADC_VALUE_LEN == 2, ep_adc.h) consistent with TC18 \u00a713.7.9.1's 16-bit ceiling. The catalogued claim that regmap.h's rcp_regmap_named_signal_t index has no ADC entry is stale: RCP_REGMAP_SIGNAL_ADC_IN (REQ-RMAP-044) has existed since an earlier batch, and rcp_regmap_named_signal_ep_signal_nr(RCP_REGMAP_SIGNAL_ADC_IN) returns 0, its own Table 23 EP_Signal_Nr -- an ADC endpoint's analog input CAN already be bound to a hardware pin via an ordinary hw_pin_map entry (hw_ep_nr = the ADC endpoint's own number, hw_ep_pin_nr = 0), the same generic, endpoint-type-agnostic mechanism every other endpoint type already uses; no ADC-specific binding code was ever needed. The one-channel-per-endpoint rule is structurally guaranteed by the wire format itself, not something this library needs to separately validate: Table 23 enumerates exactly one ADC-relevant signal (ADC_IN, EP_Signal_Nr 0), so hw_ep_pin_nr for an ADC endpoint's binding can only ever be 0 -- there is no second ADC channel number the addressing scheme could even express. Whether a given ADC endpoint's own hw_pin_map row is actually populated by a real deployment's configuration is a caller/config-time concern, the same as every other endpoint type's own pin binding -- not a decode/encode gap in this library.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "partial",
+      "status": "implemented",
       "tc18": "\u00a713.7.9.1, TC18.txt L5027-5030"
     },
     {
