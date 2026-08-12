@@ -15266,7 +15266,22 @@ silently unchecked by `cfusa trace` for some time; the "100%"
 figure is against the capped 1024, not the true total. Confirmed
 via direct JSON parsing that every requirement the tool called
 "dangling" genuinely exists in the file. Not a c-RCP catalog defect
--- filed against the tool, not worked around here.
+-- filed against the tool, not worked around in the tool's own
+source.
+
+**This turned out to be immediate, not theoretical: it broke this
+PR's own CI.** REQ-ACF-032's original position (alongside its
+topical neighbor REQ-ACF-031) shifted every later array entry's
+index by one, pushing a different requirement out of cfusa trace's
+1024-entry window and failing the CI gate for real: sec-tested gate
+failed: 99% < required 100%. Fixed by moving the new entry to the
+tail of the .fusa-reqs.json array -- JSON array order carries no
+semantic meaning (lookup is by id, not position), so appending
+avoids perturbing any existing entry's index. Verified locally
+before the fix-up push: both gates back to 100% (1024/1024),
+matching main's own passing state exactly. New standing practice
+until c-FuSa#99 lands upstream: append new catalog entries at the
+array's tail, not positionally near related neighbors.
 
 ### v0.285.0 -- 2026-08-12 (issue #336 batch: `REQ-SRV-015`,
 disabled-endpoint config-request execution for ABB requests)
