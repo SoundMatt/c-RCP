@@ -12,6 +12,7 @@
 //cfusa:test REQ-E2E-041
 //cfusa:test REQ-E2E-042
 //cfusa:test REQ-WDG-010
+//cfusa:test REQ-E2E-021
 
 /*
  * test_tc18_gaps_e2e.c -- spec-literal conformance-and-deviation suite for
@@ -965,6 +966,162 @@ static void test_dispatch_e2e_with_no_watchdog_keeper_set_dispatches_normally(vo
     rcp_mock_server_destroy(srv);
 }
 
+/* ── REQ-E2E-021: a CRC error on an rx_enforce_e2e stream blocks the whole
+ * stream until released ─────────────────────────────────────────────────── */
+
+/* A corrupted-trailer request on an rx_enforce_e2e endpoint latches the
+ * stream; a SUBSEQUENT, perfectly valid request on that SAME stream_id
+ * is rejected outright -- RCP_MOCK_DISPATCH_STREAM_FAULTED, not even
+ * reaching CRC validation -- until the tracker is reset. This is the
+ * exact gap REQ-E2E-021 used to pin: before this fix, the second request
+ * below would have been admitted and executed normally. */
+static void test_dispatch_e2e_crc_error_with_rx_enforce_e2e_blocks_the_whole_stream(void)
+{
+    rcp_mock_server_t         *srv = rcp_mock_server_new();
+    rcp_e2e_stream_fault_tracker_t tracker;
+    const uint8_t                pl[4] = {0x9A, 0x9B, 0x9C, 0x9D};
+    rcp_bytes_t                  frame = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t                  w     = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_bytes_t                  resp1 = {0};
+    rcp_bytes_t                  resp2 = {0};
+    const uint8_t                good_pl[4] = {0x01, 0x02, 0x03, 0x04};
+    rcp_bytes_t                  good_frame = make_abb(0, 0, 1, good_pl, sizeof(good_pl));
+    rcp_bytes_t                  good_wrapped =
+        rcp_e2e_wrap_framed(TEST_SID, false, TEST_TS, good_frame.data, good_frame.len);
+    rcp_acf_byte_message_info_t  hdr;
+    const uint8_t                *out_pl  = NULL;
+    size_t                        out_len = 0;
+
+    TEST_ASSERT_NOT_NULL(w.data);
+    w.data[w.len - 1u] ^= 0xFFu; /* corrupt the trailer's last octet */
+
+    rcp_e2e_stream_fault_tracker_init(&tracker);
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_rx_enforce_e2e(srv, 0x11, true));
+    rcp_mock_server_set_stream_fault_tracker(srv, &tracker);
+
+    /* First request: CRC mismatch, latches the stream (rx_enforce_e2e). */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, TEST_TS,
+                                                    w.data, w.len, &resp1));
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_is_faulted(&tracker, TEST_SID));
+
+    /* Second request: perfectly valid, but the stream is now blocked --
+     * never even reaches CRC validation, let alone admission. */
+    g_handler_called = false;
+    TEST_ASSERT_NOT_NULL(good_wrapped.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_STREAM_FAULTED,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, TEST_TS,
+                                                    good_wrapped.data, good_wrapped.len, &resp2));
+    TEST_ASSERT_FALSE(g_handler_called);
+    /* A genuine error response, matching CRC_ERROR's own convention. */
+    TEST_ASSERT_NOT_NULL(resp2.data);
+    TEST_ASSERT_EQUAL_INT(RCP_ACF_OK,
+                          rcp_acf_decode_abb(resp2.data, resp2.len, &hdr, &out_pl, &out_len));
+    TEST_ASSERT_EQUAL_UINT8(1u, hdr.err);
+    TEST_ASSERT_EQUAL_UINT(1u, out_len);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_POCI_FAILURE, out_pl[0]);
+
+    /* Released: the same valid request now succeeds normally. */
+    rcp_e2e_stream_fault_tracker_reset(&tracker, TEST_SID);
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, TEST_TS,
+                                                    good_wrapped.data, good_wrapped.len, &resp2));
+    TEST_ASSERT_TRUE(g_handler_called);
+
+    rcp_bytes_free(&resp2);
+    rcp_bytes_free(&resp1);
+    rcp_bytes_free(&good_wrapped);
+    rcp_bytes_free(&good_frame);
+    rcp_bytes_free(&w);
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* Without rx_enforce_e2e (the default), a CRC error still skips that one
+ * request (RCP_MOCK_DISPATCH_CRC_ERROR, matching every pre-existing CRC-
+ * mismatch test in this file) but does NOT latch the stream -- a
+ * subsequent valid request on the same stream succeeds normally. Matches
+ * rcp_e2e_crc_error_action()'s own RCP_E2E_CRC_ACTION_DROP_REQUEST. */
+static void test_dispatch_e2e_crc_error_without_rx_enforce_e2e_does_not_block_the_stream(void)
+{
+    rcp_mock_server_t         *srv = rcp_mock_server_new();
+    rcp_e2e_stream_fault_tracker_t tracker;
+    const uint8_t                pl[4] = {0x9A, 0x9B, 0x9C, 0x9D};
+    rcp_bytes_t                  frame = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t                  w     = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_bytes_t                  resp1 = {0};
+    rcp_bytes_t                  resp2 = {0};
+    const uint8_t                good_pl[4] = {0x01, 0x02, 0x03, 0x04};
+    rcp_bytes_t                  good_frame = make_abb(0, 0, 1, good_pl, sizeof(good_pl));
+    rcp_bytes_t                  good_wrapped =
+        rcp_e2e_wrap_framed(TEST_SID, false, TEST_TS, good_frame.data, good_frame.len);
+
+    TEST_ASSERT_NOT_NULL(w.data);
+    w.data[w.len - 1u] ^= 0xFFu;
+
+    rcp_e2e_stream_fault_tracker_init(&tracker);
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+    /* rcp_mock_server_set_endpoint_rx_enforce_e2e() deliberately never called (defaults false). */
+    rcp_mock_server_set_stream_fault_tracker(srv, &tracker);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, TEST_TS,
+                                                    w.data, w.len, &resp1));
+    TEST_ASSERT_FALSE(rcp_e2e_stream_fault_tracker_is_faulted(&tracker, TEST_SID));
+
+    g_handler_called = false;
+    TEST_ASSERT_NOT_NULL(good_wrapped.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, TEST_TS,
+                                                    good_wrapped.data, good_wrapped.len, &resp2));
+    TEST_ASSERT_TRUE(g_handler_called);
+
+    rcp_bytes_free(&resp2);
+    rcp_bytes_free(&resp1);
+    rcp_bytes_free(&good_wrapped);
+    rcp_bytes_free(&good_frame);
+    rcp_bytes_free(&w);
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* No stream fault tracker set (rcp_mock_server_new()'s own default) --
+ * dispatch_e2e() must not crash or otherwise misbehave; it just has
+ * nothing to check or record against. */
+static void test_dispatch_e2e_with_no_stream_fault_tracker_set_dispatches_normally(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t        pl[4] = {0x01, 0x02, 0x03, 0x04};
+    rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    /* rcp_mock_server_set_stream_fault_tracker() deliberately never called. */
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, TEST_TS,
+                                                    plain.data, plain.len, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── REQ-E2E-042: pad coverage and quadlet alignment ───────────────────────── */
 
 /* TC18 sec. 13.6 Figures 19/20 compute the CRC over whole quadlets --
@@ -1039,6 +1196,9 @@ int main(void)
     RUN_TEST(test_dispatch_e2e_kicks_the_watchdog_on_every_admitted_request);
     RUN_TEST(test_dispatch_e2e_kicks_the_watchdog_even_when_the_request_is_rejected);
     RUN_TEST(test_dispatch_e2e_with_no_watchdog_keeper_set_dispatches_normally);
+    RUN_TEST(test_dispatch_e2e_crc_error_with_rx_enforce_e2e_blocks_the_whole_stream);
+    RUN_TEST(test_dispatch_e2e_crc_error_without_rx_enforce_e2e_does_not_block_the_stream);
+    RUN_TEST(test_dispatch_e2e_with_no_stream_fault_tracker_set_dispatches_normally);
     RUN_TEST(test_crc_covers_pad_octets_and_alignment_is_enforced);
     return UNITY_END();
 }

@@ -738,6 +738,67 @@ bool rcp_e2e_crc_error_should_enter_safe_state(bool rx_enforce_e2e);
 /* Clears f back to the not-faulted state. */
 void rcp_e2e_stream_fault_reset(rcp_e2e_stream_fault_t *f);
 
+/* ── Per-stream fault tracker (issue #201, REQ-E2E-021) ─────────────────────
+ *
+ * rcp_e2e_stream_fault_t above is one stream's own fault latch --
+ * correct and directly tested, but nothing in this codebase's own
+ * dispatch path (mock.c) ever called it before this addition, and no
+ * caller checked rcp_e2e_stream_fault_is_faulted() before admitting a
+ * subsequent request: on a stream configured with rx_enforce_e2e, TC18's
+ * "stream is blocked until released" consequence never actually blocked
+ * anything. rcp_e2e_stream_fault_tracker_t is the small, caller-owned,
+ * keyed-by-stream_id wrapper mock.c needs to hold one
+ * rcp_e2e_stream_fault_t PER STREAM (a real server may have more than
+ * one), matching the same caller-owned-data architecture already
+ * established by rcp_watchdog_keeper_t (watchdog.h) and
+ * rcp_e2e_seq_tracker_t above -- this module sends no wire traffic and
+ * owns no transport, a caller drives every one of these calls itself. */
+
+/* This module's own chosen capacity, not spec-derived -- matching the
+ * scale of RCP_MOCK_MAX_ENDPOINTS (mock.h) as a plausible real-device
+ * stream count. */
+#define RCP_E2E_STREAM_FAULT_TRACKER_MAX_STREAMS ((size_t)16u)
+
+typedef struct {
+    uint64_t                stream_id;
+    bool                     used;   /* this slot names a real, tracked stream */
+    rcp_e2e_stream_fault_t   fault;
+} rcp_e2e_stream_fault_tracker_slot_t;
+
+typedef struct {
+    rcp_e2e_stream_fault_tracker_slot_t slots[RCP_E2E_STREAM_FAULT_TRACKER_MAX_STREAMS];
+} rcp_e2e_stream_fault_tracker_t;
+
+/* Zero-initializes t (every slot unused). */
+void rcp_e2e_stream_fault_tracker_init(rcp_e2e_stream_fault_tracker_t *t);
+
+/* rcp_e2e_stream_fault_on_crc_error()'s own multi-stream counterpart:
+ * applies a CRC_ERROR observed on stream_id (configured with
+ * rx_enforce_e2e) to that stream's own tracked fault state, registering
+ * stream_id as a newly-tracked stream on its first touch if capacity
+ * remains. Returns rcp_e2e_stream_fault_on_crc_error()'s own result
+ * (always true) for a stream that was or became tracked; returns false,
+ * leaving t entirely unchanged, only if stream_id is not already tracked
+ * AND every slot is already in use (an honest capacity-exhaustion
+ * degrade, not silently dropped state -- a caller can check this return
+ * value to know the fault was NOT recorded). */
+bool rcp_e2e_stream_fault_tracker_on_crc_error(rcp_e2e_stream_fault_tracker_t *t,
+                                                uint64_t stream_id, bool rx_enforce_e2e);
+
+/* True iff stream_id is currently tracked AND latched faulted. False,
+ * not an error, for a stream_id this tracker has never seen (vacuously
+ * not faulted -- a stream with no recorded history has no fault to
+ * report). */
+bool rcp_e2e_stream_fault_tracker_is_faulted(const rcp_e2e_stream_fault_tracker_t *t,
+                                              uint64_t stream_id);
+
+/* Clears stream_id's own tracked fault state back to not-faulted (TC18
+ * §12.7.7's own "until released" -- the release mechanism itself, e.g. a
+ * client register write, is a caller concern this function does not
+ * model). A no-op, not an error, for a stream_id this tracker has never
+ * seen. */
+void rcp_e2e_stream_fault_tracker_reset(rcp_e2e_stream_fault_tracker_t *t, uint64_t stream_id);
+
 #ifdef __cplusplus
 }
 #endif
