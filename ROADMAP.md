@@ -15037,3 +15037,57 @@ re-verified byte-identical both times.
 function built from scratch and wired into the same dispatcher
 (REQ-RMAP-061/065), then the READ side of the dispatcher (all of
 REQ-RMAP-040/041/052/054/061/065's own remaining scope).
+
+### v0.246.0 -- 2026-08-11 (issue #301 batch 3: response-queue-config
+write dispatch)
+
+**REQ-RMAP-061 (response-queue-config) closed the same way HW_config
+and EP_ID_config closed in v0.244.0/v0.245.0 -- same finding, last of
+the three tables in issue #301's own write-dispatch scope.**
+
+Unlike HW_config/EP_ID_config, no render function existed for this
+table at all before this batch. New
+`rcp_regmap_response_queue_cfg_render()` is the first one, serializing
+TC18's own exact 10-octet-per-queue wire stride confirmed via direct
+TC18.txt read (§12.7.9 Table 24, L3025-3048): `STREAM_UID`@0x0000,
+`Max_AVTPDUsize`@0x0002, `queue_size`@0x0004, `flush_on_count`@0x0006,
+`Flush_time`@0x0008. New `rcp_regmap_response_queue_cfg_apply_reconfig()`
+is the parse-side inverse (same patch-then-reparse idiom as the other
+two tables). `rcp_regmap_ep0_decode_write_request()` gains a third
+routing block targeting `svr_response_stream_cfg_ptr`'s own extent. A
+remote client can now write response-queue-config over the wire,
+completing write access to all three of issue #301's target tables.
+
+**Real content/wire width mismatch found and fixed**: `flush_time_us`
+is `uint32_t` (matching `rcp_respqueue_should_flush_by_time()`'s own
+wider `uint64_t` parameter, not the wire), but TC18's own `Flush_time`
+register is only 16 bits. The render function now saturates (never
+wraps) an oversized value to `0xFFFF` -- wraparound could silently
+produce 0, TC18's own "flush only by count" encoding, inverting the
+field's own meaning.
+
+Still open, matching the other two tables' own precedent: the READ
+side of the dispatcher, and lifecycle-state write authorization for
+this table's own mixed R/W*/R/W+ access types.
+
+New tests: `test_response_queue_cfg_apply_reconfig_patches_addressed_octets_only`,
+`test_response_queue_cfg_apply_reconfig_rejects_out_of_range_leaving_table_untouched`,
+`test_response_queue_cfg_render_saturates_oversized_flush_time_us_without_wrapping`,
+and the dispatcher test extended to 9 sub-cases including a dedicated
+routing-boundary case for response-queue-config -- designed in from
+the start based on batch 2's own mutation-testing lesson (an inner
+`apply_reconfig()`'s own bounds check can mask a loosened outer
+routing condition unless a boundary case specifically isolates it).
+
+Mutation-tested three ways (the render saturation clamp, the
+apply_reconfig bounds check, the dispatcher's own routing condition)
+-- all three caught cleanly on the first attempt. Reverted, full suite
+re-verified byte-identical all three times.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
+0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
+**Issue #301's own write-dispatch scope (batches 1-3) is now
+complete: all three pointed-to tables can be written over the wire.**
+**Next**: batch 4, the READ side of the dispatcher, for all three
+tables at once.
