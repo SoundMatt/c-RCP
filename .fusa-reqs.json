@@ -8952,6 +8952,7 @@
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
+      "status": "implemented",
       "tc18": "\u00a712.7 Configuration, TC18.txt L2452-2453"
     },
     {
@@ -8962,6 +8963,7 @@
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
+      "status": "implemented",
       "tc18": "\u00a712.7.5 Table 18, TC18.txt L2520-2521, L2661, L2664-2665"
     },
     {
@@ -8972,6 +8974,7 @@
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
+      "status": "implemented",
       "tc18": "\u00a712.7.5 Table 18, TC18.txt L2537-2542"
     },
     {
@@ -8982,6 +8985,7 @@
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
+      "status": "implemented",
       "tc18": "\u00a712.7.5 Table 18, TC18.txt L2543-2547"
     },
     {
@@ -8992,6 +8996,7 @@
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
+      "status": "implemented",
       "tc18": "\u00a712.7.5 Table 18, TC18.txt L2548-2550"
     },
     {
@@ -9002,6 +9007,7 @@
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
+      "status": "implemented",
       "tc18": "\u00a712.7.5 Table 18, TC18.txt L2551-2553"
     },
     {
@@ -9012,6 +9018,7 @@
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
+      "status": "implemented",
       "tc18": "\u00a712.7.5 Table 18, TC18.txt L2554-2560 -- primary-source-verified against OA_TC18_specification_v_0.5.1_RC.pdf Table 18, page 51, and \u00a712.9.1.1, page 64 (this milestone)"
     },
     {
@@ -9022,6 +9029,7 @@
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
+      "status": "implemented",
       "tc18": "\u00a712.7.5 Table 18, TC18.txt L2562"
     },
     {
@@ -9065,6 +9073,7 @@
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
+      "status": "implemented",
       "tc18": "\u00a712.7.5 Table 18, TC18.txt L2599"
     },
     {

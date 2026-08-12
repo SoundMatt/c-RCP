@@ -34,6 +34,14 @@ the rationale.
 
 ## Releases
 
+### v0.271.0 -- 2026-08-12 (issue #200 doc-only batch: 9 RMAP entries missing their own `status` field, corrected)
+
+**`REQ-RMAP-024/025/026/027/028/029/030/031/035` gain `"status": "implemented"` -- a `.fusa-reqs.json` data-hygiene correction, not a code change.**
+
+Found while auditing the full gap catalog for a status report: these 9 entries' own `text` already began `"IMPLEMENTED: ..."` and described real, complete, tested work from the earlier RMAP wire-dispatch lineage (issues #301/#306/#308/#310/#311), but carried no `status` key at all -- neither `"implemented"` nor anything else. Harmless to `cfusa`'s own pass/fail (a missing key doesn't fail its checks), but a genuine catalog-accuracy gap. Spot-verified all 9 against actual code (`include/rcp/regmap.h`/`src/regmap.c` field declarations) and test tags (`tests/test_tc18_gaps_regmap.c` and others) before trusting the text -- all 9 confirmed genuinely implemented and tested.
+
+No functional code change; 65/65 both trees unchanged. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.270.0 -- 2026-08-12 (issue #201 batch: `REQ-PWM-056`, PWM_OUT duty-cycle limits now cap the requested active time)
 
 **`rcp_ep_pwm_out_apply_write()` now takes `duty_cycle_min`/`duty_cycle_max` and clamps the resulting `active_duration` into that range -- status flips to `implemented`.**
