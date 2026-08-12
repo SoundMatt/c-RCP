@@ -9789,12 +9789,12 @@
     {
       "id": "REQ-WAKEUP-017",
       "title": "The WakeUp message carries the wake-up source that caused the wake",
-      "text": "NOT IMPLEMENTED: c-RCP's WakeUp message carries no wake-up source (TC18 \u00a712.4.1). rcp_ep_wakeup_encode_wakeup_message() emits a single opcode byte and rcp_ep_wakeup_decode_wakeup_message() returns only the transaction number, whereas the specification requires the repetitive wake response to convey both a WakeUp message and the WakeUp source. The client that requested sleep cannot learn which configured wake source (which sources[] index, wakepin, or network) actually woke the server, which is exactly the diagnostic information the wake-up endpoint exists to provide.",
+      "text": "IMPLEMENTED, FIXED 2026-08-12 (issue #201 batch 8): TC18 \u00a712.4.1 requires the repetitive wake response to convey both a WakeUp message and the WakeUp source. New rcp_ep_wakeup_encode_wakeup_message_with_source()/_decode_wakeup_message_with_source() (ep_wakeup.h) provide this as an additive, 3-byte-payload extension (opcode + a new rcp_ep_wakeup_source_t classification byte + a source_index byte) alongside the pre-existing, unchanged 1-byte plain pair -- zero blast radius on any existing caller, since the plain rcp_ep_wakeup_decode_wakeup_message()/rcp_ep_wakeup_is_wakeup_echo() still tolerate (though do not require) the longer payload. Covers all 3 wake-source classes TC18 \u00a712.4.1's own text names: a configured wake-source pin (RCP_EP_WAKEUP_SOURCE_IO, with a source_index into rcp_ep_wakeup_functional_cfg_t::sources[]), 'the dedicated wakepin' (RCP_EP_WAKEUP_SOURCE_WAKEPIN, named separately in that text from the configured pin table), and a TC14/TC10 network wake-up request (RCP_EP_WAKEUP_SOURCE_NETWORK), plus RCP_EP_WAKEUP_SOURCE_UNKNOWN for a caller with no source information to report. The client that requested sleep can now learn which wake source actually woke the server.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "implemented",
       "tc18": "\u00a712.4.1, TC18.txt L2298-L2300"
     },
     {

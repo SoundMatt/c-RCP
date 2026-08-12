@@ -705,12 +705,17 @@ static void test_pwm_in_functional_cfg_has_full_register_coverage(void)
 
 /* ── WakeUp endpoint (TC18 12.4 / 12.5 / 13.7.2) ──────────────────────────── */
 
-/* REQ-WAKEUP-017 (not-implemented) DEVIATION PIN: TC18 12.4.1 requires the
- * repetitive wake response to convey both a WakeUp message AND the WakeUp
- * source that caused the wake. c-RCP's WakeUp message is a single opcode
- * octet and its decoder recovers only the transaction number, so a client
- * cannot learn which configured source woke the server. */
-static void test_wakeup_message_has_no_source_field(void)
+/* REQ-WAKEUP-017's own remaining scope, as of 2026-08-12 (issue #201
+ * batch 8): the PLAIN rcp_ep_wakeup_encode_wakeup_message()/
+ * _decode_wakeup_message() pair deliberately keeps its own original
+ * 1-byte-opcode-only shape unchanged -- this test still pins that fact,
+ * not as a deviation any longer but as the documented, intentional
+ * behavior of the NARROWER function. TC18 §12.4.1's own requirement is
+ * now met by the NEW, additive
+ * rcp_ep_wakeup_encode_wakeup_message_with_source()/
+ * _decode_wakeup_message_with_source() pair, tested separately below --
+ * see that test's own comment for the fix. */
+static void test_wakeup_plain_message_has_no_source_field(void)
 {
     rcp_acf_byte_message_info_t    hdr         = {0};
     const uint8_t                 *payload     = NULL;
@@ -728,6 +733,106 @@ static void test_wakeup_message_has_no_source_field(void)
     TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_OK,
                       rcp_ep_wakeup_decode_wakeup_message(frame.data, frame.len, 2u, &tn));
     TEST_ASSERT_EQUAL_UINT8(0x77u, tn);
+    rcp_bytes_free(&frame);
+}
+
+/* REQ-WAKEUP-017, FIXED 2026-08-12 (issue #201 batch 8): TC18 §12.4.1
+ * requires the repetitive wake response to convey both a WakeUp message
+ * AND the WakeUp source that caused the wake.
+ * rcp_ep_wakeup_encode_wakeup_message_with_source()/
+ * _decode_wakeup_message_with_source() now provide that, as a 3-byte
+ * ACF_ABB payload (opcode + source + source_index) alongside the
+ * pre-existing, unchanged 1-byte plain pair. */
+static void test_wakeup_message_with_source_round_trips_all_source_kinds(void)
+{
+    rcp_bytes_t             frame;
+    uint8_t                 tn;
+    rcp_ep_wakeup_source_t  src;
+    uint8_t                 idx;
+
+    /* A configured IO source, with its own table index. */
+    frame = rcp_ep_wakeup_encode_wakeup_message_with_source(
+        3u, 0x11u, RCP_EP_WAKEUP_SOURCE_IO, 5u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_OK,
+                      rcp_ep_wakeup_decode_wakeup_message_with_source(frame.data, frame.len, 3u,
+                                                                       &tn, &src, &idx));
+    TEST_ASSERT_EQUAL_UINT8(0x11u, tn);
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_SOURCE_IO, src);
+    TEST_ASSERT_EQUAL_UINT8(5u, idx);
+    /* The plain decoder still tolerates this longer message -- a
+     * strictly additive wire extension, not a breaking change. */
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_OK,
+                      rcp_ep_wakeup_decode_wakeup_message(frame.data, frame.len, 3u, &tn));
+    TEST_ASSERT_EQUAL_UINT8(0x11u, tn);
+    rcp_bytes_free(&frame);
+
+    /* The dedicated wakepin -- source_index is the "not applicable" sentinel. */
+    frame = rcp_ep_wakeup_encode_wakeup_message_with_source(
+        3u, 0x12u, RCP_EP_WAKEUP_SOURCE_WAKEPIN, RCP_EP_WAKEUP_SOURCE_INDEX_NA);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_OK,
+                      rcp_ep_wakeup_decode_wakeup_message_with_source(frame.data, frame.len, 3u,
+                                                                       &tn, &src, &idx));
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_SOURCE_WAKEPIN, src);
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_WAKEUP_SOURCE_INDEX_NA, idx);
+    rcp_bytes_free(&frame);
+
+    /* A TC14/TC10 network wake-up request. */
+    frame = rcp_ep_wakeup_encode_wakeup_message_with_source(
+        3u, 0x13u, RCP_EP_WAKEUP_SOURCE_NETWORK, RCP_EP_WAKEUP_SOURCE_INDEX_NA);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_OK,
+                      rcp_ep_wakeup_decode_wakeup_message_with_source(frame.data, frame.len, 3u,
+                                                                       &tn, &src, &idx));
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_SOURCE_NETWORK, src);
+    rcp_bytes_free(&frame);
+
+    /* Unknown/no information -- the default a caller with nothing better
+     * to report can still send. */
+    frame = rcp_ep_wakeup_encode_wakeup_message_with_source(
+        3u, 0x14u, RCP_EP_WAKEUP_SOURCE_UNKNOWN, RCP_EP_WAKEUP_SOURCE_INDEX_NA);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_OK,
+                      rcp_ep_wakeup_decode_wakeup_message_with_source(frame.data, frame.len, 3u,
+                                                                       &tn, &src, &idx));
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_SOURCE_UNKNOWN, src);
+    rcp_bytes_free(&frame);
+}
+
+/* An out-of-range source byte is a decode failure, not silently
+ * reinterpreted as RCP_EP_WAKEUP_SOURCE_UNKNOWN. */
+static void test_wakeup_message_with_source_rejects_an_unknown_source_byte(void)
+{
+    rcp_bytes_t frame = rcp_ep_wakeup_encode_wakeup_message_with_source(
+        3u, 0x15u, RCP_EP_WAKEUP_SOURCE_NETWORK, RCP_EP_WAKEUP_SOURCE_INDEX_NA);
+    uint8_t                tn;
+    rcp_ep_wakeup_source_t  src;
+    uint8_t                 idx;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    frame.data[frame.len - 3u] = 0x7Fu; /* payload[1], the source byte -- an invalid value */
+
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_ERR_BAD_OPCODE,
+                      rcp_ep_wakeup_decode_wakeup_message_with_source(frame.data, frame.len, 3u,
+                                                                       &tn, &src, &idx));
+    rcp_bytes_free(&frame);
+}
+
+/* The plain 1-byte message shape is rejected by the _with_source
+ * decoder -- its own contract is specifically the 3-byte shape, not
+ * "the 3-byte shape or shorter". */
+static void test_wakeup_message_with_source_decoder_rejects_the_plain_shape(void)
+{
+    rcp_bytes_t frame = rcp_ep_wakeup_encode_wakeup_message(3u, 0x16u);
+    uint8_t                tn;
+    rcp_ep_wakeup_source_t  src;
+    uint8_t                 idx;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_ERR_SHORT_FRAME,
+                      rcp_ep_wakeup_decode_wakeup_message_with_source(frame.data, frame.len, 3u,
+                                                                       &tn, &src, &idx));
     rcp_bytes_free(&frame);
 }
 
@@ -1308,7 +1413,10 @@ int main(void)
     RUN_TEST(test_pwm_out_request_semantics_are_verbatim_setpoints);
     RUN_TEST(test_pwm_in_functional_cfg_has_full_register_coverage);
 
-    RUN_TEST(test_wakeup_message_has_no_source_field);
+    RUN_TEST(test_wakeup_plain_message_has_no_source_field);
+    RUN_TEST(test_wakeup_message_with_source_round_trips_all_source_kinds);
+    RUN_TEST(test_wakeup_message_with_source_rejects_an_unknown_source_byte);
+    RUN_TEST(test_wakeup_message_with_source_decoder_rejects_the_plain_shape);
     RUN_TEST(test_wakeup_repetition_time_is_configurable_but_not_wire_reachable);
     RUN_TEST(test_wakeup_refusal_is_a_genuine_error_response);
     RUN_TEST(test_wakeup_decode_rejects_an_unrelated_error_code);
