@@ -159,6 +159,30 @@ rcp_acf_response_kind_t rcp_acf_classify_response(const rcp_acf_byte_message_inf
     }
 }
 
+//cfusa:req REQ-ACF-018
+rcp_acf_rss_kind_t rcp_acf_read_size_or_segment_num_kind(const rcp_acf_byte_message_info_t *hdr)
+{
+    return (hdr->op == (uint8_t)RCP_ACF_OP_READ) ? RCP_ACF_RSS_READ_SIZE
+                                                  : RCP_ACF_RSS_SEGMENT_NUM;
+}
+
+//cfusa:req REQ-ACF-021
+bool rcp_acf_request_header_constraints_valid(const rcp_acf_byte_message_info_t *hdr,
+                                               bool cs_has_meaning)
+{
+    if (hdr->hs != 0u)  return false;
+    if (hdr->rsp != 0u) return false;
+    if (hdr->err != 0u) return false;
+    if (!cs_has_meaning && hdr->cs != 0u) return false;
+    return true;
+}
+
+//cfusa:req REQ-ACF-021
+bool rcp_acf_header_is_request(const rcp_acf_byte_message_info_t *hdr)
+{
+    return hdr->rsp == 0u;
+}
+
 //cfusa:req REQ-ACF-023
 bool rcp_acf_evt_row2_is_plain(uint8_t evt)
 {

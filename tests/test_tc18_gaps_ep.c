@@ -159,14 +159,26 @@ static void test_acf_bus_id_is_now_eleven_bits_wide(void)
     TEST_ASSERT_EQUAL_UINT16(0x1FFu, out.byte_bus_id);
 }
 
-/* REQ-ACF-021 (partial) DEVIATION PIN: TC18 11.2.1 Table 4 / 11.2.2.3 Table 8
- * require an encoded request to carry rsv = 00b, hs = 0b, err = 0b and
- * rsp = 0b (rsp = 0b is what makes a message a request rather than a
- * response), and a received message with rsp set must not be admitted as a
- * request. c-RCP forces only rsv to zero; hs, cs, rsp, err and ms are
- * round-tripped verbatim on a request, and the admission path never inspects
- * rsp at all. */
-static void test_acf_request_flags_round_trip_unconstrained(void)
+/* REQ-ACF-021: TC18 11.2.1 Table 4 / 11.2.2.3 Table 8 require an encoded
+ * request to carry rsv = 00b, hs = 0b, err = 0b and rsp = 0b (rsp = 0b is
+ * what makes a message a request rather than a response), and a received
+ * message with rsp set must not be admitted as a request.
+ *
+ * rcp_acf_pack_header()/_encode_abb() still round-trip hs, cs, rsp, err and
+ * ms verbatim -- that is deliberate and unchanged: those two functions are
+ * shared with RESPONSE encoding (rcp_acf_build_error_response() sets
+ * rsp=1/err=1 on purpose), so they cannot force these fields to their
+ * request-only fixed values unconditionally. rsv (octet 2 bits 4:3 and
+ * octet 4 bits 3:2) is the one field genuinely always forced to zero by
+ * rcp_acf_pack_header() itself, for either message shape.
+ *
+ * What closes the gap: rcp_acf_request_header_constraints_valid() is the
+ * pure validator a caller building a request can check before encoding,
+ * and rcp_server_endpoint_admit() now calls rcp_acf_header_is_request()
+ * on every arriving frame and refuses admission (RCP_SERVER_ADMIT_REJECTED,
+ * RCP_ERROR_INVALID_PARAMETER) when rsp is set -- TC18 11.2.2.3's own
+ * admission rule, not just an encode-time nicety. */
+static void test_acf_request_flags_round_trip_but_admission_now_rejects_rsp(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
     rcp_acf_byte_message_info_t out = {0};
@@ -175,6 +187,7 @@ static void test_acf_request_flags_round_trip_unconstrained(void)
     rcp_bytes_t                 frame;
     rcp_server_endpoint_t       ep;
     uint8_t                     request_type = 0xFFu;
+    rcp_wire_error_t            admit_err    = RCP_ERROR_NONE;
 
     hdr.hs  = 1u;
     hdr.cs  = 1u;
@@ -182,6 +195,12 @@ static void test_acf_request_flags_round_trip_unconstrained(void)
     hdr.err = 1u;
     hdr.ms  = 1u;
     hdr.op  = RCP_ACF_OP_READ;
+
+    /* This header fails the request-constraint validator on every one of
+     * hs/rsp/err (cs is exempted only when the caller says it carries a
+     * meaning of its own -- neither case applies here). */
+    TEST_ASSERT_FALSE(rcp_acf_request_header_constraints_valid(&hdr, false));
+    TEST_ASSERT_FALSE(rcp_acf_request_header_constraints_valid(&hdr, true)); /* still fails: hs/rsp/err */
 
     frame = rcp_acf_encode_abb(&hdr, NULL, 0);
     TEST_ASSERT_NOT_NULL(frame.data);
@@ -191,20 +210,56 @@ static void test_acf_request_flags_round_trip_unconstrained(void)
 
     TEST_ASSERT_EQUAL(RCP_ACF_OK,
                       rcp_acf_decode_abb(frame.data, frame.len, &out, &payload, &payload_len));
-    TEST_ASSERT_EQUAL_UINT8(1u, out.hs);  /* a conforming request: 0b */
-    TEST_ASSERT_EQUAL_UINT8(1u, out.rsp); /* a conforming request: 0b */
-    TEST_ASSERT_EQUAL_UINT8(1u, out.err); /* a conforming request: 0b */
+    TEST_ASSERT_EQUAL_UINT8(1u, out.hs);  /* round-tripped verbatim, by design -- see above */
+    TEST_ASSERT_EQUAL_UINT8(1u, out.rsp);
+    TEST_ASSERT_EQUAL_UINT8(1u, out.err);
     TEST_ASSERT_EQUAL_UINT8(1u, out.cs);
     TEST_ASSERT_EQUAL_UINT8(1u, out.ms);
+    TEST_ASSERT_FALSE(rcp_acf_header_is_request(&out)); /* rsp=1 -- this is a response shape */
 
-    /* ... and the rsp = 1b message is still admitted as an ordinary
-     * request, which TC18 11.2.2.3 forbids. */
+    /* FIXED: the rsp = 1b message is no longer admitted as an ordinary
+     * request -- TC18 11.2.2.3's own rule is now enforced at admission. */
     rcp_server_endpoint_init(&ep, true);
-    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_EXECUTE_NOW,
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_REJECTED,
                       rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, &request_type,
-                                                NULL, NULL));
+                                                NULL, &admit_err));
+    TEST_ASSERT_EQUAL(RCP_ERROR_INVALID_PARAMETER, admit_err);
     rcp_server_endpoint_destroy(&ep);
     rcp_bytes_free(&frame);
+}
+
+/* REQ-ACF-018: the 12-bit read_size_or_segment_num field is read_size when
+ * op selects the read sense and segment_num otherwise -- a function of op
+ * alone, independent of the field's actual numeric value. */
+static void test_acf_read_size_or_segment_num_kind_follows_op(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+
+    hdr.op = RCP_ACF_OP_READ;
+    TEST_ASSERT_EQUAL(RCP_ACF_RSS_READ_SIZE, rcp_acf_read_size_or_segment_num_kind(&hdr));
+
+    hdr.op = RCP_ACF_OP_WRITE;
+    TEST_ASSERT_EQUAL(RCP_ACF_RSS_SEGMENT_NUM, rcp_acf_read_size_or_segment_num_kind(&hdr));
+
+    /* RCP_ACF_OP_NONE is encode-only (see rcp_acf_op_t's doc comment) and
+     * encodes identically to WRITE on the wire -- classifies the same way. */
+    hdr.op = RCP_ACF_OP_NONE;
+    TEST_ASSERT_EQUAL(RCP_ACF_RSS_SEGMENT_NUM, rcp_acf_read_size_or_segment_num_kind(&hdr));
+}
+
+/* REQ-ACF-021: cs_has_meaning=true is the compound-wait/chained exemption --
+ * an otherwise-conforming header (hs=rsp=err=0) with cs=1 is valid only
+ * when the caller asserts cs carries a meaning of its own. */
+static void test_acf_request_header_constraints_cs_exemption(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+
+    TEST_ASSERT_TRUE(rcp_acf_request_header_constraints_valid(&hdr, false));
+    TEST_ASSERT_TRUE(rcp_acf_request_header_constraints_valid(&hdr, true));
+
+    hdr.cs = 1u;
+    TEST_ASSERT_FALSE(rcp_acf_request_header_constraints_valid(&hdr, false));
+    TEST_ASSERT_TRUE(rcp_acf_request_header_constraints_valid(&hdr, true));
 }
 
 /* ── GPIO endpoint (TC18 13.7.4) ──────────────────────────────────────────── */
@@ -1456,7 +1511,9 @@ int main(void)
     RUN_TEST(test_acf_msg_type_constants_and_op_wire_bit);
     RUN_TEST(test_acf_read_size_slot_is_ambiguous);
     RUN_TEST(test_acf_bus_id_is_now_eleven_bits_wide);
-    RUN_TEST(test_acf_request_flags_round_trip_unconstrained);
+    RUN_TEST(test_acf_request_flags_round_trip_but_admission_now_rejects_rsp);
+    RUN_TEST(test_acf_read_size_or_segment_num_kind_follows_op);
+    RUN_TEST(test_acf_request_header_constraints_cs_exemption);
 
     RUN_TEST(test_gpio_request_payload_is_four_octets);
     RUN_TEST(test_gpio_wire_error_is_none_for_local_only_codes);

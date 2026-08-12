@@ -34,6 +34,17 @@ the rationale.
 
 ## Releases
 
+### v0.273.0 -- 2026-08-12 (issue #337 batch: `REQ-ACF-018`/`REQ-ACF-021` -- read_size/segment_num classifier + request fixed-value enforcement)
+
+**Both `REQ-ACF-018` and `REQ-ACF-021` flip `partial` -> `implemented`.**
+
+- **`REQ-ACF-018`**: new `rcp_acf_read_size_or_segment_num_kind()` (acf.h/acf.c) classifies byte_message_info's 12-bit `read_size_or_segment_num` field as `RCP_ACF_RSS_READ_SIZE` (op == `RCP_ACF_OP_READ`) or `RCP_ACF_RSS_SEGMENT_NUM` (every other op value), exposing the TC18 §11.2.1/§11.2.2.1 selection to callers instead of leaving the field an uninterpreted round-tripped slot.
+- **`REQ-ACF-021`**: two new primitives close the gap at the two points that actually know whether they're building a request or a response (`rcp_acf_encode_abb()`/`_gbb()` are shared by both, so cannot enforce unconditionally): `rcp_acf_request_header_constraints_valid(hdr, cs_has_meaning)` is the pure encode-side validator (hs/rsp/err must be 0; cs must be 0 unless the caller says it carries compound-wait/chained meaning of its own); `rcp_acf_header_is_request(hdr)` is the decode-side `rsp == 0` check. **Real behavior change**: `rcp_server_endpoint_admit()` now calls the latter on every arriving frame, before any further classification, and refuses admission (`RCP_SERVER_ADMIT_REJECTED`, `RCP_ERROR_INVALID_PARAMETER`) when `rsp` is set -- TC18's own "a received message whose rsp bit is set shall not be admitted as a request" rule (§11.2.2.3) is now enforced, not just documented.
+
+Updated the pre-existing gap-pinning test (`test_acf_request_flags_round_trip_unconstrained` -> `test_acf_request_flags_round_trip_but_admission_now_rejects_rsp`) to assert the fixed admission behavior instead of pinning the old deviation; added two new tests for the read_size/segment_num classifier and the cs-exemption rule. Mutation-tested: inverting the new admission check's sense fails the updated test plus 4 further pre-existing tests that build requests via `mock.c`'s dispatch path.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100% (1024/1024 requirements traced, 512/512 functions annotated).
+
 ### v0.272.0 -- 2026-08-12 (issue #200 doc-only batch: `REQ-RMAP-047`/`057`/`058` closed -- register+wire scope complete, remaining text was non-normative or already out of scope)
 
 **`REQ-RMAP-047`/`REQ-RMAP-057`/`REQ-RMAP-058` flip `partial` -> `implemented` -- `.fusa-reqs.json` text/status corrections, no code change.**
