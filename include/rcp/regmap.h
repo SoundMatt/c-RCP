@@ -2054,6 +2054,86 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      rcp_wire_error_t *out_error,
                                      uint8_t *out_transaction_num);
 
+/* ── EP0 address-routed dispatcher, READ side (issue #301 batch 4) ─────────
+ *
+ * The read-side counterpart to rcp_regmap_ep0_decode_write_request()
+ * above -- closes the "no endpoint type has a server-side evt=111b
+ * decode/dispatch in either direction" gap this dispatcher's own file
+ * header first flagged, for its read half.
+ *
+ * read_size is deliberately uint8_t, matching
+ * rcp_regmap_general_encode_read_response()'s own established
+ * precedent (not the ACF header's own wider 12-bit
+ * read_size_or_segment_num field) -- every one of this dispatcher's own
+ * four routable extents comfortably fits this codebase's real,
+ * non-adversarial configurations well under 256 octets; widening this
+ * type asymmetrically for just these two new functions, when every
+ * sibling read-response function in this codebase already uses uint8_t,
+ * would be inconsistent for no real gain. */
+
+/* Decodes an ACF_ABB READ request from b[0..len) addressed to byte_bus_id
+ * 0 (EP0), with a payload shaped exactly like the write dispatcher's own
+ * request: a leading 2-octet big-endian absolute address, no further
+ * payload. The requested read_size is carried in the ACF header's own
+ * read_size_or_segment_num field (truncated to this function's own
+ * uint8_t output -- see this section's own file-header note), not in
+ * the payload. On RCP_REGMAP_EP0_OK, *out_addr, *out_read_size, and
+ * *out_transaction_num are populated; pass them to
+ * rcp_regmap_ep0_encode_read_response() below to build the actual
+ * response. Fails with the same ACF-level errc values as
+ * rcp_regmap_ep0_decode_write_request() for the same reasons, or
+ * RCP_REGMAP_EP0_ERR_WRONG_OP if op is not RCP_ACF_OP_READ. */
+rcp_regmap_ep0_errc_t
+rcp_regmap_ep0_decode_read_request(const uint8_t *b, size_t len,
+                                    uint16_t *out_addr, uint8_t *out_read_size,
+                                    uint8_t *out_transaction_num);
+
+/* Encodes an ACF_ABB READ response for a request decoded by
+ * rcp_regmap_ep0_decode_read_request() above. Routes addr across the
+ * identical four extents rcp_regmap_ep0_decode_write_request() routes
+ * (Table 18 itself, HW_config, EP_ID_config, response-queue-config),
+ * reusing this dispatcher's own already-proven per-table render()
+ * functions, not a second copy of that wire codec.
+ *
+ * On a known extent: *out_error is RCP_ERROR_NONE and the returned
+ * rcp_bytes_t carries min(read_size, that extent's own remaining length
+ * from addr) real octets followed by zero-fill up to read_size -- the
+ * identical "response spans exactly read_size octets, zero-filled past
+ * the source's own extent" convention
+ * rcp_regmap_general_encode_read_response() already establishes for
+ * Table 18 alone, now generalized to whichever of the four extents
+ * addr's own starting position falls within.
+ *
+ * On an address matching none of the four known extents: *out_error is
+ * RCP_ERROR_EP_NOT_FOUND (the identical code the write dispatcher
+ * already uses for the same condition) and the returned rcp_bytes_t is
+ * zeroed (data=NULL) -- the caller builds the actual error response via
+ * rcp_acf_build_error_response(), the same split the write dispatcher
+ * already establishes for its own denial cases. Always check *out_error
+ * before rcp_bytes_t.data: a zeroed rcp_bytes_t with *out_error ==
+ * RCP_ERROR_NONE instead means ordinary allocation failure, the same
+ * convention rcp_regmap_general_encode_read_response() already uses.
+ *
+ * Deliberately does NOT compose data across more than one extent even
+ * when addr + read_size would span into a second one -- this function's
+ * own zero-fill-past-extent convention above already answers what
+ * happens past the FIRST (addr's own) extent's own length, and TC18
+ * defines no rule for composing two distinct pointed-to tables into one
+ * response; inventing one here would not be primary-source-derived. A
+ * caller wanting a second table's own data issues a second,
+ * separately-addressed read. */
+rcp_bytes_t
+rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
+                                     uint8_t transaction_num,
+                                     const rcp_regmap_general_t *map,
+                                     const rcp_regmap_hw_pin_map_entry_t *hw_pin_map,
+                                     size_t hw_pin_map_count,
+                                     const rcp_regmap_ep_id_map_entry_t *ep_id_map,
+                                     size_t ep_id_map_count,
+                                     const rcp_regmap_response_queue_cfg_t *response_queue_cfg,
+                                     size_t response_queue_cfg_count,
+                                     rcp_wire_error_t *out_error);
+
 #ifdef __cplusplus
 }
 #endif

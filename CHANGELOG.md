@@ -34,6 +34,24 @@ the rationale.
 
 ## Releases
 
+### v0.247.0 -- 2026-08-11 (issue #301 batch 4: EP0 dispatcher READ side, batch 1-4 all closed)
+
+**REQ-RMAP-040/041 (HW_config), REQ-RMAP-052/054 (EP_ID_config), and REQ-RMAP-061 (response-queue-config) all gain their READ side, closing the last shared gap issue #301's own finding left open. All four batches of issue #301 are now complete.**
+
+New `rcp_regmap_ep0_decode_read_request()` decodes an incoming ACF_ABB READ request addressed to EP0 (same leading-2-octet-address payload shape as the write dispatcher's own request; the requested `read_size` comes from the ACF header's own `read_size_or_segment_num` field, matching every other read-request-carrying-a-size convention in this codebase). New `rcp_regmap_ep0_encode_read_response()` routes the decoded address across the identical four extents the write dispatcher already routes (Table 18 itself, HW_config, EP_ID_config, response-queue-config), reusing each table's own already-proven `render()` function -- no second copy of any wire codec. On a known extent, the response carries `min(read_size, that extent's own remaining length from addr)` real octets followed by zero-fill up to `read_size` -- the identical convention `rcp_regmap_general_encode_read_response()` already established for Table 18 alone, now generalized. On an unknown address, `*out_error` is `RCP_ERROR_EP_NOT_FOUND` and the returned `rcp_bytes_t` is zeroed, the same split the write dispatcher already uses for its own denials.
+
+`read_size` is deliberately `uint8_t`, matching `rcp_regmap_general_encode_read_response()`'s own established precedent rather than the ACF header's wider 12-bit field -- every one of this dispatcher's own four routable extents comfortably fits real configurations well under 256 octets, and widening asymmetrically for just these two new functions would be inconsistent with every sibling read-response function in this codebase.
+
+**Deliberately does NOT compose data across more than one extent** even when `addr + read_size` would span into a second one -- TC18 defines no rule for combining two distinct pointed-to tables into one response, and inventing one here would not be primary-source-derived. A caller wanting a second table's own data issues a second, separately-addressed read.
+
+New tests: `test_ep0_read_dispatcher_routes_all_four_extents_and_unknown_addresses` (10 sub-cases: Table 18 exact-length read, Table 18 oversized read proving zero-fill-not-spillover, HW_config read + its own routing boundary, EP_ID_config read + its own routing boundary, response-queue-config read + its own routing boundary, an address matching none of the four extents, and `decode_read_request()`'s own ACF-level short-frame/wrong-op failures) -- every routing-boundary case written in from the start, per batch 2/3's own established mutation-testing lesson.
+
+Mutation-tested two ways: disabling the shared response-slice helper's own zero-fill/bounds computation (caught by both a clean assertion failure on native AND a genuine ASan stack-buffer-overflow abort -- the mutation was a real out-of-bounds read, not just a logic bug), and loosening the HW_config routing condition's own upper bound (caught cleanly by its own dedicated boundary case). Reverted, full suite re-verified byte-identical both times.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
+**Issue #301 is now fully closed: all four batches complete.** All three pointed-to tables (HW_config, EP_ID_config, response-queue-config) can be both written and read over the wire, using one shared, address-routed dispatcher generalizing Table 18's own already-established wire codec. Remaining gaps in each affected requirement are now narrowed to lifecycle-state write authorization alone (deferred to whatever caller eventually owns lifecycle-state context, matching REQ-RMAP-025's own established precedent) -- no addressing or wire-format ambiguity remains anywhere in this lineage.
+
 ### v0.246.0 -- 2026-08-11 (issue #301 batch 3: response-queue-config write dispatch)
 
 **REQ-RMAP-061 (response-queue-config) closed the same way REQ-RMAP-040/041 (HW_config) and REQ-RMAP-052/054 (EP_ID_config) closed in v0.244.0/v0.245.0 -- same finding, same batch-ordered plan, last of the three tables in issue #301's own write-dispatch scope.**
