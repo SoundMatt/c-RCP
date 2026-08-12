@@ -324,6 +324,31 @@ typedef enum {
  * prev_level is true and new_level is false. */
 bool rcp_ep_gpio_trigger_fires(rcp_ep_gpio_trigger_t trigger, bool prev_level, bool new_level);
 
+/* REQ-GPIO-034: TC18 §13.7.4.1 Table 40 (RC1)/Table 43 (RC5)'s own trigger
+ * signal numbering -- signal 0 is "GPIO EP request execution done" (a
+ * whole-endpoint trigger, not modeled by this per-pin function at all;
+ * see the file header for why), and for each pin IOn: signal 3n+1 is
+ * ANY_CHANGE, 3n+2 is RISING, 3n+3 is FALLING, running up to signal 96
+ * for IO31's own FALLING entry -- confirmed directly against the current
+ * RC5 baseline PDF page 99. rcp_ep_gpio_trigger_t's own ordinal values
+ * (ANY_CHANGE=1, RISING=2, FALLING=3) were deliberately chosen to equal
+ * Table 43's own per-pin offset, so this function is exactly
+ * 3*pin_index + (uint8_t)trigger; see ep_gpio.c's own definition for the
+ * one-line proof.
+ *
+ * Returns true and populates *out_signal_number iff pin_index <
+ * RCP_EP_GPIO_MAX_PINS and trigger is one of ANY_CHANGE/RISING/FALLING
+ * (never RCP_EP_GPIO_TRIGGER_NONE, which names no trigger event and
+ * therefore no Table 43 signal number); returns false (*out_signal_number
+ * left unchanged) otherwise. A caller resolving a Triggered request's own
+ * trigger_signal_nr field against this endpoint's own configured pins
+ * calls this once per (pin, trigger) pair it has configured, looking for
+ * a match against the request's own value -- this function does not
+ * itself search a whole pin array, matching every other pure/stateless
+ * primitive this module exposes. */
+bool rcp_ep_gpio_trigger_signal_number(uint8_t pin_index, rcp_ep_gpio_trigger_t trigger,
+                                        uint8_t *out_signal_number);
+
 /* ── Functional config ─────────────────────────────────────────────────────── */
 
 /* One pin's runtime-adjustable functional configuration -- see the file

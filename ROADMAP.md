@@ -15205,6 +15205,37 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.279.0 -- 2026-08-12 (issue #336 batch: `REQ-GPIO-034`, GPIO
+trigger signal numbering)
+
+**`REQ-GPIO-034` flips `partial` -> `implemented`.**
+
+New `rcp_ep_gpio_trigger_signal_number()` computes TC18 Table 40
+(RC1)/Table 43 (RC5)'s own per-pin trigger signal numbers: signal 0
+is the whole-endpoint "GPIO EP request execution done" trigger (not
+modelled by this per-pin function), and for each pin IOn, signal
+`3n+1`/`3n+2`/`3n+3` is `ANY_CHANGE`/`RISING`/`FALLING`, running up
+to signal 96 for IO31's own `FALLING` entry -- confirmed directly
+against the RC5 baseline PDF page 99. `rcp_ep_gpio_trigger_t`'s own
+ordinal values (`ANY_CHANGE=1, RISING=2, FALLING=3`) were already
+numbered to equal Table 43's own per-pin offset, so the
+implementation is exactly `3*pin_index + (uint8_t)trigger`, with no
+per-case arithmetic needed.
+
+Returns `false` (leaving the output unchanged) for
+`pin_index >= RCP_EP_GPIO_MAX_PINS` or trigger `NONE` (which names
+no Table 40/43 signal number), rather than fabricating a number.
+
+Mutation-tested: both the pin-index boundary (`>=` weakened to `>`)
+and the signal-number formula (trigger offset dropped) are
+independently caught by the new test.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 new
+findings (128 pre-existing baseline findings on unmodified `main`,
+all `CFUSA-L004` recursion-rule false positives unrelated to this
+change, confirmed via `git stash` A/B comparison). `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.278.0 -- 2026-08-12 (issue #334 batch: `REQ-SEQ-014`,
 sequencer_state now readable over EP0)
 

@@ -34,6 +34,20 @@ the rationale.
 
 ## Releases
 
+### v0.279.0 -- 2026-08-12 (issue #336 batch: `REQ-GPIO-034`, GPIO trigger signal numbering)
+
+**`REQ-GPIO-034` flips `partial` -> `implemented`.**
+
+New `rcp_ep_gpio_trigger_signal_number()` (`ep_gpio.h`/`ep_gpio.c`) computes TC18 Table 40 (RC1)/Table 43 (RC5)'s own per-pin trigger signal numbers: signal 0 is the whole-endpoint "GPIO EP request execution done" trigger (not modelled by this per-pin function -- it names no `(pin_index, trigger)` pair at all), and for each pin IOn, signal `3n+1`/`3n+2`/`3n+3` is `ANY_CHANGE`/`RISING`/`FALLING`, running up to signal 96 for IO31's own `FALLING` entry -- confirmed directly against the current RC5 baseline PDF page 99. `rcp_ep_gpio_trigger_t`'s own ordinal values (`ANY_CHANGE=1, RISING=2, FALLING=3`) were already numbered to equal Table 43's own per-pin offset, so the implementation is exactly `3*pin_index + (uint8_t)trigger`, with no per-case arithmetic needed.
+
+Returns `false` (leaving `*out_signal_number` unchanged) for `pin_index >= RCP_EP_GPIO_MAX_PINS` or `trigger == RCP_EP_GPIO_TRIGGER_NONE` (which names no trigger event and therefore no Table 40/43 signal number), rather than fabricating a number for either case.
+
+New `test_gpio_trigger_signal_numbering` asserts pin 0's three signals (1/2/3), pin 1's first signal (4), pin 31's `FALLING` (96, the table's own highest entry), and both `false` cases.
+
+Mutation-tested: both the pin-index boundary (`>=` weakened to `>`) and the signal-number formula (trigger offset dropped) are independently caught by the new test.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 new findings (128 pre-existing baseline findings on unmodified `main`, all `CFUSA-L004` recursion-rule false positives unrelated to this change, confirmed via `git stash` A/B comparison). `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.278.0 -- 2026-08-12 (issue #334 batch: `REQ-SEQ-014`, sequencer_state now readable over EP0)
 
 **`REQ-SEQ-014` flips `partial` -> `implemented`.**
