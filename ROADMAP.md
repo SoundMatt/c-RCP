@@ -15205,6 +15205,28 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.263.0 -- 2026-08-12 (issue #201 doc-only batch: `REQ-UART-036`
+was already implemented, stale catalog entry corrected)
+
+**`REQ-UART-036` flips `not-implemented` -> `implemented` -- a
+`.fusa-reqs.json` text correction, not a code change.**
+
+`REQ-UART-038`'s own earlier fix (issue #256 Group I, 2026-08-11)
+already added exactly this register block:
+`rcp_ep_uart_render_registers()`/`_apply_reconfig()` serialize
+`uart_ep_len`, the reserved octet, and `uart_ep_status`, all
+TC18.txt-verified and already tested. This entry's own text simply
+never caught up. Same stale-catalog-entry pattern already found and
+fixed 3+ times earlier this session -- caught this time by noticing
+`REQ-UART-037`'s own text directly contradicted `-036`'s claim.
+
+Added the missing `//cfusa:test REQ-UART-036` tag (coverage was
+always real, only the tag was missing) and a `//cfusa:req
+REQ-UART-036` tag on `rcp_ep_uart_render_registers()`.
+
+65/65 both trees (unchanged). `cfusa check`: 0 errors. `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.262.0 -- 2026-08-12 (issue #201 batch: `REQ-ADC-031`, the ADC
 endpoint's five Table 50 trigger outputs)
 

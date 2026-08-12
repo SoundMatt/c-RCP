@@ -34,6 +34,16 @@ the rationale.
 
 ## Releases
 
+### v0.263.0 -- 2026-08-12 (issue #201 doc-only batch: `REQ-UART-036` was already implemented, stale catalog entry corrected)
+
+**`REQ-UART-036` (UART's `uart_ep_len`/reserved/`uart_ep_status` Table 48 register rows) flips `not-implemented` -> `implemented` -- this is a `.fusa-reqs.json` text correction, not a code change.**
+
+`REQ-UART-038`'s own earlier fix (issue #256 Group I, 2026-08-11) already added exactly this register block: `rcp_ep_uart_render_registers()`/`_apply_reconfig()` (src/ep_uart.c) serialize `uart_ep_len` (`RCP_EP_UART_REG_EP_LEN`), the reserved octet (`RCP_EP_UART_REG_RESERVED_01`), and `uart_ep_status` (`RCP_EP_UART_REG_EP_STATUS`, `rcp_ep_uart_functional_cfg_t::ep_status`), all directly TC18.txt-verified and already covered by `tests/test_ep_uart.c`'s own existing register-block tests -- this entry's own text and status simply never caught up when `REQ-UART-038` landed. Same stale-catalog-entry pattern already found and fixed 3+ times earlier this session (`REQ-RMAP-033`/`034`/`037` and others) -- caught this time by noticing `REQ-UART-037`'s own text directly contradicted `-036`'s claim ("the register block... now carries these three registers" vs. "no register-map serialization").
+
+Added the missing `//cfusa:test REQ-UART-036` tag (the test coverage was always real; only the tag was missing) and a `//cfusa:req REQ-UART-036` tag on `rcp_ep_uart_render_registers()` itself.
+
+65/65 both trees (unchanged, no functional edit). `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.262.0 -- 2026-08-12 (issue #201 batch: `REQ-ADC-031`, the ADC endpoint's five Table 50 trigger outputs)
 
 **New `rcp_ep_adc_trigger_state_t`/`rcp_ep_adc_trigger_evaluate()` (ep_adc.h/ep_adc.c) model all 5 of TC18 §13.7.9.1 Table 50's ADC trigger outputs -- status flips to `implemented`.**

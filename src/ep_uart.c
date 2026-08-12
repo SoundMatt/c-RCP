@@ -150,6 +150,7 @@ static uint8_t half_units_to_stop_bits(uint8_t half_units)
                              : (uint8_t)RCP_EP_UART_STOP_BITS_ONE;
 }
 
+//cfusa:req REQ-UART-036
 //cfusa:req REQ-UART-039
 void rcp_ep_uart_render_registers(const rcp_ep_uart_functional_cfg_t *cfg,
                                    uint8_t out[RCP_EP_UART_EP_FUNC_LEN])

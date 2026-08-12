@@ -10437,12 +10437,12 @@
     {
       "id": "REQ-UART-036",
       "title": "uart_ep_len, the reserved octet, and uart_ep_status register rows of Table 48",
-      "text": "NOT IMPLEMENTED: c-RCP does not model the UART functional-configuration block's own descriptor and status registers (TC18 \u00a713.7.8.2 Table 48): uart_ep_len (relative address 0x0000, 8 bit, R \u2014 the length of this description in octets), the reserved octet at 0x0001 (8 bit, R, reads 0x00), and uart_ep_status (0x0004, 16 bit, R/W). rcp_ep_uart_functional_cfg_t is a plain C struct with no register-map serialization, so a client walking the EP functional-config table cannot discover this block's length or read its status. Consequence: the UART block is not enumerable or serializable over the wire at the addresses Table 48 fixes.",
+      "text": "IMPLEMENTED, TEXT CORRECTED 2026-08-12 (issue #201 batch, doc-only): this entry's own claim was stale, not the code -- REQ-UART-038's own earlier fix (issue #256 Group I, 2026-08-11) already added exactly this register block. rcp_ep_uart_render_registers()/_apply_reconfig() (src/ep_uart.c) serialize uart_ep_len (RCP_EP_UART_REG_EP_LEN, 0x0000, 8 bit, R -- renders RCP_EP_UART_EP_FUNC_LEN), the reserved octet (RCP_EP_UART_REG_RESERVED_01, 0x0001, 8 bit, R -- renders 0x00), and uart_ep_status (RCP_EP_UART_REG_EP_STATUS, 0x0004, 16 bit, R/W -- rcp_ep_uart_functional_cfg_t::ep_status), all directly TC18.txt-verified and covered by tests/test_ep_uart.c's own existing register-block tests. This entry's own text and status simply never caught up when REQ-UART-038 landed -- the same stale-catalog-entry pattern already found and fixed 3+ times earlier this session (REQ-RMAP-033/034/037 and others).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "implemented",
       "tc18": "\u00a713.7.8.2 Table 48, TC18.txt L4915-4917 and L4927"
     },
     {

@@ -30,6 +30,7 @@
 //cfusa:test REQ-UART-029
 //cfusa:test REQ-UART-030
 //cfusa:test REQ-UART-031
+//cfusa:test REQ-UART-036
 //cfusa:test REQ-UART-039
 //cfusa:test REQ-UART-040
 #include "unity.h"
