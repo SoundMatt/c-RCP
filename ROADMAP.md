@@ -15205,6 +15205,34 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.269.0 -- 2026-08-12 (issue #201 batch: `REQ-UART-034`, UART
+read_size widened to the ACF header's full 12-bit field)
+
+**`rcp_ep_uart_encode_read_request()`/`_decode_read_request()`'s
+`read_size` is now `uint16_t`, matching the ACF header's own 12-bit
+`read_size_or_segment_num` field -- status flips to `implemented`.**
+
+TC18 §13.7.8.1 explicitly contemplates a `read_size` larger than
+`uart_rx_fifo_size` as the third UART read-completion trigger,
+driving a fragmented response. `read_size` was previously narrowed
+to `uint8_t` (0-255), on the file header's own now-corrected
+reasoning that 255 bytes always fits a single AVTPDU so the
+fragmentation mechanism was never actually needed -- that didn't
+survive TC18's own text: a conforming peer's request in the
+256..4095 range was simply inexpressible.
+
+**Real signature change to a function with real callers**: updated
+every call site -- `src/adapt.c`'s `RCP_ADAPT_OP_UART_READ`, plus
+test call sites across two test files. Rewrote the pre-existing
+gap-pinning test to assert the fixed round-trip, and added a new
+dedicated test verifying a value above 255 round-trips exactly.
+
+Mutation-tested (reintroducing the 8-bit truncation on decode):
+caught cleanly.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.268.0 -- 2026-08-12 (issue #201 batch: `REQ-SRV-016`, a
 disabled endpoint's request queuing now emits the requested
 acknowledge)

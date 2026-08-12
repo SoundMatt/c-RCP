@@ -114,23 +114,32 @@
  * bytes. The real RC Server races that read_size against the endpoint's
  * uart_timeout_ms functional-config field (whichever completes the read
  * first), which can yield a response shorter than the requested
- * read_size -- a *short read*. rcp_ep_uart_encode_read_request()'s
- * read_size parameter is itself one octet wide, so this endpoint's own
- * largest possible read response (255 bytes) always fits comfortably
- * within a single AVTPDU regardless -- unlike ep_can.h's CAN XL captured
- * frames (up to 2054 bytes), this endpoint's own traffic never actually
- * needs fragment.h's ms/segment_num mechanism (Phase 20, ROADMAP.md
- * milestone 76) in real-world use. rcp_ep_uart_encode_read_response_fragmented()/
- * rcp_ep_uart_decode_read_response_fragment() below are nonetheless
- * provided -- retrofitted uniformly across every Phase 20 target endpoint,
- * per that milestone's own roadmap scope -- and are exercised end-to-end
- * in this module's own test suite against a deliberately small
- * max_fragment_payload, closing the deferred single-AVTPDU-worst-case
- * test milestone 66 left open, even though this endpoint's own read_size
- * width means the mechanism is never actually reachable from genuine
- * UART traffic. rcp_ep_uart_decode_read_response() (the plain,
- * unfragmented codec) is unchanged and remains the ordinary path for
- * every real read response.
+ * read_size -- a *short read*.
+ *
+ * CORRECTED 2026-08-12 (issue #201, REQ-UART-034): rcp_ep_uart_encode_
+ * read_request()'s read_size parameter is now the ACF header's own full
+ * 12-bit width (0-4095, uint16_t) rather than one octet -- this was
+ * previously narrowed to uint8_t, on the reasoning that this endpoint's
+ * largest possible read response (255 bytes) always fit comfortably
+ * within a single AVTPDU regardless, so fragment.h's ms/segment_num
+ * mechanism (Phase 20, ROADMAP.md milestone 76) was never actually
+ * reachable from genuine UART traffic. That reasoning does not survive
+ * TC18 §13.7.8.1's own text, which explicitly contemplates a read_size
+ * larger than uart_rx_fifo_size as the THIRD read-completion trigger
+ * (alongside read_size-satisfied and uart_timeout expiry), driving a
+ * fragmented response via exactly the mechanism this module already
+ * provides below -- a conforming peer requesting more than 255 bytes was
+ * simply inexpressible before this fix, not merely unreachable in
+ * "real-world use." rcp_ep_uart_encode_read_response_fragmented()/
+ * rcp_ep_uart_decode_read_response_fragment() below are unchanged by
+ * this fix -- retrofitted uniformly across every Phase 20 target
+ * endpoint, per that milestone's own roadmap scope, and exercised
+ * end-to-end in this module's own test suite against a deliberately
+ * small max_fragment_payload -- but ARE now genuinely reachable from a
+ * request this module can itself originate, not merely a defensive
+ * provision for an unreachable case. rcp_ep_uart_decode_read_response()
+ * (the plain, unfragmented codec) is unchanged and remains the ordinary
+ * path for every real read response.
  *
  * ── The payload-bearing-read-request rejection: a deliberate asymmetry ─────
  *
@@ -571,8 +580,19 @@ rcp_ep_uart_errc_t rcp_ep_uart_decode_write_response(const uint8_t *b, size_t le
 
 /* Encodes an ACF_ABB read (RX) request addressed to byte_bus_id, with no
  * payload: read_size rides the ACF byte_message_info header's own
- * read_size_or_segment_num field (acf.h) -- see the file header. */
-rcp_bytes_t rcp_ep_uart_encode_read_request(rcp_byte_bus_id_t byte_bus_id, uint8_t read_size,
+ * read_size_or_segment_num field (acf.h) -- see the file header.
+ *
+ * FIXED 2026-08-12 (issue #201, REQ-UART-034): read_size widened from
+ * uint8_t to uint16_t -- the ACF header's own read_size_or_segment_num
+ * field is 12 bits wide (0-4095, acf.h), and TC18 §13.7.8.1 explicitly
+ * contemplates a read_size larger than uart_rx_fifo_size driving a
+ * fragmented response (rcp_ep_uart_encode_read_response_fragmented(),
+ * above) -- a case this module could not even originate a request for
+ * while read_size stayed truncated to 8 bits (0-255). Values above 4095
+ * are the caller's own responsibility to avoid; this function does not
+ * itself validate the range (matching every other endpoint's own
+ * read_size parameter, e.g. rcp_ep_adc_encode_read_request()). */
+rcp_bytes_t rcp_ep_uart_encode_read_request(rcp_byte_bus_id_t byte_bus_id, uint16_t read_size,
                                              uint8_t transaction_num);
 
 /* Decodes and validates an ACF-level UART read request from b[0..len).
@@ -586,10 +606,14 @@ rcp_bytes_t rcp_ep_uart_encode_read_request(rcp_byte_bus_id_t byte_bus_id, uint8
  * if its evt[2:0] is not 0b000 (rcp_acf_evt_row2_is_plain(), TC18 §13.5
  * Table 30 -- the caller shall respond with error code UNSUPPORTED_CMD).
  * On RCP_EP_UART_OK,
- * *out_read_size and *out_transaction_num are populated. */
+ * *out_read_size and *out_transaction_num are populated.
+ *
+ * FIXED 2026-08-12 (issue #201, REQ-UART-034): *out_read_size widened
+ * from uint8_t to uint16_t -- see the encode side's own doc comment,
+ * above, for why. */
 rcp_ep_uart_errc_t rcp_ep_uart_decode_read_request(const uint8_t *b, size_t len,
                                                     rcp_byte_bus_id_t expected_bus_id,
-                                                    uint8_t *out_read_size,
+                                                    uint16_t *out_read_size,
                                                     uint8_t *out_transaction_num);
 
 /* Encodes a read (RX) response carrying rx_data[0..rx_len) (the bytes

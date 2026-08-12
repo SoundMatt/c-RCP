@@ -279,7 +279,7 @@ rcp_bytes_t rcp_message_to_request(rcp_adapt_op_t op, rcp_byte_bus_id_t byte_bus
     case RCP_ADAPT_OP_UART_READ: {
         uint32_t read_size;
         if (!meta_get_u32(msg, "rcp.uart.read_size", &read_size)) return fail_encode(out_err);
-        result = rcp_ep_uart_encode_read_request(byte_bus_id, (uint8_t)read_size,
+        result = rcp_ep_uart_encode_read_request(byte_bus_id, (uint16_t)read_size,
                                                   transaction_num);
         break;
     }

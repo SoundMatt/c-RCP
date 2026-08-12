@@ -30,6 +30,7 @@
 //cfusa:test REQ-UART-029
 //cfusa:test REQ-UART-030
 //cfusa:test REQ-UART-031
+//cfusa:test REQ-UART-034
 //cfusa:test REQ-UART-036
 //cfusa:test REQ-UART-039
 //cfusa:test REQ-UART-040
@@ -649,13 +650,31 @@ static void test_write_response_decode_rejects_wrong_bus_and_short_frame(void)
 static void test_read_request_round_trip(void)
 {
     rcp_bytes_t frame = rcp_ep_uart_encode_read_request(6, 64, 3);
-    uint8_t     read_size = 0;
+    uint16_t    read_size = 0;
     uint8_t     txn = 0;
 
     TEST_ASSERT_NOT_NULL(frame.data);
     TEST_ASSERT_EQUAL(RCP_EP_UART_OK,
         rcp_ep_uart_decode_read_request(frame.data, frame.len, 6, &read_size, &txn));
-    TEST_ASSERT_EQUAL_UINT8(64, read_size);
+    TEST_ASSERT_EQUAL_UINT16(64, read_size);
+    TEST_ASSERT_EQUAL_UINT8(3, txn);
+
+    rcp_bytes_free(&frame);
+}
+
+/* FIXED 2026-08-12 (issue #201, REQ-UART-034): a read_size above 255 --
+ * previously inexpressible, since the parameter was narrowed to uint8_t
+ * -- now round-trips through the full 12-bit ACF header field. */
+static void test_read_request_round_trip_above_255(void)
+{
+    rcp_bytes_t frame = rcp_ep_uart_encode_read_request(6, 4000u, 3);
+    uint16_t    read_size = 0;
+    uint8_t     txn = 0;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_EP_UART_OK,
+        rcp_ep_uart_decode_read_request(frame.data, frame.len, 6, &read_size, &txn));
+    TEST_ASSERT_EQUAL_UINT16(4000u, read_size);
     TEST_ASSERT_EQUAL_UINT8(3, txn);
 
     rcp_bytes_free(&frame);
@@ -666,7 +685,7 @@ static void test_read_request_rejects_payload_with_unknown_cmd(void)
     rcp_acf_byte_message_info_t hdr = {0};
     uint8_t                     payload[1] = {0x01};
     rcp_bytes_t                 frame;
-    uint8_t                     read_size;
+    uint16_t                    read_size;
     uint8_t                     txn;
 
     hdr.byte_bus_id = 6;
@@ -686,7 +705,7 @@ static void test_read_request_rejects_wrong_bus_op_short_frame(void)
     rcp_acf_byte_message_info_t  wrong_op_hdr = {0};
     rcp_bytes_t                  wrong_op_frame;
     uint8_t                      too_short[3] = {0};
-    uint8_t                      read_size;
+    uint16_t                     read_size;
     uint8_t                      txn;
 
     TEST_ASSERT_EQUAL(RCP_EP_UART_ERR_WRONG_BUS,
@@ -712,7 +731,7 @@ static void test_read_request_rejects_nonzero_evt(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
     rcp_bytes_t                 frame;
-    uint8_t                     read_size;
+    uint16_t                    read_size;
     uint8_t                     txn;
 
     hdr.byte_bus_id = 6;
@@ -759,7 +778,7 @@ static void test_read_response_round_trip_short_read_single_avtpdu(void)
     uint8_t     rx[3] = {0x01, 0x02, 0x03}; /* far fewer than the requested 32 */
     rcp_bytes_t frame = rcp_ep_uart_encode_read_response(2, rx, sizeof(rx), 5, true,
                                                            0x1122334455667788ull);
-    uint8_t     requested_read_size = 0;
+    uint16_t    requested_read_size = 0;
     uint8_t     req_txn = 0;
     const uint8_t *out_rx = NULL;
     size_t      out_rx_len = 0;
@@ -770,7 +789,7 @@ static void test_read_response_round_trip_short_read_single_avtpdu(void)
     TEST_ASSERT_EQUAL(RCP_EP_UART_OK,
         rcp_ep_uart_decode_read_request(read_req.data, read_req.len, 2, &requested_read_size,
                                          &req_txn));
-    TEST_ASSERT_EQUAL_UINT8(32, requested_read_size);
+    TEST_ASSERT_EQUAL_UINT16(32, requested_read_size);
 
     TEST_ASSERT_EQUAL(RCP_EP_UART_OK,
         rcp_ep_uart_decode_read_response(frame.data, frame.len, 2, &out_rx, &out_rx_len, &timed,
@@ -954,6 +973,7 @@ int main(void)
     RUN_TEST(test_write_response_decode_rejects_wrong_bus_and_short_frame);
 
     RUN_TEST(test_read_request_round_trip);
+    RUN_TEST(test_read_request_round_trip_above_255);
     RUN_TEST(test_read_request_rejects_payload_with_unknown_cmd);
     RUN_TEST(test_read_request_rejects_wrong_bus_op_short_frame);
     RUN_TEST(test_read_request_rejects_nonzero_evt);

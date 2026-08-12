@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.269.0 -- 2026-08-12 (issue #201 batch: `REQ-UART-034`, UART read_size widened to the ACF header's full 12-bit field)
+
+**`rcp_ep_uart_encode_read_request()`/`_decode_read_request()`'s `read_size` is now `uint16_t`, matching the ACF header's own 12-bit `read_size_or_segment_num` field -- status flips to `implemented`.**
+
+TC18 §13.7.8.1 explicitly contemplates a `read_size` larger than `uart_rx_fifo_size` as the third UART read-completion trigger (alongside `read_size`-satisfied and `uart_timeout` expiry), driving a fragmented response via `rcp_ep_uart_encode_read_response_fragmented()`. `read_size` was previously narrowed to `uint8_t` (0-255), on the file header's own now-corrected reasoning that this endpoint's traffic never actually needs the fragmentation mechanism because 255 bytes always fits a single AVTPDU -- that reasoning didn't survive TC18's own text: a conforming peer's request in the 256..4095 range was simply inexpressible, not merely "unreachable in real-world use." The fragmentation mechanism (retrofitted uniformly across every Phase 20 target endpoint, already exercised end-to-end in this module's own test suite) is now genuinely reachable from a request this module can itself originate.
+
+**Real signature change to a function with real callers**: updated every call site -- `src/adapt.c`'s `RCP_ADAPT_OP_UART_READ`, plus test call sites across `tests/test_ep_uart.c` and `tests/test_tc18_gaps_ep2.c`. Rewrote the pre-existing `REQ-UART-034` gap-pinning test (`test_uart_read_size_truncates_above_one_octet` -> `test_uart_read_size_above_one_octet_round_trips`) to assert the fixed round-trip, and added a new dedicated test in `test_ep_uart.c` verifying a value above 255 (4000) round-trips exactly.
+
+Mutation-tested (reintroducing the 8-bit truncation on decode): caught cleanly.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.268.0 -- 2026-08-12 (issue #201 batch: `REQ-SRV-016`, a disabled endpoint's request queuing now emits the requested acknowledge)
 
 **New `rcp_acf_evt_requests_acknowledge()`/`rcp_acf_build_acknowledge_response()` (acf.h/acf.c) plus a new `out_ack` parameter on `rcp_server_endpoint_submit()` -- status flips to `implemented`.**

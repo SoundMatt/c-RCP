@@ -10415,12 +10415,12 @@
     {
       "id": "REQ-UART-034",
       "title": "UART read_size is narrowed to 8 bits, below the ACF header's 12-bit read_size field",
-      "text": "NOT IMPLEMENTED: c-RCP narrows the UART read request's read_size to one octet (rcp_ep_uart_encode_read_request()'s uint8_t read_size parameter, ep_uart.h:357), so it cannot express a read_size above 255, whereas the ACF byte_message_info read_size_or_segment_num field is 12 bits wide (0-4095, acf.h:257) and TC18 \u00a713.7.8.1 explicitly contemplates a read_size larger than uart_rx_fifo_size driving a fragmented response. Consequence: c-RCP cannot originate \u2014 and rcp_ep_uart_decode_read_request()'s uint8_t *out_read_size cannot faithfully surface \u2014 a conforming peer's UART read request in the 256..4095 range.",
+      "text": "IMPLEMENTED (2026-08-12, issue #201 Phase 5e): rcp_ep_uart_encode_read_request()'s read_size parameter and rcp_ep_uart_decode_read_request()'s *out_read_size are now uint16_t, matching the ACF byte_message_info read_size_or_segment_num field's own full 12-bit width (0-4095, acf.h). c-RCP can now originate, and faithfully surface, a conforming peer's UART read request anywhere in the 0..4095 range -- previously narrowed to uint8_t, silently truncating any request above 255 (this file header's own since-corrected rationale, that this endpoint's traffic never actually needs fragment.h's ms/segment_num mechanism because 255 bytes always fits a single AVTPDU, did not survive TC18 \u00a713.7.8.1's own text: a read_size larger than uart_rx_fifo_size is the THIRD read-completion trigger, explicitly driving a fragmented response via the mechanism this module already provides). Updated every call site (src/adapt.c's RCP_ADAPT_OP_UART_READ, plus test call sites across tests/test_ep_uart.c and tests/test_tc18_gaps_ep2.c). Mutation-tested (reintroducing the 8-bit truncation on decode): caught cleanly.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "implemented",
       "tc18": "\u00a713.7.8.1, TC18.txt L4884-4886 (read_size field width)"
     },
     {
