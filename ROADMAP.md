@@ -15205,6 +15205,38 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.257.0 -- 2026-08-12 (issue #201 batch: `REQ-WAKEUP-020`,
+WakeUp endpoint's fixed EP_Nr)
+
+**New `rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id()` diagnostic and
+`RCP_EP_WAKEUP_ENDPOINT_NUM` constant close the "no constant, no
+check" half of `REQ-WAKEUP-020` (TC18 §13.7.2.1: the WakeUp endpoint
+is fixed to endpoint nr 1).**
+
+TC18's "endpoint nr 1" refers to `rcp_regmap_ep_id_map_entry_t::ep_id`
+-- EP_ID_config's own EP_Nr field (TC18 §12.7.8 Table 23) -- not
+`RCP_EP_WAKEUP_EP_TYPE` (this codebase's own internal ep_type tag on a
+different table; both equaling 1 is coincidental, not a TC18
+identity). The new diagnostic matches `REQ-RMAP-057`/`-058`'s own
+sibling checks for this same table's other two §12.7.8
+recommendations: a caller-supplied, index-parallel `ep_types[]` array
+checked against a caller-supplied `target_ep_type`/`required_ep_id`
+pair, keeping `regmap.c` free of any dependency on a concrete
+endpoint-type header. `byte_bus_id` itself stays untouched -- TC18
+§13.7.2.2 states it is "also defined via the EP_ID_map" the same way
+as any other endpoint, so only the fixed EP_Nr is pinned.
+
+**Stays `partial`**: like its two siblings, a read-only diagnostic,
+not enforcement -- `rcp_regmap_ep_id_map_apply_reconfig()` does not
+reject a violating write.
+
+One new test, mirroring `REQ-RMAP-058`'s own test shape. Mutation-
+tested 2 ways (always-true; wrong struct field checked); both caught
+cleanly.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.256.0 -- 2026-08-12 (issue #201 batch: `REQ-WDG-010`, wiring
 the per-stream watchdog kick into `dispatch_e2e()`)
 

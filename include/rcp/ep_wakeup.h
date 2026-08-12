@@ -258,6 +258,27 @@ extern "C" {
 /* This endpoint type's assigned regmap.h ep_type value -- see the file header. */
 #define RCP_EP_WAKEUP_EP_TYPE ((uint8_t)0x01u)
 
+/* REQ-WAKEUP-020: TC18 §13.7.2.1 ("The WakeUp endpoint is a special
+ * endpoint and as this fixed to the endpoint nr 1, as it is the only
+ * endpoint which stays active in Sleep mode") -- the fixed EP_Nr/ep_id
+ * a WakeUp-type row in EP_ID_config (regmap.h's own
+ * rcp_regmap_ep_id_map_entry_t::ep_id, TC18 §12.7.8 Table 23) must
+ * carry, distinct from RCP_EP_WAKEUP_EP_TYPE above (this codebase's own
+ * internal ep_type tag, a different field on a different table --
+ * their numeric value both being 1 is this codebase's own coincidence,
+ * not a TC18 identity). byte_bus_id itself (the wire routing address
+ * every rcp_ep_wakeup_* entry point below still takes as a plain
+ * caller-supplied parameter, matching every other endpoint type in
+ * this codebase) is unaffected -- TC18 §13.7.2.2 states byte_bus_id is
+ * "also defined via the EP_ID_map" the same way as any other endpoint,
+ * so it is not, and must not be, additionally pinned by this constant.
+ * See rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id() (regmap.h) for the
+ * dedicated diagnostic checking a whole EP_ID_config table against
+ * this invariant -- a read-only recommendation check, not enforcement,
+ * matching every other TC18 §12.7.8 recommendation this codebase
+ * already models this way (REQ-RMAP-057/058). */
+#define RCP_EP_WAKEUP_ENDPOINT_NUM ((uint16_t)1u)
+
 /* ── Wake-source pin configuration/monitoring ────────────────────────────────── */
 
 #define RCP_EP_WAKEUP_MAX_SOURCES ((size_t)8u)

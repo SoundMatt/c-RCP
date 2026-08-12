@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.257.0 -- 2026-08-12 (issue #201 batch: `REQ-WAKEUP-020`, WakeUp endpoint's fixed EP_Nr)
+
+**New `rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id()` diagnostic and `RCP_EP_WAKEUP_ENDPOINT_NUM` constant close the "no constant, no check" half of `REQ-WAKEUP-020` (TC18 §13.7.2.1: "The WakeUp endpoint is a special endpoint and as this fixed to the endpoint nr 1").**
+
+TC18's "endpoint nr 1" refers to `rcp_regmap_ep_id_map_entry_t::ep_id` -- EP_ID_config's own EP_Nr field (TC18 §12.7.8 Table 23) -- not `RCP_EP_WAKEUP_EP_TYPE` (this codebase's own internal ep_type tag on a different table entirely; both happening to equal 1 is coincidental). The new diagnostic is shaped identically to `REQ-RMAP-057`/`-058`'s own sibling checks for this same table's other two TC18 §12.7.8 recommendations: a caller-supplied, index-parallel `ep_types[]` array (the row itself carries no `ep_type` field) checked against a caller-supplied `target_ep_type`/`required_ep_id` pair, keeping `regmap.c` free of any dependency on a concrete endpoint-type header. `byte_bus_id` itself (every `rcp_ep_wakeup_*` entry point's own routing-address parameter) is deliberately left untouched -- TC18 §13.7.2.2 states it is "also defined via the EP_ID_map" the same way as any other endpoint, so only the fixed EP_Nr is pinned, not the wire address.
+
+**Stays `partial`, not `implemented`**: like its two siblings, this is a read-only diagnostic, not enforcement -- nothing in `rcp_regmap_ep_id_map_apply_reconfig()` rejects a write that would violate the invariant, matching this table's own established "recommendation, not enforcement" disposition throughout.
+
+One new test mirrors `REQ-RMAP-058`'s own dedicated test shape (correct/wrong/no-such-type/vacuous cases). Mutation-tested 2 ways (always return true; check the wrong struct field) -- both caught cleanly.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.256.0 -- 2026-08-12 (issue #201 batch: `REQ-WDG-010`, wiring the per-stream watchdog kick into `dispatch_e2e()`)
 
 **`rcp_mock_server_dispatch_e2e()`/`_dispatch_frame_e2e()` now call `rcp_watchdog_keeper_kick()` for every request they receive on a stream, closing the "no production call site" half of `REQ-WDG-010` (TC18 §12.7.7: "the watchdog is reset with each request received from this RC Client").**

@@ -1594,3 +1594,20 @@ bool rcp_regmap_ep_id_map_shared_bus_homogeneous(const rcp_regmap_ep_id_map_entr
 
     return true;
 }
+
+//cfusa:req REQ-WAKEUP-020
+bool rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id(const rcp_regmap_ep_id_map_entry_t *entries,
+                                                    const uint8_t *ep_types, size_t count,
+                                                    uint8_t target_ep_type,
+                                                    uint16_t required_ep_id)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        if (ep_types[i] == target_ep_type && entries[i].ep_id != required_ep_id) {
+            return false;
+        }
+    }
+
+    return true;
+}

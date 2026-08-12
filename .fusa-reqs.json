@@ -9822,12 +9822,12 @@
     {
       "id": "REQ-WAKEUP-020",
       "title": "WakeUp endpoint is fixed to endpoint number 1",
-      "text": "NOT IMPLEMENTED: c-RCP does not pin the WakeUp endpoint to endpoint number 1 as TC18 13.7.2.1 requires; rcp_ep_wakeup_* entry points accept any caller-supplied byte_bus_id and the library defines no constant for the fixed WakeUp endpoint index, so the 'only endpoint that stays active in Sleep mode' invariant is the integrator's to uphold.",
+      "text": "PARTIAL, UPDATED 2026-08-12 (issue #201 batch 5): TC18 \u00a713.7.2.1 fixes the WakeUp endpoint's own EP_Nr (regmap.h's EP_ID_config row field, rcp_regmap_ep_id_map_entry_t::ep_id, TC18 \u00a712.7.8 Table 23) to 1, distinct from RCP_EP_WAKEUP_EP_TYPE (this codebase's own internal ep_type tag on a different table -- their numeric value both being 1 is coincidental, not a TC18 identity). New RCP_EP_WAKEUP_ENDPOINT_NUM constant (ep_wakeup.h) names the required value, and rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id() (regmap.h/regmap.c) is a dedicated diagnostic checking a whole EP_ID_config table against it -- same shape and same disposition as REQ-RMAP-057/058's own sibling diagnostics for this table's other two TC18 \u00a712.7.8 recommendations. Remains PARTIAL, not fully implemented: like those two siblings, this is a read-only diagnostic, not enforcement -- nothing in this codebase's own EP_ID_config write path (rcp_regmap_ep_id_map_apply_reconfig()) rejects a write that would violate the invariant; byte_bus_id itself (the wire routing address every rcp_ep_wakeup_* entry point still takes as a plain caller-supplied parameter) is correctly left unconstrained by this fix, since TC18 \u00a713.7.2.2 states byte_bus_id is 'also defined via the EP_ID_map' the same way as any other endpoint.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "partial",
       "tc18": "\u00a713.7.2.1, TC18.txt L4085-4086"
     },
     {

@@ -2327,6 +2327,31 @@ bool rcp_regmap_ep_id_map_shared_bus_homogeneous(const rcp_regmap_ep_id_map_entr
                                                   const uint8_t *ep_types,
                                                   size_t count);
 
+/* REQ-WAKEUP-020: TC18 §13.7.2.1 fixes the WakeUp endpoint's own EP_Nr
+ * (this table's own ep_id field, TC18 §12.7.8 Table 23) to 1 -- "The
+ * WakeUp endpoint is a special endpoint and as this fixed to the
+ * endpoint nr 1, as it is the only endpoint which stays active in
+ * Sleep mode." Same shape as REQ-RMAP-057/058 above: a caller-supplied,
+ * index-parallel ep_types[] array (this row carries no ep_type of its
+ * own, same reason _shared_bus_homogeneous() above takes one), checked
+ * against a caller-supplied target_ep_type/required_ep_id pair rather
+ * than this generic regmap.c module hardcoding ep_wakeup.h's own
+ * RCP_EP_WAKEUP_EP_TYPE/RCP_EP_WAKEUP_ENDPOINT_NUM constants -- regmap.c
+ * has no dependency on any concrete endpoint-type header, and this
+ * function does not introduce one. Returns true iff every row whose
+ * ep_types[i] == target_ep_type has ep_id == required_ep_id; vacuously
+ * true if no such row exists (count == 0, or simply no row of that
+ * ep_type). O(count). Read-only diagnostic, not enforcement -- same
+ * disposition as every other TC18 §12.7.8 recommendation this module
+ * already models this way; nothing in this codebase stops a caller
+ * from writing an EP_ID_config row that violates this invariant.
+ * entries/ep_types may both be NULL iff count == 0; when non-NULL each
+ * must have at least count elements, index-aligned with entries. */
+bool rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id(const rcp_regmap_ep_id_map_entry_t *entries,
+                                                    const uint8_t *ep_types, size_t count,
+                                                    uint8_t target_ep_type,
+                                                    uint16_t required_ep_id);
+
 /* ── EP0 address-routed dispatcher (issue #301, issue #306) ────────────────
  *
  * Generalizes rcp_regmap_general_decode_write_request() (which only
