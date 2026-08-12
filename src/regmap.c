@@ -978,6 +978,57 @@ bool rcp_regmap_ep_req_storage_size_octets_to_words(uint32_t octets,
     return true;
 }
 
+//cfusa:req REQ-RMAP-073
+//cfusa:req REQ-RMAP-074
+//cfusa:req REQ-RMAP-075
+//cfusa:req REQ-RMAP-076
+//cfusa:req REQ-RMAP-077
+//cfusa:req REQ-RMAP-078
+void rcp_regmap_ep_generic_cfg_render(const rcp_regmap_ep_generic_cfg_t *entries,
+                                       size_t count, uint8_t *out)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        uint8_t  delay_reg;
+        uint16_t req_storage_words;
+        uint8_t  octet1;
+
+        /* ep_delay_time -> reg: fall back to 0 (1us, the shortest valid
+         * delay) if the internal value is not exactly one of the 4
+         * allowed ones -- expected for any not-yet-configured endpoint
+         * (ep_delay_time's own zero-init default is not itself a valid
+         * register value). See this function's own doc comment
+         * (regmap.h) for the full "never grant more delay than
+         * configured" rationale. */
+        if (!rcp_regmap_ep_delay_time_us_to_reg(entries[i].ep_delay_time, &delay_reg)) {
+            delay_reg = 0u;
+        }
+
+        /* ep_req_storage_size -> words: clamp down to the nearest
+         * representable word count if the internal octet value is not
+         * an exact multiple of 4 or exceeds the register's own 16-bit
+         * width -- same "never grant more than configured" bias,
+         * saturating rather than wrapping. */
+        if (!rcp_regmap_ep_req_storage_size_octets_to_words(entries[i].ep_req_storage_size,
+                                                              &req_storage_words)) {
+            uint32_t clamped = entries[i].ep_req_storage_size;
+
+            if (clamped > 0xFFFFu * 4u) clamped = 0xFFFFu * 4u; /* max representable octets */
+            req_storage_words = (uint16_t)(clamped / 4u);       /* floor: rounds down, never up */
+        }
+
+        octet1 = (uint8_t)((entries[i].ep_used ? 0x01u : 0x00u) | ((delay_reg & 0x3u) << 4));
+
+        out[12u * i + 0u] = entries[i].ep_type;
+        out[12u * i + 1u] = octet1;
+        put_u16(&out[12u * i + 2u], req_storage_words);
+        put_u32(&out[12u * i + 4u], entries[i].ep_description);
+        put_u16(&out[12u * i + 8u], entries[i].ep_tx_buffer_size);
+        put_u16(&out[12u * i + 10u], entries[i].ep_rx_buffer_size);
+    }
+}
+
 //cfusa:req REQ-RMAP-017
 void rcp_regmap_ep_functional_cfg_init(rcp_regmap_ep_functional_cfg_t *cfg)
 {
