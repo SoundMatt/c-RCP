@@ -34,6 +34,24 @@ the rationale.
 
 ## Releases
 
+### v0.244.0 -- 2026-08-11 (RMAP addressing architecture resolved; issue #301)
+
+**User-directed re-investigation: the shared "how does a client's request address relate to a Table 18 pointer's value" question, left genuinely unresolved across the whole RMAP phase (issue #200), is now answered.**
+
+Direct verification of the current RC5 baseline PDF (`OA_TC18_specification_v_0.5.1_RC_5_3624.pdf`, page 61) shows Table 18's own address column is explicitly headed **"Absolute address"** — this codebase's own prior comments throughout `regmap.h` mis-cited it as "relative address" (now corrected, 25+ occurrences, scoped precisely to Table 18's own field comments; HW_config's own row-address citations, confirmed genuinely "Relative Address" against the current PDF's own Table 21, deliberately left untouched — a different, still-correct concept for a different table).
+
+This confirms every `_ptr` field in Table 18 shares ONE continuous address space scoped to EP0 (`byte_bus_id=0`): a pointer field's own value is itself an absolute address in that same space. A client reaches a pointed-to table (HW_config, EP_ID_config, response-queue config) via the same generic `evt[2:0]=111b` configuration mechanism every endpoint type already has a client-side encoder for (TC18 §12.7.1 Figure 19), targeted at `byte_bus_id=0` with `start_address` = the pointer's own current value.
+
+Broader finding, tracked but out of scope for this PR: no endpoint type in this codebase has a **server-side** decode/dispatch for `evt=111b` requests at all, in either direction — every existing `apply_reconfig()` takes already-decoded raw payload bytes, and no read-side counterpart exists anywhere. Filed as [c-RCP#301](https://github.com/SoundMatt/c-RCP/issues/301) with the full architecture plan and batch order.
+
+**REQ-RMAP-040/041 (HW_config) closed as far as this batch goes**: new `rcp_regmap_hw_pin_map_apply_reconfig()` (the parse-side inverse of the already-existing `rcp_regmap_hw_pin_map_render()`, same patch-then-reparse idiom every other endpoint type's own `apply_reconfig()` uses) and `rcp_regmap_ep0_decode_write_request()` (the generalized, address-routed dispatcher generalizing `rcp_regmap_general_decode_write_request()` to route between Table 18's own extent — always denied, reusing REQ-RMAP-025's own logic — and HW_config's own extent — applied). A remote client can now write HW_config over the wire. Still open: the READ side (an address-routed `rcp_regmap_ep0_encode_read_response()`) doesn't exist yet, and this dispatcher doesn't itself enforce HW_UNCONFIGURED-only writability (deferred to whatever caller eventually owns lifecycle-state context, matching REQ-RMAP-025's own established precedent).
+
+New tests: `test_hw_pin_map_apply_reconfig_patches_addressed_octets_only`, `test_hw_pin_map_apply_reconfig_rejects_out_of_range_leaving_table_untouched`, `test_ep0_dispatcher_routes_table18_hw_config_and_unknown_addresses` (full 5-case coverage: Table 18 rejection, HW_config apply, HW_config out-of-range, unknown address, ACF-level frame failure).
+
+Mutation-tested two ways: loosening the out-of-range bounds check, and loosening the HW_config address-range routing condition — both produced clean, deterministic assertion failures (the second one caught by two different tests simultaneously). Reverted, full suite re-verified byte-identical.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.243.0 -- 2026-08-11 (additive, zero blast radius to existing callers)
 
 **Phase 5e batch 3 (issue #201): REQ-TIMED-013, the missing ACF_ABB-over-TSCF timed-request encoder.**
