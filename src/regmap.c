@@ -929,6 +929,9 @@ rcp_lifecycle_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map
 /* ── The generic-vs-functional per-endpoint config split ───────────────────── */
 
 //cfusa:req REQ-RMAP-016
+//cfusa:req REQ-RMAP-073
+//cfusa:req REQ-RMAP-074
+//cfusa:req REQ-RMAP-075
 void rcp_regmap_ep_generic_cfg_init(rcp_regmap_ep_generic_cfg_t *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));

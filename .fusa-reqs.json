@@ -9469,6 +9469,39 @@
       "tc18": "\u00a712.3.1.2 (general write-authorization semantics) + \u00a712.7.6/\u00a712.7.7/\u00a712.7.9 (per-table access-type overrides, see REQ-RMAP-040/047/052/061's own citations)"
     },
     {
+      "id": "REQ-RMAP-073",
+      "title": "rcp_regmap_ep_generic_cfg_t carries ep_description, a content-modeling gap TC18 Table 28/31 defines but this struct never had",
+      "text": "PARTIAL: rcp_regmap_ep_generic_cfg_t shall carry ep_description (TC18 \u00a713.2 Table 28/31, relative address 0x0004, 32 bit, R/W*): a user-defined description, no further structure given by TC18 beyond its own 32-bit width. Found 2026-08-11 (issue #311) while direct-verifying Table 28/31 against both PDF revisions (RC1 pp.71-72; RC5, renumbered Table 31, pp.82-83 -- identical content on both) during a post-issue-#308 batch scoping pass: rcp_regmap_ep_generic_cfg_t previously modeled only ep_type/ep_used/ep_delay_time/ep_req_storage_size, omitting this field entirely, alongside ep_tx_buffer_size (REQ-RMAP-074) and ep_rx_buffer_size (REQ-RMAP-075). FIXED: the field is added, zero-initialized (matching every other member's own zero-init convention in rcp_regmap_ep_generic_cfg_init()). STILL PARTIAL: this is content-modeling only -- svr_ep_generic_cfg_ptr has no wire codec (render/apply_reconfig) or EP0 dispatcher routing anywhere in this codebase yet, the same class of gap issues #301/#306 closed for HW_config/EP_ID_config/response-queue-config/request-stream-cfg; tracked as the next batch of issue #311's own suggested order.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "tc18-gap",
+      "status": "partial",
+      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3564 (RC5 baseline; identical on RC1)"
+    },
+    {
+      "id": "REQ-RMAP-074",
+      "title": "rcp_regmap_ep_generic_cfg_t carries ep_tx_buffer_size, in 32-bit words per TC18's own unit",
+      "text": "PARTIAL: rcp_regmap_ep_generic_cfg_t shall carry ep_tx_buffer_size (TC18 \u00a713.2 Table 28/31, relative address 0x0008, 16 bit, R/W*): \"If buffer is configurable in device can assign a tx buffer here. If not configurable buffer size in 32-bit words can be read. If EP does not have a tx buffer it reads 0x0000.\" Found 2026-08-11 (issue #311), same batch as REQ-RMAP-073 -- see that entry's own text for the full discovery context. FIXED: the field is added as uint16_t, zero-initialized. NOTE: this field's own unit is 32-bit words, matching ep_req_storage_size's own already-known words-vs-octets mismatch (documented in this struct's own field comment, regmap.h) -- content-modeling only, no unit-conversion boundary function exists yet since no wire codec exists yet either. STILL PARTIAL: same wire-codec/dispatcher gap as REQ-RMAP-073.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "tc18-gap",
+      "status": "partial",
+      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3565-3569 (RC5 baseline; identical on RC1)"
+    },
+    {
+      "id": "REQ-RMAP-075",
+      "title": "rcp_regmap_ep_generic_cfg_t carries ep_rx_buffer_size, in 32-bit words per TC18's own unit",
+      "text": "PARTIAL: rcp_regmap_ep_generic_cfg_t shall carry ep_rx_buffer_size (TC18 \u00a713.2 Table 28/31, relative address 0x000A, 16 bit, R/W*): the same shape as ep_tx_buffer_size (REQ-RMAP-074) for the endpoint's own rx buffer instead. Found 2026-08-11 (issue #311), same batch as REQ-RMAP-073/074 -- see REQ-RMAP-073's own text for the full discovery context. FIXED: the field is added as uint16_t, zero-initialized. STILL PARTIAL: same wire-codec/dispatcher gap as REQ-RMAP-073/074.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "tc18-gap",
+      "status": "partial",
+      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3570-3574 (RC5 baseline; identical on RC1)"
+    },
+    {
       "id": "REQ-SEQ-012",
       "title": "A sequencer whose state register is manually set to 0 is disabled",
       "text": "A sequencer whose Seq_state register has been manually written to 0 shall be treated as disabled (TC18 \u00a712.7.10 Table 25, relative address 0x0000, 8 bit, R/W): no compound or compound-wait step conditioned on that sequencer shall become executable, and no advance shall move it out of 0 until it is explicitly rewritten to a nonzero state. NOT IMPLEMENTED: rcp_sequencer_set_state() treats 0 as an ordinary state value, so a step whose start_state happens to be 0 fires against a sequencer the client intended to disable, and rcp_e2e_endpoint_in_safe_state() (REQ-E2E-018) would report a disabled sequencer as \"in safe state\" if rx_safe_sequencer_state were configured to 0. Distinct from rcp_sequencer_table_unsupported() (REQ-SEQ-004), which is the table-wide \"zero sequencers implemented\" case.",

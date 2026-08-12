@@ -17,6 +17,9 @@
 //cfusa:test REQ-RMAP-014
 //cfusa:test REQ-RMAP-015
 //cfusa:test REQ-RMAP-016
+//cfusa:test REQ-RMAP-073
+//cfusa:test REQ-RMAP-074
+//cfusa:test REQ-RMAP-075
 //cfusa:test REQ-RMAP-017
 //cfusa:test REQ-RMAP-018
 //cfusa:test REQ-RMAP-019
@@ -349,6 +352,13 @@ static void test_ep_generic_cfg_init_zeroes(void)
     TEST_ASSERT_FALSE(cfg.ep_used);
     TEST_ASSERT_EQUAL_UINT32(0, cfg.ep_delay_time);
     TEST_ASSERT_EQUAL_UINT16(0, cfg.ep_req_storage_size);
+    /* REQ-RMAP-073/074/075 (issue #311): ep_description/ep_tx_buffer_size/
+     * ep_rx_buffer_size, added to close a 3-field content-modeling gap
+     * against TC18's own Table 28/31, zero-init the same as every other
+     * member. */
+    TEST_ASSERT_EQUAL_UINT32(0, cfg.ep_description);
+    TEST_ASSERT_EQUAL_UINT16(0, cfg.ep_tx_buffer_size);
+    TEST_ASSERT_EQUAL_UINT16(0, cfg.ep_rx_buffer_size);
 }
 
 static void test_ep_functional_cfg_init_zeroes(void)
