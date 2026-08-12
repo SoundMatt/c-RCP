@@ -9611,14 +9611,14 @@
     },
     {
       "id": "REQ-SPI-034",
-      "title": "SPI trigger output numbering (Table 38)",
-      "text": "NOT IMPLEMENTED: c-RCP does not implement TC18 Table 38's SPI trigger output numbering -- signal 0 'SPI execution done', signal 1 reserved, and signals 2..13 pairing each chip select CS0..CS5 with an asserted and a de-asserted event in ascending order. The endpoint models a per-channel trigger selector but derives no trigger signal from CS transitions.",
+      "title": "SPI trigger output numbering (Table 41)",
+      "text": "c-RCP now implements TC18 Table 41's SPI trigger output numbering via rcp_ep_spi_trigger_signal_number() -- signal 0 'SPI execution done' (whole-endpoint, not modelled by this per-channel function), signal 1 reserved, and signals 2+2n/3+2n pairing chip select CSn with an asserted/de-asserted event (0 <= n < 16, narrowed to this module's own 6 channels, i.e. signals 2..13). The endpoint's own per-channel trigger selector (rcp_ep_spi_trigger_t) stays the deliberately-collapsed, non-wire-rendered representation described in ep_spi.h's own file header; this numbering function is a separate, additive computation resolving a (channel, CS-edge) pair to its Table 41 signal number.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
-      "tc18": "\u00a713.7.3.1 Table 38, TC18.txt L4206-4222"
+      "status": "implemented",
+      "tc18": "\u00a713.7.3.1 Table 41, TC18.txt L4603-4611"
     },
     {
       "id": "REQ-SPI-035",

@@ -504,12 +504,17 @@ static void test_spi_six_channels_selected_by_evt(void)
     rcp_bytes_free(&frame);
 }
 
-/* REQ-SPI-034 (not-implemented) DEVIATION PIN: TC18 13.7.3.1 Table 38 numbers
- * fourteen SPI trigger outputs -- 0 execution done, 1 reserved, and 2..13
- * pairing CS0..CS5 with an asserted and a de-asserted event. c-RCP has a
- * 4-value per-channel selector whose whole range is 0..3 and whose evaluation
- * takes no chip-select index at all, so signals 4..13 cannot be named and no
- * CS transition is a trigger source.
+/* REQ-SPI-034 IMPLEMENTED (issue #336): TC18 13.7.3.1's own Table 41 "spi
+ * trigger outputs" (RC5 -- the citation of "Table 38" this deviation pin
+ * used to carry was stale; RC5's own Table 38 is the unrelated RC-Server
+ * worked example, corrected alongside this fix) numbers fourteen SPI
+ * trigger outputs per channel -- 0 execution done (whole-endpoint), 1
+ * reserved, and 2+2n/3+2n pairing CSn with an asserted/de-asserted event
+ * (0 <= n < 16, narrowed to this module's own 6 channels). c-RCP's
+ * per-channel trigger selector stays the deliberately-collapsed 4-value
+ * enum described in the file header (that design is unaffected -- see
+ * rcp_ep_spi_trigger_signal_number()'s own test, below, for the new,
+ * separate numbering computation this fix actually adds).
  * REQ-SPI-035 FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I): Table
  * 39's per-channel register block used to be modelled only in reduced form
  * (no spi_baud_rateN, spi_use_csN, spi_bits_maxN, or spi_clk-cycle lead/
@@ -557,6 +562,48 @@ static void test_spi_trigger_numbering_and_channel_cfg_full(void)
     TEST_ASSERT_EQUAL_UINT8(8u, ch.clk_cs_trailtime);
     TEST_ASSERT_EQUAL_UINT8(9u, ch.bits_max);
     TEST_ASSERT_EQUAL_UINT8(10u, ch.pause_min);
+}
+
+/* REQ-SPI-034 IMPLEMENTED (issue #336): TC18 Table 41's own 2+2n/3+2n
+ * per-channel trigger signal numbering -- see
+ * rcp_ep_spi_trigger_signal_number()'s own doc comment. */
+static void test_spi_trigger_signal_numbering(void)
+{
+    uint8_t signal;
+
+    /* Channel 0's own pair: the table's first two non-zero, non-reserved
+     * rows, verbatim. */
+    TEST_ASSERT_TRUE(rcp_ep_spi_trigger_signal_number(0u, RCP_EP_SPI_TRIGGER_CS_ASSERT,
+                                                       &signal));
+    TEST_ASSERT_EQUAL_UINT8(2u, signal);
+    TEST_ASSERT_TRUE(rcp_ep_spi_trigger_signal_number(0u, RCP_EP_SPI_TRIGGER_CS_DEASSERT,
+                                                       &signal));
+    TEST_ASSERT_EQUAL_UINT8(3u, signal);
+
+    /* Channel 1's own pair (4/5) confirms the table's own 2+2n/3+2n
+     * pattern one channel over. */
+    TEST_ASSERT_TRUE(rcp_ep_spi_trigger_signal_number(1u, RCP_EP_SPI_TRIGGER_CS_ASSERT,
+                                                       &signal));
+    TEST_ASSERT_EQUAL_UINT8(4u, signal);
+
+    /* This module's own highest channel (5, RCP_EP_SPI_MAX_CHANNELS-1):
+     * 2+2*5=12 asserted, 3+2*5=13 de-asserted -- exactly the "signals
+     * 2..13" range the requirement's own text names for 6 channels. */
+    TEST_ASSERT_TRUE(rcp_ep_spi_trigger_signal_number(5u, RCP_EP_SPI_TRIGGER_CS_ASSERT,
+                                                       &signal));
+    TEST_ASSERT_EQUAL_UINT8(12u, signal);
+    TEST_ASSERT_TRUE(rcp_ep_spi_trigger_signal_number(5u, RCP_EP_SPI_TRIGGER_CS_DEASSERT,
+                                                       &signal));
+    TEST_ASSERT_EQUAL_UINT8(13u, signal);
+
+    /* Out-of-range channel, TRANSFER_DONE (signal 0 is whole-endpoint,
+     * not per-channel), and NONE all correctly report "no such signal"
+     * rather than fabricating a number. */
+    TEST_ASSERT_FALSE(rcp_ep_spi_trigger_signal_number(RCP_EP_SPI_MAX_CHANNELS,
+                                                        RCP_EP_SPI_TRIGGER_CS_ASSERT, &signal));
+    TEST_ASSERT_FALSE(rcp_ep_spi_trigger_signal_number(0u, RCP_EP_SPI_TRIGGER_TRANSFER_DONE,
+                                                        &signal));
+    TEST_ASSERT_FALSE(rcp_ep_spi_trigger_signal_number(0u, RCP_EP_SPI_TRIGGER_NONE, &signal));
 }
 
 /* FIXED 2026-08-12 (issue #201, REQ-SPI-036): TC18 13.7.3.3 derives the
@@ -1563,6 +1610,7 @@ int main(void)
 
     RUN_TEST(test_spi_six_channels_selected_by_evt);
     RUN_TEST(test_spi_trigger_numbering_and_channel_cfg_full);
+    RUN_TEST(test_spi_trigger_signal_numbering);
     RUN_TEST(test_spi_read_size_round_trips_through_transfer_request);
     RUN_TEST(test_spi_no_error_latch);
 

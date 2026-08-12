@@ -15205,6 +15205,38 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.280.0 -- 2026-08-12 (issue #336 batch: `REQ-SPI-034`, SPI
+trigger output numbering)
+
+**`REQ-SPI-034` flips `not-implemented` -> `implemented`.**
+
+New `rcp_ep_spi_trigger_signal_number()` computes TC18 Table 41's
+"spi trigger outputs" per-channel signal numbers: signal 0 is the
+whole-endpoint "SPI execution done" trigger (not modelled here,
+same treatment as `REQ-GPIO-034`'s own signal 0), signal 1 is
+reserved, and signal `2+2n`/`3+2n` is CSn asserted/de-asserted,
+narrowed to this module's own 6 channels (signals 2..13).
+
+**Citation correction found alongside this fix**: `.fusa-reqs.json`
+cited "Table 38" -- confirmed against the current RC5 baseline that
+Table 38 is now the unrelated RC-Server worked example, not the
+trigger-outputs table (that's Table 41). Both `.fusa-reqs.json` and
+the module's own gap-pinning test comment now cite it correctly.
+
+Pure, additive computation -- `rcp_ep_spi_trigger_t`'s own
+deliberately-collapsed, non-wire-rendered per-channel trigger mode
+(documented in `ep_spi.h`'s own file header) is unaffected.
+
+Mutation-tested: both the channel boundary (`>=` weakened to `>`)
+and the signal-number formula (the `2+` offset dropped) are
+independently caught by the new test.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 new
+*classes* of finding -- 8 new instances of the same pre-existing
+`CFUSA-L004` recursion-rule false positive already on `main`
+(confirmed non-recursive by inspection). `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.279.0 -- 2026-08-12 (issue #336 batch: `REQ-GPIO-034`, GPIO
 trigger signal numbering)
 

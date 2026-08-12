@@ -76,6 +76,28 @@ bool rcp_ep_spi_trigger_fires(rcp_ep_spi_trigger_t trigger, rcp_ep_spi_event_t e
     }
 }
 
+//cfusa:req REQ-SPI-034
+bool rcp_ep_spi_trigger_signal_number(uint8_t channel, rcp_ep_spi_trigger_t trigger,
+                                       uint8_t *out_signal_number)
+{
+    if (channel >= RCP_EP_SPI_MAX_CHANNELS) return false;
+
+    switch (trigger) {
+    case RCP_EP_SPI_TRIGGER_CS_ASSERT:
+        /* Table 41's own 2+2n pattern for CSn asserted. */
+        *out_signal_number = (uint8_t)(2u + 2u * channel);
+        return true;
+    case RCP_EP_SPI_TRIGGER_CS_DEASSERT:
+        /* Table 41's own 3+2n pattern for CSn de-asserted. */
+        *out_signal_number = (uint8_t)(3u + 2u * channel);
+        return true;
+    case RCP_EP_SPI_TRIGGER_TRANSFER_DONE: /* signal 0 is whole-endpoint, not per-channel */
+    case RCP_EP_SPI_TRIGGER_NONE:
+    default:
+        return false;
+    }
+}
+
 /* ── Functional config ─────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-SPI-010
