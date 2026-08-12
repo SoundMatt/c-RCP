@@ -9502,6 +9502,28 @@
       "tc18": "\u00a713.2 Table 28/31, TC18.txt L3570-3574 (RC5 baseline; identical on RC1)"
     },
     {
+      "id": "REQ-RMAP-076",
+      "title": "rcp_regmap_ep_delay_time_us_to_reg()/_reg_to_us() convert between ep_delay_time's own free microsecond value and TC18's packed 2-bit register enum",
+      "text": "PARTIAL: ep_delay_time (TC18 \u00a713.2 Table 28/31, relative address 0x0001.4:5, 2 bit, R/W*) is restricted to exactly 4 register values -- 00b=1\u00b5s, 01b=10\u00b5s, 10b=20\u00b5s, 11b=50\u00b5s -- while rcp_regmap_ep_generic_cfg_t's own ep_delay_time field deliberately stays a free uint32_t microsecond value internally, since it is consumed as a scheduling tick unit across request_chained.h/request_triggered.h/request_compound.h/server.c, none of which should need to know about the register's own packed encoding. FIXED (issue #311 batch 2): rcp_regmap_ep_delay_time_us_to_reg() converts a microsecond value to the matching 2-bit register value, REJECTING (not rounding) any value outside the 4 allowed ones -- a silently-substituted delay would misconfigure the endpoint's own scheduling timing, so this is treated as a real R/W* configuration-input rejection case, not a saturating-is-safe case like rx_wd_timeout_ms/flush_time_us. rcp_regmap_ep_delay_time_reg_to_us() is the inverse, masking its own input to 2 bits so it can never fail (all 4 possible register values are valid TC18 encodings). CROSS-CHECK FINDING: TC18's own separate prose (request_compound/_triggered/_chained's own field descriptions, 4 occurrences, both RC1 and RC5 revisions) instead reads \"[1µs, 20µs, 20µs, 50µs]\" -- a duplicated 20µs where the table's own 10µs belongs, almost certainly a copy-paste typo in TC18's own text propagated identically across all 4 sites; Table 28/31's own definitive, typed register table is treated as authoritative here, not the repeated prose. STILL PARTIAL: these are boundary-conversion primitives only -- svr_ep_generic_cfg_ptr still has no wire codec (render/apply_reconfig) or EP0 dispatcher routing anywhere in this codebase, the remaining steps of issue #311's own suggested batch order.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "tc18-gap",
+      "status": "partial",
+      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3555-3559 (RC5 baseline; identical on RC1)"
+    },
+    {
+      "id": "REQ-RMAP-077",
+      "title": "rcp_regmap_ep_req_storage_size_words_to_octets()/_octets_to_words() convert between ep_req_storage_size's own octet count and TC18's 32-bit-word register unit; the field itself widened to uint32_t",
+      "text": "PARTIAL: ep_req_storage_size (TC18 \u00a713.2 Table 28/31, relative address 0x0002, 16 bit, R/W*) is expressed in 32-bit words on the wire, octets internally. FIXED (issue #311 batch 2): rcp_regmap_ep_generic_cfg_t's own ep_req_storage_size field is widened from uint16_t to uint32_t -- the register's own maximum representable value, 65535 words, is 262140 octets, which does not fit a 16-bit octet count, a real correctness gap independent of any wire codec (this widening has zero consumers to break, per a direct grep of the whole codebase before making the change). rcp_regmap_ep_req_storage_size_words_to_octets() (read side) is always exact and cannot fail. rcp_regmap_ep_req_storage_size_octets_to_words() (write side) rejects an octet count that is not an exact multiple of 4 (no lossy rounding of a configuration input) or whose word count would not fit the register's own 16-bit width. STILL PARTIAL: these are boundary-conversion primitives only -- same remaining wire-codec/dispatcher gap as REQ-RMAP-076.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "tc18-gap",
+      "status": "partial",
+      "tc18": "\u00a713.2 Table 28/31, TC18.txt L3562 (RC5 baseline; identical on RC1)"
+    },
+    {
       "id": "REQ-SEQ-012",
       "title": "A sequencer whose state register is manually set to 0 is disabled",
       "text": "A sequencer whose Seq_state register has been manually written to 0 shall be treated as disabled (TC18 \u00a712.7.10 Table 25, relative address 0x0000, 8 bit, R/W): no compound or compound-wait step conditioned on that sequencer shall become executable, and no advance shall move it out of 0 until it is explicitly rewritten to a nonzero state. NOT IMPLEMENTED: rcp_sequencer_set_state() treats 0 as an ordinary state value, so a step whose start_state happens to be 0 fires against a sequencer the client intended to disable, and rcp_e2e_endpoint_in_safe_state() (REQ-E2E-018) would report a disabled sequencer as \"in safe state\" if rx_safe_sequencer_state were configured to 0. Distinct from rcp_sequencer_table_unsupported() (REQ-SEQ-004), which is the table-wide \"zero sequencers implemented\" case.",
