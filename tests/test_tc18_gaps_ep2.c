@@ -266,11 +266,18 @@ static void test_uart_compound_wait_now_resolved_via_generic_primitive(void)
                                                   fifo_contents, sizeof(fifo_contents)));
 }
 
-static void test_uart_read_size_truncates_above_one_octet(void)
+/* FIXED 2026-08-12 (issue #201, REQ-UART-034): TC18 §13.7.8.1 contemplates
+ * a read_size larger than the RX FIFO (driving a fragmented response),
+ * and acf.h's read_size_or_segment_num is the wire's full 12-bit field
+ * (0..4095). c-RCP's UART read codec previously narrowed read_size to
+ * one octet, silently truncating a conforming peer's request above 255;
+ * *out_read_size is now the same 12-bit-wide uint16_t and round-trips
+ * a value above 255 exactly. */
+static void test_uart_read_size_above_one_octet_round_trips(void)
 {
     rcp_acf_byte_message_info_t hdr = {0};
     rcp_bytes_t                 f;
-    uint8_t                     read_size = 0xFFu;
+    uint16_t                    read_size = 0xFFFFu;
     uint8_t                     tn        = 0u;
 
     hdr.byte_bus_id              = 0x21u;
@@ -281,17 +288,10 @@ static void test_uart_read_size_truncates_above_one_octet(void)
     f = rcp_acf_encode_abb(&hdr, NULL, 0u);
     TEST_ASSERT_NOT_NULL(f.data);
 
-    /* DEVIATION -- TC18 §13.7.8.1 contemplates a read_size larger than the
-     * RX FIFO (driving a fragmented response), and acf.h's
-     * read_size_or_segment_num is the wire's full 12-bit field (0..4095).
-     * c-RCP's UART read codec narrows read_size to one octet, so a
-     * conforming peer's request for 1024 octets is surfaced here as 0 --
-     * silently truncated, not rejected. A conforming implementation would
-     * report 1024. */
     TEST_ASSERT_EQUAL_INT(RCP_EP_UART_OK,
                           rcp_ep_uart_decode_read_request(f.data, f.len, 0x21u,
                                                           &read_size, &tn));
-    TEST_ASSERT_EQUAL_UINT8(0u, read_size);
+    TEST_ASSERT_EQUAL_UINT16(1024u, read_size);
     TEST_ASSERT_EQUAL_UINT8(9u, tn);
     rcp_bytes_free(&f);
 }
@@ -903,7 +903,7 @@ int main(void)
     RUN_TEST(test_uart_functional_block_now_has_full_register_coverage);
     RUN_TEST(test_uart_rx_fifo_size_bounds_nothing_at_all);
     RUN_TEST(test_uart_compound_wait_now_resolved_via_generic_primitive);
-    RUN_TEST(test_uart_read_size_truncates_above_one_octet);
+    RUN_TEST(test_uart_read_size_above_one_octet_round_trips);
     RUN_TEST(test_uart_register_units_diverge_from_table_48);
 
     RUN_TEST(test_adc_value_width_and_named_analog_input_signal);

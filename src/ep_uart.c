@@ -469,7 +469,8 @@ rcp_ep_uart_errc_t rcp_ep_uart_decode_write_response(const uint8_t *b, size_t le
 /* ── RX: read request/response ─────────────────────────────────────────────── */
 
 //cfusa:req REQ-UART-023
-rcp_bytes_t rcp_ep_uart_encode_read_request(rcp_byte_bus_id_t byte_bus_id, uint8_t read_size,
+//cfusa:req REQ-UART-034
+rcp_bytes_t rcp_ep_uart_encode_read_request(rcp_byte_bus_id_t byte_bus_id, uint16_t read_size,
                                              uint8_t transaction_num)
 {
     rcp_acf_byte_message_info_t hdr = {0};
@@ -485,9 +486,10 @@ rcp_bytes_t rcp_ep_uart_encode_read_request(rcp_byte_bus_id_t byte_bus_id, uint8
 
 //cfusa:req REQ-UART-024
 //cfusa:req REQ-UART-025
+//cfusa:req REQ-UART-034
 rcp_ep_uart_errc_t rcp_ep_uart_decode_read_request(const uint8_t *b, size_t len,
                                                     rcp_byte_bus_id_t expected_bus_id,
-                                                    uint8_t *out_read_size,
+                                                    uint16_t *out_read_size,
                                                     uint8_t *out_transaction_num)
 {
     rcp_acf_byte_message_info_t hdr;
@@ -511,14 +513,11 @@ rcp_ep_uart_errc_t rcp_ep_uart_decode_read_request(const uint8_t *b, size_t len,
      * the file header. */
     if (payload_len != 0) return RCP_EP_UART_ERR_UNKNOWN_CMD;
 
-    /* out_read_size is this endpoint's own pre-existing octet-wide type
-     * (unchanged by the acf.c header rework); hdr.read_size_or_segment_num
-     * is now the wire header's real 12-bit uint16_t field, so the
-     * narrowing needs an explicit cast for MSVC's /W4 -- same reasoning as
-     * discovery.c's identical cast. A UART read request larger than 255
-     * bytes truncates here, same as it silently did before this pass; not
-     * a new limitation introduced by it. */
-    *out_read_size       = (uint8_t)hdr.read_size_or_segment_num;
+    /* FIXED 2026-08-12 (issue #201, REQ-UART-034): out_read_size is now
+     * the wire header's own 12-bit-wide uint16_t type -- no narrowing
+     * cast needed (or possible data loss) any more; see the header's own
+     * doc comment. */
+    *out_read_size       = hdr.read_size_or_segment_num;
     *out_transaction_num = hdr.transaction_num;
     return RCP_EP_UART_OK;
 }
