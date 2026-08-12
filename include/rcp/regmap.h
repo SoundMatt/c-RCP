@@ -1123,9 +1123,62 @@ typedef struct {
     uint8_t  ep_type;             /* concrete meaning assigned by each
                                       endpoint type added in Phase 16/19 */
     bool     ep_used;
-    uint32_t ep_delay_time;       /* microseconds */
+    uint32_t ep_delay_time;       /* microseconds. TC18 §13.2 Table 28/31
+                                      (RC1 pp.71-72, RC5 Table 31 pp.82-83,
+                                      identical content on both revisions)
+                                      wires this as a packed 2-bit enum at
+                                      relative address 0x0001.4:5 restricted
+                                      to exactly {1, 10, 20, 50} microseconds
+                                      -- this field's own internal
+                                      representation deliberately stays a
+                                      free microsecond value rather than the
+                                      register's own enum, since it is
+                                      consumed as a scheduling tick unit
+                                      across request_chained.h/
+                                      request_triggered.h/request_compound.h/
+                                      server.c, none of which should need to
+                                      know about the register's own packed
+                                      encoding. A wire codec (issue #311,
+                                      not yet built) will need a boundary
+                                      conversion pair that REJECTS a value
+                                      outside the 4 allowed microsecond
+                                      values on write, not silently rounds
+                                      it -- this is a real R/W* configuration
+                                      input, not a saturating-is-safe case
+                                      like rx_wd_timeout_ms/flush_time_us. */
     uint16_t ep_req_storage_size; /* octets of request-payload storage
-                                      reserved for this endpoint */
+                                      reserved for this endpoint. TC18's own
+                                      register (0x0002, 16 bit, R/W*) is in
+                                      32-bit WORDS, not octets -- the same
+                                      class of boundary-conversion gap as
+                                      ep_delay_time above, also left for
+                                      issue #311's own wire-codec batch
+                                      (octets = words * 4 on read; write
+                                      requires octets to be a multiple of 4
+                                      and the resulting word count to fit
+                                      16 bits). */
+    uint32_t ep_description;      /* REQ-RMAP-073 (TC18 §13.2 Table 28/31,
+                                      relative address 0x0004, 32 bit,
+                                      R/W*): user-defined description, no
+                                      further structure given by TC18.
+                                      Content-modeling only (issue #311) --
+                                      not yet part of any wire codec. */
+    uint16_t ep_tx_buffer_size;   /* REQ-RMAP-074 (TC18 §13.2 Table 28/31,
+                                      relative address 0x0008, 16 bit,
+                                      R/W*): in 32-bit words, matching
+                                      ep_req_storage_size's own unit, not
+                                      octets. TC18: "If buffer is
+                                      configurable in device can assign a
+                                      tx buffer here. If not configurable
+                                      buffer size in 32-bit words can be
+                                      read. If EP does not have a tx buffer
+                                      it reads 0x0000." Content-modeling
+                                      only (issue #311). */
+    uint16_t ep_rx_buffer_size;   /* REQ-RMAP-075 (TC18 §13.2 Table 28/31,
+                                      relative address 0x000A, 16 bit,
+                                      R/W*): same shape as ep_tx_buffer_size
+                                      above, for the endpoint's rx buffer.
+                                      Content-modeling only (issue #311). */
 } rcp_regmap_ep_generic_cfg_t;
 
 /* Zero-initializes cfg (ep_used = false, everything else 0). */

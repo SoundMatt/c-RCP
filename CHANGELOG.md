@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.251.0 -- 2026-08-11 (issue #311 batch 1: `rcp_regmap_ep_generic_cfg_t` gains 3 missing content-model fields)
+
+**`rcp_regmap_ep_generic_cfg_t` previously modeled only 4 of TC18 §13.2 Table 28/31's 8 fields.** Found while scoping the largest remaining RMAP cluster (REQ-RMAP-032/033/034/036/037/038/039) after issue #308: direct primary-source verification of both PDF revisions (RC1 pp.71-72; RC5, renumbered Table 31, pp.82-83 — identical content on both) against the current struct showed `ep_description` (0x0004, 32 bit), `ep_tx_buffer_size` (0x0008, 16 bit), and `ep_rx_buffer_size` (0x000A, 16 bit) were entirely absent.
+
+**Fixed, content-modeling only**: all 3 fields added (REQ-RMAP-073/074/075), zero-initialized matching every other member's convention. Zero blast radius — no existing consumer of `rcp_regmap_ep_generic_cfg_t` touches these fields, and `rcp_regmap_ep_generic_cfg_init()`'s own `memset()` already zero-initializes new members for free.
+
+**Two unit/encoding mismatches found in the SAME table, documented but deliberately NOT fixed this batch**: `ep_delay_time` is internally a free `uint32_t` microsecond value consumed as a scheduling tick unit across `request_chained.h`/`request_triggered.h`/`request_compound.h`/`server.c`, but TC18's own register is a packed 2-bit enum restricted to exactly {1, 10, 20, 50} µs — changing the internal representation would ripple through the whole scheduler subsystem, so this is deliberately left for issue #311's own next batch as a boundary-conversion pair instead (reject-on-invalid, not saturate, since this is a real R/W* configuration input). `ep_req_storage_size` has the same class of gap: internal octets vs. the register's own 32-bit-word unit.
+
+Filed as issue #311 (GitHub) with the full table layout, both mismatches, and a suggested 5-step batch order (content model → 2 boundary-conversion pairs → wire codec → EP0 dispatcher wiring + authorization) — this PR is step 1 only. `svr_ep_generic_cfg_ptr` still has zero wire codec or dispatcher routing; REQ-RMAP-073/074/075 all stay `partial` for that reason.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.250.0 -- 2026-08-11 (`.fusa-reqs.json` staleness correction: 3 RMAP entries claimed missing storage that issues #301/#306/#308 had already built)
 
 **Documentation-only correction, no code change.** While scoping the next RMAP batch after issue #308, direct comparison of REQ-RMAP-032 through REQ-RMAP-039's own current text against `src/regmap.c`'s actual dispatcher routing conditions found 3 entries whose text had never been revisited after the table they describe was built in a later PR:
