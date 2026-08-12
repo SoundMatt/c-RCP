@@ -412,7 +412,7 @@ typedef struct {
                                      reachability boundary as every other
                                      Group 1 item. */
     uint8_t  svr_configuration_lock; /* REQ-RMAP-029 (TC18 §12.7.5 Table
-                                         18, absolute address 0x0015, 8
+                                         20, absolute address 0x0015, 8
                                          bit, R): 0x00 permits write
                                          access to "R/W+" (explicitly
                                          lockable) type parameters; any
@@ -448,7 +448,7 @@ typedef struct {
                                          (issue #200's own suggested
                                          order: Group 1 before Group 3). */
     uint16_t svr_responder_mem_size; /* REQ-RMAP-027 (TC18 §12.7.5 Table
-                                         18, absolute address 0x0010, 16
+                                         20, absolute address 0x0010, 16
                                          bit, R): maximum responder-queue
                                          memory, in 32-bit words -- same
                                          "caller converts, this field
@@ -630,7 +630,7 @@ typedef struct {
                                 same REQ-RMAP-024 wire-reachability
                                 boundary as every other Group 1 item. */
     uint16_t svr_ep_generic_cfg_ptr; /* REQ-RMAP-036 (TC18 §12.7.5 Table
-                                18, absolute address 0x0024, 16 bit,
+                                20, absolute address 0x0024, 16 bit,
                                 R): the address of the EP_config
                                 register map (§13.2, generic part of
                                 the endpoint register map). Retyped
@@ -817,7 +817,7 @@ typedef struct {
                                 the PTP_config register map's own
                                 capacity. */
     uint16_t svr_security_cfg_ptr; /* REQ-RMAP-039 (TC18 §12.7.5 Table
-                                18 continued, INFERRED absolute address
+                                20 continued, INFERRED absolute address
                                 0x003C, 16 bit, R): the address of the
                                 security configuration register map
                                 (§12.7.14). A pointer value of 0 is
@@ -1477,7 +1477,7 @@ typedef struct {
  * life-cycle state HW_unconfigured"). Precisely how a client's own
  * request address relates to svr_hw_cfg_ptr's value was flagged here as
  * a genuine, unresolved architectural question -- now resolved: Table
- * 18's own address column is itself headed "Absolute address" (verified
+ * 20's own address column is itself headed "Absolute address" (verified
  * directly against the current RC5 baseline PDF, page 61, not the
  * "relative address" this codebase's own comments previously
  * mis-cited), confirming every "_ptr" field's own value is an absolute
@@ -1685,7 +1685,7 @@ typedef struct {
 
     /* ── Secure channel / acknowledge & response routing ────────────── */
     uint8_t  rx_secure_channel_index; /* REQ-RMAP-047 (TC18 §12.7.7 Table
-                                          22, relative address 0x000C, 8
+                                          24, relative address 0x000C, 8
                                           bit, R/W*): which secure channel
                                           this request stream is carried
                                           on. 0 (this field's own
@@ -1699,7 +1699,7 @@ typedef struct {
                                           has no MACsec layer of its own
                                           to select one in). */
     uint8_t  rx_ack_stream_index;     /* REQ-RMAP-048 (TC18 §12.7.7 Table
-                                          22, relative address 0x0010, 8
+                                          24, relative address 0x0010, 8
                                           bit, R/W*): the index of the
                                           response/ack stream (Table 24,
                                           respqueue.h) endpoints bound to
@@ -1713,7 +1713,7 @@ typedef struct {
                                           selected queue from this field
                                           yet. */
     uint8_t  rx_resp_stream_index;    /* REQ-RMAP-049 (TC18 §12.7.7 Table
-                                          22, relative address 0x0011, 8
+                                          24, relative address 0x0011, 8
                                           bit, R/W*): the index of the
                                           response/ack stream endpoints
                                           bound to this request stream
@@ -2233,7 +2233,7 @@ void rcp_regmap_ep_id_map_row_init_default(rcp_regmap_ep_id_map_entry_t *row);
  *
  * RESOLVED 2026-08-11 (issue #301, same finding as HW_config's own
  * section above): EP_ID_config is a separate table pointed to by Table
- * 18's own svr_ep_bytebus_id_map_ptr register (REQ-RMAP-037), reached
+ * 20's own svr_ep_bytebus_id_map_ptr register (REQ-RMAP-037), reached
  * the identical way HW_config now is -- svr_ep_bytebus_id_map_ptr's own
  * value is an absolute address in the same EP0-scoped space Table 20
  * itself lives in (Table 20's own address column is headed "Absolute

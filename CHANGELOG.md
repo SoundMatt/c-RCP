@@ -34,6 +34,14 @@ the rationale.
 
 ## Releases
 
+### v0.276.0 -- 2026-08-12 (c-RCP-AUDIT-09 doc-only fix: 11 line-wrapped table citations missed by PRs #342/#343)
+
+**Documentation-only correction, no functional code change.** Self-caught methodology bug: the `sed`-based citation fixes in PRs #342 (v0.274.0) and #343 (v0.275.0) operated line-by-line, so any occurrence where a C block comment wrapped `Table` onto one line and the number onto the next (e.g. `/* ... Table\n * 18, absolute address ...`) was invisible to the substitution and left stale.
+
+A script joining each consecutive line pair and re-scanning for the same four number pairs found 11 such misses, all in `regmap.h`/`acf.h`: 6 more `Table 18`→`20`, 3 more `Table 22`→`24`, 1 more `Table 30`→`33`, 1 more `Table 27`→`30`. Fixed precisely (only the digit token replaced, comment formatting otherwise untouched) and verified via the same joined-line re-scan -- two further line-wrapped hits found (`ep_uart.h` "Table\n48", `ep_can.h` "Table\n54") were confirmed to already be correct RC5 numbers and left alone.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.275.0 -- 2026-08-12 (c-RCP-AUDIT-08 doc-only batch: `Table 18`/`Table 22` citation drift corrected -- highest-value slice of issue #341)
 
 **Documentation-only correction, no functional code change.** First batch of issue #341's broader table-number census -- the two highest-count stale citations, both confirmed via direct content cross-check (not just number pattern-matching) against both spec revisions.

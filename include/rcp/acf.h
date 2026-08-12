@@ -389,7 +389,7 @@ bool rcp_acf_evt_row2_is_plain(uint8_t evt);
  * this rule is the SAME across every endpoint type -- unlike Table 33,
  * there is no per-endpoint-type row. rcp_acf_evt_row2_is_plain() and
  * rcp_ep_spi_channel_valid()/rcp_ep_gpio_write_semantics_valid() (Table
- * 30's own per-row rules) do not apply to a compound-wait request's evt;
+ * 33's own per-row rules) do not apply to a compound-wait request's evt;
  * use these two functions instead.
  *
  * true iff (evt & 0x7) != 0x3 -- every value except the reserved 011b,
@@ -525,7 +525,7 @@ size_t rcp_acf_reg_write_len(uint16_t acf_msg_length, uint8_t pad);
  * contain the byte_bus_id and transaction number of the request. The
  * error response shall contain a byte_msg_payload with an error code."
  * error_code is encoded as the payload's single octet, matching Table
- * 27's own small (1-17) numeric range. hdr fields not explicitly listed
+ * 30's own small (1-17) numeric range. hdr fields not explicitly listed
  * here are set to produce a header §11.3.4 ("evt[3:0] < 0x9 and err = 1
  * is an Error Response") classifies correctly when decoded: evt = 0 (any
  * value other than RCP_ACF_EVT_ACKNOWLEDGE classifies the same way once
