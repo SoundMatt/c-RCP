@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.252.0 -- 2026-08-11 (issue #311 batch 2: `ep_delay_time`/`ep_req_storage_size` boundary-conversion pairs)
+
+**Two boundary-conversion function pairs close the unit/encoding mismatches issue #311's own batch 1 documented but deliberately left unfixed.**
+
+`ep_delay_time` (TC18 §13.2 Table 28/31, 0x0001.4:5, 2 bit, R/W*, restricted to exactly {1, 10, 20, 50} µs) gets `rcp_regmap_ep_delay_time_us_to_reg()`/`_reg_to_us()` (REQ-RMAP-076). The write-side direction REJECTS any microsecond value outside the 4 allowed ones rather than rounding — a silently-substituted delay would misconfigure the endpoint's own scheduling timing, so this is treated as a real R/W* configuration-input rejection case, not a saturating-is-safe case like `rx_wd_timeout_ms`/`flush_time_us`. The read-side direction masks its own input to 2 bits and can never fail.
+
+**Cross-check finding while verifying `ep_delay_time`'s own 4 allowed values against the primary source**: TC18's own separate prose (`request_compound`/`_triggered`/`_chained`'s own field descriptions, 4 occurrences, both RC1 and RC5 revisions) instead reads `[1µs, 20µs, 20µs, 50µs]` — a duplicated 20µs where the table's own 10µs belongs, almost certainly a copy-paste typo in TC18's own text propagated identically across all 4 sites. Table 28/31's own definitive, typed register table is treated as authoritative, not the repeated prose. Documented in both the code comment and REQ-RMAP-076's own text.
+
+`ep_req_storage_size` (0x0002, 16 bit, R/W*, in 32-bit words on the wire) gets `rcp_regmap_ep_req_storage_size_words_to_octets()`/`_octets_to_words()` (REQ-RMAP-077). **The struct field itself is widened from `uint16_t` to `uint32_t`**: the register's own maximum representable value, 65535 words, is 262140 octets, which does not fit a 16-bit octet count — a real correctness gap independent of any wire codec, not merely a units mismatch. Confirmed zero blast radius via a direct grep of the whole codebase before widening (only the init test's own assertion needed updating, `UINT16` -> `UINT32`). The write-side conversion rejects an octet count that is not an exact multiple of 4 or whose word count would not fit the register's own 16-bit width.
+
+Both pairs mirror the established `rcp_regmap_wd_timeout_ms_to_ticks()`/`_ticks_to_ms()` shape (`bool` return, output parameter, false leaves the output untouched). 8 new dedicated tests. Mutation-tested 2 ways (one register-value branch in `ep_delay_time_us_to_reg()`, the 16-bit bounds check in `ep_req_storage_size_octets_to_words()`); both caught cleanly.
+
+**Still no wire codec or EP0 dispatcher routing for `svr_ep_generic_cfg_ptr`** — these are boundary-conversion primitives only, REQ-RMAP-076/077 both `partial`. Issue #311's remaining 3 steps (wire codec, dispatcher wiring, authorization) are still open.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.251.0 -- 2026-08-11 (issue #311 batch 1: `rcp_regmap_ep_generic_cfg_t` gains 3 missing content-model fields)
 
 **`rcp_regmap_ep_generic_cfg_t` previously modeled only 4 of TC18 §13.2 Table 28/31's 8 fields.** Found while scoping the largest remaining RMAP cluster (REQ-RMAP-032/033/034/036/037/038/039) after issue #308: direct primary-source verification of both PDF revisions (RC1 pp.71-72; RC5, renumbered Table 31, pp.82-83 — identical content on both) against the current struct showed `ep_description` (0x0004, 32 bit), `ep_tx_buffer_size` (0x0008, 16 bit), and `ep_rx_buffer_size` (0x000A, 16 bit) were entirely absent.

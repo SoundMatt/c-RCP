@@ -937,6 +937,47 @@ void rcp_regmap_ep_generic_cfg_init(rcp_regmap_ep_generic_cfg_t *cfg)
     memset(cfg, 0, sizeof(*cfg));
 }
 
+//cfusa:req REQ-RMAP-076
+bool rcp_regmap_ep_delay_time_us_to_reg(uint32_t delay_us, uint8_t *out_reg)
+{
+    switch (delay_us) {
+    case 1u:  *out_reg = 0u; return true;
+    case 10u: *out_reg = 1u; return true;
+    case 20u: *out_reg = 2u; return true;
+    case 50u: *out_reg = 3u; return true;
+    default:  return false; /* not one of TC18's 4 allowed values -- reject, don't round */
+    }
+}
+
+//cfusa:req REQ-RMAP-076
+uint32_t rcp_regmap_ep_delay_time_reg_to_us(uint8_t reg)
+{
+    static const uint32_t us_by_reg[4] = {1u, 10u, 20u, 50u};
+
+    return us_by_reg[reg & 0x3u]; /* masked: all 4 possible 2-bit values are valid */
+}
+
+//cfusa:req REQ-RMAP-077
+uint32_t rcp_regmap_ep_req_storage_size_words_to_octets(uint16_t words)
+{
+    return (uint32_t)words * 4u; /* always exact, always fits uint32_t */
+}
+
+//cfusa:req REQ-RMAP-077
+bool rcp_regmap_ep_req_storage_size_octets_to_words(uint32_t octets,
+                                                      uint16_t *out_words)
+{
+    uint32_t words;
+
+    if ((octets % 4u) != 0u) return false; /* not a whole number of 32-bit words */
+
+    words = octets / 4u;
+    if (words > (uint32_t)UINT16_MAX) return false; /* REQ-RMAP-077: 16-bit register width */
+
+    *out_words = (uint16_t)words;
+    return true;
+}
+
 //cfusa:req REQ-RMAP-017
 void rcp_regmap_ep_functional_cfg_init(rcp_regmap_ep_functional_cfg_t *cfg)
 {

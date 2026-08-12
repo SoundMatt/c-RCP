@@ -20,6 +20,8 @@
 //cfusa:test REQ-RMAP-073
 //cfusa:test REQ-RMAP-074
 //cfusa:test REQ-RMAP-075
+//cfusa:test REQ-RMAP-076
+//cfusa:test REQ-RMAP-077
 //cfusa:test REQ-RMAP-017
 //cfusa:test REQ-RMAP-018
 //cfusa:test REQ-RMAP-019
@@ -351,7 +353,9 @@ static void test_ep_generic_cfg_init_zeroes(void)
     TEST_ASSERT_EQUAL_UINT8(0, cfg.ep_type);
     TEST_ASSERT_FALSE(cfg.ep_used);
     TEST_ASSERT_EQUAL_UINT32(0, cfg.ep_delay_time);
-    TEST_ASSERT_EQUAL_UINT16(0, cfg.ep_req_storage_size);
+    /* ep_req_storage_size widened uint16_t -> uint32_t (issue #311 batch 2,
+     * see this field's own comment in regmap.h for why). */
+    TEST_ASSERT_EQUAL_UINT32(0, cfg.ep_req_storage_size);
     /* REQ-RMAP-073/074/075 (issue #311): ep_description/ep_tx_buffer_size/
      * ep_rx_buffer_size, added to close a 3-field content-modeling gap
      * against TC18's own Table 28/31, zero-init the same as every other
@@ -359,6 +363,103 @@ static void test_ep_generic_cfg_init_zeroes(void)
     TEST_ASSERT_EQUAL_UINT32(0, cfg.ep_description);
     TEST_ASSERT_EQUAL_UINT16(0, cfg.ep_tx_buffer_size);
     TEST_ASSERT_EQUAL_UINT16(0, cfg.ep_rx_buffer_size);
+}
+
+/* ── ep_delay_time boundary conversion (REQ-RMAP-076, issue #311 batch 2) ──── */
+
+static void test_ep_delay_time_us_to_reg_accepts_all_four_allowed_values(void)
+{
+    uint8_t reg = 0xFFu;
+
+    TEST_ASSERT_TRUE(rcp_regmap_ep_delay_time_us_to_reg(1u, &reg));
+    TEST_ASSERT_EQUAL_UINT8(0u, reg);
+
+    TEST_ASSERT_TRUE(rcp_regmap_ep_delay_time_us_to_reg(10u, &reg));
+    TEST_ASSERT_EQUAL_UINT8(1u, reg);
+
+    TEST_ASSERT_TRUE(rcp_regmap_ep_delay_time_us_to_reg(20u, &reg));
+    TEST_ASSERT_EQUAL_UINT8(2u, reg);
+
+    TEST_ASSERT_TRUE(rcp_regmap_ep_delay_time_us_to_reg(50u, &reg));
+    TEST_ASSERT_EQUAL_UINT8(3u, reg);
+}
+
+static void test_ep_delay_time_us_to_reg_rejects_every_other_value(void)
+{
+    uint8_t reg = 0xFFu;
+
+    /* Not one of {1,10,20,50} -- must be rejected, not rounded to the
+     * nearest allowed value (a silently-substituted delay would
+     * misconfigure the endpoint's own scheduling timing). */
+    TEST_ASSERT_FALSE(rcp_regmap_ep_delay_time_us_to_reg(0u, &reg));
+    TEST_ASSERT_FALSE(rcp_regmap_ep_delay_time_us_to_reg(2u, &reg));
+    TEST_ASSERT_FALSE(rcp_regmap_ep_delay_time_us_to_reg(11u, &reg));
+    TEST_ASSERT_FALSE(rcp_regmap_ep_delay_time_us_to_reg(51u, &reg));
+    TEST_ASSERT_FALSE(rcp_regmap_ep_delay_time_us_to_reg(1000000u, &reg));
+    /* out_reg left untouched by every rejected call above. */
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, reg);
+}
+
+static void test_ep_delay_time_reg_to_us_covers_all_four_register_values(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(1u,  rcp_regmap_ep_delay_time_reg_to_us(0u));
+    TEST_ASSERT_EQUAL_UINT32(10u, rcp_regmap_ep_delay_time_reg_to_us(1u));
+    TEST_ASSERT_EQUAL_UINT32(20u, rcp_regmap_ep_delay_time_reg_to_us(2u));
+    TEST_ASSERT_EQUAL_UINT32(50u, rcp_regmap_ep_delay_time_reg_to_us(3u));
+}
+
+static void test_ep_delay_time_reg_to_us_masks_out_of_range_input(void)
+{
+    /* reg is only ever a 2-bit wire field; a caller passing a wider raw
+     * byte (e.g. an unmasked octet read straight off the wire) must not
+     * produce undefined behavior -- confirm the masking, not just the
+     * in-range cases above. */
+    TEST_ASSERT_EQUAL_UINT32(1u,  rcp_regmap_ep_delay_time_reg_to_us(0x04u)); /* 0x04 & 0x3 = 0 */
+    TEST_ASSERT_EQUAL_UINT32(50u, rcp_regmap_ep_delay_time_reg_to_us(0xFFu)); /* 0xFF & 0x3 = 3 */
+}
+
+/* ── ep_req_storage_size boundary conversion (REQ-RMAP-077, issue #311 batch 2) ── */
+
+static void test_ep_req_storage_size_words_to_octets_is_exact(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(0u,      rcp_regmap_ep_req_storage_size_words_to_octets(0u));
+    TEST_ASSERT_EQUAL_UINT32(4u,      rcp_regmap_ep_req_storage_size_words_to_octets(1u));
+    TEST_ASSERT_EQUAL_UINT32(262140u, rcp_regmap_ep_req_storage_size_words_to_octets(65535u));
+}
+
+static void test_ep_req_storage_size_octets_to_words_round_trips(void)
+{
+    uint16_t words = 0xFFFFu;
+
+    TEST_ASSERT_TRUE(rcp_regmap_ep_req_storage_size_octets_to_words(0u, &words));
+    TEST_ASSERT_EQUAL_UINT16(0u, words);
+
+    TEST_ASSERT_TRUE(rcp_regmap_ep_req_storage_size_octets_to_words(4u, &words));
+    TEST_ASSERT_EQUAL_UINT16(1u, words);
+
+    TEST_ASSERT_TRUE(rcp_regmap_ep_req_storage_size_octets_to_words(262140u, &words));
+    TEST_ASSERT_EQUAL_UINT16(65535u, words);
+}
+
+static void test_ep_req_storage_size_octets_to_words_rejects_non_multiple_of_4(void)
+{
+    uint16_t words = 0xFFFFu;
+
+    TEST_ASSERT_FALSE(rcp_regmap_ep_req_storage_size_octets_to_words(1u, &words));
+    TEST_ASSERT_FALSE(rcp_regmap_ep_req_storage_size_octets_to_words(5u, &words));
+    TEST_ASSERT_FALSE(rcp_regmap_ep_req_storage_size_octets_to_words(262141u, &words));
+    /* out_words left untouched by every rejected call above. */
+    TEST_ASSERT_EQUAL_UINT16(0xFFFFu, words);
+}
+
+static void test_ep_req_storage_size_octets_to_words_rejects_over_16_bit_word_count(void)
+{
+    uint16_t words = 0xFFFFu;
+
+    /* 262144 octets = 65536 words -- one word past the register's own
+     * 16-bit width (max representable word count is 65535). */
+    TEST_ASSERT_FALSE(rcp_regmap_ep_req_storage_size_octets_to_words(262144u, &words));
+    TEST_ASSERT_EQUAL_UINT16(0xFFFFu, words);
 }
 
 static void test_ep_functional_cfg_init_zeroes(void)
@@ -478,6 +579,14 @@ int main(void)
     RUN_TEST(test_named_signal_string_unique);
 
     RUN_TEST(test_ep_generic_cfg_init_zeroes);
+    RUN_TEST(test_ep_delay_time_us_to_reg_accepts_all_four_allowed_values);
+    RUN_TEST(test_ep_delay_time_us_to_reg_rejects_every_other_value);
+    RUN_TEST(test_ep_delay_time_reg_to_us_covers_all_four_register_values);
+    RUN_TEST(test_ep_delay_time_reg_to_us_masks_out_of_range_input);
+    RUN_TEST(test_ep_req_storage_size_words_to_octets_is_exact);
+    RUN_TEST(test_ep_req_storage_size_octets_to_words_round_trips);
+    RUN_TEST(test_ep_req_storage_size_octets_to_words_rejects_non_multiple_of_4);
+    RUN_TEST(test_ep_req_storage_size_octets_to_words_rejects_over_16_bit_word_count);
     RUN_TEST(test_ep_functional_cfg_init_zeroes);
 
     RUN_TEST(test_request_stream_cfg_init_zeroes);

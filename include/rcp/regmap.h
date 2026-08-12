@@ -1146,17 +1146,25 @@ typedef struct {
                                       it -- this is a real R/W* configuration
                                       input, not a saturating-is-safe case
                                       like rx_wd_timeout_ms/flush_time_us. */
-    uint16_t ep_req_storage_size; /* octets of request-payload storage
+    uint32_t ep_req_storage_size; /* octets of request-payload storage
                                       reserved for this endpoint. TC18's own
                                       register (0x0002, 16 bit, R/W*) is in
-                                      32-bit WORDS, not octets -- the same
-                                      class of boundary-conversion gap as
-                                      ep_delay_time above, also left for
-                                      issue #311's own wire-codec batch
-                                      (octets = words * 4 on read; write
-                                      requires octets to be a multiple of 4
-                                      and the resulting word count to fit
-                                      16 bits). */
+                                      32-bit WORDS, not octets -- widened
+                                      2026-08-11 (issue #311 batch 2) from
+                                      uint16_t: the register's own maximum
+                                      representable value, 65535 words, is
+                                      262140 octets, which does not fit a
+                                      16-bit octet count -- this was a real
+                                      correctness gap independent of any
+                                      wire codec, not merely a units
+                                      mismatch. rcp_regmap_ep_req_storage_
+                                      size_words_to_octets()/_octets_to_words()
+                                      (regmap.h/.c) perform the boundary
+                                      conversion the future wire codec
+                                      needs; octets_to_words() rejects an
+                                      octet count that is not a multiple of
+                                      4 or whose word count would not fit
+                                      the register's own 16-bit width. */
     uint32_t ep_description;      /* REQ-RMAP-073 (TC18 §13.2 Table 28/31,
                                       relative address 0x0004, 32 bit,
                                       R/W*): user-defined description, no
@@ -1183,6 +1191,58 @@ typedef struct {
 
 /* Zero-initializes cfg (ep_used = false, everything else 0). */
 void rcp_regmap_ep_generic_cfg_init(rcp_regmap_ep_generic_cfg_t *cfg);
+
+/* ── ep_generic_cfg boundary conversions (issue #311 batch 2) ───────────────
+ *
+ * Two of ep_generic_cfg's fields have a wire representation this struct's
+ * own internal representation deliberately does NOT match (see each
+ * field's own comment above for why) -- these functions are the
+ * conversion boundary a future wire codec (issue #311's own remaining
+ * batches) will call, kept separate from render()/apply_reconfig() so
+ * they can be unit-tested independently, the same shape already
+ * established by rcp_regmap_wd_timeout_ms_to_ticks()/_ticks_to_ms(). */
+
+/* ep_delay_time (TC18 §13.2 Table 28/31, relative address 0x0001.4:5, 2
+ * bit, R/W*) is restricted to exactly 4 register values: 00b=1us,
+ * 01b=10us, 10b=20us, 11b=50us -- Table 28/31's own definitive register
+ * definition, unambiguous on both PDF revisions. NOTE: TC18's own
+ * separate prose (request_compound/_triggered/_chained's own field
+ * descriptions, 4 occurrences, both revisions) instead reads "[1us,
+ * 20us, 20us, 50us]" -- a duplicated 20us where the table's own 10us
+ * belongs, almost certainly a copy-paste typo in TC18's own text (the
+ * duplicated-then-propagated value appears identically at all 4 prose
+ * sites, while the one authoritative TYPED register table gets it
+ * right) -- the table, not the repeated prose, is treated as
+ * authoritative here. rcp_regmap_ep_delay_time_us_to_reg()
+ * converts a microsecond value into the matching 2-bit register value;
+ * returns false (leaving *out_reg unchanged) for any microsecond value
+ * NOT exactly one of the 4 allowed ones -- deliberately REJECTS rather
+ * than rounds, since this is a real R/W* configuration input, not a
+ * saturating-is-safe case like rx_wd_timeout_ms/flush_time_us (a
+ * silently-substituted delay would misconfigure the endpoint's own
+ * scheduling timing). */
+bool rcp_regmap_ep_delay_time_us_to_reg(uint32_t delay_us, uint8_t *out_reg);
+
+/* The inverse conversion: register value -> microseconds. reg is masked
+ * to its own 2 bits internally, so any input is well-defined and this
+ * can never fail -- all 4 possible 2-bit register values are valid TC18
+ * encodings with no reserved/undefined combination. */
+uint32_t rcp_regmap_ep_delay_time_reg_to_us(uint8_t reg);
+
+/* ep_req_storage_size (TC18 §13.2 Table 28/31, relative address 0x0002,
+ * 16 bit, R/W*) is expressed in 32-bit words on the wire, octets
+ * internally (see this struct's own ep_req_storage_size field comment).
+ * rcp_regmap_ep_req_storage_size_words_to_octets() is the read-side
+ * conversion: always exact, always fits uint32_t (max register value
+ * 65535 words = 262140 octets), cannot fail. */
+uint32_t rcp_regmap_ep_req_storage_size_words_to_octets(uint16_t words);
+
+/* The write-side inverse: octets -> words. Returns false (leaving
+ * *out_words unchanged) if octets is not an exact multiple of 4 (no
+ * lossy rounding of a configuration input) or if the resulting word
+ * count would not fit the register's own 16-bit width. */
+bool rcp_regmap_ep_req_storage_size_octets_to_words(uint32_t octets,
+                                                      uint16_t *out_words);
 
 /* The functional-config prefix common to every endpoint type. Every
  * concrete endpoint type built in Phase 16/19 composes this struct as its
