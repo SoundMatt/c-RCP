@@ -1291,21 +1291,35 @@ static void test_response_queue_flush_period_is_carried_but_inert(void)
     TEST_ASSERT_EQUAL_UINT16(8u, cfg.flush_on_count);
 }
 
-/* ── §13.7.1.3 Table 34: RC-Server-issued PTP trigger signals ──────────────── */
+/* ── §13.7.1.3 Table 37: RC-Server-issued PTP trigger signals ──────────────── */
 
-static void test_gptp_lock_transition_issues_no_trigger_signal(void)
+/* REQ-SRV-018 PARTIAL (issue #201): rcp_server_gptp_trigger_evaluate()
+ * (server.h/server.c) now derives Table 37's own trigger signal 0/1 from a
+ * genuine gPTP lock transition -- the piece this test used to pin as
+ * entirely missing. Composed by hand with the pre-existing
+ * rcp_server_endpoint_notify_trigger(), the derived signal correctly arms
+ * a stored triggered request. Deliberately still PARTIAL, not
+ * IMPLEMENTED: nothing in this library's own dispatch loop calls
+ * evaluate()+notify_trigger() together automatically on every tick yet --
+ * the same "primitive complete, dispatch wiring deferred" disposition
+ * already established for REQ-GPIO-033/REQ-ADC-031/REQ-SRV-016 -- so a
+ * caller still has to drive both calls itself each time it observes a new
+ * gptp_locked value. */
+static void test_gptp_trigger_evaluate_derives_signal_and_composes_with_notify(void)
 {
-    rcp_server_endpoint_t ep;
-    rcp_sequencer_table_t seqs = {NULL, 0u};
-    rcp_server_tick_ctx_t ctx;
-    rcp_triggered_step_t  step;
-    rcp_bytes_t           frame;
-    uint8_t               request_type = 0xFFu;
-    size_t                idx          = 0u;
+    rcp_server_endpoint_t           ep;
+    rcp_sequencer_table_t           seqs = {NULL, 0u};
+    rcp_server_tick_ctx_t           ctx;
+    rcp_triggered_step_t            step;
+    rcp_bytes_t                     frame;
+    uint8_t                         request_type = 0xFFu;
+    size_t                          idx          = 0u;
+    rcp_server_gptp_trigger_state_t trig;
+    uint8_t                         signal_nr = 0xFFu;
 
     memset(&step, 0, sizeof(step));
-    step.trigger_source_ep = 0u; /* EP0 -- where Table 34's server signals originate */
-    step.trigger_signal_nr = 0u; /* signal 0: PTP time-synch established */
+    step.trigger_source_ep = 0u; /* EP0 -- where Table 37's server signals originate */
+    step.trigger_signal_nr = RCP_SERVER_GPTP_TRIGGER_ESTABLISHED; /* signal 0 */
     rcp_server_endpoint_init(&ep, true);
     frame = rcp_triggered_encode_request(RCP_REQUEST_TYPE_TRIGGERED, (rcp_byte_bus_id_t)5u,
                                           &step, 1u, NULL, 0u);
@@ -1318,22 +1332,62 @@ static void test_gptp_lock_transition_issues_no_trigger_signal(void)
     ctx.sequencers    = &seqs;
     ctx.endpoint_idle = true;
 
-    /* TC18 §13.7.1.3 Table 34 has the RC Server issue trigger signal 0 when
-     * PTP time-synch is established and signal 1 when it is lost. gPTP lock
-     * state is modelled -- but only as a gate on timed requests. Crossing it
-     * from unlocked to locked arms nothing: the request above stays not-due
-     * on both sides of the transition. */
-    TEST_ASSERT_FALSE(rcp_server_endpoint_select_due(&ep, &ctx, &idx));
-    ctx.gptp_locked = true;
+    rcp_server_gptp_trigger_state_init(&trig);
+
+    /* The very first observation is never itself a transition -- no
+     * previous state exists yet to detect an edge against. */
+    TEST_ASSERT_FALSE(rcp_server_gptp_trigger_evaluate(&trig, false, &signal_nr));
     TEST_ASSERT_FALSE(rcp_server_endpoint_select_due(&ep, &ctx, &idx));
 
-    /* Only an explicit, caller-driven notification records an occurrence --
-     * there is no PTP-derived trigger source to drive it. */
-    TEST_ASSERT_EQUAL_UINT(1u, rcp_server_endpoint_notify_trigger(&ep, 0u, 0u));
+    /* unlocked -> locked is a genuine edge: signal 0 (ESTABLISHED). Merely
+     * observing it changes nothing on its own -- select_due() only reads
+     * ctx.gptp_locked as a gate for timed requests, not as a trigger
+     * source -- until the derived signal is actually delivered via
+     * notify_trigger(), matching this endpoint's own trigger_source_ep/
+     * trigger_signal_nr selection. */
+    ctx.gptp_locked = true;
+    TEST_ASSERT_TRUE(rcp_server_gptp_trigger_evaluate(&trig, true, &signal_nr));
+    TEST_ASSERT_EQUAL_UINT8(RCP_SERVER_GPTP_TRIGGER_ESTABLISHED, signal_nr);
+    TEST_ASSERT_FALSE(rcp_server_endpoint_select_due(&ep, &ctx, &idx));
+
+    TEST_ASSERT_EQUAL_UINT(1u, rcp_server_endpoint_notify_trigger(&ep, 0u, signal_nr));
     TEST_ASSERT_TRUE(rcp_server_endpoint_select_due(&ep, &ctx, &idx));
+
+    /* A repeated observation at the SAME lock state is not a transition:
+     * no signal fires. */
+    signal_nr = 0xFFu;
+    TEST_ASSERT_FALSE(rcp_server_gptp_trigger_evaluate(&trig, true, &signal_nr));
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, signal_nr); /* left unchanged */
+
+    /* locked -> unlocked is the symmetric edge: signal 1 (LOST). */
+    TEST_ASSERT_TRUE(rcp_server_gptp_trigger_evaluate(&trig, false, &signal_nr));
+    TEST_ASSERT_EQUAL_UINT8(RCP_SERVER_GPTP_TRIGGER_LOST, signal_nr);
 
     rcp_bytes_free(&frame);
     rcp_server_endpoint_destroy(&ep);
+}
+
+/* REQ-SRV-018: a first-ever observation is never itself a transition, even
+ * when it disagrees with rcp_server_gptp_trigger_state_init()'s own default
+ * previous_locked=false -- there is no genuine previous state to compare
+ * against yet, regardless of which value locked happens to be on that
+ * first call. Distinct from the previous test's own first call (which
+ * happens to start at locked=false, agreeing with the default, and so
+ * cannot by itself distinguish "correctly guarded by has_previous" from
+ * "accidentally correct because the two values already matched"). */
+static void test_gptp_trigger_evaluate_first_observation_never_an_edge(void)
+{
+    rcp_server_gptp_trigger_state_t trig;
+    uint8_t                         signal_nr = 0xFFu;
+
+    rcp_server_gptp_trigger_state_init(&trig);
+    TEST_ASSERT_FALSE(rcp_server_gptp_trigger_evaluate(&trig, true, &signal_nr));
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, signal_nr); /* left unchanged */
+
+    /* The second call now has a genuine previous state (true) to compare
+     * against: staying at true is still not a transition. */
+    TEST_ASSERT_FALSE(rcp_server_gptp_trigger_evaluate(&trig, true, &signal_nr));
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, signal_nr);
 }
 
 /* ── §12.7.10 Table 25: sequencer disable, ownership, and register wiring ──── */
@@ -1510,7 +1564,8 @@ int main(void)
     RUN_TEST(test_disabled_endpoint_still_queues_operational_and_compound_wait_requests);
     RUN_TEST(test_disabled_endpoint_queuing_emits_requested_acknowledge);
     RUN_TEST(test_response_queue_flush_period_is_carried_but_inert);
-    RUN_TEST(test_gptp_lock_transition_issues_no_trigger_signal);
+    RUN_TEST(test_gptp_trigger_evaluate_derives_signal_and_composes_with_notify);
+    RUN_TEST(test_gptp_trigger_evaluate_first_observation_never_an_edge);
 
     RUN_TEST(test_sequencer_zero_state_ownership_and_regmap_wiring);
     RUN_TEST(test_tscf_presentation_time_and_abb_timed_encoder);

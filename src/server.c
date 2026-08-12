@@ -616,6 +616,30 @@ size_t rcp_server_endpoint_notify_trigger(rcp_server_endpoint_t *ep, uint8_t sou
     return matched;
 }
 
+//cfusa:req REQ-SRV-018
+void rcp_server_gptp_trigger_state_init(rcp_server_gptp_trigger_state_t *s)
+{
+    s->has_previous    = false;
+    s->previous_locked = false;
+}
+
+//cfusa:req REQ-SRV-018
+bool rcp_server_gptp_trigger_evaluate(rcp_server_gptp_trigger_state_t *s, bool locked,
+                                       uint8_t *out_signal_nr)
+{
+    bool fired = false;
+
+    if (s->has_previous && locked != s->previous_locked) {
+        *out_signal_nr = locked ? RCP_SERVER_GPTP_TRIGGER_ESTABLISHED
+                                 : RCP_SERVER_GPTP_TRIGGER_LOST;
+        fired = true;
+    }
+
+    s->has_previous    = true;
+    s->previous_locked = locked;
+    return fired;
+}
+
 //cfusa:req REQ-SRV-012
 bool rcp_server_endpoint_chain_predecessor_done(rcp_server_endpoint_t *ep, size_t index,
                                                  uint32_t now)
