@@ -756,47 +756,68 @@ static void test_wakeup_message_and_repetition_time_gaps(void)
                                         + sizeof(cfg.wup_status));
 }
 
-/* REQ-WAKEUP-019 (not-implemented) DEVIATION PIN: TC18 12.5 requires a
- * refused sleep/standby request to be answered with an ERROR response
- * carrying error code REQUEST_CANCELED. c-RCP answers with a positive-form
- * SleepCMD response whose err bit is clear and whose payload byte is the
- * module-local RCP_PWRMODE_ENTRY_REFUSED value -- a conforming RC Client
- * watching for an error response never sees the refusal. */
-static void test_wakeup_refusal_is_positive_response_not_error(void)
+/* REQ-WAKEUP-019, FIXED 2026-08-12 (issue #201 batch 6): TC18 §12.5
+ * requires a refused sleep/standby request to be answered with an ERROR
+ * response carrying error code REQUEST_CANCELED. As of this fix,
+ * rcp_ep_wakeup_encode_sleepcmd_response(..., RCP_PWRMODE_ENTRY_REFUSED,
+ * ...) returns a genuine ACF Error Response (err set, classifies as
+ * RCP_ACF_RESP_ERROR, payload = the numbered wire code) instead of the
+ * old positive-form SleepCMD-shaped response this test used to pin as
+ * the deviation -- a conforming RC Client watching for an error response
+ * now sees the refusal, and the numbered wire code TC18 §12.5 calls for
+ * is genuinely carried on the wire. */
+static void test_wakeup_refusal_is_a_genuine_error_response(void)
 {
     rcp_acf_byte_message_info_t hdr    = {0};
     rcp_pwrmode_entry_result_t  result = RCP_PWRMODE_ENTRY_OK;
     rcp_bytes_t                 frame;
     uint8_t                     tn = 0;
+    const uint8_t               *payload  = NULL;
+    size_t                       payload_len = 0;
 
     frame = rcp_ep_wakeup_encode_sleepcmd_response(1u, RCP_PWRMODE_ENTRY_REFUSED, 0x33u);
     TEST_ASSERT_NOT_NULL(frame.data);
-    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_unpack_header(frame.data, &hdr));
+    TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                      rcp_acf_decode_abb(frame.data, frame.len, &hdr, &payload, &payload_len));
 
-    /* Not an error response: err is clear and the message classifies as an
-     * ordinary write response. */
-    TEST_ASSERT_EQUAL_UINT8(0u, hdr.err);
-    TEST_ASSERT_EQUAL(RCP_ACF_RESP_WRITE, rcp_acf_classify_response(&hdr));
-    TEST_ASSERT_NOT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&hdr));
+    /* A genuine error response: err is set and the message classifies
+     * accordingly, not as an ordinary write response. */
+    TEST_ASSERT_EQUAL_UINT8(1u, hdr.err);
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&hdr));
+    TEST_ASSERT_NOT_EQUAL(RCP_ACF_RESP_WRITE, rcp_acf_classify_response(&hdr));
 
+    /* The numbered wire code TC18 §12.5 calls for IS carried, as the
+     * response's own single payload octet. */
+    TEST_ASSERT_EQUAL_UINT(1u, payload_len);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_REQUEST_CANCELED, payload[0]);
+
+    /* The dedicated decoder still round-trips this exchange correctly,
+     * recognizing the error response as the refused-entry case. */
     TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_OK,
                       rcp_ep_wakeup_decode_sleepcmd_response(frame.data, frame.len, 1u, &result,
                                                              &tn));
     TEST_ASSERT_EQUAL(RCP_PWRMODE_ENTRY_REFUSED, result);
     TEST_ASSERT_EQUAL_UINT8(0x33u, tn);
-    /* The numbered wire code TC18 12.5 calls for is never carried anywhere
-     * in this exchange. */
-    {
-        /* Held in ints, not compared as their own enum types: MSVC's C5287
-         * rejects a direct comparison of two different enumerations, and
-         * the point here is precisely that these are two unrelated
-         * numbering schemes. */
-        const int wire_code  = (int)RCP_ERROR_REQUEST_CANCELED;
-        const int local_code = (int)RCP_PWRMODE_ENTRY_REFUSED;
 
-        TEST_ASSERT_EQUAL_INT(5, wire_code);
-        TEST_ASSERT_NOT_EQUAL_INT(wire_code, local_code);
-    }
+    rcp_bytes_free(&frame);
+}
+
+/* A response an unrelated err code (never built by this module's own
+ * encode side) is NOT reinterpreted as a refusal -- REQ-WAKEUP-019's own
+ * decode-side fix is specific to RCP_ERROR_REQUEST_CANCELED, not "any
+ * error response at all". */
+static void test_wakeup_decode_rejects_an_unrelated_error_code(void)
+{
+    rcp_bytes_t                 frame = rcp_acf_build_error_response(1u, 0x44u,
+                                                                       RCP_ERROR_EP_NOT_FOUND);
+    rcp_pwrmode_entry_result_t  result = RCP_PWRMODE_ENTRY_OK;
+    uint8_t                     tn = 0;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_ERR_BAD_OPCODE,
+                      rcp_ep_wakeup_decode_sleepcmd_response(frame.data, frame.len, 1u, &result,
+                                                             &tn));
+
     rcp_bytes_free(&frame);
 }
 
@@ -1269,7 +1290,8 @@ int main(void)
     RUN_TEST(test_pwm_in_functional_cfg_has_full_register_coverage);
 
     RUN_TEST(test_wakeup_message_and_repetition_time_gaps);
-    RUN_TEST(test_wakeup_refusal_is_positive_response_not_error);
+    RUN_TEST(test_wakeup_refusal_is_a_genuine_error_response);
+    RUN_TEST(test_wakeup_decode_rejects_an_unrelated_error_code);
     RUN_TEST(test_wakeup_codec_accepts_any_bus_id);
     RUN_TEST(test_wakeup_register_block_has_collision_free_layout);
 

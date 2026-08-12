@@ -9811,12 +9811,12 @@
     {
       "id": "REQ-WAKEUP-019",
       "title": "A refused sleep/standby request is answered with an error response carrying REQUEST_CANCELED",
-      "text": "NOT IMPLEMENTED: c-RCP answers a refused sleep/standby request with a positive-form SleepCMD response carrying RCP_PWRMODE_ENTRY_REFUSED, not with an error response (TC18 \u00a712.5). The specification requires the rejection to be signalled as an error message with error code REQUEST_CANCELED (RCP_ERROR_REQUEST_CANCELED, include/rcp/errors.h:55). A conformant RC Client watching for an error response never sees the refusal, and a c-RCP client peer is the only thing that can decode the refusal at all.",
+      "text": "IMPLEMENTED, FIXED 2026-08-12 (issue #201 batch 6): TC18 \u00a712.5 requires a refused sleep/standby request to be signalled as an error message with error code REQUEST_CANCELED (RCP_ERROR_REQUEST_CANCELED, include/rcp/errors.h:55), not the old positive-form SleepCMD response carrying the module-local RCP_PWRMODE_ENTRY_REFUSED value. rcp_ep_wakeup_encode_sleepcmd_response(..., RCP_PWRMODE_ENTRY_REFUSED, ...) now returns a genuine ACF Error Response (via rcp_acf_build_error_response()) carrying that numbered wire code; rcp_ep_wakeup_decode_sleepcmd_response() recognizes an error response carrying specifically that code as the refused-entry case (any other err code is RCP_EP_WAKEUP_ERR_BAD_OPCODE, not silently reinterpreted). A conformant RC Client watching for an error response now sees the refusal, and the numbered wire code is genuinely carried on the wire.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
+      "status": "implemented",
       "tc18": "\u00a712.5, TC18.txt L2327-L2328"
     },
     {

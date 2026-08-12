@@ -15205,6 +15205,42 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.258.0 -- 2026-08-12 (issue #201 batch: `REQ-WAKEUP-019`,
+refused sleep/standby is now a genuine error response)
+
+**`rcp_ep_wakeup_encode_sleepcmd_response()`/`_decode_sleepcmd_response()`
+now signal a refused standby/sleep entry as a genuine ACF Error
+Response carrying `REQUEST_CANCELED`, closing `REQ-WAKEUP-019` (TC18
+§12.5) fully -- status flips to `implemented`.**
+
+Before this fix, a refused entry used the SAME positive-form
+SleepCMD-shaped response as success (opcode + a module-local result
+byte, `err` clear) -- a conformant RC Client watching for an error
+response never saw the refusal. The encode side now delegates to
+`rcp_acf_build_error_response()` on refusal, returning a real Error
+Response (`err` set, `RCP_ACF_RESP_ERROR`) whose payload is
+`RCP_ERROR_REQUEST_CANCELED` -- the exact code TC18 §12.5 requires.
+The OK path is unchanged.
+
+The decode side gains a matching `hdr.err` branch: an error response
+carrying specifically that code decodes as `RCP_PWRMODE_ENTRY_REFUSED`;
+any other err code is `RCP_EP_WAKEUP_ERR_BAD_OPCODE`, not silently
+reinterpreted. The non-error path is unchanged, including its own
+pre-existing fail-safe tolerance for a non-conformant peer.
+
+`test_tc18_gaps_ep.c`'s own deviation-pin test is rewritten from
+asserting the now-fixed old behavior to the conforming shape, matching
+this file's own documented "rewrite it when the gap closes" test
+convention. A second new test confirms an unrelated error code is not
+misclassified as a refusal. Every pre-existing round-trip caller
+needed no changes -- they only assert the round-tripped result value.
+
+Mutation-tested 2 ways (bypass the encode-side branch; accept any err
+code on decode) -- both caught cleanly.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.257.0 -- 2026-08-12 (issue #201 batch: `REQ-WAKEUP-020`,
 WakeUp endpoint's fixed EP_Nr)
 

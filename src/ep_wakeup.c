@@ -159,12 +159,23 @@ rcp_ep_wakeup_errc_t rcp_ep_wakeup_decode_sleepcmd_request(const uint8_t *b, siz
 }
 
 //cfusa:req REQ-WAKEUP-012
+//cfusa:req REQ-WAKEUP-019
 rcp_bytes_t rcp_ep_wakeup_encode_sleepcmd_response(rcp_byte_bus_id_t byte_bus_id,
                                                     rcp_pwrmode_entry_result_t result,
                                                     uint8_t transaction_num)
 {
     rcp_acf_byte_message_info_t hdr = {0};
     uint8_t                     payload[SLEEPCMD_RESPONSE_PAYLOAD_LEN];
+
+    if (result == RCP_PWRMODE_ENTRY_REFUSED) {
+        /* REQ-WAKEUP-019 (TC18 §12.5): a refused standby/sleep entry is
+         * signalled with "an error message with error code =
+         * REQUEST_CANCELED", not this message's own positive-form
+         * SleepCMD-opcode-plus-result-byte payload -- see this
+         * function's own doc comment. */
+        return rcp_acf_build_error_response(byte_bus_id, transaction_num,
+                                             RCP_ERROR_REQUEST_CANCELED);
+    }
 
     payload[0] = RCP_EP_WAKEUP_SLEEPCMD_OPCODE;
     payload[1] = (uint8_t)result;
@@ -178,6 +189,7 @@ rcp_bytes_t rcp_ep_wakeup_encode_sleepcmd_response(rcp_byte_bus_id_t byte_bus_id
 }
 
 //cfusa:req REQ-WAKEUP-013
+//cfusa:req REQ-WAKEUP-019
 rcp_ep_wakeup_errc_t rcp_ep_wakeup_decode_sleepcmd_response(const uint8_t *b, size_t len,
                                                              rcp_byte_bus_id_t expected_bus_id,
                                                              rcp_pwrmode_entry_result_t *out_result,
@@ -193,6 +205,22 @@ rcp_ep_wakeup_errc_t rcp_ep_wakeup_decode_sleepcmd_response(const uint8_t *b, si
     if (acf_rc != RCP_ACF_OK) return RCP_EP_WAKEUP_ERR_BAD_MSG_TYPE;
 
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_WAKEUP_ERR_WRONG_BUS;
+
+    if (hdr.err) {
+        /* REQ-WAKEUP-019: the refused-entry half of this pair now
+         * arrives as a genuine ACF Error Response (see the encode
+         * side's own doc comment) -- recognize the specific
+         * REQUEST_CANCELED code that response's own contract defines.
+         * Any other err code was never built by this function's own
+         * encode counterpart, so it is not this decoder's concern. */
+        if (payload_len < 1u || payload[0] != (uint8_t)RCP_ERROR_REQUEST_CANCELED) {
+            return RCP_EP_WAKEUP_ERR_BAD_OPCODE;
+        }
+        *out_result           = RCP_PWRMODE_ENTRY_REFUSED;
+        *out_transaction_num  = hdr.transaction_num;
+        return RCP_EP_WAKEUP_OK;
+    }
+
     if (payload_len < SLEEPCMD_RESPONSE_PAYLOAD_LEN) return RCP_EP_WAKEUP_ERR_SHORT_FRAME;
     if (payload[0] != RCP_EP_WAKEUP_SLEEPCMD_OPCODE) return RCP_EP_WAKEUP_ERR_BAD_OPCODE;
 
