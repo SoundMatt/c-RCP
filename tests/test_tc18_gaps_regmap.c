@@ -39,6 +39,7 @@
 //cfusa:test REQ-RMAP-057
 //cfusa:test REQ-RMAP-058
 //cfusa:test REQ-RMAP-059
+//cfusa:test REQ-WAKEUP-020
 //cfusa:test REQ-RMAP-060
 //cfusa:test REQ-RMAP-061
 //cfusa:test REQ-RMAP-062
@@ -3555,6 +3556,41 @@ static void test_ep_id_map_flags_heterogeneous_shared_bus(void)
     TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_shared_bus_homogeneous(NULL, NULL, 0u));
 }
 
+/* REQ-WAKEUP-020: TC18 §13.7.2.1 fixes the WakeUp endpoint's own EP_Nr
+ * to 1. rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id() is the dedicated
+ * diagnostic, same shape as the two above: a caller-supplied,
+ * index-parallel ep_types[] array (this table's own row carries no
+ * ep_type field) checked against a caller-supplied
+ * target_ep_type/required_ep_id pair. */
+static void test_ep_id_map_flags_wrong_ep_id_for_a_fixed_endpoint_type(void)
+{
+    rcp_regmap_ep_id_map_entry_t correct[2];
+    rcp_regmap_ep_id_map_entry_t wrong[2];
+    rcp_regmap_ep_id_map_entry_t no_such_type[2];
+    uint8_t types[2] = {1u, 2u}; /* row 0 is the fixed type (1), row 1 is not */
+
+    /* row 0's ep_id correctly matches the required fixed value. */
+    correct[0].ep_id = 1u; correct[0].byte_bus_id = 3u; correct[0].request_stream_index = 1u;
+    correct[1].ep_id = 9u; correct[1].byte_bus_id = 4u; correct[1].request_stream_index = 1u;
+    TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id(correct, types, 2u, 1u, 1u));
+
+    /* Same shape, but row 0 (the fixed-type row) carries the wrong
+     * ep_id -- must be flagged regardless of row 1's own ep_id, which
+     * is a different, unconstrained ep_type. */
+    wrong[0].ep_id = 5u; wrong[0].byte_bus_id = 3u; wrong[0].request_stream_index = 1u;
+    wrong[1].ep_id = 9u; wrong[1].byte_bus_id = 4u; wrong[1].request_stream_index = 1u;
+    TEST_ASSERT_FALSE(rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id(wrong, types, 2u, 1u, 1u));
+
+    /* A table containing no row of the target ep_type at all is
+     * vacuously fine -- there is nothing to violate the invariant. */
+    no_such_type[0].ep_id = 5u; no_such_type[0].byte_bus_id = 3u; no_such_type[0].request_stream_index = 1u;
+    no_such_type[1].ep_id = 9u; no_such_type[1].byte_bus_id = 4u; no_such_type[1].request_stream_index = 1u;
+    TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id(no_such_type, types, 2u, 7u, 1u));
+
+    /* Vacuous case. */
+    TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id(NULL, NULL, 0u, 1u, 1u));
+}
+
 /* TC18 §12.7.8 Table 23 carries BBID in a 16-bit register holding an
  * 11-bit byte_bus_id, and the ACF byte_message_info header transports
  * byte_bus_id[10:8] in octet 2. Fixed (REQ-RMAP-053/REQ-ACF-020):
@@ -4183,6 +4219,7 @@ int main(void)
     RUN_TEST(test_ep_id_ordering_considers_request_stream_index);
     RUN_TEST(test_ep_id_map_flags_multi_client_ep);
     RUN_TEST(test_ep_id_map_flags_heterogeneous_shared_bus);
+    RUN_TEST(test_ep_id_map_flags_wrong_ep_id_for_a_fixed_endpoint_type);
     RUN_TEST(test_byte_bus_id_is_now_eleven_bits_wide);
     RUN_TEST(test_ep_id_map_render_matches_table_23_byte_offsets);
     RUN_TEST(test_w_plus_field_now_has_a_real_lockable_primitive);
