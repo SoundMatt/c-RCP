@@ -262,6 +262,28 @@ rcp_bytes_t rcp_acf_build_error_response(rcp_byte_bus_id_t byte_bus_id,
     return rcp_acf_encode_abb(&hdr, &payload, 1);
 }
 
+//cfusa:req REQ-SRV-016
+bool rcp_acf_evt_requests_acknowledge(uint8_t evt)
+{
+    return (evt & 0x08u) != 0u;
+}
+
+//cfusa:req REQ-SRV-016
+rcp_bytes_t rcp_acf_build_acknowledge_response(rcp_byte_bus_id_t byte_bus_id,
+                                                uint8_t transaction_num)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+
+    hdr.byte_bus_id     = byte_bus_id;
+    hdr.transaction_num = transaction_num;
+    hdr.evt             = RCP_ACF_EVT_ACKNOWLEDGE;
+    hdr.op              = RCP_ACF_OP_NONE;
+    hdr.rsp             = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
+    hdr.err             = 0;
+
+    return rcp_acf_encode_abb(&hdr, NULL, 0);
+}
+
 //cfusa:req REQ-ACF-004
 //cfusa:req REQ-ACF-006
 //cfusa:req REQ-ACF-014

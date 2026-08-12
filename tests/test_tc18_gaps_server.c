@@ -1039,7 +1039,7 @@ static void test_entry_gate_is_scoped_to_one_endpoint_and_one_queue(void)
     rcp_server_endpoint_init(&busy_ep, false);
 
     /* A second endpoint is plainly not idle: it holds an undrained request. */
-    TEST_ASSERT_FALSE(rcp_server_endpoint_submit(&busy_ep, frame.data, frame.len));
+    TEST_ASSERT_FALSE(rcp_server_endpoint_submit(&busy_ep, frame.data, frame.len, NULL));
     TEST_ASSERT_EQUAL_UINT(1u, rcp_server_endpoint_queue_len(&busy_ep));
 
     /* REQ-PWRMODE-025 (TC18 §12.5): entry is refused when AT LEAST ONE
@@ -1107,7 +1107,18 @@ static void test_admission_is_suspended_during_the_sleep_drain(void)
 
 /* ── §12.3.1.3: requests arriving at a disabled endpoint ───────────────────── */
 
-static void test_disabled_endpoint_queues_config_requests_without_ack(void)
+/* REQ-SRV-015 (not-implemented) DEVIATION PIN: TC18 §12.3.1.3: a disabled
+ * endpoint still executes CONFIGURATION requests immediately and queues
+ * only operational ones. c-RCP branches on ep_enable alone and never
+ * inspects the request, so a configuration request -- including the
+ * write that would set ep_enable itself -- is queued instead of executed,
+ * and the endpoint can never be re-enabled over the wire. Still open:
+ * closing it needs a way to classify a decoded request as "configuration"
+ * that's correct across all 13 heterogeneous endpoint types (Table 30's
+ * own evt[2:0]=111b "EP_func" convention is not itself universal the way
+ * evt[3]'s acknowledge-request bit is -- see REQ-SRV-016's own fix,
+ * below, for the one piece of §12.3.1.3 that IS endpoint-type-generic). */
+static void test_disabled_endpoint_still_queues_config_requests(void)
 {
     rcp_server_endpoint_t ep;
     rcp_bytes_t           frame = standard_abb((rcp_byte_bus_id_t)5u, 0x42u);
@@ -1116,20 +1127,11 @@ static void test_disabled_endpoint_queues_config_requests_without_ack(void)
     TEST_ASSERT_NOT_NULL(frame.data);
     rcp_server_endpoint_init(&ep, false);
 
-    /* TC18 §12.3.1.3: a disabled endpoint still executes CONFIGURATION
-     * requests immediately and queues only operational ones. c-RCP branches
-     * on ep_enable alone and never inspects the request, so a configuration
-     * request -- including the write that would set ep_enable itself -- is
-     * queued instead of executed, and the endpoint can never be re-enabled
-     * over the wire. */
-    TEST_ASSERT_FALSE(rcp_server_endpoint_submit(&ep, frame.data, frame.len));
+    TEST_ASSERT_FALSE(rcp_server_endpoint_submit(&ep, frame.data, frame.len, NULL));
     TEST_ASSERT_EQUAL_UINT(1u, rcp_server_endpoint_queue_len(&ep));
 
-    /* TC18 §12.3.1.3 also emits the requested acknowledge at the moment a
-     * request is STORED for a disabled endpoint. The admission path produces
-     * no acknowledge of any kind -- only a queued/executed verdict and a
-     * request-type byte -- so a client cannot distinguish a stored request
-     * (transaction 0x42, above) from a dropped one. */
+    /* admit() takes the same path for a standard request -- it too queues
+     * rather than executing, confirming the deviation isn't submit()-only. */
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_QUEUED,
                       rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u,
                                                 &request_type, NULL, NULL));
@@ -1137,6 +1139,60 @@ static void test_disabled_endpoint_queues_config_requests_without_ack(void)
     TEST_ASSERT_EQUAL_UINT(2u, rcp_server_endpoint_queue_len(&ep));
 
     rcp_bytes_free(&frame);
+    rcp_server_endpoint_destroy(&ep);
+}
+
+/* FIXED 2026-08-12 (issue #201, REQ-SRV-016): TC18 §12.3.1.3 -- "if
+ * requested an acknowledge is sent after storing the request." evt[3] is
+ * TC18 §13.5's own universal (endpoint-type-independent) acknowledge-
+ * request bit, so rcp_server_endpoint_submit()'s new out_ack can check it
+ * without needing REQ-SRV-015's own still-open endpoint-type classifier. */
+static void test_disabled_endpoint_queuing_emits_requested_acknowledge(void)
+{
+    rcp_server_endpoint_t       ep;
+    rcp_acf_byte_message_info_t req_hdr = {0};
+    rcp_bytes_t                 frame_wants_ack, frame_no_ack, ack;
+    rcp_acf_byte_message_info_t ack_hdr;
+    const uint8_t                *ack_payload;
+    size_t                        ack_payload_len;
+
+    rcp_server_endpoint_init(&ep, false);
+
+    /* evt[3] = 1 (0x08) requests an acknowledge; evt[2:0] is left 0 --
+     * this bit is independent of whatever per-endpoint meaning evt[2:0]
+     * carries (TC18 §13.5's own opening statement, before its per-
+     * endpoint-type table). */
+    req_hdr.byte_bus_id     = (rcp_byte_bus_id_t)5u;
+    req_hdr.transaction_num = 0x42u;
+    req_hdr.evt             = 0x08u;
+    frame_wants_ack = rcp_acf_encode_abb(&req_hdr, NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame_wants_ack.data);
+
+    TEST_ASSERT_FALSE(rcp_server_endpoint_submit(&ep, frame_wants_ack.data, frame_wants_ack.len,
+                                                 &ack));
+    TEST_ASSERT_EQUAL_UINT(1u, rcp_server_endpoint_queue_len(&ep));
+    TEST_ASSERT_NOT_NULL(ack.data);
+    TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                      rcp_acf_decode_abb(ack.data, ack.len, &ack_hdr, &ack_payload,
+                                        &ack_payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ACKNOWLEDGE, rcp_acf_classify_response(&ack_hdr));
+    TEST_ASSERT_EQUAL_UINT8(5u, ack_hdr.byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT8(0x42u, ack_hdr.transaction_num);
+    TEST_ASSERT_EQUAL_UINT(0u, ack_payload_len);
+    rcp_bytes_free(&ack);
+    rcp_bytes_free(&frame_wants_ack);
+
+    /* A request that did NOT set evt[3] gets no ack -- storing it is
+     * silent, exactly as before this fix. */
+    req_hdr.evt = 0x00u;
+    frame_no_ack = rcp_acf_encode_abb(&req_hdr, NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame_no_ack.data);
+
+    TEST_ASSERT_FALSE(rcp_server_endpoint_submit(&ep, frame_no_ack.data, frame_no_ack.len, &ack));
+    TEST_ASSERT_EQUAL_UINT(2u, rcp_server_endpoint_queue_len(&ep));
+    TEST_ASSERT_NULL(ack.data);
+
+    rcp_bytes_free(&frame_no_ack);
     rcp_server_endpoint_destroy(&ep);
 }
 
@@ -1335,7 +1391,7 @@ static void test_watchdog_overflows_despite_continuous_requests(void)
      * longer than its 40 ms timeout therefore still overflows the watchdog,
      * driving a live, perfectly responsive client into its safe state. */
     while (elapsed_ms < 1000 && !overflowed) {
-        TEST_ASSERT_TRUE(rcp_server_endpoint_submit(&ep, frame.data, frame.len));
+        TEST_ASSERT_TRUE(rcp_server_endpoint_submit(&ep, frame.data, frame.len, NULL));
         busy_wait_ms(10u);
         elapsed_ms += 10;
         overflowed = rcp_watchdog_keeper_status(k, 7u).overflowed;
@@ -1384,7 +1440,8 @@ int main(void)
     RUN_TEST(test_entry_gate_is_scoped_to_one_endpoint_and_one_queue);
     RUN_TEST(test_admission_is_suspended_during_the_sleep_drain);
 
-    RUN_TEST(test_disabled_endpoint_queues_config_requests_without_ack);
+    RUN_TEST(test_disabled_endpoint_still_queues_config_requests);
+    RUN_TEST(test_disabled_endpoint_queuing_emits_requested_acknowledge);
     RUN_TEST(test_response_queue_flush_period_is_carried_but_inert);
     RUN_TEST(test_gptp_lock_transition_issues_no_trigger_signal);
 

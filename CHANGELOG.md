@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.268.0 -- 2026-08-12 (issue #201 batch: `REQ-SRV-016`, a disabled endpoint's request queuing now emits the requested acknowledge)
+
+**New `rcp_acf_evt_requests_acknowledge()`/`rcp_acf_build_acknowledge_response()` (acf.h/acf.c) plus a new `out_ack` parameter on `rcp_server_endpoint_submit()` -- status flips to `implemented`.**
+
+TC18 §12.3.1.3: "Nevertheless if requested an acknowledge us sent after storing the request." `evt[3]` is TC18 §13.5's own universal, endpoint-type-independent acknowledge-request bit ("evt[3] is used to request an acknowledge. I.e. evt[3]=1 requests acknowledge" -- verified directly against TC18.txt, distinct from the per-endpoint-type `evt[2:0]` meaning Table 30 assigns). `rcp_acf_evt_requests_acknowledge()` checks it; `rcp_acf_build_acknowledge_response()` builds a genuine Acknowledge (`evt = RCP_ACF_EVT_ACKNOWLEDGE`), mirroring `rcp_acf_build_error_response()`'s own established shape. `rcp_server_endpoint_submit()` now populates its new `out_ack` output parameter with that response whenever a request is queued (`ep->ep_enable` false) and its own `evt[3]` requested one -- addressed to the request's own `byte_bus_id`/`transaction_num`, left zeroed otherwise (including fail-safe when the frame is too short to even decode a header).
+
+**Real signature change to a function with real callers**: updated every call site across `src/server.c` (`admit()`'s own two internal calls, passed `NULL` -- see scope note below), `tests/test_server.c` (8 sites), `tests/test_tc18_gaps_server.c` (3 sites).
+
+**Deliberately scoped to `submit()` itself, not `admit()`**: `admit()`'s own signature is unchanged, and its two internal `submit()` calls pass `NULL` for `out_ack` -- the mechanism is complete and directly testable at `submit()`'s own level, but not yet propagated up through `admit()` to its own callers (`mock.c`'s real dispatch). This is a separate, not-yet-attempted integration step, matching this codebase's established disposition for primitives whose dispatch-side wiring is a distinct concern (e.g. `REQ-GPIO-033`, `REQ-ADC-031`). Also does **not** resolve `REQ-SRV-015`'s own separate, still-open gap (distinguishing a configuration request from an operational one at a disabled endpoint) -- `evt[3]` is universal, but the classification `REQ-SRV-015` needs is not, since `evt[2:0]`'s meaning is per-endpoint-type.
+
+Split the pre-existing combined `REQ-SRV-015`/`REQ-SRV-016` gap-pinning test into two: one still pinning `REQ-SRV-015`'s deviation, one rewritten to verify `REQ-SRV-016`'s fix directly (an `evt[3]`-set request produces a decodable Acknowledge with the right `byte_bus_id`/`transaction_num`; an `evt[3]`-clear request produces none).
+
+Mutation-tested 3 ways (bypassing the acknowledge-request check entirely, bypassing the ack-production block entirely, and always populating `*out_ack` regardless of queuing/`evt[3]`): all 3 caught cleanly.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.267.0 -- 2026-08-12 (issue #201 batch: `REQ-SPI-036`, the SPI transfer-length rule -- zero-fill/full-PICO -- now implemented)
 
 **`rcp_ep_spi_{en,de}code_transfer_request()` now carry `read_size` through the ACF header's own `read_size_or_segment_num` field, and a new `rcp_ep_spi_transfer_length()` computes TC18 §13.7.3.3's own transfer-length rule -- status flips to `implemented`.**

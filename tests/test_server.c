@@ -22,7 +22,7 @@ static void test_disabled_endpoint_queues_submitted_requests(void)
 
     rcp_server_endpoint_init(&ep, false);
 
-    executed_now = rcp_server_endpoint_submit(&ep, body, sizeof(body));
+    executed_now = rcp_server_endpoint_submit(&ep, body, sizeof(body), NULL);
 
     TEST_ASSERT_FALSE(executed_now);
     TEST_ASSERT_EQUAL_UINT(1, rcp_server_endpoint_queue_len(&ep));
@@ -38,7 +38,7 @@ static void test_enabled_endpoint_reports_immediate_execution(void)
 
     rcp_server_endpoint_init(&ep, true);
 
-    executed_now = rcp_server_endpoint_submit(&ep, body, sizeof(body));
+    executed_now = rcp_server_endpoint_submit(&ep, body, sizeof(body), NULL);
 
     TEST_ASSERT_TRUE(executed_now);
     TEST_ASSERT_EQUAL_UINT(0, rcp_server_endpoint_queue_len(&ep));
@@ -53,7 +53,7 @@ static void test_drain_one_refuses_while_disabled(void)
     rcp_bytes_t out = {0};
 
     rcp_server_endpoint_init(&ep, false);
-    (void)rcp_server_endpoint_submit(&ep, body, sizeof(body));
+    (void)rcp_server_endpoint_submit(&ep, body, sizeof(body), NULL);
 
     TEST_ASSERT_FALSE(rcp_server_endpoint_drain_one(&ep, &out));
     TEST_ASSERT_EQUAL_UINT(1, rcp_server_endpoint_queue_len(&ep));
@@ -70,9 +70,9 @@ static void test_reenable_drains_queue_in_fifo_order(void)
     rcp_bytes_t out = {0};
 
     rcp_server_endpoint_init(&ep, false);
-    (void)rcp_server_endpoint_submit(&ep, first, sizeof(first));
-    (void)rcp_server_endpoint_submit(&ep, second, sizeof(second));
-    (void)rcp_server_endpoint_submit(&ep, third, sizeof(third));
+    (void)rcp_server_endpoint_submit(&ep, first, sizeof(first), NULL);
+    (void)rcp_server_endpoint_submit(&ep, second, sizeof(second), NULL);
+    (void)rcp_server_endpoint_submit(&ep, third, sizeof(third), NULL);
     TEST_ASSERT_EQUAL_UINT(3, rcp_server_endpoint_queue_len(&ep));
 
     rcp_server_endpoint_set_enable(&ep, true);
@@ -103,8 +103,8 @@ static void test_endpoint_destroy_frees_a_nonempty_queue(void)
     uint8_t body[] = { 1, 2 };
 
     rcp_server_endpoint_init(&ep, false);
-    (void)rcp_server_endpoint_submit(&ep, body, sizeof(body));
-    (void)rcp_server_endpoint_submit(&ep, body, sizeof(body));
+    (void)rcp_server_endpoint_submit(&ep, body, sizeof(body), NULL);
+    (void)rcp_server_endpoint_submit(&ep, body, sizeof(body), NULL);
 
     rcp_server_endpoint_destroy(&ep);
     TEST_ASSERT_EQUAL_UINT(0, rcp_server_endpoint_queue_len(&ep));
