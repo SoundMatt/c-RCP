@@ -15205,6 +15205,39 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.272.0 -- 2026-08-12 (issue #200 doc-only batch:
+`REQ-RMAP-047`/`057`/`058` closed -- register+wire scope complete,
+remaining text was non-normative or already out of scope)
+
+**`REQ-RMAP-047`/`REQ-RMAP-057`/`REQ-RMAP-058` flip `partial` ->
+`implemented` -- text/status corrections, no code change.**
+
+Investigated all 18 `partial` RMAP entries (issue #200). Three
+close honestly at their own current state:
+
+- `REQ-RMAP-047` (MACsec channel selection): register/wire/auth all
+  complete; the remaining gap (no MACsec layer to act on the
+  selection) is an already-decided architectural boundary, matching
+  this project's earlier TLS/MACsec deprecation.
+- `REQ-RMAP-057`/`REQ-RMAP-058`: both TC18 §12.7.8 citations
+  re-verified as non-normative ("recommended"/"should", not
+  MUST/SHALL) directly against TC18.txt. Both already have real,
+  tested read-only diagnostics reporting the condition -- the full,
+  appropriate extent of support TC18 itself calls for.
+
+**Investigated, not closeable this batch** (the remaining 15):
+`REQ-RMAP-023`/`066`/`067` are blocked on the same unresolved Table
+33/36 address collision (needs its own dedicated investigation, like
+MDIO/CANEP). `REQ-RMAP-050`'s own existing code comment already
+flags its render-time saturation direction as a "judgment this
+library should [not] make unilaterally" -- correctly deferred, not
+forced. The remaining 12 each need subsystems or dispatch
+infrastructure this codebase doesn't have yet.
+
+No functional code change; 65/65 both trees unchanged. `cfusa
+check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested
+100`: both 100%.
+
 ### v0.271.0 -- 2026-08-12 (issue #200 doc-only batch: 9 RMAP
 entries missing their own `status` field, corrected)
 

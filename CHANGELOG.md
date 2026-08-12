@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.272.0 -- 2026-08-12 (issue #200 doc-only batch: `REQ-RMAP-047`/`057`/`058` closed -- register+wire scope complete, remaining text was non-normative or already out of scope)
+
+**`REQ-RMAP-047`/`REQ-RMAP-057`/`REQ-RMAP-058` flip `partial` -> `implemented` -- `.fusa-reqs.json` text/status corrections, no code change.**
+
+Investigated all 18 `partial` RMAP entries (issue #200) for this batch. Three close honestly at their own current state; the rest are genuinely blocked (see the "Investigated, not closeable this batch" note below) and were left untouched.
+
+- **`REQ-RMAP-047`** (`rx_secure_channel_index`, MACsec channel selection): register storage, wire dispatch (issue #306), and write authorization (issue #308) are all already complete. The only remaining text described this library having no MACsec (802.1AE) layer to *act on* a selected channel -- an already-decided architectural boundary, not a gap: MACsec was deliberately excluded from this library's own scope (see this file's own Deprecation & Removal Log, `tls.h`/`tls.c`, v0.78.0, same "link-layer, out of scope" reasoning). Selecting and exposing the channel index is the whole of what a register-map library is responsible for.
+- **`REQ-RMAP-057`** (single-RC-Client-per-endpoint) and **`REQ-RMAP-058`** (shared-`byte_bus_id` same-`ep_type`): both cite TC18 §12.7.8 language re-verified directly against TC18.txt -- "it is **recommended**..." (L2985) and "they **should** be..." (L2988) -- non-normative, not MUST/SHALL. Both already have real, tested, read-only diagnostics (`rcp_regmap_ep_id_map_has_single_client_per_ep()`, `rcp_regmap_ep_id_map_shared_bus_homogeneous()`) reporting the condition; TC18 itself defines no corrective action for either, so a diagnostic is the full, appropriate extent of support. `REQ-RMAP-058`'s own diagnostic-to-live-data wiring remains a separate, deferred integration concern (matching this session's established "primitive complete, dispatch wiring deferred" disposition, e.g. `REQ-ADC-031`/`REQ-GPIO-033`) -- noted but does not block this requirement's own closure.
+
+**Investigated, not closeable this batch (of the remaining 15 `partial` RMAP items)**:
+- `REQ-RMAP-023`/`066`/`067` are all blocked on the SAME genuine, already-documented, unresolved Table 33/36 address collision (`regmap.h`'s own file header: 0x0002/0x0003/0x0004 each assigned to two different registers on both PDF revisions) -- building a wire codec there means picking a side of an unconfirmed hypothesis, the same class of problem as MDIO/CANEP. Needs its own dedicated investigation, not a routine fix.
+- `REQ-RMAP-050` (watchdog ms<->ticks wiring): the conversion functions already exist and are correct, but the codebase's own existing comment (`regmap.h`) explicitly flags that a render-time saturation direction "could itself be an unsafe choice depending on which direction is fail-safe for a given deployment, not a judgment this library should make unilaterally." Already correctly deferred pending an explicit scope decision, not forced into this batch.
+- The remaining 12 (`032`/`034`/`036`/`037`/`038`/`039`/`048`/`049`/`065`/`068`) each need real subsystems or dispatch infrastructure this codebase doesn't have yet (HW_config/EP_config/Sequencer_config/Network/PHY/TimeSync/Security table storage, ack/response-stream runtime routing, bit-level register-write operations, a real scheduler) -- correctly left as-is.
+
+No functional code change; 65/65 both trees unchanged. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.271.0 -- 2026-08-12 (issue #200 doc-only batch: 9 RMAP entries missing their own `status` field, corrected)
 
 **`REQ-RMAP-024/025/026/027/028/029/030/031/035` gain `"status": "implemented"` -- a `.fusa-reqs.json` data-hygiene correction, not a code change.**
