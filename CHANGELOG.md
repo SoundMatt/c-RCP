@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.278.0 -- 2026-08-12 (issue #334 batch: `REQ-SEQ-014`, sequencer_state now readable over EP0)
+
+**`REQ-SEQ-014` flips `partial` -> `implemented`.**
+
+`rcp_regmap_ep0_encode_read_response()` (`regmap.h`/`regmap.c`) now routes an incoming EP0 read across a **seventh** extent -- `sequencer_state`, addressed via `svr_sequencer_state_ptr` the same way the six existing pointed-to tables (HW_config/EP_ID_config/response-queue-config/request-stream-cfg/ep_generic_cfg) already are. This extent needed no dedicated `render()` step of its own: `rcp_sequencer_table_t.state` (`request_sequencer.h`) *is already* TC18's own one-octet-per-sequencer `Seq_state` wire image, so the raw bytes are passed straight through the dispatcher. `regmap.h` deliberately takes a bare `uint8_t` pointer and count rather than `request_sequencer.h`'s own struct type, preserving that module's documented no-cross-dependency layering. A caller with no sequencer table at all (`rcp_sequencer_table_unsupported()`) passes `NULL`/`0`, matching every other optional extent's own convention -- the dispatcher correctly falls through to its existing unknown-extent `RCP_ERROR_EP_NOT_FOUND` case rather than dereferencing a null pointer.
+
+The other half of this requirement (`svr_sequencers_max` synced with the live table's count) was already done via `mock.c`'s pre-existing `rcp_mock_server_set_sequencer_count()` -- the `.fusa-reqs.json` text describing it as unwired was stale and is corrected alongside this fix.
+
+Write access to `sequencer_state` (a client setting `Seq_state`, e.g. to 0 for `REQ-SEQ-012`'s own disable rule) remains a separate, still-open gap -- this closes the read path only, matching the requirement's own original scope.
+
+Renamed `test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresses` -> `..._all_seven_extents_...`, added two new sub-cases (real sequencer-state read, and the `NULL`/unsupported-table fallback).
+
+Mutation-tested: the new extent's own boundary check (`>=` weakened to `>`) is caught by the new test.
+
+65/65 both trees (native + ASan/UBSan). `cfusa check`: 0 errors. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.277.0 -- 2026-08-12 (c-RCP-AUDIT-10 doc-only batch: `Table 19`/`Table 21` disambiguated -- HW_config vs. signal-enumeration, issue #341)
 
 **Documentation-only correction, no functional code change.** Genuinely intricate slice of issue #341: `§12.7.6` ("HW pin mapping configuration") contains three consecutive RC1 tables -- 19 (HW_config), 20 (IO-pin properties), 21 (Enumeration of signals) -- that all shift +2 to RC5 21/22/23. `regmap.h` used the raw number `19` for HW_config in 5 spots and the raw number `21` for signal-enumeration content in 9 spots, **while simultaneously already using the correct RC5 number `21` for HW_config in 5 other spots** -- meaning `Table 21` alone was ambiguous between two different real tables depending on which paragraph you were reading, sometimes within the same comment block.

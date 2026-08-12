@@ -696,6 +696,7 @@ static rcp_bytes_t ep0_read_response_from_slice(const uint8_t *table_image, size
 //cfusa:req REQ-RMAP-077
 //cfusa:req REQ-RMAP-078
 //cfusa:req REQ-RMAP-080
+//cfusa:req REQ-SEQ-014
 rcp_bytes_t
 rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      uint8_t transaction_num,
@@ -710,6 +711,8 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      size_t request_stream_cfg_count,
                                      const rcp_regmap_ep_generic_cfg_t *ep_generic_cfg,
                                      size_t ep_generic_cfg_count,
+                                     const uint8_t *sequencer_state,
+                                     size_t sequencer_state_count,
                                      rcp_wire_error_t *out_error)
 {
     size_t hw_cfg_len;
@@ -784,6 +787,33 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
         *out_error = RCP_ERROR_NONE;
         return ep0_read_response_from_slice(image, ep_generic_cfg_len,
                                              (size_t)addr - map->svr_ep_generic_cfg_ptr,
+                                             read_size, transaction_num);
+    }
+
+    /* REQ-SEQ-014: sequencer_state (svr_sequencer_state_ptr, TC18 §12.7.10
+     * Table 25/28's own one-octet-per-sequencer Seq_state layout) is
+     * already exactly its own wire image -- no render() step needed, see
+     * this parameter's own doc comment (regmap.h). Clamped to this
+     * dispatcher's own stack bound the same way every other extent's
+     * fixed-array image above is; a caller-supplied count beyond that
+     * bound is truncated to it rather than overflowing the stack buffer
+     * (matching every sibling extent's own MAX_ENTRIES clamp, none of
+     * which validate their own count parameter either -- that validation
+     * is this dispatcher's caller's own responsibility, the same
+     * "caller keeps count in sync with real storage" contract
+     * svr_sequencers_max's own field comment (regmap.h) already states). */
+    if (sequencer_state != NULL &&
+        (size_t)addr >= map->svr_sequencer_state_ptr &&
+        (size_t)addr < (size_t)map->svr_sequencer_state_ptr + sequencer_state_count) {
+        size_t  clamped_count = (sequencer_state_count > RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES)
+                                     ? RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES
+                                     : sequencer_state_count;
+        uint8_t image[RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES];
+
+        memcpy(image, sequencer_state, clamped_count);
+        *out_error = RCP_ERROR_NONE;
+        return ep0_read_response_from_slice(image, clamped_count,
+                                             (size_t)addr - map->svr_sequencer_state_ptr,
                                              read_size, transaction_num);
     }
 

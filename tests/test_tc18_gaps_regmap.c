@@ -2484,8 +2484,13 @@ static void test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bo
  * are the read-side counterpart to the write dispatcher, routing an
  * incoming ACF_ABB READ request's own address across the identical four
  * extents the write dispatcher already routes, reusing each table's own
- * already-proven render() function. */
-static void test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresses(void)
+ * already-proven render() function. REQ-SEQ-014 (closed, issue #334)
+ * adds a seventh extent, sequencer_state -- unlike the other six, it has
+ * no dedicated render() of its own (see rcp_regmap_ep0_encode_read_
+ * response()'s own doc comment for why), so its own case below passes
+ * the raw sequencer-state bytes directly rather than rendering a struct
+ * array first. */
+static void test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addresses(void)
 {
     rcp_acf_byte_message_info_t     req_hdr = {0};
     rcp_bytes_t                     req_frame, resp_frame;
@@ -2533,6 +2538,7 @@ static void test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresse
     map.svr_response_stream_cfg_ptr  = 0x0300u;
     map.svr_request_stream_cfg_ptr   = 0x0400u;
     map.svr_ep_generic_cfg_ptr       = 0x0500u;
+    map.svr_sequencer_state_ptr      = 0x0600u;
 
     /* Helper macro-free pattern: build a READ request frame at (addr,
      * read_size), decode it, route it, and decode the response back --
@@ -2562,6 +2568,7 @@ static void test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresse
         resp_frame = rcp_regmap_ep0_encode_read_response(decoded_addr, decoded_read_size,
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
+                                                            NULL, 0u,
                                                             &err);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_NOT_NULL(resp_frame.data);
@@ -2593,6 +2600,7 @@ static void test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresse
         resp_frame = rcp_regmap_ep0_encode_read_response(decoded_addr, decoded_read_size,
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
+                                                            NULL, 0u,
                                                             &err);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_NOT_NULL(resp_frame.data);
@@ -2630,6 +2638,7 @@ static void test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresse
         resp_frame = rcp_regmap_ep0_encode_read_response(decoded_addr, decoded_read_size,
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
+                                                            NULL, 0u,
                                                             &err);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_EQUAL(RCP_ACF_OK,
@@ -2661,6 +2670,7 @@ static void test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresse
         resp_frame = rcp_regmap_ep0_encode_read_response(decoded_addr, decoded_read_size,
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
+                                                            NULL, 0u,
                                                             &err);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         TEST_ASSERT_NULL(resp_frame.data);
@@ -2685,6 +2695,7 @@ static void test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresse
         resp_frame = rcp_regmap_ep0_encode_read_response(decoded_addr, decoded_read_size,
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
+                                                            NULL, 0u,
                                                             &err);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_EQUAL(RCP_ACF_OK,
@@ -2712,6 +2723,7 @@ static void test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresse
         resp_frame = rcp_regmap_ep0_encode_read_response(decoded_addr, decoded_read_size,
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
+                                                            NULL, 0u,
                                                             &err);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         TEST_ASSERT_NULL(resp_frame.data);
@@ -2736,6 +2748,7 @@ static void test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresse
         resp_frame = rcp_regmap_ep0_encode_read_response(decoded_addr, decoded_read_size,
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
+                                                            NULL, 0u,
                                                             &err);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_EQUAL(RCP_ACF_OK,
@@ -2763,6 +2776,7 @@ static void test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresse
         resp_frame = rcp_regmap_ep0_encode_read_response(decoded_addr, decoded_read_size,
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
+                                                            NULL, 0u,
                                                             &err);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         TEST_ASSERT_NULL(resp_frame.data);
@@ -2791,6 +2805,7 @@ static void test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresse
         resp_frame = rcp_regmap_ep0_encode_read_response(decoded_addr, decoded_read_size,
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
+                                                            NULL, 0u,
                                                             &err);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_EQUAL(RCP_ACF_OK,
@@ -2818,6 +2833,7 @@ static void test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresse
         resp_frame = rcp_regmap_ep0_encode_read_response(decoded_addr, decoded_read_size,
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
+                                                            NULL, 0u,
                                                             &err);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         TEST_ASSERT_NULL(resp_frame.data);
@@ -2842,6 +2858,7 @@ static void test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresse
         resp_frame = rcp_regmap_ep0_encode_read_response(decoded_addr, decoded_read_size,
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
+                                                            NULL, 0u,
                                                             &err);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_EQUAL(RCP_ACF_OK,
@@ -2869,12 +2886,69 @@ static void test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresse
         resp_frame = rcp_regmap_ep0_encode_read_response(decoded_addr, decoded_read_size,
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
+                                                            NULL, 0u,
                                                             &err);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         TEST_ASSERT_NULL(resp_frame.data);
     }
 
-    /* 10) An address matching none of the six known extents. */
+    /* 10) sequencer_state, REQ-SEQ-014's own seventh extent -- no
+     * dedicated render() call needed (the source bytes already ARE the
+     * wire image), unlike every other case above. */
+    {
+        uint8_t payload[2];
+        uint8_t sequencer_state[3] = {0x01u, 0x02u, 0x03u};
+
+        put_test_u16(payload, map.svr_sequencer_state_ptr);
+        req_hdr.read_size_or_segment_num = 3u;
+        req_frame = rcp_acf_encode_abb(&req_hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(req_frame.data);
+
+        rc = rcp_regmap_ep0_decode_read_request(req_frame.data, req_frame.len,
+                                                  &decoded_addr, &decoded_read_size, &decoded_tn);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        rcp_bytes_free(&req_frame);
+
+        resp_frame = rcp_regmap_ep0_encode_read_response(decoded_addr, decoded_read_size,
+                                                            decoded_tn, &map, hw_pin_map, 2u,
+                                                            ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
+                                                            sequencer_state, 3u,
+                                                            &err);
+        TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
+        TEST_ASSERT_NOT_NULL(resp_frame.data);
+        TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                           rcp_acf_decode_abb(resp_frame.data, resp_frame.len, &resp_hdr,
+                                               &resp_payload, &resp_payload_len));
+        TEST_ASSERT_EQUAL_UINT8_ARRAY(sequencer_state, resp_payload, 3u);
+        rcp_bytes_free(&resp_frame);
+    }
+
+    /* 10b) sequencer_state passed as NULL (server has no sequencer table,
+     * rcp_sequencer_table_unsupported()) -- must fall through to the
+     * unknown-extent case, not dereference a null pointer. */
+    {
+        uint8_t payload[2];
+
+        put_test_u16(payload, map.svr_sequencer_state_ptr);
+        req_hdr.read_size_or_segment_num = 1u;
+        req_frame = rcp_acf_encode_abb(&req_hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(req_frame.data);
+
+        rc = rcp_regmap_ep0_decode_read_request(req_frame.data, req_frame.len,
+                                                  &decoded_addr, &decoded_read_size, &decoded_tn);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        rcp_bytes_free(&req_frame);
+
+        resp_frame = rcp_regmap_ep0_encode_read_response(decoded_addr, decoded_read_size,
+                                                            decoded_tn, &map, hw_pin_map, 2u,
+                                                            ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
+                                                            NULL, 3u,
+                                                            &err);
+        TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
+        TEST_ASSERT_NULL(resp_frame.data);
+    }
+
+    /* 11) An address matching none of the seven known extents. */
     {
         uint8_t payload[2];
 
@@ -2891,6 +2965,7 @@ static void test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresse
         resp_frame = rcp_regmap_ep0_encode_read_response(decoded_addr, decoded_read_size,
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
+                                                            NULL, 0u,
                                                             &err);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         TEST_ASSERT_NULL(resp_frame.data);
@@ -4202,7 +4277,7 @@ int main(void)
     RUN_TEST(test_request_stream_cfg_render_packs_all_eight_bits_at_0x000d);
     RUN_TEST(test_request_stream_cfg_render_leaves_rx_wd_timeout_and_reserved_octets_zero);
     RUN_TEST(test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bounds_checking);
-    RUN_TEST(test_ep0_read_dispatcher_routes_all_six_extents_and_unknown_addresses);
+    RUN_TEST(test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addresses);
     RUN_TEST(test_hw_config_row_stride_now_modeled_gpio_access_class_still_diverges);
     RUN_TEST(test_hw_pin_type_matches_table_20);
     RUN_TEST(test_hw_pin_output_stage_has_no_exclusive_input_flag);

@@ -2558,13 +2558,37 @@ rcp_regmap_ep0_decode_read_request(const uint8_t *b, size_t len,
                                     uint16_t *out_addr, uint8_t *out_read_size,
                                     uint8_t *out_transaction_num);
 
+/* REQ-SEQ-014's own upper bound on how many sequencer-state octets this
+ * dispatcher can serve in one call -- matches svr_sequencers_max's own
+ * 8-bit wire width (REQ-RMAP-028: 0..255 sequencers), so every value
+ * that register can legally hold fits. request_sequencer.h's own
+ * rcp_sequencer_table_t is heap-sized at runtime and carries no such
+ * bound itself; this dispatcher's own stack-local copy needs one, the
+ * same reason every other extent above (RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES
+ * etc.) already has its own bound. */
+#define RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES ((size_t)0xFFu)
+
 /* Encodes an ACF_ABB READ response for a request decoded by
  * rcp_regmap_ep0_decode_read_request() above. Routes addr across the
- * identical six extents rcp_regmap_ep0_decode_write_request() routes
+ * identical seven extents rcp_regmap_ep0_decode_write_request() routes
  * (Table 20 itself, HW_config, EP_ID_config, response-queue-config,
- * request-stream-cfg, ep_generic_cfg -- issue #311 batch 5 adds the
- * last of these), reusing this dispatcher's own already-proven
+ * request-stream-cfg, ep_generic_cfg, sequencer_state -- REQ-SEQ-014
+ * adds the last of these), reusing this dispatcher's own already-proven
  * per-table render() functions, not a second copy of that wire codec.
+ *
+ * sequencer_state/sequencer_state_count are the raw wire image directly
+ * -- request_sequencer.h's rcp_sequencer_table_t.state IS already
+ * exactly TC18's own one-octet-per-sequencer Seq_state layout (Table 25/
+ * 28's own relative address 0x0000, 8 bit), so no separate render()
+ * step exists for this extent the way hw_pin_map/ep_id_map/etc. each
+ * need their own struct-to-wire conversion; a caller passes
+ * table.state/table.count straight through. This header deliberately
+ * takes a raw uint8_t pointer and count rather than rcp_sequencer_table_t
+ * itself, to avoid regmap.h depending on request_sequencer.h -- the same
+ * no-cross-module-dependency layering request_sequencer.h's own file
+ * header already documents in the other direction. Pass NULL/0 if this
+ * server has no sequencer table at all (rcp_sequencer_table_unsupported()),
+ * matching every other optional extent's own NULL/0 convention.
  *
  * On a known extent: *out_error is RCP_ERROR_NONE and the returned
  * rcp_bytes_t carries min(read_size, that extent's own remaining length
@@ -2608,6 +2632,8 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      size_t request_stream_cfg_count,
                                      const rcp_regmap_ep_generic_cfg_t *ep_generic_cfg,
                                      size_t ep_generic_cfg_count,
+                                     const uint8_t *sequencer_state,
+                                     size_t sequencer_state_count,
                                      rcp_wire_error_t *out_error);
 
 #ifdef __cplusplus
