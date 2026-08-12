@@ -409,6 +409,69 @@ bool rcp_ep_adc_set_combine_avg_values(rcp_ep_adc_functional_cfg_t *cfg,
                                         rcp_lifecycle_state_t state,
                                         rcp_lifecycle_writer_ctx_t writer);
 
+/* ── Trigger outputs (Table 50), REQ-ADC-031 (issue #201) ───────────────────
+ *
+ * TC18 §13.7.9.1 Table 50: an ADC endpoint can generate five trigger
+ * events -- 0/1 fire when the averaged output value falls below/rises
+ * above adc_trigger_min, 2/3 fire when it falls below/rises above
+ * adc_trigger_max, and 4 fires when the endpoint finished a measurement
+ * interval. Triggers 0-3 are EDGE-triggered ("falls below"/"rises
+ * above" a threshold means a transition relative to the PREVIOUS
+ * averaged value, not a level comparison against the current one
+ * alone) -- distinct from trigger 4, a pure "did a measurement just
+ * finish" signal with no threshold or previous-value concept at all.
+ *
+ * rcp_ep_adc_trigger_state_t is this module's own small, caller-owned
+ * per-endpoint tracker holding the one piece of state edge detection
+ * needs (the previously observed averaged value) -- the same
+ * caller-owned-data architecture already established by
+ * rcp_watchdog_keeper_t (watchdog.h), rcp_e2e_seq_tracker_t and
+ * rcp_e2e_stream_fault_tracker_t (e2e.h): this module sends no wire
+ * traffic and owns no transport, a caller drives every evaluate() call
+ * itself, on each newly acquired averaged output value. */
+typedef struct {
+    bool     has_previous;   /* false until the first evaluate() call --
+                                 no previous value exists yet to detect an
+                                 edge against */
+    uint16_t previous_value; /* the previously observed averaged output
+                                 value; meaningless while has_previous is
+                                 false */
+} rcp_ep_adc_trigger_state_t;
+
+/* Initializes s to the no-previous-value state. */
+void rcp_ep_adc_trigger_state_init(rcp_ep_adc_trigger_state_t *s);
+
+/* Table 50's own 5 trigger signals, one bit each -- rcp_ep_adc_trigger_evaluate()
+ * returns an OR of whichever of these fire for one evaluate() call. */
+#define RCP_EP_ADC_TRIGGER_BELOW_MIN            ((uint8_t)0x01u) /* trigger 0 */
+#define RCP_EP_ADC_TRIGGER_ABOVE_MIN            ((uint8_t)0x02u) /* trigger 1 */
+#define RCP_EP_ADC_TRIGGER_BELOW_MAX            ((uint8_t)0x04u) /* trigger 2 */
+#define RCP_EP_ADC_TRIGGER_ABOVE_MAX            ((uint8_t)0x08u) /* trigger 3 */
+#define RCP_EP_ADC_TRIGGER_MEASUREMENT_FINISHED ((uint8_t)0x10u) /* trigger 4 */
+
+/* Evaluates one newly acquired averaged output value against
+ * trigger_min/trigger_max (rcp_ep_adc_functional_cfg_t's own fields of
+ * the same name) and updates s's own tracked previous value for the
+ * next call. measurement_finished is a caller-supplied bool -- trigger
+ * 4 is not a threshold comparison at all, so this function cannot
+ * derive it from value alone (a caller drives it from its own
+ * knowledge of "a measurement interval just completed", the same
+ * caller-owned-decision shape rcp_e2e_seq_evaluate()'s own
+ * caller-supplied inputs already establish for a different module).
+ *
+ * Triggers 0-3 fire only relative to a genuine previous value:
+ * BELOW_MIN/BELOW_MAX fire iff the previous value was AT OR ABOVE the
+ * threshold and value is strictly below it (a genuine downward
+ * crossing, not merely "currently below"); ABOVE_MIN/ABOVE_MAX
+ * symmetrically for an upward crossing. While s->has_previous is false
+ * (the first call ever, or right after rcp_ep_adc_trigger_state_init())
+ * no edge exists to detect yet, so none of triggers 0-3 can fire on
+ * that call regardless of value -- only trigger 4, which needs no
+ * previous value at all. Returns 0 (no bits set) iff no trigger fires. */
+uint8_t rcp_ep_adc_trigger_evaluate(rcp_ep_adc_trigger_state_t *s, uint16_t value,
+                                     uint16_t trigger_min, uint16_t trigger_max,
+                                     bool measurement_finished);
+
 /* ── The EP_func register block (the evt[2:0] == 111b target) ──────────────── */
 
 /* Relative octet offsets of the registers making up this endpoint's own
