@@ -1652,7 +1652,13 @@ typedef struct {
                                   a per-queue property); see
                                   rcp_regmap_response_queue_stream_id() below
                                   for combining the two. */
-    uint16_t max_avtpdu_size;
+    uint16_t max_avtpdu_size; /* REQ-RMAP-061 (TC18 §12.7.9 Table 24, relative
+                                  address 0x0002, 16 bit, R/W*): maximum
+                                  length, in quadlets, of an AVTPDU this
+                                  queue generates -- respqueue.h's
+                                  rcp_respqueue_t's own max_avtpdu_size_octets
+                                  is this value x 4, same caller-converts
+                                  convention as queue_size below. */
     uint16_t queue_size;      /* REQ-RMAP-059 (TC18 §12.7.9 Table 24, relative
                                   address 0x0004, 16 bit, R/W*): this queue's
                                   configured transmit-memory reservation, in
@@ -1660,8 +1666,36 @@ typedef struct {
                                   rcp_respqueue_t's own capacity_octets is
                                   this value x 4, the conversion a caller
                                   performs when calling rcp_respqueue_init(). */
-    uint16_t flush_on_count;
-    uint32_t flush_time_us;
+    uint16_t flush_on_count;  /* REQ-RMAP-063 (TC18 §12.7.9 Table 24, relative
+                                  address 0x0006, 16 bit, R/W+): the queued-
+                                  octet threshold that triggers a flush --
+                                  respqueue.h's rcp_respqueue_should_flush()
+                                  takes the octet-converted form of this
+                                  register as its own caller-supplied
+                                  parameter. */
+    uint32_t flush_time_us;   /* REQ-RMAP-064 (TC18 §12.7.9 Table 24, relative
+                                  address 0x0008, 16 bit, R/W+, microseconds):
+                                  the elapsed-since-last-transmission
+                                  threshold that forces a flush even of an
+                                  empty queue (REQ-RMAP-065). Deliberately
+                                  wider than the 16-bit wire register --
+                                  respqueue.h's own
+                                  rcp_respqueue_should_flush_by_time() already
+                                  takes an even wider uint64_t
+                                  elapsed/threshold pair, so this field's own
+                                  width was chosen to match that existing
+                                  consumer, not the wire. This is a genuine,
+                                  now-documented content/wire width mismatch:
+                                  rcp_regmap_response_queue_cfg_render()
+                                  (REQ-RMAP-061) saturates (never wraps) a
+                                  value exceeding 0xFFFF to 0xFFFF when
+                                  serializing this field, since wraparound to
+                                  a smaller value -- worst case 0, TC18's own
+                                  "flush only by count" encoding -- would
+                                  silently invert this field's own meaning;
+                                  a value read back off the wire can never
+                                  itself exceed 0xFFFF, so no corresponding
+                                  clamp exists on the parse side. */
 } rcp_regmap_response_queue_cfg_t;
 
 /* Zero-initializes cfg. */
@@ -1674,6 +1708,50 @@ void rcp_regmap_response_queue_cfg_init(rcp_regmap_response_queue_cfg_t *cfg);
  * stream_id-construction logic of its own. */
 rcp_stream_id_t rcp_regmap_response_queue_stream_id(const rcp_regmap_response_queue_cfg_t *cfg,
                                                      const uint8_t mac[6]);
+
+/* Not itself TC18-derived -- an implementation ceiling on how many
+ * response/ack queue rows (TC18 §12.7.9 Table 24) this codebase's own
+ * fixed-size wire-codec buffers support, matching the same scale as
+ * RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES/RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES. */
+#define RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES ((size_t)64u)
+
+/* RESOLVED 2026-08-11 (issue #301 batch 3, same finding as HW_config's
+ * and EP_ID_config's own sections): response-queue-config is a separate
+ * table pointed to by Table 18's own svr_response_stream_cfg_ptr
+ * register (REQ-RMAP-034), reached the identical way HW_config and
+ * EP_ID_config now are -- an ordinary evt[2:0]=111b request to
+ * byte_bus_id=0 at an absolute address inside svr_response_stream_cfg_ptr's
+ * own extent. Unlike HW_config/EP_ID_config, no render function existed
+ * for this table at all before this batch; rcp_regmap_response_queue_cfg_render()
+ * is the first one, serializing TC18's own exact 10-octet-per-queue wire
+ * stride (STREAM_UID@0x0000, Max_AVTPDUsize@0x0002, queue_size@0x0004,
+ * flush_on_count@0x0006, Flush_time@0x0008 -- confirmed via direct
+ * TC18.txt read, §12.7.9 Table 24). */
+void rcp_regmap_response_queue_cfg_render(const rcp_regmap_response_queue_cfg_t *entries,
+                                           size_t count, uint8_t *out);
+
+typedef enum {
+    RCP_REGMAP_RESPONSE_QUEUE_CFG_RECONFIG_OK = 0,
+    RCP_REGMAP_RESPONSE_QUEUE_CFG_RECONFIG_ERR_SHORT,
+    RCP_REGMAP_RESPONSE_QUEUE_CFG_RECONFIG_ERR_OUT_OF_RANGE
+} rcp_regmap_response_queue_cfg_reconfig_errc_t;
+
+const char *
+rcp_regmap_response_queue_cfg_reconfig_strerror(rcp_regmap_response_queue_cfg_reconfig_errc_t e);
+
+/* The parse-side inverse of rcp_regmap_response_queue_cfg_render() --
+ * identical patch-then-reparse idiom to
+ * rcp_regmap_hw_pin_map_apply_reconfig()/rcp_regmap_ep_id_map_apply_reconfig().
+ * relative_start_address/data are relative to this table's own start
+ * (i.e. to svr_response_stream_cfg_ptr's own current value), not to
+ * Table 18. A value parsed back for flush_time_us can never itself
+ * exceed 0xFFFF (the wire register's own full range), so no saturation
+ * is needed on this direction, unlike render()'s own. */
+rcp_regmap_response_queue_cfg_reconfig_errc_t
+rcp_regmap_response_queue_cfg_apply_reconfig(rcp_regmap_response_queue_cfg_t *entries,
+                                              size_t count,
+                                              uint16_t relative_start_address,
+                                              const uint8_t *data, size_t data_len);
 
 /* ── EP-ID / byte_bus_id map ────────────────────────────────────────────────── */
 
@@ -1887,18 +1965,18 @@ bool rcp_regmap_ep_id_map_shared_bus_homogeneous(const rcp_regmap_ep_id_map_entr
  * [0x0000, RCP_REGMAP_GENERAL_LEN) extent, always rejecting it) to
  * route by absolute address across Table 18's own extent AND every
  * pointed-to table this codebase currently has a wire codec for. As of
- * this milestone that is HW_config (svr_hw_cfg_ptr) and EP_ID_config
- * (svr_ep_bytebus_id_map_ptr) -- response-queue-config remains routed to
- * RCP_ERROR_EP_NOT_FOUND until its own batch (issue #301) wires it in
- * the same way. Table 33/36 (svr_ep_functional_cfg_ptr) is deliberately
- * never routed here: its own address-collision defect (documented in
- * this file's own "RC Server functional-configuration content" section)
- * is a separate, still-unresolved primary-source ambiguity this
- * dispatcher's own finding does not resolve.
+ * this milestone that is HW_config (svr_hw_cfg_ptr), EP_ID_config
+ * (svr_ep_bytebus_id_map_ptr), and response-queue-config
+ * (svr_response_stream_cfg_ptr). Table 33/36 (svr_ep_functional_cfg_ptr)
+ * is deliberately never routed here: its own address-collision defect
+ * (documented in this file's own "RC Server functional-configuration
+ * content" section) is a separate, still-unresolved primary-source
+ * ambiguity this dispatcher's own finding does not resolve.
  *
- * Declared here, after both HW_config's and EP_ID_config's own sections,
- * because its own signature references both rcp_regmap_hw_pin_map_entry_t
- * and rcp_regmap_ep_id_map_entry_t -- C requires each to already be
+ * Declared here, after HW_config's, EP_ID_config's, and response-queue-
+ * config's own sections, because its own signature references
+ * rcp_regmap_hw_pin_map_entry_t, rcp_regmap_ep_id_map_entry_t, and
+ * rcp_regmap_response_queue_cfg_t -- C requires each to already be
  * declared at this point; this dispatcher cannot live any earlier in
  * this header than the last of the tables it routes to. */
 
@@ -1933,7 +2011,11 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
  *   - Within [map->svr_ep_bytebus_id_map_ptr, map->svr_ep_bytebus_id_map_ptr
  *     + 4*ep_id_map_count): EP_ID_config -- routed to
  *     rcp_regmap_ep_id_map_apply_reconfig() the identical way.
- *   - For either pointed-to table, *out_error is RCP_ERROR_NONE on
+ *   - Within [map->svr_response_stream_cfg_ptr,
+ *     map->svr_response_stream_cfg_ptr + 10*response_queue_cfg_count):
+ *     response-queue-config -- routed to
+ *     rcp_regmap_response_queue_cfg_apply_reconfig() the identical way.
+ *   - For any pointed-to table, *out_error is RCP_ERROR_NONE on
  *     success, RCP_ERROR_INVALID_PARAMETER if the write's own
  *     address+length extends past that table's own current extent (the
  *     closest of TC18 Table 27's 17 numbered codes to "address range not
@@ -1955,8 +2037,9 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
  * rcp_regmap_general_decode_write_request() already fails, or
  * RCP_REGMAP_EP0_ERR_SHORT_PAYLOAD if the payload has no room for its own
  * leading 2-octet address, before authorization/routing is even reached.
- * hw_pin_map/hw_pin_map_count and ep_id_map/ep_id_map_count describe the
- * currently-configured tables this call may patch in place; either count
+ * hw_pin_map/hw_pin_map_count, ep_id_map/ep_id_map_count, and
+ * response_queue_cfg/response_queue_cfg_count describe the
+ * currently-configured tables this call may patch in place; any count
  * may be 0 (that table then has no address range at all, and any write
  * targeting it falls through to the "unknown address" case). */
 rcp_regmap_ep0_errc_t
@@ -1966,6 +2049,8 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      size_t hw_pin_map_count,
                                      rcp_regmap_ep_id_map_entry_t *ep_id_map,
                                      size_t ep_id_map_count,
+                                     rcp_regmap_response_queue_cfg_t *response_queue_cfg,
+                                     size_t response_queue_cfg_count,
                                      rcp_wire_error_t *out_error,
                                      uint8_t *out_transaction_num);
 

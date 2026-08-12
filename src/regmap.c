@@ -341,6 +341,7 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e)
 //cfusa:req REQ-RMAP-041
 //cfusa:req REQ-RMAP-052
 //cfusa:req REQ-RMAP-054
+//cfusa:req REQ-RMAP-061
 rcp_regmap_ep0_errc_t
 rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      const rcp_regmap_general_t *map,
@@ -348,6 +349,8 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      size_t hw_pin_map_count,
                                      rcp_regmap_ep_id_map_entry_t *ep_id_map,
                                      size_t ep_id_map_count,
+                                     rcp_regmap_response_queue_cfg_t *response_queue_cfg,
+                                     size_t response_queue_cfg_count,
                                      rcp_wire_error_t *out_error,
                                      uint8_t *out_transaction_num)
 {
@@ -360,6 +363,7 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
     size_t                       data_len;
     size_t                       hw_cfg_len;
     size_t                       ep_id_map_len;
+    size_t                       response_queue_cfg_len;
 
     acf_rc = rcp_acf_decode_abb(b, len, &hdr, &payload, &payload_len);
     if (acf_rc == RCP_ACF_ERR_SHORT_FRAME) return RCP_REGMAP_EP0_ERR_SHORT_FRAME;
@@ -409,9 +413,22 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
         return RCP_REGMAP_EP0_OK;
     }
 
-    /* Neither Table 18's own extent nor (yet) any known pointed-to table
-     * -- see this function's own header doc comment for which tables
-     * this milestone routes and which remain future work (issue #301). */
+    response_queue_cfg_len = response_queue_cfg_count * 10u;
+    if ((size_t)addr >= map->svr_response_stream_cfg_ptr &&
+        (size_t)addr < (size_t)map->svr_response_stream_cfg_ptr + response_queue_cfg_len) {
+        uint16_t relative = (uint16_t)((size_t)addr - map->svr_response_stream_cfg_ptr);
+        rcp_regmap_response_queue_cfg_reconfig_errc_t rc;
+
+        rc = rcp_regmap_response_queue_cfg_apply_reconfig(response_queue_cfg, response_queue_cfg_count,
+                                                             relative, &payload[2], data_len);
+        *out_error = (rc == RCP_REGMAP_RESPONSE_QUEUE_CFG_RECONFIG_OK) ? RCP_ERROR_NONE
+                                                                        : RCP_ERROR_INVALID_PARAMETER;
+        return RCP_REGMAP_EP0_OK;
+    }
+
+    /* Neither Table 18's own extent nor any known pointed-to table --
+     * see this function's own header doc comment for which tables this
+     * milestone routes (issue #301). */
     *out_error = RCP_ERROR_EP_NOT_FOUND;
     return RCP_REGMAP_EP0_OK;
 }
@@ -482,6 +499,93 @@ rcp_regmap_ep_id_map_apply_reconfig(rcp_regmap_ep_id_map_entry_t *entries, size_
     }
 
     return RCP_REGMAP_EP_ID_MAP_RECONFIG_OK;
+}
+
+/* ── response-queue-config wire stride (REQ-RMAP-061/065) ──────────────────── */
+
+//cfusa:req REQ-RMAP-061
+void rcp_regmap_response_queue_cfg_render(const rcp_regmap_response_queue_cfg_t *entries,
+                                           size_t count, uint8_t *out)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        uint16_t flush_time_wire = (entries[i].flush_time_us > 0xFFFFu)
+                                        ? (uint16_t)0xFFFFu
+                                        : (uint16_t)entries[i].flush_time_us; /* saturate, never
+                                                                                  wrap -- see this
+                                                                                  field's own doc
+                                                                                  comment (regmap.h) */
+
+        put_u16(&out[10u * i + 0u], entries[i].stream_uid);
+        put_u16(&out[10u * i + 2u], entries[i].max_avtpdu_size);
+        put_u16(&out[10u * i + 4u], entries[i].queue_size);
+        put_u16(&out[10u * i + 6u], entries[i].flush_on_count);
+        put_u16(&out[10u * i + 8u], flush_time_wire);
+    }
+}
+
+//cfusa:req REQ-RMAP-061
+//cfusa:req REQ-RMAP-065
+const char *
+rcp_regmap_response_queue_cfg_reconfig_strerror(rcp_regmap_response_queue_cfg_reconfig_errc_t e)
+{
+    switch (e) {
+    case RCP_REGMAP_RESPONSE_QUEUE_CFG_RECONFIG_OK:
+        return "rcp/regmap: response-queue-config write applied";
+    case RCP_REGMAP_RESPONSE_QUEUE_CFG_RECONFIG_ERR_SHORT:
+        return "rcp/regmap: response-queue-config write has no data";
+    case RCP_REGMAP_RESPONSE_QUEUE_CFG_RECONFIG_ERR_OUT_OF_RANGE:
+        return "rcp/regmap: response-queue-config write extends past the table's own current extent";
+    default:
+        return "rcp/regmap: response-queue-config unknown configuration-write error";
+    }
+}
+
+//cfusa:req REQ-RMAP-061
+//cfusa:req REQ-RMAP-065
+rcp_regmap_response_queue_cfg_reconfig_errc_t
+rcp_regmap_response_queue_cfg_apply_reconfig(rcp_regmap_response_queue_cfg_t *entries,
+                                              size_t count,
+                                              uint16_t relative_start_address,
+                                              const uint8_t *data, size_t data_len)
+{
+    uint8_t block[RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES * 10u];
+    size_t  block_len = count * 10u;
+    size_t  i;
+
+    if (data_len == 0u) return RCP_REGMAP_RESPONSE_QUEUE_CFG_RECONFIG_ERR_SHORT;
+
+    if ((size_t)relative_start_address + data_len > block_len) {
+        return RCP_REGMAP_RESPONSE_QUEUE_CFG_RECONFIG_ERR_OUT_OF_RANGE;
+    }
+
+    /* Same "render current image, patch the addressed octets, re-parse
+     * the whole image back" idiom rcp_regmap_hw_pin_map_apply_reconfig()/
+     * rcp_regmap_ep_id_map_apply_reconfig() and every endpoint type's own
+     * apply_reconfig() already use. */
+    rcp_regmap_response_queue_cfg_render(entries, count, block);
+    for (i = 0; i < data_len; i++) {
+        block[relative_start_address + i] = data[i]; /* STREAM_UID/flush_on_count/Flush_time are
+                                                          R/W+ (lockable, not yet enforced here --
+                                                          same deferral as every other write in
+                                                          this dispatcher); Max_AVTPDUsize/
+                                                          queue_size are R/W* -- neither access
+                                                          type is bit-level read-only, so every
+                                                          octet is currently patchable */
+    }
+    for (i = 0; i < count; i++) {
+        entries[i].stream_uid      = get_u16(&block[10u * i + 0u]);
+        entries[i].max_avtpdu_size = get_u16(&block[10u * i + 2u]);
+        entries[i].queue_size      = get_u16(&block[10u * i + 4u]);
+        entries[i].flush_on_count  = get_u16(&block[10u * i + 6u]);
+        entries[i].flush_time_us   = (uint32_t)get_u16(&block[10u * i + 8u]); /* widens, never
+                                                                                   needs the
+                                                                                   render-side
+                                                                                   saturation */
+    }
+
+    return RCP_REGMAP_RESPONSE_QUEUE_CFG_RECONFIG_OK;
 }
 
 /* ── Root-client / per-EP-restricted-client model ──────────────────────────── */

@@ -34,6 +34,24 @@ the rationale.
 
 ## Releases
 
+### v0.246.0 -- 2026-08-11 (issue #301 batch 3: response-queue-config write dispatch)
+
+**REQ-RMAP-061 (response-queue-config) closed the same way REQ-RMAP-040/041 (HW_config) and REQ-RMAP-052/054 (EP_ID_config) closed in v0.244.0/v0.245.0 -- same finding, same batch-ordered plan, last of the three tables in issue #301's own write-dispatch scope.**
+
+Unlike HW_config/EP_ID_config, no render function existed for this table at all before this batch. New `rcp_regmap_response_queue_cfg_render()` (regmap.h/regmap.c) is the first one, serializing TC18's own exact 10-octet-per-queue wire stride confirmed via direct TC18.txt read (§12.7.9 Table 24, L3025-3048): `STREAM_UID`@0x0000, `Max_AVTPDUsize`@0x0002, `queue_size`@0x0004, `flush_on_count`@0x0006, `Flush_time`@0x0008. New `rcp_regmap_response_queue_cfg_apply_reconfig()` is the parse-side inverse (same patch-then-reparse idiom as the other two tables). `rcp_regmap_ep0_decode_write_request()` gains `response_queue_cfg`/`response_queue_cfg_count` parameters and a third routing block targeting `svr_response_stream_cfg_ptr`'s own extent. A remote client can now write response-queue-config over the wire, completing write access to all three of issue #301's target tables.
+
+**Real content/wire width mismatch found and fixed in the same batch**: `rcp_regmap_response_queue_cfg_t.flush_time_us` is `uint32_t` (chosen to match `rcp_respqueue_should_flush_by_time()`'s own even-wider `uint64_t` parameter, not the wire), but TC18's own `Flush_time` register is only 16 bits. `rcp_regmap_response_queue_cfg_render()` now saturates (never wraps) a value exceeding `0xFFFF` to `0xFFFF` when serializing this field -- wraparound to a smaller value, worst case 0, would silently invert the field's own meaning to TC18's "flush only by count" encoding. No corresponding clamp exists on the parse side: a value read back off the 16-bit wire register can never itself exceed `0xFFFF`.
+
+Still open, matching REQ-RMAP-040/041/052/054's own precedent: the READ side of the dispatcher doesn't exist yet for any pointed-to table, and this dispatcher doesn't itself enforce this table's own mixed R/W*/R/W+ access types (`STREAM_UID`/`flush_on_count`/`Flush_time` are R/W+, `Max_AVTPDUsize`/`queue_size` are R/W*) via `rcp_lifecycle_field_writable()`/`_writable_w_plus()` (deferred to whatever caller eventually owns lifecycle-state context).
+
+New tests: `test_response_queue_cfg_apply_reconfig_patches_addressed_octets_only`, `test_response_queue_cfg_apply_reconfig_rejects_out_of_range_leaving_table_untouched`, `test_response_queue_cfg_render_saturates_oversized_flush_time_us_without_wrapping`, and the dispatcher test extended to 9 sub-cases (renamed `test_ep0_dispatcher_routes_all_three_pointed_to_tables_and_unknown_addresses`) including a dedicated routing-boundary case for response-queue-config, designed in from the start based on batch 2's own mutation-testing lesson (the inner `apply_reconfig()`'s own bounds check can mask a loosened outer routing condition unless a boundary case specifically isolates it).
+
+Mutation-tested three ways: the render saturation clamp, `rcp_regmap_response_queue_cfg_apply_reconfig()`'s own out-of-range bounds check, and the dispatcher's own response-queue-config routing condition -- all three caught cleanly and deterministically on the first attempt (the routing-boundary case, learned from batch 2, was written in from the start rather than discovered after an undetected mutation). Reverted, full suite re-verified byte-identical all three times.
+
+65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`: 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
+**Issue #301's own write-dispatch scope (batches 1-3) is now complete: all three pointed-to tables (HW_config, EP_ID_config, response-queue-config) can be written over the wire.** Remaining: batch 4, the READ side of the dispatcher, for all three tables at once.
+
 ### v0.245.0 -- 2026-08-11 (issue #301 batch 2: EP_ID_config write dispatch)
 
 **REQ-RMAP-052/054 (EP_ID_config) closed the same way REQ-RMAP-040/041 (HW_config) closed in v0.244.0 -- same finding, same batch-ordered plan, next table in line.**
