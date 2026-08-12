@@ -465,6 +465,32 @@ void rcp_acf_pack_header(uint8_t out[8], uint8_t acf_msg_type, uint16_t acf_msg_
  * RCP_ACF_ERR_BUS_ID_OVERFLOW here, now retired). */
 rcp_acf_errc_t rcp_acf_unpack_header(const uint8_t in[8], rcp_acf_byte_message_info_t *out_hdr);
 
+/* ── Peeking a GBB frame's own request_type without a full kind-specific decode ── */
+/*
+ * Every conditional-request module (request_compound.h/_triggered.h/
+ * _chained.h/_timed.h) places its own request_type opcode at the SAME
+ * fixed offset -- octet 0 of the 8-byte message_timestamp region this
+ * file header's own "ACF_GBB appends an 8-byte big-endian message_
+ * timestamp at offset 8" already establishes, repurposed identically by
+ * every one of those modules' own "shared repurposing trick" (see each
+ * module's own doc comment). This module previously had no shared way to
+ * read that one byte without a caller already knowing (and correctly
+ * calling into) one specific kind's own decoder -- a real, recurring gap
+ * that blocked more than one fix needing only to classify a GBB frame,
+ * not fully decode it (e.g. REQ-SRV-015's own GBB half, below).
+ *
+ * Returns true and sets *out_request_type to frame[8] iff frame_len >= 9
+ * and the header's own acf_msg_type is RCP_ACF_MSG_TYPE_GBB; returns
+ * false (*out_request_type left unchanged) for an ABB frame (no
+ * request_type concept exists on that wire shape at all) or a frame too
+ * short to hold byte_message_info(8) + the request_type octet(1). Does
+ * NOT itself validate that the returned byte is one of the six currently-
+ * defined request_type values -- callers compare it against each
+ * module's own RCP_REQUEST_TYPE_* constants or is-this-kind predicate
+ * (e.g. rcp_request_type_is_compound_wait(), request_compound.h). */
+bool rcp_acf_peek_gbb_request_type(const uint8_t *frame, size_t frame_len,
+                                    uint8_t *out_request_type);
+
 /* Returns the number of zero pad octets (0-3) needed to bring unpadded_len
  * octets of header(+timestamp)+payload up to a whole number of quadlets --
  * the unit acf_msg_length is expressed in. Exposed so any module building

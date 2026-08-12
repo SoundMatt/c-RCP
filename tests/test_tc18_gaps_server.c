@@ -1107,50 +1107,71 @@ static void test_admission_is_suspended_during_the_sleep_drain(void)
 
 /* ── §12.3.1.3: requests arriving at a disabled endpoint ───────────────────── */
 
-/* REQ-SRV-015 IMPLEMENTED for ABB (Standard) requests (issue #336): TC18
- * §12.3.1.3: a disabled endpoint still executes CONFIGURATION requests
- * immediately and queues only operational ones. rcp_server_endpoint_
- * submit() now inspects an ABB request's own evt[2:0]: 111b (TC18 Table
- * 33's own universal "EP_func configuration write" meaning, §12.7.1) is
- * executed immediately even while disabled -- including, per this rule,
- * the very write that would set ep_enable itself; any other evt[2:0]
- * value (an operational request) is still queued, as before. */
-static void test_disabled_endpoint_executes_abb_config_requests_immediately(void)
+/* REQ-SRV-015 IMPLEMENTED (issue #336, GBB half closed using REQ-ACF-032's
+ * new rcp_acf_peek_gbb_request_type()): TC18 §12.3.1.3: a disabled
+ * endpoint still executes CONFIGURATION requests immediately and queues
+ * only operational ones. rcp_server_endpoint_submit() now inspects a
+ * request's own evt[2:0]: 111b (TC18 Table 33's own universal "EP_func
+ * configuration write" meaning, §12.7.1) is executed immediately even
+ * while disabled -- including, per this rule, the very write that would
+ * set ep_enable itself -- for an ABB request AND for a GBB request of any
+ * kind except Compound Wait (whose own evt[2:0]=111b means something
+ * else entirely, §13.5.1 -- see the deviation-pin test below); any other
+ * evt[2:0] value (an operational request) is still queued, as before. */
+static void test_disabled_endpoint_executes_config_requests_immediately(void)
 {
     rcp_server_endpoint_t       ep;
     rcp_acf_byte_message_info_t hdr = {0};
-    rcp_bytes_t                 config_frame;
+    rcp_bytes_t                 abb_config_frame;
+    rcp_compound_step_t         step;
+    rcp_bytes_t                 gbb_config_frame;
 
     hdr.byte_bus_id     = (rcp_byte_bus_id_t)5u;
     hdr.transaction_num = 0x42u;
     hdr.evt             = 0x07u; /* evt[2:0] = 111b: configuration write */
-    config_frame        = rcp_acf_encode_abb(&hdr, NULL, 0);
-    TEST_ASSERT_NOT_NULL(config_frame.data);
+    abb_config_frame    = rcp_acf_encode_abb(&hdr, NULL, 0);
+    TEST_ASSERT_NOT_NULL(abb_config_frame.data);
 
     rcp_server_endpoint_init(&ep, false);
-    TEST_ASSERT_TRUE(rcp_server_endpoint_submit(&ep, config_frame.data, config_frame.len, NULL));
+    TEST_ASSERT_TRUE(rcp_server_endpoint_submit(&ep, abb_config_frame.data,
+                                                abb_config_frame.len, NULL));
+    TEST_ASSERT_EQUAL_UINT(0u, rcp_server_endpoint_queue_len(&ep));
+    rcp_bytes_free(&abb_config_frame);
+    rcp_server_endpoint_destroy(&ep);
+
+    /* A GBB Compound request (not Compound Wait) with evt[2:0] = 111b is
+     * also executed immediately -- Table 33's own config-write meaning
+     * applies to it exactly as it does to an ABB request. */
+    memset(&step, 0, sizeof(step));
+    gbb_config_frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND,
+                                                    (rcp_byte_bus_id_t)5u, &step, 0x07u, 0x43u,
+                                                    NULL, 0u);
+    TEST_ASSERT_NOT_NULL(gbb_config_frame.data);
+
+    rcp_server_endpoint_init(&ep, false);
+    TEST_ASSERT_TRUE(rcp_server_endpoint_submit(&ep, gbb_config_frame.data,
+                                                gbb_config_frame.len, NULL));
     TEST_ASSERT_EQUAL_UINT(0u, rcp_server_endpoint_queue_len(&ep));
 
-    rcp_bytes_free(&config_frame);
+    rcp_bytes_free(&gbb_config_frame);
     rcp_server_endpoint_destroy(&ep);
 }
 
-/* REQ-SRV-015 DEVIATION PIN (still genuinely open, not routine): TC18
- * §12.3.1.3's own rule needs a way to tell a configuration request apart
- * from an operational one for GBB (Conditional) requests too, not just
- * ABB. It is deliberately NOT applied to GBB frames here: a GBB frame
- * might be a Compound Wait request, whose own evt[2:0] means an 8-way
- * comparison-operator selector under §13.5.1 -- NOT a configuration-write
- * signal -- and this function has no request-kind decode (that lives in
- * request_compound.h/_triggered.h/_chained.h/_timed.h) to tell a Compound
- * Wait's own evt[2:0]=111b apart from any other conditional kind's
- * config-write use of the same value. An ordinary ABB operational request
- * (evt[2:0] != 111b) is also still queued, unaffected by this fix. */
-static void test_disabled_endpoint_still_queues_operational_and_gbb_requests(void)
+/* REQ-SRV-015 DEVIATION PIN (Compound Wait, genuinely unaffected by this
+ * fix -- not an oversight): a Compound Wait request's own evt[2:0] means
+ * an 8-way comparison-operator selector under §13.5.1, never a
+ * configuration-write signal, even when its bit pattern happens to equal
+ * 111b -- rcp_server_endpoint_submit() checks rcp_request_type_is_compound_
+ * wait() specifically to exclude it from the config-write fast path. An
+ * ordinary ABB operational request (evt[2:0] != 111b) is also still
+ * queued, unaffected by this fix. */
+static void test_disabled_endpoint_still_queues_operational_and_compound_wait_requests(void)
 {
     rcp_server_endpoint_t ep;
     rcp_bytes_t           frame = standard_abb((rcp_byte_bus_id_t)5u, 0x42u);
     uint8_t               request_type = 0xFFu;
+    rcp_compound_step_t   step;
+    rcp_bytes_t           wait_frame;
 
     TEST_ASSERT_NOT_NULL(frame.data);
     rcp_server_endpoint_init(&ep, false);
@@ -1168,6 +1189,22 @@ static void test_disabled_endpoint_still_queues_operational_and_gbb_requests(voi
     TEST_ASSERT_EQUAL_UINT(2u, rcp_server_endpoint_queue_len(&ep));
 
     rcp_bytes_free(&frame);
+    rcp_server_endpoint_destroy(&ep);
+
+    /* A Compound Wait request with evt[2:0] = 111b (a real comparison
+     * mode under §13.5.1, not a config-write signal) is still queued, not
+     * mistaken for a configuration request. */
+    memset(&step, 0, sizeof(step));
+    wait_frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT,
+                                              (rcp_byte_bus_id_t)5u, &step, 0x07u, 0x44u,
+                                              NULL, 0u);
+    TEST_ASSERT_NOT_NULL(wait_frame.data);
+
+    rcp_server_endpoint_init(&ep, false);
+    TEST_ASSERT_FALSE(rcp_server_endpoint_submit(&ep, wait_frame.data, wait_frame.len, NULL));
+    TEST_ASSERT_EQUAL_UINT(1u, rcp_server_endpoint_queue_len(&ep));
+
+    rcp_bytes_free(&wait_frame);
     rcp_server_endpoint_destroy(&ep);
 }
 
@@ -1469,8 +1506,8 @@ int main(void)
     RUN_TEST(test_entry_gate_is_scoped_to_one_endpoint_and_one_queue);
     RUN_TEST(test_admission_is_suspended_during_the_sleep_drain);
 
-    RUN_TEST(test_disabled_endpoint_executes_abb_config_requests_immediately);
-    RUN_TEST(test_disabled_endpoint_still_queues_operational_and_gbb_requests);
+    RUN_TEST(test_disabled_endpoint_executes_config_requests_immediately);
+    RUN_TEST(test_disabled_endpoint_still_queues_operational_and_compound_wait_requests);
     RUN_TEST(test_disabled_endpoint_queuing_emits_requested_acknowledge);
     RUN_TEST(test_response_queue_flush_period_is_carried_but_inert);
     RUN_TEST(test_gptp_lock_transition_issues_no_trigger_signal);
