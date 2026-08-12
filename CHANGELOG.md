@@ -34,6 +34,20 @@ the rationale.
 
 ## Releases
 
+### v0.287.0 -- 2026-08-12 (issue #201 batch: `REQ-SRV-018`, RC Server PTP trigger signals)
+
+**`REQ-SRV-018` flips `not-implemented` -> `partial`.**
+
+New `rcp_server_gptp_trigger_evaluate()`/`rcp_server_gptp_trigger_state_t` (`server.h`/`server.c`) derives TC18 §13.7.1.3 Table 37's own trigger signal 0/1 from a genuine gPTP lock transition -- signal 0 (`RCP_SERVER_GPTP_TRIGGER_ESTABLISHED`) on a false→true edge, signal 1 (`RCP_SERVER_GPTP_TRIGGER_LOST`) on true→false (signal 2 stays unimplemented -- it's "t.b.d." in the specification itself, not a local gap). A caller-owned tracker holds the previously observed lock state, the same architecture already established by `rcp_ep_adc_trigger_state_t` (`ep_adc.h`) and `rcp_e2e_seq_tracker_t`/`rcp_e2e_stream_fault_tracker_t` (`e2e.h`). Composed by hand with the pre-existing `rcp_server_endpoint_notify_trigger()`, the derived signal correctly arms a stored triggered request.
+
+**Deliberately still `partial`, not `implemented`**: nothing in this library's own dispatch loop calls `evaluate()`+`notify_trigger()` together automatically on every tick yet -- the same "primitive complete, dispatch wiring deferred" disposition already established for `REQ-GPIO-033`/`REQ-ADC-031`/`REQ-SRV-016`.
+
+**Citation-drift fix, same lineage as issue #341**: the catalog's own "Table 34" citation was stale -- RC5's own renumbered table is Table 37 (§13.7.1.3), confirmed directly against the primary source. Corrected alongside the fix.
+
+Rewrote the pre-existing gap-pinning test (`test_gptp_lock_transition_issues_no_trigger_signal` → `test_gptp_trigger_evaluate_derives_signal_and_composes_with_notify`) to assert the fixed behavior, plus a new dedicated test for the `has_previous` first-observation guard specifically (the original test's own first observation happened to already agree with the tracker's zero-initialized default, which would have silently hidden a missing guard).
+
+Mutation-tested 2 ways (`has_previous` guard dropped; `ESTABLISHED`/`LOST` signal values swapped) -- the first mutation was NOT caught by the original test alone, a genuine test-coverage gap (not an equivalent mutant): the new discriminating test was added specifically to close it, then both mutations were caught cleanly on the re-run. 65/65 both trees (native + ASan/UBSan, full suite given this touches core `server.c`). `cfusa check`: 0 errors both trees. `cfusa trace --req-coverage 100`/`--sec-tested 100` (run as CI's own separate invocations, not a combined call): both 100%.
+
 ### v0.286.0 -- 2026-08-12 (issue #336 batch: `REQ-ACF-032` shared GBB request_type peek + `REQ-SRV-015` GBB half)
 
 **New shared primitive: `rcp_acf_peek_gbb_request_type()` (`REQ-ACF-032`, `acf.h`/`acf.c`).**

@@ -9721,14 +9721,14 @@
     },
     {
       "id": "REQ-SRV-018",
-      "title": "RC Server trigger signals 0/1: PTP time-sync established and lost (Table 34)",
-      "text": "NOT IMPLEMENTED: c-RCP does not issue the RC Server trigger signals of TC18 Table 34 -- signal 0 on PTP time-synch established and signal 1 on PTP time-synch lost (signal 2 being t.b.d. in the specification). gPTP lock state is modeled (rcp_timed_admit()'s gptp_locked input) but no trigger source is derived from its transitions, so a triggered request cannot be armed on time-sync events.",
+      "title": "RC Server trigger signals 0/1: PTP time-sync established and lost (Table 37)",
+      "text": "PARTIAL (issue #201, 2026-08-12): rcp_server_gptp_trigger_evaluate() (server.h/server.c) now derives TC18 Table 37's own trigger signal 0/1 from a genuine gPTP lock transition -- signal 0 (RCP_SERVER_GPTP_TRIGGER_ESTABLISHED) on a false->true edge, signal 1 (RCP_SERVER_GPTP_TRIGGER_LOST) on true->false (signal 2 stays unimplemented -- it is 't.b.d.' in the specification itself, not a local gap). A caller-owned rcp_server_gptp_trigger_state_t tracks the previously observed lock state, the same architecture already established by rcp_ep_adc_trigger_state_t (ep_adc.h) and rcp_e2e_seq_tracker_t/rcp_e2e_stream_fault_tracker_t (e2e.h). Composed by hand with the pre-existing rcp_server_endpoint_notify_trigger(), the derived signal correctly arms a stored triggered request whose own trigger_source_ep/trigger_signal_nr selection matches it. Deliberately still PARTIAL, not IMPLEMENTED: nothing in this library's own dispatch loop calls evaluate()+notify_trigger() together automatically on every tick yet -- the same 'primitive complete, dispatch wiring deferred' disposition already established for REQ-GPIO-033/REQ-ADC-031/REQ-SRV-016 -- a caller still has to drive both calls itself each time it observes a newly changed gptp_locked value.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
-      "tc18": "\u00a713.7.1.3 Table 34, TC18.txt L4048-4053"
+      "status": "partial",
+      "tc18": "\u00a713.7.1.3 Table 37, TC18.txt L4443-4451"
     },
     {
       "id": "REQ-SRV-019",

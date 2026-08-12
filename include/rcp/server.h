@@ -425,6 +425,51 @@ bool rcp_server_endpoint_complete(rcp_server_endpoint_t *ep, size_t index,
 size_t rcp_server_endpoint_notify_trigger(rcp_server_endpoint_t *ep, uint8_t source_ep,
                                            uint8_t signal_nr);
 
+/* ── §13.7.1.3 Table 37: the RC Server's own PTP time-synch trigger signals ── */
+
+/*
+ * Table 37 defines two trigger signals the RC Server itself may issue:
+ * signal 0 fires when gPTP time-synch becomes established, signal 1 fires
+ * when it is lost (a third signal, 2, is "t.b.d." in the specification --
+ * not implemented, since TC18 itself does not yet define it). gPTP lock
+ * state is already modeled elsewhere in this codebase
+ * (rcp_server_tick_ctx_t::gptp_locked above, rcp_timed_admit()'s own
+ * gptp_locked parameter, request_timed.h) but nothing previously derived
+ * an edge from its transitions -- this tracker closes that gap, using the
+ * same caller-owned edge-detection architecture already established by
+ * rcp_ep_adc_trigger_state_t (ep_adc.h) and rcp_e2e_seq_tracker_t/
+ * rcp_e2e_stream_fault_tracker_t (e2e.h): this module sends no wire
+ * traffic and owns no transport, a caller drives every evaluate() call
+ * itself on each newly observed gptp_locked value and, when a signal
+ * fires, delivers it via the existing rcp_server_endpoint_notify_trigger()
+ * above using whichever source_ep this deployment's own convention
+ * assigns to the RC Server itself -- a caller decision this primitive
+ * does not resolve, matching REQ-SRV-011's own existing scope.
+ */
+typedef struct {
+    bool has_previous;    /* false until the first evaluate() call -- no
+                              previous state exists yet to detect an edge
+                              against */
+    bool previous_locked; /* the previously observed gPTP lock state;
+                              meaningless while has_previous is false */
+} rcp_server_gptp_trigger_state_t;
+
+/* Initializes s to the no-previous-observation state. */
+void rcp_server_gptp_trigger_state_init(rcp_server_gptp_trigger_state_t *s);
+
+#define RCP_SERVER_GPTP_TRIGGER_ESTABLISHED ((uint8_t)0u) /* Table 37 signal 0 */
+#define RCP_SERVER_GPTP_TRIGGER_LOST        ((uint8_t)1u) /* Table 37 signal 1 */
+
+/* Evaluates one newly observed gPTP lock state against s's own previously
+ * observed state and updates it for the next call. Returns true and sets
+ * *out_signal_nr to RCP_SERVER_GPTP_TRIGGER_ESTABLISHED/_LOST iff this
+ * call observed a genuine transition (false -> true / true -> false, an
+ * edge, not a level); returns false, *out_signal_nr left unchanged, if
+ * locked is unchanged from the previous call, or this is the very first
+ * call (s->has_previous false) -- no edge exists to detect yet. */
+bool rcp_server_gptp_trigger_evaluate(rcp_server_gptp_trigger_state_t *s, bool locked,
+                                       uint8_t *out_signal_nr);
+
 /* Marks the stored chained request at index as having had its predecessor
  * finalize, at tick count now: its chain_exec_delay timer starts running
  * from there and it becomes due once that delay elapses. Returns false,
