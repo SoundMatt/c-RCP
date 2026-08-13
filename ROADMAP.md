@@ -17846,3 +17846,49 @@ touching anything -- stays `not-implemented`, correctly, matching the
 No code changed. `cfusa check`/`trace` re-run: 0 errors, 1024/1024,
 identical to the pre-change baseline. 65/65 full suite unaffected (no
 code touched).
+
+### v0.310.0 -- 2026-08-13 (`REQ-CANEP-029` citation-drift correction,
+same issue #341 lineage -- 4th instance)
+
+**Doc-only**, the fourth instance from the same stale-reference-file
+root cause as v0.308.0/v0.309.0. Found while investigating
+`REQ-CANEP-029` itself (one of only two remaining `not-implemented`
+entries repo-wide) as the next actionable item -- by now, re-checking
+a citation against the freshly refreshed `TC18.txt` before trusting
+any pre-existing line-number reference has become this session's own
+standing first step, and it paid off again here.
+
+`REQ-CANEP-029`'s own citation (`TC18.txt L5355` and `L5385-5418`)
+had drifted the same way: real content (§13.7.11.2, the CAN
+functional-configuration table, including the address-collision
+defect this requirement describes) now sits at `TC18.txt L5764-5836`.
+One thing did NOT need correcting: this requirement's own table-number
+citation was already written as `Table 53/56` -- correctly
+anticipating the RC1→RC5 renumbering (RC1's Table 53 became RC5's
+Table 56, confirmed directly: `Table 56: can functional configuration`
+now labels the real table at `L5836`) -- a small but real sign that
+not every pre-existing citation in this catalog is naively RC1-only;
+some were already written with the renumbering in mind.
+
+**Re-verified the actual defect, not just the citation**, before
+touching the disposition: the `0x002C` address collision between
+acceptance filter 3 and acceptance filter 4 (`TC18.txt L5814-5815` in
+the current text) is confirmed present, word-for-word unchanged from
+the prior (stale-file) reading. This requirement's own genuine
+blocker -- TC18 gives two internally inconsistent readings for how
+many real acceptance filters exist and where the receive-ID-filter
+table (valid for all CAN variants, not just CAN XL) actually starts,
+undecidable from the primary source alone -- is unaffected. Stays
+`not-implemented`, correctly; still genuinely blocked, not by this
+session's own doing.
+
+No code changed. `cfusa check`/`trace` re-run: 0 errors, 1024/1024,
+identical to the pre-change baseline. 65/65 full suite unaffected (no
+code touched).
+
+**Four citation-drift instances now found and fixed from spot-checking
+just 5 requirements this way** (`REQ-SEQ-013`/`REQ-SEQ-014`,
+`REQ-SPI-037`, `REQ-CANEP-029`) -- a strong signal, not yet acted on
+at scale, that issue #341's own full systematic census (hundreds of
+citations, per that issue's own description) would likely surface
+many more. Flagged again, still not started as a dedicated pass.
