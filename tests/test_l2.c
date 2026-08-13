@@ -192,14 +192,23 @@ static void test_transport_new_bad_interface_is_not_ok(void)
     rcp_avtp_transport_release(t);
 }
 
-/* REQ-L2-009: on a non-Linux platform (or a Linux build lacking
- * CAP_NET_RAW/root -- both routes give ok()==false), send()/recv()
- * report RCP_ERR_CLOSED without crashing, exactly matching udp.c's own
- * Windows-stub convention. This is the not-ok() half deliberately left
- * unexercised by test_transport_new_ok_or_gracefully_unavailable()
- * above (which stops at TEST_IGNORE_MESSAGE for that case): on this
- * repo's own macOS/Windows CI jobs (and any unprivileged Linux run),
- * this test runs for real rather than being skipped. */
+#if !defined(__linux__)
+/* REQ-L2-009 is specifically scoped to "on a non-Linux platform": the
+ * stub vtable (src/l2.c's #else branch) unconditionally returns
+ * RCP_ERR_CLOSED from send()/recv(), regardless of ok(). This does NOT
+ * generalize to an unprivileged *Linux* build with ok()==false --
+ * confirmed the hard way: CI's own ubuntu runners have ok()==false here
+ * (no CAP_NET_RAW) but still compile the REAL l2_avtp_send()/recv()
+ * (src/l2.c's #if defined(__linux__) branch), which don't gate on ok()
+ * at all and can return other codes entirely (recv() timed out rather
+ * than reporting closed, in CI's own actual run) -- that not-ok()
+ * Linux case is exactly what
+ * test_transport_new_ok_or_gracefully_unavailable() above already
+ * IGNOREs rather than asserting anything about. So this test is itself
+ * #if !defined(__linux__)-gated -- it only compiles/runs on this
+ * repo's own macOS and Windows CI jobs, where the stub's
+ * "ok()==false implies RCP_ERR_CLOSED" contract is unconditionally
+ * true (no privilege check needed at all -- see l2_stub_send/recv). */
 static void test_transport_send_recv_closed_when_not_ok(void)
 {
     rcp_avtp_transport_t *t = rcp_l2_avtp_transport_new("lo", k_dst_mac, false);
@@ -209,11 +218,7 @@ static void test_transport_send_recv_closed_when_not_ok(void)
     size_t                  out_len = 0;
 
     TEST_ASSERT_NOT_NULL(t);
-    if (rcp_l2_avtp_transport_ok(t)) {
-        rcp_avtp_transport_release(t);
-        TEST_IGNORE_MESSAGE("L2 transport is privileged/available on this platform");
-        return;
-    }
+    TEST_ASSERT_FALSE(rcp_l2_avtp_transport_ok(t)); /* the stub is always not-ok */
 
     TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_avtp_transport_send(t, frame, sizeof(frame)));
     TEST_ASSERT_EQUAL(RCP_ERR_CLOSED,
@@ -221,6 +226,7 @@ static void test_transport_send_recv_closed_when_not_ok(void)
 
     rcp_avtp_transport_release(t);
 }
+#endif /* !__linux__ */
 
 int main(void)
 {
@@ -235,7 +241,9 @@ int main(void)
     RUN_TEST(test_mac_is_unicast_classifies_unicast_multicast_broadcast);
     RUN_TEST(test_transport_new_ok_or_gracefully_unavailable);
     RUN_TEST(test_transport_new_bad_interface_is_not_ok);
+#if !defined(__linux__)
     RUN_TEST(test_transport_send_recv_closed_when_not_ok);
+#endif
 
     return UNITY_END();
 }
