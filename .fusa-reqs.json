@@ -9256,7 +9256,7 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "§12.3, TC18.txt L2072-L2075 and L2106-L2108 (Figure 16)"
+      "tc18": "§12.3, TC18.txt L2447-L2450 and L2481-L2483 (Figure 17, \"RC Server lifecycle states\", TC18.txt L2517) -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338): the cached TC18.txt's own lifecycle-diagram is Figure 17 in the current RC5 baseline (\"Figure 17 - RC Server lifecycle states\", TC18.txt L2517), not \"Figure 16\" as this citation previously said -- Figure 16 in the current RC5 text is an unrelated diagram (\"Cancellation of a single, specific request\", TC18.txt L2158). Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
     },
     {
       "id": "REQ-E2E-028",
@@ -9399,7 +9399,7 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "§12.3, TC18.txt L2117-L2120 and L2129-L2131 (Figure 16, verified against primary-source PDF page 42's own image)"
+      "tc18": "§12.3, TC18.txt L2492-L2495 and L2504-L2506 (Figure 17, \"RC Server lifecycle states\", TC18.txt L2517) -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338): the cached TC18.txt's own lifecycle-diagram is Figure 17 in the current RC5 baseline (\"Figure 17 - RC Server lifecycle states\", TC18.txt L2517), not \"Figure 16\" as this citation previously said -- Figure 16 in the current RC5 text is an unrelated diagram (\"Cancellation of a single, specific request\", TC18.txt L2158). Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
     },
     {
       "id": "REQ-LIFECYCLE-023",
@@ -9432,7 +9432,7 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "§12.3, TC18.txt L2101-L2105 (Figure 16, verified against primary-source PDF page 42's own image)"
+      "tc18": "§12.3, TC18.txt L2476-L2480 (Figure 17, \"RC Server lifecycle states\", TC18.txt L2517) -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338): the cached TC18.txt's own lifecycle-diagram is Figure 17 in the current RC5 baseline (\"Figure 17 - RC Server lifecycle states\", TC18.txt L2517), not \"Figure 16\" as this citation previously said -- Figure 16 in the current RC5 text is an unrelated diagram (\"Cancellation of a single, specific request\", TC18.txt L2158). Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
     },
     {
       "id": "REQ-LIFECYCLE-026",
@@ -9498,7 +9498,7 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "§12.3.1.2, TC18.txt L2187-L2189 and L2198-L2201"
+      "tc18": "§12.3.1.2, TC18.txt L2562-L2565 and L2574-L2577 -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338). Line numbers corrected to the real current location in the refreshed RC5 TC18.txt; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
     },
     {
       "id": "REQ-LIFECYCLE-032",
@@ -9531,7 +9531,7 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "§12.7 Configuration, TC18.txt L2458-2459 (re-verified against primary-source PDF)"
+      "tc18": "§12.7 Configuration, TC18.txt L2833-L2834 -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338). Line numbers corrected to the real current location in the refreshed RC5 TC18.txt; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
     },
     {
       "id": "REQ-LIFECYCLE-035",
@@ -10301,7 +10301,7 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "§13.7.1.2, TC18.txt L4034-4038"
+      "tc18": "§13.7.1.2, TC18.txt L4420-L4425 -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, found while investigating issue #338). Line numbers corrected to the real current location in the refreshed RC5 TC18.txt; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
     },
     {
       "id": "REQ-RMAP-069",
