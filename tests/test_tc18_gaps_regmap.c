@@ -2800,12 +2800,16 @@ static void test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bo
         map.svr_configuration_lock = 0u; /* restore unlocked for the cases below */
     }
 
-    /* 5) response-queue-config: a write to its own W* sub-range
-     * (Max_AVTPDUsize, row-relative [2,4)) is denied by RCP_CONFIGURED
-     * state, while a write to its own W+ sub-range (STREAM_UID,
-     * row-relative [0,2)) in the SAME state is denied too (W+ reuses
-     * the identical state rule) -- both sub-ranges independently
-     * verified denied, not just the first one checked. */
+    /* 5) response-queue-config (QUEUE_CFG): CORRECTED 2026-08-13
+     * (issue #338, REQ-LIFECYCLE-023) -- the whole table is now
+     * RCP_LIFECYCLE_FIELD_HW_GENERIC-gated (Figure 17's own
+     * HW_CONFIGURED-box "HW_CONFIG or QUEUE_CFG or EP_GEN_CFG ->
+     * LOCKED_CONFIG_ACCESS" transition), so RCP_CONFIGURED denies both
+     * its own W*-shaped sub-range (Max_AVTPDUsize, row-relative [2,4))
+     * and its own W+-shaped sub-range (STREAM_UID, row-relative [0,2))
+     * identically -- the per-field W-star/W-plus distinction no longer
+     * matters once the table-wide state gate alone already denies the
+     * write in this state, matching HW_config's own precedent. */
     {
         uint8_t payload_wstar[4];
         uint8_t payload_wplus[4];
@@ -2839,12 +2843,22 @@ static void test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bo
         rcp_bytes_free(&frame);
     }
 
-    /* 6) response-queue-config: a write spanning BOTH a W+ octet
-     * (STREAM_UID's own byte 1, row-relative offset 1) and a W* octet
-     * (Max_AVTPDUsize's own byte 0, row-relative offset 2) in a state
-     * that permits W* but denies W+ (locked, HW_UNCONFIGURED) is denied
-     * -- proving a mixed-range write requires EVERY touched sub-range's
-     * own check to pass, not just one. */
+    /* 6) response-queue-config (QUEUE_CFG): CORRECTED 2026-08-13
+     * (issue #338, REQ-LIFECYCLE-023) -- a write spanning BOTH a W+
+     * octet (STREAM_UID's own byte 1, row-relative offset 1) and a W*
+     * octet (Max_AVTPDUsize's own byte 0, row-relative offset 2), sent
+     * with DISCOVERY_WRITER (the only writer the table-wide HW_GENERIC
+     * gate now accepts) during HW_UNCONFIGURED with the table's own
+     * INDEPENDENT R/W+ lock bit set, is still denied -- proving the
+     * table-wide HW_GENERIC gate passing does not itself bypass the
+     * separate, orthogonal W+ lock-bit check this table's own
+     * STREAM_UID/flush_on_count/Flush_time fields still carry. (Using
+     * ROOT_WRITER here, as this subtest did before this fix, would now
+     * be denied earlier and differently -- RCP_ERROR_UNAUTHORIZED_ACCESS
+     * from the table-wide HW_GENERIC gate itself, since ROOT_WRITER
+     * lacks via_discovery_stream -- which would prove the wrong thing:
+     * DISCOVERY_WRITER is needed here specifically to isolate the W+
+     * lock-bit check as this subtest's own real target.) */
     {
         uint8_t payload[4];
 
@@ -2856,7 +2870,7 @@ static void test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bo
         frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
-                                                   RCP_LIFECYCLE_HW_UNCONFIGURED, ROOT_WRITER,
+                                                   RCP_LIFECYCLE_HW_UNCONFIGURED, DISCOVERY_WRITER,
                                                    hw_pin_map, 1u, ep_id_map, 1u,
                                                    response_queue_cfg, 1u, request_stream_cfg, 1u, ep_generic_cfg, 1u,
                                                    NULL, NULL, 0u, 0u,
@@ -2868,11 +2882,67 @@ static void test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bo
         rcp_bytes_free(&frame);
     }
 
-    /* 7) RCP_CONFIGURED state denies ep_generic_cfg (W*) the identical
-     * way (issue #311 batch 5) -- confirmed via direct primary-source
-     * verification that TC18 §13.2's own surrounding prose names no
-     * table-specific override, so the generic FUNCTIONAL_W_STAR "state
-     * alone forbids it once RCP_CONFIGURED" rule applies here too. The
+    /* 7pre) NEW 2026-08-13 (issue #338, REQ-LIFECYCLE-023): the actual
+     * behavior CHANGE this fix makes, proven directly -- a write to
+     * ep_generic_cfg/response_queue_cfg that a maximally-privileged
+     * DISCOVERY_WRITER would have succeeded at once the server reaches
+     * RCP_LIFECYCLE_HW_CONFIGURED (per FUNCTIONAL_W_STAR's own "writable
+     * in HW_CONFIGURED with authorization" rule, this codebase's
+     * behavior before this fix) is now REJECTED with LOCKED_MEM_ACCESS,
+     * matching Figure 17's own explicit "HW_CONFIG or QUEUE_CFG or
+     * EP_GEN_CFG -> LOCKED_CONFIG_ACCESS" transition (TC18.txt
+     * L2485-2488) during HW_CONFIGURED specifically -- not merely
+     * RCP_CONFIGURED, which subtests 5-7 already covered and which every
+     * kind (W*, W+, HW_GENERIC alike) already agreed on. HW_CONFIGURED
+     * is the one state where the old (FUNCTIONAL_W_STAR-based) and new
+     * (HW_GENERIC-based) rules actually disagree, so it is the only
+     * state that proves the fix, not merely re-confirms unchanged
+     * behavior. */
+    {
+        uint8_t payload_queue[4];
+        uint8_t payload_ep_gen[4];
+
+        put_test_u16(payload_queue, (uint16_t)(map.svr_response_stream_cfg_ptr + 2u));
+        put_test_u16(&payload_queue[2], 0x9999u);
+        frame = rcp_acf_encode_abb(&hdr, payload_queue, sizeof(payload_queue));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   RCP_LIFECYCLE_HW_CONFIGURED, DISCOVERY_WRITER,
+                                                   hw_pin_map, 1u, ep_id_map, 1u,
+                                                   response_queue_cfg, 1u, request_stream_cfg, 1u, ep_generic_cfg, 1u,
+                                                   NULL, NULL, 0u, 0u,
+                                                   &err, &tn, 0u);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, err);
+        rcp_bytes_free(&frame);
+
+        put_test_u16(payload_ep_gen, (uint16_t)(map.svr_ep_generic_cfg_ptr + 4u));
+        put_test_u16(&payload_ep_gen[2], 0x8888u);
+        frame = rcp_acf_encode_abb(&hdr, payload_ep_gen, sizeof(payload_ep_gen));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                                   RCP_LIFECYCLE_HW_CONFIGURED, DISCOVERY_WRITER,
+                                                   hw_pin_map, 1u, ep_id_map, 1u,
+                                                   response_queue_cfg, 1u, request_stream_cfg, 1u, ep_generic_cfg, 1u,
+                                                   NULL, NULL, 0u, 0u,
+                                                   &err, &tn, 0u);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, err);
+        rcp_bytes_free(&frame);
+    }
+
+    /* 7) RCP_CONFIGURED state denies ep_generic_cfg (EP_GEN_CFG) the
+     * identical way. CORRECTED 2026-08-13 (issue #338, REQ-LIFECYCLE-023):
+     * this table is RCP_LIFECYCLE_FIELD_HW_GENERIC-gated (Figure 17's
+     * own HW_CONFIGURED-box "HW_CONFIG or QUEUE_CFG or EP_GEN_CFG ->
+     * LOCKED_CONFIG_ACCESS" transition -- issue #311 batch 5's own
+     * original claim, that §13.2's surrounding prose names no
+     * table-specific override so the generic FUNCTIONAL_W_STAR rule
+     * applied instead, only checked the prose next to Table 31 itself
+     * and missed this diagram-level override). HW_GENERIC denies
+     * RCP_CONFIGURED unconditionally too (permanently locked from
+     * HW_CONFIGURED onward), so this subtest's own assertion is
+     * unaffected by the fix -- only the underlying reason changed. The
      * write targets ep_description (fully R/W*, not the read-only
      * ep_type octet), proving this is a genuine authorization denial,
      * not merely the read-only no-op case #311 batch 4 already covers. */
