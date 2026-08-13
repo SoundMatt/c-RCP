@@ -17755,3 +17755,65 @@ session, `Coverage: N/N traced, N/N tested`, is unaffected and stays
 at 100% both before and after. Not investigated further -- out of
 this batch's own scope, flagged honestly rather than silently
 ignored.
+
+### v0.308.0 -- 2026-08-13 (`REQ-SEQ-013`/`REQ-SEQ-014` citation-drift
+correction, issue #341 lineage)
+
+**Doc-only**, fixing a real bug this project's own immediately
+preceding batch (v0.306.0) introduced. Discovered while working
+v0.307.0's own `REQ-MDIO-022`/`REQ-MDIO-024` investigation: this
+repo's own cached primary-source reference files (`TC18.txt`/
+`TC18_full.txt`/`TC18_nopgbrk.txt`, canonical path
+`/Users/matt/Documents/Coding/SoundMatt/`, outside this repo) were
+stale RC1-dated `pdftotext` dumps ("Version 0.5.1_RC", 2026-07-14)
+despite this project's own prior "TC18 spec rebaseline to 0.5.1_RC5"
+work -- the real RC5 PDF (`OA_TC18_specification_v_0.5.1_RC_5_3624.pdf`,
+2026-08-11) had apparently never actually been re-extracted to `.txt`.
+
+For the MDIO section, content happened to be unchanged between RC1
+and RC5 (only table/figure numbers and the page date differed), so
+v0.307.0's own citations, cross-checked against a fresh ad-hoc
+extraction at the time, needed no correction. The sequencer section
+was not so lucky: v0.306.0's `REQ-SEQ-013`/`REQ-SEQ-014` citations
+(`TC18.txt L3064-L3110`) were written by reading the stale file
+DIRECTLY (not cross-checked against an independent fresh extraction,
+unlike v0.307.0's own citations) -- internally consistent with that
+stale file's own RC1-numbered content at the time, but wrong once the
+file is correctly refreshed: real Table 28 (SEQUENCER_config, §12.7.10)
+sits at `TC18.txt L3460-L3493` in genuinely current RC5 text, roughly
+400 lines away from where the stale file had it. Corrected both
+citations to `L3460-L3493`.
+
+One more retraction, in the interest of full honesty: v0.307.0's own
+working notes (this same file, above) flagged `REQ-SEQ-012`'s
+pre-existing citation (also `TC18.txt L3460-L3493`) as a probable bug,
+based on the SAME stale-file comparison that caused this whole
+investigation. With the file now genuinely refreshed, `REQ-SEQ-012`'s
+citation is confirmed CORRECT -- it was never wrong; the comparison
+that flagged it was itself comparing against a stale source. No change
+needed to that entry.
+
+**Fixed at the root, not just patched at the symptom**: all three
+cached reference files (`TC18.txt`, `TC18_full.txt`, `TC18_nopgbrk.txt`)
+were re-extracted fresh from the real RC5 PDF as part of this batch
+(`pdftotext -layout` / `pdftotext -layout -nopgbrk`, matching each
+file's own pre-existing extraction convention, confirmed by diffing
+the old and new files' own formatting quirks before overwriting). This
+specific staleness class cannot recur for future primary-source
+citation work in this repo (or the other 3 x-RCP repos, which likely
+share the same staleness -- not checked this batch, flagged for a
+follow-up).
+
+No code changed -- `.fusa-reqs.json` citation text only, plus this
+narrative record. `cfusa check`/`trace` re-run to confirm: identical
+to the pre-change baseline (0 errors, 1024/1024 traced and tested).
+65/65 full suite unaffected (no code touched).
+
+**Belongs to issue #341's own scope** (RC1↔RC5 table-citation
+renumbering census) -- this is exactly the class of citation-drift
+finding that issue tracks, surfaced here as a byproduct of
+`REQ-MDIO-022`'s own investigation rather than a dedicated #341 pass.
+The broader #341 census (hundreds of citations, mixed stale/
+already-fixed state per that issue's own description) remains
+unstarted as a systematic effort -- this fix closes the two specific
+instances this session happened to find, not the full scope.

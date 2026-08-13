@@ -10455,18 +10455,18 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.7.10 Table 28, TC18.txt L3064-L3110 (2-octet stride: relative 0x0000 Seq_state, 0x0001 Request_stream_index)"
+      "tc18": "§12.7.10 Table 28, TC18.txt L3460-L3493 (2-octet stride: relative 0x0000 Seq_state, 0x0001 Request_stream_index) -- CORRECTED 2026-08-13, citation-drift fix: this repo's own cached TC18.txt was found to be a stale RC1-dated pdftotext dump, since re-extracted from the real RC5 PDF; the original L3064-L3110 citation was accurate against that stale copy's OWN (RC1-numbered) content but is wrong against the now-refreshed file"
     },
     {
       "id": "REQ-SEQ-014",
       "title": "svr_max_sequencers and the sequencer_state table expose sequencer availability and state through the register map",
-      "text": "IMPLEMENTED (issue #334, corrected issue #335/2026-08-13): rcp_regmap_general_t.svr_sequencers_max reports rcp_sequencer_table_t.count (0 when sequencers are not implemented), and the sequencer_state sub-table pointed to by svr_sequencer_state_ptr exposes each sequencer's state over EP0 (TC18 §12.7.10 Table 28). CORRECTION (2026-08-13): this requirement's original closure wrongly claimed the wire layout was TC18's own \"one-octet-per-sequencer Seq_state\" image needing no render() step -- a direct read of TC18.txt L3064-3110 (Table 28) shows each sequencer is actually 2 octets: relative 0x0000 Seq_state (8 bit, R/W) then relative 0x0001 Request_stream_index (8 bit, R/W*), repeating per sequencer. Any real client parsing the old 1-octet wire image per TC18's actual 2-octet stride would misread every sequencer past the first. Fixed as part of REQ-SEQ-013: rcp_regmap_sequencer_table_render() now interleaves state[i]/owner[i] into the correct 2-octet layout, rcp_regmap_ep0_encode_read_response() gained a sequencer_owner parameter and the correct sequencer_count*2u extent-length math, and rcp_regmap_sequencer_table_apply_reconfig() provides the matching write-side render->patch->reparse path. Write access (originally flagged as a separate, still-open gap) is now implemented as part of REQ-SEQ-013's own ownership-aware EP0 write dispatcher.",
+      "text": "IMPLEMENTED (issue #334, corrected issue #335/2026-08-13): rcp_regmap_general_t.svr_sequencers_max reports rcp_sequencer_table_t.count (0 when sequencers are not implemented), and the sequencer_state sub-table pointed to by svr_sequencer_state_ptr exposes each sequencer's state over EP0 (TC18 §12.7.10 Table 28). CORRECTION (2026-08-13): this requirement's original closure wrongly claimed the wire layout was TC18's own \"one-octet-per-sequencer Seq_state\" image needing no render() step -- a direct read of TC18.txt L3460-3493 (Table 28, corrected 2026-08-13 -- see REQ-SEQ-013's own citation-drift note) shows each sequencer is actually 2 octets: relative 0x0000 Seq_state (8 bit, R/W) then relative 0x0001 Request_stream_index (8 bit, R/W*), repeating per sequencer. Any real client parsing the old 1-octet wire image per TC18's actual 2-octet stride would misread every sequencer past the first. Fixed as part of REQ-SEQ-013: rcp_regmap_sequencer_table_render() now interleaves state[i]/owner[i] into the correct 2-octet layout, rcp_regmap_ep0_encode_read_response() gained a sequencer_owner parameter and the correct sequencer_count*2u extent-length math, and rcp_regmap_sequencer_table_apply_reconfig() provides the matching write-side render->patch->reparse path. Write access (originally flagged as a separate, still-open gap) is now implemented as part of REQ-SEQ-013's own ownership-aware EP0 write dispatcher.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "§12.7.10 Table 28, TC18.txt L3064-L3110"
+      "tc18": "§12.7.10 Table 28, TC18.txt L3460-L3493 -- CORRECTED 2026-08-13, same citation-drift fix as REQ-SEQ-013"
     },
     {
       "id": "REQ-SPI-033",
