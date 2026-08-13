@@ -11,15 +11,23 @@ rcp_sequencer_table_t rcp_sequencer_table_new(uint16_t count)
 {
     rcp_sequencer_table_t table = {0};
     uint8_t *state;
+    uint8_t *owner;
 
-    if (count == 0) return table; /* {NULL,0} -- unsupported by design, not a failure */
+    if (count == 0) return table; /* {NULL,NULL,0} -- unsupported by design, not a failure */
 
     state = (uint8_t *)malloc((size_t)count);
     if (!state) return table; /* zeroed -- see the header's failure convention */
 
+    owner = (uint8_t *)calloc((size_t)count, 1); /* RCP_SEQUENCER_OWNER_UNCLAIMED == 0 */
+    if (!owner) {
+        free(state);
+        return table; /* zeroed -- same failure convention, all-or-nothing allocation */
+    }
+
     memset(state, RCP_SEQUENCER_POWER_ON_STATE, (size_t)count);
 
     table.state = state;
+    table.owner = owner;
     table.count = count;
     return table;
 }
@@ -41,7 +49,9 @@ void rcp_sequencer_table_reset(rcp_sequencer_table_t *table)
 void rcp_sequencer_table_free(rcp_sequencer_table_t *table)
 {
     free(table->state);
+    free(table->owner);
     table->state = NULL;
+    table->owner = NULL;
     table->count = 0;
 }
 
@@ -68,4 +78,30 @@ bool rcp_sequencer_set_state(rcp_sequencer_table_t *table, uint16_t idx, uint8_t
     if (!rcp_sequencer_index_valid(table, idx)) return false;
     table->state[idx] = state;
     return true;
+}
+
+//cfusa:req REQ-SEQ-013
+bool rcp_sequencer_get_owner(const rcp_sequencer_table_t *table, uint16_t idx,
+                              uint8_t *out_owner)
+{
+    if (!rcp_sequencer_index_valid(table, idx)) return false;
+    *out_owner = table->owner[idx];
+    return true;
+}
+
+//cfusa:req REQ-SEQ-013
+bool rcp_sequencer_set_owner(rcp_sequencer_table_t *table, uint16_t idx, uint8_t owner)
+{
+    if (!rcp_sequencer_index_valid(table, idx)) return false;
+    table->owner[idx] = owner;
+    return true;
+}
+
+//cfusa:req REQ-SEQ-013
+bool rcp_sequencer_access_permitted(const rcp_sequencer_table_t *table, uint16_t idx,
+                                     uint8_t requester_stream_index)
+{
+    if (!rcp_sequencer_index_valid(table, idx)) return false;
+    if (table->owner[idx] == RCP_SEQUENCER_OWNER_UNCLAIMED) return false; /* fail-closed */
+    return table->owner[idx] == requester_stream_index;
 }

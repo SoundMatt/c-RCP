@@ -241,6 +241,21 @@ bool rcp_mock_server_set_hw_pin_map(rcp_mock_server_t *srv,
 const rcp_regmap_hw_pin_map_entry_t *rcp_mock_server_hw_pin_map(const rcp_mock_server_t *srv,
                                                                   size_t *out_len);
 
+/* Replaces srv's own request-stream-cfg table wholesale with a copy of
+ * entries[0..count). Returns false (srv's own table left unchanged) if
+ * count exceeds RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES (regmap.h);
+ * true otherwise. REQ-SEQ-013 (issue #335): this is srv's own only way
+ * to resolve an incoming request's stream_id into the 1-based
+ * request_stream_index identity rcp_mock_server_dispatch()'s own
+ * sequencer-ownership check (below) needs -- see
+ * rcp_regmap_request_stream_cfg_resolve_index()'s own doc comment
+ * (regmap.h). Same "caller may freely set... directly, no lifecycle-
+ * state gate here" convention rcp_mock_server_set_hw_pin_map() already
+ * establishes. */
+bool rcp_mock_server_set_request_stream_cfg(rcp_mock_server_t *srv,
+                                             const rcp_regmap_request_stream_cfg_t *entries,
+                                             size_t count);
+
 /* ── Endpoint registration ─────────────────────────────────────────────────── */
 
 /* Adds one endpoint slot addressed at byte_bus_id, with generic config

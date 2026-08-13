@@ -57,6 +57,14 @@ struct rcp_mock_server {
      * on rcp_mock_server_set_hw_pin_map()/_hw_pin_map(). */
     rcp_regmap_hw_pin_map_entry_t hw_pin_map[RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES];
     size_t                        hw_pin_map_len;
+    /* request-stream-cfg table (REQ-SEQ-013, issue #335) -- see mock.h's
+     * own doc comment on rcp_mock_server_set_request_stream_cfg(). Its
+     * own rx_stream_id fields are this server's only way to resolve an
+     * incoming request's stream_id into the request_stream_index
+     * identity TC18's own access-control-bearing fields (Table 28's
+     * Request_stream_index among them) are expressed in terms of. */
+    rcp_regmap_request_stream_cfg_t request_stream_cfg[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES];
+    size_t                          request_stream_cfg_count;
     /* The sequencer-state registers compound/compound-wait requests read
      * and advance. Server-wide rather than per-endpoint: a sequencer is a
      * server register, and requests on different endpoints routinely
@@ -190,6 +198,18 @@ const rcp_regmap_hw_pin_map_entry_t *rcp_mock_server_hw_pin_map(const rcp_mock_s
 {
     *out_len = srv->hw_pin_map_len;
     return srv->hw_pin_map;
+}
+
+//cfusa:req REQ-SEQ-013
+bool rcp_mock_server_set_request_stream_cfg(rcp_mock_server_t *srv,
+                                             const rcp_regmap_request_stream_cfg_t *entries,
+                                             size_t count)
+{
+    if (count > RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES) return false;
+
+    if (count > 0) memcpy(srv->request_stream_cfg, entries, count * sizeof(*entries));
+    srv->request_stream_cfg_count = count;
+    return true;
 }
 
 /* Finds the slot addressed at byte_bus_id, or NULL if none is registered. */
@@ -495,7 +515,7 @@ static rcp_mock_dispatch_result_t finish_admission(rcp_mock_endpoint_slot_t *slo
 static rcp_mock_dispatch_result_t dispatch_plain(rcp_mock_server_t *srv,
                                                   rcp_byte_bus_id_t byte_bus_id,
                                                   uint8_t avtp_subtype, uint8_t acf_msg_type,
-                                                  bool time_sync_supported,
+                                                  bool time_sync_supported, uint64_t stream_id,
                                                   const uint8_t *request, size_t request_len,
                                                   rcp_bytes_t *out_response)
 {
@@ -504,6 +524,7 @@ static rcp_mock_dispatch_result_t dispatch_plain(rcp_mock_server_t *srv,
     uint8_t                   request_type = 0;
     rcp_wire_error_t          error        = RCP_ERROR_NONE;
     rcp_lifecycle_accept_t    accept;
+    size_t                    admitted_index = 0;
 
     memset(out_response, 0, sizeof(*out_response));
 
@@ -550,8 +571,52 @@ static rcp_mock_dispatch_result_t dispatch_plain(rcp_mock_server_t *srv,
      * its own (0): a stored request's exec_delay is measured from the
      * moment its own start condition first holds, which is decided later
      * by rcp_server_endpoint_select_due() against the caller's tick. */
-    admit = rcp_server_endpoint_admit(&slot->queue, request, request_len, 0u, &request_type, NULL,
-                                       &error);
+    admit = rcp_server_endpoint_admit(&slot->queue, request, request_len, 0u, &request_type,
+                                       &admitted_index, &error);
+
+    /* REQ-SEQ-013 (issue #335): a newly-admitted COMPOUND/COMPOUND_WAIT
+     * step names a sequencer_index it will read or advance -- TC18
+     * §12.7.10 Table 28's own access-control rule ("Request_stream_index
+     * refers the Client Nr allowed to access this sequencer") applies to
+     * this indirect path exactly as much as to a direct register-map
+     * write, since a compound-wait request never touches the register
+     * map at all. Checked here, right after admission, rather than
+     * inside rcp_server_endpoint_admit() itself -- server.h has no
+     * sequencer-table dependency of its own (the same "mechanism lives
+     * below, context lives here" layering REQ-CANCEL-012's own
+     * chain_group bookkeeping already established in this same
+     * function's caller). An unauthorized step is admitted then
+     * immediately cancelled rather than never admitted at all, since the
+     * decode (and thus sequencer_index) is only known after
+     * rcp_server_endpoint_admit() itself has already run.
+     *
+     * Deliberately skipped when the sequencer table itself is
+     * unsupported (rcp_sequencer_table_unsupported(), count == 0) --
+     * that is a distinct, already-established "compound operations
+     * unsupported entirely" scenario (request_sequencer.h's own file
+     * header) orthogonal to REQ-SEQ-013's own ownership concern, and a
+     * request admitted before any sequencer table exists is expected to
+     * stay validly PENDING (simply never becoming due) rather than being
+     * newly rejected here -- conflating the two would move an existing,
+     * separately-tested "no table configured yet" behavior onto this
+     * access-control gate's own fail-closed default. */
+    if (admit == RCP_SERVER_ADMIT_PENDING && !rcp_sequencer_table_unsupported(&srv->sequencers) &&
+        (slot->queue.pending[admitted_index].kind == RCP_SCHED_KIND_COMPOUND ||
+         slot->queue.pending[admitted_index].kind == RCP_SCHED_KIND_COMPOUND_WAIT)) {
+        uint8_t sequencer_index = slot->queue.pending[admitted_index].compound.sequencer_index;
+        uint8_t requester = rcp_regmap_request_stream_cfg_resolve_index(
+            srv->request_stream_cfg, srv->request_stream_cfg_count, stream_id);
+
+        if (!rcp_sequencer_access_permitted(&srv->sequencers, sequencer_index, requester)) {
+            uint8_t tn = slot->queue.pending[admitted_index].transaction_num;
+
+            (void)rcp_server_endpoint_cancel_single(&slot->queue, tn, RCP_CANCEL_LIFECYCLE_QUEUED);
+            *out_response =
+                rcp_acf_build_error_response(byte_bus_id, tn, RCP_ERROR_UNAUTHORIZED_ACCESS);
+            return RCP_MOCK_DISPATCH_REJECTED;
+        }
+    }
+
     return finish_admission(slot, admit, request_type, request, request_len, error, byte_bus_id,
                              out_response);
 }
@@ -571,7 +636,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
     if (srv->watchdog != NULL) rcp_watchdog_keeper_kick(srv->watchdog, stream_id);
 
     return dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
-                           request, request_len, out_response);
+                           stream_id, request, request_len, out_response);
 }
 
 //cfusa:req REQ-E2E-021
@@ -633,7 +698,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
     slot = find_slot(srv, byte_bus_id);
     if (!slot || !slot->req_crc_enable) {
         return dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
-                               request, request_len, out_response);
+                               stream_id, request, request_len, out_response);
     }
 
     unwrap_result = rcp_e2e_unwrap_framed(stream_id, avtp_subtype == RCP_AVTP_SUBTYPE_NTSCF,
@@ -670,7 +735,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
      * via dispatch_plain() directly, same already-kicked-once reasoning
      * as the delegation branch above. */
     result = dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
-                             unwrapped.data, unwrapped.len, out_response);
+                             stream_id, unwrapped.data, unwrapped.len, out_response);
     rcp_bytes_free(&unwrapped);
     return result;
 }
