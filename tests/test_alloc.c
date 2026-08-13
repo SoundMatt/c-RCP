@@ -103,14 +103,17 @@ static void test_set_hooks_partial_falls_back_to_libc_for_unset_members(void)
 static void test_set_hooks_null_resets_to_default(void)
 {
     rcp_alloc_hooks_t hooks = {0};
+    void              *p;
 
     g_malloc_calls = 0;
     hooks.malloc_fn = counting_malloc;
     rcp_alloc_set_hooks(&hooks);
     rcp_alloc_set_hooks(NULL);
 
-    TEST_ASSERT_NOT_NULL(rcp_malloc(4)); /* leaked intentionally, test process exits */
+    p = rcp_malloc(4);
+    TEST_ASSERT_NOT_NULL(p);
     TEST_ASSERT_EQUAL_INT(0, g_malloc_calls); /* hook never re-invoked */
+    rcp_free(p);
 }
 
 /* ── Fault injection: the whole point of this module ─────────────────────── */
@@ -157,9 +160,13 @@ static void test_reset_hooks_restores_the_libc_passthrough(void)
 
 static void test_reset_hooks_is_a_safe_no_op_when_nothing_was_installed(void)
 {
+    void *p;
+
     rcp_alloc_reset_hooks();
     rcp_alloc_reset_hooks();
-    TEST_ASSERT_NOT_NULL(rcp_malloc(1));
+    p = rcp_malloc(1);
+    TEST_ASSERT_NOT_NULL(p);
+    rcp_free(p);
 }
 
 int main(void)
