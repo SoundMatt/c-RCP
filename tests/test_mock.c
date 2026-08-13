@@ -20,6 +20,7 @@
 //cfusa:test REQ-MOCK-019
 //cfusa:test REQ-MOCK-020
 //cfusa:test REQ-MOCK-030
+//cfusa:test REQ-WDG-010
 /* Tests the TC18-shaped RC-Server/endpoint test double (ROADMAP.md
  * milestone 77). The pre-TC18 zone-controller mock this file used to test
  * moved to tests/legacy_mock.h/.c; tests/test_legacy_mock.c (a renamed
@@ -28,11 +29,13 @@
 
 #include <rcp/acf.h>
 #include <rcp/avtp.h>
+#include <rcp/clock.h>
 #include <rcp/lifecycle.h>
 #include <rcp/mock.h>
 #include <rcp/power.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
+#include <rcp/watchdog.h>
 
 #include <string.h>
 
@@ -259,7 +262,7 @@ static void test_dispatch_dropped_by_lifecycle(void)
     /* A TSCF-headed frame is dropped outright while HW_UNCONFIGURED,
      * regardless of endpoint registration. */
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_DROPPED,
-        rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true,
+        rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
                                   req, sizeof(req), &resp));
     TEST_ASSERT_NULL(resp.data);
 
@@ -293,7 +296,7 @@ static void test_dispatch_rejected_by_lifecycle_sends_request_rejected_error(voi
 
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
         rcp_mock_server_dispatch(srv, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_SUBTYPE_NTSCF,
-                                  RCP_ACF_MSG_TYPE_GBB, false, frame.data, frame.len, &resp));
+                                  RCP_ACF_MSG_TYPE_GBB, false, 1u, frame.data, frame.len, &resp));
     TEST_ASSERT_NOT_NULL(resp.data);
 
     TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(resp.data, resp.len, &resp_hdr, &payload,
@@ -304,6 +307,112 @@ static void test_dispatch_rejected_by_lifecycle_sends_request_rejected_error(voi
     TEST_ASSERT_EQUAL_size_t(1, payload_len);
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_REQUEST_REJECTED, payload[0]);
 
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── REQ-WDG-010: rcp_mock_server_dispatch() kicks the per-stream watchdog ── */
+
+static void wdg_busy_wait_ms(unsigned ms)
+{
+    uint64_t start = rcp_monotonic_ms();
+
+    while (rcp_monotonic_ms() - start < ms) {
+        /* busy-wait: no sleep primitive is exported by rcp/clock.h, same
+         * as every other timing-based test in this codebase (see
+         * test_watchdog.c's own test_sleep_ms and
+         * test_tc18_gaps_server.c's own busy_wait_ms, plus this same
+         * helper's identically-named twin over in test_tc18_gaps_e2e.c). */
+    }
+}
+
+/* As of the REQ-WDG-010 fix, rcp_mock_server_dispatch() calls
+ * rcp_watchdog_keeper_kick() on every request it receives on the
+ * associated stream -- mirrors test_tc18_gaps_e2e.c's own
+ * test_dispatch_e2e_kicks_the_watchdog_on_every_admitted_request(): a
+ * 40 ms timeout, dispatched every 10 ms for 100 ms total, far longer
+ * than 40 ms would survive without kicking. rcp_server_endpoint_submit()
+ * (server.h's own lower-level path, exercised directly by
+ * test_tc18_gaps_server.c's own test_watchdog_overflows_despite_
+ * continuous_requests()) remains deliberately out of scope -- it has no
+ * stream_id concept at all to key a kick by; see
+ * rcp_mock_server_set_watchdog_keeper()'s own doc comment. */
+static void test_dispatch_kicks_the_watchdog_on_every_admitted_request(void)
+{
+    rcp_mock_server_t         *srv = rcp_mock_server_new();
+    rcp_watchdog_stream_cfg_t  stream = {9u, true, 40u, true, true};
+    rcp_watchdog_config_t      cfg    = rcp_watchdog_default_config();
+    rcp_watchdog_keeper_t     *k;
+    const uint8_t                req[4] = {0x01, 0x02, 0x03, 0x04};
+    int                           i;
+
+    cfg.poll_interval_ms = 5;
+    k = rcp_watchdog_keeper_new(cfg, &stream, 1u);
+    TEST_ASSERT_NOT_NULL(k);
+
+    to_rcp_configured(srv);
+    reset_handler_capture();
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, echo_handler, NULL);
+    rcp_mock_server_set_watchdog_keeper(srv, k);
+
+    for (i = 0; i < 10; i++) {
+        rcp_bytes_t resp = {0};
+
+        wdg_busy_wait_ms(10u);
+        TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+            rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                      9u, req, sizeof(req), &resp));
+        TEST_ASSERT_FALSE(rcp_watchdog_keeper_status(k, 9u).overflowed);
+
+        rcp_bytes_free(&resp);
+    }
+
+    rcp_watchdog_keeper_destroy(k);
+    rcp_mock_server_destroy(srv);
+}
+
+/* The "receipt not validation" half of the design, mirroring
+ * test_tc18_gaps_e2e.c's own test_dispatch_e2e_kicks_the_watchdog_even_
+ * when_the_request_is_rejected(): a request dispatch() goes on to
+ * REJECT (same HW_UNCONFIGURED/EP0/GBB fixture as
+ * test_dispatch_rejected_by_lifecycle_sends_request_rejected_error()
+ * above) still means the RC Client is alive and talking on this
+ * stream, so it must still kick. Spends most of the 60 ms timeout
+ * before dispatching the rejected request, then most of it again after
+ * -- only a kick actually caused by the rejected dispatch call (not
+ * rcp_watchdog_keeper_new()'s own construction-time kick) survives
+ * both waits without overflowing. */
+static void test_dispatch_kicks_the_watchdog_even_when_the_request_is_rejected(void)
+{
+    rcp_mock_server_t           *srv = rcp_mock_server_new(); /* still HW_UNCONFIGURED */
+    rcp_watchdog_stream_cfg_t    stream = {9u, true, 60u, true, true};
+    rcp_watchdog_config_t        cfg    = rcp_watchdog_default_config();
+    rcp_watchdog_keeper_t       *k;
+    rcp_acf_byte_message_info_t  hdr = {0};
+    rcp_bytes_t                  frame, resp = {0};
+
+    hdr.byte_bus_id     = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
+    hdr.transaction_num = 88;
+    frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    cfg.poll_interval_ms = 5;
+    k = rcp_watchdog_keeper_new(cfg, &stream, 1u);
+    TEST_ASSERT_NOT_NULL(k);
+    rcp_mock_server_set_watchdog_keeper(srv, k);
+
+    wdg_busy_wait_ms(40u); /* consume most of the 60 ms budget from construction */
+    TEST_ASSERT_FALSE(rcp_watchdog_keeper_status(k, 9u).overflowed);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+        rcp_mock_server_dispatch(srv, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_SUBTYPE_NTSCF,
+                                  RCP_ACF_MSG_TYPE_GBB, false, 9u, frame.data, frame.len, &resp));
+
+    wdg_busy_wait_ms(40u); /* would overflow (80 ms > 60 ms) without a kick just now */
+    TEST_ASSERT_FALSE(rcp_watchdog_keeper_status(k, 9u).overflowed); /* ... but still kicked */
+
+    rcp_watchdog_keeper_destroy(k);
     rcp_bytes_free(&resp);
     rcp_bytes_free(&frame);
     rcp_mock_server_destroy(srv);
@@ -339,7 +448,7 @@ static void test_pwrmode_resume_reenables_all_endpoints(void)
         rcp_bytes_t resp = {0};
         const uint8_t req_before[] = {1, 2, 3};
         TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_QUEUED,
-            rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, false,
+            rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, false, 1u,
                                       req_before, sizeof(req_before), &resp));
         rcp_bytes_free(&resp);
     }
@@ -355,7 +464,7 @@ static void test_pwrmode_resume_reenables_all_endpoints(void)
         rcp_bytes_t resp = {0};
         const uint8_t req_after[] = {4, 5, 6};
         TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
-            rcp_mock_server_dispatch(srv, 2, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, false,
+            rcp_mock_server_dispatch(srv, 2, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, false, 1u,
                                       req_after, sizeof(req_after), &resp));
         rcp_bytes_free(&resp);
     }
@@ -382,7 +491,7 @@ static void test_pwrmode_resume_returns_false_before_handshake_echoed(void)
 
     /* Endpoint still disabled: the request pre-loads instead of running. */
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_QUEUED,
-        rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, false,
+        rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, false, 1u,
                                   req, sizeof(req), &resp));
 
     rcp_bytes_free(&resp);
@@ -400,7 +509,7 @@ static void test_dispatch_unknown_bus_after_lifecycle_accepts(void)
     to_rcp_configured(srv); /* any byte_bus_id passes lifecycle admission now */
 
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS,
-        rcp_mock_server_dispatch(srv, 7, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+        rcp_mock_server_dispatch(srv, 7, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
                                   req, sizeof(req), &resp));
     TEST_ASSERT_NULL(resp.data);
 
@@ -434,7 +543,7 @@ static void test_dispatch_unknown_bus_is_dropped_silently(void)
     TEST_ASSERT_NOT_NULL(frame.data);
 
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS,
-        rcp_mock_server_dispatch(srv, 7, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+        rcp_mock_server_dispatch(srv, 7, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
                                   frame.data, frame.len, &resp));
     TEST_ASSERT_NULL(resp.data);
 
@@ -454,7 +563,7 @@ static void test_dispatch_ok_runs_handler_immediately(void)
     rcp_mock_server_add_endpoint(srv, 3, 1, true /* ep_enable */, echo_handler, &user_data_marker);
 
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
-        rcp_mock_server_dispatch(srv, 3, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+        rcp_mock_server_dispatch(srv, 3, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
                                   req, sizeof(req), &resp));
     TEST_ASSERT_TRUE(g_handler_called);
     TEST_ASSERT_EQUAL_UINT(sizeof(req), g_seen_request_len);
@@ -477,7 +586,7 @@ static void test_dispatch_no_handler_leaves_response_zeroed(void)
     rcp_mock_server_add_endpoint(srv, 4, 1, true, NULL, NULL);
 
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
-        rcp_mock_server_dispatch(srv, 4, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+        rcp_mock_server_dispatch(srv, 4, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
                                   req, sizeof(req), &resp));
     TEST_ASSERT_NULL(resp.data);
     TEST_ASSERT_EQUAL_UINT(0, resp.len);
@@ -496,7 +605,7 @@ static void test_dispatch_queued_when_endpoint_disabled(void)
     rcp_mock_server_add_endpoint(srv, 5, 1, false /* ep_enable */, echo_handler, NULL);
 
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_QUEUED,
-        rcp_mock_server_dispatch(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+        rcp_mock_server_dispatch(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
                                   req, sizeof(req), &resp));
     TEST_ASSERT_FALSE(g_handler_called);
     TEST_ASSERT_NULL(resp.data);
@@ -514,7 +623,7 @@ static void test_drain_endpoint_runs_queued_request(void)
     to_rcp_configured(srv); /* see to_rcp_configured()'s own comment */
     reset_handler_capture();
     rcp_mock_server_add_endpoint(srv, 6, 1, false, echo_handler, NULL);
-    rcp_mock_server_dispatch(srv, 6, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+    rcp_mock_server_dispatch(srv, 6, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
                               req, sizeof(req), &resp);
     TEST_ASSERT_FALSE(g_handler_called);
 
@@ -563,7 +672,7 @@ static void test_discovery_bus_accepted_while_hw_unconfigured(void)
 
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
         rcp_mock_server_dispatch(srv, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_SUBTYPE_NTSCF,
-                                  RCP_ACF_MSG_TYPE_ABB, true, req, sizeof(req), &resp));
+                                  RCP_ACF_MSG_TYPE_ABB, true, 1u, req, sizeof(req), &resp));
     TEST_ASSERT_TRUE(g_handler_called);
 
     rcp_bytes_free(&resp);
@@ -602,7 +711,7 @@ static void test_dispatch_frame_dispatches_each_member_to_its_own_endpoint(void)
     memcpy(combined + frame1.len, frame2.data, frame2.len);
     combined_len = frame1.len + frame2.len;
 
-    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, combined,
+    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, combined,
                                                  combined_len, results, RCP_MOCK_MAX_FRAME_MEMBERS);
 
     TEST_ASSERT_EQUAL_UINT(2, dispatched);
@@ -648,7 +757,7 @@ static void test_dispatch_frame_single_member_matches_direct_dispatch(void)
     hdr.byte_bus_id = 11;
     frame = rcp_acf_encode_abb(&hdr, body, sizeof(body));
 
-    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, frame.data,
+    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, frame.data,
                                                  frame.len, results, RCP_MOCK_MAX_FRAME_MEMBERS);
 
     TEST_ASSERT_EQUAL_UINT(1, dispatched);
@@ -673,7 +782,7 @@ static void test_dispatch_frame_returns_zero_for_unparseable_frame(void)
 
     to_hw_configured(srv);
 
-    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, garbage,
+    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, garbage,
                                                  sizeof(garbage), results, RCP_MOCK_MAX_FRAME_MEMBERS);
     TEST_ASSERT_EQUAL_UINT(0, dispatched);
 
@@ -710,7 +819,7 @@ static void test_dispatch_frame_reports_unknown_bus_for_undecodable_member(void)
     raw[1] = (uint8_t)(RCP_ACF_ABB_HEADER_LEN / 4u);        /* len=2 quadlets: 0 body octets */
     raw[2] = 0x40u; /* pad[7:6] = 01 -> pad=1, but body_len computes to 0 */
 
-    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, raw,
+    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, raw,
                                                  sizeof(raw), results, RCP_MOCK_MAX_FRAME_MEMBERS);
 
     TEST_ASSERT_EQUAL_UINT(1, dispatched);
@@ -745,7 +854,7 @@ static void test_dispatch_frame_truncates_at_out_cap(void)
     memcpy(combined + frame1.len, frame2.data, frame2.len);
     combined_len = frame1.len + frame2.len;
 
-    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, combined,
+    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, combined,
                                                  combined_len, results, 1);
 
     TEST_ASSERT_EQUAL_UINT(1, dispatched); /* only out_cap's worth, not both */
@@ -790,6 +899,8 @@ int main(void)
 
     RUN_TEST(test_dispatch_dropped_by_lifecycle);
     RUN_TEST(test_dispatch_rejected_by_lifecycle_sends_request_rejected_error);
+    RUN_TEST(test_dispatch_kicks_the_watchdog_on_every_admitted_request);
+    RUN_TEST(test_dispatch_kicks_the_watchdog_even_when_the_request_is_rejected);
     RUN_TEST(test_pwrmode_resume_reenables_all_endpoints);
     RUN_TEST(test_pwrmode_resume_returns_false_before_handshake_echoed);
     RUN_TEST(test_dispatch_unknown_bus_after_lifecycle_accepts);

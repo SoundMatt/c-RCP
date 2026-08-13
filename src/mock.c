@@ -482,12 +482,22 @@ static rcp_mock_dispatch_result_t finish_admission(rcp_mock_endpoint_slot_t *slo
 
 //cfusa:req REQ-MOCK-021
 //cfusa:req REQ-MOCK-030
-rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
-                                                     rcp_byte_bus_id_t byte_bus_id,
-                                                     uint8_t avtp_subtype, uint8_t acf_msg_type,
-                                                     bool time_sync_supported,
-                                                     const uint8_t *request, size_t request_len,
-                                                     rcp_bytes_t *out_response)
+/* The actual body of rcp_mock_server_dispatch(), factored out so
+ * rcp_mock_server_dispatch_e2e() can reach it directly (dispatch_plain())
+ * without going back through the public rcp_mock_server_dispatch() --
+ * which, as of REQ-WDG-010, kicks the watchdog itself. dispatch_e2e()
+ * already kicks once, unconditionally, at its own top (covering the CRC-
+ * mismatch/short-frame paths that return before ever reaching this
+ * helper) -- routing its own delegation calls through the public
+ * function too would kick a second time for the exact same received
+ * request. No behavior other than the watchdog kick's own call site
+ * changes here. */
+static rcp_mock_dispatch_result_t dispatch_plain(rcp_mock_server_t *srv,
+                                                  rcp_byte_bus_id_t byte_bus_id,
+                                                  uint8_t avtp_subtype, uint8_t acf_msg_type,
+                                                  bool time_sync_supported,
+                                                  const uint8_t *request, size_t request_len,
+                                                  rcp_bytes_t *out_response)
 {
     rcp_mock_endpoint_slot_t *slot;
     rcp_server_admit_t        admit;
@@ -546,6 +556,24 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
                              out_response);
 }
 
+//cfusa:req REQ-WDG-010
+rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
+                                                     rcp_byte_bus_id_t byte_bus_id,
+                                                     uint8_t avtp_subtype, uint8_t acf_msg_type,
+                                                     bool time_sync_supported, uint64_t stream_id,
+                                                     const uint8_t *request, size_t request_len,
+                                                     rcp_bytes_t *out_response)
+{
+    /* REQ-WDG-010: kicked unconditionally, before dispatch_plain()'s own
+     * lifecycle/admission checks -- same "receipt, not validation" rule
+     * and ordering as rcp_mock_server_dispatch_e2e()'s own identical
+     * kick (see that function's doc comment for the full rationale). */
+    if (srv->watchdog != NULL) rcp_watchdog_keeper_kick(srv->watchdog, stream_id);
+
+    return dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
+                           request, request_len, out_response);
+}
+
 //cfusa:req REQ-E2E-021
 //cfusa:req REQ-E2E-031
 //cfusa:req REQ-E2E-041
@@ -596,11 +624,16 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
 
     /* "plain command mode" (TC18 §13.6): an endpoint with req_crc_enable
      * not set, or an unknown byte_bus_id, is untouched by this function
-     * -- delegate outright, including its own EP_NOT_FOUND handling. */
+     * -- delegate outright, including its own EP_NOT_FOUND handling.
+     * Goes to dispatch_plain() directly, not the public dispatch()
+     * wrapper -- this call's own watchdog kick already happened above,
+     * unconditionally, before this branch was even reached; delegating
+     * through the public wrapper would kick a second time for the same
+     * received request (see dispatch_plain()'s own doc comment). */
     slot = find_slot(srv, byte_bus_id);
     if (!slot || !slot->req_crc_enable) {
-        return rcp_mock_server_dispatch(srv, byte_bus_id, avtp_subtype, acf_msg_type,
-                                         time_sync_supported, request, request_len, out_response);
+        return dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
+                               request, request_len, out_response);
     }
 
     unwrap_result = rcp_e2e_unwrap_framed(stream_id, avtp_subtype == RCP_AVTP_SUBTYPE_NTSCF,
@@ -633,10 +666,11 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
 
     /* CRC validated: dispatch the unwrapped header-and-payload region
      * (acf_msg_length already adapted back down) exactly as
-     * rcp_mock_server_dispatch() would have dispatched request itself. */
-    result = rcp_mock_server_dispatch(srv, byte_bus_id, avtp_subtype, acf_msg_type,
-                                       time_sync_supported, unwrapped.data, unwrapped.len,
-                                       out_response);
+     * rcp_mock_server_dispatch() would have dispatched request itself --
+     * via dispatch_plain() directly, same already-kicked-once reasoning
+     * as the delegation branch above. */
+    result = dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
+                             unwrapped.data, unwrapped.len, out_response);
     rcp_bytes_free(&unwrapped);
     return result;
 }
@@ -750,8 +784,8 @@ static size_t last_pending_index(const rcp_server_endpoint_t *ep)
 //cfusa:req REQ-MOCK-020
 //cfusa:req REQ-MOCK-029
 size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subtype,
-                                       bool time_sync_supported, const uint8_t *frame,
-                                       size_t frame_len,
+                                       bool time_sync_supported, uint64_t stream_id,
+                                       const uint8_t *frame, size_t frame_len,
                                        rcp_mock_frame_member_result_t *out_results,
                                        size_t out_cap)
 {
@@ -865,8 +899,8 @@ size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subty
         }
 
         out->result      = rcp_mock_server_dispatch(srv, byte_bus_id, avtp_subtype, msg_type,
-                                                      time_sync_supported, member, member_len,
-                                                      &out->response);
+                                                      time_sync_supported, stream_id, member,
+                                                      member_len, &out->response);
 
         /* What "the predecessor errored" means for the next member: a
          * member that never reached its endpoint at all (unknown bus,

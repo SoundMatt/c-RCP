@@ -17296,3 +17296,78 @@ against a 50-line advisory threshold). `server.h`, `server.c`, and
 `mock.c` carry zero new findings of any severity. `cfusa trace
 --req-coverage 100`/`--sec-tested 100`: both 100% (1024/1024). 65/65
 both trees (native + ASan/UBSan).
+
+### v0.303.0 -- 2026-08-13 (issue #334 batch 2: `REQ-WDG-010` per-
+stream watchdog kick on the plain dispatch path)
+
+**`REQ-WDG-010` flips `partial` -> `implemented`.** TC18 §12.7.7:
+"the watchdog is reset with each request received from this RC
+Client." The E2E-aware dispatch functions
+(`rcp_mock_server_dispatch_e2e()`/`_dispatch_frame_e2e()`) already
+kicked correctly (issue #201); the plain, non-E2E
+`rcp_mock_server_dispatch()`/`_dispatch_frame()` had no `stream_id`
+parameter at all to key a kick by -- this codebase's own
+`.fusa-reqs.json` text had previously flagged the gap as deliberately
+deferred, since widening the signature would ripple across every
+existing call site.
+
+Checked the primary source before widening anything: TC18 §13.6's
+"plain command mode" vs "safe command mode" distinction is only about
+whether CRC32 E2E protection is applied -- both are carried inside
+the same NTSCF/TSCF AVTPDU, which always has a real `stream_id`
+field regardless of mode. So the gap was real, not a "doesn't apply
+here" case, and both dispatch functions were widened to take an
+explicit `stream_id` parameter, matching `_dispatch_e2e()`'s own
+existing parameter ordering.
+
+To avoid a double kick: `rcp_mock_server_dispatch_e2e()` already
+kicks once, unconditionally, at its own top (covering CRC-mismatch/
+short-frame paths that return before ever reaching plain dispatch).
+Its own two delegation call sites were switched from calling the
+public `rcp_mock_server_dispatch()` (which, as of this fix, kicks on
+its own) to a new internal `dispatch_plain()` helper -- the old
+`rcp_mock_server_dispatch()` body, factored out unchanged -- so a
+request already kicked once by `dispatch_e2e()` is never kicked
+twice for the same receipt.
+
+All ~25 existing call sites across `test_mock.c`/
+`test_conditional_dispatch.c` updated (a small Python script inserted
+the new argument at each call site by locating the `time_sync_
+supported` boolean literal within each call's own balanced-paren
+span -- safe because that signature has exactly one bool parameter).
+Two new tests in `test_mock.c`, mirroring `test_tc18_gaps_e2e.c`'s
+own existing E2E watchdog tests:
+`test_dispatch_kicks_the_watchdog_on_every_admitted_request` (a 40 ms
+timeout survives being dispatched every 10 ms for 100 ms) and
+`test_dispatch_kicks_the_watchdog_even_when_the_request_is_rejected`
+(a rejected -- not executed -- request still kicks, TC18's own
+"receipt not validation" rule). Mutation-tested two ways (kick only
+on success; no kick at all) -- both caught cleanly.
+
+**Deliberately still out of scope, not a remaining gap in this
+request-reception path**: `server.h`'s own core
+`rcp_server_endpoint_submit()` (the lowest-level receive path,
+exercised directly by `test_tc18_gaps_server.c`'s own
+`test_watchdog_overflows_despite_continuous_requests()`) has no
+`stream_id` concept at all -- `server.h` operates on one
+`rcp_server_endpoint_t`, not a multi-endpoint RC Server, and is
+deliberately layered below the AVTP/stream concept entirely. A caller
+reaching an endpoint through that primitive directly, bypassing the
+reference server's own dispatch functions, is already bypassing
+every other stream-scoped RC-Client behavior along with the
+watchdog, not uniquely this one.
+
+**Tooling note**: `cfusa check` A/B (the correct CI-pinned `v0.5.50`
+binary this time, per the previous batch's own lesson) first showed 1
+new error -- a genuine (not stale-binary) `CFUSA-L004` "appears
+recursive" false positive, this time self-inflicted: a doc comment
+inside the new `wdg_busy_wait_ms()` helper's own body literally
+spelled `wdg_busy_wait_ms(` (referencing its identically-named twin
+in another test file), tripping the exact same known text-match
+mechanism the previous batch's own lesson described. Reworded to
+avoid the literal `name(` pattern; re-check confirmed 0 new errors.
+Normalized diff shows only the expected +3 `CFUSA-CY006`/+3
+`CFUSA-L003` (malloc/free-related, from the new watchdog-keeper test
+fixtures) in `test_mock.c`. `cfusa trace --req-coverage 100`/
+`--sec-tested 100`: both 100% (1024/1024). 65/65 both trees (native +
+ASan/UBSan).
