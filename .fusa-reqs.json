@@ -10171,13 +10171,13 @@
     {
       "id": "REQ-CANEP-028",
       "title": "can_ep_len, can_base_clk and the CAN endpoint's three status registers",
-      "text": "NOT IMPLEMENTED: c-RCP does not model the CAN functional-configuration block's descriptor, clock and status registers (TC18 \u00a713.7.11.2 Table 53): can_ep_len (0x0000, 8 bit, R), the reserved octet at 0x0001 (8 bit, R, reads 0x00), can_base_clk (0x0004, 16 bit, R \u2014 the CAN system clock), can_ep_status (0x0006, 16 bit, R/W), the 32-bit CAN EP status at 0x001C (R/W), and the 32-bit FIFO status at 0x0020 (R/W). rcp_ep_can_functional_cfg_t holds only bit timings, delay compensation, the execution-delay divider and the XL filter table. Consequence: bus-off, error-passive and FIFO-overflow conditions \u2014 the states those status registers exist to report \u2014 are unobservable through this endpoint, and the base clock the three bit-timing register sets divide cannot be read.",
+      "text": "IMPLEMENTED (issue #201, 2026-08-12): rcp_ep_can_render_registers()/_apply_reconfig() (ep_can.h/ep_can.c) now model the CAN functional-configuration block's own descriptor, clock and status registers (TC18 \u00a713.7.11.2 Table 56 -- RC1's own Table 53, renumbered, issue #341 lineage): can_ep_len (0x0000, 8 bit, R, fixed at RCP_EP_CAN_EP_FUNC_LEN), the reserved octet at 0x0001 (8 bit, R, reads 0x00), can_base_clk (0x0004, 16 bit, R \u2014 always renders 0, no real clock source modelled, matching every other endpoint type's own base_clk honesty), can_ep_status (0x0006, 16 bit, R/W, new rcp_ep_can_functional_cfg_t::ep_status field), the 32-bit CAN EP status at 0x001C (R/W, new ::status field) and the 32-bit FIFO status at 0x0020 (R/W, new ::fifo_status field), reachable via the generic \u00a712.7.1 evt[2:0]==111b mechanism. Bus-off, error-passive and FIFO-overflow conditions are now observable and settable through this endpoint. Scoped to end at 0x0024, immediately before REQ-CANEP-029's own already-documented address collision in the acceptance-filter region -- resolving that collision was not required to close this register block, since it lies entirely outside this span. The 0x0008-0x001B span (can_clk_divider, two reserved regions, the three 'CAN bit time register' fields, and TDCC) is deliberately left read-only/rendering 0 for now: an earlier investigation (issue #256 Group I) already found Table 56 gives those 32-bit registers no sub-field bit-layout in the specification text, so converting this module's own rcp_ep_can_bit_timing_t to and from their wire representation is not derivable without inventing an unverified bit-packing scheme -- the same reasoning already deferred mapping them anywhere else in this codebase, and this fix does not force that decision.",
       "standard": "iso26262",
-      "level": "QM",
-      "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "not-implemented",
-      "tc18": "\u00a713.7.11.2 Table 53, TC18.txt L5366-5384"
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.11.2 Table 56, TC18.txt L5764-5836"
     },
     {
       "id": "REQ-CANEP-029",

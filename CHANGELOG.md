@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.289.0 -- 2026-08-12 (issue #256 Group I dedicated investigation: CAN EP_func register block, `REQ-CANEP-028` -- ASIL-B)
+
+**`REQ-CANEP-028` flips `not-implemented` -> `implemented`, ASIL-B.**
+
+New `rcp_ep_can_render_registers()`/`rcp_ep_can_apply_reconfig()` (`ep_can.h`/`ep_can.c`) model TC18 §13.7.11.2 Table 56's own CAN functional-configuration descriptor, clock and status registers: `can_ep_len` (0x0000, fixed at the block's length), the reserved octet at 0x0001, `can_base_clk` (0x0004, always renders 0 -- no real clock source modelled, matching every other endpoint type's own honesty on this point), `can_ep_status` (0x0006, new `ep_status` field), the 32-bit CAN EP status at 0x001C (new `status` field), and the 32-bit FIFO status at 0x0020 (new `fifo_status` field) -- reachable via the generic §12.7.1 evt[2:0]==111b mechanism. Bus-off, error-passive, and FIFO-overflow conditions are now observable and settable through this endpoint.
+
+**Deliberately scoped to end at 0x0024, before `REQ-CANEP-029`'s own already-documented address collision** in the acceptance-filter region (filters 3 and 4 both print at 0x002C on both the baseline and newest PDF revisions) -- this block does not need that collision resolved, since it lies entirely outside the closed span, matching the same "don't let one unresolved sub-range block an otherwise-tractable register block" precedent `ep_wakeup.h`'s own dedicated investigation (task #95) already established.
+
+**The 0x0008-0x001B span (`can_clk_divider`, two reserved regions, the three "CAN bit time register" fields, and TDCC) is deliberately left read-only, rendering 0 for now**: an earlier investigation (issue #256 Group I) already found Table 56 gives those 32-bit registers no sub-field bit-layout in the specification text, so converting this module's own `rcp_ep_can_bit_timing_t` to/from their wire representation is not derivable without inventing an unverified bit-packing scheme -- this fix does not force that decision, and treats a write to that span the same fail-safe way a too-short or unrecognized write is already handled elsewhere: never silently accepted-then-discarded, visibly rejected for exactly that octet range while the rest of the write still applies.
+
+**Citation-drift fix, same lineage as issue #341**: the catalog's own "Table 53" citation was stale -- RC5's own renumbered table for this content is Table 56, confirmed directly against the primary source (RC1's Table 53 → RC5's Table 56, matching the established +3 shift for tables in this numeric range).
+
+Rewrote the pre-existing gap-pinning test (`test_can_block_lacks_registers_and_receive_filter_table` → split into `test_can_register_block_round_trips_ep_status_and_status_fields`, asserting the fix, and `test_can_block_lacks_receive_filter_table`, keeping the still-open receive-filter-table deviation pin, `REQ-CANEP-029`'s own scope).
+
+Mutation-tested 3 ways: the undecomposed-span read-only guard removed (confirmed a genuine **equivalent mutant** -- `parse_can_registers()` has no backing field for that span at all, so nothing persists the write regardless of whether the guard rejects it; the guard stays in for defensive/self-documentation value, not because it's independently observable here), the out-of-range boundary weakened (`>` → `>=`, caught cleanly), and `ep_status` rendering broken (caught cleanly). 65/65 both trees (native + ASan/UBSan, full suite given this touches real wire (de)serialization). `cfusa check`: 0 errors both trees. `cfusa trace --req-coverage 100`/`--sec-tested 100` (CI's own separate invocations): both 100%.
+
 ### v0.288.0 -- 2026-08-12 (issue #201 batch: `REQ-SEQ-012`, disabled-sequencer guard -- ASIL-B)
 
 **`REQ-SEQ-012` flips `partial` -> `implemented`, ASIL-B.**

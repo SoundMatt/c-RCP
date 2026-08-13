@@ -479,6 +479,12 @@ typedef struct {
                                                                 the file
                                                                 header */
     rcp_ep_can_xl_filter_t         xl_filters[RCP_EP_CAN_XL_MAX_FILTERS];
+    uint16_t                       ep_status;   /* can_ep_status, Table 56
+                                                     0x0006 -- REQ-CANEP-028 */
+    uint32_t                       status;      /* CAN EP status, Table 56
+                                                     0x001C -- REQ-CANEP-028 */
+    uint32_t                       fifo_status; /* FIFO status, Table 56
+                                                     0x0020 -- REQ-CANEP-028 */
 } rcp_ep_can_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false; every bit-timing register
@@ -538,6 +544,113 @@ bool rcp_ep_can_set_exec_delay_clk_divider(rcp_ep_can_functional_cfg_t *cfg, uin
 bool rcp_ep_can_set_xl_filter(rcp_ep_can_functional_cfg_t *cfg, uint8_t index,
                                rcp_ep_can_xl_filter_t filter, rcp_lifecycle_state_t state,
                                rcp_lifecycle_writer_ctx_t writer);
+
+/* ── The EP_func register block (the evt[2:0] == 111b target), REQ-CANEP-028 ─
+ *
+ * TC18 §13.7.11.2 Table 56 ("can functional configuration"; RC1's own
+ * Table 53 -- renumbered, same lineage as issue #341):
+ *
+ *   0x0000  can_ep_len              8 bit  R    RCP_EP_CAN_EP_FUNC_LEN (0x24)
+ *   0x0001  Reserved                8 bit  R    reads 0x00
+ *   0x0002  can_ep_enable&clr       8 bit  R/W  Table 35 common entries
+ *   0x0003  can_ep_options          8 bit  R/W* Table 35 common entries
+ *   0x0004  can_base_clk           16 bit  R    CAN system clock
+ *   0x0006  can_ep_status          16 bit  R/W
+ *   0x0008  can_clk_divider         8 bit  R/W  generates CAN_CLK
+ *   0x0009  Reserved                8 bit  R    reads 0x00
+ *   0x000A  Reserved               16 bit  R    reads 0x0000
+ *   0x000C  CAN bit time register 1  32 bit  R/W  Classical CAN bit times
+ *   0x0010  CAN bit time register 2  32 bit  R/W  CAN FD bit times
+ *   0x0014  CAN bit time register 3  32 bit  R/W  CAN XL bit times
+ *   0x0018  TDCC register            32 bit  R/W  delay compensation control
+ *   0x001C  CAN EP status           32 bit  R/W  status of CAN endpoint
+ *   0x0020  FIFO status             32 bit  R/W  status of CAN FIFOs
+ *
+ * closing at 0x0024, immediately before Table 56's own acceptance-filter
+ * region (0x0024 onward) -- REQ-CANEP-029's own already-documented,
+ * genuine address collision (acceptance filter 3 and 4 both printed at
+ * 0x002C, confirmed against the rendered PDF page image on two
+ * revisions, not an extraction artifact) blocks modeling that region at
+ * all until it is independently resolved; REQ-CANEP-028 is scoped to
+ * everything before it, matching this codebase's own established
+ * practice of never letting one genuinely unresolved sub-range block an
+ * otherwise-tractable register block (see ep_wakeup.h's own precedent,
+ * task #95).
+ *
+ * can_base_clk (read-only) always renders 0 -- no real clock source
+ * modelled, the same honesty ep_adc.h's/ep_gpio.h's/ep_i2c.h's/
+ * ep_lin.h's own base_clk fields already commit to.
+ *
+ * The 0x0008-0x001B span (can_clk_divider, two reserved octets, the
+ * three "CAN bit time register" fields, and TDCC) is deliberately
+ * treated as read-only and renders 0 for now: an earlier investigation
+ * (issue #256 Group I) already found Table 56 gives these 32-bit
+ * registers no sub-field bit-layout in the specification text, so
+ * converting this module's own rcp_ep_can_bit_timing_t (prescaler/
+ * prop_seg/phase_seg1/phase_seg2/sync_jump_width) to and from their wire
+ * representation is not derivable without inventing an unverified
+ * bit-packing scheme -- the same reasoning that already deferred
+ * mapping them anywhere else in this codebase. Treating them read-only
+ * here is the same fail-safe disposition a too-short or unrecognized
+ * write already gets elsewhere: a write is never silently accepted and
+ * then discarded, it is visibly rejected for that octet range specifically
+ * (reg_offset_read_only(), ep_can.c) while every other octet in the same
+ * write still applies. can_clk_divider and the delay-compensation fields
+ * this module already carries in memory (exec_delay_clk_divider,
+ * delay_comp_enable/_offset) remain genuinely settable via their own
+ * existing setters above -- only their WIRE representation in this
+ * specific byte range is what stays undecomposed.
+ *
+ * can_ep_status/the 32-bit CAN EP status (0x001C)/FIFO status (0x0020)
+ * are new fields on rcp_ep_can_functional_cfg_t (ep_status/status/
+ * fifo_status) -- real, freely settable in-memory state with no
+ * meaning this module enforces beyond storing and round-tripping
+ * whatever value a caller or a register-map write assigns, the same
+ * disposition every other endpoint type's own status register(s)
+ * already get. */
+
+#define RCP_EP_CAN_EP_FUNC_LEN ((uint16_t)0x0024u)
+
+#define RCP_EP_CAN_RECONFIG_ADDR_LEN ((size_t)2u)
+
+typedef enum {
+    RCP_EP_CAN_RECONFIG_OK               = 0,
+    RCP_EP_CAN_RECONFIG_ERR_SHORT        = 1,
+    RCP_EP_CAN_RECONFIG_ERR_OUT_OF_RANGE = 2,
+} rcp_ep_can_reconfig_errc_t;
+
+/* Human-readable message for an rcp_ep_can_reconfig_errc_t value. Never
+ * returns NULL. */
+const char *rcp_ep_can_reconfig_strerror(rcp_ep_can_reconfig_errc_t e);
+
+/* Serializes cfg's EP_func registers into out[0..RCP_EP_CAN_EP_FUNC_LEN)
+ * exactly as a configuration *read* of the whole block would report them
+ * -- the inverse of rcp_ep_can_apply_reconfig()'s own parse step, and the
+ * same rendering that function patches in place. can_base_clk and the
+ * 0x0008-0x001B span always render 0 -- see this section's own opening
+ * comment. */
+void rcp_ep_can_render_registers(const rcp_ep_can_functional_cfg_t *cfg,
+                                  uint8_t out[RCP_EP_CAN_EP_FUNC_LEN]);
+
+/* Applies the configuration escape hatch (evt[2:0] == 111b): payload is NOT
+ * presented at the interface but interpreted as an addressed write into
+ * this endpoint's own EP_func block -- a 16-bit big-endian relative start
+ * address followed by the configuration data octets to write from that
+ * address onward (§12.7.1).
+ *
+ * Returns RCP_EP_CAN_RECONFIG_ERR_SHORT when payload_len is not at least
+ * RCP_EP_CAN_RECONFIG_ADDR_LEN + 1, and
+ * RCP_EP_CAN_RECONFIG_ERR_OUT_OF_RANGE when the addressed span would
+ * extend past RCP_EP_CAN_EP_FUNC_LEN; in both cases cfg is left entirely
+ * unchanged, per the specification's own "such a payload is to be
+ * ignored" rule. Octets of the addressed span that land on a read-only
+ * register (EP_LEN, both reserved octets, base_clk, and the whole
+ * not-yet-decomposed 0x0008-0x001B span -- see this section's own
+ * opening comment) are left at their current values while the rest of
+ * the span is still applied. */
+rcp_ep_can_reconfig_errc_t rcp_ep_can_apply_reconfig(rcp_ep_can_functional_cfg_t *cfg,
+                                                      const uint8_t *payload,
+                                                      size_t payload_len);
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 
