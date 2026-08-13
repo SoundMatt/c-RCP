@@ -1590,7 +1590,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-TSN-005",
@@ -1650,7 +1650,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-UDP-003",
@@ -1660,7 +1660,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-UDP-004",
@@ -1770,7 +1770,7 @@
       "level": "ASIL-A",
       "asil": "ASIL-A",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-WDG-001",
@@ -2243,7 +2243,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial",
+      "status": "implemented",
       "tc18": "\u00a711.1 Figure 5 (\"TSCF-Header Version 0\"), TC18.txt L1055-1062"
     },
     {
@@ -2401,7 +2401,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-AVTP-020",
@@ -8594,7 +8594,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-UDP-019",
@@ -8694,7 +8694,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-L2-010",

@@ -235,6 +235,12 @@ static void test_tscf_roundtrip_no_payload(void)
     size_t payload_len = 0;
 
     hdr.sv = 1;
+    hdr.version = 3; /* REQ-AVTP-004: nonzero test value -- TC18 fixes this
+                       * field at 0 for this spec revision, but the wire
+                       * codec itself must round-trip whatever value it's
+                       * given; a version-always-0 bug would otherwise pass
+                       * unnoticed since every other test in this file also
+                       * leaves it at its {0}-init default. */
     hdr.tv = 1;
     hdr.tu = 0;
     hdr.mr = 1;
@@ -250,6 +256,7 @@ static void test_tscf_roundtrip_no_payload(void)
     TEST_ASSERT_EQUAL(RCP_AVTP_OK,
                        rcp_avtp_decode_tscf(frame.data, frame.len, &out, &payload, &payload_len));
     TEST_ASSERT_EQUAL_UINT8(hdr.sv, out.sv);
+    TEST_ASSERT_EQUAL_UINT8(hdr.version, out.version);
     TEST_ASSERT_EQUAL_UINT8(hdr.mr, out.mr);
     TEST_ASSERT_EQUAL_UINT8(hdr.tv, out.tv);
     TEST_ASSERT_EQUAL_UINT8(hdr.tu, out.tu);
@@ -546,6 +553,34 @@ static void test_loopback_transport_rejects_after_close(void)
     rcp_avtp_transport_release(t);
 }
 
+/* REQ-AVTP-019's own "once any already-queued frames are exhausted"
+ * clause: close() must not discard frames already queued before it was
+ * called -- recv() drains them first and only then starts returning
+ * RCP_ERR_CLOSED. test_loopback_transport_rejects_after_close() above
+ * only proves the empty-queue case. */
+static void test_loopback_transport_close_drains_queued_frame_first(void)
+{
+    rcp_avtp_transport_t *t = rcp_avtp_loopback_transport_new(true, 4);
+    rcp_context_t ctx = rcp_context_with_timeout_ms(20);
+    uint8_t frame[] = {7, 8, 9};
+    uint8_t buf[16];
+    size_t out_len = 0;
+
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_send(t, frame, sizeof(frame)));
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_close(t));
+
+    /* The frame queued before close() is still delivered once. */
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_recv(t, &ctx, buf, sizeof(buf), &out_len));
+    TEST_ASSERT_EQUAL_UINT(sizeof(frame), out_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(frame, buf, sizeof(frame));
+
+    /* Only once the queue is genuinely exhausted does recv() report closed. */
+    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_avtp_transport_recv(t, &ctx, buf, sizeof(buf), &out_len));
+    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_avtp_transport_send(t, frame, sizeof(frame)));
+
+    rcp_avtp_transport_release(t);
+}
+
 static void test_loopback_transport_send_rejects_when_full(void)
 {
     rcp_avtp_transport_t *t = rcp_avtp_loopback_transport_new(true, 1);
@@ -616,6 +651,7 @@ int main(void)
     RUN_TEST(test_loopback_transport_send_recv_fifo_order);
     RUN_TEST(test_loopback_transport_recv_times_out_when_empty);
     RUN_TEST(test_loopback_transport_rejects_after_close);
+    RUN_TEST(test_loopback_transport_close_drains_queued_frame_first);
     RUN_TEST(test_loopback_transport_send_rejects_when_full);
     RUN_TEST(test_loopback_transport_refcount_defers_destroy);
 

@@ -7,6 +7,11 @@
 //cfusa:test REQ-TSN-006
 //cfusa:test REQ-TSN-007
 //cfusa:test REQ-TSN-008
+/* SO_PRIORITY is a glibc extension -- same _DEFAULT_SOURCE requirement
+ * as tsn.c's own file header, and for the identical reason (must be the
+ * literal first thing in the translation unit). */
+#define _DEFAULT_SOURCE
+
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -15,6 +20,11 @@
 #include <rcp/request_cancel.h>
 #include <rcp/scheduler.h>
 #include <rcp/tsn.h>
+
+#if defined(__linux__)
+#include <sys/socket.h>
+#include <unistd.h>
+#endif
 
 void setUp(void) {}
 void tearDown(void) {}
@@ -136,6 +146,48 @@ static void test_send_applies_pcp_then_delegates_to_inner(void)
     rcp_avtp_transport_release(inner);
 }
 
+#if defined(__linux__)
+/* REQ-TSN-004's own SO_PRIORITY claim: every other test in this file
+ * passes socket_fd=-1, deliberately skipping the setsockopt() call
+ * entirely (see test_send_applies_pcp_then_delegates_to_inner()'s own
+ * comment) -- so nothing here has ever actually proven tsn_send() sets
+ * SO_PRIORITY on a real socket to the PCP value the frame's own
+ * classification maps to. SO_PRIORITY is a glibc/Linux-only setsockopt
+ * option (tsn.c's own RCP_TSN_SO_PRIORITY guard), so this test -- and
+ * its getsockopt() verification -- only compiles/runs on this repo's
+ * own ubuntu CI jobs. */
+static void test_send_sets_so_priority_to_the_frames_own_pcp(void)
+{
+    rcp_avtp_transport_t *inner = rcp_avtp_loopback_transport_new(true, 4);
+    rcp_tsn_config_t         cfg = rcp_tsn_default_config();
+    int                        real_fd;
+    rcp_avtp_transport_t     *tsn;
+    rcp_bytes_t                frame = make_cancellation_frame();
+    rcp_context_t              ctx = rcp_context_background();
+    uint8_t                    buf[128];
+    size_t                      out_len = 0;
+    int                          got_priority = -1;
+    socklen_t                    got_len = sizeof(got_priority);
+    int                          expected_pcp =
+        (int)rcp_tsn_pcp_for(&cfg.pcp_map, RCP_SCHED_KIND_CANCELLATION);
+
+    real_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    TEST_ASSERT_TRUE(real_fd >= 0);
+
+    tsn = rcp_tsn_avtp_transport_new(inner, real_fd, cfg);
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_send(tsn, frame.data, frame.len));
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_recv(inner, &ctx, buf, sizeof(buf), &out_len));
+
+    TEST_ASSERT_EQUAL_INT(0, getsockopt(real_fd, SOL_SOCKET, SO_PRIORITY, &got_priority, &got_len));
+    TEST_ASSERT_EQUAL_INT(expected_pcp, got_priority);
+
+    rcp_bytes_free(&frame);
+    rcp_avtp_transport_release(tsn);
+    rcp_avtp_transport_release(inner);
+    close(real_fd);
+}
+#endif /* __linux__ */
+
 static void test_recv_delegates_to_inner(void)
 {
     rcp_avtp_transport_t *inner = rcp_avtp_loopback_transport_new(true, 4);
@@ -191,6 +243,9 @@ int main(void)
     RUN_TEST(test_classify_cancellation_frame);
     RUN_TEST(test_classify_malformed_frame_fails_safe_to_standard);
     RUN_TEST(test_send_applies_pcp_then_delegates_to_inner);
+#if defined(__linux__)
+    RUN_TEST(test_send_sets_so_priority_to_the_frames_own_pcp);
+#endif
     RUN_TEST(test_recv_delegates_to_inner);
     RUN_TEST(test_close_delegates_to_inner);
     RUN_TEST(test_constructor_mirrors_inner_time_sync_supported);
