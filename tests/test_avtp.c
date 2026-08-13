@@ -19,10 +19,12 @@
 //cfusa:test REQ-AVTP-018
 //cfusa:test REQ-AVTP-019
 //cfusa:test REQ-AVTP-020
+//cfusa:test REQ-TIMED-012
 #include "unity.h"
 
 #include <rcp/avtp.h>
 #include <rcp/rcp.h>
+#include <rcp/request_timed.h>
 
 #include <string.h>
 
@@ -334,6 +336,102 @@ static void test_tscf_decode_rejects_declared_length_past_buffer(void)
     rcp_bytes_free(&frame);
 }
 
+/* ── REQ-TIMED-012: TSCF avtp_timestamp -> gPTP-domain reconstruction ───────── */
+
+static void test_extend_timestamp_exact_match_returns_reference_now(void)
+{
+    /* wire_ts's low 32 bits already equal reference_now's own -- no
+     * adjustment needed at all. */
+    uint64_t now = 0x0000123456789ABCull;
+    TEST_ASSERT_EQUAL_UINT64(now, rcp_avtp_extend_timestamp((uint32_t)now, now));
+}
+
+static void test_extend_timestamp_near_future_within_half_period(void)
+{
+    /* wire_ts is 1000ns ahead of reference_now, well within the +-2.147s
+     * (2^31 ns) nearest-window -- no period wraparound needed. */
+    uint64_t now      = 0x0000000100000000ull; /* low 32 bits == 0 */
+    uint32_t wire_ts  = 1000u;
+    TEST_ASSERT_EQUAL_UINT64(now + 1000u, rcp_avtp_extend_timestamp(wire_ts, now));
+}
+
+static void test_extend_timestamp_near_past_within_half_period(void)
+{
+    /* wire_ts is 1000ns behind reference_now's own low bits -- still the
+     * closest candidate without crossing into the next period down. */
+    uint64_t now      = 0x0000000100001000ull; /* low 32 bits == 0x1000 */
+    uint32_t wire_ts  = 0x1000u - 500u;
+    TEST_ASSERT_EQUAL_UINT64(now - 500u, rcp_avtp_extend_timestamp(wire_ts, now));
+}
+
+static void test_extend_timestamp_wraps_forward_when_wire_ts_just_past_boundary(void)
+{
+    /* reference_now sits just below a 2^32 boundary; wire_ts's own low
+     * bits are numerically small (just above 0), which naive zero-
+     * extension would misread as ~4.29 seconds in the past. The correct
+     * reconstruction recognizes wire_ts is actually ~100ns in the
+     * FUTURE, one period up from the naive candidate. */
+    uint64_t now     = ((uint64_t)1u << 32) - 100u; /* 100ns before the boundary */
+    uint32_t wire_ts = 0u; /* the boundary itself, i.e. now + 100 */
+    uint64_t got     = rcp_avtp_extend_timestamp(wire_ts, now);
+    TEST_ASSERT_EQUAL_UINT64(now + 100u, got);
+}
+
+static void test_extend_timestamp_wraps_backward_when_wire_ts_just_before_boundary(void)
+{
+    /* Symmetric case: reference_now sits just above a 2^32 boundary;
+     * wire_ts's own low bits are numerically large (near 2^32-1), which
+     * naive zero-extension would misread as ~4.29 seconds in the future.
+     * The correct reconstruction is one period DOWN, ~100ns in the past. */
+    uint64_t now     = ((uint64_t)1u << 32) + 100u; /* 100ns after the boundary */
+    uint32_t wire_ts = 0xFFFFFFFFu; /* the boundary minus 1, i.e. now - 101 */
+    uint64_t got     = rcp_avtp_extend_timestamp(wire_ts, now);
+    TEST_ASSERT_EQUAL_UINT64(now - 101u, got);
+}
+
+static void test_extend_timestamp_exactly_half_period_prefers_no_wrap(void)
+{
+    /* wire_ts exactly half a period (2^31 ns) ahead of reference_now:
+     * the tie-break condition is "> half", not ">=", so exactly half
+     * stays with the un-wrapped (forward) candidate -- pinning the
+     * boundary's own direction explicitly rather than leaving it
+     * implicit. */
+    uint64_t now      = 0x0000000200000000ull; /* low 32 bits == 0 */
+    uint32_t wire_ts  = (uint32_t)(((uint64_t)1u << 32) / 2u); /* 2^31 */
+    uint64_t got      = rcp_avtp_extend_timestamp(wire_ts, now);
+    TEST_ASSERT_EQUAL_UINT64(now + ((uint64_t)1u << 31), got);
+}
+
+static void test_extend_timestamp_exactly_half_period_backward_prefers_no_wrap(void)
+{
+    /* Symmetric to the forward case above: wire_ts exactly half a period
+     * BEHIND reference_now's own low bits. The tie-break is the same
+     * "> half", not ">=", on this branch too -- exactly half stays with
+     * the un-wrapped (backward, i.e. candidate < reference_now)
+     * candidate rather than wrapping an extra period further back. */
+    uint64_t now      = 0x0000000300000000ull | ((uint64_t)1u << 31); /* low 32 bits == 2^31 */
+    uint32_t wire_ts  = 0u;
+    uint64_t got      = rcp_avtp_extend_timestamp(wire_ts, now);
+    TEST_ASSERT_EQUAL_UINT64(now - ((uint64_t)1u << 31), got);
+}
+
+static void test_extend_timestamp_result_feeds_rcp_timed_due_correctly(void)
+{
+    /* End-to-end: a TSCF avtp_timestamp reconstructed at admission time
+     * (reference_now == the admitting tick's own gptp_now) is not yet
+     * due one tick before it, and becomes due exactly at and after it --
+     * the same rcp_timed_due() contract request_timed.h's own
+     * presentation_time already gets, now fed a TSCF-derived value
+     * instead. */
+    uint64_t admit_now   = 0x0000000500000000ull;
+    uint32_t wire_ts     = 5000u; /* 5000ns after admit_now, low bits */
+    uint64_t due_instant = rcp_avtp_extend_timestamp(wire_ts, admit_now);
+
+    TEST_ASSERT_FALSE(rcp_timed_due(due_instant, admit_now + 4999u));
+    TEST_ASSERT_TRUE(rcp_timed_due(due_instant, admit_now + 5000u));
+    TEST_ASSERT_TRUE(rcp_timed_due(due_instant, admit_now + 5001u));
+}
+
 /* ── Subtype dispatch & TSCF drop rule ─────────────────────────────────────── */
 
 static void test_peek_subtype_reads_first_byte(void)
@@ -497,6 +595,15 @@ int main(void)
     RUN_TEST(test_tscf_decode_rejects_short_frame);
     RUN_TEST(test_tscf_decode_rejects_wrong_subtype);
     RUN_TEST(test_tscf_decode_rejects_declared_length_past_buffer);
+
+    RUN_TEST(test_extend_timestamp_exact_match_returns_reference_now);
+    RUN_TEST(test_extend_timestamp_near_future_within_half_period);
+    RUN_TEST(test_extend_timestamp_near_past_within_half_period);
+    RUN_TEST(test_extend_timestamp_wraps_forward_when_wire_ts_just_past_boundary);
+    RUN_TEST(test_extend_timestamp_wraps_backward_when_wire_ts_just_before_boundary);
+    RUN_TEST(test_extend_timestamp_exactly_half_period_prefers_no_wrap);
+    RUN_TEST(test_extend_timestamp_exactly_half_period_backward_prefers_no_wrap);
+    RUN_TEST(test_extend_timestamp_result_feeds_rcp_timed_due_correctly);
 
     RUN_TEST(test_peek_subtype_reads_first_byte);
     RUN_TEST(test_peek_subtype_rejects_empty_buffer);
