@@ -18671,3 +18671,48 @@ implemented / 62 partial / 2 not-implemented / 7 retired).
 grouped as transport (8), endpoint/server/power (6), and
 observability/admin/mdns/relay (6) -- same batching plan, continuing
 under the same standing instruction.
+
+### v0.317.0 -- 2026-08-13 (CI bumped to `cfusa` v0.5.51 -- fixes
+the MAX_REQS truncation bug; real 1076/1076 trace coverage confirmed
+for the first time)
+
+The user asked to check c-FuSa for a newer release that might fix the
+`MAX_REQS` silent-truncation defect filed as c-FuSa#100 in v0.315.0.
+It does: c-FuSa v0.5.51 (c-FuSa#101, merged the same day) replaces
+`cmd_req.c`/`cmd_trace.c`/`cmd_impact.c`'s fixed-size stack arrays
+with `realloc`-grown dynamic arrays, removes the caps entirely, and
+turns a genuine allocation failure into a hard error with a non-zero
+exit code instead of a silent partial load. A follow-up commit in the
+same PR fixed an identical `MAX_TAGS=4096` truncation bug in the same
+two files' own annotation-tag arrays.
+
+**Bumped this repo's CI pin** (`.github/workflows/ci.yml` and
+`.github/workflows/release.yml`, both `v0.5.50` -> `v0.5.51`) after
+building `v0.5.51` from source locally and confirming it against this
+repo's own real, 1076-entry catalog: `cfusa trace` now reports
+**1076/1076 traced, 1076/1076 tested** (0 gaps) -- the actual,
+complete result, for the first time since the catalog first crossed
+the old 1024-entry cap several releases ago. `cfusa check` remains
+0 errors.
+
+**The real, un-truncated trace immediately surfaced one genuine gap**:
+`REQ-ACF-032` (`rcp_acf_peek_gbb_request_type()`) had a complete,
+correct, already-passing 3-case test, but the test was missing its
+own `//cfusa:test REQ-ACF-032` machine-readable tag -- only a plain
+prose comment mentioning the requirement ID existed above it, which
+`cfusa` doesn't parse as a tag. Added the missing tag (one line); no
+test logic changed. This entry had been invisible to every `cfusa
+trace` run since it was added, silently masked by the 1024-cap
+truncation happening to land before it in the catalog array (it was
+deliberately appended near the tail specifically to dodge
+index-shift problems from the same underlying tool bug -- see the
+requirement's own `text` field).
+
+Full suite 66/66 native. No stray files. `cfusa check`/`trace` both
+re-run with the new `v0.5.51` binary: 0 errors, 1076/1076 traced and
+tested. `.fusa-reqs.json` unchanged this release.
+
+**Standing caveat retired**: the "always cross-check the live catalog
+count against 1024 before trusting a trace result" caveat from
+v0.315.0 no longer applies once this fix is live -- `cfusa trace`'s
+own reported coverage can be trusted directly again.

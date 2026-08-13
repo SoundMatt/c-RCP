@@ -248,7 +248,8 @@ static void test_unpack_header_reads_full_11_bit_bus_id(void)
     TEST_ASSERT_EQUAL_UINT16(0x321u, out.byte_bus_id);
 }
 
-/* REQ-ACF-032: rcp_acf_peek_gbb_request_type() reads a GBB frame's own
+//cfusa:test REQ-ACF-032
+/* rcp_acf_peek_gbb_request_type() reads a GBB frame's own
  * request_type (frame offset 8, the message_timestamp region's own
  * repurposed leading octet) without decoding into any specific
  * conditional-request kind's own struct. */
