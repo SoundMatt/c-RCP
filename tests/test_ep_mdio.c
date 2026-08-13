@@ -18,7 +18,10 @@
 //cfusa:test REQ-MDIO-017
 //cfusa:test REQ-MDIO-018
 //cfusa:test REQ-MDIO-019
+//cfusa:test REQ-MDIO-021
+//cfusa:test REQ-MDIO-022
 //cfusa:test REQ-MDIO-023
+//cfusa:test REQ-MDIO-024
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -52,6 +55,15 @@ static rcp_ep_mdio_addr_t clause45_addr(uint8_t prtad, uint8_t devad, uint16_t r
     addr.prtad  = prtad;
     addr.devad  = devad;
     addr.regad  = regad;
+    return addr;
+}
+
+static rcp_ep_mdio_mms_addr_t mms_addr(uint8_t mms, uint16_t addr_val)
+{
+    rcp_ep_mdio_mms_addr_t addr;
+
+    addr.mms  = mms;
+    addr.addr = addr_val;
     return addr;
 }
 
@@ -1162,6 +1174,529 @@ static void test_write_response_decode_rejects_short_frame(void)
         too_short, sizeof(too_short), 2, &out_words_data, &out_word_count, &timed, &ts, &txn));
 }
 
+
+/* ── MMS addressing: REQ-MDIO-022/024 ─────────────────────────────────────────
+ *
+ * See ep_mdio.h's own "MMS addressing" section for the documented,
+ * externally-sourced (OPEN Alliance 10BASE-T1x SPI spec) assumption this
+ * whole section pins: mdio_address = 4-bit MMS selector (its own whole
+ * octet on this module's wire) + 16-bit ADDR. The 32-vs-16-bit word width
+ * rule itself (mms 0/1 -> 32-bit, else 16-bit) is TC18-literal, not an
+ * assumption -- see rcp_ep_mdio_mms_uses_32bit_words(). */
+
+static void test_mms_addr_valid_in_range(void)
+{
+    TEST_ASSERT_TRUE(rcp_ep_mdio_mms_addr_valid(mms_addr(0, 0)));
+    TEST_ASSERT_TRUE(rcp_ep_mdio_mms_addr_valid(mms_addr(RCP_EP_MDIO_MMS_MAX, 0xFFFFu)));
+}
+
+static void test_mms_addr_valid_rejects_above_max(void)
+{
+    TEST_ASSERT_FALSE(rcp_ep_mdio_mms_addr_valid(mms_addr((uint8_t)(RCP_EP_MDIO_MMS_MAX + 1u), 0)));
+}
+
+static void test_mms_uses_32bit_words_mms0_and_mms1(void)
+{
+    TEST_ASSERT_TRUE(rcp_ep_mdio_mms_uses_32bit_words(0));
+    TEST_ASSERT_TRUE(rcp_ep_mdio_mms_uses_32bit_words(1));
+}
+
+static void test_mms_uses_32bit_words_false_for_other_mms(void)
+{
+    uint8_t mms;
+
+    for (mms = 2; mms <= RCP_EP_MDIO_MMS_MAX; mms++) {
+        TEST_ASSERT_FALSE(rcp_ep_mdio_mms_uses_32bit_words(mms));
+    }
+}
+
+static void test_mms_burst_next_addr_increments(void)
+{
+    TEST_ASSERT_EQUAL_HEX16(0x0002u, rcp_ep_mdio_mms_burst_next_addr(0x0001u));
+}
+
+static void test_mms_burst_next_addr_wraps_at_16_bits(void)
+{
+    TEST_ASSERT_EQUAL_HEX16(0x0000u, rcp_ep_mdio_mms_burst_next_addr(0xFFFFu));
+}
+
+static void test_mms_mode_for_word_count_single(void)
+{
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_MODE_MMS_SINGLE, rcp_ep_mdio_mms_mode_for_word_count(1));
+}
+
+static void test_mms_mode_for_word_count_multi(void)
+{
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_MODE_MMS_MULTI, rcp_ep_mdio_mms_mode_for_word_count(2));
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_MODE_MMS_MULTI,
+                      rcp_ep_mdio_mms_mode_for_word_count(RCP_EP_MDIO_MAX_BURST_WORDS));
+}
+
+/* ── MMS word32 encode/decode ─────────────────────────────────────────────── */
+
+static void test_word32_encode_decode_round_trip(void)
+{
+    uint8_t buf[4];
+
+    rcp_ep_mdio_word32_encode(0xDEADBEEFu, buf);
+    TEST_ASSERT_EQUAL_UINT32(0xDEADBEEFu, rcp_ep_mdio_word32_decode(buf));
+}
+
+static void test_word32_encode_is_big_endian(void)
+{
+    uint8_t buf[4];
+
+    rcp_ep_mdio_word32_encode(0x12345678u, buf);
+    TEST_ASSERT_EQUAL_HEX8(0x12u, buf[0]);
+    TEST_ASSERT_EQUAL_HEX8(0x34u, buf[1]);
+    TEST_ASSERT_EQUAL_HEX8(0x56u, buf[2]);
+    TEST_ASSERT_EQUAL_HEX8(0x78u, buf[3]);
+}
+
+/* ── MMS pack/unpack: width follows mms per REQ-MDIO-022's own TC18-literal
+ * rule ─────────────────────────────────────────────────────────────────── */
+
+static void test_mms_pack_len_32bit_for_mms0(void)
+{
+    TEST_ASSERT_EQUAL_size_t(12u, rcp_ep_mdio_mms_pack_len(0, 3u));
+}
+
+static void test_mms_pack_len_16bit_for_other_mms(void)
+{
+    TEST_ASSERT_EQUAL_size_t(6u, rcp_ep_mdio_mms_pack_len(2, 3u));
+}
+
+static void test_mms_pack_words_round_trip_32bit(void)
+{
+    const uint32_t words[2] = {0x11223344u, 0xAABBCCDDu};
+    rcp_bytes_t    packed   = rcp_ep_mdio_mms_pack_words(1 /* MMS1: 32-bit */, words, 2);
+
+    TEST_ASSERT_NOT_NULL(packed.data);
+    TEST_ASSERT_EQUAL_size_t(8u, packed.len);
+    TEST_ASSERT_EQUAL_UINT32(0x11223344u, rcp_ep_mdio_mms_unpack_word_at(1, packed.data, 0));
+    TEST_ASSERT_EQUAL_UINT32(0xAABBCCDDu, rcp_ep_mdio_mms_unpack_word_at(1, packed.data, 1));
+    rcp_bytes_free(&packed);
+}
+
+static void test_mms_pack_words_round_trip_16bit(void)
+{
+    const uint32_t words[2] = {0x1234u, 0xBEEFu};
+    rcp_bytes_t    packed   = rcp_ep_mdio_mms_pack_words(4 /* not 0/1: 16-bit */, words, 2);
+
+    TEST_ASSERT_NOT_NULL(packed.data);
+    TEST_ASSERT_EQUAL_size_t(4u, packed.len);
+    TEST_ASSERT_EQUAL_UINT32(0x1234u, rcp_ep_mdio_mms_unpack_word_at(4, packed.data, 0));
+    TEST_ASSERT_EQUAL_UINT32(0xBEEFu, rcp_ep_mdio_mms_unpack_word_at(4, packed.data, 1));
+    rcp_bytes_free(&packed);
+}
+
+static void test_mms_pack_words_zero_count_returns_zeroed(void)
+{
+    rcp_bytes_t packed = rcp_ep_mdio_mms_pack_words(0, NULL, 0);
+
+    TEST_ASSERT_NULL(packed.data);
+}
+
+static void test_mms_word_count_of_32bit_rejects_non_multiple_of_four(void)
+{
+    size_t out;
+
+    TEST_ASSERT_FALSE(rcp_ep_mdio_mms_word_count_of(0, 5u, &out));
+    TEST_ASSERT_TRUE(rcp_ep_mdio_mms_word_count_of(0, 8u, &out));
+    TEST_ASSERT_EQUAL_size_t(2u, out);
+}
+
+static void test_mms_word_count_of_16bit_rejects_odd_length(void)
+{
+    size_t out;
+
+    TEST_ASSERT_FALSE(rcp_ep_mdio_mms_word_count_of(3, 3u, &out));
+    TEST_ASSERT_TRUE(rcp_ep_mdio_mms_word_count_of(3, 4u, &out));
+    TEST_ASSERT_EQUAL_size_t(2u, out);
+}
+
+/* ── MMS read request/response ────────────────────────────────────────────── */
+
+static void test_mms_read_request_round_trip_single_word_32bit(void)
+{
+    rcp_ep_mdio_mms_addr_t      addr = mms_addr(0, 0xBEEFu); /* MMS0: 32-bit */
+    rcp_bytes_t                 f;
+    rcp_ep_mdio_mms_addr_t      out_addr;
+    size_t                      out_word_count;
+    uint8_t                     txn;
+
+    f = rcp_ep_mdio_encode_mms_read_request(0x10u, addr, 1u, 7u);
+    TEST_ASSERT_NOT_NULL(f.data);
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_OK, rcp_ep_mdio_decode_mms_read_request(
+        f.data, f.len, 0x10u, &out_addr, &out_word_count, &txn));
+    TEST_ASSERT_EQUAL_UINT8(0, out_addr.mms);
+    TEST_ASSERT_EQUAL_HEX16(0xBEEFu, out_addr.addr);
+    TEST_ASSERT_EQUAL_size_t(1u, out_word_count);
+    TEST_ASSERT_EQUAL_UINT8(7u, txn);
+
+    rcp_bytes_free(&f);
+}
+
+static void test_mms_read_request_round_trip_burst_16bit(void)
+{
+    rcp_ep_mdio_mms_addr_t      addr = mms_addr(3, 0x0100u); /* not 0/1: 16-bit */
+    rcp_bytes_t                 f;
+    rcp_ep_mdio_mms_addr_t      out_addr;
+    size_t                      out_word_count;
+    uint8_t                     txn;
+
+    f = rcp_ep_mdio_encode_mms_read_request(0x10u, addr, 5u, 9u);
+    TEST_ASSERT_NOT_NULL(f.data);
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_OK, rcp_ep_mdio_decode_mms_read_request(
+        f.data, f.len, 0x10u, &out_addr, &out_word_count, &txn));
+    TEST_ASSERT_EQUAL_UINT8(3, out_addr.mms);
+    TEST_ASSERT_EQUAL_HEX16(0x0100u, out_addr.addr);
+    TEST_ASSERT_EQUAL_size_t(5u, out_word_count);
+
+    rcp_bytes_free(&f);
+}
+
+static void test_mms_read_request_encode_rejects_invalid_addr(void)
+{
+    rcp_ep_mdio_mms_addr_t addr = mms_addr((uint8_t)(RCP_EP_MDIO_MMS_MAX + 1u), 0);
+    rcp_bytes_t             f   = rcp_ep_mdio_encode_mms_read_request(0x10u, addr, 1u, 1u);
+
+    TEST_ASSERT_NULL(f.data);
+}
+
+static void test_mms_read_request_encode_rejects_zero_word_count(void)
+{
+    rcp_bytes_t f = rcp_ep_mdio_encode_mms_read_request(0x10u, mms_addr(0, 0), 0u, 1u);
+
+    TEST_ASSERT_NULL(f.data);
+}
+
+static void test_mms_read_request_encode_rejects_word_count_above_max(void)
+{
+    rcp_bytes_t f = rcp_ep_mdio_encode_mms_read_request(
+        0x10u, mms_addr(0, 0), RCP_EP_MDIO_MAX_BURST_WORDS + 1u, 1u);
+
+    TEST_ASSERT_NULL(f.data);
+}
+
+static void test_mms_read_request_decode_rejects_wrong_bus(void)
+{
+    rcp_bytes_t             f = rcp_ep_mdio_encode_mms_read_request(0x10u, mms_addr(0, 0), 1u, 1u);
+    rcp_ep_mdio_mms_addr_t  out_addr;
+    size_t                  out_word_count;
+    uint8_t                 txn;
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_WRONG_BUS, rcp_ep_mdio_decode_mms_read_request(
+        f.data, f.len, 0x11u, &out_addr, &out_word_count, &txn));
+    rcp_bytes_free(&f);
+}
+
+static void test_mms_read_request_decode_rejects_bad_mms_addr(void)
+{
+    rcp_acf_byte_message_info_t hdr        = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_mdio_mms_addr_t      out_addr;
+    size_t                      out_word_count;
+    uint8_t                     txn;
+    uint8_t                     payload[6] = {0};
+
+    payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMS_SINGLE;
+    payload[1] = (uint8_t)(RCP_EP_MDIO_MMS_MAX + 1u); /* out-of-range mms */
+    payload[5] = 1; /* word_count */
+
+    hdr.byte_bus_id = 0x10u;
+    hdr.op          = RCP_ACF_OP_READ;
+    frame           = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_BAD_MMS_ADDR, rcp_ep_mdio_decode_mms_read_request(
+        frame.data, frame.len, 0x10u, &out_addr, &out_word_count, &txn));
+    rcp_bytes_free(&frame);
+}
+
+static void test_mms_read_request_decode_rejects_zero_word_count(void)
+{
+    rcp_acf_byte_message_info_t hdr        = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_mdio_mms_addr_t      out_addr;
+    size_t                      out_word_count;
+    uint8_t                     txn;
+    uint8_t                     payload[6] = {0}; /* mdio_mode+mms+addr(2)+word_count(2)=0 */
+
+    payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMS_SINGLE;
+
+    hdr.byte_bus_id = 0x10u;
+    hdr.op          = RCP_ACF_OP_READ;
+    frame           = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_BAD_WORD_COUNT, rcp_ep_mdio_decode_mms_read_request(
+        frame.data, frame.len, 0x10u, &out_addr, &out_word_count, &txn));
+    rcp_bytes_free(&frame);
+}
+
+/* Mirror image of test_mdio_decode_rejects_mms_mode_fails_closed()
+ * (test_tc18_gaps_ep2.c) -- the MMS decoder must equally refuse to
+ * misread an MMD-mode frame as if it were MMS-shaped. */
+static void test_mms_read_request_decode_rejects_mmd_mode(void)
+{
+    rcp_acf_byte_message_info_t hdr        = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_mdio_mms_addr_t      out_addr;
+    size_t                      out_word_count;
+    uint8_t                     txn;
+    uint8_t                     payload[6] = {0};
+
+    payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMD_SINGLE;
+    payload[5] = 1;
+
+    hdr.byte_bus_id = 0x10u;
+    hdr.op          = RCP_ACF_OP_READ;
+    frame           = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_WRONG_MDIO_MODE, rcp_ep_mdio_decode_mms_read_request(
+        frame.data, frame.len, 0x10u, &out_addr, &out_word_count, &txn));
+    rcp_bytes_free(&frame);
+}
+
+static void test_mms_read_response_round_trip_untimed_32bit(void)
+{
+    const uint32_t words[1] = {0xCAFEBABEu};
+    rcp_bytes_t    f        = rcp_ep_mdio_encode_mms_read_response(0x10u, 0, words, 1, 3u, false, 0);
+    const uint8_t  *out_words_data;
+    size_t          out_word_count;
+    bool            timed;
+    uint64_t        ts;
+    uint8_t         txn;
+
+    TEST_ASSERT_NOT_NULL(f.data);
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_OK, rcp_ep_mdio_decode_mms_read_response(
+        f.data, f.len, 0x10u, 0, &out_words_data, &out_word_count, &timed, &ts, &txn));
+    TEST_ASSERT_EQUAL_size_t(1u, out_word_count);
+    TEST_ASSERT_FALSE(timed);
+    TEST_ASSERT_EQUAL_UINT8(3u, txn);
+    TEST_ASSERT_EQUAL_UINT32(0xCAFEBABEu, rcp_ep_mdio_mms_unpack_word_at(0, out_words_data, 0));
+
+    rcp_bytes_free(&f);
+}
+
+static void test_mms_read_response_round_trip_timed_16bit(void)
+{
+    const uint32_t words[1] = {0x4242u};
+    rcp_bytes_t    f = rcp_ep_mdio_encode_mms_read_response(0x10u, 5, words, 1, 4u, true, 999u);
+    const uint8_t  *out_words_data;
+    size_t          out_word_count;
+    bool            timed;
+    uint64_t        ts;
+    uint8_t         txn;
+
+    TEST_ASSERT_NOT_NULL(f.data);
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_OK, rcp_ep_mdio_decode_mms_read_response(
+        f.data, f.len, 0x10u, 5, &out_words_data, &out_word_count, &timed, &ts, &txn));
+    TEST_ASSERT_TRUE(timed);
+    TEST_ASSERT_EQUAL_UINT64(999u, ts);
+    TEST_ASSERT_EQUAL_UINT32(0x4242u, rcp_ep_mdio_mms_unpack_word_at(5, out_words_data, 0));
+
+    rcp_bytes_free(&f);
+}
+
+static void test_mms_read_response_decode_rejects_wrong_bus(void)
+{
+    const uint32_t words[1] = {1u};
+    rcp_bytes_t    f = rcp_ep_mdio_encode_mms_read_response(0x10u, 0, words, 1, 1u, false, 0);
+    const uint8_t  *out_words_data;
+    size_t          out_word_count;
+    bool            timed;
+    uint64_t        ts;
+    uint8_t         txn;
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_WRONG_BUS, rcp_ep_mdio_decode_mms_read_response(
+        f.data, f.len, 0x11u, 0, &out_words_data, &out_word_count, &timed, &ts, &txn));
+    rcp_bytes_free(&f);
+}
+
+/* A 32-bit-mms payload whose byte length is not a multiple of 4 must be
+ * rejected -- distinct from the MMD family's own odd-length check, since
+ * the modulus itself depends on which mms the caller supplies. */
+static void test_mms_read_response_decode_rejects_bad_word_count_for_32bit_mms(void)
+{
+    uint8_t                     odd_payload[3] = {0x01u, 0x02u, 0x03u};
+    rcp_acf_byte_message_info_t hdr            = {0};
+    rcp_bytes_t                 frame;
+    const uint8_t                *out_words_data;
+    size_t                        out_word_count;
+    bool                          timed;
+    uint64_t                      ts;
+    uint8_t                       txn;
+
+    hdr.byte_bus_id = 0x10u;
+    hdr.op          = RCP_ACF_OP_READ;
+    hdr.rsp         = 1;
+    frame           = rcp_acf_encode_abb(&hdr, odd_payload, sizeof(odd_payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_BAD_WORD_COUNT, rcp_ep_mdio_decode_mms_read_response(
+        frame.data, frame.len, 0x10u, 0 /* MMS0: 32-bit, 3 bytes is not a multiple of 4 */,
+        &out_words_data, &out_word_count, &timed, &ts, &txn));
+    rcp_bytes_free(&frame);
+}
+
+/* ── MMS write request/response ───────────────────────────────────────────── */
+
+static void test_mms_write_request_round_trip_single_word_32bit(void)
+{
+    rcp_ep_mdio_mms_addr_t addr     = mms_addr(1, 0x0010u); /* MMS1: 32-bit */
+    const uint32_t          words[1] = {0x11223344u};
+    rcp_bytes_t              f;
+    rcp_ep_mdio_mms_addr_t   out_addr;
+    const uint8_t             *out_words_data;
+    size_t                     out_word_count;
+    uint8_t                    txn;
+
+    f = rcp_ep_mdio_encode_mms_write_request(0x10u, addr, words, 1, 6u);
+    TEST_ASSERT_NOT_NULL(f.data);
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_OK, rcp_ep_mdio_decode_mms_write_request(
+        f.data, f.len, 0x10u, &out_addr, &out_words_data, &out_word_count, &txn));
+    TEST_ASSERT_EQUAL_UINT8(1, out_addr.mms);
+    TEST_ASSERT_EQUAL_HEX16(0x0010u, out_addr.addr);
+    TEST_ASSERT_EQUAL_size_t(1u, out_word_count);
+    TEST_ASSERT_EQUAL_UINT32(0x11223344u, rcp_ep_mdio_mms_unpack_word_at(1, out_words_data, 0));
+
+    rcp_bytes_free(&f);
+}
+
+static void test_mms_write_request_round_trip_burst_16bit(void)
+{
+    rcp_ep_mdio_mms_addr_t addr       = mms_addr(6, 0x0200u); /* not 0/1: 16-bit */
+    const uint32_t          words[3]   = {0x1111u, 0x2222u, 0x3333u};
+    rcp_bytes_t              f;
+    rcp_ep_mdio_mms_addr_t   out_addr;
+    const uint8_t             *out_words_data;
+    size_t                     out_word_count;
+    uint8_t                    txn;
+
+    f = rcp_ep_mdio_encode_mms_write_request(0x10u, addr, words, 3, 8u);
+    TEST_ASSERT_NOT_NULL(f.data);
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_OK, rcp_ep_mdio_decode_mms_write_request(
+        f.data, f.len, 0x10u, &out_addr, &out_words_data, &out_word_count, &txn));
+    TEST_ASSERT_EQUAL_size_t(3u, out_word_count);
+    TEST_ASSERT_EQUAL_UINT32(0x2222u, rcp_ep_mdio_mms_unpack_word_at(6, out_words_data, 1));
+
+    rcp_bytes_free(&f);
+}
+
+static void test_mms_write_request_encode_rejects_invalid_addr(void)
+{
+    rcp_ep_mdio_mms_addr_t addr     = mms_addr((uint8_t)(RCP_EP_MDIO_MMS_MAX + 1u), 0);
+    const uint32_t          words[1] = {1u};
+    rcp_bytes_t              f       = rcp_ep_mdio_encode_mms_write_request(0x10u, addr, words, 1, 1u);
+
+    TEST_ASSERT_NULL(f.data);
+}
+
+static void test_mms_write_request_encode_rejects_zero_word_count(void)
+{
+    rcp_bytes_t f = rcp_ep_mdio_encode_mms_write_request(0x10u, mms_addr(0, 0), NULL, 0, 1u);
+
+    TEST_ASSERT_NULL(f.data);
+}
+
+static void test_mms_write_request_decode_rejects_wrong_op(void)
+{
+    const uint32_t          words[1] = {1u};
+    rcp_bytes_t              f = rcp_ep_mdio_encode_mms_read_request(0x10u, mms_addr(0, 0), 1u, 1u);
+    rcp_ep_mdio_mms_addr_t   out_addr;
+    const uint8_t             *out_words_data;
+    size_t                     out_word_count;
+    uint8_t                    txn;
+
+    (void)words;
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_WRONG_OP, rcp_ep_mdio_decode_mms_write_request(
+        f.data, f.len, 0x10u, &out_addr, &out_words_data, &out_word_count, &txn));
+    rcp_bytes_free(&f);
+}
+
+static void test_mms_write_request_decode_rejects_zero_words(void)
+{
+    rcp_acf_byte_message_info_t hdr        = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_mdio_mms_addr_t      out_addr;
+    const uint8_t                *out_words_data;
+    size_t                        out_word_count;
+    uint8_t                       txn;
+    uint8_t                       payload[4] = {0}; /* mdio_mode(1) + mms/addr(3), no words */
+
+    payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMS_SINGLE;
+
+    hdr.byte_bus_id = 0x10u;
+    hdr.op          = RCP_ACF_OP_WRITE;
+    frame           = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_BAD_WORD_COUNT, rcp_ep_mdio_decode_mms_write_request(
+        frame.data, frame.len, 0x10u, &out_addr, &out_words_data, &out_word_count, &txn));
+    rcp_bytes_free(&frame);
+}
+
+static void test_mms_write_response_round_trip_untimed(void)
+{
+    const uint32_t accepted[1] = {0xAAAAu};
+    rcp_bytes_t    f = rcp_ep_mdio_encode_mms_write_response(0x10u, 2, accepted, 1, 5u, false, 0);
+    const uint8_t  *out_words_data;
+    size_t          out_word_count;
+    bool            timed;
+    uint64_t        ts;
+    uint8_t         txn;
+
+    TEST_ASSERT_NOT_NULL(f.data);
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_OK, rcp_ep_mdio_decode_mms_write_response(
+        f.data, f.len, 0x10u, 2, &out_words_data, &out_word_count, &timed, &ts, &txn));
+    TEST_ASSERT_EQUAL_size_t(1u, out_word_count);
+    TEST_ASSERT_EQUAL_UINT32(0xAAAAu, rcp_ep_mdio_mms_unpack_word_at(2, out_words_data, 0));
+
+    rcp_bytes_free(&f);
+}
+
+/* Mirror image of test_mms_read_request_decode_rejects_mmd_mode(), for
+ * the write side. */
+static void test_mms_write_request_decode_rejects_mmd_mode(void)
+{
+    rcp_acf_byte_message_info_t hdr        = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_mdio_mms_addr_t      out_addr;
+    const uint8_t                *out_words_data;
+    size_t                        out_word_count;
+    uint8_t                       txn;
+    uint8_t                       payload[6] = {0}; /* mdio_mode(1) + mms/addr(3) + 1 word */
+
+    payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMD_SINGLE;
+
+    hdr.byte_bus_id = 0x10u;
+    hdr.op          = RCP_ACF_OP_WRITE;
+    frame           = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_WRONG_MDIO_MODE, rcp_ep_mdio_decode_mms_write_request(
+        frame.data, frame.len, 0x10u, &out_addr, &out_words_data, &out_word_count, &txn));
+    rcp_bytes_free(&frame);
+}
+
+static void test_mms_write_response_nothing_accepted(void)
+{
+    rcp_bytes_t    f = rcp_ep_mdio_encode_mms_write_response(0x10u, 0, NULL, 0, 5u, false, 0);
+    const uint8_t  *out_words_data;
+    size_t          out_word_count;
+    bool            timed;
+    uint64_t        ts;
+    uint8_t         txn;
+
+    TEST_ASSERT_NOT_NULL(f.data);
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_OK, rcp_ep_mdio_decode_mms_write_response(
+        f.data, f.len, 0x10u, 0, &out_words_data, &out_word_count, &timed, &ts, &txn));
+    TEST_ASSERT_EQUAL_size_t(0u, out_word_count);
+
+    rcp_bytes_free(&f);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -1189,6 +1724,49 @@ int main(void)
     RUN_TEST(test_write_request_encode_sets_mdio_mode_multi);
     RUN_TEST(test_read_request_decode_rejects_mms_mode);
     RUN_TEST(test_write_request_decode_rejects_mms_mode);
+
+    RUN_TEST(test_mms_addr_valid_in_range);
+    RUN_TEST(test_mms_addr_valid_rejects_above_max);
+    RUN_TEST(test_mms_uses_32bit_words_mms0_and_mms1);
+    RUN_TEST(test_mms_uses_32bit_words_false_for_other_mms);
+    RUN_TEST(test_mms_burst_next_addr_increments);
+    RUN_TEST(test_mms_burst_next_addr_wraps_at_16_bits);
+    RUN_TEST(test_mms_mode_for_word_count_single);
+    RUN_TEST(test_mms_mode_for_word_count_multi);
+
+    RUN_TEST(test_word32_encode_decode_round_trip);
+    RUN_TEST(test_word32_encode_is_big_endian);
+    RUN_TEST(test_mms_pack_len_32bit_for_mms0);
+    RUN_TEST(test_mms_pack_len_16bit_for_other_mms);
+    RUN_TEST(test_mms_pack_words_round_trip_32bit);
+    RUN_TEST(test_mms_pack_words_round_trip_16bit);
+    RUN_TEST(test_mms_pack_words_zero_count_returns_zeroed);
+    RUN_TEST(test_mms_word_count_of_32bit_rejects_non_multiple_of_four);
+    RUN_TEST(test_mms_word_count_of_16bit_rejects_odd_length);
+
+    RUN_TEST(test_mms_read_request_round_trip_single_word_32bit);
+    RUN_TEST(test_mms_read_request_round_trip_burst_16bit);
+    RUN_TEST(test_mms_read_request_encode_rejects_invalid_addr);
+    RUN_TEST(test_mms_read_request_encode_rejects_zero_word_count);
+    RUN_TEST(test_mms_read_request_encode_rejects_word_count_above_max);
+    RUN_TEST(test_mms_read_request_decode_rejects_wrong_bus);
+    RUN_TEST(test_mms_read_request_decode_rejects_bad_mms_addr);
+    RUN_TEST(test_mms_read_request_decode_rejects_zero_word_count);
+    RUN_TEST(test_mms_read_request_decode_rejects_mmd_mode);
+    RUN_TEST(test_mms_read_response_round_trip_untimed_32bit);
+    RUN_TEST(test_mms_read_response_round_trip_timed_16bit);
+    RUN_TEST(test_mms_read_response_decode_rejects_wrong_bus);
+    RUN_TEST(test_mms_read_response_decode_rejects_bad_word_count_for_32bit_mms);
+
+    RUN_TEST(test_mms_write_request_round_trip_single_word_32bit);
+    RUN_TEST(test_mms_write_request_round_trip_burst_16bit);
+    RUN_TEST(test_mms_write_request_encode_rejects_invalid_addr);
+    RUN_TEST(test_mms_write_request_encode_rejects_zero_word_count);
+    RUN_TEST(test_mms_write_request_decode_rejects_wrong_op);
+    RUN_TEST(test_mms_write_request_decode_rejects_zero_words);
+    RUN_TEST(test_mms_write_request_decode_rejects_mmd_mode);
+    RUN_TEST(test_mms_write_response_round_trip_untimed);
+    RUN_TEST(test_mms_write_response_nothing_accepted);
 
     RUN_TEST(test_word_encode_decode_round_trip);
     RUN_TEST(test_word_encode_is_big_endian);
