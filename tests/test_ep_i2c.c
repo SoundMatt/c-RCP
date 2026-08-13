@@ -331,8 +331,8 @@ static void test_reconfig_strerror_never_null(void)
 static void test_strerror_never_null_and_distinct(void)
 {
     rcp_ep_i2c_errc_t codes[] = {
-        RCP_EP_I2C_OK, RCP_EP_I2C_ERR_SHORT_FRAME, RCP_EP_I2C_ERR_BAD_MSG_TYPE,
-        RCP_EP_I2C_ERR_WRONG_BUS, RCP_EP_I2C_ERR_WRONG_OP,
+        RCP_EP_I2C_OK,         RCP_EP_I2C_ERR_SHORT_FRAME, RCP_EP_I2C_ERR_BAD_MSG_TYPE,
+        RCP_EP_I2C_ERR_WRONG_BUS, RCP_EP_I2C_ERR_WRONG_OP,   RCP_EP_I2C_ERR_BAD_EVT,
     };
     size_t i, j;
 

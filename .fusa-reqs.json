@@ -1270,7 +1270,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-PWR-008",
@@ -1340,7 +1340,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-PWR-015",
@@ -1350,7 +1350,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-RL-001",
@@ -4130,7 +4130,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-I2C-010",
@@ -5003,7 +5003,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial",
+      "status": "implemented",
       "tc18": "\u00a713.5 Table 33, TC18.txt L3666-3710 (general ACF frame-validation basis)"
     },
     {
@@ -8933,7 +8933,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial",
+      "status": "implemented",
       "tc18": "\u00a711.2.3.1 (clear-all, mandatory)/\u00a711.2.3.2 (clear non-safestate, optional)/\u00a711.2.3.3 (clear single, optional) cancellation request handling, TC18.txt L1681 (\u00a711.2.3.1), L1735-1738 (\u00a711.2.3.2 clear-non-safestate, not \"clear-single\"), L1794 (\u00a711.2.3.3 clear-single) (established Phase 1 basis, issue #163); \u00a711.2.3 chain-cascade rule (\"If a request is cancelled to which a request is chained, then the chained successors shall be cancelled by the RC Server as well\"), TC18.txt L1674-1675 (see REQ-CANCEL-012) -- correction: the existing citation labels these two sections \"\u00a711.2.3.1/.2\" and calls them \"clear-all/clear-single\", but the three cited line ranges actually correspond to three distinct subsections (\u00a711.2.3.1 clear-all, \u00a711.2.3.2 clear-non-safestate, \u00a711.2.3.3 clear-single) matching the three functions this requirement itself describes (cancel_all, cancel_non_safestate, cancel_single) -- the label was missing \u00a711.2.3.3 and mis-paired L1735-1738 with \"clear-single\" when that range is actually clear-non-safestate."
     },
     {

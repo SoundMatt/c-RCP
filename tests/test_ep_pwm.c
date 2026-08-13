@@ -975,6 +975,22 @@ static void test_in_read_request_rejects_short_frame(void)
     TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_ERR_SHORT_FRAME, rc);
 }
 
+/* REQ-PWM-043: rcp_ep_pwm_in_decode_read_request()'s own WRONG_BUS
+ * clause -- test_in_response_decode_rejects_wrong_bus() above proves
+ * this for _decode_response(), a different function; the read-request
+ * decoder's own byte_bus_id check was never separately exercised. */
+static void test_in_read_request_rejects_wrong_bus(void)
+{
+    rcp_bytes_t           frame = rcp_ep_pwm_in_encode_read_request(2, 5);
+    uint8_t               out_tn;
+    rcp_ep_pwm_in_errc_t  rc;
+
+    rc = rcp_ep_pwm_in_decode_read_request(frame.data, frame.len, 4, &out_tn);
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_ERR_WRONG_BUS, rc);
+
+    rcp_bytes_free(&frame);
+}
+
 /* REQ-PWM-059 (FIXED 2026-08-11, issue #256 Group I): before this fix,
  * rcp_ep_pwm_in_decode_read_request() never checked evt[2:0] at all, so a
  * real evt=111b configuration-write request from a conforming peer would
@@ -1388,6 +1404,7 @@ int main(void)
 
     RUN_TEST(test_in_read_request_round_trip);
     RUN_TEST(test_in_read_request_rejects_short_frame);
+    RUN_TEST(test_in_read_request_rejects_wrong_bus);
     RUN_TEST(test_in_read_request_rejects_bad_evt);
 
     RUN_TEST(test_in_render_registers_matches_table_offsets);
