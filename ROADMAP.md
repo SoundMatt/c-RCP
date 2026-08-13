@@ -15205,6 +15205,36 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.292.0 -- 2026-08-12 (issue #336 catalog-drift correction:
+REQ-UART-032 flips not-implemented -> implemented)
+
+Doc-only, no functional code change. REQ-UART-032's own "NOT
+IMPLEMENTED" text was stale the day it was filed:
+rcp_ep_uart_functional_cfg_t::ep_status (uart_ep_status, Table 48
+0x0004, 16-bit R/W) has existed as a real, freely-settable,
+round-tripped register field since PR #276 (issue #256, 2026-08-11)
+-- the day before this requirement was filed against a stale reading
+of the code during the 2026-08-12 gap audit.
+
+TC18 13.7.8.1 requires an RX FIFO overflow to be "flagged in the UART
+EP status register" but never defines which bit of that 16-bit
+register carries the flag -- the same _ep_status spec-silence pattern
+already accepted for CAN/WakeUp/several other endpoint types' own
+status registers (REQ-CANEP-028 reached the identical disposition one
+batch earlier). Consistent with that precedent, uart_ep_status
+correctly does not invent an overflow bit -- it stores and
+round-trips whatever value a caller or register-map write assigns.
+
+Renamed the deviation-pin test in tests/test_tc18_gaps_ep2.c and
+rewrote its comment to document the corrected disposition. No new
+test needed -- tests/test_ep_uart.c's own register-block round-trip
+test already positively covers ep_status's wire round-trip.
+
+cfusa check A/B (git stash): every diff hunk is a pure line-number
+shift from the comment rewrite itself -- zero new or removed
+findings. cfusa trace: both 100%, 1024/1024 (unaffected). 65/65 both
+trees (native + ASan/UBSan).
+
 ### v0.291.0 -- 2026-08-12 (MDIO catalog cleanup: 19 entries missing
 their own status field)
 

@@ -34,6 +34,16 @@ the rationale.
 
 ## Releases
 
+### v0.292.0 -- 2026-08-12 (issue #336 catalog-drift correction: `REQ-UART-032` flips `not-implemented` -> `implemented`)
+
+**Doc-only, no functional code change.** `REQ-UART-032`'s own "NOT IMPLEMENTED" text was stale the day it was filed: `rcp_ep_uart_functional_cfg_t::ep_status` (`uart_ep_status`, Table 48 `0x0004`, 16-bit R/W) has existed as a real, freely-settable, round-tripped register field since PR #276 (issue #256, 2026-08-11) -- the day *before* this requirement was filed against a stale reading of the code during the 2026-08-12 gap audit.
+
+TC18 §13.7.8.1 requires an RX FIFO overflow to be "flagged in the UART EP status register" but never defines which bit of that 16-bit register carries the flag -- the same `_ep_status` spec-silence pattern already accepted for CAN/WakeUp/several other endpoint types' own status registers (`REQ-CANEP-028` reached the identical disposition one batch earlier: register real, freely-settable, round-tripped, no bit position invented). Consistent with that precedent, `uart_ep_status` correctly does not invent an overflow bit -- it stores and round-trips whatever value a caller or register-map write assigns, matching every other endpoint type's own status register.
+
+Renamed the deviation-pin test in `tests/test_tc18_gaps_ep2.c` (`test_uart_rx_fifo_size_bounds_nothing_at_all` -> `test_uart_rx_fifo_size_bounds_nothing_overflow_flag_left_uninterpreted`) and rewrote its comment to document the corrected disposition rather than a "still open" framing that no longer matched the code. No new test needed -- `tests/test_ep_uart.c`'s own register-block round-trip test already positively covers `ep_status`'s wire round-trip.
+
+`cfusa check` A/B (`git stash`): every diff hunk is a pure line-number shift from the comment rewrite itself (identical finding text/CWE/rule ids, same count) -- zero new or removed findings. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%, 1024/1024 (unaffected -- in-place text/status edit, no entries added/removed). 65/65 both trees (native + ASan/UBSan).
+
 ### v0.291.0 -- 2026-08-12 (MDIO catalog cleanup: 19 entries missing their own `status` field)
 
 **Doc-only, no code change.** `REQ-MDIO-001` through `REQ-MDIO-019` -- every MDIO requirement covering the module's already-implemented, already-tested address-validation, burst/word packing, and ACF encode/decode primitives (`rcp_ep_mdio_addr_valid()`, `rcp_ep_mdio_word_encode()`/`_decode()`, `rcp_ep_mdio_pack_words()`, `rcp_ep_mdio_encode_read_request()`/`_decode_read_request()`, etc.) -- had never had a `status` field added to their `.fusa-reqs.json` entry at all, the same class of gap already fixed for 9 other entries in the 2026-08-12 close-out pass (PRs #332/#333). Each function referenced by these 19 entries was individually confirmed present in `src/ep_mdio.c` and covered by `tests/test_ep_mdio.c` before flipping its entry to `status: "implemented"`.

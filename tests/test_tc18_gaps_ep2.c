@@ -194,7 +194,7 @@ static void test_uart_functional_block_now_has_full_register_coverage(void)
     }
 }
 
-static void test_uart_rx_fifo_size_bounds_nothing_at_all(void)
+static void test_uart_rx_fifo_size_bounds_nothing_overflow_flag_left_uninterpreted(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
     rcp_lifecycle_writer_ctx_t   w = any_writer();
@@ -210,18 +210,31 @@ static void test_uart_rx_fifo_size_bounds_nothing_at_all(void)
     TEST_ASSERT_TRUE(rcp_ep_uart_set_rx_buffer_size(&cfg, 4u, RCP_LIFECYCLE_HW_CONFIGURED, w));
     memset(rx, 0xA5, sizeof(rx));
 
-    /* REQ-UART-032 DEVIATION PIN (still open): TC18 §13.7.8.1 requires an
-     * RX FIFO overflow to be flagged in uart_ep_status -- TC18 never
-     * defines which bit of that 16-bit register carries the flag (the same
-     * "_ep_status has no printed bit layout" spec-silence pattern found
-     * across CAN/WakeUp/several other endpoint types' own status
-     * registers), so this module has no bit position to wire to without
-     * inventing one unilaterally. A response four times the configured
-     * FIFO size still encodes happily, in exactly one unfragmented frame,
-     * with no overflow signal on any surface -- ep_rx_buffer_size is inert
-     * for this purpose (REQ-UART-033's own read-COMPLETION arbitration,
-     * covered by the deviation this test used to also pin, is resolved
-     * separately below by rcp_ep_uart_read_completion_decision()). */
+    /* REQ-UART-032 IMPLEMENTED (2026-08-12, catalog-drift correction): TC18
+     * §13.7.8.1 requires an RX FIFO overflow to be flagged in
+     * uart_ep_status -- and that 16-bit register has, in fact, existed as a
+     * real, freely-settable, round-tripped field (cfg.ep_status) since PR
+     * #276 (issue #256, 2026-08-11), the day before this requirement was
+     * even filed against a stale reading of the code. .fusa-reqs.json's own
+     * "not-implemented" status was simply never updated to match -- this
+     * fix is a catalog correction, not new code. TC18 never defines which
+     * bit of uart_ep_status carries the overflow flag (the same
+     * "_ep_status has no printed bit layout" spec-silence pattern already
+     * accepted for CAN/WakeUp/several other endpoint types' own status
+     * registers, e.g. REQ-CANEP-028), so this module correctly does not
+     * invent a bit position -- it stores and round-trips whatever value a
+     * caller or register-map write assigns, the same disposition every
+     * other endpoint type's own status register already gets. This test
+     * documents what that disposition does NOT do: ep_rx_buffer_size
+     * itself bounds nothing at the encode/decode layer (a response four
+     * times the configured FIFO size still encodes happily, in exactly one
+     * unfragmented frame, with no overflow signal on any surface) --
+     * that's expected, not a gap, since flagging overflow is uart_ep_
+     * status's job, and setting that flag from a live FIFO-fill condition
+     * is an integrator's runtime responsibility, not this wire/register
+     * library's (REQ-UART-033's own read-COMPLETION arbitration, covered
+     * by the deviation this test used to also pin, is resolved separately
+     * below by rcp_ep_uart_read_completion_decision()). */
     f = rcp_ep_uart_encode_read_response(0x11u, rx, sizeof(rx), 3u, false, 0u);
     TEST_ASSERT_NOT_NULL(f.data);
     TEST_ASSERT_EQUAL_size_t(1u, rcp_ep_uart_read_response_fragment_count(sizeof(rx), 64u));
@@ -1114,7 +1127,7 @@ int main(void)
     UNITY_BEGIN();
 
     RUN_TEST(test_uart_functional_block_now_has_full_register_coverage);
-    RUN_TEST(test_uart_rx_fifo_size_bounds_nothing_at_all);
+    RUN_TEST(test_uart_rx_fifo_size_bounds_nothing_overflow_flag_left_uninterpreted);
     RUN_TEST(test_uart_read_completion_decision);
     RUN_TEST(test_uart_compound_wait_now_resolved_via_generic_primitive);
     RUN_TEST(test_uart_read_size_above_one_octet_round_trips);
