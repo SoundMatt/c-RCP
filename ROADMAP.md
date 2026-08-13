@@ -17454,3 +17454,36 @@ touched files (render()'s new `put_u16()` call replaced a
 two-statement inline zero-write the checker had been matching).
 `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%
 (1024/1024). 65/65 both trees (native + ASan/UBSan).
+
+### v0.305.0 -- 2026-08-13 (`.fusa-reqs.json` staleness correction:
+`REQ-CFG-011`/`REQ-CFG-012` CAN's EP_func gap already closed)
+
+**Doc-only.** `REQ-CFG-011`/`REQ-CFG-012` both flip
+`not-implemented` -> `implemented`. Both entries' own text still
+named CAN as the one endpoint type lacking the generic §12.7.1
+evt[2:0]==111b configuration mechanism and the EP_LEN/overrun-
+rejection pattern -- but `REQ-CANEP-028` (issue #201, 2026-08-12,
+landed the same day as the audit that wrote CFG-011/012's current
+text) already closed exactly that gap for CAN:
+`rcp_ep_can_apply_reconfig()`, `can_ep_len` fixed at
+`RCP_EP_CAN_EP_FUNC_LEN`, `RCP_EP_CAN_RECONFIG_ERR_OUT_OF_RANGE` on
+an out-of-range write. Nobody went back to re-check these two
+catalog entries afterward -- the same stale-precedent oversight class
+already corrected once this session for `REQ-UART-032`.
+
+Verified CAN's own bar matches the other ten endpoint types' exactly
+before flipping either entry: `rcp_ep_gpio_apply_masked_write()`'s
+own doc comment confirms routing a decoded evt[2:0]==111b request to
+`apply_reconfig()` is every endpoint module's own CALLER's
+responsibility, not something any module (CAN included) wires into a
+live dispatch loop itself -- so both requirements were always about
+the primitive existing and being reachable via the generic mechanism,
+not about a specific wired call site, and CAN now satisfies that
+exactly like the other ten. CAN's own remaining gaps
+(`REQ-CANEP-029`'s acceptance-filter address collision; bit-timing
+registers TC18 gives no sub-field layout for) are real but separately
+tracked and don't bear on either requirement.
+
+No code changed. `cfusa check`/`trace` re-run to confirm: identical
+to the pre-change baseline (0 errors, 100%/100% coverage). 65/65 both
+trees, unaffected.
