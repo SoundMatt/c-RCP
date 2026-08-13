@@ -34,6 +34,12 @@ the rationale.
 
 ## Releases
 
+### v0.291.0 -- 2026-08-12 (MDIO catalog cleanup: 19 entries missing their own `status` field)
+
+**Doc-only, no code change.** `REQ-MDIO-001` through `REQ-MDIO-019` -- every MDIO requirement covering the module's already-implemented, already-tested address-validation, burst/word packing, and ACF encode/decode primitives (`rcp_ep_mdio_addr_valid()`, `rcp_ep_mdio_word_encode()`/`_decode()`, `rcp_ep_mdio_pack_words()`, `rcp_ep_mdio_encode_read_request()`/`_decode_read_request()`, etc.) -- had never had a `status` field added to their `.fusa-reqs.json` entry at all, the same class of gap already fixed for 9 other entries in the 2026-08-12 close-out pass (PRs #332/#333). Each function referenced by these 19 entries was individually confirmed present in `src/ep_mdio.c` and covered by `tests/test_ep_mdio.c` before flipping its entry to `status: "implemented"`.
+
+Purely additive JSON edit (one new key per entry, no reordering, no entries added or removed) -- confirmed via `git diff --stat` (19 insertions) and an A/B `cfusa check` comparison (`git stash`) showing byte-identical output before/after, since this tool's lint/analyze/cyber findings are code-derived and cannot be affected by a JSON-only change. `cfusa trace`: 1024/1024 requirements traced and tested (the c-FuSa#99 1024-entry cap; all 19 edited entries sit at array indices 698-716, well within the tool's visible window, so none of them are silently dropped by that bug). Full rebuild + 65/65 tests (unaffected, as expected for a docs-only change).
+
 ### v0.290.0 -- 2026-08-12 (issue #201/#334 dedicated investigation: MDIO `mdio_mode` wire field, `REQ-MDIO-021`)
 
 **`REQ-MDIO-021` flips `not-implemented` -> `partial`.**
