@@ -34,6 +34,20 @@ the rationale.
 
 ## Releases
 
+### v0.299.0 -- 2026-08-13 (issue #336: `REQ-ISELED-025`, ISELED response fragmentation -- `not-implemented` -> `partial`)
+
+**`REQ-ISELED-025` flips `not-implemented` -> `partial`.**
+
+TC18 §13.7.12.1 requires that ISELED read responses "are collected 5/4bit decoded and aggregated into one or multiple ACF type up to the requested read_size" -- a ceiling-then-fragment rule this module never implemented: `rcp_ep_iseled_encode_response()` encoded exactly the `rx_data`/`rx_len` its caller supplied, never read a `read_size`, and had no multi-message emission path.
+
+New `rcp_ep_iseled_response_fragment_count()`/`rcp_ep_iseled_encode_response_fragmented()` (`ep_iseled.h`/`ep_iseled.c`) close this by reusing the codebase's existing generic `fragment.h` module rather than inventing an ISELED-specific scheme -- the same module `ep_can.c`'s own frame-response fragmentation already integrates against. `read_size` is applied as a ceiling first (`min(available_len, read_size)`), then `rcp_fragment_plan_count()`/`rcp_fragment_plan()` divide the capped payload into fragments, each emitted as its own ABB (untimed) or GBB (timed) ACF message with `ms`/`read_size_or_segment_num` populated for multi-segment output -- mirroring `rcp_ep_can_encode_frame_response_fragmented()`'s own established header-field conventions exactly.
+
+Deliberately **no fragment-aware decode counterpart** was added, unlike CAN's own `decode_frame_response_fragment()`: ISELED's response payload has no embedded leading-quadlet structure a fragment boundary could split awkwardly, so the pre-existing, unmodified `rcp_ep_iseled_decode_response()` already works unchanged as a per-fragment decoder -- confirmed directly by a full encode/fragment/decode/reassemble round-trip test that respects the `read_size` ceiling even when more source data was actually available.
+
+**Stays `partial`**: `src/mock.c` has no ISELED-specific dispatch of any kind (confirmed via direct grep), so nothing in a live request/response path calls either new function yet -- the same disposition already established for `REQ-CANCEL-012`/`REQ-ADC-037`/`REQ-TIMED-012`/`REQ-GPIO-035`/`REQ-GPIO-036`/`REQ-CANEP-030`. `REQ-ISELED-027`'s own cross-reference to this requirement updated to match.
+
+**Verification**: 4 new unit tests in `tests/test_ep_iseled.c`, including the full worst-case round trip described above. Mutation-tested 3 ways (the `read_size` ceiling's ternary direction, the untimed-frame `ms` bit assignment, an off-by-one dropping the final fragment from the encode loop) -- all caught cleanly, the last as a segfault (out-of-bounds `out_frames[]` write left uninitialized by the shortened loop, caught by the test harness's own bounds). `cfusa check` A/B, normalized by finding text: **0 new errors** (167 both before and after -- the actual merge gate), +9 warnings/+8 info, all individually reviewed and expected: `malloc`/`free`-related CWE-190/CWE-416/MISRA-21.3 advisories from the two `malloc(segs)`/`free(segs)` sites (same finding class already present at `rcp_ep_can_encode_frame_response_fragmented()`'s own equivalent `fragment.h` integration), pointer-arithmetic/signed-unsigned-with-`sizeof` advisories from the same new loop, two "function is N lines (max 50)" MISRA advisories (the new round-trip test itself, and `main()` growing from 65 to 70 lines from 4 new `RUN_TEST` calls), and a handful of `CFUSA-A006`/`CFUSA-CY006`/`CFUSA-A003`/`CFUSA-CY005`/`CFUSA-L001`/`CFUSA-L003` informational/style findings on the new functions themselves. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%, 1024/1024. 65/65 both trees (native + ASan/UBSan).
+
 ### v0.298.0 -- 2026-08-13 (issue #336: `REQ-CANEP-030`, CAN XL physical-layer provisioning -- `not-implemented` -> `partial`)
 
 **`REQ-CANEP-030` flips `not-implemented` -> `partial`.**

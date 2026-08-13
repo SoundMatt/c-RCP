@@ -580,3 +580,86 @@ rcp_ep_iseled_errc_t rcp_ep_iseled_decode_response(const uint8_t *b, size_t len,
     *out_transaction_num = transaction_num;
     return RCP_EP_ISELED_OK;
 }
+
+//cfusa:req REQ-ISELED-025
+size_t rcp_ep_iseled_response_fragment_count(size_t available_len, uint16_t read_size,
+                                              size_t max_fragment_payload)
+{
+    size_t capped_len = (available_len < (size_t)read_size) ? available_len : (size_t)read_size;
+
+    return rcp_fragment_plan_count(capped_len, max_fragment_payload);
+}
+
+//cfusa:req REQ-ISELED-025
+size_t rcp_ep_iseled_encode_response_fragmented(rcp_byte_bus_id_t byte_bus_id,
+                                                 const uint8_t *rx_data, size_t rx_len,
+                                                 uint16_t read_size, uint8_t transaction_num,
+                                                 bool timed, uint64_t timestamp,
+                                                 size_t max_fragment_payload,
+                                                 rcp_bytes_t *out_frames)
+{
+    size_t                  capped_len;
+    size_t                  count;
+    rcp_fragment_segment_t *segs;
+    size_t                  i;
+
+    capped_len = (rx_len < (size_t)read_size) ? rx_len : (size_t)read_size;
+
+    count = rcp_fragment_plan_count(capped_len, max_fragment_payload);
+    if (count == 0) return 0;
+
+    segs = (rcp_fragment_segment_t *)malloc(count * sizeof(*segs));
+    if (!segs) return 0;
+
+    if (rcp_fragment_plan(capped_len, max_fragment_payload, segs, count) != RCP_FRAGMENT_OK) {
+        free(segs);
+        return 0;
+    }
+
+    for (i = 0; i < count; i++) {
+        const uint8_t *slice     = (capped_len > 0) ? &rx_data[segs[i].offset] : NULL;
+        size_t         slice_len = segs[i].len;
+        rcp_bytes_t    frame;
+
+        if (timed) {
+            rcp_acf_gbb_header_t hdr = {0};
+
+            hdr.info.byte_bus_id              = byte_bus_id;
+            hdr.info.op                       = RCP_ACF_OP_READ;
+            hdr.info.rsp                      = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
+            hdr.info.evt                      = 0;
+            hdr.info.mtv                      = RCP_ACF_MTV_VALID;
+            hdr.info.transaction_num          = transaction_num;
+            hdr.info.ms                       = segs[i].ms ? 1u : 0u;
+            hdr.info.read_size_or_segment_num = segs[i].ms ? segs[i].segment_num : 0u;
+            hdr.message_timestamp             = timestamp;
+
+            frame = rcp_acf_encode_gbb(&hdr, slice, slice_len);
+        } else {
+            rcp_acf_byte_message_info_t hdr = {0};
+
+            hdr.byte_bus_id              = byte_bus_id;
+            hdr.op                       = RCP_ACF_OP_READ;
+            hdr.rsp                      = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
+            hdr.evt                      = 0;
+            hdr.transaction_num          = transaction_num;
+            hdr.ms                       = segs[i].ms ? 1u : 0u;
+            hdr.read_size_or_segment_num = segs[i].ms ? segs[i].segment_num : 0u;
+
+            frame = rcp_acf_encode_abb(&hdr, slice, slice_len);
+        }
+
+        if (!frame.data) {
+            size_t j;
+
+            for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
+            free(segs);
+            return 0;
+        }
+
+        out_frames[i] = frame;
+    }
+
+    free(segs);
+    return count;
+}

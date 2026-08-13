@@ -295,6 +295,7 @@
 
 #include "rcp/acf.h"
 #include "rcp/avtp.h"
+#include "rcp/fragment.h"
 #include "rcp/rcp.h"
 #include "rcp/regmap.h"
 #include "rcp/lifecycle.h"
@@ -623,6 +624,60 @@ rcp_ep_iseled_errc_t rcp_ep_iseled_decode_response(const uint8_t *b, size_t len,
                                                     size_t *out_rx_len, bool *out_timed,
                                                     uint64_t *out_timestamp,
                                                     uint8_t *out_transaction_num);
+
+/* ── Fragmented response (REQ-ISELED-025, fragment.h) ────────────────────────── */
+
+/* TC18 §13.7.12.1: "Upon read requests the responses are collected 5/4bit
+ * decoded and aggregated into one or multiple ACF type up to the
+ * requested read_size." The number of ACF messages
+ * rcp_ep_iseled_encode_response_fragmented() would produce for
+ * available_len octets of already-decoded ISELED data, first capped to
+ * at most read_size octets (that ceiling), then split into fragments of
+ * at most max_fragment_payload octets each -- see fragment.h's
+ * rcp_fragment_plan_count(). Returns 0 under the same conditions
+ * rcp_fragment_plan_count() returns 0 for. A caller uses this to size
+ * out_frames before calling
+ * rcp_ep_iseled_encode_response_fragmented(). Unlike ep_can.h's own
+ * analogous function, there is no per-frame-format encode-preconditions
+ * check here first -- ISELED's response payload is exactly rx_data, with
+ * no embedded leading-quadlet structure of its own to validate. */
+size_t rcp_ep_iseled_response_fragment_count(size_t available_len, uint16_t read_size,
+                                              size_t max_fragment_payload);
+
+/* Encodes an ISELED response as one or more ACF messages, first capping
+ * rx_data/rx_len to at most read_size octets (TC18 §13.7.12.1's own
+ * response-aggregation ceiling -- see
+ * rcp_ep_iseled_response_fragment_count()'s own doc comment), then
+ * fragmenting via fragment.h's ms/segment_num mechanism whenever the
+ * capped data exceeds max_fragment_payload octets -- into
+ * out_frames[0..rcp_ep_iseled_response_fragment_count(...)) (caller-
+ * allocated, sized by calling that function first). Every fragment
+ * shares byte_bus_id/op(READ)/transaction_num/timed/timestamp with
+ * rcp_ep_iseled_encode_response(); only the ms flag, the
+ * read_size_or_segment_num field (meaningful only on an ms=true
+ * fragment), and each fragment's own payload slice differ. When the
+ * capped data already fits in one fragment, this produces exactly one
+ * frame identical to what rcp_ep_iseled_encode_response() itself would
+ * have produced for that same capped length -- fragmentation is a
+ * strict superset of the unfragmented path, not a separate wire format.
+ * Returns the number of frames written to out_frames on success (equal
+ * to rcp_ep_iseled_response_fragment_count()'s answer), or 0
+ * (out_frames left entirely untouched) under the same conditions that
+ * function returns 0 for, or on allocation failure partway through (any
+ * already-written out_frames entries are freed before returning).
+ * Caller frees each successfully returned out_frames[i] with
+ * rcp_bytes_free(). A fragment's own raw payload bytes are decoded
+ * exactly as rcp_ep_iseled_decode_response() already decodes any
+ * ISELED response -- no fragment-aware decode counterpart is needed on
+ * the ISELED side, unlike ep_can.h's own decode_frame_response_fragment(),
+ * since this endpoint's response payload carries no embedded structure
+ * a fragment boundary could split awkwardly. */
+size_t rcp_ep_iseled_encode_response_fragmented(rcp_byte_bus_id_t byte_bus_id,
+                                                 const uint8_t *rx_data, size_t rx_len,
+                                                 uint16_t read_size, uint8_t transaction_num,
+                                                 bool timed, uint64_t timestamp,
+                                                 size_t max_fragment_payload,
+                                                 rcp_bytes_t *out_frames);
 
 #ifdef __cplusplus
 }
