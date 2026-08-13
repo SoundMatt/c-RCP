@@ -26,7 +26,7 @@ jobs:
 
       - name: Build c-FuSa from source
         run: |
-          git clone --depth=1 --branch v0.5.50 https://github.com/SoundMatt/c-FuSa /tmp/cfusa
+          git clone --depth=1 --branch v0.5.51 https://github.com/SoundMatt/c-FuSa /tmp/cfusa
           cmake -B /tmp/cfusa/build -S /tmp/cfusa \
             -DCMAKE_BUILD_TYPE=Release -G Ninja
           cmake --build /tmp/cfusa/build --parallel
