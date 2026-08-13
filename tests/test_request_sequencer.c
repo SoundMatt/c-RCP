@@ -13,10 +13,11 @@
 //cfusa:test REQ-SEQ-013
 #include "unity.h"
 
+#include <rcp/alloc.h>
 #include <rcp/request_sequencer.h>
 
 void setUp(void) {}
-void tearDown(void) {}
+void tearDown(void) { rcp_alloc_reset_hooks(); } /* never leak a fault-injection hook across tests */
 
 /* ── rcp_sequencer_table_new() ────────────────────────────────────────────── */
 
@@ -43,6 +44,53 @@ static void test_table_new_nonzero_count_initializes_power_on_state(void)
     for (i = 0; i < table.count; i++) {
         TEST_ASSERT_EQUAL_UINT8(RCP_SEQUENCER_POWER_ON_STATE, table.state[i]);
     }
+
+    rcp_sequencer_table_free(&table);
+}
+
+/* ── rcp_sequencer_table_new() allocation failure (REQ-SEQ-002, issue #338) ──
+ *
+ * count is uint16_t (max 65535 bytes per allocation) -- a real OOM
+ * condition can't be forced portably at that size, so this uses alloc.h's
+ * own fault-injection hooks (its first opt-in caller) instead. */
+
+static void *always_fails(size_t size) { (void)size; return NULL; }
+static void *always_fails2(size_t nmemb, size_t size) { (void)nmemb; (void)size; return NULL; }
+
+static void test_table_new_returns_zeroed_table_when_state_allocation_fails(void)
+{
+    rcp_alloc_hooks_t     hooks = {0};
+    rcp_sequencer_table_t table;
+
+    hooks.malloc_fn = always_fails; /* state's own allocation, tried first */
+    rcp_alloc_set_hooks(&hooks);
+
+    table = rcp_sequencer_table_new(4);
+
+    TEST_ASSERT_NULL(table.state);
+    TEST_ASSERT_NULL(table.owner);
+    TEST_ASSERT_EQUAL_UINT16(0, table.count);
+
+    rcp_sequencer_table_free(&table); /* safe on an already-zeroed table */
+}
+
+/* The "all-or-nothing" half: state's own allocation succeeds, owner's
+ * own subsequent allocation fails -- the already-allocated state buffer
+ * must be freed, not leaked, and the returned table must still be fully
+ * zeroed (not a half-populated table with a NULL owner). */
+static void test_table_new_frees_state_and_returns_zeroed_table_when_owner_allocation_fails(void)
+{
+    rcp_alloc_hooks_t     hooks = {0};
+    rcp_sequencer_table_t table;
+
+    hooks.calloc_fn = always_fails2; /* owner's own allocation, tried second */
+    rcp_alloc_set_hooks(&hooks);
+
+    table = rcp_sequencer_table_new(4);
+
+    TEST_ASSERT_NULL(table.state);
+    TEST_ASSERT_NULL(table.owner);
+    TEST_ASSERT_EQUAL_UINT16(0, table.count);
 
     rcp_sequencer_table_free(&table);
 }
@@ -291,6 +339,8 @@ int main(void)
 
     RUN_TEST(test_table_new_zero_count_is_unsupported_not_a_failure);
     RUN_TEST(test_table_new_nonzero_count_initializes_power_on_state);
+    RUN_TEST(test_table_new_returns_zeroed_table_when_state_allocation_fails);
+    RUN_TEST(test_table_new_frees_state_and_returns_zeroed_table_when_owner_allocation_fails);
 
     RUN_TEST(test_table_unsupported_true_only_for_zero_count);
 

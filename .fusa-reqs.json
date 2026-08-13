@@ -5463,12 +5463,12 @@
     {
       "id": "REQ-SEQ-002",
       "title": "rcp_sequencer_table_new() reports allocation failure via a zeroed table",
-      "text": "rcp_sequencer_table_new() shall, given a nonzero count for which the underlying allocation fails, return a table with state == NULL and count == 0.",
+      "text": "IMPLEMENTED (issue #338, 2026-08-13): rcp_sequencer_table_new() shall, given a nonzero count for which the underlying allocation fails, return a table with state == NULL and count == 0. Proven directly: rcp_sequencer_table_new() (request_sequencer.c) now allocates via rcp_malloc()/rcp_calloc() (alloc.h, new this batch) rather than calling malloc()/calloc() directly -- count is a plain uint16_t (max 65535 bytes), too small to force a real allocation failure portably by size alone, so a real, portable fault-injection seam was needed. test_request_sequencer.c's own test_table_new_returns_zeroed_table_when_state_allocation_fails() and test_table_new_frees_state_and_returns_zeroed_table_when_owner_allocation_fails() install a failing rcp_alloc_hooks_t hook and confirm both allocation-failure branches (state's own first allocation, and owner's own second allocation after state already succeeded) each return a fully zeroed table, with the already-allocated state buffer correctly freed (not leaked) in the second case. Both branches independently mutation-tested: disabling either guard is caught (the state-guard removal crashes outright via a NULL-pointer memset, an even stronger signal than a graceful test failure; the owner-guard removal is caught as an ordinary assertion failure).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial",
+      "status": "implemented",
       "tc18": "§12.10 (\"After power-on/reset all sequencers are in state 1.\"), TC18.txt L3468; §12.7.10 (\"Upon power-on reset all sequencer state values are set to '1'.\"), TC18.txt L3068-3069"
     },
     {
@@ -11400,6 +11400,56 @@
       "scope": "tc18",
       "status": "implemented",
       "tc18": "§11.2.2 (request_type/message_timestamp-repurposing scheme, common to every conditional request kind), TC18.txt L1299-1541"
+    },
+    {
+      "id": "REQ-ALLOC-001",
+      "title": "rcp_alloc_set_hooks() installs a caller-supplied allocator hook set",
+      "text": "rcp_alloc_set_hooks(hooks) shall replace whatever hooks were previously installed with a copy of *hooks; passing NULL shall be equivalent to rcp_alloc_reset_hooks().",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "internal",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-ALLOC-002",
+      "title": "rcp_alloc_reset_hooks() restores the default libc passthrough",
+      "text": "rcp_alloc_reset_hooks() shall restore rcp_malloc()/rcp_calloc()/rcp_free() to their default behavior (a transparent passthrough to malloc()/calloc()/free()), safely, even if no hooks were ever installed.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "internal",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-ALLOC-003",
+      "title": "rcp_malloc() delegates to the installed hook, or libc malloc() by default",
+      "text": "rcp_malloc(size) shall call the currently-installed malloc_fn hook, if any, otherwise malloc(size); its own return value (including NULL on failure) shall be returned unchanged either way.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "internal",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-ALLOC-004",
+      "title": "rcp_calloc() delegates to the installed hook, or libc calloc() by default",
+      "text": "rcp_calloc(nmemb, size) shall call the currently-installed calloc_fn hook, if any, otherwise calloc(nmemb, size); its own return value (including NULL on failure) shall be returned unchanged either way.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "internal",
+      "status": "implemented"
+    },
+    {
+      "id": "REQ-ALLOC-005",
+      "title": "rcp_free() delegates to the installed hook, or libc free() by default; NULL is a safe no-op",
+      "text": "rcp_free(ptr) shall call the currently-installed free_fn hook, if any, otherwise free(ptr); rcp_free(NULL) shall be a safe no-op either way, matching free(NULL)'s own defined behavior.",
+      "standard": "iso26262",
+      "level": "QM",
+      "asil": "QM",
+      "scope": "internal",
+      "status": "implemented"
     }
   ],
   "catalogNote": "Phase 22 re-certification pass (ROADMAP.md milestone 85, v0.85.0): every requirement below was individually reviewed against the source file its //cfusa:req tag actually appears in (a per-prefix audit, not a blind carry-over) and classified via the \"scope\" field. scope=\"tc18\" entries (779 of 854) describe the actual implemented TC18 behavior -- register-map access control, lifecycle transitions, E2E CRC32 safe points, per-endpoint-type request/response shapes, discovery, power-mode transitions, and every ADAPT-class satellite -- and are this project's own ISO 26262 ASIL-B safety-case basis going forward. scope=\"legacy-compat\" entries (75 of 854) describe the retired pre-TC18 Zone/Command surface (rcp.h/rcp.c and tests/legacy_mock.* only); they are demoted to level/asil \"QM\" and their text is prefixed accordingly, but kept -- not deleted or renumbered -- because that legacy surface is out of scope for this milestone to touch (ROADMAP.md's v0.84.0 milestone already confirmed it is the last consumer of those retired types anywhere in src/) and still carries //cfusa:req tags naming these ids; deleting the catalog entries out from under a surviving tag would only trade one inaccuracy (an unqualified legacy requirement) for another (a dangling reference cfusa trace would then report). Only the tc18 subset is this project's claimed certification basis, and it is complete against Phases 13-21 as actually shipped -- not a forward-declared placeholder the way the legacy program's own catalog was at its v0.2.0, since unlike v0.2.0 this catalog was not written before the code it describes. TC18 requirements-corpus completeness pass (v0.105.0): 158 entries were added by a clause-by-clause sweep of TC18 sections 10 through 13.7.13 for normative clauses, tables and figures that no existing entry covered. Every added entry carries a \"tc18\" field citing the exact section (and the line of the specification text it was read from) and a \"status\" field: \"implemented\" (behaviour c-RCP provides, scope \"tc18\", ASIL-B), or \"partial\"/\"not-implemented\" (a normative obligation c-RCP does NOT meet -- scope \"tc18-gap\", level/asil \"QM\", text opening with \"NOT IMPLEMENTED\", and a test that pins the deviation rather than pretending it is absent). A tc18-gap entry is deliberately NOT part of the ASIL-B safety-case basis; it exists so the catalog is an honest map of the specification's normative surface instead of a map of this implementation only."
