@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.297.0 -- 2026-08-13 (issue #336: `REQ-GPIO-035`/`REQ-GPIO-036` debounce-filter and response-timing primitives)
+
+**`REQ-GPIO-035`'s remaining debounce-filtering half, and `REQ-GPIO-036` in full, now have real, tested decision primitives -- both stay `partial`.**
+
+TC18 §13.7.4.2 Table 41's `gpio_debounce_IOn` rule ("0: no debounce; n>0: n consecutive samples of the same value need to be sampled before the output value is changed") had storage but no filtering logic. New `rcp_ep_gpio_debounce_state_t`/`rcp_ep_gpio_debounce_sample()` implement that rule as a caller-owned tracker, matching every other stateful primitive in this codebase (`rcp_ep_adc_trigger_state_t` et al.) -- directly unit-tested for the settle threshold, the differing-sample run-reset rule ("n CONSECUTIVE", not merely n at any point), first-settle-is-not-a-change, and the pre-settle `false` default (deliberately not leaking raw, unfiltered samples, which would defeat the filter's own purpose).
+
+TC18 §13.7.4.3's GPIO response-timing rule (immediate for a pure read, post-debounce for a payload-bearing read or any write) had no classifier at all. New `rcp_ep_gpio_response_timing()` is that pure classification, decided from a decoded request's own `op` and `payload_len` -- both already available to any caller that has decoded the ACF header, so no change to either existing decoder's own signature was needed.
+
+**Deliberately stays `partial`, not `implemented`, for two reasons**: (1) `gpio_base_clk` remains read-only and always renders 0 -- the same "no real clock source modelled" architecture-wide constant already established for `REQ-ADC-033`/every other endpoint type's own `base_clk` field -- so the periodic sampling cadence that would drive repeated debounce calls remains a caller-owned timer this module never itself runs; (2) `src/mock.c` has no per-endpoint-type dispatch of any kind, so neither new function is yet called by any real dispatch path -- the same disposition already established for `REQ-CANCEL-012`/`REQ-ADC-037`/`REQ-TIMED-012`.
+
+**Verification**: 10 new unit tests in `tests/test_ep_gpio.c` (one of the author's own test assertions was itself initially wrong -- `test_debounce_zero_means_no_debounce` asserted `FALSE` for a `true` first sample with `n=0`, caught immediately on the first test run and corrected, not an implementation bug). Mutation-tested 3 ways (the settle-threshold boundary, the run-reset-on-differing-sample condition, the payload-bearing-read classification) -- all caught cleanly. `cfusa check` A/B, normalized by finding text: zero new or removed findings. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%, 1024/1024 (unaffected). 65/65 both trees (native + ASan/UBSan).
+
 ### v0.296.0 -- 2026-08-13 (issue #336 catalog-drift correction: `REQ-ADC-034` flips `not-implemented` -> `implemented`)
 
 **`REQ-ADC-034` flips `not-implemented` -> `implemented`.** This requirement's own text was stale on two independent counts:

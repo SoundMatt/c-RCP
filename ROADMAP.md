@@ -15205,6 +15205,29 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.297.0 -- 2026-08-13 (issue #336: REQ-GPIO-035/REQ-GPIO-036
+debounce-filter and response-timing primitives)
+
+REQ-GPIO-035's remaining debounce-filtering half, and REQ-GPIO-036 in
+full, now have real, tested decision primitives -- both stay
+partial. New rcp_ep_gpio_debounce_state_t/rcp_ep_gpio_debounce_
+sample() implement Table 41's own n-consecutive-samples rule as a
+caller-owned tracker. New rcp_ep_gpio_response_timing() is the pure
+classification 13.7.4.3's rule describes, decided from a decoded
+request's own op and payload_len.
+
+Deliberately stays partial: (1) gpio_base_clk remains read-only and
+always renders 0, the same architecture-wide "no real clock source"
+constant already established elsewhere; (2) src/mock.c has no
+per-endpoint-type dispatch of any kind, so neither function is yet
+called by any real dispatch path.
+
+10 new unit tests (one of the author's own test assertions was
+itself initially wrong, caught on the first test run and corrected).
+Mutation-tested 3 ways -- all caught cleanly. cfusa check A/B: zero
+new or removed findings. cfusa trace: both 100%, 1024/1024
+(unaffected). 65/65 both trees (native + ASan/UBSan).
+
 ### v0.296.0 -- 2026-08-13 (issue #336 catalog-drift correction:
 REQ-ADC-034 flips not-implemented -> implemented)
 

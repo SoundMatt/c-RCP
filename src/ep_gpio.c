@@ -186,6 +186,70 @@ bool rcp_ep_gpio_trigger_signal_number(uint8_t pin_index, rcp_ep_gpio_trigger_t 
     }
 }
 
+//cfusa:req REQ-GPIO-035
+void rcp_ep_gpio_debounce_state_init(rcp_ep_gpio_debounce_state_t *s)
+{
+    memset(s, 0, sizeof(*s));
+}
+
+//cfusa:req REQ-GPIO-035
+bool rcp_ep_gpio_debounce_sample(rcp_ep_gpio_debounce_state_t *s, bool raw_value, uint8_t n,
+                                  bool *out_changed)
+{
+    bool changed;
+    bool prev_settled;
+
+    prev_settled = s->has_settled && s->settled_value;
+
+    if (n == 0u) {
+        /* "0: no debounce" -- every sample is immediately the settled
+         * value. */
+        s->has_candidate = false;
+        changed = s->has_settled && (prev_settled != raw_value);
+        s->has_settled   = true;
+        s->settled_value = raw_value;
+        if (out_changed) *out_changed = changed;
+        return s->settled_value;
+    }
+
+    if (!s->has_candidate || s->candidate_value != raw_value) {
+        /* A differing sample discards any partial run and starts a new
+         * one at count 1 -- "n CONSECUTIVE samples", not merely n samples
+         * seen at any point. */
+        s->has_candidate     = true;
+        s->candidate_value   = raw_value;
+        s->consecutive_count = 1u;
+    } else if (s->consecutive_count < 0xFFu) {
+        s->consecutive_count++;
+    }
+
+    changed = false;
+    if (s->consecutive_count >= n &&
+        (!s->has_settled || s->settled_value != s->candidate_value)) {
+        changed          = s->has_settled; /* first-ever settle isn't a "change" */
+        s->has_settled   = true;
+        s->settled_value = s->candidate_value;
+    }
+
+    if (out_changed) *out_changed = changed;
+    /* Before the very first debounce window completes there is no
+     * settled value yet -- default to false rather than leaking the raw,
+     * unfiltered sample, which would defeat the filter's own purpose for
+     * every caller checking the output mid-run. */
+    return s->has_settled ? s->settled_value : false;
+}
+
+//cfusa:req REQ-GPIO-036
+rcp_ep_gpio_response_timing_t rcp_ep_gpio_response_timing(rcp_acf_op_t op, size_t payload_len)
+{
+    if (op == RCP_ACF_OP_WRITE) return RCP_EP_GPIO_RESPONSE_AFTER_DEBOUNCE;
+    if (op == RCP_ACF_OP_READ) {
+        return (payload_len == 0u) ? RCP_EP_GPIO_RESPONSE_IMMEDIATE
+                                    : RCP_EP_GPIO_RESPONSE_AFTER_DEBOUNCE;
+    }
+    return RCP_EP_GPIO_RESPONSE_IMMEDIATE;
+}
+
 /* ── Functional config ─────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-GPIO-018

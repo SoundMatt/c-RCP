@@ -349,6 +349,89 @@ bool rcp_ep_gpio_trigger_fires(rcp_ep_gpio_trigger_t trigger, bool prev_level, b
 bool rcp_ep_gpio_trigger_signal_number(uint8_t pin_index, rcp_ep_gpio_trigger_t trigger,
                                         uint8_t *out_signal_number);
 
+/* ── Debounce filtering (REQ-GPIO-035 remainder) ─────────────────────────────── */
+
+/* One pin's own debounce-filter state -- the caller-owned tracker every
+ * other stateful primitive in this codebase uses (matches
+ * rcp_e2e_stream_fault_tracker_t/rcp_ep_adc_trigger_state_t's own
+ * "one small struct per thing being tracked" convention). Init with
+ * rcp_ep_gpio_debounce_state_init() before first use. */
+typedef struct {
+    bool    has_settled;       /* false until the first sample settles */
+    bool    settled_value;     /* the pin's current, debounced output value */
+    bool    has_candidate;     /* whether a same-value run is in progress */
+    bool    candidate_value;   /* the value being counted, if has_candidate */
+    uint8_t consecutive_count; /* how many consecutive samples of
+                                   candidate_value have been seen so far */
+} rcp_ep_gpio_debounce_state_t;
+
+/* Zero-initializes s (has_settled/has_candidate both false). */
+void rcp_ep_gpio_debounce_state_init(rcp_ep_gpio_debounce_state_t *s);
+
+/* TC18 §13.7.4.2 Table 41/44's own gpio_debounce_IOn rule: "0: no
+ * debounce; n>0: n consecutive samples of the same value need to be
+ * sampled before the output value is changed. Sampling happens based on
+ * gpio_base_clk and gpio_clk_divider, unrelated to requests." This
+ * function is the pure decision the rule describes -- feeding one newly
+ * sampled raw pin value through the filter for a given n; the actual
+ * periodic sampling cadence (gpio_base_clk/gpio_clk_divider) remains a
+ * caller-owned timer this module never itself runs, matching every other
+ * endpoint type's own "never owns a timer, thread, or hardware" scope
+ * boundary.
+ *
+ * n == 0 (no debounce): raw_value becomes the settled value immediately,
+ * every call.
+ * n > 0: raw_value must be observed n consecutive times (via n
+ * consecutive calls all reporting the same raw_value) before it becomes
+ * the new settled value; a raw_value that differs from the value
+ * currently being counted resets the count to 1 for the new value,
+ * exactly as "n CONSECUTIVE samples" requires -- a single differing
+ * sample discards any partial run, it does not merely pause it.
+ *
+ * Returns s's settled value AFTER this call (i.e. the pin's own output
+ * value right now, whether or not this call changed it) -- false before
+ * the very first debounce window ever completes (there is no settled
+ * value yet; this deliberately does not leak the raw, unfiltered sample,
+ * which would defeat the filter's own purpose for any caller checking
+ * mid-run). *out_changed, when non-NULL, is set to whether this call's
+ * settled-value return differs from the settled value before this call
+ * -- always false on the very first call (there is no "before" to differ
+ * from). */
+bool rcp_ep_gpio_debounce_sample(rcp_ep_gpio_debounce_state_t *s, bool raw_value, uint8_t n,
+                                  bool *out_changed);
+
+/* ── Response timing (REQ-GPIO-036) ──────────────────────────────────────────── */
+
+typedef enum {
+    RCP_EP_GPIO_RESPONSE_IMMEDIATE      = 0, /* pure read (no payload):
+                                                 respond immediately on
+                                                 execution */
+    RCP_EP_GPIO_RESPONSE_AFTER_DEBOUNCE = 1, /* payload-bearing read, or
+                                                 any write: change the pin
+                                                 drive first, then wait the
+                                                 configured debounce time
+                                                 before responding */
+} rcp_ep_gpio_response_timing_t;
+
+/* TC18 §13.7.4.3: "A read request without a byte_msg_payload (pure read)
+ * generates a response immediately upon execution. A read request with a
+ * byte_msg_payload as well as a write request first change the drive of
+ * the pins, then wait for the debounce time before creating a response."
+ * This function is that classification, decided purely from op and
+ * payload_len -- a caller that has already decoded the ACF header (e.g.
+ * via rcp_acf_decode_abb(), the same function
+ * rcp_ep_gpio_decode_read_request()/_decode_write_request() call
+ * internally) already has both values in hand, so no change to either
+ * decoder's own signature is needed. For RCP_ACF_OP_WRITE, payload_len is
+ * irrelevant to the outcome (a write always debounces) but is still
+ * accepted to keep the call site uniform regardless of which op is being
+ * classified. Any op other than RCP_ACF_OP_READ/_WRITE (i.e.
+ * RCP_ACF_OP_NONE, which a real decoded header never produces -- see
+ * acf.h's own doc comment) returns RCP_EP_GPIO_RESPONSE_IMMEDIATE, the
+ * least-surprising default for a value this function was never meant to
+ * classify. */
+rcp_ep_gpio_response_timing_t rcp_ep_gpio_response_timing(rcp_acf_op_t op, size_t payload_len);
+
 /* ── Functional config ─────────────────────────────────────────────────────── */
 
 /* One pin's runtime-adjustable functional configuration -- see the file
