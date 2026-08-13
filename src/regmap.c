@@ -402,6 +402,59 @@ static rcp_wire_error_t respqueue_cfg_row_write_authorize(rcp_lifecycle_state_t 
     return RCP_ERROR_NONE;
 }
 
+/* REQ-SEQ-013 (TC18 §12.7.10 Table 28, issue #335): SEQUENCER_config's
+ * own 2-octet row is authorization-mixed in a way no other table in this
+ * file is -- on top of the ordinary FUNCTIONAL_W_STAR lifecycle gate
+ * every write to this table needs, EACH octet the write's own span
+ * touches is additionally checked against the target sequencer's own
+ * CURRENT owner: a Seq_state octet (row-relative 0) requires
+ * requester_stream_index to already equal that owner, fail-closed on an
+ * unclaimed sequencer (mirrors rcp_sequencer_access_permitted(),
+ * request_sequencer.h, without this file depending on that header); a
+ * Request_stream_index octet (row-relative 1) is permitted if the
+ * sequencer is currently unclaimed (first claim) or requester_stream_
+ * index already owns it (reassign/release its own) -- see
+ * rcp_regmap_ep0_decode_write_request()'s own doc comment (regmap.h)
+ * for the full user-approved design rationale. An octet whose own row
+ * index is >= count is skipped here (out of range for THIS table) --
+ * this function's own caller checks the write's overall bounds
+ * separately, the same "authorize first, bounds-check after" ordering
+ * already used for the write as a whole. */
+static rcp_wire_error_t sequencer_row_write_authorize(rcp_lifecycle_state_t state,
+                                                        rcp_lifecycle_writer_ctx_t writer,
+                                                        const uint8_t *owner, size_t count,
+                                                        uint8_t requester_stream_index,
+                                                        uint16_t relative_start_address,
+                                                        size_t data_len)
+{
+    size_t i;
+
+    if (!rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer)) {
+        return rcp_lifecycle_field_write_error(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer);
+    }
+
+    for (i = 0; i < data_len; i++) {
+        size_t  row_index  = ((size_t)relative_start_address + i) / 2u;
+        size_t  row_offset = ((size_t)relative_start_address + i) % 2u;
+        uint8_t cur_owner;
+
+        if (row_index >= count) continue;
+        cur_owner = owner[row_index];
+
+        if (row_offset == 0u) { /* Seq_state */
+            if (cur_owner == 0u || cur_owner != requester_stream_index) {
+                return RCP_ERROR_UNAUTHORIZED_ACCESS;
+            }
+        } else { /* Request_stream_index */
+            if (cur_owner != 0u && cur_owner != requester_stream_index) {
+                return RCP_ERROR_UNAUTHORIZED_ACCESS;
+            }
+        }
+    }
+
+    return RCP_ERROR_NONE;
+}
+
 //cfusa:req REQ-RMAP-040
 //cfusa:req REQ-RMAP-041
 //cfusa:req REQ-RMAP-047
@@ -435,6 +488,10 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      size_t request_stream_cfg_count,
                                      rcp_regmap_ep_generic_cfg_t *ep_generic_cfg,
                                      size_t ep_generic_cfg_count,
+                                     uint8_t *sequencer_state,
+                                     uint8_t *sequencer_owner,
+                                     size_t sequencer_count,
+                                     uint8_t requester_stream_index,
                                      rcp_wire_error_t *out_error,
                                      uint8_t *out_transaction_num,
                                      uint32_t watchdog_ms_per_tick)
@@ -450,6 +507,7 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
     size_t                       response_queue_cfg_len;
     size_t                       request_stream_cfg_len;
     size_t                       ep_generic_cfg_len;
+    size_t                       sequencer_state_len;
     bool                         locked;
 
     acf_rc = rcp_acf_decode_abb(b, len, &hdr, &payload, &payload_len);
@@ -613,9 +671,32 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
         return RCP_REGMAP_EP0_OK;
     }
 
+    sequencer_state_len = sequencer_count * 2u;
+    if (sequencer_state != NULL && sequencer_owner != NULL &&
+        (size_t)addr >= map->svr_sequencer_state_ptr &&
+        (size_t)addr < (size_t)map->svr_sequencer_state_ptr + sequencer_state_len) {
+        uint16_t relative = (uint16_t)((size_t)addr - map->svr_sequencer_state_ptr);
+        rcp_regmap_sequencer_table_reconfig_errc_t rc;
+
+        /* REQ-SEQ-013: ownership-aware authorization, on top of the
+         * ordinary FUNCTIONAL_W_STAR gate every other table's own
+         * writes already need -- see sequencer_row_write_authorize()'s
+         * own doc comment for the full per-octet rule. */
+        *out_error = sequencer_row_write_authorize(state, writer, sequencer_owner, sequencer_count,
+                                                     requester_stream_index, relative, data_len);
+        if (*out_error != RCP_ERROR_NONE) return RCP_REGMAP_EP0_OK;
+
+        rc = rcp_regmap_sequencer_table_apply_reconfig(sequencer_state, sequencer_owner,
+                                                         sequencer_count, relative, &payload[2],
+                                                         data_len);
+        *out_error = (rc == RCP_REGMAP_SEQUENCER_TABLE_RECONFIG_OK) ? RCP_ERROR_NONE
+                                                                      : RCP_ERROR_INVALID_PARAMETER;
+        return RCP_REGMAP_EP0_OK;
+    }
+
     /* Neither Table 20's own extent nor any known pointed-to table --
      * see this function's own header doc comment for which tables this
-     * milestone routes (issue #301, issue #306, issue #311). */
+     * milestone routes (issue #301, issue #306, issue #311, issue #335). */
     *out_error = RCP_ERROR_EP_NOT_FOUND;
     return RCP_REGMAP_EP0_OK;
 }
@@ -714,7 +795,8 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      const rcp_regmap_ep_generic_cfg_t *ep_generic_cfg,
                                      size_t ep_generic_cfg_count,
                                      const uint8_t *sequencer_state,
-                                     size_t sequencer_state_count,
+                                     const uint8_t *sequencer_owner,
+                                     size_t sequencer_count,
                                      rcp_wire_error_t *out_error,
                                      uint32_t watchdog_ms_per_tick)
 {
@@ -794,29 +876,31 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                              read_size, transaction_num);
     }
 
-    /* REQ-SEQ-014: sequencer_state (svr_sequencer_state_ptr, TC18 §12.7.10
-     * Table 25/28's own one-octet-per-sequencer Seq_state layout) is
-     * already exactly its own wire image -- no render() step needed, see
-     * this parameter's own doc comment (regmap.h). Clamped to this
-     * dispatcher's own stack bound the same way every other extent's
-     * fixed-array image above is; a caller-supplied count beyond that
-     * bound is truncated to it rather than overflowing the stack buffer
-     * (matching every sibling extent's own MAX_ENTRIES clamp, none of
-     * which validate their own count parameter either -- that validation
-     * is this dispatcher's caller's own responsibility, the same
-     * "caller keeps count in sync with real storage" contract
+    /* REQ-SEQ-013/REQ-SEQ-014: sequencer_state/sequencer_owner
+     * (svr_sequencer_state_ptr, TC18 §12.7.10 Table 25/28's own real
+     * 2-octet-per-sequencer layout) now go through
+     * rcp_regmap_sequencer_table_render() -- see that function's own doc
+     * comment (regmap.h) for the conformance defect this corrects.
+     * clamped_count (a sequencer COUNT, not an octet count) is clamped to
+     * this dispatcher's own stack bound the same way every other
+     * extent's fixed-array image above is; a caller-supplied count
+     * beyond that bound is truncated to it rather than overflowing the
+     * stack buffer (matching every sibling extent's own MAX_ENTRIES
+     * clamp, none of which validate their own count parameter either --
+     * that validation is this dispatcher's caller's own responsibility,
+     * the same "caller keeps count in sync with real storage" contract
      * svr_sequencers_max's own field comment (regmap.h) already states). */
-    if (sequencer_state != NULL &&
+    if (sequencer_state != NULL && sequencer_owner != NULL &&
         (size_t)addr >= map->svr_sequencer_state_ptr &&
-        (size_t)addr < (size_t)map->svr_sequencer_state_ptr + sequencer_state_count) {
-        size_t  clamped_count = (sequencer_state_count > RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES)
+        (size_t)addr < (size_t)map->svr_sequencer_state_ptr + sequencer_count * 2u) {
+        size_t  clamped_count = (sequencer_count > RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES)
                                      ? RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES
-                                     : sequencer_state_count;
-        uint8_t image[RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES];
+                                     : sequencer_count;
+        uint8_t image[RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES * 2u];
 
-        memcpy(image, sequencer_state, clamped_count);
+        rcp_regmap_sequencer_table_render(sequencer_state, sequencer_owner, clamped_count, image);
         *out_error = RCP_ERROR_NONE;
-        return ep0_read_response_from_slice(image, clamped_count,
+        return ep0_read_response_from_slice(image, clamped_count * 2u,
                                              (size_t)addr - map->svr_sequencer_state_ptr,
                                              read_size, transaction_num);
     }
@@ -1563,6 +1647,68 @@ rcp_stream_id_t rcp_regmap_response_queue_stream_id(const rcp_regmap_response_qu
                                                      const uint8_t mac[6])
 {
     return rcp_stream_id_make(mac, cfg->stream_uid);
+}
+
+//cfusa:req REQ-SEQ-013
+uint8_t rcp_regmap_request_stream_cfg_resolve_index(
+    const rcp_regmap_request_stream_cfg_t *entries, size_t count, uint64_t stream_id)
+{
+    size_t i;
+
+    if (!entries) return 0u;
+
+    for (i = 0; i < count; i++) {
+        if (entries[i].rx_stream_id == stream_id) return (uint8_t)(i + 1u);
+    }
+    return 0u; /* no match -- 0 is the "no such request stream" sentinel */
+}
+
+/* ── SEQUENCER_config wire codec (issue #335, REQ-SEQ-013/REQ-SEQ-014) ─────
+ * See rcp_regmap_sequencer_table_render()'s own doc comment (regmap.h) for
+ * the full field mapping and the conformance defect this batch corrects. */
+
+//cfusa:req REQ-SEQ-014
+void rcp_regmap_sequencer_table_render(const uint8_t *state, const uint8_t *owner,
+                                        size_t count, uint8_t *out)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        out[2u * i + 0u] = state[i];
+        out[2u * i + 1u] = owner[i];
+    }
+}
+
+//cfusa:req REQ-SEQ-013
+//cfusa:req REQ-SEQ-014
+rcp_regmap_sequencer_table_reconfig_errc_t
+rcp_regmap_sequencer_table_apply_reconfig(uint8_t *state, uint8_t *owner, size_t count,
+                                           uint16_t relative_start_address,
+                                           const uint8_t *data, size_t data_len)
+{
+    uint8_t block[RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES * 2u];
+    size_t  block_len = count * 2u;
+    size_t  i;
+
+    if (data_len == 0u) return RCP_REGMAP_SEQUENCER_TABLE_RECONFIG_ERR_SHORT;
+
+    if ((size_t)relative_start_address + data_len > block_len) {
+        return RCP_REGMAP_SEQUENCER_TABLE_RECONFIG_ERR_OUT_OF_RANGE;
+    }
+
+    /* Same "render current image, patch the addressed octets, re-parse
+     * the whole image back" idiom every other pointed-to table's own
+     * apply_reconfig() already uses. */
+    rcp_regmap_sequencer_table_render(state, owner, count, block);
+    for (i = 0; i < data_len; i++) {
+        block[relative_start_address + i] = data[i]; /* every octet R/W or R/W* */
+    }
+    for (i = 0; i < count; i++) {
+        state[i] = block[2u * i + 0u];
+        owner[i] = block[2u * i + 1u];
+    }
+
+    return RCP_REGMAP_SEQUENCER_TABLE_RECONFIG_OK;
 }
 
 /* ── EP-ID / byte_bus_id map ────────────────────────────────────────────────── */

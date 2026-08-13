@@ -2036,6 +2036,20 @@ rcp_regmap_request_stream_cfg_apply_reconfig(rcp_regmap_request_stream_cfg_t *en
                                               const uint8_t *data, size_t data_len,
                                               uint32_t watchdog_ms_per_tick);
 
+/* REQ-SEQ-013 (issue #335): resolves stream_id to its own 1-based
+ * position in entries[0..count) (the same request_stream_index
+ * convention rcp_regmap_ep_id_map_entry_t.request_stream_index already
+ * establishes, REQ-RMAP-052 -- 1-based, with 0 reserved as a "no match"
+ * sentinel rather than a real index). Returns 0 if no entry's own
+ * rx_stream_id equals stream_id, or entries is NULL/count is 0. Every
+ * request a real transport delivers carries its own AVTP stream_id
+ * directly (avtp.h); this is the one place that identity gets turned
+ * into "which configured request stream is this," the register-map-
+ * relative identity TC18's own access-control-bearing fields (Table 28's
+ * Request_stream_index among them) are expressed in terms of. */
+uint8_t rcp_regmap_request_stream_cfg_resolve_index(
+    const rcp_regmap_request_stream_cfg_t *entries, size_t count, uint64_t stream_id);
+
 /* Not itself TC18-derived -- an implementation ceiling on how many
  * request-stream rows this codebase's own fixed-size wire-codec buffers
  * support, matching the same scale as
@@ -2538,7 +2552,34 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
  * ep_generic_cfg/ep_generic_cfg_count describe the currently-configured
  * tables this call may patch in place; any count may be 0 (that table
  * then has no address range at all, and any write targeting it falls
- * through to the "unknown address" case). */
+ * through to the "unknown address" case).
+ *
+ * sequencer_state/sequencer_owner/sequencer_count (REQ-SEQ-013, issue
+ * #335) add an eighth extent -- request_sequencer.h's own
+ * rcp_sequencer_table_t.state/.owner/.count, same NULL/NULL/0-means-
+ * unsupported convention as every other extent. Unlike every table
+ * above, this one's authorization is NOT the generic FUNCTIONAL_W_STAR
+ * row-level check alone: TC18 §12.7.10 Table 28's own Request_stream_
+ * index field names the one client ("Client Nr") allowed to touch each
+ * sequencer at all, so on top of the ordinary FUNCTIONAL_W_STAR gate,
+ * every octet the write's own span touches is additionally checked
+ * per-sequencer-row, per-sub-field, against requester_stream_index (the
+ * caller's own already-resolved identity for whichever client sent this
+ * write -- rcp_regmap_request_stream_cfg_resolve_index() derives it from
+ * a real request's own stream_id): a Seq_state octet (row-relative 0)
+ * requires the sequencer's own CURRENT owner to equal
+ * requester_stream_index, fail-closed (denied outright) if the
+ * sequencer is still unclaimed; a Request_stream_index octet
+ * (row-relative 1 -- claiming or reassigning ownership) is permitted if
+ * the sequencer is currently unclaimed (first claim, open to whichever
+ * client gets there first) OR requester_stream_index already owns it
+ * (an owner may reassign or release its own sequencer) -- both rules
+ * are this codebase's own design choice, user-approved 2026-08-13,
+ * since TC18 states an access-control rule for Seq_state itself but not
+ * for who may configure Request_stream_index in the first place. Any
+ * denial reports RCP_ERROR_UNAUTHORIZED_ACCESS, checked after the
+ * ordinary FUNCTIONAL_W_STAR gate and before the out-of-range check,
+ * matching this function's own established "authorize first" ordering. */
 rcp_regmap_ep0_errc_t
 rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      const rcp_regmap_general_t *map,
@@ -2554,6 +2595,10 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      size_t request_stream_cfg_count,
                                      rcp_regmap_ep_generic_cfg_t *ep_generic_cfg,
                                      size_t ep_generic_cfg_count,
+                                     uint8_t *sequencer_state,
+                                     uint8_t *sequencer_owner,
+                                     size_t sequencer_count,
+                                     uint8_t requester_stream_index,
                                      rcp_wire_error_t *out_error,
                                      uint8_t *out_transaction_num,
                                      uint32_t watchdog_ms_per_tick);
@@ -2592,15 +2637,60 @@ rcp_regmap_ep0_decode_read_request(const uint8_t *b, size_t len,
                                     uint16_t *out_addr, uint8_t *out_read_size,
                                     uint8_t *out_transaction_num);
 
-/* REQ-SEQ-014's own upper bound on how many sequencer-state octets this
- * dispatcher can serve in one call -- matches svr_sequencers_max's own
- * 8-bit wire width (REQ-RMAP-028: 0..255 sequencers), so every value
- * that register can legally hold fits. request_sequencer.h's own
- * rcp_sequencer_table_t is heap-sized at runtime and carries no such
- * bound itself; this dispatcher's own stack-local copy needs one, the
- * same reason every other extent above (RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES
- * etc.) already has its own bound. */
+/* REQ-SEQ-014's own upper bound on how many sequencers this dispatcher
+ * can serve in one call -- matches svr_sequencers_max's own 8-bit wire
+ * width (REQ-RMAP-028: 0..255 sequencers), so every value that register
+ * can legally hold fits. request_sequencer.h's own rcp_sequencer_table_t
+ * is heap-sized at runtime and carries no such bound itself; this
+ * dispatcher's own stack-local copy needs one, the same reason every
+ * other extent above (RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES etc.) already
+ * has its own bound. */
 #define RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES ((size_t)0xFFu)
+
+typedef enum {
+    RCP_REGMAP_SEQUENCER_TABLE_RECONFIG_OK = 0,
+    RCP_REGMAP_SEQUENCER_TABLE_RECONFIG_ERR_SHORT,
+    RCP_REGMAP_SEQUENCER_TABLE_RECONFIG_ERR_OUT_OF_RANGE
+} rcp_regmap_sequencer_table_reconfig_errc_t;
+
+/* REQ-SEQ-013/REQ-SEQ-014 (TC18 §12.7.10 Table 25/28's own 2-octet-per-
+ * sequencer SEQUENCER_config layout: relative 0x0000 Seq_state (8 bit,
+ * R/W), relative 0x0001 Request_stream_index (8 bit, R/W*), repeating
+ * per sequencer): renders count sequencers' state/owner pairs into out
+ * as out[2*i+0]=state[i], out[2*i+1]=owner[i]. Corrects a real
+ * conformance defect this codebase's own earlier REQ-SEQ-014 fix had:
+ * that fix's own doc comment claimed request_sequencer.h's
+ * rcp_sequencer_table_t.state "IS already exactly TC18's own
+ * one-octet-per-sequencer Seq_state layout" and exposed it directly with
+ * no render() step at all -- but the real Table 25/28 layout is 2 octets
+ * per sequencer, not 1, confirmed via direct primary-source read
+ * (TC18.txt) before this fix, not assumed from the prior comment's own
+ * unverified claim. A client that had been parsing this extent per
+ * TC18's own real stride would have systematically misread every
+ * sequencer past the first (e.g. reading what should be sequencer 2's
+ * own Seq_state as sequencer 1's own Request_stream_index). state/owner
+ * are request_sequencer.h's own rcp_sequencer_table_t.state/.owner
+ * arrays, passed as raw pointers (not the struct type) to preserve this
+ * header's own no-cross-module-dependency-on-request_sequencer.h
+ * layering, the same reason the now-superseded prior comment already
+ * gave. Pass NULL/NULL/0 if this server has no sequencer table at all. */
+void rcp_regmap_sequencer_table_render(const uint8_t *state, const uint8_t *owner,
+                                        size_t count, uint8_t *out);
+
+/* The parse-side inverse of rcp_regmap_sequencer_table_render() above --
+ * identical patch-then-reparse idiom to every other pointed-to table's
+ * own apply_reconfig(). relative_start_address/data are relative to this
+ * table's own start (svr_sequencer_state_ptr's own current value). This
+ * function itself performs no access-control check of its own -- see
+ * rcp_regmap_ep0_decode_write_request()'s own doc comment for
+ * REQ-SEQ-013's ownership-aware authorization, applied by the caller
+ * before this function is ever reached, the same "mechanism vs.
+ * predicate" split every access-controlled table in this file already
+ * follows. */
+rcp_regmap_sequencer_table_reconfig_errc_t
+rcp_regmap_sequencer_table_apply_reconfig(uint8_t *state, uint8_t *owner, size_t count,
+                                           uint16_t relative_start_address,
+                                           const uint8_t *data, size_t data_len);
 
 /* Encodes an ACF_ABB READ response for a request decoded by
  * rcp_regmap_ep0_decode_read_request() above. Routes addr across the
@@ -2610,19 +2700,19 @@ rcp_regmap_ep0_decode_read_request(const uint8_t *b, size_t len,
  * adds the last of these), reusing this dispatcher's own already-proven
  * per-table render() functions, not a second copy of that wire codec.
  *
- * sequencer_state/sequencer_state_count are the raw wire image directly
- * -- request_sequencer.h's rcp_sequencer_table_t.state IS already
- * exactly TC18's own one-octet-per-sequencer Seq_state layout (Table 25/
- * 28's own relative address 0x0000, 8 bit), so no separate render()
- * step exists for this extent the way hw_pin_map/ep_id_map/etc. each
- * need their own struct-to-wire conversion; a caller passes
- * table.state/table.count straight through. This header deliberately
- * takes a raw uint8_t pointer and count rather than rcp_sequencer_table_t
- * itself, to avoid regmap.h depending on request_sequencer.h -- the same
- * no-cross-module-dependency layering request_sequencer.h's own file
- * header already documents in the other direction. Pass NULL/0 if this
- * server has no sequencer table at all (rcp_sequencer_table_unsupported()),
- * matching every other optional extent's own NULL/0 convention.
+ * sequencer_state/sequencer_owner/sequencer_count are
+ * request_sequencer.h's own rcp_sequencer_table_t.state/.owner/.count,
+ * passed as raw pointers (not the struct type) to avoid regmap.h
+ * depending on request_sequencer.h -- the same no-cross-module-
+ * dependency layering request_sequencer.h's own file header already
+ * documents in the other direction. This extent now goes through
+ * rcp_regmap_sequencer_table_render() (REQ-SEQ-013, corrects the real
+ * 1-octet-vs-2-octet-per-sequencer conformance defect that function's
+ * own doc comment describes) rather than being copied through
+ * unconverted the way an earlier fix mistakenly did. Pass NULL/NULL/0
+ * if this server has no sequencer table at all
+ * (rcp_sequencer_table_unsupported()), matching every other optional
+ * extent's own NULL/0 convention.
  *
  * On a known extent: *out_error is RCP_ERROR_NONE and the returned
  * rcp_bytes_t carries min(read_size, that extent's own remaining length
@@ -2667,7 +2757,8 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      const rcp_regmap_ep_generic_cfg_t *ep_generic_cfg,
                                      size_t ep_generic_cfg_count,
                                      const uint8_t *sequencer_state,
-                                     size_t sequencer_state_count,
+                                     const uint8_t *sequencer_owner,
+                                     size_t sequencer_count,
                                      rcp_wire_error_t *out_error,
                                      uint32_t watchdog_ms_per_tick);
 

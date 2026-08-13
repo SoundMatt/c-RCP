@@ -113,6 +113,8 @@ static rcp_mock_server_t *fixture(handler_log_t *log)
     rcp_lifecycle_writer_ctx_t root = {true, false, false, false}; /* REQ-LIFECYCLE-031:
                                                                        required for the
                                                                        RCP_CONFIGURED advance */
+    rcp_regmap_request_stream_cfg_t stream_cfg[1];
+    uint16_t                        i;
 
     memset(log, 0, sizeof(*log));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
@@ -122,6 +124,24 @@ static rcp_mock_server_t *fixture(handler_log_t *log)
     TEST_ASSERT_EQUAL(RCP_MOCK_OK,
         rcp_mock_server_add_endpoint(srv, 1, 1, true /* ep_enable */, logging_handler, log));
     TEST_ASSERT_TRUE(rcp_mock_server_set_sequencer_count(srv, 4));
+
+    /* REQ-SEQ-013 (issue #335): submit()'s own dispatch calls all use
+     * stream_id=1u; claim every sequencer as owned by that same stream
+     * (resolves to request_stream_index 1) so this fixture's own
+     * compound/compound-wait tests -- none of which are themselves
+     * exercising REQ-SEQ-013's own access control -- aren't newly
+     * blocked by the fail-closed default an unclaimed sequencer now
+     * gets. Tests that DO exercise the access-control gate build their
+     * own fixture instead, deliberately leaving a sequencer unclaimed or
+     * owned by a different client (see the dedicated ownership tests
+     * below). */
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id = 1u;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+    for (i = 0; i < 4; i++) {
+        TEST_ASSERT_TRUE(rcp_sequencer_set_owner(rcp_mock_server_sequencers(srv), i, 1u));
+    }
+
     return srv;
 }
 
@@ -396,6 +416,98 @@ static void test_two_pending_compound_waits_have_independent_targets(void)
 
     rcp_bytes_free(&frame_a);
     rcp_bytes_free(&frame_b);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── REQ-SEQ-013: compound/compound-wait admission's own sequencer-
+ *    ownership access control ───────────────────────────────────────────── */
+
+//cfusa:test REQ-SEQ-013
+static void test_compound_admission_denied_for_unclaimed_sequencer(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log); /* claims sequencers 0-3 for stream_id=1 */
+    rcp_bytes_t frame = make_compound(RCP_REQUEST_TYPE_COMPOUND, 0, RCP_SEQUENCER_POWER_ON_STATE,
+                                       1, 0, 0, 31);
+
+    /* Release sequencer 0 back to unclaimed -- fixture()'s own claim
+     * undone for this one test only. */
+    TEST_ASSERT_TRUE(rcp_sequencer_set_owner(rcp_mock_server_sequencers(srv), 0,
+                                              RCP_SEQUENCER_OWNER_UNCLAIMED));
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED, submit(srv, &frame));
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 1)); /* never admitted */
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+//cfusa:test REQ-SEQ-013
+static void test_compound_admission_denied_for_sequencer_owned_by_a_different_client(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log); /* claims sequencers 0-3 for stream_id=1 */
+    rcp_bytes_t frame = make_compound(RCP_REQUEST_TYPE_COMPOUND, 0, RCP_SEQUENCER_POWER_ON_STATE,
+                                       1, 0, 0, 32);
+
+    /* Reassign sequencer 0 to a different client (99) -- submit()'s own
+     * dispatch calls all resolve to request_stream_index 1, so this
+     * request is no longer the recorded owner. */
+    TEST_ASSERT_TRUE(rcp_sequencer_set_owner(rcp_mock_server_sequencers(srv), 0, 99u));
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED, submit(srv, &frame));
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 1)); /* never admitted */
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+//cfusa:test REQ-SEQ-013
+static void test_compound_wait_admission_denied_for_unclaimed_sequencer(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    const uint8_t target[2] = {0x00, 0x05};
+    rcp_compound_step_t step = {0};
+    rcp_bytes_t frame;
+
+    step.sequencer_index = 1;
+    step.start_state     = RCP_SEQUENCER_POWER_ON_STATE;
+    step.next_state      = 1;
+
+    TEST_ASSERT_TRUE(rcp_sequencer_set_owner(rcp_mock_server_sequencers(srv), 1,
+                                              RCP_SEQUENCER_OWNER_UNCLAIMED));
+
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT, 1, &step, 0x0u, 33,
+                                         target, sizeof(target));
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED, submit(srv, &frame));
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 1));
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+//cfusa:test REQ-SEQ-013
+static void test_compound_admission_permitted_when_no_sequencer_table_configured(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    rcp_bytes_t frame = make_compound(RCP_REQUEST_TYPE_COMPOUND, 0, RCP_SEQUENCER_POWER_ON_STATE,
+                                       1, 0, 0, 34);
+
+    /* REQ-SEQ-013's own ownership gate is deliberately skipped when the
+     * sequencer table itself is unsupported (count == 0) -- a distinct,
+     * pre-existing "compound operations unsupported entirely" scenario,
+     * not this requirement's own concern (see dispatch_plain()'s own
+     * doc comment, mock.c). Still admitted PENDING, exactly like
+     * test_compound_never_due_without_a_sequencer_table(). */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_sequencer_count(srv, 0));
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &frame));
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 1));
+
+    rcp_bytes_free(&frame);
     rcp_mock_server_destroy(srv);
 }
 
@@ -1268,6 +1380,11 @@ int main(void)
     RUN_TEST(test_two_pending_compound_waits_have_independent_targets);
     RUN_TEST(test_compound_wait_reserved_evt_is_rejected_at_admission);
     RUN_TEST(test_compound_wait_reserved_evt_sends_unsupported_cmd_error_response);
+
+    RUN_TEST(test_compound_admission_denied_for_unclaimed_sequencer);
+    RUN_TEST(test_compound_admission_denied_for_sequencer_owned_by_a_different_client);
+    RUN_TEST(test_compound_wait_admission_denied_for_unclaimed_sequencer);
+    RUN_TEST(test_compound_admission_permitted_when_no_sequencer_table_configured);
 
     RUN_TEST(test_triggered_executes_only_on_its_own_trigger);
     RUN_TEST(test_triggered_threshold_delays_execution);

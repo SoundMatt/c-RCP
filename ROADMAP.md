@@ -17487,3 +17487,133 @@ tracked and don't bear on either requirement.
 No code changed. `cfusa check`/`trace` re-run to confirm: identical
 to the pre-change baseline (0 errors, 100%/100% coverage). 65/65 both
 trees, unaffected.
+
+### v0.306.0 -- 2026-08-13 (issue #335: `REQ-SEQ-013` sequencer
+ownership access control; bonus fix: real 2-octet `SEQUENCER_config`
+wire layout)
+
+Closes `REQ-SEQ-013` (TC18 §12.7.10 Table 28's `Request_stream_index`
+field, naming the one RC Client permitted to access a given
+sequencer) -- a real, previously-open security gap: any RC Client
+that could reach the register map could advance or reset any other
+client's sequencer, including one configured as another client's own
+`rx_safestate_sequencer`, defeating the §12.7.7 safety-measure
+mechanism entirely.
+
+Design taken through three separate user-confirmation rounds before
+landing:
+
+1. **Ownership semantics** -- explicit write required, fail-closed
+   until then. `rcp_sequencer_table_t` (`request_sequencer.h`/`.c`)
+   gained a parallel `owner[]` array alongside `state[]`, recording
+   each sequencer's claimant as a 1-based `request_stream_cfg` row
+   index (`RCP_SEQUENCER_OWNER_UNCLAIMED == 0`), the same
+   1-based/0-sentinel convention `REQ-RMAP-052` already established
+   for `rcp_regmap_ep_id_map_entry_t.request_stream_index`.
+   `rcp_sequencer_access_permitted()` is a pure predicate, denying an
+   unclaimed sequencer to *everyone*, not open-to-anyone, since TC18
+   states the field's purpose but never how it is first populated.
+2. **Scope: full `request_stream_cfg` plumbing for `mock.c`**, over a
+   narrower register-map-only option, because enforcing ownership at
+   admission time requires resolving an incoming request's
+   `stream_id` into a `request_stream_index` and `mock.c` had zero
+   access to that table at all. `rcp_mock_server_set_request_stream_cfg()`
+   (new setter, mirroring the existing `sequencers`/`hw_pin_map`
+   pattern) plus `rcp_regmap_request_stream_cfg_resolve_index()` (the
+   resolver itself) -- this also unblocks `REQ-RMAP-048`/`REQ-RMAP-049`,
+   still not implemented, for a future batch.
+3. **Compound-wait admission gate scope** -- after wiring an
+   admission-time ownership check into `mock.c`'s `dispatch_plain()`
+   broke 15 pre-existing tests (the shared `fixture()` helper never
+   established sequencer ownership, so every compound/compound-wait
+   admission was newly rejected under the fail-closed default), kept
+   the check and fixed the tests rather than weakening the security
+   default. `fixture()` now claims all 4 sequencers for `stream_id=1`
+   up front; tests that specifically exercise the access-control gate
+   build their own scenario on top of that baseline (releasing or
+   reassigning a specific sequencer) instead of relying on a
+   different fixture.
+
+Both halves of TC18's own vulnerability description are independently
+enforced, matching this repo's existing "mechanism vs. predicate"
+layering (the same split `rcp_lifecycle_field_writable()` already
+uses): direct EP0 register-map writes
+(`rcp_regmap_ep0_decode_write_request()`, now ownership-aware per
+octet -- `Seq_state` requires strict owner match; `Request_stream_index`
+itself permits unclaimed-or-owner-match, so a client can claim an
+unclaimed sequencer or release/reassign one it already owns, an
+asymmetric rule that is this implementation's own design choice, not
+itself TC18-mandated) AND the compound/compound-wait admission path,
+which never touches the register map at all -- a request directly
+names its own `sequencer_index` in its wire payload. `mock.c`'s
+`dispatch_plain()` admits first (decode happens inside admission),
+then immediately cancels an unauthorized admission via
+`rcp_server_endpoint_cancel_single()` before returning
+`RCP_ERROR_UNAUTHORIZED_ACCESS` -- the same "admit then immediately
+cancel if unauthorized" pattern, and the same layering split (context
+lives in `mock.c`, mechanism lives in the lower-level primitive), as
+issue #334's earlier `REQ-CANCEL-012` batch.
+
+The new gate correctly excludes an orthogonal, pre-existing "no
+sequencer table configured at all" scenario
+(`rcp_sequencer_table_unsupported()`, `count == 0`): skipped entirely
+in that case, deferring to that scenario's own separately-tested
+behavior (a request stays validly `PENDING`, never rejected).
+Conflating the two would have wrongly regressed
+`test_compound_never_due_without_a_sequencer_table` -- caught and
+fixed as its own distinct root cause, not folded into the ownership
+fix.
+
+**Bonus conformance fix, found via direct primary-source
+verification**: `REQ-SEQ-014`'s prior closure (v0.334.0-era) had
+wrongly claimed TC18's own `SEQUENCER_config` wire layout was 1 octet
+per sequencer, needing no `render()` step of its own. A direct read
+of `TC18.txt` L3064-3110 (Table 28) shows it is actually **2 octets
+per sequencer** -- `Seq_state` (relative 0x0000) then
+`Request_stream_index` (relative 0x0001), repeating per sequencer.
+Any real client parsing the old 1-octet image per TC18's true
+2-octet stride would misread every sequencer past the first. Fixed
+in this same batch: `rcp_regmap_sequencer_table_render()`/
+`_apply_reconfig()` now interleave `state[i]`/`owner[i]` into the
+correct 2-octet layout; `rcp_regmap_ep0_encode_read_response()`
+gained a `sequencer_owner` parameter and the corrected
+`sequencer_count * 2u` extent-length math. `REQ-SEQ-014`'s own
+catalog text corrected to match, citing the same primary-source line
+range.
+
+**Test-file incident, recorded honestly**: while updating
+`tests/test_tc18_gaps_regmap.c`'s ~50 pre-existing
+`rcp_regmap_ep0_decode_write_request()`/`rcp_regmap_ep0_encode_read_response()`
+call sites for the two widened signatures, an earlier attempt at a
+narrower, targeted bulk edit (fixing a subset of unrelated call
+sites' lifecycle-state argument) matched and corrupted 10 lines of
+unrelated, already-passing pre-existing test content, and a follow-up
+targeted revert made it worse rather than better. Recovered by fully
+reverting the file to clean HEAD (`git checkout --`) and redoing the
+entire sequence of mechanical edits from scratch against the clean
+baseline, verifying exact match counts (`grep -c`) against
+pre-computed expectations at each step before proceeding -- the same
+"comment-aware bulk edits" lesson this project has hit before,
+reapplied here to bulk test-argument edits rather than bulk comment
+edits.
+
+**Tests**: 6 new tests at the `regmap.c`/EP0-dispatcher layer
+(unclaimed-denies, owner-permits, wrong-client-denies,
+claim-unclaimed-permits, steal-claimed-denies, owner-release-permits)
+plus 8 new tests at the `request_sequencer.c` primitive layer
+(`test_request_sequencer.c`); 4 new dedicated tests at the
+`mock.c`/dispatch-admission layer in `test_conditional_dispatch.c`
+proving the compound/compound-wait rejection path explicitly
+(`test_compound_admission_denied_for_unclaimed_sequencer`,
+`test_compound_admission_denied_for_sequencer_owned_by_a_different_client`,
+`test_compound_wait_admission_denied_for_unclaimed_sequencer`,
+`test_compound_admission_permitted_when_no_sequencer_table_configured`
+proving the scope-boundary case stays admitted). 2 mutation tests
+confirmed both `rcp_sequencer_access_permitted()`'s own call and the
+`rcp_sequencer_table_unsupported()` guard are load-bearing: forcing
+either to a no-op is caught by the new dedicated tests (3 failures
+each time).
+
+65/65 native, 65/65 ASan/UBSan-clean. `cfusa check` (CI-pinned
+v0.5.50 binary): 0 errors. `cfusa trace`: 1024/1024 traced and
+tested.
