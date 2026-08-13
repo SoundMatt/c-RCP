@@ -34,6 +34,17 @@ the rationale.
 
 ## Releases
 
+### v0.296.0 -- 2026-08-13 (issue #336 catalog-drift correction: `REQ-ADC-034` flips `not-implemented` -> `implemented`)
+
+**`REQ-ADC-034` flips `not-implemented` -> `implemented`.** This requirement's own text was stale on two independent counts:
+
+1. Its own precedent citation -- "contrast ep_lin.h's `rcp_ep_lin_compare_fires()`, `REQ-LINEP-002..005`" -- names a function and requirement ids that do not exist anywhere in this codebase. The real, existing mechanism is `acf.h`'s `rcp_acf_compound_wait_match()`, a universal, endpoint-agnostic comparator wired into real dispatch via `server.c`'s `rcp_server_tick_ctx_t.current_status` -- exactly the same mechanism `REQ-UART-035` already corrected an identical stale claim for. No ADC-specific comparator was ever needed. `tests/test_acf.c` already carries 45+ dedicated assertions for this shared mechanism.
+2. The requirement's other half -- sampling only while a request executes, so no trigger fires absent a request -- is genuinely out of scope by this module's own documented design: `ep_adc.h`'s file header states "this module never itself owns a timer, thread, or background sampling loop", so there is no c-RCP-owned sampling loop for any caller-side gating rule to apply to. `rcp_ep_adc_trigger_evaluate()` (`REQ-ADC-031`) already gives the caller the trigger-firing decision itself.
+
+Renamed the stale deviation-pin test in `tests/test_tc18_gaps_ep2.c` (`test_adc_has_no_trigger_outputs_and_no_retained_average` -> `test_adc_pipeline_is_stateless_by_design_and_cadence_deviation_pin`) and rewrote both its comment blocks -- the first also corrected a second, independent staleness (`REQ-ADC-031` already implemented Table 50's trigger outputs; the old comment predated it).
+
+Doc-only, no functional code change. `cfusa check` A/B, normalized by finding text: zero new or removed findings. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%, 1024/1024 (unaffected). 65/65 both trees (native + ASan/UBSan).
+
 ### v0.295.0 -- 2026-08-12 (issue #336/#338: `REQ-SPI-037` genuinely blocked by TC18 spec silence -- documented, not force-implemented)
 
 **Doc-only, no code change.** Investigated `REQ-SPI-037`'s "SPI stops execution (see cs/hs bits) -- enter error state, reset EP_config enable bit" rule (TC18 §13.7.3.3) and confirmed a real specification defect, not a local implementation gap: no table anywhere in the document gives SPI's own `cs`/`hs` ACF header bits a "stopped/errored" meaning -- every standard-request table lists both as fixed `0b`/reserved, and the only request kind giving `cs` a real meaning (Chained requests, "Conditional start") has no connection to SPI's own execution model. It is equally plausible the sentence instead means the SPI bus's own physical CS/HS hardware signal lines (a distinct, electrical-level concept §13.7.3.1's own Table 38 already names "CS0"-"CS5"), not the ACF protocol header bits at all -- the two readings are not equivalent and lead to entirely different implementations.
