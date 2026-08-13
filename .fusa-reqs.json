@@ -9289,7 +9289,7 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "§12.7.7 Table 24, TC18.txt L2880-L2882"
+      "tc18": "§12.7.7 Table 24, TC18.txt L3252-L3256 -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, own follow-up self-check after PR #379's issue #335 batch left this citation untouched -- only status/text were updated there, not tc18). Table 24's real current location is TC18.txt L3217-L3293 (\"Table 24: Request stream configuration\"), not L2865-2882 as this citation previously said. Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
     },
     {
       "id": "REQ-GPIO-033",
@@ -10328,13 +10328,13 @@
     {
       "id": "REQ-RMAP-071",
       "title": "rcp_regmap_request_stream_cfg_t carries rx_ovrflw_safestate_enable, closing a gap this file's own terminology-drift note had already named but never added",
-      "text": "PARTIAL: rcp_regmap_request_stream_cfg_t shall carry rx_ovrflw_safestate_enable (TC18 §12.7.7 Table 24, relative address 0x000D bit 5, 1 bit, R/W*): true drives every endpoint bound to this stream toward its configured safe state if one endpoint's own request storage overflows. Found 2026-08-11 while implementing issue #306's own request-stream-cfg wire codec: regmap.h's own \"TC18 0.5.1_RC5 terminology drift\" section (added earlier, task #97) already NAMED rx_ovrflw_safestate_enable as one of this codebase's own eight independent 0x000D bits, but the struct itself never actually had the field -- a genuine, previously-unflagged content-modeling gap. rcp_e2e_overflow_should_enter_safe_state() (e2e.h/e2e.c, REQ-E2E-030) already existed as the pure decision function this field is the register-map source for, with no struct field to source it from until now. FIXED: the field is added, zero-initialized to false (matching TC18's own implied \"not blocked upon EP overflow\" default and every sibling boolean field's own zero-init convention), and is now part of rcp_regmap_request_stream_cfg_render()/_apply_reconfig()'s own wire codec (issue #306) at the same bit position. REQ-E2E-030's own separate, still-open cross-endpoint-orchestrator gap (bringing every OTHER endpoint on the stream into safe state, which rcp_server_endpoint_t's single-endpoint scope cannot perform) is unaffected by adding this field -- this entry closes the content-modeling/wire-reachability half only, not that orchestration gap.",
+      "text": "IMPLEMENTED (issue #335, 2026-08-13): rcp_regmap_request_stream_cfg_t carries rx_ovrflw_safestate_enable (TC18 §12.7.7 Table 24, relative address 0x000D bit 3 in the current RC5 numbering -- see the file header's own \"terminology drift\" note for why this remains a separate field rather than collapsing into the wire's own single combined rx_enforce_request_filing bit): true drives every endpoint bound to this stream toward its configured safe state if one endpoint's own request storage overflows. Found 2026-08-11 while implementing issue #306's own request-stream-cfg wire codec: the field itself and its render()/apply_reconfig() wire codec were added then (content-modeling/wire-reachability half). rcp_e2e_overflow_should_enter_safe_state() (e2e.h/e2e.c) was already the pure decision function this field sources (runtime-decision half). What was still missing, and is now closed: the actual cross-endpoint broadcast this field's own true value is supposed to drive -- rcp_mock_server_broadcast_safe_state() (mock.h/mock.c, issue #335) now resolves a request's own stream via rcp_regmap_request_stream_cfg_resolve_index(), reads this exact field, and purges every non-safety-tagged request queued on every endpoint bound to that stream (not just the one whose own request storage overflowed) when it's set. All three halves -- content model, decision, broadcast -- are now real, wired, and tested (see REQ-E2E-030's own entry and test_conditional_dispatch.c's test_overflow_on_one_endpoint_broadcasts_safe_state_to_stream_siblings()).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "partial",
-      "tc18": "§12.7.7 Table 24, TC18.txt L2880-L2882 (same citation as REQ-E2E-030's own -- this entry covers the register-map content-modeling half, REQ-E2E-030 covers the runtime-decision half)"
+      "status": "implemented",
+      "tc18": "§12.7.7 Table 24, TC18.txt L3252-L3256 (same citation as REQ-E2E-030's own -- this entry covers the register-map content-modeling half, REQ-E2E-030 covers the runtime-decision half) -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, own follow-up self-check after PR #379's issue #335 batch left this citation untouched -- only status/text were updated there, not tc18). Table 24's real current location is TC18.txt L3217-L3293 (\"Table 24: Request stream configuration\"), not L2865-2882 as this citation previously said. Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
     },
     {
       "id": "REQ-RMAP-072",
@@ -10926,7 +10926,7 @@
       "asil": "ASIL-B",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "§12.7.7 Table 24 (\"rx_enforce_e2e ... 1b: stream is blocked until released, when CRC check at EP fails. Safe state will be entered.\"), TC18.txt L2865-2867"
+      "tc18": "§12.7.7 Table 24 (\"rx_enforce_crc ... 1b: stream is blocked until released, when CRC check at EP fails and Safe state will be entered\"), TC18.txt L3239-L3243 -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, own follow-up self-check after PR #379's issue #335 batch left this citation untouched -- only status/text were updated there, not tc18). Table 24's real current location is TC18.txt L3217-L3293 (\"Table 24: Request stream configuration\"), not L2865-2882 as this citation previously said. Line numbers corrected to the real current location; the underlying technical claim is unchanged, re-verified directly against the fresh text before touching this citation."
     },
     {
       "id": "REQ-E2E-046",
