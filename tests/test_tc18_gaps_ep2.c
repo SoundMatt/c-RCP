@@ -1007,7 +1007,19 @@ static void test_mdio_block_now_exposes_ep_status_via_reconfig(void)
     TEST_ASSERT_EQUAL_UINT16(0x0006u, RCP_EP_MDIO_EP_FUNC_LEN);
 }
 
-static void test_mdio_request_prefix_carries_no_two_bit_mode_field(void)
+/* REQ-MDIO-021 PARTIAL (2026-08-12, dedicated investigation, user-approved
+ * documented assumptions -- see the file header cross-reference below and
+ * TC18_spec_defects_report.md items 25/26/55, canonical path
+ * /Users/matt/Documents/Coding/SoundMatt/, NOT in this repo): a request's
+ * payload now begins with a real, wire-encoded mdio_mode octet
+ * (ep_mdio.h's own "mdio_mode" section documents the full investigation),
+ * closing this test's own original "no mdio_mode field at all" DEVIATION.
+ * Still genuinely open: TC18's own MMS addressing family (a THIRD scheme
+ * this module has no verified primary-source basis to design a wire
+ * layout for) is recognized on decode but neither encodable nor
+ * interpretable -- see test_mdio_decode_rejects_mms_mode_fails_closed()
+ * below, and RCP_EP_MDIO_ERR_UNSUPPORTED_MMS (ep_mdio.h). */
+static void test_mdio_request_prefix_now_carries_a_two_bit_mode_field(void)
 {
     rcp_ep_mdio_addr_t          addr;
     rcp_bytes_t                 f;
@@ -1025,25 +1037,45 @@ static void test_mdio_request_prefix_carries_no_two_bit_mode_field(void)
     TEST_ASSERT_EQUAL_INT(RCP_ACF_OK,
                           rcp_acf_decode_abb(f.data, f.len, &hdr, &payload, &pay_len));
 
-    /* DEVIATION -- TC18 §13.7.13.3 Figure 42 lays a request payload out as
-     * reserved bits, a 2-BIT mdio_mode field, then mdio_address and
-     * mdio_payload, where Table 57 gives mdio_mode four meanings (MMD
-     * single-word, MMD multiple-byte, MMS single-word 10b, MMS multiple
-     * (double) word 11b). c-RCP's payload is instead a 7-octet prefix: a
-     * whole-octet clause selector, prtad, devad, big-endian regad, then a
-     * big-endian word_count. There is no mdio_mode field and no
-     * single-access/multiple-access distinction -- burst behaviour rides
-     * word_count instead -- so these requests are not wire-compatible with
-     * a conforming peer. */
-    TEST_ASSERT_EQUAL_size_t(7u, pay_len);
-    TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_EP_MDIO_CLAUSE_45, payload[0]);
-    TEST_ASSERT_EQUAL_HEX8(0x1Fu, payload[1]);
-    TEST_ASSERT_EQUAL_HEX8(0x0Au, payload[2]);
-    TEST_ASSERT_EQUAL_HEX8(0xBEu, payload[3]);
-    TEST_ASSERT_EQUAL_HEX8(0xEFu, payload[4]);
-    TEST_ASSERT_EQUAL_HEX8(0x00u, payload[5]);
-    TEST_ASSERT_EQUAL_HEX8(0x03u, payload[6]);
+    /* mdio_mode(1) + clause/prtad/devad/regad(5) + word_count(2) = 8. */
+    TEST_ASSERT_EQUAL_size_t(8u, pay_len);
+    TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_EP_MDIO_MODE_MMD_MULTI, payload[0]); /* word_count=3 */
+    TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_EP_MDIO_CLAUSE_45, payload[1]);
+    TEST_ASSERT_EQUAL_HEX8(0x1Fu, payload[2]);
+    TEST_ASSERT_EQUAL_HEX8(0x0Au, payload[3]);
+    TEST_ASSERT_EQUAL_HEX8(0xBEu, payload[4]);
+    TEST_ASSERT_EQUAL_HEX8(0xEFu, payload[5]);
+    TEST_ASSERT_EQUAL_HEX8(0x00u, payload[6]);
+    TEST_ASSERT_EQUAL_HEX8(0x03u, payload[7]);
     rcp_bytes_free(&f);
+}
+
+/* REQ-MDIO-021's own still-open remainder: an MMS-mode request is
+ * recognized (the mode octet decodes cleanly) but rejected rather than
+ * silently misread as if it were MMD-shaped -- see ep_mdio.c's own
+ * dedicated test_ep_mdio.c coverage for the read-request side of this
+ * same behavior; this pins it at the tc18-gaps deviation level too since
+ * it was this file's own original DEVIATION. */
+static void test_mdio_decode_rejects_mms_mode_fails_closed(void)
+{
+    rcp_acf_byte_message_info_t hdr        = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_mdio_addr_t          out_addr;
+    size_t                      out_word_count;
+    uint8_t                     txn;
+    uint8_t                     payload[8] = {0};
+
+    payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMS_SINGLE;
+    payload[7] = 1; /* word_count -- otherwise a well-formed request */
+
+    hdr.byte_bus_id = 0x51u;
+    hdr.op          = RCP_ACF_OP_READ;
+    frame           = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_UNSUPPORTED_MMS, rcp_ep_mdio_decode_read_request(
+        frame.data, frame.len, 0x51u, &out_addr, &out_word_count, &txn));
+
+    rcp_bytes_free(&frame);
 }
 
 static void test_mdio_data_fields_are_unconditionally_sixteen_bit(void)
@@ -1058,10 +1090,14 @@ static void test_mdio_data_fields_are_unconditionally_sixteen_bit(void)
     TEST_ASSERT_EQUAL_HEX8(0xBEu, out[0]);
     TEST_ASSERT_EQUAL_HEX8(0xEFu, out[1]);
 
-    /* DEVIATION -- TC18 §13.7.13.3 Table 57 requires 16-bit data fields for
-     * MMD accesses and for MMS other than 0 and 1, but 32-BIT data fields
-     * for MMS0 and MMS1. c-RCP's word codec is unconditionally 16-bit and
-     * consults no access mode: a single 32-bit MMS0 value is counted as two
+    /* REQ-MDIO-022 remains NOT IMPLEMENTED: TC18 §13.7.13.3 Table 60
+     * requires 16-bit data fields for MMD accesses and for MMS other than
+     * 0 and 1, but 32-BIT data fields for MMS0 and MMS1. This is now
+     * precisely, not just generically, blocked: MMS0/MMS1 access needs
+     * MMS addressing to exist at all first (REQ-MDIO-021's own remaining
+     * gap, above), so this module's word codec staying unconditionally
+     * 16-bit is a direct, unavoidable consequence, not an independent
+     * oversight -- a single 32-bit MMS0 value is still counted as two
      * words and misparsed as two unrelated 16-bit halves, and the pack
      * length is word_count * 2 where an MMS0/MMS1 access needs
      * word_count * 4. */
@@ -1101,7 +1137,8 @@ int main(void)
     RUN_TEST(test_iseled_block_now_has_collect_resp_nr_leds_and_rcv_timeout);
 
     RUN_TEST(test_mdio_block_now_exposes_ep_status_via_reconfig);
-    RUN_TEST(test_mdio_request_prefix_carries_no_two_bit_mode_field);
+    RUN_TEST(test_mdio_request_prefix_now_carries_a_two_bit_mode_field);
+    RUN_TEST(test_mdio_decode_rejects_mms_mode_fails_closed);
     RUN_TEST(test_mdio_data_fields_are_unconditionally_sixteen_bit);
 
     return UNITY_END();
