@@ -421,6 +421,42 @@ static void test_apply_wakeup_echo_wrong_txn_not_echoed(void)
     rcp_powerstate_manager_destroy(m);
 }
 
+/* REQ-PWR-007: an untracked endpoint's own "return false" branch, the
+ * same convention every other rcp_powerstate_manager_* accessor already
+ * has its own dedicated unknown-endpoint test for (see
+ * test_handshake_begin_unknown_endpoint() immediately below). b/len
+ * content is irrelevant here -- find_entry() fails before either is
+ * ever inspected. */
+static void test_apply_wakeup_echo_unknown_endpoint(void)
+{
+    rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(NULL, 0);
+    uint8_t                    dummy[1] = {0};
+
+    TEST_ASSERT_FALSE(rcp_powerstate_manager_apply_wakeup_echo(m, ADDR, dummy, sizeof(dummy), 9));
+
+    rcp_powerstate_manager_destroy(m);
+}
+
+/* REQ-PWR-014: same convention, for rcp_powerstate_manager_
+ * handshake_resume_queues()'s own untracked-endpoint branch. */
+static void test_handshake_resume_queues_unknown_endpoint(void)
+{
+    rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(NULL, 0);
+
+    TEST_ASSERT_FALSE(rcp_powerstate_manager_handshake_resume_queues(m, ADDR));
+
+    rcp_powerstate_manager_destroy(m);
+}
+
+/* REQ-PWR-015: rcp_powerstate_manager_destroy(NULL) is documented as a
+ * safe no-op -- every other test in this file destroys a real, non-NULL
+ * manager, leaving this specific clause untested. */
+static void test_manager_destroy_null_is_a_safe_no_op(void)
+{
+    rcp_powerstate_manager_destroy(NULL); /* must not crash */
+    TEST_PASS();
+}
+
 static void test_handshake_begin_unknown_endpoint(void)
 {
     rcp_powerstate_manager_t *m = rcp_powerstate_manager_new(NULL, 0);
@@ -516,6 +552,9 @@ int main(void)
     RUN_TEST(test_wake_via_pin_cold_when_handshake_not_started);
     RUN_TEST(test_wake_via_pin_requires_sleep);
     RUN_TEST(test_apply_wakeup_echo_wrong_txn_not_echoed);
+    RUN_TEST(test_apply_wakeup_echo_unknown_endpoint);
+    RUN_TEST(test_handshake_resume_queues_unknown_endpoint);
+    RUN_TEST(test_manager_destroy_null_is_a_safe_no_op);
     RUN_TEST(test_handshake_begin_unknown_endpoint);
     RUN_TEST(test_encode_wakeup_probe_unknown_endpoint_is_zeroed);
     RUN_TEST(test_endpoints_are_independently_tracked);

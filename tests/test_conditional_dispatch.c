@@ -1016,6 +1016,73 @@ static void test_clear_non_safestate_keeps_safety_tagged_requests(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* REQ-SRV-013's own literal return-value claims: the three tests above
+ * already prove cancel_all()/cancel_single()/cancel_non_safestate()'s
+ * observable BEHAVIOR end-to-end through the mock server, but none of
+ * them ever look at what the raw functions themselves return -- the
+ * mock server's own apply_cancellation() (src/mock.c) voids every one
+ * of these return values, since it reports outcome via a different
+ * mechanism (RCP_MOCK_DISPATCH_CANCELLED plus, for clear-single, an
+ * error-response payload). Calls rcp_server_endpoint_admit()/
+ * cancel_all()/cancel_single() directly on a bare rcp_server_endpoint_t,
+ * the same bypass-the-mock-server pattern
+ * test_admit_takes_no_lifecycle_state_or_stream_identity() in
+ * test_tc18_gaps_server.c already established -- admission itself never
+ * looks at any sequencer table (that only matters later, at tick/
+ * select_due time), so a compound request with any start_state at all
+ * admits PENDING unconditionally. */
+static void test_cancel_all_and_cancel_single_return_values(void)
+{
+    rcp_server_endpoint_t ep;
+    rcp_compound_step_t   step = {0};
+    rcp_bytes_t           a, b, c;
+    uint8_t               request_type = 0xFFu;
+    rcp_cancel_result_t   result;
+
+    rcp_server_endpoint_init(&ep, true);
+
+    step.sequencer_index = 1;
+    step.start_state     = RCP_SEQUENCER_POWER_ON_STATE;
+    a = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 3, &step, 0u, 21, NULL, 0);
+    b = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 3, &step, 0u, 22, NULL, 0);
+    c = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 3, &step, 0u, 23, NULL, 0);
+    TEST_ASSERT_NOT_NULL(a.data);
+    TEST_ASSERT_NOT_NULL(b.data);
+    TEST_ASSERT_NOT_NULL(c.data);
+
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
+                       rcp_server_endpoint_admit(&ep, a.data, a.len, 0u, &request_type, NULL, NULL));
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
+                       rcp_server_endpoint_admit(&ep, b.data, b.len, 0u, &request_type, NULL, NULL));
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
+                       rcp_server_endpoint_admit(&ep, c.data, c.len, 0u, &request_type, NULL, NULL));
+    TEST_ASSERT_EQUAL_size_t(3, rcp_server_endpoint_pending_count(&ep));
+
+    /* cancel_single(): reports rcp_cancel_attempt()'s own outcome and
+     * removes only the named entry -- the other two stay pending. */
+    result = rcp_server_endpoint_cancel_single(&ep, 21, RCP_CANCEL_LIFECYCLE_QUEUED);
+    TEST_ASSERT_EQUAL(RCP_CANCEL_RESULT_CANCELED, result);
+    TEST_ASSERT_EQUAL_size_t(2, rcp_server_endpoint_pending_count(&ep));
+
+    /* A transaction_num no longer present (already removed above): not
+     * found, nothing further removed. */
+    result = rcp_server_endpoint_cancel_single(&ep, 21, RCP_CANCEL_LIFECYCLE_QUEUED);
+    TEST_ASSERT_EQUAL(RCP_CANCEL_RESULT_NOT_FOUND, result);
+    TEST_ASSERT_EQUAL_size_t(2, rcp_server_endpoint_pending_count(&ep));
+
+    /* cancel_all(): returns exactly how many it removed (2, the two
+     * survivors) -- not just whether it removed anything, and not the
+     * pre-cancel_single() count of 3. */
+    TEST_ASSERT_EQUAL_size_t(2, rcp_server_endpoint_cancel_all(&ep));
+    TEST_ASSERT_EQUAL_size_t(0, rcp_server_endpoint_pending_count(&ep));
+    TEST_ASSERT_EQUAL_size_t(0, rcp_server_endpoint_cancel_all(&ep)); /* nothing left */
+
+    rcp_bytes_free(&a);
+    rcp_bytes_free(&b);
+    rcp_bytes_free(&c);
+    rcp_server_endpoint_destroy(&ep);
+}
+
 /* A watchdog overflow purges everything except the safety sequence, which
  * survives to drive the endpoint into its safe state. */
 static void test_watchdog_purge_keeps_only_the_safety_sequence(void)
@@ -1534,6 +1601,7 @@ int main(void)
     RUN_TEST(test_clear_single_removes_only_its_target);
     RUN_TEST(test_clear_single_not_found_sends_request_not_found_error);
     RUN_TEST(test_clear_non_safestate_keeps_safety_tagged_requests);
+    RUN_TEST(test_cancel_all_and_cancel_single_return_values);
     RUN_TEST(test_watchdog_purge_keeps_only_the_safety_sequence);
     RUN_TEST(test_overflow_on_one_endpoint_broadcasts_safe_state_to_stream_siblings);
     RUN_TEST(test_overflow_does_not_broadcast_without_an_ep_id_map);

@@ -34,6 +34,24 @@ the rationale.
 
 ## Releases
 
+### v0.319.0 -- 2026-08-13 (endpoint/server/power batch: 6 `scope: "tc18"` partials closed -- I2C/PWM/powerstate/server, no code changes)
+
+Third batch of the 59 unblocked `scope: "tc18"` partial requirements per the user's "complete the 59 partial" direction: `REQ-I2C-009`, `REQ-PWM-043`, `REQ-PWR-007`, `REQ-PWR-014`, `REQ-PWR-015`, `REQ-SRV-013`. All 6 were confirmed-correct implementations missing only their own dedicated test — no source changes to `ep_i2c.c`/`ep_pwm.c`/`powerstate.c`/`server.c`.
+
+**`REQ-I2C-009`**: `rcp_ep_i2c_strerror()`'s own `codes[]` test array omitted `RCP_EP_I2C_ERR_BAD_EVT` — every other defined error code was covered, this one alone was not. Added it to the array.
+
+**`REQ-PWM-043`**: `rcp_ep_pwm_in_decode_read_request()`'s own `WRONG_BUS` branch was untested — the existing `WRONG_BUS` test in this file covers `_decode_response()`, a different function. Added a dedicated test for the read-request decoder specifically.
+
+**`REQ-PWR-007`/`REQ-PWR-014`**: `rcp_powerstate_manager_apply_wakeup_echo()`/`_handshake_resume_queues()`'s own untracked-endpoint branches were untested — every existing call to either function used the tracked `ADDR` fixture. Added dedicated tests, matching the same unknown-endpoint convention this file already uses for its sibling accessors (`test_handshake_begin_unknown_endpoint()` etc.).
+
+**`REQ-PWR-015`**: `rcp_powerstate_manager_destroy(NULL)`'s own safe-no-op clause was untested — every existing test destroys a real, non-NULL manager. Added a dedicated test.
+
+**`REQ-SRV-013`**: the substantive behavior of `cancel_all()`/`cancel_single()`/`cancel_non_safestate()` was already proven end-to-end through the mock server (`test_clear_all_empties_the_request_store()`, `test_clear_single_removes_only_its_target()`, `test_clear_non_safestate_keeps_safety_tagged_requests()`) — but the mock server's own `apply_cancellation()` (`src/mock.c`) voids every one of these functions' raw return values, so the requirement's own literal "return how many" / "report the outcome" claims were never directly checked. Added a test calling `rcp_server_endpoint_admit()`/`cancel_all()`/`cancel_single()` directly on a bare `rcp_server_endpoint_t` (bypassing the mock server, the same pattern `test_admit_takes_no_lifecycle_state_or_stream_identity()` in `test_tc18_gaps_server.c` already established), asserting the exact removed-count and outcome values. First mutation attempt (`cancel_all()` returning 1-if-any-removed instead of the real count) passed unnoticed because the test only ever called `cancel_all()` with exactly one item pending; fixed by admitting a third request so `cancel_all()` genuinely has to report 2, not merely "nonzero", before it caught the mutation.
+
+Full suite 66/66 native + ASan/UBSan (CI's exact `ASAN_OPTIONS`). Every new assertion mutation-tested — two (`REQ-PWR-007`/`REQ-PWR-014`) caught via a hard crash (NULL-pointer dereference through the disabled unknown-endpoint guard) rather than a graceful assertion failure, an even stronger signal. `cfusa check`: 0 errors. `cfusa trace`: 1076/1076 traced, 1076/1076 tested, 0 gaps. No stray files. `.fusa-reqs.json`: 6 entries `partial` -> `implemented`; repo-wide total unchanged at 1076 (1019 implemented / 48 partial / 2 not-implemented / 7 retired).
+
+**Next**: 42 of the original 59 unblocked partials remain — observability/admin/mdns/relay (6) next, then the 41-item `scope: "tc18-gap"` architectural backlog under issues #334/#335/#336/#338 (minus `REQ-E2E-029`, gated on `REQ-E2E-028`).
+
 ### v0.318.0 -- 2026-08-13 (transport batch: 8 `scope: "tc18"` partials closed -- AVTP/L2/UDP/TSN, no code changes, all pre-existing implementations confirmed correct)
 
 Second batch of the remaining `scope: "tc18"` partial requirements (`REQ-AVTP-004`, `REQ-AVTP-019`, `REQ-L2-009`, `REQ-UDP-002`, `REQ-UDP-003`, `REQ-UDP-014`, `REQ-UDP-018`, `REQ-TSN-004`), per the user's "complete the 59 partial" direction. All 8 were confirmed-correct implementations missing only their own dedicated test -- no code changes to any of `avtp.c`/`l2.c`/`udp.c`/`tsn.c`.
