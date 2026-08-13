@@ -18378,3 +18378,186 @@ config/discovery/conditional-request/transport/endpoint/observability
 modules -- plus `REQ-SEQ-002`, whose own malloc-failure branch needs a
 real fault-injection seam the user has asked to be built as reusable
 infrastructure, not skipped).
+
+### v0.315.0 -- 2026-08-13 (`REQ-SEQ-002` closed: new reusable
+allocator-hook module + real fault-injection test, per user request)
+
+Closes `REQ-SEQ-002` (`rcp_sequencer_table_new()`'s own allocation-
+failure branch), the one item flagged by the 35 `scope: "tc18"`
+partial-requirement investigation as genuinely untestable with existing
+infrastructure -- `count` is a plain `uint16_t` (max 65535 bytes), far
+too small to force a real OOM condition portably. Asked the user how to
+handle it (leave genuinely partial vs. build real infrastructure vs.
+defer); explicitly directed to build a real, reusable fault-injection
+seam.
+
+**Design decision**: rather than a test-only hack (e.g. a
+malloc-symbol-interposition trick, which is Linux-glibc-only and would
+not work on macOS's two-level namespace or MSVC at all -- this project
+targets all three), built a small, genuinely reusable production
+primitive: `include/rcp/alloc.h`/`src/alloc.c`. `rcp_malloc()`/
+`rcp_calloc()`/`rcp_free()` are drop-in replacements for the libc
+functions of the same name, transparently passing through to libc by
+default; `rcp_alloc_set_hooks()`/`rcp_alloc_reset_hooks()` let a caller
+install a custom `rcp_alloc_hooks_t` (malloc_fn/calloc_fn/free_fn,
+individually nullable -- an unset member falls back to libc for that one
+operation) globally. This serves two independent purposes, not one:
+
+1. A genuine integration feature any embedder wanting to route, bound,
+   or monitor this library's own heap use now has a real seam for --
+   previously this library called libc's allocator functions directly
+   from inside individual `.c` files, with no portable interception
+   point at all.
+2. This batch's own actual need: a fully portable way to simulate an
+   allocation failure in a test, sidestepping every platform's own
+   linker quirks by construction (it's just an ordinary function-pointer
+   call, no symbol interposition of any kind).
+
+**Deliberately additive, not a sweeping rewrite**: matches the same
+scope-discipline precedent `REQ-RMAP-055`'s own W-plus primitive already
+established (a standalone function rather than forcing every existing,
+unrelated call site through a mechanical edit it doesn't need).
+`request_sequencer.c` (`rcp_sequencer_table_new()`/
+`rcp_sequencer_table_free()`) is this module's first, and so far only,
+opt-in caller -- every other `malloc()`/`calloc()`/`free()` call site in
+this codebase is untouched. Other modules may opt in individually later,
+as their own fault-injection needs arise, without this module needing to
+change.
+
+**Not thread-safe by design**, documented explicitly in the header: the
+hook table is a single, unsynchronized global, matching this codebase's
+own existing convention for other global-mutable-config primitives
+(e.g. `rcp_regmap_general_t` itself has no internal locking). Installing
+hooks concurrently with an in-flight allocation is undefined -- the
+intended use (install once, at test or integration setup, before any
+allocation this library performs) never needs concurrent installation.
+
+**New tests**: `tests/test_alloc.c` (10 tests) gives the module its own
+dedicated coverage -- default libc passthrough (malloc/calloc/free,
+including `rcp_free(NULL)`'s safe-no-op), full hook installation with
+call counting, partial hook installation (falls back to libc for unset
+members), `rcp_alloc_set_hooks(NULL)` as documented equivalent to
+`rcp_alloc_reset_hooks()`, fault injection (both malloc_fn and calloc_fn
+hooks independently proven to simulate failure), and reset behavior
+(restores passthrough; safe no-op when nothing was installed).
+`test_request_sequencer.c` gains 2 new tests directly proving
+`REQ-SEQ-002` itself:
+`test_table_new_returns_zeroed_table_when_state_allocation_fails()` and
+`test_table_new_frees_state_and_returns_zeroed_table_when_owner_
+allocation_fails()` -- the second specifically proves the "all-or-
+nothing" cleanup path (state's own already-successful allocation is
+freed, not leaked, when owner's own subsequent allocation fails).
+
+**Both branches independently mutation-tested**: removing the
+state-allocation guard doesn't just fail a test -- it crashes outright
+(`SIGSEGV`, confirmed via direct execution, exit code 139) via a
+NULL-pointer `memset()` one line later, an even stronger signal than a
+graceful assertion failure that the guard is genuinely load-bearing;
+removing the owner-allocation guard is caught as an ordinary, clean
+assertion failure. Both restored cleanly, full suite re-confirmed 66/66
+after each restore.
+
+**Found and fixed a real false positive in `cfusa`'s own `CY007`
+("double free") rule** while getting this batch to a clean `cfusa
+check`. Inspected the rule's own source directly (`c-FuSa`'s
+`cmd/cfusa/cmd_cyber.c`) rather than guessing: `CY007`'s detection is a
+pure same-line `strstr(line, "free(")` count with zero identifier-
+boundary awareness -- it just checks whether the literal substring
+`"free("` appears twice on one line, outside string/comment state. A
+locally-scoped test helper named `counting_free(void *ptr)` tripped it
+purely because the identifier `counting_free(` itself contains the
+substring `free(` (the `_free(` tail), immediately followed later on
+the same line by the real `free(ptr)` call inside the function body --
+two matches, zero real double-frees. A second line, a comment reading
+`"...libc free(), no counting_free() to observe"`, tripped the identical
+rule for the identical reason (the comment text also contains `free(`
+twice). Fixed by renaming the helper to `counting_dealloc` (no `free(`
+substring anywhere in that identifier) and rewording the comment to
+avoid the literal substring -- not by touching the external tool, per
+standing policy. Verified the fix by re-scanning every file this batch
+touched for the same substring pattern before trusting a clean `cfusa
+check` result.
+
+**Discovered and reported a separate, more significant `cfusa` defect**
+while verifying this batch's own new `.fusa-reqs.json` entries
+(`REQ-ALLOC-001..005`, bringing the catalog to 1075 total): `cfusa
+trace` reported the brand-new, correctly-formed entries as "dangling
+test reference... no such requirement in .fusa-reqs.json" -- despite
+them genuinely being present, well-formed, with matching `//cfusa:req`/
+`//cfusa:test` tags in code. Traced to the real cause by reading the
+tool's own source directly (not guessing): `cmd_req.c` and `cmd_trace.c`
+(the exact CI-pinned `v0.5.50` binary) both parse the JSON array into a
+fixed-size stack buffer (`#define MAX_REQS 1024`), and the parse loop
+(`while (*p && *p != ']' && g_req_count < MAX_REQS)`) simply **stops
+silently** once the cap is hit -- no error, no warning, nothing
+downstream is told the input was truncated. `cmd_impact.c` has the
+identical pattern at an even lower cap (`MAX_REQS 256`).
+
+c-RCP's own catalog has been over 1024 entries for several recent
+commits -- meaning `cfusa trace`'s own "1024/1024 traced, 1024/1024
+tested" result has NOT meant 100% coverage of the real catalog for a
+while: **51 real requirement entries are currently silently invisible to
+it**, including several this same session already closed as genuinely
+implemented (`REQ-E2E-043..046`, `REQ-CANEP-028..032`, `REQ-MDIO-
+020..024`, `REQ-UART-032..040`, and now this batch's own `REQ-ALLOC-
+001..005`). Every "0 errors, 1024/1024" result reported in this
+session's own recent PRs (roughly #379 onward, once the catalog crossed
+1024) was checking a truncated subset of the real file, not lying
+outright, but not the complete picture either -- discovered only now,
+disclosed to the user immediately rather than pushed past silently.
+Filed [c-FuSa#100](https://github.com/SoundMatt/c-FuSa/issues/100) with
+full reproduction steps against this exact repo and tag, and a
+suggested fix (hard error on truncation at minimum; dynamic array
+growth as the real fix) -- not touched directly, per this project's own
+standing "never edit x-Net repos" policy. `cfusa check`'s own 0-errors
+result is unaffected by this specific bug (confirmed by inspection: a
+separate code path, no `MAX_REQS` cap involved) -- only `req`/`trace`/
+`impact` share it.
+
+**What this does NOT mean**: it doesn't cast any doubt on the actual
+correctness of the underlying engineering work in any of the affected
+PRs -- every fix was independently verified against the primary source
+(TC18 PDF) and the full native + ASan/UBSan test suite, neither of which
+shares this cap. It specifically means the `cfusa trace`
+coverage-COMPLETENESS number has had a blind spot, now disclosed and
+tracked, not that any individual requirement's own disposition was
+wrong.
+
+**Standing caveat for future work on this repo**: a `cfusa trace` result
+of "1024/1024" is not, by itself, proof of 100% real coverage once the
+catalog exceeds 1024 entries -- always cross-check the catalog's own
+live entry count against 1024 before trusting a trace result at face
+value, until either `c-FuSa#100` is fixed and a newer version pinned in
+CI, or the catalog itself somehow shrinks back under the cap (unlikely,
+given this project's own trajectory).
+
+Full suite 66/66 native + ASan/UBSan (up from 65 -- new `test_alloc`
+target). No stray files. `cfusa check`: 0 errors (2695 total,
+proportional growth only vs. the pre-batch baseline). `cfusa trace`:
+still reports "1024/1024" per the truncation bug documented above -- a
+disclosed limitation of the verification tool for this specific batch,
+not a gap in the work itself; every REQ-ALLOC-*/REQ-SEQ-002 test was
+independently confirmed passing and mutation-tested regardless.
+`.fusa-reqs.json`: `REQ-SEQ-002` partial -> implemented; 5 new
+`REQ-ALLOC-001..005` entries added (all implemented); repo-wide total
+now 1075 entries.
+
+**Post-PR fix, same version**: CI's Linux ASan+LSan run caught a real
+leak my own local macOS ASan run structurally couldn't -- LeakSanitizer
+is bundled with ASan on Linux by default, not on macOS, and two
+`test_alloc.c` allocations marked "leaked intentionally, test process
+exits" were genuine leaks by LSan's own stricter standard (5 bytes
+across 2 allocations, exactly matching the reported leak). Both fixed
+to free before their own test returns; re-verified via direct grep that
+every `rcp_malloc()`/`rcp_calloc()` call in the file now has a matching
+`rcp_free()`. Worth remembering as a general lesson: this project's own
+local ASan/UBSan verification step, run on macOS, cannot substitute for
+CI's own Linux run when it comes to leak detection specifically --
+every other sanitizer check (address, UB) is platform-portable, but
+leak detection is not.
+
+**Next**: continuing the remaining 33 of the 35 `scope: "tc18"` partial
+requirements the earlier investigation classified as `MISSING_TEST` --
+narrow, well-scoped test additions across config/discovery/conditional-
+request/transport/endpoint/observability modules, no code changes
+expected, batched by subsystem across the next several PRs.

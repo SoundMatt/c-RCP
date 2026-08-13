@@ -22,6 +22,11 @@ target_link_libraries(test_errors PRIVATE rcp::rcp unity)
 target_compile_options(test_errors PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_errors COMMAND test_errors)
 
+add_executable(test_alloc test_alloc.c)
+target_link_libraries(test_alloc PRIVATE rcp::rcp unity)
+target_compile_options(test_alloc PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_alloc COMMAND test_alloc)
+
 # test_platform reaches into the internal src/platform.h (not an installed
 # public header) to unit-test the mutex/condvar/thread primitives directly,
 # since no public rcp/*.h re-exports them.

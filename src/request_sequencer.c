@@ -1,9 +1,18 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/request_sequencer.h"
 
+#include "rcp/alloc.h"
+
 #include <stdlib.h>
 #include <string.h>
 
+/* REQ-SEQ-002 (issue #338): allocates via rcp_malloc()/rcp_calloc()
+ * (alloc.h) rather than calling malloc()/calloc() directly -- the same
+ * failure convention either way (NULL on failure), but this indirection
+ * is what lets this function's own allocation-failure branch be proven
+ * by a real, portable test (tests/test_request_sequencer.c), not merely
+ * asserted correct by code inspection. See alloc.h's own file header for
+ * the full rationale; this is that module's first opt-in caller. */
 //cfusa:req REQ-SEQ-001
 //cfusa:req REQ-SEQ-002
 //cfusa:req REQ-SEQ-003
@@ -15,12 +24,12 @@ rcp_sequencer_table_t rcp_sequencer_table_new(uint16_t count)
 
     if (count == 0) return table; /* {NULL,NULL,0} -- unsupported by design, not a failure */
 
-    state = (uint8_t *)malloc((size_t)count);
+    state = (uint8_t *)rcp_malloc((size_t)count);
     if (!state) return table; /* zeroed -- see the header's failure convention */
 
-    owner = (uint8_t *)calloc((size_t)count, 1); /* RCP_SEQUENCER_OWNER_UNCLAIMED == 0 */
+    owner = (uint8_t *)rcp_calloc((size_t)count, 1); /* RCP_SEQUENCER_OWNER_UNCLAIMED == 0 */
     if (!owner) {
-        free(state);
+        rcp_free(state);
         return table; /* zeroed -- same failure convention, all-or-nothing allocation */
     }
 
@@ -48,8 +57,8 @@ void rcp_sequencer_table_reset(rcp_sequencer_table_t *table)
 //cfusa:req REQ-SEQ-006
 void rcp_sequencer_table_free(rcp_sequencer_table_t *table)
 {
-    free(table->state);
-    free(table->owner);
+    rcp_free(table->state);
+    rcp_free(table->owner);
     table->state = NULL;
     table->owner = NULL;
     table->count = 0;
