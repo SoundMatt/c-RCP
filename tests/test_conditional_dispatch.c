@@ -130,7 +130,7 @@ static rcp_mock_dispatch_result_t submit(rcp_mock_server_t *srv, const rcp_bytes
     rcp_bytes_t                resp = {0};
     rcp_mock_dispatch_result_t r;
 
-    r = rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, true,
+    r = rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, true, 1u,
                                   frame->data, frame->len, &resp);
     rcp_bytes_free(&resp);
     return r;
@@ -447,7 +447,7 @@ static void test_compound_wait_reserved_evt_sends_unsupported_cmd_error_response
 
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
                       rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF,
-                                                RCP_ACF_MSG_TYPE_GBB, true, frame.data, frame.len,
+                                                RCP_ACF_MSG_TYPE_GBB, true, 1u, frame.data, frame.len,
                                                 &resp));
     TEST_ASSERT_NOT_NULL(resp.data);
 
@@ -839,7 +839,7 @@ static void test_clear_single_not_found_sends_request_not_found_error(void)
     /* Nothing pending at all -- transaction_num 91 cannot be found. */
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CANCELLED,
                       rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF,
-                                                RCP_ACF_MSG_TYPE_GBB, true, clear.data, clear.len,
+                                                RCP_ACF_MSG_TYPE_GBB, true, 1u, clear.data, clear.len,
                                                 &resp));
     TEST_ASSERT_NOT_NULL(resp.data);
 
@@ -976,7 +976,7 @@ static void test_chained_first_in_frame_is_chain_error(void)
     rcp_mock_frame_member_result_t results[4];
     size_t n;
 
-    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, frame, frame_len,
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, frame, frame_len,
                                         results, 4);
     TEST_ASSERT_EQUAL_size_t(2, n);
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CHAIN_ERROR, results[0].result);
@@ -1012,7 +1012,7 @@ static void test_chained_first_in_frame_sends_per_member_error_responses(void)
     size_t                        payload_len;
     size_t                        n;
 
-    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, frame, frame_len,
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, frame, frame_len,
                                         results, 4);
     TEST_ASSERT_EQUAL_size_t(2, n);
 
@@ -1066,7 +1066,7 @@ static void test_chained_member_after_predecessor_executes(void)
     TEST_ASSERT_NOT_NULL(member.data);
     frame_len = concat2(frame, sizeof(frame), &lead, &member);
 
-    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, frame, frame_len,
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, frame, frame_len,
                                         results, 4);
     TEST_ASSERT_EQUAL_size_t(2, n);
     /* The lead request is standard: it ran immediately. */
@@ -1123,7 +1123,7 @@ static void test_clear_single_cascade_removes_chained_successors(void)
     TEST_ASSERT_NOT_NULL(member_b.data);
 
     frame_len = concat3(frame, sizeof(frame), &lead, &member_a, &member_b);
-    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, frame, frame_len,
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, frame, frame_len,
                                         results, 4);
     TEST_ASSERT_EQUAL_size_t(3, n);
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result);      /* lead ran immediately */
@@ -1188,7 +1188,7 @@ static void test_clear_single_cascade_does_not_cross_chains(void)
     TEST_ASSERT_NOT_NULL(member2.data);
 
     frame_len = concat4(frame, sizeof(frame), &lead1, &member1, &lead2, &member2);
-    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, frame, frame_len,
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, frame, frame_len,
                                         results, 4);
     TEST_ASSERT_EQUAL_size_t(4, n);
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, results[1].result);

@@ -433,11 +433,26 @@ typedef enum {
  * request runs now (its own registered handler, synchronously) or is
  * queued. *out_response is zeroed on entry and left zeroed whenever no
  * handler actually ran or the handler chose not to produce a response;
- * caller frees any populated response with rcp_bytes_free(). */
+ * caller frees any populated response with rcp_bytes_free().
+ *
+ * REQ-WDG-010 (TC18 §12.7.7, "the watchdog is reset with each request
+ * received from this RC Client"): stream_id is this request's own AVTPDU
+ * stream_id -- every RCP message, "plain command mode" (this function)
+ * included, is carried inside an NTSCF/TSCF AVTPDU that always has one
+ * (§13.6's plain-vs-safe command mode distinction is only about whether
+ * CRC32 protection is applied, not about which AVTPDU header fields are
+ * present). If srv has an associated watchdog keeper
+ * (rcp_mock_server_set_watchdog_keeper()), this call kicks it for
+ * stream_id unconditionally, before the lifecycle/admission checks below
+ * are even attempted -- receipt, not successful validation, is what TC18
+ * ties the reset to, mirroring rcp_mock_server_dispatch_e2e()'s own
+ * identical ordering. A caller with no watchdog keeper set passes
+ * whatever stream_id its own transport layer reports; the value is
+ * simply never looked up. */
 rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
                                                      rcp_byte_bus_id_t byte_bus_id,
                                                      uint8_t avtp_subtype, uint8_t acf_msg_type,
-                                                     bool time_sync_supported,
+                                                     bool time_sync_supported, uint64_t stream_id,
                                                      const uint8_t *request, size_t request_len,
                                                      rcp_bytes_t *out_response);
 
@@ -494,10 +509,16 @@ typedef struct {
  * the full 11-bit wire range, REQ-RMAP-053/REQ-ACF-020), that member's
  * result is RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS with byte_bus_id left at
  * 0 and no handler run, rather than dispatching against a bogus
- * address. */
+ * address.
+ *
+ * REQ-WDG-010: stream_id is shared across every member (a property of
+ * the enclosing frame, same as avtp_subtype/time_sync_supported above)
+ * and passed through to each member's own rcp_mock_server_dispatch()
+ * call, so a multi-request frame kicks the watchdog once per member --
+ * TC18's own rule is per REQUEST, and each member is independently one. */
 size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subtype,
-                                       bool time_sync_supported, const uint8_t *frame,
-                                       size_t frame_len,
+                                       bool time_sync_supported, uint64_t stream_id,
+                                       const uint8_t *frame, size_t frame_len,
                                        rcp_mock_frame_member_result_t *out_results,
                                        size_t out_cap);
 
