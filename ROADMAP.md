@@ -18542,6 +18542,20 @@ independently confirmed passing and mutation-tested regardless.
 `REQ-ALLOC-001..005` entries added (all implemented); repo-wide total
 now 1075 entries.
 
+**Post-PR fix, same version**: CI's Linux ASan+LSan run caught a real
+leak my own local macOS ASan run structurally couldn't -- LeakSanitizer
+is bundled with ASan on Linux by default, not on macOS, and two
+`test_alloc.c` allocations marked "leaked intentionally, test process
+exits" were genuine leaks by LSan's own stricter standard (5 bytes
+across 2 allocations, exactly matching the reported leak). Both fixed
+to free before their own test returns; re-verified via direct grep that
+every `rcp_malloc()`/`rcp_calloc()` call in the file now has a matching
+`rcp_free()`. Worth remembering as a general lesson: this project's own
+local ASan/UBSan verification step, run on macOS, cannot substitute for
+CI's own Linux run when it comes to leak detection specifically --
+every other sanitizer check (address, UB) is platform-portable, but
+leak detection is not.
+
 **Next**: continuing the remaining 33 of the 35 `scope: "tc18"` partial
 requirements the earlier investigation classified as `MISSING_TEST` --
 narrow, well-scoped test additions across config/discovery/conditional-
