@@ -513,7 +513,7 @@ static void test_adc_inter_sample_spacing_is_unconstrained(void)
     TEST_ASSERT_EQUAL_UINT64(a.timestamp, b.timestamp);
 }
 
-static void test_adc_has_no_trigger_outputs_and_no_retained_average(void)
+static void test_adc_pipeline_is_stateless_by_design_and_cadence_deviation_pin(void)
 {
     rcp_ep_adc_sample_t    crossing[2];
     rcp_ep_adc_sample_t    flat[2];
@@ -534,25 +534,47 @@ static void test_adc_has_no_trigger_outputs_and_no_retained_average(void)
     steady  = rcp_ep_adc_average_interval(flat, 2u);
     empty   = rcp_ep_adc_average_interval(NULL, 0u);
 
-    /* DEVIATION -- TC18 §13.7.9.1 Table 50 enumerates five ADC trigger
-     * outputs: falling below / rising above adc_trigger_min (0/1), falling
-     * below / rising above adc_trigger_max (2/3), and measurement-interval
-     * completion (4). c-RCP defines no trigger enum, no threshold registers
-     * and no evaluation predicate, so a sample stream that crosses a
-     * threshold twice is byte-for-byte indistinguishable from one that
-     * never moves. Trigger 4's absence is why the spec's own cyclic-ADC
-     * pattern -- a trigger request fired by the ADC finishing a measurement
-     * -- cannot be built on this implementation. */
+    /* Not a deviation (RENAMED 2026-08-13, issue #336, REQ-ADC-031 already
+     * fixed this): the comment this replaces claimed "c-RCP defines no
+     * trigger enum, no threshold registers and no evaluation predicate" for
+     * TC18 §13.7.9.1 Table 50's five ADC trigger outputs -- stale since
+     * REQ-ADC-031 (issue #201) added rcp_ep_adc_trigger_state_t/
+     * rcp_ep_adc_trigger_evaluate(), which decides exactly this from a
+     * caller-supplied newly-acquired value plus the tracked previous one
+     * (its own dedicated tests live in tests/test_ep_adc.c). What these two
+     * assertions actually pin is unrelated and still true:
+     * rcp_ep_adc_average_interval() itself is a pure arithmetic-mean
+     * function with no threshold awareness of its own -- crossing a
+     * threshold mid-interval and staying flat produce the same mean when
+     * the two endpoints average to the same value, exactly as ordinary
+     * averaging arithmetic predicts, not as a gap. */
     TEST_ASSERT_EQUAL_UINT16(150u, crossed.value);
     TEST_ASSERT_EQUAL_UINT16(crossed.value, steady.value);
     TEST_ASSERT_EQUAL_UINT64(crossed.timestamp, steady.timestamp);
 
-    /* DEVIATION -- §13.7.9.1 also requires sampling only while a request
-     * executes, and requires a compound wait to compare against the LAST
-     * ACQUIRED average without sampling. This pipeline is stateless: with
-     * no samples it reports the no-signal sentinel rather than any retained
-     * previous average, so there is nothing for a compound wait to compare
-     * against and no request-execution state to gate sampling on. */
+    /* Not a deviation (RENAMED 2026-08-13, issue #336, REQ-ADC-034
+     * corrected -- see .fusa-reqs.json): the comment this replaces claimed
+     * "there is nothing for a compound wait to compare against" -- stale in
+     * the same way REQ-UART-035 already corrected for UART: TC18 §13.5.1's
+     * compound-wait comparison is a universal, endpoint-agnostic mechanism
+     * (acf.h's rcp_acf_compound_wait_match(), wired into real dispatch via
+     * server.c's rcp_server_tick_ctx_t.current_status, tests/test_acf.c's
+     * own 45+ dedicated assertions) -- no ADC-specific comparator was ever
+     * needed, the same as no UART-specific one was. "Comparing against the
+     * last acquired average" is simply whatever the caller supplies as
+     * current_status; this pipeline's own statelessness (asserted below)
+     * was never actually an obstacle to that. §13.7.9.1's other half --
+     * sampling only while a request executes -- is genuinely out of scope
+     * by this module's own documented design (ep_adc.h's file header:
+     * "This module never itself owns a timer, thread, or background
+     * sampling loop"): there is no c-RCP-owned sampling loop for any
+     * caller-side gating rule to apply to. rcp_ep_adc_average_interval()
+     * itself remains, by design, a pure function of whatever samples its
+     * caller passes -- reporting the no-signal sentinel for zero samples,
+     * not a retained value, matching every other stage in this module's own
+     * "operates on caller-supplied arrays, owns no sample storage"
+     * convention (see rcp_ep_adc_cadence_response_ready()'s own doc
+     * comment for the same convention stated explicitly). */
     TEST_ASSERT_EQUAL_UINT16(RCP_EP_PWM_IN_NO_SIGNAL, empty.value);
     TEST_ASSERT_EQUAL_UINT64(0u, rcp_ep_adc_capture_moment_timestamp(NULL, 0u));
 
@@ -1146,7 +1168,7 @@ int main(void)
     RUN_TEST(test_adc_value_width_and_named_analog_input_signal);
     RUN_TEST(test_adc_functional_cfg_has_clock_status_and_interval_fields);
     RUN_TEST(test_adc_inter_sample_spacing_is_unconstrained);
-    RUN_TEST(test_adc_has_no_trigger_outputs_and_no_retained_average);
+    RUN_TEST(test_adc_pipeline_is_stateless_by_design_and_cadence_deviation_pin);
 
     RUN_TEST(test_lin_trigger_now_honours_trailing_time_and_block_has_registers);
 

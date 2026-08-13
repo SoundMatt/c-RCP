@@ -15205,6 +15205,30 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.296.0 -- 2026-08-13 (issue #336 catalog-drift correction:
+REQ-ADC-034 flips not-implemented -> implemented)
+
+REQ-ADC-034 flips not-implemented -> implemented. This requirement's
+own text was stale on two independent counts: (1) its own precedent
+citation named a function and requirement ids that do not exist
+anywhere in this codebase -- the real, existing mechanism is
+acf.h's rcp_acf_compound_wait_match(), a universal, endpoint-agnostic
+comparator wired into real dispatch via server.c's
+rcp_server_tick_ctx_t.current_status, the same mechanism REQ-UART-035
+already corrected an identical stale claim for; (2) the requirement's
+other half -- sampling only while a request executes -- is genuinely
+out of scope by this module's own documented design (no c-RCP-owned
+sampling loop exists for any endpoint type).
+
+Renamed the stale deviation-pin test in tests/test_tc18_gaps_ep2.c
+and rewrote both its comment blocks -- the first also corrected a
+second, independent staleness (REQ-ADC-031 already implemented Table
+50's trigger outputs; the old comment predated it).
+
+Doc-only, no functional code change. cfusa check A/B: zero new or
+removed findings. cfusa trace: both 100%, 1024/1024 (unaffected).
+65/65 both trees (native + ASan/UBSan).
+
 ### v0.295.0 -- 2026-08-12 (issue #336/#338: REQ-SPI-037 genuinely
 blocked by TC18 spec silence -- documented, not force-implemented)
 
