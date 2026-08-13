@@ -1484,20 +1484,29 @@ static void test_e2e_seq_evaluate_wraparound_is_a_clean_single_increment(void)
     TEST_ASSERT_EQUAL_UINT8(0x00u, t.prev_seq);
 }
 
-/* REQ-E2E-030 (partial) DEVIATION PIN: TC18 12.7.7 Table 22 relative
- * address 0x000D bit 5 (rx_ovrflw_safestate_enable) brings every endpoint
- * bound to the request stream into its configured safe state when any one
- * endpoint's request storage overflows. rcp_server_endpoint_admit() now
- * reports the per-request half conformantly -- *out_error is
- * RCP_ERROR_REQUEST_STORAGE_OVERFLOW, letting a caller build a real Table 27
- * error response via rcp_acf_build_error_response() (see mock.c's
- * finish_admission() for a worked example) -- but the stream-wide safe-state
- * escalation itself is still not performed by this call: this library's
- * rcp_server_endpoint_t type has no notion of "every other endpoint bound to
- * the same request stream" for a single endpoint's admit() to reach across
- * into. rcp_e2e_overflow_should_enter_safe_state() is the pure decision a
- * caller-owned orchestrator would consult to actually perform that
- * escalation once such a caller exists. */
+/* REQ-E2E-030 (issue #335, UPDATED 2026-08-13): TC18 §12.7.7 Table 24
+ * relative address 0x000D bit 5 (rx_ovrflw_safestate_enable) brings every
+ * endpoint bound to the request stream into its configured safe state
+ * when any one endpoint's request storage overflows.
+ * rcp_server_endpoint_admit() reports the per-request half conformantly
+ * -- *out_error is RCP_ERROR_REQUEST_STORAGE_OVERFLOW, letting a caller
+ * build a real Table 27 error response via rcp_acf_build_error_response()
+ * (see mock.c's finish_admission() for a worked example) -- but this
+ * function itself, tested here in isolation via a bare rcp_server_endpoint_t
+ * with no request-stream context, still correctly does NOT perform the
+ * stream-wide safe-state escalation on its own: server.h has no
+ * request-stream/EP_ID_config dependency of its own, matching the
+ * established "mechanism lives below, context lives here" layering
+ * (REQ-SEQ-013's own sequencer-ownership check makes the identical call at
+ * the identical layer boundary). The escalation itself IS now performed,
+ * one layer up: rcp_mock_server_broadcast_safe_state() (mock.h) is the
+ * actual orchestrator, driven from dispatch_plain()'s own overflow check
+ * (mock.c) via rcp_regmap_ep_id_map_byte_bus_ids_for_stream() (regmap.h,
+ * issue #335) -- see test_conditional_dispatch.c's own
+ * test_overflow_on_one_endpoint_broadcasts_safe_state_to_stream_siblings()
+ * for the end-to-end proof. rcp_e2e_overflow_should_enter_safe_state() is
+ * the pure per-cause decision both this function's own non-escalating
+ * behavior and mock.c's own real orchestrator ultimately consult. */
 static void test_e2e_request_store_overflow_reports_error_code_but_not_escalation(void)
 {
     rcp_server_endpoint_t ep;

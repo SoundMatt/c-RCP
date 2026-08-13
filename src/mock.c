@@ -65,6 +65,12 @@ struct rcp_mock_server {
      * Request_stream_index among them) are expressed in terms of. */
     rcp_regmap_request_stream_cfg_t request_stream_cfg[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES];
     size_t                          request_stream_cfg_count;
+    /* EP_ID_config table (issue #335) -- see mock.h's own doc comment on
+     * rcp_mock_server_set_ep_id_map(). Srv's own only way to know which
+     * byte_bus_ids are bound to a given request_stream_index --
+     * rcp_mock_server_broadcast_safe_state()'s sole data source. */
+    rcp_regmap_ep_id_map_entry_t ep_id_map[RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES];
+    size_t                       ep_id_map_count;
     /* The sequencer-state registers compound/compound-wait requests read
      * and advance. Server-wide rather than per-endpoint: a sequencer is a
      * server register, and requests on different endpoints routinely
@@ -209,6 +215,19 @@ bool rcp_mock_server_set_request_stream_cfg(rcp_mock_server_t *srv,
 
     if (count > 0) memcpy(srv->request_stream_cfg, entries, count * sizeof(*entries));
     srv->request_stream_cfg_count = count;
+    return true;
+}
+
+//cfusa:req REQ-E2E-029
+//cfusa:req REQ-E2E-030
+//cfusa:req REQ-E2E-045
+bool rcp_mock_server_set_ep_id_map(rcp_mock_server_t *srv,
+                                    const rcp_regmap_ep_id_map_entry_t *entries, size_t count)
+{
+    if (count > RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES) return false;
+
+    if (count > 0) memcpy(srv->ep_id_map, entries, count * sizeof(*entries));
+    srv->ep_id_map_count = count;
     return true;
 }
 
@@ -574,6 +593,34 @@ static rcp_mock_dispatch_result_t dispatch_plain(rcp_mock_server_t *srv,
     admit = rcp_server_endpoint_admit(&slot->queue, request, request_len, 0u, &request_type,
                                        &admitted_index, &error);
 
+    /* REQ-E2E-030 (issue #335): a request-storage overflow on THIS
+     * endpoint's own queue is answered locally exactly as before
+     * (RCP_SERVER_ADMIT_REJECTED, error == RCP_ERROR_REQUEST_STORAGE_
+     * OVERFLOW, handled by finish_admission() below) -- but TC18 §12.7.7
+     * Table 24's own rx_ovrflw_safestate_enable names a STREAM-WIDE
+     * consequence, not a single-endpoint one: every endpoint bound to
+     * the same request stream this overflow occurred on must be driven
+     * toward its configured safe state too, not just the one whose own
+     * queue happened to fill up. rcp_e2e_overflow_should_enter_safe_state()
+     * (e2e.h) is the pure per-cause decision; rcp_mock_server_broadcast_
+     * safe_state() (mock.h) is this test double's own actuator for
+     * "every endpoint bound to the stream" -- see both functions' own doc
+     * comments for the architectural background this closes. A stream_id
+     * this srv cannot resolve to a configured request stream (resolve_index()
+     * returning 0, e.g. no rcp_mock_server_set_request_stream_cfg() call
+     * was ever made) broadcasts nothing -- the same fail-toward-no-action
+     * disposition rcp_mock_server_broadcast_safe_state() itself already
+     * documents for an unresolvable stream. */
+    if (error == RCP_ERROR_REQUEST_STORAGE_OVERFLOW) {
+        uint8_t overflow_stream_index = rcp_regmap_request_stream_cfg_resolve_index(
+            srv->request_stream_cfg, srv->request_stream_cfg_count, stream_id);
+        if (overflow_stream_index != 0u &&
+            rcp_e2e_overflow_should_enter_safe_state(
+                srv->request_stream_cfg[overflow_stream_index - 1u].rx_ovrflw_safestate_enable)) {
+            (void)rcp_mock_server_broadcast_safe_state(srv, overflow_stream_index);
+        }
+    }
+
     /* REQ-SEQ-013 (issue #335): a newly-admitted COMPOUND/COMPOUND_WAIT
      * step names a sequencer_index it will read or advance -- TC18
      * §12.7.10 Table 28's own access-control rule ("Request_stream_index
@@ -724,6 +771,35 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
         if (srv->stream_fault_tracker != NULL) {
             (void)rcp_e2e_stream_fault_tracker_on_crc_error(srv->stream_fault_tracker, stream_id,
                                                               slot->rx_enforce_e2e);
+        }
+        /* REQ-E2E-045 (issue #335): TC18 §12.7.7 Table 24's own
+         * rx_enforce_e2e/rx_enforce_crc (0x000D.0) names TWO consequences
+         * for a CRC failure at the SAME single bit -- "stream is blocked
+         * until released" (the fault-tracker latch immediately above) AND
+         * "Safe state will be entered" -- and unlike its wd/overflow/seq
+         * siblings, that second consequence has no separate enable bit of
+         * its own to gate it: it is rx_enforce_e2e's own value, evaluated
+         * by rcp_e2e_crc_error_should_enter_safe_state() (e2e.h). "Safe
+         * state" is stream-wide (every endpoint bound to stream_id, not
+         * just the one slot this CRC mismatch was addressed to) --
+         * rcp_mock_server_broadcast_safe_state() (mock.h) is this test
+         * double's own actuator for that, resolved via the same
+         * rcp_regmap_request_stream_cfg_resolve_index() call
+         * rcp_mock_server_broadcast_safe_state()'s own overflow-cause
+         * sibling (dispatch_plain(), above) already uses. slot->rx_enforce_e2e
+         * (not the resolved stream's own request_stream_cfg entry) is
+         * reused here deliberately, matching the fault-tracker latch call
+         * immediately above it: both consequences of the SAME wire bit
+         * are read from the SAME per-endpoint stand-in this function
+         * already relies on for the CRC-mismatch path specifically, not
+         * a second, potentially-inconsistent source. */
+        {
+            uint8_t crc_stream_index = rcp_regmap_request_stream_cfg_resolve_index(
+                srv->request_stream_cfg, srv->request_stream_cfg_count, stream_id);
+            if (crc_stream_index != 0u &&
+                rcp_e2e_crc_error_should_enter_safe_state(slot->rx_enforce_e2e)) {
+                (void)rcp_mock_server_broadcast_safe_state(srv, crc_stream_index);
+            }
         }
         rcp_bytes_free(&unwrapped);
         return RCP_MOCK_DISPATCH_CRC_ERROR;
@@ -1229,4 +1305,35 @@ size_t rcp_mock_server_watchdog_purge(rcp_mock_server_t *srv, rcp_byte_bus_id_t 
     rcp_mock_endpoint_slot_t *slot = find_slot(srv, byte_bus_id);
     if (!slot) return 0;
     return rcp_server_endpoint_watchdog_purge(&slot->queue);
+}
+
+//cfusa:req REQ-E2E-029
+//cfusa:req REQ-E2E-030
+//cfusa:req REQ-E2E-045
+size_t rcp_mock_server_broadcast_safe_state(rcp_mock_server_t *srv, uint8_t request_stream_index)
+{
+    rcp_byte_bus_id_t bound[RCP_MOCK_MAX_ENDPOINTS];
+    size_t             total_bound;
+    size_t             purged = 0;
+    size_t             i;
+
+    if (request_stream_index == 0u) return 0;
+
+    total_bound = rcp_regmap_ep_id_map_byte_bus_ids_for_stream(
+        srv->ep_id_map, srv->ep_id_map_count, request_stream_index, bound,
+        RCP_MOCK_MAX_ENDPOINTS);
+    /* This test double never registers more than RCP_MOCK_MAX_ENDPOINTS
+     * live slots (RCP_MOCK_ERR_CAPACITY, rcp_mock_server_add_endpoint()),
+     * so a bound byte_bus_id beyond that many distinct values can never
+     * name a slot this srv actually holds -- the "ask first" total isn't
+     * separately re-scanned here for that reason. */
+    if (total_bound > RCP_MOCK_MAX_ENDPOINTS) total_bound = RCP_MOCK_MAX_ENDPOINTS;
+
+    for (i = 0; i < total_bound; i++) {
+        rcp_mock_endpoint_slot_t *slot = find_slot(srv, bound[i]);
+        if (!slot) continue; /* bound in EP_ID_config, not (or no longer) registered */
+        purged += rcp_server_endpoint_watchdog_purge(&slot->queue);
+    }
+
+    return purged;
 }

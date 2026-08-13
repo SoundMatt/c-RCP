@@ -552,6 +552,79 @@ static void test_ep_id_map_ascending_vacuous_for_zero_or_one(void)
     TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_is_ascending(one, 1));
 }
 
+/* ── rcp_regmap_ep_id_map_byte_bus_ids_for_stream() (issue #335) ────────────
+ *
+ * Struct field order is {ep_id, byte_bus_id, request_stream_index} -- see
+ * rcp_regmap_ep_id_map_entry_t's own doc comment for why. */
+
+static void test_byte_bus_ids_for_stream_finds_every_bound_endpoint(void)
+{
+    rcp_regmap_ep_id_map_entry_t entries[3] = {
+        {1, 0x100, 2}, /* ep 1, bbid 0x100, stream 2 */
+        {2, 0x200, 2}, /* ep 2, bbid 0x200, stream 2 -- same stream */
+        {3, 0x300, 5}, /* ep 3, bbid 0x300, stream 5 -- different stream */
+    };
+    rcp_byte_bus_id_t out[4] = {0};
+
+    TEST_ASSERT_EQUAL_UINT(2, rcp_regmap_ep_id_map_byte_bus_ids_for_stream(entries, 3, 2, out, 4));
+    TEST_ASSERT_EQUAL_UINT16(0x100, out[0]);
+    TEST_ASSERT_EQUAL_UINT16(0x200, out[1]);
+}
+
+static void test_byte_bus_ids_for_stream_dedupes_repeated_byte_bus_id(void)
+{
+    /* Two distinct ep_ids sharing one byte_bus_id under the same stream
+     * (TC18 §12.7.8's own multicast-within-a-stream shape) -- reported
+     * once, not twice. */
+    rcp_regmap_ep_id_map_entry_t entries[2] = {
+        {1, 0x100, 2},
+        {2, 0x100, 2},
+    };
+    rcp_byte_bus_id_t out[4] = {0};
+
+    TEST_ASSERT_EQUAL_UINT(1, rcp_regmap_ep_id_map_byte_bus_ids_for_stream(entries, 2, 2, out, 4));
+    TEST_ASSERT_EQUAL_UINT16(0x100, out[0]);
+}
+
+static void test_byte_bus_ids_for_stream_no_match_returns_zero(void)
+{
+    rcp_regmap_ep_id_map_entry_t entries[1] = {{1, 0x100, 2}};
+    rcp_byte_bus_id_t             out[4]     = {0};
+
+    TEST_ASSERT_EQUAL_UINT(0, rcp_regmap_ep_id_map_byte_bus_ids_for_stream(entries, 1, 9, out, 4));
+}
+
+static void test_byte_bus_ids_for_stream_ask_first_then_size_a_buffer(void)
+{
+    /* out_capacity smaller than the true match count: the true total is
+     * still returned, but only out_capacity entries are written -- the
+     * same idiom rcp_sched_split_frame_members() already established. */
+    rcp_regmap_ep_id_map_entry_t entries[3] = {
+        {1, 0x100, 2},
+        {2, 0x200, 2},
+        {3, 0x300, 2},
+    };
+    rcp_byte_bus_id_t out[2] = {0xEEEE, 0xEEEE};
+
+    TEST_ASSERT_EQUAL_UINT(3, rcp_regmap_ep_id_map_byte_bus_ids_for_stream(entries, 3, 2, out, 2));
+    TEST_ASSERT_EQUAL_UINT16(0x100, out[0]);
+    TEST_ASSERT_EQUAL_UINT16(0x200, out[1]);
+}
+
+static void test_byte_bus_ids_for_stream_zero_capacity_writes_nothing(void)
+{
+    rcp_regmap_ep_id_map_entry_t entries[1] = {{1, 0x100, 2}};
+
+    TEST_ASSERT_EQUAL_UINT(1, rcp_regmap_ep_id_map_byte_bus_ids_for_stream(entries, 1, 2, NULL, 0));
+}
+
+static void test_byte_bus_ids_for_stream_vacuous_for_empty_table(void)
+{
+    rcp_byte_bus_id_t out[1] = {0};
+
+    TEST_ASSERT_EQUAL_UINT(0, rcp_regmap_ep_id_map_byte_bus_ids_for_stream(NULL, 0, 2, out, 1));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -596,6 +669,13 @@ int main(void)
     RUN_TEST(test_ep_id_map_ascending_false_for_equal_adjacent);
     RUN_TEST(test_ep_id_map_ascending_false_for_descending);
     RUN_TEST(test_ep_id_map_ascending_vacuous_for_zero_or_one);
+
+    RUN_TEST(test_byte_bus_ids_for_stream_finds_every_bound_endpoint);
+    RUN_TEST(test_byte_bus_ids_for_stream_dedupes_repeated_byte_bus_id);
+    RUN_TEST(test_byte_bus_ids_for_stream_no_match_returns_zero);
+    RUN_TEST(test_byte_bus_ids_for_stream_ask_first_then_size_a_buffer);
+    RUN_TEST(test_byte_bus_ids_for_stream_zero_capacity_writes_nothing);
+    RUN_TEST(test_byte_bus_ids_for_stream_vacuous_for_empty_table);
 
     return UNITY_END();
 }

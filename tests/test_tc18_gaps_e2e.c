@@ -46,6 +46,7 @@
 #include <rcp/e2e.h>
 #include <rcp/mock.h>
 #include <rcp/regmap.h>
+#include <rcp/request_timed.h>
 #include <rcp/scheduler.h>
 #include <rcp/watchdog.h>
 
@@ -813,6 +814,135 @@ static void test_dispatch_e2e_crc_mismatch_yields_real_error_response(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* ── REQ-E2E-045 (issue #335): CRC-error safe-state broadcast ──────────────
+ *
+ * TC18 §12.7.7 Table 24's own rx_enforce_e2e/rx_enforce_crc (0x000D.0)
+ * names TWO consequences at the SAME single bit -- "stream is blocked
+ * until released" (the fault-tracker latch the test above's own sibling
+ * tests, e.g. test_crc_error_latches_the_whole_stream_faulted in this
+ * file's own REQ-E2E-021 section, already cover) AND "Safe state will be
+ * entered", stream-wide. This test proves that SECOND consequence
+ * end-to-end: a CRC mismatch on endpoint 0x11 purges a non-safety-tagged
+ * request queued on endpoint 0x12, a sibling bound to the same request
+ * stream via EP_ID_config (rcp_mock_server_set_ep_id_map(), issue #335)
+ * -- 0x12 was never the endpoint whose own CRC failed, and never even had
+ * req_crc_enable set on it. */
+static void test_crc_error_on_one_endpoint_broadcasts_safe_state_to_stream_siblings(void)
+{
+    rcp_mock_server_t              *srv     = rcp_mock_server_new();
+    const uint8_t                    pl[4]   = {0x9A, 0x9B, 0x9C, 0x9D};
+    rcp_bytes_t                      frame   = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t                      w       = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_bytes_t                      resp    = {0};
+    rcp_bytes_t                      timed;
+    rcp_regmap_ep_id_map_entry_t     ep_map[2] = {
+        {1, 0x11, 1}, /* ep 1, bbid 0x11, stream 1 -- the one whose CRC fails */
+        {2, 0x12, 1}, /* ep 2, bbid 0x12, stream 1 -- the sibling */
+    };
+    rcp_regmap_request_stream_cfg_t  stream_cfg[1];
+
+    TEST_ASSERT_NOT_NULL(w.data);
+    w.data[w.len - 1u] ^= 0xFFu; /* corrupt the trailer's last octet */
+
+    /* RCP_CONFIGURED, not merely HW_CONFIGURED: the sibling's own pending
+     * request below is admitted via the PLAIN rcp_mock_server_dispatch()
+     * (not dispatch_e2e()'s own CRC-mismatch branch, which returns before
+     * ever reaching a lifecycle check), and rcp_lifecycle_should_accept()
+     * only admits a non-EP0 byte_bus_id once fully operational. */
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    rcp_mock_server_add_endpoint(srv, 0x12, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_rx_enforce_e2e(srv, 0x11, true));
+    TEST_ASSERT_TRUE(rcp_mock_server_set_ep_id_map(srv, ep_map, 2));
+
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id = TEST_SID;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+
+    /* Give 0x12 one non-safety-tagged (RCP_REQUEST_TYPE_TIMED, MSB clear)
+     * stored request to later confirm gets purged. */
+    timed = rcp_timed_encode_request(0x12, 0x1000u, 7u, NULL, 0u);
+    TEST_ASSERT_NOT_NULL(timed.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+                      rcp_mock_server_dispatch(srv, 0x12, RCP_AVTP_SUBTYPE_NTSCF,
+                                                RCP_ACF_MSG_TYPE_GBB, true, TEST_SID, timed.data,
+                                                timed.len, &resp));
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&timed);
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 0x12));
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, TEST_TS,
+                                                    w.data, w.len, &resp));
+    TEST_ASSERT_FALSE(g_handler_called); /* never admitted, let alone executed */
+
+    /* The actual proof: 0x12's own stored request was purged by the
+     * broadcast, though 0x12 itself was never addressed by the failing
+     * request. */
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 0x12));
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&w);
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* Negative control: identical setup, EXCEPT srv's own EP_ID_config table
+ * is left empty (no rcp_mock_server_set_ep_id_map() call) -- confirms the
+ * broadcast above is a genuine consequence of EP_ID_config's own content,
+ * not something rcp_mock_server_dispatch_e2e() would have done anyway
+ * (e.g. as a byproduct of the fault-tracker latch, or unconditionally for
+ * every registered endpoint). Without a bound-endpoint table, 0x12's own
+ * pending request survives. */
+static void test_crc_error_does_not_broadcast_without_an_ep_id_map(void)
+{
+    rcp_mock_server_t              *srv     = rcp_mock_server_new();
+    const uint8_t                    pl[4]   = {0x9A, 0x9B, 0x9C, 0x9D};
+    rcp_bytes_t                      frame   = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t                      w       = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_bytes_t                      resp    = {0};
+    rcp_bytes_t                      timed;
+    rcp_regmap_request_stream_cfg_t  stream_cfg[1];
+
+    TEST_ASSERT_NOT_NULL(w.data);
+    w.data[w.len - 1u] ^= 0xFFu;
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    rcp_mock_server_add_endpoint(srv, 0x12, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_rx_enforce_e2e(srv, 0x11, true));
+    /* Deliberately no rcp_mock_server_set_ep_id_map() call. */
+
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id = TEST_SID;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+
+    timed = rcp_timed_encode_request(0x12, 0x1000u, 7u, NULL, 0u);
+    TEST_ASSERT_NOT_NULL(timed.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+                      rcp_mock_server_dispatch(srv, 0x12, RCP_AVTP_SUBTYPE_NTSCF,
+                                                RCP_ACF_MSG_TYPE_GBB, true, TEST_SID, timed.data,
+                                                timed.len, &resp));
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&timed);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, TEST_TS,
+                                                    w.data, w.len, &resp));
+
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 0x12));
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&w);
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── REQ-WDG-010: rcp_mock_server_dispatch_e2e() kicks the per-stream
  * watchdog ──────────────────────────────────────────────────────────────── */
 
@@ -1194,6 +1324,8 @@ int main(void)
     RUN_TEST(test_ms_bit_to_carries_crc_binding_is_not_enforced);
     RUN_TEST(test_crc_mismatch_skips_execution_without_error_response);
     RUN_TEST(test_dispatch_e2e_crc_mismatch_yields_real_error_response);
+    RUN_TEST(test_crc_error_on_one_endpoint_broadcasts_safe_state_to_stream_siblings);
+    RUN_TEST(test_crc_error_does_not_broadcast_without_an_ep_id_map);
     RUN_TEST(test_dispatch_e2e_kicks_the_watchdog_on_every_admitted_request);
     RUN_TEST(test_dispatch_e2e_kicks_the_watchdog_even_when_the_request_is_rejected);
     RUN_TEST(test_dispatch_e2e_with_no_watchdog_keeper_set_dispatches_normally);

@@ -2399,6 +2399,60 @@ bool rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id(const rcp_regmap_ep_id_map_ent
                                                     uint8_t target_ep_type,
                                                     uint16_t required_ep_id);
 
+/* ── Cross-endpoint orchestrator query (issue #335, REQ-E2E-029/030/045) ────
+ *
+ * e2e.h's own file header (and rcp_e2e_overflow_should_enter_safe_state()'s/
+ * rcp_e2e_crc_error_should_enter_safe_state()'s own doc comments) both name
+ * "this library's current data model has no type representing 'all
+ * endpoints on a stream'" as the reason a single endpoint's own admit()/
+ * dispatch() call could only ever act on itself, never broadcast a
+ * stream-wide safe-state escalation to its siblings on the same request
+ * stream. That claim was true of this codebase's DISPATCH layer (mock.c),
+ * but not of its underlying CONTENT model: TC18 §12.7.8 Table 23
+ * (EP_ID_config, rcp_regmap_ep_id_map_entry_t above) already *is* the
+ * wire-defined "which endpoints are bound to which request stream" table
+ * -- REQ-RMAP-052 already gave it a full render/parse codec -- it simply
+ * never had a caller-facing QUERY over it answering "given a stream, which
+ * endpoints does it address", only content-shape diagnostics
+ * (_is_ascending(), _has_single_client_per_ep(), etc., above). This
+ * function is that missing projection, closing the actual architectural
+ * gap issue #335 named.
+ *
+ * Given entries[0..count) (a caller-owned EP_ID_config table -- count is
+ * this section's own established "caller has already applied
+ * rcp_regmap_ep_id_map_effective_count() first if it cares about the
+ * end-of-table sentinel" convention, unchanged from every other
+ * diagnostic above), writes every DISTINCT byte_bus_id whose own row
+ * names request_stream_index into out_byte_bus_ids[0..out_capacity),
+ * skipping a byte_bus_id already written -- TC18 §12.7.8 permits more
+ * than one row (different ep_id, or the same ep_id via a different
+ * channel) to share one (request_stream_index, byte_bus_id) pair, or to
+ * name several distinct byte_bus_id rows under the same stream; either
+ * way this function reports each bound byte_bus_id exactly once.
+ *
+ * byte_bus_id, not ep_id, is this function's own return unit: every
+ * existing dispatch path in this codebase (mock.c's own find_slot(),
+ * keyed by byte_bus_id) resolves a live endpoint by byte_bus_id, never by
+ * raw ep_id alone -- TC18 §12.9.1's own routing rule ("the EPs are mapped
+ * by their byte_bus_ids") makes byte_bus_id the actual addressable unit a
+ * caller needs to reach one, matching this function's own purpose (a
+ * caller that also wants each row's own ep_id/channel can still scan
+ * entries[] itself -- this function does not discard that information,
+ * it is simply not what a broadcast-by-address caller needs).
+ *
+ * Returns the TOTAL number of distinct byte_bus_id values found, which
+ * may exceed out_capacity -- the same "ask first, then size a buffer"
+ * idiom rcp_sched_split_frame_members() (scheduler.h) already established
+ * in this codebase, not merely the number actually written.
+ * out_byte_bus_ids may be NULL iff out_capacity == 0. entries may be NULL
+ * iff count == 0. O(count^2); count is expected to stay small (one
+ * server's own endpoint set), the same assumption
+ * rcp_regmap_ep_id_map_has_single_client_per_ep() above already makes. */
+size_t rcp_regmap_ep_id_map_byte_bus_ids_for_stream(const rcp_regmap_ep_id_map_entry_t *entries,
+                                                      size_t count, uint8_t request_stream_index,
+                                                      rcp_byte_bus_id_t *out_byte_bus_ids,
+                                                      size_t out_capacity);
+
 /* ── EP0 address-routed dispatcher (issue #301, issue #306) ────────────────
  *
  * Generalizes rcp_regmap_general_decode_write_request() (which only
