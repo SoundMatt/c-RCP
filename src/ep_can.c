@@ -21,6 +21,17 @@ static uint32_t get_u32(const uint8_t *p)
            (uint32_t)p[3];
 }
 
+static void put_u16(uint8_t *p, uint16_t v)
+{
+    p[0] = (uint8_t)((v >> 8) & 0xFFu);
+    p[1] = (uint8_t)(v & 0xFFu);
+}
+
+static uint16_t get_u16(const uint8_t *p)
+{
+    return (uint16_t)(((uint16_t)p[0] << 8) | (uint16_t)p[1]);
+}
+
 /* ── FrameFormat selection (payload leading quadlet, TC18 Table 54) ──────── */
 
 //cfusa:req REQ-CANEP-001
@@ -683,4 +694,135 @@ rcp_ep_can_errc_t rcp_ep_can_decode_reassembled_frame_response(const uint8_t *re
     *out_rx_data       = &reassembled[prefix_len];
     *out_rx_len        = reassembled_len - prefix_len;
     return RCP_EP_CAN_OK;
+}
+
+/* ── The EP_func register block (the evt[2:0] == 111b target), REQ-CANEP-028 ─ */
+
+#define RCP_EP_CAN_REG_EP_LEN        ((uint16_t)0x0000u) /*  8 bit, R   */
+#define RCP_EP_CAN_REG_RESERVED_01   ((uint16_t)0x0001u) /*  8 bit, R   */
+#define RCP_EP_CAN_REG_EP_ENABLE_CLR ((uint16_t)0x0002u) /*  8 bit, R/W */
+#define RCP_EP_CAN_REG_EP_OPTIONS    ((uint16_t)0x0003u) /*  8 bit, R/W */
+#define RCP_EP_CAN_REG_BASE_CLK      ((uint16_t)0x0004u) /* 16 bit, R   */
+#define RCP_EP_CAN_REG_EP_STATUS     ((uint16_t)0x0006u) /* 16 bit, R/W */
+/* 0x0008-0x001B: clk_divider, two reserved regions, and the three "CAN
+ * bit time register" fields plus TDCC -- not yet decomposed, see this
+ * module's own header comment. Treated as one contiguous read-only span. */
+#define RCP_EP_CAN_REG_UNDECOMPOSED_START ((uint16_t)0x0008u)
+#define RCP_EP_CAN_REG_UNDECOMPOSED_LEN   ((uint16_t)0x0014u) /* 0x0008..0x001B */
+#define RCP_EP_CAN_REG_STATUS        ((uint16_t)0x001Cu) /* 32 bit, R/W */
+#define RCP_EP_CAN_REG_FIFO_STATUS   ((uint16_t)0x0020u) /* 32 bit, R/W */
+
+#define CAN_ENABLE_CLR_BIT_ENABLE ((uint8_t)(1u << 0))
+#define CAN_ENABLE_CLR_BIT_CLEAR  ((uint8_t)(1u << 1))
+
+#define CAN_OPTIONS_BIT_REQ_CRC  ((uint8_t)(1u << 0))
+#define CAN_OPTIONS_BIT_RESP_TS  ((uint8_t)(1u << 3))
+#define CAN_OPTIONS_BIT_SUPPRESS ((uint8_t)(1u << 7))
+
+//cfusa:req REQ-CANEP-028
+void rcp_ep_can_render_registers(const rcp_ep_can_functional_cfg_t *cfg,
+                                  uint8_t out[RCP_EP_CAN_EP_FUNC_LEN])
+{
+    uint8_t enable_clr = 0u;
+    uint8_t options    = 0u;
+
+    if (cfg->common.ep_enable) enable_clr |= CAN_ENABLE_CLR_BIT_ENABLE;
+    if (cfg->common.ep_clear_req_storage) enable_clr |= CAN_ENABLE_CLR_BIT_CLEAR;
+    if (cfg->common.ep_req_crc_enable) options |= CAN_OPTIONS_BIT_REQ_CRC;
+    if (cfg->common.ep_response_ts_enable) options |= CAN_OPTIONS_BIT_RESP_TS;
+    if (cfg->common.ep_suppress_response) options |= CAN_OPTIONS_BIT_SUPPRESS;
+
+    out[RCP_EP_CAN_REG_EP_LEN]        = (uint8_t)RCP_EP_CAN_EP_FUNC_LEN;
+    out[RCP_EP_CAN_REG_RESERVED_01]   = 0u;
+    out[RCP_EP_CAN_REG_EP_ENABLE_CLR] = enable_clr;
+    out[RCP_EP_CAN_REG_EP_OPTIONS]    = options;
+    put_u16(&out[RCP_EP_CAN_REG_BASE_CLK], 0u); /* no real clock source
+                                                    modelled -- see the
+                                                    file header */
+    put_u16(&out[RCP_EP_CAN_REG_EP_STATUS], cfg->ep_status);
+    memset(&out[RCP_EP_CAN_REG_UNDECOMPOSED_START], 0,
+           RCP_EP_CAN_REG_UNDECOMPOSED_LEN); /* not yet decomposed -- see
+                                                 the file header */
+    put_u32(&out[RCP_EP_CAN_REG_STATUS], cfg->status);
+    put_u32(&out[RCP_EP_CAN_REG_FIFO_STATUS], cfg->fifo_status);
+}
+
+/* The inverse of render: adopts every R/W register from an already
+ * patched block image. The read-only offsets (EP_LEN, the reserved
+ * octet, base_clk, and the whole not-yet-decomposed span) are
+ * deliberately not read back -- apply_reconfig() re-renders them from
+ * cfg before patching, so a write covering them is a no-op. */
+static void parse_can_registers(rcp_ep_can_functional_cfg_t *cfg,
+                                 const uint8_t in[RCP_EP_CAN_EP_FUNC_LEN])
+{
+    uint8_t enable_clr = in[RCP_EP_CAN_REG_EP_ENABLE_CLR];
+    uint8_t options    = in[RCP_EP_CAN_REG_EP_OPTIONS];
+
+    cfg->common.ep_enable             = (enable_clr & CAN_ENABLE_CLR_BIT_ENABLE) != 0u;
+    cfg->common.ep_clear_req_storage  = (enable_clr & CAN_ENABLE_CLR_BIT_CLEAR) != 0u;
+    cfg->common.ep_req_crc_enable     = (options & CAN_OPTIONS_BIT_REQ_CRC) != 0u;
+    cfg->common.ep_response_ts_enable = (options & CAN_OPTIONS_BIT_RESP_TS) != 0u;
+    cfg->common.ep_suppress_response  = (options & CAN_OPTIONS_BIT_SUPPRESS) != 0u;
+
+    cfg->ep_status   = get_u16(&in[RCP_EP_CAN_REG_EP_STATUS]);
+    cfg->status      = get_u32(&in[RCP_EP_CAN_REG_STATUS]);
+    cfg->fifo_status = get_u32(&in[RCP_EP_CAN_REG_FIFO_STATUS]);
+}
+
+/* True iff the octet at relative offset addr belongs to a read-only
+ * register of the block -- EP_LEN, the reserved octet, both octets of
+ * base_clk, or any octet of the not-yet-decomposed 0x0008-0x001B span. */
+static bool can_reg_offset_read_only(uint16_t addr)
+{
+    return addr == RCP_EP_CAN_REG_EP_LEN || addr == RCP_EP_CAN_REG_RESERVED_01 ||
+           (addr >= RCP_EP_CAN_REG_BASE_CLK && addr < RCP_EP_CAN_REG_BASE_CLK + 2u) ||
+           (addr >= RCP_EP_CAN_REG_UNDECOMPOSED_START &&
+            addr < RCP_EP_CAN_REG_UNDECOMPOSED_START + RCP_EP_CAN_REG_UNDECOMPOSED_LEN);
+}
+
+//cfusa:req REQ-CANEP-028
+const char *rcp_ep_can_reconfig_strerror(rcp_ep_can_reconfig_errc_t e)
+{
+    switch (e) {
+    case RCP_EP_CAN_RECONFIG_OK:
+        return "rcp/ep_can: CAN configuration write applied";
+    case RCP_EP_CAN_RECONFIG_ERR_SHORT:
+        return "rcp/ep_can: CAN configuration write has no address and data";
+    case RCP_EP_CAN_RECONFIG_ERR_OUT_OF_RANGE:
+        return "rcp/ep_can: CAN configuration write extends past the EP_func block";
+    default:
+        return "rcp/ep_can: CAN unknown configuration-write error";
+    }
+}
+
+//cfusa:req REQ-CANEP-028
+rcp_ep_can_reconfig_errc_t rcp_ep_can_apply_reconfig(rcp_ep_can_functional_cfg_t *cfg,
+                                                      const uint8_t *payload, size_t payload_len)
+{
+    uint8_t  block[RCP_EP_CAN_EP_FUNC_LEN];
+    uint16_t start_address;
+    size_t   data_len;
+    size_t   i;
+
+    if (payload_len <= RCP_EP_CAN_RECONFIG_ADDR_LEN) {
+        return RCP_EP_CAN_RECONFIG_ERR_SHORT;
+    }
+
+    start_address = get_u16(payload);
+    data_len      = payload_len - RCP_EP_CAN_RECONFIG_ADDR_LEN;
+
+    if ((size_t)start_address + data_len > (size_t)RCP_EP_CAN_EP_FUNC_LEN) {
+        return RCP_EP_CAN_RECONFIG_ERR_OUT_OF_RANGE;
+    }
+
+    rcp_ep_can_render_registers(cfg, block);
+    for (i = 0; i < data_len; i++) {
+        uint16_t addr = (uint16_t)(start_address + i);
+
+        if (can_reg_offset_read_only(addr)) continue; /* write ignored */
+        block[addr] = payload[RCP_EP_CAN_RECONFIG_ADDR_LEN + i];
+    }
+    parse_can_registers(cfg, block);
+
+    return RCP_EP_CAN_RECONFIG_OK;
 }

@@ -710,7 +710,113 @@ static void test_can_base_identifier_is_right_aligned_and_data_only(void)
     TEST_ASSERT_TRUE(rcp_ep_can_arbitration_id_valid(RCP_EP_CAN_FRAME_CEFF, 0x1FFFFFFFu));
 }
 
-static void test_can_block_lacks_registers_and_receive_filter_table(void)
+/* REQ-CANEP-028 IMPLEMENTED (issue #201, 2026-08-12): TC18 §13.7.11.2
+ * Table 56 (RC1's own Table 53 -- renumbered, issue #341 lineage) fixes
+ * can_ep_len at 0x0000 (8 bit, R), a reserved octet at 0x0001,
+ * can_base_clk at 0x0004 (16 bit, R), can_ep_status at 0x0006 (16 bit,
+ * R/W), a 32-bit CAN EP status at 0x001C and a 32-bit FIFO status at
+ * 0x0020 -- rcp_ep_can_render_registers()/_apply_reconfig()
+ * (ep_can.h/ep_can.c) now serialize/parse exactly that span, reachable
+ * via the generic §12.7.1 evt[2:0]==111b mechanism, so bus-off,
+ * error-passive and FIFO-overflow conditions (carried in the new
+ * status/fifo_status fields) are now observable and settable. Scoped to
+ * end at 0x0024, immediately before REQ-CANEP-029's own already-
+ * documented address collision in the acceptance-filter region --
+ * closing this register block did not require resolving that collision,
+ * since it lies entirely outside this span. */
+static void test_can_register_block_round_trips_ep_status_and_status_fields(void)
+{
+    rcp_ep_can_functional_cfg_t cfg;
+    uint8_t                     block[RCP_EP_CAN_EP_FUNC_LEN];
+    rcp_ep_can_functional_cfg_t roundtrip;
+
+    rcp_ep_can_functional_cfg_init(&cfg);
+    cfg.ep_status   = 0x1234u;
+    cfg.status      = 0xDEADBEEFu;
+    cfg.fifo_status = 0xCAFEF00Du;
+
+    rcp_ep_can_render_registers(&cfg, block);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_CAN_EP_FUNC_LEN, block[0x0000]);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, block[0x0001]);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, block[0x0004]); /* can_base_clk: no real
+                                                        clock modelled */
+    TEST_ASSERT_EQUAL_UINT8(0x12u, block[0x0006]);
+    TEST_ASSERT_EQUAL_UINT8(0x34u, block[0x0007]);
+    TEST_ASSERT_EQUAL_UINT8(0xDEu, block[0x001C]);
+    TEST_ASSERT_EQUAL_UINT8(0xEFu, block[0x001F]);
+    TEST_ASSERT_EQUAL_UINT8(0xCAu, block[0x0020]);
+    TEST_ASSERT_EQUAL_UINT8(0x0Du, block[0x0023]);
+
+    rcp_ep_can_functional_cfg_init(&roundtrip);
+
+    /* A payload carrying only the address prefix, no data octet after
+     * it, is rejected -- matching every other endpoint type's own
+     * identical RECONFIG_ADDR_LEN + 1 minimum. */
+    TEST_ASSERT_EQUAL(RCP_EP_CAN_RECONFIG_ERR_SHORT,
+                      rcp_ep_can_apply_reconfig(&roundtrip, (const uint8_t[]){0x00, 0x00},
+                                                RCP_EP_CAN_RECONFIG_ADDR_LEN));
+
+    /* A real addressed write covering can_ep_status and the 32-bit status
+     * registers round-trips through parse_can_registers(). */
+    {
+        uint8_t payload[RCP_EP_CAN_RECONFIG_ADDR_LEN + (RCP_EP_CAN_EP_FUNC_LEN - 0x0006u)];
+
+        payload[0] = 0x00u;
+        payload[1] = 0x06u; /* start_address = 0x0006 */
+        memcpy(&payload[RCP_EP_CAN_RECONFIG_ADDR_LEN], &block[0x0006],
+               RCP_EP_CAN_EP_FUNC_LEN - 0x0006u);
+        TEST_ASSERT_EQUAL(RCP_EP_CAN_RECONFIG_OK,
+                          rcp_ep_can_apply_reconfig(&roundtrip, payload, sizeof(payload)));
+    }
+    TEST_ASSERT_EQUAL_UINT16(0x1234u, roundtrip.ep_status);
+    TEST_ASSERT_EQUAL_UINT32(0xDEADBEEFu, roundtrip.status);
+    TEST_ASSERT_EQUAL_UINT32(0xCAFEF00Du, roundtrip.fifo_status);
+
+    /* A write covering EP_LEN/the reserved octet/base_clk (all read-only)
+     * is silently ignored for those octets specifically -- the whole
+     * write is not rejected, per §12.7.1's own "written data on read
+     * only registers has no effect" rule, matching every other endpoint
+     * type's own read-only-octet handling. */
+    {
+        uint8_t payload[RCP_EP_CAN_RECONFIG_ADDR_LEN + 6] = {0x00, 0x00, 0xFF, 0xFF,
+                                                              0xFF, 0xFF, 0xFF, 0xFF};
+
+        TEST_ASSERT_EQUAL(RCP_EP_CAN_RECONFIG_OK,
+                          rcp_ep_can_apply_reconfig(&roundtrip, payload, sizeof(payload)));
+    }
+    TEST_ASSERT_EQUAL_UINT16(0x1234u, roundtrip.ep_status); /* unaffected --
+                                                                 payload's tail
+                                                                 (offsets
+                                                                 0x0002-0x0005)
+                                                                 only reached
+                                                                 common flags
+                                                                 and base_clk */
+
+    /* The not-yet-decomposed 0x0008-0x001B span (clk_divider, both
+     * reserved regions, the three CAN bit time registers, and TDCC) is
+     * also read-only for now -- a write covering it leaves render()'s
+     * own output for that whole span at 0, not the written value.
+     * Literal offsets (not RCP_EP_CAN_REG_* names, which are private to
+     * ep_can.c) matching this file's own convention elsewhere above. */
+    {
+        uint8_t  payload[RCP_EP_CAN_RECONFIG_ADDR_LEN + 0x14];
+        uint8_t  after[RCP_EP_CAN_EP_FUNC_LEN];
+        uint16_t i;
+
+        payload[0] = 0x00u;
+        payload[1] = 0x08u; /* start_address = 0x0008 */
+        memset(&payload[RCP_EP_CAN_RECONFIG_ADDR_LEN], 0xFF, 0x14);
+
+        TEST_ASSERT_EQUAL(RCP_EP_CAN_RECONFIG_OK,
+                          rcp_ep_can_apply_reconfig(&roundtrip, payload, sizeof(payload)));
+        rcp_ep_can_render_registers(&roundtrip, after);
+        for (i = 0x08u; i < 0x1Cu; i++) {
+            TEST_ASSERT_EQUAL_UINT8(0x00u, after[i]);
+        }
+    }
+}
+
+static void test_can_block_lacks_receive_filter_table(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
     rcp_lifecycle_writer_ctx_t  w = any_writer();
@@ -722,30 +828,23 @@ static void test_can_block_lacks_registers_and_receive_filter_table(void)
     filt.enable = true;
     TEST_ASSERT_TRUE(rcp_ep_can_set_xl_filter(&cfg, 0u, filt, RCP_LIFECYCLE_HW_CONFIGURED, w));
 
-    /* DEVIATION -- TC18 §13.7.11.2 Table 53 fixes can_ep_len at 0x0000
-     * (8 bit, R), a reserved octet at 0x0001, can_base_clk at 0x0004
-     * (16 bit, R), can_ep_status at 0x0006 (16 bit, R/W), a 32-bit CAN EP
-     * status at 0x001C and a 32-bit FIFO status at 0x0020. c-RCP's block
-     * begins at relative address 0x0000 with the shared common flags and
-     * models none of those rows, so bus-off, error-passive and
-     * FIFO-overflow conditions are unobservable. */
-    TEST_ASSERT_EQUAL_size_t(0u, offsetof(rcp_ep_can_functional_cfg_t, common));
-
-    /* DEVIATION -- Table 53 defines TWO distinct 4-entry filter tables:
-     * acceptance filters 1..4 at 0x0024..0x0030 (CAN XL) and receive ID
-     * filters 1..4 at 0x0030..0x003C, the latter valid for ALL CAN
-     * variants. c-RCP has exactly one table, scoped to CAN XL, and it is
-     * the final member of the block -- nothing follows it -- so Classical
-     * CAN, CAN FD and CAN FD light traffic cannot be ID-filtered on
-     * reception at all. A conforming implementation would carry a second,
-     * independently writable receive-filter table. */
+    /* DEVIATION, still genuinely open -- Table 56 defines TWO distinct
+     * 4-entry filter tables: acceptance filters 1..4 (CAN XL, at
+     * addresses REQ-CANEP-029 already documents as internally
+     * inconsistent -- filters 3 and 4 both print at 0x002C) and receive
+     * ID filters 1..4 at 0x0030..0x003C, the latter valid for ALL CAN
+     * variants. c-RCP has exactly one table, scoped to CAN XL only -- so
+     * Classical CAN, CAN FD and CAN FD light traffic cannot be
+     * ID-filtered on reception at all. A conforming implementation would
+     * carry a second, independently writable receive-filter table; that
+     * table's own wire exposure is additionally blocked by
+     * REQ-CANEP-029's own unresolved collision, since the receive-filter
+     * region's own addressing depends on how the acceptance-filter
+     * region ahead of it is finally laid out. */
     TEST_ASSERT_EQUAL_UINT8(4u, RCP_EP_CAN_XL_MAX_FILTERS);
     TEST_ASSERT_TRUE(rcp_ep_can_xl_filter_index_valid(3u));
     TEST_ASSERT_FALSE(rcp_ep_can_xl_filter_index_valid(4u));
     TEST_ASSERT_EQUAL_UINT32(0x123u, cfg.xl_filters[0].id);
-    TEST_ASSERT_EQUAL_size_t(sizeof(cfg),
-                             offsetof(rcp_ep_can_functional_cfg_t, xl_filters)
-                                 + sizeof(cfg.xl_filters));
 }
 
 static void test_can_new_physical_layer_is_selected_per_frame(void)
@@ -994,7 +1093,8 @@ int main(void)
 
     RUN_TEST(test_can_frame_format_values_match_table_54);
     RUN_TEST(test_can_base_identifier_is_right_aligned_and_data_only);
-    RUN_TEST(test_can_block_lacks_registers_and_receive_filter_table);
+    RUN_TEST(test_can_register_block_round_trips_ep_status_and_status_fields);
+    RUN_TEST(test_can_block_lacks_receive_filter_table);
     RUN_TEST(test_can_new_physical_layer_is_selected_per_frame);
 
     RUN_TEST(test_iseled_response_has_no_read_size_ceiling);

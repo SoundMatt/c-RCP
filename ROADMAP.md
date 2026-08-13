@@ -15205,6 +15205,50 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.289.0 -- 2026-08-12 (issue #256 Group I dedicated
+investigation: CAN EP_func register block, REQ-CANEP-028 -- ASIL-B)
+
+**REQ-CANEP-028 flips not-implemented -> implemented, ASIL-B.**
+
+New rcp_ep_can_render_registers()/rcp_ep_can_apply_reconfig()
+(ep_can.h/ep_can.c) model TC18 13.7.11.2 Table 56's own CAN
+functional-configuration descriptor, clock and status registers:
+can_ep_len, the reserved octet, can_base_clk (always renders 0, no
+real clock modelled), can_ep_status (new ep_status field), the
+32-bit CAN EP status at 0x001C (new status field), and the 32-bit
+FIFO status at 0x0020 (new fifo_status field) -- reachable via the
+generic 12.7.1 evt[2:0]==111b mechanism. Bus-off, error-passive and
+FIFO-overflow conditions are now observable and settable.
+
+Deliberately scoped to end at 0x0024, before REQ-CANEP-029's own
+already-documented address collision in the acceptance-filter
+region -- matching the same "don't let one unresolved sub-range
+block an otherwise-tractable register block" precedent ep_wakeup.h's
+own dedicated investigation (task #95) already established.
+
+The 0x0008-0x001B span (clk_divider, two reserved regions, three
+"CAN bit time register" fields, TDCC) is deliberately left
+read-only, rendering 0: Table 56 gives those registers no sub-field
+bit-layout in the spec text, so converting rcp_ep_can_bit_timing_t
+to/from their wire representation is not derivable without
+inventing an unverified bit-packing scheme -- not forced here.
+
+Citation-drift fix, same lineage as issue #341: the catalog's own
+"Table 53" citation was stale -- RC5's own renumbered table is
+Table 56.
+
+Rewrote the pre-existing gap-pinning test, split into a fix-asserting
+test and a still-open receive-filter-table deviation pin
+(REQ-CANEP-029's own scope). Mutation-tested 3 ways: the
+undecomposed-span read-only guard removed was a genuine equivalent
+mutant (no backing field exists for that span, so nothing persists
+regardless); the out-of-range boundary and ep_status rendering
+mutations both caught cleanly.
+
+65/65 both trees (native + ASan/UBSan, full suite given real wire
+(de)serialization). `cfusa check`: 0 errors both trees. `cfusa
+trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
 ### v0.288.0 -- 2026-08-12 (issue #201 batch: `REQ-SEQ-012`,
 disabled-sequencer guard -- ASIL-B)
 
