@@ -15205,6 +15205,29 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.298.0 -- 2026-08-13 (issue #336: REQ-CANEP-030, CAN XL
+physical-layer provisioning -- not-implemented -> partial)
+
+REQ-CANEP-030 flips not-implemented -> partial. TC18 13.7.11.2 lists
+"usage of new PL (YES|NO) for CAN XL" among the CAN endpoint's
+functional-config settings, alongside bit-rate/filter settings that
+all have real register rows in Table 56. This one does not -- the
+register table jumps from can_clk_divider (0x0008) straight to the
+undecomposed bit-time/TDCC span with no row for it anywhere. Filed as
+canonical spec-defects report item 57.
+
+New rcp_ep_can_functional_cfg_t::xl_new_pl_provisioned is deliberately
+an in-memory-only field with no wire offset, matching that constraint
+honestly. rcp_ep_can_set_xl_new_pl_provisioned() lets a caller record
+this choice; new rcp_ep_can_xl_frame_matches_provisioned_pl()
+validates a decoded frame's own XL variant against it. Stays partial:
+a client still cannot read this back over the register map, since
+TC18 gives no bit position to expose it at.
+
+4 new unit tests. Mutation-tested 3 ways -- all caught cleanly. cfusa
+check A/B: zero new or removed findings. cfusa trace: both 100%,
+1024/1024. 65/65 both trees (native + ASan/UBSan).
+
 ### v0.297.0 -- 2026-08-13 (issue #336: REQ-GPIO-035/REQ-GPIO-036
 debounce-filter and response-timing primitives)
 

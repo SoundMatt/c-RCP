@@ -26,6 +26,7 @@
 //cfusa:test REQ-CANEP-025
 //cfusa:test REQ-CANEP-026
 //cfusa:test REQ-CANEP-027
+//cfusa:test REQ-CANEP-030
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -1017,6 +1018,53 @@ static void test_reassembled_decode_rejects_short_frame(void)
                                                        &out_rx, &out_rx_len));
 }
 
+/* ── REQ-CANEP-030: CAN XL physical-layer provisioning ───────────────────── */
+
+static void test_xl_pl_non_xl_frame_always_matches(void)
+{
+    TEST_ASSERT_TRUE(rcp_ep_can_xl_frame_matches_provisioned_pl(true, RCP_EP_CAN_FRAME_CBFF));
+    TEST_ASSERT_TRUE(rcp_ep_can_xl_frame_matches_provisioned_pl(false, RCP_EP_CAN_FRAME_CBFF));
+    TEST_ASSERT_TRUE(rcp_ep_can_xl_frame_matches_provisioned_pl(true, RCP_EP_CAN_FRAME_CEFF));
+    TEST_ASSERT_TRUE(rcp_ep_can_xl_frame_matches_provisioned_pl(false, RCP_EP_CAN_FRAME_FBFF));
+    TEST_ASSERT_TRUE(rcp_ep_can_xl_frame_matches_provisioned_pl(true, RCP_EP_CAN_FRAME_FEFF));
+}
+
+static void test_xl_pl_new_pl_provisioned_matches_only_new_pl_frame(void)
+{
+    TEST_ASSERT_TRUE(rcp_ep_can_xl_frame_matches_provisioned_pl(true, RCP_EP_CAN_FRAME_XL_NEW_PL));
+    TEST_ASSERT_FALSE(
+        rcp_ep_can_xl_frame_matches_provisioned_pl(true, RCP_EP_CAN_FRAME_XL_CLASSICAL_PL));
+}
+
+static void test_xl_pl_classical_pl_provisioned_matches_only_classical_pl_frame(void)
+{
+    TEST_ASSERT_TRUE(
+        rcp_ep_can_xl_frame_matches_provisioned_pl(false, RCP_EP_CAN_FRAME_XL_CLASSICAL_PL));
+    TEST_ASSERT_FALSE(
+        rcp_ep_can_xl_frame_matches_provisioned_pl(false, RCP_EP_CAN_FRAME_XL_NEW_PL));
+}
+
+static void test_xl_pl_set_provisioned_requires_authorization(void)
+{
+    rcp_ep_can_functional_cfg_t cfg;
+    rcp_lifecycle_writer_ctx_t  none = {0};
+    rcp_lifecycle_writer_ctx_t  owning;
+
+    memset(&owning, 0, sizeof(owning));
+    owning.via_owning_stream = true;
+
+    rcp_ep_can_functional_cfg_init(&cfg);
+    TEST_ASSERT_FALSE(cfg.xl_new_pl_provisioned);
+
+    TEST_ASSERT_FALSE(rcp_ep_can_set_xl_new_pl_provisioned(&cfg, true,
+                                                            RCP_LIFECYCLE_HW_UNCONFIGURED, none));
+    TEST_ASSERT_FALSE(cfg.xl_new_pl_provisioned);
+
+    TEST_ASSERT_TRUE(rcp_ep_can_set_xl_new_pl_provisioned(&cfg, true,
+                                                           RCP_LIFECYCLE_HW_CONFIGURED, owning));
+    TEST_ASSERT_TRUE(cfg.xl_new_pl_provisioned);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -1081,6 +1129,11 @@ int main(void)
     RUN_TEST(test_fragment_encode_rejects_bad_preconditions);
     RUN_TEST(test_fragment_decode_fragment_rejects_wrong_bus);
     RUN_TEST(test_reassembled_decode_rejects_short_frame);
+
+    RUN_TEST(test_xl_pl_non_xl_frame_always_matches);
+    RUN_TEST(test_xl_pl_new_pl_provisioned_matches_only_new_pl_frame);
+    RUN_TEST(test_xl_pl_classical_pl_provisioned_matches_only_classical_pl_frame);
+    RUN_TEST(test_xl_pl_set_provisioned_requires_authorization);
 
     return UNITY_END();
 }

@@ -54,6 +54,19 @@ bool rcp_ep_can_frame_format_is_xl(rcp_ep_can_frame_format_t format)
     }
 }
 
+//cfusa:req REQ-CANEP-030
+bool rcp_ep_can_xl_frame_matches_provisioned_pl(bool xl_new_pl_provisioned,
+                                                 rcp_ep_can_frame_format_t format)
+{
+    /* Physical-layer provisioning only concerns XL frames -- a non-XL
+     * frame carries no PL choice of its own to conflict with, so it
+     * trivially matches regardless of what is provisioned. */
+    if (!rcp_ep_can_frame_format_is_xl(format)) return true;
+
+    return xl_new_pl_provisioned ? (format == RCP_EP_CAN_FRAME_XL_NEW_PL)
+                                  : (format == RCP_EP_CAN_FRAME_XL_CLASSICAL_PL);
+}
+
 //cfusa:req REQ-CANEP-003
 rcp_ep_can_id_width_t rcp_ep_can_frame_format_id_width(rcp_ep_can_frame_format_t format)
 {
@@ -109,8 +122,9 @@ void rcp_ep_can_functional_cfg_init(rcp_ep_can_functional_cfg_t *cfg)
     memset(cfg, 0, sizeof(*cfg));
     rcp_regmap_ep_functional_cfg_init(&cfg->common);
     /* Every bit-timing register set, delay_comp_enable/_offset,
-     * exec_delay_clk_divider, and every xl_filters[i] (id/mask/enable) are
-     * already zero/false via the memset above. */
+     * exec_delay_clk_divider, every xl_filters[i] (id/mask/enable), and
+     * xl_new_pl_provisioned are already zero/false via the memset
+     * above. */
 }
 
 //cfusa:req REQ-CANEP-008
@@ -165,6 +179,18 @@ bool rcp_ep_can_set_delay_compensation(rcp_ep_can_functional_cfg_t *cfg, bool en
 
     cfg->delay_comp_enable = enable;
     cfg->delay_comp_offset = offset;
+    return true;
+}
+
+//cfusa:req REQ-CANEP-030
+bool rcp_ep_can_set_xl_new_pl_provisioned(rcp_ep_can_functional_cfg_t *cfg,
+                                           bool new_pl_provisioned,
+                                           rcp_lifecycle_state_t state,
+                                           rcp_lifecycle_writer_ctx_t writer)
+{
+    if (!rcp_ep_can_functional_cfg_writable(state, writer)) return false;
+
+    cfg->xl_new_pl_provisioned = new_pl_provisioned;
     return true;
 }
 
