@@ -28,6 +28,7 @@
 //cfusa:req REQ-MDIO-021
 //cfusa:req REQ-MDIO-022
 //cfusa:req REQ-MDIO-023
+//cfusa:req REQ-MDIO-024
 /*
  * ep_mdio.h -- MDIO management endpoint for the TC18 Remote Control
  * Protocol wire layer (ROADMAP.md Phase 19, "Remaining Endpoint Types",
@@ -346,16 +347,15 @@ extern "C" {
  * made before this fix; mdio_mode is now genuinely present on the wire
  * too, not merely implied.
  *
- * REQ-MDIO-022 (16 vs 32-bit data width for MMS0/MMS1) stays entirely
- * NOT IMPLEMENTED: it is unreachable without MMS addressing existing at
- * all, which this fix deliberately does not add. */
+ * REQ-MDIO-022 (16 vs 32-bit data width for MMS0/MMS1) stayed entirely
+ * NOT IMPLEMENTED as of this fix: it was unreachable without MMS
+ * addressing existing at all, which this fix deliberately did not add.
+ * See the "MMS addressing" section below for its own later fix. */
 typedef enum {
     RCP_EP_MDIO_MODE_MMD_SINGLE = 0, /* 00b -- ASSUMPTION, see above */
     RCP_EP_MDIO_MODE_MMD_MULTI  = 1, /* 01b */
-    RCP_EP_MDIO_MODE_MMS_SINGLE = 2, /* 10b -- decodable, not encodable or
-                                         interpretable by this module */
-    RCP_EP_MDIO_MODE_MMS_MULTI  = 3, /* 11b -- decodable, not encodable or
-                                         interpretable by this module */
+    RCP_EP_MDIO_MODE_MMS_SINGLE = 2, /* 10b -- see "MMS addressing" below */
+    RCP_EP_MDIO_MODE_MMS_MULTI  = 3, /* 11b -- see "MMS addressing" below */
 } rcp_ep_mdio_mode_t;
 
 /* True iff word_count selects RCP_EP_MDIO_MODE_MMD_MULTI (word_count > 1)
@@ -367,10 +367,145 @@ typedef enum {
 rcp_ep_mdio_mode_t rcp_ep_mdio_mode_for_word_count(size_t word_count);
 
 /* True iff mode is RCP_EP_MDIO_MODE_MMS_SINGLE or _MMS_MULTI -- the two
- * mdio_mode values this module can decode (recognize on the wire) but
- * not encode or otherwise interpret -- see this section's own opening
- * comment. */
+ * mdio_mode values belonging to the *_mms_* function family (below)
+ * rather than the MMD family above. Despite its name (kept for source
+ * compatibility -- see the "MMS addressing" section below for why MMS is
+ * no longer actually unsupported by this module as a whole), still
+ * exactly what it always meant: these two mode values are NOT ones the
+ * MMD-family functions above can encode or interpret -- a caller
+ * decoding an incoming frame of unknown mode should still check this
+ * first and route to the *_mms_* family instead, exactly as before. */
 bool rcp_ep_mdio_mode_is_unsupported_mms(rcp_ep_mdio_mode_t mode);
+
+/* ── MMS addressing: REQ-MDIO-022/024, FIXED 2026-08-13 ──────────────────────
+ *
+ * DOCUMENTED ASSUMPTION, user-approved 2026-08-13, informed by a real
+ * external specification this time (not invented from nothing): the
+ * OPEN Alliance 10BASE-T1x MAC-PHY Serial Interface specification, V1.1
+ * (referenced here by name and section only; no prose or figure from it
+ * is reproduced), stored at
+ * /Users/matt/Documents/Coding/SoundMatt/OPEN_Alliance_10BASE-T1x_MAC-PHY_Serial_Interface_V1.1.pdf
+ * -- NOT in this repo, NOT the confidential TC18 document, a publicly
+ * available OPEN Alliance specification found via web search and cited
+ * as this fix's own external basis.
+ *
+ * TWO DISTINCT THINGS this fix relies on, with two very different
+ * confidence levels:
+ *
+ * 1. TC18-LITERAL, not an assumption at all (REQ-MDIO-022's own text):
+ *    Table 60 states directly that MMS0 and MMS1 use 32-bit data fields
+ *    and every other MMS uses 16-bit data fields.
+ *    rcp_ep_mdio_mms_uses_32bit_words() below implements exactly this
+ *    stated rule -- nothing here is inferred.
+ *
+ * 2. AN ASSUMPTION (REQ-MDIO-024, new this fix): neither Figure 43 nor
+ *    Table 60 gives TC18's own `mdio_address` field a bit width or an
+ *    internal layout for MMS mode (TC18_spec_defects_report.md item 55,
+ *    still open, still worth the committee's attention -- this fix does
+ *    not resolve item 55, it works around it with a documented guess).
+ *    The external OA-SPI spec's own control command header (its own
+ *    §7.4.1 Table 4) gives the REAL protocol this "MMS" terminology is
+ *    almost certainly borrowed from a well-defined shape: a 4-bit MMS
+ *    selector (0-15, its own §9.1 Table 6) immediately followed by a
+ *    16-bit ADDR field -- 20 bits total. This module ASSUMES TC18's own
+ *    `mdio_address` field packs the same two sub-fields in the same
+ *    order for its MMS mode, and represents them on ITS OWN wire (not
+ *    OA-SPI's -- RCP is not literally SPI) as two whole octets --
+ *    `mms` (a full byte, valid range 0..RCP_EP_MDIO_MMS_MAX) then a
+ *    big-endian 16-bit `addr` -- the same "give every address sub-field
+ *    its own whole octet rather than bit-packing it" convention the
+ *    MMD prefix above already uses for its own 5-bit prtad/devad
+ *    fields. THIS PART COULD BE WRONG: if the real committee intent
+ *    differs (a different field order, a different MMS width, or
+ *    `mdio_address` meaning something else for MMS entirely), a peer
+ *    built against this assumption will not interoperate with one built
+ *    against the real (still unpublished, as far as this fix's own
+ *    research found) TC18 committee resolution of item 55. This is why
+ *    REQ-MDIO-024 is catalogued as PARTIAL, not IMPLEMENTED, even though
+ *    the code path fully exists and is fully tested against ITS OWN
+ *    assumed layout.
+ *
+ * One further honesty note: the external OA-SPI spec's own Table 6
+ * marks MMS 1's own register width "implementation dependent", not
+ * literally 32-bit -- TC18's own Table 60 is making an RCP-specific
+ * overriding convention here (MMS0 AND MMS1 both 32-bit for THIS
+ * protocol's purposes), not simply quoting the external spec verbatim.
+ * That part is still TC18-literal (see point 1 above); only the
+ * ADDRESSING shape (point 2) is this module's own assumption.
+ *
+ * Everything below in this section is purely additive: the existing MMD
+ * family (rcp_ep_mdio_addr_t and every read/write encode/decode function
+ * above) is completely unchanged, byte-for-byte, by this fix. */
+
+#define RCP_EP_MDIO_MMS_MAX ((uint8_t)0x0Fu) /* 4-bit MMS selector, 0..15,
+                                                 OA-SPI spec Table 6 */
+
+typedef struct {
+    uint8_t  mms;  /* Memory Map Selector, 0..RCP_EP_MDIO_MMS_MAX */
+    uint16_t addr; /* register address within the selected memory map */
+} rcp_ep_mdio_mms_addr_t;
+
+/* True iff addr.mms <= RCP_EP_MDIO_MMS_MAX. addr.addr's full 16-bit range
+ * is always valid (no MMS-specific narrower range is known -- see the
+ * file header's own honesty note above). */
+bool rcp_ep_mdio_mms_addr_valid(rcp_ep_mdio_mms_addr_t addr);
+
+/* True iff mms is 0 or 1 -- REQ-MDIO-022's own TC18-literal rule (Table
+ * 60): MMS0 and MMS1 use 32-bit data fields; every other mms (2..15)
+ * uses 16-bit data fields. Meaningless (but well-defined: false) for
+ * mms > RCP_EP_MDIO_MMS_MAX -- callers should have already validated
+ * mms via rcp_ep_mdio_mms_addr_valid() first. */
+bool rcp_ep_mdio_mms_uses_32bit_words(uint8_t mms);
+
+/* The next register address one step into an MMS burst starting at addr
+ * -- the same one-step-advance idiom rcp_ep_mdio_burst_next_regad()
+ * provides for the MMD family, at MMS addressing's own full 16-bit
+ * width (wraps at 0xFFFF). This module's own design choice, like its
+ * MMD counterpart -- not itself derived from either spec. */
+uint16_t rcp_ep_mdio_mms_burst_next_addr(uint16_t addr);
+
+/* True iff word_count selects RCP_EP_MDIO_MODE_MMS_MULTI (word_count > 1)
+ * rather than RCP_EP_MDIO_MODE_MMS_SINGLE (word_count == 1) -- the MMS
+ * family's own counterpart to rcp_ep_mdio_mode_for_word_count() above. */
+rcp_ep_mdio_mode_t rcp_ep_mdio_mms_mode_for_word_count(size_t word_count);
+
+/* ── MMS register-word packing: 16- or 32-bit per rcp_ep_mdio_mms_uses_32bit_words() ──
+ *
+ * Every word is represented in memory as a uint32_t regardless of its
+ * own wire width (the high 16 bits are simply unused/zero for a 16-bit
+ * MMS) -- one packing family instead of two width-specific ones, since
+ * the width is always a pure function of the already-known `mms` value,
+ * not a second independent parameter a caller could get wrong. */
+
+/* Encodes word into out[0..4) big-endian (out[0] = highest byte). */
+void rcp_ep_mdio_word32_encode(uint32_t word, uint8_t out[4]);
+
+/* Decodes a big-endian 32-bit word from in[0..4) (in[0] = highest byte). */
+uint32_t rcp_ep_mdio_word32_decode(const uint8_t in[4]);
+
+/* Number of octets rcp_ep_mdio_mms_pack_words() produces for word_count
+ * words at mms's own width: word_count * (4 or 2). */
+size_t rcp_ep_mdio_mms_pack_len(uint8_t mms, size_t word_count);
+
+/* Packs words[0..word_count) into a newly allocated big-endian byte
+ * buffer of rcp_ep_mdio_mms_pack_len(mms, word_count) octets, at mms's
+ * own word width (rcp_ep_mdio_word32_encode() applied word by word for a
+ * 32-bit mms; the low 16 bits of each word via rcp_ep_mdio_word_encode()
+ * otherwise). words may be NULL iff word_count == 0. Returns a zeroed
+ * rcp_bytes_t (data=NULL) if word_count == 0 or on allocation failure.
+ * Caller frees the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_ep_mdio_mms_pack_words(uint8_t mms, const uint32_t *words, size_t word_count);
+
+/* True (with *out_word_count set) iff byte_len is an exact multiple of
+ * mms's own word width (4 or 2 octets) -- the MMS family's own
+ * counterpart to rcp_ep_mdio_word_count_of(). */
+bool rcp_ep_mdio_mms_word_count_of(uint8_t mms, size_t byte_len, size_t *out_word_count);
+
+/* Reads the word_index'th packed word out of data at mms's own width,
+ * zero-extended to uint32_t for a 16-bit mms. No bounds check of its
+ * own -- the MMS family's own counterpart to
+ * rcp_ep_mdio_unpack_word_at(). */
+uint32_t rcp_ep_mdio_mms_unpack_word_at(uint8_t mms, const uint8_t *data, size_t word_index);
 
 /* ── Addressing: Clause-22 MMD / Clause-45 MMS ───────────────────────────── */
 
@@ -568,6 +703,16 @@ typedef enum {
      * request's own address/data shape, so it fails closed here rather
      * than misreading the payload as if it were MMD-shaped. */
     RCP_EP_MDIO_ERR_UNSUPPORTED_MMS = 9,
+    /* rcp_ep_mdio_mms_addr_valid() failed for the decoded MMS address --
+     * see the "MMS addressing" section above. */
+    RCP_EP_MDIO_ERR_BAD_MMS_ADDR    = 10,
+    /* The decoded mdio_mode octet is RCP_EP_MDIO_MODE_MMD_SINGLE or
+     * _MMD_MULTI -- returned by the *_mms_* decoder family (below) when
+     * handed a frame using the OTHER (MMD) addressing family. Use
+     * rcp_ep_mdio_decode_read_request()/_decode_write_request() (the MMD
+     * family, above) instead -- the mirror image of
+     * RCP_EP_MDIO_ERR_UNSUPPORTED_MMS. */
+    RCP_EP_MDIO_ERR_WRONG_MDIO_MODE = 11,
 } rcp_ep_mdio_errc_t;
 
 /* Human-readable message for an rcp_ep_mdio_errc_t value. Never returns NULL. */
@@ -722,6 +867,123 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_write_response(const uint8_t *b, size_t le
                                                       size_t *out_word_count, bool *out_timed,
                                                       uint64_t *out_timestamp,
                                                       uint8_t *out_transaction_num);
+
+/* ── MMS read request/response: REQ-MDIO-022/024 ─────────────────────────────
+ *
+ * The MMS family's own counterpart to the MMD read family above -- see
+ * the "MMS addressing" section for the wire layout and its documented
+ * assumption. Payload: a leading mdio_mode octet (always MMS_SINGLE or
+ * MMS_MULTI, derived from word_count via
+ * rcp_ep_mdio_mms_mode_for_word_count()), then a 3-byte address prefix
+ * (`mms`, one octet; `addr`, big-endian 16-bit), then (read request
+ * only) a big-endian 2-byte word_count -- the same "own word_count
+ * field, not spec-derived" choice the MMD family already makes, applied
+ * uniformly here too. */
+
+/* Returns a zeroed rcp_bytes_t (data=NULL) if !rcp_ep_mdio_mms_addr_valid(addr),
+ * if word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS, or on
+ * allocation failure. */
+rcp_bytes_t rcp_ep_mdio_encode_mms_read_request(rcp_byte_bus_id_t byte_bus_id,
+                                                 rcp_ep_mdio_mms_addr_t addr, size_t word_count,
+                                                 uint8_t transaction_num);
+
+/* Fails with RCP_EP_MDIO_ERR_SHORT_FRAME/_BAD_MSG_TYPE/_WRONG_BUS/_WRONG_OP/
+ * _BAD_EVT the same way rcp_ep_mdio_decode_read_request() does;
+ * RCP_EP_MDIO_ERR_WRONG_MDIO_MODE if the decoded mdio_mode octet belongs
+ * to the MMD family instead (use rcp_ep_mdio_decode_read_request());
+ * RCP_EP_MDIO_ERR_BAD_MMS_ADDR if the decoded address fails
+ * rcp_ep_mdio_mms_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT if the
+ * decoded word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS. On
+ * RCP_EP_MDIO_OK, *out_addr, *out_word_count, and *out_transaction_num
+ * are populated. */
+rcp_ep_mdio_errc_t rcp_ep_mdio_decode_mms_read_request(const uint8_t *b, size_t len,
+                                                        rcp_byte_bus_id_t expected_bus_id,
+                                                        rcp_ep_mdio_mms_addr_t *out_addr,
+                                                        size_t *out_word_count,
+                                                        uint8_t *out_transaction_num);
+
+/* Encodes a read response carrying rcp_ep_mdio_mms_pack_words(mms, words,
+ * word_count) as its payload -- the caller supplies mms (not carried in
+ * the response payload itself; the caller already knows it from the
+ * originating request, the same way transaction_num correlation already
+ * works for the MMD family). Otherwise identical to
+ * rcp_ep_mdio_encode_read_response() (timed/untimed ACF_GBB/ACF_ABB
+ * choice, partial-burst word_count, RCP_EP_MDIO_MAX_BURST_WORDS bound). */
+rcp_bytes_t rcp_ep_mdio_encode_mms_read_response(rcp_byte_bus_id_t byte_bus_id, uint8_t mms,
+                                                  const uint32_t *words, size_t word_count,
+                                                  uint8_t transaction_num, bool timed,
+                                                  uint64_t timestamp);
+
+/* Decodes an MMS read response. mms is a caller-supplied INPUT (see
+ * rcp_ep_mdio_encode_mms_read_response()'s own note) used only to
+ * validate the payload's own byte length against mms's own word width
+ * via rcp_ep_mdio_mms_word_count_of() -- otherwise identical to
+ * rcp_ep_mdio_decode_read_response(). *out_words_data / *out_word_count
+ * are a *borrowed* view into b; rcp_ep_mdio_mms_unpack_word_at(mms, ...)
+ * reads individual words out of it. */
+rcp_ep_mdio_errc_t rcp_ep_mdio_decode_mms_read_response(const uint8_t *b, size_t len,
+                                                         rcp_byte_bus_id_t expected_bus_id,
+                                                         uint8_t mms,
+                                                         const uint8_t **out_words_data,
+                                                         size_t *out_word_count, bool *out_timed,
+                                                         uint64_t *out_timestamp,
+                                                         uint8_t *out_transaction_num);
+
+/* ── MMS write request/response: REQ-MDIO-022/024 ────────────────────────────
+ *
+ * The MMS family's own counterpart to the MMD write family above. Write
+ * request payload: mdio_mode octet, then the 3-byte address prefix, then
+ * rcp_ep_mdio_mms_pack_words(addr.mms, words, word_count) -- word_count
+ * implied by the payload's own remaining length at addr.mms's own word
+ * width, the same "not encoded again on a write" MMD convention. */
+
+/* Returns a zeroed rcp_bytes_t (data=NULL) if !rcp_ep_mdio_mms_addr_valid(addr),
+ * if word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS, or on
+ * allocation failure. */
+rcp_bytes_t rcp_ep_mdio_encode_mms_write_request(rcp_byte_bus_id_t byte_bus_id,
+                                                  rcp_ep_mdio_mms_addr_t addr,
+                                                  const uint32_t *words, size_t word_count,
+                                                  uint8_t transaction_num);
+
+/* Fails the same way rcp_ep_mdio_decode_mms_read_request() does (with
+ * RCP_EP_MDIO_ERR_WRONG_OP instead of a read-op check, matching
+ * rcp_ep_mdio_decode_write_request()'s own convention).
+ * RCP_EP_MDIO_ERR_BAD_WORD_COUNT covers a words-region byte length that
+ * is not a whole multiple of the decoded addr.mms's own word width, is
+ * 0, or represents more than RCP_EP_MDIO_MAX_BURST_WORDS words. On
+ * RCP_EP_MDIO_OK, *out_addr and *out_transaction_num are populated, and
+ * *out_words_data / *out_word_count are a *borrowed* view into b of the
+ * packed word bytes following the address prefix (not copied) --
+ * rcp_ep_mdio_mms_unpack_word_at(out_addr->mms, ...) reads individual
+ * words out of it. */
+rcp_ep_mdio_errc_t rcp_ep_mdio_decode_mms_write_request(const uint8_t *b, size_t len,
+                                                         rcp_byte_bus_id_t expected_bus_id,
+                                                         rcp_ep_mdio_mms_addr_t *out_addr,
+                                                         const uint8_t **out_words_data,
+                                                         size_t *out_word_count,
+                                                         uint8_t *out_transaction_num);
+
+/* Encodes a write response carrying rcp_ep_mdio_mms_pack_words(mms,
+ * accepted_words, accepted_word_count) as its payload -- mms is a
+ * caller-supplied input, the same convention as
+ * rcp_ep_mdio_encode_mms_read_response(). Otherwise identical to
+ * rcp_ep_mdio_encode_write_response(). */
+rcp_bytes_t rcp_ep_mdio_encode_mms_write_response(rcp_byte_bus_id_t byte_bus_id, uint8_t mms,
+                                                   const uint32_t *accepted_words,
+                                                   size_t accepted_word_count,
+                                                   uint8_t transaction_num, bool timed,
+                                                   uint64_t timestamp);
+
+/* Decodes an MMS write response -- mms is a caller-supplied input, the
+ * same convention as rcp_ep_mdio_decode_mms_read_response(). Otherwise
+ * identical to rcp_ep_mdio_decode_write_response(). */
+rcp_ep_mdio_errc_t rcp_ep_mdio_decode_mms_write_response(const uint8_t *b, size_t len,
+                                                          rcp_byte_bus_id_t expected_bus_id,
+                                                          uint8_t mms,
+                                                          const uint8_t **out_words_data,
+                                                          size_t *out_word_count, bool *out_timed,
+                                                          uint64_t *out_timestamp,
+                                                          uint8_t *out_transaction_num);
 
 #ifdef __cplusplus
 }

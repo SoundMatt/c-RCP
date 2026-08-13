@@ -17617,3 +17617,141 @@ each time).
 65/65 native, 65/65 ASan/UBSan-clean. `cfusa check` (CI-pinned
 v0.5.50 binary): 0 errors. `cfusa trace`: 1024/1024 traced and
 tested.
+
+### v0.307.0 -- 2026-08-13 (`REQ-MDIO-022`/`REQ-MDIO-024`: MMS
+addressing and 32-bit data fields, informed by a real external spec)
+
+Closes `REQ-MDIO-022` (TC18 §13.7.13.3 Table 60's 32-bit-for-MMS0/MMS1
+data-field rule) and the PARTIAL remainder `REQ-MDIO-021` was left
+carrying since its own 2026-08-12 fix, and adds a new `REQ-MDIO-024`
+for the specific assumption this rests on.
+
+**Provenance**: the user asked directly "can you fix REQ-MDIO-022?"
+after being told the honest reason it was blocked -- TC18 states the
+32-vs-16-bit width rule directly, but never gives `mdio_address` a bit
+width or layout for MMS mode, matching `TC18_spec_defects_report.md`
+item 55. Presented three options (leave blocked and pick a different
+item; implement if the user could supply the real external OA SPI
+spec; or invent and clearly document a non-spec-derived layout). The
+user asked to search online for the spec first. A web search located
+the actual, public OPEN Alliance 10BASE-T1x MAC-PHY Serial Interface
+specification, V1.1 (`opensig.org`) -- a real external spec, not
+invented. Presented the finding and a concrete recommendation; the
+user explicitly adopted it and asked for it to be well-documented and
+the referenced PDF stored locally.
+
+**Investigation discipline, before writing any code**: re-verified
+`REQ-MDIO-022`'s own "blocked" status directly against a freshly
+`pdftotext`-extracted copy of the actual RC5 PDF
+(`OA_TC18_specification_v_0.5.1_RC_5_3624.pdf`) rather than trusting
+either the prior investigation's conclusion or this repo's own
+`TC18.txt`/`TC18_full.txt`/`TC18_nopgbrk.txt` -- all three of which
+turned out to be stale RC1-dated `pdftotext` dumps (same section
+content, different table/figure numbers and page date -- "Table 57"/
+"Figure 42" in the stale files vs. the real "Table 60"/"Figure 43").
+The section's own substantive content was unchanged between RC1 and
+RC5 in this instance, so the prior investigation's conclusion held,
+but the citation-drift discovery itself is worth a follow-up pass
+under issue #341 (not done here, out of this batch's own scope).
+Also independently re-verified a citation from the immediately prior
+batch (v0.306.0's own `REQ-SEQ-013`/`REQ-SEQ-014`) against the fresh
+extraction while in the area -- confirmed correct (`TC18.txt
+L3064-3110` genuinely is Table 28's own SEQUENCER_config section) --
+but surfaced that the PRE-EXISTING `REQ-SEQ-012` citation
+(`TC18.txt L3460-L3493`, not touched this batch) points to §12.10's
+own prose overview instead of §12.7.10's actual register table --
+a real, separate citation bug for issue #341 to pick up, not fixed
+here since it predates this batch and is out of scope.
+
+**The external spec, concretely**: the real OA-SPI control command
+header (its own §7.4.1 Table 4) is `DNC(1) | HDRB(1) | WNR(1) |
+AID(1) | MMS(4) | ADDR(16) | LEN(7) | P(1)` -- a 4-bit Memory Map
+Selector immediately followed by a 16-bit ADDR field. Its own §9.1
+Table 6 independently confirms TC18's own 32-vs-16-bit split (MMS0:
+32-bit; MMS2-6: 16-bit, IEEE 802.3 MMD register maps) with one
+honesty-worth nuance: MMS1's own width is marked "implementation
+dependent" in the real external spec, not literally 32-bit -- TC18's
+own Table 60 is making an RCP-specific overriding convention for
+MMS1, not simply quoting the external spec verbatim. That part stays
+TC18-literal and is not this fix's own assumption.
+
+**`rcp_ep_mdio_mms_addr_t`** (new, `ep_mdio.h`/`.c`): ASSUMES TC18's
+own `mdio_address` field packs the real spec's own 4-bit-MMS +
+16-bit-ADDR shape, represented on THIS module's own wire as two whole
+octets (`mms`, one byte, 0..15; big-endian 16-bit `addr`) -- the same
+give-every-sub-field-its-own-octet convention the pre-existing MMD
+prefix already uses for its own 5-bit `prtad`/`devad` fields.
+Catalogued as `REQ-MDIO-024`, status `PARTIAL` not `IMPLEMENTED`: the
+code path is fully built and fully tested against its OWN assumed
+layout, but if the real TC18 committee resolution of item 55 differs,
+a peer built against this assumption will not interoperate with one
+built against the real resolution -- an honest, load-bearing
+uncertainty this catalog entry's own text spells out in full.
+
+**Purely additive `*_mms_*` function family** -- the pre-existing MMD
+family (`rcp_ep_mdio_addr_t`, every read/write encode/decode function
+that existed before this batch) is unchanged byte-for-byte:
+`rcp_ep_mdio_word32_encode()`/`_decode()` (32-bit big-endian codec,
+mirroring the pre-existing 16-bit `rcp_ep_mdio_word_encode()`/
+`_decode()`); `rcp_ep_mdio_mms_pack_words()`/`_word_count_of()`/
+`_unpack_word_at()` (uint32_t-typed at the API boundary regardless of
+a given `mms`'s own actual wire width, since the width is a pure,
+already-known function of `mms` via `rcp_ep_mdio_mms_uses_32bit_words()`
+-- one packing family instead of two width-specific ones, since a
+caller could otherwise get the width parameter wrong independently of
+`mms`); and the full `rcp_ep_mdio_encode_mms_read_request()`/
+`_decode_mms_read_request()`/`_encode_mms_read_response()`/
+`_decode_mms_read_response()` plus write equivalents, matching the
+MMD family's own existing wire-layout conventions (leading `mdio_mode`
+octet; own `word_count` field for bursts -- this module's own
+original design choice for both families alike, not spec-derived, per
+the file header's pre-existing "this module's own word_count field"
+note).
+
+**Symmetric mode-routing error handling**: `RCP_EP_MDIO_ERR_UNSUPPORTED_MMS`
+keeps its exact name (source compatibility -- no existing enum value
+renamed) but its doc comment is corrected: it now means "this frame
+belongs to the `*_mms_*` family, use that decoder instead" rather than
+"MMS is unsupported", since MMS itself is no longer unsupported by
+this module as a whole. The new `RCP_EP_MDIO_ERR_WRONG_MDIO_MODE` is
+its mirror image, returned by the `*_mms_*` decoders when handed an
+MMD-mode frame.
+
+**Test-file honesty**: the two pre-existing gap-pinning tests in
+`test_tc18_gaps_ep2.c` whose own doc comments predated this fix
+(`test_mdio_decode_rejects_mms_mode_fails_closed`,
+`test_mdio_data_fields_are_unconditionally_sixteen_bit`) needed their
+COMMENTS corrected, not their assertions -- both still pass completely
+unchanged, because what they pin is narrower and permanent than their
+old comments implied: the MMD-family decoder specifically, and always,
+refuses an MMS-mode frame (route to `*_mms_*` instead); the MMD-family
+word codec specifically, and always, stays 16-bit (it is that family's
+own correct, permanent behavior, not a residual REQ-MDIO-022 gap).
+
+**Mutation testing, 3 rounds**: forcing `rcp_ep_mdio_mms_uses_32bit_words()`
+to always return `false` was caught by 6 tests; forcing
+`rcp_ep_mdio_mms_addr_valid()` to always return `true` was caught by 4
+tests; disabling the mode-routing guard at both `*_mms_*` decoder call
+sites was caught by only 1 test on the first pass -- the read-side
+mirror test existed, but its write-side counterpart did not.
+Added `test_mms_write_request_decode_rejects_mmd_mode` before
+considering this mutation round closed; re-ran and confirmed both call
+sites now independently caught (2 failures).
+
+46 new tests (`test_ep_mdio.c`, 114 total in that file, up from 68).
+114/114 that file; 65/65 full suite, both native and ASan/UBSan-clean.
+`cfusa check` (CI-pinned v0.5.50 binary): 0 errors. `cfusa trace`:
+1024/1024 traced and tested -- unchanged from this batch's own
+baseline. One tooling note, investigated and confirmed pre-existing
+rather than introduced by this batch: `cfusa trace` reports a
+"dangling test reference... no such requirement in .fusa-reqs.json"
+warning for several `//cfusa:test` tags (66 instances on unmodified
+`main` before this batch, 69 after -- the +3 being this batch's own
+newly-added, genuinely-cataloged tags) for requirement ids
+independently confirmed present in `.fusa-reqs.json` by direct lookup
+-- a false-positive class in `cfusa trace`'s own dangling-reference
+check, not a real gap; the actual pass bar this project has used all
+session, `Coverage: N/N traced, N/N tested`, is unaffected and stays
+at 100% both before and after. Not investigated further -- out of
+this batch's own scope, flagged honestly rather than silently
+ignored.

@@ -1059,11 +1059,14 @@ static void test_mdio_block_now_exposes_ep_status_via_reconfig(void)
  * payload now begins with a real, wire-encoded mdio_mode octet
  * (ep_mdio.h's own "mdio_mode" section documents the full investigation),
  * closing this test's own original "no mdio_mode field at all" DEVIATION.
- * Still genuinely open: TC18's own MMS addressing family (a THIRD scheme
- * this module has no verified primary-source basis to design a wire
- * layout for) is recognized on decode but neither encodable nor
- * interpretable -- see test_mdio_decode_rejects_mms_mode_fails_closed()
- * below, and RCP_EP_MDIO_ERR_UNSUPPORTED_MMS (ep_mdio.h). */
+ * UPDATED 2026-08-13: TC18's own MMS addressing family is now fully
+ * encodable and interpretable too, via the new rcp_ep_mdio_mms_*()
+ * function family (REQ-MDIO-022/024, ep_mdio.h's own "MMS addressing"
+ * section, test_ep_mdio.c's own dedicated coverage) -- this was the
+ * last still-open item this file's own original DEVIATION comment
+ * flagged. See test_mdio_decode_rejects_mms_mode_fails_closed() below
+ * for what's still (permanently, by design) true: the MMD-family
+ * decoder itself still refuses an MMS-mode frame. */
 static void test_mdio_request_prefix_now_carries_a_two_bit_mode_field(void)
 {
     rcp_ep_mdio_addr_t          addr;
@@ -1095,12 +1098,20 @@ static void test_mdio_request_prefix_now_carries_a_two_bit_mode_field(void)
     rcp_bytes_free(&f);
 }
 
-/* REQ-MDIO-021's own still-open remainder: an MMS-mode request is
- * recognized (the mode octet decodes cleanly) but rejected rather than
- * silently misread as if it were MMD-shaped -- see ep_mdio.c's own
- * dedicated test_ep_mdio.c coverage for the read-request side of this
- * same behavior; this pins it at the tc18-gaps deviation level too since
- * it was this file's own original DEVIATION. */
+/* UPDATED 2026-08-13 (REQ-MDIO-021 now fully IMPLEMENTED, REQ-MDIO-022/024):
+ * MMS addressing is no longer unsupported by this module as a whole --
+ * see ep_mdio.h's own "MMS addressing" section and the new
+ * rcp_ep_mdio_decode_mms_read_request()/_write_request() family
+ * (test_ep_mdio.c has the dedicated coverage). What THIS test still
+ * correctly pins is narrower and permanent: the MMD-FAMILY decoder
+ * specifically still refuses an MMS-mode frame (use the *_mms_* family
+ * for those instead) -- RCP_EP_MDIO_ERR_UNSUPPORTED_MMS keeps its name
+ * for source compatibility even though MMS itself is no longer
+ * unsupported; see ep_mdio.h's own updated doc comment on that error
+ * value. No longer a DEVIATION at all -- this is now this module's own
+ * intentional family-routing behavior, mirrored by
+ * test_mms_read_request_decode_rejects_mmd_mode() (test_ep_mdio.c) in
+ * the other direction. */
 static void test_mdio_decode_rejects_mms_mode_fails_closed(void)
 {
     rcp_acf_byte_message_info_t hdr        = {0};
@@ -1135,17 +1146,19 @@ static void test_mdio_data_fields_are_unconditionally_sixteen_bit(void)
     TEST_ASSERT_EQUAL_HEX8(0xBEu, out[0]);
     TEST_ASSERT_EQUAL_HEX8(0xEFu, out[1]);
 
-    /* REQ-MDIO-022 remains NOT IMPLEMENTED: TC18 §13.7.13.3 Table 60
-     * requires 16-bit data fields for MMD accesses and for MMS other than
-     * 0 and 1, but 32-BIT data fields for MMS0 and MMS1. This is now
-     * precisely, not just generically, blocked: MMS0/MMS1 access needs
-     * MMS addressing to exist at all first (REQ-MDIO-021's own remaining
-     * gap, above), so this module's word codec staying unconditionally
-     * 16-bit is a direct, unavoidable consequence, not an independent
-     * oversight -- a single 32-bit MMS0 value is still counted as two
-     * words and misparsed as two unrelated 16-bit halves, and the pack
-     * length is word_count * 2 where an MMS0/MMS1 access needs
-     * word_count * 4. */
+    /* UPDATED 2026-08-13: REQ-MDIO-022 is now IMPLEMENTED via the new
+     * MMS-specific rcp_ep_mdio_mms_*() family (ep_mdio.h's own "MMS
+     * addressing" section; test_ep_mdio.c has the dedicated 32-vs-16-bit
+     * coverage, e.g. test_mms_pack_len_32bit_for_mms0()). What this test
+     * still correctly demonstrates is narrower and still true: THIS
+     * (MMD-family) word codec -- rcp_ep_mdio_word_encode()/
+     * _pack_len()/_word_count_of()/_unpack_word_at() -- is
+     * unconditionally 16-bit, by design, and always will be: it is the
+     * MMD family's own codec, and MMD data fields are always 16 bits per
+     * TC18 Table 60 regardless of this fix. A 32-bit MMS0 value handed
+     * to THIS (wrong) codec is still misparsed as two 16-bit halves --
+     * that remains correct, expected behavior demonstrating why a caller
+     * must route to the right family by mms/mode, not a residual gap. */
     TEST_ASSERT_TRUE(rcp_ep_mdio_word_count_of(sizeof(mms0_word), &word_count));
     TEST_ASSERT_EQUAL_size_t(2u, word_count);
     TEST_ASSERT_EQUAL_HEX16(0x1234u, rcp_ep_mdio_unpack_word_at(mms0_word, 0u));
