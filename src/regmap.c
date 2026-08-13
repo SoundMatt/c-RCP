@@ -1815,3 +1815,36 @@ bool rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id(const rcp_regmap_ep_id_map_ent
 
     return true;
 }
+
+//cfusa:req REQ-E2E-029
+//cfusa:req REQ-E2E-030
+//cfusa:req REQ-E2E-045
+size_t rcp_regmap_ep_id_map_byte_bus_ids_for_stream(const rcp_regmap_ep_id_map_entry_t *entries,
+                                                      size_t count, uint8_t request_stream_index,
+                                                      rcp_byte_bus_id_t *out_byte_bus_ids,
+                                                      size_t out_capacity)
+{
+    size_t found = 0;
+    size_t i, j;
+
+    for (i = 0; i < count; i++) {
+        bool already_written;
+
+        if (entries[i].request_stream_index != request_stream_index) continue;
+
+        already_written = false;
+        for (j = 0; j < i; j++) {
+            if (entries[j].request_stream_index == request_stream_index &&
+                entries[j].byte_bus_id == entries[i].byte_bus_id) {
+                already_written = true;
+                break;
+            }
+        }
+        if (already_written) continue;
+
+        if (found < out_capacity) out_byte_bus_ids[found] = entries[i].byte_bus_id;
+        found++;
+    }
+
+    return found;
+}

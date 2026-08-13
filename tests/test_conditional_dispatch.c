@@ -156,6 +156,22 @@ static rcp_mock_dispatch_result_t submit(rcp_mock_server_t *srv, const rcp_bytes
     return r;
 }
 
+/* submit()'s own byte_bus_id-parameterized sibling -- fixture()'s own
+ * stream_id (1u) is unchanged, only the addressed endpoint varies, for
+ * the cross-endpoint broadcast tests below (issue #335), which need a
+ * second endpoint on the same stream. */
+static rcp_mock_dispatch_result_t submit_to(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
+                                             const rcp_bytes_t *frame)
+{
+    rcp_bytes_t                resp = {0};
+    rcp_mock_dispatch_result_t r;
+
+    r = rcp_mock_server_dispatch(srv, byte_bus_id, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB,
+                                  true, 1u, frame->data, frame->len, &resp);
+    rcp_bytes_free(&resp);
+    return r;
+}
+
 /* A tick context with nothing satisfied: idle endpoint, gPTP locked, not
  * in safe state, no compound-wait match. Tests adjust what they need. */
 static rcp_server_tick_ctx_t base_ctx(uint32_t now)
@@ -1030,6 +1046,119 @@ static void test_watchdog_purge_keeps_only_the_safety_sequence(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* ── Cross-endpoint safe-state broadcast (issue #335, REQ-E2E-030) ─────────
+ *
+ * TC18 §12.7.7 Table 24's own rx_ovrflw_safestate_enable (relative address
+ * 0x000D bit 5) brings every endpoint bound to the request stream into its
+ * configured safe state when any one endpoint's own request storage
+ * overflows -- not just the one endpoint whose queue happened to fill up.
+ * This proves that stream-wide half end-to-end: overflowing byte_bus_id
+ * 1's own request store purges a non-safety-tagged request queued on
+ * byte_bus_id 2, a sibling bound to the same request stream via
+ * EP_ID_config (rcp_mock_server_set_ep_id_map(), issue #335) -- 2's own
+ * queue never overflowed. */
+static void test_overflow_on_one_endpoint_broadcasts_safe_state_to_stream_siblings(void)
+{
+    handler_log_t                    log;
+    rcp_mock_server_t               *srv = fixture(&log);
+    rcp_regmap_ep_id_map_entry_t     ep_map[2] = {
+        {1, 1, 1}, /* ep 1, bbid 1, stream 1 -- the one that overflows */
+        {2, 2, 1}, /* ep 2, bbid 2, stream 1 -- the sibling */
+    };
+    rcp_regmap_request_stream_cfg_t  stream_cfg[1];
+    rcp_bytes_t                      frame;
+    size_t                           i;
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+                      rcp_mock_server_add_endpoint(srv, 2, 1, true, logging_handler, &log));
+    TEST_ASSERT_TRUE(rcp_mock_server_set_ep_id_map(srv, ep_map, 2));
+
+    /* fixture() already configured stream_cfg[0] (rx_stream_id=1) for
+     * REQ-SEQ-013's own sequencer-ownership fixture -- refresh it here
+     * with rx_ovrflw_safestate_enable also set, keeping rx_stream_id
+     * unchanged so the resolve_index() lookup this batch's overflow check
+     * (dispatch_plain(), mock.c) performs still finds it. */
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id                = 1u;
+    stream_cfg[0].rx_ovrflw_safestate_enable  = true;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+
+    /* Give bbid 2 one non-safety-tagged (RCP_REQUEST_TYPE_TIMED, MSB
+     * clear) stored request to later confirm gets purged. */
+    frame = rcp_timed_encode_request(2, 0x1000u, 9u, NULL, 0u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit_to(srv, 2, &frame));
+    rcp_bytes_free(&frame);
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 2));
+
+    /* Fill bbid 1's own request storage to capacity. */
+    for (i = 0; i < RCP_SERVER_MAX_PENDING; i++) {
+        frame = rcp_timed_encode_request(1, 0x1000u + (uint64_t)i, (uint8_t)i, NULL, 0u);
+        TEST_ASSERT_NOT_NULL(frame.data);
+        TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit_to(srv, 1, &frame));
+        rcp_bytes_free(&frame);
+    }
+    TEST_ASSERT_EQUAL_size_t(RCP_SERVER_MAX_PENDING, rcp_mock_server_pending_count(srv, 1));
+
+    /* One more request to bbid 1 overflows -- rejected locally (unchanged
+     * behavior), AND broadcasts safe-state to every endpoint bound to
+     * stream 1, including bbid 2. */
+    frame = rcp_timed_encode_request(1, 0x9000u, 99u, NULL, 0u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED, submit_to(srv, 1, &frame));
+    rcp_bytes_free(&frame);
+
+    /* The actual proof: bbid 2's own stored request was purged by the
+     * broadcast, though bbid 2 itself never overflowed. */
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 2));
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* Negative control: identical setup, EXCEPT srv's own EP_ID_config table
+ * is left empty -- confirms the broadcast above is a genuine consequence
+ * of EP_ID_config's own content, not something dispatch_plain() would
+ * have done anyway. Without a bound-endpoint table, bbid 2's own pending
+ * request survives the overflow on bbid 1. */
+static void test_overflow_does_not_broadcast_without_an_ep_id_map(void)
+{
+    handler_log_t                    log;
+    rcp_mock_server_t               *srv = fixture(&log);
+    rcp_regmap_request_stream_cfg_t  stream_cfg[1];
+    rcp_bytes_t                      frame;
+    size_t                           i;
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+                      rcp_mock_server_add_endpoint(srv, 2, 1, true, logging_handler, &log));
+    /* Deliberately no rcp_mock_server_set_ep_id_map() call. */
+
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id               = 1u;
+    stream_cfg[0].rx_ovrflw_safestate_enable = true;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+
+    frame = rcp_timed_encode_request(2, 0x1000u, 9u, NULL, 0u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit_to(srv, 2, &frame));
+    rcp_bytes_free(&frame);
+
+    for (i = 0; i < RCP_SERVER_MAX_PENDING; i++) {
+        frame = rcp_timed_encode_request(1, 0x1000u + (uint64_t)i, (uint8_t)i, NULL, 0u);
+        TEST_ASSERT_NOT_NULL(frame.data);
+        TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit_to(srv, 1, &frame));
+        rcp_bytes_free(&frame);
+    }
+
+    frame = rcp_timed_encode_request(1, 0x9000u, 99u, NULL, 0u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED, submit_to(srv, 1, &frame));
+    rcp_bytes_free(&frame);
+
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 2));
+
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── Chained requests, across one frame's members ─────────────────────────── */
 
 /* Room for the small two-member frames these tests build. */
@@ -1406,6 +1535,8 @@ int main(void)
     RUN_TEST(test_clear_single_not_found_sends_request_not_found_error);
     RUN_TEST(test_clear_non_safestate_keeps_safety_tagged_requests);
     RUN_TEST(test_watchdog_purge_keeps_only_the_safety_sequence);
+    RUN_TEST(test_overflow_on_one_endpoint_broadcasts_safe_state_to_stream_siblings);
+    RUN_TEST(test_overflow_does_not_broadcast_without_an_ep_id_map);
 
     RUN_TEST(test_chained_first_in_frame_is_chain_error);
     RUN_TEST(test_chained_first_in_frame_sends_per_member_error_responses);

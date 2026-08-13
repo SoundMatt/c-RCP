@@ -256,6 +256,23 @@ bool rcp_mock_server_set_request_stream_cfg(rcp_mock_server_t *srv,
                                              const rcp_regmap_request_stream_cfg_t *entries,
                                              size_t count);
 
+/* Replaces srv's own EP_ID_config table (TC18 §12.7.8 Table 23) wholesale
+ * with a copy of entries[0..count). Returns false (srv's own table left
+ * unchanged) if count exceeds RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES (regmap.h);
+ * true otherwise. Issue #335 (REQ-E2E-029/030/045): this is srv's own only
+ * way to know which byte_bus_ids are bound to a given request stream --
+ * rcp_mock_server_broadcast_safe_state()'s own (below) sole data source.
+ * Same "caller may freely set... directly, no lifecycle-state gate here"
+ * convention rcp_mock_server_set_hw_pin_map()/_set_request_stream_cfg()
+ * already establish. Entries are consulted in the order given, up to
+ * count -- a caller wanting TC18's own end-of-table sentinel behavior
+ * (request_stream_index == 0) applies
+ * rcp_regmap_ep_id_map_effective_count() itself before calling this
+ * function, the same "caller has already bounded the table" convention
+ * regmap.h's own EP_ID_config diagnostics already use. */
+bool rcp_mock_server_set_ep_id_map(rcp_mock_server_t *srv,
+                                    const rcp_regmap_ep_id_map_entry_t *entries, size_t count);
+
 /* ── Endpoint registration ─────────────────────────────────────────────────── */
 
 /* Adds one endpoint slot addressed at byte_bus_id, with generic config
@@ -662,6 +679,61 @@ size_t rcp_mock_server_pending_count(const rcp_mock_server_t *srv, rcp_byte_bus_
  * keep-only-the-safety-sequence rule), leaving the 0x8x ones to drive the
  * endpoint into its safe state. Returns how many requests were purged. */
 size_t rcp_mock_server_watchdog_purge(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id);
+
+/* ── Cross-endpoint safe-state broadcast (issue #335) ────────────────────────
+ *
+ * The cross-endpoint orchestrator's own actuator half: e2e.h names three
+ * per-cause decisions -- rcp_e2e_seq_evaluate()'s own
+ * result.enter_safe_state (REQ-E2E-029), rcp_e2e_overflow_should_enter_
+ * safe_state() (REQ-E2E-030), rcp_e2e_crc_error_should_enter_safe_state()
+ * (REQ-E2E-045) -- that all say the SAME thing once true: "drive every
+ * endpoint bound to this stream toward its configured safe state", not
+ * just the one endpoint whose own admit()/dispatch() call happened to
+ * observe the fault. Until this function, no caller in this codebase
+ * could act on that "every endpoint bound to this stream" part at all --
+ * see regmap.h's own rcp_regmap_ep_id_map_byte_bus_ids_for_stream()
+ * (issue #335) for the query primitive this function is built on, and
+ * e2e.h's own file header for the fuller architectural background.
+ *
+ * "Toward its configured safe state" is, concretely, this codebase's own
+ * already-established watchdog-purge action
+ * (rcp_mock_server_watchdog_purge() above, itself
+ * rcp_server_endpoint_watchdog_purge()/e2e.h's keep-only-the-safety-
+ * sequence rule): every non-safety-tagged (0x8x) request currently queued
+ * on a bound endpoint is purged, leaving only the safety-tagged ones
+ * (rcp_e2e_request_may_execute()'s own gate) to actually drive that
+ * endpoint through its safe state once it reaches the front of its own
+ * queue. This function is that SAME action, applied to every byte_bus_id
+ * srv's own EP_ID_config table (rcp_mock_server_set_ep_id_map()) reports
+ * bound to request_stream_index, not merely one.
+ *
+ * request_stream_index is the 1-based identity
+ * rcp_regmap_request_stream_cfg_resolve_index() (regmap.h) already
+ * produces from a request's own stream_id -- this function does not
+ * re-resolve stream_id itself, matching the "resolve once at the
+ * dispatch call site, pass the resolved identity down" precedent
+ * dispatch_plain()'s own REQ-SEQ-013 sequencer-ownership check already
+ * established in this same module. A request_stream_index naming no row
+ * in srv's own EP_ID_config table (including 0, the "stream not
+ * resolved" sentinel rcp_regmap_request_stream_cfg_resolve_index() itself
+ * returns on a miss) purges nothing and returns 0 -- this function never
+ * broadcasts to "every endpoint on srv" as a fallback; an unconfigured or
+ * unresolvable stream binds no endpoints, by construction.
+ *
+ * A bound byte_bus_id naming no endpoint currently registered on srv
+ * (rcp_mock_server_add_endpoint() never called for it, or since removed)
+ * is silently skipped -- this test double cannot purge a queue that does
+ * not exist, the same "type-erased slot, no way to reach what isn't
+ * there" boundary every other per-endpoint mock.c function already
+ * respects.
+ *
+ * Returns the total number of requests purged, summed across every bound,
+ * currently-registered endpoint (rcp_mock_server_watchdog_purge()'s own
+ * per-endpoint return value, added up) -- 0 both for "no endpoints bound"
+ * and for "endpoints bound, nothing queued to purge on any of them";
+ * these are not distinguished by this return value alone, matching
+ * rcp_mock_server_watchdog_purge()'s own single-endpoint convention. */
+size_t rcp_mock_server_broadcast_safe_state(rcp_mock_server_t *srv, uint8_t request_stream_index);
 
 #ifdef __cplusplus
 }

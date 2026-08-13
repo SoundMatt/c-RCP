@@ -17892,3 +17892,163 @@ just 5 requirements this way** (`REQ-SEQ-013`/`REQ-SEQ-014`,
 at scale, that issue #341's own full systematic census (hundreds of
 citations, per that issue's own description) would likely surface
 many more. Flagged again, still not started as a dedicated pass.
+
+### v0.311.0 -- 2026-08-13 (issue #335: cross-endpoint safe-state
+orchestrator -- `REQ-E2E-030`/`REQ-E2E-045` closed)
+
+Picked up as the natural next target once the citation-drift lineage
+(v0.308.0-v0.310.0) ran out of quick wins: issue #335's own cross-endpoint
+orchestrator architecture gap, the largest remaining structural lift
+flagged in the most recent status update. `rcp_server_endpoint_t` is
+scoped to exactly one endpoint, and this codebase had no way for a
+single endpoint's own admit()/dispatch() call to broadcast a stream-wide
+safe-state escalation to its siblings on the same request stream --
+`REQ-E2E-029`/`REQ-E2E-030`/`REQ-E2E-045` had all independently named
+this same blocker in their own doc comments.
+
+**Investigated before designing anything new.** Read `server.h`,
+`mock.h`/`mock.c`, `regmap.h` in full, and TC18 §12.7.8 ("Endpoint ID and
+communication configuration") directly, looking for whether this
+codebase genuinely had NO data model for stream-endpoint binding, or
+merely no *query* over an existing one. Found the latter: TC18 §12.7.8
+Table 23 (EP_ID_config) IS the wire-defined "which endpoints are bound to
+which request stream" table -- `rcp_regmap_ep_id_map_entry_t`
+(`ep_id`/`byte_bus_id`/`request_stream_index`) already existed with a
+full render/parse codec (REQ-RMAP-052, closed long before this batch) and
+several read-only diagnostics (`_is_ascending()`,
+`_has_single_client_per_ep()`, etc.) -- it simply had no caller-facing
+function answering "given a stream, which endpoints does it address".
+That is the actual, narrow gap; inventing a whole new type would have
+duplicated content this codebase already modeled correctly.
+
+**New query primitive**: `rcp_regmap_ep_id_map_byte_bus_ids_for_stream()`
+(`regmap.h`/`regmap.c`) -- given a caller's own EP_ID_config table and a
+`request_stream_index`, writes every distinct `byte_bus_id` bound to it
+into a caller-supplied buffer, deduplicating rows that share a
+`byte_bus_id` under the same stream (TC18's own documented
+multicast-within-a-stream shape). Returns `byte_bus_id`, not `ep_id`:
+every existing dispatch path in this codebase (`mock.c`'s own
+`find_slot()`) resolves a live endpoint by `byte_bus_id`, matching TC18
+§12.9.1's own "the EPs are mapped by their byte_bus_ids" routing rule.
+Follows the "ask first, then size a buffer" idiom
+`rcp_sched_split_frame_members()` (`scheduler.h`) already established in
+this codebase -- returns the TRUE total distinct count even when it
+exceeds the caller's buffer, not merely what was written. 6 dedicated
+unit tests (`test_regmap.c`): every-bound-endpoint-found, dedup, no-match,
+truncation-at-capacity, zero-capacity, empty-table.
+
+**New actuator**: `rcp_mock_server_broadcast_safe_state()`
+(`mock.h`/`mock.c`) -- resolves a `request_stream_index` to its bound
+`byte_bus_id`s via the query above, then applies this codebase's own
+already-established watchdog-purge action
+(`rcp_server_endpoint_watchdog_purge()`, i.e. e2e.h's
+keep-only-the-safety-sequence rule: every non-safety-tagged (0x8x)
+queued request is purged, leaving only the safety-tagged ones to
+actually drive that endpoint through its safe state) to EVERY bound,
+currently-registered endpoint, not just the one whose own admit()/
+dispatch() call observed the fault. A bound `byte_bus_id` naming no
+endpoint currently registered on `srv` is silently skipped (this test
+double cannot purge a queue that does not exist). Required a new
+`rcp_mock_server_set_ep_id_map()` setter, mirroring
+`_set_request_stream_cfg()`'s own "caller may freely set... directly, no
+lifecycle-state gate here" convention exactly, plus a new
+`ep_id_map[RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES]`/`ep_id_map_count` pair on
+`struct rcp_mock_server`.
+
+**Wired into two of the three named escalation causes** -- the third
+(`REQ-E2E-029`) has a separate, upstream blocker this batch does not
+touch (see below):
+
+- `REQ-E2E-030` (request-storage overflow, TC18 §12.7.7 Table 24
+  `rx_ovrflw_safestate_enable`): `dispatch_plain()`'s existing
+  `error == RCP_ERROR_REQUEST_STORAGE_OVERFLOW` check (already correctly
+  answering the single-endpoint half of this rule since an earlier
+  milestone) now also resolves the request's own stream via
+  `rcp_regmap_request_stream_cfg_resolve_index()` and, if
+  `rcp_e2e_overflow_should_enter_safe_state()` says so, broadcasts.
+  **PARTIAL → IMPLEMENTED.**
+- `REQ-E2E-045` (CRC-error safe-state consequence, TC18 §12.7.7 Table 24
+  `rx_enforce_e2e`'s SECOND consequence -- the bit names both "stream is
+  blocked until released" AND "Safe state will be entered" in the same
+  sentence, with no separate enable bit of its own for the second):
+  `dispatch_e2e()`'s existing CRC-mismatch branch, immediately after the
+  pre-existing fault-tracker-latch call (the FIRST consequence), now also
+  calls `rcp_e2e_crc_error_should_enter_safe_state(slot->rx_enforce_e2e)`
+  and broadcasts on true -- deliberately reusing the SAME per-endpoint
+  `rx_enforce_e2e` stand-in the latch call already reads (both
+  consequences of one wire bit, read from the one source this function
+  already relies on for this path), not a second, potentially
+  inconsistent source. **PARTIAL → IMPLEMENTED.**
+- `REQ-E2E-029` (sequence discontinuity, `rx_seq_safestate_enable`)
+  deliberately NOT closed this batch: its remaining blocker is upstream
+  and separate from the orchestrator gap that is now closed --
+  `rcp_server_endpoint_admit()` has no `sequence_num` input at all, so no
+  caller in this codebase ever invokes `rcp_e2e_seq_evaluate()`
+  (REQ-E2E-028's own gap, unchanged by this batch -- threading a
+  `sequence_num` through would mean widening `rcp_server_endpoint_admit()`'s
+  own signature, plus every call site in this codebase's own test suite,
+  a materially larger and separate mechanical lift). `.fusa-reqs.json`'s
+  text for both REQ-E2E-028 and REQ-E2E-029 is updated to make this
+  re-scoping explicit: the cross-endpoint broadcast half is proven and
+  no longer the blocker; wiring `rcp_e2e_seq_evaluate()` against the now-
+  existing `rcp_mock_server_broadcast_safe_state()` would be a mechanical
+  follow-up, not a new architecture investigation.
+
+**4 new end-to-end tests**, 2 positive proofs + 2 negative controls
+(confirming the broadcast is a genuine, EP_ID_config-content-driven
+consequence, not an unconditional side effect of every overflow/CRC
+error): `test_conditional_dispatch.c`'s
+`test_overflow_on_one_endpoint_broadcasts_safe_state_to_stream_siblings()`
+(fills byte_bus_id 1's own request store to `RCP_SERVER_MAX_PENDING`,
+confirms the resulting overflow purges a stored request on sibling
+byte_bus_id 2, bound via EP_ID_config to the same stream) /
+`test_overflow_does_not_broadcast_without_an_ep_id_map()` (identical
+setup, no EP_ID_config configured -- byte_bus_id 2's own request
+survives), and `test_tc18_gaps_e2e.c`'s
+`test_crc_error_on_one_endpoint_broadcasts_safe_state_to_stream_siblings()`
+/ `test_crc_error_does_not_broadcast_without_an_ep_id_map()` (same shape,
+against a corrupted-CRC-trailer frame on byte_bus_id 0x11 and a sibling
+0x12).
+
+**Mutation-tested every new behavior-changing call site**: disabling the
+overflow-broadcast condition (`dispatch_plain()`) was caught by
+`test_overflow_on_one_endpoint_broadcasts_safe_state_to_stream_siblings()`;
+disabling the CRC-broadcast condition (`dispatch_e2e()`) was caught by
+`test_crc_error_on_one_endpoint_broadcasts_safe_state_to_stream_siblings()`;
+disabling the query primitive's own dedup logic was caught by
+`test_byte_bus_ids_for_stream_dedupes_repeated_byte_bus_id()`. All three
+mutations restored cleanly, full suite re-confirmed 65/65 after each
+restore.
+
+**Housekeeping**: updated a now-stale comment in `test_tc18_gaps_ep.c`
+(`test_e2e_request_store_overflow_reports_error_code_but_not_escalation()`)
+that had claimed no caller anywhere in this codebase performs the
+stream-wide escalation -- still true, correctly, of
+`rcp_server_endpoint_admit()` itself in isolation (server.h has no
+request-stream/EP_ID_config dependency of its own, matching this
+codebase's established "mechanism lives below, context lives here"
+layering), but no longer true one layer up, in `mock.c`; the comment now
+points at this batch's own end-to-end proof instead of claiming the gap
+is still fully open.
+
+Full suite 65/65 native + ASan/UBSan (fresh clean rebuilds of both). No
+stray files. `cfusa check` (CI-pinned v0.5.50 binary): 0 errors (2619
+total vs the pre-batch baseline's 2573 -- proportional growth from new
+code only, confirmed by running the same binary against `main` before
+touching anything). `cfusa trace`: 1024/1024 traced and tested,
+unchanged (no new requirement ids were introduced -- REQ-E2E-030/045
+already existed in the catalog; only their status/text changed).
+`.fusa-reqs.json` repo-wide count: 983 implemented (+2), 78 partial (-2),
+2 not-implemented (unchanged), 7 retired (unchanged); 1070 total
+unchanged.
+
+**Remaining issue #335 scope, honestly not touched this batch**: the
+other items issue #335's own scope section named --
+`REQ-E2E-038`/`REQ-E2E-039` (fragmented-message dispatch path, a
+different structural gap: `mock.c` has no fragmented-message dispatch at
+all, protected or not) and `REQ-PWRMODE-019` (response-queue object
+model, unrelated to endpoint binding) -- are unaffected by this batch and
+remain open. `REQ-SEQ-013` (sequencer ownership) was already closed in
+an earlier, separate batch (v0.306.0). Issue #341's own systematic
+citation-drift census (flagged repeatedly across the v0.308.0-v0.310.0
+lineage, still not started) also remains open.
