@@ -34,6 +34,24 @@ the rationale.
 
 ## Releases
 
+### v0.312.0 -- 2026-08-13 (issue #338 investigation: 6 more citation-drift fixes + 2 new spec-defects-report items, issue #341 lineage -- 5th/6th/7th/8th/9th/10th instances)
+
+**Doc-only.** Picked up issue #338 ("genuine TC18 spec silence -- investigate, don't force") as the next actionable item. Most of its named items already have a documented, correct disposition; the two with a genuinely closeable piece (`REQ-LIFECYCLE-022`/`REQ-DISC-029`: diagram-mandated error responses with no numbered Table 30 code) needed verification against the primary source before anything else, which surfaced a SIXTH instance of this session's own citation-drift class -- and while re-verifying, found it wasn't isolated to those two: every `.fusa-reqs.json` citation touching the RC Server lifecycle diagram cited "Figure 16" (the diagram's own RC1-era label); in the current RC5 text, Figure 16 is a different, unrelated diagram ("Cancellation of a single, specific request", TC18.txt L2158) -- the lifecycle diagram itself is now **Figure 17** ("RC Server lifecycle states", TC18.txt L2517), with every one of its own transition-block line numbers shifted too.
+
+**6 citations corrected**, all in `.fusa-reqs.json`, all re-verified against the fresh RC5 text before touching anything -- underlying technical claims confirmed unchanged in every case, so no `status` changed:
+- `REQ-LIFECYCLE-022` (EPs_NOT_IDLE gate) -- Figure 16 → Figure 17, lines corrected to L2492-L2495/L2504-L2506.
+- `REQ-LIFECYCLE-025` (HW_CONFIGURED self-loop) -- Figure 16 → Figure 17, lines corrected to L2476-L2480.
+- `REQ-DISC-029` (DISCOVERY_STREAM_OCCUPIED) -- Figure 16 → Figure 17, lines corrected to L2447-L2450/L2481-L2483.
+- `REQ-LIFECYCLE-031` (§12.3.1.2 root-client stream binding) -- lines corrected to L2562-L2565/L2574-L2577.
+- `REQ-LIFECYCLE-034` (§12.7 direct-to-EP config gate) -- lines corrected to L2833-L2834 (was pointing INTO the unrelated lifecycle-diagram block, a symptom of the same drift, not a coincidence).
+- `REQ-RMAP-068` (bit-level register-write OR/AND/XOR/SET mechanism) -- lines corrected to L4420-L4425.
+
+**2 new items added to `TC18_spec_defects_report.md`** (canonical path `/Users/matt/Documents/Coding/SoundMatt/`, outside this repo's own git tree, so no repo diff for this part): item 58 (`EPs_NOT_IDLE`, Figure 17, has no Table 30 entry) and item 59 (`DISCOVERY_STREAM_OCCUPIED`, Figure 17, same gap) -- both confirmed genuine by direct comparison against Table 30's own complete numbered list (`UNSUPPORTED_CMD`=1 through `CHAIN_ERROR`=17, no gap for either label), both correctly citing the real Figure 17/Table 30 line numbers rather than the stale "Table 27" figure this issue's own GitHub description used (itself a 7th citation-drift instance, in the issue text rather than `.fusa-reqs.json`). Report's own item count/summary/recommendation sections updated (57 → 59 items).
+
+`REQ-RMAP-068`'s underlying scoping question (whether to implement the bit-level OR/AND/XOR/SET register-write mechanism at all) is explicitly NOT decided or implemented here -- issue #338's own text already flags it as needing an explicit go/no-go before any implementation attempt, the same class of decision this project holds for the user rather than deciding autonomously.
+
+No code changed. `cfusa check`/`trace` re-run: 0 errors, 1024/1024, identical to baseline.
+
 ### v0.311.0 -- 2026-08-13 (issue #335: cross-endpoint safe-state orchestrator -- `REQ-E2E-030`/`REQ-E2E-045` closed)
 
 Closes the core architectural gap issue #335 named: `rcp_server_endpoint_t` is scoped to one endpoint, and this codebase had no type representing "every endpoint bound to this request stream" for a safe-state escalation to broadcast to. Rather than inventing a new data model, this batch found TC18 §12.7.8 Table 23 (EP_ID_config) already IS the wire-defined "which endpoints are bound to which request stream" table -- REQ-RMAP-052 already gave it a full render/parse codec; it simply had no caller-facing query over it.

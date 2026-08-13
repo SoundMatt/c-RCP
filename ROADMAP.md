@@ -18052,3 +18052,117 @@ remain open. `REQ-SEQ-013` (sequencer ownership) was already closed in
 an earlier, separate batch (v0.306.0). Issue #341's own systematic
 citation-drift census (flagged repeatedly across the v0.308.0-v0.310.0
 lineage, still not started) also remains open.
+
+### v0.312.0 -- 2026-08-13 (issue #338 investigation: 6 more citation-drift
+fixes + 2 new spec-defects-report items, issue #341 lineage)
+
+Picked up issue #338 ("[c-RCP-GAP-6e] Genuine TC18 spec silence --
+investigation, not force-implementation") as the next actionable item once
+issue #335's own PR (#379, v0.311.0) merged and was fully verified. Most of
+issue #338's own named items already carry a documented, correct
+disposition in code and `.fusa-reqs.json` -- this batch's actionable scope
+was narrower than the issue's own six bullet points.
+
+**Investigated before touching anything**: `REQ-LIFECYCLE-022`/`REQ-DISC-029`
+(diagram-mandated error responses -- `EPs_NOT_IDLE`, `DISCOVERY_STREAM_
+OCCUPIED` -- that Figure 16's own transition labels name but that have no
+corresponding numbered code anywhere in what the issue's own text calls
+"TC18 §12.9.6 Table 27") were the two items with a genuinely closeable
+piece: verifying, and if genuine, adding them as new entries to
+`TC18_spec_defects_report.md` (the established convention for "committee
+needs to answer this" findings, per this session's own prior citation-drift
+batches).
+
+**Verifying surfaced a bigger finding than expected.** Grepping the fresh
+RC5 `TC18.txt` for the actual numbered error-code table found it at
+**Table 30** ("Error codes in responses", §12.9.6, TC18.txt L3844), not
+"Table 27" as issue #338's own GitHub description says -- confirmed the
+table does stop at `CHAIN_ERROR`=17 with no entry for either diagram label,
+so the substance of the issue's claim is correct, but its own citation had
+already drifted (this issue was filed before this session's TC18.txt
+refresh work, same root cause as every other instance this session).
+Pulling that thread further: grepping for "Figure 16" (the figure both
+`REQ-LIFECYCLE-022`/`-025` and `REQ-DISC-029` cite in `.fusa-reqs.json`)
+found the current RC5 text's own Figure 16 is a DIFFERENT, unrelated
+diagram entirely -- "Cancellation of a single, specific request"
+(TC18.txt L2158) -- while the RC Server lifecycle-state diagram these
+three requirements actually describe is captioned **Figure 17**
+("RC Server lifecycle states", TC18.txt L2517). Every one of its own
+internal transition-block line numbers had also shifted from whatever
+they were when originally cited (well before this session's own RC1→RC5
+work), since the diagram's own text sits ~250-400 lines later than the
+figure numbers alone would suggest.
+
+**6 citations corrected in `.fusa-reqs.json`**, each re-verified against
+the fresh RC5 text (not merely renumbered by inference) before touching
+anything, matching this session's own established "re-verify the
+underlying technical claim before touching the disposition" discipline --
+in every case the claim held, so `status` is unchanged, `partial` for all
+six:
+
+- `REQ-LIFECYCLE-022` (`EPs_NOT_IDLE` gate, applies to exactly two
+  transitions): corrected to L2492-L2495 (the HW_CONFIGURED→advance
+  transition, "...& all other EPs are Idle → send positive response") and
+  L2504-L2506 (the RCP_CONFIGURED→reset transition, "...& other EPs are
+  not Idle → send error response EPs_NOT_IDLE").
+- `REQ-LIFECYCLE-025` (HW_CONFIGURED's own explicit self-loop for an
+  unknown stream/bb_id): corrected to L2476-L2480.
+- `REQ-DISC-029` (`DISCOVERY_STREAM_OCCUPIED`, two independent
+  transitions -- one per box): corrected to L2447-L2450 (HW_UNCONFIGURED
+  box) and L2481-L2483 (HW_CONFIGURED box).
+- `REQ-LIFECYCLE-031` (§12.3.1.2's own root-client stream-binding rule,
+  two near-identical paragraphs -- advance and reset): corrected to
+  L2562-L2565 and L2574-L2577. This requirement's own text quotes the
+  rule verbatim; the fresh text confirms the quote is exact, only the
+  location had drifted.
+- `REQ-LIFECYCLE-034` (§12.7's own "Configuration requests directly to
+  EPs are only allowed. In RCP_CONFIGURED or in HW_CONFIGURED with valid
+  stream_id/byte_bus_id configuration" rule): corrected to L2833-L2834.
+  Notably, the OLD citation (`L2458-2459`) pointed directly INTO the
+  lifecycle-diagram's own transition-block text -- not a coincidence, the
+  same underlying drift, just discovered from a different requirement's
+  own citation.
+- `REQ-RMAP-068` (the bit-level register-write OR/AND/XOR/SET mechanism,
+  and the "write to read-only register → silent no-op" rule): corrected
+  to L4420-L4425.
+
+**2 new items added to `TC18_spec_defects_report.md`** (canonical path
+`/Users/matt/Documents/Coding/SoundMatt/`, outside this repo's own git
+tree -- no repo diff for this part, matching how this file has always
+been maintained): item 58 (`EPs_NOT_IDLE` has no Table 30 entry) and item
+59 (`DISCOVERY_STREAM_OCCUPIED` has no Table 30 entry), each independently
+confirmed by direct comparison against Table 30's own complete printed
+list before being added, citing the real, current Figure 17/Table 30
+line numbers throughout (not the stale "Table 27" the GitHub issue itself
+used -- effectively a 7th citation-drift instance, caught in the issue
+description rather than a `.fusa-reqs.json` field, and corrected here
+rather than propagated into a new defects-report entry). The report's own
+front-matter item count (57→59), context paragraph, and "Overall
+recommendation" section were all updated to match.
+
+`REQ-RMAP-068`'s own underlying scoping question -- whether to actually
+implement the full bit-level OR/AND/XOR/SET register-write mechanism
+Table 31's neighboring prose describes, beyond the one concrete case
+(`ep_type`) already proven correct -- is deliberately NOT decided or
+attempted here. Issue #338's own text already flags this specific item as
+needing an explicit go/no-go before any implementation attempt (a real
+design-scope decision, not a documentation fix), matching this project's
+own standing practice of holding decisions of that shape for the user
+rather than starting them autonomously (the same carve-out go-RCP's
+conditional-envelope rewrite has had since 2026-08-02).
+
+No code changed -- `.fusa-reqs.json` citation text only, plus the
+out-of-repo defects report. `cfusa check`/`trace` re-run to confirm: 0
+errors, 1024/1024 traced and tested, identical to the pre-change baseline.
+65/65 full suite unaffected (no code touched).
+
+**Issue #338's own remaining items, honestly not touched**: `REQ-
+LIFECYCLE-031`/`REQ-LIFECYCLE-034`'s own underlying architecture gap (no
+wire-level concept of "a valid stream_id/byte_bus_id combination
+independent of a specific endpoint's own owning stream" -- currently
+handled conservatively) is unchanged, only its citation was corrected.
+`REQ-RMAP-068`'s scoping decision remains open, as intended. Issue #341's
+own full systematic citation-drift census (now 7 confirmed instances
+found incidentally from spot-checking roughly a dozen requirements across
+two different investigations) remains its own unstarted, larger
+undertaking.
