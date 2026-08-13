@@ -339,6 +339,50 @@ size_t rcp_ep_adc_collect_response_values(const rcp_ep_adc_avg_value_t *avg_valu
                                            size_t avg_count,
                                            uint16_t *out_values, size_t value_count);
 
+/* REQ-ADC-037, TC18 §13.7.9.2: which of the three documented cadence
+ * cases applies for a given (adc_avg_intervals_per_request,
+ * adc_combine_avg_values) pair -- see the file header's "three
+ * documented cadence cases" paragraph. Pure function of the two
+ * register values; this module still owns no scheduling state (see
+ * the file header), it only names the decision a caller must make. */
+typedef enum {
+    RCP_EP_ADC_CADENCE_ACCUMULATE = 0, /* combine > intervals: several
+                                           request executions feed one
+                                           response */
+    RCP_EP_ADC_CADENCE_ONE_TO_ONE = 1, /* combine == intervals: exactly
+                                           one response per execution */
+    RCP_EP_ADC_CADENCE_FAN_OUT    = 2, /* combine < intervals: one
+                                           execution yields several
+                                           responses */
+} rcp_ep_adc_cadence_case_t;
+
+rcp_ep_adc_cadence_case_t rcp_ep_adc_cadence_case(uint16_t avg_intervals_per_request,
+                                                   uint8_t combine_avg_values);
+
+/* REQ-ADC-037: true iff pending_value_count averaged values already
+ * captured (by the caller, across one or more request executions -- see
+ * the file header) are enough to assemble one response, i.e.
+ * pending_value_count >= combine_avg_values. This single comparison is
+ * the one rule underlying all three cadence cases: in
+ * RCP_EP_ADC_CADENCE_ACCUMULATE the caller calls this after each
+ * execution until it returns true; in RCP_EP_ADC_CADENCE_ONE_TO_ONE it
+ * is true after exactly one execution; in RCP_EP_ADC_CADENCE_FAN_OUT
+ * one execution alone makes it true, and the caller calls this again
+ * after each response it emits to discover whether enough values remain
+ * pending for another (fanning the single execution's values out across
+ * several responses). This function does not decide which averaged
+ * values a ready response should contain, nor what transaction_num it
+ * should carry (TC18's own rule: the transaction_num of the request
+ * that produced the response's first included average value) -- both
+ * remain the caller's own bookkeeping, matching every stage above and
+ * this module's "operates on caller-supplied arrays, owns no sample
+ * storage" scope (see the file header). combine_avg_values == 0 always
+ * returns true (an empty response is trivially "ready"; matches
+ * rcp_ep_adc_collect_response_values()'s own value_count == 0
+ * handling). */
+bool rcp_ep_adc_cadence_response_ready(size_t pending_value_count,
+                                        uint8_t combine_avg_values);
+
 /* The last-sample-of-the-first-response-value capture-moment rule
  * (extraction §5.9.2) -- see the file header. Given the same avg_values
  * array rcp_ep_adc_collect_response_values() packed, returns

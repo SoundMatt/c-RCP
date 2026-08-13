@@ -15205,6 +15205,42 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.293.0 -- 2026-08-12 (issue #336: REQ-ADC-037 cadence-decision
+primitives -- not-implemented -> partial)
+
+REQ-ADC-037 flips not-implemented -> partial. TC18 13.7.9.2 states
+three cadence cases comparing adc_combine_avg_values against
+adc_avg_intervals_per_request (accumulate several request executions
+into one response; one response per execution; fan one execution out
+across several responses), but no function anywhere in this module
+decided which case applied or when enough values had accumulated for
+a response. New rcp_ep_adc_cadence_case() classifies the three cases;
+new rcp_ep_adc_cadence_response_ready() answers the single comparison
+underlying all three (pending_value_count >= combine_avg_values) --
+directly unit-tested, including both boundary conditions and an
+end-to-end walk of the ACCUMULATE and FAN_OUT cases across multiple
+simulated executions/responses.
+
+Deliberately does not close the requirement fully, for two honest
+reasons: (1) assembling a ready response's own value array and
+computing its transaction_num remain the caller's own bookkeeping,
+matching rcp_ep_adc_collect_response_values()'s own scope -- TC18
+gives no instruction for how a caller should track per-value
+provenance across executions; (2) unlike REQ-E2E-021's own precedent,
+no real dispatch path exists to wire this into: src/mock.c has no
+per-endpoint-type dispatch of any kind, so these two functions are
+correct and tested but not yet exercised end-to-end -- the same
+disposition REQ-CANCEL-012 was left at for an analogous reason.
+
+cfusa check A/B (normalized by finding text, not raw file:line): the
+one new finding is rcp_ep_adc_cadence_case() triggering CFUSA-L004's
+"appears recursive" heuristic -- confirmed the exact same
+pre-existing false-positive class already present ~158 times across
+this codebase, not a real recursion and not a new category CI
+doesn't already tolerate. cfusa trace: both 100%, 1024/1024
+(unaffected). 3/3 mutations caught cleanly. 65/65 both trees (native
++ ASan/UBSan).
+
 ### v0.292.0 -- 2026-08-12 (issue #336 catalog-drift correction:
 REQ-UART-032 flips not-implemented -> implemented)
 

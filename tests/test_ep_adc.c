@@ -30,6 +30,7 @@
 //cfusa:test REQ-ADC-029
 //cfusa:test REQ-ADC-030
 //cfusa:test REQ-ADC-031
+//cfusa:test REQ-ADC-037
 //cfusa:test REQ-ADC-038
 //cfusa:test REQ-ADC-039
 //cfusa:test REQ-ADC-040
@@ -1049,6 +1050,84 @@ static void test_response_no_signal_sentinel_round_trips(void)
     rcp_bytes_free(&frame);
 }
 
+/* REQ-ADC-037, TC18 §13.7.9.2's three cadence cases -- see the file
+ * header's own "three documented cadence cases" paragraph and
+ * rcp_ep_adc_cadence_case()'s doc comment. */
+static void test_cadence_case_accumulate_when_combine_exceeds_intervals(void)
+{
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_CADENCE_ACCUMULATE, rcp_ep_adc_cadence_case(2, 5));
+}
+
+static void test_cadence_case_one_to_one_when_combine_equals_intervals(void)
+{
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_CADENCE_ONE_TO_ONE, rcp_ep_adc_cadence_case(4, 4));
+}
+
+static void test_cadence_case_fan_out_when_combine_below_intervals(void)
+{
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_CADENCE_FAN_OUT, rcp_ep_adc_cadence_case(6, 2));
+}
+
+static void test_cadence_case_boundary_values(void)
+{
+    /* intervals == 0 with a nonzero combine can never be reached by any
+     * amount of accumulation from a zero-sized execution -- still
+     * correctly classified as ACCUMULATE (combine > intervals), the
+     * "caller's problem" fittingly stays the caller's problem: this
+     * function only names the case, it doesn't validate reachability. */
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_CADENCE_ACCUMULATE, rcp_ep_adc_cadence_case(0, 1));
+    /* Both zero: equal, so ONE_TO_ONE by the same rule as any other
+     * equal pair. */
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_CADENCE_ONE_TO_ONE, rcp_ep_adc_cadence_case(0, 0));
+    /* Widest possible values on each side, still compared correctly
+     * (regression pin for the uint16_t/uint8_t width mismatch this
+     * function's own parameters have). */
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_CADENCE_FAN_OUT, rcp_ep_adc_cadence_case(65535, 1));
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_CADENCE_ACCUMULATE, rcp_ep_adc_cadence_case(1, 255));
+}
+
+static void test_cadence_response_ready_true_when_pending_meets_combine(void)
+{
+    TEST_ASSERT_TRUE(rcp_ep_adc_cadence_response_ready(5u, 5u));
+    TEST_ASSERT_TRUE(rcp_ep_adc_cadence_response_ready(6u, 5u));
+}
+
+static void test_cadence_response_ready_false_when_pending_short(void)
+{
+    TEST_ASSERT_FALSE(rcp_ep_adc_cadence_response_ready(4u, 5u));
+    TEST_ASSERT_FALSE(rcp_ep_adc_cadence_response_ready(0u, 1u));
+}
+
+static void test_cadence_response_ready_zero_combine_always_ready(void)
+{
+    TEST_ASSERT_TRUE(rcp_ep_adc_cadence_response_ready(0u, 0u));
+}
+
+static void test_cadence_response_ready_drives_accumulate_case_across_executions(void)
+{
+    /* intervals=2, combine=5: not ready after 1 or 2 executions (2, 4
+     * pending), ready after the 3rd (6 pending) -- the same "several
+     * executions feed one response" rule RCP_EP_ADC_CADENCE_ACCUMULATE
+     * names, exercised end-to-end via repeated readiness checks. */
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_CADENCE_ACCUMULATE, rcp_ep_adc_cadence_case(2, 5));
+    TEST_ASSERT_FALSE(rcp_ep_adc_cadence_response_ready(2u, 5u));
+    TEST_ASSERT_FALSE(rcp_ep_adc_cadence_response_ready(4u, 5u));
+    TEST_ASSERT_TRUE(rcp_ep_adc_cadence_response_ready(6u, 5u));
+}
+
+static void test_cadence_response_ready_drives_fan_out_case_across_responses(void)
+{
+    /* intervals=6, combine=2: one execution (6 pending) is immediately
+     * ready, and stays ready after peeling off two 2-value responses (4,
+     * then 2 pending) -- RCP_EP_ADC_CADENCE_FAN_OUT's "one execution
+     * yields several responses" rule, exercised the same way. */
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_CADENCE_FAN_OUT, rcp_ep_adc_cadence_case(6, 2));
+    TEST_ASSERT_TRUE(rcp_ep_adc_cadence_response_ready(6u, 2u));
+    TEST_ASSERT_TRUE(rcp_ep_adc_cadence_response_ready(4u, 2u));
+    TEST_ASSERT_TRUE(rcp_ep_adc_cadence_response_ready(2u, 2u));
+    TEST_ASSERT_FALSE(rcp_ep_adc_cadence_response_ready(0u, 2u));
+}
+
 /* End-to-end over the corrected model: raw samples -> per-interval
  * averages (each timestamped at its own last used sample, §13.7.9.2) ->
  * COMBINE_NR_VAL of them packed into one response (Table 51 0x000C) ->
@@ -1166,6 +1245,16 @@ int main(void)
     RUN_TEST(test_response_encode_rejects_zero_or_oversized_value_count);
     RUN_TEST(test_response_no_signal_sentinel_round_trips);
     RUN_TEST(test_pipeline_end_to_end_multi_value_timed_response);
+
+    RUN_TEST(test_cadence_case_accumulate_when_combine_exceeds_intervals);
+    RUN_TEST(test_cadence_case_one_to_one_when_combine_equals_intervals);
+    RUN_TEST(test_cadence_case_fan_out_when_combine_below_intervals);
+    RUN_TEST(test_cadence_case_boundary_values);
+    RUN_TEST(test_cadence_response_ready_true_when_pending_meets_combine);
+    RUN_TEST(test_cadence_response_ready_false_when_pending_short);
+    RUN_TEST(test_cadence_response_ready_zero_combine_always_ready);
+    RUN_TEST(test_cadence_response_ready_drives_accumulate_case_across_executions);
+    RUN_TEST(test_cadence_response_ready_drives_fan_out_case_across_responses);
 
     return UNITY_END();
 }
