@@ -236,6 +236,25 @@ rcp_avtp_errc_t rcp_avtp_decode_tscf(const uint8_t *b, size_t len,
     return RCP_AVTP_OK;
 }
 
+//cfusa:req REQ-TIMED-012
+uint64_t rcp_avtp_extend_timestamp(uint32_t wire_ts, uint64_t reference_now)
+{
+    const uint64_t period    = ((uint64_t)1u << 32);
+    const uint64_t half      = period / 2u;
+    uint64_t       base      = reference_now & ~(period - 1u);
+    uint64_t       candidate = base | (uint64_t)wire_ts;
+
+    if (candidate > reference_now && (candidate - reference_now) > half) {
+        /* candidate is more than half a period ahead of reference_now --
+         * the instant one period earlier is the closer match. */
+        candidate -= period;
+    } else if (candidate < reference_now && (reference_now - candidate) > half) {
+        /* Symmetric case: one period later is closer. */
+        candidate += period;
+    }
+    return candidate;
+}
+
 /* ── Subtype dispatch & the TSCF-without-time-sync drop rule ──────────────── */
 
 //cfusa:req REQ-AVTP-013

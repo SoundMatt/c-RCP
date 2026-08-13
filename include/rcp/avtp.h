@@ -217,6 +217,42 @@ rcp_avtp_errc_t rcp_avtp_decode_tscf(const uint8_t *b, size_t len,
                                      rcp_avtp_tscf_header_t *out_hdr,
                                      const uint8_t **out_payload, size_t *out_payload_len);
 
+/* REQ-TIMED-012, TC18 §11.2/§11.2.1: "If received under TSCF header, [a
+ * request's] execution is postponed until the presentation time has
+ * occurred" -- a rule that applies to every request kind (standard,
+ * conditional, cancel), not just request_timed.h's own Timed request
+ * kind. Evaluating that rule means comparing avtp_timestamp (this
+ * header's own 32-bit, nanoseconds-modulo-2^32 IEEE 1722 field, wire
+ * width per this header's file comment) against the same 48-bit
+ * gPTP-domain clock server.h's rcp_server_tick_ctx_t::gptp_now and
+ * request_timed.h's RCP_TIMED_PRESENTATION_TIME_MAX/rcp_timed_due()
+ * already use -- but a 32-bit field cannot itself carry which of the
+ * (2^48 / 2^32) possible 48-bit instants congruent to it mod 2^32 was
+ * actually intended, and IEEE 1722 leaves that reconstruction to the
+ * receiver.
+ *
+ * rcp_avtp_extend_timestamp() resolves that ambiguity the same way
+ * every real AVTP/gPTP receiver does (this is standard IEEE 1722
+ * presentation-time reconstruction, not a c-RCP invention): of the
+ * several 48-bit instants congruent to wire_ts modulo 2^32, it returns
+ * whichever is CLOSEST to reference_now. Naively zero-extending wire_ts
+ * (OR-ing it onto reference_now's own high bits, unadjusted) is wrong
+ * whenever wire_ts's low bits happen to be numerically smaller than
+ * reference_now's -- that reads a request meant for ~100ms in the
+ * future as ~4.29 seconds (2^32 ns) in the past instead. The result is
+ * intended to be computed ONCE, at admission time (reference_now =
+ * gptp_now at that moment), then compared on every later tick via
+ * rcp_timed_due(result, ctx->gptp_now) exactly as request_timed.h's own
+ * presentation_time already is -- reference_now is a resolution anchor,
+ * not something the caller re-supplies per tick.
+ *
+ * The returned value is not pre-masked to RCP_TIMED_PRESENTATION_TIME_
+ * MAX's own 48-bit domain; rcp_timed_due()'s own forward_delta() already
+ * masks at comparison time, the same as it does for every other
+ * presentation_time value, so this function does not need to duplicate
+ * that step. */
+uint64_t rcp_avtp_extend_timestamp(uint32_t wire_ts, uint64_t reference_now);
+
 /* ── Subtype dispatch & the TSCF-without-time-sync drop rule ──────────────── */
 
 /* Reads just the subtype byte (offset 0) from a received AVTPDU, so a

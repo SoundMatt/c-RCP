@@ -15205,6 +15205,38 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.294.0 -- 2026-08-12 (issue #336: REQ-TIMED-012 TSCF
+timestamp-extension primitive -- not-implemented -> partial)
+
+REQ-TIMED-012 flips not-implemented -> partial. TC18 11.2/11.2.1
+requires that any request carried under a TSCF header -- standard,
+conditional, or cancel, not just request_timed.h's own Timed request
+kind -- is postponed until the header's own avtp_timestamp
+presentation time. avtp_timestamp is a 32-bit, nanoseconds-modulo-2^32
+IEEE 1722 field, while the admission/due-selection path operates
+entirely in the 48-bit gPTP-domain clock request_timed.h's own
+presentation_time already uses. Comparing the two directly is
+unsound: a 32-bit field cannot itself carry which of the many
+congruent 48-bit instants was intended.
+
+New rcp_avtp_extend_timestamp() resolves that reconstruction
+correctly -- the same nearest-candidate technique every real IEEE
+1722/AVTP receiver uses, not a c-RCP invention -- returning the
+48-bit-domain instant closest to a caller-supplied reference clock,
+directly composable with the existing rcp_timed_due() comparison.
+
+Deliberately does not close the requirement fully: rcp_server_
+endpoint_admit()'s own public signature has no parameter carrying a
+TSCF header's tv/avtp_timestamp at all, so no real dispatch path yet
+applies this postponement universally across every request kind --
+tracked as this requirement's own remaining scope.
+
+7 new unit tests. Mutation-tested 3 ways -- the backward-boundary
+mutation was NOT caught by the first test pass, a genuine coverage
+gap fixed by adding a dedicated backward half-period boundary test.
+cfusa check A/B: zero new or removed findings. cfusa trace: both
+100%, 1024/1024 (unaffected). 65/65 both trees (native + ASan/UBSan).
+
 ### v0.293.0 -- 2026-08-12 (issue #336: REQ-ADC-037 cadence-decision
 primitives -- not-implemented -> partial)
 
