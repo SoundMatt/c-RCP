@@ -192,6 +192,36 @@ static void test_transport_new_bad_interface_is_not_ok(void)
     rcp_avtp_transport_release(t);
 }
 
+/* REQ-L2-009: on a non-Linux platform (or a Linux build lacking
+ * CAP_NET_RAW/root -- both routes give ok()==false), send()/recv()
+ * report RCP_ERR_CLOSED without crashing, exactly matching udp.c's own
+ * Windows-stub convention. This is the not-ok() half deliberately left
+ * unexercised by test_transport_new_ok_or_gracefully_unavailable()
+ * above (which stops at TEST_IGNORE_MESSAGE for that case): on this
+ * repo's own macOS/Windows CI jobs (and any unprivileged Linux run),
+ * this test runs for real rather than being skipped. */
+static void test_transport_send_recv_closed_when_not_ok(void)
+{
+    rcp_avtp_transport_t *t = rcp_l2_avtp_transport_new("lo", k_dst_mac, false);
+    rcp_context_t          ctx = rcp_context_with_timeout_ms(20);
+    uint8_t                frame[] = {1, 2, 3};
+    uint8_t                buf[16];
+    size_t                  out_len = 0;
+
+    TEST_ASSERT_NOT_NULL(t);
+    if (rcp_l2_avtp_transport_ok(t)) {
+        rcp_avtp_transport_release(t);
+        TEST_IGNORE_MESSAGE("L2 transport is privileged/available on this platform");
+        return;
+    }
+
+    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_avtp_transport_send(t, frame, sizeof(frame)));
+    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED,
+                       rcp_avtp_transport_recv(t, &ctx, buf, sizeof(buf), &out_len));
+
+    rcp_avtp_transport_release(t);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -205,6 +235,7 @@ int main(void)
     RUN_TEST(test_mac_is_unicast_classifies_unicast_multicast_broadcast);
     RUN_TEST(test_transport_new_ok_or_gracefully_unavailable);
     RUN_TEST(test_transport_new_bad_interface_is_not_ok);
+    RUN_TEST(test_transport_send_recv_closed_when_not_ok);
 
     return UNITY_END();
 }

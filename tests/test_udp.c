@@ -45,7 +45,11 @@ static void test_thread_join(test_thread_t t)
     CloseHandle(t);
 }
 #else
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <pthread.h>
+#include <sys/socket.h>
+#include <unistd.h>
 typedef pthread_t test_thread_t;
 static test_thread_t test_thread_spawn(void *(*fn)(void *), void *arg)
 {
@@ -309,6 +313,71 @@ static void test_addr_string_and_port_report_bound_address(void)
     rcp_avtp_transport_release(srv);
 }
 
+/* REQ-UDP-002: a NULL or empty addr binds INADDR_ANY (0.0.0.0), not a
+ * specific interface -- every other bind() test in this file passes
+ * "127.0.0.1" explicitly, leaving this branch untested. */
+static void test_bind_null_addr_binds_inaddr_any(void)
+{
+    rcp_avtp_transport_t *srv = rcp_udp_avtp_transport_bind(NULL, 0, false);
+    char                    buf[64];
+    size_t                   n;
+
+    if (!rcp_udp_avtp_transport_ok(srv)) {
+        rcp_avtp_transport_release(srv);
+        TEST_IGNORE_MESSAGE("UDP transport not available on this platform");
+        return;
+    }
+
+    n = rcp_udp_avtp_transport_addr_string(srv, buf, sizeof(buf));
+    TEST_ASSERT_TRUE(n > 0);
+    buf[n] = '\0';
+    TEST_ASSERT_NOT_NULL(strstr(buf, "0.0.0.0:"));
+
+    rcp_avtp_transport_release(srv);
+}
+
+static void test_bind_empty_addr_binds_inaddr_any(void)
+{
+    rcp_avtp_transport_t *srv = rcp_udp_avtp_transport_bind("", 0, false);
+    char                    buf[64];
+    size_t                   n;
+
+    if (!rcp_udp_avtp_transport_ok(srv)) {
+        rcp_avtp_transport_release(srv);
+        TEST_IGNORE_MESSAGE("UDP transport not available on this platform");
+        return;
+    }
+
+    n = rcp_udp_avtp_transport_addr_string(srv, buf, sizeof(buf));
+    TEST_ASSERT_TRUE(n > 0);
+    buf[n] = '\0';
+    TEST_ASSERT_NOT_NULL(strstr(buf, "0.0.0.0:"));
+
+    rcp_avtp_transport_release(srv);
+}
+
+/* REQ-UDP-003: bind()'s own failure path -- ok() reports false when the
+ * underlying bind() call itself fails, not just when socket() fails.
+ * Binding the exact same address:port a still-open transport already
+ * holds is a portable, reliable way to force a genuine EADDRINUSE. */
+static void test_bind_failure_is_not_ok(void)
+{
+    rcp_avtp_transport_t *first;
+    rcp_avtp_transport_t *second;
+    uint16_t                 port;
+
+    first = bind_or_ignore();
+    if (!first) return;
+    port = rcp_udp_avtp_transport_port(first);
+
+    second = rcp_udp_avtp_transport_bind("127.0.0.1", port, false);
+    TEST_ASSERT_NOT_NULL(second);
+    TEST_ASSERT_FALSE(rcp_udp_avtp_transport_ok(second));
+
+    rcp_avtp_transport_release(second);
+    rcp_avtp_transport_release(first);
+}
+
 static void test_dial_unreachable_host_still_ok_at_construct_time(void)
 {
     /* connect() on a UDP socket only validates the address family/format,
@@ -394,6 +463,70 @@ static void test_annexj_unwrap_rejects_short_datagram(void)
     TEST_ASSERT_EQUAL_PTR((const uint8_t *)1, payload);
     TEST_ASSERT_EQUAL_UINT(0xFFu, payload_len);
 }
+
+#if !defined(_WIN32)
+/* REQ-UDP-018's own drop-and-keep-waiting clause: a raw datagram shorter
+ * than RCP_UDP_ANNEX_J_SEQ_LEN (no room for even the sequence number,
+ * let alone an AVTPDU) must not be surfaced to the caller as a
+ * malformed/garbage frame -- recv() drops it and keeps waiting for the
+ * next one. test_annexj_unwrap_rejects_short_datagram() above only
+ * proves the unwrap primitive itself rejects it; this proves recv()'s
+ * own integration actually discards it rather than, say, returning an
+ * error or (worse) surfacing the too-short bytes as if they were a
+ * valid AVTPDU. A raw POSIX socket sends the short datagram directly,
+ * bypassing this transport's own send() (which always emits a
+ * well-formed Annex J frame) -- Windows has no real UDP transport
+ * implementation at all (see this file's own header), so this is
+ * POSIX-only, matching bind_or_ignore()'s own platform gating. */
+static void test_recv_drops_short_datagram_and_keeps_waiting(void)
+{
+    rcp_avtp_transport_t *srv;
+    rcp_avtp_transport_t *cli;
+    rcp_context_t          ctx;
+    rcp_bytes_t             good_frame;
+    uint8_t                 buf[256];
+    size_t                   out_len = 0;
+    uint16_t                 port;
+    int                       raw_fd;
+    struct sockaddr_in       dst;
+    static const uint8_t     too_short[3] = {0xAA, 0xBB, 0xCC};
+
+    srv = bind_or_ignore();
+    if (!srv) return;
+    port = rcp_udp_avtp_transport_port(srv);
+
+    cli = rcp_udp_avtp_transport_dial("127.0.0.1", port, false);
+    TEST_ASSERT_TRUE(rcp_udp_avtp_transport_ok(cli));
+
+    raw_fd = socket(AF_INET, SOCK_DGRAM, 0);
+    TEST_ASSERT_TRUE(raw_fd >= 0);
+    memset(&dst, 0, sizeof(dst));
+    dst.sin_family = AF_INET;
+    dst.sin_port   = htons(port);
+    inet_pton(AF_INET, "127.0.0.1", &dst.sin_addr);
+    (void)sendto(raw_fd, too_short, sizeof(too_short), 0, (struct sockaddr *)&dst, sizeof(dst));
+    close(raw_fd);
+
+    /* The malformed datagram alone must not satisfy a recv() -- it is
+     * dropped, so a short timeout with nothing else queued still times
+     * out rather than returning the garbage bytes. */
+    ctx = rcp_context_with_timeout_ms(100);
+    TEST_ASSERT_EQUAL(RCP_ERR_TIMEOUT,
+                       rcp_avtp_transport_recv(srv, &ctx, buf, sizeof(buf), &out_len));
+
+    /* recv() itself is still healthy afterward -- a real, well-formed
+     * frame sent right after is received normally. */
+    good_frame = make_ntscf_frame(5);
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_send(cli, good_frame.data, good_frame.len));
+    rcp_bytes_free(&good_frame);
+
+    ctx = rcp_context_with_timeout_ms(2000);
+    TEST_ASSERT_EQUAL(RCP_OK, rcp_avtp_transport_recv(srv, &ctx, buf, sizeof(buf), &out_len));
+
+    rcp_avtp_transport_release(cli);
+    rcp_avtp_transport_release(srv);
+}
+#endif /* !_WIN32 */
 
 /* ── Send-side sequence numbers increment monotonically over a real
  * dial()/bind() pair, and the receiver's own last_recv_seq() reports
@@ -493,6 +626,45 @@ static void test_dial_default_port_targets_control_port(void)
     rcp_avtp_transport_release(srv);
 }
 
+#if defined(_WIN32)
+/* REQ-UDP-014: on a platform with no winsock implementation, dial()/
+ * bind() still return a non-NULL transport whose ok() reports false and
+ * whose send()/recv() return RCP_ERR_CLOSED without crashing -- the
+ * exact same "fail cleanly, never NULL, never crash" contract this
+ * file's own POSIX tests exercise for the real implementation. This is
+ * genuinely only reachable on a build with no winsock implementation
+ * (this codebase's own udp.c compiles a full POSIX socket() path on
+ * every other platform, guarded by !defined(_WIN32)) -- so this test is
+ * itself #if defined(_WIN32)-gated and only ever runs on this repo's own
+ * windows-2022 CI job, mirroring how bind_or_ignore() IGNOREs the rest
+ * of this file's own POSIX-only tests there instead. */
+static void test_win32_stub_dial_and_bind_are_not_ok_and_return_closed(void)
+{
+    rcp_avtp_transport_t *dialed;
+    rcp_avtp_transport_t *bound;
+    rcp_context_t          ctx = rcp_context_with_timeout_ms(20);
+    uint8_t                 frame[] = {1, 2, 3};
+    uint8_t                 buf[16];
+    size_t                   out_len = 0;
+
+    dialed = rcp_udp_avtp_transport_dial("127.0.0.1", 12345, false);
+    TEST_ASSERT_NOT_NULL(dialed);
+    TEST_ASSERT_FALSE(rcp_udp_avtp_transport_ok(dialed));
+    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_avtp_transport_send(dialed, frame, sizeof(frame)));
+    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED,
+                       rcp_avtp_transport_recv(dialed, &ctx, buf, sizeof(buf), &out_len));
+    rcp_avtp_transport_release(dialed);
+
+    bound = rcp_udp_avtp_transport_bind(NULL, 0, false);
+    TEST_ASSERT_NOT_NULL(bound);
+    TEST_ASSERT_FALSE(rcp_udp_avtp_transport_ok(bound));
+    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED, rcp_avtp_transport_send(bound, frame, sizeof(frame)));
+    TEST_ASSERT_EQUAL(RCP_ERR_CLOSED,
+                       rcp_avtp_transport_recv(bound, &ctx, buf, sizeof(buf), &out_len));
+    rcp_avtp_transport_release(bound);
+}
+#endif /* _WIN32 */
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -504,16 +676,26 @@ int main(void)
     RUN_TEST(test_send_recv_after_close_returns_closed);
     RUN_TEST(test_close_unblocks_in_progress_recv);
     RUN_TEST(test_addr_string_and_port_report_bound_address);
+    RUN_TEST(test_bind_null_addr_binds_inaddr_any);
+    RUN_TEST(test_bind_empty_addr_binds_inaddr_any);
+    RUN_TEST(test_bind_failure_is_not_ok);
     RUN_TEST(test_dial_unreachable_host_still_ok_at_construct_time);
     RUN_TEST(test_dial_bad_address_is_not_ok);
 
     RUN_TEST(test_annexj_wrap_unwrap_roundtrip);
     RUN_TEST(test_annexj_wrap_empty_avtpdu);
     RUN_TEST(test_annexj_unwrap_rejects_short_datagram);
+#if !defined(_WIN32)
+    RUN_TEST(test_recv_drops_short_datagram_and_keeps_waiting);
+#endif
     RUN_TEST(test_send_seq_increments_and_is_observable_on_receive);
     RUN_TEST(test_control_port_constant_is_17221);
     RUN_TEST(test_bind_default_port_binds_control_port);
     RUN_TEST(test_dial_default_port_targets_control_port);
+
+#if defined(_WIN32)
+    RUN_TEST(test_win32_stub_dial_and_bind_are_not_ok_and_return_closed);
+#endif
 
     return UNITY_END();
 }

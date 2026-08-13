@@ -34,6 +34,28 @@ the rationale.
 
 ## Releases
 
+### v0.318.0 -- 2026-08-13 (transport batch: 8 `scope: "tc18"` partials closed -- AVTP/L2/UDP/TSN, no code changes, all pre-existing implementations confirmed correct)
+
+Second batch of the remaining `scope: "tc18"` partial requirements (`REQ-AVTP-004`, `REQ-AVTP-019`, `REQ-L2-009`, `REQ-UDP-002`, `REQ-UDP-003`, `REQ-UDP-014`, `REQ-UDP-018`, `REQ-TSN-004`), per the user's "complete the 59 partial" direction. All 8 were confirmed-correct implementations missing only their own dedicated test -- no code changes to any of `avtp.c`/`l2.c`/`udp.c`/`tsn.c`.
+
+**`REQ-AVTP-004`**: the existing TSCF round-trip test asserted every header field except `version` (the struct has one, TC18 fixes it at 0 for this revision, but the wire codec must still round-trip whatever value it's given). Added the assertion with a nonzero test value.
+
+**`REQ-AVTP-019`**: `test_loopback_transport_rejects_after_close()` only proved the empty-queue case -- never proved the requirement's own "once any already-queued frames are exhausted" clause. Added a test that queues a frame, closes, and confirms `recv()` still delivers that one frame before switching to `RCP_ERR_CLOSED`.
+
+**`REQ-L2-009`**: the non-Linux stub (`src/l2.c`'s `#else` branch under `!defined(__linux__)`) is the *active* path on this repo's own `macos-14` CI job -- directly testable, no platform gating needed. The existing `test_transport_new_ok_or_gracefully_unavailable()` test stopped at `TEST_IGNORE_MESSAGE()` for exactly this case, never actually asserting `send()`/`recv()` return `RCP_ERR_CLOSED`. Added a dedicated test that runs for real (not ignored) on macOS/Windows CI.
+
+**`REQ-UDP-002`/`REQ-UDP-003`**: every existing `bind()` test passed `"127.0.0.1"` explicitly, leaving the NULL/empty-addr-\>`INADDR_ANY` branch and the bind()-failure-\>`ok()==false` branch both untested. Added dedicated tests -- the bind-failure one forces a genuine `EADDRINUSE` by binding the exact same address:port a still-open transport already holds.
+
+**`REQ-UDP-018`**: added an integration test proving `recv()` itself drops a too-short raw datagram and keeps waiting, using a raw POSIX socket to bypass this transport's own well-formed `send()`. The existing `test_annexj_unwrap_rejects_short_datagram()` only proved the unwrap primitive rejects it, not that `recv()`'s own poll loop actually discards it rather than surfacing it.
+
+**`REQ-UDP-014`**: the Windows stub (`udp.c`'s `#else` branch under `!RCP_UDP_POSIX`) is only reachable on a real Windows build -- added a `#if defined(_WIN32)`-guarded test that only compiles/runs on this repo's own `windows-2022` CI job, proving `dial()`/`bind()` both return non-NULL, `ok()==false`, and `send()`/`recv()` return `RCP_ERR_CLOSED`.
+
+**`REQ-TSN-004`**: every existing `tsn_send()` test passed `socket_fd=-1`, deliberately skipping the `setsockopt(SO_PRIORITY)` call entirely -- so nothing had ever actually proven the PCP-tagging behavior on a real socket. Added a `#if defined(__linux__)`-guarded test (SO_PRIORITY is a glibc/Linux-only `setsockopt` option, same guard `tsn.c` itself uses) that creates a real UDP socket, sends a cancellation-priority frame through the wrapper, and verifies via `getsockopt()` that the kernel's own socket option was actually set to the expected PCP value.
+
+Full suite 66/66 native + ASan/UBSan (CI's exact `ASAN_OPTIONS`). Every new assertion mutation-tested where locally reproducible (7 of 8 -- `REQ-TSN-004`'s own Linux-only path relies on CI's ubuntu jobs for verification, not locally reproducible on this macOS dev box). `cfusa check`: 0 errors. `cfusa trace` (now trustworthy under v0.5.51): 1076/1076 traced, 1076/1076 tested, 0 gaps. No stray files. `.fusa-reqs.json`: 8 entries `partial` -\> `implemented`; repo-wide total unchanged at 1076 (1013 implemented / 54 partial / 2 not-implemented / 7 retired).
+
+**Next**: 51 of the original 59 unblocked partials remain -- endpoint/server/power (6) next, then observability/admin/mdns/relay (6), then the 41-item `scope: "tc18-gap"` architectural backlog under issues #334/#335/#336/#338 (minus `REQ-E2E-029`, which stays gated on `REQ-E2E-028`'s own sequence_num-threading fix).
+
 ### v0.317.0 -- 2026-08-13 (CI bumped to `cfusa` v0.5.51 -- fixes the MAX_REQS truncation bug this project's own catalog had been silently hitting; real 1076/1076 trace coverage confirmed for the first time)
 
 The user asked to check c-FuSa for a newer release that might fix the `MAX_REQS` silent-truncation defect filed as [c-FuSa#100](https://github.com/SoundMatt/c-FuSa/issues/100) in v0.315.0. It does: c-FuSa `v0.5.51` (via [c-FuSa#101](https://github.com/SoundMatt/c-FuSa/pull/101), merged the same day) replaces `cmd_req.c`/`cmd_trace.c`/`cmd_impact.c`'s fixed-size stack arrays with `realloc`-grown dynamic arrays, removes the caps entirely, and turns a genuine allocation failure into a hard error with a non-zero exit code instead of a silent partial load. A follow-up commit in the same PR fixed an identical `MAX_TAGS=4096` truncation bug in the same two files' own annotation-tag arrays -- the same class of bug, one array over, that could under-report coverage even before the requirements array itself filled up.
