@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.298.0 -- 2026-08-13 (issue #336: `REQ-CANEP-030`, CAN XL physical-layer provisioning -- `not-implemented` -> `partial`)
+
+**`REQ-CANEP-030` flips `not-implemented` -> `partial`.**
+
+TC18 §13.7.11.2 lists "usage of new PL (YES|NO) for CAN XL" among the settings the CAN endpoint's functional configuration comprises, alongside bit-rate and filter settings that all have real register rows in Table 56. This one does not: the register table goes directly from `can_clk_divider` (0x0008) to the undecomposed CAN bit-time/TDCC register span (0x000C-0x001B) with no row named for this setting anywhere. This is a genuine specification gap, not a local implementation one -- filed as canonical spec-defects report item 57 (`TC18_spec_defects_report.md` and its `_quadruple_checked.md` review copy).
+
+New `rcp_ep_can_functional_cfg_t::xl_new_pl_provisioned` (`ep_can.h`/`ep_can.c`) is deliberately an **in-memory-only** field with no wire offset, matching that constraint honestly rather than inventing an unverified register bit. `rcp_ep_can_set_xl_new_pl_provisioned()` lets a caller record this choice (lifecycle-authorized, same as every other functional-config setter); new `rcp_ep_can_xl_frame_matches_provisioned_pl()` validates a decoded frame's own XL variant against it -- closing this requirement's own "nothing rejects a frame whose XL variant contradicts the endpoint's actual physical layer" half. c-RCP's own pre-existing per-frame expression of physical-layer selection (`RCP_EP_CAN_FRAME_XL_CLASSICAL_PL`/`_NEW_PL` in evt[2:0]) is unchanged.
+
+**Stays `partial`**: a client still cannot read this setting back over the register map the way every other functional-config setting can, since TC18 gives no bit position to expose it at.
+
+**Verification**: 4 new unit tests in `tests/test_ep_can.c`. Mutation-tested 3 ways (the provisioned-PL comparison, the non-XL early-return, the new setter's own authorization gate) -- all caught cleanly. `cfusa check` A/B: zero new or removed findings. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%, 1024/1024. 65/65 both trees (native + ASan/UBSan).
+
 ### v0.297.0 -- 2026-08-13 (issue #336: `REQ-GPIO-035`/`REQ-GPIO-036` debounce-filter and response-timing primitives)
 
 **`REQ-GPIO-035`'s remaining debounce-filtering half, and `REQ-GPIO-036` in full, now have real, tested decision primitives -- both stay `partial`.**

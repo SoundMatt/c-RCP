@@ -387,6 +387,30 @@ bool rcp_ep_can_frame_format_valid(uint8_t v);
  * XL_NEW_PL). False for every other (valid or invalid) value. */
 bool rcp_ep_can_frame_format_is_xl(rcp_ep_can_frame_format_t format);
 
+/* REQ-CANEP-030, TC18 §13.7.11.2: "usage of new PL (YES|NO) for CAN XL"
+ * is listed among the settings the CAN endpoint's functional
+ * configuration comprises -- a per-endpoint, runtime-writable
+ * provisioning choice, alongside the bit-rate and filter settings the
+ * same bullet list names. Unlike every other functional-config setting
+ * TC18 lists there, this one is never given a register offset or bit
+ * position anywhere in Table 56 (or the prose immediately below it) --
+ * the register table jumps straight from can_clk_divider (0x0008) to
+ * the undecomposed CAN bit-time/TDCC register span (0x000C-0x001B,
+ * already deferred by REQ-CANEP-028 for the same "no verified
+ * bit-layout" reason) with no row named for this setting at all. This
+ * is a genuine specification gap, not a local implementation one --
+ * filed as TC18_spec_defects_report.md item 57 -- so
+ * rcp_ep_can_functional_cfg_t::xl_new_pl_provisioned (below) is
+ * deliberately an IN-MEMORY-ONLY field with no wire offset: it lets a
+ * caller record and validate this choice programmatically (closing
+ * this requirement's own "nothing rejects a frame whose XL variant
+ * contradicts the endpoint's actual physical layer" half), but cannot
+ * be read back over the register map the way every other functional-
+ * config setting can, since TC18 gives no bit position to expose it
+ * at. */
+bool rcp_ep_can_xl_frame_matches_provisioned_pl(bool xl_new_pl_provisioned,
+                                                 rcp_ep_can_frame_format_t format);
+
 typedef enum {
     RCP_EP_CAN_ID_WIDTH_BASE_11     = 0,
     RCP_EP_CAN_ID_WIDTH_EXTENDED_29 = 1,
@@ -485,11 +509,22 @@ typedef struct {
                                                      0x001C -- REQ-CANEP-028 */
     uint32_t                       fifo_status; /* FIFO status, Table 56
                                                      0x0020 -- REQ-CANEP-028 */
+    bool                           xl_new_pl_provisioned; /* "usage of new
+                                                               PL (YES|NO)
+                                                               for CAN XL",
+                                                               §13.7.11.2 --
+                                                               in-memory
+                                                               only, no
+                                                               wire offset;
+                                                               see
+                                                               REQ-CANEP-030
+                                                               above */
 } rcp_ep_can_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false; every bit-timing register
  * set, delay-compensation field, exec_delay_clk_divider, and filter table
- * entry zeroed/disabled). */
+ * entry zeroed/disabled; xl_new_pl_provisioned false, i.e. classical
+ * physical layer). */
 void rcp_ep_can_functional_cfg_init(rcp_ep_can_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
@@ -528,6 +563,14 @@ bool rcp_ep_can_set_xl_data_timing(rcp_ep_can_functional_cfg_t *cfg,
 bool rcp_ep_can_set_delay_compensation(rcp_ep_can_functional_cfg_t *cfg, bool enable,
                                         uint8_t offset, rcp_lifecycle_state_t state,
                                         rcp_lifecycle_writer_ctx_t writer);
+
+/* Same authorization rule, for cfg->xl_new_pl_provisioned -- REQ-CANEP-030,
+ * see rcp_ep_can_xl_frame_matches_provisioned_pl()'s own doc comment for
+ * why this field has no register offset. */
+bool rcp_ep_can_set_xl_new_pl_provisioned(rcp_ep_can_functional_cfg_t *cfg,
+                                           bool new_pl_provisioned,
+                                           rcp_lifecycle_state_t state,
+                                           rcp_lifecycle_writer_ctx_t writer);
 
 /* Same authorization rule, for cfg->exec_delay_clk_divider -- see the file
  * header for why this is a distinct register from the three bit-timing
