@@ -151,6 +151,26 @@ typedef struct {
     uint16_t                chain_exec_delay;  /* CHAINED */
     uint8_t                 cs;                /* CHAINED abort/continue selector */
 
+    /* REQ-CANCEL-012 (issue #334): this entry's own position within a
+     * chain, and which chain it belongs to -- both are properties of the
+     * enclosing frame a chain member was admitted from (see
+     * request_chained.h's own file header: "a chain is defined
+     * positionally... rather than of any member's own sub-fields"), so
+     * this module has no way to derive them itself at admission time;
+     * a caller that understands frame structure (mock.c's own
+     * dispatch_frame()) sets both after admission succeeds. chain_group
+     * == 0 is the "not part of a chain" sentinel every non-chain-grouped
+     * entry carries by default (this struct's zero-initialization);
+     * every real chain (including its own non-chained anchor member, the
+     * first request a chain's own members are chained to) is assigned a
+     * chain_group != 0, unique among chains concurrently pending on the
+     * same endpoint. chain_position is 0 for a chain's own anchor member
+     * and increases by exactly one per successive chained follower,
+     * matching rcp_cancel_chain_should_cascade()'s own
+     * member_position/canceled_position parameters directly. */
+    uint32_t                 chain_group;
+    uint8_t                  chain_position;
+
     /* Runtime bookkeeping. armed becomes true the moment this request's
      * own start condition first holds; armed_at records the tick count at
      * that instant, and the exec_delay timer runs from there. */
@@ -510,6 +530,23 @@ size_t rcp_server_endpoint_cancel_non_safestate(rcp_server_endpoint_t *ep);
  * Identical in effect to rcp_server_endpoint_cancel_non_safestate(), but
  * reached by a different event and stated in e2e.h's own terms. */
 size_t rcp_server_endpoint_watchdog_purge(rcp_server_endpoint_t *ep);
+
+/* REQ-CANCEL-012, TC18 §11.2.3's cascade rule ("If a request is cancelled
+ * to which a request is chained, then the chained successors shall be
+ * cancelled by the RC Server as well"): removes every stored request
+ * whose own chain_group equals chain_group and whose own chain_position
+ * satisfies request_cancel.h's rcp_cancel_chain_should_cascade(
+ * chain_position, min_position) -- i.e. every member at or after
+ * min_position within that same chain, including min_position's own
+ * entry if it is itself still stored. chain_group == 0 (the "not part of
+ * a chain" sentinel) matches nothing, so calling this with a
+ * non-chain-grouped entry's own chain_group is always a safe no-op.
+ * Returns the count actually removed. This module has no TC18
+ * error-response concept of its own (see this file's own layering
+ * discipline) -- a caller (mock.c's own apply_cancellation()) is
+ * responsible for whatever response each removal implies. */
+size_t rcp_server_endpoint_cancel_chain_from(rcp_server_endpoint_t *ep, uint32_t chain_group,
+                                              uint8_t min_position);
 
 #ifdef __cplusplus
 }

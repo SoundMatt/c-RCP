@@ -24,6 +24,7 @@
 //cfusa:test REQ-ACF-031
 //cfusa:test REQ-MOCK-028
 //cfusa:test REQ-MOCK-029
+//cfusa:test REQ-CANCEL-012
 /*
  * test_conditional_dispatch.c -- end-to-end tests for conditional-request
  * dispatch (TC18 §11.2.2/§11.2.3) through the real server path.
@@ -935,6 +936,30 @@ static size_t concat2(uint8_t *out, size_t cap, const rcp_bytes_t *a, const rcp_
     return a->len + b->len;
 }
 
+/* concat2()'s own three- and four-member counterparts, same contract. */
+static size_t concat3(uint8_t *out, size_t cap, const rcp_bytes_t *a, const rcp_bytes_t *b,
+                       const rcp_bytes_t *c)
+{
+    TEST_ASSERT_TRUE(a->len + b->len + c->len <= cap);
+
+    memcpy(out, a->data, a->len);
+    memcpy(out + a->len, b->data, b->len);
+    memcpy(out + a->len + b->len, c->data, c->len);
+    return a->len + b->len + c->len;
+}
+
+static size_t concat4(uint8_t *out, size_t cap, const rcp_bytes_t *a, const rcp_bytes_t *b,
+                       const rcp_bytes_t *c, const rcp_bytes_t *d)
+{
+    TEST_ASSERT_TRUE(a->len + b->len + c->len + d->len <= cap);
+
+    memcpy(out, a->data, a->len);
+    memcpy(out + a->len, b->data, b->len);
+    memcpy(out + a->len + b->len, c->data, c->len);
+    memcpy(out + a->len + b->len + c->len, d->data, d->len);
+    return a->len + b->len + c->len + d->len;
+}
+
 /* §11.2.2.4: "If the first request in an AVTPDU is a chain request, then
  * there is no predecessor to chain to, thus the entire chain will be
  * ignored." */
@@ -1064,6 +1089,130 @@ static void test_chained_member_after_predecessor_executes(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* ── Chain cascade cancellation (REQ-CANCEL-012, issue #334) ──────────────── */
+
+/* TC18 §11.2.3: "If a request is cancelled to which a request is chained,
+ * then the chained successors shall be cancelled by the RC Server as
+ * well." Cancelling the FIRST chained member of a two-member chain must
+ * also remove the second, even though the clear-single request only ever
+ * names the first member's own transaction_num. */
+static void test_clear_single_cascade_removes_chained_successors(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    rcp_acf_byte_message_info_t info = {0};
+    rcp_bytes_t lead;
+    rcp_bytes_t member_a;
+    rcp_bytes_t member_b;
+    rcp_bytes_t clear;
+    uint8_t frame[FRAME_BUF_CAP];
+    size_t frame_len;
+    rcp_mock_frame_member_result_t results[4];
+    rcp_server_tick_ctx_t ctx;
+    size_t n;
+
+    info.byte_bus_id     = 1;
+    info.transaction_num = 200;
+    lead = rcp_acf_encode_abb(&info, NULL, 0); /* standard, executes immediately */
+    TEST_ASSERT_NOT_NULL(lead.data);
+
+    member_a = rcp_chained_encode_member(1, 10 /* chain_exec_delay */,
+                                          RCP_CHAINED_CS_CONTINUE_ON_ERROR, 201, NULL, 0);
+    member_b = rcp_chained_encode_member(1, 10, RCP_CHAINED_CS_CONTINUE_ON_ERROR, 202, NULL, 0);
+    TEST_ASSERT_NOT_NULL(member_a.data);
+    TEST_ASSERT_NOT_NULL(member_b.data);
+
+    frame_len = concat3(frame, sizeof(frame), &lead, &member_a, &member_b);
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, frame, frame_len,
+                                        results, 4);
+    TEST_ASSERT_EQUAL_size_t(3, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result);      /* lead ran immediately */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, results[1].result); /* member_a stored */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, results[2].result); /* member_b stored */
+    TEST_ASSERT_EQUAL_size_t(2, rcp_mock_server_pending_count(srv, 1));
+
+    /* Cancel only the FIRST chained member (201) -- its own successor
+     * (202) must cascade with it, even though nothing named 202
+     * directly. */
+    clear = rcp_cancel_encode_clear_single(1, 201, 203);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CANCELLED, submit(srv, &clear));
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 1));
+
+    /* Neither chained member ever fires -- only the lead request ran. */
+    ctx = base_ctx(50);
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(1, log.count);
+
+    rcp_bytes_free(&lead);
+    rcp_bytes_free(&member_a);
+    rcp_bytes_free(&member_b);
+    rcp_bytes_free(&clear);
+    rcp_mock_server_destroy(srv);
+}
+
+/* Two independent chains, back to back in one frame, must not cascade
+ * into one another: cancelling the first chain's own member leaves the
+ * second, unrelated chain's member untouched. Guards against a cascade
+ * implementation that matches by frame position alone, without also
+ * checking chain identity. */
+static void test_clear_single_cascade_does_not_cross_chains(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    rcp_acf_byte_message_info_t lead1_info = {0};
+    rcp_acf_byte_message_info_t lead2_info = {0};
+    rcp_bytes_t lead1;
+    rcp_bytes_t member1;
+    rcp_bytes_t lead2;
+    rcp_bytes_t member2;
+    rcp_bytes_t clear;
+    uint8_t frame[FRAME_BUF_CAP];
+    size_t frame_len;
+    rcp_mock_frame_member_result_t results[4];
+    rcp_server_tick_ctx_t ctx;
+    size_t n;
+
+    lead1_info.byte_bus_id     = 1;
+    lead1_info.transaction_num = 210;
+    lead1   = rcp_acf_encode_abb(&lead1_info, NULL, 0);
+    member1 = rcp_chained_encode_member(1, 10, RCP_CHAINED_CS_CONTINUE_ON_ERROR, 211, NULL, 0);
+
+    lead2_info.byte_bus_id     = 1;
+    lead2_info.transaction_num = 220;
+    lead2   = rcp_acf_encode_abb(&lead2_info, NULL, 0);
+    member2 = rcp_chained_encode_member(1, 10, RCP_CHAINED_CS_CONTINUE_ON_ERROR, 221, NULL, 0);
+
+    TEST_ASSERT_NOT_NULL(lead1.data);
+    TEST_ASSERT_NOT_NULL(member1.data);
+    TEST_ASSERT_NOT_NULL(lead2.data);
+    TEST_ASSERT_NOT_NULL(member2.data);
+
+    frame_len = concat4(frame, sizeof(frame), &lead1, &member1, &lead2, &member2);
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, frame, frame_len,
+                                        results, 4);
+    TEST_ASSERT_EQUAL_size_t(4, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, results[1].result);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, results[3].result);
+    TEST_ASSERT_EQUAL_size_t(2, rcp_mock_server_pending_count(srv, 1));
+
+    /* Cancel the FIRST chain's own member -- the second, unrelated
+     * chain's member must survive. */
+    clear = rcp_cancel_encode_clear_single(1, 211, 230);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CANCELLED, submit(srv, &clear));
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 1));
+
+    ctx = base_ctx(50);
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_UINT8(221, log.transaction_num[log.count - 1]);
+
+    rcp_bytes_free(&lead1);
+    rcp_bytes_free(&member1);
+    rcp_bytes_free(&lead2);
+    rcp_bytes_free(&member2);
+    rcp_bytes_free(&clear);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── Malformed conditional requests are rejected, not executed ────────────── */
 
 static void test_undecodable_conditional_request_is_rejected(void)
@@ -1144,6 +1293,9 @@ int main(void)
     RUN_TEST(test_chained_first_in_frame_is_chain_error);
     RUN_TEST(test_chained_first_in_frame_sends_per_member_error_responses);
     RUN_TEST(test_chained_member_after_predecessor_executes);
+
+    RUN_TEST(test_clear_single_cascade_removes_chained_successors);
+    RUN_TEST(test_clear_single_cascade_does_not_cross_chains);
 
     RUN_TEST(test_undecodable_conditional_request_is_rejected);
     RUN_TEST(test_compound_never_due_without_a_sequencer_table);

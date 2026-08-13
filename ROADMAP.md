@@ -17219,3 +17219,80 @@ fix); all five caught cleanly.
 
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
+
+### v0.302.0 -- 2026-08-13 (issue #334 batch 1: `REQ-CANCEL-012` chain-
+cascade cancellation)
+
+**`REQ-CANCEL-012` flips `partial` -> `implemented`.** TC18 §11.2.3:
+"If a request is cancelled to which a request is chained, then the
+chained successors shall be cancelled by the RC Server as well."
+`rcp_cancel_chain_should_cascade(member_position, canceled_position)`
+(`request_cancel.c`) already implemented and unit-tested this rule
+correctly -- but had zero callers anywhere in `src/`, a gap flagged
+back in issue #256 Group H and reconfirmed by issue #334's own audit.
+
+Two new fields on `rcp_server_pending_t` (`server.h`): `chain_group`
+(defaults to 0, the reserved "not part of a chain" sentinel every
+non-chained entry carries) and `chain_position` (0 for a chain's own
+anchor, incrementing by one per chained follower -- matching the
+cascade predicate's own parameter shape directly). Chain membership
+is a property of the *enclosing frame*, not of any member's own wire
+fields (`request_chained.h`'s positional model), so only `mock.c`'s
+own `dispatch_frame()`/`dispatch_frame_e2e()` loops -- the only
+callers with frame context -- can derive and record it at admission
+time.
+
+New `rcp_server_endpoint_cancel_chain_from()` (`server.h`/`server.c`)
+walks the pending store removing every entry in a given chain group
+at or after a given position, reusing the existing `release_slot()`
+helper and the pre-existing cascade predicate. `apply_cancellation()`'s
+`CLEAR_SINGLE` path reads the target's own `chain_group`/
+`chain_position` out of the store *before* cancelling it (a successful
+cancel frees the slot), then calls the new primitive -- a target with
+no chain membership makes the call a guaranteed no-op, matching an
+already-not-found target's own behavior.
+
+**Deliberately not fully closed**: each cascaded removal is, by the
+same TC18 §11.2.3 rule, its own `REQUEST_CANCELED` response --
+`apply_cancellation()`'s single `out_response` parameter can only
+carry one response per call. This is the identical multi-response
+fanout limitation already tracked for clear-all/clear-non-safestate
+under issue #163; not attempted here, scope stays aligned with that
+existing boundary rather than conflated with it.
+
+Two new integration tests
+(`test_clear_single_cascade_removes_chained_successors`,
+`test_clear_single_cascade_does_not_cross_chains` --
+`test_conditional_dispatch.c`): cancelling a chain's first member
+removes both it and its chained successor; cancelling one member of
+two independent back-to-back chains in the same frame leaves the
+other chain's member untouched, proving `chain_group` isolation
+rather than mere frame-position. 3 mutation tests (dropping the
+cascade call, dropping the position-capture, and flipping the
+sentinel check) all caught cleanly.
+
+**Tooling note**: this batch's `cfusa check` run first flagged 3 new
+errors against a locally cached `cfusa` binary -- root-caused to that
+binary predating c-FuSa's own upstream `v0.5.39` fix for a
+`CFUSA-L004` false-positive class (multi-line function signatures
+leave the checker's "current function" tracking state stuck on a
+prior function, causing later, unrelated code to be wrongly checked
+for self-recursion against the stale name) that this repo's CI has
+relied on being fixed since 2026-07-27. Rebuilt `cfusa` from the
+exact CI-pinned `v0.5.50` tag before re-checking: **0 errors, both
+before and after this batch.** Lesson for future batches: a locally
+cached x-FuSa binary can silently drift stale relative to what CI
+actually runs -- always confirm the local binary's tag/build date
+against the CI workflow's pinned version before trusting a "new
+errors" result enough to spend time investigating it as a real code
+defect.
+
+Normalized `cfusa check` diff (rule+file, ignoring line-number
+reshuffling from the insertion) shows exactly 4 real deltas, all
+confined to the two new tests' own buffer-building code:
+`CFUSA-CY001`/`CY006`/`L003` (memcpy/free/heap-usage advisories,
++7/+9/+9) and `CFUSA-L001` (+2, the two new tests run 51 and 55 lines
+against a 50-line advisory threshold). `server.h`, `server.c`, and
+`mock.c` carry zero new findings of any severity. `cfusa trace
+--req-coverage 100`/`--sec-tested 100`: both 100% (1024/1024). 65/65
+both trees (native + ASan/UBSan).

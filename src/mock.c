@@ -363,7 +363,10 @@ static void run_handler(rcp_mock_endpoint_slot_t *slot, const uint8_t *request, 
  * response per cancelled request, not one for the cancellation itself)
  * -- a multi-response fanout this function's single out_response cannot
  * represent; not attempted here, tracked separately
- * (github.com/SoundMatt/c-RCP/issues/163). */
+ * (github.com/SoundMatt/c-RCP/issues/163). A clear-single's own
+ * successful cascade (below, REQ-CANCEL-012) carries the identical
+ * fanout gap for the same reason -- each cascaded removal is, by the
+ * same TC18 §11.2.3 rule, its own REQUEST_CANCELED response too. */
 static void apply_cancellation(rcp_mock_endpoint_slot_t *slot, uint8_t request_type,
                                 const uint8_t *request, size_t request_len,
                                 rcp_byte_bus_id_t byte_bus_id, rcp_bytes_t *out_response)
@@ -385,6 +388,30 @@ static void apply_cancellation(rcp_mock_endpoint_slot_t *slot, uint8_t request_t
     case RCP_REQUEST_TYPE_CLEAR_SINGLE:
         if (rcp_cancel_decode_clear_single(request, request_len, &bus, &target_tn, &tn) ==
             RCP_CANCEL_OK) {
+            /* REQ-CANCEL-012: read out BEFORE cancelling -- a successful
+             * rcp_server_endpoint_cancel_single() call below already
+             * frees and clears the target's own store slot, so its
+             * chain_group/chain_position have to be captured first if
+             * TC18 §11.2.3's cascade rule (cancelling this request also
+             * cancels every chained successor at or after its own
+             * position) is to be applied afterward. Left at their
+             * zero-valued defaults (chain_group 0, the "not part of a
+             * chain" sentinel) if no matching entry is found -- the
+             * cascade call below is then a guaranteed no-op, exactly
+             * matching a target that reports NOT_FOUND. */
+            uint32_t target_chain_group    = 0;
+            uint8_t  target_chain_position = 0;
+            size_t   j;
+
+            for (j = 0; j < RCP_SERVER_MAX_PENDING; j++) {
+                if (slot->queue.pending[j].in_use &&
+                    slot->queue.pending[j].transaction_num == target_tn) {
+                    target_chain_group    = slot->queue.pending[j].chain_group;
+                    target_chain_position = slot->queue.pending[j].chain_position;
+                    break;
+                }
+            }
+
             /* Every request still sitting in the store is by definition
              * queued rather than under execution -- this dispatcher runs a
              * selected request to completion synchronously inside
@@ -395,6 +422,9 @@ static void apply_cancellation(rcp_mock_endpoint_slot_t *slot, uint8_t request_t
             if (result == RCP_CANCEL_RESULT_NOT_FOUND) {
                 *out_response =
                     rcp_acf_build_error_response(byte_bus_id, tn, RCP_ERROR_REQUEST_NOT_FOUND);
+            } else if (result == RCP_CANCEL_RESULT_CANCELED) {
+                (void)rcp_server_endpoint_cancel_chain_from(&slot->queue, target_chain_group,
+                                                              target_chain_position);
             }
         }
         break;
@@ -737,6 +767,18 @@ size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subty
     bool   chain_aborted = false;
     bool   prev_errored  = false;
     uint8_t cs           = 0;
+    /* REQ-CANCEL-012 (issue #334): chain-group/position bookkeeping, the
+     * same "properties of the enclosing frame, not of any member's own
+     * sub-fields" scope server.h's own rcp_server_pending_t.chain_group
+     * doc comment describes -- this loop is where frame order is known,
+     * so it is where these values are derived. chain_group == 0 is the
+     * "not part of a chain" sentinel; every member (chained or not)
+     * starts a fresh potential chain_group == i+1 (the +1 avoids
+     * colliding with the sentinel when i==0) unless it is itself chained,
+     * in which case it keeps its predecessor's own chain_group and
+     * advances chain_position by one. */
+    uint32_t chain_group    = 0;
+    size_t   chain_position = 0;
 
     real_count = rcp_sched_split_frame_members(frame, frame_len, offsets, RCP_MOCK_MAX_FRAME_MEMBERS);
     if (real_count == 0) return 0;
@@ -752,6 +794,8 @@ size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subty
         uint8_t                          msg_type    = 0;
         rcp_byte_bus_id_t                byte_bus_id = 0;
         rcp_mock_frame_member_result_t  *out         = &out_results[dispatched];
+        bool                              chained_flag;
+        uint8_t                           member_tn   = 0;
 
         member_off = offsets[i];
         if (i + 1 < stored_count) {
@@ -789,29 +833,34 @@ size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subty
          * not a sub-field of its own. So the chain decision has to be
          * made here, where frame order is known, rather than inside the
          * per-endpoint store. */
-        {
-            uint8_t member_tn = 0;
+        chained_flag = is_chained_member(member, member_len, &cs, &member_tn);
 
-            if (is_chained_member(member, member_len, &cs, &member_tn)) {
-                rcp_chained_member_outcome_t outcome =
-                    rcp_chained_advance(&chain_aborted, i > 0, prev_errored, cs);
+        if (!chained_flag) {
+            chain_group    = (uint32_t)i + 1u;
+            chain_position = 0;
+        } else {
+            chain_position++;
+        }
 
-                if (outcome == RCP_CHAINED_MEMBER_CHAIN_ERROR) {
-                    out->result   = RCP_MOCK_DISPATCH_CHAIN_ERROR;
-                    out->response = rcp_acf_build_error_response(byte_bus_id, member_tn,
-                                                                  RCP_ERROR_CHAIN_ERROR);
-                    prev_errored  = true;
-                    dispatched++;
-                    continue;
-                }
-                if (outcome == RCP_CHAINED_MEMBER_CHAIN_ABORTED) {
-                    out->result   = RCP_MOCK_DISPATCH_CHAIN_ABORTED;
-                    out->response = rcp_acf_build_error_response(byte_bus_id, member_tn,
-                                                                  RCP_ERROR_CHAIN_ABORTED);
-                    prev_errored  = true;
-                    dispatched++;
-                    continue;
-                }
+        if (chained_flag) {
+            rcp_chained_member_outcome_t outcome =
+                rcp_chained_advance(&chain_aborted, i > 0, prev_errored, cs);
+
+            if (outcome == RCP_CHAINED_MEMBER_CHAIN_ERROR) {
+                out->result   = RCP_MOCK_DISPATCH_CHAIN_ERROR;
+                out->response = rcp_acf_build_error_response(byte_bus_id, member_tn,
+                                                              RCP_ERROR_CHAIN_ERROR);
+                prev_errored  = true;
+                dispatched++;
+                continue;
+            }
+            if (outcome == RCP_CHAINED_MEMBER_CHAIN_ABORTED) {
+                out->result   = RCP_MOCK_DISPATCH_CHAIN_ABORTED;
+                out->response = rcp_acf_build_error_response(byte_bus_id, member_tn,
+                                                              RCP_ERROR_CHAIN_ABORTED);
+                prev_errored  = true;
+                dispatched++;
+                continue;
             }
         }
 
@@ -829,12 +878,22 @@ size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subty
 
         /* A chained member accepted into its endpoint's store has its
          * predecessor behind it already, so its chain_exec_delay timer
-         * starts now. */
+         * starts now. REQ-CANCEL-012: this same PENDING entry also
+         * records its own chain_group/chain_position -- unconditionally,
+         * exactly like the chain_predecessor_done() call below, which is
+         * itself a no-op for a non-chained entry (see that function's
+         * own doc comment); a standalone (non-chained) member that lands
+         * here is its own chain's own anchor, tagged chain_position 0,
+         * ready to cascade to any actual successors admitted after it. */
         if (out->result == RCP_MOCK_DISPATCH_PENDING) {
             rcp_mock_endpoint_slot_t *slot = find_slot(srv, byte_bus_id);
             if (slot) {
                 size_t last = last_pending_index(&slot->queue);
                 (void)rcp_server_endpoint_chain_predecessor_done(&slot->queue, last, 0u);
+                if (last < RCP_SERVER_MAX_PENDING) {
+                    slot->queue.pending[last].chain_group    = chain_group;
+                    slot->queue.pending[last].chain_position = (uint8_t)chain_position;
+                }
             }
         }
 
@@ -861,6 +920,11 @@ size_t rcp_mock_server_dispatch_frame_e2e(rcp_mock_server_t *srv, uint8_t avtp_s
     bool   chain_aborted = false;
     bool   prev_errored  = false;
     uint8_t cs           = 0;
+    /* REQ-CANCEL-012 (issue #334): same chain-group/position bookkeeping
+     * as rcp_mock_server_dispatch_frame()'s own identical local state --
+     * see that function's own comment for the full rationale. */
+    uint32_t chain_group    = 0;
+    size_t   chain_position = 0;
 
     real_count = rcp_sched_split_frame_members(frame, frame_len, offsets, RCP_MOCK_MAX_FRAME_MEMBERS);
     if (real_count == 0) return 0;
@@ -876,6 +940,8 @@ size_t rcp_mock_server_dispatch_frame_e2e(rcp_mock_server_t *srv, uint8_t avtp_s
         uint8_t                          msg_type    = 0;
         rcp_byte_bus_id_t                byte_bus_id = 0;
         rcp_mock_frame_member_result_t  *out         = &out_results[dispatched];
+        bool                              chained_flag;
+        uint8_t                           member_tn   = 0;
 
         member_off = offsets[i];
         if (i + 1 < stored_count) {
@@ -900,29 +966,34 @@ size_t rcp_mock_server_dispatch_frame_e2e(rcp_mock_server_t *srv, uint8_t avtp_s
 
         out->byte_bus_id = byte_bus_id;
 
-        {
-            uint8_t member_tn = 0;
+        chained_flag = is_chained_member(member, member_len, &cs, &member_tn);
 
-            if (is_chained_member(member, member_len, &cs, &member_tn)) {
-                rcp_chained_member_outcome_t outcome =
-                    rcp_chained_advance(&chain_aborted, i > 0, prev_errored, cs);
+        if (!chained_flag) {
+            chain_group    = (uint32_t)i + 1u;
+            chain_position = 0;
+        } else {
+            chain_position++;
+        }
 
-                if (outcome == RCP_CHAINED_MEMBER_CHAIN_ERROR) {
-                    out->result   = RCP_MOCK_DISPATCH_CHAIN_ERROR;
-                    out->response = rcp_acf_build_error_response(byte_bus_id, member_tn,
-                                                                  RCP_ERROR_CHAIN_ERROR);
-                    prev_errored  = true;
-                    dispatched++;
-                    continue;
-                }
-                if (outcome == RCP_CHAINED_MEMBER_CHAIN_ABORTED) {
-                    out->result   = RCP_MOCK_DISPATCH_CHAIN_ABORTED;
-                    out->response = rcp_acf_build_error_response(byte_bus_id, member_tn,
-                                                                  RCP_ERROR_CHAIN_ABORTED);
-                    prev_errored  = true;
-                    dispatched++;
-                    continue;
-                }
+        if (chained_flag) {
+            rcp_chained_member_outcome_t outcome =
+                rcp_chained_advance(&chain_aborted, i > 0, prev_errored, cs);
+
+            if (outcome == RCP_CHAINED_MEMBER_CHAIN_ERROR) {
+                out->result   = RCP_MOCK_DISPATCH_CHAIN_ERROR;
+                out->response = rcp_acf_build_error_response(byte_bus_id, member_tn,
+                                                              RCP_ERROR_CHAIN_ERROR);
+                prev_errored  = true;
+                dispatched++;
+                continue;
+            }
+            if (outcome == RCP_CHAINED_MEMBER_CHAIN_ABORTED) {
+                out->result   = RCP_MOCK_DISPATCH_CHAIN_ABORTED;
+                out->response = rcp_acf_build_error_response(byte_bus_id, member_tn,
+                                                              RCP_ERROR_CHAIN_ABORTED);
+                prev_errored  = true;
+                dispatched++;
+                continue;
             }
         }
 
@@ -945,11 +1016,17 @@ size_t rcp_mock_server_dispatch_frame_e2e(rcp_mock_server_t *srv, uint8_t avtp_s
                         out->result == RCP_MOCK_DISPATCH_DROPPED ||
                         out->result == RCP_MOCK_DISPATCH_CRC_ERROR);
 
+        /* REQ-CANCEL-012: see rcp_mock_server_dispatch_frame()'s own
+         * identical block for the full rationale. */
         if (out->result == RCP_MOCK_DISPATCH_PENDING) {
             rcp_mock_endpoint_slot_t *slot = find_slot(srv, byte_bus_id);
             if (slot) {
                 size_t last = last_pending_index(&slot->queue);
                 (void)rcp_server_endpoint_chain_predecessor_done(&slot->queue, last, 0u);
+                if (last < RCP_SERVER_MAX_PENDING) {
+                    slot->queue.pending[last].chain_group    = chain_group;
+                    slot->queue.pending[last].chain_position = (uint8_t)chain_position;
+                }
             }
         }
 
