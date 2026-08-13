@@ -379,25 +379,49 @@ static rcp_wire_error_t respqueue_cfg_row_write_authorize(rcp_lifecycle_state_t 
                                                             size_t data_len)
 {
     bool   touches_w_plus = false;
-    bool   touches_w_star = false;
     size_t i;
 
+    /* CORRECTED 2026-08-13 (issue #338, REQ-LIFECYCLE-023): QUEUE_CFG
+     * (this whole table, TC18 §12.7.9 Table 27 "Responder QUEUE_config")
+     * is one of the three tables Figure 17's own HW_CONFIGURED-box
+     * transition explicitly locks -- "Request on discovery stream or
+     * known stream/bb_id for configuration to HW_CONFIG or QUEUE_CFG or
+     * EP_GEN_CFG -> send error response LOCKED_CONFIG_ACCESS"
+     * (TC18.txt L2485-2488, directly confirmed against the rendered PDF
+     * page image, not just text extraction) -- the SAME RCP_LIFECYCLE_
+     * FIELD_HW_GENERIC rule HW_config itself already uses, not the
+     * generic per-field R/W-star or R/W-plus default this function
+     * previously applied. rcp_lifecycle_field_write_error()'s own doc comment
+     * (lifecycle.h) already named this exact block as belonging to
+     * HW_GENERIC -- this function itself had simply never been updated
+     * to match. Checked first, table-wide: once this fails, no
+     * per-field distinction below matters. */
+    if (!rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_HW_GENERIC, writer)) {
+        return rcp_lifecycle_field_write_error(state, RCP_LIFECYCLE_FIELD_HW_GENERIC, writer);
+    }
+
+    /* Within the HW_UNCONFIGURED window HW_GENERIC alone permits, this
+     * table's own STREAM_UID/flush_on_count/Flush_time fields still
+     * carry their own INDEPENDENT R/W+ lock bit ("independently of the
+     * lifecycle state that governs W and W*", TC18's own words,
+     * §12.7.8 -- REQ-RMAP-055's own doc comment). Checked directly
+     * against `locked` here rather than via
+     * rcp_lifecycle_field_writable_w_plus(), which internally composes
+     * against FUNCTIONAL_W_STAR's own, now-superseded-for-this-table
+     * lifecycle rule, not HW_GENERIC's -- reusing it here would silently
+     * reintroduce the very bug this fix closes. Max_AVTPDUsize/
+     * queue_size (the table's own W* fields) need no separate check:
+     * HW_GENERIC's own table-wide gate above already subsumes whatever
+     * W* would have additionally required. */
     for (i = 0; i < data_len; i++) {
         size_t row_offset = ((size_t)relative_start_address + i) % 10u;
-
         if (row_offset < 2u || row_offset >= 6u) {
             touches_w_plus = true;
-        } else {
-            touches_w_star = true;
+            break;
         }
     }
 
-    if (touches_w_plus && !rcp_lifecycle_field_writable_w_plus(state, writer, locked)) {
-        return rcp_lifecycle_field_write_error_w_plus(state, writer, locked);
-    }
-    if (touches_w_star && !rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer)) {
-        return rcp_lifecycle_field_write_error(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer);
-    }
+    if (touches_w_plus && locked) return RCP_ERROR_LOCKED_MEM_ACCESS;
 
     return RCP_ERROR_NONE;
 }
@@ -648,18 +672,29 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
         uint16_t relative = (uint16_t)((size_t)addr - map->svr_ep_generic_cfg_ptr);
         rcp_regmap_ep_generic_cfg_reconfig_errc_t rc;
 
-        /* ep_generic_cfg is entirely TC18 R/W* for authorization purposes
-         * (issue #311 batch 5) -- direct primary-source verification of
-         * this table's own surrounding prose (TC18 §13.2, immediately
-         * before Table 28/31) finds no table-specific lifecycle-state
-         * override the way §12.7.6 does for HW_config, so the generic
-         * FUNCTIONAL_W_STAR rule applies to the row as a whole. ep_type's
-         * own read-only status (relative 0x0000 within each row) is a
-         * SEPARATE, per-field concern already enforced inside
+        /* CORRECTED 2026-08-13 (issue #338, REQ-LIFECYCLE-023): the
+         * issue #311 batch 5 claim above -- "no table-specific
+         * lifecycle-state override the way §12.7.6 does for HW_config,
+         * so the generic FUNCTIONAL_W_STAR rule applies" -- checked only
+         * §13.2's own prose next to Table 31 itself, not Figure 17's own
+         * diagram (§12.3), which DOES give EP_GEN_CFG a table-specific
+         * override: "Request on discovery stream or known stream/bb_id
+         * for configuration to HW_CONFIG or QUEUE_CFG or EP_GEN_CFG ->
+         * send error response LOCKED_CONFIG_ACCESS" (TC18.txt
+         * L2485-2488, directly confirmed against the rendered PDF page
+         * image). EP_GEN_CFG is one of the three tables Figure 17 locks
+         * from HW_CONFIGURED onward -- the SAME RCP_LIFECYCLE_FIELD_
+         * HW_GENERIC rule HW_config itself already uses, matching
+         * rcp_lifecycle_field_write_error()'s own doc comment
+         * (lifecycle.h), which already named this exact block as
+         * belonging to HW_GENERIC even before this fix updated the
+         * dispatch code itself to match. ep_type's own read-only status
+         * (relative 0x0000 within each row) remains a SEPARATE,
+         * per-field concern enforced inside
          * rcp_regmap_ep_generic_cfg_apply_reconfig() itself (issue #311
          * batch 4), independent of this row-level authorization. */
-        if (!rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer)) {
-            *out_error = rcp_lifecycle_field_write_error(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
+        if (!rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_HW_GENERIC, writer)) {
+            *out_error = rcp_lifecycle_field_write_error(state, RCP_LIFECYCLE_FIELD_HW_GENERIC,
                                                           writer);
             return RCP_REGMAP_EP0_OK;
         }

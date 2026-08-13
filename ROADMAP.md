@@ -18227,3 +18227,154 @@ changing for a citation reason -- a batch's own primary purpose (closing
 a code gap) can silently leave an already-stale citation untouched simply
 because it wasn't the field under review. Worth an explicit checklist
 item in this session's own standing per-batch discipline going forward.
+
+### v0.314.0 -- 2026-08-13 (`REQ-LIFECYCLE-023` closed: real
+access-control bug found and fixed -- EP_GEN_CFG/QUEUE_CFG now correctly
+lock during HW_CONFIGURED)
+
+Picked up while triaging the 35 `scope: "tc18"` partial requirements at
+the user's own explicit direction ("complete these"). A fleet of
+parallel investigation agents classified 34 of the 35 as either
+`FULLY_COVERED` (status simply stale) or `MISSING_TEST` (implementation
+correct, a specific literal clause just never independently exercised).
+`REQ-LIFECYCLE-023` was the one exception: its own catalog text already
+held two directly-conflicting claims about whether `ep_generic_cfg`/
+`response_queue_cfg` lock during HW_CONFIGURED, explicitly left
+unreconciled by an earlier no-status audit pass. Rather than pick a side
+by inference, asked the user how to resolve it, then investigated the
+primary source directly -- including rendering the actual PDF page image
+(`pdftoppm`, page 51) rather than trusting text extraction alone, the
+same rigor this project's own prior `REQ-LIFECYCLE-022`/`REQ-LIFECYCLE-025`
+work already established for this exact diagram.
+
+**The finding**: Figure 17's own HW_CONFIGURED-box transition states,
+without qualification, "Request on discovery stream or known stream/
+bb_id for configuration to HW_CONFIG or QUEUE_CFG or EP_GEN_CFG -> send
+error response LOCKED_CONFIG_ACCESS" (TC18.txt L2485-2488) -- explicitly
+grouping `ep_generic_cfg` (Table 31, "EP_GEN_CFG") and
+`response_queue_cfg` (Table 27, "QUEUE_CFG") together with HW_config as
+locked from HW_CONFIGURED onward. But neither table's own surrounding
+prose (§13.2, §12.7.9) carries any such override -- their fields are
+marked plain `R/W*`/`R/W+` per §12.7.5's generic access-level legend,
+which defines `R/W*` as "write access prohibited **only** if in
+lifecycle state RCP_configured", implying both tables remain writable
+throughout HW_CONFIGURED. This is a genuine TC18 prose/diagram
+contradiction -- HW_config gets its own restriction stated twice (once
+in the diagram, once in its own adjacent §12.7.6 prose: "This
+configuration table can only be changed in the life-cycle state
+HW_unconfigured"), but EP_GEN_CFG/QUEUE_CFG get it only in the diagram,
+an easy detail to miss reading either table in isolation. Now catalogued
+as item 60 in `TC18_spec_defects_report.md` (canonical path outside this
+repo's own git tree), alongside a suggested fix (add the same
+cross-reference sentence Table 21 already carries).
+
+**Resolved in favor of the diagram**: the more specific, deliberate
+statement on exactly this topic, consistent with HW_config's own
+already-implemented override -- fail-closed, the safer failure mode for
+an access-control gate, matching this codebase's own established
+conventions elsewhere (e.g. e2e.h's own fail-closed safe-state
+philosophy). This also resolves a real internal inconsistency already
+present in this codebase's own documentation, not introduced by this
+investigation: `rcp_lifecycle_field_write_error()`'s own doc comment
+(`lifecycle.h`) already stated "every RCP_LIFECYCLE_FIELD_HW_GENERIC
+denial is exactly this case... REQ-LIFECYCLE-023's HW_CONFIG/QUEUE_CFG/
+EP_GEN_CFG blocks all fall under this kind" -- the correct answer was
+already documented in this exact spot in the codebase, written (almost
+certainly during the original `REQ-LIFECYCLE-024` work) with full
+knowledge of Figure 17's own diagram-derived rule. `src/regmap.c`'s
+actual write-dispatch code for `ep_generic_cfg`/`response_queue_cfg`
+had simply never been updated to match -- confirmed via `git blame`-style
+reasoning against the issue #311 batch 5 comment this fix replaces,
+which explicitly claimed "direct primary-source verification of this
+table's own surrounding prose... finds no table-specific lifecycle-state
+override" -- true of the PROSE specifically, but that investigation
+never cross-checked the diagram. **A real, now-fixed conformance bug,
+not a documentation-only finding.**
+
+**Fixed**: both write-dispatch blocks in `src/regmap.c` now gate on
+`RCP_LIFECYCLE_FIELD_HW_GENERIC` (the identical rule HW_config's own
+block already uses) instead of `RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR`
+(and, for `response_queue_cfg`, a mixed per-field W-star/W-plus split
+via `respqueue_cfg_row_write_authorize()`). `response_queue_cfg`'s own
+STREAM_UID/flush_on_count/Flush_time fields retain their independent
+R/W-plus lock-bit check ("independently of the lifecycle state that
+governs W and W*", TC18's own words, §12.7.8, REQ-RMAP-055) within the
+HW_UNCONFIGURED window HW_GENERIC still permits -- checked directly
+against the caller-supplied `locked` bit rather than via
+`rcp_lifecycle_field_writable_w_plus()`, which internally composes
+against `FUNCTIONAL_W_STAR`'s own, now-superseded-for-this-table
+lifecycle rule; reusing it here would have silently reintroduced the
+very bug this fix closes. `REQ-RMAP-055`'s own W-plus primitive itself
+is entirely unchanged -- only which lifecycle-state rule gates
+`response_queue_cfg` as a whole changed. `REQ-RMAP-047`'s own scope
+(`request_stream_cfg`, Table 24 -- not one of the three tables Figure 17
+names) is unaffected; its own citation (already independently confirmed
+correct against §12.7.7's own prose, no diagram involvement) needed no
+change.
+
+**Discovered and fixed a real code-comment gotcha along the way**: a
+literal `*/` substring inside a doc comment's own prose ("generic
+per-field R/W*/R/W+ default") silently terminates the C comment early,
+producing a cascade of confusing "undeclared identifier" errors at the
+next line that reads like real code -- happened twice (once in
+`src/regmap.c`, once in the accompanying test file) while writing this
+fix's own explanatory comments. Reworded both to avoid the literal
+substring ("R/W-star or R/W-plus") rather than escaping it, matching
+how this codebase's own existing comments already avoid the same trap
+elsewhere.
+
+**New test proves the actual behavior change, not just that nothing
+broke**: subtest 7pre (new) in
+`test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bounds_checking()`
+(`test_tc18_gaps_regmap.c`) -- a write to `ep_generic_cfg`/
+`response_queue_cfg` sent with `DISCOVERY_WRITER` during
+`RCP_LIFECYCLE_HW_CONFIGURED`, which a maximally-privileged writer would
+have succeeded at under the OLD `FUNCTIONAL_W_STAR`-based rule, is now
+correctly rejected with `RCP_ERROR_LOCKED_MEM_ACCESS`. `HW_CONFIGURED`
+is specifically the one state where the old and new rules actually
+disagree -- every pre-existing subtest exercising `RCP_CONFIGURED`
+already agreed under both rules (permanently locked either way), so
+those subtests alone would not have proven the fix; only a
+`HW_CONFIGURED`-state assertion does.
+
+Discovered while wiring this new subtest: pre-existing subtest 6 (the
+mixed-W-star/W-plus range test) used `ROOT_WRITER` during
+`HW_UNCONFIGURED`, which the OLD per-field W-plus check accepted freely
+(no writer-identity requirement of its own beyond the lock bit) but the
+NEW table-wide `HW_GENERIC` gate rejects immediately with
+`RCP_ERROR_UNAUTHORIZED_ACCESS` (ROOT_WRITER lacks `via_discovery_stream`)
+-- before ever reaching the lock-bit check the subtest actually meant to
+isolate. Updated to `DISCOVERY_WRITER`, with an expanded comment
+explaining why the writer identity matters here specifically (this
+subtest's own real target, the W-plus lock-bit dimension, is only
+reachable once the table-wide gate is satisfied first). Subtests 5 and 7
+needed only comment corrections (the underlying `RCP_ERROR_LOCKED_MEM_
+ACCESS` assertions were already correct under both the old and new
+rules, since `RCP_CONFIGURED` denies unconditionally either way) -- no
+assertion values changed in either.
+
+**Mutation-tested both fixed call sites independently**: disabling the
+`HW_GENERIC` gate in the `response_queue_cfg` block alone was caught by
+subtest 7pre's own first half; disabling it in the `ep_generic_cfg`
+block alone (isolated via a more specific text match after an initial
+attempt accidentally also matched HW_config's own identically-worded,
+unrelated, correct block -- a good reminder that "the same rule reused
+correctly elsewhere" can make a mutation's own target string ambiguous)
+was caught by subtest 7pre's own second half. Both restored cleanly,
+full suite re-confirmed 65/65 after each restore.
+
+Full suite 65/65 native + ASan/UBSan (fresh clean rebuilds of both). No
+stray files. `cfusa check` (CI-pinned v0.5.50 binary): 0 errors (2623
+total vs the pre-batch baseline -- proportional growth from the new
+test/comments only). `cfusa trace`: 1024/1024 traced and tested,
+unchanged (no new requirement ids). `.fusa-reqs.json`:
+`REQ-LIFECYCLE-023` partial -> implemented; repo-wide `implemented`
+count +1.
+
+**Next**: continuing the remaining 34 of the 35 `scope: "tc18"` partial
+requirements the investigation agents already classified (33
+`MISSING_TEST` -- narrow, well-scoped test additions across
+config/discovery/conditional-request/transport/endpoint/observability
+modules -- plus `REQ-SEQ-002`, whose own malloc-failure branch needs a
+real fault-injection seam the user has asked to be built as reusable
+infrastructure, not skipped).
