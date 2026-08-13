@@ -436,7 +436,8 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      rcp_regmap_ep_generic_cfg_t *ep_generic_cfg,
                                      size_t ep_generic_cfg_count,
                                      rcp_wire_error_t *out_error,
-                                     uint8_t *out_transaction_num)
+                                     uint8_t *out_transaction_num,
+                                     uint32_t watchdog_ms_per_tick)
 {
     rcp_acf_byte_message_info_t hdr;
     const uint8_t               *payload;
@@ -576,7 +577,8 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
         }
 
         rc = rcp_regmap_request_stream_cfg_apply_reconfig(request_stream_cfg, request_stream_cfg_count,
-                                                             relative, &payload[2], data_len);
+                                                             relative, &payload[2], data_len,
+                                                             watchdog_ms_per_tick);
         *out_error = (rc == RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_OK) ? RCP_ERROR_NONE
                                                                         : RCP_ERROR_INVALID_PARAMETER;
         return RCP_REGMAP_EP0_OK;
@@ -713,7 +715,8 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      size_t ep_generic_cfg_count,
                                      const uint8_t *sequencer_state,
                                      size_t sequencer_state_count,
-                                     rcp_wire_error_t *out_error)
+                                     rcp_wire_error_t *out_error,
+                                     uint32_t watchdog_ms_per_tick)
 {
     size_t hw_cfg_len;
     size_t ep_id_map_len;
@@ -771,7 +774,8 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
         (size_t)addr < (size_t)map->svr_request_stream_cfg_ptr + request_stream_cfg_len) {
         uint8_t image[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES * 24u];
 
-        rcp_regmap_request_stream_cfg_render(request_stream_cfg, request_stream_cfg_count, image);
+        rcp_regmap_request_stream_cfg_render(request_stream_cfg, request_stream_cfg_count, image,
+                                              watchdog_ms_per_tick);
         *out_error = RCP_ERROR_NONE;
         return ep0_read_response_from_slice(image, request_stream_cfg_len,
                                              (size_t)addr - map->svr_request_stream_cfg_ptr,
@@ -1387,16 +1391,18 @@ bool rcp_regmap_wd_timeout_ticks_to_ms(uint16_t ticks,
     return true;
 }
 
-/* ── request-stream-cfg wire codec (issue #306, REQ-RMAP-047/048/049) ──────
+/* ── request-stream-cfg wire codec (issue #306, REQ-RMAP-047/048/049/050) ──
  * See this function's own doc comment (regmap.h) for the full field-by-
- * field mapping and the three deliberately-excluded fields' own reasoning. */
+ * field mapping and the deliberately-excluded fields' own reasoning. */
 
 //cfusa:req REQ-RMAP-047
 //cfusa:req REQ-RMAP-048
 //cfusa:req REQ-RMAP-049
+//cfusa:req REQ-RMAP-050
 //cfusa:req REQ-RMAP-071
 void rcp_regmap_request_stream_cfg_render(const rcp_regmap_request_stream_cfg_t *entries,
-                                           size_t count, uint8_t *out)
+                                           size_t count, uint8_t *out,
+                                           uint32_t watchdog_ms_per_tick)
 {
     size_t i;
 
@@ -1405,6 +1411,7 @@ void rcp_regmap_request_stream_cfg_render(const rcp_regmap_request_stream_cfg_t 
         uint8_t                                bits_0x000d;
         uint16_t                               max_request_size_wire;
         uint8_t                                safestate_sequencer_wire;
+        uint16_t                               wd_timeout_ticks;
 
         put_u64(&out[24u * i + 0x0000u], e->rx_stream_id);
 
@@ -1418,9 +1425,18 @@ void rcp_regmap_request_stream_cfg_render(const rcp_regmap_request_stream_cfg_t 
                                                                                     (regmap.h) */
         put_u16(&out[24u * i + 0x0008u], max_request_size_wire);
 
-        out[24u * i + 0x000Au] = 0x00u; /* rx_wd_timeout_ms reserved, not wire-mapped this batch --
-                                            see this function's own doc comment (regmap.h) */
-        out[24u * i + 0x000Bu] = 0x00u;
+        /* REQ-RMAP-050: falls back to 0x0000 if the internal ms value
+         * cannot be represented at watchdog_ms_per_tick's own rate
+         * (including watchdog_ms_per_tick == 0, "not configured") --
+         * see this function's own doc comment (regmap.h) for the full
+         * fail-closed rationale. */
+        if (rcp_regmap_wd_timeout_ms_to_ticks(e->rx_wd_timeout_ms, watchdog_ms_per_tick,
+                                               &wd_timeout_ticks)) {
+            put_u16(&out[24u * i + 0x000Au], wd_timeout_ticks);
+        } else {
+            out[24u * i + 0x000Au] = 0x00u;
+            out[24u * i + 0x000Bu] = 0x00u;
+        }
 
         out[24u * i + 0x000Cu] = e->rx_secure_channel_index;
 
@@ -1484,7 +1500,8 @@ rcp_regmap_request_stream_cfg_reconfig_errc_t
 rcp_regmap_request_stream_cfg_apply_reconfig(rcp_regmap_request_stream_cfg_t *entries,
                                               size_t count,
                                               uint16_t relative_start_address,
-                                              const uint8_t *data, size_t data_len)
+                                              const uint8_t *data, size_t data_len,
+                                              uint32_t watchdog_ms_per_tick)
 {
     uint8_t block[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES * 24u];
     size_t  block_len = count * 24u;
@@ -1499,17 +1516,28 @@ rcp_regmap_request_stream_cfg_apply_reconfig(rcp_regmap_request_stream_cfg_t *en
     /* Same "render current image, patch the addressed octets, re-parse
      * the whole image back" idiom every other pointed-to table's own
      * apply_reconfig() already uses. */
-    rcp_regmap_request_stream_cfg_render(entries, count, block);
+    rcp_regmap_request_stream_cfg_render(entries, count, block, watchdog_ms_per_tick);
     for (i = 0; i < data_len; i++) {
         block[relative_start_address + i] = data[i]; /* every octet R/W*, none read-only */
     }
     for (i = 0; i < count; i++) {
-        uint8_t bits_0x000d = block[24u * i + 0x000Du];
+        uint8_t  bits_0x000d = block[24u * i + 0x000Du];
+        uint32_t wd_timeout_ms;
 
         entries[i].rx_stream_id               = get_u64(&block[24u * i + 0x0000u]);
         entries[i].rx_stream_max_request_size = (size_t)get_u16(&block[24u * i + 0x0008u]);
-        /* 24*i + 0x000A/0x000B (rx_wd_timeout_ms) deliberately not re-derived --
-           see this function's own doc comment (regmap.h) */
+        /* REQ-RMAP-050: the arriving wire ticks value is always exactly
+         * 16 bits by construction, so it can't itself violate any
+         * width constraint -- if the ticks-to-ms conversion still fails
+         * (watchdog_ms_per_tick == 0, or a degenerate internal-
+         * representation overflow), entries[i].rx_wd_timeout_ms is
+         * simply not assigned here, leaving its own pre-existing value
+         * untouched -- see this function's own doc comment (regmap.h)
+         * for the full rationale. */
+        if (rcp_regmap_wd_timeout_ticks_to_ms(get_u16(&block[24u * i + 0x000Au]),
+                                               watchdog_ms_per_tick, &wd_timeout_ms)) {
+            entries[i].rx_wd_timeout_ms = wd_timeout_ms;
+        }
         entries[i].rx_secure_channel_index    = block[24u * i + 0x000Cu];
 
         entries[i].rx_enforce_e2e             = (bits_0x000d & 0x01u) != 0u;
