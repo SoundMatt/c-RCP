@@ -150,6 +150,16 @@ static void count_cb(const rcp_mdns_discovery_event_t *ev, void *user_data)
  * through the static discoverer's own destroy, ASan-checked in CI for
  * leaks/double-free) by every test below that constructs and tears down a
  * static discoverer; this is the first and simplest of them. */
+/* REQ-MDNS-010's own NULL-safety clause -- every call to
+ * rcp_mdns_discoverer_destroy() elsewhere in this file passes a real,
+ * non-NULL discoverer; the d==NULL no-op branch itself was never
+ * exercised. */
+static void test_discoverer_destroy_null_is_a_safe_no_op(void)
+{
+    rcp_mdns_discoverer_destroy(NULL); /* must not crash */
+    TEST_PASS();
+}
+
 //cfusa:test REQ-MDNS-010
 //cfusa:test REQ-MDNS-011
 static void test_static_discoverer_emits_on_start(void)
@@ -244,6 +254,10 @@ static void test_server_info_carries_host_port_stream_id(void)
     TEST_ASSERT_TRUE(rcp_stream_id_equal(records[0].server_stream_id, g_first_info.server_stream_id));
     TEST_ASSERT_EQUAL_STRING("fl.local", g_first_info.host);
     TEST_ASSERT_EQUAL_UINT16(5000, g_first_info.port);
+    /* REQ-MDNS-005: instance_name is the fourth field this struct
+     * carries -- server_stream_id/host/port were already asserted
+     * above, instance_name alone was not. */
+    TEST_ASSERT_EQUAL_STRING(records[0].instance_name, g_first_info.instance_name);
 
     rcp_mdns_discoverer_destroy(disc);
 }
@@ -324,6 +338,7 @@ int main(void)
 {
     UNITY_BEGIN();
 
+    RUN_TEST(test_discoverer_destroy_null_is_a_safe_no_op);
     RUN_TEST(test_static_discoverer_emits_on_start);
     RUN_TEST(test_start_fires_added_event_per_record);
     RUN_TEST(test_stop_terminates_discovery);

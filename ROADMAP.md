@@ -18860,3 +18860,60 @@ No stray files. `.fusa-reqs.json`: 6 entries `partial` ->
 observability/admin/mdns/relay (6) next, then the 41-item
 `scope: "tc18-gap"` architectural backlog under issues
 #334/#335/#336/#338 (minus `REQ-E2E-029`, gated on `REQ-E2E-028`).
+
+### v0.320.0 -- 2026-08-13 (observability/admin/mdns/relay batch: 6
+`scope: "tc18"` partials closed -- final batch, ALL `scope: "tc18"`
+partials now closed, no code changes)
+
+Fourth and final batch of the `scope: "tc18"` partial requirements
+per the user's "complete the 59 partial" direction: `REQ-ADMIN-004`,
+`REQ-MDNS-005`, `REQ-MDNS-010`, `REQ-OBS-005`, `REQ-OBS-014`,
+`REQ-RELAY-001`. All 6 were confirmed-correct implementations
+missing only their own dedicated test -- no source changes. This
+closes the last of the 20 originally-identified `scope: "tc18"`
+partials (plus the 2 real `REQ-CFG` bugs found along the way) -- 0
+remain.
+
+**`REQ-OBS-005`/`REQ-OBS-014`**: `rcp_noop_metrics_sink()`'s own
+`record_gauge`/`record_counter` callbacks were never directly
+called by any test -- the only existing coverage drives
+`rcp_observe_record()`, which only reaches `record_span`. Added a
+test calling all three vtable functions directly. Not meaningfully
+mutation-testable (literal one-line no-ops, zero branches) -- the
+test's value is proving callability.
+
+**`REQ-ADMIN-004`**: the existing subscriber test used exactly one
+subscriber, unable to distinguish "invokes the one subscriber" from
+"invokes every subscriber, in registration order." Added a
+three-subscriber test logging call order via each subscriber's own
+`user_data`.
+
+**`REQ-MDNS-005`**: `ServerInfo`'s own `instance_name` field was the
+one field of four this struct carries that the existing test never
+asserted. Added the assertion.
+
+**`REQ-MDNS-010`**: `rcp_mdns_discoverer_destroy(NULL)`'s own
+safe-no-op clause was untested. Added a dedicated NULL test.
+
+**`REQ-RELAY-001`**: `rcp_wallclock_ms()` had zero test coverage at
+all. Added to `tests/test_platform.c` (the existing home for
+`rcp_monotonic_ms()`) -- checks both monotonic advancement and a
+plausible-epoch-time floor (2020-01-01), the latter distinguishing a
+genuine wall-clock reading from an arbitrary monotonic-style
+counter.
+
+Full suite 66/66 native + ASan/UBSan (CI's exact `ASAN_OPTIONS`).
+Every new assertion mutation-tested where a real branch exists (2
+caught via hard crash). `cfusa check`: 0 errors. `cfusa trace`:
+1076/1076 traced, 1076/1076 tested, 0 gaps. No stray files.
+`.fusa-reqs.json`: 6 entries `partial` -> `implemented`; repo-wide
+total unchanged at 1076 (1025 implemented / 42 partial / 2
+not-implemented / 7 retired) -- all 42 remaining partials are now
+`scope: "tc18-gap"` architectural backlog, not one is
+`scope: "tc18"`.
+
+**Next**: the 41-item `scope: "tc18-gap"` backlog under issues
+#334/#335/#336/#338 (minus `REQ-E2E-029`, gated on
+`REQ-E2E-028`'s own sequence_num-threading fix) -- a materially
+larger, more architectural body of work than the test-only
+`scope: "tc18"` batches just completed.

@@ -172,6 +172,27 @@ static void test_noop_sink_does_not_crash(void)
     rcp_observe_record(sink, "rcp.request", make_addr(1, 0), 0x00, 0, 1, RCP_ERR_TIMEOUT);
 }
 
+/* REQ-OBS-005/REQ-OBS-014: rcp_observe_record() above only ever drives
+ * the noop sink's own record_span callback (that's all it calls) --
+ * record_gauge/record_counter, the other two-thirds of the vtable, were
+ * never directly exercised at all. Calls all three directly, matching
+ * test_in_memory_gauge_and_counter_are_no_ops()'s own pattern for the
+ * in-memory sink. */
+static void test_noop_sink_gauge_and_counter_are_no_ops(void)
+{
+    rcp_metrics_sink_t sink = rcp_noop_metrics_sink();
+    rcp_metric_t        metric;
+
+    metric.name  = "rcp.something";
+    metric.value = 3.5;
+    metric.addr  = make_addr(1, 0);
+
+    sink.vt->record_gauge(&metric, sink.ctx);
+    sink.vt->record_counter("rcp.other", make_addr(1, 0), 1.0, sink.ctx);
+
+    TEST_PASS(); /* no crash, no observable side effect to check for */
+}
+
 /* ── Counters ─────────────────────────────────────────────────────────────── */
 
 typedef struct {
@@ -283,6 +304,7 @@ int main(void)
     RUN_TEST(test_span_captures_the_result_code);
     RUN_TEST(test_spans_reports_true_count_when_truncated_by_cap);
     RUN_TEST(test_noop_sink_does_not_crash);
+    RUN_TEST(test_noop_sink_gauge_and_counter_are_no_ops);
     RUN_TEST(test_total_counter_fires_every_time_errors_only_on_failure);
     RUN_TEST(test_in_memory_gauge_and_counter_are_no_ops);
     RUN_TEST(test_in_memory_sink_is_thread_safe_under_concurrent_spans);
