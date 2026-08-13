@@ -34,6 +34,14 @@ the rationale.
 
 ## Releases
 
+### v0.305.0 -- 2026-08-13 (`.fusa-reqs.json` staleness correction: `REQ-CFG-011`/`REQ-CFG-012` CAN's EP_func gap already closed)
+
+**Doc-only.** `REQ-CFG-011` (generic §12.7.1 evt[2:0]==111b configuration mechanism reachable for every endpoint type) and `REQ-CFG-012` (EP_LEN + overrun-rejection present for every endpoint type) both flip `not-implemented` -> `implemented`. Both entries' own text still said CAN was the one exception — "no EP_func addressed-write path at all" / "no EP_LEN register or overrun-rejection path at all" — but `REQ-CANEP-028` (issue #201, 2026-08-12, landed the same day as the audit that wrote CFG-011/012's current text) already gave CAN exactly that: `rcp_ep_can_apply_reconfig()`, `can_ep_len` fixed at `RCP_EP_CAN_EP_FUNC_LEN`, and `RCP_EP_CAN_RECONFIG_ERR_OUT_OF_RANGE` on an out-of-range write. Nobody went back to re-check these two catalog entries after CANEP-028 landed — the same class of stale-precedent oversight already corrected once this session for `REQ-UART-032`.
+
+Verified CAN's own bar matches the other ten endpoint types' exactly (not just superficially): `rcp_ep_gpio_apply_masked_write()`'s own doc comment confirms routing a decoded `evt[2:0]==111b` request to `apply_reconfig()` rather than the endpoint's normal read/write decoder is *every* endpoint module's caller's own responsibility, not something any module (including now CAN) wires into a live dispatch loop itself — so CFG-011/012 were never about a specific wired call site, only about the primitive existing and being reachable via the generic mechanism. CAN's own remaining gaps (`REQ-CANEP-029`'s acceptance-filter address collision; the bit-timing registers TC18 gives no sub-field layout for) are real but separately tracked and don't bear on either of these two requirements.
+
+No code changed. `cfusa check`/`trace` re-run to confirm: identical to the pre-change baseline (0 errors, 100%/100% coverage). 65/65 both trees, unaffected.
+
 ### v0.304.0 -- 2026-08-13 (issue #334 batch 3: `REQ-RMAP-050` watchdog-timeout tick↔ms register wiring)
 
 **`REQ-RMAP-050` flips `partial` -> `implemented`.** TC18 §12.7.7 Table 24's `rx_wd_timeout_intervall` register (relative address 0x000A, 16 bit, R/W*, "WatchDog time out for this Stream in clock tics") had a conversion pair already implemented and unit-tested (`rcp_regmap_wd_timeout_ms_to_ticks()`/`_ticks_to_ms()`) but no register-write code path called them -- the register's own two octets always rendered as a hardcoded `0x0000` and a write landing on them was silently discarded.
