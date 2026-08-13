@@ -15205,6 +15205,36 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.295.0 -- 2026-08-12 (issue #336/#338: REQ-SPI-037 genuinely
+blocked by TC18 spec silence -- documented, not force-implemented)
+
+Doc-only, no code change. Investigated REQ-SPI-037's "SPI stops
+execution (see cs/hs bits) -- enter error state, reset EP_config
+enable bit" rule (TC18 13.7.3.3) and confirmed a real specification
+defect, not a local implementation gap: no table anywhere in the
+document gives SPI's own cs/hs ACF header bits a "stopped/errored"
+meaning -- every standard-request table lists both as fixed
+0b/reserved, and the only request kind giving cs a real meaning
+(Chained requests, "Conditional start") has no connection to SPI's
+own execution model. It is equally plausible the sentence instead
+means the SPI bus's own physical CS/HS hardware signal lines (a
+distinct, electrical-level concept 13.7.3.1's own Table 38 already
+names "CS0"-"CS5"), not the ACF protocol header bits at all -- the
+two readings are not equivalent and lead to entirely different
+implementations.
+
+Filed as canonical spec-defects report item 56 (and its
+_quadruple_checked.md review copy). .fusa-reqs.json updated to
+document the real blocking reason (status stays not-implemented,
+same disposition already established for REQ-PWM-057's own TC18
+spec-defect block) -- the requirement's second half (clamped-pin
+diagnostic flag) is left unattempted alongside it rather than
+force-split into a differently-dispositioned entry.
+
+cfusa check A/B: byte-identical (only the timestamp line differs).
+cfusa trace: both 100%, 1024/1024 (unaffected). 65/65 both trees
+(unaffected, as expected for a docs-only change).
+
 ### v0.294.0 -- 2026-08-12 (issue #336: REQ-TIMED-012 TSCF
 timestamp-extension primitive -- not-implemented -> partial)
 
