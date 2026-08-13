@@ -15205,6 +15205,47 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.301.0 -- 2026-08-13 (no-status-field audit: all 862 unstatused
+.fusa-reqs.json entries verified against the TC18 PDF and the code)
+
+Doc-only. Every .fusa-reqs.json entry that had never carried a status
+field (862 of 1069 total, predating that field's introduction) checked
+individually against either the TC18 spec (497 with a real tc18
+citation) or the code alone (365 pure implementation-behavior entries
+with no TC18 basis). Run as a 51-batch parallel verify pass (grouped
+by requirement-id module) followed by an adversarial recheck on every
+non-implemented/corrected/low-confidence finding (58 of 862).
+
+Result: 827 implemented, 35 partial, 0 not-implemented. The recheck
+pass flipped two verdicts: REQ-CANCEL-001 (partial -> implemented,
+first pass missed a real covering test) and REQ-LIFECYCLE-023
+(implemented -> partial, the consequential one -- the actual EP0 write
+dispatcher gates ep_generic_cfg/request_stream_cfg/response_queue_cfg
+via FUNCTIONAL_W_STAR/W_PLUS, not HW_GENERIC as this requirement's own
+long-standing text claimed, directly conflicting with REQ-RMAP-047's
+own already-correct text; rewritten in full to document the real,
+contradictory state rather than force a resolution).
+
+91 stale/wrong TC18 citations corrected -- mostly a single root cause:
+TC18.txt (this repo's plaintext extraction) predates the currently
+authoritative PDF revision by figure/table-renumbering front-matter
+changes, the same drift class already tracked under issue #341, now
+confirmed to extend well beyond that issue's own partial census. 21
+stale requirement titles/texts corrected, all verified against the
+current code before rewriting.
+
+One item left an open question, not force-resolved: REQ-E2E-012/013
+(rcp_e2e_request_may_execute()'s safety gating) -- code matches its
+own text and tests (implemented stands), but the exact TC18 sentence
+its citation is built on has been removed from the current PDF and
+replaced with narrower language arguably describing a different
+mechanism. Not reinterpreted here, matching this codebase's standing
+policy on safety-relevant TC18 semantics.
+
+cfusa check A/B: identical score both before/after (167/1701/1209).
+cfusa trace: both 100%, 1024/1024, unaffected. 65/65 both trees
+(native + ASan/UBSan). No stray files.
+
 ### v0.300.0 -- 2026-08-13 (issue #201/#336: REQ-E2E-046,
 rx_stream_status aggregate blocked-status latch -- not-implemented ->
 partial)
