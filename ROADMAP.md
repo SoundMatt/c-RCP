@@ -15205,6 +15205,50 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.299.0 -- 2026-08-13 (issue #336: REQ-ISELED-025, ISELED
+response fragmentation -- not-implemented -> partial)
+
+REQ-ISELED-025 flips not-implemented -> partial. TC18 13.7.12.1
+requires that ISELED read responses "are collected 5/4bit decoded and
+aggregated into one or multiple ACF type up to the requested
+read_size" -- a ceiling-then-fragment rule this module never
+implemented: rcp_ep_iseled_encode_response() encoded exactly the
+rx_data/rx_len its caller supplied, never read a read_size, and had no
+multi-message emission path.
+
+New rcp_ep_iseled_response_fragment_count()/
+rcp_ep_iseled_encode_response_fragmented() close this by reusing the
+codebase's existing generic fragment.h module rather than inventing an
+ISELED-specific scheme -- the same module ep_can.c's own frame-
+response fragmentation already integrates against. read_size is
+applied as a ceiling first, then fragment.h divides the capped payload
+into fragments, each emitted as its own ABB (untimed) or GBB (timed)
+ACF message with ms/read_size_or_segment_num populated for
+multi-segment output. Deliberately no fragment-aware decode
+counterpart was added, unlike CAN's own: ISELED's response payload has
+no embedded leading-quadlet structure a fragment boundary could split
+awkwardly, so the pre-existing, unmodified
+rcp_ep_iseled_decode_response() already works unchanged as a
+per-fragment decoder -- confirmed by a full encode/fragment/decode/
+reassemble round-trip test.
+
+Stays partial: src/mock.c has no ISELED-specific dispatch of any kind,
+so nothing in a live request/response path calls either new function
+yet -- the same disposition already established for REQ-CANCEL-012/
+REQ-ADC-037/REQ-TIMED-012/REQ-GPIO-035/REQ-GPIO-036/REQ-CANEP-030.
+
+4 new unit tests, including the full worst-case round trip. Mutation-
+tested 3 ways (the read_size ceiling's ternary direction, the untimed-
+frame ms bit assignment, an off-by-one dropping the final fragment) --
+all caught cleanly, the last as a segfault. cfusa check A/B: 0 new
+errors (167 both before and after, the actual merge gate); +9
+warnings/+8 info, all reviewed and expected (malloc/free advisories
+matching ep_can.c's own equivalent fragment.h integration, pointer-
+arithmetic/sizeof advisories from the same loop, two function-length
+advisories, a handful of informational/style findings on the new
+functions). cfusa trace: both 100%, 1024/1024. 65/65 both trees
+(native + ASan/UBSan).
+
 ### v0.298.0 -- 2026-08-13 (issue #336: REQ-CANEP-030, CAN XL
 physical-layer provisioning -- not-implemented -> partial)
 

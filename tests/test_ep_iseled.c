@@ -23,6 +23,7 @@
 //cfusa:test REQ-ISELED-022
 //cfusa:test REQ-ISELED-023
 //cfusa:test REQ-ISELED-024
+//cfusa:test REQ-ISELED-025
 //cfusa:test REQ-ISELED-026
 //cfusa:test REQ-ISELED-027
 //cfusa:test REQ-ISELED-029
@@ -30,6 +31,7 @@
 
 #include <rcp/acf.h>
 #include <rcp/ep_iseled.h>
+#include <rcp/fragment.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
 #include <rcp/lifecycle.h>
@@ -836,6 +838,105 @@ static void test_response_decode_rejects_short_frame(void)
                                        &timed, &ts, &txn));
 }
 
+/* ── REQ-ISELED-025: response fragmentation, bounded by read_size ────────── */
+
+static void test_fragment_count_one_when_capped_data_fits_in_one_fragment(void)
+{
+    /* 10 available octets, read_size 10, generous 100-octet cap -> one
+     * (unfragmented) frame; count is 1, not 0 (0 means "not
+     * representable", not "no fragmentation needed"). */
+    TEST_ASSERT_EQUAL_UINT(1, rcp_ep_iseled_response_fragment_count(10, 10, 100));
+}
+
+static void test_fragment_count_respects_read_size_ceiling(void)
+{
+    /* 1000 octets of decoded data are actually available, but read_size
+     * caps the response at 10 -- fragment planning must be against the
+     * capped 10, not the full 1000, so a generous 100-octet
+     * max_fragment_payload still yields exactly one frame. */
+    TEST_ASSERT_EQUAL_UINT(1, rcp_ep_iseled_response_fragment_count(1000, 10, 100));
+}
+
+static void test_fragment_count_splits_capped_data_across_frames(void)
+{
+    /* read_size caps at 250; max_fragment_payload of 100 means the
+     * capped 250 octets need 3 frames (100 + 100 + 50), regardless of
+     * how much more data was actually available. */
+    TEST_ASSERT_EQUAL_UINT(3, rcp_ep_iseled_response_fragment_count(1000, 250, 100));
+}
+
+/* End-to-end: encode a response whose available data (300 octets)
+ * exceeds both read_size (200) and max_fragment_payload (64), fragment
+ * it, decode+reassemble every fragment via fragment.h's own generic
+ * reassembler plus this module's own already-existing (unmodified)
+ * rcp_ep_iseled_decode_response() as the per-fragment decoder, and
+ * confirm the reassembled result is exactly the first 200 (not 300)
+ * octets of the original data. */
+static void test_fragment_worst_case_response_round_trip_respects_read_size(void)
+{
+    uint8_t                    rx[300];
+    size_t                     i;
+    uint16_t                   read_size            = 200;
+    size_t                     max_fragment_payload = 64;
+    size_t                     count;
+    rcp_bytes_t                frames[4];
+    rcp_fragment_reassembler_t reasm;
+
+    for (i = 0; i < sizeof(rx); i++) rx[i] = (uint8_t)(i * 5 + 1);
+
+    count = rcp_ep_iseled_response_fragment_count(sizeof(rx), read_size, max_fragment_payload);
+    TEST_ASSERT_EQUAL_UINT(4, count); /* ceil(200 / 64) = 4 */
+    TEST_ASSERT_TRUE(count <= (sizeof(frames) / sizeof(frames[0])));
+
+    count = rcp_ep_iseled_encode_response_fragmented(9, rx, sizeof(rx), read_size, 42, false, 0,
+                                                       max_fragment_payload, frames);
+    TEST_ASSERT_EQUAL_UINT(4, count);
+
+    rcp_fragment_reassembler_init(&reasm, read_size);
+    for (i = 0; i < count; i++) {
+        const uint8_t              *out_rx;
+        size_t                       out_rx_len;
+        bool                         timed;
+        uint64_t                     ts;
+        uint8_t                      txn;
+        rcp_acf_byte_message_info_t  hdr;
+        rcp_fragment_reasm_result_t  rc;
+
+        TEST_ASSERT_EQUAL(RCP_EP_ISELED_OK,
+            rcp_ep_iseled_decode_response(frames[i].data, frames[i].len, 9, &out_rx, &out_rx_len,
+                                           &timed, &ts, &txn));
+        TEST_ASSERT_EQUAL_UINT8(42, txn);
+        TEST_ASSERT_FALSE(timed);
+
+        /* ms/segment_num live in the ACF header, not this module's own
+         * payload -- peeked directly via acf.h, matching fragment.h's own
+         * "caller supplies ms/segment_num from wherever its own wire
+         * format carries them" reassembly contract. */
+        TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(frames[i].data, frames[i].len, &hdr,
+                                                           &out_rx, &out_rx_len));
+
+        rc = rcp_fragment_reassembler_feed(&reasm, hdr.ms != 0, hdr.read_size_or_segment_num,
+                                            out_rx, out_rx_len);
+        if (i + 1 < count) {
+            TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_CONTINUE, rc);
+        } else {
+            TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_COMPLETE, rc);
+        }
+    }
+
+    {
+        const uint8_t *reassembled;
+        size_t         reassembled_len;
+
+        rcp_fragment_reassembler_get(&reasm, &reassembled, &reassembled_len);
+        TEST_ASSERT_EQUAL_UINT(read_size, reassembled_len);
+        TEST_ASSERT_EQUAL_UINT8_ARRAY(rx, reassembled, read_size);
+    }
+
+    rcp_fragment_reassembler_destroy(&reasm);
+    for (i = 0; i < count; i++) rcp_bytes_free(&frames[i]);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -900,6 +1001,11 @@ int main(void)
     RUN_TEST(test_response_round_trip_timed);
     RUN_TEST(test_response_decode_rejects_wrong_bus);
     RUN_TEST(test_response_decode_rejects_short_frame);
+
+    RUN_TEST(test_fragment_count_one_when_capped_data_fits_in_one_fragment);
+    RUN_TEST(test_fragment_count_respects_read_size_ceiling);
+    RUN_TEST(test_fragment_count_splits_capped_data_across_frames);
+    RUN_TEST(test_fragment_worst_case_response_round_trip_respects_read_size);
 
     return UNITY_END();
 }
