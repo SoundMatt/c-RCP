@@ -48,7 +48,7 @@
  * requirements-corpus completeness pass: RC Server lifecycle (§12.3,
  * §12.7), power/operation modes and the Goto Sleep / Goto StandBy
  * exchange (§12.4-§12.5, §13.7.2.3), request handling on enabled and
- * disabled endpoints (§12.3.1.3, §13.7.1), sequencers (§12.7.10 Table 25),
+ * disabled endpoints (§12.3.1.3, §13.7.1), sequencers (§12.7.10 Table 28),
  * the per-stream request watchdog (§12.7.7), and TSCF-carried timed
  * requests (§11.2).
  *
@@ -1390,31 +1390,72 @@ static void test_gptp_trigger_evaluate_first_observation_never_an_edge(void)
     TEST_ASSERT_EQUAL_UINT8(0xFFu, signal_nr);
 }
 
-/* ── §12.7.10 Table 25: sequencer disable, ownership, and register wiring ──── */
+/* ── §12.7.10 Table 28: sequencer disable, ownership, and register wiring ──── */
 
-static void test_sequencer_zero_state_ownership_and_regmap_wiring(void)
+/* REQ-SEQ-012 IMPLEMENTED (issue #201): TC18 §12.7.10 Table 28 -- a
+ * sequencer whose Seq_state register has been manually written to 0 is
+ * DISABLED: no compound or compound-wait step bound to it may become
+ * executable, and no advance may move it out of 0. rcp_compound_start_
+ * condition_met() and rcp_compound_advance_guard() (request_compound.h/
+ * .c) both now check current==0 explicitly, before either function's own
+ * ordinary start_state comparison -- including the "start in any state"
+ * wildcard (start_state==0), which would otherwise treat a disabled
+ * sequencer as satisfying every step unconditionally. */
+static void test_sequencer_zero_state_disables_start_condition_and_advance(void)
 {
     rcp_sequencer_table_t table = rcp_sequencer_table_new(4u);
     rcp_compound_step_t   step;
-    rcp_regmap_general_t  map;
     uint8_t               state = 0xFFu;
 
     TEST_ASSERT_EQUAL_UINT16(4u, table.count);
     memset(&step, 0, sizeof(step));
 
-    /* TC18 §12.7.10 Table 25: a sequencer whose Seq_state register has been
-     * manually written to 0 is DISABLED -- no conditional step bound to it
-     * may become executable. c-RCP stores 0 as an ordinary state value, so
-     * the step below (start_state 0, i.e. "any state") still starts against
-     * the sequencer the client meant to disable. */
     TEST_ASSERT_TRUE(rcp_sequencer_set_state(&table, 0u, 0u));
     TEST_ASSERT_TRUE(rcp_sequencer_get_state(&table, 0u, &state));
     TEST_ASSERT_EQUAL_UINT8(0u, state);
+
+    /* A step whose own start_state is the "any state" wildcard (0) no
+     * longer starts against a disabled sequencer -- disabled is not
+     * itself a state any step may start from. */
     step.start_state     = 0u;
     step.sequencer_index = 0u;
-    TEST_ASSERT_TRUE(rcp_compound_start_condition_met(&table, &step));
+    TEST_ASSERT_FALSE(rcp_compound_start_condition_met(&table, &step));
 
-    /* Table 25 also gives each sequencer a Request_stream_index naming the
+    /* A step whose start_state happens to also be a specific nonzero
+     * value never matches a disabled (0) sequencer either -- unaffected
+     * by the wildcard case above, but confirmed directly rather than
+     * assumed. */
+    step.start_state = 5u;
+    TEST_ASSERT_FALSE(rcp_compound_start_condition_met(&table, &step));
+
+    /* rcp_compound_advance_guard() -- the gate rcp_compound_tick()/
+     * rcp_compound_wait_tick() both check before applying next_state --
+     * also refuses to advance a disabled sequencer, even for a step
+     * whose own start_state happens to equal 0 too (the one case where a
+     * naive current==step->start_state comparison would otherwise have
+     * matched). */
+    step.start_state = 0u;
+    TEST_ASSERT_FALSE(rcp_compound_advance_guard(&table, &step));
+
+    /* Explicitly rewriting the sequencer to a nonzero state re-enables
+     * it: the very next call correctly starts/advances again. */
+    TEST_ASSERT_TRUE(rcp_sequencer_set_state(&table, 0u, 7u));
+    step.start_state = 7u;
+    TEST_ASSERT_TRUE(rcp_compound_start_condition_met(&table, &step));
+    TEST_ASSERT_TRUE(rcp_compound_advance_guard(&table, &step));
+
+    rcp_sequencer_table_free(&table);
+}
+
+static void test_sequencer_zero_state_ownership_and_regmap_wiring(void)
+{
+    rcp_sequencer_table_t table = rcp_sequencer_table_new(4u);
+    rcp_regmap_general_t  map;
+    uint8_t               state = 0xFFu;
+
+    TEST_ASSERT_EQUAL_UINT16(4u, table.count);
+
+    /* Table 28 also gives each sequencer a Request_stream_index naming the
      * one RC Client permitted to access it. rcp_sequencer_table_t is a bare
      * state array with no owner, and set_state() takes no requester
      * identity, so any client can overwrite another's sequencer -- including
@@ -1567,6 +1608,7 @@ int main(void)
     RUN_TEST(test_gptp_trigger_evaluate_derives_signal_and_composes_with_notify);
     RUN_TEST(test_gptp_trigger_evaluate_first_observation_never_an_edge);
 
+    RUN_TEST(test_sequencer_zero_state_disables_start_condition_and_advance);
     RUN_TEST(test_sequencer_zero_state_ownership_and_regmap_wiring);
     RUN_TEST(test_tscf_presentation_time_and_abb_timed_encoder);
     RUN_TEST(test_watchdog_overflows_despite_continuous_requests);

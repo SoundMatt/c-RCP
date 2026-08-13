@@ -277,22 +277,43 @@ rcp_compound_errc_t rcp_compound_decode_clear_non_safestate(const uint8_t *b, si
 /* ── The advance-only-if-still-in-start_state guard, delay timer, and tick ──── */
 
 //cfusa:req REQ-CMP-019
+//cfusa:req REQ-SEQ-012
 bool rcp_compound_advance_guard(const rcp_sequencer_table_t *table,
                                  const rcp_compound_step_t *step)
 {
     uint8_t current;
 
     if (!rcp_sequencer_get_state(table, step->sequencer_index, &current)) return false;
+    /* REQ-SEQ-012 (TC18 Table 28): a sequencer manually written to 0 is
+     * DISABLED -- no advance may move it out of 0 until it is explicitly
+     * rewritten to a nonzero state. A step's own start_state can only
+     * ever be nonzero here already (rcp_compound_start_condition_met()'s
+     * "start in any state" wildcard is a start_state==0 convention, not a
+     * live register value), so current==0 can never legitimately equal
+     * step->start_state -- this guard exists to make that failure
+     * explicit and safety-relevant, not to change the comparison's
+     * ordinary outcome. */
+    if (current == 0u) return false;
     return current == step->start_state;
 }
 
 //cfusa:req REQ-CMP-025
+//cfusa:req REQ-SEQ-012
 bool rcp_compound_start_condition_met(const rcp_sequencer_table_t *table,
                                        const rcp_compound_step_t *step)
 {
     uint8_t current;
 
     if (!rcp_sequencer_get_state(table, step->sequencer_index, &current)) return false;
+    /* REQ-SEQ-012 (TC18 Table 28): a disabled (state==0) sequencer holds
+     * no compound or compound-wait step executable, including a step
+     * whose own start_state is the "start in any state" wildcard
+     * (start_state==0) below -- disabled is not itself a state any step
+     * may start from. This check must come before the wildcard, not
+     * after: the wildcard's own "any state" answer would otherwise be
+     * true for a disabled sequencer too, exactly the bug this exists to
+     * close. */
+    if (current == 0u) return false;
     if (step->start_state == 0u) return true; /* start in any state */
     return current == step->start_state;
 }

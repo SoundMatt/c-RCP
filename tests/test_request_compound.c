@@ -463,6 +463,26 @@ static void test_advance_guard_false_for_invalid_sequencer_index(void)
     rcp_sequencer_table_free(&table);
 }
 
+/* REQ-SEQ-012: a sequencer manually written to 0 is DISABLED -- no advance
+ * may move it out of 0, even for a step whose own start_state also
+ * happens to be 0, the one case a naive current==step->start_state
+ * comparison would otherwise have matched. */
+static void test_advance_guard_false_when_sequencer_disabled(void)
+{
+    rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
+    rcp_compound_step_t step = {0};
+
+    TEST_ASSERT_TRUE(rcp_sequencer_set_state(&table, 0, 0));
+
+    step.sequencer_index = 0;
+    step.start_state     = 0;
+    step.next_state       = 2;
+
+    TEST_ASSERT_FALSE(rcp_compound_advance_guard(&table, &step));
+
+    rcp_sequencer_table_free(&table);
+}
+
 static void test_exec_delay_elapsed(void)
 {
     rcp_compound_step_t step = {0};
@@ -831,6 +851,7 @@ int main(void)
     RUN_TEST(test_advance_guard_true_when_in_start_state);
     RUN_TEST(test_advance_guard_false_when_not_in_start_state);
     RUN_TEST(test_advance_guard_false_for_invalid_sequencer_index);
+    RUN_TEST(test_advance_guard_false_when_sequencer_disabled);
 
     RUN_TEST(test_exec_delay_elapsed);
 
