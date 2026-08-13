@@ -368,6 +368,108 @@ static void test_response_truncated_slice_when_read_size_small(void)
     rcp_bytes_free(&frame);
 }
 
+/* REQ-DISC-014: rcp_discovery_decode_response() applies the same
+ * AVTP/ACF-level checks as rcp_discovery_decode_request() (both call the
+ * shared decode_common() helper) -- one test per condition, mirroring
+ * the request-side tests above but through the response entry point. */
+static void test_response_dropped_when_tscf_headed(void)
+{
+    rcp_avtp_tscf_header_t tscf_hdr = {0};
+    rcp_acf_byte_message_info_t acf_hdr = {0};
+    rcp_bytes_t acf_frame;
+    rcp_bytes_t frame;
+    rcp_discovery_result_t result;
+
+    acf_hdr.byte_bus_id = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
+    acf_hdr.op = RCP_ACF_OP_READ;
+    acf_hdr.rsp = 1;
+    acf_frame = rcp_acf_encode_abb(&acf_hdr, NULL, 0);
+
+    tscf_hdr.sv = 1;
+    tscf_hdr.stream_id = rcp_stream_id_make(SERVER_MAC, 3);
+    frame = rcp_avtp_encode_tscf(&tscf_hdr, acf_frame.data, acf_frame.len);
+    rcp_bytes_free(&acf_frame);
+
+    TEST_ASSERT_EQUAL(RCP_DISCOVERY_ERR_NOT_NTSCF,
+                       rcp_discovery_decode_response(frame.data, frame.len, &result));
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_response_rejects_non_abb_msg_type(void)
+{
+    rcp_acf_gbb_header_t gbb_hdr = {0};
+    rcp_bytes_t acf_frame;
+    rcp_avtp_ntscf_header_t ntscf_hdr = {0};
+    rcp_bytes_t frame;
+    rcp_discovery_result_t result;
+
+    gbb_hdr.info.byte_bus_id = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
+    gbb_hdr.info.op = RCP_ACF_OP_READ;
+    gbb_hdr.info.rsp = 1;
+    acf_frame = rcp_acf_encode_gbb(&gbb_hdr, NULL, 0);
+
+    ntscf_hdr.sv = 1;
+    ntscf_hdr.stream_id = rcp_stream_id_make(SERVER_MAC, 3);
+    frame = rcp_avtp_encode_ntscf(&ntscf_hdr, acf_frame.data, acf_frame.len);
+    rcp_bytes_free(&acf_frame);
+
+    TEST_ASSERT_EQUAL(RCP_DISCOVERY_ERR_BAD_MSG_TYPE,
+                       rcp_discovery_decode_response(frame.data, frame.len, &result));
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_response_rejects_wrong_byte_bus_id(void)
+{
+    rcp_stream_id_t server = rcp_stream_id_make(SERVER_MAC, 3);
+    rcp_bytes_t frame;
+    rcp_discovery_result_t result;
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t acf_frame;
+    rcp_avtp_ntscf_header_t ntscf_hdr = {0};
+
+    hdr.byte_bus_id = (rcp_byte_bus_id_t)7u; /* not the discovery bus */
+    hdr.op = RCP_ACF_OP_READ;
+    hdr.rsp = 1;
+    acf_frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+
+    ntscf_hdr.sv = 1;
+    ntscf_hdr.stream_id = server;
+    frame = rcp_avtp_encode_ntscf(&ntscf_hdr, acf_frame.data, acf_frame.len);
+    rcp_bytes_free(&acf_frame);
+
+    TEST_ASSERT_EQUAL(RCP_DISCOVERY_ERR_WRONG_BUS,
+                       rcp_discovery_decode_response(frame.data, frame.len, &result));
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_response_rejects_wrong_op(void)
+{
+    rcp_stream_id_t server = rcp_stream_id_make(SERVER_MAC, 3);
+    rcp_bytes_t frame;
+    rcp_discovery_result_t result;
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t acf_frame;
+    rcp_avtp_ntscf_header_t ntscf_hdr = {0};
+
+    hdr.byte_bus_id = RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID;
+    hdr.op = RCP_ACF_OP_WRITE; /* discovery is always a read */
+    hdr.rsp = 1;
+    acf_frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+
+    ntscf_hdr.sv = 1;
+    ntscf_hdr.stream_id = server;
+    frame = rcp_avtp_encode_ntscf(&ntscf_hdr, acf_frame.data, acf_frame.len);
+    rcp_bytes_free(&acf_frame);
+
+    TEST_ASSERT_EQUAL(RCP_DISCOVERY_ERR_WRONG_OP,
+                       rcp_discovery_decode_response(frame.data, frame.len, &result));
+
+    rcp_bytes_free(&frame);
+}
+
 static void test_response_zero_fills_beyond_general_slice(void)
 {
     rcp_regmap_general_t map = sample_map();
@@ -501,6 +603,57 @@ static void test_fragment_encode_disabled_when_zero_cap_and_oversized(void)
     size_t count = rcp_discovery_encode_response_fragmented(&map, 20, 1, server, 0, frames);
 
     TEST_ASSERT_EQUAL_UINT(0, count);
+}
+
+/* REQ-DISC-027: rcp_discovery_decode_response_fragment() applies the same
+ * AVTP/ACF-level validation rcp_discovery_decode_response() does (both
+ * go through decode_common()) -- one representative condition proves the
+ * fragment entry point actually reaches that shared check, rather than
+ * bypassing it. */
+static void test_fragment_decode_rejects_wrong_byte_bus_id(void)
+{
+    rcp_stream_id_t server = rcp_stream_id_make(SERVER_MAC, 3);
+    rcp_bytes_t frame;
+    rcp_stream_id_t from_stream;
+    bool ms;
+    uint8_t segnum;
+    const uint8_t *payload;
+    size_t payload_len;
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t acf_frame;
+    rcp_avtp_ntscf_header_t ntscf_hdr = {0};
+
+    hdr.byte_bus_id = (rcp_byte_bus_id_t)7u; /* not the discovery bus */
+    hdr.op = RCP_ACF_OP_READ;
+    hdr.rsp = 1;
+    hdr.ms = 1;
+    acf_frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+
+    ntscf_hdr.sv = 1;
+    ntscf_hdr.stream_id = server;
+    frame = rcp_avtp_encode_ntscf(&ntscf_hdr, acf_frame.data, acf_frame.len);
+    rcp_bytes_free(&acf_frame);
+
+    TEST_ASSERT_EQUAL(RCP_DISCOVERY_ERR_WRONG_BUS,
+                       rcp_discovery_decode_response_fragment(frame.data, frame.len, &from_stream,
+                                                                &ms, &segnum, &payload, &payload_len));
+
+    rcp_bytes_free(&frame);
+}
+
+/* REQ-DISC-028: a reassembled buffer shorter than
+ * RCP_DISCOVERY_GENERAL_SLICE_LEN is rejected, same
+ * short-frame-not-fabricated-zeros discipline as
+ * test_response_truncated_slice_when_read_size_small() above. */
+static void test_decode_reassembled_response_rejects_short_buffer(void)
+{
+    rcp_stream_id_t server = rcp_stream_id_make(SERVER_MAC, 3);
+    uint8_t short_buf[RCP_DISCOVERY_GENERAL_SLICE_LEN - 1] = {0};
+    rcp_discovery_result_t result;
+
+    TEST_ASSERT_EQUAL(RCP_DISCOVERY_ERR_SHORT_FRAME,
+                       rcp_discovery_decode_reassembled_response(short_buf, sizeof(short_buf),
+                                                                   server, &result));
 }
 
 /* ── Discovery-stream claiming ──────────────────────────────────────────────── */
@@ -770,11 +923,17 @@ int main(void)
     RUN_TEST(test_response_payload_len_always_equals_read_size);
     RUN_TEST(test_response_truncated_slice_when_read_size_small);
     RUN_TEST(test_response_zero_fills_beyond_general_slice);
+    RUN_TEST(test_response_dropped_when_tscf_headed);
+    RUN_TEST(test_response_rejects_non_abb_msg_type);
+    RUN_TEST(test_response_rejects_wrong_byte_bus_id);
+    RUN_TEST(test_response_rejects_wrong_op);
 
     RUN_TEST(test_fragment_count_one_when_unfragmented);
     RUN_TEST(test_fragment_unfragmented_matches_single_frame_path);
     RUN_TEST(test_fragment_deliberately_small_cap_round_trip);
     RUN_TEST(test_fragment_encode_disabled_when_zero_cap_and_oversized);
+    RUN_TEST(test_fragment_decode_rejects_wrong_byte_bus_id);
+    RUN_TEST(test_decode_reassembled_response_rejects_short_buffer);
 
     RUN_TEST(test_claim_init_is_open_and_unheld);
     RUN_TEST(test_claim_note_request_grants_when_open);

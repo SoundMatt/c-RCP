@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/fragment.h"
 
-#include <stdlib.h>
+#include "rcp/alloc.h"
+
 #include <string.h>
 
 //cfusa:req REQ-FRAG-001
@@ -109,14 +110,14 @@ void rcp_fragment_reassembler_reset(rcp_fragment_reassembler_t *r)
 {
     size_t max_total_len = r->max_total_len;
 
-    free(r->buf);
+    rcp_free(r->buf);
     rcp_fragment_reassembler_init(r, max_total_len);
 }
 
 //cfusa:req REQ-FRAG-010
 void rcp_fragment_reassembler_destroy(rcp_fragment_reassembler_t *r)
 {
-    free(r->buf);
+    rcp_free(r->buf);
     memset(r, 0, sizeof(*r));
 }
 
@@ -134,7 +135,7 @@ static bool append(rcp_fragment_reassembler_t *r, const uint8_t *payload, size_t
 
         if (new_cap < r->len + append_len) new_cap = r->len + append_len;
 
-        grown = (uint8_t *)realloc(r->buf, new_cap);
+        grown = (uint8_t *)rcp_realloc(r->buf, new_cap);
         if (!grown) return false;
 
         r->buf = grown;
