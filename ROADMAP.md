@@ -15205,6 +15205,49 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.300.0 -- 2026-08-13 (issue #201/#336: REQ-E2E-046,
+rx_stream_status aggregate blocked-status latch -- not-implemented ->
+partial)
+
+REQ-E2E-046 flips not-implemented -> partial. TC18 0.5.1_RC5's own
+Table 24 (12.7.7) adds a new read-only rx_stream_status bit at
+0x000D.7 with no counterpart in the baseline this codebase was
+originally built against: "stream is blocked, requests are rejected",
+set automatically as a reaction to a CRC error, sequence error,
+watchdog overflow, or request-storage overflow, whichever is enabled.
+A passive, client-polled AGGREGATE, distinct from each cause's own
+existing per-call "should enter safe state now" decision -- this is
+instead a PERSISTED "is the stream currently blocked" state a client
+can poll later, the same shape rcp_e2e_stream_fault_t already
+established for the CRC cause alone. regmap.h's own "TC18 0.5.1_RC5
+terminology drift" section had named this cross-cutting aggregate-
+latch primitive as the one piece left genuinely unresolved (task #97).
+
+New rcp_e2e_stream_status_t reuses rcp_e2e_stream_fault_t unchanged for
+the CRC cause and adds three sibling bool latches (seq_blocked,
+wd_blocked, overflow_blocked) of the identical shape for the other
+three fault classes. rcp_e2e_stream_status_note_crc_error()/_note_seq()/
+_note_wd()/_note_overflow() latch each cause from a result the caller
+already computed via this module's own existing evaluators -- composed,
+not re-derived. rcp_e2e_stream_status_rx_blocked() is the pure aggregate
+read: true iff ANY of the four latches is set. Each cause has its own
+independent reset, since TC18 gives each fault class its own distinct
+release condition with no basis to assume one clears another.
+
+Stays partial: src/mock.c has no per-endpoint-type dispatch of any
+kind to actually call these note_*() functions from a live path, or to
+expose the aggregate as a real register read -- the same disposition
+already established across this whole lineage.
+
+7 new unit tests (init state, each of the four causes independently
+blocking/resetting, a dedicated cross-cause independence test).
+Mutation-tested 3 ways (aggregate OR flipped to AND, note_seq()'s gate
+swapped to a weaker condition, reset_crc() made to bleed into
+seq_blocked) -- all caught cleanly. cfusa check A/B: 0 new findings at
+all -- errors/warnings/info identical; the only textual diff was one
+pre-existing function-length advisory shifting line count. cfusa
+trace: both 100%, 1024/1024. 65/65 both trees (native + ASan/UBSan).
+
 ### v0.299.0 -- 2026-08-13 (issue #336: REQ-ISELED-025, ISELED
 response fragmentation -- not-implemented -> partial)
 
