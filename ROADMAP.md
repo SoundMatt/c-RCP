@@ -17817,3 +17817,32 @@ The broader #341 census (hundreds of citations, mixed stale/
 already-fixed state per that issue's own description) remains
 unstarted as a systematic effort -- this fix closes the two specific
 instances this session happened to find, not the full scope.
+
+### v0.309.0 -- 2026-08-13 (`REQ-SPI-037` citation-drift correction,
+same issue #341 lineage)
+
+**Doc-only**, second and (for now) final instance found from the same
+stale-reference-file discovery as v0.308.0. `REQ-SPI-037`'s own
+citation (`TC18.txt L4363-4366`) had drifted the same way once the
+cached file was correctly refreshed to RC5 -- real content now sits
+at `TC18.txt L4740-4750`.
+
+This one also caught a genuine RC5 wording correction, not just a
+line-number shift: RC1's own text read `"...error state (->debug
+register)"`; RC5's own correction (marked `051RC5 corrected TI_088`
+in the source's own tracked-change annotation) changed this to
+`"...error state (-> spi_ep_status )"`. Confirmed `spi_ep_status` is
+already fully modeled in this codebase (`RCP_EP_SPI_REG_EP_STATUS`,
+Table 39) -- this is purely a citation/quote correction, not a newly
+discovered code gap.
+
+**Disposition unaffected**: the genuine ambiguity actually blocking
+this requirement (the unresolvable "see cs/hs bits" cross-reference,
+spec-defects-report item 56) is unchanged word-for-word between the
+old and new extraction, confirmed by direct comparison before
+touching anything -- stays `not-implemented`, correctly, matching the
+2026-08-12 investigation's own conclusion.
+
+No code changed. `cfusa check`/`trace` re-run: 0 errors, 1024/1024,
+identical to the pre-change baseline. 65/65 full suite unaffected (no
+code touched).
