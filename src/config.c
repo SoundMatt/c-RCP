@@ -353,14 +353,27 @@ int rcp_config_parse_json(const char *json, rcp_config_manifest_t *out, char *er
         close = strchr(open, '}');
         if (!close) break;
 
-        if (find_in_range(open, close + 1, "\"byte_bus_id\"")) {
+        if (find_in_range(open, close + 1, "\"byte_bus_id\"") ||
+            find_in_range(open, close + 1, "\"ep_type\"")) {
+            /* "ep_type" alone (byte_bus_id missing/malformed) still routes
+             * here so an endpoint entry missing its byte_bus_id field is
+             * rejected by parse_endpoint_entry() below (REQ-CFG-004),
+             * rather than silently skipped as an unrecognized object --
+             * the same "either required field routes it, so the real
+             * validator gets a chance to reject" precedent this loop's own
+             * stream branch already established below for "configured". */
             rcp_config_endpoint_t entry;
             if (!parse_endpoint_entry(open, close, &entry, err_msg, err_msg_cap)) goto fail;
             if (!append_endpoint(&endpoints, &eps_len, &eps_cap, entry)) {
                 set_err(err_msg, err_msg_cap, "out of memory", NULL);
                 goto fail;
             }
-        } else if (find_in_range(open, close + 1, "\"hw_ep_nr\"")) {
+        } else if (find_in_range(open, close + 1, "\"hw_ep_nr\"") ||
+                   find_in_range(open, close + 1, "\"hw_ep_pin_nr\"")) {
+            /* "hw_ep_pin_nr" alone (hw_ep_nr missing/malformed) still
+             * routes here so a hw_pin_map entry missing its hw_ep_nr field
+             * is rejected by parse_pin_entry() below (REQ-CFG-001), same
+             * reasoning as the endpoint branch immediately above. */
             rcp_config_hw_pin_t entry;
             if (!parse_pin_entry(open, close, &entry, err_msg, err_msg_cap)) goto fail;
             if (!append_pin(&pins, &pins_len, &pins_cap, entry)) {

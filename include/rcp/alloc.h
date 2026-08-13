@@ -29,6 +29,16 @@
  *      has its own, again different, mechanism). A plain C function-
  *      pointer indirection sidesteps all three platforms' own linker
  *      quirks by construction -- it is just an ordinary function call.
+ *      An absurdly large size (e.g. requesting near SIZE_MAX octets) is
+ *      NOT such a portable technique either, despite forcing a genuine
+ *      libc realloc() failure on a plain debug build: under this
+ *      project's own CI AddressSanitizer configuration
+ *      (ASAN_OPTIONS=halt_on_error=1:abort_on_error=1, no
+ *      allocator_may_return_null override), ASan treats any request
+ *      over its own internal max-supported-size ceiling as a hard abort,
+ *      not a NULL return -- REQ-FRAG-016's own test hit exactly this and
+ *      is why rcp_realloc() exists below rather than reusing the
+ *      REQ-SEQ-002-era "make libc fail for real" trick a second time.
  *
  * ── Scope: additive, not a sweeping rewrite ─────────────────────────────────
  *
@@ -78,6 +88,7 @@ extern "C" {
 
 typedef void *(*rcp_alloc_malloc_fn)(size_t size);
 typedef void *(*rcp_alloc_calloc_fn)(size_t nmemb, size_t size);
+typedef void *(*rcp_alloc_realloc_fn)(void *ptr, size_t size);
 typedef void  (*rcp_alloc_free_fn)(void *ptr);
 
 /* A caller-owned set of hooks to install. Any member left NULL falls
@@ -86,9 +97,10 @@ typedef void  (*rcp_alloc_free_fn)(void *ptr);
  * untouched, may leave those two members NULL rather than having to
  * re-implement libc's own behavior for them. */
 typedef struct {
-    rcp_alloc_malloc_fn malloc_fn;
-    rcp_alloc_calloc_fn calloc_fn;
-    rcp_alloc_free_fn   free_fn;
+    rcp_alloc_malloc_fn  malloc_fn;
+    rcp_alloc_calloc_fn  calloc_fn;
+    rcp_alloc_realloc_fn realloc_fn;
+    rcp_alloc_free_fn    free_fn;
 } rcp_alloc_hooks_t;
 
 /* Installs hooks globally, replacing whatever was installed before (if
@@ -102,15 +114,17 @@ void rcp_alloc_set_hooks(const rcp_alloc_hooks_t *hooks);
  * ever installed (a no-op in that case). */
 void rcp_alloc_reset_hooks(void);
 
-/* rcp_malloc(size)/rcp_calloc(nmemb, size)/rcp_free(ptr): this module's
- * own indirected counterparts of malloc()/calloc()/free(), same
- * signatures, same failure convention (NULL on failure; rcp_free(NULL)
- * is a safe no-op exactly like free(NULL) already is). A module opting
- * into this indirection calls these instead of the libc functions
- * directly -- everything else about how it handles a NULL return is
- * unchanged. */
+/* rcp_malloc(size)/rcp_calloc(nmemb, size)/rcp_realloc(ptr, size)/
+ * rcp_free(ptr): this module's own indirected counterparts of
+ * malloc()/calloc()/realloc()/free(), same signatures, same failure
+ * convention (NULL on failure, ptr left untouched exactly like libc's
+ * own realloc(); rcp_free(NULL) is a safe no-op exactly like free(NULL)
+ * already is). A module opting into this indirection calls these
+ * instead of the libc functions directly -- everything else about how
+ * it handles a NULL return is unchanged. */
 void *rcp_malloc(size_t size);
 void *rcp_calloc(size_t nmemb, size_t size);
+void *rcp_realloc(void *ptr, size_t size);
 void  rcp_free(void *ptr);
 
 #ifdef __cplusplus

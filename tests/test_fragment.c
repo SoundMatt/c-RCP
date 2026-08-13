@@ -19,13 +19,14 @@
 //cfusa:test REQ-FRAG-018
 #include "unity.h"
 
+#include <rcp/alloc.h>
 #include <rcp/e2e.h>
 #include <rcp/fragment.h>
 
 #include <string.h>
 
-void setUp(void) {}
-void tearDown(void) {}
+void setUp(void) { rcp_alloc_reset_hooks(); }
+void tearDown(void) { rcp_alloc_reset_hooks(); } /* never leak a hook across tests */
 
 /* ── strerror / result_string ─────────────────────────────────────────────── */
 
@@ -407,6 +408,75 @@ static void test_reassembler_too_large_rejects_and_preserves_state(void)
     rcp_fragment_reassembler_destroy(&r);
 }
 
+/* REQ-FRAG-016: a genuine internal buffer-growth failure returns
+ * RCP_FRAGMENT_REASM_ERR_ALLOC, distinct from every other result value,
+ * and leaves r's already-collected state untouched.
+ *
+ * An absurdly large payload_len (comfortably under max_total_len, so
+ * ERR_TOO_LARGE doesn't fire first) does force a genuine libc realloc()
+ * failure on a plain debug build -- but NOT portably under this
+ * project's own CI AddressSanitizer configuration
+ * (ASAN_OPTIONS=halt_on_error=1:abort_on_error=1, no
+ * allocator_may_return_null override): ASan treats a request over its
+ * own internal max-supported-size ceiling as a hard abort, not a NULL
+ * return. rcp/alloc.h's rcp_realloc() hook (added alongside this test)
+ * sidesteps that the same way REQ-SEQ-002's rcp_malloc()/rcp_calloc()
+ * hooks already do -- a real, portable, ASan-safe failure with no
+ * absurd size involved at all. */
+static void *always_fails_realloc(void *ptr, size_t size)
+{
+    (void)ptr;
+    (void)size;
+    return NULL;
+}
+
+static void test_reassembler_alloc_failure_is_distinct_and_preserves_state(void)
+{
+    rcp_alloc_hooks_t            hooks = {0};
+    rcp_fragment_reassembler_t   r;
+    const uint8_t                seg0[4]  = {1, 2, 3, 4};
+    const uint8_t                seg1[4]  = {5, 6, 7, 8};
+    const uint8_t                fin[2]   = {9, 10};
+    rcp_fragment_reasm_result_t  rc;
+    const uint8_t                *out;
+    size_t                        out_len;
+
+    rcp_fragment_reassembler_init(&r, 1024);
+    rc = rcp_fragment_reassembler_feed(&r, true, 0, seg0, sizeof(seg0));
+    TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_CONTINUE, rc);
+
+    hooks.realloc_fn = always_fails_realloc;
+    rcp_alloc_set_hooks(&hooks);
+
+    rc = rcp_fragment_reassembler_feed(&r, true, 1, seg1, sizeof(seg1));
+    TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_ERR_ALLOC, rc);
+    TEST_ASSERT_NOT_EQUAL(RCP_FRAGMENT_REASM_CONTINUE, rc);
+    TEST_ASSERT_NOT_EQUAL(RCP_FRAGMENT_REASM_COMPLETE, rc);
+    TEST_ASSERT_NOT_EQUAL(RCP_FRAGMENT_REASM_ERR_OUT_OF_ORDER, rc);
+    TEST_ASSERT_NOT_EQUAL(RCP_FRAGMENT_REASM_ERR_TOO_LARGE, rc);
+    TEST_ASSERT_TRUE(rcp_fragment_reassembler_is_collecting(&r));
+
+    /* State genuinely preserved, not merely flagged as such: once the
+     * real allocator is restored, the same next segment_num (1, same as
+     * the one that just failed) is still accepted, and the final
+     * reassembled result is exactly seg0+seg1+fin -- the failed attempt
+     * never landed. */
+    rcp_alloc_reset_hooks();
+    rc = rcp_fragment_reassembler_feed(&r, true, 1, seg1, sizeof(seg1));
+    TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_CONTINUE, rc);
+
+    rc = rcp_fragment_reassembler_feed(&r, false, 0, fin, sizeof(fin));
+    TEST_ASSERT_EQUAL_INT(RCP_FRAGMENT_REASM_COMPLETE, rc);
+
+    rcp_fragment_reassembler_get(&r, &out, &out_len);
+    TEST_ASSERT_EQUAL_UINT(10, out_len);
+    TEST_ASSERT_EQUAL_UINT8(1, out[0]);
+    TEST_ASSERT_EQUAL_UINT8(8, out[7]);
+    TEST_ASSERT_EQUAL_UINT8(10, out[9]);
+
+    rcp_fragment_reassembler_destroy(&r);
+}
+
 static void test_reassembler_exactly_at_max_total_len_succeeds(void)
 {
     rcp_fragment_reassembler_t  r;
@@ -537,6 +607,7 @@ int main(void)
     RUN_TEST(test_reassembler_out_of_order_mid_sequence);
     RUN_TEST(test_reassembler_final_ms0_segment_num_field_ignored);
     RUN_TEST(test_reassembler_too_large_rejects_and_preserves_state);
+    RUN_TEST(test_reassembler_alloc_failure_is_distinct_and_preserves_state);
     RUN_TEST(test_reassembler_exactly_at_max_total_len_succeeds);
 
     RUN_TEST(test_reassembler_reset_allows_reuse);

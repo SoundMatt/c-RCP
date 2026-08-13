@@ -120,6 +120,77 @@ static void test_decode_rejects_short_frame(void)
                                                       &cs, &payload, &payload_len, &txn));
 }
 
+/* REQ-CHAIN-003: rcp_chained_encode_member() returns a zeroed rcp_bytes_t
+ * when payload_len exceeds RCP_ACF_MAX_PAYLOAD. */
+static void test_encode_rejects_oversized_payload(void)
+{
+    static uint8_t oversized[RCP_ACF_MAX_PAYLOAD + 1];
+    rcp_bytes_t     frame;
+
+    memset(oversized, 0xAA, sizeof(oversized));
+    frame = rcp_chained_encode_member(1, 0, RCP_CHAINED_CS_ABORT_ON_ERROR, 0, oversized,
+                                       sizeof(oversized));
+
+    TEST_ASSERT_NULL(frame.data);
+    TEST_ASSERT_EQUAL_size_t(0, frame.len);
+}
+
+/* REQ-CHAIN-005: rcp_chained_decode_member() returns
+ * RCP_CHAINED_ERR_BAD_MSG_TYPE when rcp_acf_decode_gbb() reports it --
+ * same byte-pattern technique already established for the sibling
+ * modules (test_request_compound.c's own
+ * test_peek_request_type_bad_msg_type()). */
+static void test_decode_rejects_bad_msg_type(void)
+{
+    uint8_t            buf[RCP_ACF_GBB_HEADER_LEN];
+    rcp_byte_bus_id_t  bbid = 0;
+    uint16_t           chain_exec_delay = 0;
+    uint8_t            cs = 0;
+    const uint8_t     *payload = NULL;
+    size_t             payload_len = 0;
+    uint8_t            txn = 0;
+
+    memset(buf, 0, sizeof(buf));
+    buf[0] = RCP_ACF_MSG_TYPE_ABB; /* not GBB */
+
+    TEST_ASSERT_EQUAL_INT(RCP_CHAINED_ERR_BAD_MSG_TYPE,
+                           rcp_chained_decode_member(buf, sizeof(buf), &bbid, &chain_exec_delay,
+                                                      &cs, &payload, &payload_len, &txn));
+}
+
+/* REQ-CHAIN-006: rcp_chained_decode_member() returns
+ * RCP_CHAINED_ERR_NOT_REPURPOSED when the decoded mtv is not
+ * RCP_ACF_MTV_UNTIMED. Starts from a real encoded frame (like
+ * test_decode_rejects_unknown_request_type() above) rather than a
+ * hand-crafted all-zero buffer: a hand-crafted buffer leaves
+ * acf_msg_length at 0, which rcp_acf_decode_gbb() itself rejects as
+ * RCP_ACF_ERR_SHORT_FRAME before mtv is ever inspected -- the
+ * bad-msg-type test above doesn't hit that check because it returns
+ * even earlier, on the msg-type mismatch itself. */
+static void test_decode_rejects_non_repurposed_mtv(void)
+{
+    rcp_bytes_t        frame;
+    rcp_byte_bus_id_t  bbid = 0;
+    uint16_t           chain_exec_delay = 0;
+    uint8_t            cs = 0;
+    const uint8_t     *payload = NULL;
+    size_t             payload_len = 0;
+    uint8_t            txn = 0;
+
+    frame = rcp_chained_encode_member(1, 0, RCP_CHAINED_CS_CONTINUE_ON_ERROR, 0, NULL, 0);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    /* mtv lives in octet 2 bits 5, pad in bits 7:6 (rcp_acf_unpack_header()) --
+     * force it to VALID(1) without disturbing pad or byte_bus_id. */
+    frame.data[2] = (uint8_t)((frame.data[2] & ~0x20u) | (RCP_ACF_MTV_VALID << 5));
+
+    TEST_ASSERT_EQUAL_INT(RCP_CHAINED_ERR_NOT_REPURPOSED,
+                           rcp_chained_decode_member(frame.data, frame.len, &bbid,
+                                                      &chain_exec_delay, &cs, &payload,
+                                                      &payload_len, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
 static void test_decode_rejects_unknown_request_type(void)
 {
     rcp_bytes_t frame;
@@ -338,6 +409,9 @@ int main(void)
     RUN_TEST(test_member_round_trip);
     RUN_TEST(test_member_round_trip_continue_on_error);
     RUN_TEST(test_decode_rejects_short_frame);
+    RUN_TEST(test_encode_rejects_oversized_payload);
+    RUN_TEST(test_decode_rejects_bad_msg_type);
+    RUN_TEST(test_decode_rejects_non_repurposed_mtv);
     RUN_TEST(test_decode_rejects_unknown_request_type);
 
     RUN_TEST(test_chained_wire_sub_field_offsets);

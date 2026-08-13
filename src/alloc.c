@@ -21,8 +21,9 @@ void rcp_alloc_set_hooks(const rcp_alloc_hooks_t *hooks)
 //cfusa:req REQ-ALLOC-002
 void rcp_alloc_reset_hooks(void)
 {
-    g_hooks.malloc_fn = NULL;
-    g_hooks.calloc_fn = NULL;
+    g_hooks.malloc_fn  = NULL;
+    g_hooks.calloc_fn  = NULL;
+    g_hooks.realloc_fn = NULL;
     g_hooks.free_fn    = NULL;
 }
 
@@ -38,6 +39,13 @@ void *rcp_calloc(size_t nmemb, size_t size)
 {
     if (g_hooks.calloc_fn) return g_hooks.calloc_fn(nmemb, size);
     return calloc(nmemb, size);
+}
+
+//cfusa:req REQ-ALLOC-006
+void *rcp_realloc(void *ptr, size_t size)
+{
+    if (g_hooks.realloc_fn) return g_hooks.realloc_fn(ptr, size);
+    return realloc(ptr, size);
 }
 
 //cfusa:req REQ-ALLOC-005

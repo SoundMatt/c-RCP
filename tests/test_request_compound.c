@@ -232,6 +232,22 @@ static void test_compound_wait_safety_request_round_trip(void)
     rcp_bytes_free(&frame);
 }
 
+/* REQ-CMP-009: rcp_compound_encode_request() returns a zeroed rcp_bytes_t
+ * for a payload exceeding RCP_ACF_MAX_PAYLOAD, same technique as the
+ * sibling oversized-payload test in test_request_chained.c. */
+static void test_encode_request_rejects_oversized_payload(void)
+{
+    static uint8_t oversized[RCP_ACF_MAX_PAYLOAD + 1];
+    rcp_compound_step_t step = {0};
+    rcp_bytes_t frame;
+
+    memset(oversized, 0xAA, sizeof(oversized));
+    frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND, 0, &step, 0u, 0,
+                                         oversized, sizeof(oversized));
+    TEST_ASSERT_NULL(frame.data);
+    TEST_ASSERT_EQUAL_size_t(0, frame.len);
+}
+
 static void test_encode_request_rejects_unrecognized_request_type(void)
 {
     rcp_compound_step_t step = {0};
@@ -582,6 +598,46 @@ static void test_compound_wait_tick_guard_blocks_advance_even_on_match(void)
     rcp_sequencer_table_free(&table);
 }
 
+/* REQ-CMP-021: a next_state of 0 is the "remain in the current state"
+ * sentinel (TC18 v0.5.1_RC §11.2.2.1) -- rcp_compound_tick() still
+ * returns true (the tick executed successfully) but leaves the
+ * sequencer's actual state untouched. */
+static void test_compound_tick_next_state_zero_leaves_state_unchanged_but_returns_true(void)
+{
+    rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
+    rcp_compound_step_t step = {0};
+    uint8_t got = 0;
+
+    step.sequencer_index = 1;
+    step.start_state     = RCP_SEQUENCER_POWER_ON_STATE;
+    step.next_state       = 0; /* sentinel */
+    step.exec_delay    = 0;
+
+    TEST_ASSERT_TRUE(rcp_compound_tick(&table, &step, 0));
+    TEST_ASSERT_TRUE(rcp_sequencer_get_state(&table, 1, &got));
+    TEST_ASSERT_EQUAL_UINT8(RCP_SEQUENCER_POWER_ON_STATE, got);
+
+    rcp_sequencer_table_free(&table);
+}
+
+/* Same sentinel, for rcp_compound_wait_tick() (REQ-CMP-023). */
+static void test_compound_wait_tick_next_state_zero_leaves_state_unchanged_but_returns_true(void)
+{
+    rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
+    rcp_compound_step_t step = {0};
+    uint8_t got = 0;
+
+    step.sequencer_index = 2;
+    step.start_state     = RCP_SEQUENCER_POWER_ON_STATE;
+    step.next_state       = 0; /* sentinel */
+
+    TEST_ASSERT_TRUE(rcp_compound_wait_tick(&table, &step, true));
+    TEST_ASSERT_TRUE(rcp_sequencer_get_state(&table, 2, &got));
+    TEST_ASSERT_EQUAL_UINT8(RCP_SEQUENCER_POWER_ON_STATE, got);
+
+    rcp_sequencer_table_free(&table);
+}
+
 /* ── Literal wire layout ──────────────────────────────────────────────────────
  *
  * These assertions are written from the TC18 v0.5.1_RC specification's own
@@ -837,6 +893,7 @@ int main(void)
 
     RUN_TEST(test_compound_request_round_trip);
     RUN_TEST(test_compound_wait_safety_request_round_trip);
+    RUN_TEST(test_encode_request_rejects_oversized_payload);
     RUN_TEST(test_encode_request_rejects_unrecognized_request_type);
     RUN_TEST(test_decode_request_rejects_short_frame);
     RUN_TEST(test_decode_request_rejects_bad_msg_type);
@@ -859,6 +916,8 @@ int main(void)
     RUN_TEST(test_compound_tick_guard_blocks_advance_even_after_delay_elapses);
     RUN_TEST(test_compound_wait_tick_advances_only_on_condition_met_and_guard);
     RUN_TEST(test_compound_wait_tick_guard_blocks_advance_even_on_match);
+    RUN_TEST(test_compound_tick_next_state_zero_leaves_state_unchanged_but_returns_true);
+    RUN_TEST(test_compound_wait_tick_next_state_zero_leaves_state_unchanged_but_returns_true);
 
     RUN_TEST(test_compound_wire_sub_field_offsets);
     RUN_TEST(test_compound_wait_safety_wire_sub_field_offsets);
