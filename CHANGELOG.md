@@ -34,6 +34,12 @@ the rationale.
 
 ## Releases
 
+### v0.308.0 -- 2026-08-13 (`REQ-SEQ-013`/`REQ-SEQ-014` citation-drift correction, issue #341 lineage)
+
+**Doc-only.** Fixes a real citation bug this project's own most recent batch (v0.306.0) introduced, discovered while working the immediately following batch (`REQ-MDIO-022`/`REQ-MDIO-024`, v0.307.0). This repo's own cached primary-source reference files (`/Users/matt/Documents/Coding/SoundMatt/TC18.txt`/`TC18_full.txt`/`TC18_nopgbrk.txt`, canonical path outside this repo) were discovered to be stale RC1-dated `pdftotext` dumps despite this project's own prior "TC18 spec rebaseline to 0.5.1_RC5" work -- the real RC5 PDF was apparently never re-extracted to `.txt`. Content for the MDIO section happened to be unchanged between RC1/RC5 (only table numbers and the page date differed), but the sequencer section's own line numbers shifted by roughly 400 lines. `REQ-SEQ-013`/`REQ-SEQ-014`'s v0.306.0 citations (`TC18.txt L3064-L3110`) were verified against that stale file at the time and were internally consistent with its own (RC1) content -- but wrong against the file once correctly refreshed to RC5. The correct citation, confirmed against the freshly re-extracted RC5 text, is `TC18.txt L3460-L3493` -- which also happens to match `REQ-SEQ-012`'s own pre-existing citation exactly (that citation was never actually wrong; an earlier working note in this same investigation had wrongly flagged it as a bug based on the same stale-file comparison, now retracted).
+
+The three cached reference files have been re-extracted fresh from the real RC5 PDF (`OA_TC18_specification_v_0.5.1_RC_5_3624.pdf`) as part of this fix, so this specific staleness class cannot recur for future citation work in this repo. No code changed -- `.fusa-reqs.json` citation text only. `cfusa check`/`trace` re-run to confirm: 0 errors, 1024/1024 traced and tested, identical to the pre-change baseline.
+
 ### v0.307.0 -- 2026-08-13 (`REQ-MDIO-022`/`REQ-MDIO-024`: MMS addressing and 32-bit data fields, informed by a real external spec)
 
 Closes `REQ-MDIO-022` (TC18 §13.7.13.3 Table 60's 32-bit-for-MMS0/MMS1 data-field rule) and `REQ-MDIO-021`'s own remaining PARTIAL scope, and adds a new `REQ-MDIO-024` for the assumption this rests on -- the first fix in this project to work around a genuine TC18 spec silence using a real, external, publicly-available specification rather than either an invented-from-nothing assumption or leaving the gap open.
