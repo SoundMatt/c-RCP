@@ -11069,7 +11069,7 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "not-implemented",
-      "tc18": "§13.7.11.2, TC18.txt L5355 and Table 53 (acceptance filter 3/4 address collision at 0x002C, receive filter 1..4), TC18.txt L5385-5418"
+      "tc18": "§13.7.11.2, TC18.txt L5764-5836 and Table 56 (RC1's own Table 53 -- acceptance filter 3/4 address collision at 0x002C, receive filter 1..4 immediately following) -- CORRECTED 2026-08-13, citation-drift fix (issue #341 lineage, same root cause as REQ-SEQ-013/014/REQ-SPI-037): this repo's own cached TC18.txt was a stale RC1-dated pdftotext dump, since re-extracted from the real RC5 PDF; the address-collision defect itself is confirmed unchanged word-for-word in the current RC5 text, re-verified directly before this fix -- disposition (not-implemented, genuinely blocked) is unaffected"
     },
     {
       "id": "REQ-CANEP-030",
