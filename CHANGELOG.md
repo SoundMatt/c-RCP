@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.288.0 -- 2026-08-12 (issue #201 batch: `REQ-SEQ-012`, disabled-sequencer guard -- ASIL-B)
+
+**`REQ-SEQ-012` flips `partial` -> `implemented`, ASIL-B.**
+
+`rcp_compound_start_condition_met()` and `rcp_compound_advance_guard()` (`request_compound.h`/`.c`) both now check a sequencer's current state against 0 explicitly, before either function's own ordinary `start_state` comparison -- TC18 §12.7.10 Table 28: a sequencer manually written to 0 is DISABLED, and no compound or compound-wait step conditioned on it may become executable, nor may any advance move it out of 0 until it is explicitly rewritten to a nonzero state. This closes a real gap in `start_condition_met()`'s own "start in any state" wildcard (`start_state==0`), which previously treated a disabled sequencer as satisfying every step unconditionally -- the exact case this fix exists to close.
+
+`rcp_e2e_endpoint_in_safe_state()` (`REQ-E2E-018`) also now fails closed on a disabled (state==0) sequencer, rather than reporting "in safe state" if `rx_safe_sequencer_state` happened to also be (mis)configured to 0 -- a disabled sequencer conveys no application-state information at all, so it can never itself satisfy a safe-state check.
+
+**Citation-drift fix, same lineage as issue #341**: `.fusa-reqs.json`'s own "Table 25" citations (`REQ-SEQ-010`, `REQ-SEQ-012`, `REQ-SEQ-013`) and several matching code/test comments were stale -- RC1's own Table 25 (SEQUENCER_config) is RC5's own Table 28, confirmed directly against the primary source. Corrected everywhere it's cited for this table; `REQ-SEQ-013`'s own still-open access-control gap (a real, separate security finding tracked under issue #335, not attempted in this batch) keeps its `not-implemented` status, only its citation changed.
+
+Rewrote the pre-existing gap-pinning test into `test_sequencer_zero_state_disables_start_condition_and_advance` (both the wildcard and non-wildcard disabled cases, plus re-enabling via an explicit nonzero rewrite), split the ownership/regmap-wiring half (`REQ-SEQ-013`'s own still-open deviation) into its own unchanged test. Added dedicated unit tests: `test_advance_guard_false_when_sequencer_disabled` (`test_request_compound.c`) and `test_endpoint_in_safe_state_fails_closed_when_sequencer_disabled` (`test_e2e.c`).
+
+Mutation-tested 3 ways (the disabled-check dropped from each of the three fixed functions in turn) -- all three caught cleanly. 65/65 both trees (native + ASan/UBSan, full suite given this touches ASIL-B `request_compound.c`/`e2e.c`). `cfusa check`: 0 errors both trees. `cfusa trace --req-coverage 100`/`--sec-tested 100` (CI's own separate invocations): both 100%.
+
+**Housekeeping**: a byte-identical stray duplicate `tests/test_request_compound 2.c` (macOS filesystem-sync artifact, missing this batch's own last `RUN_TEST` line) found and removed before committing -- same class as this session's earlier `src/ep_spi 2.c`/`src/ep_pwm 2.c` incidents.
+
 ### v0.287.0 -- 2026-08-12 (issue #201 batch: `REQ-SRV-018`, RC Server PTP trigger signals)
 
 **`REQ-SRV-018` flips `not-implemented` -> `partial`.**

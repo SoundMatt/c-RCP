@@ -5034,7 +5034,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "tc18": "§12.10 (\"Sequencers are simply a state register which stores the current state of the sequencer.\"), TC18.txt L3466; readable/writable via §12.7.10's SEQUENCER_config register map, TC18.txt L3075-3092; §12.7.10 Table 25 (\"Seq_state ... if manually set to 0 then disabled\"), TC18.txt L3082, L3090"
+      "tc18": "§12.10 (\"Sequencers are simply a state register which stores the current state of the sequencer.\"), TC18.txt L3466; readable/writable via §12.7.10's SEQUENCER_config register map, TC18.txt L3460-3493; §12.7.10 Table 28 (\"Seq_state ... if manually set to 0 then disabled\"), TC18.txt L3478, L3486"
     },
     {
       "id": "REQ-SEQ-011",
@@ -9568,24 +9568,24 @@
     {
       "id": "REQ-SEQ-012",
       "title": "A sequencer whose state register is manually set to 0 is disabled",
-      "text": "A sequencer whose Seq_state register has been manually written to 0 shall be treated as disabled (TC18 \u00a712.7.10 Table 25, relative address 0x0000, 8 bit, R/W): no compound or compound-wait step conditioned on that sequencer shall become executable, and no advance shall move it out of 0 until it is explicitly rewritten to a nonzero state. NOT IMPLEMENTED: rcp_sequencer_set_state() treats 0 as an ordinary state value, so a step whose start_state happens to be 0 fires against a sequencer the client intended to disable, and rcp_e2e_endpoint_in_safe_state() (REQ-E2E-018) would report a disabled sequencer as \"in safe state\" if rx_safe_sequencer_state were configured to 0. Distinct from rcp_sequencer_table_unsupported() (REQ-SEQ-004), which is the table-wide \"zero sequencers implemented\" case.",
+      "text": "IMPLEMENTED (issue #201, 2026-08-12): a sequencer whose Seq_state register has been manually written to 0 is treated as disabled (TC18 \u00a712.7.10 Table 28, relative address 0x0000, 8 bit, R/W): no compound or compound-wait step conditioned on that sequencer becomes executable, and no advance moves it out of 0 until it is explicitly rewritten to a nonzero state. rcp_compound_start_condition_met() and rcp_compound_advance_guard() (request_compound.h/.c) both check current==0 explicitly, before their own ordinary start_state comparison -- including start_condition_met()'s own \"start in any state\" wildcard (start_state==0), which would otherwise treat a disabled sequencer as satisfying every step unconditionally. rcp_e2e_endpoint_in_safe_state() (REQ-E2E-018) also fails closed on a disabled sequencer, rather than reporting \"in safe state\" if rx_safe_sequencer_state happened to also be configured to 0. Distinct from rcp_sequencer_table_unsupported() (REQ-SEQ-004), which is the table-wide \"zero sequencers implemented\" case. Citation-drift fix, same lineage as issue #341: RC1's own Table 25 (SEQUENCER_config) is RC5's own Table 28 -- the catalog's stale \"Table 25\" citation is corrected here alongside the fix.",
       "standard": "iso26262",
-      "level": "QM",
-      "asil": "QM",
-      "scope": "tc18-gap",
-      "status": "partial",
-      "tc18": "\u00a712.7.10 Table 25, TC18.txt L3080-L3082"
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a712.7.10 Table 28, TC18.txt L3460-L3493"
     },
     {
       "id": "REQ-SEQ-013",
       "title": "each sequencer is owned by one request stream, and only that stream may access it",
-      "text": "NOT IMPLEMENTED: c-RCP models no per-sequencer Request_stream_index (TC18 \u00a712.7.10 Table 25, relative address 0x0001, 8 bit, R/W*), the register naming the one RC Client permitted to access that sequencer, and performs no access control on sequencer reads or writes. rcp_sequencer_table_t (include/rcp/request_sequencer.h:85-88) is an unowned array of state bytes and rcp_sequencer_set_state() takes no requester identity. Consequence: any RC Client that can reach the register map can advance or reset any other client's sequencer, including one another client has configured as its rx_safestate_sequencer \u2014 a client can therefore forge or clear another client's safe state, defeating the \u00a712.7.7 safety-measure mechanism entirely.",
+      "text": "NOT IMPLEMENTED: c-RCP models no per-sequencer Request_stream_index (TC18 \u00a712.7.10 Table 28, relative address 0x0001, 8 bit, R/W*), the register naming the one RC Client permitted to access that sequencer, and performs no access control on sequencer reads or writes. rcp_sequencer_table_t (include/rcp/request_sequencer.h:85-88) is an unowned array of state bytes and rcp_sequencer_set_state() takes no requester identity. Consequence: any RC Client that can reach the register map can advance or reset any other client's sequencer, including one another client has configured as its rx_safestate_sequencer \u2014 a client can therefore forge or clear another client's safe state, defeating the \u00a712.7.7 safety-measure mechanism entirely. Citation-drift fix, same lineage as issue #341 (2026-08-12): RC1's own Table 25 is RC5's own Table 28.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "not-implemented",
-      "tc18": "\u00a712.7.10 Table 25, TC18.txt L3083-L3085"
+      "tc18": "\u00a712.7.10 Table 28, TC18.txt L3480"
     },
     {
       "id": "REQ-SEQ-014",

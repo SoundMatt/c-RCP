@@ -333,6 +333,7 @@ bool rcp_e2e_measure_valid(uint8_t rx_safety_measure)
 //cfusa:req REQ-E2E-017
 //cfusa:req REQ-E2E-018
 //cfusa:req REQ-E2E-019
+//cfusa:req REQ-SEQ-012
 bool rcp_e2e_endpoint_in_safe_state(uint8_t rx_safety_measure,
                                         const rcp_sequencer_table_t *table,
                                         uint16_t safestate_sequencer,
@@ -345,6 +346,14 @@ bool rcp_e2e_endpoint_in_safe_state(uint8_t rx_safety_measure,
 
     if (!table) return false; /* fail closed */
     if (!rcp_sequencer_get_state(table, safestate_sequencer, &current)) return false; /* fail closed */
+
+    /* REQ-SEQ-012 (TC18 Table 28): a manually-disabled (state==0)
+     * sequencer conveys no application-state information at all -- it is
+     * "off," not "reached state 0" -- so it can never itself satisfy a
+     * safe-state check, even if safe_sequencer_state also happens to be
+     * (mis)configured to 0. Fail closed rather than let a disabled
+     * sequencer accidentally read as "safe." */
+    if (current == 0u) return false; /* fail closed */
 
     return current == safe_sequencer_state;
 }

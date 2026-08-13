@@ -479,6 +479,29 @@ static void test_endpoint_in_safe_state_fails_closed_on_invalid_index(void)
     rcp_sequencer_table_free(&table);
 }
 
+/* REQ-SEQ-012: a manually-disabled (state==0) sequencer conveys no
+ * application-state information -- it never satisfies a safe-state check,
+ * even when safe_sequencer_state is itself (mis)configured to 0, which a
+ * naive current==safe_sequencer_state comparison would otherwise treat as
+ * a match. */
+static void test_endpoint_in_safe_state_fails_closed_when_sequencer_disabled(void)
+{
+    rcp_sequencer_table_t table = rcp_sequencer_table_new(4);
+
+    TEST_ASSERT_TRUE(rcp_sequencer_set_state(&table, 1, 0));
+    TEST_ASSERT_FALSE(rcp_e2e_endpoint_in_safe_state(
+        (uint8_t)RCP_E2E_MEASURE_SEQUENCER, &table, 1, 0));
+
+    /* Re-enabling to the same value the safe-state check targets
+     * legitimately passes -- confirms the fix is scoped to state==0
+     * specifically, not a blanket rejection of target 0. */
+    TEST_ASSERT_TRUE(rcp_sequencer_set_state(&table, 1, 3));
+    TEST_ASSERT_TRUE(rcp_e2e_endpoint_in_safe_state(
+        (uint8_t)RCP_E2E_MEASURE_SEQUENCER, &table, 1, 3));
+
+    rcp_sequencer_table_free(&table);
+}
+
 /* ── rx_enforce_e2e: drop vs. latch ────────────────────────────────────────── */
 
 static void test_crc_error_action_maps_rx_enforce_e2e(void)
@@ -725,6 +748,7 @@ int main(void)
     RUN_TEST(test_endpoint_in_safe_state_fails_closed_on_bad_measure);
     RUN_TEST(test_endpoint_in_safe_state_fails_closed_on_null_table);
     RUN_TEST(test_endpoint_in_safe_state_fails_closed_on_invalid_index);
+    RUN_TEST(test_endpoint_in_safe_state_fails_closed_when_sequencer_disabled);
 
     RUN_TEST(test_crc_error_action_maps_rx_enforce_e2e);
     RUN_TEST(test_stream_fault_drop_request_never_latches);

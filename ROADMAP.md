@@ -15205,6 +15205,50 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.288.0 -- 2026-08-12 (issue #201 batch: `REQ-SEQ-012`,
+disabled-sequencer guard -- ASIL-B)
+
+**`REQ-SEQ-012` flips `partial` -> `implemented`, ASIL-B.**
+
+rcp_compound_start_condition_met() and rcp_compound_advance_guard()
+(request_compound.h/.c) both now check a sequencer's current state
+against 0 explicitly, before either function's own ordinary
+start_state comparison -- TC18 13.7.10 Table 28: a sequencer
+manually written to 0 is DISABLED, and no compound or compound-wait
+step conditioned on it may become executable, nor may any advance
+move it out of 0 until explicitly rewritten to a nonzero state.
+Closes a real gap in start_condition_met()'s own "start in any
+state" wildcard (start_state==0), which previously treated a
+disabled sequencer as satisfying every step unconditionally.
+
+rcp_e2e_endpoint_in_safe_state() (REQ-E2E-018) also now fails
+closed on a disabled sequencer, rather than reporting "in safe
+state" if rx_safe_sequencer_state happened to also be
+(mis)configured to 0.
+
+**Citation-drift fix, same lineage as issue #341**: the catalog's
+own "Table 25" citations (REQ-SEQ-010/012/013) and several matching
+code/test comments were stale -- RC1's own Table 25 is RC5's own
+Table 28. Corrected everywhere cited; REQ-SEQ-013's own still-open
+access-control gap (a separate security finding under issue #335,
+not attempted here) keeps its not-implemented status, only its
+citation changed.
+
+Rewrote the pre-existing gap-pinning test to cover both the
+wildcard and non-wildcard disabled cases plus re-enabling; split
+the ownership/regmap-wiring half into its own unchanged test. Added
+dedicated unit tests in test_request_compound.c and test_e2e.c.
+
+Mutation-tested 3 ways (the disabled-check dropped from each fixed
+function in turn) -- all three caught cleanly. 65/65 both trees
+(native + ASan/UBSan, full suite given this touches ASIL-B
+request_compound.c/e2e.c). `cfusa check`: 0 errors both trees.
+`cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%.
+
+**Housekeeping**: a byte-identical stray duplicate `tests/test_
+request_compound 2.c` (macOS filesystem-sync artifact) found and
+removed before committing.
+
 ### v0.287.0 -- 2026-08-12 (issue #201 batch: `REQ-SRV-018`, RC Server
 PTP trigger signals)
 
