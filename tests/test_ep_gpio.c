@@ -32,6 +32,8 @@
 //cfusa:test REQ-GPIO-030
 //cfusa:test REQ-GPIO-031
 //cfusa:test REQ-GPIO-032
+//cfusa:test REQ-GPIO-035
+//cfusa:test REQ-GPIO-036
 //cfusa:test REQ-GPIO-037
 //cfusa:test REQ-GPIO-038
 //cfusa:test REQ-GPIO-039
@@ -828,6 +830,134 @@ static void test_response_decode_rejects_short_frame(void)
         rcp_ep_gpio_decode_response(too_short, sizeof(too_short), 2, &bitmask, &timed, &ts, &txn));
 }
 
+/* ── REQ-GPIO-035: debounce filtering ─────────────────────────────────────── */
+
+static void test_debounce_zero_means_no_debounce(void)
+{
+    rcp_ep_gpio_debounce_state_t s;
+    bool                          changed;
+
+    rcp_ep_gpio_debounce_state_init(&s);
+
+    TEST_ASSERT_TRUE(rcp_ep_gpio_debounce_sample(&s, true, 0u, &changed));
+    /* Even the very first sample settles immediately with n == 0 -- but
+     * it is still not reported as a "change" (nothing to change from). */
+    TEST_ASSERT_FALSE(changed);
+    TEST_ASSERT_TRUE(rcp_ep_gpio_debounce_sample(&s, true, 0u, &changed));
+
+    TEST_ASSERT_FALSE(rcp_ep_gpio_debounce_sample(&s, false, 0u, &changed));
+    TEST_ASSERT_TRUE(changed);
+}
+
+static void test_debounce_settles_after_n_consecutive_samples(void)
+{
+    rcp_ep_gpio_debounce_state_t s;
+    bool                          changed;
+
+    rcp_ep_gpio_debounce_state_init(&s);
+
+    /* n == 3: the first two samples of "true" are not yet enough. */
+    TEST_ASSERT_FALSE(rcp_ep_gpio_debounce_sample(&s, true, 3u, &changed));
+    TEST_ASSERT_FALSE(changed);
+    TEST_ASSERT_FALSE(rcp_ep_gpio_debounce_sample(&s, true, 3u, &changed));
+    TEST_ASSERT_FALSE(changed);
+    /* The third consecutive "true" settles it. */
+    TEST_ASSERT_TRUE(rcp_ep_gpio_debounce_sample(&s, true, 3u, &changed));
+    TEST_ASSERT_FALSE(changed); /* first-ever settle, not a "change" */
+    /* Further "true" samples keep it settled, unchanged. */
+    TEST_ASSERT_TRUE(rcp_ep_gpio_debounce_sample(&s, true, 3u, &changed));
+    TEST_ASSERT_FALSE(changed);
+}
+
+static void test_debounce_differing_sample_resets_the_run(void)
+{
+    rcp_ep_gpio_debounce_state_t s;
+    bool                          changed;
+
+    rcp_ep_gpio_debounce_state_init(&s);
+
+    /* Two consecutive "true" samples (not yet enough for n == 3), then a
+     * "false" sample -- this must reset the run, not merely pause it, so
+     * two more "true" samples after that are still not enough. */
+    TEST_ASSERT_FALSE(rcp_ep_gpio_debounce_sample(&s, true, 3u, &changed));
+    TEST_ASSERT_FALSE(rcp_ep_gpio_debounce_sample(&s, true, 3u, &changed));
+    TEST_ASSERT_FALSE(rcp_ep_gpio_debounce_sample(&s, false, 3u, &changed));
+    TEST_ASSERT_FALSE(rcp_ep_gpio_debounce_sample(&s, true, 3u, &changed));
+    TEST_ASSERT_FALSE(rcp_ep_gpio_debounce_sample(&s, true, 3u, &changed));
+    /* Only the third consecutive "true" in THIS run settles it. */
+    TEST_ASSERT_TRUE(rcp_ep_gpio_debounce_sample(&s, true, 3u, &changed));
+}
+
+static void test_debounce_first_settle_is_not_reported_as_a_change(void)
+{
+    rcp_ep_gpio_debounce_state_t s;
+    bool                          changed = true; /* deliberately wrong initial value */
+
+    rcp_ep_gpio_debounce_state_init(&s);
+
+    rcp_ep_gpio_debounce_sample(&s, true, 1u, &changed);
+    TEST_ASSERT_FALSE(changed);
+}
+
+static void test_debounce_returns_false_before_first_settle(void)
+{
+    rcp_ep_gpio_debounce_state_t s;
+
+    rcp_ep_gpio_debounce_state_init(&s);
+
+    /* n == 5, only 4 consecutive samples fed -- never settles. The
+     * return value must not leak the raw "true" samples; it stays false
+     * (no settled value exists yet) throughout. */
+    TEST_ASSERT_FALSE(rcp_ep_gpio_debounce_sample(&s, true, 5u, NULL));
+    TEST_ASSERT_FALSE(rcp_ep_gpio_debounce_sample(&s, true, 5u, NULL));
+    TEST_ASSERT_FALSE(rcp_ep_gpio_debounce_sample(&s, true, 5u, NULL));
+    TEST_ASSERT_FALSE(rcp_ep_gpio_debounce_sample(&s, true, 5u, NULL));
+}
+
+static void test_debounce_repeated_settled_value_reports_no_change(void)
+{
+    rcp_ep_gpio_debounce_state_t s;
+    bool                          changed;
+
+    rcp_ep_gpio_debounce_state_init(&s);
+
+    rcp_ep_gpio_debounce_sample(&s, true, 2u, &changed);
+    rcp_ep_gpio_debounce_sample(&s, true, 2u, &changed); /* settles true */
+    TEST_ASSERT_TRUE(rcp_ep_gpio_debounce_sample(&s, true, 2u, &changed));
+    TEST_ASSERT_FALSE(changed);
+    TEST_ASSERT_TRUE(rcp_ep_gpio_debounce_sample(&s, true, 2u, &changed));
+    TEST_ASSERT_FALSE(changed);
+}
+
+/* ── REQ-GPIO-036: response timing ────────────────────────────────────────── */
+
+static void test_response_timing_pure_read_is_immediate(void)
+{
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RESPONSE_IMMEDIATE,
+                       rcp_ep_gpio_response_timing(RCP_ACF_OP_READ, 0u));
+}
+
+static void test_response_timing_payload_bearing_read_is_after_debounce(void)
+{
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RESPONSE_AFTER_DEBOUNCE,
+                       rcp_ep_gpio_response_timing(RCP_ACF_OP_READ, 4u));
+}
+
+static void test_response_timing_write_is_always_after_debounce(void)
+{
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RESPONSE_AFTER_DEBOUNCE,
+                       rcp_ep_gpio_response_timing(RCP_ACF_OP_WRITE, 0u));
+    /* A write's own payload_len never changes the outcome. */
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RESPONSE_AFTER_DEBOUNCE,
+                       rcp_ep_gpio_response_timing(RCP_ACF_OP_WRITE, 4u));
+}
+
+static void test_response_timing_none_op_defaults_to_immediate(void)
+{
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RESPONSE_IMMEDIATE,
+                       rcp_ep_gpio_response_timing(RCP_ACF_OP_NONE, 0u));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -896,6 +1026,18 @@ int main(void)
     RUN_TEST(test_response_decode_rejects_wrong_bus);
     RUN_TEST(test_response_decode_rejects_bad_payload_len);
     RUN_TEST(test_response_decode_rejects_short_frame);
+
+    RUN_TEST(test_debounce_zero_means_no_debounce);
+    RUN_TEST(test_debounce_settles_after_n_consecutive_samples);
+    RUN_TEST(test_debounce_differing_sample_resets_the_run);
+    RUN_TEST(test_debounce_first_settle_is_not_reported_as_a_change);
+    RUN_TEST(test_debounce_returns_false_before_first_settle);
+    RUN_TEST(test_debounce_repeated_settled_value_reports_no_change);
+
+    RUN_TEST(test_response_timing_pure_read_is_immediate);
+    RUN_TEST(test_response_timing_payload_bearing_read_is_after_debounce);
+    RUN_TEST(test_response_timing_write_is_always_after_debounce);
+    RUN_TEST(test_response_timing_none_op_defaults_to_immediate);
 
     return UNITY_END();
 }
