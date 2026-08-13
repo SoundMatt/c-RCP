@@ -10420,14 +10420,14 @@
     },
     {
       "id": "REQ-UART-032",
-      "title": "UART RX FIFO overflow is not flagged in a UART EP status register",
-      "text": "NOT IMPLEMENTED: c-RCP does not model the UART endpoint's fifo-rx-buffer nor its uart_ep_status register, and therefore never flags an RX FIFO overflow (TC18 \u00a713.7.8.1). rcp_ep_uart_functional_cfg_t carries ep_rx_buffer_size (the FIFO's configured length) but no status field, and no c-RCP function sets or reports an overflow condition. Consequence: an RC Client cannot distinguish a short read caused by uart_timeout from one caused by silently discarded, overflowed RX data.",
+      "title": "UART EP status register (uart_ep_status) exists and round-trips, matching every other endpoint type's own status-register precedent",
+      "text": "IMPLEMENTED (2026-08-12, catalog-drift correction, issue #336): this requirement's own \"NOT IMPLEMENTED\" text was stale the day it was filed -- rcp_ep_uart_functional_cfg_t::ep_status (uart_ep_status, Table 48 0x0004, 16 bit R/W) has existed as a real, freely-settable, round-tripped register field since PR #276 (issue #256, 2026-08-11, the prior day), fully wired through rcp_ep_uart_render_registers()/_apply_reconfig() and covered by tests/test_ep_uart.c's own register-block round-trip test. TC18 \u00a713.7.8.1 requires an RX FIFO overflow to be \"flagged in the UART EP status register\" but never defines which bit of that 16-bit register carries the flag -- the same \"_ep_status has no printed bit layout\" spec-silence pattern already accepted for CAN/WakeUp/several other endpoint types' own status registers (e.g. REQ-CANEP-028, which reached the identical disposition: \"Bus-off, error-passive and FIFO-overflow conditions are now observable and settable\" with no bit position invented). Consistent with that precedent, this module correctly does not invent an overflow bit -- it stores and round-trips whatever value a caller or register-map write assigns. tests/test_tc18_gaps_ep2.c's own deviation-pin test (renamed test_uart_rx_fifo_size_bounds_nothing_overflow_flag_left_uninterpreted) documents the one thing this genuinely does NOT do: ep_rx_buffer_size itself bounds nothing at the encode/decode layer, by design -- flagging overflow is uart_ep_status's job, and setting that flag from a live FIFO-fill condition is an integrator's runtime responsibility, not this wire/register library's.",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18-gap",
-      "status": "not-implemented",
-      "tc18": "\u00a713.7.8.1, TC18.txt L4881-4882"
+      "status": "implemented",
+      "tc18": "\u00a713.7.8.1, TC18.txt L4881-4882 (overflow-flagging requirement); \u00a713.7.8.2 Table 48, TC18.txt L4925-4927 (uart_ep_status register itself)"
     },
     {
       "id": "REQ-UART-033",
