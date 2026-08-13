@@ -110,6 +110,28 @@ static void test_monotonic_ms_never_decreases(void)
     TEST_ASSERT_TRUE(b >= a);
 }
 
+/* ── Wall clock ────────────────────────────────────────────────────────────── */
+
+/* REQ-RELAY-001: rcp_wallclock_ms() has never been called by any test in
+ * this codebase at all -- src/adapt.c's own real callers are the only
+ * existing exercise, and none of them check the returned value. */
+//cfusa:test REQ-RELAY-001
+static void test_wallclock_ms_advances_and_is_plausible_epoch_time(void)
+{
+    uint64_t a = rcp_wallclock_ms();
+    uint64_t b;
+
+    /* 2020-01-01T00:00:00Z in epoch ms -- distinguishes a genuine
+     * wall-clock (calendar) time reading from an arbitrary
+     * monotonic-style counter, which would typically read near 0 or
+     * some small boot-relative value instead. */
+    TEST_ASSERT_TRUE(a > 1577836800000ULL);
+
+    rcp_sleep_ms(5);
+    b = rcp_wallclock_ms();
+    TEST_ASSERT_TRUE(b >= a);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -121,6 +143,7 @@ int main(void)
     RUN_TEST(test_thread_start_detached_runs);
 
     RUN_TEST(test_monotonic_ms_never_decreases);
+    RUN_TEST(test_wallclock_ms_advances_and_is_plausible_epoch_time);
 
     return UNITY_END();
 }

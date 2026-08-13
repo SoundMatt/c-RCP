@@ -13,6 +13,7 @@
 
 #include <rcp/admin.h>
 
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -140,6 +141,43 @@ static void test_subscribe_and_emit_deliver_the_correct_event(void)
     TEST_ASSERT_EQUAL(RCP_ADMIN_EVT_ENDPOINT_REGISTERED, g_last_event.type);
     TEST_ASSERT_TRUE(rcp_avtp_addr_equal(addr, g_last_event.addr));
     TEST_ASSERT_EQUAL_UINT64(12345, g_last_event.ts_ms);
+
+    rcp_admin_server_destroy(srv);
+}
+
+/* REQ-ADMIN-004's own "every subscriber... in registration order" clause:
+ * the single-subscriber test above cannot distinguish "invokes the one
+ * subscriber" from "invokes every subscriber in order" -- three
+ * subscribers, each identified by its own user_data, log the order they
+ * were actually called in. */
+static int g_call_order[8];
+static int g_call_order_len;
+
+static void log_call_order(const rcp_admin_event_t *ev, void *user_data)
+{
+    (void)ev;
+    g_call_order[g_call_order_len++] = (int)(intptr_t)user_data;
+}
+
+static void test_emit_invokes_every_subscriber_in_registration_order(void)
+{
+    rcp_admin_server_t *srv = rcp_admin_server_new();
+    rcp_admin_event_t   ev;
+
+    g_call_order_len = 0;
+    TEST_ASSERT_TRUE(rcp_admin_server_subscribe(srv, log_call_order, (void *)(intptr_t)1));
+    TEST_ASSERT_TRUE(rcp_admin_server_subscribe(srv, log_call_order, (void *)(intptr_t)2));
+    TEST_ASSERT_TRUE(rcp_admin_server_subscribe(srv, log_call_order, (void *)(intptr_t)3));
+
+    ev.type  = RCP_ADMIN_EVT_ENDPOINT_REGISTERED;
+    ev.addr  = make_addr(9, 2);
+    ev.ts_ms = 1;
+    rcp_admin_server_emit(srv, ev);
+
+    TEST_ASSERT_EQUAL_INT(3, g_call_order_len);
+    TEST_ASSERT_EQUAL_INT(1, g_call_order[0]);
+    TEST_ASSERT_EQUAL_INT(2, g_call_order[1]);
+    TEST_ASSERT_EQUAL_INT(3, g_call_order[2]);
 
     rcp_admin_server_destroy(srv);
 }
@@ -292,6 +330,7 @@ int main(void)
     RUN_TEST(test_register_and_deregister_report_membership_changes);
     RUN_TEST(test_endpoints_returns_a_snapshot_of_registered_endpoints);
     RUN_TEST(test_subscribe_and_emit_deliver_the_correct_event);
+    RUN_TEST(test_emit_invokes_every_subscriber_in_registration_order);
     RUN_TEST(test_record_counter_accumulates_each_delta_exactly_once);
     RUN_TEST(test_distinct_name_labels_tracked_separately);
     RUN_TEST(test_metrics_text_renders_prometheus_format);

@@ -488,7 +488,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-OBS-006",
@@ -588,7 +588,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-ADMIN-005",
@@ -1168,7 +1168,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-MDNS-006",
@@ -1870,7 +1870,7 @@
       "level": "ASIL-A",
       "asil": "ASIL-A",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-RELAY-002",
@@ -2090,7 +2090,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-MDNS-011",
@@ -2140,7 +2140,7 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "partial"
+      "status": "implemented"
     },
     {
       "id": "REQ-OBS-015",
