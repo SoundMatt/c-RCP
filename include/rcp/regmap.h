@@ -218,14 +218,16 @@
  *      either CRC error, sequence error, watchdog overflow, EP overflow,
  *      when enabled") is a different mechanism entirely (a passive,
  *      client-polled aggregate status covering all four fault classes
- *      uniformly, not an active per-cause notification push) and would
- *      need a new cross-cutting "is this stream currently blocked by any
- *      of its four independent fault latches" primitive this codebase
- *      does not yet have -- CRC has its own persisted
- *      rcp_e2e_stream_fault_t latch, but sequence/watchdog/overflow
- *      currently report only a per-call "should enter safe state now"
- *      result, with no equivalent persisted "stream is currently
- *      blocked" state of their own to aggregate against.
+ *      uniformly, not an active per-cause notification push). UPDATED
+ *      2026-08-13 (issue #201/#336, REQ-E2E-046): the cross-cutting "is
+ *      this stream currently blocked by any of its four independent
+ *      fault latches" primitive this note originally said the codebase
+ *      lacked now exists -- e2e.h's own rcp_e2e_stream_status_t and its
+ *      rcp_e2e_stream_status_rx_blocked() aggregate (that file's own
+ *      "Aggregate rx_stream_status" section). Still not wired into
+ *      mock.c's dispatch (which has no per-endpoint-type dispatch of any
+ *      kind), and rx_safety_measure/rx_wd_info_enable's own genuine
+ *      ambiguity remains unresolved.
  *      The rest of this octet's own surrounding registers
  *      (rx_safestate_sequencer/rx_safe_sequencer_state, 0x000E/0x000F)
  *      are themselves flagged, in the same RC5 revision, as subject to a

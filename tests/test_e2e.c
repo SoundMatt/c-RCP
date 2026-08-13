@@ -29,6 +29,7 @@
 //cfusa:test REQ-E2E-026
 //cfusa:test REQ-E2E-027
 //cfusa:test REQ-WIREERR-003
+//cfusa:test REQ-E2E-046
 #include "unity.h"
 
 #include <rcp/e2e.h>
@@ -617,6 +618,113 @@ static void test_stream_fault_tracker_capacity_exhaustion_is_honestly_reported(v
     TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_is_faulted(&t, 0u));
 }
 
+/* ── aggregate rx_stream_status (issue #201/#336, REQ-E2E-046) ──────────────── */
+
+//cfusa:test REQ-E2E-046
+static void test_stream_status_init_is_not_blocked(void)
+{
+    rcp_e2e_stream_status_t s;
+    rcp_e2e_stream_status_init(&s);
+
+    TEST_ASSERT_FALSE(rcp_e2e_stream_status_rx_blocked(&s));
+}
+
+//cfusa:test REQ-E2E-046
+static void test_stream_status_crc_cause_blocks_and_resets_independently(void)
+{
+    rcp_e2e_stream_status_t s;
+    rcp_e2e_stream_status_init(&s);
+
+    TEST_ASSERT_TRUE(rcp_e2e_stream_status_note_crc_error(&s, true));
+    TEST_ASSERT_TRUE(rcp_e2e_stream_status_rx_blocked(&s));
+
+    rcp_e2e_stream_status_reset_crc(&s);
+    TEST_ASSERT_FALSE(rcp_e2e_stream_status_rx_blocked(&s));
+}
+
+//cfusa:test REQ-E2E-046
+static void test_stream_status_crc_drop_mode_never_blocks(void)
+{
+    rcp_e2e_stream_status_t s;
+    rcp_e2e_stream_status_init(&s);
+
+    TEST_ASSERT_TRUE(rcp_e2e_stream_status_note_crc_error(&s, false));
+    TEST_ASSERT_FALSE(rcp_e2e_stream_status_rx_blocked(&s));
+}
+
+//cfusa:test REQ-E2E-046
+static void test_stream_status_seq_cause_blocks_only_on_enter_safe_state(void)
+{
+    rcp_e2e_stream_status_t s;
+    rcp_e2e_seq_result_t     no_block   = {true, true, false};
+    rcp_e2e_seq_result_t     do_block   = {false, true, true};
+
+    rcp_e2e_stream_status_init(&s);
+    rcp_e2e_stream_status_note_seq(&s, no_block);
+    TEST_ASSERT_FALSE(rcp_e2e_stream_status_rx_blocked(&s));
+
+    rcp_e2e_stream_status_note_seq(&s, do_block);
+    TEST_ASSERT_TRUE(rcp_e2e_stream_status_rx_blocked(&s));
+
+    rcp_e2e_stream_status_reset_seq(&s);
+    TEST_ASSERT_FALSE(rcp_e2e_stream_status_rx_blocked(&s));
+}
+
+//cfusa:test REQ-E2E-046
+static void test_stream_status_wd_cause_blocks_only_on_enter_safe_state(void)
+{
+    rcp_e2e_stream_status_t s;
+    rcp_e2e_wd_result_t      no_block = {true, false, true};
+    rcp_e2e_wd_result_t      do_block = {true, true, false};
+
+    rcp_e2e_stream_status_init(&s);
+    rcp_e2e_stream_status_note_wd(&s, no_block);
+    TEST_ASSERT_FALSE(rcp_e2e_stream_status_rx_blocked(&s));
+
+    rcp_e2e_stream_status_note_wd(&s, do_block);
+    TEST_ASSERT_TRUE(rcp_e2e_stream_status_rx_blocked(&s));
+
+    rcp_e2e_stream_status_reset_wd(&s);
+    TEST_ASSERT_FALSE(rcp_e2e_stream_status_rx_blocked(&s));
+}
+
+//cfusa:test REQ-E2E-046
+static void test_stream_status_overflow_cause_blocks_only_when_told(void)
+{
+    rcp_e2e_stream_status_t s;
+    rcp_e2e_stream_status_init(&s);
+
+    rcp_e2e_stream_status_note_overflow(&s, false);
+    TEST_ASSERT_FALSE(rcp_e2e_stream_status_rx_blocked(&s));
+
+    rcp_e2e_stream_status_note_overflow(&s, true);
+    TEST_ASSERT_TRUE(rcp_e2e_stream_status_rx_blocked(&s));
+
+    rcp_e2e_stream_status_reset_overflow(&s);
+    TEST_ASSERT_FALSE(rcp_e2e_stream_status_rx_blocked(&s));
+}
+
+//cfusa:test REQ-E2E-046
+static void test_stream_status_causes_are_independent_of_one_another(void)
+{
+    /* Resetting one cause must not clear a different, still-latched
+     * cause -- each of the four has its own distinct TC18 release
+     * condition, so each latch must be independently resettable. */
+    rcp_e2e_stream_status_t s;
+    rcp_e2e_seq_result_t     seq_block = {false, true, true};
+
+    rcp_e2e_stream_status_init(&s);
+    TEST_ASSERT_TRUE(rcp_e2e_stream_status_note_crc_error(&s, true));
+    rcp_e2e_stream_status_note_seq(&s, seq_block);
+    TEST_ASSERT_TRUE(rcp_e2e_stream_status_rx_blocked(&s));
+
+    rcp_e2e_stream_status_reset_crc(&s);
+    TEST_ASSERT_TRUE(rcp_e2e_stream_status_rx_blocked(&s)); /* seq still latched */
+
+    rcp_e2e_stream_status_reset_seq(&s);
+    TEST_ASSERT_FALSE(rcp_e2e_stream_status_rx_blocked(&s)); /* now both clear */
+}
+
 /* ── per-stream watchdog ───────────────────────────────────────────────────── */
 
 static void test_wd_evaluate_disabled_never_overflows(void)
@@ -757,6 +865,14 @@ int main(void)
     RUN_TEST(test_stream_fault_tracker_registers_and_isolates_streams);
     RUN_TEST(test_stream_fault_tracker_reset_clears_only_that_stream);
     RUN_TEST(test_stream_fault_tracker_capacity_exhaustion_is_honestly_reported);
+
+    RUN_TEST(test_stream_status_init_is_not_blocked);
+    RUN_TEST(test_stream_status_crc_cause_blocks_and_resets_independently);
+    RUN_TEST(test_stream_status_crc_drop_mode_never_blocks);
+    RUN_TEST(test_stream_status_seq_cause_blocks_only_on_enter_safe_state);
+    RUN_TEST(test_stream_status_wd_cause_blocks_only_on_enter_safe_state);
+    RUN_TEST(test_stream_status_overflow_cause_blocks_only_when_told);
+    RUN_TEST(test_stream_status_causes_are_independent_of_one_another);
 
     RUN_TEST(test_wd_evaluate_disabled_never_overflows);
     RUN_TEST(test_wd_evaluate_below_timeout_no_overflow);

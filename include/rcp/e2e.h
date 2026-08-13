@@ -799,6 +799,108 @@ bool rcp_e2e_stream_fault_tracker_is_faulted(const rcp_e2e_stream_fault_tracker_
  * seen. */
 void rcp_e2e_stream_fault_tracker_reset(rcp_e2e_stream_fault_tracker_t *t, uint64_t stream_id);
 
+/* ── Aggregate rx_stream_status (issue #201/#336, REQ-E2E-046) ──────────────
+ *
+ * TC18 0.5.1_RC5's own Table 24 rx_stream_status (0x000D.7, read-only) is a
+ * NEW status this codebase's original baseline never had: "0b: stream is
+ * active / 1b: stream is blocked, requests are rejected", set automatically
+ * as a reaction to a CRC error, sequence error, watchdog overflow, or
+ * request-storage overflow, whichever of those four is enabled for the
+ * stream -- see regmap.h's own "TC18 0.5.1_RC5 terminology drift" section
+ * for the full investigation this primitive completes. This is a passive,
+ * client-polled AGGREGATE distinct from each cause's own existing per-call
+ * "should enter safe state now" decision (rcp_e2e_seq_evaluate()'s
+ * result.enter_safe_state, rcp_e2e_wd_evaluate()'s result.enter_safe_state,
+ * rcp_e2e_overflow_should_enter_safe_state()'s return value) -- those
+ * report a one-shot verdict at the instant a fault is evaluated; this is
+ * instead a PERSISTED "is the stream currently blocked" state a client can
+ * poll at any later time, the same shape rcp_e2e_stream_fault_t already
+ * established for the CRC cause alone.
+ *
+ * rcp_e2e_stream_status_t reuses rcp_e2e_stream_fault_t for the CRC latch
+ * unchanged (composition, not duplication) and adds three sibling bool
+ * latches of the identical shape for the other three fault classes.
+ * rcp_e2e_stream_status_rx_blocked() is the pure aggregate read: true iff
+ * ANY of the four latches is currently set. TC18's own wording ("set...as
+ * a reaction to either CRC error, sequence error, watchdog overflow, EP
+ * overflow, when enabled") does not spell out an explicit AND/OR
+ * combination, but "either...or...or...or" read plainly is a logical OR
+ * across whichever causes are enabled for that stream -- the same reading
+ * this module's own crc/seq/wd/overflow evaluators already use
+ * independently of one another.
+ *
+ * Each latch has its own independent reset (rcp_e2e_stream_status_reset_*())
+ * rather than one combined reset, since TC18 gives each of the four
+ * underlying fault classes its own distinct release condition and this
+ * module has no basis to assume clearing one cause also clears another's.
+ *
+ * rcp_e2e_stream_status_note_seq()/_note_wd()/_note_overflow() do not
+ * themselves call rcp_e2e_seq_evaluate()/_wd_evaluate()/
+ * _overflow_should_enter_safe_state() -- a caller composes the two, the
+ * same "own small pure/stateful helpers, operate on caller-supplied
+ * results" layering discipline every other latch in this module already
+ * follows (rcp_e2e_stream_fault_on_crc_error() itself takes rx_enforce_e2e,
+ * not a CRC-check result, for the identical reason).
+ *
+ * Wiring: mock.c has no per-endpoint-type dispatch of any kind (the same
+ * structural gap this whole issue #336 lineage has repeatedly routed
+ * around -- see REQ-CANCEL-012's own precedent) to actually call these
+ * note_*() functions from a live evaluate()-then-latch path, or to expose
+ * rcp_e2e_stream_status_rx_blocked() as a real register read. This
+ * primitive is real and directly tested but not yet wired into any live
+ * dispatch path -- the same disposition already established across this
+ * entire lineage.
+ */
+typedef struct {
+    rcp_e2e_stream_fault_t crc;              /* reused, unchanged CRC latch */
+    bool                    seq_blocked;
+    bool                    wd_blocked;
+    bool                    overflow_blocked;
+} rcp_e2e_stream_status_t;
+
+/* Zero-initializes s (every latch, including s->crc, not-blocked). */
+void rcp_e2e_stream_status_init(rcp_e2e_stream_status_t *s);
+
+/* CRC cause: applies a CRC_ERROR to s->crc exactly as
+ * rcp_e2e_stream_fault_on_crc_error() does (delegates to it directly).
+ * Always returns true (a CRC_ERROR always means "skip this request"). */
+bool rcp_e2e_stream_status_note_crc_error(rcp_e2e_stream_status_t *s, bool rx_enforce_e2e);
+
+/* Sequence cause: latches s->seq_blocked permanently (until
+ * rcp_e2e_stream_status_reset_seq()) iff result.enter_safe_state is true,
+ * given a result the caller already computed via rcp_e2e_seq_evaluate(). */
+void rcp_e2e_stream_status_note_seq(rcp_e2e_stream_status_t *s,
+                                     rcp_e2e_seq_result_t result);
+
+/* Watchdog cause: latches s->wd_blocked permanently (until
+ * rcp_e2e_stream_status_reset_wd()) iff result.enter_safe_state is true,
+ * given a result the caller already computed via rcp_e2e_wd_evaluate(). */
+void rcp_e2e_stream_status_note_wd(rcp_e2e_stream_status_t *s,
+                                    rcp_e2e_wd_result_t result);
+
+/* Request-storage-overflow cause: latches s->overflow_blocked permanently
+ * (until rcp_e2e_stream_status_reset_overflow()) iff enter_safe_state is
+ * true, given a verdict the caller already computed via
+ * rcp_e2e_overflow_should_enter_safe_state(). */
+void rcp_e2e_stream_status_note_overflow(rcp_e2e_stream_status_t *s, bool enter_safe_state);
+
+/* Clears s->crc back to not-faulted (delegates to
+ * rcp_e2e_stream_fault_reset()). */
+void rcp_e2e_stream_status_reset_crc(rcp_e2e_stream_status_t *s);
+
+/* Clears s->seq_blocked back to false. */
+void rcp_e2e_stream_status_reset_seq(rcp_e2e_stream_status_t *s);
+
+/* Clears s->wd_blocked back to false. */
+void rcp_e2e_stream_status_reset_wd(rcp_e2e_stream_status_t *s);
+
+/* Clears s->overflow_blocked back to false. */
+void rcp_e2e_stream_status_reset_overflow(rcp_e2e_stream_status_t *s);
+
+/* The rx_stream_status wire bit itself: true iff any of s's four latches
+ * (crc, seq_blocked, wd_blocked, overflow_blocked) is currently set. */
+bool rcp_e2e_stream_status_rx_blocked(const rcp_e2e_stream_status_t *s);
+
 #ifdef __cplusplus
 }
 #endif

@@ -551,3 +551,69 @@ void rcp_e2e_stream_fault_tracker_reset(rcp_e2e_stream_fault_tracker_t *t, uint6
 
     if (slot) rcp_e2e_stream_fault_reset(&slot->fault);
 }
+
+/* ── Aggregate rx_stream_status (issue #201/#336, REQ-E2E-046) ─────────────── */
+
+//cfusa:req REQ-E2E-046
+void rcp_e2e_stream_status_init(rcp_e2e_stream_status_t *s)
+{
+    rcp_e2e_stream_fault_init(&s->crc);
+    s->seq_blocked      = false;
+    s->wd_blocked       = false;
+    s->overflow_blocked = false;
+}
+
+//cfusa:req REQ-E2E-046
+bool rcp_e2e_stream_status_note_crc_error(rcp_e2e_stream_status_t *s, bool rx_enforce_e2e)
+{
+    return rcp_e2e_stream_fault_on_crc_error(&s->crc, rx_enforce_e2e);
+}
+
+//cfusa:req REQ-E2E-046
+void rcp_e2e_stream_status_note_seq(rcp_e2e_stream_status_t *s, rcp_e2e_seq_result_t result)
+{
+    if (result.enter_safe_state) s->seq_blocked = true;
+}
+
+//cfusa:req REQ-E2E-046
+void rcp_e2e_stream_status_note_wd(rcp_e2e_stream_status_t *s, rcp_e2e_wd_result_t result)
+{
+    if (result.enter_safe_state) s->wd_blocked = true;
+}
+
+//cfusa:req REQ-E2E-046
+void rcp_e2e_stream_status_note_overflow(rcp_e2e_stream_status_t *s, bool enter_safe_state)
+{
+    if (enter_safe_state) s->overflow_blocked = true;
+}
+
+//cfusa:req REQ-E2E-046
+void rcp_e2e_stream_status_reset_crc(rcp_e2e_stream_status_t *s)
+{
+    rcp_e2e_stream_fault_reset(&s->crc);
+}
+
+//cfusa:req REQ-E2E-046
+void rcp_e2e_stream_status_reset_seq(rcp_e2e_stream_status_t *s)
+{
+    s->seq_blocked = false;
+}
+
+//cfusa:req REQ-E2E-046
+void rcp_e2e_stream_status_reset_wd(rcp_e2e_stream_status_t *s)
+{
+    s->wd_blocked = false;
+}
+
+//cfusa:req REQ-E2E-046
+void rcp_e2e_stream_status_reset_overflow(rcp_e2e_stream_status_t *s)
+{
+    s->overflow_blocked = false;
+}
+
+//cfusa:req REQ-E2E-046
+bool rcp_e2e_stream_status_rx_blocked(const rcp_e2e_stream_status_t *s)
+{
+    return rcp_e2e_stream_fault_is_faulted(&s->crc) || s->seq_blocked || s->wd_blocked ||
+           s->overflow_blocked;
+}
