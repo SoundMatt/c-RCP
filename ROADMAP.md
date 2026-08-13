@@ -15205,6 +15205,69 @@ fixed by sizing the buffer correctly, not by weakening the assertion.
 65/65 both trees. `cfusa check`: 0 errors. `cfusa trace --gaps`:
 0/1024 untested; `--req-coverage 100`/`--sec-tested 100`: both 100%.
 
+### v0.290.0 -- 2026-08-12 (issue #201/#334 dedicated investigation:
+MDIO mdio_mode wire field, REQ-MDIO-021)
+
+**REQ-MDIO-021 flips not-implemented -> partial.**
+
+rcp_ep_mdio_encode_read_request()/_encode_write_request()/
+_decode_read_request()/_decode_write_request() now place a real,
+wire-encoded mdio_mode octet as the leading byte of every request
+payload, before the pre-existing clause/prtad/devad/regad(/
+word_count) address prefix -- closing this requirement's own
+literal "no mdio_mode field at all" complaint. rcp_ep_mdio_mode_
+for_word_count() derives MMD_SINGLE/MMD_MULTI from word_count (1
+vs >1), the same distinction already made before this fix, now
+genuinely present on the wire too.
+
+Two documented assumptions underlie this fix, both investigated
+against the primary source and confirmed on the rendered PDF page
+image (not just the text extraction) before implementation:
+
+1. TC18 13.7.13.3 Table 60's own 2-bit mdio_mode value list is
+   genuinely broken in the spec itself: 01b is assigned to both
+   "MMD, single word access" and "MMD, multiple byte access," and
+   00b is never assigned to anything. This module assigns 00b to
+   MMD_SINGLE -- the only reading that gives the field's own
+   natural 00/01/10/11 sequence four distinct meanings.
+2. A second, larger gap surfaced designing a conformant encoding:
+   neither Figure 43 nor Table 60 gives mdio_address an explicit
+   bit width, and "MMS" (Memory Mapped Space) is plausibly the
+   OPEN Alliance 10BASE-T1x SPI protocol's own distinct addressing
+   concept, not IEEE 802.3 Clause 22/45 at all -- a THIRD
+   addressing scheme with no verified primary-source basis to
+   design a wire layout for. This fix is deliberately scoped to
+   the one addressing family c-RCP already correctly implements
+   (MMD, both Clause-22 and Clause-45). Decode recognizes an
+   incoming MMS-mode request and rejects it with the new
+   RCP_EP_MDIO_ERR_UNSUPPORTED_MMS rather than silently misreading
+   its address field as if it were MMD-shaped. Status flips to
+   partial, not implemented, for exactly this reason.
+
+REQ-MDIO-022 (16 vs 32-bit data width for MMS0/MMS1) stays
+not-implemented, now precisely blocked: unreachable without MMS
+addressing existing at all, which this fix deliberately does not
+add.
+
+Citation-drift fix, same lineage as issue #341: the catalog's own
+"Figure 42"/"Table 57" citations were stale -- RC5's own renumbered
+figure/table are Figure 43/Table 60.
+
+Both findings (the mdio_mode defect and the missing mdio_address
+width/burst-count field) were added to the canonical spec-defects
+report (TC18_spec_defects_report.md, items 25/26/55, plus the
+_quadruple_checked.md review copy) for OPEN Alliance to confirm or
+correct.
+
+Rewrote the pre-existing gap-pinning test and added 9 new dedicated
+unit tests in test_ep_mdio.c covering mdio_mode derivation,
+encoding, and MMS rejection on both request paths.
+
+Mutation-tested 4 ways; all four caught cleanly. 65/65 both trees
+(native + ASan/UBSan, full suite given real wire (de)serialization).
+`cfusa check`: 0 errors both trees. `cfusa trace --req-coverage
+100`/`--sec-tested 100`: both 100%.
+
 ### v0.289.0 -- 2026-08-12 (issue #256 Group I dedicated
 investigation: CAN EP_func register block, REQ-CANEP-028 -- ASIL-B)
 

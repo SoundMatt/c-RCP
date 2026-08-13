@@ -143,14 +143,20 @@
  *
  * ── Wire layout: this module's own address-prefix-then-words choice ────────
  *
- * A read request's ACF-level payload is a fixed 7-byte prefix -- 1 byte
+ * FIXED 2026-08-12 (REQ-MDIO-021, see the "mdio_mode" section below for the
+ * full investigation and its documented assumptions): every request's
+ * payload now begins with a 1-byte `mdio_mode` octet (bits[7:2] reserved/0,
+ * bits[1:0] = mode) -- the rest of this section describes the payload
+ * *following* that new leading octet, unchanged from before this fix.
+ *
+ * A read request's remaining payload is a fixed 7-byte prefix -- 1 byte
  * `clause`, 1 byte `prtad`, 1 byte `devad`, a big-endian 2-byte `regad`,
  * and a big-endian 2-byte `word_count` -- and no further bytes (nothing to
- * read yet; only the reply carries data). A write request's payload is
- * the same 5-byte address prefix (`clause`/`prtad`/`devad`/`regad`, with
- * `word_count` this time implied by the payload's own remaining length
- * rather than encoded again) followed by `word_count` packed big-endian
- * 16-bit words -- see rcp_ep_mdio_pack_words()/_word_count_of()/
+ * read yet; only the reply carries data). A write request's remaining
+ * payload is the same 5-byte address prefix (`clause`/`prtad`/`devad`/
+ * `regad`, with `word_count` this time implied by the payload's own
+ * remaining length rather than encoded again) followed by `word_count`
+ * packed big-endian 16-bit words -- see rcp_ep_mdio_pack_words()/_word_count_of()/
  * _unpack_word_at() below. A read or write response's payload is simply
  * the packed words the endpoint actually captured or accepted (no address
  * prefix -- transaction_num already correlates a response back to its
@@ -289,6 +295,82 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/* ── mdio_mode: TC18 §13.7.13.3 Figure 43/Table 60, REQ-MDIO-021 ────────────
+ *
+ * DOCUMENTED ASSUMPTION, user-approved 2026-08-12, see the spec-defects
+ * report items 25/26/55 (TC18_spec_defects_report.md, canonical path
+ * /Users/matt/Documents/Coding/SoundMatt/, NOT in this repo) for the full
+ * primary-source investigation this is based on:
+ *
+ * Table 60's own 2-bit mdio_mode value list is genuinely broken in the
+ * spec itself (confirmed on the rendered PDF page image, not an
+ * extraction artifact): `01b` is assigned to BOTH "MMD, single word
+ * access" and "MMD, multiple byte access", and `00b` is never assigned
+ * to anything (item 25). This module assigns 00b to MMD-single, matching
+ * the only reading that gives the field's own natural 00/01/10/11
+ * sequence four DISTINCT meanings instead of three: 00b mirrors 10b/11b's
+ * own single-vs-multi pairing pattern, and is the only assignment that
+ * doesn't leave one bit pattern with two conflicting meanings.
+ *
+ * A SECOND, larger gap surfaced while designing a conformant encoding
+ * (item 55): neither Figure 43 nor Table 60 gives mdio_address an
+ * explicit bit width, and "MMS" (Memory Mapped Space) is plausibly the
+ * OPEN Alliance 10BASE-T1x SPI protocol's own distinct addressing
+ * concept, not IEEE 802.3 Clause 22/45 addressing at all -- a THIRD
+ * addressing scheme this module has no verified primary-source basis to
+ * design a wire layout for. Rather than inventing that scheme's own byte
+ * layout too, this module's own fix is deliberately scoped narrower: it
+ * adds the missing mdio_mode field to the wire (closing REQ-MDIO-021's
+ * own literal "no mdio_mode field at all" complaint) for the ONE
+ * addressing family this module already correctly implements and has
+ * always supported -- MMD, i.e. rcp_ep_mdio_addr_t's own Clause-22/
+ * Clause-45 addressing (both clauses map to TC18's own "MMD" mode value,
+ * since Table 60's own MMD/MMS axis is orthogonal to IEEE 802.3's own
+ * Clause-22-vs-45 axis, and this module has no verified basis to further
+ * subdivide "MMD" by clause). MMS is a real value mdio_mode CAN decode to
+ * (a peer may legitimately send it) but this module cannot yet interpret
+ * -- rcp_ep_mdio_decode_read_request()/_decode_write_request() reject an
+ * incoming MMS-mode request with the new RCP_EP_MDIO_ERR_UNSUPPORTED_MMS
+ * error rather than silently misreading its address field as if it were
+ * MMD-shaped. REQ-MDIO-021 flips from not-implemented to PARTIAL, not
+ * IMPLEMENTED, for exactly this reason -- MMS support remains a real,
+ * precisely-scoped, still-open remainder, not a silently-dropped case.
+ *
+ * mdio_mode is encoded as a new leading octet at payload offset 0 (bits
+ * [7:2] reserved/0, bits[1:0] = mode), placed BEFORE the existing
+ * clause/prtad/devad/regad(/word_count) address prefix, which is
+ * otherwise completely UNCHANGED -- only shifted one byte later on the
+ * wire. This module's own encoders always derive MMD_SINGLE vs MMD_MULTI
+ * from word_count (1 vs >1), the same distinction word_count already
+ * made before this fix; mdio_mode is now genuinely present on the wire
+ * too, not merely implied.
+ *
+ * REQ-MDIO-022 (16 vs 32-bit data width for MMS0/MMS1) stays entirely
+ * NOT IMPLEMENTED: it is unreachable without MMS addressing existing at
+ * all, which this fix deliberately does not add. */
+typedef enum {
+    RCP_EP_MDIO_MODE_MMD_SINGLE = 0, /* 00b -- ASSUMPTION, see above */
+    RCP_EP_MDIO_MODE_MMD_MULTI  = 1, /* 01b */
+    RCP_EP_MDIO_MODE_MMS_SINGLE = 2, /* 10b -- decodable, not encodable or
+                                         interpretable by this module */
+    RCP_EP_MDIO_MODE_MMS_MULTI  = 3, /* 11b -- decodable, not encodable or
+                                         interpretable by this module */
+} rcp_ep_mdio_mode_t;
+
+/* True iff word_count selects RCP_EP_MDIO_MODE_MMD_MULTI (word_count > 1)
+ * rather than RCP_EP_MDIO_MODE_MMD_SINGLE (word_count == 1) -- the same
+ * single-vs-burst distinction this module's own word_count parameter
+ * already made before this fix, now also reflected in the wire-encoded
+ * mdio_mode octet. Meaningless for word_count == 0, which every encoder
+ * below already rejects before this would be consulted. */
+rcp_ep_mdio_mode_t rcp_ep_mdio_mode_for_word_count(size_t word_count);
+
+/* True iff mode is RCP_EP_MDIO_MODE_MMS_SINGLE or _MMS_MULTI -- the two
+ * mdio_mode values this module can decode (recognize on the wire) but
+ * not encode or otherwise interpret -- see this section's own opening
+ * comment. */
+bool rcp_ep_mdio_mode_is_unsupported_mms(rcp_ep_mdio_mode_t mode);
 
 /* ── Addressing: Clause-22 MMD / Clause-45 MMS ───────────────────────────── */
 
@@ -479,6 +561,13 @@ typedef enum {
      * caller shall respond with error code UNSUPPORTED_CMD (see
      * rcp_acf_evt_row2_is_plain()). */
     RCP_EP_MDIO_ERR_BAD_EVT         = 8,
+    /* The decoded mdio_mode octet is RCP_EP_MDIO_MODE_MMS_SINGLE or
+     * _MMS_MULTI -- REQ-MDIO-021's own still-open remainder, see this
+     * file's own "mdio_mode" section above. This module recognizes the
+     * value on the wire but has no verified basis to interpret an MMS
+     * request's own address/data shape, so it fails closed here rather
+     * than misreading the payload as if it were MMD-shaped. */
+    RCP_EP_MDIO_ERR_UNSUPPORTED_MMS = 9,
 } rcp_ep_mdio_errc_t;
 
 /* Human-readable message for an rcp_ep_mdio_errc_t value. Never returns NULL. */
@@ -486,22 +575,28 @@ const char *rcp_ep_mdio_strerror(rcp_ep_mdio_errc_t e);
 
 /* ── Read request/response ─────────────────────────────────────────────────── */
 
-/* Encodes an ACF_ABB read request addressed to byte_bus_id: a 7-byte
- * payload of addr's own clause/prtad/devad/regad fields followed by
- * word_count -- see the file header's wire-layout discussion. Returns a
- * zeroed rcp_bytes_t (data=NULL) if !rcp_ep_mdio_addr_valid(addr), if
- * word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS, or on
- * allocation failure. */
+/* Encodes an ACF_ABB read request addressed to byte_bus_id: a new leading
+ * mdio_mode octet (REQ-MDIO-021, see the file header's own "mdio_mode"
+ * section -- always MMD_SINGLE or MMD_MULTI, derived from word_count via
+ * rcp_ep_mdio_mode_for_word_count()) followed by the existing 7-byte
+ * payload of addr's own clause/prtad/devad/regad fields and word_count,
+ * unchanged apart from shifting one byte later -- see the file header's
+ * wire-layout discussion. Returns a zeroed rcp_bytes_t (data=NULL) if
+ * !rcp_ep_mdio_addr_valid(addr), if word_count is 0 or exceeds
+ * RCP_EP_MDIO_MAX_BURST_WORDS, or on allocation failure. */
 rcp_bytes_t rcp_ep_mdio_encode_read_request(rcp_byte_bus_id_t byte_bus_id,
                                              rcp_ep_mdio_addr_t addr, size_t word_count,
                                              uint8_t transaction_num);
 
 /* Decodes and validates an ACF-level MDIO read request from b[0..len).
  * Fails with RCP_EP_MDIO_ERR_SHORT_FRAME if b is shorter than the ACF_ABB
- * fixed header, its declared payload length, or the 7-byte request
- * prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE if b is not an ACF_ABB message;
+ * fixed header, its declared payload length, or the 8-byte (mdio_mode
+ * octet + 7-byte address/word_count) request prefix;
+ * RCP_EP_MDIO_ERR_BAD_MSG_TYPE if b is not an ACF_ABB message;
  * RCP_EP_MDIO_ERR_WRONG_BUS if its byte_bus_id != expected_bus_id;
  * RCP_EP_MDIO_ERR_WRONG_OP if its op is not RCP_ACF_OP_READ;
+ * RCP_EP_MDIO_ERR_UNSUPPORTED_MMS if the decoded mdio_mode octet is an MMS
+ * value (see the file header's own "mdio_mode" section);
  * RCP_EP_MDIO_ERR_BAD_ADDR if the decoded address fails
  * rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT if the decoded
  * word_count is 0 or exceeds RCP_EP_MDIO_MAX_BURST_WORDS;
@@ -554,10 +649,14 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_read_response(const uint8_t *b, size_t len
 
 /* ── Write request/response ────────────────────────────────────────────────── */
 
-/* Encodes an ACF_ABB write request addressed to byte_bus_id: the 5-byte
- * address prefix (addr's own clause/prtad/devad/regad fields) followed by
- * rcp_ep_mdio_pack_words(words, word_count) -- see the file header's
- * wire-layout discussion. Returns a zeroed rcp_bytes_t (data=NULL) if
+/* Encodes an ACF_ABB write request addressed to byte_bus_id: a new leading
+ * mdio_mode octet (REQ-MDIO-021, see the file header's own "mdio_mode"
+ * section -- always MMD_SINGLE or MMD_MULTI, derived from word_count via
+ * rcp_ep_mdio_mode_for_word_count()) followed by the existing 5-byte
+ * address prefix (addr's own clause/prtad/devad/regad fields) and
+ * rcp_ep_mdio_pack_words(words, word_count), unchanged apart from
+ * shifting one byte later -- see the file header's wire-layout
+ * discussion. Returns a zeroed rcp_bytes_t (data=NULL) if
  * !rcp_ep_mdio_addr_valid(addr), if word_count is 0 or exceeds
  * RCP_EP_MDIO_MAX_BURST_WORDS, or on allocation failure. */
 rcp_bytes_t rcp_ep_mdio_encode_write_request(rcp_byte_bus_id_t byte_bus_id,
@@ -566,10 +665,13 @@ rcp_bytes_t rcp_ep_mdio_encode_write_request(rcp_byte_bus_id_t byte_bus_id,
 
 /* Decodes and validates an ACF-level MDIO write request from b[0..len).
  * Fails with RCP_EP_MDIO_ERR_SHORT_FRAME if b is shorter than the ACF_ABB
- * fixed header, its declared payload length, or the 5-byte address
- * prefix; RCP_EP_MDIO_ERR_BAD_MSG_TYPE if b is not an ACF_ABB message;
+ * fixed header, its declared payload length, or the 6-byte (mdio_mode
+ * octet + 5-byte address prefix) request prefix;
+ * RCP_EP_MDIO_ERR_BAD_MSG_TYPE if b is not an ACF_ABB message;
  * RCP_EP_MDIO_ERR_WRONG_BUS if its byte_bus_id != expected_bus_id;
  * RCP_EP_MDIO_ERR_WRONG_OP if its op is not RCP_ACF_OP_WRITE;
+ * RCP_EP_MDIO_ERR_UNSUPPORTED_MMS if the decoded mdio_mode octet is an MMS
+ * value (see the file header's own "mdio_mode" section);
  * RCP_EP_MDIO_ERR_BAD_ADDR if the decoded address fails
  * rcp_ep_mdio_addr_valid(); RCP_EP_MDIO_ERR_BAD_WORD_COUNT if the words
  * region's own byte length is odd, is 0, or represents more than

@@ -128,6 +128,133 @@ static void test_burst_next_regad_unknown_clause_unchanged(void)
     TEST_ASSERT_EQUAL_UINT16(42, rcp_ep_mdio_burst_next_regad((rcp_ep_mdio_clause_t)2, 42));
 }
 
+/* ── mdio_mode: REQ-MDIO-021 ────────────────────────────────────────────────── */
+
+static void test_mode_for_word_count_single(void)
+{
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_MODE_MMD_SINGLE, rcp_ep_mdio_mode_for_word_count(1));
+}
+
+static void test_mode_for_word_count_multi(void)
+{
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_MODE_MMD_MULTI, rcp_ep_mdio_mode_for_word_count(2));
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_MODE_MMD_MULTI,
+                      rcp_ep_mdio_mode_for_word_count(RCP_EP_MDIO_MAX_BURST_WORDS));
+}
+
+static void test_mode_is_unsupported_mms(void)
+{
+    TEST_ASSERT_FALSE(rcp_ep_mdio_mode_is_unsupported_mms(RCP_EP_MDIO_MODE_MMD_SINGLE));
+    TEST_ASSERT_FALSE(rcp_ep_mdio_mode_is_unsupported_mms(RCP_EP_MDIO_MODE_MMD_MULTI));
+    TEST_ASSERT_TRUE(rcp_ep_mdio_mode_is_unsupported_mms(RCP_EP_MDIO_MODE_MMS_SINGLE));
+    TEST_ASSERT_TRUE(rcp_ep_mdio_mode_is_unsupported_mms(RCP_EP_MDIO_MODE_MMS_MULTI));
+}
+
+/* REQ-MDIO-021: a read request's own encoded mdio_mode octet (the byte
+ * immediately after the 8-byte ACF_ABB header) reflects word_count's own
+ * single-vs-multi distinction. */
+static void test_read_request_encode_sets_mdio_mode_single(void)
+{
+    rcp_ep_mdio_addr_t addr  = clause22_addr(1, 0);
+    rcp_bytes_t         frame = rcp_ep_mdio_encode_read_request(2, addr, 1, 0);
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_TRUE(frame.len > RCP_ACF_ABB_HEADER_LEN);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_MDIO_MODE_MMD_SINGLE,
+                            frame.data[RCP_ACF_ABB_HEADER_LEN]);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_read_request_encode_sets_mdio_mode_multi(void)
+{
+    rcp_ep_mdio_addr_t addr  = clause22_addr(1, 0);
+    rcp_bytes_t         frame = rcp_ep_mdio_encode_read_request(2, addr, 4, 0);
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_TRUE(frame.len > RCP_ACF_ABB_HEADER_LEN);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_MDIO_MODE_MMD_MULTI,
+                            frame.data[RCP_ACF_ABB_HEADER_LEN]);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_write_request_encode_sets_mdio_mode_single(void)
+{
+    rcp_ep_mdio_addr_t addr    = clause45_addr(1, 2, 0);
+    uint16_t             word   = 0x1234;
+    rcp_bytes_t          frame  = rcp_ep_mdio_encode_write_request(2, addr, &word, 1, 0);
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_TRUE(frame.len > RCP_ACF_ABB_HEADER_LEN);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_MDIO_MODE_MMD_SINGLE,
+                            frame.data[RCP_ACF_ABB_HEADER_LEN]);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_write_request_encode_sets_mdio_mode_multi(void)
+{
+    rcp_ep_mdio_addr_t addr       = clause45_addr(1, 2, 0);
+    uint16_t             words[3]  = {1, 2, 3};
+    rcp_bytes_t          frame     = rcp_ep_mdio_encode_write_request(2, addr, words, 3, 0);
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_TRUE(frame.len > RCP_ACF_ABB_HEADER_LEN);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_MDIO_MODE_MMD_MULTI,
+                            frame.data[RCP_ACF_ABB_HEADER_LEN]);
+
+    rcp_bytes_free(&frame);
+}
+
+/* REQ-MDIO-021's own still-open remainder: a request whose mdio_mode
+ * octet decodes to an MMS value is recognized on the wire but rejected,
+ * not silently misread as if it were MMD-shaped -- see the file header's
+ * own "mdio_mode" section. */
+static void test_read_request_decode_rejects_mms_mode(void)
+{
+    rcp_acf_byte_message_info_t hdr        = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_mdio_addr_t          out_addr;
+    size_t                      out_word_count;
+    uint8_t                     txn;
+    uint8_t                     payload[8] = {0};
+
+    payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMS_SINGLE;
+    payload[7] = 1; /* word_count -- otherwise-valid request */
+
+    hdr.byte_bus_id = 2;
+    hdr.op          = RCP_ACF_OP_READ;
+    frame           = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_UNSUPPORTED_MMS, rcp_ep_mdio_decode_read_request(
+        frame.data, frame.len, 2, &out_addr, &out_word_count, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_write_request_decode_rejects_mms_mode(void)
+{
+    rcp_acf_byte_message_info_t hdr        = {0};
+    rcp_bytes_t                 frame;
+    rcp_ep_mdio_addr_t          out_addr;
+    const uint8_t                *out_words_data;
+    size_t                        out_word_count;
+    uint8_t                       txn;
+    uint8_t                       payload[1 + 5 + 2] = {0}; /* otherwise-valid, 1 word */
+
+    payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMS_MULTI;
+
+    hdr.byte_bus_id = 2;
+    hdr.op          = RCP_ACF_OP_WRITE;
+    frame           = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+
+    TEST_ASSERT_EQUAL(RCP_EP_MDIO_ERR_UNSUPPORTED_MMS, rcp_ep_mdio_decode_write_request(
+        frame.data, frame.len, 2, &out_addr, &out_words_data, &out_word_count, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
 /* ── Register-word packing ─────────────────────────────────────────────────── */
 
 static void test_word_encode_decode_round_trip(void)
@@ -573,7 +700,7 @@ static void test_read_request_decode_rejects_short_frame(void)
     rcp_ep_mdio_addr_t          out_addr;
     size_t                      out_word_count;
     uint8_t                     txn;
-    uint8_t                     too_short[3] = {0, 0, 0}; /* < 7-byte prefix */
+    uint8_t                     too_short[3] = {0, 0, 0}; /* < 8-byte (mode+address) prefix */
 
     hdr.byte_bus_id = 2;
     hdr.op          = RCP_ACF_OP_READ;
@@ -592,15 +719,16 @@ static void test_read_request_decode_rejects_bad_addr(void)
     rcp_ep_mdio_addr_t          out_addr;
     size_t                      out_word_count;
     uint8_t                     txn;
-    uint8_t                     payload[7] = {0}; /* clause=0 (Clause-22) */
+    uint8_t                     payload[8] = {0}; /* mdio_mode(1) + clause=0 (Clause-22) */
 
-    payload[0] = 0;    /* clause */
-    payload[1] = 0;    /* prtad */
-    payload[2] = 1;    /* devad -- invalid for Clause-22 */
-    payload[3] = 0;
-    payload[4] = 0;    /* regad */
-    payload[5] = 0;
-    payload[6] = 1;    /* word_count */
+    payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMD_SINGLE; /* mdio_mode */
+    payload[1] = 0;    /* clause */
+    payload[2] = 0;    /* prtad */
+    payload[3] = 1;    /* devad -- invalid for Clause-22 */
+    payload[4] = 0;
+    payload[5] = 0;    /* regad */
+    payload[6] = 0;
+    payload[7] = 1;    /* word_count */
 
     hdr.byte_bus_id = 2;
     hdr.op          = RCP_ACF_OP_READ;
@@ -619,7 +747,9 @@ static void test_read_request_decode_rejects_zero_word_count(void)
     rcp_ep_mdio_addr_t          out_addr;
     size_t                      out_word_count;
     uint8_t                     txn;
-    uint8_t                     payload[7] = {0}; /* word_count field left 0 */
+    uint8_t                     payload[8] = {0}; /* mdio_mode(1) + address(5) + word_count field left 0 */
+
+    payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMD_SINGLE; /* mdio_mode */
 
     hdr.byte_bus_id = 2;
     hdr.op          = RCP_ACF_OP_READ;
@@ -883,7 +1013,7 @@ static void test_write_request_decode_rejects_short_frame(void)
     const uint8_t                *out_words_data;
     size_t                        out_word_count;
     uint8_t                       txn;
-    uint8_t                       too_short[2] = {0, 0}; /* < 5-byte address prefix */
+    uint8_t                       too_short[2] = {0, 0}; /* < 6-byte (mode+address) prefix */
 
     hdr.byte_bus_id = 2;
     hdr.op          = RCP_ACF_OP_WRITE;
@@ -903,9 +1033,11 @@ static void test_write_request_decode_rejects_bad_addr(void)
     const uint8_t                *out_words_data;
     size_t                        out_word_count;
     uint8_t                       txn;
-    uint8_t                       payload[5 + 2] = {0}; /* clause=0, devad=1 (invalid), + 1 word */
+    /* mdio_mode(1) + clause=0, devad=1 (invalid), + 1 word */
+    uint8_t                       payload[1 + 5 + 2] = {0};
 
-    payload[2] = 1; /* devad -- invalid for Clause-22 */
+    payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMD_SINGLE; /* mdio_mode */
+    payload[3] = 1; /* devad -- invalid for Clause-22 */
 
     hdr.byte_bus_id = 2;
     hdr.op          = RCP_ACF_OP_WRITE;
@@ -925,7 +1057,9 @@ static void test_write_request_decode_rejects_zero_words(void)
     const uint8_t                *out_words_data;
     size_t                        out_word_count;
     uint8_t                       txn;
-    uint8_t                       payload[5] = {0}; /* address prefix only, no words */
+    uint8_t                       payload[1 + 5] = {0}; /* mdio_mode(1) + address prefix only, no words */
+
+    payload[0] = (uint8_t)RCP_EP_MDIO_MODE_MMD_SINGLE; /* mdio_mode */
 
     hdr.byte_bus_id = 2;
     hdr.op          = RCP_ACF_OP_WRITE;
@@ -1045,6 +1179,16 @@ int main(void)
     RUN_TEST(test_burst_next_regad_clause45_increments);
     RUN_TEST(test_burst_next_regad_clause45_wraps_at_16_bits);
     RUN_TEST(test_burst_next_regad_unknown_clause_unchanged);
+
+    RUN_TEST(test_mode_for_word_count_single);
+    RUN_TEST(test_mode_for_word_count_multi);
+    RUN_TEST(test_mode_is_unsupported_mms);
+    RUN_TEST(test_read_request_encode_sets_mdio_mode_single);
+    RUN_TEST(test_read_request_encode_sets_mdio_mode_multi);
+    RUN_TEST(test_write_request_encode_sets_mdio_mode_single);
+    RUN_TEST(test_write_request_encode_sets_mdio_mode_multi);
+    RUN_TEST(test_read_request_decode_rejects_mms_mode);
+    RUN_TEST(test_write_request_decode_rejects_mms_mode);
 
     RUN_TEST(test_word_encode_decode_round_trip);
     RUN_TEST(test_word_encode_is_big_endian);

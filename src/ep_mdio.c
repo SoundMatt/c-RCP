@@ -6,8 +6,13 @@
 
 /* ── Wire-layout constants (this module's own choice; see the file header) ── */
 
+#define MODE_OCTET_LEN           ((size_t)1u)  /* mdio_mode, REQ-MDIO-021 */
 #define ADDR_PREFIX_LEN         ((size_t)5u)  /* clause(1) + prtad(1) + devad(1) + regad(2 BE) */
-#define READ_REQUEST_PAYLOAD_LEN ((size_t)(ADDR_PREFIX_LEN + 2u)) /* + word_count(2 BE) */
+#define READ_REQUEST_PAYLOAD_LEN \
+    ((size_t)(MODE_OCTET_LEN + ADDR_PREFIX_LEN + 2u)) /* + word_count(2 BE) */
+#define WRITE_REQUEST_MIN_PAYLOAD_LEN ((size_t)(MODE_OCTET_LEN + ADDR_PREFIX_LEN))
+
+#define MDIO_MODE_MASK ((uint8_t)0x03u) /* bits[1:0] of the mode octet */
 
 /* ── Byte-order helpers (this TU's own copy, matching acf.c's/avtp.c's/
  * ep_can.c's house convention of not sharing a byte-order util across
@@ -48,6 +53,21 @@ uint16_t rcp_ep_mdio_burst_next_regad(rcp_ep_mdio_clause_t clause, uint16_t rega
     case RCP_EP_MDIO_CLAUSE_45: return (uint16_t)(regad + 1u); /* wraps at 16 bits naturally */
     default:                    return regad;
     }
+}
+
+/* ── mdio_mode: REQ-MDIO-021, see the file header's own "mdio_mode"
+ * section for the full investigation and documented assumptions ──────── */
+
+//cfusa:req REQ-MDIO-021
+rcp_ep_mdio_mode_t rcp_ep_mdio_mode_for_word_count(size_t word_count)
+{
+    return (word_count > 1u) ? RCP_EP_MDIO_MODE_MMD_MULTI : RCP_EP_MDIO_MODE_MMD_SINGLE;
+}
+
+//cfusa:req REQ-MDIO-021
+bool rcp_ep_mdio_mode_is_unsupported_mms(rcp_ep_mdio_mode_t mode)
+{
+    return mode == RCP_EP_MDIO_MODE_MMS_SINGLE || mode == RCP_EP_MDIO_MODE_MMS_MULTI;
 }
 
 /* ── Register-word packing ─────────────────────────────────────────────────── */
@@ -287,6 +307,7 @@ const char *rcp_ep_mdio_strerror(rcp_ep_mdio_errc_t e)
     case RCP_EP_MDIO_ERR_BAD_WORD_COUNT: return "rcp/ep_mdio: invalid register-word count";
     case RCP_EP_MDIO_ERR_ALLOC:          return "rcp/ep_mdio: allocation failure";
     case RCP_EP_MDIO_ERR_BAD_EVT:        return "rcp/ep_mdio: evt[2:0] is not 0b000";
+    case RCP_EP_MDIO_ERR_UNSUPPORTED_MMS: return "rcp/ep_mdio: MMS addressing not supported";
     default:                             return "rcp/ep_mdio: unknown error";
     }
 }
@@ -315,6 +336,7 @@ static rcp_ep_mdio_addr_t get_addr_prefix(const uint8_t *p)
 /* ── Read request/response ─────────────────────────────────────────────────── */
 
 //cfusa:req REQ-MDIO-012
+//cfusa:req REQ-MDIO-021
 rcp_bytes_t rcp_ep_mdio_encode_read_request(rcp_byte_bus_id_t byte_bus_id,
                                              rcp_ep_mdio_addr_t addr, size_t word_count,
                                              uint8_t transaction_num)
@@ -326,8 +348,9 @@ rcp_bytes_t rcp_ep_mdio_encode_read_request(rcp_byte_bus_id_t byte_bus_id,
     if (!rcp_ep_mdio_addr_valid(addr)) return frame;
     if (word_count == 0u || word_count > RCP_EP_MDIO_MAX_BURST_WORDS) return frame;
 
-    put_addr_prefix(payload, addr);
-    put_u16(&payload[ADDR_PREFIX_LEN], (uint16_t)word_count);
+    payload[0] = (uint8_t)rcp_ep_mdio_mode_for_word_count(word_count);
+    put_addr_prefix(&payload[MODE_OCTET_LEN], addr);
+    put_u16(&payload[MODE_OCTET_LEN + ADDR_PREFIX_LEN], (uint16_t)word_count);
 
     hdr.byte_bus_id     = byte_bus_id;
     hdr.op              = RCP_ACF_OP_READ;
@@ -338,6 +361,7 @@ rcp_bytes_t rcp_ep_mdio_encode_read_request(rcp_byte_bus_id_t byte_bus_id,
 }
 
 //cfusa:req REQ-MDIO-013
+//cfusa:req REQ-MDIO-021
 rcp_ep_mdio_errc_t rcp_ep_mdio_decode_read_request(const uint8_t *b, size_t len,
                                                     rcp_byte_bus_id_t expected_bus_id,
                                                     rcp_ep_mdio_addr_t *out_addr,
@@ -348,6 +372,7 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_read_request(const uint8_t *b, size_t len,
     const uint8_t               *payload;
     size_t                       payload_len;
     rcp_acf_errc_t               acf_rc;
+    rcp_ep_mdio_mode_t           mode;
     rcp_ep_mdio_addr_t           addr;
     uint16_t                     word_count;
 
@@ -360,10 +385,13 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_read_request(const uint8_t *b, size_t len,
     if (!rcp_acf_evt_row2_is_plain(hdr.evt)) return RCP_EP_MDIO_ERR_BAD_EVT;
     if (payload_len < READ_REQUEST_PAYLOAD_LEN) return RCP_EP_MDIO_ERR_SHORT_FRAME;
 
-    addr = get_addr_prefix(payload);
+    mode = (rcp_ep_mdio_mode_t)(payload[0] & MDIO_MODE_MASK);
+    if (rcp_ep_mdio_mode_is_unsupported_mms(mode)) return RCP_EP_MDIO_ERR_UNSUPPORTED_MMS;
+
+    addr = get_addr_prefix(&payload[MODE_OCTET_LEN]);
     if (!rcp_ep_mdio_addr_valid(addr)) return RCP_EP_MDIO_ERR_BAD_ADDR;
 
-    word_count = get_u16(&payload[ADDR_PREFIX_LEN]);
+    word_count = get_u16(&payload[MODE_OCTET_LEN + ADDR_PREFIX_LEN]);
     if (word_count == 0u || (size_t)word_count > RCP_EP_MDIO_MAX_BURST_WORDS)
         return RCP_EP_MDIO_ERR_BAD_WORD_COUNT;
 
@@ -473,6 +501,7 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_read_response(const uint8_t *b, size_t len
 /* ── Write request/response ────────────────────────────────────────────────── */
 
 //cfusa:req REQ-MDIO-016
+//cfusa:req REQ-MDIO-021
 rcp_bytes_t rcp_ep_mdio_encode_write_request(rcp_byte_bus_id_t byte_bus_id,
                                               rcp_ep_mdio_addr_t addr, const uint16_t *words,
                                               size_t word_count, uint8_t transaction_num)
@@ -489,15 +518,16 @@ rcp_bytes_t rcp_ep_mdio_encode_write_request(rcp_byte_bus_id_t byte_bus_id,
     words_bytes = rcp_ep_mdio_pack_words(words, word_count);
     if (!words_bytes.data) return frame;
 
-    payload_len = ADDR_PREFIX_LEN + words_bytes.len;
+    payload_len = MODE_OCTET_LEN + ADDR_PREFIX_LEN + words_bytes.len;
     payload     = (uint8_t *)malloc(payload_len);
     if (!payload) {
         rcp_bytes_free(&words_bytes);
         return frame;
     }
 
-    put_addr_prefix(payload, addr);
-    memcpy(&payload[ADDR_PREFIX_LEN], words_bytes.data, words_bytes.len);
+    payload[0] = (uint8_t)rcp_ep_mdio_mode_for_word_count(word_count);
+    put_addr_prefix(&payload[MODE_OCTET_LEN], addr);
+    memcpy(&payload[MODE_OCTET_LEN + ADDR_PREFIX_LEN], words_bytes.data, words_bytes.len);
     rcp_bytes_free(&words_bytes);
 
     hdr.byte_bus_id     = byte_bus_id;
@@ -511,6 +541,7 @@ rcp_bytes_t rcp_ep_mdio_encode_write_request(rcp_byte_bus_id_t byte_bus_id,
 }
 
 //cfusa:req REQ-MDIO-017
+//cfusa:req REQ-MDIO-021
 rcp_ep_mdio_errc_t rcp_ep_mdio_decode_write_request(const uint8_t *b, size_t len,
                                                      rcp_byte_bus_id_t expected_bus_id,
                                                      rcp_ep_mdio_addr_t *out_addr,
@@ -522,6 +553,7 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_write_request(const uint8_t *b, size_t len
     const uint8_t               *payload;
     size_t                       payload_len;
     rcp_acf_errc_t               acf_rc;
+    rcp_ep_mdio_mode_t           mode;
     rcp_ep_mdio_addr_t           addr;
     size_t                       words_len;
     size_t                       word_count;
@@ -533,18 +565,21 @@ rcp_ep_mdio_errc_t rcp_ep_mdio_decode_write_request(const uint8_t *b, size_t len
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_MDIO_ERR_WRONG_BUS;
     if (hdr.op != RCP_ACF_OP_WRITE) return RCP_EP_MDIO_ERR_WRONG_OP;
     if (!rcp_acf_evt_row2_is_plain(hdr.evt)) return RCP_EP_MDIO_ERR_BAD_EVT;
-    if (payload_len < ADDR_PREFIX_LEN) return RCP_EP_MDIO_ERR_SHORT_FRAME;
+    if (payload_len < WRITE_REQUEST_MIN_PAYLOAD_LEN) return RCP_EP_MDIO_ERR_SHORT_FRAME;
 
-    addr = get_addr_prefix(payload);
+    mode = (rcp_ep_mdio_mode_t)(payload[0] & MDIO_MODE_MASK);
+    if (rcp_ep_mdio_mode_is_unsupported_mms(mode)) return RCP_EP_MDIO_ERR_UNSUPPORTED_MMS;
+
+    addr = get_addr_prefix(&payload[MODE_OCTET_LEN]);
     if (!rcp_ep_mdio_addr_valid(addr)) return RCP_EP_MDIO_ERR_BAD_ADDR;
 
-    words_len = payload_len - ADDR_PREFIX_LEN;
+    words_len = payload_len - WRITE_REQUEST_MIN_PAYLOAD_LEN;
     if (!rcp_ep_mdio_word_count_of(words_len, &word_count)) return RCP_EP_MDIO_ERR_BAD_WORD_COUNT;
     if (word_count == 0u || word_count > RCP_EP_MDIO_MAX_BURST_WORDS)
         return RCP_EP_MDIO_ERR_BAD_WORD_COUNT;
 
     *out_addr             = addr;
-    *out_words_data       = &payload[ADDR_PREFIX_LEN];
+    *out_words_data       = &payload[MODE_OCTET_LEN + ADDR_PREFIX_LEN];
     *out_word_count       = word_count;
     *out_transaction_num  = hdr.transaction_num;
     return RCP_EP_MDIO_OK;
