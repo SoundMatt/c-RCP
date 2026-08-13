@@ -34,6 +34,21 @@ the rationale.
 
 ## Releases
 
+### v0.293.0 -- 2026-08-12 (issue #336: `REQ-ADC-037` cadence-decision primitives -- `not-implemented` -> `partial`)
+
+**`REQ-ADC-037` flips `not-implemented` -> `partial`.**
+
+TC18 §13.7.9.2 states three cadence cases comparing `adc_combine_avg_values` against `adc_avg_intervals_per_request` (accumulate several request executions into one response; one response per execution; fan one execution out across several responses), but no function anywhere in this module decided which case applied or when enough values had accumulated for a response. New `rcp_ep_adc_cadence_case()` (`ep_adc.h`/`ep_adc.c`) classifies the three cases; new `rcp_ep_adc_cadence_response_ready()` answers the single comparison underlying all three (`pending_value_count >= combine_avg_values`) -- directly unit-tested, including both boundary conditions and an end-to-end walk of the ACCUMULATE and FAN_OUT cases across multiple simulated executions/responses.
+
+**Deliberately does not close the requirement fully, for two honest reasons, both spelled out in `.fusa-reqs.json`:**
+
+1. Assembling a ready response's own value array and computing its `transaction_num` remain the caller's own bookkeeping, matching `rcp_ep_adc_collect_response_values()`'s own "operates on caller-supplied arrays, owns no sample storage" scope -- TC18 gives no instruction for how a caller should track per-value provenance across executions, and this module correctly does not invent one.
+2. Unlike `REQ-E2E-021`'s own precedent for this exact class of gap, no real dispatch path exists to wire this into: `src/mock.c` has no per-endpoint-type dispatch of any kind (ADC included), so these two functions are correct and tested but not yet exercised end-to-end by this codebase's own reference server -- the same disposition `REQ-CANCEL-012` was left at for an analogous reason.
+
+Renamed and rewrote the deviation-pin block in `tests/test_tc18_gaps_ep2.c` to document the narrowed (not closed) gap.
+
+**`cfusa check` A/B, normalized by finding text/CWE (not raw file:line, since the new test functions shift every later line number in the same file)**: the one genuinely new finding is `rcp_ep_adc_cadence_case()` triggering `CFUSA-L004`'s "appears recursive" (MISRA-C 2012 Rule 17.2) heuristic -- confirmed as the *exact same pre-existing false-positive class* already present ~158 times across this codebase (e.g. `rcp_ep_pwm_out_apply_write`, `rcp_acf_compound_wait_match`), not a real recursion (the function is a straightforward two-branch if/return chain) and not a new category of finding CI doesn't already tolerate. `cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%, 1024/1024 (unaffected -- in-place text/status edit). 3/3 mutations caught cleanly (both `cadence_case()` boundaries, the `response_ready()` boundary). 65/65 both trees (native + ASan/UBSan).
+
 ### v0.292.0 -- 2026-08-12 (issue #336 catalog-drift correction: `REQ-UART-032` flips `not-implemented` -> `implemented`)
 
 **Doc-only, no functional code change.** `REQ-UART-032`'s own "NOT IMPLEMENTED" text was stale the day it was filed: `rcp_ep_uart_functional_cfg_t::ep_status` (`uart_ep_status`, Table 48 `0x0004`, 16-bit R/W) has existed as a real, freely-settable, round-tripped register field since PR #276 (issue #256, 2026-08-11) -- the day *before* this requirement was filed against a stale reading of the code during the 2026-08-12 gap audit.

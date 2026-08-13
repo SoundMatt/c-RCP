@@ -102,6 +102,25 @@ size_t rcp_ep_adc_collect_response_values(const rcp_ep_adc_avg_value_t *avg_valu
     return n;
 }
 
+//cfusa:req REQ-ADC-037
+rcp_ep_adc_cadence_case_t rcp_ep_adc_cadence_case(uint16_t avg_intervals_per_request,
+                                                   uint8_t combine_avg_values)
+{
+    if ((uint32_t)combine_avg_values > (uint32_t)avg_intervals_per_request) {
+        return RCP_EP_ADC_CADENCE_ACCUMULATE;
+    }
+    if ((uint32_t)combine_avg_values < (uint32_t)avg_intervals_per_request) {
+        return RCP_EP_ADC_CADENCE_FAN_OUT;
+    }
+    return RCP_EP_ADC_CADENCE_ONE_TO_ONE;
+}
+
+//cfusa:req REQ-ADC-037
+bool rcp_ep_adc_cadence_response_ready(size_t pending_value_count, uint8_t combine_avg_values)
+{
+    return pending_value_count >= (size_t)combine_avg_values;
+}
+
 //cfusa:req REQ-ADC-012
 //cfusa:req REQ-ADC-013
 uint64_t rcp_ep_adc_capture_moment_timestamp(const rcp_ep_adc_avg_value_t *avg_values,

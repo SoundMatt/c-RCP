@@ -556,16 +556,26 @@ static void test_adc_has_no_trigger_outputs_and_no_retained_average(void)
     TEST_ASSERT_EQUAL_UINT16(RCP_EP_PWM_IN_NO_SIGNAL, empty.value);
     TEST_ASSERT_EQUAL_UINT64(0u, rcp_ep_adc_capture_moment_timestamp(NULL, 0u));
 
-    /* DEVIATION PIN (REQ-ADC-037, not implemented): TC18 §13.7.9.2 states
-     * three cadence cases comparing adc_combine_avg_values against
-     * adc_avg_intervals_per_request (multi-request-to-one-response,
-     * one-to-one, one-to-multi-response). rcp_ep_adc_collect_response_values()
-     * takes only avg_count/value_count as plain parameters -- neither
-     * adc_combine_avg_values nor adc_avg_intervals_per_request is anywhere
-     * in its signature -- and simply packs min(avg_count, value_count)
-     * values regardless of what either config field says, proving this
-     * pure packer has no cadence awareness at all; nothing else in this
-     * module does either. */
+    /* DEVIATION PIN (REQ-ADC-037, PARTIAL as of 2026-08-12, issue #336):
+     * TC18 §13.7.9.2 states three cadence cases comparing
+     * adc_combine_avg_values against adc_avg_intervals_per_request
+     * (multi-request-to-one-response, one-to-one, one-to-multi-response).
+     * rcp_ep_adc_cadence_case()/_response_ready() now give a caller the
+     * two decision primitives TC18's own rule requires (which case
+     * applies; whether enough values have accumulated for one response
+     * -- tests/test_ep_adc.c's own dedicated cadence test section), so
+     * this deviation narrows rather than closes: no real dispatch path
+     * anywhere in this codebase (src/mock.c has no per-endpoint-type
+     * dispatch of any kind, ADC included) actually calls either
+     * function, matching the exact same "correct and unit-tested, but
+     * nothing wires it up" disposition REQ-CANCEL-012 was left at.
+     * rcp_ep_adc_collect_response_values() itself, pinned below, still
+     * takes only avg_count/value_count as plain parameters -- by design:
+     * assembling a ready response's own value array and deciding its
+     * transaction_num remain the caller's own bookkeeping (see
+     * rcp_ep_adc_cadence_response_ready()'s own doc comment), the same
+     * "operates on caller-supplied arrays" scope this whole module
+     * already holds to. */
     {
         rcp_ep_adc_avg_value_t five[5] = {0};
         uint16_t                packed[3];
