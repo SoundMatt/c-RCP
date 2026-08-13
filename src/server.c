@@ -726,3 +726,23 @@ size_t rcp_server_endpoint_watchdog_purge(rcp_server_endpoint_t *ep)
 {
     return purge_non_safety(ep);
 }
+
+//cfusa:req REQ-CANCEL-012
+size_t rcp_server_endpoint_cancel_chain_from(rcp_server_endpoint_t *ep, uint32_t chain_group,
+                                              uint8_t min_position)
+{
+    size_t i;
+    size_t removed = 0;
+
+    if (chain_group == 0u) return 0; /* the "not part of a chain" sentinel matches nothing */
+
+    for (i = 0; i < RCP_SERVER_MAX_PENDING; i++) {
+        if (!ep->pending[i].in_use) continue;
+        if (ep->pending[i].chain_group != chain_group) continue;
+        if (!rcp_cancel_chain_should_cascade(ep->pending[i].chain_position, min_position)) continue;
+
+        release_slot(ep, &ep->pending[i]);
+        removed++;
+    }
+    return removed;
+}
