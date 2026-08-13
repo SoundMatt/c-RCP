@@ -18166,3 +18166,64 @@ own full systematic citation-drift census (now 7 confirmed instances
 found incidentally from spot-checking roughly a dozen requirements across
 two different investigations) remains its own unstarted, larger
 undertaking.
+
+### v0.313.0 -- 2026-08-13 (self-check follow-up: `REQ-E2E-030`/
+`REQ-E2E-045`/`REQ-RMAP-071` citations corrected, `REQ-RMAP-071`
+graduated to implemented)
+
+A direct self-check on this session's own immediately preceding work,
+prompted by investigating issue #334's remaining scope: `REQ-RMAP-071`
+(the register-map content-modeling field `REQ-E2E-030` sources its
+decision from) still cited `TC18.txt L2880-L2882`, the exact same
+pre-refresh line range issue #338's own investigation (v0.312.0) had
+just finished proving stale for a cluster of unrelated lifecycle
+requirements. Checked whether `REQ-E2E-030`/`REQ-E2E-045` -- both
+touched directly in PR #379 (v0.311.0, issue #335) -- had the same
+problem: they did. That batch updated `status`/`text` for both but never
+touched `tc18`, because the citation fields weren't part of that batch's
+own diff review focus at the time.
+
+**Re-verified Table 24's real current content before touching anything**:
+confirmed at `TC18.txt L3217-L3293` ("Table 24: Request stream
+configuration"), not the stale `L2865-2882` all three citations pointed
+at. The wire-bit content itself matches this repo's own pre-existing
+"TC18 0.5.1_RC5 terminology drift" documentation (regmap.h's file header,
+task #97) exactly: RC5 collapses `rx_enforce_e2e`/`rx_ovrflw_safestate_
+enable` into single combined bits (`rx_enforce_crc` at relative address
+0x000D.0, `rx_enforce_request_filing` at 0x000D.3) -- no new technical
+finding, this batch is purely the citation correction task #97's own
+investigation had already anticipated but this specific trio of citations
+hadn't yet received.
+
+**3 citations corrected**: `REQ-E2E-045` → `L3239-L3243`; `REQ-E2E-030`
+→ `L3252-L3256`; `REQ-RMAP-071` → `L3252-L3256` (same citation as
+`REQ-E2E-030`, by design -- both describe the same wire bit from two
+different angles).
+
+**`REQ-RMAP-071` graduated `partial` → `implemented`**: re-reading its
+own pre-existing text, the content-modeling/wire-codec half was already
+described as fully done (field added, part of `render()`/
+`apply_reconfig()`'s own wire codec since issue #306); the only thing
+keeping its own `status` at `partial` was an explicit forward-reference
+to `REQ-E2E-030`'s own then-still-open cross-endpoint-orchestrator gap.
+That gap is now closed (PR #379). All three halves this one field spans
+-- content model, runtime decision (`rcp_e2e_overflow_should_enter_safe_
+state()`), and the actual cross-endpoint broadcast
+(`rcp_mock_server_broadcast_safe_state()`) -- are real, wired, and
+covered by the same end-to-end test
+(`test_overflow_on_one_endpoint_broadcasts_safe_state_to_stream_
+siblings()`). Text rewritten to describe the completed three-part
+picture rather than the now-stale "content model only" framing.
+
+No code changed. `cfusa check`/`trace` re-run: 0 errors, 1024/1024,
+identical to baseline. 65/65 full suite unaffected (no code touched).
+Repo-wide count: 984 implemented (+1), 77 partial (-1), 2 not-implemented
+(unchanged), 7 retired (unchanged); 1070 total unchanged.
+
+**Lesson for future citation-drift batches**: when a batch touches a
+requirement's own `status`/`text` fields, its `tc18` citation field needs
+the identical re-verification pass even if the disposition itself isn't
+changing for a citation reason -- a batch's own primary purpose (closing
+a code gap) can silently leave an already-stale citation untouched simply
+because it wasn't the field under review. Worth an explicit checklist
+item in this session's own standing per-batch discipline going forward.

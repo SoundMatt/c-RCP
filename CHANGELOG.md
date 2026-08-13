@@ -34,6 +34,14 @@ the rationale.
 
 ## Releases
 
+### v0.313.0 -- 2026-08-13 (self-check follow-up: `REQ-E2E-030`/`REQ-E2E-045`/`REQ-RMAP-071` citations corrected, `REQ-RMAP-071` graduated to implemented)
+
+**Doc-only.** A direct self-check on PR #379's own issue #335 batch: that batch updated `REQ-E2E-030`/`REQ-E2E-045`'s `status`/`text` fields but never touched their `tc18` citation fields, which turned out to already be stale (`TC18.txt L2865-L2882`) from before this session's own TC18.txt refresh -- Table 24 ("Request stream configuration") is now actually at `TC18.txt L3217-L3293`. Corrected both, plus `REQ-RMAP-071` (the register-map content-modeling counterpart to `REQ-E2E-030`, sharing the same citation by design). Re-verified the underlying wire-bit content directly against the fresh text first: RC5 collapses `rx_enforce_e2e`/`rx_ovrflw_safestate_enable` into single combined bits (`rx_enforce_crc` at 0x000D.0, `rx_enforce_request_filing` at 0x000D.3) -- matching this repo's own pre-existing "TC18 0.5.1_RC5 terminology drift" documentation (task #97) exactly, no new finding there, just a citation correction.
+
+**`REQ-RMAP-071` also graduated `partial` → `implemented`**: its own text already described the content-modeling/wire-codec half as fully done; the only thing keeping it `partial` was an explicit forward-reference to `REQ-E2E-030`'s own then-open cross-endpoint-orchestrator gap, which PR #379 (v0.311.0) has since closed. All three halves this field spans -- content model, runtime decision, cross-endpoint broadcast -- are now real, wired, and tested.
+
+No code changed. `cfusa check`/`trace` re-run: 0 errors, 1024/1024, identical to baseline. 65/65 full suite unaffected.
+
 ### v0.312.0 -- 2026-08-13 (issue #338 investigation: 6 more citation-drift fixes + 2 new spec-defects-report items, issue #341 lineage -- 5th/6th/7th/8th/9th/10th instances)
 
 **Doc-only.** Picked up issue #338 ("genuine TC18 spec silence -- investigate, don't force") as the next actionable item. Most of its named items already have a documented, correct disposition; the two with a genuinely closeable piece (`REQ-LIFECYCLE-022`/`REQ-DISC-029`: diagram-mandated error responses with no numbered Table 30 code) needed verification against the primary source before anything else, which surfaced a SIXTH instance of this session's own citation-drift class -- and while re-verifying, found it wasn't isolated to those two: every `.fusa-reqs.json` citation touching the RC Server lifecycle diagram cited "Figure 16" (the diagram's own RC1-era label); in the current RC5 text, Figure 16 is a different, unrelated diagram ("Cancellation of a single, specific request", TC18.txt L2158) -- the lifecycle diagram itself is now **Figure 17** ("RC Server lifecycle states", TC18.txt L2517), with every one of its own transition-block line numbers shifted too.
