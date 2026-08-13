@@ -1922,7 +1922,7 @@ bool rcp_regmap_wd_timeout_ticks_to_ms(uint16_t ticks,
  * 24-octet-per-request-stream wire stride, addresses/widths for every
  * field below IDENTICAL across both revisions.
  *
- * Three fields deliberately NOT wire-mapped by this render()/
+ * Two fields deliberately NOT wire-mapped by this render()/
  * apply_reconfig() pair:
  *
  *   - rx_wd_action: confirmed via direct page-image read of Table 24 on
@@ -1932,24 +1932,49 @@ bool rcp_regmap_wd_timeout_ticks_to_ms(uint16_t ticks,
  *   - configured: a codebase-internal bookkeeping flag (whether this
  *     struct represents a configured request stream), not a TC18 concept
  *     -- no corresponding register.
- *   - rx_wd_timeout_ms (relative address 0x000A, 16 bit, "WatchDog time
- *     out for this Stream in clock tics"): rcp_regmap_wd_timeout_ms_to_ticks()/
- *     _ticks_to_ms() (REQ-RMAP-050, above) already exist for exactly this
- *     conversion but need a caller-supplied ms_per_tick this table's own
- *     render()/apply_reconfig() signature has no natural place for.
- *     Unlike REQ-RMAP-061's own analogous rx_stream_max_request_size/
- *     rx_safestate_sequencer width mismatches below, a conversion
- *     failure here is safety-relevant (this register gates watchdog
- *     safe-state entry, not a liveness heartbeat) -- silently saturating
- *     in either direction could itself be an unsafe choice depending on
- *     which direction is "fail-safe" for a given deployment, not a
- *     judgment this library should make unilaterally. Left as a
- *     deliberate follow-up needing its own scope decision, not forced
- *     into this batch. This register's own two octets always render as
- *     0x0000 and are ignored (not re-derived into rx_stream_max_request_size)
- *     on parse -- the same "reserved, left zero" treatment REQ-RMAP-024's
- *     own HW_config render() already established for its own single
- *     unconfirmed alignment octet.
+ *
+ * REQ-RMAP-050 (relative address 0x000A, 16 bit, "WatchDog time out for
+ * this Stream in clock tics") IS wire-mapped as of this fix, via a new
+ * trailing watchdog_ms_per_tick parameter both functions now take --
+ * TC18 names no fixed clock-tick rate for this register anywhere near
+ * its own definition, so, matching the same caller-supplies-already-
+ * classified-units convention already established elsewhere in this
+ * file, the caller (ultimately whatever integrates this library with a
+ * real clock) supplies it. 0 means "not configured" and is a safe,
+ * deliberate default (rcp_mock_server_t is calloc()'d): both
+ * rcp_regmap_wd_timeout_ms_to_ticks()/_ticks_to_ms() already reject
+ * ms_per_tick == 0 on their own, so passing 0 here makes both
+ * conversions uniformly fail-closed until a real rate is configured,
+ * with no separate "unconfigured" sentinel needed.
+ *
+ * On the READ direction (render(), internal ms -> wire ticks): TC18's
+ * own REQ-RMAP-050 "a written value shall be rejected if it does not
+ * fit the register's 16-bit width" rule is about VALIDATING a value
+ * before it is ever accepted into rx_wd_timeout_ms, not about this
+ * function -- render() has no error-return mechanism (void) and can
+ * only ever be handed an already-valid internal ms value by a
+ * conformant caller. Nonetheless, since a value that does not fit is a
+ * structurally reachable input here (a non-conformant caller, or simply
+ * ms_per_tick == 0), rcp_regmap_wd_timeout_ms_to_ticks() failing falls
+ * back to encoding 0x0000 -- the same "reserved / cannot be
+ * represented, use 0" treatment this file already established for
+ * REQ-RMAP-024's own HW_config alignment octet, not a new pattern.
+ *
+ * On the WRITE direction (apply_reconfig(), wire ticks -> internal ms):
+ * the arriving wire value is always exactly 16 bits by construction (2
+ * octets, get_u16()), so it can never itself violate a "16-bit width"
+ * constraint -- REQ-RMAP-050's own reject rule is therefore already
+ * satisfied structurally for this specific direction and does not need
+ * a corresponding runtime check. If rcp_regmap_wd_timeout_ticks_to_ms()
+ * still fails (ms_per_tick == 0, or the arriving ticks value combined
+ * with an extreme configured rate overflows this library's own uint32_t
+ * millisecond representation -- a library-internal representation
+ * limit, not a TC18 wire violation), rx_wd_timeout_ms is left
+ * unchanged rather than failing the whole apply_reconfig() call --
+ * consistent with every other field this function already can't derive
+ * anything meaningful for, and strictly more conservative than an
+ * all-or-nothing reject that would also discard unrelated fields'
+ * legitimate changes in the same write.
  *
  * Two genuine content/wire width mismatches, both resolved the same way
  * REQ-RMAP-061's own flush_time_us mismatch was: saturate (never wrap) on
@@ -1977,7 +2002,8 @@ bool rcp_regmap_wd_timeout_ticks_to_ms(uint16_t ticks,
  * simpler and loses nothing a real RC5-conformant peer could otherwise
  * distinguish. */
 void rcp_regmap_request_stream_cfg_render(const rcp_regmap_request_stream_cfg_t *entries,
-                                           size_t count, uint8_t *out);
+                                           size_t count, uint8_t *out,
+                                           uint32_t watchdog_ms_per_tick);
 
 typedef enum {
     RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_OK = 0,
@@ -1992,18 +2018,23 @@ rcp_regmap_request_stream_cfg_reconfig_strerror(rcp_regmap_request_stream_cfg_re
  * identical patch-then-reparse idiom to every other pointed-to table's own
  * apply_reconfig(). relative_start_address/data are relative to this
  * table's own start (svr_request_stream_cfg_ptr's own current value), not
- * to Table 20. A write landing on the reserved rx_wd_timeout_ms octets
- * (0x000A/0x000B) or the 3 reserved trailing octets (0x0012-0x0017) is
- * accepted (every octet in this table is R/W*, TC18 defines no read-only
- * subrange) but has no effect on any struct field -- it patches the
- * transient image this function builds internally, which is then
- * discarded rather than re-parsed back into anything, since those octets
- * correspond to no struct field. */
+ * to Table 20. A write landing on the 3 reserved trailing octets
+ * (0x0012-0x0017) is accepted (every octet in this table is R/W*, TC18
+ * defines no read-only subrange) but has no effect on any struct field --
+ * it patches the transient image this function builds internally, which
+ * is then discarded rather than re-parsed back into anything, since
+ * those octets correspond to no struct field. watchdog_ms_per_tick is
+ * this table's own rx_wd_timeout_ms field's caller-supplied tick
+ * duration -- see this table's own file-header doc comment above for
+ * the full REQ-RMAP-050 rationale, including why a failed ticks-to-ms
+ * conversion leaves rx_wd_timeout_ms unchanged rather than failing this
+ * whole call. */
 rcp_regmap_request_stream_cfg_reconfig_errc_t
 rcp_regmap_request_stream_cfg_apply_reconfig(rcp_regmap_request_stream_cfg_t *entries,
                                               size_t count,
                                               uint16_t relative_start_address,
-                                              const uint8_t *data, size_t data_len);
+                                              const uint8_t *data, size_t data_len,
+                                              uint32_t watchdog_ms_per_tick);
 
 /* Not itself TC18-derived -- an implementation ceiling on how many
  * request-stream rows this codebase's own fixed-size wire-codec buffers
@@ -2524,7 +2555,8 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      rcp_regmap_ep_generic_cfg_t *ep_generic_cfg,
                                      size_t ep_generic_cfg_count,
                                      rcp_wire_error_t *out_error,
-                                     uint8_t *out_transaction_num);
+                                     uint8_t *out_transaction_num,
+                                     uint32_t watchdog_ms_per_tick);
 
 /* ── EP0 address-routed dispatcher, READ side (issue #301 batch 4) ─────────
  *
@@ -2636,7 +2668,8 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      size_t ep_generic_cfg_count,
                                      const uint8_t *sequencer_state,
                                      size_t sequencer_state_count,
-                                     rcp_wire_error_t *out_error);
+                                     rcp_wire_error_t *out_error,
+                                     uint32_t watchdog_ms_per_tick);
 
 #ifdef __cplusplus
 }

@@ -17371,3 +17371,86 @@ Normalized diff shows only the expected +3 `CFUSA-CY006`/+3
 fixtures) in `test_mock.c`. `cfusa trace --req-coverage 100`/
 `--sec-tested 100`: both 100% (1024/1024). 65/65 both trees (native +
 ASan/UBSan).
+
+### v0.304.0 -- 2026-08-13 (issue #334 batch 3: `REQ-RMAP-050`
+watchdog-timeout tick<->ms register wiring)
+
+**`REQ-RMAP-050` flips `partial` -> `implemented`.** TC18 §12.7.7
+Table 24's `rx_wd_timeout_intervall` register (relative address
+0x000A, 16 bit, R/W*, "WatchDog time out for this Stream in clock
+tics") had a conversion pair already implemented and unit-tested
+(`rcp_regmap_wd_timeout_ms_to_ticks()`/`_ticks_to_ms()`) but no
+register-write code path called them -- the register's own two
+octets always rendered as a hardcoded 0x0000 and a write landing on
+them was silently discarded.
+
+**Asked the user for explicit sign-off before implementing this one**
+-- this register gates watchdog safe-state entry (ASIL-relevant), and
+an earlier pass in this codebase had flagged the fail-safe direction
+as "not a judgment this library should make unilaterally." On closer
+inspection, TC18's own "a written value shall be rejected if it does
+not fit the register's 16-bit width" rule turned out to be about
+validating a value before it is accepted into `rx_wd_timeout_ms` (the
+READ/render direction) -- not the WRITE/apply_reconfig direction,
+where an arriving wire value is always exactly 16 bits by
+construction and can never itself violate a width constraint. User
+approved: caller-configurable `ms_per_tick`, reject-not-saturate
+philosophy (already exactly what the existing conversion primitives
+do).
+
+`rcp_regmap_request_stream_cfg_render()`/`_apply_reconfig()`, and the
+EP0 dispatchers that call them
+(`rcp_regmap_ep0_decode_write_request()`/`_encode_read_response()`),
+all gained a new trailing `watchdog_ms_per_tick` parameter -- TC18
+names no fixed clock-tick rate for this register anywhere, so,
+matching this file's own established "caller supplies
+already-classified units" convention, the caller supplies it. 0 means
+"not configured": both conversion primitives already reject
+`ms_per_tick == 0` on their own, so this fails closed with no
+separate sentinel needed. On render, a value that can't be
+represented in 16-bit ticks (unconfigured rate, or a value that's
+simply too large) falls back to encoding 0x0000 -- the same
+"reserved / cannot be represented, use 0" treatment REQ-RMAP-024's
+own HW_config alignment octet already established. On
+apply_reconfig, a ticks-to-ms conversion failure leaves
+`rx_wd_timeout_ms` unchanged rather than clobbering it, and rather
+than failing the whole multi-field write.
+
+~50 existing call sites in `test_tc18_gaps_regmap.c` updated to pass
+0u (preserving every existing test's assertions exactly, since
+`ms_per_tick == 0` reproduces the prior "always 0x0000, always
+unchanged" behavior byte-for-byte) via a comment-aware Python script.
+**A first attempt at this same technique corrupted 6 doc-comment
+function references** (blindly appending into every textual
+occurrence of a function name, including inside `/* */` comments,
+producing garbage like `apply_reconfig(, 0u)`) -- caught before
+commit by re-grepping the file for that exact corruption pattern,
+reverted, and redone with a proper per-character comment/string-
+literal state tracker that only touches matches outside comments.
+Same root-cause class as this session's own recurring `CFUSA-L004`
+lesson (naive text matching without comment-awareness), just self-
+inflicted via a hand-written script instead of a third-party tool
+this time -- worth remembering symmetrically: **my own scripted text
+transformations need the same comment-awareness discipline I've been
+holding `cfusa` to.**
+
+5 new dedicated tests cover the real configured-rate path in both
+directions (render success, render fallback-when-still-too-large,
+apply_reconfig success, apply_reconfig fallback-when-unconfigured)
+plus the pre-existing zero-fallback test renamed for clarity. 2
+mutation tests (render always-falls-back, apply_reconfig
+always-assigns-ignoring-failure) both caught cleanly.
+
+**Tooling note**: `cfusa check` A/B (CI-pinned v0.5.50 binary) first
+showed 2 new errors -- a third self-inflicted `CFUSA-CY009` false
+positive this lineage has now hit (a test named
+`..._encodes_real_ticks_when...` contained the literal substring
+`des_` inside "en**codes\_**real", tripping the same naive
+substring-match weak-crypto checker RMAP's own audit lineage hit once
+before, issue #311 batch 4). Renamed to `..._produces_real_ticks_
+when...`; re-check confirmed 0 new errors -- in fact one fewer
+`CFUSA-A006` pointer-arithmetic advisory than baseline in both
+touched files (render()'s new `put_u16()` call replaced a
+two-statement inline zero-write the checker had been matching).
+`cfusa trace --req-coverage 100`/`--sec-tested 100`: both 100%
+(1024/1024). 65/65 both trees (native + ASan/UBSan).

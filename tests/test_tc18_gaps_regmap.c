@@ -1503,7 +1503,7 @@ static void test_ep0_dispatcher_routes_all_five_pointed_to_tables_and_unknown_ad
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
                                                    state, writer, hw_pin_map, 2u, ep_id_map, 2u,
-                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn);
+                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, err);
         TEST_ASSERT_EQUAL_UINT8(11, tn);
@@ -1523,7 +1523,7 @@ static void test_ep0_dispatcher_routes_all_five_pointed_to_tables_and_unknown_ad
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
                                                    state, writer, hw_pin_map, 2u, ep_id_map, 2u,
-                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn);
+                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_EQUAL_UINT8(0x77u, hw_pin_map[0].hw_pin_type);
@@ -1544,7 +1544,7 @@ static void test_ep0_dispatcher_routes_all_five_pointed_to_tables_and_unknown_ad
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
                                                    state, writer, hw_pin_map, 2u, ep_id_map, 2u,
-                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn);
+                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_INVALID_PARAMETER, err);
         rcp_bytes_free(&frame);
@@ -1563,7 +1563,7 @@ static void test_ep0_dispatcher_routes_all_five_pointed_to_tables_and_unknown_ad
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
                                                    state, writer, hw_pin_map, 2u, ep_id_map, 2u,
-                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn);
+                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_EQUAL_UINT16(99u, (uint16_t)ep_id_map[1].byte_bus_id);
@@ -1585,7 +1585,7 @@ static void test_ep0_dispatcher_routes_all_five_pointed_to_tables_and_unknown_ad
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
                                                    state, writer, hw_pin_map, 2u, ep_id_map, 2u,
-                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn);
+                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_INVALID_PARAMETER, err);
         rcp_bytes_free(&frame);
@@ -1606,7 +1606,7 @@ static void test_ep0_dispatcher_routes_all_five_pointed_to_tables_and_unknown_ad
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
                                                    state, writer, hw_pin_map, 2u, ep_id_map, 2u,
-                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn);
+                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         rcp_bytes_free(&frame);
@@ -1626,7 +1626,7 @@ static void test_ep0_dispatcher_routes_all_five_pointed_to_tables_and_unknown_ad
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
                                                    state, writer, hw_pin_map, 2u, ep_id_map, 2u,
-                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn);
+                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_EQUAL_UINT16(555u, response_queue_cfg[1].max_avtpdu_size);
@@ -1648,7 +1648,7 @@ static void test_ep0_dispatcher_routes_all_five_pointed_to_tables_and_unknown_ad
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
                                                    state, writer, hw_pin_map, 2u, ep_id_map, 2u,
-                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn);
+                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_INVALID_PARAMETER, err);
         rcp_bytes_free(&frame);
@@ -1668,7 +1668,7 @@ static void test_ep0_dispatcher_routes_all_five_pointed_to_tables_and_unknown_ad
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
                                                    state, writer, hw_pin_map, 2u, ep_id_map, 2u,
-                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn);
+                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         rcp_bytes_free(&frame);
@@ -1688,7 +1688,7 @@ static void test_ep0_dispatcher_routes_all_five_pointed_to_tables_and_unknown_ad
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
                                                    state, writer, hw_pin_map, 2u, ep_id_map, 2u,
-                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn);
+                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_EQUAL_UINT8(0x55u, request_stream_cfg[1].rx_secure_channel_index);
@@ -1707,7 +1707,7 @@ static void test_ep0_dispatcher_routes_all_five_pointed_to_tables_and_unknown_ad
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
                                                    state, writer, hw_pin_map, 2u, ep_id_map, 2u,
-                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn);
+                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         rcp_bytes_free(&frame);
@@ -1732,7 +1732,7 @@ static void test_ep0_dispatcher_routes_all_five_pointed_to_tables_and_unknown_ad
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
                                                    state, writer, hw_pin_map, 2u, ep_id_map, 2u,
-                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn);
+                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_EQUAL_UINT32(0x11223344u, ep_generic_cfg[1].ep_description);
@@ -1751,7 +1751,7 @@ static void test_ep0_dispatcher_routes_all_five_pointed_to_tables_and_unknown_ad
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
                                                    state, writer, hw_pin_map, 2u, ep_id_map, 2u,
-                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn);
+                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         rcp_bytes_free(&frame);
@@ -1767,7 +1767,7 @@ static void test_ep0_dispatcher_routes_all_five_pointed_to_tables_and_unknown_ad
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
                                                    state, writer, hw_pin_map, 2u, ep_id_map, 2u,
-                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn);
+                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         rcp_bytes_free(&frame);
@@ -1781,7 +1781,7 @@ static void test_ep0_dispatcher_routes_all_five_pointed_to_tables_and_unknown_ad
         TEST_ASSERT_NOT_NULL(frame.data);
         rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
                                                    state, writer, hw_pin_map, 2u, ep_id_map, 2u,
-                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn);
+                                                   response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u, &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_ERR_SHORT_PAYLOAD, rc);
         rcp_bytes_free(&frame);
     }
@@ -2132,7 +2132,7 @@ static void test_request_stream_cfg_apply_reconfig_patches_addressed_octets_only
      * address 36 = 24*1+12). */
     TEST_ASSERT_EQUAL(RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_OK,
                        rcp_regmap_request_stream_cfg_apply_reconfig(rows, 2, 36u,
-                                                                     patch_row1_secure_channel, 1u));
+                                                                     patch_row1_secure_channel, 1u, 0u));
     TEST_ASSERT_EQUAL_UINT64(1u, rows[0].rx_stream_id); /* row 0 untouched */
     TEST_ASSERT_EQUAL_UINT64(2u, rows[1].rx_stream_id); /* row 1's other octets untouched */
     TEST_ASSERT_EQUAL_UINT8(0x09u, rows[1].rx_secure_channel_index); /* patched */
@@ -2148,11 +2148,11 @@ static void test_request_stream_cfg_apply_reconfig_rejects_out_of_range_leaving_
 
     /* count=1 -> block_len=24; address 23 + data_len 2 = 25 > 24. */
     TEST_ASSERT_EQUAL(RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_ERR_OUT_OF_RANGE,
-                       rcp_regmap_request_stream_cfg_apply_reconfig(rows, 1, 23u, data, 2u));
+                       rcp_regmap_request_stream_cfg_apply_reconfig(rows, 1, 23u, data, 2u, 0u));
     TEST_ASSERT_EQUAL_UINT64(9u, rows[0].rx_stream_id); /* entirely unchanged */
 
     TEST_ASSERT_EQUAL(RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_ERR_SHORT,
-                       rcp_regmap_request_stream_cfg_apply_reconfig(rows, 1, 0u, data, 0u));
+                       rcp_regmap_request_stream_cfg_apply_reconfig(rows, 1, 0u, data, 0u, 0u));
 }
 
 static void test_request_stream_cfg_render_saturates_oversized_max_request_size_without_wrapping(void)
@@ -2163,7 +2163,7 @@ static void test_request_stream_cfg_render_saturates_oversized_max_request_size_
     rcp_regmap_request_stream_cfg_init(&row);
     row.rx_stream_max_request_size = 0x10000u; /* one past the wire register's own 16-bit range */
 
-    rcp_regmap_request_stream_cfg_render(&row, 1, out);
+    rcp_regmap_request_stream_cfg_render(&row, 1, out, 0u);
 
     /* Must saturate to 0xFFFF, NOT wrap to 0 -- wrapping would silently
      * flip this field's own meaning to TC18's "no fragmentation
@@ -2180,7 +2180,7 @@ static void test_request_stream_cfg_render_saturates_oversized_safestate_sequenc
     rcp_regmap_request_stream_cfg_init(&row);
     row.rx_safestate_sequencer = 0x0100u; /* one past the wire register's own 8-bit range */
 
-    rcp_regmap_request_stream_cfg_render(&row, 1, out);
+    rcp_regmap_request_stream_cfg_render(&row, 1, out, 0u);
 
     /* Must saturate to 0xFF, NOT wrap to 0x00 -- wrapping would silently
      * alias onto sequencer index 0, an entirely different, actually-
@@ -2198,7 +2198,7 @@ static void test_request_stream_cfg_render_packs_all_eight_bits_at_0x000d(void)
     row.rx_wd_info_enable          = true;  /* bit 7 */
     /* every other bit left false */
 
-    rcp_regmap_request_stream_cfg_render(&row, 1, out);
+    rcp_regmap_request_stream_cfg_render(&row, 1, out, 0u);
     TEST_ASSERT_EQUAL_UINT8(0x81u, out[0x000D]);
 
     row.rx_enforce_seq             = true; /* bit 1 */
@@ -2208,21 +2208,25 @@ static void test_request_stream_cfg_render_packs_all_eight_bits_at_0x000d(void)
     row.rx_ovrflw_safestate_enable = true; /* bit 5 */
     row.rx_safety_measure          = 1u;   /* bit 6 */
 
-    rcp_regmap_request_stream_cfg_render(&row, 1, out);
+    rcp_regmap_request_stream_cfg_render(&row, 1, out, 0u);
     TEST_ASSERT_EQUAL_UINT8(0xFFu, out[0x000D]);
 }
 
-static void test_request_stream_cfg_render_leaves_rx_wd_timeout_and_reserved_octets_zero(void)
+/* REQ-RMAP-050: watchdog_ms_per_tick == 0 ("not configured") makes
+ * rcp_regmap_wd_timeout_ms_to_ticks() fail unconditionally, so
+ * rx_wd_timeout_ms falls back to 0x0000 exactly like the reserved
+ * trailing octets -- see this table's own file-header note (regmap.h)
+ * for the full fail-closed rationale. */
+static void test_request_stream_cfg_render_falls_back_to_zero_when_watchdog_tick_rate_unconfigured(void)
 {
     rcp_regmap_request_stream_cfg_t row;
     uint8_t                         out[24];
 
     rcp_regmap_request_stream_cfg_init(&row);
-    row.rx_wd_timeout_ms = 12345u; /* deliberately not wire-mapped this batch --
-                                       see this table's own file-header note (regmap.h) */
-    row.rx_wd_action     = 7u;     /* no TC18 register at all -- excluded entirely */
+    row.rx_wd_timeout_ms = 12345u;
+    row.rx_wd_action     = 7u; /* no TC18 register at all -- excluded entirely */
 
-    rcp_regmap_request_stream_cfg_render(&row, 1, out);
+    rcp_regmap_request_stream_cfg_render(&row, 1, out, 0u);
 
     TEST_ASSERT_EQUAL_UINT8(0u, out[0x000A]);
     TEST_ASSERT_EQUAL_UINT8(0u, out[0x000B]);
@@ -2232,6 +2236,82 @@ static void test_request_stream_cfg_render_leaves_rx_wd_timeout_and_reserved_oct
     TEST_ASSERT_EQUAL_UINT8(0u, out[0x0015]);
     TEST_ASSERT_EQUAL_UINT8(0u, out[0x0016]);
     TEST_ASSERT_EQUAL_UINT8(0u, out[0x0017]);
+}
+
+/* REQ-RMAP-050, the real (configured) path: a 1000 ms timeout at 10
+ * ms/tick renders as exactly 100 ticks (0x0064), matching
+ * rcp_regmap_wd_timeout_ms_to_ticks()'s own already-unit-tested
+ * round-down/bounds-check behavior, now actually reachable on the wire. */
+static void test_request_stream_cfg_render_produces_real_ticks_when_watchdog_tick_rate_configured(void)
+{
+    rcp_regmap_request_stream_cfg_t row;
+    uint8_t                         out[24];
+
+    rcp_regmap_request_stream_cfg_init(&row);
+    row.rx_wd_timeout_ms = 1000u;
+
+    rcp_regmap_request_stream_cfg_render(&row, 1, out, 10u);
+
+    TEST_ASSERT_EQUAL_UINT8(0x00u, out[0x000A]);
+    TEST_ASSERT_EQUAL_UINT8(0x64u, out[0x000B]);
+}
+
+/* The other half of REQ-RMAP-050's own render-side fallback: an
+ * internal ms value that does not fit the register's 16-bit tick width
+ * even at the configured rate (here: 700000 ms at 10 ms/tick would need
+ * 70000 ticks, one past UINT16_MAX) falls back to 0x0000 the same way
+ * an unconfigured rate does -- render() has no error-return mechanism,
+ * so this is the only representable outcome for an input a conformant
+ * caller should never have accepted in the first place. */
+static void test_request_stream_cfg_render_falls_back_to_zero_when_ms_value_does_not_fit_even_configured(void)
+{
+    rcp_regmap_request_stream_cfg_t row;
+    uint8_t                         out[24];
+
+    rcp_regmap_request_stream_cfg_init(&row);
+    row.rx_wd_timeout_ms = 700000u;
+
+    rcp_regmap_request_stream_cfg_render(&row, 1, out, 10u);
+
+    TEST_ASSERT_EQUAL_UINT8(0u, out[0x000A]);
+    TEST_ASSERT_EQUAL_UINT8(0u, out[0x000B]);
+}
+
+/* REQ-RMAP-050's write direction: a wire-arriving ticks value (always
+ * exactly 16 bits, so it can never itself violate a width constraint)
+ * converts to ms using the caller-supplied rate and lands in
+ * rx_wd_timeout_ms -- the round-trip inverse of the render test above. */
+static void test_request_stream_cfg_apply_reconfig_converts_ticks_to_ms_when_watchdog_tick_rate_configured(void)
+{
+    rcp_regmap_request_stream_cfg_t rows[1];
+    uint8_t                         patch[2] = {0x00u, 0x64u}; /* 100 ticks */
+
+    rcp_regmap_request_stream_cfg_init(&rows[0]);
+
+    TEST_ASSERT_EQUAL(RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_OK,
+                       rcp_regmap_request_stream_cfg_apply_reconfig(rows, 1, 0x000Au, patch, 2u, 10u));
+    TEST_ASSERT_EQUAL_UINT32(1000u, rows[0].rx_wd_timeout_ms);
+}
+
+/* When watchdog_ms_per_tick is unconfigured (0), the ticks-to-ms
+ * conversion fails and rx_wd_timeout_ms is left at its own prior value
+ * rather than clobbered to some meaningless derived number -- the same
+ * "can't faithfully round-trip this field, so don't touch it" choice
+ * render()'s own fallback makes for the opposite direction. Confirms
+ * the whole apply_reconfig() call still succeeds (OK, not an error) --
+ * the arriving wire value is always valid 16-bit ticks regardless of
+ * whether this library can currently interpret them as milliseconds. */
+static void test_request_stream_cfg_apply_reconfig_leaves_rx_wd_timeout_ms_unchanged_when_unconfigured(void)
+{
+    rcp_regmap_request_stream_cfg_t rows[1];
+    uint8_t                         patch[2] = {0x00u, 0x64u}; /* 100 ticks */
+
+    rcp_regmap_request_stream_cfg_init(&rows[0]);
+    rows[0].rx_wd_timeout_ms = 42u;
+
+    TEST_ASSERT_EQUAL(RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_OK,
+                       rcp_regmap_request_stream_cfg_apply_reconfig(rows, 1, 0x000Au, patch, 2u, 0u));
+    TEST_ASSERT_EQUAL_UINT32(42u, rows[0].rx_wd_timeout_ms); /* untouched, not zeroed */
 }
 
 /* REQ-RMAP-040/041/047/048/049/052/054/061 CLOSED (write-authorization
@@ -2291,7 +2371,7 @@ static void test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bo
                                                    RCP_LIFECYCLE_RCP_CONFIGURED, ROOT_WRITER,
                                                    hw_pin_map, 1u, ep_id_map, 1u,
                                                    response_queue_cfg, 1u, request_stream_cfg, 1u, ep_generic_cfg, 1u,
-                                                   &err, &tn);
+                                                   &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, err);
         rcp_bytes_free(&frame);
@@ -2311,7 +2391,7 @@ static void test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bo
                                                    RCP_LIFECYCLE_RCP_CONFIGURED, ROOT_WRITER,
                                                    hw_pin_map, 1u, ep_id_map, 1u,
                                                    response_queue_cfg, 1u, request_stream_cfg, 1u, ep_generic_cfg, 1u,
-                                                   &err, &tn);
+                                                   &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, err);
         rcp_bytes_free(&frame);
@@ -2332,7 +2412,7 @@ static void test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bo
                                                    RCP_LIFECYCLE_RCP_CONFIGURED, ROOT_WRITER,
                                                    hw_pin_map, 1u, ep_id_map, 1u,
                                                    response_queue_cfg, 1u, request_stream_cfg, 1u, ep_generic_cfg, 1u,
-                                                   &err, &tn);
+                                                   &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, err);
         rcp_bytes_free(&frame);
@@ -2358,7 +2438,7 @@ static void test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bo
                                                    RCP_LIFECYCLE_HW_UNCONFIGURED, ROOT_WRITER,
                                                    hw_pin_map, 1u, ep_id_map, 1u,
                                                    response_queue_cfg, 1u, request_stream_cfg, 1u, ep_generic_cfg, 1u,
-                                                   &err, &tn);
+                                                   &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, err);
         rcp_bytes_free(&frame);
@@ -2375,7 +2455,7 @@ static void test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bo
                                                    RCP_LIFECYCLE_HW_UNCONFIGURED, DISCOVERY_WRITER,
                                                    hw_pin_map, 1u, ep_id_map, 1u,
                                                    response_queue_cfg, 1u, request_stream_cfg, 1u, ep_generic_cfg, 1u,
-                                                   &err, &tn);
+                                                   &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err); /* HW_config (W*) unaffected by the W+ lock */
         TEST_ASSERT_EQUAL_UINT8(0xAAu, hw_pin_map[0].hw_ep_nr);
@@ -2402,7 +2482,7 @@ static void test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bo
                                                    RCP_LIFECYCLE_RCP_CONFIGURED, ROOT_WRITER,
                                                    hw_pin_map, 1u, ep_id_map, 1u,
                                                    response_queue_cfg, 1u, request_stream_cfg, 1u, ep_generic_cfg, 1u,
-                                                   &err, &tn);
+                                                   &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, err);
         rcp_bytes_free(&frame);
@@ -2415,7 +2495,7 @@ static void test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bo
                                                    RCP_LIFECYCLE_RCP_CONFIGURED, ROOT_WRITER,
                                                    hw_pin_map, 1u, ep_id_map, 1u,
                                                    response_queue_cfg, 1u, request_stream_cfg, 1u, ep_generic_cfg, 1u,
-                                                   &err, &tn);
+                                                   &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, err);
         rcp_bytes_free(&frame);
@@ -2441,7 +2521,7 @@ static void test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bo
                                                    RCP_LIFECYCLE_HW_UNCONFIGURED, ROOT_WRITER,
                                                    hw_pin_map, 1u, ep_id_map, 1u,
                                                    response_queue_cfg, 1u, request_stream_cfg, 1u, ep_generic_cfg, 1u,
-                                                   &err, &tn);
+                                                   &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, err); /* denied via the touched, locked W+ octet */
 
@@ -2472,7 +2552,7 @@ static void test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bo
                                                    RCP_LIFECYCLE_RCP_CONFIGURED, ROOT_WRITER,
                                                    hw_pin_map, 1u, ep_id_map, 1u,
                                                    response_queue_cfg, 1u, request_stream_cfg, 1u, ep_generic_cfg, 1u,
-                                                   &err, &tn);
+                                                   &err, &tn, 0u);
         TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
         TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, err);
         rcp_bytes_free(&frame);
@@ -2569,7 +2649,7 @@ static void test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addres
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
                                                             NULL, 0u,
-                                                            &err);
+                                                            &err, 0u);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_NOT_NULL(resp_frame.data);
         TEST_ASSERT_EQUAL(RCP_ACF_OK,
@@ -2601,7 +2681,7 @@ static void test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addres
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
                                                             NULL, 0u,
-                                                            &err);
+                                                            &err, 0u);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_NOT_NULL(resp_frame.data);
         TEST_ASSERT_EQUAL(RCP_ACF_OK,
@@ -2639,7 +2719,7 @@ static void test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addres
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
                                                             NULL, 0u,
-                                                            &err);
+                                                            &err, 0u);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_EQUAL(RCP_ACF_OK,
                            rcp_acf_decode_abb(resp_frame.data, resp_frame.len, &resp_hdr,
@@ -2671,7 +2751,7 @@ static void test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addres
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
                                                             NULL, 0u,
-                                                            &err);
+                                                            &err, 0u);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         TEST_ASSERT_NULL(resp_frame.data);
     }
@@ -2696,7 +2776,7 @@ static void test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addres
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
                                                             NULL, 0u,
-                                                            &err);
+                                                            &err, 0u);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_EQUAL(RCP_ACF_OK,
                            rcp_acf_decode_abb(resp_frame.data, resp_frame.len, &resp_hdr,
@@ -2724,7 +2804,7 @@ static void test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addres
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
                                                             NULL, 0u,
-                                                            &err);
+                                                            &err, 0u);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         TEST_ASSERT_NULL(resp_frame.data);
     }
@@ -2749,7 +2829,7 @@ static void test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addres
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
                                                             NULL, 0u,
-                                                            &err);
+                                                            &err, 0u);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_EQUAL(RCP_ACF_OK,
                            rcp_acf_decode_abb(resp_frame.data, resp_frame.len, &resp_hdr,
@@ -2777,7 +2857,7 @@ static void test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addres
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
                                                             NULL, 0u,
-                                                            &err);
+                                                            &err, 0u);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         TEST_ASSERT_NULL(resp_frame.data);
     }
@@ -2806,12 +2886,12 @@ static void test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addres
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
                                                             NULL, 0u,
-                                                            &err);
+                                                            &err, 0u);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_EQUAL(RCP_ACF_OK,
                            rcp_acf_decode_abb(resp_frame.data, resp_frame.len, &resp_hdr,
                                                &resp_payload, &resp_payload_len));
-        rcp_regmap_request_stream_cfg_render(request_stream_cfg, 2u, expected_rs);
+        rcp_regmap_request_stream_cfg_render(request_stream_cfg, 2u, expected_rs, 0u);
         TEST_ASSERT_EQUAL_UINT8_ARRAY(expected_rs, resp_payload, 24u);
         rcp_bytes_free(&resp_frame);
     }
@@ -2834,7 +2914,7 @@ static void test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addres
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
                                                             NULL, 0u,
-                                                            &err);
+                                                            &err, 0u);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         TEST_ASSERT_NULL(resp_frame.data);
     }
@@ -2859,7 +2939,7 @@ static void test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addres
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
                                                             NULL, 0u,
-                                                            &err);
+                                                            &err, 0u);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_EQUAL(RCP_ACF_OK,
                            rcp_acf_decode_abb(resp_frame.data, resp_frame.len, &resp_hdr,
@@ -2887,7 +2967,7 @@ static void test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addres
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
                                                             NULL, 0u,
-                                                            &err);
+                                                            &err, 0u);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         TEST_ASSERT_NULL(resp_frame.data);
     }
@@ -2913,7 +2993,7 @@ static void test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addres
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
                                                             sequencer_state, 3u,
-                                                            &err);
+                                                            &err, 0u);
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
         TEST_ASSERT_NOT_NULL(resp_frame.data);
         TEST_ASSERT_EQUAL(RCP_ACF_OK,
@@ -2943,7 +3023,7 @@ static void test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addres
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
                                                             NULL, 3u,
-                                                            &err);
+                                                            &err, 0u);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         TEST_ASSERT_NULL(resp_frame.data);
     }
@@ -2966,7 +3046,7 @@ static void test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addres
                                                             decoded_tn, &map, hw_pin_map, 2u,
                                                             ep_id_map, 2u, response_queue_cfg, 2u, request_stream_cfg, 2u, ep_generic_cfg, 2u,
                                                             NULL, 0u,
-                                                            &err);
+                                                            &err, 0u);
         TEST_ASSERT_EQUAL(RCP_ERROR_EP_NOT_FOUND, err);
         TEST_ASSERT_NULL(resp_frame.data);
     }
@@ -4275,7 +4355,11 @@ int main(void)
     RUN_TEST(test_request_stream_cfg_render_saturates_oversized_max_request_size_without_wrapping);
     RUN_TEST(test_request_stream_cfg_render_saturates_oversized_safestate_sequencer_without_wrapping);
     RUN_TEST(test_request_stream_cfg_render_packs_all_eight_bits_at_0x000d);
-    RUN_TEST(test_request_stream_cfg_render_leaves_rx_wd_timeout_and_reserved_octets_zero);
+    RUN_TEST(test_request_stream_cfg_render_falls_back_to_zero_when_watchdog_tick_rate_unconfigured);
+    RUN_TEST(test_request_stream_cfg_render_produces_real_ticks_when_watchdog_tick_rate_configured);
+    RUN_TEST(test_request_stream_cfg_render_falls_back_to_zero_when_ms_value_does_not_fit_even_configured);
+    RUN_TEST(test_request_stream_cfg_apply_reconfig_converts_ticks_to_ms_when_watchdog_tick_rate_configured);
+    RUN_TEST(test_request_stream_cfg_apply_reconfig_leaves_rx_wd_timeout_ms_unchanged_when_unconfigured);
     RUN_TEST(test_ep0_dispatcher_denies_unauthorized_writes_before_applying_or_bounds_checking);
     RUN_TEST(test_ep0_read_dispatcher_routes_all_seven_extents_and_unknown_addresses);
     RUN_TEST(test_hw_config_row_stride_now_modeled_gpio_access_class_still_diverges);
