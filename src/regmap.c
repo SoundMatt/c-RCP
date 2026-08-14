@@ -101,6 +101,7 @@ static uint64_t get_u64(const uint8_t *p)
 }
 
 //cfusa:req REQ-RMAP-024
+//cfusa:req REQ-RMAP-039
 void rcp_regmap_general_render(const rcp_regmap_general_t *map, uint8_t out[RCP_REGMAP_GENERAL_LEN])
 {
     memset(out, 0, RCP_REGMAP_GENERAL_LEN);
@@ -146,6 +147,8 @@ void rcp_regmap_general_render(const rcp_regmap_general_t *map, uint8_t out[RCP_
     put_u16(&out[0x003A], map->svr_time_synch_cfg_capacity);
     put_u16(&out[0x003C], map->svr_security_cfg_ptr);
     put_u16(&out[0x003E], map->svr_security_cfg_capacity);
+    put_u16(&out[0x0040], map->svr_device_specific_cfg_ptr);
+    put_u16(&out[0x0042], map->svr_device_specific_cfg_capacity);
 }
 
 //cfusa:req REQ-RMAP-024
@@ -188,6 +191,7 @@ rcp_bytes_t rcp_regmap_general_encode_read_response(const rcp_regmap_general_t *
 }
 
 //cfusa:req REQ-RMAP-024
+//cfusa:req REQ-RMAP-039
 rcp_regmap_general_errc_t rcp_regmap_general_decode_read_response(const uint8_t *b, size_t len,
                                                                     rcp_regmap_general_t *out_map)
 {
@@ -247,6 +251,8 @@ rcp_regmap_general_errc_t rcp_regmap_general_decode_read_response(const uint8_t 
     out_map->svr_time_synch_cfg_capacity        = get_u16(&image[0x003A]);
     out_map->svr_security_cfg_ptr               = get_u16(&image[0x003C]);
     out_map->svr_security_cfg_capacity          = get_u16(&image[0x003E]);
+    out_map->svr_device_specific_cfg_ptr        = get_u16(&image[0x0040]);
+    out_map->svr_device_specific_cfg_capacity   = get_u16(&image[0x0042]);
     return RCP_REGMAP_GENERAL_OK;
 }
 
@@ -477,6 +483,65 @@ static rcp_wire_error_t sequencer_row_write_authorize(rcp_lifecycle_state_t stat
     }
 
     return RCP_ERROR_NONE;
+}
+
+/* REQ-E2E-046/REQ-RMAP-051 (issue #424): request-stream-cfg (TC18
+ * §12.7.7 Table 24) is entirely R/W* -- writable only in
+ * HW_UNCONFIGURED/HW_CONFIGURED, permanently read-only once
+ * RCP_CONFIGURED -- for every field EXCEPT ONE: row-relative offset
+ * 0x000D bit 7 (rx_stream_status) is Table 24's own distinct, plain R/W
+ * bit in that same octet, genuinely different from the seven R/W*
+ * enforcement-config bits sharing it (rx_enforce_e2e/rx_enforce_seq/
+ * rx_seq_safestate_enable/rx_wd_enable/rx_wd_safestate_enable/
+ * rx_ovrflw_safestate_enable/rx_safety_measure).
+ *
+ * FUNCTIONAL_W_STAR (checked first, exactly as every other table's own
+ * write path in this file does) is the correct, sufficient rule for
+ * EVERY octet in this table without exception -- once it passes, the
+ * whole write is authorized and no further check is needed. This
+ * function's own carve-out only matters when it FAILS (state is
+ * RCP_CONFIGURED): a write whose own final effective bytes (write_data,
+ * already SET/OR/AND/XOR-combined by the caller -- see
+ * rcp_regmap_ep0_decode_write_request()'s own call site) leave bits
+ * [6:0] of row-relative octet 0x000D unchanged from the table's own
+ * CURRENT rendered content (current_rendered, a full-table image at the
+ * identical 24-octet-per-row stride, or NULL if the caller could not
+ * resolve one, e.g. the write's own span exceeded its own fixed
+ * scratch buffer -- fails closed/denies in that case, matching this
+ * file's own established fail-closed convention for every other
+ * unresolvable case) is still authorized, since TC18 places no
+ * lifecycle restriction on that one bit; a write that would ALSO change
+ * any of bits [6:0] remains denied even if it also touches bit 7 -- this
+ * carve-out must never let a write disguised as a status-bit update
+ * smuggle a change to any of those seven genuinely safety-relevant
+ * enforcement bits through once FUNCTIONAL_W_STAR's own window has
+ * closed. A write touching any OTHER octet in the row is denied
+ * outright once FUNCTIONAL_W_STAR itself has failed, with no carve-out
+ * of its own -- this function's own bit-7 exception is the ONLY relief
+ * from FUNCTIONAL_W_STAR this table's write path grants. */
+static bool request_stream_cfg_row_write_authorize(rcp_lifecycle_state_t state,
+                                                     rcp_lifecycle_writer_ctx_t writer,
+                                                     uint16_t relative_start_address,
+                                                     const uint8_t *write_data, size_t data_len,
+                                                     const uint8_t *current_rendered)
+{
+    size_t i;
+
+    if (rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer)) {
+        return true;
+    }
+
+    if (current_rendered == NULL) return false;
+
+    for (i = 0; i < data_len; i++) {
+        uint16_t addr_i        = (uint16_t)(relative_start_address + i);
+        uint16_t offset_in_row = (uint16_t)(addr_i % 24u);
+
+        if (offset_in_row != 0x000Du) return false;
+        if ((write_data[i] & 0x7Fu) != (current_rendered[addr_i] & 0x7Fu)) return false;
+    }
+
+    return true;
 }
 
 /* ── Optional-subsystem config sections: storage + wire codec
@@ -905,35 +970,48 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
         (size_t)addr < (size_t)map->svr_request_stream_cfg_ptr + request_stream_cfg_len) {
         uint16_t relative = (uint16_t)((size_t)addr - map->svr_request_stream_cfg_ptr);
         rcp_regmap_request_stream_cfg_reconfig_errc_t rc;
+        const uint8_t *write_data     = &payload[2];
+        uint8_t        combined[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES * 24u];
+        uint8_t        rendered[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES * 24u];
+        bool           have_rendered = false;
 
-        /* request-stream-cfg is entirely TC18 R/W* (issue #308). */
-        if (!rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer)) {
+        /* Rendered unconditionally here (REQ-RMAP-068's own hw_pin_map
+         * pattern above only renders for OR/AND/XOR, since it only ever
+         * needs `rendered` to combine against) because
+         * request_stream_cfg_row_write_authorize() below also needs a
+         * current-image snapshot to resolve rx_stream_status's own bit-7
+         * carve-out (issue #424) regardless of write_op -- see that
+         * function's own doc comment. request_stream_status_blocked is
+         * NULL here (not threaded through this whole write dispatcher):
+         * safe and correct, since the carve-out check below only ever
+         * inspects bits [6:0] of this rendered image, masking bit 7 out
+         * entirely (see that function's own doc comment). */
+        if ((size_t)relative + data_len <= sizeof(rendered)) {
+            rcp_regmap_request_stream_cfg_render(request_stream_cfg, request_stream_cfg_count,
+                                                  rendered, watchdog_ms_per_tick, NULL);
+            have_rendered = true;
+            if (write_op != RCP_REGMAP_EP0_WRITE_OP_SET) {
+                rcp_regmap_ep0_combine_write_op(write_op, &rendered[relative], &payload[2],
+                                                 combined, data_len);
+                write_data = combined;
+            }
+        }
+
+        /* request-stream-cfg is TC18 R/W* for every field EXCEPT the
+         * plain R/W rx_stream_status bit at row-relative 0x000D bit 7
+         * (issue #424, REQ-E2E-046/REQ-RMAP-051) -- see this helper's
+         * own doc comment for the narrow, safe carve-out. */
+        if (!request_stream_cfg_row_write_authorize(state, writer, relative, write_data, data_len,
+                                                      have_rendered ? rendered : NULL)) {
             *out_error = rcp_lifecycle_field_write_error(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR,
                                                           writer);
             return RCP_REGMAP_EP0_OK;
         }
 
-        /* REQ-RMAP-068: see hw_pin_map's own identical pattern above. */
-        {
-            const uint8_t *write_data = &payload[2];
-            uint8_t        combined[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES * 24u];
-
-            if (write_op != RCP_REGMAP_EP0_WRITE_OP_SET &&
-                (size_t)relative + data_len <= sizeof(combined)) {
-                uint8_t rendered[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES * 24u];
-
-                rcp_regmap_request_stream_cfg_render(request_stream_cfg, request_stream_cfg_count,
-                                                      rendered, watchdog_ms_per_tick);
-                rcp_regmap_ep0_combine_write_op(write_op, &rendered[relative], &payload[2],
-                                                 combined, data_len);
-                write_data = combined;
-            }
-
-            rc = rcp_regmap_request_stream_cfg_apply_reconfig(request_stream_cfg,
-                                                                request_stream_cfg_count, relative,
-                                                                write_data, data_len,
-                                                                watchdog_ms_per_tick);
-        }
+        rc = rcp_regmap_request_stream_cfg_apply_reconfig(request_stream_cfg,
+                                                            request_stream_cfg_count, relative,
+                                                            write_data, data_len,
+                                                            watchdog_ms_per_tick);
         *out_error = (rc == RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_OK) ? RCP_ERROR_NONE
                                                                         : RCP_ERROR_INVALID_PARAMETER;
         return RCP_REGMAP_EP0_OK;
@@ -1183,6 +1261,8 @@ static rcp_bytes_t optional_subsystem_cfg_read_route(uint16_t addr, uint16_t tab
 //cfusa:req REQ-RMAP-078
 //cfusa:req REQ-RMAP-080
 //cfusa:req REQ-SEQ-014
+//cfusa:req REQ-E2E-046
+//cfusa:req REQ-RMAP-051
 rcp_bytes_t
 rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      uint8_t transaction_num,
@@ -1202,7 +1282,8 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      size_t sequencer_count,
                                      rcp_wire_error_t *out_error,
                                      uint32_t watchdog_ms_per_tick,
-                                     const rcp_regmap_optional_subsystem_cfg_ptrs_t *optional_cfg)
+                                     const rcp_regmap_optional_subsystem_cfg_ptrs_t *optional_cfg,
+                                     const bool *request_stream_status_blocked)
 {
     size_t hw_cfg_len;
     size_t ep_id_map_len;
@@ -1261,7 +1342,7 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
         uint8_t image[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES * 24u];
 
         rcp_regmap_request_stream_cfg_render(request_stream_cfg, request_stream_cfg_count, image,
-                                              watchdog_ms_per_tick);
+                                              watchdog_ms_per_tick, request_stream_status_blocked);
         *out_error = RCP_ERROR_NONE;
         return ep0_read_response_from_slice(image, request_stream_cfg_len,
                                              (size_t)addr - map->svr_request_stream_cfg_ptr,
@@ -1349,17 +1430,31 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
 /* ── EP_ID_config wire stride (REQ-RMAP-052/054) ───────────────────────────── */
 
 //cfusa:req REQ-RMAP-052
+//cfusa:req REQ-RMAP-053
 void rcp_regmap_ep_id_map_render(const rcp_regmap_ep_id_map_entry_t *entries, size_t count,
                                   uint8_t *out)
 {
     size_t i;
 
     for (i = 0; i < count; i++) {
+        uint16_t bbid_ctrl;
+
         out[4u * i + 0u] = entries[i].request_stream_index;
         out[4u * i + 1u] = (uint8_t)entries[i].ep_id; /* truncated -- see this
                                                           function's own doc
                                                           comment (regmap.h) */
-        put_u16(&out[4u * i + 2u], (uint16_t)entries[i].byte_bus_id);
+
+        /* REQ-RMAP-053 (issue #421, TC18 Table 25/26): BBID in
+         * bits[15:5] (masked to its own real 11-bit width, same
+         * masking convention rcp_acf_pack_header() already uses,
+         * acf.c), CRC_required in bit 4, Channel_selection
+         * (bits[3:0]) deliberately always 0 -- see this table's own
+         * file-header note above and
+         * rcp_regmap_ep_id_map_entry_t.crc_required's own field
+         * comment (regmap.h). */
+        bbid_ctrl = (uint16_t)(((uint16_t)entries[i].byte_bus_id & 0x07FFu) << 5);
+        bbid_ctrl = (uint16_t)(bbid_ctrl | (entries[i].crc_required ? 0x10u : 0x00u));
+        put_u16(&out[4u * i + 2u], bbid_ctrl);
     }
 }
 
@@ -1380,6 +1475,7 @@ const char *rcp_regmap_ep_id_map_reconfig_strerror(rcp_regmap_ep_id_map_reconfig
 }
 
 //cfusa:req REQ-RMAP-052
+//cfusa:req REQ-RMAP-053
 //cfusa:req REQ-RMAP-054
 rcp_regmap_ep_id_map_reconfig_errc_t
 rcp_regmap_ep_id_map_apply_reconfig(rcp_regmap_ep_id_map_entry_t *entries, size_t count,
@@ -1404,11 +1500,19 @@ rcp_regmap_ep_id_map_apply_reconfig(rcp_regmap_ep_id_map_entry_t *entries, size_
         block[relative_start_address + i] = data[i]; /* every octet R/W+, none read-only */
     }
     for (i = 0; i < count; i++) {
+        uint16_t bbid_ctrl = get_u16(&block[4u * i + 2u]);
+
         entries[i].request_stream_index = block[4u * i + 0u];
         entries[i].ep_id                = block[4u * i + 1u]; /* zero-extends -- see this
                                                                    struct's own ep_id field
                                                                    comment (regmap.h) */
-        entries[i].byte_bus_id           = (rcp_byte_bus_id_t)get_u16(&block[4u * i + 2u]);
+        /* REQ-RMAP-053 (issue #421, TC18 Table 25/26): inverse of
+         * render()'s own packing above -- BBID from bits[15:5],
+         * crc_required from bit 4; bits[3:0] (Channel_selection) are
+         * intentionally discarded, not stored to any field (see this
+         * function's own doc comment, regmap.h). */
+        entries[i].byte_bus_id  = (rcp_byte_bus_id_t)((bbid_ctrl >> 5) & 0x07FFu);
+        entries[i].crc_required = (bbid_ctrl & 0x10u) != 0u;
     }
 
     return RCP_REGMAP_EP_ID_MAP_RECONFIG_OK;
@@ -1937,9 +2041,12 @@ bool rcp_regmap_wd_timeout_ticks_to_ms(uint16_t ticks,
 //cfusa:req REQ-RMAP-049
 //cfusa:req REQ-RMAP-050
 //cfusa:req REQ-RMAP-071
+//cfusa:req REQ-E2E-046
+//cfusa:req REQ-RMAP-051
 void rcp_regmap_request_stream_cfg_render(const rcp_regmap_request_stream_cfg_t *entries,
                                            size_t count, uint8_t *out,
-                                           uint32_t watchdog_ms_per_tick)
+                                           uint32_t watchdog_ms_per_tick,
+                                           const bool *rx_stream_status_blocked)
 {
     size_t i;
 
@@ -1984,7 +2091,14 @@ void rcp_regmap_request_stream_cfg_render(const rcp_regmap_request_stream_cfg_t 
         bits_0x000d |= (uint8_t)(e->rx_wd_safestate_enable     ? 0x10u : 0x00u);
         bits_0x000d |= (uint8_t)(e->rx_ovrflw_safestate_enable ? 0x20u : 0x00u);
         bits_0x000d |= (uint8_t)(e->rx_safety_measure          ? 0x40u : 0x00u);
-        bits_0x000d |= (uint8_t)(e->rx_wd_info_enable          ? 0x80u : 0x00u);
+        /* REQ-E2E-046/REQ-RMAP-051 (issue #424): bit 7 is TC18's own
+         * distinct, live rx_stream_status bit, NOT rx_wd_info_enable --
+         * see this function's own doc comment (regmap.h) for the full
+         * mis-wiring-found-and-fixed history. */
+        bits_0x000d |= (uint8_t)((rx_stream_status_blocked != NULL &&
+                                   rx_stream_status_blocked[i])
+                                      ? 0x80u
+                                      : 0x00u);
         out[24u * i + 0x000Du] = bits_0x000d;
 
         safestate_sequencer_wire = (e->rx_safestate_sequencer > 0xFFu)
@@ -2052,8 +2166,14 @@ rcp_regmap_request_stream_cfg_apply_reconfig(rcp_regmap_request_stream_cfg_t *en
 
     /* Same "render current image, patch the addressed octets, re-parse
      * the whole image back" idiom every other pointed-to table's own
-     * apply_reconfig() already uses. */
-    rcp_regmap_request_stream_cfg_render(entries, count, block, watchdog_ms_per_tick);
+     * apply_reconfig() already uses. NULL for rx_stream_status_blocked
+     * (bit 7's own live-status source, issue #424) is correct and safe
+     * here regardless of any real live status: this function never
+     * reads bit 7 back out of block[] below (see this loop's own
+     * bits_0x000d handling), so whatever renders into that one bit of
+     * this transient substrate image has no effect on the final result
+     * either way. */
+    rcp_regmap_request_stream_cfg_render(entries, count, block, watchdog_ms_per_tick, NULL);
     for (i = 0; i < data_len; i++) {
         block[relative_start_address + i] = data[i]; /* every octet R/W*, none read-only */
     }
@@ -2084,7 +2204,14 @@ rcp_regmap_request_stream_cfg_apply_reconfig(rcp_regmap_request_stream_cfg_t *en
         entries[i].rx_wd_safestate_enable     = (bits_0x000d & 0x10u) != 0u;
         entries[i].rx_ovrflw_safestate_enable = (bits_0x000d & 0x20u) != 0u;
         entries[i].rx_safety_measure          = (uint8_t)((bits_0x000d & 0x40u) != 0u);
-        entries[i].rx_wd_info_enable          = (bits_0x000d & 0x80u) != 0u;
+        /* bit 7 (rx_stream_status, issue #424) is intentionally NOT
+         * unpacked into any struct field here -- it is a live,
+         * server-computed status, not client-configurable content; a
+         * write touching it has no effect, the same "no struct field
+         * consumes it" treatment this function's own reserved trailing
+         * octets already receive (see this function's own doc comment,
+         * regmap.h). rx_wd_info_enable no longer has any wire register
+         * position at all -- see that field's own doc comment. */
 
         entries[i].rx_safestate_sequencer     = (uint16_t)block[24u * i + 0x000Eu];
         entries[i].rx_safe_sequencer_state    = block[24u * i + 0x000Fu];

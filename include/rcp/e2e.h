@@ -872,14 +872,24 @@ void rcp_e2e_stream_fault_tracker_reset(rcp_e2e_stream_fault_tracker_t *t, uint6
  * follows (rcp_e2e_stream_fault_on_crc_error() itself takes rx_enforce_e2e,
  * not a CRC-check result, for the identical reason).
  *
- * Wiring: mock.c has no per-endpoint-type dispatch of any kind (the same
- * structural gap this whole issue #336 lineage has repeatedly routed
- * around -- see REQ-CANCEL-012's own precedent) to actually call these
- * note_*() functions from a live evaluate()-then-latch path, or to expose
- * rcp_e2e_stream_status_rx_blocked() as a real register read. This
- * primitive is real and directly tested but not yet wired into any live
- * dispatch path -- the same disposition already established across this
- * entire lineage.
+ * Wiring: UPDATED 2026-08-14 -- both halves of this note's own original
+ * claim are now stale. mock.c's real, live production dispatch paths
+ * (dispatch_frame()/dispatch_plain()/rcp_mock_server_dispatch_e2e()/
+ * rcp_mock_server_check_watchdog()) already call the note_*() functions
+ * from a real evaluate()-then-latch path for all four causes (see
+ * REQ-E2E-046's own .fusa-reqs.json entry for the full history). And
+ * rcp_e2e_stream_status_rx_blocked()'s own aggregate IS now exposed as a
+ * real register read (issue #424, REQ-RMAP-051): regmap.c's
+ * rcp_regmap_request_stream_cfg_render() takes a caller-supplied
+ * rx_stream_status_blocked[] array (index-parallel with the request-
+ * stream table) and renders it at TC18 Table 24's own real wire bit
+ * 0x000D.7 -- the bit that used to be occupied there by a plain
+ * mis-wiring of rx_wd_info_enable instead. Proven via a direct
+ * dispatcher-level test (rcp_regmap_ep0_encode_read_response()), the
+ * same "proven via the wire codec, not that mock.c's own live dispatch
+ * loop itself calls the EP0 register-map dispatcher" bar this whole
+ * register-map wire-level exchange establishes elsewhere in this
+ * codebase (see regmap.h's own file-header note).
  */
 typedef struct {
     rcp_e2e_stream_fault_t crc;              /* reused, unchanged CRC latch */

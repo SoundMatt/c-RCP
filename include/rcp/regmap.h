@@ -224,10 +224,38 @@
  *      fault latches" primitive this note originally said the codebase
  *      lacked now exists -- e2e.h's own rcp_e2e_stream_status_t and its
  *      rcp_e2e_stream_status_rx_blocked() aggregate (that file's own
- *      "Aggregate rx_stream_status" section). Still not wired into
- *      mock.c's dispatch (which has no per-endpoint-type dispatch of any
- *      kind), and rx_safety_measure/rx_wd_info_enable's own genuine
- *      ambiguity remains unresolved.
+ *      "Aggregate rx_stream_status" section).
+ *      WIRE-LEVEL BUG FOUND AND FIXED 2026-08-14 (issue #424,
+ *      REQ-E2E-046/REQ-RMAP-051): this octet's real wire bit 0x80 (row-
+ *      relative offset 0x000D bit 7) is TC18's own rx_stream_status --
+ *      but rcp_regmap_request_stream_cfg_render()/_apply_reconfig() used
+ *      to serialize rx_wd_info_enable at that exact bit position instead,
+ *      a plain mis-wiring (rx_wd_info_enable's own genuine RC5-mapping
+ *      ambiguity, described above, is NOT the same finding -- that
+ *      ambiguity is about which bit SHOULD carry it, not that this WRONG
+ *      bit was carrying it). Bit 7 now reflects a caller-supplied, live
+ *      rx_stream_status_blocked[] array (rcp_regmap_request_stream_cfg_
+ *      render()'s own new trailing parameter, threaded through
+ *      rcp_regmap_ep0_encode_read_response()) -- a real caller computes
+ *      it via rcp_e2e_stream_status_rx_blocked()/rcp_mock_server_
+ *      stream_status_rx_blocked() (already-correct, already-live
+ *      aggregates that were simply never read from this register-map
+ *      READ path before). rx_wd_info_enable itself keeps its own
+ *      genuine, still-open RC5-mapping ambiguity (unresolved by this
+ *      fix, which only removes the wrong bit-7 mis-wiring) but now has
+ *      NO wire register position of its own at all -- content-modeling
+ *      only, still consumed directly by e2e.h/watchdog.h as a plain
+ *      argument, the same disposition rx_wd_action's own doc comment
+ *      already established for a different field (see this table's own
+ *      "request-stream-cfg wire codec" section below for the full
+ *      detail). Also corrected: this bit is TC18-typed plain R/W, not
+ *      R/W* like its seven octet-mates -- rcp_regmap_ep0_decode_write_
+ *      request()'s own write-authorization for this table used to gate
+ *      the whole octet at FUNCTIONAL_W_STAR (writable only in
+ *      HW_UNCONFIGURED/HW_CONFIGURED) with no carve-out for this
+ *      genuinely different access type; see
+ *      request_stream_cfg_row_write_authorize()'s own doc comment
+ *      (regmap.c) for the narrow, safe carve-out this fix adds.
  *      The rest of this octet's own surrounding registers
  *      (rx_safestate_sequencer/rx_safe_sequencer_state, 0x000E/0x000F)
  *      are themselves flagged, in the same RC5 revision, as subject to a
@@ -758,17 +786,25 @@ typedef struct {
 
                                 These eight fields (four ptr/capacity
                                 pairs -- network interface, physical
-                                layer, time synch, security) are the
-                                LAST Group 1 item (issue #200):
-                                rcp_regmap_general_t previously declared
-                                none of them at all, so a c-RCP server
-                                could not advertise -- and a c-RCP
-                                client could not discover -- whether any
-                                of these four optional subsystems is
-                                present, including the "not supported"
-                                answer TC18 requires be expressible as
-                                a zero pointer for three of the four
-                                (see each pointer's own comment below).
+                                layer, time synch, security) were
+                                CORRECTED 2026-08-14 (issue #429): this
+                                comment used to call them Group 1's LAST
+                                item -- WRONG. svr_device_specific_
+                                cfg_ptr/_capacity below are Table 20's
+                                own real ninth pair, immediately
+                                following svr_security_cfg_capacity; see
+                                that pair's own field comments below for
+                                the full detail. Before this correction
+                                (issue #200): rcp_regmap_general_t
+                                previously declared none of these eight
+                                fields at all, so a c-RCP server could
+                                not advertise -- and a c-RCP client could
+                                not discover -- whether any of these
+                                four optional subsystems is present,
+                                including the "not supported" answer
+                                TC18 requires be expressible as a zero
+                                pointer for three of the four (see each
+                                pointer's own comment below).
                                 Unlike every other Group 1 batch since
                                 REQ-RMAP-033, these are genuinely NEW
                                 fields, not a retype of an existing one
@@ -834,6 +870,65 @@ typedef struct {
                                 for the full explanation of why every
                                 address in this group is inferred
                                 rather than directly read. */
+    uint16_t svr_device_specific_cfg_ptr; /* REQ-RMAP-039 (issue #429,
+                                TC18 §12.7.5 Table 20 continued,
+                                INFERRED absolute address 0x0040, 16
+                                bit, R): Table 20's own true final pair
+                                -- svr_security_cfg_capacity above is
+                                NOT the table's last item; the PDF's own
+                                continuation page (p.61, immediately
+                                after svr_security_cfg_capacity) defines
+                                two more 16-bit R registers,
+                                svr_device_specific_cfg_ptr and
+                                svr_device_specific_cfg_capacity below.
+                                The spec's own printed description text
+                                for this specific pair is genuinely
+                                swapped between the two rows (this
+                                ptr row's own description text reads
+                                "Data size of the device specific
+                                configurations", a capacity concept; the
+                                capacity row's below reads "Pointer to
+                                device specific configurations as
+                                defined by its vendor", a pointer
+                                concept) -- flagged by the spec's own
+                                reviewer comment ("051RC5 - proposal to
+                                solve TI_032") as an open drafting issue
+                                in the primary source itself, not an
+                                extraction error here. This field is
+                                still named/ordered _ptr first,
+                                _capacity second to match every other
+                                Group 1 pair's own established
+                                ptr-then-capacity convention (address
+                                order, not description-text order,
+                                since TC18 itself gives no basis to
+                                believe the pair's ADDRESSES are
+                                swapped, only their printed
+                                descriptions). Address is INFERRED, not
+                                directly read, the same way
+                                svr_network_interface_cfg_ptr's own
+                                comment above already explains for this
+                                whole continuation page -- immediately
+                                following svr_security_cfg_capacity's
+                                own 0x003E-0x003F. Content modeling
+                                only, same REQ-RMAP-024 wire-reachability
+                                boundary as every other Group 1 item;
+                                no real device-specific-config table
+                                storage exists anywhere in this codebase
+                                yet for this pointer to meaningfully
+                                address, the same still-open scope
+                                REQ-RMAP-039's own text already
+                                documents for the four sibling optional-
+                                subsystem pairs. */
+    uint16_t svr_device_specific_cfg_capacity; /* REQ-RMAP-039 (issue
+                                #429, TC18 §12.7.5 Table 20 continued,
+                                INFERRED absolute address 0x0042, 16
+                                bit, R): the device-specific
+                                configuration register map's own
+                                capacity -- see svr_device_specific_
+                                cfg_ptr's own comment immediately above
+                                for the full explanation of this pair's
+                                swapped description text and inferred
+                                address. */
 } rcp_regmap_general_t;
 
 /* Zero-initializes every field of map except svr_root_client_index, which
@@ -897,10 +992,14 @@ void rcp_regmap_general_init(rcp_regmap_general_t *map);
  * built (issue #301). */
 
 /* Total wire length (bytes) of the general register map's TC18 §12.7.5
- * Table 20 extent, absolute address 0x0000 through 0x003F inclusive --
- * see rcp_regmap_general_render()'s own doc comment for exactly which
+ * Table 20 extent, absolute address 0x0000 through 0x0043 inclusive --
+ * EXTENDED 2026-08-14 (issue #429) from the prior 0x0000-0x003F: Table
+ * 20 does not end at svr_security_cfg_capacity (0x003E-0x003F) -- its
+ * own continuation page defines one more pair, svr_device_specific_
+ * cfg_ptr/_capacity (0x0040-0x0043), immediately after it. See
+ * rcp_regmap_general_render()'s own doc comment for exactly which
  * struct fields this covers and which two it deliberately excludes. */
-#define RCP_REGMAP_GENERAL_LEN ((size_t)0x0040u)
+#define RCP_REGMAP_GENERAL_LEN ((size_t)0x0044u)
 
 /* Serializes map's Table 20 fields into out[0..RCP_REGMAP_GENERAL_LEN) at
  * each field's own TC18-documented absolute address (this struct's own
@@ -1832,7 +1931,30 @@ typedef struct {
                                           no clear 1:1 replacement for this
                                           bit -- see the file header's own
                                           "terminology drift" note,
-                                          reason 3. */
+                                          reason 3. CORRECTED 2026-08-14
+                                          (issue #424): this field used to
+                                          be wire-serialized at row-
+                                          relative 0x000D bit 7 by
+                                          rcp_regmap_request_stream_cfg_
+                                          render()/_apply_reconfig() --
+                                          WRONG, that bit position is
+                                          TC18's own distinct
+                                          rx_stream_status live-status
+                                          bit (REQ-E2E-046/REQ-RMAP-051),
+                                          a plain mis-wiring, not an
+                                          instance of this field's own
+                                          separate RC5-mapping ambiguity
+                                          above. This field has NO wire
+                                          register position of its own
+                                          anymore -- content-modeling
+                                          only, still consumed directly
+                                          by e2e.h/watchdog.h as a plain
+                                          argument, the same disposition
+                                          rx_wd_action's own doc comment
+                                          (this table's own "request-
+                                          stream-cfg wire codec" section
+                                          below) already established for
+                                          a different field. */
 
     /* ── Request-storage overflow (e2e.h) ───────────────────────────── */
     bool     rx_ovrflw_safestate_enable; /* REQ-RMAP-071 (TC18 §12.7.7
@@ -2029,10 +2151,10 @@ bool rcp_regmap_wd_timeout_ticks_to_ms(uint16_t ticks,
  *   - rx_safestate_sequencer is uint16_t internally (a
  *     request_sequencer.h table index) vs. an 8-bit wire register.
  *
- * The 8 independently-configurable bits at relative address 0x000D
- * (rx_enforce_e2e/rx_enforce_seq/rx_seq_safestate_enable/rx_wd_enable/
- * rx_wd_safestate_enable/rx_ovrflw_safestate_enable/rx_safety_measure/
- * rx_wd_info_enable) are serialized using this codebase's OWN existing
+ * The 7 independently-configurable bits at relative address 0x000D bits
+ * [6:0] (rx_enforce_e2e/rx_enforce_seq/rx_seq_safestate_enable/
+ * rx_wd_enable/rx_wd_safestate_enable/rx_ovrflw_safestate_enable/
+ * rx_safety_measure) are serialized using this codebase's OWN existing
  * RC1-baseline 8-independent-bit content model, not RC5's own later
  * 4-combined-bit restructuring -- already investigated and deliberately
  * NOT restructured (task #97, see this file's own "TC18 0.5.1_RC5
@@ -2040,10 +2162,29 @@ bool rcp_regmap_wd_timeout_ticks_to_ms(uint16_t ticks,
  * a strict, lossless superset of what RC5's collapsed encoding can
  * express, so serializing it directly (one struct field per bit) is both
  * simpler and loses nothing a real RC5-conformant peer could otherwise
- * distinguish. */
+ * distinguish.
+ *
+ * Bit 7 (0x000D.7) is NOT one of those 8 independent bits -- CORRECTED
+ * 2026-08-14 (issue #424, REQ-E2E-046/REQ-RMAP-051): it is TC18's own
+ * distinct, LIVE rx_stream_status bit (plain R/W, not R/W* like its
+ * seven octet-mates -- "set automatically as a reaction to either CRC
+ * error, sequence error, watchdog overflow, EP overflow, when enabled").
+ * rx_stream_status_blocked is a caller-supplied, index-parallel array
+ * (entries[i] <-> rx_stream_status_blocked[i]) of already-computed
+ * aggregate values -- a real caller sources each one from
+ * rcp_e2e_stream_status_rx_blocked()/rcp_mock_server_stream_status_
+ * rx_blocked() (e2e.h/mock.h), matching this file's own "caller supplies
+ * already-classified/already-computed values" convention (e.g.
+ * watchdog_ms_per_tick above). May be NULL, meaning "no live status
+ * known" -- bit 7 then renders 0, the same NULL-means-absent convention
+ * this file's other index-parallel array parameters (e.g.
+ * ep_id_map_ep_types) already establish. This bit used to be
+ * mis-wired to rx_wd_info_enable instead -- see that field's own doc
+ * comment above for the correction. */
 void rcp_regmap_request_stream_cfg_render(const rcp_regmap_request_stream_cfg_t *entries,
                                            size_t count, uint8_t *out,
-                                           uint32_t watchdog_ms_per_tick);
+                                           uint32_t watchdog_ms_per_tick,
+                                           const bool *rx_stream_status_blocked);
 
 typedef enum {
     RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_OK = 0,
@@ -2059,11 +2200,19 @@ rcp_regmap_request_stream_cfg_reconfig_strerror(rcp_regmap_request_stream_cfg_re
  * apply_reconfig(). relative_start_address/data are relative to this
  * table's own start (svr_request_stream_cfg_ptr's own current value), not
  * to Table 20. A write landing on the 3 reserved trailing octets
- * (0x0012-0x0017) is accepted (every octet in this table is R/W*, TC18
- * defines no read-only subrange) but has no effect on any struct field --
- * it patches the transient image this function builds internally, which
- * is then discarded rather than re-parsed back into anything, since
- * those octets correspond to no struct field. watchdog_ms_per_tick is
+ * (0x0012-0x0017), or on bit 7 of 0x000D (rx_stream_status -- issue #424,
+ * see rcp_regmap_request_stream_cfg_render()'s own doc comment above),
+ * is accepted (this table's octets are all still R/W or R/W*, TC18
+ * defines no read-only subrange) but has no effect on any struct field
+ * -- it patches the transient image this function builds internally,
+ * which is then discarded rather than re-parsed back into anything,
+ * since neither corresponds to a struct field; bits [6:0] of 0x000D
+ * remain genuinely R/W* round-tripped fields, unaffected by this. This
+ * function itself performs no lifecycle-state authorization of its own
+ * (as with every sibling apply_reconfig() in this file) -- see
+ * request_stream_cfg_row_write_authorize() (regmap.c) for where the
+ * caller-side authorization gate (including bit 7's own narrower, plain
+ * R/W carve-out) is actually enforced. watchdog_ms_per_tick is
  * this table's own rx_wd_timeout_ms field's caller-supplied tick
  * duration -- see this table's own file-header doc comment above for
  * the full REQ-RMAP-050 rationale, including why a failed ticks-to-ms
@@ -2265,6 +2414,42 @@ struct rcp_regmap_ep_id_map_entry {
                                 since removed from the spec entirely
                                 (0.5.1_RC4; see the file header's own
                                 "UPDATED 2026-08-11" note). */
+    bool               crc_required; /* REQ-RMAP-053 (issue #421, TC18
+                                §12.7.8 Table 25 row offset 0x0002 bits
+                                [4:0] "Ctrl", Table 26 bit 4
+                                "CRC_required", "051RC5: added due to
+                                NXP_101"): the register at each row's own
+                                relative offset 0x0002 is NOT a flat,
+                                unshifted 16-bit byte_bus_id -- it packs
+                                bits[15:5] as the 11-bit BBID and
+                                bits[4:0] as a separate 5-bit Ctrl
+                                sub-field (bit 4 = CRC_required, bits
+                                [3:0] = Channel_selection).
+                                rcp_regmap_ep_id_map_render()/
+                                _apply_reconfig() now pack/unpack BBID
+                                shifted into bits[15:5] and this field
+                                into bit 4, closing that mis-packing.
+                                Channel_selection (bits [3:0]) is
+                                DELIBERATELY, correctly left
+                                unimplemented -- always rendered 0,
+                                silently dropped (not stored to any
+                                field) on write -- per the dedicated
+                                investigation already on record (see
+                                ep_spi.h's own file header, "SPI
+                                channel-selection mechanism dedicated
+                                investigation": evt-bits remain
+                                authoritative over a still-draft
+                                BBID-based proposal). Placed as this
+                                struct's LAST field for the identical
+                                positional-initializer-compatibility
+                                reason request_stream_index's own field
+                                comment above already states -- adding it
+                                after that field, not before, keeps every
+                                existing 3-element positional initializer
+                                in this codebase compiling unchanged (C
+                                zero-initializes an omitted trailing
+                                member, so crc_required defaults to
+                                false). */
 };
 
 /* This module's own chosen upper bound on EP_ID_config table rows -- not
@@ -2317,10 +2502,10 @@ void rcp_regmap_ep_id_map_row_init_default(rcp_regmap_ep_id_map_entry_t *row);
 
 /* ── EP_ID_config wire stride (REQ-RMAP-052/054) ─────────────────────────────
  *
- * TC18 §12.7.8 Table 23 lays each row out as four consecutive octets --
+ * TC18 §12.7.8 lays each row out as four consecutive octets --
  * request_stream_index (8 bit, relative row offset 0x0000),
- * ep_id/EP_Nr (8 bit, 0x0001), byte_bus_id/BBID (16 bit, 0x0002) -- so
- * row N begins at relative address 4*N, confirmed directly against the
+ * ep_id/EP_Nr (8 bit, 0x0001), byte_bus_id/BBID+Ctrl (16 bit, 0x0002) --
+ * so row N begins at relative address 4*N, confirmed directly against the
  * primary source (the printed row-1/row-2/row-3 examples begin at
  * 0x0000/0x0004/0x0008).
  *
@@ -2332,7 +2517,21 @@ void rcp_regmap_ep_id_map_row_init_default(rcp_regmap_ep_id_map_entry_t *row);
  * itself lives in (Table 20's own address column is headed "Absolute
  * address" in the current RC5 baseline PDF, confirmed directly). See
  * rcp_regmap_ep_id_map_apply_reconfig() below and
- * rcp_regmap_ep0_decode_write_request()'s own routing of it. */
+ * rcp_regmap_ep0_decode_write_request()'s own routing of it.
+ *
+ * FIXED 2026-08-14 (issue #421): the 16-bit register at each row's own
+ * relative offset 0x0002 is NOT a flat byte_bus_id -- TC18 Table 25 (this
+ * table's own real number; this codebase used to cite it as "Table 23",
+ * an unrelated "Enumeration of signals at endpoints" table, a stale
+ * citation now corrected here and at this pair's own two call sites
+ * below) packs bits[15:5] as the 11-bit BBID and bits[4:0] as a separate
+ * "Ctrl" sub-field (Table 26: bit 4 = CRC_required, bits [3:0] =
+ * Channel_selection, deliberately unimplemented -- see
+ * rcp_regmap_ep_id_map_entry_t.crc_required's own field comment).
+ * rcp_regmap_ep_id_map_render()/_apply_reconfig() now shift BBID into/out
+ * of bits[15:5] and pack/unpack crc_required at bit 4; any real client
+ * reading/writing byte_bus_id below 2048 previously got a non-conformant
+ * flat, unshifted value. */
 
 /* Serializes entries[0..count) into out at each row's own TC18-cited
  * 4-octet stride -- out must have room for at least 4*count octets.
@@ -2341,7 +2540,15 @@ void rcp_regmap_ep_id_map_row_init_default(rcp_regmap_ep_id_map_entry_t *row);
  * rcp_regmap_is_ep0()'s own uint16_t parameter), truncated to the
  * wire's real 8-bit EP_Nr width on render -- the same honest,
  * documented truncation convention REQ-ADC-035/036's own render path
- * already established for its own wider in-memory fields. count beyond
+ * already established for its own wider in-memory fields. The
+ * byte_bus_id/Ctrl word at row-relative offset 0x0002 is packed per
+ * Table 25/26 (issue #421, see this section's own file-header note
+ * above): byte_bus_id is masked to its own real 11-bit wire width and
+ * shifted into bits[15:5] (silently dropping any bit above 10, the same
+ * masking convention rcp_acf_pack_header() already uses for the
+ * identical byte_bus_id field at the ACF layer, acf.c), crc_required
+ * occupies bit 4, and bits[3:0] (Channel_selection) are always rendered
+ * 0 -- deliberately unimplemented, not merely forgotten. count beyond
  * what a real caller has bounded its own table to is the caller's own
  * responsibility, matching rcp_regmap_hw_pin_map_render()'s own
  * convention. */
@@ -2369,7 +2576,15 @@ const char *rcp_regmap_ep_id_map_reconfig_strerror(rcp_regmap_ep_id_map_reconfig
  * apply_reconfig() already use -- reused, not reinvented. Every octet of
  * every row is R/W+ (no read-only sub-fields within a row), so no octet
  * is ever silently skipped. count itself (the table's own current row
- * count) is never changed by this call.
+ * count) is never changed by this call. The byte_bus_id/Ctrl word at
+ * row-relative offset 0x0002 is unpacked per Table 25/26 (issue #421,
+ * see rcp_regmap_ep_id_map_render()'s own doc comment above for the full
+ * packing rationale): byte_bus_id comes from bits[15:5], crc_required
+ * from bit 4; bits[3:0] (Channel_selection) are read but intentionally
+ * discarded -- not stored to any field, the same "no struct field
+ * consumes it" treatment this file's other reserved-octet ranges already
+ * establish (e.g. request-stream-cfg's own 0x0012-0x0017, regmap.h's own
+ * doc comment above that table's render()/apply_reconfig() pair).
  *
  * Returns RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_SHORT if data_len is 0;
  * RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_OUT_OF_RANGE if
@@ -2801,9 +3016,16 @@ void rcp_regmap_ep0_combine_write_op(rcp_regmap_ep0_write_op_t op, const uint8_t
  *     table-specific override in its own surrounding prose (confirmed
  *     the same way -- its own TC18 §12.7.7 prose explicitly names BOTH
  *     HW_UNCONFIGURED and HW_CONFIGURED as writable states, matching
- *     FUNCTIONAL_W_STAR exactly) so it genuinely IS entirely TC18 R/W*
- *     (checked via rcp_lifecycle_field_writable(state,
- *     RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer)); EP_ID_config is
+ *     FUNCTIONAL_W_STAR exactly) so it IS entirely TC18 R/W* EXCEPT for
+ *     one single bit -- CORRECTED 2026-08-14 (issue #424): row-relative
+ *     offset 0x000D bit 7 (rx_stream_status) is Table 24's own distinct
+ *     plain R/W bit, not R/W* like its seven octet-mates, so
+ *     FUNCTIONAL_W_STAR's own "permanently locked once RCP_CONFIGURED"
+ *     rule must not block a write confined to that one bit --
+ *     request_stream_cfg_row_write_authorize() (regmap.c) is the narrow
+ *     carve-out this finding adds, checked in place of a bare
+ *     rcp_lifecycle_field_writable(state,
+ *     RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer) call; EP_ID_config is
  *     entirely R/W+ (checked via
  *     rcp_lifecycle_field_writable_w_plus(state, writer,
  *     map->svr_configuration_lock != 0) -- REQ-RMAP-029's own field IS
@@ -3079,7 +3301,16 @@ rcp_regmap_sequencer_table_apply_reconfig(uint8_t *state, uint8_t *owner, size_t
  * defines no rule for composing two distinct pointed-to tables into one
  * response; inventing one here would not be primary-source-derived. A
  * caller wanting a second table's own data issues a second,
- * separately-addressed read. */
+ * separately-addressed read.
+ *
+ * request_stream_status_blocked (issue #424, REQ-E2E-046/REQ-RMAP-051)
+ * is threaded straight through to rcp_regmap_request_stream_cfg_
+ * render()'s own identically-named, identically-shaped parameter
+ * whenever addr routes into that table's own extent -- see that
+ * function's own doc comment for the full rx_stream_status rationale.
+ * NULL (no live status known) is safe and renders bit 7 as 0, the same
+ * as every other extent this dispatcher routes to when its own optional
+ * inputs are NULL. */
 rcp_bytes_t
 rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      uint8_t transaction_num,
@@ -3099,7 +3330,8 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      size_t sequencer_count,
                                      rcp_wire_error_t *out_error,
                                      uint32_t watchdog_ms_per_tick,
-                                     const rcp_regmap_optional_subsystem_cfg_ptrs_t *optional_cfg);
+                                     const rcp_regmap_optional_subsystem_cfg_ptrs_t *optional_cfg,
+                                     const bool *request_stream_status_blocked);
 
 #ifdef __cplusplus
 }
