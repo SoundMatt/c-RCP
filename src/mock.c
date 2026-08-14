@@ -998,6 +998,8 @@ static rcp_mock_dispatch_result_t dispatch_plain_inner(rcp_mock_server_t *srv,
                                                   rcp_byte_bus_id_t byte_bus_id,
                                                   uint8_t avtp_subtype, uint8_t acf_msg_type,
                                                   bool time_sync_supported, uint64_t stream_id,
+                                                  bool tv, uint32_t avtp_timestamp,
+                                                  uint64_t gptp_reference_now,
                                                   const uint8_t *request, size_t request_len,
                                                   rcp_bytes_t *out_response)
 {
@@ -1055,17 +1057,17 @@ static rcp_mock_dispatch_result_t dispatch_plain_inner(rcp_mock_server_t *srv,
      * by rcp_server_endpoint_select_due() against the caller's tick.
      *
      * tv=false, 0u, 0u: REQ-TIMED-012's own TSCF presentation-time gate
-     * (server.h) is not yet wired to a real AVTPDU header here -- this
-     * module's own dispatch()/dispatch_frame() family has no tv/
-     * avtp_timestamp/gptp_now parameters of its own yet, a separate,
-     * not-yet-attempted integration step tracked as this requirement's
-     * own remaining scope (mirroring REQ-SRV-016's own identical
-     * "primitive complete, integration deferred" disposition just
-     * above). No behavior change for any caller of this module: every
-     * request dispatched through it is, and remains, treated as if it
-     * arrived under an NTSCF header. */
-    admit = rcp_server_endpoint_admit(&slot->queue, request, request_len, 0u, false, 0u, 0u,
-                                       &request_type, &admitted_index, &error);
+     * (server.h) is now wired to tv/avtp_timestamp/gptp_reference_now,
+     * this function's own new parameters (REQ-TIMED-012/013, issue
+     * #336 follow-on) -- rcp_mock_server_dispatch()/_dispatch_e2e()
+     * still call through with tv=false, 0u, 0u, so every one of their
+     * own existing callers keeps its exact prior behavior: every
+     * request dispatched through THEM is, and remains, treated as if
+     * it arrived under an NTSCF header. Only rcp_mock_server_dispatch_
+     * tscf() (mock.h) supplies real values, for a caller that decoded
+     * an actual TSCF header one layer up. */
+    admit = rcp_server_endpoint_admit(&slot->queue, request, request_len, 0u, tv, avtp_timestamp,
+                                       gptp_reference_now, &request_type, &admitted_index, &error);
 
     /* REQ-E2E-030 (issue #335): a request-storage overflow on THIS
      * endpoint's own queue is answered locally exactly as before
@@ -1212,12 +1214,15 @@ static rcp_mock_dispatch_result_t dispatch_plain(rcp_mock_server_t *srv,
                                                   rcp_byte_bus_id_t byte_bus_id,
                                                   uint8_t avtp_subtype, uint8_t acf_msg_type,
                                                   bool time_sync_supported, uint64_t stream_id,
+                                                  bool tv, uint32_t avtp_timestamp,
+                                                  uint64_t gptp_reference_now,
                                                   const uint8_t *request, size_t request_len,
                                                   rcp_bytes_t *out_response)
 {
     rcp_mock_dispatch_result_t result =
         dispatch_plain_inner(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
-                              stream_id, request, request_len, out_response);
+                              stream_id, tv, avtp_timestamp, gptp_reference_now, request,
+                              request_len, out_response);
 
     suppress_response_per_stream_cfg(srv, stream_id, out_response);
     return result;
@@ -1238,7 +1243,27 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
     if (srv->watchdog != NULL) rcp_watchdog_keeper_kick(srv->watchdog, stream_id);
 
     return dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
-                           stream_id, request, request_len, out_response);
+                           stream_id, false, 0u, 0u, request, request_len, out_response);
+}
+
+//cfusa:req REQ-TIMED-012
+//cfusa:req REQ-TIMED-013
+rcp_mock_dispatch_result_t rcp_mock_server_dispatch_tscf(rcp_mock_server_t *srv,
+                                                          rcp_byte_bus_id_t byte_bus_id,
+                                                          uint8_t avtp_subtype, uint8_t acf_msg_type,
+                                                          bool time_sync_supported, uint64_t stream_id,
+                                                          bool tv, uint32_t avtp_timestamp,
+                                                          uint64_t gptp_reference_now,
+                                                          const uint8_t *request, size_t request_len,
+                                                          rcp_bytes_t *out_response)
+{
+    /* Same "receipt, not validation" watchdog-kick rule and ordering as
+     * rcp_mock_server_dispatch()'s own identical kick. */
+    if (srv->watchdog != NULL) rcp_watchdog_keeper_kick(srv->watchdog, stream_id);
+
+    return dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
+                           stream_id, tv, avtp_timestamp, gptp_reference_now, request, request_len,
+                           out_response);
 }
 
 //cfusa:req REQ-E2E-021
@@ -1300,7 +1325,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
     slot = find_slot(srv, byte_bus_id);
     if (!slot || !slot->req_crc_enable) {
         return dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
-                               stream_id, request, request_len, out_response);
+                               stream_id, false, 0u, 0u, request, request_len, out_response);
     }
 
     unwrap_result = rcp_e2e_unwrap_framed(stream_id, avtp_subtype == RCP_AVTP_SUBTYPE_NTSCF,
@@ -1383,7 +1408,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
      * via dispatch_plain() directly, same already-kicked-once reasoning
      * as the delegation branch above. */
     result = dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
-                             stream_id, unwrapped.data, unwrapped.len, out_response);
+                             stream_id, false, 0u, 0u, unwrapped.data, unwrapped.len, out_response);
     rcp_bytes_free(&unwrapped);
     return result;
 }
@@ -1423,7 +1448,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
     slot = find_slot(srv, byte_bus_id);
     if (!slot || !slot->req_crc_enable) {
         return dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
-                               stream_id, fragment, fragment_len, out_response);
+                               stream_id, false, 0u, 0u, fragment, fragment_len, out_response);
     }
 
     /* A cheap 8-octet peek -- format-identical for ACF_ABB and ACF_GBB,
@@ -1596,8 +1621,8 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
                 rcp_fragment_reassembler_reset(reasm);
                 if (!encoded.data && reassembled_len != 0u) return RCP_MOCK_DISPATCH_REJECTED;
                 result = dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type,
-                                         time_sync_supported, stream_id, encoded.data, encoded.len,
-                                         out_response);
+                                         time_sync_supported, stream_id, false, 0u, 0u, encoded.data,
+                                         encoded.len, out_response);
                 rcp_bytes_free(&encoded);
                 return result;
             }
@@ -1652,8 +1677,8 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
                 rcp_fragment_reassembler_reset(reasm);
                 if (!encoded.data && reassembled_len != 0u) return RCP_MOCK_DISPATCH_REJECTED;
                 result = dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type,
-                                         time_sync_supported, stream_id, encoded.data, encoded.len,
-                                         out_response);
+                                         time_sync_supported, stream_id, false, 0u, 0u, encoded.data,
+                                         encoded.len, out_response);
                 rcp_bytes_free(&encoded);
                 return result;
             }
