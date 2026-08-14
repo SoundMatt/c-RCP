@@ -328,6 +328,64 @@ typedef enum {
     RCP_EP_UART_STOP_BITS_ONE_HALF = 2,
 } rcp_ep_uart_stop_bits_t;
 
+/* ── HW trigger signals (§13.7.8.4 Table 52) ─────────────────────────────────
+ *
+ * ADDED 2026-08-14 (c-RCP-AUDIT-14, issue #425): TC18 §13.7.8.4 Table 52
+ * ("uart trigger signals") defines a real, spec-numbered HW trigger event
+ * this module previously modeled nowhere at all -- two output signals,
+ * "0: Transmit request finalized" and "1: Read request finalized". This
+ * is the same class of concept as ep_spi.h's own per-channel
+ * rcp_ep_spi_trigger_t/rcp_ep_spi_trigger_fires() (its TRANSFER_DONE
+ * signal, Table 41) -- the reference shape copied here -- and NOT
+ * ep_lin.h's rcp_ep_lin_trigger_t, which that file's own header explains
+ * has no TC18 basis whatsoever (an entirely original design filling a gap
+ * TC18 leaves silent). UART is the opposite case: a genuine, numbered
+ * spec table this module had simply never implemented. rcp_ep_uart_trigger_t
+ * names Table 52's two signals directly (RCP_EP_UART_TRIGGER_TX_FINALIZED
+ * = signal 0, RCP_EP_UART_TRIGGER_RX_FINALIZED = signal 1) plus NONE --
+ * unlike SPI's 14-signal Table 41, Table 52 defines only these two
+ * signals outright, so no per-channel collapsing (ep_spi.h's own
+ * rcp_ep_spi_trigger_signal_number()) is needed here: the enum values
+ * themselves already are the Table 52 signal numbers. rcp_ep_uart_trigger_fires()
+ * is the pure, directly-testable evaluation of a caller-classified event
+ * against a selected trigger mode -- the same caller-supplies-already-
+ * classified-inputs convention every other endpoint type's own trigger-
+ * evaluation function already uses (rcp_ep_spi_trigger_fires(),
+ * rcp_ep_lin_trigger_fires(), rcp_ep_pwm_out_trigger_fires()/
+ * rcp_ep_pwm_in_trigger_fires()).
+ *
+ * cfg->trigger (rcp_ep_uart_trigger_t, below) is, like ep_spi.h's own
+ * channels[i].trigger and ep_pwm.h's PWM_OUT/PWM_IN trigger fields, never
+ * rendered onto the wire: Table 48's own EP_func register block (see "The
+ * EP_func register block" below) has no trigger-mode register of any
+ * kind, the same "no wire-format consequence" status those sibling
+ * fields' own file headers already document. rcp_ep_uart_render_registers()/
+ * rcp_ep_uart_apply_reconfig() are therefore intentionally left untouched
+ * by this addition, matching that established sibling pattern exactly
+ * rather than inventing a register Table 48 does not define.
+ */
+
+typedef enum {
+    RCP_EP_UART_TRIGGER_NONE         = 0,
+    RCP_EP_UART_TRIGGER_TX_FINALIZED = 1, /* Table 52 signal 0: "Transmit
+                                              request finalized" */
+    RCP_EP_UART_TRIGGER_RX_FINALIZED = 2, /* Table 52 signal 1: "Read
+                                              request finalized" */
+} rcp_ep_uart_trigger_t;
+
+/* The two asynchronous events a UART endpoint's trigger mode may be
+ * evaluated against -- see rcp_ep_uart_trigger_fires(). */
+typedef enum {
+    RCP_EP_UART_EVENT_TX_REQUEST_FINALIZED   = 0,
+    RCP_EP_UART_EVENT_READ_REQUEST_FINALIZED = 1,
+} rcp_ep_uart_event_t;
+
+/* True iff event satisfies trigger: never for NONE; for TX_FINALIZED iff
+ * event == RCP_EP_UART_EVENT_TX_REQUEST_FINALIZED; for RX_FINALIZED iff
+ * event == RCP_EP_UART_EVENT_READ_REQUEST_FINALIZED -- TC18 §13.7.8.4
+ * Table 52's own two HW trigger signals, verbatim. */
+bool rcp_ep_uart_trigger_fires(rcp_ep_uart_trigger_t trigger, rcp_ep_uart_event_t event);
+
 /* ── Functional config ─────────────────────────────────────────────────────── */
 
 typedef struct {
@@ -352,15 +410,22 @@ typedef struct {
     uint8_t                        wire_timeout_bit_times; /* uart_timeout, Table 48 --
                                                                 see the file header */
     uint8_t                        trail;             /* uart_trail, Table 48 */
+    uint8_t                        trigger;           /* rcp_ep_uart_trigger_t;
+                                                            this module's own field,
+                                                            not part of the EP_func
+                                                            block -- see the file
+                                                            header's "HW trigger
+                                                            signals" section */
 } rcp_ep_uart_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false, baud_rate 0, parity
  * RCP_EP_UART_PARITY_NONE, stop_bits RCP_EP_UART_STOP_BITS_ONE,
  * ep_rx_buffer_size 0, uart_timeout_ms 0, ep_status/baud_rate_kbps/
  * wire_timeout_bit_times/trail 0, rts_enable/cts_enable/half_duplex
- * false) -- except uart_nr_bits, which is explicitly set to 8 (the only
- * sane power-on default: 0 is not itself a rcp_ep_uart_nr_bits_valid()
- * value, unlike every other zero-valued field above). */
+ * false, trigger RCP_EP_UART_TRIGGER_NONE) -- except uart_nr_bits, which
+ * is explicitly set to 8 (the only sane power-on default: 0 is not itself
+ * a rcp_ep_uart_nr_bits_valid() value, unlike every other zero-valued
+ * field above). */
 void rcp_ep_uart_functional_cfg_init(rcp_ep_uart_functional_cfg_t *cfg);
 
 /* True iff this endpoint's functional config is writable in state by
@@ -395,6 +460,12 @@ bool rcp_ep_uart_set_rx_buffer_size(rcp_ep_uart_functional_cfg_t *cfg, uint16_t 
 /* Same authorization rule as rcp_ep_uart_set_baud_rate(), for
  * cfg->uart_timeout_ms. */
 bool rcp_ep_uart_set_timeout(rcp_ep_uart_functional_cfg_t *cfg, uint32_t timeout_ms,
+                              rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer);
+
+/* Same authorization rule as rcp_ep_uart_set_baud_rate(), for cfg->trigger
+ * -- see the file header's "HW trigger signals" section. Never touches
+ * the EP_func register block (this field has no wire counterpart). */
+bool rcp_ep_uart_set_trigger(rcp_ep_uart_functional_cfg_t *cfg, rcp_ep_uart_trigger_t trigger,
                               rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer);
 
 /* ── The EP_func register block (the evt[2:0] == 111b target) ──────────────── */
