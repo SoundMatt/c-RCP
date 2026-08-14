@@ -936,6 +936,186 @@ static void test_discovery_claim_lifecycle_driven_by_configured_timeout(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* ── EP_generic_cfg live view (REQ-RMAP-036, issue #334) ─────────────────────── */
+
+/* rcp_mock_server_ep_generic_cfg_view() gathers exactly the live,
+ * in_use endpoints' own generic-cfg content -- not a stale or
+ * default-initialized copy. */
+static void test_ep_generic_cfg_view_gathers_live_in_use_slots_only(void)
+{
+    rcp_mock_server_t          *srv = rcp_mock_server_new();
+    rcp_regmap_ep_generic_cfg_t view[4];
+    size_t                       total;
+    size_t                       i;
+
+    TEST_ASSERT_NOT_NULL(srv);
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+                       rcp_mock_server_add_endpoint(srv, 10u, 3u, true, NULL, NULL)); /* slot 0 */
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+                       rcp_mock_server_add_endpoint(srv, 20u, 6u, true, NULL, NULL)); /* slot 1 */
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+                       rcp_mock_server_add_endpoint(srv, 30u, 9u, true, NULL, NULL)); /* slot 2 */
+    /* Removing the MIDDLE endpoint, with no further add_endpoint() call
+     * afterward, leaves a genuine hole at slot 1 for the view() call
+     * below to skip over -- unlike removing-then-immediately-re-adding
+     * (which reuses the freed slot and never actually exercises the
+     * in_use skip). */
+    TEST_ASSERT_TRUE(rcp_mock_server_remove_endpoint(srv, 20u));
+
+    total = rcp_mock_server_ep_generic_cfg_view(srv, view, 4u);
+    TEST_ASSERT_EQUAL(2u, total); /* 10 and 30 only -- 20 was removed, slot 1 skipped */
+
+    for (i = 0; i < total; i++) {
+        TEST_ASSERT_NOT_EQUAL(6u, view[i].ep_type); /* the removed endpoint's own ep_type never
+                                                         appears -- slot 1 was genuinely skipped,
+                                                         not just coincidentally absent */
+    }
+    TEST_ASSERT_TRUE((view[0].ep_type == 3u && view[1].ep_type == 9u) ||
+                      (view[0].ep_type == 9u && view[1].ep_type == 3u));
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* rcp_mock_server_apply_ep_generic_cfg() rejects a count that doesn't
+ * exactly match srv->endpoint_count, leaving every slot untouched --
+ * the one invariant this function's own doc comment says it enforces,
+ * since a mismatched count would otherwise silently misattribute rows. */
+static void test_apply_ep_generic_cfg_rejects_mismatched_count(void)
+{
+    rcp_mock_server_t          *srv = rcp_mock_server_new();
+    rcp_regmap_ep_generic_cfg_t entries[1];
+
+    TEST_ASSERT_NOT_NULL(srv);
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 10u, 3u, true, NULL, NULL));
+    rcp_regmap_ep_generic_cfg_init(&entries[0]);
+    entries[0].ep_type = 99u;
+
+    TEST_ASSERT_FALSE(rcp_mock_server_apply_ep_generic_cfg(srv, entries, 0u)); /* endpoint_count
+                                                                                   is 1, not 0 */
+    TEST_ASSERT_FALSE(rcp_mock_server_apply_ep_generic_cfg(srv, entries, 2u));
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* rcp_mock_server_apply_ep_generic_cfg() scatters into the correct
+ * live slots even with a genuine hole in the slot array -- same
+ * "removed, not re-added" setup test_ep_generic_cfg_view_gathers_live_
+ * in_use_slots_only() above uses, so the in_use skip in THIS
+ * function's own loop is actually exercised too (a hole-free setup
+ * would pass even with that skip removed entirely). */
+static void test_apply_ep_generic_cfg_scatters_correctly_around_a_hole(void)
+{
+    rcp_mock_server_t          *srv = rcp_mock_server_new();
+    rcp_regmap_ep_generic_cfg_t view[4];
+    size_t                       count;
+    size_t                       i;
+
+    TEST_ASSERT_NOT_NULL(srv);
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 10u, 3u, true, NULL, NULL));
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 20u, 6u, true, NULL, NULL));
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 30u, 9u, true, NULL, NULL));
+    TEST_ASSERT_TRUE(rcp_mock_server_remove_endpoint(srv, 20u)); /* genuine hole, not re-filled */
+
+    count = rcp_mock_server_ep_generic_cfg_view(srv, view, 4u);
+    TEST_ASSERT_EQUAL(2u, count);
+    for (i = 0; i < count; i++) view[i].ep_delay_time = 50u; /* mark every gathered row */
+
+    TEST_ASSERT_TRUE(rcp_mock_server_apply_ep_generic_cfg(srv, view, count));
+
+    /* Both surviving live endpoints picked up the marked value -- the
+     * hole at the removed slot was correctly skipped on the way back
+     * in, not overwritten or shifted into. */
+    {
+        rcp_regmap_ep_generic_cfg_t after[4];
+        size_t                       after_count = rcp_mock_server_ep_generic_cfg_view(srv, after, 4u);
+
+        TEST_ASSERT_EQUAL(2u, after_count);
+        for (i = 0; i < after_count; i++) {
+            TEST_ASSERT_EQUAL_UINT32(50u, after[i].ep_delay_time);
+        }
+    }
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-RMAP-036: a real write applied through the ACTUAL EP0 dispatcher
+ * (rcp_regmap_ep0_decode_write_request()), against a gathered view,
+ * genuinely lands back in the live endpoint slot once scattered --
+ * closing the same gap PR F/H already closed for the other pointed-to
+ * tables: proving the wire codec, not that mock.c's own production
+ * dispatch loop calls it (that stays deliberately unwired, matching
+ * every sibling table's own disposition). ep_tx_buffer_size (relative
+ * 0x0008, 16 bit, R/W*) is the field under test -- distinct from
+ * ep_type (relative 0x0000, plain R, silently no-op on write, would
+ * prove nothing about a real applied change). */
+static void test_ep_generic_cfg_write_round_trips_through_the_real_dispatcher(void)
+{
+    rcp_mock_server_t              *srv = rcp_mock_server_new();
+    rcp_regmap_ep_generic_cfg_t     view[4];
+    size_t                          count;
+    rcp_regmap_general_t            map;
+    rcp_lifecycle_writer_ctx_t      discovery_writer = {false, false, false, true};
+    rcp_acf_byte_message_info_t     hdr = {0};
+    rcp_bytes_t                     frame;
+    rcp_wire_error_t                err;
+    uint8_t                         tn = 0;
+    rcp_regmap_ep0_errc_t           rc;
+    uint8_t                         payload[4];
+
+    TEST_ASSERT_NOT_NULL(srv);
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 10u, 3u, true, NULL, NULL));
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 20u, 6u, true, NULL, NULL));
+
+    count = rcp_mock_server_ep_generic_cfg_view(srv, view, 4u);
+    TEST_ASSERT_EQUAL(2u, count);
+
+    rcp_regmap_general_init(&map);
+    map.svr_ep_generic_cfg_ptr = 0x0500u; /* arbitrary, matching the sibling dispatcher
+                                              test's own convention */
+
+    hdr.byte_bus_id     = RCP_REGMAP_EP0_INDEX;
+    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.transaction_num = 41;
+
+    /* addr = 0x0500 + 12 (row 1's own start) + 8 (ep_tx_buffer_size's
+     * own relative offset) = 0x0514. Whichever live slot landed at
+     * view[1] is the one this write targets. */
+    payload[0] = 0x05u;
+    payload[1] = 0x14u;
+    payload[2] = 0x12u;
+    payload[3] = 0x34u; /* new ep_tx_buffer_size = 0x1234 words */
+
+    frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+    TEST_ASSERT_NOT_NULL(frame.data);
+    rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                               RCP_LIFECYCLE_HW_UNCONFIGURED, discovery_writer,
+                                               NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u, view, count,
+                                               NULL, NULL, 0u, 0u, &err, &tn, 0u, NULL, NULL, 0u, 0u);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+    TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
+    TEST_ASSERT_EQUAL_UINT16(0x1234u, view[1].ep_tx_buffer_size); /* the dispatcher mutated the
+                                                                      gathered array in place */
+    rcp_bytes_free(&frame);
+
+    /* Scatter back -- the live slot that produced view[1] now holds
+     * the applied change too. */
+    TEST_ASSERT_TRUE(rcp_mock_server_apply_ep_generic_cfg(srv, view, count));
+    {
+        rcp_regmap_ep_generic_cfg_t after[4];
+        size_t                       after_count = rcp_mock_server_ep_generic_cfg_view(srv, after, 4u);
+        bool                         found = false;
+        size_t                       i;
+
+        TEST_ASSERT_EQUAL(2u, after_count);
+        for (i = 0; i < after_count; i++) {
+            if (after[i].ep_tx_buffer_size == 0x1234u) found = true;
+        }
+        TEST_ASSERT_TRUE(found);
+    }
+
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── Error strings ─────────────────────────────────────────────────────────── */
 
 static void test_strerror_never_null(void)
@@ -993,6 +1173,11 @@ int main(void)
     RUN_TEST(test_new_server_discovery_claim_starts_with_the_tc18_default_timeout);
     RUN_TEST(test_set_discovery_timeout_us_syncs_svr_ep_cfg_and_claim);
     RUN_TEST(test_discovery_claim_lifecycle_driven_by_configured_timeout);
+
+    RUN_TEST(test_ep_generic_cfg_view_gathers_live_in_use_slots_only);
+    RUN_TEST(test_apply_ep_generic_cfg_rejects_mismatched_count);
+    RUN_TEST(test_apply_ep_generic_cfg_scatters_correctly_around_a_hole);
+    RUN_TEST(test_ep_generic_cfg_write_round_trips_through_the_real_dispatcher);
 
     RUN_TEST(test_strerror_never_null);
 
