@@ -1001,6 +1001,53 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_multi_response(
 bool rcp_mock_server_drain_endpoint(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
                                      rcp_bytes_t *out_response);
 
+/* ── Deferred response (REQ-GPIO-035/036) ────────────────────────────────────
+ *
+ * Every dispatch entry point above answers synchronously, in the same
+ * call: a request comes in, at most one response goes out (or several,
+ * for rcp_mock_server_dispatch_multi_response()), and that is the end
+ * of this module's own involvement with it. TC18 §13.7.4.3's own GPIO
+ * response-timing rule needs something this shape cannot express: a
+ * write's own response is due only once the endpoint's configured
+ * debounce time has genuinely elapsed, not synchronously with the
+ * write itself -- "wait, THEN respond" (as opposed to "respond now,
+ * or never"). This pair gives a caller a real place to hold that
+ * eventual response until it is ready, closing the "this batch does
+ * not add" gap the prior GPIO dispatch-wiring batch's own text left
+ * open. Not GPIO-specific: mock.c continues to own none of the
+ * per-endpoint wire semantics itself (this file's own header note),
+ * so neither function knows or cares WHY a response was deferred or
+ * for how long -- that decision, and the "has enough time now
+ * elapsed" check, stay entirely the caller's own (the same "protocol
+ * library, not a scheduler" boundary rcp_mock_server_check_watchdog()'s
+ * own elapsed_since_last_kick_ms parameter already establishes). A
+ * handler (rcp_mock_endpoint_handler_fn) cannot call either function
+ * itself -- it has no srv of its own (mock.h's own file header note)
+ * -- so both are meant to be called by the caller driving dispatch()
+ * itself, alongside it, not from inside a handler. */
+
+/* Stashes response for byte_bus_id, retrievable later via
+ * rcp_mock_server_take_deferred_response() -- see this section's own
+ * header note above for the full contract. Takes ownership of
+ * response; the caller must not free it separately. Overwrites
+ * (freeing first) any previously-stashed, not-yet-taken response for
+ * the same byte_bus_id -- at most one deferred response per endpoint
+ * slot at a time, matching this mechanism's own real scope (one
+ * pending write's own eventual response), not a queue of several.
+ * Returns false (response left unstashed and still owned by the
+ * caller) if byte_bus_id names no registered endpoint. */
+bool rcp_mock_server_stash_deferred_response(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
+                                              rcp_bytes_t response);
+
+/* Retrieves and clears byte_bus_id's own stashed deferred response, if
+ * any. Returns true (*out_response populated, ownership transferred to
+ * the caller -- free with rcp_bytes_free()) iff byte_bus_id names a
+ * registered endpoint with a stashed response; false (*out_response
+ * left zeroed) otherwise, including for a registered endpoint with
+ * nothing currently stashed. */
+bool rcp_mock_server_take_deferred_response(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
+                                             rcp_bytes_t *out_response);
+
 /* ── Multi-request-per-frame dispatch (TC18 §12.9.1.1) ─────────────────────── */
 
 /* The fixed number of ACF members rcp_mock_server_dispatch_frame() can
