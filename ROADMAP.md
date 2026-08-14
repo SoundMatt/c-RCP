@@ -19106,6 +19106,64 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.364.0 -- 2026-08-14 (mock.c dispatch_e2e_fragment CRC extraction
+now pad-aware, closing a #420-fix regression)
+
+Closes issue #445 (c-RCP-AUDIT-24), a CRITICAL, empirically-reproduced
+regression introduced by the #420 fix (`src/e2e.c`): that fix correctly
+moved the CRC32 trailer in `rcp_e2e_wrap()`/`rcp_e2e_unwrap()` to sit
+immediately after the real (unpadded) payload, with alignment padding
+re-seated after the trailer -- `[header][real payload][CRC32][pad]`,
+per TC18 §13.6 Figures 20/21 -- but `src/mock.c`'s
+`rcp_mock_server_dispatch_e2e_fragment()` (final-fragment path) was not
+updated alongside it and kept reading the CRC32 trailer from the
+frame's literal last `RCP_E2E_CRC_LEN` octets, correct only under the
+pre-#420 wire order and only when a final fragment's real (unpadded)
+payload was already a multiple of 4 bytes (`pad_octets == 0`). A final
+fragment outside that shape had its CRC extracted short of the real
+trailer -- reading padding as CRC bytes -- spuriously rejecting a
+legitimately-CRC'd request with `RCP_MOCK_DISPATCH_CRC_ERROR`. Existing
+fragmentation tests never caught this because every final-fragment
+payload they used happened to already be exactly 4 bytes, the one
+condition under which the stale offset was still correct by
+coincidence.
+
+Fixed by making the extraction pad-aware, mirroring
+`rcp_e2e_unwrap()`'s own `real_len = frame_len - RCP_E2E_CRC_LEN -
+pad_octets` derivation (`e2e.c`, issue #420). The dispatch function
+already decodes the final fragment's `byte_message_info` header once,
+early, via an 8-octet peek (`peek_hdr`) to learn `ms`/
+`read_size_or_segment_num` -- that same decode already populates
+`peek_hdr.pad` (byte_message_info octet 2 bits 7:6, acf.h Figure 7),
+so the fix reuses that already-decoded field for the real/pad boundary
+instead of parsing it a second time. Calling `rcp_e2e_unwrap()` itself
+for this extraction, considered per the issue's own guidance, does not
+fit: it returns only an OK/mismatch verdict against its own
+(here-irrelevant, single-frame) CRC formula plus the pad-stripped
+body, never the raw 4 transmitted trailer octets this call site needs
+to compare against the *fragmented*-CRC formula's own `want`
+(`rcp_e2e_compute_fragmented_crc()`, REQ-E2E-038).
+
+New regression test
+`test_dispatch_e2e_fragment_final_fragment_non_aligned_payload_ok`
+(`tests/test_tc18_gaps_e2e.c`): a 2-fragment message whose final
+fragment's real payload is 3 octets (`pad_octets == 1`), correctly
+CRC'd and placed at the true pad-aware trailer offset independent of
+the code under test, dispatched and asserted `RCP_MOCK_DISPATCH_OK`
+with the full concatenated payload reaching the handler -- previously
+came back `RCP_MOCK_DISPATCH_CRC_ERROR`. The existing 4-byte-aligned
+three-fragment round-trip test is kept unchanged as the no-regression
+check for the common case. `.fusa-reqs.json`'s `REQ-E2E-039` text
+updated in place with a dated `FIXED` note; no new requirement ID
+needed.
+
+Full 66-test suite + build green; ASan/UBSan clean; `cfusa
+check`/`trace` (v0.5.54): 0 errors, 1086/1086 traced and tested
+(unchanged -- an existing entry's text was updated, not a new one
+added). Mutation-tested: reverting only the pad-aware extraction
+(leaving the new test in place) reproduced the exact bug (`Expected 0
+Was 9`); restoring the fix from a separate backup copy returned the
+suite to 100% green.
 ### v0.363.0 -- 2026-08-14 (respqueue eviction now triggers on real
 queue_size/capacity_octets exhaustion, not just an artificial slot count)
 

@@ -1816,6 +1816,87 @@ static void test_dispatch_e2e_fragment_three_fragment_round_trip_succeeds(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* issue #445 (c-RCP-AUDIT-24) regression test: same 2-fragment shape as
+ * the round-trip test above, but the final fragment's own REAL (unpadded)
+ * payload is 3 octets, not a multiple of 4 -- rcp_acf_encode_abb() pads
+ * it with 1 trailing 0x00 octet to reach quadlet alignment, so the wire
+ * frame's own pad field (peek_hdr.pad, byte_message_info octet 2 bits
+ * 7:6) reads 1. Before the fix, rcp_mock_server_dispatch_e2e_fragment()
+ * unconditionally read the CRC32 trailer from the frame's literal last
+ * RCP_E2E_CRC_LEN octets -- correct only when pad_octets == 0. Here that
+ * reads 1 pad octet (0x00) plus 3 real trailer octets instead of the
+ * real 4-octet trailer sitting one octet earlier (TC18 Figures 20/21:
+ * [header][real payload][CRC32][pad], never [...][CRC32 tail clipped by
+ * pad]), so the pre-fix code computed the wrong "got" and spuriously
+ * rejected this legitimately-CRC'd request with RCP_MOCK_DISPATCH_CRC_
+ * ERROR instead of RCP_MOCK_DISPATCH_OK. The CRC trailer itself is
+ * placed at the correct pad-aware offset (real_len = f1.len -
+ * pad_octets), mirroring exactly where rcp_e2e_wrap() itself would put
+ * it -- this test does not depend on the bug under test to construct its
+ * own wire frame. */
+static void test_dispatch_e2e_fragment_final_fragment_non_aligned_payload_ok(void)
+{
+    rcp_mock_server_t *srv        = rcp_mock_server_new();
+    const uint8_t       p0[4]     = {0xA0, 0xA1, 0xA2, 0xA3};
+    const uint8_t       p1[3]     = {0xB0, 0xB1, 0xB2}; /* NOT a multiple of 4 */
+    rcp_bytes_t          f0       = make_abb(1, 0, 0, p0, sizeof(p0)); /* ms=1, segment 0 */
+    rcp_bytes_t          f1       = make_abb(0, 0, 1, p1, sizeof(p1)); /* ms=0, final, pad=1 */
+    rcp_bytes_t          final_wire;
+    uint8_t               concatenated[7];
+    uint32_t              want;
+    size_t                pad_octets;
+    size_t                crc_offset;
+    rcp_bytes_t           resp = {0};
+
+    set_up_frag_stream(srv, capturing_handler);
+
+    /* f1.len already includes acf.c's own quadlet-alignment pad octet
+     * (rcp_acf_encode_abb() always pads); rcp_e2e_wrap() requires exactly
+     * that quadlet-aligned input and itself re-seats the pad after the
+     * trailer it appends, so final_wire's own trailer SLOT already sits
+     * at the correct pad-aware offset -- only its VALUE (wrap()'s own
+     * wrong, single-frame formula) needs overwriting below with the real
+     * fragmented CRC. */
+    final_wire = rcp_e2e_wrap(TEST_SID, TEST_TS, f1.data, f1.len);
+    TEST_ASSERT_NOT_NULL(final_wire.data);
+
+    memcpy(concatenated, p0, 4);
+    memcpy(concatenated + 4, p1, 3);
+    want = rcp_e2e_compute_fragmented_crc(TEST_SID, TEST_TS, f0.data, 8u, concatenated,
+                                           sizeof(concatenated));
+
+    pad_octets = rcp_acf_pad_len(sizeof(p1));
+    TEST_ASSERT_EQUAL_UINT(1u, pad_octets);
+    crc_offset = f1.len - pad_octets;
+    final_wire.data[crc_offset + 0u] = (uint8_t)(want >> 24);
+    final_wire.data[crc_offset + 1u] = (uint8_t)(want >> 16);
+    final_wire.data[crc_offset + 2u] = (uint8_t)(want >> 8);
+    final_wire.data[crc_offset + 3u] = (uint8_t)want;
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, f0.data, f0.len, &resp));
+    TEST_ASSERT_FALSE(g_handler_called);
+    rcp_bytes_free(&resp);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, final_wire.data,
+                                                             final_wire.len, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    TEST_ASSERT_EQUAL_UINT(sizeof(concatenated), g_captured_payload_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(concatenated, g_captured_payload, sizeof(concatenated));
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&final_wire);
+    rcp_bytes_free(&f1);
+    rcp_bytes_free(&f0);
+    rcp_mock_server_destroy(srv);
+}
+
 /* Same 3-fragment message as above, but the final fragment's trailer is
  * left at rcp_e2e_wrap()'s own (wrong-formula, but still a real 4-octet
  * value) trailer instead of the real fragmented CRC -- a genuine
@@ -2194,6 +2275,7 @@ int main(void)
 
     RUN_TEST(test_dispatch_e2e_fragment_single_fragment_matches_dispatch_e2e);
     RUN_TEST(test_dispatch_e2e_fragment_three_fragment_round_trip_succeeds);
+    RUN_TEST(test_dispatch_e2e_fragment_final_fragment_non_aligned_payload_ok);
     RUN_TEST(test_dispatch_e2e_fragment_crc_mismatch_is_rejected_and_latches);
     RUN_TEST(test_dispatch_e2e_fragment_ntscf_forces_zero_timestamp_in_crc);
     RUN_TEST(test_dispatch_e2e_fragment_out_of_order_segment_is_rejected_and_resets);
