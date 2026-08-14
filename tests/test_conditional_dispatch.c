@@ -21,6 +21,7 @@
 //cfusa:test REQ-SRV-020
 //cfusa:test REQ-SRV-021
 //cfusa:test REQ-SRV-022
+//cfusa:test REQ-ACF-024
 //cfusa:test REQ-ACF-031
 //cfusa:test REQ-ACF-033
 //cfusa:test REQ-MOCK-028
@@ -575,58 +576,48 @@ static void test_compound_wait_reserved_evt_is_rejected_at_admission(void)
     rcp_mock_server_destroy(srv);
 }
 
-/* TC18 §11.3.1, not §11.3.4 (issue #430, REQ-ACF-033): a reserved
- * compound-wait evt is rejected by rcp_server_endpoint_admit() itself
- * (RCP_SERVER_ADMIT_REJECTED, *out_error = RCP_ERROR_UNSUPPORTED_CMD)
- * BEFORE the request is ever filed into EP request storage -- exactly
- * the case §11.3.1 reserves its own Acknowledge-shaped rejection for
- * ("evt[3:0] = 0xF... err = 1 indicates that the request has been
- * rejected. The byte_msg_payload contains an error code"), not the
- * §11.3.4 Error Response shape (evt[3:0] < 0x9, err = 1) that shape is
- * reserved for a request already filed whose later execution fails.
- * FIXED 2026-08-14 (issue #430): this test used to assert the §11.3.4
- * shape (RCP_ACF_RESP_ERROR, evt = 0) here -- that was itself the bug
- * this fix closes; finish_admission()'s REJECTED case (src/mock.c) now
- * calls rcp_acf_build_acknowledge_rejected_response() instead of
- * rcp_acf_build_error_response() for exactly this "never filed"
- * scenario. Still checks the actual wire bytes, not just the
- * dispatch-result enum -- this is the one rejection path
- * github.com/SoundMatt/c-RCP/issues/163 currently wires end to end.
+/* TC18 §13.5.1, not §11.3.1 (issue #454, extending REQ-ACF-024/
+ * REQ-ACF-033): a reserved compound-wait evt is rejected by
+ * rcp_server_endpoint_admit() itself (RCP_SERVER_ADMIT_REJECTED,
+ * *out_error = RCP_ERROR_UNSUPPORTED_CMD) BEFORE the request is ever
+ * filed into EP request storage -- but §13.5.1's own text for exactly
+ * this rejection reason overrides the general §11.3.1 "never filed"
+ * default (which #430/REQ-ACF-033 correctly established for every OTHER
+ * admission-rejection reason): "evt[2:0] = 011b - reserved - request
+ * shall be ignored and an err-response with error code = UNSUPPORTED_CMD
+ * shall be sent." "err-response" is TC18's own specific term for the
+ * §11.3.4 Error Response shape (evt[3:0] < 0x9, err = 1) -- structurally
+ * distinct from §11.3.1's Acknowledge (evt[3:0] = 0xF) -- and it appears
+ * nowhere else in the specification for this admission path.
  *
- * Also re-points fixture()'s own request-stream config: as of this fix
- * the response genuinely classifies as RCP_ACF_RESP_ACKNOWLEDGE (it did
- * not before), so it is now, correctly, subject to dispatch_plain()'s
- * own suppress_response_per_stream_cfg() (REQ-RMAP-048) being gated by
- * rx_ack_stream_index -- whose TC18-defined power-on default is 0, "no
- * acknowledge is to be sent" -- rather than rx_resp_stream_index (power-
- * on default 1) the way the old, misclassified §11.3.4 shape was. A
- * conformant RC Client that wants this response delivered configures
- * rx_ack_stream_index to a real stream, exactly as this test now does;
- * see finish_admission()'s own doc comment (src/mock.c) for the same
- * point made from the production-code side. */
-static void test_compound_wait_reserved_evt_sends_acknowledge_rejected_response(void)
+ * FIXED 2026-08-14 (issue #454, c-RCP-AUDIT-29): the #430 fix
+ * over-generalized and rewrote this test (previously named
+ * test_compound_wait_reserved_evt_sends_acknowledge_rejected_response())
+ * to pin the Acknowledge shape here, which was itself a regression from
+ * the correct, pre-#430 §11.3.4 shape. finish_admission()'s REJECTED
+ * case (src/mock.c) now looks up the actual TC18-mandated shape per
+ * rejection reason (admission_reject_response_shape()) instead of
+ * treating every rejection uniformly, and calls
+ * rcp_acf_build_error_response() for this one specific reason. Still
+ * checks the actual wire bytes, not just the dispatch-result enum. */
+static void test_compound_wait_reserved_evt_sends_err_response(void)
 {
-    handler_log_t                    log;
-    rcp_mock_server_t               *srv = fixture(&log);
-    rcp_compound_step_t              step = {0};
-    rcp_bytes_t                      frame, resp = {0};
-    rcp_acf_byte_message_info_t      hdr;
-    const uint8_t                    *payload;
-    size_t                            payload_len;
-    rcp_regmap_request_stream_cfg_t  stream_cfg[1];
+    handler_log_t                log;
+    rcp_mock_server_t           *srv = fixture(&log);
+    rcp_compound_step_t          step = {0};
+    rcp_bytes_t                  frame, resp = {0};
+    rcp_acf_byte_message_info_t  hdr;
+    const uint8_t                *payload;
+    size_t                        payload_len;
 
-    /* fixture() already configured stream_cfg[0] (rx_stream_id=1) for
-     * REQ-SEQ-013's own sequencer-ownership fixture, with
-     * rx_ack_stream_index left at its TC18-defined zero (suppress)
-     * default; refresh it here with rx_ack_stream_index also set, same
-     * "keep rx_stream_id unchanged" technique
-     * test_overflow_on_one_endpoint_broadcasts_safe_state_to_stream_
-     * siblings() below already established. */
-    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
-    stream_cfg[0].rx_stream_id       = 1u;
-    stream_cfg[0].rx_ack_stream_index = 1u;
-    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
-
+    /* fixture()'s own default stream_cfg (rx_resp_stream_index left at
+     * its TC18-defined power-on default of 1, "no configuration needed
+     * to observe a response") is enough here: the §11.3.4 Error Response
+     * shape is governed by rx_resp_stream_index, unlike the §11.3.1
+     * Acknowledge shape (see suppress_response_per_stream_cfg(),
+     * REQ-RMAP-048/049), so -- unlike the old, misclassified test this
+     * one replaces -- no extra stream_cfg override is needed to see this
+     * response on the wire. */
     step.start_state = RCP_SEQUENCER_POWER_ON_STATE;
     step.next_state    = 1;
     frame = rcp_compound_encode_request(RCP_REQUEST_TYPE_COMPOUND_WAIT, 1, &step, 0x3u, 30, NULL,
@@ -641,13 +632,159 @@ static void test_compound_wait_reserved_evt_sends_acknowledge_rejected_response(
 
     TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(resp.data, resp.len, &hdr, &payload,
                                                       &payload_len));
-    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ACKNOWLEDGE, rcp_acf_classify_response(&hdr));
-    TEST_ASSERT_EQUAL_UINT8(RCP_ACF_EVT_ACKNOWLEDGE, hdr.evt);
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&hdr));
+    TEST_ASSERT_NOT_EQUAL(RCP_ACF_EVT_ACKNOWLEDGE, hdr.evt);
     TEST_ASSERT_EQUAL_UINT8(1u, hdr.err);
     TEST_ASSERT_EQUAL_UINT8(1u, hdr.byte_bus_id);
     TEST_ASSERT_EQUAL_UINT8(30u, hdr.transaction_num);
     TEST_ASSERT_EQUAL_size_t(1, payload_len);
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_UNSUPPORTED_CMD, payload[0]);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* rcp_timed_encode_request()'s own evt-controllable sibling: that public
+ * encoder hardcodes evt=0 (no acknowledge requested), which cannot
+ * exercise finish_admission()'s new evt[3] "if requested" gate on the
+ * §11.3.1 Acknowledge-rejected shape (issue #454). Builds an identical
+ * wire frame by hand, mirroring rcp_timed_encode_request()'s own
+ * construction (src/request_timed.c) with no payload, but with a
+ * caller-controlled evt nibble. */
+static rcp_bytes_t make_timed_with_evt(rcp_byte_bus_id_t byte_bus_id, uint64_t presentation_time,
+                                        uint8_t transaction_num, uint8_t evt)
+{
+    rcp_acf_byte_message_info_t info = {0};
+    uint8_t                     b[RCP_ACF_GBB_HEADER_LEN];
+    uint64_t                    ts;
+    int                         i;
+
+    info.byte_bus_id     = byte_bus_id;
+    info.transaction_num = transaction_num;
+    info.evt              = evt;
+    rcp_acf_pack_header(b, RCP_ACF_MSG_TYPE_GBB, (uint16_t)(RCP_ACF_GBB_HEADER_LEN / 4u), &info);
+
+    ts = (((uint64_t)RCP_REQUEST_TYPE_TIMED) << 56) |
+         (presentation_time & RCP_TIMED_PRESENTATION_TIME_MAX);
+    for (i = 0; i < 8; i++) {
+        b[RCP_ACF_ABB_HEADER_LEN + (size_t)i] = (uint8_t)(ts >> (56 - 8 * i));
+    }
+
+    return rcp_bytes_dup(b, RCP_ACF_GBB_HEADER_LEN);
+}
+
+/* issue #454: the §11.3.1 Acknowledge-rejected shape's evt[3] "if
+ * requested" gate, mirroring rcp_server_endpoint_submit()'s own
+ * REQ-SRV-016 discipline for the success-Acknowledge sibling ("Both
+ * success and rejected Acknowledge are the same §11.3.1 response type
+ * per Table 16, so the same 'if requested' gating should logically apply
+ * to both" -- issue #454). Drives a genuine "never filed" rejection
+ * (RCP_ERROR_REQUEST_STORAGE_OVERFLOW: the request store is full, TC18
+ * §12.7's own wording for this case carries no "err-response" override,
+ * so it correctly keeps the §11.3.1 shape) with evt[3] set -- the
+ * response is built. */
+static void test_admission_rejection_acknowledge_sent_when_evt3_requests_it(void)
+{
+    handler_log_t       log;
+    rcp_mock_server_t   *srv = fixture(&log);
+    rcp_bytes_t          frame, resp = {0};
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t        *payload;
+    size_t                payload_len;
+    size_t                i;
+
+    /* fixture()'s own default rx_ack_stream_index (0, TC18's own "no
+     * acknowledge is to be sent" power-on default) would suppress this
+     * response before it ever reached this test -- see
+     * suppress_response_per_stream_cfg() (REQ-RMAP-048) -- so it must be
+     * configured to a real stream for the §11.3.1 Acknowledge shape to
+     * be observable, exactly as TC18 itself requires. */
+    {
+        rcp_regmap_request_stream_cfg_t stream_cfg[1];
+
+        rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+        stream_cfg[0].rx_stream_id        = 1u;
+        stream_cfg[0].rx_ack_stream_index = 1u;
+        TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+    }
+
+    /* Fill the request store to capacity so the next admission genuinely
+     * overflows (RCP_ERROR_REQUEST_STORAGE_OVERFLOW), the same technique
+     * test_overflow_latches_stream_status() above already establishes. */
+    for (i = 0; i < RCP_SERVER_MAX_PENDING; i++) {
+        frame = rcp_timed_encode_request(1, 0x1000u + (uint64_t)i, (uint8_t)i, NULL, 0u);
+        TEST_ASSERT_NOT_NULL(frame.data);
+        TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &frame));
+        rcp_bytes_free(&frame);
+    }
+
+    /* The overflowing request itself asks for an acknowledge (evt[3]=1). */
+    frame = make_timed_with_evt(1, 0x9000u, 77u, 0x08u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+                      rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF,
+                                                RCP_ACF_MSG_TYPE_GBB, true, 1u, frame.data, frame.len,
+                                                &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(resp.data, resp.len, &hdr, &payload,
+                                                      &payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ACKNOWLEDGE, rcp_acf_classify_response(&hdr));
+    TEST_ASSERT_EQUAL_UINT8(RCP_ACF_EVT_ACKNOWLEDGE, hdr.evt);
+    TEST_ASSERT_EQUAL_UINT8(1u, hdr.err);
+    TEST_ASSERT_EQUAL_UINT8(1u, hdr.byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT8(77u, hdr.transaction_num);
+    TEST_ASSERT_EQUAL_size_t(1, payload_len);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_REQUEST_STORAGE_OVERFLOW, payload[0]);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* issue #454's other half: the identical overflow scenario, but the
+ * overflowing request's own evt[3] does NOT request an acknowledge --
+ * finish_admission() must build no response at all, exactly as
+ * rcp_server_endpoint_submit()'s own REQ-SRV-016 gate leaves *out_ack
+ * zeroed when evt[3] is clear. This is the regression guard for #430's
+ * own original, correct scope: a genuine "never filed" rejection with no
+ * "err-response" wording anywhere in TC18 still uses the §11.3.1
+ * Acknowledge shape's own gating discipline, not the unconditional
+ * §11.3.4 Error Response path. */
+static void test_admission_rejection_acknowledge_suppressed_when_evt3_not_requested(void)
+{
+    handler_log_t       log;
+    rcp_mock_server_t   *srv = fixture(&log);
+    rcp_bytes_t          frame, resp = {0};
+    size_t                i;
+    rcp_regmap_request_stream_cfg_t stream_cfg[1];
+
+    /* rx_ack_stream_index configured to a real stream too, so a failure
+     * of the evt[3] gate itself (not stream suppression) is what this
+     * test would actually catch. */
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id        = 1u;
+    stream_cfg[0].rx_ack_stream_index = 1u;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+
+    for (i = 0; i < RCP_SERVER_MAX_PENDING; i++) {
+        frame = rcp_timed_encode_request(1, 0x1000u + (uint64_t)i, (uint8_t)i, NULL, 0u);
+        TEST_ASSERT_NOT_NULL(frame.data);
+        TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &frame));
+        rcp_bytes_free(&frame);
+    }
+
+    /* evt=0x00: evt[3] clear, no acknowledge requested. */
+    frame = make_timed_with_evt(1, 0x9000u, 78u, 0x00u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+                      rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF,
+                                                RCP_ACF_MSG_TYPE_GBB, true, 1u, frame.data, frame.len,
+                                                &resp));
+    TEST_ASSERT_NULL(resp.data);
 
     rcp_bytes_free(&resp);
     rcp_bytes_free(&frame);
@@ -1881,7 +2018,9 @@ int main(void)
     RUN_TEST(test_compound_wait_requires_the_wait_condition);
     RUN_TEST(test_two_pending_compound_waits_have_independent_targets);
     RUN_TEST(test_compound_wait_reserved_evt_is_rejected_at_admission);
-    RUN_TEST(test_compound_wait_reserved_evt_sends_acknowledge_rejected_response);
+    RUN_TEST(test_compound_wait_reserved_evt_sends_err_response);
+    RUN_TEST(test_admission_rejection_acknowledge_sent_when_evt3_requests_it);
+    RUN_TEST(test_admission_rejection_acknowledge_suppressed_when_evt3_not_requested);
 
     RUN_TEST(test_compound_admission_denied_for_unclaimed_sequencer);
     RUN_TEST(test_compound_admission_denied_for_sequencer_owned_by_a_different_client);
