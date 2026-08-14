@@ -327,6 +327,35 @@ typedef struct {
                                     unicast (REQ-LIFECYCLE-027) */
     bool via_discovery_stream;  /* request arrived via the discovery stream
                                     (REQ-LIFECYCLE-030/031/036) */
+    bool via_valid_stream_association; /* request arrived via A stream_id/
+                                    byte_bus_id combination that is a real,
+                                    currently-configured EP_ID_config
+                                    association -- not necessarily the
+                                    specific endpoint's own owning one, and
+                                    ONLY ever true when no root client is
+                                    configured at all (TC18 §12.3.1.2:
+                                    "the request needs to come either via
+                                    the discovery stream or via a valid
+                                    stream_id/byte_bus_id combination. If a
+                                    root client is configured only the root
+                                    client's stream_id/byte_bus_id is
+                                    accepted"). REQ-LIFECYCLE-025/031: see
+                                    regmap.h's rcp_regmap_writer_ctx() for
+                                    how this member is derived -- it bakes
+                                    the "no root client configured"
+                                    condition in directly, the same
+                                    pattern via_root_client_ep0 already
+                                    uses for its own root-client-index
+                                    check, so a consumer of this struct
+                                    never separately re-checks root-client
+                                    state before trusting it. Defaults to
+                                    false on a plain {0}/partial-brace
+                                    initializer, the same convention every
+                                    other member here already follows --
+                                    every writer_ctx literal already in
+                                    this codebase before this member's
+                                    introduction continues to mean exactly
+                                    what it meant before. */
 } rcp_lifecycle_writer_ctx_t;
 
 /* ── Lifecycle transitions ─────────────────────────────────────────────────── */
@@ -361,22 +390,28 @@ typedef struct {
  *
  * Writer authorization (REQ-LIFECYCLE-031, TC18 §12.3.1.2): the
  * HW_CONFIGURED -> RCP_CONFIGURED advance and the HW_CONFIGURED ->
- * HW_UNCONFIGURED reset both require writer.via_discovery_stream or
- * writer.via_root_client_ep0 -- an unauthorized writer's request is
- * rejected with RCP_LIFECYCLE_ERR_UNAUTHORIZED, *state left unchanged,
- * before either transition's own plausibility guard runs. TC18's exact
- * text additionally narrows the non-discovery-stream case further --
- * "If a root client is configured only the root client's stream_id/
- * byte_bus_id is accepted", implying any valid stream_id/byte_bus_id
- * combination suffices only when no root client is configured at all --
- * a distinction this library cannot yet express (no wire-level concept
- * of "a valid stream_id/byte_bus_id combination" independent of a
- * specific endpoint's own owning stream exists for a server-level field
- * like svr_lifecycle_state; see REQ-LIFECYCLE-025/034's own architecture
- * finding for the same underlying gap). This function conservatively
- * requires via_root_client_ep0 in both cases until that classification
- * exists, rather than accepting an unqualified stream this library
- * cannot actually validate.
+ * HW_UNCONFIGURED reset both require writer.via_discovery_stream,
+ * writer.via_root_client_ep0, or writer.via_valid_stream_association --
+ * an unauthorized writer's request is rejected with
+ * RCP_LIFECYCLE_ERR_UNAUTHORIZED, *state left unchanged, before either
+ * transition's own plausibility guard runs. TC18's exact text further
+ * narrows the non-discovery-stream case: "If a root client is configured
+ * only the root client's stream_id/byte_bus_id is accepted", implying any
+ * valid stream_id/byte_bus_id combination suffices only when no root
+ * client is configured at all -- RESOLVED 2026-08-14 (issue #341 lineage):
+ * writer.via_valid_stream_association (rcp_lifecycle_writer_ctx_t, above)
+ * already bakes that "no root client configured" condition in at its own
+ * construction site (regmap.h's rcp_regmap_writer_ctx(), built on the new
+ * rcp_regmap_ep_id_map_is_valid_association() query over TC18 §12.7.8's
+ * own EP_ID_config table), so simply OR-ing it into this function's own
+ * authorization check is sufficient and cannot wrongly widen access when
+ * a root client IS configured (the member is always false in that case,
+ * by construction at its source). See REQ-LIFECYCLE-025/034's own
+ * architecture findings -- a related but textually distinct question
+ * (RCP_CONFIGURED's own request-filtering behavior for an unrecognized
+ * stream/byte_bus_id, not this function's HW_CONFIGURED-state writer
+ * authorization) -- for why that specific finding remains open spec
+ * silence rather than closed by this same primitive.
  *
  * The RCP_CONFIGURED -> HW_UNCONFIGURED reset is narrower still
  * (REQ-LIFECYCLE-037, TC18 §12.7.4): "Changes in configuration via a

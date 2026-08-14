@@ -994,6 +994,15 @@ rcp_regmap_general_errc_t rcp_regmap_general_decode_write_request(const uint8_t 
                                                                     rcp_wire_error_t *out_error,
                                                                     uint8_t *out_transaction_num);
 
+/* Forward declaration: rcp_regmap_writer_ctx() below (REQ-LIFECYCLE-025/031)
+ * needs a pointer to this type before its own full definition (the "──
+ * EP-ID / byte_bus_id map ──" section, further down this file) -- legal in
+ * C for a pointer parameter, since the type need not be complete at the
+ * point of a mere pointer declaration. The full definition below keeps the
+ * same struct-tag identity, just spelled as "struct rcp_regmap_ep_id_map_entry
+ * { ... };" there instead of repeating this typedef. */
+typedef struct rcp_regmap_ep_id_map_entry rcp_regmap_ep_id_map_entry_t;
+
 /* ── Root-client / per-EP-restricted-client model ──────────────────────────── */
 
 /* One endpoint's write-restriction: the single stream (if any) authorized
@@ -1022,13 +1031,36 @@ typedef struct {
  * ctx is explicitly assigned by this function -- none are left
  * uninitialized, since this struct's caller passes it straight into
  * ASIL-B write-authorization decisions (rcp_lifecycle_field_writable()/
- * rcp_lifecycle_transition()) that read every member. */
+ * rcp_lifecycle_transition()) that read every member.
+ *
+ * requesting_byte_bus_id/ep_id_map/ep_id_map_count (REQ-LIFECYCLE-025/031,
+ * issue #341 lineage) feed the derived ctx's own via_valid_stream_
+ * association member (rcp_lifecycle_writer_ctx_t, lifecycle.h): TC18
+ * §12.3.1.2's own text further narrows the non-discovery-stream
+ * authorization case -- "If a root client is configured only the root
+ * client's stream_id/byte_bus_id is accepted" -- meaning ANY valid
+ * stream_id/byte_bus_id combination suffices, but ONLY when no root
+ * client is configured at all. This function bakes that "no root client
+ * configured" condition directly into via_valid_stream_association itself
+ * (the same pattern via_root_client_ep0 above already establishes for its
+ * own "map->svr_root_client_index != RCP_REGMAP_NO_ROOT_CLIENT" condition)
+ * -- true iff map->svr_root_client_index == RCP_REGMAP_NO_ROOT_CLIENT AND
+ * rcp_regmap_ep_id_map_is_valid_association(ep_id_map, ep_id_map_count,
+ * (request_stream_index cast to uint8_t), requesting_byte_bus_id) is true
+ * -- so a caller consuming the returned ctx never has to separately ask
+ * "is a root client configured" before trusting this member; when one is
+ * configured, via_valid_stream_association is always false by
+ * construction, exactly matching TC18's own narrowing. ep_id_map may be
+ * NULL iff ep_id_map_count == 0. */
 rcp_lifecycle_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map,
                                                const rcp_regmap_ep_client_t *ep_client,
                                                uint16_t requesting_stream_index,
                                                bool via_ep0,
                                                bool via_unicast,
-                                               bool via_discovery_stream);
+                                               bool via_discovery_stream,
+                                               rcp_byte_bus_id_t requesting_byte_bus_id,
+                                               const rcp_regmap_ep_id_map_entry_t *ep_id_map,
+                                               size_t ep_id_map_count);
 
 /* ── RC Server's own functional-configuration content (TC18 §13.7.1.2) ─────
  *
@@ -2179,7 +2211,13 @@ rcp_regmap_response_queue_cfg_apply_reconfig(rcp_regmap_response_queue_cfg_t *en
 
 /* ── EP-ID / byte_bus_id map ────────────────────────────────────────────────── */
 
-typedef struct {
+/* Tagged (not the usual anonymous "typedef struct { ... } NAME;" idiom this
+ * file otherwise uses) because rcp_regmap_writer_ctx() above already
+ * forward-declares "typedef struct rcp_regmap_ep_id_map_entry
+ * rcp_regmap_ep_id_map_entry_t;" -- a second, distinct anonymous-struct
+ * typedef to the same name here would conflict with it. Struct shape and
+ * every field are otherwise unchanged. */
+struct rcp_regmap_ep_id_map_entry {
     uint16_t          ep_id;
     rcp_byte_bus_id_t byte_bus_id;
     uint8_t           request_stream_index; /* REQ-RMAP-052 (TC18
@@ -2227,7 +2265,7 @@ typedef struct {
                                 since removed from the spec entirely
                                 (0.5.1_RC4; see the file header's own
                                 "UPDATED 2026-08-11" note). */
-} rcp_regmap_ep_id_map_entry_t;
+};
 
 /* This module's own chosen upper bound on EP_ID_config table rows -- not
  * a spec-derived number (TC18 gives this table no fixed capacity of its
@@ -2460,6 +2498,45 @@ size_t rcp_regmap_ep_id_map_byte_bus_ids_for_stream(const rcp_regmap_ep_id_map_e
                                                       size_t count, uint8_t request_stream_index,
                                                       rcp_byte_bus_id_t *out_byte_bus_ids,
                                                       size_t out_capacity);
+
+/* ── Valid stream_id/byte_bus_id association query (issue #341 lineage,
+ * REQ-LIFECYCLE-025/031/034) ────────────────────────────────────────────────
+ *
+ * lifecycle.h's own rcp_lifecycle_transition() doc comment and this file's
+ * own rcp_regmap_writer_ctx() doc comment both named the same standing gap:
+ * TC18 §12.3.1.2's "the request needs to come either via the discovery
+ * stream or via a valid stream_id/byte_bus_id combination" (and its mirror
+ * sentence for the HW_CONFIGURED -> HW_UNCONFIGURED reset) could not be
+ * expressed, because this library had no wire-level concept of "a valid
+ * stream_id/byte_bus_id combination" independent of one specific endpoint's
+ * own registered owning stream (rcp_regmap_ep_client_t, singular, one
+ * stream per call).
+ *
+ * That concept already exists as CONTENT in this codebase -- TC18 §12.7.8
+ * Table 23 (EP_ID_config, rcp_regmap_ep_id_map_entry_t) already *is* the
+ * wire-defined table of every valid (request_stream_index, byte_bus_id)
+ * pair a server currently recognizes, the same table
+ * rcp_regmap_ep_id_map_byte_bus_ids_for_stream() above already projects
+ * one way (stream -> every byte_bus_id it addresses). This function is the
+ * membership test that same table was still missing: given a caller-
+ * resolved (request_stream_index, byte_bus_id) pair -- resolve the raw
+ * stream_id first via rcp_regmap_request_stream_cfg_resolve_index()
+ * (above), this function does not re-derive it -- true iff some row in
+ * entries[0..count) names EXACTLY that pair, regardless of which ep_id
+ * that row's own owning endpoint is. "Regardless of which endpoint owns
+ * it" is the operative distinction from rcp_regmap_ep_client_t's own
+ * single-endpoint-scoped via_owning_stream: TC18's "any valid stream_id/
+ * byte_bus_id combination" text does not require the combination to
+ * belong to the endpoint whose field is being written, only that the
+ * combination itself is a real, currently-configured one.
+ *
+ * entries may be NULL iff count == 0 (returns false). O(count), a single
+ * linear scan -- unlike _byte_bus_ids_for_stream() above, this function
+ * has no deduplication concern of its own (it only ever needs to find
+ * ONE matching row, not enumerate every one). */
+bool rcp_regmap_ep_id_map_is_valid_association(const rcp_regmap_ep_id_map_entry_t *entries,
+                                                 size_t count, uint8_t request_stream_index,
+                                                 rcp_byte_bus_id_t byte_bus_id);
 
 /* ── Optional-subsystem config sections: Network/PHY/time-synch/security
  * (REQ-RMAP-039, TC18 §12.7.11-.14) ────────────────────────────────────

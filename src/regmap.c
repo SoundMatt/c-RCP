@@ -1336,12 +1336,16 @@ rcp_regmap_response_queue_cfg_apply_reconfig(rcp_regmap_response_queue_cfg_t *en
 //cfusa:req REQ-RMAP-011
 //cfusa:req REQ-RMAP-012
 //cfusa:req REQ-RMAP-070
+//cfusa:req REQ-LIFECYCLE-031
 rcp_lifecycle_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map,
                                                const rcp_regmap_ep_client_t *ep_client,
                                                uint16_t requesting_stream_index,
                                                bool via_ep0,
                                                bool via_unicast,
-                                               bool via_discovery_stream)
+                                               bool via_discovery_stream,
+                                               rcp_byte_bus_id_t requesting_byte_bus_id,
+                                               const rcp_regmap_ep_id_map_entry_t *ep_id_map,
+                                               size_t ep_id_map_count)
 {
     rcp_lifecycle_writer_ctx_t ctx;
 
@@ -1361,6 +1365,24 @@ rcp_lifecycle_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map
      * could be re-derived. Explicitly assigned so every member of ctx
      * is set (REQ-RMAP-009's own fix: previously left uninitialized). */
     ctx.via_discovery_stream = via_discovery_stream;
+
+    /* REQ-LIFECYCLE-025/031 (issue #341 lineage): TC18 §12.3.1.2's own
+     * "any valid stream_id/byte_bus_id combination" case applies ONLY
+     * when no root client is configured at all -- baked in here (not
+     * left to rcp_lifecycle_transition() to re-check) so this member
+     * can never wrongly widen access when a root client IS configured,
+     * the same "condition baked into the derived member itself" pattern
+     * via_root_client_ep0 above already establishes for its own
+     * svr_root_client_index check. requesting_stream_index is narrowed
+     * to uint8_t here to match rcp_regmap_ep_id_map_entry_t's own
+     * request_stream_index field width (TC18 §12.7.8 Table 23: an 8-bit
+     * register) -- the same narrowing rcp_regmap_ep_id_map_byte_bus_ids_
+     * for_stream()'s own callers already perform at this boundary. */
+    ctx.via_valid_stream_association =
+        map->svr_root_client_index == RCP_REGMAP_NO_ROOT_CLIENT &&
+        rcp_regmap_ep_id_map_is_valid_association(ep_id_map, ep_id_map_count,
+                                                    (uint8_t)requesting_stream_index,
+                                                    requesting_byte_bus_id);
 
     return ctx;
 }
@@ -2106,4 +2128,22 @@ size_t rcp_regmap_ep_id_map_byte_bus_ids_for_stream(const rcp_regmap_ep_id_map_e
     }
 
     return found;
+}
+
+//cfusa:req REQ-LIFECYCLE-025
+//cfusa:req REQ-LIFECYCLE-031
+bool rcp_regmap_ep_id_map_is_valid_association(const rcp_regmap_ep_id_map_entry_t *entries,
+                                                 size_t count, uint8_t request_stream_index,
+                                                 rcp_byte_bus_id_t byte_bus_id)
+{
+    size_t i;
+
+    for (i = 0; i < count; i++) {
+        if (entries[i].request_stream_index == request_stream_index &&
+            entries[i].byte_bus_id == byte_bus_id) {
+            return true;
+        }
+    }
+
+    return false;
 }

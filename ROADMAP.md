@@ -19106,6 +19106,56 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.340.0 -- 2026-08-14 (REQ-LIFECYCLE-031: "valid stream_id/byte_bus_id
+combination" authorization closed; REQ-LIFECYCLE-025 re-confirmed spec
+silence)
+
+Seventh of 14 items -- the user's own framing named this pair "a new
+'stream ↔ byte_bus_id association' foundational concept", and this
+release builds exactly that as a real, reusable primitive.
+
+New `rcp_regmap_ep_id_map_is_valid_association()` (regmap.h/.c): a
+membership query over TC18 §12.7.8 Table 23's own EP_ID_config table --
+true iff SOME row names the exact (request_stream_index, byte_bus_id)
+pair, regardless of which ep_id owns it. That "regardless of which
+endpoint owns it" is the distinction from `rcp_regmap_ep_client_t`'s own
+pre-existing, single-endpoint-scoped `via_owning_stream`.
+
+REQ-LIFECYCLE-031 (implemented): `rcp_regmap_writer_ctx()` gains three
+new trailing params and derives a new `rcp_lifecycle_writer_ctx_t`
+member, `via_valid_stream_association`, bakes TC18's own "only when no
+root client is configured" narrowing directly into the member (always
+`false` by construction when a root client IS configured, so it can
+never wrongly widen access). `rcp_lifecycle_transition()` ORs it into
+the `HW_CONFIGURED -> RCP_CONFIGURED` advance and the `HW_CONFIGURED ->
+HW_UNCONFIGURED` reset, but deliberately NOT into the `RCP_CONFIGURED ->
+HW_UNCONFIGURED` reset (REQ-LIFECYCLE-037's own narrower rule); a
+dedicated test pins that non-widening.
+
+REQ-LIFECYCLE-025 (re-verified, stays partial): re-checked directly
+against §12.3.1.3's own prose (not just Figure 17's diagram) -- it
+defines what IS allowed in RCP_CONFIGURED but still specifies no
+disposition for a request matching neither case. The new primitive
+answers "is this combination configured at all", not "what happens on a
+non-match" -- inventing that disposition would risk non-conformance, so
+this stays open spec silence, now re-confirmed against the prose
+directly rather than only the diagram.
+
+New tests for the primitive, the derived writer_ctx member (three
+cases), and both authorization paths plus the one deliberately-
+NOT-widened reset. Three independent mutations (membership scan,
+"no root client" guard, `rcp_lifecycle_transition()`'s own new
+OR-clause) each removed/weakened and confirmed to fail, then restored.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51):
+0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`:
+`REQ-LIFECYCLE-031` partial → implemented; `REQ-LIFECYCLE-025` text
+updated, stays `partial` -- 1043 implemented / 24 partial / 2
+not-implemented / 7 retired, 1076 total.
+
+**Next**: the two remaining items from the user's own "complete these"
+list -- REQ-WAKEUP-018/021/022 (WakeUp API redesign, breaking changes).
+
 ### v0.339.0 -- 2026-08-14 (REQ-UART-037: 1.5 stop bits now exactly
 representable)
 

@@ -118,12 +118,15 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
 {
     rcp_lifecycle_state_t from = *state;
     /* TC18 §12.3.1.2 (REQ-LIFECYCLE-031): a svr_lifecycle_state write is
-     * accepted only via the discovery stream or the root client -- see
-     * this function's own header doc comment for why via_root_client_ep0
-     * alone (not a general "any valid stream" case) is the honestly-
-     * achievable form of TC18's further root-client-configured-vs-not
-     * narrowing given this library's current architecture. */
-    bool authorized = writer.via_discovery_stream || writer.via_root_client_ep0;
+     * accepted via the discovery stream, the root client, or -- RESOLVED
+     * 2026-08-14, issue #341 lineage -- any other currently-valid
+     * stream_id/byte_bus_id association when no root client is
+     * configured at all (writer.via_valid_stream_association already
+     * bakes that "no root client configured" narrowing in at its own
+     * construction site; see this function's own header doc comment and
+     * rcp_lifecycle_writer_ctx_t's own doc comment, lifecycle.h). */
+    bool authorized = writer.via_discovery_stream || writer.via_root_client_ep0 ||
+                       writer.via_valid_stream_association;
 
     if (target == from) return RCP_LIFECYCLE_OK; /* no-op; writer/idleness not consulted */
 
