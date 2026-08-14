@@ -34,6 +34,54 @@ the rationale.
 
 ## Releases
 
+### v0.367.0 -- 2026-08-14 (admission-rejection response shape follows TC18's own err-response vs Acknowledge distinction per rejection reason)
+
+Closes issue #454 (c-RCP-AUDIT-29), a CRITICAL regression in the immediately-preceding #430 fix
+(v0.365.0's own predecessor in this same session). #430 correctly identified that
+`RCP_SERVER_ADMIT_REJECTED` needed TC18 §11.3.1's Acknowledge-shaped rejection response (a request
+never filed into EP request storage at all), but over-generalized it: `finish_admission()`'s
+REJECTED case (`src/mock.c`) unconditionally built that shape for *every* admission-time rejection
+reason, when TC18 §13.5.1 explicitly overrides that default for one specific reason server.c's
+`rcp_server_endpoint_admit()` reports -- a compound-wait request's reserved `evt[2:0] = 011b`:
+"request shall be ignored and an err-response with error code = UNSUPPORTED_CMD shall be sent."
+"err-response" is TC18's own specific term for §11.3.4's Error Response shape (`evt[3:0] < 0x9`),
+structurally distinct from §11.3.1's Acknowledge (`evt[3:0] = 0xF`) -- and it appears nowhere else
+in the specification for this admission path (a full-text search of the TC18 0.5.1_RC5 PDF finds
+exactly two occurrences of "err-response" total: this one, and an unrelated Table 33 GPIO/PWM_OUT
+execution-time row not reachable through admission at all).
+
+A second, related gap: the rejected-Acknowledge path never checked the request's own `evt[3]`
+"client requested an acknowledge" bit, unlike its success-Acknowledge sibling
+(`rcp_server_endpoint_submit()`, REQ-SRV-016) -- both are the same §11.3.1 response type per Table
+16, so the same "if requested" gating logically applies to both.
+
+REQ-ACF-033 (extended)/REQ-ACF-024 (extended): `finish_admission()` (`src/mock.c`) now determines
+the correct response shape per rejection reason via a new `admission_reject_response_shape()`
+per-rejection-reason lookup, keyed on the admission `rcp_wire_error_t` -- following this codebase's
+own established `classify_response()`-style shape-dispatch pattern rather than a wide, cross-file
+signature change to `rcp_server_endpoint_admit()`. Every `RCP_ERROR_*` value that function can
+report for `RCP_SERVER_ADMIT_REJECTED` was audited against TC18's own text:
+`RCP_ERROR_UNSUPPORTED_CMD` (the compound-wait reserved-evt path, and only that one call site) maps
+to the §11.3.4 Error Response, built unconditionally (TC18's "shall be sent" carries no evt[3]
+qualifier, matching every other `rcp_acf_build_error_response()` call site in this file);
+`RCP_ERROR_INVALID_PARAMETER` and `RCP_ERROR_REQUEST_STORAGE_OVERFLOW` -- neither has "err-response"
+wording anywhere in TC18 -- keep the §11.3.1 Acknowledge-rejected shape, now correctly gated on the
+request's own evt[3] via `rcp_acf_evt_requests_acknowledge()`.
+
+Tests (`tests/test_conditional_dispatch.c`): `test_compound_wait_reserved_evt_sends_err_response()`
+corrects the #430-introduced, spec-contradicting
+`test_compound_wait_reserved_evt_sends_acknowledge_rejected_response()` (which had pinned the wrong
+shape for this exact case) back to asserting the actual wire bytes of the §11.3.4 shape. Two new
+tests, `test_admission_rejection_acknowledge_sent_when_evt3_requests_it()` and
+`test_admission_rejection_acknowledge_suppressed_when_evt3_not_requested()`, drive a genuine "never
+filed" rejection (request-storage overflow) with evt[3] set and clear respectively, proving both the
+new gate and -- as the regression guard for #430's own original, correct scope -- that a rejection
+reason with no "err-response" wording in TC18 still correctly uses the §11.3.1 Acknowledge shape.
+Mutation-tested: reverting only the fix (keeping the new/corrected tests) makes both the corrected
+err-response test and the evt[3]-suppression test fail exactly as expected; restored, full 66-test
+suite + ASan/UBSan clean again. `cfusa check`/`trace`: 0 errors, 1088/1088 requirements traced and
+tested (unchanged).
+
 ### v0.366.0 -- 2026-08-14 (CAN endpoint's ep_clear_req_storage wire bit corrected to bit 4)
 
 Closes issue #470 (c-RCP-AUDIT-45). `ep_can.c`'s `CAN_ENABLE_CLR_BIT_CLEAR`

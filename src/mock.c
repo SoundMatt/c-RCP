@@ -1201,37 +1201,109 @@ static void apply_cancellation(rcp_mock_endpoint_slot_t *slot, uint8_t request_t
     }
 }
 
+/* issue #454 (this session's own audit finding, following on from #430):
+ * RCP_SERVER_ADMIT_REJECTED is NOT one single TC18 response shape --
+ * server.c's rcp_server_endpoint_admit() reports several distinct
+ * rejection reasons via *out_error, and TC18's own text does not treat
+ * them uniformly. The general rule, per §11.3.1's own wording ("err = 1
+ * indicates that the request has been rejected" for a request that was
+ * never filed into EP request storage at all), is the Acknowledge-
+ * rejected shape #430 added (RCP_ADMIT_REJECT_SHAPE_ACKNOWLEDGE below).
+ * But §13.5.1 explicitly overrides that default for exactly one
+ * admission-rejection reason this codebase currently reports: a
+ * compound-wait request's reserved evt[2:0] = 011b, which server.c's
+ * admit() reports as RCP_ERROR_UNSUPPORTED_CMD from one single call site
+ * (the RCP_SCHED_KIND_COMPOUND_WAIT case) -- "request shall be ignored
+ * and an err-response with error code = UNSUPPORTED_CMD shall be sent."
+ * "err-response" is TC18's own specific term for §11.3.4's Error
+ * Response shape (evt[3:0] < 0x9, err = 1), structurally distinct from
+ * §11.3.1's Acknowledge (evt[3:0] = 0xF).
+ *
+ * This is not a guess: "err-response" appears exactly twice in the whole
+ * TC18 0.5.1_RC5 specification text -- here, and in Table 33's unrelated
+ * GPIO/PWM_OUT evt[2:0]=100b execution-time row (not reachable through
+ * this admission path at all). Every OTHER RCP_ERROR_* value admit() can
+ * report for RCP_SERVER_ADMIT_REJECTED -- RCP_ERROR_INVALID_PARAMETER
+ * (a response frame received where a request was expected) and
+ * RCP_ERROR_REQUEST_STORAGE_OVERFLOW (the request store is full; TC18
+ * §12.7's own "newly arriving requests are dropped and responses with
+ * the corresponding error code generated" carries no "err-response"
+ * wording of its own) -- has no such override anywhere in the spec text,
+ * and correctly keeps the §11.3.1 Acknowledge-rejected shape #430
+ * established. */
+typedef enum {
+    RCP_ADMIT_REJECT_SHAPE_ACKNOWLEDGE,    /* TC18 §11.3.1 (evt=0xF, err=1) */
+    RCP_ADMIT_REJECT_SHAPE_ERROR_RESPONSE, /* TC18 §11.3.4 (evt<0x9, err=1) */
+} rcp_admit_reject_shape_t;
+
+/* Per-rejection-reason lookup (issue #454): which TC18 response shape a
+ * given admission-rejection *out_error corresponds to. See the doc
+ * comment immediately above for the spec text this is derived from --
+ * RCP_ERROR_UNSUPPORTED_CMD is the ONLY value server.c's admit() can
+ * report for RCP_SERVER_ADMIT_REJECTED that TC18 itself calls an
+ * "err-response"; every other value falls through to the general §11.3.1
+ * default. RCP_ERROR_NONE never reaches this function (finish_admission()
+ * only calls it once error != RCP_ERROR_NONE has already been checked). */
+static rcp_admit_reject_shape_t admission_reject_response_shape(rcp_wire_error_t error)
+{
+    switch (error) {
+    case RCP_ERROR_UNSUPPORTED_CMD:
+        /* TC18 §13.5.1 (compound-wait reserved evt[2:0] = 011b),
+         * REQ-ACF-024/REQ-SRV-019. */
+        return RCP_ADMIT_REJECT_SHAPE_ERROR_RESPONSE;
+    default:
+        return RCP_ADMIT_REJECT_SHAPE_ACKNOWLEDGE;
+    }
+}
+
 /* Maps one server.h admission outcome onto this module's own dispatch
  * result, running the endpoint's handler for the execute-now case.
  *
  * error is rcp_server_endpoint_admit()'s *out_error: RCP_ERROR_NONE for
  * every outcome except the rejection paths that determined a specific
  * TC18 Table 30 code (see that function's own doc comment for which
- * paths currently do). When non-RCP_ERROR_NONE, out_response is
- * populated (instead of being left zeroed) with TC18 §11.3.1's
- * Acknowledge-shaped storage-admission-rejection response
- * (rcp_acf_build_acknowledge_rejected_response(), evt=0xF/err=1) -- NOT
- * the §11.3.4 Error Response (rcp_acf_build_error_response()) other
- * REJECTED-shaped call sites in this file use, since RCP_SERVER_ADMIT_
- * REJECTED specifically means the request was never filed into EP
- * request storage at all (issue #430, REQ-ACF-033) -- byte_bus_id is
- * this endpoint's own address (already known to the caller, which
- * routed to this slot by it); transaction_num is read back out of the
- * request frame's own header via rcp_acf_unpack_header(), which
- * populates it correctly regardless of mtv/request-type repurposing
- * (transaction_num is not part of the repurposed region).
+ * paths currently do). When non-RCP_ERROR_NONE, admission_reject_
+ * response_shape() (above) decides which of TC18's two rejection
+ * response shapes applies (issue #454, extending REQ-ACF-033/
+ * REQ-ACF-024):
+ *
+ *   - RCP_ADMIT_REJECT_SHAPE_ERROR_RESPONSE: TC18's own "err-response"
+ *     wording (§13.5.1) for this specific rejection reason overrides the
+ *     general rule below -- built via rcp_acf_build_error_response(),
+ *     unconditionally (TC18's "shall be sent" carries no evt[3]
+ *     "if requested" qualifier, matching every other §11.3.4 call site
+ *     in this file).
+ *   - RCP_ADMIT_REJECT_SHAPE_ACKNOWLEDGE (the default): TC18 §11.3.1's
+ *     Acknowledge-shaped storage-admission-rejection response
+ *     (rcp_acf_build_acknowledge_rejected_response(), evt=0xF/err=1) --
+ *     NOT the §11.3.4 Error Response, since RCP_SERVER_ADMIT_REJECTED
+ *     here specifically means the request was never filed into EP
+ *     request storage at all (issue #430, REQ-ACF-033). Built only when
+ *     the request's own evt[3] asked for an acknowledge
+ *     (rcp_acf_evt_requests_acknowledge()), mirroring the success-
+ *     Acknowledge sibling path's own REQ-SRV-016 gate
+ *     (rcp_server_endpoint_submit()) -- both are the same §11.3.1
+ *     response type per Table 16, so the same "if requested" gating
+ *     applies to both (issue #454; #430 omitted this gate).
+ *
+ * byte_bus_id is this endpoint's own address (already known to the
+ * caller, which routed to this slot by it); transaction_num is read back
+ * out of the request frame's own header via rcp_acf_unpack_header(),
+ * which populates it correctly regardless of mtv/request-type
+ * repurposing (transaction_num is not part of the repurposed region).
  *
  * A side effect worth flagging for a future reader: dispatch_plain()'s
  * own suppress_response_per_stream_cfg() (REQ-RMAP-048/049) classifies
  * *out_response via rcp_acf_classify_response() to decide which of
- * Table 24's two routing pointers governs it -- and this function's own
- * response now genuinely classifies as RCP_ACF_RESP_ACKNOWLEDGE (it did
- * not before this fix), so it is now governed by rx_ack_stream_index
- * (TC18-defined power-on default 0, "no acknowledge is to be sent"),
- * not rx_resp_stream_index (power-on default 1) the way the sibling
- * §11.3.4 Error Response path is. A caller/test that wants to actually
- * observe this response on the wire must configure rx_ack_stream_index
- * to a nonzero value for the resolved request stream -- exactly as TC18
+ * Table 24's two routing pointers governs it -- the Acknowledge-shaped
+ * branch above classifies as RCP_ACF_RESP_ACKNOWLEDGE, governed by
+ * rx_ack_stream_index (TC18-defined power-on default 0, "no acknowledge
+ * is to be sent"); the Error-Response-shaped branch classifies as
+ * RCP_ACF_RESP_ERROR, governed by rx_resp_stream_index (power-on default
+ * 1), the same as every other §11.3.4 call site in this file. A
+ * caller/test that wants to actually observe the Acknowledge-shaped
+ * branch's response on the wire must configure rx_ack_stream_index to a
+ * nonzero value for the resolved request stream -- exactly as TC18
  * itself requires for any other Acknowledge-classified response. */
 static rcp_mock_dispatch_result_t finish_admission(rcp_mock_endpoint_slot_t *slot,
                                                     rcp_server_admit_t admit, uint8_t request_type,
@@ -1253,20 +1325,29 @@ static rcp_mock_dispatch_result_t finish_admission(rcp_mock_endpoint_slot_t *slo
         return RCP_MOCK_DISPATCH_CANCELLED;
     case RCP_SERVER_ADMIT_REJECTED:
     default:
-        /* TC18 §11.3.1, not §11.3.4: RCP_SERVER_ADMIT_REJECTED means the
-         * request was never filed into EP request storage at all ("Nothing
-         * was stored and nothing is to be executed" -- see
-         * rcp_server_admit_t's own doc comment). §11.3.1's own Acknowledge
-         * shape (evt=0xF, err=1) is the response TC18 defines for exactly
-         * this case -- distinct from the §11.3.4 Error Response
-         * (rcp_acf_build_error_response(), evt=0, err=1) used elsewhere in
-         * this file for a request that WAS filed but whose later execution
-         * failed (issue #430, REQ-ACF-033). */
+        /* issue #454: which of TC18's two rejection response shapes
+         * applies depends on the specific rejection reason -- see this
+         * function's own doc comment and admission_reject_response_
+         * shape()'s doc comment above for the spec text this is derived
+         * from. */
         if (error != RCP_ERROR_NONE) {
             rcp_acf_byte_message_info_t hdr = {0};
             if (request_len >= 8 && rcp_acf_unpack_header(request, &hdr) == RCP_ACF_OK) {
-                *out_response = rcp_acf_build_acknowledge_rejected_response(
-                    byte_bus_id, hdr.transaction_num, error);
+                if (admission_reject_response_shape(error) ==
+                    RCP_ADMIT_REJECT_SHAPE_ERROR_RESPONSE) {
+                    /* TC18 §13.5.1 "err-response": unconditional, no
+                     * evt[3] qualifier -- matches every other
+                     * rcp_acf_build_error_response() call site in this
+                     * file. */
+                    *out_response =
+                        rcp_acf_build_error_response(byte_bus_id, hdr.transaction_num, error);
+                } else if (rcp_acf_evt_requests_acknowledge(hdr.evt)) {
+                    /* REQ-SRV-016's own evt[3] "if requested" gate,
+                     * mirrored here for the rejected-Acknowledge sibling
+                     * (issue #454; #430 omitted this gate). */
+                    *out_response = rcp_acf_build_acknowledge_rejected_response(
+                        byte_bus_id, hdr.transaction_num, error);
+                }
             }
         }
         return RCP_MOCK_DISPATCH_REJECTED;
