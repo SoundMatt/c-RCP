@@ -762,6 +762,158 @@ static void test_acknowledge_not_suppressed_when_rx_ack_stream_index_is_nonzero(
     rcp_mock_server_destroy(srv);
 }
 
+/* ── REQ-RMAP-065/SRV-017: Flush_time heartbeat composition ─────────────────── */
+
+static const uint8_t HEARTBEAT_MAC[6] = {0x02, 0x00, 0x00, 0x00, 0x00, 0x22};
+
+static rcp_mock_server_t *heartbeat_fixture(uint32_t flush_time_us)
+{
+    rcp_mock_server_t              *srv = rcp_mock_server_new();
+    rcp_regmap_response_queue_cfg_t cfg[1];
+
+    rcp_regmap_response_queue_cfg_init(&cfg[0]);
+    cfg[0].stream_uid    = 0x0001u;
+    cfg[0].flush_time_us = flush_time_us;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_response_queue_cfg(srv, cfg, 1));
+    return srv;
+}
+
+/* The very first check for a response stream only seeds this module's
+ * own bookkeeping -- no previous transmission exists yet to measure
+ * elapsed time against, so no heartbeat is reported even though a huge
+ * now_us would otherwise look like an eternity has elapsed since a
+ * zero-valued "last transmit". */
+static void test_heartbeat_first_check_only_seeds_and_reports_nothing_due(void)
+{
+    rcp_mock_server_t *srv = heartbeat_fixture(1000u);
+    rcp_bytes_t         hb  = {0};
+
+    TEST_ASSERT_FALSE(
+        rcp_mock_server_check_response_queue_heartbeat(srv, 1u, HEARTBEAT_MAC, 999999999u, &hb));
+    TEST_ASSERT_NULL(hb.data);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* Once seeded, elapsed time below flush_time_us reports nothing due; at
+ * or past it, a real, correctly composed empty NTSCF heartbeat AVTPDU
+ * comes back -- the exact composition
+ * test_flush_time_trigger_and_empty_heartbeat_are_composable()
+ * (test_tc18_gaps_regmap.c) already proved possible, now reached through
+ * one real mock.c call instead of by hand. */
+static void test_heartbeat_fires_exactly_at_flush_time_and_composes_correctly(void)
+{
+    rcp_mock_server_t *srv = heartbeat_fixture(1000u);
+    rcp_bytes_t         hb  = {0};
+    rcp_avtp_ntscf_header_t decoded_hdr;
+    const uint8_t           *decoded_payload;
+    size_t                    decoded_payload_len;
+
+    TEST_ASSERT_FALSE(
+        rcp_mock_server_check_response_queue_heartbeat(srv, 1u, HEARTBEAT_MAC, 0u, &hb)); /* seed */
+
+    TEST_ASSERT_FALSE(
+        rcp_mock_server_check_response_queue_heartbeat(srv, 1u, HEARTBEAT_MAC, 999u, &hb));
+    TEST_ASSERT_NULL(hb.data);
+
+    TEST_ASSERT_TRUE(
+        rcp_mock_server_check_response_queue_heartbeat(srv, 1u, HEARTBEAT_MAC, 1000u, &hb));
+    TEST_ASSERT_NOT_NULL(hb.data);
+    TEST_ASSERT_EQUAL_UINT(RCP_AVTP_NTSCF_HEADER_LEN, hb.len);
+
+    TEST_ASSERT_EQUAL_INT(RCP_AVTP_OK, rcp_avtp_decode_ntscf(hb.data, hb.len, &decoded_hdr,
+                                                              &decoded_payload,
+                                                              &decoded_payload_len));
+    TEST_ASSERT_EQUAL_UINT8(1u, decoded_hdr.sv);
+    TEST_ASSERT_EQUAL_UINT(0u, decoded_payload_len);
+    {
+        rcp_stream_id_t expected = rcp_stream_id_make(HEARTBEAT_MAC, 0x0001u);
+        TEST_ASSERT_EQUAL_MEMORY(expected.mac, decoded_hdr.stream_id.mac, sizeof(expected.mac));
+        TEST_ASSERT_EQUAL_UINT16(expected.unique_id, decoded_hdr.stream_id.unique_id);
+    }
+
+    rcp_bytes_free(&hb);
+    rcp_mock_server_destroy(srv);
+}
+
+/* Having just fired, the flush timer is reset -- an immediately
+ * following check (elapsed 0) reports nothing due again, even past a
+ * SECOND full interval only from that new baseline. */
+static void test_heartbeat_resets_its_own_timer_after_firing(void)
+{
+    rcp_mock_server_t *srv = heartbeat_fixture(1000u);
+    rcp_bytes_t         hb  = {0};
+
+    TEST_ASSERT_FALSE(
+        rcp_mock_server_check_response_queue_heartbeat(srv, 1u, HEARTBEAT_MAC, 0u, &hb)); /* seed */
+    TEST_ASSERT_TRUE(
+        rcp_mock_server_check_response_queue_heartbeat(srv, 1u, HEARTBEAT_MAC, 1000u, &hb));
+    rcp_bytes_free(&hb);
+
+    TEST_ASSERT_FALSE(
+        rcp_mock_server_check_response_queue_heartbeat(srv, 1u, HEARTBEAT_MAC, 1999u, &hb));
+    TEST_ASSERT_NULL(hb.data);
+
+    TEST_ASSERT_TRUE(
+        rcp_mock_server_check_response_queue_heartbeat(srv, 1u, HEARTBEAT_MAC, 2000u, &hb));
+    TEST_ASSERT_NOT_NULL(hb.data);
+
+    rcp_bytes_free(&hb);
+    rcp_mock_server_destroy(srv);
+}
+
+/* flush_time_us == 0 (TC18's own "flush only by count" encoding) never
+ * fires a heartbeat, no matter how much time elapses -- proven past the
+ * seed call with a very large now_us. */
+static void test_heartbeat_never_fires_when_flush_time_is_zero(void)
+{
+    rcp_mock_server_t *srv = heartbeat_fixture(0u);
+    rcp_bytes_t         hb  = {0};
+
+    TEST_ASSERT_FALSE(
+        rcp_mock_server_check_response_queue_heartbeat(srv, 1u, HEARTBEAT_MAC, 0u, &hb));
+    TEST_ASSERT_FALSE(
+        rcp_mock_server_check_response_queue_heartbeat(srv, 1u, HEARTBEAT_MAC, 999999999u, &hb));
+    TEST_ASSERT_NULL(hb.data);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* A non-monotonic now_us (earlier than the last recorded transmission)
+ * reports nothing due -- fails toward no heartbeat rather than firing a
+ * false positive from the unsigned subtraction that would otherwise
+ * underflow. */
+static void test_heartbeat_non_monotonic_now_us_does_not_fire(void)
+{
+    rcp_mock_server_t *srv = heartbeat_fixture(1000u);
+    rcp_bytes_t         hb  = {0};
+
+    TEST_ASSERT_FALSE(
+        rcp_mock_server_check_response_queue_heartbeat(srv, 1u, HEARTBEAT_MAC, 5000u, &hb)); /* seed */
+    TEST_ASSERT_FALSE(
+        rcp_mock_server_check_response_queue_heartbeat(srv, 1u, HEARTBEAT_MAC, 100u, &hb));
+    TEST_ASSERT_NULL(hb.data);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* response_stream_index 0 and an index beyond srv's own configured
+ * response_queue_cfg_count both report nothing due -- there is no row
+ * to check. */
+static void test_heartbeat_out_of_range_response_stream_index_does_not_fire(void)
+{
+    rcp_mock_server_t *srv = heartbeat_fixture(1000u);
+    rcp_bytes_t         hb  = {0};
+
+    TEST_ASSERT_FALSE(
+        rcp_mock_server_check_response_queue_heartbeat(srv, 0u, HEARTBEAT_MAC, 1000000u, &hb));
+    TEST_ASSERT_FALSE(
+        rcp_mock_server_check_response_queue_heartbeat(srv, 2u, HEARTBEAT_MAC, 1000000u, &hb));
+    TEST_ASSERT_NULL(hb.data);
+
+    rcp_mock_server_destroy(srv);
+}
+
 static void test_dispatch_no_handler_leaves_response_zeroed(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -1348,6 +1500,12 @@ int main(void)
     RUN_TEST(test_response_not_suppressed_for_unresolvable_stream);
     RUN_TEST(test_acknowledge_suppressed_by_default_ack_stream_index);
     RUN_TEST(test_acknowledge_not_suppressed_when_rx_ack_stream_index_is_nonzero);
+    RUN_TEST(test_heartbeat_first_check_only_seeds_and_reports_nothing_due);
+    RUN_TEST(test_heartbeat_fires_exactly_at_flush_time_and_composes_correctly);
+    RUN_TEST(test_heartbeat_resets_its_own_timer_after_firing);
+    RUN_TEST(test_heartbeat_never_fires_when_flush_time_is_zero);
+    RUN_TEST(test_heartbeat_non_monotonic_now_us_does_not_fire);
+    RUN_TEST(test_heartbeat_out_of_range_response_stream_index_does_not_fire);
     RUN_TEST(test_dispatch_no_handler_leaves_response_zeroed);
     RUN_TEST(test_dispatch_queued_when_endpoint_disabled);
     RUN_TEST(test_drain_endpoint_runs_queued_request);

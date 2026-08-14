@@ -34,6 +34,20 @@ the rationale.
 
 ## Releases
 
+### v0.337.0 -- 2026-08-14 (REQ-RMAP-065/SRV-017: Flush_time heartbeat composed into one real mock.c call)
+
+Fourth of 14 items catalogued "not blocked, left by explicit decision" in the post-backlog requirements audit -- and the first honestly resolved as "closed to its own real limit" rather than flipped to `implemented`, since the underlying scheduler/transport boundary is unchanged by design.
+
+TC18 §12.7.9/§13.7.1.1's empty-heartbeat-on-Flush_time-expiry rule already had every primitive it needed (`rcp_respqueue_should_flush_by_time()`, `rcp_avtp_encode_ntscf()`), proven composable by an existing test. What was missing was the bookkeeping of *when* each response stream last transmitted, and one real call a caller could make per tick instead of composing both primitives by hand every time.
+
+New `rcp_mock_server_check_response_queue_heartbeat(srv, response_stream_index, mac, now_us, out_heartbeat)` (mock.h/mock.c): tracks each response stream's own last-transmit moment (the same "has_previous" idiom `REQ-SRV-018`'s own edge detector already establishes -- the first check per stream only seeds, never fires) and, on a genuine expiry, builds and returns the real empty NTSCF heartbeat AVTPDU via `rcp_regmap_response_queue_stream_id()` + `rcp_avtp_encode_ntscf()`. `mac` is a new caller-supplied parameter -- this module stores no interface MAC of its own, the same "this library never invents a value it has no way to know" discipline `REQ-SRV-018`'s own `source_ep` and `REQ-ADC-033`'s own `base_clk_hz` already establish.
+
+**Deliberately still `partial`, unchanged boundary**: c-RCP remains a protocol library, not a scheduler -- calling this function periodically against a real clock, and sending the returned bytes over a real transport, stays the integrator's own job, exactly as both requirements' own text already stated.
+
+6 new tests (test_mock.c) prove the composition end to end against a real *decoded* AVTPDU -- not just that the primitives *could* combine, which the existing regmap-level test already proved. The seeding short-circuit, the non-monotonic-time guard, and the flush-time comparison were all mutation-tested and caught cleanly. Two edge cases were investigated but are honestly **not** independently mutation-provable, only verified by code inspection: the `response_stream_index` bounds guard (an out-of-range index, without the guard, lands on a still-zeroed adjacent array slot that behaviorally mimics the correct "nothing due" outcome either way) and the allocation-failure retry path (`rcp_avtp_encode_ntscf()` calls plain `malloc()` rather than this codebase's own pluggable `rcp_malloc()` hook, so failure can't be injected without a separate, out-of-scope `avtp.c` migration).
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`: `REQ-RMAP-065`/`REQ-SRV-017` text updated, both stay `partial` (1041 implemented / 26 partial / 2 not-implemented / 7 retired, 1076 total, unchanged -- text-only).
+
 ### v0.336.0 -- 2026-08-14 (REQ-SRV-018: gPTP lock-established/lost trigger delivered through the existing notify_trigger() broadcast)
 
 Third of 14 items catalogued "not blocked, left by explicit decision" in the post-backlog requirements audit. TC18 Table 37's server-own gPTP lock-established/lost trigger signals (0/1) already had a correct edge-detector primitive (`rcp_server_gptp_trigger_evaluate()`, server.h) -- what stayed missing was a single call a caller could make per newly observed `gptp_locked` value, instead of composing `evaluate()`+`notify_trigger()` by hand across every registered endpoint itself.

@@ -19106,6 +19106,47 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.337.0 -- 2026-08-14 (REQ-RMAP-065/SRV-017: Flush_time heartbeat
+composed into one real mock.c call)
+
+Fourth of 14 items catalogued "not blocked, left by explicit
+decision" -- and the first honestly closed as "its own real limit"
+rather than flipped to `implemented`, since the scheduler/transport
+boundary is unchanged by design. Every primitive Table 24's empty-
+heartbeat-on-Flush_time rule needed already existed and was proven
+composable; missing was per-stream last-transmit bookkeeping and one
+real call instead of hand-composing every tick.
+
+New `rcp_mock_server_check_response_queue_heartbeat(srv,
+response_stream_index, mac, now_us, out_heartbeat)` (mock.h/mock.c):
+tracks last-transmit moment per response stream (same "has_previous"
+idiom as REQ-SRV-018's edge detector) and, on a genuine expiry,
+builds and returns the real empty NTSCF heartbeat via
+`rcp_regmap_response_queue_stream_id()` +
+`rcp_avtp_encode_ntscf()`. `mac` is caller-supplied -- this module
+stores no interface MAC of its own, matching REQ-SRV-018's
+`source_ep`/REQ-ADC-033's `base_clk_hz` discipline.
+
+Deliberately still `partial`: calling this periodically against a
+real clock and sending the bytes over a real transport stays the
+integrator's job.
+
+6 new tests (test_mock.c) prove the composition against a real
+*decoded* AVTPDU, not just that primitives could combine. Seeding
+short-circuit, non-monotonic guard, and flush-time comparison all
+mutation-tested and caught cleanly. Two edge cases investigated but
+honestly not independently mutation-provable (verified by code
+inspection instead): the bounds guard (an out-of-range index lands
+on a still-zeroed adjacent slot that mimics the correct outcome
+either way) and the alloc-failure retry path (`rcp_avtp_encode_ntscf()`
+uses plain `malloc()`, not this codebase's pluggable hook).
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace`
+(v0.5.51): 0 errors, 0/1076 untested. `.fusa-reqs.json`:
+`REQ-RMAP-065`/`REQ-SRV-017` text updated, both stay `partial` (1041
+implemented / 26 partial / 2 not-implemented / 7 retired, 1076
+total, unchanged -- text-only).
+
 ### v0.336.0 -- 2026-08-14 (REQ-SRV-018: gPTP lock trigger delivered
 through the existing notify_trigger() broadcast)
 

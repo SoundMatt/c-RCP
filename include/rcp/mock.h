@@ -108,6 +108,7 @@
 #ifndef RCP_MOCK_H
 #define RCP_MOCK_H
 
+#include "rcp/avtp.h"
 #include "rcp/discovery.h"
 #include "rcp/e2e.h"
 #include "rcp/fragment.h"
@@ -116,6 +117,7 @@
 #include "rcp/rcp.h"
 #include "rcp/regmap.h"
 #include "rcp/request_sequencer.h"
+#include "rcp/respqueue.h"
 #include "rcp/server.h"
 #include "rcp/watchdog.h"
 
@@ -270,6 +272,70 @@ bool rcp_mock_server_set_request_stream_cfg(rcp_mock_server_t *srv,
 bool rcp_mock_server_set_response_queue_cfg(rcp_mock_server_t *srv,
                                              const rcp_regmap_response_queue_cfg_t *entries,
                                              size_t count);
+
+/* ── REQ-RMAP-065/SRV-017: Flush_time heartbeat composition ─────────────────── */
+
+/* Checks whether response_stream_index's own Flush_time (Table 24
+ * flush_time_us) has elapsed since its last transmission, as of the
+ * caller's own now_us, and if so, composes and returns the empty
+ * heartbeat AVTPDU TC18 §12.7.9/§13.7.1.1 requires -- srv's own
+ * bookkeeping of "when did this response stream last transmit" plus the
+ * already-existing rcp_respqueue_should_flush_by_time()/rcp_avtp_encode_
+ * ntscf() composition test_flush_time_trigger_and_empty_heartbeat_are_
+ * composable() (test_tc18_gaps_regmap.c) already proved possible, now a
+ * single call instead of a caller composing both by hand every tick.
+ *
+ * response_stream_index is the 1-based identity into srv's own response-
+ * queue-cfg table (the same identity rx_resp_stream_index/
+ * rx_ack_stream_index, REQ-RMAP-048/049, already point at) -- 0 or an
+ * index beyond srv's own currently-configured response_queue_cfg_count
+ * returns false, *out_heartbeat left zeroed, nothing to check.
+ *
+ * mac is the interface's own 6-octet MAC address, combined with the
+ * resolved response_queue_cfg entry's own stream_uid via
+ * rcp_regmap_response_queue_stream_id() (regmap.h) to build the
+ * heartbeat's own real stream_id -- this module stores no MAC of its
+ * own (see that struct field's own doc comment for why), the same "this
+ * library never invents a value it has no way to know" discipline
+ * REQ-SRV-018's own source_ep parameter and REQ-ADC-033's own
+ * base_clk_hz parameter already establish.
+ *
+ * The very first check for a given response_stream_index only seeds
+ * this module's own last-transmit bookkeeping to now_us and returns
+ * false -- no previous transmission exists yet to measure elapsed time
+ * against, the same "has_previous" discipline rcp_server_gptp_trigger_
+ * state_t (server.h) already establishes for REQ-SRV-018. A now_us
+ * earlier than the last recorded transmission (a non-monotonic caller
+ * input) also returns false rather than firing a spurious heartbeat
+ * from the unsigned subtraction that would otherwise underflow.
+ *
+ * On a genuine Flush_time expiry: builds a real NTSCF header (sv=1, the
+ * resolved stream_id, every other field at its own encode-recomputed or
+ * zero default -- matching discovery.c's own rcp_discovery_encode_
+ * request() convention for this same header shape) with a zero-length
+ * payload via rcp_avtp_encode_ntscf(), writes it to *out_heartbeat, and
+ * returns true. *out_heartbeat is zeroed (data=NULL) on every false
+ * return, and also on a true return if allocation itself failed -- check
+ * out_heartbeat->data, not just the return value, before treating a true
+ * return as carrying real bytes to send, the same convention every other
+ * *_bytes_t-producing function in this codebase already uses. now_us is
+ * recorded as this response stream's own new last-transmit moment ONLY
+ * when encoding actually succeeded (out_heartbeat->data != NULL) -- an
+ * allocation failure means nothing was really transmitted, so the next
+ * check still sees this heartbeat as owed and retries, rather than
+ * silently skipping a whole Flush_time interval because one attempt
+ * happened to fail. Caller frees a non-NULL *out_heartbeat with
+ * rcp_bytes_free().
+ *
+ * Sending the returned bytes over a real transport, and calling this
+ * function periodically against a real clock in the first place, stays
+ * the integrator's own job -- the same boundary REQ-SRV-017's own text
+ * already states and this fix does not change: c-RCP is a protocol
+ * library, not a scheduler. */
+bool rcp_mock_server_check_response_queue_heartbeat(rcp_mock_server_t *srv,
+                                                      uint8_t response_stream_index,
+                                                      const uint8_t mac[6], uint64_t now_us,
+                                                      rcp_bytes_t *out_heartbeat);
 
 /* Replaces srv's own EP_ID_config table (TC18 §12.7.8 Table 23) wholesale
  * with a copy of entries[0..count). Returns false (srv's own table left
