@@ -19106,6 +19106,87 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.360.0 -- 2026-08-14 (mock.c dispatch: byte_bus_id lookup now genuinely
+scoped by stream_id, TC18 §12.9.1)
+
+Closes issue #432 (c-RCP-AUDIT-21). §12.9.1: "In dependence on **the
+stream_id and byte_bus_id** the RC Server determines the endpoint that
+is addressed. If the lookup of the byte_bus_id in the context of the
+stream_id does not point to an Endpoint, the request is dropped without
+further notification." `mock.c`'s `find_slot()`/`find_slot_const()`
+looked up an endpoint by `byte_bus_id` alone, with no `stream_id`
+parameter at all, and `rcp_mock_server_add_endpoint()` rejected
+registering a second endpoint under any `byte_bus_id` already in use
+anywhere on the server -- one flat, server-wide namespace, not the
+stream-scoped one this sentence requires. `.fusa-reqs.json`'s own
+`REQ-MOCK-030` entry already quoted this exact clause in its `tc18`
+citation field (added closing out issue #256 Group H, which fixed only
+the response-shape half of the same sentence), leaving a live,
+previously-tracked-but-unimplemented gap between the citation and the
+code.
+
+Fixed following this codebase's established "new function, not a
+breaking change" pattern: a new `find_slot_on_stream(srv, stream_id,
+byte_bus_id)` (`mock.c`, static) matches a slot registered via the
+plain, existing `rcp_mock_server_add_endpoint()` against *any*
+stream_id (`stream_scoped == false`, every slot's zero-init default,
+reproducing that call's exact pre-existing global-uniqueness behavior
+unchanged), or matches a slot registered via the new
+`rcp_mock_server_add_endpoint_on_stream(srv, stream_id, byte_bus_id,
+...)` (`mock.h`/`mock.c`) only when the request's own stream_id equals
+that slot's recorded stream_id -- letting the SAME `byte_bus_id`
+validly address two different endpoints registered on two different
+`stream_id`s, exactly what §12.9.1 requires and the old flat namespace
+could never permit.
+
+Every real dispatch entry point that already carries a `stream_id` of
+its own now resolves the addressed endpoint through this stream-scoped
+lookup instead of the byte_bus_id-only `find_slot()`:
+`dispatch_plain_inner()` (the shared body behind
+`rcp_mock_server_dispatch()`/`_dispatch_tscf()`/the `_dispatch_e2e()`
+non-CRC delegation path), `rcp_mock_server_dispatch_multi_response()`,
+the "plain command mode" `req_crc_enable` check in both
+`rcp_mock_server_dispatch_e2e()` and `_dispatch_e2e_fragment()`, and the
+post-dispatch `RCP_MOCK_DISPATCH_PENDING` chain-group bookkeeping
+re-lookup inside `rcp_mock_server_dispatch_frame()`/
+`_dispatch_frame_e2e()` -- deliberately fixed alongside the primary
+dispatch path, since re-finding the just-dispatched slot with a plain,
+scope-ignorant lookup there could otherwise land on the WRONG slot's
+own queue once two different stream_ids are allowed to share one
+byte_bus_id. The ~100+ existing byte_bus_id-only call sites with no
+per-request stream_id in scope at all (`rcp_mock_server_remove_
+endpoint()`, `_set_endpoint_enable()`, `_endpoint_queue_len()`,
+`_drain_endpoint()`, `_stash_deferred_response()`, `_tick()`,
+`_watchdog_purge()`, etc.) are unchanged, matching their own existing,
+documented byte_bus_id-only accessor contracts -- `rcp_mock_server_
+add_endpoint()` itself is untouched too, so every one of its own
+existing callers keeps its exact prior behavior.
+
+New `.fusa-reqs.json` entry `REQ-MOCK-031` (`implemented`, citing
+§12.9.1 directly); `REQ-MOCK-030`'s own text tightened to reference
+`find_slot_on_stream()` and note the stream-scoping half of its own
+already-quoted sentence is now genuinely honored. New tests in
+`tests/test_mock.c`: three registration-level tests (`add_endpoint_
+on_stream` allows the same `byte_bus_id` on two different `stream_id`s,
+rejects a true same-stream duplicate, and rejects colliding with an
+already-registered unscoped endpoint) plus the real proof at the
+dispatch layer -- two endpoints sharing one `byte_bus_id`, one per
+`stream_id`, each wired to `echo_handler()` with a distinct `user_data`
+marker: a request on stream A reaches marker A's slot, the identically-
+addressed request on stream B reaches marker B's slot, and a third,
+unregistered `stream_id` is dropped (`RCP_MOCK_DISPATCH_ERR_UNKNOWN_
+BUS`) rather than silently landing on either real slot.
+
+Mutation-tested: reverting only `find_slot_on_stream()`'s own body to
+ignore `stream_id` (falling back to plain `find_slot()`, leaving the
+new tests in place) made exactly the two new tests exercising the
+routing behavior fail (`Expected 0 Was 1`, i.e. the second same-
+byte_bus_id registration wrongly rejected as a duplicate again),
+confirming they exercise the real defect; the fix was then restored
+from a separate backup copy. Full 66-test suite + ASan/UBSan clean;
+`cfusa check`/`trace` (v0.5.54): 0 errors, 1086/1086 traced and tested
+(up from 1085).
+
 ### v0.359.0 -- 2026-08-14 (TC18 §13.3 request validation: config-dependent
 ignore-vs-drop, reserved-bytes-all-zero-queues-as-NTSCF, tu=1/tu=0 equivalence)
 

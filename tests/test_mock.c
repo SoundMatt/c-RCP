@@ -20,6 +20,7 @@
 //cfusa:test REQ-MOCK-019
 //cfusa:test REQ-MOCK-020
 //cfusa:test REQ-MOCK-030
+//cfusa:test REQ-MOCK-031
 //cfusa:test REQ-WDG-010
 //cfusa:test REQ-AVTP-021
 //cfusa:test REQ-AVTP-022
@@ -180,6 +181,65 @@ static void test_add_endpoint_capacity_exhausted(void)
     }
     TEST_ASSERT_EQUAL(RCP_MOCK_ERR_CAPACITY,
         rcp_mock_server_add_endpoint(srv, (rcp_byte_bus_id_t)RCP_MOCK_MAX_ENDPOINTS, 1, true, NULL, NULL));
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── REQ-MOCK-031 (TC18 §12.9.1, issue #432): stream-scoped byte_bus_id
+ * lookup ─────────────────────────────────────────────────────────────────
+ *
+ * "In dependence on the stream_id and byte_bus_id the RC Server
+ * determines the endpoint that is addressed." Proves the SAME
+ * byte_bus_id can validly address two DIFFERENT endpoints registered on
+ * two DIFFERENT stream_ids -- something rcp_mock_server_add_endpoint()'s
+ * own flat, server-wide namespace could never permit (see
+ * test_add_endpoint_duplicate_bus_id_rejected() above, which stays
+ * correct and unaffected: that is exactly the guarantee callers of the
+ * plain, unscoped API still get). */
+
+#define STREAM_A ((uint64_t)0x1111111111111111ULL)
+#define STREAM_B ((uint64_t)0x2222222222222222ULL)
+#define STREAM_C ((uint64_t)0x3333333333333333ULL)
+
+static void test_add_endpoint_on_stream_allows_same_bus_id_on_different_streams(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+
+    /* Same byte_bus_id (5), two different stream_ids -- both succeed. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+        rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, NULL, NULL));
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+        rcp_mock_server_add_endpoint_on_stream(srv, STREAM_B, 5, 1, true, NULL, NULL));
+    TEST_ASSERT_EQUAL_UINT16(2, rcp_mock_server_regmap(srv)->svr_ep_count);
+
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_add_endpoint_on_stream_duplicate_on_same_stream_rejected(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+        rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, NULL, NULL));
+    /* Same byte_bus_id AND same stream_id -- still rejected. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_ERR_DUPLICATE_BUS_ID,
+        rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, NULL, NULL));
+    TEST_ASSERT_EQUAL_UINT16(1, rcp_mock_server_regmap(srv)->svr_ep_count);
+
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_add_endpoint_on_stream_rejected_when_unscoped_endpoint_already_registered(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+
+    /* An unscoped (plain add_endpoint()) slot at byte_bus_id 5 matches
+     * every stream_id -- registering a stream-scoped slot at the same
+     * byte_bus_id on ANY stream would make lookup ambiguous, so it is
+     * rejected exactly like a same-stream duplicate. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 5, 1, true, NULL, NULL));
+    TEST_ASSERT_EQUAL(RCP_MOCK_ERR_DUPLICATE_BUS_ID,
+        rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, NULL, NULL));
 
     rcp_mock_server_destroy(srv);
 }
@@ -857,6 +917,72 @@ static void test_dispatch_ok_runs_handler_immediately(void)
     TEST_ASSERT_EQUAL_UINT8_ARRAY(req, resp.data, sizeof(req));
 
     rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── REQ-MOCK-031 (TC18 §12.9.1, issue #432): stream-scoped byte_bus_id
+ * lookup at dispatch time ───────────────────────────────────────────────
+ *
+ * The real proof: two endpoints sharing byte_bus_id 5, one on STREAM_A
+ * and one on STREAM_B, each carrying a distinct user_data marker --
+ * echo_handler() (this file's shared handler, above) records the marker
+ * it was actually invoked with, so a request declaring STREAM_A must
+ * reach marker_a's slot and a request declaring STREAM_B must reach
+ * marker_b's slot, never the other one. A request declaring an entirely
+ * different stream_id (STREAM_C, no endpoint registered for it) must be
+ * dropped exactly as TC18 §12.9.1 requires for an unresolvable
+ * (stream_id, byte_bus_id) lookup -- not accidentally routed to either
+ * real slot. See test_add_endpoint_on_stream_allows_same_bus_id_on_
+ * different_streams() etc. (above) for the registration-level half of
+ * this same guarantee. */
+static void test_dispatch_stream_scoped_endpoints_route_by_stream_id(void)
+{
+    rcp_mock_server_t *srv      = rcp_mock_server_new();
+    rcp_bytes_t         resp    = {0};
+    const uint8_t        req[]   = {0xAA};
+    int                  marker_a = 1;
+    int                  marker_b = 2;
+
+    to_rcp_configured(srv); /* any byte_bus_id passes lifecycle admission now */
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+        rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, echo_handler,
+                                                &marker_a));
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+        rcp_mock_server_add_endpoint_on_stream(srv, STREAM_B, 5, 1, true, echo_handler,
+                                                &marker_b));
+
+    /* A request on STREAM_A addressed at byte_bus_id 5 reaches marker_a's
+     * slot, not marker_b's. */
+    reset_handler_capture();
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  STREAM_A, req, sizeof(req), &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    TEST_ASSERT_EQUAL_PTR(&marker_a, g_seen_user_data);
+    rcp_bytes_free(&resp);
+
+    /* The identically-addressed request on STREAM_B reaches marker_b's
+     * slot instead -- same byte_bus_id, disambiguated purely by
+     * stream_id. */
+    reset_handler_capture();
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  STREAM_B, req, sizeof(req), &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    TEST_ASSERT_EQUAL_PTR(&marker_b, g_seen_user_data);
+    rcp_bytes_free(&resp);
+
+    /* A third stream_id with no endpoint registered at byte_bus_id 5 on
+     * it is dropped -- TC18 §12.9.1's own "does not point to an
+     * Endpoint" case -- not silently routed to either real slot. */
+    reset_handler_capture();
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS,
+        rcp_mock_server_dispatch(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  STREAM_C, req, sizeof(req), &resp));
+    TEST_ASSERT_FALSE(g_handler_called);
+    TEST_ASSERT_NULL(resp.data);
+
     rcp_mock_server_destroy(srv);
 }
 
@@ -1928,6 +2054,9 @@ int main(void)
     RUN_TEST(test_add_endpoint_increments_svr_ep_count);
     RUN_TEST(test_add_endpoint_duplicate_bus_id_rejected);
     RUN_TEST(test_add_endpoint_capacity_exhausted);
+    RUN_TEST(test_add_endpoint_on_stream_allows_same_bus_id_on_different_streams);
+    RUN_TEST(test_add_endpoint_on_stream_duplicate_on_same_stream_rejected);
+    RUN_TEST(test_add_endpoint_on_stream_rejected_when_unscoped_endpoint_already_registered);
     RUN_TEST(test_remove_endpoint_decrements_svr_ep_count);
     RUN_TEST(test_remove_endpoint_unknown_bus_returns_false);
     RUN_TEST(test_readd_after_remove_succeeds);
@@ -1953,6 +2082,7 @@ int main(void)
     RUN_TEST(test_dispatch_unknown_bus_after_lifecycle_accepts);
     RUN_TEST(test_dispatch_unknown_bus_is_dropped_silently);
     RUN_TEST(test_dispatch_ok_runs_handler_immediately);
+    RUN_TEST(test_dispatch_stream_scoped_endpoints_route_by_stream_id);
     RUN_TEST(test_response_suppressed_when_rx_resp_stream_index_is_zero);
     RUN_TEST(test_response_not_suppressed_when_rx_resp_stream_index_is_nonzero);
     RUN_TEST(test_response_not_suppressed_for_unresolvable_stream);
