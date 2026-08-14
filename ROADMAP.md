@@ -19043,3 +19043,40 @@ scope. 4 new tests, every core-logic change mutation-tested. Full
 0 errors, 0/1076 untested.
 
 **Next**: PR D, ADC/GPIO/ISELED mock.c dispatch wiring.
+
+### v0.324.0 -- 2026-08-13 (tc18-gap backlog PR D: REQ-GPIO-035/036
+real dispatch wiring)
+
+Fourth PR of the 42-item `scope: "tc18-gap"` backlog (issue #336),
+scoped to GPIO only -- ADC/ISELED deferred to a focused follow-up.
+
+Architecture finding: mock.c's own file header states, deliberately,
+that it owns none of the per-endpoint wire semantics itself and
+never calls into ep_gpio.c or any sibling directly -- a caller
+registers one handler per byte_bus_id. Building real per-endpoint
+dispatch INTO mock.c itself would have contradicted this. Closing
+"no real dispatch path calls this primitive" instead means proving
+a real caller -- exactly the kind mock.c's own header describes --
+exercises the primitive through mock.c's existing, unmodified
+dispatch path.
+
+Both REQ-GPIO-035/036 closed to a dispatch-level test fixture
+(test_tc18_gaps_ep.c's new gpio_dispatch_handler(), an
+rcp_mock_endpoint_handler_fn registered via the existing
+rcp_mock_server_add_endpoint()), not new public API. Both stay
+`partial` (honestly): GPIO-035's gpio_base_clk still always renders
+0 (the real periodic sampling cadence source, an architecture-wide
+constant already established for every endpoint type); GPIO-036's
+classifier is now consulted and honored, but mock.c's dispatch model
+is entirely synchronous with no timer/delayed-response concept --
+actually waiting the debounce time needs a genuinely new mechanism,
+left open.
+
+3 new tests, every assertion mutation-tested (one case -- a
+debounce_n mix-up -- wasn't caught by the first draft, only after
+strengthening the assertion to check after every write). Full
+66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51):
+0 errors, 0/1076 untested.
+
+**Next**: ADC/ISELED mock.c dispatch wiring (REQ-ADC-037,
+REQ-ISELED-025), same pattern as GPIO above.

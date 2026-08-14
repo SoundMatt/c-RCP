@@ -57,6 +57,7 @@
 #include <rcp/ep_wakeup.h>
 #include <rcp/errors.h>
 #include <rcp/lifecycle.h>
+#include <rcp/mock.h>
 #include <rcp/power.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
@@ -68,6 +69,47 @@
 
 void setUp(void) {}
 void tearDown(void) {}
+
+/* ── Shared mock.c dispatch fixture (issue #338, PR D) ─────────────────────
+ *
+ * mock.c's own file header states its design deliberately: "This module
+ * owns none of the per-endpoint wire semantics itself (it never calls into
+ * ep_gpio.c or any sibling directly) -- a caller registers one handler per
+ * byte_bus_id, and that handler is free to use whichever ep_*.h... encode/
+ * decode functions it is testing." Closing "no real dispatch path calls
+ * this primitive yet" (REQ-GPIO-035/036's own text) therefore does NOT mean
+ * modifying mock.c itself -- that would contradict its own stated
+ * architecture -- it means proving a REAL caller (this test file, acting as
+ * exactly the kind of caller that header describes) exercises the
+ * primitive through mock.c's existing, unmodified dispatch path. */
+static const rcp_lifecycle_plausibility_snapshot_t GAP_EMPTY_SNAP = {NULL, 0, NULL, 0};
+
+/* Any byte_bus_id passes rcp_lifecycle_should_accept() once HW_CONFIGURED
+ * -- see lifecycle.h's own rule; a plain-{0} writer is correct for this
+ * specific transition (HW_UNCONFIGURED -> HW_CONFIGURED does not consult
+ * one), matching test_tc18_gaps_e2e.c's own identical to_hw_configured(). */
+static void gap_to_hw_configured(rcp_mock_server_t *srv)
+{
+    rcp_lifecycle_writer_ctx_t none = {0};
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                      rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &GAP_EMPTY_SNAP,
+                                                 none, true));
+}
+
+/* HW_CONFIGURED only accepts EP0 traffic (TC18 §12.3.1.2) -- a non-EP0
+ * byte_bus_id needs RCP_CONFIGURED, matching test_tc18_gaps_e2e.c's own
+ * identical to_rcp_configured(). GAP_EMPTY_SNAP's zero endpoint/request-
+ * stream counts trivially satisfy both plausibility checks. */
+static void gap_to_rcp_configured(rcp_mock_server_t *srv)
+{
+    rcp_lifecycle_writer_ctx_t root = {true, false, false, false};
+
+    gap_to_hw_configured(srv);
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                      rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &GAP_EMPTY_SNAP,
+                                                 root, true));
+}
 
 /* ── ACF byte_message_info (TC18 11.2.1 Table 4 / 11.2.2.1 Table 6) ───────── */
 
@@ -344,10 +386,14 @@ static void test_gpio_wire_error_is_none_for_local_only_codes(void)
  * REQ-GPIO-035 (partial) DEVIATION PIN: FIXED 2026-08-11 (issue #256 Group
  * G, REQ-GPIO-013) as far as storage goes -- ep_status/clk_divider/
  * debounce[32] now exist and are wire-addressable via the real EP_func
- * mechanism (see ep_gpio.h's own file header). Still not implemented:
- * gpio_base_clk always renders 0 (this module defines no real GPIO clock
- * source), and no debounce FILTERING logic exists anywhere -- the
- * registers hold values but nothing samples against them. */
+ * mechanism (see ep_gpio.h's own file header). FIXED 2026-08-13 (issue
+ * #336): rcp_ep_gpio_debounce_sample() now implements the filtering rule
+ * itself -- test_ep_gpio.c's own dedicated tests cover it directly, and
+ * test_gpio_dispatch_debounces_writes_before_reporting_settled_value()
+ * (below) proves a real mock.c dispatch path exercises it. Still not
+ * implemented: gpio_base_clk always renders 0 (this module defines no
+ * real GPIO clock source, the same architecture-wide constant every other
+ * endpoint type's own base_clk field already establishes). */
 static void test_gpio_trigger_numbering_and_functional_cfg_gaps(void)
 {
     rcp_ep_gpio_functional_cfg_t cfg;
@@ -420,50 +466,188 @@ static void test_gpio_trigger_signal_numbering(void)
     TEST_ASSERT_FALSE(rcp_ep_gpio_trigger_signal_number(0u, RCP_EP_GPIO_TRIGGER_NONE, &signal));
 }
 
-/* REQ-GPIO-036 (not-implemented) DEVIATION PIN: TC18 13.7.4.3 makes GPIO
- * response timing depend on the request -- a read carrying no
- * byte_msg_payload responds immediately on execution, while a payload-bearing
- * read or any write first drives the pins and only responds once the
- * configured debounce time has elapsed. c-RCP models no debounce and no
- * response delay: the payload-less read and the 4-octet write differ only in
- * their payload length, and both are answered through the same untimed
- * response path. */
-static void test_gpio_response_timing_is_not_modelled(void)
+/* FIXED 2026-08-13 (issue #336, REQ-GPIO-036): rcp_ep_gpio_response_timing()
+ * is now the real classifier TC18 13.7.4.3 requires -- a pure read (no
+ * byte_msg_payload) is immediate; a payload-bearing read or any write
+ * requires waiting the configured debounce time before responding. This
+ * test used to pin the deviation ("c-RCP models no debounce and no
+ * response delay"); per this file's own established convention, a
+ * gap-pinning test that starts failing once the gap closes gets rewritten
+ * to the conforming expectation, not deleted. */
+static void test_gpio_response_timing_classifier_distinguishes_read_and_write(void)
 {
-    rcp_acf_byte_message_info_t hdr         = {0};
-    const uint8_t              *payload     = NULL;
-    size_t                      payload_len = 99u;
-    rcp_bytes_t                 frame;
-    uint32_t                    bitmask = 0;
-    uint64_t                    ts      = 7u;
-    bool                        timed   = true;
-    uint8_t                     tn      = 0;
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RESPONSE_IMMEDIATE,
+                      rcp_ep_gpio_response_timing(RCP_ACF_OP_READ, 0u));
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RESPONSE_AFTER_DEBOUNCE,
+                      rcp_ep_gpio_response_timing(RCP_ACF_OP_WRITE, RCP_EP_GPIO_PAYLOAD_LEN));
+}
 
-    frame = rcp_ep_gpio_encode_read_request(3u, 0x11u);
-    TEST_ASSERT_NOT_NULL(frame.data);
-    TEST_ASSERT_EQUAL(RCP_ACF_OK,
-                      rcp_acf_decode_abb(frame.data, frame.len, &hdr, &payload, &payload_len));
-    TEST_ASSERT_EQUAL_UINT(0u, payload_len); /* pure read: immediate per TC18 */
-    rcp_bytes_free(&frame);
+/* ── GPIO endpoint: real mock.c dispatch path (issue #336, PR D) ───────────
+ *
+ * gpio_dispatch_state_t/gpio_dispatch_handler() is this test file's own
+ * rcp_mock_endpoint_handler_fn -- exactly the kind of caller-supplied
+ * handler mock.h's own file header describes -- proving REQ-GPIO-035's
+ * debounce filter and REQ-GPIO-036's response-timing classifier are both
+ * reachable, and actually consulted, from a real dispatch() call, not
+ * merely correct in isolation. Bit 0 of the bitmask is the only pin this
+ * fixture debounces, to keep the two tests below minimal. */
+typedef struct {
+    rcp_ep_gpio_debounce_state_t debounce;
+    uint32_t                     settled_bitmask;
+    uint8_t                      debounce_n;
+} gpio_dispatch_state_t;
 
-    frame = rcp_ep_gpio_encode_write_request(3u, 0xDEADBEEFu, RCP_EP_GPIO_WRITE_REPLACE, 0x12u);
-    TEST_ASSERT_NOT_NULL(frame.data);
-    TEST_ASSERT_EQUAL(RCP_ACF_OK,
-                      rcp_acf_decode_abb(frame.data, frame.len, &hdr, &payload, &payload_len));
-    TEST_ASSERT_EQUAL_UINT(RCP_EP_GPIO_PAYLOAD_LEN, payload_len);
-    rcp_bytes_free(&frame);
+static void gpio_dispatch_handler(const uint8_t *request, size_t request_len,
+                                   rcp_bytes_t *out_response, void *user_data)
+{
+    gpio_dispatch_state_t      *st = (gpio_dispatch_state_t *)user_data;
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
 
-    /* The response the write is answered with carries no notion of the
-     * elapsed debounce interval a conforming endpoint would have waited. */
-    frame = rcp_ep_gpio_encode_response(3u, 0xDEADBEEFu, 0x12u, false, 0u);
-    TEST_ASSERT_NOT_NULL(frame.data);
+    if (rcp_acf_decode_abb(request, request_len, &hdr, &payload, &payload_len) != RCP_ACF_OK) return;
+
+    if (hdr.op == (uint8_t)RCP_ACF_OP_WRITE) {
+        uint32_t bitmask;
+        uint8_t  evt;
+        uint8_t  tn;
+
+        if (rcp_ep_gpio_decode_write_request(request, request_len, 3u, &bitmask, &evt,
+                                              &tn) != RCP_EP_GPIO_OK) {
+            return;
+        }
+
+        /* REQ-GPIO-035: the raw just-written bit 0 does not become the
+         * settled/reported value until it has been sampled n consecutive
+         * times -- this handler's own "sample" is simply "a write
+         * happened", the same one-sample-per-call cadence
+         * rcp_ep_gpio_debounce_sample()'s own doc comment already notes a
+         * caller-owned timer (gpio_base_clk/gpio_clk_divider) would
+         * normally drive independently of requests. */
+        if (rcp_ep_gpio_debounce_sample(&st->debounce, (bitmask & 1u) != 0, st->debounce_n, NULL)) {
+            st->settled_bitmask |= 1u;
+        } else {
+            st->settled_bitmask &= ~1u;
+        }
+
+        /* REQ-GPIO-036: a write always requires the debounce wait before
+         * responding -- this synchronous test double has no timer of its
+         * own to actually wait with, so it honors the classifier's real
+         * consequence the same way mock.h's own out_response convention
+         * already models an endpoint that hasn't answered yet: leaving
+         * *out_response zeroed (a fire-and-forget request, from this
+         * call's own point of view). */
+        TEST_ASSERT_EQUAL(RCP_EP_GPIO_RESPONSE_AFTER_DEBOUNCE,
+                          rcp_ep_gpio_response_timing((rcp_acf_op_t)hdr.op, payload_len));
+        return;
+    }
+
+    /* A pure read (op == READ, no payload -- the only shape
+     * rcp_ep_gpio_encode_read_request() ever produces): immediate,
+     * carrying the debounce filter's own current settled value. */
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_RESPONSE_IMMEDIATE,
+                      rcp_ep_gpio_response_timing((rcp_acf_op_t)hdr.op, payload_len));
+    *out_response = rcp_ep_gpio_encode_response(3u, st->settled_bitmask, hdr.transaction_num,
+                                                 false, 0u);
+}
+
+/* A pure read dispatched through mock.c gets an IMMEDIATE response --
+ * proving rcp_ep_gpio_response_timing() is reached and its IMMEDIATE
+ * outcome genuinely produces a response in the same dispatch() call. */
+static void test_gpio_dispatch_read_responds_immediately(void)
+{
+    rcp_mock_server_t     *srv = rcp_mock_server_new();
+    gpio_dispatch_state_t  st  = {0};
+    rcp_bytes_t             req;
+    rcp_bytes_t             resp = {0};
+    uint32_t                bitmask;
+    bool                    timed;
+    uint64_t                ts;
+    uint8_t                 tn;
+
+    TEST_ASSERT_NOT_NULL(srv);
+    gap_to_rcp_configured(srv);
+    rcp_ep_gpio_debounce_state_init(&st.debounce);
+    st.debounce_n = 3u;
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+                      rcp_mock_server_add_endpoint(srv, 3u, 0u, true, gpio_dispatch_handler, &st));
+
+    req = rcp_ep_gpio_encode_read_request(3u, 0x11u);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch(srv, 3u, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB,
+                                                true, 1u, req.data, req.len, &resp));
+    TEST_ASSERT_NOT_NULL(resp.data); /* a real response, produced in this same call */
     TEST_ASSERT_EQUAL(RCP_EP_GPIO_OK,
-                      rcp_ep_gpio_decode_response(frame.data, frame.len, 3u, &bitmask, &timed, &ts,
-                                                  &tn));
-    TEST_ASSERT_FALSE(timed);
-    TEST_ASSERT_EQUAL_UINT64(0u, ts);
-    TEST_ASSERT_EQUAL_HEX32(0xDEADBEEFu, bitmask);
-    rcp_bytes_free(&frame);
+                      rcp_ep_gpio_decode_response(resp.data, resp.len, 3u, &bitmask, &timed, &ts, &tn));
+    TEST_ASSERT_EQUAL_HEX32(0u, bitmask); /* nothing settled yet */
+    TEST_ASSERT_EQUAL_UINT8(0x11u, tn);
+
+    rcp_bytes_free(&req);
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-GPIO-035/036 together, through a real dispatch path: three writes
+ * of the SAME raw value (n=3) don't settle -- and, per REQ-GPIO-036,
+ * don't respond synchronously either -- until the third one; a
+ * subsequent pure read then reports the newly-settled value, not the
+ * raw one any single write carried. */
+static void test_gpio_dispatch_debounces_writes_before_reporting_settled_value(void)
+{
+    rcp_mock_server_t     *srv = rcp_mock_server_new();
+    gpio_dispatch_state_t  st  = {0};
+    rcp_bytes_t             req;
+    rcp_bytes_t             resp = {0};
+    uint32_t                bitmask;
+    bool                    timed;
+    uint64_t                ts;
+    uint8_t                 tn;
+    int                     i;
+
+    TEST_ASSERT_NOT_NULL(srv);
+    gap_to_rcp_configured(srv);
+    rcp_ep_gpio_debounce_state_init(&st.debounce);
+    st.debounce_n = 3u;
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+                      rcp_mock_server_add_endpoint(srv, 3u, 0u, true, gpio_dispatch_handler, &st));
+
+    /* Three writes of bit 0 = 1: none produce a response (REQ-GPIO-036,
+     * every write is AFTER_DEBOUNCE), and only the third one settles
+     * (REQ-GPIO-035, n=3) -- checked after every single write, not just
+     * at the end, so a debounce_n mix-up (e.g. settling after the 1st or
+     * 2nd write) is caught, not just "settled by the 3rd or later". */
+    for (i = 0; i < 3; i++) {
+        req = rcp_ep_gpio_encode_write_request(3u, 1u, RCP_EP_GPIO_WRITE_REPLACE, 0x20u);
+        TEST_ASSERT_NOT_NULL(req.data);
+        TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                          rcp_mock_server_dispatch(srv, 3u, RCP_AVTP_SUBTYPE_NTSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, 1u, req.data,
+                                                    req.len, &resp));
+        TEST_ASSERT_NULL(resp.data); /* no synchronous response for any write */
+        rcp_bytes_free(&req);
+
+        if (i < 2) {
+            TEST_ASSERT_EQUAL_HEX32(0u, st.settled_bitmask); /* not yet settled */
+        } else {
+            TEST_ASSERT_EQUAL_HEX32(1u, st.settled_bitmask); /* settled on exactly the 3rd */
+        }
+    }
+
+    /* A pure read now reports the newly-settled value. */
+    req = rcp_ep_gpio_encode_read_request(3u, 0x21u);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch(srv, 3u, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB,
+                                                true, 1u, req.data, req.len, &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_OK,
+                      rcp_ep_gpio_decode_response(resp.data, resp.len, 3u, &bitmask, &timed, &ts, &tn));
+    TEST_ASSERT_EQUAL_HEX32(1u, bitmask);
+    rcp_bytes_free(&req);
+    rcp_bytes_free(&resp);
+
+    rcp_mock_server_destroy(srv);
 }
 
 /* ── SPI endpoint (TC18 13.7.3) ───────────────────────────────────────────── */
@@ -1703,7 +1887,9 @@ int main(void)
     RUN_TEST(test_gpio_wire_error_is_none_for_local_only_codes);
     RUN_TEST(test_gpio_trigger_numbering_and_functional_cfg_gaps);
     RUN_TEST(test_gpio_trigger_signal_numbering);
-    RUN_TEST(test_gpio_response_timing_is_not_modelled);
+    RUN_TEST(test_gpio_response_timing_classifier_distinguishes_read_and_write);
+    RUN_TEST(test_gpio_dispatch_read_responds_immediately);
+    RUN_TEST(test_gpio_dispatch_debounces_writes_before_reporting_settled_value);
 
     RUN_TEST(test_spi_six_channels_selected_by_evt);
     RUN_TEST(test_spi_trigger_numbering_and_channel_cfg_full);

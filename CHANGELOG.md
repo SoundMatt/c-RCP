@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.324.0 -- 2026-08-13 (tc18-gap backlog PR D: REQ-GPIO-035/036 real dispatch wiring)
+
+Fourth PR of the 42-item `scope: "tc18-gap"` backlog (issue #336), scoped to GPIO only — ADC/ISELED (the other two items originally bundled under "mock.c dispatch wiring") are deferred to a focused follow-up.
+
+**Architecture finding**: `mock.c`'s own file header states, deliberately: *"This module owns none of the per-endpoint wire semantics itself (it never calls into ep_gpio.c or any sibling directly) — a caller registers one handler per byte_bus_id, and that handler is free to use whichever ep_*.h... encode/decode functions it is testing."* Building real per-endpoint-type dispatch **into** `mock.c` itself would have contradicted this stated architecture. Closing "no real dispatch path calls this primitive" instead means proving a real caller — exactly the kind `mock.c`'s own header describes — exercises the primitive through `mock.c`'s existing, **unmodified** dispatch path.
+
+**Both closed to a dispatch-level test fixture, not new public API**: `test_tc18_gaps_ep.c`'s new `gpio_dispatch_handler()` (an `rcp_mock_endpoint_handler_fn` registered via the existing `rcp_mock_server_add_endpoint()`) decodes GPIO requests, calls `rcp_ep_gpio_debounce_sample()` (`REQ-GPIO-035`) and `rcp_ep_gpio_response_timing()` (`REQ-GPIO-036`), and honors both results end-to-end through a real `rcp_mock_server_dispatch()` call. Three new tests: a classifier unit check, a pure-read-gets-immediate-response proof, and a three-writes-settle-only-on-the-third proof (checked after every write, not just at the end — a debounce-threshold mix-up is caught, not just "eventually settled"). Two now-stale deviation-pin tests rewritten to the conforming expectation.
+
+**Both stay `partial`** (honestly, deliberately): `REQ-GPIO-035`'s `gpio_base_clk` (the real periodic sampling cadence source) still always renders 0, the same architecture-wide constant already established for every endpoint type's own base clock; `REQ-GPIO-036`'s classifier is now consulted and honored, but `mock.c`'s dispatch model is entirely synchronous with no timer/delayed-response concept — actually *waiting* the debounce time and then responding (as opposed to just skipping the response this call) needs a genuinely new mechanism, left open.
+
+Every new assertion's real gating verified via mutation testing — including one case (a `debounce_n` mix-up) the test's first draft failed to catch, caught only after strengthening the assertion to check after every write, not just the final state. Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
+
 ### v0.323.0 -- 2026-08-13 (tc18-gap backlog PR C: REQ-TIMED-012/013 TSCF presentation-time admission machinery)
 
 Third PR of the 42-item `scope: "tc18-gap"` backlog (issue #336). `REQ-TIMED-012`'s admission/due-selection machinery CLOSED; `REQ-TIMED-012`/`REQ-TIMED-013` both stay `partial` (honestly, deliberately) pending a real dispatch-layer caller.
