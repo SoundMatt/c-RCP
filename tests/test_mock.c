@@ -21,6 +21,9 @@
 //cfusa:test REQ-MOCK-020
 //cfusa:test REQ-MOCK-030
 //cfusa:test REQ-WDG-010
+//cfusa:test REQ-AVTP-021
+//cfusa:test REQ-AVTP-022
+//cfusa:test REQ-AVTP-023
 /* Tests the TC18-shaped RC-Server/endpoint test double (ROADMAP.md
  * milestone 77). The pre-TC18 zone-controller mock this file used to test
  * moved to tests/legacy_mock.h/.c; tests/test_legacy_mock.c (a renamed
@@ -535,7 +538,8 @@ static void test_dispatch_tscf_with_tv_false_behaves_like_plain_dispatch(void)
 
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
         rcp_mock_server_dispatch_tscf(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
-                                       false, 0xFFFFFFFFu, 0xFFFFFFFFFFu, req, sizeof(req), &resp));
+                                       false, 0xFFFFFFFFu, false, 0xFFFFFFFFFFu, req, sizeof(req),
+                                       &resp));
 
     rcp_bytes_free(&resp);
     rcp_mock_server_destroy(srv);
@@ -562,10 +566,238 @@ static void test_dispatch_tscf_with_tv_true_postpones_a_standard_request(void)
 
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
         rcp_mock_server_dispatch_tscf(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
-                                       true, 1000000u, 0u, req, sizeof(req), &resp));
+                                       true, 1000000u, false, 0u, req, sizeof(req), &resp));
     TEST_ASSERT_NULL(resp.data); /* nothing ran -- no response yet */
 
     rcp_mock_server_destroy(srv);
+}
+
+/* ── §13.3 unsupported-time-sync configurable rule (REQ-AVTP-021, issue
+ * #431) ─────────────────────────────────────────────────────────────────── */
+
+/* Default policy (RCP_AVTP_TSCF_FALLBACK_DROP): unchanged from this
+ * library's pre-issue-#431 behavior -- a TSCF frame with
+ * time_sync_supported=false is still dropped outright, whatever tv/
+ * avtp_timestamp it carries. */
+static void test_dispatch_tscf_drops_without_time_sync_and_policy_is_drop(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t       req[] = {1, 2, 3};
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1, 5, true, NULL, NULL));
+    to_rcp_configured(srv);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_DROPPED,
+        rcp_mock_server_dispatch_tscf(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB,
+                                       false /* time_sync_supported */, 1u, true, 1000000u, false,
+                                       0u, req, sizeof(req), &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* RCP_AVTP_TSCF_FALLBACK_IGNORE: the SAME time_sync_supported=false/tv=
+ * true/far-future avtp_timestamp inputs as the DROP test above -- no
+ * longer dropped, and (TC18 §13.3's own "executed as if no presentation
+ * time were included" wording) no longer postponed either: the request
+ * executes immediately (RCP_MOCK_DISPATCH_OK), not RCP_MOCK_DISPATCH_
+ * PENDING the way test_dispatch_tscf_with_tv_true_postpones_a_standard_
+ * request() proves this exact same tv/avtp_timestamp pair produces when
+ * time_sync_supported is true instead. */
+static void test_dispatch_tscf_executes_immediately_without_time_sync_when_policy_is_ignore(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t       req[] = {1, 2, 3};
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1, 5, true, NULL, NULL));
+    to_rcp_configured(srv);
+    rcp_mock_server_set_tscf_unsupported_time_sync_policy(srv, RCP_AVTP_TSCF_FALLBACK_IGNORE);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch_tscf(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB,
+                                       false /* time_sync_supported */, 1u, true, 1000000u, false,
+                                       0u, req, sizeof(req), &resp));
+
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
+}
+
+/* time_sync_supported=true is completely unaffected by this policy --
+ * rule 1's own trigger condition never holds in the first place, so
+ * IGNORE changes nothing versus the ordinary (time-sync-supported)
+ * behavior test_dispatch_tscf_with_tv_true_postpones_a_standard_request()
+ * already pins. */
+static void test_dispatch_tscf_policy_is_ignore_irrelevant_when_time_sync_supported(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t       req[] = {1, 2, 3};
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1, 5, true, NULL, NULL));
+    to_rcp_configured(srv);
+    rcp_mock_server_set_tscf_unsupported_time_sync_policy(srv, RCP_AVTP_TSCF_FALLBACK_IGNORE);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+        rcp_mock_server_dispatch_tscf(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB,
+                                       true /* time_sync_supported */, 1u, true, 1000000u, false,
+                                       0u, req, sizeof(req), &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── §13.3 reserved-bytes-all-zero rule (REQ-AVTP-022, issue #431) ────────── */
+
+/* Default policy (RCP_AVTP_TSCF_FALLBACK_DROP, the same default every
+ * rcp_mock_server_t starts with): tscf_reserved_all_zero=true drops the
+ * frame outright, exactly reproducing this library's pre-issue-#431
+ * disposition (no such parameter existed at all before this fix) for a
+ * caller that never opts in. */
+static void test_dispatch_tscf_drops_when_reserved_all_zero_and_policy_is_drop(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t       req[] = {1, 2, 3};
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1, 5, true, NULL, NULL));
+    to_rcp_configured(srv);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_DROPPED,
+        rcp_mock_server_dispatch_tscf(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
+                                       false, 0u, true, 0u, req, sizeof(req), &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* RCP_AVTP_TSCF_FALLBACK_IGNORE: the SAME tscf_reserved_all_zero=true
+ * input as the DROP test above, but now processed as if avtp_subtype had
+ * genuinely been RCP_AVTP_SUBTYPE_NTSCF all along -- a standard request
+ * to an enabled endpoint therefore executes immediately
+ * (RCP_MOCK_DISPATCH_OK), the same outcome
+ * test_dispatch_tscf_with_tv_false_behaves_like_plain_dispatch() above
+ * already proves for a genuinely-NTSCF-equivalent request, isolating
+ * this rule's own IGNORE-side effect from every other behavior. */
+static void test_dispatch_tscf_processes_as_ntscf_when_reserved_all_zero_and_policy_is_ignore(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t       req[] = {1, 2, 3};
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1, 5, true, NULL, NULL));
+    to_rcp_configured(srv);
+    rcp_mock_server_set_tscf_unsupported_time_sync_policy(srv, RCP_AVTP_TSCF_FALLBACK_IGNORE);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch_tscf(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
+                                       false, 0u, true, 0u, req, sizeof(req), &resp));
+
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
+}
+
+/* RCP_AVTP_TSCF_FALLBACK_IGNORE's own full-NTSCF substitution overrides
+ * tv too, not just avtp_subtype -- a tv=true/far-future avtp_timestamp
+ * that would otherwise postpone this exact same standard request
+ * (test_dispatch_tscf_with_tv_true_postpones_a_standard_request above)
+ * is disregarded once tscf_reserved_all_zero triggers the substitution:
+ * the request still executes immediately, not RCP_MOCK_DISPATCH_PENDING. */
+static void test_dispatch_tscf_reserved_all_zero_ignore_forces_tv_false(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t       req[] = {1, 2, 3};
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1, 5, true, NULL, NULL));
+    to_rcp_configured(srv);
+    rcp_mock_server_set_tscf_unsupported_time_sync_policy(srv, RCP_AVTP_TSCF_FALLBACK_IGNORE);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch_tscf(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
+                                       true, 1000000u, true, 0u, req, sizeof(req), &resp));
+
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
+}
+
+/* tscf_reserved_all_zero=false (the ordinary, conformant case) is
+ * completely unaffected by this rule, whatever policy is configured --
+ * proving the rule only fires when the caller's own decoded header
+ * actually earns it. */
+static void test_dispatch_tscf_unaffected_when_reserved_not_all_zero(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t       req[] = {1, 2, 3};
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1, 5, true, NULL, NULL));
+    to_rcp_configured(srv);
+    rcp_mock_server_set_tscf_unsupported_time_sync_policy(srv, RCP_AVTP_TSCF_FALLBACK_DROP);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch_tscf(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
+                                       false, 0u, false, 0u, req, sizeof(req), &resp));
+
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── §13.3 tu=1/tu=0 equivalence (REQ-AVTP-023, issue #431) ────────────────── */
+
+/* rcp_mock_server_dispatch_tscf() takes no tu parameter at all -- by
+ * construction, there is no separate tu=1 code path for it to diverge
+ * from tu=0's. This test makes that deliberate equivalence directly
+ * observable: two byte-identical TSCF wire frames, differing ONLY in
+ * their own tu bit, are each decoded (rcp_avtp_decode_tscf()) and then
+ * dispatched through this same entry point using only the decoded
+ * tv/avtp_timestamp fields (never tu) -- both produce the identical
+ * outcome, proving tu=1 really is executed as if tu=0, TC18 §13.3's own
+ * third rule, not merely assumed to be from tu's absence as a parameter. */
+static void test_dispatch_tscf_tu_one_and_tu_zero_produce_identical_outcome(void)
+{
+    uint8_t                 wire_tu0[RCP_AVTP_TSCF_HEADER_LEN] = {0};
+    uint8_t                 wire_tu1[RCP_AVTP_TSCF_HEADER_LEN] = {0};
+    rcp_avtp_tscf_header_t  hdr_tu0, hdr_tu1;
+    const uint8_t          *payload_tu0, *payload_tu1;
+    size_t                  payload_len_tu0, payload_len_tu1;
+    rcp_mock_server_t      *srv0 = rcp_mock_server_new();
+    rcp_mock_server_t      *srv1 = rcp_mock_server_new();
+    rcp_bytes_t             resp0 = {0}, resp1 = {0};
+    rcp_mock_dispatch_result_t r0, r1;
+    const uint8_t            req[] = {1, 2, 3};
+
+    wire_tu0[0] = wire_tu1[0] = RCP_AVTP_SUBTYPE_TSCF;
+    wire_tu0[1] = wire_tu1[1] = (uint8_t)(1u << 7); /* sv=1, tv=0 */
+    wire_tu1[3]               = 0x1u;               /* tu=1 -- the only byte that differs */
+
+    TEST_ASSERT_EQUAL(RCP_AVTP_OK, rcp_avtp_decode_tscf(wire_tu0, sizeof(wire_tu0), &hdr_tu0,
+                                                          &payload_tu0, &payload_len_tu0));
+    TEST_ASSERT_EQUAL(RCP_AVTP_OK, rcp_avtp_decode_tscf(wire_tu1, sizeof(wire_tu1), &hdr_tu1,
+                                                          &payload_tu1, &payload_len_tu1));
+    TEST_ASSERT_EQUAL(0u, hdr_tu0.tu);
+    TEST_ASSERT_EQUAL(1u, hdr_tu1.tu); /* decode itself still tells them apart */
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv0, 1, 5, true, NULL, NULL));
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv1, 1, 5, true, NULL, NULL));
+    to_rcp_configured(srv0);
+    to_rcp_configured(srv1);
+
+    r0 = rcp_mock_server_dispatch_tscf(srv0, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                        1u, hdr_tu0.tv != 0, hdr_tu0.avtp_timestamp, false, 0u, req,
+                                        sizeof(req), &resp0);
+    r1 = rcp_mock_server_dispatch_tscf(srv1, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                        1u, hdr_tu1.tv != 0, hdr_tu1.avtp_timestamp, false, 0u, req,
+                                        sizeof(req), &resp1);
+
+    TEST_ASSERT_EQUAL(r0, r1);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, r0);
+
+    rcp_bytes_free(&resp0);
+    rcp_bytes_free(&resp1);
+    rcp_mock_server_destroy(srv0);
+    rcp_mock_server_destroy(srv1);
 }
 
 /* TC18 §12.9.1: "If the lookup of the byte_bus_id in the context of the
@@ -1703,6 +1935,14 @@ int main(void)
     RUN_TEST(test_queue_len_unknown_bus_is_zero);
     RUN_TEST(test_dispatch_tscf_with_tv_false_behaves_like_plain_dispatch);
     RUN_TEST(test_dispatch_tscf_with_tv_true_postpones_a_standard_request);
+    RUN_TEST(test_dispatch_tscf_drops_without_time_sync_and_policy_is_drop);
+    RUN_TEST(test_dispatch_tscf_executes_immediately_without_time_sync_when_policy_is_ignore);
+    RUN_TEST(test_dispatch_tscf_policy_is_ignore_irrelevant_when_time_sync_supported);
+    RUN_TEST(test_dispatch_tscf_drops_when_reserved_all_zero_and_policy_is_drop);
+    RUN_TEST(test_dispatch_tscf_processes_as_ntscf_when_reserved_all_zero_and_policy_is_ignore);
+    RUN_TEST(test_dispatch_tscf_reserved_all_zero_ignore_forces_tv_false);
+    RUN_TEST(test_dispatch_tscf_unaffected_when_reserved_not_all_zero);
+    RUN_TEST(test_dispatch_tscf_tu_one_and_tu_zero_produce_identical_outcome);
 
     RUN_TEST(test_dispatch_dropped_by_lifecycle);
     RUN_TEST(test_dispatch_rejected_by_lifecycle_sends_request_rejected_error);

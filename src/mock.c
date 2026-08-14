@@ -211,6 +211,17 @@ struct rcp_mock_server {
      * (mock.h). NULL disables stream-fault blocking entirely, the
      * default for every rcp_mock_server_t. */
     rcp_e2e_stream_fault_tracker_t *stream_fault_tracker;
+    /* REQ-AVTP-021/022 (issue #431, TC18 §13.3): this test double's own
+     * in-process stand-in for the RC Server's own configuration of
+     * §13.3's two "...or dropped, depending on the configuration"
+     * rules -- see rcp_mock_server_set_tscf_unsupported_time_sync_
+     * policy()'s own doc comment (mock.h) for the full contract.
+     * RCP_AVTP_TSCF_FALLBACK_DROP is 0, so this field's own zero-init
+     * (srv is calloc()'d in rcp_mock_server_new()) reproduces this
+     * library's pre-issue-#431 unconditional-drop behavior by default,
+     * matching every other "defaults false/0, matching the pre-fix
+     * disposition" config field already in this struct. */
+    rcp_avtp_tscf_fallback_t tscf_unsupported_time_sync_policy;
 };
 
 //cfusa:req REQ-MOCK-001
@@ -856,6 +867,14 @@ bool rcp_mock_server_set_endpoint_rx_enforce_e2e(rcp_mock_server_t *srv,
     return true;
 }
 
+//cfusa:req REQ-AVTP-021
+//cfusa:req REQ-AVTP-022
+void rcp_mock_server_set_tscf_unsupported_time_sync_policy(rcp_mock_server_t       *srv,
+                                                             rcp_avtp_tscf_fallback_t policy)
+{
+    srv->tscf_unsupported_time_sync_policy = policy;
+}
+
 //cfusa:req REQ-WDG-010
 void rcp_mock_server_set_watchdog_keeper(rcp_mock_server_t *srv,
                                           rcp_watchdog_keeper_t *keeper)
@@ -1061,6 +1080,7 @@ static rcp_mock_dispatch_result_t finish_admission(rcp_mock_endpoint_slot_t *slo
 
 //cfusa:req REQ-MOCK-021
 //cfusa:req REQ-MOCK-030
+//cfusa:req REQ-AVTP-021
 /* The actual body of rcp_mock_server_dispatch(), factored out so
  * rcp_mock_server_dispatch_e2e() can reach it directly (dispatch_plain())
  * without going back through the public rcp_mock_server_dispatch() --
@@ -1086,11 +1106,33 @@ static rcp_mock_dispatch_result_t dispatch_plain_inner(rcp_mock_server_t *srv,
     rcp_wire_error_t          error        = RCP_ERROR_NONE;
     rcp_lifecycle_accept_t    accept;
     size_t                    admitted_index = 0;
+    /* REQ-AVTP-021, TC18 §13.3 rule 1: "In case the RC Server does not
+     * support time synchronization, the presentation time shall be
+     * ignored, and the request(s) executed as if no presentation time
+     * were included or dropped depending on the configuration of the RC
+     * Server." Under RCP_AVTP_TSCF_FALLBACK_IGNORE, rcp_lifecycle_should_
+     * accept() below no longer drops this frame (see its own
+     * unsupported_time_sync_policy parameter), so this is the second
+     * half of that rule this function itself must apply: the request is
+     * admitted with tv forced false, exactly the "as if no presentation
+     * time were included" wording -- NOT the fuller "as if the header
+     * was in NTSCF format" substitution rule 2's own IGNORE side makes
+     * (see rcp_mock_server_dispatch_tscf()'s own doc comment for why the
+     * two rules differ here despite sharing one config knob). Every
+     * other case (time_sync_supported true, subtype NTSCF, or policy
+     * still DROP) leaves tv exactly as the caller supplied it. */
+    bool effective_tv = tv;
 
     memset(out_response, 0, sizeof(*out_response));
 
+    if (avtp_subtype == RCP_AVTP_SUBTYPE_TSCF && !time_sync_supported &&
+        srv->tscf_unsupported_time_sync_policy == RCP_AVTP_TSCF_FALLBACK_IGNORE) {
+        effective_tv = false;
+    }
+
     accept = rcp_lifecycle_should_accept(srv->state, time_sync_supported, avtp_subtype,
-                                          acf_msg_type, byte_bus_id);
+                                          acf_msg_type, byte_bus_id,
+                                          srv->tscf_unsupported_time_sync_policy);
     if (accept == RCP_LIFECYCLE_DROP) {
         return RCP_MOCK_DISPATCH_DROPPED;
     }
@@ -1143,8 +1185,9 @@ static rcp_mock_dispatch_result_t dispatch_plain_inner(rcp_mock_server_t *srv,
      * it arrived under an NTSCF header. Only rcp_mock_server_dispatch_
      * tscf() (mock.h) supplies real values, for a caller that decoded
      * an actual TSCF header one layer up. */
-    admit = rcp_server_endpoint_admit(&slot->queue, request, request_len, 0u, tv, avtp_timestamp,
-                                       gptp_reference_now, &request_type, &admitted_index, &error);
+    admit = rcp_server_endpoint_admit(&slot->queue, request, request_len, 0u, effective_tv,
+                                       avtp_timestamp, gptp_reference_now, &request_type,
+                                       &admitted_index, &error);
 
     /* REQ-E2E-030 (issue #335): a request-storage overflow on THIS
      * endpoint's own queue is answered locally exactly as before
@@ -1325,11 +1368,13 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
 
 //cfusa:req REQ-TIMED-012
 //cfusa:req REQ-TIMED-013
+//cfusa:req REQ-AVTP-022
 rcp_mock_dispatch_result_t rcp_mock_server_dispatch_tscf(rcp_mock_server_t *srv,
                                                           rcp_byte_bus_id_t byte_bus_id,
                                                           uint8_t avtp_subtype, uint8_t acf_msg_type,
                                                           bool time_sync_supported, uint64_t stream_id,
                                                           bool tv, uint32_t avtp_timestamp,
+                                                          bool tscf_reserved_all_zero,
                                                           uint64_t gptp_reference_now,
                                                           const uint8_t *request, size_t request_len,
                                                           rcp_bytes_t *out_response)
@@ -1337,6 +1382,40 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_tscf(rcp_mock_server_t *srv,
     /* Same "receipt, not validation" watchdog-kick rule and ordering as
      * rcp_mock_server_dispatch()'s own identical kick. */
     if (srv->watchdog != NULL) rcp_watchdog_keeper_kick(srv->watchdog, stream_id);
+
+    /* REQ-AVTP-022, TC18 §13.3 rule 2: "If the reserved bytes in the
+     * header are all zero, then the request shall be queued as if the
+     * header was in NTSCF format or dropped, depending on
+     * configuration." tscf_reserved_all_zero is the caller's own
+     * rcp_avtp_tscf_reserved_all_zero() result from decoding the real
+     * TSCF header one layer up (avtp.h) -- this function itself still
+     * never touches the outer AVTP/TSCF framing directly, matching every
+     * sibling dispatch function's own established convention (see this
+     * function's own file-header doc comment, mock.h); it only acts on
+     * the caller-supplied boolean, exactly like tv/avtp_timestamp
+     * already do.
+     *
+     * Only meaningful for a genuine TSCF frame -- an NTSCF-headed call
+     * through this same entry point (unusual, but this function's own
+     * signature does not forbid it) has no reserved-bytes rule to apply
+     * in the first place, so tscf_reserved_all_zero is simply ignored
+     * whenever avtp_subtype is not RCP_AVTP_SUBTYPE_TSCF. */
+    if (avtp_subtype == RCP_AVTP_SUBTYPE_TSCF && tscf_reserved_all_zero) {
+        if (srv->tscf_unsupported_time_sync_policy == RCP_AVTP_TSCF_FALLBACK_DROP) {
+            memset(out_response, 0, sizeof(*out_response));
+            return RCP_MOCK_DISPATCH_DROPPED;
+        }
+        /* RCP_AVTP_TSCF_FALLBACK_IGNORE: "queued as if the header was in
+         * NTSCF format" is a literal, full substitution (unlike rule 1's
+         * own narrower "ignore the presentation time" wording) -- both
+         * avtp_subtype and tv are overridden together so every downstream
+         * decision (rcp_lifecycle_should_accept()'s own state-specific
+         * TSCF-drop rules included, not just the presentation-time gate)
+         * sees exactly what it would have seen for a frame that had
+         * genuinely arrived as NTSCF. */
+        avtp_subtype = RCP_AVTP_SUBTYPE_NTSCF;
+        tv           = false;
+    }
 
     return dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
                            stream_id, tv, avtp_timestamp, gptp_reference_now, request, request_len,
@@ -1360,7 +1439,8 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_multi_response(
     if (srv->watchdog != NULL) rcp_watchdog_keeper_kick(srv->watchdog, stream_id);
 
     accept = rcp_lifecycle_should_accept(srv->state, time_sync_supported, avtp_subtype,
-                                          acf_msg_type, byte_bus_id);
+                                          acf_msg_type, byte_bus_id,
+                                          srv->tscf_unsupported_time_sync_policy);
     if (accept == RCP_LIFECYCLE_DROP) {
         return RCP_MOCK_DISPATCH_DROPPED;
     }

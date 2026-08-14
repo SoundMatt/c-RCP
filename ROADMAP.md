@@ -19106,6 +19106,74 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.359.0 -- 2026-08-14 (TC18 §13.3 request validation: config-dependent
+ignore-vs-drop, reserved-bytes-all-zero-queues-as-NTSCF, tu=1/tu=0 equivalence)
+
+Closes issue #431 (c-RCP-AUDIT-20). §13.3's own "Request validation"
+subsection had zero direct requirement-catalog coverage, and 2 of its 3
+rules were genuinely unimplemented/non-configurable: "In case the RC
+Server does not support time synchronization, the presentation time
+shall be ignored, and the request(s) executed as if no presentation
+time were included **or dropped depending on the configuration** of
+the RC Server... If the reserved bytes in the header are all zero,
+then the request shall be queued as if the header was in NTSCF format
+**or dropped, depending on configuration**... In case the time stamp
+is uncertain (i.e. tu = 1), then this shall be executed as if tu = 0."
+
+`avtp.c`'s `rcp_avtp_should_drop_tscf()` previously dropped
+unconditionally on `!server_time_sync_supported`, grounded in §11.1's
+own differently (and genuinely unconditionally) worded sentence rather
+than §13.3's own configurable one. It now takes a new
+`rcp_avtp_tscf_fallback_t unsupported_time_sync_policy` parameter:
+`RCP_AVTP_TSCF_FALLBACK_DROP` (0, the default for every existing
+caller) reproduces the exact prior behavior; `RCP_AVTP_TSCF_FALLBACK_
+IGNORE` does not drop, and `mock.c`'s `dispatch_plain_inner()` then
+admits the request with `tv` forced false, matching §13.3's own
+"executed as if no presentation time were included" wording precisely.
+`rcp_lifecycle_should_accept()` threads the same parameter through;
+every one of its ~20 existing call sites now passes
+`RCP_AVTP_TSCF_FALLBACK_DROP` explicitly, preserving prior behavior.
+`rcp_mock_server_set_tscf_unsupported_time_sync_policy()` is the new
+per-server setter.
+
+The reserved-bytes-all-zero rule had no implementation anywhere --
+`rcp_avtp_decode_tscf()` never read the TSCF header's own reserved
+octets (wire bytes 16-19/22-23) at all. `rcp_avtp_tscf_header_t` gains
+decode-only `reserved0`/`reserved1` fields; a new `rcp_avtp_tscf_
+reserved_all_zero()` reports whether both are zero. `rcp_mock_server_
+dispatch_tscf()` gains a new `bool tscf_reserved_all_zero` parameter
+(the caller's own decode-time result, same "caller decoded the real
+header one layer up" convention `tv`/`avtp_timestamp` already use) and
+consults the SAME shared policy knob when true: DROP drops the frame
+outright; IGNORE performs a full, literal substitution -- both
+`avtp_subtype` (forced NTSCF) and `tv` (forced false) together,
+matching this rule's own broader "queued as if the header was in
+NTSCF format" wording (deliberately more than rule 1's own narrower
+substitution). One shared `rcp_avtp_tscf_fallback_t` knob governs both
+rules -- a documented design choice: both share the identical
+"ignore-and-fall-back vs. drop" outcome shape even though their
+IGNORE-side mechanics genuinely differ.
+
+tu=1 equivalence was previously only accidentally true (nothing reads
+`tu` at all in admission/dispatch). Confirmed this remains the case
+(no code change needed) and made it directly observable: new tests
+dispatch two byte-identical TSCF frames differing only in their own
+wire `tu` bit and assert identical outcomes, plus a doc comment on
+`rcp_avtp_tscf_header_t.tu` making the deliberate equivalence explicit.
+
+New `.fusa-reqs.json` entries `REQ-AVTP-021`/`REQ-AVTP-022`/
+`REQ-AVTP-023` (all `implemented`, all citing §13.3 directly);
+`REQ-AVTP-014`'s own text tightened to its now-DROP-policy-specific
+scope. New tests across `tests/test_avtp.c`, `tests/test_lifecycle.c`,
+`tests/test_mock.c`. Mutation-tested: reverting only the fix in
+`avtp.c` (policy ignored) and `mock.c` (the `effective_tv` override
+and the reserved-bytes substitution block both removed), leaving the
+new tests in place, made 5 tests fail across the three affected test
+binaries with the exact expected outcomes, confirming they exercise
+the real defects; the fix was then restored from a separate backup
+copy. Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace`
+(v0.5.54): 0 errors, 1085/1085 traced and tested (up from 1082).
+
 ### v0.358.0 -- 2026-08-14 (REQ-TIMED-012/013: TSCF presentation-time
 gate now covers Cancel requests too)
 

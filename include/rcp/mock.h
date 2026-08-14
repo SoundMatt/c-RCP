@@ -694,6 +694,41 @@ bool rcp_mock_server_set_endpoint_req_crc_enable(rcp_mock_server_t *srv,
 bool rcp_mock_server_set_endpoint_rx_enforce_e2e(rcp_mock_server_t *srv,
                                                   rcp_byte_bus_id_t byte_bus_id, bool enable);
 
+/* REQ-AVTP-021/022 (issue #431, TC18 §13.3): sets srv's own server-wide
+ * disposition for §13.3's two "...or dropped, depending on the
+ * configuration of the RC Server" rules -- one shared policy knob for
+ * both, per rcp_avtp_tscf_fallback_t's own doc comment (avtp.h):
+ *
+ *   - RCP_AVTP_TSCF_FALLBACK_DROP (0, the default for every
+ *     rcp_mock_server_t -- srv is calloc()'d): reproduces this library's
+ *     pre-issue-#431 behavior exactly for both rules -- a TSCF frame
+ *     received while time_sync_supported is false is dropped
+ *     (rcp_lifecycle_should_accept(), unchanged), and rcp_mock_server_
+ *     dispatch_tscf()'s own tscf_reserved_all_zero parameter set true is
+ *     also dropped (RCP_MOCK_DISPATCH_DROPPED).
+ *   - RCP_AVTP_TSCF_FALLBACK_IGNORE: rule 1 (unsupported time sync) is
+ *     no longer dropped by rcp_lifecycle_should_accept() -- the request
+ *     is admitted with its own presentation-time gate suppressed
+ *     (dispatch_plain_inner()'s own effective_tv, mock.c -- "executed as
+ *     if no presentation time were included", TC18 §13.3's own wording).
+ *     Rule 2 (reserved-bytes-all-zero) is a full substitution instead --
+ *     rcp_mock_server_dispatch_tscf() processes the frame exactly as if
+ *     avtp_subtype had been RCP_AVTP_SUBTYPE_NTSCF all along (§13.3's own
+ *     "queued as if the header was in NTSCF format" wording is literal,
+ *     unlike rule 1's narrower "ignore the presentation time" wording --
+ *     see rcp_avtp_tscf_reserved_all_zero()'s own doc comment, avtp.h,
+ *     for why these two rules' own IGNORE-side mechanics genuinely
+ *     differ despite sharing this one config knob).
+ *
+ * Has no effect on rcp_mock_server_dispatch()/_dispatch_frame() beyond
+ * whatever rcp_lifecycle_should_accept() itself does with it -- rule 2's
+ * own full-NTSCF-substitution mechanic is wired only into
+ * rcp_mock_server_dispatch_tscf(), the sole entry point with an actual
+ * decoded TSCF header (and therefore actual reserved-byte content) to
+ * substitute in the first place. */
+void rcp_mock_server_set_tscf_unsupported_time_sync_policy(rcp_mock_server_t       *srv,
+                                                             rcp_avtp_tscf_fallback_t policy);
+
 /* REQ-WDG-010 (issue #201): associates keeper with srv so that
  * rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e() call
  * rcp_watchdog_keeper_kick(keeper, stream_id) for every request they
@@ -892,6 +927,26 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
  * every other elapsed-time/tick parameter in this codebase already
  * uses; meaningless while tv is false.
  *
+ * tscf_reserved_all_zero (REQ-AVTP-022, issue #431, added after this
+ * function's original signature) is the caller's own rcp_avtp_tscf_
+ * reserved_all_zero() result (avtp.h) against that same decoded header --
+ * TC18 §13.3's second configurable rule: "If the reserved bytes in the
+ * header are all zero, then the request shall be queued as if the
+ * header was in NTSCF format or dropped, depending on configuration."
+ * Consulted against srv's own rcp_mock_server_set_tscf_unsupported_
+ * time_sync_policy() setting (the same shared policy knob rule 1's own
+ * unsupported-time-sync case uses -- see that setter's own doc comment
+ * for why one knob covers both): RCP_AVTP_TSCF_FALLBACK_DROP drops the
+ * frame outright (RCP_MOCK_DISPATCH_DROPPED, *out_response left
+ * zeroed); RCP_AVTP_TSCF_FALLBACK_IGNORE processes it as if avtp_subtype
+ * had genuinely been RCP_AVTP_SUBTYPE_NTSCF all along -- a literal, full
+ * substitution (both avtp_subtype and tv are overridden together),
+ * unlike the unsupported-time-sync rule's own narrower "ignore only the
+ * presentation time" substitution (dispatch_plain_inner()'s own
+ * effective_tv, mock.c). Ignored entirely when avtp_subtype is not
+ * RCP_AVTP_SUBTYPE_TSCF -- this rule has nothing to apply to a frame
+ * that was never TSCF-headed in the first place.
+ *
  * This is a NEW, additional entry point, not a signature change to
  * rcp_mock_server_dispatch() itself -- every one of that function's
  * own 130+ existing call sites across this codebase is completely
@@ -902,6 +957,7 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_tscf(rcp_mock_server_t *srv,
                                                           uint8_t avtp_subtype, uint8_t acf_msg_type,
                                                           bool time_sync_supported, uint64_t stream_id,
                                                           bool tv, uint32_t avtp_timestamp,
+                                                          bool tscf_reserved_all_zero,
                                                           uint64_t gptp_reference_now,
                                                           const uint8_t *request, size_t request_len,
                                                           rcp_bytes_t *out_response);

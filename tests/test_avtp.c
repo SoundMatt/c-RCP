@@ -19,6 +19,9 @@
 //cfusa:test REQ-AVTP-018
 //cfusa:test REQ-AVTP-019
 //cfusa:test REQ-AVTP-020
+//cfusa:test REQ-AVTP-021
+//cfusa:test REQ-AVTP-022
+//cfusa:test REQ-AVTP-023
 //cfusa:test REQ-TIMED-012
 #include "unity.h"
 
@@ -464,18 +467,157 @@ static void test_peek_subtype_rejects_empty_buffer(void)
 
 static void test_should_drop_tscf_without_time_sync(void)
 {
-    TEST_ASSERT_TRUE(rcp_avtp_should_drop_tscf(false, RCP_AVTP_SUBTYPE_TSCF));
+    /* RCP_AVTP_TSCF_FALLBACK_DROP: TC18 §11.1's own unconditional wording
+     * and this library's original (still default) disposition. */
+    TEST_ASSERT_TRUE(rcp_avtp_should_drop_tscf(false, RCP_AVTP_SUBTYPE_TSCF,
+                                                RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
 static void test_should_not_drop_tscf_with_time_sync(void)
 {
-    TEST_ASSERT_FALSE(rcp_avtp_should_drop_tscf(true, RCP_AVTP_SUBTYPE_TSCF));
+    TEST_ASSERT_FALSE(rcp_avtp_should_drop_tscf(true, RCP_AVTP_SUBTYPE_TSCF,
+                                                 RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
 static void test_should_not_drop_ntscf_regardless_of_time_sync(void)
 {
-    TEST_ASSERT_FALSE(rcp_avtp_should_drop_tscf(false, RCP_AVTP_SUBTYPE_NTSCF));
-    TEST_ASSERT_FALSE(rcp_avtp_should_drop_tscf(true, RCP_AVTP_SUBTYPE_NTSCF));
+    /* Neither subtype nor policy nor server_time_sync_supported changes
+     * NTSCF's own outcome -- this rule is TSCF-only, whatever policy is
+     * in effect. */
+    TEST_ASSERT_FALSE(rcp_avtp_should_drop_tscf(false, RCP_AVTP_SUBTYPE_NTSCF,
+                                                 RCP_AVTP_TSCF_FALLBACK_DROP));
+    TEST_ASSERT_FALSE(rcp_avtp_should_drop_tscf(true, RCP_AVTP_SUBTYPE_NTSCF,
+                                                 RCP_AVTP_TSCF_FALLBACK_DROP));
+    TEST_ASSERT_FALSE(rcp_avtp_should_drop_tscf(false, RCP_AVTP_SUBTYPE_NTSCF,
+                                                 RCP_AVTP_TSCF_FALLBACK_IGNORE));
+    TEST_ASSERT_FALSE(rcp_avtp_should_drop_tscf(true, RCP_AVTP_SUBTYPE_NTSCF,
+                                                 RCP_AVTP_TSCF_FALLBACK_IGNORE));
+}
+
+/* REQ-AVTP-021, TC18 §13.3's own configurable alternative to §11.1's
+ * unconditional wording: a caller that opts into
+ * RCP_AVTP_TSCF_FALLBACK_IGNORE gets false (not dropped) for exactly the
+ * same unsupported-time-sync/TSCF combination that
+ * test_should_drop_tscf_without_time_sync() above proves gets dropped
+ * under the default RCP_AVTP_TSCF_FALLBACK_DROP policy -- the same
+ * inputs, only the new policy parameter differs, isolating this fix's
+ * own behavior change from every pre-existing case above. */
+static void test_should_not_drop_tscf_without_time_sync_when_policy_is_ignore(void)
+{
+    TEST_ASSERT_FALSE(rcp_avtp_should_drop_tscf(false, RCP_AVTP_SUBTYPE_TSCF,
+                                                 RCP_AVTP_TSCF_FALLBACK_IGNORE));
+}
+
+/* time_sync_supported == true means this rule's own trigger condition
+ * never held in the first place -- RCP_AVTP_TSCF_FALLBACK_IGNORE changes
+ * nothing here, matching test_should_not_drop_tscf_with_time_sync()
+ * above exactly. */
+static void test_ignore_policy_irrelevant_when_time_sync_supported(void)
+{
+    TEST_ASSERT_FALSE(rcp_avtp_should_drop_tscf(true, RCP_AVTP_SUBTYPE_TSCF,
+                                                 RCP_AVTP_TSCF_FALLBACK_IGNORE));
+}
+
+/* ── §13.3 reserved-bytes-all-zero rule (REQ-AVTP-022) ─────────────────────── */
+
+static void test_tscf_reserved_all_zero_true_for_freshly_decoded_conformant_header(void)
+{
+    rcp_avtp_tscf_header_t hdr = {0};
+    rcp_bytes_t             frame;
+    const uint8_t           payload[] = {9, 9};
+    rcp_avtp_tscf_header_t  decoded;
+    const uint8_t          *out_payload;
+    size_t                  out_payload_len;
+
+    hdr.stream_id = rcp_stream_id_make(kMacA, 1);
+    frame = rcp_avtp_encode_tscf(&hdr, payload, sizeof(payload));
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    /* rcp_avtp_encode_tscf() always zero-fills the reserved octets
+     * regardless of hdr's own (here zero-initialized, but irrelevant)
+     * reserved0/reserved1 -- see rcp_avtp_tscf_header_t's own doc
+     * comment -- so a conformant round trip always decodes all-zero. */
+    TEST_ASSERT_EQUAL(RCP_AVTP_OK, rcp_avtp_decode_tscf(frame.data, frame.len, &decoded,
+                                                          &out_payload, &out_payload_len));
+    TEST_ASSERT_TRUE(rcp_avtp_tscf_reserved_all_zero(&decoded));
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_tscf_reserved_all_zero_false_when_reserved0_nonzero(void)
+{
+    rcp_avtp_tscf_header_t hdr = {0};
+
+    hdr.reserved0 = 1u;
+    hdr.reserved1 = 0u;
+    TEST_ASSERT_FALSE(rcp_avtp_tscf_reserved_all_zero(&hdr));
+}
+
+static void test_tscf_reserved_all_zero_false_when_reserved1_nonzero(void)
+{
+    rcp_avtp_tscf_header_t hdr = {0};
+
+    hdr.reserved0 = 0u;
+    hdr.reserved1 = 1u;
+    TEST_ASSERT_FALSE(rcp_avtp_tscf_reserved_all_zero(&hdr));
+}
+
+/* Decoding a hand-built wire frame whose own bytes 16-19 are nonzero
+ * (simulating a non-conformant or future-revision sender) proves decode
+ * actually reads the reserved octets off the wire, not merely that a
+ * hand-set struct field round-trips -- see this test's own sibling
+ * decode tests elsewhere in this file for the established convention of
+ * hand-building raw frame bytes to exercise decode independent of
+ * encode. */
+static void test_decode_tscf_reads_nonzero_reserved_bytes_off_the_wire(void)
+{
+    uint8_t                 b[RCP_AVTP_TSCF_HEADER_LEN] = {0};
+    rcp_avtp_tscf_header_t  decoded;
+    const uint8_t          *out_payload;
+    size_t                  out_payload_len;
+
+    b[0] = RCP_AVTP_SUBTYPE_TSCF;
+    b[1] = (uint8_t)(1u << 7); /* sv=1 */
+    /* bytes 4-11 (stream_id), 12-15 (avtp_timestamp) left zero. */
+    b[16] = 0xDEu; b[17] = 0xADu; b[18] = 0xBEu; b[19] = 0xEFu; /* reserved0 */
+    /* bytes 20-21 (stream_data_length) left zero -- no payload. */
+    b[22] = 0xAAu; b[23] = 0xBBu; /* reserved1 */
+
+    TEST_ASSERT_EQUAL(RCP_AVTP_OK, rcp_avtp_decode_tscf(b, sizeof(b), &decoded, &out_payload,
+                                                          &out_payload_len));
+    TEST_ASSERT_EQUAL_HEX32(0xDEADBEEFu, decoded.reserved0);
+    TEST_ASSERT_EQUAL_HEX16(0xAABBu, decoded.reserved1);
+    TEST_ASSERT_FALSE(rcp_avtp_tscf_reserved_all_zero(&decoded));
+}
+
+/* ── §13.3 tu=1/tu=0 equivalence (REQ-AVTP-023) ────────────────────────────── */
+
+/* rcp_avtp_decode_tscf() itself still faithfully reports tu (nothing
+ * about this fix touches decode's own fidelity) -- this is the "decode
+ * captures the wire value" half of REQ-AVTP-023; the "nothing downstream
+ * of decode treats tu=1 differently from tu=0" half is proven at the
+ * dispatch layer instead (test_mock.c's own REQ-AVTP-023 test), since
+ * this library's decode/dispatch split means no single function decides
+ * both. */
+static void test_decode_tscf_reports_tu_one_and_tu_zero_faithfully(void)
+{
+    uint8_t                 b[RCP_AVTP_TSCF_HEADER_LEN] = {0};
+    rcp_avtp_tscf_header_t  decoded;
+    const uint8_t          *out_payload;
+    size_t                  out_payload_len;
+
+    b[0] = RCP_AVTP_SUBTYPE_TSCF;
+    b[1] = (uint8_t)(1u << 7); /* sv=1 */
+    b[3] = 0x1u; /* tu=1 */
+
+    TEST_ASSERT_EQUAL(RCP_AVTP_OK, rcp_avtp_decode_tscf(b, sizeof(b), &decoded, &out_payload,
+                                                          &out_payload_len));
+    TEST_ASSERT_EQUAL(1u, decoded.tu);
+
+    b[3] = 0x0u; /* tu=0 */
+    TEST_ASSERT_EQUAL(RCP_AVTP_OK, rcp_avtp_decode_tscf(b, sizeof(b), &decoded, &out_payload,
+                                                          &out_payload_len));
+    TEST_ASSERT_EQUAL(0u, decoded.tu);
 }
 
 /* ── strerror ──────────────────────────────────────────────────────────────── */
@@ -645,6 +787,15 @@ int main(void)
     RUN_TEST(test_should_drop_tscf_without_time_sync);
     RUN_TEST(test_should_not_drop_tscf_with_time_sync);
     RUN_TEST(test_should_not_drop_ntscf_regardless_of_time_sync);
+    RUN_TEST(test_should_not_drop_tscf_without_time_sync_when_policy_is_ignore);
+    RUN_TEST(test_ignore_policy_irrelevant_when_time_sync_supported);
+
+    RUN_TEST(test_tscf_reserved_all_zero_true_for_freshly_decoded_conformant_header);
+    RUN_TEST(test_tscf_reserved_all_zero_false_when_reserved0_nonzero);
+    RUN_TEST(test_tscf_reserved_all_zero_false_when_reserved1_nonzero);
+    RUN_TEST(test_decode_tscf_reads_nonzero_reserved_bytes_off_the_wire);
+
+    RUN_TEST(test_decode_tscf_reports_tu_one_and_tu_zero_faithfully);
 
     RUN_TEST(test_avtp_strerror_unique_nonempty);
 

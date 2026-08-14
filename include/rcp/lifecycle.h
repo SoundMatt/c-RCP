@@ -476,7 +476,19 @@ typedef enum {
  * function (mirroring avtp.c's rcp_avtp_should_drop_tscf() convention):
  *
  *   - Whatever the state, a TSCF-headed frame is first subject to
- *     rcp_avtp_should_drop_tscf()'s ordinary time-sync rule (RCP_LIFECYCLE_DROP).
+ *     rcp_avtp_should_drop_tscf()'s own time-sync rule (RCP_LIFECYCLE_DROP
+ *     iff that call returns true) -- REQ-AVTP-021/TC18 §13.3: passing
+ *     unsupported_time_sync_policy straight through means this function's
+ *     own caller controls whether an unsupported-time-sync TSCF frame is
+ *     dropped here (RCP_AVTP_TSCF_FALLBACK_DROP, the default/original
+ *     behavior) or reaches the state-specific checks below un-dropped
+ *     (RCP_AVTP_TSCF_FALLBACK_IGNORE) -- see rcp_avtp_should_drop_tscf()'s
+ *     own doc comment (avtp.h) for the full §13.3-vs-§11.1 citation. A
+ *     caller taking the IGNORE path is still responsible for actually
+ *     ignoring the presentation time once this function returns
+ *     RCP_LIFECYCLE_ACCEPT/_REJECT for such a frame -- this function only
+ *     ever decides whether to admit, never how an admitted TSCF frame's
+ *     own tv/avtp_timestamp are subsequently used.
  *   - While HW_UNCONFIGURED: a TSCF-headed frame is dropped outright
  *     regardless of time_sync_supported (presentation-time semantics
  *     presuppose a configured request stream, which cannot exist yet).
@@ -537,7 +549,9 @@ rcp_lifecycle_accept_t rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
                                                    bool time_sync_supported,
                                                    uint8_t avtp_subtype,
                                                    uint8_t acf_msg_type,
-                                                   rcp_byte_bus_id_t byte_bus_id);
+                                                   rcp_byte_bus_id_t byte_bus_id,
+                                                   rcp_avtp_tscf_fallback_t
+                                                       unsupported_time_sync_policy);
 
 /* ── Register-locking-by-state ─────────────────────────────────────────────── */
 

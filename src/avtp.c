@@ -230,6 +230,11 @@ rcp_avtp_errc_t rcp_avtp_decode_tscf(const uint8_t *b, size_t len,
     out_hdr->stream_id      = get_stream_id(&b[4]);
     out_hdr->avtp_timestamp = get_u32(&b[12]);
     out_hdr->stream_data_length = dlen;
+    /* REQ-AVTP-022: bytes 16-19 / 22-23, previously never read into
+     * out_hdr at all -- see rcp_avtp_tscf_header_t's own reserved0/
+     * reserved1 doc comment (avtp.h) for why decode-only. */
+    out_hdr->reserved0      = get_u32(&b[16]);
+    out_hdr->reserved1      = get_u16(&b[22]);
 
     *out_payload     = &b[RCP_AVTP_TSCF_HEADER_LEN];
     *out_payload_len = dlen;
@@ -266,10 +271,21 @@ rcp_avtp_errc_t rcp_avtp_peek_subtype(const uint8_t *b, size_t len, uint8_t *out
 }
 
 //cfusa:req REQ-AVTP-014
-bool rcp_avtp_should_drop_tscf(bool server_time_sync_supported, uint8_t subtype)
+//cfusa:req REQ-AVTP-021
+bool rcp_avtp_should_drop_tscf(bool server_time_sync_supported, uint8_t subtype,
+                                rcp_avtp_tscf_fallback_t unsupported_time_sync_policy)
 {
     if (subtype != RCP_AVTP_SUBTYPE_TSCF) return false;
-    return !server_time_sync_supported;
+    if (!server_time_sync_supported) {
+        return unsupported_time_sync_policy == RCP_AVTP_TSCF_FALLBACK_DROP;
+    }
+    return false;
+}
+
+//cfusa:req REQ-AVTP-022
+bool rcp_avtp_tscf_reserved_all_zero(const rcp_avtp_tscf_header_t *hdr)
+{
+    return hdr->reserved0 == 0u && hdr->reserved1 == 0u;
 }
 
 /* ── Transport base refcounting ────────────────────────────────────────────── */

@@ -216,11 +216,11 @@ static void test_hw_generic_covers_ep_generic_and_queue_config_with_locked_respo
 static void test_hw_configured_admits_only_ep0(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)42u));
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)42u, RCP_AVTP_TSCF_FALLBACK_DROP));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_TSCF_FALLBACK_DROP));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_RCP_CONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)42u));
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)42u, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
 /* DEVIATION PIN (REQ-LIFECYCLE-025/036, not implemented): the admission
@@ -491,7 +491,7 @@ static void test_hw_unconfigured_admission_ignores_claimant_but_writes_still_gat
     /* Frame-level admission does not consult stream identity -- correctly
      * so, since that is field_writable()'s job, not should_accept()'s. */
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_UNCONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_TSCF_FALLBACK_DROP));
 
     /* ...but once admitted, the actual write is gated correctly: A (the
      * claimant) may write HW_GENERIC, B may not (REQ-LIFECYCLE-026/035). */
@@ -506,7 +506,7 @@ static void test_hw_unconfigured_admission_ignores_claimant_but_writes_still_gat
      * condition and answers every other otherwise-valid EP0 request with
      * REQUEST_REJECTED (wire code 11, REQ-LIFECYCLE-033 -- closed). */
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_REJECT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_UNCONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_TSCF_FALLBACK_DROP));
     TEST_ASSERT_EQUAL_INT(11, RCP_ERROR_REQUEST_REJECTED);
 }
 
@@ -566,9 +566,9 @@ static void test_hw_configured_write_access_now_requires_unicast_and_authorizati
     TEST_ASSERT_FALSE(rcp_lifecycle_field_writable(RCP_LIFECYCLE_HW_CONFIGURED,
                                                     RCP_LIFECYCLE_FIELD_FUNCTIONAL_W, broadcast));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_UNCONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_TSCF_FALLBACK_DROP));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_RCP_CONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)9u));
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)9u, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
 /* ── §12.3.1.2: TSCF and ACF_GBB in HW_CONFIGURED ──────────────────────────── */
@@ -581,15 +581,15 @@ static void test_hw_configured_write_access_now_requires_unicast_and_authorizati
 static void test_hw_configured_drops_tscf(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, true,
-        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u));
+        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u, RCP_AVTP_TSCF_FALLBACK_DROP));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
-        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u));
+        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u, RCP_AVTP_TSCF_FALLBACK_DROP));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_UNCONFIGURED, true,
-        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
+        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_TSCF_FALLBACK_DROP));
     /* The TSCF rule does not apply once RCP_CONFIGURED -- the mapping it
      * guards against not existing yet has, by then, been validated. */
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_RCP_CONFIGURED, true,
-        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u));
+        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
 /* As of the REQ-LIFECYCLE-033 fix: this test's own name is now the
@@ -606,7 +606,7 @@ static void test_hw_configured_drops_tscf(void)
 static void test_hw_configured_rejects_gbb_addressed_to_ep0(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_REJECT, rcp_lifecycle_should_accept(RCP_LIFECYCLE_HW_CONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
 /* ── §12.7.4: discovery-stream write authority after RCP_CONFIGURED ────────── */
