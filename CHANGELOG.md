@@ -34,6 +34,14 @@ the rationale.
 
 ## Releases
 
+### v0.338.0 -- 2026-08-14 (REQ-PWRMODE-019: stale "not modeled" text corrected, closed)
+
+Fifth of 14 items catalogued "not blocked, left by explicit decision" -- and a genuine data-quality find, not new feature work. This requirement's own text cited `test_response_queue_has_no_identity_size_or_storage()` and `test_flush_triggers_and_heartbeat_are_absent()` as evidence that response-queue objects and heartbeat-stream re-emission were "not modeled anywhere in this codebase." Neither test exists anymore (grep-confirmed) -- both were superseded by real work already shipped: `response_queue_cfg[]` storage (`REQ-RMAP-034/059-061`) and heartbeat-stream re-emission (`REQ-RMAP-065/SRV-017`, the immediately preceding release). `rcp_mock_server_pwrmode_resume()`'s own doc comment (mock.h) carried the identical stale claim and is corrected to match.
+
+The real remaining question -- does TC18 §12.4.1's "response queues will be [re-]enabled" clause need its own wiring beyond the endpoint-enable half `rcp_mock_server_pwrmode_resume()` already performs -- resolves to no: neither `rcp_regmap_response_queue_cfg_t` nor `rcp_mock_server_check_response_queue_heartbeat()` carries any independent "enabled/disabled" state of its own (unlike an endpoint's own `ep_enable`) for sleep to have disabled in the first place, so there is nothing left for wake to reverse. The clause is vacuously satisfied by this codebase's own stateless response-queue design. (Whether heartbeat emission should be *suppressed* while asleep is a distinct question this entry's own §12.4.1 citation does not ask -- that citation is specifically about the wake handshake's own re-enable obligation, not sleep-side gating -- and is left open as its own, separately-scoped concern.)
+
+No code change; `.fusa-reqs.json` text and status corrected only. Full 66-test suite unaffected (unmodified pass); `cfusa check`/`trace` (v0.5.51): 0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`: `REQ-PWRMODE-019` partial -> implemented (1042 implemented / 25 partial / 2 not-implemented / 7 retired, 1076 total).
+
 ### v0.337.0 -- 2026-08-14 (REQ-RMAP-065/SRV-017: Flush_time heartbeat composed into one real mock.c call)
 
 Fourth of 14 items catalogued "not blocked, left by explicit decision" in the post-backlog requirements audit -- and the first honestly resolved as "closed to its own real limit" rather than flipped to `implemented`, since the underlying scheduler/transport boundary is unchanged by design.

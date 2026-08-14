@@ -202,12 +202,22 @@ rcp_lifecycle_errc_t rcp_mock_server_transition(rcp_mock_server_t *srv,
  * this test double: every registered endpoint slot's queue is re-enabled
  * (rcp_server_endpoint_set_enable(), matching a disabled endpoint's own
  * pre-load-then-drain semantics) iff the handshake's own resume-queues
- * step reports success. Returns that same bool. Response-queue objects
- * and heartbeat-stream re-emission are NOT modeled by this fix -- neither
- * concept has ANY implementation anywhere in this codebase yet (see
- * test_flush_triggers_and_heartbeat_are_absent(), tests/test_tc18_gaps_
- * regmap.c), a separate, already-tracked architecture gap this function
- * cannot close. */
+ * step reports success. Returns that same bool.
+ *
+ * RESOLVED 2026-08-14 (tc18-gap post-backlog audit): this doc comment
+ * previously claimed response-queue objects and heartbeat-stream
+ * re-emission had no implementation anywhere in this codebase -- stale
+ * as of REQ-RMAP-034/059-061 (real response_queue_cfg[] storage,
+ * mock.c) and REQ-RMAP-065/SRV-017
+ * (rcp_mock_server_check_response_queue_heartbeat(), above). Neither
+ * concept carries its own independent "enabled/disabled" state anywhere
+ * in this codebase's response-queue representation -- unlike an
+ * endpoint's own ep_enable, nothing gates whether
+ * check_response_queue_heartbeat() may be called or fire; it is purely
+ * config- and elapsed-time-driven. TC18 §12.4.1's own "response queues
+ * will be [re-]enabled" clause is therefore already vacuously satisfied
+ * once resumed: there is nothing this test double's own response-queue
+ * model disables in the first place for wake to reverse. */
 bool rcp_mock_server_pwrmode_resume(rcp_mock_server_t *srv, rcp_pwrmode_handshake_t *hs);
 
 /* Mutable access to srv's own register map: a test or this milestone's own
