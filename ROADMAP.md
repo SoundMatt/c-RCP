@@ -19106,6 +19106,60 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.333.0 -- 2026-08-14 (tc18-gap backlog PR E completion:
+REQ-E2E-038/039 real fragmented-message dispatch)
+
+The one remaining item from PR E's original scope (`REQ-E2E-046` was
+already closed separately as PR J). New
+`rcp_mock_server_dispatch_e2e_fragment()` (mock.h/mock.c) is the
+fragmentation-aware counterpart to `rcp_mock_server_dispatch_e2e()`,
+for a caller driving true multi-AVTPDU requests (`fragment.h`)
+instead of assuming every request fits in one AVTPDU.
+
+New srv-owned per-request-stream `frag_reasm[]`
+(`rcp_fragment_reassembler_t`, init/destroy-wired since it owns heap
+storage), `frag_first_header[]`/`frag_first_header_len[]` (the first
+fragment's own raw header bytes, remembered for `REQ-E2E-038`'s CRC
+span). New accessor `rcp_mock_server_fragment_reassembler()` is the
+escape hatch for a tighter/looser `max_total_len`.
+
+An `ms=1` fragment (no CRC trailer, `REQ-E2E-039`) is fed straight
+into the reassembler; an `ms=0` fragment while not collecting
+delegates entirely to `rcp_mock_server_dispatch_e2e()` unchanged; an
+`ms=0` fragment while collecting completes the sequence --
+`rcp_e2e_unwrap_framed()` is reused purely for its length-adaptation
+(its own CRC verdict is the wrong, single-frame formula and is
+ignored), and the real check is `rcp_e2e_compute_fragmented_crc()`
+(`REQ-E2E-038`) against the trailer's actual wire bytes. On mismatch:
+the identical stream-fault-tracker/`stream_status[]`/broadcast-safe-
+state consequences `dispatch_e2e()`'s own CRC-mismatch branch already
+applies (deliberately duplicated, not refactored, to avoid touching
+any already-passing behavior). On match: a synthetic complete ACF
+message dispatches via `dispatch_plain()` unchanged.
+
+A real correctness fix caught while writing tests: an NTSCF-framed
+message's CRC timestamp contribution must be forced to 0 (no
+timestamp field on the wire), the same rule
+`rcp_e2e_wrap_framed()`/`_unwrap_framed()` already apply --
+`rcp_e2e_compute_fragmented_crc()` has no `_framed()` counterpart of
+its own, so this is applied explicitly. A dedicated 2-fragment test
+(not 1, so it actually exercises this path) pins it.
+
+New tests: single-fragment parity with `dispatch_e2e()`; a genuine
+3-fragment round trip (payload concatenation verified at the
+handler); a fragmented CRC mismatch; the NTSCF-zero-forcing fix; an
+out-of-order fragment (reassembler proven reset); an oversized
+reassembly; the unresolvable-stream fallback. CRC comparison,
+NTSCF-forcing, and out-of-order rejection all mutation-tested and
+caught cleanly.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace`
+(v0.5.51): 0 errors, 0/1076 untested. `.fusa-reqs.json`:
+`REQ-E2E-038`/`039` partial -> implemented (1037 implemented / 30
+partial / 2 not-implemented / 7 retired, 1076 total).
+
+This closes the `tc18-gap` backlog's last previously-open item.
+
 ### v0.332.0 -- 2026-08-14 (tc18-gap backlog PR J: REQ-E2E-046
 rx_stream_status live wiring)
 
