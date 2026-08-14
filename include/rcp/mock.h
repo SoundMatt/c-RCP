@@ -421,6 +421,25 @@ bool rcp_mock_server_apply_ep_generic_cfg(rcp_mock_server_t *srv,
                                            const rcp_regmap_ep_generic_cfg_t *entries,
                                            size_t count);
 
+/* ── rx_stream_status live wiring (REQ-E2E-046, issue #336) ────────────────── */
+
+/* TC18 0.5.1_RC5 Table 24's own rx_stream_status bit (0x000D.7,
+ * read-only): true iff the request stream identified by stream_id is
+ * currently blocked (any of its own CRC/sequence/overflow causes is
+ * latched -- see rcp_e2e_stream_status_t's own doc comment, e2e.h, for
+ * which fourth cause, watchdog, this server double has no live
+ * evaluate() call site for yet and therefore never latches). False,
+ * not an error, for a stream_id this server has no configured request
+ * stream for (unresolvable via rcp_regmap_request_stream_cfg_resolve_
+ * index()) -- the same fail-toward-not-blocked disposition every other
+ * unresolvable-stream case in this module already uses. srv's own
+ * live dispatch paths (rcp_mock_server_dispatch_e2e()'s own CRC check,
+ * the frame-level sequence gate both dispatch_frame()/_dispatch_frame_
+ * e2e() share, and the request-storage-overflow check inside admission)
+ * already latch this state as a byproduct of their own existing work --
+ * this accessor is the read side, not a second evaluation. */
+bool rcp_mock_server_stream_status_rx_blocked(const rcp_mock_server_t *srv, uint64_t stream_id);
+
 /* ── Endpoint registration ─────────────────────────────────────────────────── */
 
 /* Adds one endpoint slot addressed at byte_bus_id, with generic config

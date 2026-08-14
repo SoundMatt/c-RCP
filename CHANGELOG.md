@@ -34,6 +34,23 @@ the rationale.
 
 ## Releases
 
+### v0.332.0 -- 2026-08-14 (tc18-gap backlog PR J: REQ-E2E-046 rx_stream_status live wiring)
+
+Investigation first: PR I's own "next" note flagged a possible conflict between `rcp_e2e_stream_status_t` (the new TC18 0.5.1_RC5 `rx_stream_status` aggregate) and the already-shipped `rcp_e2e_stream_fault_tracker_t` (CRC-only, stream_id-keyed). Direct read of e2e.h's own doc comments confirmed no conflict: `rcp_e2e_stream_status_t.crc` reuses `rcp_e2e_stream_fault_t` unchanged -- composition, not duplication -- and adds three sibling latches (seq/wd/overflow) for the other three TC18-named causes. Both mechanisms coexist by design.
+
+New srv-owned `stream_status[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES]` array (mock.c), index-parallel with `request_stream_cfg[]`/`seq_tracker[]` -- the identical convention REQ-E2E-028/029's own `seq_tracker[]` already established. Three of the four TC18-named causes are now latched inside **real, already-existing production dispatch call sites** -- not a synthetic test harness:
+- **CRC**: `rcp_mock_server_dispatch_e2e()`'s own existing CRC-mismatch branch, alongside `stream_fault_tracker`'s own identical call.
+- **Sequence**: `frame_seq_gate_admits()`, the shared once-per-frame gate `dispatch_frame()`/`_dispatch_frame_e2e()` already call.
+- **Overflow**: `dispatch_plain()`'s own existing request-storage-overflow check, alongside `rcp_mock_server_broadcast_safe_state()`'s own call.
+
+New `rcp_mock_server_stream_status_rx_blocked(srv, stream_id)` (mock.h/mock.c) is the read side. `REQ-E2E-046` stays `partial` (the fourth cause, watchdog, has no live `rcp_e2e_wd_evaluate()` call site anywhere in this codebase) but its own text now records real production wiring for 3 of 4 causes, a materially stronger claim than "not implemented."
+
+New tests: one dedicated live-dispatch test per wired cause (each exercising the real production call path), plus an unresolvable-stream fallback test. All three wiring call sites were mutation-tested and caught cleanly.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested. `.fusa-reqs.json`: 1035 implemented / 32 partial / 2 not-implemented / 7 retired (1076 total, unchanged -- text-only update).
+
+**Next**: `REQ-E2E-038`/`039` (real fragmented-message dispatch in mock.c) is the one remaining item from PR E's original scope -- a materially larger, self-contained feature with no architectural ambiguity, well-scoped for its own dedicated PR.
+
 ### v0.331.0 -- 2026-08-14 (tc18-gap backlog PR I: REQ-RMAP-036 ep_generic_cfg live-storage wiring)
 
 Follow-up item found while accounting for the remaining `scope: "tc18-gap"` backlog after PR H (task #116). `REQ-RMAP-036`'s own text was stale: it claimed "no real EP_config table storage anywhere yet... a materially bigger, separate feature", but `rcp_mock_endpoint_slot_t` already carries its own `rcp_regmap_ep_generic_cfg_t` as of every `rcp_mock_server_add_endpoint()` call -- the storage has existed per-endpoint-slot all along, just sparse rather than the contiguous array the EP0 dispatcher's own `ep_generic_cfg`/`ep_generic_cfg_count` parameters expect.
