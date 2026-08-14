@@ -98,6 +98,12 @@ struct rcp_mock_server {
     rcp_regmap_optional_subsystem_cfg_t physical_layer_cfg;
     rcp_regmap_optional_subsystem_cfg_t time_synch_cfg;
     rcp_regmap_optional_subsystem_cfg_t security_cfg;
+    /* RC-Server functional-configuration content + discovery-stream
+     * claim (REQ-RMAP-066, issue #336) -- see mock.h's own doc comment
+     * on rcp_mock_server_svr_ep_cfg()/_discovery_claim()/
+     * _set_discovery_timeout_us(). */
+    rcp_regmap_svr_ep_cfg_t svr_ep_cfg;
+    rcp_discovery_claim_t   discovery_claim;
     /* The sequencer-state registers compound/compound-wait requests read
      * and advance. Server-wide rather than per-endpoint: a sequencer is a
      * server register, and requests on different endpoints routinely
@@ -137,6 +143,14 @@ rcp_mock_server_t *rcp_mock_server_new(void)
 
     srv->state = RCP_LIFECYCLE_HW_UNCONFIGURED;
     rcp_regmap_general_init(&srv->regmap);
+    rcp_regmap_svr_ep_cfg_init(&srv->svr_ep_cfg);
+    /* REQ-RMAP-066: rcp_regmap_svr_ep_cfg_init() has already set
+     * svr_ep_cfg.svr_discovery_timeout to TC18's own stated default
+     * (20000 us) -- route it through the same setter every later
+     * change to this value uses, rather than duplicating the us->ms
+     * conversion here, so srv->discovery_claim is never left holding a
+     * timeout_ms out of sync with svr_ep_cfg's own current value. */
+    rcp_mock_server_set_discovery_timeout_us(srv, srv->svr_ep_cfg.svr_discovery_timeout);
     return srv;
 }
 
@@ -373,6 +387,37 @@ bool rcp_mock_server_set_security_cfg(rcp_mock_server_t *srv, const uint8_t *dat
 rcp_regmap_optional_subsystem_cfg_t *rcp_mock_server_security_cfg(rcp_mock_server_t *srv)
 {
     return &srv->security_cfg;
+}
+
+//cfusa:req REQ-RMAP-066
+rcp_regmap_svr_ep_cfg_t *rcp_mock_server_svr_ep_cfg(rcp_mock_server_t *srv)
+{
+    return &srv->svr_ep_cfg;
+}
+
+//cfusa:req REQ-RMAP-066
+rcp_discovery_claim_t *rcp_mock_server_discovery_claim(rcp_mock_server_t *srv)
+{
+    return &srv->discovery_claim;
+}
+
+//cfusa:req REQ-RMAP-066
+void rcp_mock_server_set_discovery_timeout_us(rcp_mock_server_t *srv, uint16_t timeout_us)
+{
+    srv->svr_ep_cfg.svr_discovery_timeout = timeout_us;
+    /* No rcp_discovery_claim_init() call here -- that would reset
+     * held/claimant/deadline_ms too, which this function's own doc
+     * comment promises NOT to do. srv->discovery_claim's own
+     * zero-initial state (held=false, claimant=0, deadline_ms=0, from
+     * rcp_mock_server_new()'s own calloc()) already matches exactly
+     * what rcp_discovery_claim_init() would produce for a fresh,
+     * unheld claim -- the same "calloc's own zero-fill already
+     * satisfies this module's own init contract" convention this
+     * server double relies on elsewhere (seq_tracker[], etc.).
+     * Truncating division, not rounding -- matches every other µs/ms
+     * boundary conversion in this codebase's own convention of never
+     * silently rounding a caller's own requested bound UP. */
+    srv->discovery_claim.timeout_ms = (uint32_t)timeout_us / 1000u;
 }
 
 /* Finds the slot addressed at byte_bus_id, or NULL if none is registered. */

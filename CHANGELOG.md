@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.330.0 -- 2026-08-13 (tc18-gap backlog PR H: REQ-RMAP-066 discovery-timeout wiring)
+
+Tenth item of the 42-item `scope: "tc18-gap"` backlog (task #114). `svr_discovery_timeout` (TC18 §13.7.1.2's RC-Server functional-configuration table) had no server-side storage anywhere in this codebase at all -- a bigger gap than this entry's own prior text stated (it described the register as unwired to `rcp_discovery_claim_t`, but the register itself was never even declared in `rcp_mock_server_t`).
+
+`rcp_mock_server_t` now carries an `rcp_regmap_svr_ep_cfg_t` (the register's own real storage) and an `rcp_discovery_claim_t` (discovery.h's own already-tested, generic claim/timeout/re-open module -- previously had zero callers anywhere in this codebase). New `rcp_mock_server_set_discovery_timeout_us()` (mock.h/mock.c) sets `svr_ep_cfg.svr_discovery_timeout` AND re-derives `discovery_claim.timeout_ms` via a truncating microsecond-to-millisecond conversion, the same capacity-sync convention REQ-RMAP-032/034/036/037 already established; new `rcp_mock_server_svr_ep_cfg()`/`_discovery_claim()` accessors give direct-pointer access, matching `rcp_mock_server_regmap()`'s own established convention for plain, fully public struct types. `rcp_mock_server_new()` calls the new setter once internally with TC18's own stated default (20000 µs), so every server starts with a real, correctly-configured, unheld claim.
+
+New dedicated tests: the TC18 default is genuinely applied at construction, the setter keeps both fields in sync with a truncating (not rounding) conversion, and the real `discovery.h` claim functions (`rcp_discovery_claim_is_open()`/`_note_request()`) operate correctly end-to-end against `srv->discovery_claim`, driven by a configured timeout. The truncating conversion was mutation-tested and caught cleanly. `REQ-RMAP-066` flips `partial` -> `implemented`. Same "generic primitive proven, production dispatch routing deferred" disposition as HW_config/EP_ID_config/etc.'s own earlier closures: `mock.c` still has no discovery-request/response frame handling to route through at all.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested. `.fusa-reqs.json`: 1034 implemented / 33 partial / 2 not-implemented / 7 retired (1076 total).
+
+**This concludes the original 8-PR plan for the `scope: "tc18-gap"` backlog (tasks #107-#115), except PR E** (task #111, `REQ-E2E-038`/`039`/`046`), which stays open pending the architectural call recorded in v0.327.0 -- either a fresh-context session or explicit user input on the stream-status-vs-fault-tracker question. 10 PRs shipped this session (A through H, plus the RMAP-068 primary-source re-verification), closing 15 requirements from `partial`/`not-implemented` to `implemented`.
+
 ### v0.329.0 -- 2026-08-13 (tc18-gap backlog PR G: REQ-WAKEUP-020 EP_ID_config write enforcement)
 
 Ninth item of the 42-item `scope: "tc18-gap"` backlog (task #113). TC18 §13.7.2.1 fixes the WakeUp endpoint's own `ep_id` (EP_ID_config row field) to 1 -- previously only diagnosed after the fact (`rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id()`, a read-only check over a whole table), never enforced at write time.
