@@ -1875,9 +1875,29 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
             rcp_fragment_reassembler_reset(reasm);
             return RCP_MOCK_DISPATCH_REJECTED;
         }
-        got = ((uint32_t)fragment[fragment_len - 4] << 24) |
-              ((uint32_t)fragment[fragment_len - 3] << 16) |
-              ((uint32_t)fragment[fragment_len - 2] << 8) | (uint32_t)fragment[fragment_len - 1];
+
+        /* Pad-aware CRC location (issue #445): TC18 Figures 20/21 place
+         * the CRC32 immediately after the real (unpadded) payload, with
+         * any quadlet-alignment pad octets re-seated AFTER the trailer --
+         * frame = [real_len][CRC32][pad_octets], not "the trailer is
+         * always the last RCP_E2E_CRC_LEN octets of the frame" (only ever
+         * true when pad_octets == 0). rcp_e2e_wrap()/_unwrap() (e2e.c,
+         * issue #420) already locate that boundary this same way, reading
+         * it straight out of the header's own wire-format "pad" field
+         * (acf.h Figure 7, byte_message_info octet 2 bits 7:6) --
+         * peek_hdr.pad above decoded that exact field from this same
+         * fragment already, so no fresh read is needed here. */
+        if ((size_t)peek_hdr.pad > fragment_len - RCP_E2E_CRC_LEN) {
+            rcp_fragment_reassembler_reset(reasm);
+            return RCP_MOCK_DISPATCH_REJECTED;
+        }
+        {
+            size_t real_len = fragment_len - RCP_E2E_CRC_LEN - (size_t)peek_hdr.pad;
+
+            got = ((uint32_t)fragment[real_len] << 24) |
+                  ((uint32_t)fragment[real_len + 1] << 16) |
+                  ((uint32_t)fragment[real_len + 2] << 8) | (uint32_t)fragment[real_len + 3];
+        }
 
         unwrap_result = rcp_e2e_unwrap_framed(stream_id, avtp_subtype == RCP_AVTP_SUBTYPE_NTSCF,
                                                avtp_timestamp, fragment, fragment_len, &unwrapped);
