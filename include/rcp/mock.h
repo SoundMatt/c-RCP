@@ -108,6 +108,7 @@
 #ifndef RCP_MOCK_H
 #define RCP_MOCK_H
 
+#include "rcp/discovery.h"
 #include "rcp/e2e.h"
 #include "rcp/lifecycle.h"
 #include "rcp/power.h"
@@ -340,6 +341,39 @@ bool rcp_mock_server_set_security_cfg(rcp_mock_server_t *srv, const uint8_t *dat
 /* srv's own security-config section -- see
  * rcp_mock_server_network_interface_cfg()'s own doc comment. */
 rcp_regmap_optional_subsystem_cfg_t *rcp_mock_server_security_cfg(rcp_mock_server_t *srv);
+
+/* ── Discovery-stream claim (REQ-RMAP-066, issue #336) ─────────────────────── */
+
+/* srv's own RC-Server functional-configuration content (TC18 §13.7.1.2
+ * Table 36/Table 33 -- svr_discovery_timeout, svr_ep_status), and srv's
+ * own discovery-stream claim/timeout/re-open state (discovery.h's
+ * rcp_discovery_claim_t) -- see rcp_mock_server_set_discovery_timeout_us()
+ * below for how the two are kept in sync. Direct-pointer access, the
+ * same "caller may freely set... directly" convention
+ * rcp_mock_server_regmap() already establishes for Table 20 -- both
+ * rcp_regmap_svr_ep_cfg_t and rcp_discovery_claim_t are themselves
+ * plain, fully public structs (regmap.h/discovery.h), not opaque
+ * handles, so this codebase's own established convention for that
+ * shape applies unchanged. Never NULL for a non-NULL srv. */
+rcp_regmap_svr_ep_cfg_t *rcp_mock_server_svr_ep_cfg(rcp_mock_server_t *srv);
+rcp_discovery_claim_t   *rcp_mock_server_discovery_claim(rcp_mock_server_t *srv);
+
+/* Sets srv->svr_ep_cfg.svr_discovery_timeout to timeout_us (TC18's own
+ * wire register, microseconds) AND re-derives
+ * srv->discovery_claim.timeout_ms from it (truncating microsecond
+ * division, matching every other µs/ms boundary conversion in this
+ * codebase's own convention of never silently rounding up past a
+ * caller's own requested bound) -- the same "one setter keeps a
+ * derived field in sync" convention REQ-RMAP-032/034/036/037 already
+ * established for svr_io_pin_count/svr_ep_bytebus_id_map_capacity/etc.
+ * Does NOT reset srv->discovery_claim's own held/claimant/deadline_ms
+ * state -- an in-flight claim's own current deadline is unaffected by
+ * a timeout-VALUE change mid-claim; only the window a FUTURE grant
+ * (rcp_discovery_claim_note_request()/_note_config_write()) computes
+ * uses the new value. rcp_mock_server_new() calls this once internally
+ * (via TC18's own stated default, 20000 µs) so srv->discovery_claim is
+ * never left holding an uninitialized timeout_ms. */
+void rcp_mock_server_set_discovery_timeout_us(rcp_mock_server_t *srv, uint16_t timeout_us);
 
 /* ── Endpoint registration ─────────────────────────────────────────────────── */
 

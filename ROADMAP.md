@@ -19106,6 +19106,39 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.330.0 -- 2026-08-13 (tc18-gap backlog PR H: REQ-RMAP-066
+discovery-timeout wiring)
+
+Tenth item of the 42-item `scope: "tc18-gap"` backlog (task #114).
+`svr_discovery_timeout` had no server-side storage anywhere in this
+codebase at all -- bigger than this entry's own prior text stated.
+
+`rcp_mock_server_t` now carries an `rcp_regmap_svr_ep_cfg_t` (the
+register's own real storage) and an `rcp_discovery_claim_t`
+(discovery.h's own already-tested, generic module -- previously zero
+callers anywhere). New `rcp_mock_server_set_discovery_timeout_us()`
+sets both fields in sync via a truncating us->ms conversion, the same
+convention REQ-RMAP-032/034/036/037 already established; new
+`_svr_ep_cfg()`/`_discovery_claim()` accessors match
+`rcp_mock_server_regmap()`'s own established direct-pointer
+convention. `rcp_mock_server_new()` calls the new setter once
+internally with TC18's own stated default (20000 us).
+
+New tests prove the default applies at construction, the setter
+keeps both fields in sync (mutation-tested), and the real discovery.h
+claim functions operate correctly end-to-end against the wired
+storage. `REQ-RMAP-066` flips partial -> implemented.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace`
+(v0.5.51): 0 errors, 0/1076 untested. `.fusa-reqs.json`: 1034
+implemented / 33 partial / 2 not-implemented / 7 retired (1076
+total).
+
+**This concludes the original 8-PR plan for the `scope: "tc18-gap"`
+backlog (tasks #107-#115), except PR E** (task #111), which stays
+open pending the architectural call recorded in v0.327.0. 10 PRs
+shipped this session, closing 15 requirements to implemented.
+
 ### v0.329.0 -- 2026-08-13 (tc18-gap backlog PR G: REQ-WAKEUP-020
 EP_ID_config write enforcement)
 

@@ -865,6 +865,77 @@ static void test_dispatch_frame_truncates_at_out_cap(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* ── Discovery-stream claim (REQ-RMAP-066, issue #336) ─────────────────────── */
+
+/* A new server's discovery_claim.timeout_ms already reflects TC18's own
+ * stated svr_discovery_timeout default (20000 us -> 20 ms) -- proves
+ * rcp_mock_server_new()'s own internal call to
+ * rcp_mock_server_set_discovery_timeout_us() actually ran, not just
+ * that the accessor returns a non-NULL pointer. */
+static void test_new_server_discovery_claim_starts_with_the_tc18_default_timeout(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+
+    TEST_ASSERT_NOT_NULL(srv);
+    TEST_ASSERT_EQUAL_UINT16(20000u, rcp_mock_server_svr_ep_cfg(srv)->svr_discovery_timeout);
+    TEST_ASSERT_EQUAL_UINT32(20u, rcp_mock_server_discovery_claim(srv)->timeout_ms);
+    TEST_ASSERT_FALSE(rcp_mock_server_discovery_claim(srv)->held); /* fresh, unheld */
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* rcp_mock_server_set_discovery_timeout_us() keeps svr_ep_cfg and
+ * discovery_claim in sync -- the same capacity-sync convention
+ * REQ-RMAP-032/034/036/037 already established for other tables --
+ * with a truncating (not rounding) us->ms conversion. */
+static void test_set_discovery_timeout_us_syncs_svr_ep_cfg_and_claim(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+
+    TEST_ASSERT_NOT_NULL(srv);
+
+    rcp_mock_server_set_discovery_timeout_us(srv, 5500u); /* 5.5 ms -> truncates to 5 */
+    TEST_ASSERT_EQUAL_UINT16(5500u, rcp_mock_server_svr_ep_cfg(srv)->svr_discovery_timeout);
+    TEST_ASSERT_EQUAL_UINT32(5u, rcp_mock_server_discovery_claim(srv)->timeout_ms);
+
+    rcp_mock_server_set_discovery_timeout_us(srv, 999u); /* < 1 ms -> truncates to 0 */
+    TEST_ASSERT_EQUAL_UINT32(0u, rcp_mock_server_discovery_claim(srv)->timeout_ms);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* The real discovery.h claim lifecycle (open -> note_request -> lapse ->
+ * open again), genuinely driven end-to-end by srv's own configured
+ * svr_discovery_timeout -- not a re-implementation of discovery.h's own
+ * logic, the actual rcp_discovery_claim_* functions operating on
+ * srv->discovery_claim via rcp_mock_server_discovery_claim(). Proves
+ * the wiring is real, not merely that the two fields happen to hold
+ * matching numbers. */
+static void test_discovery_claim_lifecycle_driven_by_configured_timeout(void)
+{
+    rcp_mock_server_t     *srv = rcp_mock_server_new();
+    rcp_discovery_claim_t *claim;
+    rcp_stream_id_t         requester_a = {{1, 2, 3, 4, 5, 6}, 1u};
+    rcp_stream_id_t         requester_b = {{7, 8, 9, 10, 11, 12}, 2u};
+
+    TEST_ASSERT_NOT_NULL(srv);
+    rcp_mock_server_set_discovery_timeout_us(srv, 10000u); /* 10 ms, a short, test-friendly window */
+    claim = rcp_mock_server_discovery_claim(srv);
+
+    TEST_ASSERT_TRUE(rcp_discovery_claim_is_open(claim, 0u)); /* never held -- open */
+    TEST_ASSERT_TRUE(rcp_discovery_claim_note_request(claim, requester_a, 0u));
+    TEST_ASSERT_FALSE(rcp_discovery_claim_is_open(claim, 5u)); /* well within the 10 ms window */
+    TEST_ASSERT_FALSE(rcp_discovery_claim_note_request(claim, requester_b, 5u)); /* a second
+                                                                                     requester is
+                                                                                     refused,
+                                                                                     REQ-DISC-029 */
+    TEST_ASSERT_TRUE(rcp_discovery_claim_is_open(claim, 10u)); /* the window has now lapsed */
+    TEST_ASSERT_TRUE(rcp_discovery_claim_note_request(claim, requester_b, 10u)); /* re-grantable
+                                                                                     once open */
+
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── Error strings ─────────────────────────────────────────────────────────── */
 
 static void test_strerror_never_null(void)
@@ -918,6 +989,10 @@ int main(void)
     RUN_TEST(test_dispatch_frame_returns_zero_for_unparseable_frame);
     RUN_TEST(test_dispatch_frame_reports_unknown_bus_for_undecodable_member);
     RUN_TEST(test_dispatch_frame_truncates_at_out_cap);
+
+    RUN_TEST(test_new_server_discovery_claim_starts_with_the_tc18_default_timeout);
+    RUN_TEST(test_set_discovery_timeout_us_syncs_svr_ep_cfg_and_claim);
+    RUN_TEST(test_discovery_claim_lifecycle_driven_by_configured_timeout);
 
     RUN_TEST(test_strerror_never_null);
 
