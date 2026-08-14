@@ -698,6 +698,24 @@ static rcp_mock_endpoint_slot_t *find_slot_on_stream(rcp_mock_server_t *srv, uin
     return NULL;
 }
 
+/* const counterpart of find_slot_on_stream(), for read-only stream-scoped
+ * accessors (rcp_mock_server_pending_count_on_stream(), issue #447) --
+ * same relationship find_slot_const() already has to find_slot(). */
+static const rcp_mock_endpoint_slot_t *find_slot_on_stream_const(const rcp_mock_server_t *srv,
+                                                                   uint64_t           stream_id,
+                                                                   rcp_byte_bus_id_t  byte_bus_id)
+{
+    size_t i;
+    for (i = 0; i < RCP_MOCK_MAX_ENDPOINTS; i++) {
+        const rcp_mock_endpoint_slot_t *slot = &srv->endpoints[i];
+        if (slot->in_use && slot->byte_bus_id == byte_bus_id &&
+            (!slot->stream_scoped || slot->stream_id == stream_id)) {
+            return slot;
+        }
+    }
+    return NULL;
+}
+
 //cfusa:req REQ-MOCK-007
 //cfusa:req REQ-MOCK-008
 rcp_mock_errc_t rcp_mock_server_add_endpoint(rcp_mock_server_t *srv,
@@ -855,6 +873,32 @@ bool rcp_mock_server_remove_endpoint(rcp_mock_server_t *srv, rcp_byte_bus_id_t b
     return true;
 }
 
+/* REQ-MOCK-032 (issue #447): stream-scoped counterpart of
+ * rcp_mock_server_remove_endpoint(), following the same "new function, not
+ * a breaking change" pattern rcp_mock_server_add_endpoint_on_stream()
+ * (issue #432) already established -- the plain, unscoped
+ * rcp_mock_server_remove_endpoint() above is untouched, still resolving by
+ * byte_bus_id alone via find_slot() for every one of its existing call
+ * sites. Only needed once two slots can legitimately share one
+ * byte_bus_id on different stream_ids (rcp_mock_server_add_endpoint_
+ * on_stream()); this is the disambiguated remove for that case. */
+//cfusa:req REQ-MOCK-032
+bool rcp_mock_server_remove_endpoint_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                                rcp_byte_bus_id_t byte_bus_id)
+{
+    rcp_mock_endpoint_slot_t *slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
+    if (!slot) return false;
+
+    rcp_server_endpoint_destroy(&slot->queue);
+    rcp_bytes_free(&slot->deferred_response);
+    memset(slot, 0, sizeof(*slot));
+
+    srv->endpoint_count--;
+    srv->regmap.svr_ep_count = (uint16_t)srv->endpoint_count;
+    srv->regmap.svr_ep_generic_cfg_capacity = (uint16_t)(srv->endpoint_count * 12u);
+    return true;
+}
+
 //cfusa:req REQ-RMAP-036
 size_t rcp_mock_server_ep_generic_cfg_view(const rcp_mock_server_t *srv,
                                             rcp_regmap_ep_generic_cfg_t *out, size_t out_capacity)
@@ -954,6 +998,22 @@ bool rcp_mock_server_set_endpoint_enable(rcp_mock_server_t *srv, rcp_byte_bus_id
     return true;
 }
 
+/* REQ-MOCK-032 (issue #447): stream-scoped counterpart of
+ * rcp_mock_server_set_endpoint_enable() -- see
+ * rcp_mock_server_remove_endpoint_on_stream()'s own doc comment for the
+ * shared rationale/pattern every _on_stream() accessor added by this fix
+ * follows. */
+//cfusa:req REQ-MOCK-032
+bool rcp_mock_server_set_endpoint_enable_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                                    rcp_byte_bus_id_t byte_bus_id, bool enable)
+{
+    rcp_mock_endpoint_slot_t *slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
+    if (!slot) return false;
+
+    rcp_server_endpoint_set_enable(&slot->queue, enable);
+    return true;
+}
+
 //cfusa:req REQ-E2E-031
 bool rcp_mock_server_set_endpoint_req_crc_enable(rcp_mock_server_t *srv,
                                                   rcp_byte_bus_id_t byte_bus_id, bool enable)
@@ -965,11 +1025,37 @@ bool rcp_mock_server_set_endpoint_req_crc_enable(rcp_mock_server_t *srv,
     return true;
 }
 
+//cfusa:req REQ-MOCK-032
+bool rcp_mock_server_set_endpoint_req_crc_enable_on_stream(rcp_mock_server_t *srv,
+                                                             uint64_t stream_id,
+                                                             rcp_byte_bus_id_t byte_bus_id,
+                                                             bool enable)
+{
+    rcp_mock_endpoint_slot_t *slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
+    if (!slot) return false;
+
+    slot->req_crc_enable = enable;
+    return true;
+}
+
 //cfusa:req REQ-E2E-021
 bool rcp_mock_server_set_endpoint_rx_enforce_e2e(rcp_mock_server_t *srv,
                                                   rcp_byte_bus_id_t byte_bus_id, bool enable)
 {
     rcp_mock_endpoint_slot_t *slot = find_slot(srv, byte_bus_id);
+    if (!slot) return false;
+
+    slot->rx_enforce_e2e = enable;
+    return true;
+}
+
+//cfusa:req REQ-MOCK-032
+bool rcp_mock_server_set_endpoint_rx_enforce_e2e_on_stream(rcp_mock_server_t *srv,
+                                                             uint64_t stream_id,
+                                                             rcp_byte_bus_id_t byte_bus_id,
+                                                             bool enable)
+{
+    rcp_mock_endpoint_slot_t *slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
     if (!slot) return false;
 
     slot->rx_enforce_e2e = enable;
@@ -2049,6 +2135,24 @@ bool rcp_mock_server_drain_endpoint(rcp_mock_server_t *srv, rcp_byte_bus_id_t by
     return true;
 }
 
+//cfusa:req REQ-MOCK-032
+bool rcp_mock_server_drain_endpoint_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                               rcp_byte_bus_id_t byte_bus_id,
+                                               rcp_bytes_t *out_response)
+{
+    rcp_mock_endpoint_slot_t *slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
+    rcp_bytes_t                frame = {0};
+
+    memset(out_response, 0, sizeof(*out_response));
+    if (!slot) return false;
+
+    if (!rcp_server_endpoint_drain_one(&slot->queue, &frame)) return false;
+
+    run_handler(slot, frame.data, frame.len, out_response);
+    rcp_bytes_free(&frame);
+    return true;
+}
+
 //cfusa:req REQ-GPIO-036
 bool rcp_mock_server_stash_deferred_response(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
                                               rcp_bytes_t response)
@@ -2061,11 +2165,39 @@ bool rcp_mock_server_stash_deferred_response(rcp_mock_server_t *srv, rcp_byte_bu
     return true;
 }
 
+//cfusa:req REQ-MOCK-032
+bool rcp_mock_server_stash_deferred_response_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                                         rcp_byte_bus_id_t byte_bus_id,
+                                                         rcp_bytes_t response)
+{
+    rcp_mock_endpoint_slot_t *slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
+    if (!slot) return false;
+
+    rcp_bytes_free(&slot->deferred_response);
+    slot->deferred_response = response;
+    return true;
+}
+
 //cfusa:req REQ-GPIO-036
 bool rcp_mock_server_take_deferred_response(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
                                              rcp_bytes_t *out_response)
 {
     rcp_mock_endpoint_slot_t *slot = find_slot(srv, byte_bus_id);
+
+    memset(out_response, 0, sizeof(*out_response));
+    if (!slot || slot->deferred_response.data == NULL) return false;
+
+    *out_response = slot->deferred_response;
+    memset(&slot->deferred_response, 0, sizeof(slot->deferred_response));
+    return true;
+}
+
+//cfusa:req REQ-MOCK-032
+bool rcp_mock_server_take_deferred_response_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                                        rcp_byte_bus_id_t byte_bus_id,
+                                                        rcp_bytes_t *out_response)
+{
+    rcp_mock_endpoint_slot_t *slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
 
     memset(out_response, 0, sizeof(*out_response));
     if (!slot || slot->deferred_response.data == NULL) return false;
@@ -2596,6 +2728,46 @@ bool rcp_mock_server_tick(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
     return true;
 }
 
+/* REQ-MOCK-032 (issue #447): stream-scoped counterpart of
+ * rcp_mock_server_tick(). Unlike rcp_mock_server_broadcast_safe_state()
+ * (below), tick() takes byte_bus_id as its ONLY endpoint selector and
+ * operates on exactly one slot per call (rcp_server_endpoint_select_due()
+ * runs against a single queue, not the whole table) -- it does not
+ * already have enough context to disambiguate two slots sharing one
+ * byte_bus_id on different stream_ids, so (unlike broadcast_safe_state())
+ * it genuinely needs this new variant, not just an internal fix. */
+//cfusa:req REQ-MOCK-032
+bool rcp_mock_server_tick_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                     rcp_byte_bus_id_t byte_bus_id,
+                                     const rcp_server_tick_ctx_t *ctx, rcp_bytes_t *out_response)
+{
+    rcp_mock_endpoint_slot_t *slot;
+    rcp_server_tick_ctx_t     local;
+    size_t                    index = 0;
+
+    memset(out_response, 0, sizeof(*out_response));
+
+    slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
+    if (!slot) return false;
+
+    local            = *ctx;
+    local.sequencers = &srv->sequencers;
+
+    if (!rcp_server_endpoint_select_due(&slot->queue, &local, &index)) return false;
+
+    if (slot->queue.pending[index].kind == RCP_SCHED_KIND_CANCELLATION) {
+        apply_cancellation(slot, slot->queue.pending[index].request_type,
+                            slot->queue.pending[index].frame.data,
+                            slot->queue.pending[index].frame.len, byte_bus_id, out_response);
+    } else {
+        run_handler(slot, slot->queue.pending[index].frame.data,
+                     slot->queue.pending[index].frame.len, out_response);
+    }
+
+    (void)rcp_server_endpoint_complete(&slot->queue, index, &local);
+    return true;
+}
+
 //cfusa:req REQ-MOCK-025
 size_t rcp_mock_server_notify_trigger(rcp_mock_server_t *srv, uint8_t source_ep,
                                        uint8_t signal_nr)
@@ -2619,6 +2791,15 @@ size_t rcp_mock_server_pending_count(const rcp_mock_server_t *srv, rcp_byte_bus_
     return rcp_server_endpoint_pending_count(&slot->queue);
 }
 
+//cfusa:req REQ-MOCK-032
+size_t rcp_mock_server_pending_count_on_stream(const rcp_mock_server_t *srv, uint64_t stream_id,
+                                                rcp_byte_bus_id_t byte_bus_id)
+{
+    const rcp_mock_endpoint_slot_t *slot = find_slot_on_stream_const(srv, stream_id, byte_bus_id);
+    if (!slot) return 0;
+    return rcp_server_endpoint_pending_count(&slot->queue);
+}
+
 //cfusa:req REQ-MOCK-026
 size_t rcp_mock_server_watchdog_purge(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id)
 {
@@ -2627,17 +2808,59 @@ size_t rcp_mock_server_watchdog_purge(rcp_mock_server_t *srv, rcp_byte_bus_id_t 
     return rcp_server_endpoint_watchdog_purge(&slot->queue);
 }
 
+//cfusa:req REQ-MOCK-032
+size_t rcp_mock_server_watchdog_purge_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                                 rcp_byte_bus_id_t byte_bus_id)
+{
+    rcp_mock_endpoint_slot_t *slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
+    if (!slot) return 0;
+    return rcp_server_endpoint_watchdog_purge(&slot->queue);
+}
+
+/* issue #447: unlike every other function this issue's audit named,
+ * rcp_mock_server_broadcast_safe_state() does NOT take byte_bus_id as its
+ * only endpoint selector -- request_stream_index already disambiguates
+ * which request stream is escalating, so this function does not need a
+ * new _on_stream() variant the way rcp_mock_server_tick()/_drain_endpoint()
+ * etc. do. It DID have a real, narrower version of the same bug: its own
+ * per-byte_bus_id loop below used to resolve each bound slot via the
+ * unscoped find_slot(), which -- once two endpoints legitimately share one
+ * byte_bus_id on different stream_ids (rcp_mock_server_add_endpoint_
+ * on_stream()) -- could purge the wrong one of the two. Fixed in place
+ * (not by adding a variant): request_stream_index already carries enough
+ * context to resolve the real stream_id this call is escalating (srv's
+ * own request_stream_cfg[request_stream_index-1].rx_stream_id, the same
+ * table rcp_regmap_request_stream_cfg_resolve_index() -- the inverse
+ * lookup -- already keys off), so the loop below now calls
+ * find_slot_on_stream() with that resolved stream_id instead. */
 //cfusa:req REQ-E2E-029
 //cfusa:req REQ-E2E-030
 //cfusa:req REQ-E2E-045
+//cfusa:req REQ-MOCK-033
 size_t rcp_mock_server_broadcast_safe_state(rcp_mock_server_t *srv, uint8_t request_stream_index)
 {
     rcp_byte_bus_id_t bound[RCP_MOCK_MAX_ENDPOINTS];
     size_t             total_bound;
     size_t             purged = 0;
     size_t             i;
+    bool               have_stream_id = false;
+    uint64_t           resolved_stream_id = 0;
 
     if (request_stream_index == 0u) return 0;
+
+    /* Resolve the real wire stream_id this request_stream_index names, so
+     * the per-slot lookup below can be genuinely stream-scoped rather than
+     * byte_bus_id-only -- see this function's own doc comment above. A
+     * request_stream_index beyond srv's own currently-configured
+     * request_stream_cfg_count has no known stream_id to resolve (an
+     * EP_ID_config row referencing an unconfigured request stream); the
+     * loop below falls back to the old, unscoped find_slot() only for
+     * that misconfigured case, exactly this function's pre-fix behavior
+     * -- no worse than before, and no in-range call is affected. */
+    if ((size_t)request_stream_index <= srv->request_stream_cfg_count) {
+        resolved_stream_id = srv->request_stream_cfg[request_stream_index - 1u].rx_stream_id;
+        have_stream_id      = true;
+    }
 
     total_bound = rcp_regmap_ep_id_map_byte_bus_ids_for_stream(
         srv->ep_id_map, srv->ep_id_map_count, request_stream_index, bound,
@@ -2650,7 +2873,9 @@ size_t rcp_mock_server_broadcast_safe_state(rcp_mock_server_t *srv, uint8_t requ
     if (total_bound > RCP_MOCK_MAX_ENDPOINTS) total_bound = RCP_MOCK_MAX_ENDPOINTS;
 
     for (i = 0; i < total_bound; i++) {
-        rcp_mock_endpoint_slot_t *slot = find_slot(srv, bound[i]);
+        rcp_mock_endpoint_slot_t *slot = have_stream_id
+            ? find_slot_on_stream(srv, resolved_stream_id, bound[i])
+            : find_slot(srv, bound[i]);
         if (!slot) continue; /* bound in EP_ID_config, not (or no longer) registered */
         purged += rcp_server_endpoint_watchdog_purge(&slot->queue);
     }

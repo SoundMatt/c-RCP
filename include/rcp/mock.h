@@ -701,11 +701,35 @@ rcp_mock_errc_t rcp_mock_server_add_endpoint_on_stream(rcp_mock_server_t *srv, u
  * was never registered. */
 bool rcp_mock_server_remove_endpoint(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id);
 
+/* REQ-MOCK-032 (issue #447): stream-scoped counterpart of
+ * rcp_mock_server_remove_endpoint() above, following the same "new
+ * function, not a breaking change" pattern rcp_mock_server_add_endpoint_
+ * on_stream() (issue #432) already established -- the plain, unscoped
+ * rcp_mock_server_remove_endpoint() is untouched, still resolving by
+ * byte_bus_id alone for its own ~100+ existing call sites. Needed because
+ * rcp_mock_server_add_endpoint_on_stream() lets two slots legitimately
+ * share one byte_bus_id on different stream_ids, which the unscoped
+ * lookup cannot disambiguate; removes the slot at (stream_id,
+ * byte_bus_id) instead. Returns true iff that exact pair named a
+ * registered slot (and it was removed); false, srv left unchanged,
+ * otherwise. */
+bool rcp_mock_server_remove_endpoint_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                                rcp_byte_bus_id_t byte_bus_id);
+
 /* Sets the ep_enable flag of the endpoint at byte_bus_id (server.h's
  * rcp_server_endpoint_set_enable()). Returns true iff byte_bus_id names a
  * registered endpoint. */
 bool rcp_mock_server_set_endpoint_enable(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
                                           bool enable);
+
+/* REQ-MOCK-032 (issue #447): stream-scoped counterpart of
+ * rcp_mock_server_set_endpoint_enable() above -- see
+ * rcp_mock_server_remove_endpoint_on_stream()'s own doc comment for the
+ * shared rationale/pattern every _on_stream() accessor added by this fix
+ * follows. Returns true iff (stream_id, byte_bus_id) names a registered
+ * slot. */
+bool rcp_mock_server_set_endpoint_enable_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                                    rcp_byte_bus_id_t byte_bus_id, bool enable);
 
 /* Sets whether rcp_mock_server_dispatch_e2e()/_dispatch_frame_e2e()
  * require a valid e2e.h CRC32 trailer on requests addressed to the
@@ -721,6 +745,16 @@ bool rcp_mock_server_set_endpoint_enable(rcp_mock_server_t *srv, rcp_byte_bus_id
  * names a registered endpoint. */
 bool rcp_mock_server_set_endpoint_req_crc_enable(rcp_mock_server_t *srv,
                                                   rcp_byte_bus_id_t byte_bus_id, bool enable);
+
+/* REQ-MOCK-032 (issue #447): stream-scoped counterpart of
+ * rcp_mock_server_set_endpoint_req_crc_enable() above -- see
+ * rcp_mock_server_remove_endpoint_on_stream()'s own doc comment for the
+ * shared rationale/pattern. Returns true iff (stream_id, byte_bus_id)
+ * names a registered slot. */
+bool rcp_mock_server_set_endpoint_req_crc_enable_on_stream(rcp_mock_server_t *srv,
+                                                             uint64_t stream_id,
+                                                             rcp_byte_bus_id_t byte_bus_id,
+                                                             bool enable);
 
 /* REQ-E2E-021 (issue #201): this test double's own in-process stand-in
  * for TC18 §12.7.7 Table 24's own rx_enforce_e2e -- a per-REQUEST-
@@ -738,6 +772,16 @@ bool rcp_mock_server_set_endpoint_req_crc_enable(rcp_mock_server_t *srv,
  * Returns true iff byte_bus_id names a registered endpoint. */
 bool rcp_mock_server_set_endpoint_rx_enforce_e2e(rcp_mock_server_t *srv,
                                                   rcp_byte_bus_id_t byte_bus_id, bool enable);
+
+/* REQ-MOCK-032 (issue #447): stream-scoped counterpart of
+ * rcp_mock_server_set_endpoint_rx_enforce_e2e() above -- see
+ * rcp_mock_server_remove_endpoint_on_stream()'s own doc comment for the
+ * shared rationale/pattern. Returns true iff (stream_id, byte_bus_id)
+ * names a registered slot. */
+bool rcp_mock_server_set_endpoint_rx_enforce_e2e_on_stream(rcp_mock_server_t *srv,
+                                                             uint64_t stream_id,
+                                                             rcp_byte_bus_id_t byte_bus_id,
+                                                             bool enable);
 
 /* REQ-AVTP-021/022 (issue #431, TC18 §13.3): sets srv's own server-wide
  * disposition for §13.3's two "...or dropped, depending on the
@@ -1102,6 +1146,15 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_multi_response(
 bool rcp_mock_server_drain_endpoint(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
                                      rcp_bytes_t *out_response);
 
+/* REQ-MOCK-032 (issue #447): stream-scoped counterpart of
+ * rcp_mock_server_drain_endpoint() above -- see
+ * rcp_mock_server_remove_endpoint_on_stream()'s own doc comment for the
+ * shared rationale/pattern. Drains and runs the oldest queued request on
+ * the slot at (stream_id, byte_bus_id) specifically. */
+bool rcp_mock_server_drain_endpoint_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                               rcp_byte_bus_id_t byte_bus_id,
+                                               rcp_bytes_t *out_response);
+
 /* ── Deferred response (REQ-GPIO-035/036) ────────────────────────────────────
  *
  * Every dispatch entry point above answers synchronously, in the same
@@ -1140,6 +1193,15 @@ bool rcp_mock_server_drain_endpoint(rcp_mock_server_t *srv, rcp_byte_bus_id_t by
 bool rcp_mock_server_stash_deferred_response(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
                                               rcp_bytes_t response);
 
+/* REQ-MOCK-032 (issue #447): stream-scoped counterpart of
+ * rcp_mock_server_stash_deferred_response() above -- see
+ * rcp_mock_server_remove_endpoint_on_stream()'s own doc comment for the
+ * shared rationale/pattern. Stashes response for the slot at (stream_id,
+ * byte_bus_id) specifically. */
+bool rcp_mock_server_stash_deferred_response_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                                         rcp_byte_bus_id_t byte_bus_id,
+                                                         rcp_bytes_t response);
+
 /* Retrieves and clears byte_bus_id's own stashed deferred response, if
  * any. Returns true (*out_response populated, ownership transferred to
  * the caller -- free with rcp_bytes_free()) iff byte_bus_id names a
@@ -1148,6 +1210,15 @@ bool rcp_mock_server_stash_deferred_response(rcp_mock_server_t *srv, rcp_byte_bu
  * nothing currently stashed. */
 bool rcp_mock_server_take_deferred_response(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
                                              rcp_bytes_t *out_response);
+
+/* REQ-MOCK-032 (issue #447): stream-scoped counterpart of
+ * rcp_mock_server_take_deferred_response() above -- see
+ * rcp_mock_server_remove_endpoint_on_stream()'s own doc comment for the
+ * shared rationale/pattern. Retrieves and clears the deferred response
+ * stashed for the slot at (stream_id, byte_bus_id) specifically. */
+bool rcp_mock_server_take_deferred_response_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                                        rcp_byte_bus_id_t byte_bus_id,
+                                                        rcp_bytes_t *out_response);
 
 /* ── Multi-request-per-frame dispatch (TC18 §12.9.1.1) ─────────────────────── */
 
@@ -1414,6 +1485,19 @@ rcp_sequencer_table_t *rcp_mock_server_sequencers(rcp_mock_server_t *srv);
 bool rcp_mock_server_tick(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
                            const rcp_server_tick_ctx_t *ctx, rcp_bytes_t *out_response);
 
+/* REQ-MOCK-032 (issue #447): stream-scoped counterpart of
+ * rcp_mock_server_tick() above -- see rcp_mock_server_remove_endpoint_
+ * on_stream()'s own doc comment for the shared rationale/pattern.
+ * rcp_mock_server_tick() operates on exactly one slot per call (selected
+ * by byte_bus_id alone), so -- unlike rcp_mock_server_broadcast_safe_
+ * state(), which already has enough context via request_stream_index to
+ * fix its own internal lookup without a new variant -- this one genuinely
+ * needs a stream-scoped entry point. Runs at most one due conditional
+ * request on the slot at (stream_id, byte_bus_id) specifically. */
+bool rcp_mock_server_tick_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                     rcp_byte_bus_id_t byte_bus_id,
+                                     const rcp_server_tick_ctx_t *ctx, rcp_bytes_t *out_response);
+
 /* Reports one observed trigger occurrence, emitted by endpoint source_ep
  * as its trigger signal number signal_nr, to every endpoint registered on
  * srv -- a triggered request stored on one endpoint routinely waits on a
@@ -1428,12 +1512,29 @@ size_t rcp_mock_server_notify_trigger(rcp_mock_server_t *srv, uint8_t source_ep,
  * endpoint. */
 size_t rcp_mock_server_pending_count(const rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id);
 
+/* REQ-MOCK-032 (issue #447): stream-scoped counterpart of
+ * rcp_mock_server_pending_count() above -- see
+ * rcp_mock_server_remove_endpoint_on_stream()'s own doc comment for the
+ * shared rationale/pattern. Number of conditional requests held in the
+ * request store of the slot at (stream_id, byte_bus_id) specifically, or
+ * 0 if that pair names no registered endpoint. */
+size_t rcp_mock_server_pending_count_on_stream(const rcp_mock_server_t *srv, uint64_t stream_id,
+                                                rcp_byte_bus_id_t byte_bus_id);
+
 /* Applies a watchdog overflow to the endpoint at byte_bus_id: purges
  * every non-safety-tagged request from its store (server.h's
  * rcp_server_endpoint_watchdog_purge(), i.e. e2e.h's own
  * keep-only-the-safety-sequence rule), leaving the 0x8x ones to drive the
  * endpoint into its safe state. Returns how many requests were purged. */
 size_t rcp_mock_server_watchdog_purge(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id);
+
+/* REQ-MOCK-032 (issue #447): stream-scoped counterpart of
+ * rcp_mock_server_watchdog_purge() above -- see
+ * rcp_mock_server_remove_endpoint_on_stream()'s own doc comment for the
+ * shared rationale/pattern. Applies a watchdog overflow to the slot at
+ * (stream_id, byte_bus_id) specifically. */
+size_t rcp_mock_server_watchdog_purge_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                                 rcp_byte_bus_id_t byte_bus_id);
 
 /* ── Cross-endpoint safe-state broadcast (issue #335) ────────────────────────
  *
@@ -1481,6 +1582,18 @@ size_t rcp_mock_server_watchdog_purge(rcp_mock_server_t *srv, rcp_byte_bus_id_t 
  * not exist, the same "type-erased slot, no way to reach what isn't
  * there" boundary every other per-endpoint mock.c function already
  * respects.
+ *
+ * REQ-MOCK-033 (issue #447): each bound byte_bus_id is resolved to a slot
+ * via find_slot_on_stream(), keyed by the real wire stream_id
+ * request_stream_index itself resolves to (srv's own request_stream_cfg[
+ * request_stream_index-1].rx_stream_id) -- not the plain, unscoped
+ * find_slot() this function used before this fix. This function's own
+ * signature is UNCHANGED (no new _on_stream() variant was needed, unlike
+ * rcp_mock_server_tick()/_drain_endpoint()/etc.): request_stream_index
+ * already disambiguates which request stream is escalating, so the fix
+ * lives entirely inside this function's own existing lookup, correcting a
+ * genuine defect (silently purging whichever of two byte_bus_id-sharing
+ * slots came first by array index) rather than adding new API surface.
  *
  * Returns the total number of requests purged, summed across every bound,
  * currently-registered endpoint (rcp_mock_server_watchdog_purge()'s own

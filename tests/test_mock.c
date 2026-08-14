@@ -21,6 +21,8 @@
 //cfusa:test REQ-MOCK-020
 //cfusa:test REQ-MOCK-030
 //cfusa:test REQ-MOCK-031
+//cfusa:test REQ-MOCK-032
+//cfusa:test REQ-MOCK-033
 //cfusa:test REQ-WDG-010
 //cfusa:test REQ-AVTP-021
 //cfusa:test REQ-AVTP-022
@@ -34,11 +36,13 @@
 #include <rcp/acf.h>
 #include <rcp/avtp.h>
 #include <rcp/clock.h>
+#include <rcp/e2e.h>
 #include <rcp/lifecycle.h>
 #include <rcp/mock.h>
 #include <rcp/power.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
+#include <rcp/request_triggered.h>
 #include <rcp/watchdog.h>
 
 #include <string.h>
@@ -2028,6 +2032,418 @@ static void test_ep_generic_cfg_write_round_trips_through_the_real_dispatcher(vo
     rcp_mock_server_destroy(srv);
 }
 
+/* ── REQ-MOCK-032/033 (issue #447): stream-scoped accessor variants ─────────
+ *
+ * The #432 fix stream-scoped every real DISPATCH entry point, but left the
+ * rest of mock.c's byte_bus_id-only accessor API resolving by byte_bus_id
+ * alone (find_slot()) -- fine before #432 (a shared byte_bus_id was
+ * impossible), but genuinely ambiguous once two endpoints legitimately
+ * share one byte_bus_id on two different stream_ids
+ * (rcp_mock_server_add_endpoint_on_stream()). Every test below registers
+ * exactly that pair (STREAM_A/STREAM_B, byte_bus_id 5, the same fixture
+ * shape test_dispatch_stream_scoped_endpoints_route_by_stream_id() above
+ * already uses) and proves each new _on_stream() accessor reaches the
+ * slot its own stream_id names, never the other one -- the mutation this
+ * is meant to catch is exactly "silently falls back to find_slot(), so it
+ * always hits whichever slot happens to be first by array index". */
+
+/* An ACF_ABB frame with no e2e.h CRC32 trailer -- rcp_mock_server_
+ * dispatch_e2e() executes it immediately on a plain-command-mode
+ * endpoint, but rejects it (RCP_MOCK_DISPATCH_CRC_ERROR) on one switched
+ * to safe command mode (req_crc_enable) -- the same fixture shape
+ * test_dispatch_e2e_safe_mode_rejects_an_unprotected_request()
+ * (test_tc18_gaps_e2e.c) already established, reused here as the
+ * targeting probe for _set_endpoint_req_crc_enable_on_stream()/
+ * _set_endpoint_rx_enforce_e2e_on_stream(). */
+static rcp_bytes_t make_plain_abb(rcp_byte_bus_id_t byte_bus_id, uint8_t txn)
+{
+    rcp_acf_byte_message_info_t h;
+    const uint8_t                pl[2] = {0xAA, 0xBB};
+
+    memset(&h, 0, sizeof(h));
+    h.byte_bus_id     = byte_bus_id;
+    h.transaction_num = txn;
+    h.op              = (uint8_t)RCP_ACF_OP_WRITE;
+    return rcp_acf_encode_abb(&h, pl, sizeof(pl));
+}
+
+/* A TRIGGERED request waiting on (source_ep, signal_nr) -- stored in the
+ * addressed slot's own request store (RCP_MOCK_DISPATCH_PENDING) until
+ * rcp_mock_server_notify_trigger() reports that exact occurrence. Used as
+ * the targeting probe for _pending_count_on_stream()/_watchdog_purge_
+ * on_stream()/_tick_on_stream() -- the same rcp_triggered_encode_request()
+ * primitive test_conditional_dispatch.c's own make_triggered() helper
+ * uses, reused directly rather than duplicating its own compound/
+ * sequencer-ownership fixture machinery this simpler case does not need
+ * (REQ-SEQ-013 is COMPOUND/COMPOUND_WAIT-only, per mock.c's own comment
+ * at the ownership check itself). */
+static rcp_bytes_t make_triggered_frame(rcp_byte_bus_id_t byte_bus_id, uint8_t source_ep,
+                                         uint8_t signal_nr, uint8_t txn)
+{
+    rcp_triggered_step_t step;
+
+    memset(&step, 0, sizeof(step));
+    step.trigger_source_ep = source_ep;
+    step.trigger_signal_nr = signal_nr;
+    step.trigger_threshold = 0;
+    return rcp_triggered_encode_request(RCP_REQUEST_TYPE_TRIGGERED, byte_bus_id, &step, txn, NULL,
+                                         0);
+}
+
+static void test_remove_endpoint_on_stream_targets_correct_slot(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+        rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, NULL, NULL));
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+        rcp_mock_server_add_endpoint_on_stream(srv, STREAM_B, 5, 1, true, NULL, NULL));
+
+    /* Wrong stream_id: no-op, both slots still present. */
+    TEST_ASSERT_FALSE(rcp_mock_server_remove_endpoint_on_stream(srv, STREAM_C, 5));
+    TEST_ASSERT_EQUAL_UINT16(2, rcp_mock_server_regmap(srv)->svr_ep_count);
+
+    /* Removes STREAM_A's slot only -- proven two ways: svr_ep_count drops
+     * by exactly one, and STREAM_B's own slot (still there) still
+     * rejects a fresh STREAM_B registration at the same byte_bus_id as a
+     * duplicate, while STREAM_A's own byte_bus_id is free again. */
+    TEST_ASSERT_TRUE(rcp_mock_server_remove_endpoint_on_stream(srv, STREAM_A, 5));
+    TEST_ASSERT_EQUAL_UINT16(1, rcp_mock_server_regmap(srv)->svr_ep_count);
+    TEST_ASSERT_EQUAL(RCP_MOCK_ERR_DUPLICATE_BUS_ID,
+        rcp_mock_server_add_endpoint_on_stream(srv, STREAM_B, 5, 1, true, NULL, NULL));
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+        rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, NULL, NULL));
+
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_set_endpoint_enable_on_stream_and_drain_endpoint_on_stream_target_correct_slot(
+    void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t        req[] = {0x42};
+    int                  marker_a = 1;
+    int                  marker_b = 2;
+
+    to_rcp_configured(srv);
+    /* Both slots start disabled -- a dispatched request just queues. */
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, false, echo_handler, &marker_a);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_B, 5, 1, false, echo_handler, &marker_b);
+    rcp_mock_server_dispatch(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true, STREAM_A,
+                              req, sizeof(req), &resp);
+    rcp_mock_server_dispatch(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true, STREAM_B,
+                              req, sizeof(req), &resp);
+
+    /* Enables ONLY STREAM_A's slot. */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_enable_on_stream(srv, STREAM_A, 5, true));
+
+    /* STREAM_A's slot drains and runs; STREAM_B's own slot is still
+     * disabled, so its own drain is a no-op -- proving the enable above
+     * did not reach it. */
+    reset_handler_capture();
+    TEST_ASSERT_TRUE(rcp_mock_server_drain_endpoint_on_stream(srv, STREAM_A, 5, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    TEST_ASSERT_EQUAL_PTR(&marker_a, g_seen_user_data);
+    rcp_bytes_free(&resp);
+
+    reset_handler_capture();
+    TEST_ASSERT_FALSE(rcp_mock_server_drain_endpoint_on_stream(srv, STREAM_B, 5, &resp));
+    TEST_ASSERT_FALSE(g_handler_called);
+    TEST_ASSERT_NULL(resp.data);
+
+    /* Now enable STREAM_B's slot too, and prove drain_endpoint_on_stream()
+     * itself resolves the right one when both are enabled. */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_enable_on_stream(srv, STREAM_B, 5, true));
+    reset_handler_capture();
+    TEST_ASSERT_TRUE(rcp_mock_server_drain_endpoint_on_stream(srv, STREAM_B, 5, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    TEST_ASSERT_EQUAL_PTR(&marker_b, g_seen_user_data);
+    rcp_bytes_free(&resp);
+
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_stash_and_take_deferred_response_on_stream_target_correct_slot(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, NULL, NULL);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_B, 5, 1, true, NULL, NULL);
+
+    TEST_ASSERT_TRUE(rcp_mock_server_stash_deferred_response_on_stream(
+        srv, STREAM_A, 5, rcp_bytes_dup((const uint8_t *)"A", 1)));
+
+    /* STREAM_B's own slot has nothing stashed -- proves the stash above
+     * did not land there. */
+    TEST_ASSERT_FALSE(rcp_mock_server_take_deferred_response_on_stream(srv, STREAM_B, 5, &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    TEST_ASSERT_TRUE(rcp_mock_server_take_deferred_response_on_stream(srv, STREAM_A, 5, &resp));
+    TEST_ASSERT_EQUAL_size_t(1, resp.len);
+    TEST_ASSERT_EQUAL_UINT8('A', resp.data[0]);
+    rcp_bytes_free(&resp);
+
+    /* Already taken -- STREAM_A's own slot is empty again now, not
+     * accidentally re-fed from STREAM_B. */
+    TEST_ASSERT_FALSE(rcp_mock_server_take_deferred_response_on_stream(srv, STREAM_A, 5, &resp));
+
+    /* Stash on STREAM_B this time -- proves the write side targets by
+     * stream_id too, not just the read side. */
+    TEST_ASSERT_TRUE(rcp_mock_server_stash_deferred_response_on_stream(
+        srv, STREAM_B, 5, rcp_bytes_dup((const uint8_t *)"B", 1)));
+    TEST_ASSERT_FALSE(rcp_mock_server_take_deferred_response_on_stream(srv, STREAM_A, 5, &resp));
+    TEST_ASSERT_TRUE(rcp_mock_server_take_deferred_response_on_stream(srv, STREAM_B, 5, &resp));
+    TEST_ASSERT_EQUAL_size_t(1, resp.len);
+    TEST_ASSERT_EQUAL_UINT8('B', resp.data[0]);
+    rcp_bytes_free(&resp);
+
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_pending_count_on_stream_and_watchdog_purge_on_stream_target_correct_slot(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    /* Never actually notified in this test -- stays pending forever,
+     * which is exactly what a count-and-purge probe needs. */
+    rcp_bytes_t frame = make_triggered_frame(5, 200, 200, 70);
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, NULL, NULL);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_B, 5, 1, true, NULL, NULL);
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+        rcp_mock_server_dispatch(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, true,
+                                  STREAM_A, frame.data, frame.len, &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    /* Only STREAM_A's own slot has a stored request. */
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count_on_stream(srv, STREAM_A, 5));
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count_on_stream(srv, STREAM_B, 5));
+
+    /* Purging STREAM_B's own (empty) slot removes nothing and leaves
+     * STREAM_A's own stored request untouched. */
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_watchdog_purge_on_stream(srv, STREAM_B, 5));
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count_on_stream(srv, STREAM_A, 5));
+
+    /* Purging STREAM_A's own slot does. */
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_watchdog_purge_on_stream(srv, STREAM_A, 5));
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count_on_stream(srv, STREAM_A, 5));
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_tick_on_stream_targets_correct_slot(void)
+{
+    rcp_mock_server_t     *srv  = rcp_mock_server_new();
+    rcp_bytes_t             resp = {0};
+    rcp_bytes_t             frame_a;
+    rcp_bytes_t             frame_b;
+    int                     marker_a = 1;
+    int                     marker_b = 2;
+    rcp_server_tick_ctx_t   ctx;
+
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.gptp_locked   = true;
+    ctx.endpoint_idle = true;
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, echo_handler, &marker_a);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_B, 5, 1, true, echo_handler, &marker_b);
+
+    /* Both slots store a triggered request waiting on the SAME
+     * (source_ep, signal_nr) -- one occurrence arms both at once. */
+    frame_a = make_triggered_frame(5, 7, 3, 60);
+    frame_b = make_triggered_frame(5, 7, 3, 61);
+    TEST_ASSERT_NOT_NULL(frame_a.data);
+    TEST_ASSERT_NOT_NULL(frame_b.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+        rcp_mock_server_dispatch(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, true,
+                                  STREAM_A, frame_a.data, frame_a.len, &resp));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+        rcp_mock_server_dispatch(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, true,
+                                  STREAM_B, frame_b.data, frame_b.len, &resp));
+    TEST_ASSERT_EQUAL_size_t(2, rcp_mock_server_notify_trigger(srv, 7, 3));
+
+    /* STREAM_B first, deliberately -- STREAM_A's own slot was registered
+     * first (lower array index), so a tick_on_stream() that silently fell
+     * back to the unscoped find_slot() would still "accidentally" reach
+     * the right slot if checked in registration order. Checking STREAM_B
+     * first rules that out. */
+    reset_handler_capture();
+    TEST_ASSERT_TRUE(rcp_mock_server_tick_on_stream(srv, STREAM_B, 5, &ctx, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    TEST_ASSERT_EQUAL_PTR(&marker_b, g_seen_user_data);
+    rcp_bytes_free(&resp);
+
+    reset_handler_capture();
+    TEST_ASSERT_TRUE(rcp_mock_server_tick_on_stream(srv, STREAM_A, 5, &ctx, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    TEST_ASSERT_EQUAL_PTR(&marker_a, g_seen_user_data);
+    rcp_bytes_free(&resp);
+
+    /* Both now drained -- a further tick_on_stream() on either finds
+     * nothing due. */
+    TEST_ASSERT_FALSE(rcp_mock_server_tick_on_stream(srv, STREAM_A, 5, &ctx, &resp));
+    TEST_ASSERT_FALSE(rcp_mock_server_tick_on_stream(srv, STREAM_B, 5, &ctx, &resp));
+
+    rcp_bytes_free(&frame_a);
+    rcp_bytes_free(&frame_b);
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_set_endpoint_req_crc_enable_on_stream_targets_correct_slot(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    rcp_bytes_t         plain = make_plain_abb(5, 30);
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, echo_handler, NULL);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_B, 5, 1, true, echo_handler, NULL);
+
+    /* Safe command mode (req_crc_enable) on STREAM_A's own slot only. */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable_on_stream(srv, STREAM_A, 5, true));
+
+    /* The same unprotected request is rejected on STREAM_A's own slot...
+     * (a CRC_ERROR result carries a real, allocated error response --
+     * rcp_acf_build_error_response() -- freed here before resp is reused
+     * below, not just once at the end.) */
+    reset_handler_capture();
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+        rcp_mock_server_dispatch_e2e(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                      STREAM_A, 0, plain.data, plain.len, &resp));
+    TEST_ASSERT_FALSE(g_handler_called);
+    rcp_bytes_free(&resp);
+
+    /* ...but still executes on STREAM_B's own slot -- its own
+     * req_crc_enable is untouched (still plain command mode), proving the
+     * setter above targeted only STREAM_A's slot. */
+    reset_handler_capture();
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch_e2e(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                      STREAM_B, 0, plain.data, plain.len, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_set_endpoint_rx_enforce_e2e_on_stream_targets_correct_slot(void)
+{
+    rcp_mock_server_t             *srv = rcp_mock_server_new();
+    rcp_bytes_t                     resp = {0};
+    rcp_bytes_t                     plain = make_plain_abb(5, 31);
+    rcp_e2e_stream_fault_tracker_t  tracker;
+
+    rcp_e2e_stream_fault_tracker_init(&tracker);
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, echo_handler, NULL);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_B, 5, 1, true, echo_handler, NULL);
+    /* Safe command mode on BOTH -- only rx_enforce_e2e is under test
+     * here, so both slots must actually detect the CRC mismatch. */
+    rcp_mock_server_set_endpoint_req_crc_enable_on_stream(srv, STREAM_A, 5, true);
+    rcp_mock_server_set_endpoint_req_crc_enable_on_stream(srv, STREAM_B, 5, true);
+    rcp_mock_server_set_stream_fault_tracker(srv, &tracker);
+
+    /* rx_enforce_e2e set on STREAM_A's own slot only. */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_rx_enforce_e2e_on_stream(srv, STREAM_A, 5, true));
+
+    /* A CRC mismatch on STREAM_A's own slot latches the WHOLE stream
+     * faulted -- that slot's own rx_enforce_e2e is set. (Each CRC_ERROR
+     * result carries a real, allocated error response, freed immediately
+     * rather than letting resp's second assignment below leak the
+     * first.) */
+    rcp_mock_server_dispatch_e2e(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  STREAM_A, 0, plain.data, plain.len, &resp);
+    TEST_ASSERT_TRUE(rcp_e2e_stream_fault_tracker_is_faulted(&tracker, STREAM_A));
+    rcp_bytes_free(&resp);
+
+    /* The identical CRC mismatch on STREAM_B's own slot does NOT latch
+     * STREAM_B faulted -- its own rx_enforce_e2e is untouched (still
+     * false), proving the setter above targeted only STREAM_A's slot. */
+    rcp_mock_server_dispatch_e2e(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  STREAM_B, 0, plain.data, plain.len, &resp);
+    TEST_ASSERT_FALSE(rcp_e2e_stream_fault_tracker_is_faulted(&tracker, STREAM_B));
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-MOCK-033: rcp_mock_server_broadcast_safe_state() itself gains no new
+ * _on_stream() variant (request_stream_index already disambiguates which
+ * request stream is escalating) -- this proves its own INTERNAL lookup is
+ * now genuinely stream-scoped instead. Two endpoints share byte_bus_id 5
+ * on two different stream_ids, each bound (EP_ID_config) to a DIFFERENT
+ * request_stream_index, each with its own pending (never-fired) triggered
+ * request -- broadcasting to request_stream_index 1 (STREAM_A's own)
+ * must purge only STREAM_A's own slot, never STREAM_B's, even though both
+ * slots share the same byte_bus_id the old, unscoped find_slot() could
+ * not tell apart. */
+static void test_broadcast_safe_state_resolves_bound_byte_bus_id_by_stream(void)
+{
+    rcp_mock_server_t              *srv = rcp_mock_server_new();
+    rcp_bytes_t                      resp = {0};
+    rcp_bytes_t                      frame_a = make_triggered_frame(5, 200, 200, 80);
+    rcp_bytes_t                      frame_b = make_triggered_frame(5, 200, 200, 81);
+    rcp_regmap_request_stream_cfg_t  stream_cfg[2];
+    rcp_regmap_ep_id_map_entry_t     ep_id_map[2];
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_A, 5, 1, true, NULL, NULL);
+    rcp_mock_server_add_endpoint_on_stream(srv, STREAM_B, 5, 1, true, NULL, NULL);
+
+    /* request_stream_index 1 -> STREAM_A, request_stream_index 2 ->
+     * STREAM_B (rx_stream_id is REQ-MOCK-033's own newly-consulted
+     * field). */
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id = STREAM_A;
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[1]);
+    stream_cfg[1].rx_stream_id = STREAM_B;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 2));
+
+    /* Both request streams bind byte_bus_id 5 in EP_ID_config -- the only
+     * way the two slots stay indistinguishable to the OLD, unscoped
+     * find_slot() this fix replaced. */
+    memset(ep_id_map, 0, sizeof(ep_id_map));
+    ep_id_map[0].byte_bus_id          = 5;
+    ep_id_map[0].request_stream_index = 1;
+    ep_id_map[1].byte_bus_id          = 5;
+    ep_id_map[1].request_stream_index = 2;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_ep_id_map(srv, ep_id_map, 2));
+
+    TEST_ASSERT_NOT_NULL(frame_a.data);
+    TEST_ASSERT_NOT_NULL(frame_b.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+        rcp_mock_server_dispatch(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, true,
+                                  STREAM_A, frame_a.data, frame_a.len, &resp));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+        rcp_mock_server_dispatch(srv, 5, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, true,
+                                  STREAM_B, frame_b.data, frame_b.len, &resp));
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count_on_stream(srv, STREAM_A, 5));
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count_on_stream(srv, STREAM_B, 5));
+
+    /* Escalating request_stream_index 1 (STREAM_A) purges STREAM_A's own
+     * slot only. */
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_broadcast_safe_state(srv, 1));
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count_on_stream(srv, STREAM_A, 5));
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count_on_stream(srv, STREAM_B, 5));
+
+    /* Escalating request_stream_index 2 (STREAM_B) purges the other. */
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_broadcast_safe_state(srv, 2));
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count_on_stream(srv, STREAM_B, 5));
+
+    rcp_bytes_free(&frame_a);
+    rcp_bytes_free(&frame_b);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── Error strings ─────────────────────────────────────────────────────────── */
 
 static void test_strerror_never_null(void)
@@ -2125,6 +2541,15 @@ int main(void)
     RUN_TEST(test_apply_ep_generic_cfg_rejects_mismatched_count);
     RUN_TEST(test_apply_ep_generic_cfg_scatters_correctly_around_a_hole);
     RUN_TEST(test_ep_generic_cfg_write_round_trips_through_the_real_dispatcher);
+
+    RUN_TEST(test_remove_endpoint_on_stream_targets_correct_slot);
+    RUN_TEST(test_set_endpoint_enable_on_stream_and_drain_endpoint_on_stream_target_correct_slot);
+    RUN_TEST(test_stash_and_take_deferred_response_on_stream_target_correct_slot);
+    RUN_TEST(test_pending_count_on_stream_and_watchdog_purge_on_stream_target_correct_slot);
+    RUN_TEST(test_tick_on_stream_targets_correct_slot);
+    RUN_TEST(test_set_endpoint_req_crc_enable_on_stream_targets_correct_slot);
+    RUN_TEST(test_set_endpoint_rx_enforce_e2e_on_stream_targets_correct_slot);
+    RUN_TEST(test_broadcast_safe_state_resolves_bound_byte_bus_id_by_stream);
 
     RUN_TEST(test_strerror_never_null);
 
