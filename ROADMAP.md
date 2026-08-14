@@ -19106,6 +19106,42 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.341.0 -- 2026-08-14 (REQ-WAKEUP-021: wup_status redesigned as a
+genuine per-source bitmask)
+
+Eighth of 14 items -- the first of the three WakeUp items and a real
+breaking API change, matching the user's own description of this trio
+("WakeUp redesigns (breaking API changes)").
+
+TC18 Table 36's own `wup_status` register is a 16-bit bitmask ("each
+bit represents a wake-up source", write-1-to-clear). The struct
+previously modeled only a single aggregate latch bit -- BREAKING
+CHANGE: `bool latched` is now `uint16_t mask`, one bit per wake-source
+slot. `_latch()` (index-free) is removed, replaced by `_latch_source(i)`;
+new `_clear_source(i)` clears exactly one bit; new
+`_source_is_latched(i)` queries one bit. Out-of-range index is a
+fail-safe no-op, not UB.
+
+Register-block render/parse now cover the FULL wire word, not just bit
+0 -- parse applies write-1-to-clear bit-by-bit, so a write naming only
+some sources clears only those, leaving the rest latched (unrepresentable
+under the old model).
+
+New tests prove per-source independence, partial-clear, out-of-range
+no-ops, and the multi-bit wire round trip. Three independent mutations
+(per-bit clear, parse loop's bit-by-bit application, render-side
+masking) each weakened and confirmed to fail, then restored.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51):
+0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`:
+`REQ-WAKEUP-021` partial → implemented -- 1044 implemented / 23 partial
+/ 2 not-implemented / 7 retired, 1076 total.
+
+**Next**: REQ-WAKEUP-022 (edge-triggered IO_SRC modes -- needs
+previous-pin-level state, a bigger redesign than this one), then
+REQ-WAKEUP-018 (repetition_time_us wire mapping -- a cross-endpoint
+architecture question).
+
 ### v0.340.0 -- 2026-08-14 (REQ-LIFECYCLE-031: "valid stream_id/byte_bus_id
 combination" authorization closed; REQ-LIFECYCLE-025 re-confirmed spec
 silence)

@@ -84,25 +84,42 @@ bool rcp_ep_wakeup_any_source_asserted(const rcp_ep_wakeup_functional_cfg_t *fcf
 //cfusa:req REQ-WAKEUP-005
 void rcp_ep_wakeup_wup_status_init(rcp_ep_wakeup_wup_status_t *s)
 {
-    s->latched = false;
+    s->mask = 0;
 }
 
 //cfusa:req REQ-WAKEUP-006
-void rcp_ep_wakeup_wup_status_latch(rcp_ep_wakeup_wup_status_t *s)
+//cfusa:req REQ-WAKEUP-021
+void rcp_ep_wakeup_wup_status_latch_source(rcp_ep_wakeup_wup_status_t *s, size_t source_index)
 {
-    s->latched = true;
+    if (source_index >= RCP_EP_WAKEUP_MAX_SOURCES) return;
+    s->mask = (uint16_t)(s->mask | (uint16_t)(1u << source_index));
 }
 
 //cfusa:req REQ-WAKEUP-007
 void rcp_ep_wakeup_wup_status_clear(rcp_ep_wakeup_wup_status_t *s)
 {
-    s->latched = false;
+    s->mask = 0;
+}
+
+//cfusa:req REQ-WAKEUP-021
+void rcp_ep_wakeup_wup_status_clear_source(rcp_ep_wakeup_wup_status_t *s, size_t source_index)
+{
+    if (source_index >= RCP_EP_WAKEUP_MAX_SOURCES) return;
+    s->mask = (uint16_t)(s->mask & (uint16_t)~(1u << source_index));
 }
 
 //cfusa:req REQ-WAKEUP-008
 bool rcp_ep_wakeup_wup_status_is_clear(const rcp_ep_wakeup_wup_status_t *s)
 {
-    return !s->latched;
+    return s->mask == 0;
+}
+
+//cfusa:req REQ-WAKEUP-021
+bool rcp_ep_wakeup_wup_status_source_is_latched(const rcp_ep_wakeup_wup_status_t *s,
+                                                  size_t source_index)
+{
+    if (source_index >= RCP_EP_WAKEUP_MAX_SOURCES) return false;
+    return (s->mask & (uint16_t)(1u << source_index)) != 0u;
 }
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
@@ -354,10 +371,11 @@ void rcp_ep_wakeup_render_registers(const rcp_ep_wakeup_functional_cfg_t *cfg,
     out[RCP_EP_WAKEUP_REG_EP_LEN]         = (uint8_t)RCP_EP_WAKEUP_EP_FUNC_LEN;
     out[RCP_EP_WAKEUP_REG_NR_IO_PINS_MAX] = (uint8_t)RCP_EP_WAKEUP_MAX_SOURCES;
     put_u16(&out[RCP_EP_WAKEUP_REG_EP_STATUS], cfg->ep_status);
-    /* wup_status: only bit 0 is rendered (this module's own single-
-     * aggregate-latch simplification -- see the file header). */
+    /* wup_status: the full per-source bitmask (REQ-WAKEUP-021) -- bits
+     * [15:RCP_EP_WAKEUP_MAX_SOURCES] are masked off since this module
+     * never latches a source index that high (see the file header). */
     put_u16(&out[RCP_EP_WAKEUP_REG_WUP_STATUS],
-            cfg->wup_status.latched ? 0x0001u : 0x0000u);
+            (uint16_t)(cfg->wup_status.mask & ((1u << RCP_EP_WAKEUP_MAX_SOURCES) - 1u)));
 
     for (i = 0; i < RCP_EP_WAKEUP_MAX_SOURCES; i++) {
         const rcp_ep_wakeup_source_cfg_t *src = &cfg->sources[i];
@@ -388,13 +406,19 @@ static void parse_wakeup_registers(rcp_ep_wakeup_functional_cfg_t *cfg,
 
     cfg->ep_status = get_u16(&in[RCP_EP_WAKEUP_REG_EP_STATUS]);
 
-    /* write-1-to-clear (TC18 §13.7.2.2's own rule): the written value's
-     * bit 0 set clears the latch; any other bit pattern (including 0) is
-     * a no-op -- writing 0 does not itself set the latch, matching the
-     * pre-existing rcp_ep_wakeup_wup_status_t API's own semantics (only
-     * a real wake-source assertion calls _latch()). */
+    /* write-1-to-clear, per bit (TC18 §13.7.2.2's own rule, REQ-WAKEUP-021):
+     * each wire bit set to 1 clears that SAME bit's own source in the
+     * mask, independently of every other bit -- a write naming only some
+     * sources clears only those, leaving the rest latched exactly as
+     * TC18's own per-bit register semantics require. A written bit that
+     * is 0 is a no-op for that source (does not itself latch it -- only
+     * a real wake-source assertion calls _latch_source()). */
     wup = get_u16(&in[RCP_EP_WAKEUP_REG_WUP_STATUS]);
-    if ((wup & 0x0001u) != 0u) rcp_ep_wakeup_wup_status_clear(&cfg->wup_status);
+    for (i = 0; i < RCP_EP_WAKEUP_MAX_SOURCES; i++) {
+        if ((wup & (uint16_t)(1u << i)) != 0u) {
+            rcp_ep_wakeup_wup_status_clear_source(&cfg->wup_status, i);
+        }
+    }
 
     for (i = 0; i < RCP_EP_WAKEUP_MAX_SOURCES; i++) {
         rcp_ep_wakeup_source_cfg_t *src = &cfg->sources[i];
