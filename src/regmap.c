@@ -519,6 +519,55 @@ rcp_regmap_optional_subsystem_cfg_apply_reconfig(rcp_regmap_optional_subsystem_c
     return RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_RECONFIG_OK;
 }
 
+/* REQ-WAKEUP-020 (issue #336): peeks what entries[]'s own wire-encoded
+ * ep_id octets would become after applying data[0..data_len) at
+ * relative_start_address, without mutating entries itself -- the
+ * "render current image, patch the addressed octets" half of
+ * rcp_regmap_ep_id_map_apply_reconfig()'s own idiom, stopped short of
+ * the reparse-back-into-entries[] step, since this helper's only job
+ * is to check the WOULD-BE result before committing to it (this
+ * dispatcher's own established "authorize/validate first, apply after"
+ * ordering, same as every access-control check above). Returns true
+ * (write may proceed) iff ep_types is NULL (no enforcement configured
+ * for this table -- same NULL-means-absent convention every other
+ * optional check in this dispatcher already uses), OR every row whose
+ * own ep_types[i] == target_ep_type would end up with the wire row's
+ * own 8-bit ep_id octet (relative offset 1 within each 4-octet row,
+ * matching rcp_regmap_ep_id_map_render()'s own established truncation)
+ * equal to (uint8_t)required_ep_id after this write. A write whose own
+ * [relative_start_address, relative_start_address+data_len) would
+ * overflow this function's own fixed scratch buffer is left unchecked
+ * here (returns true) -- rcp_regmap_ep_id_map_apply_reconfig() itself
+ * separately rejects any such out-of-range write with
+ * RCP_REGMAP_EP_ID_MAP_RECONFIG_ERR_OUT_OF_RANGE right after this
+ * check, so skipping the fixed-ep_id check for it is safe: the write
+ * never actually gets applied either way. */
+static bool ep_id_map_write_keeps_fixed_ep_id(const rcp_regmap_ep_id_map_entry_t *entries,
+                                               size_t count, const uint8_t *ep_types,
+                                               uint8_t target_ep_type, uint16_t required_ep_id,
+                                               uint16_t relative_start_address,
+                                               const uint8_t *data, size_t data_len)
+{
+    uint8_t block[RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES * 4u];
+    size_t  i;
+
+    if (ep_types == NULL) return true;
+    if ((size_t)relative_start_address + data_len > sizeof(block)) return true;
+
+    rcp_regmap_ep_id_map_render(entries, count, block);
+    for (i = 0; i < data_len; i++) {
+        block[relative_start_address + i] = data[i];
+    }
+
+    for (i = 0; i < count; i++) {
+        if (ep_types[i] == target_ep_type && block[4u * i + 1u] != (uint8_t)required_ep_id) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 /* Shared per-section write-routing check for the write dispatcher below:
  * true (and *out_error set) iff addr falls within [table_ptr,
  * table_ptr + cfg->len) and cfg is non-NULL -- the caller returns
@@ -596,7 +645,10 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      rcp_wire_error_t *out_error,
                                      uint8_t *out_transaction_num,
                                      uint32_t watchdog_ms_per_tick,
-                                     const rcp_regmap_optional_subsystem_cfg_ptrs_t *optional_cfg)
+                                     const rcp_regmap_optional_subsystem_cfg_ptrs_t *optional_cfg,
+                                     const uint8_t *ep_id_map_ep_types,
+                                     uint8_t fixed_ep_id_target_ep_type,
+                                     uint16_t fixed_ep_id_required_ep_id)
 {
     rcp_acf_byte_message_info_t hdr;
     const uint8_t               *payload;
@@ -686,6 +738,17 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
         locked = map->svr_configuration_lock != 0u;
         if (!rcp_lifecycle_field_writable_w_plus(state, writer, locked)) {
             *out_error = rcp_lifecycle_field_write_error_w_plus(state, writer, locked);
+            return RCP_REGMAP_EP0_OK;
+        }
+
+        /* REQ-WAKEUP-020: checked after authorization (an unauthorized
+         * writer is denied for that reason first, matching every other
+         * table's own check ordering), before applying. */
+        if (!ep_id_map_write_keeps_fixed_ep_id(ep_id_map, ep_id_map_count, ep_id_map_ep_types,
+                                                fixed_ep_id_target_ep_type,
+                                                fixed_ep_id_required_ep_id, relative, &payload[2],
+                                                data_len)) {
+            *out_error = RCP_ERROR_INVALID_PARAMETER;
             return RCP_REGMAP_EP0_OK;
         }
 
