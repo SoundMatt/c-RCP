@@ -190,7 +190,7 @@ static rcp_mock_dispatch_result_t submit_tscf(rcp_mock_server_t *srv, const rcp_
     rcp_mock_dispatch_result_t r;
 
     r = rcp_mock_server_dispatch_tscf(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_GBB, true, 1u,
-                                       tv, avtp_timestamp, gptp_reference_now, frame->data,
+                                       tv, avtp_timestamp, false, gptp_reference_now, frame->data,
                                        frame->len, &resp);
     rcp_bytes_free(&resp);
     return r;

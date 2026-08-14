@@ -207,13 +207,19 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
 //cfusa:req REQ-LIFECYCLE-029
 //cfusa:req REQ-LIFECYCLE-032
 //cfusa:req REQ-LIFECYCLE-033
+//cfusa:req REQ-AVTP-021
 rcp_lifecycle_accept_t rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
                                                     bool time_sync_supported,
                                                     uint8_t avtp_subtype,
                                                     uint8_t acf_msg_type,
-                                                    rcp_byte_bus_id_t byte_bus_id)
+                                                    rcp_byte_bus_id_t byte_bus_id,
+                                                    rcp_avtp_tscf_fallback_t
+                                                        unsupported_time_sync_policy)
 {
-    if (rcp_avtp_should_drop_tscf(time_sync_supported, avtp_subtype)) return RCP_LIFECYCLE_DROP;
+    if (rcp_avtp_should_drop_tscf(time_sync_supported, avtp_subtype,
+                                   unsupported_time_sync_policy)) {
+        return RCP_LIFECYCLE_DROP;
+    }
 
     if (state == RCP_LIFECYCLE_HW_UNCONFIGURED) {
         /* TSCF's presentation-time semantics presuppose a configured

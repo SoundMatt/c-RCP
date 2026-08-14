@@ -2344,8 +2344,8 @@
     },
     {
       "id": "REQ-AVTP-014",
-      "title": "TSCF-without-time-sync is unconditionally dropped",
-      "text": "rcp_avtp_should_drop_tscf() shall return true if and only if subtype equals RCP_AVTP_SUBTYPE_TSCF and server_time_sync_supported is false; it shall return false for RCP_AVTP_SUBTYPE_NTSCF regardless of server_time_sync_supported, and false for RCP_AVTP_SUBTYPE_TSCF when server_time_sync_supported is true.",
+      "title": "TSCF-without-time-sync is dropped under the default (DROP) policy",
+      "text": "rcp_avtp_should_drop_tscf() shall return true if and only if subtype equals RCP_AVTP_SUBTYPE_TSCF, server_time_sync_supported is false, and unsupported_time_sync_policy equals RCP_AVTP_TSCF_FALLBACK_DROP (this function's own default/original disposition, matching every pre-issue-#431 caller); it shall return false for RCP_AVTP_SUBTYPE_NTSCF regardless of server_time_sync_supported or policy, and false for RCP_AVTP_SUBTYPE_TSCF when server_time_sync_supported is true. As of issue #431 (REQ-AVTP-021), the drop is no longer unconditional -- a caller may instead pass RCP_AVTP_TSCF_FALLBACK_IGNORE per TC18 \u00a713.3's own configurable alternative; this entry pins the unchanged DROP-policy behavior specifically.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -2412,6 +2412,39 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented"
+    },
+    {
+      "id": "REQ-AVTP-021",
+      "title": "TSCF-without-time-sync ignore-vs-drop is caller-configurable (§13.3)",
+      "text": "As of issue #431, rcp_avtp_should_drop_tscf() and rcp_lifecycle_should_accept() shall each accept an rcp_avtp_tscf_fallback_t unsupported_time_sync_policy parameter governing a TSCF-headed AVTPDU received while server_time_sync_supported is false: RCP_AVTP_TSCF_FALLBACK_DROP (value 0, the default for every rcp_mock_server_t and the behavior of every caller predating this parameter) shall drop the frame; RCP_AVTP_TSCF_FALLBACK_IGNORE shall NOT drop it, and rcp_mock_server_dispatch_tscf()'s own dispatch_plain_inner() helper shall then admit the request with its presentation-time gate suppressed (tv forced false before rcp_server_endpoint_admit()), matching TC18 §13.3's own \"executed as if no presentation time were included\" wording. rcp_mock_server_set_tscf_unsupported_time_sync_policy() sets this policy on an rcp_mock_server_t; both mock.c call sites of rcp_lifecycle_should_accept() (dispatch_plain_inner(), rcp_mock_server_dispatch_multi_response()) thread it through. This policy has no effect on HW_UNCONFIGURED's/HW_CONFIGURED's own separate, unconditional (time-sync-independent) TSCF-drop rules.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§13.3 (\"Requests may come within an AVTPDU with a presentation time (i.e. TSCF header). In case the RC Server does not support time synchronization, the presentation time shall be ignored, and the request(s) executed as if no presentation time were included or dropped depending on the configuration of the RC Server.\")"
+    },
+    {
+      "id": "REQ-AVTP-022",
+      "title": "TSCF reserved-bytes-all-zero queues as NTSCF or drops, per configuration (§13.3)",
+      "text": "rcp_avtp_decode_tscf() shall populate rcp_avtp_tscf_header_t's own reserved0 (wire bytes 16-19) and reserved1 (wire bytes 22-23) fields from the decoded frame; rcp_avtp_tscf_reserved_all_zero() shall return true iff both are zero. rcp_mock_server_dispatch_tscf() shall accept a caller-supplied tscf_reserved_all_zero boolean (the caller's own rcp_avtp_tscf_reserved_all_zero() result against a real decoded TSCF header) and, whenever avtp_subtype is RCP_AVTP_SUBTYPE_TSCF and tscf_reserved_all_zero is true, shall consult srv's own rcp_avtp_tscf_fallback_t policy (rcp_mock_server_set_tscf_unsupported_time_sync_policy(), the same shared policy knob REQ-AVTP-021 uses): RCP_AVTP_TSCF_FALLBACK_DROP shall drop the frame (RCP_MOCK_DISPATCH_DROPPED, *out_response left zeroed); RCP_AVTP_TSCF_FALLBACK_IGNORE shall process the frame as if avtp_subtype had genuinely been RCP_AVTP_SUBTYPE_NTSCF all along -- a full substitution of both avtp_subtype and tv, not merely a suppressed presentation-time gate, matching this rule's own literal \"queued as if the header was in NTSCF format\" wording (distinct from REQ-AVTP-021's own narrower \"ignore only the presentation time\" wording for the unsupported-time-sync rule).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§13.3 (\"If the reserved bytes in the header are all zero, then the request shall be queued as if the header was in NTSCF format or dropped, depending on configuration.\")"
+    },
+    {
+      "id": "REQ-AVTP-023",
+      "title": "TSCF tu=1 (uncertain timestamp) is treated identically to tu=0 (§13.3)",
+      "text": "No admission or dispatch function in this codebase (rcp_server_endpoint_admit(), rcp_mock_server_dispatch_tscf(), and every sibling dispatch entry point) shall take a tu parameter or otherwise branch on rcp_avtp_tscf_header_t's own tu field -- there is no separate tu=1 code path to diverge from tu=0's, which is this library's own honestly-achievable form of TC18's \"this shall be executed as if tu = 0\" rule. rcp_avtp_decode_tscf() shall still faithfully decode tu into out_hdr for a caller's own inspection. test_avtp.c's/test_mock.c's own REQ-AVTP-023 tests dispatch two byte-identical requests differing only in their own wire tu bit and assert byte-identical dispatch outcomes, directly observing this deliberate equivalence rather than merely inferring it from tu's absence as a parameter.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§13.3 (\"In case the time stamp is uncertain (i.e. tu = 1), then this shall be executed as if tu = 0.\")"
     },
     {
       "id": "REQ-ACF-001",

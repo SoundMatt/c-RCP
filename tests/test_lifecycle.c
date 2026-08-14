@@ -22,6 +22,7 @@
 //cfusa:test REQ-LIFECYCLE-021
 //cfusa:test REQ-WIREERR-004
 //cfusa:test REQ-RMAP-025
+//cfusa:test REQ-AVTP-021
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -398,14 +399,14 @@ static void test_hw_unconfigured_accepts_discovery_abb_under_ntscf(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_UNCONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
 static void test_hw_unconfigured_drops_wrong_byte_bus_id(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_UNCONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)1u));
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)1u, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
 /* REQ-LIFECYCLE-033: a non-ABB message type addressed correctly to EP0
@@ -419,7 +420,7 @@ static void test_hw_unconfigured_drops_non_abb_message_type(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_UNCONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, (rcp_byte_bus_id_t)1u));
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, (rcp_byte_bus_id_t)1u, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
 /* REQ-LIFECYCLE-033 (TC18 §12.7): a GBB-framed request correctly
@@ -429,21 +430,21 @@ static void test_hw_unconfigured_rejects_non_abb_message_type_addressed_to_ep0(v
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_REJECT, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_UNCONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
 static void test_hw_unconfigured_drops_tscf_even_with_time_sync_supported(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_UNCONFIGURED, true,
-        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
+        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
 static void test_hw_unconfigured_drops_tscf_without_time_sync(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_UNCONFIGURED, false,
-        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
+        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
 static void test_hw_configured_applies_ordinary_tscf_drop_rule(void)
@@ -452,7 +453,7 @@ static void test_hw_configured_applies_ordinary_tscf_drop_rule(void)
      * rcp_avtp_should_drop_tscf()'s own general rule. */
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_CONFIGURED, false,
-        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u));
+        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
 /* As of the REQ-LIFECYCLE-028 fix (TC18 §12.3.1.2, issue #198), a
@@ -467,7 +468,7 @@ static void test_hw_configured_drops_tscf_even_when_time_sync_supported(void)
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_CONFIGURED, true,
-        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u));
+        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
 /* REQ-LIFECYCLE-033: a GBB-framed request addressed to EP0 while
@@ -477,7 +478,7 @@ static void test_hw_configured_rejects_non_abb_message_type_addressed_to_ep0(voi
 {
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_REJECT, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_HW_CONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID));
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID, RCP_AVTP_TSCF_FALLBACK_DROP));
 }
 
 static void test_rcp_configured_accepts_ntscf_at_any_byte_bus_id(void)
@@ -487,7 +488,50 @@ static void test_rcp_configured_accepts_ntscf_at_any_byte_bus_id(void)
      * directly-tested concern (rcp_lifecycle_field_writable()). */
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(
         RCP_LIFECYCLE_RCP_CONFIGURED, false,
-        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, (rcp_byte_bus_id_t)42u));
+        RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, (rcp_byte_bus_id_t)42u, RCP_AVTP_TSCF_FALLBACK_DROP));
+}
+
+/* REQ-AVTP-021, TC18 §13.3's own configurable alternative to the
+ * general drop rule test_hw_configured_applies_ordinary_tscf_drop_rule()
+ * above already pins for RCP_AVTP_TSCF_FALLBACK_DROP: the SAME inputs
+ * (RCP_CONFIGURED, time_sync_supported=false, TSCF) under
+ * RCP_AVTP_TSCF_FALLBACK_IGNORE are no longer dropped -- RCP_CONFIGURED
+ * has no OTHER unconditional TSCF-drop rule of its own (unlike
+ * HW_UNCONFIGURED/HW_CONFIGURED, both proven elsewhere in this file to
+ * still drop TSCF under IGNORE too -- see rcp_avtp_should_drop_tscf()'s
+ * own doc comment, avtp.h, for why this rule's own config only ever
+ * governs the general time-sync check, never those states' own separate,
+ * always-unconditional rules), so ACCEPT is this rule's own directly
+ * observable effect. */
+static void test_rcp_configured_accepts_tscf_without_time_sync_when_policy_is_ignore(void)
+{
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ACCEPT, rcp_lifecycle_should_accept(
+        RCP_LIFECYCLE_RCP_CONFIGURED, false,
+        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u,
+        RCP_AVTP_TSCF_FALLBACK_IGNORE));
+}
+
+/* HW_UNCONFIGURED's own unconditional TSCF-drop rule (independent of
+ * time_sync_supported, and of this policy) still applies -- proving
+ * RCP_AVTP_TSCF_FALLBACK_IGNORE only ever suppresses the general
+ * time-sync check at the top of rcp_lifecycle_should_accept(), never the
+ * separate, state-specific rules below it. */
+static void test_hw_unconfigured_still_drops_tscf_when_policy_is_ignore(void)
+{
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
+        RCP_LIFECYCLE_HW_UNCONFIGURED, false,
+        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, RCP_LIFECYCLE_DISCOVERY_BYTE_BUS_ID,
+        RCP_AVTP_TSCF_FALLBACK_IGNORE));
+}
+
+/* Same reasoning as test_hw_unconfigured_still_drops_tscf_when_policy_is_
+ * ignore() above, for HW_CONFIGURED's own separate unconditional rule. */
+static void test_hw_configured_still_drops_tscf_when_policy_is_ignore(void)
+{
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_DROP, rcp_lifecycle_should_accept(
+        RCP_LIFECYCLE_HW_CONFIGURED, false,
+        RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, (rcp_byte_bus_id_t)7u,
+        RCP_AVTP_TSCF_FALLBACK_IGNORE));
 }
 
 /* ── Register-locking-by-state ─────────────────────────────────────────────── */
@@ -743,6 +787,9 @@ int main(void)
     RUN_TEST(test_hw_configured_drops_tscf_even_when_time_sync_supported);
     RUN_TEST(test_hw_configured_rejects_non_abb_message_type_addressed_to_ep0);
     RUN_TEST(test_rcp_configured_accepts_ntscf_at_any_byte_bus_id);
+    RUN_TEST(test_rcp_configured_accepts_tscf_without_time_sync_when_policy_is_ignore);
+    RUN_TEST(test_hw_unconfigured_still_drops_tscf_when_policy_is_ignore);
+    RUN_TEST(test_hw_configured_still_drops_tscf_when_policy_is_ignore);
 
     RUN_TEST(test_hw_generic_writable_only_in_hw_unconfigured);
     RUN_TEST(test_functional_w_not_writable_in_hw_unconfigured);
