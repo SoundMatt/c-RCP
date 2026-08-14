@@ -34,6 +34,16 @@ the rationale.
 
 ## Releases
 
+### v0.326.0 -- 2026-08-13 (tc18-gap backlog PR D concluded: REQ-ISELED-025 real dispatch wiring)
+
+Sixth PR of the 42-item `scope: "tc18-gap"` backlog (issue #336), closing the ISELED third of "mock.c dispatch wiring" — concludes the GPIO/ADC/ISELED trio (GPIO: v0.324.0/PR #392; ADC: v0.325.0/PR #393).
+
+**Closed, with a genuine new architectural limit found**: `test_tc18_gaps_ep2.c`'s new `iseled_dispatch_handler()` calls `rcp_ep_iseled_response_fragment_count()`/`rcp_ep_iseled_encode_response_fragmented()` on every dispatched command request and returns the result through a real `rcp_mock_server_dispatch()` call — proven via `test_iseled_dispatch_single_fragment_response_round_trips()`. This proves the fragmentation primitives are genuinely reachable and correct through dispatch, but **only for the single-fragment case**: `rcp_mock_endpoint_handler_fn`'s own signature (`mock.h`) produces exactly one `*out_response` per dispatched request, while TC18's own rule can require several response frames for one request whenever the response data exceeds one fragment's own `max_fragment_payload`. Delivering more than one frame per request through `mock.c`'s own existing dispatch surface is **structurally impossible today, not merely untested** — it would need a new `mock.h` entry point returning multiple frames per dispatched request, a real, separate, larger gap this batch does not attempt to close.
+
+Mutation-tested (a truncated-payload mutation caught cleanly). Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
+
+**This concludes the mock.c-dispatch-wiring trio** (GPIO/ADC/ISELED) that originally motivated the user's Q1 "build it out" decision. All three closed to test-fixture-level reference handlers (not new public API), all three correctly stay `partial` for their own separate remaining reasons — a real, honest increment, not a forced "implemented" label.
+
 ### v0.325.0 -- 2026-08-13 (tc18-gap backlog PR D continued: REQ-ADC-037 real dispatch wiring)
 
 Fifth PR of the 42-item `scope: "tc18-gap"` backlog (issue #336), closing the ADC third of "mock.c dispatch wiring" (GPIO closed in v0.324.0; ISELED remains).

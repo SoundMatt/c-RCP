@@ -19105,3 +19105,31 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
+
+### v0.326.0 -- 2026-08-13 (tc18-gap backlog PR D concluded:
+REQ-ISELED-025 real dispatch wiring)
+
+Sixth PR of the 42-item `scope: "tc18-gap"` backlog (issue #336),
+concluding the GPIO/ADC/ISELED "mock.c dispatch wiring" trio.
+
+Closed, with a genuine new architectural limit found:
+iseled_dispatch_handler() calls both ISELED fragmentation entry
+points on every dispatched command request and returns the result
+through a real dispatch() call -- proven for the single-fragment
+case only. rcp_mock_endpoint_handler_fn's own signature produces
+exactly one response per request, while TC18's own rule can require
+several response frames for one request. Delivering more than one
+frame per request through mock.c's own existing dispatch surface is
+structurally impossible today, not merely untested -- a real,
+separate, larger gap left open.
+
+Mutation-tested. Full 66-test suite + ASan/UBSan clean; `cfusa
+check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
+
+This concludes the mock.c-dispatch-wiring trio that motivated the
+user's Q1 "build it out" decision -- all three closed to
+test-fixture-level reference handlers, all three correctly stay
+partial for their own separate remaining reasons.
+
+**Next**: continuing the 42-item `scope: "tc18-gap"` backlog --
+REQ-E2E-038/039/046 fragmented dispatch + stream status (PR E).

@@ -1158,6 +1158,97 @@ static void test_iseled_block_now_has_collect_resp_nr_leds_and_rcv_timeout(void)
     TEST_ASSERT_EQUAL_UINT16(0x000Eu, RCP_EP_ISELED_EP_FUNC_LEN);
 }
 
+/* ── ISELED endpoint: real mock.c dispatch path (issue #338, PR D
+ * concluded) ─────────────────────────────────────────────────────────────
+ *
+ * iseled_dispatch_state_t/iseled_dispatch_handler() mirrors the GPIO/ADC
+ * fixtures' own shape, but with a genuine architectural limit this
+ * requirement's own updated .fusa-reqs.json text names explicitly:
+ * rcp_mock_endpoint_handler_fn (mock.h) produces exactly ONE *out_response
+ * per dispatched request, while rcp_ep_iseled_encode_response_fragmented()
+ * can genuinely need to produce SEVERAL response frames for one request
+ * whenever the (read_size-capped) response data exceeds one fragment's
+ * own max_fragment_payload. This fixture therefore only demonstrates the
+ * single-fragment case (chip_data sized to fit in one fragment, asserting
+ * rcp_ep_iseled_response_fragment_count() itself returns exactly 1) --
+ * proving the fragmentation entry points are genuinely reachable and
+ * correct through a real dispatch() call, but NOT that a multi-fragment
+ * response can be delivered through mock.c's own existing dispatch
+ * surface at all, since it structurally cannot be: that would need a new
+ * mock.h entry point returning more than one frame per dispatched
+ * request, out of scope here. */
+typedef struct {
+    uint8_t chip_data[8];
+    size_t  chip_data_len;
+} iseled_dispatch_state_t;
+
+static void iseled_dispatch_handler(const uint8_t *request, size_t request_len,
+                                     rcp_bytes_t *out_response, void *user_data)
+{
+    iseled_dispatch_state_t *st = (iseled_dispatch_state_t *)user_data;
+    const uint8_t             *tx_data;
+    size_t                      tx_len;
+    uint8_t                     tn;
+    size_t                      n;
+    rcp_bytes_t                 frames[1];
+
+    if (rcp_ep_iseled_decode_command_request(request, request_len, 5u, &tx_data, &tx_len,
+                                              &tn) != RCP_EP_ISELED_OK) {
+        return;
+    }
+
+    /* REQ-ISELED-025: read_size == chip_data_len and a generous
+     * max_fragment_payload together guarantee exactly one fragment for
+     * this fixture's own small chip_data -- see this section's own header
+     * comment for why a genuinely multi-fragment response cannot be
+     * demonstrated through this handler shape at all. */
+    n = rcp_ep_iseled_response_fragment_count(st->chip_data_len, (uint16_t)st->chip_data_len,
+                                               RCP_ACF_MAX_PAYLOAD);
+    TEST_ASSERT_EQUAL_size_t(1u, n);
+    if (n != 1u) return;
+
+    n = rcp_ep_iseled_encode_response_fragmented(5u, st->chip_data, st->chip_data_len,
+                                                  (uint16_t)st->chip_data_len, tn, false, 0u,
+                                                  RCP_ACF_MAX_PAYLOAD, frames);
+    if (n != 1u) return;
+    *out_response = frames[0];
+}
+
+static void test_iseled_dispatch_single_fragment_response_round_trips(void)
+{
+    rcp_mock_server_t        *srv = rcp_mock_server_new();
+    iseled_dispatch_state_t   st  = {{0x11, 0x22, 0x33, 0x44}, 4u};
+    rcp_bytes_t                req;
+    rcp_bytes_t                resp = {0};
+    const uint8_t              *out_rx_data;
+    size_t                      out_rx_len;
+    bool                        out_timed;
+    uint64_t                    out_ts;
+    uint8_t                     out_tn;
+
+    TEST_ASSERT_NOT_NULL(srv);
+    gap_to_rcp_configured(srv);
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+                      rcp_mock_server_add_endpoint(srv, 5u, 0u, true, iseled_dispatch_handler, &st));
+
+    req = rcp_ep_iseled_encode_command_request(5u, (const uint8_t *)"\x01\x02", 2u, 0x44u);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch(srv, 5u, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB,
+                                                true, 1u, req.data, req.len, &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_OK,
+                      rcp_ep_iseled_decode_response(resp.data, resp.len, 5u, &out_rx_data,
+                                                    &out_rx_len, &out_timed, &out_ts, &out_tn));
+    TEST_ASSERT_EQUAL_size_t(4u, out_rx_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(st.chip_data, out_rx_data, 4u);
+    TEST_ASSERT_EQUAL_UINT8(0x44u, out_tn);
+
+    rcp_bytes_free(&req);
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── MDIO (§13.7.13) ───────────────────────────────────────────────────────── */
 
 /* FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-MDIO-020/023):
@@ -1339,6 +1430,7 @@ int main(void)
 
     RUN_TEST(test_iseled_response_has_no_read_size_ceiling);
     RUN_TEST(test_iseled_block_now_has_collect_resp_nr_leds_and_rcv_timeout);
+    RUN_TEST(test_iseled_dispatch_single_fragment_response_round_trips);
 
     RUN_TEST(test_mdio_block_now_exposes_ep_status_via_reconfig);
     RUN_TEST(test_mdio_request_prefix_now_carries_a_two_bit_mode_field);
