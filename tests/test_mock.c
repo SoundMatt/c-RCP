@@ -516,6 +516,58 @@ static void test_dispatch_unknown_bus_after_lifecycle_accepts(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* REQ-TIMED-012/013: rcp_mock_server_dispatch_tscf() with tv=false
+ * behaves byte-for-byte like rcp_mock_server_dispatch() itself -- a
+ * standard request to an enabled endpoint still executes immediately,
+ * exactly as it did (and still does, through the plain entry point)
+ * before this function existed. avtp_timestamp/gptp_reference_now are
+ * meaningless while tv is false (server.h's own doc comment), so
+ * nonzero, otherwise-postponing values are deliberately passed here
+ * to prove they really are ignored, not merely untested. */
+static void test_dispatch_tscf_with_tv_false_behaves_like_plain_dispatch(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t       req[] = {1, 2, 3};
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1, 5, true, NULL, NULL));
+    to_rcp_configured(srv);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch_tscf(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
+                                       false, 0xFFFFFFFFu, 0xFFFFFFFFFFu, req, sizeof(req), &resp));
+
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-TIMED-012/013: tv=true postpones a STANDARD request -- the exact
+ * gap this pair's own text described as its own remaining scope
+ * ("no real dispatch path... calls rcp_server_endpoint_admit() with a
+ * real tv/avtp_timestamp/gptp_reference_now yet"). avtp_timestamp is
+ * far ahead of gptp_reference_now, so the reconstructed presentation
+ * instant is comfortably in the future: admission stores the request
+ * (RCP_SERVER_ADMIT_PENDING) instead of running it immediately, the
+ * same outcome a conditional request already gets, per server.h's own
+ * REQ-TIMED-012 doc comment ("claimed into the request store exactly
+ * like a conditional one"). */
+static void test_dispatch_tscf_with_tv_true_postpones_a_standard_request(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t       req[] = {1, 2, 3};
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1, 5, true, NULL, NULL));
+    to_rcp_configured(srv);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+        rcp_mock_server_dispatch_tscf(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u,
+                                       true, 1000000u, 0u, req, sizeof(req), &resp));
+    TEST_ASSERT_NULL(resp.data); /* nothing ran -- no response yet */
+
+    rcp_mock_server_destroy(srv);
+}
+
 /* TC18 §12.9.1: "If the lookup of the byte_bus_id in the context of the
  * stream_id does not point to an Endpoint, the request is dropped
  * without further notification." Extends the test above with a real,
@@ -1649,6 +1701,8 @@ int main(void)
     RUN_TEST(test_readd_after_remove_succeeds);
     RUN_TEST(test_set_endpoint_enable_unknown_bus_returns_false);
     RUN_TEST(test_queue_len_unknown_bus_is_zero);
+    RUN_TEST(test_dispatch_tscf_with_tv_false_behaves_like_plain_dispatch);
+    RUN_TEST(test_dispatch_tscf_with_tv_true_postpones_a_standard_request);
 
     RUN_TEST(test_dispatch_dropped_by_lifecycle);
     RUN_TEST(test_dispatch_rejected_by_lifecycle_sends_request_rejected_error);

@@ -870,6 +870,42 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch(rcp_mock_server_t *srv,
                                                      const uint8_t *request, size_t request_len,
                                                      rcp_bytes_t *out_response);
 
+/* REQ-TIMED-012/013 (TC18 §11.2/§11.2.1): identical to
+ * rcp_mock_server_dispatch() in every other respect, except this
+ * call's own request arrived under a TSCF header (avtp.h's
+ * rcp_avtp_tscf_header_t) -- tv/avtp_timestamp are that header's own
+ * decoded fields, threaded straight through to rcp_server_endpoint_
+ * admit() (server.h -- see that function's own REQ-TIMED-012 doc
+ * comment for the complete admission-time semantics: tv=false behaves
+ * exactly like rcp_mock_server_dispatch() itself; tv=true postpones
+ * the request, of any kind, until avtp_timestamp's own reconstructed
+ * presentation instant). A caller who received a real TSCF-wrapped
+ * frame decodes it one layer up via rcp_avtp_decode_tscf() -- this
+ * function itself never touches the outer AVTP/TSCF framing, only the
+ * already-unwrapped ACF payload in request/request_len, matching
+ * every sibling dispatch function's own established convention (none
+ * of them parse AVTP-level framing either). gptp_reference_now is the
+ * caller's own current gPTP-synchronized clock reading, in the same
+ * domain avtp_timestamp's own 32-bit value is reconstructed against
+ * (rcp_avtp_extend_timestamp(), avtp.h) -- this library owns no clock
+ * of its own, the same "protocol library, not a scheduler" boundary
+ * every other elapsed-time/tick parameter in this codebase already
+ * uses; meaningless while tv is false.
+ *
+ * This is a NEW, additional entry point, not a signature change to
+ * rcp_mock_server_dispatch() itself -- every one of that function's
+ * own 130+ existing call sites across this codebase is completely
+ * unaffected; a caller with a real TSCF header simply has somewhere
+ * new to hand tv=true/avtp_timestamp instead. */
+rcp_mock_dispatch_result_t rcp_mock_server_dispatch_tscf(rcp_mock_server_t *srv,
+                                                          rcp_byte_bus_id_t byte_bus_id,
+                                                          uint8_t avtp_subtype, uint8_t acf_msg_type,
+                                                          bool time_sync_supported, uint64_t stream_id,
+                                                          bool tv, uint32_t avtp_timestamp,
+                                                          uint64_t gptp_reference_now,
+                                                          const uint8_t *request, size_t request_len,
+                                                          rcp_bytes_t *out_response);
+
 /* Drains and runs the oldest queued request on the endpoint at byte_bus_id
  * (server.h's rcp_server_endpoint_drain_one() -- a no-op unless that
  * endpoint's own ep_enable is currently true and its queue is non-empty).
