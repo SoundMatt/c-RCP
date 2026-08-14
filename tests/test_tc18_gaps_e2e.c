@@ -1613,6 +1613,376 @@ static void test_stream_status_rx_blocked_false_for_unresolvable_stream(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* ── REQ-E2E-038/039 (issue #336): real fragmented-message dispatch ─────────
+ *
+ * rcp_mock_server_dispatch_e2e_fragment() (mock.c) is the fragmentation-
+ * aware counterpart to rcp_mock_server_dispatch_e2e() -- these tests
+ * exercise the real dispatch wiring end to end, not fragment.h's/e2e.h's
+ * own already-tested primitives in isolation (those are covered above,
+ * §REQ-E2E-038/039). */
+
+static uint8_t g_captured_payload[64];
+static size_t  g_captured_payload_len;
+
+static void capturing_handler(const uint8_t *request, size_t request_len, rcp_bytes_t *out_response,
+                               void *user_data)
+{
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                        payload_len;
+
+    (void)out_response;
+    (void)user_data;
+    g_handler_called = true;
+    TEST_ASSERT_EQUAL_INT(RCP_ACF_OK,
+                          rcp_acf_decode_abb(request, request_len, &hdr, &payload, &payload_len));
+    TEST_ASSERT_TRUE(payload_len <= sizeof(g_captured_payload));
+    memcpy(g_captured_payload, payload, payload_len);
+    g_captured_payload_len = payload_len;
+}
+
+static void set_up_frag_stream(rcp_mock_server_t *srv, rcp_mock_endpoint_handler_fn handler)
+{
+    rcp_regmap_request_stream_cfg_t stream_cfg[1];
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id = TEST_SID;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+}
+
+/* A single, never-actually-fragmented message dispatched through the new
+ * entry point behaves byte-identically to calling
+ * rcp_mock_server_dispatch_e2e() directly -- the doc comment's own
+ * documented fallback for an ms=0 fragment arriving while the
+ * reassembler is not collecting. */
+static void test_dispatch_e2e_fragment_single_fragment_matches_dispatch_e2e(void)
+{
+    rcp_mock_server_t *srv     = rcp_mock_server_new();
+    const uint8_t       pl[4]  = {0x01, 0x02, 0x03, 0x04};
+    rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t          wrapped;
+    rcp_bytes_t          resp = {0};
+
+    set_up_frag_stream(srv, counting_handler);
+    wrapped = rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_TS, plain.data, plain.len);
+    TEST_ASSERT_NOT_NULL(wrapped.data);
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, wrapped.data, wrapped.len,
+                                                             &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&wrapped);
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+/* A genuine 3-fragment message, CRC-protected via the real
+ * rcp_e2e_compute_fragmented_crc() formula (segment 0's header +
+ * concatenated segment 0/1/2 payload), reassembles and dispatches
+ * exactly once -- the concatenated payload, not just the final
+ * fragment's own slice, reaches the handler. TSCF framing (real,
+ * nonzero avtp_timestamp) deliberately, so this test cannot pass by
+ * accident of the NTSCF-forces-zero rule the dedicated test below pins
+ * separately. */
+static void test_dispatch_e2e_fragment_three_fragment_round_trip_succeeds(void)
+{
+    rcp_mock_server_t *srv        = rcp_mock_server_new();
+    const uint8_t       p0[4]     = {0xF0, 0xF1, 0xF2, 0xF3};
+    const uint8_t       p1[4]     = {0xE0, 0xE1, 0xE2, 0xE3};
+    const uint8_t       p2[4]     = {0xD0, 0xD1, 0xD2, 0xD3};
+    rcp_bytes_t          f0       = make_abb(1, 0, 0, p0, sizeof(p0)); /* ms=1, segment 0 */
+    rcp_bytes_t          f1       = make_abb(1, 0, 1, p1, sizeof(p1)); /* ms=1, segment 1 */
+    rcp_bytes_t          f2       = make_abb(0, 0, 2, p2, sizeof(p2)); /* ms=0, final     */
+    rcp_bytes_t          final_wire;
+    uint8_t               concatenated[12];
+    uint32_t              want;
+    rcp_bytes_t           resp = {0};
+
+    set_up_frag_stream(srv, capturing_handler);
+
+    /* rcp_e2e_wrap() is used here purely to obtain a correctly
+     * length-adapted final fragment with a trailer SLOT -- its own
+     * trailer VALUE is the wrong (single-frame) formula and is
+     * overwritten below with the real fragmented CRC. */
+    final_wire = rcp_e2e_wrap(TEST_SID, TEST_TS, f2.data, f2.len);
+    TEST_ASSERT_NOT_NULL(final_wire.data);
+
+    memcpy(concatenated, p0, 4);
+    memcpy(concatenated + 4, p1, 4);
+    memcpy(concatenated + 8, p2, 4);
+    want = rcp_e2e_compute_fragmented_crc(TEST_SID, TEST_TS, f0.data, 8u, concatenated,
+                                           sizeof(concatenated));
+    final_wire.data[final_wire.len - 4u] = (uint8_t)(want >> 24);
+    final_wire.data[final_wire.len - 3u] = (uint8_t)(want >> 16);
+    final_wire.data[final_wire.len - 2u] = (uint8_t)(want >> 8);
+    final_wire.data[final_wire.len - 1u] = (uint8_t)want;
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, f0.data, f0.len, &resp));
+    TEST_ASSERT_FALSE(g_handler_called);
+    rcp_bytes_free(&resp);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, f1.data, f1.len, &resp));
+    TEST_ASSERT_FALSE(g_handler_called);
+    rcp_bytes_free(&resp);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, final_wire.data,
+                                                             final_wire.len, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    TEST_ASSERT_EQUAL_UINT(sizeof(concatenated), g_captured_payload_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(concatenated, g_captured_payload, sizeof(concatenated));
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&final_wire);
+    rcp_bytes_free(&f2);
+    rcp_bytes_free(&f1);
+    rcp_bytes_free(&f0);
+    rcp_mock_server_destroy(srv);
+}
+
+/* Same 3-fragment message as above, but the final fragment's trailer is
+ * left at rcp_e2e_wrap()'s own (wrong-formula, but still a real 4-octet
+ * value) trailer instead of the real fragmented CRC -- a genuine
+ * mismatch, not merely an absent one. Rejected, not executed, and
+ * latches the same three consequences rcp_mock_server_dispatch_e2e()'s
+ * own CRC-mismatch branch already does. */
+static void test_dispatch_e2e_fragment_crc_mismatch_is_rejected_and_latches(void)
+{
+    rcp_mock_server_t *srv    = rcp_mock_server_new();
+    const uint8_t       p0[4] = {0x10, 0x11, 0x12, 0x13};
+    const uint8_t       p1[4] = {0x20, 0x21, 0x22, 0x23};
+    rcp_bytes_t          f0   = make_abb(1, 0, 0, p0, sizeof(p0));
+    rcp_bytes_t          f1   = make_abb(0, 0, 1, p1, sizeof(p1)); /* ms=0, final */
+    rcp_bytes_t          final_wire;
+    rcp_bytes_t           resp = {0};
+
+    set_up_frag_stream(srv, counting_handler);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_rx_enforce_e2e(srv, 0x11, true));
+
+    /* wrap()'s own trailer is the SINGLE-fragment formula over f1 alone
+     * -- already wrong for this 2-fragment message, with no overwrite
+     * needed to force a mismatch. */
+    final_wire = rcp_e2e_wrap(TEST_SID, TEST_TS, f1.data, f1.len);
+    TEST_ASSERT_NOT_NULL(final_wire.data);
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, f0.data, f0.len, &resp));
+    rcp_bytes_free(&resp);
+
+    TEST_ASSERT_FALSE(rcp_mock_server_stream_status_rx_blocked(srv, TEST_SID));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, final_wire.data,
+                                                             final_wire.len, &resp));
+    TEST_ASSERT_FALSE(g_handler_called);
+    TEST_ASSERT_NOT_NULL(resp.data);
+    TEST_ASSERT_TRUE(rcp_mock_server_stream_status_rx_blocked(srv, TEST_SID));
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&final_wire);
+    rcp_bytes_free(&f1);
+    rcp_bytes_free(&f0);
+    rcp_mock_server_destroy(srv);
+}
+
+/* An NTSCF-framed fragmented message's CRC contribution from
+ * avtp_timestamp is forced to 0 -- the same rule
+ * rcp_e2e_wrap_framed()/_unwrap_framed() already apply, now also
+ * honored by rcp_e2e_compute_fragmented_crc()'s own caller in mock.c.
+ * Genuinely 2 fragments (not 1): a single-fragment ms=0 message would
+ * take the "never actually fragmented" fallback straight to
+ * rcp_mock_server_dispatch_e2e() (already covered by the single-fragment
+ * test above) and never reach this function's OWN fragmented-CRC
+ * computation at all -- exercising the collecting path here is what
+ * actually proves this fix, not merely a differently-labeled repeat of
+ * that other test. "want" is computed with avtp_timestamp forced to 0,
+ * as an NTSCF-framed message's real contribution must be; if this
+ * function's own effective_ts forcing were missing, it would instead
+ * verify against rcp_e2e_compute_fragmented_crc(..., TEST_TS, ...) and
+ * this call would come back RCP_MOCK_DISPATCH_CRC_ERROR. */
+static void test_dispatch_e2e_fragment_ntscf_forces_zero_timestamp_in_crc(void)
+{
+    rcp_mock_server_t *srv    = rcp_mock_server_new();
+    const uint8_t       p0[4] = {0x30, 0x31, 0x32, 0x33};
+    const uint8_t       p1[4] = {0x34, 0x35, 0x36, 0x37};
+    rcp_bytes_t          f0   = make_abb(1, 0, 0, p0, sizeof(p0)); /* ms=1, segment 0 */
+    rcp_bytes_t          f1   = make_abb(0, 0, 1, p1, sizeof(p1)); /* ms=0, final     */
+    rcp_bytes_t           final_wire;
+    uint8_t                concatenated[8];
+    uint32_t               want;
+    rcp_bytes_t            resp = {0};
+
+    set_up_frag_stream(srv, counting_handler);
+
+    final_wire = rcp_e2e_wrap(TEST_SID, TEST_TS, f1.data, f1.len); /* trailer slot only, see above */
+    TEST_ASSERT_NOT_NULL(final_wire.data);
+
+    memcpy(concatenated, p0, 4);
+    memcpy(concatenated + 4, p1, 4);
+    want = rcp_e2e_compute_fragmented_crc(TEST_SID, 0u /* forced, NTSCF has no timestamp field */,
+                                           f0.data, 8u, concatenated, sizeof(concatenated));
+    final_wire.data[final_wire.len - 4u] = (uint8_t)(want >> 24);
+    final_wire.data[final_wire.len - 3u] = (uint8_t)(want >> 16);
+    final_wire.data[final_wire.len - 2u] = (uint8_t)(want >> 8);
+    final_wire.data[final_wire.len - 1u] = (uint8_t)want;
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, f0.data, f0.len, &resp));
+    rcp_bytes_free(&resp);
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, final_wire.data,
+                                                             final_wire.len, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&final_wire);
+    rcp_bytes_free(&f1);
+    rcp_bytes_free(&f0);
+    rcp_mock_server_destroy(srv);
+}
+
+/* An out-of-order intermediate fragment (segment_num 5 following a fresh
+ * sequence's own segment 0) is rejected and abandons the in-progress
+ * reassembly -- a fresh, correctly-ordered sequence afterward succeeds,
+ * proving the reassembler was actually reset rather than left wedged. */
+static void test_dispatch_e2e_fragment_out_of_order_segment_is_rejected_and_resets(void)
+{
+    rcp_mock_server_t *srv    = rcp_mock_server_new();
+    const uint8_t       p0[4] = {0x40, 0x41, 0x42, 0x43};
+    rcp_bytes_t          f0   = make_abb(1, 0, 0, p0, sizeof(p0));
+    rcp_bytes_t          f_bad = make_abb(1, 0, 5, p0, sizeof(p0)); /* segment 5, not 1 */
+    rcp_bytes_t          plain = make_abb(0, 0, 0, p0, sizeof(p0));
+    rcp_bytes_t          wrapped;
+    rcp_bytes_t           resp = {0};
+
+    set_up_frag_stream(srv, counting_handler);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_FRAGMENT_PENDING,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, f0.data, f0.len, &resp));
+    rcp_bytes_free(&resp);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, f_bad.data, f_bad.len, &resp));
+    rcp_bytes_free(&resp);
+
+    /* A fresh, correctly-ordered single-fragment message now succeeds --
+     * proving the reassembler was reset, not left collecting the
+     * abandoned sequence. */
+    wrapped = rcp_e2e_wrap_framed(TEST_SID, false, TEST_TS, plain.data, plain.len);
+    TEST_ASSERT_NOT_NULL(wrapped.data);
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, wrapped.data, wrapped.len,
+                                                             &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&wrapped);
+    rcp_bytes_free(&plain);
+    rcp_bytes_free(&f_bad);
+    rcp_bytes_free(&f0);
+    rcp_mock_server_destroy(srv);
+}
+
+/* A reassembly that would exceed the stream's own configured
+ * max_total_len is rejected outright -- rcp_mock_server_fragment_
+ * reassembler()'s own documented escape hatch for a caller wanting a
+ * tighter bound than RCP_MOCK_FRAG_REASM_DEFAULT_MAX_TOTAL_LEN,
+ * exercised here to keep the test cheap (no 64KiB payload needed). */
+static void test_dispatch_e2e_fragment_too_large_reassembly_is_rejected(void)
+{
+    rcp_mock_server_t          *srv    = rcp_mock_server_new();
+    const uint8_t                p0[4] = {0x50, 0x51, 0x52, 0x53};
+    rcp_bytes_t                  f0    = make_abb(1, 0, 0, p0, sizeof(p0));
+    rcp_fragment_reassembler_t *reasm;
+    rcp_bytes_t                  resp = {0};
+
+    set_up_frag_stream(srv, counting_handler);
+
+    reasm = rcp_mock_server_fragment_reassembler(srv, TEST_SID);
+    TEST_ASSERT_NOT_NULL(reasm);
+    rcp_fragment_reassembler_init(reasm, 2u); /* smaller than p0's own 4 octets */
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, f0.data, f0.len, &resp));
+    TEST_ASSERT_FALSE(rcp_fragment_reassembler_is_collecting(reasm));
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&f0);
+    rcp_mock_server_destroy(srv);
+}
+
+/* An unresolvable stream_id (no rcp_mock_server_set_request_stream_cfg()
+ * call for it) has no reassembler slot to use -- the documented
+ * fallback delegates to rcp_mock_server_dispatch_e2e() unchanged rather
+ * than rejecting outright, exactly as if the fragment-aware entry point
+ * had never been called at all. */
+static void test_dispatch_e2e_fragment_unresolvable_stream_falls_back_to_dispatch_e2e(void)
+{
+    rcp_mock_server_t *srv    = rcp_mock_server_new();
+    const uint8_t       pl[4] = {0x60, 0x61, 0x62, 0x63};
+    rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t          wrapped;
+    rcp_bytes_t           resp = {0};
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+    /* Deliberately no rcp_mock_server_set_request_stream_cfg() call. */
+
+    wrapped = rcp_e2e_wrap_framed(TEST_SID, false, TEST_TS, plain.data, plain.len);
+    TEST_ASSERT_NOT_NULL(wrapped.data);
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, wrapped.data, wrapped.len,
+                                                             &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&wrapped);
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── REQ-E2E-042: pad coverage and quadlet alignment ───────────────────────── */
 
 /* TC18 sec. 13.6 Figures 19/20 compute the CRC over whole quadlets --
@@ -1703,6 +2073,15 @@ int main(void)
     RUN_TEST(test_dispatch_e2e_crc_error_latches_stream_status);
     RUN_TEST(test_dispatch_frame_seq_error_latches_stream_status);
     RUN_TEST(test_stream_status_rx_blocked_false_for_unresolvable_stream);
+
+    RUN_TEST(test_dispatch_e2e_fragment_single_fragment_matches_dispatch_e2e);
+    RUN_TEST(test_dispatch_e2e_fragment_three_fragment_round_trip_succeeds);
+    RUN_TEST(test_dispatch_e2e_fragment_crc_mismatch_is_rejected_and_latches);
+    RUN_TEST(test_dispatch_e2e_fragment_ntscf_forces_zero_timestamp_in_crc);
+    RUN_TEST(test_dispatch_e2e_fragment_out_of_order_segment_is_rejected_and_resets);
+    RUN_TEST(test_dispatch_e2e_fragment_too_large_reassembly_is_rejected);
+    RUN_TEST(test_dispatch_e2e_fragment_unresolvable_stream_falls_back_to_dispatch_e2e);
+
     RUN_TEST(test_crc_covers_pad_octets_and_alignment_is_enforced);
     return UNITY_END();
 }

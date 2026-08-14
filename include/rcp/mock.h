@@ -110,6 +110,7 @@
 
 #include "rcp/discovery.h"
 #include "rcp/e2e.h"
+#include "rcp/fragment.h"
 #include "rcp/lifecycle.h"
 #include "rcp/power.h"
 #include "rcp/rcp.h"
@@ -440,6 +441,30 @@ bool rcp_mock_server_apply_ep_generic_cfg(rcp_mock_server_t *srv,
  * this accessor is the read side, not a second evaluation. */
 bool rcp_mock_server_stream_status_rx_blocked(const rcp_mock_server_t *srv, uint64_t stream_id);
 
+/* ── Fragmented-message dispatch (REQ-E2E-038/039, issue #336) ─────────────── */
+
+/* This implementation's own default reassembly bound (octets), NOT
+ * TC18-derived and NOT wired to the corresponding request_stream_cfg[]
+ * entry's own rx_stream_max_request_size -- see srv's own frag_reasm[]
+ * declaration comment (mock.c) for why. Generous enough for real
+ * product-specific multi-fragment messages without growing this
+ * server double's own worst-case per-stream memory use unreasonably. */
+#define RCP_MOCK_FRAG_REASM_DEFAULT_MAX_TOTAL_LEN ((size_t)65536u)
+
+/* srv's own reassembly accumulator for the request stream identified by
+ * stream_id -- direct-pointer access, the same convention
+ * rcp_mock_server_discovery_claim() already establishes for a plain,
+ * fully public struct type (rcp_fragment_reassembler_t, fragment.h).
+ * A caller wanting a tighter or looser max_total_len than
+ * RCP_MOCK_FRAG_REASM_DEFAULT_MAX_TOTAL_LEN calls
+ * rcp_fragment_reassembler_init() directly against the returned
+ * pointer. Returns NULL for a stream_id this server has no configured
+ * request stream for (unresolvable via
+ * rcp_regmap_request_stream_cfg_resolve_index()) -- there is no slot to
+ * return a pointer to. */
+rcp_fragment_reassembler_t *rcp_mock_server_fragment_reassembler(rcp_mock_server_t *srv,
+                                                                  uint64_t stream_id);
+
 /* ── Endpoint registration ─────────────────────────────────────────────────── */
 
 /* Adds one endpoint slot addressed at byte_bus_id, with generic config
@@ -633,6 +658,19 @@ typedef enum {
      * left zeroed, the same "no per-member wire response" convention
      * RCP_MOCK_DISPATCH_DROPPED already establishes. */
     RCP_MOCK_DISPATCH_SEQ_ERROR       = 11,
+    /* REQ-E2E-038/039 (issue #336): rcp_mock_server_dispatch_e2e_fragment()
+     * only -- this call carried an ms=1 (intermediate) fragment, or an
+     * ms=0 final fragment that successfully extended an in-progress
+     * reassembly, and the logical message is not yet complete. Nothing
+     * was admitted or executed; *out_response is left zeroed, the same
+     * "no per-call wire response" convention RCP_MOCK_DISPATCH_DROPPED/
+     * _SEQ_ERROR already establish. Call again with the next fragment in
+     * sequence; the eventual completing call returns one of this
+     * function's own other result values instead (RCP_MOCK_DISPATCH_OK/
+     * _QUEUED/_PENDING/etc., or RCP_MOCK_DISPATCH_CRC_ERROR/_REJECTED on
+     * failure) -- FRAGMENT_PENDING itself is never a completing call's
+     * own result. */
+    RCP_MOCK_DISPATCH_FRAGMENT_PENDING = 12,
 } rcp_mock_dispatch_result_t;
 
 /* Runs one already-framed request through srv: first
@@ -810,6 +848,74 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
                                                           uint64_t stream_id, uint32_t avtp_timestamp,
                                                           const uint8_t *request, size_t request_len,
                                                           rcp_bytes_t *out_response);
+
+/* ── Fragmented-message dispatch (REQ-E2E-038/039, issue #336) ─────────────── */
+
+/* Runs one fragment of a potentially multi-fragment, E2E-protected
+ * request through srv -- the fragmentation-aware counterpart to
+ * rcp_mock_server_dispatch_e2e() above, for a caller (transport layer)
+ * driving true multi-AVTPDU requests (fragment.h) rather than assuming
+ * every request fits in one AVTPDU. Same watchdog-kick/stream-fault-
+ * tracker/plain-command-mode-delegation checks as
+ * rcp_mock_server_dispatch_e2e() run first, in the same order, for the
+ * same reasons (see that function's own doc comment) -- an endpoint
+ * without req_crc_enable set is delegated to dispatch_plain() exactly
+ * as before, since fragmentation-CRC interaction (REQ-E2E-038/039) is
+ * scoped to the E2E-protected case specifically.
+ *
+ * fragment/fragment_len is ONE already-decoded-at-the-AVTPDU-level ACF
+ * message -- an intermediate (ms=1) or final (ms=0) fragment of a
+ * logical request, per fragment.h's own wire semantics; acf_msg_type
+ * says whether to expect an ACF_ABB or ACF_GBB header shape.
+ *
+ *   - An ms=1 fragment carries no CRC trailer at all (REQ-E2E-039): its
+ *     own decoded payload is fed directly into srv's own per-stream
+ *     rcp_fragment_reassembler_t (rcp_mock_server_fragment_reassembler()).
+ *     The very first ms=1 fragment of a new sequence has its own raw
+ *     encoded header bytes remembered for the eventual CRC check
+ *     (REQ-E2E-038's own "the FIRST fragment's ACF header" span).
+ *     Returns RCP_MOCK_DISPATCH_FRAGMENT_PENDING; nothing is admitted
+ *     or executed yet. An out-of-order segment_num or a reassembly that
+ *     would exceed the reassembler's own bound resets the reassembler
+ *     and returns RCP_MOCK_DISPATCH_REJECTED instead.
+ *   - An ms=0 fragment arriving while srv's own reassembler for this
+ *     stream is NOT currently collecting means this call was never
+ *     actually fragmented -- delegates entirely to
+ *     rcp_mock_server_dispatch_e2e() unchanged (byte-identical
+ *     behavior to calling that function directly for a single-fragment
+ *     message; this is the case every existing dispatch_e2e() test
+ *     already covers).
+ *   - An ms=0 fragment arriving while srv's own reassembler IS
+ *     collecting completes a real multi-fragment sequence. This
+ *     fragment's own decoded payload carries the CRC32 trailer in its
+ *     own last RCP_E2E_CRC_LEN octets (REQ-E2E-039); the trailer-free
+ *     remainder completes the reassembly. The CRC is verified via
+ *     rcp_e2e_compute_fragmented_crc() -- stream_id + avtp_timestamp +
+ *     the remembered FIRST fragment's own header + the full
+ *     concatenated reassembled payload (REQ-E2E-038) -- NOT the
+ *     ordinary single-frame rcp_e2e_compute_crc() formula. On mismatch:
+ *     the identical stream-fault-tracker latch / stream_status[] CRC
+ *     latch / broadcast-safe-state consequences
+ *     rcp_mock_server_dispatch_e2e()'s own CRC-mismatch branch already
+ *     applies, and RCP_MOCK_DISPATCH_CRC_ERROR. On match: a synthetic,
+ *     complete ACF message (the final fragment's own decoded header +
+ *     the full reassembled payload) is dispatched exactly as
+ *     rcp_mock_server_dispatch_e2e() dispatches an ordinary
+ *     already-CRC-validated request -- via dispatch_plain(), so every
+ *     existing admission/conditional-request/response-building
+ *     behavior applies unchanged past this point. srv's own reassembler
+ *     for this stream is reset either way (success or CRC mismatch),
+ *     ready for the next logical message.
+ *
+ * Scope note: this function handles ONE request at a time
+ * (rcp_mock_server_dispatch_e2e()'s own counterpart), not a whole
+ * multi-member AVTPDU frame -- rcp_mock_server_dispatch_frame_e2e()'s
+ * own per-member fragmentation integration is a separate, not-yet-
+ * attempted extension of this same mechanism. */
+rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
+    rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id, uint8_t avtp_subtype,
+    uint8_t acf_msg_type, bool time_sync_supported, uint64_t stream_id, uint32_t avtp_timestamp,
+    const uint8_t *fragment, size_t fragment_len, rcp_bytes_t *out_response);
 
 /* rcp_mock_server_dispatch_frame()'s E2E-aware counterpart -- same
  * member-splitting behavior (TC18 §12.9.1.1), but each member is routed
