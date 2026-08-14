@@ -74,6 +74,25 @@ uint32_t rcp_ep_gpio_apply_write(uint32_t current, uint32_t request,
     switch (evt) {
     case RCP_EP_GPIO_WRITE_REPLACE: return request;
     case RCP_EP_GPIO_WRITE_OR:      return current | request;
+    /* Known editorial defect in the source spec (issue #433): §13.7.4.1's
+     * own prose summary names this operation "NAND" ("Output pins can be
+     * set to a defined state and the current state can be changed by a
+     * logical operation (NAND, OR, XOR)"), but Table 33's own
+     * authoritative, worked-example row for evt[2:0]=010b both names it
+     * "AND" and demonstrates it with a worked example that only holds for
+     * a plain bitwise AND: "byte_msg_payload bitwise AND current
+     * interface status is written to the interface (example: with a
+     * byte_msg_payload of 0xFFFF FFFE the first IO pin will be reset,
+     * while other IO pins remain unchanged)" -- a NAND of the same
+     * operands would invert, not leave unchanged, every pin whose payload
+     * bit is set. Table 33's own worked example is the more
+     * authoritative, unambiguous definition, so this code follows AND,
+     * not the prose's "NAND" -- no code or behavior change here, this
+     * note exists only to record the specification's own internal
+     * inconsistency, matching this file's gpio_debounce_IO31 offset
+     * defect note (ep_gpio.h's own file header) and ep_pwm.h's PWM
+     * idle-state bit-collision note's own practice of pinning known TC18
+     * editorial defects in place. */
     case RCP_EP_GPIO_WRITE_AND:     return current & request;
     case RCP_EP_GPIO_WRITE_XOR:     return current ^ request;
     case RCP_EP_GPIO_WRITE_ADD:
@@ -474,11 +493,13 @@ const char *rcp_ep_gpio_strerror(rcp_ep_gpio_errc_t e)
     case RCP_EP_GPIO_ERR_WRONG_BUS:       return "rcp/ep_gpio: wrong byte_bus_id";
     case RCP_EP_GPIO_ERR_WRONG_OP:        return "rcp/ep_gpio: wrong ACF op";
     case RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN: return "rcp/ep_gpio: unexpected payload length";
+    case RCP_EP_GPIO_ERR_RESERVED_EVT:    return "rcp/ep_gpio: evt[2:0] is the reserved value 100b";
     default:                              return "rcp/ep_gpio: unknown error";
     }
 }
 
 //cfusa:req REQ-GPIO-033
+//cfusa:req REQ-GPIO-012
 rcp_wire_error_t rcp_ep_gpio_wire_error(rcp_ep_gpio_errc_t e)
 {
     switch (e) {
@@ -486,6 +507,12 @@ rcp_wire_error_t rcp_ep_gpio_wire_error(rcp_ep_gpio_errc_t e)
      * rejected and an error response with error code = INVALID_PARAMETER
      * will be sent." */
     case RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN: return RCP_ERROR_INVALID_PARAMETER;
+    /* TC18 §13.5 Table 33's GPIO/PWM_OUT row, evt[2:0]=100b: "reserved --
+     * request shall be ignored and an err-response with error code =
+     * UNSUPPORTED_CMD shall be sent." FIXED 2026-08-14, issue #426 --
+     * matches src/regmap.c's REQ-RMAP-068 "reserved value ->
+     * UNSUPPORTED_CMD" precedent for the same evt[2:0]=100b case. */
+    case RCP_EP_GPIO_ERR_RESERVED_EVT:    return RCP_ERROR_UNSUPPORTED_CMD;
     /* RCP_EP_GPIO_OK and the remaining error codes are all local
      * framing/routing outcomes with no numbered wire-error-code
      * counterpart -- see this function's own doc comment (ep_gpio.h). */
@@ -554,6 +581,7 @@ rcp_bytes_t rcp_ep_gpio_encode_write_request(rcp_byte_bus_id_t byte_bus_id, uint
 
 //cfusa:req REQ-GPIO-028
 //cfusa:req REQ-GPIO-029
+//cfusa:req REQ-GPIO-012
 rcp_ep_gpio_errc_t rcp_ep_gpio_decode_write_request(const uint8_t *b, size_t len,
                                                      rcp_byte_bus_id_t expected_bus_id,
                                                      uint32_t *out_bitmask, uint8_t *out_evt,
@@ -571,6 +599,16 @@ rcp_ep_gpio_errc_t rcp_ep_gpio_decode_write_request(const uint8_t *b, size_t len
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_GPIO_ERR_WRONG_BUS;
     if (hdr.op != RCP_ACF_OP_WRITE) return RCP_EP_GPIO_ERR_WRONG_OP;
     if (payload_len != RCP_EP_GPIO_PAYLOAD_LEN) return RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN;
+    /* Table 33's own GPIO/PWM_OUT row, evt[2:0]=100b: "reserved -- request
+     * shall be ignored and an err-response with error code =
+     * UNSUPPORTED_CMD shall be sent" -- the "err-response" half of that
+     * two-part rule (rcp_ep_gpio_apply_write() already implements the
+     * "ignored" half). FIXED 2026-08-14, issue #426; mirrors
+     * src/regmap.c's REQ-RMAP-068 fix for the same evt[2:0]=100b reserved
+     * value in a different context. */
+    if ((hdr.evt & 0x7u) == (uint8_t)RCP_EP_GPIO_WRITE_RESERVED4) {
+        return RCP_EP_GPIO_ERR_RESERVED_EVT;
+    }
 
     *out_bitmask         = get_u32(payload);
     *out_evt             = (uint8_t)(hdr.evt & 0x7u);

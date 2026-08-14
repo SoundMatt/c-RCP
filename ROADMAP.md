@@ -19106,6 +19106,66 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.355.0 -- 2026-08-14 (GPIO/PWM_OUT evt=100b UNSUPPORTED_CMD, PWM_OUT
+wire-error mapping, PWM_IN MAX_PERIOD behavior, NAND/AND doc note)
+
+Four independently-verified conformance gaps in `ep_gpio.c`/`ep_pwm.c`,
+closed together (issues #426, #427, #428, #433).
+
+(1) TC18 §13.5 Table 33's GPIO/PWM_OUT row states a two-part rule for
+the reserved `evt[2:0]=100b` value: "request shall be ignored **and**
+an err-response with error code = UNSUPPORTED_CMD shall be sent" --
+both endpoint types implemented only the "ignored" half. New
+`RCP_EP_GPIO_ERR_RESERVED_EVT`/`RCP_EP_PWM_OUT_ERR_RESERVED_EVT` are
+now returned by `rcp_ep_gpio_decode_write_request()`/
+`rcp_ep_pwm_out_decode_write_request()` for that evt value, mapped to
+`RCP_ERROR_UNSUPPORTED_CMD` by `rcp_ep_gpio_wire_error()` (extended)
+and the new `rcp_ep_pwm_out_wire_error()` -- mirroring `src/regmap.c`'s
+own REQ-RMAP-068 fix, which already implemented this identical
+"reserved value -> UNSUPPORTED_CMD" pattern in a different context.
+`ep_gpio.h`'s stale "carries no assigned meaning" doc comment is
+corrected.
+
+(2) `rcp_ep_pwm_out_wire_error()` is new: it also maps the pre-existing
+`RCP_EP_PWM_OUT_ERR_BAD_PAYLOAD_LEN` to `RCP_ERROR_INVALID_PARAMETER`
+(TC18 §13.7.5.3, verbatim identical to GPIO's own §13.7.4.1 rule), a
+mapping PWM_OUT never had despite GPIO's identical rule being fixed at
+REQ-GPIO-033 (issue #201).
+
+(3) New `rcp_ep_pwm_in_max_period_outcome()` is the pure, caller-driven
+classifier Table 48's `pwmi_err_on_max_period` bit needed: given a
+measured period, `max_period`, and the bit's own value, it returns the
+table's own outcome -- bit=0 invalidates the measurement and waits for
+a new active phase (never an error); bit=1 stops the measurement and,
+only if the caller-supplied `EP_RESP_ON_ERR` (EP_config) is enabled,
+signals an error -- following `rcp_ep_gpio_debounce_sample()`'s own
+"this module owns no timer, a caller who does drives the classifier"
+pattern exactly. Also corrects four stale "Table 45" code-comment/doc/
+`.fusa-reqs.json` citations for PWM_IN's own functional-configuration
+table to the real "Table 48" (Table 45 is PWM_OUT's own "pwmo trigger
+outputs" table).
+
+(4) A code comment, not a behavior change: `rcp_ep_gpio_apply_write()`'s
+`RCP_EP_GPIO_WRITE_AND` case now documents TC18's own editorial
+self-contradiction -- §13.7.4.1's prose calls this operation "NAND"
+while Table 33's own authoritative, worked-example row calls it "AND"
+(the code correctly follows Table 33) -- matching this file's existing
+`gpio_debounce_IO31` and PWM idle-state-bit-collision defect-note
+style.
+
+New tests in `tests/test_ep_gpio.c`, `tests/test_ep_pwm.c`, and
+`tests/test_tc18_gaps_ep.c` cover both halves of the evt=100b rule for
+both endpoint types, the new wire-error mappings, and all four
+`rcp_ep_pwm_in_max_period_outcome()` outcomes; mutation-tested by
+temporarily reverting each behavioral change in place -- every new
+test failed against the reverted behavior and passed once restored.
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.54):
+0 errors, 1081/1081 traced and tested. `.fusa-reqs.json`:
+`REQ-GPIO-012`, `REQ-PWM-008`, `REQ-PWM-028`, `REQ-PWM-058`,
+`REQ-GPIO-008` text tightened (all were already `implemented`; no
+status flips) -- 1059 implemented / 13 partial / 2 not-implemented /
+7 retired, 1081 total.
+
 ### v0.354.0 -- 2026-08-14 (REQ-RMAP-059/061: respqueue.h evict-lowest-
 sequence_num on slot-count overflow, TC18 §12.9.4/§12.9.5)
 
@@ -19256,6 +19316,7 @@ this change); `cfusa trace`: 1081/1081 requirements traced and tested (up
 from 1076/1076 -- the 5 new REQ-UART ids).
 
 **Next**: none queued from this item -- awaiting further direction.
+
 ### v0.352.0 -- 2026-08-14 (REQ-E2E-042: Safe-command-mode CRC32 now
 excludes padding and lands before it, not after)
 

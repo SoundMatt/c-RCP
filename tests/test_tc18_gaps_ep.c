@@ -378,6 +378,49 @@ static void test_gpio_wire_error_is_none_for_local_only_codes(void)
                           (int)rcp_ep_gpio_wire_error(RCP_EP_GPIO_ERR_WRONG_OP));
 }
 
+/* FIXED 2026-08-14 (issue #426, REQ-GPIO-012): TC18 §13.5 Table 33's
+ * GPIO/PWM_OUT row states a two-part rule for evt[2:0]=100b
+ * (RCP_EP_GPIO_WRITE_RESERVED4): "reserved -- request shall be ignored
+ * and an err-response with error code = UNSUPPORTED_CMD shall be sent".
+ * Both halves are now exercised here: rcp_ep_gpio_apply_write() still
+ * ignores the request (returns current unchanged), and
+ * rcp_ep_gpio_decode_write_request() now returns the dedicated
+ * RCP_EP_GPIO_ERR_RESERVED_EVT for that same evt value, which
+ * rcp_ep_gpio_wire_error() maps to RCP_ERROR_UNSUPPORTED_CMD -- closing
+ * the previously-missing error-response half of the rule. */
+static void test_gpio_reserved_evt_is_ignored_and_reports_unsupported_cmd(void)
+{
+    rcp_bytes_t frame;
+    uint32_t    bitmask = 0xFFFFFFFFu;
+    uint8_t     evt = 0xFFu, tn = 0xFFu;
+
+    /* The "ignored" half: apply_write() leaves the register unchanged. */
+    TEST_ASSERT_EQUAL_UINT32(0x12345678u,
+        rcp_ep_gpio_apply_write(0x12345678u, 0xDEADBEEFu, RCP_EP_GPIO_WRITE_RESERVED4));
+
+    /* The "err-response" half: decode_write_request() now rejects it,
+     * without touching any of the output parameters. */
+    frame = rcp_ep_gpio_encode_write_request(9u, 0xDEADBEEFu, RCP_EP_GPIO_WRITE_RESERVED4, 0x55u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_ERR_RESERVED_EVT,
+                      rcp_ep_gpio_decode_write_request(frame.data, frame.len, 9u, &bitmask, &evt,
+                                                       &tn));
+    /* Outputs are untouched on this error path. */
+    TEST_ASSERT_EQUAL_UINT32(0xFFFFFFFFu, bitmask);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, evt);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, tn);
+    rcp_bytes_free(&frame);
+
+    /* And the numbered wire code TC18 Table 33 names for this case is
+     * reachable via rcp_ep_gpio_wire_error(). */
+    {
+        const int wire_code = (int)rcp_ep_gpio_wire_error(RCP_EP_GPIO_ERR_RESERVED_EVT);
+
+        TEST_ASSERT_EQUAL_INT(1, wire_code);
+        TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_UNSUPPORTED_CMD, wire_code);
+    }
+}
+
 /* REQ-GPIO-034 (partial) DEVIATION PIN: the three trigger CONDITIONS exist,
  * but TC18 13.7.4.1 Table 40's trigger signal NUMBERING (0 = execution done;
  * per pin IOn: 3n+1 change, 3n+2 rising, 3n+3 falling, up to 96 for IO31
@@ -1227,13 +1270,16 @@ static void test_pwm_out_request_semantics_are_verbatim_setpoints(void)
 }
 
 /* REQ-PWM-058 (implemented, FIXED 2026-08-11, issue #256 Group I): TC18
- * §13.7.6.2 Table 45's PWM_IN registers -- pwmi_polarity,
+ * §13.7.6.2 Table 48's PWM_IN registers -- pwmi_polarity,
  * pwmi_err_on_max_period, pwmi_continuous_mode, pwmi_max_period,
  * pwmi_base_clk, pwmi_clk_divider and pwmi_ep_status -- now all exist,
  * reachable via the evt[2:0]=111b register-block mechanism, same as every
  * other endpoint type. `trigger` remains a non-wire, module-own field (see
  * ep_pwm.h's file header); the measurement-timeout sentinel is unrelated to
- * the register block and untouched. */
+ * the register block and untouched. (CORRECTED 2026-08-14, issue #428:
+ * this comment previously cited "Table 45" -- PWM_OUT's own "pwmo trigger
+ * outputs" table -- rather than Table 48, PWM_IN's real functional-
+ * configuration table.) */
 static void test_pwm_in_functional_cfg_has_full_register_coverage(void)
 {
     rcp_ep_pwm_in_functional_cfg_t cfg;
@@ -1253,7 +1299,7 @@ static void test_pwm_in_functional_cfg_has_full_register_coverage(void)
      * value, unrelated to pwmi_max_period's own register. */
     TEST_ASSERT_EQUAL_HEX16(0xFFFFu, RCP_EP_PWM_IN_NO_SIGNAL);
 
-    /* Now positively confirm Table 45's registers round-trip. */
+    /* Now positively confirm Table 48's registers round-trip. */
     cfg.ep_status   = 0x1234u;
     cfg.clk_divider = 7u;
     cfg.flags       = RCP_EP_PWM_IN_FLAG_POLARITY | RCP_EP_PWM_IN_FLAG_CONTINUOUS_MODE;
@@ -1981,6 +2027,7 @@ int main(void)
 
     RUN_TEST(test_gpio_request_payload_is_four_octets);
     RUN_TEST(test_gpio_wire_error_is_none_for_local_only_codes);
+    RUN_TEST(test_gpio_reserved_evt_is_ignored_and_reports_unsupported_cmd);
     RUN_TEST(test_gpio_trigger_numbering_and_functional_cfg_gaps);
     RUN_TEST(test_gpio_trigger_signal_numbering);
     RUN_TEST(test_gpio_response_timing_classifier_distinguishes_read_and_write);
