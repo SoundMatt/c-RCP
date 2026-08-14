@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 //cfusa:test REQ-RMAP-059
+//cfusa:test REQ-RMAP-061
 //cfusa:test REQ-RMAP-064
 //cfusa:test REQ-RMAP-065
 #include "unity.h"
@@ -172,6 +173,143 @@ static void test_push_refused_once_a_single_frame_exceeds_max_avtpdu_size(void)
     rcp_respqueue_destroy(&q);
 }
 
+/* ── TC18 §12.9.4/§12.9.5 (GitHub #423): slot-count eviction + overflow bit ─ */
+
+static void test_push_evicts_lowest_sequence_num_not_oldest_inserted(void)
+{
+    rcp_respqueue_t q;
+    uint8_t         frame[1];
+    size_t          i;
+    rcp_bytes_t     out;
+    bool            saw_evicted_payload = false;
+    bool            saw_new_payload     = false;
+
+    /* Unbounded byte budget/message ceiling: isolates the NEW slot-count
+     * eviction rule from REQ-RMAP-059/061's own separate, UNCHANGED
+     * byte-budget rules (covered by their own tests above). */
+    rcp_respqueue_init(&q, 0, 0);
+
+    /* Fill all RCP_RESPQUEUE_MAX_ENTRIES slots. The first
+     * MAX_ENTRIES-1 pushes get INCREASING sequence numbers (1..63); the
+     * LAST one pushed (the FIFO-newest entry) is deliberately given
+     * sequence_num 0 -- lower than every entry already queued. This
+     * makes "lowest sequence_num" and "FIFO-oldest" name two DIFFERENT
+     * entries, so an implementation that merely evicts index 0
+     * (oldest-inserted) instead of genuinely comparing sequence_num
+     * values is caught. */
+    for (i = 0; i + 1 < RCP_RESPQUEUE_MAX_ENTRIES; i++) {
+        frame[0] = (uint8_t)i;
+        TEST_ASSERT_TRUE(rcp_respqueue_push_seq(&q, frame, 1, (uint8_t)(i + 1)));
+    }
+    frame[0] = 0xAAu; /* the FIFO-newest entry's own payload marker */
+    TEST_ASSERT_TRUE(rcp_respqueue_push_seq(&q, frame, 1, 0u));
+    TEST_ASSERT_EQUAL_UINT(RCP_RESPQUEUE_MAX_ENTRIES, rcp_respqueue_len(&q));
+    TEST_ASSERT_FALSE(rcp_respqueue_overflow(&q));
+
+    /* Queue is now completely full by slot count (not byte budget).
+     * TC18 §12.9.4/§12.9.5 requires evicting the LOWEST-sequence_num
+     * entry to make room -- that is the entry just pushed above (seq 0),
+     * NOT index 0 (seq 1, the true FIFO-oldest entry). */
+    frame[0] = 0xBBu;
+    TEST_ASSERT_TRUE(rcp_respqueue_push_seq(&q, frame, 1, 200u));
+    TEST_ASSERT_EQUAL_UINT(RCP_RESPQUEUE_MAX_ENTRIES, rcp_respqueue_len(&q));
+    TEST_ASSERT_TRUE(rcp_respqueue_overflow(&q));
+
+    /* The true FIFO-oldest entry (payload 0, sequence_num 1) must still
+     * be present and still at the front -- only the 0xAA entry (the
+     * genuine lowest sequence_num) was evicted. */
+    TEST_ASSERT_TRUE(rcp_respqueue_pop(&q, &out));
+    TEST_ASSERT_EQUAL_UINT(1u, out.len);
+    TEST_ASSERT_EQUAL_UINT8(0u, out.data[0]);
+    rcp_bytes_free(&out);
+
+    /* Drain the rest: the 0xAA payload (evicted) must never reappear;
+     * the 0xBB payload (the push that triggered the eviction) must. */
+    while (rcp_respqueue_pop(&q, &out)) {
+        if (out.len == 1 && out.data[0] == 0xAAu) saw_evicted_payload = true;
+        if (out.len == 1 && out.data[0] == 0xBBu) saw_new_payload = true;
+        rcp_bytes_free(&out);
+    }
+    TEST_ASSERT_FALSE(saw_evicted_payload);
+    TEST_ASSERT_TRUE(saw_new_payload);
+
+    rcp_respqueue_destroy(&q);
+}
+
+static void test_overflow_flag_latches_until_cleared(void)
+{
+    rcp_respqueue_t q;
+    uint8_t         frame[1] = {0};
+    size_t          i;
+    rcp_bytes_t     out;
+
+    rcp_respqueue_init(&q, 0, 0);
+
+    for (i = 0; i < RCP_RESPQUEUE_MAX_ENTRIES; i++) {
+        TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, 1));
+    }
+    TEST_ASSERT_FALSE(rcp_respqueue_overflow(&q)); /* not full-and-pushed-past yet */
+
+    /* One more push while completely full: triggers eviction, latches
+     * the overflow bit. */
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, 1));
+    TEST_ASSERT_TRUE(rcp_respqueue_overflow(&q));
+
+    rcp_respqueue_clear_overflow(&q);
+    TEST_ASSERT_FALSE(rcp_respqueue_overflow(&q));
+
+    /* Pop one entry so the queue is no longer completely full, then
+     * push again: no eviction this time, so overflow must stay clear
+     * (it is a latch a caller clears explicitly, not one that
+     * auto-clears on every push -- but a push that never evicts must
+     * never itself set it either). */
+    TEST_ASSERT_TRUE(rcp_respqueue_pop(&q, &out));
+    rcp_bytes_free(&out);
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, 1));
+    TEST_ASSERT_FALSE(rcp_respqueue_overflow(&q));
+
+    rcp_respqueue_destroy(&q);
+}
+
+static void test_capacity_octets_rejection_unaffected_by_slot_count_eviction(void)
+{
+    /* REQ-RMAP-059's own byte-budget rejection must stay byte-for-byte
+     * unchanged now that the slot-count eviction path (above) exists in
+     * the same function: a push refused for exceeding capacity_octets
+     * must still leave the queue entirely unchanged (no eviction, no
+     * overflow bit), the same as before GitHub #423. */
+    rcp_respqueue_t q;
+    const uint8_t   five[5] = {1, 2, 3, 4, 5};
+    const uint8_t   six[6]  = {1, 2, 3, 4, 5, 6};
+
+    rcp_respqueue_init(&q, 10u, 0);
+    TEST_ASSERT_TRUE(rcp_respqueue_push_seq(&q, five, sizeof(five), 7u));
+    TEST_ASSERT_FALSE(rcp_respqueue_push_seq(&q, six, sizeof(six), 8u));
+    TEST_ASSERT_EQUAL_UINT(1u, rcp_respqueue_len(&q));
+    TEST_ASSERT_EQUAL_UINT(5u, rcp_respqueue_octets(&q));
+    TEST_ASSERT_FALSE(rcp_respqueue_overflow(&q));
+
+    rcp_respqueue_destroy(&q);
+}
+
+static void test_max_avtpdu_size_rejection_unaffected_by_slot_count_eviction(void)
+{
+    /* Same guarantee as above, for REQ-RMAP-061's own per-message
+     * Max_AVTPDUsize ceiling. */
+    rcp_respqueue_t q;
+    uint8_t         ok[10]   = {0};
+    uint8_t         over[11] = {0};
+
+    rcp_respqueue_init(&q, 1000u, 10u);
+    TEST_ASSERT_TRUE(rcp_respqueue_push_seq(&q, ok, sizeof(ok), 1u));
+    TEST_ASSERT_FALSE(rcp_respqueue_push_seq(&q, over, sizeof(over), 2u));
+    TEST_ASSERT_EQUAL_UINT(1u, rcp_respqueue_len(&q));
+    TEST_ASSERT_EQUAL_UINT(10u, rcp_respqueue_octets(&q));
+    TEST_ASSERT_FALSE(rcp_respqueue_overflow(&q));
+
+    rcp_respqueue_destroy(&q);
+}
+
 /* ── REQ-RMAP-062: the fragmentation-budget helper ─────────────────────── */
 
 static void test_max_fragment_payload_reserves_header_and_worst_case_pad(void)
@@ -332,6 +470,11 @@ int main(void)
 
     RUN_TEST(test_zero_max_avtpdu_size_is_unbounded);
     RUN_TEST(test_push_refused_once_a_single_frame_exceeds_max_avtpdu_size);
+
+    RUN_TEST(test_push_evicts_lowest_sequence_num_not_oldest_inserted);
+    RUN_TEST(test_overflow_flag_latches_until_cleared);
+    RUN_TEST(test_capacity_octets_rejection_unaffected_by_slot_count_eviction);
+    RUN_TEST(test_max_avtpdu_size_rejection_unaffected_by_slot_count_eviction);
 
     RUN_TEST(test_max_fragment_payload_reserves_header_and_worst_case_pad);
     RUN_TEST(test_max_fragment_payload_is_zero_when_unbounded_or_no_budget_remains);

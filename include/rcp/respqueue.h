@@ -57,6 +57,51 @@
  * separate, pointer-addressed table like the other two), and has been
  * corrected in `.fusa-reqs.json` accordingly.
  *
+ * ── Slot-count overflow: evict-lowest-sequence_num, not reject-newest ──────
+ *
+ * GitHub #423 (REQ-RMAP-059/061): TC18 §12.9.4 (response queue) and
+ * §12.9.5 (acknowledge queue) both give the SAME additional, mandatory
+ * rule, independent of and layered on top of the queue_size octet
+ * budget above: "In case a [response/acknowledge] queue is completely
+ * full and not yet sent while the next [response/acknowledge] is
+ * delivered by an endpoint, then the AVTPDU with the lowest
+ * sequence_num has to be removed from the queue to make space for the
+ * new [response/acknowledge]. The overflow bit in the respective
+ * [header] shall be set." Before this fix, rcp_respqueue_push() had
+ * only ever modeled the queue_size byte budget (REQ-RMAP-059) and the
+ * per-message Max_AVTPDUsize ceiling (REQ-RMAP-061) -- both of which
+ * correctly reject-and-leave-unchanged on failure, and neither of which
+ * this fix touches (see each one's own doc comment on
+ * rcp_respqueue_push() below, unchanged). This module additionally
+ * bounds its own slot count at RCP_RESPQUEUE_MAX_ENTRIES -- a distinct
+ * "completely full" condition from the byte budget, matching the
+ * "realistic bound" convention this codebase already uses for every
+ * other repeated-row table (RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES,
+ * RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES,
+ * RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES, RCP_REGMAP_EP_ID_MAP_MAX_
+ * ENTRIES, all 64) -- and, once THAT bound (not the byte budget) is hit,
+ * rcp_respqueue_push()/_push_seq() now evict the queued entry with the
+ * lowest sequence_num (a genuine, literal numeric minimum over
+ * q->entries_seq[], not merely the FIFO-oldest -- those two coincide
+ * only until sequence_num, an 8-bit counter matching AVTP's own
+ * sequence_num field width, wraps) and set q->overflow, exactly as
+ * TC18 mandates. rcp_respqueue_push() itself keeps its original
+ * signature and assigns sequence_num automatically, from an internal
+ * wrapping uint8_t counter, so no existing caller needs to change;
+ * rcp_respqueue_push_seq() is the same operation with an
+ * explicitly-supplied sequence_num, for a caller that already tracks
+ * its own (e.g. one that wants queue-internal sequence_num to agree
+ * with the eventual AVTPDU header's own sequence_num field). Reading
+ * and clearing the resulting overflow bit (rcp_respqueue_overflow()/
+ * _clear_overflow() below) follows this module's own established
+ * "primitive is real and directly tested, live AVTPDU-header population
+ * is a caller/integrator concern" disposition -- the same one
+ * rcp_e2e_stream_status_rx_blocked() (e2e.h) and REQ-RMAP-065's own
+ * empty-heartbeat composition already use, and for the identical
+ * reason stated in this header's own file comment above: this module
+ * has no ACF/AVTP framing knowledge of its own to populate a header
+ * field with.
+ *
  * This module owns no register-map instance of its own (regmap.h's
  * rcp_regmap_response_queue_cfg_t.queue_size/max_avtpdu_size are the
  * configured values a caller reads and passes to rcp_respqueue_init()
@@ -111,12 +156,36 @@
 extern "C" {
 #endif
 
+/* TC18 §12.9.4/§12.9.5 (REQ-RMAP-059/061, GitHub #423): the "queue is
+ * completely full" slot-count bound rcp_respqueue_push()/_push_seq()
+ * evict against, once reached -- a distinct condition from the
+ * capacity_octets byte budget below, matching the "realistic bound"
+ * convention this codebase already uses for every other repeated-row
+ * table (RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES,
+ * RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES,
+ * RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES,
+ * RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES, all regmap.h, all 64). */
+#define RCP_RESPQUEUE_MAX_ENTRIES ((size_t)64u)
+
 typedef struct {
     rcp_bytes_t *entries;
+    uint8_t     *entries_seq;    /* entries_seq[i] is the sequence_num
+                                     rcp_respqueue_push()/_push_seq()
+                                     assigned entries[i] at push time,
+                                     0 <= i < entries_len -- the value
+                                     rcp_respqueue_push()/_push_seq()
+                                     compares to find the lowest-
+                                     sequence_num entry to evict once
+                                     RCP_RESPQUEUE_MAX_ENTRIES is
+                                     reached (TC18 §12.9.4/§12.9.5). */
     size_t       entries_len;
-    size_t       entries_cap;    /* entries[] array growth capacity --
-                                     an implementation detail, not the
-                                     TC18 queue_size reservation below. */
+    size_t       entries_cap;    /* entries[]/entries_seq[] array growth
+                                     capacity -- an implementation
+                                     detail, not the TC18 queue_size
+                                     reservation below, and never grown
+                                     past RCP_RESPQUEUE_MAX_ENTRIES
+                                     (eviction keeps entries_len at or
+                                     under that bound instead). */
     size_t       octets;         /* running total of entries[i].len,
                                      0 <= i < entries_len */
     size_t       capacity_octets; /* REQ-RMAP-059: the configured
@@ -127,6 +196,27 @@ typedef struct {
                                              octets (Max_AVTPDUsize
                                              quadlets x 4); 0 means
                                              unbounded. */
+    uint8_t      next_sequence_num; /* auto-increment counter
+                                        rcp_respqueue_push() assigns
+                                        from and advances on every
+                                        successful push; wraps mod 256,
+                                        matching AVTP's own 8-bit
+                                        sequence_num field width
+                                        (avtp.h). Unused by
+                                        rcp_respqueue_push_seq(), which
+                                        takes an explicit sequence_num
+                                        instead. */
+    bool         overflow;        /* TC18 §12.9.4/§12.9.5's overflow
+                                      bit: latched true the moment an
+                                      eviction first occurs, and stays
+                                      true until a caller calls
+                                      rcp_respqueue_clear_overflow()
+                                      (read with rcp_respqueue_overflow()
+                                      below) -- matching e2e.h's own
+                                      note_*()/reset_*() latch
+                                      convention (rcp_e2e_stream_status_t)
+                                      rather than auto-clearing on the
+                                      next successful non-evicting push. */
 } rcp_respqueue_t;
 
 /* Initializes q empty, with the given octet capacity and per-message
@@ -143,14 +233,62 @@ void rcp_respqueue_init(rcp_respqueue_t *q, size_t capacity_octets,
 void rcp_respqueue_destroy(rcp_respqueue_t *q);
 
 /* Appends a copy of frame[0..frame_len) to q's tail (frame may be NULL
- * iff frame_len == 0). Returns true and grows q->octets by frame_len on
- * success. Returns false, leaving q entirely unchanged, if:
- *   - q->max_avtpdu_size_octets is nonzero and frame_len exceeds it
- *     (REQ-RMAP-061 -- checked first, independently of capacity_octets);
- *   - q->capacity_octets is nonzero and frame_len would push q->octets
- *     past it (REQ-RMAP-059); or
- *   - the internal copy/array-growth allocation fails. */
+ * iff frame_len == 0), tagged with q->next_sequence_num (then advances
+ * that counter, wrapping mod 256). Identical in every other respect to
+ * rcp_respqueue_push_seq() below -- see its doc comment for the full
+ * REQ-RMAP-059/061 byte-budget behavior (UNCHANGED by this function)
+ * and the TC18 §12.9.4/§12.9.5 slot-count eviction behavior (NEW).
+ * Existing callers that never cared about sequence_num keep working
+ * unchanged; a caller that wants explicit control over sequence_num
+ * (e.g. to keep it in agreement with an eventual AVTPDU header's own
+ * sequence_num field) uses rcp_respqueue_push_seq() directly instead. */
 bool rcp_respqueue_push(rcp_respqueue_t *q, const uint8_t *frame, size_t frame_len);
+
+/* Same as rcp_respqueue_push() above, except sequence_num is supplied
+ * by the caller rather than assigned from q's own internal counter (and
+ * q->next_sequence_num is left untouched). Returns true and grows
+ * q->octets by frame_len on success. Returns false, leaving q entirely
+ * unchanged, if:
+ *   - q->max_avtpdu_size_octets is nonzero and frame_len exceeds it
+ *     (REQ-RMAP-061 -- checked first, independently of capacity_octets;
+ *     UNCHANGED by this fix);
+ *   - q->capacity_octets is nonzero and frame_len would push q->octets
+ *     past it (REQ-RMAP-059's own queue_size byte budget; UNCHANGED by
+ *     this fix -- checked against q's octet total exactly as before,
+ *     never accounting for any eviction below); or
+ *   - the internal frame-copy allocation fails.
+ *
+ * Otherwise, once both checks above pass: if q->entries_len has reached
+ * RCP_RESPQUEUE_MAX_ENTRIES (the queue's own bounded slot count is
+ * "completely full", a distinct condition from the capacity_octets byte
+ * budget above), TC18 §12.9.4/§12.9.5 (REQ-RMAP-059/061, GitHub #423)
+ * applies: the queued entry with the lowest sequence_num (a literal
+ * numeric minimum over q->entries_seq[], evaluated by linear scan --
+ * RCP_RESPQUEUE_MAX_ENTRIES is small enough this is never a performance
+ * concern) is evicted to make room, and q->overflow is latched true
+ * (rcp_respqueue_overflow()/_clear_overflow() below). This is NOT
+ * simply "evict the FIFO-oldest entry" -- the two coincide only until
+ * sequence_num wraps (256 values, uint8_t), matching this function's
+ * own contract exactly: the entry evicted is always whichever one
+ * currently holds the numerically lowest sequence_num, full stop. */
+bool rcp_respqueue_push_seq(rcp_respqueue_t *q, const uint8_t *frame, size_t frame_len,
+                             uint8_t sequence_num);
+
+/* TC18 §12.9.4/§12.9.5's overflow bit (REQ-RMAP-059/061, GitHub #423):
+ * true iff rcp_respqueue_push()/_push_seq() has evicted at least one
+ * entry since q was last rcp_respqueue_init()'d or last had
+ * rcp_respqueue_clear_overflow() called. Matches this module's own
+ * "primitive is real and directly tested, live AVTPDU-header population
+ * is a caller/integrator concern" disposition (see this header's own
+ * file comment) -- a caller reflects this bit into whichever outgoing
+ * AVTPDU/ACF header field TC18 assigns it to, the same way
+ * rcp_e2e_stream_status_rx_blocked() (e2e.h) is read into the
+ * rx_stream_status wire bit. */
+bool rcp_respqueue_overflow(const rcp_respqueue_t *q);
+
+/* Clears q->overflow back to false. Safe to call whether or not it was
+ * ever set. */
+void rcp_respqueue_clear_overflow(rcp_respqueue_t *q);
 
 /* REQ-RMAP-061's own remaining "MTU-consistency" half (TC18 §12.7.9,
  * TC18.txt L3010-3011: "The Max_AVTPDUsize shall always be configured

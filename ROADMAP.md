@@ -19106,6 +19106,77 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.354.0 -- 2026-08-14 (REQ-RMAP-059/061: respqueue.h evict-lowest-
+sequence_num on slot-count overflow, TC18 §12.9.4/§12.9.5)
+
+Closes issue #423 (c-RCP-AUDIT-12). TC18 §12.9.4 (response queue) and
+§12.9.5 (acknowledge queue) both give the same mandatory rule: "In
+case a [response/acknowledge] queue is completely full and not yet
+sent while the next [response/acknowledge] is delivered by an
+endpoint, then the AVTPDU with the lowest sequence_num has to be
+removed from the queue to make space for the new
+[response/acknowledge]. The overflow bit in the respective [header]
+shall be set." `src/respqueue.c`'s `rcp_respqueue_push()` did the
+exact opposite: it rejected the new item outright and left the queue
+-- including every stale entry already queued -- byte-for-byte
+unchanged, with no overflow-bit concept anywhere in this codebase.
+
+New `RCP_RESPQUEUE_MAX_ENTRIES` (64, matching this codebase's own
+established `*_MAX_ENTRIES` convention already used throughout
+`regmap.h`) is a distinct "queue is completely full" slot-count bound
+-- layered on top of, and never changing, the pre-existing
+`capacity_octets`/`max_avtpdu_size_octets` byte-budget rejection rules
+(TC18 §12.7.9's own, separate queue_size/Max_AVTPDUsize concern, still
+checked first and still rejects-and-leaves-unchanged entirely on its
+own). Once that slot-count bound is reached, `rcp_respqueue_push()`/
+new `rcp_respqueue_push_seq()` now evict the queued entry with the
+numerically lowest `sequence_num` (a genuine linear-scan minimum over
+a new parallel `q->entries_seq[]` array, never simply the FIFO-oldest
+entry -- those two differ once `sequence_num`, an 8-bit counter
+matching AVTP's own `sequence_num` field width, has wrapped) and latch
+a new `q->overflow` bit, readable/clearable via
+`rcp_respqueue_overflow()`/`rcp_respqueue_clear_overflow()` for a
+caller to reflect into whichever outgoing AVTPDU/ACF header field TC18
+assigns it to -- the same "primitive real and directly tested, live
+header population is a caller/integrator concern" disposition already
+established for `e2e.h`'s `rx_stream_status`.
+
+`rcp_respqueue_push()` keeps its original signature and assigns
+`sequence_num` automatically from an internal wrapping counter, so no
+existing caller needed to change; `rcp_respqueue_push_seq()` is the
+same operation with an explicit `sequence_num`, for a caller that
+wants queue-internal sequencing to agree with an eventual AVTPDU
+header field. `rcp_respqueue_pop()`'s own FIFO shift-down was also
+extended to keep the new `entries_seq[]` array in sync with
+`entries[]` -- a desync that would otherwise have corrupted eviction
+decisions from the very first pop.
+
+`tests/test_respqueue.c` gained four new tests.
+`test_push_evicts_lowest_sequence_num_not_oldest_inserted()`
+deliberately assigns the FIFO-newest of 64 queued entries a lower
+`sequence_num` than every entry already queued, so a 65th push proves
+genuine lowest-`sequence_num` comparison rather than merely "evict
+index 0". `test_overflow_flag_latches_until_cleared()` proves the
+overflow bit sets on eviction, survives until explicitly cleared, and
+a later non-evicting push never re-sets it. The remaining two prove
+`capacity_octets`/`max_avtpdu_size_octets` rejection stays byte-for-
+byte unaffected by the new eviction path.
+
+Mutation-tested: reverting the eviction branch to the original
+reject-on-full behavior made exactly the two new eviction/overflow
+tests fail, with the two byte-budget-unaffected tests and every
+pre-existing test still passing -- confirming the new tests genuinely
+exercise the fix, and that the byte-budget rules genuinely stay
+untouched.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace`
+(v0.5.54): 0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`:
+`REQ-RMAP-059`/`REQ-RMAP-061` both stay `implemented` (text tightened
+to describe the now-resolved eviction/overflow gap; no status change,
+since both were already implemented for their own original, narrower
+scope).
+
+**Next**: none queued from this fix -- awaiting further direction.
 ### v0.353.0 -- 2026-08-14 (REQ-UART-041..045: UART HW trigger signals,
 TC18 §13.7.8.4 Table 52, implemented)
 
