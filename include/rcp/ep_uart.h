@@ -695,6 +695,47 @@ typedef enum {
                                                  response_fragmented() now */
 } rcp_ep_uart_read_completion_t;
 
+/* REQ-UART-037's own remaining Table 48 divergence (issue #341 lineage):
+ * cfg->wire_timeout_bit_times (uart_timeout, Table 48 -- TC18's real
+ * register, correctly wire-modeled by rcp_ep_uart_render_registers()/
+ * _apply_reconfig() since REQ-UART-038) is expressed in raw UART bit
+ * periods, "measured from the last received stop bit" -- a runtime
+ * origin (WHEN the countdown starts), not itself a duration this
+ * function converts. rcp_ep_uart_read_completion_decision() below, by
+ * contrast, has only ever consulted the separate, differently-scoped
+ * uart_timeout_ms (this module's own pre-existing, unit-unspecified
+ * wall-clock field) -- nothing anywhere in this codebase converted the
+ * REAL wire register's own bit-time count into a wall-clock duration a
+ * caller could actually use. This function is that conversion: one UART
+ * bit period is 1000/baud_rate_kbps microseconds (baud_rate_kbps is
+ * cfg->baud_rate_kbps, the SAME correctly-unit'd Table 48 field render/
+ * apply_reconfig already use for the wire's own uart_baud_rate
+ * register), so wire_timeout_bit_times bit periods is
+ * wire_timeout_bit_times * 1000 / baud_rate_kbps microseconds --
+ * rounded UP (ceiling), never down, so a caller relying on this value
+ * never waits LESS than TC18's own configured timeout actually means
+ * (the same "never underestimate a safety-relevant duration" discipline
+ * REQ-ADC-033's own tolerance handling already establishes).
+ *
+ * Fails open (returns 0) when baud_rate_kbps == 0 -- this library never
+ * invents a clock rate it has no way to know, the same "this library
+ * never invents a value it has no way to know" discipline REQ-ADC-033's
+ * own base_clk_hz parameter and REQ-SRV-018's own source_ep parameter
+ * already establish; a caller with no configured baud rate cannot derive
+ * a real duration and must fall back to its own choice (mirroring
+ * uart_timeout_ms's own "0 means no configured interval" convention
+ * elsewhere in this module). wire_timeout_bit_times == 0 naturally
+ * converts to 0 through the same formula, with no special-casing needed
+ * -- consistent with rcp_ep_uart_read_completion_decision()'s own
+ * documented "uart_timeout_ms == 0 completes immediately" reading.
+ *
+ * Does not itself read cfg -- takes baud_rate_kbps/wire_timeout_bit_times
+ * as plain parameters, the same explicit-inputs convention
+ * rcp_ep_uart_read_completion_decision() below already uses, so a
+ * caller may derive the duration for any two values without needing a
+ * live rcp_ep_uart_functional_cfg_t on hand. */
+uint32_t rcp_ep_uart_wire_timeout_us(uint16_t baud_rate_kbps, uint8_t wire_timeout_bit_times);
+
 /* Decides which of the three TC18 §13.7.8.1 triggers, if any, has fired for
  * a read request in progress: bytes_available is the caller-tracked count
  * currently held in the fifo-rx-buffer; read_size is the request's own
