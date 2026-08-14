@@ -19106,6 +19106,62 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.348.0 -- 2026-08-14 (REQ-RMAP-068: EP0 register-map writes now
+implement TC18's own evt[2:0]-keyed SET/OR/AND/XOR rule)
+
+Last of the `complete these now!` batch's originally-listed 7 items.
+TC18 13.7.1.2: "The handling of the data depends on evt[2:0] so that
+the bits are either SET, OR'ed, AND'ed or XOR'ed to the target
+registers content" -- a genuine, distinct rule from Table 33's own
+per-endpoint evt[2:0] scheme, re-verified directly against the primary
+source before starting (this entry's own prior investigations,
+2026-08-12/13, had already reached the same reading twice).
+
+Key design finding that shrank the real blast radius: `rcp_regmap_
+ep0_decode_write_request()` already decodes the ACF header locally
+(`hdr.evt`) -- no new PARAMETER was needed on the dispatcher itself,
+so none of its 46 existing test call sites needed updating. New
+`rcp_regmap_ep0_write_op_t` (SET/OR/AND/XOR, matching evt[2:0]'s low 2
+bits -- exactly 4 operations named for this context, unlike Table 33's
+8) and `rcp_regmap_ep0_combine_write_op()`, a shared byte-wise combine
+primitive. evt[2:0] in {4..7} is rejected with `RCP_ERROR_UNSUPPORTED_
+CMD` before any address routing, matching Table 33's own reserved-
+value precedent. Each of the 6 row-typed table extents renders its own
+current image and combines against it before calling its existing,
+UNMODIFIED apply_reconfig() -- SET short-circuits to a pure
+passthrough, identical to this dispatcher's own pre-fix behavior, so
+every pre-existing test keeps passing unchanged. The 4 optional-
+subsystem sections combine directly against their own `cfg->data`
+(already the current wire image, no render() needed).
+
+A genuine correctness subtlety found and fixed along the way:
+`REQ-WAKEUP-020`'s own fixed-ep_id invariant prediction must see the
+SAME combined bytes the write will really apply, not the raw
+pre-combine request -- checking the raw request alone is wrong under
+OR/AND/XOR, since the write's real effect depends on the table's own
+current content too. Mutation-tested (reverted to the raw-bytes check)
+and caught cleanly.
+
+7 new tests: the combine primitive directly (including TC18's own
+worked "OR with zero has no effect" example), the reserved-value
+rejection, OR/AND/XOR each applied end-to-end through the dispatcher
+against a representative table, the fixed-ep_id-after-combine
+interaction (both sub-cases), and the optional-subsystem direct
+combine path. 3 mutations (the OR operator, the reserved-value gate,
+the fixed-ep_id fix), all caught cleanly.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.54):
+0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`:
+`REQ-RMAP-068` partial -> implemented -- 1050 implemented / 17 partial
+/ 2 not-implemented / 7 retired, 1076 total.
+
+Fourth of the user's own explicit `complete these now!` 7-item list
+now genuinely closed to implemented (`REQ-UART-037`, `REQ-E2E-046`,
+`REQ-RMAP-038`, `REQ-RMAP-068`); `REQ-TIMED-012/013`, `REQ-ISELED-025`,
+`REQ-GPIO-035/036` remain -- see each one's own task entry.
+
+**Next**: `REQ-TIMED-012/013` mock.c TSCF dispatch-layer wiring.
+
 ### v0.347.0 -- 2026-08-14 (REQ-RMAP-038: Sequencer_config storage claim
 was stale -- corrected to implemented, no code change)
 

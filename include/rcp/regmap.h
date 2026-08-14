@@ -2687,6 +2687,40 @@ typedef enum {
  * returns NULL. */
 const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
 
+/* REQ-RMAP-068 (TC18 13.7.1.2): "The handling of the data depends on
+ * evt[2:0] so that the bits are either SET, OR'ed, AND'ed or XOR'ed to
+ * the target registers content." -- a genuine, distinct rule from
+ * Table 33's own per-endpoint evt[2:0] semantics (ep_gpio.h's own
+ * rcp_ep_gpio_write_semantics_t): this one applies to EVERY EP0
+ * register-map write, regardless of which table the write's own
+ * address lands in. Confirmed directly against the primary source
+ * (TC18.txt) that exactly 4 operations are named for this context --
+ * unlike Table 33, no ADD/SUB/reserved-config-escape values are
+ * described here, so this enum has only 4 members, matching evt[2:0]'s
+ * low 2 bits (0b100-0b111 are rejected before any table routing, see
+ * rcp_regmap_ep0_decode_write_request()'s own doc comment). SET (0)
+ * reproduces this codebase's own pre-existing plain-overwrite
+ * behavior exactly -- REQ-RMAP-068's own fix does not change how any
+ * existing evt=0 write behaves. */
+typedef enum {
+    RCP_REGMAP_EP0_WRITE_OP_SET = 0,
+    RCP_REGMAP_EP0_WRITE_OP_OR  = 1,
+    RCP_REGMAP_EP0_WRITE_OP_AND = 2,
+    RCP_REGMAP_EP0_WRITE_OP_XOR = 3,
+} rcp_regmap_ep0_write_op_t;
+
+/* Combines request[0..len) onto current[0..len) per op, writing the
+ * result into out[0..len) -- current/request/out may not overlap.
+ * RCP_REGMAP_EP0_WRITE_OP_SET ignores current entirely (out[i] =
+ * request[i]); OR/AND/XOR compute the named bitwise operation
+ * byte-wise. This is the one primitive rcp_regmap_ep0_decode_write_
+ * request() calls for every row-typed table extent it routes to (a
+ * caller wanting SET semantics may skip calling this entirely and
+ * pass its own request bytes straight through -- SET's own output is
+ * always identical to request, by definition). */
+void rcp_regmap_ep0_combine_write_op(rcp_regmap_ep0_write_op_t op, const uint8_t *current,
+                                      const uint8_t *request, uint8_t *out, size_t len);
+
 /* Decodes an ACF_ABB WRITE request from b[0..len) addressed to byte_bus_id
  * 0 (EP0), with a payload shaped exactly like every other endpoint type's
  * own evt[2:0]=111b configuration write (TC18 §12.7.1 Figure 19): a
@@ -2822,6 +2856,23 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
  * rcp_regmap_general_decode_write_request() already fails, or
  * RCP_REGMAP_EP0_ERR_SHORT_PAYLOAD if the payload has no room for its own
  * leading 2-octet address, before authorization/routing is even reached.
+ *
+ * REQ-RMAP-068: b's own decoded evt[2:0] (the ACF header's own evt
+ * field, low 3 bits -- evt[3], the acknowledge-request bit, is
+ * unrelated and ignored here) selects a rcp_regmap_ep0_write_op_t --
+ * every routed table extent below combines the write's own data
+ * against that table's OWN CURRENT content at the addressed octets
+ * via rcp_regmap_ep0_combine_write_op() before applying it, per TC18
+ * 13.7.1.2's own SET/OR/AND/XOR rule. evt[2:0] in {4..7} is rejected
+ * before any address routing is attempted: *out_error is set to
+ * RCP_ERROR_UNSUPPORTED_CMD (this function still returns
+ * RCP_REGMAP_EP0_OK -- a real, well-formed denial response, not a
+ * frame-decode failure) and the table itself is left entirely
+ * unchanged, matching Table 33's own "reserved value -> UNSUPPORTED_CMD"
+ * precedent for the same evt[2:0]=100b case in a different context.
+ * evt[2:0]=0 (SET) is a pure passthrough, identical to this function's
+ * own pre-fix behavior for every existing caller that never set evt at
+ * all (the ACF header's own zero-initialized default).
  * state/writer are the same already-established types every endpoint
  * type's own writability gate already takes -- a caller already has
  * both to hand for any other write path.

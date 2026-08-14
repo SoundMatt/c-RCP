@@ -583,11 +583,14 @@ static bool optional_subsystem_cfg_write_route(uint16_t addr, uint16_t table_ptr
                                                 rcp_regmap_optional_subsystem_cfg_t *cfg,
                                                 rcp_lifecycle_state_t state,
                                                 rcp_lifecycle_writer_ctx_t writer,
+                                                rcp_regmap_ep0_write_op_t write_op,
                                                 const uint8_t *data, size_t data_len,
                                                 rcp_wire_error_t *out_error)
 {
     uint16_t                                          relative;
     rcp_regmap_optional_subsystem_cfg_reconfig_errc_t rc;
+    const uint8_t                                     *write_data = data;
+    uint8_t                                            combined[RCP_ACF_ABB_MAX_PAYLOAD];
 
     if (cfg == NULL) return false;
     if ((size_t)addr < table_ptr || (size_t)addr >= (size_t)table_ptr + cfg->len) return false;
@@ -598,10 +601,42 @@ static bool optional_subsystem_cfg_write_route(uint16_t addr, uint16_t table_ptr
         return true;
     }
 
-    rc = rcp_regmap_optional_subsystem_cfg_apply_reconfig(cfg, relative, data, data_len);
+    /* REQ-RMAP-068: cfg->data already IS the section's own current wire
+     * image (no separate render() needed, unlike every row-typed
+     * table above -- see rcp_regmap_optional_subsystem_cfg_apply_
+     * reconfig()'s own doc comment), so this combines directly against
+     * it. Same out-of-range fallback as every row-typed table's own
+     * pattern: apply_reconfig() itself still correctly rejects a
+     * too-large write using cfg->len, the real bound. */
+    if (write_op != RCP_REGMAP_EP0_WRITE_OP_SET && (size_t)relative + data_len <= cfg->len &&
+        data_len <= sizeof(combined)) {
+        rcp_regmap_ep0_combine_write_op(write_op, &cfg->data[relative], data, combined, data_len);
+        write_data = combined;
+    }
+
+    rc = rcp_regmap_optional_subsystem_cfg_apply_reconfig(cfg, relative, write_data, data_len);
     *out_error = (rc == RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_RECONFIG_OK) ? RCP_ERROR_NONE
                                                                         : RCP_ERROR_INVALID_PARAMETER;
     return true;
+}
+
+//cfusa:req REQ-RMAP-068
+void rcp_regmap_ep0_combine_write_op(rcp_regmap_ep0_write_op_t op, const uint8_t *current,
+                                      const uint8_t *request, uint8_t *out, size_t len)
+{
+    size_t i;
+
+    for (i = 0; i < len; i++) {
+        switch (op) {
+        case RCP_REGMAP_EP0_WRITE_OP_OR:  out[i] = (uint8_t)(current[i] | request[i]); break;
+        case RCP_REGMAP_EP0_WRITE_OP_AND: out[i] = (uint8_t)(current[i] & request[i]); break;
+        case RCP_REGMAP_EP0_WRITE_OP_XOR: out[i] = (uint8_t)(current[i] ^ request[i]); break;
+        case RCP_REGMAP_EP0_WRITE_OP_SET:
+        default:
+            out[i] = request[i];
+            break;
+        }
+    }
 }
 
 //cfusa:req REQ-RMAP-040
@@ -614,6 +649,7 @@ static bool optional_subsystem_cfg_write_route(uint16_t addr, uint16_t table_ptr
 //cfusa:req REQ-RMAP-052
 //cfusa:req REQ-RMAP-054
 //cfusa:req REQ-RMAP-061
+//cfusa:req REQ-RMAP-068
 //cfusa:req REQ-RMAP-072
 //cfusa:req REQ-RMAP-073
 //cfusa:req REQ-RMAP-074
@@ -663,6 +699,7 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
     size_t                       ep_generic_cfg_len;
     size_t                       sequencer_state_len;
     bool                         locked;
+    rcp_regmap_ep0_write_op_t    write_op;
 
     acf_rc = rcp_acf_decode_abb(b, len, &hdr, &payload, &payload_len);
     if (acf_rc == RCP_ACF_ERR_SHORT_FRAME) return RCP_REGMAP_EP0_ERR_SHORT_FRAME;
@@ -675,6 +712,18 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
     addr     = get_u16(payload);
     data_len = payload_len - 2u;
     *out_transaction_num = hdr.transaction_num;
+
+    /* REQ-RMAP-068: evt[2:0] in {4..7} has no defined meaning for an
+     * EP0 register-map write (TC18 13.7.1.2 names exactly 4 operations
+     * -- see rcp_regmap_ep0_write_op_t's own doc comment) -- rejected
+     * before any address routing, matching Table 33's own "reserved
+     * value -> UNSUPPORTED_CMD" precedent for the same evt[2:0]=100b
+     * case in a different context. */
+    if ((hdr.evt & 0x07u) > (uint8_t)RCP_REGMAP_EP0_WRITE_OP_XOR) {
+        *out_error = RCP_ERROR_UNSUPPORTED_CMD;
+        return RCP_REGMAP_EP0_OK;
+    }
+    write_op = (rcp_regmap_ep0_write_op_t)(hdr.evt & 0x07u);
 
     if ((size_t)addr < RCP_REGMAP_GENERAL_LEN) {
         /* Table 20's own extent -- unconditionally read-only (REQ-RMAP-025),
@@ -718,8 +767,31 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
             return RCP_REGMAP_EP0_OK;
         }
 
-        rc = rcp_regmap_hw_pin_map_apply_reconfig(hw_pin_map, hw_pin_map_count, relative,
-                                                    &payload[2], data_len);
+        /* REQ-RMAP-068: SET passes request bytes straight through
+         * (identical to this dispatcher's own pre-fix behavior);
+         * OR/AND/XOR render the table's own current image first and
+         * combine against it. Skipped (falls through to the raw
+         * passthrough) when the write's own span exceeds this
+         * function's own fixed scratch buffer -- apply_reconfig()
+         * itself still correctly rejects that write as out-of-range,
+         * using the table's own real count, not this buffer's bound. */
+        {
+            const uint8_t *write_data = &payload[2];
+            uint8_t        combined[RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES * 3u];
+
+            if (write_op != RCP_REGMAP_EP0_WRITE_OP_SET &&
+                (size_t)relative + data_len <= sizeof(combined)) {
+                uint8_t rendered[RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES * 3u];
+
+                rcp_regmap_hw_pin_map_render(hw_pin_map, hw_pin_map_count, rendered);
+                rcp_regmap_ep0_combine_write_op(write_op, &rendered[relative], &payload[2],
+                                                 combined, data_len);
+                write_data = combined;
+            }
+
+            rc = rcp_regmap_hw_pin_map_apply_reconfig(hw_pin_map, hw_pin_map_count, relative,
+                                                        write_data, data_len);
+        }
         *out_error = (rc == RCP_REGMAP_HW_PIN_MAP_RECONFIG_OK) ? RCP_ERROR_NONE
                                                                 : RCP_ERROR_INVALID_PARAMETER;
         return RCP_REGMAP_EP0_OK;
@@ -741,21 +813,45 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
             return RCP_REGMAP_EP0_OK;
         }
 
-        /* REQ-WAKEUP-020: checked after authorization (an unauthorized
-         * writer is denied for that reason first, matching every other
-         * table's own check ordering), before applying. */
-        if (!ep_id_map_write_keeps_fixed_ep_id(ep_id_map, ep_id_map_count, ep_id_map_ep_types,
-                                                fixed_ep_id_target_ep_type,
-                                                fixed_ep_id_required_ep_id, relative, &payload[2],
-                                                data_len)) {
-            *out_error = RCP_ERROR_INVALID_PARAMETER;
-            return RCP_REGMAP_EP0_OK;
-        }
+        /* REQ-RMAP-068: computed once, up front, so both the
+         * REQ-WAKEUP-020 fixed-ep_id prediction below and the actual
+         * apply_reconfig() see the SAME bytes the write will really
+         * produce -- checking the fixed-ep_id invariant against the
+         * raw, pre-combine request bytes would be wrong under OR/AND/
+         * XOR (the write's real effect depends on the table's own
+         * current content too). See hw_pin_map's own identical pattern
+         * above for the out-of-range fallback rationale. */
+        {
+            const uint8_t *write_data = &payload[2];
+            uint8_t        combined[RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES * 4u];
 
-        rc = rcp_regmap_ep_id_map_apply_reconfig(ep_id_map, ep_id_map_count, relative,
-                                                   &payload[2], data_len);
-        *out_error = (rc == RCP_REGMAP_EP_ID_MAP_RECONFIG_OK) ? RCP_ERROR_NONE
-                                                               : RCP_ERROR_INVALID_PARAMETER;
+            if (write_op != RCP_REGMAP_EP0_WRITE_OP_SET &&
+                (size_t)relative + data_len <= sizeof(combined)) {
+                uint8_t rendered[RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES * 4u];
+
+                rcp_regmap_ep_id_map_render(ep_id_map, ep_id_map_count, rendered);
+                rcp_regmap_ep0_combine_write_op(write_op, &rendered[relative], &payload[2],
+                                                 combined, data_len);
+                write_data = combined;
+            }
+
+            /* REQ-WAKEUP-020: checked after authorization (an
+             * unauthorized writer is denied for that reason first,
+             * matching every other table's own check ordering),
+             * before applying. */
+            if (!ep_id_map_write_keeps_fixed_ep_id(ep_id_map, ep_id_map_count, ep_id_map_ep_types,
+                                                    fixed_ep_id_target_ep_type,
+                                                    fixed_ep_id_required_ep_id, relative,
+                                                    write_data, data_len)) {
+                *out_error = RCP_ERROR_INVALID_PARAMETER;
+                return RCP_REGMAP_EP0_OK;
+            }
+
+            rc = rcp_regmap_ep_id_map_apply_reconfig(ep_id_map, ep_id_map_count, relative,
+                                                       write_data, data_len);
+            *out_error = (rc == RCP_REGMAP_EP_ID_MAP_RECONFIG_OK) ? RCP_ERROR_NONE
+                                                                   : RCP_ERROR_INVALID_PARAMETER;
+        }
         return RCP_REGMAP_EP0_OK;
     }
 
@@ -779,8 +875,26 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
             return RCP_REGMAP_EP0_OK;
         }
 
-        rc = rcp_regmap_response_queue_cfg_apply_reconfig(response_queue_cfg, response_queue_cfg_count,
-                                                             relative, &payload[2], data_len);
+        /* REQ-RMAP-068: see hw_pin_map's own identical pattern above. */
+        {
+            const uint8_t *write_data = &payload[2];
+            uint8_t        combined[RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES * 10u];
+
+            if (write_op != RCP_REGMAP_EP0_WRITE_OP_SET &&
+                (size_t)relative + data_len <= sizeof(combined)) {
+                uint8_t rendered[RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES * 10u];
+
+                rcp_regmap_response_queue_cfg_render(response_queue_cfg, response_queue_cfg_count,
+                                                      rendered);
+                rcp_regmap_ep0_combine_write_op(write_op, &rendered[relative], &payload[2],
+                                                 combined, data_len);
+                write_data = combined;
+            }
+
+            rc = rcp_regmap_response_queue_cfg_apply_reconfig(response_queue_cfg,
+                                                                response_queue_cfg_count, relative,
+                                                                write_data, data_len);
+        }
         *out_error = (rc == RCP_REGMAP_RESPONSE_QUEUE_CFG_RECONFIG_OK) ? RCP_ERROR_NONE
                                                                         : RCP_ERROR_INVALID_PARAMETER;
         return RCP_REGMAP_EP0_OK;
@@ -799,9 +913,27 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
             return RCP_REGMAP_EP0_OK;
         }
 
-        rc = rcp_regmap_request_stream_cfg_apply_reconfig(request_stream_cfg, request_stream_cfg_count,
-                                                             relative, &payload[2], data_len,
-                                                             watchdog_ms_per_tick);
+        /* REQ-RMAP-068: see hw_pin_map's own identical pattern above. */
+        {
+            const uint8_t *write_data = &payload[2];
+            uint8_t        combined[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES * 24u];
+
+            if (write_op != RCP_REGMAP_EP0_WRITE_OP_SET &&
+                (size_t)relative + data_len <= sizeof(combined)) {
+                uint8_t rendered[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES * 24u];
+
+                rcp_regmap_request_stream_cfg_render(request_stream_cfg, request_stream_cfg_count,
+                                                      rendered, watchdog_ms_per_tick);
+                rcp_regmap_ep0_combine_write_op(write_op, &rendered[relative], &payload[2],
+                                                 combined, data_len);
+                write_data = combined;
+            }
+
+            rc = rcp_regmap_request_stream_cfg_apply_reconfig(request_stream_cfg,
+                                                                request_stream_cfg_count, relative,
+                                                                write_data, data_len,
+                                                                watchdog_ms_per_tick);
+        }
         *out_error = (rc == RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_OK) ? RCP_ERROR_NONE
                                                                         : RCP_ERROR_INVALID_PARAMETER;
         return RCP_REGMAP_EP0_OK;
@@ -840,8 +972,27 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
             return RCP_REGMAP_EP0_OK;
         }
 
-        rc = rcp_regmap_ep_generic_cfg_apply_reconfig(ep_generic_cfg, ep_generic_cfg_count,
-                                                         relative, &payload[2], data_len);
+        /* REQ-RMAP-068: see hw_pin_map's own identical pattern above.
+         * ep_type's own read-only status (noted above) is unaffected --
+         * apply_reconfig() ignores that octet's write value regardless
+         * of whether it came from a raw request or a combined one. */
+        {
+            const uint8_t *write_data = &payload[2];
+            uint8_t        combined[RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES * 12u];
+
+            if (write_op != RCP_REGMAP_EP0_WRITE_OP_SET &&
+                (size_t)relative + data_len <= sizeof(combined)) {
+                uint8_t rendered[RCP_REGMAP_EP_GENERIC_CFG_MAX_ENTRIES * 12u];
+
+                rcp_regmap_ep_generic_cfg_render(ep_generic_cfg, ep_generic_cfg_count, rendered);
+                rcp_regmap_ep0_combine_write_op(write_op, &rendered[relative], &payload[2],
+                                                 combined, data_len);
+                write_data = combined;
+            }
+
+            rc = rcp_regmap_ep_generic_cfg_apply_reconfig(ep_generic_cfg, ep_generic_cfg_count,
+                                                            relative, write_data, data_len);
+        }
         *out_error = (rc == RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK) ? RCP_ERROR_NONE
                                                                      : RCP_ERROR_INVALID_PARAMETER;
         return RCP_REGMAP_EP0_OK;
@@ -862,9 +1013,30 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                                      requester_stream_index, relative, data_len);
         if (*out_error != RCP_ERROR_NONE) return RCP_REGMAP_EP0_OK;
 
-        rc = rcp_regmap_sequencer_table_apply_reconfig(sequencer_state, sequencer_owner,
-                                                         sequencer_count, relative, &payload[2],
-                                                         data_len);
+        /* REQ-RMAP-068: see hw_pin_map's own identical pattern above.
+         * The ownership authorization just above depends only on WHICH
+         * octets the write's own span touches (relative/data_len), not
+         * their value, so it is unaffected by whether write_data ends
+         * up being the raw request or a combined one. */
+        {
+            const uint8_t *write_data = &payload[2];
+            uint8_t        combined[RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES * 2u];
+
+            if (write_op != RCP_REGMAP_EP0_WRITE_OP_SET &&
+                (size_t)relative + data_len <= sizeof(combined)) {
+                uint8_t rendered[RCP_REGMAP_SEQUENCER_STATE_MAX_ENTRIES * 2u];
+
+                rcp_regmap_sequencer_table_render(sequencer_state, sequencer_owner, sequencer_count,
+                                                   rendered);
+                rcp_regmap_ep0_combine_write_op(write_op, &rendered[relative], &payload[2],
+                                                 combined, data_len);
+                write_data = combined;
+            }
+
+            rc = rcp_regmap_sequencer_table_apply_reconfig(sequencer_state, sequencer_owner,
+                                                             sequencer_count, relative, write_data,
+                                                             data_len);
+        }
         *out_error = (rc == RCP_REGMAP_SEQUENCER_TABLE_RECONFIG_OK) ? RCP_ERROR_NONE
                                                                       : RCP_ERROR_INVALID_PARAMETER;
         return RCP_REGMAP_EP0_OK;
@@ -879,22 +1051,22 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
     if (optional_cfg != NULL) {
         if (optional_subsystem_cfg_write_route(addr, map->svr_network_interface_cfg_ptr,
                                                 optional_cfg->network_interface_cfg, state, writer,
-                                                &payload[2], data_len, out_error)) {
+                                                write_op, &payload[2], data_len, out_error)) {
             return RCP_REGMAP_EP0_OK;
         }
         if (optional_subsystem_cfg_write_route(addr, map->svr_physical_layer_cfg_ptr,
                                                 optional_cfg->physical_layer_cfg, state, writer,
-                                                &payload[2], data_len, out_error)) {
+                                                write_op, &payload[2], data_len, out_error)) {
             return RCP_REGMAP_EP0_OK;
         }
         if (optional_subsystem_cfg_write_route(addr, map->svr_time_synch_cfg_ptr,
                                                 optional_cfg->time_synch_cfg, state, writer,
-                                                &payload[2], data_len, out_error)) {
+                                                write_op, &payload[2], data_len, out_error)) {
             return RCP_REGMAP_EP0_OK;
         }
         if (optional_subsystem_cfg_write_route(addr, map->svr_security_cfg_ptr,
                                                 optional_cfg->security_cfg, state, writer,
-                                                &payload[2], data_len, out_error)) {
+                                                write_op, &payload[2], data_len, out_error)) {
             return RCP_REGMAP_EP0_OK;
         }
     }
