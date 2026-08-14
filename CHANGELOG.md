@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.342.0 -- 2026-08-14 (REQ-WAKEUP-022: edge-triggered wake-source detection, all 6 Table 40 IO_SRC values now representable)
+
+Ninth of 14 items -- the second of the three WakeUp items (`REQ-WAKEUP-018/021/022`), closing the last of the two deliberate simplifications the WakeUp register-block milestone left open.
+
+TC18 Table 40's own IO_SRC[15:11] field defines 6 values: inactive, rising edge, falling edge, both edges, high level, low level (plus a reserved range). This module previously represented only 3 (inactive/high/low); the other 3 (all edge-triggered) were left unrepresentable, since edge detection needs previous-pin-level state a pure per-call predicate can't carry, and redesigning the existing level-only `rcp_ep_wakeup_source_asserted()` would ripple into every caller's own calling convention.
+
+**Additive, not breaking** (unlike the previous WakeUp release): `rcp_ep_wakeup_source_cfg_t` gains two new fields, `trigger_on_rising_edge`/`trigger_on_falling_edge` (both false by default -- every pre-existing LEVEL-mode caller's own behavior is completely unchanged). `rcp_ep_wakeup_source_asserted()` itself is untouched. A new, separate, stateful predicate pair closes the gap instead: `rcp_ep_wakeup_source_edge_asserted()`/`_any_source_edge_asserted()`, each taking an explicit caller-owned `rcp_ep_wakeup_source_edge_state_t` -- the same caller-owned "has_previous" idiom this codebase already establishes elsewhere (e.g. `lifecycle.h`'s `rcp_server_gptp_trigger_state_t`). The very first observation for a slot only seeds `previous_level`, never fires, avoiding a false-positive edge from an arbitrary starting level; a LEVEL-mode source (neither trigger flag set) simply delegates to the existing `rcp_ep_wakeup_source_asserted()`, state left untouched.
+
+`rcp_ep_wakeup_render_registers()`/`_apply_reconfig()` now render/parse all 6 IO_SRC values; only the genuinely reserved range (0x06-0x1F) remains unrepresentable, correctly so, since TC18 itself defines no meaning for it.
+
+**Bonus citation-drift fix** (issue #341 lineage): `REQ-WAKEUP-022`'s own `tc18` citation pointed at "Table 37, TC18.txt L4128-4139" -- verified while updating this requirement's own text, that line range is actually §13.5.1's unrelated compound-wait evt-field prose, not Table 40 at all. Corrected to the real location (L4528-4541), title corrected from "Table 37" to "Table 40" to match.
+
+New tests cover LEVEL-mode delegation, first-observation seeding, rising/falling/both-edges firing, a disabled edge source updating state without firing, and the array-level `_any_source_edge_asserted()`'s own no-short-circuit contract (every in-range source's state must update every call, not just sources scanned before the first hit) -- the first version of that last test did not actually exercise the differential and passed even with short-circuiting mutated in; it was rewritten with a genuine 3-call scenario (an earlier source firing alongside a later source's own transition, then a third call proving the later source's state was tracked correctly) before being trusted. Four independent mutations (the first-observation seed guard, the no-short-circuit contract, and the render-side EDGE-over-LEVEL precedence) were each weakened and confirmed to fail the new tests, then restored.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`: `REQ-WAKEUP-022` partial → implemented -- 1045 implemented / 22 partial / 2 not-implemented / 7 retired, 1076 total.
+
 ### v0.341.0 -- 2026-08-14 (REQ-WAKEUP-021: wup_status redesigned as a genuine per-source bitmask)
 
 Eighth of 14 items catalogued "not blocked, left by explicit decision" -- the first of the three WakeUp items (REQ-WAKEUP-018/021/022), and a real breaking API change, matching how the user's own list described this trio ("WakeUp redesigns (breaking API changes)").

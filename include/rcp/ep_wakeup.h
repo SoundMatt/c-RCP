@@ -211,25 +211,33 @@
  *      endpoint type's own `ep_status`/`svr_ep_status` field gets.
  *   2. Each wake-source's own wire register encodes a 5-bit IO_SRC
  *      behavior code (TC18's own Table 37/40: inactive, rising edge,
- *      falling edge, both edges, high level, low level, else reserved) --
- *      this module's own pre-existing `rcp_ep_wakeup_source_cfg_t` only
- *      ever modeled 2 of those 6 states (`active_high`, a level-only
- *      predicate `rcp_ep_wakeup_source_asserted()` already implements and
- *      is already tested). Rather than redesigning that detection logic
- *      to add edge-triggering (which would need previous-level state
- *      this module's own existing, tested API doesn't carry, and would
- *      ripple into every caller's own calling convention), the register
- *      block below renders/parses exactly the 2 states this module can
- *      already represent (io_src 0x04 = high level, 0x05 = low level,
- *      0x00 = disabled) faithfully, and a configuration write encoding
- *      an edge-triggered or reserved io_src value (0x01-0x03, 0x06-0x1F)
- *      leaves that source's own `enabled`/`active_high` fields UNCHANGED
- *      (its `pin_number` still updates) -- honestly representing "this
- *      implementation cannot act on that request" rather than silently
- *      misinterpreting an edge-triggered request as a level-triggered
- *      one, which would be actively wrong instead of merely incomplete.
- *      `rcp_ep_wakeup_source_asserted()`'s own existing signature,
- *      semantics, and tests are entirely unchanged by this addition.
+ *      falling edge, both edges, high level, low level, else reserved).
+ *      This module's own `rcp_ep_wakeup_source_cfg_t` originally modeled
+ *      only 2 of those 6 states (`active_high`, a level-only predicate
+ *      `rcp_ep_wakeup_source_asserted()` implements) -- RESOLVED
+ *      2026-08-14 (REQ-WAKEUP-022, issue #341 lineage): rather than
+ *      redesigning that existing level-only predicate itself (which
+ *      would need previous-level state a pure per-call function cannot
+ *      carry, and would ripple into every existing caller's own calling
+ *      convention), `rcp_ep_wakeup_source_cfg_t` gained two new,
+ *      purely-additive `trigger_on_rising_edge`/`trigger_on_falling_edge`
+ *      fields (both false by default -- every pre-existing LEVEL-mode
+ *      caller's own behavior is completely unchanged), and a NEW,
+ *      separate, stateful predicate pair --
+ *      `rcp_ep_wakeup_source_edge_asserted()`/`_any_source_edge_
+ *      asserted()`, each taking an explicit caller-owned `rcp_ep_wakeup_
+ *      source_edge_state_t` (the same "has_previous" idiom this codebase
+ *      already establishes elsewhere) -- now covers the 4 states the old
+ *      level-only predicate could not (`rcp_ep_wakeup_source_asserted()`
+ *      itself, and the pre-existing `active_high` field, are both left
+ *      entirely unchanged for the LEVEL case). Only the genuinely
+ *      reserved IO_SRC range (0x06-0x1F) remains unrepresentable, now
+ *      correctly so, since TC18 itself defines no meaning for it -- a
+ *      configuration write encoding a reserved value leaves that
+ *      source's own `enabled`/`active_high`/`trigger_on_*_edge` fields
+ *      UNCHANGED (its `pin_number` still updates), honestly representing
+ *      "this implementation cannot act on that request" rather than
+ *      silently misinterpreting it.
  *
  * `wup_status` itself -- RESOLVED 2026-08-14 (REQ-WAKEUP-021, issue #341
  * lineage) -- now renders/parses the FULL 16-bit wire word as a genuine
@@ -319,7 +327,9 @@ typedef struct {
 
 typedef struct {
     bool     enabled;     /* this wake-source slot participates in wake detection */
-    bool     active_high; /* true: a high pin level asserts wake; false: a low level does */
+    bool     active_high; /* true: a high pin level asserts wake; false: a low level does --
+                              consulted only in LEVEL mode (see trigger_on_rising_edge/
+                              trigger_on_falling_edge below); ignored in EDGE mode */
     uint16_t pin_number;  /* ADDED 2026-08-11: wup_io_scrN's own [10:0] wire
                               field -- the physical IO pin this slot
                               observes. 0 is the wire's own "unconfigured/
@@ -330,6 +340,32 @@ typedef struct {
                               active_high), it is purely the wire-visible
                               identity of which physical pin enabled/
                               active_high describe. */
+    bool     trigger_on_rising_edge;  /* ADDED 2026-08-14 (REQ-WAKEUP-022,
+                              issue #341 lineage): TC18 Table 40's own
+                              IO_SRC "rising edge" (0x01) / "both edges"
+                              (0x03, both flags true) values. Either this
+                              or trigger_on_falling_edge true puts this
+                              slot in EDGE mode -- active_high is then not
+                              consulted; rcp_ep_wakeup_source_asserted()
+                              (the pure, stateless, LEVEL-only predicate)
+                              is deliberately left entirely unchanged, see
+                              its own doc comment below -- edge detection
+                              needs previous-pin-level state a pure
+                              per-call predicate cannot carry, so it gets
+                              its own separate, additive, stateful
+                              predicate (rcp_ep_wakeup_source_edge_
+                              asserted() below) instead. Both false (the
+                              zero-init default) means LEVEL mode,
+                              governed by enabled/active_high exactly as
+                              before this field's own introduction --
+                              this field is purely additive for every
+                              existing LEVEL-mode caller. */
+    bool     trigger_on_falling_edge; /* ADDED 2026-08-14: TC18 Table 40's
+                              own IO_SRC "falling edge" (0x02) / "both
+                              edges" (0x03, both flags true) values -- see
+                              trigger_on_rising_edge's own doc comment
+                              immediately above for the shared EDGE-mode
+                              rule both fields follow together. */
 } rcp_ep_wakeup_source_cfg_t;
 
 typedef struct {
@@ -397,7 +433,9 @@ typedef struct {
 } rcp_ep_wakeup_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false; every source entry
- * disabled with active_high == false and pin_number == 0; ep_status == 0;
+ * disabled with active_high == false, pin_number == 0, and both
+ * trigger_on_rising_edge/trigger_on_falling_edge false (LEVEL mode,
+ * REQ-WAKEUP-022); ep_status == 0;
  * wup_status cleared; repetition_time_us == 0). */
 void rcp_ep_wakeup_functional_cfg_init(rcp_ep_wakeup_functional_cfg_t *cfg);
 
@@ -409,16 +447,87 @@ bool rcp_ep_wakeup_functional_cfg_writable(rcp_lifecycle_state_t state,
                                             rcp_lifecycle_writer_ctx_t writer);
 
 /* True iff cfg is enabled and pin_level matches cfg's own active_high
- * polarity -- i.e. this one source currently indicates a wake condition. */
+ * polarity -- i.e. this one source currently indicates a wake condition.
+ * LEVEL-mode only (see rcp_ep_wakeup_source_cfg_t's own
+ * trigger_on_rising_edge/trigger_on_falling_edge doc comment) --
+ * deliberately left entirely unchanged by REQ-WAKEUP-022 (issue #341
+ * lineage): a source in EDGE mode needs rcp_ep_wakeup_source_edge_
+ * asserted() below instead, since edge detection needs state this pure,
+ * stateless predicate cannot carry. Every existing caller of this
+ * function keeps its exact pre-existing meaning. */
 bool rcp_ep_wakeup_source_asserted(rcp_ep_wakeup_source_cfg_t cfg, bool pin_level);
 
 /* True iff any of the first (RCP_EP_WAKEUP_MAX_SOURCES min pin_level_count)
  * entries of fcfg->sources is currently asserted per
  * rcp_ep_wakeup_source_asserted(), given pin_level_count raw pin levels in
  * pin_levels (pin_levels[i] corresponds to fcfg->sources[i]). fcfg == NULL
- * or pin_levels == NULL (with pin_level_count > 0) returns false. */
+ * or pin_levels == NULL (with pin_level_count > 0) returns false. LEVEL-mode
+ * only, same as rcp_ep_wakeup_source_asserted() above -- unchanged by
+ * REQ-WAKEUP-022; see rcp_ep_wakeup_any_source_edge_asserted() below for
+ * the EDGE-aware counterpart. */
 bool rcp_ep_wakeup_any_source_asserted(const rcp_ep_wakeup_functional_cfg_t *fcfg,
                                         const bool *pin_levels, size_t pin_level_count);
+
+/* ── Edge-triggered wake-source detection (REQ-WAKEUP-022, issue #341
+ * lineage) ───────────────────────────────────────────────────────────────
+ *
+ * One previous-pin-level slot per wake-source: edge detection needs to
+ * compare the CURRENT pin level against the PREVIOUS one, state a pure
+ * per-call predicate like rcp_ep_wakeup_source_asserted() cannot carry
+ * itself -- the same caller-owned "has_previous" idiom this codebase
+ * already establishes elsewhere (lifecycle.h's rcp_server_gptp_trigger_
+ * state_t; e2e.h's rcp_e2e_seq_tracker_t): the very first observation
+ * only seeds previous_level, never fires, avoiding a false-positive edge
+ * from an arbitrary/unknown starting level. A caller owns one instance
+ * per wake-source slot (mirroring rcp_ep_wakeup_source_cfg_t's own
+ * per-slot indexing), initialized once via _init() before the first
+ * rcp_ep_wakeup_source_edge_asserted() call for that slot. */
+typedef struct {
+    bool has_previous;
+    bool previous_level;
+} rcp_ep_wakeup_source_edge_state_t;
+
+/* Initializes *s to "no previous observation yet". */
+void rcp_ep_wakeup_source_edge_state_init(rcp_ep_wakeup_source_edge_state_t *s);
+
+/* The EDGE-aware counterpart to rcp_ep_wakeup_source_asserted() above --
+ * a single source, given its own dedicated *state (updated in place by
+ * every call, per the "has_previous" idiom described above). If cfg is in
+ * LEVEL mode (both trigger_on_rising_edge/trigger_on_falling_edge false),
+ * *state is left entirely untouched and this function simply delegates to
+ * rcp_ep_wakeup_source_asserted(cfg, pin_level) -- a single call site a
+ * caller can use uniformly for every source regardless of its own
+ * configured mode, without special-casing LEVEL vs. EDGE itself.
+ * Otherwise (EDGE mode): the very first call for a given *state only
+ * seeds previous_level and returns false; every call after that returns
+ * true iff the level actually transitioned in a direction cfg's own
+ * trigger_on_rising_edge/trigger_on_falling_edge flags select (both true
+ * -- Table 40's own "both edges" -- fires on either transition), false
+ * otherwise, and *state's own previous_level is updated to pin_level
+ * unconditionally (every call, whether or not it fires) so the next call
+ * always compares against the most recent real observation. Disabled
+ * (cfg.enabled == false) EDGE-mode sources still update *state (matching
+ * LEVEL mode's own "always observe" behavior) but never fire. */
+bool rcp_ep_wakeup_source_edge_asserted(rcp_ep_wakeup_source_cfg_t cfg,
+                                         rcp_ep_wakeup_source_edge_state_t *state,
+                                         bool pin_level);
+
+/* The EDGE-aware counterpart to rcp_ep_wakeup_any_source_asserted() above:
+ * true iff rcp_ep_wakeup_source_edge_asserted() fires for ANY of the first
+ * (RCP_EP_WAKEUP_MAX_SOURCES min pin_level_count) entries of fcfg->sources,
+ * given pin_level_count raw pin levels in pin_levels and one
+ * rcp_ep_wakeup_source_edge_state_t per source in states (same index
+ * convention as fcfg->sources/pin_levels; caller-owned, RCP_EP_WAKEUP_
+ * MAX_SOURCES-sized). Deliberately does NOT short-circuit on the first
+ * match -- every in-range source's own state must be updated on every
+ * call (per rcp_ep_wakeup_source_edge_asserted()'s own "every call
+ * updates state" contract above), not just sources scanned before the
+ * first hit, or a later transition on an unscanned source would be
+ * silently missed. fcfg == NULL, states == NULL, or pin_levels == NULL
+ * (with pin_level_count > 0) returns false without touching any state. */
+bool rcp_ep_wakeup_any_source_edge_asserted(const rcp_ep_wakeup_functional_cfg_t *fcfg,
+                                             rcp_ep_wakeup_source_edge_state_t *states,
+                                             const bool *pin_levels, size_t pin_level_count);
 
 /* ── wup_status latch ─────────────────────────────────────────────────────────── */
 
@@ -690,13 +799,18 @@ rcp_ep_wakeup_decode_wakeup_message_with_source(const uint8_t *b, size_t len,
 #define RCP_EP_WAKEUP_REG_SOURCE_BASE ((uint16_t)0x0006u)
 #define RCP_EP_WAKEUP_REG_SOURCE_SPAN ((uint16_t)0x0002u)
 
-/* The 3 IO_SRC[15:11] values this module can represent -- see the file
- * header's own register-block note for why the other TC18-defined values
- * (rising/falling/both-edges, 0x01-0x03) and the reserved range
- * (0x06-0x1F) are not representable here. */
-#define RCP_EP_WAKEUP_IO_SRC_INACTIVE   ((uint8_t)0x00u)
-#define RCP_EP_WAKEUP_IO_SRC_HIGH_LEVEL ((uint8_t)0x04u)
-#define RCP_EP_WAKEUP_IO_SRC_LOW_LEVEL  ((uint8_t)0x05u)
+/* The 6 IO_SRC[15:11] values this module can represent (RESOLVED
+ * 2026-08-14, REQ-WAKEUP-022, issue #341 lineage: rising/falling/both-
+ * edges added, closing the gap the file header's own register-block
+ * note previously described) -- only the reserved range (0x06-0x1F)
+ * remains unrepresentable, correctly, since TC18 itself defines no
+ * meaning for it. */
+#define RCP_EP_WAKEUP_IO_SRC_INACTIVE     ((uint8_t)0x00u)
+#define RCP_EP_WAKEUP_IO_SRC_RISING_EDGE  ((uint8_t)0x01u)
+#define RCP_EP_WAKEUP_IO_SRC_FALLING_EDGE ((uint8_t)0x02u)
+#define RCP_EP_WAKEUP_IO_SRC_BOTH_EDGES   ((uint8_t)0x03u)
+#define RCP_EP_WAKEUP_IO_SRC_HIGH_LEVEL   ((uint8_t)0x04u)
+#define RCP_EP_WAKEUP_IO_SRC_LOW_LEVEL    ((uint8_t)0x05u)
 
 /* The block's own length in octets -- one past the last assigned offset,
  * i.e. the value this endpoint reports at RCP_EP_WAKEUP_REG_EP_LEN and
@@ -736,10 +850,12 @@ const char *rcp_ep_wakeup_reconfig_strerror(rcp_ep_wakeup_reconfig_errc_t e);
  * -- the inverse of rcp_ep_wakeup_apply_reconfig()'s own parse step, and
  * the same rendering that function patches in place. wup_status renders
  * cfg->wup_status.mask in full (bits [15:RCP_EP_WAKEUP_MAX_SOURCES]
- * always 0, REQ-WAKEUP-021); each source slot renders exactly one of
- * RCP_EP_WAKEUP_IO_SRC_INACTIVE/_HIGH_LEVEL/_LOW_LEVEL, derived from
- * enabled/active_high -- see the file header's own register-block note
- * for that remaining simplification. */
+ * always 0, REQ-WAKEUP-021); each source slot renders one of
+ * RCP_EP_WAKEUP_IO_SRC_INACTIVE/_RISING_EDGE/_FALLING_EDGE/_BOTH_EDGES/
+ * _HIGH_LEVEL/_LOW_LEVEL, derived from enabled/active_high/
+ * trigger_on_rising_edge/trigger_on_falling_edge (REQ-WAKEUP-022,
+ * issue #341 lineage: all 6 of Table 40's own defined values are now
+ * representable). */
 void rcp_ep_wakeup_render_registers(const rcp_ep_wakeup_functional_cfg_t *cfg,
                                      uint8_t out[RCP_EP_WAKEUP_EP_FUNC_LEN]);
 
@@ -756,15 +872,17 @@ void rcp_ep_wakeup_render_registers(const rcp_ep_wakeup_functional_cfg_t *cfg,
  * entirely unchanged, per the specification's own "such a payload is to
  * be ignored" rule. Octets landing on a read-only register (EP_LEN or
  * NR_IO_PINS_MAX) are left at their current values while the rest of the
- * span is still applied. A write to wup_status sets bit 0 clear iff the
- * written value's own bit 0 is set (write-1-to-clear, matching §13.7.2.2's
- * own rule); any other written bit pattern in that register is a no-op.
- * A write to a source slot encoding an IO_SRC value this module cannot
- * represent (see RCP_EP_WAKEUP_IO_SRC_* above) leaves that slot's own
- * enabled/active_high unchanged while still updating its pin_number --
- * see the file header's own register-block note for why. Partially-
- * covered multi-octet registers are handled correctly: the write is
- * applied at octet granularity over the block's rendered image. */
+ * span is still applied. A write to wup_status clears each bit whose own
+ * written value is set to 1 (write-1-to-clear, matching §13.7.2.2's own
+ * rule, applied independently per bit -- REQ-WAKEUP-021); a written bit
+ * that is 0 is a no-op for that source. A write to a source slot encoding
+ * a RESERVED IO_SRC value (0x06-0x1F -- every other value is now
+ * representable, REQ-WAKEUP-022) leaves that slot's own enabled/
+ * active_high/trigger_on_rising_edge/trigger_on_falling_edge unchanged
+ * while still updating its pin_number -- see the file header's own
+ * register-block note for why. Partially-covered multi-octet registers
+ * are handled correctly: the write is applied at octet granularity over
+ * the block's rendered image. */
 rcp_ep_wakeup_reconfig_errc_t rcp_ep_wakeup_apply_reconfig(rcp_ep_wakeup_functional_cfg_t *cfg,
                                                             const uint8_t *payload,
                                                             size_t payload_len);
