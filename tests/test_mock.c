@@ -576,6 +576,192 @@ static void test_dispatch_ok_runs_handler_immediately(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* ── REQ-RMAP-048/049 (issue #334-6): response/ack routing suppression ──────
+ *
+ * TC18 §12.7.7 Table 24's own "0 means no X is to be sent" rule for
+ * rx_ack_stream_index/rx_resp_stream_index, exercised through
+ * rcp_mock_server_dispatch() itself -- not by reading the struct field
+ * directly (that was already possible before this fix; the WIRING is
+ * what these tests prove). */
+
+#define RMAP048049_STREAM_ID ((uint64_t)0x0102030405060708ULL)
+
+/* A real ACF_ABB-encoded request whose header echo_handler's own
+ * rcp_bytes_dup() faithfully carries into the response -- unlike the
+ * raw {1,2,3} bytes test_dispatch_ok_runs_handler_immediately uses
+ * above, this is decodable by rcp_acf_classify_response() itself, the
+ * same "everything but Acknowledge" (evt != 0x0F) Write-classified shape
+ * REQ-RMAP-049's own rx_resp_stream_index governs. */
+static rcp_bytes_t write_shaped_request(rcp_byte_bus_id_t byte_bus_id, uint8_t transaction_num)
+{
+    rcp_acf_byte_message_info_t h;
+    const uint8_t                pl[2] = {0xAA, 0xBB};
+
+    memset(&h, 0, sizeof(h));
+    h.byte_bus_id     = byte_bus_id;
+    h.transaction_num = transaction_num;
+    h.op              = (uint8_t)RCP_ACF_OP_WRITE;
+    return rcp_acf_encode_abb(&h, pl, sizeof(pl));
+}
+
+/* Ignores its own request entirely and always answers with a real,
+ * evt[3:0] == 0xF Acknowledge-shaped response -- proving
+ * suppress_response_per_stream_cfg() (mock.c) correctly classifies and
+ * suppresses an Acknowledge even though this module's own dispatch
+ * pipeline has no live caller of its own that builds one yet (a
+ * separate, already-known gap -- see the wiring's own doc comment in
+ * mock.c). */
+static void acknowledge_shaped_handler(const uint8_t *request, size_t request_len,
+                                        rcp_bytes_t *out_response, void *user_data)
+{
+    (void)request;
+    (void)request_len;
+    (void)user_data;
+    g_handler_called = true;
+    *out_response    = rcp_acf_build_acknowledge_response((rcp_byte_bus_id_t)0x11u, 0x42u);
+}
+
+static void test_response_suppressed_when_rx_resp_stream_index_is_zero(void)
+{
+    rcp_mock_server_t              *srv  = rcp_mock_server_new();
+    rcp_bytes_t                      req  = write_shaped_request(0x11, 0x22);
+    rcp_bytes_t                      resp = {0};
+    rcp_regmap_request_stream_cfg_t  cfg[1];
+
+    to_rcp_configured(srv);
+    reset_handler_capture();
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, echo_handler, NULL);
+
+    rcp_regmap_request_stream_cfg_init(&cfg[0]);
+    cfg[0].rx_stream_id       = RMAP048049_STREAM_ID;
+    cfg[0].rx_resp_stream_index = 0u; /* "no response is to be sent" */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, cfg, 1));
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  RMAP048049_STREAM_ID, req.data, req.len, &resp));
+    /* Admission/execution are unaffected -- only the wire response is
+     * suppressed; the handler still ran. */
+    TEST_ASSERT_TRUE(g_handler_called);
+    TEST_ASSERT_NULL(resp.data);
+    TEST_ASSERT_EQUAL_UINT(0u, resp.len);
+
+    rcp_bytes_free(&req);
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_response_not_suppressed_when_rx_resp_stream_index_is_nonzero(void)
+{
+    rcp_mock_server_t              *srv  = rcp_mock_server_new();
+    rcp_bytes_t                      req  = write_shaped_request(0x11, 0x22);
+    rcp_bytes_t                      resp = {0};
+    rcp_regmap_request_stream_cfg_t  cfg[1];
+
+    to_rcp_configured(srv);
+    reset_handler_capture();
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, echo_handler, NULL);
+
+    rcp_regmap_request_stream_cfg_init(&cfg[0]); /* rx_resp_stream_index defaults to 1 */
+    cfg[0].rx_stream_id = RMAP048049_STREAM_ID;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, cfg, 1));
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  RMAP048049_STREAM_ID, req.data, req.len, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    TEST_ASSERT_NOT_NULL(resp.data);
+    TEST_ASSERT_EQUAL_UINT(req.len, resp.len);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&req);
+    rcp_mock_server_destroy(srv);
+}
+
+/* An unresolvable stream_id (no rcp_mock_server_set_request_stream_cfg()
+ * call for it at all) suppresses nothing -- the same fail-toward-no-
+ * action disposition every other resolve_index() call site in mock.c
+ * already uses. */
+static void test_response_not_suppressed_for_unresolvable_stream(void)
+{
+    rcp_mock_server_t *srv  = rcp_mock_server_new();
+    rcp_bytes_t         req  = write_shaped_request(0x11, 0x22);
+    rcp_bytes_t         resp = {0};
+
+    to_rcp_configured(srv);
+    reset_handler_capture();
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, echo_handler, NULL);
+    /* Deliberately no rcp_mock_server_set_request_stream_cfg() call. */
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  RMAP048049_STREAM_ID, req.data, req.len, &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&req);
+    rcp_mock_server_destroy(srv);
+}
+
+/* rx_ack_stream_index's own TC18 default (0, "no acknowledge is to be
+ * sent") suppresses an Acknowledge-shaped response -- the field
+ * rx_resp_stream_index does NOT govern, proven by leaving
+ * rx_resp_stream_index at its own nonzero default alongside. */
+static void test_acknowledge_suppressed_by_default_ack_stream_index(void)
+{
+    rcp_mock_server_t              *srv  = rcp_mock_server_new();
+    const uint8_t                    req[8] = {0};
+    rcp_bytes_t                      resp = {0};
+    rcp_regmap_request_stream_cfg_t  cfg[1];
+
+    to_rcp_configured(srv);
+    reset_handler_capture();
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, acknowledge_shaped_handler, NULL);
+
+    rcp_regmap_request_stream_cfg_init(&cfg[0]); /* rx_ack_stream_index defaults to 0 */
+    cfg[0].rx_stream_id = RMAP048049_STREAM_ID;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, cfg, 1));
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  RMAP048049_STREAM_ID, req, sizeof(req), &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    TEST_ASSERT_NULL(resp.data);
+    TEST_ASSERT_EQUAL_UINT(0u, resp.len);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* Setting rx_ack_stream_index nonzero lets the same Acknowledge-shaped
+ * response through, EVEN with rx_resp_stream_index explicitly set to 0
+ * on the very same stream -- proving field separation: an Acknowledge
+ * is governed only by rx_ack_stream_index, never by rx_resp_stream_index. */
+static void test_acknowledge_not_suppressed_when_rx_ack_stream_index_is_nonzero(void)
+{
+    rcp_mock_server_t              *srv  = rcp_mock_server_new();
+    const uint8_t                    req[8] = {0};
+    rcp_bytes_t                      resp = {0};
+    rcp_regmap_request_stream_cfg_t  cfg[1];
+
+    to_rcp_configured(srv);
+    reset_handler_capture();
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, acknowledge_shaped_handler, NULL);
+
+    rcp_regmap_request_stream_cfg_init(&cfg[0]);
+    cfg[0].rx_stream_id         = RMAP048049_STREAM_ID;
+    cfg[0].rx_ack_stream_index  = 1u; /* "send it" */
+    cfg[0].rx_resp_stream_index = 0u; /* must NOT apply to an Acknowledge */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, cfg, 1));
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+        rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  RMAP048049_STREAM_ID, req, sizeof(req), &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+    TEST_ASSERT_NOT_NULL(resp.data);
+
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
+}
+
 static void test_dispatch_no_handler_leaves_response_zeroed(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -1157,6 +1343,11 @@ int main(void)
     RUN_TEST(test_dispatch_unknown_bus_after_lifecycle_accepts);
     RUN_TEST(test_dispatch_unknown_bus_is_dropped_silently);
     RUN_TEST(test_dispatch_ok_runs_handler_immediately);
+    RUN_TEST(test_response_suppressed_when_rx_resp_stream_index_is_zero);
+    RUN_TEST(test_response_not_suppressed_when_rx_resp_stream_index_is_nonzero);
+    RUN_TEST(test_response_not_suppressed_for_unresolvable_stream);
+    RUN_TEST(test_acknowledge_suppressed_by_default_ack_stream_index);
+    RUN_TEST(test_acknowledge_not_suppressed_when_rx_ack_stream_index_is_nonzero);
     RUN_TEST(test_dispatch_no_handler_leaves_response_zeroed);
     RUN_TEST(test_dispatch_queued_when_endpoint_disabled);
     RUN_TEST(test_drain_endpoint_runs_queued_request);

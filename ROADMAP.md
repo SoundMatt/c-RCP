@@ -19106,6 +19106,43 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.335.0 -- 2026-08-14 (REQ-RMAP-048/049: response/ack routing
+suppression, TC18's "0 means send nothing" rule)
+
+Second of 14 items catalogued "not blocked, left by explicit
+decision". Table 24's two per-request-stream pointers --
+`rx_ack_stream_index` (Acknowledge), `rx_resp_stream_index`
+(everything else) -- each carry a "0 = send nothing" default. No
+real multi-stream transport exists to actually DELIVER a response
+(unchanged boundary), but "send nothing" needs none.
+
+`dispatch_plain()` renamed to `dispatch_plain_inner()` (unchanged),
+wrapped by a new `dispatch_plain()` applying
+`suppress_response_per_stream_cfg()` -- reached uniformly by every
+mock.c dispatch entry point. A built response is classified via
+`rcp_acf_classify_response()`; if its own governing pointer is 0 for
+the resolved stream, it's freed before returning. Unresolvable
+`stream_id` suppresses nothing (fail-toward-no-action, matching
+every other `resolve_index()` site).
+
+Safety analysis first: `rx_resp_stream_index`'s own nonzero default
+plus the confirmed fact that mock.c's own dispatch never yet builds
+an Acknowledge response itself (a separate, already-known gap) means
+this is additive and safe -- confirmed by the full 66-test suite
+passing unmodified before any new test was added.
+
+5 new tests (test_mock.c), including a field-separation test (an
+Acknowledge is governed only by `rx_ack_stream_index`, never
+`rx_resp_stream_index`, even set to conflicting values on the same
+stream) and one exercising the ack-suppression path with a
+purpose-built Acknowledge-shaped test handler. All 4 mutations
+caught cleanly -- one via a SIGBUS crash, an even stronger signal.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace`
+(v0.5.51): 0 errors, 0/1076 untested. `.fusa-reqs.json`:
+`REQ-RMAP-048`/`049` partial -> implemented (1040 implemented / 27
+partial / 2 not-implemented / 7 retired, 1076 total).
+
 ### v0.334.0 -- 2026-08-14 (REQ-ADC-033: inter-sample spacing
 validated against a caller-supplied clock)
 

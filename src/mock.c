@@ -852,7 +852,7 @@ static rcp_mock_dispatch_result_t finish_admission(rcp_mock_endpoint_slot_t *slo
  * function too would kick a second time for the exact same received
  * request. No behavior other than the watchdog kick's own call site
  * changes here. */
-static rcp_mock_dispatch_result_t dispatch_plain(rcp_mock_server_t *srv,
+static rcp_mock_dispatch_result_t dispatch_plain_inner(rcp_mock_server_t *srv,
                                                   rcp_byte_bus_id_t byte_bus_id,
                                                   uint8_t avtp_subtype, uint8_t acf_msg_type,
                                                   bool time_sync_supported, uint64_t stream_id,
@@ -1006,6 +1006,79 @@ static rcp_mock_dispatch_result_t dispatch_plain(rcp_mock_server_t *srv,
 
     return finish_admission(slot, admit, request_type, request, request_len, error, byte_bus_id,
                              out_response);
+}
+
+/* REQ-RMAP-048/049 (issue #334-6): TC18 §12.7.7 Table 24's own two
+ * per-request-stream routing pointers each carry a "0 means no X is to
+ * be sent" default -- rx_ack_stream_index for an Acknowledge-classified
+ * response, rx_resp_stream_index for every other response kind (Write/
+ * Read/Error). This module owns no real multi-stream transport to
+ * actually DELIVER a response on a caller-chosen stream (the same
+ * "protocol library, not a scheduler/transport" boundary REQ-SRV-016/
+ * 017/018 and REQ-RMAP-065 already established elsewhere in this file)
+ * -- but it CAN, and now does, honor the "0 means send nothing at all"
+ * half of that rule, which needs no transport concept whatsoever: *out
+ * is simply freed and left zeroed, exactly as if this dispatch call had
+ * taken one of this module's own pre-existing "no response" paths
+ * (RCP_MOCK_DISPATCH_DROPPED, an unresolved byte_bus_id, etc.).
+ *
+ * An unresolvable stream_id (no rcp_mock_server_set_request_stream_cfg()
+ * call for it) suppresses nothing -- the same fail-toward-no-action
+ * disposition every other resolve_index() call site in this file already
+ * uses; a caller that never configured a request stream sees this
+ * module's pre-existing, unaffected response behavior.
+ *
+ * *out is classified via rcp_acf_classify_response() to pick which of
+ * the two pointers governs it -- Acknowledge vs. everything else, TC18's
+ * own §11.3 split, already established this file's own response-
+ * building convention. This module's own dispatch pipeline never yet
+ * builds an Acknowledge-classified response itself (admit(), unlike the
+ * lower-level rcp_server_endpoint_submit(), has no evt[3]-triggered
+ * out_ack of its own -- a separate, already-known, not-yet-wired gap),
+ * so rx_ack_stream_index's own suppression is presently reachable only
+ * by a caller-supplied endpoint handler that builds one itself; it is
+ * still implemented correctly and tested directly, ready for whenever
+ * that separate gap closes. */
+static void suppress_response_per_stream_cfg(rcp_mock_server_t *srv, uint64_t stream_id,
+                                              rcp_bytes_t *out)
+{
+    uint8_t                      stream_index;
+    rcp_acf_byte_message_info_t hdr = {0};
+
+    if (out->data == NULL) return; /* nothing built, nothing to suppress */
+
+    stream_index = rcp_regmap_request_stream_cfg_resolve_index(
+        srv->request_stream_cfg, srv->request_stream_cfg_count, stream_id);
+    if (stream_index == 0u) return;
+
+    if (out->len < 8u || rcp_acf_unpack_header(out->data, &hdr) != RCP_ACF_OK) return;
+
+    if (rcp_acf_classify_response(&hdr) == RCP_ACF_RESP_ACKNOWLEDGE) {
+        if (srv->request_stream_cfg[stream_index - 1u].rx_ack_stream_index == 0u) {
+            rcp_bytes_free(out);
+        }
+    } else {
+        if (srv->request_stream_cfg[stream_index - 1u].rx_resp_stream_index == 0u) {
+            rcp_bytes_free(out);
+        }
+    }
+}
+
+//cfusa:req REQ-RMAP-048
+//cfusa:req REQ-RMAP-049
+static rcp_mock_dispatch_result_t dispatch_plain(rcp_mock_server_t *srv,
+                                                  rcp_byte_bus_id_t byte_bus_id,
+                                                  uint8_t avtp_subtype, uint8_t acf_msg_type,
+                                                  bool time_sync_supported, uint64_t stream_id,
+                                                  const uint8_t *request, size_t request_len,
+                                                  rcp_bytes_t *out_response)
+{
+    rcp_mock_dispatch_result_t result =
+        dispatch_plain_inner(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
+                              stream_id, request, request_len, out_response);
+
+    suppress_response_per_stream_cfg(srv, stream_id, out_response);
+    return result;
 }
 
 //cfusa:req REQ-WDG-010
