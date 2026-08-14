@@ -1182,6 +1182,47 @@ static void test_overflow_on_one_endpoint_broadcasts_safe_state_to_stream_siblin
     rcp_mock_server_destroy(srv);
 }
 
+/* REQ-E2E-046 (issue #336): the identical overflow this file's own
+ * broadcast test above already drives also latches stream_status[]'s
+ * own overflow cause -- the readable Table 24 rx_stream_status bit,
+ * a separate concern from the broadcast-safe-state actuator (this
+ * server double's own reaction, not itself part of the register). */
+static void test_overflow_latches_stream_status(void)
+{
+    handler_log_t                    log;
+    rcp_mock_server_t               *srv = fixture(&log);
+    rcp_regmap_request_stream_cfg_t  stream_cfg[1];
+    rcp_bytes_t                      frame;
+    size_t                           i;
+
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id               = 1u;
+    stream_cfg[0].rx_ovrflw_safestate_enable = true; /* gates
+                                                          rcp_e2e_overflow_should_enter_safe_state(),
+                                                          the same flag stream_status[]'s own
+                                                          overflow latch is gated on too */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+
+    TEST_ASSERT_FALSE(rcp_mock_server_stream_status_rx_blocked(srv, 1u));
+
+    for (i = 0; i < RCP_SERVER_MAX_PENDING; i++) {
+        frame = rcp_timed_encode_request(1, 0x1000u + (uint64_t)i, (uint8_t)i, NULL, 0u);
+        TEST_ASSERT_NOT_NULL(frame.data);
+        TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit_to(srv, 1, &frame));
+        rcp_bytes_free(&frame);
+    }
+    TEST_ASSERT_FALSE(rcp_mock_server_stream_status_rx_blocked(srv, 1u)); /* still not overflowed */
+
+    frame = rcp_timed_encode_request(1, 0x9000u, 99u, NULL, 0u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED, submit_to(srv, 1, &frame));
+    rcp_bytes_free(&frame);
+
+    TEST_ASSERT_TRUE(rcp_mock_server_stream_status_rx_blocked(srv, 1u));
+
+    rcp_mock_server_destroy(srv);
+}
+
 /* Negative control: identical setup, EXCEPT srv's own EP_ID_config table
  * is left empty -- confirms the broadcast above is a genuine consequence
  * of EP_ID_config's own content, not something dispatch_plain() would
@@ -1604,6 +1645,7 @@ int main(void)
     RUN_TEST(test_cancel_all_and_cancel_single_return_values);
     RUN_TEST(test_watchdog_purge_keeps_only_the_safety_sequence);
     RUN_TEST(test_overflow_on_one_endpoint_broadcasts_safe_state_to_stream_siblings);
+    RUN_TEST(test_overflow_latches_stream_status);
     RUN_TEST(test_overflow_does_not_broadcast_without_an_ep_id_map);
 
     RUN_TEST(test_chained_first_in_frame_is_chain_error);

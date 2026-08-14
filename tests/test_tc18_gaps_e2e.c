@@ -1509,6 +1509,110 @@ static void test_dispatch_e2e_with_no_stream_fault_tracker_set_dispatches_normal
     rcp_mock_server_destroy(srv);
 }
 
+/* ── REQ-E2E-046 (issue #336): rx_stream_status live wiring ─────────────────
+ *
+ * srv's own stream_status[] array (mock.c) is now latched as a byproduct
+ * of the SAME live dispatch paths that already existed for
+ * stream_fault_tracker (CRC) and the frame-level sequence gate (seq) --
+ * proven here via rcp_mock_server_stream_status_rx_blocked(), not by
+ * calling rcp_e2e_stream_status_*() directly (that would only prove the
+ * primitive works, already established by e2e.h's own unit tests; this
+ * proves the WIRING). */
+
+/* A CRC mismatch on a request-stream-cfg-resolvable stream latches
+ * stream_status[]'s own CRC cause -- independent of whether
+ * rx_enforce_e2e/stream_fault_tracker are configured at all (this is
+ * the readable Table 24 bit, not the blocking mechanism). */
+static void test_dispatch_e2e_crc_error_latches_stream_status(void)
+{
+    rcp_mock_server_t              *srv   = rcp_mock_server_new();
+    const uint8_t                    pl[4] = {0x9A, 0x9B, 0x9C, 0x9D};
+    rcp_bytes_t                      frame = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t                      w     = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_bytes_t                      resp  = {0};
+    rcp_regmap_request_stream_cfg_t  stream_cfg[1];
+
+    TEST_ASSERT_NOT_NULL(w.data);
+    w.data[w.len - 1u] ^= 0xFFu;
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+    /* rx_enforce_e2e must be set for a CRC error to actually latch --
+     * rcp_e2e_stream_fault_on_crc_error()'s own gate, the same one
+     * stream_fault_tracker's own identical call already relies on. */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_rx_enforce_e2e(srv, 0x11, true));
+
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id = TEST_SID;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+
+    TEST_ASSERT_FALSE(rcp_mock_server_stream_status_rx_blocked(srv, TEST_SID)); /* not yet */
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, TEST_TS,
+                                                    w.data, w.len, &resp));
+
+    TEST_ASSERT_TRUE(rcp_mock_server_stream_status_rx_blocked(srv, TEST_SID));
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&w);
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* A replayed sequence_num on an rx_enforce_seq-configured stream latches
+ * stream_status[]'s own sequence cause. */
+static void test_dispatch_frame_seq_error_latches_stream_status(void)
+{
+    rcp_mock_server_t             *srv   = rcp_mock_server_new();
+    const uint8_t                   pl[4] = {1, 2, 3, 4};
+    rcp_bytes_t                     frame = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_mock_frame_member_result_t  results[4];
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    /* rx_seq_safestate_enable must be set for a discontinuity to set
+     * result.enter_safe_state -- stream_status[]'s own seq latch is
+     * gated on that flag, the same one the broadcast-safe-state
+     * actuator right below it (mock.c) already gates on. A plain
+     * rejection (result.accept == false) alone does not imply
+     * enter_safe_state == true. */
+    set_up_seq_stream(srv, true, true);
+
+    TEST_ASSERT_FALSE(rcp_mock_server_stream_status_rx_blocked(srv, TEST_SID));
+
+    rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, TEST_SID, 5u, frame.data,
+                                    frame.len, results, 4);
+    rcp_bytes_free(&results[0].response);
+    TEST_ASSERT_FALSE(rcp_mock_server_stream_status_rx_blocked(srv, TEST_SID)); /* first-ever seq
+                                                                                    always accepts */
+
+    /* Replay -- rejected, and now latched. */
+    rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, TEST_SID, 5u, frame.data,
+                                    frame.len, results, 4);
+    TEST_ASSERT_NULL(results[0].response.data);
+    TEST_ASSERT_TRUE(rcp_mock_server_stream_status_rx_blocked(srv, TEST_SID));
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* An unresolvable stream_id (no rcp_mock_server_set_request_stream_cfg()
+ * call for it) reads as not-blocked -- the same fail-toward-not-blocked
+ * disposition every other unresolvable-stream case in this module
+ * already uses; not a crash or an error. */
+static void test_stream_status_rx_blocked_false_for_unresolvable_stream(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+
+    TEST_ASSERT_NOT_NULL(srv);
+    TEST_ASSERT_FALSE(rcp_mock_server_stream_status_rx_blocked(srv, TEST_SID));
+
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── REQ-E2E-042: pad coverage and quadlet alignment ───────────────────────── */
 
 /* TC18 sec. 13.6 Figures 19/20 compute the CRC over whole quadlets --
@@ -1595,6 +1699,10 @@ int main(void)
     RUN_TEST(test_dispatch_e2e_crc_error_with_rx_enforce_e2e_blocks_the_whole_stream);
     RUN_TEST(test_dispatch_e2e_crc_error_without_rx_enforce_e2e_does_not_block_the_stream);
     RUN_TEST(test_dispatch_e2e_with_no_stream_fault_tracker_set_dispatches_normally);
+
+    RUN_TEST(test_dispatch_e2e_crc_error_latches_stream_status);
+    RUN_TEST(test_dispatch_frame_seq_error_latches_stream_status);
+    RUN_TEST(test_stream_status_rx_blocked_false_for_unresolvable_stream);
     RUN_TEST(test_crc_covers_pad_octets_and_alignment_is_enforced);
     return UNITY_END();
 }

@@ -76,6 +76,20 @@ struct rcp_mock_server {
      * (has_prev = false, prev_seq = 0), the same convention every other
      * table here already relies on. */
     rcp_e2e_seq_tracker_t           seq_tracker[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES];
+    /* REQ-E2E-046 (issue #336): one caller-owned rcp_e2e_stream_status_t
+     * per request_stream_cfg[] slot -- the identical indexing
+     * seq_tracker[] above already establishes. Composition, not
+     * duplication, with stream_fault_tracker above (e2e.h's own file
+     * header note on rcp_e2e_stream_status_t): stream_status[].crc is a
+     * SEPARATE, per-request-stream-indexed rcp_e2e_stream_fault_t of its
+     * own -- not aliased to *stream_fault_tracker (a distinct,
+     * caller-owned, stream_id-KEYED tracker covering CRC alone) -- since
+     * TC18's own rx_stream_status bit (Table 24) is a per-request-stream
+     * register this server double has no other home for. No explicit
+     * init loop needed: rcp_e2e_stream_status_init()'s own
+     * "zero-initializes" contract is exactly calloc()'s own zero-fill,
+     * the same convention seq_tracker[] itself already relies on. */
+    rcp_e2e_stream_status_t         stream_status[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES];
     /* response-queue-cfg table (REQ-RMAP-034's own response-stream half)
      * -- see mock.h's own doc comment on
      * rcp_mock_server_set_response_queue_cfg(). Mirrors
@@ -544,6 +558,16 @@ bool rcp_mock_server_apply_ep_generic_cfg(rcp_mock_server_t *srv,
     return true;
 }
 
+//cfusa:req REQ-E2E-046
+bool rcp_mock_server_stream_status_rx_blocked(const rcp_mock_server_t *srv, uint64_t stream_id)
+{
+    uint8_t stream_index = rcp_regmap_request_stream_cfg_resolve_index(
+        srv->request_stream_cfg, srv->request_stream_cfg_count, stream_id);
+
+    if (stream_index == 0u) return false;
+    return rcp_e2e_stream_status_rx_blocked(&srv->stream_status[stream_index - 1u]);
+}
+
 //cfusa:req REQ-MOCK-010
 bool rcp_mock_server_set_endpoint_enable(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
                                           bool enable)
@@ -860,10 +884,18 @@ static rcp_mock_dispatch_result_t dispatch_plain(rcp_mock_server_t *srv,
     if (error == RCP_ERROR_REQUEST_STORAGE_OVERFLOW) {
         uint8_t overflow_stream_index = rcp_regmap_request_stream_cfg_resolve_index(
             srv->request_stream_cfg, srv->request_stream_cfg_count, stream_id);
-        if (overflow_stream_index != 0u &&
-            rcp_e2e_overflow_should_enter_safe_state(
-                srv->request_stream_cfg[overflow_stream_index - 1u].rx_ovrflw_safestate_enable)) {
-            (void)rcp_mock_server_broadcast_safe_state(srv, overflow_stream_index);
+        if (overflow_stream_index != 0u) {
+            bool enter_safe_state = rcp_e2e_overflow_should_enter_safe_state(
+                srv->request_stream_cfg[overflow_stream_index - 1u].rx_ovrflw_safestate_enable);
+            /* REQ-E2E-046: latches stream_status[]'s own overflow cause --
+             * independent of, and in addition to, the broadcast actuator
+             * below (this is the readable Table 24 rx_stream_status bit,
+             * not itself a safe-state trigger). */
+            rcp_e2e_stream_status_note_overflow(&srv->stream_status[overflow_stream_index - 1u],
+                                                 enter_safe_state);
+            if (enter_safe_state) {
+                (void)rcp_mock_server_broadcast_safe_state(srv, overflow_stream_index);
+            }
         }
     }
 
@@ -1017,6 +1049,23 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
         if (srv->stream_fault_tracker != NULL) {
             (void)rcp_e2e_stream_fault_tracker_on_crc_error(srv->stream_fault_tracker, stream_id,
                                                               slot->rx_enforce_e2e);
+        }
+        /* REQ-E2E-046: latches stream_status[]'s own CRC cause too --
+         * request_stream_index-indexed (this table's own real address
+         * space), a separate instance from stream_fault_tracker's own
+         * stream_id-keyed latch immediately above, same reasoning as
+         * this array's own declaration comment. An unresolvable
+         * stream_id (no rcp_mock_server_set_request_stream_cfg() call
+         * for it) latches nothing -- the same fail-toward-no-action
+         * disposition every other resolve_index() call site in this
+         * file already uses. */
+        {
+            uint8_t crc_stream_index = rcp_regmap_request_stream_cfg_resolve_index(
+                srv->request_stream_cfg, srv->request_stream_cfg_count, stream_id);
+            if (crc_stream_index != 0u) {
+                (void)rcp_e2e_stream_status_note_crc_error(
+                    &srv->stream_status[crc_stream_index - 1u], slot->rx_enforce_e2e);
+            }
         }
         /* REQ-E2E-045 (issue #335): TC18 §12.7.7 Table 24's own
          * rx_enforce_e2e/rx_enforce_crc (0x000D.0) names TWO consequences
@@ -1188,6 +1237,11 @@ static bool frame_seq_gate_admits(rcp_mock_server_t *srv, uint64_t stream_id, ui
     cfg    = &srv->request_stream_cfg[seq_stream_index - 1u];
     result = rcp_e2e_seq_evaluate(&srv->seq_tracker[seq_stream_index - 1u], cfg->rx_enforce_seq,
                                    cfg->rx_seq_safestate_enable, sequence_num);
+
+    /* REQ-E2E-046: latches stream_status[]'s own sequence cause,
+     * regardless of result.accept -- same "checked every time, not just
+     * on rejection" reasoning as the broadcast actuator right below. */
+    rcp_e2e_stream_status_note_seq(&srv->stream_status[seq_stream_index - 1u], result);
 
     /* Checked regardless of result.accept -- a gap (advanced by more than
      * one) is evidence of a problem even when ordering itself still held. */

@@ -19106,6 +19106,37 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.332.0 -- 2026-08-14 (tc18-gap backlog PR J: REQ-E2E-046
+rx_stream_status live wiring)
+
+Investigation first: confirmed no conflict between the new
+`rcp_e2e_stream_status_t` aggregate and the already-shipped,
+CRC-only `rcp_e2e_stream_fault_tracker_t` -- e2e.h's own doc comments
+already document composition, not duplication.
+
+New srv-owned `stream_status[]` array (mock.c), index-parallel with
+`request_stream_cfg[]`/`seq_tracker[]`. Three of the four TC18-named
+causes now latch inside REAL, already-existing production dispatch
+call sites (not a test harness): CRC (`dispatch_e2e()`'s own
+CRC-mismatch branch), sequence (`frame_seq_gate_admits()`), overflow
+(`dispatch_plain()`'s own overflow check). New
+`rcp_mock_server_stream_status_rx_blocked()` is the read side.
+`REQ-E2E-046` stays partial (watchdog has no live evaluate() call
+site anywhere) but records real production wiring for 3 of 4 causes.
+
+New tests: one live-dispatch test per wired cause plus an
+unresolvable-stream fallback; all three wiring call sites
+mutation-tested and caught cleanly.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace`
+(v0.5.51): 0 errors, 0/1076 untested. `.fusa-reqs.json`: 1035
+implemented / 32 partial / 2 not-implemented / 7 retired (1076
+total, unchanged).
+
+**Next**: `REQ-E2E-038`/`039` (real fragmented-message dispatch) is
+the one remaining item from PR E's original scope -- materially
+larger, no architectural ambiguity, well-scoped for its own PR.
+
 ### v0.331.0 -- 2026-08-14 (tc18-gap backlog PR I: REQ-RMAP-036
 ep_generic_cfg live-storage wiring)
 
