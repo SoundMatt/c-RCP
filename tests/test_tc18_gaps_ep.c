@@ -1461,18 +1461,21 @@ static void test_wakeup_codec_accepts_any_bus_id(void)
  * wup_ep_len/wup_nr_io_pins_max/wup_ep_status/wup_status/wup_io_scrN are
  * all reachable via the generic evt[2:0]==111b configuration mechanism.
  *
- * Two things remain deliberately, honestly simplified rather than fully
- * redesigned (still partial, not fully implemented -- see
- * ep_wakeup.h's own "register block" file-header note for the full
- * reasoning): wup_status is now a genuine per-source bitmask (RESOLVED
- * 2026-08-14, REQ-WAKEUP-021, issue #341 lineage -- see test_ep_wakeup.c
- * for the dedicated per-source tests); each wup_io_scrN register still
- * renders/parses only 3 of Table 37's 6 IO_SRC values (inactive/high
- * level/low level) -- the pre-existing rcp_ep_wakeup_source_asserted()
- * predicate is level-only and unchanged, so edge-triggered modes remain
- * unrepresentable, and a configuration write encoding one leaves that
- * slot's own enabled/active_high untouched (only pin_number always
- * updates) rather than silently misinterpreting it. */
+ * Both former simplifications here are now RESOLVED (issue #341
+ * lineage; see ep_wakeup.h's own "register block" file-header note for
+ * the full history): wup_status is a genuine per-source bitmask
+ * (REQ-WAKEUP-021, 2026-08-14 -- see test_ep_wakeup.c for the dedicated
+ * per-source tests), and each wup_io_scrN register now renders/parses
+ * all 6 of Table 40's own defined IO_SRC values, including the 3 edge
+ * modes (REQ-WAKEUP-022, 2026-08-14 -- via the new, separate, stateful
+ * rcp_ep_wakeup_source_edge_asserted()/_any_source_edge_asserted()
+ * predicate pair; the pre-existing level-only
+ * rcp_ep_wakeup_source_asserted() itself is unchanged, see
+ * test_ep_wakeup.c for the dedicated edge-detection tests). Only the
+ * genuinely reserved IO_SRC range (0x06-0x1F) remains unrepresentable,
+ * correctly so -- a configuration write encoding one leaves that slot's
+ * own enabled/active_high/trigger_on_*_edge untouched (only pin_number
+ * always updates) rather than silently misinterpreting it. */
 static void test_wakeup_register_block_has_collision_free_layout(void)
 {
     rcp_ep_wakeup_wup_status_t     status;

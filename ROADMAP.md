@@ -19106,6 +19106,47 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.342.0 -- 2026-08-14 (REQ-WAKEUP-022: edge-triggered wake-source
+detection, all 6 Table 40 IO_SRC values now representable)
+
+Ninth of 14 items -- the second of the three WakeUp items, closing the
+last deliberate simplification the WakeUp register-block milestone left
+open.
+
+Table 40's own IO_SRC field defines 6 values; this module represented
+only 3 (inactive/high/low), since edge detection needs previous-pin-
+level state a pure per-call predicate can't carry. Additive, NOT
+breaking (unlike v0.341.0): two new fields on `rcp_ep_wakeup_source_
+cfg_t` (`trigger_on_rising_edge`/`trigger_on_falling_edge`, both false
+by default -- every LEVEL-mode caller unchanged); the existing level-
+only `rcp_ep_wakeup_source_asserted()` itself untouched. A NEW, separate
+stateful predicate pair (`_source_edge_asserted()`/`_any_source_edge_
+asserted()`) closes the gap, each taking a caller-owned `rcp_ep_wakeup_
+source_edge_state_t` -- the same "has_previous" idiom used elsewhere.
+Register block now renders/parses all 6 IO_SRC values; only the
+genuinely reserved range (0x06-0x1F) remains unrepresentable.
+
+Bonus citation-drift fix (issue #341 lineage): `REQ-WAKEUP-022`'s own
+citation pointed at an unrelated section (§13.5.1's compound-wait
+prose, not Table 40 at all) -- corrected.
+
+New tests cover LEVEL delegation, first-observation seeding, both edge
+directions, a disabled source's own no-fire, and the array-level
+function's no-short-circuit contract -- the first version of that last
+test didn't actually exercise the differential and passed even with
+short-circuiting mutated in; rewritten with a genuine 3-call scenario
+before being trusted. Four independent mutations weakened and confirmed
+to fail, then restored.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51):
+0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`:
+`REQ-WAKEUP-022` partial → implemented -- 1045 implemented / 22 partial
+/ 2 not-implemented / 7 retired, 1076 total.
+
+**Next**: REQ-WAKEUP-018 (repetition_time_us wire mapping -- a
+cross-endpoint architecture question), the last of the user's own
+"complete these" 14-item list.
+
 ### v0.341.0 -- 2026-08-14 (REQ-WAKEUP-021: wup_status redesigned as a
 genuine per-source bitmask)
 

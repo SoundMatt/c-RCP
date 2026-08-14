@@ -79,6 +79,71 @@ bool rcp_ep_wakeup_any_source_asserted(const rcp_ep_wakeup_functional_cfg_t *fcf
     return false;
 }
 
+/* ── Edge-triggered wake-source detection (REQ-WAKEUP-022) ──────────────────── */
+
+//cfusa:req REQ-WAKEUP-022
+void rcp_ep_wakeup_source_edge_state_init(rcp_ep_wakeup_source_edge_state_t *s)
+{
+    s->has_previous   = false;
+    s->previous_level = false;
+}
+
+//cfusa:req REQ-WAKEUP-022
+bool rcp_ep_wakeup_source_edge_asserted(rcp_ep_wakeup_source_cfg_t cfg,
+                                         rcp_ep_wakeup_source_edge_state_t *state,
+                                         bool pin_level)
+{
+    bool rose, fell, fired;
+
+    if (!cfg.trigger_on_rising_edge && !cfg.trigger_on_falling_edge) {
+        /* LEVEL mode: delegate, state untouched. */
+        return rcp_ep_wakeup_source_asserted(cfg, pin_level);
+    }
+
+    if (!state->has_previous) {
+        /* First observation for this slot only seeds previous_level --
+         * never fires, avoiding a false-positive edge from an
+         * arbitrary/unknown starting level. */
+        state->has_previous   = true;
+        state->previous_level = pin_level;
+        return false;
+    }
+
+    rose = !state->previous_level && pin_level;
+    fell = state->previous_level && !pin_level;
+    fired = cfg.enabled &&
+            ((cfg.trigger_on_rising_edge && rose) || (cfg.trigger_on_falling_edge && fell));
+
+    state->previous_level = pin_level; /* every call updates state, fired or not */
+    return fired;
+}
+
+//cfusa:req REQ-WAKEUP-022
+bool rcp_ep_wakeup_any_source_edge_asserted(const rcp_ep_wakeup_functional_cfg_t *fcfg,
+                                             rcp_ep_wakeup_source_edge_state_t *states,
+                                             const bool *pin_levels, size_t pin_level_count)
+{
+    size_t n;
+    size_t i;
+    bool   any = false;
+
+    if (!fcfg) return false;
+    if (!states) return false;
+    if (pin_level_count > 0u && !pin_levels) return false;
+
+    n = pin_level_count < RCP_EP_WAKEUP_MAX_SOURCES ? pin_level_count : RCP_EP_WAKEUP_MAX_SOURCES;
+
+    /* Deliberately does NOT short-circuit -- every in-range source's own
+     * state must be updated on every call (see this function's own doc
+     * comment, ep_wakeup.h). */
+    for (i = 0; i < n; i++) {
+        if (rcp_ep_wakeup_source_edge_asserted(fcfg->sources[i], &states[i], pin_levels[i])) {
+            any = true;
+        }
+    }
+    return any;
+}
+
 /* ── wup_status latch ─────────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-WAKEUP-005
@@ -384,9 +449,22 @@ void rcp_ep_wakeup_render_registers(const rcp_ep_wakeup_functional_cfg_t *cfg,
         uint8_t  io_src;
         uint16_t reg;
 
-        if (!src->enabled) io_src = RCP_EP_WAKEUP_IO_SRC_INACTIVE;
-        else io_src = src->active_high ? RCP_EP_WAKEUP_IO_SRC_HIGH_LEVEL
-                                        : RCP_EP_WAKEUP_IO_SRC_LOW_LEVEL;
+        /* REQ-WAKEUP-022: EDGE mode (either trigger bit set) takes
+         * precedence over the LEVEL-mode enabled/active_high pair --
+         * see rcp_ep_wakeup_source_cfg_t's own doc comment for this
+         * precedence rule. */
+        if (src->trigger_on_rising_edge && src->trigger_on_falling_edge) {
+            io_src = RCP_EP_WAKEUP_IO_SRC_BOTH_EDGES;
+        } else if (src->trigger_on_rising_edge) {
+            io_src = RCP_EP_WAKEUP_IO_SRC_RISING_EDGE;
+        } else if (src->trigger_on_falling_edge) {
+            io_src = RCP_EP_WAKEUP_IO_SRC_FALLING_EDGE;
+        } else if (!src->enabled) {
+            io_src = RCP_EP_WAKEUP_IO_SRC_INACTIVE;
+        } else {
+            io_src = src->active_high ? RCP_EP_WAKEUP_IO_SRC_HIGH_LEVEL
+                                       : RCP_EP_WAKEUP_IO_SRC_LOW_LEVEL;
+        }
 
         reg = (uint16_t)(((uint16_t)(io_src & 0x1Fu) << 11) |
                           (src->pin_number & 0x07FFu));
@@ -431,22 +509,43 @@ static void parse_wakeup_registers(rcp_ep_wakeup_functional_cfg_t *cfg,
 
         switch (io_src) {
         case RCP_EP_WAKEUP_IO_SRC_INACTIVE:
-            src->enabled = false;
+            src->enabled                = false;
+            src->trigger_on_rising_edge  = false;
+            src->trigger_on_falling_edge = false;
+            break;
+        case RCP_EP_WAKEUP_IO_SRC_RISING_EDGE:
+            src->enabled                 = true;
+            src->trigger_on_rising_edge  = true;
+            src->trigger_on_falling_edge = false;
+            break;
+        case RCP_EP_WAKEUP_IO_SRC_FALLING_EDGE:
+            src->enabled                 = true;
+            src->trigger_on_rising_edge  = false;
+            src->trigger_on_falling_edge = true;
+            break;
+        case RCP_EP_WAKEUP_IO_SRC_BOTH_EDGES:
+            src->enabled                 = true;
+            src->trigger_on_rising_edge  = true;
+            src->trigger_on_falling_edge = true;
             break;
         case RCP_EP_WAKEUP_IO_SRC_HIGH_LEVEL:
-            src->enabled     = true;
-            src->active_high = true;
+            src->enabled                 = true;
+            src->active_high             = true;
+            src->trigger_on_rising_edge  = false;
+            src->trigger_on_falling_edge = false;
             break;
         case RCP_EP_WAKEUP_IO_SRC_LOW_LEVEL:
-            src->enabled     = true;
-            src->active_high = false;
+            src->enabled                 = true;
+            src->active_high             = false;
+            src->trigger_on_rising_edge  = false;
+            src->trigger_on_falling_edge = false;
             break;
         default:
-            /* Edge-triggered (0x01-0x03) or reserved (0x06-0x1F): this
-             * module cannot represent it -- enabled/active_high are left
-             * exactly as they were, an honest "cannot apply" rather than
-             * a silently wrong reinterpretation as a level mode. See the
-             * file header's own register-block note. */
+            /* Reserved (0x06-0x1F): this module cannot represent it --
+             * enabled/active_high/trigger_on_*_edge are left exactly as
+             * they were, an honest "cannot apply" rather than a silently
+             * wrong reinterpretation. See the file header's own
+             * register-block note. */
             break;
         }
     }

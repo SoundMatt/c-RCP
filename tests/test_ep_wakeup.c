@@ -124,6 +124,168 @@ static void test_any_source_asserted_null_safe(void)
     TEST_ASSERT_FALSE(rcp_ep_wakeup_any_source_asserted(&cfg, NULL, 0));
 }
 
+/* ── Edge-triggered wake-source detection (REQ-WAKEUP-022, issue #341
+ * lineage) ───────────────────────────────────────────────────────────────
+ *
+ * Struct field order is {enabled, active_high, pin_number,
+ * trigger_on_rising_edge, trigger_on_falling_edge}. */
+
+static void test_source_edge_asserted_delegates_to_level_predicate_in_level_mode(void)
+{
+    rcp_ep_wakeup_source_cfg_t        active_high = {true, true, 0, false, false};
+    rcp_ep_wakeup_source_edge_state_t state;
+
+    rcp_ep_wakeup_source_edge_state_init(&state);
+
+    /* Identical results to rcp_ep_wakeup_source_asserted() directly, and
+     * state is never touched (still has_previous == false afterward --
+     * verified indirectly: a subsequent edge-mode source starting from
+     * this same *state would still treat its first call as a seed, but
+     * we can't observe has_previous directly, so we instead prove level
+     * mode never DEPENDS on state by calling twice with different levels
+     * and getting the same, correct level-only answer both times). */
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_source_edge_asserted(active_high, &state, true));
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_source_edge_asserted(active_high, &state, true));
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_source_edge_asserted(active_high, &state, false));
+}
+
+static void test_source_edge_asserted_first_observation_only_seeds(void)
+{
+    rcp_ep_wakeup_source_cfg_t        rising = {true, false, 0, true, false};
+    rcp_ep_wakeup_source_edge_state_t state;
+
+    rcp_ep_wakeup_source_edge_state_init(&state);
+
+    /* First call ever, level already high: must NOT fire -- there is no
+     * real "previous" observation to compare against yet. */
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_source_edge_asserted(rising, &state, true));
+}
+
+static void test_source_edge_asserted_fires_on_configured_rising_edge_only(void)
+{
+    rcp_ep_wakeup_source_cfg_t        rising = {true, false, 0, true, false};
+    rcp_ep_wakeup_source_edge_state_t state;
+
+    rcp_ep_wakeup_source_edge_state_init(&state);
+    rcp_ep_wakeup_source_edge_asserted(rising, &state, false); /* seed at low */
+
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_source_edge_asserted(rising, &state, true));   /* 0->1: fires */
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_source_edge_asserted(rising, &state, true));  /* 1->1: no edge */
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_source_edge_asserted(rising, &state, false)); /* 1->0: wrong edge */
+}
+
+static void test_source_edge_asserted_fires_on_configured_falling_edge_only(void)
+{
+    rcp_ep_wakeup_source_cfg_t        falling = {true, false, 0, false, true};
+    rcp_ep_wakeup_source_edge_state_t state;
+
+    rcp_ep_wakeup_source_edge_state_init(&state);
+    rcp_ep_wakeup_source_edge_asserted(falling, &state, true); /* seed at high */
+
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_source_edge_asserted(falling, &state, true)); /* 1->1 */
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_source_edge_asserted(falling, &state, false)); /* 1->0: fires */
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_source_edge_asserted(falling, &state, false)); /* 0->0 */
+}
+
+static void test_source_edge_asserted_both_edges_fires_either_direction(void)
+{
+    rcp_ep_wakeup_source_cfg_t        both = {true, false, 0, true, true};
+    rcp_ep_wakeup_source_edge_state_t state;
+
+    rcp_ep_wakeup_source_edge_state_init(&state);
+    rcp_ep_wakeup_source_edge_asserted(both, &state, false); /* seed */
+
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_source_edge_asserted(both, &state, true));  /* rising: fires */
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_source_edge_asserted(both, &state, false)); /* falling: fires */
+}
+
+static void test_source_edge_asserted_disabled_updates_state_but_never_fires(void)
+{
+    rcp_ep_wakeup_source_cfg_t        rising_disabled = {false, false, 0, true, false};
+    rcp_ep_wakeup_source_edge_state_t state;
+
+    rcp_ep_wakeup_source_edge_state_init(&state);
+    rcp_ep_wakeup_source_edge_asserted(rising_disabled, &state, false); /* seed */
+
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_source_edge_asserted(rising_disabled, &state, true));
+}
+
+static void test_any_source_edge_asserted_true_when_one_fires(void)
+{
+    rcp_ep_wakeup_functional_cfg_t    cfg;
+    rcp_ep_wakeup_source_edge_state_t states[RCP_EP_WAKEUP_MAX_SOURCES];
+    bool                              levels_low[2]  = {false, false};
+    bool                              levels_high[2] = {false, true};
+    size_t                            i;
+
+    rcp_ep_wakeup_functional_cfg_init(&cfg);
+    cfg.sources[1].enabled                = true;
+    cfg.sources[1].trigger_on_rising_edge = true;
+    for (i = 0; i < RCP_EP_WAKEUP_MAX_SOURCES; i++) rcp_ep_wakeup_source_edge_state_init(&states[i]);
+
+    rcp_ep_wakeup_any_source_edge_asserted(&cfg, states, levels_low, 2); /* seed */
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_any_source_edge_asserted(&cfg, states, levels_high, 2));
+}
+
+/* Deliberately proves the NO-short-circuit contract. Source 0 (scanned
+ * first) and source 3 (scanned last) are BOTH edge-triggered. Call 2
+ * makes source 0 fire on the SAME call where source 3 also transitions
+ * -- if the function stopped scanning at the first hit (source 0), it
+ * would never observe source 3's own transition on that call, leaving
+ * source 3's state stale. Call 3 then proves that difference: source 3
+ * (BOTH_EDGES) sees a genuine transition relative to its own TRUE
+ * previous level (set during call 2) and must fire -- a short-circuited
+ * implementation would have missed updating source 3's state during
+ * call 2, so it would incorrectly see no transition here and fail to
+ * fire. */
+static void test_any_source_edge_asserted_updates_every_source_state_not_just_until_first_hit(void)
+{
+    rcp_ep_wakeup_functional_cfg_t    cfg;
+    rcp_ep_wakeup_source_edge_state_t states[RCP_EP_WAKEUP_MAX_SOURCES];
+    bool                              levels_1[4] = {false, false, false, false}; /* seed */
+    bool                              levels_2[4] = {true,  false, false, true};  /* source 0 AND
+                                                                                       source 3 both
+                                                                                       transition low->high */
+    bool                              levels_3[4] = {false, false, false, false}; /* source 0 stays
+                                                                                       high->low (not
+                                                                                       observed, rising-
+                                                                                       only); source 3
+                                                                                       goes high->low,
+                                                                                       BOTH_EDGES fires
+                                                                                       if its state
+                                                                                       tracked call 2
+                                                                                       correctly */
+    size_t                            i;
+
+    rcp_ep_wakeup_functional_cfg_init(&cfg);
+    cfg.sources[0].enabled                 = true;
+    cfg.sources[0].trigger_on_rising_edge  = true; /* scanned first */
+    cfg.sources[3].enabled                 = true;
+    cfg.sources[3].trigger_on_rising_edge  = true; /* BOTH_EDGES: scanned last */
+    cfg.sources[3].trigger_on_falling_edge = true;
+    for (i = 0; i < RCP_EP_WAKEUP_MAX_SOURCES; i++) rcp_ep_wakeup_source_edge_state_init(&states[i]);
+
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_any_source_edge_asserted(&cfg, states, levels_1, 4)); /* seed */
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_any_source_edge_asserted(&cfg, states, levels_2, 4));  /* both fire */
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_any_source_edge_asserted(&cfg, states, levels_3, 4));  /* source 3
+                                                                                               falling
+                                                                                               edge */
+}
+
+static void test_any_source_edge_asserted_null_safe(void)
+{
+    rcp_ep_wakeup_functional_cfg_t    cfg;
+    rcp_ep_wakeup_source_edge_state_t states[RCP_EP_WAKEUP_MAX_SOURCES];
+    bool                              levels[1] = {true};
+
+    rcp_ep_wakeup_functional_cfg_init(&cfg);
+
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_any_source_edge_asserted(NULL, states, levels, 1));
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_any_source_edge_asserted(&cfg, NULL, levels, 1));
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_any_source_edge_asserted(&cfg, states, NULL, 1));
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_any_source_edge_asserted(&cfg, states, NULL, 0));
+}
+
 /* ── wup_status latch ─────────────────────────────────────────────────────────── */
 
 static void test_wup_status_init_is_clear(void)
@@ -564,13 +726,11 @@ static void test_apply_reconfig_writes_source_slot(void)
     TEST_ASSERT_FALSE(cfg.sources[1].enabled);
 }
 
-/* REQ-WAKEUP-022's own remaining, honestly disclosed gap: an edge-
- * triggered or reserved io_src value cannot be represented by this
- * module's own level-only rcp_ep_wakeup_source_asserted() predicate, so
- * a configuration write encoding one leaves enabled/active_high
- * untouched rather than silently misinterpreting it as a level mode --
- * pin_number still updates regardless, since it is always representable. */
-static void test_apply_reconfig_edge_triggered_io_src_leaves_enabled_unchanged(void)
+/* RESOLVED 2026-08-14 (REQ-WAKEUP-022, issue #341 lineage): edge-
+ * triggered io_src values are now representable -- this test used to pin
+ * the old "cannot represent it" gap for io_src 0x01 (rising edge); it now
+ * proves the write is correctly APPLIED instead. */
+static void test_apply_reconfig_rising_edge_io_src_sets_trigger_flag(void)
 {
     rcp_ep_wakeup_functional_cfg_t cfg;
     uint8_t                        payload[4];
@@ -580,8 +740,37 @@ static void test_apply_reconfig_edge_triggered_io_src_leaves_enabled_unchanged(v
     cfg.sources[0].enabled     = true;
     cfg.sources[0].active_high = true;
 
-    /* io_src = 0x01 (rising edge) -- not representable. */
+    /* io_src = 0x01 (rising edge). */
     reg = (uint16_t)((0x01u << 11) | 0x0007u);
+    payload[0] = 0x00; payload[1] = (uint8_t)RCP_EP_WAKEUP_REG_SOURCE_BASE;
+    payload[2] = (uint8_t)(reg >> 8);
+    payload[3] = (uint8_t)(reg & 0xFFu);
+
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_RECONFIG_OK,
+        rcp_ep_wakeup_apply_reconfig(&cfg, payload, sizeof(payload)));
+    TEST_ASSERT_TRUE(cfg.sources[0].enabled);
+    TEST_ASSERT_TRUE(cfg.sources[0].trigger_on_rising_edge);
+    TEST_ASSERT_FALSE(cfg.sources[0].trigger_on_falling_edge);
+    TEST_ASSERT_EQUAL_UINT16(0x0007u, cfg.sources[0].pin_number);
+}
+
+/* The genuinely reserved range (0x06-0x1F) remains this module's own
+ * honestly disclosed gap -- a write encoding one leaves enabled/
+ * active_high/trigger_on_*_edge untouched rather than silently
+ * misinterpreting it; pin_number still updates regardless, since it is
+ * always representable. */
+static void test_apply_reconfig_reserved_io_src_leaves_enabled_unchanged(void)
+{
+    rcp_ep_wakeup_functional_cfg_t cfg;
+    uint8_t                        payload[4];
+    uint16_t                       reg;
+
+    rcp_ep_wakeup_functional_cfg_init(&cfg);
+    cfg.sources[0].enabled     = true;
+    cfg.sources[0].active_high = true;
+
+    /* io_src = 0x06 -- reserved. */
+    reg = (uint16_t)((0x06u << 11) | 0x0007u);
     payload[0] = 0x00; payload[1] = (uint8_t)RCP_EP_WAKEUP_REG_SOURCE_BASE;
     payload[2] = (uint8_t)(reg >> 8);
     payload[3] = (uint8_t)(reg & 0xFFu);
@@ -590,7 +779,38 @@ static void test_apply_reconfig_edge_triggered_io_src_leaves_enabled_unchanged(v
         rcp_ep_wakeup_apply_reconfig(&cfg, payload, sizeof(payload)));
     TEST_ASSERT_TRUE(cfg.sources[0].enabled);      /* unchanged */
     TEST_ASSERT_TRUE(cfg.sources[0].active_high);  /* unchanged */
+    TEST_ASSERT_FALSE(cfg.sources[0].trigger_on_rising_edge);  /* unchanged */
+    TEST_ASSERT_FALSE(cfg.sources[0].trigger_on_falling_edge); /* unchanged */
     TEST_ASSERT_EQUAL_UINT16(0x0007u, cfg.sources[0].pin_number); /* updated */
+}
+
+/* Round trip proof: render a BOTH_EDGES-configured slot, re-parse it, and
+ * confirm both trigger flags survive. */
+static void test_render_then_apply_reconfig_both_edges_round_trips(void)
+{
+    rcp_ep_wakeup_functional_cfg_t cfg;
+    rcp_ep_wakeup_functional_cfg_t reparsed;
+    uint8_t                        image[RCP_EP_WAKEUP_EP_FUNC_LEN];
+    uint8_t                        payload[2 + RCP_EP_WAKEUP_EP_FUNC_LEN];
+
+    rcp_ep_wakeup_functional_cfg_init(&cfg);
+    cfg.sources[2].enabled                 = true;
+    cfg.sources[2].trigger_on_rising_edge   = true;
+    cfg.sources[2].trigger_on_falling_edge  = true;
+    cfg.sources[2].pin_number              = 0x0013u;
+
+    rcp_ep_wakeup_render_registers(&cfg, image);
+
+    rcp_ep_wakeup_functional_cfg_init(&reparsed);
+    payload[0] = 0x00; payload[1] = 0x00; /* address 0: whole block */
+    memcpy(&payload[2], image, RCP_EP_WAKEUP_EP_FUNC_LEN);
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_RECONFIG_OK,
+        rcp_ep_wakeup_apply_reconfig(&reparsed, payload, sizeof(payload)));
+
+    TEST_ASSERT_TRUE(reparsed.sources[2].enabled);
+    TEST_ASSERT_TRUE(reparsed.sources[2].trigger_on_rising_edge);
+    TEST_ASSERT_TRUE(reparsed.sources[2].trigger_on_falling_edge);
+    TEST_ASSERT_EQUAL_UINT16(0x0013u, reparsed.sources[2].pin_number);
 }
 
 static void test_apply_reconfig_ignores_read_only_registers(void)
@@ -703,6 +923,16 @@ int main(void)
     RUN_TEST(test_any_source_asserted_false_when_none_match);
     RUN_TEST(test_any_source_asserted_null_safe);
 
+    RUN_TEST(test_source_edge_asserted_delegates_to_level_predicate_in_level_mode);
+    RUN_TEST(test_source_edge_asserted_first_observation_only_seeds);
+    RUN_TEST(test_source_edge_asserted_fires_on_configured_rising_edge_only);
+    RUN_TEST(test_source_edge_asserted_fires_on_configured_falling_edge_only);
+    RUN_TEST(test_source_edge_asserted_both_edges_fires_either_direction);
+    RUN_TEST(test_source_edge_asserted_disabled_updates_state_but_never_fires);
+    RUN_TEST(test_any_source_edge_asserted_true_when_one_fires);
+    RUN_TEST(test_any_source_edge_asserted_updates_every_source_state_not_just_until_first_hit);
+    RUN_TEST(test_any_source_edge_asserted_null_safe);
+
     RUN_TEST(test_wup_status_init_is_clear);
     RUN_TEST(test_wup_status_latch_then_clear);
     RUN_TEST(test_wup_status_latch_source_is_independent_per_index);
@@ -738,7 +968,9 @@ int main(void)
     RUN_TEST(test_apply_reconfig_wup_status_write_one_clears);
     RUN_TEST(test_apply_reconfig_wup_status_clears_only_the_named_sources);
     RUN_TEST(test_apply_reconfig_writes_source_slot);
-    RUN_TEST(test_apply_reconfig_edge_triggered_io_src_leaves_enabled_unchanged);
+    RUN_TEST(test_apply_reconfig_rising_edge_io_src_sets_trigger_flag);
+    RUN_TEST(test_apply_reconfig_reserved_io_src_leaves_enabled_unchanged);
+    RUN_TEST(test_render_then_apply_reconfig_both_edges_round_trips);
     RUN_TEST(test_apply_reconfig_ignores_read_only_registers);
     RUN_TEST(test_apply_reconfig_rejects_short_payload);
     RUN_TEST(test_apply_reconfig_rejects_out_of_range);
