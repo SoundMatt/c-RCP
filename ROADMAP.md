@@ -19106,6 +19106,71 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.351.0 -- 2026-08-14 (REQ-GPIO-036: rcp_mock_server_stash_deferred_response()/
+_take_deferred_response() close the last item of the 7-item batch)
+
+Seventh and final item of the user's own explicit `complete these
+now!` 7-item list.
+
+The prior GPIO dispatch-wiring batch's own text found the genuine
+remaining gap precisely: "mock.c's own dispatch model is entirely
+synchronous... actually WAITING the configured debounce time and THEN
+producing a response... would need a genuinely new mechanism this
+batch does not add." Every write's own response (TC18 §13.7.4.3's own
+rule: change the pin drive, wait the debounce time, THEN respond) was
+being permanently skipped, not merely delayed.
+
+New `rcp_mock_server_stash_deferred_response()`/`_take_deferred_
+response()` (mock.h): a small, generic pair -- not GPIO-specific,
+matching mock.c's own established "owns none of the per-endpoint wire
+semantics itself" boundary. Neither function tracks a timer, elapsed
+time, or an "is it ready yet" concept of its own, matching the same
+"protocol library, not a scheduler" boundary every other caller-
+driven-clock primitive in this codebase already uses (e.g.
+`rcp_mock_server_check_watchdog()`'s own `elapsed_since_last_kick_ms`
+parameter) -- the caller decides when to stash and when to take. A
+handler (`rcp_mock_endpoint_handler_fn`) has no `srv` of its own, so
+cannot call either function itself; both are meant to be called
+alongside `dispatch()`, by whatever code drives it.
+
+`test_tc18_gaps_ep.c`'s own new `test_gpio_dispatch_deferred_write_
+response_is_retrievable_once_debounce_settles()` closes the gap
+end-to-end: the same three-write debounce sequence the prior batch's
+own test already proved reachable, but on the settling (3rd) write --
+the moment the write's own response genuinely becomes due -- the test
+itself (not the handler) stashes the response that write owes, and a
+later `take_deferred_response()` call retrieves it exactly once,
+carrying that write's own real `transaction_num`, proving a genuine
+"answer withheld now, delivered later" round trip through mock.c for
+the first time.
+
+2 mutations (the stash assignment itself, and the take-side
+clear-after-taking step), both caught cleanly.
+
+This closes REQ-GPIO-036's own remaining gap only -- REQ-GPIO-035's
+own separate, already-correctly-scoped concern (`gpio_base_clk`
+always renders 0, no real periodic sampling cadence) is untouched and
+stays partial on its own terms, the same "no real clock source"
+architecture-wide disposition already accepted for REQ-ADC-033 and
+every other endpoint type's own base_clk field -- not something this
+fix needed, or should force closed.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.54):
+0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`:
+`REQ-GPIO-036` partial -> implemented -- 1054 implemented / 13 partial
+/ 2 not-implemented / 7 retired, 1076 total.
+
+**This closes the user's own explicit `complete these now!` 7-item
+list in full**: `REQ-UART-037`, `REQ-RMAP-038`, `REQ-RMAP-068`,
+`REQ-TIMED-012/013`, `REQ-E2E-046`, `REQ-ISELED-025`,
+`REQ-GPIO-035/036` -- all 7 genuinely closed to implemented (or, for
+`REQ-RMAP-038`, correctly re-classified after finding its own text
+stale), none forced, none half-attempted, every genuinely-remaining
+sub-concern (RMAP-067's Table 36 collision, GPIO-035's own base_clk
+gap) left honestly documented rather than papered over.
+
+**Next**: none queued from this list -- awaiting further direction.
+
 ### v0.350.0 -- 2026-08-14 (REQ-ISELED-025: rcp_mock_server_dispatch_multi_response()
 closes the genuine multi-fragment-response architectural limit)
 

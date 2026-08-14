@@ -27,6 +27,15 @@ typedef struct {
      * multi_response(); every other dispatch entry point ignores it. */
     rcp_mock_endpoint_multi_response_handler_fn multi_handler;
     void                        *user_data;
+    /* REQ-GPIO-035/036: a real place to hold a response a caller has
+     * decided NOT to answer a dispatch() call with yet (e.g. TC18
+     * §13.7.4.3's own GPIO debounce-timing rule), until whatever
+     * condition it was genuinely waiting for is later met -- see
+     * rcp_mock_server_stash_deferred_response()'s own doc comment
+     * (mock.h) for the full contract. Zeroed (no stashed response) for
+     * every slot by default; .data != NULL means a real, not-yet-taken
+     * response is held here. */
+    rcp_bytes_t                  deferred_response;
     /* This test double's own stand-in for TC18 §12.7.1's
      * ep_req_crc_enable -- see
      * rcp_mock_server_set_endpoint_req_crc_enable()'s own doc comment
@@ -255,6 +264,10 @@ void rcp_mock_server_destroy(rcp_mock_server_t *srv)
     for (i = 0; i < RCP_MOCK_MAX_ENDPOINTS; i++) {
         if (srv->endpoints[i].in_use) {
             rcp_server_endpoint_destroy(&srv->endpoints[i].queue);
+            /* REQ-GPIO-035/036: a stashed-but-never-taken deferred
+             * response owns heap storage too -- same leak class the
+             * comment below already calls out for frag_reasm[]. */
+            rcp_bytes_free(&srv->endpoints[i].deferred_response);
         }
     }
     /* REQ-E2E-038/039: frag_reasm[] slots own heap storage
@@ -711,6 +724,9 @@ bool rcp_mock_server_remove_endpoint(rcp_mock_server_t *srv, rcp_byte_bus_id_t b
     if (!slot) return false;
 
     rcp_server_endpoint_destroy(&slot->queue);
+    /* REQ-GPIO-035/036: same leak class rcp_mock_server_destroy() must
+     * also guard against -- see that function's own identical fix. */
+    rcp_bytes_free(&slot->deferred_response);
     memset(slot, 0, sizeof(*slot));
 
     srv->endpoint_count--;
@@ -1784,6 +1800,32 @@ bool rcp_mock_server_drain_endpoint(rcp_mock_server_t *srv, rcp_byte_bus_id_t by
 
     run_handler(slot, frame.data, frame.len, out_response);
     rcp_bytes_free(&frame);
+    return true;
+}
+
+//cfusa:req REQ-GPIO-036
+bool rcp_mock_server_stash_deferred_response(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
+                                              rcp_bytes_t response)
+{
+    rcp_mock_endpoint_slot_t *slot = find_slot(srv, byte_bus_id);
+    if (!slot) return false;
+
+    rcp_bytes_free(&slot->deferred_response);
+    slot->deferred_response = response;
+    return true;
+}
+
+//cfusa:req REQ-GPIO-036
+bool rcp_mock_server_take_deferred_response(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
+                                             rcp_bytes_t *out_response)
+{
+    rcp_mock_endpoint_slot_t *slot = find_slot(srv, byte_bus_id);
+
+    memset(out_response, 0, sizeof(*out_response));
+    if (!slot || slot->deferred_response.data == NULL) return false;
+
+    *out_response = slot->deferred_response;
+    memset(&slot->deferred_response, 0, sizeof(slot->deferred_response));
     return true;
 }
 

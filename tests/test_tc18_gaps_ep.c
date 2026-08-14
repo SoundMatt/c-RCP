@@ -482,7 +482,8 @@ static void test_gpio_response_timing_classifier_distinguishes_read_and_write(vo
                       rcp_ep_gpio_response_timing(RCP_ACF_OP_WRITE, RCP_EP_GPIO_PAYLOAD_LEN));
 }
 
-/* ── GPIO endpoint: real mock.c dispatch path (issue #336, PR D) ───────────
+/* ── GPIO endpoint: real mock.c dispatch path (issue #336, PR D;
+ * REQ-GPIO-036's own remaining gap closed 2026-08-14) ──────────────────────
  *
  * gpio_dispatch_state_t/gpio_dispatch_handler() is this test file's own
  * rcp_mock_endpoint_handler_fn -- exactly the kind of caller-supplied
@@ -490,7 +491,17 @@ static void test_gpio_response_timing_classifier_distinguishes_read_and_write(vo
  * debounce filter and REQ-GPIO-036's response-timing classifier are both
  * reachable, and actually consulted, from a real dispatch() call, not
  * merely correct in isolation. Bit 0 of the bitmask is the only pin this
- * fixture debounces, to keep the two tests below minimal. */
+ * fixture debounces, to keep the two tests below minimal.
+ *
+ * RESOLVED 2026-08-14: this section's own prior text found a genuine
+ * remaining gap -- a debounced write's own response was left
+ * permanently unfabricated (mock.c had nowhere to hold it once the
+ * debounce time genuinely elapsed) and concluded "actually WAITING...
+ * would need a genuinely new mechanism this batch does not add". That
+ * mechanism now exists: mock.h's rcp_mock_server_stash_deferred_
+ * response()/_take_deferred_response(). test_gpio_dispatch_deferred_
+ * write_response_is_retrievable_once_debounce_settles() below closes
+ * it end-to-end. */
 typedef struct {
     rcp_ep_gpio_debounce_state_t debounce;
     uint32_t                     settled_bitmask;
@@ -646,6 +657,87 @@ static void test_gpio_dispatch_debounces_writes_before_reporting_settled_value(v
     TEST_ASSERT_EQUAL_HEX32(1u, bitmask);
     rcp_bytes_free(&req);
     rcp_bytes_free(&resp);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-GPIO-036: closes this requirement's own last-remaining gap --
+ * "actually WAITING the configured debounce time and THEN producing a
+ * response... would need a genuinely new mechanism this batch does not
+ * add" (the prior batch's own text). That mechanism now exists
+ * (mock.h's rcp_mock_server_stash_deferred_response()/_take_deferred_
+ * response()). This test drives the SAME three-write debounce sequence
+ * as the test above, but on the settling (3rd) write -- the moment
+ * gpio_dispatch_handler()'s own caller (this test, not the handler
+ * itself, which has no srv of its own -- see mock.h's own file header
+ * note) knows the real response is now due -- stashes the response
+ * that write genuinely owes, and proves it is later retrievable
+ * exactly once, carrying that write's own transaction_num (not a
+ * subsequent read's), closing the gap the prior test's own "no
+ * synchronous response for any write" assertion left permanently
+ * open. */
+static void test_gpio_dispatch_deferred_write_response_is_retrievable_once_debounce_settles(void)
+{
+    rcp_mock_server_t     *srv = rcp_mock_server_new();
+    gpio_dispatch_state_t  st  = {0};
+    rcp_bytes_t             req;
+    rcp_bytes_t             resp = {0};
+    rcp_bytes_t             deferred = {0};
+    uint32_t                bitmask;
+    bool                    timed;
+    uint64_t                ts;
+    uint8_t                 tn;
+    int                     i;
+    static const uint8_t    write_tn[3] = {0x30u, 0x31u, 0x32u};
+
+    TEST_ASSERT_NOT_NULL(srv);
+    gap_to_rcp_configured(srv);
+    rcp_ep_gpio_debounce_state_init(&st.debounce);
+    st.debounce_n = 3u;
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+                      rcp_mock_server_add_endpoint(srv, 3u, 0u, true, gpio_dispatch_handler, &st));
+
+    /* Nothing stashed before any write. */
+    TEST_ASSERT_FALSE(rcp_mock_server_take_deferred_response(srv, 3u, &deferred));
+    TEST_ASSERT_NULL(deferred.data);
+
+    for (i = 0; i < 3; i++) {
+        req = rcp_ep_gpio_encode_write_request(3u, 1u, RCP_EP_GPIO_WRITE_REPLACE, write_tn[i]);
+        TEST_ASSERT_NOT_NULL(req.data);
+        TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                          rcp_mock_server_dispatch(srv, 3u, RCP_AVTP_SUBTYPE_NTSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, 1u, req.data,
+                                                    req.len, &resp));
+        TEST_ASSERT_NULL(resp.data); /* still no synchronous response */
+        rcp_bytes_free(&req);
+
+        if (i == 2) {
+            /* The 3rd write is exactly the one that settled
+             * (st.settled_bitmask just became 1, per the test above's
+             * own identical check) -- this write's own response is
+             * genuinely due now. The caller (this test) builds it the
+             * same way gpio_dispatch_handler()'s own read path already
+             * does, and stashes it. */
+            TEST_ASSERT_EQUAL_HEX32(1u, st.settled_bitmask);
+            deferred = rcp_ep_gpio_encode_response(3u, st.settled_bitmask, write_tn[i], false, 0u);
+            TEST_ASSERT_NOT_NULL(deferred.data);
+            TEST_ASSERT_TRUE(rcp_mock_server_stash_deferred_response(srv, 3u, deferred));
+        }
+    }
+
+    /* Retrievable exactly once, carrying the settling WRITE's own
+     * transaction_num -- not fabricated, not a later read's. */
+    TEST_ASSERT_TRUE(rcp_mock_server_take_deferred_response(srv, 3u, &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+    TEST_ASSERT_EQUAL(RCP_EP_GPIO_OK,
+                      rcp_ep_gpio_decode_response(resp.data, resp.len, 3u, &bitmask, &timed, &ts, &tn));
+    TEST_ASSERT_EQUAL_HEX32(1u, bitmask);
+    TEST_ASSERT_EQUAL_UINT8(write_tn[2], tn);
+    rcp_bytes_free(&resp);
+
+    /* Taken once means gone -- not a queue, not re-deliverable. */
+    TEST_ASSERT_FALSE(rcp_mock_server_take_deferred_response(srv, 3u, &resp));
+    TEST_ASSERT_NULL(resp.data);
 
     rcp_mock_server_destroy(srv);
 }
@@ -1894,6 +1986,7 @@ int main(void)
     RUN_TEST(test_gpio_response_timing_classifier_distinguishes_read_and_write);
     RUN_TEST(test_gpio_dispatch_read_responds_immediately);
     RUN_TEST(test_gpio_dispatch_debounces_writes_before_reporting_settled_value);
+    RUN_TEST(test_gpio_dispatch_deferred_write_response_is_retrievable_once_debounce_settles);
 
     RUN_TEST(test_spi_six_channels_selected_by_evt);
     RUN_TEST(test_spi_trigger_numbering_and_channel_cfg_full);
