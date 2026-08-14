@@ -34,6 +34,38 @@ the rationale.
 
 ## Releases
 
+### v0.368.0 -- 2026-08-14 (rcp_server_endpoint_admit() now checks ep_enable for conditional requests)
+
+Closes issue #461 (c-RCP-AUDIT-36). `rcp_server_endpoint_admit()`'s conditional-request-store path
+(`src/server.c`, `kind` in `{COMPOUND, COMPOUND_WAIT, TRIGGERED, TIMED, CHAINED}`) claims a request
+store slot directly via `claim_slot()` and never called `rcp_server_endpoint_submit()` -- the only
+function that checks `ep->ep_enable` -- at all. A disabled endpoint's stored Compound/Compound
+Wait/Triggered/Timed/Chained request therefore still EXECUTED once its own kind-specific condition
+became due, violating TC18 §12.3.1.3's rule that a disabled endpoint "will only execute config
+requests" (operational requests stay queued, never executed, while disabled) -- the same rule
+`rcp_server_endpoint_submit()` (`server.c:56`) already enforces for a Standard request.
+
+Fixed at the execution gate, not at admission: admission is unaffected by this fix (every one of
+these kinds was, and remains, stored regardless of `ep_enable`, matching REQ-SRV-015's own "still
+queued" half). New `kind_is_gated_by_ep_enable()` names the five conditional kinds; `is_due()` (now
+taking `ep`, not just `slot`/`ctx`) returns `false` unconditionally for a gated kind while
+`ep->ep_enable` is false, ahead of every other condition. A gated request stays fully stored and is
+re-evaluated fresh once a caller re-enables the endpoint via `rcp_server_endpoint_set_enable()` --
+the same primitive `rcp_mock_server_pwrmode_resume()`'s own re-enable loop already uses for the
+analogous Standard-request queued-then-drain transition, reused here rather than a new mechanism.
+`STANDARD`/`CANCELLATION` entries admitted via REQ-TIMED-012's own separate TSCF presentation-time
+gate stay out of scope -- that path bypasses `submit()`'s config-vs-operational classification
+entirely and is a separately-scoped question this fix does not answer.
+
+Four new tests (`tests/test_conditional_dispatch.c`), one per kind family (Compound, Triggered,
+Timed, Chained), each drive the stored request's own condition fully due on a disabled endpoint
+(proving it does NOT execute, however many times ticked, while remaining genuinely stored, not
+silently dropped) and then re-enable the same endpoint to confirm the same still-pending request
+finally runs on the very next tick with no re-submission. Mutation-tested: reverting just the
+`is_due()`/`kind_is_gated_by_ep_enable()` gate (keeping the new tests) makes all four fail exactly
+as expected; restored, suite green again. Full 66-test suite + ASan/UBSan clean; `cfusa
+check`/`trace`: 0 errors, 1088/1088 traced and tested (unchanged -- REQ-SRV-015/016 were already
+tracked; this closes a real conformance defect in their own implementation, not a new requirement).
 ### v0.367.0 -- 2026-08-14 (admission-rejection response shape follows TC18's own err-response vs Acknowledge distinction per rejection reason)
 
 Closes issue #454 (c-RCP-AUDIT-29), a CRITICAL regression in the immediately-preceding #430 fix

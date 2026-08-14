@@ -19106,6 +19106,88 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.368.0 -- 2026-08-14 (REQ-SRV-015/016: rcp_server_endpoint_admit()
+now checks ep_enable for conditional requests)
+
+Closes issue #461 (c-RCP-AUDIT-36). `rcp_server_endpoint_admit()`'s
+conditional-request-store path (`src/server.c`, `kind` in `{COMPOUND,
+COMPOUND_WAIT, TRIGGERED, TIMED, CHAINED}`) claims a request store slot
+directly via `claim_slot()` and never called `rcp_server_endpoint_
+submit()` -- the only function that checks `ep->ep_enable` -- at all. A
+disabled endpoint's stored Compound/Compound Wait/Triggered/Timed/Chained
+request therefore still EXECUTED once its own kind-specific condition
+became due, violating TC18 §12.3.1.3's "as long as EPs are not enabled...
+Operational requests will be stored in the EP's queue" rule -- the same
+rule `rcp_server_endpoint_submit()` (`server.c:56`) already enforces for a
+Standard request. REQ-SRV-015's own `.fusa-reqs.json` text claimed parity
+with the ABB/Standard-request path ("every other GBB request_type is
+treated the same as an ABB request") that did not actually hold for this
+specific rule -- found by an independent third deep-audit pass sweeping
+the whole TC18 spec fresh against the current code.
+
+Fixed at the execution gate, not at admission: admission is genuinely
+unaffected by this fix -- every one of these kinds was, and remains,
+stored in `ep`'s request store regardless of `ep_enable` (REQ-SRV-015's
+own "still queued" half was always correct; only the "never executed
+while disabled" half was missing). New `kind_is_gated_by_ep_enable()`
+names the five conditional kinds this rule applies to; `is_due()` (now
+taking `ep`, not just `slot`/`ctx`) returns `false` unconditionally for a
+gated kind while `ep->ep_enable` is false, evaluated before any of its
+other conditions (safe-state gate, presentation gate, arming, auxiliary
+condition, delay) -- a gated request is treated exactly as if its own
+condition had not yet been met. It stays fully stored and is re-evaluated
+fresh -- including arming its exec_delay timer from whenever it is first
+found startable AFTER re-enable, not from whenever its start condition
+first held while disabled, the same "frozen while disabled" treatment as
+the rest of its state -- once a caller re-enables the endpoint via
+`rcp_server_endpoint_set_enable()`. This reuses the exact re-enable
+primitive `rcp_mock_server_pwrmode_resume()`'s own loop already drives for
+the analogous Standard-request queued-then-drain transition (TC18
+§12.4.1), rather than inventing a new mechanism, per this codebase's own
+established convention.
+
+`STANDARD`/`CANCELLATION` entries admitted into this same request store
+via REQ-TIMED-012's own separate TSCF presentation-time gate
+(`admit_under_tscf_gate()`) are deliberately NOT covered by this fix --
+that path bypasses `rcp_server_endpoint_submit()`'s config-vs-operational
+classification entirely (it is reached without ever calling `submit()`),
+so whether `ep_enable` should further gate that path is a separately-
+scoped question this fix's own title ("conditional requests") does not
+answer.
+
+Four new tests (`tests/test_conditional_dispatch.c`), one per kind family
+(Compound, Triggered, Timed, Chained -- Compound Wait shares COMPOUND's
+own `is_due()` gate and is not separately re-tested), each mirror an
+existing enabled-endpoint test in the same file, with the endpoint
+disabled first: the stored request's own condition is driven fully due
+(proving an enabled endpoint would fire on that exact tick), ticked twice
+while disabled to confirm it does NOT execute and remains genuinely
+stored (not silently dropped -- `rcp_mock_server_pending_count()` checked
+throughout), then the SAME endpoint is re-enabled and the SAME
+still-pending request is confirmed to run on the very next tick with no
+re-submission. The chained-request test also confirms the chain's own
+lead (a plain Standard request) correctly QUEUES rather than runs while
+disabled, and that this does not break the chain (`dispatch_frame()`
+treats QUEUED, not just OK, as "predecessor available" for chaining
+purposes) -- proving the fix composes correctly with the pre-existing
+Standard-request `ep_enable` queue, not just with the request store in
+isolation.
+
+Mutation-tested: reverting just the `is_due()`/`kind_is_gated_by_ep_
+enable()` gate (keeping the new tests) makes all four new tests fail
+exactly as expected -- "Expected FALSE Was TRUE" on the first disabled
+tick, i.e. the disabled endpoint's request executes when it shouldn't;
+restored, suite green again. Full 66-test suite + ASan/UBSan clean;
+`cfusa check`/`trace`: 0 errors, 1088/1088 traced and tested (unchanged --
+REQ-SRV-015/016 were already tracked and tested elsewhere
+(`tests/test_tc18_gaps_server.c`) for `rcp_server_endpoint_submit()`'s own
+behavior; this fix and its new tests close a real conformance defect in a
+DIFFERENT code path these two requirements' own text had implied, but
+never actually established, was covered).
+
+**Next**: none currently queued for this specific defect; the #454/#458/
+#470 lineage (landed concurrently) covers other in-flight `src/server.c`/
+`src/mock.c` work.
 ### v0.367.0 -- 2026-08-14 (admission-rejection response shape now
 follows TC18's own err-response vs Acknowledge distinction per
 rejection reason)

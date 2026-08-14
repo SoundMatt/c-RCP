@@ -601,9 +601,63 @@ static bool delay_expired(const rcp_server_pending_t *slot, const rcp_server_tic
     }
 }
 
-/* Whether slot's execution condition is fully satisfied right now. */
-static bool is_due(rcp_server_pending_t *slot, const rcp_server_tick_ctx_t *ctx)
+/* Whether slot's own kind is one of the conditional-request kinds
+ * REQ-SRV-015/016's extension (issue #461) gates on ep->ep_enable below --
+ * every kind rcp_server_endpoint_admit()'s conditional-request path
+ * (server.c:374-438, the switch on kind after claim_slot()) can decode:
+ * Compound, Compound Wait, Triggered, Timed, Chained. STANDARD and
+ * CANCELLATION are deliberately excluded: those two kinds also reach this
+ * store, but only via admit_under_tscf_gate()'s own separate REQ-TIMED-012
+ * envelope-level gate, which bypasses rcp_server_endpoint_submit()'s
+ * config-vs-operational classification entirely (see that function's own
+ * doc comment) -- whether ep_enable should further gate THAT path is a
+ * separately-scoped question this fix's own title does not cover. */
+static bool kind_is_gated_by_ep_enable(rcp_sched_kind_t kind)
 {
+    switch (kind) {
+    case RCP_SCHED_KIND_COMPOUND:
+    case RCP_SCHED_KIND_COMPOUND_WAIT:
+    case RCP_SCHED_KIND_TRIGGERED:
+    case RCP_SCHED_KIND_TIMED:
+    case RCP_SCHED_KIND_CHAINED:
+        return true;
+    default:
+        return false;
+    }
+}
+
+/* Whether slot's execution condition is fully satisfied right now. */
+static bool is_due(rcp_server_pending_t *slot, const rcp_server_endpoint_t *ep,
+                    const rcp_server_tick_ctx_t *ctx)
+{
+    /* REQ-SRV-015/016 extension (issue #461, TC18 §12.3.1.3): "as long as
+     * EPs are not enabled... Operational requests will be stored in the
+     * EP's queue" -- i.e. queued, never executed. rcp_server_endpoint_
+     * admit()'s conditional-request path (server.c:374-438) stores a
+     * Compound/Compound Wait/Triggered/Timed/Chained request into ep's
+     * request store regardless of ep->ep_enable (matching the "still
+     * stored" half of that rule already), but until this fix nothing
+     * downstream ever consulted ep_enable again, so the stored request
+     * would still SELECT and EXECUTE once its own kind-specific condition
+     * became due -- violating the "never executed while disabled" half
+     * rcp_server_endpoint_submit() (server.c:56) already enforces for a
+     * Standard request. This is the equivalent fail-closed gate for the
+     * conditional-request path: a gated request simply never becomes due
+     * while ep->ep_enable is false, exactly as if its own condition had
+     * not yet been met -- it stays in the store, unarmed if not already
+     * armed, and is re-evaluated fresh (arming from THIS instant, not
+     * whenever its start condition first held while disabled -- the same
+     * "frozen while disabled" treatment as the rest of its state) the next
+     * time this function runs with ep->ep_enable true. No config-vs-
+     * operational distinction is needed here the way rcp_server_endpoint_
+     * submit() needs one for evt[2:0] == 111b: every kind this gate
+     * applies to (see kind_is_gated_by_ep_enable()'s own doc comment) is
+     * inherently an operational request once it reaches this store --
+     * evt[2:0] means something else entirely per-kind for a decoded
+     * conditional request (e.g. Compound Wait's own 8-way comparison
+     * selector, TC18 §13.5.1), never a configuration-write signal. */
+    if (!ep->ep_enable && kind_is_gated_by_ep_enable(slot->kind)) return false;
+
     /* Safety-tagged requests stay in the store until the endpoint has
      * actually reached its configured safe state -- e2e.h's own gate. */
     if (!rcp_e2e_request_may_execute(slot->request_type, ctx->in_safe_state)) return false;
@@ -632,6 +686,8 @@ static bool is_due(rcp_server_pending_t *slot, const rcp_server_tick_ctx_t *ctx)
 //cfusa:req REQ-SRV-007
 //cfusa:req REQ-SRV-008
 //cfusa:req REQ-SRV-020
+//cfusa:req REQ-SRV-015
+//cfusa:req REQ-SRV-016
 bool rcp_server_endpoint_select_due(rcp_server_endpoint_t *ep,
                                      const rcp_server_tick_ctx_t *ctx, size_t *out_index)
 {
@@ -644,7 +700,7 @@ bool rcp_server_endpoint_select_due(rcp_server_endpoint_t *ep,
         rcp_sched_entry_t entry;
 
         if (!ep->pending[i].in_use) continue;
-        if (!is_due(&ep->pending[i], ctx)) continue;
+        if (!is_due(&ep->pending[i], ep, ctx)) continue;
 
         entry.kind     = ep->pending[i].kind;
         entry.sequence = ep->pending[i].sequence;

@@ -29,6 +29,8 @@
 //cfusa:test REQ-CANCEL-012
 //cfusa:test REQ-TIMED-012
 //cfusa:test REQ-TIMED-013
+//cfusa:test REQ-SRV-015
+//cfusa:test REQ-SRV-016
 /*
  * test_conditional_dispatch.c -- end-to-end tests for conditional-request
  * dispatch (TC18 §11.2.2/§11.2.3) through the real server path.
@@ -1840,6 +1842,204 @@ static void test_chained_member_after_predecessor_executes(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* ── ep_enable gates conditional-request execution (REQ-SRV-015/016
+ *    extension, issue #461) ──────────────────────────────────────────────── */
+
+/* rcp_server_endpoint_admit()'s conditional-request path (server.c) never
+ * consulted ep->ep_enable at all -- a Compound/Compound Wait/Triggered/
+ * Timed/Chained request was ALWAYS stored regardless of ep_enable (that
+ * half was, and remains, correct: TC18 §12.3.1.3 says an operational
+ * request is stored while an EP is disabled), but nothing downstream ever
+ * re-checked ep_enable before letting the stored request run once its own
+ * condition became due -- so a disabled endpoint's Compound/Triggered/
+ * Timed/Chained request still EXECUTED, violating the "will only execute
+ * config requests" half of the same TC18 rule. These four tests each
+ * mirror an existing enabled-endpoint test above (test_compound_never_
+ * fires_while_endpoint_busy(), test_triggered_executes_only_on_its_own_
+ * trigger(), test_timed_waits_for_its_presentation_time(),
+ * test_chained_member_after_predecessor_executes()) with one addition:
+ * the endpoint starts disabled, its own kind-specific condition is driven
+ * fully due, and the handler must NOT run -- then, only once the endpoint
+ * is explicitly re-enabled (rcp_mock_server_set_endpoint_enable(), the
+ * same primitive rcp_mock_server_pwrmode_resume()'s own re-enable loop in
+ * src/mock.c uses for the analogous Standard-request queued->drain
+ * transition), the identical still-pending request finally executes on
+ * the very next tick -- proving the fix gates EXECUTION, not ADMISSION:
+ * the request was genuinely stored and waiting the whole time, not
+ * silently dropped. */
+
+//cfusa:test REQ-SRV-015
+//cfusa:test REQ-SRV-016
+static void test_disabled_endpoint_queues_compound_request_without_executing_it(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    /* start_state 1 == the power-on state, so the start condition holds
+     * from admission and the (zero) delay is already elapsed -- once
+     * enabled, only ep_enable itself stands between this and executing. */
+    rcp_bytes_t frame = make_compound(RCP_REQUEST_TYPE_COMPOUND, 0,
+                                       RCP_SEQUENCER_POWER_ON_STATE, 4, 0, 0, 51);
+    rcp_server_tick_ctx_t ctx = base_ctx(0);
+    uint8_t got = 0;
+
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_enable(srv, 1, false));
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    /* Still stored even while disabled -- admission itself is unaffected
+     * by this fix, exactly as REQ-SRV-015's own text for admit()'s
+     * conditional path establishes. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &frame));
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 1));
+
+    /* Condition fully due, endpoint idle -- an enabled endpoint would fire
+     * on this very tick (see test_compound_never_fires_while_endpoint_
+     * busy()). Disabled, it must not, however many times ticked. */
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(0, log.count);
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 1)); /* still stored */
+
+    /* Re-enabled: the SAME still-pending request now runs, on the very
+     * next tick, with no re-submission. */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_enable(srv, 1, true));
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(1, log.count);
+    TEST_ASSERT_EQUAL_HEX8(RCP_REQUEST_TYPE_COMPOUND, log.opcode[0]);
+    TEST_ASSERT_TRUE(rcp_sequencer_get_state(rcp_mock_server_sequencers(srv), 0, &got));
+    TEST_ASSERT_EQUAL_UINT8(4, got);
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 1));
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+//cfusa:test REQ-SRV-015
+//cfusa:test REQ-SRV-016
+static void test_disabled_endpoint_queues_triggered_request_without_executing_it(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    rcp_bytes_t frame = make_triggered(RCP_REQUEST_TYPE_TRIGGERED, 6, 2, 0, 0, 52);
+    rcp_server_tick_ctx_t ctx = base_ctx(0);
+
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_enable(srv, 1, false));
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &frame));
+
+    /* Trigger occurrences are still counted while disabled -- notify_
+     * trigger() has no ep_enable concept of its own, and shouldn't need
+     * one: only EXECUTION is gated, not occurrence bookkeeping. */
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_notify_trigger(srv, 6, 2));
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(0, log.count);
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 1));
+
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_enable(srv, 1, true));
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(1, log.count);
+    TEST_ASSERT_EQUAL_HEX8(RCP_REQUEST_TYPE_TRIGGERED, log.opcode[0]);
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+//cfusa:test REQ-SRV-015
+//cfusa:test REQ-SRV-016
+static void test_disabled_endpoint_queues_timed_request_without_executing_it(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    const uint64_t pt = 0x0000A5A500000064ull;
+    rcp_bytes_t frame = rcp_timed_encode_request(1, pt, 53, NULL, 0);
+    rcp_server_tick_ctx_t ctx = base_ctx(0);
+
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_enable(srv, 1, false));
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &frame));
+
+    /* presentation_time already reached -- an enabled endpoint would fire
+     * (see test_timed_waits_for_its_presentation_time()). */
+    ctx.gptp_now = pt;
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(0, log.count);
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 1));
+
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_enable(srv, 1, true));
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(1, log.count);
+    TEST_ASSERT_EQUAL_HEX8(RCP_REQUEST_TYPE_TIMED, log.opcode[0]);
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 1));
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+//cfusa:test REQ-SRV-015
+//cfusa:test REQ-SRV-016
+static void test_disabled_endpoint_queues_chained_request_without_executing_it(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    rcp_acf_byte_message_info_t info = {0};
+    rcp_bytes_t lead;
+    rcp_bytes_t member;
+    uint8_t frame[FRAME_BUF_CAP];
+    size_t frame_len;
+    rcp_mock_frame_member_result_t results[4];
+    rcp_server_tick_ctx_t ctx;
+    size_t n;
+
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_enable(srv, 1, false));
+
+    info.byte_bus_id     = 1;
+    info.transaction_num = 141;
+    lead = rcp_acf_encode_abb(&info, NULL, 0);
+    TEST_ASSERT_NOT_NULL(lead.data);
+
+    member = rcp_chained_encode_member(1, 10 /* chain_exec_delay */,
+                                        RCP_CHAINED_CS_CONTINUE_ON_ERROR, 142, NULL, 0);
+    TEST_ASSERT_NOT_NULL(member.data);
+    frame_len = concat2(frame, sizeof(frame), &lead, &member);
+
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, frame, frame_len,
+                                        results, 4);
+    TEST_ASSERT_EQUAL_size_t(2, n);
+    /* The lead is a plain standard request: while disabled it queues
+     * (server.h's own pre-existing ep_enable queue) rather than running --
+     * this does not count as a chain error (server.c's own dispatch_frame()
+     * only treats unknown-bus/rejected/dropped as breaking the chain), so
+     * the chained member behind it is still admitted normally. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_QUEUED, results[0].result);
+    /* The chained member is stored, its predecessor already marked done
+     * (chain_exec_delay starts running immediately, same as the enabled-
+     * endpoint test) -- but it must not execute while disabled. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, results[1].result);
+    TEST_ASSERT_EQUAL_size_t(0, log.count);
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 1));
+
+    /* chain_exec_delay (10) fully elapsed -- an enabled endpoint would fire
+     * (see test_chained_member_after_predecessor_executes()). */
+    ctx = base_ctx(10);
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(0, log.count);
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 1));
+
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_enable(srv, 1, true));
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(1, log.count);
+    TEST_ASSERT_EQUAL_HEX8(RCP_REQUEST_TYPE_CHAINED, log.opcode[0]);
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 1));
+
+    rcp_bytes_free(&lead);
+    rcp_bytes_free(&member);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── Chain cascade cancellation (REQ-CANCEL-012, issue #334) ──────────────── */
 
 /* TC18 §11.2.3: "If a request is cancelled to which a request is chained,
@@ -2060,6 +2260,11 @@ int main(void)
     RUN_TEST(test_chained_first_in_frame_is_chain_error);
     RUN_TEST(test_chained_first_in_frame_sends_per_member_error_responses);
     RUN_TEST(test_chained_member_after_predecessor_executes);
+
+    RUN_TEST(test_disabled_endpoint_queues_compound_request_without_executing_it);
+    RUN_TEST(test_disabled_endpoint_queues_triggered_request_without_executing_it);
+    RUN_TEST(test_disabled_endpoint_queues_timed_request_without_executing_it);
+    RUN_TEST(test_disabled_endpoint_queues_chained_request_without_executing_it);
 
     RUN_TEST(test_clear_single_cascade_removes_chained_successors);
     RUN_TEST(test_clear_single_cascade_does_not_cross_chains);
