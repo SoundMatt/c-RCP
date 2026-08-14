@@ -19106,6 +19106,56 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.352.0 -- 2026-08-14 (REQ-E2E-042: Safe-command-mode CRC32 now
+excludes padding and lands before it, not after)
+
+Real wire-conformance defect fix (issue #420), not a gap-closure item.
+For any endpoint payload whose real (unpadded) length isn't already a
+multiple of 4 bytes -- TC18 Figure 20's own worked ACF_ABB example
+(8-byte header + 6-byte payload) among them -- `rcp_e2e_wrap()`
+computed the CRC32 over `acf.c`'s already quadlet-padded frame,
+covering the 0x00 pad octets §13.6 explicitly excludes ("the entire
+payload (except padding)"), and appended the trailer directly after
+that padding, producing `[header][payload][pad][CRC32]` on the wire --
+the reverse of Figures 20/21's `[header][payload][CRC32][pad]`.
+
+`src/e2e.c`'s new `acf_pad_octets()` reads the real/pad boundary
+straight out of the frame's own wire-format `byte_message_info.pad`
+field (acf.h Figure 7, octet 2 bits 7:6 -- the same count `acf.c`'s
+encoders already record there), so neither `rcp_e2e_wrap()`/`_unwrap()`
+needed a new parameter, nor did `acf.c` need any change at all: the
+CRC32 is now computed over, and the trailer placed immediately after,
+only the real header-and-payload prefix, with the original pad octets
+re-seated after the trailer instead of before it. Total wire length
+and the existing +1-quadlet `acf_msg_length` adaptation (REQ-E2E-036)
+are unchanged -- a whole quadlet's worth of trailer never changes how
+many pad octets are needed, only where they sit. `rcp_e2e_unwrap()`
+mirrors this: it now excises the CRC32 trailer from the middle of the
+wire frame (not merely trims the last 4 octets) to reassemble the
+exact plain-ACF layout `acf.c`'s decoders expect.
+
+New `tests/test_tc18_gaps_e2e.c::test_crc_omits_pad_octets_wire_
+order_header_payload_crc_then_pad()` uses Figure 20's own 6-byte-
+payload example to pin the corrected wire layout byte-for-byte, the
+corrected (pad-excluding) CRC value against an independently-computed
+expectation, and that perturbing only the two pad octets' VALUES never
+changes the CRC32 while still round-tripping through `rcp_e2e_unwrap()`
+byte-identically to `acf.c`'s own encoder output. Also corrects
+`REQ-E2E-042`'s own `.fusa-reqs.json` citation from "Figures 19 and 20"
+(Figure 19 is an unrelated §12.7.1 diagram) to the real "Figures 20 and
+21".
+
+Mutation-tested: reverting only the `src/e2e.c` fix (new test left in
+place) makes the new test fail (`Expected 0 Was 44`, the corrupted
+CRC32 low byte) against the old wire order; restoring the fix passes
+again. Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace`
+(v0.5.54): 0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`:
+`REQ-E2E-042`/`REQ-E2E-036`/`REQ-E2E-003` texts tightened to describe
+the corrected behavior (all three remain `implemented` -- 1076 total,
+counts otherwise unchanged).
+
+**Next**: remaining issues in the #420-434 audit range.
+
 ### v0.351.0 -- 2026-08-14 (REQ-GPIO-036: rcp_mock_server_stash_deferred_response()/
 _take_deferred_response() close the last item of the 7-item batch)
 

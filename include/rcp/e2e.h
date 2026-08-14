@@ -111,9 +111,18 @@
  * stand-in an NTSCF-framed message uses in place of a real StreamID),
  * the 4-byte avtp_timestamp (IEEE 1722's own field width; again all-zero
  * under NTSCF framing, which carries no timestamp of its own), and
- * finally the complete ACF header-and-payload region exactly as acf.c's
- * rcp_acf_encode_abb()/_encode_gbb() would produce it, *after* the
- * length adaptation below has already been applied to it.
+ * finally the ACF header-and-REAL-payload region -- acf.c's
+ * rcp_acf_encode_abb()/_encode_gbb() output, minus their own trailing
+ * 0x00 quadlet-alignment pad octets -- *after* the length adaptation
+ * below has already been applied to it. TC18 §13.6 Figures 20/21 are
+ * explicit that padding is excluded ("a CRC32 is calculated ... across
+ * ... the entire payload (except padding)") and that the trailer sits
+ * immediately after the real payload, with any pad octets AFTER the
+ * trailer, not before it: [header][real payload][CRC32][pad], never
+ * [header][real payload][pad][CRC32]. rcp_e2e_wrap()/_unwrap() (issue
+ * #420) locate that real/pad boundary by reading acf_frame's own
+ * wire-format "pad" field (acf.h Figure 7) rather than requiring a
+ * caller to pre-split the buffer or pass its length explicitly.
  *
  * Before that CRC is computed, the ACF header's own acf_msg_length field
  * (acf.h, a 9-bit quadlet count spanning bit 0 of octet 0 and all of
@@ -371,44 +380,65 @@ size_t rcp_e2e_data_length_for_protected_members(size_t protected_member_count);
 /* The composed encode entry point: adapts a copy of acf_frame (an
  * already fully-encoded ACF_ABB/ACF_GBB header-and-payload region, as
  * produced by acf.c, still carrying its own original un-adapted
- * acf_msg_length) by incrementing its acf_msg_length field (acf.h, the
- * 9-bit quadlet count spanning bit 0 of octet 0 and all of octet 1;
- * octet 0's other 7 bits, acf_msg_type, are preserved unmodified) by one
- * quadlet, computes the CRC via rcp_e2e_compute_crc() over stream_id +
- * avtp_timestamp + that adapted copy, and appends the RCP_E2E_CRC_LEN-byte
- * big-endian trailer. acf_frame may be NULL iff acf_frame_len == 0.
- * acf_frame_len must be at least 2 octets (enough to contain the
- * acf_msg_length field) for the adaptation to have anywhere to write;
- * shorter non-NULL frames fail safe (data=NULL, len=0), as does an
- * acf_msg_length value already at its 9-bit field's maximum (0x1FF).
- * acf_frame_len must also be a whole quadlet (a multiple of 4) -- TC18
- * §13.6 Figures 19/20 compute the CRC over whole quadlets of the ACF
- * message so the trailer itself occupies the message's final whole
- * quadlet; a non-quadlet-aligned acf_frame_len fails safe the same way
- * (data=NULL, len=0) rather than appending a trailer that straddles a
- * quadlet boundary. Caller owns acf_frame throughout -- it is read, never
+ * acf_msg_length and its own trailing 0x00 quadlet-alignment pad octets)
+ * by incrementing its acf_msg_length field (acf.h, the 9-bit quadlet
+ * count spanning bit 0 of octet 0 and all of octet 1; octet 0's other 7
+ * bits, acf_msg_type, are preserved unmodified) by one quadlet, computes
+ * the CRC via rcp_e2e_compute_crc() over stream_id + avtp_timestamp +
+ * that adapted copy's REAL (unpadded) header-and-payload prefix, and
+ * places the RCP_E2E_CRC_LEN-byte big-endian trailer immediately after
+ * that prefix -- with acf_frame's own trailing pad octets re-seated
+ * after the trailer rather than before it. This matches TC18 §13.6
+ * Figures 20/21's own wire order and CRC coverage span ("a CRC32 is
+ * calculated ... across ... the entire payload (except padding)"):
+ * [header][real payload][CRC32][pad], not [header][real payload][pad]
+ * [CRC32] (issue #420). The real/pad split is read directly out of
+ * acf_frame's own wire-format "pad" field (acf.h Figure 7, byte_message_
+ * info octet 2 bits 7:6) -- the same count rcp_acf_pad_len() computed
+ * and acf.c's encoders already recorded there -- so this function needs
+ * no additional parameter beyond acf_frame/acf_frame_len to find it.
+ * acf_frame may be NULL iff acf_frame_len == 0. acf_frame_len must be at
+ * least 2 octets (enough to contain the acf_msg_length field) for the
+ * adaptation to have anywhere to write; shorter non-NULL frames fail safe
+ * (data=NULL, len=0), as does an acf_msg_length value already at its
+ * 9-bit field's maximum (0x1FF). acf_frame_len must also be a whole
+ * quadlet (a multiple of 4) -- matching acf.c's own encoders' output,
+ * which always pad the ACF message (header-and-payload plus their own
+ * trailing pad octets) to a whole quadlet regardless of E2E use; a
+ * non-quadlet-aligned acf_frame_len fails safe the same way (data=NULL,
+ * len=0). Total output length is unchanged from acf_frame_len +
+ * RCP_E2E_CRC_LEN either way: re-seating a whole quadlet's worth of
+ * trailer ahead of the pad octets never changes how many of them are
+ * needed. Caller owns acf_frame throughout -- it is read, never
  * modified. Returns a freshly heap-allocated, owned rcp_bytes_t (data=NULL,
  * len=0 on allocation failure or any of the above); caller frees the
  * result with rcp_bytes_free(). */
 rcp_bytes_t rcp_e2e_wrap(uint64_t stream_id, uint32_t avtp_timestamp,
                           const uint8_t *acf_frame, size_t acf_frame_len);
 
-/* The composed decode entry point, reversing rcp_e2e_wrap(): validates
- * the trailing CRC32 of frame (header-and-payload plus trailer, as
- * produced by rcp_e2e_wrap(), acf_msg_length still reflecting the
- * sender's +1-quadlet adaptation) via rcp_e2e_compute_crc() over
- * stream_id + avtp_timestamp + frame-minus-trailer, then -- regardless
- * of match -- writes *out_acf_frame a freshly heap-allocated copy of the
- * header-and-payload region (frame minus the trailing RCP_E2E_CRC_LEN
- * bytes) with acf_msg_length adapted back down by one quadlet, ready to
- * hand to acf.c's rcp_acf_decode_abb()/_decode_gbb() unmodified. Caller
- * frees *out_acf_frame with rcp_bytes_free() once RCP_E2E_OK or
- * RCP_E2E_ERR_CRC_MISMATCH is returned. Returns RCP_E2E_ERR_SHORT_FRAME
- * if frame_len < RCP_E2E_CRC_LEN (*out_acf_frame left zeroed, nothing to
- * free). Returns RCP_E2E_ERR_CRC_MISMATCH (CRC_ERROR) if the trailing
- * CRC does not match -- the caller must skip executing the request this
- * frame carries; *out_acf_frame is still populated in this case, for
- * diagnostic use, but must not be treated as a validated payload. */
+/* The composed decode entry point, reversing rcp_e2e_wrap(): frame is
+ * [real header-and-payload][CRC32][pad octets] (TC18 §13.6 Figures 20/21;
+ * see rcp_e2e_wrap()'s own doc comment), not a trailer simply appended to
+ * the end -- the real/pad split is read the same way rcp_e2e_wrap() reads
+ * it, directly out of frame's own wire-format "pad" field. This function
+ * validates the CRC32 sitting immediately after the real prefix (acf_msg_
+ * length still reflecting the sender's +1-quadlet adaptation) via
+ * rcp_e2e_compute_crc() over stream_id + avtp_timestamp + that real
+ * prefix, then -- regardless of match -- writes *out_acf_frame a freshly
+ * heap-allocated copy reassembling the real header-and-payload region
+ * immediately followed by the original pad octets (i.e. frame with the
+ * RCP_E2E_CRC_LEN-byte trailer excised from the middle, not merely
+ * trimmed off the end) with acf_msg_length adapted back down by one
+ * quadlet, ready to hand to acf.c's rcp_acf_decode_abb()/_decode_gbb()
+ * unmodified. Caller frees *out_acf_frame with rcp_bytes_free() once
+ * RCP_E2E_OK or RCP_E2E_ERR_CRC_MISMATCH is returned. Returns
+ * RCP_E2E_ERR_SHORT_FRAME if frame_len is too short to contain both the
+ * CRC32 trailer and the pad octets the header's own "pad" field claims
+ * (*out_acf_frame left zeroed, nothing to free). Returns
+ * RCP_E2E_ERR_CRC_MISMATCH (CRC_ERROR) if the CRC does not match -- the
+ * caller must skip executing the request this frame carries;
+ * *out_acf_frame is still populated in this case, for diagnostic use, but
+ * must not be treated as a validated payload. */
 rcp_e2e_errc_t rcp_e2e_unwrap(uint64_t stream_id, uint32_t avtp_timestamp,
                                const uint8_t *frame, size_t frame_len,
                                rcp_bytes_t *out_acf_frame);

@@ -2041,54 +2041,113 @@ static void test_dispatch_e2e_fragment_unresolvable_stream_falls_back_to_dispatc
     rcp_mock_server_destroy(srv);
 }
 
-/* ── REQ-E2E-042: pad coverage and quadlet alignment ───────────────────────── */
+/* ── REQ-E2E-042: pad EXCLUSION, trailer placement, and quadlet alignment ───── */
 
-/* TC18 sec. 13.6 Figures 19/20 compute the CRC over whole quadlets --
- * header quadlets plus byte_msg_payload INCLUDING the 0x00 pad octets --
- * so that the CRC itself occupies the message's final whole quadlet. The
- * pad octets are covered (mutating one changes the CRC), and as of the
- * REQ-E2E-042 fix, alignment is enforced too: rcp_e2e_wrap() rejects any
- * acf_frame_len that is not a whole quadlet (data=NULL, len=0) rather than
- * appending a trailer that straddles a quadlet boundary. */
-static void test_crc_covers_pad_octets_and_alignment_is_enforced(void)
+/* TC18 sec. 13.6 Figures 20/21's own worked ACF_ABB example: an 8-octet
+ * byte_message_info header plus a 6-octet real payload (PL_Byte1..
+ * PL_Byte6) -- 14 octets unpadded, needing 2 pad octets to reach the next
+ * quadlet boundary (16 octets = 4 quadlets). The wire order the figures
+ * show is [header][PL_Byte1..6][CRC32][0x00 pad][0x00 pad] -- the CRC32
+ * immediately after the real payload, with the pad octets strictly AFTER
+ * the complete trailer -- never [header][payload][pad][CRC32]. The CRC32
+ * itself excludes the pad octets ("a CRC32 is calculated ... across ...
+ * the entire payload (except padding)"). issue #420: previously
+ * rcp_e2e_wrap() got both of these backwards -- it required acf.c's
+ * already-padded output, computed the CRC over the whole thing (covering
+ * the pad octets it should have excluded), and appended the trailer
+ * directly after that, producing [header][payload][pad][CRC32]. This test
+ * pins the corrected wire layout, the corrected (pad-excluding) CRC value,
+ * that perturbing only the pad octets' VALUES never changes the CRC, and
+ * that rcp_e2e_unwrap() still reassembles byte-identically to what
+ * acf.c's own encoder produced despite the trailer no longer sitting at
+ * the very end of the wire frame. The quadlet-alignment rejection this
+ * test used to cover is unaffected by the fix and is still asserted
+ * below. */
+static void test_crc_omits_pad_octets_wire_order_header_payload_crc_then_pad(void)
 {
-    const uint8_t               pl[5] = {0x01, 0x02, 0x03, 0x04, 0x05};
-    rcp_bytes_t                 frame = make_abb(0, 0, 0, pl, sizeof(pl));
-    rcp_acf_byte_message_info_t hdr;
-    const uint8_t              *out_pl  = NULL;
-    size_t                      out_len = 0;
-    uint32_t                    with_zero_pad;
-    uint8_t                     misaligned[6] = {0x1Cu, 0x02u, 0, 0, 0, 0};
-    rcp_bytes_t                 mis;
-    rcp_bytes_t                 aligned_ok;
+    const uint8_t                pl[6] = {0x11, 0x22, 0x33, 0x44, 0x55, 0x66};
+    rcp_bytes_t                  frame = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_acf_byte_message_info_t  hdr;
+    const uint8_t                *out_pl  = NULL;
+    size_t                        out_len = 0;
+    rcp_bytes_t                  wrapped;
+    rcp_bytes_t                  wrapped_perturbed_pad;
+    uint8_t                      perturbed[16];
+    uint8_t                      adapted_prefix[14];
+    uint32_t                     expected_crc;
+    rcp_e2e_errc_t                rc;
+    rcp_bytes_t                  body = {0};
+    uint8_t                      misaligned[6] = {0x1Cu, 0x02u, 0, 0, 0, 0};
+    rcp_bytes_t                  mis;
 
-    /* 8 + 5 = 13 octets, so 3 pad octets bring it to 4 whole quadlets. */
+    /* 8 + 6 = 14 octets, so 2 pad octets bring it to 4 whole quadlets. */
     TEST_ASSERT_EQUAL_UINT(16u, frame.len);
-    TEST_ASSERT_EQUAL_UINT8(3u, rcp_acf_pad_len(8u + sizeof(pl)));
+    TEST_ASSERT_EQUAL_UINT8(2u, rcp_acf_pad_len(8u + sizeof(pl)));
     TEST_ASSERT_EQUAL_INT(RCP_ACF_OK,
                           rcp_acf_decode_abb(frame.data, frame.len, &hdr, &out_pl, &out_len));
-    TEST_ASSERT_EQUAL_UINT8(3u, hdr.pad);
+    TEST_ASSERT_EQUAL_UINT8(2u, hdr.pad);
+    TEST_ASSERT_EQUAL_UINT8(0u, frame.data[14]);
     TEST_ASSERT_EQUAL_UINT8(0u, frame.data[15]);
 
-    /* The pad octets are inside the coverage span. */
-    with_zero_pad = rcp_e2e_compute_crc(TEST_SID, TEST_TS, frame.data, frame.len);
-    frame.data[15] = 0xFFu;
-    TEST_ASSERT_TRUE(rcp_e2e_compute_crc(TEST_SID, TEST_TS, frame.data, frame.len) !=
-                     with_zero_pad);
+    wrapped = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    TEST_ASSERT_NOT_NULL(wrapped.data);
+    TEST_ASSERT_EQUAL_UINT(frame.len + RCP_E2E_CRC_LEN, wrapped.len); /* 20 */
 
-    /* Enforced: 6 octets is not a whole quadlet, so wrap() now fails safe
-     * instead of appending a trailer that straddles a quadlet boundary. */
+    /* Wire order: [0..14) real header+payload (acf_msg_length adapted),
+     * [14..18) CRC32, [18..20) the original 2 pad octets -- CRC32
+     * immediately after the real payload, pad octets strictly after it. */
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(pl, wrapped.data + 8, sizeof(pl)); /* real payload, unmoved */
+    TEST_ASSERT_EQUAL_UINT8(0u, wrapped.data[18]); /* pad, now AFTER the CRC32 */
+    TEST_ASSERT_EQUAL_UINT8(0u, wrapped.data[19]);
+
+    /* The trailer at [14..18) is the real CRC32: computed independently
+     * over the length-adapted 14-byte real prefix only, matching
+     * rcp_e2e_compute_crc()'s documented coverage span -- NOT over all 16
+     * bytes of frame.data (which would include the 2 pad octets). */
+    memcpy(adapted_prefix, frame.data, sizeof(adapted_prefix));
+    adapted_prefix[1] = (uint8_t)(adapted_prefix[1] + 1u); /* +1 quadlet: 4 -> 5, no MSB carry here */
+    expected_crc = rcp_e2e_compute_crc(TEST_SID, TEST_TS, adapted_prefix, sizeof(adapted_prefix));
+    TEST_ASSERT_EQUAL_HEX32(expected_crc, be32(wrapped.data + 14));
+
+    /* Perturbing only the pad octets' VALUES (not their count, still 2
+     * per the header's own "pad" field) must not change the CRC32 --
+     * TC18's "except padding" exclusion means this module must not care
+     * what the pad bytes contain. Build a second frame identical except
+     * its trailing pad octets hold different byte values and confirm the
+     * two wrapped CRC32 trailers are byte-identical, while the two
+     * wrapped pad regions differ (proving the pad bytes are still
+     * faithfully carried through, just excluded from the CRC). */
+    memcpy(perturbed, frame.data, sizeof(perturbed));
+    perturbed[14] = 0xAAu;
+    perturbed[15] = 0xBBu;
+    wrapped_perturbed_pad = rcp_e2e_wrap(TEST_SID, TEST_TS, perturbed, sizeof(perturbed));
+    TEST_ASSERT_NOT_NULL(wrapped_perturbed_pad.data);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(wrapped.data + 14, wrapped_perturbed_pad.data + 14,
+                                   RCP_E2E_CRC_LEN);
+    TEST_ASSERT_EQUAL_HEX8(0xAAu, wrapped_perturbed_pad.data[18]);
+    TEST_ASSERT_EQUAL_HEX8(0xBBu, wrapped_perturbed_pad.data[19]);
+    TEST_ASSERT_TRUE(memcmp(wrapped.data + 18, wrapped_perturbed_pad.data + 18, 2) != 0);
+
+    /* rcp_e2e_unwrap() reverses both the CRC-in-the-middle placement and
+     * the length adaptation, reassembling the exact original acf.c-
+     * produced frame (header+payload+pad, un-adapted acf_msg_length) even
+     * though the CRC32 trailer sat between the real payload and the pad
+     * octets on the wire, not after them. */
+    rc = rcp_e2e_unwrap(TEST_SID, TEST_TS, wrapped.data, wrapped.len, &body);
+    TEST_ASSERT_EQUAL_INT(RCP_E2E_OK, rc);
+    TEST_ASSERT_EQUAL_UINT(frame.len, body.len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(frame.data, body.data, body.len);
+
+    /* Unaffected by this fix: 6 octets is not a whole quadlet -- not
+     * acf.c's own quadlet-aligned output shape -- so wrap() still fails
+     * safe instead of appending a trailer to it. */
     mis = rcp_e2e_wrap(TEST_SID, TEST_TS, misaligned, sizeof(misaligned));
     TEST_ASSERT_NULL(mis.data);
     TEST_ASSERT_EQUAL_UINT(0u, mis.len);
 
-    /* A properly quadlet-aligned, already-padded frame still wraps fine. */
-    frame.data[15] = 0u;
-    aligned_ok = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
-    TEST_ASSERT_NOT_NULL(aligned_ok.data);
-    TEST_ASSERT_EQUAL_UINT(frame.len + RCP_E2E_CRC_LEN, aligned_ok.len);
-
-    rcp_bytes_free(&aligned_ok);
+    rcp_bytes_free(&body);
+    rcp_bytes_free(&wrapped_perturbed_pad);
+    rcp_bytes_free(&wrapped);
     rcp_bytes_free(&mis);
     rcp_bytes_free(&frame);
 }
@@ -2141,6 +2200,6 @@ int main(void)
     RUN_TEST(test_dispatch_e2e_fragment_too_large_reassembly_is_rejected);
     RUN_TEST(test_dispatch_e2e_fragment_unresolvable_stream_falls_back_to_dispatch_e2e);
 
-    RUN_TEST(test_crc_covers_pad_octets_and_alignment_is_enforced);
+    RUN_TEST(test_crc_omits_pad_octets_wire_order_header_payload_crc_then_pad);
     return UNITY_END();
 }
