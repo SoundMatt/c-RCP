@@ -19106,6 +19106,33 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.338.0 -- 2026-08-14 (REQ-PWRMODE-019: stale "not modeled" text
+corrected, closed)
+
+Fifth of 14 items -- a data-quality find, not new feature work. This
+requirement's own text cited two tests as evidence response-queue
+objects/heartbeat re-emission were "not modeled anywhere." Neither
+test exists anymore (grep-confirmed) -- both superseded by real work
+already shipped (`REQ-RMAP-034/059-061` storage,
+`REQ-RMAP-065/SRV-017` heartbeat, the immediately preceding
+release). `rcp_mock_server_pwrmode_resume()`'s own doc comment
+carried the identical stale claim, corrected to match.
+
+Real remaining question resolves to no: neither the response-queue
+config struct nor the new heartbeat-check function carries any
+independent enabled/disabled state (unlike an endpoint's own
+`ep_enable`) for sleep to have disabled, so there's nothing for wake
+to reverse -- §12.4.1's clause is vacuously satisfied by this
+codebase's own stateless response-queue design. (Sleep-side
+heartbeat suppression is a distinct, separately-scoped question this
+citation doesn't ask.)
+
+No code change; text/status corrected only. Full 66-test suite
+unaffected; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076
+untested. `.fusa-reqs.json`: `REQ-PWRMODE-019` partial ->
+implemented (1042 implemented / 25 partial / 2 not-implemented / 7
+retired, 1076 total).
+
 ### v0.337.0 -- 2026-08-14 (REQ-RMAP-065/SRV-017: Flush_time heartbeat
 composed into one real mock.c call)
 
