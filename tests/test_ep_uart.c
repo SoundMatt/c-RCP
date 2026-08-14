@@ -34,6 +34,11 @@
 //cfusa:test REQ-UART-036
 //cfusa:test REQ-UART-039
 //cfusa:test REQ-UART-040
+//cfusa:test REQ-UART-041
+//cfusa:test REQ-UART-042
+//cfusa:test REQ-UART-043
+//cfusa:test REQ-UART-044
+//cfusa:test REQ-UART-045
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -100,6 +105,40 @@ static void test_apply_bit_padding_invalid_nr_bits_zeroes_buffer(void)
     TEST_ASSERT_EQUAL_HEX8(0x00, buf[1]);
 }
 
+/* ── HW trigger signals (§13.7.8.4 Table 52) ─────────────────────────────────
+ *
+ * Proves rcp_ep_uart_trigger_fires() implements Table 52's two HW trigger
+ * signals -- "Transmit request finalized" (RCP_EP_UART_TRIGGER_TX_FINALIZED,
+ * signal 0) and "Read request finalized" (RCP_EP_UART_TRIGGER_RX_FINALIZED,
+ * signal 1) -- and does not fire spuriously for NONE, for the other
+ * trigger's own event, or for the other trigger's own mode. */
+
+static void test_trigger_fires_none_never_fires(void)
+{
+    TEST_ASSERT_FALSE(rcp_ep_uart_trigger_fires(
+        RCP_EP_UART_TRIGGER_NONE, RCP_EP_UART_EVENT_TX_REQUEST_FINALIZED));
+    TEST_ASSERT_FALSE(rcp_ep_uart_trigger_fires(
+        RCP_EP_UART_TRIGGER_NONE, RCP_EP_UART_EVENT_READ_REQUEST_FINALIZED));
+}
+
+static void test_trigger_fires_tx_finalized_on_tx_event_only(void)
+{
+    TEST_ASSERT_TRUE(rcp_ep_uart_trigger_fires(
+        RCP_EP_UART_TRIGGER_TX_FINALIZED, RCP_EP_UART_EVENT_TX_REQUEST_FINALIZED));
+    /* Does not spuriously fire for the OTHER signal's own event. */
+    TEST_ASSERT_FALSE(rcp_ep_uart_trigger_fires(
+        RCP_EP_UART_TRIGGER_TX_FINALIZED, RCP_EP_UART_EVENT_READ_REQUEST_FINALIZED));
+}
+
+static void test_trigger_fires_rx_finalized_on_read_event_only(void)
+{
+    TEST_ASSERT_TRUE(rcp_ep_uart_trigger_fires(
+        RCP_EP_UART_TRIGGER_RX_FINALIZED, RCP_EP_UART_EVENT_READ_REQUEST_FINALIZED));
+    /* Does not spuriously fire for the OTHER signal's own event. */
+    TEST_ASSERT_FALSE(rcp_ep_uart_trigger_fires(
+        RCP_EP_UART_TRIGGER_RX_FINALIZED, RCP_EP_UART_EVENT_TX_REQUEST_FINALIZED));
+}
+
 /* ── Functional config ─────────────────────────────────────────────────────── */
 
 static void test_functional_cfg_init_zeroes_except_nr_bits(void)
@@ -127,6 +166,7 @@ static void test_functional_cfg_init_zeroes_except_nr_bits(void)
     TEST_ASSERT_FALSE(cfg.half_duplex);
     TEST_ASSERT_EQUAL_UINT8(0, cfg.wire_timeout_bit_times);
     TEST_ASSERT_EQUAL_UINT8(0, cfg.trail);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_TRIGGER_NONE, cfg.trigger);
 }
 
 static void test_functional_cfg_writable_false_hw_unconfigured(void)
@@ -294,6 +334,31 @@ static void test_set_timeout_applies_when_authorized(void)
     TEST_ASSERT_TRUE(rcp_ep_uart_set_timeout(
         &cfg, 50, RCP_LIFECYCLE_HW_CONFIGURED, writer));
     TEST_ASSERT_EQUAL_UINT32(50, cfg.uart_timeout_ms);
+}
+
+static void test_set_trigger_rejects_unauthorized(void)
+{
+    rcp_ep_uart_functional_cfg_t cfg;
+    rcp_lifecycle_writer_ctx_t      none = {0};
+
+    rcp_ep_uart_functional_cfg_init(&cfg);
+
+    TEST_ASSERT_FALSE(rcp_ep_uart_set_trigger(
+        &cfg, RCP_EP_UART_TRIGGER_TX_FINALIZED, RCP_LIFECYCLE_HW_UNCONFIGURED, none));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_TRIGGER_NONE, cfg.trigger);
+}
+
+static void test_set_trigger_applies_when_authorized(void)
+{
+    rcp_ep_uart_functional_cfg_t cfg;
+    rcp_lifecycle_writer_ctx_t      writer = {0};
+    writer.via_owning_stream = true;
+
+    rcp_ep_uart_functional_cfg_init(&cfg);
+
+    TEST_ASSERT_TRUE(rcp_ep_uart_set_trigger(
+        &cfg, RCP_EP_UART_TRIGGER_RX_FINALIZED, RCP_LIFECYCLE_HW_CONFIGURED, writer));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_TRIGGER_RX_FINALIZED, cfg.trigger);
 }
 
 /* ── The EP_func register block ────────────────────────────────────────────── */
@@ -1013,6 +1078,10 @@ int main(void)
     RUN_TEST(test_apply_bit_padding_no_op_for_8_bits);
     RUN_TEST(test_apply_bit_padding_invalid_nr_bits_zeroes_buffer);
 
+    RUN_TEST(test_trigger_fires_none_never_fires);
+    RUN_TEST(test_trigger_fires_tx_finalized_on_tx_event_only);
+    RUN_TEST(test_trigger_fires_rx_finalized_on_read_event_only);
+
     RUN_TEST(test_functional_cfg_init_zeroes_except_nr_bits);
     RUN_TEST(test_functional_cfg_writable_false_hw_unconfigured);
     RUN_TEST(test_functional_cfg_writable_hw_configured_requires_authorization_or_discovery_stream);
@@ -1027,6 +1096,8 @@ int main(void)
     RUN_TEST(test_set_rx_buffer_size_applies_when_authorized);
     RUN_TEST(test_set_timeout_rejects_unauthorized);
     RUN_TEST(test_set_timeout_applies_when_authorized);
+    RUN_TEST(test_set_trigger_rejects_unauthorized);
+    RUN_TEST(test_set_trigger_applies_when_authorized);
 
     RUN_TEST(test_render_registers_matches_table_offsets);
     RUN_TEST(test_apply_reconfig_writes_multi_register_span);

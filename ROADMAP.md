@@ -19106,6 +19106,85 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.353.0 -- 2026-08-14 (REQ-UART-041..045: UART HW trigger signals,
+TC18 §13.7.8.4 Table 52, implemented)
+
+Closes issue #425 (c-RCP-AUDIT-14 finding). TC18 §13.7.8.4 Table 52 ("uart
+trigger signals") defines a real, spec-numbered UART HW trigger event --
+"Trigger signal (output) 0: Transmit request finalized", "1: Read request
+finalized" -- with zero implementation and zero requirement-catalog
+coverage anywhere in `ep_uart.h`/`ep_uart.c`, the one endpoint in this
+section of TC18 with a genuine spec-defined trigger table and the only
+one with nothing modeling it. Every sibling endpoint type with an
+analogous concept models it: `ep_spi.h`'s `TRANSFER_DONE`
+(Table 41, REQ-SPI-034) and `ep_lin.h`'s `rcp_ep_lin_trigger_fires()`
+(REQ-LINEP-006/023, an entirely original design filling a gap TC18 itself
+leaves silent for LIN).
+
+New `rcp_ep_uart_trigger_t` (`RCP_EP_UART_TRIGGER_NONE`/`_TX_FINALIZED`/
+`_RX_FINALIZED`) names Table 52's two signals directly -- the enum values
+themselves ARE the Table 52 signal numbers, so unlike SPI's 14-signal
+Table 41 (which needs `rcp_ep_spi_trigger_signal_number()`'s own
+per-channel collapsing), no separate numbering function is needed here.
+New `rcp_ep_uart_trigger_fires(trigger, event)` is the pure,
+directly-testable evaluator, the same caller-supplies-already-classified-
+inputs shape every sibling trigger function already uses
+(`rcp_ep_spi_trigger_fires()`, `rcp_ep_lin_trigger_fires()`,
+`rcp_ep_pwm_out_trigger_fires()`/`_in_trigger_fires()`).
+
+New `cfg->trigger` field (`rcp_ep_uart_functional_cfg_t`) and
+`rcp_ep_uart_set_trigger()` mutator, gated by the same
+`rcp_ep_uart_functional_cfg_writable()` §12.3.1.3 W* authorization every
+other UART setter already uses. Checked whether SPI/PWM_OUT/PWM_IN's own
+trigger config fields have a dedicated wire-rendered register in their
+own EP_func register blocks at this point in the sibling investigation,
+per the fix's own instructions: they do not -- `channels[i].trigger`
+(SPI) and `trigger` (PWM_OUT/PWM_IN) are all explicitly documented as
+excluded from their respective register blocks ("never rendered onto the
+wire"). Matching that established sibling pattern exactly, `cfg->trigger`
+is likewise never rendered onto the wire, and
+`rcp_ep_uart_render_registers()`/`rcp_ep_uart_apply_reconfig()` are
+deliberately left untouched by this addition -- Table 48's own EP_func
+block genuinely has no trigger-mode register to wire it into. Not to be
+conflated with the pre-existing, unrelated `rcp_ep_uart_read_completion_
+decision()` (§13.7.8.1's read-completion race -- fifo-satisfied/
+timeout-expired/fifo-full-fragmentation), which this fix leaves entirely
+untouched.
+
+Five new `REQ-UART-041..045` entries added to `.fusa-reqs.json`, citing
+§13.7.8.4/Table 52 (and §12.3.1.3 for the setter's authorization
+behavior) directly, appended at the requirements array's tail rather than
+inserted alongside REQ-UART-040 where they topically belong -- this
+file's own SoundMatt/c-FuSa#99 workaround (see REQ-ACF-032's own note):
+inserting before the ~1024th array entry risks shifting a
+previously-tracked, tested requirement's index out of `cfusa trace`'s own
+internal parse window. New `tests/test_ep_uart.c` coverage
+(`test_trigger_fires_none_never_fires`, `test_trigger_fires_tx_finalized_
+on_tx_event_only`, `test_trigger_fires_rx_finalized_on_read_event_only`,
+`test_set_trigger_rejects_unauthorized`, `test_set_trigger_applies_when_
+authorized`) proves both signals fire for their own event, never fire for
+the sibling signal's own event (no spurious firing), and NONE never
+fires.
+
+Mutation-tested: reverting `rcp_ep_uart_trigger_fires()`'s two real-signal
+`switch` cases to unconditional `false` and `rcp_ep_uart_set_trigger()`'s
+field assignment to a no-op (test code left untouched) made exactly the 3
+directly-targeted new assertions fail (2 `trigger_fires` tests, 1
+`set_trigger` test; `test_trigger_fires_none_never_fires` and
+`test_set_trigger_rejects_unauthorized` correctly kept passing, since
+neither mutation touches the NONE/unauthorized-reject paths they cover),
+with every other test in the 56-test `test_ep_uart` binary still passing
+-- confirming the new tests genuinely exercise this fix rather than
+incidental surface. Fix restored from a pre-mutation backup copy (never
+`git checkout` on uncommitted work) and reverified clean before
+finishing.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`: 0 errors (2076
+total, 920 warnings, 1156 infos, same pre-existing warning set as before
+this change); `cfusa trace`: 1081/1081 requirements traced and tested (up
+from 1076/1076 -- the 5 new REQ-UART ids).
+
+**Next**: none queued from this item -- awaiting further direction.
 ### v0.352.0 -- 2026-08-14 (REQ-E2E-042: Safe-command-mode CRC32 now
 excludes padding and lands before it, not after)
 

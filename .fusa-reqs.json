@@ -11460,6 +11460,61 @@
       "asil": "QM",
       "scope": "internal",
       "status": "implemented"
+    },
+    {
+      "id": "REQ-UART-041",
+      "title": "rcp_ep_uart_trigger_fires() never fires for RCP_EP_UART_TRIGGER_NONE",
+      "text": "ADDED 2026-08-14 (c-RCP-AUDIT-14, issue #425): TC18 §13.7.8.4 Table 52 (\"uart trigger signals\") defines a real UART HW trigger event with two output signals that this module previously modeled nowhere at all. rcp_ep_uart_trigger_fires() shall return false for trigger == RCP_EP_UART_TRIGGER_NONE regardless of event -- NONE is this module's own off/none state, the same shape as ep_spi.h's own RCP_EP_SPI_TRIGGER_NONE (see REQ-SPI-006) and ep_lin.h's RCP_EP_LIN_TRIGGER_NONE, neither of which Table 52 (nor Table 41, nor this endpoint type's own original LIN trigger concept) itself defines a wire value for.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§13.7.8.4 Table 52 (\"A UART EP optionally generates HW trigger event\")"
+    },
+    {
+      "id": "REQ-UART-042",
+      "title": "rcp_ep_uart_trigger_fires() implements RCP_EP_UART_TRIGGER_TX_FINALIZED",
+      "text": "ADDED 2026-08-14 (c-RCP-AUDIT-14, issue #425): rcp_ep_uart_trigger_fires() shall return true for trigger == RCP_EP_UART_TRIGGER_TX_FINALIZED iff event == RCP_EP_UART_EVENT_TX_REQUEST_FINALIZED (and false for the other defined event, RCP_EP_UART_EVENT_READ_REQUEST_FINALIZED, i.e. no spurious firing for the sibling signal's own event) -- TC18 Table 52's trigger signal 0, \"Transmit request finalized\".",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§13.7.8.4 Table 52 (trigger signal 0, \"Transmit request finalized\")"
+    },
+    {
+      "id": "REQ-UART-043",
+      "title": "rcp_ep_uart_trigger_fires() implements RCP_EP_UART_TRIGGER_RX_FINALIZED",
+      "text": "ADDED 2026-08-14 (c-RCP-AUDIT-14, issue #425): rcp_ep_uart_trigger_fires() shall return true for trigger == RCP_EP_UART_TRIGGER_RX_FINALIZED iff event == RCP_EP_UART_EVENT_READ_REQUEST_FINALIZED (and false for the other defined event, RCP_EP_UART_EVENT_TX_REQUEST_FINALIZED, i.e. no spurious firing for the sibling signal's own event) -- TC18 Table 52's trigger signal 1, \"Read request finalized\". Not to be conflated with rcp_ep_uart_read_completion_decision() (REQ-UART-033), which arbitrates §13.7.8.1's unrelated read-completion race (fifo-satisfied / timeout-expired / fifo-full-fragmentation) rather than this Table 52 HW trigger signal.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§13.7.8.4 Table 52 (trigger signal 1, \"Read request finalized\")"
+    },
+    {
+      "id": "REQ-UART-044",
+      "title": "rcp_ep_uart_set_trigger() rejects an unauthorized write without mutating cfg",
+      "text": "ADDED 2026-08-14 (c-RCP-AUDIT-14, issue #425): rcp_ep_uart_set_trigger() shall return false and leave cfg->trigger unchanged when the write is not authorized by rcp_ep_uart_functional_cfg_writable() -- the same §12.3.1.3 W* marker convention every other rcp_ep_uart_set_*() mutator already enforces (REQ-UART-008/010/013/015).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18-gap",
+      "status": "implemented",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- governs the write-authorization behavior; §13.7.8.4 Table 52 is the trigger-signal basis cfg->trigger models (see REQ-UART-041/042/043)."
+    },
+    {
+      "id": "REQ-UART-045",
+      "title": "rcp_ep_uart_set_trigger() applies the write when authorized, and never touches the wire register block",
+      "text": "ADDED 2026-08-14 (c-RCP-AUDIT-14, issue #425): rcp_ep_uart_set_trigger() shall return true and set cfg->trigger to the requested trigger when the write is authorized. cfg->trigger has no counterpart in Table 48's own EP_func register block (RCP_EP_UART_REG_*) -- the same \"no wire-format consequence\" status ep_spi.h's own channels[i].trigger and ep_pwm.h's PWM_OUT/PWM_IN trigger fields already have (see ep_spi.h's own file header) -- so rcp_ep_uart_render_registers()/rcp_ep_uart_apply_reconfig() are correctly left untouched by this field's addition.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18-gap",
+      "status": "implemented",
+      "tc18": "§12.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same basis as REQ-UART-044"
     }
   ],
   "catalogNote": "Phase 22 re-certification pass (ROADMAP.md milestone 85, v0.85.0): every requirement below was individually reviewed against the source file its //cfusa:req tag actually appears in (a per-prefix audit, not a blind carry-over) and classified via the \"scope\" field. scope=\"tc18\" entries (779 of 854) describe the actual implemented TC18 behavior -- register-map access control, lifecycle transitions, E2E CRC32 safe points, per-endpoint-type request/response shapes, discovery, power-mode transitions, and every ADAPT-class satellite -- and are this project's own ISO 26262 ASIL-B safety-case basis going forward. scope=\"legacy-compat\" entries (75 of 854) describe the retired pre-TC18 Zone/Command surface (rcp.h/rcp.c and tests/legacy_mock.* only); they are demoted to level/asil \"QM\" and their text is prefixed accordingly, but kept -- not deleted or renumbered -- because that legacy surface is out of scope for this milestone to touch (ROADMAP.md's v0.84.0 milestone already confirmed it is the last consumer of those retired types anywhere in src/) and still carries //cfusa:req tags naming these ids; deleting the catalog entries out from under a surviving tag would only trade one inaccuracy (an unqualified legacy requirement) for another (a dangling reference cfusa trace would then report). Only the tc18 subset is this project's claimed certification basis, and it is complete against Phases 13-21 as actually shipped -- not a forward-declared placeholder the way the legacy program's own catalog was at its v0.2.0, since unlike v0.2.0 this catalog was not written before the code it describes. TC18 requirements-corpus completeness pass (v0.105.0): 158 entries were added by a clause-by-clause sweep of TC18 sections 10 through 13.7.13 for normative clauses, tables and figures that no existing entry covered. Every added entry carries a \"tc18\" field citing the exact section (and the line of the specification text it was read from) and a \"status\" field: \"implemented\" (behaviour c-RCP provides, scope \"tc18\", ASIL-B), or \"partial\"/\"not-implemented\" (a normative obligation c-RCP does NOT meet -- scope \"tc18-gap\", level/asil \"QM\", text opening with \"NOT IMPLEMENTED\", and a test that pins the deviation rather than pretending it is absent). A tc18-gap entry is deliberately NOT part of the ASIL-B safety-case basis; it exists so the catalog is an honest map of the specification's normative surface instead of a map of this implementation only."

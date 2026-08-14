@@ -48,6 +48,22 @@ void rcp_ep_uart_apply_bit_padding(uint8_t *buf, size_t len, uint8_t nr_bits)
     }
 }
 
+/* ── HW trigger signals (§13.7.8.4 Table 52) ─────────────────────────────────
+ * See the file header's own "HW trigger signals" section. */
+
+//cfusa:req REQ-UART-041
+//cfusa:req REQ-UART-042
+//cfusa:req REQ-UART-043
+bool rcp_ep_uart_trigger_fires(rcp_ep_uart_trigger_t trigger, rcp_ep_uart_event_t event)
+{
+    switch (trigger) {
+    case RCP_EP_UART_TRIGGER_TX_FINALIZED: return event == RCP_EP_UART_EVENT_TX_REQUEST_FINALIZED;
+    case RCP_EP_UART_TRIGGER_RX_FINALIZED: return event == RCP_EP_UART_EVENT_READ_REQUEST_FINALIZED;
+    case RCP_EP_UART_TRIGGER_NONE:
+    default:                                return false;
+    }
+}
+
 /* ── Functional config ─────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-UART-004
@@ -60,7 +76,8 @@ void rcp_ep_uart_functional_cfg_init(rcp_ep_uart_functional_cfg_t *cfg)
      * cannot be left at that memset's 0, since 0 is not itself
      * rcp_ep_uart_nr_bits_valid() -- see the file header. ep_status/
      * baud_rate_kbps/wire_timeout_bit_times/trail are already 0 and
-     * rts_enable/cts_enable/half_duplex already false, via the memset. */
+     * rts_enable/cts_enable/half_duplex already false, via the memset.
+     * trigger is already RCP_EP_UART_TRIGGER_NONE (0) via the memset. */
     cfg->uart_nr_bits = RCP_EP_UART_NR_BITS_MAX;
 }
 
@@ -119,6 +136,17 @@ bool rcp_ep_uart_set_timeout(rcp_ep_uart_functional_cfg_t *cfg, uint32_t timeout
     if (!rcp_ep_uart_functional_cfg_writable(state, writer)) return false;
 
     cfg->uart_timeout_ms = timeout_ms;
+    return true;
+}
+
+//cfusa:req REQ-UART-044
+//cfusa:req REQ-UART-045
+bool rcp_ep_uart_set_trigger(rcp_ep_uart_functional_cfg_t *cfg, rcp_ep_uart_trigger_t trigger,
+                              rcp_lifecycle_state_t state, rcp_lifecycle_writer_ctx_t writer)
+{
+    if (!rcp_ep_uart_functional_cfg_writable(state, writer)) return false;
+
+    cfg->trigger = (uint8_t)trigger;
     return true;
 }
 
