@@ -440,6 +440,34 @@ bool rcp_mock_server_check_response_queue_heartbeat(rcp_mock_server_t *srv,
     return true;
 }
 
+//cfusa:req REQ-WAKEUP-018
+bool rcp_mock_server_wakeup_repetition_interval_us(const rcp_mock_server_t *srv,
+                                                     uint8_t request_stream_index,
+                                                     uint32_t *out_interval_us)
+{
+    size_t  req_idx;
+    uint8_t resp_stream_index;
+    size_t  resp_idx;
+
+    *out_interval_us = 0;
+
+    if (request_stream_index == 0u ||
+        (size_t)request_stream_index > srv->request_stream_cfg_count) {
+        return false;
+    }
+    req_idx = (size_t)request_stream_index - 1u;
+
+    resp_stream_index = srv->request_stream_cfg[req_idx].rx_resp_stream_index;
+    if (resp_stream_index == 0u ||
+        (size_t)resp_stream_index > srv->response_queue_cfg_count) {
+        return false;
+    }
+    resp_idx = (size_t)resp_stream_index - 1u;
+
+    *out_interval_us = srv->response_queue_cfg[resp_idx].flush_time_us;
+    return true;
+}
+
 //cfusa:req REQ-E2E-029
 //cfusa:req REQ-E2E-030
 //cfusa:req REQ-E2E-045

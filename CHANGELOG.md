@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.343.0 -- 2026-08-14 (REQ-WAKEUP-018: repetition-interval resolution via Flush_time -- final item of the user's 14-item "complete these" list)
+
+Tenth and final item of the batch catalogued "not blocked, left by explicit decision" -- the third and last of the three WakeUp items (`REQ-WAKEUP-018/021/022`), completing the user's own explicit "complete these" instruction across all 14 items from the post-backlog requirements audit.
+
+TC18 §13.7.2.1's own text: "After establishing a network connection, the WakeUp endpoint sends repetitive messages. The timing interval is configurable (flush_time)." This requirement's own prior text correctly identified "(flush_time)" as `rcp_regmap_response_queue_cfg_t::flush_time_us` (TC18 §12.7.9 Table 24, REQ-RMAP-064) -- a DIFFERENT table's field, associated with the response queue, not the WakeUp endpoint's own functional config -- and correctly flagged that reusing it would require reaching into a different endpoint's own response-queue row by ep_id/byte_bus_id lookup, "a real architectural decision this fix deliberately does not make unilaterally."
+
+That decision is now made, following this session's own established composition pattern (mirroring `rcp_mock_server_check_response_queue_heartbeat()`, REQ-RMAP-065/SRV-017): new `rcp_mock_server_wakeup_repetition_interval_us()` (mock.h/mock.c) resolves a WakeUp endpoint's own 1-based `request_stream_index` through `srv->request_stream_cfg[]`'s own `rx_resp_stream_index` (REQ-RMAP-049's already-authoritative request-stream → response-stream association) to the associated `response_queue_cfg[]` row's own `flush_time_us` -- composed entirely from existing primitives, no new wire field, no new table.
+
+Kept in `mock.c` rather than `ep_wakeup.h` itself, preserving that module's own "nothing... is touched here" layering promise (its own file header) -- the same boundary every other cross-endpoint composition this codebase already respects. `ep_wakeup.h`'s own in-memory `repetition_time_us` field is unchanged: it remains a caller-settable fallback for when no request/response stream is configured yet, not the authoritative source once one is.
+
+New tests prove the resolution (a fixture combining `rcp_regmap_request_stream_cfg_init()`'s own default `rx_resp_stream_index == 1` with a configured response-queue row), an out-of-range `request_stream_index`, and an `rx_resp_stream_index` that doesn't resolve to a real row. Two independent mutations (the response-row resolution, the `request_stream_index` range guard) each weakened and confirmed to fail the new tests, then restored.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`: `REQ-WAKEUP-018` partial → implemented -- 1046 implemented / 21 partial / 2 not-implemented / 7 retired, 1076 total.
+
+**This closes the user's own 14-item "complete these" list in full.** Final disposition of all 14: `REQ-WAKEUP-018/021/022`, `REQ-LIFECYCLE-025` (re-verified, genuinely stays open spec silence, not closeable without inventing non-conformant behavior), `REQ-LIFECYCLE-031`, `REQ-RMAP-048/049`, `REQ-RMAP-065`/`REQ-SRV-017`/`REQ-SRV-018`/`REQ-PWRMODE-019`, `REQ-MDIO-024` (investigated, genuinely blocked by external-spec ambiguity), `REQ-UART-037`, `REQ-ADC-033` — 13 of 14 closed to `implemented`, 1 honestly re-confirmed as a genuine, non-forceable spec-silence gap.
+
 ### v0.342.0 -- 2026-08-14 (REQ-WAKEUP-022: edge-triggered wake-source detection, all 6 Table 40 IO_SRC values now representable)
 
 Ninth of 14 items -- the second of the three WakeUp items (`REQ-WAKEUP-018/021/022`), closing the last of the two deliberate simplifications the WakeUp register-block milestone left open.

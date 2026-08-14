@@ -914,6 +914,72 @@ static void test_heartbeat_out_of_range_response_stream_index_does_not_fire(void
     rcp_mock_server_destroy(srv);
 }
 
+/* ── REQ-WAKEUP-018: WakeUp repetition interval, resolved from Flush_time ──── */
+
+/* rcp_regmap_request_stream_cfg_init()'s own default already sets
+ * rx_resp_stream_index = 1 (REQ-RMAP-049's own documented exception to
+ * "zero everything") -- combined with heartbeat_fixture()'s own
+ * response_queue_cfg[0] (response_stream_index 1), the default fixture
+ * below already forms a real request-stream -> response-stream chain
+ * with no extra wiring needed. */
+static rcp_mock_server_t *wakeup_interval_fixture(uint32_t flush_time_us)
+{
+    rcp_mock_server_t              *srv = heartbeat_fixture(flush_time_us);
+    rcp_regmap_request_stream_cfg_t req[1];
+
+    rcp_regmap_request_stream_cfg_init(&req[0]); /* rx_resp_stream_index defaults to 1 */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, req, 1));
+    return srv;
+}
+
+static void test_wakeup_repetition_interval_resolves_via_flush_time(void)
+{
+    rcp_mock_server_t *srv = wakeup_interval_fixture(5000u);
+    uint32_t            interval = 0xEEEEEEEEu;
+
+    TEST_ASSERT_TRUE(rcp_mock_server_wakeup_repetition_interval_us(srv, 1u, &interval));
+    TEST_ASSERT_EQUAL_UINT32(5000u, interval);
+
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_wakeup_repetition_interval_out_of_range_request_stream_index(void)
+{
+    rcp_mock_server_t *srv = wakeup_interval_fixture(5000u);
+    uint32_t            interval = 0xEEEEEEEEu;
+
+    TEST_ASSERT_FALSE(rcp_mock_server_wakeup_repetition_interval_us(srv, 0u, &interval));
+    TEST_ASSERT_EQUAL_UINT32(0u, interval);
+
+    interval = 0xEEEEEEEEu;
+    TEST_ASSERT_FALSE(rcp_mock_server_wakeup_repetition_interval_us(srv, 2u, &interval));
+    TEST_ASSERT_EQUAL_UINT32(0u, interval);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* An rx_resp_stream_index that does not resolve to a real
+ * response_queue_cfg[] row (here: no response-queue table configured at
+ * all, so even the default rx_resp_stream_index == 1 is out of range)
+ * fails the same way as an out-of-range request_stream_index -- the
+ * identical "not a real row" convention rcp_mock_server_check_response_
+ * queue_heartbeat() already uses for its own response_stream_index. */
+static void test_wakeup_repetition_interval_unresolvable_response_stream_fails(void)
+{
+    rcp_mock_server_t              *srv = rcp_mock_server_new();
+    rcp_regmap_request_stream_cfg_t req[1];
+    uint32_t                        interval = 0xEEEEEEEEu;
+
+    rcp_regmap_request_stream_cfg_init(&req[0]); /* rx_resp_stream_index == 1, but no
+                                                      response_queue_cfg row exists */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, req, 1));
+
+    TEST_ASSERT_FALSE(rcp_mock_server_wakeup_repetition_interval_us(srv, 1u, &interval));
+    TEST_ASSERT_EQUAL_UINT32(0u, interval);
+
+    rcp_mock_server_destroy(srv);
+}
+
 static void test_dispatch_no_handler_leaves_response_zeroed(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -1506,6 +1572,10 @@ int main(void)
     RUN_TEST(test_heartbeat_never_fires_when_flush_time_is_zero);
     RUN_TEST(test_heartbeat_non_monotonic_now_us_does_not_fire);
     RUN_TEST(test_heartbeat_out_of_range_response_stream_index_does_not_fire);
+
+    RUN_TEST(test_wakeup_repetition_interval_resolves_via_flush_time);
+    RUN_TEST(test_wakeup_repetition_interval_out_of_range_request_stream_index);
+    RUN_TEST(test_wakeup_repetition_interval_unresolvable_response_stream_fails);
     RUN_TEST(test_dispatch_no_handler_leaves_response_zeroed);
     RUN_TEST(test_dispatch_queued_when_endpoint_disabled);
     RUN_TEST(test_drain_endpoint_runs_queued_request);
