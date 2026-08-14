@@ -69,7 +69,11 @@ static uint16_t apply_write_field(uint16_t current, uint16_t request,
     case RCP_EP_PWM_OUT_WRITE_ADD:     return saturating_add_u16(current, request);
     case RCP_EP_PWM_OUT_WRITE_SUB:     return saturating_sub_u16(current, request);
     case RCP_EP_PWM_OUT_WRITE_RESERVED4:
-        return current; /* documented no-op; see the file header */
+        /* The "ignored" half of Table 33's own two-part reserved-value
+         * rule; the "err-response" half is
+         * rcp_ep_pwm_out_decode_write_request()'s own
+         * RCP_EP_PWM_OUT_ERR_RESERVED_EVT -- see the file header. */
+        return current;
     case RCP_EP_PWM_OUT_WRITE_RECONFIG:
     default:
         /* Not a data-write semantic -- callers must route evt == RECONFIG
@@ -395,7 +399,29 @@ const char *rcp_ep_pwm_out_strerror(rcp_ep_pwm_out_errc_t e)
     case RCP_EP_PWM_OUT_ERR_WRONG_BUS:       return "rcp/ep_pwm: PWM_OUT wrong byte_bus_id";
     case RCP_EP_PWM_OUT_ERR_WRONG_OP:        return "rcp/ep_pwm: PWM_OUT wrong ACF op";
     case RCP_EP_PWM_OUT_ERR_BAD_PAYLOAD_LEN: return "rcp/ep_pwm: PWM_OUT unexpected payload length";
+    case RCP_EP_PWM_OUT_ERR_RESERVED_EVT:    return "rcp/ep_pwm: PWM_OUT evt[2:0] is the reserved value 100b";
     default:                                 return "rcp/ep_pwm: PWM_OUT unknown error";
+    }
+}
+
+//cfusa:req REQ-PWM-028
+//cfusa:req REQ-PWM-008
+rcp_wire_error_t rcp_ep_pwm_out_wire_error(rcp_ep_pwm_out_errc_t e)
+{
+    switch (e) {
+    /* TC18 §13.7.5.3: "A request not having exactly four bytes is
+     * rejected and an error response with error code = INVALID_PARAMETER
+     * will be sent." (verbatim identical to GPIO's own §13.7.4.1 rule --
+     * mirrors ep_gpio.c's rcp_ep_gpio_wire_error(), REQ-GPIO-033.) */
+    case RCP_EP_PWM_OUT_ERR_BAD_PAYLOAD_LEN: return RCP_ERROR_INVALID_PARAMETER;
+    /* TC18 §13.5 Table 33's GPIO/PWM_OUT row, evt[2:0]=100b: "reserved --
+     * request shall be ignored and an err-response with error code =
+     * UNSUPPORTED_CMD shall be sent." FIXED 2026-08-14, issue #426. */
+    case RCP_EP_PWM_OUT_ERR_RESERVED_EVT:    return RCP_ERROR_UNSUPPORTED_CMD;
+    /* RCP_EP_PWM_OUT_OK and the remaining error codes are all local
+     * framing/routing outcomes with no numbered wire-error-code
+     * counterpart -- see this function's own doc comment (ep_pwm.h). */
+    default: return RCP_ERROR_NONE;
     }
 }
 
@@ -462,6 +488,7 @@ rcp_bytes_t rcp_ep_pwm_out_encode_write_request(rcp_byte_bus_id_t byte_bus_id,
 
 //cfusa:req REQ-PWM-027
 //cfusa:req REQ-PWM-028
+//cfusa:req REQ-PWM-008
 rcp_ep_pwm_out_errc_t rcp_ep_pwm_out_decode_write_request(const uint8_t *b, size_t len,
                                                            rcp_byte_bus_id_t expected_bus_id,
                                                            rcp_ep_pwm_value_t *out_value,
@@ -480,6 +507,16 @@ rcp_ep_pwm_out_errc_t rcp_ep_pwm_out_decode_write_request(const uint8_t *b, size
     if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_PWM_OUT_ERR_WRONG_BUS;
     if (hdr.op != RCP_ACF_OP_WRITE) return RCP_EP_PWM_OUT_ERR_WRONG_OP;
     if (payload_len != RCP_EP_PWM_PAYLOAD_LEN) return RCP_EP_PWM_OUT_ERR_BAD_PAYLOAD_LEN;
+    /* Table 33's own GPIO/PWM_OUT row, evt[2:0]=100b: "reserved -- request
+     * shall be ignored and an err-response with error code =
+     * UNSUPPORTED_CMD shall be sent" -- the "err-response" half of that
+     * two-part rule (rcp_ep_pwm_out_apply_write() already implements the
+     * "ignored" half). FIXED 2026-08-14, issue #426; mirrors
+     * ep_gpio.c's identical fix and src/regmap.c's REQ-RMAP-068 fix for
+     * the same evt[2:0]=100b reserved value in a different context. */
+    if ((hdr.evt & 0x7u) == (uint8_t)RCP_EP_PWM_OUT_WRITE_RESERVED4) {
+        return RCP_EP_PWM_OUT_ERR_RESERVED_EVT;
+    }
 
     *out_value           = get_pwm_value(payload);
     *out_evt             = (uint8_t)(hdr.evt & 0x7u);
@@ -927,6 +964,25 @@ rcp_ep_pwm_in_errc_t rcp_ep_pwm_in_decode_response(const uint8_t *b, size_t len,
 
     *out_transaction_num = transaction_num;
     return RCP_EP_PWM_IN_OK;
+}
+
+/* ── PWM_IN: MAX_PERIOD timeout classification (REQ-PWM-058 remainder) ──────── */
+
+//cfusa:req REQ-PWM-058
+rcp_ep_pwm_in_max_period_outcome_t
+rcp_ep_pwm_in_max_period_outcome(uint16_t measured_period, uint16_t max_period,
+                                  bool err_on_max_period, bool resp_on_err_enabled)
+{
+    /* Table 48's own pwmi_err_on_max_period row (0x0009.1) -- see this
+     * function's own doc comment (ep_pwm.h) for the full rule text and
+     * the pure-classifier/caller-owns-the-timer design this mirrors from
+     * rcp_ep_gpio_debounce_sample() (ep_gpio.c). */
+    if (measured_period <= max_period) return RCP_EP_PWM_IN_MAX_PERIOD_OK;
+
+    if (!err_on_max_period) return RCP_EP_PWM_IN_MAX_PERIOD_INVALIDATE;
+
+    return resp_on_err_enabled ? RCP_EP_PWM_IN_MAX_PERIOD_STOP_AND_ERROR
+                                : RCP_EP_PWM_IN_MAX_PERIOD_STOP;
 }
 
 /* ── Compound-wait's numeric ≥/≤ comparison modes against PWM_IN ────────────── */

@@ -645,6 +645,7 @@ static void test_out_strerror_never_null_and_distinct(void)
         RCP_EP_PWM_OUT_OK,               RCP_EP_PWM_OUT_ERR_SHORT_FRAME,
         RCP_EP_PWM_OUT_ERR_BAD_MSG_TYPE, RCP_EP_PWM_OUT_ERR_WRONG_BUS,
         RCP_EP_PWM_OUT_ERR_WRONG_OP,     RCP_EP_PWM_OUT_ERR_BAD_PAYLOAD_LEN,
+        RCP_EP_PWM_OUT_ERR_RESERVED_EVT,
     };
     size_t i;
     size_t j;
@@ -659,6 +660,47 @@ static void test_out_strerror_never_null_and_distinct(void)
         }
     }
     TEST_ASSERT_NOT_NULL(rcp_ep_pwm_out_strerror((rcp_ep_pwm_out_errc_t)99));
+}
+
+/* ADDED 2026-08-14 (issue #427, REQ-PWM-028): rcp_ep_pwm_out_wire_error()
+ * mirrors ep_gpio.c's rcp_ep_gpio_wire_error() (REQ-GPIO-033) exactly for
+ * PWM_OUT's own error enum -- TC18 §13.7.5.3's "a request not having
+ * exactly four bytes" rule maps to RCP_ERROR_INVALID_PARAMETER, the same
+ * numbered code GPIO's own, verbatim-identical §13.7.4.1 rule already
+ * uses. */
+static void test_out_wire_error_maps_bad_payload_len_to_invalid_parameter(void)
+{
+    const int wire_code = (int)rcp_ep_pwm_out_wire_error(RCP_EP_PWM_OUT_ERR_BAD_PAYLOAD_LEN);
+
+    TEST_ASSERT_EQUAL_INT(15, wire_code);
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_INVALID_PARAMETER, wire_code);
+}
+
+/* ADDED 2026-08-14 (issue #426, REQ-PWM-008): the new
+ * RCP_EP_PWM_OUT_ERR_RESERVED_EVT maps to RCP_ERROR_UNSUPPORTED_CMD --
+ * TC18 §13.5 Table 33's GPIO/PWM_OUT row's own "reserved value ->
+ * UNSUPPORTED_CMD" rule for evt[2:0]=100b. */
+static void test_out_wire_error_maps_reserved_evt_to_unsupported_cmd(void)
+{
+    const int wire_code = (int)rcp_ep_pwm_out_wire_error(RCP_EP_PWM_OUT_ERR_RESERVED_EVT);
+
+    TEST_ASSERT_EQUAL_INT(1, wire_code);
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_UNSUPPORTED_CMD, wire_code);
+}
+
+/* Every other rcp_ep_pwm_out_errc_t value is a local framing/routing
+ * outcome with no numbered wire-error-code counterpart. */
+static void test_out_wire_error_is_none_for_local_only_codes(void)
+{
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_NONE, (int)rcp_ep_pwm_out_wire_error(RCP_EP_PWM_OUT_OK));
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_NONE,
+                          (int)rcp_ep_pwm_out_wire_error(RCP_EP_PWM_OUT_ERR_SHORT_FRAME));
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_NONE,
+                          (int)rcp_ep_pwm_out_wire_error(RCP_EP_PWM_OUT_ERR_BAD_MSG_TYPE));
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_NONE,
+                          (int)rcp_ep_pwm_out_wire_error(RCP_EP_PWM_OUT_ERR_WRONG_BUS));
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_NONE,
+                          (int)rcp_ep_pwm_out_wire_error(RCP_EP_PWM_OUT_ERR_WRONG_OP));
 }
 
 /* ── PWM_OUT: read request ─────────────────────────────────────────────────── */
@@ -763,6 +805,45 @@ static void test_out_write_request_rejects_wrong_bus(void)
 
     rc = rcp_ep_pwm_out_decode_write_request(frame.data, frame.len, 6, &out_value, &out_evt, &out_tn);
     TEST_ASSERT_EQUAL(RCP_EP_PWM_OUT_ERR_WRONG_BUS, rc);
+
+    rcp_bytes_free(&frame);
+}
+
+/* FIXED 2026-08-14 (issue #426, REQ-PWM-008): TC18 §13.5 Table 33's
+ * GPIO/PWM_OUT row's two-part rule for evt[2:0]=100b
+ * (RCP_EP_PWM_OUT_WRITE_RESERVED4): "reserved -- request shall be
+ * ignored and an err-response with error code = UNSUPPORTED_CMD shall be
+ * sent". Both halves exercised here: rcp_ep_pwm_out_apply_write() still
+ * ignores the request (returns current unchanged), and
+ * rcp_ep_pwm_out_decode_write_request() now returns the dedicated
+ * RCP_EP_PWM_OUT_ERR_RESERVED_EVT for that same evt value. */
+static void test_out_write_request_rejects_reserved_evt(void)
+{
+    rcp_ep_pwm_value_t    current = {1234, 567};
+    rcp_ep_pwm_value_t    request = {999, 888};
+    rcp_ep_pwm_value_t    result;
+    rcp_bytes_t            frame;
+    rcp_ep_pwm_value_t    out_value = {0xAAAAu, 0xAAAAu};
+    uint8_t                out_evt = 0xFFu;
+    uint8_t                out_tn = 0xFFu;
+    rcp_ep_pwm_out_errc_t rc;
+
+    /* The "ignored" half. */
+    result = rcp_ep_pwm_out_apply_write(current, request, RCP_EP_PWM_OUT_WRITE_RESERVED4, 0, 0xFFFFu);
+    TEST_ASSERT_EQUAL_UINT16(current.period, result.period);
+    TEST_ASSERT_EQUAL_UINT16(current.active_duration, result.active_duration);
+
+    /* The "err-response" half. */
+    frame = rcp_ep_pwm_out_encode_write_request(5, request, RCP_EP_PWM_OUT_WRITE_RESERVED4, 0x33u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    rc = rcp_ep_pwm_out_decode_write_request(frame.data, frame.len, 5, &out_value, &out_evt, &out_tn);
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_OUT_ERR_RESERVED_EVT, rc);
+    /* Outputs are untouched on this error path. */
+    TEST_ASSERT_EQUAL_UINT16(0xAAAAu, out_value.period);
+    TEST_ASSERT_EQUAL_UINT16(0xAAAAu, out_value.active_duration);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, out_evt);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, out_tn);
 
     rcp_bytes_free(&frame);
 }
@@ -1255,6 +1336,41 @@ static void test_in_response_no_signal_sentinel_round_trips(void)
     rcp_bytes_free(&frame);
 }
 
+/* ── PWM_IN: MAX_PERIOD timeout classification (REQ-PWM-058 remainder) ──────── */
+
+/* ADDED 2026-08-14 (issue #428, REQ-PWM-058): a measured period at or
+ * below max_period is never a timeout, regardless of err_on_max_period or
+ * resp_on_err_enabled. */
+static void test_in_max_period_outcome_not_exceeded_is_ok(void)
+{
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_MAX_PERIOD_OK,
+                      rcp_ep_pwm_in_max_period_outcome(100u, 200u, true, true));
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_MAX_PERIOD_OK,
+                      rcp_ep_pwm_in_max_period_outcome(200u, 200u, false, false));
+}
+
+/* Table 48's 0b row: "if MAX PERIOD is exceeded, invalidate measurement
+ * and wait for new active phase of signal" -- never an error, regardless
+ * of resp_on_err_enabled. */
+static void test_in_max_period_outcome_bit_clear_invalidates_never_errors(void)
+{
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_MAX_PERIOD_INVALIDATE,
+                      rcp_ep_pwm_in_max_period_outcome(201u, 200u, false, true));
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_MAX_PERIOD_INVALIDATE,
+                      rcp_ep_pwm_in_max_period_outcome(201u, 200u, false, false));
+}
+
+/* Table 48's 1b row: "if MAX_PERIOD is exceeded stop measurement and
+ * signal error if error response is enabled in EP_config" -- stop always
+ * happens; the error signal is conditional on resp_on_err_enabled. */
+static void test_in_max_period_outcome_bit_set_stops_and_conditionally_errors(void)
+{
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_MAX_PERIOD_STOP_AND_ERROR,
+                      rcp_ep_pwm_in_max_period_outcome(201u, 200u, true, true));
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_MAX_PERIOD_STOP,
+                      rcp_ep_pwm_in_max_period_outcome(201u, 200u, true, false));
+}
+
 /* ── Compound-wait's numeric ≥/≤ comparison modes against PWM_IN ────────────── */
 
 static void test_compound_wait_mode_valid_accepts_exactly_4_to_7(void)
@@ -1375,6 +1491,9 @@ int main(void)
     RUN_TEST(test_out_set_enabled_applies_when_authorized);
 
     RUN_TEST(test_out_strerror_never_null_and_distinct);
+    RUN_TEST(test_out_wire_error_maps_bad_payload_len_to_invalid_parameter);
+    RUN_TEST(test_out_wire_error_maps_reserved_evt_to_unsupported_cmd);
+    RUN_TEST(test_out_wire_error_is_none_for_local_only_codes);
 
     RUN_TEST(test_out_read_request_round_trip);
     RUN_TEST(test_out_read_request_rejects_wrong_bus);
@@ -1384,6 +1503,7 @@ int main(void)
     RUN_TEST(test_out_write_request_round_trip);
     RUN_TEST(test_out_write_request_rejects_bad_payload_len);
     RUN_TEST(test_out_write_request_rejects_wrong_bus);
+    RUN_TEST(test_out_write_request_rejects_reserved_evt);
 
     RUN_TEST(test_out_response_round_trip_untimed);
     RUN_TEST(test_out_response_round_trip_timed);
@@ -1420,6 +1540,10 @@ int main(void)
     RUN_TEST(test_in_response_round_trip_timed);
     RUN_TEST(test_in_response_decode_rejects_wrong_bus);
     RUN_TEST(test_in_response_no_signal_sentinel_round_trips);
+
+    RUN_TEST(test_in_max_period_outcome_not_exceeded_is_ok);
+    RUN_TEST(test_in_max_period_outcome_bit_clear_invalidates_never_errors);
+    RUN_TEST(test_in_max_period_outcome_bit_set_stops_and_conditionally_errors);
 
     RUN_TEST(test_compound_wait_mode_valid_accepts_exactly_4_to_7);
     RUN_TEST(test_compound_wait_period_ge);

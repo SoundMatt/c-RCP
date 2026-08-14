@@ -3414,7 +3414,7 @@
     {
       "id": "REQ-GPIO-008",
       "title": "rcp_ep_gpio_apply_write() implements RCP_EP_GPIO_WRITE_AND",
-      "text": "rcp_ep_gpio_apply_write() with evt = RCP_EP_GPIO_WRITE_AND shall return current bitwise-ANDed with request.",
+      "text": "rcp_ep_gpio_apply_write() with evt = RCP_EP_GPIO_WRITE_AND shall return current bitwise-ANDed with request. DOCUMENTED 2026-08-14 (issue #433, code/requirement already correct): TC18 §13.7.4.1's own prose summary calls this operation 'NAND', but Table 33's own authoritative, worked-example row (the same row this entry cites) both names it 'AND' and demonstrates it with a worked example that only holds for a plain AND -- a known spec-internal editorial inconsistency, now recorded as a code comment at rcp_ep_gpio_apply_write()'s RCP_EP_GPIO_WRITE_AND case, matching this file's gpio_debounce_IO31 and PWM idle-state-bit-collision defect notes. No behavior change.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -3458,7 +3458,7 @@
     {
       "id": "REQ-GPIO-012",
       "title": "rcp_ep_gpio_apply_write() treats RCP_EP_GPIO_WRITE_RESERVED4 as a no-op",
-      "text": "rcp_ep_gpio_apply_write() with evt = RCP_EP_GPIO_WRITE_RESERVED4 shall return current unchanged, regardless of request.",
+      "text": "IMPLEMENTED (FIXED 2026-08-14, issue #426): rcp_ep_gpio_apply_write() with evt = RCP_EP_GPIO_WRITE_RESERVED4 returns current unchanged, regardless of request (the 'ignored' half of Table 33's two-part reserved-value rule); rcp_ep_gpio_decode_write_request() now also returns the new RCP_EP_GPIO_ERR_RESERVED_EVT for that same evt value, which rcp_ep_gpio_wire_error() maps to RCP_ERROR_UNSUPPORTED_CMD, closing the previously-missing 'an err-response with error code = UNSUPPORTED_CMD shall be sent' half.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4617,7 +4617,7 @@
     {
       "id": "REQ-PWM-008",
       "title": "rcp_ep_pwm_out_apply_write() treats RCP_EP_PWM_OUT_WRITE_RESERVED4 as a no-op",
-      "text": "rcp_ep_pwm_out_apply_write() shall return current unchanged for evt == RCP_EP_PWM_OUT_WRITE_RESERVED4.",
+      "text": "IMPLEMENTED (FIXED 2026-08-14, issue #426): rcp_ep_pwm_out_apply_write() returns current unchanged for evt == RCP_EP_PWM_OUT_WRITE_RESERVED4 (the 'ignored' half of Table 33's two-part reserved-value rule); rcp_ep_pwm_out_decode_write_request() now also returns the new RCP_EP_PWM_OUT_ERR_RESERVED_EVT for that same evt value, which the new rcp_ep_pwm_out_wire_error() maps to RCP_ERROR_UNSUPPORTED_CMD, closing the previously-missing 'an err-response with error code = UNSUPPORTED_CMD shall be sent' half.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -4835,7 +4835,7 @@
     {
       "id": "REQ-PWM-028",
       "title": "rcp_ep_pwm_out_decode_write_request() rejects a malformed, wrong-op, or bad-payload-length frame",
-      "text": "rcp_ep_pwm_out_decode_write_request() shall return RCP_EP_PWM_OUT_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE, and RCP_EP_PWM_OUT_ERR_BAD_PAYLOAD_LEN when the payload is not exactly RCP_EP_PWM_PAYLOAD_LEN octets.",
+      "text": "IMPLEMENTED (FIXED 2026-08-14, issue #427): rcp_ep_pwm_out_decode_write_request() returns RCP_EP_PWM_OUT_ERR_WRONG_OP when op is not RCP_ACF_OP_WRITE, and RCP_EP_PWM_OUT_ERR_BAD_PAYLOAD_LEN when the payload is not exactly RCP_EP_PWM_PAYLOAD_LEN octets; the new rcp_ep_pwm_out_wire_error() now maps RCP_EP_PWM_OUT_ERR_BAD_PAYLOAD_LEN to the numbered wire code RCP_ERROR_INVALID_PARAMETER this section names, mirroring ep_gpio.c's rcp_ep_gpio_wire_error() (REQ-GPIO-033) -- previously PWM_OUT had no wire-error-code mapping at all, unlike GPIO's identical rule.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -9612,14 +9612,14 @@
     },
     {
       "id": "REQ-PWM-058",
-      "title": "PWM_IN functional-config register block (Table 45)",
-      "text": "IMPLEMENTED (FIXED 2026-08-11, c-RCP-AUDIT-06, issue #256 Group I): c-RCP's rcp_ep_pwm_in_functional_cfg_t now models every TC18 Table 45 PWM_IN register -- pwmi_polarity, pwmi_err_on_max_period, pwmi_continuous_mode (packed into a new flags octet at 0x0009, RCP_EP_PWM_IN_FLAG_* masks), pwmi_max_period (0x000A-0x000B), pwmi_base_clk (0x0004-0x0005, read-only), pwmi_clk_divider (0x0008), and pwmi_ep_status (0x0006-0x0007) -- reachable via the same generic evt[2:0]=111b TC18 \u00a712.7.1 register-block mechanism every other endpoint type now has: rcp_ep_pwm_in_render_registers()/_apply_reconfig()/_reconfig_strerror()/_encode_reconfig_request(). This endpoint type had been silently omitted from every prior batch's own 'N of 11 endpoint types' accounting (REQ-CFG-011/REQ-CFG-012's own text counted the pwm.c module as fully done once PWM_OUT's own fix landed, without separately checking PWM_IN); see REQ-CFG-011's own corrected text. `trigger` remains a non-wire, module-own field; the measurement-timeout sentinel RCP_EP_PWM_IN_NO_SIGNAL is unrelated to the register block.",
+      "title": "PWM_IN functional-config register block (Table 48)",
+      "text": "IMPLEMENTED (FIXED 2026-08-11, c-RCP-AUDIT-06, issue #256 Group I; behavioral gap closed 2026-08-14, issue #428): c-RCP's rcp_ep_pwm_in_functional_cfg_t models every TC18 Table 48 PWM_IN register -- pwmi_polarity, pwmi_err_on_max_period, pwmi_continuous_mode (packed into a new flags octet at 0x0009, RCP_EP_PWM_IN_FLAG_* masks), pwmi_max_period (0x000A-0x000B), pwmi_base_clk (0x0004-0x0005, read-only), pwmi_clk_divider (0x0008), and pwmi_ep_status (0x0006-0x0007) -- reachable via the same generic evt[2:0]=111b TC18 \u00a712.7.1 register-block mechanism every other endpoint type now has: rcp_ep_pwm_in_render_registers()/_apply_reconfig()/_reconfig_strerror()/_encode_reconfig_request(). This endpoint type had been silently omitted from every prior batch's own 'N of 11 endpoint types' accounting (REQ-CFG-011/REQ-CFG-012's own text counted the pwm.c module as fully done once PWM_OUT's own fix landed, without separately checking PWM_IN); see REQ-CFG-011's own corrected text. `trigger` remains a non-wire, module-own field; the measurement-timeout sentinel RCP_EP_PWM_IN_NO_SIGNAL is unrelated to the register block. The new rcp_ep_pwm_in_max_period_outcome() (issue #428) is the pure classifier this bit's behavioral meaning needed: given a measured period, max_period, and the err_on_max_period bit, it returns Table 48's own outcome -- bit=0 invalidates the measurement and waits for a new active phase; bit=1 stops the measurement and, only if the caller-supplied EP_RESP_ON_ERR (EP_config) is enabled, signals an error -- closing the last purely-storage gap this entry used to pin. Also corrects this entry's own stale 'Table 45' citation (PWM_OUT's own 'pwmo trigger outputs' table) to the real 'Table 48' (pwmi functional configuration).",
       "standard": "iso26262",
       "level": "QM",
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.6.2 Table 45, TC18.txt L4700-4750"
+      "tc18": "\u00a713.7.6.2 Table 48, TC18.txt L4700-4750"
     },
     {
       "id": "REQ-PWM-059",

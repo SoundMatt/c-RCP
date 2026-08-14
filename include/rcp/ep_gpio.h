@@ -105,9 +105,19 @@
  * that occupy (extraction §4.5 Group C). Six of the eight are ordinary
  * whole-register arithmetic/logical operations against the endpoint's
  * current 32-bit bitmask (replace/OR/AND/XOR/add/subtract); a seventh
- * (RCP_EP_GPIO_WRITE_RESERVED4, value 4) carries no assigned meaning and is
- * treated here as a documented no-op, matching this codebase's fail-safe
- * convention for a wire value with no defined write behavior. This
+ * (RCP_EP_GPIO_WRITE_RESERVED4, value 4) DOES carry an assigned meaning --
+ * Table 33's own GPIO/PWM_OUT row states a two-part rule for it: "reserved
+ * -- request shall be ignored and an err-response with error code =
+ * UNSUPPORTED_CMD shall be sent". rcp_ep_gpio_apply_write() implements the
+ * "ignored" half (a documented no-op, matching this codebase's fail-safe
+ * convention for a write value that must never mutate state); the
+ * "err-response" half is implemented by rcp_ep_gpio_decode_write_request(),
+ * which returns the dedicated RCP_EP_GPIO_ERR_RESERVED_EVT for this same
+ * evt value, mapped by rcp_ep_gpio_wire_error() to RCP_ERROR_UNSUPPORTED_CMD
+ * (FIXED 2026-08-14, issue #426 -- this module previously implemented only
+ * the "ignored" half; src/regmap.c's REQ-RMAP-068 fix already established
+ * this same "reserved value -> UNSUPPORTED_CMD" pattern for a different
+ * evt[2:0]=100b case, which this fix mirrors). This
  * ordering (4=reserved, 5=add, 6=subtract) was independently cross-checked
  * against cpp-RCP's own WriteSemantics enum (derived from the same
  * structured spec extraction this module cites) and corrected accordingly
@@ -257,7 +267,9 @@ typedef enum {
     RCP_EP_GPIO_WRITE_OR        = 1,
     RCP_EP_GPIO_WRITE_AND       = 2,
     RCP_EP_GPIO_WRITE_XOR       = 3,
-    RCP_EP_GPIO_WRITE_RESERVED4 = 4, /* documented no-op; see the file header */
+    RCP_EP_GPIO_WRITE_RESERVED4 = 4, /* apply_write() no-ops; decode_write_request()
+                                         returns RCP_EP_GPIO_ERR_RESERVED_EVT ->
+                                         UNSUPPORTED_CMD -- see the file header */
     RCP_EP_GPIO_WRITE_ADD       = 5,
     RCP_EP_GPIO_WRITE_SUB       = 6,
     RCP_EP_GPIO_WRITE_RECONFIG  = 7, /* the reconfiguration escape hatch */
@@ -587,6 +599,15 @@ typedef enum {
     RCP_EP_GPIO_ERR_WRONG_BUS       = 3,
     RCP_EP_GPIO_ERR_WRONG_OP        = 4,
     RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN = 5,
+    /* ADDED 2026-08-14 (issue #426, REQ-GPIO-012): evt[2:0] ==
+     * RCP_EP_GPIO_WRITE_RESERVED4 (100b) -- Table 33's own GPIO/PWM_OUT
+     * row's reserved value, whose request "shall be ignored and an
+     * err-response with error code = UNSUPPORTED_CMD shall be sent".
+     * rcp_ep_gpio_apply_write() already implements the "ignored" half;
+     * this errc value is the "err-response" half -- see
+     * rcp_ep_gpio_wire_error(), which maps it to
+     * RCP_ERROR_UNSUPPORTED_CMD. */
+    RCP_EP_GPIO_ERR_RESERVED_EVT    = 6,
 } rcp_ep_gpio_errc_t;
 
 /* Human-readable message for an rcp_ep_gpio_errc_t value. Never returns NULL. */
@@ -598,13 +619,21 @@ const char *rcp_ep_gpio_strerror(rcp_ep_gpio_errc_t e);
  * failed to decode. Returns RCP_ERROR_INVALID_PARAMETER for
  * RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN -- TC18 §13.7.4.1's own numbered code
  * for "a request not having exactly four bytes" -- and RCP_ERROR_NONE for
- * every other rcp_ep_gpio_errc_t value: RCP_EP_GPIO_OK means nothing went
- * wrong, and RCP_EP_GPIO_ERR_SHORT_FRAME/_BAD_MSG_TYPE/_WRONG_BUS/_WRONG_OP
- * are all local framing/routing outcomes a caller resolves before a
- * GPIO-specific Response frame -- addressed via this same byte_bus_id --
- * would even be constructible, matching rcp_e2e_wire_error()'s own
- * disposition for its analogous local-only codes (e2e.h). Matches this
- * codebase's established rcp_<module>_wire_error() naming convention. */
+ * every other rcp_ep_gpio_errc_t value except one: RCP_EP_GPIO_OK means
+ * nothing went wrong, and RCP_EP_GPIO_ERR_SHORT_FRAME/_BAD_MSG_TYPE/
+ * _WRONG_BUS/_WRONG_OP are all local framing/routing outcomes a caller
+ * resolves before a GPIO-specific Response frame -- addressed via this
+ * same byte_bus_id -- would even be constructible, matching
+ * rcp_e2e_wire_error()'s own disposition for its analogous local-only
+ * codes (e2e.h). Matches this codebase's established
+ * rcp_<module>_wire_error() naming convention.
+ *
+ * ADDED 2026-08-14 (issue #426, REQ-GPIO-012): RCP_EP_GPIO_ERR_RESERVED_EVT
+ * maps to RCP_ERROR_UNSUPPORTED_CMD -- Table 33's own GPIO/PWM_OUT row's
+ * explicit "reserved value -> UNSUPPORTED_CMD" rule for evt[2:0]=100b,
+ * closing this function's previously-missing error-response half of that
+ * row's two-part rule; the same pattern src/regmap.c's REQ-RMAP-068 fix
+ * already implements for a different evt[2:0]=100b case. */
 rcp_wire_error_t rcp_ep_gpio_wire_error(rcp_ep_gpio_errc_t e);
 
 /* ── Request/response payload length ───────────────────────────────────────── */
@@ -646,8 +675,16 @@ rcp_bytes_t rcp_ep_gpio_encode_write_request(rcp_byte_bus_id_t byte_bus_id, uint
  * as rcp_ep_gpio_decode_read_request() (short frame / bad msg type / wrong
  * bus), except RCP_EP_GPIO_ERR_WRONG_OP is returned when op is not
  * RCP_ACF_OP_WRITE, and RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN is returned when
- * the payload is not exactly RCP_EP_GPIO_PAYLOAD_LEN octets. On
- * RCP_EP_GPIO_OK, *out_bitmask, *out_evt (evt[2:0] of the header's evt
+ * the payload is not exactly RCP_EP_GPIO_PAYLOAD_LEN octets.
+ *
+ * ADDED 2026-08-14 (issue #426, REQ-GPIO-012): RCP_EP_GPIO_ERR_RESERVED_EVT
+ * is returned when evt[2:0] == RCP_EP_GPIO_WRITE_RESERVED4 (100b), Table
+ * 33's own GPIO/PWM_OUT row's reserved value -- neither *out_bitmask,
+ * *out_evt, nor *out_transaction_num is populated in that case; a caller
+ * builds the required err-response via rcp_ep_gpio_wire_error(), which
+ * maps this errc to RCP_ERROR_UNSUPPORTED_CMD.
+ *
+ * On RCP_EP_GPIO_OK, *out_bitmask, *out_evt (evt[2:0] of the header's evt
  * field; see rcp_ep_gpio_write_semantics_valid()), and
  * *out_transaction_num are populated. */
 rcp_ep_gpio_errc_t rcp_ep_gpio_decode_write_request(const uint8_t *b, size_t len,

@@ -127,9 +127,19 @@
  * rather than wrapping (or, worse, carrying between the two fields, which
  * this module deliberately avoids by applying arithmetic per field, never
  * on the two fields' 32-bit concatenation). RCP_EP_PWM_OUT_WRITE_RESERVED4
- * (value 4) is, like GPIO's own RESERVED4, a documented no-op for a wire
- * value with no assigned write behavior. This ordering (4=reserved,
- * 5=add, 6=subtract) matches ep_gpio.h's own correction -- see issue #104.
+ * (value 4) is, like GPIO's own RESERVED4, Table 33's own GPIO/PWM_OUT row
+ * reserved value: "reserved -- request shall be ignored and an
+ * err-response with error code = UNSUPPORTED_CMD shall be sent" -- a
+ * two-part rule. rcp_ep_pwm_out_apply_write() implements the "ignored"
+ * half (a documented no-op); the "err-response" half is implemented by
+ * rcp_ep_pwm_out_decode_write_request(), which returns the dedicated
+ * RCP_EP_PWM_OUT_ERR_RESERVED_EVT for this same evt value, mapped by the
+ * new rcp_ep_pwm_out_wire_error() to RCP_ERROR_UNSUPPORTED_CMD (FIXED
+ * 2026-08-14, issue #426 -- mirroring ep_gpio.h's own identical fix and
+ * src/regmap.c's REQ-RMAP-068 "reserved value -> UNSUPPORTED_CMD"
+ * precedent for the same evt[2:0]=100b case in a different context). This
+ * ordering (4=reserved, 5=add, 6=subtract) matches ep_gpio.h's own
+ * correction -- see issue #104.
  * Subtract computes request minus current (the payload value is the
  * minuend, the current register value the subtrahend), the operand order
  * the single evt[2:0]=110b row covering GPIO and PWM_OUT jointly states
@@ -219,7 +229,13 @@
  * type sharing this same source file, with its own TC18 table -- needed the
  * identical fix. It did: rcp_ep_pwm_in_functional_cfg_t modeled only
  * `trigger` (this module's own original, non-wire field -- see above), with
- * no counterpart for any of TC18 §13.7.6.2 Table 45's real registers.
+ * no counterpart for any of TC18 §13.7.6.2 Table 48's real registers.
+ * (CORRECTED 2026-08-14, issue #428: this whole section previously cited
+ * "Table 45" for PWM_IN's own functional-configuration register block --
+ * the real Table 45 is "pwmo trigger outputs", PWM_OUT's own table,
+ * unrelated to PWM_IN; PWM_IN's functional-configuration table is Table
+ * 48, matching REQ-PWM-058's own tc18 citation, which was already
+ * correct.)
  *
  * Worse than every prior batch's own finding in this Group: this was not
  * merely an unreachable path (like ADC's own decode_read_request()
@@ -234,7 +250,7 @@
  * endpoint-type group (ADC/I2C/LIN/CAN/UART/ISELED/MDIO) already has, plus
  * a new RCP_EP_PWM_IN_ERR_BAD_EVT value.
  *
- * TC18 §13.7.6.2 Table 45 defines a clean, ten-entry register block with no
+ * TC18 §13.7.6.2 Table 48 defines a clean, ten-entry register block with no
  * address-collision editorial defect (unlike GPIO's/I2C's own source
  * tables): 0x0000 pwmi_ep_len(R), 0x0001 reserved(R), 0x0002/0x0003 common
  * entries, 0x0004 16-bit pwmi_base_clk(R), 0x0006 16-bit pwmi_ep_status
@@ -322,7 +338,9 @@ typedef enum {
     RCP_EP_PWM_OUT_WRITE_OR        = 1,
     RCP_EP_PWM_OUT_WRITE_AND       = 2,
     RCP_EP_PWM_OUT_WRITE_XOR       = 3,
-    RCP_EP_PWM_OUT_WRITE_RESERVED4 = 4, /* documented no-op; see the file header */
+    RCP_EP_PWM_OUT_WRITE_RESERVED4 = 4, /* apply_write() no-ops; decode_write_request()
+                                            returns RCP_EP_PWM_OUT_ERR_RESERVED_EVT ->
+                                            UNSUPPORTED_CMD -- see the file header */
     RCP_EP_PWM_OUT_WRITE_ADD       = 5,
     RCP_EP_PWM_OUT_WRITE_SUB       = 6,
     RCP_EP_PWM_OUT_WRITE_RECONFIG  = 7, /* the reconfiguration escape hatch */
@@ -661,11 +679,39 @@ typedef enum {
     RCP_EP_PWM_OUT_ERR_WRONG_BUS       = 3,
     RCP_EP_PWM_OUT_ERR_WRONG_OP        = 4,
     RCP_EP_PWM_OUT_ERR_BAD_PAYLOAD_LEN = 5,
+    /* ADDED 2026-08-14 (issue #426, REQ-PWM-008): evt[2:0] ==
+     * RCP_EP_PWM_OUT_WRITE_RESERVED4 (100b) -- Table 33's own GPIO/PWM_OUT
+     * row's reserved value, whose request "shall be ignored and an
+     * err-response with error code = UNSUPPORTED_CMD shall be sent".
+     * rcp_ep_pwm_out_apply_write() already implements the "ignored" half;
+     * this errc value is the "err-response" half -- see
+     * rcp_ep_pwm_out_wire_error(), which maps it to
+     * RCP_ERROR_UNSUPPORTED_CMD. */
+    RCP_EP_PWM_OUT_ERR_RESERVED_EVT    = 6,
 } rcp_ep_pwm_out_errc_t;
 
 /* Human-readable message for an rcp_ep_pwm_out_errc_t value. Never returns
  * NULL. */
 const char *rcp_ep_pwm_out_strerror(rcp_ep_pwm_out_errc_t e);
+
+/* ADDED 2026-08-14 (issue #427, REQ-PWM-028): maps e to its numbered wire
+ * error code (errors.h), for a caller building an Error Response frame
+ * (e.g. via acf.h's rcp_acf_build_error_response()) once a request has
+ * failed to decode -- mirroring ep_gpio.h's rcp_ep_gpio_wire_error()
+ * (REQ-GPIO-033) exactly, for PWM_OUT's own error enum. Returns
+ * RCP_ERROR_INVALID_PARAMETER for RCP_EP_PWM_OUT_ERR_BAD_PAYLOAD_LEN --
+ * TC18 §13.7.5.3's own numbered code for "a request not having exactly
+ * four bytes" (the identical rule GPIO's own §13.7.4.1 states, verbatim);
+ * RCP_ERROR_UNSUPPORTED_CMD for RCP_EP_PWM_OUT_ERR_RESERVED_EVT (issue
+ * #426, TC18 §13.5 Table 33's GPIO/PWM_OUT row, evt[2:0]=100b); and
+ * RCP_ERROR_NONE for every other rcp_ep_pwm_out_errc_t value:
+ * RCP_EP_PWM_OUT_OK means nothing went wrong, and
+ * RCP_EP_PWM_OUT_ERR_SHORT_FRAME/_BAD_MSG_TYPE/_WRONG_BUS/_WRONG_OP are
+ * all local framing/routing outcomes a caller resolves before a
+ * PWM_OUT-specific Response frame would even be constructible. Matches
+ * this codebase's established rcp_<module>_wire_error() naming
+ * convention. */
+rcp_wire_error_t rcp_ep_pwm_out_wire_error(rcp_ep_pwm_out_errc_t e);
 
 /* ── PWM_OUT: read request ─────────────────────────────────────────────────── */
 
@@ -705,6 +751,14 @@ rcp_bytes_t rcp_ep_pwm_out_encode_write_request(rcp_byte_bus_id_t byte_bus_id,
  * type / wrong bus), except RCP_EP_PWM_OUT_ERR_WRONG_OP is returned when
  * op is not RCP_ACF_OP_WRITE, and RCP_EP_PWM_OUT_ERR_BAD_PAYLOAD_LEN is
  * returned when the payload is not exactly RCP_EP_PWM_PAYLOAD_LEN octets.
+ *
+ * ADDED 2026-08-14 (issue #426, REQ-PWM-008): RCP_EP_PWM_OUT_ERR_RESERVED_EVT
+ * is returned when evt[2:0] == RCP_EP_PWM_OUT_WRITE_RESERVED4 (100b), Table
+ * 33's own GPIO/PWM_OUT row's reserved value -- neither *out_value,
+ * *out_evt, nor *out_transaction_num is populated in that case; a caller
+ * builds the required err-response via rcp_ep_pwm_out_wire_error(), which
+ * maps this errc to RCP_ERROR_UNSUPPORTED_CMD.
+ *
  * On RCP_EP_PWM_OUT_OK, *out_value, *out_evt (evt[2:0] of the header's evt
  * field; see rcp_ep_pwm_out_write_semantics_valid()), and
  * *out_transaction_num are populated. */
@@ -799,7 +853,7 @@ bool rcp_ep_pwm_in_set_trigger(rcp_ep_pwm_in_functional_cfg_t *cfg,
 /* ── PWM_IN: the EP_func register block (evt[2:0] == 111b) ────────────────── */
 
 /* Relative octet offsets of the registers making up a PWM_IN endpoint's own
- * EP_func block, at the widths and in the order TC18 §13.7.6.2 Table 45
+ * EP_func block, at the widths and in the order TC18 §13.7.6.2 Table 48
  * assigns them. See the file header. */
 #define RCP_EP_PWM_IN_REG_EP_LEN        ((uint16_t)0x0000u) /*  8 bit, R   */
 #define RCP_EP_PWM_IN_REG_RESERVED_01   ((uint16_t)0x0001u) /*  8 bit, R   */
@@ -814,7 +868,7 @@ bool rcp_ep_pwm_in_set_trigger(rcp_ep_pwm_in_functional_cfg_t *cfg,
 /* The block's own length in octets -- one past the last assigned offset. */
 #define RCP_EP_PWM_IN_EP_FUNC_LEN       ((uint16_t)0x000Cu)
 
-/* Bit masks within the RCP_EP_PWM_IN_REG_FLAGS octet -- Table 45's own three
+/* Bit masks within the RCP_EP_PWM_IN_REG_FLAGS octet -- Table 48's own three
  * named single-bit parameters (polarity, err_on_max_period,
  * continuous_mode), packed at the offsets the table's own row order
  * assigns; the remaining 5 bits are reserved and always read 0. */
@@ -945,6 +999,78 @@ rcp_ep_pwm_in_errc_t rcp_ep_pwm_in_decode_response(const uint8_t *b, size_t len,
                                                     rcp_ep_pwm_value_t *out_value, bool *out_timed,
                                                     uint64_t *out_timestamp,
                                                     uint8_t *out_transaction_num);
+
+/* ── PWM_IN: MAX_PERIOD timeout classification (REQ-PWM-058 remainder) ──────── */
+
+/* ADDED 2026-08-14 (issue #428, REQ-PWM-058): Table 48's own
+ * pwmi_err_on_max_period bit (RCP_EP_PWM_IN_FLAG_ERR_ON_MAX_PERIOD) had,
+ * until this fix, only ever been round-tripped as opaque register data --
+ * no primitive anywhere decided what a MAX_PERIOD timeout actually DOES.
+ * Table 48's own row states two distinct outcomes for it:
+ *
+ *   0b: if MAX_PERIOD is exceeded, invalidate measurement and wait for
+ *       new active phase of signal
+ *   1b: if MAX_PERIOD is exceeded, stop measurement and signal error if
+ *       error response is enabled in EP_config (EP_RESP_ON_ERR)
+ *
+ * rcp_ep_pwm_in_max_period_outcome() is that decision, as a pure function
+ * of a measured period, the configured max_period, and the
+ * err_on_max_period bit -- following rcp_ep_gpio_debounce_sample()'s own
+ * pattern exactly (ep_gpio.h/.c): this module owns no timer or hardware
+ * capable of actually measuring an incoming PWM_IN signal, so a caller
+ * who does own that timer drives this classifier with the measurement it
+ * already has, exactly the "logic this module doesn't own a timer for"
+ * split every other endpoint type's own base_clk-adjacent primitive
+ * already follows.
+ *
+ * resp_on_err_enabled is EP_config's own EP_RESP_ON_ERR flag (TC18 §13.2,
+ * the generic part of the endpoint register map -- a distinct register
+ * block from the EP_func block rcp_ep_pwm_in_functional_cfg_t already
+ * models, and one this codebase does not otherwise read a live value
+ * for), passed in already classified by the caller -- this module never
+ * itself reaches into a register map to resolve it, matching this
+ * codebase's standing convention for every other caller-supplied
+ * classification flag (e.g. the `timed` bool rcp_ep_pwm_in_encode_response()
+ * above takes for ep_response_ts_enable, ep_gpio.h's own file header). */
+typedef enum {
+    RCP_EP_PWM_IN_MAX_PERIOD_OK             = 0, /* measured_period <=
+                                                      max_period -- no
+                                                      timeout */
+    RCP_EP_PWM_IN_MAX_PERIOD_INVALIDATE     = 1, /* err_on_max_period == 0b:
+                                                      invalidate the
+                                                      measurement and wait
+                                                      for a new active
+                                                      phase; no error is
+                                                      ever signaled for
+                                                      this bit value */
+    RCP_EP_PWM_IN_MAX_PERIOD_STOP           = 2, /* err_on_max_period == 1b
+                                                      but resp_on_err_enabled
+                                                      is false: stop the
+                                                      measurement, but
+                                                      EP_RESP_ON_ERR is not
+                                                      enabled so no error is
+                                                      signaled */
+    RCP_EP_PWM_IN_MAX_PERIOD_STOP_AND_ERROR = 3, /* err_on_max_period == 1b
+                                                      and resp_on_err_enabled
+                                                      is true: stop the
+                                                      measurement and signal
+                                                      an error response */
+} rcp_ep_pwm_in_max_period_outcome_t;
+
+/* Classifies a single completed (or in-progress) PWM_IN measurement
+ * against Table 48's own MAX_PERIOD rule: returns
+ * RCP_EP_PWM_IN_MAX_PERIOD_OK when measured_period does not exceed
+ * max_period (measured_period <= max_period); otherwise consults
+ * err_on_max_period exactly as Table 48's own row specifies --
+ * RCP_EP_PWM_IN_MAX_PERIOD_INVALIDATE when it is false (0b), or, when it
+ * is true (1b), RCP_EP_PWM_IN_MAX_PERIOD_STOP_AND_ERROR if
+ * resp_on_err_enabled is also true, else RCP_EP_PWM_IN_MAX_PERIOD_STOP.
+ * A caller acts on the returned outcome using whatever real timer/signal
+ * state it owns (this function mutates nothing and reads no register map
+ * itself -- see this section's own header comment above). */
+rcp_ep_pwm_in_max_period_outcome_t
+rcp_ep_pwm_in_max_period_outcome(uint16_t measured_period, uint16_t max_period,
+                                  bool err_on_max_period, bool resp_on_err_enabled);
 
 /* ── Compound-wait's numeric ≥/≤ comparison modes against PWM_IN ────────────── */
 

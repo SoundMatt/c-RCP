@@ -578,6 +578,7 @@ static void test_strerror_never_null_and_distinct(void)
     rcp_ep_gpio_errc_t codes[] = {
         RCP_EP_GPIO_OK, RCP_EP_GPIO_ERR_SHORT_FRAME, RCP_EP_GPIO_ERR_BAD_MSG_TYPE,
         RCP_EP_GPIO_ERR_WRONG_BUS, RCP_EP_GPIO_ERR_WRONG_OP, RCP_EP_GPIO_ERR_BAD_PAYLOAD_LEN,
+        RCP_EP_GPIO_ERR_RESERVED_EVT,
     };
     size_t i, j;
 
