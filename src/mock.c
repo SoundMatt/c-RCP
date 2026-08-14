@@ -728,6 +728,38 @@ bool rcp_mock_server_stream_status_rx_blocked(const rcp_mock_server_t *srv, uint
     return rcp_e2e_stream_status_rx_blocked(&srv->stream_status[stream_index - 1u]);
 }
 
+//cfusa:req REQ-E2E-046
+bool rcp_mock_server_check_watchdog(rcp_mock_server_t *srv, uint8_t request_stream_index,
+                                     uint64_t elapsed_since_last_kick_ms,
+                                     rcp_e2e_wd_result_t *out_result)
+{
+    size_t                            idx;
+    const rcp_regmap_request_stream_cfg_t *cfg;
+
+    memset(out_result, 0, sizeof(*out_result));
+
+    if (request_stream_index == 0u ||
+        (size_t)request_stream_index > srv->request_stream_cfg_count) {
+        return false;
+    }
+    idx = (size_t)request_stream_index - 1u;
+    cfg = &srv->request_stream_cfg[idx];
+
+    *out_result = rcp_e2e_wd_evaluate(cfg->rx_wd_enable, cfg->rx_wd_timeout_ms,
+                                       cfg->rx_wd_safestate_enable, cfg->rx_wd_info_enable,
+                                       elapsed_since_last_kick_ms);
+
+    /* Latched every time, not just on overflow -- same "checked every
+     * time" reasoning frame_seq_gate_admits() already applies to the
+     * sequence cause. */
+    rcp_e2e_stream_status_note_wd(&srv->stream_status[idx], *out_result);
+
+    if (out_result->enter_safe_state) {
+        (void)rcp_mock_server_broadcast_safe_state(srv, request_stream_index);
+    }
+    return true;
+}
+
 //cfusa:req REQ-E2E-038
 //cfusa:req REQ-E2E-039
 rcp_fragment_reassembler_t *rcp_mock_server_fragment_reassembler(rcp_mock_server_t *srv,

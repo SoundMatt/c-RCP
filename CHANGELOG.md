@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.345.0 -- 2026-08-14 (REQ-E2E-046: watchdog cause wired, closing rx_stream_status fully -- all four fault causes now live)
+
+Second of the follow-on batch: the fourth and final `rx_stream_status` fault cause -- watchdog -- now has a live evaluate() call site.
+
+Unlike the other three causes (each an inherently synchronous, content-based check triggered by a single frame arriving), a watchdog is a TIME-based absence-of-activity detector: `e2e.h`'s own `rcp_e2e_wd_evaluate()` takes `elapsed_since_last_kick_ms` as an explicit, caller-computed input, stating plainly that it owns no clock or background thread of its own -- `srv` does not either (the same "protocol library, not a scheduler" boundary `rcp_mock_server_check_response_queue_heartbeat()`'s own doc comment already states for a different concern, `REQ-RMAP-065`/`SRV-017`).
+
+New `rcp_mock_server_check_watchdog(srv, request_stream_index, elapsed_since_last_kick_ms, out_result)` is therefore this server's own thin composition, not a new clock or kick-tracker: reads that stream's own `rx_wd_enable`/`rx_wd_timeout_ms`/`rx_wd_safestate_enable`/`rx_wd_info_enable` straight into `rcp_e2e_wd_evaluate()`, latches the result into `stream_status[]`'s own watchdog cause via `rcp_e2e_stream_status_note_wd()` (mirroring `frame_seq_gate_admits()`'s own identical "latch every time, not just on overflow" treatment of the sequence cause), and on a genuine overflow that also enters the safe state, broadcasts it to every endpoint on the stream via the same `rcp_mock_server_broadcast_safe_state()` the sequence/CRC/overflow causes already use. Tracking `elapsed_since_last_kick_ms` itself stays the integrator's own job, exactly as `e2e.h`'s own function already states.
+
+New tests prove overflow-latches, below-timeout-no-overflow, disabled-never-overflows, notify-without-safestate-does-not-latch (proving `*out_result` carries information the whole-stream `rx_blocked()` query alone cannot), out-of-range `request_stream_index`, and the cross-endpoint broadcast (a sibling endpoint's own pending non-safety-tagged request purged, the same observable-effect proof `REQ-E2E-045`'s own CRC-cause test already established). Both the latching and the broadcast were mutation-tested and caught cleanly.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`: `REQ-E2E-046` partial → implemented -- 1048 implemented / 19 partial / 2 not-implemented / 7 retired, 1076 total.
+
 ### v0.344.0 -- 2026-08-14 (REQ-UART-037: uart_timeout's own bit-time-to-wall-clock conversion, closing its last Table 48 divergence)
 
 First of a follow-on batch: the user reviewed the post-"complete these" status update's own 🟡 not-blocked-but-not-yet-done list and asked for all seven items to be closed.

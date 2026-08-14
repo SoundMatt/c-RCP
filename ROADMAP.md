@@ -19106,6 +19106,40 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.345.0 -- 2026-08-14 (REQ-E2E-046: watchdog cause wired, all four
+rx_stream_status fault causes now live)
+
+Second of the follow-on batch: the fourth and final `rx_stream_status`
+cause -- watchdog -- now has a live evaluate() call site.
+
+Unlike the other three (each an inherently synchronous, content-based
+check), a watchdog is TIME-based: `rcp_e2e_wd_evaluate()` takes
+`elapsed_since_last_kick_ms` as a caller-computed input, owning no
+clock itself -- `srv` doesn't either (the same "protocol library, not
+a scheduler" boundary the Flush_time heartbeat already established).
+
+New `rcp_mock_server_check_watchdog()`: a thin composition, not a new
+clock -- reads the stream's own `rx_wd_*` config into
+`rcp_e2e_wd_evaluate()`, latches via `rcp_e2e_stream_status_note_wd()`
+(mirroring the sequence cause's own "latch every time" rule), and
+broadcasts to stream siblings via the same `rcp_mock_server_
+broadcast_safe_state()` the other three causes already use. Tracking
+`elapsed_since_last_kick_ms` itself stays the integrator's job.
+
+New tests: overflow-latches, below-timeout, disabled-never-overflows,
+notify-without-safestate (proving `*out_result` carries info the
+whole-stream query alone can't), out-of-range index, and the
+cross-endpoint broadcast (sibling's pending request purged). Both the
+latching and broadcast mutation-tested and caught cleanly.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51):
+0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`:
+`REQ-E2E-046` partial → implemented -- 1048 implemented / 19 partial
+/ 2 not-implemented / 7 retired, 1076 total.
+
+**Next**: `REQ-RMAP-038` (real EP_FUNC_config/Sequencer_config table
+storage, so the pointers stop always reading 0).
+
 ### v0.344.0 -- 2026-08-14 (REQ-UART-037: uart_timeout's own bit-time-to-
 wall-clock conversion, closing its last Table 48 divergence)
 

@@ -980,6 +980,104 @@ static void test_wakeup_repetition_interval_unresolvable_response_stream_fails(v
     rcp_mock_server_destroy(srv);
 }
 
+/* ── REQ-E2E-046: watchdog cause, rcp_mock_server_check_watchdog() ─────────── */
+
+static rcp_mock_server_t *watchdog_fixture(bool wd_enable, uint32_t wd_timeout_ms,
+                                            bool wd_safestate_enable, bool wd_info_enable)
+{
+    rcp_mock_server_t              *srv = rcp_mock_server_new();
+    rcp_regmap_request_stream_cfg_t req[1];
+
+    rcp_regmap_request_stream_cfg_init(&req[0]);
+    req[0].rx_wd_enable           = wd_enable;
+    req[0].rx_wd_timeout_ms       = wd_timeout_ms;
+    req[0].rx_wd_safestate_enable = wd_safestate_enable;
+    req[0].rx_wd_info_enable      = wd_info_enable;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, req, 1));
+    return srv;
+}
+
+static void test_watchdog_overflow_latches_stream_status(void)
+{
+    rcp_mock_server_t   *srv = watchdog_fixture(true, 1000u, true, false);
+    rcp_e2e_wd_result_t   result;
+
+    TEST_ASSERT_TRUE(rcp_mock_server_check_watchdog(srv, 1u, 1000u, &result));
+    TEST_ASSERT_TRUE(result.overflowed);
+    TEST_ASSERT_TRUE(result.enter_safe_state);
+    TEST_ASSERT_FALSE(result.notify);
+    TEST_ASSERT_TRUE(rcp_mock_server_stream_status_rx_blocked(srv, 0)); /* stream_id unused by
+                                                                            resolve_index() when
+                                                                            no rx_stream_id was
+                                                                            set -- see below */
+
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_watchdog_below_timeout_does_not_overflow(void)
+{
+    rcp_mock_server_t   *srv = watchdog_fixture(true, 1000u, true, false);
+    rcp_e2e_wd_result_t   result;
+
+    TEST_ASSERT_TRUE(rcp_mock_server_check_watchdog(srv, 1u, 999u, &result));
+    TEST_ASSERT_FALSE(result.overflowed);
+    TEST_ASSERT_FALSE(result.enter_safe_state);
+
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_watchdog_disabled_never_overflows(void)
+{
+    rcp_mock_server_t   *srv = watchdog_fixture(false, 1000u, true, true);
+    rcp_e2e_wd_result_t   result;
+
+    TEST_ASSERT_TRUE(rcp_mock_server_check_watchdog(srv, 1u, 999999u, &result));
+    TEST_ASSERT_FALSE(result.overflowed);
+    TEST_ASSERT_FALSE(result.enter_safe_state);
+    TEST_ASSERT_FALSE(result.notify);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* rx_wd_safestate_enable == false: an overflow still fires notify (if
+ * rx_wd_info_enable), but never latches stream_status[]'s own wd cause --
+ * rcp_e2e_stream_status_note_wd() only ever latches on enter_safe_state,
+ * exactly like the other three causes' own identical rule. This is the
+ * scenario rcp_mock_server_stream_status_rx_blocked() alone could never
+ * distinguish from "nothing happened" -- *out_result is why this function
+ * returns the full result, not just the latched bit. */
+static void test_watchdog_notify_without_safestate_does_not_latch(void)
+{
+    rcp_mock_server_t   *srv = watchdog_fixture(true, 1000u, false, true);
+    rcp_e2e_wd_result_t   result;
+
+    TEST_ASSERT_TRUE(rcp_mock_server_check_watchdog(srv, 1u, 1000u, &result));
+    TEST_ASSERT_TRUE(result.overflowed);
+    TEST_ASSERT_FALSE(result.enter_safe_state);
+    TEST_ASSERT_TRUE(result.notify);
+    TEST_ASSERT_FALSE(rcp_mock_server_stream_status_rx_blocked(srv, 0));
+
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_watchdog_out_of_range_request_stream_index_returns_false(void)
+{
+    rcp_mock_server_t   *srv = watchdog_fixture(true, 1000u, true, true);
+    rcp_e2e_wd_result_t   result;
+
+    memset(&result, 0xEE, sizeof(result));
+    TEST_ASSERT_FALSE(rcp_mock_server_check_watchdog(srv, 0u, 999999u, &result));
+    TEST_ASSERT_FALSE(result.overflowed);
+    TEST_ASSERT_FALSE(result.enter_safe_state);
+    TEST_ASSERT_FALSE(result.notify);
+
+    memset(&result, 0xEE, sizeof(result));
+    TEST_ASSERT_FALSE(rcp_mock_server_check_watchdog(srv, 2u, 999999u, &result));
+    TEST_ASSERT_FALSE(result.overflowed);
+
+    rcp_mock_server_destroy(srv);
+}
+
 static void test_dispatch_no_handler_leaves_response_zeroed(void)
 {
     rcp_mock_server_t *srv = rcp_mock_server_new();
@@ -1576,6 +1674,12 @@ int main(void)
     RUN_TEST(test_wakeup_repetition_interval_resolves_via_flush_time);
     RUN_TEST(test_wakeup_repetition_interval_out_of_range_request_stream_index);
     RUN_TEST(test_wakeup_repetition_interval_unresolvable_response_stream_fails);
+
+    RUN_TEST(test_watchdog_overflow_latches_stream_status);
+    RUN_TEST(test_watchdog_below_timeout_does_not_overflow);
+    RUN_TEST(test_watchdog_disabled_never_overflows);
+    RUN_TEST(test_watchdog_notify_without_safestate_does_not_latch);
+    RUN_TEST(test_watchdog_out_of_range_request_stream_index_returns_false);
     RUN_TEST(test_dispatch_no_handler_leaves_response_zeroed);
     RUN_TEST(test_dispatch_queued_when_endpoint_disabled);
     RUN_TEST(test_drain_endpoint_runs_queued_request);
