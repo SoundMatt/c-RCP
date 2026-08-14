@@ -19106,6 +19106,69 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.365.0 -- 2026-08-14 (mock.c byte_bus_id-only accessors gain
+stream-scoped counterparts, closing out the #432 follow-up)
+
+Closes issue #447 (c-RCP-AUDIT-26). The #432 fix (v0.360.0) correctly
+stream-scoped `find_slot_on_stream()` into every real dispatch entry
+point, enabling a new capability -- two endpoints legitimately sharing
+one `byte_bus_id` on different `stream_id`s -- that the REST of
+`mock.c`'s byte_bus_id-only accessor API wasn't prepared for:
+`rcp_mock_server_tick()`, `_drain_endpoint()`, `_watchdog_purge()`,
+`_pending_count()`, `_stash_deferred_response()`/
+`_take_deferred_response()`, `_remove_endpoint()`,
+`_set_endpoint_enable()`, `_set_endpoint_req_crc_enable()`,
+`_set_endpoint_rx_enforce_e2e()` all still resolved a slot via the
+original, unscoped `find_slot()`/`find_slot_const()`, silently picking
+whichever matching-`byte_bus_id` slot came first by array index once
+two exist.
+
+Followed the issue's own recommended direction (a) and this codebase's
+established "new function, not a breaking change" pattern
+(`rcp_mock_server_add_endpoint_on_stream()`, issue #432): REQ-MOCK-032
+adds ten new `_on_stream()` variants -- one per function in the list
+above (`_stash_deferred_response`/`_take_deferred_response` each get
+their own) -- each routing through `find_slot_on_stream()`/a new
+`find_slot_on_stream_const()`, while every existing plain accessor
+keeps its exact prior signature and behavior (still byte_bus_id-only,
+via `find_slot()`) for its own ~100+ existing call sites.
+
+`rcp_mock_server_broadcast_safe_state()`, also named in the issue,
+deliberately got no new variant: unlike the ten above, it does not
+take `byte_bus_id` as its only endpoint selector -- it already takes
+`request_stream_index`, which alone disambiguates which request stream
+is escalating. It had a real, narrower instance of the same bug in its
+own per-slot loop (`find_slot()` on each byte_bus_id EP_ID_config
+reports bound to the stream); REQ-MOCK-033 fixes that internally,
+resolving the real wire `stream_id` from
+`request_stream_cfg[request_stream_index-1].rx_stream_id` and calling
+`find_slot_on_stream()` instead -- no new API surface, because none was
+needed.
+
+`rcp_mock_server_tick()` was verified against its actual
+implementation before assuming it needed a variant (as the issue
+itself invited): it does not sweep every slot in the table each call
+-- `rcp_server_endpoint_select_due()` runs against exactly one queue,
+the one `byte_bus_id` alone selects -- so it genuinely cannot
+disambiguate two `byte_bus_id`-sharing slots without one, unlike
+`broadcast_safe_state()`.
+
+Tests (`tests/test_mock.c`): registers the same STREAM_A/STREAM_B/
+byte_bus_id-5 pair the #432 fix's own dispatch test already
+established, then proves each new `_on_stream()` accessor reaches only
+its own named slot (checking the "wrong" slot's own stream_id first,
+where order matters, specifically to rule out an accessor that
+silently fell back to array-index-first find_slot() and only
+"accidentally" looked correct). Mutation-tested
+`rcp_mock_server_tick_on_stream()`: reverting its own lookup to the
+unscoped `find_slot()` makes `test_tick_on_stream_targets_correct_slot`
+fail exactly as expected; restored, suite green again. Full 66-test
+suite + ASan/UBSan clean; `cfusa check`/`trace`: 0 errors, 1088/1088
+traced and tested (+2 for REQ-MOCK-032/033).
+
+**Next**: none currently queued for mock.c -- see the #445/#448/#449
+lineage (landed concurrently) for other in-flight mock.c work.
+
 ### v0.364.0 -- 2026-08-14 (mock.c dispatch_e2e_fragment CRC extraction
 now pad-aware, closing a #420-fix regression)
 

@@ -9095,6 +9095,28 @@
       "tc18": "\u00a712.9.1 (\"In dependence on the stream_id and byte_bus_id the RC Server determines the endpoint that is addressed.\"), TC18.txt L3591-3593"
     },
     {
+      "id": "REQ-MOCK-032",
+      "title": "Byte-bus-id-only endpoint accessors gain stream-scoped _on_stream() counterparts",
+      "text": "rcp_mock_server_remove_endpoint_on_stream()/_set_endpoint_enable_on_stream()/_set_endpoint_req_crc_enable_on_stream()/_set_endpoint_rx_enforce_e2e_on_stream()/_drain_endpoint_on_stream()/_stash_deferred_response_on_stream()/_take_deferred_response_on_stream()/_tick_on_stream()/_pending_count_on_stream()/_watchdog_purge_on_stream() shall resolve the addressed slot via find_slot_on_stream()/find_slot_on_stream_const() (stream_id, byte_bus_id), leaving each of their own plain, unscoped, byte_bus_id-only counterparts (rcp_mock_server_remove_endpoint() etc., already REQ-MOCK-009/010/016-018/023-024/026-027, REQ-E2E-021/031, REQ-GPIO-036) completely unchanged in signature and behavior for their own ~100+ existing call sites -- the same \"new function, not a breaking change\" pattern REQ-MOCK-031/rcp_mock_server_add_endpoint_on_stream() already established. Issue #447 (c-RCP-AUDIT-26): the #432 fix correctly stream-scoped every real dispatch entry point via find_slot_on_stream(), but left this specific list of accessors -- which operate on already-admitted/queued per-slot state, not on an incoming request's own carried stream_id -- still resolving by the unscoped find_slot(), silently picking whichever matching-byte_bus_id slot came first by array index once two slots legitimately share one byte_bus_id on different stream_ids (a capability the #432 fix itself introduced). rcp_mock_server_broadcast_safe_state() is deliberately NOT in this list -- see REQ-MOCK-033.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a712.9.1 (\"In dependence on the stream_id and byte_bus_id the RC Server determines the endpoint that is addressed.\"), TC18.txt L3591-3593"
+    },
+    {
+      "id": "REQ-MOCK-033",
+      "title": "rcp_mock_server_broadcast_safe_state() resolves each bound byte_bus_id via find_slot_on_stream(), not byte_bus_id alone",
+      "text": "rcp_mock_server_broadcast_safe_state() shall resolve each byte_bus_id EP_ID_config reports bound to request_stream_index via find_slot_on_stream(), keyed by the real wire stream_id request_stream_index itself resolves to (srv->request_stream_cfg[request_stream_index-1].rx_stream_id), not the plain, unscoped find_slot() it used before this fix. Unlike REQ-MOCK-032's own accessor list, this function's own signature is unchanged and it gains no new _on_stream() variant: request_stream_index already disambiguates which request stream is escalating, so the fix is internal to this function's own existing lookup, correcting a genuine defect (silently purging whichever of two byte_bus_id-sharing slots came first by array index, once two slots legitimately share one byte_bus_id on different stream_ids per REQ-MOCK-031) rather than adding new API surface. Issue #447 (c-RCP-AUDIT-26).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a712.9.1 (\"In dependence on the stream_id and byte_bus_id the RC Server determines the endpoint that is addressed.\"), TC18.txt L3591-3593"
+    },
+    {
       "id": "REQ-ACF-017",
       "title": "acf_msg_type constants carry the specification's own numeric values",
       "text": "RCP_ACF_MSG_TYPE_ABB shall equal 0x0E and RCP_ACF_MSG_TYPE_GBB shall equal 0x0D, the acf_msg_type values TC18 \u00a711.2.1 Table 4 and \u00a711.2.2.1 Table 6 assign to the abbreviated byte bus (ACF_ABB) and generic byte bus (ACF_GBB) message formats respectively.",

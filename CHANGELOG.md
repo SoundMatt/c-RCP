@@ -34,6 +34,42 @@ the rationale.
 
 ## Releases
 
+### v0.365.0 -- 2026-08-14 (mock.c byte_bus_id-only accessors gain stream-scoped counterparts)
+
+Closes issue #447 (c-RCP-AUDIT-26). The #432 fix (v0.360.0, PR #443) correctly
+stream-scoped `find_slot_on_stream()` into every real dispatch entry point, enabling a new
+capability: two endpoints legitimately sharing one `byte_bus_id` on different `stream_id`s. That
+capability left the rest of `mock.c`'s byte_bus_id-only accessor API unprepared for it -- each one
+still resolved a slot via the original, unscoped `find_slot()`/`find_slot_const()`, silently
+picking whichever matching-`byte_bus_id` slot came first by array index once two exist.
+
+REQ-MOCK-032: ten new `_on_stream()` variants, following the same "new function, not a breaking
+change" pattern `rcp_mock_server_add_endpoint_on_stream()` (issue #432) already established --
+`rcp_mock_server_remove_endpoint_on_stream()`, `_set_endpoint_enable_on_stream()`,
+`_set_endpoint_req_crc_enable_on_stream()`, `_set_endpoint_rx_enforce_e2e_on_stream()`,
+`_drain_endpoint_on_stream()`, `_stash_deferred_response_on_stream()`,
+`_take_deferred_response_on_stream()`, `_tick_on_stream()`, `_pending_count_on_stream()`,
+`_watchdog_purge_on_stream()`. Each plain, unscoped accessor is completely unchanged in signature
+and behavior for its own existing call sites.
+
+REQ-MOCK-033: `rcp_mock_server_broadcast_safe_state()` is deliberately NOT in that list -- it
+already takes `request_stream_index`, not `byte_bus_id`, as its own endpoint selector, so it had
+enough context to resolve the real wire `stream_id` (`request_stream_cfg[request_stream_index-1]
+.rx_stream_id`) and fix its own internal per-slot lookup in place, correcting a real (narrower)
+instance of the same defect without adding new API surface.
+
+`rcp_mock_server_tick()` was verified, not assumed, to need its own variant: unlike a function that
+sweeps every slot in the table each call, it resolves and acts on exactly one slot per call
+(`rcp_server_endpoint_select_due()` runs against a single queue), so it genuinely cannot
+disambiguate two `byte_bus_id`-sharing slots without one.
+
+Tests (`tests/test_mock.c`): registers the same STREAM_A/STREAM_B/byte_bus_id-5 pair the #432 fix's
+own dispatch test already established, then proves each new `_on_stream()` accessor reaches only
+its own named slot. Mutation-tested `rcp_mock_server_tick_on_stream()`: reverting its own lookup to
+the unscoped `find_slot()` made the new targeting test fail exactly as expected; restored, suite
+green again. Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace`: 0 errors, 1088/1088
+traced and tested (+2 for REQ-MOCK-032/033).
+
 ### v0.364.0 -- 2026-08-14 (mock.c dispatch_e2e_fragment CRC extraction now pad-aware, closing a #420-fix regression)
 
 Closes issue #445 (c-RCP-AUDIT-24), a CRITICAL, empirically-reproduced regression introduced by the #420 fix (`src/e2e.c`): that fix correctly moved the CRC32 trailer in `rcp_e2e_wrap()`/`rcp_e2e_unwrap()` to sit immediately after the real (unpadded) payload, with alignment padding re-seated after the trailer -- `[header][real payload][CRC32][pad]`, per TC18 §13.6 Figures 20/21 -- but `src/mock.c`'s `rcp_mock_server_dispatch_e2e_fragment()` (final-fragment path) was not updated alongside it and kept reading the CRC32 trailer from the frame's literal last `RCP_E2E_CRC_LEN` octets, an assumption that was correct under the pre-#420 wire order but wrong whenever a final fragment's real (unpadded) payload is not itself already a multiple of 4 bytes (`pad_octets != 0`). A final fragment in that shape had its CRC extracted one-to-three octets short of the real trailer -- reading part of the alignment padding as if it were CRC bytes -- causing a legitimately-CRC'd request to be spuriously rejected with `RCP_MOCK_DISPATCH_CRC_ERROR`. Existing fragmentation tests never caught this because every one of their final-fragment payloads happened to already be exactly 4 bytes (`pad_octets == 0` in every case), the one condition under which the old, non-pad-aware offset was still correct by coincidence.
