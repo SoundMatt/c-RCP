@@ -19106,6 +19106,40 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.327.0 -- 2026-08-13 (tc18-gap backlog: REQ-RMAP-068
+primary-source re-verification)
+
+Seventh item of the 42-item `scope: "tc18-gap"` backlog (task #115),
+a quick primary-source check flagged in the prior batch's own
+remaining-work note rather than a code change.
+
+Investigated PR E (REQ-E2E-038/039/046) first and deliberately
+stepped back: 038/039 are tightly coupled and both require a
+materially larger fragmented-dispatch rebuild already flagged as
+separate scope; 046's proposed new stream-status latch risks
+conflating with the already-shipped stream-fault-tracker mechanism.
+Abandoned the branch cleanly, zero commits. PR E stays open (task
+#111) for a fresh-context session or explicit user architectural
+input.
+
+Picked up REQ-RMAP-068's own remaining-work note instead: re-read
+TC18.txt §13.7.1.2 directly at the primary source, confirming
+verbatim the entry's existing "bit-level SET/OR/AND/XOR
+register-write-operation mechanism" finding. Appended a dated
+re-verification paragraph confirming (not correcting) the prior
+analysis; decision recorded explicitly: leave documented, not
+attempted -- comparable in scope to REQ-RMAP-039's own four new
+sub-table types, not a quick fix. `status` stays `partial`; no code
+change this release.
+
+`.fusa-reqs.json`-only change. Full 66-test suite + ASan/UBSan clean
+(unaffected, run for consistency); `cfusa check`/`trace` (v0.5.51):
+0 errors, 0/1076 untested.
+
+**Next**: continuing the 42-item `scope: "tc18-gap"` backlog --
+REQ-RMAP-039 four optional-subsystem sub-tables (PR F, task #112);
+PR E (task #111) stays open pending the architectural call above.
+
 ### v0.326.0 -- 2026-08-13 (tc18-gap backlog PR D concluded:
 REQ-ISELED-025 real dispatch wiring)
 

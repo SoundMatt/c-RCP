@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.327.0 -- 2026-08-13 (tc18-gap backlog: REQ-RMAP-068 primary-source re-verification)
+
+Seventh item of the 42-item `scope: "tc18-gap"` backlog (task #115), a quick primary-source check flagged in the prior batch's own remaining-work note rather than a code change.
+
+Investigated PR E (REQ-E2E-038/039/046 fragmented dispatch + stream status) first and deliberately stepped back: REQ-E2E-038/039 are tightly coupled and both require a materially larger fragmented-dispatch rebuild the prior batch's own investigation already flagged as separate, larger scope; REQ-E2E-046's proposed new stream-status latch risks conflating with the already-shipped `rcp_e2e_stream_fault_tracker_t` mechanism in a way that felt like a genuine architectural fork, not a safe unilateral call this late in an unattended session. Abandoned the branch cleanly with zero commits rather than force an ambiguous change through. PR E stays open (task #111) for a fresh-context session or explicit user architectural input.
+
+Picked up REQ-RMAP-068's own remaining-work note instead: re-read TC18.txt §13.7.1.2 directly at the primary source (not a cached/derived copy) to confirm the entry's existing "bit-level SET/OR/AND/XOR register-write-operation mechanism" finding. Confirmed verbatim: "The handling of the data depends on evt[2:0] so that the bits are either SET, OR'ed, AND'ed or XOR'ed to the target registers content" -- immediately preceding the read-only/write-prohibited sentences this entry's text already correctly cited. This is a genuine, distinct TC18 rule that no register-write dispatch mechanism in this codebase implements at the bit level (every write path remains whole-struct-field decode). Appended a dated re-verification paragraph to the entry's `text` field confirming (not correcting) the prior analysis and recording the decision explicitly: leave documented, not attempted -- implementing the mechanism across every register-map write path is a substantial, separate architecture feature (comparable in scope to REQ-RMAP-039's own four new sub-table types), not a quick fix. `status` correctly stays `partial`; no code, test, or behavior change this release.
+
+`.fusa-reqs.json`-only change. Full 66-test suite + ASan/UBSan clean (unaffected, run for consistency); `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
+
+**Next**: continuing the 42-item `scope: "tc18-gap"` backlog -- REQ-RMAP-039 four optional-subsystem sub-tables (PR F, task #112), the largest single remaining feature; PR E (task #111) stays open pending the architectural call above.
+
 ### v0.326.0 -- 2026-08-13 (tc18-gap backlog PR D concluded: REQ-ISELED-025 real dispatch wiring)
 
 Sixth PR of the 42-item `scope: "tc18-gap"` backlog (issue #336), closing the ISELED third of "mock.c dispatch wiring" — concludes the GPIO/ADC/ISELED trio (GPIO: v0.324.0/PR #392; ADC: v0.325.0/PR #393).
