@@ -79,28 +79,37 @@ static void test_zero_capacity_is_unbounded(void)
     rcp_respqueue_destroy(&q);
 }
 
-static void test_push_refused_once_capacity_octets_would_be_exceeded(void)
+static void test_push_refused_outright_when_frame_exceeds_total_capacity_octets(void)
 {
     rcp_respqueue_t q;
-    const uint8_t   five[5]  = {1, 2, 3, 4, 5};
-    const uint8_t   six[6]   = {1, 2, 3, 4, 5, 6};
+    const uint8_t   five[5]    = {1, 2, 3, 4, 5};
+    const uint8_t   eleven[11] = {0};
 
     /* TC18 §12.7.9 Table 24: queue_size is a memory reservation ("assigned
      * memory in 32bit words"), not a message-count limit -- capacity is
-     * checked in octets, and refusal leaves the queue entirely unchanged. */
+     * checked in octets. GitHub #446: a frame that exceeds the ENTIRE
+     * configured capacity outright can never be admitted no matter how
+     * much gets evicted (evicting everything only frees capacity_octets
+     * octets total) -- this is the one case that still refuses outright,
+     * queue entirely unchanged, no eviction attempted. Once eviction
+     * COULD make room (the ordinary case), the queue evicts instead --
+     * see the GitHub #446 test group below. */
     rcp_respqueue_init(&q, 10u, 0);
     TEST_ASSERT_TRUE(rcp_respqueue_push(&q, five, sizeof(five)));
     TEST_ASSERT_EQUAL_UINT(5u, rcp_respqueue_octets(&q));
 
-    /* 5 + 6 = 11 > capacity 10: refused. */
-    TEST_ASSERT_FALSE(rcp_respqueue_push(&q, six, sizeof(six)));
+    /* 11 > capacity 10 outright: refused regardless of current occupancy. */
+    TEST_ASSERT_FALSE(rcp_respqueue_push(&q, eleven, sizeof(eleven)));
     TEST_ASSERT_EQUAL_UINT(1u, rcp_respqueue_len(&q));
     TEST_ASSERT_EQUAL_UINT(5u, rcp_respqueue_octets(&q));
+    TEST_ASSERT_FALSE(rcp_respqueue_overflow(&q));
 
-    /* Exactly at the remaining budget (5 more octets, total 10): accepted. */
+    /* Exactly at the remaining budget (5 more octets, total 10): accepted,
+     * no eviction needed. */
     TEST_ASSERT_TRUE(rcp_respqueue_push(&q, five, sizeof(five)));
     TEST_ASSERT_EQUAL_UINT(2u, rcp_respqueue_len(&q));
     TEST_ASSERT_EQUAL_UINT(10u, rcp_respqueue_octets(&q));
+    TEST_ASSERT_FALSE(rcp_respqueue_overflow(&q));
 
     rcp_respqueue_destroy(&q);
 }
@@ -108,12 +117,17 @@ static void test_push_refused_once_capacity_octets_would_be_exceeded(void)
 static void test_pop_frees_capacity_for_a_later_push(void)
 {
     rcp_respqueue_t q;
-    const uint8_t   frame[8] = {0};
+    const uint8_t   frame[8]     = {0};
+    const uint8_t   oversized[9] = {0};
     rcp_bytes_t     out;
 
     rcp_respqueue_init(&q, 8u, 0);
     TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
-    TEST_ASSERT_FALSE(rcp_respqueue_push(&q, frame, sizeof(frame)));
+    /* 9 > capacity 8 outright: still refused unconditionally regardless of
+     * GitHub #446 -- a frame bigger than the ENTIRE configured budget can
+     * never fit no matter how much eviction happens (see the dedicated
+     * eviction test group below for the case where eviction WOULD help). */
+    TEST_ASSERT_FALSE(rcp_respqueue_push(&q, oversized, sizeof(oversized)));
 
     TEST_ASSERT_TRUE(rcp_respqueue_pop(&q, &out));
     rcp_bytes_free(&out);
@@ -271,22 +285,26 @@ static void test_overflow_flag_latches_until_cleared(void)
     rcp_respqueue_destroy(&q);
 }
 
-static void test_capacity_octets_rejection_unaffected_by_slot_count_eviction(void)
+static void test_capacity_octets_nonzero_disables_max_entries_slot_eviction(void)
 {
-    /* REQ-RMAP-059's own byte-budget rejection must stay byte-for-byte
-     * unchanged now that the slot-count eviction path (above) exists in
-     * the same function: a push refused for exceeding capacity_octets
-     * must still leave the queue entirely unchanged (no eviction, no
-     * overflow bit), the same as before GitHub #423. */
+    /* GitHub #446: once capacity_octets (the real queue_size bound) is
+     * configured, RCP_RESPQUEUE_MAX_ENTRIES is no longer the "queue is
+     * completely full" trigger at all -- it is retained only as the
+     * fallback for the capacity_octets == 0 (unbounded) case. A
+     * capacity_octets budget generous enough in bytes but tiny per-entry
+     * must therefore be able to hold MORE than RCP_RESPQUEUE_MAX_ENTRIES
+     * entries without ever evicting. */
     rcp_respqueue_t q;
-    const uint8_t   five[5] = {1, 2, 3, 4, 5};
-    const uint8_t   six[6]  = {1, 2, 3, 4, 5, 6};
+    uint8_t         frame[1] = {0};
+    size_t          i;
+    size_t          n = RCP_RESPQUEUE_MAX_ENTRIES + 10u;
 
-    rcp_respqueue_init(&q, 10u, 0);
-    TEST_ASSERT_TRUE(rcp_respqueue_push_seq(&q, five, sizeof(five), 7u));
-    TEST_ASSERT_FALSE(rcp_respqueue_push_seq(&q, six, sizeof(six), 8u));
-    TEST_ASSERT_EQUAL_UINT(1u, rcp_respqueue_len(&q));
-    TEST_ASSERT_EQUAL_UINT(5u, rcp_respqueue_octets(&q));
+    rcp_respqueue_init(&q, n, 0); /* n octets capacity, 1 octet per entry */
+    for (i = 0; i < n; i++) {
+        TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, 1));
+    }
+    TEST_ASSERT_EQUAL_UINT(n, rcp_respqueue_len(&q));
+    TEST_ASSERT_EQUAL_UINT(n, rcp_respqueue_octets(&q));
     TEST_ASSERT_FALSE(rcp_respqueue_overflow(&q));
 
     rcp_respqueue_destroy(&q);
@@ -306,6 +324,150 @@ static void test_max_avtpdu_size_rejection_unaffected_by_slot_count_eviction(voi
     TEST_ASSERT_EQUAL_UINT(1u, rcp_respqueue_len(&q));
     TEST_ASSERT_EQUAL_UINT(10u, rcp_respqueue_octets(&q));
     TEST_ASSERT_FALSE(rcp_respqueue_overflow(&q));
+
+    rcp_respqueue_destroy(&q);
+}
+
+/* ── GitHub #446: capacity_octets (the real TC18 queue_size bound) exhaustion
+ * triggers eviction, not reject-and-unchanged ──────────────────────────── */
+
+static void test_push_evicts_single_entry_when_capacity_octets_would_be_exceeded(void)
+{
+    /* A realistically-configured queue_size (well under
+     * RCP_RESPQUEUE_MAX_ENTRIES entries) is the binding constraint here --
+     * exactly the "in any realistically-configured server" scenario
+     * GitHub #446 is about. One eviction is enough to free the room the
+     * incoming frame needs. */
+    rcp_respqueue_t q;
+    const uint8_t   five[5] = {1, 2, 3, 4, 5};
+    const uint8_t   six[6]  = {1, 2, 3, 4, 5, 6};
+
+    rcp_respqueue_init(&q, 10u, 0);
+    TEST_ASSERT_TRUE(rcp_respqueue_push_seq(&q, five, sizeof(five), 7u));
+    TEST_ASSERT_EQUAL_UINT(1u, rcp_respqueue_len(&q));
+    TEST_ASSERT_EQUAL_UINT(5u, rcp_respqueue_octets(&q));
+    TEST_ASSERT_FALSE(rcp_respqueue_overflow(&q));
+
+    /* 5 (queued) + 6 (incoming) = 11 > capacity 10: the old behavior
+     * rejected this outright. GitHub #446: eviction should fire instead
+     * -- the only queued entry (seq 7) is evicted, freeing 5 octets, and
+     * the 6-octet frame is then admitted. */
+    TEST_ASSERT_TRUE(rcp_respqueue_push_seq(&q, six, sizeof(six), 8u));
+    TEST_ASSERT_EQUAL_UINT(1u, rcp_respqueue_len(&q));
+    TEST_ASSERT_EQUAL_UINT(6u, rcp_respqueue_octets(&q));
+    TEST_ASSERT_TRUE(rcp_respqueue_overflow(&q));
+
+    rcp_respqueue_destroy(&q);
+}
+
+static void test_push_evicts_multiple_entries_when_one_is_not_enough_bytes(void)
+{
+    /* Byte-size varies per evicted entry -- a single eviction is not
+     * always enough to free room for a byte-larger incoming frame.
+     * capacity_octets = 10; three small entries (2+3+2 = 7 octets)
+     * queued; an incoming 8-octet frame needs evicting TWO of them
+     * (the two lowest sequence_num entries) before it fits, not just
+     * one. */
+    rcp_respqueue_t q;
+    const uint8_t   a[2] = {0xA1, 0xA2};
+    const uint8_t   b[3] = {0xB1, 0xB2, 0xB3};
+    const uint8_t   c[2] = {0xC1, 0xC2};
+    const uint8_t   d[8] = {0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8};
+    rcp_bytes_t     out;
+    bool            saw_a = false, saw_b = false, saw_c = false, saw_d = false;
+
+    rcp_respqueue_init(&q, 10u, 0);
+    TEST_ASSERT_TRUE(rcp_respqueue_push_seq(&q, a, sizeof(a), 1u)); /* octets: 2 */
+    TEST_ASSERT_TRUE(rcp_respqueue_push_seq(&q, b, sizeof(b), 2u)); /* octets: 5 */
+    TEST_ASSERT_TRUE(rcp_respqueue_push_seq(&q, c, sizeof(c), 3u)); /* octets: 7 */
+    TEST_ASSERT_EQUAL_UINT(3u, rcp_respqueue_len(&q));
+    TEST_ASSERT_EQUAL_UINT(7u, rcp_respqueue_octets(&q));
+    TEST_ASSERT_FALSE(rcp_respqueue_overflow(&q));
+
+    /* Incoming d needs 8 octets; only 10 - 7 = 3 free. Evicting just `a`
+     * (seq 1, lowest, 2 octets) only frees 2 more (5 free) -- still not
+     * enough for 8. `b` (seq 2, now the lowest remaining) must also be
+     * evicted (3 more octets, 8 free total) before d fits. `c` (seq 3)
+     * must survive -- it was never the lowest remaining sequence_num. */
+    TEST_ASSERT_TRUE(rcp_respqueue_push_seq(&q, d, sizeof(d), 4u));
+    TEST_ASSERT_EQUAL_UINT(2u, rcp_respqueue_len(&q)); /* c and d remain */
+    TEST_ASSERT_EQUAL_UINT(10u, rcp_respqueue_octets(&q)); /* 2 + 8: exact budget, no leak/stale total */
+    TEST_ASSERT_TRUE(rcp_respqueue_overflow(&q));
+
+    while (rcp_respqueue_pop(&q, &out)) {
+        if (out.len == sizeof(a) && memcmp(out.data, a, sizeof(a)) == 0) saw_a = true;
+        if (out.len == sizeof(b) && memcmp(out.data, b, sizeof(b)) == 0) saw_b = true;
+        if (out.len == sizeof(c) && memcmp(out.data, c, sizeof(c)) == 0) saw_c = true;
+        if (out.len == sizeof(d) && memcmp(out.data, d, sizeof(d)) == 0) saw_d = true;
+        rcp_bytes_free(&out);
+    }
+    TEST_ASSERT_FALSE(saw_a); /* evicted */
+    TEST_ASSERT_FALSE(saw_b); /* evicted */
+    TEST_ASSERT_TRUE(saw_c);  /* survived: never the lowest remaining seq */
+    TEST_ASSERT_TRUE(saw_d);  /* the push that triggered the eviction */
+
+    rcp_respqueue_destroy(&q);
+}
+
+static void test_capacity_octets_eviction_prefers_lowest_sequence_num_not_fifo_oldest(void)
+{
+    /* Same "lowest sequence_num, not FIFO-oldest" guarantee the #423
+     * slot-count eviction test above proves, but for the capacity_octets
+     * path: the FIFO-oldest entry is given the HIGHEST sequence_num, so
+     * an implementation that evicts index 0 instead of genuinely
+     * comparing q->entries_seq[] is caught. */
+    rcp_respqueue_t q;
+    const uint8_t   oldest_but_highest_seq[4] = {1, 1, 1, 1};
+    const uint8_t   newest_but_lowest_seq[4]  = {2, 2, 2, 2};
+    const uint8_t   incoming[4]               = {3, 3, 3, 3};
+    rcp_bytes_t     out;
+
+    rcp_respqueue_init(&q, 8u, 0);
+    TEST_ASSERT_TRUE(rcp_respqueue_push_seq(&q, oldest_but_highest_seq, 4, 200u));
+    TEST_ASSERT_TRUE(rcp_respqueue_push_seq(&q, newest_but_lowest_seq, 4, 5u));
+    TEST_ASSERT_EQUAL_UINT(8u, rcp_respqueue_octets(&q));
+
+    /* capacity 8, already full: incoming 4-octet frame needs an eviction.
+     * Lowest sequence_num is 5 (the FIFO-newest entry) -- it must be the
+     * one evicted, not index 0 (the FIFO-oldest, seq 200). */
+    TEST_ASSERT_TRUE(rcp_respqueue_push_seq(&q, incoming, 4, 201u));
+    TEST_ASSERT_EQUAL_UINT(2u, rcp_respqueue_len(&q));
+    TEST_ASSERT_EQUAL_UINT(8u, rcp_respqueue_octets(&q));
+    TEST_ASSERT_TRUE(rcp_respqueue_overflow(&q));
+
+    TEST_ASSERT_TRUE(rcp_respqueue_pop(&q, &out));
+    TEST_ASSERT_EQUAL_MEMORY(oldest_but_highest_seq, out.data, 4); /* survived */
+    rcp_bytes_free(&out);
+
+    TEST_ASSERT_TRUE(rcp_respqueue_pop(&q, &out));
+    TEST_ASSERT_EQUAL_MEMORY(incoming, out.data, 4);
+    rcp_bytes_free(&out);
+
+    rcp_respqueue_destroy(&q);
+}
+
+static void test_capacity_octets_zero_falls_back_to_max_entries_bound(void)
+{
+    /* GitHub #446's own design recommendation: with capacity_octets == 0
+     * (unbounded), there is no byte budget to evict against, so eviction
+     * falls back to the RCP_RESPQUEUE_MAX_ENTRIES slot-count bound --
+     * exactly the #423 behavior, still exercised end-to-end here for the
+     * unbounded case specifically (the general slot-count mechanics are
+     * already covered in detail by
+     * test_push_evicts_lowest_sequence_num_not_oldest_inserted() above). */
+    rcp_respqueue_t q;
+    uint8_t         frame[1] = {0};
+    size_t          i;
+
+    rcp_respqueue_init(&q, 0, 0);
+    for (i = 0; i < RCP_RESPQUEUE_MAX_ENTRIES; i++) {
+        TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, 1));
+    }
+    TEST_ASSERT_FALSE(rcp_respqueue_overflow(&q));
+
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, 1));
+    TEST_ASSERT_EQUAL_UINT(RCP_RESPQUEUE_MAX_ENTRIES, rcp_respqueue_len(&q));
+    TEST_ASSERT_TRUE(rcp_respqueue_overflow(&q));
 
     rcp_respqueue_destroy(&q);
 }
@@ -464,7 +626,7 @@ int main(void)
     RUN_TEST(test_push_pop_is_fifo);
     RUN_TEST(test_pop_on_empty_queue_returns_false);
     RUN_TEST(test_zero_capacity_is_unbounded);
-    RUN_TEST(test_push_refused_once_capacity_octets_would_be_exceeded);
+    RUN_TEST(test_push_refused_outright_when_frame_exceeds_total_capacity_octets);
     RUN_TEST(test_pop_frees_capacity_for_a_later_push);
     RUN_TEST(test_destroy_on_nonempty_queue_is_safe);
 
@@ -473,8 +635,13 @@ int main(void)
 
     RUN_TEST(test_push_evicts_lowest_sequence_num_not_oldest_inserted);
     RUN_TEST(test_overflow_flag_latches_until_cleared);
-    RUN_TEST(test_capacity_octets_rejection_unaffected_by_slot_count_eviction);
+    RUN_TEST(test_capacity_octets_nonzero_disables_max_entries_slot_eviction);
     RUN_TEST(test_max_avtpdu_size_rejection_unaffected_by_slot_count_eviction);
+
+    RUN_TEST(test_push_evicts_single_entry_when_capacity_octets_would_be_exceeded);
+    RUN_TEST(test_push_evicts_multiple_entries_when_one_is_not_enough_bytes);
+    RUN_TEST(test_capacity_octets_eviction_prefers_lowest_sequence_num_not_fifo_oldest);
+    RUN_TEST(test_capacity_octets_zero_falls_back_to_max_entries_bound);
 
     RUN_TEST(test_max_fragment_payload_reserves_header_and_worst_case_pad);
     RUN_TEST(test_max_fragment_payload_is_zero_when_unbounded_or_no_budget_remains);
