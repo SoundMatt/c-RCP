@@ -650,6 +650,51 @@ rcp_mock_errc_t rcp_mock_server_add_endpoint(rcp_mock_server_t *srv,
                                               rcp_mock_endpoint_handler_fn handler,
                                               void *user_data);
 
+/* REQ-MOCK-031 (TC18 §12.9.1, issue #432): stream-scoped counterpart of
+ * rcp_mock_server_add_endpoint() -- registers an endpoint slot addressed
+ * at byte_bus_id, but ONLY within the context of stream_id, exactly TC18
+ * §12.9.1's own "In dependence on the stream_id and byte_bus_id the RC
+ * Server determines the endpoint that is addressed" rule. This is what
+ * lets the SAME byte_bus_id validly address two different endpoints
+ * registered on two different stream_ids -- something the plain,
+ * unscoped rcp_mock_server_add_endpoint() cannot express (it rejects any
+ * byte_bus_id already registered anywhere on srv, regardless of stream,
+ * on the reasonable assumption that a caller not naming a stream_id at
+ * all wants the old, simpler global-uniqueness guarantee).
+ *
+ * Every real dispatch entry point (rcp_mock_server_dispatch(),
+ * _dispatch_tscf(), _dispatch_multi_response(), _dispatch_e2e(),
+ * _dispatch_e2e_fragment(), _dispatch_frame(), _dispatch_frame_e2e())
+ * resolves the addressed endpoint via this stream-scoped lookup, so a
+ * slot registered here is only ever reachable through a request that
+ * arrived declaring this exact stream_id -- an identically-addressed
+ * request on any OTHER stream_id either reaches a DIFFERENT slot
+ * registered at the same byte_bus_id on that other stream (if any), or
+ * is dropped per RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS/§12.9.1, exactly as if
+ * byte_bus_id were entirely unregistered on that stream.
+ *
+ * ep_type/ep_enable/handler/user_data and every other allocation detail
+ * (svr_ep_count/svr_ep_generic_cfg_capacity bookkeeping, capacity
+ * against RCP_MOCK_MAX_ENDPOINTS shared with every other registered
+ * endpoint regardless of scoping) are identical to
+ * rcp_mock_server_add_endpoint(). Returns RCP_MOCK_ERR_DUPLICATE_BUS_ID
+ * if byte_bus_id already names a registered endpoint reachable in the
+ * context of stream_id (either a slot scoped to this exact stream_id, or
+ * an unscoped slot from rcp_mock_server_add_endpoint(), which matches
+ * every stream_id); RCP_MOCK_ERR_CAPACITY if srv already holds
+ * RCP_MOCK_MAX_ENDPOINTS endpoints. Endpoints registered through this
+ * function and through the plain rcp_mock_server_add_endpoint() may be
+ * freely mixed on one srv; rcp_mock_server_remove_endpoint() and every
+ * other byte_bus_id-only accessor in this header (set_endpoint_enable(),
+ * queue_len(), drain_endpoint(), etc.) still address a slot registered
+ * here by byte_bus_id alone -- see each such function's own doc comment;
+ * only the real dispatch path is stream-scoped. */
+rcp_mock_errc_t rcp_mock_server_add_endpoint_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                                        rcp_byte_bus_id_t byte_bus_id,
+                                                        uint8_t ep_type, bool ep_enable,
+                                                        rcp_mock_endpoint_handler_fn handler,
+                                                        void *user_data);
+
 /* Removes the endpoint slot at byte_bus_id, freeing any requests still
  * queued on it. Returns true iff a slot was found and removed (and
  * svr_ep_count decremented); false, leaving srv unchanged, if byte_bus_id

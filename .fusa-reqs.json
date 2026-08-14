@@ -9075,13 +9075,24 @@
     {
       "id": "REQ-MOCK-030",
       "title": "rcp_mock_server_dispatch() drops a request silently when byte_bus_id names no registered endpoint",
-      "text": "rcp_mock_server_dispatch(), when byte_bus_id names no registered endpoint (find_slot() returns NULL), shall leave out_response zeroed (no response sent) and return RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): this entry previously required a wire EP_NOT_FOUND error response for this case, a real conformance bug introduced by an earlier milestone (issue #163 Phase 1) that misapplied TC18 Table 30's EP_NOT_FOUND (8) code -- that code's own Table 30 description is scoped to \"if a Trigger request refers to a nonexisting EP\" (a Trigger request's own trigger_source_ep sub-field naming a nonexistent EP, a case this codebase does not implement at all, per ROADMAP.md milestone 120's own note), not to the addressed endpoint of the request itself. TC18 \u00a712.9.1 explicitly and unambiguously requires the opposite of what this entry previously claimed: an unregistered byte_bus_id is dropped with no response. RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS's own internal dispatch-result semantics (distinguishing this case for chained-request cascade purposes in rcp_mock_server_dispatch_frame()) are unaffected -- only the wire response this function used to send has been removed.",
+      "text": "rcp_mock_server_dispatch(), when the (stream_id, byte_bus_id) pair names no registered endpoint (find_slot_on_stream() returns NULL), shall leave out_response zeroed (no response sent) and return RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS. Corrected 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group H): this entry previously required a wire EP_NOT_FOUND error response for this case, a real conformance bug introduced by an earlier milestone (issue #163 Phase 1) that misapplied TC18 Table 30's EP_NOT_FOUND (8) code -- that code's own Table 30 description is scoped to \"if a Trigger request refers to a nonexisting EP\" (a Trigger request's own trigger_source_ep sub-field naming a nonexistent EP, a case this codebase does not implement at all, per ROADMAP.md milestone 120's own note), not to the addressed endpoint of the request itself. TC18 \u00a712.9.1 explicitly and unambiguously requires the opposite of what this entry previously claimed: an unregistered byte_bus_id is dropped with no response. RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS's own internal dispatch-result semantics (distinguishing this case for chained-request cascade purposes in rcp_mock_server_dispatch_frame()) are unaffected -- only the wire response this function used to send has been removed. Corrected further 2026-08-14 (c-RCP-AUDIT-21, issue #432): the lookup itself is now genuinely scoped by stream_id, not byte_bus_id alone -- see REQ-MOCK-031, which this entry's own citation of \u00a712.9.1's stream_id clause had already anticipated but the code had not yet implemented.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
       "tc18": "\u00a712.9.1 (\"If the lookup of the byte_bus_id in the context of the stream_id does not point to an Endpoint, the request is dropped without further notification.\"), TC18.txt L3195-3197 -- Table 30's EP_NOT_FOUND (8) row (TC18.txt L3425-3426), previously miscited here, describes a different, unimplemented scenario (a Trigger request's own trigger_source_ep naming a nonexistent EP)"
+    },
+    {
+      "id": "REQ-MOCK-031",
+      "title": "Endpoint lookup at every real dispatch entry point is scoped by (stream_id, byte_bus_id), not byte_bus_id alone",
+      "text": "rcp_mock_server_dispatch()/_dispatch_tscf()/_dispatch_multi_response()/_dispatch_e2e()/_dispatch_e2e_fragment()/_dispatch_frame()/_dispatch_frame_e2e() shall resolve the addressed endpoint via find_slot_on_stream(), which matches a slot registered by rcp_mock_server_add_endpoint_on_stream() only when the request's own stream_id equals that slot's recorded stream_id (a slot registered by the plain, unscoped rcp_mock_server_add_endpoint() continues to match any stream_id, preserving that call's pre-existing global-uniqueness behavior). This lets the same byte_bus_id validly address two different endpoints registered on two different stream_ids. Corrected 2026-08-14 (c-RCP-AUDIT-21, issue #432): find_slot()/find_slot_const() and rcp_mock_server_add_endpoint() previously treated byte_bus_id as unique across the whole server regardless of stream_id, honoring only the response-shape half of \u00a712.9.1's own quoted sentence (REQ-MOCK-030's own history) while leaving the stream-scoping half unimplemented despite already being cited here.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a712.9.1 (\"In dependence on the stream_id and byte_bus_id the RC Server determines the endpoint that is addressed.\"), TC18.txt L3193-3197"
     },
     {
       "id": "REQ-ACF-017",

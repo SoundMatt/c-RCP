@@ -17,6 +17,21 @@
 typedef struct {
     bool                         in_use;
     rcp_byte_bus_id_t            byte_bus_id;
+    /* REQ-MOCK-031 (TC18 §12.9.1, issue #432): stream_scoped == false
+     * (every slot's own zero-init default, matching in_use/byte_bus_id's
+     * own "calloc()-safe" convention) means this slot was registered via
+     * the plain, pre-existing rcp_mock_server_add_endpoint() and matches
+     * a byte_bus_id lookup in ANY stream_id context, exactly this
+     * module's pre-#432 behavior. stream_scoped == true (set only by
+     * rcp_mock_server_add_endpoint_on_stream()) means this slot matches a
+     * lookup ONLY when stream_id equals this slot's own stream_id field
+     * below -- see find_slot_on_stream()'s own doc comment for the full
+     * matching rule, and rcp_mock_server_add_endpoint_on_stream()'s own
+     * doc comment (mock.h) for why two slots sharing one byte_bus_id
+     * across two different stream_ids is exactly the case TC18 §12.9.1
+     * requires this module to support. */
+    bool                         stream_scoped;
+    uint64_t                     stream_id;
     rcp_regmap_ep_generic_cfg_t  generic;
     rcp_server_endpoint_t        queue;
     rcp_mock_endpoint_handler_fn handler;
@@ -649,6 +664,40 @@ static const rcp_mock_endpoint_slot_t *find_slot_const(const rcp_mock_server_t *
     return NULL;
 }
 
+/* REQ-MOCK-031 (TC18 §12.9.1, issue #432): "In dependence on the
+ * stream_id and byte_bus_id the RC Server determines the endpoint that
+ * is addressed." Stream-scoped counterpart of find_slot(), used by this
+ * module's own real request-dispatch entry points (the ones that already
+ * carry a stream_id of their own) rather than find_slot() itself, so the
+ * SAME byte_bus_id can correctly resolve to two different endpoints
+ * registered on two different stream_ids.
+ *
+ * Matching rule for a slot addressed at byte_bus_id: a slot with
+ * stream_scoped == false (registered via the plain, unscoped
+ * rcp_mock_server_add_endpoint()) matches unconditionally, exactly this
+ * module's pre-#432 "byte_bus_id alone" behavior; a slot with
+ * stream_scoped == true (registered via
+ * rcp_mock_server_add_endpoint_on_stream()) matches only when stream_id
+ * equals that slot's own recorded stream_id. At most one slot can ever
+ * satisfy this for a given (stream_id, byte_bus_id) pair: both add-
+ * endpoint entry points' own duplicate-byte_bus_id rejection together
+ * rule out every other combination -- see
+ * rcp_mock_server_add_endpoint_on_stream()'s own doc comment (mock.h)
+ * for why. */
+static rcp_mock_endpoint_slot_t *find_slot_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                                       rcp_byte_bus_id_t byte_bus_id)
+{
+    size_t i;
+    for (i = 0; i < RCP_MOCK_MAX_ENDPOINTS; i++) {
+        rcp_mock_endpoint_slot_t *slot = &srv->endpoints[i];
+        if (slot->in_use && slot->byte_bus_id == byte_bus_id &&
+            (!slot->stream_scoped || slot->stream_id == stream_id)) {
+            return slot;
+        }
+    }
+    return NULL;
+}
+
 //cfusa:req REQ-MOCK-007
 //cfusa:req REQ-MOCK-008
 rcp_mock_errc_t rcp_mock_server_add_endpoint(rcp_mock_server_t *srv,
@@ -695,6 +744,66 @@ rcp_mock_errc_t rcp_mock_server_add_endpoint(rcp_mock_server_t *srv,
      * response() already compute ep_generic_cfg_len from (src/regmap.c,
      * ep_generic_cfg_count * 12u); endpoint_count is well within
      * uint16_t even at RCP_MOCK_MAX_ENDPOINTS (64 * 12 = 768). */
+    srv->regmap.svr_ep_generic_cfg_capacity = (uint16_t)(srv->endpoint_count * 12u);
+    return RCP_MOCK_OK;
+}
+
+//cfusa:req REQ-MOCK-031
+rcp_mock_errc_t rcp_mock_server_add_endpoint_on_stream(rcp_mock_server_t *srv, uint64_t stream_id,
+                                                        rcp_byte_bus_id_t byte_bus_id,
+                                                        uint8_t ep_type, bool ep_enable,
+                                                        rcp_mock_endpoint_handler_fn handler,
+                                                        void *user_data)
+{
+    size_t i;
+    rcp_mock_endpoint_slot_t *slot = NULL;
+
+    /* Deliberately its own self-contained slot-allocation body, not a
+     * thin wrapper around rcp_mock_server_add_endpoint() the way
+     * rcp_mock_server_add_endpoint_multi_response() is -- that function's
+     * own reuse works only because it registers unscoped, with the exact
+     * same duplicate-check semantics add_endpoint() itself already
+     * applies. This function's own duplicate check is different on
+     * purpose (find_slot_on_stream(), not find_slot()): the entire point
+     * of REQ-MOCK-031 is that the SAME byte_bus_id, scoped to two
+     * DIFFERENT stream_ids, must be allowed to coexist as two separate
+     * slots -- something routing every call through add_endpoint()'s own
+     * find_slot()-based rejection could never permit. Following this
+     * file's own "new function, not a breaking change" convention
+     * (issue #432): rcp_mock_server_add_endpoint() itself is completely
+     * untouched by this addition, so its own existing global-uniqueness
+     * contract (and every one of its ~100+ existing call sites) keeps its
+     * exact prior behavior. */
+    if (find_slot_on_stream(srv, stream_id, byte_bus_id)) return RCP_MOCK_ERR_DUPLICATE_BUS_ID;
+    if (srv->endpoint_count >= RCP_MOCK_MAX_ENDPOINTS) return RCP_MOCK_ERR_CAPACITY;
+
+    for (i = 0; i < RCP_MOCK_MAX_ENDPOINTS; i++) {
+        if (!srv->endpoints[i].in_use) {
+            slot = &srv->endpoints[i];
+            break;
+        }
+    }
+    /* Unreachable given the endpoint_count check above, but guarded rather
+     * than trusted -- matches rcp_mock_server_add_endpoint()'s own
+     * identical guard. */
+    if (!slot) return RCP_MOCK_ERR_CAPACITY;
+
+    memset(slot, 0, sizeof(*slot));
+    slot->in_use        = true;
+    slot->byte_bus_id   = byte_bus_id;
+    slot->stream_scoped = true;
+    slot->stream_id     = stream_id;
+    rcp_regmap_ep_generic_cfg_init(&slot->generic);
+    slot->generic.ep_type = ep_type;
+    slot->generic.ep_used = true;
+    rcp_server_endpoint_init(&slot->queue, ep_enable);
+    slot->handler   = handler;
+    slot->user_data = user_data;
+
+    srv->endpoint_count++;
+    srv->regmap.svr_ep_count = (uint16_t)srv->endpoint_count;
+    /* Same REQ-RMAP-036 bookkeeping as rcp_mock_server_add_endpoint()'s
+     * own identical line -- see that function's own doc comment. */
     srv->regmap.svr_ep_generic_cfg_capacity = (uint16_t)(srv->endpoint_count * 12u);
     return RCP_MOCK_OK;
 }
@@ -1150,7 +1259,11 @@ static rcp_mock_dispatch_result_t dispatch_plain_inner(rcp_mock_server_t *srv,
         return RCP_MOCK_DISPATCH_REJECTED;
     }
 
-    slot = find_slot(srv, byte_bus_id);
+    /* REQ-MOCK-031 (issue #432): stream-scoped, not find_slot() -- this
+     * is the real dispatch path TC18 §12.9.1's own "In dependence on the
+     * stream_id and byte_bus_id" sentence governs; see
+     * find_slot_on_stream()'s own doc comment for the matching rule. */
+    slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
     if (!slot) {
         /* TC18 §12.9.1: "If the lookup of the byte_bus_id in the context
          * of the stream_id does not point to an Endpoint, the request is
@@ -1455,7 +1568,9 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_multi_response(
         return RCP_MOCK_DISPATCH_REJECTED;
     }
 
-    slot = find_slot(srv, byte_bus_id);
+    /* REQ-MOCK-031 (issue #432): stream-scoped lookup -- see
+     * find_slot_on_stream()'s own doc comment. */
+    slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
     if (!slot) {
         return RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS;
     }
@@ -1525,8 +1640,11 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
      * wrapper -- this call's own watchdog kick already happened above,
      * unconditionally, before this branch was even reached; delegating
      * through the public wrapper would kick a second time for the same
-     * received request (see dispatch_plain()'s own doc comment). */
-    slot = find_slot(srv, byte_bus_id);
+     * received request (see dispatch_plain()'s own doc comment).
+     *
+     * REQ-MOCK-031 (issue #432): stream-scoped, not find_slot() -- see
+     * find_slot_on_stream()'s own doc comment. */
+    slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
     if (!slot || !slot->req_crc_enable) {
         return dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
                                stream_id, false, 0u, 0u, request, request_len, out_response);
@@ -1649,7 +1767,9 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
         return RCP_MOCK_DISPATCH_STREAM_FAULTED;
     }
 
-    slot = find_slot(srv, byte_bus_id);
+    /* REQ-MOCK-031 (issue #432): stream-scoped, not find_slot() -- see
+     * find_slot_on_stream()'s own doc comment. */
+    slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
     if (!slot || !slot->req_crc_enable) {
         return dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
                                stream_id, false, 0u, 0u, fragment, fragment_len, out_response);
@@ -2204,9 +2324,16 @@ size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subty
          * itself a no-op for a non-chained entry (see that function's
          * own doc comment); a standalone (non-chained) member that lands
          * here is its own chain's own anchor, tagged chain_position 0,
-         * ready to cascade to any actual successors admitted after it. */
+         * ready to cascade to any actual successors admitted after it.
+         *
+         * REQ-MOCK-031 (issue #432): stream-scoped, not find_slot() --
+         * the dispatch call just above already resolved (and admitted
+         * into) the stream-scoped slot; re-finding it with a plain,
+         * scope-ignorant byte_bus_id lookup here could land on the WRONG
+         * slot's own queue whenever two different stream_ids each hold
+         * their own endpoint at this same byte_bus_id. */
         if (out->result == RCP_MOCK_DISPATCH_PENDING) {
-            rcp_mock_endpoint_slot_t *slot = find_slot(srv, byte_bus_id);
+            rcp_mock_endpoint_slot_t *slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
             if (slot) {
                 size_t last = last_pending_index(&slot->queue);
                 (void)rcp_server_endpoint_chain_predecessor_done(&slot->queue, last, 0u);
@@ -2347,9 +2474,11 @@ size_t rcp_mock_server_dispatch_frame_e2e(rcp_mock_server_t *srv, uint8_t avtp_s
                         out->result == RCP_MOCK_DISPATCH_CRC_ERROR);
 
         /* REQ-CANCEL-012: see rcp_mock_server_dispatch_frame()'s own
-         * identical block for the full rationale. */
+         * identical block for the full rationale. REQ-MOCK-031 (issue
+         * #432): stream-scoped, not find_slot() -- same reasoning as
+         * that function's own identical block. */
         if (out->result == RCP_MOCK_DISPATCH_PENDING) {
-            rcp_mock_endpoint_slot_t *slot = find_slot(srv, byte_bus_id);
+            rcp_mock_endpoint_slot_t *slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
             if (slot) {
                 size_t last = last_pending_index(&slot->queue);
                 (void)rcp_server_endpoint_chain_predecessor_done(&slot->queue, last, 0u);
