@@ -168,7 +168,8 @@
  * entry refers to -- see that field's own comment and fragment.h's file
  * header for the fragmentation mechanism it configures.
  *
- * ── TC18 0.5.1_RC5 terminology drift (investigated, NOT restructured) ──────
+ * ── TC18 0.5.1_RC5 terminology drift (investigated; wire layout RECONCILED
+ *    2026-08-14, issue #458 -- see this section's own closing paragraph) ──
  *
  * INVESTIGATED 2026-08-11 (spec rebaseline to TC18 0.5.1_RC5,
  * c-RCP-AUDIT-06, task #97): spec revision 0.5.1_RC4 renames and
@@ -184,12 +185,21 @@
  * No code change was made here, for three reasons, checked directly
  * against the rendered PDF on both spec revisions before concluding:
  *
- *   1. This struct has NO wire (de)serialization anywhere in this
- *      codebase (confirmed via grep across every .c file under src/) -- only
+ *   1. SUPERSEDED 2026-08-14 (issue #424, then #458 -- see this
+ *      section's own closing paragraph): This struct has NO wire
+ *      (de)serialization anywhere in this codebase (confirmed via grep
+ *      across every .c file under src/) -- only
  *      rcp_regmap_request_stream_cfg_t's own _init() exists. Nothing
  *      decodes a real 0x000D byte from the wire today, so there is no
  *      live conformance defect the old-vs-new bit layout could cause;
- *      this is a pure in-memory, caller-populated API surface.
+ *      this is a pure in-memory, caller-populated API surface. THIS
+ *      PREMISE IS NO LONGER TRUE: issue #424 added this table's first
+ *      real wire (de)serializer (rcp_regmap_request_stream_cfg_render()/
+ *      _apply_reconfig()), which retroactively made the "no live
+ *      conformance defect" conclusion below false without anyone
+ *      revisiting it at the time -- issue #458 is that revisit, closing
+ *      the gap. Kept here, historically, to show what this deferral
+ *      correctly rested on at the time it was made.
  *
  *   2. rx_enforce_e2e's own RC5 rename (rx_enforce_crc) is a pure
  *      synonym -- both are already single bits whose 1-value gates BOTH
@@ -264,6 +274,39 @@
  *      confirmed-still-draft status) -- their own eventual shape is not
  *      yet settled either, reinforcing that a full structural rewrite of
  *      this whole octet would be premature.
+ *
+ *      WIRE LAYOUT RECONCILED 2026-08-14 (issue #458, c-RCP-AUDIT-33):
+ *      issue #424's own fix above closed bit 7's mis-wiring but left
+ *      bits [6:0] untouched, still serialized against reason 1's own
+ *      now-false premise -- nobody had revisited THAT conclusion once
+ *      #424 made it stale, a real, demonstrable wire-format conformance
+ *      defect an independent audit pass caught. Fixed here:
+ *      rcp_regmap_request_stream_cfg_render()/_apply_reconfig() now
+ *      serialize the REAL RC5 4-bit layout (bit0 rx_enforce_crc, bit1
+ *      rx_enforce_sequence, bit2 rx_enforce_watchdog, bit3
+ *      rx_enforce_request_filing, bits [6:4] Reserved/R-only), not the
+ *      old RC1-baseline 8-independent-bit model. Reason 2's own
+ *      "superset, not a defect" analysis is UNCHANGED and remains
+ *      correct in spirit -- this codebase's struct still keeps
+ *      rx_enforce_seq/rx_seq_safestate_enable and rx_wd_enable/
+ *      rx_wd_safestate_enable as independently expressible internal
+ *      dimensions, exactly as e2e.h's own evaluators need -- but the
+ *      WIRE now genuinely renders only the coupled subset RC5 can
+ *      express (bit true iff BOTH internal dimensions of a pair agree,
+ *      AND not OR, so this register can never overstate a safety
+ *      guarantee), and a real wire WRITE now sets both dimensions of a
+ *      pair together, matching the only state a real RC5 write could
+ *      ever produce. Reason 3's own ambiguity for rx_safety_measure and
+ *      rx_wd_info_enable is likewise UNCHANGED (still genuinely
+ *      unresolved, still no clear 1:1 RC5 replacement) -- both fields
+ *      simply lose the wire register position an earlier, incorrect
+ *      revision of this codec had given them (bit 6 and bit 7
+ *      respectively), the same "content-modeling only, no wire
+ *      position" disposition rx_wd_action already had. See
+ *      rcp_regmap_request_stream_cfg_render()'s own doc comment (this
+ *      table's "request-stream-cfg wire codec" section below) for the
+ *      complete field-by-field mapping and the safety rationale behind
+ *      the AND-not-OR render() rule.
  *
  * ── Known spec ambiguity: EP-ID/byte_bus_id ordering is not enforced ───────
  *
@@ -1896,9 +1939,29 @@ typedef struct {
                                           rx_seq_safestate_enable below,
                                           this pair corresponds to TC18
                                           0.5.1_RC5's own single combined
-                                          rx_enforce_sequence bit -- see
+                                          rx_enforce_sequence bit (row-
+                                          relative 0x000D bit 1) -- see
                                           the file header's own
-                                          "terminology drift" note. */
+                                          "terminology drift" note.
+                                          CORRECTED 2026-08-14 (issue
+                                          #458): this is now a REAL wire
+                                          mapping, not just a content-
+                                          model note --
+                                          rcp_regmap_request_stream_cfg_
+                                          render() sets bit 1 true only
+                                          when BOTH this field AND
+                                          rx_seq_safestate_enable are
+                                          true (never OR), since RC5's
+                                          single bit ties "block" and
+                                          "enter safe state" together
+                                          atomically and a wire read must
+                                          never overstate that coupled
+                                          guarantee; _apply_reconfig()
+                                          sets BOTH fields together from
+                                          that one bit on write -- see
+                                          render()'s own doc comment
+                                          below for the full
+                                          reconciliation. */
     bool     rx_seq_safestate_enable; /* true: a sequence_num that did not
                                           advance by exactly one increment
                                           drives every endpoint bound to
@@ -1917,9 +1980,18 @@ typedef struct {
                                           rx_wd_safestate_enable below,
                                           this pair corresponds to TC18
                                           0.5.1_RC5's own single combined
-                                          rx_enforce_watchdog bit -- see
+                                          rx_enforce_watchdog bit (row-
+                                          relative 0x000D bit 2) -- see
                                           the file header's own
-                                          "terminology drift" note. */
+                                          "terminology drift" note.
+                                          CORRECTED 2026-08-14 (issue
+                                          #458): now a REAL wire mapping
+                                          -- see rx_enforce_seq's own doc
+                                          comment above for the identical
+                                          AND-not-OR render() rule and
+                                          both-together apply_reconfig()
+                                          rule this field shares with
+                                          rx_wd_safestate_enable. */
     uint32_t rx_wd_timeout_ms;        /* elapsed-since-last-kick overflow threshold */
     uint8_t  rx_wd_action;            /* caller-defined; round-tripped only */
     bool     rx_wd_safestate_enable;  /* overflow drives the endpoint toward
@@ -1959,8 +2031,10 @@ typedef struct {
     /* ── Request-storage overflow (e2e.h) ───────────────────────────── */
     bool     rx_ovrflw_safestate_enable; /* REQ-RMAP-071 (TC18 §12.7.7
                                           Table 24, relative address
-                                          0x000D bit 5, 1 bit, R/W*):
-                                          true drives every endpoint bound
+                                          0x000D bit 3 in the current RC5
+                                          numbering -- rx_enforce_request_
+                                          filing, 1 bit, R/W*): true
+                                          drives every endpoint bound
                                           to this stream toward its
                                           configured safe state if one
                                           endpoint's own request storage
@@ -1968,18 +2042,26 @@ typedef struct {
                                           rcp_e2e_overflow_should_enter_safe_state()
                                           (e2e.h), the pure decision
                                           function this field is the
-                                          register-map source for.
-                                          Content modeling only, closing a
-                                          gap this file's own
-                                          "terminology drift" section
-                                          (above) already NAMED as one of
-                                          this codebase's own eight
-                                          independent bits but never
-                                          actually added as a struct
-                                          field until now -- REQ-E2E-030's
-                                          own separate, still-open
-                                          cross-endpoint-orchestrator gap
-                                          is unaffected by adding it. */
+                                          register-map source for. This
+                                          field never had a separate
+                                          "enable" dimension of its own
+                                          (TC18 couples block-and-enter-
+                                          safe-state into one bit on both
+                                          sides here, unlike the
+                                          sequence/watchdog pairs above),
+                                          so it maps directly to that one
+                                          real wire bit, uncombined.
+                                          WIRE-MAPPED 2026-08-14 (issue
+                                          #458): rcp_regmap_request_
+                                          stream_cfg_render()/
+                                          _apply_reconfig() previously
+                                          serialized this field at the
+                                          OLD RC1-baseline bit position
+                                          (bit 5) instead of its real RC5
+                                          position (bit 3) -- corrected;
+                                          see render()'s own doc comment
+                                          below for the full
+                                          reconciliation. */
 
     /* ── Configured safe state (e2e.h) ──────────────────────────────── */
     uint8_t  rx_safety_measure;         /* RCP_E2E_MEASURE_FORCE_HIGH_IMPEDANCE (0)
@@ -1989,7 +2071,26 @@ typedef struct {
                                             replacement for this selector
                                             either -- see the file
                                             header's own "terminology
-                                            drift" note, reason 3. */
+                                            drift" note, reason 3.
+                                            CORRECTED 2026-08-14 (issue
+                                            #458): this field used to be
+                                            wire-serialized at row-
+                                            relative 0x000D bit 6 by
+                                            rcp_regmap_request_stream_cfg_
+                                            render()/_apply_reconfig() --
+                                            WRONG, that bit is Reserved
+                                            (R only) in TC18 RC5's real
+                                            layout, not a content bit at
+                                            all. This field has NO wire
+                                            register position of its own
+                                            anymore -- content-modeling
+                                            only, still consumed directly
+                                            by e2e.h as a plain argument,
+                                            the same disposition
+                                            rx_wd_info_enable's own doc
+                                            comment above already
+                                            established for a different
+                                            field. */
     uint16_t rx_safestate_sequencer;    /* request_sequencer.h table index the
                                             RCP_E2E_MEASURE_SEQUENCER measure
                                             polls; meaningless otherwise */
@@ -2151,24 +2252,71 @@ bool rcp_regmap_wd_timeout_ticks_to_ms(uint16_t ticks,
  *   - rx_safestate_sequencer is uint16_t internally (a
  *     request_sequencer.h table index) vs. an 8-bit wire register.
  *
- * The 7 independently-configurable bits at relative address 0x000D bits
- * [6:0] (rx_enforce_e2e/rx_enforce_seq/rx_seq_safestate_enable/
- * rx_wd_enable/rx_wd_safestate_enable/rx_ovrflw_safestate_enable/
- * rx_safety_measure) are serialized using this codebase's OWN existing
- * RC1-baseline 8-independent-bit content model, not RC5's own later
- * 4-combined-bit restructuring -- already investigated and deliberately
- * NOT restructured (task #97, see this file's own "TC18 0.5.1_RC5
- * terminology drift" section above): this codebase's own richer model is
- * a strict, lossless superset of what RC5's collapsed encoding can
- * express, so serializing it directly (one struct field per bit) is both
- * simpler and loses nothing a real RC5-conformant peer could otherwise
- * distinguish.
+ * RECONCILED 2026-08-14 (issue #458, REQ-RMAP-047/048/049/050/051/071,
+ * REQ-E2E-046): relative address 0x000D's real TC18 RC5 layout is 4
+ * meaningful bits, not the 8-independent-bit RC1-baseline content model
+ * this codebase used to serialize directly (one struct field per bit,
+ * bits [6:0]) -- confirmed via direct pdftotext -layout extraction of
+ * Table 24 against the primary-source PDF (OA_TC18_specification_v0.5.1_
+ * RC_5, p.66): bit0 rx_enforce_crc, bit1 rx_enforce_sequence, bit2
+ * rx_enforce_watchdog, bit3 rx_enforce_request_filing, bits [6:4]
+ * Reserved (R only, no field), bit7 rx_stream_status (see below). This
+ * reopens and closes the reconciliation this file's own "TC18 0.5.1_RC5
+ * terminology drift" section above previously, correctly, deferred
+ * (task #97) on the explicit premise that "nothing decodes a real
+ * 0x000D byte from the wire today" -- issue #424's rx_stream_status
+ * live-wiring made that premise false without anyone revisiting this
+ * section's own conclusion, producing a real, demonstrable wire-format
+ * conformance defect (issue #458) until now.
  *
- * Bit 7 (0x000D.7) is NOT one of those 8 independent bits -- CORRECTED
+ *   - bit0 (rx_enforce_crc): a pure rename of rx_enforce_e2e, unchanged
+ *     single-bit semantics -- maps directly, same bit position as
+ *     before.
+ *   - bit1 (rx_enforce_sequence) / bit2 (rx_enforce_watchdog): TC18's
+ *     own spec text ties both actions of each bit together atomically
+ *     ("stream is blocked ... AND Safe state will be entered") -- this
+ *     codebase's own richer model deliberately keeps the "block"
+ *     dimension (rx_enforce_seq/rx_wd_enable) and the "also enter safe
+ *     state" dimension (rx_seq_safestate_enable/rx_wd_safestate_enable)
+ *     independently expressible (e2e.h's own design, "either can be
+ *     enabled without the other"), so each of these two wire bits
+ *     renders true ONLY when BOTH of its own internal dimensions agree
+ *     (logical AND, never OR): rendering OR would let a stream that
+ *     only blocks (without entering safe state) claim, to a real RC5
+ *     peer reading this register, that it also enters safe state on
+ *     violation -- a false, overstated safety guarantee this codebase
+ *     must never produce. The reverse direction is exact and lossless:
+ *     a real RC5 write can only ever express the coupled state to begin
+ *     with (there is no wire encoding for "block but don't enter safe
+ *     state"), so apply_reconfig() below sets BOTH of a pair's internal
+ *     dimensions together from that one arriving bit -- the coupled
+ *     subset this codebase's own superset model was always said to
+ *     represent correctly (see the file header's own "terminology
+ *     drift" note, reason 2) is now the actually-wired reality, not
+ *     just an abstract claim.
+ *   - bit3 (rx_enforce_request_filing): maps directly, uncombined, from
+ *     rx_ovrflw_safestate_enable -- that field never had a separate
+ *     "enable" dimension of its own (TC18 couples it to one bit on both
+ *     sides here too), so no AND/OR logic is needed for this bit.
+ *   - bits [6:4]: Reserved, R only -- render() always writes 0;
+ *     apply_reconfig() ignores whatever arrives there (the same
+ *     "accepted, no struct field consumes it" treatment this table's
+ *     own 3 reserved trailing octets already receive, per
+ *     apply_reconfig()'s own doc comment below).
+ *   - rx_safety_measure and rx_wd_info_enable both lose the wire
+ *     register position an earlier (buggy) revision of this codec gave
+ *     them (bit 6 and bit 7 respectively) -- neither has a clear 1:1
+ *     replacement in RC5's real 4-bit scheme (file header, reason 3),
+ *     so both are now purely content-modeling, consumed directly by
+ *     e2e.h/watchdog.h as plain arguments, the same disposition
+ *     rx_wd_action's own doc comment already established for a
+ *     different field with no TC18 wire basis at all.
+ *
+ * Bit 7 (0x000D.7) is NOT one of the 4 meaningful bits above -- CORRECTED
  * 2026-08-14 (issue #424, REQ-E2E-046/REQ-RMAP-051): it is TC18's own
  * distinct, LIVE rx_stream_status bit (plain R/W, not R/W* like its
- * seven octet-mates -- "set automatically as a reaction to either CRC
- * error, sequence error, watchdog overflow, EP overflow, when enabled").
+ * octet-mates -- "set automatically as a reaction to either CRC error,
+ * sequence error, watchdog overflow, EP overflow, when enabled").
  * rx_stream_status_blocked is a caller-supplied, index-parallel array
  * (entries[i] <-> rx_stream_status_blocked[i]) of already-computed
  * aggregate values -- a real caller sources each one from
@@ -2200,14 +2348,18 @@ rcp_regmap_request_stream_cfg_reconfig_strerror(rcp_regmap_request_stream_cfg_re
  * apply_reconfig(). relative_start_address/data are relative to this
  * table's own start (svr_request_stream_cfg_ptr's own current value), not
  * to Table 20. A write landing on the 3 reserved trailing octets
- * (0x0012-0x0017), or on bit 7 of 0x000D (rx_stream_status -- issue #424,
- * see rcp_regmap_request_stream_cfg_render()'s own doc comment above),
- * is accepted (this table's octets are all still R/W or R/W*, TC18
- * defines no read-only subrange) but has no effect on any struct field
- * -- it patches the transient image this function builds internally,
- * which is then discarded rather than re-parsed back into anything,
- * since neither corresponds to a struct field; bits [6:0] of 0x000D
- * remain genuinely R/W* round-tripped fields, unaffected by this. This
+ * (0x0012-0x0017), on bits [6:4] of 0x000D (Reserved, R only -- CORRECTED
+ * 2026-08-14, issue #458: this codebase used to treat these as genuine
+ * R/W* content bits, see rcp_regmap_request_stream_cfg_render()'s own doc
+ * comment above for the full reconciliation), or on bit 7 of 0x000D
+ * (rx_stream_status -- issue #424, same doc comment), is accepted (this
+ * table's octets are all still R/W or R/W*, TC18 defines no read-only
+ * subrange the wire codec itself must enforce) but has no effect on any
+ * struct field -- it patches the transient image this function builds
+ * internally, which is then discarded rather than re-parsed back into
+ * anything, since none of those bits correspond to a struct field; bits
+ * [3:0] of 0x000D remain the genuinely R/W* content-bearing fields this
+ * function round-trips, unaffected by this. This
  * function itself performs no lifecycle-state authorization of its own
  * (as with every sibling apply_reconfig() in this file) -- see
  * request_stream_cfg_row_write_authorize() (regmap.c) for where the

@@ -1520,9 +1520,11 @@ static void test_watchdog_purge_keeps_only_the_safety_sequence(void)
 /* ── Cross-endpoint safe-state broadcast (issue #335, REQ-E2E-030) ─────────
  *
  * TC18 §12.7.7 Table 24's own rx_ovrflw_safestate_enable (relative address
- * 0x000D bit 5) brings every endpoint bound to the request stream into its
- * configured safe state when any one endpoint's own request storage
- * overflows -- not just the one endpoint whose queue happened to fill up.
+ * 0x000D bit 3 in the real RC5 numbering -- corrected 2026-08-14, issue
+ * #458; see regmap.h's own file-header note) brings every endpoint bound
+ * to the request stream into its configured safe state when any one
+ * endpoint's own request storage overflows -- not just the one endpoint
+ * whose queue happened to fill up.
  * This proves that stream-wide half end-to-end: overflowing byte_bus_id
  * 1's own request store purges a non-safety-tagged request queued on
  * byte_bus_id 2, a sibling bound to the same request stream via

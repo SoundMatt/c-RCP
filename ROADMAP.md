@@ -19106,6 +19106,70 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.369.0 -- 2026-08-14 (REQ-RMAP-051/071: request-stream-cfg's Table
+24 byte 0x000D wire layout reconciled with the real RC5 4-bit model)
+
+Closes issue #458 (c-RCP-AUDIT-33). `regmap.h`'s own file-header "TC18
+0.5.1_RC5 terminology drift" note previously, correctly, deferred
+reconciling this codebase's RC1-baseline 8-independent-bit content
+model of Table 24's relative-address `0x000D` octet with RC5's real,
+simplified 4-bit layout -- deferred specifically because, at the time,
+"this struct has NO wire (de)serialization anywhere in this
+codebase... nothing decodes a real `0x000D` byte from the wire today,
+so there is no live conformance defect the old-vs-new bit layout could
+cause." Issue #424 retroactively invalidated that premise by adding
+`rcp_regmap_request_stream_cfg_render()`/`_apply_reconfig()` as this
+table's first real wire (de)serializer -- but nobody revisited the
+deferral's own conclusion once its precondition changed, leaving bits
+`[6:0]` of that octet still serialized against the old, wrong model.
+An independent audit pass caught it.
+
+Real RC5 layout, confirmed via direct `pdftotext -layout` extraction of
+Table 24 against the primary-source PDF: bit0 `rx_enforce_crc`, bit1
+`rx_enforce_sequence`, bit2 `rx_enforce_watchdog`, bit3
+`rx_enforce_request_filing`, bits `[6:4]` Reserved (R only), bit7
+`rx_stream_status` (already correctly wired by #424). Old, wrong
+layout this codebase actually serialized: one independent bit per
+struct field, bit0 `rx_enforce_e2e`, bit1 `rx_enforce_seq`, bit2
+`rx_seq_safestate_enable`, bit3 `rx_wd_enable`, bit4
+`rx_wd_safestate_enable`, bit5 `rx_ovrflw_safestate_enable`, bit6
+`rx_safety_measure`.
+
+Fixed: `render()`/`_apply_reconfig()` (`src/regmap.c`) now serialize
+the real 4-bit layout. Bit0 is an unchanged pure rename
+(`rx_enforce_e2e`). Bits 1/2 each collapse TWO independently-
+expressible internal dimensions (an "enable"/"block" bit plus its own
+separate "also enter safe state" bit -- `e2e.h`'s own deliberate
+design, kept unchanged) into the ONE real wire bit RC5 defines:
+render() sets that bit true only when BOTH internal dimensions agree
+(logical AND, never OR), since RC5's own spec text ties "blocked" and
+"safe state entered" together atomically and rendering OR would let a
+stream that only blocks (without escalating to safe state) falsely
+claim that stronger guarantee to a real RC5 peer -- `apply_reconfig()`
+sets both dimensions of a pair together from that one arriving bit,
+exactly the coupled subset a real RC5 write can ever express. Bit3
+(`rx_enforce_request_filing`) maps directly, uncombined, from
+`rx_ovrflw_safestate_enable`, moving off its old bit-5 position.
+`rx_safety_measure` loses its old, incorrect bit-6 wire position
+entirely -- Reserved in the real layout, no 1:1 RC5 replacement
+exists (unchanged, still-open ambiguity, same disposition
+`rx_wd_info_enable` already had after #424) -- now purely
+content-modeling. `request_stream_cfg_row_write_authorize()`'s own
+bits-`[6:0]` write-authorization mask needed no change: already
+conservative enough.
+
+New byte-literal tests (`tests/test_tc18_gaps_regmap.c`) prove the
+real bit positions directly, the AND-not-OR merge rule for both
+combined bits, and an `apply_reconfig()` round-trip proving a write
+confined to the Reserved bits `[6:4]` has no effect on any struct
+field. Mutation-tested: reverting only the fix (keeping the new
+tests) makes all 4 new tests fail cleanly; restored, suite green
+again. Full 66-test suite + ASan/UBSan clean; `cfusa check`: 0
+errors; `cfusa trace`: 1088/1088 traced and tested (unchanged --
+REQ-RMAP-047/048/049/050/051/071 and REQ-E2E-046 already existed,
+this closes a wire-format defect in their own implementation, not a
+new requirement).
+
 ### v0.368.0 -- 2026-08-14 (REQ-SRV-015/016: rcp_server_endpoint_admit()
 now checks ep_enable for conditional requests)
 

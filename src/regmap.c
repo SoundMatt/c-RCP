@@ -490,10 +490,15 @@ static rcp_wire_error_t sequencer_row_write_authorize(rcp_lifecycle_state_t stat
  * HW_UNCONFIGURED/HW_CONFIGURED, permanently read-only once
  * RCP_CONFIGURED -- for every field EXCEPT ONE: row-relative offset
  * 0x000D bit 7 (rx_stream_status) is Table 24's own distinct, plain R/W
- * bit in that same octet, genuinely different from the seven R/W*
- * enforcement-config bits sharing it (rx_enforce_e2e/rx_enforce_seq/
- * rx_seq_safestate_enable/rx_wd_enable/rx_wd_safestate_enable/
- * rx_ovrflw_safestate_enable/rx_safety_measure).
+ * bit in that same octet, genuinely different from the real R/W*
+ * enforcement-config bits sharing it. CORRECTED 2026-08-14 (issue
+ * #458): that octet's real bits [3:0] are TC18 RC5's own
+ * rx_enforce_crc/rx_enforce_sequence/rx_enforce_watchdog/
+ * rx_enforce_request_filing (bits [6:4] are Reserved, R only, carrying
+ * no field at all) -- NOT the eight independently-configurable bits an
+ * older revision of this comment described; see
+ * rcp_regmap_request_stream_cfg_render()'s own doc comment (regmap.h)
+ * for the full reconciliation this fix made.
  *
  * FUNCTIONAL_W_STAR (checked first, exactly as every other table's own
  * write path in this file does) is the correct, sufficient rule for
@@ -513,12 +518,16 @@ static rcp_wire_error_t sequencer_row_write_authorize(rcp_lifecycle_state_t stat
  * lifecycle restriction on that one bit; a write that would ALSO change
  * any of bits [6:0] remains denied even if it also touches bit 7 -- this
  * carve-out must never let a write disguised as a status-bit update
- * smuggle a change to any of those seven genuinely safety-relevant
- * enforcement bits through once FUNCTIONAL_W_STAR's own window has
- * closed. A write touching any OTHER octet in the row is denied
- * outright once FUNCTIONAL_W_STAR itself has failed, with no carve-out
- * of its own -- this function's own bit-7 exception is the ONLY relief
- * from FUNCTIONAL_W_STAR this table's write path grants. */
+ * smuggle a change to any of those genuinely safety-relevant enforcement
+ * bits through once FUNCTIONAL_W_STAR's own window has closed (the mask
+ * is deliberately still the full bits-[6:0] span, not narrowed to the
+ * real bits-[3:0] content -- denying a write that ALSO touches a
+ * Reserved bit is strictly more conservative than necessary, never less,
+ * so it needed no change for this fix). A write touching any OTHER
+ * octet in the row is denied outright once FUNCTIONAL_W_STAR itself has
+ * failed, with no carve-out of its own -- this function's own bit-7
+ * exception is the ONLY relief from FUNCTIONAL_W_STAR this table's write
+ * path grants. */
 static bool request_stream_cfg_row_write_authorize(rcp_lifecycle_state_t state,
                                                      rcp_lifecycle_writer_ctx_t writer,
                                                      uint16_t relative_start_address,
@@ -2084,13 +2093,43 @@ void rcp_regmap_request_stream_cfg_render(const rcp_regmap_request_stream_cfg_t 
 
         out[24u * i + 0x000Cu] = e->rx_secure_channel_index;
 
-        bits_0x000d  = (uint8_t)(e->rx_enforce_e2e            ? 0x01u : 0x00u);
-        bits_0x000d |= (uint8_t)(e->rx_enforce_seq             ? 0x02u : 0x00u);
-        bits_0x000d |= (uint8_t)(e->rx_seq_safestate_enable    ? 0x04u : 0x00u);
-        bits_0x000d |= (uint8_t)(e->rx_wd_enable               ? 0x08u : 0x00u);
-        bits_0x000d |= (uint8_t)(e->rx_wd_safestate_enable     ? 0x10u : 0x00u);
-        bits_0x000d |= (uint8_t)(e->rx_ovrflw_safestate_enable ? 0x20u : 0x00u);
-        bits_0x000d |= (uint8_t)(e->rx_safety_measure          ? 0x40u : 0x00u);
+        /* REQ-RMAP-047..051/071 (issue #458): TC18 RC5's own real Table
+         * 24 layout for this octet is 4 meaningful bits (bit0
+         * rx_enforce_crc, bit1 rx_enforce_sequence, bit2
+         * rx_enforce_watchdog, bit3 rx_enforce_request_filing; bits
+         * [6:4] Reserved/R-only), NOT this codebase's old RC1-baseline
+         * 8-independent-bit model -- see this function's own doc
+         * comment (regmap.h) for the full reconciliation.
+         *
+         *   - bit0: rx_enforce_crc is a pure rename of rx_enforce_e2e,
+         *     unchanged single-bit semantics.
+         *   - bit1/bit2: RC5's own spec text ties BOTH actions of each
+         *     bit together atomically ("stream is blocked ... AND Safe
+         *     state will be entered") -- this codebase's own richer
+         *     model keeps the "block" (rx_enforce_seq/rx_wd_enable) and
+         *     "also enter safe state" (rx_seq_safestate_enable/
+         *     rx_wd_safestate_enable) dimensions independently
+         *     expressible (e2e.h's own deliberate design), so each wire
+         *     bit renders true only when BOTH internal dimensions agree
+         *     (logical AND, never OR): this can never overstate a
+         *     safety guarantee (claim "blocked AND safe-state-entered"
+         *     to a real RC5 peer when only one of those two is actually
+         *     configured). A real RC5 write can only ever produce this
+         *     exact coupled state anyway -- see apply_reconfig() below.
+         *   - bit3: rx_enforce_request_filing maps directly,
+         *     uncombined, from rx_ovrflw_safestate_enable -- that field
+         *     never had a separate "enable" dimension of its own (TC18
+         *     couples it to a single bit on both sides).
+         *   - bits [6:4]: Reserved, always render 0.
+         *   - rx_safety_measure no longer has any wire register
+         *     position of its own -- same disposition already
+         *     established for rx_wd_info_enable (see that field's own
+         *     doc comment, regmap.h): content-modeling only. */
+        bits_0x000d  = (uint8_t)(e->rx_enforce_e2e ? 0x01u : 0x00u);
+        bits_0x000d |= (uint8_t)((e->rx_enforce_seq && e->rx_seq_safestate_enable) ? 0x02u
+                                                                                    : 0x00u);
+        bits_0x000d |= (uint8_t)((e->rx_wd_enable && e->rx_wd_safestate_enable) ? 0x04u : 0x00u);
+        bits_0x000d |= (uint8_t)(e->rx_ovrflw_safestate_enable ? 0x08u : 0x00u);
         /* REQ-E2E-046/REQ-RMAP-051 (issue #424): bit 7 is TC18's own
          * distinct, live rx_stream_status bit, NOT rx_wd_info_enable --
          * see this function's own doc comment (regmap.h) for the full
@@ -2197,13 +2236,39 @@ rcp_regmap_request_stream_cfg_apply_reconfig(rcp_regmap_request_stream_cfg_t *en
         }
         entries[i].rx_secure_channel_index    = block[24u * i + 0x000Cu];
 
-        entries[i].rx_enforce_e2e             = (bits_0x000d & 0x01u) != 0u;
-        entries[i].rx_enforce_seq             = (bits_0x000d & 0x02u) != 0u;
-        entries[i].rx_seq_safestate_enable    = (bits_0x000d & 0x04u) != 0u;
-        entries[i].rx_wd_enable               = (bits_0x000d & 0x08u) != 0u;
-        entries[i].rx_wd_safestate_enable     = (bits_0x000d & 0x10u) != 0u;
-        entries[i].rx_ovrflw_safestate_enable = (bits_0x000d & 0x20u) != 0u;
-        entries[i].rx_safety_measure          = (uint8_t)((bits_0x000d & 0x40u) != 0u);
+        /* CORRECTED 2026-08-14 (issue #458): unpack the real RC5 4-bit
+         * layout, not the old RC1-baseline 8-independent-bit model --
+         * see rcp_regmap_request_stream_cfg_render()'s own doc comment
+         * above (this same fix's render-side half) for the full
+         * reconciliation. bit1/bit2 each set BOTH of this codebase's own
+         * two internal dimensions together: a real RC5 write can only
+         * ever express the coupled "block AND enter safe state" state
+         * (there is no wire encoding for "block but don't enter safe
+         * state" or vice versa), so both rx_enforce_seq/
+         * rx_seq_safestate_enable (and rx_wd_enable/
+         * rx_wd_safestate_enable) always end up equal after a write --
+         * exactly the coupled subset this codebase's own richer,
+         * independently-expressible superset model was always said to
+         * represent correctly (see regmap.h's own "terminology drift"
+         * file-header note). */
+        entries[i].rx_enforce_e2e = (bits_0x000d & 0x01u) != 0u;
+        {
+            bool seq_bit = (bits_0x000d & 0x02u) != 0u;
+
+            entries[i].rx_enforce_seq          = seq_bit;
+            entries[i].rx_seq_safestate_enable = seq_bit;
+        }
+        {
+            bool wd_bit = (bits_0x000d & 0x04u) != 0u;
+
+            entries[i].rx_wd_enable           = wd_bit;
+            entries[i].rx_wd_safestate_enable = wd_bit;
+        }
+        entries[i].rx_ovrflw_safestate_enable = (bits_0x000d & 0x08u) != 0u;
+        /* rx_safety_measure has no wire register position at all
+         * anymore (bits [6:4] are Reserved) -- left unchanged, the same
+         * disposition rx_wd_info_enable already has; see that field's
+         * own doc comment (regmap.h). */
         /* bit 7 (rx_stream_status, issue #424) is intentionally NOT
          * unpacked into any struct field here -- it is a live,
          * server-computed status, not client-configurable content; a

@@ -2694,41 +2694,134 @@ static void test_request_stream_cfg_render_saturates_oversized_safestate_sequenc
     TEST_ASSERT_EQUAL_UINT8(0xFFu, out[0x000E]);
 }
 
-/* TC18 Table 24's own 0x000D octet: bits [6:0] alone are this codebase's
- * own RC1-baseline 8-independent-bit content model (regmap.h's own "TC18
- * 0.5.1_RC5 terminology drift" file-header note) --
- * rx_enforce_e2e/rx_enforce_seq/rx_seq_safestate_enable/rx_wd_enable/
- * rx_wd_safestate_enable/rx_ovrflw_safestate_enable/rx_safety_measure.
- * Bit 7 is NOT one of these seven -- REQ-E2E-046/REQ-RMAP-051 (issue
- * #424): it is TC18's own distinct, live rx_stream_status bit, covered
- * by the dedicated tests below, not by this one. rx_wd_info_enable set
- * true here (and never appearing in the expected byte) proves it no
- * longer leaks into bit 7 -- see that field's own doc comment. */
-static void test_request_stream_cfg_render_packs_seven_config_bits_at_0x000d(void)
+/* CORRECTED 2026-08-14 (issue #458): TC18 Table 24's own 0x000D octet's
+ * REAL RC5 layout is 4 meaningful bits, not this codebase's old
+ * RC1-baseline 8-independent-bit model an earlier revision of this test
+ * proved (regmap.h's own "TC18 0.5.1_RC5 terminology drift" file-header
+ * note has the full reconciliation) -- bit0 rx_enforce_crc
+ * (rx_enforce_e2e), bit1 rx_enforce_sequence (rx_enforce_seq AND
+ * rx_seq_safestate_enable), bit2 rx_enforce_watchdog (rx_wd_enable AND
+ * rx_wd_safestate_enable), bit3 rx_enforce_request_filing
+ * (rx_ovrflw_safestate_enable), bits [6:4] Reserved (always 0, no
+ * field -- rx_safety_measure no longer has a wire position at all).
+ * Bit 7 is NOT one of these -- REQ-E2E-046/REQ-RMAP-051 (issue #424):
+ * it is TC18's own distinct, live rx_stream_status bit, covered by the
+ * dedicated tests below, not by this one. rx_wd_info_enable set true
+ * here (and never appearing in the expected byte) proves it no longer
+ * leaks into bit 7. */
+static void test_request_stream_cfg_render_packs_four_config_bits_at_0x000d(void)
 {
     rcp_regmap_request_stream_cfg_t row;
     uint8_t                         out[24];
 
     rcp_regmap_request_stream_cfg_init(&row);
-    row.rx_enforce_e2e    = true;  /* bit 0 */
-    row.rx_wd_info_enable = true;  /* no wire position anymore -- must NOT appear */
+    row.rx_enforce_e2e    = true; /* bit 0 */
+    row.rx_wd_info_enable = true; /* no wire position anymore -- must NOT appear */
     /* every other bit left false */
 
     rcp_regmap_request_stream_cfg_render(&row, 1, out, 0u, NULL);
     TEST_ASSERT_EQUAL_UINT8(0x01u, out[0x000D]);
 
-    row.rx_enforce_seq             = true; /* bit 1 */
-    row.rx_seq_safestate_enable    = true; /* bit 2 */
-    row.rx_wd_enable               = true; /* bit 3 */
-    row.rx_wd_safestate_enable     = true; /* bit 4 */
-    row.rx_ovrflw_safestate_enable = true; /* bit 5 */
-    row.rx_safety_measure          = 1u;   /* bit 6 */
+    row.rx_ovrflw_safestate_enable = true; /* bit 3: single dimension, direct map */
+    row.rx_safety_measure          = 1u;   /* Reserved bit 6 -- must NOT appear */
 
     rcp_regmap_request_stream_cfg_render(&row, 1, out, 0u, NULL);
-    /* All seven config bits set, bit 7 (rx_stream_status) still 0 -- no
-     * live-status array supplied to this call, and rx_wd_info_enable
-     * (also still true here) still nowhere in this byte. */
-    TEST_ASSERT_EQUAL_UINT8(0x7Fu, out[0x000D]);
+    TEST_ASSERT_EQUAL_UINT8(0x09u, out[0x000D]); /* bit0 | bit3, bits [6:4] still 0 */
+}
+
+/* AND-not-OR merge rule (issue #458): bit1/bit2 each collapse TWO
+ * independently-expressible internal dimensions into ONE real wire bit
+ * whose own TC18 text ties "block" and "enter safe state" together
+ * atomically -- render() must render true ONLY when BOTH dimensions of
+ * a pair agree, never when only one is set (that would overstate a
+ * safety guarantee to a real RC5 peer reading this register). */
+static void test_request_stream_cfg_render_couples_sequence_bit_with_and_not_or(void)
+{
+    rcp_regmap_request_stream_cfg_t row;
+    uint8_t                         out[24];
+
+    rcp_regmap_request_stream_cfg_init(&row);
+
+    row.rx_enforce_seq = true; /* enable only, safestate off */
+    rcp_regmap_request_stream_cfg_render(&row, 1, out, 0u, NULL);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, out[0x000D]); /* NOT bit1 -- decoupled, no wire bit */
+
+    row.rx_enforce_seq          = false;
+    row.rx_seq_safestate_enable = true; /* safestate only, enable off */
+    rcp_regmap_request_stream_cfg_render(&row, 1, out, 0u, NULL);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, out[0x000D]); /* NOT bit1 -- still decoupled */
+
+    row.rx_enforce_seq = true; /* both true: the real RC5-expressible coupled state */
+    rcp_regmap_request_stream_cfg_render(&row, 1, out, 0u, NULL);
+    TEST_ASSERT_EQUAL_UINT8(0x02u, out[0x000D]); /* bit1 set */
+}
+
+static void test_request_stream_cfg_render_couples_watchdog_bit_with_and_not_or(void)
+{
+    rcp_regmap_request_stream_cfg_t row;
+    uint8_t                         out[24];
+
+    rcp_regmap_request_stream_cfg_init(&row);
+
+    row.rx_wd_enable = true; /* enable only, safestate off */
+    rcp_regmap_request_stream_cfg_render(&row, 1, out, 0u, NULL);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, out[0x000D]); /* NOT bit2 -- decoupled, no wire bit */
+
+    row.rx_wd_enable           = false;
+    row.rx_wd_safestate_enable = true; /* safestate only, enable off */
+    rcp_regmap_request_stream_cfg_render(&row, 1, out, 0u, NULL);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, out[0x000D]); /* NOT bit2 -- still decoupled */
+
+    row.rx_wd_enable = true; /* both true: the real RC5-expressible coupled state */
+    rcp_regmap_request_stream_cfg_render(&row, 1, out, 0u, NULL);
+    TEST_ASSERT_EQUAL_UINT8(0x04u, out[0x000D]); /* bit2 set */
+}
+
+/* apply_reconfig() write-side half of the same reconciliation: a real
+ * RC5 write can only ever express the coupled state (there is no wire
+ * encoding for "block but don't enter safe state"), so writing bit1/bit2
+ * sets BOTH of a pair's own internal dimensions together -- and a write
+ * confined to the Reserved bits [6:4] (which used to be rx_wd_safestate_
+ * enable/rx_ovrflw_safestate_enable/rx_safety_measure's own OLD,
+ * RC1-baseline positions) has NO effect on any struct field, exactly
+ * like this table's own reserved trailing octets. */
+static void test_request_stream_cfg_apply_reconfig_couples_sequence_and_watchdog_bits(void)
+{
+    rcp_regmap_request_stream_cfg_t rows[1];
+    uint8_t                         patch_seq[1] = {0x02u};
+    uint8_t                         patch_wd[1]  = {0x04u};
+    uint8_t                         patch_reserved[1] = {0x70u}; /* bits [6:4] only */
+
+    rcp_regmap_request_stream_cfg_init(&rows[0]);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_OK,
+                       rcp_regmap_request_stream_cfg_apply_reconfig(rows, 1, 0x000Du, patch_seq,
+                                                                     1u, 0u));
+    TEST_ASSERT_TRUE(rows[0].rx_enforce_seq);
+    TEST_ASSERT_TRUE(rows[0].rx_seq_safestate_enable);
+    TEST_ASSERT_FALSE(rows[0].rx_wd_enable);
+    TEST_ASSERT_FALSE(rows[0].rx_wd_safestate_enable);
+
+    rcp_regmap_request_stream_cfg_init(&rows[0]);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_OK,
+                       rcp_regmap_request_stream_cfg_apply_reconfig(rows, 1, 0x000Du, patch_wd, 1u,
+                                                                     0u));
+    TEST_ASSERT_TRUE(rows[0].rx_wd_enable);
+    TEST_ASSERT_TRUE(rows[0].rx_wd_safestate_enable);
+    TEST_ASSERT_FALSE(rows[0].rx_enforce_seq);
+    TEST_ASSERT_FALSE(rows[0].rx_seq_safestate_enable);
+
+    /* A write confined to the Reserved bits [6:4] leaves rx_safety_measure
+     * (this field's own OLD, RC1-baseline bit-6 position) completely
+     * unaffected -- it has NO wire register position anymore. */
+    rcp_regmap_request_stream_cfg_init(&rows[0]);
+    rows[0].rx_safety_measure = 1u;
+    TEST_ASSERT_EQUAL(RCP_REGMAP_REQUEST_STREAM_CFG_RECONFIG_OK,
+                       rcp_regmap_request_stream_cfg_apply_reconfig(rows, 1, 0x000Du,
+                                                                     patch_reserved, 1u, 0u));
+    TEST_ASSERT_EQUAL_UINT8(1u, rows[0].rx_safety_measure); /* unchanged */
+    TEST_ASSERT_FALSE(rows[0].rx_enforce_seq);              /* unaffected */
+    TEST_ASSERT_FALSE(rows[0].rx_wd_enable);                /* unaffected */
+    TEST_ASSERT_FALSE(rows[0].rx_ovrflw_safestate_enable);  /* unaffected */
 }
 
 /* REQ-E2E-046/REQ-RMAP-051 (issue #424): TC18 Table 24's own 0x000D.7
@@ -5897,7 +5990,10 @@ int main(void)
     RUN_TEST(test_request_stream_cfg_apply_reconfig_rejects_out_of_range_leaving_table_untouched);
     RUN_TEST(test_request_stream_cfg_render_saturates_oversized_max_request_size_without_wrapping);
     RUN_TEST(test_request_stream_cfg_render_saturates_oversized_safestate_sequencer_without_wrapping);
-    RUN_TEST(test_request_stream_cfg_render_packs_seven_config_bits_at_0x000d);
+    RUN_TEST(test_request_stream_cfg_render_packs_four_config_bits_at_0x000d);
+    RUN_TEST(test_request_stream_cfg_render_couples_sequence_bit_with_and_not_or);
+    RUN_TEST(test_request_stream_cfg_render_couples_watchdog_bit_with_and_not_or);
+    RUN_TEST(test_request_stream_cfg_apply_reconfig_couples_sequence_and_watchdog_bits);
     RUN_TEST(test_request_stream_cfg_render_wires_rx_stream_status_bit_from_live_array);
     RUN_TEST(test_ep0_read_dispatcher_surfaces_live_rx_stream_status_from_a_real_crc_fault);
     RUN_TEST(test_ep0_write_dispatcher_authorizes_rx_stream_status_bit_even_when_rcp_configured);
