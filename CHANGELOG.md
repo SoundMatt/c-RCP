@@ -34,6 +34,20 @@ the rationale.
 
 ## Releases
 
+### v0.341.0 -- 2026-08-14 (REQ-WAKEUP-021: wup_status redesigned as a genuine per-source bitmask)
+
+Eighth of 14 items catalogued "not blocked, left by explicit decision" -- the first of the three WakeUp items (REQ-WAKEUP-018/021/022), and a real breaking API change, matching how the user's own list described this trio ("WakeUp redesigns (breaking API changes)").
+
+TC18 §13.7.2.2 Table 36's own `wup_status` register is a 16-bit bitmask: "Indication of wake-up source, writing '1' clears the flag. Each bit represents a wake-up source." `rcp_ep_wakeup_wup_status_t` previously modeled only a single aggregate latch bit ("has ANY source woken the device") -- an honestly-documented but real simplification of the register's own per-source shape.
+
+**BREAKING CHANGE**: `rcp_ep_wakeup_wup_status_t`'s `bool latched` field is now `uint16_t mask`, one bit per wake-source slot (bit `i` ↔ `sources[i]`, the same index convention `wup_io_scrN`'s own array already established). The old index-free `rcp_ep_wakeup_wup_status_latch()` is removed, replaced by `rcp_ep_wakeup_wup_status_latch_source(s, i)`; a new `rcp_ep_wakeup_wup_status_clear_source(s, i)` clears exactly one bit (the existing whole-mask `_clear()` still clears everything at once); a new `rcp_ep_wakeup_wup_status_source_is_latched(s, i)` queries one bit specifically. Both out-of-range index functions fail safe (no-op / `false`) rather than undefined behavior.
+
+`rcp_ep_wakeup_render_registers()`/`_apply_reconfig()` now render/parse the FULL wire word instead of only bit 0: render masks `mask` to the low `RCP_EP_WAKEUP_MAX_SOURCES` bits; parse applies TC18's own write-1-to-clear rule bit-by-bit, so a write naming only some sources clears only those, leaving the rest latched exactly as the register's own per-bit semantics require -- something the old single-bit model could not even express.
+
+Every existing call site (5 in `tests/`) updated to the new API. New tests prove per-source independence (latch one, others stay clear), partial-clear (clear one, others stay latched), out-of-range no-ops, and the wire-level multi-bit render/parse round trip. Three independent mutations (the per-bit clear, the parse loop's own bit-by-bit application, and the render-side masking) each weakened and confirmed to fail the new tests, then restored.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`: `REQ-WAKEUP-021` partial → implemented -- 1044 implemented / 23 partial / 2 not-implemented / 7 retired, 1076 total.
+
 ### v0.340.0 -- 2026-08-14 (REQ-LIFECYCLE-031: "valid stream_id/byte_bus_id combination" authorization, closed; REQ-LIFECYCLE-025 re-confirmed genuine spec silence)
 
 Seventh of 14 items catalogued "not blocked, left by explicit decision" in the post-backlog requirements audit -- the user's own framing named this pair "a new 'stream ↔ byte_bus_id association' foundational concept", and this release builds exactly that concept as a real, reusable primitive rather than a one-off special case.

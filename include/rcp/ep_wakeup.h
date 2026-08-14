@@ -165,17 +165,23 @@
  * samples elsewhere (this module owns no pin-sampling of its own, mirror-
  * ing every prior endpoint type's "structural fields only" scope).
  *
- * rcp_ep_wakeup_wup_status_t is this module's own minimal latch modeling
- * the roadmap's `wup_status` register: `_latch()` sets it (a caller drives
- * this on a wake-source assertion edge, via
- * rcp_ep_wakeup_any_source_asserted() detecting a 0->1 transition itself),
- * and `_clear()` clears it (a caller drives this from an explicit client
- * register write). power.h's rcp_pwrmode_check_entry() gate consumes
- * `rcp_ep_wakeup_wup_status_is_clear()`'s result as its own
- * `wup_status_clear` field -- this module does not include power.h itself
- * for that wiring, keeping the dependency one-directional (ep_wakeup.h
- * depends on power.h for rcp_pwrmode_t/rcp_pwrmode_entry_result_t in the
- * SleepCMD codec above; power.h does not depend back on ep_wakeup.h).
+ * rcp_ep_wakeup_wup_status_t is this module's own latch modeling the
+ * roadmap's `wup_status` register -- REDESIGNED 2026-08-14
+ * (REQ-WAKEUP-021, issue #341 lineage) from a single aggregate bit to a
+ * per-source bitmask, matching TC18's own "each bit represents a wake-up
+ * source" register shape: `_latch_source(i)` sets source `i`'s own bit (a
+ * caller drives this on THAT source's own wake-source assertion edge,
+ * detected via `rcp_ep_wakeup_source_asserted()`), `_clear_source(i)`
+ * clears exactly that bit, and `_clear()` clears every bit at once (a
+ * caller drives either from an explicit client register write, per-bit
+ * or whole-word respectively). power.h's rcp_pwrmode_check_entry() gate
+ * consumes `rcp_ep_wakeup_wup_status_is_clear()`'s result (still a
+ * whole-mask "is anything latched at all" query, unchanged signature) as
+ * its own `wup_status_clear` field -- this module does not include
+ * power.h itself for that wiring, keeping the dependency one-directional
+ * (ep_wakeup.h depends on power.h for rcp_pwrmode_t/
+ * rcp_pwrmode_entry_result_t in the SleepCMD codec above; power.h does
+ * not depend back on ep_wakeup.h).
  *
  * ── The EP_func register block (evt[2:0] == 111b), added 2026-08-11 ────────
  *
@@ -225,17 +231,18 @@
  *      `rcp_ep_wakeup_source_asserted()`'s own existing signature,
  *      semantics, and tests are entirely unchanged by this addition.
  *
- * `wup_status` itself keeps its own pre-existing, already-tested
- * single-aggregate-latch-bit API and shape entirely unchanged too (see
- * above) -- TC18's own register is a 16-bit bitmask, "each bit represents
- * a wake-up source", but this module has never modeled a per-source
- * latch (only "has ANY source woken the device"). The register block
- * renders/parses only bit 0 of the wire's wup_status word (1 = latched,
- * matching this module's own existing meaning); bits [15:1] always read
- * 0 and a write's bit 0 clears the latch (matching the spec's own
- * "writing '1' clears the flag" rule) while any other written bit
- * pattern is a no-op -- an honestly disclosed simplification, not a
- * silently wrong one, exactly like the IO_SRC treatment above.
+ * `wup_status` itself -- RESOLVED 2026-08-14 (REQ-WAKEUP-021, issue #341
+ * lineage) -- now renders/parses the FULL 16-bit wire word as a genuine
+ * per-source bitmask, closing the gap the paragraph above used to
+ * describe. The register block renders every bit of
+ * `rcp_ep_wakeup_wup_status_t::mask` (bits [15:RCP_EP_WAKEUP_MAX_SOURCES]
+ * always read 0, since this module's own MAX_SOURCES==8 scale defines no
+ * source for them to latch); a write applies TC18's own "writing '1'
+ * clears the flag" rule bit-by-bit -- each wire bit set to 1 clears that
+ * SAME bit's own source in `mask` via `rcp_ep_wakeup_wup_status_clear_
+ * source()`, independently of every other bit, so a write naming only
+ * some sources clears only those, leaving the rest latched exactly as
+ * TC18's own per-bit register semantics require.
  */
 #ifndef RCP_EP_WAKEUP_H
 #define RCP_EP_WAKEUP_H
@@ -286,9 +293,28 @@ extern "C" {
 /* Moved above rcp_ep_wakeup_functional_cfg_t (2026-08-11) so that struct
  * can embed one as a field -- see the file header's own register-block
  * note. Function declarations for this type stay in their own "wup_status
- * latch" section below, unmoved. */
+ * latch" section below, unmoved.
+ *
+ * REDESIGNED 2026-08-14 (REQ-WAKEUP-021, issue #341 lineage): TC18
+ * §13.7.2.2 Table 36's own `wup_status` register is a 16-bit bitmask,
+ * "each bit represents a wake-up source" -- this type previously modeled
+ * only a single aggregate latch bit ("has ANY source woken the device"),
+ * an honestly-documented but real simplification of the wire register's
+ * own per-source shape. `mask` now carries one latch bit per wake-source
+ * slot, bit `i` corresponding to `sources[i]` (the same index convention
+ * `wup_io_scrN`'s own array already established) -- BREAKING CHANGE: the
+ * old single-bool `latched` field and the old index-free
+ * `rcp_ep_wakeup_wup_status_latch()` function are both gone; see this
+ * type's own function declarations below for their per-source
+ * replacements. Only the low RCP_EP_WAKEUP_MAX_SOURCES bits of `mask`
+ * are ever meaningfully written by this module's own API -- the
+ * remaining high bits of the wire's 16-bit register have no defined
+ * source to latch in this module's own RCP_EP_WAKEUP_MAX_SOURCES==8
+ * scale, and are always rendered/parsed as 0, matching the pre-existing
+ * "bits [15:1] always read 0" disclosure this same struct's predecessor
+ * already made for its own unused high bits. */
 typedef struct {
-    bool latched;
+    uint16_t mask;
 } rcp_ep_wakeup_wup_status_t;
 
 typedef struct {
@@ -396,19 +422,50 @@ bool rcp_ep_wakeup_any_source_asserted(const rcp_ep_wakeup_functional_cfg_t *fcf
 
 /* ── wup_status latch ─────────────────────────────────────────────────────────── */
 
-/* Initializes *s to cleared (latched = false). */
+/* Initializes *s to cleared (mask == 0, no source latched). */
 void rcp_ep_wakeup_wup_status_init(rcp_ep_wakeup_wup_status_t *s);
 
-/* Sets *s to latched -- a caller drives this on a wake-source assertion
- * edge (see the file header). */
-void rcp_ep_wakeup_wup_status_latch(rcp_ep_wakeup_wup_status_t *s);
+/* REQ-WAKEUP-021 (issue #341 lineage): latches source_index specifically --
+ * a caller drives this on THAT source's own wake-source assertion edge
+ * (see the file header; rcp_ep_wakeup_source_asserted() is the per-source
+ * predicate a caller evaluates to detect one). source_index >=
+ * RCP_EP_WAKEUP_MAX_SOURCES is a no-op (fails safe: no bit this module
+ * ever renders is touched) rather than undefined behavior. Replaces the
+ * pre-existing index-free rcp_ep_wakeup_wup_status_latch() (BREAKING
+ * CHANGE, see this type's own doc comment above) -- an index-free latch
+ * cannot express TC18's own "each bit represents a wake-up source"
+ * register shape. */
+void rcp_ep_wakeup_wup_status_latch_source(rcp_ep_wakeup_wup_status_t *s, size_t source_index);
 
-/* Clears *s -- a caller drives this from an explicit client register
- * write. */
+/* Clears every latched bit in *s at once (mask = 0) -- a caller drives
+ * this from an explicit client register write that writes 1 to every bit
+ * position (or from rcp_ep_wakeup_functional_cfg_init()'s own full
+ * reset). For clearing exactly one source's own bit, see
+ * rcp_ep_wakeup_wup_status_clear_source() below -- TC18's own per-bit
+ * write-1-to-clear semantics do not require a write to clear every
+ * latched source at once. */
 void rcp_ep_wakeup_wup_status_clear(rcp_ep_wakeup_wup_status_t *s);
 
-/* True iff *s is not latched. */
+/* REQ-WAKEUP-021: clears source_index's own bit only, leaving every other
+ * source's own latch state untouched -- the register-block write path
+ * (rcp_ep_wakeup_apply_reconfig()) calls this once per bit the incoming
+ * wire write sets to 1, matching TC18's own "writing '1' clears the
+ * flag. Each bit represents a wake-up source" rule exactly (a write that
+ * sets only SOME bits clears only those sources, not every latched
+ * source). source_index >= RCP_EP_WAKEUP_MAX_SOURCES is a no-op, same
+ * fail-safe convention as rcp_ep_wakeup_wup_status_latch_source() above. */
+void rcp_ep_wakeup_wup_status_clear_source(rcp_ep_wakeup_wup_status_t *s, size_t source_index);
+
+/* True iff *s has no source latched at all (mask == 0). */
 bool rcp_ep_wakeup_wup_status_is_clear(const rcp_ep_wakeup_wup_status_t *s);
+
+/* REQ-WAKEUP-021: true iff source_index's own bit is latched specifically
+ * -- the per-source counterpart rcp_ep_wakeup_wup_status_is_clear()
+ * above (a whole-mask query) did not previously provide. source_index >=
+ * RCP_EP_WAKEUP_MAX_SOURCES always returns false (no such bit is ever
+ * set by this module's own API). */
+bool rcp_ep_wakeup_wup_status_source_is_latched(const rcp_ep_wakeup_wup_status_t *s,
+                                                  size_t source_index);
 
 /* ── Error codes ───────────────────────────────────────────────────────────── */
 
@@ -678,10 +735,11 @@ const char *rcp_ep_wakeup_reconfig_strerror(rcp_ep_wakeup_reconfig_errc_t e);
  * exactly as a configuration *read* of the whole block would report them
  * -- the inverse of rcp_ep_wakeup_apply_reconfig()'s own parse step, and
  * the same rendering that function patches in place. wup_status renders
- * only bit 0 (bits [15:1] always 0); each source slot renders exactly one
- * of RCP_EP_WAKEUP_IO_SRC_INACTIVE/_HIGH_LEVEL/_LOW_LEVEL, derived from
+ * cfg->wup_status.mask in full (bits [15:RCP_EP_WAKEUP_MAX_SOURCES]
+ * always 0, REQ-WAKEUP-021); each source slot renders exactly one of
+ * RCP_EP_WAKEUP_IO_SRC_INACTIVE/_HIGH_LEVEL/_LOW_LEVEL, derived from
  * enabled/active_high -- see the file header's own register-block note
- * for both simplifications. */
+ * for that remaining simplification. */
 void rcp_ep_wakeup_render_registers(const rcp_ep_wakeup_functional_cfg_t *cfg,
                                      uint8_t out[RCP_EP_WAKEUP_EP_FUNC_LEN]);
 

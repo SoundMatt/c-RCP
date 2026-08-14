@@ -139,11 +139,57 @@ static void test_wup_status_latch_then_clear(void)
     rcp_ep_wakeup_wup_status_t s;
 
     rcp_ep_wakeup_wup_status_init(&s);
-    rcp_ep_wakeup_wup_status_latch(&s);
+    rcp_ep_wakeup_wup_status_latch_source(&s, 0);
     TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_is_clear(&s));
 
     rcp_ep_wakeup_wup_status_clear(&s);
     TEST_ASSERT_TRUE(rcp_ep_wakeup_wup_status_is_clear(&s));
+}
+
+/* REQ-WAKEUP-021 (issue #341 lineage): TC18's own wup_status register is
+ * a per-source bitmask, "each bit represents a wake-up source" -- these
+ * tests prove that shape directly, distinct from the aggregate
+ * is_clear()/clear() whole-mask queries already covered above. */
+static void test_wup_status_latch_source_is_independent_per_index(void)
+{
+    rcp_ep_wakeup_wup_status_t s;
+
+    rcp_ep_wakeup_wup_status_init(&s);
+    rcp_ep_wakeup_wup_status_latch_source(&s, 2);
+
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_wup_status_source_is_latched(&s, 2));
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_source_is_latched(&s, 0));
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_source_is_latched(&s, 1));
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_is_clear(&s)); /* something is latched */
+}
+
+static void test_wup_status_clear_source_leaves_other_sources_latched(void)
+{
+    rcp_ep_wakeup_wup_status_t s;
+
+    rcp_ep_wakeup_wup_status_init(&s);
+    rcp_ep_wakeup_wup_status_latch_source(&s, 0);
+    rcp_ep_wakeup_wup_status_latch_source(&s, 3);
+
+    rcp_ep_wakeup_wup_status_clear_source(&s, 0);
+
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_source_is_latched(&s, 0));
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_wup_status_source_is_latched(&s, 3));
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_is_clear(&s)); /* source 3 still latched */
+}
+
+static void test_wup_status_out_of_range_source_index_is_a_no_op(void)
+{
+    rcp_ep_wakeup_wup_status_t s;
+
+    rcp_ep_wakeup_wup_status_init(&s);
+    rcp_ep_wakeup_wup_status_latch_source(&s, RCP_EP_WAKEUP_MAX_SOURCES); /* out of range */
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_wup_status_is_clear(&s));
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_source_is_latched(&s, RCP_EP_WAKEUP_MAX_SOURCES));
+
+    rcp_ep_wakeup_wup_status_latch_source(&s, 0);
+    rcp_ep_wakeup_wup_status_clear_source(&s, RCP_EP_WAKEUP_MAX_SOURCES); /* out of range, no-op */
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_wup_status_source_is_latched(&s, 0));
 }
 
 /* ── strerror ──────────────────────────────────────────────────────────────── */
@@ -374,9 +420,11 @@ static void test_is_wakeup_echo_false_for_sleepcmd_frame(void)
  * ADDED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I dedicated
  * investigation, task #95): see ep_wakeup.h's own "register block" file
  * header note for the full address-collision-resolution rationale and
- * the two deliberate, honestly disclosed simplifications (wup_status is
- * a single aggregate bit, not a per-source bitmask; IO_SRC only
- * represents 3 of Table 37's 6 values). */
+ * the remaining, honestly disclosed simplification (IO_SRC only
+ * represents 3 of Table 37's 6 values -- wup_status's own former
+ * single-aggregate-bit simplification is RESOLVED as of REQ-WAKEUP-021,
+ * issue #341 lineage: it is now a genuine per-source bitmask, see the
+ * tests below). */
 
 static void test_render_registers_matches_table_offsets(void)
 {
@@ -385,7 +433,7 @@ static void test_render_registers_matches_table_offsets(void)
 
     rcp_ep_wakeup_functional_cfg_init(&cfg);
     cfg.ep_status = 0x1234;
-    rcp_ep_wakeup_wup_status_latch(&cfg.wup_status);
+    rcp_ep_wakeup_wup_status_latch_source(&cfg.wup_status, 0);
     cfg.sources[0].enabled     = true;
     cfg.sources[0].active_high = true;
     cfg.sources[0].pin_number  = 0x0041u; /* fits in 11 bits */
@@ -406,6 +454,25 @@ static void test_render_registers_matches_table_offsets(void)
     TEST_ASSERT_EQUAL_UINT8(0x41u, out[RCP_EP_WAKEUP_REG_SOURCE_BASE + 1]);
 
     TEST_ASSERT_EQUAL_UINT16(0x0016u, RCP_EP_WAKEUP_EP_FUNC_LEN);
+}
+
+/* REQ-WAKEUP-021 (issue #341 lineage): proves the wire word is a genuine
+ * multi-bit mask, not just bit 0 -- two independently-latched sources
+ * render as two independently-set bits in the same 16-bit word. */
+static void test_render_registers_wup_status_is_a_multi_bit_mask(void)
+{
+    rcp_ep_wakeup_functional_cfg_t cfg;
+    uint8_t                        out[RCP_EP_WAKEUP_EP_FUNC_LEN];
+
+    rcp_ep_wakeup_functional_cfg_init(&cfg);
+    rcp_ep_wakeup_wup_status_latch_source(&cfg.wup_status, 0);
+    rcp_ep_wakeup_wup_status_latch_source(&cfg.wup_status, 3);
+
+    rcp_ep_wakeup_render_registers(&cfg, out);
+
+    /* bit 0 | bit 3 == 0x0009. */
+    TEST_ASSERT_EQUAL_UINT8(0x00u, out[RCP_EP_WAKEUP_REG_WUP_STATUS]);
+    TEST_ASSERT_EQUAL_UINT8(0x09u, out[RCP_EP_WAKEUP_REG_WUP_STATUS + 1]);
 }
 
 static void test_apply_reconfig_writes_ep_status(void)
@@ -429,7 +496,7 @@ static void test_apply_reconfig_wup_status_write_one_clears(void)
     uint8_t                        payload[4];
 
     rcp_ep_wakeup_functional_cfg_init(&cfg);
-    rcp_ep_wakeup_wup_status_latch(&cfg.wup_status);
+    rcp_ep_wakeup_wup_status_latch_source(&cfg.wup_status, 0);
     TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_is_clear(&cfg.wup_status));
 
     /* Writing bit 0 == 0 is a no-op -- it must not itself clear or set
@@ -445,6 +512,30 @@ static void test_apply_reconfig_wup_status_write_one_clears(void)
     TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_RECONFIG_OK,
         rcp_ep_wakeup_apply_reconfig(&cfg, payload, sizeof(payload)));
     TEST_ASSERT_TRUE(rcp_ep_wakeup_wup_status_is_clear(&cfg.wup_status));
+}
+
+/* REQ-WAKEUP-021: the defining new behavior -- a write naming only SOME
+ * bits clears only those sources, leaving every other latched source
+ * untouched. The old single-aggregate-bit model could not even express
+ * this scenario (there was only ever one bit to clear). */
+static void test_apply_reconfig_wup_status_clears_only_the_named_sources(void)
+{
+    rcp_ep_wakeup_functional_cfg_t cfg;
+    uint8_t                        payload[4];
+
+    rcp_ep_wakeup_functional_cfg_init(&cfg);
+    rcp_ep_wakeup_wup_status_latch_source(&cfg.wup_status, 0);
+    rcp_ep_wakeup_wup_status_latch_source(&cfg.wup_status, 3);
+
+    /* Write bit 0 only (0x0001) -- source 3 must remain latched. */
+    payload[0] = 0x00; payload[1] = RCP_EP_WAKEUP_REG_WUP_STATUS & 0xFFu;
+    payload[2] = 0x00; payload[3] = 0x01;
+    TEST_ASSERT_EQUAL(RCP_EP_WAKEUP_RECONFIG_OK,
+        rcp_ep_wakeup_apply_reconfig(&cfg, payload, sizeof(payload)));
+
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_source_is_latched(&cfg.wup_status, 0));
+    TEST_ASSERT_TRUE(rcp_ep_wakeup_wup_status_source_is_latched(&cfg.wup_status, 3));
+    TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_is_clear(&cfg.wup_status));
 }
 
 static void test_apply_reconfig_writes_source_slot(void)
@@ -614,6 +705,9 @@ int main(void)
 
     RUN_TEST(test_wup_status_init_is_clear);
     RUN_TEST(test_wup_status_latch_then_clear);
+    RUN_TEST(test_wup_status_latch_source_is_independent_per_index);
+    RUN_TEST(test_wup_status_clear_source_leaves_other_sources_latched);
+    RUN_TEST(test_wup_status_out_of_range_source_index_is_a_no_op);
 
     RUN_TEST(test_strerror_nonnull_for_every_code);
 
@@ -639,8 +733,10 @@ int main(void)
     RUN_TEST(test_is_wakeup_echo_false_for_sleepcmd_frame);
 
     RUN_TEST(test_render_registers_matches_table_offsets);
+    RUN_TEST(test_render_registers_wup_status_is_a_multi_bit_mask);
     RUN_TEST(test_apply_reconfig_writes_ep_status);
     RUN_TEST(test_apply_reconfig_wup_status_write_one_clears);
+    RUN_TEST(test_apply_reconfig_wup_status_clears_only_the_named_sources);
     RUN_TEST(test_apply_reconfig_writes_source_slot);
     RUN_TEST(test_apply_reconfig_edge_triggered_io_src_leaves_enabled_unchanged);
     RUN_TEST(test_apply_reconfig_ignores_read_only_registers);

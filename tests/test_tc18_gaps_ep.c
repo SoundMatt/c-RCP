@@ -1464,15 +1464,15 @@ static void test_wakeup_codec_accepts_any_bus_id(void)
  * Two things remain deliberately, honestly simplified rather than fully
  * redesigned (still partial, not fully implemented -- see
  * ep_wakeup.h's own "register block" file-header note for the full
- * reasoning): wup_status still renders/parses only its own bit 0 (this
- * module's pre-existing single-aggregate-latch API, unchanged), not a
- * true per-source bitmask; and each wup_io_scrN register renders/parses
- * only 3 of Table 37's 6 IO_SRC values (inactive/high level/low level) --
- * the pre-existing rcp_ep_wakeup_source_asserted() predicate is level-only
- * and unchanged, so edge-triggered modes remain unrepresentable, and a
- * configuration write encoding one leaves that slot's own enabled/
- * active_high untouched (only pin_number always updates) rather than
- * silently misinterpreting it. */
+ * reasoning): wup_status is now a genuine per-source bitmask (RESOLVED
+ * 2026-08-14, REQ-WAKEUP-021, issue #341 lineage -- see test_ep_wakeup.c
+ * for the dedicated per-source tests); each wup_io_scrN register still
+ * renders/parses only 3 of Table 37's 6 IO_SRC values (inactive/high
+ * level/low level) -- the pre-existing rcp_ep_wakeup_source_asserted()
+ * predicate is level-only and unchanged, so edge-triggered modes remain
+ * unrepresentable, and a configuration write encoding one leaves that
+ * slot's own enabled/active_high untouched (only pin_number always
+ * updates) rather than silently misinterpreting it. */
 static void test_wakeup_register_block_has_collision_free_layout(void)
 {
     rcp_ep_wakeup_wup_status_t     status;
@@ -1484,15 +1484,16 @@ static void test_wakeup_register_block_has_collision_free_layout(void)
 
     rcp_ep_wakeup_wup_status_init(&status);
     TEST_ASSERT_TRUE(rcp_ep_wakeup_wup_status_is_clear(&status));
-    rcp_ep_wakeup_wup_status_latch(&status);
+    rcp_ep_wakeup_wup_status_latch_source(&status, 0);
     TEST_ASSERT_FALSE(rcp_ep_wakeup_wup_status_is_clear(&status));
     /* One wholesale clear, not a per-source write-1-to-clear bit -- the
-     * standalone rcp_ep_wakeup_wup_status_t API itself is unchanged; only
-     * the register block built on top of it (below) gained write-1-to-
-     * clear wire semantics. */
+     * standalone rcp_ep_wakeup_wup_status_t API's own _clear() is a
+     * whole-mask clear; only the register block built on top of it
+     * (below) additionally gained per-BIT write-1-to-clear wire
+     * semantics, via _clear_source(). */
     rcp_ep_wakeup_wup_status_clear(&status);
     TEST_ASSERT_TRUE(rcp_ep_wakeup_wup_status_is_clear(&status));
-    TEST_ASSERT_EQUAL_UINT(sizeof(bool), sizeof(status));
+    TEST_ASSERT_EQUAL_UINT(sizeof(uint16_t), sizeof(status));
 
     /* Level modes only: the predicate takes the current level and nothing
      * else, so rising/falling/both-edges have no representation -- still
@@ -1515,7 +1516,7 @@ static void test_wakeup_register_block_has_collision_free_layout(void)
     TEST_ASSERT_EQUAL_UINT16(0x0016u, RCP_EP_WAKEUP_EP_FUNC_LEN);
 
     cfg.sources[1].pin_number = 5u;
-    rcp_ep_wakeup_wup_status_latch(&cfg.wup_status);
+    rcp_ep_wakeup_wup_status_latch_source(&cfg.wup_status, 0);
     rcp_ep_wakeup_render_registers(&cfg, out);
     TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_EP_WAKEUP_EP_FUNC_LEN, out[RCP_EP_WAKEUP_REG_EP_LEN]);
     TEST_ASSERT_EQUAL_HEX8((uint8_t)RCP_EP_WAKEUP_MAX_SOURCES,
