@@ -460,6 +460,24 @@ typedef struct {
  * when nothing is. Safety-tagged requests are held back until
  * ctx->in_safe_state, via rcp_e2e_request_may_execute().
  *
+ * REQ-SRV-015/016 extension (issue #461, TC18 §12.3.1.3): a Compound,
+ * Compound Wait, Triggered, Timed, or Chained request stored on a
+ * currently-disabled endpoint (ep->ep_enable == false) is never reported
+ * due, however long its own kind-specific condition has held -- the same
+ * "operational requests stay queued, never executed, while disabled" rule
+ * rcp_server_endpoint_submit() already enforces for a Standard request
+ * (server.c:56). It remains fully stored (rcp_server_endpoint_admit()'s
+ * own admission behavior for these kinds is unchanged by this rule -- it
+ * never consulted ep_enable and still doesn't) and is evaluated fresh --
+ * including arming its exec_delay timer from whenever this function first
+ * finds it startable AFTER ep_enable becomes true again, not from whenever
+ * its start condition first held while disabled -- once a caller
+ * re-enables the endpoint (rcp_server_endpoint_set_enable()). A request
+ * admitted into this store via REQ-TIMED-012's own TSCF presentation-time
+ * gate under kind RCP_SCHED_KIND_STANDARD/_CANCELLATION is NOT covered by
+ * this rule -- that path bypasses submit()'s config-vs-operational
+ * classification entirely and stays a separately-scoped gap.
+ *
  * This function never executes anything and never advances a sequencer --
  * the caller runs the selected request's own frame (ep->pending[*out_index].frame)
  * and then reports the outcome back through
