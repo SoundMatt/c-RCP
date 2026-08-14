@@ -178,6 +178,23 @@ typedef struct {
     uint32_t armed_at;
     /* CHAINED only: set once this member's predecessor has finalized. */
     bool     predecessor_done;
+
+    /* REQ-TIMED-012 (issue #336, TC18 §11.2/§11.2.1): "postponed until
+     * [the TSCF header's own avtp_timestamp] presentation time" applies
+     * to a request of ANY kind carried under a TSCF header, independent
+     * of (ANDed with) that kind's own existing execution condition above
+     * -- an envelope-level gate, not a per-kind one. has_presentation_gate
+     * is false for every request admitted under an NTSCF header (or a
+     * TSCF header with tv unset); presentation_gate_ns is meaningless
+     * while it is false. When true, it holds the 48-bit-domain instant
+     * rcp_avtp_extend_timestamp() (avtp.h) reconstructed from the TSCF
+     * header's own 32-bit avtp_timestamp at admission time (a resolution
+     * anchor computed ONCE, not re-derived per tick -- see that
+     * function's own doc comment), compared against rcp_server_tick_ctx_t's
+     * own gptp_now the same way TIMED's own presentation_time already is
+     * (rcp_timed_due()). */
+    bool     has_presentation_gate;
+    uint64_t presentation_gate_ns;
 } rcp_server_pending_t;
 
 /* ── Per-endpoint ep_enable: pre-load-then-drain-on-enable ─────────────────── */
@@ -355,10 +372,39 @@ typedef enum {
  * rejection paths' error-response wiring is tracked separately
  * (github.com/SoundMatt/c-RCP/issues/163) -- do not assume
  * RCP_ERROR_NONE means "no error occurred", only "this function did not
- * determine a specific Table 30 code for it". */
+ * determine a specific Table 30 code for it".
+ *
+ * REQ-TIMED-012 (issue #336, TC18 §11.2/§11.2.1): tv/avtp_timestamp are
+ * the enclosing AVTPDU's own TSCF header fields (avtp.h's
+ * rcp_avtp_tscf_header_t) -- tv false (an NTSCF header, or a TSCF header
+ * whose own tv bit is unset) means frame carries no presentation time at
+ * all, and this call behaves EXACTLY as it did before this parameter
+ * pair existed: a standard request still takes RCP_SERVER_ADMIT_EXECUTE_
+ * NOW/_QUEUED, never stored. tv true means the request -- of ANY kind,
+ * standard or conditional alike, per TC18's own "standard, conditional,
+ * or cancel" wording -- is postponed until avtp_timestamp's own
+ * reconstructed 48-bit-domain instant (rcp_avtp_extend_timestamp(),
+ * avtp.h, resolved once here against gptp_reference_now and stored as
+ * the new slot's own presentation_gate_ns -- see rcp_server_pending_t's
+ * own field doc comment): a standard request that would otherwise
+ * EXECUTE_NOW/_QUEUE is instead claimed into the request store exactly
+ * like a conditional one (kind RCP_SCHED_KIND_STANDARD, request_type 0,
+ * no kind-specific execution condition of its own -- see
+ * rcp_server_endpoint_select_due()'s own is_due() gate) and this call
+ * returns RCP_SERVER_ADMIT_PENDING instead; a conditional request is
+ * stored exactly as it already is, with its own kind-specific condition
+ * unchanged, PLUS this new envelope-level gate ANDed on top. Cancellation
+ * requests are NOT covered by this parameter pair -- RCP_SERVER_ADMIT_
+ * CANCELLATION is returned immediately, unstored, exactly as without a
+ * TSCF header, since this module has no mechanism today for a "postponed
+ * action" (as opposed to a postponed stored request); TSCF-gated
+ * cancellation stays this requirement's own remaining, separately-scoped
+ * gap. gptp_reference_now is meaningless while tv is false. */
 rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
                                               const uint8_t *frame, size_t frame_len,
-                                              uint32_t now, uint8_t *out_request_type,
+                                              uint32_t now, bool tv, uint32_t avtp_timestamp,
+                                              uint64_t gptp_reference_now,
+                                              uint8_t *out_request_type,
                                               size_t *out_index, rcp_wire_error_t *out_error);
 
 /* ── The execution-condition tick ─────────────────────────────────────────── */

@@ -1051,11 +1051,11 @@ static void test_cancel_all_and_cancel_single_return_values(void)
     TEST_ASSERT_NOT_NULL(c.data);
 
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
-                       rcp_server_endpoint_admit(&ep, a.data, a.len, 0u, &request_type, NULL, NULL));
+                       rcp_server_endpoint_admit(&ep, a.data, a.len, 0u, false, 0u, 0u, &request_type, NULL, NULL));
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
-                       rcp_server_endpoint_admit(&ep, b.data, b.len, 0u, &request_type, NULL, NULL));
+                       rcp_server_endpoint_admit(&ep, b.data, b.len, 0u, false, 0u, 0u, &request_type, NULL, NULL));
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
-                       rcp_server_endpoint_admit(&ep, c.data, c.len, 0u, &request_type, NULL, NULL));
+                       rcp_server_endpoint_admit(&ep, c.data, c.len, 0u, false, 0u, 0u, &request_type, NULL, NULL));
     TEST_ASSERT_EQUAL_size_t(3, rcp_server_endpoint_pending_count(&ep));
 
     /* cancel_single(): reports rcp_cancel_attempt()'s own outcome and

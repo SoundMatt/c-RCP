@@ -662,9 +662,20 @@ static rcp_mock_dispatch_result_t dispatch_plain(rcp_mock_server_t *srv,
      * reported back for this module to apply. Admission carries no tick of
      * its own (0): a stored request's exec_delay is measured from the
      * moment its own start condition first holds, which is decided later
-     * by rcp_server_endpoint_select_due() against the caller's tick. */
-    admit = rcp_server_endpoint_admit(&slot->queue, request, request_len, 0u, &request_type,
-                                       &admitted_index, &error);
+     * by rcp_server_endpoint_select_due() against the caller's tick.
+     *
+     * tv=false, 0u, 0u: REQ-TIMED-012's own TSCF presentation-time gate
+     * (server.h) is not yet wired to a real AVTPDU header here -- this
+     * module's own dispatch()/dispatch_frame() family has no tv/
+     * avtp_timestamp/gptp_now parameters of its own yet, a separate,
+     * not-yet-attempted integration step tracked as this requirement's
+     * own remaining scope (mirroring REQ-SRV-016's own identical
+     * "primitive complete, integration deferred" disposition just
+     * above). No behavior change for any caller of this module: every
+     * request dispatched through it is, and remains, treated as if it
+     * arrived under an NTSCF header. */
+    admit = rcp_server_endpoint_admit(&slot->queue, request, request_len, 0u, false, 0u, 0u,
+                                       &request_type, &admitted_index, &error);
 
     /* REQ-E2E-030 (issue #335): a request-storage overflow on THIS
      * endpoint's own queue is answered locally exactly as before

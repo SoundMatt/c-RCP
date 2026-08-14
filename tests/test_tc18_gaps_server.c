@@ -241,7 +241,7 @@ static void test_admit_takes_no_lifecycle_state_or_stream_identity(void)
     rcp_server_endpoint_init(&ep, true);
 
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_EXECUTE_NOW,
-                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u,
+                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, false, 0u, 0u,
                                                 &request_type, NULL, NULL));
     TEST_ASSERT_EQUAL_UINT8(0u, request_type);
 
@@ -1146,7 +1146,7 @@ static void test_admission_is_suspended_during_the_sleep_drain(void)
     /* Before any sleep request has arrived, admission behaves exactly as
      * ever -- an enabled endpoint executes a standard request immediately. */
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_EXECUTE_NOW,
-                      rcp_server_endpoint_admit(&wakeup_ep, frame.data, frame.len, 0u,
+                      rcp_server_endpoint_admit(&wakeup_ep, frame.data, frame.len, 0u, false, 0u, 0u,
                                                 &request_type, NULL, NULL));
 
     /* REQ-PWRMODE-028 (TC18 §13.7.2.3 step 1): "on receipt of a sleep
@@ -1158,7 +1158,7 @@ static void test_admission_is_suspended_during_the_sleep_drain(void)
      * mid-drain is refused outright, not queued and not executed. */
     rcp_server_endpoint_set_admission_suspended(&wakeup_ep, true);
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_SUSPENDED,
-                      rcp_server_endpoint_admit(&wakeup_ep, frame.data, frame.len, 0u,
+                      rcp_server_endpoint_admit(&wakeup_ep, frame.data, frame.len, 0u, false, 0u, 0u,
                                                 &request_type, NULL, NULL));
     TEST_ASSERT_EQUAL_UINT(0u, rcp_server_endpoint_queue_len(&wakeup_ep));
 
@@ -1167,7 +1167,7 @@ static void test_admission_is_suspended_during_the_sleep_drain(void)
      * normal admission by clearing the flag again. */
     rcp_server_endpoint_set_admission_suspended(&wakeup_ep, false);
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_EXECUTE_NOW,
-                      rcp_server_endpoint_admit(&wakeup_ep, frame.data, frame.len, 0u,
+                      rcp_server_endpoint_admit(&wakeup_ep, frame.data, frame.len, 0u, false, 0u, 0u,
                                                 &request_type, NULL, NULL));
 
     rcp_bytes_free(&frame);
@@ -1252,7 +1252,7 @@ static void test_disabled_endpoint_still_queues_operational_and_compound_wait_re
     /* admit() takes the same path for a standard request -- it too queues
      * rather than executing, confirming the deviation isn't submit()-only. */
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_QUEUED,
-                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u,
+                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, false, 0u, 0u,
                                                 &request_type, NULL, NULL));
     TEST_ASSERT_EQUAL_UINT8(0u, request_type);
     TEST_ASSERT_EQUAL_UINT(2u, rcp_server_endpoint_queue_len(&ep));
@@ -1394,7 +1394,7 @@ static void test_gptp_trigger_evaluate_derives_signal_and_composes_with_notify(v
                                           &step, 1u, NULL, 0u);
     TEST_ASSERT_NOT_NULL(frame.data);
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
-                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u,
+                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, false, 0u, 0u,
                                                 &request_type, &idx, NULL));
 
     memset(&ctx, 0, sizeof(ctx));
@@ -1550,41 +1550,165 @@ static void test_sequencer_zero_state_ownership_and_regmap_wiring(void)
 
 /* ── §11.2 / §11.2.1: TSCF-carried timed requests ──────────────────────────── */
 
-static void test_tscf_presentation_time_and_abb_timed_encoder(void)
+/* FIXED 2026-08-13 (issue #338, tc18-gap backlog PR C, REQ-TIMED-012):
+ * rcp_server_endpoint_admit() now takes tv/avtp_timestamp/
+ * gptp_reference_now. tv=false is byte-for-byte the old behavior
+ * (postponement never applies -- every existing caller of this module
+ * is unaffected); this test used to pin exactly that as a gap. It now
+ * asserts the conforming positive case instead, per this file's own
+ * established "a gap-pinning test failing after a fix means rewrite it
+ * to the conforming expectation" convention. */
+static void test_ntscf_standard_request_still_executes_immediately(void)
 {
     rcp_server_endpoint_t ep;
     rcp_bytes_t           frame = standard_abb((rcp_byte_bus_id_t)5u, 1u);
-    rcp_bytes_t           timed;
     uint8_t               request_type = 0xFFu;
-    uint8_t               msg_type     = 0u;
 
     TEST_ASSERT_NOT_NULL(frame.data);
     rcp_server_endpoint_init(&ep, true);
 
-    /* TC18 §11.2 / §11.2.1: a request carried under a TSCF header is
-     * postponed until that header's own avtp_timestamp presentation time.
-     * rcp_server_endpoint_admit() receives neither the AVTP subtype nor the
-     * timestamp -- only the bare ACF message -- so the request below
-     * executes immediately no matter how far in the future the enclosing
-     * TSCF header's presentation time lies. */
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_EXECUTE_NOW,
-                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u,
+                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, false, 0u, 0u,
                                                 &request_type, NULL, NULL));
     TEST_ASSERT_EQUAL_UINT8(0u, request_type);
 
-    /* TC18 §11.2 / §11.2.1 also encode a timed request whose presentation
-     * time rides in the enclosing TSCF header as an ACF_ABB message. c-RCP's
-     * only timed-request encoder emits the §11.2.2.5 ACF_GBB form with the
-     * repurposed message_timestamp region -- there is no ACF_ABB variant. */
-    timed = rcp_timed_encode_request((rcp_byte_bus_id_t)5u, 1000u, 1u, NULL, 0u);
-    TEST_ASSERT_NOT_NULL(timed.data);
-    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_peek_msg_type(timed.data, timed.len, &msg_type));
-    TEST_ASSERT_EQUAL_HEX8(RCP_ACF_MSG_TYPE_GBB, msg_type);
-    TEST_ASSERT_NOT_EQUAL(RCP_ACF_MSG_TYPE_ABB, msg_type);
+    rcp_bytes_free(&frame);
+    rcp_server_endpoint_destroy(&ep);
+}
+
+/* The actual TC18 §11.2/§11.2.1 rule closed: tv=true postpones a
+ * standard request via the request store instead of executing it
+ * immediately -- it becomes due only once rcp_server_tick_ctx_t's own
+ * gptp_now reaches the reconstructed presentation time, and never while
+ * gptp_locked is false (fail-closed, the same rule TIMED's own
+ * presentation_time already follows). reference_now is chosen as 0 so
+ * the reconstructed instant equals avtp_timestamp verbatim (no
+ * wraparound arithmetic to reason about -- rcp_avtp_extend_timestamp()'s
+ * own reconstruction math is already directly unit-tested in
+ * tests/test_avtp.c). */
+static void test_tscf_standard_request_postponed_until_presentation_time(void)
+{
+    rcp_server_endpoint_t ep;
+    rcp_bytes_t           frame = standard_abb((rcp_byte_bus_id_t)5u, 1u);
+    uint8_t               request_type = 0xFFu;
+    size_t                idx = 0u;
+    rcp_server_tick_ctx_t ctx;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    rcp_server_endpoint_init(&ep, true);
+
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
+                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, true, 5000000u,
+                                                0u, &request_type, &idx, NULL));
+    TEST_ASSERT_EQUAL_UINT8(0u, request_type); /* standard, not conditional -- no repurposed opcode */
+
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.endpoint_idle = true;
+
+    /* Locked but one tick early: not yet due. */
+    ctx.gptp_locked = true;
+    ctx.gptp_now     = 4999999u;
+    TEST_ASSERT_FALSE(rcp_server_endpoint_select_due(&ep, &ctx, &idx));
+
+    /* Reached the reconstructed instant, but time base not locked: still
+     * fail-closed, the same rule TIMED's own auxiliary_condition_met()
+     * already applies. */
+    ctx.gptp_locked = false;
+    ctx.gptp_now     = 5000000u;
+    TEST_ASSERT_FALSE(rcp_server_endpoint_select_due(&ep, &ctx, &idx));
+
+    /* Both conditions satisfied: due. */
+    ctx.gptp_locked = true;
+    TEST_ASSERT_TRUE(rcp_server_endpoint_select_due(&ep, &ctx, &idx));
 
     rcp_bytes_free(&frame);
-    rcp_bytes_free(&timed);
     rcp_server_endpoint_destroy(&ep);
+}
+
+/* A conditional request under a TSCF header is gated by BOTH its own
+ * kind-specific condition AND the new envelope-level presentation gate,
+ * independently -- neither alone is sufficient. Uses TRIGGERED (armed
+ * immediately, no sequencer table needed) rather than COMPOUND to keep
+ * the fixture minimal. */
+static void test_tscf_conditional_request_needs_both_its_own_condition_and_the_gate(void)
+{
+    rcp_server_endpoint_t   ep;
+    rcp_triggered_step_t    step;
+    rcp_bytes_t             frame;
+    uint8_t                 request_type = 0xFFu;
+    size_t                  idx          = 0u;
+    rcp_server_tick_ctx_t   ctx;
+
+    memset(&step, 0, sizeof(step)); /* trigger_threshold 0: fires on the first occurrence */
+    step.trigger_source_ep    = 0u;
+    step.trigger_signal_nr    = 0u;
+    frame = rcp_triggered_encode_request(RCP_REQUEST_TYPE_TRIGGERED, (rcp_byte_bus_id_t)5u,
+                                          &step, 1u, NULL, 0u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    rcp_server_endpoint_init(&ep, true);
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
+                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, true, 5000000u,
+                                                0u, &request_type, &idx, NULL));
+
+    memset(&ctx, 0, sizeof(ctx));
+    ctx.endpoint_idle = true;
+    ctx.gptp_locked   = true;
+    ctx.gptp_now      = 5000000u; /* presentation gate open */
+
+    /* Presentation gate open, but the trigger's own threshold never
+     * reached: still not due -- the envelope gate does not bypass the
+     * kind's own condition. */
+    TEST_ASSERT_FALSE(rcp_server_endpoint_select_due(&ep, &ctx, &idx));
+
+    /* Trigger threshold reached, but presentation gate not yet open:
+     * still not due -- the kind's own condition does not bypass the
+     * envelope gate either. */
+    TEST_ASSERT_EQUAL_UINT(1u, rcp_server_endpoint_notify_trigger(&ep, 0u, 0u));
+    ctx.gptp_now = 0u;
+    TEST_ASSERT_FALSE(rcp_server_endpoint_select_due(&ep, &ctx, &idx));
+
+    /* Both satisfied: due. */
+    ctx.gptp_now = 5000000u;
+    TEST_ASSERT_TRUE(rcp_server_endpoint_select_due(&ep, &ctx, &idx));
+
+    rcp_bytes_free(&frame);
+    rcp_server_endpoint_destroy(&ep);
+}
+
+/* FIXED (REQ-TIMED-013, already closed in an earlier batch -- reconfirmed
+ * here rather than left as a stale deviation pin): TC18 §11.2/§11.2.1
+ * also names an ACF_ABB encoding for a timed request whose presentation
+ * time rides in the enclosing TSCF header, distinct from the ACF_GBB
+ * repurposed-timestamp form rcp_timed_encode_request() emits.
+ * rcp_timed_encode_request_tscf() (request_timed.h) is that encoder. */
+static void test_timed_encode_request_tscf_produces_a_real_abb_message(void)
+{
+    static const uint8_t        mac[6] = {0x01, 0x02, 0x03, 0x04, 0x05, 0x06};
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 timed;
+    rcp_avtp_tscf_header_t      out_hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    uint8_t                      msg_type = 0u;
+
+    hdr.byte_bus_id     = (rcp_byte_bus_id_t)5u;
+    hdr.transaction_num = 1u;
+    hdr.op              = (uint8_t)RCP_ACF_OP_WRITE;
+
+    timed = rcp_timed_encode_request_tscf(&hdr, NULL, 0u, rcp_stream_id_make(mac, 1u),
+                                           5000000u, 1u);
+    TEST_ASSERT_NOT_NULL(timed.data);
+
+    TEST_ASSERT_EQUAL(RCP_AVTP_OK,
+                      rcp_avtp_decode_tscf(timed.data, timed.len, &out_hdr, &payload, &payload_len));
+    TEST_ASSERT_EQUAL_UINT8(1u, out_hdr.tv);
+    TEST_ASSERT_EQUAL_UINT32(5000000u, out_hdr.avtp_timestamp);
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_peek_msg_type(payload, payload_len, &msg_type));
+    TEST_ASSERT_EQUAL_HEX8(RCP_ACF_MSG_TYPE_ABB, msg_type);
+
+    rcp_bytes_free(&timed);
 }
 
 /* ── §12.7.7: the per-stream request watchdog is never kicked ──────────────── */
@@ -1681,7 +1805,10 @@ int main(void)
 
     RUN_TEST(test_sequencer_zero_state_disables_start_condition_and_advance);
     RUN_TEST(test_sequencer_zero_state_ownership_and_regmap_wiring);
-    RUN_TEST(test_tscf_presentation_time_and_abb_timed_encoder);
+    RUN_TEST(test_ntscf_standard_request_still_executes_immediately);
+    RUN_TEST(test_tscf_standard_request_postponed_until_presentation_time);
+    RUN_TEST(test_tscf_conditional_request_needs_both_its_own_condition_and_the_gate);
+    RUN_TEST(test_timed_encode_request_tscf_produces_a_real_abb_message);
     RUN_TEST(test_watchdog_overflows_despite_continuous_requests);
 
     return UNITY_END();

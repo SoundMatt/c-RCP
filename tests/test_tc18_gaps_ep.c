@@ -221,7 +221,7 @@ static void test_acf_request_flags_round_trip_but_admission_now_rejects_rsp(void
      * request -- TC18 11.2.2.3's own rule is now enforced at admission. */
     rcp_server_endpoint_init(&ep, true);
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_REJECTED,
-                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, &request_type,
+                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, false, 0u, 0u, &request_type,
                                                 NULL, &admit_err));
     TEST_ASSERT_EQUAL(RCP_ERROR_INVALID_PARAMETER, admit_err);
     rcp_server_endpoint_destroy(&ep);
@@ -1375,12 +1375,12 @@ static void test_e2e_replayed_request_is_admitted_again(void)
 
     rcp_server_endpoint_init(&ep, true);
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
-                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, &request_type,
+                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, false, 0u, 0u, &request_type,
                                                 &index, NULL));
     /* Identical AVTPDU content, no sequence advance: filed again anyway --
      * admit() itself still has no sequence_num input to gate on. */
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
-                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, &request_type,
+                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, false, 0u, 0u, &request_type,
                                                 &index, NULL));
     TEST_ASSERT_EQUAL_UINT(2u, rcp_server_endpoint_pending_count(&ep));
 
@@ -1592,7 +1592,7 @@ static void test_e2e_request_store_overflow_reports_error_code_but_not_escalatio
     rcp_server_endpoint_init(&ep, true);
     for (i = 0; i < RCP_SERVER_MAX_PENDING; i++) {
         TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
-                          rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, &request_type,
+                          rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, false, 0u, 0u, &request_type,
                                                     NULL, &err));
         TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
     }
@@ -1602,7 +1602,7 @@ static void test_e2e_request_store_overflow_reports_error_code_but_not_escalatio
      * caller can turn into a conformant error response. */
     err = RCP_ERROR_NONE;
     TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_REJECTED,
-                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, &request_type,
+                      rcp_server_endpoint_admit(&ep, frame.data, frame.len, 0u, false, 0u, 0u, &request_type,
                                                 NULL, &err));
     TEST_ASSERT_EQUAL(RCP_ERROR_REQUEST_STORAGE_OVERFLOW, err);
     TEST_ASSERT_EQUAL_UINT(RCP_SERVER_MAX_PENDING, rcp_server_endpoint_pending_count(&ep));

@@ -19012,3 +19012,34 @@ New `rcp_e2e_seq_tracker_t seq_tracker[]` array added to
 
 **Next**: PR C, `REQ-TIMED-012`/`REQ-TIMED-013`'s TSCF
 presentation-time gating.
+
+### v0.323.0 -- 2026-08-13 (tc18-gap backlog PR C: REQ-TIMED-012/013
+TSCF presentation-time admission machinery)
+
+Third PR of the 42-item `scope: "tc18-gap"` backlog (issue #336).
+`REQ-TIMED-012`'s admission/due-selection machinery CLOSED; both
+requirements stay `partial` (honestly, deliberately) pending a real
+dispatch-layer caller.
+
+`rcp_server_endpoint_admit()` (server.h/server.c) now takes
+`tv`/`avtp_timestamp`/`gptp_reference_now`. `tv=false` is
+byte-for-byte the prior behavior; `tv=true` postpones a request of
+ANY kind via the request store -- a standard request that would
+otherwise `EXECUTE_NOW`/`_QUEUE` is claimed into a new
+`RCP_SCHED_KIND_STANDARD` pending slot; a conditional request keeps
+its own kind-specific condition with the new envelope-level gate
+ANDed on top. New `rcp_server_pending_t.has_presentation_gate`/
+`presentation_gate_ns` fields carry the reconstructed instant;
+`rcp_server_endpoint_select_due()`'s own `is_due()` checks it,
+fail-closed without a locked gPTP base. Cancellation requests are
+explicitly not covered (no "postponed action" mechanism exists).
+
+Honestly-scoped increment, matching this project's own precedent:
+closes the admission primitive, does NOT wire mock.c's own
+dispatch()/_dispatch_e2e()/_dispatch_frame()/_dispatch_frame_e2e()
+family to a real TSCF header yet -- that stays tracked remaining
+scope. 4 new tests, every core-logic change mutation-tested. Full
+66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51):
+0 errors, 0/1076 untested.
+
+**Next**: PR D, ADC/GPIO/ISELED mock.c dispatch wiring.

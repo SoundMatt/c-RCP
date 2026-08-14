@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/server.h"
 
+#include "rcp/avtp.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -194,9 +196,45 @@ static rcp_server_pending_t *claim_slot(rcp_server_endpoint_t *ep)
 //cfusa:req REQ-SRV-022
 //cfusa:req REQ-PWRMODE-028
 //cfusa:req REQ-ACF-021
+/* REQ-TIMED-012 (issue #336): claims a fresh slot for a request carried
+ * under a TSCF header with no execution condition of its own -- a
+ * standard request that would otherwise EXECUTE_NOW/_QUEUE, now
+ * postponed purely by the envelope-level presentation-time gate (see
+ * rcp_server_pending_t's own has_presentation_gate/presentation_gate_ns
+ * field doc comments and is_due()'s own gate below). kind is
+ * RCP_SCHED_KIND_STANDARD, request_type 0 -- matching admit()'s own
+ * existing "0 for a standard [request]" *out_request_type convention.
+ * Returns RCP_SERVER_ADMIT_REJECTED (request store full) or
+ * RCP_SERVER_ADMIT_PENDING. */
+static rcp_server_admit_t admit_standard_under_tscf_gate(rcp_server_endpoint_t *ep,
+                                                           const uint8_t *frame, size_t frame_len,
+                                                           uint32_t now, uint64_t presentation_gate_ns,
+                                                           size_t *out_index)
+{
+    rcp_server_pending_t *slot = claim_slot(ep);
+
+    if (!slot) return RCP_SERVER_ADMIT_REJECTED;
+
+    slot->kind                  = RCP_SCHED_KIND_STANDARD;
+    slot->request_type          = 0;
+    slot->has_presentation_gate = true;
+    slot->presentation_gate_ns  = presentation_gate_ns;
+    slot->armed_at              = now;
+    slot->frame                 = rcp_bytes_dup(frame, frame_len);
+    if (!slot->frame.data && frame_len > 0) {
+        release_slot(ep, slot);
+        return RCP_SERVER_ADMIT_REJECTED;
+    }
+
+    if (out_index) *out_index = (size_t)(slot - &ep->pending[0]);
+    return RCP_SERVER_ADMIT_PENDING;
+}
+
 rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
                                               const uint8_t *frame, size_t frame_len,
-                                              uint32_t now, uint8_t *out_request_type,
+                                              uint32_t now, bool tv, uint32_t avtp_timestamp,
+                                              uint64_t gptp_reference_now,
+                                              uint8_t *out_request_type,
                                               size_t *out_index, rcp_wire_error_t *out_error)
 {
     uint8_t                     request_type = 0;
@@ -209,6 +247,10 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
     rcp_byte_bus_id_t           bus;
     uint8_t                     tn;
     rcp_acf_byte_message_info_t peek_hdr;
+    /* REQ-TIMED-012: resolved once here (not re-derived per tick) iff tv
+     * -- meaningless otherwise. */
+    uint64_t                    presentation_gate_ns =
+        tv ? rcp_avtp_extend_timestamp(avtp_timestamp, gptp_reference_now) : 0u;
 
     *out_request_type = 0;
     if (out_error) *out_error = RCP_ERROR_NONE;
@@ -231,9 +273,14 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
         return RCP_SERVER_ADMIT_REJECTED;
     }
 
-    /* Not a repurposed-timestamp ACF_GBB at all: a standard request, and
-     * the original submit path handles it unchanged. */
+    /* Not a repurposed-timestamp ACF_GBB at all: a standard request. Under
+     * a TSCF header (tv), REQ-TIMED-012 postpones it via the request
+     * store instead of the original immediate submit path. */
     if (rcp_compound_peek_request_type(frame, frame_len, &request_type) != RCP_COMPOUND_OK) {
+        if (tv) {
+            return admit_standard_under_tscf_gate(ep, frame, frame_len, now,
+                                                   presentation_gate_ns, out_index);
+        }
         /* NULL: admit()'s own signature does not yet propagate a queuing
          * acknowledge to its caller -- a separate, not-yet-attempted
          * integration step (REQ-SRV-016's own primitive is complete and
@@ -246,7 +293,13 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
     if (kind == RCP_SCHED_KIND_STANDARD) {
         /* A repurposed region carrying an opcode byte this build does not
          * recognize: treated as standard, never over-privileged (see
-         * rcp_sched_classify()'s own fail-safe rule). */
+         * rcp_sched_classify()'s own fail-safe rule). Same TSCF-gated
+         * postponement as the "not a repurposed ACF_GBB at all" branch
+         * above. */
+        if (tv) {
+            return admit_standard_under_tscf_gate(ep, frame, frame_len, now,
+                                                   presentation_gate_ns, out_index);
+        }
         /* NULL: admit()'s own signature does not yet propagate a queuing
          * acknowledge to its caller -- a separate, not-yet-attempted
          * integration step (REQ-SRV-016's own primitive is complete and
@@ -351,6 +404,14 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
         return RCP_SERVER_ADMIT_REJECTED;
     }
 
+    /* REQ-TIMED-012: a conditional request carried under a TSCF header is
+     * ALSO gated by the envelope-level presentation time, on top of (not
+     * instead of) its own kind-specific condition just decoded above --
+     * see is_due()'s own gate and rcp_server_pending_t's own field doc
+     * comments. */
+    slot->has_presentation_gate = tv;
+    slot->presentation_gate_ns  = presentation_gate_ns;
+
     slot->armed_at = now;
     slot->frame    = rcp_bytes_dup(frame, frame_len);
     if (!slot->frame.data && frame_len > 0) {
@@ -387,6 +448,15 @@ static bool start_condition_holds(const rcp_server_pending_t *slot,
     case RCP_SCHED_KIND_CHAINED:
         /* Recorded by rcp_server_endpoint_chain_predecessor_done(). */
         return slot->predecessor_done;
+
+    case RCP_SCHED_KIND_STANDARD:
+        /* REQ-TIMED-012: only reachable here for a standard request
+         * postponed purely by the envelope-level presentation-time gate
+         * (is_due()'s own gate, checked before this function is ever
+         * called) -- it has no kind-specific start condition of its own,
+         * the same "no separate arming step" shape TIMED already
+         * establishes. */
+        return true;
 
     default:
         return false;
@@ -471,6 +541,12 @@ static bool delay_expired(const rcp_server_pending_t *slot, const rcp_server_tic
     case RCP_SCHED_KIND_CHAINED:
         return rcp_chained_exec_delay_elapsed(slot->chain_exec_delay, elapsed);
 
+    case RCP_SCHED_KIND_STANDARD:
+        /* REQ-TIMED-012: no exec_delay of its own -- is_due()'s own
+         * envelope-level presentation gate (checked before this function
+         * is ever reached) is this kind's entire condition here. */
+        return true;
+
     default:
         return false;
     }
@@ -482,6 +558,17 @@ static bool is_due(rcp_server_pending_t *slot, const rcp_server_tick_ctx_t *ctx)
     /* Safety-tagged requests stay in the store until the endpoint has
      * actually reached its configured safe state -- e2e.h's own gate. */
     if (!rcp_e2e_request_may_execute(slot->request_type, ctx->in_safe_state)) return false;
+
+    /* REQ-TIMED-012 (TC18 §11.2/§11.2.1): a request carried under a TSCF
+     * header is postponed until its own reconstructed presentation time,
+     * regardless of kind -- an envelope-level gate independent of (ANDed
+     * with) each kind's own existing condition below. Without a locked
+     * time base the gate can never open, the same fail-closed rule
+     * TIMED's own auxiliary_condition_met() already applies. */
+    if (slot->has_presentation_gate &&
+        !(ctx->gptp_locked && rcp_timed_due(slot->presentation_gate_ns, ctx->gptp_now))) {
+        return false;
+    }
 
     /* Arming is evaluated before the auxiliary gate on purpose: a
      * triggered request's exec_delay runs from the moment its threshold
