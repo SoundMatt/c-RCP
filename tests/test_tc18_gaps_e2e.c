@@ -13,6 +13,8 @@
 //cfusa:test REQ-E2E-042
 //cfusa:test REQ-WDG-010
 //cfusa:test REQ-E2E-021
+//cfusa:test REQ-E2E-028
+//cfusa:test REQ-E2E-029
 
 /*
  * test_tc18_gaps_e2e.c -- spec-literal conformance-and-deviation suite for
@@ -50,6 +52,7 @@
 #include <rcp/scheduler.h>
 #include <rcp/watchdog.h>
 
+#include <stdlib.h>
 #include <string.h>
 
 void setUp(void) {}
@@ -504,7 +507,7 @@ static void test_dispatch_frame_e2e_verifies_each_member_independently(void)
 
     g_handler_called = false;
     dispatched = rcp_mock_server_dispatch_frame_e2e(srv, RCP_AVTP_SUBTYPE_TSCF, true, TEST_SID,
-                                                     TEST_TS, joined, sizeof(joined), results, 4);
+                                                     TEST_TS, 0u, joined, sizeof(joined), results, 4);
     TEST_ASSERT_EQUAL_UINT(2u, dispatched);
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result);
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CRC_ERROR, results[1].result);
@@ -943,6 +946,259 @@ static void test_crc_error_does_not_broadcast_without_an_ep_id_map(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* ── REQ-E2E-028/029 (issue #338): per-frame sequence_num gate ─────────────
+ *
+ * TC18 §12.7.7 Table 24's own rx_enforce_seq (0x000D bit 1) and
+ * rx_seq_safestate_enable (0x000D bit 2) previously had a complete pure
+ * primitive (rcp_e2e_seq_evaluate(), e2e.h) but no caller anywhere in this
+ * codebase -- rcp_mock_server_dispatch_frame()/_dispatch_frame_e2e() now
+ * evaluate it once per frame, before any member is processed, using
+ * srv's own new per-request-stream rcp_e2e_seq_tracker_t. */
+
+static void set_up_seq_stream(rcp_mock_server_t *srv, bool rx_enforce_seq,
+                               bool rx_seq_safestate_enable)
+{
+    rcp_regmap_request_stream_cfg_t stream_cfg[1];
+
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id             = TEST_SID;
+    stream_cfg[0].rx_enforce_seq           = rx_enforce_seq;
+    stream_cfg[0].rx_seq_safestate_enable  = rx_seq_safestate_enable;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+}
+
+/* The first call ever against a fresh tracker always accepts (nothing to
+ * compare against yet, rcp_e2e_seq_evaluate()'s own has_prev contract) --
+ * a REPLAY of that same sequence_num on the very next frame is then
+ * correctly rejected: every member of the second frame comes back
+ * RCP_MOCK_DISPATCH_SEQ_ERROR, byte_bus_id 0, response zeroed. */
+static void test_dispatch_frame_rejects_replayed_sequence_num(void)
+{
+    rcp_mock_server_t             *srv   = rcp_mock_server_new();
+    const uint8_t                   pl[4] = {1, 2, 3, 4};
+    rcp_bytes_t                     frame = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_mock_frame_member_result_t  results[4];
+    size_t                           n;
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    set_up_seq_stream(srv, true, false);
+
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, TEST_SID, 5u,
+                                        frame.data, frame.len, results, 4);
+    TEST_ASSERT_EQUAL_size_t(1, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result);
+    rcp_bytes_free(&results[0].response);
+
+    /* Same seq again -- a replay, not a fresh request. */
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, TEST_SID, 5u,
+                                        frame.data, frame.len, results, 4);
+    TEST_ASSERT_EQUAL_size_t(1, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_SEQ_ERROR, results[0].result);
+    TEST_ASSERT_EQUAL_UINT16(0, results[0].byte_bus_id);
+    TEST_ASSERT_NULL(results[0].response.data);
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* RFC 1982 wraparound: 0xFF -> 0x00 is a valid single increment, not a
+ * replay -- see rcp_e2e_seq_evaluate()'s own doc comment (e2e.h). */
+static void test_dispatch_frame_accepts_wrapped_sequence_num(void)
+{
+    rcp_mock_server_t             *srv   = rcp_mock_server_new();
+    const uint8_t                   pl[4] = {1, 2, 3, 4};
+    rcp_bytes_t                     frame = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_mock_frame_member_result_t  results[4];
+    size_t                           n;
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    set_up_seq_stream(srv, true, false);
+
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, TEST_SID, 0xFFu,
+                                        frame.data, frame.len, results, 4);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result);
+    rcp_bytes_free(&results[0].response);
+
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, TEST_SID, 0x00u,
+                                        frame.data, frame.len, results, 4);
+    TEST_ASSERT_EQUAL_size_t(1, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result); /* NOT rejected as a replay */
+    rcp_bytes_free(&results[0].response);
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* The correctness pitfall this design deliberately avoids: sequence_num
+ * is a property of the whole AVTPDU, not of any one ACF member packed
+ * inside it. Two members in the SAME frame, same seq, must both be
+ * admitted -- a per-member evaluate() would spuriously reject the second
+ * one (its own prev_seq already advanced by the first member's own
+ * call). */
+static void test_dispatch_frame_seq_gate_evaluates_once_not_per_member(void)
+{
+    rcp_mock_server_t             *srv    = rcp_mock_server_new();
+    const uint8_t                   pl[4]  = {1, 2, 3, 4};
+    rcp_bytes_t                     one    = make_abb(0, 0, 0, pl, sizeof(pl));
+    uint8_t                        *joined;
+    size_t                           joined_len = one.len * 2u;
+    rcp_mock_frame_member_result_t  results[4];
+    size_t                           n;
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    set_up_seq_stream(srv, true, false);
+
+    joined = malloc(joined_len);
+    TEST_ASSERT_NOT_NULL(joined);
+    memcpy(joined, one.data, one.len);
+    memcpy(joined + one.len, one.data, one.len);
+
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, TEST_SID, 9u,
+                                        joined, joined_len, results, 4);
+    TEST_ASSERT_EQUAL_size_t(2, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[1].result); /* NOT SEQ_ERROR */
+    rcp_bytes_free(&results[0].response);
+    rcp_bytes_free(&results[1].response);
+
+    free(joined);
+    rcp_bytes_free(&one);
+    rcp_mock_server_destroy(srv);
+}
+
+/* rx_seq_safestate_enable's own discontinuity check is independent of
+ * rx_enforce_seq's own accept/reject decision -- a forward jump of more
+ * than one (still "ahead", so accept stays true) still broadcasts safe
+ * state to every endpoint bound to the stream, the same
+ * rcp_mock_server_broadcast_safe_state() escalation already proven for
+ * REQ-E2E-030 (overflow) and REQ-E2E-045 (CRC error, above), reached
+ * through a materially different trigger this time. */
+static void test_dispatch_frame_discontinuity_broadcasts_safe_state_without_rejecting(void)
+{
+    rcp_mock_server_t             *srv       = rcp_mock_server_new();
+    const uint8_t                   pl[4]     = {1, 2, 3, 4};
+    rcp_bytes_t                     frame     = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t                     resp      = {0};
+    rcp_bytes_t                     timed;
+    rcp_mock_frame_member_result_t  results[4];
+    rcp_regmap_ep_id_map_entry_t    ep_map[2] = {
+        {1, 0x11, 1},
+        {2, 0x12, 1},
+    };
+    size_t                           n;
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    rcp_mock_server_add_endpoint(srv, 0x12, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_ep_id_map(srv, ep_map, 2));
+    set_up_seq_stream(srv, true, true);
+
+    /* Give 0x12 one non-safety-tagged stored request to confirm gets
+     * purged by the broadcast. */
+    timed = rcp_timed_encode_request(0x12, 0x1000u, 7u, NULL, 0u);
+    TEST_ASSERT_NOT_NULL(timed.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+                      rcp_mock_server_dispatch(srv, 0x12, RCP_AVTP_SUBTYPE_NTSCF,
+                                                RCP_ACF_MSG_TYPE_GBB, true, TEST_SID, timed.data,
+                                                timed.len, &resp));
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&timed);
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 0x12));
+
+    /* Establishes prev_seq = 5 (first call, always accepts). */
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, TEST_SID, 5u,
+                                        frame.data, frame.len, results, 4);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result);
+    rcp_bytes_free(&results[0].response);
+
+    /* Jumps to 10 -- still forward (accept stays true, this frame's own
+     * member is NOT rejected), but a genuine gap (not seq == 6). */
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, TEST_SID, 10u,
+                                        frame.data, frame.len, results, 4);
+    TEST_ASSERT_EQUAL_size_t(1, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result);
+    rcp_bytes_free(&results[0].response);
+
+    /* The actual proof: 0x12's own stored request was purged, though 0x12
+     * was never addressed by either dispatch_frame() call above. */
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 0x12));
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* No rcp_mock_server_set_request_stream_cfg() call resolving TEST_SID at
+ * all -- resolve_index() returns 0, the gate is skipped entirely (fail-
+ * toward-no-action), and dispatch proceeds regardless of any sequence_num
+ * pattern -- the exact same seq value twice in a row, unrejected. */
+static void test_dispatch_frame_seq_gate_skipped_for_unresolvable_stream(void)
+{
+    rcp_mock_server_t             *srv   = rcp_mock_server_new();
+    const uint8_t                   pl[4] = {1, 2, 3, 4};
+    rcp_bytes_t                     frame = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_mock_frame_member_result_t  results[4];
+    size_t                           n;
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    /* Deliberately no rcp_mock_server_set_request_stream_cfg() call. */
+
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, TEST_SID, 5u,
+                                        frame.data, frame.len, results, 4);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result);
+    rcp_bytes_free(&results[0].response);
+
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, TEST_SID, 5u,
+                                        frame.data, frame.len, results, 4);
+    TEST_ASSERT_EQUAL_size_t(1, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result); /* NOT SEQ_ERROR */
+    rcp_bytes_free(&results[0].response);
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* Confirms rcp_mock_server_dispatch_frame_e2e()'s own identical gate,
+ * end-to-end: a replayed sequence_num rejects the frame before any
+ * member's own CRC handling is even attempted, on an endpoint with
+ * req_crc_enable set (so the E2E-specific code path is genuinely
+ * exercised, not just the plain per-member dispatch it delegates to when
+ * req_crc_enable is unset). */
+static void test_dispatch_frame_e2e_rejects_replayed_sequence_num(void)
+{
+    rcp_mock_server_t             *srv   = rcp_mock_server_new();
+    const uint8_t                   pl[4] = {1, 2, 3, 4};
+    rcp_bytes_t                     frame = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t                     w     = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_mock_frame_member_result_t  results[4];
+    size_t                           n;
+
+    TEST_ASSERT_NOT_NULL(w.data);
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+    set_up_seq_stream(srv, true, false);
+
+    n = rcp_mock_server_dispatch_frame_e2e(srv, RCP_AVTP_SUBTYPE_TSCF, true, TEST_SID, TEST_TS,
+                                            5u, w.data, w.len, results, 4);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result);
+    rcp_bytes_free(&results[0].response);
+
+    n = rcp_mock_server_dispatch_frame_e2e(srv, RCP_AVTP_SUBTYPE_TSCF, true, TEST_SID, TEST_TS,
+                                            5u, w.data, w.len, results, 4);
+    TEST_ASSERT_EQUAL_size_t(1, n);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_SEQ_ERROR, results[0].result);
+    TEST_ASSERT_NULL(results[0].response.data);
+
+    rcp_bytes_free(&w);
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── REQ-WDG-010: rcp_mock_server_dispatch_e2e() kicks the per-stream
  * watchdog ──────────────────────────────────────────────────────────────── */
 
@@ -1326,6 +1582,13 @@ int main(void)
     RUN_TEST(test_dispatch_e2e_crc_mismatch_yields_real_error_response);
     RUN_TEST(test_crc_error_on_one_endpoint_broadcasts_safe_state_to_stream_siblings);
     RUN_TEST(test_crc_error_does_not_broadcast_without_an_ep_id_map);
+
+    RUN_TEST(test_dispatch_frame_rejects_replayed_sequence_num);
+    RUN_TEST(test_dispatch_frame_accepts_wrapped_sequence_num);
+    RUN_TEST(test_dispatch_frame_seq_gate_evaluates_once_not_per_member);
+    RUN_TEST(test_dispatch_frame_discontinuity_broadcasts_safe_state_without_rejecting);
+    RUN_TEST(test_dispatch_frame_seq_gate_skipped_for_unresolvable_stream);
+    RUN_TEST(test_dispatch_frame_e2e_rejects_replayed_sequence_num);
     RUN_TEST(test_dispatch_e2e_kicks_the_watchdog_on_every_admitted_request);
     RUN_TEST(test_dispatch_e2e_kicks_the_watchdog_even_when_the_request_is_rejected);
     RUN_TEST(test_dispatch_e2e_with_no_watchdog_keeper_set_dispatches_normally);

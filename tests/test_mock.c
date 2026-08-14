@@ -711,7 +711,7 @@ static void test_dispatch_frame_dispatches_each_member_to_its_own_endpoint(void)
     memcpy(combined + frame1.len, frame2.data, frame2.len);
     combined_len = frame1.len + frame2.len;
 
-    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, combined,
+    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, combined,
                                                  combined_len, results, RCP_MOCK_MAX_FRAME_MEMBERS);
 
     TEST_ASSERT_EQUAL_UINT(2, dispatched);
@@ -757,7 +757,7 @@ static void test_dispatch_frame_single_member_matches_direct_dispatch(void)
     hdr.byte_bus_id = 11;
     frame = rcp_acf_encode_abb(&hdr, body, sizeof(body));
 
-    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, frame.data,
+    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, frame.data,
                                                  frame.len, results, RCP_MOCK_MAX_FRAME_MEMBERS);
 
     TEST_ASSERT_EQUAL_UINT(1, dispatched);
@@ -782,7 +782,7 @@ static void test_dispatch_frame_returns_zero_for_unparseable_frame(void)
 
     to_hw_configured(srv);
 
-    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, garbage,
+    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, garbage,
                                                  sizeof(garbage), results, RCP_MOCK_MAX_FRAME_MEMBERS);
     TEST_ASSERT_EQUAL_UINT(0, dispatched);
 
@@ -819,7 +819,7 @@ static void test_dispatch_frame_reports_unknown_bus_for_undecodable_member(void)
     raw[1] = (uint8_t)(RCP_ACF_ABB_HEADER_LEN / 4u);        /* len=2 quadlets: 0 body octets */
     raw[2] = 0x40u; /* pad[7:6] = 01 -> pad=1, but body_len computes to 0 */
 
-    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, raw,
+    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, raw,
                                                  sizeof(raw), results, RCP_MOCK_MAX_FRAME_MEMBERS);
 
     TEST_ASSERT_EQUAL_UINT(1, dispatched);
@@ -854,7 +854,7 @@ static void test_dispatch_frame_truncates_at_out_cap(void)
     memcpy(combined + frame1.len, frame2.data, frame2.len);
     combined_len = frame1.len + frame2.len;
 
-    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, combined,
+    dispatched = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, combined,
                                                  combined_len, results, 1);
 
     TEST_ASSERT_EQUAL_UINT(1, dispatched); /* only out_cap's worth, not both */

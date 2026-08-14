@@ -1284,7 +1284,7 @@ static void test_chained_first_in_frame_is_chain_error(void)
     rcp_mock_frame_member_result_t results[4];
     size_t n;
 
-    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, frame, frame_len,
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, frame, frame_len,
                                         results, 4);
     TEST_ASSERT_EQUAL_size_t(2, n);
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_CHAIN_ERROR, results[0].result);
@@ -1320,7 +1320,7 @@ static void test_chained_first_in_frame_sends_per_member_error_responses(void)
     size_t                        payload_len;
     size_t                        n;
 
-    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, frame, frame_len,
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, frame, frame_len,
                                         results, 4);
     TEST_ASSERT_EQUAL_size_t(2, n);
 
@@ -1374,7 +1374,7 @@ static void test_chained_member_after_predecessor_executes(void)
     TEST_ASSERT_NOT_NULL(member.data);
     frame_len = concat2(frame, sizeof(frame), &lead, &member);
 
-    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, frame, frame_len,
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, frame, frame_len,
                                         results, 4);
     TEST_ASSERT_EQUAL_size_t(2, n);
     /* The lead request is standard: it ran immediately. */
@@ -1431,7 +1431,7 @@ static void test_clear_single_cascade_removes_chained_successors(void)
     TEST_ASSERT_NOT_NULL(member_b.data);
 
     frame_len = concat3(frame, sizeof(frame), &lead, &member_a, &member_b);
-    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, frame, frame_len,
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, frame, frame_len,
                                         results, 4);
     TEST_ASSERT_EQUAL_size_t(3, n);
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result);      /* lead ran immediately */
@@ -1496,7 +1496,7 @@ static void test_clear_single_cascade_does_not_cross_chains(void)
     TEST_ASSERT_NOT_NULL(member2.data);
 
     frame_len = concat4(frame, sizeof(frame), &lead1, &member1, &lead2, &member2);
-    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, frame, frame_len,
+    n = rcp_mock_server_dispatch_frame(srv, RCP_AVTP_SUBTYPE_NTSCF, true, 1u, 0u, frame, frame_len,
                                         results, 4);
     TEST_ASSERT_EQUAL_size_t(4, n);
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, results[1].result);
