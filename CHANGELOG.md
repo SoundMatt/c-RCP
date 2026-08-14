@@ -34,6 +34,16 @@ the rationale.
 
 ## Releases
 
+### v0.325.0 -- 2026-08-13 (tc18-gap backlog PR D continued: REQ-ADC-037 real dispatch wiring)
+
+Fifth PR of the 42-item `scope: "tc18-gap"` backlog (issue #336), closing the ADC third of "mock.c dispatch wiring" (GPIO closed in v0.324.0; ISELED remains).
+
+Same pattern as GPIO: `test_tc18_gaps_ep2.c`'s new `adc_dispatch_handler()` (an `rcp_mock_endpoint_handler_fn` registered via the existing, unmodified `rcp_mock_server_add_endpoint()`) calls `rcp_ep_adc_cadence_response_ready()` on every dispatched request and honors its result end-to-end through a real `rcp_mock_server_dispatch()` call. New `test_adc_dispatch_accumulates_across_executions_before_responding()` proves the `RCP_EP_ADC_CADENCE_ACCUMULATE` case withholds a synchronous response across two executions and produces one — with all three accumulated values in correct order — on the third.
+
+**Stays `partial`** (honestly): the dispatch-level fixture deliberately skips layer 1 (`rcp_ep_adc_average_interval()`, already independently tested and exercised end-to-end in a non-dispatch context) — it injects one already-averaged value per execution directly rather than deriving it from real per-sample averaging within that execution, so no single test yet exercises the full raw-samples-to-response pipeline through a real dispatch path.
+
+The mutation test for this batch caught its target via a SIGSEGV (a stale-`pending_count` `memmove()` underflowing to a huge size) rather than a graceful assertion failure — an even stronger "caught" signal per this project's own established mutation-testing convention. Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
+
 ### v0.324.0 -- 2026-08-13 (tc18-gap backlog PR D: REQ-GPIO-035/036 real dispatch wiring)
 
 Fourth PR of the 42-item `scope: "tc18-gap"` backlog (issue #336), scoped to GPIO only — ADC/ISELED (the other two items originally bundled under "mock.c dispatch wiring") are deferred to a focused follow-up.

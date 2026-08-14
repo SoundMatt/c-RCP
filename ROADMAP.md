@@ -19080,3 +19080,28 @@ strengthening the assertion to check after every write). Full
 
 **Next**: ADC/ISELED mock.c dispatch wiring (REQ-ADC-037,
 REQ-ISELED-025), same pattern as GPIO above.
+
+### v0.325.0 -- 2026-08-13 (tc18-gap backlog PR D continued:
+REQ-ADC-037 real dispatch wiring)
+
+Fifth PR of the 42-item `scope: "tc18-gap"` backlog (issue #336),
+closing the ADC third of "mock.c dispatch wiring" -- ISELED remains.
+
+Same pattern as GPIO: test_tc18_gaps_ep2.c's new
+adc_dispatch_handler() calls rcp_ep_adc_cadence_response_ready() on
+every dispatched request and honors its result through a real
+dispatch() call. New test proves RCP_EP_ADC_CADENCE_ACCUMULATE
+withholds a response across two executions and produces one, with
+all three accumulated values in order, on the third.
+
+Stays `partial`: the fixture deliberately skips layer 1
+(rcp_ep_adc_average_interval(), independently tested elsewhere) --
+it injects one already-averaged value per execution directly.
+
+The mutation test for this batch caught its target via a SIGSEGV (a
+stale-pending_count memmove() underflow) rather than a graceful
+failure -- an even stronger signal. Full 66-test suite + ASan/UBSan
+clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
+
+**Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
+out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).

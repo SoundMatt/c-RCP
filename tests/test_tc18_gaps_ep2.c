@@ -73,6 +73,7 @@
 #include <rcp/ep_pwm.h>
 #include <rcp/ep_uart.h>
 #include <rcp/lifecycle.h>
+#include <rcp/mock.h>
 #include <rcp/rcp.h>
 #include <rcp/regmap.h>
 
@@ -81,6 +82,32 @@
 
 void setUp(void) {}
 void tearDown(void) {}
+
+/* ── Shared mock.c dispatch fixture (issue #338, PR D continued) -- see
+ * test_tc18_gaps_ep.c's own identical fixture for the full mock.c
+ * architecture rationale (this module deliberately never calls into
+ * ep_adc.c/ep_iseled.c directly; a caller-registered handler is the
+ * documented way to wire one in). ─────────────────────────────────────── */
+static const rcp_lifecycle_plausibility_snapshot_t GAP_EMPTY_SNAP = {NULL, 0, NULL, 0};
+
+static void gap_to_hw_configured(rcp_mock_server_t *srv)
+{
+    rcp_lifecycle_writer_ctx_t none = {0};
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                      rcp_mock_server_transition(srv, RCP_LIFECYCLE_HW_CONFIGURED, &GAP_EMPTY_SNAP,
+                                                 none, true));
+}
+
+static void gap_to_rcp_configured(rcp_mock_server_t *srv)
+{
+    rcp_lifecycle_writer_ctx_t root = {true, false, false, false};
+
+    gap_to_hw_configured(srv);
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                      rcp_mock_server_transition(srv, RCP_LIFECYCLE_RCP_CONFIGURED, &GAP_EMPTY_SNAP,
+                                                 root, true));
+}
 
 /* ── Shared helpers ────────────────────────────────────────────────────────── */
 
@@ -578,26 +605,30 @@ static void test_adc_pipeline_is_stateless_by_design_and_cadence_deviation_pin(v
     TEST_ASSERT_EQUAL_UINT16(RCP_EP_PWM_IN_NO_SIGNAL, empty.value);
     TEST_ASSERT_EQUAL_UINT64(0u, rcp_ep_adc_capture_moment_timestamp(NULL, 0u));
 
-    /* DEVIATION PIN (REQ-ADC-037, PARTIAL as of 2026-08-12, issue #336):
+    /* FIXED 2026-08-13 (issue #338, tc18-gap backlog PR D continued):
      * TC18 §13.7.9.2 states three cadence cases comparing
-     * adc_combine_avg_values against adc_avg_intervals_per_request
-     * (multi-request-to-one-response, one-to-one, one-to-multi-response).
-     * rcp_ep_adc_cadence_case()/_response_ready() now give a caller the
-     * two decision primitives TC18's own rule requires (which case
-     * applies; whether enough values have accumulated for one response
-     * -- tests/test_ep_adc.c's own dedicated cadence test section), so
-     * this deviation narrows rather than closes: no real dispatch path
-     * anywhere in this codebase (src/mock.c has no per-endpoint-type
-     * dispatch of any kind, ADC included) actually calls either
-     * function, matching the exact same "correct and unit-tested, but
-     * nothing wires it up" disposition REQ-CANCEL-012 was left at.
-     * rcp_ep_adc_collect_response_values() itself, pinned below, still
-     * takes only avg_count/value_count as plain parameters -- by design:
-     * assembling a ready response's own value array and deciding its
-     * transaction_num remain the caller's own bookkeeping (see
-     * rcp_ep_adc_cadence_response_ready()'s own doc comment), the same
-     * "operates on caller-supplied arrays" scope this whole module
-     * already holds to. */
+     * adc_combine_avg_values against adc_avg_intervals_per_request.
+     * rcp_ep_adc_cadence_case()/_response_ready() give a caller the two
+     * decision primitives TC18's own rule requires -- tests/test_ep_adc.c's
+     * own dedicated cadence section unit-tests both directly, including
+     * both boundary conditions and an end-to-end walk of the ACCUMULATE
+     * and FAN_OUT cases. DISPATCH-WIRING CLOSED THIS BATCH:
+     * test_adc_dispatch_accumulates_across_executions_before_responding()
+     * (below) proves a real caller -- adc_dispatch_handler(), an
+     * rcp_mock_endpoint_handler_fn registered via the existing, unmodified
+     * rcp_mock_server_add_endpoint() -- calls rcp_ep_adc_cadence_response_
+     * ready() on every dispatched request and honors its result end-to-end
+     * through a real mock.c dispatch() path, the same "mock.c never calls
+     * into ep_*.c directly; a caller-registered handler is the documented
+     * mechanism" disposition test_tc18_gaps_ep.c's own GPIO fixture
+     * already established (see that file's own shared-fixture comment for
+     * the full architecture rationale). rcp_ep_adc_collect_response_
+     * values() itself, pinned below, still takes only avg_count/
+     * value_count as plain parameters -- by design: assembling a ready
+     * response's own value array and deciding its transaction_num remain
+     * the caller's own bookkeeping (see rcp_ep_adc_cadence_response_
+     * ready()'s own doc comment), the same "operates on caller-supplied
+     * arrays" scope this whole module already holds to. */
     {
         rcp_ep_adc_avg_value_t five[5] = {0};
         uint16_t                packed[3];
@@ -606,6 +637,120 @@ static void test_adc_pipeline_is_stateless_by_design_and_cadence_deviation_pin(v
         n = rcp_ep_adc_collect_response_values(five, 5u, packed, 3u);
         TEST_ASSERT_EQUAL_size_t(3u, n); /* min(5, 3) -- min() only, no cadence logic */
     }
+}
+
+/* ── ADC endpoint: real mock.c dispatch path (issue #338, PR D continued) ──
+ *
+ * adc_dispatch_state_t/adc_dispatch_handler() mirrors test_tc18_gaps_ep.c's
+ * own gpio_dispatch_handler() shape: this fixture's own "one execution"
+ * (one dispatched read request) contributes exactly one already-averaged
+ * value to a pending FIFO -- a deliberate simplification of layer 1's own
+ * real sample-to-average reduction (rcp_ep_adc_average_interval(), already
+ * directly tested in test_ep_adc.c and exercised end-to-end just above),
+ * so this fixture can isolate layers 2/3's own cadence decision without
+ * re-deriving layer 1. Demonstrates RCP_EP_ADC_CADENCE_ACCUMULATE
+ * (combine_avg_values > 1 execution's worth): the response is withheld
+ * across executions until enough values have accumulated. */
+#define ADC_DISPATCH_PENDING_CAP 8u
+
+typedef struct {
+    uint16_t pending[ADC_DISPATCH_PENDING_CAP];
+    size_t   pending_count;
+    uint8_t  combine_avg_values;
+    uint16_t next_value;
+} adc_dispatch_state_t;
+
+static void adc_dispatch_handler(const uint8_t *request, size_t request_len,
+                                  rcp_bytes_t *out_response, void *user_data)
+{
+    adc_dispatch_state_t *st = (adc_dispatch_state_t *)user_data;
+    uint16_t               read_size;
+    uint8_t                 tn;
+
+    if (rcp_ep_adc_decode_read_request(request, request_len, 4u, &read_size, &tn) !=
+        RCP_EP_ADC_OK) {
+        return;
+    }
+
+    /* This fixture's own stand-in "execution": one newly-averaged value,
+     * appended to the pending FIFO -- see this section's own header
+     * comment for why layer 1's real averaging is deliberately not
+     * re-derived here. */
+    TEST_ASSERT_TRUE(st->pending_count < ADC_DISPATCH_PENDING_CAP);
+    st->pending[st->pending_count++] = st->next_value++;
+
+    /* REQ-ADC-037: the one comparison underlying all three cadence cases
+     * -- withhold the response until enough values have accumulated. */
+    if (!rcp_ep_adc_cadence_response_ready(st->pending_count, st->combine_avg_values)) {
+        return; /* out_response left zeroed -- not yet ready */
+    }
+
+    *out_response = rcp_ep_adc_encode_response(4u, st->pending, st->combine_avg_values, tn, false,
+                                                0u);
+
+    /* FIFO: shift the consumed prefix out, matching
+     * rcp_ep_adc_collect_response_values()'s own "packs the FIRST
+     * value_count... in capture order" convention. */
+    memmove(st->pending, &st->pending[st->combine_avg_values],
+            (st->pending_count - st->combine_avg_values) * sizeof(st->pending[0]));
+    st->pending_count -= st->combine_avg_values;
+}
+
+static void test_adc_dispatch_accumulates_across_executions_before_responding(void)
+{
+    rcp_mock_server_t    *srv = rcp_mock_server_new();
+    adc_dispatch_state_t   st  = {0};
+    rcp_bytes_t             req;
+    rcp_bytes_t             resp = {0};
+    uint16_t                out_values[3];
+    size_t                  out_count;
+    bool                    out_timed;
+    uint64_t                out_ts;
+    uint8_t                 out_tn;
+    int                     i;
+
+    TEST_ASSERT_NOT_NULL(srv);
+    gap_to_rcp_configured(srv);
+    st.combine_avg_values = 3u;
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+                      rcp_mock_server_add_endpoint(srv, 4u, 0u, true, adc_dispatch_handler, &st));
+
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_CADENCE_ACCUMULATE, rcp_ep_adc_cadence_case(1u, 3u));
+
+    /* Two executions: neither alone has 3 accumulated values yet. */
+    for (i = 0; i < 2; i++) {
+        req = rcp_ep_adc_encode_read_request(4u, 6u, (uint8_t)(0x30 + i));
+        TEST_ASSERT_NOT_NULL(req.data);
+        TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                          rcp_mock_server_dispatch(srv, 4u, RCP_AVTP_SUBTYPE_NTSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, 1u, req.data,
+                                                    req.len, &resp));
+        TEST_ASSERT_NULL(resp.data); /* not enough accumulated yet */
+        rcp_bytes_free(&req);
+    }
+    TEST_ASSERT_EQUAL_size_t(2u, st.pending_count);
+
+    /* The third execution reaches combine_avg_values (3): a real response,
+     * in this same call, carrying all 3 accumulated values in order. */
+    req = rcp_ep_adc_encode_read_request(4u, 6u, 0x32u);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch(srv, 4u, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB,
+                                                true, 1u, req.data, req.len, &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_OK,
+                      rcp_ep_adc_decode_response(resp.data, resp.len, 4u, out_values, 3u,
+                                                  &out_count, &out_timed, &out_ts, &out_tn));
+    TEST_ASSERT_EQUAL_size_t(3u, out_count);
+    TEST_ASSERT_EQUAL_UINT16(0u, out_values[0]);
+    TEST_ASSERT_EQUAL_UINT16(1u, out_values[1]);
+    TEST_ASSERT_EQUAL_UINT16(2u, out_values[2]);
+    TEST_ASSERT_EQUAL_UINT8(0x32u, out_tn);
+    TEST_ASSERT_EQUAL_size_t(0u, st.pending_count); /* fully drained */
+
+    rcp_bytes_free(&req);
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
 }
 
 /* ── LIN (§13.7.10) ────────────────────────────────────────────────────────── */
@@ -1182,6 +1327,7 @@ int main(void)
     RUN_TEST(test_adc_functional_cfg_has_clock_status_and_interval_fields);
     RUN_TEST(test_adc_inter_sample_spacing_is_unconstrained);
     RUN_TEST(test_adc_pipeline_is_stateless_by_design_and_cadence_deviation_pin);
+    RUN_TEST(test_adc_dispatch_accumulates_across_executions_before_responding);
 
     RUN_TEST(test_lin_trigger_now_honours_trailing_time_and_block_has_registers);
 
