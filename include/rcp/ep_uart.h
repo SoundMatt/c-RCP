@@ -341,13 +341,26 @@ typedef enum {
  * has no TC18 basis whatsoever (an entirely original design filling a gap
  * TC18 leaves silent). UART is the opposite case: a genuine, numbered
  * spec table this module had simply never implemented. rcp_ep_uart_trigger_t
- * names Table 52's two signals directly (RCP_EP_UART_TRIGGER_TX_FINALIZED
- * = signal 0, RCP_EP_UART_TRIGGER_RX_FINALIZED = signal 1) plus NONE --
- * unlike SPI's 14-signal Table 41, Table 52 defines only these two
- * signals outright, so no per-channel collapsing (ep_spi.h's own
- * rcp_ep_spi_trigger_signal_number()) is needed here: the enum values
- * themselves already are the Table 52 signal numbers. rcp_ep_uart_trigger_fires()
- * is the pure, directly-testable evaluation of a caller-classified event
+ * names Table 52's two signals (RCP_EP_UART_TRIGGER_TX_FINALIZED = signal
+ * 0, RCP_EP_UART_TRIGGER_RX_FINALIZED = signal 1) plus a NONE member for
+ * "no trigger selected", which this codebase's own enum convention always
+ * puts at ordinal 0 (see e.g. rcp_ep_spi_trigger_t's own NONE). CORRECTED
+ * 2026-08-14 (c-RCP-AUDIT-28, issue #449): that NONE member means the C
+ * enum's own ordinals do NOT directly equal Table 52's signal numbers --
+ * RCP_EP_UART_TRIGGER_TX_FINALIZED == 1 (Table 52 signal 0),
+ * RCP_EP_UART_TRIGGER_RX_FINALIZED == 2 (Table 52 signal 1), an off-by-one
+ * versus the table caused purely by NONE occupying slot 0. This is a
+ * documentation-only correction: nothing in this module today renders
+ * rcp_ep_uart_trigger_t's ordinal onto the wire (see the next paragraph),
+ * so no code depended on the false "already Table 52-numbered" claim this
+ * comment previously made. A future wire-rendering of this field WOULD
+ * need an explicit ordinal -> signal-number mapping function first,
+ * matching the pattern ep_spi.h's own rcp_ep_spi_trigger_signal_number()
+ * already uses for SPI's own per-channel trigger field -- do not assume
+ * the raw enum value is Table 52-safe to emit directly.
+ *
+ * rcp_ep_uart_trigger_fires() is the pure, directly-testable evaluation of
+ * a caller-classified event
  * against a selected trigger mode -- the same caller-supplies-already-
  * classified-inputs convention every other endpoint type's own trigger-
  * evaluation function already uses (rcp_ep_spi_trigger_fires(),

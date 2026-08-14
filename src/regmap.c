@@ -2211,7 +2211,34 @@ rcp_regmap_request_stream_cfg_apply_reconfig(rcp_regmap_request_stream_cfg_t *en
          * consumes it" treatment this function's own reserved trailing
          * octets already receive (see this function's own doc comment,
          * regmap.h). rx_wd_info_enable no longer has any wire register
-         * position at all -- see that field's own doc comment. */
+         * position at all -- see that field's own doc comment.
+         *
+         * INVESTIGATED 2026-08-14 (c-RCP-AUDIT-27, issue #448): re-read
+         * TC18 §12.7.7 Table 24's own rx_stream_status row and its
+         * margin comment directly against the primary-source PDF
+         * (OA_TC18_specification_v_0.5.1_RC_5) before writing this note.
+         * The row's ONLY behavioral text describes how the bit gets SET
+         * ("will be set automatically as a reaction to either CRC
+         * error, sequence error, watchdog overflow, EP overflow, when
+         * enabled") -- there is no sentence anywhere in Table 24, nor in
+         * §12.7.7's surrounding prose, describing what a CLIENT WRITE to
+         * this bit does. This is genuine spec silence, not an
+         * under-read: TC18 demonstrably DOES spell out write-clears
+         * semantics in prose, in the exact phrasing pattern that would
+         * be expected here, when it means them -- compare
+         * wup_status (§13.7.2.2 Table 39: "Indication of wake-up
+         * source, writing "1" clears the flag") and
+         * ep_clear_req_storage (§13.7 Table 34 common entries:
+         * "writing a 1b clears the EPs request storage, reads always
+         * 0"). rx_stream_status's own row has no such sentence; its R/W
+         * typing (vs. every sibling bit's R/W*, see this table's own
+         * write-authorization carve-out above) only establishes that a
+         * write is architecturally PERMITTED at all lifecycle states,
+         * not what that write does. Force-implementing a write-clears-
+         * the-latch behavior here would be inventing non-conformant
+         * behavior the spec does not ask for, not fixing a bug -- left
+         * as a documented, investigated no-op; see issue #448's own
+         * closing comment for the same finding. */
 
         entries[i].rx_safestate_sequencer     = (uint16_t)block[24u * i + 0x000Eu];
         entries[i].rx_safe_sequencer_state    = block[24u * i + 0x000Fu];
