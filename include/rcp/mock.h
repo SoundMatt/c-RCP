@@ -286,6 +286,61 @@ bool rcp_mock_server_set_response_queue_cfg(rcp_mock_server_t *srv,
 bool rcp_mock_server_set_ep_id_map(rcp_mock_server_t *srv,
                                     const rcp_regmap_ep_id_map_entry_t *entries, size_t count);
 
+/* Installs srv's own network-interface-config section (TC18 §12.7.11,
+ * REQ-RMAP-039) as a copy of data[0..len). Returns false (srv's own
+ * section left unchanged) if len exceeds
+ * RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_MAX_OCTETS (regmap.h); true
+ * otherwise. Also syncs svr_network_interface_cfg_capacity (Table 20) to
+ * len -- the same capacity-sync convention
+ * rcp_mock_server_set_hw_pin_map() already established (REQ-RMAP-032).
+ * A caller still owns setting svr_network_interface_cfg_ptr itself
+ * (rcp_mock_server_regmap(), same "caller may freely set... directly"
+ * convention every other pointer register already uses) -- this
+ * function only installs the content the pointer will eventually
+ * address, not the address itself. len == 0 (or never calling this at
+ * all) correctly leaves the section unreachable, matching TC18's own
+ * zero-pointer "not supported" default. */
+bool rcp_mock_server_set_network_interface_cfg(rcp_mock_server_t *srv, const uint8_t *data,
+                                                size_t len);
+
+/* srv's own network-interface-config section. Never NULL for a
+ * non-NULL srv. See rcp_mock_server_set_network_interface_cfg()'s own
+ * doc comment for what this handle's fields mean and how to wire it
+ * into the EP0 dispatcher (rcp_regmap_optional_subsystem_cfg_ptrs_t,
+ * regmap.h). */
+rcp_regmap_optional_subsystem_cfg_t *rcp_mock_server_network_interface_cfg(rcp_mock_server_t *srv);
+
+/* Installs srv's own physical-layer-config section (TC18 §12.7.12,
+ * REQ-RMAP-039) -- otherwise identical to
+ * rcp_mock_server_set_network_interface_cfg() above, syncing
+ * svr_physical_layer_cfg_capacity instead. */
+bool rcp_mock_server_set_physical_layer_cfg(rcp_mock_server_t *srv, const uint8_t *data,
+                                             size_t len);
+
+/* srv's own physical-layer-config section -- see
+ * rcp_mock_server_network_interface_cfg()'s own doc comment. */
+rcp_regmap_optional_subsystem_cfg_t *rcp_mock_server_physical_layer_cfg(rcp_mock_server_t *srv);
+
+/* Installs srv's own time-synch-config section (TC18 §12.7.13,
+ * REQ-RMAP-039) -- otherwise identical to
+ * rcp_mock_server_set_network_interface_cfg() above, syncing
+ * svr_time_synch_cfg_capacity instead. */
+bool rcp_mock_server_set_time_synch_cfg(rcp_mock_server_t *srv, const uint8_t *data, size_t len);
+
+/* srv's own time-synch-config section -- see
+ * rcp_mock_server_network_interface_cfg()'s own doc comment. */
+rcp_regmap_optional_subsystem_cfg_t *rcp_mock_server_time_synch_cfg(rcp_mock_server_t *srv);
+
+/* Installs srv's own security-config section (TC18 §12.7.14,
+ * REQ-RMAP-039) -- otherwise identical to
+ * rcp_mock_server_set_network_interface_cfg() above, syncing
+ * svr_security_cfg_capacity instead. */
+bool rcp_mock_server_set_security_cfg(rcp_mock_server_t *srv, const uint8_t *data, size_t len);
+
+/* srv's own security-config section -- see
+ * rcp_mock_server_network_interface_cfg()'s own doc comment. */
+rcp_regmap_optional_subsystem_cfg_t *rcp_mock_server_security_cfg(rcp_mock_server_t *srv);
+
 /* ── Endpoint registration ─────────────────────────────────────────────────── */
 
 /* Adds one endpoint slot addressed at byte_bus_id, with generic config

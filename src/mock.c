@@ -89,6 +89,15 @@ struct rcp_mock_server {
      * rcp_mock_server_broadcast_safe_state()'s sole data source. */
     rcp_regmap_ep_id_map_entry_t ep_id_map[RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES];
     size_t                       ep_id_map_count;
+    /* The four optional-subsystem sections (REQ-RMAP-039, issue #336) --
+     * see mock.h's own doc comment on
+     * rcp_mock_server_set_network_interface_cfg() etc. Zero-initialized
+     * by rcp_mock_server_new()'s own calloc(), matching every one of
+     * these sections' own "len == 0 means not installed" default. */
+    rcp_regmap_optional_subsystem_cfg_t network_interface_cfg;
+    rcp_regmap_optional_subsystem_cfg_t physical_layer_cfg;
+    rcp_regmap_optional_subsystem_cfg_t time_synch_cfg;
+    rcp_regmap_optional_subsystem_cfg_t security_cfg;
     /* The sequencer-state registers compound/compound-wait requests read
      * and advance. Server-wide rather than per-endpoint: a sequencer is a
      * server register, and requests on different endpoints routinely
@@ -290,6 +299,80 @@ bool rcp_mock_server_set_ep_id_map(rcp_mock_server_t *srv,
      * by the field's own 8-bit wire width). */
     srv->regmap.svr_ep_bytebus_id_map_capacity = (uint8_t)count;
     return true;
+}
+
+/* Shared body for the four optional-subsystem section setters below --
+ * one bounded memcpy plus a capacity-register sync, the identical shape
+ * every other _set_*() function above already follows, generalized
+ * since all four sections share one storage type
+ * (rcp_regmap_optional_subsystem_cfg_t). *capacity_reg is whichever of
+ * srv->regmap's own four svr_*_cfg_capacity fields this particular
+ * section owns. */
+static bool optional_subsystem_cfg_set(rcp_regmap_optional_subsystem_cfg_t *cfg,
+                                        uint16_t *capacity_reg, const uint8_t *data, size_t len)
+{
+    if (len > RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_MAX_OCTETS) return false;
+
+    if (len > 0) memcpy(cfg->data, data, len);
+    cfg->len     = len;
+    *capacity_reg = (uint16_t)len; /* len is already bounds-checked above against
+                                       RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_MAX_OCTETS (256),
+                                       well within uint16_t. */
+    return true;
+}
+
+//cfusa:req REQ-RMAP-039
+bool rcp_mock_server_set_network_interface_cfg(rcp_mock_server_t *srv, const uint8_t *data,
+                                                size_t len)
+{
+    return optional_subsystem_cfg_set(&srv->network_interface_cfg,
+                                       &srv->regmap.svr_network_interface_cfg_capacity, data, len);
+}
+
+//cfusa:req REQ-RMAP-039
+rcp_regmap_optional_subsystem_cfg_t *rcp_mock_server_network_interface_cfg(rcp_mock_server_t *srv)
+{
+    return &srv->network_interface_cfg;
+}
+
+//cfusa:req REQ-RMAP-039
+bool rcp_mock_server_set_physical_layer_cfg(rcp_mock_server_t *srv, const uint8_t *data,
+                                             size_t len)
+{
+    return optional_subsystem_cfg_set(&srv->physical_layer_cfg,
+                                       &srv->regmap.svr_physical_layer_cfg_capacity, data, len);
+}
+
+//cfusa:req REQ-RMAP-039
+rcp_regmap_optional_subsystem_cfg_t *rcp_mock_server_physical_layer_cfg(rcp_mock_server_t *srv)
+{
+    return &srv->physical_layer_cfg;
+}
+
+//cfusa:req REQ-RMAP-039
+bool rcp_mock_server_set_time_synch_cfg(rcp_mock_server_t *srv, const uint8_t *data, size_t len)
+{
+    return optional_subsystem_cfg_set(&srv->time_synch_cfg, &srv->regmap.svr_time_synch_cfg_capacity,
+                                       data, len);
+}
+
+//cfusa:req REQ-RMAP-039
+rcp_regmap_optional_subsystem_cfg_t *rcp_mock_server_time_synch_cfg(rcp_mock_server_t *srv)
+{
+    return &srv->time_synch_cfg;
+}
+
+//cfusa:req REQ-RMAP-039
+bool rcp_mock_server_set_security_cfg(rcp_mock_server_t *srv, const uint8_t *data, size_t len)
+{
+    return optional_subsystem_cfg_set(&srv->security_cfg, &srv->regmap.svr_security_cfg_capacity,
+                                       data, len);
+}
+
+//cfusa:req REQ-RMAP-039
+rcp_regmap_optional_subsystem_cfg_t *rcp_mock_server_security_cfg(rcp_mock_server_t *srv)
+{
+    return &srv->security_cfg;
 }
 
 /* Finds the slot addressed at byte_bus_id, or NULL if none is registered. */

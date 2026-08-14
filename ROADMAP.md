@@ -19106,6 +19106,44 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.328.0 -- 2026-08-13 (tc18-gap backlog PR F: REQ-RMAP-039
+optional-subsystem config sections)
+
+Eighth item of the 42-item `scope: "tc18-gap"` backlog (task #112),
+closing the "largest single feature" item -- the four
+optional-subsystem configuration sections (network interface,
+physical layer, time synch, security; TC18 §12.7.11-.14).
+
+Scope narrower than originally planned: a direct primary-source read
+of §12.7.11-.14's own section text found each section's own text
+states verbatim "The content is product specific" -- TC18 defines no
+field-level layout for any of the four, unlike HW_config/EP_ID_config/
+response-queue-config/request-stream-cfg. The conformant
+implementation is therefore one generic mechanism, not four bespoke
+ones: `rcp_regmap_optional_subsystem_cfg_t` (regmap.h), a flat,
+capacity-bounded opaque byte buffer, plus a direct-memcpy
+`apply_reconfig()`. The EP0 dispatcher pair now route all four
+sections through it via a new NULL-able `optional_cfg` parameter.
+FUNCTIONAL_W_STAR is this codebase's own documented default
+access-type choice (TC18 gives no table-specific override for these
+four). New `rcp_mock_server_set_*_cfg()` setters install content and
+sync each `svr_*_cfg_capacity` register, the same convention
+REQ-RMAP-032/034/036/037 already established.
+
+New dispatcher-level, apply_reconfig-unit-level, and mock-server
+storage/sync tests; bounds-check and authorization-gate wiring both
+mutation-tested and caught cleanly. `REQ-RMAP-039` flips partial ->
+implemented, matching REQ-RMAP-040's own established bar for closure.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace`
+(v0.5.51): 0 errors, 0/1076 untested. `.fusa-reqs.json`: 1032
+implemented / 35 partial / 2 not-implemented / 7 retired (1076
+total).
+
+**Next**: REQ-WAKEUP-020 EP_ID_config write enforcement (PR G, task
+#113); PR E (task #111) stays open pending the architectural call
+recorded in v0.327.0.
+
 ### v0.327.0 -- 2026-08-13 (tc18-gap backlog: REQ-RMAP-068
 primary-source re-verification)
 
