@@ -19106,6 +19106,58 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.361.0 -- 2026-08-14 (systemic TC18.txt citation-drift correction
+across .fusa-reqs.json)
+
+Closes issue #434. A single TC18.txt re-extraction event (the RC5 spec
+rebaseline) shifted line numbers by roughly 350-450 lines across most
+of the document, and in some spots renumbered tables/figures outright
+(`Table 20`->`Table 22`, `Table 33`->`Table 36`, `Figure 22`->`Figure
+23` for the sleep-request diagram, a new `§11.2.2.1 Trigger request`
+subsection inserted ahead of Compound/Compound-wait pushing every
+later §11.2.2.x number up by one). `.fusa-reqs.json`'s `tc18` citation
+fields were only ever partially corrected for this in prior passes
+(AUDIT-07/#339, AUDIT-08/#341) -- roughly 6 of 90+ affected entries.
+In every case the underlying requirement `text` and the code were
+already correct; only the citation (line range and/or table/figure
+number) was stale. Pure metadata fix, no behavior change: no `text`,
+`title`, `status`, or source file was touched.
+
+Re-derived every scoped citation from a fresh `pdftotext -layout`
+extraction of `OA_TC18_specification_v_0.5.1_RC_5_3624.pdf` (confirmed
+byte-identical to this repo's cached `TC18.txt`, so its line numbers
+are trustworthy ground truth), then applied via targeted single-field
+string replacement so the diff touches only the `tc18` line of each
+corrected entry. Worked the clusters issue #434 called out in order:
+`REQ-AVTP-*` (§11.1, 14 entries); `REQ-CMP-*`/`REQ-TRIG-*`/
+`REQ-CHAIN-*`/`REQ-CANCEL-*`/`REQ-TIMED-*` (§11.2.2-3, including the
+new-subsection reordering, 79 entries); `REQ-ACF-002/022/031` (3
+entries); `REQ-LIFECYCLE-*`/`REQ-PWRMODE-*`/`REQ-DISC-*` (§12.1-12.6,
+83 entries); `REQ-SEQ-*`/`REQ-SCHED-*`/`REQ-MOCK-*`/`REQ-WIREERR-*`/
+`REQ-SRV-*` (§12.8-12.10, 63 entries); `REQ-RMAP-026/036/042` plus
+`REQ-RMAP-052`-`065` (§12.7.5-9, individually re-verified per the
+issue's own caution that 5 of the 14 in that range cite no table
+number at all); `REQ-SRV-017`/`REQ-RMAP-003/066/067/079`/
+`REQ-LIFECYCLE-001`/`REQ-WAKEUP-003`-`022`/`REQ-PWRMODE-028`
+(§13.7.1-2, 24 entries); `REQ-SPI-*`/`REQ-I2C-*` (§13.7.3/§13.7.7, 54
+entries, several previously landed in unrelated endpoint/lifecycle
+content); `REQ-GPIO-*`/`REQ-PWM-*` (§13.7.4-6, 90 entries); `REQ-UART-*`/
+`REQ-LINEP-*` (§13.7.8/§13.7.10, 65 entries, including two LIN
+entries' "Table 52"->real Table 55 mislabel); `REQ-CANEP-*`/
+`REQ-ISELED-*`/`REQ-MDIO-*` (§13.7.11-13, 62 entries, including
+MDIO-012 through 019's stale Figure 42/Table 57 -> real Figure
+43/Table 60, and MDIO-020/023's CAN-Table-56 -> MDIO's-own-Table-59
+mislabel). 534 `tc18` fields corrected in total; entries already
+citing correct RC5 locations from the #341 lineage (e.g.
+`REQ-CANCEL-002`-`007`/`015`, `REQ-SEQ-013/014`, `REQ-SPI-034/037`,
+`REQ-MDIO-021/022/024`, most `REQ-LIFECYCLE-02x` Figure-17 fixes) were
+left untouched.
+
+Full 66-test suite + build unaffected (data-only change); `cfusa
+check`/`trace` (v0.5.54): 0 errors, 1086/1086 traced and tested
+(unchanged from before this pass, as expected for a citation-only
+fix).
+
 ### v0.360.0 -- 2026-08-14 (mock.c dispatch: byte_bus_id lookup now genuinely
 scoped by stream_id, TC18 §12.9.1)
 
