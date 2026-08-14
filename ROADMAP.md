@@ -19106,6 +19106,92 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.357.0 -- 2026-08-14 (RC-Server register-map conformance: EP_ID_config
+BBID/Ctrl bit-packing, rx_stream_status live wiring, Table 20's real last
+register pair)
+
+Three independent register-map conformance fixes from the 2026-08-14
+audit, all in `regmap.h`/`regmap.c` (issues #421, #424, #429).
+
+**#421 -- EP_ID_config BBID/Ctrl bit-packing.** The 16-bit register at
+each EP_ID_config row's own relative offset 0x0002 is not a flat
+`byte_bus_id` -- TC18 Table 25 packs it: bits[15:5] carry the 11-bit
+BBID, bits[4:0] carry a separate `Ctrl` field (Table 26: bit 4 =
+`CRC_required`, bits[3:0] = `Channel_selection`).
+`rcp_regmap_ep_id_map_render()`/`_apply_reconfig()` serialized/parsed
+this word as a flat, unshifted 16-bit value -- any real client
+reading/writing `byte_bus_id` below 2048 got a non-conformant value.
+Both functions now shift BBID into/out of bits[15:5] (masked to its
+own real 11-bit width, the same masking convention
+`rcp_acf_pack_header()` already uses for `byte_bus_id` at the ACF
+layer). A new `rcp_regmap_ep_id_map_entry_t.crc_required` bool field
+packs/unpacks bit 4; `Channel_selection` (bits[3:0]) stays
+DELIBERATELY unimplemented, per the standing SPI channel-selection
+investigation on record (`ep_spi.h`) -- always rendered 0, silently
+dropped on write, never stored to any field. c-RCP's own stale "Table
+23" citation for this content (an unrelated "Enumeration of signals at
+endpoints" table) is corrected to the real Table 25/26 throughout the
+touched code/tests. New tests round-trip a `byte_bus_id` >= 32 (so the
+shift genuinely moves real bits) together with `crc_required` true and
+false, and prove `Channel_selection` is never round-tripped.
+
+**#424 -- rx_stream_status live wiring.** Wire bit 0x000D.7 of the
+request-stream-config table (Table 24) is a distinct, live status bit
+-- "set automatically as a reaction to either CRC error, sequence
+error, watchdog overflow, EP overflow, when enabled" -- but
+`rcp_regmap_request_stream_cfg_render()`/`_apply_reconfig()` mapped
+that exact bit position to the unrelated `rx_wd_info_enable` config
+flag instead, a plain mis-wiring (not an instance of that field's own
+separate, already-documented RC5-mapping ambiguity). `render()` gains
+a new `rx_stream_status_blocked[]` parameter -- caller-sourced from the
+already-correct, already-live `rcp_e2e_stream_status_rx_blocked()`/
+`rcp_mock_server_stream_status_rx_blocked()` aggregates, which simply
+were never read from this register-map READ path before --
+`rcp_regmap_ep0_encode_read_response()` threads it straight through.
+`rx_wd_info_enable` keeps its own real behavior (still consumed
+directly by `e2e.h`/`watchdog.h`) but now has no wire register position
+at all, the same disposition `rx_wd_action` already had. This bit is
+also plain R/W, not R/W* like its seven octet-mates -- new
+`request_stream_cfg_row_write_authorize()` adds a narrow,
+safety-preserving carve-out: FUNCTIONAL_W_STAR remains the correct,
+sufficient rule for the whole octet, and only when it fails
+(`RCP_CONFIGURED`) does a write confined to bit 7 alone become
+authorized anyway, while a write that also touches any of the seven
+genuinely R/W* enforcement bits sharing that octet stays denied even
+then -- the carve-out can never smuggle a safety-relevant change past a
+closed FUNCTIONAL_W_STAR window. New tests: a dispatcher-level test
+injects a REAL CRC fault via `rcp_e2e_stream_status_note_crc_error()`
+(not a synthetic bit flip) and confirms it becomes visible in a
+decoded EP0 register READ response, then confirms it clears again; a
+second test proves the write-authorization carve-out's own boundary in
+both directions.
+
+**#429 -- Table 20's real last register pair.** `rcp_regmap_general_t`
+was missing Table 20's own true final two registers,
+`svr_device_specific_cfg_ptr`/`svr_device_specific_cfg_capacity`
+(both 16-bit R, immediately after `svr_security_cfg_capacity` on the
+spec's own continuation page) -- a real RC Client could never learn
+the device-specific configuration pointer/capacity from a real c-RCP
+server. `RCP_REGMAP_GENERAL_LEN` extends from 0x0040 to 0x0044 and
+both `rcp_regmap_general_render()`/`_decode_read_response()` now cover
+the new range. REQ-RMAP-039's own text, which claimed the four
+preceding optional-subsystem ptr/capacity pairs were Table 20's own
+last item, is corrected. New tests prove both fields reachable via a
+full-table read (byte-offset check and round-trip).
+
+Each fix's own new/changed behavior was mutation-tested independently:
+the real fix was backed up, temporarily reverted (leaving the new
+tests in place), rebuilt, and each fix's own new test(s) confirmed to
+FAIL against the reverted/buggy behavior, then the real fix was
+restored from the backup. All caught cleanly, no false negatives. Full
+66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.54): 0
+errors, 1076/1076 traced and tested. `.fusa-reqs.json`:
+REQ-RMAP-052/053/039/051 and REQ-E2E-046 were all already
+`implemented` -- text corrected/enriched in place, no status changes
+(1054 implemented / 13 partial / 2 not-implemented / 7 retired, 1076
+total, unchanged).
+
+**Next**: none currently queued for this specific audit lineage.
 ### v0.356.0 -- 2026-08-14 (REQ-ACF-033: rcp_acf_build_acknowledge_rejected_response()
 closes the missing TC18 §11.3.1 storage-admission-rejection shape)
 
