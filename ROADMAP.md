@@ -19106,6 +19106,65 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.363.0 -- 2026-08-14 (respqueue eviction now triggers on real
+queue_size/capacity_octets exhaustion, not just an artificial slot count)
+
+Closes issue #446 (c-RCP-AUDIT-25, a post-merge audit re-check of the
+#423/#437 fix). Root cause: the #423 fix implemented TC18
+§12.9.4/§12.9.5's mandatory evict-lowest-sequence_num +
+set-overflow-bit rule, but wired it only to a new, spec-uncited
+`RCP_RESPQUEUE_MAX_ENTRIES = 64` slot-count bound
+(`include/rcp/respqueue.h`/`src/respqueue.c`). The pre-existing
+`capacity_octets`/`max_avtpdu_size_octets` byte-budget rejection path
+-- which *is* the real TC18 `queue_size` register (§12.7.9's own
+memory reservation, "assigned memory in 32bit words"; TC18 defines no
+entry-count concept at all) -- kept doing plain
+reject-and-leave-unchanged, unaffected by the eviction fix. In any
+realistically-configured server where `queue_size`/`capacity_octets`
+is the binding constraint (the ordinary case), the TC18-mandated
+eviction/overflow behavior never fired, so #423 was not actually
+closed for realistic deployments.
+
+Fixed in `rcp_respqueue_push_seq()` (`src/respqueue.c`): once
+accepting an incoming frame would exhaust `q->capacity_octets`,
+entries are now evicted in ascending sequence_num order (a literal
+numeric minimum over `q->entries_seq[]`, never merely the FIFO-oldest)
+*repeatedly*, as many times as it takes to free enough octets for the
+incoming frame -- a single eviction only frees its own evicted
+entry's own byte length, which may be smaller than the incoming
+frame, so one eviction is not always sufficient. A frame whose own
+length exceeds `capacity_octets` outright is still refused
+unconditionally (queue unchanged, no eviction attempted) -- no amount
+of eviction could ever make room for it, even against a fully empty
+queue. Per the issue's own recommended fix direction,
+`RCP_RESPQUEUE_MAX_ENTRIES` is retained, but only as a secondary,
+defensive slot-count bound for the `capacity_octets == 0` (unbounded)
+case, where there is no byte budget to evict against at all -- once
+`capacity_octets` is nonzero, the slot-count bound no longer applies,
+and `q->entries_len` may legitimately exceed 64.
+
+`tests/test_respqueue.c`: new tests proving single- and multi-entry
+capacity_octets-triggered eviction (including byte-accounting
+correctness after eviction, no stale/leaked total), lowest-sequence_num
+preference over FIFO-oldest for the capacity_octets path, the
+capacity_octets == 0 fallback to `RCP_RESPQUEUE_MAX_ENTRIES`, and that
+a nonzero capacity_octets disables the slot-count bound entirely.
+Updated two pre-existing tests (`tests/test_respqueue.c` and
+`tests/test_tc18_gaps_regmap.c`) that had pinned the old
+reject-outright behavior for a case this fix now correctly evicts
+instead.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.54):
+0 errors, 1086/1086 traced and tested (unchanged). Mutation-tested:
+reverting only the `capacity_octets`-triggered eviction back to plain
+reject (leaving the `RCP_RESPQUEUE_MAX_ENTRIES`-triggered eviction and
+the new tests in place) made exactly the three new
+capacity_octets-eviction tests fail, confirming they exercise the real
+defect; the fix was then restored and the suite re-confirmed green.
+
+**Next**: continue working the post-merge audit backlog
+(c-RCP-AUDIT-* issues) as they surface.
+
 ### v0.362.0 -- 2026-08-14 (UART trigger enum ordinal doc-comment fix;
 rx_stream_status write-side investigated, confirmed spec-silent)
 

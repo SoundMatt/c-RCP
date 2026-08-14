@@ -5119,8 +5119,13 @@ static void test_response_queue_size_register_and_storage_now_exist(void)
     TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
     TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
     TEST_ASSERT_EQUAL_UINT(8u, rcp_respqueue_octets(&q));
-    /* A third push would exceed the 8-octet reservation: refused. */
-    TEST_ASSERT_FALSE(rcp_respqueue_push(&q, frame, sizeof(frame)));
+    /* GitHub #446: a third push once the 8-octet reservation is exhausted
+     * now evicts the lowest-sequence_num entry (TC18 §12.9.4/§12.9.5) to
+     * make room, rather than being refused -- the reservation itself is
+     * unchanged, still exactly 8 octets, still enforced. */
+    TEST_ASSERT_TRUE(rcp_respqueue_push(&q, frame, sizeof(frame)));
+    TEST_ASSERT_EQUAL_UINT(8u, rcp_respqueue_octets(&q));
+    TEST_ASSERT_TRUE(rcp_respqueue_overflow(&q));
 
     rcp_respqueue_destroy(&q);
 }
