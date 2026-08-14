@@ -172,7 +172,7 @@ static void test_writer_ctx_grants_root_client_via_ep0(void)
     rcp_regmap_general_init(&map);
     map.svr_root_client_index = 7;
 
-    ctx = rcp_regmap_writer_ctx(&map, NULL, 7, true, true, false);
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 7, true, true, false, 0, NULL, 0);
     TEST_ASSERT_TRUE(ctx.via_root_client_ep0);
     TEST_ASSERT_FALSE(ctx.via_owning_stream);
 }
@@ -185,10 +185,10 @@ static void test_writer_ctx_denies_root_client_when_wrong_stream_or_not_ep0(void
     rcp_regmap_general_init(&map);
     map.svr_root_client_index = 7;
 
-    ctx = rcp_regmap_writer_ctx(&map, NULL, 8, true, true, false);
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 8, true, true, false, 0, NULL, 0);
     TEST_ASSERT_FALSE(ctx.via_root_client_ep0);
 
-    ctx = rcp_regmap_writer_ctx(&map, NULL, 7, false, true, false);
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 7, false, true, false, 0, NULL, 0);
     TEST_ASSERT_FALSE(ctx.via_root_client_ep0);
 }
 
@@ -199,7 +199,7 @@ static void test_writer_ctx_denies_root_client_when_none_granted(void)
 
     rcp_regmap_general_init(&map); /* svr_root_client_index == RCP_REGMAP_NO_ROOT_CLIENT */
 
-    ctx = rcp_regmap_writer_ctx(&map, NULL, RCP_REGMAP_NO_ROOT_CLIENT, true, true, false);
+    ctx = rcp_regmap_writer_ctx(&map, NULL, RCP_REGMAP_NO_ROOT_CLIENT, true, true, false, 0, NULL, 0);
     TEST_ASSERT_FALSE(ctx.via_root_client_ep0);
 }
 
@@ -213,7 +213,7 @@ static void test_writer_ctx_grants_owning_stream(void)
     owner.has_owning_stream   = true;
     owner.owning_stream_index = 3;
 
-    ctx = rcp_regmap_writer_ctx(&map, &owner, 3, false, true, false);
+    ctx = rcp_regmap_writer_ctx(&map, &owner, 3, false, true, false, 0, NULL, 0);
     TEST_ASSERT_TRUE(ctx.via_owning_stream);
     TEST_ASSERT_FALSE(ctx.via_root_client_ep0);
 }
@@ -226,17 +226,17 @@ static void test_writer_ctx_denies_owning_stream_when_no_owner_or_null(void)
 
     rcp_regmap_general_init(&map);
 
-    ctx = rcp_regmap_writer_ctx(&map, NULL, 3, false, true, false);
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 3, false, true, false, 0, NULL, 0);
     TEST_ASSERT_FALSE(ctx.via_owning_stream);
 
     owner.has_owning_stream   = false;
     owner.owning_stream_index = 3;
-    ctx = rcp_regmap_writer_ctx(&map, &owner, 3, false, true, false);
+    ctx = rcp_regmap_writer_ctx(&map, &owner, 3, false, true, false, 0, NULL, 0);
     TEST_ASSERT_FALSE(ctx.via_owning_stream);
 
     owner.has_owning_stream   = true;
     owner.owning_stream_index = 3;
-    ctx = rcp_regmap_writer_ctx(&map, &owner, 4, false, true, false);
+    ctx = rcp_regmap_writer_ctx(&map, &owner, 4, false, true, false, 0, NULL, 0);
     TEST_ASSERT_FALSE(ctx.via_owning_stream);
 }
 
@@ -254,11 +254,11 @@ static void test_writer_ctx_plumbs_via_unicast_to_non_unicast_frame_flag(void)
     rcp_regmap_general_init(&map);
     map.svr_root_client_index = 7;
 
-    ctx = rcp_regmap_writer_ctx(&map, NULL, 7, true, true, false);
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 7, true, true, false, 0, NULL, 0);
     TEST_ASSERT_FALSE(ctx.via_non_unicast_frame);
     TEST_ASSERT_TRUE(ctx.via_root_client_ep0); /* unaffected by unicast-ness */
 
-    ctx = rcp_regmap_writer_ctx(&map, NULL, 7, true, false, false);
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 7, true, false, false, 0, NULL, 0);
     TEST_ASSERT_TRUE(ctx.via_non_unicast_frame);
     TEST_ASSERT_TRUE(ctx.via_root_client_ep0); /* still granted -- these are independent
                                                    axes; rcp_lifecycle_field_writable() is
@@ -279,13 +279,61 @@ static void test_writer_ctx_plumbs_via_discovery_stream(void)
 
     rcp_regmap_general_init(&map); /* no root client, no owning stream */
 
-    ctx = rcp_regmap_writer_ctx(&map, NULL, 3, false, true, true);
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 3, false, true, true, 0, NULL, 0);
     TEST_ASSERT_TRUE(ctx.via_discovery_stream);
     TEST_ASSERT_FALSE(ctx.via_root_client_ep0);
     TEST_ASSERT_FALSE(ctx.via_owning_stream);
 
-    ctx = rcp_regmap_writer_ctx(&map, NULL, 3, false, true, false);
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 3, false, true, false, 0, NULL, 0);
     TEST_ASSERT_FALSE(ctx.via_discovery_stream);
+}
+
+/* REQ-LIFECYCLE-025/031 (issue #341 lineage): TC18 §12.3.1.2's own "any
+ * valid stream_id/byte_bus_id combination" authorization case, ONLY when
+ * no root client is configured at all -- see rcp_regmap_writer_ctx()'s own
+ * doc comment for why that "no root client" condition is baked directly
+ * into via_valid_stream_association rather than left for a caller to
+ * re-check. */
+static void test_writer_ctx_grants_valid_stream_association_when_no_root_client(void)
+{
+    rcp_regmap_general_t map;
+    rcp_lifecycle_writer_ctx_t ctx;
+    rcp_regmap_ep_id_map_entry_t entries[1] = {{1, 0x100, 2}}; /* ep 1, bbid 0x100, stream 2 */
+
+    rcp_regmap_general_init(&map); /* no root client */
+
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 2, false, true, false, 0x100, entries, 1);
+    TEST_ASSERT_TRUE(ctx.via_valid_stream_association);
+    TEST_ASSERT_FALSE(ctx.via_root_client_ep0); /* independent axis, not conflated */
+}
+
+static void test_writer_ctx_denies_valid_stream_association_when_root_client_configured(void)
+{
+    rcp_regmap_general_t map;
+    rcp_lifecycle_writer_ctx_t ctx;
+    rcp_regmap_ep_id_map_entry_t entries[1] = {{1, 0x100, 2}};
+
+    rcp_regmap_general_init(&map);
+    map.svr_root_client_index = 7; /* a root client IS configured */
+
+    /* Same otherwise-valid (stream 2, bbid 0x100) association as the test
+     * above -- denied purely because a root client now exists, TC18's own
+     * narrowing this member exists to express. */
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 2, false, true, false, 0x100, entries, 1);
+    TEST_ASSERT_FALSE(ctx.via_valid_stream_association);
+}
+
+static void test_writer_ctx_denies_valid_stream_association_for_an_unrecognized_pair(void)
+{
+    rcp_regmap_general_t map;
+    rcp_lifecycle_writer_ctx_t ctx;
+    rcp_regmap_ep_id_map_entry_t entries[1] = {{1, 0x100, 2}};
+
+    rcp_regmap_general_init(&map); /* no root client */
+
+    /* Right stream, wrong byte_bus_id -- not a real association. */
+    ctx = rcp_regmap_writer_ctx(&map, NULL, 2, false, true, false, 0x200, entries, 1);
+    TEST_ASSERT_FALSE(ctx.via_valid_stream_association);
 }
 
 /* ── HW pin-property bit assignments ───────────────────────────────────────── */
@@ -625,6 +673,52 @@ static void test_byte_bus_ids_for_stream_vacuous_for_empty_table(void)
     TEST_ASSERT_EQUAL_UINT(0, rcp_regmap_ep_id_map_byte_bus_ids_for_stream(NULL, 0, 2, out, 1));
 }
 
+/* ── rcp_regmap_ep_id_map_is_valid_association() (issue #341 lineage,
+ * REQ-LIFECYCLE-025/031) ─────────────────────────────────────────────────── */
+
+static void test_is_valid_association_true_for_an_exact_match(void)
+{
+    rcp_regmap_ep_id_map_entry_t entries[2] = {
+        {1, 0x100, 2}, /* ep 1, bbid 0x100, stream 2 */
+        {2, 0x200, 5}, /* ep 2, bbid 0x200, stream 5 */
+    };
+
+    TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_is_valid_association(entries, 2, 2, 0x100));
+    TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_is_valid_association(entries, 2, 5, 0x200));
+}
+
+/* The whole point of this function, distinct from rcp_regmap_ep_client_t's
+ * own single-endpoint-scoped via_owning_stream (see this function's own
+ * regmap.h doc comment): a valid association owned by SOME OTHER endpoint
+ * still counts, since TC18's own "any valid stream_id/byte_bus_id
+ * combination" text does not require the combination to belong to the
+ * caller's own endpoint. */
+static void test_is_valid_association_true_regardless_of_which_ep_id_owns_it(void)
+{
+    rcp_regmap_ep_id_map_entry_t entries[1] = {{99, 0x100, 2}}; /* owned by ep 99, not the caller */
+
+    TEST_ASSERT_TRUE(rcp_regmap_ep_id_map_is_valid_association(entries, 1, 2, 0x100));
+}
+
+static void test_is_valid_association_false_for_right_stream_wrong_bbid(void)
+{
+    rcp_regmap_ep_id_map_entry_t entries[1] = {{1, 0x100, 2}};
+
+    TEST_ASSERT_FALSE(rcp_regmap_ep_id_map_is_valid_association(entries, 1, 2, 0x200));
+}
+
+static void test_is_valid_association_false_for_right_bbid_wrong_stream(void)
+{
+    rcp_regmap_ep_id_map_entry_t entries[1] = {{1, 0x100, 2}};
+
+    TEST_ASSERT_FALSE(rcp_regmap_ep_id_map_is_valid_association(entries, 1, 5, 0x100));
+}
+
+static void test_is_valid_association_vacuous_for_empty_table(void)
+{
+    TEST_ASSERT_FALSE(rcp_regmap_ep_id_map_is_valid_association(NULL, 0, 2, 0x100));
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -645,6 +739,9 @@ int main(void)
     RUN_TEST(test_writer_ctx_denies_owning_stream_when_no_owner_or_null);
     RUN_TEST(test_writer_ctx_plumbs_via_unicast_to_non_unicast_frame_flag);
     RUN_TEST(test_writer_ctx_plumbs_via_discovery_stream);
+    RUN_TEST(test_writer_ctx_grants_valid_stream_association_when_no_root_client);
+    RUN_TEST(test_writer_ctx_denies_valid_stream_association_when_root_client_configured);
+    RUN_TEST(test_writer_ctx_denies_valid_stream_association_for_an_unrecognized_pair);
 
     RUN_TEST(test_pin_property_bits_are_pairwise_distinct);
 
@@ -676,6 +773,12 @@ int main(void)
     RUN_TEST(test_byte_bus_ids_for_stream_ask_first_then_size_a_buffer);
     RUN_TEST(test_byte_bus_ids_for_stream_zero_capacity_writes_nothing);
     RUN_TEST(test_byte_bus_ids_for_stream_vacuous_for_empty_table);
+
+    RUN_TEST(test_is_valid_association_true_for_an_exact_match);
+    RUN_TEST(test_is_valid_association_true_regardless_of_which_ep_id_owns_it);
+    RUN_TEST(test_is_valid_association_false_for_right_stream_wrong_bbid);
+    RUN_TEST(test_is_valid_association_false_for_right_bbid_wrong_stream);
+    RUN_TEST(test_is_valid_association_vacuous_for_empty_table);
 
     return UNITY_END();
 }

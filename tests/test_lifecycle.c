@@ -259,6 +259,28 @@ static void test_transition_hw_configured_to_rcp_configured_requires_authorizati
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state);
 }
 
+/* RESOLVED 2026-08-14 (REQ-LIFECYCLE-031, issue #341 lineage): TC18
+ * §12.3.1.2's own "any valid stream_id/byte_bus_id combination" case --
+ * distinct from via_discovery_stream/via_root_client_ep0, both already
+ * covered above -- now authorizes this advance too. writer.
+ * via_valid_stream_association is a caller-computed input here
+ * (rcp_regmap_writer_ctx() is what actually derives it, including baking
+ * in TC18's own "only when no root client is configured" narrowing --
+ * see test_regmap.c's own writer_ctx tests for that derivation); this
+ * function itself just has to honor it once set. */
+static void test_transition_hw_configured_to_rcp_configured_accepts_valid_stream_association(void)
+{
+    rcp_lifecycle_endpoint_plausibility_t ep;
+    rcp_lifecycle_request_stream_plausibility_t rs;
+    rcp_lifecycle_plausibility_snapshot_t snap = plausible_snapshot(&ep, &rs);
+    rcp_lifecycle_state_t state = RCP_LIFECYCLE_HW_CONFIGURED;
+    rcp_lifecycle_writer_ctx_t valid_assoc = {false, false, false, false, true};
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_RCP_CONFIGURED, &snap, valid_assoc, true));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state);
+}
+
 static void test_transition_hw_configured_to_hw_unconfigured_is_unconditional_once_authorized(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_HW_CONFIGURED;
@@ -274,6 +296,21 @@ static void test_transition_hw_configured_to_hw_unconfigured_is_unconditional_on
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, state);
 }
 
+/* Same closed gap as the advance above, but for the mirror-image
+ * HW_CONFIGURED -> HW_UNCONFIGURED reset -- TC18 §12.3.1.2's own
+ * wording repeats the identical "discovery stream or a valid
+ * stream_id/byte_bus_id combination" authorization for this direction
+ * too (this function's own header doc comment quotes both sentences). */
+static void test_transition_hw_configured_to_hw_unconfigured_accepts_valid_stream_association(void)
+{
+    rcp_lifecycle_state_t state = RCP_LIFECYCLE_HW_CONFIGURED;
+    rcp_lifecycle_writer_ctx_t valid_assoc = {false, false, false, false, true};
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, valid_assoc, true));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, state);
+}
+
 /* REQ-LIFECYCLE-037 (TC18 §12.7.4): "Changes in configuration via a
  * discovery request are no longer allowed" once RCP_CONFIGURED. Unlike
  * the HW_CONFIGURED->HW_UNCONFIGURED reset (still HW_CONFIGURED at the
@@ -285,9 +322,10 @@ static void test_transition_hw_configured_to_hw_unconfigured_is_unconditional_on
 static void test_transition_rcp_configured_to_hw_unconfigured_requires_root_client(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_RCP_CONFIGURED;
-    rcp_lifecycle_writer_ctx_t stranger  = {0};
-    rcp_lifecycle_writer_ctx_t discovery = {false, false, false, true};
-    rcp_lifecycle_writer_ctx_t root      = {true, false, false, false};
+    rcp_lifecycle_writer_ctx_t stranger    = {0};
+    rcp_lifecycle_writer_ctx_t discovery   = {false, false, false, true};
+    rcp_lifecycle_writer_ctx_t valid_assoc = {false, false, false, false, true};
+    rcp_lifecycle_writer_ctx_t root        = {true, false, false, false};
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_UNAUTHORIZED,
                        rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, stranger, true));
@@ -297,6 +335,15 @@ static void test_transition_rcp_configured_to_hw_unconfigured_requires_root_clie
                        rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, discovery, true));
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state); /* unchanged -- discovery stream no
                                                                 longer suffices once RCP_CONFIGURED */
+
+    /* REQ-LIFECYCLE-031's own new via_valid_stream_association member
+     * does NOT widen this specific reset -- §12.7.4's narrower rule
+     * ("only... the root client") governs here, not §12.3.1.2's own
+     * wider "any valid stream_id/byte_bus_id combination" case this
+     * function only honors for the two other transitions above. */
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_UNAUTHORIZED,
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, valid_assoc, true));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state); /* unchanged */
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
                        rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_UNCONFIGURED, NULL, root, true));
@@ -678,7 +725,9 @@ int main(void)
     RUN_TEST(test_transition_hw_configured_to_rcp_configured_succeeds_when_plausible);
     RUN_TEST(test_transition_hw_configured_to_rcp_configured_fails_when_implausible);
     RUN_TEST(test_transition_hw_configured_to_rcp_configured_requires_authorization);
+    RUN_TEST(test_transition_hw_configured_to_rcp_configured_accepts_valid_stream_association);
     RUN_TEST(test_transition_hw_configured_to_hw_unconfigured_is_unconditional_once_authorized);
+    RUN_TEST(test_transition_hw_configured_to_hw_unconfigured_accepts_valid_stream_association);
     RUN_TEST(test_transition_rcp_configured_to_hw_unconfigured_requires_root_client);
     RUN_TEST(test_transition_rejects_skipping_hw_configured);
     RUN_TEST(test_transition_rejects_rcp_configured_to_hw_configured);
