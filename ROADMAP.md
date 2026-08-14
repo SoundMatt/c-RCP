@@ -19106,6 +19106,61 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.349.0 -- 2026-08-14 (REQ-TIMED-012/013: rcp_mock_server_dispatch_tscf()
+wires the real TSCF presentation-time gate into a live dispatch path)
+
+Sixth of the user's own explicit `complete these now!` 7-item list.
+The admission/due-selection machinery itself (rcp_server_endpoint_
+admit()'s own tv/avtp_timestamp/gptp_reference_now gate) was already
+built in an earlier batch; this pair's own remaining text named the
+SAME gap both entries share: no real dispatch path in mock.c called
+it with real values yet.
+
+New `rcp_mock_server_dispatch_tscf()` (mock.h/mock.c) -- identical to
+`rcp_mock_server_dispatch()` in every other respect, taking tv/
+avtp_timestamp/gptp_reference_now and threading them straight through.
+Key design finding that shrank the blast radius: `dispatch_plain_
+inner()`/`dispatch_plain()` (mock.c's own internal, static shared
+core, reached by every one of `rcp_mock_server_dispatch()`/`_dispatch_
+e2e()`'s combined 130+ existing call sites across this codebase)
+gained the same three parameters, but as a NEW additional entry
+point, not a signature change to either existing PUBLIC function --
+both still call through explicitly with `tv=false`, so every one of
+their own existing callers keeps its exact prior behavior. Mutation-
+tested: flipping either `false` passthrough to `true` broke 15
+pre-existing tests, caught cleanly; the real `tv` threading itself was
+also mutation-tested and caught.
+
+A caller who received a real TSCF-wrapped frame decodes it one layer
+up via `rcp_avtp_decode_tscf()` -- this function itself never touches
+the outer AVTP/TSCF framing, only the already-unwrapped ACF payload,
+matching every sibling dispatch function's own established
+convention (none of them parse AVTP-level framing either).
+
+2 new tests: `tv=false` behaves byte-for-byte like plain `dispatch()`;
+`tv=true` postpones a standard request (`RCP_MOCK_DISPATCH_PENDING`,
+not executed immediately) -- the exact remaining gap this pair's own
+text described.
+
+Deliberately left open, as a natural, narrower follow-on rather than
+forced into this batch: `rcp_mock_server_dispatch_frame()`/
+`_dispatch_frame_e2e()` (TC18 §12.9.1.1 multi-request-per-frame
+dispatch) have no TSCF-aware twin yet, and `rcp_mock_server_
+dispatch_e2e()` itself still does not thread its own existing
+`avtp_timestamp` parameter (used today only for E2E CRC/sequence
+unwrap prep, a different purpose) into TSCF admission gating -- both
+are straightforward extensions of the same `dispatch_plain()`-level
+plumbing this batch built, not a new open design question.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.54):
+0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`:
+`REQ-TIMED-012`/`REQ-TIMED-013` both partial -> implemented -- 1052
+implemented / 15 partial / 2 not-implemented / 7 retired, 1076 total.
+
+**Next**: `REQ-ISELED-025` multi-fragment dispatch (a genuinely
+different, larger architectural limit -- see that requirement's own
+text) or `REQ-GPIO-035/036` periodic sampling timer + delayed response.
+
 ### v0.348.0 -- 2026-08-14 (REQ-RMAP-068: EP0 register-map writes now
 implement TC18's own evt[2:0]-keyed SET/OR/AND/XOR rule)
 
