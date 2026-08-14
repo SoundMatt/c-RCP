@@ -5194,6 +5194,324 @@ static void test_effective_register_write_length_helper_matches_the_formula(void
     rcp_bytes_free(&msg);
 }
 
+/* REQ-RMAP-068 (TC18 13.7.1.2): direct unit test of the shared
+ * combine primitive, independent of any dispatcher plumbing -- SET is
+ * a pure passthrough (current ignored), OR/AND/XOR compute the named
+ * bitwise op byte-wise, and the spec's own worked example (OR with an
+ * all-zero request leaves current unchanged) holds. */
+static void test_ep0_combine_write_op_implements_set_or_and_xor(void)
+{
+    uint8_t current[4] = {0xF0u, 0x0Fu, 0xAAu, 0x55u};
+    uint8_t request[4] = {0x0Fu, 0xF0u, 0x55u, 0xAAu};
+    uint8_t out[4];
+
+    rcp_regmap_ep0_combine_write_op(RCP_REGMAP_EP0_WRITE_OP_SET, current, request, out, 4u);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(request, out, 4);
+
+    rcp_regmap_ep0_combine_write_op(RCP_REGMAP_EP0_WRITE_OP_OR, current, request, out, 4u);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, out[0]);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, out[1]);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, out[2]);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, out[3]);
+
+    rcp_regmap_ep0_combine_write_op(RCP_REGMAP_EP0_WRITE_OP_AND, current, request, out, 4u);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, out[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, out[1]);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, out[2]);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, out[3]);
+
+    rcp_regmap_ep0_combine_write_op(RCP_REGMAP_EP0_WRITE_OP_XOR, current, request, out, 4u);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, out[0]);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, out[1]);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, out[2]);
+    TEST_ASSERT_EQUAL_UINT8(0xFFu, out[3]);
+
+    /* TC18 13.7.1.2's own worked example: "A request with
+     * byte_msg_payload 0x0000 0000 and evt = 0x001 (OR) results in
+     * 'no effect'." */
+    {
+        uint8_t zero[4] = {0};
+
+        rcp_regmap_ep0_combine_write_op(RCP_REGMAP_EP0_WRITE_OP_OR, current, zero, out, 4u);
+        TEST_ASSERT_EQUAL_UINT8_ARRAY(current, out, 4);
+    }
+}
+
+/* REQ-RMAP-068: evt[2:0] in {4..7} has no defined SET/OR/AND/XOR
+ * meaning for an EP0 register-map write -- rejected with
+ * RCP_ERROR_UNSUPPORTED_CMD before any address routing is even
+ * attempted, table left entirely unchanged. */
+static void test_ep0_dispatcher_rejects_reserved_write_op_before_any_routing(void)
+{
+    rcp_acf_byte_message_info_t   hdr = {0};
+    rcp_bytes_t                   frame;
+    rcp_regmap_general_t          map;
+    rcp_regmap_hw_pin_map_entry_t hw_pin_map[1] = {{1u, 2u, 0x03u}};
+    rcp_lifecycle_state_t         state         = RCP_LIFECYCLE_HW_UNCONFIGURED;
+    rcp_lifecycle_writer_ctx_t    writer        = DISCOVERY_WRITER;
+    rcp_wire_error_t              err;
+    uint8_t                       tn = 0;
+    rcp_regmap_ep0_errc_t         rc;
+    uint8_t                       payload[3];
+
+    rcp_regmap_general_init(&map);
+    map.svr_hw_cfg_ptr = 0x0100u;
+
+    hdr.byte_bus_id     = RCP_REGMAP_EP0_INDEX;
+    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.evt             = 0x04u; /* reserved for this context -- {4..7} */
+    hdr.transaction_num = 5;
+
+    put_test_u16(payload, (uint16_t)(map.svr_hw_cfg_ptr + 2u)); /* row 0's own hw_pin_type */
+    payload[2] = 0xFFu;
+
+    frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+    TEST_ASSERT_NOT_NULL(frame.data);
+    rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map, state, writer,
+                                              hw_pin_map, 1u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u,
+                                              NULL, NULL, 0u, 0u, &err, &tn, 0u, NULL, NULL, 0u, 0u);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+    TEST_ASSERT_EQUAL(RCP_ERROR_UNSUPPORTED_CMD, err);
+    TEST_ASSERT_EQUAL_UINT8(0x03u, hw_pin_map[0].hw_pin_type); /* unchanged */
+    rcp_bytes_free(&frame);
+}
+
+/* REQ-RMAP-068: evt[2:0]=001b (OR) applied end-to-end through the EP0
+ * write dispatcher against HW_config -- proves the render+combine step
+ * actually reads the table's own CURRENT content, not just the raw
+ * request bytes (0x03 | 0x04 = 0x07, not 0x04). */
+static void test_ep0_dispatcher_applies_or_write_op_to_hw_pin_map(void)
+{
+    rcp_acf_byte_message_info_t   hdr = {0};
+    rcp_bytes_t                   frame;
+    rcp_regmap_general_t          map;
+    rcp_regmap_hw_pin_map_entry_t hw_pin_map[1] = {{1u, 2u, 0x03u}};
+    rcp_lifecycle_state_t         state         = RCP_LIFECYCLE_HW_UNCONFIGURED;
+    rcp_lifecycle_writer_ctx_t    writer        = DISCOVERY_WRITER;
+    rcp_wire_error_t              err;
+    uint8_t                       tn = 0;
+    rcp_regmap_ep0_errc_t         rc;
+    uint8_t                       payload[3];
+
+    rcp_regmap_general_init(&map);
+    map.svr_hw_cfg_ptr = 0x0100u;
+
+    hdr.byte_bus_id     = RCP_REGMAP_EP0_INDEX;
+    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.evt             = (uint8_t)RCP_REGMAP_EP0_WRITE_OP_OR;
+    hdr.transaction_num = 6;
+
+    put_test_u16(payload, (uint16_t)(map.svr_hw_cfg_ptr + 2u));
+    payload[2] = 0x04u;
+
+    frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+    TEST_ASSERT_NOT_NULL(frame.data);
+    rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map, state, writer,
+                                              hw_pin_map, 1u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u,
+                                              NULL, NULL, 0u, 0u, &err, &tn, 0u, NULL, NULL, 0u, 0u);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+    TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
+    TEST_ASSERT_EQUAL_UINT8(0x07u, hw_pin_map[0].hw_pin_type);
+    rcp_bytes_free(&frame);
+}
+
+/* REQ-RMAP-068: evt[2:0]=010b (AND) applied end-to-end against
+ * EP_ID_config's own ep_id octet (0xFF & 0x0F = 0x0F). */
+static void test_ep0_dispatcher_applies_and_write_op_to_ep_id_map(void)
+{
+    rcp_acf_byte_message_info_t  hdr = {0};
+    rcp_bytes_t                  frame;
+    rcp_regmap_general_t         map;
+    rcp_regmap_ep_id_map_entry_t ep_id_map[1] = {{0xFFu, 10u, 1u}}; /* ep_id, byte_bus_id,
+                                                                        request_stream_index --
+                                                                        the struct's own real
+                                                                        declaration order */
+    rcp_lifecycle_state_t        state        = RCP_LIFECYCLE_HW_UNCONFIGURED;
+    rcp_lifecycle_writer_ctx_t   writer       = DISCOVERY_WRITER;
+    rcp_wire_error_t             err;
+    uint8_t                      tn = 0;
+    rcp_regmap_ep0_errc_t        rc;
+    uint8_t                      payload[3];
+
+    rcp_regmap_general_init(&map);
+    map.svr_ep_bytebus_id_map_ptr = 0x0200u;
+
+    hdr.byte_bus_id     = RCP_REGMAP_EP0_INDEX;
+    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.evt             = (uint8_t)RCP_REGMAP_EP0_WRITE_OP_AND;
+    hdr.transaction_num = 7;
+
+    put_test_u16(payload, (uint16_t)(map.svr_ep_bytebus_id_map_ptr + 1u)); /* row 0's own ep_id */
+    payload[2] = 0x0Fu;
+
+    frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+    TEST_ASSERT_NOT_NULL(frame.data);
+    rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map, state, writer, NULL, 0u,
+                                              ep_id_map, 1u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, NULL,
+                                              0u, 0u, &err, &tn, 0u, NULL, NULL, 0u, 0u);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+    TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
+    TEST_ASSERT_EQUAL_UINT16(0x0Fu, ep_id_map[0].ep_id);
+    rcp_bytes_free(&frame);
+}
+
+/* REQ-RMAP-068: evt[2:0]=011b (XOR) applied end-to-end against the
+ * sequencer table's own Seq_state octet (0x0F ^ 0x0F = 0x00), through
+ * the SAME ownership-authorized path REQ-SEQ-013's own tests already
+ * cover -- proves the write-op combine step and REQ-SEQ-013's own
+ * per-octet ownership authorization compose correctly (authorization
+ * depends only on which octets the write's own span touches, not
+ * their value, so it is unaffected either way). */
+static void test_ep0_dispatcher_applies_xor_write_op_to_sequencer_table(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_regmap_general_t        map;
+    uint8_t                     sequencer_state[1] = {0x0Fu};
+    uint8_t                     sequencer_owner[1] = {3u};
+    uint8_t                     payload[3];
+    rcp_bytes_t                 frame;
+    rcp_wire_error_t            err;
+    uint8_t                     tn;
+    rcp_regmap_ep0_errc_t       rc;
+
+    rcp_regmap_general_init(&map);
+    map.svr_sequencer_state_ptr = 0x0600u;
+
+    put_test_u16(payload, (uint16_t)map.svr_sequencer_state_ptr);
+    payload[2] = 0x0Fu;
+    hdr.byte_bus_id = RCP_REGMAP_EP0_INDEX;
+    hdr.op          = RCP_ACF_OP_WRITE;
+    hdr.evt         = (uint8_t)RCP_REGMAP_EP0_WRITE_OP_XOR;
+    frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map,
+                                              RCP_LIFECYCLE_HW_UNCONFIGURED, ROOT_WRITER,
+                                              NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u,
+                                              sequencer_state, sequencer_owner, 1u, 3u,
+                                              &err, &tn, 0u, NULL, NULL, 0u, 0u);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+    TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
+    TEST_ASSERT_EQUAL_UINT8(0x00u, sequencer_state[0]);
+    rcp_bytes_free(&frame);
+}
+
+/* REQ-RMAP-068 x REQ-WAKEUP-020: the fixed-ep_id invariant prediction
+ * (ep_id_map_write_keeps_fixed_ep_id()) must see the SAME combined
+ * bytes the write will really apply, not the raw pre-combine request
+ * -- checking against raw bytes would be wrong under OR/AND/XOR since
+ * the write's real effect depends on the table's own current content
+ * too. Row 0 is WakeUp-typed (ep_type=9) with ep_id already fixed to
+ * 1; both sub-cases OR at the SAME address with different data,
+ * distinguished only by whether the COMBINED result keeps ep_id==1. */
+static void test_ep0_dispatcher_or_write_op_respects_fixed_ep_id_after_combine(void)
+{
+    rcp_acf_byte_message_info_t  hdr = {0};
+    rcp_bytes_t                  frame;
+    rcp_regmap_general_t         map;
+    rcp_lifecycle_state_t        state  = RCP_LIFECYCLE_HW_UNCONFIGURED;
+    rcp_lifecycle_writer_ctx_t   writer = PLAIN_WRITER;
+    rcp_wire_error_t             err;
+    uint8_t                      tn = 0;
+    rcp_regmap_ep0_errc_t        rc;
+    uint8_t                      ep_types[1] = {9u};
+
+    rcp_regmap_general_init(&map);
+    map.svr_ep_bytebus_id_map_ptr = 0x0200u;
+
+    hdr.byte_bus_id     = RCP_REGMAP_EP0_INDEX;
+    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.evt             = (uint8_t)RCP_REGMAP_EP0_WRITE_OP_OR;
+    hdr.transaction_num = 8;
+
+    /* 1) OR 0x00 onto ep_id=1 -- combined stays 1, invariant held,
+     * permitted. */
+    {
+        rcp_regmap_ep_id_map_entry_t ep_id_map[1] = {{1u, 1u, 10u}};
+        uint8_t                      payload[3];
+
+        put_test_u16(payload, (uint16_t)(map.svr_ep_bytebus_id_map_ptr + 1u));
+        payload[2] = 0x00u;
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map, state, writer, NULL,
+                                                   0u, ep_id_map, 1u, NULL, 0u, NULL, 0u, NULL, 0u,
+                                                   NULL, NULL, 0u, 0u, &err, &tn, 0u, NULL, ep_types,
+                                                   9u, 1u);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
+        TEST_ASSERT_EQUAL_UINT16(1u, ep_id_map[0].ep_id);
+        rcp_bytes_free(&frame);
+    }
+
+    /* 2) OR 0x06 onto ep_id=1 -- combined becomes 7, invariant broken,
+     * denied, table left entirely unchanged (the raw request byte
+     * alone, 0x06, would have looked fine if checked without
+     * combining first -- this is exactly the bug this fix closes). */
+    {
+        rcp_regmap_ep_id_map_entry_t ep_id_map[1] = {{1u, 1u, 10u}};
+        uint8_t                      payload[3];
+
+        put_test_u16(payload, (uint16_t)(map.svr_ep_bytebus_id_map_ptr + 1u));
+        payload[2] = 0x06u;
+
+        frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+        TEST_ASSERT_NOT_NULL(frame.data);
+        rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map, state, writer, NULL,
+                                                   0u, ep_id_map, 1u, NULL, 0u, NULL, 0u, NULL, 0u,
+                                                   NULL, NULL, 0u, 0u, &err, &tn, 0u, NULL, ep_types,
+                                                   9u, 1u);
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+        TEST_ASSERT_EQUAL(RCP_ERROR_INVALID_PARAMETER, err);
+        TEST_ASSERT_EQUAL_UINT16(1u, ep_id_map[0].ep_id); /* unchanged */
+        rcp_bytes_free(&frame);
+    }
+}
+
+/* REQ-RMAP-068: evt[2:0]=010b (AND) applied end-to-end against an
+ * optional-subsystem section (network_interface_cfg) -- proves the
+ * direct cfg->data combine path (no separate render() call needed,
+ * unlike every row-typed table above). */
+static void test_ep0_dispatcher_applies_and_write_op_to_optional_subsystem_section(void)
+{
+    rcp_acf_byte_message_info_t              hdr          = {0};
+    rcp_bytes_t                               frame;
+    rcp_regmap_general_t                      map;
+    rcp_regmap_optional_subsystem_cfg_t       network_cfg  = {{0}, 4u};
+    rcp_regmap_optional_subsystem_cfg_ptrs_t  optional_cfg = {0};
+    rcp_lifecycle_state_t                     state        = RCP_LIFECYCLE_HW_UNCONFIGURED;
+    rcp_lifecycle_writer_ctx_t                writer       = PLAIN_WRITER;
+    rcp_wire_error_t                          err;
+    uint8_t                                   tn = 0;
+    rcp_regmap_ep0_errc_t                     rc;
+    uint8_t                                   payload[3];
+
+    network_cfg.data[2] = 0xFFu;
+    optional_cfg.network_interface_cfg = &network_cfg;
+
+    rcp_regmap_general_init(&map);
+    map.svr_network_interface_cfg_ptr = 0x0600u;
+
+    hdr.byte_bus_id     = RCP_REGMAP_EP0_INDEX;
+    hdr.op              = RCP_ACF_OP_WRITE;
+    hdr.evt             = (uint8_t)RCP_REGMAP_EP0_WRITE_OP_AND;
+    hdr.transaction_num = 9;
+
+    put_test_u16(payload, (uint16_t)(map.svr_network_interface_cfg_ptr + 2u));
+    payload[2] = 0x0Fu;
+
+    frame = rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+    TEST_ASSERT_NOT_NULL(frame.data);
+    rc = rcp_regmap_ep0_decode_write_request(frame.data, frame.len, &map, state, writer, NULL, 0u,
+                                              NULL, 0u, NULL, 0u, NULL, 0u, NULL, 0u, NULL, NULL, 0u,
+                                              0u, &err, &tn, 0u, &optional_cfg, NULL, 0u, 0u);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP0_OK, rc);
+    TEST_ASSERT_EQUAL(RCP_ERROR_NONE, err);
+    TEST_ASSERT_EQUAL_UINT8(0x0Fu, network_cfg.data[2]); /* 0xFF & 0x0F */
+    rcp_bytes_free(&frame);
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -5315,6 +5633,14 @@ int main(void)
     RUN_TEST(test_svr_ep_cfg_now_models_discovery_timeout_and_status);
     RUN_TEST(test_field_write_error_distinguishes_state_from_writer_denial);
     RUN_TEST(test_effective_register_write_length_helper_matches_the_formula);
+
+    RUN_TEST(test_ep0_combine_write_op_implements_set_or_and_xor);
+    RUN_TEST(test_ep0_dispatcher_rejects_reserved_write_op_before_any_routing);
+    RUN_TEST(test_ep0_dispatcher_applies_or_write_op_to_hw_pin_map);
+    RUN_TEST(test_ep0_dispatcher_applies_and_write_op_to_ep_id_map);
+    RUN_TEST(test_ep0_dispatcher_applies_xor_write_op_to_sequencer_table);
+    RUN_TEST(test_ep0_dispatcher_or_write_op_respects_fixed_ep_id_after_combine);
+    RUN_TEST(test_ep0_dispatcher_applies_and_write_op_to_optional_subsystem_section);
 
     return UNITY_END();
 }
