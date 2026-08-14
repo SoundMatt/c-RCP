@@ -367,27 +367,55 @@ static void test_apply_reconfig_writes_multi_register_span(void)
     TEST_ASSERT_EQUAL_UINT8(12, cfg.trail);
 }
 
-static void test_apply_reconfig_stop_bits_half_unit_rounding(void)
+/* CLOSED 2026-08-14 (REQ-UART-037, tc18-gap post-backlog audit): was
+ * test_apply_reconfig_stop_bits_half_unit_rounding(), pinning register
+ * value 3 (1.5 stop bits) rounding UP to TWO for lack of a real
+ * representation. rcp_ep_uart_stop_bits_t now has a third member,
+ * ONE_HALF, so the mapping is exact for all three legal values; only
+ * an out-of-range register value (5, tested below in place of the old
+ * "high" case, since 4 is now TWO's own exact value) still falls back
+ * to the conservative TWO default. */
+static void test_apply_reconfig_stop_bits_now_maps_exactly(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
-    uint8_t                      payload_low[3]  = {0x00, (uint8_t)RCP_EP_UART_REG_STOP_BITS, 2};
-    uint8_t                      payload_mid[3]  = {0x00, (uint8_t)RCP_EP_UART_REG_STOP_BITS, 3};
-    uint8_t                      payload_high[3] = {0x00, (uint8_t)RCP_EP_UART_REG_STOP_BITS, 4};
+    uint8_t                      payload_one[3]      = {0x00, (uint8_t)RCP_EP_UART_REG_STOP_BITS, 2};
+    uint8_t                      payload_one_half[3] = {0x00, (uint8_t)RCP_EP_UART_REG_STOP_BITS, 3};
+    uint8_t                      payload_two[3]       = {0x00, (uint8_t)RCP_EP_UART_REG_STOP_BITS, 4};
+    uint8_t                      payload_out_of_range[3] =
+        {0x00, (uint8_t)RCP_EP_UART_REG_STOP_BITS, 5};
 
     rcp_ep_uart_functional_cfg_init(&cfg);
     TEST_ASSERT_EQUAL(RCP_EP_UART_RECONFIG_OK,
-        rcp_ep_uart_apply_reconfig(&cfg, payload_low, sizeof(payload_low)));
+        rcp_ep_uart_apply_reconfig(&cfg, payload_one, sizeof(payload_one)));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_STOP_BITS_ONE, cfg.stop_bits);
 
     rcp_ep_uart_functional_cfg_init(&cfg);
     TEST_ASSERT_EQUAL(RCP_EP_UART_RECONFIG_OK,
-        rcp_ep_uart_apply_reconfig(&cfg, payload_mid, sizeof(payload_mid)));
+        rcp_ep_uart_apply_reconfig(&cfg, payload_one_half, sizeof(payload_one_half)));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_STOP_BITS_ONE_HALF, cfg.stop_bits);
+
+    rcp_ep_uart_functional_cfg_init(&cfg);
+    TEST_ASSERT_EQUAL(RCP_EP_UART_RECONFIG_OK,
+        rcp_ep_uart_apply_reconfig(&cfg, payload_two, sizeof(payload_two)));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_STOP_BITS_TWO, cfg.stop_bits);
 
     rcp_ep_uart_functional_cfg_init(&cfg);
     TEST_ASSERT_EQUAL(RCP_EP_UART_RECONFIG_OK,
-        rcp_ep_uart_apply_reconfig(&cfg, payload_high, sizeof(payload_high)));
+        rcp_ep_uart_apply_reconfig(&cfg, payload_out_of_range, sizeof(payload_out_of_range)));
     TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_STOP_BITS_TWO, cfg.stop_bits);
+}
+
+/* The render side of the same three-way mapping: ONE_HALF renders as
+ * register value 3, distinct from ONE (2) and TWO (4). */
+static void test_render_registers_stop_bits_one_half_is_distinct(void)
+{
+    rcp_ep_uart_functional_cfg_t cfg;
+    uint8_t                      out[RCP_EP_UART_EP_FUNC_LEN];
+
+    rcp_ep_uart_functional_cfg_init(&cfg);
+    cfg.stop_bits = (uint8_t)RCP_EP_UART_STOP_BITS_ONE_HALF;
+    rcp_ep_uart_render_registers(&cfg, out);
+    TEST_ASSERT_EQUAL_UINT8(3u, out[RCP_EP_UART_REG_STOP_BITS]);
 }
 
 static void test_apply_reconfig_ignores_read_only_registers(void)
@@ -956,7 +984,8 @@ int main(void)
 
     RUN_TEST(test_render_registers_matches_table_offsets);
     RUN_TEST(test_apply_reconfig_writes_multi_register_span);
-    RUN_TEST(test_apply_reconfig_stop_bits_half_unit_rounding);
+    RUN_TEST(test_apply_reconfig_stop_bits_now_maps_exactly);
+    RUN_TEST(test_render_registers_stop_bits_one_half_is_distinct);
     RUN_TEST(test_apply_reconfig_ignores_read_only_registers);
     RUN_TEST(test_apply_reconfig_rejects_write_past_ep_len);
     RUN_TEST(test_apply_reconfig_rejects_payload_without_data);

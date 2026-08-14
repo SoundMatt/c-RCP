@@ -19106,6 +19106,35 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.339.0 -- 2026-08-14 (REQ-UART-037: 1.5 stop bits now exactly
+representable)
+
+Sixth of 14 items -- the first real, source-compatible enum widening
+in this batch rather than a composition or stale-text fix.
+`rcp_ep_uart_stop_bits_t` had exactly two members (ONE/TWO), so Table
+48's own `uart_stop_bits` register value 3 (1.5 stop bits) passed the
+setter unvalidated and rounded UP to TWO on parse -- honestly
+documented but a real conflation, distinct from this requirement's
+other two still-open divergences (`uart_baud_rate` width,
+`uart_timeout` unit/origin).
+
+New `RCP_EP_UART_STOP_BITS_ONE_HALF = 2`, appended (not inserted) so
+TWO's own numeric value stays unchanged -- confirmed no `switch`
+over this enum exists anywhere before adding the member, so every
+existing comparison/assignment site is unaffected. Both render/parse
+directions now map all three legal register values exactly; an
+out-of-range value still fails safe the same way as before.
+
+Both old deviation-pin tests rewritten to prove the new exact
+mapping; a new render-side test added. Both directions
+mutation-tested and caught cleanly.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace`
+(v0.5.51): 0 errors, 0/1076 untested. `.fusa-reqs.json`:
+`REQ-UART-037` text updated, stays `partial` (baud_rate/timeout
+divergences remain open) -- 1042 implemented / 25 partial / 2
+not-implemented / 7 retired, 1076 total, unchanged.
+
 ### v0.338.0 -- 2026-08-14 (REQ-PWRMODE-019: stale "not modeled" text
 corrected, closed)
 
