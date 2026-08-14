@@ -957,6 +957,52 @@ static void test_fragment_encode_disabled_when_zero_cap_and_oversized(void)
     TEST_ASSERT_EQUAL_UINT(0, count);
 }
 
+/* ── rcp_ep_uart_wire_timeout_us() (REQ-UART-037, issue #341 lineage) ───────── */
+
+/* At 3 kbit/s (3000 bit/s), one bit period is 1000/3 = 333.33...us; 10 bit
+ * periods is 3333.33...us, which ceilings to 3334 -- proves the rounding
+ * is genuinely UP, not truncated, for a case with a real remainder. */
+static void test_wire_timeout_us_computes_ceiling_of_bit_periods(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(3334u, rcp_ep_uart_wire_timeout_us(3u, 10u));
+}
+
+/* A baud rate/bit-time pair that divides EXACTLY still returns the exact
+ * value -- the ceiling rounding must not add a spurious extra microsecond
+ * when there is no remainder. 1000 kbit/s -> 1 bit period exactly 1us;
+ * 10 bit periods -> exactly 10us. */
+static void test_wire_timeout_us_exact_division_has_no_off_by_one(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(10u, rcp_ep_uart_wire_timeout_us(1000u, 10u));
+}
+
+/* baud_rate_kbps == 0 fails open (returns 0) -- no configured clock to
+ * derive a real duration from, the same "this library never invents a
+ * value it has no way to know" discipline REQ-ADC-033's own base_clk_hz
+ * parameter already establishes. */
+static void test_wire_timeout_us_fails_open_with_no_baud_rate(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(0u, rcp_ep_uart_wire_timeout_us(0u, 10u));
+    TEST_ASSERT_EQUAL_UINT32(0u, rcp_ep_uart_wire_timeout_us(0u, 0u));
+}
+
+/* wire_timeout_bit_times == 0 naturally converts to 0us through the same
+ * formula, with no special-casing -- consistent with
+ * rcp_ep_uart_read_completion_decision()'s own documented
+ * "uart_timeout_ms == 0 completes immediately" reading. */
+static void test_wire_timeout_us_zero_bit_times_is_zero(void)
+{
+    TEST_ASSERT_EQUAL_UINT32(0u, rcp_ep_uart_wire_timeout_us(9600u, 0u));
+}
+
+/* The maximum representable inputs (uint16_t baud_rate_kbps, uint8_t
+ * wire_timeout_bit_times) must not overflow uint32_t arithmetic. */
+static void test_wire_timeout_us_max_inputs_do_not_overflow(void)
+{
+    uint32_t result = rcp_ep_uart_wire_timeout_us(1u, 255u); /* slowest baud rate, longest timeout */
+    TEST_ASSERT_EQUAL_UINT32(255000u, result); /* 255 bit periods at 1 kbit/s: 255 * 1000us exactly */
+}
+
 int main(void)
 {
     UNITY_BEGIN();
@@ -1014,6 +1060,12 @@ int main(void)
     RUN_TEST(test_fragment_unfragmented_matches_single_frame_path);
     RUN_TEST(test_fragment_deliberately_small_cap_round_trip);
     RUN_TEST(test_fragment_encode_disabled_when_zero_cap_and_oversized);
+
+    RUN_TEST(test_wire_timeout_us_computes_ceiling_of_bit_periods);
+    RUN_TEST(test_wire_timeout_us_exact_division_has_no_off_by_one);
+    RUN_TEST(test_wire_timeout_us_fails_open_with_no_baud_rate);
+    RUN_TEST(test_wire_timeout_us_zero_bit_times_is_zero);
+    RUN_TEST(test_wire_timeout_us_max_inputs_do_not_overflow);
 
     return UNITY_END();
 }

@@ -615,6 +615,19 @@ rcp_ep_uart_errc_t rcp_ep_uart_decode_read_response(const uint8_t *b, size_t len
 
 /* ── Read-completion arbitration (REQ-UART-033) ─────────────────────────────── */
 
+//cfusa:req REQ-UART-037
+uint32_t rcp_ep_uart_wire_timeout_us(uint16_t baud_rate_kbps, uint8_t wire_timeout_bit_times)
+{
+    uint32_t bit_periods_us_numerator;
+
+    if (baud_rate_kbps == 0u) return 0u; /* fails open -- no configured clock to derive from */
+
+    /* wire_timeout_bit_times * 1000 / baud_rate_kbps, rounded UP (ceiling)
+     * so a caller never underestimates TC18's own configured timeout. */
+    bit_periods_us_numerator = (uint32_t)wire_timeout_bit_times * 1000u;
+    return (bit_periods_us_numerator + (uint32_t)baud_rate_kbps - 1u) / (uint32_t)baud_rate_kbps;
+}
+
 //cfusa:req REQ-UART-033
 rcp_ep_uart_read_completion_t rcp_ep_uart_read_completion_decision(
     uint16_t bytes_available, uint16_t read_size, uint32_t elapsed_ms,

@@ -34,6 +34,20 @@ the rationale.
 
 ## Releases
 
+### v0.344.0 -- 2026-08-14 (REQ-UART-037: uart_timeout's own bit-time-to-wall-clock conversion, closing its last Table 48 divergence)
+
+First of a follow-on batch: the user reviewed the post-"complete these" status update's own 🟡 not-blocked-but-not-yet-done list and asked for all seven items to be closed.
+
+Re-investigated `REQ-UART-037` directly against the code before writing anything: `baud_rate_kbps`/`wire_timeout_bit_times` (added 2026-08-11, REQ-UART-038) already correctly model `uart_baud_rate`/`uart_timeout` at TC18's own width/units on the wire, and `render_registers()`/`apply_reconfig()` were already confirmed (by direct grep) to use them, not the legacy `baud_rate`/`uart_timeout_ms` fields -- the requirement's own "STILL PARTIAL... untouched by this fix" text describing a width/unit mismatch was stale, carried over from before the 2026-08-11 fix landed.
+
+The real remaining gap was different: `uart_timeout`'s own TC18 origin ("measured from the last received stop bit") is a raw UART bit-time count, but `rcp_ep_uart_read_completion_decision()` (REQ-UART-033, the only runtime consumer of "the UART timeout" anywhere in this codebase) has only ever taken the separate, unit-unspecified `uart_timeout_ms` as its own parameter -- nothing anywhere converted the real wire register's own bit-time count into a wall-clock duration a caller could actually use.
+
+New `rcp_ep_uart_wire_timeout_us(baud_rate_kbps, wire_timeout_bit_times)`: one bit period is `1000/baud_rate_kbps` microseconds, so `wire_timeout_bit_times` bit periods is `wire_timeout_bit_times*1000/baud_rate_kbps` microseconds, rounded UP (ceiling) so a caller never underestimates the configured timeout. Fails open (returns 0) when `baud_rate_kbps == 0` -- this library never invents a clock rate it has no way to know, the same discipline `REQ-ADC-033`'s own `base_clk_hz` parameter already establishes. Purely additive: no existing field, setter, or function signature changed.
+
+New tests cover the ceiling rounding (a case with a real remainder), an exact-division case (proving no spurious off-by-one when there's no remainder), the fail-open guard, the natural zero-bit-times case, and the maximum-input overflow boundary. Both the ceiling-rounding and the fail-open guard were mutation-tested and caught cleanly.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`: `REQ-UART-037` partial → implemented -- 1047 implemented / 20 partial / 2 not-implemented / 7 retired, 1076 total.
+
 ### v0.343.0 -- 2026-08-14 (REQ-WAKEUP-018: repetition-interval resolution via Flush_time -- final item of the user's 14-item "complete these" list)
 
 Tenth and final item of the batch catalogued "not blocked, left by explicit decision" -- the third and last of the three WakeUp items (`REQ-WAKEUP-018/021/022`), completing the user's own explicit "complete these" instruction across all 14 items from the post-backlog requirements audit.

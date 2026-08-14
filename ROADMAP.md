@@ -19106,6 +19106,39 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.344.0 -- 2026-08-14 (REQ-UART-037: uart_timeout's own bit-time-to-
+wall-clock conversion, closing its last Table 48 divergence)
+
+First of a follow-on batch: the user asked for all 7 items on the
+post-"complete these" status update's own 🟡 not-blocked-but-not-yet-
+done list to be closed.
+
+Re-investigated directly against the code before writing anything:
+`baud_rate_kbps`/`wire_timeout_bit_times` already correctly model
+`uart_baud_rate`/`uart_timeout` at TC18's own width/units on the wire
+(confirmed by grep) -- the requirement's own "STILL PARTIAL" text
+describing a width/unit mismatch was stale. The real gap: TC18's
+"measured from the last received stop bit" bit-time count is never
+converted into a wall-clock duration anywhere -- the only runtime
+consumer of "the UART timeout" only ever took the separate,
+unit-unspecified `uart_timeout_ms`.
+
+New `rcp_ep_uart_wire_timeout_us()`: `wire_timeout_bit_times*1000/
+baud_rate_kbps` microseconds, ceiling-rounded (never underestimates),
+fails open to 0 when `baud_rate_kbps == 0`. Purely additive.
+
+New tests cover ceiling rounding, exact division, fail-open, zero
+bit-times, and max-input overflow. Both the ceiling and fail-open
+guard mutation-tested and caught cleanly.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51):
+0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`:
+`REQ-UART-037` partial → implemented -- 1047 implemented / 20 partial
+/ 2 not-implemented / 7 retired, 1076 total.
+
+**Next**: `REQ-E2E-046`'s watchdog cause (same wiring pattern as its
+3 already-wired siblings).
+
 ### v0.343.0 -- 2026-08-14 (REQ-WAKEUP-018: repetition-interval resolution
 via Flush_time -- final item of the user's 14-item "complete these" list)
 
