@@ -308,6 +308,36 @@ bool rcp_ep_pwm_out_trigger_fires(rcp_ep_pwm_out_trigger_t trigger, rcp_ep_pwm_o
     }
 }
 
+//cfusa:req REQ-PWM-055
+uint8_t rcp_ep_pwm_out_trigger_events_at_tick(uint16_t period, uint16_t active_duration,
+                                               uint8_t skew, uint32_t raw_tick)
+{
+    uint32_t skew_mod;
+    uint32_t delayed_tick;
+    uint8_t  events = 0;
+
+    if (period == 0) return 0; /* STOPPED -- no cycle to derive a phase within */
+
+    /* TC18 §13.7.5.1: "For trigger signal generation the delayed signal
+     * is used" -- delayed_tick is raw_tick measured from the SKEWED
+     * edge, i.e. skew ticks later than the undelayed source edge
+     * raw_tick is itself measured from. skew is reduced mod period
+     * first since an 8-bit skew register (0-255) can legally exceed a
+     * small period. */
+    skew_mod     = (uint32_t)skew % period;
+    delayed_tick = (raw_tick % period + period - skew_mod) % period;
+
+    if (delayed_tick == 0) events |= RCP_EP_PWM_OUT_TRIGGER_EVENT_CYCLE_START;
+
+    /* Table 45's own "even in case duty cycle is 0%" carve-out: no
+     * special case needed -- when active_duration == 0 this reduces to
+     * "at the delayed cycle start too", firing alongside CYCLE_START
+     * rather than being suppressed. */
+    if (delayed_tick == (uint32_t)(active_duration / 2u)) events |= RCP_EP_PWM_OUT_TRIGGER_EVENT_MID_PULSE;
+
+    return events;
+}
+
 /* ── PWM_OUT: functional config ─────────────────────────────────────────────── */
 
 //cfusa:req REQ-PWM-016

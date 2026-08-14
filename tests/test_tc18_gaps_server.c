@@ -263,16 +263,20 @@ static void test_admit_takes_no_lifecycle_state_or_stream_identity(void)
 static void test_rcp_cfg_inconsistent_catches_an_orphaned_stream(void)
 {
     rcp_lifecycle_request_stream_plausibility_t streams[1] = {
-        { true, true }, /* configured, has_response_stream -- both "satisfied" */
+        { true, true, 0 }, /* configured, has_response_stream, response_stream_index -- all "satisfied" */
     };
     rcp_lifecycle_plausibility_snapshot_t snap = {0};
 
     /* No endpoints at all reference this stream -- TC18's own bullet 2
-     * now correctly rejects this as RCP_CFG_INCONSISTENT. */
-    snap.endpoints            = NULL;
-    snap.endpoint_count       = 0;
-    snap.request_streams      = streams;
-    snap.request_stream_count = 1;
+     * now correctly rejects this as RCP_CFG_INCONSISTENT. response_stream_
+     * count is set so streams[0]'s own REQ-RMAP-049 check passes too --
+     * this test isolates the orphan bullet specifically, not a
+     * response_stream_index-out-of-range rejection getting there first. */
+    snap.endpoints             = NULL;
+    snap.endpoint_count        = 0;
+    snap.request_streams       = streams;
+    snap.request_stream_count  = 1;
+    snap.response_stream_count = 1;
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT, rcp_lifecycle_check_rcp_cfg(&snap));
 }
@@ -286,7 +290,7 @@ static void test_rcp_cfg_inconsistent_a_bound_endpoint_satisfies_bullet_two(void
 {
     rcp_lifecycle_endpoint_plausibility_t eps[1];
     rcp_lifecycle_request_stream_plausibility_t streams[1] = {
-        { true, true },
+        { true, true, 0 },
     };
     rcp_lifecycle_plausibility_snapshot_t snap = {0};
 
@@ -296,10 +300,11 @@ static void test_rcp_cfg_inconsistent_a_bound_endpoint_satisfies_bullet_two(void
     eps[0].has_stream_assoc     = true;
     eps[0].request_stream_index = 0;
 
-    snap.endpoints            = eps;
-    snap.endpoint_count       = 1;
-    snap.request_streams      = streams;
-    snap.request_stream_count = 1;
+    snap.endpoints             = eps;
+    snap.endpoint_count        = 1;
+    snap.request_streams       = streams;
+    snap.request_stream_count  = 1;
+    snap.response_stream_count = 1; /* REQ-RMAP-049: streams[0]'s own response_stream_index (0) is valid */
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK, rcp_lifecycle_check_rcp_cfg(&snap));
 }
@@ -311,8 +316,8 @@ static void test_rcp_cfg_inconsistent_catches_the_specific_orphaned_stream_among
 {
     rcp_lifecycle_endpoint_plausibility_t eps[1];
     rcp_lifecycle_request_stream_plausibility_t streams[2] = {
-        { true, true }, /* stream 0: bound below */
-        { true, true }, /* stream 1: configured, but nothing references it */
+        { true, true, 0 }, /* stream 0: bound below */
+        { true, true, 0 }, /* stream 1: configured, but nothing references it */
     };
     rcp_lifecycle_plausibility_snapshot_t snap = {0};
 
@@ -322,12 +327,73 @@ static void test_rcp_cfg_inconsistent_catches_the_specific_orphaned_stream_among
     eps[0].has_stream_assoc     = true;
     eps[0].request_stream_index = 0;
 
-    snap.endpoints            = eps;
-    snap.endpoint_count       = 1;
-    snap.request_streams      = streams;
-    snap.request_stream_count = 2;
+    snap.endpoints             = eps;
+    snap.endpoint_count        = 1;
+    snap.request_streams       = streams;
+    snap.request_stream_count  = 2;
+    snap.response_stream_count = 1; /* REQ-RMAP-049: both streams' own response_stream_index (0) is
+                                        valid -- isolates the orphan bullet this test targets */
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT, rcp_lifecycle_check_rcp_cfg(&snap));
+}
+
+/* REQ-RMAP-049 (issue #338): has_response_stream alone is not enough --
+ * a stream whose own response_stream_index doesn't name a real slot in
+ * snap->own response_stream_count space is still RCP_CFG_INCONSISTENT,
+ * even though bullet 2's old, weaker check (has_response_stream == true)
+ * would have accepted it. Isolates this specific rejection from the
+ * orphan-stream bullet above (this endpoint IS bound to the stream --
+ * request_stream_index correctly references it -- so only the new
+ * response_stream_index range check can be what fails here). */
+static void test_rcp_cfg_inconsistent_response_stream_index_out_of_range(void)
+{
+    rcp_lifecycle_endpoint_plausibility_t eps[1];
+    rcp_lifecycle_request_stream_plausibility_t streams[1] = {
+        { true, true, 1 }, /* response_stream_index 1 -- but response_stream_count is only 1 below,
+                               so the only real slot is index 0; 1 names nothing */
+    };
+    rcp_lifecycle_plausibility_snapshot_t snap = {0};
+
+    eps[0].ep_used              = true;
+    eps[0].hw_pin_mapped        = true;
+    eps[0].has_request_stream   = true;
+    eps[0].has_stream_assoc     = true;
+    eps[0].request_stream_index = 0;
+
+    snap.endpoints             = eps;
+    snap.endpoint_count        = 1;
+    snap.request_streams       = streams;
+    snap.request_stream_count  = 1;
+    snap.response_stream_count = 1;
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT, rcp_lifecycle_check_rcp_cfg(&snap));
+}
+
+/* The mirror-image positive case: response_stream_count widened to 2
+ * makes the identical streams[0].response_stream_index == 1 from the
+ * test above a real, valid slot -- proving the check is a genuine range
+ * comparison, not a disguised "must be 0" rule. */
+static void test_rcp_cfg_consistent_response_stream_index_within_range(void)
+{
+    rcp_lifecycle_endpoint_plausibility_t eps[1];
+    rcp_lifecycle_request_stream_plausibility_t streams[1] = {
+        { true, true, 1 },
+    };
+    rcp_lifecycle_plausibility_snapshot_t snap = {0};
+
+    eps[0].ep_used              = true;
+    eps[0].hw_pin_mapped        = true;
+    eps[0].has_request_stream   = true;
+    eps[0].has_stream_assoc     = true;
+    eps[0].request_stream_index = 0;
+
+    snap.endpoints             = eps;
+    snap.endpoint_count        = 1;
+    snap.request_streams       = streams;
+    snap.request_stream_count  = 1;
+    snap.response_stream_count = 2;
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK, rcp_lifecycle_check_rcp_cfg(&snap));
 }
 
 /* An endpoint with has_stream_assoc FALSE is never consulted for bullet
@@ -374,7 +440,7 @@ static void test_rcp_cfg_inconsistent_an_unused_endpoint_does_not_cover_a_stream
 {
     rcp_lifecycle_endpoint_plausibility_t eps[1];
     rcp_lifecycle_request_stream_plausibility_t streams[1] = {
-        { true, true }, /* configured, has_response_stream */
+        { true, true, 0 }, /* configured, has_response_stream, response_stream_index */
     };
     rcp_lifecycle_plausibility_snapshot_t snap = {0};
 
@@ -384,10 +450,12 @@ static void test_rcp_cfg_inconsistent_an_unused_endpoint_does_not_cover_a_stream
     eps[0].has_stream_assoc     = true; /* stale leftover value on an unused slot */
     eps[0].request_stream_index = 0;    /* matches streams[0] -- must NOT count */
 
-    snap.endpoints            = eps;
-    snap.endpoint_count       = 1;
-    snap.request_streams      = streams;
-    snap.request_stream_count = 1;
+    snap.endpoints             = eps;
+    snap.endpoint_count        = 1;
+    snap.request_streams       = streams;
+    snap.request_stream_count  = 1;
+    snap.response_stream_count = 1; /* REQ-RMAP-049: streams[0]'s own response_stream_index (0) is
+                                        valid -- isolates the ep_used-gate bullet this test targets */
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT, rcp_lifecycle_check_rcp_cfg(&snap));
 }
@@ -568,15 +636,16 @@ static void test_discovery_write_authority_survives_rcp_configured(void)
     rcp_stream_id_t       a     = rcp_stream_id_make(MAC_A, 1u);
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_HW_CONFIGURED;
     rcp_lifecycle_endpoint_plausibility_t eps[1]     = {{true, true, true, true}};
-    rcp_lifecycle_request_stream_plausibility_t rs[1] = {{true, true}};
+    rcp_lifecycle_request_stream_plausibility_t rs[1] = {{true, true, 0}};
     rcp_lifecycle_plausibility_snapshot_t snap;
     rcp_lifecycle_writer_ctx_t discovery = {false, false, false, true};
     rcp_lifecycle_writer_ctx_t root      = {true, false, false, false};
 
-    snap.endpoints            = eps;
-    snap.endpoint_count       = 1u;
-    snap.request_streams      = rs;
-    snap.request_stream_count = 1u;
+    snap.endpoints             = eps;
+    snap.endpoint_count        = 1u;
+    snap.request_streams       = rs;
+    snap.request_stream_count  = 1u;
+    snap.response_stream_count = 1u; /* REQ-RMAP-049: rs[0]'s own response_stream_index (0) is valid */
 
     rcp_discovery_claim_init(&claim, 20u);
     rcp_discovery_claim_note_request(&claim, a, 1000u);
@@ -1577,6 +1646,8 @@ int main(void)
     RUN_TEST(test_rcp_cfg_inconsistent_catches_an_orphaned_stream);
     RUN_TEST(test_rcp_cfg_inconsistent_a_bound_endpoint_satisfies_bullet_two);
     RUN_TEST(test_rcp_cfg_inconsistent_catches_the_specific_orphaned_stream_among_several);
+    RUN_TEST(test_rcp_cfg_inconsistent_response_stream_index_out_of_range);
+    RUN_TEST(test_rcp_cfg_consistent_response_stream_index_within_range);
     RUN_TEST(test_rcp_cfg_inconsistent_ignores_stream_index_without_stream_assoc);
     RUN_TEST(test_rcp_cfg_inconsistent_an_unused_endpoint_does_not_cover_a_stream);
     RUN_TEST(test_hw_unconfigured_admission_ignores_claimant_but_writes_still_gated);

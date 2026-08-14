@@ -199,6 +199,43 @@ typedef struct {
 typedef struct {
     bool configured;          /* this request stream slot is configured */
     bool has_response_stream; /* an associated response stream exists */
+    size_t response_stream_index; /* REQ-RMAP-049 (issue #338): which
+                                 snap->own response_stream_count-space
+                                 slot this stream's own has_response_
+                                 stream refers to -- meaningless while
+                                 has_response_stream is false. This is
+                                 rx_resp_stream_index's real-slot
+                                 counterpart, the caller-supplied cross-
+                                 reference REQ-RMAP-049's own "STILL
+                                 PARTIAL" text named as missing: knowing
+                                 SOME response stream exists
+                                 (has_response_stream) is not the same as
+                                 knowing it names a real, present one.
+                                 0-based direct indexing, the SAME
+                                 translation rcp_lifecycle_endpoint_
+                                 plausibility_t's own request_stream_index
+                                 field already establishes (REQ-LIFECYCLE-
+                                 038) -- deliberately NOT rx_resp_stream_
+                                 index's own 1-based/0-sentinel wire
+                                 encoding (regmap.h); a caller building
+                                 this snapshot from a live register map
+                                 performs that translation itself (e.g.
+                                 rx_resp_stream_index - 1 once it has
+                                 already confirmed rx_resp_stream_index is
+                                 nonzero), the same way it already must
+                                 for request_stream_index. Placed as this
+                                 struct's own LAST field, matching that
+                                 same established convention, so every
+                                 existing positional-initializer test call
+                                 site keeps compiling unchanged -- a
+                                 brace-list initializer shorter than this
+                                 struct's own field count zero-initializes
+                                 this trailing field, and 0 is a safe
+                                 default only when has_response_stream is
+                                 also left false (the same "only matters
+                                 when the sibling bool is true" caveat
+                                 request_stream_index's own field comment
+                                 already states). */
 } rcp_lifecycle_request_stream_plausibility_t;
 
 /* A read-only view over every endpoint and request stream slot, passed to
@@ -209,6 +246,19 @@ typedef struct {
     size_t                                     endpoint_count;
     const rcp_lifecycle_request_stream_plausibility_t *request_streams;
     size_t                                           request_stream_count;
+    size_t response_stream_count; /* REQ-RMAP-049 (issue #338): how many
+                                 real response/ack-queue slots exist --
+                                 the space rcp_lifecycle_request_stream_
+                                 plausibility_t's own new response_stream_
+                                 index field (above) is validated against.
+                                 Placed as this struct's own LAST field for
+                                 the same positional-initializer-
+                                 compatibility reason as that field; a
+                                 4-value legacy initializer (e.g. this
+                                 codebase's own EMPTY_SNAP test constants)
+                                 zero-initializes it, matching
+                                 response_stream_count == 0's own correct
+                                 meaning ("no response streams exist"). */
 } rcp_lifecycle_plausibility_snapshot_t;
 
 /* The HW_CFG_INCONSISTENT plausibility check: returns RCP_LIFECYCLE_OK iff
@@ -236,7 +286,17 @@ rcp_lifecycle_errc_t rcp_lifecycle_check_hw_cfg(const rcp_lifecycle_plausibility
  * unused stream slot). rcp_lifecycle_endpoint_plausibility_t's own new
  * request_stream_index field (see that struct's own declaration, above)
  * is the caller-supplied cross-reference this check needed and did not
- * have before this fix. */
+ * have before this fix.
+ *
+ * WIDENED 2026-08-13 (issue #338, REQ-RMAP-049): check (2) above now also
+ * requires that a stream's own response_stream_index (rcp_lifecycle_
+ * request_stream_plausibility_t's own new field, see that struct's own
+ * declaration above) actually names a real response-stream slot --
+ * response_stream_index < snap->response_stream_count -- not merely that
+ * has_response_stream is set. REQ-RMAP-049's own text named this the
+ * still-open half of its own gap: has_response_stream alone only proves
+ * SOME association was recorded, not that rx_resp_stream_index resolves
+ * to a response/ack queue that actually exists. */
 rcp_lifecycle_errc_t rcp_lifecycle_check_rcp_cfg(const rcp_lifecycle_plausibility_snapshot_t *snap);
 
 /* Identifies who is attempting a write -- a functional-config write (the

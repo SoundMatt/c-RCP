@@ -43,6 +43,7 @@ rcp_lifecycle_errc_t rcp_lifecycle_check_hw_cfg(const rcp_lifecycle_plausibility
 //cfusa:req REQ-LIFECYCLE-006
 //cfusa:req REQ-LIFECYCLE-007
 //cfusa:req REQ-LIFECYCLE-038
+//cfusa:req REQ-RMAP-049
 rcp_lifecycle_errc_t rcp_lifecycle_check_rcp_cfg(const rcp_lifecycle_plausibility_snapshot_t *snap)
 {
     size_t i;
@@ -63,6 +64,16 @@ rcp_lifecycle_errc_t rcp_lifecycle_check_rcp_cfg(const rcp_lifecycle_plausibilit
 
         if (!rs->configured) continue;
         if (!rs->has_response_stream) return RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT;
+
+        /* REQ-RMAP-049 (issue #338): has_response_stream alone only
+         * proves SOME association was recorded, not that it names a
+         * response stream that actually exists -- response_stream_index
+         * must also be a real slot in snap->own response_stream_count
+         * space (0-based, the same rcp_lifecycle_endpoint_plausibility_t
+         * request_stream_index translation convention, REQ-LIFECYCLE-
+         * 038 -- see that field's own doc comment, lifecycle.h). */
+        if (rs->response_stream_index >= snap->response_stream_count)
+            return RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT;
 
         /* REQ-LIFECYCLE-038: TC18 §12.3.1.2's third bullet -- a
          * configured stream with no endpoint referencing it (an

@@ -130,8 +130,8 @@ static void test_rcp_cfg_consistent_when_satisfied(void)
         { true, true, true, true },
     };
     rcp_lifecycle_request_stream_plausibility_t streams[2] = {
-        { true, true },
-        { false, false }, /* not configured -- ignored */
+        { true, true, 0 }, /* response_stream_index 0 -- names snap's own slot 0 below */
+        { false, false, 0 }, /* not configured -- ignored */
     };
     rcp_lifecycle_plausibility_snapshot_t snap = {0};
 
@@ -139,6 +139,7 @@ static void test_rcp_cfg_consistent_when_satisfied(void)
     snap.endpoint_count        = 1;
     snap.request_streams       = streams;
     snap.request_stream_count  = 2;
+    snap.response_stream_count = 1; /* REQ-RMAP-049: streams[0]'s own response_stream_index (0) is valid */
 
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK, rcp_lifecycle_check_rcp_cfg(&snap));
 }
@@ -156,12 +157,13 @@ static rcp_lifecycle_plausibility_snapshot_t plausible_snapshot(rcp_lifecycle_en
     rcp_lifecycle_plausibility_snapshot_t snap = {0};
 
     *ep = (rcp_lifecycle_endpoint_plausibility_t){ true, true, true, true };
-    *rs = (rcp_lifecycle_request_stream_plausibility_t){ true, true };
+    *rs = (rcp_lifecycle_request_stream_plausibility_t){ true, true, 0 };
 
-    snap.endpoints            = ep;
-    snap.endpoint_count       = 1;
-    snap.request_streams      = rs;
-    snap.request_stream_count = 1;
+    snap.endpoints             = ep;
+    snap.endpoint_count        = 1;
+    snap.request_streams       = rs;
+    snap.request_stream_count  = 1;
+    snap.response_stream_count = 1; /* REQ-RMAP-049: rs's own response_stream_index (0) is valid */
     return snap;
 }
 

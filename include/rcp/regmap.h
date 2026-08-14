@@ -1090,13 +1090,21 @@ rcp_lifecycle_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map
  *      RC Server -- modeling them would require silently picking a side
  *      of a stated, unresolved spec self-contradiction. rcp_regmap_svr_ep_cfg_t
  *      below models ONLY the two fields free of both defects above:
- *      svr_discovery_timeout and svr_ep_status -- neither collides with
- *      an already-elsewhere-modeled field (svr_root_client_index/
- *      svr_lifecycle_state are already correctly modeled at their own,
- *      uncontested Table 20 addresses -- REQ-RMAP-038/023 -- so this
- *      struct deliberately does NOT duplicate them under this table's
- *      own disputed local addressing), and neither depends on resolving
- *      contradiction #2. */
+ *      svr_discovery_timeout and svr_ep_status -- CORRECTION (was wrong
+ *      until this fix, caught investigating REQ-RMAP-023): svr_root_
+ *      client_index/svr_lifecycle_state are NOT "already correctly
+ *      modeled at their own, uncontested Table 20 addresses" -- see
+ *      rcp_regmap_general_render()'s own doc comment above (near
+ *      RCP_REGMAP_GENERAL_LEN): Table 20 has no address for either
+ *      field at all, and rcp_regmap_general_t only carries them as an
+ *      in-process convenience placement, deliberately excluded from
+ *      that struct's own Table 20 wire image (REQ-RMAP-023's own gap
+ *      is exactly this -- it stays open, not closed elsewhere). This
+ *      struct still doesn't duplicate them here, but the real reason is
+ *      that doing so would just be a second, no-better-justified guess
+ *      at their true Table 33/36 address on top of contradiction #2
+ *      above, not that a correct home already exists for them
+ *      elsewhere. */
 
 /* REQ-RMAP-066/067 (content-modeling scope only -- see the section note
  * above for what is deliberately excluded and why). svr_discovery_timeout

@@ -756,19 +756,14 @@ static void test_i2c_payload_address_carried_verbatim(void)
 
 /* ── PWM endpoints (TC18 13.7.5 / 13.7.6) ─────────────────────────────────── */
 
-/* REQ-PWM-055 (partial) DEVIATION PIN: TC18 13.7.5.1 generates PWM_OUT
- * trigger signals from the SKEW-DELAYED output (the break-before-make
- * provision for half/full-bridge drivers) and fires the mid-active-pulse
- * trigger even at 0% duty cycle. c-RCP's trigger evaluation is a pure
- * selector-vs-event match taking neither the skew register nor the duty
- * cycle as an input, so pwmo_skew is stored and never consulted. */
-static void test_pwm_out_trigger_gaps(void)
+/* REQ-PWM-055 CLOSED (issue #338): rcp_ep_pwm_out_trigger_fires() is
+ * still a pure selector-vs-event match, unchanged -- but it is no longer
+ * this module's ONLY trigger primitive. rcp_ep_pwm_out_trigger_events_at_
+ * tick() (below) is the new phase-tracking primitive that derives WHICH
+ * event(s) actually occur at a given clock tick, closing both of TC18
+ * §13.7.5.1's own rules this deviation used to pin. */
+static void test_pwm_out_trigger_fires_is_a_pure_selector(void)
 {
-    rcp_ep_pwm_out_functional_cfg_t cfg;
-
-    rcp_ep_pwm_out_functional_cfg_init(&cfg);
-    cfg.skew = 0x2Au;
-
     TEST_ASSERT_TRUE(rcp_ep_pwm_out_trigger_fires(RCP_EP_PWM_OUT_TRIGGER_MID_PULSE,
                                                   RCP_EP_PWM_OUT_EVENT_MID_PULSE));
     TEST_ASSERT_FALSE(rcp_ep_pwm_out_trigger_fires(RCP_EP_PWM_OUT_TRIGGER_MID_PULSE,
@@ -777,7 +772,83 @@ static void test_pwm_out_trigger_gaps(void)
                                                   RCP_EP_PWM_OUT_EVENT_DONE));
     TEST_ASSERT_FALSE(rcp_ep_pwm_out_trigger_fires(RCP_EP_PWM_OUT_TRIGGER_NONE,
                                                    RCP_EP_PWM_OUT_EVENT_DONE));
-    TEST_ASSERT_EQUAL_UINT8(0x2Au, cfg.skew); /* held, never consulted above */
+}
+
+/* REQ-PWM-055 rule 1 (TC18 §13.7.5.1: "For trigger signal generation the
+ * delayed signal is used"): with skew == 0, the delayed edge coincides
+ * with the undelayed one, so CYCLE_START fires at raw_tick == 0 exactly
+ * as a naive, skew-unaware implementation would already expect. */
+static void test_pwm_out_trigger_events_zero_skew_matches_undelayed_edge(void)
+{
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_PWM_OUT_TRIGGER_EVENT_CYCLE_START,
+                            rcp_ep_pwm_out_trigger_events_at_tick(20u, 10u, 0u, 0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_ep_pwm_out_trigger_events_at_tick(20u, 10u, 0u, 1u));
+}
+
+/* REQ-PWM-055 rule 1, the actual skew case this deviation used to pin:
+ * with skew == 5, the delayed edge is 5 ticks LATER than the undelayed
+ * source edge -- CYCLE_START must NOT fire at raw_tick == 0 (that's still
+ * the undelayed edge), only at raw_tick == skew. */
+static void test_pwm_out_trigger_events_nonzero_skew_delays_cycle_start(void)
+{
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_ep_pwm_out_trigger_events_at_tick(20u, 10u, 5u, 0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_ep_pwm_out_trigger_events_at_tick(20u, 10u, 5u, 4u));
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_PWM_OUT_TRIGGER_EVENT_CYCLE_START,
+                            rcp_ep_pwm_out_trigger_events_at_tick(20u, 10u, 5u, 5u));
+}
+
+/* Skew wraps modulo period rather than being applied verbatim -- an
+ * 8-bit skew register (0-255) can legally exceed a small period. */
+static void test_pwm_out_trigger_events_skew_wraps_modulo_period(void)
+{
+    /* period 20, skew 25 -> skew_mod 5, same delayed edge as skew == 5. */
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_PWM_OUT_TRIGGER_EVENT_CYCLE_START,
+                            rcp_ep_pwm_out_trigger_events_at_tick(20u, 10u, 25u, 5u));
+}
+
+/* MID_PULSE fires at active_duration/2 ticks past the delayed cycle
+ * start, distinct from CYCLE_START for a genuine nonzero active phase. */
+static void test_pwm_out_trigger_events_mid_pulse_at_half_active_duration(void)
+{
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_ep_pwm_out_trigger_events_at_tick(20u, 10u, 0u, 4u));
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_PWM_OUT_TRIGGER_EVENT_MID_PULSE,
+                            rcp_ep_pwm_out_trigger_events_at_tick(20u, 10u, 0u, 5u));
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_ep_pwm_out_trigger_events_at_tick(20u, 10u, 0u, 6u));
+}
+
+/* REQ-PWM-055 rule 2 (Table 45: "in the middle of the active pulse (even
+ * in case duty cycle is 0%)"): active_duration == 0 does NOT suppress
+ * MID_PULSE -- it fires alongside CYCLE_START, both OR'd into the same
+ * tick's own return value, not dropped as a degenerate "no active phase"
+ * case. */
+static void test_pwm_out_trigger_events_mid_pulse_fires_at_zero_duty_cycle(void)
+{
+    uint8_t events = rcp_ep_pwm_out_trigger_events_at_tick(20u, 0u, 0u, 0u);
+
+    TEST_ASSERT_TRUE((events & RCP_EP_PWM_OUT_TRIGGER_EVENT_CYCLE_START) != 0);
+    TEST_ASSERT_TRUE((events & RCP_EP_PWM_OUT_TRIGGER_EVENT_MID_PULSE)   != 0);
+    TEST_ASSERT_EQUAL_UINT8(
+        RCP_EP_PWM_OUT_TRIGGER_EVENT_CYCLE_START | RCP_EP_PWM_OUT_TRIGGER_EVENT_MID_PULSE, events);
+}
+
+/* period == 0 (RCP_EP_PWM_OUT_GEN_STOPPED) yields no trigger events at
+ * all, regardless of raw_tick -- a stopped generator has no cycle to
+ * derive a phase within. */
+static void test_pwm_out_trigger_events_stopped_generator_yields_nothing(void)
+{
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_ep_pwm_out_trigger_events_at_tick(0u, 0u, 0u, 0u));
+    TEST_ASSERT_EQUAL_UINT8(0u, rcp_ep_pwm_out_trigger_events_at_tick(0u, 0u, 5u, 100u));
+}
+
+/* raw_tick wraps modulo period the same way skew does -- a caller free-
+ * running a tick counter across many cycles still gets the same
+ * per-cycle answer every time around. */
+static void test_pwm_out_trigger_events_raw_tick_wraps_modulo_period(void)
+{
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_PWM_OUT_TRIGGER_EVENT_CYCLE_START,
+                            rcp_ep_pwm_out_trigger_events_at_tick(20u, 10u, 0u, 20u));
+    TEST_ASSERT_EQUAL_UINT8(RCP_EP_PWM_OUT_TRIGGER_EVENT_CYCLE_START,
+                            rcp_ep_pwm_out_trigger_events_at_tick(20u, 10u, 0u, 40u));
 }
 
 /* FIXED 2026-08-12 (issue #201, REQ-PWM-056): TC18 13.7.5.2 Table 43
@@ -1643,7 +1714,14 @@ int main(void)
     RUN_TEST(test_i2c_mode_presets_and_register_block);
     RUN_TEST(test_i2c_payload_address_carried_verbatim);
 
-    RUN_TEST(test_pwm_out_trigger_gaps);
+    RUN_TEST(test_pwm_out_trigger_fires_is_a_pure_selector);
+    RUN_TEST(test_pwm_out_trigger_events_zero_skew_matches_undelayed_edge);
+    RUN_TEST(test_pwm_out_trigger_events_nonzero_skew_delays_cycle_start);
+    RUN_TEST(test_pwm_out_trigger_events_skew_wraps_modulo_period);
+    RUN_TEST(test_pwm_out_trigger_events_mid_pulse_at_half_active_duration);
+    RUN_TEST(test_pwm_out_trigger_events_mid_pulse_fires_at_zero_duty_cycle);
+    RUN_TEST(test_pwm_out_trigger_events_stopped_generator_yields_nothing);
+    RUN_TEST(test_pwm_out_trigger_events_raw_tick_wraps_modulo_period);
     RUN_TEST(test_pwm_out_duty_cap);
     RUN_TEST(test_pwm_out_generation_state);
     RUN_TEST(test_pwm_out_request_semantics_are_verbatim_setpoints);

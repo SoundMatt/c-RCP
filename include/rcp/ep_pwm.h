@@ -430,6 +430,53 @@ typedef enum {
  * RCP_EP_PWM_OUT_EVENT_DONE. */
 bool rcp_ep_pwm_out_trigger_fires(rcp_ep_pwm_out_trigger_t trigger, rcp_ep_pwm_out_event_t event);
 
+/* REQ-PWM-055 (TC18 §13.7.5.1, Table 45): the two rules
+ * rcp_ep_pwm_out_trigger_fires() above cannot itself provide -- it only
+ * classifies an ALREADY-KNOWN event against a configured trigger mode; it
+ * has no notion of cycle timing at all. This function derives WHICH of
+ * the two per-cycle events (CYCLE_START, MID_PULSE) actually occur at a
+ * given elapsed clock-source tick, honoring both TC18 rules this
+ * codebase previously did not implement:
+ *
+ * (1) "For trigger signal generation the delayed signal is used" --
+ * pwmo_skew (regmap's own skew field, ep_functional_cfg_t.skew) delays
+ * PWM_out/PWM_outn's own rising edge by skew clock ticks for
+ * break-before-make half/full-bridge support (TC18 §13.7.5.1's own
+ * text); trigger timing tracks that DELAYED edge, not the undelayed
+ * source edge raw_tick is measured from. This function performs that
+ * translation itself so no caller has to.
+ *
+ * (2) "in the middle of the active pulse (even in case duty cycle is
+ * 0%)" (Table 45's own event 2 row) -- MID_PULSE is evaluated
+ * unconditionally at active_duration/2 ticks past the delayed cycle
+ * start, including active_duration == 0, where this naturally
+ * coincides with CYCLE_START itself (both fire together) rather than
+ * being suppressed as a "no active phase" special case.
+ *
+ * raw_tick is the elapsed PWM-source-clock tick count since the
+ * UNDELAYED/primary cycle's own rising edge, 0-based and wrapping at
+ * period (a caller already tracking hardware/simulated PWM phase passes
+ * raw_tick % period itself; this function does not wrap an out-of-range
+ * value for the caller). period == 0 (RCP_EP_PWM_OUT_GEN_STOPPED, see
+ * rcp_ep_pwm_out_generation_state()) yields 0 (no bits) unconditionally
+ * -- a stopped generator has no cycle to derive a phase within.
+ *
+ * Returns an OR of RCP_EP_PWM_OUT_TRIGGER_EVENT_CYCLE_START /
+ * _MID_PULSE, whichever fire at this exact tick (0 if neither). Table
+ * 45's own event 0 ("PWM request exec done") -- RCP_EP_PWM_OUT_EVENT_DONE
+ * -- is deliberately NOT derived here: nothing in TC18's own text ties it
+ * to cycle timing or the skewed signal at all; it stays the one-shot,
+ * caller-driven signal rcp_ep_pwm_out_trigger_fires() already models via
+ * that event value. A caller composes this function's own output with
+ * rcp_ep_pwm_out_trigger_fires(cfg->trigger, event) per set bit, the same
+ * evaluate-then-classify layering rcp_ep_adc_trigger_evaluate() (ep_adc.h)
+ * already establishes for a different endpoint type. */
+#define RCP_EP_PWM_OUT_TRIGGER_EVENT_CYCLE_START ((uint8_t)0x01u)
+#define RCP_EP_PWM_OUT_TRIGGER_EVENT_MID_PULSE   ((uint8_t)0x02u)
+
+uint8_t rcp_ep_pwm_out_trigger_events_at_tick(uint16_t period, uint16_t active_duration,
+                                               uint8_t skew, uint32_t raw_tick);
+
 /* ── PWM_OUT: functional config ─────────────────────────────────────────────── */
 
 /* The PWM_OUT endpoint's functional config: regmap.h's shared prefix
