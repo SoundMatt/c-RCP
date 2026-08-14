@@ -994,14 +994,31 @@ static void apply_cancellation(rcp_mock_endpoint_slot_t *slot, uint8_t request_t
  * every outcome except the rejection paths that determined a specific
  * TC18 Table 30 code (see that function's own doc comment for which
  * paths currently do). When non-RCP_ERROR_NONE, out_response is
- * populated with a real TC18 sec 12.9.6 error response
- * (rcp_acf_build_error_response()) instead of being left zeroed --
- * byte_bus_id is this endpoint's own address (already known to the
- * caller, which routed to this slot by it); transaction_num is read
- * back out of the request frame's own header via
- * rcp_acf_unpack_header(), which populates it correctly regardless of
- * mtv/request-type repurposing (transaction_num is not part of the
- * repurposed region). */
+ * populated (instead of being left zeroed) with TC18 §11.3.1's
+ * Acknowledge-shaped storage-admission-rejection response
+ * (rcp_acf_build_acknowledge_rejected_response(), evt=0xF/err=1) -- NOT
+ * the §11.3.4 Error Response (rcp_acf_build_error_response()) other
+ * REJECTED-shaped call sites in this file use, since RCP_SERVER_ADMIT_
+ * REJECTED specifically means the request was never filed into EP
+ * request storage at all (issue #430, REQ-ACF-033) -- byte_bus_id is
+ * this endpoint's own address (already known to the caller, which
+ * routed to this slot by it); transaction_num is read back out of the
+ * request frame's own header via rcp_acf_unpack_header(), which
+ * populates it correctly regardless of mtv/request-type repurposing
+ * (transaction_num is not part of the repurposed region).
+ *
+ * A side effect worth flagging for a future reader: dispatch_plain()'s
+ * own suppress_response_per_stream_cfg() (REQ-RMAP-048/049) classifies
+ * *out_response via rcp_acf_classify_response() to decide which of
+ * Table 24's two routing pointers governs it -- and this function's own
+ * response now genuinely classifies as RCP_ACF_RESP_ACKNOWLEDGE (it did
+ * not before this fix), so it is now governed by rx_ack_stream_index
+ * (TC18-defined power-on default 0, "no acknowledge is to be sent"),
+ * not rx_resp_stream_index (power-on default 1) the way the sibling
+ * §11.3.4 Error Response path is. A caller/test that wants to actually
+ * observe this response on the wire must configure rx_ack_stream_index
+ * to a nonzero value for the resolved request stream -- exactly as TC18
+ * itself requires for any other Acknowledge-classified response. */
 static rcp_mock_dispatch_result_t finish_admission(rcp_mock_endpoint_slot_t *slot,
                                                     rcp_server_admit_t admit, uint8_t request_type,
                                                     const uint8_t *request, size_t request_len,
@@ -1022,11 +1039,20 @@ static rcp_mock_dispatch_result_t finish_admission(rcp_mock_endpoint_slot_t *slo
         return RCP_MOCK_DISPATCH_CANCELLED;
     case RCP_SERVER_ADMIT_REJECTED:
     default:
+        /* TC18 §11.3.1, not §11.3.4: RCP_SERVER_ADMIT_REJECTED means the
+         * request was never filed into EP request storage at all ("Nothing
+         * was stored and nothing is to be executed" -- see
+         * rcp_server_admit_t's own doc comment). §11.3.1's own Acknowledge
+         * shape (evt=0xF, err=1) is the response TC18 defines for exactly
+         * this case -- distinct from the §11.3.4 Error Response
+         * (rcp_acf_build_error_response(), evt=0, err=1) used elsewhere in
+         * this file for a request that WAS filed but whose later execution
+         * failed (issue #430, REQ-ACF-033). */
         if (error != RCP_ERROR_NONE) {
             rcp_acf_byte_message_info_t hdr = {0};
             if (request_len >= 8 && rcp_acf_unpack_header(request, &hdr) == RCP_ACF_OK) {
-                *out_response =
-                    rcp_acf_build_error_response(byte_bus_id, hdr.transaction_num, error);
+                *out_response = rcp_acf_build_acknowledge_rejected_response(
+                    byte_bus_id, hdr.transaction_num, error);
             }
         }
         return RCP_MOCK_DISPATCH_REJECTED;

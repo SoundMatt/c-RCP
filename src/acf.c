@@ -322,6 +322,28 @@ rcp_bytes_t rcp_acf_build_acknowledge_response(rcp_byte_bus_id_t byte_bus_id,
     return rcp_acf_encode_abb(&hdr, NULL, 0);
 }
 
+//cfusa:req REQ-ACF-033
+rcp_bytes_t rcp_acf_build_acknowledge_rejected_response(rcp_byte_bus_id_t byte_bus_id,
+                                                          uint8_t transaction_num,
+                                                          rcp_wire_error_t error_code)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    uint8_t                     payload = (uint8_t)error_code;
+
+    hdr.byte_bus_id     = byte_bus_id;
+    hdr.transaction_num = transaction_num;
+    hdr.evt             = RCP_ACF_EVT_ACKNOWLEDGE;
+    hdr.op              = RCP_ACF_OP_NONE;
+    hdr.rsp             = 1; /* TC18.txt:1885 -- rsp=1b identifies a response */
+    hdr.err             = 1; /* TC18 §11.3.1: "err = 1 indicates that the
+                               * request has been rejected." -- distinct
+                               * from rcp_acf_build_error_response()'s
+                               * §11.3.4 shape; see this function's own
+                               * doc comment in acf.h. */
+
+    return rcp_acf_encode_abb(&hdr, &payload, 1);
+}
+
 //cfusa:req REQ-ACF-004
 //cfusa:req REQ-ACF-006
 //cfusa:req REQ-ACF-014

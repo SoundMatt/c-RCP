@@ -19106,6 +19106,61 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.356.0 -- 2026-08-14 (REQ-ACF-033: rcp_acf_build_acknowledge_rejected_response()
+closes the missing TC18 §11.3.1 storage-admission-rejection shape)
+
+Real conformance gap fix (issue #430). TC18 §11.3.1 defines a distinct
+Acknowledge-shaped rejection response (`evt[3:0]=0xF`, `err=1`,
+`byte_msg_payload`=error code) for a request rejected before ever being
+filed into EP request storage -- "err = 1 indicates that the request
+has been rejected. The byte_msg_payload contains an error code" --
+separate from §11.3.4's Error Response (`evt[3:0]<0x9`, `err=1`), which
+covers execution failure of a request already filed. No code path
+built the former: `rcp_acf_build_acknowledge_response()` (`src/acf.c`)
+hardcoded `err=0` and took no `error_code` parameter, and
+`finish_admission()`'s `REJECTED` case (`src/mock.c`) always called
+`rcp_acf_build_error_response()` -- the §11.3.4 shape -- even for
+`RCP_SERVER_ADMIT_REJECTED` outcomes (request-store full, an
+undecodable conditional request, a reserved compound-wait `evt`) that
+`rcp_server_admit_t`'s own doc comment defines as "nothing was stored
+and nothing is to be executed."
+
+New `rcp_acf_build_acknowledge_rejected_response(byte_bus_id,
+transaction_num, error_code)` (`acf.h`/`acf.c`) builds the correct
+shape (`evt=RCP_ACF_EVT_ACKNOWLEDGE`, `err=1`, one-octet payload),
+added alongside the existing builders rather than changing either
+signature, matching this codebase's established non-breaking-extension
+convention. `finish_admission()`'s `REJECTED` case now calls it
+specifically for storage-admission rejections; every post-admission
+execution-failure call site elsewhere in `mock.c` (chained-member
+`CHAIN_ERROR`, clear-single `REQUEST_NOT_FOUND`, the sequencer-access-
+control admit-then-cancel path, etc.) is unchanged and still correctly
+uses `rcp_acf_build_error_response()`.
+
+One genuine, spec-conformant interaction this surfaces: `dispatch_
+plain()`'s own `suppress_response_per_stream_cfg()` (REQ-RMAP-048/049)
+now correctly classifies this response as `RCP_ACF_RESP_ACKNOWLEDGE`
+and gates it by `rx_ack_stream_index` (TC18 power-on default 0, "no
+acknowledge is to be sent") instead of `rx_resp_stream_index` (power-on
+default 1) -- not a regression, but the same routing rule TC18 already
+applies to every Acknowledge-classified response. `tests/test_
+conditional_dispatch.c`'s own `test_compound_wait_reserved_evt_sends_
+acknowledge_rejected_response()` (renamed and rewritten from its
+pre-fix form, which used to pin the wrong §11.3.4 shape as correct)
+proves this end to end, configuring `rx_ack_stream_index` on its
+fixture so the response is observable; two new `tests/test_acf.c` unit
+tests exercise the new builder directly and pin its distinction from
+`rcp_acf_build_error_response()`.
+
+Mutation-tested: reverting only the `finish_admission()` call-site
+change (test left in place) makes the updated test fail (`Expected 0
+Was 3`, i.e. `RCP_ACF_RESP_ERROR` where `RCP_ACF_RESP_ACKNOWLEDGE` was
+expected); restoring the fix passes again. Full 66-test suite +
+ASan/UBSan clean; `cfusa check`/`trace` (v0.5.54): 0 errors, 1077/1077
+traced and tested. `.fusa-reqs.json`: new `REQ-ACF-033` (`implemented`,
+ASIL-B, `tc18` scope) -- 1077 total.
+
+**Next**: remaining issues in the #420-434 audit range.
 ### v0.355.0 -- 2026-08-14 (GPIO/PWM_OUT evt=100b UNSUPPORTED_CMD, PWM_OUT
 wire-error mapping, PWM_IN MAX_PERIOD behavior, NAND/AND doc note)
 

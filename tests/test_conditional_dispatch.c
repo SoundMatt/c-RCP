@@ -22,6 +22,7 @@
 //cfusa:test REQ-SRV-021
 //cfusa:test REQ-SRV-022
 //cfusa:test REQ-ACF-031
+//cfusa:test REQ-ACF-033
 //cfusa:test REQ-MOCK-028
 //cfusa:test REQ-MOCK-029
 //cfusa:test REQ-CANCEL-012
@@ -551,21 +552,57 @@ static void test_compound_wait_reserved_evt_is_rejected_at_admission(void)
     rcp_mock_server_destroy(srv);
 }
 
-/* TC18 §12.9.6: "The error response shall contain the byte_bus_id and
- * transaction number of the request. The error response shall contain a
- * byte_msg_payload with an error code." Extends the rejection test above
- * to check the actual wire bytes, not just the dispatch-result enum --
- * this is the one rejection path github.com/SoundMatt/c-RCP/issues/163
- * currently wires end to end. */
-static void test_compound_wait_reserved_evt_sends_unsupported_cmd_error_response(void)
+/* TC18 §11.3.1, not §11.3.4 (issue #430, REQ-ACF-033): a reserved
+ * compound-wait evt is rejected by rcp_server_endpoint_admit() itself
+ * (RCP_SERVER_ADMIT_REJECTED, *out_error = RCP_ERROR_UNSUPPORTED_CMD)
+ * BEFORE the request is ever filed into EP request storage -- exactly
+ * the case §11.3.1 reserves its own Acknowledge-shaped rejection for
+ * ("evt[3:0] = 0xF... err = 1 indicates that the request has been
+ * rejected. The byte_msg_payload contains an error code"), not the
+ * §11.3.4 Error Response shape (evt[3:0] < 0x9, err = 1) that shape is
+ * reserved for a request already filed whose later execution fails.
+ * FIXED 2026-08-14 (issue #430): this test used to assert the §11.3.4
+ * shape (RCP_ACF_RESP_ERROR, evt = 0) here -- that was itself the bug
+ * this fix closes; finish_admission()'s REJECTED case (src/mock.c) now
+ * calls rcp_acf_build_acknowledge_rejected_response() instead of
+ * rcp_acf_build_error_response() for exactly this "never filed"
+ * scenario. Still checks the actual wire bytes, not just the
+ * dispatch-result enum -- this is the one rejection path
+ * github.com/SoundMatt/c-RCP/issues/163 currently wires end to end.
+ *
+ * Also re-points fixture()'s own request-stream config: as of this fix
+ * the response genuinely classifies as RCP_ACF_RESP_ACKNOWLEDGE (it did
+ * not before), so it is now, correctly, subject to dispatch_plain()'s
+ * own suppress_response_per_stream_cfg() (REQ-RMAP-048) being gated by
+ * rx_ack_stream_index -- whose TC18-defined power-on default is 0, "no
+ * acknowledge is to be sent" -- rather than rx_resp_stream_index (power-
+ * on default 1) the way the old, misclassified §11.3.4 shape was. A
+ * conformant RC Client that wants this response delivered configures
+ * rx_ack_stream_index to a real stream, exactly as this test now does;
+ * see finish_admission()'s own doc comment (src/mock.c) for the same
+ * point made from the production-code side. */
+static void test_compound_wait_reserved_evt_sends_acknowledge_rejected_response(void)
 {
-    handler_log_t                log;
-    rcp_mock_server_t           *srv = fixture(&log);
-    rcp_compound_step_t          step = {0};
-    rcp_bytes_t                  frame, resp = {0};
-    rcp_acf_byte_message_info_t  hdr;
-    const uint8_t                *payload;
-    size_t                        payload_len;
+    handler_log_t                    log;
+    rcp_mock_server_t               *srv = fixture(&log);
+    rcp_compound_step_t              step = {0};
+    rcp_bytes_t                      frame, resp = {0};
+    rcp_acf_byte_message_info_t      hdr;
+    const uint8_t                    *payload;
+    size_t                            payload_len;
+    rcp_regmap_request_stream_cfg_t  stream_cfg[1];
+
+    /* fixture() already configured stream_cfg[0] (rx_stream_id=1) for
+     * REQ-SEQ-013's own sequencer-ownership fixture, with
+     * rx_ack_stream_index left at its TC18-defined zero (suppress)
+     * default; refresh it here with rx_ack_stream_index also set, same
+     * "keep rx_stream_id unchanged" technique
+     * test_overflow_on_one_endpoint_broadcasts_safe_state_to_stream_
+     * siblings() below already established. */
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id       = 1u;
+    stream_cfg[0].rx_ack_stream_index = 1u;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
 
     step.start_state = RCP_SEQUENCER_POWER_ON_STATE;
     step.next_state    = 1;
@@ -581,7 +618,8 @@ static void test_compound_wait_reserved_evt_sends_unsupported_cmd_error_response
 
     TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(resp.data, resp.len, &hdr, &payload,
                                                       &payload_len));
-    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&hdr));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ACKNOWLEDGE, rcp_acf_classify_response(&hdr));
+    TEST_ASSERT_EQUAL_UINT8(RCP_ACF_EVT_ACKNOWLEDGE, hdr.evt);
     TEST_ASSERT_EQUAL_UINT8(1u, hdr.err);
     TEST_ASSERT_EQUAL_UINT8(1u, hdr.byte_bus_id);
     TEST_ASSERT_EQUAL_UINT8(30u, hdr.transaction_num);
@@ -1729,7 +1767,7 @@ int main(void)
     RUN_TEST(test_compound_wait_requires_the_wait_condition);
     RUN_TEST(test_two_pending_compound_waits_have_independent_targets);
     RUN_TEST(test_compound_wait_reserved_evt_is_rejected_at_admission);
-    RUN_TEST(test_compound_wait_reserved_evt_sends_unsupported_cmd_error_response);
+    RUN_TEST(test_compound_wait_reserved_evt_sends_acknowledge_rejected_response);
 
     RUN_TEST(test_compound_admission_denied_for_unclaimed_sequencer);
     RUN_TEST(test_compound_admission_denied_for_sequencer_owned_by_a_different_client);
