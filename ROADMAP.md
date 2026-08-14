@@ -19106,6 +19106,60 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.358.0 -- 2026-08-14 (REQ-TIMED-012/013: TSCF presentation-time
+gate now covers Cancel requests too)
+
+Closes issue #422 (c-RCP-AUDIT-11). TC18 §11.2: "There are three basic
+types of requests... If received under TSCF header all of them shall
+be executed earliest at the given presentation time" -- Standard,
+Conditional, **and** Cancel, with no carve-out anywhere in §11.2 or
+§11.2.3.
+
+`src/server.c`'s `rcp_server_endpoint_admit()` applied the gate to
+Standard (`admit_standard_under_tscf_gate()`) and Conditional
+(`slot->has_presentation_gate = tv;`), but returned
+`RCP_SERVER_ADMIT_CANCELLATION` for `kind ==
+RCP_SCHED_KIND_CANCELLATION` unconditionally -- before `tv`/
+`presentation_gate_ns` (already resolved earlier in the same function)
+were ever consulted. `src/mock.c`'s `finish_admission()`/
+`apply_cancellation()` then ran the cancellation synchronously, with
+no reference to `tv`/`avtp_timestamp` anywhere in that call chain.
+
+Fixed by routing cancellation admission through the identical gate
+helper Standard already used: `admit_standard_under_tscf_gate()` is
+generalized (renamed `admit_under_tscf_gate()`, parameterized by
+`kind`/`request_type`) rather than duplicated a third time. The
+cancellation branch now calls it when `tv` is set; `tv` unset (NTSCF,
+or a TSCF header without a valid timestamp) keeps the original
+immediate-apply behavior unchanged. `start_condition_holds()`/
+`delay_expired()` gained a `RCP_SCHED_KIND_CANCELLATION` case
+mirroring STANDARD's own "envelope gate is the entire condition"
+shape. `rcp_mock_server_tick()` now dispatches a due
+`RCP_SCHED_KIND_CANCELLATION` slot to `apply_cancellation()` instead
+of the ordinary endpoint handler, since a stored cancellation's own
+frame is a cancellation request, not something a handler understands.
+
+Verified `avtp.h`'s `rcp_avtp_extend_timestamp()` doc comment claim
+("applies to every request kind (standard, conditional, cancel)")
+against the fixed behavior: the claim is now genuinely true, so the
+comment needed no correction.
+
+Two new tests in `tests/test_conditional_dispatch.c` use two
+unmet-threshold TRIGGERED requests as cancellation targets (isolating
+the assertion from anything except the cancellation's own gate) to
+prove a clear-all admitted with `tv=true` and a future presentation
+time leaves the request store completely untouched until that time
+passes, then removes every entry -- including itself -- in one tick
+once it does. Mutation-tested: reverting only the `src/server.c`
+admit()-side fix (new tests left in place) made both new tests fail
+(`Expected 4 Was 5`), confirming they exercise the real defect. Full
+66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.54): 0
+errors, 1081/1081 traced and tested. `.fusa-reqs.json`:
+`REQ-TIMED-012`/`REQ-TIMED-013` texts tightened to describe the closed
+gap (both remain `implemented` -- this closes a real, independent
+defect in the gate itself, distinct from the dispatch-wiring gap their
+prior text already described as closed).
+
 ### v0.357.0 -- 2026-08-14 (RC-Server register-map conformance: EP_ID_config
 BBID/Ctrl bit-packing, rx_stream_status live wiring, Table 20's real last
 register pair)
@@ -19192,6 +19246,7 @@ REQ-RMAP-052/053/039/051 and REQ-E2E-046 were all already
 total, unchanged).
 
 **Next**: none currently queued for this specific audit lineage.
+
 ### v0.356.0 -- 2026-08-14 (REQ-ACF-033: rcp_acf_build_acknowledge_rejected_response()
 closes the missing TC18 §11.3.1 storage-admission-rejection shape)
 
@@ -19247,6 +19302,7 @@ traced and tested. `.fusa-reqs.json`: new `REQ-ACF-033` (`implemented`,
 ASIL-B, `tc18` scope) -- 1077 total.
 
 **Next**: remaining issues in the #420-434 audit range.
+
 ### v0.355.0 -- 2026-08-14 (GPIO/PWM_OUT evt=100b UNSUPPORTED_CMD, PWM_OUT
 wire-error mapping, PWM_IN MAX_PERIOD behavior, NAND/AND doc note)
 
