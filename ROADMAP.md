@@ -19106,6 +19106,57 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.362.0 -- 2026-08-14 (UART trigger enum ordinal doc-comment fix;
+rx_stream_status write-side investigated, confirmed spec-silent)
+
+Closes issue #449 (c-RCP-AUDIT-28): `include/rcp/ep_uart.h`'s file-header
+doc comment for `rcp_ep_uart_trigger_t` (added by the #425 fix, PR #435)
+claimed "the enum values themselves already are the Table 52 signal
+numbers." False: the real enum is `NONE = 0, TX_FINALIZED = 1,
+RX_FINALIZED = 2`, off by one against Table 52's real signal numbers (0
+and 1) because `NONE` occupies ordinal 0. No functional impact --
+`rcp_ep_uart_trigger_fires()` is a pure logical evaluator and nothing
+in this module renders the enum's ordinal onto the wire -- but the
+false "already wire-ready" claim could mislead a future maintainer
+wiring this field onto a register without re-deriving the correct
+mapping. Corrected the doc comment to state the ordinals do NOT
+directly correspond to Table 52's signal numbers, and that any future
+wire-rendering would need an explicit ordinal -> signal-number mapping
+function, matching the pattern `ep_spi.h`'s own
+`rcp_ep_spi_trigger_signal_number()` already uses. `tests/test_ep_uart.c`'s
+own Table-52 comment was checked and found not to make the same
+load-bearing claim -- left unchanged. Comment-only fix, no behavior
+change, no new tests needed.
+
+Also investigated issue #448 (c-RCP-AUDIT-27): whether TC18 §12.7.7
+Table 24 genuinely specifies a client-write-clears-blocked-status
+semantic for `rx_stream_status` (0x000D.7), which
+`rcp_regmap_request_stream_cfg_apply_reconfig()` (`src/regmap.c`)
+accepts (per the #424 write-authorization carve-out) but silently
+discards. Re-read Table 24's own row and margin comment directly
+against the primary-source PDF: the row's only behavioral text
+describes how the bit gets SET ("will be set automatically as a
+reaction to either CRC error, sequence error, watchdog overflow, EP
+overflow, when enabled") -- there is no sentence anywhere in Table 24
+or §12.7.7's surrounding prose describing what a client write to this
+bit does. Confirmed as genuine spec silence, not an under-read: TC18
+demonstrably DOES spell out write-clears semantics in prose, in the
+exact phrasing pattern that would be expected here, when it means
+them -- compare `wup_status` (§13.7.2.2 Table 39: "writing "1" clears
+the flag") and `ep_clear_req_storage` (§13.7 Table 34: "writing a 1b
+clears the EPs request storage, reads always 0"). `rx_stream_status`'s
+own row has no such sentence; its plain R/W typing (vs. every sibling
+bit's R/W*) only establishes that a write is architecturally permitted
+at all lifecycle states, not what that write does. Documented the
+investigation and finding directly at the `apply_reconfig()` discard
+site (`src/regmap.c`); no behavior change. Issue #448 closed with the
+same finding recorded in its own closing comment rather than via this
+PR, since there was nothing to fix.
+
+Full 66-test suite unchanged (doc-only change, no behavior touched);
+`cfusa check`/`trace` (v0.5.54): 0 errors, 1086/1086 traced and tested
+(unchanged).
+
 ### v0.361.0 -- 2026-08-14 (systemic TC18.txt citation-drift correction
 across .fusa-reqs.json)
 
