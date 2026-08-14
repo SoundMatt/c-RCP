@@ -1269,27 +1269,36 @@ static void test_iseled_block_now_has_collect_resp_nr_leds_and_rcv_timeout(void)
 }
 
 /* ── ISELED endpoint: real mock.c dispatch path (issue #338, PR D
- * concluded) ─────────────────────────────────────────────────────────────
+ * concluded; multi-fragment case closed 2026-08-14) ────────────────────────
  *
  * iseled_dispatch_state_t/iseled_dispatch_handler() mirrors the GPIO/ADC
- * fixtures' own shape, but with a genuine architectural limit this
- * requirement's own updated .fusa-reqs.json text names explicitly:
- * rcp_mock_endpoint_handler_fn (mock.h) produces exactly ONE *out_response
- * per dispatched request, while rcp_ep_iseled_encode_response_fragmented()
- * can genuinely need to produce SEVERAL response frames for one request
- * whenever the (read_size-capped) response data exceeds one fragment's
- * own max_fragment_payload. This fixture therefore only demonstrates the
- * single-fragment case (chip_data sized to fit in one fragment, asserting
- * rcp_ep_iseled_response_fragment_count() itself returns exactly 1) --
- * proving the fragmentation entry points are genuinely reachable and
- * correct through a real dispatch() call, but NOT that a multi-fragment
- * response can be delivered through mock.c's own existing dispatch
- * surface at all, since it structurally cannot be: that would need a new
+ * fixtures' own shape for the single-fragment case (chip_data sized to
+ * fit in one fragment, asserting rcp_ep_iseled_response_fragment_count()
+ * itself returns exactly 1) -- proving the fragmentation entry points are
+ * genuinely reachable and correct through a real, plain dispatch() call.
+ *
+ * RESOLVED 2026-08-14: this section's own prior text found a genuine
+ * architectural limit -- rcp_mock_endpoint_handler_fn (mock.h) produces
+ * exactly ONE *out_response per dispatched request, while
+ * rcp_ep_iseled_encode_response_fragmented() can genuinely need to
+ * produce SEVERAL response frames for one request whenever the
+ * (read_size-capped) response data exceeds one fragment's own
+ * max_fragment_payload -- and concluded closing it would need "a new
  * mock.h entry point returning more than one frame per dispatched
- * request, out of scope here. */
+ * request". That entry point now exists:
+ * rcp_mock_server_dispatch_multi_response()/rcp_mock_server_add_endpoint_
+ * multi_response() (mock.h), a new rcp_mock_endpoint_multi_response_
+ * handler_fn kind alongside the plain one, not a breaking change to it.
+ * iseled_dispatch_multi_handler()/test_iseled_dispatch_multi_fragment_
+ * response_round_trips() below demonstrate the genuinely-multi-fragment
+ * case through that real entry point end-to-end. */
 typedef struct {
     uint8_t chip_data[8];
     size_t  chip_data_len;
+    /* Only consulted by iseled_dispatch_multi_handler() below --
+     * iseled_dispatch_handler()'s own single-fragment case still
+     * hardcodes RCP_ACF_MAX_PAYLOAD, unchanged. */
+    size_t  max_fragment_payload;
 } iseled_dispatch_state_t;
 
 static void iseled_dispatch_handler(const uint8_t *request, size_t request_len,
@@ -1327,7 +1336,7 @@ static void iseled_dispatch_handler(const uint8_t *request, size_t request_len,
 static void test_iseled_dispatch_single_fragment_response_round_trips(void)
 {
     rcp_mock_server_t        *srv = rcp_mock_server_new();
-    iseled_dispatch_state_t   st  = {{0x11, 0x22, 0x33, 0x44}, 4u};
+    iseled_dispatch_state_t   st  = {{0x11, 0x22, 0x33, 0x44}, 4u, 0u};
     rcp_bytes_t                req;
     rcp_bytes_t                resp = {0};
     const uint8_t              *out_rx_data;
@@ -1356,6 +1365,102 @@ static void test_iseled_dispatch_single_fragment_response_round_trips(void)
 
     rcp_bytes_free(&req);
     rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-ISELED-025: the genuinely-multi-fragment counterpart to
+ * iseled_dispatch_handler() above -- a rcp_mock_endpoint_multi_response_
+ * handler_fn (mock.h), registered via rcp_mock_server_add_endpoint_
+ * multi_response() instead of the plain rcp_mock_server_add_endpoint().
+ * Otherwise decodes/re-encodes identically, but writes directly into
+ * out_responses[] (rcp_ep_iseled_encode_response_fragmented()'s own
+ * out_frames parameter) rather than a single *out_response. */
+static void iseled_dispatch_multi_handler(const uint8_t *request, size_t request_len,
+                                           rcp_bytes_t *out_responses, size_t out_cap,
+                                           size_t *out_count, void *user_data)
+{
+    iseled_dispatch_state_t *st = (iseled_dispatch_state_t *)user_data;
+    const uint8_t             *tx_data;
+    size_t                      tx_len;
+    uint8_t                     tn;
+    size_t                      n;
+
+    *out_count = 0;
+    if (rcp_ep_iseled_decode_command_request(request, request_len, 5u, &tx_data, &tx_len,
+                                              &tn) != RCP_EP_ISELED_OK) {
+        return;
+    }
+
+    n = rcp_ep_iseled_response_fragment_count(st->chip_data_len, (uint16_t)st->chip_data_len,
+                                               st->max_fragment_payload);
+    if (n == 0u || n > out_cap) return;
+
+    *out_count = rcp_ep_iseled_encode_response_fragmented(
+        5u, st->chip_data, st->chip_data_len, (uint16_t)st->chip_data_len, tn, false, 0u,
+        st->max_fragment_payload, out_responses);
+}
+
+/* REQ-ISELED-025: closes this requirement's own last-remaining gap --
+ * chip_data (8 octets) capped by a deliberately small
+ * max_fragment_payload (3 octets) forces ceil(8/3) = 3 fragments, real
+ * multi-fragment aggregation TC18 §13.7.12.1 describes, delivered
+ * through a real rcp_mock_server_dispatch_multi_response() call, not
+ * just the fragmentation primitives tested in isolation
+ * (test_ep_iseled.c) or the artificially-single-fragment case above. */
+static void test_iseled_dispatch_multi_fragment_response_round_trips(void)
+{
+    rcp_mock_server_t      *srv = rcp_mock_server_new();
+    iseled_dispatch_state_t st  = {{0x11, 0x22, 0x33, 0x44, 0x55, 0x66, 0x77, 0x88}, 8u, 3u};
+    rcp_bytes_t              req;
+    rcp_bytes_t              responses[8] = {{0}};
+    size_t                   response_count = 0;
+    uint8_t                  reassembled[16];
+    size_t                   reassembled_len = 0;
+    size_t                   i;
+
+    TEST_ASSERT_NOT_NULL(srv);
+    gap_to_rcp_configured(srv);
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint_multi_response(
+                                        srv, 5u, 0u, true, iseled_dispatch_multi_handler, &st));
+
+    req = rcp_ep_iseled_encode_command_request(5u, (const uint8_t *)"\x01\x02", 2u, 0x44u);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_multi_response(
+                          srv, 5u, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true, 1u, req.data,
+                          req.len, responses, 8u, &response_count));
+
+    /* The point of this test: genuinely MORE than one response frame,
+     * not the single-fragment case iseled_dispatch_handler() already
+     * covers. */
+    TEST_ASSERT_EQUAL_size_t(3u, response_count);
+
+    for (i = 0; i < response_count; i++) {
+        const uint8_t *out_rx_data;
+        size_t          out_rx_len;
+        bool            out_timed;
+        uint64_t        out_ts;
+        uint8_t         out_tn;
+
+        TEST_ASSERT_NOT_NULL(responses[i].data);
+        TEST_ASSERT_EQUAL(RCP_EP_ISELED_OK,
+                          rcp_ep_iseled_decode_response(responses[i].data, responses[i].len, 5u,
+                                                        &out_rx_data, &out_rx_len, &out_timed,
+                                                        &out_ts, &out_tn));
+        TEST_ASSERT_EQUAL_UINT8(0x44u, out_tn);
+        TEST_ASSERT_TRUE(reassembled_len + out_rx_len <= sizeof(reassembled));
+        memcpy(&reassembled[reassembled_len], out_rx_data, out_rx_len);
+        reassembled_len += out_rx_len;
+    }
+
+    /* Every fragment's own payload reassembles back to the exact
+     * original chip_data, in order -- proving this is real, correct
+     * response-aggregation, not just three frames of arbitrary content. */
+    TEST_ASSERT_EQUAL_size_t(st.chip_data_len, reassembled_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(st.chip_data, reassembled, st.chip_data_len);
+
+    rcp_bytes_free(&req);
+    for (i = 0; i < response_count; i++) rcp_bytes_free(&responses[i]);
     rcp_mock_server_destroy(srv);
 }
 
@@ -1546,6 +1651,7 @@ int main(void)
     RUN_TEST(test_iseled_response_has_no_read_size_ceiling);
     RUN_TEST(test_iseled_block_now_has_collect_resp_nr_leds_and_rcv_timeout);
     RUN_TEST(test_iseled_dispatch_single_fragment_response_round_trips);
+    RUN_TEST(test_iseled_dispatch_multi_fragment_response_round_trips);
 
     RUN_TEST(test_mdio_block_now_exposes_ep_status_via_reconfig);
     RUN_TEST(test_mdio_request_prefix_now_carries_a_two_bit_mode_field);

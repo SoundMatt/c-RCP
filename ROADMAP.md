@@ -19106,6 +19106,85 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.350.0 -- 2026-08-14 (REQ-ISELED-025: rcp_mock_server_dispatch_multi_response()
+closes the genuine multi-fragment-response architectural limit)
+
+Seventh and final item of the user's own explicit `complete these now!`
+7-item list to receive a real fix.
+
+The prior batch's own careful investigation found a genuine, not
+merely untested, architectural limit: `rcp_mock_endpoint_handler_fn`
+(mock.h) produces exactly ONE `*out_response` per dispatched request,
+while TC18 §13.7.12.1's own ISELED response-aggregation rule can
+genuinely require SEVERAL response frames for one request whenever
+the read_size-capped response exceeds one fragment's own
+`max_fragment_payload`. That text named the fix precisely: "a new
+mock.h entry point returning more than one frame per dispatched
+request."
+
+New `rcp_mock_endpoint_multi_response_handler_fn`: may write up to
+`out_cap` response frames into a caller-provided array, setting
+`*out_count` to how many it actually wrote -- the same shape
+`rcp_ep_iseled_encode_response_fragmented()`'s own `out_frames`
+parameter already has, so the new handler kind is a thin pass-through,
+not a new encoding convention. New
+`rcp_mock_server_add_endpoint_multi_response()` registers it for a
+`byte_bus_id`, internally calling the existing, UNMODIFIED
+`rcp_mock_server_add_endpoint()` with a NULL plain handler to reuse
+its own slot-allocation logic rather than duplicating it, then
+patching the slot's own new `multi_handler` field.
+
+New `rcp_mock_server_dispatch_multi_response()` is a self-contained
+entry point -- NOT threaded through `dispatch_plain_inner()`'s own
+conditional-request admission machinery. A multi-response handler is,
+by construction, a synchronous read/report operation (TC18's own rule
+is about one request producing several frames, not about deferring
+when that request runs), so this entry point does lifecycle admission
+and slot lookup (matching every other dispatch entry point's own
+DROPPED/REJECTED/ERR_UNKNOWN_BUS outcomes exactly, including a real
+error response through the single-response path on REJECTED) then
+calls the slot's own handler directly -- no queued/pending outcome
+exists for it. Every response passes through the same
+`suppress_response_per_stream_cfg()` rule every other dispatch entry
+point's own response already does.
+
+This is a NEW, additional pair of entry points, not a signature
+change to `rcp_mock_server_add_endpoint()`/`rcp_mock_server_dispatch()`
+-- neither existing function nor any of their own many callers across
+this codebase is affected.
+
+`test_tc18_gaps_ep2.c`'s own `iseled_dispatch_multi_handler()`/
+`test_iseled_dispatch_multi_fragment_response_round_trips()` demonstrate
+the genuinely-multi-fragment case end-to-end for the first time:
+`chip_data` (8 octets) capped by a deliberately small
+`max_fragment_payload` (3 octets) forces 3 real fragments, delivered
+through a real `rcp_mock_server_dispatch_multi_response()` call and
+reassembled back to the exact original data, in order -- not just the
+fragmentation primitives tested in isolation (`test_ep_iseled.c`) or
+the artificially-single-fragment case the prior batch's own
+`iseled_dispatch_handler()` was limited to. That section's own stale
+"structurally impossible" text is corrected in place to point at the
+new mechanism.
+
+2 mutations (the `multi_handler` invocation gate, and the
+registration's own `multi_handler` field assignment), both caught
+cleanly.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.54):
+0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`:
+`REQ-ISELED-025` partial -> implemented -- 1053 implemented / 14
+partial / 2 not-implemented / 7 retired, 1076 total.
+
+Sixth of the user's own explicit `complete these now!` 7-item list
+(`REQ-UART-037`, `REQ-RMAP-038`, `REQ-RMAP-068`, `REQ-TIMED-012/013`,
+`REQ-E2E-046`, `REQ-ISELED-025`, `REQ-GPIO-035/036`) now genuinely
+closed to implemented, none forced or half-attempted. Only
+`REQ-GPIO-035/036` (periodic sampling timer + delayed response)
+remains -- mock.c's own dispatch model is entirely synchronous, with
+no timer/delayed-response concept of any kind.
+
+**Next**: `REQ-GPIO-035/036`, the last item of the 7-item list.
+
 ### v0.349.0 -- 2026-08-14 (REQ-TIMED-012/013: rcp_mock_server_dispatch_tscf()
 wires the real TSCF presentation-time gate into a live dispatch path)
 

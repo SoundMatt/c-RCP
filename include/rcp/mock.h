@@ -906,6 +906,91 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_tscf(rcp_mock_server_t *srv,
                                                           const uint8_t *request, size_t request_len,
                                                           rcp_bytes_t *out_response);
 
+/* REQ-ISELED-025 (TC18 §13.7.12.1): rcp_mock_endpoint_handler_fn's own
+ * single-*out_response signature structurally cannot express a request
+ * whose response must span several frames (e.g. an ISELED read whose
+ * read_size-capped response exceeds one max_avtpdu_size-derived
+ * fragment -- see ep_iseled.h's rcp_ep_iseled_response_fragment_count()/
+ * _encode_response_fragmented()). This handler kind may instead write
+ * UP TO out_cap response frames into out_responses[] (each entry
+ * zeroed on entry), setting *out_count to how many it actually wrote
+ * (0 meaning no response at all, the same fire-and-forget convention
+ * rcp_mock_endpoint_handler_fn's own NULL-*out_response case already
+ * establishes). Ownership of every populated out_responses[i]
+ * transfers to the dispatcher's own caller (rcp_mock_server_dispatch_
+ * multi_response()'s own out_responses parameter); free each with
+ * rcp_bytes_free(). user_data is the opaque pointer passed to
+ * rcp_mock_server_add_endpoint_multi_response(). */
+typedef void (*rcp_mock_endpoint_multi_response_handler_fn)(const uint8_t *request,
+                                                              size_t request_len,
+                                                              rcp_bytes_t *out_responses,
+                                                              size_t out_cap, size_t *out_count,
+                                                              void *user_data);
+
+/* Registers a multi-response handler for byte_bus_id -- otherwise
+ * identical to rcp_mock_server_add_endpoint() (same ep_type/ep_enable/
+ * capacity/duplicate-bus-id semantics; internally calls it directly,
+ * with a NULL plain handler, to reuse its own slot-allocation logic
+ * rather than duplicating it). A slot uses EITHER handler kind, never
+ * both -- every dispatch entry point OTHER than rcp_mock_server_
+ * dispatch_multi_response() (plain dispatch()/_dispatch_e2e()/
+ * _dispatch_frame()/etc.) ignores a slot's own multi-response handler
+ * entirely and calls its plain one instead (NULL for a multi-response-
+ * only slot -- see run_handler()'s own doc comment for what a NULL
+ * handler does: no response, the same as an unset plain handler).
+ * Conversely, rcp_mock_server_dispatch_multi_response() ignores a
+ * slot's own plain handler and calls only its multi-response one. */
+rcp_mock_errc_t rcp_mock_server_add_endpoint_multi_response(
+    rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id, uint8_t ep_type, bool ep_enable,
+    rcp_mock_endpoint_multi_response_handler_fn handler, void *user_data);
+
+/* REQ-ISELED-025: identical to rcp_mock_server_dispatch() through
+ * lifecycle admission and endpoint lookup -- RCP_MOCK_DISPATCH_DROPPED/
+ * _REJECTED/_ERR_UNKNOWN_BUS all mean exactly what they already do
+ * there (a _REJECTED outcome still populates out_responses[0] with a
+ * real error response, exactly as rcp_mock_server_dispatch()'s own
+ * *out_response would, when out_cap permits it). Past that point this
+ * entry point diverges deliberately: an admitted request always runs
+ * IMMEDIATELY against the addressed slot's own multi-response handler
+ * (rcp_mock_server_add_endpoint_multi_response()) -- there is no
+ * queued/pending outcome here. A multi-response handler is, by
+ * construction, a synchronous read/report operation: TC18 §13.7.12.1's
+ * own response-aggregation rule is about ONE request producing SEVERAL
+ * response frames, not about deferring when that request runs -- the
+ * conditional-request admission machinery (rcp_server_endpoint_admit(),
+ * request_compound.h/_triggered.h/etc.) is an orthogonal concern this
+ * entry point does not touch, matching test_tc18_gaps_ep2.c's own
+ * already-proven iseled_dispatch_handler() fixture's own treatment of
+ * every dispatched ISELED command. Every response this call produces
+ * (whether the single _REJECTED error above, or 0..out_cap handler
+ * outputs) is passed through suppress_response_per_stream_cfg()'s own
+ * discovery-stream ack/response-suppression rule, exactly as every
+ * other dispatch entry point's own response already is.
+ *
+ * *out_response_count (zeroed on entry) is always populated on
+ * RCP_MOCK_DISPATCH_OK; out_responses[0..*out_response_count) are
+ * populated (any response suppress_response_per_stream_cfg() drops is
+ * left zeroed at its own index, not compacted out -- a caller checks
+ * each index's own .data for NULL exactly as it already would for a
+ * single suppressed rcp_mock_server_dispatch() response), the rest of
+ * out_responses[0..out_cap) left zeroed. A byte_bus_id registered via
+ * the PLAIN rcp_mock_server_add_endpoint() instead (no multi-response
+ * handler registered) produces RCP_MOCK_DISPATCH_OK with
+ * *out_response_count == 0 -- fire-and-forget, the same convention a
+ * NULL/no-op plain handler already gets through every other dispatch
+ * entry point. Handler output beyond out_cap is silently dropped by
+ * the handler's own contract (rcp_mock_endpoint_multi_response_
+ * handler_fn's own doc comment), not by this function -- it never
+ * inspects *out_count itself beyond what the handler reports.
+ *
+ * REQ-WDG-010: kicked unconditionally, before lifecycle/admission, the
+ * same "receipt, not validation" rule and ordering as every other
+ * dispatch entry point's own identical kick. */
+rcp_mock_dispatch_result_t rcp_mock_server_dispatch_multi_response(
+    rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id, uint8_t avtp_subtype,
+    uint8_t acf_msg_type, bool time_sync_supported, uint64_t stream_id, const uint8_t *request,
+    size_t request_len, rcp_bytes_t *out_responses, size_t out_cap, size_t *out_response_count);
+
 /* Drains and runs the oldest queued request on the endpoint at byte_bus_id
  * (server.h's rcp_server_endpoint_drain_one() -- a no-op unless that
  * endpoint's own ep_enable is currently true and its queue is non-empty).

@@ -20,6 +20,12 @@ typedef struct {
     rcp_regmap_ep_generic_cfg_t  generic;
     rcp_server_endpoint_t        queue;
     rcp_mock_endpoint_handler_fn handler;
+    /* REQ-ISELED-025: mutually exclusive with handler above -- a slot
+     * registered via rcp_mock_server_add_endpoint_multi_response()
+     * sets this instead, leaving handler NULL (see that function's own
+     * doc comment, mock.h). Consulted only by rcp_mock_server_dispatch_
+     * multi_response(); every other dispatch entry point ignores it. */
+    rcp_mock_endpoint_multi_response_handler_fn multi_handler;
     void                        *user_data;
     /* This test double's own stand-in for TC18 §12.7.1's
      * ep_req_crc_enable -- see
@@ -669,6 +675,35 @@ rcp_mock_errc_t rcp_mock_server_add_endpoint(rcp_mock_server_t *srv,
     return RCP_MOCK_OK;
 }
 
+//cfusa:req REQ-ISELED-025
+rcp_mock_errc_t rcp_mock_server_add_endpoint_multi_response(
+    rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id, uint8_t ep_type, bool ep_enable,
+    rcp_mock_endpoint_multi_response_handler_fn handler, void *user_data)
+{
+    rcp_mock_errc_t            rc;
+    rcp_mock_endpoint_slot_t *slot;
+
+    /* Reuses rcp_mock_server_add_endpoint()'s own slot-allocation logic
+     * entirely (same capacity/duplicate-bus-id checks, same
+     * svr_ep_count/svr_ep_generic_cfg_capacity bookkeeping) rather than
+     * duplicating it -- registered with a NULL plain handler, then
+     * patched below to carry the real multi-response one instead. */
+    rc = rcp_mock_server_add_endpoint(srv, byte_bus_id, ep_type, ep_enable, NULL, NULL);
+    if (rc != RCP_MOCK_OK) return rc;
+
+    slot = find_slot(srv, byte_bus_id);
+    /* Unreachable -- the call above just successfully created this
+     * exact slot; guarded rather than trusted, matching this file's
+     * own established "fail closed instead of dereferencing NULL"
+     * convention (see rcp_mock_server_add_endpoint()'s own identical
+     * guard). */
+    if (!slot) return RCP_MOCK_ERR_CAPACITY;
+
+    slot->multi_handler = handler;
+    slot->user_data     = user_data;
+    return RCP_MOCK_OK;
+}
+
 //cfusa:req REQ-MOCK-009
 bool rcp_mock_server_remove_endpoint(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id)
 {
@@ -1264,6 +1299,53 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_tscf(rcp_mock_server_t *srv,
     return dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
                            stream_id, tv, avtp_timestamp, gptp_reference_now, request, request_len,
                            out_response);
+}
+
+//cfusa:req REQ-ISELED-025
+//cfusa:req REQ-WDG-010
+rcp_mock_dispatch_result_t rcp_mock_server_dispatch_multi_response(
+    rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id, uint8_t avtp_subtype,
+    uint8_t acf_msg_type, bool time_sync_supported, uint64_t stream_id, const uint8_t *request,
+    size_t request_len, rcp_bytes_t *out_responses, size_t out_cap, size_t *out_response_count)
+{
+    rcp_mock_endpoint_slot_t *slot;
+    rcp_lifecycle_accept_t     accept;
+    size_t                     i;
+
+    *out_response_count = 0;
+    for (i = 0; i < out_cap; i++) memset(&out_responses[i], 0, sizeof(out_responses[i]));
+
+    if (srv->watchdog != NULL) rcp_watchdog_keeper_kick(srv->watchdog, stream_id);
+
+    accept = rcp_lifecycle_should_accept(srv->state, time_sync_supported, avtp_subtype,
+                                          acf_msg_type, byte_bus_id);
+    if (accept == RCP_LIFECYCLE_DROP) {
+        return RCP_MOCK_DISPATCH_DROPPED;
+    }
+    if (accept == RCP_LIFECYCLE_REJECT) {
+        rcp_acf_byte_message_info_t hdr = {0};
+        if (request_len >= 8 && rcp_acf_unpack_header(request, &hdr) == RCP_ACF_OK && out_cap > 0u) {
+            out_responses[0] = rcp_acf_build_error_response(byte_bus_id, hdr.transaction_num,
+                                                             RCP_ERROR_REQUEST_REJECTED);
+            suppress_response_per_stream_cfg(srv, stream_id, &out_responses[0]);
+            if (out_responses[0].data) *out_response_count = 1u;
+        }
+        return RCP_MOCK_DISPATCH_REJECTED;
+    }
+
+    slot = find_slot(srv, byte_bus_id);
+    if (!slot) {
+        return RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS;
+    }
+
+    if (slot->multi_handler != NULL) {
+        slot->multi_handler(request, request_len, out_responses, out_cap, out_response_count,
+                             slot->user_data);
+        for (i = 0; i < *out_response_count && i < out_cap; i++) {
+            suppress_response_per_stream_cfg(srv, stream_id, &out_responses[i]);
+        }
+    }
+    return RCP_MOCK_DISPATCH_OK;
 }
 
 //cfusa:req REQ-E2E-021
