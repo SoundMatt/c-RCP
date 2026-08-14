@@ -25,6 +25,8 @@
 //cfusa:test REQ-MOCK-028
 //cfusa:test REQ-MOCK-029
 //cfusa:test REQ-CANCEL-012
+//cfusa:test REQ-TIMED-012
+//cfusa:test REQ-TIMED-013
 /*
  * test_conditional_dispatch.c -- end-to-end tests for conditional-request
  * dispatch (TC18 §11.2.2/§11.2.3) through the real server path.
@@ -168,6 +170,27 @@ static rcp_mock_dispatch_result_t submit_to(rcp_mock_server_t *srv, rcp_byte_bus
 
     r = rcp_mock_server_dispatch(srv, byte_bus_id, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB,
                                   true, 1u, frame->data, frame->len, &resp);
+    rcp_bytes_free(&resp);
+    return r;
+}
+
+/* submit()'s own TSCF-headed sibling (REQ-TIMED-012/013, issue #422):
+ * threads tv/avtp_timestamp/gptp_reference_now through to
+ * rcp_mock_server_dispatch_tscf() instead of the plain NTSCF entry point
+ * submit() uses, for the TSCF cancellation presentation-time gate tests
+ * below. Same byte_bus_id (1)/stream_id (1u)/ACF_MSG_TYPE_GBB convention
+ * as submit() itself -- every frame this file dispatches carries a
+ * repurposed opcode byte. */
+static rcp_mock_dispatch_result_t submit_tscf(rcp_mock_server_t *srv, const rcp_bytes_t *frame,
+                                               bool tv, uint32_t avtp_timestamp,
+                                               uint64_t gptp_reference_now)
+{
+    rcp_bytes_t                resp = {0};
+    rcp_mock_dispatch_result_t r;
+
+    r = rcp_mock_server_dispatch_tscf(srv, 1, RCP_AVTP_SUBTYPE_TSCF, RCP_ACF_MSG_TYPE_GBB, true, 1u,
+                                       tv, avtp_timestamp, gptp_reference_now, frame->data,
+                                       frame->len, &resp);
     rcp_bytes_free(&resp);
     return r;
 }
@@ -1129,6 +1152,97 @@ static void test_clear_non_safestate_keeps_safety_tagged_requests(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* ── TSCF presentation-time gate applies to Cancel too (issue #422) ────────── */
+
+/* TC18 §11.2: "There are three basic types of requests... If received
+ * under TSCF header all of them shall be executed earliest at the given
+ * presentation time" -- Standard, Conditional, AND Cancel, with no
+ * carve-out. Before this fix, rcp_server_endpoint_admit() returned
+ * RCP_SERVER_ADMIT_CANCELLATION for a clear-all unconditionally, and
+ * mock.c applied it synchronously with no reference to tv/avtp_timestamp
+ * at all -- so a cancellation admitted under a TSCF header with a future
+ * presentation time still ran immediately, cancelling both targets right
+ * on receipt. This test proves the opposite: the two TRIGGERED targets
+ * (unmet threshold, never notified -- so neither can become due on its
+ * own, isolating this test from anything except the cancellation itself)
+ * are still both present in the request store, completely untouched,
+ * after the clear-all is admitted and after a tick before the
+ * presentation time is reached. */
+static void test_tscf_cancellation_with_future_presentation_time_is_deferred(void)
+{
+    handler_log_t          log;
+    rcp_mock_server_t     *srv = fixture(&log);
+    rcp_bytes_t             a  = make_triggered(RCP_REQUEST_TYPE_TRIGGERED, 6, 1, 0, 0, 111);
+    rcp_bytes_t             b  = make_triggered(RCP_REQUEST_TYPE_TRIGGERED, 6, 2, 0, 0, 112);
+    rcp_bytes_t             clear = rcp_cancel_encode_clear_all(1, 113);
+    rcp_server_tick_ctx_t   ctx = base_ctx(0);
+
+    TEST_ASSERT_NOT_NULL(a.data);
+    TEST_ASSERT_NOT_NULL(b.data);
+    TEST_ASSERT_NOT_NULL(clear.data);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &a));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &b));
+    TEST_ASSERT_EQUAL_size_t(2, rcp_mock_server_pending_count(srv, 1));
+
+    /* tv=true, avtp_timestamp comfortably ahead of gptp_reference_now
+     * (0u): the reconstructed presentation instant is in the future. The
+     * cancellation must be PENDING, not CANCELLED -- and, critically,
+     * neither target may have been removed from the store yet. */
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit_tscf(srv, &clear, true, 5000000u, 0u));
+    TEST_ASSERT_EQUAL_size_t(3, rcp_mock_server_pending_count(srv, 1)); /* a, b, and the cancel itself */
+
+    /* A tick before the presentation time: gPTP locked, endpoint idle,
+     * but neither the cancellation's own gate nor either TRIGGERED
+     * target's own threshold is satisfied -- nothing runs at all. */
+    ctx.gptp_locked = true;
+    ctx.gptp_now    = 4999999u;
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(3, rcp_mock_server_pending_count(srv, 1));
+    TEST_ASSERT_EQUAL_size_t(0, log.count); /* neither target ever ran */
+
+    rcp_bytes_free(&a);
+    rcp_bytes_free(&b);
+    rcp_bytes_free(&clear);
+    rcp_mock_server_destroy(srv);
+}
+
+/* Companion to the deferral test above: once the reconstructed
+ * presentation instant is actually reached (and gPTP is locked), the
+ * deferred cancellation becomes due -- ranking above every other kind
+ * (scheduler.h's own cancellation > triggered > ... ordering) -- and
+ * apply_cancellation() removes both targets, exactly as the immediate
+ * (tv=false) path already does. */
+static void test_tscf_cancellation_executes_once_presentation_time_passes(void)
+{
+    handler_log_t          log;
+    rcp_mock_server_t     *srv = fixture(&log);
+    rcp_bytes_t             a  = make_triggered(RCP_REQUEST_TYPE_TRIGGERED, 6, 1, 0, 0, 121);
+    rcp_bytes_t             b  = make_triggered(RCP_REQUEST_TYPE_TRIGGERED, 6, 2, 0, 0, 122);
+    rcp_bytes_t             clear = rcp_cancel_encode_clear_all(1, 123);
+    rcp_server_tick_ctx_t   ctx = base_ctx(0);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &a));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &b));
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit_tscf(srv, &clear, true, 5000000u, 0u));
+    TEST_ASSERT_EQUAL_size_t(3, rcp_mock_server_pending_count(srv, 1));
+
+    /* The reconstructed presentation instant, gPTP locked: the
+     * cancellation is now due and, being ranked above TRIGGERED, is the
+     * one rcp_server_endpoint_select_due() picks -- clearing itself and
+     * both of its targets in one tick. */
+    ctx.gptp_locked = true;
+    ctx.gptp_now    = 5000000u;
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 1));
+    TEST_ASSERT_EQUAL_size_t(0, log.count); /* neither target's handler ever ran -- both were cancelled */
+
+    rcp_bytes_free(&a);
+    rcp_bytes_free(&b);
+    rcp_bytes_free(&clear);
+    rcp_mock_server_destroy(srv);
+}
+
 /* REQ-SRV-013's own literal return-value claims: the three tests above
  * already prove cancel_all()/cancel_single()/cancel_non_safestate()'s
  * observable BEHAVIOR end-to-end through the mock server, but none of
@@ -1758,6 +1872,8 @@ int main(void)
     RUN_TEST(test_clear_single_removes_only_its_target);
     RUN_TEST(test_clear_single_not_found_sends_request_not_found_error);
     RUN_TEST(test_clear_non_safestate_keeps_safety_tagged_requests);
+    RUN_TEST(test_tscf_cancellation_with_future_presentation_time_is_deferred);
+    RUN_TEST(test_tscf_cancellation_executes_once_presentation_time_passes);
     RUN_TEST(test_cancel_all_and_cancel_single_return_values);
     RUN_TEST(test_watchdog_purge_keeps_only_the_safety_sequence);
     RUN_TEST(test_overflow_on_one_endpoint_broadcasts_safe_state_to_stream_siblings);

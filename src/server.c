@@ -196,27 +196,37 @@ static rcp_server_pending_t *claim_slot(rcp_server_endpoint_t *ep)
 //cfusa:req REQ-SRV-022
 //cfusa:req REQ-PWRMODE-028
 //cfusa:req REQ-ACF-021
-/* REQ-TIMED-012 (issue #336): claims a fresh slot for a request carried
- * under a TSCF header with no execution condition of its own -- a
- * standard request that would otherwise EXECUTE_NOW/_QUEUE, now
+/* REQ-TIMED-012 (issue #336, extended by issue #422): claims a fresh slot
+ * for a request carried under a TSCF header that has no kind-specific
+ * execution condition of its own -- a standard request that would
+ * otherwise EXECUTE_NOW/_QUEUE, or a cancellation request that would
+ * otherwise apply immediately (RCP_SERVER_ADMIT_CANCELLATION) -- now
  * postponed purely by the envelope-level presentation-time gate (see
  * rcp_server_pending_t's own has_presentation_gate/presentation_gate_ns
- * field doc comments and is_due()'s own gate below). kind is
- * RCP_SCHED_KIND_STANDARD, request_type 0 -- matching admit()'s own
- * existing "0 for a standard [request]" *out_request_type convention.
- * Returns RCP_SERVER_ADMIT_REJECTED (request store full) or
- * RCP_SERVER_ADMIT_PENDING. */
-static rcp_server_admit_t admit_standard_under_tscf_gate(rcp_server_endpoint_t *ep,
-                                                           const uint8_t *frame, size_t frame_len,
-                                                           uint32_t now, uint64_t presentation_gate_ns,
-                                                           size_t *out_index)
+ * field doc comments and is_due()'s own gate below). kind/request_type
+ * are the caller's own already-classified values: (RCP_SCHED_KIND_
+ * STANDARD, 0) for a standard request -- matching admit()'s own existing
+ * "0 for a standard [request]" *out_request_type convention -- or
+ * (RCP_SCHED_KIND_CANCELLATION, request_type) for a cancellation, where
+ * request_type identifies which of the three cancellation opcodes it is
+ * (mock.c's apply_cancellation() still decides what that means once the
+ * slot becomes due). Returns RCP_SERVER_ADMIT_REJECTED (request store
+ * full) or RCP_SERVER_ADMIT_PENDING. Named generically (not "_standard_")
+ * because issue #422 made this the shared gate helper for both kinds --
+ * duplicating claim_slot()/frame-dup/gate-set logic a third time would
+ * be the real defect here, not just the missing cancellation gate. */
+static rcp_server_admit_t admit_under_tscf_gate(rcp_server_endpoint_t *ep,
+                                                 const uint8_t *frame, size_t frame_len,
+                                                 uint32_t now, uint64_t presentation_gate_ns,
+                                                 rcp_sched_kind_t kind, uint8_t request_type,
+                                                 size_t *out_index)
 {
     rcp_server_pending_t *slot = claim_slot(ep);
 
     if (!slot) return RCP_SERVER_ADMIT_REJECTED;
 
-    slot->kind                  = RCP_SCHED_KIND_STANDARD;
-    slot->request_type          = 0;
+    slot->kind                  = kind;
+    slot->request_type          = request_type;
     slot->has_presentation_gate = true;
     slot->presentation_gate_ns  = presentation_gate_ns;
     slot->armed_at              = now;
@@ -278,8 +288,8 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
      * store instead of the original immediate submit path. */
     if (rcp_compound_peek_request_type(frame, frame_len, &request_type) != RCP_COMPOUND_OK) {
         if (tv) {
-            return admit_standard_under_tscf_gate(ep, frame, frame_len, now,
-                                                   presentation_gate_ns, out_index);
+            return admit_under_tscf_gate(ep, frame, frame_len, now, presentation_gate_ns,
+                                          RCP_SCHED_KIND_STANDARD, 0, out_index);
         }
         /* NULL: admit()'s own signature does not yet propagate a queuing
          * acknowledge to its caller -- a separate, not-yet-attempted
@@ -297,8 +307,8 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
          * postponement as the "not a repurposed ACF_GBB at all" branch
          * above. */
         if (tv) {
-            return admit_standard_under_tscf_gate(ep, frame, frame_len, now,
-                                                   presentation_gate_ns, out_index);
+            return admit_under_tscf_gate(ep, frame, frame_len, now, presentation_gate_ns,
+                                          RCP_SCHED_KIND_STANDARD, 0, out_index);
         }
         /* NULL: admit()'s own signature does not yet propagate a queuing
          * acknowledge to its caller -- a separate, not-yet-attempted
@@ -309,7 +319,30 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
     }
 
     *out_request_type = request_type;
-    if (kind == RCP_SCHED_KIND_CANCELLATION) return RCP_SERVER_ADMIT_CANCELLATION;
+    if (kind == RCP_SCHED_KIND_CANCELLATION) {
+        /* REQ-TIMED-012/013 (TC18 §11.2, issue #422): "There are three
+         * basic types of requests... If received under TSCF header all of
+         * them shall be executed earliest at the given presentation
+         * time" -- Standard, Conditional, AND Cancel, with no carve-out.
+         * Previously this branch returned RCP_SERVER_ADMIT_CANCELLATION
+         * unconditionally, before tv/presentation_gate_ns (already
+         * resolved above) were ever consulted, so a cancellation always
+         * ran synchronously regardless of the TSCF header's own
+         * presentation time. Now routed through the identical
+         * admit_under_tscf_gate() helper Standard already uses above: a
+         * cancellation admitted with tv unset (NTSCF, or a TSCF header
+         * without a valid timestamp) keeps applying immediately, exactly
+         * as before; one admitted with tv set is instead stored and only
+         * actually applied once is_due()'s own envelope-level gate opens
+         * (mock.c's rcp_mock_server_tick() calls apply_cancellation()
+         * instead of the ordinary handler once this kind becomes due --
+         * see that function's own doc comment). */
+        if (tv) {
+            return admit_under_tscf_gate(ep, frame, frame_len, now, presentation_gate_ns,
+                                          RCP_SCHED_KIND_CANCELLATION, request_type, out_index);
+        }
+        return RCP_SERVER_ADMIT_CANCELLATION;
+    }
 
     slot = claim_slot(ep);
     if (!slot) {
@@ -458,6 +491,14 @@ static bool start_condition_holds(const rcp_server_pending_t *slot,
          * establishes. */
         return true;
 
+    case RCP_SCHED_KIND_CANCELLATION:
+        /* REQ-TIMED-012/013 (issue #422): only reachable here for a
+         * cancellation postponed purely by the envelope-level
+         * presentation-time gate (same is_due() gate, same reasoning as
+         * STANDARD immediately above) -- a cancellation has no
+         * kind-specific start condition of its own either. */
+        return true;
+
     default:
         return false;
     }
@@ -545,6 +586,14 @@ static bool delay_expired(const rcp_server_pending_t *slot, const rcp_server_tic
         /* REQ-TIMED-012: no exec_delay of its own -- is_due()'s own
          * envelope-level presentation gate (checked before this function
          * is ever reached) is this kind's entire condition here. */
+        return true;
+
+    case RCP_SCHED_KIND_CANCELLATION:
+        /* REQ-TIMED-012/013 (issue #422): same reasoning as STANDARD
+         * immediately above -- a cancellation reaches this function only
+         * when it was itself postponed purely by is_due()'s own
+         * envelope-level presentation gate, which has already been
+         * checked; it has no exec_delay of its own. */
         return true;
 
     default:
@@ -656,9 +705,14 @@ bool rcp_server_endpoint_complete(rcp_server_endpoint_t *ep, size_t index,
     case RCP_SCHED_KIND_TIMED:
     case RCP_SCHED_KIND_CHAINED:
     default:
-        /* Neither kind carries a repetition sub-field of its own: a timed
-         * request names one instant and a chain's repetition is driven by
-         * the chain's first request, not by its chained members. */
+        /* Neither TIMED nor CHAINED carries a repetition sub-field of its
+         * own: a timed request names one instant and a chain's repetition
+         * is driven by the chain's first request, not by its chained
+         * members. STANDARD and CANCELLATION (issue #422) fall through
+         * this same default for the identical reason -- neither carries a
+         * repeat_count either, so both are released after their single
+         * execution, the same one-shot disposition already established
+         * for a request under no envelope-level gate at all. */
         release_slot(ep, slot);
         return false;
     }

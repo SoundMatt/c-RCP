@@ -2316,10 +2316,26 @@ bool rcp_mock_server_tick(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
 
     if (!rcp_server_endpoint_select_due(&slot->queue, &local, &index)) return false;
 
-    /* Run the selected request's own stored frame through the endpoint's
-     * handler -- the identical execution path a standard request takes. */
-    run_handler(slot, slot->queue.pending[index].frame.data, slot->queue.pending[index].frame.len,
-                 out_response);
+    /* REQ-TIMED-012/013 (issue #422): a cancellation admitted under a TSCF
+     * header with a future presentation time is stored in the request
+     * store exactly like a standard/conditional request (see
+     * rcp_server_endpoint_admit()'s own TSCF gate, admit_under_tscf_gate())
+     * and surfaces here the same way once due -- but its own stored frame
+     * is a cancellation request, not something an endpoint handler
+     * understands. apply_cancellation() (this file, above) is the same
+     * function finish_admission()'s own RCP_SERVER_ADMIT_CANCELLATION case
+     * already calls for the tv=false/immediate path; this is that same
+     * logic, just reached from the deferred path instead. */
+    if (slot->queue.pending[index].kind == RCP_SCHED_KIND_CANCELLATION) {
+        apply_cancellation(slot, slot->queue.pending[index].request_type,
+                            slot->queue.pending[index].frame.data,
+                            slot->queue.pending[index].frame.len, byte_bus_id, out_response);
+    } else {
+        /* Run the selected request's own stored frame through the endpoint's
+         * handler -- the identical execution path a standard request takes. */
+        run_handler(slot, slot->queue.pending[index].frame.data,
+                     slot->queue.pending[index].frame.len, out_response);
+    }
 
     (void)rcp_server_endpoint_complete(&slot->queue, index, &local);
     return true;
