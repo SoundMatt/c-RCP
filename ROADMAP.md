@@ -19106,6 +19106,51 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.347.0 -- 2026-08-14 (REQ-RMAP-038: Sequencer_config storage claim
+was stale -- corrected to implemented, no code change)
+
+Continuing the `complete these now!` batch: investigated
+`REQ-RMAP-038` next, expecting to build a Sequencer_config wire codec
+from scratch based on its own text's "no real ... table storage
+anywhere yet for either pointer to meaningfully address" claim.
+
+Re-reading `include/rcp/request_sequencer.h` found that claim already
+false for the Sequencer_config half: `REQ-SEQ-013`/`REQ-SEQ-014`
+(issue #334/#335, 2026-08-13) already built real storage
+(`rcp_sequencer_table_t.state[]/owner[]`), a real wire codec
+(`rcp_regmap_sequencer_table_render()`/`_apply_reconfig()`, TC18
+§12.7.10 Table 28's 2-octet-per-sequencer stride), and full EP0
+dispatcher routing with ownership-aware per-octet write authorization
+-- all landed AFTER `REQ-RMAP-038`'s own text was last written, and
+never back-propagated to it. Re-verified directly against
+`src/regmap.c` and its own dispatcher-level tests
+(`tests/test_tc18_gaps_regmap.c`) before trusting this, not merely
+inferred from the sibling requirements' own status -- this session's
+third stale-requirement-text finding (after `REQ-UART-037` and
+`REQ-PWRMODE-019`).
+
+The EP_FUNC_config half (`svr_ep_functional_cfg_ptr`'s own target,
+TC18 §13.7.1.2 Table 33/36's RC-Server-specific block) remains
+genuinely unaddressable -- but that's `REQ-RMAP-067`'s own
+separately-tracked, already-documented spec self-contradiction (the
+Table 36 address collision plus §13.7.1.1's own prose contradicting
+the table), not a new finding and not this requirement's own
+responsibility to re-solve. `REQ-RMAP-038`'s own title claim (both
+pointers correctly sized and separately addressed) was already true;
+its own remaining-gap note is now resolved for the half that's
+actually its own scope.
+
+`.fusa-reqs.json`-only change, matching `REQ-PWRMODE-019`'s own prior
+precedent for a text-only stale-status correction -- no source edited.
+Full 66-test suite + ASan/UBSan clean (unaffected, run for
+consistency); `cfusa check`/`trace` (v0.5.54, first release run under
+the new pin): 0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`:
+`REQ-RMAP-038` partial -> implemented -- 1049 implemented / 18 partial
+/ 2 not-implemented / 7 retired, 1076 total.
+
+**Next**: `REQ-RMAP-068` bit-level SET/OR/AND/XOR register-write
+mechanism.
+
 ### v0.346.0 -- 2026-08-14 (CI tooling: bump pinned `cfusa` v0.5.51 -> v0.5.54)
 
 The user asked to update to the latest tagged c-FuSa release. Checked
