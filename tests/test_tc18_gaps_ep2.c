@@ -380,6 +380,11 @@ static void test_uart_read_size_above_one_octet_round_trips(void)
     rcp_bytes_free(&f);
 }
 
+/* REQ-UART-037's own stop_bits half-unit deviation CLOSED 2026-08-14
+ * (tc18-gap post-backlog audit) -- moved out of this still-genuinely-
+ * diverging test into test_uart_stop_bits_now_representable_at_half_
+ * unit_precision() below. The baud_rate/timeout deviations remain real,
+ * separate, unaddressed limitations this fix does not touch. */
 static void test_uart_register_units_diverge_from_table_48(void)
 {
     rcp_ep_uart_functional_cfg_t cfg;
@@ -395,18 +400,6 @@ static void test_uart_register_units_diverge_from_table_48(void)
     TEST_ASSERT_EQUAL_UINT32(115200u, cfg.baud_rate);
     TEST_ASSERT_GREATER_THAN_UINT32(65535u, cfg.baud_rate);
 
-    /* DEVIATION -- Table 48 counts uart_stop_bits in HALF stop bits, so 1.5
-     * stop bits is the legal value 3. c-RCP's enum has exactly two members,
-     * 0 and 1, meaning one and two whole stop bits; 3 passes the setter
-     * unvalidated and is stored, but names no framing this module defines,
-     * so 1.5-stop-bit framing is inexpressible. */
-    TEST_ASSERT_EQUAL_INT(0, (int)RCP_EP_UART_STOP_BITS_ONE);
-    TEST_ASSERT_EQUAL_INT(1, (int)RCP_EP_UART_STOP_BITS_TWO);
-    TEST_ASSERT_TRUE(rcp_ep_uart_set_frame_format(&cfg, 8u, RCP_EP_UART_PARITY_NONE,
-                                                  (rcp_ep_uart_stop_bits_t)3,
-                                                  RCP_LIFECYCLE_HW_CONFIGURED, w));
-    TEST_ASSERT_EQUAL_UINT8(3u, cfg.stop_bits);
-
     /* DEVIATION -- Table 48 expresses uart_timeout as an 8-bit count of BIT
      * TIMES measured from the last received stop bit. c-RCP stores a 32-bit
      * millisecond value with no measurement origin, unrelated to the baud
@@ -415,6 +408,29 @@ static void test_uart_register_units_diverge_from_table_48(void)
     TEST_ASSERT_TRUE(rcp_ep_uart_set_timeout(&cfg, 250u, RCP_LIFECYCLE_HW_CONFIGURED, w));
     TEST_ASSERT_TRUE(rcp_ep_uart_set_baud_rate(&cfg, 9600u, RCP_LIFECYCLE_HW_CONFIGURED, w));
     TEST_ASSERT_EQUAL_UINT32(250u, cfg.uart_timeout_ms);
+}
+
+/* CLOSED 2026-08-14 (REQ-UART-037, tc18-gap post-backlog audit): Table
+ * 48 counts uart_stop_bits in HALF stop bits, so 1.5 stop bits is the
+ * legal wire value 3. rcp_ep_uart_stop_bits_t now has a third member,
+ * RCP_EP_UART_STOP_BITS_ONE_HALF (2), so this is exactly representable
+ * through the public setter -- no longer an unvalidated raw integer with
+ * no named framing behind it. */
+static void test_uart_stop_bits_now_representable_at_half_unit_precision(void)
+{
+    rcp_ep_uart_functional_cfg_t cfg;
+    rcp_lifecycle_writer_ctx_t   w = any_writer();
+
+    rcp_ep_uart_functional_cfg_init(&cfg);
+
+    TEST_ASSERT_EQUAL_INT(0, (int)RCP_EP_UART_STOP_BITS_ONE);
+    TEST_ASSERT_EQUAL_INT(1, (int)RCP_EP_UART_STOP_BITS_TWO);
+    TEST_ASSERT_EQUAL_INT(2, (int)RCP_EP_UART_STOP_BITS_ONE_HALF);
+
+    TEST_ASSERT_TRUE(rcp_ep_uart_set_frame_format(&cfg, 8u, RCP_EP_UART_PARITY_NONE,
+                                                  RCP_EP_UART_STOP_BITS_ONE_HALF,
+                                                  RCP_LIFECYCLE_HW_CONFIGURED, w));
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_EP_UART_STOP_BITS_ONE_HALF, cfg.stop_bits);
 }
 
 /* ── ADC (§13.7.9) ─────────────────────────────────────────────────────────── */
@@ -1507,6 +1523,7 @@ int main(void)
     RUN_TEST(test_uart_compound_wait_now_resolved_via_generic_primitive);
     RUN_TEST(test_uart_read_size_above_one_octet_round_trips);
     RUN_TEST(test_uart_register_units_diverge_from_table_48);
+    RUN_TEST(test_uart_stop_bits_now_representable_at_half_unit_precision);
 
     RUN_TEST(test_adc_value_width_and_named_analog_input_signal);
     RUN_TEST(test_adc_functional_cfg_has_clock_status_and_interval_fields);

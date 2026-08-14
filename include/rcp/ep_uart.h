@@ -242,16 +242,26 @@
  *     wall-clock read-completion race timeout at a different layer
  *     entirely -- see this file header's own RX section above). Neither
  *     field is derived from the other.
- *   - stop_bits (the pre-existing rcp_ep_uart_stop_bits_t enum, ONE/TWO)
- *     round-trips through uart_stop_bits's half-stop-bit units via a
- *     documented, lossy simplification: render emits 2 for ONE and 4 for
- *     TWO; parse maps any value >= 3 to TWO and anything else to ONE.
- *     This enum has no representation for an intermediate half-stop-bit
- *     count (e.g. 1.5 stop bits, register value 3) -- the >= 3 threshold
- *     rounds such a value up to the more conservative TWO rather than
- *     truncating it down to ONE, matching this codebase's general
- *     fail-safe convention of not silently under-specifying a timing
- *     margin.
+ *   - stop_bits (rcp_ep_uart_stop_bits_t, now ONE/ONE_HALF/TWO -- see
+ *     REQ-UART-037's own CLOSED note below) round-trips through
+ *     uart_stop_bits's half-stop-bit units exactly: render emits 2 for
+ *     ONE, 3 for ONE_HALF, 4 for TWO; parse maps register value 2 to
+ *     ONE, 3 to ONE_HALF, and anything >= 4 (or < 2) to TWO/ONE
+ *     respectively, matching this codebase's general fail-safe
+ *     convention of not silently under-specifying a timing margin for
+ *     an out-of-range register value.
+ *
+ *     CLOSED 2026-08-14 (tc18-gap post-backlog audit, REQ-UART-037):
+ *     ONE_HALF (wire value 3, 1.5 stop bits) is now a real, third,
+ *     separately-representable enum member -- previously this enum had
+ *     exactly two members (0/1, one and two whole stop bits), so 1.5
+ *     stop bits passed the setter unvalidated and round-tripped through
+ *     the wire as the DIFFERENT value TWO on parse, an honestly-
+ *     documented but real lossy conflation. No existing call site in
+ *     this codebase used a `switch` over this enum (grep-confirmed
+ *     before adding the new member), so this addition is source-
+ *     compatible everywhere it was already used by direct comparison or
+ *     assignment.
  *
  * uart_nr_bits (0x0008) maps directly, byte-for-byte, onto the
  * pre-existing uart_nr_bits field -- both are literally "the number of
@@ -308,8 +318,14 @@ typedef enum {
 } rcp_ep_uart_parity_t;
 
 typedef enum {
-    RCP_EP_UART_STOP_BITS_ONE = 0,
-    RCP_EP_UART_STOP_BITS_TWO = 1,
+    RCP_EP_UART_STOP_BITS_ONE      = 0,
+    RCP_EP_UART_STOP_BITS_TWO      = 1,
+    /* REQ-UART-037 (tc18-gap post-backlog audit, 2026-08-14): 1.5 stop
+     * bits -- Table 48's own uart_stop_bits register value 3 (half-
+     * stop-bit units). Appended rather than inserted, so TWO's own
+     * existing numeric value (1) is unchanged for any code that stored
+     * it as a raw integer before this fix. */
+    RCP_EP_UART_STOP_BITS_ONE_HALF = 2,
 } rcp_ep_uart_stop_bits_t;
 
 /* ── Functional config ─────────────────────────────────────────────────────── */

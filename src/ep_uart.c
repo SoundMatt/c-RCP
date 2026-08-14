@@ -138,15 +138,18 @@ bool rcp_ep_uart_set_timeout(rcp_ep_uart_functional_cfg_t *cfg, uint32_t timeout
 #define UART_OPTIONS_BIT_SUPPRESS  ((uint8_t)(1u << 7))
 
 /* uart_stop_bits's own half-stop-bit units <-> rcp_ep_uart_stop_bits_t --
- * see the file header for the documented, deliberately lossy mapping. */
+ * see the file header for the exact three-way mapping (REQ-UART-037). */
 static uint8_t stop_bits_to_half_units(uint8_t stop_bits)
 {
-    return stop_bits == (uint8_t)RCP_EP_UART_STOP_BITS_TWO ? 4u : 2u;
+    if (stop_bits == (uint8_t)RCP_EP_UART_STOP_BITS_TWO) return 4u;
+    if (stop_bits == (uint8_t)RCP_EP_UART_STOP_BITS_ONE_HALF) return 3u;
+    return 2u; /* RCP_EP_UART_STOP_BITS_ONE, and any other/invalid value */
 }
 
 static uint8_t half_units_to_stop_bits(uint8_t half_units)
 {
-    return half_units >= 3u ? (uint8_t)RCP_EP_UART_STOP_BITS_TWO
+    if (half_units == 3u) return (uint8_t)RCP_EP_UART_STOP_BITS_ONE_HALF;
+    return half_units >= 4u ? (uint8_t)RCP_EP_UART_STOP_BITS_TWO
                              : (uint8_t)RCP_EP_UART_STOP_BITS_ONE;
 }
 

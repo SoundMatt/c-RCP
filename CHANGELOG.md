@@ -34,6 +34,18 @@ the rationale.
 
 ## Releases
 
+### v0.339.0 -- 2026-08-14 (REQ-UART-037: 1.5 stop bits, Table 48's own uart_stop_bits value 3, now exactly representable)
+
+Sixth of 14 items catalogued "not blocked, left by explicit decision" in the post-backlog requirements audit -- the first of this batch that's a real, source-compatible enum widening rather than a composition or a stale-text fix.
+
+`rcp_ep_uart_stop_bits_t` (ep_uart.h) previously had exactly two members (`ONE`/`TWO`), so TC18 §13.7.8.2 Table 48's own `uart_stop_bits` register value 3 (1.5 stop bits, expressed in half-stop-bit units) passed the public setter unvalidated and rounded UP to `TWO` on register parse -- an honestly-documented but real conflation, distinct from that same requirement's own two other, still-open Table 48 divergences (`uart_baud_rate`'s 16-bit-vs-`uint32_t` width, `uart_timeout`'s bit-time-vs-millisecond unit/origin).
+
+New `RCP_EP_UART_STOP_BITS_ONE_HALF = 2`, **appended** (not inserted) so `TWO`'s own existing numeric value (1) is unchanged for source compatibility -- confirmed no call site anywhere in this codebase uses a `switch` over this enum before adding the member, so every existing use (direct comparison or assignment) is unaffected. `stop_bits_to_half_units()`/`half_units_to_stop_bits()` (ep_uart.c) now map all three legal register values (2/3/4) exactly; an out-of-range value still fails safe toward the same conservative defaults as before.
+
+Both the old parse-side deviation-pin test (`test_ep_uart.c`) and the stop_bits half of the old regmap-divergence deviation-pin test (`test_tc18_gaps_ep2.c`) are rewritten to prove the new exact mapping instead of pinning the old rounding behavior; a new render-side test proves the same mapping in the encode direction. Both the parse-side and render-side three-way mapping were mutation-tested and caught cleanly.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`: `REQ-UART-037` text updated, stays `partial` (the requirement's other two Table 48 divergences remain genuinely open) -- 1042 implemented / 25 partial / 2 not-implemented / 7 retired, 1076 total, unchanged.
+
 ### v0.338.0 -- 2026-08-14 (REQ-PWRMODE-019: stale "not modeled" text corrected, closed)
 
 Fifth of 14 items catalogued "not blocked, left by explicit decision" -- and a genuine data-quality find, not new feature work. This requirement's own text cited `test_response_queue_has_no_identity_size_or_storage()` and `test_flush_triggers_and_heartbeat_are_absent()` as evidence that response-queue objects and heartbeat-stream re-emission were "not modeled anywhere in this codebase." Neither test exists anymore (grep-confirmed) -- both were superseded by real work already shipped: `response_queue_cfg[]` storage (`REQ-RMAP-034/059-061`) and heartbeat-stream re-emission (`REQ-RMAP-065/SRV-017`, the immediately preceding release). `rcp_mock_server_pwrmode_resume()`'s own doc comment (mock.h) carried the identical stale claim and is corrected to match.
