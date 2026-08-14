@@ -1887,8 +1887,13 @@ static void test_e2e_seq_evaluate_wraparound_is_a_clean_single_increment(void)
  * when any one endpoint's request storage overflows.
  * rcp_server_endpoint_admit() reports the per-request half conformantly
  * -- *out_error is RCP_ERROR_REQUEST_STORAGE_OVERFLOW, letting a caller
- * build a real Table 27 error response via rcp_acf_build_error_response()
- * (see mock.c's finish_admission() for a worked example) -- but this
+ * build a real Table 27 response (see mock.c's finish_admission() for a
+ * worked example: as of issue #430/REQ-ACF-033, a RCP_SERVER_ADMIT_
+ * REJECTED outcome like this one -- the request was never filed into
+ * storage at all -- is answered with TC18 §11.3.1's Acknowledge-shaped
+ * rejection, rcp_acf_build_acknowledge_rejected_response(), not the
+ * §11.3.4 Error Response rcp_acf_build_error_response() builds for a
+ * request already filed whose later execution fails) -- but this
  * function itself, tested here in isolation via a bare rcp_server_endpoint_t
  * with no request-stream context, still correctly does NOT perform the
  * stream-wide safe-state escalation on its own: server.h has no

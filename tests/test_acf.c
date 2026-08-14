@@ -983,6 +983,77 @@ static void test_build_error_response_never_classifies_as_acknowledge(void)
     rcp_bytes_free(&resp);
 }
 
+/* ── Acknowledge-shaped storage-admission rejection (TC18 §11.3.1) ─────────── */
+
+/* FIXED 2026-08-14 (issue #430, REQ-ACF-033): TC18 §11.3.1's own OTHER
+ * Acknowledge shape -- "err = 1 indicates that the request has been
+ * rejected. The byte_msg_payload contains an error code." -- for a
+ * request that was never filed into EP request storage at all. Distinct
+ * from rcp_acf_build_error_response()'s §11.3.4 Error Response shape
+ * (evt[3:0] < 0x9, err = 1): same err=1/one-octet-payload wire shape,
+ * but THIS function's evt = RCP_ACF_EVT_ACKNOWLEDGE (0xF) is what makes
+ * rcp_acf_classify_response() recognize it as RCP_ACF_RESP_ACKNOWLEDGE
+ * rather than RCP_ACF_RESP_ERROR -- the two are not interchangeable on
+ * the wire, whatever their payload happens to carry. */
+//cfusa:test REQ-ACF-033
+static void test_build_acknowledge_rejected_response_carries_bus_id_txn_and_code(void)
+{
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    rcp_bytes_t                  resp = rcp_acf_build_acknowledge_rejected_response(
+        (rcp_byte_bus_id_t)7, 200, RCP_ERROR_REQUEST_STORAGE_OVERFLOW);
+
+    TEST_ASSERT_NOT_NULL(resp.data);
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(resp.data, resp.len, &hdr, &payload,
+                                                      &payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ACKNOWLEDGE, rcp_acf_classify_response(&hdr));
+    TEST_ASSERT_EQUAL_UINT8(RCP_ACF_EVT_ACKNOWLEDGE, hdr.evt);
+    TEST_ASSERT_EQUAL_UINT8(1u, hdr.err);
+    TEST_ASSERT_EQUAL_UINT8(1u, hdr.rsp);
+    TEST_ASSERT_EQUAL_UINT8(7u, hdr.byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT8(200u, hdr.transaction_num);
+    TEST_ASSERT_EQUAL_size_t(1, payload_len);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_REQUEST_STORAGE_OVERFLOW, payload[0]);
+
+    rcp_bytes_free(&resp);
+}
+
+/* Pins the distinction from rcp_acf_build_error_response() directly: same
+ * transaction_num/error code, but the two builders' own responses must
+ * classify differently (Acknowledge vs Error), and only the rejected-
+ * acknowledge shape's own evt is 0xF. */
+//cfusa:test REQ-ACF-033
+static void test_build_acknowledge_rejected_response_differs_from_error_response(void)
+{
+    rcp_acf_byte_message_info_t ack_hdr, err_hdr;
+    const uint8_t               *ack_payload, *err_payload;
+    size_t                       ack_payload_len, err_payload_len;
+    rcp_bytes_t                  ack_resp = rcp_acf_build_acknowledge_rejected_response(
+        (rcp_byte_bus_id_t)3, 55, RCP_ERROR_UNSUPPORTED_CMD);
+    rcp_bytes_t                  err_resp =
+        rcp_acf_build_error_response((rcp_byte_bus_id_t)3, 55, RCP_ERROR_UNSUPPORTED_CMD);
+
+    TEST_ASSERT_NOT_NULL(ack_resp.data);
+    TEST_ASSERT_NOT_NULL(err_resp.data);
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(ack_resp.data, ack_resp.len, &ack_hdr,
+                                                      &ack_payload, &ack_payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(err_resp.data, err_resp.len, &err_hdr,
+                                                      &err_payload, &err_payload_len));
+
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ACKNOWLEDGE, rcp_acf_classify_response(&ack_hdr));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&err_hdr));
+    TEST_ASSERT_EQUAL_UINT8(RCP_ACF_EVT_ACKNOWLEDGE, ack_hdr.evt);
+    TEST_ASSERT_NOT_EQUAL(RCP_ACF_EVT_ACKNOWLEDGE, err_hdr.evt);
+    /* Both carry err=1 and the same payload octet -- only evt tells them apart. */
+    TEST_ASSERT_EQUAL_UINT8(1u, ack_hdr.err);
+    TEST_ASSERT_EQUAL_UINT8(1u, err_hdr.err);
+    TEST_ASSERT_EQUAL_UINT8(ack_payload[0], err_payload[0]);
+
+    rcp_bytes_free(&ack_resp);
+    rcp_bytes_free(&err_resp);
+}
+
 /* ── Message-type dispatch ─────────────────────────────────────────────────── */
 
 static void test_peek_msg_type_reads_first_byte(void)
@@ -1089,6 +1160,8 @@ int main(void)
 
     RUN_TEST(test_build_error_response_carries_bus_id_txn_and_code);
     RUN_TEST(test_build_error_response_never_classifies_as_acknowledge);
+    RUN_TEST(test_build_acknowledge_rejected_response_carries_bus_id_txn_and_code);
+    RUN_TEST(test_build_acknowledge_rejected_response_differs_from_error_response);
 
     RUN_TEST(test_peek_msg_type_reads_first_byte);
     RUN_TEST(test_peek_msg_type_rejects_empty_buffer);
