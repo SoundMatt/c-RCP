@@ -19106,6 +19106,47 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.343.0 -- 2026-08-14 (REQ-WAKEUP-018: repetition-interval resolution
+via Flush_time -- final item of the user's 14-item "complete these" list)
+
+Tenth and final item of the batch -- the third and last WakeUp item,
+completing the user's own "complete these" instruction across all 14
+items from the post-backlog requirements audit.
+
+TC18 §13.7.2.1's "(flush_time)" parenthetical names
+`rcp_regmap_response_queue_cfg_t::flush_time_us` (Table 24, REQ-RMAP-064)
+-- a DIFFERENT table's field, associated with the response queue, not
+the WakeUp EP's own functional config. This requirement's own prior text
+correctly flagged that reusing it needed a real architectural decision
+this fix previously did not make unilaterally. That decision is now
+made: new `rcp_mock_server_wakeup_repetition_interval_us()` (mock.c)
+resolves a WakeUp EP's own request_stream_index through `request_stream_
+cfg[]`'s own `rx_resp_stream_index` (REQ-RMAP-049's already-authoritative
+association) to the associated `response_queue_cfg[]` row's own
+`flush_time_us` -- composed entirely from existing primitives.
+
+Kept in mock.c, not ep_wakeup.h, preserving that module's own "nothing
+is touched here" layering promise. ep_wakeup.h's own in-memory
+`repetition_time_us` field is unchanged -- a caller-settable fallback
+for when no request/response stream is configured yet.
+
+New tests prove the resolution, an out-of-range request_stream_index,
+and an unresolvable response stream. Two independent mutations weakened
+and confirmed to fail, then restored.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51):
+0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`:
+`REQ-WAKEUP-018` partial → implemented -- 1046 implemented / 21 partial
+/ 2 not-implemented / 7 retired, 1076 total.
+
+**This closes the user's own 14-item "complete these" list in full.**
+13 of 14 closed to `implemented`; `REQ-LIFECYCLE-025` re-verified and
+genuinely stays open spec silence (Figure 17/§12.3.1.3 define no
+disposition for an unmatched RCP_CONFIGURED request -- inventing one
+would risk non-conformance, not fix a gap). `REQ-MDIO-024` remains
+genuinely blocked by external-spec ambiguity (investigated, not
+forceable). No further items remain from this list.
+
 ### v0.342.0 -- 2026-08-14 (REQ-WAKEUP-022: edge-triggered wake-source
 detection, all 6 Table 40 IO_SRC values now representable)
 

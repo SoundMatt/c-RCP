@@ -402,34 +402,48 @@ typedef struct {
                                 to its own choice), matching every other
                                 zero-init default in this struct.
                                 DISCOVERABLE and SETTABLE over this
-                                module's own in-memory API (closing the
-                                specific complaint REQ-WAKEUP-018's own
-                                text raised), but NOT wire-reachable: TC18
-                                §13.7.2.2 Table 36 (the WakeUp EP's own
-                                functional-config register block, already
-                                fully mapped by REQ-WAKEUP-021 above)
-                                defines no field for it at all -- the
-                                *only* other TC18 mention of a WakeUp
-                                repetition/timing concept is §13.7.2.1's
-                                own parenthetical "(flush_time)", naming a
-                                register that lives on a DIFFERENT table
-                                entirely (rcp_regmap_response_queue_cfg_t
-                                ::flush_time_us, TC18 §12.7.9 Table 24,
+                                module's own in-memory API, but NOT itself
+                                wire-reachable: TC18 §13.7.2.2 Table 36/40
+                                (the WakeUp EP's own functional-config
+                                register block, already fully mapped by
+                                REQ-WAKEUP-021/022 above) defines no field
+                                for it at all -- the *only* other TC18
+                                mention of a WakeUp repetition/timing
+                                concept is §13.7.2.1's own parenthetical
+                                "(flush_time)", naming a register that
+                                lives on a DIFFERENT table entirely
+                                (rcp_regmap_response_queue_cfg_t::
+                                flush_time_us, TC18 §12.7.9 Table 24,
                                 REQ-RMAP-064) associated with the response
                                 QUEUE, not this endpoint's own functional
-                                config -- reusing that field here would
-                                require this module to reach into a
-                                different endpoint's own response-queue
-                                row by ep_id/byte_bus_id lookup, a real
-                                architectural decision this fix
-                                deliberately does not make unilaterally.
-                                This field's own remaining wire-mapping
-                                gap is therefore left honestly open,
-                                exactly like every other Table-36-omits-
-                                a-field finding in this same module (see
-                                the file header's own register-block
-                                note) rather than inventing a wire address
-                                TC18 does not define. */
+                                config.
+                                RESOLVED 2026-08-14 (issue #341 lineage):
+                                the real, wire-derived value is now
+                                available via mock.h's
+                                rcp_mock_server_wakeup_repetition_
+                                interval_us() -- following the same
+                                request-stream -> response-stream ->
+                                Flush_time chain rcp_mock_server_check_
+                                response_queue_heartbeat() already
+                                established for REQ-RMAP-065/SRV-017,
+                                composed entirely from existing
+                                primitives (regmap.h's own rx_resp_
+                                stream_index cross-reference), not a new
+                                field on this struct -- this field itself
+                                stays exactly what its own doc comment
+                                already said: a caller-settable in-memory
+                                fallback for when no request/response
+                                stream is configured yet, not the
+                                authoritative wire-derived source once
+                                one is. Kept in ep_wakeup.h rather than
+                                reading regmap.h's response-queue tables
+                                directly, preserving this module's own
+                                "nothing... is touched here" layering
+                                promise (file header, above) -- the real
+                                cross-table composition lives in mock.c
+                                instead, matching every other cross-
+                                endpoint composition this codebase
+                                already places there. */
 } rcp_ep_wakeup_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false; every source entry

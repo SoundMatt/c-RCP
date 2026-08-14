@@ -347,6 +347,50 @@ bool rcp_mock_server_check_response_queue_heartbeat(rcp_mock_server_t *srv,
                                                       const uint8_t mac[6], uint64_t now_us,
                                                       rcp_bytes_t *out_heartbeat);
 
+/* ── REQ-WAKEUP-018: WakeUp repetition interval, resolved from Flush_time ──── */
+
+/* TC18 §13.7.2.1's own text: "After establishing a network connection,
+ * the WakeUp endpoint sends repetitive messages. The timing interval is
+ * configurable (flush_time)." ep_wakeup.h's own REQ-WAKEUP-018 finding
+ * named the architectural decision this parenthetical requires but does
+ * not itself make: "(flush_time)" names TC18 §12.7.9 Table 24's
+ * flush_time_us -- the SAME register REQ-RMAP-064 and REQ-RMAP-065/
+ * SRV-017 (rcp_mock_server_check_response_queue_heartbeat() above)
+ * already model -- not a field of the WakeUp endpoint's own functional
+ * config (Table 39/40 defines none), so resolving it requires reaching
+ * into a DIFFERENT table via a chain of existing cross-references, not
+ * a wire-level field ep_wakeup.h itself could ever carry. This function
+ * is that resolution, composed entirely from primitives this codebase
+ * already has (the same "compose, don't reinvent" discipline
+ * rcp_mock_server_check_response_queue_heartbeat() itself already
+ * established) -- it does not read or write ep_wakeup.h's own in-memory
+ * rcp_ep_wakeup_functional_cfg_t::repetition_time_us field at all (that
+ * field remains a caller-settable fallback for when no request/response
+ * stream is configured yet, per its own doc comment); this function is
+ * the real, wire-derived value once one is.
+ *
+ * request_stream_index is the WakeUp endpoint's own 1-based request-
+ * stream identity (the same identity rcp_regmap_request_stream_cfg_
+ * resolve_index() produces from a raw incoming stream_id, and the same
+ * one rcp_mock_server_check_response_queue_heartbeat()'s own
+ * response_stream_index parameter is downstream of) -- this function
+ * follows srv->request_stream_cfg[request_stream_index-1]'s own
+ * rx_resp_stream_index (REQ-RMAP-049's own field, already the
+ * authoritative request-stream -> response-stream association this
+ * codebase maintains) to the associated response_queue_cfg[] row and
+ * returns its own flush_time_us as *out_interval_us.
+ *
+ * Returns false, *out_interval_us left at 0, if request_stream_index is
+ * 0 or exceeds srv's own currently-configured request_stream_cfg_count,
+ * or if the resolved rx_resp_stream_index is itself 0 or exceeds srv's
+ * own response_queue_cfg_count -- the identical "0 is unset, out-of-
+ * range is unconfigured" convention rcp_mock_server_check_response_
+ * queue_heartbeat() already uses for the same response_stream_index
+ * identity, not a fresh invention. */
+bool rcp_mock_server_wakeup_repetition_interval_us(const rcp_mock_server_t *srv,
+                                                     uint8_t request_stream_index,
+                                                     uint32_t *out_interval_us);
+
 /* Replaces srv's own EP_ID_config table (TC18 §12.7.8 Table 23) wholesale
  * with a copy of entries[0..count). Returns false (srv's own table left
  * unchanged) if count exceeds RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES (regmap.h);
