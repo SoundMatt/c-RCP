@@ -138,6 +138,26 @@ struct rcp_mock_server {
      * storage in this server double at all. */
     rcp_regmap_response_queue_cfg_t response_queue_cfg[RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES];
     size_t                          response_queue_cfg_count;
+    /* REQ-RMAP-065/SRV-017 (tc18-gap post-backlog audit): per-response-
+     * queue Flush_time bookkeeping -- rcp_respqueue_should_flush_by_time()
+     * (respqueue.h) takes elapsed_since_last_transmit_us as a caller-
+     * supplied value, exactly like e2e.h's own rcp_e2e_wd_evaluate()
+     * convention; this module owns no clock of its own (see that
+     * function's own file-header note), only the bookkeeping of WHEN a
+     * response stream last transmitted, so a caller repeatedly checking
+     * "is it time yet" doesn't have to track that itself.
+     * response_queue_seeded[]/_last_transmit_us[] together are the same
+     * "has_previous" idiom rcp_server_gptp_trigger_state_t (server.h)
+     * already establishes: the very first check for a given response
+     * stream only seeds last_transmit_us to that call's own now_us and
+     * reports no heartbeat due, rather than measuring elapsed time
+     * against an arbitrary zero epoch and firing a spurious heartbeat
+     * immediately on srv's own first-ever check. Zero-init-safe as
+     * arrays (seeded starts false, matching rcp_server_gptp_trigger_
+     * state_t's own has_previous default) -- no explicit rcp_mock_
+     * server_new() initialization needed. */
+    bool                             response_queue_seeded[RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES];
+    uint64_t              response_queue_last_transmit_us[RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES];
     /* EP_ID_config table (issue #335) -- see mock.h's own doc comment on
      * rcp_mock_server_set_ep_id_map(). Srv's own only way to know which
      * byte_bus_ids are bound to a given request_stream_index --
@@ -365,6 +385,58 @@ bool rcp_mock_server_set_response_queue_cfg(rcp_mock_server_t *srv,
      * RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES (64), well within
      * uint8_t. */
     srv->regmap.svr_response_stream_cfg_capacity = (uint8_t)count;
+    return true;
+}
+
+//cfusa:req REQ-RMAP-065
+//cfusa:req REQ-SRV-017
+bool rcp_mock_server_check_response_queue_heartbeat(rcp_mock_server_t *srv,
+                                                      uint8_t response_stream_index,
+                                                      const uint8_t mac[6], uint64_t now_us,
+                                                      rcp_bytes_t *out_heartbeat)
+{
+    size_t                            idx;
+    rcp_regmap_response_queue_cfg_t *cfg;
+    uint64_t                          elapsed_us;
+    rcp_avtp_ntscf_header_t           hdr;
+
+    memset(out_heartbeat, 0, sizeof(*out_heartbeat));
+
+    if (response_stream_index == 0u || (size_t)response_stream_index > srv->response_queue_cfg_count) {
+        return false;
+    }
+    idx = (size_t)response_stream_index - 1u;
+    cfg = &srv->response_queue_cfg[idx];
+
+    if (!srv->response_queue_seeded[idx]) {
+        srv->response_queue_seeded[idx]         = true;
+        srv->response_queue_last_transmit_us[idx] = now_us;
+        return false; /* nothing to measure elapsed time against yet */
+    }
+
+    if (now_us < srv->response_queue_last_transmit_us[idx]) {
+        return false; /* non-monotonic caller input -- fail toward no heartbeat
+                          rather than an unsigned-underflow false positive */
+    }
+
+    elapsed_us = now_us - srv->response_queue_last_transmit_us[idx];
+    if (!rcp_respqueue_should_flush_by_time(elapsed_us, cfg->flush_time_us)) {
+        return false;
+    }
+
+    memset(&hdr, 0, sizeof(hdr));
+    hdr.sv        = 1;
+    hdr.stream_id = rcp_regmap_response_queue_stream_id(cfg, mac);
+
+    *out_heartbeat = rcp_avtp_encode_ntscf(&hdr, NULL, 0);
+    /* Only advance the bookkeeping on a real success -- an allocation
+     * failure means nothing was actually transmitted, so the next check
+     * should still see this heartbeat as owed and retry, not silently
+     * skip a whole Flush_time interval because one attempt happened to
+     * fail. */
+    if (out_heartbeat->data != NULL) {
+        srv->response_queue_last_transmit_us[idx] = now_us;
+    }
     return true;
 }
 
