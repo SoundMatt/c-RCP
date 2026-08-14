@@ -375,6 +375,52 @@ rcp_discovery_claim_t   *rcp_mock_server_discovery_claim(rcp_mock_server_t *srv)
  * never left holding an uninitialized timeout_ms. */
 void rcp_mock_server_set_discovery_timeout_us(rcp_mock_server_t *srv, uint16_t timeout_us);
 
+/* ── EP_generic_cfg live view (REQ-RMAP-036, issue #334) ───────────────────── */
+
+/* REQ-RMAP-036: each registered endpoint slot already carries its own
+ * rcp_regmap_ep_generic_cfg_t (rcp_mock_server_add_endpoint()'s own
+ * generic parameter) -- real storage, just held per-slot (sparse,
+ * indexed by registration) rather than as the contiguous array
+ * rcp_regmap_ep0_decode_write_request()/_encode_read_response()'s own
+ * ep_generic_cfg/ep_generic_cfg_count parameters expect. These two
+ * functions bridge that gap without inventing a second, parallel wire
+ * codec: gather a snapshot into a caller-supplied scratch array (the
+ * same "ask first, then size a buffer" idiom
+ * rcp_regmap_ep_id_map_byte_bus_ids_for_stream() already establishes),
+ * hand that array to the real dispatcher (which mutates it in place on
+ * a write, using the already-tested rcp_regmap_ep_generic_cfg_apply_
+ * reconfig()), then apply the scatter function below to commit any
+ * change back into the live slots -- one atomic gather-dispatch-scatter
+ * sequence per request, so there is never a window where a stale copy
+ * could be read from or written to independently of the live state.
+ * Row order is this server double's own slot-array iteration order
+ * (in_use slots only, skipping empty ones) -- TC18 defines no
+ * requirement-relevant ordering for this table beyond each row's own
+ * wire offset, and gather/scatter always use the identical order
+ * within one call, so a write's own row identity is stable for the
+ * whole gather-dispatch-scatter sequence it took part in. */
+
+/* Copies srv's own live per-endpoint generic-cfg fields, in_use slots
+ * only, into out[0..min(count, out_capacity)). Returns the TOTAL
+ * number of in_use endpoints (srv->endpoint_count), which may exceed
+ * out_capacity -- same idiom as
+ * rcp_regmap_ep_id_map_byte_bus_ids_for_stream(). out may be NULL iff
+ * out_capacity == 0. */
+size_t rcp_mock_server_ep_generic_cfg_view(const rcp_mock_server_t *srv,
+                                            rcp_regmap_ep_generic_cfg_t *out, size_t out_capacity);
+
+/* The inverse of rcp_mock_server_ep_generic_cfg_view() above -- writes
+ * entries[0..count) back into srv's own live in_use slots, in the
+ * identical iteration order the view above used. Returns false (srv's
+ * own slots left entirely unchanged) if count does not exactly match
+ * srv->endpoint_count -- this function is only ever safe to call with
+ * the same count the paired _view() call just returned, applied to
+ * the identical, unmodified-in-the-meantime slot set; a mismatched
+ * count would silently misattribute rows to the wrong endpoint. */
+bool rcp_mock_server_apply_ep_generic_cfg(rcp_mock_server_t *srv,
+                                           const rcp_regmap_ep_generic_cfg_t *entries,
+                                           size_t count);
+
 /* ── Endpoint registration ─────────────────────────────────────────────────── */
 
 /* Adds one endpoint slot addressed at byte_bus_id, with generic config

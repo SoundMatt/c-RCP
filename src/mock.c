@@ -510,6 +510,40 @@ bool rcp_mock_server_remove_endpoint(rcp_mock_server_t *srv, rcp_byte_bus_id_t b
     return true;
 }
 
+//cfusa:req REQ-RMAP-036
+size_t rcp_mock_server_ep_generic_cfg_view(const rcp_mock_server_t *srv,
+                                            rcp_regmap_ep_generic_cfg_t *out, size_t out_capacity)
+{
+    size_t i;
+    size_t written = 0;
+
+    for (i = 0; i < RCP_MOCK_MAX_ENDPOINTS; i++) {
+        if (!srv->endpoints[i].in_use) continue;
+        if (written < out_capacity) out[written] = srv->endpoints[i].generic;
+        written++;
+    }
+
+    return srv->endpoint_count;
+}
+
+//cfusa:req REQ-RMAP-036
+bool rcp_mock_server_apply_ep_generic_cfg(rcp_mock_server_t *srv,
+                                           const rcp_regmap_ep_generic_cfg_t *entries, size_t count)
+{
+    size_t i;
+    size_t taken = 0;
+
+    if (count != srv->endpoint_count) return false;
+
+    for (i = 0; i < RCP_MOCK_MAX_ENDPOINTS && taken < count; i++) {
+        if (!srv->endpoints[i].in_use) continue;
+        srv->endpoints[i].generic = entries[taken];
+        taken++;
+    }
+
+    return true;
+}
+
 //cfusa:req REQ-MOCK-010
 bool rcp_mock_server_set_endpoint_enable(rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id,
                                           bool enable)

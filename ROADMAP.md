@@ -19106,6 +19106,37 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.331.0 -- 2026-08-14 (tc18-gap backlog PR I: REQ-RMAP-036
+ep_generic_cfg live-storage wiring)
+
+Follow-up item found while accounting for the remaining backlog after
+PR H (task #116). `REQ-RMAP-036`'s own text was stale: claimed no
+storage exists, but `rcp_mock_endpoint_slot_t` already carries its
+own `rcp_regmap_ep_generic_cfg_t` per registered endpoint -- just
+sparse, not the contiguous array the EP0 dispatcher expects.
+
+New `rcp_mock_server_ep_generic_cfg_view()`/`_apply_ep_generic_cfg()`
+(mock.h/mock.c) bridge the gap without a second wire codec: gather a
+snapshot, let the real, already-tested dispatcher primitives mutate
+it, scatter the result back into the live slots. Rejects a
+mismatched count outright.
+
+New tests: a genuine round trip through the real dispatcher, plus
+dedicated hole-in-the-slot-array tests for both the gather and
+scatter loops' own `in_use` skip (a hole-free setup would pass even
+with the skip removed -- caught by mutation testing, fixed). All
+mutation-tested and caught cleanly. `REQ-RMAP-036` flips partial ->
+implemented.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace`
+(v0.5.51): 0 errors, 0/1076 untested. `.fusa-reqs.json`: 1035
+implemented / 32 partial / 2 not-implemented / 7 retired (1076
+total).
+
+**Next**: `REQ-E2E-046`'s own relationship to the already-shipped
+`rcp_e2e_stream_fault_tracker_t` mechanism needs a quick
+investigation before PR E proceeds.
+
 ### v0.330.0 -- 2026-08-13 (tc18-gap backlog PR H: REQ-RMAP-066
 discovery-timeout wiring)
 
