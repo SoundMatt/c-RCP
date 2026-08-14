@@ -546,20 +546,67 @@ bool rcp_mock_server_apply_ep_generic_cfg(rcp_mock_server_t *srv,
 
 /* TC18 0.5.1_RC5 Table 24's own rx_stream_status bit (0x000D.7,
  * read-only): true iff the request stream identified by stream_id is
- * currently blocked (any of its own CRC/sequence/overflow causes is
- * latched -- see rcp_e2e_stream_status_t's own doc comment, e2e.h, for
- * which fourth cause, watchdog, this server double has no live
- * evaluate() call site for yet and therefore never latches). False,
- * not an error, for a stream_id this server has no configured request
- * stream for (unresolvable via rcp_regmap_request_stream_cfg_resolve_
- * index()) -- the same fail-toward-not-blocked disposition every other
- * unresolvable-stream case in this module already uses. srv's own
- * live dispatch paths (rcp_mock_server_dispatch_e2e()'s own CRC check,
- * the frame-level sequence gate both dispatch_frame()/_dispatch_frame_
- * e2e() share, and the request-storage-overflow check inside admission)
- * already latch this state as a byproduct of their own existing work --
- * this accessor is the read side, not a second evaluation. */
+ * currently blocked (any of its own CRC/sequence/watchdog/overflow
+ * causes is latched -- see rcp_e2e_stream_status_t's own doc comment,
+ * e2e.h). False, not an error, for a stream_id this server has no
+ * configured request stream for (unresolvable via rcp_regmap_request_
+ * stream_cfg_resolve_index()) -- the same fail-toward-not-blocked
+ * disposition every other unresolvable-stream case in this module
+ * already uses. srv's own live dispatch paths (rcp_mock_server_
+ * dispatch_e2e()'s own CRC check, the frame-level sequence gate both
+ * dispatch_frame()/_dispatch_frame_e2e() share, and the request-
+ * storage-overflow check inside admission) already latch three of the
+ * four causes as a byproduct of their own existing work; the fourth,
+ * watchdog, is latched by rcp_mock_server_check_watchdog() below --
+ * this accessor is the read side for all four, not a second
+ * evaluation. */
 bool rcp_mock_server_stream_status_rx_blocked(const rcp_mock_server_t *srv, uint64_t stream_id);
+
+/* REQ-E2E-046's own last remaining cause (issue #341 lineage): TC18's
+ * rx_stream_status names four fault classes -- CRC error, sequence
+ * error, watchdog overflow, request-storage overflow -- and, unlike
+ * the other three (each an inherently SYNCHRONOUS, content-based check
+ * triggered by a single frame arriving), a watchdog is a TIME-based
+ * absence-of-activity detector: e2e.h's own rcp_e2e_wd_evaluate() takes
+ * elapsed_since_last_kick_ms as an explicit, caller-computed input,
+ * stating plainly that "this module owns no clock or background thread
+ * of its own" -- srv does not either (the same "protocol library, not
+ * a scheduler" boundary rcp_mock_server_check_response_queue_
+ * heartbeat()'s own doc comment already states for a different
+ * concern). This function is therefore this server's own thin
+ * composition, not a new clock or kick-tracker: given request_stream_
+ * index (the same 1-based identity every other per-request-stream
+ * query in this file already uses) and a caller-computed elapsed_
+ * since_last_kick_ms, it reads that stream's own rx_wd_enable/
+ * rx_wd_timeout_ms/rx_wd_safestate_enable/rx_wd_info_enable
+ * (rcp_regmap_request_stream_cfg_t) straight into rcp_e2e_wd_evaluate(),
+ * latches the result into stream_status[]'s own watchdog cause via
+ * rcp_e2e_stream_status_note_wd() (mirroring frame_seq_gate_admits()'s
+ * own identical "latch every time, not just on overflow" treatment of
+ * the sequence cause), and on a genuine overflow that also enters the
+ * safe state, broadcasts it to every endpoint on the stream via the
+ * same rcp_mock_server_broadcast_safe_state() the sequence cause
+ * already uses -- the identical cross-endpoint escalation, not a
+ * bespoke one for this cause alone.
+ *
+ * Returns false (nothing evaluated or latched) for a request_stream_
+ * index that is 0 or exceeds srv's own configured request_stream_cfg_
+ * count -- the same "0 is unset, out-of-range is unconfigured"
+ * convention every other request_stream_index-keyed query in this file
+ * already uses. *out_result is always written on a true return (never
+ * left uninitialized), giving the caller the full rcp_e2e_wd_result_t
+ * (overflowed/enter_safe_state/notify) e2e.h itself defines, not just
+ * the single latched bit rcp_mock_server_stream_status_rx_blocked()
+ * exposes -- a caller wanting the notify-only case (overflowed but not
+ * entering the safe state) has no other way to observe it.
+ *
+ * Tracking elapsed_since_last_kick_ms itself -- i.e. resetting it to 0
+ * on real traffic -- stays the integrator's own job, exactly as e2e.h's
+ * own rcp_e2e_wd_evaluate() already states; this function does not
+ * invent a kick-tracking mechanism srv has no clock to drive honestly. */
+bool rcp_mock_server_check_watchdog(rcp_mock_server_t *srv, uint8_t request_stream_index,
+                                     uint64_t elapsed_since_last_kick_ms,
+                                     rcp_e2e_wd_result_t *out_result);
 
 /* ── Fragmented-message dispatch (REQ-E2E-038/039, issue #336) ─────────────── */
 

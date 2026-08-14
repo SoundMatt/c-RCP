@@ -1130,6 +1130,64 @@ static void test_dispatch_frame_discontinuity_broadcasts_safe_state_without_reje
     rcp_mock_server_destroy(srv);
 }
 
+/* REQ-E2E-046's own last remaining cause (issue #341 lineage): a
+ * watchdog overflow on request stream 1 broadcasts safe state to every
+ * endpoint bound to that stream via EP_ID_config, the same
+ * rcp_mock_server_broadcast_safe_state() escalation already proven above
+ * for REQ-E2E-030 (overflow), REQ-E2E-045 (CRC error), and the sequence-
+ * discontinuity case -- reached this time through rcp_mock_server_check_
+ * watchdog() directly, since a watchdog is this codebase's one TIME-based
+ * cause (see that function's own doc comment, mock.h) rather than a
+ * per-frame content check reachable through dispatch_frame() itself. */
+static void test_watchdog_overflow_broadcasts_safe_state_to_stream_siblings(void)
+{
+    rcp_mock_server_t              *srv       = rcp_mock_server_new();
+    rcp_bytes_t                      resp      = {0};
+    rcp_bytes_t                      timed;
+    rcp_regmap_ep_id_map_entry_t     ep_map[2] = {
+        {1, 0x11, 1},
+        {2, 0x12, 1},
+    };
+    rcp_regmap_request_stream_cfg_t  stream_cfg[1];
+    rcp_e2e_wd_result_t              result;
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    rcp_mock_server_add_endpoint(srv, 0x12, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_ep_id_map(srv, ep_map, 2));
+
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id           = TEST_SID;
+    stream_cfg[0].rx_wd_enable           = true;
+    stream_cfg[0].rx_wd_timeout_ms       = 1000u;
+    stream_cfg[0].rx_wd_safestate_enable = true;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+
+    /* Give 0x12 one non-safety-tagged stored request to confirm gets
+     * purged by the broadcast, though 0x12 was never itself the
+     * endpoint the watchdog is scoped to -- a watchdog is a per-
+     * request-STREAM concern, not per-endpoint. */
+    timed = rcp_timed_encode_request(0x12, 0x1000u, 7u, NULL, 0u);
+    TEST_ASSERT_NOT_NULL(timed.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+                      rcp_mock_server_dispatch(srv, 0x12, RCP_AVTP_SUBTYPE_NTSCF,
+                                                RCP_ACF_MSG_TYPE_GBB, true, TEST_SID, timed.data,
+                                                timed.len, &resp));
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&timed);
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 0x12));
+
+    TEST_ASSERT_TRUE(rcp_mock_server_check_watchdog(srv, 1u, 1000u, &result));
+    TEST_ASSERT_TRUE(result.enter_safe_state);
+
+    /* The actual proof: 0x12's own stored request was purged by the
+     * broadcast, though 0x12 itself was never addressed by the
+     * watchdog check. */
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 0x12));
+
+    rcp_mock_server_destroy(srv);
+}
+
 /* No rcp_mock_server_set_request_stream_cfg() call resolving TEST_SID at
  * all -- resolve_index() returns 0, the gate is skipped entirely (fail-
  * toward-no-action), and dispatch proceeds regardless of any sequence_num
@@ -2061,6 +2119,7 @@ int main(void)
     RUN_TEST(test_dispatch_frame_accepts_wrapped_sequence_num);
     RUN_TEST(test_dispatch_frame_seq_gate_evaluates_once_not_per_member);
     RUN_TEST(test_dispatch_frame_discontinuity_broadcasts_safe_state_without_rejecting);
+    RUN_TEST(test_watchdog_overflow_broadcasts_safe_state_to_stream_siblings);
     RUN_TEST(test_dispatch_frame_seq_gate_skipped_for_unresolvable_stream);
     RUN_TEST(test_dispatch_frame_e2e_rejects_replayed_sequence_num);
     RUN_TEST(test_dispatch_e2e_kicks_the_watchdog_on_every_admitted_request);
