@@ -34,6 +34,10 @@ the rationale.
 
 ## Releases
 
+### v0.347.0 -- 2026-08-14 (REQ-RMAP-038: Sequencer_config storage claim was stale -- corrected to implemented, no code change)
+
+Investigating REQ-RMAP-038 (Sequencer_config table storage) found its own text stale: `REQ-SEQ-013`/`REQ-SEQ-014` (issue #334/#335, 2026-08-13) already built real storage, a real wire codec (`rcp_regmap_sequencer_table_render()`/`_apply_reconfig()`), and full EP0 dispatcher routing for it, landing after REQ-RMAP-038's own text was last written and never back-propagated. Re-verified directly against `src/regmap.c` and its own dispatcher-level tests before trusting this (third stale-requirement-text finding this session, after `REQ-UART-037` and `REQ-PWRMODE-019`). The EP_FUNC_config half remains genuinely blocked by `REQ-RMAP-067`'s own separately-tracked Table 36 address collision -- not this requirement's own responsibility to re-solve. `.fusa-reqs.json`-only change; full 66-test suite + ASan/UBSan clean (unaffected); `cfusa check`/`trace` (v0.5.54): 0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`: `REQ-RMAP-038` partial -> implemented -- 1049 implemented / 18 partial / 2 not-implemented / 7 retired, 1076 total.
+
 ### v0.346.0 -- 2026-08-14 (CI tooling: bump pinned `cfusa` v0.5.51 -> v0.5.54)
 
 User-requested update to the latest tagged c-FuSa release. Reviewed all three intervening tags (v0.5.52 ASIL-scaling, v0.5.53 MC/DC gate honesty fixes, v0.5.54 fclose()/CFUSA-A006/L003 fixes) for anything this repo's CI actually exercises: neither the removed `qualify --achievable-asil` flag nor `--mcdc-file` are used here, and `.fusa.json` declares no ASIL, so v0.5.54's ASIL-scaled L003 severity stays inert. Verified by building v0.5.54 from source and running it directly against this repo before touching the pin: `cfusa check` 0 errors/PASS, `cfusa trace` 1076/1076 traced and tested, full 66-test suite + ASan/UBSan clean (tooling-only change, no source edited). Bumped `.github/workflows/ci.yml` and `.github/workflows/release.yml`.
