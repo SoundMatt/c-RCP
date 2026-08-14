@@ -1116,6 +1116,63 @@ static void test_can_register_block_round_trips_ep_status_and_status_fields(void
     }
 }
 
+/* REQ-CANEP-028 wire-format regression (issue #470, 2026-08-14):
+ * CAN_ENABLE_CLR_BIT_CLEAR was defined at bit 1 instead of TC18 Table 35's
+ * bit 4 for ep_clear_req_storage -- self-consistent (render and parse both
+ * used the same wrong bit), so the round-trip test above never caught it.
+ * This test asserts the exact rendered byte value instead of round-
+ * tripping through this module's own (at the time, wrong) encode/decode
+ * pair, the only way to catch this class of bug: it would have failed
+ * before the fix (can_ep_enable&clr would have rendered 0x02, not 0x10). */
+static void test_can_ep_enable_clr_clear_bit_is_wire_bit_4(void)
+{
+    rcp_ep_can_functional_cfg_t cfg;
+    uint8_t                     block[RCP_EP_CAN_EP_FUNC_LEN];
+    rcp_ep_can_functional_cfg_t roundtrip;
+
+    /* ep_clear_req_storage alone (ep_enable left false) must set exactly
+     * bit 4 (0x10) of can_ep_enable&clr (0x0002) -- not bit 1 (0x02),
+     * TC18 Table 35's reserved position this endpoint used to (wrongly)
+     * react to. */
+    rcp_ep_can_functional_cfg_init(&cfg);
+    cfg.common.ep_clear_req_storage = true;
+    rcp_ep_can_render_registers(&cfg, block);
+    TEST_ASSERT_EQUAL_HEX8(0x10u, block[0x0002]);
+    TEST_ASSERT_BITS(0x02u, 0x00u, block[0x0002]); /* the old wrong bit
+                                                        stays clear */
+
+    /* ep_enable + ep_clear_req_storage together set exactly bits 0 and 4
+     * (0x11), TC18 Table 35's own two defined bits of this octet -- every
+     * other bit (including the old wrong bit 1) stays clear. */
+    rcp_ep_can_functional_cfg_init(&cfg);
+    cfg.common.ep_enable            = true;
+    cfg.common.ep_clear_req_storage = true;
+    rcp_ep_can_render_registers(&cfg, block);
+    TEST_ASSERT_EQUAL_HEX8(0x11u, block[0x0002]);
+
+    /* A raw register write setting only bit 4 (0x10) -- the real TC18
+     * wire bit -- is parsed back as ep_clear_req_storage == true, and a
+     * write setting only the old wrong bit 1 (0x02) is NOT. */
+    rcp_ep_can_functional_cfg_init(&roundtrip);
+    {
+        uint8_t payload[RCP_EP_CAN_RECONFIG_ADDR_LEN + 1] = {0x00, 0x02, 0x10};
+
+        TEST_ASSERT_EQUAL(RCP_EP_CAN_RECONFIG_OK,
+                          rcp_ep_can_apply_reconfig(&roundtrip, payload, sizeof(payload)));
+    }
+    TEST_ASSERT_TRUE(roundtrip.common.ep_clear_req_storage);
+    TEST_ASSERT_FALSE(roundtrip.common.ep_enable);
+
+    rcp_ep_can_functional_cfg_init(&roundtrip);
+    {
+        uint8_t payload[RCP_EP_CAN_RECONFIG_ADDR_LEN + 1] = {0x00, 0x02, 0x02};
+
+        TEST_ASSERT_EQUAL(RCP_EP_CAN_RECONFIG_OK,
+                          rcp_ep_can_apply_reconfig(&roundtrip, payload, sizeof(payload)));
+    }
+    TEST_ASSERT_FALSE(roundtrip.common.ep_clear_req_storage);
+}
+
 static void test_can_block_lacks_receive_filter_table(void)
 {
     rcp_ep_can_functional_cfg_t cfg;
@@ -1645,6 +1702,7 @@ int main(void)
     RUN_TEST(test_can_frame_format_values_match_table_54);
     RUN_TEST(test_can_base_identifier_is_right_aligned_and_data_only);
     RUN_TEST(test_can_register_block_round_trips_ep_status_and_status_fields);
+    RUN_TEST(test_can_ep_enable_clr_clear_bit_is_wire_bit_4);
     RUN_TEST(test_can_block_lacks_receive_filter_table);
     RUN_TEST(test_can_new_physical_layer_is_selected_per_frame);
 
