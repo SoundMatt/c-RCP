@@ -2626,7 +2626,25 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
  *     map->svr_hw_cfg_ptr).
  *   - Within [map->svr_ep_bytebus_id_map_ptr, map->svr_ep_bytebus_id_map_ptr
  *     + 4*ep_id_map_count): EP_ID_config -- routed to
- *     rcp_regmap_ep_id_map_apply_reconfig() the identical way.
+ *     rcp_regmap_ep_id_map_apply_reconfig() the identical way. REQ-WAKEUP-020
+ *     (issue #336): before applying, every row this write's own
+ *     [relative, relative+data_len) span touches is checked against
+ *     ep_id_map_ep_types[]/fixed_ep_id_target_ep_type/
+ *     fixed_ep_id_required_ep_id -- a row whose own ep_type equals
+ *     fixed_ep_id_target_ep_type must end up with ep_id equal to
+ *     fixed_ep_id_required_ep_id after this write is applied, or the
+ *     whole write is denied (RCP_ERROR_INVALID_PARAMETER) with the
+ *     table left entirely unchanged (peeked via a scratch render, not
+ *     applied then rolled back). ep_id_map_ep_types may be NULL to skip
+ *     this check entirely (no enforcement configured) -- same
+ *     NULL-means-absent convention every other optional check in this
+ *     dispatcher already uses. This is regmap.c's own generic
+ *     mechanism: it has no dependency on ep_wakeup.h and does not
+ *     hardcode RCP_EP_WAKEUP_EP_TYPE/RCP_EP_WAKEUP_ENDPOINT_NUM --
+ *     matching rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id()'s own
+ *     established caller-supplied-target convention (same section,
+ *     above), now enforced at write time instead of only diagnosed
+ *     after the fact.
  *   - Within [map->svr_response_stream_cfg_ptr,
  *     map->svr_response_stream_cfg_ptr + 10*response_queue_cfg_count):
  *     response-queue-config -- routed to
@@ -2786,7 +2804,10 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      rcp_wire_error_t *out_error,
                                      uint8_t *out_transaction_num,
                                      uint32_t watchdog_ms_per_tick,
-                                     const rcp_regmap_optional_subsystem_cfg_ptrs_t *optional_cfg);
+                                     const rcp_regmap_optional_subsystem_cfg_ptrs_t *optional_cfg,
+                                     const uint8_t *ep_id_map_ep_types,
+                                     uint8_t fixed_ep_id_target_ep_type,
+                                     uint16_t fixed_ep_id_required_ep_id);
 
 /* ── EP0 address-routed dispatcher, READ side (issue #301 batch 4) ─────────
  *

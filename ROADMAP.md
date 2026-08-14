@@ -19106,6 +19106,45 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.329.0 -- 2026-08-13 (tc18-gap backlog PR G: REQ-WAKEUP-020
+EP_ID_config write enforcement)
+
+Ninth item of the 42-item `scope: "tc18-gap"` backlog (task #113).
+TC18 §13.7.2.1 fixes the WakeUp endpoint's own `ep_id` to 1 --
+previously only diagnosed after the fact
+(`rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id()`, read-only), never
+enforced at write time.
+
+`rcp_regmap_ep0_decode_write_request()` now enforces it. New static
+`ep_id_map_write_keeps_fixed_ep_id()` (src/regmap.c) peeks what a
+write's own touched row(s) would become -- via the same
+render-then-patch half of
+`rcp_regmap_ep_id_map_apply_reconfig()`'s own idiom, stopped short of
+committing -- and denies the whole write
+(`RCP_ERROR_INVALID_PARAMETER`, table unchanged) if any row whose own
+caller-supplied `ep_types[i]` equals a caller-supplied
+`fixed_ep_id_target_ep_type` would end up with an `ep_id` other than
+a caller-supplied `fixed_ep_id_required_ep_id`. Same
+caller-supplied-target design as the pre-existing diagnostic --
+regmap.c keeps zero dependency on ep_wakeup.h. `NULL` skips
+enforcement entirely, matching this dispatcher's own established
+NULL-means-absent convention.
+
+New dispatcher-level test covering denial, an unconstrained row's
+normal apply, a same-value (already-compliant) normal apply, and the
+NULL-disables fallback; both the check's own row-offset and its
+dispatcher wiring were mutation-tested and caught cleanly.
+`REQ-WAKEUP-020` flips partial -> implemented.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace`
+(v0.5.51): 0 errors, 0/1076 untested. `.fusa-reqs.json`: 1033
+implemented / 34 partial / 2 not-implemented / 7 retired (1076
+total).
+
+**Next**: REQ-RMAP-066 `svr_discovery_timeout` wiring (PR H, task
+#114); PR E (task #111) stays open pending the architectural call
+recorded in v0.327.0.
+
 ### v0.328.0 -- 2026-08-13 (tc18-gap backlog PR F: REQ-RMAP-039
 optional-subsystem config sections)
 
