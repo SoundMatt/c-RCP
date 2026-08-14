@@ -34,6 +34,38 @@ the rationale.
 
 ## Releases
 
+### v0.366.0 -- 2026-08-14 (CAN endpoint's ep_clear_req_storage wire bit corrected to bit 4)
+
+Closes issue #470 (c-RCP-AUDIT-45). `ep_can.c`'s `CAN_ENABLE_CLR_BIT_CLEAR`
+constant -- the wire bit for `ep_clear_req_storage` inside the shared
+`can_ep_enable&clr` octet (0x0002) -- was defined at bit 1 instead of the
+bit 4 TC18 §13.7.11.2 Table 56 requires via its own explicit deferral to
+Table 35 (EP functional config common entries, `0x0002.4
+ep_clear_req_storage`). Every sibling endpoint (`ep_uart.c`, `ep_lin.c`,
+`ep_adc.c`, `ep_iseled.c`, `ep_mdio.c`) already defined its own
+`*_ENABLE_CLR_BIT_CLEAR` as `(1u<<4)`; CAN alone used `(1u<<1)`. Because
+`rcp_ep_can_render_registers()`/`parse_can_registers()` both read and wrote
+the same wrong bit, the defect was internally self-consistent and invisible
+to a same-process round-trip test -- only a byte-literal wire assertion (or
+a real TC18 peer, which would set bit 4 per spec and see no effect on this
+endpoint) could catch it.
+
+Independently re-verified against TC18.txt lines 4303-4308/4343 (Table 35's
+own text) and against CAN's own Table 56 `can_ep_enable&clr` row (TC18.txt
+around line 5785), which explicitly defers to Table 35 for this octet's bit
+layout rather than redefining it. 0x0002.1:3 is reserved (reads 000b) in
+Table 35, so the old, wrong bit 1 collided with nothing, and moving to bit 4
+introduces no new collision either -- confirmed by inspection of the whole
+octet's bit layout, not just the two bits involved.
+
+REQ-CANEP-028: `CAN_ENABLE_CLR_BIT_CLEAR` corrected to `(1u<<4)` in
+`src/ep_can.c`. `tests/test_tc18_gaps_ep2.c`'s new
+`test_can_ep_enable_clr_clear_bit_is_wire_bit_4()` asserts the exact
+rendered/parsed byte values (0x10, not 0x02) -- the byte-literal wire-format
+test class this issue's own finding said was missing -- and was confirmed
+(by temporarily reverting only the fix) to fail against the prior, wrong
+bit position.
+
 ### v0.365.0 -- 2026-08-14 (mock.c byte_bus_id-only accessors gain stream-scoped counterparts)
 
 Closes issue #447 (c-RCP-AUDIT-26). The #432 fix (v0.360.0, PR #443) correctly

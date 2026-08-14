@@ -738,8 +738,21 @@ rcp_ep_can_errc_t rcp_ep_can_decode_reassembled_frame_response(const uint8_t *re
 #define RCP_EP_CAN_REG_STATUS        ((uint16_t)0x001Cu) /* 32 bit, R/W */
 #define RCP_EP_CAN_REG_FIFO_STATUS   ((uint16_t)0x0020u) /* 32 bit, R/W */
 
+/* TC18 Table 35 (EP functional config common entries) fixes ep_enable at
+ * 0x0002.0 and ep_clear_req_storage at 0x0002.4 for EVERY endpoint type --
+ * CAN's own Table 56 can_ep_enable&clr row (0x0002) explicitly defers to
+ * Table 35 for this octet's bit layout rather than redefining it, so no
+ * CAN-specific table can override this. 0x0002.1:3 is reserved (reads
+ * 000b) in Table 35, so bit 1 -- this constant's previous, wrong value --
+ * has no meaning of its own to collide with here. Every sibling endpoint
+ * (ep_uart.c/ep_lin.c/ep_adc.c/ep_iseled.c/ep_mdio.c) already defines its
+ * own *_ENABLE_CLR_BIT_CLEAR as (1u<<4); this module alone used (1u<<1),
+ * a wire-format conformance defect (issue #470) that made
+ * ep_clear_req_storage react to the wrong wire bit -- a real TC18 peer
+ * setting bit 4 per spec would have had no effect on this endpoint. */
+//cfusa:req REQ-CANEP-028
 #define CAN_ENABLE_CLR_BIT_ENABLE ((uint8_t)(1u << 0))
-#define CAN_ENABLE_CLR_BIT_CLEAR  ((uint8_t)(1u << 1))
+#define CAN_ENABLE_CLR_BIT_CLEAR  ((uint8_t)(1u << 4))
 
 #define CAN_OPTIONS_BIT_REQ_CRC  ((uint8_t)(1u << 0))
 #define CAN_OPTIONS_BIT_RESP_TS  ((uint8_t)(1u << 3))

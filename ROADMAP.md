@@ -19106,6 +19106,43 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.366.0 -- 2026-08-14 (REQ-CANEP-028: CAN ep_clear_req_storage
+wire bit corrected from bit 1 to bit 4)
+
+Closes issue #470 (c-RCP-AUDIT-45). `ep_can.c`'s
+`CAN_ENABLE_CLR_BIT_CLEAR` -- the wire bit for `ep_clear_req_storage`
+inside the shared `can_ep_enable&clr` octet (0x0002) -- was defined at
+bit 1 instead of bit 4. TC18 §13.7.11.2 Table 56's own
+`can_ep_enable&clr` row explicitly defers to Table 35 (EP functional
+config common entries) for this octet's bit layout rather than
+redefining it, and Table 35 fixes `ep_enable` at 0x0002.0 and
+`ep_clear_req_storage` at 0x0002.4 for every endpoint type -- verified
+independently against TC18.txt lines 4303-4308/4343 and against CAN's
+own table (TC18.txt around line 5785). Every sibling endpoint
+(`ep_uart.c`, `ep_lin.c`, `ep_adc.c`, `ep_iseled.c`, `ep_mdio.c`)
+already defines its own `*_ENABLE_CLR_BIT_CLEAR` as `(1u<<4)`; CAN
+alone used `(1u<<1)`.
+
+Checked for a collision before moving the bit: Table 35 marks
+0x0002.1:3 reserved (reads 000b), so the old, wrong bit 1 collided
+with nothing, and CAN's own Table 56 row does not redefine this
+octet's layout at all -- so bit 4 introduces no new collision either.
+
+Because `rcp_ep_can_render_registers()`/`parse_can_registers()` both
+read and wrote the same wrong bit, the defect was internally
+self-consistent -- invisible to a same-process round-trip test. Fixed
+by correcting the constant to `(1u<<4)`; `tests/test_tc18_gaps_ep2.c`'s
+new `test_can_ep_enable_clr_clear_bit_is_wire_bit_4()` asserts the
+exact rendered/parsed byte values (0x10, not 0x02) instead of
+round-tripping through this module's own encoder/decoder pair -- the
+byte-literal wire-format test class the issue's own finding said was
+missing. Mutation-tested: reverting only the fix (keeping the new
+test) makes it fail exactly as expected (`Expected 0x10 Was 0x02`);
+restored, suite green again. Full 66-test suite + ASan/UBSan clean;
+`cfusa check`: 0 errors; `cfusa trace`: 1088/1088 traced and tested
+(unchanged -- REQ-CANEP-028 already existed, this closes a defect in
+its own implementation, not a new requirement).
+
 ### v0.365.0 -- 2026-08-14 (mock.c byte_bus_id-only accessors gain
 stream-scoped counterparts, closing out the #432 follow-up)
 
