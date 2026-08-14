@@ -19106,6 +19106,38 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.334.0 -- 2026-08-14 (REQ-ADC-033: inter-sample spacing
+validated against a caller-supplied clock)
+
+First of 14 items catalogued "not blocked, left by explicit
+decision" in the post-backlog audit. New
+`rcp_ep_adc_validate_sample_spacing()` (ep_adc.h/ep_adc.c) validates
+TC18 §13.7.9.1's spacing rule against `rcp_ep_adc_sample_t`'s own
+real wall-clock timestamp -- without inventing the clock model
+`adc_base_clk` still deliberately does not carry. `base_clk_hz` is a
+new caller-supplied real oscillator frequency, the same discipline
+`REQ-TIMED-012`'s own `gptp_reference_now` already established.
+
+`expected_ns = sample_interval * base_clk_divider * 1e9 /
+base_clk_hz`, checked per consecutive pair within a caller-chosen
+`tolerance_ns`. Non-monotonic timestamps are their own distinct
+violation, caught before an underflowing subtraction. Fails open
+(no real clock/divider, or `sample_count < 2`) rather than asserting
+a false violation.
+
+Old deviation-pin test retired/renamed
+(`test_adc_average_interval_itself_has_no_timing_awareness`, still
+correctly pins the averaging layer's own separate no-timing-
+awareness fact). 4 new tests; tolerance window, both fail-open
+guards, and the monotonicity guard all mutation-tested and caught
+cleanly (including a wide-tolerance edge case proving the
+monotonicity guard is load-bearing, not redundant).
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace`
+(v0.5.51): 0 errors, 0/1076 untested. `.fusa-reqs.json`:
+`REQ-ADC-033` partial -> implemented (1038 implemented / 29 partial
+/ 2 not-implemented / 7 retired, 1076 total).
+
 ### v0.333.0 -- 2026-08-14 (tc18-gap backlog PR E completion:
 REQ-E2E-038/039 real fragmented-message dispatch)
 

@@ -323,6 +323,62 @@ typedef struct {
 rcp_ep_adc_avg_value_t rcp_ep_adc_average_interval(const rcp_ep_adc_sample_t *samples,
                                                     size_t sample_count);
 
+/* ── REQ-ADC-033: inter-sample spacing, validated against a real caller-
+ *    supplied clock rate ─────────────────────────────────────────────────── */
+
+typedef enum {
+    RCP_EP_ADC_SPACING_OK        = 0, /* every consecutive pair within tolerance,
+                                          or too little information to check
+                                          (sample_count < 2, base_clk_hz == 0,
+                                          or base_clk_divider == 0) */
+    RCP_EP_ADC_SPACING_VIOLATION = 1, /* at least one consecutive pair was not
+                                          spaced within tolerance of the
+                                          configured interval, OR two
+                                          consecutive timestamps were not
+                                          monotonically increasing */
+} rcp_ep_adc_spacing_result_t;
+
+/* TC18 §13.7.9.1's own inter-sample-spacing rule: successive samples one
+ * adc_sample_interval apart, that interval expressed in multiples of
+ * ADC_CLK cycles, where ADC_CLK = adc_base_clk / adc_base_clk_divider
+ * (the register table's own "adc_base_clk_divider ... generates ADC_CLK"
+ * wording -- a standard clock-divider relationship). Validated against
+ * samples[]'s own real wall-clock timestamp field, the same nanosecond
+ * domain rcp_ep_adc_encode_response()'s own message_timestamp parameter
+ * already uses.
+ *
+ * adc_base_clk itself is deliberately never modelled by this module (see
+ * the file header's own "no real clock source" honesty note) -- nothing
+ * in rcp_ep_adc_functional_cfg_t stores a value to derive ADC_CLK from.
+ * This function does not invent one: base_clk_hz is the caller's own
+ * real oscillator frequency in Hz, supplied directly -- the same "this
+ * library never invents wall time or a clock rate itself" discipline
+ * REQ-TIMED-012's own caller-supplied gptp_reference_now parameter
+ * already establishes for presentation-time admission.
+ *
+ * expected_spacing_ns = sample_interval * base_clk_divider * 1e9 /
+ * base_clk_hz (ADC_CLK cycles converted to nanoseconds via the caller's
+ * real base_clk_hz). tolerance_ns widens that expectation by +/-
+ * tolerance_ns on each side to absorb real capture jitter; 0 demands
+ * exact spacing.
+ *
+ * Returns RCP_EP_ADC_SPACING_OK if sample_count < 2 (nothing to
+ * compare), base_clk_hz == 0, or base_clk_divider == 0 (no real ADC_CLK
+ * rate to validate against) -- fails open, the same "insufficient
+ * information to check" disposition rcp_ep_adc_average_interval()'s own
+ * sample_count == 0 case already uses. Otherwise returns
+ * RCP_EP_ADC_SPACING_VIOLATION on the first consecutive pair whose
+ * timestamps are not monotonically increasing, or whose spacing falls
+ * outside [expected_spacing_ns - tolerance_ns, expected_spacing_ns +
+ * tolerance_ns] -- does not continue checking past the first violation.
+ * A NO_SIGNAL sample (rcp_ep_adc_sample_t's own doc comment) still
+ * carries a real capture timestamp -- an attempted-but-timed-out sample
+ * is still a real capture attempt at a real moment, so it is not skipped
+ * here. */
+rcp_ep_adc_spacing_result_t rcp_ep_adc_validate_sample_spacing(
+    const rcp_ep_adc_sample_t *samples, size_t sample_count, uint8_t base_clk_divider,
+    uint8_t sample_interval, uint32_t base_clk_hz, uint64_t tolerance_ns);
+
 /* ── Layers 2/3: adc_avg_intervals_per_request + adc_combine_avg_values ─────── */
 
 /* Packs the first value_count layer-1 results into out_values, in capture

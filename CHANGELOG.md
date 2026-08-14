@@ -34,6 +34,16 @@ the rationale.
 
 ## Releases
 
+### v0.334.0 -- 2026-08-14 (REQ-ADC-033: real inter-sample-spacing validation against a caller-supplied clock)
+
+Closes the first of the 14 items catalogued as "not blocked, left by explicit decision" in the post-backlog requirements audit. New `rcp_ep_adc_validate_sample_spacing()` (ep_adc.h/ep_adc.c) validates TC18 §13.7.9.1's own inter-sample-spacing rule against `rcp_ep_adc_sample_t`'s own real wall-clock `timestamp` field -- without inventing the clock model `adc_base_clk` still deliberately does not carry (unchanged; still always renders 0). Instead, `base_clk_hz` is a new caller-supplied parameter -- the caller's own real oscillator frequency in Hz, the same "this library never invents wall time or a clock rate itself" discipline `REQ-TIMED-012`'s own `gptp_reference_now` parameter already established.
+
+`expected_spacing_ns = sample_interval * base_clk_divider * 1e9 / base_clk_hz` (ADC_CLK cycles converted to nanoseconds via the caller's real clock), checked against every consecutive sample pair within a caller-chosen `tolerance_ns`. A non-monotonic timestamp pair is its own distinct violation, caught before the subtraction that would otherwise underflow. Fails open (`RCP_EP_ADC_SPACING_OK`) when `sample_count < 2`, `base_clk_hz == 0`, or `base_clk_divider == 0` -- never asserts a false violation from a degenerate or absent clock configuration.
+
+The old `test_adc_inter_sample_spacing_is_unconstrained` deviation-pin test is retired (renamed `test_adc_average_interval_itself_has_no_timing_awareness`, now correctly pinning that `rcp_ep_adc_average_interval()`'s own arithmetic-mean layer has -- and always will have -- no timing awareness of its own, a separate, unchanged fact from the new spacing check). 4 new tests prove the new primitive: distinguishes the same "even" vs. "ragged" fixtures the old deviation pin used, respects `tolerance_ns` as a real boundary, fails open without a real clock, and rejects non-monotonic timestamps as their own distinct violation (including a wide-`tolerance_ns` edge case proving the monotonicity guard is load-bearing, not redundant with the ordinary tolerance check).
+
+Tolerance-window comparison, the two fail-open guards, and the monotonicity guard were all mutation-tested and caught cleanly. Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`: `REQ-ADC-033` partial -> implemented (1038 implemented / 29 partial / 2 not-implemented / 7 retired, 1076 total).
+
 ### v0.333.0 -- 2026-08-14 (tc18-gap backlog PR E completion: REQ-E2E-038/039 real fragmented-message dispatch)
 
 The one remaining item from the original PR E scope (`REQ-E2E-046` was already closed separately as PR J): a real, wired fragmented-message dispatch entry point, `rcp_mock_server_dispatch_e2e_fragment()` (mock.h/mock.c) -- the fragmentation-aware counterpart to `rcp_mock_server_dispatch_e2e()`, for a transport-layer caller driving true multi-AVTPDU requests (`fragment.h`) instead of assuming every request fits in one AVTPDU.
