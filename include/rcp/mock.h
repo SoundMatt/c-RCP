@@ -469,6 +469,16 @@ typedef enum {
      * CRC failure), under the same "frame long enough to read a
      * transaction_num back out of" condition. */
     RCP_MOCK_DISPATCH_STREAM_FAULTED  = 10,
+    /* REQ-E2E-028 (issue #338): rcp_mock_server_dispatch_frame()/
+     * _dispatch_frame_e2e() only -- the frame's own sequence_num failed
+     * rcp_e2e_seq_evaluate()'s admission check (TC18 §12.7.7 Table 24
+     * rx_enforce_seq: a replayed or reordered AVTPDU). Every member of the
+     * frame is rejected together (sequence_num is a property of the whole
+     * AVTPDU, not of any one ACF member packed inside it) -- see
+     * rcp_mock_server_dispatch_frame()'s own doc comment. *out_response is
+     * left zeroed, the same "no per-member wire response" convention
+     * RCP_MOCK_DISPATCH_DROPPED already establishes. */
+    RCP_MOCK_DISPATCH_SEQ_ERROR       = 11,
 } rcp_mock_dispatch_result_t;
 
 /* Runs one already-framed request through srv: first
@@ -560,9 +570,40 @@ typedef struct {
  * the enclosing frame, same as avtp_subtype/time_sync_supported above)
  * and passed through to each member's own rcp_mock_server_dispatch()
  * call, so a multi-request frame kicks the watchdog once per member --
- * TC18's own rule is per REQUEST, and each member is independently one. */
+ * TC18's own rule is per REQUEST, and each member is independently one.
+ *
+ * REQ-E2E-028/029 (issue #338): sequence_num is this frame's own AVTPDU
+ * Sequence_Nr (avtp.h's rcp_avtp_ntscf_header_t/rcp_avtp_tscf_header_t
+ * sequence_num field, already decoded by whatever caller demultiplexed
+ * this AVTPDU before handing this function its ACF payload) -- a
+ * property of the WHOLE frame, evaluated exactly ONCE here, before any
+ * member is processed, never per member (a legitimate 2nd+ member of a
+ * multi-member frame would otherwise be spuriously rejected as a replay
+ * against the 1st member's own just-advanced tracker state). Resolves
+ * stream_id to a configured request stream the same way the overflow-
+ * safestate check does (rcp_regmap_request_stream_cfg_resolve_index());
+ * an unresolvable stream_id skips the check entirely (fail-toward-no-
+ * action, same disposition). When resolved, rcp_e2e_seq_evaluate()
+ * (e2e.h) is run against that stream's own caller-owned tracker and its
+ * own rx_enforce_seq/rx_seq_safestate_enable config bits
+ * (rcp_mock_server_set_request_stream_cfg()):
+ *
+ *   - result.enter_safe_state drives every endpoint bound to the stream
+ *     toward its configured safe state (rcp_mock_server_broadcast_
+ *     safe_state()), the same escalation shape already proven for
+ *     REQ-E2E-030 (overflow) and REQ-E2E-045 (CRC error) -- checked
+ *     regardless of result.accept, since a gap (advanced by more than
+ *     one) is evidence of a problem even when ordering itself still
+ *     held.
+ *   - !result.accept (a replay/reorder, rx_enforce_seq only) rejects the
+ *     WHOLE frame: every member up to out_cap is written
+ *     RCP_MOCK_DISPATCH_SEQ_ERROR (byte_bus_id 0, response zeroed,
+ *     mirroring RCP_MOCK_DISPATCH_DROPPED's own "no per-member wire
+ *     response" convention) and this function returns immediately,
+ *     without decoding or dispatching any member at all. */
 size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subtype,
                                        bool time_sync_supported, uint64_t stream_id,
+                                       uint8_t sequence_num,
                                        const uint8_t *frame, size_t frame_len,
                                        rcp_mock_frame_member_result_t *out_results,
                                        size_t out_cap);
@@ -627,10 +668,15 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
  * the same way avtp_subtype/time_sync_supported already are (both are
  * properties of the enclosing NTSCF/TSCF frame, not of an individual ACF
  * message). Every other parameter and the return value are exactly
- * rcp_mock_server_dispatch_frame()'s own. */
+ * rcp_mock_server_dispatch_frame()'s own, including the new sequence_num
+ * parameter and its own once-per-frame REQ-E2E-028/029 gate -- see that
+ * function's own doc comment; this variant's gate runs before any
+ * member's own E2E/CRC handling, exactly where the plain variant's runs
+ * relative to lifecycle/admission. */
 size_t rcp_mock_server_dispatch_frame_e2e(rcp_mock_server_t *srv, uint8_t avtp_subtype,
                                            bool time_sync_supported, uint64_t stream_id,
-                                           uint32_t avtp_timestamp, const uint8_t *frame,
+                                           uint32_t avtp_timestamp, uint8_t sequence_num,
+                                           const uint8_t *frame,
                                            size_t frame_len,
                                            rcp_mock_frame_member_result_t *out_results,
                                            size_t out_cap);

@@ -18976,3 +18976,39 @@ ASan/UBSan (CI's exact `ASAN_OPTIONS`) clean; `cfusa check`/`trace`
 implemented / 38 partial / 2 not-implemented / 7 retired).
 
 **Next**: PR B, `REQ-E2E-028`/`REQ-E2E-029`'s sequence_num wiring.
+
+### v0.322.0 -- 2026-08-13 (tc18-gap backlog PR B: REQ-E2E-028/029
+sequence_num wiring)
+
+Second PR of the 42-item `scope: "tc18-gap"` backlog (issue #338).
+`REQ-E2E-028`/`REQ-E2E-029` (TC18 §12.7.7 Table 24, 0x000D bits 1/2)
+both CLOSED: `rcp_e2e_seq_evaluate()` (e2e.h/e2e.c) was already a
+complete, tested primitive with no caller anywhere in this codebase
+-- `rcp_mock_server_dispatch_frame()`/`_dispatch_frame_e2e()`
+(mock.c) now take a new `sequence_num` parameter and evaluate it
+exactly once per frame, before any ACF member is processed.
+
+Design note (autonomous implementation-correctness pick, deviates
+from the original investigation plan): rather than adding
+`sequence_num` to all four dispatch entry points (~68 test call
+sites, per the original plan), restricting it to just the two
+frame-level entry points proved more correct by construction
+(sequence_num is a property of the whole AVTPDU, not of any one ACF
+member -- a per-member evaluation would spuriously reject a
+legitimate 2nd+ member as a replay) and far less invasive (12 real
+call sites). A replayed/reordered seq now rejects the whole frame
+(`RCP_MOCK_DISPATCH_SEQ_ERROR`, new enum value); wraparound (`0xFF`
+-> `0x00`) is correctly accepted; a discontinuity broadcasts safe
+state via the existing `rcp_mock_server_broadcast_safe_state()`
+independent of accept/reject; an unresolvable stream_id skips the
+gate entirely.
+
+New `rcp_e2e_seq_tracker_t seq_tracker[]` array added to
+`rcp_mock_server_t`. 6 new tests, each mutation-tested. Full
+66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51):
+0 errors, 0/1076 untested. `.fusa-reqs.json`: 2 entries `partial` ->
+`implemented`, repo-wide total unchanged at 1076 (1031 implemented
+/ 36 partial / 2 not-implemented / 7 retired).
+
+**Next**: PR C, `REQ-TIMED-012`/`REQ-TIMED-013`'s TSCF
+presentation-time gating.

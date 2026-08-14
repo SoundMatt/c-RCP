@@ -65,6 +65,17 @@ struct rcp_mock_server {
      * Request_stream_index among them) are expressed in terms of. */
     rcp_regmap_request_stream_cfg_t request_stream_cfg[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES];
     size_t                          request_stream_cfg_count;
+    /* REQ-E2E-028/029 (issue #338): one caller-owned rcp_e2e_seq_tracker_t
+     * per request_stream_cfg[] slot (same indexing, same
+     * RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES size) -- the "previously
+     * accepted request on this stream" state rcp_e2e_seq_evaluate() (e2e.h)
+     * needs, one instance per configured request stream, matching that
+     * function's own doc comment. No explicit init loop needed: srv is
+     * calloc()'d in rcp_mock_server_new() and rcp_e2e_seq_tracker_init()'s
+     * own "zero-initializes" contract is exactly calloc()'s own zero-fill
+     * (has_prev = false, prev_seq = 0), the same convention every other
+     * table here already relies on. */
+    rcp_e2e_seq_tracker_t           seq_tracker[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES];
     /* response-queue-cfg table (REQ-RMAP-034's own response-stream half)
      * -- see mock.h's own doc comment on
      * rcp_mock_server_set_response_queue_cfg(). Mirrors
@@ -983,11 +994,42 @@ static size_t last_pending_index(const rcp_server_endpoint_t *ep)
     return best;
 }
 
+/* REQ-E2E-028/029 (issue #338): shared once-per-frame sequence-number
+ * gate for rcp_mock_server_dispatch_frame()/_dispatch_frame_e2e() -- see
+ * either function's own doc comment (mock.h) for the full rationale.
+ * Returns true iff the frame may proceed to per-member dispatch; false
+ * means the caller must reject every member with RCP_MOCK_DISPATCH_
+ * SEQ_ERROR and return immediately without processing any of them. */
+//cfusa:req REQ-E2E-028
+//cfusa:req REQ-E2E-029
+static bool frame_seq_gate_admits(rcp_mock_server_t *srv, uint64_t stream_id, uint8_t sequence_num)
+{
+    uint8_t seq_stream_index = rcp_regmap_request_stream_cfg_resolve_index(
+        srv->request_stream_cfg, srv->request_stream_cfg_count, stream_id);
+    rcp_regmap_request_stream_cfg_t *cfg;
+    rcp_e2e_seq_result_t             result;
+
+    if (seq_stream_index == 0u) return true; /* unresolvable stream -- fail toward no action,
+                                                  same disposition as the overflow-safestate check */
+
+    cfg    = &srv->request_stream_cfg[seq_stream_index - 1u];
+    result = rcp_e2e_seq_evaluate(&srv->seq_tracker[seq_stream_index - 1u], cfg->rx_enforce_seq,
+                                   cfg->rx_seq_safestate_enable, sequence_num);
+
+    /* Checked regardless of result.accept -- a gap (advanced by more than
+     * one) is evidence of a problem even when ordering itself still held. */
+    if (result.enter_safe_state) {
+        (void)rcp_mock_server_broadcast_safe_state(srv, seq_stream_index);
+    }
+    return result.accept;
+}
+
 //cfusa:req REQ-MOCK-019
 //cfusa:req REQ-MOCK-020
 //cfusa:req REQ-MOCK-029
 size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subtype,
                                        bool time_sync_supported, uint64_t stream_id,
+                                       uint8_t sequence_num,
                                        const uint8_t *frame, size_t frame_len,
                                        rcp_mock_frame_member_result_t *out_results,
                                        size_t out_cap)
@@ -1022,6 +1064,15 @@ size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subty
 
     stored_count = (real_count < RCP_MOCK_MAX_FRAME_MEMBERS) ? real_count : RCP_MOCK_MAX_FRAME_MEMBERS;
     process_count = (stored_count < out_cap) ? stored_count : out_cap;
+
+    if (!frame_seq_gate_admits(srv, stream_id, sequence_num)) {
+        for (i = 0; i < process_count; i++) {
+            out_results[i].result      = RCP_MOCK_DISPATCH_SEQ_ERROR;
+            out_results[i].byte_bus_id = 0;
+            memset(&out_results[i].response, 0, sizeof(out_results[i].response));
+        }
+        return process_count;
+    }
 
     for (i = 0; i < process_count; i++) {
         size_t                           member_off;
@@ -1143,7 +1194,8 @@ size_t rcp_mock_server_dispatch_frame(rcp_mock_server_t *srv, uint8_t avtp_subty
 //cfusa:req REQ-E2E-033
 size_t rcp_mock_server_dispatch_frame_e2e(rcp_mock_server_t *srv, uint8_t avtp_subtype,
                                            bool time_sync_supported, uint64_t stream_id,
-                                           uint32_t avtp_timestamp, const uint8_t *frame,
+                                           uint32_t avtp_timestamp, uint8_t sequence_num,
+                                           const uint8_t *frame,
                                            size_t frame_len,
                                            rcp_mock_frame_member_result_t *out_results,
                                            size_t out_cap)
@@ -1168,6 +1220,15 @@ size_t rcp_mock_server_dispatch_frame_e2e(rcp_mock_server_t *srv, uint8_t avtp_s
 
     stored_count = (real_count < RCP_MOCK_MAX_FRAME_MEMBERS) ? real_count : RCP_MOCK_MAX_FRAME_MEMBERS;
     process_count = (stored_count < out_cap) ? stored_count : out_cap;
+
+    if (!frame_seq_gate_admits(srv, stream_id, sequence_num)) {
+        for (i = 0; i < process_count; i++) {
+            out_results[i].result      = RCP_MOCK_DISPATCH_SEQ_ERROR;
+            out_results[i].byte_bus_id = 0;
+            memset(&out_results[i].response, 0, sizeof(out_results[i].response));
+        }
+        return process_count;
+    }
 
     for (i = 0; i < process_count; i++) {
         size_t                           member_off;
