@@ -2461,6 +2461,113 @@ size_t rcp_regmap_ep_id_map_byte_bus_ids_for_stream(const rcp_regmap_ep_id_map_e
                                                       rcp_byte_bus_id_t *out_byte_bus_ids,
                                                       size_t out_capacity);
 
+/* ── Optional-subsystem config sections: Network/PHY/time-synch/security
+ * (REQ-RMAP-039, TC18 §12.7.11-.14) ────────────────────────────────────
+ *
+ * Unlike every other Table 20 pointed-to table this file models
+ * (HW_config, EP_ID_config, response-queue-config, request-stream-cfg,
+ * ep_generic_cfg, Sequencer_config), TC18 defines NO field-level layout
+ * for any of these four sections -- each one's own section text states
+ * verbatim "The content is product specific" (§12.7.11: "In case of an
+ * Ethernet interface this section comprised the entire MAC
+ * configuration"; §12.7.12: "might be empty" for MDIO-managed PHYs;
+ * §12.7.13: "Typically, gPTP (IEEE802.1AS)"; §12.7.14: "Typically,
+ * MacSec... and specifics of the key agreement"), confirmed by direct
+ * primary-source read (TC18.txt) before implementing, not assumed from
+ * REQ-RMAP-039's own earlier text. There is therefore no row-typed
+ * struct to declare the way HW_config/EP_ID_config/etc. have one: each
+ * section is a flat, capacity-bounded, opaque byte buffer, and a
+ * conformant implementation's whole job is making that buffer reachable
+ * at its own advertised [ptr, ptr+capacity) extent via ordinary
+ * ACF_ABB reads/writes -- not interpreting what is inside it.
+ *
+ * Access type: TC18 gives no table-specific access-type override for
+ * any of these four sections in their own surrounding prose (unlike
+ * HW_config's own §12.7.6 "HW_unconfigured-only" override) -- so this
+ * codebase applies the generic FUNCTIONAL_W_STAR rule, the same
+ * documented default request-stream-cfg's own dispatcher routing
+ * already uses for the identical "no table-specific override found"
+ * reason. Flagged as a codebase-level default choice, not a
+ * primary-source-derived fact TC18 itself states. */
+
+/* This implementation's own storage bound per optional-subsystem
+ * section -- NOT a TC18-mandated limit (TC18 leaves each section's own
+ * real capacity entirely up to the product, via its own
+ * svr_*_cfg_capacity register). Matches every sibling table's own
+ * MAX_ENTRIES-style bound (RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES etc.):
+ * generous enough for real product-specific MAC/PHY/gPTP/MACsec
+ * configuration blobs, small enough to keep this dispatcher's own
+ * stack-local read-response buffers bounded. A caller with a genuinely
+ * larger product-specific section cannot be served by this
+ * implementation as-is -- the same honest limitation every other
+ * MAX_ENTRIES bound in this file already carries. */
+#define RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_MAX_OCTETS ((size_t)256u)
+
+/* One flat byte buffer + its own currently-configured length, for one
+ * of the four optional-subsystem sections above -- see this section's
+ * own file-header note for why there is no row-typed struct here. len
+ * mirrors the corresponding svr_*_cfg_capacity register in
+ * rcp_regmap_general_t (kept in sync by whichever call installs this
+ * buffer -- rcp_mock_server_set_network_interface_cfg() etc., mock.h --
+ * the same capacity-sync convention REQ-RMAP-032/034/036/037 already
+ * established for other tables). A zero-initialized instance (len == 0)
+ * correctly means "nothing installed" -- matches this table's own zero
+ * pointer/capacity register default (rcp_regmap_general_init()), TC18's
+ * own defined "not supported" encoding for three of the four
+ * (physical-layer/time-synch/security; network-interface has no such
+ * explicit note, see svr_network_interface_cfg_ptr's own field
+ * comment). */
+typedef struct {
+    uint8_t data[RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_MAX_OCTETS];
+    size_t  len;
+} rcp_regmap_optional_subsystem_cfg_t;
+
+/* Bundles all four optional-subsystem sections' own storage into one
+ * handle, passed to the EP0 dispatcher pair below as a single optional
+ * (NULL-able) parameter -- matches this dispatcher's own established
+ * "NULL means this server has none of this table at all"
+ * convention (sequencer_state/sequencer_owner's own NULL/NULL/0
+ * precedent). A NULL individual field within a non-NULL
+ * rcp_regmap_optional_subsystem_cfg_ptrs_t means that ONE section is
+ * absent while sibling sections may still be present -- finer-grained
+ * than the all-or-nothing NULL convention above, deliberately: a real
+ * product may support gPTP time-synch configuration while genuinely
+ * having no MACsec security section at all, and TC18's own per-pointer
+ * "0 means not supported" encoding already expects exactly this
+ * per-section granularity. */
+typedef struct {
+    rcp_regmap_optional_subsystem_cfg_t *network_interface_cfg;
+    rcp_regmap_optional_subsystem_cfg_t *physical_layer_cfg;
+    rcp_regmap_optional_subsystem_cfg_t *time_synch_cfg;
+    rcp_regmap_optional_subsystem_cfg_t *security_cfg;
+} rcp_regmap_optional_subsystem_cfg_ptrs_t;
+
+typedef enum {
+    RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_RECONFIG_OK = 0,
+    RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_RECONFIG_ERR_SHORT,
+    RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_RECONFIG_ERR_OUT_OF_RANGE
+} rcp_regmap_optional_subsystem_cfg_reconfig_errc_t;
+
+/* Human-readable message for an
+ * rcp_regmap_optional_subsystem_cfg_reconfig_errc_t value. Never
+ * returns NULL. */
+const char *
+rcp_regmap_optional_subsystem_cfg_reconfig_strerror(rcp_regmap_optional_subsystem_cfg_reconfig_errc_t e);
+
+/* Applies a write of data[0..data_len) at relative_start_address within
+ * cfg's own current extent ([0, cfg->len)) -- a direct bounded memcpy,
+ * not the render-patch-reparse idiom every row-typed table's own
+ * apply_reconfig() needs, since an opaque byte buffer has no rows to
+ * reparse. Fails ERR_OUT_OF_RANGE if the write would extend past
+ * cfg->len (this section's own currently-configured capacity, not
+ * RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_MAX_OCTETS), ERR_SHORT if
+ * data_len == 0 -- matching every sibling apply_reconfig()'s own two
+ * failure modes exactly. */
+rcp_regmap_optional_subsystem_cfg_reconfig_errc_t
+rcp_regmap_optional_subsystem_cfg_apply_reconfig(rcp_regmap_optional_subsystem_cfg_t *cfg,
+                                                  uint16_t relative_start_address,
+                                                  const uint8_t *data, size_t data_len);
+
 /* ── EP0 address-routed dispatcher (issue #301, issue #306) ────────────────
  *
  * Generalizes rcp_regmap_general_decode_write_request() (which only
@@ -2470,21 +2577,23 @@ size_t rcp_regmap_ep_id_map_byte_bus_ids_for_stream(const rcp_regmap_ep_id_map_e
  * pointed-to table this codebase currently has a wire codec for. As of
  * this milestone that is HW_config (svr_hw_cfg_ptr), EP_ID_config
  * (svr_ep_bytebus_id_map_ptr), response-queue-config
- * (svr_response_stream_cfg_ptr), and request-stream-cfg
+ * (svr_response_stream_cfg_ptr), request-stream-cfg
  * (svr_request_stream_cfg_ptr) -- the fourth pointed-to table, found and
  * closed separately (issue #306) after issue #301's own original four
- * batches. Table 33/36 (svr_ep_functional_cfg_ptr) is deliberately never
- * routed here: its own address-collision defect (documented in this
- * file's own "RC Server functional-configuration content" section) is a
- * separate, still-unresolved primary-source ambiguity neither issue's
- * own finding resolves.
+ * batches -- and the four optional-subsystem sections above
+ * (REQ-RMAP-039, issue #336). Table 33/36 (svr_ep_functional_cfg_ptr) is
+ * deliberately never routed here: its own address-collision defect
+ * (documented in this file's own "RC Server functional-configuration
+ * content" section) is a separate, still-unresolved primary-source
+ * ambiguity neither issue's own finding resolves.
  *
  * Declared here, after HW_config's, EP_ID_config's, response-queue-
- * config's, and request-stream-cfg's own sections, because its own
- * signature references rcp_regmap_hw_pin_map_entry_t,
- * rcp_regmap_ep_id_map_entry_t, rcp_regmap_response_queue_cfg_t, and
- * rcp_regmap_request_stream_cfg_t -- C requires each to already be
- * declared at this point; this dispatcher cannot live any earlier in
+ * config's, request-stream-cfg's, and the optional-subsystem sections'
+ * own sections, because its own signature references
+ * rcp_regmap_hw_pin_map_entry_t, rcp_regmap_ep_id_map_entry_t,
+ * rcp_regmap_response_queue_cfg_t, rcp_regmap_request_stream_cfg_t, and
+ * rcp_regmap_optional_subsystem_cfg_ptrs_t -- C requires each to already
+ * be declared at this point; this dispatcher cannot live any earlier in
  * this header than the last of the tables it routes to. */
 
 typedef enum {
@@ -2534,6 +2643,19 @@ const char *rcp_regmap_ep0_strerror(rcp_regmap_ep0_errc_t e);
  *     inside that function itself, per its own doc comment -- this
  *     dispatcher's own authorization check below applies to the row
  *     as a whole, not per-field.
+ *   - Within [map->svr_network_interface_cfg_ptr, ...+ optional_cfg->
+ *     network_interface_cfg->len) and the same shape for
+ *     physical_layer_cfg/time_synch_cfg/security_cfg (REQ-RMAP-039,
+ *     TC18 §12.7.11-.14): routed to
+ *     rcp_regmap_optional_subsystem_cfg_apply_reconfig() -- see that
+ *     section's own file-header note (above) for why these four are
+ *     opaque byte buffers, not row-typed tables, and why
+ *     FUNCTIONAL_W_STAR is this codebase's own documented default
+ *     access-type choice for them. optional_cfg (or any one of its own
+ *     four fields) may be NULL -- that whole section, or just that one
+ *     subsystem, is then skipped by this routing the same way a NULL
+ *     sequencer_state/sequencer_owner already skips the sequencer
+ *     extent below.
  *   - For any pointed-to table, the write is first subject to lifecycle-
  *     state/writer authorization (issue #308) before being applied.
  *     HW_config is NOT its own "R/W*" column legend despite appearances
@@ -2663,7 +2785,8 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      uint8_t requester_stream_index,
                                      rcp_wire_error_t *out_error,
                                      uint8_t *out_transaction_num,
-                                     uint32_t watchdog_ms_per_tick);
+                                     uint32_t watchdog_ms_per_tick,
+                                     const rcp_regmap_optional_subsystem_cfg_ptrs_t *optional_cfg);
 
 /* ── EP0 address-routed dispatcher, READ side (issue #301 batch 4) ─────────
  *
@@ -2756,11 +2879,15 @@ rcp_regmap_sequencer_table_apply_reconfig(uint8_t *state, uint8_t *owner, size_t
 
 /* Encodes an ACF_ABB READ response for a request decoded by
  * rcp_regmap_ep0_decode_read_request() above. Routes addr across the
- * identical seven extents rcp_regmap_ep0_decode_write_request() routes
+ * identical eleven extents rcp_regmap_ep0_decode_write_request() routes
  * (Table 20 itself, HW_config, EP_ID_config, response-queue-config,
- * request-stream-cfg, ep_generic_cfg, sequencer_state -- REQ-SEQ-014
- * adds the last of these), reusing this dispatcher's own already-proven
- * per-table render() functions, not a second copy of that wire codec.
+ * request-stream-cfg, ep_generic_cfg, sequencer_state, and the four
+ * optional-subsystem sections -- REQ-SEQ-014 added sequencer_state,
+ * REQ-RMAP-039 added the last four), reusing this dispatcher's own
+ * already-proven per-table render() functions where one exists (the
+ * four optional-subsystem sections read directly from their own raw
+ * buffer instead -- see that section's own file-header note for why),
+ * not a second copy of that wire codec.
  *
  * sequencer_state/sequencer_owner/sequencer_count are
  * request_sequencer.h's own rcp_sequencer_table_t.state/.owner/.count,
@@ -2822,7 +2949,8 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      const uint8_t *sequencer_owner,
                                      size_t sequencer_count,
                                      rcp_wire_error_t *out_error,
-                                     uint32_t watchdog_ms_per_tick);
+                                     uint32_t watchdog_ms_per_tick,
+                                     const rcp_regmap_optional_subsystem_cfg_ptrs_t *optional_cfg);
 
 #ifdef __cplusplus
 }

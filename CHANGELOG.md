@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.328.0 -- 2026-08-13 (tc18-gap backlog PR F: REQ-RMAP-039 optional-subsystem config sections)
+
+Eighth item of the 42-item `scope: "tc18-gap"` backlog (task #112), closing the "largest single feature" item -- the four optional-subsystem configuration sections (network interface, physical layer, time synch, security; TC18 §12.7.11-.14).
+
+**Scope narrower than originally planned**: a direct primary-source read of §12.7.11-.14's own section text (not just Table 20's own pointer/capacity row) found each section's own text states verbatim "The content is product specific" -- TC18 defines no field-level layout for any of the four, unlike HW_config/EP_ID_config/response-queue-config/request-stream-cfg (all already-implemented row-typed tables). The conformant implementation is therefore one generic mechanism, not four bespoke ones.
+
+**New**: `rcp_regmap_optional_subsystem_cfg_t` (regmap.h) -- a flat, capacity-bounded opaque byte buffer (256-octet bound, this library's own storage limit, not TC18-mandated); `rcp_regmap_optional_subsystem_cfg_apply_reconfig()` -- a direct-memcpy write primitive (no render-patch-reparse idiom needed, since the buffer already IS the wire image). `rcp_regmap_ep0_decode_write_request()`/`_encode_read_response()` now route all four sections' own `[ptr, ptr+len)` extents through it via a new `optional_cfg` parameter (`rcp_regmap_optional_subsystem_cfg_ptrs_t`), NULL-able as a whole or per-section, matching this dispatcher's own established sequencer_state/sequencer_owner NULL-means-absent convention. FUNCTIONAL_W_STAR is this codebase's own documented default access-type choice for all four (TC18 gives no table-specific override the way HW_config's own §12.7.6 has one) -- flagged explicitly as a codebase-level default, not a primary-source-derived fact. `rcp_mock_server_set_network_interface_cfg()`/`_physical_layer_cfg()`/`_time_synch_cfg()`/`_security_cfg()` (mock.h/mock.c) install each section's own content and keep its `svr_*_cfg_capacity` register synced, the same capacity-sync convention REQ-RMAP-032/034/036/037 already established.
+
+New tests: a dispatcher-level test (write, read-back including zero-fill past len, a genuinely-denied write under FUNCTIONAL_W_STAR's own "permanently locked once RCP_CONFIGURED" rule, and the per-section/whole-NULL fallback), a direct `apply_reconfig()` unit test (bounds check), and a mock-server storage/capacity-sync test. Both the bounds-check and the authorization-gate wiring were mutation-tested and caught cleanly. `REQ-RMAP-039` flips `partial` -> `implemented`, matching REQ-RMAP-040's own established bar for closure (a proven wire codec via the dispatcher, not that mock.c's own live per-request dispatch loop calls it -- that whole register-map wire-level exchange stays deliberately unwired into mock.c's own production dispatch path, per regmap.h's own file-header note).
+
+Also investigated PR E again in passing (no change) -- the deliberate step-back recorded in v0.327.0 still stands.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested. `.fusa-reqs.json`: 1032 implemented / 35 partial / 2 not-implemented / 7 retired (1076 total).
+
+**Next**: continuing the 42-item `scope: "tc18-gap"` backlog -- REQ-WAKEUP-020 EP_ID_config write enforcement (PR G, task #113, "small-medium" per the original plan); PR E (task #111) stays open pending the architectural call recorded in v0.327.0.
+
 ### v0.327.0 -- 2026-08-13 (tc18-gap backlog: REQ-RMAP-068 primary-source re-verification)
 
 Seventh item of the 42-item `scope: "tc18-gap"` backlog (task #115), a quick primary-source check flagged in the prior batch's own remaining-work note rather than a code change.

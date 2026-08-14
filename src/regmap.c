@@ -479,12 +479,89 @@ static rcp_wire_error_t sequencer_row_write_authorize(rcp_lifecycle_state_t stat
     return RCP_ERROR_NONE;
 }
 
+/* ── Optional-subsystem config sections: storage + wire codec
+ * (REQ-RMAP-039) -- see regmap.h's own file-header note on
+ * rcp_regmap_optional_subsystem_cfg_t for why these four sections are
+ * opaque byte buffers, not row-typed tables. ────────────────────────── */
+
+//cfusa:req REQ-RMAP-039
+const char *
+rcp_regmap_optional_subsystem_cfg_reconfig_strerror(rcp_regmap_optional_subsystem_cfg_reconfig_errc_t e)
+{
+    switch (e) {
+    case RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_RECONFIG_OK:
+        return "rcp/regmap: optional-subsystem config write applied";
+    case RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_RECONFIG_ERR_SHORT:
+        return "rcp/regmap: optional-subsystem config write has no data";
+    case RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_RECONFIG_ERR_OUT_OF_RANGE:
+        return "rcp/regmap: optional-subsystem config write extends past the section's own current extent";
+    default:
+        return "rcp/regmap: optional-subsystem config unknown configuration-write error";
+    }
+}
+
+//cfusa:req REQ-RMAP-039
+rcp_regmap_optional_subsystem_cfg_reconfig_errc_t
+rcp_regmap_optional_subsystem_cfg_apply_reconfig(rcp_regmap_optional_subsystem_cfg_t *cfg,
+                                                  uint16_t relative_start_address,
+                                                  const uint8_t *data, size_t data_len)
+{
+    if (data_len == 0u) return RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_RECONFIG_ERR_SHORT;
+
+    if ((size_t)relative_start_address + data_len > cfg->len) {
+        return RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_RECONFIG_ERR_OUT_OF_RANGE;
+    }
+
+    /* No render-patch-reparse idiom needed here, unlike every row-typed
+     * table's own apply_reconfig() -- cfg->data IS the wire image
+     * already, a direct bounded memcpy. */
+    memcpy(&cfg->data[relative_start_address], data, data_len);
+    return RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_RECONFIG_OK;
+}
+
+/* Shared per-section write-routing check for the write dispatcher below:
+ * true (and *out_error set) iff addr falls within [table_ptr,
+ * table_ptr + cfg->len) and cfg is non-NULL -- the caller returns
+ * RCP_REGMAP_EP0_OK immediately whenever this returns true, the same
+ * "one helper call, one early return" shape
+ * respqueue_cfg_row_write_authorize() already establishes for a
+ * different table. FUNCTIONAL_W_STAR is this codebase's own documented
+ * default access-type choice for all four optional-subsystem sections
+ * (regmap.h's own file-header note explains why: TC18 gives no
+ * table-specific override for any of them, unlike HW_config's own
+ * §12.7.6 override). */
+static bool optional_subsystem_cfg_write_route(uint16_t addr, uint16_t table_ptr,
+                                                rcp_regmap_optional_subsystem_cfg_t *cfg,
+                                                rcp_lifecycle_state_t state,
+                                                rcp_lifecycle_writer_ctx_t writer,
+                                                const uint8_t *data, size_t data_len,
+                                                rcp_wire_error_t *out_error)
+{
+    uint16_t                                          relative;
+    rcp_regmap_optional_subsystem_cfg_reconfig_errc_t rc;
+
+    if (cfg == NULL) return false;
+    if ((size_t)addr < table_ptr || (size_t)addr >= (size_t)table_ptr + cfg->len) return false;
+
+    relative = (uint16_t)((size_t)addr - table_ptr);
+    if (!rcp_lifecycle_field_writable(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer)) {
+        *out_error = rcp_lifecycle_field_write_error(state, RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR, writer);
+        return true;
+    }
+
+    rc = rcp_regmap_optional_subsystem_cfg_apply_reconfig(cfg, relative, data, data_len);
+    *out_error = (rc == RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_RECONFIG_OK) ? RCP_ERROR_NONE
+                                                                        : RCP_ERROR_INVALID_PARAMETER;
+    return true;
+}
+
 //cfusa:req REQ-RMAP-040
 //cfusa:req REQ-RMAP-041
 //cfusa:req REQ-RMAP-047
 //cfusa:req REQ-RMAP-048
 //cfusa:req REQ-RMAP-049
 //cfusa:req REQ-RMAP-071
+//cfusa:req REQ-RMAP-039
 //cfusa:req REQ-RMAP-052
 //cfusa:req REQ-RMAP-054
 //cfusa:req REQ-RMAP-061
@@ -518,7 +595,8 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
                                      uint8_t requester_stream_index,
                                      rcp_wire_error_t *out_error,
                                      uint8_t *out_transaction_num,
-                                     uint32_t watchdog_ms_per_tick)
+                                     uint32_t watchdog_ms_per_tick,
+                                     const rcp_regmap_optional_subsystem_cfg_ptrs_t *optional_cfg)
 {
     rcp_acf_byte_message_info_t hdr;
     const uint8_t               *payload;
@@ -729,9 +807,39 @@ rcp_regmap_ep0_decode_write_request(const uint8_t *b, size_t len,
         return RCP_REGMAP_EP0_OK;
     }
 
+    /* REQ-RMAP-039: the four optional-subsystem sections -- see
+     * optional_subsystem_cfg_write_route()'s own doc comment above for
+     * what "handled" means here (a NULL optional_cfg, or a NULL
+     * individual field within it, simply falls through to every other
+     * check exactly like NULL sequencer_state/sequencer_owner already
+     * does). */
+    if (optional_cfg != NULL) {
+        if (optional_subsystem_cfg_write_route(addr, map->svr_network_interface_cfg_ptr,
+                                                optional_cfg->network_interface_cfg, state, writer,
+                                                &payload[2], data_len, out_error)) {
+            return RCP_REGMAP_EP0_OK;
+        }
+        if (optional_subsystem_cfg_write_route(addr, map->svr_physical_layer_cfg_ptr,
+                                                optional_cfg->physical_layer_cfg, state, writer,
+                                                &payload[2], data_len, out_error)) {
+            return RCP_REGMAP_EP0_OK;
+        }
+        if (optional_subsystem_cfg_write_route(addr, map->svr_time_synch_cfg_ptr,
+                                                optional_cfg->time_synch_cfg, state, writer,
+                                                &payload[2], data_len, out_error)) {
+            return RCP_REGMAP_EP0_OK;
+        }
+        if (optional_subsystem_cfg_write_route(addr, map->svr_security_cfg_ptr,
+                                                optional_cfg->security_cfg, state, writer,
+                                                &payload[2], data_len, out_error)) {
+            return RCP_REGMAP_EP0_OK;
+        }
+    }
+
     /* Neither Table 20's own extent nor any known pointed-to table --
      * see this function's own header doc comment for which tables this
-     * milestone routes (issue #301, issue #306, issue #311, issue #335). */
+     * milestone routes (issue #301, issue #306, issue #311, issue #335,
+     * issue #336). */
     *out_error = RCP_ERROR_EP_NOT_FOUND;
     return RCP_REGMAP_EP0_OK;
 }
@@ -798,6 +906,31 @@ static rcp_bytes_t ep0_read_response_from_slice(const uint8_t *table_image, size
     return rcp_acf_encode_abb(&hdr, payload, read_size);
 }
 
+/* Shared per-section read-routing check for the read dispatcher below --
+ * the read-side counterpart to optional_subsystem_cfg_write_route()
+ * above. *out_handled is set true iff addr falls within [table_ptr,
+ * table_ptr + cfg->len) and cfg is non-NULL; the caller returns the
+ * result immediately whenever *out_handled is true, same shape every
+ * other extent's own inline read-side block already uses. Reads
+ * directly from cfg->data via ep0_read_response_from_slice() -- no
+ * render() step, matching this section's own file-header note (no
+ * row-typed table to render). */
+static rcp_bytes_t optional_subsystem_cfg_read_route(uint16_t addr, uint16_t table_ptr,
+                                                      const rcp_regmap_optional_subsystem_cfg_t *cfg,
+                                                      uint8_t read_size, uint8_t transaction_num,
+                                                      bool *out_handled)
+{
+    if (cfg == NULL || (size_t)addr < table_ptr || (size_t)addr >= (size_t)table_ptr + cfg->len) {
+        rcp_bytes_t zero = {0};
+        *out_handled = false;
+        return zero;
+    }
+
+    *out_handled = true;
+    return ep0_read_response_from_slice(cfg->data, cfg->len, (size_t)addr - table_ptr, read_size,
+                                         transaction_num);
+}
+
 //cfusa:req REQ-RMAP-040
 //cfusa:req REQ-RMAP-041
 //cfusa:req REQ-RMAP-047
@@ -833,7 +966,8 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
                                      const uint8_t *sequencer_owner,
                                      size_t sequencer_count,
                                      rcp_wire_error_t *out_error,
-                                     uint32_t watchdog_ms_per_tick)
+                                     uint32_t watchdog_ms_per_tick,
+                                     const rcp_regmap_optional_subsystem_cfg_ptrs_t *optional_cfg)
 {
     size_t hw_cfg_len;
     size_t ep_id_map_len;
@@ -938,6 +1072,33 @@ rcp_regmap_ep0_encode_read_response(uint16_t addr, uint8_t read_size,
         return ep0_read_response_from_slice(image, clamped_count * 2u,
                                              (size_t)addr - map->svr_sequencer_state_ptr,
                                              read_size, transaction_num);
+    }
+
+    /* REQ-RMAP-039: the four optional-subsystem sections -- see
+     * optional_subsystem_cfg_read_route()'s own doc comment above. */
+    if (optional_cfg != NULL) {
+        bool        handled;
+        rcp_bytes_t r;
+
+        r = optional_subsystem_cfg_read_route(addr, map->svr_network_interface_cfg_ptr,
+                                               optional_cfg->network_interface_cfg, read_size,
+                                               transaction_num, &handled);
+        if (handled) { *out_error = RCP_ERROR_NONE; return r; }
+
+        r = optional_subsystem_cfg_read_route(addr, map->svr_physical_layer_cfg_ptr,
+                                               optional_cfg->physical_layer_cfg, read_size,
+                                               transaction_num, &handled);
+        if (handled) { *out_error = RCP_ERROR_NONE; return r; }
+
+        r = optional_subsystem_cfg_read_route(addr, map->svr_time_synch_cfg_ptr,
+                                               optional_cfg->time_synch_cfg, read_size,
+                                               transaction_num, &handled);
+        if (handled) { *out_error = RCP_ERROR_NONE; return r; }
+
+        r = optional_subsystem_cfg_read_route(addr, map->svr_security_cfg_ptr,
+                                               optional_cfg->security_cfg, read_size,
+                                               transaction_num, &handled);
+        if (handled) { *out_error = RCP_ERROR_NONE; return r; }
     }
 
     /* Neither Table 20's own extent nor any known pointed-to table --
