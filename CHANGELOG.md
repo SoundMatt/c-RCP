@@ -34,6 +34,10 @@ the rationale.
 
 ## Releases
 
+### v0.346.0 -- 2026-08-14 (CI tooling: bump pinned `cfusa` v0.5.51 -> v0.5.54)
+
+User-requested update to the latest tagged c-FuSa release. Reviewed all three intervening tags (v0.5.52 ASIL-scaling, v0.5.53 MC/DC gate honesty fixes, v0.5.54 fclose()/CFUSA-A006/L003 fixes) for anything this repo's CI actually exercises: neither the removed `qualify --achievable-asil` flag nor `--mcdc-file` are used here, and `.fusa.json` declares no ASIL, so v0.5.54's ASIL-scaled L003 severity stays inert. Verified by building v0.5.54 from source and running it directly against this repo before touching the pin: `cfusa check` 0 errors/PASS, `cfusa trace` 1076/1076 traced and tested, full 66-test suite + ASan/UBSan clean (tooling-only change, no source edited). Bumped `.github/workflows/ci.yml` and `.github/workflows/release.yml`.
+
 ### v0.345.0 -- 2026-08-14 (REQ-E2E-046: watchdog cause wired, closing rx_stream_status fully -- all four fault causes now live)
 
 Second of the follow-on batch: the fourth and final `rx_stream_status` fault cause -- watchdog -- now has a live evaluate() call site.

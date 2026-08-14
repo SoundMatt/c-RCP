@@ -19106,6 +19106,42 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.346.0 -- 2026-08-14 (CI tooling: bump pinned `cfusa` v0.5.51 -> v0.5.54)
+
+The user asked to update to the latest tagged c-FuSa release. Checked
+the real releases (`gh release list --repo SoundMatt/c-FuSa`): three
+tags landed since v0.5.51 -- v0.5.52 (ASIL-scaling: `qualify`'s
+`--achievable-asil` flag removed in favor of a computed ceiling,
+`coverage --asil` MC/DC gate, ASIL-scaled MISRA severity), v0.5.53
+(MC/DC gate honesty: `--mcdc-file` no longer silently PASSes on an
+empty parse; the branch-coverage MC/DC fallback is now labeled
+"NOT verified MC/DC" instead of implying it's the real thing), and
+v0.5.54 (unchecked `fclose()` fixed at 39 sites, CFUSA-A006/L003
+false-positive fixes, CFUSA-L003 severity ASIL-scaled).
+
+None of the two breaking/behavior changes apply to this repo today:
+grepped both workflow files and confirmed neither uses the removed
+`--achievable-asil` flag nor `--mcdc-file`, and `.fusa.json` declares
+no ASIL (only DAL-B), so v0.5.54's ASIL-scaled L003 severity bump
+stays inert here. Confirmed by building v0.5.54 from source and
+running it directly against this repo's own tree before touching the
+pin, matching the same discipline the v0.5.51 bump (v0.317.0) used:
+`cfusa check` 0 errors/PASS (`.fusa-reqs.json`'s existing 264 L003
+findings all still WARNING, not ERROR, confirming the no-declared-ASIL
+read was correct), `cfusa trace` 1076/1076 traced and tested, full
+66-test suite + ASan/UBSan clean and unaffected (tooling-only change,
+no source edited).
+
+Bumped `.github/workflows/ci.yml` and `.github/workflows/release.yml`,
+both `v0.5.51` -> `v0.5.54`. `safety-case.md`'s own `c-FuSa v0.5.51`
+citation is a `cfusa safety-case`-generated artifact refreshed only by
+a real `release.yml` run, not a hand-maintained doc -- left alone; it
+will pick up the new version stamp the next time that workflow runs
+for real, same as it already lags the current project version today.
+
+**Next**: `REQ-RMAP-038` (real EP_FUNC_config/Sequencer_config table
+storage, so the pointers stop always reading 0).
+
 ### v0.345.0 -- 2026-08-14 (REQ-E2E-046: watchdog cause wired, all four
 rx_stream_status fault causes now live)
 
