@@ -34,6 +34,72 @@ the rationale.
 
 ## Releases
 
+### v0.369.0 -- 2026-08-14 (request-stream-cfg's Table 24 byte 0x000D wire layout reconciled with the real RC5 4-bit model)
+
+Closes issue #458 (c-RCP-AUDIT-33). `regmap.h`'s own file-header "TC18
+0.5.1_RC5 terminology drift" note previously, correctly, deferred
+reconciling this codebase's RC1-baseline 8-independent-bit content model
+of Table 24's relative-address `0x000D` octet with RC5's real, simplified
+4-bit layout -- deferred specifically because, at the time, "this struct
+has NO wire (de)serialization anywhere in this codebase... nothing decodes
+a real `0x000D` byte from the wire today, so there is no live conformance
+defect the old-vs-new bit layout could cause." Issue #424 (v0.363.0 lineage)
+retroactively invalidated that premise by adding
+`rcp_regmap_request_stream_cfg_render()`/`_apply_reconfig()` as this
+table's first real wire (de)serializer -- but nobody revisited the
+deferral's own conclusion once its precondition changed, leaving bits
+`[6:0]` of that octet still serialized against the old, wrong model. An
+independent audit pass caught it.
+
+**The real RC5 layout**, confirmed via direct `pdftotext -layout`
+extraction of Table 24 against the primary-source PDF
+(`OA_TC18_specification_v_0.5.1_RC_5`, p.66): bit0 `rx_enforce_crc`, bit1
+`rx_enforce_sequence`, bit2 `rx_enforce_watchdog`, bit3
+`rx_enforce_request_filing`, bits `[6:4]` Reserved (R only), bit7
+`rx_stream_status` (already correctly wired by #424). **The old, wrong
+layout** this codebase actually serialized: one independent bit per
+struct field, bit0 `rx_enforce_e2e`, bit1 `rx_enforce_seq`, bit2
+`rx_seq_safestate_enable`, bit3 `rx_wd_enable`, bit4
+`rx_wd_safestate_enable`, bit5 `rx_ovrflw_safestate_enable`, bit6
+`rx_safety_measure`.
+
+**Fixed**: `rcp_regmap_request_stream_cfg_render()`/`_apply_reconfig()`
+(`src/regmap.c`) now serialize the real 4-bit layout. bit0 is an unchanged
+pure rename (`rx_enforce_e2e`). Bits 1/2 each collapse TWO
+independently-expressible internal dimensions (an "enable"/"block" bit
+plus its own separate "also enter safe state" bit -- `e2e.h`'s own
+deliberate design, kept unchanged here) into the ONE real wire bit RC5
+defines: render() sets that bit true only when BOTH internal dimensions
+agree (logical AND, never OR), since RC5's own spec text ties "blocked"
+and "safe state entered" together atomically and rendering OR would let a
+stream that only blocks (without escalating to safe state) falsely claim
+that stronger guarantee to a real RC5 peer reading this register --
+`apply_reconfig()` sets both dimensions of a pair together from that one
+arriving bit, exactly the coupled subset a real RC5 write can ever
+express. Bit3 (`rx_enforce_request_filing`) maps directly, uncombined,
+from `rx_ovrflw_safestate_enable`, moving off its old bit-5 position.
+`rx_safety_measure` loses its old, incorrect bit-6 wire position
+entirely -- Reserved in the real layout, no 1:1 RC5 replacement exists
+(unchanged, still-open ambiguity, same disposition `rx_wd_info_enable`
+already had after #424) -- now purely content-modeling, consumed
+directly by `e2e.h` as a plain argument.
+`request_stream_cfg_row_write_authorize()`'s own bits-`[6:0]`
+write-authorization mask (`src/regmap.c`) needed no change: it was
+already conservative enough (denies a write touching any Reserved bit
+too, never less strict than the real layout requires).
+
+New byte-literal tests (`tests/test_tc18_gaps_regmap.c`) prove the real
+bit positions directly, plus the AND-not-OR merge rule for both combined
+bits (each dimension alone renders 0; both together renders the real
+bit), plus an `apply_reconfig()` round-trip proving a write confined to
+the Reserved bits `[6:4]` has no effect on any struct field
+(`rx_safety_measure` in particular, at its own old, wrong bit-6
+position). Mutation-tested: reverting only the `render()`/
+`apply_reconfig()` fix (keeping the new tests) makes all 4 new tests fail
+cleanly; restoring the fix makes them pass again, with the full 66-suite
+regression, ASan/UBSan, and `cfusa check`/`trace` all unaffected
+(0 errors, requirement-coverage unchanged at 1088/1088).
+
 ### v0.368.0 -- 2026-08-14 (rcp_server_endpoint_admit() now checks ep_enable for conditional requests)
 
 Closes issue #461 (c-RCP-AUDIT-36). `rcp_server_endpoint_admit()`'s conditional-request-store path
@@ -113,7 +179,6 @@ Mutation-tested: reverting only the fix (keeping the new/corrected tests) makes 
 err-response test and the evt[3]-suppression test fail exactly as expected; restored, full 66-test
 suite + ASan/UBSan clean again. `cfusa check`/`trace`: 0 errors, 1088/1088 requirements traced and
 tested (unchanged).
-
 ### v0.366.0 -- 2026-08-14 (CAN endpoint's ep_clear_req_storage wire bit corrected to bit 4)
 
 Closes issue #470 (c-RCP-AUDIT-45). `ep_can.c`'s `CAN_ENABLE_CLR_BIT_CLEAR`
