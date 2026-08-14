@@ -597,6 +597,37 @@ bool rcp_acf_evt_requests_acknowledge(uint8_t evt);
 rcp_bytes_t rcp_acf_build_acknowledge_response(rcp_byte_bus_id_t byte_bus_id,
                                                 uint8_t transaction_num);
 
+/* FIXED 2026-08-14 (issue #430, REQ-ACF-033): TC18 §11.3.1's OTHER
+ * Acknowledge shape, distinct from rcp_acf_build_acknowledge_response()
+ * above -- same evt = RCP_ACF_EVT_ACKNOWLEDGE (0x0F), but for a request
+ * that was never filed into EP request storage at all: "err = 1
+ * indicates that the request has been rejected. The byte_msg_payload
+ * contains an error code." This is NOT the same wire shape as
+ * rcp_acf_build_error_response()'s §11.3.4 Error Response (evt[3:0] < 0x9,
+ * err = 1) -- that shape is for a request already accepted into storage
+ * whose later EXECUTION fails; this one is for admission itself refusing
+ * to file the request in the first place (e.g. request-store full, a
+ * malformed opcode, or any other rcp_server_endpoint_admit()
+ * RCP_SERVER_ADMIT_REJECTED outcome). Both shapes decode identically
+ * through rcp_acf_unpack_header() into evt/err, but only THIS function's
+ * evt=0xF lets rcp_acf_classify_response() recognize the response as an
+ * Acknowledge (still RCP_ACF_RESP_ACKNOWLEDGE, per that function's own
+ * "err=1 Acknowledge is still an Acknowledge, not an Error Response" doc
+ * comment) rather than RCP_ACF_RESP_ERROR.
+ *
+ * hdr fields not explicitly listed here: err = 1, rsp = 1, op =
+ * RCP_ACF_OP_NONE (op does not affect classification once evt[3:0] ==
+ * 0x0F). error_code is encoded as the payload's single octet, the same
+ * convention rcp_acf_build_error_response() uses for its own Table 30
+ * code. Encoded as ACF_ABB (no timestamp), mirroring both sibling
+ * builders' own ABB/GBB-split convention. Returns a zeroed rcp_bytes_t
+ * (data=NULL) only on allocation failure -- a single payload octet is
+ * always within RCP_ACF_ABB_MAX_PAYLOAD. Caller frees the result with
+ * rcp_bytes_free(). */
+rcp_bytes_t rcp_acf_build_acknowledge_rejected_response(rcp_byte_bus_id_t byte_bus_id,
+                                                          uint8_t transaction_num,
+                                                          rcp_wire_error_t error_code);
+
 rcp_bytes_t rcp_acf_encode_abb(const rcp_acf_byte_message_info_t *hdr,
                                 const uint8_t *payload, size_t payload_len);
 
