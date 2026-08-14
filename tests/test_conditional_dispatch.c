@@ -687,6 +687,119 @@ static void test_triggered_never_fires_while_endpoint_busy(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* ── REQ-SRV-018: the gPTP lock trigger arms via the same real mechanism ───── */
+
+/* rcp_mock_server_notify_gptp_lock_state()'s own edge-derived signal
+ * (RCP_SERVER_GPTP_TRIGGER_ESTABLISHED, Table 37 signal 0) arms a stored
+ * Triggered request exactly as rcp_mock_server_notify_trigger() itself
+ * already does above -- proven by literally the same
+ * fixture/submit/tick sequence, source_ep standing in for "this
+ * deployment's own convention for the RC Server as a trigger source". */
+static void test_gptp_lock_established_arms_a_waiting_triggered_request(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    /* Waits on endpoint 0's (the RC Server's own convention here) trigger
+     * signal 0 (RCP_SERVER_GPTP_TRIGGER_ESTABLISHED), threshold 0. */
+    rcp_bytes_t frame =
+        make_triggered(RCP_REQUEST_TYPE_TRIGGERED, 0, RCP_SERVER_GPTP_TRIGGER_ESTABLISHED, 0, 0, 41);
+    rcp_server_tick_ctx_t ctx = base_ctx(0);
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &frame));
+
+    /* The very first observation is never itself an edge -- nothing to
+     * notify, nothing arms. */
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_notify_gptp_lock_state(srv, false, 0));
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(0, log.count);
+
+    /* unlocked -> locked: a genuine edge, signal 0. */
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_notify_gptp_lock_state(srv, true, 0));
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(1, log.count);
+    TEST_ASSERT_EQUAL_HEX8(RCP_REQUEST_TYPE_TRIGGERED, log.opcode[0]);
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* A request waiting on signal 1 (LOST) is untouched by an ESTABLISHED
+ * edge, and vice versa -- REQ-SRV-018's own two distinct signals are not
+ * conflated by this wiring. */
+static void test_gptp_lock_signals_are_not_conflated(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    rcp_bytes_t frame =
+        make_triggered(RCP_REQUEST_TYPE_TRIGGERED, 0, RCP_SERVER_GPTP_TRIGGER_LOST, 0, 0, 42);
+    rcp_server_tick_ctx_t ctx = base_ctx(0);
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &frame));
+
+    /* unlocked -> locked fires ESTABLISHED (signal 0), not LOST (signal
+     * 1) -- this request, waiting on signal 1, stays put. */
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_notify_gptp_lock_state(srv, false, 0));
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_notify_gptp_lock_state(srv, true, 0));
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(0, log.count);
+
+    /* locked -> unlocked fires LOST (signal 1): the request it actually
+     * named. */
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_notify_gptp_lock_state(srv, false, 0));
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(1, log.count);
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* source_ep is threaded through unchanged, in both directions: a
+ * request naming a DIFFERENT trigger_source_ep than the caller's own
+ * gPTP-source convention is not armed (the same "wrong endpoint, no
+ * match" discipline rcp_mock_server_notify_trigger() itself already
+ * enforces), and reporting the MATCHING source_ep does arm it -- proving
+ * this is a real passthrough, not a hardcoded value that happens not to
+ * matter for the mismatched case alone. */
+static void test_gptp_lock_state_respects_source_ep(void)
+{
+    handler_log_t log;
+    rcp_mock_server_t *srv = fixture(&log);
+    rcp_bytes_t frame =
+        make_triggered(RCP_REQUEST_TYPE_TRIGGERED, 6, RCP_SERVER_GPTP_TRIGGER_ESTABLISHED, 0, 0, 43);
+    rcp_server_tick_ctx_t ctx = base_ctx(0);
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, submit(srv, &frame));
+
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_notify_gptp_lock_state(srv, false, 0));
+    /* unlocked->locked: ESTABLISHED, reported as source_ep=0, but this
+     * request waits on source_ep=6 -- no match, nothing arms. */
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_notify_gptp_lock_state(srv, true, 0));
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(0, log.count);
+
+    /* locked->unlocked: LOST, reported as source_ep=6 -- source_ep now
+     * matches, but the SIGNAL doesn't (this request waits on
+     * ESTABLISHED, not LOST) -- still nothing arms. Both dimensions
+     * matter independently. */
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_notify_gptp_lock_state(srv, false, 6));
+    TEST_ASSERT_FALSE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(0, log.count);
+
+    /* unlocked->locked again: ESTABLISHED, reported as source_ep=6 --
+     * NOW both source_ep and signal_nr match. Proves source_ep is
+     * genuinely threaded through to rcp_mock_server_notify_trigger(),
+     * not silently dropped or hardcoded. */
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_notify_gptp_lock_state(srv, true, 6));
+    TEST_ASSERT_TRUE(tick(srv, &ctx));
+    TEST_ASSERT_EQUAL_size_t(1, log.count);
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── Timed: presentation-time gated execution ─────────────────────────────── */
 
 static void test_timed_waits_for_its_presentation_time(void)
@@ -1626,6 +1739,9 @@ int main(void)
     RUN_TEST(test_triggered_executes_only_on_its_own_trigger);
     RUN_TEST(test_triggered_threshold_delays_execution);
     RUN_TEST(test_triggered_never_fires_while_endpoint_busy);
+    RUN_TEST(test_gptp_lock_established_arms_a_waiting_triggered_request);
+    RUN_TEST(test_gptp_lock_signals_are_not_conflated);
+    RUN_TEST(test_gptp_lock_state_respects_source_ep);
 
     RUN_TEST(test_timed_waits_for_its_presentation_time);
     RUN_TEST(test_timed_never_due_without_gptp_lock);

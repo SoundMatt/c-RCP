@@ -19106,6 +19106,37 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.336.0 -- 2026-08-14 (REQ-SRV-018: gPTP lock trigger delivered
+through the existing notify_trigger() broadcast)
+
+Third of 14 items catalogued "not blocked, left by explicit
+decision". Table 37's gPTP lock-established/lost signals already had
+a correct edge-detector (`rcp_server_gptp_trigger_evaluate()`,
+server.h) -- missing was one call per newly observed `gptp_locked`
+value instead of composing `evaluate()`+`notify_trigger()` by hand.
+
+New `rcp_mock_server_notify_gptp_lock_state(srv, locked, source_ep)`
+(mock.h/mock.c): drives the edge-detector and, on a genuine edge,
+reports the derived signal through this test double's OWN
+ALREADY-EXISTING `rcp_mock_server_notify_trigger()` broadcast --
+REQ-SRV-015's own per-endpoint-type triggers already reuse it. An
+early draft reimplemented that broadcast's own loop from scratch;
+caught during implementation and replaced with delegation instead.
+
+3 new tests (test_conditional_dispatch.c), reusing that file's own
+real fixture/submit/tick machinery: a stored Triggered request
+genuinely arms on an ESTABLISHED edge, the two signals aren't
+conflated, and `source_ep` is a real passthrough (proven both
+directions). Both the edge-detection short-circuit and the
+`source_ep` passthrough mutation-tested; the latter required
+strengthening the test first (it only ever used `source_ep=0`, so a
+hardcoded-0 mutant was invisible).
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace`
+(v0.5.51): 0 errors, 0/1076 untested. `.fusa-reqs.json`:
+`REQ-SRV-018` partial -> implemented (1041 implemented / 26 partial
+/ 2 not-implemented / 7 retired, 1076 total).
+
 ### v0.335.0 -- 2026-08-14 (REQ-RMAP-048/049: response/ack routing
 suppression, TC18's "0 means send nothing" rule)
 

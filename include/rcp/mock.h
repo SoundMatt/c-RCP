@@ -1054,6 +1054,47 @@ size_t rcp_mock_server_watchdog_purge(rcp_mock_server_t *srv, rcp_byte_bus_id_t 
  * rcp_mock_server_watchdog_purge()'s own single-endpoint convention. */
 size_t rcp_mock_server_broadcast_safe_state(rcp_mock_server_t *srv, uint8_t request_stream_index);
 
+/* ── REQ-SRV-018: gPTP lock-established/lost trigger delivery ──────────────── */
+
+/* Drives srv's own TC18 Table 37 gPTP trigger edge-detector
+ * (server.h's rcp_server_gptp_trigger_evaluate(), against srv's own
+ * caller-owned rcp_server_gptp_trigger_state_t) with one newly observed
+ * gPTP lock state, and, on a genuine edge (false->true or true->false --
+ * not a level, an unchanged locked value from the previous call notifies
+ * nothing), reports the derived signal (RCP_SERVER_GPTP_TRIGGER_
+ * ESTABLISHED/_LOST) through this test double's own existing
+ * rcp_mock_server_notify_trigger() broadcast (above) -- so a stored
+ * Triggered request whose own trigger_source_ep/trigger_signal_nr
+ * selection matches source_ep/the derived signal correctly arms,
+ * exactly as if a per-endpoint-type trigger had fired via that same
+ * broadcast.
+ *
+ * source_ep is the caller's own choice of which byte_bus_id identifies
+ * the RC Server itself as a trigger source for THIS deployment's
+ * purposes -- rcp_server_gptp_trigger_evaluate()'s own doc comment
+ * (server.h) is explicit that this primitive does not resolve that
+ * convention itself, matching REQ-SRV-011's own existing scope; this
+ * function does not invent one either, it only threads the caller's own
+ * choice through to rcp_mock_server_notify_trigger().
+ *
+ * Unlike REQ-GPIO-033/REQ-ADC-031/REQ-SRV-016's own siblings (each of
+ * which the caller still drives itself, no automatic per-tick wiring
+ * existing anywhere in this test double), a caller wanting REQ-SRV-018's
+ * own signal delivered now has a single call to make per newly observed
+ * gptp_locked value, rather than composing evaluate()+notify_trigger()
+ * by hand.
+ *
+ * Returns rcp_mock_server_notify_trigger()'s own return value when an
+ * edge fired (the total number of stored Triggered requests that
+ * counted this occurrence, across every registered endpoint), or 0
+ * without calling it at all when no edge was detected (locked unchanged,
+ * or this is the very first call) -- these two 0 cases (no edge vs. an
+ * edge nothing currently stored matched) are not distinguished by this
+ * return value alone, matching rcp_mock_server_broadcast_safe_state()'s
+ * own identical convention. */
+size_t rcp_mock_server_notify_gptp_lock_state(rcp_mock_server_t *srv, bool locked,
+                                               uint8_t source_ep);
+
 #ifdef __cplusplus
 }
 #endif

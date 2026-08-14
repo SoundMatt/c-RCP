@@ -34,6 +34,16 @@ the rationale.
 
 ## Releases
 
+### v0.336.0 -- 2026-08-14 (REQ-SRV-018: gPTP lock-established/lost trigger delivered through the existing notify_trigger() broadcast)
+
+Third of 14 items catalogued "not blocked, left by explicit decision" in the post-backlog requirements audit. TC18 Table 37's server-own gPTP lock-established/lost trigger signals (0/1) already had a correct edge-detector primitive (`rcp_server_gptp_trigger_evaluate()`, server.h) -- what stayed missing was a single call a caller could make per newly observed `gptp_locked` value, instead of composing `evaluate()`+`notify_trigger()` by hand across every registered endpoint itself.
+
+New `rcp_mock_server_notify_gptp_lock_state(srv, locked, source_ep)` (mock.h/mock.c): drives srv's own caller-owned `rcp_server_gptp_trigger_state_t` with one newly observed lock state and, on a genuine edge, reports the derived signal through this test double's **own already-existing** `rcp_mock_server_notify_trigger()` broadcast -- the same primitive `REQ-SRV-015`'s own per-endpoint-type triggers already reuse. An early implementation draft reimplemented that broadcast's own iterate-every-registered-endpoint loop from scratch; caught during implementation and replaced with delegation to the existing, already-tested helper instead.
+
+3 new tests (test_conditional_dispatch.c), reusing that file's own real fixture/submit/tick machinery -- not synthetic unit tests of the primitive in isolation: a stored Triggered request genuinely arms and executes on an ESTABLISHED edge, the two Table 37 signals (ESTABLISHED/LOST) are not conflated, and `source_ep` is a real passthrough to `notify_trigger()` (proven in both directions: a mismatched `source_ep` does not arm, a matching one does). Both the edge-detection short-circuit and the `source_ep` passthrough were mutation-tested; the `source_ep` mutation required strengthening the test first -- the original version only ever exercised `source_ep=0`, so a hardcoded-0 mutant was invisible to it.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 1076/1076 traced and tested. `.fusa-reqs.json`: `REQ-SRV-018` partial -> implemented (1041 implemented / 26 partial / 2 not-implemented / 7 retired, 1076 total).
+
 ### v0.335.0 -- 2026-08-14 (REQ-RMAP-048/049: response/acknowledge routing suppression, TC18's "0 means send nothing" rule)
 
 Second of 14 items catalogued "not blocked, left by explicit decision" in the post-backlog requirements audit. TC18 §12.7.7 Table 24's two per-request-stream routing pointers -- `rx_ack_stream_index` (Acknowledge responses) and `rx_resp_stream_index` (everything else: Write/Read/Error) -- each carry a "0 means no X is to be sent" default. This module owns no real multi-stream transport to actually deliver a response on a caller-chosen stream (unchanged; the same "protocol library, not a scheduler/transport" boundary `REQ-SRV-016/017/018`/`REQ-RMAP-065` already establish) -- but the "send nothing at all" half needs no transport concept whatsoever, and is now wired.

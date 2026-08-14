@@ -122,6 +122,15 @@ struct rcp_mock_server {
     uint8_t                         frag_first_header[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES]
                                                        [RCP_ACF_GBB_HEADER_LEN];
     size_t                          frag_first_header_len[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES];
+    /* REQ-SRV-018 (issue #201/tc18-gap post-backlog audit): the RC
+     * Server's own edge-detector state for TC18 Table 37's gPTP lock-
+     * established/lost trigger signals (server.h's own
+     * rcp_server_gptp_trigger_state_t) -- zero-init-safe as-is
+     * (has_previous starts false, exactly rcp_server_gptp_trigger_
+     * state_init()'s own contract), but initialized explicitly in
+     * rcp_mock_server_new() anyway to match this file's own "never rely
+     * on calloc() alone for a type with its own _init()" convention. */
+    rcp_server_gptp_trigger_state_t gptp_trigger_state;
     /* response-queue-cfg table (REQ-RMAP-034's own response-stream half)
      * -- see mock.h's own doc comment on
      * rcp_mock_server_set_response_queue_cfg(). Mirrors
@@ -207,6 +216,7 @@ rcp_mock_server_t *rcp_mock_server_new(void)
                                            RCP_MOCK_FRAG_REASM_DEFAULT_MAX_TOTAL_LEN);
         }
     }
+    rcp_server_gptp_trigger_state_init(&srv->gptp_trigger_state);
     return srv;
 }
 
@@ -2094,4 +2104,23 @@ size_t rcp_mock_server_broadcast_safe_state(rcp_mock_server_t *srv, uint8_t requ
     }
 
     return purged;
+}
+
+//cfusa:req REQ-SRV-018
+size_t rcp_mock_server_notify_gptp_lock_state(rcp_mock_server_t *srv, bool locked,
+                                               uint8_t source_ep)
+{
+    uint8_t signal_nr;
+
+    if (!rcp_server_gptp_trigger_evaluate(&srv->gptp_trigger_state, locked, &signal_nr)) {
+        return 0; /* no edge -- unchanged locked value, or the very first call */
+    }
+
+    /* rcp_mock_server_notify_trigger() (below) is already this test
+     * double's own "report one trigger occurrence to every registered
+     * endpoint" broadcast primitive -- REQ-SRV-015's own per-endpoint-
+     * type triggers already reuse it; the derived Table 37 signal is
+     * just another occurrence to report through the same call, not a
+     * reason to duplicate its own iterate-every-in_use-slot loop here. */
+    return rcp_mock_server_notify_trigger(srv, source_ep, signal_nr);
 }
