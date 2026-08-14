@@ -494,7 +494,14 @@ static void test_adc_functional_cfg_has_clock_status_and_interval_fields(void)
                                                  sizeof(before)));
 }
 
-static void test_adc_inter_sample_spacing_is_unconstrained(void)
+/* Still true and still worth pinning: rcp_ep_adc_average_interval()
+ * itself (layer 1's arithmetic-mean reduction) has no timing awareness
+ * of its own and never will -- the two intervals below have completely
+ * different sample spacing and are nevertheless indistinguishable at
+ * THIS function's own output. That is by design (this function's own
+ * job is the mean, not the timing check); REQ-ADC-033's actual spacing
+ * validation is a separate, dedicated primitive exercised below. */
+static void test_adc_average_interval_itself_has_no_timing_awareness(void)
 {
     rcp_ep_adc_sample_t    even[3];
     rcp_ep_adc_sample_t    ragged[3];
@@ -516,28 +523,115 @@ static void test_adc_inter_sample_spacing_is_unconstrained(void)
     a = rcp_ep_adc_average_interval(even, 3u);
     b = rcp_ep_adc_average_interval(ragged, 3u);
 
-    /* REQ-ADC-033 DEVIATION PIN (still genuinely open, not a routine gap):
-     * TC18 §13.7.9.1 requires successive samples to be exactly one
-     * adc_sample_interval apart, that interval being a multiple of
-     * adc_base_clk scaled by adc_base_clk_divider, whenever more than one
-     * sample is taken. adc_sample_interval and adc_base_clk_divider are now
-     * real, wire-reachable config fields (REQ-ADC-035/036, see
-     * test_adc_functional_cfg_has_clock_status_and_interval_fields above),
-     * but adc_base_clk itself is deliberately never modelled as a real
-     * value (always renders 0, the same honest "no real clock source"
-     * stance ep_gpio.h's/ep_i2c.h's/ep_lin.h's own base_clk fields commit
-     * to) -- so this module has no way to convert a cycle count into real
-     * wall-clock spacing, and rcp_ep_adc_average_interval() still consumes
-     * caller-supplied samples with no timing validation whatsoever: the two
-     * intervals below have completely different sample spacing and are
-     * nevertheless indistinguishable at this module's only output.
-     * Enforcing this would mean inventing a clock model this codebase
-     * deliberately doesn't have for any endpoint type, not a field-wiring
-     * fix. */
     TEST_ASSERT_EQUAL_UINT16(100u, a.value);
     TEST_ASSERT_EQUAL_UINT16(a.value, b.value);
     TEST_ASSERT_EQUAL_UINT64(2000u, a.timestamp);
     TEST_ASSERT_EQUAL_UINT64(a.timestamp, b.timestamp);
+}
+
+/* CLOSED 2026-08-14 (was DEVIATION PIN): REQ-ADC-033's own real spacing
+ * check, rcp_ep_adc_validate_sample_spacing() (ep_adc.h/ep_adc.c) --
+ * proven against the exact same "even" (uniform, 1000ns cadence) vs.
+ * "ragged" (wildly non-uniform) sample sets the old deviation-pin test
+ * used, now genuinely distinguished. base_clk_divider=5,
+ * sample_interval=200 (both within Table 51's own 8-bit fields),
+ * base_clk_hz=1_000_000_000 (a 1GHz caller-real
+ * clock) yields an expected_spacing_ns of exactly 1000 -- chosen so the
+ * "even" fixture's own real 1000-tick timestamps validate at zero
+ * tolerance without any unit-conversion cleverness in the test itself. */
+static void test_adc_validate_sample_spacing_distinguishes_even_from_ragged(void)
+{
+    rcp_ep_adc_sample_t even[3];
+    rcp_ep_adc_sample_t ragged[3];
+    size_t               i;
+
+    for (i = 0u; i < 3u; i++) {
+        even[i].value   = 100u;
+        ragged[i].value = 100u;
+    }
+    even[0].timestamp   = 0u;
+    even[1].timestamp   = 1000u;
+    even[2].timestamp   = 2000u;
+    ragged[0].timestamp = 0u;
+    ragged[1].timestamp = 5u;
+    ragged[2].timestamp = 2000u;
+
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_SPACING_OK,
+                      rcp_ep_adc_validate_sample_spacing(even, 3u, 5u, 200u,
+                                                          1000000000u, 0u));
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_SPACING_VIOLATION,
+                      rcp_ep_adc_validate_sample_spacing(ragged, 3u, 5u, 200u,
+                                                          1000000000u, 0u));
+}
+
+/* A spacing within tolerance is OK; the same deviation outside tolerance
+ * is a violation -- tolerance_ns is a real, exercised parameter, not
+ * dead width. */
+static void test_adc_validate_sample_spacing_respects_tolerance(void)
+{
+    rcp_ep_adc_sample_t s[2];
+
+    s[0].value = 100u;
+    s[1].value = 100u;
+    s[0].timestamp = 0u;
+    s[1].timestamp = 1050u; /* 50ns late against an expected 1000ns */
+
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_SPACING_VIOLATION,
+                      rcp_ep_adc_validate_sample_spacing(s, 2u, 5u, 200u, 1000000000u, 0u));
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_SPACING_OK,
+                      rcp_ep_adc_validate_sample_spacing(s, 2u, 5u, 200u, 1000000000u, 50u));
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_SPACING_VIOLATION,
+                      rcp_ep_adc_validate_sample_spacing(s, 2u, 5u, 200u, 1000000000u, 49u));
+}
+
+/* No real clock rate/divider to check against (base_clk_hz == 0 or
+ * base_clk_divider == 0, matching adc_base_clk's own never-modelled
+ * default) or fewer than 2 samples: fails open, not a false violation. */
+static void test_adc_validate_sample_spacing_fails_open_without_a_real_clock(void)
+{
+    rcp_ep_adc_sample_t s[2];
+
+    s[0].value = 100u;
+    s[1].value = 100u;
+    s[0].timestamp = 0u;
+    s[1].timestamp = 999999999u; /* wildly off from any sane 1000ns cadence */
+
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_SPACING_OK,
+                      rcp_ep_adc_validate_sample_spacing(s, 2u, 1u, 1u, 0u, 0u));
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_SPACING_OK,
+                      rcp_ep_adc_validate_sample_spacing(s, 2u, 0u, 1u, 1000000000u, 0u));
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_SPACING_OK,
+                      rcp_ep_adc_validate_sample_spacing(s, 1u, 1u, 1u, 1000000000u, 0u));
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_SPACING_OK,
+                      rcp_ep_adc_validate_sample_spacing(NULL, 0u, 1u, 1u, 1000000000u, 0u));
+}
+
+/* A non-monotonic timestamp pair (real clock configured) is its own
+ * violation, distinct from an out-of-tolerance spacing -- caught before
+ * the unsigned subtraction that would otherwise underflow. */
+static void test_adc_validate_sample_spacing_rejects_non_monotonic_timestamps(void)
+{
+    rcp_ep_adc_sample_t s[2];
+
+    s[0].value = 100u;
+    s[1].value = 100u;
+    s[0].timestamp = 2000u;
+    s[1].timestamp = 1000u; /* earlier than s[0] */
+
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_SPACING_VIOLATION,
+                      rcp_ep_adc_validate_sample_spacing(s, 2u, 5u, 200u, 1000000000u, 0u));
+
+    /* The monotonicity check must be its own, independent reason to
+     * reject -- not an accident of the (i+1)-minus-i subtraction
+     * underflowing into some huge unsigned value that happens to also
+     * fail the ordinary tolerance window. Proven by choosing a
+     * tolerance_ns wide enough (UINT64_MAX - expected_ns) that the
+     * window clamps to [0, UINT64_MAX] -- an underflowed value would
+     * fall INSIDE that window and read as a false OK if the
+     * monotonicity check were ever removed or short-circuited away. */
+    TEST_ASSERT_EQUAL(RCP_EP_ADC_SPACING_VIOLATION,
+                      rcp_ep_adc_validate_sample_spacing(s, 2u, 5u, 200u, 1000000000u,
+                                                          (uint64_t)-1 - 1000u));
 }
 
 static void test_adc_pipeline_is_stateless_by_design_and_cadence_deviation_pin(void)
@@ -1416,7 +1510,11 @@ int main(void)
 
     RUN_TEST(test_adc_value_width_and_named_analog_input_signal);
     RUN_TEST(test_adc_functional_cfg_has_clock_status_and_interval_fields);
-    RUN_TEST(test_adc_inter_sample_spacing_is_unconstrained);
+    RUN_TEST(test_adc_average_interval_itself_has_no_timing_awareness);
+    RUN_TEST(test_adc_validate_sample_spacing_distinguishes_even_from_ragged);
+    RUN_TEST(test_adc_validate_sample_spacing_respects_tolerance);
+    RUN_TEST(test_adc_validate_sample_spacing_fails_open_without_a_real_clock);
+    RUN_TEST(test_adc_validate_sample_spacing_rejects_non_monotonic_timestamps);
     RUN_TEST(test_adc_pipeline_is_stateless_by_design_and_cadence_deviation_pin);
     RUN_TEST(test_adc_dispatch_accumulates_across_executions_before_responding);
 

@@ -76,6 +76,45 @@ rcp_ep_adc_avg_value_t rcp_ep_adc_average_interval(const rcp_ep_adc_sample_t *sa
     return result;
 }
 
+//cfusa:req REQ-ADC-033
+rcp_ep_adc_spacing_result_t rcp_ep_adc_validate_sample_spacing(
+    const rcp_ep_adc_sample_t *samples, size_t sample_count, uint8_t base_clk_divider,
+    uint8_t sample_interval, uint32_t base_clk_hz, uint64_t tolerance_ns)
+{
+    uint64_t expected_ns;
+    uint64_t lo;
+    uint64_t hi;
+    size_t   i;
+
+    if (sample_count < 2u || base_clk_hz == 0u || base_clk_divider == 0u) {
+        return RCP_EP_ADC_SPACING_OK;
+    }
+
+    /* ADC_CLK cycles (sample_interval * base_clk_divider) converted to
+     * nanoseconds via the caller's own real base_clk_hz. Bounded well
+     * within uint64_t: sample_interval/base_clk_divider are each at most
+     * 255 (Table 51's own 8-bit fields), so the numerator is at most
+     * 255*255*1e9, and dividing by a nonzero base_clk_hz only shrinks
+     * it further. */
+    expected_ns =
+        (uint64_t)sample_interval * (uint64_t)base_clk_divider * 1000000000ULL / base_clk_hz;
+
+    lo = (expected_ns > tolerance_ns) ? (expected_ns - tolerance_ns) : 0u;
+    hi = (expected_ns <= UINT64_MAX - tolerance_ns) ? (expected_ns + tolerance_ns) : UINT64_MAX;
+
+    for (i = 0; i + 1 < sample_count; i++) {
+        uint64_t actual_ns;
+
+        if (samples[i + 1].timestamp < samples[i].timestamp) {
+            return RCP_EP_ADC_SPACING_VIOLATION; /* not monotonically increasing */
+        }
+        actual_ns = samples[i + 1].timestamp - samples[i].timestamp;
+        if (actual_ns < lo || actual_ns > hi) return RCP_EP_ADC_SPACING_VIOLATION;
+    }
+
+    return RCP_EP_ADC_SPACING_OK;
+}
+
 /* ── Layers 2/3: adc_avg_intervals_per_request + adc_combine_avg_values ─────── */
 
 //cfusa:req REQ-ADC-006
