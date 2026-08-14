@@ -18912,8 +18912,67 @@ not-implemented / 7 retired) -- all 42 remaining partials are now
 `scope: "tc18-gap"` architectural backlog, not one is
 `scope: "tc18"`.
 
-**Next**: the 41-item `scope: "tc18-gap"` backlog under issues
-#334/#335/#336/#338 (minus `REQ-E2E-029`, gated on
-`REQ-E2E-028`'s own sequence_num-threading fix) -- a materially
-larger, more architectural body of work than the test-only
-`scope: "tc18"` batches just completed.
+**Next**: PR B, `REQ-E2E-028`/`REQ-E2E-029`'s sequence_num wiring,
+then the rest of the 8-PR plan (TSCF presentation-time gating,
+ADC/GPIO/ISELED mock.c dispatch wiring, fragmented E2E dispatch,
+`REQ-RMAP-039`'s four optional-subsystem sub-tables,
+`REQ-WAKEUP-020` enforcement, `REQ-RMAP-066` discovery-timeout
+wiring) recorded in this session's own memory file.
+
+### v0.321.0 -- 2026-08-13 (tc18-gap backlog PR A: RMAP capacity
+cross-checks, RCP_CFG_INCONSISTENT response-stream validation, real
+REQ-PWM-055 fix)
+
+First PR of the 42-item `scope: "tc18-gap"` backlog (issues
+#334/#335/#336/#338) per the user's "plan and complete all of this"
+direction, following a 5-agent investigation and 4 consolidated
+`AskUserQuestion` decisions. No-decision items only -- the harder,
+decision-gated items (mock.c dispatch buildout, E2E sequence-number
+wiring, TSCF gating, etc.) are separate follow-up PRs.
+
+`REQ-RMAP-032`/`REQ-RMAP-034`/`REQ-RMAP-037` CLOSED,
+`REQ-RMAP-036` capacity half closed: four Table 20
+`svr_*_capacity` registers were wire-reachable but never
+cross-checked against the real table each one describes, silently
+staying 0 regardless of how many entries were actually configured.
+`rcp_mock_server_set_hw_pin_map()`/`_set_request_stream_cfg()`/
+`_set_ep_id_map()`/`_add_endpoint()`/`_remove_endpoint()` (mock.c)
+now sync their own capacity register on every call, shrinking back
+down on a smaller replacement too. `REQ-RMAP-034`'s response-stream
+half needed new backing storage: `rcp_mock_server_set_response_
+queue_cfg()` (mock.c/mock.h) is new this batch, mirroring
+`set_request_stream_cfg()`'s own shape. `REQ-RMAP-036`'s pointer
+half stays open -- no real EP_config table storage exists yet for
+it to address. Also fixed a real doc-comment bug in `regmap.h`
+found while investigating `REQ-RMAP-023`/`038`: a comment wrongly
+claimed two fields were "already correctly modeled at Table 20
+addresses," contradicting the correct doc comment 170 lines above
+it and the actual code.
+
+`REQ-RMAP-049` plausibility-validation half closed:
+`rcp_lifecycle_check_rcp_cfg()`'s `RCP_CFG_INCONSISTENT` check
+previously only verified a boolean `has_response_stream`.
+`rcp_lifecycle_request_stream_plausibility_t` gained a
+`response_stream_index` field (0-based, matching
+`REQ-LIFECYCLE-038`'s own `request_stream_index` convention),
+validated against a new `response_stream_count` on the snapshot.
+The ack-routing half stays documented, not built, per project
+decision.
+
+`REQ-PWM-055` IMPLEMENTED (was `status: "partial"` with a
+self-contradictory `text` starting "NOT IMPLEMENTED" -- a
+data-quality bug fixed alongside the real one): new
+`rcp_ep_pwm_out_trigger_events_at_tick()` (ep_pwm.h/.c) closes both
+of TC18 §13.7.5.1/Table 45's rules -- trigger timing is now derived
+relative to the `pwmo_skew`-delayed edge, not the undelayed source
+edge, and `MID_PULSE` now fires unconditionally at
+`active_duration/2` ticks past the delayed cycle start, including
+`active_duration == 0`.
+
+All fixes mutation-tested independently. Full 66-test suite +
+ASan/UBSan (CI's exact `ASAN_OPTIONS`) clean; `cfusa check`/`trace`
+(v0.5.51): 0 errors, 0/1076 untested. `.fusa-reqs.json`: 5 entries
+`partial` -> `implemented`, repo-wide total unchanged at 1076 (1029
+implemented / 38 partial / 2 not-implemented / 7 retired).
+
+**Next**: PR B, `REQ-E2E-028`/`REQ-E2E-029`'s sequence_num wiring.

@@ -256,6 +256,19 @@ bool rcp_mock_server_set_request_stream_cfg(rcp_mock_server_t *srv,
                                              const rcp_regmap_request_stream_cfg_t *entries,
                                              size_t count);
 
+/* Replaces srv's own response-queue-cfg table wholesale with a copy of
+ * entries[0..count). Returns false (srv's own table left unchanged) if
+ * count exceeds RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES (regmap.h);
+ * true otherwise. REQ-RMAP-034 (response-stream half): mirrors
+ * rcp_mock_server_set_request_stream_cfg()'s own shape exactly, keeping
+ * svr_response_stream_cfg_capacity (Table 20) synced to the real table's
+ * own length. Same "caller may freely set... directly, no lifecycle-
+ * state gate here" convention rcp_mock_server_set_hw_pin_map()/
+ * _set_request_stream_cfg() already establish. */
+bool rcp_mock_server_set_response_queue_cfg(rcp_mock_server_t *srv,
+                                             const rcp_regmap_response_queue_cfg_t *entries,
+                                             size_t count);
+
 /* Replaces srv's own EP_ID_config table (TC18 §12.7.8 Table 23) wholesale
  * with a copy of entries[0..count). Returns false (srv's own table left
  * unchanged) if count exceeds RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES (regmap.h);

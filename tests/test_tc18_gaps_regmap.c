@@ -474,14 +474,16 @@ static void test_lifecycle_state_register_field_tracks_the_authoritative_state(v
 {
     rcp_mock_server_t                          *srv;
     rcp_lifecycle_endpoint_plausibility_t       eps[1] = {{true, true, true, true}};
-    rcp_lifecycle_request_stream_plausibility_t rs[1]  = {{true, true}};
+    rcp_lifecycle_request_stream_plausibility_t rs[1]  = {{true, true, 0}};
     rcp_lifecycle_plausibility_snapshot_t       snap;
     rcp_lifecycle_writer_ctx_t                  writer = ROOT_WRITER;
 
-    snap.endpoints            = eps;
-    snap.endpoint_count       = 1u;
-    snap.request_streams      = rs;
-    snap.request_stream_count = 1u;
+    snap.endpoints             = eps;
+    snap.endpoint_count        = 1u;
+    snap.request_streams       = rs;
+    snap.request_stream_count  = 1u;
+    snap.response_stream_count = 1u; /* REQ-RMAP-049: unused by this test's own HW_CONFIGURED-only
+                                         transition (check_hw_cfg, not check_rcp_cfg), set for hygiene */
 
     TEST_ASSERT_EQUAL_HEX8(0x00, (uint8_t)RCP_LIFECYCLE_HW_UNCONFIGURED);
     TEST_ASSERT_EQUAL_HEX8(0x55, (uint8_t)RCP_LIFECYCLE_HW_CONFIGURED);
@@ -1359,6 +1361,151 @@ static void test_hw_pin_map_rejects_oversized_table_leaving_existing_data_intact
     stored = rcp_mock_server_hw_pin_map(srv, &stored_len);
     TEST_ASSERT_EQUAL_UINT((size_t)1u, stored_len);
     TEST_ASSERT_EQUAL_HEX8(4, stored[0].hw_ep_nr);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-RMAP-032: svr_io_pin_count (Table 20, wire-readable) is this
+ * server's own report of how many HW pins it has -- previously never
+ * set anywhere at all (rcp_regmap_general_init() leaves it at its
+ * zero-init default forever), so a wire reader's own view of Table 20
+ * silently disagreed with the real, larger hw_pin_map this same server
+ * actually enforces writes against. rcp_mock_server_set_hw_pin_map()
+ * now syncs it to the real table's own length on every call, including
+ * shrinking back down on a later, smaller replacement (not just a
+ * one-time high-water mark). */
+static void test_set_hw_pin_map_syncs_svr_io_pin_count(void)
+{
+    rcp_mock_server_t             *srv;
+    rcp_regmap_hw_pin_map_entry_t  three[3] = {{1, 1, 0x0Cu}, {2, 2, 0x0Cu}, {3, 3, 0x0Cu}};
+    rcp_regmap_hw_pin_map_entry_t  one[1]   = {{4, 4, 0x0Cu}};
+
+    srv = rcp_mock_server_new();
+    TEST_ASSERT_NOT_NULL(srv);
+    TEST_ASSERT_EQUAL_UINT16(0, rcp_mock_server_regmap(srv)->svr_io_pin_count);
+
+    TEST_ASSERT_TRUE(rcp_mock_server_set_hw_pin_map(srv, three, 3));
+    TEST_ASSERT_EQUAL_UINT16(3, rcp_mock_server_regmap(srv)->svr_io_pin_count);
+
+    /* Shrinks back down too, not just a one-time high-water mark. */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_hw_pin_map(srv, one, 1));
+    TEST_ASSERT_EQUAL_UINT16(1, rcp_mock_server_regmap(srv)->svr_io_pin_count);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-RMAP-034: svr_request_stream_cfg_capacity/svr_response_stream_cfg_
+ * capacity (Table 20, wire-readable entry counts, not byte lengths) are
+ * this server's own report of how many request/response streams it has
+ * configured -- previously never set anywhere, so a wire reader's own
+ * view of Table 20 silently disagreed with the real tables this same
+ * server actually enforces writes against, the same class of gap
+ * REQ-RMAP-032 (hw_pin_map/svr_io_pin_count, above) already fixed.
+ * rcp_mock_server_set_response_queue_cfg() is new this batch -- no
+ * backing storage for response-queue-cfg existed in rcp_mock_server_t at
+ * all before now, so its own capacity register had no real table to sync
+ * from either. */
+static void test_set_request_stream_cfg_syncs_svr_request_stream_cfg_capacity(void)
+{
+    rcp_mock_server_t              *srv;
+    rcp_regmap_request_stream_cfg_t two[2];
+    rcp_regmap_request_stream_cfg_t one[1];
+
+    rcp_regmap_request_stream_cfg_init(&two[0]);
+    rcp_regmap_request_stream_cfg_init(&two[1]);
+    rcp_regmap_request_stream_cfg_init(&one[0]);
+
+    srv = rcp_mock_server_new();
+    TEST_ASSERT_NOT_NULL(srv);
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_mock_server_regmap(srv)->svr_request_stream_cfg_capacity);
+
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, two, 2));
+    TEST_ASSERT_EQUAL_UINT8(2, rcp_mock_server_regmap(srv)->svr_request_stream_cfg_capacity);
+
+    /* Shrinks back down too, not just a one-time high-water mark. */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, one, 1));
+    TEST_ASSERT_EQUAL_UINT8(1, rcp_mock_server_regmap(srv)->svr_request_stream_cfg_capacity);
+
+    rcp_mock_server_destroy(srv);
+}
+
+static void test_set_response_queue_cfg_syncs_svr_response_stream_cfg_capacity(void)
+{
+    rcp_mock_server_t               *srv;
+    rcp_regmap_response_queue_cfg_t  two[2];
+    rcp_regmap_response_queue_cfg_t  one[1];
+
+    rcp_regmap_response_queue_cfg_init(&two[0]);
+    rcp_regmap_response_queue_cfg_init(&two[1]);
+    rcp_regmap_response_queue_cfg_init(&one[0]);
+
+    srv = rcp_mock_server_new();
+    TEST_ASSERT_NOT_NULL(srv);
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_mock_server_regmap(srv)->svr_response_stream_cfg_capacity);
+
+    TEST_ASSERT_TRUE(rcp_mock_server_set_response_queue_cfg(srv, two, 2));
+    TEST_ASSERT_EQUAL_UINT8(2, rcp_mock_server_regmap(srv)->svr_response_stream_cfg_capacity);
+
+    /* Shrinks back down too, not just a one-time high-water mark. */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_response_queue_cfg(srv, one, 1));
+    TEST_ASSERT_EQUAL_UINT8(1, rcp_mock_server_regmap(srv)->svr_response_stream_cfg_capacity);
+
+    /* Rejects an oversized table, leaving the existing table (and its
+     * capacity register) untouched. */
+    TEST_ASSERT_FALSE(rcp_mock_server_set_response_queue_cfg(
+        srv, two, RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES + 1));
+    TEST_ASSERT_EQUAL_UINT8(1, rcp_mock_server_regmap(srv)->svr_response_stream_cfg_capacity);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-RMAP-037: svr_ep_bytebus_id_map_capacity (Table 20, wire-readable
+ * entry count) is this server's own report of how many EP_ID_config rows
+ * it has -- previously never set anywhere, same class of gap as
+ * REQ-RMAP-032/034 above. */
+static void test_set_ep_id_map_syncs_svr_ep_bytebus_id_map_capacity(void)
+{
+    rcp_mock_server_t            *srv;
+    rcp_regmap_ep_id_map_entry_t  two[2] = {{0u, 1u, 1u}, {0u, 2u, 1u}};
+    rcp_regmap_ep_id_map_entry_t  one[1] = {{0u, 3u, 1u}};
+
+    srv = rcp_mock_server_new();
+    TEST_ASSERT_NOT_NULL(srv);
+    TEST_ASSERT_EQUAL_UINT8(0, rcp_mock_server_regmap(srv)->svr_ep_bytebus_id_map_capacity);
+
+    TEST_ASSERT_TRUE(rcp_mock_server_set_ep_id_map(srv, two, 2));
+    TEST_ASSERT_EQUAL_UINT8(2, rcp_mock_server_regmap(srv)->svr_ep_bytebus_id_map_capacity);
+
+    /* Shrinks back down too, not just a one-time high-water mark. */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_ep_id_map(srv, one, 1));
+    TEST_ASSERT_EQUAL_UINT8(1, rcp_mock_server_regmap(srv)->svr_ep_bytebus_id_map_capacity);
+
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-RMAP-036: svr_ep_generic_cfg_capacity (Table 20) is the LENGTH OF
+ * THE EP CONFIG REGISTER SECTION IN BYTES (regmap.h's own field doc
+ * comment), not an entry count -- previously never set anywhere,
+ * staying 0 regardless of how many endpoints were registered. Confirms
+ * the byte-stride conversion (12 bytes/endpoint, matching
+ * src/regmap.c's own ep_generic_cfg_len computation) and that it tracks
+ * both registration and removal, not just a one-time high-water mark. */
+static void test_endpoint_registration_syncs_svr_ep_generic_cfg_capacity(void)
+{
+    rcp_mock_server_t *srv;
+
+    srv = rcp_mock_server_new();
+    TEST_ASSERT_NOT_NULL(srv);
+    TEST_ASSERT_EQUAL_UINT16(0, rcp_mock_server_regmap(srv)->svr_ep_generic_cfg_capacity);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 1u, 1u, true, NULL, NULL));
+    TEST_ASSERT_EQUAL_UINT16(12, rcp_mock_server_regmap(srv)->svr_ep_generic_cfg_capacity);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 2u, 1u, true, NULL, NULL));
+    TEST_ASSERT_EQUAL_UINT16(24, rcp_mock_server_regmap(srv)->svr_ep_generic_cfg_capacity);
+
+    TEST_ASSERT_TRUE(rcp_mock_server_remove_endpoint(srv, 1u));
+    TEST_ASSERT_EQUAL_UINT16(12, rcp_mock_server_regmap(srv)->svr_ep_generic_cfg_capacity);
 
     rcp_mock_server_destroy(srv);
 }
@@ -4744,6 +4891,11 @@ int main(void)
     RUN_TEST(test_four_optional_subsystem_pointer_pairs_are_now_present);
     RUN_TEST(test_hw_config_table_now_has_real_server_side_storage);
     RUN_TEST(test_hw_pin_map_rejects_oversized_table_leaving_existing_data_intact);
+    RUN_TEST(test_set_hw_pin_map_syncs_svr_io_pin_count);
+    RUN_TEST(test_set_request_stream_cfg_syncs_svr_request_stream_cfg_capacity);
+    RUN_TEST(test_set_response_queue_cfg_syncs_svr_response_stream_cfg_capacity);
+    RUN_TEST(test_set_ep_id_map_syncs_svr_ep_bytebus_id_map_capacity);
+    RUN_TEST(test_endpoint_registration_syncs_svr_ep_generic_cfg_capacity);
     RUN_TEST(test_hw_pin_map_apply_reconfig_patches_addressed_octets_only);
     RUN_TEST(test_hw_pin_map_apply_reconfig_rejects_out_of_range_leaving_table_untouched);
     RUN_TEST(test_ep0_dispatcher_routes_all_five_pointed_to_tables_and_unknown_addresses);

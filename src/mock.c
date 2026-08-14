@@ -65,6 +65,13 @@ struct rcp_mock_server {
      * Request_stream_index among them) are expressed in terms of. */
     rcp_regmap_request_stream_cfg_t request_stream_cfg[RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES];
     size_t                          request_stream_cfg_count;
+    /* response-queue-cfg table (REQ-RMAP-034's own response-stream half)
+     * -- see mock.h's own doc comment on
+     * rcp_mock_server_set_response_queue_cfg(). Mirrors
+     * request_stream_cfg's own shape exactly; previously had no backing
+     * storage in this server double at all. */
+    rcp_regmap_response_queue_cfg_t response_queue_cfg[RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES];
+    size_t                          response_queue_cfg_count;
     /* EP_ID_config table (issue #335) -- see mock.h's own doc comment on
      * rcp_mock_server_set_ep_id_map(). Srv's own only way to know which
      * byte_bus_ids are bound to a given request_stream_index --
@@ -188,6 +195,7 @@ rcp_regmap_general_t *rcp_mock_server_regmap(rcp_mock_server_t *srv)
 }
 
 //cfusa:req REQ-RMAP-040
+//cfusa:req REQ-RMAP-032
 bool rcp_mock_server_set_hw_pin_map(rcp_mock_server_t *srv,
                                      const rcp_regmap_hw_pin_map_entry_t *entries, size_t len)
 {
@@ -195,6 +203,13 @@ bool rcp_mock_server_set_hw_pin_map(rcp_mock_server_t *srv,
 
     if (len > 0) memcpy(srv->hw_pin_map, entries, len * sizeof(*entries));
     srv->hw_pin_map_len = len;
+    /* REQ-RMAP-032: svr_io_pin_count (Table 20, wire-readable) is this
+     * server's own report of how many HW pins it has -- previously never
+     * set anywhere, so it silently stayed 0 regardless of how many pins
+     * were actually configured here. len is already bounds-checked above
+     * against RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES (64), well within
+     * uint16_t. */
+    srv->regmap.svr_io_pin_count = (uint16_t)len;
     return true;
 }
 
@@ -207,6 +222,7 @@ const rcp_regmap_hw_pin_map_entry_t *rcp_mock_server_hw_pin_map(const rcp_mock_s
 }
 
 //cfusa:req REQ-SEQ-013
+//cfusa:req REQ-RMAP-034
 bool rcp_mock_server_set_request_stream_cfg(rcp_mock_server_t *srv,
                                              const rcp_regmap_request_stream_cfg_t *entries,
                                              size_t count)
@@ -215,12 +231,39 @@ bool rcp_mock_server_set_request_stream_cfg(rcp_mock_server_t *srv,
 
     if (count > 0) memcpy(srv->request_stream_cfg, entries, count * sizeof(*entries));
     srv->request_stream_cfg_count = count;
+    /* REQ-RMAP-034 (request-stream half): svr_request_stream_cfg_capacity
+     * (Table 20, an entry count not a byte length) previously never set
+     * anywhere, staying 0 regardless of how many request streams were
+     * actually configured. count is already bounds-checked above against
+     * RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES (64), well within
+     * uint8_t. */
+    srv->regmap.svr_request_stream_cfg_capacity = (uint8_t)count;
+    return true;
+}
+
+//cfusa:req REQ-RMAP-034
+bool rcp_mock_server_set_response_queue_cfg(rcp_mock_server_t *srv,
+                                             const rcp_regmap_response_queue_cfg_t *entries,
+                                             size_t count)
+{
+    if (count > RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES) return false;
+
+    if (count > 0) memcpy(srv->response_queue_cfg, entries, count * sizeof(*entries));
+    srv->response_queue_cfg_count = count;
+    /* REQ-RMAP-034 (response-stream half): svr_response_stream_cfg_
+     * capacity (Table 20, an entry count not a byte length) previously
+     * had no backing storage in this server double to sync from at all.
+     * count is already bounds-checked above against
+     * RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES (64), well within
+     * uint8_t. */
+    srv->regmap.svr_response_stream_cfg_capacity = (uint8_t)count;
     return true;
 }
 
 //cfusa:req REQ-E2E-029
 //cfusa:req REQ-E2E-030
 //cfusa:req REQ-E2E-045
+//cfusa:req REQ-RMAP-037
 bool rcp_mock_server_set_ep_id_map(rcp_mock_server_t *srv,
                                     const rcp_regmap_ep_id_map_entry_t *entries, size_t count)
 {
@@ -228,6 +271,13 @@ bool rcp_mock_server_set_ep_id_map(rcp_mock_server_t *srv,
 
     if (count > 0) memcpy(srv->ep_id_map, entries, count * sizeof(*entries));
     srv->ep_id_map_count = count;
+    /* REQ-RMAP-037: svr_ep_bytebus_id_map_capacity (Table 20, an entry
+     * count not a byte length) previously never set anywhere, staying 0
+     * regardless of how many EP_ID_config entries were actually
+     * configured. count is already bounds-checked above against
+     * RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES, well within uint8_t (confirmed
+     * by the field's own 8-bit wire width). */
+    srv->regmap.svr_ep_bytebus_id_map_capacity = (uint8_t)count;
     return true;
 }
 
@@ -292,6 +342,17 @@ rcp_mock_errc_t rcp_mock_server_add_endpoint(rcp_mock_server_t *srv,
 
     srv->endpoint_count++;
     srv->regmap.svr_ep_count = (uint16_t)srv->endpoint_count;
+    /* REQ-RMAP-036: svr_ep_generic_cfg_capacity (Table 20) is the LENGTH
+     * OF THE EP CONFIG REGISTER SECTION IN BYTES, not an entry count
+     * (regmap.h's own field doc comment) -- previously never set
+     * anywhere, staying 0 regardless of how many endpoints (each
+     * carrying its own rcp_regmap_ep_generic_cfg_t, one EP_generic_cfg
+     * row) were actually registered. 12 is the same per-entry byte
+     * stride rcp_regmap_ep0_decode_write_request()/_encode_read_
+     * response() already compute ep_generic_cfg_len from (src/regmap.c,
+     * ep_generic_cfg_count * 12u); endpoint_count is well within
+     * uint16_t even at RCP_MOCK_MAX_ENDPOINTS (64 * 12 = 768). */
+    srv->regmap.svr_ep_generic_cfg_capacity = (uint16_t)(srv->endpoint_count * 12u);
     return RCP_MOCK_OK;
 }
 
@@ -306,6 +367,7 @@ bool rcp_mock_server_remove_endpoint(rcp_mock_server_t *srv, rcp_byte_bus_id_t b
 
     srv->endpoint_count--;
     srv->regmap.svr_ep_count = (uint16_t)srv->endpoint_count;
+    srv->regmap.svr_ep_generic_cfg_capacity = (uint16_t)(srv->endpoint_count * 12u);
     return true;
 }
 
