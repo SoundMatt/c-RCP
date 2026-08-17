@@ -1540,6 +1540,18 @@ rcp_regmap_ep_generic_cfg_reconfig_strerror(rcp_regmap_ep_generic_cfg_reconfig_e
  * RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK, matching TC18's own "confirmed
  * normally" language -- this is not an error case.
  *
+ * ep_used (bit 0 of octet 0x0001) has its own narrower, row-0-only
+ * override on top of its otherwise general R/W* status: TC18 Table 31's
+ * ep_used row states EP0's own bit is "fixed to 1 as EP0 needs to be
+ * always implemented". A write to row 0 (entries[0], EP0's own
+ * EP_GENERIC_config row) that covers this bit never clears it --
+ * entries[0].ep_used is forced to true regardless of the incoming bit,
+ * the same "no effect, confirmed normally" treatment ep_type gets above,
+ * scoped to row 0's ep_used instead of every row's ep_type. Every other
+ * row (EP1..EPn) honors the incoming bit normally. Row 0's own
+ * ep_delay_time (bits 4:5 of the same octet) is unaffected by this
+ * override and is still updated from the write like any other row.
+ *
  * Reserved bits within octet 0x0001 (bits 1:3 and 6:7, either side of
  * ep_delay_time) have no corresponding struct field and are never
  * consulted -- only ep_used (bit 0) and ep_delay_time (bits 4:5) are
