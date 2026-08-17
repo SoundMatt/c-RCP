@@ -19106,6 +19106,42 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.401.0 -- 2026-08-17 (c-RCP-AUDIT-04: tc18_master_id backfill,
+REQ-DISC-*/REQ-MOCK-* batch)
+
+Now unblocked: the master TC18 requirement catalog (447 entries,
+`RELAY/docs/tc18-master-catalog.json` v1.0.0) has been rebuilt and
+published. This is one category-scoped batch of the resulting
+multi-repo `tc18_master_id` backfill (RCP-ARCHITECTURE.md canonical
+choice #6), covering c-RCP's `REQ-DISC-*` and `REQ-MOCK-*`
+categories only.
+
+Purely additive `.fusa-reqs.json` field: for each entry already
+carrying a `tc18` citation, matched it to the master catalog by
+section + table/figure number, confirmed against the catalog
+entry's own `summary` (not section number alone), and set
+`tc18_master_id`. Entries with no `tc18` citation are left alone,
+per this project's established discipline against inventing spec
+basis that doesn't exist.
+
+28/29 `REQ-DISC-*` matched (1 has no `tc18` citation). 14/33
+`REQ-MOCK-*` matched, 16 have no `tc18` citation, and 3
+(`REQ-MOCK-026`, `-027`, `-029`) are flagged as ambiguous rather
+than forced: each cites TC18 content spanning more than one
+distinct catalog entry (e.g. `REQ-MOCK-029`'s CHAIN_ERROR and
+CHAIN_ABORTED halves are two separate MUST clauses in the catalog)
+with no single clause dominant enough to anchor one id.
+
+`.fusa-reqs.json`-only change, no source touched. Full 66-test
+suite clean; pinned `cfusa` (v0.5.54) `check`: 0 errors; `trace
+--req-coverage 100 --sec-tested 100`: 1095/1095 (100%) requirement
+traceability, 512/512 (100%) function annotation density, both
+verified identical to an `origin/main` baseline run.
+
+**Next**: the remaining c-RCP categories' `tc18_master_id` batches,
+then the same pass across cpp-RCP/go-RCP/rust-RCP; follow-up on the
+3 flagged ambiguous `REQ-MOCK-*` entries above.
+
 ### v0.400.0 -- 2026-08-16 (c-RCP-AUDIT-08: exhaustive census of the
 twelve remaining table numbers -- `55`/`37`/`40`/`57`/`19`/`59`/`49`/
 `15`/`34`/`17`/`14`/`16` -- closes out this issue's own tracked
