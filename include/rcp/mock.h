@@ -404,7 +404,13 @@ bool rcp_mock_server_wakeup_repetition_interval_us(const rcp_mock_server_t *srv,
  * (request_stream_index == 0) applies
  * rcp_regmap_ep_id_map_effective_count() itself before calling this
  * function, the same "caller has already bounded the table" convention
- * regmap.h's own EP_ID_config diagnostics already use. */
+ * regmap.h's own EP_ID_config diagnostics already use.
+ *
+ * REQ-RMAP-054 (issue #459): rcp_mock_server_new() has already seeded row
+ * 0 of srv's own table with rcp_regmap_ep_id_map_row_init_default()'s
+ * power-on default (permitting EP0 access before any client config is
+ * written, per TC18 §12.7.8) -- calling this function, as always, wholly
+ * replaces that seeded default along with everything else in the table. */
 bool rcp_mock_server_set_ep_id_map(rcp_mock_server_t *srv,
                                     const rcp_regmap_ep_id_map_entry_t *entries, size_t count);
 

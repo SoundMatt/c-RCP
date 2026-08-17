@@ -23,6 +23,7 @@
 //cfusa:test REQ-MOCK-031
 //cfusa:test REQ-MOCK-032
 //cfusa:test REQ-MOCK-033
+//cfusa:test REQ-RMAP-054
 //cfusa:test REQ-WDG-010
 //cfusa:test REQ-AVTP-021
 //cfusa:test REQ-AVTP-022
@@ -2444,6 +2445,54 @@ static void test_broadcast_safe_state_resolves_bound_byte_bus_id_by_stream(void)
     rcp_mock_server_destroy(srv);
 }
 
+/* REQ-RMAP-054 (issue #459): TC18 §12.7.8 requires the EP_ID_config table's
+ * power-on default to permit EP0 access before any client config is
+ * written. rcp_mock_server_new() must seed row 0 with
+ * rcp_regmap_ep_id_map_row_init_default()'s own default (request_stream_
+ * index=1, ep_id=EP0, byte_bus_id=0) itself -- this test never calls
+ * rcp_mock_server_set_ep_id_map() at all, proving the default row is
+ * genuinely present at construction time, not merely available as an
+ * unused primitive. rcp_mock_server_broadcast_safe_state() is used as the
+ * observation point because it is srv's own only public consumer of
+ * ep_id_map[]/ep_id_map_count (see that field's own struct comment,
+ * mock.c) -- resolving byte_bus_id 0 as bound to request_stream_index 1
+ * purely from the seeded default row is only possible if
+ * rcp_mock_server_new() actually populated it. */
+static void test_new_server_seeds_ep_id_map_default_row_for_ep0(void)
+{
+    rcp_mock_server_t *srv  = rcp_mock_server_new();
+    rcp_bytes_t         resp  = {0};
+    /* Never notified -- stays pending until purged, exactly what this
+     * probe needs. */
+    rcp_bytes_t         frame = make_triggered_frame(0, 200, 200, 90);
+
+    to_rcp_configured(srv);
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+        rcp_mock_server_add_endpoint(srv, 0, 1, true, NULL, NULL));
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+        rcp_mock_server_dispatch(srv, 0, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_GBB, true,
+                                  STREAM_A, frame.data, frame.len, &resp));
+    TEST_ASSERT_NULL(resp.data);
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 0));
+
+    /* The seeded default row's own request_stream_index is 1 (the smallest
+     * value that is a valid stream index rather than the end-of-table
+     * sentinel, per rcp_regmap_ep_id_map_row_init_default()'s own doc
+     * comment) -- broadcasting to request_stream_index 1 must resolve
+     * byte_bus_id 0 and purge the pending request above. Before the
+     * REQ-RMAP-054 fix, ep_id_map_count stayed 0 (calloc()'s own all-zero,
+     * never populated without an explicit rcp_mock_server_set_ep_id_map()
+     * call), so rcp_regmap_ep_id_map_byte_bus_ids_for_stream() would
+     * report zero bound byte_bus_ids and this call would purge nothing. */
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_broadcast_safe_state(srv, 1));
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 0));
+
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── Error strings ─────────────────────────────────────────────────────────── */
 
 static void test_strerror_never_null(void)
@@ -2550,6 +2599,7 @@ int main(void)
     RUN_TEST(test_set_endpoint_req_crc_enable_on_stream_targets_correct_slot);
     RUN_TEST(test_set_endpoint_rx_enforce_e2e_on_stream_targets_correct_slot);
     RUN_TEST(test_broadcast_safe_state_resolves_bound_byte_bus_id_by_stream);
+    RUN_TEST(test_new_server_seeds_ep_id_map_default_row_for_ep0);
 
     RUN_TEST(test_strerror_never_null);
 

@@ -191,7 +191,11 @@ struct rcp_mock_server {
     /* EP_ID_config table (issue #335) -- see mock.h's own doc comment on
      * rcp_mock_server_set_ep_id_map(). Srv's own only way to know which
      * byte_bus_ids are bound to a given request_stream_index --
-     * rcp_mock_server_broadcast_safe_state()'s sole data source. */
+     * rcp_mock_server_broadcast_safe_state()'s sole data source.
+     * REQ-RMAP-054 (issue #459): NOT left at calloc()'s own all-zero --
+     * rcp_mock_server_new() seeds row 0 with rcp_regmap_ep_id_map_row_
+     * init_default()'s power-on default (ep_id_map_count = 1) before
+     * returning, matching that primitive's own documented contract. */
     rcp_regmap_ep_id_map_entry_t ep_id_map[RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES];
     size_t                       ep_id_map_count;
     /* The four optional-subsystem sections (REQ-RMAP-039, issue #336) --
@@ -252,6 +256,7 @@ const char *rcp_mock_strerror(rcp_mock_errc_t e)
 }
 
 //cfusa:req REQ-MOCK-002
+//cfusa:req REQ-RMAP-054
 rcp_mock_server_t *rcp_mock_server_new(void)
 {
     rcp_mock_server_t *srv = (rcp_mock_server_t *)calloc(1, sizeof(*srv));
@@ -278,6 +283,21 @@ rcp_mock_server_t *rcp_mock_server_new(void)
         }
     }
     rcp_server_gptp_trigger_state_init(&srv->gptp_trigger_state);
+    /* REQ-RMAP-054 (issue #459): TC18 §12.7.8 requires the EP_ID_config
+     * table's power-on default to permit EP0 access before any client
+     * config is written. rcp_regmap_ep_id_map_row_init_default()'s own
+     * contract already says callers owning a fixed-capacity table (srv's
+     * own ep_id_map[] above is exactly that) are expected to place its
+     * result at row 0 at startup, before any client write -- do that
+     * here, rather than leaving ep_id_map[] at calloc()'s own all-zero
+     * (request_stream_index == 0, TC18's own end-of-table sentinel,
+     * which rcp_regmap_ep_id_map_effective_count() would read as "zero
+     * real rows", not a valid EP0 mapping). A later, explicit
+     * rcp_mock_server_set_ep_id_map() call still replaces this default
+     * row wholesale, exactly like every other "seeded default, freely
+     * overwritten by a real client config" field in this constructor. */
+    rcp_regmap_ep_id_map_row_init_default(&srv->ep_id_map[0]);
+    srv->ep_id_map_count = 1;
     return srv;
 }
 
