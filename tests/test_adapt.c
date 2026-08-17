@@ -81,6 +81,26 @@ static void test_protocol_string_unique_nonempty(void)
     TEST_ASSERT_EQUAL_STRING("CAN", relay_protocol_string(RELAY_PROTOCOL_CAN));
 }
 
+/* Every relay_protocol_t enumerator maps to its own distinct name, plus the
+ * switch's default arm for a value outside the defined enum range (issue
+ * #520 category 1: dispatch-table switch arms previously only exercised for
+ * two of the six protocols). */
+static void test_protocol_string_covers_every_enumerator(void)
+{
+    TEST_ASSERT_EQUAL_STRING("CAN",    relay_protocol_string(RELAY_PROTOCOL_CAN));
+    TEST_ASSERT_EQUAL_STRING("DDS",    relay_protocol_string(RELAY_PROTOCOL_DDS));
+    TEST_ASSERT_EQUAL_STRING("LIN",    relay_protocol_string(RELAY_PROTOCOL_LIN));
+    TEST_ASSERT_EQUAL_STRING("MQTT",   relay_protocol_string(RELAY_PROTOCOL_MQTT));
+    TEST_ASSERT_EQUAL_STRING("RCP",    relay_protocol_string(RELAY_PROTOCOL_RCP));
+    TEST_ASSERT_EQUAL_STRING("SOMEIP", relay_protocol_string(RELAY_PROTOCOL_SOMEIP));
+}
+
+static void test_protocol_string_rejects_out_of_range_value(void)
+{
+    TEST_ASSERT_EQUAL_STRING("unknown", relay_protocol_string((relay_protocol_t)0));
+    TEST_ASSERT_EQUAL_STRING("unknown", relay_protocol_string((relay_protocol_t)7));
+}
+
 /* ── §4/§18.2: relay_message_t lifecycle ───────────────────────────────────── */
 
 static void test_message_init_then_free_is_safe(void)
@@ -177,6 +197,39 @@ static void test_op_kind_families(void)
     TEST_ASSERT_EQUAL(RCP_ADAPT_EP_DISCOVERY, rcp_adapt_op_kind(RCP_ADAPT_OP_DISCOVERY));
 }
 
+/* Every rcp_adapt_op_t <-> rcp_adapt_ep_kind_t switch arm, one per op (issue
+ * #520 category 1: rcp_adapt_op_kind()'s switch was only exercised for 7 of
+ * 18 ops -- GPIO/UART/WAKEUP/DISCOVERY -- leaving SPI/I2C/ADC/PWM_OUT/
+ * PWM_IN/LIN/CAN/ISELED/MDIO entirely unhit). */
+static void test_op_kind_covers_every_op(void)
+{
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_GPIO,      rcp_adapt_op_kind(RCP_ADAPT_OP_GPIO_READ));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_GPIO,      rcp_adapt_op_kind(RCP_ADAPT_OP_GPIO_WRITE));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_SPI,       rcp_adapt_op_kind(RCP_ADAPT_OP_SPI_TRANSFER));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_I2C,       rcp_adapt_op_kind(RCP_ADAPT_OP_I2C_TRANSFER));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_UART,      rcp_adapt_op_kind(RCP_ADAPT_OP_UART_WRITE));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_UART,      rcp_adapt_op_kind(RCP_ADAPT_OP_UART_READ));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_ADC,       rcp_adapt_op_kind(RCP_ADAPT_OP_ADC_READ));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_PWM_OUT,   rcp_adapt_op_kind(RCP_ADAPT_OP_PWM_OUT_READ));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_PWM_OUT,   rcp_adapt_op_kind(RCP_ADAPT_OP_PWM_OUT_WRITE));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_PWM_IN,    rcp_adapt_op_kind(RCP_ADAPT_OP_PWM_IN_READ));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_LIN,       rcp_adapt_op_kind(RCP_ADAPT_OP_LIN_COMMAND));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_CAN,       rcp_adapt_op_kind(RCP_ADAPT_OP_CAN_FRAME));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_ISELED,    rcp_adapt_op_kind(RCP_ADAPT_OP_ISELED_COMMAND));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_MDIO,      rcp_adapt_op_kind(RCP_ADAPT_OP_MDIO_READ));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_MDIO,      rcp_adapt_op_kind(RCP_ADAPT_OP_MDIO_WRITE));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_WAKEUP,    rcp_adapt_op_kind(RCP_ADAPT_OP_WAKEUP_SLEEPCMD));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_WAKEUP,    rcp_adapt_op_kind(RCP_ADAPT_OP_WAKEUP_WAKEUP));
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_DISCOVERY, rcp_adapt_op_kind(RCP_ADAPT_OP_DISCOVERY));
+}
+
+static void test_op_kind_rejects_out_of_range_op(void)
+{
+    /* The default arm falls back to RCP_ADAPT_EP_DISCOVERY -- see adapt.c's
+     * rcp_adapt_op_kind(). */
+    TEST_ASSERT_EQUAL(RCP_ADAPT_EP_DISCOVERY, rcp_adapt_op_kind((rcp_adapt_op_t)999));
+}
+
 static void test_op_string_round_trips_every_op(void)
 {
     static const rcp_adapt_op_t ALL_OPS[] = {
@@ -210,6 +263,32 @@ static void test_adapt_strerror_never_null(void)
     TEST_ASSERT_NOT_NULL(rcp_adapt_strerror(RCP_ADAPT_ERR_ENCODE));
     TEST_ASSERT_NOT_NULL(rcp_adapt_strerror(RCP_ADAPT_ERR_DECODE));
     TEST_ASSERT_NOT_NULL(rcp_adapt_strerror(RCP_ADAPT_ERR_NOT_SUPPORTED));
+}
+
+/* Every rcp_adapt_errc_t switch arm, plus the default "unknown" fallback for
+ * a value outside the enum (issue #520 category 1: rcp_adapt_strerror()'s
+ * switch previously left RCP_ADAPT_ERR_CLOSED/_TIMEOUT/_TRANSPORT and its
+ * default arm unhit -- those two error codes are exercised transport-side
+ * elsewhere in this file, via rcp_errc_to_relay_errc(), but never fed
+ * through strerror() itself). */
+static void test_adapt_strerror_covers_every_code(void)
+{
+    TEST_ASSERT_EQUAL_STRING("ok",      rcp_adapt_strerror(RCP_ADAPT_OK));
+    TEST_ASSERT_EQUAL_STRING("closed",  rcp_adapt_strerror(RCP_ADAPT_ERR_CLOSED));
+    TEST_ASSERT_EQUAL_STRING("timeout", rcp_adapt_strerror(RCP_ADAPT_ERR_TIMEOUT));
+    TEST_ASSERT_EQUAL_STRING("could not encode message as a wire request",
+                              rcp_adapt_strerror(RCP_ADAPT_ERR_ENCODE));
+    TEST_ASSERT_EQUAL_STRING("could not decode wire response as a message",
+                              rcp_adapt_strerror(RCP_ADAPT_ERR_DECODE));
+    TEST_ASSERT_EQUAL_STRING("underlying transport failure",
+                              rcp_adapt_strerror(RCP_ADAPT_ERR_TRANSPORT));
+    TEST_ASSERT_EQUAL_STRING("not supported", rcp_adapt_strerror(RCP_ADAPT_ERR_NOT_SUPPORTED));
+}
+
+static void test_adapt_strerror_rejects_out_of_range_code(void)
+{
+    TEST_ASSERT_EQUAL_STRING("unknown rcp_adapt_errc_t",
+                              rcp_adapt_strerror((rcp_adapt_errc_t)12345));
 }
 
 /* ── §15.7.5: rcp_message_to_request()/rcp_response_to_message() field mapping ── */
@@ -854,6 +933,8 @@ int main(void)
     RUN_TEST(test_rcp_spec_version_equals_relay_spec_version);
     RUN_TEST(test_protocol_enum_values_match_spec);
     RUN_TEST(test_protocol_string_unique_nonempty);
+    RUN_TEST(test_protocol_string_covers_every_enumerator);
+    RUN_TEST(test_protocol_string_rejects_out_of_range_value);
 
     RUN_TEST(test_message_init_then_free_is_safe);
     RUN_TEST(test_message_set_id_replaces_prior_value);
@@ -865,9 +946,13 @@ int main(void)
     RUN_TEST(test_subscriber_options_defaults);
 
     RUN_TEST(test_op_kind_families);
+    RUN_TEST(test_op_kind_covers_every_op);
+    RUN_TEST(test_op_kind_rejects_out_of_range_op);
     RUN_TEST(test_op_string_round_trips_every_op);
     RUN_TEST(test_op_from_string_rejects_unknown_and_null);
     RUN_TEST(test_adapt_strerror_never_null);
+    RUN_TEST(test_adapt_strerror_covers_every_code);
+    RUN_TEST(test_adapt_strerror_rejects_out_of_range_code);
 
     RUN_TEST(test_gpio_read_request_round_trips);
     RUN_TEST(test_gpio_write_request_maps_payload_and_evt_meta);
