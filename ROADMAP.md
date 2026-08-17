@@ -19501,6 +19501,44 @@ tool tolerates the new field with zero effect on coverage.
 own `tc18_master_id` batches (tracked centrally against issue 166 by
 the coordinating session).
 
+### v0.410.0 -- 2026-08-17 (c-RCP-19: dispatch-table branch coverage
+for `rcp_adapt_op_kind()`/`rcp_adapt_strerror()`/`relay_protocol_string()`)
+
+First increment against issue #520 (c-RCP-19)'s coverage-gap
+investigation (line ~92% / branch ~79%, branch not gated by CI at
+all). Closed the smallest, safest, fully-mechanical slice of its
+category 1 backlog: three small `switch` dispatch tables in
+`adapt.c`/`relay.c` whose non-happy-path arms were never directly
+exercised, even though every value they dispatch on was already
+covered indirectly elsewhere in the suite.
+
+Added to `tests/test_adapt.c`: full-coverage tests for all 18
+`rcp_adapt_op_t` arms of `rcp_adapt_op_kind()` plus its `default`
+arm, all 7 `rcp_adapt_errc_t` arms of `rcp_adapt_strerror()` plus its
+`default` arm, and all 6 `relay_protocol_t` arms of
+`relay_protocol_string()` plus its `default` arm. No source change --
+purely new test coverage of existing, already-correct logic.
+
+Mutation-tested: one arm from each of the three switches was
+independently broken and confirmed to fail the new assertion, then
+restored. Measured impact (local `lcov --branch-coverage` build
+matching `ci.yml`'s `coverage` job exactly): `src/adapt.c` line
+59.9% -> 63.3%, branch 46.5% -> 53.1%; `src/relay.c` line 77.3% ->
+80.0%, branch 54.5% -> 61.0%; project-wide line 92.3% -> 92.5%,
+branch 79.6% -> 79.9%. `cfusa coverage --lcov ... --threshold 88`
+still `PASS` on both metrics.
+
+Full 66-test suite + ASan/UBSan clean. `cfusa check`/`trace
+--req-coverage 100 --sec-tested 100` (v0.5.54): 0 errors, unchanged
+1095/1095 (100%) traced, 512/512 (100%) annotated -- no
+`.fusa-reqs.json` change, these three functions were already tagged
+under existing `REQ-RELAY-002`/`-007`/`-011`.
+
+**Next**: issue #520 stays open -- the larger category-1 surface
+(per-op field-mapping switches' less-common branches), category 2
+(`mock.c` CRC/fault-injection paths and friends), and the category 3
+`_WIN32`-block carve-out documentation are unstarted.
+
 ### v0.400.0 -- 2026-08-16 (c-RCP-AUDIT-08: exhaustive census of the
 twelve remaining table numbers -- `55`/`37`/`40`/`57`/`19`/`59`/`49`/
 `15`/`34`/`17`/`14`/`16` -- closes out this issue's own tracked

@@ -34,6 +34,60 @@ the rationale.
 
 ## Releases
 
+### v0.410.0 -- 2026-08-17 (c-RCP-19: dispatch-table branch coverage for `rcp_adapt_op_kind()`/`rcp_adapt_strerror()`/`relay_protocol_string()`)
+
+First increment against issue #520 (c-RCP-19)'s "line ~92% / branch
+~79%, branch not gated" coverage-gap investigation, closing the
+smallest, safest, fully-mechanical slice of its category 1
+("genuinely untested feature surface") backlog: three small `switch`
+dispatch tables in `adapt.c`/`relay.c` whose non-happy-path arms were
+never exercised, even though every op/error-code/protocol value they
+dispatch on was already covered indirectly elsewhere in the suite.
+
+- `tests/test_adapt.c`: added `test_op_kind_covers_every_op()` (all
+  18 `rcp_adapt_op_t` -> `rcp_adapt_ep_kind_t` switch arms in
+  `rcp_adapt_op_kind()`, previously only 7 of 18 were hit directly),
+  `test_op_kind_rejects_out_of_range_op()` (the `default` arm),
+  `test_adapt_strerror_covers_every_code()` (all 7
+  `rcp_adapt_errc_t` arms in `rcp_adapt_strerror()`, previously
+  `RCP_ADAPT_ERR_CLOSED`/`_TIMEOUT`/`_TRANSPORT` were only exercised
+  transport-side via `rcp_errc_to_relay_errc()`, never fed through
+  `strerror()` itself), `test_adapt_strerror_rejects_out_of_range_code()`
+  (the `default` arm), `test_protocol_string_covers_every_enumerator()`
+  (all 6 `relay_protocol_t` arms in `relay_protocol_string()`,
+  previously only `RCP_RELAY`/`CAN` were hit), and
+  `test_protocol_string_rejects_out_of_range_value()` (the `default`
+  arm). No source change -- purely new test coverage of existing,
+  already-correct dispatch logic.
+- Mutation-tested: each of the three switches' previously-uncovered
+  arms (one `rcp_adapt_op_kind()` case, the `RCP_ADAPT_ERR_TRANSPORT`
+  string, `relay_protocol_string()`'s `default` arm) was independently
+  broken and confirmed to fail the new assertion, then restored.
+- Measured impact (local `lcov --branch-coverage` build matching
+  `ci.yml`'s `coverage` job's exact capture/filter invocation):
+  `src/adapt.c` line 59.9% -> 63.3%, branch 46.5% -> 53.1%;
+  `src/relay.c` line 77.3% -> 80.0%, branch 54.5% -> 61.0%;
+  project-wide (post test/vendor filter) line 92.3% -> 92.5%, branch
+  79.6% -> 79.9%. `cfusa coverage --lcov ... --threshold 88` still
+  `PASS` on both metrics with headroom.
+- Full 66-test suite + ASan/UBSan (`-fsanitize=address,undefined
+  -fno-sanitize-recover=all -g -O1`) clean. `cfusa check`/`trace
+  --req-coverage 100 --sec-tested 100` (v0.5.54): 0 errors, unchanged
+  1095/1095 (100%) requirement traceability, 512/512 (100%) function
+  annotation density -- no `.fusa-reqs.json` change, these three
+  dispatch functions were already tagged under existing
+  `REQ-RELAY-002`/`-007`/`-011` requirements this file already
+  `cfusa:test`s.
+
+Issue #520 stays open: this closes only the `adapt.c`/`relay.c`
+op-kind/strerror/protocol-string dispatch-table slice of its
+category 1. Remaining, larger category-1 surface (the per-op
+`rcp_message_to_request()`/`rcp_response_to_message()` field-mapping
+switches' own less-common branches), all of category 2 (`mock.c`
+CRC/fault-injection paths and friends), and the category 3
+`_WIN32`-block carve-out documentation are unstarted -- see the
+issue for the full phased backlog.
+
 ### v0.408.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for `REQ-LIFECYCLE-*`/`REQ-RMAP-*`)
 
 One of several parallel per-category batches for c-RCP-AUDIT-04
