@@ -2727,7 +2727,7 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"Besides advancing the state it is also possible to go back to state HW_UNCONFIGURED via a write request...\"), TC18.txt L2574-2577 -- NOTE: TC18's Figure 17 state-transition chart additionally gates this specific demotion on all other EPs being idle (\"other EPs are not Idle -> send error response EPs_NOT_IDLE\", TC18.txt L2501-2502); that gate is a known, separately-tracked gap, see REQ-LIFECYCLE-022 (not this requirement, which documents the mechanism c-RCP actually implements)"
+      "tc18": "\u00a712.3.1.2 (\"Besides advancing the state it is also possible to go back to state HW_UNCONFIGURED via a write request...\"), TC18.txt L2574-2577 -- NOTE: TC18's Figure 17 state-transition chart additionally gates this specific demotion on all other EPs being idle (\"other EPs are not Idle -> send error response EPs_NOT_IDLE\", TC18.txt L2501-2502); CORRECTED 2026-08-16 (issue #456): that gate IS implemented -- rcp_lifecycle_transition()'s RCP_CONFIGURED->HW_UNCONFIGURED branch enforces it via the all_other_eps_idle parameter (src/lifecycle.c:189, `if (!all_other_eps_idle) return RCP_LIFECYCLE_ERR_EPS_NOT_IDLE;`), landed under REQ-LIFECYCLE-022; see that requirement for the separate, still-open gap (EPs_NOT_IDLE has no corresponding numbered wire error code in \u00a712.9.6's table, so the local error is not yet wired to a wire response) -- not this requirement, which documents the snapshot-independence of the transition itself"
     },
     {
       "id": "REQ-LIFECYCLE-012",

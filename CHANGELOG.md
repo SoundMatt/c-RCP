@@ -34,6 +34,40 @@ the rationale.
 
 ## Releases
 
+### v0.370.0 -- 2026-08-16 (two stale-documentation corrections: REQ-LIFECYCLE-011's citation, e2e.h's regmap.h cross-reference)
+
+Closes issues #456 and #460 -- two small, unrelated doc-only fixes.
+
+**Issue #456**: `.fusa-reqs.json`'s `REQ-LIFECYCLE-011` citation footnote
+claimed the `RCP_CONFIGURED -> HW_UNCONFIGURED` demotion's EPs-idle gate
+(TC18 Figure 17, "other EPs are not Idle -> send error response
+EPs_NOT_IDLE") was "a known, separately-tracked gap." Stale: verified
+directly against `src/lifecycle.c`'s current `rcp_lifecycle_transition()`
+-- the `RCP_CONFIGURED`->`HW_UNCONFIGURED` branch (line 189) already
+enforces `if (!all_other_eps_idle) return RCP_LIFECYCLE_ERR_EPS_NOT_IDLE;`,
+landed under the REQ-LIFECYCLE-022 fix. Corrected the citation to state
+the gate IS implemented, with the enforcement site cited directly, and
+pointed at REQ-LIFECYCLE-022's own entry for the real, still-open, unrelated
+gap there (`EPs_NOT_IDLE` has no numbered wire error code in TC18's
+§12.9.6 table). No `text`/`title`/`status` change -- those were already
+correct.
+
+**Issue #460**: `include/rcp/e2e.h`'s doc comment for
+`rcp_e2e_stream_status_t` (REQ-E2E-046/REQ-RMAP-051) claimed
+`rx_stream_status`'s wire-exposure proof met "the same... bar this whole
+register-map wire-level exchange establishes elsewhere in this codebase
+(see regmap.h's own file-header note)." No such consolidated note exists
+anywhere in `regmap.h`'s file header -- confirmed by direct search; the
+actual convention is scattered across dozens of individual per-field
+comments throughout `regmap.h`, each independently citing "REQ-RMAP-024
+wire-reachability boundary." Corrected `e2e.h`'s comment to point at that
+real, scattered convention instead of a nonexistent single location.
+
+Both fixes are comment/citation-only: no `text`, `title`, `status`, or
+source-file behavior touched. Full 66-test suite unchanged; `cfusa
+check`/`trace` (v0.5.54): 0 errors, 1088/1088 traced and tested
+(unchanged).
+
 ### v0.369.0 -- 2026-08-14 (request-stream-cfg's Table 24 byte 0x000D wire layout reconciled with the real RC5 4-bit model)
 
 Closes issue #458 (c-RCP-AUDIT-33). `regmap.h`'s own file-header "TC18
