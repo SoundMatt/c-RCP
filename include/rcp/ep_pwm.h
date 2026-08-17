@@ -176,15 +176,15 @@
  * milestone's scope.
  *
  * CLARIFIED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group C): TC18
- * §13.7.5.1 Table 42 names its three trigger signals (exec-done,
+ * §13.7.5.1 Table 45 names its three trigger signals (exec-done,
  * cycle-start, mid-pulse) as fixed hardware output lines an endpoint
- * "creates" -- Table 43 (this endpoint's own functional-config register
+ * "creates" -- Table 46 (this endpoint's own functional-config register
  * block) defines no register field that selects among them, so nothing
  * in the specification suggests a client ever configures which one is
  * active; the natural reading is that a real implementation exposes all
  * three simultaneously. rcp_ep_pwm_out_trigger_t's single, mutually-
- * exclusive `trigger` field (plus a NONE/off state neither Table 42 nor
- * 43 defines) is this module's own original simplification, letting a
+ * exclusive `trigger` field (plus a NONE/off state neither Table 45 nor
+ * 46 defines) is this module's own original simplification, letting a
  * caller name the one event it cares about rather than modeling three
  * independent always-on signals. `cfg->trigger` is never rendered onto
  * the wire (rcp_ep_pwm_out_render_registers() does not touch it) -- this
@@ -209,12 +209,12 @@
  * inconsistent, sentinel of its own -- see ep_adc.h's file header.
  * rcp_ep_pwm_in_trigger_t names PWM_IN's own two edge-trigger modes
  * (rising/falling), plus NONE. CLARIFIED 2026-08-10 (c-RCP-AUDIT-06,
- * issue #256 Group C): TC18 §13.7.6.1 Table 44 names these as PWM_IN's
+ * issue #256 Group C): TC18 §13.7.6.1 Table 47 names these as PWM_IN's
  * two fixed, always-on hardware trigger signals, not a client-selectable
  * register field (PWM_IN has no functional-config register block for
  * triggers at all in this codebase, matching TC18's own silence on any
  * such register) -- the exclusive-select `trigger` field (plus a
- * NONE/off state Table 44 doesn't define) is this module's own original
+ * NONE/off state Table 47 doesn't define) is this module's own original
  * simplification, exactly like PWM_OUT's (see that section's own note,
  * above). Never wire-serialized.
  *
@@ -365,12 +365,12 @@ bool rcp_ep_pwm_out_write_semantics_valid(uint8_t v);
  *
  * FIXED 2026-08-12 (issue #201, REQ-PWM-056): duty_cycle_min/duty_cycle_max
  * are the endpoint's own rcp_ep_pwm_out_functional_cfg_t fields of the
- * same name (TC18 Table 43: "Min/Max value of PWM active in clock cycles,
+ * same name (TC18 Table 46: "Min/Max value of PWM active in clock cycles,
  * requests with lower/higher values will be capped to this limit"). The
  * resulting active_duration -- after evt's own write semantics have
  * already been applied -- is CAPPED into [duty_cycle_min, duty_cycle_max]
  * rather than rejected or applied verbatim, per that table's own wording.
- * period is not affected -- Table 43 names only "PWM active" (the active
+ * period is not affected -- Table 46 names only "PWM active" (the active
  * phase duration), not the whole period. Applied unconditionally,
  * including for RCP_EP_PWM_OUT_WRITE_RESERVED4/_RECONFIG's own "current
  * unchanged" cases: idempotent if current already satisfied the limits,

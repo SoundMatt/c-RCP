@@ -111,7 +111,7 @@ rcp_ep_pwm_value_t rcp_ep_pwm_out_apply_write(rcp_ep_pwm_value_t current,
     result.period          = apply_write_field(current.period, request.period, evt);
     result.active_duration = apply_write_field(current.active_duration, request.active_duration, evt);
 
-    /* REQ-PWM-056 (TC18 Table 43): cap, don't reject -- see the header's
+    /* REQ-PWM-056 (TC18 Table 46): cap, don't reject -- see the header's
      * own doc comment. */
     if (result.active_duration < duty_cycle_min) result.active_duration = duty_cycle_min;
     if (result.active_duration > duty_cycle_max) result.active_duration = duty_cycle_max;
