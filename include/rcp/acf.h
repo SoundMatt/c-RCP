@@ -247,7 +247,7 @@ typedef enum {
     RCP_ACF_RESP_ERROR       = 3,
 } rcp_acf_response_kind_t;
 
-/* TC18 Table 15's evt[3:0] = 0xF value, the wire marker for an Acknowledge
+/* TC18 Table 17's evt[3:0] = 0xF value, the wire marker for an Acknowledge
  * response -- see rcp_acf_classify_response()'s doc comment for why this
  * must be checked before op/err. */
 #define RCP_ACF_EVT_ACKNOWLEDGE ((uint8_t)0x0Fu)
@@ -291,7 +291,7 @@ typedef struct {
 } rcp_acf_byte_message_info_t;
 
 /* Classifies a decoded byte_message_info header into one of the four
- * response semantics per TC18 Table 15/§11.3.1-§11.3.4: evt[3:0] ==
+ * response semantics per TC18 Table 17/§11.3.1-§11.3.4: evt[3:0] ==
  * RCP_ACF_EVT_ACKNOWLEDGE (0xF) takes priority over everything else --
  * an Acknowledge stays an Acknowledge whether err is 0 (request filed) or
  * 1 (request rejected); the spec's Error Response kind (§11.3.4) is a

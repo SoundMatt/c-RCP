@@ -154,7 +154,7 @@
  * Figure 39, and giving evt[2:0] its ordinary Table 33 meaning.
  *
  * rcp_ep_can_frame_format_t names the six frame variants TC18's own Table
- * 54 enumerates -- Classical Base/Extended Frame Format (CBFF/CEFF), FD
+ * 57 enumerates -- Classical Base/Extended Frame Format (CBFF/CEFF), FD
  * Base/Extended Frame Format (FBFF/FEFF), and CAN XL over either the
  * classical or the new CAN XL physical layer -- with Table 57's own
  * numeric assignments (0-5); values 6-7 are Table 57's own two reserved

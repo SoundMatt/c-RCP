@@ -109,7 +109,7 @@ typedef struct {
     uint8_t hw_ep_pin_nr;
     uint8_t hw_pin_type; /* RCP_REGMAP_HW_PIN_* bitmask (regmap.h),
                              REQ-RMAP-042 -- renamed from pin_property to
-                             match the wire register's own name (Table 19)
+                             match the wire register's own name (Table 21)
                              and stop implying kinship with ep_gpio.h's
                              differently-shaped, same-named field */
 } rcp_config_hw_pin_t;

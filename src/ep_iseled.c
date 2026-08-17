@@ -119,7 +119,7 @@ uint8_t rcp_ep_iseled_crc8(const uint8_t *data, size_t len)
 
 /* ── Recovered-clock mode ──────────────────────────────────────────────────── */
 
-/* CORRECTED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group G): TC18 Table 55
+/* CORRECTED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group G): TC18 Table 58
  * documents 0x0007.4 iseled_use_rcv_clk itself as "Use clock provided by
  * ISELED 1st device instead of FreqSync pattern" -- true selects the
  * device-provided clock, which arrives on ISP_N (§13.7.12.2: ISP_N need
