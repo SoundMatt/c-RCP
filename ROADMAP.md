@@ -19106,6 +19106,47 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.372.0 -- 2026-08-16 (REQ-RMAP-016/079: EP0's own ep_generic_cfg
+row -- ep_used bit forced to 1, never clearable by an incoming write)
+
+Closes issue #466. TC18 Table 31's `ep_used` row states EP0's own bit
+is "fixed to 1 as EP0 needs to be always implemented" -- an
+EP0-specific override on top of the field's otherwise general R/W*
+status for EP1..EPn. `rcp_regmap_ep_generic_cfg_apply_reconfig()`
+(`src/regmap.c`) was applying the incoming `ep_used` bit uniformly to
+every row with no special case for `row_i == 0`, so a write targeting
+EP0's own `EP_GENERIC_config` row (relative address `0x0001`) could
+clear `entries[0].ep_used` to `false`, contradicting the spec. The
+codebase already applies exactly this kind of per-field EP0-only
+exception elsewhere in the same function -- `ep_type` at row offset 0
+is deliberately never written by any row, matching TC18 §13.7.1.2's
+own read-only rule -- but that existing exception had no analog for
+`ep_used`.
+
+Fixed: the same "no effect, confirmed normally" treatment `ep_type`
+already gets is now applied to row 0's own `ep_used` bit --
+`entries[0].ep_used` is forced to `true` regardless of the incoming
+bit, while row 0's own `ep_delay_time` (bits 4:5 of the same octet)
+and every other row's own `ep_used` (EP1..EPn) continue to honor the
+incoming write exactly as before -- no regression to the general R/W*
+case. Reads always reflect row 0's own `ep_used` correctly.
+
+New byte-literal tests (`tests/test_tc18_gaps_regmap.c`, next to the
+existing `ep_type` row-0 no-op test) prove both halves: a write
+targeting row 0's own `ep_used` bit is silently ignored (row 0 stays
+`ep_used=true`, its own `ep_delay_time` still updates normally from
+the same octet), and EP1's own `ep_used` still honors both `0` and `1`
+writes normally through a real 2-row table. One pre-existing
+single-row test was widened to a 2-row table targeting row 1 instead
+of row 0, since it was incidentally exercising the general case
+through what is now row 0's own fixed-bit exception. Mutation-tested:
+reverting only the fix (keeping the new tests) makes both new tests
+fail cleanly (`Expected TRUE Was FALSE`); restoring the fix returns
+the suite to green. Full 66-test suite + ASan/UBSan clean; `cfusa
+check`: 0 errors; `cfusa trace`: 1088/1088 traced and tested
+(unchanged -- REQ-RMAP-016/079 already existed, this closes a
+conformance defect in their own implementation, not a new
+requirement).
 ### v0.371.0 -- 2026-08-16 (REQ-DISC-002/007: discovery request
 unique_id=0x0000 investigated and closed -- no server-side check needed)
 

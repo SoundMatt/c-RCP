@@ -2528,6 +2528,74 @@ static void test_ep_generic_cfg_apply_reconfig_write_touching_only_ep_type_is_a_
     TEST_ASSERT_EQUAL_UINT8(0x03u, row.ep_type);
 }
 
+/* REQ-RMAP-016/REQ-RMAP-079 (issue #466): ep_used's own row-0-only
+ * override -- TC18 Table 31's ep_used row states EP0's bit is "fixed to
+ * 1 as EP0 needs to be always implemented", on top of the field's
+ * otherwise general R/W* status for EP1..EPn. A write targeting row 0's
+ * own ep_used bit must be silently ignored, the same "no effect,
+ * confirmed normally" treatment ep_type gets above -- see this
+ * function's own doc comment (regmap.h). */
+static void test_ep_generic_cfg_apply_reconfig_row0_ep_used_write_is_ignored_stays_true(void)
+{
+    rcp_regmap_ep_generic_cfg_t row;
+    uint8_t                     patch[1] = {0x00u}; /* ep_used=0, delay_reg=0 (1us) --
+                                                         targets ONLY octet 0x0001 */
+    rcp_regmap_ep_generic_cfg_reconfig_errc_t rc;
+
+    rcp_regmap_ep_generic_cfg_init(&row);
+    row.ep_used = true; /* EP0's own required-always-on state */
+
+    rc = rcp_regmap_ep_generic_cfg_apply_reconfig(&row, 1, 1u, patch, sizeof(patch));
+
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK, rc);
+    /* Forced -- the incoming ep_used=0 bit has no effect on row 0. */
+    TEST_ASSERT_TRUE(row.ep_used);
+    /* ep_delay_time (bits 4:5 of the same octet) is NOT part of this
+     * override and is still updated normally from the write. */
+    TEST_ASSERT_EQUAL_UINT32(1u, row.ep_delay_time);
+}
+
+/* Same override, exercised through a real 2-row EP_GENERIC_config table
+ * so the "row 0 only" scoping (not "every row", not "no rows") is
+ * checked directly rather than inferred from a single-row table. */
+static void test_ep_generic_cfg_apply_reconfig_ep0_ep_used_forced_true_ep1_honors_write(void)
+{
+    rcp_regmap_ep_generic_cfg_t rows[2];
+    uint8_t                     patch[2] = {
+        0x00u, /* row 0 octet 0x0001: ep_used=0 -- must be ignored */
+        0x00u, /* row 1 octet 0x0001: ep_used=0 -- must be honored */
+    };
+    rcp_regmap_ep_generic_cfg_reconfig_errc_t rc;
+
+    rcp_regmap_ep_generic_cfg_init(&rows[0]);
+    rcp_regmap_ep_generic_cfg_init(&rows[1]);
+    rows[0].ep_used = true;  /* EP0's own required-always-on state */
+    rows[1].ep_used = true;  /* EP1 starts on so the write's own effect is observable */
+
+    /* relative_start_address=1 covers row 0's own octet 0x0001 (12*0+1);
+     * relative_start_address=13 covers row 1's own octet 0x0001 (12*1+1).
+     * Two separate single-byte writes, mirroring how every other test in
+     * this file addresses one row's octet 0x0001 at a time. */
+    rc = rcp_regmap_ep_generic_cfg_apply_reconfig(rows, 2, 1u, &patch[0], 1u);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK, rc);
+    TEST_ASSERT_TRUE(rows[0].ep_used); /* row 0: forced, write ignored */
+
+    rc = rcp_regmap_ep_generic_cfg_apply_reconfig(rows, 2, 13u, &patch[1], 1u);
+    TEST_ASSERT_EQUAL(RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK, rc);
+    TEST_ASSERT_FALSE(rows[1].ep_used); /* row 1: honored normally */
+
+    /* And the general case still works the other direction too --
+     * writing ep_used=1 to a non-EP0 row is not a no-op regression. */
+    {
+        uint8_t set_patch[1] = {0x01u}; /* ep_used=1, delay_reg=0 */
+
+        rows[1].ep_used = false;
+        rc = rcp_regmap_ep_generic_cfg_apply_reconfig(rows, 2, 13u, set_patch, sizeof(set_patch));
+        TEST_ASSERT_EQUAL(RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK, rc);
+        TEST_ASSERT_TRUE(rows[1].ep_used);
+    }
+}
+
 static void test_ep_generic_cfg_apply_reconfig_leaves_partially_covered_field_unchanged(void)
 {
     rcp_regmap_ep_generic_cfg_t row;
@@ -2574,17 +2642,23 @@ static void test_ep_generic_cfg_apply_reconfig_does_not_launder_an_untouched_row
 
 static void test_ep_generic_cfg_apply_reconfig_extracts_delay_time_register_value(void)
 {
-    rcp_regmap_ep_generic_cfg_t row;
+    /* Row 1 (EP1), NOT row 0 -- row 0's own ep_used bit is forced true by
+     * issue #466's own row-0-only override (see the dedicated
+     * test_ep_generic_cfg_apply_reconfig_row0_ep_used_write_is_ignored_*
+     * tests above), so this general-case, non-EP0 extraction check uses
+     * a row where ep_used still honors the incoming bit normally. */
+    rcp_regmap_ep_generic_cfg_t rows[2];
     uint8_t                     patch[1] = {0x30u}; /* bits 4:5 = 11b = 50us */
     rcp_regmap_ep_generic_cfg_reconfig_errc_t rc;
 
-    rcp_regmap_ep_generic_cfg_init(&row);
+    rcp_regmap_ep_generic_cfg_init(&rows[0]);
+    rcp_regmap_ep_generic_cfg_init(&rows[1]);
 
-    rc = rcp_regmap_ep_generic_cfg_apply_reconfig(&row, 1, 1u, patch, sizeof(patch));
+    rc = rcp_regmap_ep_generic_cfg_apply_reconfig(rows, 2, 13u, patch, sizeof(patch));
 
     TEST_ASSERT_EQUAL(RCP_REGMAP_EP_GENERIC_CFG_RECONFIG_OK, rc);
-    TEST_ASSERT_EQUAL_UINT32(50u, row.ep_delay_time);
-    TEST_ASSERT_FALSE(row.ep_used); /* bit 0 of 0x30 is 0 */
+    TEST_ASSERT_EQUAL_UINT32(50u, rows[1].ep_delay_time);
+    TEST_ASSERT_FALSE(rows[1].ep_used); /* bit 0 of 0x30 is 0 */
 }
 
 static void test_ep_generic_cfg_apply_reconfig_rejects_short_payload(void)
@@ -5981,6 +6055,8 @@ int main(void)
     RUN_TEST(test_ep_generic_cfg_render_clamps_non_multiple_of_4_req_storage_size);
     RUN_TEST(test_ep_generic_cfg_apply_reconfig_patches_addressed_octets_only);
     RUN_TEST(test_ep_generic_cfg_apply_reconfig_write_touching_only_ep_type_is_a_no_op_confirmed_normally);
+    RUN_TEST(test_ep_generic_cfg_apply_reconfig_row0_ep_used_write_is_ignored_stays_true);
+    RUN_TEST(test_ep_generic_cfg_apply_reconfig_ep0_ep_used_forced_true_ep1_honors_write);
     RUN_TEST(test_ep_generic_cfg_apply_reconfig_leaves_partially_covered_field_unchanged);
     RUN_TEST(test_ep_generic_cfg_apply_reconfig_does_not_launder_an_untouched_rows_own_invalid_delay_time);
     RUN_TEST(test_ep_generic_cfg_apply_reconfig_extracts_delay_time_register_value);

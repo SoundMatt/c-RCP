@@ -1816,14 +1816,33 @@ rcp_regmap_ep_generic_cfg_apply_reconfig(rcp_regmap_ep_generic_cfg_t *entries, s
      * below is updated ONLY if [row_base+offset, row_base+offset+width) is
      * entirely within [touched_start, touched_end); ep_type (offset 0) is
      * never updated at all, matching TC18 §13.7.1.2's own "no effect"
-     * rule for read-only registers. */
+     * rule for read-only registers.
+     *
+     * ep_used (offset 1, bit 0) has its own narrower, row-0-only override:
+     * TC18 Table 31's ep_used row states EP0's bit is "fixed to 1 as EP0
+     * needs to be always implemented", on top of the field's otherwise
+     * general R/W* status for every other row. A write to row 0 that
+     * targets this bit is silently ignored for that one field only --
+     * entries[0].ep_used stays true regardless of the incoming bit -- the
+     * same "confirmed normally, no effect" treatment ep_type gets above,
+     * scoped to row 0 instead of every row. Row 0's own ep_delay_time
+     * (bits 4:5 of the same octet) is unaffected and still honors the
+     * write normally. */
     for (row_i = row_start_idx; row_i <= row_end_idx; row_i++) {
         size_t row_base = row_i * 12u;
 
         if (touched_start <= row_base + 1u && row_base + 1u + 1u <= touched_end) {
             uint8_t octet1 = data[(row_base + 1u) - touched_start];
 
-            entries[row_i].ep_used       = (octet1 & 0x01u) != 0u;
+            if (row_i == 0u) {
+                entries[row_i].ep_used = true; /* forced -- TC18 Table 31: EP0's
+                                                   ep_used bit is "fixed to 1 as
+                                                   EP0 needs to be always
+                                                   implemented", never clearable
+                                                   by an incoming write. */
+            } else {
+                entries[row_i].ep_used = (octet1 & 0x01u) != 0u;
+            }
             entries[row_i].ep_delay_time =
                 rcp_regmap_ep_delay_time_reg_to_us((uint8_t)((octet1 >> 4) & 0x3u));
         }
