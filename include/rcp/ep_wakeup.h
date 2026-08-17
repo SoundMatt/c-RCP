@@ -413,7 +413,7 @@ typedef struct {
                                 "(flush_time)", naming a register that
                                 lives on a DIFFERENT table entirely
                                 (rcp_regmap_response_queue_cfg_t::
-                                flush_time_us, TC18 §12.7.9 Table 24,
+                                flush_time_us, TC18 §12.7.9 Table 27,
                                 REQ-RMAP-064) associated with the response
                                 QUEUE, not this endpoint's own functional
                                 config.

@@ -510,7 +510,7 @@ typedef struct {
                                          for the W+ lockable-access-type
                                          primitive this register drives
                                          -- Table 23's EP_ID_config rows
-                                         and Table 24's STREAM_UID/
+                                         and Table 27's STREAM_UID/
                                          flush_on_count/Flush_time
                                          registers are ALSO R/W+ and need
                                          the identical lock check, so
@@ -642,7 +642,7 @@ typedef struct {
                                 §12.7.5 Table 20, absolute address
                                 0x001D, 8 bit, R): number of usable
                                 entries in the response/ack-stream
-                                config table (§12.7.9 Table 24). */
+                                config table (§12.7.9 Table 27). */
     uint16_t svr_request_stream_cfg_ptr; /* REQ-RMAP-034 (TC18 §12.7.5
                                 Table 20, absolute address 0x001E, 16
                                 bit, R): the address of the
@@ -1639,7 +1639,7 @@ void rcp_regmap_ep_functional_cfg_init(rcp_regmap_ep_functional_cfg_t *cfg);
 #define RCP_REGMAP_PIN_PROP_PULL_DOWN  ((uint8_t)1u << 4)
 #define RCP_REGMAP_PIN_PROP_ACTIVE_LOW ((uint8_t)1u << 5)
 
-/* TC18 §12.7.6 Table 20's own hw_pin_type bit layout (REQ-RMAP-042),
+/* TC18 §12.7.6 Table 21's own hw_pin_type bit layout (REQ-RMAP-042),
  * primary-source verified directly against the TC18 v0.5.1_RC PDF:
  * four packed sub-fields, not the six independent one-hot flags
  * RCP_REGMAP_PIN_PROP_* above uses for its own, different, register.
@@ -1934,7 +1934,7 @@ typedef struct {
     uint8_t  rx_ack_stream_index;     /* REQ-RMAP-048 (TC18 §12.7.7 Table
                                           24, relative address 0x0010, 8
                                           bit, R/W*): the index of the
-                                          response/ack stream (Table 24,
+                                          response/ack stream (Table 27,
                                           respqueue.h) endpoints bound to
                                           this request stream send their
                                           acknowledges on. 0 (this field's
@@ -2448,7 +2448,7 @@ uint8_t rcp_regmap_request_stream_cfg_resolve_index(
 #define RCP_REGMAP_REQUEST_STREAM_CFG_MAX_ENTRIES ((size_t)64u)
 
 typedef struct {
-    uint16_t stream_uid;      /* REQ-RMAP-060 (TC18 §12.7.9 Table 24, relative
+    uint16_t stream_uid;      /* REQ-RMAP-060 (TC18 §12.7.9 Table 27, relative
                                   address 0x0000, 16 bit, R/W+): supplies bits
                                   [63:48] of the stream_id this queue transmits
                                   responses/acknowledges on -- the unique_id
@@ -2458,28 +2458,28 @@ typedef struct {
                                   a per-queue property); see
                                   rcp_regmap_response_queue_stream_id() below
                                   for combining the two. */
-    uint16_t max_avtpdu_size; /* REQ-RMAP-061 (TC18 §12.7.9 Table 24, relative
+    uint16_t max_avtpdu_size; /* REQ-RMAP-061 (TC18 §12.7.9 Table 27, relative
                                   address 0x0002, 16 bit, R/W*): maximum
                                   length, in quadlets, of an AVTPDU this
                                   queue generates -- respqueue.h's
                                   rcp_respqueue_t's own max_avtpdu_size_octets
                                   is this value x 4, same caller-converts
                                   convention as queue_size below. */
-    uint16_t queue_size;      /* REQ-RMAP-059 (TC18 §12.7.9 Table 24, relative
+    uint16_t queue_size;      /* REQ-RMAP-059 (TC18 §12.7.9 Table 27, relative
                                   address 0x0004, 16 bit, R/W*): this queue's
                                   configured transmit-memory reservation, in
                                   32-bit words -- respqueue.h's
                                   rcp_respqueue_t's own capacity_octets is
                                   this value x 4, the conversion a caller
                                   performs when calling rcp_respqueue_init(). */
-    uint16_t flush_on_count;  /* REQ-RMAP-063 (TC18 §12.7.9 Table 24, relative
+    uint16_t flush_on_count;  /* REQ-RMAP-063 (TC18 §12.7.9 Table 27, relative
                                   address 0x0006, 16 bit, R/W+): the queued-
                                   octet threshold that triggers a flush --
                                   respqueue.h's rcp_respqueue_should_flush()
                                   takes the octet-converted form of this
                                   register as its own caller-supplied
                                   parameter. */
-    uint32_t flush_time_us;   /* REQ-RMAP-064 (TC18 §12.7.9 Table 24, relative
+    uint32_t flush_time_us;   /* REQ-RMAP-064 (TC18 §12.7.9 Table 27, relative
                                   address 0x0008, 16 bit, R/W+, microseconds):
                                   the elapsed-since-last-transmission
                                   threshold that forces a flush even of an
@@ -2516,7 +2516,7 @@ rcp_stream_id_t rcp_regmap_response_queue_stream_id(const rcp_regmap_response_qu
                                                      const uint8_t mac[6]);
 
 /* Not itself TC18-derived -- an implementation ceiling on how many
- * response/ack queue rows (TC18 §12.7.9 Table 24) this codebase's own
+ * response/ack queue rows (TC18 §12.7.9 Table 27) this codebase's own
  * fixed-size wire-codec buffers support, matching the same scale as
  * RCP_REGMAP_HW_PIN_MAP_MAX_ENTRIES/RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES. */
 #define RCP_REGMAP_RESPONSE_QUEUE_CFG_MAX_ENTRIES ((size_t)64u)
@@ -2532,7 +2532,7 @@ rcp_stream_id_t rcp_regmap_response_queue_stream_id(const rcp_regmap_response_qu
  * is the first one, serializing TC18's own exact 10-octet-per-queue wire
  * stride (STREAM_UID@0x0000, Max_AVTPDUsize@0x0002, queue_size@0x0004,
  * flush_on_count@0x0006, Flush_time@0x0008 -- confirmed via direct
- * TC18.txt read, §12.7.9 Table 24). */
+ * TC18.txt read, §12.7.9 Table 27). */
 void rcp_regmap_response_queue_cfg_render(const rcp_regmap_response_queue_cfg_t *entries,
                                            size_t count, uint8_t *out);
 
