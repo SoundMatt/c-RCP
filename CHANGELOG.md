@@ -34,6 +34,89 @@ the rationale.
 
 ## Releases
 
+### v0.391.0 -- 2026-08-16 (c-RCP-AUDIT-02 citation backfill: LIFECYCLE/RMAP/E2E/ACF/PWRMODE/WIREERR + RELAY/MOCK/LOAN/ALLOC scoping, 2 of 66 requirements in scope now cited)
+
+Continuation of issue #164 (c-RCP-AUDIT-02), covering two groups:
+
+**Part A** -- LIFECYCLE, RMAP, E2E, ACF, PWRMODE, WIREERR, previously
+excluded to avoid file overlap with the now-merged issue #198
+lifecycle/access-control work. Re-derived current counts from
+`.fusa-reqs.json` directly: these six categories were already
+substantially cited by earlier batches (PRs #171-175, #182), leaving
+only 18 uncited requirements going in (LIFECYCLE 2, RMAP 7, E2E 2,
+ACF 2, PWRMODE 2, WIREERR 3).
+
+**Part B** -- RELAY, MOCK, LOAN, ALLOC, not previously individually
+triaged. RELAY (17 uncited) and LOAN (9 uncited) and ALLOC (6 uncited)
+were each investigated fresh: read the module's own source/header, then
+exhaustively grepped a fresh `pdftotext -layout` extraction of
+`OA_TC18_specification_v_0.5.1_RC_5_3624.pdf` for related terminology.
+MOCK's remaining 16 (after PR #496's partial pass) were re-verified by
+reading `src/mock.c`'s actual construction/CRUD/dispatch-mapping logic.
+
+**Cited 2, both in WIREERR** (6/7 now, up from 4/7):
+- `REQ-WIREERR-003` (`rcp_e2e_wire_error()` maps CRC mismatch to
+  POCI_FAILURE) -- TC18 §12.9.6 Table 30's own `POCI_FAILURE 12 - CRC
+  of request does not match` row, TC18.txt L3830.
+- `REQ-WIREERR-004` (`rcp_lifecycle_field_write_error()` distinguishes
+  LOCKED_MEM_ACCESS from UNAUTHORIZED_ACCESS) -- TC18 §13.7.1.2's
+  write-prohibited-register/UNAUTHORIZED_ACCESS prose (TC18.txt
+  L4436-4437) plus Table 30's LOCKED_MEM_ACCESS(4)/UNAUTHORIZED_ACCESS(3)
+  rows (TC18.txt L3815-3816), cross-referencing REQ-LIFECYCLE-024's own
+  Figure 17 LOCKED_CONFIG_ACCESS finding for the state-locked half.
+
+**64 left uncited, individually re-verified against the fresh
+extraction, not assumed:**
+- LIFECYCLE-013/021, E2E-001, ACF-001, PWRMODE-001/002, WIREERR-002 --
+  the `strerror()`/`string()` uniqueness pattern, implementation
+  detail, no TC18 clause, consistent with every prior batch.
+- RMAP-013 through 019 (bitmask distinctness, string-helper
+  guarantees, config-struct zero-init) -- re-confirmed uncited.
+  RMAP-018's own text invokes a Table 24 "power-on default" for
+  `rx_resp_stream_index`, but the fresh extraction shows Table 24 only
+  documents what `0` *means* ("no response is to be sent"), never a
+  mandated non-zero reset value -- the `1` default is this
+  implementation's own bootstrap convenience, not a TC18 requirement.
+- E2E-006 (defensive fail-safe on invalid input) and ACF-011 (ACF_GBB
+  encode zeroes the timestamp region for an untimed message) -- no
+  explicit TC18 mandate for either; TC18 states mtv=0 means "not
+  valid" without specifying the byte content, and in fact explicitly
+  repurposes those same bytes for non-zero condition data in
+  conditional/timed GBB requests.
+- RELAY (17), LOAN (9), ALLOC (6): confirmed to have **no TC18 basis
+  at all**. RELAY is this project's own RELAY-spec (§5.1/§18.2/§4/§15.7.5)
+  C binding plus its own original TC18-adapter-glue design (`adapt.h`'s
+  own header: "this module is this repository's own interim answer...
+  the upstream conversation about how RELAY's own spec should
+  eventually define that mapping generically is tracked as a GitHub
+  issue"). LOAN is a free-list buffer-pool implementation (`loan.h`'s
+  own header: "type, field, and constant names in this header are this
+  implementation's own original engineering design"). ALLOC is a
+  pluggable malloc/calloc/free/realloc indirection for fault-injection
+  and portability. Exhaustive grep of the extracted TC18 text finds
+  zero "pool"/"free-list"/"allocat" (beyond two unrelated prose uses)
+  hits. Suggest adding all three to issue #164's "not a TC18 concept"
+  exclusion list (alongside MDNS/CFG/ADMIN/AUTH/CLI/CORE/DDS/DOIP/GRPC/
+  MQTT/OBS/PLATFORM/REC/REST/RL/SHMEM/SOMEIP/UDS/ERR/FI) -- would drop
+  the effective remaining-uncited count by 32.
+- MOCK's remaining 16 -- re-confirmed as genuine thin wrappers (server
+  construction/destruction, lifecycle accessors, endpoint-table CRUD,
+  and dispatch/admission/tick functions whose entire decision logic
+  and control flow delegates to already-cited `server.h`/`lifecycle.h`
+  primitives), matching PR #496's own prior characterization exactly.
+
+**Content-bug / citation-drift candidate surfaced (pre-existing,
+not touched in this PR):** `REQ-LIFECYCLE-024`'s own citation claims
+"TC18.txt L4039-L4041" for §13.7.1.2's UNAUTHORIZED_ACCESS prose, but
+in the current extraction that prose is actually at L4436-4437 (L4039
+is mid-§13.3, unrelated content). Same class of drift as issue #434/
+PR #444/PR #492's PWR findings -- flagging per issue #164's own Method
+step 1, not fixing here (pre-dating this PR).
+
+Verification: full clean rebuild, 66/66 tests, pinned `cfusa` (v0.5.54)
+`check` 0 errors (968 warnings/1312 info, unchanged), `cfusa trace`
+1095/1095 traced+tested (unchanged).
+
 ### v0.390.0 -- 2026-08-16 (c-RCP-AUDIT-02 citation backfill batch: CFG/DISC/MOCK/SEQ/TRIG/CANCEL/CHAIN/CMP/CANEP/UART/SRV, 10 of 46 uncited requirements in scope now cited)
 
 Partial progress on issue #164 (c-RCP-AUDIT-02). Scoped to the eleven
