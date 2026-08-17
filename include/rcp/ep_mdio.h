@@ -222,7 +222,7 @@
  * FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-MDIO-020/023):
  * "no configurable parameters" (above) describes what a *write* can
  * change -- it says nothing about whether the block is *readable*. TC18
- * §13.7.13.2 Table 56 still fixes a real register block every endpoint
+ * §13.7.13.2 Table 59 still fixes a real register block every endpoint
  * type exposes via evt[2:0]=111b (extraction §12.7.1): mdio_ep_len
  * (0x0000, R), the reserved octet (0x0001, R), the common enable&clr/
  * options octets (0x0002/0x0003, shared with every other endpoint type),
@@ -231,9 +231,9 @@
  *
  * A genuine address-collision editorial defect, the FIFTH this audit has
  * found (after ep_pwm.h's/ep_gpio.h's/ep_i2c.h's/ep_iseled.h's own):
- * mdio_ep_status is printed at relative address 0x0002 in Table 56 --
+ * mdio_ep_status is printed at relative address 0x0002 in Table 59 --
  * identical to mdio_ep_enable&clr, separately printed at the same
- * address. Unlike every other endpoint type's own table, Table 56 prints
+ * address. Unlike every other endpoint type's own table, Table 59 prints
  * no base_clk row at all (consistent with "MDIO EP does not have any
  * configurable parameters" -- there is genuinely no system clock
  * register to expose here), so the minimal, table-literal-following fix
@@ -612,10 +612,10 @@ bool rcp_ep_mdio_functional_cfg_writable(rcp_lifecycle_state_t state,
 /* ── The EP_func register block (evt[2:0] == 111b) ─────────────────────────── */
 
 /* Relative octet offsets of the registers making up an MDIO endpoint's own
- * EP_func block, at the widths TC18 §13.7.13.2 Table 56 assigns them,
+ * EP_func block, at the widths TC18 §13.7.13.2 Table 59 assigns them,
  * corrected for the address-collision editorial defect -- see the file
  * header. Note there is no base_clk row here, unlike every other endpoint
- * type's own common prefix -- Table 56 genuinely defines none. */
+ * type's own common prefix -- Table 59 genuinely defines none. */
 #define RCP_EP_MDIO_REG_EP_LEN        ((uint16_t)0x0000u) /*  8 bit, R   */
 #define RCP_EP_MDIO_REG_RESERVED_01   ((uint16_t)0x0001u) /*  8 bit, R   */
 #define RCP_EP_MDIO_REG_EP_ENABLE_CLR ((uint16_t)0x0002u) /*  8 bit, R/W */

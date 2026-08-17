@@ -173,11 +173,11 @@
  * ── Recovered-clock mode: iseled_use_rcv_clk and the unwired ISP_N case ─────
  *
  * `rcp_ep_iseled_functional_cfg_t.iseled_use_rcv_clk` names TC18 §13.7.12.2
- * Table 55's own 0x0007.4 register bit directly: "Use clock provided by
+ * Table 58's own 0x0007.4 register bit directly: "Use clock provided by
  * ISELED 1st device instead of FreqSync pattern". CORRECTED 2026-08-10
  * (c-RCP-AUDIT-06, issue #256 Group G): this file previously described the
  * opposite polarity (claiming true meant *recovering* the clock via
- * Freq_Sync and needing no ISP_N wiring) -- backwards from what Table 55's
+ * Freq_Sync and needing no ISP_N wiring) -- backwards from what Table 58's
  * own bit description and §13.7.12.2's own prose both say. True selects
  * the *device*-provided clock (arriving on ISP_N, the "clock provided on
  * the ISP_N pin" §13.7.12.2 names); false selects the Freq_Sync pattern
@@ -207,7 +207,7 @@
  * §12.7.1 configuration-write path -- the same class of gap SPI's/I2C's/
  * UART's/LIN's/ADC's/PWM_IN's own earlier fixes closed.
  *
- * TC18 §13.7.12.2 Table 55 defines the register block, but -- like GPIO's,
+ * TC18 §13.7.12.2 Table 58 defines the register block, but -- like GPIO's,
  * I2C's, and PWM_OUT's own source tables -- with a genuine address-
  * collision editorial defect (visually confirmed on the PDF, not an
  * extraction artifact): iseled_base_clk (16 bit, R) is printed at relative
@@ -242,7 +242,7 @@
  * equivalents). `iseled_crc_enable` is explicitly NOT part of this
  * register block -- it gates this module's own original, second,
  * independent CRC-8 integrity layer (see the "ISELED-level CRC" section
- * above), which Table 55 does not define a register for at all, so it is
+ * above), which Table 58 does not define a register for at all, so it is
  * never rendered onto or parsed from the wire here.
  *
  * New rcp_ep_iseled_render_registers()/_apply_reconfig()/
@@ -437,7 +437,7 @@ bool rcp_ep_iseled_set_trigger(rcp_ep_iseled_functional_cfg_t *cfg,
 /* ── The EP_func register block (evt[2:0] == 111b) ─────────────────────────── */
 
 /* Relative octet offsets of the registers making up an ISELED endpoint's
- * own EP_func block, at the widths TC18 §13.7.12.2 Table 55 assigns them,
+ * own EP_func block, at the widths TC18 §13.7.12.2 Table 58 assigns them,
  * corrected for the address-collision editorial defect -- see the file
  * header. */
 #define RCP_EP_ISELED_REG_EP_LEN        ((uint16_t)0x0000u) /*  8 bit, R   */
@@ -454,7 +454,7 @@ bool rcp_ep_iseled_set_trigger(rcp_ep_iseled_functional_cfg_t *cfg,
 /* The block's own length in octets -- one past the last assigned offset. */
 #define RCP_EP_ISELED_EP_FUNC_LEN       ((uint16_t)0x000Eu)
 
-/* Bit masks within the RCP_EP_ISELED_REG_FLAGS octet -- Table 55's own two
+/* Bit masks within the RCP_EP_ISELED_REG_FLAGS octet -- Table 58's own two
  * named single-bit parameters (iseled_collect_resp, iseled_use_rcv_clk),
  * at the same relative bit positions the table's own row order assigns
  * (0x0007.3/0x0007.4 in the table's own uncorrected numbering, shifted to

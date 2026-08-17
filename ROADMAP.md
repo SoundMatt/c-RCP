@@ -19106,6 +19106,58 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.378.0 -- 2026-08-16 (UART/LIN/ADC/CAN/ISELED/MDIO functional-
+config table citations corrected, the six-item residue issue #434's
+bulk pass missed)
+
+Closes issue #472. Doc-comment-only citation fix, same lineage as
+issue #434 (v0.361.0): each cited table number in this cluster was
+exactly 3 less than the table's real RC5 number -- `Table 48` for
+UART functional config (real `Table 51`), `Table 52` for LIN
+functional config (real `Table 55`), `Table 50`/`Table 51` for ADC's
+trigger-outputs/functional-config tables (real `Table 53`/`Table
+54`), `Table 54` for CAN's own FrameFormat table (real `Table 57`),
+`Table 55` for ISELED functional config (real `Table 58`), and
+`Table 56` for MDIO functional config (real `Table 59`). Every
+corrected number was independently re-verified against a fresh
+`pdftotext -layout` extraction of
+`OA_TC18_specification_v_0.5.1_RC_5_3624.pdf` before being applied.
+
+`#434`'s bulk-fix pass only ever targeted `.fusa-reqs.json`'s own
+`tc18` citation field, and only partially even there -- it never
+touched `title`/`text` (both present in this same file) nor the doc
+comments inside
+`include/rcp/ep_{uart,lin,adc,can,iseled,mdio}.h`/`src/ep_can.c` this
+batch also corrects. Re-scanning past the six requirements this
+issue named by number (`REQ-UART-038`, `REQ-LINEP-024`,
+`REQ-ADC-031`) surfaced 7 more `.fusa-reqs.json` `tc18` fields
+carrying the identical stale ADC numbering
+(`REQ-ADC-007/020/022/031/035/036/040`) that `#434`'s own pass had
+also missed -- corrected alongside the rest. In total, 40
+`title`/`text`/`tc18` fields across 31 requirements, applied via
+targeted per-line string replacement (not a full JSON
+re-serialization, so the diff touches only the corrected citation on
+each line) after confirming each occurrence's real topic against the
+PDF -- several requirements correctly cite the *same* stale-looking
+number for an unrelated, already-correct table (e.g. UART's own
+trigger-signals table is genuinely `Table 52`, unrelated to LIN's
+stale `Table 52`; CAN's own functional-config table is genuinely
+`Table 56`, unrelated to MDIO's stale `Table 56`) and were left
+untouched. `REQ-PWM-058`'s own `Table 48` citations are similarly
+genuine (`Table 48` really is PWM_IN's functional-config table) and
+untouched. `REQ-CANEP-001`'s `tc18` field cites an unrelated section
+(`§13.7.11.2 Table 56`, the CAN functional-config table, for a
+FrameFormat requirement) -- a different, pre-existing citation
+defect, not this cluster's renumbering pattern; left for separate
+investigation, only its `title`'s in-cluster `Table 54` was
+corrected.
+
+No behavior change: no `text` content beyond the corrected table
+number was altered, no `status` field changed, and no source-code
+logic changed, only doc comments. Full 66-test suite unchanged;
+`cfusa check`/`trace`: 0 errors, 1088/1088 traced and tested
+(unchanged).
+
 ### v0.376.0 -- 2026-08-16 (orphaned classifier/error-mapping
 primitives wired into real dispatch: issues #468, #469)
 
@@ -19217,8 +19269,6 @@ already on the real error-response path.
 66-test suite passes unchanged; `cfusa check`/`trace` (v0.5.54): 0 errors,
 1088/1088 traced and tested (unchanged).
 
-
-
 ### v0.373.0 -- 2026-08-16 (REQ-RMAP-054: rcp_mock_server_new() now
 seeds the EP_ID_config power-on default; issue #464 audit closed with
 no code gap remaining)
@@ -19315,6 +19365,7 @@ check`: 0 errors; `cfusa trace`: 1088/1088 traced and tested
 (unchanged -- REQ-RMAP-016/079 already existed, this closes a
 conformance defect in their own implementation, not a new
 requirement).
+
 ### v0.371.0 -- 2026-08-16 (REQ-DISC-002/007: discovery request
 unique_id=0x0000 investigated and closed -- no server-side check needed)
 

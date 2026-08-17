@@ -176,12 +176,12 @@
  * (the read-completion race's timeout half -- see above).
  *
  * FIXED 2026-08-11 (c-RCP-AUDIT-06, issue #256 Group I, REQ-UART-038):
- * the four TC18 §13.7.8.2 Table 48 R/W fields this struct previously had
+ * the four TC18 §13.7.8.2 Table 51 R/W fields this struct previously had
  * no counterpart for at all -- uart_rts_enable/uart_cts_enable (hardware
  * RTS/CTS flow control), uart_half_duplex (full- vs. half-duplex
  * operation), and uart_trail (inter-transmission trail time in bit
  * times) -- are now modelled (rts_enable/cts_enable/half_duplex/trail),
- * alongside the whole Table 48 register block itself (see "The EP_func
+ * alongside the whole Table 51 register block itself (see "The EP_func
  * register block" below). Unlike GPIO's/I2C's own source tables, Table
  * 48 is internally consistent -- no address-collision editorial defect
  * to resolve here.
@@ -201,10 +201,10 @@
  * shared rcp_acf_evt_row2_is_plain()) -- exactly right, since a
  * config-write request is not a plain transfer. What was missing, the
  * same class of gap SPI's and I2C's own earlier fixes closed, was any
- * counterpart implementing that §12.7.1 path: this endpoint's Table 48
+ * counterpart implementing that §12.7.1 path: this endpoint's Table 51
  * register block had no wire render/parse path of any kind.
  *
- * Table 48's own layout (unlike GPIO's/I2C's own source tables, this one
+ * Table 51's own layout (unlike GPIO's/I2C's own source tables, this one
  * has no address-collision editorial defect -- its printed addresses are
  * internally consistent throughout):
  *
@@ -218,7 +218,7 @@
  *   0x0009  bit 0 uart_parity_enable, bit 1 uart_parity_pol, bit 2
  *           uart_rts_enable, bit 3 uart_cts_enable, bit 4
  *           uart_half_duplex, bits 5-7 reserved      8 bit  R/W
- *   0x000A  uart_stop_bits    8 bit  R/W  in HALF stop bits (Table 48's
+ *   0x000A  uart_stop_bits    8 bit  R/W  in HALF stop bits (Table 51's
  *           own units: 1 stop bit = 2, 2 stop bits = 4)
  *   0x000B  uart_timeout      8 bit  R/W  receiver timeout, bit times
  *   0x000C  uart_trail        8 bit  R/W  inter-transmission trail time,
@@ -321,7 +321,7 @@ typedef enum {
     RCP_EP_UART_STOP_BITS_ONE      = 0,
     RCP_EP_UART_STOP_BITS_TWO      = 1,
     /* REQ-UART-037 (tc18-gap post-backlog audit, 2026-08-14): 1.5 stop
-     * bits -- Table 48's own uart_stop_bits register value 3 (half-
+     * bits -- Table 51's own uart_stop_bits register value 3 (half-
      * stop-bit units). Appended rather than inserted, so TWO's own
      * existing numeric value (1) is unchanged for any code that stored
      * it as a raw integer before this fix. */
@@ -369,13 +369,13 @@ typedef enum {
  *
  * cfg->trigger (rcp_ep_uart_trigger_t, below) is, like ep_spi.h's own
  * channels[i].trigger and ep_pwm.h's PWM_OUT/PWM_IN trigger fields, never
- * rendered onto the wire: Table 48's own EP_func register block (see "The
+ * rendered onto the wire: Table 51's own EP_func register block (see "The
  * EP_func register block" below) has no trigger-mode register of any
  * kind, the same "no wire-format consequence" status those sibling
  * fields' own file headers already document. rcp_ep_uart_render_registers()/
  * rcp_ep_uart_apply_reconfig() are therefore intentionally left untouched
  * by this addition, matching that established sibling pattern exactly
- * rather than inventing a register Table 48 does not define.
+ * rather than inventing a register Table 51 does not define.
  */
 
 typedef enum {
@@ -414,15 +414,15 @@ typedef struct {
     uint32_t                       uart_timeout_ms;   /* read-completion race
                                                            timeout -- see the
                                                            file header */
-    uint16_t                       ep_status;         /* uart_ep_status, Table 48 */
-    uint16_t                       baud_rate_kbps;    /* uart_baud_rate, Table 48 --
+    uint16_t                       ep_status;         /* uart_ep_status, Table 51 */
+    uint16_t                       baud_rate_kbps;    /* uart_baud_rate, Table 51 --
                                                            see the file header */
-    bool                           rts_enable;        /* uart_rts_enable, Table 48 */
-    bool                           cts_enable;        /* uart_cts_enable, Table 48 */
-    bool                           half_duplex;       /* uart_half_duplex, Table 48 */
-    uint8_t                        wire_timeout_bit_times; /* uart_timeout, Table 48 --
+    bool                           rts_enable;        /* uart_rts_enable, Table 51 */
+    bool                           cts_enable;        /* uart_cts_enable, Table 51 */
+    bool                           half_duplex;       /* uart_half_duplex, Table 51 */
+    uint8_t                        wire_timeout_bit_times; /* uart_timeout, Table 51 --
                                                                 see the file header */
-    uint8_t                        trail;             /* uart_trail, Table 48 */
+    uint8_t                        trail;             /* uart_trail, Table 51 */
     uint8_t                        trigger;           /* rcp_ep_uart_trigger_t;
                                                             this module's own field,
                                                             not part of the EP_func
@@ -520,7 +520,7 @@ bool rcp_ep_uart_set_trigger(rcp_ep_uart_functional_cfg_t *cfg, rcp_ep_uart_trig
 /* The block's own length in octets -- one past the last assigned offset,
  * i.e. the value the endpoint reports at RCP_EP_UART_REG_EP_LEN and the
  * bound the "write beyond EP_LEN is ignored" rule (§12.7.1) is applied
- * against. Table 48's own addressing is internally consistent (unlike
+ * against. Table 51's own addressing is internally consistent (unlike
  * GPIO's/I2C's own source tables), so there is no editorial defect to
  * resolve here. */
 #define RCP_EP_UART_EP_FUNC_LEN ((uint16_t)0x000Du)
@@ -779,8 +779,8 @@ typedef enum {
                                                  response_fragmented() now */
 } rcp_ep_uart_read_completion_t;
 
-/* REQ-UART-037's own remaining Table 48 divergence (issue #341 lineage):
- * cfg->wire_timeout_bit_times (uart_timeout, Table 48 -- TC18's real
+/* REQ-UART-037's own remaining Table 51 divergence (issue #341 lineage):
+ * cfg->wire_timeout_bit_times (uart_timeout, Table 51 -- TC18's real
  * register, correctly wire-modeled by rcp_ep_uart_render_registers()/
  * _apply_reconfig() since REQ-UART-038) is expressed in raw UART bit
  * periods, "measured from the last received stop bit" -- a runtime
@@ -792,7 +792,7 @@ typedef enum {
  * REAL wire register's own bit-time count into a wall-clock duration a
  * caller could actually use. This function is that conversion: one UART
  * bit period is 1000/baud_rate_kbps microseconds (baud_rate_kbps is
- * cfg->baud_rate_kbps, the SAME correctly-unit'd Table 48 field render/
+ * cfg->baud_rate_kbps, the SAME correctly-unit'd Table 51 field render/
  * apply_reconfig already use for the wire's own uart_baud_rate
  * register), so wire_timeout_bit_times bit periods is
  * wire_timeout_bit_times * 1000 / baud_rate_kbps microseconds --

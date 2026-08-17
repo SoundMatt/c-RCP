@@ -32,7 +32,7 @@ static uint16_t get_u16(const uint8_t *p)
     return (uint16_t)(((uint16_t)p[0] << 8) | (uint16_t)p[1]);
 }
 
-/* ── FrameFormat selection (payload leading quadlet, TC18 Table 54) ──────── */
+/* ── FrameFormat selection (payload leading quadlet, TC18 Table 57) ──────── */
 
 //cfusa:req REQ-CANEP-001
 bool rcp_ep_can_frame_format_valid(uint8_t v)

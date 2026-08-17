@@ -215,7 +215,7 @@
  * acf.h's rcp_acf_evt_row2_is_plain()), but
  * no counterpart implemented that TC18 §12.7.1 configuration-write path
  * -- the same class of gap SPI's/I2C's/UART's/LIN's own earlier fixes
- * closed. TC18 §13.7.9.2 Table 51 defines a clean register block with no
+ * closed. TC18 §13.7.9.2 Table 54 defines a clean register block with no
  * address-collision editorial defect:
  *
  *   0x0000  adc_ep_len              8 bit  R    RCP_EP_ADC_EP_FUNC_LEN (0x12)
@@ -234,20 +234,20 @@
  *   0x0010  adc_trigger_max        16 bit  R/W  high threshold
  *
  * Unlike SPI's/UART's/LIN's own diverging fields, the three pre-existing
- * sampling-pipeline fields above share Table 51's own register names
+ * sampling-pipeline fields above share Table 54's own register names
  * exactly, and REQ-ADC-035's own prior text already treated them as the
  * same underlying quantity -- so rcp_ep_adc_render_registers()/
  * _apply_reconfig() render/parse them directly rather than adding
  * parallel wire-only fields. adc_avg_intervals_per_request and
  * adc_samples_per_avg_interval are this module's own uint16_t (wider
- * than Table 51's own 8-bit registers, and their setters apply no range
+ * than Table 54's own 8-bit registers, and their setters apply no range
  * check) -- render truncates to the low octet, and a value already set
  * above 255 via rcp_ep_adc_set_avg_intervals_per_request()/
  * _set_samples_per_avg_interval() is therefore not representable on the
  * wire and reads back truncated. This is a narrow, honestly-documented
  * limitation, not a silent one: no test in this codebase exercises a
  * value that large, and neither setter validates a bound, so the
- * limitation only bites a caller who chooses a value Table 51's own
+ * limitation only bites a caller who chooses a value Table 54's own
  * 8-bit field could never have held in the first place.
  *
  * adc_base_clk is not itself stored (no setter, no meaningful derivable
@@ -462,7 +462,7 @@ typedef struct {
                                                                response -- not a
                                                                mode selector; see
                                                                the file header */
-    uint16_t                       ep_status;           /* adc_ep_status, Table 51 */
+    uint16_t                       ep_status;           /* adc_ep_status, Table 54 */
     uint8_t                        base_clk_divider;    /* adc_base_clk_divider */
     uint8_t                        sample_interval;     /* adc_sample_interval */
     uint8_t                        resolution;          /* adc_resolution, <=16 */
@@ -509,9 +509,9 @@ bool rcp_ep_adc_set_combine_avg_values(rcp_ep_adc_functional_cfg_t *cfg,
                                         rcp_lifecycle_state_t state,
                                         rcp_lifecycle_writer_ctx_t writer);
 
-/* ── Trigger outputs (Table 50), REQ-ADC-031 (issue #201) ───────────────────
+/* ── Trigger outputs (Table 53), REQ-ADC-031 (issue #201) ───────────────────
  *
- * TC18 §13.7.9.1 Table 50: an ADC endpoint can generate five trigger
+ * TC18 §13.7.9.1 Table 53: an ADC endpoint can generate five trigger
  * events -- 0/1 fire when the averaged output value falls below/rises
  * above adc_trigger_min, 2/3 fire when it falls below/rises above
  * adc_trigger_max, and 4 fires when the endpoint finished a measurement
@@ -541,7 +541,7 @@ typedef struct {
 /* Initializes s to the no-previous-value state. */
 void rcp_ep_adc_trigger_state_init(rcp_ep_adc_trigger_state_t *s);
 
-/* Table 50's own 5 trigger signals, one bit each -- rcp_ep_adc_trigger_evaluate()
+/* Table 53's own 5 trigger signals, one bit each -- rcp_ep_adc_trigger_evaluate()
  * returns an OR of whichever of these fire for one evaluate() call. */
 #define RCP_EP_ADC_TRIGGER_BELOW_MIN            ((uint8_t)0x01u) /* trigger 0 */
 #define RCP_EP_ADC_TRIGGER_ABOVE_MIN            ((uint8_t)0x02u) /* trigger 1 */
@@ -597,7 +597,7 @@ uint8_t rcp_ep_adc_trigger_evaluate(rcp_ep_adc_trigger_state_t *s, uint16_t valu
 /* The block's own length in octets -- one past the last assigned offset,
  * i.e. the value the endpoint reports at RCP_EP_ADC_REG_EP_LEN and the
  * bound the "write beyond EP_LEN is ignored" rule (§12.7.1) is applied
- * against. Table 51's own addressing is internally consistent, so there
+ * against. Table 54's own addressing is internally consistent, so there
  * is no editorial defect to resolve here. */
 #define RCP_EP_ADC_EP_FUNC_LEN ((uint16_t)0x0012u)
 
