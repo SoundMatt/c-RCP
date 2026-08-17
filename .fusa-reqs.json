@@ -8418,7 +8418,8 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "implemented"
+      "status": "implemented",
+      "tc18": "§12.9.1 (\"In dependence on the stream_id and byte_bus_id the RC Server determines the endpoint that is addressed. If the lookup of the byte_bus_id in the context of the stream_id does not point to an Endpoint, the request is dropped without further notification.\"), TC18.txt L3591-3593 -- same basis already established for REQ-MOCK-030's sibling lookup-failure path"
     },
     {
       "id": "REQ-MOCK-014",
@@ -8428,7 +8429,8 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "implemented"
+      "status": "implemented",
+      "tc18": "§13.7's Table 35 (Table 32 in TC18 0.5.1_RC1) (\"0x0002.0 ep_enable ... indicating if the endpoint is enabled to executed requests from its request storage\"), TC18.txt L4300-4304 -- same basis as REQ-SRV-002's own enabled-endpoint sibling requirement"
     },
     {
       "id": "REQ-MOCK-015",
@@ -8438,7 +8440,8 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "implemented"
+      "status": "implemented",
+      "tc18": "§13.7's Table 35 (Table 32 in TC18 0.5.1_RC1) (\"0x0002.0 ep_enable ... indicating if the endpoint is enabled to executed requests from its request storage\"), TC18.txt L4300-4304 -- same basis as REQ-SRV-001's own disabled-endpoint sibling requirement"
     },
     {
       "id": "REQ-MOCK-016",
@@ -8448,7 +8451,8 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "implemented"
+      "status": "implemented",
+      "tc18": "§13.7's Table 35 (Table 32 in TC18 0.5.1_RC1) (\"0x0002.0 ep_enable ... indicating if the endpoint is enabled to executed requests from its request storage\"), TC18.txt L4300-4304 -- same basis as REQ-SRV-003's own re-enable/FIFO-drain sibling requirement"
     },
     {
       "id": "REQ-MOCK-017",
@@ -8458,7 +8462,8 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "implemented"
+      "status": "implemented",
+      "tc18": "§13.7's Table 35 (Table 32 in TC18 0.5.1_RC1) (\"0x0002.0 ep_enable ... indicating if the endpoint is enabled to executed requests from its request storage\"), TC18.txt L4300-4304 -- negative-case counterpart of REQ-MOCK-016 (no drain when disabled or nothing queued), same ep_enable field"
     },
     {
       "id": "REQ-MOCK-018",
@@ -8468,7 +8473,8 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "implemented"
+      "status": "implemented",
+      "tc18": "§12.9.1 (\"In dependence on the stream_id and byte_bus_id the RC Server determines the endpoint that is addressed. If the lookup of the byte_bus_id in the context of the stream_id does not point to an Endpoint, the request is dropped without further notification.\"), TC18.txt L3591-3593 -- same basis as REQ-MOCK-013/030's lookup-failure path, applied here to drain_endpoint()"
     },
     {
       "id": "REQ-MOCK-019",
@@ -8489,7 +8495,8 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "implemented"
+      "status": "implemented",
+      "tc18": "§12.9.1.1 (\"An RC Server shall support to handle multiple requests in one frame and check each of them individually if to be processed or not\"), TC18.txt L3619-3621 -- same basis as REQ-SRV-004's own per-member admission requirement, applied here to dispatch_frame()'s own fail-safe decode-failure handling"
     },
     {
       "id": "REQ-CFG-007",
@@ -9099,7 +9106,8 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "implemented"
+      "status": "implemented",
+      "tc18": "§11.2.2.5 Table 10 (\"trigger_source_ep defines the endpoint which issues the trigger to be used for this request... trigger_signal_nr defines the trigger number of the endpoint addressed by trigger_source_ep\"), TC18.txt L1720-1721 -- a triggered request stored on one endpoint names a DIFFERENT endpoint as its trigger source, so a genuine cross-endpoint fan-out is required; §12.9.3 Table 29 (Triggered request row), TC18.txt L3690-3695"
     },
     {
       "id": "REQ-MOCK-026",
@@ -9109,7 +9117,8 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "implemented"
+      "status": "implemented",
+      "tc18": "§11.2.2.6 (\"If the first request in an AVTPDU is a chain request, then there is no predecessor to chain to, thus the entire chain will be ignored. An error response with the error code “CHAIN_ERROR” to each request will be generated\"), TC18.txt L1796-1798; §11.2.2.6 (\"cs ... 1b: request will not be executed in case the previous request returned an error, as a consequence the remainder of the chain is not executed, and the request send an error response with error code = CHAIN_ABORTED\"), TC18.txt L1833-1837 -- same basis as REQ-CHAIN-008/009; watchdog_purge() half reuses REQ-SRV-014's own watch-dog-overflow queue-clearing basis, TC18.txt L1409-1411, L1500-1502"
     },
     {
       "id": "REQ-MOCK-027",
@@ -9119,7 +9128,8 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "implemented"
+      "status": "implemented",
+      "tc18": "§12.9.2 (\"Each endpoint receives request via its dedicated EP request storage.\"), TC18.txt L3647 -- same basis as REQ-SRV-021's own pending-count requirement; §12.9.1 byte_bus_id lookup rule (unregistered byte_bus_id reports nothing rather than a count), TC18.txt L3591-3593"
     },
     {
       "id": "REQ-MOCK-028",
