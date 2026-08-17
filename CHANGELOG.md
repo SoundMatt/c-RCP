@@ -34,6 +34,27 @@ the rationale.
 
 ## Releases
 
+### v0.392.0 -- 2026-08-16 (issue #164 follow-up: fix stale `Table 24` -> `Table 27` citation in lifecycle.h)
+
+`include/rcp/lifecycle.h`'s own doc comment for `REQ-RMAP-055` (the W+
+lockable-access-type primitive) cited "§12.7.9 Table 24" for the
+STREAM_UID/flush_on_count/Flush_time response-queue fields -- stale
+RC1 numbering left over from before the RC1->RC5 rebaseline. Verified
+against a fresh RC5 `pdftotext -layout` extraction: §12.7.9's own
+content is captioned "Table 27: Responder QUEUE_config", not Table
+24 (RC5's own Table 24 is a different table, §12.7.7's
+`request_stream_cfg`, already correctly cited that way elsewhere in
+this codebase). `.fusa-reqs.json`'s own `REQ-RMAP-055` entry already
+had the correct "Table 27" citation -- only this one doc comment (2
+occurrences, lines 717/737) had drifted. Flagged by PR #497's own
+citation-drift check on issue #164 and by issue #341's PR #495
+comment, fixed directly here rather than left dangling.
+
+Comment-only change -- no behavior, no test, no trace-coverage
+impact. Full clean rebuild + full test suite: 66/66 unchanged.
+`cfusa check`: 0 errors, unchanged warning/info counts. `cfusa
+trace`: 1095/1095 traced+tested, unchanged.
+
 ### v0.391.0 -- 2026-08-16 (c-RCP-AUDIT-02 citation backfill: LIFECYCLE/RMAP/E2E/ACF/PWRMODE/WIREERR + RELAY/MOCK/LOAN/ALLOC scoping, 2 of 66 requirements in scope now cited)
 
 Continuation of issue #164 (c-RCP-AUDIT-02), covering two groups:
