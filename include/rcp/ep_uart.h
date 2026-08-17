@@ -210,8 +210,8 @@
  *
  *   0x0000  uart_ep_len       8 bit  R    RCP_EP_UART_EP_FUNC_LEN (0x0D)
  *   0x0001  Reserved          8 bit  R    reads 0x00
- *   0x0002  uart_ep_enable&clr 8 bit R/W  Table 32 common entries
- *   0x0003  uart_ep_options   8 bit  R/W* Table 32 common entries
+ *   0x0002  uart_ep_enable&clr 8 bit R/W  Table 35 common entries
+ *   0x0003  uart_ep_options   8 bit  R/W* Table 35 common entries
  *   0x0004  uart_ep_status   16 bit  R/W
  *   0x0006  uart_baud_rate   16 bit  R/W  kbit/s
  *   0x0008  uart_nr_bits      8 bit  R/W  number of data bits

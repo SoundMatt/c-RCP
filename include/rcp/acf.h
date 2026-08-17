@@ -337,7 +337,7 @@ rcp_acf_rss_kind_t rcp_acf_read_size_or_segment_num_kind(const rcp_acf_byte_mess
  * encoded REQUEST (rsv is already always forced to 0 by
  * rcp_acf_pack_header() itself; see the file header): hs=0b, rsp=0b,
  * err=0b unconditionally, and cs=0b UNLESS cs_has_meaning is true --
- * compound-wait (TC18 §11.2.2.2 Table 7) and chained (§11.2.2.4 Table 9)
+ * compound-wait (TC18 §11.2.2.3 Table 8) and chained (§11.2.2.6 Table 11)
  * are the only two request kinds that assign cs a meaning of its own, so a
  * caller building one of those two kinds passes true; every other request
  * kind passes false.

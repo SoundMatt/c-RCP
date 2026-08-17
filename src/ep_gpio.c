@@ -319,7 +319,7 @@ bool rcp_ep_gpio_set_pin_trigger(rcp_ep_gpio_functional_cfg_t *cfg, uint8_t pin_
 
 /* The EP-common enable&clr (0x0002) and options (0x0003) octets, packed
  * from / unpacked into the flags regmap.h's shared functional-config
- * prefix already models -- the same Table 32 common-entries bit positions
+ * prefix already models -- the same Table 35 common-entries bit positions
  * ep_pwm.c's own PWM_OUT_ENABLE_CLR_BIT_ and PWM_OUT_OPTIONS_BIT_ constants
  * use, since both endpoint types cite the identical shared table. */
 #define GPIO_ENABLE_CLR_BIT_ENABLE ((uint8_t)(1u << 0))

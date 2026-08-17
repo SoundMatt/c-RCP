@@ -34,6 +34,97 @@ the rationale.
 
 ## Releases
 
+### v0.393.0 -- 2026-08-16 (issue #341: `Table 32`->`35` EP_functional_config-common-entries cluster; compound/compound-wait `Table 6/7/8/9/11` and `Table 26`->`29`/`33` boundary-case citation fixes)
+
+Fifth pass on issue #341 (RC1->RC5 table-number census). Fresh census
+first (`grep -roh "Table [0-9]\+" include/ src/ .fusa-reqs.json |
+sort | uniq -c | sort -rn`) confirmed the prior pass's own
+convergence list, then re-verified the next several highest-count
+numbers: `Table 52`/`58`/`31`/`25` are all **already fully
+RC5-resolved** (no changes needed -- `Table 52`'s uart-trigger-signals
+cluster and `Table 58`'s iseled cluster were both added post-RC5
+adoption directly against the correct numbering; `Table 31`'s
+ep_generic_config-register-map citations, including the reused-digit
+CRC32-Polynomial case, were already correctly dual-noted from an
+earlier pass; `Table 25`'s EP_ID_config citations were already fixed
+by issue #421).
+
+**`Table 32`->`35` (13 code occurrences, 9 files)**: genuine
+reused-digit case, same pattern as the 41/42/43/44 and 51/54
+clusters PRs #494/#495 fixed. RC5-native `Table 32` = "ep_type
+values" (unrelated, left alone everywhere it occurs). RC1's own
+`Table 32` = "EP functional config common entries" -> RC5 `Table
+35` (identical caption, confirmed via fresh `pdftotext -layout`
+extraction of both PDFs). Every bare "Table 32 common(-)entries"
+citation describing the shared 0x0002 enable&clr / 0x0003 options
+octets (`ep_spi.h`, `ep_uart.h`, `ep_lin.h`, `ep_adc.h`, `ep_lin.c`,
+`ep_uart.c`, `ep_i2c.c`, `ep_spi.c`, `ep_gpio.c`) corrected to `Table
+35`. `regmap.h`'s own already-dual-noted `Table 32-or-35` generic-
+header aside and all seven `.fusa-reqs.json` `tc18`-field occurrences
+(already dual-noted `Table 35 (Table 32 in TC18 0.5.1_RC1)`) were
+already correct and left untouched.
+
+**Compound/compound-wait `Table 6/7/8/9/11` boundary case**: this
+issue's own flagged "new-table-insertion" boundary, same shape as
+the already-resolved `Table 25/26/27` region. RC5 inserts a new
+`Table 6` ("trigger requests", no RC1 counterpart) ahead of RC1's own
+`Table 6` ("compound requests", §11.2.2.1), which shifts to RC5
+`Table 7`/§11.2.2.2; RC1's `Table 7` ("compound wait requests",
+§11.2.2.2) shifts to RC5 `Table 8`/§11.2.2.3; RC1's `Table 9`
+("chained requests", §11.2.2.4) shifts to RC5 `Table 11`/§11.2.2.6
+(a second new table, "compare requests", occupies RC5's own `Table
+9`). Fixed 3 genuinely stale occurrences, each individually content-
+verified against both PDFs before touching: `acf.h`'s
+`rcp_acf_request_header_constraints_valid()` doc comment
+("compound-wait (TC18 §11.2.2.2 Table 7) and chained (§11.2.2.4
+Table 9)" -> "§11.2.2.3 Table 8 ... §11.2.2.6 Table 11"); two
+`.fusa-reqs.json` entries (`REQ-CMP-010`, `REQ-CMP-020`) whose `tc18`
+fields already carried the correct RC5 numbering but whose own `text`
+fields had drifted (`REQ-CMP-010`: "§11.2.2.1 Figure 8 / Table 6,
+§11.2.2.2 Figure 9 / Table 7" -> "§11.2.2.2 Figure 8 / Table 7,
+§11.2.2.3 Figure 9 / Table 8"; `REQ-CMP-020`: "§11.2.2.1 Table 6" ->
+"§11.2.2.2 Table 7"), same tc18-field-already-fixed/text-field-
+lagging pattern PR #494's REQ-GPIO-035 and PR #495's respqueue.h
+fixes already established. Left alone: several generic GBB-header-
+field citations (`acf.h`'s read_size/segment_num doc comment, three
+`.fusa-reqs.json` `acf_msg_type`/`read_size_or_segment_num`
+citations) that bare-cite "§11.2.2.1 Table 6" for content (the
+op/rsp/err/ms/evt/transaction_num footer) that is byte-for-byte
+identical in RC5's own native Table 6 too -- genuinely correct under
+either numbering, not stale. `ep_mdio.h`'s own "OA-SPI spec Table 6"
+mentions are a citation to a different, external document entirely,
+untouched.
+
+**`Table 26`->`29`/`33` boundary case (2 `.fusa-reqs.json`
+occurrences fixed)**: RC5's own native `Table 26` ("BBID control
+bits") is a genuinely new table with no RC1 counterpart, inserted
+between RC1's `Table 23`/RC5 `Table 25` (EP_ID_config) and RC1's
+`Table 24`/RC5 `Table 27` (Responder QUEUE_config) -- confirmed
+already correctly cited everywhere it's used (`ep_spi.h`,
+`regmap.h`, plus issue #421's already-fixed `Table 25/26`
+dual-notation in `regmap.h`/`regmap.c`). Found two unrelated stale
+`Table 26` citations whose own `tc18` fields had already been
+corrected while their `text` fields lagged: `REQ-SRV-006`'s "TC18
+Table 26's Compound row" (describing the Execution-procedure table's
+Compound row, RC1's own `Table 26` -> RC5 `Table 29`) corrected to
+"Table 29"; `REQ-SPI-033`'s "confirmed correct against Table
+26/§13.5" (describing the SPI evt[2:0]-channel-selection table, RC1's
+own `Table 30` -> RC5 `Table 33`, neither of which is `26` under
+either numbering) corrected to "Table 33/§13.5".
+
+**Deliberately left untouched, flagged for a future pass**:
+`src/server.c:606` has the identical stale "TC18 Table 26's own
+Compound row" citation `REQ-SRV-006` above was fixed for (should read
+`Table 29`) -- `src/server.c` is outside this pass's editable scope
+per its own standing file restriction, not fixed here.
+
+Citation-text-only change (plus one `.fusa-reqs.json` `text`-field
+narrative correction reconciling with already-correct `tc18` fields)
+-- trace coverage unchanged. Full clean rebuild + 66/66 tests
+unchanged. `cfusa check` (pinned v0.5.54): 0 errors, 968/1312
+warnings/info, unchanged. `cfusa trace`: 1095/1095 traced and tested,
+unchanged.
+
 ### v0.392.0 -- 2026-08-16 (issue #164 follow-up: fix stale `Table 24` -> `Table 27` citation in lifecycle.h)
 
 `include/rcp/lifecycle.h`'s own doc comment for `REQ-RMAP-055` (the W+

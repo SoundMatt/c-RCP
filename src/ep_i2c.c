@@ -92,7 +92,7 @@ static rcp_ep_i2c_dir_t op_to_dir(uint8_t op)
 /* The EP-common enable&clr (0x0002) and options (0x0003) octets, packed
  * from / unpacked into the flags regmap.h's shared functional-config
  * prefix already models -- same bit positions as ep_pwm.c's/ep_gpio.c's/
- * ep_spi.c's own copies, since Table 32's common entries are shared
+ * ep_spi.c's own copies, since Table 35's common entries are shared
  * across every endpoint type. Only the bits regmap.h models are
  * represented; see ep_pwm.c's identical note for why the rest read back
  * as 0. */

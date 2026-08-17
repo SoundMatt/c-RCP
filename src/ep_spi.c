@@ -210,7 +210,7 @@ bool rcp_ep_spi_set_channel_trigger(rcp_ep_spi_functional_cfg_t *cfg, uint8_t ch
  * from / unpacked into the flags regmap.h's shared functional-config
  * prefix already models -- same bit positions as ep_pwm.c's
  * PWM_OUT_ENABLE_CLR_BIT_/PWM_OUT_OPTIONS_BIT_ constants and ep_gpio.c's
- * own copies, since Table 32's common entries are shared across every
+ * own copies, since Table 35's common entries are shared across every
  * endpoint type. Only the bits regmap.h models are represented; see
  * ep_pwm.c's identical note for why the rest read back as 0. */
 #define SPI_ENABLE_CLR_BIT_ENABLE ((uint8_t)(1u << 0))
