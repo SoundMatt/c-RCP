@@ -19106,6 +19106,61 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.386.0 -- 2026-08-16 (c-RCP-AUDIT-02 citation backfill batch:
+AVTP/WDG/PWR/TSN/UDP/DL/L2/MDNS/FRAG, 34 of 113 uncited requirements
+in scope now cited)
+
+Partial progress on issue #164 (c-RCP-AUDIT-02, "Backfill TC18
+citations on ~801 uncited requirements"). Scoped to nine categories
+whose files don't overlap concurrent lifecycle/access-control work:
+AVTP, WDG, PWR, TSN, UDP, DL, L2, MDNS, FRAG.
+
+Method: for each of the 113 requirements in these categories carrying
+no `tc18` field, read its `text`, located the governing section in a
+fresh `pdftotext -layout` extraction of
+`OA_TC18_specification_v_0.5.1_RC_5_3624.pdf`, and confirmed the
+stated behavior genuinely matches the spec before citing -- following
+the same discipline as the earlier batch-1-through-25 citation-backfill
+passes and the SHOULD/MAY non-normative pass.
+
+Cited 34: AVTP 14->17, WDG 1->6, PWR 2->10, TSN 0->2, UDP 0->2,
+DL 0->4, L2 0->3, MDNS 0->0, FRAG 0->7. Flagged 79 as having no
+genuine TC18 counterpart rather than forcing a citation -- mostly
+implementation-only plumbing (socket/thread lifecycle, memory
+management, strerror() convenience, callback-subscription APIs) that
+this repo's own module file-header comments already self-document as
+original engineering choices, several with an explicit "not a value
+taken from the specification" disclaimer (e.g. `fragment.h`'s
+segment_num monotonic-ordering rule, `deadline.h`'s default timings,
+`udp.h`'s Annex J port/sequence-number provenance caveat).
+
+**Whole-category finding: MDNS (11/11) has no TC18 basis for citation
+at all.** TC18's "Discovery" (§12.6) is a wire-protocol AVTP/ACF_ABB
+read-request/response exchange, categorically different from this
+module's mDNS/DNS-SD bootstrap layer; the extracted spec text contains
+zero mDNS/DNS-SD/zeroconf/bonjour terminology anywhere (exhaustive
+grep). Recommend re-triaging MDNS into issue #164's own
+not-a-TC18-concept exclusion list rather than continuing to track it
+as backfillable.
+
+**Side-finding, not fixed here (out of this pass's additive-only
+scope):** REQ-PWR-005 and REQ-PWR-001 (both already cited, pre-dating
+this pass) have citation line-number/figure-number drift against the
+current `TC18.txt` -- same class of issue as #434/PR #444's systemic
+drift fix, worth a small targeted follow-up.
+
+Full clean rebuild + full 66-test suite green, unchanged; `cfusa
+check` (v0.5.54) 0 errors; `cfusa trace` (v0.5.54) 1095/1095 traced
+and tested, unchanged -- citations are additive-only, as expected.
+`.fusa-reqs.json`'s `tc18_master_id` field intentionally untouched
+(separate cross-repo work per issue #164's own scope note).
+
+**Next**: remaining categories issue #164 still tracks (CFG, DISC,
+MOCK, SEQ, TRIG, CANCEL, PWM, ADC, GPIO, SPI, ISELED, I2C, LINEP,
+MDIO, SRV, WAKEUP, CHAIN, CMP, CANEP, UART, E2E, ACF, LIFECYCLE,
+PWRMODE, RMAP) -- several already partially or substantially covered
+by concurrent work outside this PR's scope.
+
 ### v0.385.0 -- 2026-08-16 (issue #465: Figure 20/21 header-CRC bytes --
 rcp_e2e_compute_crc() was missing avtp_subtype/header_octet1/tu from
 the E2E CRC coverage span)
