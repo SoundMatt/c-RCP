@@ -19457,6 +19457,50 @@ freshly built, CI-pinned `cfusa` (v0.5.54) `check`: 0 errors;
 requirements traced, 512/512 (100%) functions annotated, unchanged
 from baseline.
 
+### v0.409.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id`
+cross-repo linkage, MDIO/WAKEUP/UART batch)
+
+The master TC18 requirement catalog rebuild landed
+(`RELAY/docs/tc18-master-catalog.json`, 447 entries), unblocking
+c-RCP-AUDIT-04 (issue 166): a `tc18_master_id` field on
+`.fusa-reqs.json` entries, cross-referencing the master catalog so
+cross-repo reconciliation becomes an exact-id lookup instead of a
+line-range-overlap heuristic. This is one of several parallel
+per-category batches; this one covers `REQ-MDIO-`, `REQ-WAKEUP-`,
+and `REQ-UART-` (91 requirements total).
+
+Method: for each of the 91, if it had no `tc18` citation the field
+was left unset (expected -- some requirements are implementation-only
+plumbing with no TC18 basis, 7 of 91 here); if it had a `tc18`
+citation, its section/table/figure reference was matched against the
+catalog's own `summary`/`citation` text (not section number alone) to
+find the one master entry it actually describes.
+
+77 of 91 matched confidently and got the new field. 7 were left
+unset as genuinely ambiguous, flagged for follow-up rather than
+forced: `REQ-MDIO-002`/`005`/`006`/`007`/`008` each cite `§13.7.13.1`
+purely as topic-area attribution for a design their own `tc18` text
+says is explicitly *not* derived from that citation (no catalog entry
+under that section describes MDIO burst-addressing/word-packing
+specifically); `REQ-MDIO-010`/`REQ-WAKEUP-002` delegate to a shared
+field-authorization helper whose citation spans `§12.3.1.2` and
+`§12.3.1.3` jointly (lock rule + root-client restriction + W* R/W
+notation, three distinct catalog entries) without pointing at one.
+Purely additive: no `text`/`title`/`status`/`tc18` field touched, no
+source file touched.
+
+Full 66-test suite green, unchanged pass count. `cfusa check`
+(pinned v0.5.54): 0 errors, 968 warnings/1312 info -- identical to
+the pre-change baseline. `cfusa trace --req-coverage 100
+--sec-tested 100`: 1095/1095 traced, 512/512 functions annotated --
+output byte-for-byte identical before/after (same pre-existing,
+unrelated `REQ-UART-038` untraced note either way), confirming the
+tool tolerates the new field with zero effect on coverage.
+
+**Next**: the remaining `.fusa-reqs.json` categories still need their
+own `tc18_master_id` batches (tracked centrally against issue 166 by
+the coordinating session).
+
 ### v0.400.0 -- 2026-08-16 (c-RCP-AUDIT-08: exhaustive census of the
 twelve remaining table numbers -- `55`/`37`/`40`/`57`/`19`/`59`/`49`/
 `15`/`34`/`17`/`14`/`16` -- closes out this issue's own tracked
