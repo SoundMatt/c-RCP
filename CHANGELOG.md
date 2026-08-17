@@ -34,6 +34,62 @@ the rationale.
 
 ## Releases
 
+### v0.387.0 -- 2026-08-16 (c-RCP-AUDIT-02 citation backfill: PWM/ADC/GPIO/SPI/ISELED/I2C/LINEP/MDIO/WAKEUP, 3 of 41 uncited requirements in scope cited)
+
+Partial progress on issue #164 (c-RCP-AUDIT-02, "Backfill TC18
+citations on ~801 uncited requirements"). Scoped to the nine
+per-endpoint-type categories PWM, ADC, GPIO, SPI, ISELED, I2C, LINEP,
+MDIO, WAKEUP, chosen to avoid file overlap with concurrent
+lifecycle/discovery/mock/server work.
+
+Re-derived current per-category cited/total counts directly from
+`.fusa-reqs.json` rather than trusting the issue body's stale
+originals: these nine categories were already substantially cited by
+the earlier batch-6-through-25 per-endpoint-type passes (PRs #176-189)
+predating this PR -- 258/299 cited, only 41 requirements left
+uncited going in, not the much larger counts #164's own body lists.
+
+Method: for each of the 41 uncited requirements, read its `text`,
+located the governing TC18 section in a fresh `pdftotext -layout`
+extraction of `OA_TC18_specification_v_0.5.1_RC_5_3624.pdf`, and
+confirmed the stated behavior genuinely matches the spec before
+citing -- following the same discipline as the earlier
+citation-backfill passes.
+
+**3 cited**: REQ-MDIO-006 (`rcp_ep_mdio_pack_words()`, the same
+§13.7.13.1 topic-area attribution citation already given to its
+sibling pack/unpack helpers REQ-MDIO-002/005/007/008 -- simply missed
+in the earlier MDIO pass), REQ-MDIO-010 (`rcp_ep_mdio_functional_cfg_writable()`,
+the standard §12.3.1.2/.3 lifecycle-write-authorization citation every
+sibling category's writable-delegate function already carries, e.g.
+REQ-WAKEUP-002), and REQ-ISELED-014 (`rcp_ep_iseled_set_trigger()`,
+the same §12.3.1.3 W*-marker write-authorization citation already
+given to its own sibling setters REQ-ISELED-011/012/013).
+
+**38 left uncited, each individually re-verified rather than assumed
+correct from the earlier passes**: `strerror()` message-uniqueness
+and `functional_cfg_init()` zero-initialization requirements across
+all nine categories (implementation detail, no TC18 clause -- verified
+by confirming zero `functional_cfg_init`/`strerror` citations exist
+anywhere in the whole catalog, not just these categories); the
+`RCP_EP_PWM_IN_NO_SIGNAL` payload-sentinel family (REQ-PWM-047/054,
+REQ-ADC-003/004/009/030) already carries its own detailed
+issue-#184-lineage "RESOLVED, left honestly uncited" notes explaining
+TC18 defines this sentinel only as a numbered Table 30 wire error
+code, never a payload convention; and 13 ISELED bit-framing/CRC-8
+requirements (symbol encode/decode, bitframe encode/decode/CRC) whose
+governing prose (§13.7.12.1, TC18.txt L5907-5912) explicitly defers
+the actual bit-level scheme to "the ISLED standard" by reference,
+confirmed by grep to be undefined anywhere in the extracted TC18 text
+itself -- re-confirmed fresh, matching this repo's own batch-14
+finding.
+
+Citations are additive-only: no `text`/`status`/`tc18_master_id`
+field touched, no impl/test change. Full clean rebuild + full 66-test
+suite green (unchanged); `cfusa check` (v0.5.54) 0 errors; `cfusa
+trace` (v0.5.54) 1095/1095 traced and tested, unchanged from before
+this pass.
+
 ### v0.386.0 -- 2026-08-16 (c-RCP-AUDIT-02 citation backfill: AVTP/WDG/PWR/TSN/UDP/DL/L2/MDNS/FRAG, 34 of 113 uncited requirements in scope cited)
 
 Partial progress on issue #164 (c-RCP-AUDIT-02). Worked the AVTP, WDG,
