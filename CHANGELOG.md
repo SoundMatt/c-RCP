@@ -34,6 +34,44 @@ the rationale.
 
 ## Releases
 
+### v0.401.0 -- 2026-08-17 (c-RCP-AUDIT-04: tc18_master_id backfill for REQ-DISC-*/REQ-MOCK-*)
+
+Adds the `tc18_master_id` field (RCP-ARCHITECTURE.md canonical choice
+#6) to `.fusa-reqs.json`, scoped to the `REQ-DISC-*` and `REQ-MOCK-*`
+categories -- one batch of a multi-repo, multi-category effort now
+unblocked by the freshly rebuilt 447-entry master TC18 requirement
+catalog (`RELAY/docs/tc18-master-catalog.json`, v1.0.0).
+
+Purely additive: for every `REQ-DISC-*`/`REQ-MOCK-*` entry that
+already carried a `tc18` citation (issue #164's backfill), looked up
+the corresponding master-catalog entry by section + table/figure
+number, cross-checked against the catalog entry's own `summary`
+before accepting the match, and added `tc18_master_id`. No other
+field touched; no `.c`/`.h` source changed.
+
+28 of `REQ-DISC-*`'s 29 entries matched (`REQ-DISC-024` has no `tc18`
+citation -- correctly left alone, no field added). 14 of
+`REQ-MOCK-*`'s 33 entries matched; 16 have no `tc18` citation
+(correctly skipped); 3 (`REQ-MOCK-026`, `REQ-MOCK-027`,
+`REQ-MOCK-029`) are flagged, not guessed -- their citations each span
+more than one distinct master-catalog entry (e.g. both the
+`CHAIN_ERROR` clause and the separate cs-bit/`CHAIN_ABORTED` clause,
+or, for `REQ-MOCK-027`, no single catalog entry cleanly covers both
+the `§12.9.2` and `§12.9.1` halves of its citation) with no single
+dominant clause to anchor a one-to-one id; left for follow-up rather
+than forced onto either candidate.
+
+`.fusa-reqs.json`-only change. Full 66-test suite clean (unchanged
+count); pinned `cfusa` (v0.5.54) `check`: 0 errors, `trace
+--req-coverage 100 --sec-tested 100`: 100% (1095/1095) requirement
+traceability, 100% (512/512) function annotation density -- both
+identical to a from-`origin/main` baseline run, confirming the new
+field is tolerated without affecting coverage.
+
+**Next**: the same `tc18_master_id` backfill for c-RCP's other
+requirement categories (separate batches), then the same pass across
+cpp-RCP/go-RCP/rust-RCP.
+
 ### v0.400.0 -- 2026-08-16 (c-RCP-AUDIT-08: exhaustive census of the twelve remaining table numbers, closes out the issue's own tracked backlog)
 
 Tenth pass on the RC1->RC5 table-number citation-drift audit
