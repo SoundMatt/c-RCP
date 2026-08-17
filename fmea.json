@@ -2,9 +2,9 @@
   "schemaVersion": "1.15.2",
   "kind": "fmea-report",
   "tool": "c-FuSa",
-  "toolVersion": "0.5.51",
+  "toolVersion": "0.5.54",
   "language": "c",
-  "generatedAt": "2026-08-14T13:16:00Z",
+  "generatedAt": "2026-08-17T21:35:18Z",
   "project": "c-RCP",
   "version": "0.225.0",
   "standard": "iso26262",
@@ -142,7 +142,7 @@
       "id": "FM-009",
       "item": "rcp_ep_gpio_toggle_pin_direction",
       "file": "src/ep_gpio.c",
-      "line": 114,
+      "line": 133,
       "failureMode": "rcp_ep_gpio_toggle_pin_direction (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_gpio_toggle_pin_direction could propagate undetected to callers in ep_gpio.c",
       "cause": "Logic error or untested edge case in rcp_ep_gpio_toggle_pin_direction",
@@ -158,7 +158,7 @@
       "id": "FM-010",
       "item": "rcp_ep_gpio_trigger_fires",
       "file": "src/ep_gpio.c",
-      "line": 155,
+      "line": 174,
       "failureMode": "rcp_ep_gpio_trigger_fires (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_gpio_trigger_fires could propagate undetected to callers in ep_gpio.c",
       "cause": "Logic error or untested edge case in rcp_ep_gpio_trigger_fires",
@@ -174,7 +174,7 @@
       "id": "FM-011",
       "item": "rcp_ep_gpio_debounce_state_init",
       "file": "src/ep_gpio.c",
-      "line": 190,
+      "line": 209,
       "failureMode": "rcp_ep_gpio_debounce_state_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_gpio_debounce_state_init could propagate undetected to callers in ep_gpio.c",
       "cause": "Configuration or state inconsistency affecting rcp_ep_gpio_debounce_state_init",
@@ -190,7 +190,7 @@
       "id": "FM-012",
       "item": "rcp_ep_gpio_response_timing",
       "file": "src/ep_gpio.c",
-      "line": 243,
+      "line": 262,
       "failureMode": "rcp_ep_gpio_response_timing (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_gpio_response_timing could propagate undetected to callers in ep_gpio.c",
       "cause": "Logic error or untested edge case in rcp_ep_gpio_response_timing",
@@ -206,7 +206,7 @@
       "id": "FM-013",
       "item": "rcp_ep_gpio_functional_cfg_init",
       "file": "src/ep_gpio.c",
-      "line": 256,
+      "line": 275,
       "failureMode": "rcp_ep_gpio_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_gpio_functional_cfg_init could propagate undetected to callers in ep_gpio.c",
       "cause": "Configuration or state inconsistency affecting rcp_ep_gpio_functional_cfg_init",
@@ -222,7 +222,7 @@
       "id": "FM-014",
       "item": "put_u16",
       "file": "src/ep_gpio.c",
-      "line": 330,
+      "line": 349,
       "failureMode": "put_u16 (general function) does not perform its intended action",
       "effect": "Failure of put_u16 could propagate undetected to callers in ep_gpio.c",
       "cause": "Logic error or untested edge case in put_u16",
@@ -238,7 +238,7 @@
       "id": "FM-015",
       "item": "rcp_ep_gpio_wire_error",
       "file": "src/ep_gpio.c",
-      "line": 482,
+      "line": 503,
       "failureMode": "rcp_ep_gpio_wire_error (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_ep_gpio_wire_error could propagate undetected to callers in ep_gpio.c",
       "cause": "Unhandled fault or invalid input condition within rcp_ep_gpio_wire_error",
@@ -254,7 +254,7 @@
       "id": "FM-016",
       "item": "rcp_ep_gpio_encode_read_request",
       "file": "src/ep_gpio.c",
-      "line": 499,
+      "line": 526,
       "failureMode": "rcp_ep_gpio_encode_read_request (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_gpio_encode_read_request could propagate undetected to callers in ep_gpio.c",
       "cause": "Logic error or untested edge case in rcp_ep_gpio_encode_read_request",
@@ -430,7 +430,7 @@
       "id": "FM-027",
       "item": "rcp_ep_adc_cadence_response_ready",
       "file": "src/ep_adc.c",
-      "line": 119,
+      "line": 158,
       "failureMode": "rcp_ep_adc_cadence_response_ready (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_adc_cadence_response_ready could propagate undetected to callers in ep_adc.c",
       "cause": "Logic error or untested edge case in rcp_ep_adc_cadence_response_ready",
@@ -446,7 +446,7 @@
       "id": "FM-028",
       "item": "rcp_ep_adc_functional_cfg_init",
       "file": "src/ep_adc.c",
-      "line": 136,
+      "line": 175,
       "failureMode": "rcp_ep_adc_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_adc_functional_cfg_init could propagate undetected to callers in ep_adc.c",
       "cause": "Configuration or state inconsistency affecting rcp_ep_adc_functional_cfg_init",
@@ -462,7 +462,7 @@
       "id": "FM-029",
       "item": "rcp_ep_adc_trigger_state_init",
       "file": "src/ep_adc.c",
-      "line": 197,
+      "line": 236,
       "failureMode": "rcp_ep_adc_trigger_state_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_adc_trigger_state_init could propagate undetected to callers in ep_adc.c",
       "cause": "Configuration or state inconsistency affecting rcp_ep_adc_trigger_state_init",
@@ -478,7 +478,7 @@
       "id": "FM-030",
       "item": "put_u16",
       "file": "src/ep_adc.c",
-      "line": 266,
+      "line": 305,
       "failureMode": "put_u16 (general function) does not perform its intended action",
       "effect": "Failure of put_u16 could propagate undetected to callers in ep_adc.c",
       "cause": "Logic error or untested edge case in put_u16",
@@ -494,7 +494,7 @@
       "id": "FM-031",
       "item": "encode_reconfig_request",
       "file": "src/ep_adc.c",
-      "line": 406,
+      "line": 445,
       "failureMode": "encode_reconfig_request (monitoring/control function) does not perform its intended action",
       "effect": "Failure of encode_reconfig_request could propagate undetected to callers in ep_adc.c",
       "cause": "Configuration or state inconsistency affecting encode_reconfig_request",
@@ -830,7 +830,7 @@
       "id": "FM-052",
       "item": "rcp_mock_server_new",
       "file": "src/mock.c",
-      "line": 153,
+      "line": 283,
       "failureMode": "rcp_mock_server_new (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_new could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_new",
@@ -846,7 +846,7 @@
       "id": "FM-053",
       "item": "rcp_mock_server_destroy",
       "file": "src/mock.c",
-      "line": 172,
+      "line": 328,
       "failureMode": "rcp_mock_server_destroy (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_destroy could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_destroy",
@@ -862,7 +862,7 @@
       "id": "FM-054",
       "item": "rcp_mock_server_state",
       "file": "src/mock.c",
-      "line": 187,
+      "line": 355,
       "failureMode": "rcp_mock_server_state (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_state could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_state",
@@ -878,7 +878,7 @@
       "id": "FM-055",
       "item": "rcp_mock_server_pwrmode_resume",
       "file": "src/mock.c",
-      "line": 214,
+      "line": 382,
       "failureMode": "rcp_mock_server_pwrmode_resume (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_pwrmode_resume could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_pwrmode_resume",
@@ -894,7 +894,7 @@
       "id": "FM-056",
       "item": "rcp_mock_server_regmap",
       "file": "src/mock.c",
-      "line": 240,
+      "line": 408,
       "failureMode": "rcp_mock_server_regmap (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_regmap could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_regmap",
@@ -910,7 +910,7 @@
       "id": "FM-057",
       "item": "RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_MAX_OCTETS",
       "file": "src/mock.c",
-      "line": 347,
+      "line": 595,
       "failureMode": "RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_MAX_OCTETS (general function) does not perform its intended action",
       "effect": "Failure of RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_MAX_OCTETS could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in RCP_REGMAP_OPTIONAL_SUBSYSTEM_CFG_MAX_OCTETS",
@@ -926,7 +926,7 @@
       "id": "FM-058",
       "item": "rcp_mock_server_network_interface_cfg",
       "file": "src/mock.c",
-      "line": 361,
+      "line": 609,
       "failureMode": "rcp_mock_server_network_interface_cfg (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_network_interface_cfg could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_network_interface_cfg",
@@ -942,7 +942,7 @@
       "id": "FM-059",
       "item": "rcp_mock_server_physical_layer_cfg",
       "file": "src/mock.c",
-      "line": 375,
+      "line": 623,
       "failureMode": "rcp_mock_server_physical_layer_cfg (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_physical_layer_cfg could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_physical_layer_cfg",
@@ -958,7 +958,7 @@
       "id": "FM-060",
       "item": "rcp_mock_server_set_time_synch_cfg",
       "file": "src/mock.c",
-      "line": 381,
+      "line": 629,
       "failureMode": "rcp_mock_server_set_time_synch_cfg (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_set_time_synch_cfg could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_set_time_synch_cfg",
@@ -974,7 +974,7 @@
       "id": "FM-061",
       "item": "rcp_mock_server_time_synch_cfg",
       "file": "src/mock.c",
-      "line": 388,
+      "line": 636,
       "failureMode": "rcp_mock_server_time_synch_cfg (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_time_synch_cfg could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_time_synch_cfg",
@@ -990,7 +990,7 @@
       "id": "FM-062",
       "item": "rcp_mock_server_set_security_cfg",
       "file": "src/mock.c",
-      "line": 394,
+      "line": 642,
       "failureMode": "rcp_mock_server_set_security_cfg (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_set_security_cfg could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_set_security_cfg",
@@ -1006,7 +1006,7 @@
       "id": "FM-063",
       "item": "rcp_mock_server_security_cfg",
       "file": "src/mock.c",
-      "line": 401,
+      "line": 649,
       "failureMode": "rcp_mock_server_security_cfg (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_security_cfg could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_security_cfg",
@@ -1022,7 +1022,7 @@
       "id": "FM-064",
       "item": "rcp_mock_server_svr_ep_cfg",
       "file": "src/mock.c",
-      "line": 407,
+      "line": 655,
       "failureMode": "rcp_mock_server_svr_ep_cfg (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_svr_ep_cfg could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_svr_ep_cfg",
@@ -1038,7 +1038,7 @@
       "id": "FM-065",
       "item": "rcp_mock_server_discovery_claim",
       "file": "src/mock.c",
-      "line": 413,
+      "line": 661,
       "failureMode": "rcp_mock_server_discovery_claim (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_discovery_claim could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_discovery_claim",
@@ -1054,7 +1054,7 @@
       "id": "FM-066",
       "item": "rcp_mock_server_set_discovery_timeout_us",
       "file": "src/mock.c",
-      "line": 419,
+      "line": 667,
       "failureMode": "rcp_mock_server_set_discovery_timeout_us (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_set_discovery_timeout_us could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_set_discovery_timeout_us",
@@ -1070,7 +1070,7 @@
       "id": "FM-067",
       "item": "rcp_mock_server_remove_endpoint",
       "file": "src/mock.c",
-      "line": 513,
+      "line": 902,
       "failureMode": "rcp_mock_server_remove_endpoint (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_remove_endpoint could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_remove_endpoint",
@@ -1086,7 +1086,7 @@
       "id": "FM-068",
       "item": "rcp_mock_server_stream_status_rx_blocked",
       "file": "src/mock.c",
-      "line": 562,
+      "line": 980,
       "failureMode": "rcp_mock_server_stream_status_rx_blocked (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_stream_status_rx_blocked could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_stream_status_rx_blocked",
@@ -1102,7 +1102,7 @@
       "id": "FM-069",
       "item": "rcp_mock_server_endpoint_queue_len",
       "file": "src/mock.c",
-      "line": 619,
+      "line": 1131,
       "failureMode": "rcp_mock_server_endpoint_queue_len (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_endpoint_queue_len could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_endpoint_queue_len",
@@ -1118,7 +1118,7 @@
       "id": "FM-070",
       "item": "rcp_e2e_stream_fault_tracker_is_faulted",
       "file": "src/mock.c",
-      "line": 1006,
+      "line": 1922,
       "failureMode": "rcp_e2e_stream_fault_tracker_is_faulted (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_fault_tracker_is_faulted could propagate undetected to callers in mock.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_stream_fault_tracker_is_faulted",
@@ -1134,7 +1134,7 @@
       "id": "FM-071",
       "item": "rcp_e2e_crc_error_should_enter_safe_state",
       "file": "src/mock.c",
-      "line": 1095,
+      "line": 2016,
       "failureMode": "rcp_e2e_crc_error_should_enter_safe_state (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_crc_error_should_enter_safe_state could propagate undetected to callers in mock.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_crc_error_should_enter_safe_state",
@@ -1148,9 +1148,73 @@
     },
     {
       "id": "FM-072",
+      "item": "rcp_e2e_stream_fault_tracker_is_faulted",
+      "file": "src/mock.c",
+      "line": 2091,
+      "failureMode": "rcp_e2e_stream_fault_tracker_is_faulted (safety-critical function) does not perform its intended action",
+      "effect": "Failure of rcp_e2e_stream_fault_tracker_is_faulted could propagate undetected to callers in mock.c",
+      "cause": "Unhandled fault or invalid input condition within rcp_e2e_stream_fault_tracker_is_faulted",
+      "severity": 9,
+      "occurrence": 4,
+      "detection": 6,
+      "actionPriority": "high",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-073",
+      "item": "rcp_e2e_crc_error_should_enter_safe_state",
+      "file": "src/mock.c",
+      "line": 2148,
+      "failureMode": "rcp_e2e_crc_error_should_enter_safe_state (safety-critical function) does not perform its intended action",
+      "effect": "Failure of rcp_e2e_crc_error_should_enter_safe_state could propagate undetected to callers in mock.c",
+      "cause": "Unhandled fault or invalid input condition within rcp_e2e_crc_error_should_enter_safe_state",
+      "severity": 9,
+      "occurrence": 4,
+      "detection": 6,
+      "actionPriority": "high",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-074",
+      "item": "rcp_e2e_stream_fault_tracker_is_faulted",
+      "file": "src/mock.c",
+      "line": 2190,
+      "failureMode": "rcp_e2e_stream_fault_tracker_is_faulted (safety-critical function) does not perform its intended action",
+      "effect": "Failure of rcp_e2e_stream_fault_tracker_is_faulted could propagate undetected to callers in mock.c",
+      "cause": "Unhandled fault or invalid input condition within rcp_e2e_stream_fault_tracker_is_faulted",
+      "severity": 9,
+      "occurrence": 4,
+      "detection": 6,
+      "actionPriority": "high",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-075",
+      "item": "rcp_e2e_stream_fault_tracker_is_faulted",
+      "file": "src/mock.c",
+      "line": 2513,
+      "failureMode": "rcp_e2e_stream_fault_tracker_is_faulted (safety-critical function) does not perform its intended action",
+      "effect": "Failure of rcp_e2e_stream_fault_tracker_is_faulted could propagate undetected to callers in mock.c",
+      "cause": "Unhandled fault or invalid input condition within rcp_e2e_stream_fault_tracker_is_faulted",
+      "severity": 9,
+      "occurrence": 4,
+      "detection": 6,
+      "actionPriority": "high",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-076",
       "item": "rcp_sched_split_frame_members",
       "file": "src/mock.c",
-      "line": 1266,
+      "line": 3022,
       "failureMode": "rcp_sched_split_frame_members (general function) does not perform its intended action",
       "effect": "Failure of rcp_sched_split_frame_members could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_sched_split_frame_members",
@@ -1163,10 +1227,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-073",
+      "id": "FM-077",
       "item": "rcp_mock_server_set_sequencer_count",
       "file": "src/mock.c",
-      "line": 1568,
+      "line": 3498,
       "failureMode": "rcp_mock_server_set_sequencer_count (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_set_sequencer_count could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_set_sequencer_count",
@@ -1179,10 +1243,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-074",
+      "id": "FM-078",
       "item": "rcp_mock_server_sequencers",
       "file": "src/mock.c",
-      "line": 1595,
+      "line": 3525,
       "failureMode": "rcp_mock_server_sequencers (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_sequencers could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_sequencers",
@@ -1195,10 +1259,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-075",
+      "id": "FM-079",
       "item": "rcp_mock_server_pending_count",
       "file": "src/mock.c",
-      "line": 1645,
+      "line": 3631,
       "failureMode": "rcp_mock_server_pending_count (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_pending_count could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_pending_count",
@@ -1211,10 +1275,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-076",
+      "id": "FM-080",
       "item": "rcp_mock_server_watchdog_purge",
       "file": "src/mock.c",
-      "line": 1653,
+      "line": 3648,
       "failureMode": "rcp_mock_server_watchdog_purge (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_watchdog_purge could propagate undetected to callers in mock.c",
       "cause": "Unhandled fault or invalid input condition within rcp_mock_server_watchdog_purge",
@@ -1227,10 +1291,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-077",
+      "id": "FM-081",
       "item": "rcp_mock_server_broadcast_safe_state",
       "file": "src/mock.c",
-      "line": 1663,
+      "line": 3684,
       "failureMode": "rcp_mock_server_broadcast_safe_state (general function) does not perform its intended action",
       "effect": "Failure of rcp_mock_server_broadcast_safe_state could propagate undetected to callers in mock.c",
       "cause": "Logic error or untested edge case in rcp_mock_server_broadcast_safe_state",
@@ -1243,7 +1307,23 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-078",
+      "id": "FM-082",
+      "item": "find_slot_on_stream",
+      "file": "src/mock.c",
+      "line": 3721,
+      "failureMode": "find_slot_on_stream (general function) does not perform its intended action",
+      "effect": "Failure of find_slot_on_stream could propagate undetected to callers in mock.c",
+      "cause": "Logic error or untested edge case in find_slot_on_stream",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-083",
       "item": "rcp_chained_exec_delay_elapsed",
       "file": "src/request_chained.c",
       "line": 127,
@@ -1259,7 +1339,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-079",
+      "id": "FM-084",
       "item": "rcp_lin_default_config",
       "file": "src/linbr.c",
       "line": 5,
@@ -1275,7 +1355,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-080",
+      "id": "FM-085",
       "item": "rcp_ep_lin_functional_cfg_init",
       "file": "src/ep_lin.c",
       "line": 48,
@@ -1291,7 +1371,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-081",
+      "id": "FM-086",
       "item": "put_u16",
       "file": "src/ep_lin.c",
       "line": 120,
@@ -1307,7 +1387,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-082",
+      "id": "FM-087",
       "item": "encode_reconfig_request",
       "file": "src/ep_lin.c",
       "line": 243,
@@ -1323,7 +1403,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-083",
+      "id": "FM-088",
       "item": "rcp_watchdog_default_config",
       "file": "src/watchdog.c",
       "line": 12,
@@ -1339,7 +1419,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-084",
+      "id": "FM-089",
       "item": "rcp_watchdog_keeper_kick",
       "file": "src/watchdog.c",
       "line": 196,
@@ -1355,7 +1435,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-085",
+      "id": "FM-090",
       "item": "rcp_watchdog_keeper_status",
       "file": "src/watchdog.c",
       "line": 210,
@@ -1371,7 +1451,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-086",
+      "id": "FM-091",
       "item": "rcp_watchdog_keeper_subscribe",
       "file": "src/watchdog.c",
       "line": 226,
@@ -1387,7 +1467,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-087",
+      "id": "FM-092",
       "item": "rcp_watchdog_keeper_close",
       "file": "src/watchdog.c",
       "line": 236,
@@ -1403,7 +1483,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-088",
+      "id": "FM-093",
       "item": "rcp_watchdog_keeper_destroy",
       "file": "src/watchdog.c",
       "line": 249,
@@ -1419,7 +1499,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-089",
+      "id": "FM-094",
       "item": "rcp_mutex_init",
       "file": "src/platform.c",
       "line": 16,
@@ -1435,7 +1515,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-090",
+      "id": "FM-095",
       "item": "rcp_mutex_lock",
       "file": "src/platform.c",
       "line": 17,
@@ -1451,7 +1531,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-091",
+      "id": "FM-096",
       "item": "rcp_mutex_unlock",
       "file": "src/platform.c",
       "line": 18,
@@ -1467,7 +1547,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-092",
+      "id": "FM-097",
       "item": "rcp_mutex_destroy",
       "file": "src/platform.c",
       "line": 19,
@@ -1483,7 +1563,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-093",
+      "id": "FM-098",
       "item": "rcp_cond_init",
       "file": "src/platform.c",
       "line": 21,
@@ -1499,7 +1579,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-094",
+      "id": "FM-099",
       "item": "rcp_cond_wait",
       "file": "src/platform.c",
       "line": 22,
@@ -1515,7 +1595,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-095",
+      "id": "FM-100",
       "item": "rcp_cond_timedwait_until",
       "file": "src/platform.c",
       "line": 24,
@@ -1531,7 +1611,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-096",
+      "id": "FM-101",
       "item": "rcp_cond_signal",
       "file": "src/platform.c",
       "line": 31,
@@ -1547,7 +1627,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-097",
+      "id": "FM-102",
       "item": "rcp_cond_broadcast",
       "file": "src/platform.c",
       "line": 32,
@@ -1563,7 +1643,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-098",
+      "id": "FM-103",
       "item": "rcp_cond_destroy",
       "file": "src/platform.c",
       "line": 33,
@@ -1579,7 +1659,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-099",
+      "id": "FM-104",
       "item": "rcp_thread_start_detached",
       "file": "src/platform.c",
       "line": 51,
@@ -1595,7 +1675,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-100",
+      "id": "FM-105",
       "item": "CloseHandle",
       "file": "src/platform.c",
       "line": 63,
@@ -1611,7 +1691,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-101",
+      "id": "FM-106",
       "item": "rcp_thread_start",
       "file": "src/platform.c",
       "line": 67,
@@ -1627,7 +1707,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-102",
+      "id": "FM-107",
       "item": "rcp_thread_join",
       "file": "src/platform.c",
       "line": 83,
@@ -1643,7 +1723,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-103",
+      "id": "FM-108",
       "item": "rcp_atomic_inc",
       "file": "src/platform.c",
       "line": 89,
@@ -1659,7 +1739,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-104",
+      "id": "FM-109",
       "item": "rcp_atomic_dec",
       "file": "src/platform.c",
       "line": 94,
@@ -1675,7 +1755,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-105",
+      "id": "FM-110",
       "item": "rcp_sleep_ms",
       "file": "src/platform.c",
       "line": 99,
@@ -1691,7 +1771,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-106",
+      "id": "FM-111",
       "item": "rcp_mutex_init",
       "file": "src/platform.c",
       "line": 109,
@@ -1707,7 +1787,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-107",
+      "id": "FM-112",
       "item": "rcp_mutex_lock",
       "file": "src/platform.c",
       "line": 110,
@@ -1723,7 +1803,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-108",
+      "id": "FM-113",
       "item": "rcp_mutex_unlock",
       "file": "src/platform.c",
       "line": 111,
@@ -1739,7 +1819,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-109",
+      "id": "FM-114",
       "item": "rcp_mutex_destroy",
       "file": "src/platform.c",
       "line": 112,
@@ -1755,7 +1835,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-110",
+      "id": "FM-115",
       "item": "rcp_cond_init",
       "file": "src/platform.c",
       "line": 114,
@@ -1771,7 +1851,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-111",
+      "id": "FM-116",
       "item": "rcp_cond_wait",
       "file": "src/platform.c",
       "line": 115,
@@ -1787,7 +1867,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-112",
+      "id": "FM-117",
       "item": "rcp_cond_timedwait_until",
       "file": "src/platform.c",
       "line": 117,
@@ -1803,7 +1883,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-113",
+      "id": "FM-118",
       "item": "rcp_cond_signal",
       "file": "src/platform.c",
       "line": 141,
@@ -1819,7 +1899,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-114",
+      "id": "FM-119",
       "item": "rcp_cond_broadcast",
       "file": "src/platform.c",
       "line": 142,
@@ -1835,7 +1915,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-115",
+      "id": "FM-120",
       "item": "rcp_cond_destroy",
       "file": "src/platform.c",
       "line": 143,
@@ -1851,7 +1931,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-116",
+      "id": "FM-121",
       "item": "rcp_thread_start_detached",
       "file": "src/platform.c",
       "line": 161,
@@ -1867,7 +1947,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-117",
+      "id": "FM-122",
       "item": "rcp_thread_start",
       "file": "src/platform.c",
       "line": 178,
@@ -1883,7 +1963,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-118",
+      "id": "FM-123",
       "item": "rcp_thread_join",
       "file": "src/platform.c",
       "line": 193,
@@ -1899,7 +1979,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-119",
+      "id": "FM-124",
       "item": "rcp_atomic_inc",
       "file": "src/platform.c",
       "line": 198,
@@ -1915,7 +1995,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-120",
+      "id": "FM-125",
       "item": "rcp_atomic_dec",
       "file": "src/platform.c",
       "line": 203,
@@ -1931,7 +2011,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-121",
+      "id": "FM-126",
       "item": "rcp_sleep_ms",
       "file": "src/platform.c",
       "line": 208,
@@ -1947,7 +2027,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-122",
+      "id": "FM-127",
       "item": "rcp_sched_classify",
       "file": "src/scheduler.c",
       "line": 7,
@@ -1963,7 +2043,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-123",
+      "id": "FM-128",
       "item": "rcp_sched_kind_rank",
       "file": "src/scheduler.c",
       "line": 30,
@@ -1979,7 +2059,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-124",
+      "id": "FM-129",
       "item": "rcp_sched_compare",
       "file": "src/scheduler.c",
       "line": 47,
@@ -1995,7 +2075,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-125",
+      "id": "FM-130",
       "item": "rcp_sched_frame_timing_consistent",
       "file": "src/scheduler.c",
       "line": 110,
@@ -2011,7 +2091,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-126",
+      "id": "FM-131",
       "item": "rcp_monotonic_ms",
       "file": "src/clock.c",
       "line": 15,
@@ -2027,7 +2107,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-127",
+      "id": "FM-132",
       "item": "rcp_wallclock_ms",
       "file": "src/clock.c",
       "line": 30,
@@ -2043,7 +2123,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-128",
+      "id": "FM-133",
       "item": "rcp_monotonic_ms",
       "file": "src/clock.c",
       "line": 49,
@@ -2059,7 +2139,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-129",
+      "id": "FM-134",
       "item": "rcp_wallclock_ms",
       "file": "src/clock.c",
       "line": 57,
@@ -2075,7 +2155,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-130",
+      "id": "FM-135",
       "item": "rcp_ep_wakeup_functional_cfg_init",
       "file": "src/ep_wakeup.c",
       "line": 38,
@@ -2091,7 +2171,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-131",
+      "id": "FM-136",
       "item": "rcp_ep_wakeup_sleepcmd_writable",
       "file": "src/ep_wakeup.c",
       "line": 53,
@@ -2107,7 +2187,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-132",
+      "id": "FM-137",
       "item": "rcp_ep_wakeup_source_asserted",
       "file": "src/ep_wakeup.c",
       "line": 59,
@@ -2123,10 +2203,26 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-133",
-      "item": "rcp_ep_wakeup_wup_status_init",
+      "id": "FM-138",
+      "item": "rcp_ep_wakeup_source_edge_state_init",
       "file": "src/ep_wakeup.c",
       "line": 85,
+      "failureMode": "rcp_ep_wakeup_source_edge_state_init (monitoring/control function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_wakeup_source_edge_state_init could propagate undetected to callers in ep_wakeup.c",
+      "cause": "Configuration or state inconsistency affecting rcp_ep_wakeup_source_edge_state_init",
+      "severity": 5,
+      "occurrence": 3,
+      "detection": 4,
+      "actionPriority": "medium",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-139",
+      "item": "rcp_ep_wakeup_wup_status_init",
+      "file": "src/ep_wakeup.c",
+      "line": 150,
       "failureMode": "rcp_ep_wakeup_wup_status_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_wakeup_wup_status_init could propagate undetected to callers in ep_wakeup.c",
       "cause": "Configuration or state inconsistency affecting rcp_ep_wakeup_wup_status_init",
@@ -2139,13 +2235,13 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-134",
-      "item": "rcp_ep_wakeup_wup_status_latch",
+      "id": "FM-140",
+      "item": "rcp_ep_wakeup_wup_status_latch_source",
       "file": "src/ep_wakeup.c",
-      "line": 91,
-      "failureMode": "rcp_ep_wakeup_wup_status_latch (general function) does not perform its intended action",
-      "effect": "Failure of rcp_ep_wakeup_wup_status_latch could propagate undetected to callers in ep_wakeup.c",
-      "cause": "Logic error or untested edge case in rcp_ep_wakeup_wup_status_latch",
+      "line": 157,
+      "failureMode": "rcp_ep_wakeup_wup_status_latch_source (general function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_wakeup_wup_status_latch_source could propagate undetected to callers in ep_wakeup.c",
+      "cause": "Logic error or untested edge case in rcp_ep_wakeup_wup_status_latch_source",
       "severity": 3,
       "occurrence": 2,
       "detection": 3,
@@ -2155,10 +2251,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-135",
+      "id": "FM-141",
       "item": "rcp_ep_wakeup_wup_status_clear",
       "file": "src/ep_wakeup.c",
-      "line": 97,
+      "line": 164,
       "failureMode": "rcp_ep_wakeup_wup_status_clear (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_wakeup_wup_status_clear could propagate undetected to callers in ep_wakeup.c",
       "cause": "Logic error or untested edge case in rcp_ep_wakeup_wup_status_clear",
@@ -2171,10 +2267,26 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-136",
+      "id": "FM-142",
+      "item": "rcp_ep_wakeup_wup_status_clear_source",
+      "file": "src/ep_wakeup.c",
+      "line": 170,
+      "failureMode": "rcp_ep_wakeup_wup_status_clear_source (general function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_wakeup_wup_status_clear_source could propagate undetected to callers in ep_wakeup.c",
+      "cause": "Logic error or untested edge case in rcp_ep_wakeup_wup_status_clear_source",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-143",
       "item": "rcp_ep_wakeup_wup_status_is_clear",
       "file": "src/ep_wakeup.c",
-      "line": 103,
+      "line": 177,
       "failureMode": "rcp_ep_wakeup_wup_status_is_clear (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_wakeup_wup_status_is_clear could propagate undetected to callers in ep_wakeup.c",
       "cause": "Logic error or untested edge case in rcp_ep_wakeup_wup_status_is_clear",
@@ -2187,7 +2299,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-137",
+      "id": "FM-144",
       "item": "rcp_mdns_discoverer_destroy",
       "file": "src/mdns.c",
       "line": 12,
@@ -2203,7 +2315,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-138",
+      "id": "FM-145",
       "item": "rcp_mdns_announcer_destroy",
       "file": "src/mdns.c",
       "line": 19,
@@ -2219,7 +2331,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-139",
+      "id": "FM-146",
       "item": "rcp_mdns_make_instance_name",
       "file": "src/mdns.c",
       "line": 26,
@@ -2235,7 +2347,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-140",
+      "id": "FM-147",
       "item": "stopped",
       "file": "src/mdns.c",
       "line": 47,
@@ -2251,7 +2363,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-141",
+      "id": "FM-148",
       "item": "rcp_mdns_static_discoverer_new",
       "file": "src/mdns.c",
       "line": 126,
@@ -2267,7 +2379,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-142",
+      "id": "FM-149",
       "item": "rcp_adapt_op_kind",
       "file": "src/adapt.c",
       "line": 27,
@@ -2283,7 +2395,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-143",
+      "id": "FM-150",
       "item": "rcp_adapt_op_from_string",
       "file": "src/adapt.c",
       "line": 90,
@@ -2299,7 +2411,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-144",
+      "id": "FM-151",
       "item": "rcp_discovery_encode_request",
       "file": "src/adapt.c",
       "line": 224,
@@ -2315,7 +2427,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-145",
+      "id": "FM-152",
       "item": "rcp_ep_spi_encode_transfer_request",
       "file": "src/adapt.c",
       "line": 253,
@@ -2331,7 +2443,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-146",
+      "id": "FM-153",
       "item": "rcp_ep_uart_encode_read_request",
       "file": "src/adapt.c",
       "line": 282,
@@ -2347,7 +2459,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-147",
+      "id": "FM-154",
       "item": "rcp_ep_adc_encode_read_request",
       "file": "src/adapt.c",
       "line": 294,
@@ -2363,10 +2475,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-148",
+      "id": "FM-155",
       "item": "rcp_ep_mdio_encode_read_request",
       "file": "src/adapt.c",
-      "line": 358,
+      "line": 372,
       "failureMode": "rcp_ep_mdio_encode_read_request (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_mdio_encode_read_request could propagate undetected to callers in adapt.c",
       "cause": "Logic error or untested edge case in rcp_ep_mdio_encode_read_request",
@@ -2379,10 +2491,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-149",
+      "id": "FM-156",
       "item": "rcp_errc_to_relay_errc",
       "file": "src/adapt.c",
-      "line": 787,
+      "line": 801,
       "failureMode": "rcp_errc_to_relay_errc (general function) does not perform its intended action",
       "effect": "Failure of rcp_errc_to_relay_errc could propagate undetected to callers in adapt.c",
       "cause": "Logic error or untested edge case in rcp_errc_to_relay_errc",
@@ -2395,7 +2507,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-150",
+      "id": "FM-157",
       "item": "rcp_timed_feature_enabled",
       "file": "src/request_timed.c",
       "line": 45,
@@ -2411,7 +2523,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-151",
+      "id": "FM-158",
       "item": "rcp_timed_too_far",
       "file": "src/request_timed.c",
       "line": 177,
@@ -2427,7 +2539,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-152",
+      "id": "FM-159",
       "item": "rcp_timed_due",
       "file": "src/request_timed.c",
       "line": 186,
@@ -2443,7 +2555,23 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-153",
+      "id": "FM-160",
+      "item": "rcp_timed_wire_error",
+      "file": "src/request_timed.c",
+      "line": 206,
+      "failureMode": "rcp_timed_wire_error (safety-critical function) does not perform its intended action",
+      "effect": "Failure of rcp_timed_wire_error could propagate undetected to callers in request_timed.c",
+      "cause": "Unhandled fault or invalid input condition within rcp_timed_wire_error",
+      "severity": 9,
+      "occurrence": 4,
+      "detection": 6,
+      "actionPriority": "high",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-161",
       "item": "rcp_config_manifest_free",
       "file": "src/config.c",
       "line": 181,
@@ -2459,7 +2587,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-154",
+      "id": "FM-162",
       "item": "DEFINE_APPEND",
       "file": "src/config.c",
       "line": 208,
@@ -2475,7 +2603,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-155",
+      "id": "FM-163",
       "item": "DEFINE_APPEND",
       "file": "src/config.c",
       "line": 209,
@@ -2491,7 +2619,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-156",
+      "id": "FM-164",
       "item": "DEFINE_APPEND",
       "file": "src/config.c",
       "line": 210,
@@ -2507,7 +2635,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-157",
+      "id": "FM-165",
       "item": "rcp_config_parse_json",
       "file": "src/config.c",
       "line": 336,
@@ -2523,7 +2651,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-158",
+      "id": "FM-166",
       "item": "find_in_range",
       "file": "src/config.c",
       "line": 357,
@@ -2539,7 +2667,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-159",
+      "id": "FM-167",
       "item": "find_in_range",
       "file": "src/config.c",
       "line": 372,
@@ -2555,7 +2683,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-160",
+      "id": "FM-168",
       "item": "find_in_range",
       "file": "src/config.c",
       "line": 384,
@@ -2571,7 +2699,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-161",
+      "id": "FM-169",
       "item": "rcp_config_apply_to_mock",
       "file": "src/config.c",
       "line": 421,
@@ -2587,7 +2715,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-162",
+      "id": "FM-170",
       "item": "rcp_config_load",
       "file": "src/config.c",
       "line": 459,
@@ -2603,7 +2731,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-163",
+      "id": "FM-171",
       "item": "rcp_ep_i2c_mode_valid",
       "file": "src/ep_i2c.c",
       "line": 26,
@@ -2619,7 +2747,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-164",
+      "id": "FM-172",
       "item": "rcp_ep_i2c_functional_cfg_init",
       "file": "src/ep_i2c.c",
       "line": 34,
@@ -2635,7 +2763,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-165",
+      "id": "FM-173",
       "item": "rcp_ep_i2c_dir_valid",
       "file": "src/ep_i2c.c",
       "line": 67,
@@ -2651,7 +2779,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-166",
+      "id": "FM-174",
       "item": "put_u16",
       "file": "src/ep_i2c.c",
       "line": 123,
@@ -2667,7 +2795,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-167",
+      "id": "FM-175",
       "item": "encode_reconfig_request",
       "file": "src/ep_i2c.c",
       "line": 250,
@@ -2683,7 +2811,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-168",
+      "id": "FM-176",
       "item": "rcp_regmap_is_ep0",
       "file": "src/regmap.c",
       "line": 10,
@@ -2699,7 +2827,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-169",
+      "id": "FM-177",
       "item": "rcp_regmap_general_init",
       "file": "src/regmap.c",
       "line": 43,
@@ -2715,10 +2843,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-170",
+      "id": "FM-178",
       "item": "rcp_regmap_general_render",
       "file": "src/regmap.c",
-      "line": 104,
+      "line": 105,
       "failureMode": "rcp_regmap_general_render (general function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_general_render could propagate undetected to callers in regmap.c",
       "cause": "Logic error or untested edge case in rcp_regmap_general_render",
@@ -2731,10 +2859,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-171",
+      "id": "FM-179",
       "item": "rcp_regmap_optional_subsystem_cfg_reconfig_strerror",
       "file": "src/regmap.c",
-      "line": 489,
+      "line": 563,
       "failureMode": "rcp_regmap_optional_subsystem_cfg_reconfig_strerror (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_optional_subsystem_cfg_reconfig_strerror could propagate undetected to callers in regmap.c",
       "cause": "Unhandled fault or invalid input condition within rcp_regmap_optional_subsystem_cfg_reconfig_strerror",
@@ -2747,10 +2875,26 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-172",
+      "id": "FM-180",
+      "item": "sizeof",
+      "file": "src/regmap.c",
+      "line": 686,
+      "failureMode": "sizeof (general function) does not perform its intended action",
+      "effect": "Failure of sizeof could propagate undetected to callers in regmap.c",
+      "cause": "Logic error or untested edge case in sizeof",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-181",
       "item": "comment",
       "file": "src/regmap.c",
-      "line": 936,
+      "line": 1195,
       "failureMode": "comment (general function) does not perform its intended action",
       "effect": "Failure of comment could propagate undetected to callers in regmap.c",
       "cause": "Logic error or untested edge case in comment",
@@ -2763,10 +2907,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-173",
+      "id": "FM-182",
       "item": "note",
       "file": "src/regmap.c",
-      "line": 955,
+      "line": 1214,
       "failureMode": "note (general function) does not perform its intended action",
       "effect": "Failure of note could propagate undetected to callers in regmap.c",
       "cause": "Logic error or untested edge case in note",
@@ -2779,10 +2923,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-174",
+      "id": "FM-183",
       "item": "comment",
       "file": "src/regmap.c",
-      "line": 1189,
+      "line": 1454,
       "failureMode": "comment (general function) does not perform its intended action",
       "effect": "Failure of comment could propagate undetected to callers in regmap.c",
       "cause": "Logic error or untested edge case in comment",
@@ -2795,10 +2939,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-175",
+      "id": "FM-184",
       "item": "comment",
       "file": "src/regmap.c",
-      "line": 1238,
+      "line": 1517,
       "failureMode": "comment (general function) does not perform its intended action",
       "effect": "Failure of comment could propagate undetected to callers in regmap.c",
       "cause": "Logic error or untested edge case in comment",
@@ -2811,10 +2955,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-176",
+      "id": "FM-185",
       "item": "comment",
       "file": "src/regmap.c",
-      "line": 1259,
+      "line": 1544,
       "failureMode": "comment (general function) does not perform its intended action",
       "effect": "Failure of comment could propagate undetected to callers in regmap.c",
       "cause": "Logic error or untested edge case in comment",
@@ -2827,10 +2971,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-177",
+      "id": "FM-186",
       "item": "rcp_regmap_response_queue_cfg_reconfig_strerror",
       "file": "src/regmap.c",
-      "line": 1272,
+      "line": 1557,
       "failureMode": "rcp_regmap_response_queue_cfg_reconfig_strerror (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_response_queue_cfg_reconfig_strerror could propagate undetected to callers in regmap.c",
       "cause": "Unhandled fault or invalid input condition within rcp_regmap_response_queue_cfg_reconfig_strerror",
@@ -2843,10 +2987,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-178",
+      "id": "FM-187",
       "item": "rcp_regmap_ep_generic_cfg_init",
       "file": "src/regmap.c",
-      "line": 1374,
+      "line": 1681,
       "failureMode": "rcp_regmap_ep_generic_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_ep_generic_cfg_init could propagate undetected to callers in regmap.c",
       "cause": "Configuration or state inconsistency affecting rcp_regmap_ep_generic_cfg_init",
@@ -2859,10 +3003,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-179",
+      "id": "FM-188",
       "item": "rcp_regmap_ep_delay_time_us_to_reg",
       "file": "src/regmap.c",
-      "line": 1380,
+      "line": 1687,
       "failureMode": "rcp_regmap_ep_delay_time_us_to_reg (general function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_ep_delay_time_us_to_reg could propagate undetected to callers in regmap.c",
       "cause": "Logic error or untested edge case in rcp_regmap_ep_delay_time_us_to_reg",
@@ -2875,10 +3019,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-180",
+      "id": "FM-189",
       "item": "rcp_regmap_ep_delay_time_reg_to_us",
       "file": "src/regmap.c",
-      "line": 1392,
+      "line": 1699,
       "failureMode": "rcp_regmap_ep_delay_time_reg_to_us (general function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_ep_delay_time_reg_to_us could propagate undetected to callers in regmap.c",
       "cause": "Logic error or untested edge case in rcp_regmap_ep_delay_time_reg_to_us",
@@ -2891,10 +3035,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-181",
+      "id": "FM-190",
       "item": "rcp_regmap_ep_req_storage_size_words_to_octets",
       "file": "src/regmap.c",
-      "line": 1400,
+      "line": 1707,
       "failureMode": "rcp_regmap_ep_req_storage_size_words_to_octets (general function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_ep_req_storage_size_words_to_octets could propagate undetected to callers in regmap.c",
       "cause": "Logic error or untested edge case in rcp_regmap_ep_req_storage_size_words_to_octets",
@@ -2907,10 +3051,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-182",
+      "id": "FM-191",
       "item": "rcp_regmap_ep_generic_cfg_reconfig_strerror",
       "file": "src/regmap.c",
-      "line": 1473,
+      "line": 1781,
       "failureMode": "rcp_regmap_ep_generic_cfg_reconfig_strerror (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_ep_generic_cfg_reconfig_strerror could propagate undetected to callers in regmap.c",
       "cause": "Unhandled fault or invalid input condition within rcp_regmap_ep_generic_cfg_reconfig_strerror",
@@ -2923,10 +3067,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-183",
+      "id": "FM-192",
       "item": "rcp_regmap_ep_functional_cfg_init",
       "file": "src/regmap.c",
-      "line": 1547,
+      "line": 1874,
       "failureMode": "rcp_regmap_ep_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_ep_functional_cfg_init could propagate undetected to callers in regmap.c",
       "cause": "Configuration or state inconsistency affecting rcp_regmap_ep_functional_cfg_init",
@@ -2939,10 +3083,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-184",
+      "id": "FM-193",
       "item": "rcp_regmap_svr_ep_cfg_init",
       "file": "src/regmap.c",
-      "line": 1554,
+      "line": 1881,
       "failureMode": "rcp_regmap_svr_ep_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_svr_ep_cfg_init could propagate undetected to callers in regmap.c",
       "cause": "Configuration or state inconsistency affecting rcp_regmap_svr_ep_cfg_init",
@@ -2955,10 +3099,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-185",
+      "id": "FM-194",
       "item": "rcp_regmap_named_signal_ep_signal_nr",
       "file": "src/regmap.c",
-      "line": 1634,
+      "line": 1961,
       "failureMode": "rcp_regmap_named_signal_ep_signal_nr (general function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_named_signal_ep_signal_nr could propagate undetected to callers in regmap.c",
       "cause": "Logic error or untested edge case in rcp_regmap_named_signal_ep_signal_nr",
@@ -2971,10 +3115,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-186",
+      "id": "FM-195",
       "item": "rcp_regmap_request_stream_cfg_init",
       "file": "src/regmap.c",
-      "line": 1680,
+      "line": 2007,
       "failureMode": "rcp_regmap_request_stream_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_request_stream_cfg_init could propagate undetected to callers in regmap.c",
       "cause": "Configuration or state inconsistency affecting rcp_regmap_request_stream_cfg_init",
@@ -2987,10 +3131,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-187",
+      "id": "FM-196",
       "item": "rcp_regmap_response_queue_cfg_init",
       "file": "src/regmap.c",
-      "line": 1695,
+      "line": 2022,
       "failureMode": "rcp_regmap_response_queue_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_response_queue_cfg_init could propagate undetected to callers in regmap.c",
       "cause": "Configuration or state inconsistency affecting rcp_regmap_response_queue_cfg_init",
@@ -3003,10 +3147,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-188",
+      "id": "FM-197",
       "item": "reserved",
       "file": "src/regmap.c",
-      "line": 1810,
+      "line": 2177,
       "failureMode": "reserved (general function) does not perform its intended action",
       "effect": "Failure of reserved could propagate undetected to callers in regmap.c",
       "cause": "Logic error or untested edge case in reserved",
@@ -3019,10 +3163,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-189",
+      "id": "FM-198",
       "item": "reserved",
       "file": "src/regmap.c",
-      "line": 1812,
+      "line": 2179,
       "failureMode": "reserved (general function) does not perform its intended action",
       "effect": "Failure of reserved could propagate undetected to callers in regmap.c",
       "cause": "Logic error or untested edge case in reserved",
@@ -3035,10 +3179,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-190",
+      "id": "FM-199",
       "item": "rcp_regmap_request_stream_cfg_reconfig_strerror",
       "file": "src/regmap.c",
-      "line": 1824,
+      "line": 2191,
       "failureMode": "rcp_regmap_request_stream_cfg_reconfig_strerror (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_request_stream_cfg_reconfig_strerror could propagate undetected to callers in regmap.c",
       "cause": "Unhandled fault or invalid input condition within rcp_regmap_request_stream_cfg_reconfig_strerror",
@@ -3051,10 +3195,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-191",
+      "id": "FM-200",
       "item": "rcp_regmap_ep_id_map_row_init_default",
       "file": "src/regmap.c",
-      "line": 2016,
+      "line": 2449,
       "failureMode": "rcp_regmap_ep_id_map_row_init_default (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_regmap_ep_id_map_row_init_default could propagate undetected to callers in regmap.c",
       "cause": "Unhandled fault or invalid input condition within rcp_regmap_ep_id_map_row_init_default",
@@ -3067,7 +3211,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-192",
+      "id": "FM-201",
       "item": "rcp_doip_default_config",
       "file": "src/doipbr.c",
       "line": 5,
@@ -3083,7 +3227,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-193",
+      "id": "FM-202",
       "item": "rcp_alloc_set_hooks",
       "file": "src/alloc.c",
       "line": 12,
@@ -3099,7 +3243,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-194",
+      "id": "FM-203",
       "item": "rcp_alloc_reset_hooks",
       "file": "src/alloc.c",
       "line": 22,
@@ -3115,7 +3259,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-195",
+      "id": "FM-204",
       "item": "rcp_malloc",
       "file": "src/alloc.c",
       "line": 31,
@@ -3131,7 +3275,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-196",
+      "id": "FM-205",
       "item": "rcp_calloc",
       "file": "src/alloc.c",
       "line": 38,
@@ -3147,7 +3291,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-197",
+      "id": "FM-206",
       "item": "rcp_realloc",
       "file": "src/alloc.c",
       "line": 45,
@@ -3163,7 +3307,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-198",
+      "id": "FM-207",
       "item": "rcp_free",
       "file": "src/alloc.c",
       "line": 52,
@@ -3179,7 +3323,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-199",
+      "id": "FM-208",
       "item": "rcp_powerstate_manager_new",
       "file": "src/powerstate.c",
       "line": 98,
@@ -3195,7 +3339,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-200",
+      "id": "FM-209",
       "item": "rcp_powerstate_manager_mode",
       "file": "src/powerstate.c",
       "line": 127,
@@ -3211,7 +3355,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-201",
+      "id": "FM-210",
       "item": "rcp_powerstate_manager_handshake_resume_queues",
       "file": "src/powerstate.c",
       "line": 372,
@@ -3227,7 +3371,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-202",
+      "id": "FM-211",
       "item": "rcp_powerstate_manager_subscribe",
       "file": "src/powerstate.c",
       "line": 416,
@@ -3243,7 +3387,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-203",
+      "id": "FM-212",
       "item": "rcp_powerstate_manager_destroy",
       "file": "src/powerstate.c",
       "line": 426,
@@ -3259,7 +3403,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-204",
+      "id": "FM-213",
       "item": "rcp_admin_server_new",
       "file": "src/admin.c",
       "line": 35,
@@ -3275,7 +3419,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-205",
+      "id": "FM-214",
       "item": "rcp_admin_server_destroy",
       "file": "src/admin.c",
       "line": 44,
@@ -3291,7 +3435,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-206",
+      "id": "FM-215",
       "item": "rcp_admin_server_register_endpoint",
       "file": "src/admin.c",
       "line": 65,
@@ -3307,7 +3451,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-207",
+      "id": "FM-216",
       "item": "rcp_admin_server_deregister_endpoint",
       "file": "src/admin.c",
       "line": 89,
@@ -3323,7 +3467,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-208",
+      "id": "FM-217",
       "item": "rcp_admin_server_endpoints",
       "file": "src/admin.c",
       "line": 106,
@@ -3339,7 +3483,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-209",
+      "id": "FM-218",
       "item": "rcp_admin_server_subscribe",
       "file": "src/admin.c",
       "line": 123,
@@ -3355,7 +3499,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-210",
+      "id": "FM-219",
       "item": "rcp_admin_server_emit",
       "file": "src/admin.c",
       "line": 148,
@@ -3371,7 +3515,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-211",
+      "id": "FM-220",
       "item": "rcp_admin_server_record_counter",
       "file": "src/admin.c",
       "line": 173,
@@ -3387,7 +3531,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-212",
+      "id": "FM-221",
       "item": "rcp_admin_server_metrics_text",
       "file": "src/admin.c",
       "line": 211,
@@ -3403,7 +3547,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-213",
+      "id": "FM-222",
       "item": "rcp_dds_default_config",
       "file": "src/ddsbr.c",
       "line": 5,
@@ -3419,7 +3563,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-214",
+      "id": "FM-223",
       "item": "rcp_udp_annexj_wrap",
       "file": "src/udp.c",
       "line": 49,
@@ -3435,7 +3579,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-215",
+      "id": "FM-224",
       "item": "rcp_udp_avtp_transport_bind",
       "file": "src/udp.c",
       "line": 103,
@@ -3451,7 +3595,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-216",
+      "id": "FM-225",
       "item": "rcp_udp_avtp_transport_ok",
       "file": "src/udp.c",
       "line": 391,
@@ -3467,7 +3611,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-217",
+      "id": "FM-226",
       "item": "rcp_udp_avtp_transport_port",
       "file": "src/udp.c",
       "line": 397,
@@ -3483,7 +3627,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-218",
+      "id": "FM-227",
       "item": "rcp_udp_avtp_transport_addr_string",
       "file": "src/udp.c",
       "line": 407,
@@ -3499,7 +3643,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-219",
+      "id": "FM-228",
       "item": "rcp_udp_avtp_transport_last_recv_seq",
       "file": "src/udp.c",
       "line": 425,
@@ -3515,7 +3659,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-220",
+      "id": "FM-229",
       "item": "rcp_udp_avtp_transport_ok",
       "file": "src/udp.c",
       "line": 514,
@@ -3531,7 +3675,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-221",
+      "id": "FM-230",
       "item": "rcp_udp_avtp_transport_port",
       "file": "src/udp.c",
       "line": 521,
@@ -3547,7 +3691,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-222",
+      "id": "FM-231",
       "item": "rcp_udp_avtp_transport_addr_string",
       "file": "src/udp.c",
       "line": 528,
@@ -3563,7 +3707,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-223",
+      "id": "FM-232",
       "item": "rcp_udp_avtp_transport_last_recv_seq",
       "file": "src/udp.c",
       "line": 535,
@@ -3579,7 +3723,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-224",
+      "id": "FM-233",
       "item": "rcp_request_type_is_safety",
       "file": "src/request_compound.c",
       "line": 26,
@@ -3595,7 +3739,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-225",
+      "id": "FM-234",
       "item": "rcp_request_type_is_compound",
       "file": "src/request_compound.c",
       "line": 32,
@@ -3611,7 +3755,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-226",
+      "id": "FM-235",
       "item": "rcp_request_type_is_compound_wait",
       "file": "src/request_compound.c",
       "line": 39,
@@ -3627,7 +3771,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-227",
+      "id": "FM-236",
       "item": "rcp_request_type_is_compound_wait",
       "file": "src/request_compound.c",
       "line": 178,
@@ -3643,7 +3787,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-228",
+      "id": "FM-237",
       "item": "rcp_compound_exec_delay_elapsed",
       "file": "src/request_compound.c",
       "line": 322,
@@ -3659,7 +3803,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-229",
+      "id": "FM-238",
       "item": "rcp_grpc_default_config",
       "file": "src/grpcbridge.c",
       "line": 5,
@@ -3675,7 +3819,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-230",
+      "id": "FM-239",
       "item": "rcp_cancel_encode_clear_all",
       "file": "src/request_cancel.c",
       "line": 72,
@@ -3691,7 +3835,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-231",
+      "id": "FM-240",
       "item": "rcp_cancel_is_cancellable",
       "file": "src/request_cancel.c",
       "line": 180,
@@ -3707,7 +3851,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-232",
+      "id": "FM-241",
       "item": "rcp_cancel_attempt",
       "file": "src/request_cancel.c",
       "line": 188,
@@ -3723,7 +3867,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-233",
+      "id": "FM-242",
       "item": "rcp_cancel_chain_should_cascade",
       "file": "src/request_cancel.c",
       "line": 196,
@@ -3739,7 +3883,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-234",
+      "id": "FM-243",
       "item": "rcp_ep_mdio_addr_valid",
       "file": "src/ep_mdio.c",
       "line": 56,
@@ -3755,7 +3899,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-235",
+      "id": "FM-244",
       "item": "rcp_ep_mdio_burst_next_regad",
       "file": "src/ep_mdio.c",
       "line": 69,
@@ -3771,7 +3915,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-236",
+      "id": "FM-245",
       "item": "rcp_ep_mdio_mode_for_word_count",
       "file": "src/ep_mdio.c",
       "line": 83,
@@ -3787,7 +3931,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-237",
+      "id": "FM-246",
       "item": "rcp_ep_mdio_mode_is_unsupported_mms",
       "file": "src/ep_mdio.c",
       "line": 89,
@@ -3803,7 +3947,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-238",
+      "id": "FM-247",
       "item": "rcp_ep_mdio_mms_addr_valid",
       "file": "src/ep_mdio.c",
       "line": 98,
@@ -3819,7 +3963,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-239",
+      "id": "FM-248",
       "item": "rcp_ep_mdio_mms_uses_32bit_words",
       "file": "src/ep_mdio.c",
       "line": 104,
@@ -3835,7 +3979,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-240",
+      "id": "FM-249",
       "item": "rcp_ep_mdio_mms_burst_next_addr",
       "file": "src/ep_mdio.c",
       "line": 110,
@@ -3851,7 +3995,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-241",
+      "id": "FM-250",
       "item": "rcp_ep_mdio_mms_mode_for_word_count",
       "file": "src/ep_mdio.c",
       "line": 116,
@@ -3867,7 +4011,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-242",
+      "id": "FM-251",
       "item": "rcp_ep_mdio_word_encode",
       "file": "src/ep_mdio.c",
       "line": 124,
@@ -3883,7 +4027,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-243",
+      "id": "FM-252",
       "item": "rcp_ep_mdio_word_decode",
       "file": "src/ep_mdio.c",
       "line": 130,
@@ -3899,7 +4043,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-244",
+      "id": "FM-253",
       "item": "rcp_ep_mdio_pack_len",
       "file": "src/ep_mdio.c",
       "line": 136,
@@ -3915,7 +4059,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-245",
+      "id": "FM-254",
       "item": "rcp_ep_mdio_pack_words",
       "file": "src/ep_mdio.c",
       "line": 142,
@@ -3931,7 +4075,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-246",
+      "id": "FM-255",
       "item": "rcp_ep_mdio_word_count_of",
       "file": "src/ep_mdio.c",
       "line": 161,
@@ -3947,7 +4091,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-247",
+      "id": "FM-256",
       "item": "rcp_ep_mdio_unpack_word_at",
       "file": "src/ep_mdio.c",
       "line": 170,
@@ -3963,7 +4107,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-248",
+      "id": "FM-257",
       "item": "rcp_ep_mdio_word32_encode",
       "file": "src/ep_mdio.c",
       "line": 186,
@@ -3979,7 +4123,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-249",
+      "id": "FM-258",
       "item": "rcp_ep_mdio_word32_decode",
       "file": "src/ep_mdio.c",
       "line": 192,
@@ -3995,7 +4139,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-250",
+      "id": "FM-259",
       "item": "rcp_ep_mdio_mms_pack_len",
       "file": "src/ep_mdio.c",
       "line": 198,
@@ -4011,7 +4155,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-251",
+      "id": "FM-260",
       "item": "rcp_ep_mdio_mms_pack_words",
       "file": "src/ep_mdio.c",
       "line": 204,
@@ -4027,7 +4171,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-252",
+      "id": "FM-261",
       "item": "rcp_ep_mdio_mms_word_count_of",
       "file": "src/ep_mdio.c",
       "line": 230,
@@ -4043,7 +4187,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-253",
+      "id": "FM-262",
       "item": "rcp_ep_mdio_mms_unpack_word_at",
       "file": "src/ep_mdio.c",
       "line": 241,
@@ -4059,7 +4203,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-254",
+      "id": "FM-263",
       "item": "rcp_ep_mdio_functional_cfg_init",
       "file": "src/ep_mdio.c",
       "line": 252,
@@ -4075,10 +4219,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-255",
+      "id": "FM-264",
       "item": "rcp_ep_pwm_out_write_semantics_valid",
       "file": "src/ep_pwm.c",
-      "line": 85,
+      "line": 89,
       "failureMode": "rcp_ep_pwm_out_write_semantics_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_pwm_out_write_semantics_valid could propagate undetected to callers in ep_pwm.c",
       "cause": "Logic error or untested edge case in rcp_ep_pwm_out_write_semantics_valid",
@@ -4091,10 +4235,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-256",
+      "id": "FM-265",
       "item": "rcp_ep_pwm_out_generation_state",
       "file": "src/ep_pwm.c",
-      "line": 119,
+      "line": 123,
       "failureMode": "rcp_ep_pwm_out_generation_state (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_pwm_out_generation_state could propagate undetected to callers in ep_pwm.c",
       "cause": "Logic error or untested edge case in rcp_ep_pwm_out_generation_state",
@@ -4107,10 +4251,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-257",
+      "id": "FM-266",
       "item": "rcp_ep_pwm_out_trigger_fires",
       "file": "src/ep_pwm.c",
-      "line": 300,
+      "line": 304,
       "failureMode": "rcp_ep_pwm_out_trigger_fires (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_pwm_out_trigger_fires could propagate undetected to callers in ep_pwm.c",
       "cause": "Logic error or untested edge case in rcp_ep_pwm_out_trigger_fires",
@@ -4123,10 +4267,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-258",
+      "id": "FM-267",
       "item": "rcp_ep_pwm_out_functional_cfg_init",
       "file": "src/ep_pwm.c",
-      "line": 344,
+      "line": 348,
       "failureMode": "rcp_ep_pwm_out_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_pwm_out_functional_cfg_init could propagate undetected to callers in ep_pwm.c",
       "cause": "Configuration or state inconsistency affecting rcp_ep_pwm_out_functional_cfg_init",
@@ -4139,10 +4283,26 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-259",
+      "id": "FM-268",
+      "item": "rcp_ep_pwm_out_wire_error",
+      "file": "src/ep_pwm.c",
+      "line": 409,
+      "failureMode": "rcp_ep_pwm_out_wire_error (safety-critical function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_pwm_out_wire_error could propagate undetected to callers in ep_pwm.c",
+      "cause": "Unhandled fault or invalid input condition within rcp_ep_pwm_out_wire_error",
+      "severity": 9,
+      "occurrence": 4,
+      "detection": 6,
+      "actionPriority": "high",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-269",
       "item": "rcp_ep_pwm_in_trigger_fires",
       "file": "src/ep_pwm.c",
-      "line": 583,
+      "line": 620,
       "failureMode": "rcp_ep_pwm_in_trigger_fires (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_pwm_in_trigger_fires could propagate undetected to callers in ep_pwm.c",
       "cause": "Logic error or untested edge case in rcp_ep_pwm_in_trigger_fires",
@@ -4155,10 +4315,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-260",
+      "id": "FM-270",
       "item": "rcp_ep_pwm_in_functional_cfg_init",
       "file": "src/ep_pwm.c",
-      "line": 596,
+      "line": 633,
       "failureMode": "rcp_ep_pwm_in_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_pwm_in_functional_cfg_init could propagate undetected to callers in ep_pwm.c",
       "cause": "Configuration or state inconsistency affecting rcp_ep_pwm_in_functional_cfg_init",
@@ -4171,10 +4331,26 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-261",
+      "id": "FM-271",
+      "item": "rcp_ep_pwm_in_wire_error",
+      "file": "src/ep_pwm.c",
+      "line": 989,
+      "failureMode": "rcp_ep_pwm_in_wire_error (safety-critical function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_pwm_in_wire_error could propagate undetected to callers in ep_pwm.c",
+      "cause": "Unhandled fault or invalid input condition within rcp_ep_pwm_in_wire_error",
+      "severity": 9,
+      "occurrence": 4,
+      "detection": 6,
+      "actionPriority": "high",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-272",
       "item": "rcp_ep_pwm_in_compound_wait_mode_valid",
       "file": "src/ep_pwm.c",
-      "line": 935,
+      "line": 1006,
       "failureMode": "rcp_ep_pwm_in_compound_wait_mode_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_pwm_in_compound_wait_mode_valid could propagate undetected to callers in ep_pwm.c",
       "cause": "Logic error or untested edge case in rcp_ep_pwm_in_compound_wait_mode_valid",
@@ -4187,7 +4363,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-262",
+      "id": "FM-273",
       "item": "rcp_l2_mac_is_unicast",
       "file": "src/l2.c",
       "line": 76,
@@ -4203,7 +4379,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-263",
+      "id": "FM-274",
       "item": "rcp_l2_avtp_transport_ok",
       "file": "src/l2.c",
       "line": 340,
@@ -4219,7 +4395,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-264",
+      "id": "FM-275",
       "item": "rcp_l2_avtp_transport_local_mac",
       "file": "src/l2.c",
       "line": 346,
@@ -4235,7 +4411,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-265",
+      "id": "FM-276",
       "item": "rcp_l2_avtp_transport_ok",
       "file": "src/l2.c",
       "line": 407,
@@ -4251,7 +4427,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-266",
+      "id": "FM-277",
       "item": "rcp_l2_avtp_transport_local_mac",
       "file": "src/l2.c",
       "line": 414,
@@ -4267,7 +4443,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-267",
+      "id": "FM-278",
       "item": "rcp_span_duration_ms",
       "file": "src/observe.c",
       "line": 9,
@@ -4283,7 +4459,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-268",
+      "id": "FM-279",
       "item": "rcp_noop_metrics_sink",
       "file": "src/observe.c",
       "line": 32,
@@ -4299,7 +4475,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-269",
+      "id": "FM-280",
       "item": "rcp_in_memory_sink_new",
       "file": "src/observe.c",
       "line": 50,
@@ -4315,7 +4491,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-270",
+      "id": "FM-281",
       "item": "rcp_in_memory_sink_as_sink",
       "file": "src/observe.c",
       "line": 94,
@@ -4331,7 +4507,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-271",
+      "id": "FM-282",
       "item": "rcp_in_memory_sink_span_count",
       "file": "src/observe.c",
       "line": 103,
@@ -4347,7 +4523,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-272",
+      "id": "FM-283",
       "item": "rcp_in_memory_sink_spans",
       "file": "src/observe.c",
       "line": 113,
@@ -4363,7 +4539,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-273",
+      "id": "FM-284",
       "item": "rcp_in_memory_sink_destroy",
       "file": "src/observe.c",
       "line": 124,
@@ -4379,7 +4555,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-274",
+      "id": "FM-285",
       "item": "rcp_respqueue_destroy",
       "file": "src/respqueue.c",
       "line": 18,
@@ -4395,10 +4571,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-275",
+      "id": "FM-286",
       "item": "rcp_respqueue_push",
       "file": "src/respqueue.c",
-      "line": 34,
+      "line": 38,
       "failureMode": "rcp_respqueue_push (general function) does not perform its intended action",
       "effect": "Failure of rcp_respqueue_push could propagate undetected to callers in respqueue.c",
       "cause": "Logic error or untested edge case in rcp_respqueue_push",
@@ -4411,10 +4587,42 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-276",
+      "id": "FM-287",
+      "item": "rcp_respqueue_overflow",
+      "file": "src/respqueue.c",
+      "line": 172,
+      "failureMode": "rcp_respqueue_overflow (general function) does not perform its intended action",
+      "effect": "Failure of rcp_respqueue_overflow could propagate undetected to callers in respqueue.c",
+      "cause": "Logic error or untested edge case in rcp_respqueue_overflow",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-288",
+      "item": "rcp_respqueue_clear_overflow",
+      "file": "src/respqueue.c",
+      "line": 179,
+      "failureMode": "rcp_respqueue_clear_overflow (general function) does not perform its intended action",
+      "effect": "Failure of rcp_respqueue_clear_overflow could propagate undetected to callers in respqueue.c",
+      "cause": "Logic error or untested edge case in rcp_respqueue_clear_overflow",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-289",
       "item": "rcp_respqueue_pop",
       "file": "src/respqueue.c",
-      "line": 65,
+      "line": 193,
       "failureMode": "rcp_respqueue_pop (general function) does not perform its intended action",
       "effect": "Failure of rcp_respqueue_pop could propagate undetected to callers in respqueue.c",
       "cause": "Logic error or untested edge case in rcp_respqueue_pop",
@@ -4427,10 +4635,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-277",
+      "id": "FM-290",
       "item": "rcp_respqueue_len",
       "file": "src/respqueue.c",
-      "line": 81,
+      "line": 210,
       "failureMode": "rcp_respqueue_len (general function) does not perform its intended action",
       "effect": "Failure of rcp_respqueue_len could propagate undetected to callers in respqueue.c",
       "cause": "Logic error or untested edge case in rcp_respqueue_len",
@@ -4443,10 +4651,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-278",
+      "id": "FM-291",
       "item": "rcp_respqueue_octets",
       "file": "src/respqueue.c",
-      "line": 87,
+      "line": 216,
       "failureMode": "rcp_respqueue_octets (general function) does not perform its intended action",
       "effect": "Failure of rcp_respqueue_octets could propagate undetected to callers in respqueue.c",
       "cause": "Logic error or untested edge case in rcp_respqueue_octets",
@@ -4459,10 +4667,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-279",
+      "id": "FM-292",
       "item": "rcp_respqueue_max_fragment_payload",
       "file": "src/respqueue.c",
-      "line": 93,
+      "line": 222,
       "failureMode": "rcp_respqueue_max_fragment_payload (general function) does not perform its intended action",
       "effect": "Failure of rcp_respqueue_max_fragment_payload could propagate undetected to callers in respqueue.c",
       "cause": "Logic error or untested edge case in rcp_respqueue_max_fragment_payload",
@@ -4475,10 +4683,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-280",
+      "id": "FM-293",
       "item": "rcp_respqueue_should_flush",
       "file": "src/respqueue.c",
-      "line": 106,
+      "line": 235,
       "failureMode": "rcp_respqueue_should_flush (general function) does not perform its intended action",
       "effect": "Failure of rcp_respqueue_should_flush could propagate undetected to callers in respqueue.c",
       "cause": "Logic error or untested edge case in rcp_respqueue_should_flush",
@@ -4491,10 +4699,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-281",
+      "id": "FM-294",
       "item": "rcp_respqueue_plan_batch",
       "file": "src/respqueue.c",
-      "line": 115,
+      "line": 244,
       "failureMode": "rcp_respqueue_plan_batch (general function) does not perform its intended action",
       "effect": "Failure of rcp_respqueue_plan_batch could propagate undetected to callers in respqueue.c",
       "cause": "Logic error or untested edge case in rcp_respqueue_plan_batch",
@@ -4507,7 +4715,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-282",
+      "id": "FM-295",
       "item": "rcp_ep_uart_nr_bits_valid",
       "file": "src/ep_uart.c",
       "line": 25,
@@ -4523,7 +4731,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-283",
+      "id": "FM-296",
       "item": "rcp_ep_uart_bit_pad_mask",
       "file": "src/ep_uart.c",
       "line": 31,
@@ -4539,7 +4747,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-284",
+      "id": "FM-297",
       "item": "rcp_ep_uart_apply_bit_padding",
       "file": "src/ep_uart.c",
       "line": 41,
@@ -4555,10 +4763,26 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-285",
+      "id": "FM-298",
+      "item": "rcp_ep_uart_trigger_fires",
+      "file": "src/ep_uart.c",
+      "line": 57,
+      "failureMode": "rcp_ep_uart_trigger_fires (general function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_uart_trigger_fires could propagate undetected to callers in ep_uart.c",
+      "cause": "Logic error or untested edge case in rcp_ep_uart_trigger_fires",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-299",
       "item": "rcp_ep_uart_functional_cfg_init",
       "file": "src/ep_uart.c",
-      "line": 54,
+      "line": 70,
       "failureMode": "rcp_ep_uart_functional_cfg_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_ep_uart_functional_cfg_init could propagate undetected to callers in ep_uart.c",
       "cause": "Configuration or state inconsistency affecting rcp_ep_uart_functional_cfg_init",
@@ -4571,10 +4795,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-286",
+      "id": "FM-300",
       "item": "encode_reconfig_request",
       "file": "src/ep_uart.c",
-      "line": 317,
+      "line": 348,
       "failureMode": "encode_reconfig_request (monitoring/control function) does not perform its intended action",
       "effect": "Failure of encode_reconfig_request could propagate undetected to callers in ep_uart.c",
       "cause": "Configuration or state inconsistency affecting encode_reconfig_request",
@@ -4587,10 +4811,26 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-287",
+      "id": "FM-301",
+      "item": "rcp_ep_uart_wire_timeout_us",
+      "file": "src/ep_uart.c",
+      "line": 647,
+      "failureMode": "rcp_ep_uart_wire_timeout_us (general function) does not perform its intended action",
+      "effect": "Failure of rcp_ep_uart_wire_timeout_us could propagate undetected to callers in ep_uart.c",
+      "cause": "Logic error or untested edge case in rcp_ep_uart_wire_timeout_us",
+      "severity": 3,
+      "occurrence": 2,
+      "detection": 3,
+      "actionPriority": "low",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-302",
       "item": "rcp_ep_uart_read_response_fragment_count",
       "file": "src/ep_uart.c",
-      "line": 645,
+      "line": 689,
       "failureMode": "rcp_ep_uart_read_response_fragment_count (general function) does not perform its intended action",
       "effect": "Failure of rcp_ep_uart_read_response_fragment_count could propagate undetected to callers in ep_uart.c",
       "cause": "Logic error or untested edge case in rcp_ep_uart_read_response_fragment_count",
@@ -4603,7 +4843,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-288",
+      "id": "FM-303",
       "item": "rcp_cli_run",
       "file": "src/cli.c",
       "line": 264,
@@ -4619,7 +4859,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-289",
+      "id": "FM-304",
       "item": "rcp_someip_default_config",
       "file": "src/someipbr.c",
       "line": 5,
@@ -4635,7 +4875,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-290",
+      "id": "FM-305",
       "item": "rcp_stream_id_make",
       "file": "src/avtp.c",
       "line": 65,
@@ -4651,7 +4891,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-291",
+      "id": "FM-306",
       "item": "rcp_stream_id_to_u64",
       "file": "src/avtp.c",
       "line": 74,
@@ -4667,7 +4907,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-292",
+      "id": "FM-307",
       "item": "rcp_stream_id_from_u64",
       "file": "src/avtp.c",
       "line": 83,
@@ -4683,7 +4923,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-293",
+      "id": "FM-308",
       "item": "rcp_stream_id_equal",
       "file": "src/avtp.c",
       "line": 99,
@@ -4699,7 +4939,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-294",
+      "id": "FM-309",
       "item": "rcp_avtp_addr_equal",
       "file": "src/avtp.c",
       "line": 105,
@@ -4715,10 +4955,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-295",
+      "id": "FM-310",
       "item": "rcp_avtp_extend_timestamp",
       "file": "src/avtp.c",
-      "line": 240,
+      "line": 245,
       "failureMode": "rcp_avtp_extend_timestamp (general function) does not perform its intended action",
       "effect": "Failure of rcp_avtp_extend_timestamp could propagate undetected to callers in avtp.c",
       "cause": "Logic error or untested edge case in rcp_avtp_extend_timestamp",
@@ -4731,10 +4971,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-296",
+      "id": "FM-311",
       "item": "rcp_avtp_peek_subtype",
       "file": "src/avtp.c",
-      "line": 261,
+      "line": 266,
       "failureMode": "rcp_avtp_peek_subtype (general function) does not perform its intended action",
       "effect": "Failure of rcp_avtp_peek_subtype could propagate undetected to callers in avtp.c",
       "cause": "Logic error or untested edge case in rcp_avtp_peek_subtype",
@@ -4747,13 +4987,13 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-297",
-      "item": "rcp_avtp_should_drop_tscf",
+      "id": "FM-312",
+      "item": "rcp_avtp_tscf_reserved_all_zero",
       "file": "src/avtp.c",
-      "line": 269,
-      "failureMode": "rcp_avtp_should_drop_tscf (general function) does not perform its intended action",
-      "effect": "Failure of rcp_avtp_should_drop_tscf could propagate undetected to callers in avtp.c",
-      "cause": "Logic error or untested edge case in rcp_avtp_should_drop_tscf",
+      "line": 286,
+      "failureMode": "rcp_avtp_tscf_reserved_all_zero (general function) does not perform its intended action",
+      "effect": "Failure of rcp_avtp_tscf_reserved_all_zero could propagate undetected to callers in avtp.c",
+      "cause": "Logic error or untested edge case in rcp_avtp_tscf_reserved_all_zero",
       "severity": 3,
       "occurrence": 2,
       "detection": 3,
@@ -4763,10 +5003,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-298",
+      "id": "FM-313",
       "item": "rcp_avtp_transport_retain",
       "file": "src/avtp.c",
-      "line": 278,
+      "line": 294,
       "failureMode": "rcp_avtp_transport_retain (general function) does not perform its intended action",
       "effect": "Failure of rcp_avtp_transport_retain could propagate undetected to callers in avtp.c",
       "cause": "Logic error or untested edge case in rcp_avtp_transport_retain",
@@ -4779,10 +5019,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-299",
+      "id": "FM-314",
       "item": "rcp_avtp_transport_release",
       "file": "src/avtp.c",
-      "line": 285,
+      "line": 301,
       "failureMode": "rcp_avtp_transport_release (general function) does not perform its intended action",
       "effect": "Failure of rcp_avtp_transport_release could propagate undetected to callers in avtp.c",
       "cause": "Logic error or untested edge case in rcp_avtp_transport_release",
@@ -4795,7 +5035,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-300",
+      "id": "FM-315",
       "item": "rcp_uds_default_config",
       "file": "src/udsbr.c",
       "line": 5,
@@ -4811,7 +5051,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-301",
+      "id": "FM-316",
       "item": "rcp_ep_spi_channel_valid",
       "file": "src/ep_spi.c",
       "line": 25,
@@ -4827,7 +5067,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-302",
+      "id": "FM-317",
       "item": "rcp_ep_spi_mode_valid",
       "file": "src/ep_spi.c",
       "line": 33,
@@ -4843,7 +5083,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-303",
+      "id": "FM-318",
       "item": "rcp_ep_spi_mode_cpol",
       "file": "src/ep_spi.c",
       "line": 39,
@@ -4859,7 +5099,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-304",
+      "id": "FM-319",
       "item": "rcp_ep_spi_mode_cpha",
       "file": "src/ep_spi.c",
       "line": 51,
@@ -4875,7 +5115,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-305",
+      "id": "FM-320",
       "item": "rcp_ep_spi_trigger_fires",
       "file": "src/ep_spi.c",
       "line": 68,
@@ -4891,7 +5131,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-306",
+      "id": "FM-321",
       "item": "rcp_ep_spi_functional_cfg_init",
       "file": "src/ep_spi.c",
       "line": 104,
@@ -4907,7 +5147,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-307",
+      "id": "FM-322",
       "item": "encode_reconfig_request",
       "file": "src/ep_spi.c",
       "line": 421,
@@ -4923,7 +5163,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-308",
+      "id": "FM-323",
       "item": "rcp_ep_spi_transfer_length",
       "file": "src/ep_spi.c",
       "line": 511,
@@ -4939,7 +5179,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-309",
+      "id": "FM-324",
       "item": "rcp_sequencer_table_new",
       "file": "src/request_sequencer.c",
       "line": 19,
@@ -4955,7 +5195,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-310",
+      "id": "FM-325",
       "item": "rcp_sequencer_table_unsupported",
       "file": "src/request_sequencer.c",
       "line": 45,
@@ -4971,7 +5211,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-311",
+      "id": "FM-326",
       "item": "rcp_sequencer_table_reset",
       "file": "src/request_sequencer.c",
       "line": 51,
@@ -4987,7 +5227,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-312",
+      "id": "FM-327",
       "item": "rcp_sequencer_table_free",
       "file": "src/request_sequencer.c",
       "line": 58,
@@ -5003,7 +5243,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-313",
+      "id": "FM-328",
       "item": "rcp_sequencer_index_valid",
       "file": "src/request_sequencer.c",
       "line": 68,
@@ -5019,7 +5259,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-314",
+      "id": "FM-329",
       "item": "rcp_sequencer_set_state",
       "file": "src/request_sequencer.c",
       "line": 85,
@@ -5035,7 +5275,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-315",
+      "id": "FM-330",
       "item": "rcp_sequencer_set_owner",
       "file": "src/request_sequencer.c",
       "line": 102,
@@ -5051,7 +5291,23 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-316",
+      "id": "FM-331",
+      "item": "rcp_sequencer_wire_error",
+      "file": "src/request_sequencer.c",
+      "line": 143,
+      "failureMode": "rcp_sequencer_wire_error (safety-critical function) does not perform its intended action",
+      "effect": "Failure of rcp_sequencer_wire_error could propagate undetected to callers in request_sequencer.c",
+      "cause": "Unhandled fault or invalid input condition within rcp_sequencer_wire_error",
+      "severity": 9,
+      "occurrence": 4,
+      "detection": 6,
+      "actionPriority": "high",
+      "mitigations": [],
+      "requirementIds": [],
+      "cyberFailureMode": ""
+    },
+    {
+      "id": "FM-332",
       "item": "rcp_request_type_is_triggered",
       "file": "src/request_triggered.c",
       "line": 25,
@@ -5067,7 +5323,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-317",
+      "id": "FM-333",
       "item": "rcp_triggered_runtime_enter_started",
       "file": "src/request_triggered.c",
       "line": 152,
@@ -5083,7 +5339,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-318",
+      "id": "FM-334",
       "item": "rcp_triggered_exec_delay_elapsed",
       "file": "src/request_triggered.c",
       "line": 179,
@@ -5099,7 +5355,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-319",
+      "id": "FM-335",
       "item": "rcp_mqtt_default_config",
       "file": "src/mqttbr.c",
       "line": 5,
@@ -5115,7 +5371,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-320",
+      "id": "FM-336",
       "item": "rcp_ep_can_frame_format_valid",
       "file": "src/ep_can.c",
       "line": 38,
@@ -5131,7 +5387,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-321",
+      "id": "FM-337",
       "item": "rcp_ep_can_frame_format_is_xl",
       "file": "src/ep_can.c",
       "line": 44,
@@ -5147,7 +5403,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-322",
+      "id": "FM-338",
       "item": "rcp_ep_can_frame_format_id_width",
       "file": "src/ep_can.c",
       "line": 71,
@@ -5163,7 +5419,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-323",
+      "id": "FM-339",
       "item": "rcp_ep_can_arbitration_id_valid",
       "file": "src/ep_can.c",
       "line": 85,
@@ -5179,7 +5435,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-324",
+      "id": "FM-340",
       "item": "rcp_ep_can_frame_format_max_data_len",
       "file": "src/ep_can.c",
       "line": 96,
@@ -5195,7 +5451,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-325",
+      "id": "FM-341",
       "item": "rcp_ep_can_xl_filter_index_valid",
       "file": "src/ep_can.c",
       "line": 112,
@@ -5211,7 +5467,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-326",
+      "id": "FM-342",
       "item": "rcp_ep_can_functional_cfg_init",
       "file": "src/ep_can.c",
       "line": 120,
@@ -5227,10 +5483,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-327",
+      "id": "FM-343",
       "item": "put_u16",
       "file": "src/ep_can.c",
-      "line": 765,
+      "line": 778,
       "failureMode": "put_u16 (general function) does not perform its intended action",
       "effect": "Failure of put_u16 could propagate undetected to callers in ep_can.c",
       "cause": "Logic error or untested edge case in put_u16",
@@ -5243,7 +5499,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-328",
+      "id": "FM-344",
       "item": "rcp_rest_default_config",
       "file": "src/restbridge.c",
       "line": 5,
@@ -5259,7 +5515,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-329",
+      "id": "FM-345",
       "item": "rcp_pwrmode_cold_start_lifecycle_target",
       "file": "src/power.c",
       "line": 35,
@@ -5275,7 +5531,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-330",
+      "id": "FM-346",
       "item": "rcp_pwrmode_hotstart_required",
       "file": "src/power.c",
       "line": 84,
@@ -5291,7 +5547,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-331",
+      "id": "FM-347",
       "item": "rcp_pwrmode_handshake_init",
       "file": "src/power.c",
       "line": 97,
@@ -5307,7 +5563,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-332",
+      "id": "FM-348",
       "item": "rcp_pwrmode_handshake_iface_reenabled",
       "file": "src/power.c",
       "line": 106,
@@ -5323,7 +5579,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-333",
+      "id": "FM-349",
       "item": "rcp_pwrmode_handshake_wakeup_attempt",
       "file": "src/power.c",
       "line": 121,
@@ -5339,7 +5595,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-334",
+      "id": "FM-350",
       "item": "rcp_pwrmode_handshake_resume_queues",
       "file": "src/power.c",
       "line": 141,
@@ -5355,7 +5611,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-335",
+      "id": "FM-351",
       "item": "rcp_pwrmode_handshake_is_complete",
       "file": "src/power.c",
       "line": 150,
@@ -5371,7 +5627,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-336",
+      "id": "FM-352",
       "item": "rcp_pwrmode_handshake_has_failed",
       "file": "src/power.c",
       "line": 156,
@@ -5387,7 +5643,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-337",
+      "id": "FM-353",
       "item": "rcp_pwrmode_check_entry",
       "file": "src/power.c",
       "line": 187,
@@ -5403,7 +5659,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-338",
+      "id": "FM-354",
       "item": "rcp_can_default_config",
       "file": "src/canbr.c",
       "line": 5,
@@ -5419,7 +5675,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-339",
+      "id": "FM-355",
       "item": "rcp_server_endpoint_init",
       "file": "src/server.c",
       "line": 14,
@@ -5435,7 +5691,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-340",
+      "id": "FM-356",
       "item": "rcp_server_endpoint_destroy",
       "file": "src/server.c",
       "line": 23,
@@ -5451,7 +5707,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-341",
+      "id": "FM-357",
       "item": "rcp_request_type_is_compound_wait",
       "file": "src/server.c",
       "line": 94,
@@ -5467,7 +5723,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-342",
+      "id": "FM-358",
       "item": "rcp_acf_evt_requests_acknowledge",
       "file": "src/server.c",
       "line": 123,
@@ -5483,7 +5739,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-343",
+      "id": "FM-359",
       "item": "rcp_server_endpoint_set_enable",
       "file": "src/server.c",
       "line": 131,
@@ -5499,7 +5755,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-344",
+      "id": "FM-360",
       "item": "rcp_server_endpoint_set_admission_suspended",
       "file": "src/server.c",
       "line": 137,
@@ -5515,7 +5771,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-345",
+      "id": "FM-361",
       "item": "rcp_server_endpoint_drain_one",
       "file": "src/server.c",
       "line": 143,
@@ -5531,7 +5787,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-346",
+      "id": "FM-362",
       "item": "rcp_server_endpoint_queue_len",
       "file": "src/server.c",
       "line": 159,
@@ -5547,10 +5803,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-347",
+      "id": "FM-363",
       "item": "rcp_acf_header_is_request",
       "file": "src/server.c",
-      "line": 271,
+      "line": 339,
       "failureMode": "rcp_acf_header_is_request (general function) does not perform its intended action",
       "effect": "Failure of rcp_acf_header_is_request could propagate undetected to callers in server.c",
       "cause": "Logic error or untested edge case in rcp_acf_header_is_request",
@@ -5563,10 +5819,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-348",
+      "id": "FM-364",
       "item": "rcp_server_gptp_trigger_state_init",
       "file": "src/server.c",
-      "line": 707,
+      "line": 881,
       "failureMode": "rcp_server_gptp_trigger_state_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_server_gptp_trigger_state_init could propagate undetected to callers in server.c",
       "cause": "Configuration or state inconsistency affecting rcp_server_gptp_trigger_state_init",
@@ -5579,10 +5835,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-349",
+      "id": "FM-365",
       "item": "rcp_server_endpoint_pending_count",
       "file": "src/server.c",
-      "line": 746,
+      "line": 920,
       "failureMode": "rcp_server_endpoint_pending_count (general function) does not perform its intended action",
       "effect": "Failure of rcp_server_endpoint_pending_count could propagate undetected to callers in server.c",
       "cause": "Logic error or untested edge case in rcp_server_endpoint_pending_count",
@@ -5595,10 +5851,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-350",
+      "id": "FM-366",
       "item": "rcp_server_endpoint_cancel_all",
       "file": "src/server.c",
-      "line": 754,
+      "line": 928,
       "failureMode": "rcp_server_endpoint_cancel_all (general function) does not perform its intended action",
       "effect": "Failure of rcp_server_endpoint_cancel_all could propagate undetected to callers in server.c",
       "cause": "Logic error or untested edge case in rcp_server_endpoint_cancel_all",
@@ -5611,10 +5867,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-351",
+      "id": "FM-367",
       "item": "rcp_server_endpoint_cancel_non_safestate",
       "file": "src/server.c",
-      "line": 806,
+      "line": 980,
       "failureMode": "rcp_server_endpoint_cancel_non_safestate (general function) does not perform its intended action",
       "effect": "Failure of rcp_server_endpoint_cancel_non_safestate could propagate undetected to callers in server.c",
       "cause": "Logic error or untested edge case in rcp_server_endpoint_cancel_non_safestate",
@@ -5627,10 +5883,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-352",
+      "id": "FM-368",
       "item": "rcp_server_endpoint_watchdog_purge",
       "file": "src/server.c",
-      "line": 812,
+      "line": 986,
       "failureMode": "rcp_server_endpoint_watchdog_purge (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_server_endpoint_watchdog_purge could propagate undetected to callers in server.c",
       "cause": "Unhandled fault or invalid input condition within rcp_server_endpoint_watchdog_purge",
@@ -5643,7 +5899,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-353",
+      "id": "FM-369",
       "item": "rcp_e2e_wire_error",
       "file": "src/e2e.c",
       "line": 25,
@@ -5659,7 +5915,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-354",
+      "id": "FM-370",
       "item": "rcp_e2e_crc32",
       "file": "src/e2e.c",
       "line": 61,
@@ -5675,10 +5931,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-355",
+      "id": "FM-371",
       "item": "rcp_e2e_length_with_crc",
       "file": "src/e2e.c",
-      "line": 142,
+      "line": 180,
       "failureMode": "rcp_e2e_length_with_crc (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_length_with_crc could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_length_with_crc",
@@ -5691,10 +5947,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-356",
+      "id": "FM-372",
       "item": "rcp_e2e_data_length_for_protected_members",
       "file": "src/e2e.c",
-      "line": 149,
+      "line": 187,
       "failureMode": "rcp_e2e_data_length_for_protected_members (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_data_length_for_protected_members could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_data_length_for_protected_members",
@@ -5707,10 +5963,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-357",
+      "id": "FM-373",
       "item": "rcp_e2e_fragment_carries_crc",
       "file": "src/e2e.c",
-      "line": 262,
+      "line": 369,
       "failureMode": "rcp_e2e_fragment_carries_crc (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_fragment_carries_crc could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_fragment_carries_crc",
@@ -5723,10 +5979,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-358",
+      "id": "FM-374",
       "item": "rcp_e2e_is_safety_request",
       "file": "src/e2e.c",
-      "line": 293,
+      "line": 407,
       "failureMode": "rcp_e2e_is_safety_request (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_is_safety_request could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_is_safety_request",
@@ -5739,10 +5995,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-359",
+      "id": "FM-375",
       "item": "rcp_e2e_request_may_execute",
       "file": "src/e2e.c",
-      "line": 300,
+      "line": 414,
       "failureMode": "rcp_e2e_request_may_execute (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_request_may_execute could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_request_may_execute",
@@ -5755,10 +6011,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-360",
+      "id": "FM-376",
       "item": "rcp_e2e_watchdog_purge_should_keep",
       "file": "src/e2e.c",
-      "line": 309,
+      "line": 423,
       "failureMode": "rcp_e2e_watchdog_purge_should_keep (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_watchdog_purge_should_keep could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_watchdog_purge_should_keep",
@@ -5771,10 +6027,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-361",
+      "id": "FM-377",
       "item": "rcp_e2e_measure_valid",
       "file": "src/e2e.c",
-      "line": 327,
+      "line": 441,
       "failureMode": "rcp_e2e_measure_valid (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_measure_valid could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_measure_valid",
@@ -5787,10 +6043,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-362",
+      "id": "FM-378",
       "item": "rcp_e2e_overflow_should_enter_safe_state",
       "file": "src/e2e.c",
-      "line": 383,
+      "line": 497,
       "failureMode": "rcp_e2e_overflow_should_enter_safe_state (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_overflow_should_enter_safe_state could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_overflow_should_enter_safe_state",
@@ -5803,10 +6059,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-363",
+      "id": "FM-379",
       "item": "rcp_e2e_seq_tracker_init",
       "file": "src/e2e.c",
-      "line": 390,
+      "line": 504,
       "failureMode": "rcp_e2e_seq_tracker_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_seq_tracker_init could propagate undetected to callers in e2e.c",
       "cause": "Configuration or state inconsistency affecting rcp_e2e_seq_tracker_init",
@@ -5819,10 +6075,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-364",
+      "id": "FM-380",
       "item": "rcp_e2e_crc_error_action",
       "file": "src/e2e.c",
-      "line": 440,
+      "line": 554,
       "failureMode": "rcp_e2e_crc_error_action (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_crc_error_action could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_crc_error_action",
@@ -5835,10 +6091,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-365",
+      "id": "FM-381",
       "item": "rcp_e2e_stream_fault_init",
       "file": "src/e2e.c",
-      "line": 447,
+      "line": 561,
       "failureMode": "rcp_e2e_stream_fault_init (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_fault_init could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_stream_fault_init",
@@ -5851,10 +6107,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-366",
+      "id": "FM-382",
       "item": "rcp_e2e_stream_fault_on_crc_error",
       "file": "src/e2e.c",
-      "line": 454,
+      "line": 568,
       "failureMode": "rcp_e2e_stream_fault_on_crc_error (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_fault_on_crc_error could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_stream_fault_on_crc_error",
@@ -5867,10 +6123,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-367",
+      "id": "FM-383",
       "item": "rcp_e2e_stream_fault_is_faulted",
       "file": "src/e2e.c",
-      "line": 463,
+      "line": 577,
       "failureMode": "rcp_e2e_stream_fault_is_faulted (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_fault_is_faulted could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_stream_fault_is_faulted",
@@ -5883,10 +6139,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-368",
+      "id": "FM-384",
       "item": "rcp_e2e_stream_fault_reset",
       "file": "src/e2e.c",
-      "line": 469,
+      "line": 583,
       "failureMode": "rcp_e2e_stream_fault_reset (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_fault_reset could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_stream_fault_reset",
@@ -5899,10 +6155,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-369",
+      "id": "FM-385",
       "item": "rcp_e2e_crc_error_should_enter_safe_state",
       "file": "src/e2e.c",
-      "line": 475,
+      "line": 589,
       "failureMode": "rcp_e2e_crc_error_should_enter_safe_state (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_crc_error_should_enter_safe_state could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_crc_error_should_enter_safe_state",
@@ -5915,10 +6171,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-370",
+      "id": "FM-386",
       "item": "stream_fault_tracker_find",
       "file": "src/e2e.c",
-      "line": 483,
+      "line": 597,
       "failureMode": "stream_fault_tracker_find (safety-critical function) does not perform its intended action",
       "effect": "Failure of stream_fault_tracker_find could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within stream_fault_tracker_find",
@@ -5931,10 +6187,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-371",
+      "id": "FM-387",
       "item": "stream_fault_tracker_find_free",
       "file": "src/e2e.c",
-      "line": 494,
+      "line": 608,
       "failureMode": "stream_fault_tracker_find_free (safety-critical function) does not perform its intended action",
       "effect": "Failure of stream_fault_tracker_find_free could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within stream_fault_tracker_find_free",
@@ -5947,10 +6203,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-372",
+      "id": "FM-388",
       "item": "rcp_e2e_stream_fault_tracker_init",
       "file": "src/e2e.c",
-      "line": 505,
+      "line": 619,
       "failureMode": "rcp_e2e_stream_fault_tracker_init (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_fault_tracker_init could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_stream_fault_tracker_init",
@@ -5963,10 +6219,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-373",
+      "id": "FM-389",
       "item": "rcp_e2e_stream_fault_tracker_reset",
       "file": "src/e2e.c",
-      "line": 548,
+      "line": 662,
       "failureMode": "rcp_e2e_stream_fault_tracker_reset (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_fault_tracker_reset could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_stream_fault_tracker_reset",
@@ -5979,10 +6235,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-374",
+      "id": "FM-390",
       "item": "rcp_e2e_stream_status_init",
       "file": "src/e2e.c",
-      "line": 558,
+      "line": 672,
       "failureMode": "rcp_e2e_stream_status_init (monitoring/control function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_status_init could propagate undetected to callers in e2e.c",
       "cause": "Configuration or state inconsistency affecting rcp_e2e_stream_status_init",
@@ -5995,10 +6251,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-375",
+      "id": "FM-391",
       "item": "rcp_e2e_stream_status_note_crc_error",
       "file": "src/e2e.c",
-      "line": 567,
+      "line": 681,
       "failureMode": "rcp_e2e_stream_status_note_crc_error (safety-critical function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_status_note_crc_error could propagate undetected to callers in e2e.c",
       "cause": "Unhandled fault or invalid input condition within rcp_e2e_stream_status_note_crc_error",
@@ -6011,10 +6267,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-376",
+      "id": "FM-392",
       "item": "rcp_e2e_stream_status_note_seq",
       "file": "src/e2e.c",
-      "line": 573,
+      "line": 687,
       "failureMode": "rcp_e2e_stream_status_note_seq (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_status_note_seq could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_stream_status_note_seq",
@@ -6027,10 +6283,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-377",
+      "id": "FM-393",
       "item": "rcp_e2e_stream_status_note_wd",
       "file": "src/e2e.c",
-      "line": 579,
+      "line": 693,
       "failureMode": "rcp_e2e_stream_status_note_wd (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_status_note_wd could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_stream_status_note_wd",
@@ -6043,10 +6299,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-378",
+      "id": "FM-394",
       "item": "rcp_e2e_stream_status_note_overflow",
       "file": "src/e2e.c",
-      "line": 585,
+      "line": 699,
       "failureMode": "rcp_e2e_stream_status_note_overflow (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_status_note_overflow could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_stream_status_note_overflow",
@@ -6059,10 +6315,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-379",
+      "id": "FM-395",
       "item": "rcp_e2e_stream_status_reset_crc",
       "file": "src/e2e.c",
-      "line": 591,
+      "line": 705,
       "failureMode": "rcp_e2e_stream_status_reset_crc (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_status_reset_crc could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_stream_status_reset_crc",
@@ -6075,10 +6331,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-380",
+      "id": "FM-396",
       "item": "rcp_e2e_stream_status_reset_seq",
       "file": "src/e2e.c",
-      "line": 597,
+      "line": 711,
       "failureMode": "rcp_e2e_stream_status_reset_seq (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_status_reset_seq could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_stream_status_reset_seq",
@@ -6091,10 +6347,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-381",
+      "id": "FM-397",
       "item": "rcp_e2e_stream_status_reset_wd",
       "file": "src/e2e.c",
-      "line": 603,
+      "line": 717,
       "failureMode": "rcp_e2e_stream_status_reset_wd (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_status_reset_wd could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_stream_status_reset_wd",
@@ -6107,10 +6363,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-382",
+      "id": "FM-398",
       "item": "rcp_e2e_stream_status_reset_overflow",
       "file": "src/e2e.c",
-      "line": 609,
+      "line": 723,
       "failureMode": "rcp_e2e_stream_status_reset_overflow (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_status_reset_overflow could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_stream_status_reset_overflow",
@@ -6123,10 +6379,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-383",
+      "id": "FM-399",
       "item": "rcp_e2e_stream_status_rx_blocked",
       "file": "src/e2e.c",
-      "line": 615,
+      "line": 729,
       "failureMode": "rcp_e2e_stream_status_rx_blocked (general function) does not perform its intended action",
       "effect": "Failure of rcp_e2e_stream_status_rx_blocked could propagate undetected to callers in e2e.c",
       "cause": "Logic error or untested edge case in rcp_e2e_stream_status_rx_blocked",
@@ -6139,7 +6395,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-384",
+      "id": "FM-400",
       "item": "rcp_ep_iseled_symbol_encode",
       "file": "src/ep_iseled.c",
       "line": 36,
@@ -6155,7 +6411,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-385",
+      "id": "FM-401",
       "item": "rcp_ep_iseled_symbol_decode",
       "file": "src/ep_iseled.c",
       "line": 45,
@@ -6171,7 +6427,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-386",
+      "id": "FM-402",
       "item": "rcp_ep_iseled_bitframe_encoded_len",
       "file": "src/ep_iseled.c",
       "line": 59,
@@ -6187,7 +6443,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-387",
+      "id": "FM-403",
       "item": "rcp_ep_iseled_encode_bitframe",
       "file": "src/ep_iseled.c",
       "line": 68,
@@ -6203,7 +6459,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-388",
+      "id": "FM-404",
       "item": "rcp_ep_iseled_crc8",
       "file": "src/ep_iseled.c",
       "line": 111,
@@ -6219,7 +6475,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-389",
+      "id": "FM-405",
       "item": "rcp_ep_iseled_requires_isp_n",
       "file": "src/ep_iseled.c",
       "line": 132,
@@ -6235,7 +6491,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-390",
+      "id": "FM-406",
       "item": "rcp_ep_iseled_trigger_fires",
       "file": "src/ep_iseled.c",
       "line": 140,
@@ -6251,7 +6507,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-391",
+      "id": "FM-407",
       "item": "rcp_ep_iseled_functional_cfg_init",
       "file": "src/ep_iseled.c",
       "line": 152,
@@ -6267,7 +6523,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-392",
+      "id": "FM-408",
       "item": "rcp_ep_iseled_symbol_decode",
       "file": "src/ep_iseled.c",
       "line": 427,
@@ -6283,7 +6539,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-393",
+      "id": "FM-409",
       "item": "rcp_discovery_should_drop",
       "file": "src/discovery.c",
       "line": 52,
@@ -6299,7 +6555,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-394",
+      "id": "FM-410",
       "item": "put_u32",
       "file": "src/discovery.c",
       "line": 184,
@@ -6315,7 +6571,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-395",
+      "id": "FM-411",
       "item": "rcp_discovery_response_fragment_count",
       "file": "src/discovery.c",
       "line": 246,
@@ -6331,7 +6587,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-396",
+      "id": "FM-412",
       "item": "put_u32",
       "file": "src/discovery.c",
       "line": 269,
@@ -6347,7 +6603,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-397",
+      "id": "FM-413",
       "item": "rcp_discovery_claim_init",
       "file": "src/discovery.c",
       "line": 374,
@@ -6363,7 +6619,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-398",
+      "id": "FM-414",
       "item": "rcp_discovery_claim_is_open",
       "file": "src/discovery.c",
       "line": 381,
@@ -6379,7 +6635,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-399",
+      "id": "FM-415",
       "item": "rcp_discovery_claim_release",
       "file": "src/discovery.c",
       "line": 424,
@@ -6395,7 +6651,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-400",
+      "id": "FM-416",
       "item": "rcp_discovery_cache_init",
       "file": "src/discovery.c",
       "line": 432,
@@ -6411,7 +6667,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-401",
+      "id": "FM-417",
       "item": "rcp_discovery_cache_destroy",
       "file": "src/discovery.c",
       "line": 440,
@@ -6427,7 +6683,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-402",
+      "id": "FM-418",
       "item": "rcp_discovery_cache_len",
       "file": "src/discovery.c",
       "line": 491,
@@ -6443,7 +6699,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-403",
+      "id": "FM-419",
       "item": "rcp_acf_unpack_header",
       "file": "src/acf.c",
       "line": 79,
@@ -6459,7 +6715,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-404",
+      "id": "FM-420",
       "item": "rcp_acf_pad_len",
       "file": "src/acf.c",
       "line": 131,
@@ -6475,7 +6731,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-405",
+      "id": "FM-421",
       "item": "rcp_acf_reg_write_len",
       "file": "src/acf.c",
       "line": 137,
@@ -6491,7 +6747,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-406",
+      "id": "FM-422",
       "item": "rcp_acf_classify_response",
       "file": "src/acf.c",
       "line": 158,
@@ -6507,7 +6763,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-407",
+      "id": "FM-423",
       "item": "rcp_acf_read_size_or_segment_num_kind",
       "file": "src/acf.c",
       "line": 177,
@@ -6523,7 +6779,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-408",
+      "id": "FM-424",
       "item": "rcp_acf_header_is_request",
       "file": "src/acf.c",
       "line": 195,
@@ -6539,7 +6795,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-409",
+      "id": "FM-425",
       "item": "rcp_acf_evt_row2_is_plain",
       "file": "src/acf.c",
       "line": 201,
@@ -6555,7 +6811,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-410",
+      "id": "FM-426",
       "item": "rcp_acf_compound_wait_evt_valid",
       "file": "src/acf.c",
       "line": 218,
@@ -6571,7 +6827,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-411",
+      "id": "FM-427",
       "item": "rcp_acf_evt_requests_acknowledge",
       "file": "src/acf.c",
       "line": 304,
@@ -6587,10 +6843,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-412",
+      "id": "FM-428",
       "item": "rcp_acf_gbb_is_timed",
       "file": "src/acf.c",
-      "line": 480,
+      "line": 502,
       "failureMode": "rcp_acf_gbb_is_timed (general function) does not perform its intended action",
       "effect": "Failure of rcp_acf_gbb_is_timed could propagate undetected to callers in acf.c",
       "cause": "Logic error or untested edge case in rcp_acf_gbb_is_timed",
@@ -6603,10 +6859,10 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-413",
+      "id": "FM-429",
       "item": "rcp_acf_peek_msg_type",
       "file": "src/acf.c",
-      "line": 488,
+      "line": 510,
       "failureMode": "rcp_acf_peek_msg_type (general function) does not perform its intended action",
       "effect": "Failure of rcp_acf_peek_msg_type could propagate undetected to callers in acf.c",
       "cause": "Logic error or untested edge case in rcp_acf_peek_msg_type",
@@ -6619,7 +6875,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-414",
+      "id": "FM-430",
       "item": "rcp_deadline_default_config",
       "file": "src/deadline.c",
       "line": 11,
@@ -6635,7 +6891,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-415",
+      "id": "FM-431",
       "item": "rcp_deadline_monitor_heartbeat",
       "file": "src/deadline.c",
       "line": 94,
@@ -6651,7 +6907,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-416",
+      "id": "FM-432",
       "item": "rcp_deadline_monitor_notify_overflow",
       "file": "src/deadline.c",
       "line": 113,
@@ -6667,7 +6923,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-417",
+      "id": "FM-433",
       "item": "rcp_deadline_monitor_alive",
       "file": "src/deadline.c",
       "line": 221,
@@ -6683,7 +6939,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-418",
+      "id": "FM-434",
       "item": "rcp_deadline_monitor_subscribe",
       "file": "src/deadline.c",
       "line": 234,
@@ -6699,7 +6955,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-419",
+      "id": "FM-435",
       "item": "rcp_deadline_monitor_close",
       "file": "src/deadline.c",
       "line": 245,
@@ -6715,7 +6971,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-420",
+      "id": "FM-436",
       "item": "rcp_deadline_monitor_destroy",
       "file": "src/deadline.c",
       "line": 258,
@@ -6731,7 +6987,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-421",
+      "id": "FM-437",
       "item": "relay_bytes_dup",
       "file": "src/relay.c",
       "line": 25,
@@ -6747,7 +7003,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-422",
+      "id": "FM-438",
       "item": "relay_bytes_free",
       "file": "src/relay.c",
       "line": 40,
@@ -6763,7 +7019,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-423",
+      "id": "FM-439",
       "item": "relay_message_init",
       "file": "src/relay.c",
       "line": 51,
@@ -6779,7 +7035,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-424",
+      "id": "FM-440",
       "item": "relay_message_free",
       "file": "src/relay.c",
       "line": 64,
@@ -6795,7 +7051,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-425",
+      "id": "FM-441",
       "item": "relay_message_set_id",
       "file": "src/relay.c",
       "line": 82,
@@ -6811,7 +7067,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-426",
+      "id": "FM-442",
       "item": "relay_message_set_meta",
       "file": "src/relay.c",
       "line": 99,
@@ -6827,7 +7083,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-427",
+      "id": "FM-443",
       "item": "relay_subscriber_options_default",
       "file": "src/relay.c",
       "line": 155,
@@ -6843,7 +7099,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-428",
+      "id": "FM-444",
       "item": "relay_message_channel_new",
       "file": "src/relay.c",
       "line": 181,
@@ -6859,7 +7115,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-429",
+      "id": "FM-445",
       "item": "relay_message_channel_retain",
       "file": "src/relay.c",
       "line": 206,
@@ -6875,7 +7131,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-430",
+      "id": "FM-446",
       "item": "relay_message_channel_release",
       "file": "src/relay.c",
       "line": 212,
@@ -6891,7 +7147,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-431",
+      "id": "FM-447",
       "item": "relay_message_channel_push",
       "file": "src/relay.c",
       "line": 251,
@@ -6907,7 +7163,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-432",
+      "id": "FM-448",
       "item": "relay_message_channel_recv",
       "file": "src/relay.c",
       "line": 275,
@@ -6923,7 +7179,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-433",
+      "id": "FM-449",
       "item": "relay_message_channel_try_recv",
       "file": "src/relay.c",
       "line": 292,
@@ -6939,7 +7195,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-434",
+      "id": "FM-450",
       "item": "relay_message_channel_close",
       "file": "src/relay.c",
       "line": 306,
@@ -6955,7 +7211,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-435",
+      "id": "FM-451",
       "item": "relay_message_channel_is_closed",
       "file": "src/relay.c",
       "line": 315,
@@ -6971,7 +7227,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-436",
+      "id": "FM-452",
       "item": "rcp_relay_caller_retain",
       "file": "src/relay.c",
       "line": 327,
@@ -6987,7 +7243,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-437",
+      "id": "FM-453",
       "item": "rcp_relay_caller_release",
       "file": "src/relay.c",
       "line": 333,
@@ -7003,7 +7259,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-438",
+      "id": "FM-454",
       "item": "rcp_authz_policy_new",
       "file": "src/authz.c",
       "line": 32,
@@ -7019,7 +7275,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-439",
+      "id": "FM-455",
       "item": "rcp_authz_policy_retain",
       "file": "src/authz.c",
       "line": 42,
@@ -7035,7 +7291,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-440",
+      "id": "FM-456",
       "item": "rcp_authz_policy_release",
       "file": "src/authz.c",
       "line": 55,
@@ -7051,7 +7307,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-441",
+      "id": "FM-457",
       "item": "rcp_fragment_plan_count",
       "file": "src/fragment.c",
       "line": 24,
@@ -7067,7 +7323,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-442",
+      "id": "FM-458",
       "item": "rcp_fragment_reassembler_init",
       "file": "src/fragment.c",
       "line": 98,
@@ -7083,7 +7339,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-443",
+      "id": "FM-459",
       "item": "rcp_fragment_reassembler_reset",
       "file": "src/fragment.c",
       "line": 109,
@@ -7099,7 +7355,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-444",
+      "id": "FM-460",
       "item": "rcp_fragment_reassembler_destroy",
       "file": "src/fragment.c",
       "line": 118,
@@ -7115,7 +7371,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-445",
+      "id": "FM-461",
       "item": "rcp_fragment_reassembler_is_collecting",
       "file": "src/fragment.c",
       "line": 193,
@@ -7131,7 +7387,7 @@
       "cyberFailureMode": ""
     },
     {
-      "id": "FM-446",
+      "id": "FM-462",
       "item": "main",
       "file": "cli/main.c",
       "line": 12,
@@ -7148,7 +7404,7 @@
     }
   ],
   "summary": {
-    "total": 446, "highPriority": 52,
-    "componentsAnalyzed": 446, "componentsInProject": 446, "coveragePct": 100
+    "total": 462, "highPriority": 60,
+    "componentsAnalyzed": 462, "componentsInProject": 462, "coveragePct": 100
   }
 }

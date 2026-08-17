@@ -2,9 +2,9 @@
   "schemaVersion": "1.15.2",
   "kind": "sbom",
   "tool": "c-FuSa",
-  "toolVersion": "0.5.51",
+  "toolVersion": "0.5.54",
   "language": "c",
-  "generatedAt": "2026-08-14T13:16:00Z",
+  "generatedAt": "2026-08-17T21:35:18Z",
   "format": "x-FuSa SBOM v1",
   "module": "c-RCP@0.225.0",
   "components": []
