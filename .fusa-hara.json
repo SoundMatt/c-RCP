@@ -2,22 +2,62 @@
   "schemaVersion": "1.10.4",
   "kind": "hara",
   "tool": "c-FuSa",
-  "toolVersion": "0.5.46",
+  "toolVersion": "0.5.54",
   "language": "c",
-  "generatedAt": "2026-07-28T21:00:00Z",
+  "generatedAt": "2026-08-17T00:00:00Z",
   "project": "c-RCP",
-  "version": "0.85.0",
+  "version": "0.415.0",
   "standard": "ISO 26262-3:2018",
+  "operationalSituations": [
+    {
+      "id": "OS-001",
+      "description": "Normal operation — RC Server RCP_CONFIGURED, all admitted request streams active"
+    },
+    {
+      "id": "OS-002",
+      "description": "HW/RCP configuration fault — HW pin map or endpoint/stream manifest inconsistent; server cannot reach or remain in RCP_CONFIGURED"
+    },
+    {
+      "id": "OS-003",
+      "description": "Safety-critical maneuver — a safety-tagged (MSB-set) request in flight against a safety-relevant actuator endpoint"
+    },
+    {
+      "id": "OS-004",
+      "description": "HPC/application software fault — runaway process, crash, or malformed manifest driving the RC Server"
+    },
+    {
+      "id": "OS-005",
+      "description": "Elevated network latency/jitter — congestion, EMI, or degraded Ethernet/CAN(FD/XL) link affecting AVTPDU delivery timing"
+    },
+    {
+      "id": "OS-006",
+      "description": "Adversarial access — attacker present on the native Ethernet/AVB segment or the IEEE1722-over-UDP/IP path"
+    },
+    {
+      "id": "OS-007",
+      "description": "Power transition — cold-start/hot-start WakeUp handshake in progress after a StandBy/Sleep period"
+    },
+    {
+      "id": "OS-008",
+      "description": "Discovery/bootstrap — server in HW_UNCONFIGURED, admitting only the discovery request at the reserved discovery byte_bus_id"
+    }
+  ],
   "hazards": [
     {
       "id": "H-001",
       "item": "rcp_e2e_wd_evaluate() / rcp_watchdog_keeper_t (Phase 18 milestone 70, Phase 21 milestone 79)",
+      "situations": [
+        "OS-001",
+        "OS-003",
+        "OS-005"
+      ],
       "hazardous_event": "Loss of safety-tagged request delivery/execution to a safety-critical endpoint (e.g. an actuator fail-safe command)",
       "risk": {
         "severity": "S3",
         "exposure": "E4",
         "controllability": "C2",
-        "asil": "ASIL-C"
+        "asil": "ASIL-C",
+        "rationale": "S3 (ISO 26262-3:2018 Table 1): loss of delivery/execution of a safety-tagged request to a safety-critical actuator during OS-003 (a safety-critical maneuver already in flight) can leave that actuator without its commanded fail-safe action -- a life-threatening outcome whose survival is not assured. E4 (Table 2): every admitted request stream capable of carrying a safety-tagged request is active throughout OS-001 (normal operation), so the situation in which this hazard could occur is present essentially continuously, not merely in a rare or occasional window; OS-005's elevated latency/jitter further raises the chance that a given watchdog-timeout window is actually reached. C2 (Table 3): rcp_e2e_wd_evaluate()'s own watchdog/safe-state mechanism is the last line of defense this hazard's safety goal analyzes, but a downstream supervisor can still normally intervene before the FTTI elapses -- 'normally controllable' rather than 'difficult to control'."
       },
       "safe_state": "rcp_e2e_wd_evaluate() reports overflow once elapsed time reaches rx_wd_timeout_ms and, when rx_wd_safestate_enable is set, drives the stream toward its configured safe state; rcp_watchdog_keeper_t re-evaluates this periodically and fires a callback on every verdict change.",
       "safetyGoals": [
@@ -28,12 +68,16 @@
     {
       "id": "H-002",
       "item": "avtp.h (stream_id, byte_bus_id) addressing + regmap.h endpoint identification (Phase 13-14)",
+      "situations": [
+        "OS-001"
+      ],
       "hazardous_event": "A request is executed against the wrong endpoint due to a stream_id/byte_bus_id addressing error",
       "risk": {
         "severity": "S2",
         "exposure": "E3",
         "controllability": "C2",
-        "asil": "ASIL-A"
+        "asil": "ASIL-A",
+        "rationale": "S2: an addressing error executing a request against the wrong endpoint causes severe but not necessarily life-threatening harm (a command reaches an unintended actuator) -- survival probable. E3: the cause is a programming/config defect not tied to any elevated-risk situation (OS-003/OS-005/OS-006); it can occur any time a request is dispatched during OS-001, but nowhere near E4's 'most operating conditions' rate, since correct (stream_id, byte_bus_id) resolution is the overwhelmingly common case. C2: normally controllable -- an operator or a downstream consistency check (the wrong output responding) can typically catch it."
       },
       "safe_state": "Requests are addressed by the (stream_id, byte_bus_id) pair; a request naming an unregistered byte_bus_id is rejected once lifecycle admission succeeds, never silently routed to a different endpoint.",
       "safetyGoals": [
@@ -44,12 +88,17 @@
     {
       "id": "H-003",
       "item": "rcp_e2e_wd_evaluate() rx_wd_safestate_enable gating (Phase 18 milestone 70)",
+      "situations": [
+        "OS-001",
+        "OS-003"
+      ],
       "hazardous_event": "A request stream's watchdog overflows but the endpoint is not driven toward its configured safe state",
       "risk": {
         "severity": "S2",
         "exposure": "E4",
         "controllability": "C2",
-        "asil": "ASIL-B"
+        "asil": "ASIL-B",
+        "rationale": "S2: an un-driven safe state on watchdog overflow is severe (an unresponsive endpoint after loss of comms) but the endpoint merely fails to move to its defined safe posture rather than executing an unsafe action outright -- survival probable, one class below H-001's S3. E4: rx_wd_safestate_enable gating is evaluated on every watchdog overflow across the whole OS-001 normal-operation envelope, and OS-003 (safety-critical maneuver) is a continuously-present subset of it, so the triggering situation is present in most operating conditions, matching H-001's E4. C2: normally controllable by the same reasoning as H-001 -- a downstream safe-state observer or supervisor can react before harm accrues."
       },
       "safe_state": "rx_wd_safestate_enable independently gates whether an overflow drives enter_safe_state; rcp_e2e_watchdog_purge_should_keep()/_classify() ensure a safety-tagged request pending at overflow time is never discarded by the resulting purge (formally verified: tla/E2ESafePoint.tla SafetyRequestsSurvivePurge).",
       "safetyGoals": [
@@ -60,12 +109,17 @@
     {
       "id": "H-004",
       "item": "include/rcp/e2e.h (Phase 18 milestone 70) -- no sequence-counter/replay-window mechanism implemented",
+      "situations": [
+        "OS-001",
+        "OS-006"
+      ],
       "hazardous_event": "A stale or duplicated request is captured and re-executed",
       "risk": {
         "severity": "S2",
         "exposure": "E3",
         "controllability": "C2",
-        "asil": "ASIL-A"
+        "asil": "ASIL-A",
+        "rationale": "S2: a stale/duplicated request re-executed against an actuator is severe but repeats a previously-valid command rather than an arbitrary/unauthorized one -- survival probable. E3: requires either OS-006 (an adversarial actor capturing and replaying traffic) or, for accidental duplication, an unusual link-layer retransmit/duplication fault during OS-001 -- a specific triggering condition layered on top of ordinary operation, medium rather than high probability. C2: normally controllable -- a repeated command an endpoint already accepted once is often observable/idempotent-checkable downstream."
       },
       "safe_state": "No mitigation is currently implemented in this library -- the TC18 CRC32 safe-point mechanism that replaced the retired CRC-16/sequence-counter/replay-window guard does not reimplement replay detection (see include/rcp/e2e.h's own file header and tara.md TS-002). Tracked as an open residual risk, not a closed hazard.",
       "safetyGoals": [
@@ -76,12 +130,17 @@
     {
       "id": "H-005",
       "item": "rcp_e2e_endpoint_in_safe_state() / rcp_e2e_request_may_execute() (Phase 18 milestone 70)",
+      "situations": [
+        "OS-003",
+        "OS-007"
+      ],
       "hazardous_event": "A safety-tagged request executes before its endpoint has actually reached the configured safe state",
       "risk": {
         "severity": "S3",
         "exposure": "E3",
         "controllability": "C2",
-        "asil": "ASIL-B"
+        "asil": "ASIL-B",
+        "rationale": "S3: executing a safety-tagged request before the endpoint has actually reached its configured safe state directly defeats the safe-state precondition during OS-003's safety-critical maneuver -- life-threatening, survival not assured, matching H-001. E3: this specific execute-before-confirmed-safe race needs a narrower timing window than H-001's general delivery-loss hazard -- most concretely during OS-007's power-transition/WakeUp sequencing, where safe-state/sequencer state is actively changing, rather than being continuously exposed across all of OS-001 -- medium rather than high probability. C2: normally controllable, since rcp_e2e_endpoint_in_safe_state()'s fail-closed design is the analyzed mitigation, not a claim the hazard is otherwise unrecoverable."
       },
       "safe_state": "rcp_e2e_endpoint_in_safe_state() fails closed (returns false) for an unrecognized rx_safety_measure or an invalid safestate_sequencer index, and rcp_e2e_request_may_execute() denies execution of a safety-tagged request whenever it returns false (formally verified: tla/E2ESafePoint.tla NoUnsafeSafetyExecution).",
       "safetyGoals": [
@@ -92,12 +151,18 @@
     {
       "id": "H-006",
       "item": "rcp_regmap_writer_ctx() (Phase 14 milestone 62)",
+      "situations": [
+        "OS-001",
+        "OS-002",
+        "OS-006"
+      ],
       "hazardous_event": "A register-map field write succeeds without the caller holding the required writer authorization",
       "risk": {
         "severity": "S2",
         "exposure": "E3",
         "controllability": "C2",
-        "asil": "ASIL-A"
+        "asil": "ASIL-A",
+        "rationale": "S2: an unauthorized register-map write is severe (a functional field could be altered outside its intended writer's control) but does not by itself put a safety-tagged request in flight -- survival probable. E3: requires either an OS-002 configuration fault (a manifest/pin-map inconsistency letting writer-context checks be bypassed or misapplied) or an OS-006 adversarial actor issuing writes without authorization; under ordinary OS-001 operation with a correctly configured manifest the writer-context check is expected to hold, so medium rather than high probability. C2: normally controllable -- a write to a monitored/locked field is typically observable and reversible before it drives an unsafe state, per the FUNCTIONAL_W_STAR locking behavior recorded in safe_state."
       },
       "safe_state": "rcp_regmap_writer_ctx() grants via_root_client_ep0/via_owning_stream only to the authorized writer context; HW_GENERIC fields become read-only once HW_CONFIGURED and FUNCTIONAL_W_STAR fields are permanently locked for the remainder of the configured session once RCP_CONFIGURED (formally verified: tla/LifecycleStateMachine.tla FieldLockMonotonicWhileConfigured).",
       "safetyGoals": [
@@ -108,12 +173,16 @@
     {
       "id": "H-007",
       "item": "native Ethernet / IEEE1722-over-UDP/IP transport (udp.c, avtp.c) -- MACsec is link-layer, outside this library",
+      "situations": [
+        "OS-006"
+      ],
       "hazardous_event": "An unauthenticated request is accepted and acted on over the native transport in the absence of link-layer authentication",
       "risk": {
         "severity": "S3",
         "exposure": "E2",
         "controllability": "C2",
-        "asil": "ASIL-A"
+        "asil": "ASIL-A",
+        "rationale": "S3: an unauthenticated, accepted request over the native transport could carry an arbitrary safety-tagged command with no cryptographic origin check -- matching H-001/H-005's life-threatening severity class. E2 (low probability): this hazard requires OS-006 (an adversarial actor already present on the native Ethernet/AVB segment or the IEEE1722-over-UDP/IP path) -- gaining that access at all is itself a low-probability precondition, unlike the E3/E4 hazards above whose triggering situation is part of ordinary operation. C2: normally controllable in the sense that this hazard's own safety goal (SG-007) explicitly delegates the actual control (MACsec) to the deployment/integrator as the intended, normally-available external control -- not that this library mitigates it internally."
       },
       "safe_state": "Not mitigated within this library. MACsec (802.1AE) is a link-layer, product-specific/opaque control the spec delegates outside RCP itself; this library's own default posture (mock/sim/udp/shmem transports) has no cryptographic identity source, matching the tls.c-deprecation rationale (see CYBERSECURITY.md Layer 1 and tara.md TS-001/TS-003).",
       "safetyGoals": [
@@ -124,12 +193,16 @@
     {
       "id": "H-008",
       "item": "rcp_pwrmode_* WakeUp handshake state machine (Phase 19 milestones 73-75)",
+      "situations": [
+        "OS-007"
+      ],
       "hazardous_event": "The RC Server fails to complete its WakeUp handshake after a Sleep/StandBy transition, leaving safety-relevant actuators unresponsive",
       "risk": {
         "severity": "S3",
         "exposure": "E3",
         "controllability": "C2",
-        "asil": "ASIL-B"
+        "asil": "ASIL-B",
+        "rationale": "S3: a WakeUp handshake that fails to complete leaves safety-relevant actuators unresponsive after a Sleep/StandBy transition -- life-threatening if that unresponsiveness coincides with a safety-relevant demand, matching H-001/H-005. E3: this hazard's triggering situation is OS-007 (power transition) specifically, a bounded, less-frequent sub-window of total operating time (only across StandBy/Sleep transitions), not the continuously-active OS-001 envelope -- medium rather than high probability. C2: normally controllable -- rcp_pwrmode_handshake_has_failed() reports the failure explicitly (rather than silently assuming completion), giving a supervisor the chance to intervene before an unresponsive actuator is relied upon."
       },
       "safe_state": "rcp_pwrmode_handshake_is_complete() must report true before normal operation resumes; a failed handshake is reported via rcp_pwrmode_handshake_has_failed() rather than silently assumed complete, and rcp_pwrmode_wake_from_sleep() correctly classifies hot vs. cold wake starts so a cold start re-runs full re-initialization.",
       "safetyGoals": [
@@ -140,12 +213,17 @@
     {
       "id": "H-009",
       "item": "rcp_e2e_crc_error_action() / rcp_e2e_stream_fault_t (Phase 18 milestone 70)",
+      "situations": [
+        "OS-001",
+        "OS-005"
+      ],
       "hazardous_event": "A CRC32-corrupted request frame is executed instead of rejected",
       "risk": {
         "severity": "S2",
         "exposure": "E3",
         "controllability": "C2",
-        "asil": "ASIL-A"
+        "asil": "ASIL-A",
+        "rationale": "S2: executing a CRC32-corrupted request frame instead of rejecting it risks acting on corrupted command data -- severe, but unlike H-001/H-005 this hazard's mitigation (rcp_e2e_crc_error_action()) is evaluated per-frame rather than needing to survive an entire maneuver window, so survival is probable. E3: frame corruption is driven by OS-005 (elevated network latency/jitter/EMI or a degraded link) layered on top of ordinary OS-001 traffic -- real but not constant, medium rather than high probability. C2: normally controllable -- the stream-fault latching behavior (rcp_e2e_stream_fault_t) gives a downstream consumer an observable signal rather than a silent corrupted execution."
       },
       "safe_state": "rcp_e2e_unwrap() reports CRC_ERROR on a mismatched trailer; rcp_e2e_crc_error_action() maps the endpoint's rx_enforce_e2e configuration to either drop-this-request or latch-the-whole-stream-faulted, and rcp_e2e_stream_fault_t implements the latter statefully until explicitly reset.",
       "safetyGoals": [
@@ -156,12 +234,17 @@
     {
       "id": "H-010",
       "item": "faultinject.c (Phase 21 milestone 80, ADAPT)",
+      "situations": [
+        "OS-001",
+        "OS-004"
+      ],
       "hazardous_event": "Fault-injection rules persist across process or vehicle power cycles, masking or fabricating faults outside the test session that created them",
       "risk": {
         "severity": "S2",
         "exposure": "E2",
         "controllability": "C3",
-        "asil": "ASIL-A"
+        "asil": "ASIL-A",
+        "rationale": "S2: a fault-injection rule outliving its injecting process/power cycle could mask a real fault or fabricate a false one during subsequent OS-001 normal operation -- severe if a genuine fault goes unnoticed as a result, but this requires the fabricated/masked condition to itself coincide with a safety-relevant event, so survival is probable. E2 (low probability): requires OS-004 (an HPC/application software fault -- e.g. a leaked or non-cleaned-up test/dev fault-injection configuration reaching a field session) as precondition; fault-injection tooling is not part of ordinary OS-001 traffic at all, so its presence in a deployed session is already a low-probability event. C3: difficult to control -- unlike the other hazards' downstream-observable mitigations, a persisted fault-injection rule actively falsifies the signal a supervisor would otherwise use to detect or correct the condition, which is why this hazard alone carries C3 rather than C2."
       },
       "safe_state": "Fault-injection rules live only in caller-owned, in-process state with no persistence mechanism of its own.",
       "safetyGoals": [
@@ -172,12 +255,17 @@
     {
       "id": "H-011",
       "item": "rcp_lifecycle_transition() (Phase 14 milestone 61)",
+      "situations": [
+        "OS-002",
+        "OS-008"
+      ],
       "hazardous_event": "The RC Server reaches RCP_CONFIGURED without having passed through a validated HW_CONFIGURED state (a configuration-validation bypass)",
       "risk": {
         "severity": "S2",
         "exposure": "E2",
         "controllability": "C2",
-        "asil": "QM"
+        "asil": "QM",
+        "rationale": "S2: reaching RCP_CONFIGURED without having passed through a validated HW_CONFIGURED state risks operating against an unvalidated hardware configuration -- severe in principle, though this is a state-machine precondition violation rather than a direct unsafe actuation. E2 (low probability): requires OS-002 (an HW/RCP configuration fault) or occurs only within OS-008's narrow discovery/bootstrap window -- both edge conditions outside ordinary OS-001 traffic, not a continuously-present exposure. C2: normally controllable -- rcp_lifecycle_transition()'s own modeled transition table is the analyzed control. At S2/E2/C2 this hazard computes to QM under ISO 26262-3:2018 Table 4 (S+E+C sum = 6), consistent with the ASIL Determination Note above; it stays a documented HARA entry (not merely omitted) because the situations that could feed a bypass (OS-002/OS-008) are worth keeping traceable even though the resulting risk itself doesn't rise above QM."
       },
       "safe_state": "rcp_lifecycle_transition() rejects any transition outside its modeled table; RCP_CONFIGURED is reachable only from HW_CONFIGURED, itself gated by the HW_CFG_INCONSISTENT check (formally verified: tla/LifecycleStateMachine.tla NoSkipConfiguration).",
       "safetyGoals": [
@@ -287,5 +375,5 @@
       "safeState": "rcp_lifecycle_transition() rejects any transition outside its modeled table; RCP_CONFIGURED is reachable only from HW_CONFIGURED, itself gated by the HW_CFG_INCONSISTENT check (formally verified: tla/LifecycleStateMachine.tla NoSkipConfiguration)."
     }
   ],
-  "note": "ASIL values are computed via `cfusa hara asil` (ISO 26262-3:2018 Table 4). This HARA replaces the pre-TC18 Zone/Command-era hazard set in full (ROADMAP.md milestone 85, Phase 22 re-certification pass) -- it is derived from the actual implemented TC18 behavior (Phase 13-21), not carried over from the retired watchdog/CRC-16 model. See HARA.md's 'Safety Goals' table for the full SG-001..SG-011 list (kept in Markdown, not duplicated here, since c-FuSa's HARA002/HARA003 rules scan every top-level '\"id\"' occurrence in this file as if it were a hazard entry)."
+  "note": "ASIL values are computed via `cfusa hara asil` (ISO 26262-3:2018 Table 4). This HARA replaces the pre-TC18 Zone/Command-era hazard set in full (ROADMAP.md milestone 85, Phase 22 re-certification pass) -- it is derived from the actual implemented TC18 behavior (Phase 13-21), not carried over from the retired watchdog/CRC-16 model. See HARA.md's 'Safety Goals' table for the full SG-001..SG-011 list (kept in Markdown, not duplicated here, since c-FuSa's HARA002/HARA003 rules scan every top-level '\\\"id\\\"' occurrence in this file as if it were a hazard entry). v0.415.0 (issue c-RCP-22, Gaps 1-3): promoted HARA.md's OS-001..008 operational-situations table into this file's own `operationalSituations` array (previously prose-only, per ISO 26262-3:2018 Clause 6.4.2's requirement that hazard analysis be performed per operational situation), added a `situations` reference array to every hazard linking it to the operational situation(s) its S/E/C rating is actually evaluated within, and added a `rationale` string to every hazard's `risk` object justifying its recorded S/E/C classification against ISO 26262-3:2018 Table 4's own class definitions and the linked operational situation(s) -- none of the existing severity/exposure/controllability/asil values themselves changed (that arithmetic was already corrected and closed by issue #125; this pass adds the missing written justification for those unchanged values, per ISO 26262-3:2018 Clause 6.4.3). Gap 4 (hazard-identification pass over the 9 protocol-bridge modules) and Gap 5 (FTTI-vs-measured-reaction-time cross-check) remain open, tracked against issue c-RCP-22 for a future pass -- see that issue's tracking comment."
 }

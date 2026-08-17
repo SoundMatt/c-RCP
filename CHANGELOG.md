@@ -34,6 +34,67 @@ the rationale.
 
 ## Releases
 
+### v0.415.0 -- 2026-08-17 (c-RCP-22: HARA operational-situation linkage + S/E/C rationale)
+
+First of a planned multi-PR pass closing structural content gaps in
+`HARA.md`/`.fusa-hara.json` found by issue 524 (`c-RCP-22`): the HARA's
+ASIL arithmetic was already correct (issue #125), but its *content*
+fell short of ISO 26262-3:2018 Clause 6 and of what `cfusa hara show`
+is built to check. Closes 3 of the issue's 5 numbered gaps in this
+pass; the remaining 2 are documented as open, deliberately deferred.
+
+- Added `operationalSituations[]` to `.fusa-hara.json`, promoting
+  `HARA.md`'s existing OS-001..008 table (previously prose-only, with
+  no machine-checkable representation at all) into the schema
+  `cfusa`'s own `cmd_hara.c` already expects. `cfusa hara show` now
+  correctly reports `Operational Situations (8)` instead of `(0)`.
+- Added a `situations` reference array to every one of the 11 hazard
+  entries, linking each to the operational situation(s) its S/E/C
+  rating is actually evaluated within (ISO 26262-3:2018 Clause 6.4.2:
+  hazard analysis is performed per operational situation, and
+  `Exposure` specifically is the probability of that situation).
+  `HARA.md`'s Hazard Table gained a `Situations` column mirroring it.
+- Added a `rationale` string to every hazard's `risk` object,
+  justifying its recorded severity/exposure/controllability against
+  ISO 26262-3:2018 Table 4's own class definitions and the linked
+  operational situation(s) -- e.g. explaining concretely why H-001 is
+  E4 (its triggering condition is present continuously across normal
+  operation) while H-007 is E2 (it additionally requires gaining
+  adversarial network access, itself a low-probability precondition).
+  None of the existing S/E/C/ASIL values themselves changed -- that
+  arithmetic was already corrected and closed by issue #125; this
+  pass supplies the missing written justification for those unchanged
+  values. `HARA.md` gained a one-line-per-hazard "S/E/C Rationale
+  Summary" table so a reviewer doesn't have to open the JSON.
+- Documented, in a new `HARA.md` "Known Content Gaps" section, that
+  the remaining 2 gaps from issue 524 stay open for a future pass: a
+  real hazard-identification pass over the 9 protocol-bridge modules
+  (`grpcbridge.c`/`restbridge.c`/`someipbr.c`/`canbr.c`/`ddsbr.c`/
+  `mqttbr.c`/`linbr.c`/`udsbr.c`/`doipbr.c`, none of which appear in
+  this HARA today), and a sampled cross-check of a recorded `ftti_ms`
+  against its implementing mechanism's actual measured reaction time.
+  Also recorded, so a future reader isn't misled: `cfusa hara show`'s
+  own `Hazards (0)` / partial `Safety Goals` count in this repo is a
+  pre-existing `cmd_hara.c` parser limit (a fixed 512-byte
+  per-array-element buffer that silently drops any hazard/safety-goal
+  JSON object whose literal text exceeds it, which every entry in
+  this file's verbose safety-relevant prose does) -- unrelated to
+  either gap above, not fixable from this repo (the parser lives in
+  `c-FuSa`), and not affecting `cfusa check`'s actual gating rules
+  (`HARA001`-`HARA006`), which scan the raw file directly.
+
+`.fusa-hara.json`/`HARA.md`-only change; no source touched. Full
+66-test suite + ASan/UBSan (`-fsanitize=address,undefined
+-fno-sanitize-recover=all -g -O1`, `ASAN_OPTIONS=detect_leaks=0`)
+clean, both unchanged from the pre-change baseline (this PR touches
+no C code). `cfusa check` (pinned v0.5.54): 0 errors, 968
+warnings/1312 info -- byte-for-byte identical to the pre-change
+baseline. `cfusa trace --req-coverage 100 --sec-tested 100`:
+1095/1095 traced, 512/512 functions annotated -- also identical.
+
+**Next**: c-RCP-22's remaining 2 gaps (protocol-bridge hazard-ID pass;
+FTTI cross-check) tracked against issue 524 for a future PR.
+
 ### v0.414.0 -- 2026-08-17 (c-RCP-18: "Writing a requirement" convention in CONTRIBUTING.md)
 
 Docs-only change addressing issue 519 (c-RCP-18)'s Method step 1:
