@@ -34,6 +34,61 @@ the rationale.
 
 ## Releases
 
+### v0.408.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for `REQ-LIFECYCLE-*`/`REQ-RMAP-*`)
+
+One of several parallel per-category batches for c-RCP-AUDIT-04
+(issue 166), unblocked now that RELAY's master TC18 requirement
+catalog (`docs/tc18-master-catalog.json`, 447 entries) has been
+rebuilt and published. This batch covers only the `REQ-LIFECYCLE-*`/
+`REQ-RMAP-*` category prefixes; sibling batches (see the releases
+below) cover the rest of `.fusa-reqs.json`'s 1095 entries under
+their own PRs.
+
+- Added a `tc18_master_id` field to 102 of the 120 `REQ-LIFECYCLE-*`/
+  `REQ-RMAP-*` requirements that already carry a `tc18` citation
+  (issue #164's backfill), matched by section + table/figure number
+  + content confirmation against the catalog entry's own `summary`/
+  `title`/`citation` -- several catalog entries share a section
+  number with others (e.g. `§12.7.5` Table 20 alone owns 16 of this
+  batch's requirements, all correctly pointed at the same
+  `TC18-12.7.5-001` table entry rather than guessed apart), and a
+  few requirements cite one section while the catalog files the
+  identical quoted sentence under a different one (`REQ-RMAP-020`/
+  `021`/`022`/`056`'s ascending-order clause: cited as `§13.2` by
+  three of the four and `§12.7.8` by the fourth, but character-for-
+  character the same removed sentence, matched to `TC18-12.7.8-006`
+  by content, not by section label). Purely additive -- no other
+  field on any entry touched, no `.c`/`.h` source file touched.
+- Left untouched, as expected: the 9 `REQ-LIFECYCLE-*`/`REQ-RMAP-*`
+  entries in scope that carry no `tc18` field at all (implementation
+  -only plumbing with no TC18 basis) -- no `tc18_master_id` invented
+  for these.
+- Left unset and flagged ambiguous (documented in the PR body): 9
+  entries whose citation either spans more than one catalog clause
+  with no single dominant owner, or whose `tc18` field's own text
+  admits the citation was already found incorrect --
+  `REQ-RMAP-004`/`005`/`006`/`007`/`008` (RETIRED entries whose
+  `tc18` field itself says "citation found incorrect -- see text"),
+  `REQ-RMAP-046` (RETIRED, its `tc18` field is a cross-reference
+  note -- "see REQ-RMAP-039" -- not a real citation), `REQ-RMAP-061`
+  (`Max_AVTPDUsize` bounding/MTU-consistency/discoverability spans
+  `TC18-12.7.9-001` and `-002` evenly), `REQ-RMAP-072` (an
+  address-routed dispatcher's authorization check spanning
+  `§12.3.1.2` plus three separate per-table override sections, no
+  single catalog entry captures the aggregate), and
+  `REQ-LIFECYCLE-024` (denial outcome names both `LOCKED_MEM_ACCESS`
+  and `UNAUTHORIZED_ACCESS`; only the latter has an exact catalog
+  match, the former's catalog analog is named `LOCKED_CONFIG_ACCESS`
+  in the Figure 17 entry -- not confidently the same code under a
+  different label).
+
+Verified against the pinned `cfusa` v0.5.54 binary from the repo
+root: `check` and `trace --req-coverage 100 --sec-tested 100` output
+byte-identical before/after (apart from the report timestamp) --
+1095/1095 (100%) requirement traceability, 512/512 (100%) function
+annotation density, 0 errors, all unchanged. Full 66/66 test suite
+unchanged.
+
 ### v0.407.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for `REQ-AVTP-*`/`REQ-WDG-*`/`REQ-PWR-*`/`REQ-TSN-*`/`REQ-UDP-*`/`REQ-DL-*`/`REQ-L2-*`/`REQ-FRAG-*`)
 
 One of several parallel per-category batches for c-RCP-AUDIT-04
