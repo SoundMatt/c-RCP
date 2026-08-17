@@ -19142,6 +19142,51 @@ verified identical to an `origin/main` baseline run.
 then the same pass across cpp-RCP/go-RCP/rust-RCP; follow-up on the
 3 flagged ambiguous `REQ-MOCK-*` entries above.
 
+### v0.402.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id`
+backfill for CAN/CANEP requirements, issue 166)
+
+First `tc18_master_id` batch for c-RCP now that issue 166's blocker
+is resolved -- the 447-entry master TC18 requirement catalog
+(`docs/tc18-master-catalog.json` in RELAY, RC5-based, published
+2026-08-17) exists. This batch covers only the `REQ-CAN-*`/
+`REQ-CANEP-*` category (34 requirements); the issue's other
+categories are separate, disjoint parallel batches.
+
+Method: for each of the 34 requirements, if it had no `tc18`
+citation it was left untouched (4 cases: `REQ-CAN-001`/`002`,
+`REQ-CANEP-007`/`015` -- stub-backend return value, default-config
+values, functional-config zero-init, and the CAN error-string
+table, none of which have a TC18 basis to cite). Otherwise the
+citation was parsed and matched against the master catalog by
+section + table/figure number, confirmed against the catalog
+entry's own `summary`/`citation` text rather than section number
+alone (several `Table 56` register-map rows share a section with
+Figure 40 and Table 57, so section-only matching would have
+misattributed them).
+
+29 of 34 matched with confidence. One case was flagged ambiguous
+rather than forced: `REQ-CANEP-032` ("remote frames not supported,
+and an 11-bit CAN ID is right-aligned") cites one TC18 sentence
+that the master catalog split into two separate MUST entries
+(`TC18-13.7.11.3-004`/`-005`); since `tc18_master_id` is a
+single-value field, this 1:2 mapping is left unset for a follow-up
+decision rather than arbitrarily picking one half. Separately (not
+part of this batch's own citation, so not touched, but flagged for
+a future citation-accuracy pass): `REQ-CANEP-001`/`002`'s existing
+`tc18` field cites "Table 56", but their titles and `ep_can.c`'s own
+file-header comment ("TC18 Table 57") make clear the real basis is
+Table 57's FrameFormat code table -- matched to
+`TC18-13.7.11.3-003` on content per this task's explicit
+content-over-citation-text instruction.
+
+Purely additive -- no other field, and no `.c`/`.h` source file,
+touched. Verified directly (not assumed) against the pinned `cfusa`
+v0.5.54 from the repo root: `cfusa check` and `cfusa trace
+--req-coverage 100 --sec-tested 100` both exit 0, byte-identical
+output before/after (aside from the run timestamp) -- 1095/1095
+traced, 512/512 functions annotated, 968/1312 warnings/info, all
+unchanged. Full 66/66 test suite unchanged.
+
 ### v0.400.0 -- 2026-08-16 (c-RCP-AUDIT-08: exhaustive census of the
 twelve remaining table numbers -- `55`/`37`/`40`/`57`/`19`/`59`/`49`/
 `15`/`34`/`17`/`14`/`16` -- closes out this issue's own tracked

@@ -4123,7 +4123,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.7.2 Table 49 (i2c functional configuration; RC5 renumbering of RC1's Table 46), TC18.txt L5206-5235 (i2c_mode, 0x0007, values 0-4 with a duplicated \"3:\" high-speed labeling); REQ-I2C-019 (issue #256 Group I) closed the Ultra-fast (value 4) gap, and this module's conservative lower-numbered reading of the ambiguous \"High-speed\" row still resolves to 3, so the valid range is now 0..4, not the pre-fix 0..3"
+      "tc18": "\u00a713.7.7.2 Table 49 (i2c functional configuration; RC5 renumbering of RC1's Table 46), TC18.txt L5206-5235 (i2c_mode, 0x0007, values 0-4 with a duplicated \"3:\" high-speed labeling); REQ-I2C-019 (issue #256 Group I) closed the Ultra-fast (value 4) gap, and this module's conservative lower-numbered reading of the ambiguous \"High-speed\" row still resolves to 3, so the valid range is now 0..4, not the pre-fix 0..3",
+      "tc18_master_id": "TC18-13.7.7.2-001"
     },
     {
       "id": "REQ-I2C-002",
@@ -4144,7 +4145,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2553-2554"
+      "tc18": "\u00a712.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2553-2554",
+      "tc18_master_id": "TC18-12.3.1.2-001"
     },
     {
       "id": "REQ-I2C-004",
@@ -4155,7 +4157,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2560"
+      "tc18": "\u00a712.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2560",
+      "tc18_master_id": "TC18-12.3.1.2-004"
     },
     {
       "id": "REQ-I2C-005",
@@ -4166,7 +4169,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-I2C-006",
@@ -4177,7 +4181,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.7.2 Table 49 (i2c functional configuration; RC5 renumbering of RC1's Table 46), TC18.txt L5206-5235 (i2c_mode register), writability per \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)"
+      "tc18": "\u00a713.7.7.2 Table 49 (i2c functional configuration; RC5 renumbering of RC1's Table 46), TC18.txt L5206-5235 (i2c_mode register), writability per \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)",
+      "tc18_master_id": "TC18-13.7.7.2-001"
     },
     {
       "id": "REQ-I2C-007",
@@ -4188,7 +4193,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.7.2 Table 49 (i2c functional configuration; RC5 renumbering of RC1's Table 46), TC18.txt L5206-5235 (i2c_mode register), writability per \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)"
+      "tc18": "\u00a713.7.7.2 Table 49 (i2c functional configuration; RC5 renumbering of RC1's Table 46), TC18.txt L5206-5235 (i2c_mode register), writability per \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-I2C-008",
@@ -4199,7 +4205,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.7.2 Table 49 (i2c functional configuration; RC5 renumbering of RC1's Table 46), TC18.txt L5206-5235 (i2c_mode register), writability per \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)"
+      "tc18": "\u00a713.7.7.2 Table 49 (i2c functional configuration; RC5 renumbering of RC1's Table 46), TC18.txt L5206-5235 (i2c_mode register), writability per \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)",
+      "tc18_master_id": "TC18-13.7.7.2-001"
     },
     {
       "id": "REQ-I2C-009",
@@ -4220,7 +4227,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.7.3 Figure 30 (i2c request format; RC5 renumbering of RC1's Figure 29), TC18.txt L5240-5257; \"no channel selector\" per \u00a713.5 Table 33 (I2C's row-2 group, only evt=111b defined), TC18.txt L4083-4093"
+      "tc18": "\u00a713.7.7.3 Figure 30 (i2c request format; RC5 renumbering of RC1's Figure 29), TC18.txt L5240-5257; \"no channel selector\" per \u00a713.5 Table 33 (I2C's row-2 group, only evt=111b defined), TC18.txt L4083-4093",
+      "tc18_master_id": "TC18-13.7.7.3-001"
     },
     {
       "id": "REQ-I2C-011",
@@ -4231,7 +4239,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.7.3 Figure 30 (i2c request format; RC5 renumbering of RC1's Figure 29), TC18.txt L5240-5257; \u00a713.7.7.1 (\"Requests are accepted in ACF_ABB and ACF_GBB.\"), TC18.txt L5201; evt[2:0] validation per \u00a713.5 Table 33 (I2C's row-2 group, only evt=111b defined), TC18.txt L4083-4093"
+      "tc18": "\u00a713.7.7.3 Figure 30 (i2c request format; RC5 renumbering of RC1's Figure 29), TC18.txt L5240-5257; \u00a713.7.7.1 (\"Requests are accepted in ACF_ABB and ACF_GBB.\"), TC18.txt L5201; evt[2:0] validation per \u00a713.5 Table 33 (I2C's row-2 group, only evt=111b defined), TC18.txt L4083-4093",
+      "tc18_master_id": "TC18-13.7.7.3-001"
     },
     {
       "id": "REQ-I2C-012",
@@ -4242,7 +4251,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-I2C-013",
@@ -4253,7 +4263,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.7.3 Figure 30 (i2c request format; RC5 renumbering of RC1's Figure 29), TC18.txt L5240-5257; \u00a713.7.7.3 (\"The byte msg payload is the I2C payload including the address. The I2C endpoint does not know whether there is a 7- or 10-bit address, since the endpoint is just transparent.\"), TC18.txt L5241-5242"
+      "tc18": "\u00a713.7.7.3 Figure 30 (i2c request format; RC5 renumbering of RC1's Figure 29), TC18.txt L5240-5257; \u00a713.7.7.3 (\"The byte msg payload is the I2C payload including the address. The I2C endpoint does not know whether there is a 7- or 10-bit address, since the endpoint is just transparent.\"), TC18.txt L5241-5242",
+      "tc18_master_id": "TC18-13.7.7.3-001"
     },
     {
       "id": "REQ-I2C-014",
@@ -4264,7 +4275,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.7.3 Figure 30 (i2c request format; RC5 renumbering of RC1's Figure 29), TC18.txt L5240-5257; response timed/untimed ACF_GBB/ACF_ABB convention shared with every prior endpoint type"
+      "tc18": "\u00a713.7.7.3 Figure 30 (i2c request format; RC5 renumbering of RC1's Figure 29), TC18.txt L5240-5257; response timed/untimed ACF_GBB/ACF_ABB convention shared with every prior endpoint type",
+      "tc18_master_id": "TC18-13.7.7.3-001"
     },
     {
       "id": "REQ-I2C-015",
@@ -4275,7 +4287,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.7.3 Figure 30 (i2c request format; RC5 renumbering of RC1's Figure 29), TC18.txt L5240-5257; response timed/untimed ACF_GBB/ACF_ABB convention shared with every prior endpoint type"
+      "tc18": "\u00a713.7.7.3 Figure 30 (i2c request format; RC5 renumbering of RC1's Figure 29), TC18.txt L5240-5257; response timed/untimed ACF_GBB/ACF_ABB convention shared with every prior endpoint type",
+      "tc18_master_id": "TC18-13.7.7.3-001"
     },
     {
       "id": "REQ-I2C-016",
@@ -4286,7 +4299,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.7.3 Figure 30 (i2c request format; RC5 renumbering of RC1's Figure 29), TC18.txt L5240-5257, TC18.txt L5257 -- general ACF frame-validation basis for the response wire format"
+      "tc18": "\u00a713.7.7.3 Figure 30 (i2c request format; RC5 renumbering of RC1's Figure 29), TC18.txt L5240-5257, TC18.txt L5257 -- general ACF frame-validation basis for the response wire format",
+      "tc18_master_id": "TC18-13.7.7.3-001"
     },
     {
       "id": "REQ-I2C-017",
@@ -4297,7 +4311,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.7.1 (\"The Client can request the I\u00b2C endpoint to send one or more bytes... Requests are accepted in ACF_ABB and ACF_GBB.\"), TC18.txt L5199-5201 -- I2C's genuinely bidirectional read/write op sense"
+      "tc18": "\u00a713.7.7.1 (\"The Client can request the I\u00b2C endpoint to send one or more bytes... Requests are accepted in ACF_ABB and ACF_GBB.\"), TC18.txt L5199-5201 -- I2C's genuinely bidirectional read/write op sense",
+      "tc18_master_id": "TC18-13.7.7.1-002"
     },
     {
       "id": "REQ-I2C-018",
@@ -4308,7 +4323,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.7.3 Figure 30 (i2c request format; RC5 renumbering of RC1's Figure 29), TC18.txt L5240-5257; \"no channel selector\" per \u00a713.5 Table 33 (I2C's row-2 group, only evt=111b defined), TC18.txt L4083-4093"
+      "tc18": "\u00a713.7.7.3 Figure 30 (i2c request format; RC5 renumbering of RC1's Figure 29), TC18.txt L5240-5257; \"no channel selector\" per \u00a713.5 Table 33 (I2C's row-2 group, only evt=111b defined), TC18.txt L4083-4093",
+      "tc18_master_id": "TC18-13.7.7.3-001"
     },
     {
       "id": "REQ-UART-001",
@@ -6806,7 +6822,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.10.1 (\"The LIN EP issues a trigger when a transmission has been finalized, and the configured trailing time has expired.\"), TC18.txt L5694-5695"
+      "tc18": "\u00a713.7.10.1 (\"The LIN EP issues a trigger when a transmission has been finalized, and the configured trailing time has expired.\"), TC18.txt L5694-5695",
+      "tc18_master_id": "TC18-13.7.10.1-002"
     },
     {
       "id": "REQ-LINEP-007",
@@ -6827,7 +6844,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2553-2554"
+      "tc18": "\u00a712.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2553-2554",
+      "tc18_master_id": "TC18-12.3.1.2-001"
     },
     {
       "id": "REQ-LINEP-009",
@@ -6838,7 +6856,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2560"
+      "tc18": "\u00a712.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2560",
+      "tc18_master_id": "TC18-12.3.1.2-004"
     },
     {
       "id": "REQ-LINEP-010",
@@ -6849,7 +6868,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-LINEP-011",
@@ -6860,7 +6880,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.10.2 Table 55 (lin_clk_divider, 0x0008, \"generate Lin bit time\"), TC18.txt L5713"
+      "tc18": "\u00a713.7.10.2 Table 55 (lin_clk_divider, 0x0008, \"generate Lin bit time\"), TC18.txt L5713",
+      "tc18_master_id": "TC18-13.7.10.2-001"
     },
     {
       "id": "REQ-LINEP-012",
@@ -6871,7 +6892,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.10.2 Table 55 (lin_clk_divider register), TC18.txt L5713; writability per \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)"
+      "tc18": "\u00a713.7.10.2 Table 55 (lin_clk_divider register), TC18.txt L5713; writability per \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)",
+      "tc18_master_id": "TC18-13.7.10.2-001"
     },
     {
       "id": "REQ-LINEP-013",
@@ -6882,7 +6904,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- governs the write-authorization behavior; `trigger` itself is this module's own original design with no TC18 counterpart (see ep_lin.h's file header)"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- governs the write-authorization behavior; `trigger` itself is this module's own original design with no TC18 counterpart (see ep_lin.h's file header)",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-LINEP-014",
@@ -6893,7 +6916,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- governs the write-authorization behavior; `trigger` itself is this module's own original design with no TC18 counterpart (see ep_lin.h's file header)"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- governs the write-authorization behavior; `trigger` itself is this module's own original design with no TC18 counterpart (see ep_lin.h's file header)",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-LINEP-015",
@@ -6914,7 +6938,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-LINEP-017",
@@ -6925,7 +6950,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; \"the LIN endpoint checks each received message against the byte_msg_payload and if a match under the conditions given by evt[2:0] is found a reply is sent if op = 0\" (\u00a713.7.10.1), TC18.txt L5691-5693; evt[2:0] plain-request rule per \u00a713.5 Table 33 (LIN's row-2 group, only evt=111b defined), TC18.txt L4083-4093"
+      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; \"the LIN endpoint checks each received message against the byte_msg_payload and if a match under the conditions given by evt[2:0] is found a reply is sent if op = 0\" (\u00a713.7.10.1), TC18.txt L5691-5693; evt[2:0] plain-request rule per \u00a713.5 Table 33 (LIN's row-2 group, only evt=111b defined), TC18.txt L4083-4093",
+      "tc18_master_id": "TC18-13.7.10.3-001"
     },
     {
       "id": "REQ-LINEP-018",
@@ -6936,7 +6962,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; general ACF frame-validation basis"
+      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; general ACF frame-validation basis",
+      "tc18_master_id": "TC18-13.7.10.3-001"
     },
     {
       "id": "REQ-LINEP-019",
@@ -6947,7 +6974,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736"
+      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736",
+      "tc18_master_id": "TC18-13.7.10.3-001"
     },
     {
       "id": "REQ-LINEP-020",
@@ -6958,7 +6986,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; response timed/untimed ACF_GBB/ACF_ABB convention shared with every prior endpoint type"
+      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; response timed/untimed ACF_GBB/ACF_ABB convention shared with every prior endpoint type",
+      "tc18_master_id": "TC18-13.7.10.3-001"
     },
     {
       "id": "REQ-LINEP-021",
@@ -6969,7 +6998,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; response timed/untimed ACF_GBB/ACF_ABB convention shared with every prior endpoint type"
+      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; response timed/untimed ACF_GBB/ACF_ABB convention shared with every prior endpoint type",
+      "tc18_master_id": "TC18-13.7.10.3-001"
     },
     {
       "id": "REQ-LINEP-022",
@@ -6980,7 +7010,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; general ACF frame-validation basis for the response wire format"
+      "tc18": "\u00a713.7.10.3 Figure 39 (lin request/response format), TC18.txt L5719-5736; general ACF frame-validation basis for the response wire format",
+      "tc18_master_id": "TC18-13.7.10.3-001"
     },
     {
       "id": "REQ-CANEP-001",
@@ -6991,7 +7022,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.2 Table 56, TC18.txt L5764-5836"
+      "tc18": "\u00a713.7.11.2 Table 56, TC18.txt L5764-5836",
+      "tc18_master_id": "TC18-13.7.11.3-003"
     },
     {
       "id": "REQ-CANEP-002",
@@ -7002,7 +7034,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.2 Table 56, TC18.txt L5764-5836"
+      "tc18": "\u00a713.7.11.2 Table 56, TC18.txt L5764-5836",
+      "tc18_master_id": "TC18-13.7.11.3-003"
     },
     {
       "id": "REQ-CANEP-003",
@@ -7013,7 +7046,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 (\"Sending remote frames is not supported. In case the CAN ID is 11bits, then it shall be right aligned in the CAN ID field.\"), TC18.txt L5887; \u00a713.7.11.2 Table 56, TC18.txt L5764-5836"
+      "tc18": "\u00a713.7.11.3 (\"Sending remote frames is not supported. In case the CAN ID is 11bits, then it shall be right aligned in the CAN ID field.\"), TC18.txt L5887; \u00a713.7.11.2 Table 56, TC18.txt L5764-5836",
+      "tc18_master_id": "TC18-13.7.11.3-005"
     },
     {
       "id": "REQ-CANEP-004",
@@ -7024,7 +7058,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 (\"In case the CAN ID is 11bits, then it shall be right aligned in the CAN ID field.\"), TC18.txt L5887"
+      "tc18": "\u00a713.7.11.3 (\"In case the CAN ID is 11bits, then it shall be right aligned in the CAN ID field.\"), TC18.txt L5887",
+      "tc18_master_id": "TC18-13.7.11.3-005"
     },
     {
       "id": "REQ-CANEP-005",
@@ -7035,7 +7070,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 (\"For CAN XL this can be up to 2054 bytes (2048 + 6, see below)... The 'CAN data' field includes the additional data (RRS, SDT, VCID, AF (in total 6 bytes)- see ISO11898-1) needed for CAN XL frames\"), TC18.txt L5859-5860, L5888-5889"
+      "tc18": "\u00a713.7.11.3 (\"For CAN XL this can be up to 2054 bytes (2048 + 6, see below)... The 'CAN data' field includes the additional data (RRS, SDT, VCID, AF (in total 6 bytes)- see ISO11898-1) needed for CAN XL frames\"), TC18.txt L5859-5860, L5888-5889",
+      "tc18_master_id": "TC18-13.7.11.3-002"
     },
     {
       "id": "REQ-CANEP-006",
@@ -7046,7 +7082,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.2 Table 56 (four \"acceptance filter\" entries: acceptance filter 1-4, each 32 bit R/W), TC18.txt L5801-5815"
+      "tc18": "\u00a713.7.11.2 Table 56 (four \"acceptance filter\" entries: acceptance filter 1-4, each 32 bit R/W), TC18.txt L5801-5815",
+      "tc18_master_id": "TC18-13.7.11.2-002"
     },
     {
       "id": "REQ-CANEP-007",
@@ -7067,7 +7104,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2553-2554; \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)"
+      "tc18": "\u00a712.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2553-2554; \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)",
+      "tc18_master_id": "TC18-12.3.1.2-001"
     },
     {
       "id": "REQ-CANEP-009",
@@ -7078,7 +7116,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.2 Table 56 (\"CAN bit time register 1 ... Defines bit times for Classical CAN\"), TC18.txt L5795; \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)"
+      "tc18": "\u00a713.7.11.2 Table 56 (\"CAN bit time register 1 ... Defines bit times for Classical CAN\"), TC18.txt L5795; \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)",
+      "tc18_master_id": "TC18-13.7.11.2-002"
     },
     {
       "id": "REQ-CANEP-010",
@@ -7089,7 +7128,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.2 Table 56 (\"CAN bit time register 2 ... Defines bit times for CAN FD\"), TC18.txt L5796; \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)"
+      "tc18": "\u00a713.7.11.2 Table 56 (\"CAN bit time register 2 ... Defines bit times for CAN FD\"), TC18.txt L5796; \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)",
+      "tc18_master_id": "TC18-13.7.11.2-002"
     },
     {
       "id": "REQ-CANEP-011",
@@ -7100,7 +7140,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.2 Table 56 (\"CAN bit time register 3 ... Defines bit times for CAN XL\"), TC18.txt L5797; \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)"
+      "tc18": "\u00a713.7.11.2 Table 56 (\"CAN bit time register 3 ... Defines bit times for CAN XL\"), TC18.txt L5797; \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)",
+      "tc18_master_id": "TC18-13.7.11.2-002"
     },
     {
       "id": "REQ-CANEP-012",
@@ -7111,7 +7152,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.2 Table 56 (\"TDCC register ... delay compensation control\"), TC18.txt L5798; \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)"
+      "tc18": "\u00a713.7.11.2 Table 56 (\"TDCC register ... delay compensation control\"), TC18.txt L5798; \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)",
+      "tc18_master_id": "TC18-13.7.11.2-002"
     },
     {
       "id": "REQ-CANEP-013",
@@ -7122,7 +7164,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.2 Table 56 (\"can_clk_divider ... generate CAN_CLK time reference\"), TC18.txt L5792; \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)"
+      "tc18": "\u00a713.7.11.2 Table 56 (\"can_clk_divider ... generate CAN_CLK time reference\"), TC18.txt L5792; \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)",
+      "tc18_master_id": "TC18-13.7.11.2-002"
     },
     {
       "id": "REQ-CANEP-014",
@@ -7133,7 +7176,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.2 Table 56 (four \"acceptance filter\" entries: acceptance filter 1-4), TC18.txt L5801-5815; \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)"
+      "tc18": "\u00a713.7.11.2 Table 56 (four \"acceptance filter\" entries: acceptance filter 1-4), TC18.txt L5801-5815; \u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention)",
+      "tc18_master_id": "TC18-13.7.11.2-002"
     },
     {
       "id": "REQ-CANEP-015",
@@ -7154,7 +7198,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856"
+      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856",
+      "tc18_master_id": "TC18-13.7.11.3-001"
     },
     {
       "id": "REQ-CANEP-017",
@@ -7165,7 +7210,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856"
+      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856",
+      "tc18_master_id": "TC18-13.7.11.3-001"
     },
     {
       "id": "REQ-CANEP-018",
@@ -7176,7 +7222,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856"
+      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856",
+      "tc18_master_id": "TC18-13.7.11.3-001"
     },
     {
       "id": "REQ-CANEP-019",
@@ -7187,7 +7234,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856"
+      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856",
+      "tc18_master_id": "TC18-13.7.11.3-001"
     },
     {
       "id": "REQ-CANEP-020",
@@ -7198,7 +7246,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856"
+      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856",
+      "tc18_master_id": "TC18-13.7.11.3-001"
     },
     {
       "id": "REQ-CANEP-021",
@@ -7209,7 +7258,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856"
+      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856",
+      "tc18_master_id": "TC18-13.7.11.3-001"
     },
     {
       "id": "REQ-CANEP-022",
@@ -7220,7 +7270,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856"
+      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856",
+      "tc18_master_id": "TC18-13.7.11.3-001"
     },
     {
       "id": "REQ-ISELED-001",
@@ -7291,7 +7342,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.12.2 Table 58, TC18.txt L5950-5952 (\"iseled_use_rcv_clk ... Use clock provided by ISELED 1st device instead of FreqSync pattern\"); \u00a713.7.12.2 (\"For receiving ISELED frames on the ISP_P Pin of the interface either a clock synchronization via the Freq_Sync pattern can be done or data sampling based on the clock provided on the ISP_N pin. If the Freq_Sync pattern is used it is not necessary to connect the ISP_N of the EP to a physical Pin.\"), TC18.txt L5964-5966"
+      "tc18": "\u00a713.7.12.2 Table 58, TC18.txt L5950-5952 (\"iseled_use_rcv_clk ... Use clock provided by ISELED 1st device instead of FreqSync pattern\"); \u00a713.7.12.2 (\"For receiving ISELED frames on the ISP_P Pin of the interface either a clock synchronization via the Freq_Sync pattern can be done or data sampling based on the clock provided on the ISP_N pin. If the Freq_Sync pattern is used it is not necessary to connect the ISP_N of the EP to a physical Pin.\"), TC18.txt L5964-5966",
+      "tc18_master_id": "TC18-13.7.12.2-004"
     },
     {
       "id": "REQ-ISELED-008",
@@ -7302,7 +7354,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.12.1 (\"The ISELED endpoint creates a single trigger event, when transmission of a data packet has been completed on the ISELED network.\"), TC18.txt L5913-5914"
+      "tc18": "\u00a713.7.12.1 (\"The ISELED endpoint creates a single trigger event, when transmission of a data packet has been completed on the ISELED network.\"), TC18.txt L5913-5914",
+      "tc18_master_id": "TC18-13.7.12.1-002"
     },
     {
       "id": "REQ-ISELED-009",
@@ -7323,7 +7376,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.12.2 Table 58 (iseled_ep_options, 0x0003, R/W*), TC18.txt L5934-5936; W* marker convention per \u00a712.3.1.3, TC18.txt L2601-2602"
+      "tc18": "\u00a713.7.12.2 Table 58 (iseled_ep_options, 0x0003, R/W*), TC18.txt L5934-5936; W* marker convention per \u00a712.3.1.3, TC18.txt L2601-2602",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-ISELED-011",
@@ -7334,7 +7388,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.12.2 Table 58 (iseled_clk_divider, 0x0006, 8 bit, R/W, \"generate ISELED_CLK time reference should be nominal 2MHz\"), TC18.txt L5940-5942; writability per \u00a712.3.1.3, TC18.txt L2601-2602"
+      "tc18": "\u00a713.7.12.2 Table 58 (iseled_clk_divider, 0x0006, 8 bit, R/W, \"generate ISELED_CLK time reference should be nominal 2MHz\"), TC18.txt L5940-5942; writability per \u00a712.3.1.3, TC18.txt L2601-2602",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-ISELED-012",
@@ -7345,7 +7400,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.12.2 Table 58 (iseled_use_rcv_clk, 0x0007.4, R/W, \"Use clock provided by ISELED 1st device instead of FreqSync pattern\"), TC18.txt L5950-5952; writability per \u00a712.3.1.3, TC18.txt L2601-2602"
+      "tc18": "\u00a713.7.12.2 Table 58 (iseled_use_rcv_clk, 0x0007.4, R/W, \"Use clock provided by ISELED 1st device instead of FreqSync pattern\"), TC18.txt L5950-5952; writability per \u00a712.3.1.3, TC18.txt L2601-2602",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-ISELED-013",
@@ -7356,7 +7412,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.12.1 (\"The optional CRC generation as specified in the ISLED standard can be enabled. If so, the CRC will be generated and attached to the write messages to the ISELED network.\"), TC18.txt L5910-5912; writability per \u00a712.3.1.3, TC18.txt L2601-2602"
+      "tc18": "\u00a713.7.12.1 (\"The optional CRC generation as specified in the ISLED standard can be enabled. If so, the CRC will be generated and attached to the write messages to the ISELED network.\"), TC18.txt L5910-5912; writability per \u00a712.3.1.3, TC18.txt L2601-2602",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-ISELED-014",
@@ -7367,7 +7424,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- governs the write-authorization behavior; the trigger event itself has its own basis at REQ-ISELED-008 (§13.7.12.1, \"The ISELED endpoint creates a single trigger event, when transmission of a data packet has been completed on the ISELED network.\", TC18.txt L5913-5914)"
+      "tc18": "§12.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- governs the write-authorization behavior; the trigger event itself has its own basis at REQ-ISELED-008 (§13.7.12.1, \"The ISELED endpoint creates a single trigger event, when transmission of a data packet has been completed on the ISELED network.\", TC18.txt L5913-5914)",
+      "tc18_master_id": "TC18-12.3.1.3-005"
     },
     {
       "id": "REQ-ISELED-015",
@@ -7438,7 +7496,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.12.3 Figure 41 (iseled request format -- Instruction/Address/Data payload, ACF_ABB op=write), TC18.txt L5981-5995"
+      "tc18": "\u00a713.7.12.3 Figure 41 (iseled request format -- Instruction/Address/Data payload, ACF_ABB op=write), TC18.txt L5981-5995",
+      "tc18_master_id": "TC18-13.7.12.3-001"
     },
     {
       "id": "REQ-ISELED-022",
@@ -7449,7 +7508,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-ISELED-023",
@@ -7460,7 +7520,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.12.3 Figure 42 (iseled response format -- Address/Data[11:0]/CRC payload), TC18.txt L6014-6018; response rsp bit per \u00a711.3 Table 17, TC18.txt L2260"
+      "tc18": "\u00a713.7.12.3 Figure 42 (iseled response format -- Address/Data[11:0]/CRC payload), TC18.txt L6014-6018; response rsp bit per \u00a711.3 Table 17, TC18.txt L2260",
+      "tc18_master_id": "TC18-13.7.12.3-002"
     },
     {
       "id": "REQ-ISELED-024",
@@ -7471,7 +7532,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.12.3 Figure 42 (iseled response format), TC18.txt L6014-6018; timed/untimed ACF_GBB/ACF_ABB response convention shared with every prior endpoint type"
+      "tc18": "\u00a713.7.12.3 Figure 42 (iseled response format), TC18.txt L6014-6018; timed/untimed ACF_GBB/ACF_ABB response convention shared with every prior endpoint type",
+      "tc18_master_id": "TC18-13.7.12.3-002"
     },
     {
       "id": "REQ-MDIO-001",
@@ -8190,7 +8252,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 (\"...which requires segmentation, which is supported by the fields 'ms' and 'segment_num'.\"), TC18.txt L5859-5860"
+      "tc18": "\u00a713.7.11.3 (\"...which requires segmentation, which is supported by the fields 'ms' and 'segment_num'.\"), TC18.txt L5859-5860",
+      "tc18_master_id": "TC18-13.7.11.3-002"
     },
     {
       "id": "REQ-CANEP-024",
@@ -8201,7 +8264,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 (\"...which requires segmentation, which is supported by the fields 'ms' and 'segment_num'.\"), TC18.txt L5859-5860"
+      "tc18": "\u00a713.7.11.3 (\"...which requires segmentation, which is supported by the fields 'ms' and 'segment_num'.\"), TC18.txt L5859-5860",
+      "tc18_master_id": "TC18-13.7.11.3-002"
     },
     {
       "id": "REQ-CANEP-025",
@@ -8212,7 +8276,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 (\"...which requires segmentation, which is supported by the fields 'ms' and 'segment_num'.\"), TC18.txt L5859-5860; \u00a713.7.11.3 Figure 40, TC18.txt L5842-5856"
+      "tc18": "\u00a713.7.11.3 (\"...which requires segmentation, which is supported by the fields 'ms' and 'segment_num'.\"), TC18.txt L5859-5860; \u00a713.7.11.3 Figure 40, TC18.txt L5842-5856",
+      "tc18_master_id": "TC18-13.7.11.3-002"
     },
     {
       "id": "REQ-CANEP-026",
@@ -8223,7 +8288,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856"
+      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856",
+      "tc18_master_id": "TC18-13.7.11.3-001"
     },
     {
       "id": "REQ-CANEP-027",
@@ -8234,7 +8300,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856"
+      "tc18": "\u00a713.7.11.3 Figure 40, TC18.txt L5842-5856",
+      "tc18_master_id": "TC18-13.7.11.3-001"
     },
     {
       "id": "REQ-UART-029",
@@ -9546,7 +9613,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.7.2 Table 49, TC18.txt L5211-5234"
+      "tc18": "\u00a713.7.7.2 Table 49, TC18.txt L5211-5234",
+      "tc18_master_id": "TC18-13.7.7.2-001"
     },
     {
       "id": "REQ-I2C-020",
@@ -9557,7 +9625,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.7.3, TC18.txt L5241-5243"
+      "tc18": "\u00a713.7.7.3, TC18.txt L5241-5243",
+      "tc18_master_id": "TC18-13.7.7.3-001"
     },
     {
       "id": "REQ-I2C-021",
@@ -9568,7 +9637,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.1 Configuration of endpoints + Figure 19 (renumbered from Figure 18 by the RC5 rebaseline), TC18.txt L2844-2860"
+      "tc18": "\u00a712.7.1 Configuration of endpoints + Figure 19 (renumbered from Figure 18 by the RC5 rebaseline), TC18.txt L2844-2860",
+      "tc18_master_id": "TC18-12.7.1-002"
     },
     {
       "id": "REQ-I2C-022",
@@ -9579,7 +9649,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.1 Configuration of endpoints, TC18.txt L2844-2860"
+      "tc18": "\u00a712.7.1 Configuration of endpoints, TC18.txt L2844-2860",
+      "tc18_master_id": "TC18-12.7.1-003"
     },
     {
       "id": "REQ-LIFECYCLE-022",
@@ -11271,7 +11342,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.2 Table 56, TC18.txt L5764-5836"
+      "tc18": "\u00a713.7.11.2 Table 56, TC18.txt L5764-5836",
+      "tc18_master_id": "TC18-13.7.11.2-002"
     },
     {
       "id": "REQ-CANEP-029",
@@ -11282,7 +11354,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "not-implemented",
-      "tc18": "\u00a713.7.11.2, TC18.txt L5764-5836 and Table 56 (acceptance filter 3/4 address collision at 0x002C, receive filter 1..4 immediately following), TC18.txt L5813-5815 -- the address-collision defect itself is confirmed unchanged word-for-word in the current RC5 text; disposition (not-implemented, genuinely blocked) is unaffected"
+      "tc18": "\u00a713.7.11.2, TC18.txt L5764-5836 and Table 56 (acceptance filter 3/4 address collision at 0x002C, receive filter 1..4 immediately following), TC18.txt L5813-5815 -- the address-collision defect itself is confirmed unchanged word-for-word in the current RC5 text; disposition (not-implemented, genuinely blocked) is unaffected",
+      "tc18_master_id": "TC18-13.7.11.2-002"
     },
     {
       "id": "REQ-CANEP-030",
@@ -11293,7 +11366,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "\u00a713.7.11.2, TC18.txt L5772"
+      "tc18": "\u00a713.7.11.2, TC18.txt L5772",
+      "tc18_master_id": "TC18-13.7.11.2-001"
     },
     {
       "id": "REQ-CANEP-031",
@@ -11304,7 +11378,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.11.3 Table 57 + Figure 40, TC18.txt L5842-5872"
+      "tc18": "\u00a713.7.11.3 Table 57 + Figure 40, TC18.txt L5842-5872",
+      "tc18_master_id": "TC18-13.7.11.3-003"
     },
     {
       "id": "REQ-CANEP-032",
@@ -11337,7 +11412,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.12.2 Table 58, TC18.txt L5944-5946"
+      "tc18": "\u00a713.7.12.2 Table 58, TC18.txt L5944-5946",
+      "tc18_master_id": "TC18-13.7.12.2-001"
     },
     {
       "id": "REQ-ISELED-027",
@@ -11348,7 +11424,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.12.2 Table 58, TC18.txt L5953-5955"
+      "tc18": "\u00a713.7.12.2 Table 58, TC18.txt L5953-5955",
+      "tc18_master_id": "TC18-13.7.12.2-001"
     },
     {
       "id": "REQ-ISELED-028",
@@ -11359,7 +11436,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "retired",
-      "tc18": "\u00a713.7.12.2, TC18.txt L5948-5952 and L5964-5966"
+      "tc18": "\u00a713.7.12.2, TC18.txt L5948-5952 and L5964-5966",
+      "tc18_master_id": "TC18-13.7.12.2-004"
     },
     {
       "id": "REQ-ISELED-029",
@@ -11370,7 +11448,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.12.2 Table 58, TC18.txt L5916-5961"
+      "tc18": "\u00a713.7.12.2 Table 58, TC18.txt L5916-5961",
+      "tc18_master_id": "TC18-13.7.12.2-001"
     },
     {
       "id": "REQ-ISELED-030",
@@ -11392,7 +11471,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33 (evt[2:0]=000b legality), TC18.txt L4069-4116; \u00a713.7.12.3 Figure 41 (iseled request format), TC18.txt L5985-5995"
+      "tc18": "\u00a713.5 Table 33 (evt[2:0]=000b legality), TC18.txt L4069-4116; \u00a713.7.12.3 Figure 41 (iseled request format), TC18.txt L5985-5995",
+      "tc18_master_id": "TC18-13.7.12.3-001"
     },
     {
       "id": "REQ-LINEP-023",
@@ -11403,7 +11483,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.10.1, TC18.txt L5694-5695"
+      "tc18": "\u00a713.7.10.1, TC18.txt L5694-5695",
+      "tc18_master_id": "TC18-13.7.10.1-002"
     },
     {
       "id": "REQ-LINEP-024",
@@ -11414,7 +11495,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.10.2 Table 55, TC18.txt L5697-5714"
+      "tc18": "\u00a713.7.10.2 Table 55, TC18.txt L5697-5714",
+      "tc18_master_id": "TC18-13.7.10.2-001"
     },
     {
       "id": "REQ-LINEP-028",
@@ -11425,7 +11507,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.1 Configuration of endpoints + Figure 19 (renumbered from Figure 18 by the RC5 rebaseline), TC18.txt L2844-2860"
+      "tc18": "\u00a712.7.1 Configuration of endpoints + Figure 19 (renumbered from Figure 18 by the RC5 rebaseline), TC18.txt L2844-2860",
+      "tc18_master_id": "TC18-12.7.1-002"
     },
     {
       "id": "REQ-LINEP-029",
@@ -11436,7 +11519,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.1 Configuration of endpoints, TC18.txt L2844-2860"
+      "tc18": "\u00a712.7.1 Configuration of endpoints, TC18.txt L2844-2860",
+      "tc18_master_id": "TC18-12.7.1-003"
     },
     {
       "id": "REQ-LINEP-025",
@@ -11447,7 +11531,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.10.1, TC18.txt L5694-5695; \u00a713.5.1, TC18.txt L4134-4142"
+      "tc18": "\u00a713.7.10.1, TC18.txt L5694-5695; \u00a713.5.1, TC18.txt L4134-4142",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-LINEP-026",
@@ -11458,7 +11543,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-LINEP-027",
@@ -11469,7 +11555,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116; \u00a713.7.10.1, TC18.txt L5694-5695"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116; \u00a713.7.10.1, TC18.txt L5694-5695",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-MDIO-020",
