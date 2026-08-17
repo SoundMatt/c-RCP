@@ -60,6 +60,7 @@
 //cfusa:test REQ-RMAP-078
 //cfusa:test REQ-RMAP-079
 //cfusa:test REQ-RMAP-080
+//cfusa:test REQ-RMAP-081
 
 /*
  * test_tc18_gaps_regmap.c -- spec-literal conformance-and-deviation suite
@@ -2472,6 +2473,53 @@ static void test_ep_generic_cfg_render_clamps_non_multiple_of_4_req_storage_size
 
     TEST_ASSERT_EQUAL_UINT8(0x00u, out[2]);
     TEST_ASSERT_EQUAL_UINT8(0x02u, out[3]);
+}
+
+/* REQ-RMAP-081 (issue #467, investigated 2026-08-16): TC18's own prose
+ * immediately below Table 31 ("The configuration parameter
+ * EP_RESP_ON_ERROR also switches on the gauging of the assigned physical
+ * IO pins...") names a configuration parameter Table 31 itself never
+ * actually defines -- confirmed via direct extraction of the primary-
+ * source PDF page image (pdftotext -layout, physical pages 81-82): Table
+ * 31's own row list for EP0 ends at ep_rx_buffer_size with no
+ * ep_resp_on_error row anywhere, and the two spans octet 0x0001 does
+ * reserve (relative 0x0001.1:3 and 0x0001.6:7) are both marked plain
+ * "reserved". A full-document search finds "EP_RESP_ON_ERROR" exactly
+ * once, in this same sentence -- a dangling reference, independently
+ * confirmed three times by TC18_spec_defects_report.md item 22 and its
+ * own review copies, not an unwired local gap. There is no bit position
+ * anywhere in the document for c-RCP to model, so this test pins that
+ * rcp_regmap_ep_generic_cfg_render() invents none: both reserved spans of
+ * octet 1 stay zero for every input, including inputs deliberately chosen
+ * to be non-zero/extreme everywhere else, so this assertion cannot pass
+ * by accident of an all-zero row. See regmap.h's own REQ-RMAP-081 comment
+ * (next to rcp_regmap_ep_generic_cfg_t) for the full investigation
+ * writeup and .fusa-reqs.json's REQ-RMAP-081 entry for the catalog
+ * record. */
+static void test_ep_generic_cfg_render_has_no_ep_resp_on_error_bit_reserved_bits_stay_zero(void)
+{
+    rcp_regmap_ep_generic_cfg_t row;
+    uint8_t                     out[12];
+
+    rcp_regmap_ep_generic_cfg_init(&row);
+    row.ep_type             = 0xFFu;       /* read-only; non-default so this test's own mask
+                                               isn't accidentally checking ep_type instead */
+    row.ep_used              = true;
+    row.ep_delay_time        = 50u;        /* one of the 4 allowed values -- register 11b */
+    row.ep_req_storage_size  = 0xFFFFFFFFu; /* deliberately extreme -- an all-zero row would
+                                                make this assertion pass trivially */
+    row.ep_description       = 0xFFFFFFFFu;
+    row.ep_tx_buffer_size    = 0xFFFFu;
+    row.ep_rx_buffer_size    = 0xFFFFu;
+
+    rcp_regmap_ep_generic_cfg_render(&row, 1, out);
+
+    /* octet 1 (relative 0x0001): bit 0 is ep_used, bits [5:4] are
+     * ep_delay_time -- TC18's own two reserved spans are bits [3:1] and
+     * [7:6] (mask 0xCE). Neither holds an EP_RESP_ON_ERROR bit or any
+     * other meaning; this function must never set either span regardless
+     * of how every other field is populated. */
+    TEST_ASSERT_EQUAL_UINT8(0x00u, (uint8_t)(out[1] & 0xCEu));
 }
 
 /* REQ-RMAP-079 (issue #311 batch 4): the WRITE side of ep_generic_cfg's
@@ -6053,6 +6101,7 @@ int main(void)
     RUN_TEST(test_ep_generic_cfg_render_falls_back_to_1us_for_any_disallowed_delay_value);
     RUN_TEST(test_ep_generic_cfg_render_clamps_oversized_req_storage_size_without_wrapping);
     RUN_TEST(test_ep_generic_cfg_render_clamps_non_multiple_of_4_req_storage_size);
+    RUN_TEST(test_ep_generic_cfg_render_has_no_ep_resp_on_error_bit_reserved_bits_stay_zero);
     RUN_TEST(test_ep_generic_cfg_apply_reconfig_patches_addressed_octets_only);
     RUN_TEST(test_ep_generic_cfg_apply_reconfig_write_touching_only_ep_type_is_a_no_op_confirmed_normally);
     RUN_TEST(test_ep_generic_cfg_apply_reconfig_row0_ep_used_write_is_ignored_stays_true);

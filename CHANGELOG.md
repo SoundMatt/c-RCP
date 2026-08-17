@@ -34,6 +34,32 @@ the rationale.
 
 ## Releases
 
+### v0.379.0 -- 2026-08-16 (EP_RESP_ON_ERROR investigated and confirmed a genuine TC18 spec defect, not an addressable local gap)
+
+Closes issue #467. TC18 §13.2's own prose immediately below Table 31
+("ep_generic_config register map") names a configuration parameter,
+`EP_RESP_ON_ERROR`, gating a pin-readback error-response behavior --
+but Table 31 itself never actually defines a parameter of this name.
+Confirmed via direct primary-source PDF extraction: Table 31's row list
+ends at `ep_rx_buffer_size` with no `ep_resp_on_error` row, and the
+octet's own two reserved spans carry no association with this name. A
+full-document search finds the string exactly once, in this same
+sentence -- a dangling reference, independently confirmed three times
+by this project's own `TC18_spec_defects_report.md` (item 22). A
+second, near-identically-named reference (`EP_RESP_ON_ERR`, §13.7.6.1,
+PWM_IN chapter -- "if enabled within the EP_config (EP_RESP_ON_ERR)")
+reinforces the same conclusion: it too describes a bit living in the
+shared, generic `EP_config` block (Table 31), not a PWM_IN-specific one,
+and is itself never given a wire position anywhere either. There is no
+wire location for c-RCP to implement against, unlike this codebase's
+other hardware-dependent gaps (which all have a real register position
+and are blocked only by needing physical IO a mock server cannot model).
+No functional code change; new `REQ-RMAP-081` (`.fusa-reqs.json`, status
+`not-implemented`) records the investigation, with a matching doc
+comment (`include/rcp/regmap.h`) and a pinning test confirming this
+codebase does not invent an unverified bit assignment for the missing
+parameter. 66/66 tests green (native + ASan/UBSan); `cfusa check`: 0
+errors; `cfusa trace`: 100%/100%.
 ### v0.378.0 -- 2026-08-16 (UART/LIN/ADC/CAN/ISELED/MDIO functional-config table citations corrected, the six-item residue issue #434's bulk pass missed)
 
 Closes issue #472. Doc-comment-only citation fix, same lineage as issue
