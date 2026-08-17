@@ -19106,6 +19106,41 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.407.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for
+`REQ-AVTP-*`/`REQ-WDG-*`/`REQ-PWR-*`/`REQ-TSN-*`/`REQ-UDP-*`/
+`REQ-DL-*`/`REQ-L2-*`/`REQ-FRAG-*`)
+
+One of several parallel per-category batches for c-RCP-AUDIT-04
+(issue 166), unblocked now that RELAY's master TC18 requirement
+catalog (`docs/tc18-master-catalog.json`, 447 entries) exists.
+Scope is the `REQ-AVTP-*`/`REQ-WDG-*`/`REQ-PWR-*`/`REQ-TSN-*`/
+`REQ-UDP-*`/`REQ-DL-*`/`REQ-L2-*`/`REQ-FRAG-*` prefixes (119
+entries); sibling batches cover the rest of `.fusa-reqs.json` under
+their own PRs.
+
+Added `tc18_master_id` to 41 of the 51 requirements in scope that
+already carry a `tc18` citation, matched by section + table/figure
+number + a content check against the catalog entry's own summary
+(not on section number alone -- `§12.7.7`, `§12.4.1`, and `§11.1`
+each own more than one catalog entry). The 68 requirements with no
+`tc18` field at all were left alone, as expected. 10 requirements
+were left unset rather than forced, for three distinct reasons:
+`REQ-AVTP-009`/`REQ-AVTP-013`/`REQ-L2-011` each genuinely span two
+or more catalog clauses with no single confident owner;
+`REQ-WDG-002`/`REQ-WDG-003`/`REQ-WDG-010` cite only the §12.7.7
+watchdog-reset-on-each-request narrative, which has no corresponding
+catalog clause (only the Table 24 register-map entry exists for that
+section); and `REQ-UDP-017`/`REQ-UDP-018`/`REQ-L2-001`/`REQ-L2-002`
+cite TC18 §10.1, a section the current 447-entry master catalog does
+not cover at all (its lowest cataloged section is §11.1) -- flagged
+in the PR as a master-catalog gap for follow-up, not a matching
+failure on this repo's side.
+
+Purely additive field; `cfusa` v0.5.54 `check`/`trace
+--req-coverage 100 --sec-tested 100` output confirmed byte-identical
+before and after (same 100%/100%, 0 errors). Full 66-test suite
+unchanged (66/66 passed).
+
 ### v0.406.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for
 PWM/ADC `.fusa-reqs.json` entries)
 
