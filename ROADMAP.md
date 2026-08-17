@@ -19106,6 +19106,82 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.382.0 -- 2026-08-16 (issue #455: Figure 17 lifecycle-diagram
+re-transcription -- missing transition added, idle-gate misattribution
+corrected, Figure-16-should-be-17 citations fixed)
+
+Closes issue #455 (sev:high). Re-traced Figure 17 ("RC Server
+lifecycle states", page 51 of the current RC5 PDF) at pixel
+resolution -- a 400dpi page render, cropped and re-cropped around
+every transition arrow's own label, since `pdftotext`'s text
+extraction loses the diagram's arrow topology -- against
+`rcp_lifecycle_transition()`, line by line, before touching any code.
+
+Three findings, all independently confirmed against the primary
+source rather than trusted from the issue body:
+
+1. Figure 17 diagrams a direct `RCP_CONFIGURED -> HW_CONFIGURED`
+   arrow ("Root Client or (stream/bb_ID & no root configured) access
+   via EP0 to set state to HW_CONFIGURED & all other EPs are Idle ->
+   send positive response") that `rcp_lifecycle_transition()` did not
+   implement at all -- this pair fell through unconditionally to the
+   function's own catch-all (`RCP_LIFECYCLE_ERR_INVALID_TRANSITION`).
+   Added as a new branch: authorized via `writer.via_root_client_ep0`
+   or `writer.via_valid_stream_association` only (the label names only
+   EP0-routed access -- `via_discovery_stream` deliberately excluded,
+   matching REQ-LIFECYCLE-037's own finding that discovery-stream
+   authorization no longer applies once RCP_CONFIGURED), then gated
+   by `all_other_eps_idle`. New `REQ-LIFECYCLE-039`.
+2. The pre-existing `HW_UNCONFIGURED -> HW_CONFIGURED` transition was
+   idle-gated, citing finding 1's own label text as its basis -- a
+   conflation of two different arrows. Figure 17's real label for
+   `HW_UNCONFIGURED -> HW_CONFIGURED` ("Request on discovery stream to
+   set HW_CONFIGURED state & HW_config consistent -> send positive
+   response") has no idleness condition and no root-client
+   alternative (none can exist yet this early in bring-up -- the
+   diagram's own topology at HW_UNCONFIGURED confirms this). Idle-gate
+   removed from this transition.
+3. `grep -rn "Figure 16" src/ include/ .fusa-reqs.json tests/ docs/`
+   found 37 matches; verified against the PDF before trusting the
+   issue's own "approximately 13" estimate -- 2 (`REQ-CANCEL-005`/
+   `006`) genuinely cite the real, different Figure 16
+   ("Cancellation of a single, specific request") and were left alone;
+   the other 35 all cite the lifecycle diagram (Figure 17 in the
+   current RC5 baseline) and are corrected across `src/lifecycle.c`,
+   `src/discovery.c`, `include/rcp/lifecycle.h`,
+   `include/rcp/discovery.h`, four test files, and three
+   `.fusa-reqs.json` `text` fields the 2026-08-13 citation-drift pass
+   (issue #341 lineage) fixed in their sibling `tc18` field but missed
+   in `text` -- `REQ-LIFECYCLE-022`'s own `text` field also carried
+   finding 2's exact misattribution and needed a substantive rewrite,
+   not just a citation swap. `REQ-LIFECYCLE-012`'s "unmodeled
+   transitions" list corrected to drop `RCP_CONFIGURED ->
+   HW_CONFIGURED`, now modeled.
+
+Flagged, not fixed (own separate scope): the `HW_CONFIGURED ->
+HW_UNCONFIGURED` reset's own label also has no idleness mention in
+the diagram, yet is idle-gated in code -- a possible fourth
+citation/behavior question, recorded in `REQ-LIFECYCLE-022`'s
+`.fusa-reqs.json` entry for a future issue rather than force-fixed
+without the same level of independent confirmation this issue's own
+three findings received.
+
+New tests in `tests/test_lifecycle.c`: a regression test proving the
+old, misapplied `HW_UNCONFIGURED -> HW_CONFIGURED` idle-gate is gone;
+the new `RCP_CONFIGURED -> HW_CONFIGURED` transition's success path,
+correct-gate rejection/acceptance, and idle-gate. Mutation-tested
+both behavioral changes (disabled the new transition, restored the
+old misapplied idle check -- each reproduced exactly the expected new
+test failures, then restored).
+
+Full clean rebuild + 66/66 tests green, native and ASan/UBSan
+(`-fsanitize=address,undefined -fno-sanitize-recover=all`,
+`ASAN_OPTIONS=detect_leaks=0` on macOS). `cfusa check`: 0 errors;
+`cfusa trace`: 1090/1090 traced and tested.
+
+**Next**: the flagged `HW_CONFIGURED -> HW_UNCONFIGURED` idle-gate
+question above, as its own separately-confirmed issue.
+
 ### v0.381.0 -- 2026-08-16 (REQ-SRV-016: admit() now builds the
 success-path Acknowledge TC18 §12.9.5 requires, not just submit())
 

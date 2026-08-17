@@ -79,7 +79,7 @@ static void to_hw_configured(rcp_mock_server_t *srv)
  * to_hw_configured() already relies on for its own single transition. As
  * of the REQ-LIFECYCLE-031 fix, the HW_CONFIGURED -> RCP_CONFIGURED
  * advance also requires an authorized writer (not idle-gated, per
- * Figure 16) -- root is used here since this fixture is not itself
+ * Figure 17) -- root is used here since this fixture is not itself
  * testing lifecycle authorization policy. */
 static void to_rcp_configured(rcp_mock_server_t *srv)
 {

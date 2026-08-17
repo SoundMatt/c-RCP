@@ -116,7 +116,7 @@ static void to_hw_configured(rcp_mock_server_t *srv)
  * plausibility checks along the way, the same way to_hw_configured()
  * already relies on for its own single transition. As of the
  * REQ-LIFECYCLE-031 fix, the HW_CONFIGURED -> RCP_CONFIGURED advance
- * also requires an authorized writer (not idle-gated, per Figure 16). */
+ * also requires an authorized writer (not idle-gated, per Figure 17). */
 static void to_rcp_configured(rcp_mock_server_t *srv)
 {
     rcp_lifecycle_writer_ctx_t root = {true, false, false, false};

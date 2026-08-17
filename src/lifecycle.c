@@ -110,6 +110,7 @@ rcp_lifecycle_errc_t rcp_lifecycle_check_rcp_cfg(const rcp_lifecycle_plausibilit
 //cfusa:req REQ-LIFECYCLE-022
 //cfusa:req REQ-LIFECYCLE-031
 //cfusa:req REQ-LIFECYCLE-037
+//cfusa:req REQ-LIFECYCLE-039
 rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
                                                rcp_lifecycle_state_t target,
                                                const rcp_lifecycle_plausibility_snapshot_t *snap,
@@ -134,11 +135,18 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
         target == RCP_LIFECYCLE_HW_CONFIGURED) {
         /* writer not consulted for this transition -- see header doc
          * comment: already enforced one layer up by should_accept().
-         * REQ-LIFECYCLE-022: Figure 16's own diagram requires "all other
-         * EPs are Idle" for this advance too, not just the demotion
-         * below. */
+         * CORRECTED (issue #455): NOT idle-gated. TC18 Figure 17's own
+         * label for this specific arrow -- "Request on discovery stream
+         * to set HW_CONFIGURED state & HW_config consistent -> send
+         * positive response" (page 51 of the current RC5 PDF) -- makes
+         * no mention of endpoint idleness and offers no root-client
+         * alternative (none can exist yet this early in bring-up). The
+         * "all other EPs are Idle" condition previously (mis)applied
+         * here was transcribed from a DIFFERENT arrow -- the
+         * RCP_CONFIGURED -> HW_CONFIGURED demotion's own label (see that
+         * transition below) -- and has been moved there, where it
+         * actually belongs. */
         rcp_lifecycle_errc_t rc;
-        if (!all_other_eps_idle) return RCP_LIFECYCLE_ERR_EPS_NOT_IDLE;
         rc = rcp_lifecycle_check_hw_cfg(snap);
         if (rc != RCP_LIFECYCLE_OK) return rc;
         *state = target;
@@ -147,7 +155,7 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
 
     if (from == RCP_LIFECYCLE_HW_CONFIGURED &&
         target == RCP_LIFECYCLE_RCP_CONFIGURED) {
-        /* Not idle-gated -- Figure 16's own label for this transition
+        /* Not idle-gated -- Figure 17's own label for this transition
          * ("...& RCP_config consistent -> send positive response") makes
          * no mention of endpoint idleness, unlike the HW_UNCONFIGURED <->
          * HW_CONFIGURED transitions above/below. */
@@ -159,10 +167,37 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
         return RCP_LIFECYCLE_OK;
     }
 
+    /* ADDED (issue #455): TC18 Figure 17's own explicit
+     * RCP_CONFIGURED -> HW_CONFIGURED arrow -- "Root Client or
+     * (stream/bb_ID & no root configured) access via EP0 to set state to
+     * HW_CONFIGURED & all other EPs are Idle -> send positive response"
+     * (page 51 of the current RC5 PDF) -- previously fell through
+     * unconditionally to the catch-all RCP_LIFECYCLE_ERR_INVALID_
+     * TRANSITION below, even though the diagram models it as a real,
+     * first-class demotion. Authorization is narrower than the general
+     * `authorized` variable at the top of this function: only
+     * writer.via_root_client_ep0 or writer.via_valid_stream_association
+     * satisfy this specific label -- both are, by their own text,
+     * "access via EP0" -- via_discovery_stream is deliberately NOT
+     * accepted here, consistent with REQ-LIFECYCLE-037's own finding
+     * that discovery-stream authorization no longer suffices for a
+     * configuration change made once already RCP_CONFIGURED (TC18
+     * §12.7.4). Like the two reset-to-HW_UNCONFIGURED transitions,
+     * snap is not consulted -- a demotion does not re-verify
+     * plausibility. */
+    if (from == RCP_LIFECYCLE_RCP_CONFIGURED &&
+        target == RCP_LIFECYCLE_HW_CONFIGURED) {
+        if (!writer.via_root_client_ep0 && !writer.via_valid_stream_association)
+            return RCP_LIFECYCLE_ERR_UNAUTHORIZED;
+        if (!all_other_eps_idle) return RCP_LIFECYCLE_ERR_EPS_NOT_IDLE;
+        *state = target;
+        return RCP_LIFECYCLE_OK;
+    }
+
     /* Demotion back to HW_UNCONFIGURED via the discovery-stream/root-client
      * reset path -- from either configured state -- is unconditional once
      * authorized and idle; snap is not consulted for a reset.
-     * REQ-LIFECYCLE-022: TC18 Figure 16 -- "Root Client access via EP0 to
+     * REQ-LIFECYCLE-022: TC18 Figure 17 -- "Root Client access via EP0 to
      * set state to HW_UNCONFIGURED & other EPs are not Idle -> send error
      * response EPs_NOT_IDLE" -- gates exactly this transition.
      *
@@ -191,9 +226,10 @@ rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
         return RCP_LIFECYCLE_OK;
     }
 
-    /* Everything else -- skipping a state on the way up, or downgrading
-     * from RCP_CONFIGURED to HW_CONFIGURED directly -- is not a modeled
-     * transition, regardless of writer or idleness. */
+    /* Everything else -- e.g. skipping a state entirely on the way up
+     * (HW_UNCONFIGURED -> RCP_CONFIGURED directly) -- is not a modeled
+     * transition, regardless of writer or idleness. (RCP_CONFIGURED ->
+     * HW_CONFIGURED directly IS modeled, above -- issue #455.) */
     return RCP_LIFECYCLE_ERR_INVALID_TRANSITION;
 }
 
@@ -410,7 +446,7 @@ rcp_wire_error_t rcp_lifecycle_field_write_error(rcp_lifecycle_state_t state,
     /* Re-evaluate with a maximally-privileged writer (every authorizing
      * condition true, frame unicast) to isolate whether the denial above
      * was purely state-driven -- see this function's own header doc
-     * comment for the full rationale, corrected against TC18 Figure 16's
+     * comment for the full rationale, corrected against TC18 Figure 17's
      * own LOCKED_CONFIG_ACCESS transition. */
     best.via_root_client_ep0   = true;
     best.via_owning_stream     = true;

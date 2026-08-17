@@ -34,6 +34,91 @@ the rationale.
 
 ## Releases
 
+### v0.382.0 -- 2026-08-16 (Figure 17 lifecycle-diagram re-transcription: missing RCP_CONFIGURED->HW_CONFIGURED transition added, misattributed idle-gate corrected, Figure-16-should-be-17 citation drift fixed)
+
+Closes issue #455 (sev:high). Re-traced TC18's actual lifecycle
+state diagram (Figure 17, "RC Server lifecycle states", page 51 of
+`OA_TC18_specification_v_0.5.1_RC_5_3624.pdf`) at pixel resolution
+against `src/lifecycle.c`'s `rcp_lifecycle_transition()`, transcribing
+every transition arrow's own label from a 400dpi page render (not
+just the pre-existing text extraction, which loses the diagram's
+arrow topology) before touching any code. Three confirmed findings:
+
+1. **Missing transition.** Figure 17 diagrams a direct
+   `RCP_CONFIGURED -> HW_CONFIGURED` arrow -- "Root Client or
+   (stream/bb_ID & no root configured) access via EP0 to set state to
+   HW_CONFIGURED & all other EPs are Idle -> send positive response"
+   -- that `rcp_lifecycle_transition()` did not implement at all: this
+   `(from, target)` pair fell through unconditionally to the
+   function's own catch-all, returning
+   `RCP_LIFECYCLE_ERR_INVALID_TRANSITION` regardless of writer or
+   idleness. Added as a new branch, gated by `writer.via_root_client_ep0
+   || writer.via_valid_stream_association` (both are, by the label's
+   own text, "access via EP0" -- `via_discovery_stream` deliberately
+   NOT accepted, consistent with REQ-LIFECYCLE-037's own finding that
+   the discovery stream no longer authorizes a configuration change
+   once already RCP_CONFIGURED) then by `all_other_eps_idle`. New
+   `REQ-LIFECYCLE-039`.
+2. **Mislabeled idle-gate.** The pre-existing `HW_UNCONFIGURED ->
+   HW_CONFIGURED` transition was gated on `all_other_eps_idle`,
+   citing finding 1's own label as its basis -- but that label
+   belongs to the `RCP_CONFIGURED -> HW_CONFIGURED` arrow (finding 1
+   above), not this one. Figure 17's real, distinct label for
+   `HW_UNCONFIGURED -> HW_CONFIGURED` reads only "Request on discovery
+   stream to set HW_CONFIGURED state & HW_config consistent -> send
+   positive response" -- no idleness condition, and no root-client
+   alternative (none can exist yet at HW_UNCONFIGURED, confirmed by
+   the diagram's own topology). The idle-gate on this transition is
+   removed; the server's first configuration advance is no longer
+   incorrectly refused with `RCP_LIFECYCLE_ERR_EPS_NOT_IDLE`.
+3. **Stale "Figure 16" citations.** `grep -rn "Figure 16" src/
+   include/ .fusa-reqs.json tests/ docs/` found 37 matches; 2 (both in
+   `.fusa-reqs.json`, `REQ-CANCEL-005`/`006`) genuinely cite the real
+   Figure 16 ("Cancellation of a single, specific request", TC18.txt
+   L2158) and were left untouched; the other 35 all cite the lifecycle
+   diagram, which is Figure 17 in the current RC5 baseline (verified
+   directly against the PDF before assuming the issue's own count),
+   and are corrected -- `src/lifecycle.c`, `src/discovery.c`,
+   `include/rcp/lifecycle.h`, `include/rcp/discovery.h`,
+   `tests/test_lifecycle.c`, `tests/test_mock.c`,
+   `tests/test_tc18_gaps_{e2e,server,regmap}.c`, and three
+   `.fusa-reqs.json` `text` fields (`REQ-WIREERR-004`, `REQ-DISC-029`,
+   `REQ-LIFECYCLE-022`) whose sibling `tc18` fields had already been
+   corrected in the 2026-08-13 pass (issue #341 lineage) but whose
+   `text` fields were missed -- `REQ-LIFECYCLE-022`'s own `text` field
+   also carried finding 2's exact misattribution and is substantively
+   rewritten, not just re-labeled. `REQ-LIFECYCLE-012`'s own
+   "unmodeled transitions" list corrected to drop
+   `RCP_CONFIGURED -> HW_CONFIGURED`, now a modeled transition
+   (REQ-LIFECYCLE-039).
+
+STILL OPEN, flagged but deliberately NOT changed (out of this issue's
+own three-finding scope, needs its own independent confirmation
+first): a closer pixel-level reading also found the pre-existing
+`HW_CONFIGURED -> HW_UNCONFIGURED` reset's own diagram label ("Request
+on (discovery stream or known stream_id/bb_id and no root client set)
+or root client to set HW_UNCONFIGURED state -> send positive
+response") makes no mention of idleness either, yet
+`rcp_lifecycle_transition()` idle-gates it anyway -- a possible fourth
+citation/behavior question in the same family, noted in
+`REQ-LIFECYCLE-022`'s own `.fusa-reqs.json` entry for a future issue.
+
+New tests: the corrected `HW_UNCONFIGURED -> HW_CONFIGURED` gate (a
+regression test proving `all_other_eps_idle = false` now succeeds,
+where it previously, incorrectly, returned `EPS_NOT_IDLE`); the new
+`RCP_CONFIGURED -> HW_CONFIGURED` transition's success path (root
+client), its correct-gate rejection (stranger/discovery-stream
+rejected, valid-stream-association accepted), and its idle-gate.
+Mutation-tested both behavioral changes: reverting each in turn
+(disabling the new transition; restoring the old misapplied idle
+check) reproduced exactly the expected new-test failures, confirmed,
+then restored.
+
+Full clean rebuild + 66/66 tests green (native + ASan/UBSan,
+`-fsanitize=address,undefined -fno-sanitize-recover=all`,
+`ASAN_OPTIONS=detect_leaks=0` on macOS). `cfusa check`: 0 errors;
+`cfusa trace`: 1090/1090 traced and tested.
+
 ### v0.381.0 -- 2026-08-16 (admit() now builds the REQ-SRV-016 Acknowledge on every successful admission, not just via submit())
 
 Closes issue #463. TC18 §12.9.5's own generic wording -- "an acknowledge

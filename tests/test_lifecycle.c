@@ -20,6 +20,7 @@
 //cfusa:test REQ-LIFECYCLE-019
 //cfusa:test REQ-LIFECYCLE-020
 //cfusa:test REQ-LIFECYCLE-021
+//cfusa:test REQ-LIFECYCLE-039
 //cfusa:test REQ-WIREERR-004
 //cfusa:test REQ-RMAP-025
 //cfusa:test REQ-AVTP-021
@@ -181,12 +182,20 @@ static void test_transition_hw_unconfigured_to_hw_configured_succeeds_when_plaus
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_CONFIGURED, state);
 }
 
-/* REQ-LIFECYCLE-022, TC18 Figure 16: "Root Client or (stream/bb_ID & no
- * root configured) access via EP0 to set state to HW_CONFIGURED & all
- * other EPs are Idle -> send positive response" -- the advance is
- * refused with RCP_LIFECYCLE_ERR_EPS_NOT_IDLE, checked before (and thus
- * independent of) plausibility, when all_other_eps_idle is false. */
-static void test_transition_hw_unconfigured_to_hw_configured_requires_idle(void)
+/* CORRECTED (issue #455): a pixel-level re-transcription of TC18 Figure
+ * 17 (page 51 of the current RC5 PDF) found that the HW_UNCONFIGURED ->
+ * HW_CONFIGURED advance's own label -- "Request on discovery stream to
+ * set HW_CONFIGURED state & HW_config consistent -> send positive
+ * response" -- makes no mention of endpoint idleness at all. The "all
+ * other EPs are Idle" wording this test previously pinned as this
+ * transition's own gate in fact belongs to a DIFFERENT arrow -- the
+ * RCP_CONFIGURED -> HW_CONFIGURED demotion's own label (see
+ * test_transition_rcp_configured_to_hw_configured_requires_idle() below,
+ * REQ-LIFECYCLE-022's real home). This is now a regression test proving
+ * the OLD, misapplied gate is gone: a request with all_other_eps_idle
+ * false now SUCCEEDS for this specific transition, where it previously,
+ * incorrectly, failed with RCP_LIFECYCLE_ERR_EPS_NOT_IDLE. */
+static void test_transition_hw_unconfigured_to_hw_configured_not_idle_gated(void)
 {
     rcp_lifecycle_endpoint_plausibility_t ep;
     rcp_lifecycle_request_stream_plausibility_t rs;
@@ -194,9 +203,9 @@ static void test_transition_hw_unconfigured_to_hw_configured_requires_idle(void)
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_HW_UNCONFIGURED;
     rcp_lifecycle_writer_ctx_t none = {0};
 
-    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_EPS_NOT_IDLE,
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
                        rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_CONFIGURED, &snap, none, false));
-    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, state); /* unchanged */
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_CONFIGURED, state);
 }
 
 static void test_transition_hw_unconfigured_to_hw_configured_fails_when_implausible(void)
@@ -367,14 +376,74 @@ static void test_transition_rejects_skipping_hw_configured(void)
     TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_UNCONFIGURED, state);
 }
 
-static void test_transition_rejects_rcp_configured_to_hw_configured(void)
+/* ADDED (issue #455): TC18 Figure 17 explicitly diagrams a
+ * RCP_CONFIGURED -> HW_CONFIGURED arrow -- "Root Client or (stream/bb_ID
+ * & no root configured) access via EP0 to set state to HW_CONFIGURED &
+ * all other EPs are Idle -> send positive response" -- that
+ * rcp_lifecycle_transition() previously did not implement at all,
+ * falling through unconditionally to RCP_LIFECYCLE_ERR_INVALID_
+ * TRANSITION regardless of writer or idleness. Root client via EP0,
+ * idle, succeeds. */
+static void test_transition_rcp_configured_to_hw_configured_succeeds_for_root_client(void)
 {
     rcp_lifecycle_state_t state = RCP_LIFECYCLE_RCP_CONFIGURED;
     rcp_lifecycle_writer_ctx_t root = {true, false, false, false};
 
-    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_INVALID_TRANSITION,
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
                        rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_CONFIGURED, NULL, root, true));
-    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state);
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_CONFIGURED, state);
+}
+
+/* The label's own "(stream/bb_ID & no root configured)" alternative --
+ * writer.via_valid_stream_association, which already bakes in "no root
+ * client configured" at its own construction site -- also authorizes
+ * this transition, same as the HW_CONFIGURED -> RCP_CONFIGURED advance's
+ * own equivalent test. via_discovery_stream alone does NOT (unlike the
+ * HW_CONFIGURED -> RCP_CONFIGURED advance): Figure 17's own label for
+ * this arrow names only EP0-routed access, consistent with
+ * REQ-LIFECYCLE-037's finding that the discovery stream no longer
+ * authorizes a configuration change once already RCP_CONFIGURED. */
+static void test_transition_rcp_configured_to_hw_configured_requires_correct_gate(void)
+{
+    rcp_lifecycle_state_t state = RCP_LIFECYCLE_RCP_CONFIGURED;
+    rcp_lifecycle_writer_ctx_t stranger    = {0};
+    rcp_lifecycle_writer_ctx_t discovery   = {false, false, false, true};
+    rcp_lifecycle_writer_ctx_t valid_assoc = {false, false, false, false, true};
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_UNAUTHORIZED,
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_CONFIGURED, NULL, stranger, true));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state); /* unchanged */
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_UNAUTHORIZED,
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_CONFIGURED, NULL, discovery, true));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state); /* unchanged -- discovery
+                                                                stream alone does not
+                                                                authorize this arrow */
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_CONFIGURED, NULL, valid_assoc, true));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_CONFIGURED, state);
+}
+
+/* REQ-LIFECYCLE-022, TC18 Figure 17: "...& all other EPs are Idle ->
+ * send positive response" -- an authorized (root client) request is
+ * still refused with RCP_LIFECYCLE_ERR_EPS_NOT_IDLE, checked after
+ * writer authorization, when all_other_eps_idle is false. This is
+ * REQ-LIFECYCLE-022's real home for this label (issue #455 corrected
+ * its prior misattribution to the HW_UNCONFIGURED -> HW_CONFIGURED
+ * advance, see that transition's own test above). */
+static void test_transition_rcp_configured_to_hw_configured_requires_idle(void)
+{
+    rcp_lifecycle_state_t state = RCP_LIFECYCLE_RCP_CONFIGURED;
+    rcp_lifecycle_writer_ctx_t root = {true, false, false, false};
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_ERR_EPS_NOT_IDLE,
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_CONFIGURED, NULL, root, false));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_RCP_CONFIGURED, state); /* unchanged */
+
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_OK,
+                       rcp_lifecycle_transition(&state, RCP_LIFECYCLE_HW_CONFIGURED, NULL, root, true));
+    TEST_ASSERT_EQUAL(RCP_LIFECYCLE_HW_CONFIGURED, state);
 }
 
 static void test_transition_same_state_is_noop_success(void)
@@ -650,7 +719,7 @@ static void test_field_writable_denies_non_unicast_frame_regardless_of_kind_or_a
 
 /* REQ-LIFECYCLE-024 / REQ-WIREERR-004: rcp_lifecycle_field_write_error()
  * distinguishes a state-only denial (RCP_ERROR_LOCKED_MEM_ACCESS -- TC18
- * Figure 16's own "...configuration to HW_CONFIG or QUEUE_CFG or
+ * Figure 17's own "...configuration to HW_CONFIG or QUEUE_CFG or
  * EP_GEN_CFG -> send error response LOCKED_CONFIG_ACCESS") from a
  * writer/frame-only denial on top of an otherwise-permitting state
  * (RCP_ERROR_UNAUTHORIZED_ACCESS -- TC18 §13.7.1.2's own separate "write
@@ -671,7 +740,7 @@ static void test_field_write_error_distinguishes_state_from_writer_denial(void)
         RCP_LIFECYCLE_HW_UNCONFIGURED, RCP_LIFECYCLE_FIELD_HW_GENERIC, discovery));
 
     /* State-only denial: even root can't write HW_GENERIC once past
-     * HW_UNCONFIGURED -- LOCKED_MEM_ACCESS (Figure 16's
+     * HW_UNCONFIGURED -- LOCKED_MEM_ACCESS (Figure 17's
      * LOCKED_CONFIG_ACCESS), not UNAUTHORIZED_ACCESS, since HW_GENERIC's
      * own writability rule has no authorization concept at all. */
     TEST_ASSERT_EQUAL(RCP_ERROR_LOCKED_MEM_ACCESS, rcp_lifecycle_field_write_error(
@@ -764,7 +833,7 @@ int main(void)
     RUN_TEST(test_rcp_cfg_null_snapshot_is_inconsistent);
 
     RUN_TEST(test_transition_hw_unconfigured_to_hw_configured_succeeds_when_plausible);
-    RUN_TEST(test_transition_hw_unconfigured_to_hw_configured_requires_idle);
+    RUN_TEST(test_transition_hw_unconfigured_to_hw_configured_not_idle_gated);
     RUN_TEST(test_transition_hw_unconfigured_to_hw_configured_fails_when_implausible);
     RUN_TEST(test_transition_hw_configured_to_rcp_configured_succeeds_when_plausible);
     RUN_TEST(test_transition_hw_configured_to_rcp_configured_fails_when_implausible);
@@ -774,7 +843,9 @@ int main(void)
     RUN_TEST(test_transition_hw_configured_to_hw_unconfigured_accepts_valid_stream_association);
     RUN_TEST(test_transition_rcp_configured_to_hw_unconfigured_requires_root_client);
     RUN_TEST(test_transition_rejects_skipping_hw_configured);
-    RUN_TEST(test_transition_rejects_rcp_configured_to_hw_configured);
+    RUN_TEST(test_transition_rcp_configured_to_hw_configured_succeeds_for_root_client);
+    RUN_TEST(test_transition_rcp_configured_to_hw_configured_requires_correct_gate);
+    RUN_TEST(test_transition_rcp_configured_to_hw_configured_requires_idle);
     RUN_TEST(test_transition_same_state_is_noop_success);
 
     RUN_TEST(test_hw_unconfigured_accepts_discovery_abb_under_ntscf);
