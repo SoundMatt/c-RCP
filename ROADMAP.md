@@ -19106,6 +19106,46 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.387.0 -- 2026-08-16 (c-RCP-AUDIT-02 citation backfill batch:
+PWM/ADC/GPIO/SPI/ISELED/I2C/LINEP/MDIO/WAKEUP, 3 of 41 uncited
+requirements in scope now cited)
+
+Partial progress on issue #164 (c-RCP-AUDIT-02). Scoped to the nine
+per-endpoint-type categories PWM, ADC, GPIO, SPI, ISELED, I2C, LINEP,
+MDIO, WAKEUP -- avoiding file overlap with concurrent
+lifecycle/discovery/mock/server work.
+
+Re-derived current counts from `.fusa-reqs.json` directly rather than
+trusting #164's stale body: these categories were already
+substantially cited by the earlier batch-6-through-25 passes
+(PRs #176-189) -- 258/299 cited, only 41 uncited going in.
+
+Method: read each uncited requirement's `text`, located the governing
+TC18 section in a fresh `pdftotext -layout` extraction of
+`OA_TC18_specification_v_0.5.1_RC_5_3624.pdf`, confirmed the stated
+behavior genuinely matches before citing.
+
+**Cited 3**: REQ-MDIO-006 (`pack_words()` -- same §13.7.13.1
+topic-area attribution as its sibling pack/unpack helpers, simply
+missed earlier), REQ-MDIO-010 (`functional_cfg_writable()` -- the
+standard §12.3.1.2/.3 write-authorization citation every sibling
+category's writable-delegate already carries), REQ-ISELED-014
+(`set_trigger()` -- the same §12.3.1.3 W*-marker citation its own
+sibling setters REQ-ISELED-011/012/013 already carry).
+
+**Left 38 uncited**, each re-verified rather than assumed: `strerror`/
+`functional_cfg_init` (implementation detail, confirmed zero such
+citations exist anywhere in the catalog); the `RCP_EP_PWM_IN_NO_SIGNAL`
+sentinel family (already carries detailed issue-#184-lineage
+"RESOLVED" notes); 13 ISELED bit-framing/CRC-8 requirements whose
+own governing prose defers the bit-level scheme to "the ISLED
+standard" by reference (re-confirmed by grep, matching this repo's
+own batch-14 finding).
+
+Citations additive-only, no impl/test change. Full 66-test suite
+green (unchanged); `cfusa check` (v0.5.54) 0 errors; `cfusa trace`
+(v0.5.54) 1095/1095 traced and tested, unchanged.
+
 ### v0.386.0 -- 2026-08-16 (c-RCP-AUDIT-02 citation backfill batch:
 AVTP/WDG/PWR/TSN/UDP/DL/L2/MDNS/FRAG, 34 of 113 uncited requirements
 in scope now cited)

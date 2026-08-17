@@ -7343,7 +7343,8 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "implemented"
+      "status": "implemented",
+      "tc18": "§12.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- governs the write-authorization behavior; the trigger event itself has its own basis at REQ-ISELED-008 (§13.7.12.1, \"The ISELED endpoint creates a single trigger event, when transmission of a data packet has been completed on the ISELED network.\", TC18.txt L5913-5914)"
     },
     {
       "id": "REQ-ISELED-015",
@@ -7512,7 +7513,8 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "implemented"
+      "status": "implemented",
+      "tc18": "§13.7.13.1, TC18.txt L6033-6037 (cited only as attribution for which general topic area -- MDIO management access -- motivated this endpoint type's existence, per ep_mdio.h's own file header; not as a source for this specific buffer-packing design; see REQ-MDIO-002/005/007/008)"
     },
     {
       "id": "REQ-MDIO-007",
@@ -7554,7 +7556,8 @@
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
-      "status": "implemented"
+      "status": "implemented",
+      "tc18": "§12.3.1.2/.3, TC18.txt L2553-2554, L2601-2602 -- §12.3.1.3 W* marker convention, TC18.txt L2601-2602 (same delegate-function citation basis as REQ-WAKEUP-002)"
     },
     {
       "id": "REQ-MDIO-011",
