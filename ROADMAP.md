@@ -19106,6 +19106,93 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.379.0 -- 2026-08-16 (REQ-RMAP-081: EP_RESP_ON_ERROR investigated
+and confirmed a genuine TC18 spec defect, not an addressable local gap)
+
+Closes issue #467. Filed at low confidence: a repo-wide search found zero
+references to "gauging", `EP_RESP_ON_ERROR`, readback pin verification, or
+a pin-carrying error-response payload in `src/regmap.c` or `src/ep_gpio.c`,
+with no `ROADMAP.md`/`.fusa-reqs.json` entry acknowledging it as deferred
+-- unlike this codebase's other known gaps. The filer correctly flagged
+the real open question: `EP_RESP_ON_ERROR` is never named as a bit/field
+in TC18 §13.2 Table 31 itself, only in the prose immediately below it, so
+whether this is a real addressable gap needed confirming before treating
+it as actionable.
+
+**Investigated and confirmed: not an addressable local gap.** Direct
+extraction of the primary-source PDF page image (`pdftotext -layout`,
+`OA_TC18_specification_v_0.5.1_RC_5_3624.pdf`, physical pages 81-82,
+byte-for-byte matching this project's own `TC18.txt` L3900-3990) shows
+Table 31's own EP0 row list running `ep_type`/`ep_used`/`ep_delay_time`/
+`ep_req_storage_size`/`ep_description`/`ep_tx_buffer_size`/
+`ep_rx_buffer_size` and stopping there -- no `ep_resp_on_error` row
+anywhere, and the two spans the shared octet `0x0001` does reserve
+(relative `0x0001.1:3` and `0x0001.6:7`) are both marked plain
+"reserved", with no association to this name. A full-text search of the
+entire document finds the string "EP_RESP_ON_ERROR" exactly once, in the
+sentence immediately below the table: "The configuration parameter
+EP_RESP_ON_ERROR also switches on the gauging of the assigned physical IO
+pins. If the endpoint tries to set an IO-Pin and the state of the IO-Pin
+does not follow, then an error will be flagged, and the response will be
+sent. The response shall include the reference to the error causing
+pin." This is a dangling reference -- a parameter the specification
+drafters apparently intended to define but never actually placed on the
+wire -- independently confirmed three separate times by this project's
+own `TC18_spec_defects_report.md` (item 22) and its `_audited`/
+`_quadruple_checked` review copies, all reaching the identical
+conclusion.
+
+A second, near-identically-named reference reinforces this rather than
+complicating it: §13.7.6.1 (PWM_IN chapter, TC18.txt L5079) reads "if
+enabled within the EP_config (EP_RESP_ON_ERR)" -- one letter short of
+`EP_RESP_ON_ERROR`, and explicitly describing a bit inside the shared,
+generic `EP_config` block (i.e. Table 31 itself), not a PWM_IN-specific
+one. It too is never given a wire position anywhere. Both citations
+point at the same single missing generic bit, not two independent gaps.
+
+This is a materially different defect shape from every existing
+`tc18-gap` entry citing genuine hardware c-RCP cannot model
+(REQ-SPI-037's clamped-pin/cs-hs ambiguity, REQ-PWM-057's pin-toggle-
+readback rule, every endpoint type's own `base_clk` field): those all
+have a real, defined wire location and are blocked only by needing
+physical IO this mock/test-double server has never modelled. This one
+has no wire location to be blocked at -- there is no bit for c-RCP to
+read, write, or leave a documented no-op stub for, so no code change
+applies here. Filed as a specification defect for the OPEN Alliance TC18
+committee to resolve (most plausibly by assigning `EP_RESP_ON_ERROR` one
+of Table 31's own two currently-reserved spans in octet `0x0001`, or by
+removing/rewriting the prose), not something implementable around
+unilaterally by inventing an unverified bit assignment.
+
+For the record, in case the committee does assign a real bit position in
+a future revision: the config bit itself would then be directly
+wire-modelable the way every other `ep_generic_cfg` field already is, but
+the "gauging" behavior it would enable -- comparing a commanded IO-pin's
+state against its own real electrical state after a write -- is real
+hardware this protocol-codec library has never modelled for any endpoint
+type, so the readback comparison itself would need to stay a documented
+no-op/always-pass in `src/mock.c`, matching this codebase's established
+boundary for every other hardware-dependent behavior, not a real
+simulation.
+
+New `REQ-RMAP-081` (`.fusa-reqs.json`, status `not-implemented`, scope
+`tc18-gap`) records this investigation so it is no longer silently
+untracked. A new doc comment next to `rcp_regmap_ep_generic_cfg_t`
+(`include/rcp/regmap.h`) carries the same writeup at the code site. New
+test `test_ep_generic_cfg_render_has_no_ep_resp_on_error_bit_reserved_bits_stay_zero()`
+(`tests/test_tc18_gaps_regmap.c`) pins that
+`rcp_regmap_ep_generic_cfg_render()` does not invent an unverified bit
+assignment for the missing parameter -- both of octet `0x0001`'s reserved
+spans render zero for every input, including inputs deliberately chosen
+to be non-zero/extreme everywhere else so the assertion cannot pass by
+accident of an all-zero row. Mutation-tested by hand (leaking a bit into
+the formerly-reserved bit 6): caught cleanly by both the new test and the
+pre-existing `test_ep_generic_cfg_render_matches_table_28_byte_offsets()`.
+
+No functional code change -- this is a docs/catalog-only fix. Full
+66-test suite green on both the native and ASan/UBSan trees; `cfusa
+check`: 0 errors; `cfusa trace --req-coverage 100`/`--sec-tested 100`:
+both 100%.
 ### v0.378.0 -- 2026-08-16 (UART/LIN/ADC/CAN/ISELED/MDIO functional-
 config table citations corrected, the six-item residue issue #434's
 bulk pass missed)
@@ -19211,6 +19298,7 @@ errors; `cfusa trace`: 1088/1088 traced and tested (unchanged).
 
 **Next**: no other orphaned-primitive issues currently open in this
 tracker; awaiting new findings from the ongoing conformance audit.
+
 ### v0.374.0 -- 2026-08-16 (REQ-ACF-012 RCP_ACF_MTV_UNCERTAIN citation
 closed; RCP_EP_PWM_IN_NO_SIGNAL payload-sentinel ambiguity resolved,
 honestly documented as no-TC18-basis)

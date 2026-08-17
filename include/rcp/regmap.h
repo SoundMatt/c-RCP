@@ -1373,6 +1373,43 @@ typedef struct {
                                       Content-modeling only (issue #311). */
 } rcp_regmap_ep_generic_cfg_t;
 
+/* REQ-RMAP-081 (issue #467, investigated 2026-08-16): TC18's own prose
+ * immediately below Table 31 reads "The configuration parameter
+ * EP_RESP_ON_ERROR also switches on the gauging of the assigned physical IO
+ * pins. If the endpoint tries to set an IO-Pin and the state of the IO-Pin
+ * does not follow, then an error will be flagged, and the response will be
+ * sent. The response shall include the reference to the error causing
+ * pin." -- but Table 31 itself never actually defines a parameter of this
+ * name. Confirmed by direct extraction of the primary-source PDF page
+ * image (pdftotext -layout, OA_TC18_specification_v_0.5.1_RC PDF, physical
+ * pages 81-82): Table 31's own row list for EP0 ends at ep_rx_buffer_size
+ * (relative 0x000A-0x000B, modeled above as ep_rx_buffer_size); the two
+ * spans octet 0x0001 does reserve (relative 0x0001.1:3 and 0x0001.6:7,
+ * see rcp_regmap_ep_generic_cfg_render()'s own octet1 packing) are both
+ * marked plain "reserved" in the table, with no association to this name.
+ * A full-text search of the entire document finds "EP_RESP_ON_ERROR"
+ * exactly once, in this same sentence -- independently confirmed three
+ * times by this project's own TC18_spec_defects_report.md (item 22) and
+ * its _audited/_quadruple_checked review copies. This is a dangling
+ * reference to a parameter the specification never actually placed on the
+ * wire, not an unwired local gap: there is no bit position anywhere in
+ * the document for c-RCP to model, so no register field, no gauging
+ * (physical-IO readback) logic, and no pin-naming error-response shape are
+ * added for it here. Even if the committee later assigns
+ * EP_RESP_ON_ERROR a real bit, the "gauging" behavior it would enable --
+ * comparing a commanded IO-pin state against the pin's own real electrical
+ * state after a write -- is real hardware this protocol-codec mock/test-
+ * double library has never modelled for any endpoint type (the same "no
+ * hardware" honesty already committed to by every base_clk field and by
+ * REQ-SPI-037's own clamped-pin/error-latch gap); the config bit itself
+ * (once it exists) would be addressable, but the readback comparison it
+ * gates would remain a caller-owned, real-hardware-only concern, not
+ * something this library could do more than a documented no-op for. See
+ * REQ-RMAP-081's own .fusa-reqs.json entry for the full investigation
+ * writeup, and test_ep_generic_cfg_render_has_no_ep_resp_on_error_bit_
+ * reserved_bits_stay_zero() (tests/test_tc18_gaps_regmap.c) for the test
+ * that pins this octet's two reserved spans staying zero. */
+
 /* Zero-initializes cfg (ep_used = false, everything else 0). */
 void rcp_regmap_ep_generic_cfg_init(rcp_regmap_ep_generic_cfg_t *cfg);
 

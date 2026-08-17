@@ -1730,6 +1730,7 @@ bool rcp_regmap_ep_req_storage_size_octets_to_words(uint32_t octets,
 //cfusa:req REQ-RMAP-076
 //cfusa:req REQ-RMAP-077
 //cfusa:req REQ-RMAP-078
+//cfusa:req REQ-RMAP-081
 void rcp_regmap_ep_generic_cfg_render(const rcp_regmap_ep_generic_cfg_t *entries,
                                        size_t count, uint8_t *out)
 {
