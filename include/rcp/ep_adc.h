@@ -220,8 +220,8 @@
  *
  *   0x0000  adc_ep_len              8 bit  R    RCP_EP_ADC_EP_FUNC_LEN (0x12)
  *   0x0001  Reserved                8 bit  R    reads 0x00
- *   0x0002  adc_ep_enable&clr       8 bit  R/W  Table 32 common entries
- *   0x0003  adc_ep_options          8 bit  R/W* Table 32 common entries
+ *   0x0002  adc_ep_enable&clr       8 bit  R/W  Table 35 common entries
+ *   0x0003  adc_ep_options          8 bit  R/W* Table 35 common entries
  *   0x0004  adc_base_clk           16 bit  R    ADC system clock
  *   0x0006  adc_ep_status          16 bit  R/W
  *   0x0008  adc_base_clk_divider    8 bit  R/W  generates ADC_CLK

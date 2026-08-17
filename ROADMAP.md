@@ -19106,6 +19106,65 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.393.0 -- 2026-08-16 (issue #341: `Table 32`->`35`
+EP-functional-config-common-entries cluster; compound/compound-wait
+`Table 6/7/8/9/11` and `Table 26`->`29`/`33` boundary-case fixes)
+
+Fifth pass on issue #341. Fresh census confirmed `Table 52`/`58`/
+`31`/`25` are already fully RC5-resolved (no changes needed).
+
+`Table 32`->`35` (13 code occurrences, 9 files): reused-digit case
+like the 41/42/43/44 and 51/54 clusters. RC5-native `Table 32` =
+"ep_type values" (untouched); RC1's own `Table 32` = "EP functional
+config common entries" -> RC5 `Table 35` (identical caption,
+confirmed via fresh `pdftotext -layout` extraction). Every bare
+"Table 32 common(-)entries" citation (`ep_spi.h`/`ep_uart.h`/
+`ep_lin.h`/`ep_adc.h`/`ep_lin.c`/`ep_uart.c`/`ep_i2c.c`/`ep_spi.c`/
+`ep_gpio.c`) corrected to `Table 35`. `regmap.h`'s already-dual-noted
+`Table 32-or-35` aside and all `.fusa-reqs.json` dual-noted `tc18`
+occurrences left untouched.
+
+Compound/compound-wait `Table 6/7/8/9/11` boundary case (this
+issue's own flagged new-table-insertion boundary, same shape as the
+already-resolved `Table 25/26/27` region): RC5 inserts a new `Table
+6` ("trigger requests", no RC1 counterpart) ahead of RC1's own
+`Table 6` ("compound requests", §11.2.2.1) -> RC5 `Table 7`/
+§11.2.2.2; RC1's `Table 7` ("compound wait", §11.2.2.2) -> RC5
+`Table 8`/§11.2.2.3; RC1's `Table 9` ("chained", §11.2.2.4) -> RC5
+`Table 11`/§11.2.2.6 (RC5's own `Table 9` is a second new table,
+"compare requests"). Fixed 3 stale occurrences: `acf.h`'s
+`rcp_acf_request_header_constraints_valid()` doc comment, plus two
+`.fusa-reqs.json` entries (`REQ-CMP-010`/`REQ-CMP-020`) whose `tc18`
+fields already carried correct RC5 numbering but whose own `text`
+fields had drifted -- same tc18-fixed/text-lagging pattern as PR
+#494's REQ-GPIO-035 and PR #495's respqueue.h fixes. Left alone:
+several generic GBB-header-field citations that bare-cite "§11.2.2.1
+Table 6" for footer content byte-for-byte identical in RC5's own
+native Table 6 too -- genuinely correct under either numbering.
+`ep_mdio.h`'s "OA-SPI spec Table 6" mentions cite a different,
+external document entirely, untouched.
+
+`Table 26`->`29`/`33` boundary case (2 `.fusa-reqs.json` occurrences
+fixed): RC5-native `Table 26` ("BBID control bits") is a genuinely
+new table with no RC1 counterpart, already correctly cited
+everywhere it's used. Found two unrelated stale `Table 26` citations
+whose `tc18` fields were already corrected while their `text` fields
+lagged: `REQ-SRV-006`'s "TC18 Table 26's Compound row" (Execution-
+procedure table, RC1's `Table 26` -> RC5 `Table 29`) corrected to
+"Table 29"; `REQ-SPI-033`'s "against Table 26/§13.5" (SPI evt[2:0]-
+channel-selection table, RC1's `Table 30` -> RC5 `Table 33`, neither
+of which is `26` under either numbering) corrected to "Table 33".
+
+Left untouched, flagged for a future pass: `src/server.c:606` has
+the identical stale "TC18 Table 26's own Compound row" citation
+`REQ-SRV-006` was fixed for (should read `Table 29`) -- outside this
+pass's editable scope per its own standing file restriction.
+
+Citation-text-only change -- trace coverage unchanged. Full clean
+rebuild + 66/66 tests unchanged. `cfusa check` (pinned v0.5.54): 0
+errors, 968/1312 warnings/info, unchanged. `cfusa trace`: 1095/1095
+traced and tested, unchanged.
+
 ### v0.392.0 -- 2026-08-16 (issue #164 follow-up: fix stale `Table 24`
 -> `Table 27` citation in lifecycle.h)
 

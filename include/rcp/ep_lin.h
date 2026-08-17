@@ -202,8 +202,8 @@
  *
  *   0x0000  lin_ep_len       8 bit  R    RCP_EP_LIN_EP_FUNC_LEN (0x09)
  *   0x0001  Reserved         8 bit  R    reads 0x00
- *   0x0002  lin_ep_enable&clr 8 bit R/W  Table 32 common entries
- *   0x0003  lin_ep_options   8 bit  R/W* Table 32 common entries
+ *   0x0002  lin_ep_enable&clr 8 bit R/W  Table 35 common entries
+ *   0x0003  lin_ep_options   8 bit  R/W* Table 35 common entries
  *   0x0004  lin_base_clk    16 bit  R    LIN system clock
  *   0x0006  lin_ep_status   16 bit  R/W
  *   0x0008  lin_clk_divider  8 bit  R/W  generates the LIN bit time

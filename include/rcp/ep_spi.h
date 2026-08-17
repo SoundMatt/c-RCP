@@ -220,8 +220,8 @@
  *   0x0000     spi_ep_len        8 bit  R    RCP_EP_SPI_EP_FUNC_LEN (0x36)
  *   0x0001.3:0 spi_nr_cs         4 bit  R    RCP_EP_SPI_MAX_CHANNELS-1 (5)
  *   0x0001.7:4 reserved          4 bit  R    Reads: 0000b
- *   0x0002     spi_ep_enable&clr 8 bit  R/W  Table 32 common entries
- *   0x0003     spi_ep_options    8 bit  R/W* Table 32 common entries
+ *   0x0002     spi_ep_enable&clr 8 bit  R/W  Table 35 common entries
+ *   0x0003     spi_ep_options    8 bit  R/W* Table 35 common entries
  *   0x0004     spi_ep_status    16 bit  R/W
  *   0x0006     channel 0's own 8-octet block (channel 1's own starts at
  *              0x000E, and so on through channel 5's at 0x002E):
