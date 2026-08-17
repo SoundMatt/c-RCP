@@ -34,6 +34,101 @@ the rationale.
 
 ## Releases
 
+### v0.395.0 -- 2026-08-16 (issue #341: exhaustive `Table 33` re-verification; `Table 20`/`21`/`22` `hw_pin_type` content-bug fix; `Table 23`->`25` EP_ID_config citation-drift cluster)
+
+Sixth pass on issue #341 (RC1->RC5 table-number census). Fresh census
+first (`grep -roh "Table [0-9]\+" include/ src/ .fusa-reqs.json | sort
+| uniq -c | sort -rn`) cross-checked against every prior pass's own
+convergence list, not just the most recent one, before picking
+targets.
+
+**`Table 33` (176 occurrences) -- exhaustive re-verification, not
+just another spot-check.** The prior pass only sample-verified this
+cluster; re-read every single occurrence against a fresh
+`pdftotext -layout` extraction of both PDFs. Confirms the earlier
+spot-check was correct for the overwhelming majority: RC5-native
+`Table 33` = "EP specific usage of evt-field" (§13.5, the per-endpoint-
+type evt[2:0] row semantics -- SPI/GPIO/PWM_OUT/CAN/LIN/etc rows),
+already correctly cited everywhere it appears, including every
+occurrence that superficially looked ambiguous on a `grep -v` sweep.
+Found exactly 2 genuine "`tc18` field already correct, narrative
+`text` field lagging" misses (`.fusa-reqs.json`, REQ-RMAP-023/024):
+both cited bare "TC18 §13.7.1.2 Table 33" for the RC-Server
+functional-configuration block, inconsistent with the dual-notation
+convention (`Table 33/36` or `Table 36 (Table 33 in RC1)`) already
+established by every sibling REQ-RMAP-066/067/068 entry describing
+the same table. Corrected to match.
+
+**`Table 20`/`21`/`22` -- found and fixed a real content-bug, not
+just a stale-numbering miss.** While re-verifying `Table 20`'s own
+157 occurrences (previously only "sample re-verified"), the
+`hw_pin_type` bit-layout doc comments (`regmap.h`, `src/config.c`,
+REQ-RMAP-042's own `title`/`text`) turned out to still say `Table 20`
+in one place (REQ-RMAP-042) and, worse, **`Table 21` in the actual
+code comments** (`regmap.h:1642`, `src/config.c:82`) -- a citation a
+prior pass (#495) had itself "corrected" to, but landed on the wrong
+neighbor table. Fresh page-region extraction of both PDFs confirms:
+RC5 `Table 21` ("HW_config") is the *field list* (`hw_ep_nr`/
+`hw_ep_pin_nr`/`hw_pin_type` as an opaque 8-bit register per IO pin,
+no bit breakdown); RC5 `Table 22` ("IO-pin properties") is the
+*separate, following table* that actually defines `hw_pin_type`'s
+four packed sub-fields (Pull-Up/Output-stage/Drive-strength/Schmitt-
+Trigger) -- exactly the content these comments describe. Corrected
+both code comments and REQ-RMAP-042's `title`/`text` to cite `Table
+22`, consistent with REQ-RMAP-042's own `tc18` field, which already
+correctly said `Table 22` the whole time. Every other `Table 20`/`21`
+occurrence individually re-verified as genuinely correct (RC Server
+general register map / HW_config field-list content respectively) --
+left untouched.
+
+**`Table 23`->`25` EP_ID_config cluster (14 occurrences, 6 files) --
+a prior pass's "already fixed by issue #421" claim was only partially
+true.** Issue #421 fixed exactly one function's own doc comment and
+"this pair's own two call sites" for EP_ID_config's real table number
+(RC5 `Table 25`, confirmed via fresh extraction: RC1's own `Table 23`
+"EP_ID_config" shifts +2 to RC5 `Table 25`, distinct from RC5's own
+native `Table 23` "Enumeration of signals at endpoints" -- a genuine
+reused-digit case). It did not touch the rest of the cluster. Found
+and fixed 8 more stale `§12.7.8 Table 23` EP_ID_config citations in
+`regmap.h` (5 occurrences, including the `rcp_regmap_ep_id_map_entry_t`
+struct's own field comment), `mock.h`, `ep_wakeup.h`, and
+`src/regmap.c`, plus 6 more in `.fusa-reqs.json` `text` fields
+(REQ-RMAP-023's cross-endpoint-query text, REQ-RMAP-025's valid-
+association text, REQ-RMAP-029's svr_configuration_lock text,
+REQ-RMAP-052's sentinel-scanning text, REQ-RMAP-055's W+-access-type
+text, REQ-WAKEUP-020's fixed-EP_Nr text) -- all citing "`Table 23`"
+for genuinely EP_ID_config content, while their sibling `tc18` fields
+(REQ-RMAP-052/053/054/055/056/057/058) already correctly said `Table
+25`/`26`. Every genuinely RC5-native `Table 23` occurrence (the
+`rcp_regmap_named_signal_t` enum and its doc comments, all of
+"Enumeration of signals at endpoints" content) individually verified
+and left untouched -- including the historical `§13.2 Table 23`
+citations for the ascending-order sentence TC18 0.5.1_RC4 struck
+through (REQ-RMAP-020/021/022), deliberately preserved as-is since
+they cite a real, dated, RC1-baseline removal, not a live citation.
+
+**`Table 28` (52 occurrences) -- re-verified, genuinely already fully
+converged**, confirming the prior pass's own sample-check for this
+one number: every occurrence is either RC5-native `Table 28`
+"SEQUENCER_config" (§12.7.10, correct) or the already-established
+`Table 28/31` dual notation for RC1's own "ep_generic_config register
+map" (shift +3 to RC5 `Table 31`). No changes needed.
+
+**Deliberately left untouched (file-scope restriction, not
+uncertainty):** `include/rcp/lifecycle.h:717` has the identical stale
+`§12.7.8 Table 23` EP_ID_config citation (REQ-RMAP-055's own doc
+comment) just fixed elsewhere in this same pass -- `lifecycle.h` is
+outside this batch's editable-file scope; flagging for whoever next
+touches that file. `src/server.c` and `src/lifecycle.c` were checked
+for `Table 20`/`23`/`28`/`33` citations and found already correct
+(no stale citations present) -- confirmed, not assumed, but also not
+touched either way per this batch's own file-scope discipline.
+
+Citation-text-only changes throughout -- trace coverage counts
+unchanged. Full clean rebuild + full 66-test suite unchanged. `cfusa
+check` (pinned v0.5.54): 0 errors, 968/1312 warnings/info, unchanged.
+`cfusa trace`: 1095/1095 traced and tested, unchanged.
+
 ### v0.394.0 -- 2026-08-16 (issue #341 follow-up: fix stale `Table 26` -> `Table 29` citation in server.c)
 
 `src/server.c`'s own doc comment for `RCP_SCHED_KIND_COMPOUND` cited
