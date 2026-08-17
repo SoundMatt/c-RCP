@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/discovery.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -278,11 +279,11 @@ size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
                    : RCP_DISCOVERY_GENERAL_SLICE_LEN;
     memcpy(payload, slice, copy_len);
 
-    segs = (rcp_fragment_segment_t *)malloc(count * sizeof(*segs));
+    segs = (rcp_fragment_segment_t *)rcp_malloc(count * sizeof(*segs));
     if (!segs) return 0;
 
     if (rcp_fragment_plan((size_t)read_size, max_fragment_payload, segs, count) != RCP_FRAGMENT_OK) {
-        free(segs);
+        rcp_free(segs);
         return 0;
     }
 
@@ -304,7 +305,7 @@ size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
             size_t j;
 
             for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
-            free(segs);
+            rcp_free(segs);
             return 0;
         }
 
@@ -318,14 +319,14 @@ size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
             size_t j;
 
             for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
-            free(segs);
+            rcp_free(segs);
             return 0;
         }
 
         out_frames[i] = frame;
     }
 
-    free(segs);
+    rcp_free(segs);
     return count;
 }
 
@@ -439,7 +440,7 @@ void rcp_discovery_cache_init(rcp_discovery_cache_t *cache)
 //cfusa:req REQ-DISC-023
 void rcp_discovery_cache_destroy(rcp_discovery_cache_t *cache)
 {
-    free(cache->entries);
+    rcp_free(cache->entries);
     cache->entries = NULL;
     cache->len     = 0;
     cache->cap     = 0;
@@ -462,7 +463,7 @@ bool rcp_discovery_cache_put(rcp_discovery_cache_t *cache,
     if (cache->len == cache->cap) {
         size_t new_cap = (cache->cap == 0) ? 4 : cache->cap * 2;
 
-        grown = (rcp_discovery_result_t *)realloc(cache->entries, new_cap * sizeof(*grown));
+        grown = (rcp_discovery_result_t *)rcp_realloc(cache->entries, new_cap * sizeof(*grown));
         if (!grown) return false;
         cache->entries = grown;
         cache->cap     = new_cap;

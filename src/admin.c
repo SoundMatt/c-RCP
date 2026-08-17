@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/admin.h"
+#include "rcp/alloc.h"
 
 #include "platform.h"
 
@@ -34,7 +35,7 @@ struct rcp_admin_server {
 //cfusa:req REQ-ADMIN-009
 rcp_admin_server_t *rcp_admin_server_new(void)
 {
-    rcp_admin_server_t *srv = (rcp_admin_server_t *)calloc(1, sizeof(*srv));
+    rcp_admin_server_t *srv = (rcp_admin_server_t *)rcp_calloc(1, sizeof(*srv));
     if (!srv) return NULL;
     rcp_mutex_init(&srv->mu);
     return srv;
@@ -45,10 +46,10 @@ void rcp_admin_server_destroy(rcp_admin_server_t *srv)
 {
     if (!srv) return;
     rcp_mutex_destroy(&srv->mu);
-    free(srv->endpoints);
-    free(srv->subscribers);
-    free(srv->counters);
-    free(srv);
+    rcp_free(srv->endpoints);
+    rcp_free(srv->subscribers);
+    rcp_free(srv->counters);
+    rcp_free(srv);
 }
 
 static size_t find_endpoint_index(rcp_admin_server_t *srv, rcp_avtp_addr_t addr)
@@ -70,7 +71,7 @@ bool rcp_admin_server_register_endpoint(rcp_admin_server_t *srv, rcp_avtp_addr_t
     if (find_endpoint_index(srv, addr) == srv->endpoints_len) {
         if (srv->endpoints_len == srv->endpoints_cap) {
             size_t new_cap = (srv->endpoints_cap == 0) ? 8 : srv->endpoints_cap * 2;
-            rcp_avtp_addr_t *grown = (rcp_avtp_addr_t *)realloc(srv->endpoints, new_cap * sizeof(*grown));
+            rcp_avtp_addr_t *grown = (rcp_avtp_addr_t *)rcp_realloc(srv->endpoints, new_cap * sizeof(*grown));
             if (grown) {
                 srv->endpoints     = grown;
                 srv->endpoints_cap = new_cap;
@@ -127,7 +128,7 @@ bool rcp_admin_server_subscribe(rcp_admin_server_t *srv, rcp_admin_event_fn cb, 
     rcp_mutex_lock(&srv->mu);
     if (srv->subscribers_len == srv->subscribers_cap) {
         size_t new_cap = (srv->subscribers_cap == 0) ? 4 : srv->subscribers_cap * 2;
-        admin_subscriber_t *grown = (admin_subscriber_t *)realloc(srv->subscribers, new_cap * sizeof(*grown));
+        admin_subscriber_t *grown = (admin_subscriber_t *)rcp_realloc(srv->subscribers, new_cap * sizeof(*grown));
         if (!grown) {
             ok = false;
         } else {
@@ -153,7 +154,7 @@ void rcp_admin_server_emit(rcp_admin_server_t *srv, rcp_admin_event_t ev)
 
     rcp_mutex_lock(&srv->mu);
     n = srv->subscribers_len;
-    local = (admin_subscriber_t *)malloc(n > 0 ? n * sizeof(*local) : 1);
+    local = (admin_subscriber_t *)rcp_malloc(n > 0 ? n * sizeof(*local) : 1);
     if (local) {
         for (i = 0; i < n; i++) local[i] = srv->subscribers[i];
     } else {
@@ -165,7 +166,7 @@ void rcp_admin_server_emit(rcp_admin_server_t *srv, rcp_admin_event_t ev)
     for (i = 0; i < n; i++) {
         local[i].cb(&ev, local[i].user_data);
     }
-    free(local);
+    rcp_free(local);
 }
 
 //cfusa:req REQ-ADMIN-005
@@ -186,7 +187,7 @@ bool rcp_admin_server_record_counter(rcp_admin_server_t *srv, const char *name, 
 
     if (srv->counters_len == srv->counters_cap) {
         size_t new_cap = (srv->counters_cap == 0) ? 8 : srv->counters_cap * 2;
-        admin_counter_t *grown = (admin_counter_t *)realloc(srv->counters, new_cap * sizeof(*grown));
+        admin_counter_t *grown = (admin_counter_t *)rcp_realloc(srv->counters, new_cap * sizeof(*grown));
         if (!grown) {
             ok = false;
         } else {
@@ -239,7 +240,7 @@ size_t rcp_admin_server_metrics_text(rcp_admin_server_t *srv, char *out, size_t 
             size_t new_cap = scratch_cap == 0 ? 256 : scratch_cap * 2;
             char *grown;
             while (new_cap < scratch_len + written + 1) new_cap *= 2;
-            grown = (char *)realloc(scratch, new_cap);
+            grown = (char *)rcp_realloc(scratch, new_cap);
             if (!grown) continue;
             scratch     = grown;
             scratch_cap = new_cap;
@@ -256,6 +257,6 @@ size_t rcp_admin_server_metrics_text(rcp_admin_server_t *srv, char *out, size_t 
         if (scratch) memcpy(out, scratch, to_copy);
         out[to_copy] = '\0';
     }
-    free(scratch);
+    rcp_free(scratch);
     return total;
 }

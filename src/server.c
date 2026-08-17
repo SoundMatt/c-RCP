@@ -2,6 +2,7 @@
 #include "rcp/server.h"
 
 #include "rcp/avtp.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -27,7 +28,7 @@ void rcp_server_endpoint_destroy(rcp_server_endpoint_t *ep)
     for (i = 0; i < ep->queue_len; i++) {
         rcp_bytes_free(&ep->queue[i]);
     }
-    free(ep->queue);
+    rcp_free(ep->queue);
     ep->queue     = NULL;
     ep->queue_len = 0;
     ep->queue_cap = 0;
@@ -101,7 +102,7 @@ bool rcp_server_endpoint_submit(rcp_server_endpoint_t *ep,
     if (ep->queue_len == ep->queue_cap) {
         size_t new_cap = (ep->queue_cap == 0) ? 4 : ep->queue_cap * 2;
 
-        grown = (rcp_bytes_t *)realloc(ep->queue, new_cap * sizeof(*grown));
+        grown = (rcp_bytes_t *)rcp_realloc(ep->queue, new_cap * sizeof(*grown));
         if (!grown) return false; /* still "queued": nothing to execute now */
         ep->queue     = grown;
         ep->queue_cap = new_cap;

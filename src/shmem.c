@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/shmem.h"
+#include "rcp/alloc.h"
 
 #include "platform.h"
 
@@ -165,14 +166,14 @@ static void shmem_side_destroy(rcp_avtp_transport_t *self)
         }
         rcp_mutex_destroy(&c->mu);
         rcp_cond_destroy(&c->cv);
-        free(c->a_to_b_items);
+        rcp_free(c->a_to_b_items);
         c->a_to_b_items = NULL;
-        free(c->b_to_a_items);
+        rcp_free(c->b_to_a_items);
         c->b_to_a_items = NULL;
-        free(c);
+        rcp_free(c);
         c = NULL;
     }
-    free(s);
+    rcp_free(s);
     s = NULL;
 }
 
@@ -199,7 +200,7 @@ rcp_shmem_errc_t rcp_shmem_avtp_pair_new(bool time_sync_supported, size_t queue_
 
     if (queue_capacity == 0) queue_capacity = 1;
 
-    c = (rcp_shmem_pair_core_t *)calloc(1, sizeof(*c));
+    c = (rcp_shmem_pair_core_t *)rcp_calloc(1, sizeof(*c));
     if (!c) return RCP_SHMEM_ERR_ALLOC;
 
     /* Checked locally before ever being stored through c, rather than
@@ -207,14 +208,14 @@ rcp_shmem_errc_t rcp_shmem_avtp_pair_new(bool time_sync_supported, size_t queue_
      * c->b_to_a_items and checking afterward -- matches this codebase's
      * own "check an allocation before dereferencing/storing it" house
      * convention (see e.g. avtp.c's loopback constructor). */
-    a_to_b_items = (rcp_bytes_t *)calloc(queue_capacity, sizeof(*a_to_b_items));
-    b_to_a_items = (rcp_bytes_t *)calloc(queue_capacity, sizeof(*b_to_a_items));
+    a_to_b_items = (rcp_bytes_t *)rcp_calloc(queue_capacity, sizeof(*a_to_b_items));
+    b_to_a_items = (rcp_bytes_t *)rcp_calloc(queue_capacity, sizeof(*b_to_a_items));
     if (!a_to_b_items || !b_to_a_items) {
-        free(a_to_b_items);
+        rcp_free(a_to_b_items);
         a_to_b_items = NULL;
-        free(b_to_a_items);
+        rcp_free(b_to_a_items);
         b_to_a_items = NULL;
-        free(c);
+        rcp_free(c);
         c = NULL;
         return RCP_SHMEM_ERR_ALLOC;
     }
@@ -226,20 +227,20 @@ rcp_shmem_errc_t rcp_shmem_avtp_pair_new(bool time_sync_supported, size_t queue_
     rcp_mutex_init(&c->mu);
     rcp_cond_init(&c->cv);
 
-    a = (rcp_shmem_side_t *)calloc(1, sizeof(*a));
-    b = (rcp_shmem_side_t *)calloc(1, sizeof(*b));
+    a = (rcp_shmem_side_t *)rcp_calloc(1, sizeof(*a));
+    b = (rcp_shmem_side_t *)rcp_calloc(1, sizeof(*b));
     if (!a || !b) {
-        free(a);
+        rcp_free(a);
         a = NULL;
-        free(b);
+        rcp_free(b);
         b = NULL;
-        free(c->a_to_b_items);
+        rcp_free(c->a_to_b_items);
         c->a_to_b_items = NULL;
-        free(c->b_to_a_items);
+        rcp_free(c->b_to_a_items);
         c->b_to_a_items = NULL;
         rcp_mutex_destroy(&c->mu);
         rcp_cond_destroy(&c->cv);
-        free(c);
+        rcp_free(c);
         c = NULL;
         return RCP_SHMEM_ERR_ALLOC;
     }

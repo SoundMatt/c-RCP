@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/request_chained.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -59,7 +60,7 @@ rcp_bytes_t rcp_chained_encode_member(rcp_byte_bus_id_t byte_bus_id, uint16_t ch
     total    = unpadded + pad;
     quadlets = (uint16_t)(total / 4u);
 
-    b = (uint8_t *)malloc(total);
+    b = (uint8_t *)rcp_malloc(total);
     if (!b) return frame;
 
     /* pad computed above, mtv=RCP_ACF_MTV_UNTIMED(0), hs=0, cs=this

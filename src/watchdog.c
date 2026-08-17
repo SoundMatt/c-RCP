@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/watchdog.h"
+#include "rcp/alloc.h"
 
 #include "platform.h"
 
@@ -49,11 +50,11 @@ static bool callbacks_append(rcp_watchdog_keeper_t *k, rcp_watchdog_event_fn cb,
 {
     if (k->n_callbacks == k->callbacks_cap) {
         size_t new_cap = (k->callbacks_cap == 0) ? 4 : k->callbacks_cap * 2;
-        rcp_watchdog_event_fn *grown_cb  = (rcp_watchdog_event_fn *)realloc(k->callbacks, new_cap * sizeof(*grown_cb));
+        rcp_watchdog_event_fn *grown_cb  = (rcp_watchdog_event_fn *)rcp_realloc(k->callbacks, new_cap * sizeof(*grown_cb));
         void                  **grown_ctx;
         if (!grown_cb) return false;
         k->callbacks     = grown_cb;
-        grown_ctx = (void **)realloc(k->callback_ctx, new_cap * sizeof(*grown_ctx));
+        grown_ctx = (void **)rcp_realloc(k->callback_ctx, new_cap * sizeof(*grown_ctx));
         if (!grown_ctx) return false;
         k->callback_ctx  = grown_ctx;
         k->callbacks_cap = new_cap;
@@ -154,7 +155,7 @@ rcp_watchdog_keeper_t *rcp_watchdog_keeper_new(rcp_watchdog_config_t cfg,
                                                 const rcp_watchdog_stream_cfg_t *streams,
                                                 size_t n_streams)
 {
-    rcp_watchdog_keeper_t *k = (rcp_watchdog_keeper_t *)calloc(1, sizeof(*k));
+    rcp_watchdog_keeper_t *k = (rcp_watchdog_keeper_t *)rcp_calloc(1, sizeof(*k));
     uint64_t now_ms;
     size_t i;
 
@@ -163,11 +164,11 @@ rcp_watchdog_keeper_t *rcp_watchdog_keeper_new(rcp_watchdog_config_t cfg,
     rcp_mutex_init(&k->mu);
 
     if (n_streams > 0) {
-        stream_state_t *states = (stream_state_t *)calloc(n_streams, sizeof(*states));
+        stream_state_t *states = (stream_state_t *)rcp_calloc(n_streams, sizeof(*states));
         k->states = states;
         if (!k->states) {
             rcp_mutex_destroy(&k->mu);
-            free(k);
+            rcp_free(k);
             return NULL;
         }
     }
@@ -251,9 +252,9 @@ void rcp_watchdog_keeper_destroy(rcp_watchdog_keeper_t *k)
     if (!k) return;
     rcp_watchdog_keeper_close(k);
 
-    free(k->states);
-    free(k->callbacks);
-    free(k->callback_ctx);
+    rcp_free(k->states);
+    rcp_free(k->callbacks);
+    rcp_free(k->callback_ctx);
     rcp_mutex_destroy(&k->mu);
-    free(k);
+    rcp_free(k);
 }

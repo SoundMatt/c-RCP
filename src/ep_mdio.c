@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/ep_mdio.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -147,7 +148,7 @@ rcp_bytes_t rcp_ep_mdio_pack_words(const uint16_t *words, size_t word_count)
 
     if (word_count == 0u) return out;
 
-    b = (uint8_t *)malloc(rcp_ep_mdio_pack_len(word_count));
+    b = (uint8_t *)rcp_malloc(rcp_ep_mdio_pack_len(word_count));
     if (!b) return out;
 
     for (i = 0; i < word_count; i++) rcp_ep_mdio_word_encode(words[i], &b[2u * i]);
@@ -210,7 +211,7 @@ rcp_bytes_t rcp_ep_mdio_mms_pack_words(uint8_t mms, const uint32_t *words, size_
 
     if (word_count == 0u) return out;
 
-    b = (uint8_t *)malloc(word_count * width);
+    b = (uint8_t *)rcp_malloc(word_count * width);
     if (!b) return out;
 
     for (i = 0; i < word_count; i++) {
@@ -390,7 +391,7 @@ rcp_bytes_t rcp_ep_mdio_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
     payload_len = RCP_EP_MDIO_RECONFIG_ADDR_LEN + data_len;
     if (payload_len > RCP_ACF_MAX_PAYLOAD) return empty;
 
-    payload = (uint8_t *)malloc(payload_len);
+    payload = (uint8_t *)rcp_malloc(payload_len);
     if (!payload) return empty;
 
     put_u16(payload, start_address);
@@ -410,7 +411,7 @@ rcp_bytes_t rcp_ep_mdio_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
     hdr.transaction_num = transaction_num;
 
     frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
-    free(payload);
+    rcp_free(payload);
     return frame;
 }
 
@@ -660,7 +661,7 @@ rcp_bytes_t rcp_ep_mdio_encode_write_request(rcp_byte_bus_id_t byte_bus_id,
     if (!words_bytes.data) return frame;
 
     payload_len = MODE_OCTET_LEN + ADDR_PREFIX_LEN + words_bytes.len;
-    payload     = (uint8_t *)malloc(payload_len);
+    payload     = (uint8_t *)rcp_malloc(payload_len);
     if (!payload) {
         rcp_bytes_free(&words_bytes);
         return frame;
@@ -677,7 +678,7 @@ rcp_bytes_t rcp_ep_mdio_encode_write_request(rcp_byte_bus_id_t byte_bus_id,
     hdr.transaction_num = transaction_num;
 
     frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
-    free(payload);
+    rcp_free(payload);
     return frame;
 }
 
@@ -1015,7 +1016,7 @@ rcp_bytes_t rcp_ep_mdio_encode_mms_write_request(rcp_byte_bus_id_t byte_bus_id,
     if (!words_bytes.data) return frame;
 
     payload_len = MODE_OCTET_LEN + MMS_ADDR_PREFIX_LEN + words_bytes.len;
-    payload     = (uint8_t *)malloc(payload_len);
+    payload     = (uint8_t *)rcp_malloc(payload_len);
     if (!payload) {
         rcp_bytes_free(&words_bytes);
         return frame;
@@ -1032,7 +1033,7 @@ rcp_bytes_t rcp_ep_mdio_encode_mms_write_request(rcp_byte_bus_id_t byte_bus_id,
     hdr.transaction_num = transaction_num;
 
     frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
-    free(payload);
+    rcp_free(payload);
     return frame;
 }
 

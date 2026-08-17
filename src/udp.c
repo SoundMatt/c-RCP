@@ -4,6 +4,7 @@
 #define _POSIX_C_SOURCE 200809L
 
 #include "rcp/udp.h"
+#include "rcp/alloc.h"
 
 #include "platform.h"
 
@@ -54,7 +55,7 @@ rcp_bytes_t rcp_udp_annexj_wrap(uint32_t seq, const uint8_t *avtpdu, size_t avtp
     out.data = NULL;
     out.len  = 0;
 
-    buf = (uint8_t *)malloc(RCP_UDP_ANNEX_J_SEQ_LEN + avtpdu_len);
+    buf = (uint8_t *)rcp_malloc(RCP_UDP_ANNEX_J_SEQ_LEN + avtpdu_len);
     if (!buf) return out;
 
     put_u32(buf, seq);
@@ -177,7 +178,7 @@ static int udp_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
     rcp_udp_avtp_transport_t *u = (rcp_udp_avtp_transport_t *)self;
     uint8_t *tmp;
 
-    tmp = (uint8_t *)malloc(RCP_UDP_AVTP_MAX_FRAME);
+    tmp = (uint8_t *)rcp_malloc(RCP_UDP_AVTP_MAX_FRAME);
     if (!tmp) return RCP_ERR_BUSY;
 
     for (;;) {
@@ -191,11 +192,11 @@ static int udp_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
         rcp_mutex_unlock(&u->mu);
 
         if (closed_now) {
-            free(tmp);
+            rcp_free(tmp);
             return RCP_ERR_CLOSED;
         }
         if (rcp_context_done(ctx)) {
-            free(tmp);
+            rcp_free(tmp);
             return RCP_ERR_TIMEOUT;
         }
 
@@ -252,12 +253,12 @@ static int udp_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
                  * the moment recvfrom() reads it, so there is nothing left
                  * to leave queued. This matches UDP's own inherent
                  * no-delivery-guarantee contract rather than fighting it. */
-                free(tmp);
+                rcp_free(tmp);
                 return RCP_ERR_BUSY;
             }
             if (payload_len > 0) memcpy(buf, payload, payload_len);
             *out_len = payload_len;
-            free(tmp);
+            rcp_free(tmp);
             return RCP_OK;
         }
         /* sel == 0 (poll slice elapsed) or sel < 0 (e.g. EINTR): loop back
@@ -285,7 +286,7 @@ static void udp_avtp_destroy(rcp_avtp_transport_t *self)
         u->fd = -1;
     }
     rcp_mutex_destroy(&u->mu);
-    free(u);
+    rcp_free(u);
 }
 
 static const rcp_avtp_transport_vtable_t udp_avtp_vtable = {
@@ -297,7 +298,7 @@ static const rcp_avtp_transport_vtable_t udp_avtp_vtable = {
 
 static rcp_udp_avtp_transport_t *udp_avtp_new_base(bool time_sync_supported)
 {
-    rcp_udp_avtp_transport_t *u = (rcp_udp_avtp_transport_t *)calloc(1, sizeof(*u));
+    rcp_udp_avtp_transport_t *u = (rcp_udp_avtp_transport_t *)rcp_calloc(1, sizeof(*u));
     if (!u) return NULL;
     u->base.vt                  = &udp_avtp_vtable;
     u->base.refcount             = 1;
@@ -463,7 +464,7 @@ static int stub_close(rcp_avtp_transport_t *self)
 
 static void stub_destroy(rcp_avtp_transport_t *self)
 {
-    free(self);
+    rcp_free(self);
 }
 
 static const rcp_avtp_transport_vtable_t udp_stub_vtable = {
@@ -472,7 +473,7 @@ static const rcp_avtp_transport_vtable_t udp_stub_vtable = {
 
 static rcp_avtp_transport_t *stub_new(bool time_sync_supported)
 {
-    rcp_udp_avtp_transport_t *u = (rcp_udp_avtp_transport_t *)calloc(1, sizeof(*u));
+    rcp_udp_avtp_transport_t *u = (rcp_udp_avtp_transport_t *)rcp_calloc(1, sizeof(*u));
     if (!u) return NULL;
     u->base.vt                  = &udp_stub_vtable;
     u->base.refcount             = 1;

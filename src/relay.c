@@ -5,6 +5,7 @@
 #include <string.h>
 
 #include "platform.h"
+#include "rcp/alloc.h"
 
 //cfusa:req REQ-RELAY-002
 const char *relay_protocol_string(relay_protocol_t p)
@@ -29,7 +30,7 @@ relay_bytes_t relay_bytes_dup(const uint8_t *data, size_t len)
     b.len  = 0;
     if (len == 0) return b;
 
-    b.data = (uint8_t *)malloc(len);
+    b.data = (uint8_t *)rcp_malloc(len);
     if (!b.data) return b;
 
     memcpy(b.data, data, len);
@@ -40,7 +41,7 @@ relay_bytes_t relay_bytes_dup(const uint8_t *data, size_t len)
 void relay_bytes_free(relay_bytes_t *b)
 {
     if (!b) return;
-    free(b->data);
+    rcp_free(b->data);
     b->data = NULL;
     b->len  = 0;
 }
@@ -67,16 +68,16 @@ void relay_message_free(relay_message_t *m)
 
     if (!m) return;
 
-    free(m->id);
+    rcp_free(m->id);
     m->id = NULL;
     relay_bytes_free(&m->payload);
     for (i = 0; i < m->meta_len; i++) {
-        free(m->meta[i].key);
+        rcp_free(m->meta[i].key);
         m->meta[i].key = NULL;
-        free(m->meta[i].value);
+        rcp_free(m->meta[i].value);
         m->meta[i].value = NULL;
     }
-    free(m->meta);
+    rcp_free(m->meta);
     m->meta = NULL;
 
     relay_message_init(m);
@@ -89,12 +90,12 @@ bool relay_message_set_id(relay_message_t *m, const char *id)
 
     if (id) {
         size_t n = strlen(id) + 1;
-        copy = (char *)malloc(n);
+        copy = (char *)rcp_malloc(n);
         if (!copy) return false;
         memcpy(copy, id, n);
     }
 
-    free(m->id);
+    rcp_free(m->id);
     m->id = copy;
     return true;
 }
@@ -110,10 +111,10 @@ bool relay_message_set_meta(relay_message_t *m, const char *key, const char *val
     for (i = 0; i < m->meta_len; i++) {
         if (strcmp(m->meta[i].key, key) == 0) {
             value_n    = strlen(value) + 1;
-            value_copy = (char *)malloc(value_n);
+            value_copy = (char *)rcp_malloc(value_n);
             if (!value_copy) return false;
             memcpy(value_copy, value, value_n);
-            free(m->meta[i].value);
+            rcp_free(m->meta[i].value);
             m->meta[i].value = value_copy;
             return true;
         }
@@ -121,22 +122,22 @@ bool relay_message_set_meta(relay_message_t *m, const char *key, const char *val
 
     key_n    = strlen(key) + 1;
     value_n  = strlen(value) + 1;
-    key_copy = (char *)malloc(key_n);
+    key_copy = (char *)rcp_malloc(key_n);
     if (!key_copy) return false;
-    value_copy = (char *)malloc(value_n);
+    value_copy = (char *)rcp_malloc(value_n);
     if (!value_copy) {
-        free(key_copy);
+        rcp_free(key_copy);
         key_copy = NULL;
         return false;
     }
     memcpy(key_copy, key, key_n);
     memcpy(value_copy, value, value_n);
 
-    grown = (relay_meta_entry_t *)realloc(m->meta, (m->meta_len + 1) * sizeof(*grown));
+    grown = (relay_meta_entry_t *)rcp_realloc(m->meta, (m->meta_len + 1) * sizeof(*grown));
     if (!grown) {
-        free(key_copy);
+        rcp_free(key_copy);
         key_copy = NULL;
-        free(value_copy);
+        rcp_free(value_copy);
         value_copy = NULL;
         return false;
     }
@@ -191,12 +192,12 @@ relay_message_channel_t *relay_message_channel_new(size_t capacity)
 
     if (capacity == 0) capacity = 1;
 
-    ch = (relay_message_channel_t *)malloc(sizeof(relay_message_channel_t));
+    ch = (relay_message_channel_t *)rcp_malloc(sizeof(relay_message_channel_t));
     if (!ch) return NULL;
 
-    ch->items = (relay_message_t *)calloc(capacity, sizeof(relay_message_t));
+    ch->items = (relay_message_t *)rcp_calloc(capacity, sizeof(relay_message_t));
     if (!ch->items) {
-        free(ch);
+        rcp_free(ch);
         ch = NULL;
         return NULL;
     }
@@ -229,9 +230,9 @@ void relay_message_channel_release(relay_message_channel_t *ch)
     }
     rcp_mutex_destroy(&ch->mu);
     rcp_cond_destroy(&ch->cv);
-    free(ch->items);
+    rcp_free(ch->items);
     ch->items = NULL;
-    free(ch);
+    rcp_free(ch);
     ch = NULL;
 }
 

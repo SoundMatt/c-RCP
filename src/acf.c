@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/acf.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -365,7 +366,7 @@ rcp_bytes_t rcp_acf_encode_abb(const rcp_acf_byte_message_info_t *hdr,
     quadlets = (uint16_t)(total / 4u);
     if (quadlets > RCP_ACF_MAX_QUADLETS) return frame;
 
-    b = (uint8_t *)malloc(total);
+    b = (uint8_t *)rcp_malloc(total);
     if (!b) return frame;
 
     h     = *hdr;
@@ -442,7 +443,7 @@ rcp_bytes_t rcp_acf_encode_gbb(const rcp_acf_gbb_header_t *hdr,
     quadlets = (uint16_t)(total / 4u);
     if (quadlets > RCP_ACF_MAX_QUADLETS) return frame;
 
-    b = (uint8_t *)malloc(total);
+    b = (uint8_t *)rcp_malloc(total);
     if (!b) return frame;
 
     h     = hdr->info;

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/powerstate.h"
+#include "rcp/alloc.h"
 
 #include "platform.h"
 
@@ -60,11 +61,11 @@ static bool callbacks_append(rcp_powerstate_manager_t *m, rcp_powerstate_power_f
 {
     if (m->n_callbacks == m->callbacks_cap) {
         size_t new_cap = (m->callbacks_cap == 0) ? 4 : m->callbacks_cap * 2;
-        rcp_powerstate_power_fn *grown_cb = (rcp_powerstate_power_fn *)realloc(m->callbacks, new_cap * sizeof(*grown_cb));
+        rcp_powerstate_power_fn *grown_cb = (rcp_powerstate_power_fn *)rcp_realloc(m->callbacks, new_cap * sizeof(*grown_cb));
         void                   **grown_ctx;
         if (!grown_cb) return false;
         m->callbacks = grown_cb;
-        grown_ctx = (void **)realloc(m->callback_ctx, new_cap * sizeof(*grown_ctx));
+        grown_ctx = (void **)rcp_realloc(m->callback_ctx, new_cap * sizeof(*grown_ctx));
         if (!grown_ctx) return false;
         m->callback_ctx  = grown_ctx;
         m->callbacks_cap = new_cap;
@@ -97,18 +98,18 @@ static void emit(rcp_powerstate_manager_t *m, rcp_avtp_addr_t addr, rcp_pwrmode_
 //cfusa:req REQ-PWR-011
 rcp_powerstate_manager_t *rcp_powerstate_manager_new(const rcp_avtp_addr_t *endpoints, size_t n_endpoints)
 {
-    rcp_powerstate_manager_t *m = (rcp_powerstate_manager_t *)calloc(1, sizeof(*m));
+    rcp_powerstate_manager_t *m = (rcp_powerstate_manager_t *)rcp_calloc(1, sizeof(*m));
     size_t i;
 
     if (!m) return NULL;
     rcp_mutex_init(&m->mu);
 
     if (n_endpoints > 0) {
-        endpoint_entry_t *entries = (endpoint_entry_t *)calloc(n_endpoints, sizeof(*entries));
+        endpoint_entry_t *entries = (endpoint_entry_t *)rcp_calloc(n_endpoints, sizeof(*entries));
         m->entries = entries;
         if (!m->entries) {
             rcp_mutex_destroy(&m->mu);
-            free(m);
+            rcp_free(m);
             return NULL;
         }
     }
@@ -427,9 +428,9 @@ void rcp_powerstate_manager_destroy(rcp_powerstate_manager_t *m)
 {
     if (!m) return;
 
-    free(m->entries);
-    free(m->callbacks);
-    free(m->callback_ctx);
+    rcp_free(m->entries);
+    rcp_free(m->callbacks);
+    rcp_free(m->callback_ctx);
     rcp_mutex_destroy(&m->mu);
-    free(m);
+    rcp_free(m);
 }

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/deadline.h"
+#include "rcp/alloc.h"
 
 #include "platform.h"
 
@@ -51,11 +52,11 @@ static bool callbacks_append(rcp_deadline_monitor_t *m, rcp_deadline_liveness_fn
 {
     if (m->n_callbacks == m->callbacks_cap) {
         size_t new_cap = (m->callbacks_cap == 0) ? 4 : m->callbacks_cap * 2;
-        rcp_deadline_liveness_fn *grown_cb = (rcp_deadline_liveness_fn *)realloc(m->callbacks, new_cap * sizeof(*grown_cb));
+        rcp_deadline_liveness_fn *grown_cb = (rcp_deadline_liveness_fn *)rcp_realloc(m->callbacks, new_cap * sizeof(*grown_cb));
         void                    **grown_ctx;
         if (!grown_cb) return false;
         m->callbacks = grown_cb;
-        grown_ctx = (void **)realloc(m->callback_ctx, new_cap * sizeof(*grown_ctx));
+        grown_ctx = (void **)rcp_realloc(m->callback_ctx, new_cap * sizeof(*grown_ctx));
         if (!grown_ctx) return false;
         m->callback_ctx  = grown_ctx;
         m->callbacks_cap = new_cap;
@@ -182,7 +183,7 @@ rcp_deadline_monitor_t *rcp_deadline_monitor_new(rcp_deadline_config_t cfg,
                                                   const rcp_deadline_stream_cfg_t *streams,
                                                   size_t n_streams)
 {
-    rcp_deadline_monitor_t *m = (rcp_deadline_monitor_t *)calloc(1, sizeof(*m));
+    rcp_deadline_monitor_t *m = (rcp_deadline_monitor_t *)rcp_calloc(1, sizeof(*m));
     uint64_t now_ms;
     size_t i;
 
@@ -191,11 +192,11 @@ rcp_deadline_monitor_t *rcp_deadline_monitor_new(rcp_deadline_config_t cfg,
     rcp_mutex_init(&m->mu);
 
     if (n_streams > 0) {
-        stream_watch_t *states = (stream_watch_t *)calloc(n_streams, sizeof(*states));
+        stream_watch_t *states = (stream_watch_t *)rcp_calloc(n_streams, sizeof(*states));
         m->states = states;
         if (!m->states) {
             rcp_mutex_destroy(&m->mu);
-            free(m);
+            rcp_free(m);
             return NULL;
         }
     }
@@ -260,9 +261,9 @@ void rcp_deadline_monitor_destroy(rcp_deadline_monitor_t *m)
     if (!m) return;
     rcp_deadline_monitor_close(m);
 
-    free(m->states);
-    free(m->callbacks);
-    free(m->callback_ctx);
+    rcp_free(m->states);
+    rcp_free(m->callbacks);
+    rcp_free(m->callback_ctx);
     rcp_mutex_destroy(&m->mu);
-    free(m);
+    rcp_free(m);
 }

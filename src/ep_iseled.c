@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/ep_iseled.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -76,7 +77,7 @@ rcp_bytes_t rcp_ep_iseled_encode_bitframe(const uint8_t *data, size_t data_len, 
 
     if (n == 0u) return out;
 
-    b = (uint8_t *)malloc(n);
+    b = (uint8_t *)rcp_malloc(n);
     if (!b) return out;
 
     if (append_crc) crc = rcp_ep_iseled_crc8(data, data_len);
@@ -350,7 +351,7 @@ rcp_bytes_t rcp_ep_iseled_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
     payload_len = RCP_EP_ISELED_RECONFIG_ADDR_LEN + data_len;
     if (payload_len > RCP_ACF_MAX_PAYLOAD) return empty;
 
-    payload = (uint8_t *)malloc(payload_len);
+    payload = (uint8_t *)rcp_malloc(payload_len);
     if (!payload) return empty;
 
     put_u16(payload, start_address);
@@ -369,7 +370,7 @@ rcp_bytes_t rcp_ep_iseled_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
     hdr.transaction_num = transaction_num;
 
     frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
-    free(payload);
+    rcp_free(payload);
     return frame;
 }
 
@@ -417,7 +418,7 @@ rcp_ep_iseled_errc_t rcp_ep_iseled_decode_bitframe(const uint8_t *symbols, size_
     if (expect_crc && byte_count == 0u) return RCP_EP_ISELED_ERR_SHORT_FRAME;
 
     if (byte_count > 0u) {
-        bytes = (uint8_t *)malloc(byte_count);
+        bytes = (uint8_t *)rcp_malloc(byte_count);
         if (!bytes) return RCP_EP_ISELED_ERR_ALLOC;
 
         for (i = 0; i < byte_count; i++) {
@@ -425,7 +426,7 @@ rcp_ep_iseled_errc_t rcp_ep_iseled_decode_bitframe(const uint8_t *symbols, size_
 
             if (!rcp_ep_iseled_symbol_decode(symbols[2u * i], &hi) ||
                 !rcp_ep_iseled_symbol_decode(symbols[2u * i + 1u], &lo)) {
-                free(bytes);
+                rcp_free(bytes);
                 return RCP_EP_ISELED_ERR_BAD_SYMBOL;
             }
             bytes[i] = (uint8_t)((uint8_t)(hi << 4) | lo);
@@ -437,12 +438,12 @@ rcp_ep_iseled_errc_t rcp_ep_iseled_decode_bitframe(const uint8_t *symbols, size_
         uint8_t want     = rcp_ep_iseled_crc8(bytes, data_len);
 
         if (bytes[byte_count - 1u] != want) {
-            free(bytes);
+            rcp_free(bytes);
             return RCP_EP_ISELED_ERR_CRC_MISMATCH;
         }
 
         *out_data = rcp_bytes_dup(bytes, data_len);
-        free(bytes);
+        rcp_free(bytes);
     } else {
         out_data->data = bytes;
         out_data->len  = byte_count;
@@ -660,11 +661,11 @@ size_t rcp_ep_iseled_encode_response_fragmented(rcp_byte_bus_id_t byte_bus_id,
     count = rcp_fragment_plan_count(capped_len, max_fragment_payload);
     if (count == 0) return 0;
 
-    segs = (rcp_fragment_segment_t *)malloc(count * sizeof(*segs));
+    segs = (rcp_fragment_segment_t *)rcp_malloc(count * sizeof(*segs));
     if (!segs) return 0;
 
     if (rcp_fragment_plan(capped_len, max_fragment_payload, segs, count) != RCP_FRAGMENT_OK) {
-        free(segs);
+        rcp_free(segs);
         return 0;
     }
 
@@ -705,13 +706,13 @@ size_t rcp_ep_iseled_encode_response_fragmented(rcp_byte_bus_id_t byte_bus_id,
             size_t j;
 
             for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
-            free(segs);
+            rcp_free(segs);
             return 0;
         }
 
         out_frames[i] = frame;
     }
 
-    free(segs);
+    rcp_free(segs);
     return count;
 }

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/request_timed.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -70,7 +71,7 @@ rcp_bytes_t rcp_timed_encode_request(rcp_byte_bus_id_t byte_bus_id, uint64_t pre
     total    = unpadded + pad;
     quadlets = (uint16_t)(total / 4u);
 
-    b = (uint8_t *)malloc(total);
+    b = (uint8_t *)rcp_malloc(total);
     if (!b) return frame;
 
     /* mtv=RCP_ACF_MTV_UNTIMED(0), see the file header: this repurposes

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/ep_pwm.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -279,7 +280,7 @@ rcp_bytes_t rcp_ep_pwm_out_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id
     payload_len = RCP_EP_PWM_OUT_RECONFIG_ADDR_LEN + data_len;
     if (payload_len > RCP_ACF_MAX_PAYLOAD) return empty;
 
-    payload = (uint8_t *)malloc(payload_len);
+    payload = (uint8_t *)rcp_malloc(payload_len);
     if (!payload) return empty;
 
     put_u16(payload, start_address);
@@ -291,7 +292,7 @@ rcp_bytes_t rcp_ep_pwm_out_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id
     hdr.transaction_num = transaction_num;
 
     frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
-    free(payload);
+    rcp_free(payload);
     return frame;
 }
 
@@ -794,7 +795,7 @@ rcp_bytes_t rcp_ep_pwm_in_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
     payload_len = RCP_EP_PWM_IN_RECONFIG_ADDR_LEN + data_len;
     if (payload_len > RCP_ACF_MAX_PAYLOAD) return empty;
 
-    payload = (uint8_t *)malloc(payload_len);
+    payload = (uint8_t *)rcp_malloc(payload_len);
     if (!payload) return empty;
 
     put_u16(payload, start_address);
@@ -814,7 +815,7 @@ rcp_bytes_t rcp_ep_pwm_in_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
     hdr.transaction_num = transaction_num;
 
     frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
-    free(payload);
+    rcp_free(payload);
     return frame;
 }
 

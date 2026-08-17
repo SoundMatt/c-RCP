@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/request_cancel.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -51,7 +52,7 @@ static rcp_bytes_t encode_gbb_repurposed(rcp_byte_bus_id_t byte_bus_id, uint8_t 
     rcp_acf_byte_message_info_t  info  = {0};
     uint8_t                     *b;
 
-    b = (uint8_t *)malloc(RCP_ACF_GBB_HEADER_LEN);
+    b = (uint8_t *)rcp_malloc(RCP_ACF_GBB_HEADER_LEN);
     if (!b) return frame;
 
     info.byte_bus_id     = byte_bus_id;

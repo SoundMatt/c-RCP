@@ -14,6 +14,7 @@
 #define _DEFAULT_SOURCE
 
 #include "rcp/l2.h"
+#include "rcp/alloc.h"
 
 #include "platform.h"
 
@@ -39,7 +40,7 @@ rcp_bytes_t rcp_l2_frame_encode(const uint8_t dst_mac[6], const uint8_t src_mac[
     out.data = NULL;
     out.len  = 0;
 
-    buf = (uint8_t *)malloc(RCP_L2_HEADER_LEN + avtpdu_len);
+    buf = (uint8_t *)rcp_malloc(RCP_L2_HEADER_LEN + avtpdu_len);
     if (!buf) return out;
 
     memcpy(buf, dst_mac, 6);
@@ -154,7 +155,7 @@ static int l2_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
     rcp_l2_avtp_transport_t *l = (rcp_l2_avtp_transport_t *)self;
     uint8_t                   *tmp;
 
-    tmp = (uint8_t *)malloc(RCP_L2_MAX_FRAME);
+    tmp = (uint8_t *)rcp_malloc(RCP_L2_MAX_FRAME);
     if (!tmp) return RCP_ERR_BUSY;
 
     for (;;) {
@@ -168,11 +169,11 @@ static int l2_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
         rcp_mutex_unlock(&l->mu);
 
         if (closed_now) {
-            free(tmp);
+            rcp_free(tmp);
             return RCP_ERR_CLOSED;
         }
         if (rcp_context_done(ctx)) {
-            free(tmp);
+            rcp_free(tmp);
             return RCP_ERR_TIMEOUT;
         }
 
@@ -231,12 +232,12 @@ static int l2_avtp_recv(rcp_avtp_transport_t *self, const rcp_context_t *ctx,
                  * "nothing left in the kernel's own receive queue to
                  * retry against once recvfrom() already consumed it"
                  * reasoning as udp.c's own oversized-datagram handling. */
-                free(tmp);
+                rcp_free(tmp);
                 return RCP_ERR_BUSY;
             }
             if (payload_len > 0) memcpy(buf, payload, payload_len);
             *out_len = payload_len;
-            free(tmp);
+            rcp_free(tmp);
             return RCP_OK;
         }
         /* sel == 0 (poll slice elapsed) or sel < 0 (e.g. EINTR): loop back
@@ -263,7 +264,7 @@ static void l2_avtp_destroy(rcp_avtp_transport_t *self)
         l->fd = -1;
     }
     rcp_mutex_destroy(&l->mu);
-    free(l);
+    rcp_free(l);
 }
 
 static const rcp_avtp_transport_vtable_t l2_avtp_vtable = {
@@ -278,7 +279,7 @@ static const rcp_avtp_transport_vtable_t l2_avtp_vtable = {
 rcp_avtp_transport_t *rcp_l2_avtp_transport_new(const char *ifname, const uint8_t dst_mac[6],
                                                  bool time_sync_supported)
 {
-    rcp_l2_avtp_transport_t *l = (rcp_l2_avtp_transport_t *)calloc(1, sizeof(*l));
+    rcp_l2_avtp_transport_t *l = (rcp_l2_avtp_transport_t *)rcp_calloc(1, sizeof(*l));
     struct ifreq               ifr;
     struct sockaddr_ll          sll;
     size_t                        iflen;
@@ -383,7 +384,7 @@ static int l2_stub_close(rcp_avtp_transport_t *self)
 
 static void l2_stub_destroy(rcp_avtp_transport_t *self)
 {
-    free(self);
+    rcp_free(self);
 }
 
 static const rcp_avtp_transport_vtable_t l2_stub_vtable = {
@@ -394,7 +395,7 @@ static const rcp_avtp_transport_vtable_t l2_stub_vtable = {
 rcp_avtp_transport_t *rcp_l2_avtp_transport_new(const char *ifname, const uint8_t dst_mac[6],
                                                  bool time_sync_supported)
 {
-    rcp_l2_avtp_transport_t *l = (rcp_l2_avtp_transport_t *)calloc(1, sizeof(*l));
+    rcp_l2_avtp_transport_t *l = (rcp_l2_avtp_transport_t *)rcp_calloc(1, sizeof(*l));
     (void)ifname; (void)dst_mac;
     if (!l) return NULL;
     l->base.vt                  = &l2_stub_vtable;

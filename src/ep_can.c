@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/ep_can.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -308,7 +309,7 @@ static uint8_t *build_payload(rcp_ep_can_frame_format_t frame_format, uint32_t a
 {
     size_t   prefix_len = prefix_len_for(frame_format);
     size_t   total_len  = prefix_len + data_len;
-    uint8_t *buf        = (uint8_t *)malloc(total_len > 0 ? total_len : 1);
+    uint8_t *buf        = (uint8_t *)rcp_malloc(total_len > 0 ? total_len : 1);
 
     if (!buf) return NULL;
 
@@ -346,7 +347,7 @@ rcp_bytes_t rcp_ep_can_encode_frame_request(rcp_byte_bus_id_t byte_bus_id,
     hdr.transaction_num = transaction_num;
 
     frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
-    free(payload);
+    rcp_free(payload);
     payload = NULL;
     return frame;
 }
@@ -440,7 +441,7 @@ rcp_bytes_t rcp_ep_can_encode_frame_response(rcp_byte_bus_id_t byte_bus_id,
         frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
     }
 
-    free(payload);
+    rcp_free(payload);
     payload = NULL;
     return frame;
 }
@@ -560,17 +561,17 @@ size_t rcp_ep_can_encode_frame_response_fragmented(rcp_byte_bus_id_t byte_bus_id
                               &combined_len);
     if (!combined) return 0;
 
-    segs = (rcp_fragment_segment_t *)malloc(count * sizeof(*segs));
+    segs = (rcp_fragment_segment_t *)rcp_malloc(count * sizeof(*segs));
     if (!segs) {
-        free(combined);
+        rcp_free(combined);
         combined = NULL;
         return 0;
     }
 
     if (rcp_fragment_plan(combined_len, max_fragment_payload, segs, count) != RCP_FRAGMENT_OK) {
-        free(segs);
+        rcp_free(segs);
         segs = NULL;
-        free(combined);
+        rcp_free(combined);
         combined = NULL;
         return 0;
     }
@@ -612,9 +613,9 @@ size_t rcp_ep_can_encode_frame_response_fragmented(rcp_byte_bus_id_t byte_bus_id
             size_t j;
 
             for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
-            free(segs);
+            rcp_free(segs);
             segs = NULL;
-            free(combined);
+            rcp_free(combined);
             combined = NULL;
             return 0;
         }
@@ -622,9 +623,9 @@ size_t rcp_ep_can_encode_frame_response_fragmented(rcp_byte_bus_id_t byte_bus_id
         out_frames[i] = frame;
     }
 
-    free(segs);
+    rcp_free(segs);
     segs = NULL;
-    free(combined);
+    rcp_free(combined);
     combined = NULL;
     return count;
 }

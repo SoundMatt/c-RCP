@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/observe.h"
+#include "rcp/alloc.h"
 
 #include "platform.h"
 
@@ -49,7 +50,7 @@ struct rcp_in_memory_sink {
 //cfusa:req REQ-OBS-015
 rcp_in_memory_sink_t *rcp_in_memory_sink_new(void)
 {
-    rcp_in_memory_sink_t *s = (rcp_in_memory_sink_t *)calloc(1, sizeof(*s));
+    rcp_in_memory_sink_t *s = (rcp_in_memory_sink_t *)rcp_calloc(1, sizeof(*s));
     if (!s) return NULL;
     rcp_mutex_init(&s->mu);
     return s;
@@ -64,7 +65,7 @@ static void in_memory_record_span(const rcp_span_t *span, void *ctx)
     rcp_mutex_lock(&s->mu);
     if (s->len == s->cap) {
         size_t new_cap = (s->cap == 0) ? 16 : s->cap * 2;
-        rcp_span_t *grown = (rcp_span_t *)realloc(s->spans, new_cap * sizeof(*grown));
+        rcp_span_t *grown = (rcp_span_t *)rcp_realloc(s->spans, new_cap * sizeof(*grown));
         if (grown) {
             s->spans = grown;
             s->cap   = new_cap;
@@ -125,8 +126,8 @@ void rcp_in_memory_sink_destroy(rcp_in_memory_sink_t *s)
 {
     if (!s) return;
     rcp_mutex_destroy(&s->mu);
-    free(s->spans);
-    free(s);
+    rcp_free(s->spans);
+    rcp_free(s);
 }
 
 /* ── Recording a request ──────────────────────────────────────────────────── */

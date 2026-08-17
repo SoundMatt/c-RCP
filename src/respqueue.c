@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/respqueue.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -22,8 +23,8 @@ void rcp_respqueue_destroy(rcp_respqueue_t *q)
     for (i = 0; i < q->entries_len; i++) {
         rcp_bytes_free(&q->entries[i]);
     }
-    free(q->entries);
-    free(q->entries_seq);
+    rcp_free(q->entries);
+    rcp_free(q->entries_seq);
     q->entries           = NULL;
     q->entries_seq       = NULL;
     q->entries_len       = 0;
@@ -143,14 +144,14 @@ bool rcp_respqueue_push_seq(rcp_respqueue_t *q, const uint8_t *frame, size_t fra
     if (q->entries_len == q->entries_cap) {
         size_t new_cap = (q->entries_cap == 0) ? 4 : q->entries_cap * 2;
 
-        grown_entries = (rcp_bytes_t *)realloc(q->entries, new_cap * sizeof(*grown_entries));
+        grown_entries = (rcp_bytes_t *)rcp_realloc(q->entries, new_cap * sizeof(*grown_entries));
         if (!grown_entries) {
             rcp_bytes_free(&copy);
             return false;
         }
         q->entries = grown_entries;
 
-        grown_seq = (uint8_t *)realloc(q->entries_seq, new_cap * sizeof(*grown_seq));
+        grown_seq = (uint8_t *)rcp_realloc(q->entries_seq, new_cap * sizeof(*grown_seq));
         if (!grown_seq) {
             rcp_bytes_free(&copy);
             return false;

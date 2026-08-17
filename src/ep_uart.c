@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/ep_uart.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -332,7 +333,7 @@ rcp_bytes_t rcp_ep_uart_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
     payload_len = RCP_EP_UART_RECONFIG_ADDR_LEN + data_len;
     if (payload_len > RCP_ACF_MAX_PAYLOAD) return empty;
 
-    payload = (uint8_t *)malloc(payload_len);
+    payload = (uint8_t *)rcp_malloc(payload_len);
     if (!payload) return empty;
 
     put_u16(payload, start_address);
@@ -350,7 +351,7 @@ rcp_bytes_t rcp_ep_uart_encode_reconfig_request(rcp_byte_bus_id_t byte_bus_id,
     hdr.transaction_num = transaction_num;
 
     frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
-    free(payload);
+    rcp_free(payload);
     return frame;
 }
 
@@ -706,11 +707,11 @@ size_t rcp_ep_uart_encode_read_response_fragmented(rcp_byte_bus_id_t byte_bus_id
     count = rcp_fragment_plan_count(rx_len, max_fragment_payload);
     if (count == 0) return 0;
 
-    segs = (rcp_fragment_segment_t *)malloc(count * sizeof(*segs));
+    segs = (rcp_fragment_segment_t *)rcp_malloc(count * sizeof(*segs));
     if (!segs) return 0;
 
     if (rcp_fragment_plan(rx_len, max_fragment_payload, segs, count) != RCP_FRAGMENT_OK) {
-        free(segs);
+        rcp_free(segs);
         return 0;
     }
 
@@ -751,14 +752,14 @@ size_t rcp_ep_uart_encode_read_response_fragmented(rcp_byte_bus_id_t byte_bus_id
             size_t j;
 
             for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
-            free(segs);
+            rcp_free(segs);
             return 0;
         }
 
         out_frames[i] = frame;
     }
 
-    free(segs);
+    rcp_free(segs);
     return count;
 }
 

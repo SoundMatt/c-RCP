@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/ratelimit.h"
+#include "rcp/alloc.h"
 
 #include "platform.h"
 
@@ -34,7 +35,7 @@ struct rcp_ratelimit_limiter {
 //cfusa:req REQ-RL-011
 rcp_ratelimit_limiter_t *rcp_ratelimit_limiter_new(rcp_ratelimit_config_t cfg)
 {
-    rcp_ratelimit_limiter_t *rl = (rcp_ratelimit_limiter_t *)calloc(1, sizeof(*rl));
+    rcp_ratelimit_limiter_t *rl = (rcp_ratelimit_limiter_t *)rcp_calloc(1, sizeof(*rl));
     if (!rl) return NULL;
     rl->cfg = cfg;
     rcp_mutex_init(&rl->mu);
@@ -51,7 +52,7 @@ static bucket_t *find_or_create_bucket(rcp_ratelimit_limiter_t *rl, rcp_avtp_add
 
     if (rl->n_buckets == rl->cap_buckets) {
         size_t new_cap = (rl->cap_buckets == 0) ? 4 : rl->cap_buckets * 2;
-        bucket_t *grown = (bucket_t *)realloc(rl->buckets, new_cap * sizeof(*grown));
+        bucket_t *grown = (bucket_t *)rcp_realloc(rl->buckets, new_cap * sizeof(*grown));
         if (!grown) return NULL;
         rl->buckets     = grown;
         rl->cap_buckets = new_cap;
@@ -104,6 +105,6 @@ void rcp_ratelimit_limiter_destroy(rcp_ratelimit_limiter_t *rl)
 {
     if (!rl) return;
     rcp_mutex_destroy(&rl->mu);
-    free(rl->buckets);
-    free(rl);
+    rcp_free(rl->buckets);
+    rcp_free(rl);
 }

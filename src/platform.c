@@ -7,6 +7,7 @@
 #include "platform.h"
 
 #include "rcp/clock.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 
@@ -42,7 +43,7 @@ static DWORD WINAPI thread_trampoline(LPVOID param)
     thread_thunk_t *t = (thread_thunk_t *)param;
     void (*fn)(void *) = t->fn;
     void *arg = t->arg;
-    free(t);
+    rcp_free(t);
     fn(arg);
     return 0;
 }
@@ -50,14 +51,14 @@ static DWORD WINAPI thread_trampoline(LPVOID param)
 //cfusa:req REQ-PLATFORM-002
 int rcp_thread_start_detached(void (*fn)(void *arg), void *arg)
 {
-    thread_thunk_t *t = (thread_thunk_t *)malloc(sizeof(thread_thunk_t));
+    thread_thunk_t *t = (thread_thunk_t *)rcp_malloc(sizeof(thread_thunk_t));
     HANDLE h;
     if (!t) return -1;
     t->fn  = fn;
     t->arg = arg;
     h = CreateThread(NULL, 0, thread_trampoline, t, 0, NULL);
     if (!h) {
-        free(t);
+        rcp_free(t);
         return -1;
     }
     CloseHandle(h); /* detach: we never join, just don't leak the handle */
@@ -66,14 +67,14 @@ int rcp_thread_start_detached(void (*fn)(void *arg), void *arg)
 
 int rcp_thread_start(rcp_thread_t *out, void (*fn)(void *arg), void *arg)
 {
-    thread_thunk_t *t = (thread_thunk_t *)malloc(sizeof(thread_thunk_t));
+    thread_thunk_t *t = (thread_thunk_t *)rcp_malloc(sizeof(thread_thunk_t));
     HANDLE h;
     if (!t) return -1;
     t->fn  = fn;
     t->arg = arg;
     h = CreateThread(NULL, 0, thread_trampoline, t, 0, NULL);
     if (!h) {
-        free(t);
+        rcp_free(t);
         return -1;
     }
     *out = h;
@@ -152,7 +153,7 @@ static void *thread_trampoline(void *param)
     thread_thunk_t *t = (thread_thunk_t *)param;
     void (*fn)(void *) = t->fn;
     void *arg = t->arg;
-    free(t);
+    rcp_free(t);
     fn(arg);
     return NULL;
 }
@@ -161,14 +162,14 @@ static void *thread_trampoline(void *param)
 int rcp_thread_start_detached(void (*fn)(void *arg), void *arg)
 {
     pthread_t tid;
-    thread_thunk_t *t = (thread_thunk_t *)malloc(sizeof(thread_thunk_t));
+    thread_thunk_t *t = (thread_thunk_t *)rcp_malloc(sizeof(thread_thunk_t));
     int rc;
     if (!t) return -1;
     t->fn  = fn;
     t->arg = arg;
     rc = pthread_create(&tid, NULL, thread_trampoline, t);
     if (rc != 0) {
-        free(t);
+        rcp_free(t);
         return -1;
     }
     pthread_detach(tid);
@@ -177,14 +178,14 @@ int rcp_thread_start_detached(void (*fn)(void *arg), void *arg)
 
 int rcp_thread_start(rcp_thread_t *out, void (*fn)(void *arg), void *arg)
 {
-    thread_thunk_t *t = (thread_thunk_t *)malloc(sizeof(thread_thunk_t));
+    thread_thunk_t *t = (thread_thunk_t *)rcp_malloc(sizeof(thread_thunk_t));
     int rc;
     if (!t) return -1;
     t->fn  = fn;
     t->arg = arg;
     rc = pthread_create(out, NULL, thread_trampoline, t);
     if (rc != 0) {
-        free(t);
+        rcp_free(t);
         return -1;
     }
     return 0;
