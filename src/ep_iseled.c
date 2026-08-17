@@ -497,6 +497,58 @@ rcp_ep_iseled_errc_t rcp_ep_iseled_decode_command_request(const uint8_t *b, size
     return RCP_EP_ISELED_OK;
 }
 
+/* ── Read request (issue #471) ─────────────────────────────────────────────── */
+
+//cfusa:req REQ-ISELED-030
+rcp_bytes_t rcp_ep_iseled_encode_read_request(rcp_byte_bus_id_t byte_bus_id,
+                                               const uint8_t *tx_data, size_t tx_len,
+                                               uint16_t read_size, uint8_t transaction_num)
+{
+    rcp_acf_byte_message_info_t hdr  = {0};
+    rcp_bytes_t                 fail = {0};
+
+    if (read_size > RCP_EP_ISELED_MAX_READ_SIZE) return fail;
+
+    hdr.byte_bus_id              = byte_bus_id;
+    hdr.op                       = RCP_ACF_OP_READ;
+    hdr.evt                      = 0;
+    hdr.transaction_num          = transaction_num;
+    hdr.read_size_or_segment_num = read_size;
+
+    return rcp_acf_encode_abb(&hdr, tx_data, tx_len);
+}
+
+//cfusa:req REQ-ISELED-031
+rcp_ep_iseled_errc_t rcp_ep_iseled_decode_read_request(const uint8_t *b, size_t len,
+                                                        rcp_byte_bus_id_t expected_bus_id,
+                                                        const uint8_t **out_tx_data,
+                                                        size_t *out_tx_len,
+                                                        uint16_t *out_read_size,
+                                                        uint8_t *out_transaction_num)
+{
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    rcp_acf_errc_t               acf_rc;
+
+    acf_rc = rcp_acf_decode_abb(b, len, &hdr, &payload, &payload_len);
+    if (acf_rc == RCP_ACF_ERR_SHORT_FRAME) return RCP_EP_ISELED_ERR_SHORT_FRAME;
+    if (acf_rc != RCP_ACF_OK) return RCP_EP_ISELED_ERR_BAD_MSG_TYPE;
+
+    if (hdr.byte_bus_id != expected_bus_id) return RCP_EP_ISELED_ERR_WRONG_BUS;
+    if (hdr.op != RCP_ACF_OP_READ) return RCP_EP_ISELED_ERR_WRONG_OP;
+    if (!rcp_acf_evt_row2_is_plain(hdr.evt)) return RCP_EP_ISELED_ERR_BAD_EVT;
+
+    /* payload (the plain Instruction/Address content selecting what to
+     * read back) is round-tripped verbatim, byte for byte -- see
+     * rcp_ep_iseled_decode_command_request()'s own identical note. */
+    *out_tx_data         = payload;
+    *out_tx_len          = payload_len;
+    *out_read_size       = hdr.read_size_or_segment_num;
+    *out_transaction_num = hdr.transaction_num;
+    return RCP_EP_ISELED_OK;
+}
+
 /* ── Response ───────────────────────────────────────────────────────────────── */
 
 //cfusa:req REQ-ISELED-023

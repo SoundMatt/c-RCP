@@ -85,7 +85,7 @@
  * | PWM_IN_READ               | PWM_IN    | (none)                                 | (none beyond payload)           |
  * | LIN_COMMAND               | LIN       | (none)                                 | (none)                          |
  * | CAN_FRAME                  | CAN       | meta rcp.can.frame_format (required, out-of-scope for the 2 CAN XL values -- see below), rcp.can.arbitration_id (required) | meta rcp.can.frame_format, rcp.can.arbitration_id |
- * | ISELED_COMMAND             | ISELED    | (none)                                 | (none)                          |
+ * | ISELED_COMMAND             | ISELED    | meta rcp.iseled.read_size (default 0 = the write direction; non-zero selects the read direction and asks for that many octets back, issue #471) | (none) |
  * | MDIO_READ                  | MDIO      | meta rcp.mdio.clause/prtad/devad/regad, rcp.mdio.word_count (all required) | meta rcp.mdio.clause/prtad/devad/regad |
  * | MDIO_WRITE                  | MDIO      | meta rcp.mdio.clause/prtad/devad/regad (required); payload = packed words (rcp_ep_mdio_word_encode() order) | meta rcp.mdio.clause/prtad/devad/regad |
  * | WAKEUP_SLEEPCMD              | WAKEUP    | meta rcp.wakeup.target_mode (required, rcp_pwrmode_t raw value) | meta rcp.wakeup.result (rcp_pwrmode_entry_result_t raw value); no timed/timestamp |

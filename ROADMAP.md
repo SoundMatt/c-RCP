@@ -19193,6 +19193,75 @@ No functional code change -- this is a docs/catalog-only fix. Full
 66-test suite green on both the native and ASan/UBSan trees; `cfusa
 check`: 0 errors; `cfusa trace --req-coverage 100`/`--sec-tested 100`:
 both 100%.
+
+### v0.380.0 -- 2026-08-16 (ISELED read-direction command request added)
+
+Closes issue #471. `ep_iseled.c`/`.h` modeled only a single,
+write-direction "command request" (`rcp_ep_iseled_encode_command_request()`
+always set `hdr.op = RCP_ACF_OP_WRITE`;
+`rcp_ep_iseled_decode_command_request()` rejected anything else with
+`RCP_EP_ISELED_ERR_WRONG_OP`), with no read-direction request and no
+`read_size` parameter anywhere in the module -- despite
+`rcp_ep_iseled_encode_response_fragmented()` (`REQ-ISELED-025`) already
+taking a `read_size` to cap/fragment a response, with no wire-level way
+to have actually received that value from an incoming request.
+
+Re-verified independently against the TC18 v0.5.1_RC_5 PDF (`pdftotext
+-layout`) before implementing: §13.7.12.1 explicitly describes a
+distinct read-eliciting request carrying a `read_size` ("Upon read
+requests the responses are collected 5/4bit decoded and aggregated
+into one or multiple ACF [messages] up to the requested read_size",
+TC18.txt L5909-5910), and the general ACF `byte_message_info` rule,
+confirmed identical at every endpoint-type occurrence throughout the
+spec (e.g. Table 4: "read_size/segment_num -- if op = 0 this is
+read_size, else segment_num", TC18.txt L1235), together with §12.9.1
+("A response with payload data read from the EP is given, if requested
+by op=0 (read request)", TC18.txt L3604) confirms
+`read_size_or_segment_num` is specifically `read_size` when `op` is the
+read sense.
+
+New `rcp_ep_iseled_encode_read_request()`/`_decode_read_request()`
+(`REQ-ISELED-030`/`031`) add the missing counterpart, modeled on
+`ep_i2c.h`'s `rcp_ep_i2c_encode_transfer_request()`/
+`_decode_transfer_request()` (not `ep_uart.h`'s payload-free read
+requests): a read request carries the plain Instruction/Address payload
+selecting what to read back (no Data octets, per Figure 41) plus the ACF
+header's own 12-bit `read_size_or_segment_num`, newly bounded by
+`RCP_EP_ISELED_MAX_READ_SIZE` (0x0FFF). The existing write-direction
+`rcp_ep_iseled_encode_command_request()`/`_decode_command_request()`
+pair is completely unchanged -- it continues to model `ACF_OP_WRITE`
+only and reject `ACF_OP_READ` with `RCP_EP_ISELED_ERR_WRONG_OP` exactly
+as before; the new decoder is a sibling function, not a modification of
+the write-direction one, keeping both directions independently testable.
+
+`src/adapt.c`'s `RCP_ADAPT_OP_ISELED_COMMAND` now selects the read
+direction the same way `RCP_ADAPT_OP_I2C_TRANSFER` already does: meta
+`rcp.iseled.read_size` absent or `0` keeps the (unchanged) write
+direction; non-zero switches to the new read-direction encoder and asks
+for that many octets back (`include/rcp/adapt.h`'s field table updated
+to match). `RCP_ADAPT_OP_ISELED_COMMAND`'s response decode needed no
+change -- `rcp_ep_iseled_decode_response()` was already direction-agnostic.
+
+New tests: the encode/decode round trip carrying an Instruction/Address
+payload and `read_size`, empty-payload round trip, `read_size`
+zero/max/above-max boundaries, every `decode_read_request` rejection
+path (wrong bus, wrong op, bad msg type, short frame, nonzero evt), an
+explicit regression test pinning that the write-direction path did not
+move, and three `src/adapt.c` dispatch tests (default write direction,
+read direction selected by `read_size` meta, rejection above the 12-bit
+ceiling). Mutation-tested twice: reverting the whole fix broke the build
+(undefined `rcp_ep_iseled_encode_read_request()`/`_decode_read_request()`/
+`RCP_EP_ISELED_MAX_READ_SIZE`); a second, targeted mutation (deleting
+just the `op != RCP_ACF_OP_READ` check) was caught cleanly by both the
+new `test_read_request_rejects_wrong_op` and the write-direction
+regression test.
+
+Full 66-test suite + ASan/UBSan clean; `cfusa check`: 0 errors; `cfusa
+trace`: 1091/1091 requirements traced and tested (up from 1089).
+`.fusa-reqs.json`: `REQ-ISELED-030`/`031` added, both `implemented`,
+with dated notes and primary-source `tc18` citations from this release's
+own re-verification.
+
 ### v0.378.0 -- 2026-08-16 (UART/LIN/ADC/CAN/ISELED/MDIO functional-
 config table citations corrected, the six-item residue issue #434's
 bulk pass missed)
