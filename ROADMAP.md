@@ -19106,6 +19106,32 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.403.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for
+`REQ-GPIO-*`/`REQ-SPI-*`)
+
+One of several parallel per-category batches for c-RCP-AUDIT-04
+(issue 166), unblocked now that RELAY's master TC18 requirement
+catalog (`docs/tc18-master-catalog.json`, 447 entries) exists.
+Scope is only the `REQ-GPIO-*`/`REQ-SPI-*` prefixes; sibling batches
+(see `v0.401.0` and `v0.402.0` below) cover the rest of
+`.fusa-reqs.json` under their own PRs.
+
+Added `tc18_master_id` to 69 of the 77 requirements in scope that
+already carry a `tc18` citation, matched by section + table/figure
+number + a content check against the catalog entry's own summary
+(not on section number alone -- several sections, e.g. `§13.5` Table
+33 and `§12.3.1.3`'s W* marker convention, own more than one
+requirement each). The 8 requirements with no `tc18` field at all
+were left alone, as expected. 4 requirements (`REQ-GPIO-033`,
+`REQ-GPIO-036`, `REQ-SPI-036`, `REQ-SPI-037`) genuinely span two
+catalog clauses each with no single confident owner and were left
+unset rather than forced -- flagged for follow-up in the PR.
+
+Purely additive field; `cfusa` v0.5.54 `check`/`trace
+--req-coverage 100 --sec-tested 100` output confirmed unchanged
+(same 100%/100%, 0 errors) before and after. Full 66-test suite
+unchanged.
+
 ### v0.401.0 -- 2026-08-17 (c-RCP-AUDIT-04: tc18_master_id backfill,
 REQ-DISC-*/REQ-MOCK-* batch)
 

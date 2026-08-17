@@ -34,6 +34,38 @@ the rationale.
 
 ## Releases
 
+### v0.403.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for `REQ-GPIO-*`/`REQ-SPI-*`)
+
+One of several parallel per-category batches for c-RCP-AUDIT-04
+(issue 166), unblocked now that RELAY's master TC18 requirement
+catalog (`docs/tc18-master-catalog.json`, 447 entries) has been
+rebuilt and published. This batch covers only the `REQ-GPIO-*`/
+`REQ-SPI-*` category prefixes; sibling batches (see `v0.401.0` and
+`v0.402.0` below) cover the rest of `.fusa-reqs.json`'s 1095
+entries under their own PRs.
+
+- Added a `tc18_master_id` field to 69 of the 77 `REQ-GPIO-*`/
+  `REQ-SPI-*` requirements that already carry a `tc18` citation
+  (issue #164's backfill), matched by section + table/figure number
+  + content confirmation against the catalog entry's own `summary`/
+  `title`. Purely additive -- no other field on any entry touched,
+  no `.c`/`.h` source file touched.
+- Left untouched, as expected: the 4 `REQ-GPIO-*` and 4 `REQ-SPI-*`
+  entries in scope that carry no `tc18` field at all (implementation
+  -only plumbing with no TC18 basis) -- no `tc18_master_id` invented
+  for these.
+- Left unset and flagged ambiguous (documented in the PR body):
+  `REQ-GPIO-033`, `REQ-GPIO-036`, `REQ-SPI-036`, `REQ-SPI-037` --
+  each requirement's own citation spans two distinct master-catalog
+  clauses with no single confident match (REQ-SPI-037's own text
+  explicitly says as much: "rather than force-splitting one
+  requirement into two differently-dispositioned catalog entries").
+
+Verified against the pinned `cfusa` v0.5.54 binary: `check` and
+`trace --req-coverage 100 --sec-tested 100` output byte-identical
+before/after (apart from the report timestamp) -- 100%/100%
+coverage unchanged, 0 errors. Full 66-test suite unchanged.
+
 ### v0.401.0 -- 2026-08-17 (c-RCP-AUDIT-04: tc18_master_id backfill for REQ-DISC-*/REQ-MOCK-*)
 
 Adds the `tc18_master_id` field (RCP-ARCHITECTURE.md canonical choice
