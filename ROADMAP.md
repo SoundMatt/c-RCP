@@ -19501,6 +19501,73 @@ tool tolerates the new field with zero effect on coverage.
 own `tc18_master_id` batches (tracked centrally against issue 166 by
 the coordinating session).
 
+### v0.411.0 -- 2026-08-17 (CFUSA-CY006 free()-without-NULL hygiene
+batch 1: relay.c/shmem.c/loan.c/ep_can.c, issue #522)
+
+Re-verified issue #522's own claim before acting on it: re-ran the
+pinned `cfusa` (v0.5.54) `check --format json` against current
+`main`, confirmed the same 1266 CFUSA-CY006 findings the issue
+reports, and independently re-derived its per-file raw-`free()`/
+`rcp_free()` breakdown from the JSON report's file:line list plus
+the actual source line at each site -- reproduced the issue's exact
+counts (150 raw `free()` + 17 `rcp_free()` = 167 total across the
+whole repo; `relay.c` 13, `shmem.c` 12, `loan.c` 10, `ep_can.c` 9,
+`ep_iseled.c` 7, `admin.c`/`udp.c`/`l2.c`/`platform.c`/`config.c` 6
+each). This PR is the first of the issue's own recommended
+"batch by file, one batch = one PR" plan: the four highest-count
+files (44 of the ~161 real candidate sites), the same four the issue
+itself names as its representative real-candidate cluster.
+
+Read the full function body around every one of the 44 sites (not
+just the flagged line), same as the issue's own manual-verification
+pass -- no live use-after-free or double-free found at any of them;
+every freed pointer either goes out of scope on the same or the very
+next statement, or is owned by a struct field that already gets
+reset by an enclosing re-init call a few lines later. Added an
+explicit `ptr = NULL;` immediately after `free()`/`rcp_free()` at 41
+of the 44 sites as MEM30-C defense-in-depth against a future
+refactor extending one of these functions; the remaining 3 (all in
+`relay.c`) were reviewed and deliberately left alone: 1
+(`relay_bytes_free`'s `b->data`) already NULLs its target one line
+later via the existing `b->data = NULL;` assignment CY006's detector
+just doesn't recognize as a struct-field match; the other 2
+(`relay_message_set_id`, `relay_message_set_meta`'s in-place value
+rename) immediately reassign the same pointer variable to a fresh,
+valid allocation on the very next statement with no intervening
+code -- already memory-safe, and prepending a `= NULL;` there would
+be a pure dead store, not a real fix.
+
+Confirmed empirically that `cfusa`'s own CY006 count does not (and
+structurally cannot) reflect this fix: re-ran `cfusa check
+--format json` after the change and the CY006 count is unchanged at
+1266, matching the issue's own diagnosis that the detector is a
+naive per-line `free(`-substring match with no look-ahead at
+all -- it flags the `free()` call line itself regardless of any
+`= NULL;` added afterward, bare identifier or struct field alike.
+`cfusa check`'s pass/fail gate is unaffected either way: these are
+INFO-severity, not errors, and `Result: PASS`/`0 errors` holds
+unchanged before and after.
+
+No behavior change (confirmed via full rebuild + ASan/UBSan; this
+is why no mutation test applies -- there is no test that could
+distinguish before/after since no code path's observable behavior
+differs). Full 66-test suite clean. ASan/UBSan
+(`-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1`,
+`ASAN_OPTIONS=detect_leaks=0`) clean, all 66 tests. `cfusa check`
+(pinned v0.5.54): 0 errors, unchanged. `cfusa trace --req-coverage
+100 --sec-tested 100`: 1095/1095 (100%) requirements traced, 512/512
+(100%) functions annotated, unchanged from baseline (this PR touches
+no requirement-bearing code).
+
+**Next**: roughly 117 more real raw-`free()`/`rcp_free()` candidate
+sites remain across ~35 more files -- `ep_iseled.c` (7),
+`admin.c`/`udp.c`/`l2.c`/`platform.c`/`config.c` (6 each),
+`deadline.c`/`powerstate.c`/`discovery.c`/`watchdog.c`/`authz.c`/
+`mdns.c` (5 each), and the rest at 4 or fewer -- same per-site
+manual review + defense-in-depth `= NULL;` treatment as this batch,
+one file-cluster per PR. Issue #522 stays open for those follow-up
+batches.
+
 ### v0.410.0 -- 2026-08-17 (c-RCP-19: dispatch-table branch coverage
 for `rcp_adapt_op_kind()`/`rcp_adapt_strerror()`/`relay_protocol_string()`)
 

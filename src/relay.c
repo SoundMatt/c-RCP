@@ -68,12 +68,16 @@ void relay_message_free(relay_message_t *m)
     if (!m) return;
 
     free(m->id);
+    m->id = NULL;
     relay_bytes_free(&m->payload);
     for (i = 0; i < m->meta_len; i++) {
         free(m->meta[i].key);
+        m->meta[i].key = NULL;
         free(m->meta[i].value);
+        m->meta[i].value = NULL;
     }
     free(m->meta);
+    m->meta = NULL;
 
     relay_message_init(m);
 }
@@ -122,6 +126,7 @@ bool relay_message_set_meta(relay_message_t *m, const char *key, const char *val
     value_copy = (char *)malloc(value_n);
     if (!value_copy) {
         free(key_copy);
+        key_copy = NULL;
         return false;
     }
     memcpy(key_copy, key, key_n);
@@ -130,7 +135,9 @@ bool relay_message_set_meta(relay_message_t *m, const char *key, const char *val
     grown = (relay_meta_entry_t *)realloc(m->meta, (m->meta_len + 1) * sizeof(*grown));
     if (!grown) {
         free(key_copy);
+        key_copy = NULL;
         free(value_copy);
+        value_copy = NULL;
         return false;
     }
     m->meta = grown;
@@ -190,6 +197,7 @@ relay_message_channel_t *relay_message_channel_new(size_t capacity)
     ch->items = (relay_message_t *)calloc(capacity, sizeof(relay_message_t));
     if (!ch->items) {
         free(ch);
+        ch = NULL;
         return NULL;
     }
 
@@ -222,7 +230,9 @@ void relay_message_channel_release(relay_message_channel_t *ch)
     rcp_mutex_destroy(&ch->mu);
     rcp_cond_destroy(&ch->cv);
     free(ch->items);
+    ch->items = NULL;
     free(ch);
+    ch = NULL;
 }
 
 /* Deep-copies msg's owned fields into *dst (dst assumed zeroed/uninitialized

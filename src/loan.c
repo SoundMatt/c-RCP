@@ -23,6 +23,7 @@ void rcp_loan_release(rcp_loan_t *loan)
     if (!loan) return;
     rcp_loan_return(loan);
     free(loan);
+    loan = NULL;
 }
 
 /* ── Pool ──────────────────────────────────────────────────────────────────── */
@@ -79,11 +80,14 @@ static void loan_release_to_pool(void *ctx_v)
          * the buffer outright rather than leaking it. */
         rcp_mutex_unlock(&ctx->pool->mu);
         free(ctx->data);
+        ctx->data = NULL;
         free(ctx);
+        ctx = NULL;
         return;
     }
     rcp_mutex_unlock(&ctx->pool->mu);
     free(ctx);
+    ctx = NULL;
 }
 
 //cfusa:req REQ-LOAN-001
@@ -122,8 +126,11 @@ rcp_loan_t *rcp_loan_pool_acquire(rcp_loan_pool_t *pool, size_t size)
     release_ctx = (loan_release_ctx_t *)malloc(sizeof(*release_ctx));
     if (!loan || !release_ctx) {
         free(loan);
+        loan = NULL;
         free(release_ctx);
+        release_ctx = NULL;
         free(data);
+        data = NULL;
         return NULL;
     }
     release_ctx->pool = pool;
@@ -144,8 +151,13 @@ void rcp_loan_pool_destroy(rcp_loan_pool_t *pool)
     size_t i;
 
     if (!pool) return;
-    for (i = 0; i < pool->entries_len; i++) free(pool->entries[i].data);
+    for (i = 0; i < pool->entries_len; i++) {
+        free(pool->entries[i].data);
+        pool->entries[i].data = NULL;
+    }
     free(pool->entries);
+    pool->entries = NULL;
     rcp_mutex_destroy(&pool->mu);
     free(pool);
+    pool = NULL;
 }

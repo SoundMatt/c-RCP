@@ -347,6 +347,7 @@ rcp_bytes_t rcp_ep_can_encode_frame_request(rcp_byte_bus_id_t byte_bus_id,
 
     frame = rcp_acf_encode_abb(&hdr, payload, payload_len);
     free(payload);
+    payload = NULL;
     return frame;
 }
 
@@ -440,6 +441,7 @@ rcp_bytes_t rcp_ep_can_encode_frame_response(rcp_byte_bus_id_t byte_bus_id,
     }
 
     free(payload);
+    payload = NULL;
     return frame;
 }
 
@@ -561,12 +563,15 @@ size_t rcp_ep_can_encode_frame_response_fragmented(rcp_byte_bus_id_t byte_bus_id
     segs = (rcp_fragment_segment_t *)malloc(count * sizeof(*segs));
     if (!segs) {
         free(combined);
+        combined = NULL;
         return 0;
     }
 
     if (rcp_fragment_plan(combined_len, max_fragment_payload, segs, count) != RCP_FRAGMENT_OK) {
         free(segs);
+        segs = NULL;
         free(combined);
+        combined = NULL;
         return 0;
     }
 
@@ -608,7 +613,9 @@ size_t rcp_ep_can_encode_frame_response_fragmented(rcp_byte_bus_id_t byte_bus_id
 
             for (j = 0; j < i; j++) rcp_bytes_free(&out_frames[j]);
             free(segs);
+            segs = NULL;
             free(combined);
+            combined = NULL;
             return 0;
         }
 
@@ -616,7 +623,9 @@ size_t rcp_ep_can_encode_frame_response_fragmented(rcp_byte_bus_id_t byte_bus_id
     }
 
     free(segs);
+    segs = NULL;
     free(combined);
+    combined = NULL;
     return count;
 }
 
