@@ -714,7 +714,7 @@ rcp_wire_error_t rcp_lifecycle_field_write_error(rcp_lifecycle_state_t state,
                                                   rcp_lifecycle_writer_ctx_t writer);
 
 /* REQ-RMAP-055: TC18's own W+ (explicitly lockable) access type
- * (§12.7.8 Table 23 -- every EP_ID_config row; §12.7.9 Table 27 --
+ * (§12.7.8 Table 25 -- every EP_ID_config row; §12.7.9 Table 27 --
  * STREAM_UID/flush_on_count/Flush_time) -- distinct from every kind
  * rcp_lifecycle_field_kind_t already models. A W+ field follows the
  * SAME lifecycle-state/writer rule as RCP_LIFECYCLE_FIELD_FUNCTIONAL_W_STAR

@@ -34,6 +34,22 @@ the rationale.
 
 ## Releases
 
+### v0.396.0 -- 2026-08-16 (issue #341 follow-up: fix stale `Table 23` -> `Table 25` EP_ID_config citation in lifecycle.h)
+
+`include/rcp/lifecycle.h`'s own doc comment for `REQ-RMAP-055` cited
+"§12.7.8 Table 23 -- every EP_ID_config row" -- the same stale RC1
+numbering PR #501 just fixed across `regmap.h`/`mock.h`/`ep_wakeup.h`/
+`src/regmap.c`/`.fusa-reqs.json`, left behind here because
+`lifecycle.h` was outside that pass's editable file scope (flagged
+explicitly in its own PR description). RC1's Table 23 (EP_ID_config)
+is RC5's own Table 25 -- RC5's own native Table 23 is a different
+table ("Enumeration of signals at endpoints").
+
+Comment-only change -- no behavior, no test, no trace-coverage
+impact. Full clean rebuild + full test suite: 66/66 unchanged
+(verified in an independent fresh clone, sidestepping a build-race
+issue observed in the shared working tree).
+
 ### v0.395.0 -- 2026-08-16 (issue #341: exhaustive `Table 33` re-verification; `Table 20`/`21`/`22` `hw_pin_type` content-bug fix; `Table 23`->`25` EP_ID_config citation-drift cluster)
 
 Sixth pass on issue #341 (RC1->RC5 table-number census). Fresh census
