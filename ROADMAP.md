@@ -19106,6 +19106,16 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.396.0 -- 2026-08-16 (issue #341 follow-up: fix stale `Table 23`
+-> `Table 25` EP_ID_config citation in lifecycle.h)
+
+`include/rcp/lifecycle.h`'s own doc comment for `REQ-RMAP-055` cited
+"§12.7.8 Table 23 -- every EP_ID_config row" -- the same stale RC1
+numbering PR #501 just fixed elsewhere, left behind since
+`lifecycle.h` was outside that pass's file scope. RC1's Table 23 is
+RC5's own Table 25. Comment-only, no behavior/test impact -- 66/66
+unchanged (verified in an independent fresh clone).
+
 ### v0.395.0 -- 2026-08-16 (issue #341: exhaustive `Table 33`
 re-verification; `Table 20`/`21`/`22` `hw_pin_type` content-bug fix;
 `Table 23`->`25` EP_ID_config citation-drift cluster)
