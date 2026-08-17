@@ -19106,6 +19106,22 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.392.0 -- 2026-08-16 (issue #164 follow-up: fix stale `Table 24`
+-> `Table 27` citation in lifecycle.h)
+
+`include/rcp/lifecycle.h`'s own doc comment for `REQ-RMAP-055` cited
+"§12.7.9 Table 24" for the STREAM_UID/flush_on_count/Flush_time
+response-queue fields -- stale RC1 numbering. Verified against a
+fresh RC5 `pdftotext -layout` extraction: §12.7.9's own content is
+captioned "Table 27: Responder QUEUE_config", not Table 24 (RC5's
+own Table 24 is a different table, §12.7.7's `request_stream_cfg`,
+already correctly cited that way elsewhere). `.fusa-reqs.json`'s own
+`REQ-RMAP-055` entry already had the correct citation -- only this
+doc comment (2 occurrences) had drifted. Flagged by PR #497's own
+citation-drift check and issue #341's PR #495 comment, fixed
+directly rather than left dangling. Comment-only, no behavior/test
+impact -- 66/66 unchanged, `cfusa check`/`trace` unchanged.
+
 ### v0.391.0 -- 2026-08-16 (c-RCP-AUDIT-02 citation backfill:
 LIFECYCLE/RMAP/E2E/ACF/PWRMODE/WIREERR + RELAY/MOCK/LOAN/ALLOC
 scoping, 2 of 66 requirements in scope now cited)
