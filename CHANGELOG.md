@@ -34,6 +34,108 @@ the rationale.
 
 ## Releases
 
+### v0.385.0 -- 2026-08-16 (Figure 20/21 header-CRC bytes: rcp_e2e_compute_crc() was missing avtp_subtype/header_octet1/tu from the E2E CRC coverage span)
+
+Closes issue #465 (sev:high, wire-format-affecting). TC18 §13.6
+Figure 20 (ACF_ABB under TSCF header) and Figure 21 (ACF_GBB under
+NTSCF header) use a color legend -- orange = header-CRC input, green =
+ACF-CRC input, pink = explicitly excluded, blue = CRC result, yellow =
+padding -- that plain-text spec extraction cannot show at all (no
+color information survives `pdftotext`); confirming or refuting this
+finding required rendering the actual page. Rendered
+`OA_TC18_specification_v_0.5.1_RC_5_3624.pdf` pages 88 (Figure 20) and
+89 (Figure 21) at 250dpi with `pdftoppm` and inspected the fill color
+of every field directly, cross-referenced against pixel-sampled RGB
+values and the prose immediately below each figure.
+
+**Finding confirmed, not a false positive.** Figure 20's orange region
+is: the AVTPDU subtype byte (byte 0, full -- 0x05 for TSCF) + the
+sv|version|mr|rsv|tv byte (byte 1, full) + the tu bit alone (byte 3's
+last bit only -- byte 3's other 7 "reserved" bits are white/uncolored,
+and byte 2, sequence_num_lsb, is white/uncolored, i.e. genuinely
+skipped) + stream_id (8 bytes) + avtp_timestamp (4 bytes). `src/e2e.c`'s
+`rcp_e2e_compute_crc()` fed only the last two of those five regions
+into the CRC, silently dropping the AVTPDU subtype octet, the header's
+second octet, and the tu bit entirely -- a genuine, wire-format-
+affecting gap: a spec-conformant peer's CRC32 over a TSCF-headed
+E2E-safe frame would not match this library's prior output at all,
+meaning either legitimate interop failure (a correctly-signed request
+from a real peer rejected as CRC_ERROR) or a corrupted subtype/header
+octet going completely undetected. Figure 21 (NTSCF) confirms the same
+shape minus the fields NTSCF's own header doesn't carry (no
+avtp_timestamp row, no tu column): orange there is subtype(0x82) + the
+full sv|version|r byte + stream_id. Both figures' own prose directly
+underneath ("The fields marked in orange in the TSCF/NSCF header shall
+be used to calculate a header CRC, which is then used are seed value
+for the calculation of the individual CRCs of each ACF type under this
+header") independently corroborates the diagram's own color-coding,
+not just the color-coding alone -- and is mathematically exact to
+implement as one continuous CRC run (header bytes then green bytes,
+single init/final-XOR), not an approximation: see `include/rcp/e2e.h`'s
+own file header for the full "why these are bit-for-bit identical"
+argument from CRC32's incremental/streaming property.
+
+**Fix.** `rcp_e2e_compute_crc()`, `rcp_e2e_wrap()`, `rcp_e2e_unwrap()`,
+and `rcp_e2e_compute_fragmented_crc()` each gained three new leading
+parameters -- `avtp_subtype`, `header_octet1`, `tu` -- fed into the CRC
+ahead of `stream_id`/`avtp_timestamp`, in Figure 20/21's own exact
+left-to-right wire order. `rcp_e2e_wrap_framed()`/`_unwrap_framed()`
+derive `avtp_subtype` from their existing `is_ntscf_framed` bool
+internally (0x05 TSCF / 0x82 NTSCF, hardcoded per this module's own
+"no dependency on avtp.c" layering discipline) and force `tu` to false
+under NTSCF framing, mirroring -- not diverging from -- this file's
+pre-existing `avtp_timestamp`-is-zeroed-under-NTSCF convention (NTSCF
+has no tu bit of its own, exactly as it has no avtp_timestamp field of
+its own). `header_octet1` remains a required caller-supplied parameter
+throughout (`mr`/`tv` are genuine per-message wire values, not
+constants, so this module cannot derive them itself). `src/mock.c`'s
+`rcp_mock_server_dispatch_e2e()`/`_dispatch_e2e_fragment()` -- this
+module's only in-tree caller of the wrap/unwrap/compute_crc family, and
+itself lacking per-message `header_octet1`/`tu` on its own public
+signature -- pass a newly-documented placeholder
+(`RCP_MOCK_E2E_HEADER_OCTET1_PLACEHOLDER` 0x00,
+`RCP_MOCK_E2E_TU_PLACEHOLDER` false) uniformly on every call, keeping
+every existing mock-driven round-trip self-consistent without claiming
+to model real per-message `sv`/`mr`/`tv`/`tu` bits; extending
+`mock.h`'s own public dispatch signatures to carry the real wire values
+is a separate, materially larger architecture item outside this
+issue's file scope (`src/e2e.c`, `include/rcp/e2e.h`).
+
+This is a wire-format-affecting change: every test asserting a specific
+CRC32 value for a TSCF-headed E2E-safe frame was audited.
+`tests/test_e2e.c`'s and `tests/test_tc18_gaps_e2e.c`'s CRC assertions
+are all self-referential (compare `rcp_e2e_compute_crc()`'s output
+against a hand-built byte concatenation fed to `rcp_e2e_crc32()`
+independently, not a hardcoded magic constant) except one
+(`test_crc32_known_answer_vector`, the CRC-32/AUTOSAR published check
+value over `"123456789"`, which is unaffected -- it exercises
+`rcp_e2e_crc32()` directly, not `rcp_e2e_compute_crc()`'s coverage
+span); every self-referential concatenation was rewritten to include
+the new 3-byte prefix in the correct order, and the new expected values
+were independently cross-checked against a from-scratch Python
+CRC-32/AUTOSAR reference implementation (not merely re-derived from
+what the changed C code itself now produces), which reproduced the
+new C output exactly (`0xAAFB463D` for the coverage-prefix test's own
+vector). New tests added specifically proving the fix: flipping just
+`avtp_subtype`, just `header_octet1`, or just `tu` (holding every other
+byte identical) each independently changes the resulting CRC32, proving
+all three are genuinely fed into the running CRC and not silently
+ignored; a dedicated test proving `rcp_e2e_wrap_framed()` forces `tu`
+to false under NTSCF framing (byte-identical output for `tu=true` vs
+`tu=false` there) while a TSCF-framed call's trailer genuinely differs
+by `tu`. Mutation-tested: reverting the fix (disabling the three new
+`crc32_update()` calls in both `rcp_e2e_compute_crc()` and
+`rcp_e2e_compute_fragmented_crc()`) reproduced exactly the expected
+7 new/updated test failures in `test_e2e.c` and 1 in
+`test_tc18_gaps_e2e.c`, confirmed, then restored.
+
+Full clean rebuild + full 66-test suite green; ASan/UBSan build
+(`-fsanitize=address,undefined -fno-sanitize-recover=all`) green;
+`cfusa check` 0 errors; `cfusa trace` full coverage.
+`.fusa-reqs.json` REQ-E2E-003/005/006/007/008/009 updated with this
+investigation's dated notes and exact Figure 20/21 page citations
+(pp. 88-89 of the RC5 PDF).
+
 ### v0.384.0 -- 2026-08-16 (Table 27/30 wire-error mappings: SEQUENCER_NOT_KNOWN, GPTP_FAIL, PWM_IN_NO_SIGNAL)
 
 Closes issue #163. Re-audited `grep -rn "RCP_ERROR_" src/ include/ | grep -v
@@ -167,6 +269,7 @@ explicitly left open) and REQ-E2E-021/033 (documenting that this fix
 leaves their own mechanisms unchanged). 66/66 tests green (native +
 ASan/UBSan); `cfusa check`: 0 errors; `cfusa trace`: 1089/1089 traced
 and tested.
+
 ### v0.382.0 -- 2026-08-16 (Figure 17 lifecycle-diagram re-transcription: missing RCP_CONFIGURED->HW_CONFIGURED transition added, misattributed idle-gate corrected, Figure-16-should-be-17 citation drift fixed)
 
 Closes issue #455 (sev:high). Re-traced TC18's actual lifecycle

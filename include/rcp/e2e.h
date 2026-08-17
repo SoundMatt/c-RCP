@@ -106,23 +106,125 @@
  *
  * ── Coverage span and the length-accounting pre-adjustment ─────────────────
  *
- * The CRC spans, in order: the 8-byte StreamID this request stream is
- * addressed by (avtp.h's own addressing model; pass 0 for the all-zero
- * stand-in an NTSCF-framed message uses in place of a real StreamID),
- * the 4-byte avtp_timestamp (IEEE 1722's own field width; again all-zero
- * under NTSCF framing, which carries no timestamp of its own), and
- * finally the ACF header-and-REAL-payload region -- acf.c's
- * rcp_acf_encode_abb()/_encode_gbb() output, minus their own trailing
- * 0x00 quadlet-alignment pad octets -- *after* the length adaptation
- * below has already been applied to it. TC18 §13.6 Figures 20/21 are
- * explicit that padding is excluded ("a CRC32 is calculated ... across
- * ... the entire payload (except padding)") and that the trailer sits
- * immediately after the real payload, with any pad octets AFTER the
- * trailer, not before it: [header][real payload][CRC32][pad], never
- * [header][real payload][pad][CRC32]. rcp_e2e_wrap()/_unwrap() (issue
- * #420) locate that real/pad boundary by reading acf_frame's own
- * wire-format "pad" field (acf.h Figure 7) rather than requiring a
- * caller to pre-split the buffer or pass its length explicitly.
+ * CORRECTED 2026-08-16 (issue #465): this section previously described
+ * the CRC as spanning only StreamID + avtp_timestamp + the ACF region --
+ * that was a genuine coverage gap, not a documented simplification. See
+ * the dedicated "Figure 20/21 header-CRC bytes" section below for the
+ * investigation and the fix. The span is now, in order: the AVTPDU
+ * subtype byte (1 octet -- 0x05 TSCF / 0x82 NTSCF), the header's own
+ * second octet (1 octet -- TSCF's packed sv|version|mr|rsv|tv or NTSCF's
+ * packed sv|version|r, exactly as transmitted), a tu byte (1 octet, LSB
+ * = the TSCF tu bit, forced 0 under NTSCF framing -- see below), the
+ * 8-byte StreamID this request stream is addressed by (avtp.h's own
+ * addressing model; pass 0 for the all-zero stand-in an NTSCF-framed
+ * message uses in place of a real StreamID), the 4-byte avtp_timestamp
+ * (IEEE 1722's own field width; again all-zero under NTSCF framing,
+ * which carries no timestamp of its own), and finally the ACF
+ * header-and-REAL-payload region -- acf.c's rcp_acf_encode_abb()/
+ * _encode_gbb() output, minus their own trailing 0x00 quadlet-alignment
+ * pad octets -- *after* the length adaptation below has already been
+ * applied to it. TC18 §13.6 Figures 20/21 are explicit that padding is
+ * excluded ("a CRC32 is calculated ... across ... the entire payload
+ * (except padding)") and that the trailer sits immediately after the
+ * real payload, with any pad octets AFTER the trailer, not before it:
+ * [header][real payload][CRC32][pad], never [header][real payload][pad]
+ * [CRC32]. rcp_e2e_wrap()/_unwrap() (issue #420) locate that real/pad
+ * boundary by reading acf_frame's own wire-format "pad" field (acf.h
+ * Figure 7) rather than requiring a caller to pre-split the buffer or
+ * pass its length explicitly.
+ *
+ * ── Figure 20/21 header-CRC bytes (issue #465) ──────────────────────────────
+ *
+ * INVESTIGATED 2026-08-16 (issue #465): filed as a possible coverage gap
+ * -- Figures 20/21 use a color legend (orange = header-CRC input, green =
+ * ACF-CRC input, pink = explicitly excluded, blue = CRC result, yellow =
+ * padding) that plain-text spec extraction cannot show, so this needed
+ * the rendered page, not just the surrounding prose. Rendered TC18
+ * 0.5.1_RC5 page 88 (Figure 20, ACF_ABB under TSCF) and page 89 (Figure
+ * 21, ACF_GBB under NTSCF) at 250dpi and inspected the fill color of
+ * every field directly (not just the prose, which under-specifies this
+ * relative to the diagram). Finding CONFIRMED, not a false positive:
+ * Figure 20's orange region is subtype(byte 0, full) + the sv/version/
+ * mr/rsv/tv byte (byte 1, full) + the tu bit alone (byte 3's last bit;
+ * byte 3's other 7 bits, "reserved", are white/uncolored, and byte 2,
+ * sequence_num_lsb, is white/uncolored -- i.e. genuinely skipped, not
+ * merely a don't-care) + stream_id (8 bytes) + avtp_timestamp (4 bytes).
+ * This module's own prior implementation fed only the last two of those
+ * five regions into the CRC, silently dropping subtype/octet1/tu
+ * entirely -- a real, wire-format-affecting gap: a genuinely
+ * spec-conformant peer's CRC32 over a TSCF-headed E2E-safe frame would
+ * not match this library's prior output at all. Figure 21 (NTSCF)
+ * confirms the same shape minus the fields NTSCF's own header doesn't
+ * have (no avtp_timestamp row, no tu column) -- orange there is
+ * subtype(0x82) + the sv/version/r byte, full, + stream_id; both
+ * figures' own prose directly under each ("The fields marked in orange
+ * in the TSCF/NSCF header shall be used to calculate a header CRC, which
+ * is then used are seed value for the calculation of the individual CRCs
+ * of each ACF type under this header") independently corroborates the
+ * diagram, not just the color-coding alone.
+ *
+ * Fixed here by feeding avtp_subtype + header_octet1 + a tu byte ahead
+ * of stream_id/avtp_timestamp in rcp_e2e_compute_crc()/_compute_
+ * fragmented_crc(), and threading the same two new parameters through
+ * rcp_e2e_wrap()/_unwrap(). This is mathematically exact, not an
+ * approximation of the spec's own two-stage "header CRC becomes the seed
+ * for the ACF CRC" description: Table 34's own "Initial Value (for
+ * header CRC calculation)" / "Final XOR (to be applied on ACF CRC
+ * result)" split says the header-CRC stage runs from init 0xFFFFFFFF
+ * with NO intermediate final-XOR, and its raw running register becomes
+ * the ACF-CRC stage's own init value, XORed only once, at the very end.
+ * For any CRC built the standard way (a per-byte LFSR update folding
+ * reflection in via the polynomial's own bit-reversed form, exactly this
+ * module's crc32_update()), continuing that same per-byte update across
+ * a byte-stream boundary with no XOR in between is bit-for-bit identical
+ * to running one continuous CRC over the concatenation of both byte
+ * regions with a single init and a single final XOR applied once at the
+ * very end -- the same incremental/streaming property real-world CRC32
+ * implementations (e.g. zlib's crc32() "carry the running value forward"
+ * convention) already rely on. So "feed the header bytes first, then the
+ * ACF bytes, one continuous run" is not a simplification of the spec's
+ * two-stage description -- it computes the identical 32-bit result.
+ *
+ * The tu byte deliberately mirrors, not diverges from, this file's
+ * pre-existing avtp_timestamp-is-zero-under-NTSCF convention: NTSCF's
+ * own header has no tu bit at all (Figure 21 has no tu column), so
+ * rcp_e2e_wrap_framed()/_unwrap_framed() force tu to false (a single
+ * 0x00 byte fed to the CRC) under is_ntscf_framed, exactly as they
+ * already force avtp_timestamp to 0 -- one consistent "zero stand-in for
+ * a field this framing doesn't carry" rule, not two different ones. This
+ * module hardcodes the two AVTP subtype byte values (0x05 TSCF, 0x82
+ * NTSCF) as internal constants to let rcp_e2e_wrap_framed()/_unwrap_
+ * framed() derive avtp_subtype from is_ntscf_framed themselves (so a
+ * caller cannot pass a subtype byte inconsistent with its own framing
+ * argument) -- matching this file's own "no dependency on avtp.h"
+ * layering discipline (see the file header above), the same discipline
+ * adapt_acf_msg_length() already follows for acf_msg_length's 9-bit
+ * field width.
+ *
+ * header_octet1 (TSCF's sv|version|mr|rsv|tv byte, or NTSCF's
+ * sv|version|r byte) is NOT similarly derivable -- mr and tv are
+ * genuinely per-message wire values (avtp.h's own rcp_avtp_tscf_header_t
+ * comments: "mr: media clock restart, carried through unmodified"; "tv:
+ * avtp_timestamp valid") -- so it remains a required caller-supplied
+ * parameter on every function in this section, exactly the real
+ * already-encoded (or about-to-be-decoded) wire byte, unmodified.
+ * src/mock.c's own dispatch_e2e()/_dispatch_e2e_fragment() -- this
+ * module's only in-tree caller of the wrap/unwrap/compute_crc family --
+ * do not currently receive per-message sv/mr/tv/tu bits at all through
+ * their own public signatures (only avtp_subtype, stream_id,
+ * avtp_timestamp): extending those public signatures to carry real
+ * per-message header_octet1/tu values, and threading them from wherever
+ * a real caller decodes an AVTPDU header, is a separate, materially
+ * larger architecture item outside issue #465's own file scope
+ * (src/e2e.c, include/rcp/e2e.h) -- mock.c instead passes this module's
+ * own documented placeholder (RCP_MOCK_E2E_HEADER_OCTET1_PLACEHOLDER,
+ * 0x00; tu false) uniformly on both its own encode-side test fixtures and
+ * decode-side dispatch calls, which keeps every existing mock.c-driven
+ * round-trip self-consistent (same constant on both sides) without
+ * claiming to model the real per-message sv/mr/tv/tu bits -- a caller
+ * that needs the real wire-accurate values must call rcp_e2e_wrap()/
+ * _unwrap() (or the _framed() variants) directly, not through mock.c's
+ * simplified test-double surface.
  *
  * Before that CRC is computed, the ACF header's own acf_msg_length field
  * (acf.h, a 9-bit quadlet count spanning bit 0 of octet 0 and all of
@@ -339,14 +441,21 @@ rcp_wire_error_t rcp_e2e_wire_error(rcp_e2e_errc_t e);
  * header) over data[0..len). data may be NULL iff len == 0. */
 uint32_t rcp_e2e_crc32(const uint8_t *data, size_t len);
 
-/* The coverage-span-specific wrapper: CRC32 over stream_id (8 bytes,
- * big-endian) + avtp_timestamp (4 bytes, big-endian -- IEEE 1722's own
- * field width; pass 0 for the NTSCF all-zero stand-in) +
- * acf_frame[0..acf_frame_len). acf_frame may be NULL iff acf_frame_len ==
- * 0. Equivalent to concatenating those three regions and calling
- * rcp_e2e_crc32() once, without the allocation such a concatenation
- * would need. */
-uint32_t rcp_e2e_compute_crc(uint64_t stream_id, uint32_t avtp_timestamp,
+/* The coverage-span-specific wrapper: CRC32 over avtp_subtype (1 byte --
+ * 0x05 TSCF / 0x82 NTSCF) + header_octet1 (1 byte -- TSCF's packed
+ * sv|version|mr|rsv|tv or NTSCF's packed sv|version|r, exactly as
+ * transmitted) + a tu byte (1 byte, LSB = tu; pass false for NTSCF,
+ * which has no tu bit of its own -- see rcp_e2e_wrap_framed()) +
+ * stream_id (8 bytes, big-endian) + avtp_timestamp (4 bytes, big-endian
+ * -- IEEE 1722's own field width; pass 0 for the NTSCF all-zero
+ * stand-in) + acf_frame[0..acf_frame_len). acf_frame may be NULL iff
+ * acf_frame_len == 0. Equivalent to concatenating those six regions and
+ * calling rcp_e2e_crc32() once, without the allocation such a
+ * concatenation would need -- see the file header's "Figure 20/21
+ * header-CRC bytes" section (issue #465) for why this is exact, not an
+ * approximation of TC18's own two-stage header-CRC-as-seed description. */
+uint32_t rcp_e2e_compute_crc(uint8_t avtp_subtype, uint8_t header_octet1, bool tu,
+                              uint64_t stream_id, uint32_t avtp_timestamp,
                               const uint8_t *acf_frame, size_t acf_frame_len);
 
 /* The length-accounting pre-adjustment: payload_len + RCP_E2E_CRC_LEN.
@@ -384,8 +493,9 @@ size_t rcp_e2e_data_length_for_protected_members(size_t protected_member_count);
  * by incrementing its acf_msg_length field (acf.h, the 9-bit quadlet
  * count spanning bit 0 of octet 0 and all of octet 1; octet 0's other 7
  * bits, acf_msg_type, are preserved unmodified) by one quadlet, computes
- * the CRC via rcp_e2e_compute_crc() over stream_id + avtp_timestamp +
- * that adapted copy's REAL (unpadded) header-and-payload prefix, and
+ * the CRC via rcp_e2e_compute_crc() over avtp_subtype + header_octet1 +
+ * tu + stream_id + avtp_timestamp + that adapted copy's REAL (unpadded)
+ * header-and-payload prefix, and
  * places the RCP_E2E_CRC_LEN-byte big-endian trailer immediately after
  * that prefix -- with acf_frame's own trailing pad octets re-seated
  * after the trailer rather than before it. This matches TC18 §13.6
@@ -413,7 +523,8 @@ size_t rcp_e2e_data_length_for_protected_members(size_t protected_member_count);
  * modified. Returns a freshly heap-allocated, owned rcp_bytes_t (data=NULL,
  * len=0 on allocation failure or any of the above); caller frees the
  * result with rcp_bytes_free(). */
-rcp_bytes_t rcp_e2e_wrap(uint64_t stream_id, uint32_t avtp_timestamp,
+rcp_bytes_t rcp_e2e_wrap(uint8_t avtp_subtype, uint8_t header_octet1, bool tu,
+                          uint64_t stream_id, uint32_t avtp_timestamp,
                           const uint8_t *acf_frame, size_t acf_frame_len);
 
 /* The composed decode entry point, reversing rcp_e2e_wrap(): frame is
@@ -423,8 +534,9 @@ rcp_bytes_t rcp_e2e_wrap(uint64_t stream_id, uint32_t avtp_timestamp,
  * it, directly out of frame's own wire-format "pad" field. This function
  * validates the CRC32 sitting immediately after the real prefix (acf_msg_
  * length still reflecting the sender's +1-quadlet adaptation) via
- * rcp_e2e_compute_crc() over stream_id + avtp_timestamp + that real
- * prefix, then -- regardless of match -- writes *out_acf_frame a freshly
+ * rcp_e2e_compute_crc() over avtp_subtype + header_octet1 + tu +
+ * stream_id + avtp_timestamp + that real prefix, then -- regardless of
+ * match -- writes *out_acf_frame a freshly
  * heap-allocated copy reassembling the real header-and-payload region
  * immediately followed by the original pad octets (i.e. frame with the
  * RCP_E2E_CRC_LEN-byte trailer excised from the middle, not merely
@@ -439,37 +551,49 @@ rcp_bytes_t rcp_e2e_wrap(uint64_t stream_id, uint32_t avtp_timestamp,
  * caller must skip executing the request this frame carries;
  * *out_acf_frame is still populated in this case, for diagnostic use, but
  * must not be treated as a validated payload. */
-rcp_e2e_errc_t rcp_e2e_unwrap(uint64_t stream_id, uint32_t avtp_timestamp,
+rcp_e2e_errc_t rcp_e2e_unwrap(uint8_t avtp_subtype, uint8_t header_octet1, bool tu,
+                               uint64_t stream_id, uint32_t avtp_timestamp,
                                const uint8_t *frame, size_t frame_len,
                                rcp_bytes_t *out_acf_frame);
 
-/* ── Framing-aware wrap/unwrap: the NTSCF all-zero timestamp stand-in ───────── */
+/* ── Framing-aware wrap/unwrap: the NTSCF all-zero timestamp/tu stand-in ───── */
 
-/* Framing-safe convenience wrapper over rcp_e2e_wrap(): forces the CRC's
- * avtp_timestamp contribution to 0 when is_ntscf_framed is true (TC18
- * §13.6's own all-zero stand-in for a message riding an NTSCF header,
- * which carries no timestamp field of its own -- ignoring whatever the
- * caller passed in avtp_timestamp for that case, rather than trusting it
- * to already be 0), or passes avtp_timestamp through unchanged when
- * is_ntscf_framed is false (a TSCF-framed message, whose own
- * avtp_timestamp field is real and must be reflected in the CRC). Prefer
- * this over calling rcp_e2e_wrap() directly whenever the caller already
- * knows which framing a message is riding -- e.g. avtp.h's own
+/* Framing-safe convenience wrapper over rcp_e2e_wrap(): derives
+ * avtp_subtype from is_ntscf_framed itself (0x82 NTSCF / 0x05 TSCF --
+ * hardcoded internally, see the file header's "Figure 20/21 header-CRC
+ * bytes" section, so a caller cannot pass a subtype byte inconsistent
+ * with its own is_ntscf_framed argument), forces the CRC's avtp_timestamp
+ * contribution to 0 AND its tu contribution to false when is_ntscf_framed
+ * is true (TC18 §13.6's own all-zero stand-in for a message riding an
+ * NTSCF header, which carries no timestamp field or tu bit of its own --
+ * ignoring whatever the caller passed in avtp_timestamp/tu for that case,
+ * rather than trusting them to already be 0/false), or passes
+ * avtp_timestamp and tu through unchanged when is_ntscf_framed is false
+ * (a TSCF-framed message, whose own avtp_timestamp field and tu bit are
+ * real and must be reflected in the CRC). header_octet1 is always passed
+ * through unchanged regardless of framing -- both TSCF and NTSCF have a
+ * real, meaningful second header octet of their own (see the file
+ * header), unlike avtp_timestamp/tu which only TSCF actually carries.
+ * Prefer this over calling rcp_e2e_wrap() directly whenever the caller
+ * already knows which framing a message is riding -- e.g. avtp.h's own
  * RCP_AVTP_SUBTYPE_NTSCF/_TSCF discriminator -- since rcp_e2e_wrap()
- * itself has no way to catch a caller passing a nonzero avtp_timestamp
- * for NTSCF-framed traffic; see the file header. Every other parameter
- * and the return value are exactly rcp_e2e_wrap()'s own. */
+ * itself has no way to catch a caller passing a nonzero avtp_timestamp or
+ * true tu for NTSCF-framed traffic; see the file header. Every other
+ * parameter and the return value are exactly rcp_e2e_wrap()'s own. */
 rcp_bytes_t rcp_e2e_wrap_framed(uint64_t stream_id, bool is_ntscf_framed,
+                                 uint8_t header_octet1, bool tu,
                                  uint32_t avtp_timestamp,
                                  const uint8_t *acf_frame, size_t acf_frame_len);
 
-/* The decode-side counterpart of rcp_e2e_wrap_framed(): forces
- * avtp_timestamp to 0 when is_ntscf_framed is true before delegating to
+/* The decode-side counterpart of rcp_e2e_wrap_framed(): derives
+ * avtp_subtype the same way, and forces avtp_timestamp to 0 and tu to
+ * false when is_ntscf_framed is true, before delegating to
  * rcp_e2e_unwrap(), so a caller that already knows a message's framing
- * cannot accidentally verify it against the wrong (nonzero) timestamp
- * contribution. Every other parameter and the return value are exactly
- * rcp_e2e_unwrap()'s own. */
+ * cannot accidentally verify it against the wrong (nonzero/true)
+ * timestamp/tu contribution. Every other parameter and the return value
+ * are exactly rcp_e2e_unwrap()'s own. */
 rcp_e2e_errc_t rcp_e2e_unwrap_framed(uint64_t stream_id, bool is_ntscf_framed,
+                                      uint8_t header_octet1, bool tu,
                                       uint32_t avtp_timestamp,
                                       const uint8_t *frame, size_t frame_len,
                                       rcp_bytes_t *out_acf_frame);
@@ -501,12 +625,19 @@ bool rcp_e2e_fragment_carries_crc(bool is_last_fragment);
  * always one of those two values in practice, though this function
  * itself does not require it). reassembled_payload is the full
  * concatenation described above, NOT any single fragment's own payload
- * slice. Equivalent to concatenating first_fragment_header ++
- * reassembled_payload and calling rcp_e2e_compute_crc(stream_id,
- * avtp_timestamp, ..., ...) once, without the allocation such a
+ * slice. avtp_subtype/header_octet1/tu are exactly rcp_e2e_compute_crc()'s
+ * own (issue #465 -- see the file header's "Figure 20/21 header-CRC
+ * bytes" section); this function has no _framed() counterpart of its own
+ * to derive avtp_subtype or force avtp_timestamp/tu to their NTSCF
+ * stand-ins, so a caller riding NTSCF framing must apply that forcing
+ * itself before calling in (mock.c's own caller already does this for
+ * avtp_timestamp; see src/mock.c). Equivalent to concatenating
+ * avtp_subtype ++ header_octet1 ++ a tu byte ++ stream_id ++
+ * avtp_timestamp ++ first_fragment_header ++ reassembled_payload and
+ * calling rcp_e2e_crc32() once, without the allocation such a
  * concatenation would need -- the same "running CRC over several
  * caller-owned regions" technique rcp_e2e_compute_crc() itself already
- * uses for stream_id/avtp_timestamp/acf_frame.
+ * uses.
  *
  * This function is the CRC arithmetic alone. It does not itself locate
  * "the first fragment's header" out of a sequence of already-encoded
@@ -522,7 +653,8 @@ bool rcp_e2e_fragment_carries_crc(bool is_last_fragment);
  * message dispatch path of any kind (protected or not) to wire this
  * into, a materially larger, separate architecture item than adding this
  * one arithmetic primitive. */
-uint32_t rcp_e2e_compute_fragmented_crc(uint64_t stream_id, uint32_t avtp_timestamp,
+uint32_t rcp_e2e_compute_fragmented_crc(uint8_t avtp_subtype, uint8_t header_octet1, bool tu,
+                                         uint64_t stream_id, uint32_t avtp_timestamp,
                                          const uint8_t *first_fragment_header,
                                          size_t first_fragment_header_len,
                                          const uint8_t *reassembled_payload,

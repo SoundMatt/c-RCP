@@ -6480,14 +6480,14 @@
     },
     {
       "id": "REQ-E2E-003",
-      "title": "rcp_e2e_compute_crc() covers stream_id, avtp_timestamp, and the ACF header-and-payload region, in that order",
-      "text": "rcp_e2e_compute_crc() shall return the same value as calling rcp_e2e_crc32() over the concatenation of stream_id (8 bytes, big-endian), avtp_timestamp (4 bytes, big-endian -- the AVTPDU header's own 32-bit field, which TC18 13.6 requires to be included in the calculation and to be filled with all zeros under an NTSCF header), and acf_frame[0..acf_frame_len). The width was previously recorded here as 8 bytes, which neither src/e2e.c (a uint32_t parameter serialised by put_u32) nor include/rcp/e2e.h ever implemented and which no AVTPDU header field has. CLOSED 2026-08-14 (issue #420): rcp_e2e_compute_crc() itself is unchanged -- a pure 'cover exactly what acf_frame[0..acf_frame_len) is handed as' primitive -- but rcp_e2e_wrap() (REQ-E2E-042) now calls it over only the real, unpadded header-and-payload prefix, excluding acf.c's own trailing 0x00 quadlet-alignment pad octets, matching \"the entire payload (except padding)\" above; previously rcp_e2e_wrap() called it over the whole already-padded frame, incorrectly folding those pad octets into the CRC.",
+      "title": "rcp_e2e_compute_crc() covers avtp_subtype, header_octet1, tu, stream_id, avtp_timestamp, and the ACF header-and-payload region, in that order",
+      "text": "rcp_e2e_compute_crc() shall return the same value as calling rcp_e2e_crc32() over the concatenation of avtp_subtype (1 byte), header_octet1 (1 byte), a tu byte (1 byte, LSB = tu), stream_id (8 bytes, big-endian), avtp_timestamp (4 bytes, big-endian -- the AVTPDU header's own 32-bit field, which TC18 13.6 requires to be included in the calculation and to be filled with all zeros under an NTSCF header), and acf_frame[0..acf_frame_len). The width was previously recorded here as 8 bytes, which neither src/e2e.c (a uint32_t parameter serialised by put_u32) nor include/rcp/e2e.h ever implemented and which no AVTPDU header field has. CLOSED 2026-08-14 (issue #420): rcp_e2e_compute_crc() itself is unchanged -- a pure 'cover exactly what acf_frame[0..acf_frame_len) is handed as' primitive -- but rcp_e2e_wrap() (REQ-E2E-042) now calls it over only the real, unpadded header-and-payload prefix, excluding acf.c's own trailing 0x00 quadlet-alignment pad octets, matching \"the entire payload (except padding)\" above; previously rcp_e2e_wrap() called it over the whole already-padded frame, incorrectly folding those pad octets into the CRC. FIXED 2026-08-16 (issue #465): this requirement itself, not only src/e2e.c, was previously wrong -- it never named the AVTPDU subtype octet, the header's second octet (TSCF's sv|version|mr|rsv|tv or NTSCF's sv|version|r), or TSCF's tu bit, all three of which TC18 0.5.1_RC5 \u00a713.6 Figure 20/21's own orange color-coding marks as header-CRC input ahead of stream_id/avtp_timestamp -- a rendered-page finding invisible to plain-text spec extraction (see e2e.h's file header \"Figure 20/21 header-CRC bytes\" section for the full investigation: rendered TC18 0.5.1_RC5 page 88/89 at 250dpi, inspected fill color per field directly). rcp_e2e_compute_crc() gained three new leading parameters (avtp_subtype, header_octet1, tu) to close this gap; this is a wire-format-affecting fix, not a documentation-only correction -- a genuinely spec-conformant peer's CRC32 over a TSCF-headed E2E-safe frame did not match this library's prior output at all.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.6 (\"In Safe command mode a CRC32 is calculated per ACF type across specific fields of an AVTPDU header, ACF header, and the entire payload (except padding).\" -- the covered header fields are shown via Figure 20/21's highlighting, not named in the 0.5.1_RC5 running prose), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.87-88"
+      "tc18": "\u00a713.6 (\"In Safe command mode a CRC32 is calculated per ACF type across specific fields of an AVTPDU header, ACF header, and the entire payload (except padding).\" -- the covered header fields are shown via Figure 20/21's own orange color-coding, not named in the 0.5.1_RC5 running prose), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.87-89 (Figure 20 p.88, Figure 21 p.89, rendered/visually inspected 2026-08-16 for issue #465)"
     },
     {
       "id": "REQ-E2E-004",
@@ -6503,18 +6503,18 @@
     {
       "id": "REQ-E2E-005",
       "title": "rcp_e2e_wrap() appends a big-endian CRC32 trailer computed via rcp_e2e_compute_crc()",
-      "text": "rcp_e2e_wrap() shall return an owned rcp_bytes_t equal to acf_frame[0..acf_frame_len) followed by RCP_E2E_CRC_LEN big-endian bytes holding rcp_e2e_compute_crc(stream_id, avtp_timestamp, acf_frame, acf_frame_len).",
+      "text": "rcp_e2e_wrap() shall return an owned rcp_bytes_t equal to acf_frame[0..acf_frame_len) followed by RCP_E2E_CRC_LEN big-endian bytes holding rcp_e2e_compute_crc(avtp_subtype, header_octet1, tu, stream_id, avtp_timestamp, acf_frame, acf_frame_len). UPDATED 2026-08-16 (issue #465): rcp_e2e_wrap() gained the same three new leading parameters (avtp_subtype, header_octet1, tu) rcp_e2e_compute_crc() did -- see REQ-E2E-003's own updated text for the investigation (TC18 0.5.1_RC5 \u00a713.6 Figure 20/21's rendered-page orange header-CRC bytes) and e2e.h's file header \"Figure 20/21 header-CRC bytes\" section.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.6 Figure 20/Figure 21 (\"CRC32\" trailer quadlet in the ACF_ABB/ACF_GBB message layout; renumbered from Figure 19/20 in TC18.txt's own pre-RC5 revision), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.88-89"
+      "tc18": "\u00a713.6 Figure 20/Figure 21 (\"CRC32\" trailer quadlet in the ACF_ABB/ACF_GBB message layout; renumbered from Figure 19/20 in TC18.txt's own pre-RC5 revision), OA_TC18_specification_v_0.5.1_RC_5_3624.pdf p.88-89 (rendered/visually inspected 2026-08-16 for issue #465)"
     },
     {
       "id": "REQ-E2E-006",
       "title": "rcp_e2e_wrap() fails safe on invalid input or allocation failure",
-      "text": "rcp_e2e_wrap() shall return a zeroed rcp_bytes_t (data=NULL, len=0) when acf_frame is NULL while acf_frame_len != 0, or when the internal allocation fails.",
+      "text": "rcp_e2e_wrap() shall return a zeroed rcp_bytes_t (data=NULL, len=0) when acf_frame is NULL while acf_frame_len != 0, or when the internal allocation fails. UNCHANGED 2026-08-16 (issue #465): rcp_e2e_wrap()'s three new leading parameters (avtp_subtype, header_octet1, tu; see REQ-E2E-005/REQ-E2E-003) do not affect this fail-safe behavior -- it is governed entirely by acf_frame/acf_frame_len and allocation success, independent of the CRC coverage span.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -6524,7 +6524,7 @@
     {
       "id": "REQ-E2E-007",
       "title": "rcp_e2e_unwrap() rejects a frame shorter than the CRC32 trailer",
-      "text": "rcp_e2e_unwrap() shall return RCP_E2E_ERR_SHORT_FRAME whenever frame_len < RCP_E2E_CRC_LEN.",
+      "text": "rcp_e2e_unwrap() shall return RCP_E2E_ERR_SHORT_FRAME whenever frame_len < RCP_E2E_CRC_LEN. UNCHANGED 2026-08-16 (issue #465): rcp_e2e_unwrap()'s three new leading parameters (avtp_subtype, header_octet1, tu; see REQ-E2E-008/REQ-E2E-003) do not affect this length gate -- it is checked before the CRC is computed at all.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -6535,7 +6535,7 @@
     {
       "id": "REQ-E2E-008",
       "title": "rcp_e2e_unwrap() reports CRC_ERROR on a mismatched trailer",
-      "text": "rcp_e2e_unwrap() shall return RCP_E2E_ERR_CRC_MISMATCH whenever the trailing RCP_E2E_CRC_LEN bytes of frame do not equal rcp_e2e_compute_crc(stream_id, avtp_timestamp, frame, frame_len - RCP_E2E_CRC_LEN); a caller receiving this code shall skip executing the request the frame carries.",
+      "text": "rcp_e2e_unwrap() shall return RCP_E2E_ERR_CRC_MISMATCH whenever the trailing RCP_E2E_CRC_LEN bytes of frame do not equal rcp_e2e_compute_crc(avtp_subtype, header_octet1, tu, stream_id, avtp_timestamp, frame, frame_len - RCP_E2E_CRC_LEN); a caller receiving this code shall skip executing the request the frame carries. UPDATED 2026-08-16 (issue #465): rcp_e2e_unwrap() gained the same three new leading parameters (avtp_subtype, header_octet1, tu) rcp_e2e_compute_crc() did -- see REQ-E2E-003's own updated text for the investigation. A caller (or peer) omitting the real avtp_subtype/header_octet1/tu now correctly produces RCP_E2E_ERR_CRC_MISMATCH where it previously would not have -- this widens, not narrows, the set of frames this function detects as corrupted/non-conformant.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -6546,7 +6546,7 @@
     {
       "id": "REQ-E2E-009",
       "title": "rcp_e2e_unwrap() round-trips a frame produced by rcp_e2e_wrap()",
-      "text": "For a frame produced by rcp_e2e_wrap(stream_id, avtp_timestamp, acf_frame, acf_frame_len), rcp_e2e_unwrap() called with the same stream_id and avtp_timestamp shall return RCP_E2E_OK with *out_acf_frame/*out_acf_frame_len describing exactly acf_frame[0..acf_frame_len).",
+      "text": "For a frame produced by rcp_e2e_wrap(avtp_subtype, header_octet1, tu, stream_id, avtp_timestamp, acf_frame, acf_frame_len), rcp_e2e_unwrap() called with the same avtp_subtype, header_octet1, tu, stream_id, and avtp_timestamp shall return RCP_E2E_OK with *out_acf_frame/*out_acf_frame_len describing exactly acf_frame[0..acf_frame_len). UPDATED 2026-08-16 (issue #465): the round-trip contract now additionally requires the caller to supply the same avtp_subtype/header_octet1/tu on both the wrap() and unwrap() side, exactly as it already required the same stream_id/avtp_timestamp -- see REQ-E2E-003/REQ-E2E-005/REQ-E2E-008's own updated text for the investigation.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",

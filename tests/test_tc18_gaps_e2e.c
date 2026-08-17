@@ -65,6 +65,25 @@ void tearDown(void) {}
 #define TEST_SID ((uint64_t)0x0102030405060708ULL)
 #define TEST_TS  ((uint32_t)0x11223344u)
 
+/* issue #465: avtp_subtype/header_octet1/tu -- the Figure 20/21
+ * header-CRC bytes rcp_e2e_compute_crc()/_wrap()/_unwrap() now require.
+ * TEST_OCTET1/TEST_TU are deliberately equal to src/mock.c's own
+ * documented RCP_MOCK_E2E_HEADER_OCTET1_PLACEHOLDER/_TU_PLACEHOLDER
+ * (0x00/false) -- most tests in this file build a request with the raw
+ * wrap()/wrap_framed() primitives and then feed it into
+ * rcp_mock_server_dispatch_e2e()/_fragment(), whose own internal
+ * rcp_e2e_unwrap_framed()/_compute_fragmented_crc() calls always use
+ * that same placeholder (mock.c has no per-message header_octet1/tu of
+ * its own to pass -- see mock.c's own file-top comment); using anything
+ * else here would make every one of those round-trips spuriously CRC-
+ * mismatch. Coverage for "header_octet1/tu are actually fed into the
+ * CRC" (flipping just one of them changes the result) lives in
+ * test_e2e.c's own dedicated tests instead, which call the raw
+ * primitives directly and are not constrained by mock.c's placeholder. */
+#define TEST_SUBTYPE ((uint8_t)0x05u) /* TSCF */
+#define TEST_OCTET1  ((uint8_t)0x00u)
+#define TEST_TU      (false)
+
 /* Encodes one ACF_ABB message through acf.c's own encoder, i.e. exactly
  * the input rcp_e2e_wrap() documents itself as taking. */
 static rcp_bytes_t make_abb(uint8_t ms, uint8_t rsp, uint16_t seg,
@@ -185,7 +204,7 @@ static void test_dispatch_e2e_safe_mode_executes_a_validly_wrapped_request(void)
     const uint8_t        pl[4] = {0x01, 0x02, 0x03, 0x04};
     rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
     rcp_bytes_t          wrapped =
-        rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_TS, plain.data, plain.len);
+        rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_OCTET1, TEST_TU, TEST_TS, plain.data, plain.len);
 
     /* RCP_CONFIGURED, not HW_CONFIGURED: TSCF-framed traffic (real,
      * nonzero avtp_timestamp) is unconditionally dropped in HW_CONFIGURED
@@ -246,8 +265,8 @@ static void test_safe_mode_changes_only_trailer_and_length(void)
     const uint8_t pl[4] = {0xDE, 0xAD, 0xBE, 0xEF};
     rcp_bytes_t   req   = make_abb(0, 0, 0, pl, sizeof(pl)); /* request-shaped  */
     rcp_bytes_t   rsp   = make_abb(0, 1, 0, pl, sizeof(pl)); /* response-shaped */
-    rcp_bytes_t   wreq  = rcp_e2e_wrap(TEST_SID, TEST_TS, req.data, req.len);
-    rcp_bytes_t   wrsp  = rcp_e2e_wrap(TEST_SID, TEST_TS, rsp.data, rsp.len);
+    rcp_bytes_t   wreq  = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, req.data, req.len);
+    rcp_bytes_t   wrsp  = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, rsp.data, rsp.len);
 
     TEST_ASSERT_NOT_NULL(wreq.data);
     TEST_ASSERT_NOT_NULL(wrsp.data);
@@ -267,9 +286,9 @@ static void test_safe_mode_changes_only_trailer_and_length(void)
 
     /* Same trailer derivation for both: CRC over the length-adapted frame,
      * big-endian, in the message's final quadlet. */
-    TEST_ASSERT_EQUAL_HEX32(rcp_e2e_compute_crc(TEST_SID, TEST_TS, wreq.data, req.len),
+    TEST_ASSERT_EQUAL_HEX32(rcp_e2e_compute_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, wreq.data, req.len),
                             be32(wreq.data + req.len));
-    TEST_ASSERT_EQUAL_HEX32(rcp_e2e_compute_crc(TEST_SID, TEST_TS, wrsp.data, rsp.len),
+    TEST_ASSERT_EQUAL_HEX32(rcp_e2e_compute_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, wrsp.data, rsp.len),
                             be32(wrsp.data + rsp.len));
 
     rcp_bytes_free(&wrsp);
@@ -280,32 +299,37 @@ static void test_safe_mode_changes_only_trailer_and_length(void)
 
 /* ── REQ-E2E-034: the CRC coverage prefix ──────────────────────────────────── */
 
-/* Catalogued "implemented": stream_id contributes 8 big-endian octets and
- * avtp_timestamp 4 (IEEE 1722's own field width), in that order, ahead of
- * the ACF frame. Asserted against a hand-built concatenation, plus two
- * negative controls that would pass if the width or the byte order were
- * wrong. */
+/* Catalogued "implemented": avtp_subtype (1 octet) + header_octet1 (1
+ * octet) + a tu byte (1 octet) -- Figure 20/21's own orange header-CRC
+ * bytes, issue #465 -- then stream_id (8 big-endian octets) and
+ * avtp_timestamp (4, IEEE 1722's own field width), in that order, ahead
+ * of the ACF frame. Asserted against a hand-built concatenation, plus
+ * two negative controls that would pass if the width or the byte order
+ * were wrong. */
 static void test_crc_coverage_prefix_is_stream_id_8_then_timestamp_4(void)
 {
     const uint8_t body[4] = {0xAA, 0xBB, 0xCC, 0xDD};
-    uint8_t       be_ref[8 + 4 + 4];
-    uint8_t       le_ts[8 + 4 + 4];
-    uint8_t       ts8[8 + 8 + 4];
+    uint8_t       be_ref[3 + 8 + 4 + 4];
+    uint8_t       le_ts[3 + 8 + 4 + 4];
+    uint8_t       ts8[3 + 8 + 8 + 4];
     uint32_t      actual;
     size_t        i;
 
-    for (i = 0; i < 8; i++) be_ref[i] = (uint8_t)(TEST_SID >> (56u - 8u * i));
-    for (i = 0; i < 4; i++) be_ref[8 + i] = (uint8_t)(TEST_TS >> (24u - 8u * i));
-    memcpy(be_ref + 12, body, sizeof(body));
+    be_ref[0] = TEST_SUBTYPE;
+    be_ref[1] = TEST_OCTET1;
+    be_ref[2] = TEST_TU ? 0x01u : 0x00u;
+    for (i = 0; i < 8; i++) be_ref[3 + i] = (uint8_t)(TEST_SID >> (56u - 8u * i));
+    for (i = 0; i < 4; i++) be_ref[11 + i] = (uint8_t)(TEST_TS >> (24u - 8u * i));
+    memcpy(be_ref + 15, body, sizeof(body));
 
     memcpy(le_ts, be_ref, sizeof(le_ts));
-    for (i = 0; i < 4; i++) le_ts[8 + i] = (uint8_t)(TEST_TS >> (8u * i));
+    for (i = 0; i < 4; i++) le_ts[11 + i] = (uint8_t)(TEST_TS >> (8u * i));
 
-    memcpy(ts8, be_ref, 8);
-    for (i = 0; i < 8; i++) ts8[8 + i] = (uint8_t)((uint64_t)TEST_TS >> (56u - 8u * i));
-    memcpy(ts8 + 16, body, sizeof(body));
+    memcpy(ts8, be_ref, 11);
+    for (i = 0; i < 8; i++) ts8[11 + i] = (uint8_t)((uint64_t)TEST_TS >> (56u - 8u * i));
+    memcpy(ts8 + 19, body, sizeof(body));
 
-    actual = rcp_e2e_compute_crc(TEST_SID, TEST_TS, body, sizeof(body));
+    actual = rcp_e2e_compute_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, body, sizeof(body));
 
     TEST_ASSERT_EQUAL_HEX32(rcp_e2e_crc32(be_ref, sizeof(be_ref)), actual);
     /* Not little-endian, and not an 8-octet timestamp. */
@@ -330,12 +354,18 @@ static void test_ntscf_framed_wrapper_forces_zero_timestamp(void)
 {
     const uint8_t pl[4]   = {0x5A, 0x5B, 0x5C, 0x5D};
     rcp_bytes_t   frame   = make_abb(0, 0, 0, pl, sizeof(pl));
-    /* Raw primitive: still trusts the caller (documented, unchanged). */
-    rcp_bytes_t   as_spec = rcp_e2e_wrap(TEST_SID, 0u, frame.data, frame.len);
-    rcp_bytes_t   as_told = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    /* Raw primitive: still trusts the caller (documented, unchanged).
+     * as_spec models exactly what rcp_e2e_wrap_framed(..., true, ...)
+     * derives/forces internally (issue #465): avtp_subtype =
+     * RCP_AVTP_SUBTYPE_NTSCF (not TEST_SUBTYPE, a TSCF value), tu =
+     * false (not TEST_TU), avtp_timestamp = 0 -- header_octet1 passes
+     * through unchanged, exactly like the framed wrapper's own contract. */
+    rcp_bytes_t   as_spec = rcp_e2e_wrap(RCP_AVTP_SUBTYPE_NTSCF, TEST_OCTET1, false, TEST_SID, 0u,
+                                          frame.data, frame.len);
+    rcp_bytes_t   as_told = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, frame.data, frame.len);
     /* Framing-aware wrapper: is_ntscf_framed=true forces the zero
      * contribution even though a nonzero avtp_timestamp was passed in. */
-    rcp_bytes_t   framed  = rcp_e2e_wrap_framed(TEST_SID, true, TEST_TS,
+    rcp_bytes_t   framed  = rcp_e2e_wrap_framed(TEST_SID, true, TEST_OCTET1, TEST_TU, TEST_TS,
                                                  frame.data, frame.len);
     rcp_bytes_t   body    = {0};
 
@@ -356,17 +386,19 @@ static void test_ntscf_framed_wrapper_forces_zero_timestamp(void)
      * verifies against the zeroed contribution and matches the wrapper's
      * own output, regardless of the nonzero avtp_timestamp passed in. */
     TEST_ASSERT_EQUAL_INT(RCP_E2E_OK,
-                          rcp_e2e_unwrap_framed(TEST_SID, true, TEST_TS,
+                          rcp_e2e_unwrap_framed(TEST_SID, true, TEST_OCTET1, TEST_TU, TEST_TS,
                                                  framed.data, framed.len, &body));
     rcp_bytes_free(&body);
 
     /* The raw primitive's own mismatch-surfaces-late behavior is unchanged
      * (still documented, not a regression this fix touches). */
     TEST_ASSERT_EQUAL_INT(RCP_E2E_ERR_CRC_MISMATCH,
-                          rcp_e2e_unwrap(TEST_SID, 0u, as_told.data, as_told.len, &body));
+                          rcp_e2e_unwrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, 0u,
+                                         as_told.data, as_told.len, &body));
     rcp_bytes_free(&body);
     TEST_ASSERT_EQUAL_INT(RCP_E2E_OK,
-                          rcp_e2e_unwrap(TEST_SID, 0u, as_spec.data, as_spec.len, &body));
+                          rcp_e2e_unwrap(RCP_AVTP_SUBTYPE_NTSCF, TEST_OCTET1, false, TEST_SID, 0u,
+                                         as_spec.data, as_spec.len, &body));
 
     rcp_bytes_free(&body);
     rcp_bytes_free(&framed);
@@ -396,22 +428,22 @@ static void test_acf_msg_length_adaptation_and_reversal(void)
     TEST_ASSERT_EQUAL_UINT(12u, frame.len);
     TEST_ASSERT_EQUAL_UINT16(3u, len_field(frame.data));
 
-    wrapped = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    wrapped = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, frame.data, frame.len);
     TEST_ASSERT_NOT_NULL(wrapped.data);
     TEST_ASSERT_EQUAL_UINT16(4u, len_field(wrapped.data));
     TEST_ASSERT_EQUAL_UINT16(3u, len_field(frame.data)); /* caller's copy untouched */
 
     /* unwrap() reverses it exactly: byte-identical to what wrap() got. */
     TEST_ASSERT_EQUAL_INT(RCP_E2E_OK,
-                          rcp_e2e_unwrap(TEST_SID, TEST_TS, wrapped.data, wrapped.len, &body));
+                          rcp_e2e_unwrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, wrapped.data, wrapped.len, &body));
     TEST_ASSERT_EQUAL_UINT(frame.len, body.len);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(frame.data, body.data, frame.len);
 
     /* Fail safe: too short to hold the field, and adaptation overflow. */
-    too_short = rcp_e2e_wrap(TEST_SID, TEST_TS, &one_octet, 1u);
+    too_short = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, &one_octet, 1u);
     TEST_ASSERT_NULL(too_short.data);
     TEST_ASSERT_EQUAL_UINT(0u, too_short.len);
-    overflowed = rcp_e2e_wrap(TEST_SID, TEST_TS, maxed, sizeof(maxed));
+    overflowed = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, maxed, sizeof(maxed));
     TEST_ASSERT_NULL(overflowed.data);
     TEST_ASSERT_EQUAL_UINT(0u, overflowed.len);
 
@@ -437,8 +469,8 @@ static void test_each_member_of_a_multi_acf_frame_carries_its_own_crc(void)
     const uint8_t b[4] = {0xB1, 0xB2, 0xB3, 0xB4};
     rcp_bytes_t   m1   = make_abb(0, 0, 0, a, sizeof(a));
     rcp_bytes_t   m2   = make_abb(0, 0, 0, b, sizeof(b));
-    rcp_bytes_t   w1   = rcp_e2e_wrap(TEST_SID, TEST_TS, m1.data, m1.len);
-    rcp_bytes_t   w2   = rcp_e2e_wrap(TEST_SID, TEST_TS, m2.data, m2.len);
+    rcp_bytes_t   w1   = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, m1.data, m1.len);
+    rcp_bytes_t   w2   = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, m2.data, m2.len);
     rcp_bytes_t   body = {0};
     uint8_t       joined[32];
     size_t        offs[4];
@@ -455,16 +487,16 @@ static void test_each_member_of_a_multi_acf_frame_carries_its_own_crc(void)
     /* Each member verifies against its own trailer, not one CRC across
      * the whole payload. */
     TEST_ASSERT_EQUAL_INT(RCP_E2E_OK,
-                          rcp_e2e_unwrap(TEST_SID, TEST_TS, joined, 16u, &body));
+                          rcp_e2e_unwrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, joined, 16u, &body));
     rcp_bytes_free(&body);
 
     /* Corrupt only the second member's trailer. */
     joined[31] ^= 0xFFu;
     TEST_ASSERT_EQUAL_INT(RCP_E2E_OK,
-                          rcp_e2e_unwrap(TEST_SID, TEST_TS, joined, 16u, &body));
+                          rcp_e2e_unwrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, joined, 16u, &body));
     rcp_bytes_free(&body);
     TEST_ASSERT_EQUAL_INT(RCP_E2E_ERR_CRC_MISMATCH,
-                          rcp_e2e_unwrap(TEST_SID, TEST_TS, joined + 16u, 16u, &body));
+                          rcp_e2e_unwrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, joined + 16u, 16u, &body));
     /* The frame walker itself, being e2e-blind, still reports two
      * syntactic members regardless -- that's rcp_sched_split_frame_members()'s
      * own, unrelated contract (member boundaries, not trailer validity). */
@@ -488,8 +520,8 @@ static void test_dispatch_frame_e2e_verifies_each_member_independently(void)
     const uint8_t                   b[4] = {0xB1, 0xB2, 0xB3, 0xB4};
     rcp_bytes_t                     m1   = make_abb(0, 0, 0, a, sizeof(a));
     rcp_bytes_t                     m2   = make_abb(0, 0, 0, b, sizeof(b));
-    rcp_bytes_t                     w1   = rcp_e2e_wrap(TEST_SID, TEST_TS, m1.data, m1.len);
-    rcp_bytes_t                     w2   = rcp_e2e_wrap(TEST_SID, TEST_TS, m2.data, m2.len);
+    rcp_bytes_t                     w1   = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, m1.data, m1.len);
+    rcp_bytes_t                     w2   = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, m2.data, m2.len);
     uint8_t                         joined[32];
     rcp_mock_frame_member_result_t  results[4];
     size_t                          dispatched;
@@ -541,7 +573,7 @@ static void test_avtpdu_data_length_grows_four_octets_per_protected_member(void)
 {
     const uint8_t             p[4] = {0xC1, 0xC2, 0xC3, 0xC4};
     rcp_bytes_t               m    = make_abb(0, 0, 0, p, sizeof(p));
-    rcp_bytes_t               w    = rcp_e2e_wrap(TEST_SID, TEST_TS, m.data, m.len);
+    rcp_bytes_t               w    = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, m.data, m.len);
     uint8_t                   plain_payload[24];
     uint8_t                   safe_payload[32];
     rcp_avtp_ntscf_header_t   hdr;
@@ -625,28 +657,28 @@ static void test_fragmented_crc_covers_only_the_last_fragment(void)
     uint32_t      conforming;
 
     TEST_ASSERT_TRUE(rcp_e2e_fragment_carries_crc(true));
-    w2 = rcp_e2e_wrap(TEST_SID, TEST_TS, f2.data, f2.len);
+    w2 = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, f2.data, f2.len);
     TEST_ASSERT_NOT_NULL(w2.data);
 
     /* What rcp_e2e_wrap()-based dispatch actually computes: the final
      * fragment's bytes alone. */
-    TEST_ASSERT_EQUAL_HEX32(rcp_e2e_compute_crc(TEST_SID, TEST_TS, w2.data, f2.len),
+    TEST_ASSERT_EQUAL_HEX32(rcp_e2e_compute_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, w2.data, f2.len),
                             be32(w2.data + f2.len));
 
     memcpy(payload, p0, 4);
     memcpy(payload + 4, p1, 4);
     memcpy(payload + 8, p2, 4);
-    conforming = rcp_e2e_compute_fragmented_crc(TEST_SID, TEST_TS, f0.data, 8u,
+    conforming = rcp_e2e_compute_fragmented_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, f0.data, 8u,
                                                  payload, sizeof(payload));
     TEST_ASSERT_TRUE(conforming != be32(w2.data + f2.len));
 
     /* Segment 0 is unprotected: its corruption moves the conforming CRC
      * but leaves this implementation's verification happy. */
     payload[0] ^= 0xFFu;
-    TEST_ASSERT_TRUE(rcp_e2e_compute_fragmented_crc(TEST_SID, TEST_TS, f0.data, 8u,
+    TEST_ASSERT_TRUE(rcp_e2e_compute_fragmented_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, f0.data, 8u,
                                                      payload, sizeof(payload)) != conforming);
     TEST_ASSERT_EQUAL_INT(RCP_E2E_OK,
-                          rcp_e2e_unwrap(TEST_SID, TEST_TS, w2.data, w2.len, &body));
+                          rcp_e2e_unwrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, w2.data, w2.len, &body));
 
     rcp_bytes_free(&body);
     rcp_bytes_free(&w2);
@@ -670,9 +702,9 @@ static void test_compute_fragmented_crc_matches_manual_concatenation(void)
     memcpy(concat, hdr, sizeof(hdr));
     memcpy(concat + sizeof(hdr), payload, sizeof(payload));
 
-    via_helper = rcp_e2e_compute_fragmented_crc(TEST_SID, TEST_TS, hdr, sizeof(hdr),
+    via_helper = rcp_e2e_compute_fragmented_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, hdr, sizeof(hdr),
                                                  payload, sizeof(payload));
-    via_manual_concat = rcp_e2e_compute_crc(TEST_SID, TEST_TS, concat, sizeof(concat));
+    via_manual_concat = rcp_e2e_compute_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, concat, sizeof(concat));
     TEST_ASSERT_EQUAL_HEX32(via_manual_concat, via_helper);
 
     /* Sensitive to the header region... */
@@ -680,7 +712,7 @@ static void test_compute_fragmented_crc_matches_manual_concatenation(void)
         uint8_t bad_hdr[8];
         memcpy(bad_hdr, hdr, sizeof(hdr));
         bad_hdr[0] ^= 0xFFu;
-        TEST_ASSERT_TRUE(rcp_e2e_compute_fragmented_crc(TEST_SID, TEST_TS, bad_hdr, sizeof(bad_hdr),
+        TEST_ASSERT_TRUE(rcp_e2e_compute_fragmented_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, bad_hdr, sizeof(bad_hdr),
                                                          payload, sizeof(payload)) != via_helper);
     }
     /* ...and to the payload region, anywhere in it (not just the tail). */
@@ -688,7 +720,7 @@ static void test_compute_fragmented_crc_matches_manual_concatenation(void)
         uint8_t bad_payload[8];
         memcpy(bad_payload, payload, sizeof(payload));
         bad_payload[0] ^= 0xFFu; /* segment 0's own octet, not segment 1's */
-        TEST_ASSERT_TRUE(rcp_e2e_compute_fragmented_crc(TEST_SID, TEST_TS, hdr, sizeof(hdr),
+        TEST_ASSERT_TRUE(rcp_e2e_compute_fragmented_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, hdr, sizeof(hdr),
                                                          bad_payload, sizeof(bad_payload)) != via_helper);
     }
 }
@@ -727,7 +759,7 @@ static void test_ms_bit_to_carries_crc_binding_is_not_enforced(void)
 
     /* Unenforced: wrap() protects the ms=1 fragment anyway, leaving its ms
      * bit (octet 6, bit 4) set alongside a trailer sec. 13.6 forbids. */
-    wmid = rcp_e2e_wrap(TEST_SID, TEST_TS, mid.data, mid.len);
+    wmid = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, mid.data, mid.len);
     TEST_ASSERT_NOT_NULL(wmid.data);
     TEST_ASSERT_EQUAL_UINT(mid.len + RCP_E2E_CRC_LEN, wmid.len);
     TEST_ASSERT_EQUAL_HEX8(0x10u, wmid.data[6] & 0x10u);
@@ -755,14 +787,14 @@ static void test_crc_mismatch_skips_execution_without_error_response(void)
 {
     const uint8_t               pl[4] = {0x9A, 0x9B, 0x9C, 0x9D};
     rcp_bytes_t                 frame = make_abb(0, 0, 0, pl, sizeof(pl));
-    rcp_bytes_t                 w     = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_bytes_t                 w     = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, frame.data, frame.len);
     rcp_bytes_t                 body  = {0};
     rcp_e2e_errc_t              rc;
 
     TEST_ASSERT_NOT_NULL(w.data);
     w.data[w.len - 1u] ^= 0xFFu; /* corrupt the trailer's last octet */
 
-    rc = rcp_e2e_unwrap(TEST_SID, TEST_TS, w.data, w.len, &body);
+    rc = rcp_e2e_unwrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, w.data, w.len, &body);
     TEST_ASSERT_EQUAL_INT(RCP_E2E_ERR_CRC_MISMATCH, rc); /* execution skipped */
     TEST_ASSERT_EQUAL_INT(12, (int)RCP_ERROR_POCI_FAILURE);
     TEST_ASSERT_EQUAL_INT(RCP_ERROR_POCI_FAILURE, rcp_e2e_wire_error(rc));
@@ -780,7 +812,7 @@ static void test_dispatch_e2e_crc_mismatch_yields_real_error_response(void)
     rcp_mock_server_t          *srv  = rcp_mock_server_new();
     const uint8_t                pl[4] = {0x9A, 0x9B, 0x9C, 0x9D};
     rcp_bytes_t                  frame = make_abb(0, 0, 0, pl, sizeof(pl));
-    rcp_bytes_t                  w     = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_bytes_t                  w     = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, frame.data, frame.len);
     rcp_bytes_t                  resp  = {0};
     rcp_acf_byte_message_info_t  hdr;
     const uint8_t               *out_pl  = NULL;
@@ -837,7 +869,7 @@ static void test_crc_error_on_one_endpoint_broadcasts_safe_state_to_stream_sibli
     rcp_mock_server_t              *srv     = rcp_mock_server_new();
     const uint8_t                    pl[4]   = {0x9A, 0x9B, 0x9C, 0x9D};
     rcp_bytes_t                      frame   = make_abb(0, 0, 0, pl, sizeof(pl));
-    rcp_bytes_t                      w       = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_bytes_t                      w       = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, frame.data, frame.len);
     rcp_bytes_t                      resp    = {0};
     rcp_bytes_t                      timed;
     rcp_regmap_ep_id_map_entry_t     ep_map[2] = {
@@ -907,7 +939,7 @@ static void test_crc_error_does_not_broadcast_without_an_ep_id_map(void)
     rcp_mock_server_t              *srv     = rcp_mock_server_new();
     const uint8_t                    pl[4]   = {0x9A, 0x9B, 0x9C, 0x9D};
     rcp_bytes_t                      frame   = make_abb(0, 0, 0, pl, sizeof(pl));
-    rcp_bytes_t                      w       = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_bytes_t                      w       = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, frame.data, frame.len);
     rcp_bytes_t                      resp    = {0};
     rcp_bytes_t                      timed;
     rcp_regmap_request_stream_cfg_t  stream_cfg[1];
@@ -1232,7 +1264,7 @@ static void test_dispatch_frame_e2e_rejects_replayed_sequence_num(void)
     rcp_mock_server_t             *srv   = rcp_mock_server_new();
     const uint8_t                   pl[4] = {1, 2, 3, 4};
     rcp_bytes_t                     frame = make_abb(0, 0, 0, pl, sizeof(pl));
-    rcp_bytes_t                     w     = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_bytes_t                     w     = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, frame.data, frame.len);
     rcp_mock_frame_member_result_t  results[4];
     size_t                           n;
 
@@ -1309,7 +1341,7 @@ static void test_dispatch_e2e_kicks_the_watchdog_on_every_admitted_request(void)
     for (i = 0; i < 10; i++) {
         rcp_bytes_t resp = {0};
 
-        wrapped = rcp_e2e_wrap_framed(TEST_SID, false, TEST_TS, plain.data, plain.len);
+        wrapped = rcp_e2e_wrap_framed(TEST_SID, false, TEST_OCTET1, TEST_TU, TEST_TS, plain.data, plain.len);
         TEST_ASSERT_NOT_NULL(wrapped.data);
 
         wdg_busy_wait_ms(10u);
@@ -1351,7 +1383,7 @@ static void test_dispatch_e2e_kicks_the_watchdog_even_when_the_request_is_reject
     rcp_watchdog_keeper_t     *k;
     const uint8_t               pl[4] = {0x9A, 0x9B, 0x9C, 0x9D};
     rcp_bytes_t                 frame = make_abb(0, 0, 0, pl, sizeof(pl));
-    rcp_bytes_t                 w     = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_bytes_t                 w     = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, frame.data, frame.len);
     rcp_bytes_t                 resp  = {0};
 
     TEST_ASSERT_NOT_NULL(w.data);
@@ -1427,13 +1459,13 @@ static void test_dispatch_e2e_crc_error_with_rx_enforce_e2e_blocks_the_whole_str
     rcp_e2e_stream_fault_tracker_t tracker;
     const uint8_t                pl[4] = {0x9A, 0x9B, 0x9C, 0x9D};
     rcp_bytes_t                  frame = make_abb(0, 0, 0, pl, sizeof(pl));
-    rcp_bytes_t                  w     = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_bytes_t                  w     = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, frame.data, frame.len);
     rcp_bytes_t                  resp1 = {0};
     rcp_bytes_t                  resp2 = {0};
     const uint8_t                good_pl[4] = {0x01, 0x02, 0x03, 0x04};
     rcp_bytes_t                  good_frame = make_abb(0, 0, 1, good_pl, sizeof(good_pl));
     rcp_bytes_t                  good_wrapped =
-        rcp_e2e_wrap_framed(TEST_SID, false, TEST_TS, good_frame.data, good_frame.len);
+        rcp_e2e_wrap_framed(TEST_SID, false, TEST_OCTET1, TEST_TU, TEST_TS, good_frame.data, good_frame.len);
     rcp_acf_byte_message_info_t  hdr;
     const uint8_t                *out_pl  = NULL;
     size_t                        out_len = 0;
@@ -1502,13 +1534,13 @@ static void test_dispatch_e2e_crc_error_without_rx_enforce_e2e_does_not_block_th
     rcp_e2e_stream_fault_tracker_t tracker;
     const uint8_t                pl[4] = {0x9A, 0x9B, 0x9C, 0x9D};
     rcp_bytes_t                  frame = make_abb(0, 0, 0, pl, sizeof(pl));
-    rcp_bytes_t                  w     = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_bytes_t                  w     = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, frame.data, frame.len);
     rcp_bytes_t                  resp1 = {0};
     rcp_bytes_t                  resp2 = {0};
     const uint8_t                good_pl[4] = {0x01, 0x02, 0x03, 0x04};
     rcp_bytes_t                  good_frame = make_abb(0, 0, 1, good_pl, sizeof(good_pl));
     rcp_bytes_t                  good_wrapped =
-        rcp_e2e_wrap_framed(TEST_SID, false, TEST_TS, good_frame.data, good_frame.len);
+        rcp_e2e_wrap_framed(TEST_SID, false, TEST_OCTET1, TEST_TU, TEST_TS, good_frame.data, good_frame.len);
 
     TEST_ASSERT_NOT_NULL(w.data);
     w.data[w.len - 1u] ^= 0xFFu;
@@ -1588,7 +1620,7 @@ static void test_dispatch_e2e_crc_error_latches_stream_status(void)
     rcp_mock_server_t              *srv   = rcp_mock_server_new();
     const uint8_t                    pl[4] = {0x9A, 0x9B, 0x9C, 0x9D};
     rcp_bytes_t                      frame = make_abb(0, 0, 0, pl, sizeof(pl));
-    rcp_bytes_t                      w     = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    rcp_bytes_t                      w     = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, frame.data, frame.len);
     rcp_bytes_t                      resp  = {0};
     rcp_regmap_request_stream_cfg_t  stream_cfg[1];
 
@@ -1728,7 +1760,7 @@ static void test_dispatch_e2e_fragment_single_fragment_matches_dispatch_e2e(void
     rcp_bytes_t          resp = {0};
 
     set_up_frag_stream(srv, counting_handler);
-    wrapped = rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_TS, plain.data, plain.len);
+    wrapped = rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_OCTET1, TEST_TU, TEST_TS, plain.data, plain.len);
     TEST_ASSERT_NOT_NULL(wrapped.data);
 
     g_handler_called = false;
@@ -1773,13 +1805,13 @@ static void test_dispatch_e2e_fragment_three_fragment_round_trip_succeeds(void)
      * length-adapted final fragment with a trailer SLOT -- its own
      * trailer VALUE is the wrong (single-frame) formula and is
      * overwritten below with the real fragmented CRC. */
-    final_wire = rcp_e2e_wrap(TEST_SID, TEST_TS, f2.data, f2.len);
+    final_wire = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, f2.data, f2.len);
     TEST_ASSERT_NOT_NULL(final_wire.data);
 
     memcpy(concatenated, p0, 4);
     memcpy(concatenated + 4, p1, 4);
     memcpy(concatenated + 8, p2, 4);
-    want = rcp_e2e_compute_fragmented_crc(TEST_SID, TEST_TS, f0.data, 8u, concatenated,
+    want = rcp_e2e_compute_fragmented_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, f0.data, 8u, concatenated,
                                            sizeof(concatenated));
     final_wire.data[final_wire.len - 4u] = (uint8_t)(want >> 24);
     final_wire.data[final_wire.len - 3u] = (uint8_t)(want >> 16);
@@ -1859,12 +1891,12 @@ static void test_dispatch_e2e_fragment_final_fragment_non_aligned_payload_ok(voi
      * at the correct pad-aware offset -- only its VALUE (wrap()'s own
      * wrong, single-frame formula) needs overwriting below with the real
      * fragmented CRC. */
-    final_wire = rcp_e2e_wrap(TEST_SID, TEST_TS, f1.data, f1.len);
+    final_wire = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, f1.data, f1.len);
     TEST_ASSERT_NOT_NULL(final_wire.data);
 
     memcpy(concatenated, p0, 4);
     memcpy(concatenated + 4, p1, 3);
-    want = rcp_e2e_compute_fragmented_crc(TEST_SID, TEST_TS, f0.data, 8u, concatenated,
+    want = rcp_e2e_compute_fragmented_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, f0.data, 8u, concatenated,
                                            sizeof(concatenated));
 
     pad_octets = rcp_acf_pad_len(sizeof(p1));
@@ -1921,7 +1953,7 @@ static void test_dispatch_e2e_fragment_crc_mismatch_is_rejected_and_latches(void
     /* wrap()'s own trailer is the SINGLE-fragment formula over f1 alone
      * -- already wrong for this 2-fragment message, with no overwrite
      * needed to force a mismatch. */
-    final_wire = rcp_e2e_wrap(TEST_SID, TEST_TS, f1.data, f1.len);
+    final_wire = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, f1.data, f1.len);
     TEST_ASSERT_NOT_NULL(final_wire.data);
 
     g_handler_called = false;
@@ -1977,12 +2009,20 @@ static void test_dispatch_e2e_fragment_ntscf_forces_zero_timestamp_in_crc(void)
 
     set_up_frag_stream(srv, counting_handler);
 
-    final_wire = rcp_e2e_wrap(TEST_SID, TEST_TS, f1.data, f1.len); /* trailer slot only, see above */
+    final_wire = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, f1.data, f1.len); /* trailer slot only, see above */
     TEST_ASSERT_NOT_NULL(final_wire.data);
 
     memcpy(concatenated, p0, 4);
     memcpy(concatenated + 4, p1, 4);
-    want = rcp_e2e_compute_fragmented_crc(TEST_SID, 0u /* forced, NTSCF has no timestamp field */,
+    /* issue #465: mock.c's own dispatch_e2e_fragment() passes the REAL
+     * avtp_subtype it was given (RCP_AVTP_SUBTYPE_NTSCF here, matching
+     * the dispatch calls below), but has no per-message header_octet1/tu
+     * bits available -- it feeds its own documented placeholder
+     * (0x00/false, mirrored literally here; see src/mock.c's
+     * RCP_MOCK_E2E_HEADER_OCTET1_PLACEHOLDER/_TU_PLACEHOLDER) for both,
+     * uniformly regardless of framing. */
+    want = rcp_e2e_compute_fragmented_crc(RCP_AVTP_SUBTYPE_NTSCF, 0x00u, false, TEST_SID,
+                                           0u /* forced, NTSCF has no timestamp field */,
                                            f0.data, 8u, concatenated, sizeof(concatenated));
     final_wire.data[final_wire.len - 4u] = (uint8_t)(want >> 24);
     final_wire.data[final_wire.len - 3u] = (uint8_t)(want >> 16);
@@ -2041,7 +2081,7 @@ static void test_dispatch_e2e_fragment_out_of_order_segment_is_rejected_and_rese
     /* A fresh, correctly-ordered single-fragment message now succeeds --
      * proving the reassembler was reset, not left collecting the
      * abandoned sequence. */
-    wrapped = rcp_e2e_wrap_framed(TEST_SID, false, TEST_TS, plain.data, plain.len);
+    wrapped = rcp_e2e_wrap_framed(TEST_SID, false, TEST_OCTET1, TEST_TU, TEST_TS, plain.data, plain.len);
     TEST_ASSERT_NOT_NULL(wrapped.data);
     g_handler_called = false;
     TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
@@ -2107,7 +2147,7 @@ static void test_dispatch_e2e_fragment_unresolvable_stream_falls_back_to_dispatc
     TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
     /* Deliberately no rcp_mock_server_set_request_stream_cfg() call. */
 
-    wrapped = rcp_e2e_wrap_framed(TEST_SID, false, TEST_TS, plain.data, plain.len);
+    wrapped = rcp_e2e_wrap_framed(TEST_SID, false, TEST_OCTET1, TEST_TU, TEST_TS, plain.data, plain.len);
     TEST_ASSERT_NOT_NULL(wrapped.data);
 
     g_handler_called = false;
@@ -2172,7 +2212,7 @@ static void test_dispatch_e2e_tscf_safe_mode_with_tv_true_postpones_a_standard_r
     const uint8_t        pl[4] = {0x01, 0x02, 0x03, 0x04};
     rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
     rcp_bytes_t          wrapped =
-        rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_TS, plain.data, plain.len);
+        rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_OCTET1, TEST_TU, TEST_TS, plain.data, plain.len);
 
     to_rcp_configured(srv);
     rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
@@ -2209,7 +2249,7 @@ static void test_dispatch_e2e_fragment_tscf_with_tv_true_postpones_a_standard_re
     rcp_bytes_t          resp = {0};
 
     set_up_frag_stream(srv, counting_handler);
-    wrapped = rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_TS, plain.data, plain.len);
+    wrapped = rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_OCTET1, TEST_TU, TEST_TS, plain.data, plain.len);
     TEST_ASSERT_NOT_NULL(wrapped.data);
 
     g_handler_called = false;
@@ -2238,7 +2278,7 @@ static void test_dispatch_frame_e2e_tscf_with_tv_true_postpones_a_standard_reque
     rcp_mock_server_t             *srv = rcp_mock_server_new();
     const uint8_t                   a[4] = {0xA1, 0xA2, 0xA3, 0xA4};
     rcp_bytes_t                     m1   = make_abb(0, 0, 0, a, sizeof(a));
-    rcp_bytes_t                     w1   = rcp_e2e_wrap(TEST_SID, TEST_TS, m1.data, m1.len);
+    rcp_bytes_t                     w1   = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, m1.data, m1.len);
     rcp_mock_frame_member_result_t  results[4];
     size_t                          dispatched;
 
@@ -2308,7 +2348,7 @@ static void test_dispatch_e2e_fragment_still_ignores_presentation_time_after_462
     rcp_bytes_t          resp = {0};
 
     set_up_frag_stream(srv, counting_handler);
-    wrapped = rcp_e2e_wrap_framed(TEST_SID, false, TEST_TS, plain.data, plain.len);
+    wrapped = rcp_e2e_wrap_framed(TEST_SID, false, TEST_OCTET1, TEST_TU, TEST_TS, plain.data, plain.len);
     TEST_ASSERT_NOT_NULL(wrapped.data);
 
     g_handler_called = false;
@@ -2332,7 +2372,7 @@ static void test_dispatch_frame_e2e_still_ignores_presentation_time_after_462(vo
     rcp_mock_server_t             *srv = rcp_mock_server_new();
     const uint8_t                   a[4] = {0xA1, 0xA2, 0xA3, 0xA4};
     rcp_bytes_t                     m1   = make_abb(0, 0, 0, a, sizeof(a));
-    rcp_bytes_t                     w1   = rcp_e2e_wrap(TEST_SID, TEST_TS, m1.data, m1.len);
+    rcp_bytes_t                     w1   = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, m1.data, m1.len);
     rcp_mock_frame_member_result_t  results[4];
     size_t                          dispatched;
 
@@ -2403,7 +2443,7 @@ static void test_crc_omits_pad_octets_wire_order_header_payload_crc_then_pad(voi
     TEST_ASSERT_EQUAL_UINT8(0u, frame.data[14]);
     TEST_ASSERT_EQUAL_UINT8(0u, frame.data[15]);
 
-    wrapped = rcp_e2e_wrap(TEST_SID, TEST_TS, frame.data, frame.len);
+    wrapped = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, frame.data, frame.len);
     TEST_ASSERT_NOT_NULL(wrapped.data);
     TEST_ASSERT_EQUAL_UINT(frame.len + RCP_E2E_CRC_LEN, wrapped.len); /* 20 */
 
@@ -2420,7 +2460,7 @@ static void test_crc_omits_pad_octets_wire_order_header_payload_crc_then_pad(voi
      * bytes of frame.data (which would include the 2 pad octets). */
     memcpy(adapted_prefix, frame.data, sizeof(adapted_prefix));
     adapted_prefix[1] = (uint8_t)(adapted_prefix[1] + 1u); /* +1 quadlet: 4 -> 5, no MSB carry here */
-    expected_crc = rcp_e2e_compute_crc(TEST_SID, TEST_TS, adapted_prefix, sizeof(adapted_prefix));
+    expected_crc = rcp_e2e_compute_crc(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, adapted_prefix, sizeof(adapted_prefix));
     TEST_ASSERT_EQUAL_HEX32(expected_crc, be32(wrapped.data + 14));
 
     /* Perturbing only the pad octets' VALUES (not their count, still 2
@@ -2434,7 +2474,7 @@ static void test_crc_omits_pad_octets_wire_order_header_payload_crc_then_pad(voi
     memcpy(perturbed, frame.data, sizeof(perturbed));
     perturbed[14] = 0xAAu;
     perturbed[15] = 0xBBu;
-    wrapped_perturbed_pad = rcp_e2e_wrap(TEST_SID, TEST_TS, perturbed, sizeof(perturbed));
+    wrapped_perturbed_pad = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, perturbed, sizeof(perturbed));
     TEST_ASSERT_NOT_NULL(wrapped_perturbed_pad.data);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(wrapped.data + 14, wrapped_perturbed_pad.data + 14,
                                    RCP_E2E_CRC_LEN);
@@ -2447,7 +2487,7 @@ static void test_crc_omits_pad_octets_wire_order_header_payload_crc_then_pad(voi
      * produced frame (header+payload+pad, un-adapted acf_msg_length) even
      * though the CRC32 trailer sat between the real payload and the pad
      * octets on the wire, not after them. */
-    rc = rcp_e2e_unwrap(TEST_SID, TEST_TS, wrapped.data, wrapped.len, &body);
+    rc = rcp_e2e_unwrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, wrapped.data, wrapped.len, &body);
     TEST_ASSERT_EQUAL_INT(RCP_E2E_OK, rc);
     TEST_ASSERT_EQUAL_UINT(frame.len, body.len);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(frame.data, body.data, body.len);
@@ -2455,7 +2495,7 @@ static void test_crc_omits_pad_octets_wire_order_header_payload_crc_then_pad(voi
     /* Unaffected by this fix: 6 octets is not a whole quadlet -- not
      * acf.c's own quadlet-aligned output shape -- so wrap() still fails
      * safe instead of appending a trailer to it. */
-    mis = rcp_e2e_wrap(TEST_SID, TEST_TS, misaligned, sizeof(misaligned));
+    mis = rcp_e2e_wrap(TEST_SUBTYPE, TEST_OCTET1, TEST_TU, TEST_SID, TEST_TS, misaligned, sizeof(misaligned));
     TEST_ASSERT_NULL(mis.data);
     TEST_ASSERT_EQUAL_UINT(0u, mis.len);
 
