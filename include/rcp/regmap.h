@@ -509,7 +509,7 @@ typedef struct {
                                          plumbing, implement once" home
                                          for the W+ lockable-access-type
                                          primitive this register drives
-                                         -- Table 23's EP_ID_config rows
+                                         -- Table 25's EP_ID_config rows
                                          and Table 27's STREAM_UID/
                                          flush_on_count/Flush_time
                                          registers are ALSO R/W+ and need
@@ -1639,8 +1639,11 @@ void rcp_regmap_ep_functional_cfg_init(rcp_regmap_ep_functional_cfg_t *cfg);
 #define RCP_REGMAP_PIN_PROP_PULL_DOWN  ((uint8_t)1u << 4)
 #define RCP_REGMAP_PIN_PROP_ACTIVE_LOW ((uint8_t)1u << 5)
 
-/* TC18 §12.7.6 Table 21's own hw_pin_type bit layout (REQ-RMAP-042),
- * primary-source verified directly against the TC18 v0.5.1_RC PDF:
+/* TC18 §12.7.6 Table 22's own hw_pin_type bit layout (REQ-RMAP-042;
+ * Table 21 is the separate HW_config field-list table that merely
+ * *names* hw_pin_type as a register -- the bit layout below is Table
+ * 22's own, distinct "IO-pin properties" table), primary-source
+ * verified directly against the TC18 v0.5.1_RC PDF:
  * four packed sub-fields, not the six independent one-hot flags
  * RCP_REGMAP_PIN_PROP_* above uses for its own, different, register.
  * Pull (bits 1:0): float(00b)/pull-down(01b)/pull-up(10b) -- 11b is
@@ -2571,7 +2574,7 @@ struct rcp_regmap_ep_id_map_entry {
     uint16_t          ep_id;
     rcp_byte_bus_id_t byte_bus_id;
     uint8_t           request_stream_index; /* REQ-RMAP-052 (TC18
-                                §12.7.8 Table 23, row offset 0x0000, 8
+                                §12.7.8 Table 25, row offset 0x0000, 8
                                 bit, R/W+): which request stream this
                                 row's mapping applies to -- the same
                                 byte_bus_id may legally be mapped to
@@ -2837,7 +2840,7 @@ bool rcp_regmap_ep_id_map_shared_bus_homogeneous(const rcp_regmap_ep_id_map_entr
                                                   size_t count);
 
 /* REQ-WAKEUP-020: TC18 §13.7.2.1 fixes the WakeUp endpoint's own EP_Nr
- * (this table's own ep_id field, TC18 §12.7.8 Table 23) to 1 -- "The
+ * (this table's own ep_id field, TC18 §12.7.8 Table 25) to 1 -- "The
  * WakeUp endpoint is a special endpoint and as this fixed to the
  * endpoint nr 1, as it is the only endpoint which stays active in
  * Sleep mode." Same shape as REQ-RMAP-057/058 above: a caller-supplied,
@@ -2870,7 +2873,7 @@ bool rcp_regmap_ep_id_map_ep_type_has_fixed_ep_id(const rcp_regmap_ep_id_map_ent
  * dispatch() call could only ever act on itself, never broadcast a
  * stream-wide safe-state escalation to its siblings on the same request
  * stream. That claim was true of this codebase's DISPATCH layer (mock.c),
- * but not of its underlying CONTENT model: TC18 §12.7.8 Table 23
+ * but not of its underlying CONTENT model: TC18 §12.7.8 Table 25
  * (EP_ID_config, rcp_regmap_ep_id_map_entry_t above) already *is* the
  * wire-defined "which endpoints are bound to which request stream" table
  * -- REQ-RMAP-052 already gave it a full render/parse codec -- it simply
@@ -2929,7 +2932,7 @@ size_t rcp_regmap_ep_id_map_byte_bus_ids_for_stream(const rcp_regmap_ep_id_map_e
  * stream per call).
  *
  * That concept already exists as CONTENT in this codebase -- TC18 §12.7.8
- * Table 23 (EP_ID_config, rcp_regmap_ep_id_map_entry_t) already *is* the
+ * Table 25 (EP_ID_config, rcp_regmap_ep_id_map_entry_t) already *is* the
  * wire-defined table of every valid (request_stream_index, byte_bus_id)
  * pair a server currently recognizes, the same table
  * rcp_regmap_ep_id_map_byte_bus_ids_for_stream() above already projects

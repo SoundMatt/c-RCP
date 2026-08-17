@@ -277,7 +277,7 @@ extern "C" {
  * endpoint and as this fixed to the endpoint nr 1, as it is the only
  * endpoint which stays active in Sleep mode") -- the fixed EP_Nr/ep_id
  * a WakeUp-type row in EP_ID_config (regmap.h's own
- * rcp_regmap_ep_id_map_entry_t::ep_id, TC18 §12.7.8 Table 23) must
+ * rcp_regmap_ep_id_map_entry_t::ep_id, TC18 §12.7.8 Table 25) must
  * carry, distinct from RCP_EP_WAKEUP_EP_TYPE above (this codebase's own
  * internal ep_type tag, a different field on a different table --
  * their numeric value both being 1 is this codebase's own coincidence,

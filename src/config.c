@@ -79,7 +79,7 @@ typedef struct {
     uint8_t     bit;
 } pin_prop_name_t;
 
-/* TC18 §12.7.6 Table 21's own hw_pin_type bit layout (regmap.h's
+/* TC18 §12.7.6 Table 22's own hw_pin_type bit layout (regmap.h's
  * RCP_REGMAP_HW_PIN_* family) -- each name's own "bit" value here is
  * already shifted to its field's own position, so or_named_bits_u8()
  * (unchanged, reused as-is) can OR them together directly: every

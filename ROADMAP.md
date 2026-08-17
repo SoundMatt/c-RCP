@@ -19106,6 +19106,73 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.395.0 -- 2026-08-16 (issue #341: exhaustive `Table 33`
+re-verification; `Table 20`/`21`/`22` `hw_pin_type` content-bug fix;
+`Table 23`->`25` EP_ID_config citation-drift cluster)
+
+Sixth pass on issue #341. Fresh census cross-checked against every
+prior pass's own convergence list before picking targets: `Table 33`
+(176), `Table 20`(157) both previously only "sample" or partially
+re-verified, never exhaustively; `Table 23`(44) carried a prior
+pass's over-broad "already fixed by issue #421" claim; `Table 28`(52)
+re-checked as a control.
+
+`Table 33` exhaustive pass confirmed the earlier spot-check largely
+held (RC5-native "EP specific usage of evt-field", §13.5, correct
+almost everywhere), but found 2 genuine "`tc18` correct, narrative
+`text` lagging" misses in `.fusa-reqs.json` (REQ-RMAP-023/024, bare
+"Table 33" for the RC-Server functional-config block, inconsistent
+with the `Table 33/36` dual notation every sibling entry already
+uses) -- corrected.
+
+`Table 20`/`21`/`22` re-verification surfaced a real content bug, not
+just stale numbering: a prior pass (#495) "fixed" `hw_pin_type`'s
+bit-layout doc comments from `Table 20` to `Table 21`, but `Table 21`
+("HW_config") is actually the field-*list* table (`hw_ep_nr`/
+`hw_ep_pin_nr`/`hw_pin_type` as an opaque octet) -- the Pull-Up/
+Output-stage/Drive-strength/Schmitt-Trigger *bit layout* those
+comments describe is the separate, following `Table 22` ("IO-pin
+properties"), confirmed via fresh page-region extraction of both
+PDFs. `regmap.h:1642`, `src/config.c:82`, and REQ-RMAP-042's own
+`title`/`text` corrected to `Table 22`, now matching REQ-RMAP-042's
+own `tc18` field, which was already correct.
+
+`Table 23`->`25` EP_ID_config cluster: issue #421 had fixed one
+function's own doc comment and its two call sites for EP_ID_config's
+real number (RC1's own `Table 23` shifts +2 to RC5 `Table 25`,
+distinct from RC5's own native `Table 23` "Enumeration of signals at
+endpoints" -- a genuine reused-digit case), but a later pass's claim
+that this made the whole cluster "already fixed" was over-broad.
+Found and fixed 8 more stale citations in `regmap.h`, `mock.h`,
+`ep_wakeup.h`, `src/regmap.c`, plus 6 more in `.fusa-reqs.json` text
+fields whose sibling `tc18` fields already correctly said `Table
+25`/`26`. RC5-native `Table 23` content (the named-signal enumeration)
+individually verified and left alone throughout, including the
+historical, deliberately-preserved `§13.2 Table 23` citations for
+TC18 0.5.1_RC4's struck-through ascending-order sentence.
+
+`Table 28` re-verified as genuinely already fully converged (no
+changes) -- SEQUENCER_config natively, `Table 28/31` dual-noted for
+ep_generic_config, confirming the prior pass's sample-check held for
+this one number specifically.
+
+Left untouched: `include/rcp/lifecycle.h:717` carries the identical
+stale `Table 23` EP_ID_config citation just fixed elsewhere --
+outside this batch's editable-file scope, flagged for the next pass
+that touches `lifecycle.h`. `server.c`/`lifecycle.c` checked and
+confirmed already correct for `Table 20`/`23`/`28`/`33` -- not
+touched either way, per this batch's own file-scope discipline.
+
+Citation-text-only -- trace coverage unchanged. Full clean rebuild +
+66/66 tests unchanged. `cfusa check`/`trace` (v0.5.54): 0 errors,
+968/1312 warnings/info, 1095/1095 traced+tested, all unchanged.
+
+**Next**: `Table 24`(91)/`Table 51`(41)/`Table 60`(27)/`Table 56`(25)
+already confirmed-resolved by earlier passes; remaining unexamined
+mid-count numbers include `Table 39`(37) and `Table 30`(37), never
+individually verified by any prior pass in this issue's own history
+-- worth a dedicated look next.
+
 ### v0.394.0 -- 2026-08-16 (issue #341 follow-up: fix stale `Table 26`
 -> `Table 29` citation in server.c)
 

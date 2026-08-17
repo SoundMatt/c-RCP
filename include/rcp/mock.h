@@ -391,7 +391,7 @@ bool rcp_mock_server_wakeup_repetition_interval_us(const rcp_mock_server_t *srv,
                                                      uint8_t request_stream_index,
                                                      uint32_t *out_interval_us);
 
-/* Replaces srv's own EP_ID_config table (TC18 §12.7.8 Table 23) wholesale
+/* Replaces srv's own EP_ID_config table (TC18 §12.7.8 Table 25) wholesale
  * with a copy of entries[0..count). Returns false (srv's own table left
  * unchanged) if count exceeds RCP_REGMAP_EP_ID_MAP_MAX_ENTRIES (regmap.h);
  * true otherwise. Issue #335 (REQ-E2E-029/030/045): this is srv's own only

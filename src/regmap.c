@@ -1660,7 +1660,7 @@ rcp_lifecycle_writer_ctx_t rcp_regmap_writer_ctx(const rcp_regmap_general_t *map
      * via_root_client_ep0 above already establishes for its own
      * svr_root_client_index check. requesting_stream_index is narrowed
      * to uint8_t here to match rcp_regmap_ep_id_map_entry_t's own
-     * request_stream_index field width (TC18 §12.7.8 Table 23: an 8-bit
+     * request_stream_index field width (TC18 §12.7.8 Table 25: an 8-bit
      * register) -- the same narrowing rcp_regmap_ep_id_map_byte_bus_ids_
      * for_stream()'s own callers already perform at this boundary. */
     ctx.via_valid_stream_association =
