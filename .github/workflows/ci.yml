@@ -238,6 +238,42 @@ jobs:
           done
           [ "$missing" -eq 0 ] || exit 1
 
+  # ── Version sources agree (c-RCP-09) ─────────────────────────────────────────
+  # CMakeLists.txt's project() VERSION, include/rcp/version.h's RCP_VERSION, and
+  # .fusa.json's "version" are three hand-maintained copies of the same value
+  # (see the header comment in version.h). Only CMakeLists.txt was reliably
+  # bumped every release; version.h and .fusa.json silently fell ~184 versions
+  # behind (issue c-RCP-09) because nothing checked them against each other.
+  # .fusa.json's "version" in particular is what `cfusa` stamps into every
+  # shipped SBOM/provenance/SPDX artifact's "module" field at release time
+  # (release.yml), so letting it drift here means every artifact generated
+  # from a stale .fusa.json is silently mislabeled, not just unbuilt.
+  version-sources-agree:
+    name: version.h / CMakeLists.txt / .fusa.json versions agree
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Compare the three version sources
+        run: |
+          cmake_version=$(grep -m1 -oE '^\s*VERSION [0-9]+\.[0-9]+\.[0-9]+' CMakeLists.txt | awk '{print $2}')
+          header_version=$(grep -m1 -oE '#define RCP_VERSION "[0-9]+\.[0-9]+\.[0-9]+"' include/rcp/version.h | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          fusa_version=$(grep -m1 -oE '"version": *"[0-9]+\.[0-9]+\.[0-9]+"' .fusa.json | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+
+          echo "CMakeLists.txt project() VERSION : ${cmake_version:-<not found>}"
+          echo "include/rcp/version.h RCP_VERSION: ${header_version:-<not found>}"
+          echo ".fusa.json \"version\"             : ${fusa_version:-<not found>}"
+
+          fail=0
+          [ -n "$cmake_version" ]  || { echo "::error file=CMakeLists.txt::Could not parse project() VERSION"; fail=1; }
+          [ -n "$header_version" ] || { echo "::error file=include/rcp/version.h::Could not parse RCP_VERSION"; fail=1; }
+          [ -n "$fusa_version" ]   || { echo "::error file=.fusa.json::Could not parse \"version\""; fail=1; }
+          [ "$fail" -eq 0 ] || exit 1
+
+          if [ "$cmake_version" != "$header_version" ] || [ "$cmake_version" != "$fusa_version" ]; then
+            echo "::error::Version sources disagree -- CMakeLists.txt=$cmake_version, version.h=$header_version, .fusa.json=$fusa_version. Bump all three together (see version.h's header comment); a mismatch here silently mislabels every SBOM/provenance/SPDX artifact release.yml generates from .fusa.json's stale value."
+            exit 1
+          fi
+
   # ── SPDX license headers (c-RCP-15) ───────────────────────────────────────────
   spdx-headers:
     name: SPDX-License-Identifier headers present

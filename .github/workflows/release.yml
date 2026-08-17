@@ -75,6 +75,40 @@ jobs:
       - name: Regenerate SBOM, provenance, and artifact manifest
         run: /tmp/cfusa/build/cfusa release
 
+      # Release-gate check (issue c-RCP-09): `cfusa release` stamps every
+      # generated artifact's declared version from .fusa.json's "version"
+      # field, not from the git tag being released or from CMakeLists.txt/
+      # version.h. If .fusa.json ever falls behind again despite the
+      # version-sources-agree check in ci.yml (e.g. a hotfix tag pushed
+      # without going through normal PR review), this catches it here too,
+      # before the mislabeled artifact is committed and shipped -- exactly
+      # the drift that left sbom.json/provenance.json/the newest .spdx.json
+      # declaring "c-RCP@0.225.0" for ~184 versions' worth of real tags.
+      - name: Verify shipped artifacts declare the version being released
+        run: |
+          header_version=$(grep -m1 -oE '#define RCP_VERSION "[0-9]+\.[0-9]+\.[0-9]+"' include/rcp/version.h | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+          if [ -z "$header_version" ]; then
+            echo "::error file=include/rcp/version.h::Could not parse RCP_VERSION"
+            exit 1
+          fi
+
+          fail=0
+          for f in sbom.json provenance.json; do
+            declared=$(grep -m1 -oE '"module": *"c-RCP@[0-9]+\.[0-9]+\.[0-9]+"' "$f" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
+            if [ "$declared" != "$header_version" ]; then
+              echo "::error file=$f::Declares module version '$declared', but include/rcp/version.h says '$header_version' -- .fusa.json's \"version\" field is likely stale; bump it to match version.h and re-run 'cfusa release'."
+              fail=1
+            fi
+          done
+
+          spdx_file="c-RCP-${header_version}.spdx.json"
+          if [ ! -f "$spdx_file" ]; then
+            echo "::error::Expected freshly generated $spdx_file (matching version.h's RCP_VERSION) but it does not exist -- .fusa.json's \"version\" field is likely stale."
+            fail=1
+          fi
+
+          [ "$fail" -eq 0 ] || exit 1
+
       # Gap/coverage reports below grade against certification targets
       # (ASIL-B / SIL-2 / DAL-B). Milestone-1 foundation code cannot reach the
       # 100% thresholds those targets demand this early in the roadmap, but

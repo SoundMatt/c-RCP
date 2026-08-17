@@ -34,6 +34,39 @@ the rationale.
 
 ## Releases
 
+### v0.413.0 -- 2026-08-17 (c-RCP-09: fix SBOM/provenance/SPDX version drift)
+
+`sbom.json`, `provenance.json`, and the newest `c-RCP-*.spdx.json` had been
+declaring `module: "c-RCP@0.225.0"` across every real tag since v0.286.0
+(five tags, ~184 source version bumps) even though each was regenerated
+fresh at every tag push. Root cause: `cfusa release` stamps a shipped
+artifact's declared version from `.fusa.json`'s `"version"` field, not
+from the git tag or from `CMakeLists.txt`'s `project()` VERSION --
+and nothing kept `.fusa.json` (or `include/rcp/version.h`, which had
+independently fallen behind the same way) in sync with the value that
+actually got bumped every release, `CMakeLists.txt`.
+
+- Bumped `include/rcp/version.h`'s `RCP_VERSION` and `.fusa.json`'s
+  `"version"` from the stale `0.225.0` to `0.413.0`, matching
+  `CMakeLists.txt`'s `project()` VERSION.
+- Regenerated `sbom.json`, `provenance.json`, and `artifact-manifest.json`
+  via the pinned `cfusa release` (v0.5.54); the freshly written
+  `c-RCP-0.413.0.spdx.json` replaces the stale, repeatedly-overwritten
+  `c-RCP-0.225.0.spdx.json` (which never corresponded to a real tagged
+  release at that version -- it was silently rewritten in place at every
+  subsequent tag while its filename never advanced).
+- Added two release-gate checks so this can't drift silently again:
+  `ci.yml`'s new `version-sources-agree` job fails any PR where
+  `CMakeLists.txt`/`version.h`/`.fusa.json` disagree, and `release.yml`
+  now verifies immediately after `cfusa release` that `sbom.json`'s and
+  `provenance.json`'s declared `module` version, and the presence of a
+  `c-RCP-<version>.spdx.json` matching `version.h`'s `RCP_VERSION`, agree
+  with the version actually being released -- before the artifacts are
+  committed. Both checks were mutation-tested against the pre-fix
+  `.fusa.json`/`sbom.json` state and confirmed to fail on it.
+- No behavior change to the library itself; `.fusa-reqs.json` untouched
+  (`cfusa trace --req-coverage 100 --sec-tested 100` still 100%/100%).
+
 ### v0.412.0 -- 2026-08-17 (c-RCP-17 Phase (a): route all raw libc allocation call sites through `alloc.h`)
 
 Closes the `alloc.h` abstraction-bypass gap identified by issue #521's
