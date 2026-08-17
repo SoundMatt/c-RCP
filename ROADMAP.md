@@ -19106,6 +19106,65 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.371.0 -- 2026-08-16 (REQ-DISC-002/007: discovery request
+unique_id=0x0000 investigated and closed -- no server-side check needed)
+
+Closes issue #457 (c-RCP-AUDIT-32). TC18 Table 18 (§12.6.1) lists
+`stream_id = streamMAC + unique_id` with `unique_id = 0x0000` as a
+"Required value in 'discovery request'". `decode_common()`/
+`rcp_discovery_decode_request()` (`src/discovery.c`) extract and pass
+through the NTSCF header's `stream_id` verbatim without checking that
+sub-field, so a request whose `unique_id` is nonzero is still accepted
+and processed as valid. Filed at low confidence -- the issue itself
+noted only `byte_bus_id` and `op` get sub-field-level enforcement in
+`decode_common()`, and asked whether that was an intentional scope
+boundary rather than a bug.
+
+Investigated directly against `OA_TC18_specification_v_0.5.1_RC_5_3624.pdf`
+(TC18.txt L2729-2758, L2790-2811, L3568-3569, L3591-3593) and concluded
+this is **not** a server-side MUST:
+
+1. Table 18's own `streamMAC: 6bytes, don't care` (the adjacent half of
+   the very same `stream_id`) already shows the table mixes fields the
+   RC Server inspects with ones it explicitly does not. Table 19 (the
+   discovery *response*) requires the identical `unique_id = 0x0000` for
+   the RC Server's *own* outgoing `stream_id` -- the same convention
+   both sides apply when constructing their own frame, not a value
+   either inspects on the other's incoming one.
+2. `byte_bus_id`/`op` -- the two fields `decode_common()` *does* check --
+   play a structurally different role: they are message-type
+   discriminators. Table 18's reserved `byte_bus_id` value and
+   `op=1b/read` ("a discovery request is a read request", TC18.txt
+   L2741) are what make an ACF_ABB frame identifiable as a discovery
+   request at all, among the rest of the ACF_ABB traffic sharing the
+   wire -- exactly the role §12.9.1 assigns `byte_bus_id` generally
+   ("the RC Server determines the endpoint that is addressed... If the
+   lookup of `byte_bus_id`... does not point to an Endpoint, the request
+   is dropped", TC18.txt L3591-3593). `stream_id`/`unique_id` carries no
+   such role: §12.8.2/§12.9.1 (TC18.txt L3568-3569, L3591) treat
+   `stream_id` as opaque addressing data the RC Server captures and,
+   for post-discovery traffic, later matches *whole* against configured
+   `stream_id`/`byte_bus_id` combinations -- never validated
+   sub-field-by-sub-field.
+3. §12.6's own prose ("An RC Server may receive a 'discovery request' in
+   any state of the life-cycle and shall send a 'discovery response' in
+   return", TC18.txt L2731-2732) is unconditional except the two
+   explicit exclusions named two sentences later ("AVTPDUs having a
+   TSCF header are dropped without further response, as well as
+   requests in ACF_GBB format", TC18.txt L2743). `unique_id` is not
+   among them, and no other passage in §12.6/§12.8/§12.9 conditions
+   discovery-request acceptance on it.
+
+No code change -- `decode_common()`'s existing `byte_bus_id`/`op` checks
+(REQ-DISC-006/007) remain the correctly-scoped set. `.fusa-reqs.json`'s
+`REQ-DISC-002` (encode-side) and `REQ-DISC-007` (decode-side) citations
+were both updated in place with this dated investigation conclusion and
+its full spec citations, matching this codebase's established pattern
+for genuinely-resolved spec-silence questions (e.g. REQ-LIFECYCLE-011's
+issue #456 correction, REQ-SPI-\*'s issue #256 Group C trigger-model
+clarifications). Full clean rebuild, full 66-test suite unchanged (no
+behavior touched, so no ASan/UBSan pass or mutation test required);
+`cfusa check`/`trace` (v0.5.54): 0 errors, 1088/1088 traced and tested.
 ### v0.370.0 -- 2026-08-16 (two stale-documentation corrections:
 REQ-LIFECYCLE-011's citation, e2e.h's regmap.h cross-reference)
 

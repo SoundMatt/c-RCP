@@ -34,6 +34,43 @@ the rationale.
 
 ## Releases
 
+### v0.371.0 -- 2026-08-16 (discovery request unique_id=0x0000 investigated and closed -- no server-side check needed)
+
+Closes issue #457 (c-RCP-AUDIT-32). TC18 Table 18 lists `unique_id =
+0x0000` as a "Required value in 'discovery request'" for the NTSCF
+`stream_id` sub-field, which `decode_common()`/`rcp_discovery_decode_request()`
+(`src/discovery.c`) never validate -- a request with a nonzero `unique_id`
+is still accepted. Investigated against the TC18 0.5.1_RC5 PDF and
+concluded this is *not* a missing server-side check:
+
+- Table 18's own `streamMAC: 6bytes, don't care` for the adjacent half
+  of the same `stream_id`, and Table 19's identical `unique_id = 0x0000`
+  requirement for the RC Server's own outgoing discovery-response
+  `stream_id` (TC18.txt L2794-2795), together show this is the wire
+  construction convention each side applies to the frame it builds, not
+  a value the receiver validates on the other's.
+- `byte_bus_id`/`op`, which *are* checked in `decode_common()`, play a
+  structurally different role: they are the message-type discriminators
+  that make an ACF_ABB frame identifiable as a discovery request at all
+  (reserved `byte_bus_id`, `op=read` per "a discovery request is a read
+  request", TC18.txt L2741) -- the same role §12.9.1 assigns `byte_bus_id`
+  generally ("If the lookup of `byte_bus_id` ... does not point to an
+  Endpoint, the request is dropped", TC18.txt L3591-3593). `stream_id`
+  carries no such role -- §12.8.2/§12.9.1 treat it as opaque addressing
+  data the RC Server captures and later matches whole, never sub-field
+  validated.
+- §12.6's own prose ("An RC Server may receive a 'discovery request' in
+  any state of the life-cycle and shall send a 'discovery response' in
+  return", TC18.txt L2731-2732) is unconditional except the two explicit
+  exclusions it names two sentences later (TSCF header, ACF_GBB format,
+  TC18.txt L2743); `unique_id` is not among them.
+
+No code change. `.fusa-reqs.json`'s `REQ-DISC-002`/`REQ-DISC-007`
+citations were updated with the dated investigation conclusion and full
+spec citations, matching this codebase's established pattern for
+genuinely-resolved spec-silence questions. Full 66-test suite unchanged
+(no behavior touched); `cfusa check`/`trace` (v0.5.54): 0 errors,
+1088/1088 traced and tested.
 ### v0.370.0 -- 2026-08-16 (two stale-documentation corrections: REQ-LIFECYCLE-011's citation, e2e.h's regmap.h cross-reference)
 
 Closes issues #456 and #460 -- two small, unrelated doc-only fixes.
