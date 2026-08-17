@@ -19106,6 +19106,17 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.394.0 -- 2026-08-16 (issue #341 follow-up: fix stale `Table 26`
+-> `Table 29` citation in server.c)
+
+`src/server.c`'s own doc comment for `RCP_SCHED_KIND_COMPOUND` cited
+"TC18 Table 26's own Compound row" -- the same stale RC1 numbering
+PR #499 just fixed for `REQ-SRV-006`'s `.fusa-reqs.json` text field,
+left behind here since `server.c` was outside that pass's file
+scope. RC1's Table 26 (Execution-procedure table's Compound row) is
+RC5's own Table 29. Comment-only, no behavior/test impact -- 66/66
+unchanged.
+
 ### v0.393.0 -- 2026-08-16 (issue #341: `Table 32`->`35`
 EP-functional-config-common-entries cluster; compound/compound-wait
 `Table 6/7/8/9/11` and `Table 26`->`29`/`33` boundary-case fixes)

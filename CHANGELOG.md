@@ -34,6 +34,19 @@ the rationale.
 
 ## Releases
 
+### v0.394.0 -- 2026-08-16 (issue #341 follow-up: fix stale `Table 26` -> `Table 29` citation in server.c)
+
+`src/server.c`'s own doc comment for `RCP_SCHED_KIND_COMPOUND` cited
+"TC18 Table 26's own Compound row" -- the same stale RC1 numbering
+PR #499 just fixed for `REQ-SRV-006`'s `.fusa-reqs.json` `text` field,
+left behind here because `server.c` was outside that pass's editable
+file scope. RC1's Table 26 (Execution-procedure table's Compound row)
+is RC5's own Table 29 -- confirmed already correct in `REQ-SRV-006`'s
+own citation, only this code comment had drifted.
+
+Comment-only change -- no behavior, no test, no trace-coverage
+impact. Full clean rebuild + full test suite: 66/66 unchanged.
+
 ### v0.393.0 -- 2026-08-16 (issue #341: `Table 32`->`35` EP_functional_config-common-entries cluster; compound/compound-wait `Table 6/7/8/9/11` and `Table 26`->`29`/`33` boundary-case citation fixes)
 
 Fifth pass on issue #341 (RC1->RC5 table-number census). Fresh census
