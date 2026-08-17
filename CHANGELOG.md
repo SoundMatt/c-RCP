@@ -34,6 +34,83 @@ the rationale.
 
 ## Releases
 
+### v0.389.0 -- 2026-08-17 (c-RCP-AUDIT-08: respqueue.h/hw_pin_type Table fixes + Table 51/56/60 re-verification)
+
+Continues issue #341 (c-RCP-AUDIT-08). A fresh full-codebase census
+(`grep -roh "Table [0-9]\+" include/ src/ .fusa-reqs.json | sort | uniq -c
+| sort -rn`) confirmed the counts reported by the prior batch's own
+comment; picked up its two flagged quick-win items plus the next three
+highest-count clusters (`Table 51`, `Table 60`, `Table 56`).
+
+**`respqueue.h`'s own stale `Table 24` -> `Table 27` (RC1's "Responder
+QUEUE_config" == RC5's own Table 27, confirmed via fresh `pdftotext
+-layout` extractions of both PDFs), and a related cluster the original
+flag under-scoped**: the same `§12.7.9 Table 24` (should read `Table
+27`) mislabeling was present well beyond `respqueue.h` -- `regmap.h`'s
+own `rcp_regmap_response_queue_cfg_t` field comments (7 occurrences),
+`mock.h`'s Flush_time-heartbeat doc comments (2), and `ep_wakeup.h`'s
+own cross-table note (1) all carried the identical stale citation, plus
+9 matching occurrences in `.fusa-reqs.json`'s `text` fields (the `tc18`
+fields for REQ-RMAP-059/060/061/063/064 were already correct -- only
+the narrative prose had drifted, the same `title`/`text`-vs-`tc18`-field
+mismatch class PR #494 fixed for REQ-GPIO-035). Every genuinely
+RC5-native `§12.7.7 Table 24` citation (`rx_stream_status`,
+`rx_enforce_e2e`, `rx_ovrflw_safestate_enable`, etc., the request-stream
+configuration table) was individually re-verified and left untouched.
+
+**`config.c`/`regmap.h`'s `hw_pin_type` bit-layout citation, "Table 20"
+-> "Table 21"**: `hw_pin_type`'s own Pull/Output-stage/Drive-strength/
+Schmitt-Trigger bit layout is defined in TC18 §12.7.6 Table 21
+("HW_config"), not §12.7.5 Table 20 ("RC Server configuration static
+part") -- confirmed against the fresh RC5 extraction. Two occurrences
+fixed; `regmap.h`'s own `hw_pin_type` struct-field comment already
+correctly said "Table 21", so this closes the last inconsistency.
+
+**`Table 51` re-audited**: a genuine reused-digit case -- RC1's own
+Table 51 ("adc functional configuration") became RC5's own Table 54,
+while RC5's own Table 51 is a *different* table, "uart functional
+configuration" (RC1's own Table 48). `ep_uart.h`'s 13+ occurrences and
+`.fusa-reqs.json`'s UART entries were already correctly citing RC5's
+own Table 51 -- untouched. Found and fixed exactly one straggler:
+`src/ep_adc.c`'s own `rcp_ep_adc_validate_sample_spacing()` comment
+still said "Table 51's own 8-bit fields" for an ADC field, corrected to
+`Table 54` (matching `ep_adc.h`'s own already-correct citations).
+
+**`Table 60` re-verified, already fully converged**: all 27 occurrences
+(`ep_mdio.h`, `.fusa-reqs.json`) are genuinely RC5-native TC18 §13.7.13.3
+"Usage of ABB message for mdio requests" citations (RC1's own Table 57,
+confirmed via fresh extraction) -- no stale leftovers found, no changes
+made.
+
+**`Table 56` quick re-verified, already fully converged** (as the prior
+batch's own comment predicted): all occurrences in `ep_can.h`/
+`src/ep_can.c`/`.fusa-reqs.json` are genuinely RC5-native §13.7.11.2
+"can functional configuration" (RC1's own Table 53), several already
+carrying explicit RC1/RC5 dual-notation. `ep_wakeup.h`'s own "MDIO
+Table 56/59 collision" mention is a deliberate RC1/RC5 dual-notation
+aside about a *different*, already-resolved MDIO editorial defect, not
+a citation needing correction -- left as-is.
+
+**Deliberately left untouched, out of scope for files this batch may
+not edit**: `include/rcp/lifecycle.h` carries two genuinely stale
+`§12.7.9 Table 24` citations of its own (REQ-RMAP-055's own doc comment,
+lines ~717/737, "queue registers" -- should read `Table 27`) that this
+batch's own file restrictions exclude from editing; flagged in the
+issue #341 comment for whoever next touches `lifecycle.h`. `Table 26`/
+`Table 6`/`Table 7` (the issue's own flagged new-table-insertion boundary
+cases) were not attempted this batch -- left for a dedicated pass with
+the extra scrutiny the issue's own background section calls for.
+
+Comment/citation-text-only, no behavior change, no trace-coverage
+change. Full clean rebuild + 66/66 tests unchanged; `cfusa check`
+(v0.5.54) 0 errors, 968/1312 warnings/info unchanged; `cfusa trace`
+1095/1095 unchanged.
+
+**Next**: `Table 52`(21)/`Table 32`(20)/`Table 48`(20, already resolved
+per this batch's own Table 51 investigation)/`Table 58`(19)/`Table
+31`(18)/`Table 25`(18), and the still-deferred `Table 26`/`Table 6`/
+`Table 7` boundary cases.
+
 ### v0.388.0 -- 2026-08-17 (c-RCP-AUDIT-08: Table 41/42/43/44 RC1->RC5 GPIO/PWM_OUT/PWM_IN citation drift)
 
 Partial progress on issue #341 (c-RCP-AUDIT-08). Continues the per-table,

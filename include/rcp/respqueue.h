@@ -10,7 +10,7 @@
  * TC18 Remote Control Protocol wire layer (ROADMAP.md gap-closure Phase
  * 5d, "RMAP register-map exposure gaps", issue #200 Group 4).
  *
- * TC18 §12.7.9 Table 24 describes a per-response/ack-stream transmit
+ * TC18 §12.7.9 Table 27 describes a per-response/ack-stream transmit
  * queue with a configured memory reservation (queue_size, in 32-bit
  * words) that responses and acknowledges from the RC Server's own
  * endpoints are collected into for aggregated transmission. Nothing in
@@ -44,7 +44,7 @@
  * a caller uses before ever calling rcp_respqueue_init(), not a
  * per-message queue concern). REQ-RMAP-061 still stays `partial`
  * overall, for a reason that has nothing to do with this module: TC18
- * §12.7.9's own Table 24 (response/ack queue config, including
+ * §12.7.9's own Table 27 (response/ack queue config, including
  * Max_AVTPDUsize) is a separate table pointed to by Table 20's own
  * svr_response_stream_cfg_ptr register (REQ-RMAP-034, already
  * implemented) -- exactly the same genuine, unresolved ACF_ABB
@@ -52,7 +52,7 @@
  * (EP_ID_config) already document applies here too. An earlier revision
  * of this requirement's own catalog text described the gap as
  * "exposing the value in the discovery general-register slice" -- that
- * framing predates this codebase's own later discovery that Table 24
+ * framing predates this codebase's own later discovery that Table 27
  * was never part of the 14-octet discovery slice at all (it is a
  * separate, pointer-addressed table like the other two), and has been
  * corrected in `.fusa-reqs.json` accordingly.
@@ -419,7 +419,7 @@ size_t rcp_respqueue_max_fragment_payload(size_t max_avtpdu_size_octets, size_t 
 
 /* ── flush_on_count packing trigger ────────────────────────────────────────── */
 
-/* REQ-RMAP-063 (TC18 §12.7.9, Table 24 relative address 0x0006, 16 bit,
+/* REQ-RMAP-063 (TC18 §12.7.9, Table 27 relative address 0x0006, 16 bit,
  * R/W+, default 1, legal range 1..queue_size in 32-bit-word entries):
  * "Once a queue is filled with an amount of quadlets that is equal or
  * larger than given by flush_on_count, the transmission of one or
@@ -431,7 +431,7 @@ size_t rcp_respqueue_max_fragment_payload(size_t max_avtpdu_size_octets, size_t 
  * above. flush_on_count_octets == 0 always returns true iff q is
  * non-empty (the register's own documented default, 1 quadlet, is the
  * smallest possible nonzero threshold -- "immediate transmission" --
- * and 0 is not itself a legal configured value per Table 24's own
+ * and 0 is not itself a legal configured value per Table 27's own
  * range, so this is this function's fail-safe reading of an
  * unconfigured/zero threshold, not a real TC18 case). */
 bool rcp_respqueue_should_flush(const rcp_respqueue_t *q, size_t flush_on_count_octets);
@@ -461,7 +461,7 @@ size_t rcp_respqueue_plan_batch(const rcp_respqueue_t *q, size_t max_avtpdu_size
 
 /* ── Flush_time trigger + empty-queue heartbeat composition ────────────────── */
 
-/* REQ-RMAP-064 (TC18 §12.7.9, Table 24 relative address 0x0008, 16 bit,
+/* REQ-RMAP-064 (TC18 §12.7.9, Table 27 relative address 0x0008, 16 bit,
  * R/W+, microseconds, default 0, 0 meaning "flush only by count"): "The
  * server shall initiate transmission from a response queue whenever the
  * time since that queue's last transmission is equal to or greater than

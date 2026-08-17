@@ -285,7 +285,7 @@ bool rcp_mock_server_set_response_queue_cfg(rcp_mock_server_t *srv,
 
 /* ── REQ-RMAP-065/SRV-017: Flush_time heartbeat composition ─────────────────── */
 
-/* Checks whether response_stream_index's own Flush_time (Table 24
+/* Checks whether response_stream_index's own Flush_time (Table 27
  * flush_time_us) has elapsed since its last transmission, as of the
  * caller's own now_us, and if so, composes and returns the empty
  * heartbeat AVTPDU TC18 §12.7.9/§13.7.1.1 requires -- srv's own
@@ -353,7 +353,7 @@ bool rcp_mock_server_check_response_queue_heartbeat(rcp_mock_server_t *srv,
  * the WakeUp endpoint sends repetitive messages. The timing interval is
  * configurable (flush_time)." ep_wakeup.h's own REQ-WAKEUP-018 finding
  * named the architectural decision this parenthetical requires but does
- * not itself make: "(flush_time)" names TC18 §12.7.9 Table 24's
+ * not itself make: "(flush_time)" names TC18 §12.7.9 Table 27's
  * flush_time_us -- the SAME register REQ-RMAP-064 and REQ-RMAP-065/
  * SRV-017 (rcp_mock_server_check_response_queue_heartbeat() above)
  * already model -- not a field of the WakeUp endpoint's own functional

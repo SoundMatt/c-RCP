@@ -19106,6 +19106,53 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.389.0 -- 2026-08-17 (c-RCP-AUDIT-08: respqueue.h/hw_pin_type Table
+fixes + Table 51/56/60 re-verification)
+
+Continues issue #341. Fixed the prior batch's own two flagged quick
+wins -- `respqueue.h`'s stale `Table 24` -> `Table 27` (RC1's
+"Responder QUEUE_config" == RC5's own Table 27), and `config.c`/
+`regmap.h`'s `hw_pin_type` citation, "Table 20" -> "Table 21" (the bit
+layout is defined in §12.7.6 Table 21 "HW_config", not §12.7.5 Table
+20) -- both confirmed against fresh `pdftotext -layout` extractions of
+both PDFs.
+
+The `Table 24`->`27` fix turned out broader than the original flag:
+the same `§12.7.9 Table 24` mislabeling also appeared in `regmap.h`'s
+own response-queue struct comments (7), `mock.h`'s Flush_time doc
+comments (2), `ep_wakeup.h`'s own cross-table note (1), and 9 matching
+`.fusa-reqs.json` `text`-field occurrences -- the `tc18` fields for
+REQ-RMAP-059/060/061/063/064 were already correct, only the narrative
+prose had drifted (same class as PR #494's `title`/`text`-vs-`tc18`
+mismatch fix). Every genuinely RC5-native `§12.7.7 Table 24` citation
+(`rx_stream_status`, `rx_enforce_e2e`, etc.) was individually verified
+and left alone.
+
+Picked the next three highest-count clusters: `Table 51` (a genuine
+reused-digit case -- RC1's own Table 51 "adc functional configuration"
+became RC5's own Table 54, while RC5's own Table 51 is a *different*
+table, "uart functional configuration"; `ep_uart.h` was already
+correct, found and fixed one straggler in `src/ep_adc.c` still saying
+"Table 51" for an ADC field); `Table 60` (27 occurrences, all genuinely
+RC5-native MDIO citations -- already fully converged, no changes);
+`Table 56` (quick re-verify per the prior batch's own prediction --
+already fully converged CAN citations, no changes; `ep_wakeup.h`'s own
+"MDIO Table 56/59" mention is a deliberate dual-notation aside about a
+different, already-resolved MDIO defect, not a citation bug).
+
+Deliberately left untouched: `lifecycle.h` carries two genuinely stale
+`§12.7.9 Table 24` citations of its own (REQ-RMAP-055's doc comment)
+that this batch's file restrictions exclude from editing -- flagged on
+issue #341 for a future pass. `Table 26`/`Table 6`/`Table 7` (the
+issue's own flagged boundary cases) not attempted this batch.
+
+Comment/citation-text-only, no behavior change. Full clean rebuild +
+66/66 tests unchanged; `cfusa check` (v0.5.54) 0 errors, 968/1312
+warnings/info unchanged; `cfusa trace` 1095/1095 unchanged.
+
+**Next**: `Table 52`/`32`/`48`(already resolved)/`58`/`31`/`25`, and
+the still-deferred `Table 26`/`6`/`7` boundary cases.
+
 ### v0.388.0 -- 2026-08-17 (c-RCP-AUDIT-08: Table 41/42/43/44 RC1->RC5
 GPIO/PWM_OUT/PWM_IN citation drift)
 

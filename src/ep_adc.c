@@ -93,7 +93,7 @@ rcp_ep_adc_spacing_result_t rcp_ep_adc_validate_sample_spacing(
     /* ADC_CLK cycles (sample_interval * base_clk_divider) converted to
      * nanoseconds via the caller's own real base_clk_hz. Bounded well
      * within uint64_t: sample_interval/base_clk_divider are each at most
-     * 255 (Table 51's own 8-bit fields), so the numerator is at most
+     * 255 (Table 54's own 8-bit fields), so the numerator is at most
      * 255*255*1e9, and dividing by a nonzero base_clk_hz only shrinks
      * it further. */
     expected_ns =
