@@ -128,7 +128,7 @@ static rcp_bytes_t standard_abb_with_evt(rcp_byte_bus_id_t bus, uint8_t transact
 
 /* ── §12.3 lifecycle transitions: idleness and writer authorization both now enforced ── */
 
-/* As of the REQ-LIFECYCLE-022 fix, TC18 Figure 16's "Root Client access
+/* As of the REQ-LIFECYCLE-022 fix, TC18 Figure 17's "Root Client access
  * via EP0 to set state to HW_UNCONFIGURED & other EPs are not Idle ->
  * send error response EPs_NOT_IDLE" transition is enforced directly:
  * rcp_lifecycle_transition() now takes an all_other_eps_idle input and
@@ -195,7 +195,7 @@ static void test_transition_now_rejects_unauthorized_writer(void)
  * REQ-WIREERR-004 fix (corrected once already, see that function's own
  * header doc comment): rcp_lifecycle_field_write_error() answers this
  * exact denial with RCP_ERROR_LOCKED_MEM_ACCESS, the closest numbered
- * wire code to Figure 16's own diagram-only "LOCKED_CONFIG_ACCESS"
+ * wire code to Figure 17's own diagram-only "LOCKED_CONFIG_ACCESS"
  * name. */
 static void test_hw_generic_covers_ep_generic_and_queue_config_with_locked_response(void)
 {

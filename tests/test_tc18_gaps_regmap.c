@@ -414,7 +414,7 @@ static void test_ep_len_overrun_rule_implemented_endpoints(void)
 
 /* ── §12.3: discovery-stream occupancy ─────────────────────────────────────── */
 
-/* TC18 §12.3 / Figure 16: a discovery request arriving while the
+/* TC18 §12.3 / Figure 17: a discovery request arriving while the
  * discovery stream is already claimed is answered with a stream-occupied
  * error. FIXED (REQ-DISC-029): rcp_discovery_claim_note_request() now
  * returns bool -- true when the claim was open and granted, false when
@@ -5627,7 +5627,7 @@ static void test_svr_ep_cfg_now_models_discovery_timeout_and_status(void)
  * 16's own diagram carries a second, more specific rule the prose alone
  * does not surface):
  *
- *   - Figure 16's HW_CONFIGURED-box transition: "Request on discovery
+ *   - Figure 17's HW_CONFIGURED-box transition: "Request on discovery
  *     stream or known stream/bb_id for configuration to HW_CONFIG or
  *     QUEUE_CFG or EP_GEN_CFG -> send error response LOCKED_CONFIG_ACCESS"
  *     -- an otherwise-authorized request, denied purely because the
@@ -5651,13 +5651,13 @@ static void test_svr_ep_cfg_now_models_discovery_timeout_and_status(void)
  * this: HW_GENERIC-past-HW_UNCONFIGURED was first called TC18's distinct
  * "read only" case, then (after that was corrected) called
  * UNAUTHORIZED_ACCESS uniformly with every other denial -- both wrong,
- * per Figure 16's own LOCKED_CONFIG_ACCESS transition found on a closer
+ * per Figure 17's own LOCKED_CONFIG_ACCESS transition found on a closer
  * re-reading of the primary source. */
 static void test_field_write_error_distinguishes_state_from_writer_denial(void)
 {
     /* HW_GENERIC past HW_UNCONFIGURED: state-locked configuration
      * (§12.3.1.2's own text: "access to the HW_config...are locked";
-     * Figure 16's own HW_CONFIG/EP_GEN_CFG/QUEUE_CFG grouping,
+     * Figure 17's own HW_CONFIG/EP_GEN_CFG/QUEUE_CFG grouping,
      * REQ-LIFECYCLE-023) -- LOCKED_MEM_ACCESS, even for the
      * fully-authorized ROOT_WRITER, since HW_GENERIC's own writability
      * rule has no authorization concept at all. */

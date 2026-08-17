@@ -392,7 +392,7 @@ bool rcp_discovery_claim_note_request(rcp_discovery_claim_t *claim,
 {
     if (!rcp_discovery_claim_is_open(claim, now_ms)) return false; /* REQ-DISC-029:
         already held by an unlapsed claimant -- not preempted, DISCOVERY_STREAM_OCCUPIED
-        per Figure 16, see this function's own header doc comment */
+        per Figure 17, see this function's own header doc comment */
 
     claim->held        = true;
     claim->claimant     = requester;

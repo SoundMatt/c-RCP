@@ -42,6 +42,7 @@
 //cfusa:req REQ-LIFECYCLE-035
 //cfusa:req REQ-LIFECYCLE-036
 //cfusa:req REQ-LIFECYCLE-037
+//cfusa:req REQ-LIFECYCLE-039
 /*
  * lifecycle.h -- RC Server lifecycle state machine for the TC18 Remote
  * Control Protocol wire layer (ROADMAP.md Phase 14, "RC Server Lifecycle &
@@ -138,7 +139,7 @@ typedef enum {
     RCP_LIFECYCLE_ERR_EPS_NOT_IDLE         = 5, /* REQ-LIFECYCLE-022: another
                                                     endpoint still has an
                                                     in-flight or queued
-                                                    request; TC18 Figure 16's
+                                                    request; TC18 Figure 17's
                                                     own diagram-only "EPs_NOT_
                                                     IDLE" outcome, which maps
                                                     to none of the seventeen
@@ -365,17 +366,23 @@ typedef struct {
  * RCP_LIFECYCLE_OK is returned; on failure *state is left unchanged and
  * the failure reason is returned. Permitted transitions:
  *
- *   - HW_UNCONFIGURED -> HW_CONFIGURED: guarded by idleness (see below),
- *     then by rcp_lifecycle_check_hw_cfg(); a plausibility failure
- *     returns RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT. writer is not
- *     consulted for this transition -- TC18 §12.3.1.1 requires only that
- *     the request travel via the discovery stream, already enforced one
- *     layer up by rcp_lifecycle_should_accept()'s HW_UNCONFIGURED branch
- *     (no root client can exist yet at this point in bring-up).
+ *   - HW_UNCONFIGURED -> HW_CONFIGURED: guarded by
+ *     rcp_lifecycle_check_hw_cfg(); a plausibility failure returns
+ *     RCP_LIFECYCLE_ERR_HW_CFG_INCONSISTENT. writer is not consulted for
+ *     this transition -- TC18 §12.3.1.1 requires only that the request
+ *     travel via the discovery stream, already enforced one layer up by
+ *     rcp_lifecycle_should_accept()'s HW_UNCONFIGURED branch (no root
+ *     client can exist yet at this point in bring-up). NOT idle-gated --
+ *     see idleness paragraph below (CORRECTED, issue #455: this advance
+ *     was previously, incorrectly, idle-gated).
  *   - HW_CONFIGURED -> RCP_CONFIGURED: guarded first by writer authorization
  *     (see below), then by rcp_lifecycle_check_rcp_cfg(); a plausibility
  *     failure returns RCP_LIFECYCLE_ERR_RCP_CFG_INCONSISTENT. NOT
  *     idle-gated -- see idleness paragraph below.
+ *   - RCP_CONFIGURED -> HW_CONFIGURED (ADDED, issue #455): a demotion,
+ *     guarded by a narrower writer authorization (see below) and by
+ *     idleness (see below); no plausibility recheck, same as the two
+ *     reset-to-HW_UNCONFIGURED transitions below.
  *   - HW_CONFIGURED -> HW_UNCONFIGURED: the discovery-stream/root-client
  *     reset path, guarded by the same writer authorization as the advance
  *     above and by idleness (see below); snap is ignored once authorized
@@ -413,6 +420,16 @@ typedef struct {
  * authorization) -- for why that specific finding remains open spec
  * silence rather than closed by this same primitive.
  *
+ * The RCP_CONFIGURED -> HW_CONFIGURED demotion (ADDED, issue #455) uses a
+ * narrower authorization than the HW_CONFIGURED -> RCP_CONFIGURED advance
+ * above: only writer.via_root_client_ep0 or writer.via_valid_stream_
+ * association -- via_discovery_stream is NOT accepted. This matches
+ * Figure 17's own label for this specific arrow verbatim ("Root Client or
+ * (stream/bb_ID & no root configured) access via EP0..."), which names
+ * only EP0-routed access, and is consistent with REQ-LIFECYCLE-037's own
+ * finding that the discovery stream no longer authorizes a configuration
+ * change made once already RCP_CONFIGURED (TC18 §12.7.4).
+ *
  * The RCP_CONFIGURED -> HW_UNCONFIGURED reset is narrower still
  * (REQ-LIFECYCLE-037, TC18 §12.7.4): "Changes in configuration via a
  * discovery request are no longer allowed" once RCP_CONFIGURED, so
@@ -421,30 +438,43 @@ typedef struct {
  * HW_CONFIGURED -> RCP_CONFIGURED advance (still HW_CONFIGURED at the
  * time of THAT request, where §12.7.3 explicitly permits the discovery
  * stream) -- no longer suffices once already RCP_CONFIGURED. Only
- * writer.via_root_client_ep0 authorizes this specific reset.
+ * writer.via_root_client_ep0 authorizes this specific reset (Figure 17's
+ * own label for this arrow names only "Root Client access via EP0", with
+ * no stream/bb_ID alternative at all -- narrower even than the
+ * RCP_CONFIGURED -> HW_CONFIGURED demotion's own label immediately
+ * above, which does admit that alternative).
  *
- * Idleness (REQ-LIFECYCLE-022, TC18 Figure 16): the HW_UNCONFIGURED ->
- * HW_CONFIGURED advance and either reset-to-HW_UNCONFIGURED transition
- * both require all_other_eps_idle -- an in-flight or queued request on
+ * Idleness (REQ-LIFECYCLE-022, TC18 Figure 17): the RCP_CONFIGURED ->
+ * HW_CONFIGURED demotion and either reset-to-HW_UNCONFIGURED transition
+ * all require all_other_eps_idle -- an in-flight or queued request on
  * another endpoint rejects the transition with
- * RCP_LIFECYCLE_ERR_EPS_NOT_IDLE, *state left unchanged, checked before
- * (for the advance) or after (for the reset, alongside writer
- * authorization) each transition's own other guards. The
- * HW_CONFIGURED -> RCP_CONFIGURED advance is deliberately NOT idle-
- * gated: Figure 16's own label for that transition ("...& RCP_config
- * consistent -> send positive response") makes no mention of endpoint
- * idleness, unlike the two transitions above/below it. Figure 16 itself
- * names this outcome "EPs_NOT_IDLE" but that name maps to none of the
- * seventeen numbered wire error codes errors.h models (§12.9.6's own
- * table) -- a genuine TC18 inconsistency this library cannot resolve by
- * inventing a mapping, so RCP_LIFECYCLE_ERR_EPS_NOT_IDLE is a
- * local-only error code for now.
+ * RCP_LIFECYCLE_ERR_EPS_NOT_IDLE, *state left unchanged, checked after
+ * writer authorization for each of these three. CORRECTED (issue #455):
+ * the HW_UNCONFIGURED -> HW_CONFIGURED advance is NOT idle-gated -- a
+ * pixel-level re-transcription of Figure 17 (page 51 of the current RC5
+ * PDF) found that transition's own label ("Request on discovery stream
+ * to set HW_CONFIGURED state & HW_config consistent -> send positive
+ * response") makes no mention of idleness at all; the "all other EPs are
+ * Idle" wording previously (mis)cited for it in fact belongs to the
+ * RCP_CONFIGURED -> HW_CONFIGURED demotion's own, textually distinct,
+ * label ("Root Client or (stream/bb_ID & no root configured) access via
+ * EP0 to set state to HW_CONFIGURED & all other EPs are Idle -> send
+ * positive response") -- the two labels sit on different arrows of the
+ * same diagram and were conflated. The HW_CONFIGURED -> RCP_CONFIGURED
+ * advance remains deliberately NOT idle-gated either: Figure 17's own
+ * label for that arrow ("...& RCP_config consistent -> send positive
+ * response") makes no mention of endpoint idleness, unlike the three
+ * demotions above. Figure 17 itself names the idle-gate failure outcome
+ * "EPs_NOT_IDLE" but that name maps to none of the seventeen numbered
+ * wire error codes errors.h models (§12.9.6's own table) -- a genuine
+ * TC18 inconsistency this library cannot resolve by inventing a mapping,
+ * so RCP_LIFECYCLE_ERR_EPS_NOT_IDLE is a local-only error code for now.
  *
- * Any other requested transition (e.g. skipping straight from
- * HW_UNCONFIGURED to RCP_CONFIGURED, or downgrading from RCP_CONFIGURED to
- * HW_CONFIGURED without first returning all the way to HW_UNCONFIGURED) is
- * rejected with RCP_LIFECYCLE_ERR_INVALID_TRANSITION, regardless of
- * writer or idleness. */
+ * Any other requested transition -- the only genuinely unmodeled topology
+ * is skipping HW_CONFIGURED entirely on the way up, i.e. requesting
+ * HW_UNCONFIGURED -> RCP_CONFIGURED directly -- is rejected with
+ * RCP_LIFECYCLE_ERR_INVALID_TRANSITION, regardless of writer or
+ * idleness. */
 rcp_lifecycle_errc_t rcp_lifecycle_transition(rcp_lifecycle_state_t *state,
                                                rcp_lifecycle_state_t target,
                                                const rcp_lifecycle_plausibility_snapshot_t *snap,
@@ -556,14 +586,14 @@ rcp_lifecycle_accept_t rcp_lifecycle_should_accept(rcp_lifecycle_state_t state,
 /* ── Register-locking-by-state ─────────────────────────────────────────────── */
 
 /* Which broad category a register field falls into for locking purposes.
- * HW_GENERIC covers HW-pin-mapping (TC18 Figure 16's "HW_CONFIG") and
- * every other block Figure 16 groups under the identical HW_UNCONFIGURED-
+ * HW_GENERIC covers HW-pin-mapping (TC18 Figure 17's "HW_CONFIG") and
+ * every other block Figure 17 groups under the identical HW_UNCONFIGURED-
  * only locking rule and identical LOCKED_CONFIG_ACCESS response --
  * REQ-LIFECYCLE-023: this includes the endpoint-generic configuration
- * (rcp_regmap_ep_generic_cfg_t, Figure 16's "EP_GEN_CFG") and the
+ * (rcp_regmap_ep_generic_cfg_t, Figure 17's "EP_GEN_CFG") and the
  * response-queue/request-stream configuration (rcp_regmap_response_
  * queue_cfg_t / rcp_regmap_request_stream_cfg_t not already covered by
- * Table 24's own separate W* legend, Figure 16's "QUEUE_CFG") -- these
+ * Table 24's own separate W* legend, Figure 17's "QUEUE_CFG") -- these
  * are deliberately NOT modeled as distinct enum values, since their
  * writability rule is identical to HW_GENERIC's own, and this codebase's
  * own convention (see FUNCTIONAL_W vs. FUNCTIONAL_W_STAR immediately
@@ -645,13 +675,13 @@ bool rcp_lifecycle_field_writable(rcp_lifecycle_state_t state,
  *
  * Two distinct TC18 sources, both verified directly against the
  * primary-source PDF (initially only §13.7.1.2's prose was checked,
- * which is necessary but not sufficient -- Figure 16's own diagram
+ * which is necessary but not sufficient -- Figure 17's own diagram
  * gives a second, more specific rule the prose alone does not surface):
  *
  *   - RCP_ERROR_LOCKED_MEM_ACCESS: state alone forbids the write -- even
  *     a maximally-privileged writer (root client, owning stream,
  *     discovery stream, unicast frame) would still be denied. This is
- *     Figure 16's own HW_CONFIGURED-box transition: "Request on
+ *     Figure 17's own HW_CONFIGURED-box transition: "Request on
  *     discovery stream or known stream/bb_id for configuration to
  *     HW_CONFIG or QUEUE_CFG or EP_GEN_CFG -> send error response
  *     LOCKED_CONFIG_ACCESS" -- a diagram-only name that does not

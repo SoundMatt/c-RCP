@@ -373,7 +373,7 @@ bool rcp_discovery_claim_is_open(const rcp_discovery_claim_t *claim, uint64_t no
  * requester, starts a fresh Discovery_TimeOut window, and returns true --
  * the caller answers with an ordinary discovery response. If the claim is
  * already held by a not-yet-lapsed claimant (REQ-DISC-029), this is a
- * no-op on claim's own state and returns false: TC18 Figure 16's own two
+ * no-op on claim's own state and returns false: TC18 Figure 17's own two
  * "Discovery request received" transitions read literally --
  * "& no discovery stream assigned -> assign discovery stream -> send
  * discovery response" versus "& discovery stream assigned -> send error
