@@ -5623,7 +5623,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.10 (\"[an implementation] may support only a lower number of sequencers\"), TC18.txt L3871"
+      "tc18": "\u00a712.10 (\"[an implementation] may support only a lower number of sequencers\"), TC18.txt L3871",
+      "tc18_master_id": "TC18-12.10-004"
     },
     {
       "id": "REQ-SEQ-002",
@@ -5656,7 +5657,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.10 (\"An RC Server implementation may support only a lower number of sequencers.\"), TC18.txt L3870-3871; the implementation of one or more sequencers into an RC Server is optional, TC18.txt L3467-3468"
+      "tc18": "\u00a712.10 (\"An RC Server implementation may support only a lower number of sequencers.\"), TC18.txt L3870-3871; the implementation of one or more sequencers into an RC Server is optional, TC18.txt L3467-3468",
+      "tc18_master_id": "TC18-12.7.10-003"
     },
     {
       "id": "REQ-SEQ-005",
@@ -5678,7 +5680,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.10 (\"Sequencers are simply a state register which stores the current state of the sequencer.\"), TC18.txt L3864; readable/writable via \u00a712.7.10's SEQUENCER_config register map, TC18.txt L3470-3493"
+      "tc18": "\u00a712.10 (\"Sequencers are simply a state register which stores the current state of the sequencer.\"), TC18.txt L3864; readable/writable via \u00a712.7.10's SEQUENCER_config register map, TC18.txt L3470-3493",
+      "tc18_master_id": "TC18-12.7.10-004"
     },
     {
       "id": "REQ-SEQ-007",
@@ -5689,7 +5692,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.10 (\"The number of sequencers and states per sequencer are limited to 256 by this definition.\"), TC18.txt L3870"
+      "tc18": "\u00a712.10 (\"The number of sequencers and states per sequencer are limited to 256 by this definition.\"), TC18.txt L3870",
+      "tc18_master_id": "TC18-12.10-003"
     },
     {
       "id": "REQ-SEQ-008",
@@ -5700,7 +5704,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.10 (\"Sequencers are simply a state register which stores the current state of the sequencer.\"), TC18.txt L3864; readable/writable via \u00a712.7.10's SEQUENCER_config register map, TC18.txt L3470-3493"
+      "tc18": "\u00a712.10 (\"Sequencers are simply a state register which stores the current state of the sequencer.\"), TC18.txt L3864; readable/writable via \u00a712.7.10's SEQUENCER_config register map, TC18.txt L3470-3493",
+      "tc18_master_id": "TC18-12.7.10-004"
     },
     {
       "id": "REQ-SEQ-009",
@@ -5711,7 +5716,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.10 (\"The number of sequencers and states per sequencer are limited to 256 by this definition.\"), TC18.txt L3870"
+      "tc18": "\u00a712.10 (\"The number of sequencers and states per sequencer are limited to 256 by this definition.\"), TC18.txt L3870",
+      "tc18_master_id": "TC18-12.10-003"
     },
     {
       "id": "REQ-SEQ-010",
@@ -5722,7 +5728,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.10 (\"Sequencers are simply a state register which stores the current state of the sequencer.\"), TC18.txt L3864; readable/writable via \u00a712.7.10's SEQUENCER_config register map, TC18.txt L3460-3493; \u00a712.7.10 Table 28 (\"Seq_state ... if manually set to 0 then disabled\"), TC18.txt L3476-3477"
+      "tc18": "\u00a712.10 (\"Sequencers are simply a state register which stores the current state of the sequencer.\"), TC18.txt L3864; readable/writable via \u00a712.7.10's SEQUENCER_config register map, TC18.txt L3460-3493; \u00a712.7.10 Table 28 (\"Seq_state ... if manually set to 0 then disabled\"), TC18.txt L3476-3477",
+      "tc18_master_id": "TC18-12.7.10-004"
     },
     {
       "id": "REQ-SEQ-011",
@@ -5733,7 +5740,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.10 (\"The number of sequencers and states per sequencer are limited to 256 by this definition.\"), TC18.txt L3870"
+      "tc18": "\u00a712.10 (\"The number of sequencers and states per sequencer are limited to 256 by this definition.\"), TC18.txt L3870",
+      "tc18_master_id": "TC18-12.10-003"
     },
     {
       "id": "REQ-CMP-001",
@@ -6028,7 +6036,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 Table 5 (request_type 0x0E/0x8E = Triggered), TC18.txt L1264; \u00a711.2.2.5 (\"Each endpoint may be configured to start a request upon receiving a selected trigger signal\"), TC18.txt L1691"
+      "tc18": "\u00a711.2.2 Table 5 (request_type 0x0E/0x8E = Triggered), TC18.txt L1264; \u00a711.2.2.5 (\"Each endpoint may be configured to start a request upon receiving a selected trigger signal\"), TC18.txt L1691",
+      "tc18_master_id": "TC18-11.2.2-002"
     },
     {
       "id": "REQ-TRIG-002",
@@ -6049,7 +6058,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.5 Figure 11 / Table 10 (GBB message for triggered requests: request_type=0x0E/0x8E, trigger_source_ep, trigger_signal_nr, trigger_threshold, trigger_exec_delay, trigger_repetitions), TC18.txt L1685-1755"
+      "tc18": "\u00a711.2.2.5 Figure 11 / Table 10 (GBB message for triggered requests: request_type=0x0E/0x8E, trigger_source_ep, trigger_signal_nr, trigger_threshold, trigger_exec_delay, trigger_repetitions), TC18.txt L1685-1755",
+      "tc18_master_id": "TC18-11.2.2.5-006"
     },
     {
       "id": "REQ-TRIG-004",
@@ -6060,7 +6070,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.5 Table 10 (trigger_source_ep/trigger_signal sub-field offsets), TC18.txt L1720-1721"
+      "tc18": "\u00a711.2.2.5 Table 10 (trigger_source_ep/trigger_signal sub-field offsets), TC18.txt L1720-1721",
+      "tc18_master_id": "TC18-11.2.2.5-006"
     },
     {
       "id": "REQ-TRIG-005",
@@ -6071,7 +6082,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258; general ACF_GBB frame-validation basis"
+      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258; general ACF_GBB frame-validation basis",
+      "tc18_master_id": "TC18-11.2-005"
     },
     {
       "id": "REQ-TRIG-006",
@@ -6082,7 +6094,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258"
+      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258",
+      "tc18_master_id": "TC18-11.2-005"
     },
     {
       "id": "REQ-TRIG-007",
@@ -6093,7 +6106,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 Table 5 (\"0x0E, 0x8E\" -> \"Triggered\"), TC18.txt L1254-1267"
+      "tc18": "\u00a711.2.2 Table 5 (\"0x0E, 0x8E\" -> \"Triggered\"), TC18.txt L1254-1267",
+      "tc18_master_id": "TC18-11.2.2-002"
     },
     {
       "id": "REQ-TRIG-008",
@@ -6104,7 +6118,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.9.3 Table 29 (Triggered request row: \"Upon entering RS state the counted number of received trigger signals is reset to zero and newly arriving trigger signals are counted from zero. The execution delay timer is started.\"), TC18.txt L3690-3695"
+      "tc18": "\u00a712.9.3 Table 29 (Triggered request row: \"Upon entering RS state the counted number of received trigger signals is reset to zero and newly arriving trigger signals are counted from zero. The execution delay timer is started.\"), TC18.txt L3690-3695",
+      "tc18_master_id": "TC18-12.9.3-002"
     },
     {
       "id": "REQ-TRIG-009",
@@ -6115,7 +6130,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.9.3 Table 29 (Triggered request row: \"Upon entering RS state the counted number of received trigger signals is reset to zero and newly arriving trigger signals are counted from zero. The execution delay timer is started.\"), TC18.txt L3690-3695; \u00a711.2.2.5 Table 10 (\"trigger_source_ep defines the endpoint which issues the trigger... trigger_signal_nr defines the trigger number of the endpoint addressed by trigger_source_ep\"), TC18.txt L1720-1721"
+      "tc18": "\u00a712.9.3 Table 29 (Triggered request row: \"Upon entering RS state the counted number of received trigger signals is reset to zero and newly arriving trigger signals are counted from zero. The execution delay timer is started.\"), TC18.txt L3690-3695; \u00a711.2.2.5 Table 10 (\"trigger_source_ep defines the endpoint which issues the trigger... trigger_signal_nr defines the trigger number of the endpoint addressed by trigger_source_ep\"), TC18.txt L1720-1721",
+      "tc18_master_id": "TC18-11.2.2.5-006"
     },
     {
       "id": "REQ-TRIG-010",
@@ -6126,7 +6142,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.5 Table 10 (trigger_threshold), TC18.txt L1722-1724"
+      "tc18": "\u00a711.2.2.5 Table 10 (trigger_threshold), TC18.txt L1722-1724",
+      "tc18_master_id": "TC18-11.2.2.5-006"
     },
     {
       "id": "REQ-TRIG-011",
@@ -6137,7 +6154,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.5 Table 10 (trigger_exec_delay), TC18.txt L1725-1727"
+      "tc18": "\u00a711.2.2.5 Table 10 (trigger_exec_delay), TC18.txt L1725-1727",
+      "tc18_master_id": "TC18-11.2.2.5-006"
     },
     {
       "id": "REQ-TRIG-012",
@@ -6148,7 +6166,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.9.3 Table 29 (Triggered request row: \"Upon entering RS state the counted number of received trigger signals is reset to zero and newly arriving trigger signals are counted from zero. The execution delay timer is started.\"), TC18.txt L3690-3695; \"When the trigger_exec_delay timer has expired the state advances to RE as soon as the EP is idle and no request with higher priority is pending.\", TC18.txt L3692-3693"
+      "tc18": "\u00a712.9.3 Table 29 (Triggered request row: \"Upon entering RS state the counted number of received trigger signals is reset to zero and newly arriving trigger signals are counted from zero. The execution delay timer is started.\"), TC18.txt L3690-3695; \"When the trigger_exec_delay timer has expired the state advances to RE as soon as the EP is idle and no request with higher priority is pending.\", TC18.txt L3692-3693",
+      "tc18_master_id": "TC18-12.9.3-002"
     },
     {
       "id": "REQ-TRIG-013",
@@ -6159,7 +6178,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.9.3 Table 29 (Triggered request row: \"Upon entering RS state the counted number of received trigger signals is reset to zero and newly arriving trigger signals are counted from zero. The execution delay timer is started.\"), TC18.txt L3690-3695; TC18.txt L3692-3693 (trigger_exec_delay expiry + EP-idle gating)"
+      "tc18": "\u00a712.9.3 Table 29 (Triggered request row: \"Upon entering RS state the counted number of received trigger signals is reset to zero and newly arriving trigger signals are counted from zero. The execution delay timer is started.\"), TC18.txt L3690-3695; TC18.txt L3692-3693 (trigger_exec_delay expiry + EP-idle gating)",
+      "tc18_master_id": "TC18-12.9.3-002"
     },
     {
       "id": "REQ-CHAIN-001",
@@ -6180,7 +6200,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.6 Table 11 (chained request reserved fields), TC18.txt L1827-1830"
+      "tc18": "\u00a711.2.2.6 Table 11 (chained request reserved fields), TC18.txt L1827-1830",
+      "tc18_master_id": "TC18-11.2.2.6-010"
     },
     {
       "id": "REQ-CHAIN-003",
@@ -6191,7 +6212,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.6 Figure 12 / field table (GBB for chained requests: request_type=0x01, reserved octets, chain_exec_delay, cs), TC18.txt L1773-1847; general ACF_GBB frame-validation basis"
+      "tc18": "\u00a711.2.2.6 Figure 12 / field table (GBB for chained requests: request_type=0x01, reserved octets, chain_exec_delay, cs), TC18.txt L1773-1847; general ACF_GBB frame-validation basis",
+      "tc18_master_id": "TC18-11.2.2.6-010"
     },
     {
       "id": "REQ-CHAIN-004",
@@ -6202,7 +6224,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.6 Table 11 (chain_exec_delay, cs semantics), TC18.txt L1828-1839"
+      "tc18": "\u00a711.2.2.6 Table 11 (chain_exec_delay, cs semantics), TC18.txt L1828-1839",
+      "tc18_master_id": "TC18-11.2.2.6-010"
     },
     {
       "id": "REQ-CHAIN-005",
@@ -6213,7 +6236,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258; general ACF_GBB frame-validation basis"
+      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258; general ACF_GBB frame-validation basis",
+      "tc18_master_id": "TC18-11.2-005"
     },
     {
       "id": "REQ-CHAIN-006",
@@ -6224,7 +6248,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258"
+      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258",
+      "tc18_master_id": "TC18-11.2-005"
     },
     {
       "id": "REQ-CHAIN-007",
@@ -6235,7 +6260,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 Table 5 (\"0x01\" -> \"Chained\"), TC18.txt L1254-1267"
+      "tc18": "\u00a711.2.2 Table 5 (\"0x01\" -> \"Chained\"), TC18.txt L1254-1267",
+      "tc18_master_id": "TC18-11.2.2-002"
     },
     {
       "id": "REQ-CHAIN-008",
@@ -6246,7 +6272,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.6 (\"If the first request in an AVTPDU is a chain request, then there is no predecessor to chain to, thus the entire chain will be ignored. An error response with the error code 'CHAIN_ERROR' to each request will be generated\"), TC18.txt L1796-1798"
+      "tc18": "\u00a711.2.2.6 (\"If the first request in an AVTPDU is a chain request, then there is no predecessor to chain to, thus the entire chain will be ignored. An error response with the error code 'CHAIN_ERROR' to each request will be generated\"), TC18.txt L1796-1798",
+      "tc18_master_id": "TC18-11.2.2.6-005"
     },
     {
       "id": "REQ-CHAIN-009",
@@ -6257,7 +6284,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.6 (\"cs ... 1b: request will not be executed in case the previous request returned an error, as a consequence the remainder of the chain is not executed, and the request send an error response with error code = CHAIN_ABORTED\"), TC18.txt L1833-1837"
+      "tc18": "\u00a711.2.2.6 (\"cs ... 1b: request will not be executed in case the previous request returned an error, as a consequence the remainder of the chain is not executed, and the request send an error response with error code = CHAIN_ABORTED\"), TC18.txt L1833-1837",
+      "tc18_master_id": "TC18-11.2.2.6-011"
     },
     {
       "id": "REQ-CHAIN-010",
@@ -6268,7 +6296,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.6 Table 11 (cs conditional-start semantics), TC18.txt L1833-1839"
+      "tc18": "\u00a711.2.2.6 Table 11 (cs conditional-start semantics), TC18.txt L1833-1839",
+      "tc18_master_id": "TC18-11.2.2.6-011"
     },
     {
       "id": "REQ-TIMED-001",
@@ -6376,7 +6405,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3.1 Figure 14 + Table 13 (clear-all, request_type 0x05), TC18.txt L1983-2050"
+      "tc18": "\u00a711.2.3.1 Figure 14 + Table 13 (clear-all, request_type 0x05), TC18.txt L1983-2050",
+      "tc18_master_id": "TC18-11.2.3.1-004"
     },
     {
       "id": "REQ-CANCEL-003",
@@ -6387,7 +6417,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3.1 Figure 14 / Table 13 (Usage of GBB message to cancel all requests, request_type=0x05), TC18.txt L1983-2050; general ACF_GBB frame-validation basis and \u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258"
+      "tc18": "\u00a711.2.3.1 Figure 14 / Table 13 (Usage of GBB message to cancel all requests, request_type=0x05), TC18.txt L1983-2050; general ACF_GBB frame-validation basis and \u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258",
+      "tc18_master_id": "TC18-11.2.3.1-004"
     },
     {
       "id": "REQ-CANCEL-004",
@@ -6398,7 +6429,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3.1 Table 13 (clear-all, request_type 0x05), TC18.txt L2024-2025"
+      "tc18": "\u00a711.2.3.1 Table 13 (clear-all, request_type 0x05), TC18.txt L2024-2025",
+      "tc18_master_id": "TC18-11.2.3.1-004"
     },
     {
       "id": "REQ-CANCEL-005",
@@ -6409,7 +6441,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3.3 Figure 16 (clear-single, clear_transaction_num offset), TC18.txt L2140-2158"
+      "tc18": "\u00a711.2.3.3 Figure 16 (clear-single, clear_transaction_num offset), TC18.txt L2140-2158",
+      "tc18_master_id": "TC18-11.2.3.3-002"
     },
     {
       "id": "REQ-CANCEL-006",
@@ -6420,7 +6453,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3.3 Figure 16 / Table 15 (Usage of GBB message to cancel a single, specific request, request_type=0x07, clear_transaction_num), TC18.txt L2140-2210; general ACF_GBB frame-validation basis and \u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258"
+      "tc18": "\u00a711.2.3.3 Figure 16 / Table 15 (Usage of GBB message to cancel a single, specific request, request_type=0x07, clear_transaction_num), TC18.txt L2140-2210; general ACF_GBB frame-validation basis and \u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258",
+      "tc18_master_id": "TC18-11.2.3.3-004"
     },
     {
       "id": "REQ-CANCEL-007",
@@ -6431,7 +6465,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3.3 Table 15 (clear-single, clear_transaction_num), TC18.txt L2185"
+      "tc18": "\u00a711.2.3.3 Table 15 (clear-single, clear_transaction_num), TC18.txt L2185",
+      "tc18_master_id": "TC18-11.2.3.3-004"
     },
     {
       "id": "REQ-CANCEL-008",
@@ -6442,7 +6477,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3 (\"A request can be cancelled while it is pending and after it has been started until it is under execution. Requests under execution will not be aborted.\"), TC18.txt L1977-1978"
+      "tc18": "\u00a711.2.3 (\"A request can be cancelled while it is pending and after it has been started until it is under execution. Requests under execution will not be aborted.\"), TC18.txt L1977-1978",
+      "tc18_master_id": "TC18-11.2.3-001"
     },
     {
       "id": "REQ-CANCEL-009",
@@ -6453,7 +6489,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3.3 (\"The request initiating the cancellation will create an error response with the error code = REQUEST_NOT_FOUND, when the clear_transaction_num was not found.\"), TC18.txt L2212-2213"
+      "tc18": "\u00a711.2.3.3 (\"The request initiating the cancellation will create an error response with the error code = REQUEST_NOT_FOUND, when the clear_transaction_num was not found.\"), TC18.txt L2212-2213",
+      "tc18_master_id": "TC18-11.2.3.3-005"
     },
     {
       "id": "REQ-CANCEL-010",
@@ -6464,7 +6501,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3 (\"A request can be cancelled while it is pending and after it has been started until it is under execution. Requests under execution will not be aborted.\"), TC18.txt L1977-1978"
+      "tc18": "\u00a711.2.3 (\"A request can be cancelled while it is pending and after it has been started until it is under execution. Requests under execution will not be aborted.\"), TC18.txt L1977-1978",
+      "tc18_master_id": "TC18-11.2.3-001"
     },
     {
       "id": "REQ-CANCEL-011",
@@ -6475,7 +6513,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3 (\"A request can be cancelled while it is pending and after it has been started until it is under execution. Requests under execution will not be aborted.\"), TC18.txt L1977-1978; \u00a711.2.3.3 (\"The request initiating the cancellation will create an error response with the error code = REQUEST_NOT_FOUND, when the clear_transaction_num was not found.\"), TC18.txt L2212-2213"
+      "tc18": "\u00a711.2.3 (\"A request can be cancelled while it is pending and after it has been started until it is under execution. Requests under execution will not be aborted.\"), TC18.txt L1977-1978; \u00a711.2.3.3 (\"The request initiating the cancellation will create an error response with the error code = REQUEST_NOT_FOUND, when the clear_transaction_num was not found.\"), TC18.txt L2212-2213",
+      "tc18_master_id": "TC18-11.2.3-001"
     },
     {
       "id": "REQ-CANCEL-012",
@@ -6486,7 +6525,8 @@
       "asil": "ASIL-B",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a711.2.3 (\"If a request is cancelled to which a request is chained, then the chained successors shall be cancelled by the RC Server as well.\"), TC18.txt L1978-1979"
+      "tc18": "\u00a711.2.3 (\"If a request is cancelled to which a request is chained, then the chained successors shall be cancelled by the RC Server as well.\"), TC18.txt L1978-1979",
+      "tc18_master_id": "TC18-11.2.3-002"
     },
     {
       "id": "REQ-CANCEL-013",
@@ -6497,7 +6537,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3.1 Table 13 (\"reserved: All bits shall be written as 0, else the request shall be rejected\"), TC18.txt L2025"
+      "tc18": "\u00a711.2.3.1 Table 13 (\"reserved: All bits shall be written as 0, else the request shall be rejected\"), TC18.txt L2025",
+      "tc18_master_id": "TC18-11.2.3.1-004"
     },
     {
       "id": "REQ-CANCEL-014",
@@ -6508,7 +6549,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3.1 Table 13 (evt/hs/cs field descriptions), TC18.txt L2026-2030"
+      "tc18": "\u00a711.2.3.1 Table 13 (evt/hs/cs field descriptions), TC18.txt L2026-2030",
+      "tc18_master_id": "TC18-11.2.3.1-004"
     },
     {
       "id": "REQ-CANCEL-015",
@@ -6519,7 +6561,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3.3 (\"Evt, hs and cs shall be zero\"), Table 15, TC18.txt L2140-2185"
+      "tc18": "\u00a711.2.3.3 (\"Evt, hs and cs shall be zero\"), Table 15, TC18.txt L2140-2185",
+      "tc18_master_id": "TC18-11.2.3.3-004"
     },
     {
       "id": "REQ-SCHED-001",
@@ -9152,7 +9195,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.6 (\"chain_exec_delay: Execution delay in multiples of ep_delay_time... for the request execution after the previous request has been finalized.\"), TC18.txt L1828-1829"
+      "tc18": "\u00a711.2.2.6 (\"chain_exec_delay: Execution delay in multiples of ep_delay_time... for the request execution after the previous request has been finalized.\"), TC18.txt L1828-1829",
+      "tc18_master_id": "TC18-11.2.2.6-010"
     },
     {
       "id": "REQ-CHAIN-012",
@@ -9163,7 +9207,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.6 (\"reserved: All bits shall be written as 0, else the request will be rejected\" / \"...shall be rejected\"), TC18.txt L1827, L1830"
+      "tc18": "\u00a711.2.2.6 (\"reserved: All bits shall be written as 0, else the request will be rejected\" / \"...shall be rejected\"), TC18.txt L1827, L1830",
+      "tc18_master_id": "TC18-11.2.2.6-010"
     },
     {
       "id": "REQ-SRV-004",
@@ -10896,7 +10941,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.10 Table 28, TC18.txt L3460-L3493"
+      "tc18": "\u00a712.7.10 Table 28, TC18.txt L3460-L3493",
+      "tc18_master_id": "TC18-12.7.10-004"
     },
     {
       "id": "REQ-SEQ-013",
@@ -10907,7 +10953,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.7.10 Table 28, TC18.txt L3460-L3493 (2-octet stride: relative 0x0000 Seq_state, 0x0001 Request_stream_index)"
+      "tc18": "\u00a712.7.10 Table 28, TC18.txt L3460-L3493 (2-octet stride: relative 0x0000 Seq_state, 0x0001 Request_stream_index)",
+      "tc18_master_id": "TC18-12.7.10-004"
     },
     {
       "id": "REQ-SEQ-014",
@@ -10918,7 +10965,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.10 Table 28, TC18.txt L3460-L3493"
+      "tc18": "\u00a712.7.10 Table 28, TC18.txt L3460-L3493",
+      "tc18_master_id": "TC18-12.7.10-004"
     },
     {
       "id": "REQ-SPI-033",

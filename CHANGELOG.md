@@ -34,6 +34,46 @@ the rationale.
 
 ## Releases
 
+### v0.405.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for `REQ-SEQ-*`/`REQ-TRIG-*`/`REQ-CANCEL-*`/`REQ-CHAIN-*`)
+
+One of several parallel per-category batches for c-RCP-AUDIT-04
+(issue 166), unblocked now that RELAY's master TC18 requirement
+catalog (`docs/tc18-master-catalog.json`, 447 entries) has been
+rebuilt and published. This batch covers only the `REQ-SEQ-*`/
+`REQ-TRIG-*`/`REQ-CANCEL-*`/`REQ-CHAIN-*` category prefixes; sibling
+batches (see `v0.401.0`-`v0.404.0` below) cover the rest of
+`.fusa-reqs.json`'s 1095 entries under their own PRs.
+
+- Added a `tc18_master_id` field to 48 of the 54 `REQ-SEQ-*`/
+  `REQ-TRIG-*`/`REQ-CANCEL-*`/`REQ-CHAIN-*` requirements that already
+  carry a `tc18` citation (issue #164's backfill), matched by section
+  + table/figure number + content confirmation against the catalog
+  entry's own `summary`/`title`/`citation`. Purely additive -- no
+  other field on any entry touched, no `.c`/`.h` source file touched.
+- Left untouched, as expected: `REQ-TRIG-002`, `REQ-CHAIN-001`, and
+  `REQ-CANCEL-001` (each repo's own `_strerror()` helper) carry no
+  `tc18` field at all (implementation-only plumbing with no TC18
+  basis) -- no `tc18_master_id` invented for these.
+- Left unset, no confident single match: `REQ-SEQ-002`, `REQ-SEQ-003`,
+  `REQ-SEQ-005` -- each cites the sequencer power-on-reset-to-1 fact
+  from both TC18 §12.10 (general/overview prose) and §12.7.10
+  (the `SEQUENCER_config` register-map table), which the master
+  catalog captured as two separate, independently-verbatim-matching
+  entries (`TC18-12.10-001`/`TC18-12.7.10-002`) for what is the exact
+  same normative statement restated in two places in the spec --
+  flagged for coordinator follow-up rather than picking one
+  arbitrarily. (Where a sibling requirement's own citation combined
+  the same two sections around clearly distinguishable, non-duplicate
+  facts -- e.g. `REQ-SEQ-004`'s "may support fewer" vs. "implementation
+  is optional" -- the more precise/authoritative source was picked
+  confidently instead of flagged.)
+
+Verified against the pinned `cfusa` v0.5.54 binary: `check` and
+`trace --req-coverage 100 --sec-tested 100` output numerically
+identical before/after (0 errors/968 warnings/1312 infos; 1095/1095
+requirements traced, 512/512 functions annotated). Full 66-test
+suite unchanged.
+
 ### v0.404.0 -- 2026-08-17 (c-RCP-AUDIT-04: tc18_master_id backfill for REQ-CMP-*/REQ-SRV-*)
 
 Adds the `tc18_master_id` field (RCP-ARCHITECTURE.md canonical choice

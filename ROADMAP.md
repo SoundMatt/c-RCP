@@ -19106,6 +19106,35 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.405.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for
+`REQ-SEQ-*`/`REQ-TRIG-*`/`REQ-CANCEL-*`/`REQ-CHAIN-*`)
+
+One of several parallel per-category batches for c-RCP-AUDIT-04
+(issue 166), unblocked now that RELAY's master TC18 requirement
+catalog (`docs/tc18-master-catalog.json`, 447 entries) exists.
+Scope is only the `REQ-SEQ-*`/`REQ-TRIG-*`/`REQ-CANCEL-*`/
+`REQ-CHAIN-*` prefixes; sibling batches (see `v0.401.0`-`v0.404.0`
+below) cover the rest of `.fusa-reqs.json` under their own PRs.
+
+Added `tc18_master_id` to 48 of the 54 requirements in scope that
+already carry a `tc18` citation, matched by section + table/figure
+number + a content check against the catalog entry's own summary/
+title/citation (not on section number alone). The 3 requirements
+with no `tc18` field at all (`REQ-TRIG-002`, `REQ-CHAIN-001`,
+`REQ-CANCEL-001` -- each family's own `_strerror()` helper) were
+left alone, as expected. 3 requirements (`REQ-SEQ-002`, `REQ-SEQ-003`,
+`REQ-SEQ-005`) genuinely span two catalog clauses -- the sequencer
+power-on-reset-to-1 fact captured once from TC18 §12.10's general
+prose and again from §12.7.10's register-map table, both an equally
+valid verbatim match -- and were left unset rather than forced,
+flagged for follow-up in the PR.
+
+Purely additive field; `cfusa` v0.5.54 `check`/`trace
+--req-coverage 100 --sec-tested 100` output confirmed unchanged
+(0 errors/968 warnings/1312 infos; 1095/1095 requirements traced,
+512/512 functions annotated) before and after. Full 66-test suite
+unchanged.
+
 ### v0.404.0 -- 2026-08-17 (c-RCP-AUDIT-04: tc18_master_id backfill,
 REQ-CMP-*/REQ-SRV-* batch)
 
