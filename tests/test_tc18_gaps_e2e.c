@@ -15,6 +15,8 @@
 //cfusa:test REQ-E2E-021
 //cfusa:test REQ-E2E-028
 //cfusa:test REQ-E2E-029
+//cfusa:test REQ-TIMED-012
+//cfusa:test REQ-TIMED-013
 
 /*
  * test_tc18_gaps_e2e.c -- spec-literal conformance-and-deviation suite for
@@ -2122,6 +2124,237 @@ static void test_dispatch_e2e_fragment_unresolvable_stream_falls_back_to_dispatc
     rcp_mock_server_destroy(srv);
 }
 
+/* ── issue #462: TSCF presentation-time gate wired into every E2E entry
+ * point (REQ-TIMED-012/013) ────────────────────────────────────────────── */
+
+/* Companion to test_dispatch_tscf_with_tv_true_postpones_a_standard_
+ * request() (test_mock.c) -- rcp_mock_server_dispatch_e2e_tscf() (issue
+ * #462) closes exactly the gap that pair's own comment describes: tv=true
+ * on a PLAIN-command-mode request (req_crc_enable left at its default)
+ * now postpones a standard request via the request store
+ * (RCP_SERVER_ADMIT_PENDING/RCP_MOCK_DISPATCH_PENDING), instead of the
+ * request's own presentation time being silently discarded the way it
+ * still is through rcp_mock_server_dispatch_e2e() itself (see the
+ * regression guard below). */
+static void test_dispatch_e2e_tscf_plain_mode_with_tv_true_postpones_a_standard_request(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t        pl[4] = {0x01, 0x02, 0x03, 0x04};
+    rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    /* req_crc_enable left at its default (false): plain command mode. */
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+                      rcp_mock_server_dispatch_e2e_tscf(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                         RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                         true /* tv */, 1000000u, 0u, plain.data,
+                                                         plain.len, &resp));
+    TEST_ASSERT_FALSE(g_handler_called);
+    TEST_ASSERT_NULL(resp.data); /* nothing ran -- no response yet */
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+/* Same tv=true postponement, but now past a real, valid CRC32 unwrap
+ * (safe command mode) -- proves the gate applies to the CRC-validated
+ * dispatch_plain() call site too, not just the plain-command-mode
+ * delegation branch above. */
+static void test_dispatch_e2e_tscf_safe_mode_with_tv_true_postpones_a_standard_request(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t        pl[4] = {0x01, 0x02, 0x03, 0x04};
+    rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t          wrapped =
+        rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_TS, plain.data, plain.len);
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+
+    g_handler_called = false;
+    TEST_ASSERT_NOT_NULL(wrapped.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+                      rcp_mock_server_dispatch_e2e_tscf(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                         RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                         true /* tv */, TEST_TS, 0u, wrapped.data,
+                                                         wrapped.len, &resp));
+    TEST_ASSERT_FALSE(g_handler_called);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&wrapped);
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+/* Fragment-aware entry point: same tv=true postponement, threaded
+ * through the "never actually fragmented" fallback (an ms=0 fragment
+ * arriving while nothing is collecting) -- which, as of issue #462,
+ * reaches rcp_mock_server_dispatch_e2e_tscf() rather than the plain
+ * rcp_mock_server_dispatch_e2e(), so tv/avtp_timestamp/gptp_reference_now
+ * survive that delegation instead of being silently dropped one layer
+ * down. */
+static void test_dispatch_e2e_fragment_tscf_with_tv_true_postpones_a_standard_request(void)
+{
+    rcp_mock_server_t *srv    = rcp_mock_server_new();
+    const uint8_t       pl[4] = {0x01, 0x02, 0x03, 0x04};
+    rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t          wrapped;
+    rcp_bytes_t          resp = {0};
+
+    set_up_frag_stream(srv, counting_handler);
+    wrapped = rcp_e2e_wrap_framed(TEST_SID, false /* TSCF-framed */, TEST_TS, plain.data, plain.len);
+    TEST_ASSERT_NOT_NULL(wrapped.data);
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+                      rcp_mock_server_dispatch_e2e_fragment_tscf(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                                  RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                                  true /* tv */, TEST_TS, 0u,
+                                                                  wrapped.data, wrapped.len, &resp));
+    TEST_ASSERT_FALSE(g_handler_called);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&wrapped);
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+/* Multi-member frame entry point: a single, validly-CRC'd member
+ * dispatched via rcp_mock_server_dispatch_frame_e2e_tscf() with tv=true
+ * is postponed (RCP_MOCK_DISPATCH_PENDING) instead of executing
+ * immediately, proving tv/avtp_timestamp/gptp_reference_now reach each
+ * member's own admission through the per-member rcp_mock_server_
+ * dispatch_e2e_tscf() delegation (issue #462), not just a single-request
+ * entry point. */
+static void test_dispatch_frame_e2e_tscf_with_tv_true_postpones_a_standard_request(void)
+{
+    rcp_mock_server_t             *srv = rcp_mock_server_new();
+    const uint8_t                   a[4] = {0xA1, 0xA2, 0xA3, 0xA4};
+    rcp_bytes_t                     m1   = make_abb(0, 0, 0, a, sizeof(a));
+    rcp_bytes_t                     w1   = rcp_e2e_wrap(TEST_SID, TEST_TS, m1.data, m1.len);
+    rcp_mock_frame_member_result_t  results[4];
+    size_t                          dispatched;
+
+    TEST_ASSERT_EQUAL_UINT(16u, w1.len);
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+
+    g_handler_called = false;
+    dispatched = rcp_mock_server_dispatch_frame_e2e_tscf(srv, RCP_AVTP_SUBTYPE_TSCF, true, TEST_SID,
+                                                          true /* tv */, TEST_TS, 0u /* gptp_reference_now */,
+                                                          0u /* sequence_num */, w1.data, w1.len, results,
+                                                          4);
+    TEST_ASSERT_EQUAL_UINT(1u, dispatched);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING, results[0].result);
+    TEST_ASSERT_FALSE(g_handler_called);
+
+    rcp_bytes_free(&results[0].response);
+    rcp_bytes_free(&w1);
+    rcp_bytes_free(&m1);
+    rcp_mock_server_destroy(srv);
+}
+
+/* ── issue #462 regression guard: the pre-existing entry points are
+ * unaffected ────────────────────────────────────────────────────────────── */
+
+/* rcp_mock_server_dispatch_e2e() itself takes no tv parameter at all, by
+ * construction -- there is no way for a caller to reach the
+ * presentation-time gate through it, whatever avtp_timestamp it is
+ * given. The exact request/config pair that
+ * test_dispatch_e2e_tscf_plain_mode_with_tv_true_postpones_a_standard_
+ * request() above proves IS postponed through the new _tscf sibling
+ * still executes immediately (RCP_MOCK_DISPATCH_OK) through this
+ * pre-existing entry point -- issue #462 added a new function, it did
+ * not change this one. */
+static void test_dispatch_e2e_still_ignores_presentation_time_after_462(void)
+{
+    rcp_mock_server_t *srv = rcp_mock_server_new();
+    rcp_bytes_t         resp = {0};
+    const uint8_t        pl[4] = {0x01, 0x02, 0x03, 0x04};
+    rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                    RCP_ACF_MSG_TYPE_ABB, true, TEST_SID, 1000000u,
+                                                    plain.data, plain.len, &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+/* Same regression guard for rcp_mock_server_dispatch_e2e_fragment() --
+ * still executes immediately, unaffected by issue #462's new sibling. */
+static void test_dispatch_e2e_fragment_still_ignores_presentation_time_after_462(void)
+{
+    rcp_mock_server_t *srv    = rcp_mock_server_new();
+    const uint8_t       pl[4] = {0x01, 0x02, 0x03, 0x04};
+    rcp_bytes_t          plain = make_abb(0, 0, 0, pl, sizeof(pl));
+    rcp_bytes_t          wrapped;
+    rcp_bytes_t          resp = {0};
+
+    set_up_frag_stream(srv, counting_handler);
+    wrapped = rcp_e2e_wrap_framed(TEST_SID, false, TEST_TS, plain.data, plain.len);
+    TEST_ASSERT_NOT_NULL(wrapped.data);
+
+    g_handler_called = false;
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch_e2e_fragment(srv, 0x11, RCP_AVTP_SUBTYPE_TSCF,
+                                                             RCP_ACF_MSG_TYPE_ABB, true, TEST_SID,
+                                                             TEST_TS, wrapped.data, wrapped.len,
+                                                             &resp));
+    TEST_ASSERT_TRUE(g_handler_called);
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&wrapped);
+    rcp_bytes_free(&plain);
+    rcp_mock_server_destroy(srv);
+}
+
+/* Same regression guard for rcp_mock_server_dispatch_frame_e2e() --
+ * still executes immediately, unaffected by issue #462's new sibling. */
+static void test_dispatch_frame_e2e_still_ignores_presentation_time_after_462(void)
+{
+    rcp_mock_server_t             *srv = rcp_mock_server_new();
+    const uint8_t                   a[4] = {0xA1, 0xA2, 0xA3, 0xA4};
+    rcp_bytes_t                     m1   = make_abb(0, 0, 0, a, sizeof(a));
+    rcp_bytes_t                     w1   = rcp_e2e_wrap(TEST_SID, TEST_TS, m1.data, m1.len);
+    rcp_mock_frame_member_result_t  results[4];
+    size_t                          dispatched;
+
+    TEST_ASSERT_EQUAL_UINT(16u, w1.len);
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, true, counting_handler, NULL);
+    TEST_ASSERT_TRUE(rcp_mock_server_set_endpoint_req_crc_enable(srv, 0x11, true));
+
+    g_handler_called = false;
+    dispatched = rcp_mock_server_dispatch_frame_e2e(srv, RCP_AVTP_SUBTYPE_TSCF, true, TEST_SID,
+                                                     TEST_TS, 0u, w1.data, w1.len, results, 4);
+    TEST_ASSERT_EQUAL_UINT(1u, dispatched);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK, results[0].result);
+    TEST_ASSERT_TRUE(g_handler_called);
+
+    rcp_bytes_free(&results[0].response);
+    rcp_bytes_free(&w1);
+    rcp_bytes_free(&m1);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── REQ-E2E-042: pad EXCLUSION, trailer placement, and quadlet alignment ───── */
 
 /* TC18 sec. 13.6 Figures 20/21's own worked ACF_ABB example: an 8-octet
@@ -2281,6 +2514,14 @@ int main(void)
     RUN_TEST(test_dispatch_e2e_fragment_out_of_order_segment_is_rejected_and_resets);
     RUN_TEST(test_dispatch_e2e_fragment_too_large_reassembly_is_rejected);
     RUN_TEST(test_dispatch_e2e_fragment_unresolvable_stream_falls_back_to_dispatch_e2e);
+
+    RUN_TEST(test_dispatch_e2e_tscf_plain_mode_with_tv_true_postpones_a_standard_request);
+    RUN_TEST(test_dispatch_e2e_tscf_safe_mode_with_tv_true_postpones_a_standard_request);
+    RUN_TEST(test_dispatch_e2e_fragment_tscf_with_tv_true_postpones_a_standard_request);
+    RUN_TEST(test_dispatch_frame_e2e_tscf_with_tv_true_postpones_a_standard_request);
+    RUN_TEST(test_dispatch_e2e_still_ignores_presentation_time_after_462);
+    RUN_TEST(test_dispatch_e2e_fragment_still_ignores_presentation_time_after_462);
+    RUN_TEST(test_dispatch_frame_e2e_still_ignores_presentation_time_after_462);
 
     RUN_TEST(test_crc_omits_pad_octets_wire_order_header_payload_crc_then_pad);
     return UNITY_END();

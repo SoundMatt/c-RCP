@@ -1507,13 +1507,16 @@ static rcp_mock_dispatch_result_t dispatch_plain_inner(rcp_mock_server_t *srv,
      * tv=false, 0u, 0u: REQ-TIMED-012's own TSCF presentation-time gate
      * (server.h) is now wired to tv/avtp_timestamp/gptp_reference_now,
      * this function's own new parameters (REQ-TIMED-012/013, issue
-     * #336 follow-on) -- rcp_mock_server_dispatch()/_dispatch_e2e()
-     * still call through with tv=false, 0u, 0u, so every one of their
-     * own existing callers keeps its exact prior behavior: every
-     * request dispatched through THEM is, and remains, treated as if
-     * it arrived under an NTSCF header. Only rcp_mock_server_dispatch_
-     * tscf() (mock.h) supplies real values, for a caller that decoded
-     * an actual TSCF header one layer up. */
+     * #336 follow-on) -- rcp_mock_server_dispatch()/_dispatch_e2e()/
+     * _dispatch_e2e_fragment() still call through with tv=false, 0u, 0u
+     * at every one of THEIR own call sites, so every one of their own
+     * existing callers keeps its exact prior behavior: every request
+     * dispatched through them is, and remains, treated as if it arrived
+     * under an NTSCF header. Only rcp_mock_server_dispatch_tscf() and its
+     * E2E-aware siblings added alongside it -- rcp_mock_server_dispatch_
+     * e2e_tscf()/_dispatch_e2e_fragment_tscf()/_dispatch_frame_e2e_tscf()
+     * (issue #462) -- supply real values, for a caller that decoded an
+     * actual TSCF header one layer up. */
     /* issue #463, REQ-SRV-016: _with_ack() (not the plain wrapper) so a
      * successfully-stored request's own evt[3] "if requested" acknowledge
      * (TC18 §12.9.5) is actually built -- see finish_admission()'s own doc
@@ -1962,6 +1965,136 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
     return result;
 }
 
+//cfusa:req REQ-TIMED-012
+//cfusa:req REQ-TIMED-013
+//cfusa:req REQ-E2E-021
+//cfusa:req REQ-E2E-031
+//cfusa:req REQ-E2E-041
+//cfusa:req REQ-WDG-010
+/* REQ-TIMED-012/013 (issue #462): rcp_mock_server_dispatch_e2e()'s own
+ * TSCF-aware counterpart, byte-for-byte identical to it in every respect
+ * EXCEPT that the two dispatch_plain() call sites below thread this
+ * call's own tv/avtp_timestamp/gptp_reference_now through to the
+ * REQ-TIMED-012 presentation-time gate (server.h's admit_under_tscf_
+ * gate(), reached via dispatch_plain_inner()'s rcp_server_endpoint_
+ * admit() call) instead of hardcoding tv=false, 0u, 0u the way
+ * rcp_mock_server_dispatch_e2e() itself still does for every one of its
+ * own existing callers.
+ *
+ * This is a NEW, additional entry point, not a signature change to
+ * rcp_mock_server_dispatch_e2e() -- mirrors the exact "new function, not
+ * a breaking change" pattern rcp_mock_server_dispatch_tscf() itself
+ * already established alongside rcp_mock_server_dispatch() (see that
+ * function's own doc comment, mock.h): every one of dispatch_e2e()'s own
+ * existing call sites is completely unaffected; a caller with a real
+ * decoded TSCF header simply has somewhere new to hand tv=true/
+ * avtp_timestamp/gptp_reference_now instead. Deliberately a full,
+ * separate copy of dispatch_e2e()'s own body -- not a shared refactor --
+ * for the same "keep this addition from touching any already-passing
+ * behavior" reasoning rcp_mock_server_dispatch_e2e_fragment()'s own CRC-
+ * mismatch consequences block (mock.c, above) already gives for its own
+ * deliberate duplication. */
+rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_tscf(rcp_mock_server_t *srv,
+                                                               rcp_byte_bus_id_t byte_bus_id,
+                                                               uint8_t avtp_subtype,
+                                                               uint8_t acf_msg_type,
+                                                               bool time_sync_supported,
+                                                               uint64_t stream_id, bool tv,
+                                                               uint32_t avtp_timestamp,
+                                                               uint64_t gptp_reference_now,
+                                                               const uint8_t *request,
+                                                               size_t request_len,
+                                                               rcp_bytes_t *out_response)
+{
+    rcp_mock_endpoint_slot_t *slot;
+    rcp_bytes_t                unwrapped;
+    rcp_e2e_errc_t             unwrap_result;
+    rcp_mock_dispatch_result_t result;
+
+    memset(out_response, 0, sizeof(*out_response));
+
+    /* REQ-WDG-010: same "receipt, not validation" watchdog-kick rule and
+     * ordering as rcp_mock_server_dispatch_e2e()'s own identical kick. */
+    if (srv->watchdog != NULL) rcp_watchdog_keeper_kick(srv->watchdog, stream_id);
+
+    /* REQ-E2E-021: same whole-stream fault-block check, same ordering,
+     * as rcp_mock_server_dispatch_e2e()'s own identical block -- see that
+     * function's own doc comment. */
+    if (srv->stream_fault_tracker != NULL &&
+        rcp_e2e_stream_fault_tracker_is_faulted(srv->stream_fault_tracker, stream_id)) {
+        rcp_acf_byte_message_info_t hdr = {0};
+        if (request_len >= 8 && rcp_acf_unpack_header(request, &hdr) == RCP_ACF_OK) {
+            *out_response =
+                rcp_acf_build_error_response(byte_bus_id, hdr.transaction_num, RCP_ERROR_POCI_FAILURE);
+        }
+        return RCP_MOCK_DISPATCH_STREAM_FAULTED;
+    }
+
+    /* "plain command mode" (TC18 §13.6): same delegation rule as
+     * rcp_mock_server_dispatch_e2e()'s own identical branch, but this
+     * call's own real tv/avtp_timestamp/gptp_reference_now are threaded
+     * through to dispatch_plain() rather than hardcoded tv=false, 0u, 0u
+     * -- the entire point of this function's existence (REQ-TIMED-012/
+     * 013): an endpoint in plain command mode still has its own
+     * TSCF-headed request subject to the presentation-time gate. */
+    slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
+    if (!slot || !slot->req_crc_enable) {
+        return dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
+                               stream_id, tv, avtp_timestamp, gptp_reference_now, request,
+                               request_len, out_response);
+    }
+
+    unwrap_result = rcp_e2e_unwrap_framed(stream_id, avtp_subtype == RCP_AVTP_SUBTYPE_NTSCF,
+                                           avtp_timestamp, request, request_len, &unwrapped);
+    if (unwrap_result != RCP_E2E_OK) {
+        /* Same CRC-mismatch/short-frame handling as
+         * rcp_mock_server_dispatch_e2e()'s own identical block -- see
+         * that function's own doc comments for the full rationale of
+         * each consequence below. Nothing here depends on tv/
+         * avtp_timestamp/gptp_reference_now: a CRC failure is never
+         * admitted at all, so the presentation-time gate never runs. */
+        rcp_wire_error_t werr = rcp_e2e_wire_error(unwrap_result);
+        if (werr != RCP_ERROR_NONE) {
+            rcp_acf_byte_message_info_t hdr = {0};
+            if (request_len >= 8 && rcp_acf_unpack_header(request, &hdr) == RCP_ACF_OK) {
+                *out_response = rcp_acf_build_error_response(byte_bus_id, hdr.transaction_num, werr);
+            }
+        }
+        if (srv->stream_fault_tracker != NULL) {
+            (void)rcp_e2e_stream_fault_tracker_on_crc_error(srv->stream_fault_tracker, stream_id,
+                                                              slot->rx_enforce_e2e);
+        }
+        {
+            uint8_t crc_stream_index = rcp_regmap_request_stream_cfg_resolve_index(
+                srv->request_stream_cfg, srv->request_stream_cfg_count, stream_id);
+            if (crc_stream_index != 0u) {
+                (void)rcp_e2e_stream_status_note_crc_error(
+                    &srv->stream_status[crc_stream_index - 1u], slot->rx_enforce_e2e);
+            }
+        }
+        {
+            uint8_t crc_stream_index = rcp_regmap_request_stream_cfg_resolve_index(
+                srv->request_stream_cfg, srv->request_stream_cfg_count, stream_id);
+            if (crc_stream_index != 0u &&
+                rcp_e2e_crc_error_should_enter_safe_state(slot->rx_enforce_e2e)) {
+                (void)rcp_mock_server_broadcast_safe_state(srv, crc_stream_index);
+            }
+        }
+        rcp_bytes_free(&unwrapped);
+        return RCP_MOCK_DISPATCH_CRC_ERROR;
+    }
+
+    /* CRC validated: dispatch the unwrapped header-and-payload region via
+     * dispatch_plain(), this call's own real tv/avtp_timestamp/gptp_
+     * reference_now threaded through -- same already-kicked-once
+     * reasoning as the delegation branch above. */
+    result = dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
+                             stream_id, tv, avtp_timestamp, gptp_reference_now, unwrapped.data,
+                             unwrapped.len, out_response);
+    rcp_bytes_free(&unwrapped);
+    return result;
+}
+
 //cfusa:req REQ-E2E-038
 //cfusa:req REQ-E2E-039
 rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
@@ -2250,6 +2383,326 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
                 result = dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type,
                                          time_sync_supported, stream_id, false, 0u, 0u, encoded.data,
                                          encoded.len, out_response);
+                rcp_bytes_free(&encoded);
+                return result;
+            }
+        }
+    }
+}
+
+//cfusa:req REQ-TIMED-012
+//cfusa:req REQ-TIMED-013
+//cfusa:req REQ-E2E-038
+//cfusa:req REQ-E2E-039
+/* REQ-TIMED-012/013 (issue #462): rcp_mock_server_dispatch_e2e_fragment()'s
+ * own TSCF-aware counterpart, byte-for-byte identical to it in every
+ * respect EXCEPT that this call's own tv/avtp_timestamp/gptp_reference_now
+ * are threaded through to the REQ-TIMED-012 presentation-time gate at
+ * every one of its own dispatch_plain() call sites (plain-command-mode
+ * delegation and both completed-reassembly dispatches), and its own two
+ * "never/no-longer fragmented" fallback calls now reach rcp_mock_server_
+ * dispatch_e2e_tscf() rather than rcp_mock_server_dispatch_e2e() --
+ * otherwise this call's own tv/avtp_timestamp/gptp_reference_now would
+ * be silently dropped one layer down, reopening the exact gap this
+ * function itself exists to close.
+ *
+ * This is a NEW, additional entry point, not a signature change to
+ * rcp_mock_server_dispatch_e2e_fragment() -- same "new function, not a
+ * breaking change" pattern as rcp_mock_server_dispatch_e2e_tscf()'s own
+ * doc comment describes, deliberately a full, separate copy of that
+ * function's own body rather than a shared refactor. */
+rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment_tscf(
+    rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id, uint8_t avtp_subtype,
+    uint8_t acf_msg_type, bool time_sync_supported, uint64_t stream_id, bool tv,
+    uint32_t avtp_timestamp, uint64_t gptp_reference_now, const uint8_t *fragment,
+    size_t fragment_len, rcp_bytes_t *out_response)
+{
+    rcp_mock_endpoint_slot_t   *slot;
+    uint8_t                     stream_index;
+    rcp_fragment_reassembler_t *reasm;
+    rcp_acf_byte_message_info_t peek_hdr = {0};
+    size_t                      header_len;
+    rcp_fragment_reasm_result_t reasm_result;
+    rcp_mock_dispatch_result_t  result;
+
+    memset(out_response, 0, sizeof(*out_response));
+
+    /* Same watchdog-kick / stream-fault-tracker / plain-command-mode
+     * delegation checks as rcp_mock_server_dispatch_e2e_fragment(), same
+     * order, same reasons -- see that function's own doc comment. */
+    if (srv->watchdog != NULL) rcp_watchdog_keeper_kick(srv->watchdog, stream_id);
+
+    if (srv->stream_fault_tracker != NULL &&
+        rcp_e2e_stream_fault_tracker_is_faulted(srv->stream_fault_tracker, stream_id)) {
+        rcp_acf_byte_message_info_t hdr = {0};
+        if (fragment_len >= 8 && rcp_acf_unpack_header(fragment, &hdr) == RCP_ACF_OK) {
+            *out_response =
+                rcp_acf_build_error_response(byte_bus_id, hdr.transaction_num, RCP_ERROR_POCI_FAILURE);
+        }
+        return RCP_MOCK_DISPATCH_STREAM_FAULTED;
+    }
+
+    /* REQ-MOCK-031 (issue #432): stream-scoped, not find_slot() -- see
+     * find_slot_on_stream()'s own doc comment. */
+    slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
+    if (!slot || !slot->req_crc_enable) {
+        return dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type, time_sync_supported,
+                               stream_id, tv, avtp_timestamp, gptp_reference_now, fragment,
+                               fragment_len, out_response);
+    }
+
+    /* A cheap 8-octet peek -- format-identical for ACF_ABB and ACF_GBB,
+     * since a GBB header is an ABB header's same 8 octets plus 8 more of
+     * timestamp -- to learn ms/read_size_or_segment_num without
+     * committing to either variant's own full decode yet. The final
+     * fragment's own full decode is CRC-trailer-sensitive (see below)
+     * and must not be attempted until ms is known to be false. */
+    if (fragment_len < 8 || rcp_acf_unpack_header(fragment, &peek_hdr) != RCP_ACF_OK) {
+        return RCP_MOCK_DISPATCH_REJECTED;
+    }
+
+    stream_index = rcp_regmap_request_stream_cfg_resolve_index(
+        srv->request_stream_cfg, srv->request_stream_cfg_count, stream_id);
+    if (stream_index == 0u) {
+        /* No configured request-stream slot to reassemble into --
+         * rcp_mock_server_dispatch_e2e_tscf() itself has no such
+         * dependency, so fall back to it (not the plain, non-TSCF-gated
+         * rcp_mock_server_dispatch_e2e()) unchanged rather than reject
+         * outright. */
+        return rcp_mock_server_dispatch_e2e_tscf(srv, byte_bus_id, avtp_subtype, acf_msg_type,
+                                                  time_sync_supported, stream_id, tv, avtp_timestamp,
+                                                  gptp_reference_now, fragment, fragment_len,
+                                                  out_response);
+    }
+    reasm      = &srv->frag_reasm[stream_index - 1u];
+    header_len = (acf_msg_type == RCP_ACF_MSG_TYPE_GBB) ? RCP_ACF_GBB_HEADER_LEN
+                                                          : RCP_ACF_ABB_HEADER_LEN;
+
+    if (peek_hdr.ms) {
+        /* Intermediate fragment (REQ-E2E-039): no CRC trailer, safe to
+         * decode fully and directly. */
+        const uint8_t *payload;
+        size_t         payload_len;
+
+        if (acf_msg_type == RCP_ACF_MSG_TYPE_GBB) {
+            rcp_acf_gbb_header_t hdr;
+            if (rcp_acf_decode_gbb(fragment, fragment_len, &hdr, &payload, &payload_len) !=
+                RCP_ACF_OK) {
+                return RCP_MOCK_DISPATCH_REJECTED;
+            }
+        } else {
+            rcp_acf_byte_message_info_t hdr;
+            if (rcp_acf_decode_abb(fragment, fragment_len, &hdr, &payload, &payload_len) !=
+                RCP_ACF_OK) {
+                return RCP_MOCK_DISPATCH_REJECTED;
+            }
+        }
+
+        if (!rcp_fragment_reassembler_is_collecting(reasm)) {
+            /* First fragment of a new sequence: remember its own raw
+             * encoded header bytes for REQ-E2E-038's eventual fragmented
+             * CRC check. header_len <= fragment_len is already
+             * guaranteed by the successful decode above. */
+            memcpy(srv->frag_first_header[stream_index - 1u], fragment, header_len);
+            srv->frag_first_header_len[stream_index - 1u] = header_len;
+        }
+
+        reasm_result = rcp_fragment_reassembler_feed(reasm, true, peek_hdr.read_size_or_segment_num,
+                                                       payload, payload_len);
+        if (reasm_result != RCP_FRAGMENT_REASM_CONTINUE) {
+            rcp_fragment_reassembler_reset(reasm);
+            return RCP_MOCK_DISPATCH_REJECTED;
+        }
+        return RCP_MOCK_DISPATCH_FRAGMENT_PENDING;
+    }
+
+    /* ms == 0: final fragment. */
+    if (!rcp_fragment_reassembler_is_collecting(reasm)) {
+        /* Never actually fragmented -- byte-identical to calling
+         * rcp_mock_server_dispatch_e2e_tscf() directly. */
+        return rcp_mock_server_dispatch_e2e_tscf(srv, byte_bus_id, avtp_subtype, acf_msg_type,
+                                                  time_sync_supported, stream_id, tv, avtp_timestamp,
+                                                  gptp_reference_now, fragment, fragment_len,
+                                                  out_response);
+    }
+
+    /* Real multi-fragment message completing: this final fragment's own
+     * message carries the CRC32 trailer in its raw last RCP_E2E_CRC_LEN
+     * octets, and its own acf_msg_length is already adapted by +1
+     * quadlet for it (REQ-E2E-039/e2e.h) -- rcp_e2e_unwrap_framed() is
+     * the already-tested tool that strips/adapts that, exactly as
+     * rcp_mock_server_dispatch_e2e_tscf() itself already relies on for
+     * the single-fragment case. Its OWN CRC verdict is wrong for this
+     * fragmented case (single-frame formula) and is deliberately
+     * ignored here -- rcp_e2e_compute_fragmented_crc() below is the
+     * real check (REQ-E2E-038). */
+    {
+        uint32_t       got;
+        rcp_bytes_t    unwrapped;
+        rcp_e2e_errc_t unwrap_result;
+        /* rcp_e2e_wrap_framed()'s own rule (e2e.h): an NTSCF-framed
+         * message carries no avtp_timestamp field of its own on the
+         * wire at all, so its CRC's own avtp_timestamp contribution is
+         * always 0, regardless of whatever this call's own
+         * avtp_timestamp argument happens to be -- rcp_e2e_unwrap_framed()
+         * below already applies this same forcing internally for its own
+         * (ignored) single-frame verdict; rcp_e2e_compute_fragmented_crc()
+         * has no _framed() counterpart of its own to do so on this
+         * function's behalf, so it is applied here explicitly. */
+        uint32_t effective_ts = (avtp_subtype == RCP_AVTP_SUBTYPE_NTSCF) ? 0u : avtp_timestamp;
+
+        if (fragment_len < RCP_E2E_CRC_LEN) {
+            rcp_fragment_reassembler_reset(reasm);
+            return RCP_MOCK_DISPATCH_REJECTED;
+        }
+
+        /* Pad-aware CRC location (issue #445): TC18 Figures 20/21 place
+         * the CRC32 immediately after the real (unpadded) payload, with
+         * any quadlet-alignment pad octets re-seated AFTER the trailer --
+         * frame = [real_len][CRC32][pad_octets], not "the trailer is
+         * always the last RCP_E2E_CRC_LEN octets of the frame" (only ever
+         * true when pad_octets == 0). rcp_e2e_wrap()/_unwrap() (e2e.c,
+         * issue #420) already locate that boundary this same way, reading
+         * it straight out of the header's own wire-format "pad" field
+         * (acf.h Figure 7, byte_message_info octet 2 bits 7:6) --
+         * peek_hdr.pad above decoded that exact field from this same
+         * fragment already, so no fresh read is needed here. */
+        if ((size_t)peek_hdr.pad > fragment_len - RCP_E2E_CRC_LEN) {
+            rcp_fragment_reassembler_reset(reasm);
+            return RCP_MOCK_DISPATCH_REJECTED;
+        }
+        {
+            size_t real_len = fragment_len - RCP_E2E_CRC_LEN - (size_t)peek_hdr.pad;
+
+            got = ((uint32_t)fragment[real_len] << 24) |
+                  ((uint32_t)fragment[real_len + 1] << 16) |
+                  ((uint32_t)fragment[real_len + 2] << 8) | (uint32_t)fragment[real_len + 3];
+        }
+
+        unwrap_result = rcp_e2e_unwrap_framed(stream_id, avtp_subtype == RCP_AVTP_SUBTYPE_NTSCF,
+                                               avtp_timestamp, fragment, fragment_len, &unwrapped);
+        if (unwrap_result == RCP_E2E_ERR_SHORT_FRAME) {
+            rcp_bytes_free(&unwrapped);
+            rcp_fragment_reassembler_reset(reasm);
+            return RCP_MOCK_DISPATCH_REJECTED;
+        }
+
+        if (acf_msg_type == RCP_ACF_MSG_TYPE_GBB) {
+            rcp_acf_gbb_header_t final_hdr;
+            const uint8_t       *final_payload;
+            size_t                final_payload_len;
+            const uint8_t        *reassembled;
+            size_t                reassembled_len;
+            uint32_t              want;
+
+            if (rcp_acf_decode_gbb(unwrapped.data, unwrapped.len, &final_hdr, &final_payload,
+                                    &final_payload_len) != RCP_ACF_OK) {
+                rcp_bytes_free(&unwrapped);
+                rcp_fragment_reassembler_reset(reasm);
+                return RCP_MOCK_DISPATCH_REJECTED;
+            }
+
+            reasm_result =
+                rcp_fragment_reassembler_feed(reasm, false, 0u, final_payload, final_payload_len);
+            if (reasm_result != RCP_FRAGMENT_REASM_COMPLETE) {
+                rcp_bytes_free(&unwrapped);
+                rcp_fragment_reassembler_reset(reasm);
+                return RCP_MOCK_DISPATCH_REJECTED;
+            }
+            rcp_fragment_reassembler_get(reasm, &reassembled, &reassembled_len);
+            want = rcp_e2e_compute_fragmented_crc(stream_id, effective_ts,
+                                                   srv->frag_first_header[stream_index - 1u],
+                                                   srv->frag_first_header_len[stream_index - 1u],
+                                                   reassembled, reassembled_len);
+
+            if (got != want) {
+                /* Same three consequences rcp_mock_server_dispatch_e2e_
+                 * tscf()'s own CRC-mismatch branch already applies
+                 * (REQ-E2E-021/REQ-E2E-045/REQ-E2E-046) -- duplicated here
+                 * deliberately rather than refactored out of that
+                 * already-tested function, to keep this addition from
+                 * touching any already-passing behavior. */
+                *out_response = rcp_acf_build_error_response(byte_bus_id,
+                                                               final_hdr.info.transaction_num,
+                                                               RCP_ERROR_POCI_FAILURE);
+                if (srv->stream_fault_tracker != NULL) {
+                    (void)rcp_e2e_stream_fault_tracker_on_crc_error(srv->stream_fault_tracker,
+                                                                      stream_id, slot->rx_enforce_e2e);
+                }
+                (void)rcp_e2e_stream_status_note_crc_error(&srv->stream_status[stream_index - 1u],
+                                                            slot->rx_enforce_e2e);
+                if (rcp_e2e_crc_error_should_enter_safe_state(slot->rx_enforce_e2e)) {
+                    (void)rcp_mock_server_broadcast_safe_state(srv, stream_index);
+                }
+                rcp_bytes_free(&unwrapped);
+                rcp_fragment_reassembler_reset(reasm);
+                return RCP_MOCK_DISPATCH_CRC_ERROR;
+            }
+
+            {
+                rcp_bytes_t encoded = rcp_acf_encode_gbb(&final_hdr, reassembled, reassembled_len);
+                rcp_bytes_free(&unwrapped);
+                rcp_fragment_reassembler_reset(reasm);
+                if (!encoded.data && reassembled_len != 0u) return RCP_MOCK_DISPATCH_REJECTED;
+                result = dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type,
+                                         time_sync_supported, stream_id, tv, avtp_timestamp,
+                                         gptp_reference_now, encoded.data, encoded.len, out_response);
+                rcp_bytes_free(&encoded);
+                return result;
+            }
+        } else {
+            rcp_acf_byte_message_info_t final_hdr;
+            const uint8_t               *final_payload;
+            size_t                       final_payload_len;
+            const uint8_t               *reassembled;
+            size_t                       reassembled_len;
+            uint32_t                     want;
+
+            if (rcp_acf_decode_abb(unwrapped.data, unwrapped.len, &final_hdr, &final_payload,
+                                    &final_payload_len) != RCP_ACF_OK) {
+                rcp_bytes_free(&unwrapped);
+                rcp_fragment_reassembler_reset(reasm);
+                return RCP_MOCK_DISPATCH_REJECTED;
+            }
+
+            reasm_result =
+                rcp_fragment_reassembler_feed(reasm, false, 0u, final_payload, final_payload_len);
+            if (reasm_result != RCP_FRAGMENT_REASM_COMPLETE) {
+                rcp_bytes_free(&unwrapped);
+                rcp_fragment_reassembler_reset(reasm);
+                return RCP_MOCK_DISPATCH_REJECTED;
+            }
+            rcp_fragment_reassembler_get(reasm, &reassembled, &reassembled_len);
+            want = rcp_e2e_compute_fragmented_crc(stream_id, effective_ts,
+                                                   srv->frag_first_header[stream_index - 1u],
+                                                   srv->frag_first_header_len[stream_index - 1u],
+                                                   reassembled, reassembled_len);
+
+            if (got != want) {
+                *out_response = rcp_acf_build_error_response(byte_bus_id, final_hdr.transaction_num,
+                                                               RCP_ERROR_POCI_FAILURE);
+                if (srv->stream_fault_tracker != NULL) {
+                    (void)rcp_e2e_stream_fault_tracker_on_crc_error(srv->stream_fault_tracker,
+                                                                      stream_id, slot->rx_enforce_e2e);
+                }
+                (void)rcp_e2e_stream_status_note_crc_error(&srv->stream_status[stream_index - 1u],
+                                                            slot->rx_enforce_e2e);
+                if (rcp_e2e_crc_error_should_enter_safe_state(slot->rx_enforce_e2e)) {
+                    (void)rcp_mock_server_broadcast_safe_state(srv, stream_index);
+                }
+                rcp_bytes_free(&unwrapped);
+                rcp_fragment_reassembler_reset(reasm);
+                return RCP_MOCK_DISPATCH_CRC_ERROR;
+            }
+
+            {
+                rcp_bytes_t encoded = rcp_acf_encode_abb(&final_hdr, reassembled, reassembled_len);
+                rcp_bytes_free(&unwrapped);
+                rcp_fragment_reassembler_reset(reasm);
+                if (!encoded.data && reassembled_len != 0u) return RCP_MOCK_DISPATCH_REJECTED;
+                result = dispatch_plain(srv, byte_bus_id, avtp_subtype, acf_msg_type,
+                                         time_sync_supported, stream_id, tv, avtp_timestamp,
+                                         gptp_reference_now, encoded.data, encoded.len, out_response);
                 rcp_bytes_free(&encoded);
                 return result;
             }
@@ -2757,6 +3210,171 @@ size_t rcp_mock_server_dispatch_frame_e2e(rcp_mock_server_t *srv, uint8_t avtp_s
                                                           time_sync_supported, stream_id,
                                                           avtp_timestamp, member, member_len,
                                                           &out->response);
+
+        /* A member whose CRC failed never reached its endpoint's store
+         * either -- same chaining-error treatment as unknown-bus/
+         * rejected/dropped. */
+        prev_errored = (out->result == RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS ||
+                        out->result == RCP_MOCK_DISPATCH_REJECTED ||
+                        out->result == RCP_MOCK_DISPATCH_DROPPED ||
+                        out->result == RCP_MOCK_DISPATCH_CRC_ERROR);
+
+        /* REQ-CANCEL-012: see rcp_mock_server_dispatch_frame()'s own
+         * identical block for the full rationale. REQ-MOCK-031 (issue
+         * #432): stream-scoped, not find_slot() -- same reasoning as
+         * that function's own identical block. */
+        if (out->result == RCP_MOCK_DISPATCH_PENDING) {
+            rcp_mock_endpoint_slot_t *slot = find_slot_on_stream(srv, stream_id, byte_bus_id);
+            if (slot) {
+                size_t last = last_pending_index(&slot->queue);
+                (void)rcp_server_endpoint_chain_predecessor_done(&slot->queue, last, 0u);
+                if (last < RCP_SERVER_MAX_PENDING) {
+                    slot->queue.pending[last].chain_group    = chain_group;
+                    slot->queue.pending[last].chain_position = (uint8_t)chain_position;
+                }
+            }
+        }
+
+        dispatched++;
+    }
+
+    return dispatched;
+}
+
+//cfusa:req REQ-TIMED-012
+//cfusa:req REQ-TIMED-013
+//cfusa:req REQ-E2E-033
+/* REQ-TIMED-012/013 (issue #462): rcp_mock_server_dispatch_frame_e2e()'s
+ * own TSCF-aware counterpart, byte-for-byte identical to it in every
+ * respect EXCEPT that this call's own tv/avtp_timestamp/gptp_reference_now
+ * are threaded through to the REQ-TIMED-012 presentation-time gate at
+ * its own per-member dispatch call site, which now reaches
+ * rcp_mock_server_dispatch_e2e_tscf() rather than rcp_mock_server_
+ * dispatch_e2e() -- otherwise this call's own tv/avtp_timestamp/
+ * gptp_reference_now would be silently dropped one layer down (every
+ * member routed through the plain, non-TSCF-gated entry point), the
+ * exact gap this function itself exists to close.
+ *
+ * This is a NEW, additional entry point, not a signature change to
+ * rcp_mock_server_dispatch_frame_e2e() -- same "new function, not a
+ * breaking change" pattern as rcp_mock_server_dispatch_e2e_tscf()'s own
+ * doc comment describes, deliberately a full, separate copy of that
+ * function's own body rather than a shared refactor. */
+size_t rcp_mock_server_dispatch_frame_e2e_tscf(rcp_mock_server_t *srv, uint8_t avtp_subtype,
+                                                bool time_sync_supported, uint64_t stream_id,
+                                                bool tv, uint32_t avtp_timestamp,
+                                                uint64_t gptp_reference_now, uint8_t sequence_num,
+                                                const uint8_t *frame, size_t frame_len,
+                                                rcp_mock_frame_member_result_t *out_results,
+                                                size_t out_cap)
+{
+    size_t offsets[RCP_MOCK_MAX_FRAME_MEMBERS];
+    size_t real_count;
+    size_t stored_count;
+    size_t process_count;
+    size_t i;
+    size_t dispatched = 0;
+    bool   chain_aborted = false;
+    bool   prev_errored  = false;
+    uint8_t cs           = 0;
+    /* REQ-CANCEL-012 (issue #334): same chain-group/position bookkeeping
+     * as rcp_mock_server_dispatch_frame()'s own identical local state --
+     * see that function's own comment for the full rationale. */
+    uint32_t chain_group    = 0;
+    size_t   chain_position = 0;
+
+    real_count = rcp_sched_split_frame_members(frame, frame_len, offsets, RCP_MOCK_MAX_FRAME_MEMBERS);
+    if (real_count == 0) return 0;
+
+    stored_count = (real_count < RCP_MOCK_MAX_FRAME_MEMBERS) ? real_count : RCP_MOCK_MAX_FRAME_MEMBERS;
+    process_count = (stored_count < out_cap) ? stored_count : out_cap;
+
+    if (!frame_seq_gate_admits(srv, stream_id, sequence_num)) {
+        for (i = 0; i < process_count; i++) {
+            out_results[i].result      = RCP_MOCK_DISPATCH_SEQ_ERROR;
+            out_results[i].byte_bus_id = 0;
+            memset(&out_results[i].response, 0, sizeof(out_results[i].response));
+        }
+        return process_count;
+    }
+
+    for (i = 0; i < process_count; i++) {
+        size_t                           member_off;
+        size_t                           member_end;
+        size_t                           member_len;
+        const uint8_t                   *member;
+        uint8_t                          msg_type    = 0;
+        rcp_byte_bus_id_t                byte_bus_id = 0;
+        rcp_mock_frame_member_result_t  *out         = &out_results[dispatched];
+        bool                              chained_flag;
+        uint8_t                           member_tn   = 0;
+
+        member_off = offsets[i];
+        if (i + 1 < stored_count) {
+            member_end = offsets[i + 1];
+        } else if (i + 1 == real_count) {
+            member_end = frame_len;
+        } else {
+            break;
+        }
+
+        member_len = member_end - member_off;
+        member     = &frame[member_off];
+
+        if (!peek_member_byte_bus_id(member, member_len, &msg_type, &byte_bus_id)) {
+            out->result      = RCP_MOCK_DISPATCH_ERR_UNKNOWN_BUS;
+            out->byte_bus_id = 0;
+            memset(&out->response, 0, sizeof(out->response));
+            prev_errored     = true;
+            dispatched++;
+            continue;
+        }
+
+        out->byte_bus_id = byte_bus_id;
+
+        chained_flag = is_chained_member(member, member_len, &cs, &member_tn);
+
+        if (!chained_flag) {
+            chain_group    = (uint32_t)i + 1u;
+            chain_position = 0;
+        } else {
+            chain_position++;
+        }
+
+        if (chained_flag) {
+            rcp_chained_member_outcome_t outcome =
+                rcp_chained_advance(&chain_aborted, i > 0, prev_errored, cs);
+
+            if (outcome == RCP_CHAINED_MEMBER_CHAIN_ERROR) {
+                out->result   = RCP_MOCK_DISPATCH_CHAIN_ERROR;
+                out->response = rcp_acf_build_error_response(byte_bus_id, member_tn,
+                                                              RCP_ERROR_CHAIN_ERROR);
+                prev_errored  = true;
+                dispatched++;
+                continue;
+            }
+            if (outcome == RCP_CHAINED_MEMBER_CHAIN_ABORTED) {
+                out->result   = RCP_MOCK_DISPATCH_CHAIN_ABORTED;
+                out->response = rcp_acf_build_error_response(byte_bus_id, member_tn,
+                                                              RCP_ERROR_CHAIN_ABORTED);
+                prev_errored  = true;
+                dispatched++;
+                continue;
+            }
+        }
+
+        /* The one real difference from rcp_mock_server_dispatch_frame():
+         * each member is independently unwrapped-and-verified against
+         * its own CRC32 (if the addressed endpoint has req_crc_enable
+         * set) via rcp_mock_server_dispatch_e2e_tscf() -- TC18 §13.6's "a
+         * separate CRC32... for each E2E-protected ACF message"
+         * (REQ-E2E-033), never one CRC across the whole frame -- with
+         * this call's own tv/avtp_timestamp/gptp_reference_now threaded
+         * through to every member's own admission (REQ-TIMED-012/013). */
+        out->result      = rcp_mock_server_dispatch_e2e_tscf(srv, byte_bus_id, avtp_subtype, msg_type,
+                                                          time_sync_supported, stream_id, tv,
+                                                          avtp_timestamp, gptp_reference_now, member,
+                                                          member_len, &out->response);
 
         /* A member whose CRC failed never reached its endpoint's store
          * either -- same chaining-error treatment as unknown-bus/
