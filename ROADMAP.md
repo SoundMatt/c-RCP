@@ -19106,6 +19106,84 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.417.0 -- 2026-08-17 (c-RCP-16: SEOOC boundary/AoU document,
+`cfusa qualify` regression fix)
+
+First real pass at c-RCP-16 (issue #518), a large multi-PR-scale
+effort to move c-RCP's safety case toward an ASIL-D-*capable* SEOOC
+evidence package (not "make c-RCP ASIL-D" -- ASIL attaches to a
+vehicle-level hazard via an integrator's own item-level HARA, not to
+a software element in isolation). Of the issue's own five-item
+suggested approach, this release does items 1 and 2 completely;
+items 3-5 remain, tracked in a status comment on the issue rather
+than attempted shallowly here.
+
+**Item 1 -- SEOOC documentary skeleton.** Added `SEOOC_BOUNDARY.md`:
+an Item Definition boundary statement (what this element does not
+own -- no vehicle-level HARA, no integration-level ASIL assignment,
+no implied safety mechanism beyond what `SAFETY_PLAN.md` already
+lists, no hardware architectural metrics) plus a consolidated
+Assumptions of Use document per ISO 26262-10:2018 Clause 9.3, written
+for an integrator. The seven AoU items restate (not duplicate) facts
+already recorded in `safety-case.md` (GSN node A1), `HARA.md`
+(Residual Risks: H-004/H-007's deployment-responsibility notes,
+`rcp_e2e_endpoint_in_safe_state()`'s fail-closed posture, H-001's
+undecomposed ASIL-C rating), and `tara.md` (TS-001/TS-002/TS-003/TS-004
+residual-risk notes) -- each AoU item cites its source of record
+rather than inventing a new claim. `SAFETY_PLAN.md` gained a new
+"SEOOC status" section and an Artifact Locations row; `AUDIT_PACK.md`
+gained a new §2a cross-referencing it and explaining how it differs
+in audience from §2's existing ASIL-C Gap Analysis (internal
+derogation table vs. integrator-facing AoU).
+
+**Item 2 -- tool confidence level for `cfusa`.** Verified against
+current HEAD that `ci.yml`'s `cfusa-qualify` job and `release.yml`'s
+"Tool qualification evidence" step both invoke `cfusa qualify` with
+no `--qualification-method` flag, producing the same self-contradictory
+`qualify-report.json` shape (`"qualified": true` beside
+`"qualificationBadge": "unqualified"`/`"independenceStatus":
+"unqualified"`) issue #124 previously diagnosed. Added
+`--qualification-method self --qualifier "c-RCP CI (self-run,
+non-independent)" --implementation-author "SoundMatt/c-RCP
+maintainers"` to both invocations and regenerated `qualify-report.json`
+immediately (not deferred to the next tag) -- new shape:
+`"qualificationBadge": "self-qualified"`, `"achievableAsil":
+"ASIL-B"`. Deliberately did not add `--project-asil` -- this is an
+honest self-qualification disclosure, not a new hard gate.
+`SEOOC_BOUNDARY.md` §3 documents the substantive consequence for an
+integrator: `cfusa`'s own analysis output (distinct from c-RCP's
+requirement/test artifacts, which don't depend on `cfusa`'s own
+correctness) supports an ASIL-B tool-confidence argument at most per
+ISO 26262-8:2018 Clause 11's TD/TI-derived ceiling logic (no
+independent reviewer -> ASIL-B ceiling); an integrator targeting
+ASIL-C/D who wants to rely on `cfusa`'s analysis itself as safety
+evidence must separately qualify it to a higher TCL -- c-RCP cannot
+unilaterally do this on an integrator's behalf since `cfusa` is
+shared across the whole x-RCP ecosystem.
+
+Docs-and-CI-only change; no source file touched, no requirement
+added or modified. Full 66-test suite unchanged; ASan/UBSan clean
+(build unaffected, re-run for consistency); freshly built, CI-pinned
+`cfusa` (v0.5.54) `check`: 0 errors; `trace --req-coverage 100
+--sec-tested 100`: 1095/1095 (100%) requirements traced, 512/512
+(100%) functions annotated, byte-for-byte unchanged from baseline.
+
+Also updates `include/rcp/version.h`'s `RCP_VERSION` and
+`.fusa.json`'s `"version"` to `0.417.0` to match `CMakeLists.txt`,
+per the `version-sources-agree` gate (c-RCP-09, PR #529).
+
+**Deferred** (tracked in a status comment on issue #518, not
+attempted here): item 3, real MC/DC measurement via `c-FuSa`
+v0.5.53's `--mcdc-file`/`--achievable-asil` flags, landed first as a
+reported non-gating metric per the issue's own suggested sequencing;
+item 4, a freedom-from-interference argument for the current
+`.fusa-reqs.json` scope partition (which has itself evolved past the
+issue's own "scope: tc18 vs scope: legacy-compat" framing --
+current HEAD's split is `tc18`/`tc18-gap`/`retired`/`internal`, worth
+re-verifying against the issue's stale numbers before that pass
+starts); item 5, reframing `AUDIT_PACK.md` §2 itself (not just adding
+§2a alongside it) as an SEOOC evidence-package argument.
+
 ### v0.414.0 -- 2026-08-17 (c-RCP-18: "Writing a requirement"
 convention in CONTRIBUTING.md)
 
@@ -19177,6 +19255,46 @@ server/dispatch prefixes), batched the same way as this repo's own
 citation-backfill (#164) and table-number-census (#472) efforts, is
 the concrete follow-on. A master tracker issue for that batching
 (mirroring #256's pattern) is still needed before starting it.
+### v0.413.0 -- 2026-08-17 (c-RCP-09: fix SBOM/provenance/SPDX version
+drift)
+
+`sbom.json`, `provenance.json`, and the newest `c-RCP-*.spdx.json` had
+been declaring `module: "c-RCP@0.225.0"` across every real tag since
+v0.286.0 (five tags, ~184 source version bumps) even though each was
+regenerated fresh at every tag push. Root cause: `cfusa release`
+stamps a shipped artifact's declared version from `.fusa.json`'s
+`"version"` field, not from the git tag or from `CMakeLists.txt`'s
+`project()` VERSION -- and nothing kept `.fusa.json` (or
+`include/rcp/version.h`, which had independently fallen behind the
+same way) in sync with the value that actually got bumped every
+release, `CMakeLists.txt`.
+
+- Bumped `include/rcp/version.h`'s `RCP_VERSION` and `.fusa.json`'s
+  `"version"` from the stale `0.225.0` to `0.413.0`, matching
+  `CMakeLists.txt`'s `project()` VERSION.
+- Regenerated `sbom.json`, `provenance.json`, and
+  `artifact-manifest.json` via the pinned `cfusa release` (v0.5.54);
+  the freshly written `c-RCP-0.413.0.spdx.json` replaces the stale,
+  repeatedly-overwritten `c-RCP-0.225.0.spdx.json` (which never
+  corresponded to a real tagged release at that version -- it was
+  silently rewritten in place at every subsequent tag while its
+  filename never advanced).
+- Added two release-gate checks so this can't drift silently again:
+  `ci.yml`'s new `version-sources-agree` job fails any PR where
+  `CMakeLists.txt`/`version.h`/`.fusa.json` disagree, and
+  `release.yml` now verifies immediately after `cfusa release` that
+  `sbom.json`'s and `provenance.json`'s declared `module` version,
+  and the presence of a `c-RCP-<version>.spdx.json` matching
+  `version.h`'s `RCP_VERSION`, agree with the version actually being
+  released -- before the artifacts are committed. Both checks were
+  mutation-tested against the pre-fix `.fusa.json`/`sbom.json` state
+  and confirmed to fail on it.
+
+No behavior change to the library itself; `.fusa-reqs.json` untouched.
+Full 66-test suite + ASan/UBSan clean; `cfusa check`: 0 errors;
+`trace --req-coverage 100 --sec-tested 100`: 1095/1095 (100%)
+requirements traced, 512/512 (100%) functions annotated, unchanged
+from baseline.
 
 ### v0.412.0 -- 2026-08-17 (c-RCP-17 Phase (a): route all raw libc
 allocation call sites through `alloc.h`)

@@ -21,6 +21,16 @@ goals (SG-004, SG-007) are recorded as open — no implemented mitigation
 exists in this library for replay/staleness detection or link-layer
 authentication; see `HARA.md`'s Residual Risks and `tara.md`.
 
+## SEOOC status
+
+c-RCP is developed and safety-argued as a Safety Element out of
+Context (ISO 26262-10:2018 Clause 9) — a library integrated later into
+a vehicle item whose own HARA and ASIL assignment this repository does
+not have visibility into. `SEOOC_BOUNDARY.md` is the integrator-facing
+Item Definition boundary statement and consolidated Assumptions of Use
+(AoU) document this implies; read it before relying on this safety
+case as part of a larger item's own safety argument.
+
 ## Safety mechanisms
 
 | Mechanism | Requirement | Description |
@@ -61,6 +71,8 @@ authentication; see `HARA.md`'s Residual Risks and `tara.md`.
 | TARA | `tara.md` / `tara.json` |
 | Cybersecurity architecture | `CYBERSECURITY.md` |
 | Formal verification | `FORMAL_VERIFICATION.md` / `tla/*.tla` |
+| SEOOC boundary & Assumptions of Use | `SEOOC_BOUNDARY.md` |
+| Tool qualification evidence | `qualify-report.json` |
 | IEC 62443 config | `.fusa-iec62443.json` |
 | Incident response | `INCIDENT-RESPONSE.md` |
 | Security policy | `SECURITY.md` |
