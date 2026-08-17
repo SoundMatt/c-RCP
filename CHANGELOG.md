@@ -34,6 +34,42 @@ the rationale.
 
 ## Releases
 
+### v0.406.0 -- 2026-08-17 (c-RCP-AUDIT-04: add `tc18_master_id` to PWM/ADC `.fusa-reqs.json` entries)
+
+Now that the master TC18 requirement catalog (`docs/tc18-master-catalog.json`
+in RELAY, 447 entries) has been rebuilt, this closes the `REQ-PWM-*`/
+`REQ-ADC-*` slice of issue 166 (c-RCP-AUDIT-04): every PWM_OUT/PWM_IN/ADC
+requirement that already carries a real `tc18` citation now also carries a
+`tc18_master_id` cross-reference into that catalog, resolved by
+section/table/content match, not by citation-string equality alone.
+
+Purely additive `.fusa-reqs.json` change -- no `id`/`title`/`text`/
+`standard`/`level`/`asil`/`scope`/`status`/`tc18` field touched, no source
+file touched.
+
+- 85 of 99 in-scope entries (59 `REQ-PWM-*`, 40 `REQ-ADC-*`) matched to a
+  single confident catalog entry.
+- 12 entries (`REQ-PWM-016/024/035/041/047/054`, `REQ-ADC-003/004/009/014/
+  024/030`) have no `tc18` field at all -- left untouched, per this
+  effort's own "don't invent a citation" discipline.
+- 2 entries flagged ambiguous rather than guessed: `REQ-PWM-057` (its own
+  citation spans 4 distinct §13.7.5.3 MUST clauses -- stop-on-period-0,
+  active=0 output-off, trigger-config phase-shift, output-toggle
+  self-check -- no single catalog entry covers all four) and `REQ-ADC-037`
+  (spans 3 distinct §13.7.9.2 cadence-case MUST clauses, combine
+  `>`/`==`/`<` intervals). Left for follow-up.
+
+Full 66-test suite clean (unaffected -- JSON-metadata-only change). Pinned
+`cfusa` v0.5.54 `check`/`trace --req-coverage 100 --sec-tested 100`:
+identical output before/after (0 errors, 968 warnings, 1312 infos;
+1095/1095 requirements traced) -- confirms `cfusa` tolerates the new field
+and coverage numbers are unchanged. Rebased onto `origin/main` twice as
+sibling batches landed: after `REQ-GPIO-*`/`REQ-SPI-*` (v0.401.0),
+CAN/CANEP (v0.402.0), E2E/ACF/PWRMODE/WIREERR (v0.403.0), and CMP/SRV
+(v0.404.0), then again after SEQ/TRIG/CANCEL/CHAIN (v0.405.0); version
+bumped past all of them to v0.406.0. `.fusa-reqs.json` merged
+automatically both times (disjoint categories, no conflict).
+
 ### v0.405.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for `REQ-SEQ-*`/`REQ-TRIG-*`/`REQ-CANCEL-*`/`REQ-CHAIN-*`)
 
 One of several parallel per-category batches for c-RCP-AUDIT-04

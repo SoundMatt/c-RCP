@@ -4711,7 +4711,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33 (\"evt[2:0]\" GPIO/PWM_OUT row, values 000b-111b), TC18.txt L4093-4115"
+      "tc18": "\u00a713.5 Table 33 (\"evt[2:0]\" GPIO/PWM_OUT row, values 000b-111b), TC18.txt L4093-4115",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-PWM-002",
@@ -4722,7 +4723,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=000b: \"The byte_msg_payload is presented at the interface\"), TC18.txt L4093"
+      "tc18": "\u00a713.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=000b: \"The byte_msg_payload is presented at the interface\"), TC18.txt L4093",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-PWM-003",
@@ -4733,7 +4735,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=001b: \"The 'byte_msg_payload' bitwise OR 'current interface status' is written to the interface\"), TC18.txt L4094-4096"
+      "tc18": "\u00a713.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=001b: \"The 'byte_msg_payload' bitwise OR 'current interface status' is written to the interface\"), TC18.txt L4094-4096",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-PWM-004",
@@ -4744,7 +4747,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=010b: \"The 'byte_msg_payload' bitwise AND 'current interface status' is written to the interface\"), TC18.txt L4098-4100"
+      "tc18": "\u00a713.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=010b: \"The 'byte_msg_payload' bitwise AND 'current interface status' is written to the interface\"), TC18.txt L4098-4100",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-PWM-005",
@@ -4755,7 +4759,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=011b: \"The 'byte_msg_payload' bitwise XOR 'current interface status' is written to the interface\"), TC18.txt L4102-4104"
+      "tc18": "\u00a713.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=011b: \"The 'byte_msg_payload' bitwise XOR 'current interface status' is written to the interface\"), TC18.txt L4102-4104",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-PWM-006",
@@ -4766,7 +4771,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=101b: \"The 'byte_msg_payload' plus 'current interface status' is written to the interface\"), TC18.txt L4108-4109; saturation rule, TC18.txt L4118-4119"
+      "tc18": "\u00a713.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=101b: \"The 'byte_msg_payload' plus 'current interface status' is written to the interface\"), TC18.txt L4108-4109; saturation rule, TC18.txt L4118-4119",
+      "tc18_master_id": "TC18-13.5-003"
     },
     {
       "id": "REQ-PWM-007",
@@ -4777,7 +4783,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=110b: \"'byte_msg_payload' minus 'current interface status' is written as is to interface\"), TC18.txt L4111-4112; saturation rule, TC18.txt L4118-4119"
+      "tc18": "\u00a713.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=110b: \"'byte_msg_payload' minus 'current interface status' is written as is to interface\"), TC18.txt L4111-4112; saturation rule, TC18.txt L4118-4119",
+      "tc18_master_id": "TC18-13.5-003"
     },
     {
       "id": "REQ-PWM-008",
@@ -4788,7 +4795,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=100b: \"reserved -request shall be ignored and an err-response with error code = UNSUPPORTED_CMD shall be sent\"), TC18.txt L4106-4107"
+      "tc18": "\u00a713.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=100b: \"reserved -request shall be ignored and an err-response with error code = UNSUPPORTED_CMD shall be sent\"), TC18.txt L4106-4107",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-PWM-009",
@@ -4799,7 +4807,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=111b: \"The byte_msg_payload is not presented to the interface but used to change the configuration of the endpoint (see 12.7.1).\"), TC18.txt L4114-4115"
+      "tc18": "\u00a713.5 Table 33 (GPIO/PWM_OUT row, evt[2:0]=111b: \"The byte_msg_payload is not presented to the interface but used to change the configuration of the endpoint (see 12.7.1).\"), TC18.txt L4114-4115",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-PWM-010",
@@ -4810,7 +4819,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.5.2 Table 46 (pwmo functional configuration register block), TC18.txt L4967-5012"
+      "tc18": "\u00a713.7.5.2 Table 46 (pwmo functional configuration register block), TC18.txt L4967-5012",
+      "tc18_master_id": "TC18-13.7.5.2-001"
     },
     {
       "id": "REQ-PWM-011",
@@ -4821,7 +4831,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.5.2 Table 46 (pwmo functional configuration register block, pwmo_ep_len fixed at 0x06), TC18.txt L4967-5012"
+      "tc18": "\u00a713.7.5.2 Table 46 (pwmo functional configuration register block, pwmo_ep_len fixed at 0x06), TC18.txt L4967-5012",
+      "tc18_master_id": "TC18-13.7.5.2-001"
     },
     {
       "id": "REQ-PWM-012",
@@ -4832,7 +4843,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.5.1 Table 45 (\"A PWM endpoint creates three trigger events\"), TC18.txt L4939-4947 -- names three fixed hardware signals, not a client-configurable field; Table 46 (pwmo functional configuration), TC18.txt L4967-5012, defines no trigger-select register"
+      "tc18": "\u00a713.7.5.1 Table 45 (\"A PWM endpoint creates three trigger events\"), TC18.txt L4939-4947 -- names three fixed hardware signals, not a client-configurable field; Table 46 (pwmo functional configuration), TC18.txt L4967-5012, defines no trigger-select register",
+      "tc18_master_id": "TC18-13.7.5.1-005"
     },
     {
       "id": "REQ-PWM-013",
@@ -4843,7 +4855,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.5.1 Table 45 (trigger signal 1, \"at the start of the cycle\"), TC18.txt L4944 -- a fixed hardware signal, not a client-configurable field"
+      "tc18": "\u00a713.7.5.1 Table 45 (trigger signal 1, \"at the start of the cycle\"), TC18.txt L4944 -- a fixed hardware signal, not a client-configurable field",
+      "tc18_master_id": "TC18-13.7.5.1-005"
     },
     {
       "id": "REQ-PWM-014",
@@ -4854,7 +4867,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.5.1 Table 45 (trigger signal 2, \"in the middle of the active pulse\"), TC18.txt L4945 -- a fixed hardware signal, not a client-configurable field"
+      "tc18": "\u00a713.7.5.1 Table 45 (trigger signal 2, \"in the middle of the active pulse\"), TC18.txt L4945 -- a fixed hardware signal, not a client-configurable field",
+      "tc18_master_id": "TC18-13.7.5.1-005"
     },
     {
       "id": "REQ-PWM-015",
@@ -4865,7 +4879,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.5.1 Table 45 (trigger signal 0, \"PWM request exec done (requested values applied)\"), TC18.txt L4943 -- a fixed hardware signal, not a client-configurable field"
+      "tc18": "\u00a713.7.5.1 Table 45 (trigger signal 0, \"PWM request exec done (requested values applied)\"), TC18.txt L4943 -- a fixed hardware signal, not a client-configurable field",
+      "tc18_master_id": "TC18-13.7.5.1-005"
     },
     {
       "id": "REQ-PWM-016",
@@ -4886,7 +4901,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2553-2554"
+      "tc18": "\u00a712.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2553-2554",
+      "tc18_master_id": "TC18-12.3.1.2-001"
     },
     {
       "id": "REQ-PWM-018",
@@ -4897,7 +4913,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2560"
+      "tc18": "\u00a712.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2560",
+      "tc18_master_id": "TC18-12.3.1.2-004"
     },
     {
       "id": "REQ-PWM-019",
@@ -4908,7 +4925,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3 (\"...only write access to the EP's functional configurations is allowed via their dedicated stream_id/byte_bus_id combinations or via root client access EP0... Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables.\"), TC18.txt L2581-2582, L2601-2602"
+      "tc18": "\u00a712.3.1.3 (\"...only write access to the EP's functional configurations is allowed via their dedicated stream_id/byte_bus_id combinations or via root client access EP0... Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables.\"), TC18.txt L2581-2582, L2601-2602",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-PWM-020",
@@ -4919,7 +4937,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same basis as REQ-PWM-019"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same basis as REQ-PWM-019",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-PWM-021",
@@ -4930,7 +4949,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same basis as REQ-PWM-019"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same basis as REQ-PWM-019",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-PWM-022",
@@ -4941,7 +4961,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same basis as REQ-PWM-019"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same basis as REQ-PWM-019",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-PWM-023",
@@ -4952,7 +4973,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same basis as REQ-PWM-019"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same basis as REQ-PWM-019",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-PWM-024",
@@ -4973,7 +4995,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116 (general ACF frame-validation basis for the request/response wire format)"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116 (general ACF frame-validation basis for the request/response wire format)",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-PWM-026",
@@ -4984,7 +5007,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-PWM-027",
@@ -4995,7 +5019,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.5.3 (\"The PWM_out request and response contain two values in the payload. The active time of the PWM signal as well as the period of the signal in clock ticks of the clock selected for this PWM_out endpoint.\"), TC18.txt L5031-5033; evt[2:0] semantics per \u00a713.5 Table 33 (\"evt[2:0]\" GPIO/PWM_OUT row, values 000b-111b), TC18.txt L4093-4115"
+      "tc18": "\u00a713.7.5.3 (\"The PWM_out request and response contain two values in the payload. The active time of the PWM signal as well as the period of the signal in clock ticks of the clock selected for this PWM_out endpoint.\"), TC18.txt L5031-5033; evt[2:0] semantics per \u00a713.5 Table 33 (\"evt[2:0]\" GPIO/PWM_OUT row, values 000b-111b), TC18.txt L4093-4115",
+      "tc18_master_id": "TC18-13.7.5.3-001"
     },
     {
       "id": "REQ-PWM-028",
@@ -5006,7 +5031,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.5.3 (\"A request not having exactly four bytes is rejected and an error response with error code = INVALID_PARAMETER will be sent.\"), TC18.txt L5040-5041"
+      "tc18": "\u00a713.7.5.3 (\"A request not having exactly four bytes is rejected and an error response with error code = INVALID_PARAMETER will be sent.\"), TC18.txt L5040-5041",
+      "tc18_master_id": "TC18-13.7.5.3-002"
     },
     {
       "id": "REQ-PWM-029",
@@ -5017,7 +5043,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.5.3 (\"The PWM_out request and response contain two values in the payload.\"), TC18.txt L5031-5033"
+      "tc18": "\u00a713.7.5.3 (\"The PWM_out request and response contain two values in the payload.\"), TC18.txt L5031-5033",
+      "tc18_master_id": "TC18-13.7.5.3-001"
     },
     {
       "id": "REQ-PWM-030",
@@ -5028,7 +5055,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.5.3 (\"The PWM_out request and response contain two values in the payload.\"), TC18.txt L5031-5033"
+      "tc18": "\u00a713.7.5.3 (\"The PWM_out request and response contain two values in the payload.\"), TC18.txt L5031-5033",
+      "tc18_master_id": "TC18-13.7.5.3-001"
     },
     {
       "id": "REQ-PWM-031",
@@ -5039,7 +5067,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116 (general ACF frame-validation basis)"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116 (general ACF frame-validation basis)",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-PWM-032",
@@ -5050,7 +5079,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.6.1 Table 47 (\"The PWM_IN endpoint [optionally] generates two trigger events\"), TC18.txt L5081-5087 -- names two fixed hardware signals, not a client-configurable field."
+      "tc18": "\u00a713.7.6.1 Table 47 (\"The PWM_IN endpoint [optionally] generates two trigger events\"), TC18.txt L5081-5087 -- names two fixed hardware signals, not a client-configurable field.",
+      "tc18_master_id": "TC18-13.7.6.1-002"
     },
     {
       "id": "REQ-PWM-033",
@@ -5061,7 +5091,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.6.1 Table 47 (trigger signal 0, \"rising edge of PWM_IN signal\"), TC18.txt L5085 -- a fixed hardware signal, not a client-configurable field."
+      "tc18": "\u00a713.7.6.1 Table 47 (trigger signal 0, \"rising edge of PWM_IN signal\"), TC18.txt L5085 -- a fixed hardware signal, not a client-configurable field.",
+      "tc18_master_id": "TC18-13.7.6.1-002"
     },
     {
       "id": "REQ-PWM-034",
@@ -5072,7 +5103,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.6.1 Table 47 (trigger signal 1, \"falling edge of PWM_IN signal\"), TC18.txt L5086 -- a fixed hardware signal, not a client-configurable field."
+      "tc18": "\u00a713.7.6.1 Table 47 (trigger signal 1, \"falling edge of PWM_IN signal\"), TC18.txt L5086 -- a fixed hardware signal, not a client-configurable field.",
+      "tc18_master_id": "TC18-13.7.6.1-002"
     },
     {
       "id": "REQ-PWM-035",
@@ -5093,7 +5125,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2553-2554"
+      "tc18": "\u00a712.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2553-2554",
+      "tc18_master_id": "TC18-12.3.1.2-001"
     },
     {
       "id": "REQ-PWM-037",
@@ -5104,7 +5137,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2560"
+      "tc18": "\u00a712.3.1.2 (\"Write access via EP0 to other EPs configuration is only possible for a configured 'root client' of via the discovery stream.\"), TC18.txt L2560",
+      "tc18_master_id": "TC18-12.3.1.2-004"
     },
     {
       "id": "REQ-PWM-038",
@@ -5115,7 +5149,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2581-2582, L2601-2602 (W* marker convention) -- same basis as REQ-PWM-019"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2581-2582, L2601-2602 (W* marker convention) -- same basis as REQ-PWM-019",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-PWM-039",
@@ -5126,7 +5161,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same basis as REQ-PWM-019"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same basis as REQ-PWM-019",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-PWM-040",
@@ -5137,7 +5173,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same basis as REQ-PWM-019"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2601-2602 (W* marker convention) -- same basis as REQ-PWM-019",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-PWM-041",
@@ -5158,7 +5195,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.6.3 (\"The PWM_IN request and response contain two 16 bit values in the payload... The interpretation of the evt-bits is described in the section 'The usage of evt bits in requests'.\"), TC18.txt L5169-5180"
+      "tc18": "\u00a713.7.6.3 (\"The PWM_IN request and response contain two 16 bit values in the payload... The interpretation of the evt-bits is described in the section 'The usage of evt bits in requests'.\"), TC18.txt L5169-5180",
+      "tc18_master_id": "TC18-13.7.6.3-001"
     },
     {
       "id": "REQ-PWM-043",
@@ -5169,7 +5207,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116 (general ACF frame-validation basis)"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116 (general ACF frame-validation basis)",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-PWM-044",
@@ -5180,7 +5219,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.6.3 (\"Responses include the measured active time of the PWM signal as well as the period of the signal in clock ticks of the clock selected for this PWM_IN endpoint.\"), TC18.txt L5170-5172"
+      "tc18": "\u00a713.7.6.3 (\"Responses include the measured active time of the PWM signal as well as the period of the signal in clock ticks of the clock selected for this PWM_IN endpoint.\"), TC18.txt L5170-5172",
+      "tc18_master_id": "TC18-13.7.6.3-001"
     },
     {
       "id": "REQ-PWM-045",
@@ -5191,7 +5231,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.6.3 (\"Responses include the measured active time of the PWM signal as well as the period of the signal in clock ticks of the clock selected for this PWM_IN endpoint.\"), TC18.txt L5170-5172"
+      "tc18": "\u00a713.7.6.3 (\"Responses include the measured active time of the PWM signal as well as the period of the signal in clock ticks of the clock selected for this PWM_IN endpoint.\"), TC18.txt L5170-5172",
+      "tc18_master_id": "TC18-13.7.6.3-001"
     },
     {
       "id": "REQ-PWM-046",
@@ -5202,7 +5243,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116 (general ACF frame-validation basis)"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116 (general ACF frame-validation basis)",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-PWM-047",
@@ -5223,7 +5265,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1 (\"evt[2:0] = 100b ... wait condition is met when the first two bytes... larger or equal...\" through \"evt[2:0] = 111b\"), TC18.txt L4152-4163"
+      "tc18": "\u00a713.5.1 (\"evt[2:0] = 100b ... wait condition is met when the first two bytes... larger or equal...\" through \"evt[2:0] = 111b\"), TC18.txt L4152-4163",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-PWM-049",
@@ -5234,7 +5277,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1 (\"evt[2:0] = 100b 0xB - wait condition is met when the first two bytes of the first quadlet of 'byte_msg_payload' is larger or equal to the first two bytes of the first quadlet of the 'current interface status' (example: this can be used to check the period of PWM_in)\"), TC18.txt L4152-4154"
+      "tc18": "\u00a713.5.1 (\"evt[2:0] = 100b 0xB - wait condition is met when the first two bytes of the first quadlet of 'byte_msg_payload' is larger or equal to the first two bytes of the first quadlet of the 'current interface status' (example: this can be used to check the period of PWM_in)\"), TC18.txt L4152-4154",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-PWM-050",
@@ -5245,7 +5289,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1 (\"evt[2:0] = 101b - wait condition is met when the first two bytes of the first quadlet of 'byte_msg_payload' is smaller or to equal the first two bytes of the first quadlet of the 'current interface status' (example: this can be used to check the period of PWM_in)\"), TC18.txt L4155-4157"
+      "tc18": "\u00a713.5.1 (\"evt[2:0] = 101b - wait condition is met when the first two bytes of the first quadlet of 'byte_msg_payload' is smaller or to equal the first two bytes of the first quadlet of the 'current interface status' (example: this can be used to check the period of PWM_in)\"), TC18.txt L4155-4157",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-PWM-051",
@@ -5256,7 +5301,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1 (\"evt[2:0] = 110b - wait condition is met when the last two bytes of the first quadlet of 'byte_msg_payload' is larger or equal to the last two bytes of the first quadlet of the 'current interface status' (example: this can be used to check the duty_cycle of PWM_in)\"), TC18.txt L4158-4160"
+      "tc18": "\u00a713.5.1 (\"evt[2:0] = 110b - wait condition is met when the last two bytes of the first quadlet of 'byte_msg_payload' is larger or equal to the last two bytes of the first quadlet of the 'current interface status' (example: this can be used to check the duty_cycle of PWM_in)\"), TC18.txt L4158-4160",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-PWM-052",
@@ -5267,7 +5313,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1 (\"evt[2:0] = 111b - wait condition is met when the last two bytes of the first quadlet of 'byte_msg_payload' is smaller or to equal... (example: this can be used to check the duty_cycle of PWM_in)\"), TC18.txt L4161-4163"
+      "tc18": "\u00a713.5.1 (\"evt[2:0] = 111b - wait condition is met when the last two bytes of the first quadlet of 'byte_msg_payload' is smaller or to equal... (example: this can be used to check the duty_cycle of PWM_in)\"), TC18.txt L4161-4163",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-PWM-053",
@@ -5278,7 +5325,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1, TC18.txt L4152-4163 -- only evt[2:0]=100b..111b (4..7) are defined compound-wait comparison modes for PWM_in in this table"
+      "tc18": "\u00a713.5.1, TC18.txt L4152-4163 -- only evt[2:0]=100b..111b (4..7) are defined compound-wait comparison modes for PWM_in in this table",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-PWM-054",
@@ -5299,7 +5347,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.3 (\"Responses contain as much measurement values as requested by half the read size of a request.\"), TC18.txt L5162-5163"
+      "tc18": "\u00a713.7.9.3 (\"Responses contain as much measurement values as requested by half the read size of a request.\"), TC18.txt L5162-5163",
+      "tc18_master_id": "TC18-13.7.9.3-002"
     },
     {
       "id": "REQ-ADC-002",
@@ -5310,7 +5359,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.1 (\"...further samples are taken with a timely distance of one 'adc_sample_interval'... For the readings acquired during the averaging interval given in number of samples... the average is calculated.\"), TC18.txt L5036-5040"
+      "tc18": "\u00a713.7.9.1 (\"...further samples are taken with a timely distance of one 'adc_sample_interval'... For the readings acquired during the averaging interval given in number of samples... the average is calculated.\"), TC18.txt L5036-5040",
+      "tc18_master_id": "TC18-13.7.9.1-006"
     },
     {
       "id": "REQ-ADC-003",
@@ -5341,7 +5391,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.3 (\"If the response includes a timestamp, it shall represent the point in time when the last sample that was used for the first average value that is included in the response has been captured.\"), TC18.txt L5143-5145"
+      "tc18": "\u00a713.7.9.3 (\"If the response includes a timestamp, it shall represent the point in time when the last sample that was used for the first average value that is included in the response has been captured.\"), TC18.txt L5143-5145",
+      "tc18_master_id": "TC18-13.7.9.2-006"
     },
     {
       "id": "REQ-ADC-006",
@@ -5352,7 +5403,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.1 (\"...the COMBINE_NR_VAL defines how many measurement values (i.e. averaging results) will be put in one response frame.\"), TC18.txt L5040-5042"
+      "tc18": "\u00a713.7.9.1 (\"...the COMBINE_NR_VAL defines how many measurement values (i.e. averaging results) will be put in one response frame.\"), TC18.txt L5040-5042",
+      "tc18_master_id": "TC18-13.7.9.3-002"
     },
     {
       "id": "REQ-ADC-007",
@@ -5363,7 +5415,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.2 Table 54 (\"adc_combine_avg_values ... Nr of output values to be combined in one response\"), TC18.txt L5110-5111"
+      "tc18": "\u00a713.7.9.2 Table 54 (\"adc_combine_avg_values ... Nr of output values to be combined in one response\"), TC18.txt L5110-5111",
+      "tc18_master_id": "TC18-13.7.9.3-002"
     },
     {
       "id": "REQ-ADC-008",
@@ -5374,7 +5427,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.2 (\"When adc_combine_avg_values < adc_avg_intervals_per_request, then there are multiple responses per request execution.\"), TC18.txt L5132-5133"
+      "tc18": "\u00a713.7.9.2 (\"When adc_combine_avg_values < adc_avg_intervals_per_request, then there are multiple responses per request execution.\"), TC18.txt L5132-5133",
+      "tc18_master_id": "TC18-13.7.9.3-002"
     },
     {
       "id": "REQ-ADC-009",
@@ -5395,7 +5449,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.3 (\"Responses contain as much measurement values as requested by half the read size of a request.\"), TC18.txt L5162-5163"
+      "tc18": "\u00a713.7.9.3 (\"Responses contain as much measurement values as requested by half the read size of a request.\"), TC18.txt L5162-5163",
+      "tc18_master_id": "TC18-13.7.9.3-002"
     },
     {
       "id": "REQ-ADC-011",
@@ -5406,7 +5461,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.3 (\"Responses contain as much measurement values as requested by half the read size of a request.\"), TC18.txt L5162-5163"
+      "tc18": "\u00a713.7.9.3 (\"Responses contain as much measurement values as requested by half the read size of a request.\"), TC18.txt L5162-5163",
+      "tc18_master_id": "TC18-13.7.9.3-002"
     },
     {
       "id": "REQ-ADC-012",
@@ -5417,7 +5473,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.3 (\"If the response includes a timestamp, it shall represent the point in time when the last sample that was used for the first average value that is included in the response has been captured.\"), TC18.txt L5143-5145"
+      "tc18": "\u00a713.7.9.3 (\"If the response includes a timestamp, it shall represent the point in time when the last sample that was used for the first average value that is included in the response has been captured.\"), TC18.txt L5143-5145",
+      "tc18_master_id": "TC18-13.7.9.2-006"
     },
     {
       "id": "REQ-ADC-013",
@@ -5428,7 +5485,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.3 (\"If the response includes a timestamp, it shall represent the point in time when the last sample...\"), TC18.txt L5143-5145"
+      "tc18": "\u00a713.7.9.3 (\"If the response includes a timestamp, it shall represent the point in time when the last sample...\"), TC18.txt L5143-5145",
+      "tc18_master_id": "TC18-13.7.9.2-006"
     },
     {
       "id": "REQ-ADC-014",
@@ -5449,7 +5507,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178"
+      "tc18": "\u00a712.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178",
+      "tc18_master_id": "TC18-12.3.1.2-001"
     },
     {
       "id": "REQ-ADC-016",
@@ -5460,7 +5519,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178 -- writable once concluded (i.e. HW_CONFIGURED)"
+      "tc18": "\u00a712.3.1.2 (\"...all access to the HW_config and EP_generic_config are locked.\"), TC18.txt L2177-2178 -- writable once concluded (i.e. HW_CONFIGURED)",
+      "tc18_master_id": "TC18-12.3.1.2-004"
     },
     {
       "id": "REQ-ADC-017",
@@ -5471,7 +5531,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3 (\"...only write access to the EP's functional configurations is allowed via their dedicated stream_id/byte_bus_id combinations or via root client access EP0... Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables.\"), TC18.txt L2203-2206, L2225-2226"
+      "tc18": "\u00a712.3.1.3 (\"...only write access to the EP's functional configurations is allowed via their dedicated stream_id/byte_bus_id combinations or via root client access EP0... Write access to some parameters might be prohibited in this life-cycle state, this is marked by * in the R/W-column of the respective tables.\"), TC18.txt L2203-2206, L2225-2226",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-ADC-018",
@@ -5482,7 +5543,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same authorization basis as REQ-ADC-019 (corrected 2026-08-11, c-RCP-AUDIT-06, issue #256 Group J: this entry previously cited \u00a713.7.9.1's own averaging-interval prose, TC18.txt L5040/L5107 -- background on why this field is writable at all, not the authorization-rejection behavior this requirement actually describes; REQ-ADC-019's own citation already correctly names this entry as sharing its W*-marker basis, so this entry's citation was the one out of step)"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same authorization basis as REQ-ADC-019 (corrected 2026-08-11, c-RCP-AUDIT-06, issue #256 Group J: this entry previously cited \u00a713.7.9.1's own averaging-interval prose, TC18.txt L5040/L5107 -- background on why this field is writable at all, not the authorization-rejection behavior this requirement actually describes; REQ-ADC-019's own citation already correctly names this entry as sharing its W*-marker basis, so this entry's citation was the one out of step)",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-ADC-019",
@@ -5493,7 +5555,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same authorization basis as REQ-ADC-018"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same authorization basis as REQ-ADC-018",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-ADC-020",
@@ -5504,7 +5567,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.2 Table 54 (\"adc_avg_intervals_per_request ... Intervals to be captures per measurement cycle\"), TC18.txt L5102-5103; \u00a712.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
+      "tc18": "\u00a713.7.9.2 Table 54 (\"adc_avg_intervals_per_request ... Intervals to be captures per measurement cycle\"), TC18.txt L5102-5103; \u00a712.3.1.3, TC18.txt L2225-2226 (W* marker convention)",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-ADC-021",
@@ -5515,7 +5579,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same authorization basis as REQ-ADC-018"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same authorization basis as REQ-ADC-018",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-ADC-022",
@@ -5526,7 +5591,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.2 Table 54 (\"adc_combine_avg_values ... Nr of output values to be combined in one response\"), TC18.txt L5110-5111; \u00a712.3.1.3, TC18.txt L2225-2226 (W* marker convention)"
+      "tc18": "\u00a713.7.9.2 Table 54 (\"adc_combine_avg_values ... Nr of output values to be combined in one response\"), TC18.txt L5110-5111; \u00a712.3.1.3, TC18.txt L2225-2226 (W* marker convention)",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-ADC-023",
@@ -5537,7 +5603,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same authorization basis as REQ-ADC-018"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2225-2226 (W* marker convention) -- same authorization basis as REQ-ADC-018",
+      "tc18_master_id": "TC18-12.3.1.3-001"
     },
     {
       "id": "REQ-ADC-024",
@@ -5558,7 +5625,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.3 (\"The ADC request has no byte_msg_payload...\"), TC18.txt L5162"
+      "tc18": "\u00a713.7.9.3 (\"The ADC request has no byte_msg_payload...\"), TC18.txt L5162",
+      "tc18_master_id": "TC18-13.7.9.3-001"
     },
     {
       "id": "REQ-ADC-026",
@@ -5569,7 +5637,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L3666-3710"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L3666-3710",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-ADC-027",
@@ -5580,7 +5649,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.3 (\"Responses contain as much measurement values as requested by half the read size of a request.\" / Figure 32, \"Response with a single measurement value\"), TC18.txt L5162-5167"
+      "tc18": "\u00a713.7.9.3 (\"Responses contain as much measurement values as requested by half the read size of a request.\" / Figure 32, \"Response with a single measurement value\"), TC18.txt L5162-5167",
+      "tc18_master_id": "TC18-13.7.9.3-002"
     },
     {
       "id": "REQ-ADC-028",
@@ -5591,7 +5661,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.3 (\"Responses contain as much measurement values as requested by half the read size of a request.\" / Figure 32), TC18.txt L5162-5167"
+      "tc18": "\u00a713.7.9.3 (\"Responses contain as much measurement values as requested by half the read size of a request.\" / Figure 32), TC18.txt L5162-5167",
+      "tc18_master_id": "TC18-13.7.9.3-002"
     },
     {
       "id": "REQ-ADC-029",
@@ -5602,7 +5673,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33 (ADC/PWM_IN/I\u00b2C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L3684-3693"
+      "tc18": "\u00a713.5 Table 33 (ADC/PWM_IN/I\u00b2C/LIN/CAN/UART/ISELED/MDIO row), TC18.txt L3684-3693",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-ADC-030",
@@ -10058,7 +10130,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.5.1, TC18.txt L4924-4935 and Table 45 L4939-4947"
+      "tc18": "\u00a713.7.5.1, TC18.txt L4924-4935 and Table 45 L4939-4947",
+      "tc18_master_id": "TC18-13.7.5.1-005"
     },
     {
       "id": "REQ-PWM-056",
@@ -10069,7 +10142,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.5.2 Table 46, TC18.txt L4967-5012"
+      "tc18": "\u00a713.7.5.2 Table 46, TC18.txt L4967-5012",
+      "tc18_master_id": "TC18-13.7.5.2-001"
     },
     {
       "id": "REQ-PWM-057",
@@ -10091,7 +10165,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.6.2 Table 48, TC18.txt L5104-5149"
+      "tc18": "\u00a713.7.6.2 Table 48, TC18.txt L5104-5149",
+      "tc18_master_id": "TC18-13.7.6.2-001"
     },
     {
       "id": "REQ-PWM-059",
@@ -10102,7 +10177,8 @@
       "asil": "QM",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116; \u00a713.7.6.2 Table 48, TC18.txt L5104-5149"
+      "tc18": "\u00a713.5 Table 33, TC18.txt L4069-4116; \u00a713.7.6.2 Table 48, TC18.txt L5104-5149",
+      "tc18_master_id": "TC18-13.5-001"
     },
     {
       "id": "REQ-PWRMODE-014",
@@ -11473,7 +11549,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.1 Table 53, TC18.txt L5052-5058"
+      "tc18": "\u00a713.7.9.1 Table 53, TC18.txt L5052-5058",
+      "tc18_master_id": "TC18-13.7.9.1-009"
     },
     {
       "id": "REQ-ADC-032",
@@ -11484,7 +11561,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.1, TC18.txt L5027-5030"
+      "tc18": "\u00a713.7.9.1, TC18.txt L5027-5030",
+      "tc18_master_id": "TC18-13.7.9.1-001"
     },
     {
       "id": "REQ-ADC-033",
@@ -11495,7 +11573,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.1, TC18.txt L5036-5039"
+      "tc18": "\u00a713.7.9.1, TC18.txt L5036-5039",
+      "tc18_master_id": "TC18-13.7.9.1-005"
     },
     {
       "id": "REQ-ADC-034",
@@ -11506,7 +11585,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.1, TC18.txt L5060-5063"
+      "tc18": "\u00a713.7.9.1, TC18.txt L5060-5063",
+      "tc18_master_id": "TC18-13.7.9.1-011"
     },
     {
       "id": "REQ-ADC-035",
@@ -11517,7 +11597,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.2 Table 54, TC18.txt L5085-5098"
+      "tc18": "\u00a713.7.9.2 Table 54, TC18.txt L5085-5098",
+      "tc18_master_id": "TC18-13.7.9.2-001"
     },
     {
       "id": "REQ-ADC-036",
@@ -11528,7 +11609,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.2 Table 54, TC18.txt L5100-5101"
+      "tc18": "\u00a713.7.9.2 Table 54, TC18.txt L5100-5101",
+      "tc18_master_id": "TC18-13.7.9.2-001"
     },
     {
       "id": "REQ-ADC-038",
@@ -11539,7 +11621,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.1 Configuration of endpoints + Figure 18, TC18.txt L2463-2484"
+      "tc18": "\u00a712.7.1 Configuration of endpoints + Figure 18, TC18.txt L2463-2484",
+      "tc18_master_id": "TC18-12.7.1-002"
     },
     {
       "id": "REQ-ADC-039",
@@ -11550,7 +11633,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.7.1 Configuration of endpoints, TC18.txt L2463-2484"
+      "tc18": "\u00a712.7.1 Configuration of endpoints, TC18.txt L2463-2484",
+      "tc18_master_id": "TC18-12.7.1-003"
     },
     {
       "id": "REQ-ADC-040",
@@ -11561,7 +11645,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.9.2 Table 54, TC18.txt L5114-5122"
+      "tc18": "\u00a713.7.9.2 Table 54, TC18.txt L5114-5122",
+      "tc18_master_id": "TC18-13.7.9.2-001"
     },
     {
       "id": "REQ-ADC-037",
