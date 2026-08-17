@@ -889,7 +889,12 @@ void rcp_e2e_stream_fault_tracker_reset(rcp_e2e_stream_fault_tracker_t *t, uint6
  * same "proven via the wire codec, not that mock.c's own live dispatch
  * loop itself calls the EP0 register-map dispatcher" bar this whole
  * register-map wire-level exchange establishes elsewhere in this
- * codebase (see regmap.h's own file-header note).
+ * codebase -- CORRECTED 2026-08-16 (issue #460): regmap.h has no single
+ * consolidated note stating that bar; the convention instead lives as
+ * dozens of individual per-field comments scattered throughout
+ * regmap.h, each independently citing "REQ-RMAP-024 wire-reachability
+ * boundary" (e.g. svr_lifecycle_state, svr_req_stream_max, and the
+ * other REQ-RMAP-024-tagged fields there).
  */
 typedef struct {
     rcp_e2e_stream_fault_t crc;              /* reused, unchanged CRC latch */

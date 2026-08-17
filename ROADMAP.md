@@ -19106,6 +19106,46 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.370.0 -- 2026-08-16 (two stale-documentation corrections:
+REQ-LIFECYCLE-011's citation, e2e.h's regmap.h cross-reference)
+
+Closes issues #456 and #460 -- two small, unrelated doc-only fixes,
+landed together.
+
+**Issue #456**: `.fusa-reqs.json`'s `REQ-LIFECYCLE-011` citation
+footnote claimed the `RCP_CONFIGURED -> HW_UNCONFIGURED` demotion's
+EPs-idle gate (TC18 Figure 17, "other EPs are not Idle -> send error
+response EPs_NOT_IDLE") was "a known, separately-tracked gap." Verified
+directly against the current `src/lifecycle.c`: `rcp_lifecycle_transition()`'s
+`RCP_CONFIGURED`->`HW_UNCONFIGURED` branch (line 189) already enforces
+`if (!all_other_eps_idle) return RCP_LIFECYCLE_ERR_EPS_NOT_IDLE;`,
+landed under the REQ-LIFECYCLE-022 fix -- the "known gap" framing was
+stale. Corrected the citation to state the gate IS implemented, citing
+the enforcement site directly, and pointed at REQ-LIFECYCLE-022's own
+entry for the real, separate, still-open gap there (`EPs_NOT_IDLE` has
+no numbered wire error code anywhere in TC18's §12.9.6 table). No
+`text`/`title`/`status` change -- those were already correct.
+
+**Issue #460**: `include/rcp/e2e.h`'s doc comment for
+`rcp_e2e_stream_status_t` (REQ-E2E-046/REQ-RMAP-051) claimed
+`rx_stream_status`'s wire-exposure proof met "the same... bar this
+whole register-map wire-level exchange establishes elsewhere in this
+codebase (see regmap.h's own file-header note)." No such consolidated
+note exists anywhere in `regmap.h`'s file header -- confirmed by direct
+search of the file. The actual convention is scattered across dozens
+of individual per-field comments throughout `regmap.h`, each
+independently citing "REQ-RMAP-024 wire-reachability boundary" (e.g.
+`svr_lifecycle_state`, `svr_req_stream_max`). Corrected `e2e.h`'s
+comment to point at that real, scattered convention rather than a
+nonexistent single location, rather than fabricating a consolidated
+note in `regmap.h` that this codebase's actual documentation style
+doesn't otherwise use.
+
+Both fixes are comment/citation-only: no `text`, `title`, `status`, or
+source-file behavior touched, no new tests needed. Full 66-test suite
+clean; `cfusa check`/`trace` (v0.5.54): 0 errors, 1088/1088 traced and
+tested (unchanged).
+
 ### v0.369.0 -- 2026-08-14 (REQ-RMAP-051/071: request-stream-cfg's Table
 24 byte 0x000D wire layout reconciled with the real RC5 4-bit model)
 
