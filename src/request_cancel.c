@@ -100,12 +100,12 @@ rcp_cancel_errc_t rcp_cancel_decode_clear_all(const uint8_t *b, size_t len,
     if (rt != RCP_REQUEST_TYPE_CLEAR_ALL) return RCP_CANCEL_ERR_UNKNOWN_TYPE;
 
     /* REQ-CANCEL-013: clear-all carries no sub-field of its own -- all 7
-     * trailing octets of message_timestamp are reserved (TC18 Table 11). */
+     * trailing octets of message_timestamp are reserved (TC18 Table 13). */
     if ((hdr.message_timestamp & 0x00FFFFFFFFFFFFFFull) != 0ull) {
         return RCP_CANCEL_ERR_RESERVED_NONZERO;
     }
 
-    /* REQ-CANCEL-014: TC18 Table 11 -- evt is either 0000b (no ack) or
+    /* REQ-CANCEL-014: TC18 Table 13 -- evt is either 0000b (no ack) or
      * 1000b (ack requested), so evt[2:0] must be zero; hs and cs are
      * always zero. */
     if ((hdr.info.evt & 0x07u) != 0u || hdr.info.hs != 0u || hdr.info.cs != 0u) {
@@ -162,8 +162,8 @@ rcp_cancel_errc_t rcp_cancel_decode_clear_single(const uint8_t *b, size_t len,
         return RCP_CANCEL_ERR_RESERVED_NONZERO;
     }
 
-    /* REQ-CANCEL-015: TC18 Table 13 -- "Evt, hs and cs shall be zero"
-     * (same evt[3]-is-the-only-free-bit rule as clear-all/Table 11). */
+    /* REQ-CANCEL-015: TC18 Table 15 -- "Evt, hs and cs shall be zero"
+     * (same evt[3]-is-the-only-free-bit rule as clear-all/Table 13). */
     if ((hdr.info.evt & 0x07u) != 0u || hdr.info.hs != 0u || hdr.info.cs != 0u) {
         return RCP_CANCEL_ERR_EVT_HS_CS_NONZERO;
     }

@@ -34,6 +34,70 @@ the rationale.
 
 ## Releases
 
+### v0.399.0 -- 2026-08-16 (issue #341: cancel-family `Table 11`/`12`/`13` cluster, `ep_adc.c` `Table 50`->`53`, `regmap.c` `Table 34`->`35` fixes)
+
+Ninth pass on issue #341. Fixed the three concrete, verified-but-
+unfixed content bugs PR #504's own top-to-bottom classification
+sweep surfaced and deliberately left out of its scope.
+
+- **Cancel-family cluster** (`request_cancel.h`/`.c`,
+  `request_compound.h`/`.c`, `.fusa-reqs.json`): confirmed via fresh
+  `pdftotext -layout` extraction of both PDFs that RC1's `Table 11`
+  ("cancel all requests") -> RC5 `Table 13`, RC1's `Table 12`
+  ("clear all non-safestate requests") -> RC5 `Table 14`, and RC1's
+  `Table 13` ("cancel a single, specific request") -> RC5 `Table 15`
+  -- each caption byte-for-byte matched between revisions. Fixed all
+  10 stale bare-number occurrences across `request_cancel.h:168,194`,
+  `request_cancel.c:103,108,165,166`, `request_compound.h:202,327`,
+  `request_compound.c:260,265`. In `.fusa-reqs.json`, fixed the two
+  "narrative text lagging" occurrences (REQ-CANCEL-013/014's own
+  `text` fields at what were lines ~6364/6375, still stale `Table
+  11`) and REQ-CMP-028/029's counterparts (~8868/8879, stale `Table
+  12`) -- their sibling `tc18` fields (~8874/8885) already correctly
+  said `Table 14`, confirming the recurring "tc18 field correct,
+  narrative text lagging" pattern. Also found and fixed a subtler
+  case the classification sweep flagged explicitly: REQ-CANCEL-005's
+  own `text` field (encode_clear_single, ~6276) cited RC1's stale
+  `Figure 15 / Table 13` for clear-single -- both numbers happened to
+  look like valid RC5 citations (RC5 does have its own `Figure 15`/
+  `Table 13`, just for the unrelated clear-non-safestate/cancel-all
+  functions), so a naive "is this number valid in RC5" check would
+  have missed it; the real RC5 numbering for clear-single is `Figure
+  16 / Table 15`. REQ-CANCEL-015's own `text` field (~6386) had the
+  same clear-single/`Table 13`-vs-`15` confusion, fixed likewise.
+  Confirmed **not** part of this cluster (RC5-native citations to a
+  different pair of tables that happen to reuse the same digits):
+  `.fusa-reqs.json`'s several `§11.2.2.6 Table 11` (chained requests)
+  and `§11.2.2.7 Table 12` (timed requests) citations -- RC1's own
+  chained/timed-request tables are `9`/`10`, not `11`/`12`, so these
+  are genuinely RC5's own `11`/`12`, correctly cited already.
+- **`src/ep_adc.c:233`**: confirmed "adc trigger outputs" is caption-
+  identical between RC1 (`Table 50`) and RC5 (`Table 53`) -- a plain
+  RC1->RC5 shift, not a reused-digit case (RC1's own, *different*
+  `Table 53` is "can functional configuration", already correctly
+  shifted elsewhere to RC5 `Table 56`). Fixed the flagged occurrence
+  plus three more of the identical stale `Table 50` citation the
+  classification sweep's own file scope didn't cover:
+  `tests/test_ep_adc.c:398,542` and
+  `tests/test_tc18_gaps_ep2.c:677`.
+- **`src/regmap.c:2316`**: confirmed via fresh extraction that
+  `ep_clear_req_storage`'s `writing a 1b clears the EPs request
+  storage` row lives in RC5 `Table 35` ("EP functional config common
+  entries"), not `Table 34` ("CRC32 Polynomial", an unrelated table
+  already correctly cited everywhere else in this codebase). A plain
+  wrong-digit typo, not an RC1/RC5 numbering confusion; fixed.
+
+Citation-text-only changes -- trace coverage counts unchanged. Full
+clean rebuild + full 66-test suite: 66/66, unchanged. `cfusa check`
+(pinned v0.5.54, run from repo root): 0 errors, 968/1312
+warnings/info, unchanged. `cfusa trace --req-coverage 100
+--sec-tested 100`: 1095/1095 traced and tested, unchanged.
+
+Does not close #341 -- issue left open per its own established
+convention. The `(c)`-list table numbers from PR #504's own
+classification sweep (`Table 55`/`37`/`40`/`57`/`19`/`59`/`49`/`15`/
+`34`/`17`/`14`/`16`) remain open for a future pass.
+
 ### v0.398.0 -- 2026-08-16 (issue #341: `Table 4`/`5`/`52`/`58` exhaustive census, `Table 36` reused-digit fix, final convergence classification)
 
 Eighth pass on issue #341. Worked the five table numbers this

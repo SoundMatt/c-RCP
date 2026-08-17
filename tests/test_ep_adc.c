@@ -395,7 +395,7 @@ static void test_set_combine_avg_values_applies_when_authorized(void)
     TEST_ASSERT_EQUAL_UINT8(255, cfg.adc_combine_avg_values);
 }
 
-/* ── Trigger outputs (Table 50), REQ-ADC-031 ─────────────────────────────── */
+/* ── Trigger outputs (Table 53), REQ-ADC-031 ─────────────────────────────── */
 
 static void test_trigger_state_init_has_no_previous_value(void)
 {
@@ -539,7 +539,7 @@ static void test_trigger_evaluate_large_jump_fires_multiple_triggers(void)
 }
 
 /* Trigger 4 composes with any of triggers 0-3 in the same call --
- * Table 50's own 5 signals are independent, not mutually exclusive. */
+ * Table 53's own 5 signals are independent, not mutually exclusive. */
 static void test_trigger_evaluate_measurement_finished_composes_with_edge_triggers(void)
 {
     rcp_ep_adc_trigger_state_t s;

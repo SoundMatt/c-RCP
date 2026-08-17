@@ -2313,7 +2313,7 @@ rcp_regmap_request_stream_cfg_apply_reconfig(rcp_regmap_request_stream_cfg_t *en
          * be expected here, when it means them -- compare
          * wup_status (§13.7.2.2 Table 39: "Indication of wake-up
          * source, writing "1" clears the flag") and
-         * ep_clear_req_storage (§13.7 Table 34 common entries:
+         * ep_clear_req_storage (§13.7 Table 35 common entries:
          * "writing a 1b clears the EPs request storage, reads always
          * 0"). rx_stream_status's own row has no such sentence; its R/W
          * typing (vs. every sibling bit's R/W*, see this table's own
