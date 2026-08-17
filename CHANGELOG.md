@@ -34,6 +34,72 @@ the rationale.
 
 ## Releases
 
+### v0.390.0 -- 2026-08-16 (c-RCP-AUDIT-02 citation backfill batch: CFG/DISC/MOCK/SEQ/TRIG/CANCEL/CHAIN/CMP/CANEP/UART/SRV, 10 of 46 uncited requirements in scope now cited)
+
+Partial progress on issue #164 (c-RCP-AUDIT-02). Scoped to the eleven
+remaining tracked categories CFG, DISC, MOCK, SEQ, TRIG, CANCEL,
+CHAIN, CMP, CANEP, UART, SRV -- avoiding file overlap with the
+concurrent lifecycle/RMAP/E2E work.
+
+Re-derived current counts from `.fusa-reqs.json` directly rather than
+trusting #164's stale body: most of these categories were already
+substantially or fully cited by the earlier batch-16-through-25
+per-module passes (PRs #187-196) -- 231/257 cited, only 46 uncited
+going in, concentrated almost entirely in CFG (2/13) and MOCK (7/33).
+
+Method: read each uncited requirement's `text`, located the governing
+TC18 section in a fresh `pdftotext -layout` extraction of
+`OA_TC18_specification_v_0.5.1_RC_5_3624.pdf`, and for `mock.c`/
+`mock.h` requirements specifically, read the actual dispatch/tick/
+drain implementation to tell a genuinely independent re-implementation
+of documented TC18 dispatch behavior (citable) apart from a thin
+pass-through wrapper over an already-cited `server.h`/`lifecycle.h`
+primitive (not citable on its own -- same "no distinct TC18 text of
+its own" reasoning this issue's history already applied to PWR/WDG/
+MDIO).
+
+**Cited 10, all in MOCK** (17/33 now, up from 7/33): the endpoint
+lookup-fails-silently rule (REQ-MOCK-013/018, reusing REQ-MOCK-030's
+own §12.9.1 citation), the `ep_enable`-gated immediate-execute/queue/
+drain behavior (REQ-MOCK-014/015/016/017, reusing REQ-SRV-001/002/003's
+own §13.7 Table 35 citation), per-member frame fail-safe handling
+(REQ-MOCK-020, reusing REQ-SRV-004's §12.9.1.1 citation), the
+cross-endpoint trigger fan-out (REQ-MOCK-025, new §11.2.2.5 Table 10
+`trigger_source_ep` citation plus REQ-SRV-011's Table 29 basis), chain
+sequencing plus watchdog purge (REQ-MOCK-026, reusing REQ-CHAIN-008/
+009's §11.2.2.6 citations plus REQ-SRV-014's watchdog citation), and
+pending-count reporting (REQ-MOCK-027, reusing REQ-SRV-021's §12.9.2
+citation plus the same §12.9.1 lookup rule).
+
+**Left 36 uncited, each individually re-verified:** the `strerror()`
+family across all eleven categories (REQ-DISC-024, REQ-UART-017,
+REQ-CMP-004, REQ-TRIG-002, REQ-CHAIN-001, REQ-CANCEL-001,
+REQ-CANEP-015, REQ-MOCK-001) and two `functional_cfg_init()`
+zero-init requirements (REQ-UART-004, REQ-CANEP-007) -- same
+implementation-detail pattern left uncited everywhere else in the
+catalog. The remaining 16 MOCK requirements are genuinely thin
+pass-through wrappers (server construction/destruction, lifecycle
+accessors, endpoint-table CRUD, and dispatch/admission/tick functions
+whose entire decision logic lives in an already-cited `server.h`/
+`lifecycle.h` primitive with no independent logic of MOCK's own) --
+confirmed by reading `src/mock.c`, not assumed from the category name.
+
+**Whole-category finding: CFG (2/13, 11 requirements) has no TC18
+basis for citation at all.** `config.h`'s own file header
+self-documents its JSON manifest schema (`hw_pin_map`/`endpoints`/
+`streams`) as this repo's own bring-up/test-config format, replacing a
+pre-TC18 zone-manifest schema -- TC18 itself defines no JSON
+configuration format of any kind. Exhaustive grep of the extracted
+spec text for "json"/"manifest"/"hw_pin_map" returns zero hits.
+Recommend adding CFG to issue #164's own not-a-TC18-concept exclusion
+list, same disposition as MDNS in the prior batch.
+
+Full clean rebuild + full 66-test suite green, unchanged; `cfusa
+check` (v0.5.54) 0 errors, 968/1312 warnings/info unchanged; `cfusa
+trace` (v0.5.54) 1095/1095 traced and tested, unchanged -- citations
+are additive-only, as expected. `.fusa-reqs.json`'s `tc18_master_id`
+field intentionally untouched.
+
 ### v0.389.0 -- 2026-08-17 (c-RCP-AUDIT-08: respqueue.h/hw_pin_type Table fixes + Table 51/56/60 re-verification)
 
 Continues issue #341 (c-RCP-AUDIT-08). A fresh full-codebase census
