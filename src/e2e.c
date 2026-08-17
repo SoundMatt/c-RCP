@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/e2e.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -231,7 +232,7 @@ rcp_bytes_t rcp_e2e_wrap(uint8_t avtp_subtype, uint8_t header_octet1, bool tu,
     if ((size_t)pad_octets > acf_frame_len) return out; /* malformed pad field */
     real_len = acf_frame_len - pad_octets;
 
-    data = (uint8_t *)malloc(acf_frame_len + RCP_E2E_CRC_LEN);
+    data = (uint8_t *)rcp_malloc(acf_frame_len + RCP_E2E_CRC_LEN);
     if (!data) return out;
 
     if (real_len > 0) memcpy(data, acf_frame, real_len);
@@ -245,7 +246,7 @@ rcp_bytes_t rcp_e2e_wrap(uint8_t avtp_subtype, uint8_t header_octet1, bool tu,
      * are needed to reach the next quadlet boundary, only where they
      * sit. */
     if (!adapt_acf_msg_length(data, real_len, 1)) {
-        free(data);
+        rcp_free(data);
         return out;
     }
 
@@ -309,7 +310,7 @@ rcp_e2e_errc_t rcp_e2e_unwrap(uint8_t avtp_subtype, uint8_t header_octet1, bool 
      * contiguous in `frame`, the CRC32 trailer now sits between them). */
     body_len = real_len + pad_octets; /* == frame_len - RCP_E2E_CRC_LEN */
     if (body_len > 0) {
-        body_copy.data = (uint8_t *)malloc(body_len);
+        body_copy.data = (uint8_t *)rcp_malloc(body_len);
         if (body_copy.data) {
             if (real_len > 0) memcpy(body_copy.data, frame, real_len);
             if (pad_octets > 0) {

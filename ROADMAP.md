@@ -19106,6 +19106,54 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.412.0 -- 2026-08-17 (c-RCP-17 Phase (a): route all raw libc
+allocation call sites through `alloc.h`)
+
+Closes the `alloc.h` abstraction-bypass gap identified by issue
+#521's investigation (`c-RCP-17`, "Remove dynamic (heap) allocation
+as a category, in service of a stricter ASIL-D-oriented safety
+case"): all 256 remaining raw `malloc()`/`calloc()`/`realloc()`/
+`free()` call sites across 43 `src/*.c` files now route through the
+existing `rcp_malloc()`/`rcp_calloc()`/`rcp_realloc()`/`rcp_free()`
+seam (`alloc.h`/`alloc.c`, issue #338), same signatures, same
+NULL-on-failure convention -- up from 8 sites in 2 files
+(`fragment.c`, `request_sequencer.c`) before this change.
+
+This is Phase (a) of the issue's own three-phase plan only: a
+mechanical, behavior-preserving refactor (default hooks are a
+transparent passthrough to libc). It does **not** remove dynamic
+allocation as a category -- that is Phase (b) (convert boundable
+cases to static/compile-time buffers) and Phase (c) (document/
+justify what stays dynamic), both real, separately-scoped follow-on
+work. Issue #521 stays open for that remaining work.
+
+Conversion was comment/string-literal-aware (a small purpose-built
+scanner, not a blind `sed`) -- prose referencing `malloc()`/
+`calloc()`/`free()` in doc comments was deliberately left untouched;
+only real call-site occurrences were rewritten. `alloc.c` itself (the
+seam's own libc-calling implementation) was excluded, as were the
+two files already on the seam.
+
+Full 66-test suite clean on both a plain Debug build and an
+ASan/UBSan build (`-fsanitize=address,undefined
+-fno-sanitize-recover=all -g -O1`, `ASAN_OPTIONS=detect_leaks=0` on
+macOS); freshly built, CI-pinned `cfusa` (v0.5.54) `check`: 0 errors;
+`trace --req-coverage 100 --sec-tested 100`: 1095/1095 (100%)
+requirements traced, 512/512 (100%) functions annotated, unchanged
+from baseline. Mutation-tested: reverting one converted call site
+(`l2.c`'s stub-path `rcp_calloc()`) back to raw `calloc()` and
+re-running a hook-installing harness confirmed the reverted site
+silently bypasses an installed allocation-failure hook while the
+converted version correctly observes it.
+
+**Next**: Phase (b) (boundable-case conversion to static/compile-time
+buffers -- `l2.c`/`udp.c`'s already-constant-sized frame buffers are
+the cleanest starting point) and Phase (c) (document/justify the
+genuinely dynamic remainder: `fragment.c`'s reassembly buffer,
+`relay.c`'s message metadata, `mdns.c`/`platform.c`'s
+config-time/thread-thunk allocations) -- both left for a future pass,
+per issue #521's own explicit multi-session phasing.
+
 ### v0.408.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for
 `REQ-LIFECYCLE-*`/`REQ-RMAP-*`)
 

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/request_triggered.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -92,7 +93,7 @@ rcp_bytes_t rcp_triggered_encode_request(uint8_t request_type, rcp_byte_bus_id_t
     total    = unpadded + pad;
     quadlets = (uint16_t)(total / 4u);
 
-    b = (uint8_t *)malloc(total);
+    b = (uint8_t *)rcp_malloc(total);
     if (!b) return frame;
 
     /* mtv=RCP_ACF_MTV_UNTIMED(0) -- see the file header: this repurposes

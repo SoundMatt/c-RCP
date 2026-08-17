@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/mdns.h"
+#include "rcp/alloc.h"
 
 #include "platform.h"
 
@@ -56,7 +57,7 @@ static char *dup_cstr(const char *s)
     char *copy;
     if (!s) return NULL;
     len = strlen(s);
-    copy = (char *)malloc(len + 1);
+    copy = (char *)rcp_malloc(len + 1);
     if (!copy) return NULL;
     memcpy(copy, s, len + 1);
     return copy;
@@ -108,12 +109,12 @@ static void static_disc_destroy(rcp_mdns_discoverer_t *self)
     static_discoverer_t *d = (static_discoverer_t *)self;
     size_t i;
     for (i = 0; i < d->count; i++) {
-        free(d->records[i].host);
-        free(d->records[i].instance_name);
+        rcp_free(d->records[i].host);
+        rcp_free(d->records[i].instance_name);
     }
-    free(d->records);
+    rcp_free(d->records);
     rcp_mutex_destroy(&d->mu);
-    free(d);
+    rcp_free(d);
 }
 
 static const rcp_mdns_discoverer_vtable_t static_disc_vtable = {
@@ -125,7 +126,7 @@ static const rcp_mdns_discoverer_vtable_t static_disc_vtable = {
 //cfusa:req REQ-MDNS-011
 rcp_mdns_discoverer_t *rcp_mdns_static_discoverer_new(const rcp_mdns_server_info_t *records, size_t count)
 {
-    static_discoverer_t *d = (static_discoverer_t *)calloc(1, sizeof(*d));
+    static_discoverer_t *d = (static_discoverer_t *)rcp_calloc(1, sizeof(*d));
     size_t i;
     if (!d) return NULL;
 
@@ -134,10 +135,10 @@ rcp_mdns_discoverer_t *rcp_mdns_static_discoverer_new(const rcp_mdns_server_info
 
     if (count > 0) {
         static_record_entry_t *entries =
-            (static_record_entry_t *)calloc(count, sizeof(*entries));
+            (static_record_entry_t *)rcp_calloc(count, sizeof(*entries));
         if (!entries) {
             rcp_mutex_destroy(&d->mu);
-            free(d);
+            rcp_free(d);
             return NULL;
         }
         d->records = entries;

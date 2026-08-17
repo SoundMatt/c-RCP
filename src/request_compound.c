@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/request_compound.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -142,7 +143,7 @@ static rcp_bytes_t encode_gbb_repurposed(rcp_byte_bus_id_t byte_bus_id, uint8_t 
     total    = unpadded + pad;
     quadlets = (uint16_t)(total / 4u);
 
-    b = (uint8_t *)malloc(total);
+    b = (uint8_t *)rcp_malloc(total);
     if (!b) return frame;
 
     info.byte_bus_id     = byte_bus_id;

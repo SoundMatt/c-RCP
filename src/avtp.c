@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/avtp.h"
+#include "rcp/alloc.h"
 
 #include "platform.h"
 
@@ -121,7 +122,7 @@ rcp_bytes_t rcp_avtp_encode_ntscf(const rcp_avtp_ntscf_header_t *hdr,
     if (payload_len > RCP_AVTP_NTSCF_MAX_PAYLOAD) return frame;
 
     n = RCP_AVTP_NTSCF_HEADER_LEN + payload_len;
-    b = (uint8_t *)malloc(n);
+    b = (uint8_t *)rcp_malloc(n);
     if (!b) return frame;
 
     b[0] = RCP_AVTP_SUBTYPE_NTSCF;
@@ -180,7 +181,7 @@ rcp_bytes_t rcp_avtp_encode_tscf(const rcp_avtp_tscf_header_t *hdr,
     if (payload_len > RCP_AVTP_TSCF_MAX_PAYLOAD) return frame;
 
     n = RCP_AVTP_TSCF_HEADER_LEN + payload_len;
-    b = (uint8_t *)malloc(n);
+    b = (uint8_t *)rcp_malloc(n);
     if (!b) return frame;
 
     memset(b, 0, RCP_AVTP_TSCF_HEADER_LEN);
@@ -412,8 +413,8 @@ static void loopback_destroy(rcp_avtp_transport_t *self)
     }
     rcp_mutex_destroy(&lb->mu);
     rcp_cond_destroy(&lb->cv);
-    free(lb->items);
-    free(lb);
+    rcp_free(lb->items);
+    rcp_free(lb);
 }
 
 static const rcp_avtp_transport_vtable_t loopback_vtable = {
@@ -433,12 +434,12 @@ rcp_avtp_transport_t *rcp_avtp_loopback_transport_new(bool time_sync_supported,
 
     if (queue_capacity == 0) queue_capacity = 1;
 
-    lb = (rcp_avtp_loopback_transport_t *)malloc(sizeof(*lb));
+    lb = (rcp_avtp_loopback_transport_t *)rcp_malloc(sizeof(*lb));
     if (!lb) return NULL;
 
-    items = (rcp_bytes_t *)calloc(queue_capacity, sizeof(*items));
+    items = (rcp_bytes_t *)rcp_calloc(queue_capacity, sizeof(*items));
     if (!items) {
-        free(lb);
+        rcp_free(lb);
         return NULL;
     }
     lb->items = items;

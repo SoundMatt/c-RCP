@@ -10,6 +10,7 @@
 
 #include "rcp/acf.h"
 #include "rcp/request_compound.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 
@@ -138,7 +139,7 @@ static void tsn_destroy(rcp_avtp_transport_t *self)
 {
     tsn_transport_t *t = (tsn_transport_t *)self;
     rcp_avtp_transport_release(t->inner);
-    free(t);
+    rcp_free(t);
 }
 
 static const rcp_avtp_transport_vtable_t tsn_vtable = {
@@ -152,7 +153,7 @@ static const rcp_avtp_transport_vtable_t tsn_vtable = {
 rcp_avtp_transport_t *rcp_tsn_avtp_transport_new(rcp_avtp_transport_t *inner, int socket_fd,
                                                   rcp_tsn_config_t cfg)
 {
-    tsn_transport_t *t = (tsn_transport_t *)calloc(1, sizeof(*t));
+    tsn_transport_t *t = (tsn_transport_t *)rcp_calloc(1, sizeof(*t));
     if (!t) return NULL;
     t->base.vt                  = &tsn_vtable;
     t->base.refcount             = 1;

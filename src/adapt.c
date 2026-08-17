@@ -20,6 +20,7 @@
 #include "rcp/ep_uart.h"
 #include "rcp/ep_wakeup.h"
 #include "rcp/power.h"
+#include "rcp/alloc.h"
 
 /* ── Op <-> kind / string (see adapt.h's file header table) ─────────────────── */
 
@@ -965,7 +966,7 @@ static void adapter_destroy(rcp_relay_caller_t *self)
 {
     rcp_adapter_t *a = (rcp_adapter_t *)self;
     rcp_avtp_transport_release(a->transport);
-    free(a);
+    rcp_free(a);
 }
 
 static const rcp_relay_caller_vtable_t adapter_vtable = {
@@ -983,7 +984,7 @@ static const rcp_relay_caller_vtable_t adapter_vtable = {
 rcp_relay_caller_t *rcp_adapt(rcp_avtp_transport_t *transport, rcp_stream_id_t local_stream_id,
                                rcp_byte_bus_id_t byte_bus_id, rcp_adapt_ep_kind_t kind)
 {
-    rcp_adapter_t *a = (rcp_adapter_t *)calloc(1, sizeof(*a));
+    rcp_adapter_t *a = (rcp_adapter_t *)rcp_calloc(1, sizeof(*a));
     if (!a) return NULL;
     a->base.vt           = &adapter_vtable;
     a->base.refcount      = 1;

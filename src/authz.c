@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/authz.h"
+#include "rcp/alloc.h"
 
 #include "platform.h"
 
@@ -31,7 +32,7 @@ static void copy_identity(char *dst, const char *src)
 //cfusa:req REQ-AUTH-009
 rcp_authz_policy_t *rcp_authz_policy_new(void)
 {
-    rcp_authz_policy_t *p = (rcp_authz_policy_t *)calloc(1, sizeof(*p));
+    rcp_authz_policy_t *p = (rcp_authz_policy_t *)rcp_calloc(1, sizeof(*p));
     if (!p) return NULL;
     p->refcount = 1;
     rcp_mutex_init(&p->mu);
@@ -47,8 +48,8 @@ rcp_authz_policy_t *rcp_authz_policy_retain(rcp_authz_policy_t *p)
 
 static void entry_free(policy_entry_t *e)
 {
-    free(e->addrs);
-    free(e->request_types);
+    rcp_free(e->addrs);
+    rcp_free(e->request_types);
 }
 
 //cfusa:req REQ-AUTH-011
@@ -60,8 +61,8 @@ void rcp_authz_policy_release(rcp_authz_policy_t *p)
     if (rcp_atomic_dec(&p->refcount) > 0) return;
     for (i = 0; i < p->entries_len; i++) entry_free(&p->entries[i]);
     rcp_mutex_destroy(&p->mu);
-    free(p->entries);
-    free(p);
+    rcp_free(p->entries);
+    rcp_free(p);
 }
 
 //cfusa:req REQ-AUTH-003
@@ -77,15 +78,15 @@ bool rcp_authz_policy_allow(rcp_authz_policy_t *policy, const char *identity,
     copy_identity(entry.identity, identity);
 
     if (n_addrs > 0) {
-        entry.addrs = (rcp_avtp_addr_t *)malloc(n_addrs * sizeof(*entry.addrs));
+        entry.addrs = (rcp_avtp_addr_t *)rcp_malloc(n_addrs * sizeof(*entry.addrs));
         if (!entry.addrs) return false;
         memcpy(entry.addrs, addrs, n_addrs * sizeof(*entry.addrs));
         entry.n_addrs = n_addrs;
     }
     if (n_request_types > 0) {
-        entry.request_types = (uint8_t *)malloc(n_request_types * sizeof(*entry.request_types));
+        entry.request_types = (uint8_t *)rcp_malloc(n_request_types * sizeof(*entry.request_types));
         if (!entry.request_types) {
-            free(entry.addrs);
+            rcp_free(entry.addrs);
             return false;
         }
         memcpy(entry.request_types, request_types, n_request_types * sizeof(*entry.request_types));
@@ -95,7 +96,7 @@ bool rcp_authz_policy_allow(rcp_authz_policy_t *policy, const char *identity,
     rcp_mutex_lock(&policy->mu);
     if (policy->entries_len == policy->entries_cap) {
         size_t new_cap = (policy->entries_cap == 0) ? 4 : policy->entries_cap * 2;
-        policy_entry_t *grown = (policy_entry_t *)realloc(policy->entries, new_cap * sizeof(*grown));
+        policy_entry_t *grown = (policy_entry_t *)rcp_realloc(policy->entries, new_cap * sizeof(*grown));
         if (!grown) {
             ok = false;
         } else {

@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/faultinject.h"
+#include "rcp/alloc.h"
 
 #include "platform.h"
 
@@ -16,7 +17,7 @@ struct rcp_faultinject {
 //cfusa:req REQ-FI-011
 rcp_faultinject_t *rcp_faultinject_new(void)
 {
-    rcp_faultinject_t *fi = (rcp_faultinject_t *)calloc(1, sizeof(*fi));
+    rcp_faultinject_t *fi = (rcp_faultinject_t *)rcp_calloc(1, sizeof(*fi));
     if (!fi) return NULL;
     rcp_mutex_init(&fi->mu);
     return fi;
@@ -30,7 +31,7 @@ bool rcp_faultinject_add_rule(rcp_faultinject_t *fi, rcp_fi_rule_t rule)
     rcp_mutex_lock(&fi->mu);
     if (fi->rules_len == fi->rules_cap) {
         size_t new_cap = (fi->rules_cap == 0) ? 4 : fi->rules_cap * 2;
-        rcp_fi_rule_t *grown = (rcp_fi_rule_t *)realloc(fi->rules, new_cap * sizeof(*grown));
+        rcp_fi_rule_t *grown = (rcp_fi_rule_t *)rcp_realloc(fi->rules, new_cap * sizeof(*grown));
         if (!grown) {
             ok = false;
         } else {
@@ -103,7 +104,7 @@ rcp_fi_action_t rcp_faultinject_evaluate(rcp_faultinject_t *fi, uint64_t *out_la
 void rcp_faultinject_destroy(rcp_faultinject_t *fi)
 {
     if (!fi) return;
-    free(fi->rules);
+    rcp_free(fi->rules);
     rcp_mutex_destroy(&fi->mu);
-    free(fi);
+    rcp_free(fi);
 }

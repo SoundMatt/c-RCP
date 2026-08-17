@@ -8,6 +8,7 @@
 #include "rcp/request_chained.h"
 #include "rcp/request_compound.h"
 #include "rcp/scheduler.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -282,7 +283,7 @@ const char *rcp_mock_strerror(rcp_mock_errc_t e)
 //cfusa:req REQ-RMAP-054
 rcp_mock_server_t *rcp_mock_server_new(void)
 {
-    rcp_mock_server_t *srv = (rcp_mock_server_t *)calloc(1, sizeof(*srv));
+    rcp_mock_server_t *srv = (rcp_mock_server_t *)rcp_calloc(1, sizeof(*srv));
     if (!srv) return NULL;
 
     srv->state = RCP_LIFECYCLE_HW_UNCONFIGURED;
@@ -348,7 +349,7 @@ void rcp_mock_server_destroy(rcp_mock_server_t *srv)
         rcp_fragment_reassembler_destroy(&srv->frag_reasm[i]);
     }
     rcp_sequencer_table_free(&srv->sequencers);
-    free(srv);
+    rcp_free(srv);
 }
 
 //cfusa:req REQ-MOCK-004

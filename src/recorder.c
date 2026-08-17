@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/recorder.h"
+#include "rcp/alloc.h"
 
 #include "platform.h"
 
@@ -19,7 +20,7 @@ struct rcp_recorder {
 //cfusa:req REQ-REC-012
 rcp_recorder_t *rcp_recorder_new(void)
 {
-    rcp_recorder_t *r = (rcp_recorder_t *)calloc(1, sizeof(*r));
+    rcp_recorder_t *r = (rcp_recorder_t *)rcp_calloc(1, sizeof(*r));
     if (!r) return NULL;
     rcp_mutex_init(&r->mu);
     return r;
@@ -33,8 +34,8 @@ void rcp_recorder_destroy(rcp_recorder_t *r)
     if (!r) return;
     for (i = 0; i < r->len; i++) rcp_bytes_free(&r->entries[i].frame);
     rcp_mutex_destroy(&r->mu);
-    free(r->entries);
-    free(r);
+    rcp_free(r->entries);
+    rcp_free(r);
 }
 
 //cfusa:req REQ-REC-013
@@ -79,7 +80,7 @@ bool rcp_recorder_capture(rcp_recorder_t *r, uint64_t timestamp_ms, rcp_avtp_add
     rcp_mutex_lock(&r->mu);
     if (r->len == r->cap) {
         size_t new_cap = (r->cap == 0) ? 16 : r->cap * 2;
-        rcp_recorder_entry_t *grown = (rcp_recorder_entry_t *)realloc(r->entries, new_cap * sizeof(*grown));
+        rcp_recorder_entry_t *grown = (rcp_recorder_entry_t *)rcp_realloc(r->entries, new_cap * sizeof(*grown));
         if (!grown) {
             ok = false;
         } else {
@@ -177,7 +178,7 @@ int rcp_playback_run_all(rcp_recorder_t *rec, rcp_playback_deliver_fn deliver, v
 
     if (n == 0) return RCP_OK;
 
-    snapshot = (rcp_recorder_entry_t *)malloc(n * sizeof(*snapshot));
+    snapshot = (rcp_recorder_entry_t *)rcp_malloc(n * sizeof(*snapshot));
     if (!snapshot) return RCP_ERR_BUSY;
     n = rcp_recorder_entries(rec, snapshot, n);
 
@@ -193,6 +194,6 @@ int rcp_playback_run_all(rcp_recorder_t *rec, rcp_playback_deliver_fn deliver, v
         deliver(&snapshot[i], user_data);
     }
 
-    free(snapshot);
+    rcp_free(snapshot);
     return RCP_OK;
 }

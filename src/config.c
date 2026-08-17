@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/config.h"
+#include "rcp/alloc.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -180,9 +181,9 @@ static void or_named_bits_options(const char *start, const char *end, uint8_t *o
 //cfusa:req REQ-CFG-013
 void rcp_config_manifest_free(rcp_config_manifest_t *m)
 {
-    free(m->hw_pin_map);
-    free(m->endpoints);
-    free(m->streams);
+    rcp_free(m->hw_pin_map);
+    rcp_free(m->endpoints);
+    rcp_free(m->streams);
     memset(m, 0, sizeof(*m));
 }
 
@@ -195,7 +196,7 @@ void rcp_config_manifest_free(rcp_config_manifest_t *m)
     {                                                                                          \
         if (*len == *cap) {                                                                    \
             size_t new_cap = (*cap == 0) ? 8 : *cap * 2;                                       \
-            ELEM_T *grown = (ELEM_T *)realloc(*arr, new_cap * sizeof(**arr));                  \
+            ELEM_T *grown = (ELEM_T *)rcp_realloc(*arr, new_cap * sizeof(**arr));                  \
             if (!grown) return false;                                                          \
             *arr = grown;                                                                      \
             *cap = new_cap;                                                                    \
@@ -409,9 +410,9 @@ int rcp_config_parse_json(const char *json, rcp_config_manifest_t *out, char *er
     return RCP_OK;
 
 fail:
-    free(pins);
-    free(endpoints);
-    free(streams);
+    rcp_free(pins);
+    rcp_free(endpoints);
+    rcp_free(streams);
     memset(out, 0, sizeof(*out));
     return RCP_CFG_ERR_PARSE;
 }

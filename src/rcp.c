@@ -1,5 +1,6 @@
 /* SPDX-License-Identifier: MPL-2.0 */
 #include "rcp/rcp.h"
+#include "rcp/alloc.h"
 
 #include <stdlib.h>
 #include <string.h>
@@ -46,7 +47,7 @@ rcp_bytes_t rcp_bytes_dup(const uint8_t *data, size_t len)
     b.len  = 0;
     if (len == 0) return b;
 
-    b.data = (uint8_t *)malloc(len);
+    b.data = (uint8_t *)rcp_malloc(len);
     if (!b.data) return b; /* len stays 0: allocation failure yields an empty buffer */
 
     memcpy(b.data, data, len);
@@ -58,7 +59,7 @@ rcp_bytes_t rcp_bytes_dup(const uint8_t *data, size_t len)
 void rcp_bytes_free(rcp_bytes_t *b)
 {
     if (!b) return;
-    free(b->data);
+    rcp_free(b->data);
     b->data = NULL;
     b->len  = 0;
 }

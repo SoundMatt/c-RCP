@@ -34,6 +34,58 @@ the rationale.
 
 ## Releases
 
+### v0.412.0 -- 2026-08-17 (c-RCP-17 Phase (a): route all raw libc allocation call sites through `alloc.h`)
+
+Closes the `alloc.h` abstraction-bypass gap identified by issue #521's
+investigation (`c-RCP-17`, "Remove dynamic (heap) allocation as a
+category, in service of a stricter ASIL-D-oriented safety case"): all
+256 remaining raw `malloc()`/`calloc()`/`realloc()`/`free()` call sites
+across 43 `src/*.c` files now route through the existing
+`rcp_malloc()`/`rcp_calloc()`/`rcp_realloc()`/`rcp_free()` seam
+(`alloc.h`/`alloc.c`, issue #338), same signatures, same NULL-on-failure
+convention -- up from 8 sites in 2 files (`fragment.c`,
+`request_sequencer.c`) before this change.
+
+This is Phase (a) of the issue's three-phase plan only: a mechanical,
+behavior-preserving refactor (default hooks are a transparent
+passthrough to libc) that gives every integrator today's
+fault-injection/monitoring capability uniformly instead of on 4% of
+call sites. It does **not** remove dynamic allocation as a category --
+that is Phase (b) (convert boundable cases to static/compile-time
+buffers) and Phase (c) (document/justify what stays dynamic), both
+real, substantial, separately-scoped follow-on work the issue itself
+declines to force into one pass. Issue #521 stays open for that
+remaining work; see the issue comment accompanying this release for the
+concrete per-phase-(b)-example disposition list carried over from the
+original filing.
+
+Conversion was comment/string-literal-aware (not a blind `sed`) --
+prose referencing `malloc()`/`calloc()`/`free()` in doc comments (e.g.
+`mock.c`'s extensive "zeroed via `calloc()`" convention commentary) was
+deliberately left untouched; only real call-site occurrences were
+rewritten. `alloc.c` itself (the seam's own libc-calling implementation)
+was excluded, as were the two files already on the seam.
+
+Rebased on top of `v0.411.0`'s CFUSA-CY006 `free()`-without-NULL
+hygiene batch (issue #522), which touched the same four highest-count
+files (`relay.c`/`shmem.c`/`loan.c`/`ep_can.c`) this Phase (a) pass
+also converts -- merge conflicts resolved by combining both changes at
+every site (`rcp_free(ptr); ptr = NULL;`), not by picking one side.
+
+Verified: full 66-test suite clean on both a plain Debug build and an
+ASan/UBSan build (`-fsanitize=address,undefined
+-fno-sanitize-recover=all -g -O1`, `ASAN_OPTIONS=detect_leaks=0` on
+macOS); freshly built, CI-pinned `cfusa` (v0.5.54) `check`: 0 errors;
+`trace --req-coverage 100 --sec-tested 100`: 1095/1095 (100%)
+requirements traced, 512/512 (100%) functions annotated, unchanged from
+baseline (this is a pure implementation refactor, no requirement text
+touched). Mutation-tested: reverting one converted call site
+(`l2.c`'s stub-path `rcp_calloc()`) back to raw `calloc()` and
+re-running a hook-installing harness confirmed the reverted site
+silently bypasses an installed allocation-failure hook, while the
+converted version correctly observes it -- proving the conversion is a
+real, load-bearing change and not a no-op.
+
 ### v0.411.0 -- 2026-08-17 (CFUSA-CY006 free()-without-NULL hygiene batch 1: relay.c/shmem.c/loan.c/ep_can.c, issue #522)
 
 Re-verified issue #522's own claim before acting on it: re-ran the
