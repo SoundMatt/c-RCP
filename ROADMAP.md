@@ -19386,6 +19386,38 @@ errors, 968/1312 warnings/info unchanged; 1095/1095 traced unchanged
 -- confirms `cfusa` tolerates the new field without affecting any
 reported count.
 
+### v0.408.0 -- 2026-08-17 (c-RCP-AUDIT-04: tc18_master_id backfill,
+I2C/ISELED/LINEP categories)
+
+This batch's slice of c-RCP-AUDIT-04 (issue 166), now unblocked by
+the 447-entry master TC18 requirement catalog published at
+`RELAY/docs/tc18-master-catalog.json`. Adds the new `tc18_master_id`
+field (RCP-ARCHITECTURE.md canonical choice #6) to every
+`REQ-ISELED-*`/`REQ-I2C-*`/`REQ-LINEP-*` entry in `.fusa-reqs.json`
+that already carries a `tc18` citation, resolving each citation's
+own `TC18.txt L<start>-<end>` line range directly against the
+source text to identify the exact catalog entry it describes rather
+than matching on section number alone.
+
+58 of this batch's 60 already-cited entries got a confident match;
+2 (`REQ-ISELED-025`, `REQ-ISELED-030`) are left unset -- both cite
+`§13.7.12.1`'s read-response-aggregation rule (TC18.txt
+L5909-5912), and the master catalog's own `§13.7.12.1` coverage
+turned out to include only the CRC-generation and trigger-event
+MUST clauses from that section, not this one; a genuine catalog gap
+worth a follow-up pass over the catalog itself, not something to
+force a match for. The remaining 17 entries in this batch's three
+categories have no `tc18` field at all (implementation-only
+plumbing/test scaffolding) and were correctly left untouched per
+this issue's own stated discipline.
+
+Purely additive JSON field -- no `text`/`title`/`status`/`tc18`
+field touched, no source file touched. Full 66-test suite clean;
+freshly built, CI-pinned `cfusa` (v0.5.54) `check`: 0 errors;
+`trace --req-coverage 100 --sec-tested 100`: 1095/1095 (100%)
+requirements traced, 512/512 (100%) functions annotated, unchanged
+from baseline.
+
 ### v0.400.0 -- 2026-08-16 (c-RCP-AUDIT-08: exhaustive census of the
 twelve remaining table numbers -- `55`/`37`/`40`/`57`/`19`/`59`/`49`/
 `15`/`34`/`17`/`14`/`16` -- closes out this issue's own tracked
