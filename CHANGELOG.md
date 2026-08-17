@@ -34,6 +34,57 @@ the rationale.
 
 ## Releases
 
+### v0.380.0 -- 2026-08-16 (ISELED read-direction command request added)
+
+Closes issue #471. `ep_iseled.c`/`.h` modeled only a single, write-direction
+"command request" (`rcp_ep_iseled_encode_command_request()` always set
+`hdr.op = RCP_ACF_OP_WRITE`; `rcp_ep_iseled_decode_command_request()`
+rejected anything else with `RCP_EP_ISELED_ERR_WRONG_OP`), with no
+read-direction request and no `read_size` parameter anywhere in the
+module -- despite `rcp_ep_iseled_encode_response_fragmented()`
+(`REQ-ISELED-025`) already taking a `read_size` to cap/fragment a
+response, with no wire-level way to have actually received that value
+from an incoming request. Re-verified independently against the TC18
+v0.5.1_RC_5 PDF: §13.7.12.1 explicitly describes a distinct
+read-eliciting request carrying a `read_size` ("Upon read requests the
+responses are collected 5/4bit decoded and aggregated into one or
+multiple ACF [messages] up to the requested read_size"), and the general
+ACF `byte_message_info` rule (confirmed at every endpoint-type
+occurrence, e.g. Table 4: "read_size/segment_num -- if op = 0 this is
+read_size, else segment_num") together with §12.9.1 ("A response with
+payload data read from the EP is given, if requested by op=0 (read
+request)") confirms `read_size_or_segment_num` is `read_size` precisely
+when `op` is the read sense. New `rcp_ep_iseled_encode_read_request()`/
+`_decode_read_request()` (`REQ-ISELED-030`/`031`) add the missing
+counterpart, modeled on `ep_i2c.h`'s
+`rcp_ep_i2c_encode_transfer_request()`/`_decode_transfer_request()`: a
+read request carries the plain Instruction/Address payload selecting
+what to read back (no Data octets) plus the ACF header's own 12-bit
+`read_size_or_segment_num`, newly bounded by `RCP_EP_ISELED_MAX_READ_SIZE`
+(0x0FFF). The existing write-direction
+`rcp_ep_iseled_encode_command_request()`/`_decode_command_request()` pair
+is completely unchanged -- it continues to model `ACF_OP_WRITE` only, and
+`rcp_ep_iseled_decode_read_request()` is a new sibling function, not a
+modification of the write-direction decoder, so the two directions stay
+independently testable and independently correct. `src/adapt.c`'s
+`RCP_ADAPT_OP_ISELED_COMMAND` now selects the read direction the same way
+`RCP_ADAPT_OP_I2C_TRANSFER` already does: meta `rcp.iseled.read_size`
+absent or `0` keeps the (unchanged) write direction; non-zero switches to
+the new read-direction encoder and asks for that many octets back
+(`include/rcp/adapt.h`'s field table updated to match). New tests cover
+the encode/decode round trip, empty-payload and `read_size`
+zero/max/above-max boundaries, every `decode_read_request` rejection path
+(wrong bus, wrong op, bad msg type, short frame, nonzero evt), an explicit
+regression test pinning that the write-direction path did not move, and
+three `src/adapt.c` dispatch tests (default write direction, read
+direction selected by `read_size` meta, and rejection above the 12-bit
+ceiling). Mutation-tested: reverting the fix broke the build (undefined
+`rcp_ep_iseled_encode_read_request()`/`_decode_read_request()`/
+`RCP_EP_ISELED_MAX_READ_SIZE`); a second, targeted mutation (deleting the
+`op != RCP_ACF_OP_READ` check) was caught cleanly by both the new
+`test_read_request_rejects_wrong_op` and the write-direction regression
+test.
+
 ### v0.379.0 -- 2026-08-16 (EP_RESP_ON_ERROR investigated and confirmed a genuine TC18 spec defect, not an addressable local gap)
 
 Closes issue #467. TC18 §13.2's own prose immediately below Table 31

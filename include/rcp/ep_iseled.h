@@ -34,6 +34,12 @@
 //cfusa:req REQ-ISELED-027
 //cfusa:req REQ-ISELED-028
 //cfusa:req REQ-ISELED-029
+
+/* issue #471 (2026-08-16): the read-direction command request TC18
+ * §13.7.12.1 describes was missing entirely -- see the "Read request"
+ * section below for the full citation and rationale. */
+//cfusa:req REQ-ISELED-030
+//cfusa:req REQ-ISELED-031
 /*
  * ep_iseled.h -- ISELED endpoint for the TC18 Remote Control Protocol wire
  * layer (ROADMAP.md Phase 19, "Remaining Endpoint Types", milestone 73).
@@ -468,6 +474,11 @@ bool rcp_ep_iseled_set_trigger(rcp_ep_iseled_functional_cfg_t *cfg,
  * RCP_EP_PWM_OUT_RECONFIG_ADDR_LEN's own identical note (ep_pwm.h). */
 #define RCP_EP_ISELED_RECONFIG_ADDR_LEN ((size_t)2u)
 
+/* Largest value the ACF header's 12-bit read_size_or_segment_num field can
+ * carry (acf.h) -- see RCP_EP_I2C_MAX_READ_SIZE's own identical note
+ * (ep_i2c.h). Used by rcp_ep_iseled_encode_read_request() (issue #471). */
+#define RCP_EP_ISELED_MAX_READ_SIZE ((uint16_t)0x0FFFu)
+
 typedef enum {
     RCP_EP_ISELED_RECONFIG_OK               = 0,
     RCP_EP_ISELED_RECONFIG_ERR_SHORT        = 1, /* payload carries no
@@ -591,6 +602,66 @@ rcp_ep_iseled_errc_t rcp_ep_iseled_decode_command_request(const uint8_t *b, size
                                                             const uint8_t **out_tx_data,
                                                             size_t *out_tx_len,
                                                             uint8_t *out_transaction_num);
+
+/* ── Read request (issue #471, REQ-ISELED-030/031) ───────────────────────────── */
+
+/* FIXED 2026-08-16 (issue #471): rcp_ep_iseled_encode_command_request()/
+ * _decode_command_request() above model only the ACF_OP_WRITE sense of a
+ * command request -- TC18 §13.7.12.1 explicitly describes a *distinct*
+ * read-eliciting request ("Upon read requests the responses are collected
+ * 5/4bit decoded and aggregated into one or multiple ACF [messages] up to
+ * the requested read_size"), and the general ACF byte_message_info rule
+ * (identical at every endpoint-type occurrence, e.g. TC18 Table 4 and
+ * §12.9.1: "A response with payload data read from the EP is given, if
+ * requested by op=0 (read request)") says read_size_or_segment_num is
+ * read_size specifically when op=0. rcp_ep_iseled_encode_response_fragmented()
+ * already took a read_size parameter for capping/fragmenting a response
+ * (REQ-ISELED-025) -- but until this fix there was no wire-level way to
+ * *receive* that read_size from an actual ACF_OP_READ request; a caller
+ * had no choice but to invent it. These two functions are the missing
+ * counterpart, modeled on ep_i2c.h's rcp_ep_i2c_encode_transfer_request()/
+ * _decode_transfer_request() (a read request may still carry a payload --
+ * the plain Instruction/Address content selecting what to read back from
+ * the ISELED chain, Figure 41 -- exactly as an I2C read carries the target
+ * register address; only the Data octets are meaningless on a read). The
+ * existing write-direction rcp_ep_iseled_encode_command_request()/
+ * _decode_command_request() pair above is completely unchanged by this
+ * fix -- it continues to model ACF_OP_WRITE only, and continues to reject
+ * ACF_OP_READ with RCP_EP_ISELED_ERR_WRONG_OP, exactly as before. */
+
+/* Encodes an ACF_ABB read request addressed to byte_bus_id: the payload is
+ * exactly tx_data[0..tx_len) (the raw plain Instruction/Address content
+ * selecting what to read back; tx_data may be NULL iff tx_len == 0), and
+ * the ACF header's own 12-bit read_size_or_segment_num field carries
+ * read_size, the number of octets requested back (0-4095; TC18
+ * §13.7.12.1's own read_size, acf.h). Returns a zeroed rcp_bytes_t
+ * (data=NULL) if tx_len exceeds RCP_ACF_MAX_PAYLOAD, if read_size exceeds
+ * the 12-bit field's own range (RCP_EP_ISELED_MAX_READ_SIZE), or on
+ * allocation failure. Caller frees the result with rcp_bytes_free(). */
+rcp_bytes_t rcp_ep_iseled_encode_read_request(rcp_byte_bus_id_t byte_bus_id,
+                                               const uint8_t *tx_data, size_t tx_len,
+                                               uint16_t read_size, uint8_t transaction_num);
+
+/* Decodes and validates an ACF-level ISELED read request from b[0..len).
+ * Fails with RCP_EP_ISELED_ERR_SHORT_FRAME if b is shorter than the
+ * ACF_ABB fixed header or its declared payload length;
+ * RCP_EP_ISELED_ERR_BAD_MSG_TYPE if b is not an ACF_ABB message;
+ * RCP_EP_ISELED_ERR_WRONG_BUS if its byte_bus_id != expected_bus_id;
+ * RCP_EP_ISELED_ERR_WRONG_OP if its op is not RCP_ACF_OP_READ (the mirror
+ * image of rcp_ep_iseled_decode_command_request()'s own check);
+ * RCP_EP_ISELED_ERR_BAD_EVT if its evt[2:0] is not 0b000
+ * (rcp_acf_evt_row2_is_plain(), TC18 §13.5 Table 33). On RCP_EP_ISELED_OK,
+ * *out_transaction_num and *out_read_size (the header's own
+ * read_size_or_segment_num, meaningful only because op==RCP_ACF_OP_READ
+ * was already confirmed) are populated, and *out_tx_data / *out_tx_len are
+ * set to a *borrowed* view into b (not copied) of the raw plain
+ * Instruction/Address content. */
+rcp_ep_iseled_errc_t rcp_ep_iseled_decode_read_request(const uint8_t *b, size_t len,
+                                                        rcp_byte_bus_id_t expected_bus_id,
+                                                        const uint8_t **out_tx_data,
+                                                        size_t *out_tx_len,
+                                                        uint16_t *out_read_size,
+                                                        uint8_t *out_transaction_num);
 
 /* ── Response ───────────────────────────────────────────────────────────────── */
 

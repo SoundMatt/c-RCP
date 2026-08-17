@@ -33,6 +33,7 @@
 #include <rcp/ep_can.h>
 #include <rcp/ep_gpio.h>
 #include <rcp/ep_i2c.h>
+#include <rcp/ep_iseled.h>
 #include <rcp/ep_mdio.h>
 #include <rcp/ep_spi.h>
 #include <rcp/ep_wakeup.h>
@@ -384,6 +385,78 @@ static void test_uart_read_request_requires_read_size_meta(void)
     relay_message_init(&msg); /* no rcp.uart.read_size set */
 
     req = rcp_message_to_request(RCP_ADAPT_OP_UART_READ, 1, make_stream(1), &msg, 1, &err);
+    TEST_ASSERT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_ENCODE, err);
+
+    relay_message_free(&msg);
+}
+
+/* issue #471: RCP_ADAPT_OP_ISELED_COMMAND now selects the read direction
+ * the same way RCP_ADAPT_OP_I2C_TRANSFER does -- meta rcp.iseled.read_size
+ * absent/0 stays the (unchanged) write direction; non-zero switches to
+ * the newly-added read-direction encoder. */
+static void test_iseled_command_default_is_write_direction(void)
+{
+    relay_message_t  msg;
+    rcp_bytes_t       req;
+    rcp_adapt_errc_t  err = RCP_ADAPT_ERR_ENCODE;
+    uint8_t           tx[] = {0x01, 0x02, 0x03};
+    const uint8_t    *out_tx;
+    size_t            out_tx_len;
+    uint8_t           txn;
+
+    relay_message_init(&msg); /* no rcp.iseled.read_size set */
+    msg.payload = relay_bytes_dup(tx, sizeof(tx));
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_ISELED_COMMAND, 2, make_stream(1), &msg, 5, &err);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_OK,
+        rcp_ep_iseled_decode_command_request(req.data, req.len, 2, &out_tx, &out_tx_len, &txn));
+    TEST_ASSERT_EQUAL_UINT32(sizeof(tx), out_tx_len);
+
+    rcp_bytes_free(&req);
+    relay_message_free(&msg);
+}
+
+static void test_iseled_command_read_size_meta_selects_read_direction(void)
+{
+    relay_message_t  msg;
+    rcp_bytes_t       req;
+    rcp_adapt_errc_t  err = RCP_ADAPT_ERR_ENCODE;
+    uint8_t           tx[] = {0x03, 0x40}; /* Instruction+Address */
+    const uint8_t    *out_tx;
+    size_t            out_tx_len;
+    uint16_t          read_size = 0;
+    uint8_t           txn;
+
+    relay_message_init(&msg);
+    msg.payload = relay_bytes_dup(tx, sizeof(tx));
+    relay_message_set_meta(&msg, "rcp.iseled.read_size", "16");
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_ISELED_COMMAND, 2, make_stream(1), &msg, 5, &err);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_ADAPT_OK, err);
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_OK,
+        rcp_ep_iseled_decode_read_request(req.data, req.len, 2, &out_tx, &out_tx_len, &read_size,
+                                           &txn));
+    TEST_ASSERT_EQUAL_UINT32(sizeof(tx), out_tx_len);
+    TEST_ASSERT_EQUAL_UINT16(16, read_size);
+
+    rcp_bytes_free(&req);
+    relay_message_free(&msg);
+}
+
+static void test_iseled_command_read_size_above_max_rejected(void)
+{
+    relay_message_t  msg;
+    rcp_bytes_t       req;
+    rcp_adapt_errc_t  err = RCP_ADAPT_OK;
+
+    relay_message_init(&msg);
+    relay_message_set_meta(&msg, "rcp.iseled.read_size", "4096"); /* > 12-bit ceiling */
+
+    req = rcp_message_to_request(RCP_ADAPT_OP_ISELED_COMMAND, 2, make_stream(1), &msg, 5, &err);
     TEST_ASSERT_NULL(req.data);
     TEST_ASSERT_EQUAL(RCP_ADAPT_ERR_ENCODE, err);
 
@@ -804,6 +877,9 @@ int main(void)
     RUN_TEST(test_spi_transfer_request_maps_channel_meta_and_payload);
     RUN_TEST(test_i2c_transfer_request_has_no_channel_selector);
     RUN_TEST(test_uart_read_request_requires_read_size_meta);
+    RUN_TEST(test_iseled_command_default_is_write_direction);
+    RUN_TEST(test_iseled_command_read_size_meta_selects_read_direction);
+    RUN_TEST(test_iseled_command_read_size_above_max_rejected);
     RUN_TEST(test_can_frame_request_rejects_xl_formats_as_out_of_scope);
     RUN_TEST(test_can_frame_request_accepts_classical_format);
     RUN_TEST(test_mdio_write_request_maps_addr_meta_and_packed_words);

@@ -27,6 +27,8 @@
 //cfusa:test REQ-ISELED-026
 //cfusa:test REQ-ISELED-027
 //cfusa:test REQ-ISELED-029
+//cfusa:test REQ-ISELED-030
+//cfusa:test REQ-ISELED-031
 #include "unity.h"
 
 #include <rcp/acf.h>
@@ -759,6 +761,223 @@ static void test_command_request_rejects_short_frame(void)
                                               &out_tx_len, &txn));
 }
 
+/* ── Regression: write-direction command request is unchanged (issue #471) ──
+ *
+ * These four assertions are the same wire behavior
+ * test_command_request_round_trip_carries_raw_bytes() and
+ * test_command_request_rejects_wrong_op() above already pin -- repeated
+ * here, by name, as an explicit "the write path did not move" regression
+ * check alongside the new read-direction tests below, so a future reader
+ * (or a mutation run) sees both directions verified side by side. */
+static void test_command_request_write_direction_unchanged_regression(void)
+{
+    uint8_t        tx[3] = {0x01, 0x02, 0x03};
+    rcp_bytes_t    frame = rcp_ep_iseled_encode_command_request(2, tx, sizeof(tx), 9);
+    const uint8_t *out_tx = NULL;
+    size_t         out_tx_len = 0;
+    uint16_t       read_size = 0;
+    uint8_t        txn = 0;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    /* Still ACF_OP_WRITE on the wire -- decode_read_request must reject it. */
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_ERR_WRONG_OP,
+        rcp_ep_iseled_decode_read_request(frame.data, frame.len, 2, &out_tx, &out_tx_len,
+                                           &read_size, &txn));
+    /* And decode_command_request still accepts it exactly as before. */
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_OK,
+        rcp_ep_iseled_decode_command_request(frame.data, frame.len, 2, &out_tx, &out_tx_len,
+                                              &txn));
+    TEST_ASSERT_EQUAL_UINT32(sizeof(tx), out_tx_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(tx, out_tx, sizeof(tx));
+    TEST_ASSERT_EQUAL_UINT8(9, txn);
+
+    rcp_bytes_free(&frame);
+}
+
+/* ── Read request (issue #471, REQ-ISELED-030/031) ───────────────────────────── */
+
+static void test_read_request_round_trip_carries_address_and_read_size(void)
+{
+    /* Instruction+Address selecting what to read back -- no Data octets,
+     * see the header's own file-level note. */
+    uint8_t        tx[2] = {0x03, 0x40};
+    rcp_bytes_t    frame = rcp_ep_iseled_encode_read_request(6, tx, sizeof(tx), 12, 7);
+    const uint8_t *out_tx = NULL;
+    size_t         out_tx_len = 0;
+    uint16_t       read_size = 0;
+    uint8_t        txn = 0;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_OK,
+        rcp_ep_iseled_decode_read_request(frame.data, frame.len, 6, &out_tx, &out_tx_len,
+                                           &read_size, &txn));
+    TEST_ASSERT_EQUAL_UINT32(sizeof(tx), out_tx_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(tx, out_tx, sizeof(tx));
+    TEST_ASSERT_EQUAL_UINT16(12, read_size);
+    TEST_ASSERT_EQUAL_UINT8(7, txn);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_read_request_round_trip_empty_payload(void)
+{
+    rcp_bytes_t    frame = rcp_ep_iseled_encode_read_request(1, NULL, 0, 64, 1);
+    const uint8_t *out_tx = NULL;
+    size_t         out_tx_len = 1;
+    uint16_t       read_size = 0;
+    uint8_t        txn = 0;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_OK,
+        rcp_ep_iseled_decode_read_request(frame.data, frame.len, 1, &out_tx, &out_tx_len,
+                                           &read_size, &txn));
+    TEST_ASSERT_EQUAL_UINT32(0, out_tx_len);
+    TEST_ASSERT_EQUAL_UINT16(64, read_size);
+
+    rcp_bytes_free(&frame);
+}
+
+/* Boundary: read_size == 0 is legal (a caller asking for nothing back is
+ * still a well-formed read request on the wire). */
+static void test_read_request_read_size_zero(void)
+{
+    rcp_bytes_t frame = rcp_ep_iseled_encode_read_request(3, NULL, 0, 0, 2);
+    const uint8_t *out_tx;
+    size_t      out_tx_len;
+    uint16_t    read_size = 0xFFFFu;
+    uint8_t     txn;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_OK,
+        rcp_ep_iseled_decode_read_request(frame.data, frame.len, 3, &out_tx, &out_tx_len,
+                                           &read_size, &txn));
+    TEST_ASSERT_EQUAL_UINT16(0, read_size);
+
+    rcp_bytes_free(&frame);
+}
+
+/* Boundary: read_size == RCP_EP_ISELED_MAX_READ_SIZE (0x0FFF, the ACF
+ * header's own 12-bit ceiling) round-trips; one above it is rejected at
+ * encode time. */
+static void test_read_request_read_size_max_boundary(void)
+{
+    rcp_bytes_t frame = rcp_ep_iseled_encode_read_request(3, NULL, 0,
+                                                            RCP_EP_ISELED_MAX_READ_SIZE, 2);
+    const uint8_t *out_tx;
+    size_t      out_tx_len;
+    uint16_t    read_size = 0;
+    uint8_t     txn;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_OK,
+        rcp_ep_iseled_decode_read_request(frame.data, frame.len, 3, &out_tx, &out_tx_len,
+                                           &read_size, &txn));
+    TEST_ASSERT_EQUAL_UINT16(RCP_EP_ISELED_MAX_READ_SIZE, read_size);
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_read_request_read_size_above_max_rejected_at_encode(void)
+{
+    rcp_bytes_t frame = rcp_ep_iseled_encode_read_request(
+        3, NULL, 0, (uint16_t)(RCP_EP_ISELED_MAX_READ_SIZE + 1u), 2);
+
+    TEST_ASSERT_NULL(frame.data);
+    TEST_ASSERT_EQUAL_UINT32(0, frame.len);
+}
+
+static void test_read_request_rejects_wrong_bus(void)
+{
+    uint8_t     tx[1] = {0xAB};
+    rcp_bytes_t frame = rcp_ep_iseled_encode_read_request(4, tx, sizeof(tx), 8, 0);
+    const uint8_t *out_tx;
+    size_t      out_tx_len;
+    uint16_t    read_size;
+    uint8_t     txn;
+
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_ERR_WRONG_BUS,
+        rcp_ep_iseled_decode_read_request(frame.data, frame.len, 5, &out_tx, &out_tx_len,
+                                           &read_size, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_read_request_rejects_wrong_op(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    const uint8_t               *out_tx;
+    size_t                       out_tx_len;
+    uint16_t                     read_size;
+    uint8_t                      txn;
+
+    hdr.byte_bus_id = 4;
+    hdr.op          = RCP_ACF_OP_WRITE; /* not a read request */
+    frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_ERR_WRONG_OP,
+        rcp_ep_iseled_decode_read_request(frame.data, frame.len, 4, &out_tx, &out_tx_len,
+                                           &read_size, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
+/* TC18 §13.5 Table 33: evt[2:0] = 000b is the only legal value for a
+ * plain ISELED read request; every other value shall be rejected. */
+static void test_read_request_rejects_nonzero_evt(void)
+{
+    rcp_acf_byte_message_info_t hdr = {0};
+    rcp_bytes_t                 frame;
+    const uint8_t               *out_tx;
+    size_t                       out_tx_len;
+    uint16_t                     read_size;
+    uint8_t                      txn;
+
+    hdr.byte_bus_id = 4;
+    hdr.op          = RCP_ACF_OP_READ;
+    hdr.evt         = 0x3;
+    frame = rcp_acf_encode_abb(&hdr, NULL, 0);
+
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_ERR_BAD_EVT,
+        rcp_ep_iseled_decode_read_request(frame.data, frame.len, 4, &out_tx, &out_tx_len,
+                                           &read_size, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_read_request_rejects_bad_msg_type(void)
+{
+    rcp_acf_gbb_header_t gbb_hdr = {0};
+    rcp_bytes_t          frame;
+    const uint8_t        *out_tx;
+    size_t                out_tx_len;
+    uint16_t              read_size;
+    uint8_t               txn;
+
+    gbb_hdr.info.byte_bus_id = 4;
+    gbb_hdr.info.op          = RCP_ACF_OP_READ;
+    frame = rcp_acf_encode_gbb(&gbb_hdr, NULL, 0);
+
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_ERR_BAD_MSG_TYPE,
+        rcp_ep_iseled_decode_read_request(frame.data, frame.len, 4, &out_tx, &out_tx_len,
+                                           &read_size, &txn));
+
+    rcp_bytes_free(&frame);
+}
+
+static void test_read_request_rejects_short_frame(void)
+{
+    uint8_t        too_short[3] = {0};
+    const uint8_t  *out_tx;
+    size_t          out_tx_len;
+    uint16_t        read_size;
+    uint8_t         txn;
+
+    TEST_ASSERT_EQUAL(RCP_EP_ISELED_ERR_SHORT_FRAME,
+        rcp_ep_iseled_decode_read_request(too_short, sizeof(too_short), 4, &out_tx,
+                                           &out_tx_len, &read_size, &txn));
+}
+
 /* ── Response round trip ───────────────────────────────────────────────────── */
 
 static void test_response_round_trip_untimed(void)
@@ -996,6 +1215,18 @@ int main(void)
     RUN_TEST(test_command_request_rejects_nonzero_evt);
     RUN_TEST(test_command_request_rejects_bad_msg_type);
     RUN_TEST(test_command_request_rejects_short_frame);
+    RUN_TEST(test_command_request_write_direction_unchanged_regression);
+
+    RUN_TEST(test_read_request_round_trip_carries_address_and_read_size);
+    RUN_TEST(test_read_request_round_trip_empty_payload);
+    RUN_TEST(test_read_request_read_size_zero);
+    RUN_TEST(test_read_request_read_size_max_boundary);
+    RUN_TEST(test_read_request_read_size_above_max_rejected_at_encode);
+    RUN_TEST(test_read_request_rejects_wrong_bus);
+    RUN_TEST(test_read_request_rejects_wrong_op);
+    RUN_TEST(test_read_request_rejects_nonzero_evt);
+    RUN_TEST(test_read_request_rejects_bad_msg_type);
+    RUN_TEST(test_read_request_rejects_short_frame);
 
     RUN_TEST(test_response_round_trip_untimed);
     RUN_TEST(test_response_round_trip_timed);

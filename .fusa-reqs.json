@@ -11238,6 +11238,28 @@
       "tc18": "\u00a713.7.12.2 Table 58, TC18.txt L5916-5961"
     },
     {
+      "id": "REQ-ISELED-030",
+      "title": "rcp_ep_iseled_encode_read_request() carries a plain Instruction/Address payload and read_size as ACF_OP_READ",
+      "text": "FIXED (2026-08-16, issue #471): rcp_ep_iseled_encode_command_request()/_decode_command_request() modeled only the ACF_OP_WRITE sense of an ISELED command request, with no way to originate or receive the distinct read-eliciting request TC18 \u00a713.7.12.1 describes, and no read_size parameter anywhere in the module -- despite rcp_ep_iseled_encode_response_fragmented() (REQ-ISELED-025) already taking a read_size to cap/fragment a response, with no wire-level way to have actually received that value from an incoming request. rcp_ep_iseled_encode_read_request() shall encode an ACF_ABB frame addressed to byte_bus_id with op RCP_ACF_OP_READ, payload exactly tx_data[0..tx_len) (the plain Instruction/Address content selecting what to read back; no Data octets), and the ACF header's own read_size_or_segment_num field set to read_size (0-4095, RCP_EP_ISELED_MAX_READ_SIZE), returning a zeroed rcp_bytes_t if read_size exceeds that range. The existing write-direction rcp_ep_iseled_encode_command_request()/_decode_command_request() pair is unchanged: it continues to model ACF_OP_WRITE only.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.7.12.1 (\"Upon read requests the responses are collected 5/4bit decoded and aggregated into one or multiple ACF [messages] up to the requested read_size\"), TC18.txt L5909-5910; \u00a712.9.1 (\"A response with payload data read from the EP is given, if requested by op=0 (read request)\"), TC18.txt L3604; general ACF byte_message_info rule \"read_size/segment_num -- if op = 0 this is read_size, else segment_num\" (e.g. Table 4), TC18.txt L1235"
+    },
+    {
+      "id": "REQ-ISELED-031",
+      "title": "rcp_ep_iseled_decode_read_request() validates and decodes an ACF-level read request",
+      "text": "FIXED (2026-08-16, issue #471): rcp_ep_iseled_decode_read_request() shall return RCP_EP_ISELED_ERR_SHORT_FRAME for a frame shorter than the ACF_ABB header or its declared payload, RCP_EP_ISELED_ERR_BAD_MSG_TYPE for a non-ACF_ABB frame, RCP_EP_ISELED_ERR_WRONG_BUS for a mismatched byte_bus_id, RCP_EP_ISELED_ERR_WRONG_OP for an op other than RCP_ACF_OP_READ (the mirror image of rcp_ep_iseled_decode_command_request()'s own RCP_ACF_OP_WRITE-only check, REQ-ISELED-022), RCP_EP_ISELED_ERR_BAD_EVT when evt[2:0] is not 0b000, and otherwise RCP_EP_ISELED_OK with the plain Instruction/Address payload, the requested read_size (from the ACF header's own read_size_or_segment_num field), and transaction number all populated. Modeled on ep_i2c.h's rcp_ep_i2c_decode_transfer_request() (a read request may carry addressing payload, unlike ep_uart.h's payload-free read requests).",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "\u00a713.5 Table 33 (evt[2:0]=000b legality), TC18.txt L4069-4116; \u00a713.7.12.3 Figure 41 (iseled request format), TC18.txt L5985-5995"
+    },
+    {
       "id": "REQ-LINEP-023",
       "title": "The LIN transmission-done trigger fires only after the configured trailing time has also expired",
       "text": "FIXED 2026-08-11 (Phase 5e batch 2, issue #201): TC18 \u00a713.7.10.1 requires the LIN endpoint's trigger to fire when BOTH conditions hold \u2014 the transmission has been finalized AND the configured trailing time has expired. rcp_ep_lin_trigger_fires() (src/ep_lin.c) now takes trailing_time_expired as a second, caller-classified boolean parameter and ANDs it with tx_done_event for RCP_EP_LIN_TRIGGER_TX_DONE \u2014 the same caller-supplies-already-classified-inputs convention every endpoint module in this codebase already follows for its own trigger evaluation. Table 55 (\u00a713.7.10.2) defines no dedicated wire register for \"the configured trailing time\" itself \u2014 like this endpoint type's own trigger concept as a whole (no TC18 basis at all, entirely this module's own original design \u2014 see ep_lin.h's own file header), a wire-configurable duration was never something TC18 gives this codebase a register to model; the caller classifying trailing-time-expired is this module's established architecture, not a remaining gap.",

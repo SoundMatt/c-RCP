@@ -338,10 +338,24 @@ rcp_bytes_t rcp_message_to_request(rcp_adapt_op_t op, rcp_byte_bus_id_t byte_bus
         break;
     }
 
-    case RCP_ADAPT_OP_ISELED_COMMAND:
-        result = rcp_ep_iseled_encode_command_request(byte_bus_id, msg->payload.data,
-                                                       msg->payload.len, transaction_num);
+    case RCP_ADAPT_OP_ISELED_COMMAND: {
+        /* FIXED (issue #471): an ISELED command request is half duplex,
+         * exactly like RCP_ADAPT_OP_I2C_TRANSFER above -- a caller asking
+         * for octets back selects the read direction by setting
+         * rcp.iseled.read_size; the default (absent or 0) is the write
+         * direction, unchanged from before this fix. */
+        uint32_t read_size = meta_get_u32_default(msg, "rcp.iseled.read_size", 0);
+        if (read_size > RCP_EP_ISELED_MAX_READ_SIZE) return fail_encode(out_err);
+        if (read_size != 0) {
+            result = rcp_ep_iseled_encode_read_request(byte_bus_id, msg->payload.data,
+                                                         msg->payload.len, (uint16_t)read_size,
+                                                         transaction_num);
+        } else {
+            result = rcp_ep_iseled_encode_command_request(byte_bus_id, msg->payload.data,
+                                                           msg->payload.len, transaction_num);
+        }
         break;
+    }
 
     case RCP_ADAPT_OP_MDIO_READ: {
         uint32_t clause, prtad, devad, regad, word_count;
