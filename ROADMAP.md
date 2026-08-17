@@ -19106,6 +19106,57 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.398.0 -- 2026-08-16 (issue #341: `Table 4`/`5`/`52`/`58`
+exhaustive census, `Table 36` reused-digit fix, final convergence
+classification)
+
+Eighth pass on issue #341. Worked the five table numbers this task
+explicitly flagged as never individually verified -- `Table 4`(42),
+`52`(21), `58`(19), `5`(15), `36`(15) -- with the same exhaustive,
+every-occurrence discipline PR #501 used for `Table 33`.
+
+`Table 4`/`5`: never shift RC1->RC5 (identical captions confirmed in
+a fresh extraction of both PDFs); every occurrence individually
+content-matched. Fully converged, zero changes for either.
+`Table 52`/`58`: both fully converged already -- RC5-native
+"uart trigger signals" (§13.7.8.4) and "ISELED EP functional
+configuration" (§13.7.12.2) respectively, all occurrences correct.
+Zero changes for either.
+
+`Table 36`: a genuine reused-digit case (same shape as 41/42/43/44
+and 39/42). RC5-native = "RC Server functional configuration"
+(= RC1's Table 33, already correctly dual-noted, 11/15 occurrences).
+RC1's own, different Table 36 = "WakeUp functional configuration"
+(RC1's own caption mislabels it "ep1", but the row content --
+wup_ep_len/wup_status/wup_io_scr1/wup_io_scr2 -- is unambiguously
+WakeUp's), shifts +3 to RC5 Table 39. Fixed the 4 remaining stale
+bare `Table 36` occurrences (`ep_wakeup.h:307`, REQ-WAKEUP-021's
+title/text in `.fusa-reqs.json`) to the established `Table 36/39`
+dual notation, plus a related inconsistency at `ep_wakeup.h:406`
+(`Table 36/40` mixed RC1's 36 with RC5's 40 for what are actually two
+adjoining tables -- corrected to `Table 36/39 and Table 37/40`).
+
+Citation-text-only, trace coverage unchanged. Full 66-test suite:
+66/66. `cfusa check`/`trace` (v0.5.54): 0 errors, 968/1312
+warnings/info, 1095/1095 traced/tested -- all unchanged.
+
+Also did a full top-to-bottom classification sweep of every
+remaining table number in the census against every prior pass's own
+claims -- see CHANGELOG.md v0.398.0 and issue #341's own comment
+thread for the complete (a)/(b)/(c)/(d) breakdown. Three new,
+verified-but-unfixed content bugs surfaced and flagged for a future
+pass (out of this pass's Table 4/5/36/52/58 scope): a cancel-family
+`Table 11/12/13` stale-RC1-numbering cluster across
+`request_cancel.h`/`.c`, `request_compound.h`/`.c`, and
+`.fusa-reqs.json`; a single stale `Table 50` citation in
+`src/ep_adc.c` (should be `Table 53`, itself a newly-identified
+reused digit); and a plain wrong-digit citation at `regmap.c:2316`
+("Table 34" should be "Table 35").
+
+**Next**: the `(c)`-list table numbers from the classification sweep
+(`Table 55`/`37`/`40`/`57`/`19`/`12`/`13`/`10`/`59`/`49`/`15`/`34`/
+`17`/`14`/`16`), and the three new findings above.
+
 ### v0.397.0 -- 2026-08-16 (issue #341: exhaustive `Table 30`/`Table 39`
 census, `Table 27` control re-verify)
 

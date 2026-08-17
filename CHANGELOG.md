@@ -34,6 +34,138 @@ the rationale.
 
 ## Releases
 
+### v0.398.0 -- 2026-08-16 (issue #341: `Table 4`/`5`/`52`/`58` exhaustive census, `Table 36` reused-digit fix, final convergence classification)
+
+Eighth pass on issue #341. Worked the five table numbers this
+task explicitly flagged as never individually verified by any prior
+pass -- `Table 4`(42), `Table 52`(21), `Table 58`(19), `Table 5`(15),
+`Table 36`(15) -- with the same exhaustive, every-occurrence
+discipline PR #501 used for `Table 33`, then did a full top-to-bottom
+classification sweep of the entire remaining census for issue #341's
+final-convergence tracking.
+
+- **`Table 4`** (42 occurrences) and **`Table 5`** (15 occurrences):
+  both never shift RC1->RC5 -- captions confirmed byte-for-byte
+  identical in a fresh `pdftotext -layout` extraction of both PDFs
+  ("Usage of ABB message for standard requests" / "Different types of
+  conditional requests"). Every occurrence of each individually read
+  and content-matched (down to specific field names and request_type
+  hex values). **Fully converged, zero changes needed for either.**
+- **`Table 52`** (21 occurrences) and **`Table 58`** (19 occurrences):
+  both genuinely fully converged already. RC5-native `Table 52` =
+  "uart trigger signals" (§13.7.8.4, correctly cited in all 21 --
+  12 in `ep_uart.h`/`.c`, 9 in `.fusa-reqs.json`); RC1's own,
+  different Table 52 ("lin functional configuration", shifts +3 to
+  RC5 Table 55) does not leak in anywhere -- confirmed `ep_lin.h`
+  already correctly cites Table 55 for its own functional config.
+  RC1 has no Table 58 at all (its own table sequence tops out at 57);
+  RC5's `Table 58` = "ISELED EP functional configuration" (§13.7.12.2,
+  a plain, non-reused-digit +3 shift from RC1's Table 55), correctly
+  cited in all 19 occurrences (6 in `ep_iseled.h`, 13 in
+  `.fusa-reqs.json`). **Zero changes needed for either.**
+- **`Table 36`** (15 occurrences): a genuine reused-digit case, same
+  shape as the 41/42/43/44 and 39/42 clusters already fixed.
+  RC5-native `Table 36` = "RC Server functional configuration"
+  (= RC1's own Table 33, already correctly dual-noted everywhere --
+  11 of the 15 occurrences). RC1's own, *different* Table 36 =
+  "WakeUp functional configuration" (RC1's own spec text mislabels
+  the caption "ep1 - functional configuration", but the row content
+  -- `wup_ep_len`/`wup_status`/`wup_io_scr1`/`wup_io_scr2` -- is
+  unambiguously WakeUp's), which shifts +3 to RC5 Table 39. Found and
+  fixed the remaining 4 stale bare `Table 36` occurrences that should
+  have carried the established `Table 36/39` dual notation:
+  `ep_wakeup.h:307`, `.fusa-reqs.json` REQ-WAKEUP-021's `title` and
+  `text` fields. Also fixed a related internal inconsistency at
+  `ep_wakeup.h:406`: the existing text cited `Table 36/40`, mixing
+  RC1's own `36` with RC5's own `40` for what is actually **two**
+  adjoining tables (the functional-config block, `36/39`, and the
+  IO_SRC trigger block, already correctly dual-noted `37/40`
+  elsewhere in the same file) -- corrected to `Table 36/39 and
+  Table 37/40`, matching what the sentence's own
+  "REQ-WAKEUP-021/022 above" cross-reference actually covers.
+
+Citation-text-only changes -- trace coverage counts unchanged.
+`Table 36`'s own occurrence count stays 15 pre/post (dual-notation
+suffix additions keep the same leading digit the census regex
+matches, same as prior passes' equivalent fixes); `Table 37` ticks
+13 -> 14 as an incidental side effect of the added "Table 37/40" text
+(not a cluster migration). Full clean rebuild + full 66-test suite:
+66/66, unchanged. `cfusa check` (pinned v0.5.54, run from repo root):
+0 errors, 968/1312 warnings/info, unchanged. `cfusa trace
+--req-coverage 100 --sec-tested 100`: 1095/1095 traced and tested,
+unchanged.
+
+## Final convergence classification (issue #341, full census sweep)
+
+A full top-to-bottom pass over every table number the current census
+turns up, cross-referenced against every prior pass's own comments
+in issue #341 (not just the most recent):
+
+**(a) Confirmed-resolved by name in a prior pass:** `Table 33`(176),
+`20`(156), `24`(91), `28`(52), `51`(41), `27`(39), `30`(37), `25`(33),
+`46`(29), `23`(29), `35`(28), `60`(27), `56`(25), `54`(23), `41`(22),
+`48`(20), `45`(19), `42`(14), `38`(13), `21`(13), `22`(5), `18`(12,
+count grew 7->12 since the original re-verification via new,
+independently spot-checked-correct discovery-request citations,
+issue #457 lineage), `26`(7), `6`(9)/`7`(9)/`8`(10)/`9`(6) (the
+compound/chained-request-format boundary cluster), `43`(10), `47`(8),
+`44`(8).
+
+**(b) Resolved this pass:** `Table 4`(42), `5`(15), `36`(15, content
+fix), `52`(21), `58`(19) -- see above.
+
+**(c) Genuinely unverified, listed explicitly:** `Table 55`(14),
+`37`(14), `40`(13), `57`(12), `19`(12), `12`(9), `13`(9), `10`(9),
+`59`(11), `49`(6), `15`(6), `34`(4), `17`(4), `14`(4), `16`(3) -- none
+flagged as suspicious by any prior pass, none individually
+exhaustively audited either. `Table 11`(10) is **mixed**: part
+correctly resolved (the chained-request-format meaning PR #499's
+boundary-case fix covered) and part a newly-found stale citation
+(see below) -- not cleanly (a).
+
+**New findings this pass, verified but deliberately NOT fixed (out
+of this pass's assigned Table 4/5/36/52/58 scope; flagged for a
+dedicated future pass):**
+- **Cancel-family cluster (`Table 11`/`12`/`13`, RC1 numbering
+  stale):** `request_cancel.h:168,194`, `request_cancel.c:103,108,
+  165,166`, `request_compound.h:202,327`, `request_compound.c:260,
+  265`, `.fusa-reqs.json:6364,6375,6276,6386,8868,8879` all cite
+  RC1's own old numbers for the "cancel all requests" / "clear all
+  non-safestate requests" / "cancel a single, specific request"
+  trio. Fresh extraction confirms RC1 `Table 11`->RC5 `13`, RC1
+  `12`->RC5 `14`, RC1 `13`->RC5 `15` (a further, un-fixed part of the
+  same insertion-shift zone PR #499's `Table 6/7/8/9/11` boundary fix
+  addressed, but that fix did not reach this cluster). The familiar
+  "tc18 field correct, narrative text field lagging" pattern recurs
+  here too: `.fusa-reqs.json:8874,8885`'s own `tc18` fields for the
+  same two requirements as `8868,8879` already correctly say
+  `Table 14`.
+- **`Table 50` (single occurrence, `src/ep_adc.c:233`):** cites RC1's
+  own stale number for "adc trigger outputs" (RC5 `Table 53`,
+  confirmed same caption in both PDFs). `Table 53` is itself a
+  reused digit (RC5-native = "adc trigger outputs"; RC1's own,
+  different Table 53 = "can functional configuration", already
+  correctly shifted to RC5 Table 56 elsewhere) -- not yet exhaustively
+  audited as its own cluster.
+- **`regmap.c:2316`:** cites "§13.7 Table 34 common entries" for
+  `ep_clear_req_storage`; RC5's real "EP functional config common
+  entries" table (§13.7, `ep_enable`/`ep_clear_req_storage`/etc.) is
+  **Table 35**, confirmed via fresh extraction -- Table 34 is an
+  unrelated table (§13.6 CRC32 parameters). A plain wrong-digit
+  citation, not an RC1/RC5 numbering issue.
+
+**(d) Too low-count/ambiguous to be worth further individual
+verification:** none found this pass -- every low-count number
+spot-checked (`10`, `14`, `16`, `17`, `50`) turned out to be a
+genuine, unambiguous spec-table citation (one, `Table 50`, a real
+bug -- see above), not incidental prose. `Table 16`(3) and the rest
+of the `(c)` list above remain the closest candidates for a future
+`(d)` classification, but were not dismissed without a look.
+
+Does not close #341 -- issue left open per its own established
+convention, for whoever picks up the `(c)`-list numbers and the three
+new findings above.
+
 ### v0.397.0 -- 2026-08-16 (issue #341: exhaustive `Table 30`/`Table 39` census, `Table 27` control re-verify)
 
 Seventh pass on issue #341 (RC1->RC5 table-number census). Fresh

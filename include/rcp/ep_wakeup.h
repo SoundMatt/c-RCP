@@ -304,7 +304,7 @@ extern "C" {
  * latch" section below, unmoved.
  *
  * REDESIGNED 2026-08-14 (REQ-WAKEUP-021, issue #341 lineage): TC18
- * §13.7.2.2 Table 36's own `wup_status` register is a 16-bit bitmask,
+ * §13.7.2.2 Table 36/39's own `wup_status` register is a 16-bit bitmask,
  * "each bit represents a wake-up source" -- this type previously modeled
  * only a single aggregate latch bit ("has ANY source woken the device"),
  * an honestly-documented but real simplification of the wire register's
@@ -403,11 +403,12 @@ typedef struct {
                                 zero-init default in this struct.
                                 DISCOVERABLE and SETTABLE over this
                                 module's own in-memory API, but NOT itself
-                                wire-reachable: TC18 §13.7.2.2 Table 36/40
-                                (the WakeUp EP's own functional-config
-                                register block, already fully mapped by
-                                REQ-WAKEUP-021/022 above) defines no field
-                                for it at all -- the *only* other TC18
+                                wire-reachable: TC18 §13.7.2.2 Table 36/39
+                                and Table 37/40 (the WakeUp EP's own
+                                functional-config register block, already
+                                fully mapped by REQ-WAKEUP-021/022 above)
+                                define no field for it at all -- the
+                                *only* other TC18
                                 mention of a WakeUp repetition/timing
                                 concept is §13.7.2.1's own parenthetical
                                 "(flush_time)", naming a register that
