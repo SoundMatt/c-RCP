@@ -34,42 +34,6 @@ the rationale.
 
 ## Releases
 
-<<<<<<< HEAD
-### v0.372.0 -- 2026-08-16 (EP0's own ep_generic_cfg row: ep_used bit forced to 1, never clearable by an incoming write)
-
-Closes issue #466. TC18 Table 31's `ep_used` row states EP0's own bit is
-"fixed to 1 as EP0 needs to be always implemented" -- an EP0-specific
-override on top of the field's otherwise general R/W* status for
-EP1..EPn. `rcp_regmap_ep_generic_cfg_apply_reconfig()` (`src/regmap.c`)
-was applying the incoming `ep_used` bit uniformly to every row with no
-special case for `row_i == 0`, so a write targeting EP0's own
-`EP_GENERIC_config` row (relative address `0x0001`) could clear
-`entries[0].ep_used` to `false`, contradicting the spec.
-
-**Fixed**: the same "no effect, confirmed normally" treatment this
-function's own `ep_type` row already gets (TC18 §13.7.1.2) is now applied
-to row 0's own `ep_used` bit -- `entries[0].ep_used` is forced to `true`
-regardless of the incoming bit, while row 0's own `ep_delay_time` (bits
-4:5 of the same octet) and every other row's own `ep_used` (EP1..EPn)
-continue to honor the incoming write exactly as before. Reads always
-reflect row 0's own `ep_used` correctly (it can never observably become
-`false` through this write path).
-
-New byte-literal tests (`tests/test_tc18_gaps_regmap.c`) prove both
-halves directly: a write targeting row 0's own `ep_used` bit is silently
-ignored (row 0 stays `ep_used=true`, its own `ep_delay_time` still
-updates normally from the same octet), and the general case is
-unaffected -- EP1's own `ep_used` still honors both `0` and `1` writes
-normally through a real 2-row table. One pre-existing single-row test
-(`test_ep_generic_cfg_apply_reconfig_extracts_delay_time_register_value`)
-was widened to a 2-row table targeting row 1 instead of row 0, since it
-was incidentally exercising the general case through what is now row 0's
-own fixed-bit exception. Mutation-tested: reverting only the fix (keeping
-the new tests) makes both new tests fail cleanly (`Expected TRUE Was
-FALSE`); restoring the fix makes them pass again, with the full
-66-suite regression, ASan/UBSan, and `cfusa check`/`trace` all unaffected
-(0 errors, requirement-coverage unchanged at 1088/1088).
-=======
 ### v0.373.0 -- 2026-08-16 (rcp_mock_server_new() now seeds the EP_ID_config power-on default; issue #464 audit closed with no code gap remaining)
 
 Closes issues #459 and #464.
@@ -121,7 +85,41 @@ traced and tested (unchanged -- REQ-RMAP-054 was already traced/tested via
 already-covered primitive into `rcp_mock_server_new()`, adding no new
 requirement).
 
->>>>>>> ca31e31 (fix: rcp_mock_server_new() seeds EP_ID_config power-on default (closes #459, #464))
+### v0.372.0 -- 2026-08-16 (EP0's own ep_generic_cfg row: ep_used bit forced to 1, never clearable by an incoming write)
+
+Closes issue #466. TC18 Table 31's `ep_used` row states EP0's own bit is
+"fixed to 1 as EP0 needs to be always implemented" -- an EP0-specific
+override on top of the field's otherwise general R/W* status for
+EP1..EPn. `rcp_regmap_ep_generic_cfg_apply_reconfig()` (`src/regmap.c`)
+was applying the incoming `ep_used` bit uniformly to every row with no
+special case for `row_i == 0`, so a write targeting EP0's own
+`EP_GENERIC_config` row (relative address `0x0001`) could clear
+`entries[0].ep_used` to `false`, contradicting the spec.
+
+**Fixed**: the same "no effect, confirmed normally" treatment this
+function's own `ep_type` row already gets (TC18 §13.7.1.2) is now applied
+to row 0's own `ep_used` bit -- `entries[0].ep_used` is forced to `true`
+regardless of the incoming bit, while row 0's own `ep_delay_time` (bits
+4:5 of the same octet) and every other row's own `ep_used` (EP1..EPn)
+continue to honor the incoming write exactly as before. Reads always
+reflect row 0's own `ep_used` correctly (it can never observably become
+`false` through this write path).
+
+New byte-literal tests (`tests/test_tc18_gaps_regmap.c`) prove both
+halves directly: a write targeting row 0's own `ep_used` bit is silently
+ignored (row 0 stays `ep_used=true`, its own `ep_delay_time` still
+updates normally from the same octet), and the general case is
+unaffected -- EP1's own `ep_used` still honors both `0` and `1` writes
+normally through a real 2-row table. One pre-existing single-row test
+(`test_ep_generic_cfg_apply_reconfig_extracts_delay_time_register_value`)
+was widened to a 2-row table targeting row 1 instead of row 0, since it
+was incidentally exercising the general case through what is now row 0's
+own fixed-bit exception. Mutation-tested: reverting only the fix (keeping
+the new tests) makes both new tests fail cleanly (`Expected TRUE Was
+FALSE`); restoring the fix makes them pass again, with the full
+66-suite regression, ASan/UBSan, and `cfusa check`/`trace` all unaffected
+(0 errors, requirement-coverage unchanged at 1088/1088).
+
 ### v0.371.0 -- 2026-08-16 (discovery request unique_id=0x0000 investigated and closed -- no server-side check needed)
 
 Closes issue #457 (c-RCP-AUDIT-32). TC18 Table 18 lists `unique_id =
