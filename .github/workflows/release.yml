@@ -164,7 +164,11 @@ jobs:
           /tmp/cfusa/build/cfusa report --format html --output report.html || true
 
       - name: Tool qualification evidence
-        run: /tmp/cfusa/build/cfusa qualify --format json --output qualify-report.json
+        run: |
+          /tmp/cfusa/build/cfusa qualify --format json --output qualify-report.json \
+            --qualification-method self \
+            --qualifier "c-RCP CI (self-run, non-independent)" \
+            --implementation-author "SoundMatt/c-RCP maintainers"
 
       - name: Configure git
         run: |

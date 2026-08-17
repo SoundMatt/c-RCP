@@ -547,7 +547,11 @@ jobs:
       - run: chmod +x /tmp/cfusa/build/cfusa
 
       - name: Tool qualification
-        run: /tmp/cfusa/build/cfusa qualify
+        run: |
+          /tmp/cfusa/build/cfusa qualify \
+            --qualification-method self \
+            --qualifier "c-RCP CI (self-run, non-independent)" \
+            --implementation-author "SoundMatt/c-RCP maintainers"
 
   # ── c-FuSa: known-vulnerable function pattern scan ───────────────────────────
   cfusa-vuln:

@@ -34,6 +34,60 @@ the rationale.
 
 ## Releases
 
+### v0.417.0 -- 2026-08-17 (c-RCP-16: SEOOC boundary/AoU document, `cfusa qualify` regression fix)
+
+Addresses the first two items of c-RCP-16's (issue #518) five-item
+suggested approach for moving c-RCP's safety case toward an
+ASIL-D-capable SEOOC evidence package. Not a full resolution — issue
+left open with the remaining three items tracked in a status comment.
+
+**Added `SEOOC_BOUNDARY.md`**: the Item Definition boundary statement
+and consolidated Assumptions of Use (AoU) document ISO 26262-10:2018
+Clause 9 expects of a Safety Element out of Context, which no document
+in this repo previously had the actual shape of. Consolidates
+assumptions previously scattered across `safety-case.md`'s GSN node
+A1, `HARA.md`'s Residual Risks table, and `tara.md`'s TS-001/TS-004
+notes into one integrator-facing document (7 numbered AoU items), adds
+an explicit "what c-RCP does not own" boundary section (no vehicle-
+level HARA, no integration-level ASIL assignment, no implied safety
+mechanism beyond what `SAFETY_PLAN.md` already lists, no hardware
+architectural metrics), and a Tool Confidence Level (TCL) argument for
+`cfusa` (see below). `SAFETY_PLAN.md` and `AUDIT_PACK.md` (new §2a)
+now cross-reference it.
+
+**Fixed a real `qualify-report.json` regression**: `ci.yml:514` and
+`release.yml:133`'s `cfusa qualify` invocations had no
+`--qualification-method` flag, producing the exact self-contradictory
+shape (`"qualified": true` beside `"qualificationBadge": "unqualified"`
+and `"independenceStatus": "unqualified"`) issue #124 previously
+diagnosed. Added `--qualification-method self` plus
+`--qualifier`/`--implementation-author` identity flags to both
+invocations (honest self-run framing, no independent reviewer/test
+executor claimed) and regenerated `qualify-report.json` with the same
+command so the currently-shipped artifact is fixed immediately, not
+just at the next tagged release. New shape:
+`"qualificationBadge": "self-qualified"`, `"qualificationMethod":
+"self"`, `"achievableAsil": "ASIL-B"` (matches `cfusa qualify --help`'s
+documented TD/TI ceiling logic: no independent reviewer caps
+achievable TCL at ASIL-B). No `--project-asil` flag added — this
+remains an informational fix, not a new hard gate.
+
+Docs-and-CI-only change; no source file touched. Full 66-test suite
+unchanged; ASan/UBSan clean (unaffected); `cfusa check`/`trace`
+(pinned v0.5.54): 0 errors, 1095/1095 (100%) requirements traced,
+512/512 (100%) functions annotated, unchanged from baseline.
+
+Also updates `include/rcp/version.h`'s `RCP_VERSION` and
+`.fusa.json`'s `"version"` to `0.417.0` to match `CMakeLists.txt`,
+per the `version-sources-agree` gate (c-RCP-09, PR #529).
+
+Deferred to a future c-RCP-16 pass (see issue #518's tracking
+comment): real MC/DC measurement via `c-FuSa` v0.5.53's
+`--mcdc-file`/`--achievable-asil` flags, a freedom-from-interference
+argument for the `.fusa-reqs.json` scope partition, and reframing
+`AUDIT_PACK.md` §2 as an SEOOC evidence-package argument rather than
+an internal derogation table.
+
 ### v0.416.0 -- 2026-08-17 (issue #523: CFUSA-CY005 allocation-overflow guards, 29/29 sites)
 
 Fully resolves the CY005 sub-effort of issue #523's five-rule CFUSA lint
@@ -221,7 +275,6 @@ Also updates `include/rcp/version.h`'s `RCP_VERSION` and
 `.fusa.json`'s `"version"` to `0.414.0` to match `CMakeLists.txt`,
 per the new `version-sources-agree` gate this branch was rebased
 past (c-RCP-09, PR #529).
-
 ### v0.413.0 -- 2026-08-17 (c-RCP-09: fix SBOM/provenance/SPDX version drift)
 
 `sbom.json`, `provenance.json`, and the newest `c-RCP-*.spdx.json` had been

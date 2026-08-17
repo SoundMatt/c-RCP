@@ -25,6 +25,8 @@ TC18 protocol and its own measured evidence.
 | Safety Requirements | `.fusa-reqs.json` | 854 requirements; 779 `scope: "tc18"` (this project's ISO 26262 safety-case basis), 75 `scope: "legacy-compat"` (retired pre-TC18 surface, `level`/`asil` demoted to `QM`) — see the file's own `catalogNote` |
 | Safety Case | `safety-case.md` (auto-generated, `cfusa safety-case --gsn`) | CI gate |
 | Release Badge | `fusa-badge.svg` (auto-generated, `cfusa badge`) | CI gate |
+| SEOOC Boundary & Assumptions of Use | `SEOOC_BOUNDARY.md` | Added c-RCP-16 (issue #518) — see §2a |
+| Tool Qualification Evidence | `qualify-report.json` (auto-generated, `cfusa qualify`) | CI gate — self-qualified, see §2a |
 
 ---
 
@@ -64,6 +66,39 @@ are genuinely open gaps this re-certification pass surfaced rather than
 closed — recorded honestly here rather than folded into the same
 "derogation" framing as the others, which would misrepresent an absent
 control as a considered rigor trade-off.
+
+---
+
+## 2a. SEOOC Framing & Tool Confidence Level
+
+c-RCP is developed and safety-argued as a Safety Element out of
+Context (ISO 26262-10:2018 Clause 9). `SEOOC_BOUNDARY.md` (added
+c-RCP-16, issue #518) is the integrator-facing Item Definition
+boundary statement and consolidated Assumptions of Use (AoU) document
+this implies — it collects, without duplicating, the assumptions
+previously scattered across `safety-case.md`'s GSN node A1,
+`HARA.md`'s Residual Risks table, and `tara.md`'s TS-001/TS-004 notes.
+This §2's ASIL-C Gap Analysis table above records this project's own
+derogation posture against its own ASIL-B baseline; `SEOOC_BOUNDARY.md`
+is the separate, integrator-facing document that frames the same
+evidence as *supporting, without asserting*, an integrator's own
+item-level ASIL-D HARA — the two documents serve different audiences
+and are not redundant with each other.
+
+`SEOOC_BOUNDARY.md` §3 also documents `cfusa`'s own Tool Confidence
+Level (TCL) posture: `qualify-report.json` records a **self-run,
+non-independent** qualification (`qualificationMethod: "self"`), which
+per `cfusa qualify`'s own ISO 26262-8:2018 Clause 11 TD/TI-derived
+ceiling logic supports an ASIL-B tool-confidence argument at most. An
+integrator relying on `cfusa`'s analysis output (not merely c-RCP's
+requirement/test artifacts) as part of an ASIL-C/D safety case must
+separately establish a higher TCL for `cfusa` themselves; c-RCP cannot
+unilaterally qualify a tool shared across the whole x-RCP ecosystem.
+(This corrects a prior regression: `ci.yml`/`release.yml`'s `cfusa
+qualify` invocations had drifted to omitting `--qualification-method`
+entirely, producing a self-contradictory `qualify-report.json`
+[`qualified: true` beside `qualificationBadge: "unqualified"`] —
+fixed in the same c-RCP-16 revision that added this section.)
 
 ---
 
