@@ -2,6 +2,7 @@
 #include "rcp/ratelimit.h"
 #include "rcp/alloc.h"
 
+#include "alloc_overflow.h"
 #include "platform.h"
 
 #include <rcp/clock.h>
@@ -52,7 +53,10 @@ static bucket_t *find_or_create_bucket(rcp_ratelimit_limiter_t *rl, rcp_avtp_add
 
     if (rl->n_buckets == rl->cap_buckets) {
         size_t new_cap = (rl->cap_buckets == 0) ? 4 : rl->cap_buckets * 2;
-        bucket_t *grown = (bucket_t *)rcp_realloc(rl->buckets, new_cap * sizeof(*grown));
+        size_t alloc_bytes = rcp_alloc_checked_size(new_cap, sizeof(*rl->buckets));
+        bucket_t *grown = alloc_bytes == 0
+            ? NULL
+            : (bucket_t *)rcp_realloc(rl->buckets, alloc_bytes);
         if (!grown) return NULL;
         rl->buckets     = grown;
         rl->cap_buckets = new_cap;

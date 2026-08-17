@@ -19822,6 +19822,78 @@ under existing `REQ-RELAY-002`/`-007`/`-011`.
 (`mock.c` CRC/fault-injection paths and friends), and the category 3
 `_WIN32`-block carve-out documentation are unstarted.
 
+### v0.416.0 -- 2026-08-17 (issue #523: CFUSA-CY005 allocation-overflow
+guards, 29/29 sites -- full resolution of one sub-effort of the
+5-rule CFUSA lint bundle)
+
+Picked the single highest-value, fully self-contained sub-effort out
+of issue #523's own prioritized "Suggested approach" list: CFUSA-CY005
+(29 findings, all in `src/`, `cfusa fix`'s own deterministic guard
+guidance available, small enough for one PR). Re-verified all 29
+findings against current `main` before touching anything -- counts and
+per-site disposition matched the issue's own prior analysis exactly:
+every site is a geometric-doubling growable-array capacity
+(`new_cap = cap==0 ? N : cap*2`) or a fragment count pre-capped by
+`rcp_fragment_plan_count()` at `RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS`.
+No live memory-safety defect in any of the 29; this is defense-in-depth
+against a future refactor accidentally removing one of those bounds.
+
+Added `src/alloc_overflow.h` (internal, not installed, same convention
+as `src/platform.h`): `rcp_alloc_size_would_overflow(n, elem_size)` and
+`rcp_alloc_checked_size(n, elem_size)`, implementing `cfusa fix`'s own
+suggested `if (n > SIZE_MAX / sizeof(T))` guard. The guarded size is
+computed into a named local *before* the `malloc()`/`realloc()` call --
+an inline ternary at the call site (tried first) does NOT clear the
+finding, confirmed by direct A/B `cfusa check` runs: the detector
+pattern-matches the literal `n * sizeof(...)` token sequence appearing
+as an allocation call's own argument, not the value's actual proven
+safety. Applied at all 29 sites across 18 files (`recorder.c`,
+`ep_uart.c`, `deadline.c`, `observe.c`, `ratelimit.c`, `ep_can.c`,
+`powerstate.c`, `admin.c`, `server.c`, `discovery.c`, `watchdog.c`,
+`authz.c`, `respqueue.c`, `ep_iseled.c`, `config.c`, `loan.c`,
+`faultinject.c`, `relay.c`); on overflow the guard yields `NULL`/`0`,
+which every site's existing OOM-handling path already treats the same
+as a real allocation failure.
+
+Added `tests/test_alloc_overflow.c` (6 cases, boundary arithmetic
+including the exact `SIZE_MAX/elem_size + 1` overflow edge).
+Mutation-tested: flipped the guard's `>` to `>=`, confirmed 3 of 6
+assertions failed, reverted.
+
+Also caught and fixed two incidental regressions this diff's own added
+lines would otherwise have introduced in *unrelated* rules, both found
+by diffing full `cfusa check` output before/after rather than only
+watching the CY005 count: (1) writing `sizeof(void *)` literally
+instead of `sizeof(*existing_pointer)` in three dual-array
+callback-registration sites tripped CFUSA-L008 (MISRA void* rule) on a
+line that has nothing to do with void* semantics -- fixed by matching
+the codebase's own existing `sizeof(*ptr)` idiom instead of spelling
+the type out; (2) rewriting `config.c`'s shared `DEFINE_APPEND` macro's
+ternary-with-cast as an equivalent `if`/assignment tripped COUP002
+(control-coupling/function-pointer heuristic) on a cast that isn't a
+function pointer at all -- fixed by restructuring to an `if (need != 0)
+grown = (T*)realloc(...)` shape. Final `cfusa check` diff against the
+pre-change baseline is exactly one line: `CFUSA-CY005: 29 -> 0`; every
+other rule's count (including CFUSA-L008's 149 and COUP002's 72) is
+byte-identical.
+
+Full 67/67 test suite (66 existing + new `test_alloc_overflow`) and a
+from-scratch ASan/UBSan build (`-fsanitize=address,undefined
+-fno-sanitize-recover=all -g -O1`, `ASAN_OPTIONS=detect_leaks=0`) both
+clean. `cfusa check`: 0 errors. `cfusa trace --req-coverage 100
+--sec-tested 100`: 1095/1095 (100%) requirements traced, 512/512
+(100%) functions annotated, unchanged from baseline (same pre-existing
+`REQ-UART-038` untraced note either way).
+
+**Next**: issue #523 stays open -- CY001 (memcpy hardening, 140
+findings, has `cfusa fix` guidance, next-lowest-risk per the issue's
+own ordering), L001 (3 real `src/` function-length candidates),
+L008 (void* review, low priority), and A003 (sizeof-signedness,
+recommend reporting the detector's own false-positive rate upstream
+rather than bulk-fixing) all remain as their own separate future
+batches. Posted a status comment on the issue with this summary
+rather than closing it.
+
 ### v0.400.0 -- 2026-08-16 (c-RCP-AUDIT-08: exhaustive census of the
 twelve remaining table numbers -- `55`/`37`/`40`/`57`/`19`/`59`/`49`/
 `15`/`34`/`17`/`14`/`16` -- closes out this issue's own tracked

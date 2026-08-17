@@ -2,6 +2,7 @@
 #include "rcp/recorder.h"
 #include "rcp/alloc.h"
 
+#include "alloc_overflow.h"
 #include "platform.h"
 
 #include <rcp/clock.h>
@@ -80,7 +81,10 @@ bool rcp_recorder_capture(rcp_recorder_t *r, uint64_t timestamp_ms, rcp_avtp_add
     rcp_mutex_lock(&r->mu);
     if (r->len == r->cap) {
         size_t new_cap = (r->cap == 0) ? 16 : r->cap * 2;
-        rcp_recorder_entry_t *grown = (rcp_recorder_entry_t *)rcp_realloc(r->entries, new_cap * sizeof(*grown));
+        size_t alloc_bytes = rcp_alloc_checked_size(new_cap, sizeof(*r->entries));
+        rcp_recorder_entry_t *grown = alloc_bytes == 0
+            ? NULL
+            : (rcp_recorder_entry_t *)rcp_realloc(r->entries, alloc_bytes);
         if (!grown) {
             ok = false;
         } else {
@@ -178,7 +182,10 @@ int rcp_playback_run_all(rcp_recorder_t *rec, rcp_playback_deliver_fn deliver, v
 
     if (n == 0) return RCP_OK;
 
-    snapshot = (rcp_recorder_entry_t *)rcp_malloc(n * sizeof(*snapshot));
+    {
+        size_t alloc_bytes = rcp_alloc_checked_size(n, sizeof(*snapshot));
+        snapshot = alloc_bytes == 0 ? NULL : (rcp_recorder_entry_t *)rcp_malloc(alloc_bytes);
+    }
     if (!snapshot) return RCP_ERR_BUSY;
     n = rcp_recorder_entries(rec, snapshot, n);
 

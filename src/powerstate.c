@@ -2,6 +2,7 @@
 #include "rcp/powerstate.h"
 #include "rcp/alloc.h"
 
+#include "alloc_overflow.h"
 #include "platform.h"
 
 #include <stdlib.h>
@@ -61,11 +62,18 @@ static bool callbacks_append(rcp_powerstate_manager_t *m, rcp_powerstate_power_f
 {
     if (m->n_callbacks == m->callbacks_cap) {
         size_t new_cap = (m->callbacks_cap == 0) ? 4 : m->callbacks_cap * 2;
-        rcp_powerstate_power_fn *grown_cb = (rcp_powerstate_power_fn *)rcp_realloc(m->callbacks, new_cap * sizeof(*grown_cb));
+        size_t cb_bytes = rcp_alloc_checked_size(new_cap, sizeof(rcp_powerstate_power_fn));
+        rcp_powerstate_power_fn *grown_cb = cb_bytes == 0
+            ? NULL
+            : (rcp_powerstate_power_fn *)rcp_realloc(m->callbacks, cb_bytes);
         void                   **grown_ctx;
+        size_t ctx_bytes;
         if (!grown_cb) return false;
         m->callbacks = grown_cb;
-        grown_ctx = (void **)rcp_realloc(m->callback_ctx, new_cap * sizeof(*grown_ctx));
+        ctx_bytes = rcp_alloc_checked_size(new_cap, sizeof(*m->callback_ctx));
+        grown_ctx = ctx_bytes == 0
+            ? NULL
+            : (void **)rcp_realloc(m->callback_ctx, ctx_bytes);
         if (!grown_ctx) return false;
         m->callback_ctx  = grown_ctx;
         m->callbacks_cap = new_cap;

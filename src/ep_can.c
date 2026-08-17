@@ -2,6 +2,8 @@
 #include "rcp/ep_can.h"
 #include "rcp/alloc.h"
 
+#include "alloc_overflow.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -561,7 +563,10 @@ size_t rcp_ep_can_encode_frame_response_fragmented(rcp_byte_bus_id_t byte_bus_id
                               &combined_len);
     if (!combined) return 0;
 
-    segs = (rcp_fragment_segment_t *)rcp_malloc(count * sizeof(*segs));
+    {
+        size_t alloc_bytes = rcp_alloc_checked_size(count, sizeof(*segs));
+        segs = alloc_bytes == 0 ? NULL : (rcp_fragment_segment_t *)rcp_malloc(alloc_bytes);
+    }
     if (!segs) {
         rcp_free(combined);
         combined = NULL;

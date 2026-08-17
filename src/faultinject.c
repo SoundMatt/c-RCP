@@ -2,6 +2,7 @@
 #include "rcp/faultinject.h"
 #include "rcp/alloc.h"
 
+#include "alloc_overflow.h"
 #include "platform.h"
 
 #include <stdlib.h>
@@ -31,7 +32,10 @@ bool rcp_faultinject_add_rule(rcp_faultinject_t *fi, rcp_fi_rule_t rule)
     rcp_mutex_lock(&fi->mu);
     if (fi->rules_len == fi->rules_cap) {
         size_t new_cap = (fi->rules_cap == 0) ? 4 : fi->rules_cap * 2;
-        rcp_fi_rule_t *grown = (rcp_fi_rule_t *)rcp_realloc(fi->rules, new_cap * sizeof(*grown));
+        size_t alloc_bytes = rcp_alloc_checked_size(new_cap, sizeof(*fi->rules));
+        rcp_fi_rule_t *grown = alloc_bytes == 0
+            ? NULL
+            : (rcp_fi_rule_t *)rcp_realloc(fi->rules, alloc_bytes);
         if (!grown) {
             ok = false;
         } else {

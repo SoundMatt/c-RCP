@@ -2,6 +2,8 @@
 #include "rcp/respqueue.h"
 #include "rcp/alloc.h"
 
+#include "alloc_overflow.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -143,15 +145,22 @@ bool rcp_respqueue_push_seq(rcp_respqueue_t *q, const uint8_t *frame, size_t fra
 
     if (q->entries_len == q->entries_cap) {
         size_t new_cap = (q->entries_cap == 0) ? 4 : q->entries_cap * 2;
+        size_t entries_bytes = rcp_alloc_checked_size(new_cap, sizeof(*q->entries));
+        size_t seq_bytes;
 
-        grown_entries = (rcp_bytes_t *)rcp_realloc(q->entries, new_cap * sizeof(*grown_entries));
+        grown_entries = entries_bytes == 0
+            ? NULL
+            : (rcp_bytes_t *)rcp_realloc(q->entries, entries_bytes);
         if (!grown_entries) {
             rcp_bytes_free(&copy);
             return false;
         }
         q->entries = grown_entries;
 
-        grown_seq = (uint8_t *)rcp_realloc(q->entries_seq, new_cap * sizeof(*grown_seq));
+        seq_bytes = rcp_alloc_checked_size(new_cap, sizeof(*q->entries_seq));
+        grown_seq = seq_bytes == 0
+            ? NULL
+            : (uint8_t *)rcp_realloc(q->entries_seq, seq_bytes);
         if (!grown_seq) {
             rcp_bytes_free(&copy);
             return false;

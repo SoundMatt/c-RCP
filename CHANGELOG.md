@@ -34,6 +34,77 @@ the rationale.
 
 ## Releases
 
+### v0.416.0 -- 2026-08-17 (issue #523: CFUSA-CY005 allocation-overflow guards, 29/29 sites)
+
+Fully resolves the CY005 sub-effort of issue #523's five-rule CFUSA lint
+bundle (`cfusa check`: 29 `CFUSA-CY005`/CERT-C INT30-C/CWE-190 findings,
+all in `src/`). Re-verified all 29 individually against current `main`
+before fixing: every site is a geometric-doubling growable-array capacity
+(`new_cap = cap==0 ? N : cap*2`) or a value pre-capped by
+`rcp_fragment_plan_count()` at `RCP_FRAGMENT_MAX_INTERMEDIATE_SEGMENTS` --
+none is reachable from a raw, unclamped wire-parsed length, matching the
+issue's own prior analysis. No live memory-safety defect; this is
+defense-in-depth against a future refactor accidentally removing one of
+those bounds.
+
+- Added `src/alloc_overflow.h` (internal, not installed -- same
+  convention as `src/platform.h`): a single shared
+  `rcp_alloc_size_would_overflow(n, elem_size)` / `rcp_alloc_checked_size(n,
+  elem_size)` pair implementing `cfusa fix`'s own suggested guard
+  (`if (n > SIZE_MAX / sizeof(T)) ...`), computed into a named `size_t`
+  local *before* the allocation call rather than inline in the call's own
+  size argument -- confirmed by direct A/B `cfusa check` runs that only
+  this shape (not an inline ternary at the call site) actually clears
+  CFUSA-CY005's own detector, since it pattern-matches the literal
+  `n * sizeof(...)` token sequence appearing as an allocation call's
+  argument, not the value's dataflow-proven safety.
+- Applied the guard at all 29 call sites across 18 files (`recorder.c`,
+  `ep_uart.c`, `deadline.c`, `observe.c`, `ratelimit.c`, `ep_can.c`,
+  `powerstate.c`, `admin.c`, `server.c`, `discovery.c`, `watchdog.c`,
+  `authz.c`, `respqueue.c`, `ep_iseled.c`, `config.c`, `loan.c`,
+  `faultinject.c`, `relay.c`) -- on overflow, the guard yields `NULL`/`0`,
+  which every site's pre-existing OOM-handling path already treats
+  identically to a real allocation failure; no new failure path invented.
+- Added `tests/test_alloc_overflow.c` (6 cases) unit-testing the helper's
+  boundary arithmetic directly, plus mutation-tested: temporarily changed
+  the guard's `>` to `>=` and confirmed 3 of the 6 new assertions fail
+  before reverting.
+- Rebased four times past concurrently-merged PRs that touched the same
+  allocation call sites, the same `CHANGELOG.md`/`ROADMAP.md` insertion
+  point, or claimed the same version number first: the `alloc.h`-seam
+  Phase (a) refactor (issue #521, touched the exact same 18 files this
+  PR guards -- resolved by combining both changes at every site, this
+  PR's guarded named-local size computation calling
+  `rcp_malloc()`/`rcp_realloc()` per the seam rather than raw
+  `malloc()`/`realloc()`); the SBOM/provenance/SPDX version-drift fix
+  (c-RCP-09, added the `version-sources-agree` CI gate this PR's own
+  version bump must satisfy); the "Writing a requirement" convention
+  docs change (c-RCP-18); and the HARA operational-situation linkage
+  docs change (c-RCP-22) -- none of the latter three touch any `src/`
+  file, so each rebase was a version-number/CHANGELOG-position-only
+  reconciliation, not a logic merge.
+- Bumped `include/rcp/version.h`'s `RCP_VERSION` and `.fusa.json`'s
+  `"version"` to `0.416.0` alongside `CMakeLists.txt`.
+
+Verified: `cfusa check` after vs. before is byte-identical except
+`CFUSA-CY005: 29 -> 0` (every other rule's finding count, including the
+149 CFUSA-L008 and 72 COUP002 findings this same diff's added/moved lines
+could have perturbed, is unchanged) -- 0 errors both before and after.
+`cfusa trace --req-coverage 100 --sec-tested 100`: 1095/1095 (100%)
+requirement traceability, 512/512 (100%) function annotation density,
+unchanged. Full 67/67 test suite (66 existing + the new
+`test_alloc_overflow`) and a from-scratch ASan/UBSan build
+(`-fsanitize=address,undefined -fno-sanitize-recover=all`,
+`ASAN_OPTIONS=detect_leaks=0`) both clean. All 24 CI checks green
+(build matrix, sanitizers, formal verification, RELAY conformance,
+L2 veth transport, full `cfusa` suite, version-sources-agree, DCO).
+
+Leaves the issue's other four sub-efforts (CY001 memcpy hardening, L001
+function-length, L008 void* review, A003 sizeof-signedness) open for
+future batches, per the issue's own prioritized "Suggested approach"
+ordering -- see the issue for the full per-category disposition and
+rationale.
+
 ### v0.415.0 -- 2026-08-17 (c-RCP-22: HARA operational-situation linkage + S/E/C rationale)
 
 First of a planned multi-PR pass closing structural content gaps in

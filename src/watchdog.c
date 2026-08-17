@@ -2,6 +2,7 @@
 #include "rcp/watchdog.h"
 #include "rcp/alloc.h"
 
+#include "alloc_overflow.h"
 #include "platform.h"
 
 #include <rcp/clock.h>
@@ -50,11 +51,18 @@ static bool callbacks_append(rcp_watchdog_keeper_t *k, rcp_watchdog_event_fn cb,
 {
     if (k->n_callbacks == k->callbacks_cap) {
         size_t new_cap = (k->callbacks_cap == 0) ? 4 : k->callbacks_cap * 2;
-        rcp_watchdog_event_fn *grown_cb  = (rcp_watchdog_event_fn *)rcp_realloc(k->callbacks, new_cap * sizeof(*grown_cb));
+        size_t cb_bytes = rcp_alloc_checked_size(new_cap, sizeof(rcp_watchdog_event_fn));
+        rcp_watchdog_event_fn *grown_cb  = cb_bytes == 0
+            ? NULL
+            : (rcp_watchdog_event_fn *)rcp_realloc(k->callbacks, cb_bytes);
         void                  **grown_ctx;
+        size_t ctx_bytes;
         if (!grown_cb) return false;
         k->callbacks     = grown_cb;
-        grown_ctx = (void **)rcp_realloc(k->callback_ctx, new_cap * sizeof(*grown_ctx));
+        ctx_bytes = rcp_alloc_checked_size(new_cap, sizeof(*k->callback_ctx));
+        grown_ctx = ctx_bytes == 0
+            ? NULL
+            : (void **)rcp_realloc(k->callback_ctx, ctx_bytes);
         if (!grown_ctx) return false;
         k->callback_ctx  = grown_ctx;
         k->callbacks_cap = new_cap;

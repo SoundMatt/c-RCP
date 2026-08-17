@@ -2,6 +2,7 @@
 #include "rcp/admin.h"
 #include "rcp/alloc.h"
 
+#include "alloc_overflow.h"
 #include "platform.h"
 
 #include <stdio.h>
@@ -71,7 +72,10 @@ bool rcp_admin_server_register_endpoint(rcp_admin_server_t *srv, rcp_avtp_addr_t
     if (find_endpoint_index(srv, addr) == srv->endpoints_len) {
         if (srv->endpoints_len == srv->endpoints_cap) {
             size_t new_cap = (srv->endpoints_cap == 0) ? 8 : srv->endpoints_cap * 2;
-            rcp_avtp_addr_t *grown = (rcp_avtp_addr_t *)rcp_realloc(srv->endpoints, new_cap * sizeof(*grown));
+            size_t alloc_bytes = rcp_alloc_checked_size(new_cap, sizeof(*srv->endpoints));
+            rcp_avtp_addr_t *grown = alloc_bytes == 0
+                ? NULL
+                : (rcp_avtp_addr_t *)rcp_realloc(srv->endpoints, alloc_bytes);
             if (grown) {
                 srv->endpoints     = grown;
                 srv->endpoints_cap = new_cap;
@@ -128,7 +132,10 @@ bool rcp_admin_server_subscribe(rcp_admin_server_t *srv, rcp_admin_event_fn cb, 
     rcp_mutex_lock(&srv->mu);
     if (srv->subscribers_len == srv->subscribers_cap) {
         size_t new_cap = (srv->subscribers_cap == 0) ? 4 : srv->subscribers_cap * 2;
-        admin_subscriber_t *grown = (admin_subscriber_t *)rcp_realloc(srv->subscribers, new_cap * sizeof(*grown));
+        size_t alloc_bytes = rcp_alloc_checked_size(new_cap, sizeof(*srv->subscribers));
+        admin_subscriber_t *grown = alloc_bytes == 0
+            ? NULL
+            : (admin_subscriber_t *)rcp_realloc(srv->subscribers, alloc_bytes);
         if (!grown) {
             ok = false;
         } else {
@@ -154,7 +161,10 @@ void rcp_admin_server_emit(rcp_admin_server_t *srv, rcp_admin_event_t ev)
 
     rcp_mutex_lock(&srv->mu);
     n = srv->subscribers_len;
-    local = (admin_subscriber_t *)rcp_malloc(n > 0 ? n * sizeof(*local) : 1);
+    {
+        size_t alloc_bytes = (n > 0) ? rcp_alloc_checked_size(n, sizeof(*local)) : 1;
+        local = alloc_bytes == 0 ? NULL : (admin_subscriber_t *)rcp_malloc(alloc_bytes);
+    }
     if (local) {
         for (i = 0; i < n; i++) local[i] = srv->subscribers[i];
     } else {
@@ -187,7 +197,10 @@ bool rcp_admin_server_record_counter(rcp_admin_server_t *srv, const char *name, 
 
     if (srv->counters_len == srv->counters_cap) {
         size_t new_cap = (srv->counters_cap == 0) ? 8 : srv->counters_cap * 2;
-        admin_counter_t *grown = (admin_counter_t *)rcp_realloc(srv->counters, new_cap * sizeof(*grown));
+        size_t alloc_bytes = rcp_alloc_checked_size(new_cap, sizeof(*srv->counters));
+        admin_counter_t *grown = alloc_bytes == 0
+            ? NULL
+            : (admin_counter_t *)rcp_realloc(srv->counters, alloc_bytes);
         if (!grown) {
             ok = false;
         } else {
