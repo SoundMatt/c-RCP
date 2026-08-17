@@ -156,8 +156,8 @@
  * rcp_ep_can_frame_format_t names the six frame variants TC18's own Table
  * 54 enumerates -- Classical Base/Extended Frame Format (CBFF/CEFF), FD
  * Base/Extended Frame Format (FBFF/FEFF), and CAN XL over either the
- * classical or the new CAN XL physical layer -- with Table 54's own
- * numeric assignments (0-5); values 6-7 are Table 54's own two reserved
+ * classical or the new CAN XL physical layer -- with Table 57's own
+ * numeric assignments (0-5); values 6-7 are Table 57's own two reserved
  * codes and select no defined format.
  * rcp_ep_can_frame_format_valid() accepts only 0-5; a decoded FrameFormat
  * of 6 or 7 is rejected with RCP_EP_CAN_ERR_BAD_FRAME_FORMAT.
@@ -704,7 +704,7 @@ typedef enum {
     RCP_EP_CAN_ERR_WRONG_BUS         = 3,
     RCP_EP_CAN_ERR_WRONG_OP          = 4,
     /* The payload's leading quadlet's top 3 bits (FrameFormat, TC18
-     * Table 54) are not one of Table 54's six defined values -- see the
+     * Table 57) are not one of Table 57's six defined values -- see the
      * file header's "FrameFormat selection" section. */
     RCP_EP_CAN_ERR_BAD_FRAME_FORMAT  = 5,
     /* evt[2:0] is not 0b000, TC18 §13.5 Table 33's only legal value for a

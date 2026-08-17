@@ -196,7 +196,7 @@
  * = 111b as not a plain command request (RCP_EP_LIN_ERR_BAD_EVT, via
  * acf.h's rcp_acf_evt_row2_is_plain()), but no counterpart implemented
  * that TC18 §12.7.1 configuration-write path -- the same class of gap
- * SPI's/I2C's/UART's own earlier fixes closed. TC18 §13.7.10.2 Table 52
+ * SPI's/I2C's/UART's own earlier fixes closed. TC18 §13.7.10.2 Table 55
  * defines a clean, five-entry register block with no address-collision
  * editorial defect (unlike GPIO's/I2C's own source tables):
  *
@@ -263,7 +263,7 @@ typedef enum {
  * trigger: never for NONE; for TX_DONE iff BOTH are true -- TC18
  * §13.7.10.1's own text (REQ-LINEP-023): "The LIN EP issues a trigger
  * when a transmission has been finalized, AND the configured trailing
- * time has expired." Table 52 (§13.7.10.2) defines no dedicated wire
+ * time has expired." Table 55 (§13.7.10.2) defines no dedicated wire
  * register for "the configured trailing time" -- like this endpoint
  * type's own trigger concept as a whole (see the file header: "TC18
  * defines no 'lin trigger outputs' table at all... entirely this
@@ -285,8 +285,8 @@ typedef struct {
     uint32_t                       lin_clk_divider; /* bit-time clock divider;
                                                          see the file header */
     uint8_t                        trigger;         /* rcp_ep_lin_trigger_t */
-    uint16_t                       ep_status;         /* lin_ep_status, Table 52 */
-    uint8_t                        wire_clk_divider;  /* lin_clk_divider, Table 52 --
+    uint16_t                       ep_status;         /* lin_ep_status, Table 55 */
+    uint8_t                        wire_clk_divider;  /* lin_clk_divider, Table 55 --
                                                            see the file header */
 } rcp_ep_lin_functional_cfg_t;
 
@@ -331,7 +331,7 @@ bool rcp_ep_lin_set_trigger(rcp_ep_lin_functional_cfg_t *cfg, rcp_ep_lin_trigger
 /* The block's own length in octets -- one past the last assigned offset,
  * i.e. the value the endpoint reports at RCP_EP_LIN_REG_EP_LEN and the
  * bound the "write beyond EP_LEN is ignored" rule (§12.7.1) is applied
- * against. Table 52's own addressing is internally consistent, so there
+ * against. Table 55's own addressing is internally consistent, so there
  * is no editorial defect to resolve here. */
 #define RCP_EP_LIN_EP_FUNC_LEN ((uint16_t)0x0009u)
 

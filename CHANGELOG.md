@@ -34,6 +34,50 @@ the rationale.
 
 ## Releases
 
+### v0.378.0 -- 2026-08-16 (UART/LIN/ADC/CAN/ISELED/MDIO functional-config table citations corrected, the six-item residue issue #434's bulk pass missed)
+
+Closes issue #472. Doc-comment-only citation fix, same lineage as issue
+#434 (v0.361.0): each cited table number in this cluster was exactly 3
+less than the table's real RC5 number -- `Table 48` for UART functional
+config (real `Table 51`), `Table 52` for LIN functional config (real
+`Table 55`), `Table 50`/`Table 51` for ADC's trigger-outputs/functional-
+config tables (real `Table 53`/`Table 54`), `Table 54` for CAN's own
+FrameFormat table (real `Table 57`), `Table 55` for ISELED functional
+config (real `Table 58`), and `Table 56` for MDIO functional config (real
+`Table 59`). Every corrected number was independently re-verified against
+a fresh `pdftotext -layout` extraction of
+`OA_TC18_specification_v_0.5.1_RC_5_3624.pdf` before being applied.
+
+`#434`'s bulk-fix pass only ever targeted `.fusa-reqs.json`'s own `tc18`
+citation field, and only partially even there -- it never touched
+`title`/`text` (both present in this same file) nor the doc comments
+inside `include/rcp/ep_{uart,lin,adc,can,iseled,mdio}.h`/`src/ep_can.c`
+this batch also corrects. Re-scanning past the six requirements this
+issue named by number (`REQ-UART-038`, `REQ-LINEP-024`, `REQ-ADC-031`)
+surfaced 7 more `.fusa-reqs.json` `tc18` fields carrying the identical
+stale ADC numbering (`REQ-ADC-007/020/022/031/035/036/040`) that `#434`'s
+own pass had also missed -- corrected alongside the rest. In total, 40
+`title`/`text`/`tc18` fields across 31 requirements, applied via targeted
+per-line string replacement (not a full JSON re-serialization, so the
+diff touches only the corrected citation on each line) after confirming
+each occurrence's real topic against the PDF -- several requirements
+correctly cite the *same* stale-looking number for an unrelated, already-
+correct table (e.g. UART's own trigger-signals table is genuinely `Table
+52`, unrelated to LIN's stale `Table 52`; CAN's own functional-config
+table is genuinely `Table 56`, unrelated to MDIO's stale `Table 56`) and
+were left untouched. `REQ-PWM-058`'s own `Table 48` citations are
+similarly genuine (`Table 48` really is PWM_IN's functional-config table)
+and untouched. `REQ-CANEP-001`'s `tc18` field cites an unrelated section
+(`§13.7.11.2 Table 56`, the CAN functional-config table, for a
+FrameFormat requirement) -- a different, pre-existing citation defect,
+not this cluster's renumbering pattern; left for separate investigation,
+only its `title`'s in-cluster `Table 54` was corrected.
+
+No behavior change: no `text` content beyond the corrected table number
+was altered, no `status` field changed, and no source-code logic
+changed, only doc comments. Full 66-test suite unchanged; `cfusa
+check`/`trace`: 0 errors, 1088/1088 traced and tested (unchanged).
+
 ### v0.376.0 -- 2026-08-16 (orphaned classifier/error-mapping primitives wired into real dispatch: issues #468, #469)
 
 Closes issues #468 and #469 -- both "wire an existing-but-unused classifier/error-mapping function into the real dispatch path" fixes, following this project's own established `mock.c`-owns-no-per-endpoint-semantics architecture (see `test_tc18_gaps_ep.c`'s own shared-fixture comment, and issue #392/PR D's own identical GPIO-debounce precedent) exactly.
@@ -43,6 +87,7 @@ Closes issues #468 and #469 -- both "wire an existing-but-unused classifier/erro
 **Issue #468** (`REQ-PWM-058`): `rcp_ep_pwm_in_max_period_outcome()` (TC18 Table 48's `pwmi_err_on_max_period` rule) had zero callers outside its own unit test -- unlike its own reference pattern, `rcp_ep_gpio_debounce_sample()`, which `gpio_dispatch_handler()` already calls on every dispatched write. The new `pwm_in_dispatch_handler()` mirrors that same pattern for PWM_IN's own read path: it calls the classifier on every dispatched read and honors all four of Table 48's own outcomes end-to-end through a real `mock.c` `dispatch()` call -- `OK` reports the captured value immediately; `INVALIDATE`/`STOP` leave the response unfabricated; `STOP_AND_ERROR` builds a genuine Error Response carrying `RCP_ERROR_PWM_IN_NO_SIGNAL`. Three new tests cover all three caller-observable branches.
 
 `.fusa-reqs.json` updated for all four requirements with dated notes; none needed a status downgrade (each classifier/mapping function was, and remains, correctly implemented -- only its real-dispatch reachability was closed this batch). Full 66-test suite + ASan/UBSan (`-fsanitize=address,undefined -fno-sanitize-recover=all`) clean; `cfusa check`: 0 errors; `cfusa trace`: 1088/1088 requirements traced and tested (unchanged). Every new assertion mutation-tested: reverting each fix (forcing the wire-error/classifier call site back to its pre-fix behavior) makes exactly its own new test(s) fail, nothing else; restoring returns the suite to green.
+
 ### v0.374.0 -- 2026-08-16 (REQ-ACF-012 mtv citation closed; RCP_EP_PWM_IN_NO_SIGNAL payload-sentinel ambiguity resolved, documented as no-TC18-basis)
 
 Closes issue #184 (c-RCP-AUDIT-05), both of its two genuine, previously honestly-uncited TC18 ambiguities.
@@ -52,7 +97,6 @@ Closes issue #184 (c-RCP-AUDIT-05), both of its two genuine, previously honestly
 **Ambiguity 2 (`RCP_EP_PWM_IN_NO_SIGNAL` payload sentinel, `REQ-PWM-047`/`REQ-PWM-054`, ADC counterparts `REQ-ADC-003`/`004`/`009`/`030`)**: read TC18's PWM_IN (§13.7.6) and ADC (§13.7.9) chapter prose directly, not just their already-cited tables. TC18 defines `PWM_IN_NO_SIGNAL` solely as a numbered wire error code -- §12.9.6 **Table 30** (not "Table 27", a stale pre-RC5 number the issue itself used -- the same citation-drift class PR #339/#342 already corrected elsewhere), value 9, carried via the response `err` field, for the one no-signal case TC18 documents (the external PWM source stopping, with `EP_RESP_ON_ERR` enabled). `rcp_ep_pwm_in_max_period_outcome()` (`REQ-PWM-058`, issue #428) already routes exactly that case to the real Table 30 code, not this sentinel. TC18 defines no payload-sentinel convention anywhere and is silent on the cases this codebase's own sentinel actually covers (`EP_RESP_ON_ERR` disabled; no capture yet in PWM_IN continuous mode; ADC's own per-position failure within a combined multi-value response -- TC18's ADC chapter never discusses timeouts at all). `RCP_EP_PWM_IN_NO_SIGNAL` (0xFFFF) as an in-payload value is this codebase's own invention for exactly those TC18-silent cases, not a citation gap to force-fit. All six `.fusa-reqs.json` entries now carry an explicit resolution note recording this finding in place of a fabricated `tc18` citation. No behavior change.
 
 `.fusa-reqs.json`/doc-only change (plus one doc-comment correction in `include/rcp/acf.h`); no behavior touched, no new tests needed. Full 66-test suite passes unchanged; `cfusa check`/`trace` (v0.5.54): 0 errors, 1088/1088 traced and tested (unchanged).
-
 
 ### v0.373.0 -- 2026-08-16 (rcp_mock_server_new() now seeds the EP_ID_config power-on default; issue #464 audit closed with no code gap remaining)
 
@@ -139,6 +183,7 @@ the new tests) makes both new tests fail cleanly (`Expected TRUE Was
 FALSE`); restoring the fix makes them pass again, with the full
 66-suite regression, ASan/UBSan, and `cfusa check`/`trace` all unaffected
 (0 errors, requirement-coverage unchanged at 1088/1088).
+
 ### v0.371.0 -- 2026-08-16 (discovery request unique_id=0x0000 investigated and closed -- no server-side check needed)
 
 Closes issue #457 (c-RCP-AUDIT-32). TC18 Table 18 lists `unique_id =
