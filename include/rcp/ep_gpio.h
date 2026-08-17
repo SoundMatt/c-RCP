@@ -138,7 +138,7 @@
  * followed by the data octets to patch there -- and ep_pwm.h's
  * rcp_ep_pwm_out_apply_reconfig() already implements it correctly. The
  * old pin-direction-toggle behavior corresponded to no TC18 mechanism at
- * all (Table 41, the GPIO functional-configuration register block, has no
+ * all (Table 41/44, the GPIO functional-configuration register block, has no
  * per-pin direction field whatsoever -- direction lives in HW_config's
  * own hw_pin_type, a different subsystem entirely, configured only in
  * HW_UNCONFIGURED state, not via a per-request evt value). Retained, under

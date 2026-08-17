@@ -34,6 +34,52 @@ the rationale.
 
 ## Releases
 
+### v0.388.0 -- 2026-08-17 (c-RCP-AUDIT-08: Table 41/42/43/44 RC1->RC5 GPIO/PWM_OUT/PWM_IN citation drift)
+
+Partial progress on issue #341 (c-RCP-AUDIT-08). Continues the per-table,
+content-verified RC1->RC5 renumbering audit after PRs #343/#344/#345
+(`Table 18`/`19`/`21`/`22`) and #481 (`Table 48`/`50`/`51`/`54`/`55`/`56`
+UART/LIN/ADC/CAN/ISELED/MDIO cluster) -- a fresh full-codebase census
+(`grep -roh "Table [0-9]\+" include/ src/ .fusa-reqs.json | sort | uniq -c`)
+confirmed `Table 18`/`19`/`20`/`21`/`22`/`23`/`24`/`28`/`33` are already
+fully RC5-resolved (either genuinely RC5-native or deliberately dual-noted
+"OLD/NEW", e.g. `Table 33/36`, `Table 28/31`) and did not need touching.
+
+Found and fixed a genuine mixed-state cluster instead: the bare numbers
+`41`, `43`, and `44` are each used for TWO different tables in this
+codebase, because RC5's own native meaning for that digit differs from
+what the same digit meant in RC1:
+
+- `Table 41`: RC5-native = "spi trigger outputs" (already correct
+  everywhere in `ep_spi.h`/`src/ep_spi.c` -- untouched). RC1-stale = "gpio
+  functional configuration" (one occurrence, `ep_gpio.h`) -- corrected to
+  the file's own established `Table 41/44` dual-notation style.
+- `Table 43`: RC5-native = "gpio trigger outputs" (already correct
+  everywhere in `ep_gpio.h`/`ep_spi.h`/`src/ep_gpio.c` -- untouched).
+  RC1-stale = "pwmo functional configuration" (7 occurrences across
+  `ep_pwm.h`/`src/ep_pwm.c`/`.fusa-reqs.json`) -- corrected to `Table 46`.
+- `Table 44`: RC5-native = "gpio functional configuration" (already
+  correct in several `.fusa-reqs.json` `tc18` fields -- untouched, and 2
+  stale `title`/`text` holdouts on `REQ-GPIO-035` corrected to match their
+  own already-correct `tc18` field). RC1-stale = "pwmi trigger outputs" (5
+  occurrences across `ep_pwm.h`/`.fusa-reqs.json`) -- corrected to `Table 47`.
+- `Table 42` (PWM_OUT's own 3 trigger signals, unambiguous in this
+  codebase) corrected RC1 `42` -> RC5 `45`.
+
+Every occurrence was read in its full surrounding context and checked
+against a fresh `pdftotext -layout` extraction of both the RC1 and RC5
+`OA_TC18_specification` PDFs (not committed) before touching it -- no
+blind renumbering. `Table 40`'s occurrences were already correctly
+dual-noted (`Table 40 (RC1)/Table 43 (RC5)`) and left alone.
+`ep_wakeup.h`'s own `Table 40` citations are a different table
+(WAKEUP's IO_SRC pin-configuration table) outside this batch's scope --
+flagged, not touched.
+
+Comment/citation-text-only: no `text`/`status`/behavior change on any
+`.fusa-reqs.json` entry, no source logic touched. 66/66 tests unchanged.
+`cfusa check` (pinned v0.5.54): 0 errors, 968/1312 warnings/info,
+unchanged. `cfusa trace`: 1095/1095 traced and tested, unchanged.
+
 ### v0.387.0 -- 2026-08-16 (c-RCP-AUDIT-02 citation backfill: PWM/ADC/GPIO/SPI/ISELED/I2C/LINEP/MDIO/WAKEUP, 3 of 41 uncited requirements in scope cited)
 
 Partial progress on issue #164 (c-RCP-AUDIT-02, "Backfill TC18

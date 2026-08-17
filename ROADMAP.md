@@ -19106,6 +19106,46 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.388.0 -- 2026-08-17 (c-RCP-AUDIT-08: Table 41/42/43/44 RC1->RC5
+GPIO/PWM_OUT/PWM_IN citation drift)
+
+Partial progress on issue #341 (c-RCP-AUDIT-08, "Full RC1->RC5
+table-number census"). A fresh full-codebase census confirmed the
+prior batches' highest-count numbers (`Table 18`/`19`/`20`/`21`/`22`/
+`23`/`24`/`28`/`33`) are already fully RC5-resolved -- either
+genuinely RC5-native already, or deliberately dual-noted "OLD/NEW"
+(e.g. `Table 33/36`, `Table 28/31`), matching this codebase's own
+established disambiguation convention.
+
+Found a genuine mixed-state cluster instead: `41`, `43`, and `44` are
+each used for two different tables, since RC5's own native meaning
+for the digit differs from RC1's. `Table 41` RC5-native = spi trigger
+outputs (already correct); RC1-stale = gpio functional configuration
+(1 occurrence, corrected to the file's own `Table 41/44` style).
+`Table 43` RC5-native = gpio trigger outputs (already correct);
+RC1-stale = pwmo functional configuration (7 occurrences, corrected
+to `Table 46`). `Table 44` RC5-native = gpio functional configuration
+(already correct, plus 2 stale `title`/`text` holdouts corrected to
+match their own already-correct `tc18` field); RC1-stale = pwmi
+trigger outputs (5 occurrences, corrected to `Table 47`). `Table 42`
+(PWM_OUT's own trigger signals, unambiguous) corrected RC1 42 ->
+RC5 45.
+
+Every occurrence read in full context and checked against fresh
+`pdftotext -layout` extractions of both the RC1 and RC5
+`OA_TC18_specification` PDFs before touching it -- no blind
+renumbering. `ep_wakeup.h`'s own `Table 40` citations (a different,
+WAKEUP-specific table) flagged out of scope, not touched.
+
+Comment/citation-text-only, no behavior change. 66/66 tests
+unchanged; `cfusa check` (v0.5.54) 0 errors, 968/1312 warnings/info
+unchanged; `cfusa trace` 1095/1095 unchanged.
+
+**Next**: remaining un-audited table-number clusters from issue #341's
+census (`Table 51`/`60`/`26`/`6`/`7` and the still-untouched
+`respqueue.h` Table 24->27 and `config.c`/`regmap.h` hw_pin_type
+Table 20->21 fixes flagged by PR #343's own comment).
+
 ### v0.387.0 -- 2026-08-16 (c-RCP-AUDIT-02 citation backfill batch:
 PWM/ADC/GPIO/SPI/ISELED/I2C/LINEP/MDIO/WAKEUP, 3 of 41 uncited
 requirements in scope now cited)
