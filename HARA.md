@@ -43,19 +43,54 @@ also `tara.md`'s TS-002/TS-001/TS-003 notes on residual risk).
 
 ## Hazard Table
 
-| ID | Hazard | Severity | Exposure | Controllability | ASIL | Safety Goals |
-|----|--------|----------|----------|-----------------|------|--------------|
-| H-001 | Loss of safety-tagged request delivery/execution to a safety-critical endpoint | S3 | E4 | C2 | **ASIL-C** | SG-001 |
-| H-002 | Request executed against the wrong endpoint due to a `(stream_id, byte_bus_id)` addressing error | S2 | E3 | C2 | ASIL-A | SG-002 |
-| H-003 | Per-stream watchdog overflows but the endpoint is not driven toward its configured safe state | S2 | E4 | C2 | ASIL-B | SG-003 |
-| H-004 | Stale or duplicated request captured and re-executed | S2 | E3 | C2 | ASIL-A | SG-004 |
-| H-005 | A safety-tagged request executes before its endpoint has actually reached the configured safe state | S3 | E3 | C2 | ASIL-B | SG-005 |
-| H-006 | A register-map field write succeeds without the caller holding the required writer authorization | S2 | E3 | C2 | ASIL-A | SG-006 |
-| H-007 | An unauthenticated request is accepted over the native transport in the absence of link-layer authentication | S3 | E2 | C2 | ASIL-A | SG-007 |
-| H-008 | RC Server fails to complete its WakeUp handshake, leaving safety-relevant actuators unresponsive | S3 | E3 | C2 | ASIL-B | SG-008 |
-| H-009 | A CRC32-corrupted request frame is executed instead of rejected | S2 | E3 | C2 | ASIL-A | SG-009 |
-| H-010 | Fault-injection rules persist across process/vehicle power cycles | S2 | E2 | C3 | ASIL-A | SG-010 |
-| H-011 | RC Server reaches `RCP_CONFIGURED` without first passing through a validated `HW_CONFIGURED` state | S2 | E2 | C2 | QM | SG-011 |
+Each hazard's `situations` column links it to the `Operational Situations`
+table above (ISO 26262-3:2018 Clause 6.4.2: hazard identification and
+analysis is performed per operational situation, and `Exposure` in
+particular is the probability of *that* situation, not a
+situation-independent constant). `.fusa-hara.json` carries this same
+`situations` reference array on every hazard entry, plus a `rationale`
+string on each `risk` object spelling out, against ISO 26262-3:2018 Table
+4's own S/E/C class definitions, why that hazard's recorded classification
+is what it is — summarized per-hazard in the Rationale Summary below.
+
+| ID | Hazard | Situations | Severity | Exposure | Controllability | ASIL | Safety Goals |
+|----|--------|------------|----------|----------|-----------------|------|--------------|
+| H-001 | Loss of safety-tagged request delivery/execution to a safety-critical endpoint | OS-001, OS-003, OS-005 | S3 | E4 | C2 | **ASIL-C** | SG-001 |
+| H-002 | Request executed against the wrong endpoint due to a `(stream_id, byte_bus_id)` addressing error | OS-001 | S2 | E3 | C2 | ASIL-A | SG-002 |
+| H-003 | Per-stream watchdog overflows but the endpoint is not driven toward its configured safe state | OS-001, OS-003 | S2 | E4 | C2 | ASIL-B | SG-003 |
+| H-004 | Stale or duplicated request captured and re-executed | OS-001, OS-006 | S2 | E3 | C2 | ASIL-A | SG-004 |
+| H-005 | A safety-tagged request executes before its endpoint has actually reached the configured safe state | OS-003, OS-007 | S3 | E3 | C2 | ASIL-B | SG-005 |
+| H-006 | A register-map field write succeeds without the caller holding the required writer authorization | OS-001, OS-002, OS-006 | S2 | E3 | C2 | ASIL-A | SG-006 |
+| H-007 | An unauthenticated request is accepted over the native transport in the absence of link-layer authentication | OS-006 | S3 | E2 | C2 | ASIL-A | SG-007 |
+| H-008 | RC Server fails to complete its WakeUp handshake, leaving safety-relevant actuators unresponsive | OS-007 | S3 | E3 | C2 | ASIL-B | SG-008 |
+| H-009 | A CRC32-corrupted request frame is executed instead of rejected | OS-001, OS-005 | S2 | E3 | C2 | ASIL-A | SG-009 |
+| H-010 | Fault-injection rules persist across process/vehicle power cycles | OS-001, OS-004 | S2 | E2 | C3 | ASIL-A | SG-010 |
+| H-011 | RC Server reaches `RCP_CONFIGURED` without first passing through a validated `HW_CONFIGURED` state | OS-002, OS-008 | S2 | E2 | C2 | QM | SG-011 |
+
+---
+
+## S/E/C Rationale Summary (Clause 6.4.3)
+
+The full text of each hazard's classification rationale lives in
+`.fusa-hara.json`'s `hazards[].risk.rationale` field (ISO 26262-3:2018
+Table 4 class definitions applied against the linked operational
+situation(s) above); this table gives the one-line gist of each so a
+reviewer doesn't have to open the JSON to sanity-check the shape of the
+argument.
+
+| ID | Severity rationale (gist) | Exposure rationale (gist) | Controllability rationale (gist) |
+|----|---------------------------|----------------------------|-----------------------------------|
+| H-001 | S3: watchdog/safe-state loss during an in-flight safety maneuver (OS-003) is life-threatening, survival not assured | E4: the triggering condition (an active safety-tagged stream) is present essentially continuously across OS-001 | C2: a downstream supervisor can still normally intervene before FTTI elapses |
+| H-002 | S2: wrong-endpoint execution is severe but survival probable | E3: an addressing defect, not tied to an elevated-risk situation — medium, not high, probability | C2: an operator/consistency check can typically catch it |
+| H-003 | S2: safe state simply isn't driven, rather than an unsafe action executing | E4: evaluated on every overflow across the whole OS-001 envelope, same continuous exposure as H-001 | C2: same downstream-observer reasoning as H-001 |
+| H-004 | S2: a replayed request repeats a previously-valid command rather than an arbitrary one | E3: needs OS-006 (an adversary) or an unusual duplicating link fault — a specific added precondition | C2: a repeated command is often idempotent-checkable downstream |
+| H-005 | S3: defeats the safe-state precondition during OS-003, matching H-001's severity | E3: needs OS-007's narrower power-transition timing window, not the whole OS-001 envelope | C2: `rcp_e2e_endpoint_in_safe_state()`'s fail-closed design is the analyzed control |
+| H-006 | S2: an unauthorized write is severe but doesn't by itself put a safety-tagged request in flight | E3: needs an OS-002 config fault or OS-006 adversary; the authorized-writer check is expected to hold under ordinary OS-001 operation | C2: a write to a monitored/locked field is typically observable and reversible |
+| H-007 | S3: an unauthenticated command could be an arbitrary safety-tagged one, matching H-001/H-005 | E2: requires OS-006 access in the first place — gaining that access at all is itself low-probability | C2: SG-007 delegates the actual control (MACsec) to the deployment as the intended external control |
+| H-008 | S3: an incomplete handshake leaves actuators unresponsive, matching H-001/H-005 | E3: bounded to OS-007's power-transition window, not the continuous OS-001 envelope | C2: `rcp_pwrmode_handshake_has_failed()` reports the failure explicitly rather than assuming completion |
+| H-009 | S2: corrupted-frame execution is severe but evaluated per-frame, not across a whole maneuver window | E3: driven by OS-005 (link degradation/EMI) on top of ordinary OS-001 traffic — real but not constant | C2: stream-fault latching gives a downstream consumer an observable signal |
+| H-010 | S2: a persisted rule masking/fabricating a fault is severe only if it coincides with a real safety-relevant event | E2: requires OS-004 (a software fault leaking dev/test tooling into a field session) — itself low-probability | C3: uniquely difficult to control — the persisted rule actively falsifies the signal a supervisor would use to detect it |
+| H-011 | S2: an unvalidated-hardware-configuration bypass is severe in principle, though a precondition violation rather than a direct unsafe actuation | E2: needs OS-002 or occurs only within OS-008's narrow bootstrap window — an edge condition, not continuous exposure | C2: `rcp_lifecycle_transition()`'s modeled transition table is the analyzed control |
 
 ---
 
@@ -140,3 +175,53 @@ field and in `tara.md`'s residual-risk notes, not asserted as closed.
 | `rcp_e2e_endpoint_in_safe_state()` misconfiguration (invalid `safestate_sequencer` index, unrecognized `rx_safety_measure`) | Low | Fails closed (returns false) by explicit design choice, not a spec-mandated value | Accepted |
 | Discovery/bootstrap (`OS-008`) accepts any claimant at the reserved discovery `byte_bus_id` while `HW_UNCONFIGURED` | Low | No identity check exists at this stage in the spec's own bootstrap sequence; matches the same residual posture as H-007 above | Accepted, tracked alongside H-007 |
 | One hazard (H-001) computes to ASIL-C against an ASIL-B-scoped implementation rigor | Open | See ASIL Determination Note above | **Open — not yet closed** |
+
+---
+
+## Known Content Gaps (issue `c-RCP-22`)
+
+A structural review of this HARA (issue `c-RCP-22`) found it fell short of
+ISO 26262-3:2018 Clause 6 and of what `cfusa hara show` is built to check
+in several ways. This revision closes three of those:
+
+1. **Operational situations were prose-only** — `.fusa-hara.json` had no
+   `operationalSituations[]` key at all, so no tool could verify hazard
+   analysis had actually been performed per situation (Clause 6.4.2).
+   **Closed** — promoted into `.fusa-hara.json`'s own schema above.
+2. **Hazards weren't linked to the situations they occur in** — no
+   `situations` reference array on any hazard entry. **Closed** — every
+   hazard now carries one (Hazard Table above; `.fusa-hara.json`
+   `hazards[].situations`).
+3. **No written S/E/C classification rationale** — bare letters/numbers
+   with no justification against ISO 26262-3:2018 Table 4. **Closed** —
+   every hazard's `risk` object now carries a `rationale` string
+   (S/E/C Rationale Summary above; full text in
+   `.fusa-hara.json`).
+
+Two gaps from that issue remain **open**, deliberately deferred rather
+than forced through in this pass:
+
+4. **The 9 protocol-bridge/adapter modules** (`grpcbridge.c`,
+   `restbridge.c`, `someipbr.c`, `canbr.c`, `ddsbr.c`, `mqttbr.c`,
+   `linbr.c`, `udsbr.c`, `doipbr.c`) have never been through a hazard-ID
+   pass — none appear in this HARA. This is a real, separate
+   hazard-identification exercise (reading each bridge's actual behavior
+   and either recording a genuine new hazard or an explicit "analyzed,
+   no hazard, QM" conclusion), not a mechanical field-fill, and is sized
+   for its own dedicated pass.
+5. **`ftti_ms` is asserted, not cross-checked** — nothing in this repo
+   verifies a hazard's recorded FTTI against its implementing mechanism's
+   actual measured reaction time (e.g. H-001's watchdog). Needs at least
+   one sampled timing test or a documented manual-verification record.
+
+`cfusa hara show`'s own `Hazards (0)` / partial `Safety Goals` count in
+this repo is **not** a symptom of either open gap above — it's a
+pre-existing limit in `cfusa`'s own `cmd_hara.c` parser (a fixed 512-byte
+per-array-element buffer that silently drops any hazard/safety-goal JSON
+object whose literal text exceeds that, which every entry in this file's
+verbose, safety-relevant prose does). `cfusa check`'s actual gating rules
+(`HARA001`–`HARA006`) scan the raw file directly and are unaffected;
+`cfusa hara show`'s pretty-printer is the only thing that undercounts.
+Not fixable from this repo (the parser lives in `c-FuSa`); noted here so
+a future reader isn't misled by the display into thinking the hazards
+themselves are missing.
