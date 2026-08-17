@@ -2,6 +2,7 @@
 #include "rcp/authz.h"
 #include "rcp/alloc.h"
 
+#include "alloc_overflow.h"
 #include "platform.h"
 
 #include <stdlib.h>
@@ -78,13 +79,15 @@ bool rcp_authz_policy_allow(rcp_authz_policy_t *policy, const char *identity,
     copy_identity(entry.identity, identity);
 
     if (n_addrs > 0) {
-        entry.addrs = (rcp_avtp_addr_t *)rcp_malloc(n_addrs * sizeof(*entry.addrs));
+        size_t alloc_bytes = rcp_alloc_checked_size(n_addrs, sizeof(*entry.addrs));
+        entry.addrs = alloc_bytes == 0 ? NULL : (rcp_avtp_addr_t *)rcp_malloc(alloc_bytes);
         if (!entry.addrs) return false;
         memcpy(entry.addrs, addrs, n_addrs * sizeof(*entry.addrs));
         entry.n_addrs = n_addrs;
     }
     if (n_request_types > 0) {
-        entry.request_types = (uint8_t *)rcp_malloc(n_request_types * sizeof(*entry.request_types));
+        size_t alloc_bytes = rcp_alloc_checked_size(n_request_types, sizeof(*entry.request_types));
+        entry.request_types = alloc_bytes == 0 ? NULL : (uint8_t *)rcp_malloc(alloc_bytes);
         if (!entry.request_types) {
             rcp_free(entry.addrs);
             return false;
@@ -96,7 +99,10 @@ bool rcp_authz_policy_allow(rcp_authz_policy_t *policy, const char *identity,
     rcp_mutex_lock(&policy->mu);
     if (policy->entries_len == policy->entries_cap) {
         size_t new_cap = (policy->entries_cap == 0) ? 4 : policy->entries_cap * 2;
-        policy_entry_t *grown = (policy_entry_t *)rcp_realloc(policy->entries, new_cap * sizeof(*grown));
+        size_t alloc_bytes = rcp_alloc_checked_size(new_cap, sizeof(*policy->entries));
+        policy_entry_t *grown = alloc_bytes == 0
+            ? NULL
+            : (policy_entry_t *)rcp_realloc(policy->entries, alloc_bytes);
         if (!grown) {
             ok = false;
         } else {

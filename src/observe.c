@@ -2,6 +2,7 @@
 #include "rcp/observe.h"
 #include "rcp/alloc.h"
 
+#include "alloc_overflow.h"
 #include "platform.h"
 
 #include <stdlib.h>
@@ -65,7 +66,10 @@ static void in_memory_record_span(const rcp_span_t *span, void *ctx)
     rcp_mutex_lock(&s->mu);
     if (s->len == s->cap) {
         size_t new_cap = (s->cap == 0) ? 16 : s->cap * 2;
-        rcp_span_t *grown = (rcp_span_t *)rcp_realloc(s->spans, new_cap * sizeof(*grown));
+        size_t alloc_bytes = rcp_alloc_checked_size(new_cap, sizeof(*s->spans));
+        rcp_span_t *grown = alloc_bytes == 0
+            ? NULL
+            : (rcp_span_t *)rcp_realloc(s->spans, alloc_bytes);
         if (grown) {
             s->spans = grown;
             s->cap   = new_cap;

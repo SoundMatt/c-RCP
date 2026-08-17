@@ -2,6 +2,8 @@
 #include "rcp/discovery.h"
 #include "rcp/alloc.h"
 
+#include "alloc_overflow.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -279,7 +281,10 @@ size_t rcp_discovery_encode_response_fragmented(const rcp_regmap_general_t *map,
                    : RCP_DISCOVERY_GENERAL_SLICE_LEN;
     memcpy(payload, slice, copy_len);
 
-    segs = (rcp_fragment_segment_t *)rcp_malloc(count * sizeof(*segs));
+    {
+        size_t alloc_bytes = rcp_alloc_checked_size(count, sizeof(*segs));
+        segs = alloc_bytes == 0 ? NULL : (rcp_fragment_segment_t *)rcp_malloc(alloc_bytes);
+    }
     if (!segs) return 0;
 
     if (rcp_fragment_plan((size_t)read_size, max_fragment_payload, segs, count) != RCP_FRAGMENT_OK) {
@@ -462,8 +467,11 @@ bool rcp_discovery_cache_put(rcp_discovery_cache_t *cache,
 
     if (cache->len == cache->cap) {
         size_t new_cap = (cache->cap == 0) ? 4 : cache->cap * 2;
+        size_t alloc_bytes = rcp_alloc_checked_size(new_cap, sizeof(*cache->entries));
 
-        grown = (rcp_discovery_result_t *)rcp_realloc(cache->entries, new_cap * sizeof(*grown));
+        grown = alloc_bytes == 0
+            ? NULL
+            : (rcp_discovery_result_t *)rcp_realloc(cache->entries, alloc_bytes);
         if (!grown) return false;
         cache->entries = grown;
         cache->cap     = new_cap;

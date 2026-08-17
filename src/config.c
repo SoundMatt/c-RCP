@@ -2,6 +2,8 @@
 #include "rcp/config.h"
 #include "rcp/alloc.h"
 
+#include "alloc_overflow.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -196,7 +198,9 @@ void rcp_config_manifest_free(rcp_config_manifest_t *m)
     {                                                                                          \
         if (*len == *cap) {                                                                    \
             size_t new_cap = (*cap == 0) ? 8 : *cap * 2;                                       \
-            ELEM_T *grown = (ELEM_T *)rcp_realloc(*arr, new_cap * sizeof(**arr));                  \
+            size_t need = rcp_alloc_checked_size(new_cap, sizeof(**arr));                      \
+            ELEM_T *grown = NULL;                                                              \
+            if (need != 0) grown = (ELEM_T *)rcp_realloc(*arr, need);                              \
             if (!grown) return false;                                                          \
             *arr = grown;                                                                      \
             *cap = new_cap;                                                                    \

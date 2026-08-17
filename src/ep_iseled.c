@@ -2,6 +2,8 @@
 #include "rcp/ep_iseled.h"
 #include "rcp/alloc.h"
 
+#include "alloc_overflow.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -661,7 +663,10 @@ size_t rcp_ep_iseled_encode_response_fragmented(rcp_byte_bus_id_t byte_bus_id,
     count = rcp_fragment_plan_count(capped_len, max_fragment_payload);
     if (count == 0) return 0;
 
-    segs = (rcp_fragment_segment_t *)rcp_malloc(count * sizeof(*segs));
+    {
+        size_t alloc_bytes = rcp_alloc_checked_size(count, sizeof(*segs));
+        segs = alloc_bytes == 0 ? NULL : (rcp_fragment_segment_t *)rcp_malloc(alloc_bytes);
+    }
     if (!segs) return 0;
 
     if (rcp_fragment_plan(capped_len, max_fragment_payload, segs, count) != RCP_FRAGMENT_OK) {

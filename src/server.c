@@ -4,6 +4,8 @@
 #include "rcp/avtp.h"
 #include "rcp/alloc.h"
 
+#include "alloc_overflow.h"
+
 #include <stdlib.h>
 #include <string.h>
 
@@ -101,8 +103,11 @@ bool rcp_server_endpoint_submit(rcp_server_endpoint_t *ep,
 
     if (ep->queue_len == ep->queue_cap) {
         size_t new_cap = (ep->queue_cap == 0) ? 4 : ep->queue_cap * 2;
+        size_t alloc_bytes = rcp_alloc_checked_size(new_cap, sizeof(*ep->queue));
 
-        grown = (rcp_bytes_t *)rcp_realloc(ep->queue, new_cap * sizeof(*grown));
+        grown = alloc_bytes == 0
+            ? NULL
+            : (rcp_bytes_t *)rcp_realloc(ep->queue, alloc_bytes);
         if (!grown) return false; /* still "queued": nothing to execute now */
         ep->queue     = grown;
         ep->queue_cap = new_cap;

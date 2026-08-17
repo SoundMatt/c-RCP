@@ -37,6 +37,15 @@ target_compile_options(test_platform PRIVATE ${RCP_TEST_WARNING_FLAGS})
 add_test(NAME rcp_platform COMMAND test_platform)
 set_tests_properties(rcp_platform PROPERTIES TIMEOUT 30)
 
+# test_alloc_overflow reaches into the internal src/alloc_overflow.h (not
+# an installed public header) to unit-test the CFUSA-CY005 allocation-size
+# overflow guard directly (issue #523) -- same pattern as test_platform.
+add_executable(test_alloc_overflow test_alloc_overflow.c)
+target_include_directories(test_alloc_overflow PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_alloc_overflow PRIVATE rcp::rcp unity)
+target_compile_options(test_alloc_overflow PRIVATE ${RCP_TEST_WARNING_FLAGS})
+add_test(NAME rcp_alloc_overflow COMMAND test_alloc_overflow)
+
 add_executable(test_mock test_mock.c)
 target_link_libraries(test_mock PRIVATE rcp::rcp unity)
 target_compile_options(test_mock PRIVATE ${RCP_TEST_WARNING_FLAGS})

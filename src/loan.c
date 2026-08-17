@@ -2,6 +2,7 @@
 #include "rcp/loan.h"
 #include "rcp/alloc.h"
 
+#include "alloc_overflow.h"
 #include "platform.h"
 
 #include <stdlib.h>
@@ -60,7 +61,10 @@ static bool pool_append(rcp_loan_pool_t *pool, uint8_t *data, size_t cap)
 {
     if (pool->entries_len == pool->entries_cap) {
         size_t new_cap = (pool->entries_cap == 0) ? 4 : pool->entries_cap * 2;
-        pool_entry_t *grown = (pool_entry_t *)rcp_realloc(pool->entries, new_cap * sizeof(*grown));
+        size_t alloc_bytes = rcp_alloc_checked_size(new_cap, sizeof(*pool->entries));
+        pool_entry_t *grown = alloc_bytes == 0
+            ? NULL
+            : (pool_entry_t *)rcp_realloc(pool->entries, alloc_bytes);
         if (!grown) return false;
         pool->entries     = grown;
         pool->entries_cap = new_cap;

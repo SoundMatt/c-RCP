@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "alloc_overflow.h"
 #include "platform.h"
 #include "rcp/alloc.h"
 
@@ -133,7 +134,10 @@ bool relay_message_set_meta(relay_message_t *m, const char *key, const char *val
     memcpy(key_copy, key, key_n);
     memcpy(value_copy, value, value_n);
 
-    grown = (relay_meta_entry_t *)rcp_realloc(m->meta, (m->meta_len + 1) * sizeof(*grown));
+    {
+        size_t alloc_bytes = rcp_alloc_checked_size(m->meta_len + 1u, sizeof(*m->meta));
+        grown = alloc_bytes == 0 ? NULL : (relay_meta_entry_t *)rcp_realloc(m->meta, alloc_bytes);
+    }
     if (!grown) {
         rcp_free(key_copy);
         key_copy = NULL;
