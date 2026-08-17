@@ -34,42 +34,17 @@ the rationale.
 
 ## Releases
 
-<<<<<<< HEAD
-### v0.372.0 -- 2026-08-16 (EP0's own ep_generic_cfg row: ep_used bit forced to 1, never clearable by an incoming write)
+### v0.374.0 -- 2026-08-16 (REQ-ACF-012 mtv citation closed; RCP_EP_PWM_IN_NO_SIGNAL payload-sentinel ambiguity resolved, documented as no-TC18-basis)
 
-Closes issue #466. TC18 Table 31's `ep_used` row states EP0's own bit is
-"fixed to 1 as EP0 needs to be always implemented" -- an EP0-specific
-override on top of the field's otherwise general R/W* status for
-EP1..EPn. `rcp_regmap_ep_generic_cfg_apply_reconfig()` (`src/regmap.c`)
-was applying the incoming `ep_used` bit uniformly to every row with no
-special case for `row_i == 0`, so a write targeting EP0's own
-`EP_GENERIC_config` row (relative address `0x0001`) could clear
-`entries[0].ep_used` to `false`, contradicting the spec.
+Closes issue #184 (c-RCP-AUDIT-05), both of its two genuine, previously honestly-uncited TC18 ambiguities.
 
-**Fixed**: the same "no effect, confirmed normally" treatment this
-function's own `ep_type` row already gets (TC18 §13.7.1.2) is now applied
-to row 0's own `ep_used` bit -- `entries[0].ep_used` is forced to `true`
-regardless of the incoming bit, while row 0's own `ep_delay_time` (bits
-4:5 of the same octet) and every other row's own `ep_used` (EP1..EPn)
-continue to honor the incoming write exactly as before. Reads always
-reflect row 0's own `ep_used` correctly (it can never observably become
-`false` through this write path).
+**Ambiguity 1 (`REQ-ACF-012` / `RCP_ACF_MTV_UNCERTAIN`)**: the citation-backfill pass (PR #172) had already correctly concluded `mtv` has no third wire state, but had only Table 4's fixed `mtv 0b` row (a single ABB-standard-request context, not a field definition) to cite. Direct `pdftotext -layout` re-extraction of the primary-source PDF found the real, general, exhaustive definition at Table 17 (§11.3 Responses, TC18.txt L2246-2247): `mtv` is `0b - message_timestamp not valid` / `1b - message_timestamp valid`, two values, no third. `.fusa-reqs.json`'s `REQ-ACF-012` now carries a real `tc18` citation to Table 17 (plus Table 4); `include/rcp/acf.h`'s doc comment updated to match. No code or behavior change.
 
-New byte-literal tests (`tests/test_tc18_gaps_regmap.c`) prove both
-halves directly: a write targeting row 0's own `ep_used` bit is silently
-ignored (row 0 stays `ep_used=true`, its own `ep_delay_time` still
-updates normally from the same octet), and the general case is
-unaffected -- EP1's own `ep_used` still honors both `0` and `1` writes
-normally through a real 2-row table. One pre-existing single-row test
-(`test_ep_generic_cfg_apply_reconfig_extracts_delay_time_register_value`)
-was widened to a 2-row table targeting row 1 instead of row 0, since it
-was incidentally exercising the general case through what is now row 0's
-own fixed-bit exception. Mutation-tested: reverting only the fix (keeping
-the new tests) makes both new tests fail cleanly (`Expected TRUE Was
-FALSE`); restoring the fix makes them pass again, with the full
-66-suite regression, ASan/UBSan, and `cfusa check`/`trace` all unaffected
-(0 errors, requirement-coverage unchanged at 1088/1088).
-=======
+**Ambiguity 2 (`RCP_EP_PWM_IN_NO_SIGNAL` payload sentinel, `REQ-PWM-047`/`REQ-PWM-054`, ADC counterparts `REQ-ADC-003`/`004`/`009`/`030`)**: read TC18's PWM_IN (§13.7.6) and ADC (§13.7.9) chapter prose directly, not just their already-cited tables. TC18 defines `PWM_IN_NO_SIGNAL` solely as a numbered wire error code -- §12.9.6 **Table 30** (not "Table 27", a stale pre-RC5 number the issue itself used -- the same citation-drift class PR #339/#342 already corrected elsewhere), value 9, carried via the response `err` field, for the one no-signal case TC18 documents (the external PWM source stopping, with `EP_RESP_ON_ERR` enabled). `rcp_ep_pwm_in_max_period_outcome()` (`REQ-PWM-058`, issue #428) already routes exactly that case to the real Table 30 code, not this sentinel. TC18 defines no payload-sentinel convention anywhere and is silent on the cases this codebase's own sentinel actually covers (`EP_RESP_ON_ERR` disabled; no capture yet in PWM_IN continuous mode; ADC's own per-position failure within a combined multi-value response -- TC18's ADC chapter never discusses timeouts at all). `RCP_EP_PWM_IN_NO_SIGNAL` (0xFFFF) as an in-payload value is this codebase's own invention for exactly those TC18-silent cases, not a citation gap to force-fit. All six `.fusa-reqs.json` entries now carry an explicit resolution note recording this finding in place of a fabricated `tc18` citation. No behavior change.
+
+`.fusa-reqs.json`/doc-only change (plus one doc-comment correction in `include/rcp/acf.h`); no behavior touched, no new tests needed. Full 66-test suite passes unchanged; `cfusa check`/`trace` (v0.5.54): 0 errors, 1088/1088 traced and tested (unchanged).
+
+
 ### v0.373.0 -- 2026-08-16 (rcp_mock_server_new() now seeds the EP_ID_config power-on default; issue #464 audit closed with no code gap remaining)
 
 Closes issues #459 and #464.
@@ -121,7 +96,40 @@ traced and tested (unchanged -- REQ-RMAP-054 was already traced/tested via
 already-covered primitive into `rcp_mock_server_new()`, adding no new
 requirement).
 
->>>>>>> ca31e31 (fix: rcp_mock_server_new() seeds EP_ID_config power-on default (closes #459, #464))
+### v0.372.0 -- 2026-08-16 (EP0's own ep_generic_cfg row: ep_used bit forced to 1, never clearable by an incoming write)
+
+Closes issue #466. TC18 Table 31's `ep_used` row states EP0's own bit is
+"fixed to 1 as EP0 needs to be always implemented" -- an EP0-specific
+override on top of the field's otherwise general R/W* status for
+EP1..EPn. `rcp_regmap_ep_generic_cfg_apply_reconfig()` (`src/regmap.c`)
+was applying the incoming `ep_used` bit uniformly to every row with no
+special case for `row_i == 0`, so a write targeting EP0's own
+`EP_GENERIC_config` row (relative address `0x0001`) could clear
+`entries[0].ep_used` to `false`, contradicting the spec.
+
+**Fixed**: the same "no effect, confirmed normally" treatment this
+function's own `ep_type` row already gets (TC18 §13.7.1.2) is now applied
+to row 0's own `ep_used` bit -- `entries[0].ep_used` is forced to `true`
+regardless of the incoming bit, while row 0's own `ep_delay_time` (bits
+4:5 of the same octet) and every other row's own `ep_used` (EP1..EPn)
+continue to honor the incoming write exactly as before. Reads always
+reflect row 0's own `ep_used` correctly (it can never observably become
+`false` through this write path).
+
+New byte-literal tests (`tests/test_tc18_gaps_regmap.c`) prove both
+halves directly: a write targeting row 0's own `ep_used` bit is silently
+ignored (row 0 stays `ep_used=true`, its own `ep_delay_time` still
+updates normally from the same octet), and the general case is
+unaffected -- EP1's own `ep_used` still honors both `0` and `1` writes
+normally through a real 2-row table. One pre-existing single-row test
+(`test_ep_generic_cfg_apply_reconfig_extracts_delay_time_register_value`)
+was widened to a 2-row table targeting row 1 instead of row 0, since it
+was incidentally exercising the general case through what is now row 0's
+own fixed-bit exception. Mutation-tested: reverting only the fix (keeping
+the new tests) makes both new tests fail cleanly (`Expected TRUE Was
+FALSE`); restoring the fix makes them pass again, with the full
+66-suite regression, ASan/UBSan, and `cfusa check`/`trace` all unaffected
+(0 errors, requirement-coverage unchanged at 1088/1088).
 ### v0.371.0 -- 2026-08-16 (discovery request unique_id=0x0000 investigated and closed -- no server-side check needed)
 
 Closes issue #457 (c-RCP-AUDIT-32). TC18 Table 18 lists `unique_id =

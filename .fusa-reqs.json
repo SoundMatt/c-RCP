@@ -2557,11 +2557,12 @@
     {
       "id": "REQ-ACF-012",
       "title": "Timestamp-validity folding rule",
-      "text": "rcp_acf_gbb_is_timed() shall return true only when info.mtv equals RCP_ACF_MTV_VALID; it shall return false for RCP_ACF_MTV_UNTIMED, the only other wire state -- mtv is a single wire bit (TC18 Table 4) with no third 'uncertain' state on the wire. An earlier revision of this header modeled such a state (RCP_ACF_MTV_UNCERTAIN) in a 2-bit field of its own invention that had no real TC18 encoding, and it has since been removed. A caller that needs to represent 'timestamp present but not trustworthy' must fold that into RCP_ACF_MTV_UNTIMED, the same not-confidently-timed treatment rcp_acf_gbb_is_timed() already gives it.",
+      "text": "rcp_acf_gbb_is_timed() shall return true only when info.mtv equals RCP_ACF_MTV_VALID; it shall return false for RCP_ACF_MTV_UNTIMED, the only other wire state -- mtv is a single wire bit with exactly two defined encodings (0b/1b) and no third 'uncertain' state on the wire. An earlier revision of this header modeled such a state (RCP_ACF_MTV_UNCERTAIN) in a 2-bit field of its own invention that had no real TC18 encoding, and it has since been removed. A caller that needs to represent 'timestamp present but not trustworthy' must fold that into RCP_ACF_MTV_UNTIMED, the same not-confidently-timed treatment rcp_acf_gbb_is_timed() already gives it. RESOLVED (issue #184, c-RCP-AUDIT-05): the earlier citation-backfill pass (PR #172) had only Table 4's fixed 'mtv 0b' row (a single ABB-standard-request context, not a field definition) to go on; the general, exhaustive mtv definition is Table 17 (§11.3 Responses), whose own row spells out both encodings in full -- '0b - message_timestamp not valid (for ACF_GBB if PTP not working and for ACF_ABB)' / '1b - message_timestamp valid (for ACF_GBB if PTP working correctly)' -- confirming mtv is genuinely a single bit throughout the specification, not a field this codebase under-modeled.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
       "scope": "tc18",
+      "tc18": "§11.3 Responses, Table 17 (\"mtv 0b - message_timestamp not valid (for ACF_GBB if PTP not working and for ACF_ABB) / 1b - message_timestamp valid (for ACF_GBB if PTP working correctly)\"), TC18.txt L2246-2247 -- the general, exhaustive two-value mtv definition; also §11.2.1 Figure 7/Table 4 (\"mtv 0b\"), TC18.txt L1208-1222, the fixed-context row the earlier citation-backfill pass (PR #172) had already found",
       "status": "implemented"
     },
     {
@@ -5075,7 +5076,7 @@
     {
       "id": "REQ-PWM-047",
       "title": "PWM_IN response encode/decode round-trips RCP_EP_PWM_IN_NO_SIGNAL verbatim",
-      "text": "rcp_ep_pwm_in_decode_response() shall, given a frame produced by rcp_ep_pwm_in_encode_response() with either or both of value's fields equal to RCP_EP_PWM_IN_NO_SIGNAL, recover that sentinel unchanged, treating it as an ordinary uint16_t value with no special decode-time handling.",
+      "text": "rcp_ep_pwm_in_decode_response() shall, given a frame produced by rcp_ep_pwm_in_encode_response() with either or both of value's fields equal to RCP_EP_PWM_IN_NO_SIGNAL, recover that sentinel unchanged, treating it as an ordinary uint16_t value with no special decode-time handling. RESOLVED (issue #184, c-RCP-AUDIT-05), left honestly uncited rather than force-cited: TC18 defines PWM_IN_NO_SIGNAL solely as a numbered wire error code (§12.9.6 Table 30, value 9, carried via the response err field -- not \"Table 27\", a stale pre-RC5 number; see #339/#342's own citation-drift correction) for the one no-signal case it documents in prose (§13.7.6.1: the external PWM source stopping, reported via an error response \"if enabled within EP_config (EP_RESP_ON_ERR)\"; rcp_ep_pwm_in_max_period_outcome()'s STOP_AND_ERROR outcome, REQ-PWM-058, already routes exactly that case to the real Table 30 code, not this sentinel). TC18 defines no payload-sentinel convention anywhere, and is silent on what a Read Response should carry when EP_RESP_ON_ERR is disabled or before any valid capture exists in continuous mode. RCP_EP_PWM_IN_NO_SIGNAL (0xFFFF) as an in-payload value is this codebase's own invention for exactly those TC18-silent cases -- a defensible implementation choice, not a citation gap.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -5151,7 +5152,7 @@
     {
       "id": "REQ-PWM-054",
       "title": "rcp_ep_pwm_in_compound_wait_compare() never matches a RCP_EP_PWM_IN_NO_SIGNAL sub-field",
-      "text": "rcp_ep_pwm_in_compound_wait_compare() shall return false for every defined mode whenever the sub-field that mode compares (captured.period for PERIOD_GE/PERIOD_LE, captured.active_duration for DUTY_GE/DUTY_LE) equals RCP_EP_PWM_IN_NO_SIGNAL, regardless of threshold.",
+      "text": "rcp_ep_pwm_in_compound_wait_compare() shall return false for every defined mode whenever the sub-field that mode compares (captured.period for PERIOD_GE/PERIOD_LE, captured.active_duration for DUTY_GE/DUTY_LE) equals RCP_EP_PWM_IN_NO_SIGNAL, regardless of threshold. RESOLVED (issue #184, c-RCP-AUDIT-05), left honestly uncited rather than force-cited: the RCP_EP_PWM_IN_NO_SIGNAL payload sentinel this rule guards against has no TC18 basis of its own -- see REQ-PWM-047's own resolution note for the full analysis (TC18 defines PWM_IN_NO_SIGNAL only as a numbered §12.9.6 Table 30 error code, never a payload value).",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -5183,7 +5184,7 @@
     {
       "id": "REQ-ADC-003",
       "title": "rcp_ep_adc_average_interval() returns RCP_EP_PWM_IN_NO_SIGNAL with a zero timestamp when sample_count is 0",
-      "text": "rcp_ep_adc_average_interval() shall return value == RCP_EP_PWM_IN_NO_SIGNAL and timestamp == 0 when sample_count == 0.",
+      "text": "rcp_ep_adc_average_interval() shall return value == RCP_EP_PWM_IN_NO_SIGNAL and timestamp == 0 when sample_count == 0. RESOLVED (issue #184, c-RCP-AUDIT-05), left honestly uncited rather than force-cited: TC18's ADC chapter (§13.7.9) never discusses a raw-sample timeout, a \"no signal\" condition, or any payload-sentinel convention at all -- unlike PWM_IN (see REQ-PWM-047's own resolution note), TC18 does not even describe the failure mode this value represents for ADC. Reusing RCP_EP_PWM_IN_NO_SIGNAL here (ep_adc.h's own documented choice, rather than declaring a second, inconsistent sentinel) is entirely this codebase's own invention with no TC18 basis to cite, real or drifted.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -5193,7 +5194,7 @@
     {
       "id": "REQ-ADC-004",
       "title": "rcp_ep_adc_average_interval() excludes RCP_EP_PWM_IN_NO_SIGNAL samples from its mean, and reports NO_SIGNAL only if every sample timed out",
-      "text": "rcp_ep_adc_average_interval() shall exclude every sample whose value equals RCP_EP_PWM_IN_NO_SIGNAL from its arithmetic mean, and shall return value == RCP_EP_PWM_IN_NO_SIGNAL only when every sample in the interval equals RCP_EP_PWM_IN_NO_SIGNAL.",
+      "text": "rcp_ep_adc_average_interval() shall exclude every sample whose value equals RCP_EP_PWM_IN_NO_SIGNAL from its arithmetic mean, and shall return value == RCP_EP_PWM_IN_NO_SIGNAL only when every sample in the interval equals RCP_EP_PWM_IN_NO_SIGNAL. RESOLVED (issue #184, c-RCP-AUDIT-05), left honestly uncited rather than force-cited: same basis as REQ-ADC-003 -- TC18's ADC chapter defines no timeout/no-signal concept and no payload-sentinel convention to cite; this exclude-and-propagate rule is this codebase's own design for a failure mode TC18 does not address, not a TC18 citation gap.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -5247,7 +5248,7 @@
     {
       "id": "REQ-ADC-009",
       "title": "rcp_ep_adc_collect_response_values() carries RCP_EP_PWM_IN_NO_SIGNAL through verbatim",
-      "text": "rcp_ep_adc_collect_response_values() shall copy an avg_values[i].value equal to RCP_EP_PWM_IN_NO_SIGNAL into its own out_values slot unchanged, never substituting or averaging it away.",
+      "text": "rcp_ep_adc_collect_response_values() shall copy an avg_values[i].value equal to RCP_EP_PWM_IN_NO_SIGNAL into its own out_values slot unchanged, never substituting or averaging it away. RESOLVED (issue #184, c-RCP-AUDIT-05), left honestly uncited rather than force-cited: same basis as REQ-ADC-003/004 -- TC18's §13.7.9.1 COMBINE_NR_VAL rule (multiple averaged values packed into one response) has no companion rule anywhere for a per-position failure marker; propagating the sentinel through this packing step verbatim is this codebase's own choice for a case TC18 leaves unaddressed, not a TC18 citation gap.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
@@ -5475,7 +5476,7 @@
     {
       "id": "REQ-ADC-030",
       "title": "ADC response encode/decode round-trips RCP_EP_PWM_IN_NO_SIGNAL verbatim in its own value slot",
-      "text": "rcp_ep_adc_decode_response() shall, given a frame produced by rcp_ep_adc_encode_response() where some values[i] == RCP_EP_PWM_IN_NO_SIGNAL, recover that sentinel unchanged in out_values[i].",
+      "text": "rcp_ep_adc_decode_response() shall, given a frame produced by rcp_ep_adc_encode_response() where some values[i] == RCP_EP_PWM_IN_NO_SIGNAL, recover that sentinel unchanged in out_values[i]. RESOLVED (issue #184, c-RCP-AUDIT-05), left honestly uncited rather than force-cited: same basis as REQ-PWM-047's own resolution note -- TC18 defines no payload-sentinel convention for ADC or PWM_IN, only the numbered §12.9.6 Table 30 error-response code (PWM_IN_NO_SIGNAL, value 9), which this wire-level round-trip does not use or displace.",
       "standard": "iso26262",
       "level": "ASIL-B",
       "asil": "ASIL-B",
