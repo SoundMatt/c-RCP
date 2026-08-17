@@ -1362,6 +1362,46 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e(rcp_mock_server_t *srv,
                                                           const uint8_t *request, size_t request_len,
                                                           rcp_bytes_t *out_response);
 
+/* REQ-TIMED-012/013 (issue #462): identical to rcp_mock_server_dispatch_
+ * e2e() in every other respect, except this call's own request arrived
+ * under a TSCF header (avtp.h's rcp_avtp_tscf_header_t) -- tv/
+ * gptp_reference_now are that header's own decoded field and the
+ * caller's own current gPTP-synchronized clock reading, threaded
+ * straight through to the REQ-TIMED-012 presentation-time gate exactly
+ * the way rcp_mock_server_dispatch_tscf() already threads them for the
+ * plain (non-E2E) path -- see that function's own doc comment for the
+ * complete tv/avtp_timestamp/gptp_reference_now semantics, which apply
+ * here unchanged. avtp_timestamp itself is not a new parameter --
+ * rcp_mock_server_dispatch_e2e() already takes it, for its own,
+ * unrelated e2e.h CRC-coverage use -- this function reuses that exact
+ * same value for the presentation-time gate too, rather than taking a
+ * second, potentially-inconsistent copy.
+ *
+ * Before this fix (issue #462), rcp_mock_server_dispatch_e2e() -- unlike
+ * rcp_mock_server_dispatch_tscf() -- had no way to supply tv/
+ * gptp_reference_now at all: every one of its own callers, including a
+ * caller that had genuinely decoded a TSCF header one layer up, was
+ * silently treated as if the request had arrived under an NTSCF header
+ * (dispatch_plain_inner()'s own doc comment, mock.c). This is a NEW,
+ * additional entry point, not a signature change to
+ * rcp_mock_server_dispatch_e2e() itself -- every one of that function's
+ * own existing call sites is completely unaffected; a caller with a real
+ * TSCF header simply has somewhere new to hand tv=true/
+ * gptp_reference_now instead, the same "new function, not a breaking
+ * change" pattern rcp_mock_server_dispatch_tscf() itself already
+ * established alongside rcp_mock_server_dispatch(). */
+rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_tscf(rcp_mock_server_t *srv,
+                                                               rcp_byte_bus_id_t byte_bus_id,
+                                                               uint8_t avtp_subtype,
+                                                               uint8_t acf_msg_type,
+                                                               bool time_sync_supported,
+                                                               uint64_t stream_id, bool tv,
+                                                               uint32_t avtp_timestamp,
+                                                               uint64_t gptp_reference_now,
+                                                               const uint8_t *request,
+                                                               size_t request_len,
+                                                               rcp_bytes_t *out_response);
+
 /* ── Fragmented-message dispatch (REQ-E2E-038/039, issue #336) ─────────────── */
 
 /* Runs one fragment of a potentially multi-fragment, E2E-protected
@@ -1430,6 +1470,26 @@ rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment(
     uint8_t acf_msg_type, bool time_sync_supported, uint64_t stream_id, uint32_t avtp_timestamp,
     const uint8_t *fragment, size_t fragment_len, rcp_bytes_t *out_response);
 
+/* REQ-TIMED-012/013 (issue #462): identical to rcp_mock_server_dispatch_
+ * e2e_fragment() in every other respect, except this call's own tv/
+ * gptp_reference_now are threaded through to the REQ-TIMED-012
+ * presentation-time gate -- see rcp_mock_server_dispatch_e2e_tscf()'s own
+ * doc comment for the full rationale, which applies identically here.
+ * Both of this function's own fallback delegations (an unresolvable
+ * stream_id, and an ms=0 fragment arriving while nothing is collecting)
+ * reach rcp_mock_server_dispatch_e2e_tscf() rather than
+ * rcp_mock_server_dispatch_e2e(), so tv/gptp_reference_now survive that
+ * delegation too rather than being silently dropped one layer down.
+ *
+ * This is a NEW, additional entry point, not a signature change to
+ * rcp_mock_server_dispatch_e2e_fragment() -- same "new function, not a
+ * breaking change" pattern as rcp_mock_server_dispatch_e2e_tscf() above. */
+rcp_mock_dispatch_result_t rcp_mock_server_dispatch_e2e_fragment_tscf(
+    rcp_mock_server_t *srv, rcp_byte_bus_id_t byte_bus_id, uint8_t avtp_subtype,
+    uint8_t acf_msg_type, bool time_sync_supported, uint64_t stream_id, bool tv,
+    uint32_t avtp_timestamp, uint64_t gptp_reference_now, const uint8_t *fragment,
+    size_t fragment_len, rcp_bytes_t *out_response);
+
 /* rcp_mock_server_dispatch_frame()'s E2E-aware counterpart -- same
  * member-splitting behavior (TC18 §12.9.1.1), but each member is routed
  * through rcp_mock_server_dispatch_e2e() instead of
@@ -1453,6 +1513,28 @@ size_t rcp_mock_server_dispatch_frame_e2e(rcp_mock_server_t *srv, uint8_t avtp_s
                                            size_t frame_len,
                                            rcp_mock_frame_member_result_t *out_results,
                                            size_t out_cap);
+
+/* REQ-TIMED-012/013 (issue #462): identical to rcp_mock_server_dispatch_
+ * frame_e2e() in every other respect, except this call's own tv/
+ * gptp_reference_now are threaded through to the REQ-TIMED-012
+ * presentation-time gate at every member's own admission -- see
+ * rcp_mock_server_dispatch_e2e_tscf()'s own doc comment for the full
+ * rationale, which applies identically here. Each member is routed
+ * through rcp_mock_server_dispatch_e2e_tscf() rather than
+ * rcp_mock_server_dispatch_e2e(), so tv/gptp_reference_now survive the
+ * per-member delegation too rather than being silently dropped one layer
+ * down.
+ *
+ * This is a NEW, additional entry point, not a signature change to
+ * rcp_mock_server_dispatch_frame_e2e() -- same "new function, not a
+ * breaking change" pattern as rcp_mock_server_dispatch_e2e_tscf() above. */
+size_t rcp_mock_server_dispatch_frame_e2e_tscf(rcp_mock_server_t *srv, uint8_t avtp_subtype,
+                                                bool time_sync_supported, uint64_t stream_id,
+                                                bool tv, uint32_t avtp_timestamp,
+                                                uint64_t gptp_reference_now, uint8_t sequence_num,
+                                                const uint8_t *frame, size_t frame_len,
+                                                rcp_mock_frame_member_result_t *out_results,
+                                                size_t out_cap);
 
 /* ── Conditional-request execution (TC18 §11.2.2) ─────────────────────────── */
 

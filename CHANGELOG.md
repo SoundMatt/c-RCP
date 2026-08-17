@@ -34,6 +34,43 @@ the rationale.
 
 ## Releases
 
+### v0.383.0 -- 2026-08-16 (REQ-TIMED-012/013: TSCF presentation-time gate wired into every E2E dispatch entry point, not just the plain path)
+
+Closes issue #462. The TSCF presentation-time gate (`admit_under_tscf_gate()`,
+`server.c`) was reachable from only one of the four dispatch entry
+points that can receive a TSCF-headed AVTPDU: `rcp_mock_server_
+dispatch_tscf()`, which already threads real `tv`/`avtp_timestamp`/
+`gptp_reference_now` values through. The other three --
+`rcp_mock_server_dispatch_e2e()`, `_dispatch_e2e_fragment()`, and
+`_dispatch_frame_e2e()` -- each hardcoded `tv=false, 0u, 0u` at every
+one of their own `dispatch_plain()` call sites, silently discarding a
+genuine TSCF header's own presentation time for any caller running the
+E2E-protected (safe command mode) or multi-member-frame path. Three
+new, additional entry points close this the same "new function, not a
+breaking change" pattern `rcp_mock_server_dispatch_tscf()` itself
+already established: `rcp_mock_server_dispatch_e2e_tscf()`,
+`_dispatch_e2e_fragment_tscf()`, and `_dispatch_frame_e2e_tscf()`
+(`include/rcp/mock.h`, `src/mock.c`) -- each a full, separate copy of
+its non-TSCF sibling's own body, with `tv`/`avtp_timestamp`/
+`gptp_reference_now` threaded through every `dispatch_plain()` call
+site and every internal delegation routed to the `_tscf` sibling
+instead of the plain one, so the values survive plain-command-mode
+delegation, CRC-validated dispatch, fragment-reassembly completion, and
+per-member frame dispatch alike. Every one of the three pre-existing
+entry points' own call sites is completely unaffected -- confirmed by
+three dedicated regression tests, in addition to four new tests proving
+a TSCF-headed request with `tv=true` is genuinely postponed
+(`RCP_MOCK_DISPATCH_PENDING`) through each of the three new entry
+points. Mutation-tested: reverting only `rcp_mock_server_dispatch_e2e_
+tscf()`'s own two `dispatch_plain()` call sites (leaving the new tests
+in place) made all four new postponement tests fail with a clear
+"Expected RCP_MOCK_DISPATCH_PENDING Was RCP_MOCK_DISPATCH_OK" message,
+confirming they exercise the real gap. `.fusa-reqs.json` updated for
+REQ-TIMED-012/013 (closing the narrower follow-on their own text
+explicitly left open) and REQ-E2E-021/033 (documenting that this fix
+leaves their own mechanisms unchanged). 66/66 tests green (native +
+ASan/UBSan); `cfusa check`: 0 errors; `cfusa trace`: 1089/1089 traced
+and tested.
 ### v0.382.0 -- 2026-08-16 (Figure 17 lifecycle-diagram re-transcription: missing RCP_CONFIGURED->HW_CONFIGURED transition added, misattributed idle-gate corrected, Figure-16-should-be-17 citation drift fixed)
 
 Closes issue #455 (sev:high). Re-traced TC18's actual lifecycle

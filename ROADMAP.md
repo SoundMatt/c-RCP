@@ -19106,6 +19106,94 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.383.0 -- 2026-08-16 (REQ-TIMED-012/013: TSCF presentation-time gate
+wired into every E2E dispatch entry point, not just the plain path)
+
+Closes issue #462. The TSCF presentation-time gate
+(`admit_under_tscf_gate()`, `server.c`, REQ-TIMED-012/013) was reachable
+from only one of the four dispatch entry points that can receive a
+TSCF-headed AVTPDU: `rcp_mock_server_dispatch_tscf()`, which already
+threads real `tv`/`avtp_timestamp`/`gptp_reference_now` values through
+to `rcp_server_endpoint_admit()`. The other three -- `rcp_mock_server_
+dispatch_e2e()`, `_dispatch_e2e_fragment()`, and `_dispatch_frame_e2e()`
+-- silently discarded the header's own presentation-time information:
+`_dispatch_e2e()` has no `tv` parameter at all in its signature, and
+every one of its own `dispatch_plain()` call sites hardcodes
+`tv=false, 0u, 0u`; `_dispatch_e2e_fragment()` and `_dispatch_frame_e2e()`
+(which routes every member through `_dispatch_e2e()`) inherit the same
+gap. This is exactly REQ-TIMED-012's own text's prior "NOT covered by
+this batch" note calling out `rcp_mock_server_dispatch_frame()/
+_dispatch_frame_e2e()` and `rcp_mock_server_dispatch_e2e()`'s own
+`avtp_timestamp` non-wiring as "a natural, narrower follow-on" -- this
+release is that follow-on.
+
+**Fix, following this codebase's established "new function, not a
+breaking change" pattern** (the same one `rcp_mock_server_dispatch_
+tscf()` itself used alongside `rcp_mock_server_dispatch()`, and
+`add_endpoint_on_stream()` used alongside `add_endpoint()`): three new,
+additional entry points, each a full, separate copy of its non-TSCF
+sibling's own body rather than a shared refactor (matching this file's
+own established "duplicated here deliberately... to keep this addition
+from touching any already-passing behavior" precedent, already used for
+`_dispatch_e2e_fragment()`'s own CRC-mismatch consequences block):
+
+- `rcp_mock_server_dispatch_e2e_tscf()` -- adds `bool tv` and
+  `uint64_t gptp_reference_now` alongside `_dispatch_e2e()`'s own
+  existing `avtp_timestamp` parameter (reused unchanged for its own,
+  unrelated e2e.h CRC-coverage purpose), threaded through both of this
+  function's own `dispatch_plain()` call sites: the plain-command-mode
+  delegation branch (an endpoint without `req_crc_enable` set) and the
+  CRC-validated dispatch after a successful unwrap.
+- `rcp_mock_server_dispatch_e2e_fragment_tscf()` -- same `tv`/
+  `gptp_reference_now` addition, threaded through its own
+  plain-command-mode delegation and both completed-reassembly
+  `dispatch_plain()` call sites (GBB and ABB), with both of its own
+  "never/no-longer fragmented" fallback delegations now reaching
+  `rcp_mock_server_dispatch_e2e_tscf()` instead of the plain
+  `_dispatch_e2e()` -- otherwise `tv`/`gptp_reference_now` would be
+  silently dropped one layer down, reopening the exact gap this
+  function exists to close.
+- `rcp_mock_server_dispatch_frame_e2e_tscf()` -- same addition, with
+  its own per-member dispatch call now reaching `_dispatch_e2e_tscf()`
+  instead of `_dispatch_e2e()`, so every member of a multi-ACF-message
+  frame is admitted under the real presentation-time gate, not just the
+  frame's first.
+
+Every one of `rcp_mock_server_dispatch_e2e()`/`_dispatch_e2e_fragment()`/
+`_dispatch_frame_e2e()`'s own existing call sites across this codebase's
+own test suite is completely unaffected -- these are new, additional
+entry points, not signature changes.
+
+**Tests**: four new tests (`tests/test_tc18_gaps_e2e.c`) prove a
+TSCF-headed request with `tv=true` is genuinely postponed
+(`RCP_MOCK_DISPATCH_PENDING`, request store holds it rather than running
+it immediately) through each of the three new entry points -- plain
+command mode, CRC-validated safe mode (proving the gate applies past a
+real CRC32 unwrap, not just the delegation branch), the fragment-aware
+entry point's own fallback path, and every member of a multi-member
+frame. Three further regression tests pin that the pre-existing,
+non-`_tscf` entry points still execute the identical request/config pair
+immediately, byte-for-byte unaffected by this release. Mutation-tested:
+reverting only `rcp_mock_server_dispatch_e2e_tscf()`'s own two
+`dispatch_plain()` call sites back to `tv=false, 0u, 0u` (leaving the new
+tests in place) made all four new postponement tests fail with a clear
+`Expected RCP_MOCK_DISPATCH_PENDING Was RCP_MOCK_DISPATCH_OK` message --
+confirming they exercise the real gap, not a tautology; restoring the fix
+returned the suite to green.
+
+`.fusa-reqs.json` updated: REQ-TIMED-012/013 record this fix closing the
+narrower follow-on their own prior text explicitly left open;
+REQ-E2E-021/033 record that this release leaves their own mechanisms
+(the whole-stream fault-block check, and per-member CRC32 independence,
+respectively) genuinely unchanged -- only `tv`/`avtp_timestamp`/
+`gptp_reference_now` threading is new.
+
+Full 66-test suite green on both the native and ASan/UBSan trees
+(`ASAN_OPTIONS=detect_leaks=0` on macOS -- LeakSanitizer is Linux-CI-only;
+every new test frees its own `rcp_bytes_t` allocations with
+`rcp_bytes_free()`, matching this codebase's established pattern); `cfusa
+check`: 0 errors; `cfusa trace`: 1089/1089 requirements traced and
+tested (not decreased).
 ### v0.382.0 -- 2026-08-16 (issue #455: Figure 17 lifecycle-diagram
 re-transcription -- missing transition added, idle-gate misattribution
 corrected, Figure-16-should-be-17 citations fixed)
