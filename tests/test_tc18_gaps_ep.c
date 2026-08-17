@@ -4,6 +4,7 @@
 //cfusa:test REQ-ACF-019
 //cfusa:test REQ-ACF-020
 //cfusa:test REQ-ACF-021
+//cfusa:test REQ-GPIO-012
 //cfusa:test REQ-GPIO-033
 //cfusa:test REQ-GPIO-034
 //cfusa:test REQ-GPIO-035
@@ -15,6 +16,8 @@
 //cfusa:test REQ-SPI-037
 //cfusa:test REQ-I2C-019
 //cfusa:test REQ-I2C-020
+//cfusa:test REQ-PWM-008
+//cfusa:test REQ-PWM-028
 //cfusa:test REQ-PWM-055
 //cfusa:test REQ-PWM-056
 //cfusa:test REQ-PWM-057
@@ -562,12 +565,29 @@ static void gpio_dispatch_handler(const uint8_t *request, size_t request_len,
     if (rcp_acf_decode_abb(request, request_len, &hdr, &payload, &payload_len) != RCP_ACF_OK) return;
 
     if (hdr.op == (uint8_t)RCP_ACF_OP_WRITE) {
-        uint32_t bitmask;
-        uint8_t  evt;
-        uint8_t  tn;
+        uint32_t            bitmask;
+        uint8_t             evt;
+        uint8_t             tn;
+        rcp_ep_gpio_errc_t  wrc = rcp_ep_gpio_decode_write_request(request, request_len, 3u,
+                                                                     &bitmask, &evt, &tn);
 
-        if (rcp_ep_gpio_decode_write_request(request, request_len, 3u, &bitmask, &evt,
-                                              &tn) != RCP_EP_GPIO_OK) {
+        /* issue #469 (REQ-GPIO-012): a request this endpoint's own decoder
+         * rejects with a numbered wire-error-code counterpart -- today,
+         * only RCP_EP_GPIO_ERR_RESERVED_EVT -- gets the required
+         * err-response built via rcp_ep_gpio_wire_error(), the same way
+         * this handler's own file header already documents mock.c's
+         * caller-registered-handler architecture requiring. Every other
+         * decode failure (short frame, bad msg type, wrong bus/op, bad
+         * payload len) maps to RCP_ERROR_NONE here and is still just
+         * dropped -- local framing/routing outcomes this same byte_bus_id
+         * has no Response frame to carry, per rcp_ep_gpio_wire_error()'s
+         * own doc comment. */
+        if (wrc != RCP_EP_GPIO_OK) {
+            rcp_wire_error_t werr = rcp_ep_gpio_wire_error(wrc);
+
+            if (werr != RCP_ERROR_NONE) {
+                *out_response = rcp_acf_build_error_response(3u, hdr.transaction_num, werr);
+            }
             return;
         }
 
@@ -782,6 +802,58 @@ static void test_gpio_dispatch_deferred_write_response_is_retrievable_once_debou
     TEST_ASSERT_FALSE(rcp_mock_server_take_deferred_response(srv, 3u, &resp));
     TEST_ASSERT_NULL(resp.data);
 
+    rcp_mock_server_destroy(srv);
+}
+
+/* issue #469 (REQ-GPIO-012): rcp_ep_gpio_wire_error() itself has been
+ * directly unit-tested since issue #426 (test_gpio_reserved_evt_is_
+ * ignored_and_reports_unsupported_cmd() above and test_ep_gpio.c's own
+ * dedicated tests), but until now had no caller anywhere outside those
+ * direct unit tests -- not even this file's own gpio_dispatch_handler(),
+ * the reference dispatch fixture REQ-GPIO-035/036 already prove reachable
+ * through a real mock.c dispatch() call. This test closes that gap the
+ * same way: a RESERVED_EVT (evt[2:0]=100b) write dispatched through a
+ * real rcp_mock_server_dispatch() call now gets a genuine Error Response
+ * frame, in the same call, carrying RCP_ERROR_UNSUPPORTED_CMD -- built by
+ * gpio_dispatch_handler() itself via rcp_ep_gpio_wire_error(), not
+ * fabricated by this test. */
+static void test_gpio_dispatch_reserved_evt_write_gets_unsupported_cmd_error_response(void)
+{
+    rcp_mock_server_t          *srv = rcp_mock_server_new();
+    gpio_dispatch_state_t       st  = {0};
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    rcp_bytes_t                  req;
+    rcp_bytes_t                  resp = {0};
+
+    TEST_ASSERT_NOT_NULL(srv);
+    gap_to_rcp_configured(srv);
+    rcp_ep_gpio_debounce_state_init(&st.debounce);
+    st.debounce_n = 3u;
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+                      rcp_mock_server_add_endpoint(srv, 3u, 0u, true, gpio_dispatch_handler, &st));
+
+    req = rcp_ep_gpio_encode_write_request(3u, 0xFFu, RCP_EP_GPIO_WRITE_RESERVED4, 0x40u);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch(srv, 3u, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB,
+                                                true, 1u, req.data, req.len, &resp));
+    TEST_ASSERT_NOT_NULL(resp.data); /* a real Error Response, in this same call */
+    TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                      rcp_acf_decode_abb(resp.data, resp.len, &hdr, &payload, &payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&hdr));
+    TEST_ASSERT_EQUAL_UINT8(0x40u, hdr.transaction_num);
+    TEST_ASSERT_EQUAL_size_t(1, payload_len);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_UNSUPPORTED_CMD, payload[0]);
+
+    /* Neither the debounce filter nor the settled bitmask was touched by
+     * this rejected write -- the "ignored" half of Table 33's own rule,
+     * still whole. */
+    TEST_ASSERT_EQUAL_HEX32(0u, st.settled_bitmask);
+
+    rcp_bytes_free(&req);
+    rcp_bytes_free(&resp);
     rcp_mock_server_destroy(srv);
 }
 
@@ -1269,6 +1341,106 @@ static void test_pwm_out_request_semantics_are_verbatim_setpoints(void)
     rcp_bytes_free(&frame);
 }
 
+/* ── PWM_OUT endpoint: real mock.c dispatch path (issue #469, REQ-PWM-008/
+ * REQ-PWM-028) ───────────────────────────────────────────────────────────
+ *
+ * pwm_out_dispatch_state_t/pwm_out_dispatch_handler() mirrors this file's
+ * own gpio_dispatch_handler() shape exactly (see that fixture's own
+ * shared-fixture comment, above the GPIO section, for the full mock.c
+ * architecture rationale this equally applies to): an
+ * rcp_mock_endpoint_handler_fn registered via the existing, unmodified
+ * rcp_mock_server_add_endpoint(), proving rcp_ep_pwm_out_wire_error() --
+ * until now called only by its own direct unit tests (test_ep_pwm.c) and
+ * this file's own test_out_wire_error-adjacent checks, never by any real
+ * dispatch path, not even PWM_OUT's own -- is reachable end-to-end. */
+typedef struct {
+    rcp_ep_pwm_value_t current;
+} pwm_out_dispatch_state_t;
+
+static void pwm_out_dispatch_handler(const uint8_t *request, size_t request_len,
+                                      rcp_bytes_t *out_response, void *user_data)
+{
+    pwm_out_dispatch_state_t   *st = (pwm_out_dispatch_state_t *)user_data;
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+
+    if (rcp_acf_decode_abb(request, request_len, &hdr, &payload, &payload_len) != RCP_ACF_OK) return;
+
+    if (hdr.op == (uint8_t)RCP_ACF_OP_WRITE) {
+        rcp_ep_pwm_value_t     value;
+        uint8_t                 evt;
+        uint8_t                 tn;
+        rcp_ep_pwm_out_errc_t   wrc =
+            rcp_ep_pwm_out_decode_write_request(request, request_len, 6u, &value, &evt, &tn);
+
+        /* issue #469 (REQ-PWM-008/REQ-PWM-028): the same "err-response via
+         * rcp_ep_pwm_out_wire_error()" wiring gpio_dispatch_handler() now
+         * does for its own RCP_EP_GPIO_ERR_RESERVED_EVT -- mirroring
+         * ep_pwm.c's own rcp_ep_pwm_out_wire_error() doc comment, which
+         * states it mirrors rcp_ep_gpio_wire_error() exactly. */
+        if (wrc != RCP_EP_PWM_OUT_OK) {
+            rcp_wire_error_t werr = rcp_ep_pwm_out_wire_error(wrc);
+
+            if (werr != RCP_ERROR_NONE) {
+                *out_response = rcp_acf_build_error_response(6u, hdr.transaction_num, werr);
+            }
+            return;
+        }
+
+        st->current = rcp_ep_pwm_out_apply_write(st->current, value,
+                                                  (rcp_ep_pwm_out_write_semantics_t)evt, 0u,
+                                                  0xFFFFu);
+        return;
+    }
+
+    *out_response = rcp_ep_pwm_out_encode_response(6u, st->current, hdr.transaction_num, false, 0u);
+}
+
+/* A RESERVED_EVT (evt[2:0]=100b) write dispatched through a real
+ * rcp_mock_server_dispatch() call gets a genuine Error Response frame, in
+ * the same call, carrying RCP_ERROR_UNSUPPORTED_CMD -- built by
+ * pwm_out_dispatch_handler() itself via rcp_ep_pwm_out_wire_error(), not
+ * fabricated by this test -- and current is left untouched (the
+ * "ignored" half of Table 33's own two-part rule, unaffected by this
+ * fix). */
+static void test_pwm_out_dispatch_reserved_evt_write_gets_unsupported_cmd_error_response(void)
+{
+    rcp_mock_server_t          *srv = rcp_mock_server_new();
+    pwm_out_dispatch_state_t    st  = {0};
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    rcp_bytes_t                  req;
+    rcp_bytes_t                  resp = {0};
+
+    TEST_ASSERT_NOT_NULL(srv);
+    gap_to_rcp_configured(srv);
+    st.current = (rcp_ep_pwm_value_t){1000u, 400u};
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK, rcp_mock_server_add_endpoint(srv, 6u, 0u, true,
+                                                                 pwm_out_dispatch_handler, &st));
+
+    req = rcp_ep_pwm_out_encode_write_request(6u, (rcp_ep_pwm_value_t){2000u, 900u},
+                                              RCP_EP_PWM_OUT_WRITE_RESERVED4, 0x41u);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch(srv, 6u, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB,
+                                                true, 1u, req.data, req.len, &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+    TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                      rcp_acf_decode_abb(resp.data, resp.len, &hdr, &payload, &payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&hdr));
+    TEST_ASSERT_EQUAL_UINT8(0x41u, hdr.transaction_num);
+    TEST_ASSERT_EQUAL_size_t(1, payload_len);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_UNSUPPORTED_CMD, payload[0]);
+    TEST_ASSERT_EQUAL_UINT16(1000u, st.current.period);         /* untouched */
+    TEST_ASSERT_EQUAL_UINT16(400u, st.current.active_duration); /* untouched */
+
+    rcp_bytes_free(&req);
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
+}
+
 /* REQ-PWM-058 (implemented, FIXED 2026-08-11, issue #256 Group I): TC18
  * §13.7.6.2 Table 48's PWM_IN registers -- pwmi_polarity,
  * pwmi_err_on_max_period, pwmi_continuous_mode, pwmi_max_period,
@@ -1313,6 +1485,205 @@ static void test_pwm_in_functional_cfg_has_full_register_coverage(void)
     TEST_ASSERT_EQUAL_UINT8(cfg.flags, block[RCP_EP_PWM_IN_REG_FLAGS]);
     TEST_ASSERT_EQUAL_HEX16(0xBEEFu, (uint16_t)((block[RCP_EP_PWM_IN_REG_MAX_PERIOD] << 8) |
                                                 block[RCP_EP_PWM_IN_REG_MAX_PERIOD + 1]));
+}
+
+/* ── PWM_IN endpoint: real mock.c dispatch path (issue #468, REQ-PWM-058) ──
+ *
+ * pwm_in_dispatch_state_t/pwm_in_dispatch_handler() mirrors this file's own
+ * gpio_dispatch_handler() shape exactly (see that fixture's own shared-
+ * fixture comment, above the GPIO section, for the full mock.c architecture
+ * rationale this equally applies to): an rcp_mock_endpoint_handler_fn
+ * registered via the existing, unmodified rcp_mock_server_add_endpoint().
+ * measured_period stands in for the real capture hardware this module
+ * never owns (rcp_ep_pwm_in_max_period_outcome()'s own doc comment,
+ * ep_pwm.h) -- this fixture's own caller (each test below) pre-loads it,
+ * the same "caller drives the classifier with a measurement it already
+ * has" split rcp_ep_gpio_debounce_sample()'s own reference pattern already
+ * established for gpio_dispatch_handler()'s st.debounce.
+ *
+ * Until now, rcp_ep_pwm_in_max_period_outcome() had zero callers outside
+ * its own direct unit tests (test_ep_pwm.c) -- unlike its own reference
+ * pattern, rcp_ep_gpio_debounce_sample(), which gpio_dispatch_handler()
+ * already calls on every dispatched write. This fixture closes that gap
+ * the same way, for a dispatched READ (PWM_IN has no write request; see
+ * ep_pwm.h's file header): every one of Table 48's own four outcomes is
+ * consulted and honored end-to-end through a real mock.c dispatch() call. */
+typedef struct {
+    uint16_t           measured_period;
+    uint16_t           max_period;
+    bool                err_on_max_period;
+    bool                resp_on_err_enabled;
+    rcp_ep_pwm_value_t captured;
+} pwm_in_dispatch_state_t;
+
+static void pwm_in_dispatch_handler(const uint8_t *request, size_t request_len,
+                                     rcp_bytes_t *out_response, void *user_data)
+{
+    pwm_in_dispatch_state_t           *st = (pwm_in_dispatch_state_t *)user_data;
+    uint8_t                             tn;
+    rcp_ep_pwm_in_max_period_outcome_t outcome;
+
+    if (rcp_ep_pwm_in_decode_read_request(request, request_len, 8u, &tn) != RCP_EP_PWM_IN_OK) {
+        return;
+    }
+
+    /* REQ-PWM-058: Table 48's own pwmi_err_on_max_period rule, as the one
+     * pure classifier that decides it -- see rcp_ep_pwm_in_max_period_
+     * outcome()'s own doc comment (ep_pwm.h) for the full four-way rule
+     * this switch implements. */
+    outcome = rcp_ep_pwm_in_max_period_outcome(st->measured_period, st->max_period,
+                                                st->err_on_max_period, st->resp_on_err_enabled);
+
+    switch (outcome) {
+    case RCP_EP_PWM_IN_MAX_PERIOD_OK:
+        *out_response = rcp_ep_pwm_in_encode_response(8u, st->captured, tn, false, 0u);
+        break;
+
+    case RCP_EP_PWM_IN_MAX_PERIOD_INVALIDATE:
+    case RCP_EP_PWM_IN_MAX_PERIOD_STOP:
+        /* Measurement invalidated (wait for a new active phase) or
+         * stopped with EP_RESP_ON_ERR disabled: neither case signals an
+         * error, and this synchronous test double has no active-phase
+         * timer of its own to actually wait with -- *out_response is left
+         * zeroed, the same "not yet"/"nothing to report" convention
+         * gpio_dispatch_handler() already established for its own
+         * synchronous-only dispatch model. */
+        break;
+
+    case RCP_EP_PWM_IN_MAX_PERIOD_STOP_AND_ERROR:
+        /* Measurement stopped AND EP_RESP_ON_ERR is enabled: a genuine
+         * err-response, carrying RCP_ERROR_PWM_IN_NO_SIGNAL (errors.h) --
+         * this endpoint type's own numbered wire code for "has no signal
+         * to report", exactly Table 48's own outcome. */
+        *out_response = rcp_acf_build_error_response(8u, tn, RCP_ERROR_PWM_IN_NO_SIGNAL);
+        break;
+    }
+}
+
+/* measured_period <= max_period: RCP_EP_PWM_IN_MAX_PERIOD_OK, and the
+ * dispatched read gets a real, immediate response carrying the captured
+ * value -- in the same call. */
+static void test_pwm_in_dispatch_period_within_bound_reports_captured_value(void)
+{
+    rcp_mock_server_t      *srv = rcp_mock_server_new();
+    pwm_in_dispatch_state_t st  = {0};
+    rcp_bytes_t              req;
+    rcp_bytes_t              resp = {0};
+    rcp_ep_pwm_value_t       out_value;
+    bool                     out_timed;
+    uint64_t                 out_ts;
+    uint8_t                  out_tn;
+
+    TEST_ASSERT_NOT_NULL(srv);
+    gap_to_rcp_configured(srv);
+    st.measured_period     = 100u;
+    st.max_period           = 200u;
+    st.err_on_max_period    = true;
+    st.resp_on_err_enabled  = true;
+    st.captured             = (rcp_ep_pwm_value_t){100u, 40u};
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+                      rcp_mock_server_add_endpoint(srv, 8u, 0u, true, pwm_in_dispatch_handler, &st));
+
+    req = rcp_ep_pwm_in_encode_read_request(8u, 0x50u);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch(srv, 8u, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB,
+                                                true, 1u, req.data, req.len, &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_OK,
+                      rcp_ep_pwm_in_decode_response(resp.data, resp.len, 8u, &out_value, &out_timed,
+                                                    &out_ts, &out_tn));
+    TEST_ASSERT_EQUAL_UINT16(100u, out_value.period);
+    TEST_ASSERT_EQUAL_UINT16(40u, out_value.active_duration);
+    TEST_ASSERT_EQUAL_UINT8(0x50u, out_tn);
+
+    rcp_bytes_free(&req);
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
+}
+
+/* measured_period > max_period, err_on_max_period == false:
+ * RCP_EP_PWM_IN_MAX_PERIOD_INVALIDATE -- no error is ever signaled for
+ * this bit value, so the dispatched read gets no response at all in this
+ * same call (this fixture's own stand-in for "wait for a new active
+ * phase"). */
+static void test_pwm_in_dispatch_period_exceeded_without_err_bit_invalidates_silently(void)
+{
+    rcp_mock_server_t      *srv = rcp_mock_server_new();
+    pwm_in_dispatch_state_t st  = {0};
+    rcp_bytes_t              req;
+    rcp_bytes_t              resp = {0};
+
+    TEST_ASSERT_NOT_NULL(srv);
+    gap_to_rcp_configured(srv);
+    st.measured_period     = 300u;
+    st.max_period           = 200u;
+    st.err_on_max_period    = false;
+    st.resp_on_err_enabled  = true; /* irrelevant when err_on_max_period is false */
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+                      rcp_mock_server_add_endpoint(srv, 8u, 0u, true, pwm_in_dispatch_handler, &st));
+
+    req = rcp_ep_pwm_in_encode_read_request(8u, 0x51u);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch(srv, 8u, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB,
+                                                true, 1u, req.data, req.len, &resp));
+    TEST_ASSERT_NULL(resp.data);
+
+    rcp_bytes_free(&req);
+    rcp_mock_server_destroy(srv);
+}
+
+/* measured_period > max_period, err_on_max_period == true AND
+ * resp_on_err_enabled == true: RCP_EP_PWM_IN_MAX_PERIOD_STOP_AND_ERROR --
+ * the dispatched read gets a genuine Error Response frame, in the same
+ * call, carrying RCP_ERROR_PWM_IN_NO_SIGNAL -- built by
+ * pwm_in_dispatch_handler() itself via rcp_ep_pwm_in_max_period_outcome(),
+ * not fabricated by this test. Closes issue #468: the classifier now has
+ * a real caller outside its own unit tests. */
+static void test_pwm_in_dispatch_period_exceeded_with_err_bit_and_resp_enabled_errors(void)
+{
+    rcp_mock_server_t          *srv = rcp_mock_server_new();
+    pwm_in_dispatch_state_t     st  = {0};
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               *payload;
+    size_t                       payload_len;
+    rcp_bytes_t                  req;
+    rcp_bytes_t                  resp = {0};
+
+    TEST_ASSERT_NOT_NULL(srv);
+    gap_to_rcp_configured(srv);
+    st.measured_period     = 300u;
+    st.max_period           = 200u;
+    st.err_on_max_period    = true;
+    st.resp_on_err_enabled  = true;
+    TEST_ASSERT_EQUAL(RCP_MOCK_OK,
+                      rcp_mock_server_add_endpoint(srv, 8u, 0u, true, pwm_in_dispatch_handler, &st));
+
+    /* The classifier itself, consulted with these exact inputs, agrees
+     * this is the STOP_AND_ERROR case -- pinning the handler's own
+     * dispatch-time result against the same call a direct unit test
+     * would make. */
+    TEST_ASSERT_EQUAL(RCP_EP_PWM_IN_MAX_PERIOD_STOP_AND_ERROR,
+                      rcp_ep_pwm_in_max_period_outcome(st.measured_period, st.max_period,
+                                                       st.err_on_max_period, st.resp_on_err_enabled));
+
+    req = rcp_ep_pwm_in_encode_read_request(8u, 0x52u);
+    TEST_ASSERT_NOT_NULL(req.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_OK,
+                      rcp_mock_server_dispatch(srv, 8u, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB,
+                                                true, 1u, req.data, req.len, &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+    TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                      rcp_acf_decode_abb(resp.data, resp.len, &hdr, &payload, &payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&hdr));
+    TEST_ASSERT_EQUAL_UINT8(0x52u, hdr.transaction_num);
+    TEST_ASSERT_EQUAL_size_t(1, payload_len);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_PWM_IN_NO_SIGNAL, payload[0]);
+
+    rcp_bytes_free(&req);
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
 }
 
 /* ── WakeUp endpoint (TC18 12.4 / 12.5 / 13.7.2) ──────────────────────────── */
@@ -2039,6 +2410,7 @@ int main(void)
     RUN_TEST(test_gpio_dispatch_read_responds_immediately);
     RUN_TEST(test_gpio_dispatch_debounces_writes_before_reporting_settled_value);
     RUN_TEST(test_gpio_dispatch_deferred_write_response_is_retrievable_once_debounce_settles);
+    RUN_TEST(test_gpio_dispatch_reserved_evt_write_gets_unsupported_cmd_error_response);
 
     RUN_TEST(test_spi_six_channels_selected_by_evt);
     RUN_TEST(test_spi_trigger_numbering_and_channel_cfg_full);
@@ -2060,7 +2432,11 @@ int main(void)
     RUN_TEST(test_pwm_out_duty_cap);
     RUN_TEST(test_pwm_out_generation_state);
     RUN_TEST(test_pwm_out_request_semantics_are_verbatim_setpoints);
+    RUN_TEST(test_pwm_out_dispatch_reserved_evt_write_gets_unsupported_cmd_error_response);
     RUN_TEST(test_pwm_in_functional_cfg_has_full_register_coverage);
+    RUN_TEST(test_pwm_in_dispatch_period_within_bound_reports_captured_value);
+    RUN_TEST(test_pwm_in_dispatch_period_exceeded_without_err_bit_invalidates_silently);
+    RUN_TEST(test_pwm_in_dispatch_period_exceeded_with_err_bit_and_resp_enabled_errors);
 
     RUN_TEST(test_wakeup_plain_message_has_no_source_field);
     RUN_TEST(test_wakeup_message_with_source_round_trips_all_source_kinds);
