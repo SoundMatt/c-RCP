@@ -18,6 +18,7 @@
  * this module does NOT provide; their tests pin the deviation. */
 //cfusa:req REQ-TIMED-012
 //cfusa:req REQ-TIMED-013
+//cfusa:req REQ-WIREERR-006
 /*
  * request_timed.h -- Timed conditional requests for the TC18 Remote Control
  * Protocol wire layer (ROADMAP.md Phase 17, "Conditional Requests &
@@ -251,6 +252,31 @@ rcp_timed_admission_t rcp_timed_admit(bool gptp_locked, uint64_t presentation_ti
  * 48-bit domain rcp_timed_too_far() uses -- i.e. this request's execution
  * condition is satisfied and it may now run. */
 bool rcp_timed_due(uint64_t presentation_time, uint64_t now);
+
+/* REQ-WIREERR-006 (issue #163): maps a to its numbered wire error code
+ * (errors.h), for a caller populating a Response frame's err field --
+ * mirrors rcp_e2e_wire_error()'s own established pattern exactly.
+ * RCP_TIMED_REJECT_GPTP_FAIL maps to RCP_ERROR_GPTP_FAIL and
+ * RCP_TIMED_REJECT_PRESENTATION_TIME_TOO_FAR to RCP_ERROR_
+ * PRESENTATION_TIME_TOO_FAR -- the governing spec's own numbered
+ * error-code table's assigned codes for each of rcp_timed_admit()'s two
+ * rejection reasons (see that function's own doc comment). RCP_TIMED_
+ * ACCEPT maps to RCP_ERROR_NONE (nothing to report).
+ *
+ * Only the GPTP_FAIL half of rcp_timed_admit() is currently reachable
+ * from a real dispatch path (rcp_mock_server_dispatch()'s own
+ * time_sync_supported parameter -- TC18's own gPTP-lock concept -- is
+ * already threaded through every dispatch entry point; see mock.c's
+ * dispatch_plain_inner()). PRESENTATION_TIME_TOO_FAR's own trigger
+ * (rcp_timed_too_far(), against a "product specific limit" TC18 itself
+ * leaves implementation-defined) has no configured admission-horizon
+ * value anywhere in this codebase's register map to evaluate against --
+ * wiring it up for real would mean inventing that configuration concept
+ * from scratch, not just relaying an outcome this implementation
+ * already computes, so it is left real future work rather than forced
+ * here. This mapping function itself is still exercised, and correct,
+ * for both outcomes -- only the dispatch-side wiring is partial. */
+rcp_wire_error_t rcp_timed_wire_error(rcp_timed_admission_t a);
 
 #ifdef __cplusplus
 }

@@ -23,14 +23,31 @@
  * seventeen codes: most internal errors (e.g. "malloc failed", "buffer
  * too small") have no wire representation at all -- they never leave the
  * local process, so there is nothing in the spec's table for them to map
- * onto. `rcp_e2e_wire_error()` below is the one concrete mapping this
- * milestone adds, for the one case the audit identified a real, wire-
- * visible mismatch in (c-RCP-04): a CRC32 mismatch. Additional mappings
- * (e.g. sequencer.h's REQUEST_NOT_FOUND-shaped failures, authz.h's
- * UNAUTHORIZED_ACCESS-shaped failures) are real future work, not modeled
- * here -- each would need its own module-by-module audit of which local
- * failure actually corresponds to which numbered code, which is a larger
- * effort than this milestone's scope.
+ * onto. `rcp_e2e_wire_error()` (`e2e.h`) was this project's own first
+ * concrete mapping (a CRC32 mismatch, c-RCP-04); a module-by-module audit
+ * across several later milestones (most recently issue #163) has since
+ * added a dedicated `rcp_<mod>_wire_error()`-style mapping for every code
+ * this codebase can genuinely detect: `rcp_ep_gpio_wire_error()`,
+ * `rcp_ep_pwm_out_wire_error()`, `rcp_ep_pwm_in_wire_error()` (`ep_gpio.h`/
+ * `ep_pwm.h`), `rcp_lifecycle_field_write_error()` (`lifecycle.h`),
+ * `rcp_sequencer_wire_error()` (`request_sequencer.h`), and
+ * `rcp_timed_wire_error()` (`request_timed.h`), plus several codes
+ * (`RCP_ERROR_INVALID_PARAMETER`, `RCP_ERROR_EP_NOT_FOUND`,
+ * `RCP_ERROR_REQUEST_STORAGE_OVERFLOW`, `RCP_ERROR_REQUEST_REJECTED`,
+ * `RCP_ERROR_REQUEST_NOT_FOUND`, `RCP_ERROR_REQUEST_CANCELED`,
+ * `RCP_ERROR_CHAIN_ABORTED`, `RCP_ERROR_CHAIN_ERROR`) reported directly
+ * by `regmap.c`/`server.c`/`mock.c`'s own dispatch logic, with no
+ * intermediate mapping function of their own. Two codes remain
+ * genuinely unresolved, each with its own doc-comment explanation rather
+ * than a forced mapping: `RCP_ERROR_EP_ERROR` (7) -- every endpoint
+ * module's own `ep_status` register is deliberately treated as opaque,
+ * TC18-undefined content throughout this codebase, so no internal
+ * "endpoint execution fault" condition exists to map onto it -- and
+ * `RCP_ERROR_PRESENTATION_TIME_TOO_FAR` (13)'s own dispatch-side
+ * rejection, whose "product specific limit" (TC18 §11.2.2.7) has no
+ * configured admission-horizon value anywhere in this codebase's
+ * register map yet (see `rcp_timed_wire_error()`'s own doc comment,
+ * `request_timed.h`).
  */
 #ifndef RCP_ERRORS_H
 #define RCP_ERRORS_H

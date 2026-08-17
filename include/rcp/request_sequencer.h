@@ -76,6 +76,8 @@
 #ifndef RCP_REQUEST_SEQUENCER_H
 #define RCP_REQUEST_SEQUENCER_H
 
+#include "rcp/errors.h"
+
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -212,6 +214,52 @@ bool rcp_sequencer_set_owner(rcp_sequencer_table_t *table, uint16_t idx, uint8_t
  * to close. */
 bool rcp_sequencer_access_permitted(const rcp_sequencer_table_t *table, uint16_t idx,
                                      uint8_t requester_stream_index);
+
+/* ── REQ-WIREERR-005 (issue #163): SEQUENCER_NOT_KNOWN vs UNAUTHORIZED_ACCESS ─
+ *
+ * rcp_sequencer_access_permitted() above answers one caller-facing
+ * question ("may requester_stream_index touch this sequencer right
+ * now?") by collapsing two DIFFERENT TC18 error-code-table rejection
+ * reasons into a single bool: idx not addressing a real sequencer-state
+ * register at all (Table 30's own SEQUENCER_NOT_KNOWN, code 2 -- "the
+ * referenced sequencer index isn't configured"), versus idx being a
+ * real, configured sequencer this requester simply isn't the owner of
+ * (Table 30's UNAUTHORIZED_ACCESS, code 3). A caller building a real
+ * Error Response frame needs to distinguish these -- an RC Client
+ * cannot tell "you don't own this" from "this doesn't exist" from a
+ * bool alone, exactly the diagnostic-precision concern errors.h's own
+ * file header raises. rcp_sequencer_access_check() is the same
+ * predicate, restated as a three-way outcome; rcp_sequencer_access_
+ * permitted() itself is unchanged (still `== RCP_SEQUENCER_ACCESS_OK`)
+ * for every existing caller. */
+typedef enum {
+    RCP_SEQUENCER_ACCESS_OK      = 0, /* idx valid, owner == requester_stream_index */
+    RCP_SEQUENCER_ACCESS_UNKNOWN = 1, /* !rcp_sequencer_index_valid(table, idx) */
+    RCP_SEQUENCER_ACCESS_DENIED  = 2, /* idx valid, but unclaimed or owned by someone else */
+} rcp_sequencer_access_errc_t;
+
+/* Human-readable message for an rcp_sequencer_access_errc_t value. Never
+ * returns NULL. */
+const char *rcp_sequencer_access_strerror(rcp_sequencer_access_errc_t e);
+
+/* The same access decision rcp_sequencer_access_permitted() makes,
+ * restated as a three-way rcp_sequencer_access_errc_t rather than a
+ * bool -- see this section's own file-header note for why. Priority
+ * mirrors rcp_sequencer_access_permitted()'s own short-circuit order:
+ * an unknown idx is reported as RCP_SEQUENCER_ACCESS_UNKNOWN before
+ * ownership is even consulted (there is no owner to consult), never as
+ * RCP_SEQUENCER_ACCESS_DENIED. */
+rcp_sequencer_access_errc_t rcp_sequencer_access_check(const rcp_sequencer_table_t *table,
+                                                        uint16_t idx,
+                                                        uint8_t requester_stream_index);
+
+/* Maps e to its numbered wire error code (errors.h), for a caller
+ * populating a Response frame's err field: RCP_ERROR_SEQUENCER_NOT_KNOWN
+ * for RCP_SEQUENCER_ACCESS_UNKNOWN, RCP_ERROR_UNAUTHORIZED_ACCESS for
+ * RCP_SEQUENCER_ACCESS_DENIED, RCP_ERROR_NONE for RCP_SEQUENCER_ACCESS_OK
+ * (access was permitted -- nothing to report). Mirrors rcp_e2e_wire_
+ * error()'s own established pattern exactly. */
+rcp_wire_error_t rcp_sequencer_wire_error(rcp_sequencer_access_errc_t e);
 
 #ifdef __cplusplus
 }

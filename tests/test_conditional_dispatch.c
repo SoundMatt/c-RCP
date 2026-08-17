@@ -31,6 +31,8 @@
 //cfusa:test REQ-TIMED-013
 //cfusa:test REQ-SRV-015
 //cfusa:test REQ-SRV-016
+//cfusa:test REQ-WIREERR-005
+//cfusa:test REQ-WIREERR-006
 /*
  * test_conditional_dispatch.c -- end-to-end tests for conditional-request
  * dispatch (TC18 §11.2.2/§11.2.3) through the real server path.
@@ -502,6 +504,46 @@ static void test_compound_admission_denied_for_sequencer_owned_by_a_different_cl
     TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 1)); /* never admitted */
 
     rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-WIREERR-005 (issue #163): a sequencer_index that isn't even a real
+ * entry in this server's table (fixture()'s own table has 4: 0-3) is a
+ * DIFFERENT TC18 Table 30 rejection reason than "owned by someone else"
+ * -- SEQUENCER_NOT_KNOWN (2), not UNAUTHORIZED_ACCESS (3) -- and, unlike
+ * the two REJECTED-only tests just above, this test checks the real
+ * wire bytes of the Error Response, not just the dispatch-result enum,
+ * the same "prove the numbered code, not just the rejection" standard
+ * test_compound_wait_reserved_evt_sends_err_response() already
+ * established for RCP_ERROR_UNSUPPORTED_CMD. */
+//cfusa:test REQ-WIREERR-005
+static void test_compound_admission_rejected_for_unknown_sequencer_index_reports_sequencer_not_known(void)
+{
+    handler_log_t                log;
+    rcp_mock_server_t           *srv = fixture(&log); /* 4-register table: indices 0-3 valid */
+    rcp_bytes_t                  frame = make_compound(RCP_REQUEST_TYPE_COMPOUND, 9,
+                                                        RCP_SEQUENCER_POWER_ON_STATE, 1, 0, 0, 41);
+    rcp_bytes_t                  resp = {0};
+    rcp_acf_byte_message_info_t  hdr;
+    const uint8_t                *payload;
+    size_t                        payload_len;
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+                      rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF,
+                                                RCP_ACF_MSG_TYPE_GBB, true, 1u, frame.data, frame.len,
+                                                &resp));
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 1)); /* never admitted */
+    TEST_ASSERT_NOT_NULL(resp.data);
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(resp.data, resp.len, &hdr, &payload,
+                                                      &payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&hdr));
+    TEST_ASSERT_EQUAL_UINT8(41u, hdr.transaction_num);
+    TEST_ASSERT_EQUAL_size_t(1, payload_len);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_SEQUENCER_NOT_KNOWN, payload[0]);
+
+    rcp_bytes_free(&frame);
+    rcp_bytes_free(&resp);
     rcp_mock_server_destroy(srv);
 }
 
@@ -1144,6 +1186,76 @@ static void test_timed_never_due_without_gptp_lock(void)
     TEST_ASSERT_EQUAL_size_t(1, log.count);
 
     rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* REQ-WIREERR-006 (issue #163): "In case the time synchronization hasn't
+ * been established, timed requests... shall be rejected and an error
+ * response shall be sent (error code = GPTP_FAIL)." -- a DIFFERENT
+ * scenario from test_timed_never_due_without_gptp_lock() just above:
+ * that test's own ctx.gptp_locked=false is the TICK-time scheduling
+ * signal (rcp_server_tick_ctx_t, consulted only once a Timed request is
+ * already stored and its own start condition is being evaluated), so
+ * the request is admitted successfully first and then simply never
+ * becomes due. This test's own time_sync_supported=false is the
+ * ADMISSION-time signal (rcp_mock_server_dispatch()'s own parameter,
+ * TC18's real "has gPTP been established" concept -- already threaded
+ * through every dispatch entry point for REQ-AVTP-021's own TSCF rule
+ * 1) -- the spec's own "shall be rejected" case this fix closes: the
+ * request is answered with a real Error Response immediately, at
+ * admission, and never reaches the request store at all. */
+//cfusa:test REQ-WIREERR-006
+static void test_timed_request_rejected_at_admission_when_time_sync_not_supported(void)
+{
+    handler_log_t                log;
+    rcp_mock_server_t           *srv = fixture(&log);
+    rcp_bytes_t                  frame = rcp_timed_encode_request(1, 100, 55, NULL, 0);
+    rcp_bytes_t                  resp = {0};
+    rcp_acf_byte_message_info_t  hdr;
+    const uint8_t                *payload;
+    size_t                        payload_len;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_REJECTED,
+                      rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF,
+                                                RCP_ACF_MSG_TYPE_GBB, /* time_sync_supported */ false,
+                                                1u, frame.data, frame.len, &resp));
+    TEST_ASSERT_EQUAL_size_t(0, rcp_mock_server_pending_count(srv, 1)); /* never queued */
+    TEST_ASSERT_NOT_NULL(resp.data);
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(resp.data, resp.len, &hdr, &payload,
+                                                      &payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ERROR, rcp_acf_classify_response(&hdr));
+    TEST_ASSERT_EQUAL_UINT8(55u, hdr.transaction_num);
+    TEST_ASSERT_EQUAL_size_t(1, payload_len);
+    TEST_ASSERT_EQUAL_UINT8((uint8_t)RCP_ERROR_GPTP_FAIL, payload[0]);
+
+    rcp_bytes_free(&frame);
+    rcp_bytes_free(&resp);
+    rcp_mock_server_destroy(srv);
+}
+
+/* A non-Timed conditional request (Compound) is unaffected by
+ * time_sync_supported=false -- REQ-WIREERR-006's own new gate is scoped
+ * to request_type == RCP_REQUEST_TYPE_TIMED only, mirroring the
+ * sequencer-ownership gate's own kind-scoping just above. */
+//cfusa:test REQ-WIREERR-006
+static void test_compound_admission_unaffected_by_time_sync_not_supported(void)
+{
+    handler_log_t      log;
+    rcp_mock_server_t *srv = fixture(&log);
+    rcp_bytes_t         frame = make_compound(RCP_REQUEST_TYPE_COMPOUND, 0,
+                                              RCP_SEQUENCER_POWER_ON_STATE, 1, 0, 0, 56);
+    rcp_bytes_t         resp = {0};
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+                      rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF,
+                                                RCP_ACF_MSG_TYPE_GBB, /* time_sync_supported */ false,
+                                                1u, frame.data, frame.len, &resp));
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 1));
+
+    rcp_bytes_free(&frame);
+    rcp_bytes_free(&resp);
     rcp_mock_server_destroy(srv);
 }
 
@@ -2321,6 +2433,7 @@ int main(void)
 
     RUN_TEST(test_compound_admission_denied_for_unclaimed_sequencer);
     RUN_TEST(test_compound_admission_denied_for_sequencer_owned_by_a_different_client);
+    RUN_TEST(test_compound_admission_rejected_for_unknown_sequencer_index_reports_sequencer_not_known);
     RUN_TEST(test_compound_wait_admission_denied_for_unclaimed_sequencer);
     RUN_TEST(test_compound_admission_permitted_when_no_sequencer_table_configured);
 
@@ -2333,6 +2446,8 @@ int main(void)
 
     RUN_TEST(test_timed_waits_for_its_presentation_time);
     RUN_TEST(test_timed_never_due_without_gptp_lock);
+    RUN_TEST(test_timed_request_rejected_at_admission_when_time_sync_not_supported);
+    RUN_TEST(test_compound_admission_unaffected_by_time_sync_not_supported);
 
     RUN_TEST(test_safety_tagged_request_waits_for_safe_state);
 

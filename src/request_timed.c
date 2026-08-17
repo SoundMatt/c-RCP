@@ -201,3 +201,20 @@ rcp_timed_admission_t rcp_timed_admit(bool gptp_locked, uint64_t presentation_ti
     }
     return RCP_TIMED_ACCEPT;
 }
+
+//cfusa:req REQ-WIREERR-006
+rcp_wire_error_t rcp_timed_wire_error(rcp_timed_admission_t a)
+{
+    switch (a) {
+    /* "In case the time synchronization hasn't been established, timed
+     * requests... shall be rejected and an error response shall be sent
+     * (error code = GPTP_FAIL)." */
+    case RCP_TIMED_REJECT_GPTP_FAIL: return RCP_ERROR_GPTP_FAIL;
+    /* "The RC Server may reject the request, when the presentation_time
+     * is too far in the future... (error code = PRESENTATION_TIME_TOO_
+     * FAR)." */
+    case RCP_TIMED_REJECT_PRESENTATION_TIME_TOO_FAR: return RCP_ERROR_PRESENTATION_TIME_TOO_FAR;
+    /* RCP_TIMED_ACCEPT: nothing to report. */
+    default: return RCP_ERROR_NONE;
+    }
+}

@@ -316,6 +316,76 @@ static void test_access_permitted_invalid_index_is_false(void)
     rcp_sequencer_table_free(&table);
 }
 
+/* ── REQ-WIREERR-005 (issue #163): rcp_sequencer_access_check()/
+ *    rcp_sequencer_wire_error() ────────────────────────────────────────── */
+
+static void test_access_check_unknown_index_is_unknown_not_denied(void)
+{
+    rcp_sequencer_table_t table = rcp_sequencer_table_new(2);
+
+    TEST_ASSERT_EQUAL(RCP_SEQUENCER_ACCESS_UNKNOWN,
+                       rcp_sequencer_access_check(&table, 2, 1u));
+    TEST_ASSERT_EQUAL(RCP_ERROR_SEQUENCER_NOT_KNOWN,
+                       rcp_sequencer_wire_error(rcp_sequencer_access_check(&table, 2, 1u)));
+
+    rcp_sequencer_table_free(&table);
+}
+
+static void test_access_check_unclaimed_is_denied_not_unknown(void)
+{
+    rcp_sequencer_table_t table = rcp_sequencer_table_new(2);
+
+    TEST_ASSERT_EQUAL(RCP_SEQUENCER_ACCESS_DENIED, rcp_sequencer_access_check(&table, 0, 1u));
+    TEST_ASSERT_EQUAL(RCP_ERROR_UNAUTHORIZED_ACCESS,
+                       rcp_sequencer_wire_error(rcp_sequencer_access_check(&table, 0, 1u)));
+
+    rcp_sequencer_table_free(&table);
+}
+
+static void test_access_check_wrong_owner_is_denied(void)
+{
+    rcp_sequencer_table_t table = rcp_sequencer_table_new(2);
+
+    TEST_ASSERT_TRUE(rcp_sequencer_set_owner(&table, 0, 7u));
+    TEST_ASSERT_EQUAL(RCP_SEQUENCER_ACCESS_DENIED, rcp_sequencer_access_check(&table, 0, 8u));
+    TEST_ASSERT_EQUAL(RCP_ERROR_UNAUTHORIZED_ACCESS,
+                       rcp_sequencer_wire_error(rcp_sequencer_access_check(&table, 0, 8u)));
+
+    rcp_sequencer_table_free(&table);
+}
+
+static void test_access_check_ok_maps_to_no_wire_error(void)
+{
+    rcp_sequencer_table_t table = rcp_sequencer_table_new(2);
+
+    TEST_ASSERT_TRUE(rcp_sequencer_set_owner(&table, 0, 7u));
+    TEST_ASSERT_EQUAL(RCP_SEQUENCER_ACCESS_OK, rcp_sequencer_access_check(&table, 0, 7u));
+    TEST_ASSERT_EQUAL(RCP_ERROR_NONE,
+                       rcp_sequencer_wire_error(rcp_sequencer_access_check(&table, 0, 7u)));
+
+    rcp_sequencer_table_free(&table);
+}
+
+/* rcp_sequencer_access_permitted() itself is unchanged: still exactly
+ * `== RCP_SEQUENCER_ACCESS_OK`, for both new outcomes. */
+static void test_access_permitted_still_false_for_both_unknown_and_denied(void)
+{
+    rcp_sequencer_table_t table = rcp_sequencer_table_new(2);
+
+    TEST_ASSERT_FALSE(rcp_sequencer_access_permitted(&table, 2, 1u)); /* unknown */
+    TEST_ASSERT_FALSE(rcp_sequencer_access_permitted(&table, 0, 1u)); /* denied (unclaimed) */
+
+    rcp_sequencer_table_free(&table);
+}
+
+static void test_access_strerror_never_returns_null(void)
+{
+    TEST_ASSERT_NOT_NULL(rcp_sequencer_access_strerror(RCP_SEQUENCER_ACCESS_OK));
+    TEST_ASSERT_NOT_NULL(rcp_sequencer_access_strerror(RCP_SEQUENCER_ACCESS_UNKNOWN));
+    TEST_ASSERT_NOT_NULL(rcp_sequencer_access_strerror(RCP_SEQUENCER_ACCESS_DENIED));
+    TEST_ASSERT_NOT_NULL(rcp_sequencer_access_strerror((rcp_sequencer_access_errc_t)99));
+}
+
 /* Table 28's own literal scope ("all sequencer state values are set to
  * 1") names Seq_state only -- ownership (Request_stream_index)
  * deliberately survives a state-only reset, matching every other
@@ -364,6 +434,14 @@ int main(void)
     RUN_TEST(test_access_permitted_false_when_unclaimed_regardless_of_requester);
     RUN_TEST(test_access_permitted_true_only_for_the_recorded_owner);
     RUN_TEST(test_access_permitted_invalid_index_is_false);
+
+    RUN_TEST(test_access_check_unknown_index_is_unknown_not_denied);
+    RUN_TEST(test_access_check_unclaimed_is_denied_not_unknown);
+    RUN_TEST(test_access_check_wrong_owner_is_denied);
+    RUN_TEST(test_access_check_ok_maps_to_no_wire_error);
+    RUN_TEST(test_access_permitted_still_false_for_both_unknown_and_denied);
+    RUN_TEST(test_access_strerror_never_returns_null);
+
     RUN_TEST(test_table_reset_does_not_clear_owner);
 
     return UNITY_END();

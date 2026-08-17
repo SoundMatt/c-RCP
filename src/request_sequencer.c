@@ -110,7 +110,47 @@ bool rcp_sequencer_set_owner(rcp_sequencer_table_t *table, uint16_t idx, uint8_t
 bool rcp_sequencer_access_permitted(const rcp_sequencer_table_t *table, uint16_t idx,
                                      uint8_t requester_stream_index)
 {
-    if (!rcp_sequencer_index_valid(table, idx)) return false;
-    if (table->owner[idx] == RCP_SEQUENCER_OWNER_UNCLAIMED) return false; /* fail-closed */
-    return table->owner[idx] == requester_stream_index;
+    return rcp_sequencer_access_check(table, idx, requester_stream_index) ==
+           RCP_SEQUENCER_ACCESS_OK;
+}
+
+//cfusa:req REQ-WIREERR-005
+const char *rcp_sequencer_access_strerror(rcp_sequencer_access_errc_t e)
+{
+    switch (e) {
+    case RCP_SEQUENCER_ACCESS_OK:      return "rcp/sequencer: access permitted";
+    case RCP_SEQUENCER_ACCESS_UNKNOWN: return "rcp/sequencer: sequencer index not known";
+    case RCP_SEQUENCER_ACCESS_DENIED:  return "rcp/sequencer: access denied (not the owner)";
+    default:                           return "rcp/sequencer: unknown access outcome";
+    }
+}
+
+//cfusa:req REQ-SEQ-013
+//cfusa:req REQ-WIREERR-005
+rcp_sequencer_access_errc_t rcp_sequencer_access_check(const rcp_sequencer_table_t *table,
+                                                        uint16_t idx,
+                                                        uint8_t requester_stream_index)
+{
+    if (!rcp_sequencer_index_valid(table, idx)) return RCP_SEQUENCER_ACCESS_UNKNOWN;
+    /* fail-closed: an unclaimed sequencer is never open-access, see this
+     * function's own doc comment (request_sequencer.h). */
+    if (table->owner[idx] == RCP_SEQUENCER_OWNER_UNCLAIMED) return RCP_SEQUENCER_ACCESS_DENIED;
+    return (table->owner[idx] == requester_stream_index) ? RCP_SEQUENCER_ACCESS_OK
+                                                           : RCP_SEQUENCER_ACCESS_DENIED;
+}
+
+//cfusa:req REQ-WIREERR-005
+rcp_wire_error_t rcp_sequencer_wire_error(rcp_sequencer_access_errc_t e)
+{
+    switch (e) {
+    /* TC18 §12.7.10 Table 30: the referenced sequencer index isn't
+     * configured at all. */
+    case RCP_SEQUENCER_ACCESS_UNKNOWN: return RCP_ERROR_SEQUENCER_NOT_KNOWN;
+    /* A real, configured sequencer this requester_stream_index isn't
+     * the owner of (or that is currently unclaimed) -- the caller isn't
+     * permitted to perform this request. */
+    case RCP_SEQUENCER_ACCESS_DENIED:  return RCP_ERROR_UNAUTHORIZED_ACCESS;
+    /* RCP_SEQUENCER_ACCESS_OK: access was permitted, nothing to report. */
+    default:                           return RCP_ERROR_NONE;
+    }
 }

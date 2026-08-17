@@ -1371,6 +1371,46 @@ static void test_in_max_period_outcome_bit_set_stops_and_conditionally_errors(vo
                       rcp_ep_pwm_in_max_period_outcome(201u, 200u, true, false));
 }
 
+/* REQ-WIREERR-007 (issue #163): STOP_AND_ERROR is the only outcome
+ * Table 48's own row ties to "signal error" -- the numbered wire code is
+ * PWM_IN's own RCP_ERROR_PWM_IN_NO_SIGNAL (9), the only Table 30 entry
+ * naming this endpoint type specifically. */
+static void test_in_wire_error_maps_stop_and_error_to_pwm_in_no_signal(void)
+{
+    const int wire_code = (int)rcp_ep_pwm_in_wire_error(RCP_EP_PWM_IN_MAX_PERIOD_STOP_AND_ERROR);
+
+    TEST_ASSERT_EQUAL_INT(9, wire_code);
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_PWM_IN_NO_SIGNAL, wire_code);
+}
+
+/* OK/INVALIDATE/STOP each explicitly signal no error of their own -- see
+ * rcp_ep_pwm_in_max_period_outcome()'s own doc comment. */
+static void test_in_wire_error_is_none_for_the_non_error_outcomes(void)
+{
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_NONE,
+                          (int)rcp_ep_pwm_in_wire_error(RCP_EP_PWM_IN_MAX_PERIOD_OK));
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_NONE,
+                          (int)rcp_ep_pwm_in_wire_error(RCP_EP_PWM_IN_MAX_PERIOD_INVALIDATE));
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_NONE,
+                          (int)rcp_ep_pwm_in_wire_error(RCP_EP_PWM_IN_MAX_PERIOD_STOP));
+}
+
+/* End-to-end: whatever rcp_ep_pwm_in_max_period_outcome() itself decides,
+ * for a range of inputs, rcp_ep_pwm_in_wire_error() of that decision is
+ * always the correct numbered code. */
+static void test_in_wire_error_matches_max_period_outcome_across_inputs(void)
+{
+    TEST_ASSERT_EQUAL_INT(
+        (int)RCP_ERROR_PWM_IN_NO_SIGNAL,
+        (int)rcp_ep_pwm_in_wire_error(rcp_ep_pwm_in_max_period_outcome(201u, 200u, true, true)));
+    TEST_ASSERT_EQUAL_INT(
+        (int)RCP_ERROR_NONE,
+        (int)rcp_ep_pwm_in_wire_error(rcp_ep_pwm_in_max_period_outcome(201u, 200u, true, false)));
+    TEST_ASSERT_EQUAL_INT(
+        (int)RCP_ERROR_NONE,
+        (int)rcp_ep_pwm_in_wire_error(rcp_ep_pwm_in_max_period_outcome(100u, 200u, true, true)));
+}
+
 /* ── Compound-wait's numeric ≥/≤ comparison modes against PWM_IN ────────────── */
 
 static void test_compound_wait_mode_valid_accepts_exactly_4_to_7(void)
@@ -1544,6 +1584,9 @@ int main(void)
     RUN_TEST(test_in_max_period_outcome_not_exceeded_is_ok);
     RUN_TEST(test_in_max_period_outcome_bit_clear_invalidates_never_errors);
     RUN_TEST(test_in_max_period_outcome_bit_set_stops_and_conditionally_errors);
+    RUN_TEST(test_in_wire_error_maps_stop_and_error_to_pwm_in_no_signal);
+    RUN_TEST(test_in_wire_error_is_none_for_the_non_error_outcomes);
+    RUN_TEST(test_in_wire_error_matches_max_period_outcome_across_inputs);
 
     RUN_TEST(test_compound_wait_mode_valid_accepts_exactly_4_to_7);
     RUN_TEST(test_compound_wait_period_ge);

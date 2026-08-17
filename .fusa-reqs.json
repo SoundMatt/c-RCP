@@ -8591,6 +8591,39 @@
       "status": "implemented"
     },
     {
+      "id": "REQ-WIREERR-005",
+      "title": "rcp_sequencer_wire_error() distinguishes SEQUENCER_NOT_KNOWN (unknown index) from UNAUTHORIZED_ACCESS (real sequencer, wrong owner)",
+      "text": "rcp_sequencer_access_check() shall return RCP_SEQUENCER_ACCESS_UNKNOWN when !rcp_sequencer_index_valid(table, idx) (idx does not address a real sequencer-state register in table), RCP_SEQUENCER_ACCESS_DENIED when idx is valid but table->owner[idx] is RCP_SEQUENCER_OWNER_UNCLAIMED or differs from requester_stream_index, and RCP_SEQUENCER_ACCESS_OK otherwise; rcp_sequencer_wire_error() shall map RCP_SEQUENCER_ACCESS_UNKNOWN to RCP_ERROR_SEQUENCER_NOT_KNOWN (the governing spec's own numbered error-code table's assigned code for a sequencer index that isn't configured), RCP_SEQUENCER_ACCESS_DENIED to RCP_ERROR_UNAUTHORIZED_ACCESS, and RCP_SEQUENCER_ACCESS_OK to RCP_ERROR_NONE. mock.c's own dispatch_plain_inner() shall use these, not the collapsed rcp_sequencer_access_permitted() bool, when building the Error Response for a Compound/Compound Wait step naming a sequencer_index its own requester is not permitted to touch, so an unknown sequencer_index and a real-but-not-owned one are reported with different numbered codes.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§12.7.10 Table 28 (own-access-control rule, \"Request_stream_index... allowed to access this sequencer\"), TC18.txt L3460-3493; §12.9.6 Table 30 (SEQUENCER_NOT_KNOWN=2, UNAUTHORIZED_ACCESS=3), TC18.txt L3812-3844"
+    },
+    {
+      "id": "REQ-WIREERR-006",
+      "title": "rcp_timed_wire_error() maps a Timed request's admission rejection to GPTP_FAIL / PRESENTATION_TIME_TOO_FAR",
+      "text": "rcp_timed_wire_error() shall return RCP_ERROR_GPTP_FAIL for RCP_TIMED_REJECT_GPTP_FAIL, RCP_ERROR_PRESENTATION_TIME_TOO_FAR for RCP_TIMED_REJECT_PRESENTATION_TIME_TOO_FAR, and RCP_ERROR_NONE for RCP_TIMED_ACCEPT -- the governing spec's own numbered codes for rcp_timed_admit()'s two rejection reasons. mock.c's own dispatch_plain_inner() shall reject a Timed request (request_type == RCP_REQUEST_TYPE_TIMED) at admission time with RCP_ERROR_GPTP_FAIL, via rcp_timed_wire_error(RCP_TIMED_REJECT_GPTP_FAIL), whenever time_sync_supported is false -- the spec's own mandatory (\"shall be rejected\") rule; this is the ONE rejection reason genuinely detectable from a real dispatch entry point today. RCP_ERROR_PRESENTATION_TIME_TOO_FAR's own trigger (rcp_timed_too_far() against an implementation-defined admission horizon the spec itself leaves undefined, \"may reject\") has no configured horizon value anywhere in this codebase's register map to evaluate against, so only rcp_timed_wire_error() itself -- not a real dispatch-side rejection -- is implemented for that half; see rcp_timed_wire_error()'s own doc comment (request_timed.h) for the full status split.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "partial",
+      "tc18": "§11.2.2.7 Timed requests, TC18.txt L1865-1882 (section), L1948-1956 (GPTP_FAIL \"shall be rejected\" / PRESENTATION_TIME_TOO_FAR \"may reject\" rules); §12.9.6 Table 30 (PRESENTATION_TIME_TOO_FAR=13, GPTP_FAIL=14), TC18.txt L3812-3844"
+    },
+    {
+      "id": "REQ-WIREERR-007",
+      "title": "rcp_ep_pwm_in_wire_error() maps a MAX_PERIOD timeout's STOP_AND_ERROR outcome to PWM_IN_NO_SIGNAL",
+      "text": "rcp_ep_pwm_in_wire_error() shall return RCP_ERROR_PWM_IN_NO_SIGNAL for RCP_EP_PWM_IN_MAX_PERIOD_STOP_AND_ERROR (Table 48's own pwmi_err_on_max_period=1b, EP_RESP_ON_ERR-enabled \"stop measurement and signal error\" outcome) and RCP_ERROR_NONE for RCP_EP_PWM_IN_MAX_PERIOD_OK/_INVALIDATE/_STOP, each of which explicitly signals no error of its own. tests/test_tc18_gaps_ep.c's own pwm_in_dispatch_handler() (issue #468's real rcp_mock_server_dispatch() proof that rcp_ep_pwm_in_max_period_outcome() has a real caller) shall build its Error Response via this function rather than hardcoding RCP_ERROR_PWM_IN_NO_SIGNAL directly, matching the rcp_ep_pwm_out_wire_error()/rcp_ep_gpio_wire_error() naming and usage convention every sibling endpoint type's own dispatch handler already follows.",
+      "standard": "iso26262",
+      "level": "ASIL-B",
+      "asil": "ASIL-B",
+      "scope": "tc18",
+      "status": "implemented",
+      "tc18": "§13.7.6.2 Table 48 (pwmi_err_on_max_period, pwmi_max_period rows), TC18.txt L5107-5149; §12.9.6 Table 30 (PWM_IN_NO_SIGNAL=9), TC18.txt L3812-3844"
+    },
+    {
       "id": "REQ-UDP-015",
       "title": "rcp_udp_annexj_wrap() prepends a 4-octet big-endian sequence number",
       "text": "rcp_udp_annexj_wrap() shall heap-allocate a buffer holding a 4-octet big-endian encapsulation sequence number followed by the given AVTPDU bytes, and return a zeroed rcp_bytes_t (data=NULL) on allocation failure.",
