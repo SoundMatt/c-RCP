@@ -19106,6 +19106,46 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.406.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for
+PWM/ADC `.fusa-reqs.json` entries)
+
+With the master TC18 requirement catalog rebuilt in RELAY
+(`docs/tc18-master-catalog.json`, 447 entries), issue 166
+(c-RCP-AUDIT-04) is unblocked. This batch resolves its `REQ-PWM-*`/
+`REQ-ADC-*` slice: every PWM_OUT/PWM_IN/ADC requirement carrying a
+real `tc18` citation gets a `tc18_master_id` cross-reference,
+resolved by section/table/content match against the catalog's own
+`summary`/`title`/`citation` fields, not by string equality with the
+existing `tc18` citation alone.
+
+Purely additive -- no other field on any entry touched, no source
+file touched.
+
+85 of 99 in-scope entries matched. 12 entries genuinely have no
+`tc18` field (implementation-only plumbing) and were left alone. 2
+were flagged ambiguous rather than force-matched: `REQ-PWM-057`
+(citation spans 4 distinct §13.7.5.3 MUST clauses) and `REQ-ADC-037`
+(spans 3 distinct §13.7.9.2 cadence-case MUST clauses) -- each
+requirement's own text confirms it covers more than one catalog
+entry's worth of normative content, so no single `tc18_master_id`
+would be honest.
+
+Full 66-test suite unaffected. Pinned `cfusa` v0.5.54 `check`/
+`trace --req-coverage 100 --sec-tested 100` output is byte-identical
+before/after this change (0 errors, 968 warnings, 1312 infos;
+1095/1095 requirements traced), confirming `cfusa` tolerates the new
+field and coverage numbers don't move. Rebased onto `origin/main`
+twice as sibling batches landed: after `REQ-GPIO-*`/`REQ-SPI-*`
+(v0.401.0), CAN/CANEP (v0.402.0), E2E/ACF/PWRMODE/WIREERR
+(v0.403.0), and CMP/SRV (v0.404.0), then again after
+SEQ/TRIG/CANCEL/CHAIN (v0.405.0); version bumped past all of them to
+v0.406.0. `.fusa-reqs.json` merged automatically both times
+(disjoint categories, no conflict).
+
+**Next**: the remaining category batches of issue 166
+(c-RCP-AUDIT-04) land in parallel; a coordinator pass verifies and
+closes the issue once all categories are done.
+
 ### v0.405.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for
 `REQ-SEQ-*`/`REQ-TRIG-*`/`REQ-CANCEL-*`/`REQ-CHAIN-*`)
 
