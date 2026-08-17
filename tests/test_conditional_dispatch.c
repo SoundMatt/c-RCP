@@ -793,6 +793,99 @@ static void test_admission_rejection_acknowledge_suppressed_when_evt3_not_reques
     rcp_mock_server_destroy(srv);
 }
 
+/* ── issue #463 (REQ-SRV-016): admit()'s own success-path Acknowledge ────────
+ *
+ * TC18 §12.9.5's own generic wording -- "an acknowledge is given if
+ * requested as soon as the new request has been successfully queued for
+ * execution in the addressed endpoint's request storage" -- is worded over
+ * the whole endpoint request storage, not scoped to a Standard request the
+ * way rcp_server_endpoint_submit()'s own REQ-SRV-016 fix (issue #201)
+ * reads. rcp_server_endpoint_admit() itself (server.c) never built one for
+ * a Compound/Compound-Wait/Triggered/Timed/Chained request placed into
+ * ep->pending -- this is the success-path sibling of issue #454's own
+ * rejection-path fix immediately above: same evt[3] "if requested" gate,
+ * same §11.3.1 Acknowledge wire shape, but err=0 (accepted, not rejected)
+ * this time. Timed is used here (make_timed_with_evt(), above) for the
+ * identical evt-control reason #454's own tests already established. */
+static void test_pending_conditional_request_emits_requested_acknowledge(void)
+{
+    handler_log_t                log;
+    rcp_mock_server_t           *srv = fixture(&log);
+    rcp_bytes_t                  frame, resp = {0};
+    rcp_acf_byte_message_info_t  hdr;
+    const uint8_t                *payload;
+    size_t                        payload_len;
+    rcp_regmap_request_stream_cfg_t stream_cfg[1];
+
+    /* fixture()'s own default rx_ack_stream_index (0) would suppress this
+     * response before it ever reached this test -- see
+     * suppress_response_per_stream_cfg() -- so it must be configured to a
+     * real stream first, exactly as issue #454's own rejection-Acknowledge
+     * tests above already do. */
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id        = 1u;
+    stream_cfg[0].rx_ack_stream_index = 1u;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+
+    /* evt[3] = 1: this admission-succeeding request asks for an ack. */
+    frame = make_timed_with_evt(1, 0x9000u, 88u, 0x08u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+                      rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF,
+                                                RCP_ACF_MSG_TYPE_GBB, true, 1u, frame.data, frame.len,
+                                                &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK, rcp_acf_decode_abb(resp.data, resp.len, &hdr, &payload,
+                                                      &payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ACKNOWLEDGE, rcp_acf_classify_response(&hdr));
+    TEST_ASSERT_EQUAL_UINT8(RCP_ACF_EVT_ACKNOWLEDGE, hdr.evt);
+    TEST_ASSERT_EQUAL_UINT8(0u, hdr.err); /* success -- NOT #454's rejection shape */
+    TEST_ASSERT_EQUAL_UINT8(1u, hdr.byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT8(88u, hdr.transaction_num);
+    TEST_ASSERT_EQUAL_size_t(0, payload_len);
+    /* The request really was filed, not merely acknowledged -- the same
+     * "still stored" proof #454's own overflow-fill loop relies on. */
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 1));
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
+/* evt[3] clear: the identical successful admission, but no acknowledge is
+ * built -- REQ-SRV-016's own "if requested" conditional wording, matching
+ * rcp_server_endpoint_submit()'s existing behavior for the plain
+ * Standard-queuing case and issue #454's rejection-Acknowledge sibling
+ * test's own identical evt[3]=0 shape. */
+static void test_pending_conditional_request_no_acknowledge_when_evt3_clear(void)
+{
+    handler_log_t                log;
+    rcp_mock_server_t           *srv = fixture(&log);
+    rcp_bytes_t                  frame, resp = {0};
+    rcp_regmap_request_stream_cfg_t stream_cfg[1];
+
+    rcp_regmap_request_stream_cfg_init(&stream_cfg[0]);
+    stream_cfg[0].rx_stream_id        = 1u;
+    stream_cfg[0].rx_ack_stream_index = 1u;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, stream_cfg, 1));
+
+    frame = make_timed_with_evt(1, 0x9000u, 89u, 0x00u);
+    TEST_ASSERT_NOT_NULL(frame.data);
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_PENDING,
+                      rcp_mock_server_dispatch(srv, 1, RCP_AVTP_SUBTYPE_NTSCF,
+                                                RCP_ACF_MSG_TYPE_GBB, true, 1u, frame.data, frame.len,
+                                                &resp));
+    TEST_ASSERT_NULL(resp.data);
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_pending_count(srv, 1));
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&frame);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── Triggered: the real trigger-selection mechanism ──────────────────────── */
 
 static rcp_bytes_t make_triggered(uint8_t request_type, uint8_t source_ep, uint8_t signal_nr,
@@ -2223,6 +2316,8 @@ int main(void)
     RUN_TEST(test_compound_wait_reserved_evt_sends_err_response);
     RUN_TEST(test_admission_rejection_acknowledge_sent_when_evt3_requests_it);
     RUN_TEST(test_admission_rejection_acknowledge_suppressed_when_evt3_not_requested);
+    RUN_TEST(test_pending_conditional_request_emits_requested_acknowledge);
+    RUN_TEST(test_pending_conditional_request_no_acknowledge_when_evt3_clear);
 
     RUN_TEST(test_compound_admission_denied_for_unclaimed_sequencer);
     RUN_TEST(test_compound_admission_denied_for_sequencer_owned_by_a_different_client);

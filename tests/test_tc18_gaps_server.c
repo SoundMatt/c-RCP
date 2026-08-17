@@ -110,6 +110,22 @@ static rcp_bytes_t standard_abb(rcp_byte_bus_id_t bus, uint8_t transaction_num)
     return rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
 }
 
+/* standard_abb()'s own evt-controllable sibling (issue #463): that helper
+ * hardcodes evt=0 (no acknowledge requested), which cannot exercise
+ * rcp_server_endpoint_admit_with_ack()'s own evt[3] "if requested" gate. */
+static rcp_bytes_t standard_abb_with_evt(rcp_byte_bus_id_t bus, uint8_t transaction_num,
+                                          uint8_t evt)
+{
+    rcp_acf_byte_message_info_t hdr;
+    const uint8_t               payload[2] = {0xDEu, 0xADu};
+
+    memset(&hdr, 0, sizeof(hdr));
+    hdr.byte_bus_id     = bus;
+    hdr.transaction_num = transaction_num;
+    hdr.evt             = evt;
+    return rcp_acf_encode_abb(&hdr, payload, sizeof(payload));
+}
+
 /* ── §12.3 lifecycle transitions: idleness and writer authorization both now enforced ── */
 
 /* As of the REQ-LIFECYCLE-022 fix, TC18 Figure 16's "Root Client access
@@ -1676,6 +1692,80 @@ static void test_tscf_conditional_request_needs_both_its_own_condition_and_the_g
     rcp_server_endpoint_destroy(&ep);
 }
 
+/* ── issue #463 (REQ-SRV-016): rcp_server_endpoint_admit_with_ack() ────────── */
+
+/* TC18 §12.9.5's own generic wording -- "an acknowledge is given if
+ * requested as soon as the new request has been successfully queued for
+ * execution in the addressed endpoint's request storage" -- is worded
+ * over the whole endpoint request storage, not scoped to a Standard
+ * request the way rcp_server_endpoint_submit()'s own REQ-SRV-016 fix
+ * (issue #201) reads. This test exercises admit_under_tscf_gate()'s own
+ * new out_ack build (server.c) directly: a Standard request postponed
+ * purely by REQ-TIMED-012's TSCF presentation-time gate (the exact
+ * scenario test_tscf_standard_request_postponed_until_presentation_time()
+ * above already covers for admission itself) whose own evt[3] asks for an
+ * acknowledge gets one built immediately at admission time -- TC18's own
+ * "as soon as... successfully queued" wording, not deferred until the
+ * request later becomes due. */
+static void test_tscf_pending_standard_request_emits_requested_acknowledge(void)
+{
+    rcp_server_endpoint_t       ep;
+    rcp_bytes_t                 frame = standard_abb_with_evt((rcp_byte_bus_id_t)5u, 0x42u, 0x08u);
+    uint8_t                     request_type = 0xFFu;
+    size_t                      idx          = 0u;
+    rcp_bytes_t                 ack          = {0};
+    rcp_acf_byte_message_info_t ack_hdr;
+    const uint8_t                *ack_payload;
+    size_t                        ack_payload_len;
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    rcp_server_endpoint_init(&ep, true);
+
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
+                      rcp_server_endpoint_admit_with_ack(&ep, frame.data, frame.len, 0u, true,
+                                                          5000000u, 0u, &request_type, &idx, NULL,
+                                                          &ack));
+    TEST_ASSERT_NOT_NULL(ack.data);
+    TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                      rcp_acf_decode_abb(ack.data, ack.len, &ack_hdr, &ack_payload,
+                                        &ack_payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ACKNOWLEDGE, rcp_acf_classify_response(&ack_hdr));
+    TEST_ASSERT_EQUAL_UINT8(0u, ack_hdr.err); /* success, not the #454 rejection shape */
+    TEST_ASSERT_EQUAL_UINT8(5u, ack_hdr.byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT8(0x42u, ack_hdr.transaction_num);
+    TEST_ASSERT_EQUAL_UINT(0u, ack_payload_len);
+
+    rcp_bytes_free(&ack);
+    rcp_bytes_free(&frame);
+    rcp_server_endpoint_destroy(&ep);
+}
+
+/* evt[3] clear (no acknowledge requested): admission still succeeds
+ * (RCP_SERVER_ADMIT_PENDING, unaffected -- this fix only ever ADDS a
+ * response, never changes admission itself), but out_ack stays zeroed,
+ * exactly as rcp_server_endpoint_submit()'s own REQ-SRV-016 gate already
+ * behaves for the plain Standard-queuing case. */
+static void test_tscf_pending_standard_request_no_acknowledge_when_evt3_clear(void)
+{
+    rcp_server_endpoint_t ep;
+    rcp_bytes_t           frame = standard_abb_with_evt((rcp_byte_bus_id_t)5u, 0x43u, 0x00u);
+    uint8_t               request_type = 0xFFu;
+    size_t                idx          = 0u;
+    rcp_bytes_t           ack          = {0};
+
+    TEST_ASSERT_NOT_NULL(frame.data);
+    rcp_server_endpoint_init(&ep, true);
+
+    TEST_ASSERT_EQUAL(RCP_SERVER_ADMIT_PENDING,
+                      rcp_server_endpoint_admit_with_ack(&ep, frame.data, frame.len, 0u, true,
+                                                          5000000u, 0u, &request_type, &idx, NULL,
+                                                          &ack));
+    TEST_ASSERT_NULL(ack.data);
+
+    rcp_bytes_free(&frame);
+    rcp_server_endpoint_destroy(&ep);
+}
+
 /* FIXED (REQ-TIMED-013, already closed in an earlier batch -- reconfirmed
  * here rather than left as a stale deviation pin): TC18 §11.2/§11.2.1
  * also names an ACF_ABB encoding for a timed request whose presentation
@@ -1808,6 +1898,8 @@ int main(void)
     RUN_TEST(test_ntscf_standard_request_still_executes_immediately);
     RUN_TEST(test_tscf_standard_request_postponed_until_presentation_time);
     RUN_TEST(test_tscf_conditional_request_needs_both_its_own_condition_and_the_gate);
+    RUN_TEST(test_tscf_pending_standard_request_emits_requested_acknowledge);
+    RUN_TEST(test_tscf_pending_standard_request_no_acknowledge_when_evt3_clear);
     RUN_TEST(test_timed_encode_request_tscf_produces_a_real_abb_message);
     RUN_TEST(test_watchdog_overflows_despite_continuous_requests);
 

@@ -1177,6 +1177,100 @@ static void test_acknowledge_not_suppressed_when_rx_ack_stream_index_is_nonzero(
     rcp_mock_server_destroy(srv);
 }
 
+/* ── issue #463 (REQ-SRV-016): admit()'s own success-path Acknowledge,
+ *    the RCP_SERVER_ADMIT_QUEUED (Standard request, disabled endpoint) case
+ *    ─────────────────────────────────────────────────────────────────────
+ *
+ * TC18 §12.9.5's own generic wording -- "an acknowledge is given if
+ * requested as soon as the new request has been successfully queued for
+ * execution in the addressed endpoint's request storage" -- covers a
+ * Standard request queued on a disabled endpoint too, not just the
+ * conditional-request kinds test_pending_conditional_request_emits_
+ * requested_acknowledge() (test_conditional_dispatch.c) exercises.
+ * rcp_mock_server_dispatch()'s own doc comment already establishes that a
+ * disabled endpoint pre-loads (queues) rather than executes a request --
+ * this proves the queuing case now also emits the acknowledge TC18
+ * requires, via rcp_server_endpoint_admit_with_ack()'s own out_ack
+ * threaded straight through to rcp_server_endpoint_submit() (server.c). */
+static rcp_bytes_t standard_abb_with_evt(rcp_byte_bus_id_t byte_bus_id, uint8_t transaction_num,
+                                          uint8_t evt)
+{
+    rcp_acf_byte_message_info_t h;
+
+    memset(&h, 0, sizeof(h));
+    h.byte_bus_id     = byte_bus_id;
+    h.transaction_num = transaction_num;
+    h.evt             = evt;
+    return rcp_acf_encode_abb(&h, NULL, 0);
+}
+
+static void test_dispatch_queued_standard_request_emits_requested_acknowledge(void)
+{
+    rcp_mock_server_t              *srv  = rcp_mock_server_new();
+    rcp_bytes_t                      req  = standard_abb_with_evt(0x11, 0x55u, 0x08u);
+    rcp_bytes_t                      resp = {0};
+    rcp_regmap_request_stream_cfg_t  cfg[1];
+    rcp_acf_byte_message_info_t      hdr;
+    const uint8_t                     *payload;
+    size_t                             payload_len;
+
+    to_rcp_configured(srv);
+    /* Endpoint added disabled: a Standard request pre-loads (queues)
+     * instead of executing, per rcp_mock_server_dispatch()'s own doc
+     * comment. */
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, false, echo_handler, NULL);
+
+    rcp_regmap_request_stream_cfg_init(&cfg[0]);
+    cfg[0].rx_stream_id        = RMAP048049_STREAM_ID;
+    cfg[0].rx_ack_stream_index = 1u; /* "send it" -- see this file's own #334-6 tests above */
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, cfg, 1));
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_QUEUED,
+        rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  RMAP048049_STREAM_ID, req.data, req.len, &resp));
+    TEST_ASSERT_NOT_NULL(resp.data);
+
+    TEST_ASSERT_EQUAL(RCP_ACF_OK,
+                      rcp_acf_decode_abb(resp.data, resp.len, &hdr, &payload, &payload_len));
+    TEST_ASSERT_EQUAL(RCP_ACF_RESP_ACKNOWLEDGE, rcp_acf_classify_response(&hdr));
+    TEST_ASSERT_EQUAL_UINT8(0u, hdr.err);
+    TEST_ASSERT_EQUAL_UINT8(0x11u, hdr.byte_bus_id);
+    TEST_ASSERT_EQUAL_UINT8(0x55u, hdr.transaction_num);
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_endpoint_queue_len(srv, 0x11));
+
+    rcp_bytes_free(&resp);
+    rcp_bytes_free(&req);
+    rcp_mock_server_destroy(srv);
+}
+
+/* evt[3] clear: the identical queuing outcome, but no acknowledge -- the
+ * same REQ-SRV-016 "if requested" conditional wording as every other
+ * acknowledge test in this codebase. */
+static void test_dispatch_queued_standard_request_no_acknowledge_when_evt3_clear(void)
+{
+    rcp_mock_server_t              *srv  = rcp_mock_server_new();
+    rcp_bytes_t                      req  = standard_abb_with_evt(0x11, 0x56u, 0x00u);
+    rcp_bytes_t                      resp = {0};
+    rcp_regmap_request_stream_cfg_t  cfg[1];
+
+    to_rcp_configured(srv);
+    rcp_mock_server_add_endpoint(srv, 0x11, 1, false, echo_handler, NULL);
+
+    rcp_regmap_request_stream_cfg_init(&cfg[0]);
+    cfg[0].rx_stream_id        = RMAP048049_STREAM_ID;
+    cfg[0].rx_ack_stream_index = 1u;
+    TEST_ASSERT_TRUE(rcp_mock_server_set_request_stream_cfg(srv, cfg, 1));
+
+    TEST_ASSERT_EQUAL(RCP_MOCK_DISPATCH_QUEUED,
+        rcp_mock_server_dispatch(srv, 0x11, RCP_AVTP_SUBTYPE_NTSCF, RCP_ACF_MSG_TYPE_ABB, true,
+                                  RMAP048049_STREAM_ID, req.data, req.len, &resp));
+    TEST_ASSERT_NULL(resp.data);
+    TEST_ASSERT_EQUAL_size_t(1, rcp_mock_server_endpoint_queue_len(srv, 0x11));
+
+    rcp_bytes_free(&req);
+    rcp_mock_server_destroy(srv);
+}
+
 /* ── REQ-RMAP-065/SRV-017: Flush_time heartbeat composition ─────────────────── */
 
 static const uint8_t HEARTBEAT_MAC[6] = {0x02, 0x00, 0x00, 0x00, 0x00, 0x22};
@@ -2553,6 +2647,8 @@ int main(void)
     RUN_TEST(test_response_not_suppressed_for_unresolvable_stream);
     RUN_TEST(test_acknowledge_suppressed_by_default_ack_stream_index);
     RUN_TEST(test_acknowledge_not_suppressed_when_rx_ack_stream_index_is_nonzero);
+    RUN_TEST(test_dispatch_queued_standard_request_emits_requested_acknowledge);
+    RUN_TEST(test_dispatch_queued_standard_request_no_acknowledge_when_evt3_clear);
     RUN_TEST(test_heartbeat_first_check_only_seeds_and_reports_nothing_due);
     RUN_TEST(test_heartbeat_fires_exactly_at_flush_time_and_composes_correctly);
     RUN_TEST(test_heartbeat_resets_its_own_timer_after_firing);

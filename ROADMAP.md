@@ -19106,6 +19106,90 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.381.0 -- 2026-08-16 (REQ-SRV-016: admit() now builds the
+success-path Acknowledge TC18 §12.9.5 requires, not just submit())
+
+Closes issue #463. TC18 §12.9.5's own generic wording -- "an
+acknowledge is given if requested as soon as the new request has
+been successfully queued for execution in the addressed endpoint's
+request storage" -- is worded over the whole endpoint request
+storage, not scoped to a Standard request the way issue #201's
+original REQ-SRV-016 fix reads. Only `rcp_server_endpoint_submit()`
+(the Standard-request path) ever built this acknowledge;
+`rcp_server_endpoint_admit()` -- the function that actually files
+Compound/Compound-Wait/Triggered/Timed/Chained requests and, via its
+own TSCF gate (`admit_under_tscf_gate()`), Standard/Cancellation
+requests into the request store -- never built or returned any
+acknowledge at all. `admit()`'s own file-header doc comment already
+named this explicitly ("This module's own dispatch pipeline never
+yet builds an Acknowledge-classified response itself"), confirming
+this was a known, documented, but still-open gap, not a silent
+omission. Related to, but distinct from, issue #454 (already merged):
+#454 fixed the response SHAPE for admission REJECTIONS (err-response
+vs. Acknowledge-rejected); this issue is about the SUCCESS path --
+building a real Acknowledge when a request is successfully
+admitted/stored, not rejected.
+
+New `rcp_server_endpoint_admit_with_ack()` (`server.h`/`server.c`) is
+`admit()`'s own out_ack-carrying sibling, added via this codebase's
+established "new function, not a breaking change" pattern
+(`rcp_mock_server_add_endpoint_on_stream()`, issue #432) rather than
+changing `admit()`'s own signature -- every one of `admit()`'s many
+existing callers (production and test alike) is unaffected;
+`admit()` itself is now a thin wrapper forwarding out_ack=NULL. A new
+static `build_store_ack()` helper mirrors `submit()`'s own identical
+evt[3] "if requested" logic and is called at every point admission
+reaches a genuine "successfully queued... in the addressed
+endpoint's request storage" outcome: both of
+`admit_under_tscf_gate()`'s call sites (Standard and Cancellation
+under a TSCF presentation-time gate) and the conditional-request
+switch's shared final `RCP_SERVER_ADMIT_PENDING` return (covering all
+five conditional kinds with one call site). The pre-existing
+Standard-request forwarding to `rcp_server_endpoint_submit()` now
+threads its own out_ack straight through instead of passing NULL,
+reusing `submit()`'s already-correct, already-tested logic verbatim.
+Immediate execution, cancellation, admission rejection (issue #454's
+own separate, unaffected rejection-shape logic), and admission
+suspension are all correctly excluded -- none of them means "queued
+into the request store."
+
+`mock.c`'s `dispatch_plain_inner()` now calls the new function, and
+`finish_admission()` transfers the resulting ack into the response
+for exactly the `RCP_SERVER_ADMIT_QUEUED`/`RCP_SERVER_ADMIT_PENDING`
+outcomes -- composing cleanly alongside issue #454's already-merged
+`admission_reject_response_shape()` rejection logic in that same
+function's `REJECTED` case, not duplicating or conflicting with it.
+One leak guard was needed: the pre-existing REQ-SEQ-013
+sequencer-access-control gate can admit a Compound/Compound-Wait
+request into `RCP_SERVER_ADMIT_PENDING` and then immediately cancel
+it again on an unauthorized `sequencer_index` -- an ack already built
+for that same request is now explicitly freed on that path (not
+transferred), since the caller receives the Error Response this
+rejection actually gets instead.
+
+Proven by six new tests: two at the `server.h` unit level
+(`tests/test_tc18_gaps_server.c`, exercising
+`admit_under_tscf_gate()`'s own new ack build directly), two at the
+`mock.c` dispatch level for the `QUEUED` outcome
+(`tests/test_mock.c`, a Standard request to a disabled endpoint), and
+two at the `mock.c` dispatch level for the `PENDING` outcome via the
+conditional-request switch (`tests/test_conditional_dispatch.c`, a
+Timed request, reusing that file's own `make_timed_with_evt()`
+helper issue #454 already added). Each pair proves both halves of
+REQ-SRV-016's own conditional wording -- evt[3]=1 produces a real,
+correctly-addressed Acknowledge (err=0, the success shape, proven
+distinct from issue #454's own err=1 rejection shape); evt[3]=0
+produces none -- while issue #454's own rejection-path tests were
+re-run unmodified as a regression guard and remain green. Full
+66-test suite green on both the native and ASan/UBSan trees;
+mutation-tested by reverting just this fix (keeping the six new
+tests): the four "emits acknowledge" tests fail exactly as expected
+(two at compile time, since `admit_with_ack()` no longer exists; two
+at runtime), while the two "no acknowledge when evt[3] clear" tests
+keep passing, confirming they are not vacuously true; restored, suite
+green again. `cfusa check`: 0 errors; `cfusa trace`: 1089/1089 traced
+and tested (unchanged).
+
 ### v0.379.0 -- 2026-08-16 (REQ-RMAP-081: EP_RESP_ON_ERROR investigated
 and confirmed a genuine TC18 spec defect, not an addressable local gap)
 

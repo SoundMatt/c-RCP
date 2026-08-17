@@ -1279,6 +1279,16 @@ static rcp_admit_reject_shape_t admission_reject_response_shape(rcp_wire_error_t
 /* Maps one server.h admission outcome onto this module's own dispatch
  * result, running the endpoint's handler for the execute-now case.
  *
+ * ack (issue #463, REQ-SRV-016): the caller's own already-built
+ * rcp_server_endpoint_admit_with_ack() out_ack -- a genuine Acknowledge
+ * response when the request was successfully filed into ep's request
+ * storage (RCP_SERVER_ADMIT_QUEUED or RCP_SERVER_ADMIT_PENDING) and its
+ * own evt[3] asked for one, left zeroed otherwise (server.h's own doc
+ * comment). Transferred to *out_response for exactly those two outcomes,
+ * below -- the success-Acknowledge sibling of admission_reject_response_
+ * shape()'s own rejection-Acknowledge handling in the RCP_SERVER_ADMIT_
+ * REJECTED case further down.
+ *
  * error is rcp_server_endpoint_admit()'s *out_error: RCP_ERROR_NONE for
  * every outcome except the rejection paths that determined a specific
  * TC18 Table 30 code (see that function's own doc comment for which
@@ -1330,15 +1340,30 @@ static rcp_mock_dispatch_result_t finish_admission(rcp_mock_endpoint_slot_t *slo
                                                     const uint8_t *request, size_t request_len,
                                                     rcp_wire_error_t error,
                                                     rcp_byte_bus_id_t byte_bus_id,
-                                                    rcp_bytes_t *out_response)
+                                                    rcp_bytes_t *ack, rcp_bytes_t *out_response)
 {
     switch (admit) {
     case RCP_SERVER_ADMIT_EXECUTE_NOW:
         run_handler(slot, request, request_len, out_response);
         return RCP_MOCK_DISPATCH_OK;
     case RCP_SERVER_ADMIT_QUEUED:
+        /* issue #463, REQ-SRV-016: ack was already built by
+         * rcp_server_endpoint_admit_with_ack() (via rcp_server_endpoint_
+         * submit()'s own out_ack) iff the request's own evt[3] asked for
+         * one -- transferred to the caller here, the same "assign the
+         * already-built rcp_bytes_t directly" convention this function's
+         * REJECTED case below already uses. Left zeroed (nothing to
+         * transfer) otherwise. */
+        *out_response = *ack;
         return RCP_MOCK_DISPATCH_QUEUED;
     case RCP_SERVER_ADMIT_PENDING:
+        /* issue #463, REQ-SRV-016: same transfer as RCP_SERVER_ADMIT_QUEUED
+         * immediately above -- ack was built by admit_under_tscf_gate() or
+         * the conditional-request switch's own shared return
+         * (server.c), covering every kind that can reach this outcome
+         * (Standard/Cancellation under a TSCF gate, and Compound/Compound
+         * Wait/Triggered/Timed/Chained). */
+        *out_response = *ack;
         return RCP_MOCK_DISPATCH_PENDING;
     case RCP_SERVER_ADMIT_CANCELLATION:
         apply_cancellation(slot, request_type, request, request_len, byte_bus_id, out_response);
@@ -1402,6 +1427,10 @@ static rcp_mock_dispatch_result_t dispatch_plain_inner(rcp_mock_server_t *srv,
     rcp_wire_error_t          error        = RCP_ERROR_NONE;
     rcp_lifecycle_accept_t    accept;
     size_t                    admitted_index = 0;
+    /* issue #463, REQ-SRV-016: rcp_server_endpoint_admit_with_ack()'s own
+     * new out_ack -- see finish_admission()'s own doc comment for how this
+     * is transferred to *out_response. */
+    rcp_bytes_t                ack = {0};
     /* REQ-AVTP-021, TC18 §13.3 rule 1: "In case the RC Server does not
      * support time synchronization, the presentation time shall be
      * ignored, and the request(s) executed as if no presentation time
@@ -1485,9 +1514,13 @@ static rcp_mock_dispatch_result_t dispatch_plain_inner(rcp_mock_server_t *srv,
      * it arrived under an NTSCF header. Only rcp_mock_server_dispatch_
      * tscf() (mock.h) supplies real values, for a caller that decoded
      * an actual TSCF header one layer up. */
-    admit = rcp_server_endpoint_admit(&slot->queue, request, request_len, 0u, effective_tv,
-                                       avtp_timestamp, gptp_reference_now, &request_type,
-                                       &admitted_index, &error);
+    /* issue #463, REQ-SRV-016: _with_ack() (not the plain wrapper) so a
+     * successfully-stored request's own evt[3] "if requested" acknowledge
+     * (TC18 §12.9.5) is actually built -- see finish_admission()'s own doc
+     * comment for how ack reaches *out_response. */
+    admit = rcp_server_endpoint_admit_with_ack(&slot->queue, request, request_len, 0u, effective_tv,
+                                                avtp_timestamp, gptp_reference_now, &request_type,
+                                                &admitted_index, &error, &ack);
 
     /* REQ-E2E-030 (issue #335): a request-storage overflow on THIS
      * endpoint's own queue is answered locally exactly as before
@@ -1562,13 +1595,20 @@ static rcp_mock_dispatch_result_t dispatch_plain_inner(rcp_mock_server_t *srv,
             uint8_t tn = slot->queue.pending[admitted_index].transaction_num;
 
             (void)rcp_server_endpoint_cancel_single(&slot->queue, tn, RCP_CANCEL_LIFECYCLE_QUEUED);
+            /* issue #463: admit_with_ack() above may already have built a
+             * genuine Acknowledge into ack (this request's own evt[3] may
+             * have asked for one) before this access-control gate decided
+             * to cancel it again right here -- freed, not transferred,
+             * since *out_response is about to carry the Error Response
+             * this rejection actually gets instead. */
+            rcp_bytes_free(&ack);
             *out_response =
                 rcp_acf_build_error_response(byte_bus_id, tn, RCP_ERROR_UNAUTHORIZED_ACCESS);
             return RCP_MOCK_DISPATCH_REJECTED;
         }
     }
 
-    return finish_admission(slot, admit, request_type, request, request_len, error, byte_bus_id,
+    return finish_admission(slot, admit, request_type, request, request_len, error, byte_bus_id, &ack,
                              out_response);
 }
 
