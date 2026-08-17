@@ -34,6 +34,43 @@ the rationale.
 
 ## Releases
 
+### v0.407.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for `REQ-AVTP-*`/`REQ-WDG-*`/`REQ-PWR-*`/`REQ-TSN-*`/`REQ-UDP-*`/`REQ-DL-*`/`REQ-L2-*`/`REQ-FRAG-*`)
+
+One of several parallel per-category batches for c-RCP-AUDIT-04
+(issue 166), unblocked now that RELAY's master TC18 requirement
+catalog (`docs/tc18-master-catalog.json`, 447 entries) has been
+rebuilt and published. This batch covers only the `REQ-AVTP-*`/
+`REQ-WDG-*`/`REQ-PWR-*`/`REQ-TSN-*`/`REQ-UDP-*`/`REQ-DL-*`/
+`REQ-L2-*`/`REQ-FRAG-*` category prefixes (119 entries); sibling
+batches cover the rest of `.fusa-reqs.json`'s 1095 entries under
+their own PRs.
+
+- Added a `tc18_master_id` field to 41 of the 51 in-scope
+  requirements that already carry a `tc18` citation (issue #164's
+  backfill), matched by section + table/figure number + a content
+  check against the catalog entry's own `summary`/`title`/
+  `citation` -- not on section number alone, since several sections
+  (e.g. `§12.7.7`, `§12.4.1`, `§11.1`) own more than one catalog
+  entry each. Purely additive -- no other field on any entry
+  touched, no `.c`/`.h` source file touched.
+- Left untouched, as expected: the 68 in-scope requirements that
+  carry no `tc18` field at all (implementation-only plumbing/tests
+  with no TC18 basis) -- no `tc18_master_id` invented for these.
+- Left unset and flagged ambiguous (documented in the PR body): 10
+  requirements whose own citation either spans two-or-more distinct
+  master-catalog clauses with no single confident owner
+  (`REQ-AVTP-009`, `REQ-AVTP-013`, `REQ-L2-011`), cites only
+  narrative behavior text with no corresponding catalog clause
+  (`REQ-WDG-002`, `REQ-WDG-003`, `REQ-WDG-010`), or cites TC18 §10.1
+  -- a section the current master catalog does not cover at all,
+  its lowest cataloged section being §11.1 (`REQ-UDP-017`,
+  `REQ-UDP-018`, `REQ-L2-001`, `REQ-L2-002`).
+
+Verified against the pinned `cfusa` v0.5.54 binary: `check` and
+`trace --req-coverage 100 --sec-tested 100` output byte-identical
+before/after -- 100%/100% coverage unchanged, 0 errors. Full
+66-test suite unchanged (66/66 passed).
+
 ### v0.406.0 -- 2026-08-17 (c-RCP-AUDIT-04: add `tc18_master_id` to PWM/ADC `.fusa-reqs.json` entries)
 
 Now that the master TC18 requirement catalog (`docs/tc18-master-catalog.json`

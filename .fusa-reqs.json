@@ -9,7 +9,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.7.9 (\"An AVTPDU shall be generated in this case even when the queue is empty to generate a heartbeat, so that the RC Client sees that the RC Server is alive.\"), TC18.txt L3416-3417"
+      "tc18": "§12.7.9 (\"An AVTPDU shall be generated in this case even when the queue is empty to generate a heartbeat, so that the RC Client sees that the RC Server is alive.\"), TC18.txt L3416-3417",
+      "tc18_master_id": "TC18-12.7.9-006"
     },
     {
       "id": "REQ-DL-002",
@@ -20,7 +21,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.7.7 (\"WatchDog time out for this Stream in clock tics ... 0dec: WD is disabled\"), TC18.txt L3233-3235; \"...the watchdog is reset with each request received from this RC Client. If the watchdog exceeds its threshold again...\", TC18.txt L3302-3303"
+      "tc18": "§12.7.7 (\"WatchDog time out for this Stream in clock tics ... 0dec: WD is disabled\"), TC18.txt L3233-3235; \"...the watchdog is reset with each request received from this RC Client. If the watchdog exceeds its threshold again...\", TC18.txt L3302-3303",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-DL-003",
@@ -41,7 +43,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.7.9 (\"An AVTPDU shall be generated in this case even when the queue is empty to generate a heartbeat, so that the RC Client sees that the RC Server is alive.\"), TC18.txt L3416-3417"
+      "tc18": "§12.7.9 (\"An AVTPDU shall be generated in this case even when the queue is empty to generate a heartbeat, so that the RC Client sees that the RC Server is alive.\"), TC18.txt L3416-3417",
+      "tc18_master_id": "TC18-12.7.9-006"
     },
     {
       "id": "REQ-DL-005",
@@ -62,7 +65,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.7.7 (\"0b: no watchdog for this stream / 1b: stream is blocked upon WD overflow and Safe state will be entered\"), TC18.txt L3249-3251; \"If the watchdog exceeds its threshold again it can be selected if a safety measure shall be taken...\", TC18.txt L3303"
+      "tc18": "§12.7.7 (\"0b: no watchdog for this stream / 1b: stream is blocked upon WD overflow and Safe state will be entered\"), TC18.txt L3249-3251; \"If the watchdog exceeds its threshold again it can be selected if a safety measure shall be taken...\", TC18.txt L3303",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-DL-007",
@@ -1213,7 +1217,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7.2.3 Figure 22 (Endpoint sleep request), TC18.txt L4160-4166 -- corrected 2026-08-10, c-RCP-AUDIT-06, issue #256 Group E, superseding this entry's prior (incorrect) reading of target_mode as wire-encodable"
+      "tc18": "\u00a713.7.2.3 Figure 22 (Endpoint sleep request), TC18.txt L4160-4166 -- corrected 2026-08-10, c-RCP-AUDIT-06, issue #256 Group E, superseding this entry's prior (incorrect) reading of target_mode as wire-encodable",
+      "tc18_master_id": "TC18-13.7.2.3-003"
     },
     {
       "id": "REQ-PWR-002",
@@ -1224,7 +1229,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.7.2.3 (\"Based on the sleep request the RC Server will: ...as soon as all EPs are idle and the responder queues are empty (all responses sent): send an acknowledge to sleep request; bring the RC Server implementation to sleep mode.\"), TC18.txt L4548-4556; §12.5 (\"The RC Server enters standby or sleep mode, as soon as the go to sleep/standby response to the standby/sleep request has been sent.\"), TC18.txt L2710-2711"
+      "tc18": "§13.7.2.3 (\"Based on the sleep request the RC Server will: ...as soon as all EPs are idle and the responder queues are empty (all responses sent): send an acknowledge to sleep request; bring the RC Server implementation to sleep mode.\"), TC18.txt L4548-4556; §12.5 (\"The RC Server enters standby or sleep mode, as soon as the go to sleep/standby response to the standby/sleep request has been sent.\"), TC18.txt L2710-2711",
+      "tc18_master_id": "TC18-12.5-006"
     },
     {
       "id": "REQ-PWR-003",
@@ -1235,7 +1241,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.5 (\"The RC Server will reject requests to enter sleep or standby mode and send an error message with error code = REQUEST_CANCELED, when: The wake-up event register (wup_status) is not cleared / At least one EP is not idle / In at least one responder queue there is a message pending for transmission.\"), TC18.txt L2703-2708"
+      "tc18": "§12.5 (\"The RC Server will reject requests to enter sleep or standby mode and send an error message with error code = REQUEST_CANCELED, when: The wake-up event register (wup_status) is not cleared / At least one EP is not idle / In at least one responder queue there is a message pending for transmission.\"), TC18.txt L2703-2708",
+      "tc18_master_id": "TC18-12.5-005"
     },
     {
       "id": "REQ-PWR-004",
@@ -1246,7 +1253,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.9.4 (\"The Endpoint provides responses associated with the requests identified by the transaction number of the request to the RC Responder.\"), TC18.txt L3769-3770; general transaction_num field definition (\"This field identifies the request in the context of the stream\"), TC18.txt L1228"
+      "tc18": "§12.9.4 (\"The Endpoint provides responses associated with the requests identified by the transaction number of the request to the RC Responder.\"), TC18.txt L3769-3770; general transaction_num field definition (\"This field identifies the request in the context of the stream\"), TC18.txt L1228",
+      "tc18_master_id": "TC18-12.9.4-004"
     },
     {
       "id": "REQ-PWR-005",
@@ -1257,7 +1265,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.4.1 (\"a TC14/TC10 wake-up request on the network...will directly check for the network availability and proceed as before\"), TC18.txt L2304-L2305 -- same basis as REQ-PWRMODE-020's own correction"
+      "tc18": "\u00a712.4.1 (\"a TC14/TC10 wake-up request on the network...will directly check for the network availability and proceed as before\"), TC18.txt L2304-L2305 -- same basis as REQ-PWRMODE-020's own correction",
+      "tc18_master_id": "TC18-12.4.1-004"
     },
     {
       "id": "REQ-PWR-006",
@@ -1268,7 +1277,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.4.1 (\"...it will first enable the network interface, check if the network is available and if not initiate a WakeUp to be sent via the network.\"), TC18.txt L2672-2674"
+      "tc18": "§12.4.1 (\"...it will first enable the network interface, check if the network is available and if not initiate a WakeUp to be sent via the network.\"), TC18.txt L2672-2674",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWR-007",
@@ -1279,7 +1289,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.4.1 (\"...the RC Server will send via the responder stream which is configured for the original standby request a repetitive response to the sleep request with a WakeUp message and the WakeUp source. The message will be repeated until a valid AVTPDU from the sleep request Client is received.\"), TC18.txt L2674-2677"
+      "tc18": "§12.4.1 (\"...the RC Server will send via the responder stream which is configured for the original standby request a repetitive response to the sleep request with a WakeUp message and the WakeUp source. The message will be repeated until a valid AVTPDU from the sleep request Client is received.\"), TC18.txt L2674-2677",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWR-008",
@@ -1290,7 +1301,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.4.1 (\"There are two types of start-up: a cold start (after power-on or wake-up from sleep) and a hot start (=wake-up from StandBy)...A hot-start appears after StandBy mode when a wake-up is triggered. In hot-start the configuration does not need to be redone...\"), TC18.txt L2662-2670; hot-start-up procedure requiring network availability and a valid AVTPDU received back from the sleep-request Client before the wake completes, TC18.txt L2671-2681"
+      "tc18": "§12.4.1 (\"There are two types of start-up: a cold start (after power-on or wake-up from sleep) and a hot start (=wake-up from StandBy)...A hot-start appears after StandBy mode when a wake-up is triggered. In hot-start the configuration does not need to be redone...\"), TC18.txt L2662-2670; hot-start-up procedure requiring network availability and a valid AVTPDU received back from the sleep-request Client before the wake completes, TC18.txt L2671-2681",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWR-009",
@@ -1341,7 +1353,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.4.1 (\"...the RC Server will send...a repetitive response to the sleep request with a WakeUp message and the WakeUp source.\"), TC18.txt L2674-2677; byte_bus_id addressing, §10.1 (\"...the RC Server decides based on the stream_id and byte_bus_id in each request to which of its endpoints the request is to be dispatched.\"), TC18.txt L1086-1088"
+      "tc18": "§12.4.1 (\"...the RC Server will send...a repetitive response to the sleep request with a WakeUp message and the WakeUp source.\"), TC18.txt L2674-2677; byte_bus_id addressing, §10.1 (\"...the RC Server decides based on the stream_id and byte_bus_id in each request to which of its endpoints the request is to be dispatched.\"), TC18.txt L1086-1088",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWR-014",
@@ -1352,7 +1365,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.4.1 (\"After reception of valid message from the sleep request Client all used endpoints and response queues will be enabled.\"), TC18.txt L2677-2679"
+      "tc18": "§12.4.1 (\"After reception of valid message from the sleep request Client all used endpoints and response queues will be enabled.\"), TC18.txt L2677-2679",
+      "tc18_master_id": "TC18-12.4.1-003"
     },
     {
       "id": "REQ-PWR-015",
@@ -1573,7 +1587,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.9.2 (\"In case two or more requests are due for execution then the priorities are as follows: 1. cancellation 2. triggered 3. timed 4. compound 5. compound wait 6. chained 7. standard\"), TC18.txt L3652-3663"
+      "tc18": "§12.9.2 (\"In case two or more requests are due for execution then the priorities are as follows: 1. cancellation 2. triggered 3. timed 4. compound 5. compound wait 6. chained 7. standard\"), TC18.txt L3652-3663",
+      "tc18_master_id": "TC18-12.9.2-003"
     },
     {
       "id": "REQ-TSN-002",
@@ -1594,7 +1609,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§11.2 (\"The RC Client uses ACF_ABB format for standard requests and timed requests (under TSCF header)... The RC Client uses ACF_GBB format for conditional requests. Conditions for these types of requests are coded in the message_time_stamp field. The message_timestamp valid bit is cleared (mtv=0) to indicate this alternative usage of the bytes... The RC Client uses ACF_GBB format for cancel requests...\"), TC18.txt L1182-1188; request_type identifiers per §11.2.2 Table 5, TC18.txt L1254-1267"
+      "tc18": "§11.2 (\"The RC Client uses ACF_ABB format for standard requests and timed requests (under TSCF header)... The RC Client uses ACF_GBB format for conditional requests. Conditions for these types of requests are coded in the message_time_stamp field. The message_timestamp valid bit is cleared (mtv=0) to indicate this alternative usage of the bytes... The RC Client uses ACF_GBB format for cancel requests...\"), TC18.txt L1182-1188; request_type identifiers per §11.2.2 Table 5, TC18.txt L1254-1267",
+      "tc18_master_id": "TC18-11.2.2-002"
     },
     {
       "id": "REQ-TSN-004",
@@ -1827,7 +1843,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.7.7 Table 24 (rx_stream_status: \"0b: stream is active / 1b: stream is blocked, requests are rejected...set automatically as a reaction to either CRC error, sequence error, watchdog overflow, EP overflow, when enabled\"), TC18.txt L3258-3263"
+      "tc18": "§12.7.7 Table 24 (rx_stream_status: \"0b: stream is active / 1b: stream is blocked, requests are rejected...set automatically as a reaction to either CRC error, sequence error, watchdog overflow, EP overflow, when enabled\"), TC18.txt L3258-3263",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-WDG-005",
@@ -1838,7 +1855,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.7.7 Table 24 (rx_wd_timeout_intervall \"0dec: WD is disabled\"), TC18.txt L3233-3235; rx_stream_id \"0dec: no reception, since not a valid stream_id\", TC18.txt L3227-3229"
+      "tc18": "§12.7.7 Table 24 (rx_wd_timeout_intervall \"0dec: WD is disabled\"), TC18.txt L3233-3235; rx_stream_id \"0dec: no reception, since not a valid stream_id\", TC18.txt L3227-3229",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-WDG-006",
@@ -1869,7 +1887,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.7.7 Table 24 (rx_wd_timeout_intervall \"0dec: WD is disabled\"), TC18.txt L3233-3235; rx_enforce_watchdog \"0b: no watchdog for this stream\", TC18.txt L3249"
+      "tc18": "§12.7.7 Table 24 (rx_wd_timeout_intervall \"0dec: WD is disabled\"), TC18.txt L3233-3235; rx_enforce_watchdog \"0b: no watchdog for this stream\", TC18.txt L3249",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-WDG-009",
@@ -2230,7 +2249,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.1 Figure 6 (\"NTSCF-Header Version 0\"), TC18.txt L1130-1138; example wire trace confirming subtype=0x82, TC18.txt L4247-4258"
+      "tc18": "\u00a711.1 Figure 6 (\"NTSCF-Header Version 0\"), TC18.txt L1130-1138; example wire trace confirming subtype=0x82, TC18.txt L4247-4258",
+      "tc18_master_id": "TC18-11.1-004"
     },
     {
       "id": "REQ-AVTP-002",
@@ -2241,7 +2261,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.1 Figure 5 (\"TSCF-Header Version 0\"), TC18.txt L1121-1128; example wire trace confirming subtype=0x05, TC18.txt L4210-4222"
+      "tc18": "\u00a711.1 Figure 5 (\"TSCF-Header Version 0\"), TC18.txt L1121-1128; example wire trace confirming subtype=0x05, TC18.txt L4210-4222",
+      "tc18_master_id": "TC18-11.1-002"
     },
     {
       "id": "REQ-AVTP-003",
@@ -2252,7 +2273,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.1 Figure 6 (\"NTSCF-Header Version 0\"), TC18.txt L1130-1138"
+      "tc18": "\u00a711.1 Figure 6 (\"NTSCF-Header Version 0\"), TC18.txt L1130-1138",
+      "tc18_master_id": "TC18-11.1-004"
     },
     {
       "id": "REQ-AVTP-004",
@@ -2263,7 +2285,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.1 Figure 5 (\"TSCF-Header Version 0\"), TC18.txt L1121-1128"
+      "tc18": "\u00a711.1 Figure 5 (\"TSCF-Header Version 0\"), TC18.txt L1121-1128",
+      "tc18_master_id": "TC18-11.1-002"
     },
     {
       "id": "REQ-AVTP-005",
@@ -2274,7 +2297,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.1 Figure 6's fixed header length (\"NTSCF-Header Version 0\"), TC18.txt L1130-1138"
+      "tc18": "\u00a711.1 Figure 6's fixed header length (\"NTSCF-Header Version 0\"), TC18.txt L1130-1138",
+      "tc18_master_id": "TC18-11.1-004"
     },
     {
       "id": "REQ-AVTP-006",
@@ -2285,7 +2309,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.1 Figure 5's fixed header length (\"TSCF-Header Version 0\"), TC18.txt L1121-1128"
+      "tc18": "\u00a711.1 Figure 5's fixed header length (\"TSCF-Header Version 0\"), TC18.txt L1121-1128",
+      "tc18_master_id": "TC18-11.1-002"
     },
     {
       "id": "REQ-AVTP-007",
@@ -2296,7 +2321,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.1 (NTSCF subtype=0x82 vs TSCF subtype=0x05 distinguish the two header forms), TC18.txt L1118-1138"
+      "tc18": "\u00a711.1 (NTSCF subtype=0x82 vs TSCF subtype=0x05 distinguish the two header forms), TC18.txt L1118-1138",
+      "tc18_master_id": "TC18-11.1-004"
     },
     {
       "id": "REQ-AVTP-008",
@@ -2307,7 +2333,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.1 (NTSCF subtype=0x82 vs TSCF subtype=0x05 distinguish the two header forms), TC18.txt L1118-1138"
+      "tc18": "\u00a711.1 (NTSCF subtype=0x82 vs TSCF subtype=0x05 distinguish the two header forms), TC18.txt L1118-1138",
+      "tc18_master_id": "TC18-11.1-002"
     },
     {
       "id": "REQ-AVTP-009",
@@ -2329,7 +2356,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.9.4 (\"The RC Responder will provide several responder queues that are assigned 1:1 to a stream_id (RC Servers's MAC address + 16bit unique stream_id) and a destination address which can also be a multicast destination.\"), TC18.txt L3763-3765; confirming stream_id's two-part composition, §10.1 (\"The stream identification includes a unique stream id identifier and the sender’s MAC address, which supports scalability in network size without the need to re-organize client ids...\"), TC18.txt L1073"
+      "tc18": "§12.9.4 (\"The RC Responder will provide several responder queues that are assigned 1:1 to a stream_id (RC Servers's MAC address + 16bit unique stream_id) and a destination address which can also be a multicast destination.\"), TC18.txt L3763-3765; confirming stream_id's two-part composition, §10.1 (\"The stream identification includes a unique stream id identifier and the sender’s MAC address, which supports scalability in network size without the need to re-organize client ids...\"), TC18.txt L1073",
+      "tc18_master_id": "TC18-12.9.4-001"
     },
     {
       "id": "REQ-AVTP-011",
@@ -2340,7 +2368,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.1 (\"Requests not having a known STREAM_ID are discarded by the RC Server.\"), TC18.txt L3898; stream_id's two-part (MAC + unique_id) composition that makes a stream_id \"known\" only when both match, §10.1, TC18.txt L1073"
+      "tc18": "§13.1 (\"Requests not having a known STREAM_ID are discarded by the RC Server.\"), TC18.txt L3898; stream_id's two-part (MAC + unique_id) composition that makes a stream_id \"known\" only when both match, §10.1, TC18.txt L1073",
+      "tc18_master_id": "TC18-13.1-001"
     },
     {
       "id": "REQ-AVTP-012",
@@ -2351,7 +2380,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.1 (\"The byte_bus_id is only unique in the context of a STREAM_ID and requests are only passed to the endpoint if both match.\"), TC18.txt L3898-3899; confirming §12.9.1 (\"In dependence on the stream_id and byte_bus_id the RC Server determines the endpoint that is addressed. If the lookup of the byte_bus_id in the context of the stream_id does not point to an Endpoint, the request is dropped without further notification.\"), TC18.txt L3591-3593"
+      "tc18": "§13.1 (\"The byte_bus_id is only unique in the context of a STREAM_ID and requests are only passed to the endpoint if both match.\"), TC18.txt L3898-3899; confirming §12.9.1 (\"In dependence on the stream_id and byte_bus_id the RC Server determines the endpoint that is addressed. If the lookup of the byte_bus_id in the context of the stream_id does not point to an Endpoint, the request is dropped without further notification.\"), TC18.txt L3591-3593",
+      "tc18_master_id": "TC18-13.1-001"
     },
     {
       "id": "REQ-AVTP-013",
@@ -2373,7 +2403,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.1 (\"In case time-synchronization is not supported, AVTPDUs having a TSCF header are dropped, and no response send.\"), TC18.txt L1140"
+      "tc18": "\u00a711.1 (\"In case time-synchronization is not supported, AVTPDUs having a TSCF header are dropped, and no response send.\"), TC18.txt L1140",
+      "tc18_master_id": "TC18-11.1-005"
     },
     {
       "id": "REQ-AVTP-015",
@@ -2444,7 +2475,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.3 (\"Requests may come within an AVTPDU with a presentation time (i.e. TSCF header). In case the RC Server does not support time synchronization, the presentation time shall be ignored, and the request(s) executed as if no presentation time were included or dropped depending on the configuration of the RC Server.\"), TC18.txt L4035-4038"
+      "tc18": "§13.3 (\"Requests may come within an AVTPDU with a presentation time (i.e. TSCF header). In case the RC Server does not support time synchronization, the presentation time shall be ignored, and the request(s) executed as if no presentation time were included or dropped depending on the configuration of the RC Server.\"), TC18.txt L4035-4038",
+      "tc18_master_id": "TC18-13.3-001"
     },
     {
       "id": "REQ-AVTP-022",
@@ -2455,7 +2487,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.3 (\"If the reserved bytes in the header are all zero, then the request shall be queued as if the header was in NTSCF format or dropped, depending on configuration.\"), TC18.txt L4039-4040"
+      "tc18": "§13.3 (\"If the reserved bytes in the header are all zero, then the request shall be queued as if the header was in NTSCF format or dropped, depending on configuration.\"), TC18.txt L4039-4040",
+      "tc18_master_id": "TC18-13.3-003"
     },
     {
       "id": "REQ-AVTP-023",
@@ -2466,7 +2499,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§13.3 (\"In case the time stamp is uncertain (i.e. tu = 1), then this shall be executed as if tu = 0.\"), TC18.txt L4040-4041"
+      "tc18": "§13.3 (\"In case the time stamp is uncertain (i.e. tu = 1), then this shall be executed as if tu = 0.\"), TC18.txt L4040-4041",
+      "tc18_master_id": "TC18-13.3-004"
     },
     {
       "id": "REQ-ACF-001",
@@ -8306,7 +8340,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.7.9 (\"In case an AVTPDU containing a single ACF_type would exceed the ‘Max_AVTPDUsize’ fragmentation as supported in ACF_ABB and ACF_GBB by the ms-bit will be performed.\"), TC18.txt L3408-3409"
+      "tc18": "§12.7.9 (\"In case an AVTPDU containing a single ACF_type would exceed the ‘Max_AVTPDUsize’ fragmentation as supported in ACF_ABB and ACF_GBB by the ms-bit will be performed.\"), TC18.txt L3408-3409",
+      "tc18_master_id": "TC18-12.7.9-003"
     },
     {
       "id": "REQ-FRAG-003",
@@ -8327,7 +8362,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§11.2.1 Table 4 (\"ms 0b – the fragment sequence is completed with this ABB message\"), TC18.txt L1233; §12.7.9 (Max_AVTPDUsize fragmentation trigger), TC18.txt L3408-3409"
+      "tc18": "§11.2.1 Table 4 (\"ms 0b – the fragment sequence is completed with this ABB message\"), TC18.txt L1233; §12.7.9 (Max_AVTPDUsize fragmentation trigger), TC18.txt L3408-3409",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-FRAG-005",
@@ -8338,7 +8374,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§11.2.1 Table 4 (\"ms 0b – the fragment sequence is completed with this ABB message / 1b - more data to follow in one or more subsequent ABB messages\"; \"read_size/segment_num if op = 0 this is read_size, else segment_num\"), TC18.txt L1233-1235"
+      "tc18": "§11.2.1 Table 4 (\"ms 0b – the fragment sequence is completed with this ABB message / 1b - more data to follow in one or more subsequent ABB messages\"; \"read_size/segment_num if op = 0 this is read_size, else segment_num\"), TC18.txt L1233-1235",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-FRAG-006",
@@ -8399,7 +8436,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§11.2.1 Table 4 (\"ms 0b – the fragment sequence is completed with this ABB message\"), TC18.txt L1233"
+      "tc18": "§11.2.1 Table 4 (\"ms 0b – the fragment sequence is completed with this ABB message\"), TC18.txt L1233",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-FRAG-012",
@@ -8430,7 +8468,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§11.2.1 Table 4 (\"ms 0b – the fragment sequence is completed with this ABB message\"), TC18.txt L1233"
+      "tc18": "§11.2.1 Table 4 (\"ms 0b – the fragment sequence is completed with this ABB message\"), TC18.txt L1233",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-FRAG-015",
@@ -8441,7 +8480,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§12.7.7 Table 24 (\"rx_stream_max_request_size ... Max size of a request in bytes (longer requests will be rejected)\"), TC18.txt L3230-3232"
+      "tc18": "§12.7.7 Table 24 (\"rx_stream_max_request_size ... Max size of a request in bytes (longer requests will be rejected)\"), TC18.txt L3230-3232",
+      "tc18_master_id": "TC18-12.7.7-001"
     },
     {
       "id": "REQ-FRAG-016",
@@ -8472,7 +8512,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "§11.2.1 Table 4 (\"ms\"/\"read_size/segment_num\" fields – the mechanism by which a split message's fragments are numbered so they can be reassembled), TC18.txt L1233-1235"
+      "tc18": "§11.2.1 Table 4 (\"ms\"/\"read_size/segment_num\" fields – the mechanism by which a split message's fragments are numbered so they can be reassembled), TC18.txt L1233-1235",
+      "tc18_master_id": "TC18-11.2.1-005"
     },
     {
       "id": "REQ-CANEP-023",
