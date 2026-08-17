@@ -19106,6 +19106,7 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+<<<<<<< HEAD
 ### v0.372.0 -- 2026-08-16 (REQ-RMAP-016/079: EP0's own ep_generic_cfg
 row -- ep_used bit forced to 1, never clearable by an incoming write)
 
@@ -19147,6 +19148,63 @@ check`: 0 errors; `cfusa trace`: 1088/1088 traced and tested
 (unchanged -- REQ-RMAP-016/079 already existed, this closes a
 conformance defect in their own implementation, not a new
 requirement).
+=======
+### v0.373.0 -- 2026-08-16 (REQ-RMAP-054: rcp_mock_server_new() now
+seeds the EP_ID_config power-on default; issue #464 audit closed with
+no code gap remaining)
+
+Closes issues #459 and #464.
+
+Issue #459 (REQ-RMAP-054): TC18 §12.7.8 requires the EP_ID_config
+table's power-on default to permit EP0 access before any client config
+is written. `rcp_regmap_ep_id_map_row_init_default()` (`src/regmap.c`)
+already implemented and unit-tested that default row -- but
+`rcp_mock_server_new()` (`src/mock.c`) never called it: `srv->ep_id_map`
+stayed `calloc()`'s own all-zero (`request_stream_index == 0`, TC18's
+own end-of-table sentinel, not a valid EP0 mapping) until an explicit
+`rcp_mock_server_set_ep_id_map()` call, contradicting both this
+requirement's text and `rcp_regmap_ep_id_map_row_init_default()`'s own
+documented contract that fixed-capacity-table owners place its result
+at row 0 at startup.
+
+Fixed: `rcp_mock_server_new()` now calls
+`rcp_regmap_ep_id_map_row_init_default(&srv->ep_id_map[0])` and sets
+`ep_id_map_count = 1` before returning. A later, explicit
+`rcp_mock_server_set_ep_id_map()` call still replaces the seeded row
+wholesale, exactly like every other "seeded default, freely overwritten
+by a real client config" field this constructor already establishes.
+New test (`tests/test_mock.c`,
+`test_new_server_seeds_ep_id_map_default_row_for_ep0`) proves EP0
+(byte_bus_id 0) is reachable via `rcp_mock_server_broadcast_safe_state()`
+immediately after `rcp_mock_server_new()`, with no
+`rcp_mock_server_set_ep_id_map()` call at all -- mutation-tested by
+temporarily reverting the new seeding call (keeping the new test),
+which failed cleanly (`Expected 1 Was 0`); restored, suite green again.
+
+Issue #464: extended #447's already-partial fix, claiming
+`rcp_mock_server_tick()`/`_watchdog_purge()`/`_pending_count()` still
+resolved their target endpoint via the unscoped `find_slot(byte_bus_id)`.
+Verified against the current codebase first, per this issue's own note
+to do so: PR #453 (closing #447, merged immediately prior in this
+session) had already added `rcp_mock_server_tick_on_stream()`/
+`_watchdog_purge_on_stream()`/`_pending_count_on_stream()`
+(REQ-MOCK-032), each already routing through `find_slot_on_stream()`,
+and already regression-tested
+(`test_tick_on_stream_targets_correct_slot`,
+`test_pending_count_on_stream_and_watchdog_purge_on_stream_target_correct_slot`).
+No code gap remains for any function this issue named. Closed as
+already-resolved, no further `_on_stream()` variants added (avoiding a
+duplicate of #453's own work).
+
+Verification: full 66-test suite 100% pass (Debug); ASan/UBSan
+(`-fsanitize=address,undefined -fno-sanitize-recover=all -g -O1`) 100%
+pass, clean; `cfusa check`: 0 errors; `cfusa trace`: 1088/1088
+requirements traced and tested (unchanged -- REQ-RMAP-054 was already
+traced/tested via `src/regmap.c`/`tests/test_tc18_gaps_regmap.c`; this
+fix wires an existing, already-covered primitive into
+`rcp_mock_server_new()`, adding no new requirement).
+
+>>>>>>> ca31e31 (fix: rcp_mock_server_new() seeds EP_ID_config power-on default (closes #459, #464))
 ### v0.371.0 -- 2026-08-16 (REQ-DISC-002/007: discovery request
 unique_id=0x0000 investigated and closed -- no server-side check needed)
 
@@ -19206,6 +19264,7 @@ issue #456 correction, REQ-SPI-\*'s issue #256 Group C trigger-model
 clarifications). Full clean rebuild, full 66-test suite unchanged (no
 behavior touched, so no ASan/UBSan pass or mutation test required);
 `cfusa check`/`trace` (v0.5.54): 0 errors, 1088/1088 traced and tested.
+
 ### v0.370.0 -- 2026-08-16 (two stale-documentation corrections:
 REQ-LIFECYCLE-011's citation, e2e.h's regmap.h cross-reference)
 
