@@ -190,12 +190,39 @@ static rcp_server_pending_t *claim_slot(rcp_server_endpoint_t *ep)
     return NULL;
 }
 
+/* Shared by rcp_server_endpoint_admit_with_ack()'s own store-success paths
+ * (issue #463, REQ-SRV-016): builds a genuine Acknowledge response into
+ * *out_ack when frame's own evt[3] requests one
+ * (rcp_acf_evt_requests_acknowledge()), mirroring rcp_server_endpoint_
+ * submit()'s identical, already-established logic (this file, above) --
+ * duplicated rather than shared by a direct call because submit() folds
+ * this check into its own single early-return control flow, while this
+ * function's callers reach a store-success outcome from several different
+ * places (admit_under_tscf_gate()'s two callers, and the conditional-
+ * request switch's own shared final return). Leaves *out_ack zeroed
+ * (data=NULL) if out_ack is NULL, frame is too short to hold a header, or
+ * evt[3] is clear -- the same fail-safe defaults submit() already applies. */
+static void build_store_ack(const uint8_t *frame, size_t frame_len, rcp_bytes_t *out_ack)
+{
+    rcp_acf_byte_message_info_t hdr;
+
+    if (!out_ack) return;
+    *out_ack = (rcp_bytes_t){0};
+
+    if (frame_len < 8) return;
+    if (rcp_acf_unpack_header(frame, &hdr) != RCP_ACF_OK) return;
+    if (!rcp_acf_evt_requests_acknowledge(hdr.evt)) return;
+
+    *out_ack = rcp_acf_build_acknowledge_response(hdr.byte_bus_id, hdr.transaction_num);
+}
+
 //cfusa:req REQ-SRV-004
 //cfusa:req REQ-SRV-005
 //cfusa:req REQ-SRV-019
 //cfusa:req REQ-SRV-022
 //cfusa:req REQ-PWRMODE-028
 //cfusa:req REQ-ACF-021
+//cfusa:req REQ-SRV-016
 /* REQ-TIMED-012 (issue #336, extended by issue #422): claims a fresh slot
  * for a request carried under a TSCF header that has no kind-specific
  * execution condition of its own -- a standard request that would
@@ -214,12 +241,18 @@ static rcp_server_pending_t *claim_slot(rcp_server_endpoint_t *ep)
  * full) or RCP_SERVER_ADMIT_PENDING. Named generically (not "_standard_")
  * because issue #422 made this the shared gate helper for both kinds --
  * duplicating claim_slot()/frame-dup/gate-set logic a third time would
- * be the real defect here, not just the missing cancellation gate. */
+ * be the real defect here, not just the missing cancellation gate.
+ *
+ * out_ack (issue #463, REQ-SRV-016): built via build_store_ack() on the
+ * successful (RCP_SERVER_ADMIT_PENDING) return only -- a request reaching
+ * this store is exactly "successfully queued for execution in the
+ * addressed endpoint's request storage" per TC18 §12.9.5's own generic
+ * wording, whether its kind is Standard or Cancellation. May be NULL. */
 static rcp_server_admit_t admit_under_tscf_gate(rcp_server_endpoint_t *ep,
                                                  const uint8_t *frame, size_t frame_len,
                                                  uint32_t now, uint64_t presentation_gate_ns,
                                                  rcp_sched_kind_t kind, uint8_t request_type,
-                                                 size_t *out_index)
+                                                 size_t *out_index, rcp_bytes_t *out_ack)
 {
     rcp_server_pending_t *slot = claim_slot(ep);
 
@@ -237,6 +270,7 @@ static rcp_server_admit_t admit_under_tscf_gate(rcp_server_endpoint_t *ep,
     }
 
     if (out_index) *out_index = (size_t)(slot - &ep->pending[0]);
+    build_store_ack(frame, frame_len, out_ack);
     return RCP_SERVER_ADMIT_PENDING;
 }
 
@@ -246,6 +280,25 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
                                               uint64_t gptp_reference_now,
                                               uint8_t *out_request_type,
                                               size_t *out_index, rcp_wire_error_t *out_error)
+{
+    /* issue #463, REQ-SRV-016: this wrapper never wanted the acknowledge
+     * rcp_server_endpoint_admit_with_ack() (below) now knows how to build
+     * -- every one of this function's own existing callers passes NULL
+     * here, exactly as before this fix. */
+    return rcp_server_endpoint_admit_with_ack(ep, frame, frame_len, now, tv, avtp_timestamp,
+                                               gptp_reference_now, out_request_type, out_index,
+                                               out_error, NULL);
+}
+
+//cfusa:req REQ-SRV-016
+rcp_server_admit_t rcp_server_endpoint_admit_with_ack(rcp_server_endpoint_t *ep,
+                                                       const uint8_t *frame, size_t frame_len,
+                                                       uint32_t now, bool tv,
+                                                       uint32_t avtp_timestamp,
+                                                       uint64_t gptp_reference_now,
+                                                       uint8_t *out_request_type, size_t *out_index,
+                                                       rcp_wire_error_t *out_error,
+                                                       rcp_bytes_t *out_ack)
 {
     uint8_t                     request_type = 0;
     rcp_sched_kind_t            kind;
@@ -264,6 +317,11 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
 
     *out_request_type = 0;
     if (out_error) *out_error = RCP_ERROR_NONE;
+    /* issue #463, REQ-SRV-016: zeroed up front, the same convention
+     * rcp_server_endpoint_submit() already establishes for out_ack --
+     * every return path below either leaves this alone (no ack) or
+     * overwrites it via build_store_ack()/submit()'s own identical gate. */
+    if (out_ack) *out_ack = (rcp_bytes_t){0};
 
     /* REQ-PWRMODE-028 (TC18 §13.7.2.3 step 1): checked before frame is
      * inspected at all -- a request arriving during a sleep-request drain
@@ -289,14 +347,16 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
     if (rcp_compound_peek_request_type(frame, frame_len, &request_type) != RCP_COMPOUND_OK) {
         if (tv) {
             return admit_under_tscf_gate(ep, frame, frame_len, now, presentation_gate_ns,
-                                          RCP_SCHED_KIND_STANDARD, 0, out_index);
+                                          RCP_SCHED_KIND_STANDARD, 0, out_index, out_ack);
         }
-        /* NULL: admit()'s own signature does not yet propagate a queuing
-         * acknowledge to its caller -- a separate, not-yet-attempted
-         * integration step (REQ-SRV-016's own primitive is complete and
-         * directly reachable via rcp_server_endpoint_submit() itself). */
-        return rcp_server_endpoint_submit(ep, frame, frame_len, NULL) ? RCP_SERVER_ADMIT_EXECUTE_NOW
-                                                                       : RCP_SERVER_ADMIT_QUEUED;
+        /* issue #463: out_ack threaded straight through to submit() --
+         * submit()'s own REQ-SRV-016 out_ack logic (this file, above)
+         * already does exactly what TC18 §12.9.5 requires here: built
+         * when this call returns false (queued), left zeroed when it
+         * returns true (executed now, never queued at all). */
+        return rcp_server_endpoint_submit(ep, frame, frame_len, out_ack)
+                   ? RCP_SERVER_ADMIT_EXECUTE_NOW
+                   : RCP_SERVER_ADMIT_QUEUED;
     }
 
     kind = rcp_sched_classify(true, request_type);
@@ -308,14 +368,12 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
          * above. */
         if (tv) {
             return admit_under_tscf_gate(ep, frame, frame_len, now, presentation_gate_ns,
-                                          RCP_SCHED_KIND_STANDARD, 0, out_index);
+                                          RCP_SCHED_KIND_STANDARD, 0, out_index, out_ack);
         }
-        /* NULL: admit()'s own signature does not yet propagate a queuing
-         * acknowledge to its caller -- a separate, not-yet-attempted
-         * integration step (REQ-SRV-016's own primitive is complete and
-         * directly reachable via rcp_server_endpoint_submit() itself). */
-        return rcp_server_endpoint_submit(ep, frame, frame_len, NULL) ? RCP_SERVER_ADMIT_EXECUTE_NOW
-                                                                       : RCP_SERVER_ADMIT_QUEUED;
+        /* issue #463: see the identical submit() call immediately above. */
+        return rcp_server_endpoint_submit(ep, frame, frame_len, out_ack)
+                   ? RCP_SERVER_ADMIT_EXECUTE_NOW
+                   : RCP_SERVER_ADMIT_QUEUED;
     }
 
     *out_request_type = request_type;
@@ -339,7 +397,8 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
          * see that function's own doc comment). */
         if (tv) {
             return admit_under_tscf_gate(ep, frame, frame_len, now, presentation_gate_ns,
-                                          RCP_SCHED_KIND_CANCELLATION, request_type, out_index);
+                                          RCP_SCHED_KIND_CANCELLATION, request_type, out_index,
+                                          out_ack);
         }
         return RCP_SERVER_ADMIT_CANCELLATION;
     }
@@ -453,6 +512,11 @@ rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
     }
 
     if (out_index) *out_index = (size_t)(slot - &ep->pending[0]);
+    /* issue #463, REQ-SRV-016: every kind reaching this shared return
+     * (Compound, Compound Wait, Triggered, Timed, Chained) has just been
+     * "successfully queued for execution in the addressed endpoint's
+     * request storage" per TC18 §12.9.5's own generic wording. */
+    build_store_ack(frame, frame_len, out_ack);
     return RCP_SERVER_ADMIT_PENDING;
 }
 

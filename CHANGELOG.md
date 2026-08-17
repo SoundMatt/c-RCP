@@ -34,6 +34,48 @@ the rationale.
 
 ## Releases
 
+### v0.381.0 -- 2026-08-16 (admit() now builds the REQ-SRV-016 Acknowledge on every successful admission, not just via submit())
+
+Closes issue #463. TC18 §12.9.5's own generic wording -- "an acknowledge
+is given if requested as soon as the new request has been successfully
+queued for execution in the addressed endpoint's request storage" -- is
+worded over the whole endpoint request storage, not scoped to a Standard
+request. Only `rcp_server_endpoint_submit()` (the Standard-request path)
+ever built this acknowledge; `rcp_server_endpoint_admit()` -- the function
+that actually files Compound/Compound-Wait/Triggered/Timed/Chained
+requests and, via its TSCF gate, Standard/Cancellation requests into the
+request store -- never built or returned one at all, a gap its own doc
+comment already named explicitly.
+
+New `rcp_server_endpoint_admit_with_ack()` (`server.h`/`server.c`) is
+`admit()`'s own out_ack-carrying sibling, added via this codebase's
+established "new function, not a breaking change" pattern rather than
+changing `admit()`'s signature -- every one of its many existing callers
+is unaffected; `admit()` itself is now a thin wrapper forwarding
+out_ack=NULL. A new `build_store_ack()` helper mirrors `submit()`'s own
+evt[3] "if requested" logic and fires at every point admission reaches a
+genuine "successfully queued... in the addressed endpoint's request
+storage" outcome (both `admit_under_tscf_gate()` call sites and the
+conditional-request switch's shared final return) -- correctly excluding
+immediate execution, cancellation, rejection (issue #454's own separate
+rejection-shape logic, unaffected), and suspension. `mock.c`'s
+`dispatch_plain_inner()` now calls the new function and `finish_admission()`
+transfers the built ack into the response for the QUEUED/PENDING outcomes,
+composing cleanly alongside #454's already-merged rejection logic; one
+leak guard was added for the pre-existing sequencer-access-control path
+that can admit then immediately cancel a Compound/Compound-Wait request.
+
+Six new tests (two at the `server.h` unit level, two each at the `mock.c`
+dispatch level for QUEUED and PENDING) prove both halves of REQ-SRV-016's
+conditional wording -- evt[3]=1 produces a real, correctly-addressed
+Acknowledge (err=0, distinct from #454's own err=1 rejection shape),
+evt[3]=0 produces none -- while #454's own rejection-path tests were
+re-run unmodified as a regression guard and remain green. Mutation-tested:
+reverting just this fix makes the four "emits acknowledge" tests fail
+exactly as expected (two at compile time, two at runtime) while the two
+"no acknowledge" tests keep passing. 66/66 tests green (native +
+ASan/UBSan); `cfusa check`: 0 errors; `cfusa trace`: 1089/1089 traced and
+tested.
 ### v0.380.0 -- 2026-08-16 (ISELED read-direction command request added)
 
 Closes issue #471. `ep_iseled.c`/`.h` modeled only a single, write-direction

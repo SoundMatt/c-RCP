@@ -399,13 +399,67 @@ typedef enum {
  * TSCF header, since this module has no mechanism today for a "postponed
  * action" (as opposed to a postponed stored request); TSCF-gated
  * cancellation stays this requirement's own remaining, separately-scoped
- * gap. gptp_reference_now is meaningless while tv is false. */
+ * gap. gptp_reference_now is meaningless while tv is false.
+ *
+ * FIXED 2026-08-16 (issue #463, REQ-SRV-016): this function itself never
+ * builds an Acknowledge response -- see rcp_server_endpoint_admit_with_
+ * ack()'s own doc comment immediately below for the fix. Kept as a thin
+ * wrapper (out_ack forced NULL) so none of this function's many existing
+ * callers (every one of them positional, several inside this same header's
+ * own test suite) needs to change -- the "new function, not a breaking
+ * change" pattern rcp_mock_server_add_endpoint_on_stream() (issue #432)
+ * already established elsewhere in this codebase. */
 rcp_server_admit_t rcp_server_endpoint_admit(rcp_server_endpoint_t *ep,
                                               const uint8_t *frame, size_t frame_len,
                                               uint32_t now, bool tv, uint32_t avtp_timestamp,
                                               uint64_t gptp_reference_now,
                                               uint8_t *out_request_type,
                                               size_t *out_index, rcp_wire_error_t *out_error);
+
+/* FIXED 2026-08-16 (issue #463, REQ-SRV-016): TC18 §12.9.5's own generic
+ * wording -- "an acknowledge is given if requested as soon as the new
+ * request has been successfully queued for execution in the addressed
+ * endpoint's request storage" -- is worded over the whole endpoint request
+ * storage (both ep->queue, the standard-request FIFO, and ep->pending, the
+ * conditional-request store), not scoped to a Standard request the way
+ * rcp_server_endpoint_submit()'s own REQ-SRV-016 fix (issue #201) reads.
+ * rcp_server_endpoint_admit() (immediately above) already routes a
+ * Standard request to submit() (whose own out_ack this function now
+ * threads through unchanged) but never built one itself for a
+ * Compound/Compound-Wait/Triggered/Timed/Chained request placed in
+ * ep->pending, nor for a Standard/Cancellation request placed there via
+ * admit_under_tscf_gate() (REQ-TIMED-012's own TSCF presentation-time
+ * gate, server.c) -- both were a known, documented, but still-open gap
+ * (this function's file-header doc comment used to say so explicitly; see
+ * mock.c's suppress_response_per_stream_cfg() for where the wiring
+ * finally lands).
+ *
+ * out_ack may be NULL if the caller doesn't want this (rcp_server_
+ * endpoint_admit() above passes NULL). Left zeroed (data=NULL) unless
+ * this call's own outcome is RCP_SERVER_ADMIT_QUEUED or RCP_SERVER_ADMIT_
+ * PENDING -- the two outcomes that mean "successfully queued... in the
+ * addressed endpoint's request storage" per TC18's own wording quoted
+ * above -- AND frame's own evt[3] requested one
+ * (rcp_acf_evt_requests_acknowledge(), acf.h). RCP_SERVER_ADMIT_EXECUTE_
+ * NOW (the request runs immediately -- never queued at all) and RCP_
+ * SERVER_ADMIT_CANCELLATION (applied immediately, never stored) are
+ * correctly excluded, as is RCP_SERVER_ADMIT_REJECTED (nothing was filed;
+ * see mock.c's own admission_reject_response_shape(), issue #454, for
+ * that separate response shape) and RCP_SERVER_ADMIT_SUSPENDED (nothing
+ * was even inspected). When built, *out_ack is a genuine Acknowledge
+ * response (rcp_acf_build_acknowledge_response()) addressed to the
+ * request's own byte_bus_id/transaction_num -- caller frees it with
+ * rcp_bytes_free(). Fail-safe if frame is too short to even hold a header:
+ * no ack is fabricated for a request this module cannot actually decode --
+ * the same rule rcp_server_endpoint_submit() already applies. */
+rcp_server_admit_t rcp_server_endpoint_admit_with_ack(rcp_server_endpoint_t *ep,
+                                                       const uint8_t *frame, size_t frame_len,
+                                                       uint32_t now, bool tv,
+                                                       uint32_t avtp_timestamp,
+                                                       uint64_t gptp_reference_now,
+                                                       uint8_t *out_request_type, size_t *out_index,
+                                                       rcp_wire_error_t *out_error,
+                                                       rcp_bytes_t *out_ack);
 
 /* ── The execution-condition tick ─────────────────────────────────────────── */
 
