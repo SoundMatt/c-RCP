@@ -198,15 +198,18 @@ const char *rcp_acf_strerror(rcp_acf_errc_t e);
 
 /* ── mtv: message-timestamp validity (ACF_GBB only) ───────────────────────── */
 
-/* mtv is a single wire bit (Table 4): whether the message_timestamp region
- * (only present for ACF_GBB) holds a genuinely valid timestamp. There is
- * no third "uncertain" wire state -- an earlier revision of this header
- * modeled one (RCP_ACF_MTV_UNCERTAIN) in a 2-bit field of its own
- * invention; that field never had a real TC18 encoding and has been
- * removed. Callers that need to represent "timestamp present but not
- * trustworthy" must fold that into RCP_ACF_MTV_UNTIMED, the same
- * "not confidently timed" treatment rcp_acf_gbb_is_timed() already gives
- * it. */
+/* mtv is a single wire bit: whether the message_timestamp region (only
+ * present for ACF_GBB) holds a genuinely valid timestamp. There is no third
+ * "uncertain" wire state -- Table 17 (general responses usage, §11.3)
+ * spells out both encodings in full ("0b - message_timestamp not valid ...
+ * / 1b - message_timestamp valid ..."), and every other GBB-usage table in
+ * the specification (Table 4 included) is consistent with that same
+ * two-value field. An earlier revision of this header modeled a third
+ * state (RCP_ACF_MTV_UNCERTAIN) in a 2-bit field of its own invention;
+ * that field never had a real TC18 encoding and has been removed. Callers
+ * that need to represent "timestamp present but not trustworthy" must fold
+ * that into RCP_ACF_MTV_UNTIMED, the same "not confidently timed"
+ * treatment rcp_acf_gbb_is_timed() already gives it. */
 typedef enum {
     RCP_ACF_MTV_UNTIMED = 0,
     RCP_ACF_MTV_VALID   = 1,
