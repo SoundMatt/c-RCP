@@ -2866,7 +2866,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7's Table 35 (Table 32 in TC18 0.5.1_RC1) (\"0x0002.0 ep_enable ... indicating if the endpoint is enabled to executed requests from its request storage\"), TC18.txt L4300-4304 -- citation-drift correction: the existing text says \"\u00a712.3's Table 32\", but \u00a712.3 is TC18's Lifecycle chapter, unrelated; Table 32 (RC1 numbering, Table 35 under the current 0.5.1_RC5 numbering used by the authoritative PDF) is actually defined under \u00a713.7 Types of endpoints (TC18.txt L4293), confirmed against both TC18.txt and a fresh pdftotext extraction of OA_TC18_specification_v_0.5.1_RC_5_3624.pdf."
+      "tc18": "\u00a713.7's Table 35 (Table 32 in TC18 0.5.1_RC1) (\"0x0002.0 ep_enable ... indicating if the endpoint is enabled to executed requests from its request storage\"), TC18.txt L4300-4304 -- citation-drift correction: the existing text says \"\u00a712.3's Table 32\", but \u00a712.3 is TC18's Lifecycle chapter, unrelated; Table 32 (RC1 numbering, Table 35 under the current 0.5.1_RC5 numbering used by the authoritative PDF) is actually defined under \u00a713.7 Types of endpoints (TC18.txt L4293), confirmed against both TC18.txt and a fresh pdftotext extraction of OA_TC18_specification_v_0.5.1_RC_5_3624.pdf.",
+      "tc18_master_id": "TC18-13.7-001"
     },
     {
       "id": "REQ-SRV-002",
@@ -2877,7 +2878,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7's Table 35 (Table 32 in TC18 0.5.1_RC1) (\"0x0002.0 ep_enable ... indicating if the endpoint is enabled to executed requests from its request storage\"), TC18.txt L4300-4304 -- same citation-drift correction as REQ-SRV-001/003: \u00a712.3 is Lifecycle, not where Table 32/35 lives (\u00a713.7)."
+      "tc18": "\u00a713.7's Table 35 (Table 32 in TC18 0.5.1_RC1) (\"0x0002.0 ep_enable ... indicating if the endpoint is enabled to executed requests from its request storage\"), TC18.txt L4300-4304 -- same citation-drift correction as REQ-SRV-001/003: \u00a712.3 is Lifecycle, not where Table 32/35 lives (\u00a713.7).",
+      "tc18_master_id": "TC18-13.7-001"
     },
     {
       "id": "REQ-SRV-003",
@@ -2888,7 +2890,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.7's Table 35 (Table 32 in TC18 0.5.1_RC1) (\"0x0002.0 ep_enable ... indicating if the endpoint is enabled to executed requests from its request storage\"), TC18.txt L4300-4304 -- same citation-drift correction as REQ-SRV-001/002."
+      "tc18": "\u00a713.7's Table 35 (Table 32 in TC18 0.5.1_RC1) (\"0x0002.0 ep_enable ... indicating if the endpoint is enabled to executed requests from its request storage\"), TC18.txt L4300-4304 -- same citation-drift correction as REQ-SRV-001/002.",
+      "tc18_master_id": "TC18-13.7-001"
     },
     {
       "id": "REQ-LIFECYCLE-021",
@@ -5741,7 +5744,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 (\"If the MSB of the identifier (0x8x) is set the request is treated as a safety request and will not be deleted when the EP needs to go to safe state.\"), TC18.txt L1258-1259"
+      "tc18": "\u00a711.2.2 (\"If the MSB of the identifier (0x8x) is set the request is treated as a safety request and will not be deleted when the EP needs to go to safe state.\"), TC18.txt L1258-1259",
+      "tc18_master_id": "TC18-11.2.2-001"
     },
     {
       "id": "REQ-CMP-002",
@@ -5752,7 +5756,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 Table 5 (request_type 0x0F/0x8F = Compound), TC18.txt L1262"
+      "tc18": "\u00a711.2.2 Table 5 (request_type 0x0F/0x8F = Compound), TC18.txt L1262",
+      "tc18_master_id": "TC18-11.2.2-002"
     },
     {
       "id": "REQ-CMP-003",
@@ -5763,7 +5768,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 Table 5 (request_type 0x0B/0x8B = Compound wait), TC18.txt L1263"
+      "tc18": "\u00a711.2.2 Table 5 (request_type 0x0B/0x8B = Compound wait), TC18.txt L1263",
+      "tc18_master_id": "TC18-11.2.2-002"
     },
     {
       "id": "REQ-CMP-004",
@@ -5784,7 +5790,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258; general ACF_GBB frame-validation basis"
+      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258; general ACF_GBB frame-validation basis",
+      "tc18_master_id": "TC18-11.2-005"
     },
     {
       "id": "REQ-CMP-006",
@@ -5795,7 +5802,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258"
+      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258",
+      "tc18_master_id": "TC18-11.2-005"
     },
     {
       "id": "REQ-CMP-007",
@@ -5806,7 +5814,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 Table 5 (\"first byte in message_timestamp field\" -> \"type of condition\": 0x0F/0x8F Compound, 0x0B/0x8B Compound wait), TC18.txt L1254-1267"
+      "tc18": "\u00a711.2.2 Table 5 (\"first byte in message_timestamp field\" -> \"type of condition\": 0x0F/0x8F Compound, 0x0B/0x8B Compound wait), TC18.txt L1254-1267",
+      "tc18_master_id": "TC18-11.2.2-002"
     },
     {
       "id": "REQ-CMP-008",
@@ -5839,7 +5848,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.3 Figure 9 (compound-wait GBB sub-field offsets), TC18.txt L1494-1506"
+      "tc18": "\u00a711.2.2.3 Figure 9 (compound-wait GBB sub-field offsets), TC18.txt L1494-1506",
+      "tc18_master_id": "TC18-11.2.2.3-005"
     },
     {
       "id": "REQ-CMP-011",
@@ -5850,7 +5860,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258; general ACF_GBB frame-validation basis"
+      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258; general ACF_GBB frame-validation basis",
+      "tc18_master_id": "TC18-11.2-005"
     },
     {
       "id": "REQ-CMP-012",
@@ -5861,7 +5872,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258; general ACF_GBB frame-validation basis"
+      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258; general ACF_GBB frame-validation basis",
+      "tc18_master_id": "TC18-11.2-005"
     },
     {
       "id": "REQ-CMP-013",
@@ -5872,7 +5884,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258"
+      "tc18": "\u00a711.2.2 (\"conditional requests are sent using ACF_GBB having mtv = 0 (time stamp not valid) and using the bytes of the message_timestamp field to convey the execution condition\"), TC18.txt L1255-1258",
+      "tc18_master_id": "TC18-11.2-005"
     },
     {
       "id": "REQ-CMP-014",
@@ -5883,7 +5896,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2 Table 5 (\"first byte in message_timestamp field\" -> \"type of condition\": 0x0F/0x8F Compound, 0x0B/0x8B Compound wait), TC18.txt L1254-1267"
+      "tc18": "\u00a711.2.2 Table 5 (\"first byte in message_timestamp field\" -> \"type of condition\": 0x0F/0x8F Compound, 0x0B/0x8B Compound wait), TC18.txt L1254-1267",
+      "tc18_master_id": "TC18-11.2.2-002"
     },
     {
       "id": "REQ-CMP-015",
@@ -5894,7 +5908,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.3 Figure 9 (compound-wait GBB sub-field offsets), TC18.txt L1494-1506"
+      "tc18": "\u00a711.2.2.3 Figure 9 (compound-wait GBB sub-field offsets), TC18.txt L1494-1506",
+      "tc18_master_id": "TC18-11.2.2.3-005"
     },
     {
       "id": "REQ-CMP-016",
@@ -5905,7 +5920,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3.2 Table 14 (clear-non-safestate, request_type 0x06), TC18.txt L2093-2124"
+      "tc18": "\u00a711.2.3.2 Table 14 (clear-non-safestate, request_type 0x06), TC18.txt L2093-2124",
+      "tc18_master_id": "TC18-11.2.3.2-004"
     },
     {
       "id": "REQ-CMP-017",
@@ -5916,7 +5932,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3.2 Figure 15 (clear-non-safestate GBB layout), TC18.txt L2073-2082"
+      "tc18": "\u00a711.2.3.2 Figure 15 (clear-non-safestate GBB layout), TC18.txt L2073-2082",
+      "tc18_master_id": "TC18-11.2.3.2-002"
     },
     {
       "id": "REQ-CMP-018",
@@ -5927,7 +5944,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3.2 Table 14 (clear-non-safestate, request_type 0x06), TC18.txt L2093-2124"
+      "tc18": "\u00a711.2.3.2 Table 14 (clear-non-safestate, request_type 0x06), TC18.txt L2093-2124",
+      "tc18_master_id": "TC18-11.2.3.2-004"
     },
     {
       "id": "REQ-CMP-019",
@@ -5938,7 +5956,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.2 (\"the state (cmp_next_state) the sequencer shall enter after the compound request has been executed (if the sequencer is still in cmp_start_state)\"), TC18.txt L1385-1387"
+      "tc18": "\u00a711.2.2.2 (\"the state (cmp_next_state) the sequencer shall enter after the compound request has been executed (if the sequencer is still in cmp_start_state)\"), TC18.txt L1385-1387",
+      "tc18_master_id": "TC18-11.2.2.2-007"
     },
     {
       "id": "REQ-CMP-020",
@@ -5949,7 +5968,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.2 Table 7 (\"cmp_exec_delay: delay time between the sequencer reaching the state defined in start_state and the start of the execution of the request... execution shall happen even in case the state changes before the delay expired\"), TC18.txt L1439-1442"
+      "tc18": "\u00a711.2.2.2 Table 7 (\"cmp_exec_delay: delay time between the sequencer reaching the state defined in start_state and the start of the execution of the request... execution shall happen even in case the state changes before the delay expired\"), TC18.txt L1439-1442",
+      "tc18_master_id": "TC18-11.2.2.2-007"
     },
     {
       "id": "REQ-CMP-021",
@@ -5960,7 +5980,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.2 Table 7 / Figure 8 (GBB message for compound requests: request_type, cmp_start_state, cmp_next_state, cmp_sequencer, cmp_exec_delay, cmp_repetitions), TC18.txt L1379-1458; \"If cmp_next_state is = 0 then the sequencer remains in the current state, when the execution is finalized.\", TC18.txt L1387-1388"
+      "tc18": "\u00a711.2.2.2 Table 7 / Figure 8 (GBB message for compound requests: request_type, cmp_start_state, cmp_next_state, cmp_sequencer, cmp_exec_delay, cmp_repetitions), TC18.txt L1379-1458; \"If cmp_next_state is = 0 then the sequencer remains in the current state, when the execution is finalized.\", TC18.txt L1387-1388",
+      "tc18_master_id": "TC18-11.2.2.2-007"
     },
     {
       "id": "REQ-CMP-022",
@@ -5971,7 +5992,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.2 Table 7 (\"cmp_exec_delay: delay time between the sequencer reaching the state defined in start_state and the start of the execution of the request... execution shall happen even in case the state changes before the delay expired\"), TC18.txt L1439-1442; \u00a711.2.2.2 (\"the state (cmp_next_state) the sequencer shall enter after the compound request has been executed (if the sequencer is still in cmp_start_state)\"), TC18.txt L1385-1387"
+      "tc18": "\u00a711.2.2.2 Table 7 (\"cmp_exec_delay: delay time between the sequencer reaching the state defined in start_state and the start of the execution of the request... execution shall happen even in case the state changes before the delay expired\"), TC18.txt L1439-1442; \u00a711.2.2.2 (\"the state (cmp_next_state) the sequencer shall enter after the compound request has been executed (if the sequencer is still in cmp_start_state)\"), TC18.txt L1385-1387",
+      "tc18_master_id": "TC18-11.2.2.2-007"
     },
     {
       "id": "REQ-CMP-023",
@@ -5982,7 +6004,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.3 (\"When the check finds that the condition is met the cmpw_exec_delay needs to expire before a response is generated, else the request execution is finalized without further action.\"), TC18.txt L1480-1482; \u00a711.2.2.2 (\"the state (cmp_next_state) the sequencer shall enter after the compound request has been executed (if the sequencer is still in cmp_start_state)\"), TC18.txt L1385-1387"
+      "tc18": "\u00a711.2.2.3 (\"When the check finds that the condition is met the cmpw_exec_delay needs to expire before a response is generated, else the request execution is finalized without further action.\"), TC18.txt L1480-1482; \u00a711.2.2.2 (\"the state (cmp_next_state) the sequencer shall enter after the compound request has been executed (if the sequencer is still in cmp_start_state)\"), TC18.txt L1385-1387",
+      "tc18_master_id": "TC18-11.2.2.3-002"
     },
     {
       "id": "REQ-CMP-024",
@@ -5993,7 +6016,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.3 (\"When the check finds that the condition is met the cmpw_exec_delay needs to expire before a response is generated, else the request execution is finalized without further action.\"), TC18.txt L1480-1482"
+      "tc18": "\u00a711.2.2.3 (\"When the check finds that the condition is met the cmpw_exec_delay needs to expire before a response is generated, else the request execution is finalized without further action.\"), TC18.txt L1480-1482",
+      "tc18_master_id": "TC18-11.2.2.3-002"
     },
     {
       "id": "REQ-TRIG-001",
@@ -9035,7 +9059,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.2 (\"If cmp_start_state = 0 then the request shall be started in any state unless the sequencer is disabled which will prohibit the execution of the compound request.\"), TC18.txt L1389-1391; same rule for compound-wait, \u00a711.2.2.3, TC18.txt L1489-1491"
+      "tc18": "\u00a711.2.2.2 (\"If cmp_start_state = 0 then the request shall be started in any state unless the sequencer is disabled which will prohibit the execution of the compound request.\"), TC18.txt L1389-1391; same rule for compound-wait, \u00a711.2.2.3, TC18.txt L1489-1491",
+      "tc18_master_id": "TC18-11.2.2.2-002"
     },
     {
       "id": "REQ-CMP-026",
@@ -9046,7 +9071,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1, TC18.txt L4134-4136"
+      "tc18": "\u00a713.5.1, TC18.txt L4134-4136",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-CMP-027",
@@ -9057,7 +9083,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1, TC18.txt L4134-4136"
+      "tc18": "\u00a713.5.1, TC18.txt L4134-4136",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-CMP-028",
@@ -9068,7 +9095,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3.2 Table 14 (\"reserved: All bits shall be written as 0, else the request shall be rejected\"), TC18.txt L2093-2097"
+      "tc18": "\u00a711.2.3.2 Table 14 (\"reserved: All bits shall be written as 0, else the request shall be rejected\"), TC18.txt L2093-2097",
+      "tc18_master_id": "TC18-11.2.3.2-004"
     },
     {
       "id": "REQ-CMP-029",
@@ -9079,7 +9107,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.3.2 Table 14 (\"evt[2:0], hs, cs: All bits shall be written as 0, else the request shall be rejected with error code = UNSUPPORTED_CMD\"), TC18.txt L2118-2124"
+      "tc18": "\u00a711.2.3.2 Table 14 (\"evt[2:0], hs, cs: All bits shall be written as 0, else the request shall be rejected with error code = UNSUPPORTED_CMD\"), TC18.txt L2118-2124",
+      "tc18_master_id": "TC18-11.2.3.2-004"
     },
     {
       "id": "REQ-TIMED-009",
@@ -9145,7 +9174,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.9.1.1 (\"An RC Server shall support to handle multiple requests in one frame and check each of them individually if to be processed or not\"), TC18.txt L3619-3621; request_type identifiers per \u00a711.2.2 Table 5, TC18.txt L1254-1267"
+      "tc18": "\u00a712.9.1.1 (\"An RC Server shall support to handle multiple requests in one frame and check each of them individually if to be processed or not\"), TC18.txt L3619-3621; request_type identifiers per \u00a711.2.2 Table 5, TC18.txt L1254-1267",
+      "tc18_master_id": "TC18-12.9.1.1-002"
     },
     {
       "id": "REQ-SRV-005",
@@ -9156,7 +9186,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.9.1.1 (\"An RC Server shall support to handle multiple requests in one frame and check each of them individually if to be processed or not\"), TC18.txt L3619-3621; request_type identifiers per \u00a711.2.2 Table 5, TC18.txt L1254-1267; UNSUPPORTED_CMD error-code basis per \u00a711.2.2.1/.2's own optional-feature-not-supported rule, TC18.txt L1286-1287, L1379-1380"
+      "tc18": "\u00a712.9.1.1 (\"An RC Server shall support to handle multiple requests in one frame and check each of them individually if to be processed or not\"), TC18.txt L3619-3621; request_type identifiers per \u00a711.2.2 Table 5, TC18.txt L1254-1267; UNSUPPORTED_CMD error-code basis per \u00a711.2.2.1/.2's own optional-feature-not-supported rule, TC18.txt L1286-1287, L1379-1380",
+      "tc18_master_id": "TC18-12.9.1.1-002"
     },
     {
       "id": "REQ-SRV-006",
@@ -9167,7 +9198,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.9.2 (\"Whenever an Endpoint is able to start a new request, it shall check for all requests in the EP request storage whether they are due for execution\" ... priority list: 1. cancellation 2. triggered 3. timed 4. compound 5. compound wait 6. chained 7. standard), TC18.txt L3652-3663; \u00a712.9.3 Table 29, Compound row (\"the state advances to RE as soon as the EP is idle and no request with higher priority is pending\"), TC18.txt L3700-3701"
+      "tc18": "\u00a712.9.2 (\"Whenever an Endpoint is able to start a new request, it shall check for all requests in the EP request storage whether they are due for execution\" ... priority list: 1. cancellation 2. triggered 3. timed 4. compound 5. compound wait 6. chained 7. standard), TC18.txt L3652-3663; \u00a712.9.3 Table 29, Compound row (\"the state advances to RE as soon as the EP is idle and no request with higher priority is pending\"), TC18.txt L3700-3701",
+      "tc18_master_id": "TC18-12.9.3-002"
     },
     {
       "id": "REQ-SRV-007",
@@ -9178,7 +9210,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.9.2 (\"Whenever an Endpoint is able to start a new request, it shall check for all requests in the EP request storage whether they are due for execution\" ... priority list: 1. cancellation 2. triggered 3. timed 4. compound 5. compound wait 6. chained 7. standard), TC18.txt L3652-3663; safety-tagged (MSB-set) requests staying in the store until the endpoint's safe state per \u00a711.2.2, TC18.txt L1258-1259 (already implemented as REQ-E2E-012/013's e2e.h gate, rcp_e2e_request_may_execute())"
+      "tc18": "\u00a712.9.2 (\"Whenever an Endpoint is able to start a new request, it shall check for all requests in the EP request storage whether they are due for execution\" ... priority list: 1. cancellation 2. triggered 3. timed 4. compound 5. compound wait 6. chained 7. standard), TC18.txt L3652-3663; safety-tagged (MSB-set) requests staying in the store until the endpoint's safe state per \u00a711.2.2, TC18.txt L1258-1259 (already implemented as REQ-E2E-012/013's e2e.h gate, rcp_e2e_request_may_execute())",
+      "tc18_master_id": "TC18-11.2.2-001"
     },
     {
       "id": "REQ-SRV-008",
@@ -9189,7 +9222,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.9.2 (\"When two or more requests with the same priority are due then starting the execution shall happen in the order with which the requests arrived in the EP request storage.\"), TC18.txt L3663-3664"
+      "tc18": "\u00a712.9.2 (\"When two or more requests with the same priority are due then starting the execution shall happen in the order with which the requests arrived in the EP request storage.\"), TC18.txt L3663-3664",
+      "tc18_master_id": "TC18-12.9.2-004"
     },
     {
       "id": "REQ-SRV-009",
@@ -9200,7 +9234,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.9.3 Table 29 (execution procedure per request type -- compound/compound-wait sequencer-state advance and repeat_count decrement, triggered request's exec_delay-from-threshold timing), TC18.txt L3678-3739"
+      "tc18": "\u00a712.9.3 Table 29 (execution procedure per request type -- compound/compound-wait sequencer-state advance and repeat_count decrement, triggered request's exec_delay-from-threshold timing), TC18.txt L3678-3739",
+      "tc18_master_id": "TC18-12.9.3-002"
     },
     {
       "id": "REQ-SRV-010",
@@ -9211,7 +9246,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.9.3 Table 29 (execution procedure per request type), TC18.txt L3678-3739 -- repeat_count 0xFFFF-infinite / zero-removes-on-finalize rule shared with Table 7/8, TC18.txt L1439-1442, L1494-1506"
+      "tc18": "\u00a712.9.3 Table 29 (execution procedure per request type), TC18.txt L3678-3739 -- repeat_count 0xFFFF-infinite / zero-removes-on-finalize rule shared with Table 7/8, TC18.txt L1439-1442, L1494-1506",
+      "tc18_master_id": "TC18-12.9.3-002"
     },
     {
       "id": "REQ-SRV-011",
@@ -9222,7 +9258,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.9.3 Table 29 (execution procedure per request type -- Triggered request row: \"Upon entering RS state the counted number of received trigger signals is reset to zero and newly arriving trigger signals are counted from zero\"), TC18.txt L3678-3739 (quote itself at L3690)"
+      "tc18": "\u00a712.9.3 Table 29 (execution procedure per request type -- Triggered request row: \"Upon entering RS state the counted number of received trigger signals is reset to zero and newly arriving trigger signals are counted from zero\"), TC18.txt L3678-3739 (quote itself at L3690)",
+      "tc18_master_id": "TC18-12.9.3-002"
     },
     {
       "id": "REQ-SRV-012",
@@ -9233,7 +9270,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a711.2.2.6 (\"the second and following requests always wait on the predecessor request to finish its execution\"), TC18.txt L1793-1794 (chapter reference)"
+      "tc18": "\u00a711.2.2.6 (\"the second and following requests always wait on the predecessor request to finish its execution\"), TC18.txt L1793-1794 (chapter reference)",
+      "tc18_master_id": "TC18-11.2.2.6-004"
     },
     {
       "id": "REQ-SRV-013",
@@ -9255,7 +9293,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "watch-dog-overflow queue-clearing rule for non-safety-tagged conditional requests (\"compound requests with 0x0F will be cleared from the queue while the requests with 0x8F remain active after watch-dog overflow\"), TC18.txt L1409-1411, L1500-1502 (compound-wait analogue)"
+      "tc18": "watch-dog-overflow queue-clearing rule for non-safety-tagged conditional requests (\"compound requests with 0x0F will be cleared from the queue while the requests with 0x8F remain active after watch-dog overflow\"), TC18.txt L1409-1411, L1500-1502 (compound-wait analogue)",
+      "tc18_master_id": "TC18-11.2.2.2-006"
     },
     {
       "id": "REQ-MOCK-021",
@@ -10984,7 +11023,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2594-L2596"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2594-L2596",
+      "tc18_master_id": "TC18-12.3.1.3-002"
     },
     {
       "id": "REQ-SRV-016",
@@ -10995,7 +11035,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a712.3.1.3, TC18.txt L2596-L2597"
+      "tc18": "\u00a712.3.1.3, TC18.txt L2596-L2597",
+      "tc18_master_id": "TC18-12.9.5-001"
     },
     {
       "id": "REQ-SRV-017",
@@ -11006,7 +11047,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "partial",
-      "tc18": "\u00a713.7.1.1, TC18.txt L4360-4368"
+      "tc18": "\u00a713.7.1.1, TC18.txt L4360-4368",
+      "tc18_master_id": "TC18-13.7.1.1-002"
     },
     {
       "id": "REQ-SRV-018",
@@ -11017,7 +11059,8 @@
       "asil": "QM",
       "scope": "tc18-gap",
       "status": "implemented",
-      "tc18": "\u00a713.7.1.3 Table 37, TC18.txt L4443-4451"
+      "tc18": "\u00a713.7.1.3 Table 37, TC18.txt L4443-4451",
+      "tc18_master_id": "TC18-13.7.1.3-001"
     },
     {
       "id": "REQ-SRV-019",
@@ -11028,7 +11071,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1, TC18.txt L4150-4151 (evt[2:0] = 011b reserved)"
+      "tc18": "\u00a713.5.1, TC18.txt L4150-4151 (evt[2:0] = 011b reserved)",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-SRV-020",
@@ -11050,7 +11094,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a712.9.2 (\"Each endpoint receives request via its dedicated EP request storage.\"), TC18.txt L3647"
+      "tc18": "\u00a712.9.2 (\"Each endpoint receives request via its dedicated EP request storage.\"), TC18.txt L3647",
+      "tc18_master_id": "TC18-12.9.2-001"
     },
     {
       "id": "REQ-SRV-022",
@@ -11061,7 +11106,8 @@
       "asil": "ASIL-B",
       "scope": "tc18",
       "status": "implemented",
-      "tc18": "\u00a713.5.1 (\"request shall be ignored and an err-response with error code = UNSUPPORTED_CMD shall be sent\"), TC18.txt L4150-4151"
+      "tc18": "\u00a713.5.1 (\"request shall be ignored and an err-response with error code = UNSUPPORTED_CMD shall be sent\"), TC18.txt L4150-4151",
+      "tc18_master_id": "TC18-13.5.1-002"
     },
     {
       "id": "REQ-TIMED-012",

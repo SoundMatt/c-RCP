@@ -34,6 +34,49 @@ the rationale.
 
 ## Releases
 
+### v0.404.0 -- 2026-08-17 (c-RCP-AUDIT-04: tc18_master_id backfill for REQ-CMP-*/REQ-SRV-*)
+
+Adds the `tc18_master_id` field (RCP-ARCHITECTURE.md canonical choice
+#6) to `.fusa-reqs.json`, scoped to the `REQ-CMP-*` and `REQ-SRV-*`
+categories -- another batch of the same multi-repo, multi-category
+effort v0.401.0 started, against the same 447-entry master TC18
+requirement catalog (`RELAY/docs/tc18-master-catalog.json`, v1.0.0).
+
+Purely additive: for every `REQ-CMP-*`/`REQ-SRV-*` entry that already
+carried a `tc18` citation, looked up the corresponding master-catalog
+entry by section + table/figure number, cross-checked against the
+catalog entry's own `summary`/`title`/`citation` before accepting the
+match (not on section number alone -- several sections carry more
+than one catalog entry), and added `tc18_master_id`. No other field
+touched; no `.c`/`.h` source changed.
+
+28 of `REQ-CMP-*`'s 29 entries matched (`REQ-CMP-004` has no `tc18`
+citation -- correctly left alone, no field added). 20 of
+`REQ-SRV-*`'s 22 entries matched. 4 entries are flagged, not guessed:
+`REQ-CMP-008`/`REQ-CMP-009` each cite both the compound (`§11.2.2.2`
+`Table 7`/`Figure 8`) and compound-wait (`§11.2.2.3` `Table 8`/
+`Figure 9`) GBB layouts side by side as their basis for rejecting an
+unrecognized `request_type`, with no single catalog entry covering
+both families at once; `REQ-SRV-013` covers three separate
+cancellation functions (`cancel_all`/`cancel_single`/
+`cancel_non_safestate`) grounded in three different subsections
+(`§11.2.3.1`/`.2`/`.3`) in one entry; `REQ-SRV-020` cites the whole
+`§13.5.1` compound-wait comparison subsection spanning both the
+byte-length-capping clause and the evt-comparison-mode clause with no
+single dominant one. Each left for follow-up rather than forced onto
+one candidate.
+
+`.fusa-reqs.json`-only change. Full 66-test suite clean (unchanged
+count); pinned `cfusa` (v0.5.54) `check`: 0 errors, `trace
+--req-coverage 100 --sec-tested 100`: 100% (1095/1095) requirement
+traceability, 100% (512/512) function annotation density -- both
+identical to a from-`origin/main` baseline run, confirming the new
+field is tolerated without affecting coverage.
+
+**Next**: the same `tc18_master_id` backfill for c-RCP's other
+requirement categories (separate batches), then the same pass across
+cpp-RCP/go-RCP/rust-RCP.
+
 ### v0.403.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for `REQ-GPIO-*`/`REQ-SPI-*`)
 
 One of several parallel per-category batches for c-RCP-AUDIT-04

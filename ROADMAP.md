@@ -19106,6 +19106,48 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.404.0 -- 2026-08-17 (c-RCP-AUDIT-04: tc18_master_id backfill,
+REQ-CMP-*/REQ-SRV-* batch)
+
+Another category-scoped batch of the same multi-repo
+`tc18_master_id` backfill (RCP-ARCHITECTURE.md canonical choice #6)
+v0.401.0 started, against the same 447-entry master TC18 requirement
+catalog (`RELAY/docs/tc18-master-catalog.json` v1.0.0), covering
+c-RCP's `REQ-CMP-*` and `REQ-SRV-*` categories only.
+
+Same method: for each entry already carrying a `tc18` citation,
+matched it to the master catalog by section + table/figure number,
+confirmed against the catalog entry's own `summary`/`title`/
+`citation` (not section number alone -- several sections here carry
+more than one distinct catalog entry, e.g. `§11.2.2.2` has both a
+`Figure 8` byte-layout entry and a separate `Table 7` field-semantics
+entry), and set `tc18_master_id`. Entries with no `tc18` citation are
+left alone.
+
+28/29 `REQ-CMP-*` matched (`REQ-CMP-004` has no `tc18` citation).
+20/22 `REQ-SRV-*` matched. 4 entries are flagged as ambiguous rather
+than forced: `REQ-CMP-008`/`REQ-CMP-009` each cite both the compound
+(`§11.2.2.2` `Table 7`/`Figure 8`) and compound-wait (`§11.2.2.3`
+`Table 8`/`Figure 9`) GBB layouts as their basis for validating an
+unrecognized `request_type`, with no catalog entry spanning both
+families at once; `REQ-SRV-013` grounds three separate cancellation
+functions in three different subsections (`§11.2.3.1`/`.2`/`.3`) in
+one requirement entry; `REQ-SRV-020` cites the whole `§13.5.1`
+compound-wait comparison subsection, spanning both the byte-length-
+capping clause and the evt-comparison-mode clause with neither
+dominant.
+
+`.fusa-reqs.json`-only change, no source touched. Full 66-test suite
+clean; pinned `cfusa` (v0.5.54) `check`: 0 errors; `trace
+--req-coverage 100 --sec-tested 100`: 1095/1095 (100%) requirement
+traceability, 512/512 (100%) function annotation density, both
+verified identical to an `origin/main` baseline run.
+
+**Next**: the remaining c-RCP categories' `tc18_master_id` batches,
+then the same pass across cpp-RCP/go-RCP/rust-RCP; follow-up on the
+4 flagged ambiguous entries above (plus other batches' own flagged
+entries).
+
 ### v0.403.0 -- 2026-08-17 (c-RCP-AUDIT-04: `tc18_master_id` for
 `REQ-GPIO-*`/`REQ-SPI-*`)
 
