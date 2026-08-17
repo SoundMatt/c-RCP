@@ -19106,6 +19106,77 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.397.0 -- 2026-08-16 (issue #341: exhaustive `Table 30`/`Table 39`
+census, `Table 27` control re-verify)
+
+Seventh pass on issue #341. Fresh census run first, cross-checked
+against every prior pass's own convergence claims -- picked `Table 30`
+(37 occurrences) and `Table 39` (37), the two the prior pass explicitly
+flagged as "never individually verified by any prior pass."
+
+`Table 30` (37 occurrences, `discovery.h`/`regmap.h`/`acf.h`/`mock.h`/
+`server.h`/`ep_pwm.h`/`request_sequencer.h`/`.c`/`server.c`/`mock.c`/
+`.fusa-reqs.json`, plus one line-wrapped `acf.h` hit the plain grep
+missed): every single occurrence read in context against a fresh
+`pdftotext -layout` extraction of both PDFs. RC5's own native
+`Table 30` is "Error codes in responses" (§12.9.6, the 17 numbered
+wire error codes UNSUPPORTED_CMD=1..CHAIN_ERROR=17) -- every
+occurrence found genuinely cites this content (SEQUENCER_NOT_KNOWN=2,
+UNAUTHORIZED_ACCESS=3, EP_NOT_FOUND=8, PWM_IN_NO_SIGNAL=9,
+POCI_FAILURE=12, PRESENTATION_TIME_TOO_FAR=13, GPTP_FAIL=14,
+CHAIN_ERROR=17, each individually cross-checked against the table's
+own rows). RC1's own *different* Table 30 ("EP specific usage of
+evt-field", which shifts +3 to RC5 Table 33, already established
+correct in v0.395.0) does not appear under a bare `Table 30` citation
+anywhere in this codebase. **Fully converged already -- zero changes
+needed.**
+
+`Table 39` (37 occurrences): a genuine reused-digit case, same shape
+as the 41/42/43/44 and 32/35 clusters. RC5's own native `Table 39` is
+"wake-up control - functional configuration" (§13.7.2.2, WakeUp's
+`wup_status`/`wup_nr_io_pins_max` etc.) -- confirmed correct everywhere
+it appears in that context (`mock.h`, `src/regmap.c`, `.fusa-reqs.json`
+REQ-WAKEUP-*). RC1's *own* Table 39 is a completely different table,
+"spi functional configuration" -- shifts +3 to RC5 Table 42 (fresh
+extraction confirms the caption survives unchanged). Found the
+"`tc18`-equivalent field already correct, narrative/doc-comment field
+lagging" pattern again: `.fusa-reqs.json`'s own REQ-SPI-035 `title` and
+`tc18` fields already correctly used `Table 39/42` dual notation
+(fixed by an earlier, unlogged pass), but `include/rcp/ep_spi.h`'s own
+8 bare `Table 39` doc-comment citations (file header + 2 struct field
+comments) never got the matching update, and REQ-SPI-035/037/038/039's
+own `text` (narrative) fields still had 4 more bare mentions. Fixed
+all 12 to the codebase's own established `Table X/Y` (RC1/RC5)
+dual-notation convention (matching `ep_gpio.h`'s `Table 41/44`,
+`regmap.h`'s `Table 33/36`, etc.) -- including the one trigger-table
+citation embedded in the same doc comment (`Table 38` -> `Table 38/41`,
+"spi trigger outputs", confirmed via fresh extraction).
+
+Control re-verify: `Table 27` (39 occurrences, the table PR #495's own
+`respqueue.h` fix populated) -- read every occurrence; all are RC5-native
+"Responder QUEUE_config" (§12.7.9) content, several explicitly noting
+"not Table 27, a stale pre-RC5 number" in their own text. **Fully
+converged, zero changes needed** -- confirms PR #495's migration left
+no genuinely-stale remainder and no RC1-Table-27 ("Error codes in
+responses", which shifts to RC5 Table 30) content is mislabeled here.
+
+Citation-text-only changes -- trace coverage counts unchanged
+throughout (`Table 39` census count stays 37 pre/post, since the
+`Table 39/42` dual-notation substitutions keep the same leading
+digits `grep -roh "Table [0-9]\+"` matches). Full clean rebuild + full
+66-test suite: 66/66, unchanged. `cfusa check` (pinned v0.5.54): 0
+errors, 968/1312 warnings/info, unchanged. `cfusa trace
+--req-coverage 100 --sec-tested 100`: 1095/1095 traced and tested,
+unchanged.
+
+**Next**: `Table 25`(33)/`Table 46`(29)/`Table 23`(29)/`Table 35`(28)
+all already confirmed-resolved by earlier passes -- no need to
+revisit. `Table 54`(23)/`Table 52`(21)/`Table 48`(20)/`Table 58`(19)/
+`Table 45`(19)/`Table 31`(18) likewise already re-verified resolved
+per PR #495/#499's own comments. A final convergence sweep across the
+handful of remaining low-count numbers (below ~15 occurrences) would
+close this issue out entirely.
+
 ### v0.396.0 -- 2026-08-16 (issue #341 follow-up: fix stale `Table 23`
 -> `Table 25` EP_ID_config citation in lifecycle.h)
 

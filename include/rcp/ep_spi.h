@@ -145,7 +145,7 @@
  * divider, chip-select active-polarity, and inter-byte/inter-transfer
  * timing delays (nanoseconds; this module's own unit choice). NOTED
  * 2026-08-10 (c-RCP-AUDIT-06, issue #256): bit order has no counterpart
- * in TC18 §13.7.3.2 Table 39 at all -- that table's per-channel register
+ * in TC18 §13.7.3.2 Table 39/42 at all -- that table's per-channel register
  * block defines clock polarity/phase, CS polarity, CS-sharing, lead/
  * trail timing, max-consecutive-bits, and inter-transfer pause, but no
  * MSB-first/LSB-first selector of any kind; this field is this module's
@@ -174,16 +174,16 @@
  * selected trigger mode.
  *
  * CLARIFIED 2026-08-10 (c-RCP-AUDIT-06, issue #256 Group C): TC18
- * §13.7.3.1 Table 38 names 14 distinct, always-on hardware trigger
+ * §13.7.3.1 Table 38/41 names 14 distinct, always-on hardware trigger
  * signals per SPI endpoint (execution-done, plus an assert/de-assert
- * pair for each of CS0 through CS5) -- Table 39 (this endpoint's own
+ * pair for each of CS0 through CS5) -- Table 39/42 (this endpoint's own
  * per-channel functional-config register block) defines no register
  * field that selects among them, so nothing in the specification
  * suggests a client configures which one(s) are active. This module's
  * `rcp_ep_spi_trigger_t` collapses that 14-signal, per-CS-channel table
  * into 4 generic values (NONE + transfer-done + a single CS-assert/
  * CS-deassert pair with no per-channel distinction) -- an original
- * simplification, not a literal reproduction of Table 38, and one that
+ * simplification, not a literal reproduction of Table 38/41, and one that
  * cannot distinguish "CS2 asserted" from "CS5 asserted" the way TC18's
  * own signal set can. `cfg->channels[i].trigger` is never rendered onto
  * the wire (this module implements no functional-config register
@@ -207,14 +207,14 @@
  * (rcp_ep_gpio_apply_reconfig(), ep_gpio.h) already implement -- until now,
  * SPI had no counterpart at all: rcp_ep_spi_channel_valid() rejected evt=6
  * and evt=7 identically as RCP_EP_SPI_ERR_BAD_CHANNEL, so an evt=111b
- * request had no path through this module and TC18 Table 39's own SPI
+ * request had no path through this module and TC18 Table 39/42's own SPI
  * functional-configuration register block (§13.7.3.2) was reachable
  * nowhere in the API even though rcp_ep_spi_channel_cfg_t already stored
  * most of the same information in a different (non-wire-mapped) shape --
  * this is exactly REQ-SPI-035's previously-recorded "modeled only in
  * reduced form" gap, closed by the register block below.
  *
- * Table 39's layout (channel c's block starts at
+ * Table 39/42's layout (channel c's block starts at
  * RCP_EP_SPI_REG_CHANNEL_BASE + c * RCP_EP_SPI_REG_CHANNEL_SPAN):
  *
  *   0x0000     spi_ep_len        8 bit  R    RCP_EP_SPI_EP_FUNC_LEN (0x36)
@@ -421,7 +421,7 @@ typedef struct {
     uint32_t clock_divider;
     uint32_t inter_byte_delay_ns;
     uint32_t inter_transfer_delay_ns;
-    uint16_t baud_rate_kbps;           /* spi_baud_rateN, Table 39 -- see the
+    uint16_t baud_rate_kbps;           /* spi_baud_rateN, Table 39/42 -- see the
                                            "EP_func register block" section
                                            of the file header */
     bool     use_common_cs;            /* spi_use_csN: false = this
@@ -454,7 +454,7 @@ typedef struct {
                                                first member -- see the file
                                                header */
     rcp_ep_spi_channel_cfg_t       channels[RCP_EP_SPI_MAX_CHANNELS];
-    uint16_t                       ep_status; /* spi_ep_status, Table 39 */
+    uint16_t                       ep_status; /* spi_ep_status, Table 39/42 */
 } rcp_ep_spi_functional_cfg_t;
 
 /* Zero-initializes cfg (common's flags all false; every channel's mode
@@ -570,7 +570,7 @@ bool rcp_ep_spi_set_channel_trigger(rcp_ep_spi_functional_cfg_t *cfg, uint8_t ch
  * bound the "write beyond EP_LEN is ignored" rule (§12.7.1) is applied
  * against: the 6-octet common prefix plus RCP_EP_SPI_MAX_CHANNELS 8-octet
  * per-channel blocks (0x36 = 54 octets). Unlike PWM_OUT's/GPIO's own source
- * tables, Table 39's own elided per-channel rows (channel 1's
+ * tables, Table 39/42's own elided per-channel rows (channel 1's
  * spi_baud_rate1 explicitly at 0x000E = 0x0006 + 8) are internally
  * consistent with this arithmetic, so there is no editorial defect to
  * resolve here. */
@@ -607,7 +607,7 @@ const char *rcp_ep_spi_reconfig_strerror(rcp_ep_spi_reconfig_errc_t e);
  * -- the inverse of rcp_ep_spi_apply_reconfig()'s own parse step, and the
  * same rendering that function patches in place. mode's CPOL/CPHA bits are
  * rendered via rcp_ep_spi_mode_cpol()/_cpha(); bit_order and trigger have
- * no wire counterpart in Table 39 (see the file header) and are not
+ * no wire counterpart in Table 39/42 (see the file header) and are not
  * rendered. */
 void rcp_ep_spi_render_registers(const rcp_ep_spi_functional_cfg_t *cfg,
                                   uint8_t out[RCP_EP_SPI_EP_FUNC_LEN]);

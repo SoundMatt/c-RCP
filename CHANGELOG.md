@@ -34,6 +34,72 @@ the rationale.
 
 ## Releases
 
+### v0.397.0 -- 2026-08-16 (issue #341: exhaustive `Table 30`/`Table 39` census, `Table 27` control re-verify)
+
+Seventh pass on issue #341 (RC1->RC5 table-number census). Fresh
+census run first, cross-checked against every prior pass's own
+convergence claims -- picked `Table 30`(37) and `Table 39`(37), the
+two the previous pass (`#501`) explicitly flagged as "never
+individually verified by any prior pass."
+
+- **`Table 30`** (37 occurrences across `discovery.h`, `regmap.h`,
+  `acf.h`, `mock.h`, `server.h`, `ep_pwm.h`, `request_sequencer.h`/
+  `.c`, `server.c`, `mock.c`, `.fusa-reqs.json`, plus one line-wrapped
+  `acf.h` hit a plain grep misses): every occurrence individually
+  read against a fresh `pdftotext -layout` extraction of both PDFs.
+  All 37 genuinely cite RC5-native `Table 30` "Error codes in
+  responses" (§12.9.6) -- the specific numbered codes named
+  (`SEQUENCER_NOT_KNOWN`=2, `UNAUTHORIZED_ACCESS`=3, `EP_NOT_FOUND`=8,
+  `PWM_IN_NO_SIGNAL`=9, `POCI_FAILURE`=12,
+  `PRESENTATION_TIME_TOO_FAR`=13, `GPTP_FAIL`=14, `CHAIN_ERROR`=17)
+  individually cross-checked against the table's own rows in the
+  fresh extraction. RC1's own *different* Table 30 ("EP specific
+  usage of evt-field", RC5 Table 33, already correct since v0.395.0)
+  does not appear anywhere under a bare `Table 30` citation. **Fully
+  converged -- zero changes needed.**
+- **`Table 39`** (37 occurrences): a genuine reused-digit case (same
+  shape as the 41/42/43/44 and 32/35 clusters already fixed). RC5's
+  own native `Table 39` is "wake-up control - functional
+  configuration" (§13.7.2.2) -- confirmed correct everywhere it's
+  cited for WakeUp content (`mock.h`, `src/regmap.c`,
+  `.fusa-reqs.json` REQ-WAKEUP-*). RC1's *own* Table 39 is a
+  different table entirely, "spi functional configuration", which
+  shifts +3 to RC5 Table 42. Found the "narrative/doc-comment field
+  lagging behind an already-correct citation" pattern again:
+  `.fusa-reqs.json`'s REQ-SPI-035 `title`/`tc18` fields already
+  correctly used `Table 39/42` dual notation, but
+  `include/rcp/ep_spi.h`'s own 8 bare `Table 39` doc-comment
+  citations were never updated to match, and REQ-SPI-035/037/038/039's
+  own `text` fields carried 4 more bare mentions. Fixed all 12 to the
+  codebase's established `Table X/Y` (RC1/RC5) dual-notation
+  convention (matching `ep_gpio.h`'s `Table 41/44`, `regmap.h`'s
+  `Table 33/36`), including the trigger-table citation in the same
+  comment (`Table 38` -> `Table 38/41`, "spi trigger outputs",
+  confirmed via fresh extraction).
+- **Control re-verify, `Table 27`** (39 occurrences, the table PR
+  #495's own `respqueue.h` fix populated): every occurrence read;
+  all are RC5-native "Responder QUEUE_config" (§12.7.9) content,
+  several explicitly noting "not Table 27, a stale pre-RC5 number" in
+  their own text. **Fully converged, zero changes needed** --
+  confirms PR #495's migration left no stale remainder.
+
+Citation-text-only changes -- trace coverage counts unchanged
+throughout (the `Table 39` occurrence count stays 37 pre/post since
+the `Table 39/42` dual-notation substitutions keep the same leading
+digit the census regex matches). Full clean rebuild + full 66-test
+suite: 66/66, unchanged. `cfusa check` (pinned v0.5.54, run from repo
+root): 0 errors, 968/1312 warnings/info, unchanged. `cfusa trace
+--req-coverage 100 --sec-tested 100`: 1095/1095 traced and tested,
+unchanged.
+
+**Left deliberately untouched, with reasons:** every other `Table N`
+number this pass's census turned up was already confirmed-resolved by
+an earlier pass (see this issue's own comment history for each
+number's individual convergence record) -- not re-litigated here to
+stay in scope. No content-bug candidates (citations pointing at
+genuinely mismatched table content) were found in either `Table 30`
+or `Table 39`'s occurrence set.
+
 ### v0.396.0 -- 2026-08-16 (issue #341 follow-up: fix stale `Table 23` -> `Table 25` EP_ID_config citation in lifecycle.h)
 
 `include/rcp/lifecycle.h`'s own doc comment for `REQ-RMAP-055` cited
