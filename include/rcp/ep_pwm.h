@@ -64,6 +64,7 @@
 //cfusa:req REQ-PWM-057
 //cfusa:req REQ-PWM-058
 //cfusa:req REQ-PWM-059
+//cfusa:req REQ-WIREERR-007
 /*
  * ep_pwm.h -- PWM_OUT + PWM_IN endpoints for the TC18 Remote Control
  * Protocol wire layer (ROADMAP.md Phase 16, "Basic Endpoints", milestone
@@ -1071,6 +1072,19 @@ typedef enum {
 rcp_ep_pwm_in_max_period_outcome_t
 rcp_ep_pwm_in_max_period_outcome(uint16_t measured_period, uint16_t max_period,
                                   bool err_on_max_period, bool resp_on_err_enabled);
+
+/* REQ-WIREERR-007 (issue #163): maps outcome to its numbered wire error
+ * code (errors.h), for a caller populating a Response frame's err field
+ * -- mirrors rcp_ep_pwm_out_wire_error()/rcp_ep_gpio_wire_error()'s own
+ * established pattern exactly. RCP_EP_PWM_IN_MAX_PERIOD_STOP_AND_ERROR
+ * is Table 48's own "stop measurement and signal error" outcome --
+ * PWM_IN's own numbered wire error code, RCP_ERROR_PWM_IN_NO_SIGNAL (9),
+ * is the only Table 30 entry naming this endpoint type specifically, and
+ * this is the sole outcome Table 48's own row ties to "signal error" at
+ * all. RCP_EP_PWM_IN_MAX_PERIOD_OK/_INVALIDATE/_STOP each explicitly
+ * signal no error of their own (see rcp_ep_pwm_in_max_period_outcome()'s
+ * own doc comment) and map to RCP_ERROR_NONE. */
+rcp_wire_error_t rcp_ep_pwm_in_wire_error(rcp_ep_pwm_in_max_period_outcome_t outcome);
 
 /* ── Compound-wait's numeric ≥/≤ comparison modes against PWM_IN ────────────── */
 

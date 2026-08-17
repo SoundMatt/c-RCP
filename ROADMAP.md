@@ -19106,6 +19106,78 @@ clean; `cfusa check`/`trace` (v0.5.51): 0 errors, 0/1076 untested.
 **Next**: ISELED mock.c dispatch wiring (REQ-ISELED-025), closing
 out the mock.c-dispatch-wiring trio (GPIO/ADC/ISELED).
 
+### v0.384.0 -- 2026-08-16 (REQ-WIREERR-005/006/007: SEQUENCER_NOT_KNOWN,
+GPTP_FAIL, PWM_IN_NO_SIGNAL wire-error mappings)
+
+Closes issue #163, the largest item in this wave. Re-audited
+`grep -rn "RCP_ERROR_" src/ include/ | grep -v errors\.` fresh against
+current `origin/main` before starting, per the issue's own instruction
+not to trust its stale "16 unmapped" count -- this session's own earlier
+concurrent PRs (#454, #463, #468, #469, and others) had already wired 12
+of the 17 Table 30 codes. Only `RCP_ERROR_SEQUENCER_NOT_KNOWN` (2),
+`RCP_ERROR_EP_ERROR` (7), `RCP_ERROR_PWM_IN_NO_SIGNAL` (9), `RCP_ERROR_
+PRESENTATION_TIME_TOO_FAR` (13), and `RCP_ERROR_GPTP_FAIL` (14) remained
+genuinely unmapped.
+
+**Mapped (new `REQ-WIREERR-005/006/007`, each with a dedicated
+`rcp_<mod>_wire_error()` mapping function mirroring `rcp_e2e_wire_
+error()`'s own pattern, wired into a real dispatch/response-building
+path):**
+
+- **SEQUENCER_NOT_KNOWN (2)**: `rcp_sequencer_access_permitted()`
+  (`request_sequencer.h`) collapsed "unknown sequencer_index" and "real
+  sequencer, wrong owner" into one bool -- mock.c's own Compound/Compound
+  Wait admission-time ownership gate (issue #335's REQ-SEQ-013) always
+  reported `RCP_ERROR_UNAUTHORIZED_ACCESS` for both, a real conformance
+  defect. New `rcp_sequencer_access_check()` (three-way
+  `rcp_sequencer_access_errc_t`) + `rcp_sequencer_wire_error()` fix it;
+  `rcp_sequencer_access_permitted()` itself is unchanged.
+- **GPTP_FAIL (14)**: TC18 §11.2.2.7's own mandatory rule -- "timed
+  requests... shall be rejected... (error code = GPTP_FAIL)" when time
+  sync isn't established -- was not implemented at all; a Timed request
+  admitted without gPTP lock just queued forever. New `rcp_timed_wire_
+  error()` (`request_timed.h/.c`) + a new admission-time check in
+  `src/mock.c`'s `dispatch_plain_inner()`, keyed off the
+  `time_sync_supported` parameter every dispatch entry point already
+  carries (no new parameter needed), close the gap for real. `PRESENTATION_
+  TIME_TOO_FAR`'s own half of `rcp_timed_admit()` is mapped by the same
+  function but not yet wired into dispatch -- see below.
+- **PWM_IN_NO_SIGNAL (9)**: issue #468 already had a real
+  `rcp_mock_server_dispatch()`-level proof (Table 48's MAX_PERIOD-timeout
+  "signal error" outcome) but hardcoded the constant instead of going
+  through a dedicated mapping function, unlike every sibling GPIO/PWM_OUT
+  dispatch handler. New `rcp_ep_pwm_in_wire_error()` (`ep_pwm.h/.c`)
+  closes that inconsistency; the existing handler now calls it.
+
+**Deliberately left unmapped (honest-gap doc comments, not forced
+mappings):**
+
+- **PRESENTATION_TIME_TOO_FAR (13)**: TC18 itself calls this
+  implementation-defined ("may reject... which is implementation
+  dependent"), against a "product specific limit" this codebase has no
+  configured admission-horizon value for anywhere in its register map.
+  `REQ-WIREERR-006` is `status: partial` for exactly this reason -- the
+  mapping function is correct and tested, the dispatch-side rejection is
+  real future work (inventing a new configuration concept is out of this
+  PR's scope).
+- **EP_ERROR (7)**: "error occurred during request execution; for
+  details read ep_status register" -- every endpoint module in this
+  codebase treats its own `ep_status` register as opaque, TC18-undefined
+  content by deliberate, consistent design. No internal failure condition
+  this implementation can detect corresponds to this code; forcing one
+  would be speculative. Documented in `errors.h`'s file header.
+
+Full 66-test suite + ASan/UBSan clean. `cfusa check`: 0 errors. `cfusa
+trace`: 1092/1092 traced and tested (up from 1089). Each of the three
+real-dispatch mappings individually mutation-tested (revert just that
+mapping, confirm its own new test fails, restore, confirm green).
+
+**Next**: EP_ERROR's own ep_status semantics remain genuinely
+undefined by TC18 -- no further action expected here without a spec
+update. PRESENTATION_TIME_TOO_FAR's dispatch-side wiring needs a real
+admission-horizon configuration concept, not modeled anywhere yet.
+
+
 ### v0.383.0 -- 2026-08-16 (REQ-TIMED-012/013: TSCF presentation-time gate
 wired into every E2E dispatch entry point, not just the plain path)
 

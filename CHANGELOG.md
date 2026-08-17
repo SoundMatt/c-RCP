@@ -34,6 +34,102 @@ the rationale.
 
 ## Releases
 
+### v0.384.0 -- 2026-08-16 (Table 27/30 wire-error mappings: SEQUENCER_NOT_KNOWN, GPTP_FAIL, PWM_IN_NO_SIGNAL)
+
+Closes issue #163. Re-audited `grep -rn "RCP_ERROR_" src/ include/ | grep -v
+errors\.` fresh against current `origin/main` before starting (per the
+issue's own instruction not to trust its stale count): of the 17 codes,
+12 were already wired by concurrent Wave-2 PRs (#454, #463, #468, #469,
+and others) landed earlier this session -- only `RCP_ERROR_SEQUENCER_
+NOT_KNOWN` (2), `RCP_ERROR_EP_ERROR` (7), `RCP_ERROR_PWM_IN_NO_SIGNAL`
+(9), `RCP_ERROR_PRESENTATION_TIME_TOO_FAR` (13), and `RCP_ERROR_
+GPTP_FAIL` (14) remained genuinely unmapped, not 16.
+
+**Mapped, with a real internal failure condition and a dedicated
+`rcp_<mod>_wire_error()` mapping function each, mirroring `rcp_e2e_
+wire_error()`'s own established pattern:**
+
+- **`RCP_ERROR_SEQUENCER_NOT_KNOWN` (2)** -- new `REQ-WIREERR-005`.
+  `rcp_sequencer_access_permitted()` (`request_sequencer.h`) collapsed two
+  distinct TC18 Table 30 rejection reasons -- an unknown `sequencer_index`
+  and a real-but-not-owned one -- into a single bool, so mock.c's own
+  Compound/Compound Wait admission-time ownership check
+  (`src/mock.c`, issue #335's own REQ-SEQ-013 gate) always reported
+  `RCP_ERROR_UNAUTHORIZED_ACCESS` for both. New `rcp_sequencer_access_
+  check()` restates the same predicate as a three-way
+  `rcp_sequencer_access_errc_t`; new `rcp_sequencer_wire_error()` maps
+  its `RCP_SEQUENCER_ACCESS_UNKNOWN` outcome to `RCP_ERROR_SEQUENCER_
+  NOT_KNOWN` (TC18 §12.7.10 Table 28's own access-control rule) --
+  `rcp_sequencer_access_permitted()` itself is unchanged. A real
+  conformance defect, not a doc-only gap.
+- **`RCP_ERROR_GPTP_FAIL` (14)** -- new `REQ-WIREERR-006` (`status:
+  partial` -- see below). TC18 §11.2.2.7: "In case the time
+  synchronization hasn't been established, timed requests... shall be
+  rejected and an error response shall be sent (error code =
+  GPTP_FAIL)" -- a spec-mandated "shall", unlike `PRESENTATION_TIME_
+  TOO_FAR`'s own "may reject". `time_sync_supported` is already every
+  `rcp_mock_server_dispatch()` entry point's own real "has gPTP been
+  established" parameter (REQ-AVTP-021's TSCF rule 1 already treats it
+  that way); a Timed request admitted while it is false was previously
+  just queued forever, never rejected. New `rcp_timed_wire_error()`
+  (`request_timed.h/.c`) maps `rcp_timed_admit()`'s two rejection
+  reasons to their numbered codes; `src/mock.c`'s `dispatch_plain_inner()`
+  now rejects a Timed request at admission with a real Error Response
+  carrying `RCP_ERROR_GPTP_FAIL` whenever `time_sync_supported` is
+  false, cancelling the slot exactly like the sequencer-ownership gate
+  just above it.
+- **`RCP_ERROR_PWM_IN_NO_SIGNAL` (9)** -- new `REQ-WIREERR-007`. Issue
+  #468 already wired a real `rcp_mock_server_dispatch()`-level proof of
+  Table 48's own MAX_PERIOD-timeout "signal error" outcome
+  (`tests/test_tc18_gaps_ep.c`'s `pwm_in_dispatch_handler()`), but built
+  its Error Response by hardcoding `RCP_ERROR_PWM_IN_NO_SIGNAL` directly
+  -- the one PWM_IN/GPIO/PWM_OUT-family endpoint whose dispatch handler
+  didn't go through a dedicated `rcp_ep_<type>_wire_error()` function.
+  New `rcp_ep_pwm_in_wire_error()` (`ep_pwm.h/.c`) closes that
+  inconsistency, mirroring `rcp_ep_pwm_out_wire_error()`/`rcp_ep_gpio_
+  wire_error()` exactly; the existing dispatch handler now calls it
+  instead of hardcoding the constant. No new dispatch test needed --
+  #468's own real-dispatch proof already existed and now goes through
+  the formal mapping function too.
+
+**Deliberately left unmapped, with an honest-gap doc comment, not a
+forced/speculative mapping:**
+
+- **`RCP_ERROR_PRESENTATION_TIME_TOO_FAR` (13)** -- TC18 §11.2.2.7 itself
+  states this is implementation-defined ("may reject... which is
+  implementation dependent"), evaluated against a "product specific
+  limit" this codebase has no configured admission-horizon value for
+  anywhere in its register map (`rcp_timed_too_far()`'s own
+  `max_horizon` parameter has no live caller to source a real value
+  from). `rcp_timed_wire_error()` still maps this outcome correctly --
+  only the dispatch-side rejection is unimplemented, since inventing a
+  new configuration concept from scratch is out of this PR's scope (real
+  future work, tracked by `REQ-WIREERR-006`'s own `status: partial`).
+- **`RCP_ERROR_EP_ERROR` (7)** -- TC18 Table 30: "error occurred during
+  request execution; for details read ep_status register." Every
+  endpoint module in this codebase (`ep_gpio.h`, `ep_pwm.h`, `ep_can.h`,
+  `ep_uart.h`, etc.) explicitly and consistently treats its own
+  `ep_status` register as opaque, TC18-undefined content -- this
+  implementation never interprets what would go inside it, matching a
+  hardware-fault concept genuinely outside a protocol library/mock test
+  double's scope (unlike POCI_FAILURE's pure protocol-level CRC check,
+  or the sequencer/timed conditions above, which this codebase's own
+  logic genuinely detects). No defensible internal failure condition
+  exists to map onto this code; forcing one would be exactly the
+  speculative mapping this milestone's own scope excludes. Documented in
+  `errors.h`'s file header.
+
+New tests: `tests/test_request_sequencer.c` (6), `tests/test_request_
+timed.c` (4), `tests/test_ep_pwm.c` (3), `tests/test_conditional_
+dispatch.c` (4 end-to-end `rcp_mock_server_dispatch()` proofs, 2 new +
+2 confirming the fix doesn't affect unrelated Timed/Compound paths).
+Each of the three real-dispatch mappings (SEQUENCER_NOT_KNOWN, GPTP_FAIL,
+PWM_IN_NO_SIGNAL) individually mutation-tested: reverting just that one
+mapping fails exactly its own new test(s), restoring it turns the suite
+green again. Full 66-test suite + ASan/UBSan clean; `cfusa check`: 0
+errors; `cfusa trace`: 1092/1092 traced and tested (up from 1089).
+
+
 ### v0.383.0 -- 2026-08-16 (REQ-TIMED-012/013: TSCF presentation-time gate wired into every E2E dispatch entry point, not just the plain path)
 
 Closes issue #462. The TSCF presentation-time gate (`admit_under_tscf_gate()`,

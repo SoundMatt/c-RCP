@@ -985,6 +985,21 @@ rcp_ep_pwm_in_max_period_outcome(uint16_t measured_period, uint16_t max_period,
                                 : RCP_EP_PWM_IN_MAX_PERIOD_STOP;
 }
 
+//cfusa:req REQ-WIREERR-007
+rcp_wire_error_t rcp_ep_pwm_in_wire_error(rcp_ep_pwm_in_max_period_outcome_t outcome)
+{
+    switch (outcome) {
+    /* TC18 §13.7.6.2 Table 48's own pwmi_err_on_max_period row:
+     * "1b: if MAX_PERIOD is exceeded stop measurement and signal error
+     * if error response is enabled in EP_config" -- PWM_IN's own
+     * numbered wire error code. */
+    case RCP_EP_PWM_IN_MAX_PERIOD_STOP_AND_ERROR: return RCP_ERROR_PWM_IN_NO_SIGNAL;
+    /* OK/INVALIDATE/STOP each explicitly signal no error of their own
+     * -- see rcp_ep_pwm_in_max_period_outcome()'s own doc comment. */
+    default: return RCP_ERROR_NONE;
+    }
+}
+
 /* ── Compound-wait's numeric ≥/≤ comparison modes against PWM_IN ────────────── */
 
 //cfusa:req REQ-PWM-048

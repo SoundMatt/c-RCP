@@ -1525,6 +1525,40 @@ static rcp_mock_dispatch_result_t dispatch_plain_inner(rcp_mock_server_t *srv,
                                                 avtp_timestamp, gptp_reference_now, &request_type,
                                                 &admitted_index, &error, &ack);
 
+    /* REQ-WIREERR-006 (issue #163): "In case the time synchronization
+     * hasn't been established, timed requests... shall be rejected and
+     * an error response shall be sent (error code = GPTP_FAIL)." --
+     * unlike PRESENTATION_TIME_TOO_FAR (implementation-defined, "may
+     * reject"), this is a spec-mandated "shall", and time_sync_supported
+     * is already this function's own real, caller-supplied "has gPTP
+     * been established" signal (REQ-AVTP-021's own TSCF rule 1 already
+     * treats it that way) -- no new state or configuration concept is
+     * needed to detect this condition for real, unlike PRESENTATION_
+     * TIME_TOO_FAR's own currently-unconfigurable admission horizon
+     * (see rcp_timed_wire_error()'s own doc comment, request_timed.h).
+     * A rejected Timed request is cancelled out of the store exactly
+     * like an unauthorized sequencer-owned Compound/Compound Wait step
+     * just above -- admitted, then immediately un-admitted, since
+     * request_type is only known after rcp_server_endpoint_admit() has
+     * already run. */
+    if (admit == RCP_SERVER_ADMIT_PENDING && request_type == RCP_REQUEST_TYPE_TIMED &&
+        !time_sync_supported) {
+        uint8_t tn = slot->queue.pending[admitted_index].transaction_num;
+
+        (void)rcp_server_endpoint_cancel_single(&slot->queue, tn, RCP_CANCEL_LIFECYCLE_QUEUED);
+        /* issue #463: admit_with_ack() above may already have built a
+         * genuine Acknowledge into ack (this request's own evt[3] may
+         * have asked for one) before this gate decided to cancel it
+         * again right here -- freed, not transferred, since *out_response
+         * is about to carry the Error Response this rejection actually
+         * gets instead. Same leak guard as the sequencer-access-control
+         * gate just below. */
+        rcp_bytes_free(&ack);
+        *out_response = rcp_acf_build_error_response(
+            byte_bus_id, tn, rcp_timed_wire_error(RCP_TIMED_REJECT_GPTP_FAIL));
+        return RCP_MOCK_DISPATCH_REJECTED;
+    }
+
     /* REQ-E2E-030 (issue #335): a request-storage overflow on THIS
      * endpoint's own queue is answered locally exactly as before
      * (RCP_SERVER_ADMIT_REJECTED, error == RCP_ERROR_REQUEST_STORAGE_
@@ -1593,8 +1627,16 @@ static rcp_mock_dispatch_result_t dispatch_plain_inner(rcp_mock_server_t *srv,
         uint8_t sequencer_index = slot->queue.pending[admitted_index].compound.sequencer_index;
         uint8_t requester = rcp_regmap_request_stream_cfg_resolve_index(
             srv->request_stream_cfg, srv->request_stream_cfg_count, stream_id);
+        /* REQ-WIREERR-005 (issue #163): three-way, not the collapsed
+         * bool -- an unknown sequencer_index now reports
+         * RCP_ERROR_SEQUENCER_NOT_KNOWN, distinct from a real,
+         * configured-but-not-owned sequencer's RCP_ERROR_UNAUTHORIZED_
+         * ACCESS. See rcp_sequencer_access_check()'s own doc comment
+         * (request_sequencer.h). */
+        rcp_sequencer_access_errc_t seq_access =
+            rcp_sequencer_access_check(&srv->sequencers, sequencer_index, requester);
 
-        if (!rcp_sequencer_access_permitted(&srv->sequencers, sequencer_index, requester)) {
+        if (seq_access != RCP_SEQUENCER_ACCESS_OK) {
             uint8_t tn = slot->queue.pending[admitted_index].transaction_num;
 
             (void)rcp_server_endpoint_cancel_single(&slot->queue, tn, RCP_CANCEL_LIFECYCLE_QUEUED);
@@ -1606,7 +1648,7 @@ static rcp_mock_dispatch_result_t dispatch_plain_inner(rcp_mock_server_t *srv,
              * this rejection actually gets instead. */
             rcp_bytes_free(&ack);
             *out_response =
-                rcp_acf_build_error_response(byte_bus_id, tn, RCP_ERROR_UNAUTHORIZED_ACCESS);
+                rcp_acf_build_error_response(byte_bus_id, tn, rcp_sequencer_wire_error(seq_access));
             return RCP_MOCK_DISPATCH_REJECTED;
         }
     }

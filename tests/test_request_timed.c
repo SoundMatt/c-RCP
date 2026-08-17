@@ -267,6 +267,44 @@ static void test_admit_accept(void)
     TEST_ASSERT_EQUAL_INT(RCP_TIMED_ACCEPT, rcp_timed_admit(true, 0, 1000, 500));
 }
 
+/* ── REQ-WIREERR-006 (issue #163): rcp_timed_wire_error() ─────────────────── */
+
+static void test_wire_error_maps_gptp_fail_to_the_numbered_code(void)
+{
+    const int wire_code = (int)rcp_timed_wire_error(RCP_TIMED_REJECT_GPTP_FAIL);
+
+    TEST_ASSERT_EQUAL_INT(14, wire_code);
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_GPTP_FAIL, wire_code);
+}
+
+static void test_wire_error_maps_presentation_time_too_far_to_the_numbered_code(void)
+{
+    const int wire_code = (int)rcp_timed_wire_error(RCP_TIMED_REJECT_PRESENTATION_TIME_TOO_FAR);
+
+    TEST_ASSERT_EQUAL_INT(13, wire_code);
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_PRESENTATION_TIME_TOO_FAR, wire_code);
+}
+
+static void test_wire_error_accept_maps_to_none(void)
+{
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_NONE, (int)rcp_timed_wire_error(RCP_TIMED_ACCEPT));
+}
+
+/* End-to-end: whatever rcp_timed_admit() itself decides, for a range of
+ * inputs, rcp_timed_wire_error() of that decision is always the correct
+ * numbered code -- ties the two functions together rather than testing
+ * each in isolation only against hand-picked enum values. */
+static void test_wire_error_matches_admit_across_inputs(void)
+{
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_GPTP_FAIL,
+                          (int)rcp_timed_wire_error(rcp_timed_admit(false, 100000, 0, 10)));
+    TEST_ASSERT_EQUAL_INT(
+        (int)RCP_ERROR_PRESENTATION_TIME_TOO_FAR,
+        (int)rcp_timed_wire_error(rcp_timed_admit(true, 2000, 1000, 500)));
+    TEST_ASSERT_EQUAL_INT((int)RCP_ERROR_NONE,
+                          (int)rcp_timed_wire_error(rcp_timed_admit(true, 1200, 1000, 500)));
+}
+
 
 /* ── Literal wire layout ──────────────────────────────────────────────────────
  *
@@ -441,6 +479,11 @@ int main(void)
     RUN_TEST(test_admit_gptp_fail_takes_priority);
     RUN_TEST(test_admit_presentation_time_too_far);
     RUN_TEST(test_admit_accept);
+
+    RUN_TEST(test_wire_error_maps_gptp_fail_to_the_numbered_code);
+    RUN_TEST(test_wire_error_maps_presentation_time_too_far_to_the_numbered_code);
+    RUN_TEST(test_wire_error_accept_maps_to_none);
+    RUN_TEST(test_wire_error_matches_admit_across_inputs);
 
     RUN_TEST(test_timed_wire_sub_field_offsets);
     RUN_TEST(test_timed_reserved_octet_stays_zero_at_max);

@@ -22,6 +22,7 @@
 //cfusa:test REQ-PWM-056
 //cfusa:test REQ-PWM-057
 //cfusa:test REQ-PWM-058
+//cfusa:test REQ-WIREERR-007
 //cfusa:test REQ-WAKEUP-017
 //cfusa:test REQ-WAKEUP-018
 //cfusa:test REQ-WAKEUP-019
@@ -1554,8 +1555,14 @@ static void pwm_in_dispatch_handler(const uint8_t *request, size_t request_len,
         /* Measurement stopped AND EP_RESP_ON_ERR is enabled: a genuine
          * err-response, carrying RCP_ERROR_PWM_IN_NO_SIGNAL (errors.h) --
          * this endpoint type's own numbered wire code for "has no signal
-         * to report", exactly Table 48's own outcome. */
-        *out_response = rcp_acf_build_error_response(8u, tn, RCP_ERROR_PWM_IN_NO_SIGNAL);
+         * to report", exactly Table 48's own outcome. REQ-WIREERR-007
+         * (issue #163): now derived via rcp_ep_pwm_in_wire_error(), the
+         * dedicated mapping function mirroring rcp_ep_pwm_out_wire_
+         * error()/rcp_ep_gpio_wire_error()'s own established pattern --
+         * this used to hardcode RCP_ERROR_PWM_IN_NO_SIGNAL directly,
+         * unlike every sibling endpoint type's own dispatch handler. */
+        *out_response =
+            rcp_acf_build_error_response(8u, tn, rcp_ep_pwm_in_wire_error(outcome));
         break;
     }
 }
@@ -1638,9 +1645,10 @@ static void test_pwm_in_dispatch_period_exceeded_without_err_bit_invalidates_sil
  * resp_on_err_enabled == true: RCP_EP_PWM_IN_MAX_PERIOD_STOP_AND_ERROR --
  * the dispatched read gets a genuine Error Response frame, in the same
  * call, carrying RCP_ERROR_PWM_IN_NO_SIGNAL -- built by
- * pwm_in_dispatch_handler() itself via rcp_ep_pwm_in_max_period_outcome(),
- * not fabricated by this test. Closes issue #468: the classifier now has
- * a real caller outside its own unit tests. */
+ * pwm_in_dispatch_handler() itself via rcp_ep_pwm_in_max_period_outcome()
+ * and (REQ-WIREERR-007, issue #163) rcp_ep_pwm_in_wire_error(), not
+ * fabricated by this test. Closes issue #468: the classifier now has a
+ * real caller outside its own unit tests. */
 static void test_pwm_in_dispatch_period_exceeded_with_err_bit_and_resp_enabled_errors(void)
 {
     rcp_mock_server_t          *srv = rcp_mock_server_new();
